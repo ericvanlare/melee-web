@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <string>
 
 namespace melee_web {
 namespace {
@@ -244,9 +245,17 @@ DatTexture read_texture(const DatArchive& archive, std::uint32_t offset, bool na
     // for every non-bump texture.
     const bool native_bump_only = native_descriptors &&
         (result.source_flags & tex_bump) && !(result.source_flags & 0xf0U);
+    // HSD's native TObj path implements TEX_COORD_HILIGHT as a lighting-vector
+    // texgen. The viewer model path has no equivalent and remains UV/reflection
+    // only; preserve the authored mode for source descriptors instead of
+    // approximating it as a UV texture.
     if ((result.source_flags & ~allowed_flags) ||
-        (!(result.source_flags & 0xf0U) && !native_bump_only) || coordinates > 1)
-        reject("Unsupported texture coordinate, lightmap or behavior flags");
+        (!(result.source_flags & 0xf0U) && !native_bump_only) ||
+        coordinates > (native_descriptors ? 2U : 1U))
+        throw DatError("Unsupported texture coordinate, lightmap or behavior flags: source=" +
+            std::to_string(result.source) + " flags=" + std::to_string(result.source_flags) +
+            " coordinates=" + std::to_string(coordinates) +
+            " native=" + std::to_string(native_descriptors));
     if (coordinates == 0 && (result.source < 4 || result.source > 11))
         reject("UV texture requires a TEX0 through TEX7 vertex source");
     if (((result.source_flags >> 16) & 15U) > 8 || ((result.source_flags >> 20) & 15U) > 7)

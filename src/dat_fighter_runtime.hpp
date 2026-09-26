@@ -105,6 +105,8 @@ public:
     // Peach uses the exact ftPe_DatAttrs ABI; the asset owner owns its five
     // Explode/Turnip/Parasol/Toad/ToadSpore Articles.
     [[nodiscard]] const std::optional<MeleeWebPeachAttributes>& peach_attributes() const noexcept { return peach_; }
+    [[nodiscard]] const std::optional<MeleeWebSamusAttributes>& samus_attributes() const noexcept { return samus_; }
+    [[nodiscard]] const std::optional<MeleeWebYoshiAttributes>& yoshi_attributes() const noexcept { return yoshi_; }
     [[nodiscard]] std::uint32_t extension_offset() const noexcept { return extension_; }
     [[nodiscard]] const std::vector<DatRuntimeAction>& actions() const noexcept { return actions_; }
     [[nodiscard]] const DatRuntimeAction& action(std::uint32_t motion_id) const;
@@ -136,6 +138,8 @@ private:
     std::optional<MeleeWebLinkAttributes> link_;
     std::optional<MeleeWebNessAttributes> ness_;
     std::optional<MeleeWebPeachAttributes> peach_;
+    std::optional<MeleeWebSamusAttributes> samus_;
+    std::optional<MeleeWebYoshiAttributes> yoshi_;
     std::vector<DatRuntimeAction> actions_;
     std::vector<DatWaitChoice> wait_choices_, squat_wait_choices_;
     std::vector<DatFighterHurtbox> hurtboxes_;

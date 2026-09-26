@@ -22,6 +22,14 @@
 #include <melee/ft/kinds/ftLink/types.h>
 #include <melee/ft/kinds/ftNess/types.h>
 #include <melee/ft/kinds/ftPeach/types.h>
+#include <melee/ft/kinds/ftGameWatch/types.h>
+#include <melee/ft/kinds/ftKirby/types.h>
+#include <melee/ft/kinds/ftPopo/types.h>
+#include <melee/ft/kinds/ftSamus/types.h>
+#include <melee/ft/kinds/ftYoshi/types.h>
+#include <melee/ft/kinds/ftZelda/types.h>
+#include <melee/ft/kinds/ftSeak/types.h>
+#include <melee/ft/dobjlist.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <stddef.h>
 #include <math.h>
@@ -43,6 +51,49 @@ _Static_assert(sizeof(ftPikachuAttributes) == MELEE_WEB_PIKACHU_ATTRIBUTE_BYTES,
                "Pikachu/Pichu shared extension ABI");
 _Static_assert(sizeof(ftPurinAttributes) == MELEE_WEB_PURIN_ATTRIBUTE_BYTES,
                "Purin extension ABI");
+_Static_assert(sizeof(ftGameWatchAttributes) == 0x94, "Game & Watch extension ABI");
+_Static_assert(offsetof(ftGameWatchAttributes, x4_GAMEWATCH_COLOR) == 0x04 &&
+               offsetof(ftGameWatchAttributes, x14_GAMEWATCH_OUTLINE) == 0x14 &&
+               offsetof(ftGameWatchAttributes, x34_GAMEWATCH_JUDGE_ROLL) == 0x34 &&
+               offsetof(ftGameWatchAttributes, x80_GAMEWATCH_PANIC_ABSORPTION) == 0x80,
+               "Game & Watch extension field offsets");
+_Static_assert(sizeof(struct ftKb_DatAttrs) == 0x424 &&
+               offsetof(struct ftKb_DatAttrs, jumpaerial_unk) == 0x34 &&
+               offsetof(struct ftKb_DatAttrs, specialn_pe_absorbdesc) == 0x3EC &&
+               offsetof(struct ftKb_DatAttrs, specialn_zd_reflectdesc) == 0x400 &&
+               __builtin_offsetof(struct ftKb_DatAttrs, specialn_zd_reflectdesc.x20_behavior) == 0x420,
+               "Kirby extension ABI and mixed-width fields");
+_Static_assert(sizeof(ftIceClimberAttributes) == 0x15C,
+               "Ice Climbers extension ABI");
+_Static_assert(sizeof(ftSs_DatAttrs) == MELEE_WEB_SAMUS_ATTRIBUTE_BYTES,
+               "Samus extension ABI");
+_Static_assert(sizeof(ftYoshiAttributes) == MELEE_WEB_YOSHI_ATTRIBUTE_BYTES &&
+               sizeof(struct ftYs_DatAttrs) == 0x120,
+               "Yoshi extension and source overlay ABI");
+_Static_assert(sizeof(ftZelda_DatAttrs) == 0xA8, "Zelda source extension ABI");
+_Static_assert(sizeof(ftSeakAttributes) == 0x74, "Sheik source extension ABI");
+#define CHECK_YOSHI_PORTABLE(offset,type,name,original) \
+    _Static_assert(offsetof(MeleeWebYoshiAttributes, name) == offset, \
+                   "Yoshi portable field offset");
+MELEE_WEB_YOSHI_ATTRIBUTE_FIELDS(CHECK_YOSHI_PORTABLE)
+#undef CHECK_YOSHI_PORTABLE
+_Static_assert(offsetof(ftYoshiAttributes, x0) == 0x00 &&
+               offsetof(ftYoshiAttributes, x38) == 0x38 &&
+               offsetof(ftYoshiAttributes, x3C) == 0x3C &&
+               offsetof(ftYoshiAttributes, x48) == 0x48 &&
+               offsetof(ftYoshiAttributes, xA4) == 0xA4 &&
+               offsetof(ftYoshiAttributes, xDC) == 0xDC &&
+               offsetof(ftYoshiAttributes, pad_xEC) == 0xEC &&
+               offsetof(struct ftYs_DatAttrs, specialhi_base_angle) == 0xF8 &&
+               offsetof(struct ftYs_DatAttrs, speciallw_star_offset) == 0x118,
+               "Yoshi source attribute overlay offsets");
+#define CHECK_SAMUS(offset,type,name,original) \
+    _Static_assert(offsetof(ftSs_DatAttrs, original) == offset, "Samus source field offset"); \
+    _Static_assert(offsetof(MeleeWebSamusAttributes, name) == offset, "Samus portable field offset"); \
+    _Static_assert(sizeof(((ftSs_DatAttrs*)0)->original) == 4, "Samus source field width"); \
+    _Static_assert(sizeof(((MeleeWebSamusAttributes*)0)->name) == 4, "Samus portable field width");
+MELEE_WEB_SAMUS_ATTRIBUTE_FIELDS(CHECK_SAMUS)
+#undef CHECK_SAMUS
 #define CHECK_PIKACHU_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
 #define CHECK_PIKACHU_SOURCE_I32(value) \
     _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
@@ -329,6 +380,41 @@ static Counted* visibility(const MeleeWebNativeDat* r,uint32_t at,uint32_t count
     }
     return groups;
 }
+static FtPartsVisLookup* gamewatch_part_visibility(const MeleeWebNativeDat* r,
+                                                    uint32_t at,uint32_t models)
+{
+    REGION(at,(size_t)models*sizeof(FtPartsVisLookup));
+    FtPartsVisLookup* lookup=NEW(FtPartsVisLookup,models);
+    for(uint32_t model=0;model<models;++model) {
+        const uint32_t row=at+model*sizeof(FtPartsVisLookup);
+        const uint32_t variants=WORD(row);
+        lookup[model].x0=(int)variants;
+        const uint32_t table=PTR(row+4,variants?variants*sizeof(TempS):1);
+        REQUIRE(!variants||table!=UINT32_MAX,
+                "Game & Watch part-visibility variants are missing");
+        if(!variants)continue;
+        REQUIRE(r->extent && r->extent(r->context,table)>=variants*sizeof(TempS),
+                "Game & Watch part-visibility variants cross their authored table bound");
+        REGION(table,(size_t)variants*sizeof(TempS));
+        lookup[model].x4=NEW(TempS,variants);
+        for(uint32_t variant=0;variant<variants;++variant) {
+            const uint32_t entry=table+variant*sizeof(TempS);
+            const uint32_t count=WORD(entry);
+            lookup[model].x4[variant].x0=(int)count;
+            const uint32_t indices=PTR(entry+4,count?count:1);
+            REQUIRE(!count||indices!=UINT32_MAX,
+                    "Game & Watch part-visibility index list is missing");
+            if(!count)continue;
+            REQUIRE(r->extent && r->extent(r->context,indices)>=count,
+                    "Game & Watch part-visibility indices cross their authored table bound");
+            REGION(indices,count);
+            lookup[model].x4[variant].x4=NEW(u8,count);
+            for(uint32_t index=0;index<count;++index)
+                lookup[model].x4[variant].x4[index]=BYTE(indices+index);
+        }
+    }
+    return lookup;
+}
 static FtSFXArr* sound_array(const MeleeWebNativeDat* r,uint32_t slot)
 {
     uint32_t at=PTR(slot,8); if(at==UINT32_MAX) return NULL;
@@ -434,7 +520,10 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
         kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_CAPTAIN || kind==FTKIND_GANON ||
         kind==FTKIND_DONKEY || kind==FTKIND_KOOPA || kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU ||
-        kind==FTKIND_NESS || kind==FTKIND_MEWTWO || kind==FTKIND_PURIN || kind==FTKIND_PEACH,
+        kind==FTKIND_NESS || kind==FTKIND_MEWTWO || kind==FTKIND_PURIN || kind==FTKIND_PEACH ||
+        kind==FTKIND_GAMEWATCH || kind==FTKIND_KIRBY || kind==FTKIND_SAMUS ||
+        kind==FTKIND_YOSHI || kind==FTKIND_ZELDA || kind==FTKIND_SEAK ||
+        kind==FTKIND_POPO || kind==FTKIND_NANA,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
@@ -514,6 +603,42 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                 "Native Peach Toad counter item table exceeds its source extent");
         REQUIRE(peach->xAC.x0_bone_id>=0 && peach->xAC.x0_bone_id<140 && peach->xAC.x10_size>0,
                 "Native Peach absorb descriptor invalid");
+    } else if(kind==FTKIND_SAMUS) {
+        at=required(r,root+4,MELEE_WEB_SAMUS_ATTRIBUTE_BYTES);
+        ftSs_DatAttrs* samus=NEW(ftSs_DatAttrs,1); d->ext_attr=samus;
+#define SAMUS(o,t,n,orig) samus->orig=READ_##t(at+o);
+        MELEE_WEB_SAMUS_ATTRIBUTE_FIELDS(SAMUS)
+#undef SAMUS
+    } else if(kind==FTKIND_YOSHI) {
+        at=required(r,root+4,MELEE_WEB_YOSHI_ATTRIBUTE_BYTES);
+        ftYoshiAttributes* yoshi=NEW(ftYoshiAttributes,1); d->ext_attr=yoshi;
+        /* Yoshi's original callbacks view this one allocation through both
+         * ftYoshiAttributes and ftYs_DatAttrs. Preserve every source word at
+         * its exact offset, including overlay-only fields and padding. */
+        for(uint32_t offset=0;offset<MELEE_WEB_YOSHI_ATTRIBUTE_BYTES;offset+=4) {
+            const uint32_t value=WORD(at+offset);
+            memcpy((uint8_t*)yoshi+offset,&value,sizeof(value));
+        }
+    } else if(kind==FTKIND_ZELDA) {
+        at=required(r,root+4,sizeof(ftZelda_DatAttrs));
+        ftZelda_DatAttrs* zelda=NEW(ftZelda_DatAttrs,1); d->ext_attr=zelda;
+        /* All source fields through ReflectDesc::x1C are 32-bit scalars.
+         * Preserve the final byte-sized behavior flag and its padding in
+         * source byte order rather than swapping that mixed-width lane. */
+        for(uint32_t offset=0;offset<offsetof(ftZelda_DatAttrs,x84)+offsetof(ReflectDesc,x20_behavior);offset+=4) {
+            const uint32_t value=WORD(at+offset);
+            memcpy((uint8_t*)zelda+offset,&value,sizeof(value));
+        }
+        for(uint32_t offset=offsetof(ftZelda_DatAttrs,x84)+offsetof(ReflectDesc,x20_behavior);
+            offset<sizeof(*zelda);++offset)
+            ((uint8_t*)zelda)[offset]=BYTE(at+offset);
+    } else if(kind==FTKIND_SEAK) {
+        at=required(r,root+4,sizeof(ftSeakAttributes));
+        ftSeakAttributes* seak=NEW(ftSeakAttributes,1); d->ext_attr=seak;
+        for(uint32_t offset=0;offset<sizeof(*seak);offset+=4) {
+            const uint32_t value=WORD(at+offset);
+            memcpy((uint8_t*)seak+offset,&value,sizeof(value));
+        }
     } else if(kind==FTKIND_DONKEY) {
         at=required(r,root+4,MELEE_WEB_DONKEY_ATTRIBUTE_BYTES); ftDonkeyAttributes* donkey=NEW(ftDonkeyAttributes,1); d->ext_attr=donkey;
 #define DONKEY(o,t,n,orig) donkey->orig=READ_##t(at+o);
@@ -573,6 +698,81 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #undef PURIN_READ_OPAQUE32
 #undef PURIN_READ_I32
 #undef PURIN_READ_F32
+    } else if(kind==FTKIND_GAMEWATCH) {
+        at=required(r,root+4,sizeof(ftGameWatchAttributes));
+        ftGameWatchAttributes* gw=NEW(ftGameWatchAttributes,1);d->ext_attr=gw;
+        gw->x0_GAMEWATCH_WIDTH=floating(r,at);
+        for(unsigned color=0;color<4;++color) {
+            const uint32_t color_at=at+4+color*4;
+            gw->x4_GAMEWATCH_COLOR[color].r=BYTE(color_at);
+            gw->x4_GAMEWATCH_COLOR[color].g=BYTE(color_at+1);
+            gw->x4_GAMEWATCH_COLOR[color].b=BYTE(color_at+2);
+            gw->x4_GAMEWATCH_COLOR[color].a=BYTE(color_at+3);
+        }
+        gw->x14_GAMEWATCH_OUTLINE.r=BYTE(at+0x14);
+        gw->x14_GAMEWATCH_OUTLINE.g=BYTE(at+0x15);
+        gw->x14_GAMEWATCH_OUTLINE.b=BYTE(at+0x16);
+        gw->x14_GAMEWATCH_OUTLINE.a=BYTE(at+0x17);
+        gw->x18_GAMEWATCH_CHEF_LOOPFRAME=floating(r,at+0x18);
+        gw->x1C_GAMEWATCH_CHEF_MAX=floating(r,at+0x1C);
+        gw->x20_GAMEWATCH_JUDGE_MOMENTUM_PRESERVE=floating(r,at+0x20);
+        gw->x24_GAMEWATCH_JUDGE_MOMENTUM_MUL=floating(r,at+0x24);
+        gw->x28_GAMEWATCH_JUDGE_VEL_Y=floating(r,at+0x28);
+        gw->x2C_GAMEWATCH_JUDGE_FRICTION1=floating(r,at+0x2C);
+        gw->x30_GAMEWATCH_JUDGE_FRICTION2=floating(r,at+0x30);
+        for(unsigned roll=0;roll<9;++roll)
+            gw->x34_GAMEWATCH_JUDGE_ROLL[roll]=READ_I32(at+0x34+roll*4);
+        gw->x58_GAMEWATCH_RESCUE_STICK_RANGE=floating(r,at+0x58);
+        gw->x5C_GAMEWATCH_RESCUE_ANGLE_UNK=floating(r,at+0x5C);
+        gw->x60_GAMEWATCH_RESCUE_LANDING=floating(r,at+0x60);
+        gw->x64_GAMEWATCH_PANIC_MOMENTUM_PRESERVE=floating(r,at+0x64);
+        gw->x68_GAMEWATCH_PANIC_MOMENTUM_MUL=floating(r,at+0x68);
+        gw->x6C_GAMEWATCH_PANIC_FALL_ACCEL=floating(r,at+0x6C);
+        gw->x70_GAMEWATCH_PANIC_VEL_Y_MAX=floating(r,at+0x70);
+        gw->x74_GAMEWATCH_PANIC_DAMAGE_ADD=floating(r,at+0x74);
+        gw->x78_GAMEWATCH_PANIC_DAMAGE_MUL=floating(r,at+0x78);
+        gw->x7C_GAMEWATCH_PANIC_TURN_FRAMES=floating(r,at+0x7C);
+        gw->x80_GAMEWATCH_PANIC_ABSORPTION.x0_bone_id=READ_I32(at+0x80);
+        gw->x80_GAMEWATCH_PANIC_ABSORPTION.x4_offset=(Vec3){
+            floating(r,at+0x84),floating(r,at+0x88),floating(r,at+0x8C)};
+        gw->x80_GAMEWATCH_PANIC_ABSORPTION.x10_size=floating(r,at+0x90);
+        REQUIRE(gw->x80_GAMEWATCH_PANIC_ABSORPTION.x0_bone_id>=0 &&
+                gw->x80_GAMEWATCH_PANIC_ABSORPTION.x0_bone_id<140 &&
+                gw->x80_GAMEWATCH_PANIC_ABSORPTION.x10_size>0,
+                "Native Game & Watch absorption descriptor invalid");
+    } else if(kind==FTKIND_KIRBY) {
+        at=required(r,root+4,sizeof(struct ftKb_DatAttrs));
+        struct ftKb_DatAttrs* kirby=NEW(struct ftKb_DatAttrs,1);d->ext_attr=kirby;
+        /* The source ABI is a 0x424-byte record with two non-word lanes:
+         * one s16 plus padding at +0x34, and ReflectDesc's behavior byte at
+         * +0x420. Decode all remaining source words through the checked DAT
+         * reader so relocations are rejected and target byte order is native. */
+        for(uint32_t offset=0;offset<sizeof(*kirby);offset+=4) {
+            if(offset==0x34) {
+                const uint16_t value=r->half(r->context,at+offset);
+                memcpy((uint8_t*)kirby+offset,&value,sizeof(value));
+            } else if(offset==0x420) {
+                ((uint8_t*)kirby)[offset]=BYTE(at+offset);
+            } else {
+                const uint32_t value=WORD(at+offset);
+                memcpy((uint8_t*)kirby+offset,&value,sizeof(value));
+            }
+        }
+    } else if(kind==FTKIND_POPO || kind==FTKIND_NANA) {
+        /* Popo and Nana share this source extension, but their constructors
+         * consume different fields. Copy every word in source byte order;
+         * validate the actual float lanes while preserving integer/padding
+         * words without reinterpretation. */
+        at=required(r,root+4,sizeof(ftIceClimberAttributes));
+        ftIceClimberAttributes* ice=NEW(ftIceClimberAttributes,1);d->ext_attr=ice;
+        for(uint32_t offset=0;offset<sizeof(*ice);offset+=4) {
+            const bool integer_word=offset==0x1C||offset==0x68;
+            const bool padding=offset==0x20||offset==0xCC||
+                (offset>=0xD4&&offset<0x12C)||offset==0x150;
+            const uint32_t value=WORD(at+offset);
+            if(!integer_word&&!padding)(void)floating(r,at+offset);
+            memcpy((uint8_t*)ice+offset,&value,sizeof(value));
+        }
     } else if(kind==FTKIND_CAPTAIN || kind==FTKIND_GANON) {
         at=required(r,root+4,0x8C); ftCaptain_DatAttrs* captain=NEW(ftCaptain_DatAttrs,1); d->ext_attr=captain;
 #define CAPTAIN(o,t,n,orig) captain->orig=READ_##t(at+o);
@@ -695,7 +895,10 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
          * selector is the second byte of every blend row like the families
          * above. */
         const bool peach_modes = kind==FTKIND_PEACH && d->x2C->dynamicsNum==9;
-        REQUIRE(sword_or_cape_modes || donkey_modes || mewtwo_modes || peach_modes,
+        /* Zelda has nine independently scheduled chains. GALE01r2's 311
+         * blend rows author selectors 0..35 and a corresponding 36-row table. */
+        const bool zelda_modes = kind==FTKIND_ZELDA && d->x2C->dynamicsNum==9;
+        REQUIRE(sword_or_cape_modes || donkey_modes || mewtwo_modes || peach_modes || zelda_modes,
                 "Native fighter dynamics mode schema unavailable");
         REQUIRE(blends,"Native fighter dynamics selectors are missing");
         unsigned mode_count=0;
@@ -776,7 +979,13 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     d->x58->x10=BYTE(at+16); d->x58->x11=BYTE(at+17); d->x58->x18=floating(r,at+24);
     REQUIRE(d->x58->x0<140 && d->x58->x1<140 && d->x58->x8<140 && d->x58->x9<140 &&
         d->x58->x10<140 && d->x58->x11<140,"Native IK bone index invalid");
-    const unsigned item_slots=(kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:
+    const unsigned item_slots=(kind==FTKIND_POPO||kind==FTKIND_NANA)?3:
+                               kind==FTKIND_GAMEWATCH?11:
+                               (kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:
+                               kind==FTKIND_KIRBY?5:
+                               kind==FTKIND_SAMUS?5:
+                               kind==FTKIND_SEAK?6:
+                               kind==FTKIND_ZELDA?2:
                                (kind==FTKIND_LUIGI||kind==FTKIND_KOOPA)?1:
                                (kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)?3:
                                kind==FTKIND_PURIN||kind==FTKIND_MEWTWO?2:
@@ -788,7 +997,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
      * ftNs_Init_OnLoad); slot 6 remains a Link joint, never an Article. The
      * allocation covers the accessor's index bound (seven elsewhere), while
      * item_slots above is only the authored read extent. */
-    const unsigned item_capacity=kind==FTKIND_NESS?11:7;
+    const unsigned item_capacity=(kind==FTKIND_NESS||kind==FTKIND_GAMEWATCH)?11:7;
     d->x48_items=NEW(void*,item_capacity); memset(d->x48_items,0,item_capacity*sizeof(void*));
     at=UINT32_MAX;
     if(kind==FTKIND_PURIN) {
@@ -806,8 +1015,24 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         if(at!=UINT32_MAX) {
             REGION(at,item_slots*4);
             for(unsigned i=0;i<item_slots;++i) {
+                if(kind==FTKIND_NANA) {
+                    /* ftNn_Init_OnLoad does not register or consume its
+                     * duplicate x48 Article roots; those identities belong
+                     * to Popo's original OnLoad path. Preserve the authored
+                     * three-root table without hydrating Nana's unresolved
+                     * GumStrings joint references as independent Articles. */
+                    REQUIRE(PTR(at+i*4,24)!=UINT32_MAX,
+                            "Nana source x48 Article root is missing");
+                    continue;
+                }
                 const bool link_joint=i==6&&(kind==FTKIND_LINK||kind==FTKIND_CLINK);
-                const size_t minimum=link_joint?64:24;
+                const bool yoshi_joint=i==3&&kind==FTKIND_YOSHI;
+                const bool kirby_joint=i==4&&kind==FTKIND_KIRBY;
+                const bool samus_grapple=i==4&&kind==FTKIND_SAMUS;
+                const bool seak_special_joint=(i==4||i==5)&&kind==FTKIND_SEAK;
+                const bool gamewatch_parts=kind==FTKIND_GAMEWATCH&&i==10;
+                const size_t minimum=(link_joint||yoshi_joint||kirby_joint||seak_special_joint)?64:samus_grapple?16:gamewatch_parts?
+                    (size_t)d->x8->x0.model_num*sizeof(FtPartsVisLookup):24;
                 uint32_t p=PTR(at+i*4,minimum), article_unresolved;
                 /* Link's seventh entry is the source HSD_Joint descriptor used by
                  * ftParts_800753D4, not an Article root. Its native descriptor is
@@ -815,6 +1040,22 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                 if(link_joint) {
                     REQUIRE(p!=UINT32_MAX,
                         "Link part descriptor is missing");
+                } else if(yoshi_joint) {
+                    REQUIRE(p!=UINT32_MAX,
+                            "Yoshi special-N source joint is missing");
+                } else if(kirby_joint) {
+                    REQUIRE(p!=UINT32_MAX,
+                            "Kirby swallowed-star source joint is missing");
+                } else if(samus_grapple) {
+                    REQUIRE(p!=UINT32_MAX,
+                            "Samus grapple throw descriptor is missing");
+                } else if(seak_special_joint) {
+                    REQUIRE(p!=UINT32_MAX,
+                            "Sheik side-special pose joint is missing");
+                } else if(gamewatch_parts) {
+                    REQUIRE(p!=UINT32_MAX,
+                            "Game & Watch part-visibility descriptor is missing");
+                    d->x48_items[i]=gamewatch_part_visibility(r,p,d->x8->x0.model_num);
                 } else if(p!=UINT32_MAX) {
                     d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
                 }
@@ -864,6 +1105,36 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] && d->x48_items[2] &&
             d->x48_items[3] && d->x48_items[4],
             "Peach OnLoad requires its five Explode/Turnip/Parasol/Toad/ToadSpore Articles");
+    else if(kind==FTKIND_GAMEWATCH)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] &&
+            d->x48_items[2] && d->x48_items[3] && d->x48_items[4] &&
+            d->x48_items[5] && d->x48_items[6] && d->x48_items[7] &&
+            d->x48_items[8] && d->x48_items[9] && d->x48_items[10],
+            "Game & Watch OnLoad requires ten Article identities and its part-visibility descriptor");
+    else if(kind==FTKIND_KIRBY)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] &&
+                    d->x48_items[2] && d->x48_items[3],
+                "Kirby OnLoad requires Cutter Beam, Hammer and both helper Articles");
+    else if(kind==FTKIND_POPO||kind==FTKIND_NANA)
+        REQUIRE(at!=UINT32_MAX &&
+            (kind==FTKIND_NANA ||
+             (d->x48_items[0] && d->x48_items[1] && d->x48_items[2])),
+            "Ice Climber source x48 roots or Popo Articles are missing");
+    else if(kind==FTKIND_SAMUS)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] &&
+                d->x48_items[2] && d->x48_items[3],
+                "Samus OnLoad requires Bomb, Charge Shot, Missile and Grapple Beam Articles");
+    else if(kind==FTKIND_YOSHI)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] &&
+                d->x48_items[2] && !d->x48_items[3],
+                "Yoshi OnLoad requires Egg Throw, Star, Egg Lay and its separately-owned joint");
+    else if(kind==FTKIND_ZELDA)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1],
+                "Zelda OnLoad requires DinFire and DinFire explosion Articles");
+    else if(kind==FTKIND_SEAK)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] &&
+                d->x48_items[2] && d->x48_items[3],
+                "Sheik OnLoad requires thrown/held needles, vanish and chain Articles");
     else
         REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM) && at==UINT32_MAX,
                 "Marth/Roy source ftData must not invent an Article table");
@@ -871,7 +1142,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) {
         /* Keep the Link part descriptor unresolved until its source HSD_Joint
          * has been converted to the native 32-bit descriptor ABI. */
-        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK)) continue;
+        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK||kind==FTKIND_YOSHI||kind==FTKIND_KIRBY||kind==FTKIND_SAMUS||kind==FTKIND_SEAK)) continue;
         *unresolved &= ~(1U<<ready[i]);
     }
     if(actions) *unresolved &= ~(1U<<3);
@@ -886,7 +1157,9 @@ void* melee_web_fighter_data_article(void* data, uint32_t kind, uint32_t index)
     /* Ness's authored table has eleven Article slots, all consumed by
      * ftNs_Init_OnLoad. Every other family keeps the source seven-slot
      * array bound (Link's slot 6 is a joint, never an Article). */
-    if (index >= (kind==FTKIND_NESS?11U:6U)) return NULL;
+    if (index >= (kind==FTKIND_NESS||kind==FTKIND_GAMEWATCH?11U:6U) ||
+        (kind==FTKIND_YOSHI&&index==3) || (kind==FTKIND_KIRBY&&index==4) ||
+        (kind==FTKIND_GAMEWATCH&&index==10)) return NULL;
     return ((ftData*)data)->x48_items[index];
 }
 
@@ -899,6 +1172,62 @@ int melee_web_fighter_data_set_link_part(void* data,void* joint,uint32_t* unreso
         "Link part descriptor requires an unresolved source part root");
     d->x48_items[6]=joint;*unresolved&=~(1U<<18);if(error&&size)*error=0;return 1;
 #undef LINK_PART_REQUIRE
+}
+
+int melee_web_fighter_data_set_yoshi_joint(void* data,void* joint,uint32_t* unresolved,
+    char* error,size_t size)
+{
+    ftData* d=data;
+#define YOSHI_JOINT_REQUIRE(c,m) do { if(!(c)){if(error&&size)snprintf(error,size,"%s",m);return 0;} } while(0)
+    YOSHI_JOINT_REQUIRE(d&&d->x48_items&&joint&&unresolved&&(*unresolved&(1U<<18))&&
+        !d->x48_items[3]&&d->x48_items[2],
+        "Yoshi special-N joint requires Egg Lay's owned model descriptor");
+    d->x48_items[3]=joint;*unresolved&=~(1U<<18);if(error&&size)*error=0;return 1;
+#undef YOSHI_JOINT_REQUIRE
+}
+
+int melee_web_fighter_data_set_kirby_joint(void* data,void* joint,uint32_t* unresolved,
+    char* error,size_t size)
+{
+    ftData* d=data;
+#define KIRBY_JOINT_REQUIRE(c,m) do { if(!(c)){if(error&&size)snprintf(error,size,"%s",m);return 0;} } while(0)
+    KIRBY_JOINT_REQUIRE(d&&d->x48_items&&joint&&unresolved&&(*unresolved&(1U<<18))&&
+        d->x48_items[0]&&d->x48_items[1]&&d->x48_items[2]&&d->x48_items[3]&&
+        !d->x48_items[4],
+        "Kirby swallowed-star joint requires four source Articles and its unresolved fifth x48 joint root");
+    d->x48_items[4]=joint;*unresolved&=~(1U<<18);if(error&&size)*error=0;return 1;
+#undef KIRBY_JOINT_REQUIRE
+}
+
+int melee_web_fighter_data_set_samus_grapple(void* data,void* grapple,uint32_t* unresolved,
+    char* error,size_t size)
+{
+    ftData* d=data;
+    if(!d||!d->x48_items||!grapple||!unresolved||!(*unresolved&(1U<<18))||
+       !d->x48_items[0]||!d->x48_items[1]||!d->x48_items[2]||!d->x48_items[3]||
+       d->x48_items[4]) {
+        if(error&&size) snprintf(error,size,"Samus grapple descriptor requires four source Articles and its unresolved fifth x48 root");
+        return 0;
+    }
+    d->x48_items[4]=grapple;*unresolved&=~(1U<<18);if(error&&size)*error=0;return 1;
+}
+
+int melee_web_fighter_data_set_seak_joint(void* data,uint32_t index,void* joint,
+    uint32_t* unresolved,char* error,size_t size)
+{
+    ftData* d=data;
+    if(!d||!d->x48_items||!joint||!unresolved||!(*unresolved&(1U<<18))||
+       (index!=4&&index!=5)||!d->x48_items[0]||!d->x48_items[1]||
+       !d->x48_items[2]||!d->x48_items[3]||d->x48_items[index]||
+       !((HSD_Joint*)joint)->child) {
+        if(error&&size) snprintf(error,size,
+            "Sheik side-special pose requires its authored x48[4]/x48[5] child-joint descriptor");
+        return 0;
+    }
+    d->x48_items[index]=joint;
+    if(d->x48_items[4]&&d->x48_items[5]) *unresolved&=~(1U<<18);
+    if(error&&size)error[0]=0;
+    return 1;
 }
 
 int melee_web_fighter_data_set_metal(void* data,void* joint,uint32_t costumes,
@@ -929,13 +1258,24 @@ int melee_web_fighter_data_set_metal(void* data,void* joint,uint32_t costumes,
 }
 
 void melee_web_fighter_data_set_guard(const MeleeWebNativeDat* r,uint32_t root,
-    void* data,void* joint,uint32_t* unresolved)
+    uint32_t kind,void* data,void* joint,uint32_t* unresolved)
 {
     _Static_assert(offsetof(HSD_Joint,child)==2*sizeof(HSD_Joint*),"Source guard child alias");
     ftData* d=data; HSD_Joint* pose=joint;
-    REQUIRE(d&&pose&&pose->child&&unresolved&&(*unresolved&(1U<<8))&&!d->x20,
-            "Guard pose requires an unresolved source descriptor with a child");
+    REQUIRE(d&&unresolved&&(*unresolved&(1U<<8))&&!d->x20,
+            "Guard pose requires an unresolved source descriptor");
     uint32_t at=required(r,root+0x20,4);
+    if(kind==FTKIND_YOSHI&&!pose) {
+        /* The pinned Yoshi ftData_x20 record has a null x0 guard-joint root
+         * and a zero x8 scalar. Yoshi's authored guard motion handlers use
+         * the costume skeleton directly; preserve this exact null record. */
+        REQUIRE(PTR(at,4)==UINT32_MAX,
+                "Yoshi's null guard record gained a source joint relocation");
+        struct ftData_x20* guard=NEW(struct ftData_x20,1);
+        guard->x0=NULL;guard->x8=floating(r,at+4);
+        d->x20=guard;*unresolved&=~(1U<<8);return;
+    }
+    REQUIRE(pose&&pose->child,"Guard pose requires a source joint with a child");
     required(r,at,64);
     /* Source guard consumers read only x0. The next relocated object starts
      * at +4; the decompiler's unused x8 member is not serialized here. */

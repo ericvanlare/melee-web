@@ -19,6 +19,7 @@ extern "C" void melee_web_test_guard_data(const MeleeWebNativeDat*,uint32_t,void
 extern "C" void melee_web_test_purin_data(void*);
 extern "C" void melee_web_test_donkey_data(void*);
 extern "C" void melee_web_test_koopa_data(void*,int);
+extern "C" int melee_web_test_gamewatch_data(const MeleeWebNativeDat*,uint32_t,void*);
 namespace {
 /* Keep this focused check independent of the full source header graph. These
  * are the two native ABI prefixes needed to inspect ftData->x2C->x10. */
@@ -324,6 +325,34 @@ void verify_koopa(const Bytes& source) {
     rejects([&]{decode(short_extension,0);});
     std::cout<<"Native Koopa 0xa0 typed ABI and single Flame registration: passed\n";
 }
+void verify_gamewatch(const Bytes& source,const Bytes& container) {
+    const auto archive=std::make_shared<const DatArchive>(source,DatExternalPolicy::ResolveNull);
+    const auto identity_row=std::find_if(fighter_costumes().begin(),fighter_costumes().end(),
+        [](const auto& row){return row.fighter_kind==24&&row.costume_index==0;});
+    check(identity_row!=fighter_costumes().end(),"Missing source Game & Watch costume zero");
+    const auto& identity=*identity_row;
+    check(identity.fighter_kind==24&&identity.motion_count==323,
+          "Missing source Game & Watch identity");
+    const auto runtime=std::make_shared<const DatFighterRuntime>(archive,identity);
+    check(runtime->actions().size()==identity.motion_count,
+          "Game & Watch source action extent changed");
+    DatFighterActions(*archive,identity).validate_container(container);
+    GameplayActionStore actions(archive,identity,container);
+    uint32_t root=UINT32_MAX;
+    for(const auto& symbol:archive->public_symbols())
+        if(symbol.name=="ftDataGamewatch")root=symbol.data_offset;
+    check(root!=UINT32_MAX,"Missing ftDataGamewatch root");
+    NativeDatArena owner(archive);uint32_t unresolved=UINT32_MAX;
+    void* data=melee_web_fighter_data_decode(owner.reader(),root,24,4,
+        identity.motion_count,actions.action_rows(),actions.blend_rows(),
+        actions.wait_choices(),&unresolved);
+    check(data&&melee_web_test_gamewatch_data(owner.reader(),root,data),
+          "Game & Watch typed attributes or separate part-visibility graph changed");
+    check((unresolved&((1U<<3)|(1U<<4)|(1U<<18)))==0,
+          "Game & Watch source action/article roots remain unresolved");
+    std::cout<<"Native Game & Watch 0x94 attributes, ten Article registrations, "
+                "part-visibility ownership and 323 source motions: passed\n";
+}
 void verify_purin(const Bytes& source,const Bytes& container) {
     const auto archive=std::make_shared<const DatArchive>(source);
     const auto& identity=resolve_fighter_costume("PlyPurin5K_Share_joint");
@@ -449,6 +478,9 @@ void verify_purin(const Bytes& source,const Bytes& container) {
 }
 int main(int argc,char**argv) {
     try {
+        if(argc==4&&std::string_view(argv[1])=="--gamewatch") {
+            verify_gamewatch(read_file(argv[2]),read_file(argv[3]));return 0;
+        }
         if(argc==3 && std::string_view(argv[1])=="--koopa") {
             verify_koopa(read_file(argv[2]));return 0;
         }

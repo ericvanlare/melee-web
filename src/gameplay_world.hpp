@@ -2,6 +2,7 @@
 #include "gameplay_collision.h"
 #include "dat_menu_support.hpp"
 #include <array>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -46,7 +47,7 @@ public:
     ~GameplayWorld();
     GameplayWorld(const GameplayWorld&) = delete;
     GameplayWorld& operator=(const GameplayWorld&) = delete;
-    void close();
+    void close(const std::function<void()>& after_effect_runtime_end = {});
     void enable_stage_visual();
     void enable_full_stage(bool defer_start = false);
     void end_stage();

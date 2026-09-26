@@ -1,10 +1,13 @@
 #include "gameplay_compat.h"
 #include <melee/pl/player.h>
 #include <melee/ft/types.h>
+#include <melee/ft/kinds/ftKirby/ftkirby.h>
+#include <melee/ft/kinds/ftZelda/ftzeldaspeciallw.h>
 #include <melee/ft/kinds/ftDonkey/forward.h>
 #include <melee/ft/kinds/ftKoopa/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/ft/ftdata.h>
+#include <melee/ft/ftparts.h>
 #include <melee/gm/gm_1601.h>
 #include <melee/it/it_26B1.h>
 #include <melee/mn/forward.h>
@@ -13,6 +16,7 @@
 #include <melee/cm/camera.h>
 #include <melee/cm/types.h>
 #include <math.h>
+#include <stdio.h>
 extern void* melee_web_camera_state(void);
 int melee_web_test_quake_start(int variant){
     const unsigned before=melee_web_gameplay_stats().objects;
@@ -55,6 +59,14 @@ static const MeleeWebSourceIdentity* melee_web_source_identity(int ckind){
         {CKIND_NESS, FTKIND_NESS, ICONHUD_NESS},
         {CKIND_PEACH, FTKIND_PEACH, ICONHUD_PEACH},
         {CKIND_MEWTWO, FTKIND_MEWTWO, ICONHUD_MEWTWO},
+        {CKIND_GAMEWATCH, FTKIND_GAMEWATCH, ICONHUD_GAMEWATCH},
+        {CKIND_KIRBY, FTKIND_KIRBY, ICONHUD_KIRBY},
+        {CKIND_POPONANA, FTKIND_POPO, ICONHUD_POPONANA},
+        {CKIND_SAMUS, FTKIND_SAMUS, ICONHUD_SAMUS},
+        {CKIND_YOSHI, FTKIND_YOSHI, ICONHUD_YOSHI},
+        {CKIND_ZELDA, FTKIND_ZELDA, ICONHUD_ZELDA},
+        /* gm_80168B34 uses stock icon 0x19 for the live Sheik FTKind. */
+        {CKIND_SEAK, FTKIND_SEAK, 0x19},
     };
     for (unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i)
         if (rows[i].character==(CharacterKind)ckind) return &rows[i];
@@ -74,6 +86,70 @@ int melee_web_test_content_player(unsigned slot,int ckind,int kind,unsigned cost
     const float icon=identity->stock_icon+30*costume;
     return fighter&&fighter->kind==identity->fighter&&Player_GetPlayerCharacter(slot)==identity->character&&
         Player_GetCostumeId(slot)==costume&&gm_80168BF8(slot)==icon;
+}
+int melee_web_test_entity_state(unsigned slot,unsigned index,int* kind,int* motion,
+                                int* grounded,int* has_skeleton){
+    HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,(int)index);
+    if(!entity||!entity->user_data)return 0;
+    Fighter* fighter=entity->user_data;
+    if(kind)*kind=fighter->kind;
+    if(motion)*motion=fighter->motion_id;
+    if(grounded)*grounded=fighter->ground_or_air==0;
+    if(has_skeleton)*has_skeleton=fighter->x8AC_animSkeleton!=NULL;
+    return 1;
+}
+int melee_web_test_entity_position(unsigned slot,unsigned index,float* x,float* y){
+    HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,(int)index);
+    if(!entity||!entity->user_data||!x||!y)return 0;
+    Fighter* fighter=entity->user_data;
+    *x=fighter->cur_pos.x;*y=fighter->cur_pos.y;
+    return 1;
+}
+int melee_web_test_entity_damage(unsigned slot,unsigned index,float* damage){
+    HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,(int)index);
+    if(!entity||!entity->user_data||!damage)return 0;
+    *damage=((Fighter*)entity->user_data)->dmg.x1830_percent;
+    return 1;
+}
+int melee_web_test_active_fighter_kind(unsigned slot){
+    HSD_GObj* entity=Player_GetEntity(slot);
+    return entity&&entity->user_data?((Fighter*)entity->user_data)->kind:-1;
+}
+int melee_web_test_invoke_dormant_zelda_transform(unsigned slot){
+    HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,1);
+    if(!entity||!entity->user_data||((Fighter*)entity->user_data)->kind!=FTKIND_ZELDA)
+        return 0;
+    ftZd_SpecialLw_8013AEAC(entity);
+    return melee_web_test_active_fighter_kind(slot)==FTKIND_SEAK;
+}
+int melee_web_test_kirby_copy_kind(unsigned slot){
+    HSD_GObj* entity=Player_GetEntity(slot);
+    if(!entity||!entity->user_data)return -1;
+    Fighter* fighter=entity->user_data;
+    return fighter->kind==FTKIND_KIRBY?fighter->u.kb.hat.kind:-1;
+}
+int melee_web_test_apply_kirby_copy_visibility(unsigned slot){
+    HSD_GObj* entity=Player_GetEntity(slot);
+    if(!entity||!entity->user_data)return 0;
+    Fighter* fighter=entity->user_data;
+    if(fighter->kind!=FTKIND_KIRBY||
+       fighter->u.kb.hat.kind!=FTKIND_GAMEWATCH||
+       fighter->u.kb.hat.x14.data==NULL||
+       fighter->x5AC.xC[4]==NULL||
+       fighter->u.kb.hat.x24.xC[4]!=fighter->x5AC.xC[4]||
+       fighter->u.kb.hat.x24.model_num==0||
+       fighter->u.kb.hat.x24.model_num>=fighter->x5AC.model_num)return 0;
+    const unsigned body_models=fighter->x5AC.model_num;
+    ftParts_800750C8(fighter,4,0);
+    if(fighter->x5AC.model_num!=body_models)return 0;
+    ftParts_800750C8(fighter,4,1);
+    return fighter->x5AC.model_num==body_models&&!fighter->x5AC.cleared[4];
+}
+int melee_web_test_fighter_owns_victim(unsigned slot,unsigned victim_slot){
+    HSD_GObj* entity=Player_GetEntity(slot);
+    HSD_GObj* victim=Player_GetEntity(victim_slot);
+    if(!entity||!entity->user_data||!victim)return 0;
+    return ((Fighter*)entity->user_data)->victim_gobj==victim;
 }
 int melee_web_test_item_count(int kind){return it_8026B3C0((ItemKind)kind);}
 

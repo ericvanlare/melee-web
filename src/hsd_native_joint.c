@@ -158,7 +158,8 @@ static int visit_joint(const MeleeWebNativeGraph* g, uint32_t i, uint8_t* seen, 
     if (i >= g->joint_count || seen[i]) return 0;
     seen[i] = 1; ++*visited;
     const MeleeWebNativeJointDesc* j = &g->joints[i];
-    return visit_joint(g, j->child, seen, visited) && visit_joint(g, j->next, seen, visited);
+    return ((j->flags & JOBJ_INSTANCE) || visit_joint(g, j->child, seen, visited)) &&
+        visit_joint(g, j->next, seen, visited);
 }
 static int validate(const MeleeWebNativeGraph* g, char* error, size_t size)
 {
@@ -172,8 +173,17 @@ static int validate(const MeleeWebNativeGraph* g, char* error, size_t size)
         return fail(error, size, "Native HSD joints must form one complete acyclic unshared graph");
     for (uint32_t i = 0; i < g->joint_count; ++i) {
         const MeleeWebNativeJointDesc* j = &g->joints[i];
-        if ((j->flags & (JOBJ_INSTANCE | JOBJ_PTCL)) || !valid_index(j->dobj, g->dobj_count))
+        if ((j->flags & JOBJ_PTCL) || !valid_index(j->dobj, g->dobj_count))
             return fail(error, size, "Native HSD joint union or DObj index is unsupported");
+        if(j->flags&JOBJ_INSTANCE) {
+            int found=0;
+            if(j->child!=UINT32_MAX||!j->instance_target)
+                return fail(error,size,"Native JOBJ_INSTANCE requires a separate source target identity");
+            for(uint32_t target=0;target<g->joint_count;target++)
+                if(j->instance_target==&g->joints[target]){found=1;break;}
+            if(!found)return fail(error,size,"Native JOBJ_INSTANCE target is outside its owned graph");
+        } else if(j->instance_target)
+            return fail(error,size,"Native non-instance joint carries an instance target");
         if(!!(j->flags&JOBJ_SPLINE)!=!!j->spline||(j->spline&&j->dobj!=UINT32_MAX))
             return fail(error,size,"Native spline union does not match its joint flags");
         if(j->spline){
@@ -326,7 +336,9 @@ static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uin
         const MeleeWebNativeJointDesc* s = &g->joints[i]; HSD_Joint* d = &h->joints[i].desc;
         h->joints[i].source_offset = s->source_offset;
         d->flags = s->flags;
-        d->child = s->child == UINT32_MAX ? NULL : &h->joints[s->child].desc;
+        d->child = (s->flags & JOBJ_INSTANCE)
+            ? &h->joints[(uint32_t)(s->instance_target-g->joints)].desc
+            : s->child == UINT32_MAX ? NULL : &h->joints[s->child].desc;
         d->next = s->next == UINT32_MAX ? NULL : &h->joints[s->next].desc;
         d->u.dobjdesc = s->dobj == UINT32_MAX ? NULL : &h->dobjs[s->dobj];
         if(s->spline){

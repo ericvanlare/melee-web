@@ -8089,6 +8089,26 @@ diff --git a/src/melee/ft/ftcommon.c b/src/melee/ft/ftcommon.c
          HSD_JObjSetTranslate(jobj, &fp->x1A7C);
      }
  }
+@@ -1242,8 +1242,17 @@
+ void ftCommon_8007EFC8(HSD_GObj* gobj, void (*arg1)(HSD_GObj*))
+ {
+     Fighter* src = gobj->user_data;
+-    HSD_GObj* dst_gobj = Player_GetEntityAtIndex(src->player_id, 1);
+-    Fighter* dst = dst_gobj->user_data;
++    HSD_GObj* dst_gobj;
++    Fighter* dst;
+     s32 tmp_bit;
+ 
++    /* The inactive Zelda/Sheik entity can retain a stale accessory callback
++     * for one draw after a transform. Only the active form may swap state. */
++    if (Player_GetEntityAtIndex(src->player_id, 0) != gobj)
++        return;
++    dst_gobj = Player_GetEntityAtIndex(src->player_id, 1);
++    if (dst_gobj == NULL || dst_gobj == gobj)
++        return;
++    dst = dst_gobj->user_data;
++
+     u8 _[16];
 diff --git a/src/melee/gr/grshrine.c b/src/melee/gr/grshrine.c
 --- a/src/melee/gr/grshrine.c
 +++ b/src/melee/gr/grshrine.c
@@ -9114,3 +9134,63 @@ diff --git a/src/melee/gm/gmmain_lib.c b/src/melee/gm/gmmain_lib.c
  void HSD_Init_803755A8(void)
  {
      // Does nothing, but need to force a comparison to make this match
+--- a/src/melee/it/itanimlist.c
++++ b/src/melee/it/itanimlist.c
+@@ -48,8 +48,11 @@ void it_80278F2C(Item_GObj* item_gobj, CommandInfo* cmd)
+     s32 arg6;
+     PAD_STACK(4);
+ 
+-    arg2 = ((u16*) cmd->u)[0];
+-    arg2 = arg2 & 0x3FF;
++#ifdef TARGET_PC
++    arg2 = cmd->u->Command_00.value & 0x3FF;
++#else
++    arg2 = ((u16*) cmd->u)[0] & 0x3FF;
++#endif
+     ++cmd->u;
+     arg6 = (f32) ((u16*) cmd->u)[1];
+     ef_id = ((u16*) cmd->u)[0];
+
+--- a/src/melee/ft/kinds/ftKirby/ftkirby.c
++++ b/src/melee/ft/kinds/ftKirby/ftkirby.c
+@@ -1,3 +1,6 @@
+ #include "ftkirby.h"
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
+ #include <stddef.h>
+@@ -3587,7 +3587,7 @@
+         ftParts_8007487C((FtPartsDesc*) (hat), &(fp)->u.kb.hat.x24,           \
+                          (fp)->x619_costume_id, &(fp)->u.kb.hat.x14,          \
+                          &(fp)->u.kb.hat.x1C);                                \
+-        ftAnim_80070200(fp, (ftData_x8_x8*) &(hat)->desc.vis_table,           \
++        ftAnim_80070200(fp, (ftData_x8_x8*) &(hat)->desc.vis_table,           \
+                         &(fp)->u.kb.x44, &(fp)->u.kb.hat.x14);                \
+     } while (0)
+ 
+--- a/src/melee/ft/ftparts.c
++++ b/src/melee/ft/ftparts.c
+@@ -731,2 +731,15 @@ void ftParts_800750C8(Fighter* fp, enum_t arg1, melee_source_bool arg2)
+ {
++    u32 model_num = fp->x5AC.model_num;
++    if (arg1 == 4 && fp->kind == FTKIND_KIRBY &&
++        fp->u.kb.hat.kind == FTKIND_GAMEWATCH &&
++        fp->u.kb.hat.x14.data != NULL &&
++        fp->u.kb.hat.x24.xC[4] != NULL &&
++        fp->u.kb.hat.x24.xC[4] == fp->x5AC.xC[4] &&
++        fp->u.kb.hat.x24.model_num > 0 &&
++        fp->u.kb.hat.x24.model_num < model_num) {
++        /* PlKbCpGw authors one category-4 row, while Kirby's base FtPartsDesc
++         * has two. Keep the body list/visibility owner, but scope this shared
++         * row to the copy archive's declared model count. */
++        fp->x5AC.model_num = fp->u.kb.hat.x24.model_num;
++    }
+     if (arg1 == 2) {
+@@ -755,5 +768,6 @@ void ftParts_800750C8(Fighter* fp, enum_t arg1, melee_source_bool arg2)
+         if (ftData_UnkIntBoolFunc0.model_events[fp->kind] != NULL) {
+             ftData_UnkIntBoolFunc0.model_events[fp->kind](fp, arg1, arg2);
+         }
+     }
++    fp->x5AC.model_num = model_num;
+ }

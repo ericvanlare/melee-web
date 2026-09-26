@@ -11,13 +11,13 @@ from check_gameplay import node_runtime  # noqa: E402
 
 
 class HitchCaptureBrowserTests(unittest.TestCase):
-    def test_foreground_browser_jobs_require_explicit_headed_opt_in(self):
+    def test_browser_capture_modes_are_explicit_and_foreground_jobs_require_headed(self):
         result = subprocess.run(
             [str(node_runtime()), str(ROOT / "tests/foreground_browser_guard_test.mjs")],
             capture_output=True, text=True, timeout=30,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Foreground browser guards reject missing --headed", result.stdout)
+        self.assertIn("Capture mode guards reject implicit/conflicting modes", result.stdout)
 
     def test_frozen_profile_requires_complete_bound_artifact_inventories(self):
         result = subprocess.run(

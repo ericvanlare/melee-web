@@ -326,6 +326,10 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             reject("Bump texture requires an interleaved GX_VA_NBT stream");
         if ((texture.source_flags & 15U) == 1) {
             if (!has_normal) reject("Reflection texture requires normal coordinates");
+        } else if ((texture.source_flags & 15U) == 2 &&
+                   policy == DatMaterialPolicy::NativeDescriptors) {
+            // Native HSD computes TEX_COORD_HILIGHT from the active light and
+            // camera in TObjSetupMtx; it does not index a model UV attribute.
         } else if (!has_attribute(va_tex0 + texture.source - 4)) {
             reject("Texture requires a missing UV vertex source");
         }
@@ -462,22 +466,31 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_
     if (pass != ModelRenderPass::All && pass != ModelRenderPass::Opaque)
         reject("Unsupported model render-pass selection");
     const auto& a = *archive;
-    struct PendingJoint { uint32_t offset, parent; };
-    std::vector<PendingJoint> pending{{joint_offset, RigidJoint::no_parent}};
-    std::set<uint32_t> visited_joints;
+    struct PendingJoint {
+        uint32_t offset, parent, link_owner, sibling_group;
+        bool child_link;
+        std::vector<uint32_t> ancestors;
+    };
+    std::vector<PendingJoint> pending{{joint_offset,RigidJoint::no_parent,
+        RigidJoint::no_parent,0,false,{}}};
+    std::map<uint32_t,std::set<uint32_t>> sibling_lists;
+    uint32_t next_sibling_group=1;
     std::map<uint32_t, std::shared_ptr<const DatMaterial>> material_cache;
     size_t texture_bytes = 0;
     size_t source_mesh_count = 0;
     while (!pending.empty()) {
-        const auto [joint, parent] = pending.back();
+        auto current=std::move(pending.back());
         pending.pop_back();
-        if (joint % 4 || !visited_joints.insert(joint).second || joints.size() >= max_joints)
+        const auto joint=current.offset;
+        const bool ancestor_cycle=std::find(current.ancestors.begin(),current.ancestors.end(),joint)!=current.ancestors.end();
+        if (joint % 4 || ancestor_cycle ||
+            !sibling_lists[current.sibling_group].insert(joint).second || joints.size() >= max_joints)
             reject("Cyclic, shared, unaligned or oversized joint graph");
         (void) a.range(joint, 64);
         absent(a, joint, "Custom joint classes are unsupported");
         RigidJoint node;
         node.descriptor_offset = joint;
-        node.parent = parent;
+        node.parent = current.parent;
         node.flags = a.be32(joint + 4);
         // These flags change the descriptor union itself, so this is not a
         // DObj graph whose render pass we can classify without another loader.
@@ -503,10 +516,35 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_
         (void) a.pointer(joint + 60); // Retained dependencies are validated below.
         const auto joint_index = uint32_t(joints.size());
         joints.push_back(node);
-        // Siblings inherit this node's parent, not this node. Push child last so
-        // the iterative traversal visits parents before descendants without recursion.
-        if (auto next = a.pointer(joint + 12, 64)) pending.push_back({*next, parent});
-        if (auto child = a.pointer(joint + 8, 64)) pending.push_back({*child, joint_index});
+        if(current.link_owner!=RigidJoint::no_parent) {
+            if(current.child_link)joints[current.link_owner].child=joint_index;
+            else joints[current.link_owner].next=joint_index;
+        }
+        // Siblings inherit this node's parent, not this node. Repeated source
+        // descriptors in distinct child lists are separate runtime JObjs, as
+        // HSD_JObjLoadJoint expands the authored DAG. Ancestor references and
+        // loops within one sibling list remain invalid.
+        if (auto next = a.pointer(joint + 12, 64))
+            pending.push_back({*next,current.parent,joint_index,current.sibling_group,
+                               false,current.ancestors});
+        const auto source_child=a.pointer(joint+8,64);
+        if((node.flags&0x1000U)&&!source_child)
+            reject("Joint instance has no source target reference");
+        if (source_child) {
+            const auto child=source_child;
+            if(node.flags&0x1000U) {
+                if(materials!=DatMaterialPolicy::NativeDescriptors)
+                    reject("Joint instance references require the native HSD path");
+                if(*child%4)reject("Joint instance target is unaligned");
+                (void)a.range(*child,64);
+                joints[joint_index].instance_target_source_offset=*child;
+            } else {
+                auto ancestors=current.ancestors;
+                ancestors.push_back(joint);
+                pending.push_back({*child,joint_index,joint_index,next_sibling_group++,
+                                   true,std::move(ancestors)});
+            }
+        }
         if (node.flags & 0x4000U) continue; // Native owner validates the spline union separately.
         std::set<uint32_t> objects;
         auto dobj = a.pointer(joint + 16, 16);
@@ -595,9 +633,14 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_
         /* Native displayfunc.c implements perspective billboards as well as
          * the ordinary/axis/rotation variants. Keep the inspection path
          * strict because it does not have that camera-dependent transform. */
+        // Native HSD dispatches source translucent JObjs through JOBJ_XLU;
+        // preserve that display-function bit for the original loader. The
+        // inspection renderer still rejects it because it has no XLU pass.
         const uint32_t allowed = 0x701D01DFu |
-            (materials == DatMaterialPolicy::NativeDescriptors ? 0x6e00u : 0u);
-        if ((node.flags & ~allowed) || (node.flags & 0xe00u)>0x800u) reject("Joint flags require unsupported HSD behavior");
+            (materials == DatMaterialPolicy::NativeDescriptors ? 0x7e00u : 0u);
+        if ((node.flags & ~allowed) || (node.flags & 0xe00u)>0x800u)
+            throw DatError("Joint flags require unsupported HSD behavior at source offset "+
+                std::to_string(node.descriptor_offset)+" flags="+std::to_string(node.flags));
         absent(a, node.descriptor_offset + 60, "Joint references are unsupported");
     }
     std::map<uint32_t, uint32_t> joint_indices;

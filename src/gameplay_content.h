@@ -53,10 +53,46 @@ static inline const MeleeWebFighterContent* melee_web_fighter_content(int ckind)
         { CKIND_NESS, FTKIND_NESS, 4, "Ness", "EfNsData.dat", "effNessDataTable", 10, 4, "ness.ssm" },
         { CKIND_PEACH, FTKIND_PEACH, 5, "Peach", "EfPeData.dat", "effPeachDataTable", 15, 1, "peach.ssm" },
         { CKIND_MEWTWO, FTKIND_MEWTWO, 4, "Mewtwo", "EfMtData.dat", "effMewtwoDataTable", 13, 4, "mewtwo.ssm" },
+        { CKIND_GAMEWATCH, FTKIND_GAMEWATCH, 4, "Mr. Game & Watch", NULL, NULL, 0, 0, "gw.ssm" },
+        { CKIND_KIRBY, FTKIND_KIRBY, 6, "Kirby", "EfKbData.dat", "effKirbyDataTable", 5, 9, "kirby.ssm" },
+        { CKIND_POPONANA, FTKIND_POPO, 4, "Ice Climbers", "EfIcData.dat", "effIceclimberDataTable", 14, 1, "ice.ssm" },
+        { CKIND_SAMUS, FTKIND_SAMUS, 5, "Samus", "EfSsData.dat", "effSamusDataTable", 2, 4, "samus.ssm" },
+        { CKIND_YOSHI, FTKIND_YOSHI, 6, "Yoshi", "EfYsData.dat", "effYoshiDataTable", 9, 1, "yoshi.ssm" },
+        /* The two selectable transformation forms have distinct FTKinds,
+         * effects and results, but share the original zs.ssm sound bank. */
+        { CKIND_ZELDA, FTKIND_ZELDA, 5, "Zelda", "EfSsData.dat", "effSamusDataTable", 2, 4, "zs.ssm" },
+        { CKIND_SEAK, FTKIND_SEAK, 5, "Sheik", "EfZdData.dat", "effZeldaDataTable", 17, 7, "zs.ssm" },
     };
     for (size_t i = 0; i < sizeof(rows) / sizeof(rows[0]); ++i)
         if (rows[i].character_kind == ckind) return &rows[i];
     return NULL;
+}
+
+/* A small number of selectable identities publish more than one source
+ * FighterKind. Player_80031AD0 creates the extra identity as a second live
+ * entity (Ice Climbers) or as the other transformation form (Zelda/Sheik).
+ * The source Player mapping remains authoritative for creation and switching;
+ * this helper enumerates the asset owners that must be resident first. */
+static inline int melee_web_fighter_alternate_kind(int ckind)
+{
+    switch (ckind) {
+    case CKIND_POPONANA: return FTKIND_NANA;
+    case CKIND_ZELDA: return FTKIND_SEAK;
+    case CKIND_SEAK: return FTKIND_ZELDA;
+    default: return FTKIND_NONE;
+    }
+}
+
+static inline unsigned melee_web_fighter_kind_count(int ckind)
+{
+    return melee_web_fighter_alternate_kind(ckind) == FTKIND_NONE ? 1U : 2U;
+}
+
+static inline int melee_web_fighter_kind_at(int ckind, unsigned index)
+{
+    const MeleeWebFighterContent* row = melee_web_fighter_content(ckind);
+    if (!row || index >= melee_web_fighter_kind_count(ckind)) return FTKIND_NONE;
+    return index == 0 ? row->fighter_kind : melee_web_fighter_alternate_kind(ckind);
 }
 
 static inline const MeleeWebFighterContent* melee_web_fighter_content_by_kind(int kind)
@@ -64,10 +100,16 @@ static inline const MeleeWebFighterContent* melee_web_fighter_content_by_kind(in
     const int characters[] = { CKIND_MARIO, CKIND_FOX, CKIND_FALCO, CKIND_MARS,
                                CKIND_DRMARIO, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK, CKIND_CAPTAIN, CKIND_GANON, CKIND_LUIGI,
                                CKIND_PIKACHU, CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY, CKIND_KOOPA, CKIND_NESS,
-                               CKIND_PEACH, CKIND_MEWTWO };
+                               CKIND_PEACH, CKIND_MEWTWO, CKIND_GAMEWATCH, CKIND_KIRBY,
+                               CKIND_POPONANA, CKIND_SAMUS, CKIND_YOSHI,
+                               CKIND_ZELDA, CKIND_SEAK };
     for (size_t i = 0; i < sizeof(characters) / sizeof(characters[0]); ++i) {
         const MeleeWebFighterContent* row = melee_web_fighter_content(characters[i]);
         if (row->fighter_kind == kind) return row;
+    }
+    for (size_t i = 0; i < sizeof(characters) / sizeof(characters[0]); ++i) {
+        const MeleeWebFighterContent* row = melee_web_fighter_content(characters[i]);
+        if (melee_web_fighter_alternate_kind(row->character_kind) == kind) return row;
     }
     return NULL;
 }

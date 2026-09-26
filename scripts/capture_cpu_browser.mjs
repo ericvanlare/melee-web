@@ -1,24 +1,25 @@
 #!/usr/bin/env node
-/** Foreground-only CPU match capture through the existing development runtime UI.
+/** CPU match capture through the existing development runtime UI.
  * Retains partial traces and page failures. No CPU decisions are supplied.
- * Timing is reported by the host but is not admitted by this state run.
+ * Headless mode still renders the source draw path; timing is not admitted.
  */
 import fs from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {createHash} from 'node:crypto';
 import {installCpuBrowserModuleCapture} from './cpu_browser_module_capture.mjs';
+import {browserLaunchOptions, loadBrowserTools} from './browser_tools.mjs';
 const {values: options} = parseArgs({options: {
   ...Object.fromEntries(['url','disc','recipe','out','playwright'].map(name => [name, {type:'string'}])),
   timeout: {type:'string', default:'900000'},
   headed: {type:'boolean', default:false},
+  headless: {type:'boolean', default:false},
 }});
-if (!options.headed)
-  throw Error('Foreground browser access requires explicit --headed; no browser or capture artifacts were created.');
+if (options.headed === options.headless)
+  throw Error('Choose exactly one browser mode: --headless or --headed; no browser or capture artifacts were created.');
 if (!options.url || !options.disc || !options.recipe || !options.out)
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc PATH --recipe PATH --out NEW_DIRECTORY --headed [--playwright PACKAGE_DIR]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc PATH --recipe PATH --out NEW_DIRECTORY (--headless | --headed) [--playwright PACKAGE_DIR]');
 const url = new URL(options.url);
 if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
@@ -34,14 +35,19 @@ await fs.writeFile(path.join(options.out, 'capture-config.json'), JSON.stringify
   disc_image_sha256: await fileHash(options.disc),
   disc_image_bytes: (await fs.stat(options.disc)).size,
   recipe_sha256: await fileHash(options.recipe),
-  url: options.url, visible_browser: true, mode: 'state_capture',
+  url: options.url,
+  browser_mode: options.headed ? 'headed' : 'headless',
+  visible_browser: options.headed,
+  mode: 'state_capture',
 }, null, 2) + '\n');
-const {chromium} = options.playwright
-  ? await import(pathToFileURL(path.join(path.resolve(options.playwright), 'index.mjs')).href)
-  : await import('playwright');
-const browser = await chromium.launch({channel:'chrome', headless:false, chromiumSandbox:true});
+const {chromium, browser: browserConfig, browserPath} = await loadBrowserTools(options.playwright);
+const browser = await chromium.launch(browserLaunchOptions(browserConfig, {headed:options.headed}));
 await fs.writeFile(path.join(options.out, 'browser-identity.json'), JSON.stringify({
-  browser: 'chrome', version: await browser.version(), visible_browser: true,
+  browser: 'chrome',
+  executable: browserPath,
+  version: await browser.version(),
+  browser_mode: options.headed ? 'headed' : 'headless',
+  visible_browser: options.headed,
 }, null, 2) + '\n');
 const page = await browser.newPage({viewport:{width:1280,height:960}, deviceScaleFactor:1});
 const errors = [], requests = [];

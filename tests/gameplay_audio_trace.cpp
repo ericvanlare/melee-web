@@ -9,7 +9,7 @@
 extern "C" int lbAudioAx_800237A8(int,int,int);
 static std::vector<uint8_t> read(const char* path){std::ifstream f(path,std::ios::binary);if(!f)throw melee_web::DatError("Cannot open audio fixture");return {std::istreambuf_iterator<char>(f),{}};}
 int main(int argc,char**argv){try{
- if(argc!=5){puts("usage: audio_trace main.ssm mario.ssm smash2.sem dsp_coef.bin");return 2;}
+ if(argc<5){puts("usage: audio_trace main.ssm mario.ssm smash2.sem dsp_coef.bin [extra.ssm ...]");return 2;}
  auto main=read(argv[1]),mario=read(argv[2]),sem=read(argv[3]),coefficients=read(argv[4]);char error[256];
  for(int sound:{0,74,443,180000,180001}){
   std::vector<float> reference;
@@ -28,6 +28,17 @@ int main(int argc,char**argv){try{
    if(cycle)CHECK(pcm==reference);else reference=std::move(pcm);
    printf("cycle%u source voice PCM energy %.9f\n",cycle,energy);
   }
+ }
+
+ if(argc>5){
+  std::vector<std::vector<uint8_t>> extra_storage;
+  std::vector<std::span<const uint8_t>> banks{main,mario};
+  for(int i=5;i<argc;i++){extra_storage.push_back(read(argv[i]));banks.emplace_back(extra_storage.back());}
+  {
+   melee_web::GameplayAudioBank overlapping_banks(sem,banks,coefficients);
+   CHECK(melee_web_audio_generation(overlapping_banks.get())>0);
+  }
+  puts("Overlapping SSM sample IDs retained through original synth bucket construction and teardown");
  }
 
  puts("Original SEM/synth/AX four-tap PCM, partition invariance and scoped restart and source ITD ramp passed");

@@ -47,7 +47,8 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
     auto& s = *storage_;
     const auto& a = *s.model.archive;
     std::map<uint32_t, uint32_t> joint_ids, dobj_ids, pobj_ids, material_ids;
-    for (const auto& j : s.model.joints) joint_ids.emplace(j.descriptor_offset, uint32_t(joint_ids.size()));
+    for (uint32_t i=0;i<s.model.joints.size();++i)
+        joint_ids[s.model.joints[i].descriptor_offset]=i;
     // The source loader creates one runtime object per descriptor occurrence.
     // Shared DObj/PObj descriptors remain shared descriptor identities; original
     // loading still allocates their separate runtime occurrences as usual.
@@ -75,16 +76,24 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
         const auto p = a.pointer(slot);
         return p ? ids.at(*p) : UINT32_MAX;
     };
-    s.joints.resize(joint_ids.size()); s.dobjs.resize(dobj_ids.size());
+    s.joints.resize(s.model.joints.size()); s.dobjs.resize(dobj_ids.size());
     s.pobjs.resize(pobj_ids.size()); s.envelopes.resize(pobj_ids.size());
     s.shapes.reserve(pobj_ids.size());
     s.shape_vertex_lists.reserve(pobj_ids.size()); s.shape_normal_lists.reserve(pobj_ids.size());
     s.materials.resize(material_ids.size()); s.textures.resize(material_ids.size());
-    for (const auto& j : s.model.joints) {
-        auto& out = s.joints.at(joint_ids.at(j.descriptor_offset));
+    for (uint32_t joint_index=0;joint_index<s.model.joints.size();++joint_index) {
+        const auto& j=s.model.joints[joint_index];
+        auto& out = s.joints.at(joint_index);
         out.source_offset = j.descriptor_offset; out.flags = j.flags;
-        out.child = index(joint_ids, j.descriptor_offset + 8);
-        out.next = index(joint_ids, j.descriptor_offset + 12);
+        out.child = j.child;
+        out.next = j.next;
+        if(j.instance_target_source_offset!=UINT32_MAX) {
+            const auto target=joint_ids.find(j.instance_target_source_offset);
+            if(target==joint_ids.end())
+                throw DatError("Native joint instance target is absent from its authored graph at source offset "+
+                    std::to_string(j.instance_target_source_offset));
+            out.instance_target=&s.joints.at(target->second);
+        }
         out.dobj = UINT32_MAX;
         if(j.flags&0x4000U){
             auto p=a.pointer(j.descriptor_offset+16,24);if(!p)throw DatError("Native spline joint payload missing");
@@ -171,7 +180,7 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
     for (const auto& [offset, m] : empty_materials) { (void) offset; copy_material(m); }
     s.graph = {s.joints.data(), s.dobjs.data(), s.pobjs.data(), s.materials.data(),
                uint32_t(s.joints.size()), uint32_t(s.dobjs.size()), uint32_t(s.pobjs.size()),
-               uint32_t(s.materials.size()), joint_ids.at(root)};
+               uint32_t(s.materials.size()), 0};
 }
 DatNativeJoint::~DatNativeJoint() = default;
 const MeleeWebNativeGraph& DatNativeJoint::graph() const noexcept { return storage_->graph; }

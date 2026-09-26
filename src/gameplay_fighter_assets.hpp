@@ -11,7 +11,10 @@ class GameplayFighterAssets {
 public:
     GameplayFighterAssets(std::shared_ptr<const DatArchive> fighter,
         std::shared_ptr<const DatArchive> costume,std::span<const uint8_t> animation,
-        const FighterCostume& identity);
+        const FighterCostume& identity,
+        std::shared_ptr<const DatArchive> nana_popo_fighter = {},
+        const FighterCostume* nana_popo_identity = nullptr,
+        std::span<const uint8_t> nana_popo_animation = {});
     ~GameplayFighterAssets();
     GameplayFighterAssets(const GameplayFighterAssets&)=delete;
     GameplayFighterAssets& operator=(const GameplayFighterAssets&)=delete;

@@ -1,8 +1,9 @@
 #include "dat_effect_banks.hpp"
 #include <stdexcept>
 namespace melee_web {
-DatEffectBanks::DatEffectBanks(std::shared_ptr<const DatArchive> archive,std::string_view symbol,uint32_t bank)
-    :arena_(archive)
+DatEffectBanks::DatEffectBanks(std::shared_ptr<const DatArchive> archive,std::string_view symbol,uint32_t bank,
+    std::vector<NativeDatSourceRegion> source_regions)
+    :arena_(archive,std::move(source_regions))
 {
     std::optional<uint32_t> root;
     for(const auto& entry:archive->public_symbols())if(entry.name==symbol)root=entry.data_offset;
@@ -14,7 +15,8 @@ DatEffectBanks::DatEffectBanks(std::shared_ptr<const DatArchive> archive,std::st
         archive->next_target_offset(*textures)-*textures,bank);
 }
 DatEffectBanks::DatEffectBanks(std::shared_ptr<const DatArchive> archive,std::string_view command_symbol,
-    std::string_view texture_symbol,uint32_t bank):arena_(archive)
+    std::string_view texture_symbol,uint32_t bank,std::vector<NativeDatSourceRegion> source_regions)
+    :arena_(archive,std::move(source_regions))
 {
     std::optional<uint32_t> commands,textures;
     for(const auto& entry:archive->public_symbols()) {

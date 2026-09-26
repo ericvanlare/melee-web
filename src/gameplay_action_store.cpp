@@ -1,4 +1,5 @@
 #include "gameplay_action_store.hpp"
+#include "gameplay_result_motion_table.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <set>
@@ -26,7 +27,10 @@ struct GameplayActionStore::Clip {
     }
 };
 GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archive, const FighterCostume& costume,
-    std::span<const uint8_t> container, std::shared_ptr<const DatArchive> result_motion)
+    std::span<const uint8_t> container, std::shared_ptr<const DatArchive> result_motion,
+    std::shared_ptr<const DatArchive> nana_popo_archive,
+    const FighterCostume* nana_popo_identity,
+    std::span<const uint8_t> nana_popo_container)
     : runtime_(std::make_shared<const DatFighterRuntime>(archive, costume)), store_(runtime_, container),
       rows_(nullptr, melee_web_action_rows_destroy), result_motion_(std::move(result_motion))
 {
@@ -47,12 +51,19 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     const bool pikachu_family = costume.fighter_kind == 12 || costume.fighter_kind == 23;
     const bool captain = costume.fighter_kind == 2;
     const bool ganon = costume.fighter_kind == 25;
-    require(mario || fox_family || mars || link_family || luigi || pikachu_family || purin || donkey || koopa || ness || peach || mewtwo || captain || ganon, "Native action store has no checked fighter command schema for this kind");
+    const bool gamewatch = costume.fighter_kind == 24;
+    const bool kirby = costume.fighter_kind == 4;
+    const bool ice_climber = costume.fighter_kind == 10 || costume.fighter_kind == 11;
+    const bool samus = costume.fighter_kind == 13;
+    const bool yoshi = costume.fighter_kind == 14;
+    const bool zelda_sheik = costume.fighter_kind == 7 || costume.fighter_kind == 19;
+    require(mario || fox_family || mars || link_family || luigi || pikachu_family || purin || donkey || koopa || ness || peach || mewtwo || captain || ganon || gamewatch || kirby || ice_climber || samus || yoshi || zelda_sheik, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
     command_motions_ = {0,1,2,3,6};
     auto group=[&](uint32_t first,uint32_t last){for(uint32_t id=first;id<=last;++id)command_motions_.insert(id);};
+    command_motions_.insert(284);                    // ftCo_SM_ThrownCopyStar (motion state 291 selects submotion 284)
     group(7,31);group(34,77);                     // locomotion through grounded/aerial attacks and landings
     // Link-family bombs enter the common light-item pickup/throw actions.
     // Opponents may also catch and throw those same original items.
@@ -66,6 +77,9 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // Donkey's cargo moves drive the victim's original Shouldered/ThrownF*
     // actions. These source command graphs belong to every possible victim.
     group(267,275);
+    // Yoshi's tongue/egg capture installs ftCo_MS_YoshiEgg on its victim;
+    // the victim executes its own fighter-kind row 277 while held.
+    command_motions_.insert(277);
     // Koopa's side special drives the common CaptureKoopa/CaptureDamageKoopa/
     // CaptureWaitKoopa and ThrownKoopa ground/air rows on its victim. These
     // rows likewise belong to every possible victim action store. The common
@@ -110,6 +124,12 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // (295,326) extent would overrun her table.
     else if (peach) group(295,costume.motion_count-1);
     else if (mewtwo) group(295,costume.motion_count-1); // Mewtwo's authored self rows end at 313.
+    else if (gamewatch) group(295,costume.motion_count-1); // Game & Watch's source special rows are fighter-owned.
+    else if (kirby) group(295,costume.motion_count-1); // Kirby's authored copy and fighter-special rows end at 478.
+    else if (ice_climber) group(295,costume.motion_count-1); // Popo and Nana have separate 321-row source tables.
+    else if (samus) group(295,costume.motion_count-1); // Samus's 313-row source table ends at 312.
+    else if (yoshi) group(295,costume.motion_count-1); // Yoshi's 314-row source table ends at 313.
+    else if (zelda_sheik) group(295,costume.motion_count-1); // Both transformation forms own their exact special-motion command rows.
     else group(295,326);                         // Fox/Falco/Marth/Roy source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto choice : runtime_->squat_wait_choices()) command_motions_.insert(choice.motion_id);
@@ -130,6 +150,16 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     std::vector<std::pair<DatFighterAction, std::shared_ptr<const DatAnimation>>> hydrated_results;
     std::vector<std::optional<DatFighterAction>> result_table;
     if (result_motion_) {
+        const auto result_spec = result_motion_archive_spec(costume.fighter_kind);
+        require(!result_spec.root.empty(),
+                "Fighter has no source Results motion root");
+        const auto root = std::find_if(
+            result_motion_->public_symbols().begin(),
+            result_motion_->public_symbols().end(),
+            [&](const auto& symbol) { return symbol.name == result_spec.root; });
+        require(root != result_motion_->public_symbols().end(),
+                "Fighter Results archive is missing its source motion root");
+        const auto result_root_offset = root->data_offset;
         const DatFighterActions demo_actions(*archive, costume, 0x14,
                                               fighter_demo_motion_count(costume.fighter_kind));
         result_table.resize(fighter_demo_motion_count(costume.fighter_kind));
@@ -142,11 +172,24 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
             if (!action.archive_bytes) continue;
             result_expected.insert(action.symbol);
             const auto bytes = result_motion_->data();
-            require(action.container_offset <= bytes.size() &&
-                        action.archive_bytes <= bytes.size() - action.container_offset,
+            require(result_root_offset <= bytes.size() &&
+                        action.container_offset <= bytes.size() - result_root_offset,
+                    "Result demo action offset exceeds its authored public root");
+            const auto nested_offset = std::size_t{result_root_offset} +
+                                       action.container_offset;
+            require(action.archive_bytes <= bytes.size() - nested_offset,
                     "Result demo action range exceeds its authored archive");
-            auto nested = std::make_shared<const DatArchive>(bytes.subspan(
-                action.container_offset, action.archive_bytes));
+            std::shared_ptr<const DatArchive> nested;
+            try {
+                nested = std::make_shared<const DatArchive>(
+                    bytes.subspan(nested_offset, action.archive_bytes));
+            } catch (const DatError& error) {
+                throw DatError("Result demo action " + action.symbol +
+                    " for fighter kind " + std::to_string(costume.fighter_kind) +
+                    " at archive offset " + std::to_string(nested_offset) +
+                    " (root " + std::to_string(result_root_offset) + "): " +
+                    error.what());
+            }
             const auto root = std::find_if(nested->public_symbols().begin(),
                                            nested->public_symbols().end(),
                                            [&](const auto& symbol) {
@@ -206,6 +249,17 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
                            melee_web_action_rows_destroy);
         require(bool(result_rows_), "Native result action rows allocation failed");
     }
+    if (costume.fighter_kind == 11) {
+        require(nana_popo_archive && nana_popo_identity && !nana_popo_container.empty(),
+                "Nana requires the authored Popo animation fallback");
+        require(nana_popo_identity->fighter_kind == 10 && nana_popo_identity->costume_index == 0,
+                "Nana animation fallback is not the base Popo identity");
+        nana_popo_fallback_ = std::make_unique<GameplayActionStore>(
+            std::move(nana_popo_archive), *nana_popo_identity, nana_popo_container);
+    } else {
+        require(!nana_popo_archive && !nana_popo_identity && nana_popo_container.empty(),
+                "Popo animation fallback was supplied to a non-Nana fighter");
+    }
 }
 GameplayActionStore::~GameplayActionStore() { unbind(); }
 void GameplayActionStore::bind(Fighter* fighter)
@@ -260,10 +314,13 @@ int GameplayActionStore::select_from(GameplayActionStore& source, int motion, un
     const bool ordinary_domain = source_table == melee_web_action_rows(source.rows_.get());
     require(result_domain || ordinary_domain,
             "Fighter action table identity is not owned by its action store");
-    const auto& identity_rows = result_domain ? source.result_rows_ : source.rows_;
-    require(uint32_t(motion) < melee_web_action_row_count(identity_rows.get()),
+    const auto& source_rows = result_domain ? source.result_rows_ : source.rows_;
+    require(uint32_t(motion) < melee_web_action_row_count(source_rows.get()),
             "Fighter action ID is outside its selected source table");
-    auto selected = source.select_source_action(uint32_t(motion), result_domain);
+    std::shared_ptr<MeleeWebNativeActionRows> identity_rows;
+    std::shared_ptr<DatCommands> command_owner;
+    auto selected = source.select_source_action(uint32_t(motion), result_domain,
+                                                &identity_rows, &command_owner);
     // The result table is a second authored motion domain.  Compare the
     // selected row itself so a result clip can be retained in the active
     // slot instead of being compared with the ordinary Pl*AJ row at the
@@ -277,7 +334,7 @@ int GameplayActionStore::select_from(GameplayActionStore& source, int motion, un
     if (!clip) {
         clip = std::make_shared<Clip>(std::move(selected));
         clip->identity_rows = identity_rows;
-        clip->command_owner = source.commands_;
+        clip->command_owner = std::move(command_owner);
     }
     active_[slot] = clip; motions_[slot] = uint32_t(motion);
     *tree = melee_web_native_clip_tree(clip->native.get());
@@ -287,13 +344,30 @@ int GameplayActionStore::select_from(GameplayActionStore& source, int motion, un
     return 1;
 }
 
-DatSelectedAction GameplayActionStore::select_source_action(uint32_t motion, bool result_domain)
+DatSelectedAction GameplayActionStore::select_source_action(uint32_t motion, bool result_domain,
+    std::shared_ptr<MeleeWebNativeActionRows>* identity_rows,
+    std::shared_ptr<DatCommands>* command_owner)
 {
     if (result_domain) {
         if (const auto found = result_actions_.find(motion); found != result_actions_.end())
+        {
+            if (identity_rows) *identity_rows = result_rows_;
+            if (command_owner) *command_owner = commands_;
             return found->second;
+        }
         throw DatError("Selected result demo motion has no authored archive");
     }
+    // Source ftData_80085FD4 routes non-demo Nana rows with a null x14
+    // archive pointer through Popo's exact source row at the same motion ID.
+    if (runtime_->costume().fighter_kind == 11 &&
+        runtime_->action(motion).archive_bytes == 0) {
+        require(bool(nana_popo_fallback_), "Nana Popo animation fallback is unavailable");
+        if (identity_rows) *identity_rows = nana_popo_fallback_->rows_;
+        if (command_owner) *command_owner = nana_popo_fallback_->commands_;
+        return nana_popo_fallback_->select_source_action(motion, false, nullptr, nullptr);
+    }
+    if (identity_rows) *identity_rows = rows_;
+    if (command_owner) *command_owner = commands_;
     return store_.select_native_action(motion);
 }
 }

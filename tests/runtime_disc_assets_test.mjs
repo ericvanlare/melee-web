@@ -12,19 +12,31 @@ view.setUint32(0x600,0x100);view.setUint32(0x690,0x10000000);
 await assert.rejects(loadRuntimeDisc(new Blob([bytes])),/Invalid game executable section/);
 console.log('Runtime disc language paths and executable rejection checks passed');
 
-assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,35);
+assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,41);
 assert.equal(NATIVE_MENU_DISC_FILES['LbRb.dat'],'LbRb.dat');
 for (const name of Object.keys(NATIVE_MENU_DISC_FILES).filter(name => name.endsWith('.ssm')))
   assert.equal(NATIVE_MENU_DISC_FILES[name], 'audio/us/' + name);
-assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,237);
+assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,355);
 // The original Results and Prize scenes run over their own authored archives
 // and voice streams; the scoped import must find each at its authored path.
 for(const name of ['GmRst.usd','SdRst.usd','TyDatai.usd','IfPrize.usd','SdPrize.usd',
   'GmRstMMr.dat','GmRstMDr.dat','GmRstMFx.dat','GmRstMFc.dat',
   'GmRstMMs.dat','GmRstMFe.dat','GmRstMLk.dat','GmRstMCl.dat',
-  'GmRstMCa.dat','GmRstMDk.dat','GmRstMGn.dat','GmRstMKp.dat',
+  'GmRstMCa.dat','GmRstMDk.dat','GmRstMGn.dat','GmRstMKp.dat','GmRstMSs.dat',
   'GmRstMLg.dat','GmRstMMt.dat','GmRstMPk.dat','GmRstMPc.dat','GmRstMPr.dat'])
   assert.equal(NATIVE_GAME_DISC_FILES[name],name);
+for(const name of ['GmRstMZd.dat','GmRstMSk.dat'])
+  assert.equal(NATIVE_GAME_DISC_FILES[name],name);
+for(const name of ['PlPp.dat','PlPpAJ.dat','PlPpNr.dat','PlPpGr.dat','PlPpOr.dat','PlPpRe.dat',
+  'PlNn.dat','PlNnAJ.dat','PlNnNr.dat','PlNnYe.dat','PlNnAq.dat','PlNnWh.dat',
+  'EfIcData.dat','GmRstMPn.dat']) assert.equal(NATIVE_GAME_DISC_FILES[name],name);
+assert.equal(NATIVE_GAME_DISC_FILES['ice.ssm'],'audio/us/ice.ssm');
+for(const name of ['ff_flat.hps','ff_ice.hps','ff_kirby.hps','ff_samus.hps','ff_yoshi.hps'])
+  assert.equal(NATIVE_GAME_DISC_FILES[name],'audio/'+name);
+for(const name of ['PlZd.dat','PlZdAJ.dat','PlZdNr.dat','PlZdRe.dat','PlZdBu.dat','PlZdGr.dat','PlZdWh.dat',
+  'PlSk.dat','PlSkAJ.dat','PlSkNr.dat','PlSkRe.dat','PlSkBu.dat','PlSkGr.dat','PlSkWh.dat','EfZdData.dat'])
+  assert.equal(NATIVE_GAME_DISC_FILES[name],name);
+assert.equal(NATIVE_GAME_DISC_FILES['zs.ssm'],'audio/us/zs.ssm');
 for(const name of ['GmRstMNs.dat','GmRstMPe.dat'])
   assert.equal(NATIVE_GAME_DISC_FILES[name],name);
 for(const [name,path] of Object.entries({
@@ -82,6 +94,9 @@ for(const name of ['PlPe.dat','PlPeAJ.dat','PlPeNr.dat','PlPeYe.dat','PlPeWh.dat
 assert.equal(NATIVE_GAME_DISC_FILES['mewtwo.ssm'],'audio/us/mewtwo.ssm');
 for(const name of ['PlMt.dat','PlMtAJ.dat','PlMtNr.dat','PlMtRe.dat','PlMtBu.dat','PlMtGr.dat','EfMtData.dat'])
   assert.equal(NATIVE_GAME_DISC_FILES[name],name);
+assert.equal(NATIVE_GAME_DISC_FILES['samus.ssm'],'audio/us/samus.ssm');
+for(const name of ['PlSs.dat','PlSsAJ.dat','PlSsNr.dat','PlSsPi.dat','PlSsBk.dat',
+  'PlSsGr.dat','PlSsLa.dat','EfSsData.dat']) assert.equal(NATIVE_GAME_DISC_FILES[name],name);
 assert.equal(NATIVE_GAME_DISC_FILES['old_ys.hps'],'audio/old_ys.hps');
 assert.equal(NATIVE_GAME_DISC_FILES['pupupu.ssm'],'audio/us/pupupu.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['sp_zako.hps'],'audio/sp_zako.hps');

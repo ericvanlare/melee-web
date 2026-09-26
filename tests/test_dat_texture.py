@@ -56,6 +56,9 @@ class DatTextureTests(unittest.TestCase):
     def test_native_bump_flags_require_and_preserve_native_policy(self):
         self.run_case("native_bump_descriptor")
 
+    def test_native_hilight_texgen_preserves_source_mode(self):
+        self.run_case("native_hilight_texgen")
+
     def test_custom_tev_invalid_coordinates_and_transform_rejections(self):
         self.run_case("unsupported_graphs_and_transforms")
 

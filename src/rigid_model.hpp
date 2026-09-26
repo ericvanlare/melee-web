@@ -15,7 +15,9 @@ namespace melee_web {
 enum class ModelRenderPass { All, Opaque };
 struct RigidJoint {
     static constexpr uint32_t no_parent = UINT32_MAX;
-    uint32_t descriptor_offset = 0, parent = no_parent, flags = 0;
+    uint32_t descriptor_offset = 0, parent = no_parent, child = no_parent,
+             next = no_parent, flags = 0,
+             instance_target_source_offset = UINT32_MAX;
     std::array<float, 3> rotation{}, scale{}, translation{};
     std::optional<std::array<float, 12>> inverse_bind; // Row-major original 3x4 matrix.
 };

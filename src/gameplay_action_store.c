@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#if defined(__EMSCRIPTEN__) && !defined(__STRICT_ANSI__)
+#include <emscripten.h>
+#endif
 struct MeleeWebNativeClip { FigaTree tree; };
 MeleeWebNativeClip* melee_web_native_clip_create(uint32_t type, uint32_t flags, float frames,
     const uint8_t* nodes, size_t node_count, const MeleeWebAnimationTrack* tracks, size_t track_count)
@@ -390,12 +393,49 @@ void melee_web_command_require_supported(uint32_t opcode)
     // through the compiled item consumers (Peach's authored ItemParasol
     // rows 316/317; the parasol item runtime is source-compiled).
     case 42: return;
+    // ftAction_80072CB0 stores the authored 26-bit operand into the source
+    // one-bit Fighter.x2225_b2 flag (used by fighter-specific movement and
+    // visibility paths). The original consumer is linked in this runtime.
+    case 53: return;
+    // The four-word Stage SFX record is decoded in source order and consumed
+    // by original ftAction_80072320 (including its audio handle fields).
+    // Kirby's copied Mario neutral special uses this authored command.
+    case 39: return;
     case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 10: case 11: case 13: case 14: case 15: case 16: case 17: case 18: case 19: case 20: case 21: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 30: case 31: case 34: case 35: case 37: case 38: case 40: case 41: case 43: case 46: case 49: case 50: case 52: case 54: case 55: case 56: case 58: return;
     default:
+#if defined(__EMSCRIPTEN__) && !defined(__STRICT_ANSI__)
+        {
+            int snapshot[18];
+            for (unsigned i = 0; i < 6; ++i) {
+                snapshot[i * 3] = bindings[i].fighter ? bindings[i].fighter->kind : -1;
+                snapshot[i * 3 + 1] = bindings[i].fighter ? bindings[i].fighter->motion_id : -1;
+                snapshot[i * 3 + 2] = bindings[i].fighter ? bindings[i].fighter->anim_id : -1;
+            }
+            EM_ASM({
+                const words = $1 >> 2;
+                const fighters = [];
+                for (let i = 0; i < 6; ++i) {
+                    if (HEAP32[words + i * 3] >= 0) {
+                        const fighter = Object.create(null);
+                        fighter.kind = HEAP32[words + i * 3];
+                        fighter.motion = HEAP32[words + i * 3 + 1];
+                        fighter.animation = HEAP32[words + i * 3 + 2];
+                        fighters.push(fighter);
+                    }
+                }
+                const diagnostic = Object.create(null);
+                diagnostic.opcode = $0;
+                diagnostic.fighters = fighters;
+                window.__meleeWebUnsupportedCommand = diagnostic;
+            }, opcode, snapshot);
+        }
+#endif
         fprintf(stderr, "Unsupported native fighter command opcode %u\n", opcode);
         for (unsigned i = 0; i < 6; ++i) if (bindings[i].fighter)
-            fprintf(stderr, "Bound fighter %u: motion %d, animation %d\n", i,
-                    bindings[i].fighter->motion_id, bindings[i].fighter->anim_id);
+            fprintf(stderr, "Bound fighter %u: kind %d motion %d animation %d\n", i,
+                    bindings[i].fighter->kind,bindings[i].fighter->motion_id,
+                    bindings[i].fighter->anim_id);
+        fflush(stderr);
         abort();
     }
 }

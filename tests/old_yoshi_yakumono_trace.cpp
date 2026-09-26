@@ -93,7 +93,18 @@ struct SyntheticReader {
 
     MeleeWebNativeDat api()
     {
-        return {this, word, half, byte, pointer, region, allocate, reject, nullptr};
+        return MeleeWebNativeDat{
+            .context = this,
+            .word = word,
+            .half = half,
+            .byte = byte,
+            .pointer = pointer,
+            .region = region,
+            .source_region = nullptr,
+            .allocate = allocate,
+            .reject = reject,
+            .extent = nullptr,
+        };
     }
 
     void put_half(uint32_t offset, int16_t value)

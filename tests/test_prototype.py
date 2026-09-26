@@ -24,7 +24,8 @@ class PrototypeTests(unittest.TestCase):
                          ['Mario', 'Fox', 'Falco', 'Marth', 'Dr. Mario', 'Roy',
                           'Link', 'Young Link', 'Captain Falcon', 'Ganondorf', 'Luigi',
                           'Pikachu', 'Pichu', 'Jigglypuff', 'Donkey Kong', 'Bowser',
-                          'Ness', 'Peach', 'Mewtwo'])
+                          'Ness', 'Peach', 'Mewtwo', 'Mr. Game & Watch', 'Kirby',
+                          'Ice Climbers', 'Samus', 'Yoshi', 'Zelda', 'Sheik'])
         self.assertEqual([row['name'] for row in manifest['stages']], [
             'Final Destination', 'Battlefield', "Yoshi's Story", 'Dream Land', 'Hyrule Temple',
             'Fountain of Dreams', "Yoshi's Island 64"])
@@ -63,7 +64,7 @@ class PrototypeTests(unittest.TestCase):
                         self.assertEqual(response.headers['Cross-Origin-Opener-Policy'], 'same-origin')
                         self.assertEqual(response.headers['Cross-Origin-Embedder-Policy'], 'require-corp')
                     with urlopen(base + '/prototype-content.json') as response:
-                        self.assertEqual(len(json.load(response)['fighters']), 19)
+                        self.assertEqual(len(json.load(response)['fighters']), 26)
                     with self.assertRaises(HTTPError) as error:
                         urlopen(base + '/private-disc.iso')
                     error.exception.close()

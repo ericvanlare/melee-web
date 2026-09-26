@@ -10,6 +10,7 @@
 #include "gameplay_hud.h"
 #include "gameplay_match_flow.h"
 #include "gameplay_fighter_assets.h"
+#include "gameplay_kirby_copy_assets.hpp"
 #include "gameplay_hud_assets.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -46,6 +47,7 @@ struct GameplayMatchSession::Storage {
     MeleeWebMatchContext* match=nullptr;
     MeleeWebRender* render=nullptr;
     std::unique_ptr<GameplayHudAssets> hud_assets;
+    std::unique_ptr<GameplayKirbyCopyAssets> kirby_copy_assets;
     MeleeWebHud* hud=nullptr;
     MeleeWebMatchFlow* flow=nullptr;
     bool mode_owned=false;
@@ -73,6 +75,8 @@ struct GameplayMatchSession::Storage {
         check(selection.hud_layout == selection.start.rules.x0_3,
               "Match compatibility settings differ from source payload");
         runtime_files=&files;runtime_cache=archive_cache;selected=selection;
+        if(selection_uses_kirby(selection))
+            kirby_copy_assets=std::make_unique<GameplayKirbyCopyAssets>(files,selection);
         stage=melee_web_stage_content(selection.start.rules.stkind);
         check(stage!=nullptr,"Match stage has no source runtime owner");
         content.ground_kind=stage->ground_kind;
@@ -139,8 +143,12 @@ struct GameplayMatchSession::Storage {
             for(unsigned i=0;i<content.player_count;++i){
                 const auto kind=content.fighter_kinds[i];
                 const auto* dependency=melee_web_fighter_content_by_kind(kind);
-                if(fighter_banks.insert(dependency->audio_bank).second)
-                    bank_names.emplace_back(dependency->audio_bank);
+                for(unsigned identity=0;identity<melee_web_fighter_kind_count(dependency->character_kind);++identity){
+                    const auto* owner=melee_web_fighter_content_by_kind(
+                        melee_web_fighter_kind_at(dependency->character_kind,identity));
+                    if(fighter_banks.insert(owner->audio_bank).second)
+                        bank_names.emplace_back(owner->audio_bank);
+                }
             }
             if(stage->audio_bank)bank_names.emplace_back(stage->audio_bank);
             if(runtime_cache){
@@ -182,6 +190,7 @@ struct GameplayMatchSession::Storage {
         }
         if(construction_phase==3){
             check(melee_web_match_create_fighters_intro(match,error,sizeof(error)),error);
+            if(kirby_copy_assets)kirby_copy_assets->activate();
             construction_phase=4;
             return false;
         }
@@ -224,8 +233,16 @@ struct GameplayMatchSession::Storage {
         music.reset();
         if(world){
             check_fighter_asset_ownership("before-world-close");
-            world->verify_immutable_archives();world->close();world.reset();
+            world->verify_immutable_archives();
+            world->close([this]{
+                /* Kirby donor effect tables share HSD's global live-generator
+                 * guard. Release their banks only after the world's original
+                 * particle runtime has removed stage/fighter generators. */
+                if(kirby_copy_assets){kirby_copy_assets->close();kirby_copy_assets.reset();}
+            });
+            world.reset();
         }
+        if(kirby_copy_assets){kirby_copy_assets->close();kirby_copy_assets.reset();}
         if(hud_assets){hud_assets->close();hud_assets.reset();}
         bank.reset();
         if(profile_owned){

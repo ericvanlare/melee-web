@@ -43,7 +43,10 @@ constexpr char EXPECTED_DOL[] =
 constexpr char EXPECTED_COMMIT[] = "c77bbaa0f372c3f72281602a8b087206706542cb";
 constexpr u16 SCHEMA = 1;
 constexpr u32 MAGIC = 0x4f52574d; // little-endian "MWRO"
-constexpr size_t RING_SIZE = 128;
+// Headless Dolphin can advance much faster than the host while source draw
+// callbacks emit a burst of records for a frame. Keep enough bounded
+// headroom for those bursts; overflow remains a hard capture failure.
+constexpr size_t RING_SIZE = 1024;
 constexpr size_t RING_PAYLOAD = 256 * 1024;
 constexpr size_t MAX_SLICES = 64;
 constexpr size_t MAX_RAW = 192 * 1024;
@@ -245,6 +248,27 @@ struct CpuProbeRecord
   std::array<u64, 7> fpr{};
   std::array<u8, CPU_PROBE_STACK_SIZE> stack{};
   std::array<u8, 8> random_seed_and_pointer{};
+  bool effect_group_present = false;
+  u32 effect_bank_base = 0;
+  u32 effect_group_address = 0;
+  u32 effect_palette_offset = 0;
+  u32 effect_palette_address = 0;
+  bool effect_palette_readable = false;
+  std::array<u8, 512> effect_palette{};
+  bool effect_literal_palette_readable = false;
+  std::array<u8, 512> effect_literal_palette{};
+  bool samus_effect_loaded_group_present = false;
+  u32 samus_effect_loaded_bank = 0;
+  u32 samus_effect_loaded_texture_base = 0;
+  u32 samus_effect_loaded_group_address = 0;
+  u32 samus_effect_loaded_image_address = 0;
+  u32 samus_effect_loaded_palette_address = 0;
+  bool samus_effect_gx_tlut_call = false;
+  u32 samus_effect_gx_tlut_address = 0;
+  bool samus_effect_particle_spawn = false;
+  u32 samus_effect_particle_bank = 0;
+  u32 samus_effect_particle_kind = 0;
+  u32 samus_effect_particle_group = 0;
   std::array<bool, 4> fighter_present{};
   std::array<CpuProbeFighterRecord, 4> fighters{};
 };
@@ -378,7 +402,7 @@ struct CpuProbePoint
 // tools/cpu-register-gale01r2.json.  They intentionally remain compiled
 // constants: a probe cannot turn an unverified guest PC into an observer
 // boundary by supplying a different file at runtime.
-constexpr std::array<CpuProbePoint, 32> CPU_PROBE_POINTS = {{
+constexpr std::array<CpuProbePoint, 36> CPU_PROBE_POINTS = {{
     {"after_kind_dispatch", 0x800b3924, 0x7fe3fb78},
     {"state_dispatch_entry", 0x800b2790, 0x7c0802a6},
     {"before_hitlag_sticks", 0x800b2aa8, 0x4bff9af9},
@@ -411,6 +435,14 @@ constexpr std::array<CpuProbePoint, 32> CPU_PROBE_POINTS = {{
     {"hitlag_random_call", 0x800ae21c, 0x482d230d},
     {"hitlag_random_return", 0x800ae220, 0x807b0010},
     {"randf_return", 0x8038057c, 0x4e800020},
+    // Exact GALE01r2 entry instruction. This bounded diagnostic snapshots
+    // only the unusual C8 group-0 palette referenced by Kirby's Samus bank.
+    {"samus_effect_bank_locate", 0x80398614, 0xa0c30000},
+    // Exact GALE01r2 entries from the DOL. These observe the already-located
+    // group at registration and the renderer's consumed TLUT argument.
+    {"samus_effect_bank_load", 0x803984f4, 0x7c0802a6},
+    {"gx_init_tlut", 0x8033f024, 0x38000000},
+    {"samus_effect_particle_spawn", 0x80398c04, 0x7c0802a6},
 }};
 
 const CpuProbePoint* FindCpuProbePoint(u32 address)
@@ -665,6 +697,45 @@ struct Observer::Impl
     return true;
   }
 
+  bool ReadFighterSourceSlot(Core::System* system, u32 fighter, u8* slot) const
+  {
+    // This boundary is Fighter_Create's return: r3 is its GObj, and the
+    // GObj's +0x2c user_data is a Fighter whose source player_id is at +0xc.
+    return IsMem1Range(fighter, 0xD) && ReadBytes(system, fighter + 0xC, 1, slot);
+  }
+
+  static u16 FighterEntitySliceFlags(u32 slot, u32 entity_index)
+  {
+    // Keep the source slot in the low byte and distinguish the paired fighter
+    // in the high byte. Entity zero retains the legacy flags.
+    return static_cast<u16>(slot | (entity_index << 8));
+  }
+
+  bool RegisterFighterEntity(u32 slot, u32 fighter, u32 kind, u32* entity_index)
+  {
+    if (slot >= fighter_entity_pointers.size() || !fighter || !entity_index)
+      return false;
+    const u32 count = fighter_entity_count[slot];
+    if (count >= fighter_entity_pointers[slot].size())
+      return false;
+    for (u32 index = 0; index < count; ++index)
+    {
+      if (fighter_entity_pointers[slot][index] == fighter ||
+          fighter_entity_kinds[slot][index] == kind)
+        return false;
+    }
+    fighter_entity_pointers[slot][count] = fighter;
+    fighter_entity_kinds[slot][count] = kind;
+    fighter_entity_count[slot] = static_cast<u8>(count + 1);
+    if (count == 0)
+    {
+      fighter_pointers[slot] = fighter;
+      fighter_present[slot] = true;
+    }
+    *entity_index = count;
+    return true;
+  }
+
   bool ReadU32(Core::System* system, u32 address, u32* value) const
   {
     std::array<u8, 4> bytes{};
@@ -699,21 +770,33 @@ struct Observer::Impl
   void RecordCpuProbe(Core::System* system, u32 pc, const CpuProbePoint& point,
                       PowerPC::PowerPCState* state, u32 source_tick)
   {
-    if (!cpu_probe_configured || !cpu_probe_valid || cpu_probe_closed || !match_active ||
-        !setup_ready || match_index != cpu_probe_match)
+    const bool samus_effect_bank_probe = pc == 0x80398614;
+    const bool samus_effect_bank_load_probe = pc == 0x803984f4;
+    const bool samus_effect_gx_tlut_probe = pc == 0x8033f024;
+    const bool samus_effect_particle_probe = pc == 0x80398c04;
+    const bool samus_effect_load_scope =
+        samus_effect_bank_probe || samus_effect_bank_load_probe;
+    if (!cpu_probe_configured || !cpu_probe_valid || cpu_probe_closed ||
+        (!samus_effect_load_scope &&
+         (!match_active || !setup_ready || match_index != cpu_probe_match)) ||
+        (samus_effect_bank_probe && cpu_probe_effect_group_found))
       return;
     u32 instruction = 0;
     if (!ReadU32(system, pc, &instruction) || instruction != point.expected_word)
     {
-      SetInvalid("CPU probe instruction differs from the verified GALE01r2 word");
+      SetInvalid("CPU probe instruction differs from the verified GALE01r2 word at pc=" +
+                 std::to_string(pc) + " expected=" +
+                 std::to_string(point.expected_word) + " actual=" +
+                 std::to_string(instruction));
       return;
     }
-    if (source_tick > cpu_probe_last_tick)
+    if (!samus_effect_load_scope && source_tick > cpu_probe_last_tick)
     {
       CloseCpuProbe();
       return;
     }
-    if (source_tick < cpu_probe_first_tick || match_index != cpu_probe_match)
+    if (!samus_effect_load_scope &&
+        (source_tick < cpu_probe_first_tick || match_index != cpu_probe_match))
       return;
     if (cpu_probe_record_count >= CPU_PROBE_MAX_RECORDS)
     {
@@ -738,6 +821,123 @@ struct Observer::Impl
       SetInvalid("CPU probe stack or random-seed range is outside MEM1");
       return;
     }
+    if (samus_effect_bank_load_probe)
+    {
+      // psInitDataBankLoad receives the bank number in r3 and the already
+      // relocated texture-group table in r5. Retain only the exact C8/64x64
+      // group-zero signature from Kirby's Samus bank; unrelated registrations
+      // remain outside this diagnostic.
+      const u32 bank = state->gpr[3];
+      const u32 texture_base = state->gpr[5];
+      u32 group_count = 0;
+      u32 group_address = 0;
+      u32 image_count = 0;
+      u32 format = 0;
+      u32 width = 0;
+      u32 height = 0;
+      u32 palette_counts = 0;
+      u32 image_address = 0;
+      u32 palette_address = 0;
+      if (bank == 34 && ReadU32(system, texture_base, &group_count) &&
+          group_count >= 1 && group_count <= 256 &&
+          ReadU32(system, texture_base + 4, &group_address) &&
+          IsMem1Range(group_address, 0x20) &&
+          ReadU32(system, group_address, &image_count) &&
+          ReadU32(system, group_address + 4, &format) &&
+          ReadU32(system, group_address + 12, &width) &&
+          ReadU32(system, group_address + 16, &height) &&
+          ReadU32(system, group_address + 20, &palette_counts) &&
+          ReadU32(system, group_address + 24, &image_address) &&
+          ReadU32(system, group_address + 28, &palette_address) &&
+          image_count == 1 && format == 9 && width == 64 && height == 64 &&
+          palette_counts == 0)
+      {
+        record.samus_effect_loaded_group_present = true;
+        record.samus_effect_loaded_bank = bank;
+        record.samus_effect_loaded_texture_base = texture_base;
+        record.samus_effect_loaded_group_address = group_address;
+        record.samus_effect_loaded_image_address = image_address;
+        record.samus_effect_loaded_palette_address = palette_address;
+        cpu_probe_samus_effect_palette_address = palette_address;
+      }
+    }
+    if (samus_effect_gx_tlut_probe && cpu_probe_samus_effect_palette_address != 0 &&
+        state->gpr[4] == cpu_probe_samus_effect_palette_address)
+    {
+      record.samus_effect_gx_tlut_call = true;
+      record.samus_effect_gx_tlut_address = state->gpr[4];
+    }
+    if (samus_effect_particle_probe && state->gpr[5] == 34)
+    {
+      // psGenerateParticle0's source ABI carries bank, command kind and
+      // texture-group identity in r5-r7. This observes simulation-side use
+      // without depending on a video backend or sampling graphics output.
+      record.samus_effect_particle_spawn = true;
+      record.samus_effect_particle_bank = state->gpr[5];
+      record.samus_effect_particle_kind = state->gpr[6];
+      record.samus_effect_particle_group = state->gpr[7] & 0xffff;
+    }
+    if (pc == 0x80398614)
+    {
+      // psInitDataBankLocate receives the texture bank root in r4. Its source
+      // group table is still relative at entry; compute the address the
+      // original routine will publish for a C8 palette without writing guest
+      // memory. The signature is diagnostic-only and does not affect the
+      // capture or source execution.
+      u32 group_count = 0;
+      u32 group_offset = 0;
+      u32 image_count = 0;
+      u32 format = 0;
+      u32 width = 0;
+      u32 height = 0;
+      u32 palette_counts = 0;
+      u32 image_offset = 0;
+      u32 palette_offset = 0;
+      const u32 bank_base = state->gpr[4];
+      if (ReadU32(system, bank_base, &group_count) && group_count >= 1 &&
+          group_count <= 256 && ReadU32(system, bank_base + 4, &group_offset) &&
+          group_offset != 0 && group_offset <= 0x100000 &&
+          bank_base + group_offset >= bank_base &&
+          ReadU32(system, bank_base + group_offset, &image_count) &&
+          ReadU32(system, bank_base + group_offset + 4, &format) &&
+          ReadU32(system, bank_base + group_offset + 12, &width) &&
+          ReadU32(system, bank_base + group_offset + 16, &height) &&
+          ReadU32(system, bank_base + group_offset + 20, &palette_counts) &&
+          ReadU32(system, bank_base + group_offset + 24, &image_offset) &&
+          ReadU32(system, bank_base + group_offset + 28, &palette_offset) &&
+          image_count == 1 && format == 9 && width == 64 && height == 64 &&
+          palette_counts == 0 && image_offset == 0x40 &&
+          palette_offset == 0x80a8812a)
+      {
+        record.effect_group_present = true;
+        record.effect_bank_base = bank_base;
+        record.effect_group_address = bank_base + group_offset;
+        record.effect_palette_offset = palette_offset;
+        const u32 target = bank_base + palette_offset;
+        record.effect_palette_address = target;
+        record.effect_literal_palette_readable =
+            IsMem1Range(palette_offset, record.effect_literal_palette.size()) &&
+            ReadMem1(system, palette_offset, record.effect_literal_palette.size(),
+                     record.effect_literal_palette.data());
+        u32 readable_target = target;
+        if (readable_target < 0x01800000)
+          readable_target += 0x80000000;
+        record.effect_palette_readable =
+            IsMem1Range(readable_target, record.effect_palette.size()) &&
+            ReadMem1(system, readable_target, record.effect_palette.size(),
+                     record.effect_palette.data());
+      }
+    }
+    if (samus_effect_bank_probe && !record.effect_group_present)
+      return;
+    if (samus_effect_bank_load_probe && !record.samus_effect_loaded_group_present)
+      return;
+    if (samus_effect_gx_tlut_probe && !record.samus_effect_gx_tlut_call)
+      return;
+    if (samus_effect_particle_probe && !record.samus_effect_particle_spawn)
+      return;
+    if (record.effect_group_present)
+      cpu_probe_effect_group_found = true;
     for (u32 slot = 0; slot < record.fighters.size(); ++slot)
     {
       if (!fighter_present[slot])
@@ -775,25 +975,22 @@ struct Observer::Impl
     return true;
   }
 
-  bool AddFighterSlices(Core::System* system, u32 slot, u32 pointer)
+  bool AddFighterSlices(Core::System* system, u32 slot, u32 entity_index, u32 pointer)
   {
-    if (!AddSlice(system, SliceTag::FighterHead, pointer, 0x100, static_cast<u16>(slot)) ||
+    const u16 flags = FighterEntitySliceFlags(slot, entity_index);
+    if (!AddSlice(system, SliceTag::FighterHead, pointer, 0x100, flags) ||
         !AddSlice(system, SliceTag::FighterInputAnim, pointer + 0x620, 0x280,
-                  static_cast<u16>(slot)) ||
+                  flags) ||
         !AddSlice(system, SliceTag::FighterDamageShield, pointer + 0x1830, 0x16c,
-                  static_cast<u16>(slot)) ||
-        !AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1,
-                  static_cast<u16>(slot)))
+                  flags))
       return false;
     u32 subject = 0;
     if (!ReadU32(system, pointer + 0x890, &subject))
       return false;
-    if (subject && !AddSlice(system, SliceTag::FighterSubject, subject, 0x28,
-                             static_cast<u16>(slot)))
+    if (subject && !AddSlice(system, SliceTag::FighterSubject, subject, 0x28, flags))
       return false;
     if (cpu_slots[slot] &&
-        !AddSlice(system, SliceTag::CpuState, pointer + 0x1a88, 0x57c,
-                  static_cast<u16>(slot)))
+        !AddSlice(system, SliceTag::CpuState, pointer + 0x1a88, 0x57c, flags))
       return false;
     return true;
   }
@@ -811,13 +1008,20 @@ struct Observer::Impl
       return false;
     for (u32 slot = 0; slot < 4; ++slot)
     {
-      if (fighter_present[slot] && !AddFighterSlices(system, slot, fighter_pointers[slot]))
-        return false;
-      if (fighter_present[slot] &&
-          (!AddSlice(system, SliceTag::Hud, 0x804a10c8 + slot * 0x64, 0x11,
-                     static_cast<u16>(slot)) ||
-           !AddSlice(system, SliceTag::Magnifier, 0x804a1de0 + 0x14 + slot * 0x10 + 0xc, 1,
-                     static_cast<u16>(slot))))
+      if (!fighter_present[slot])
+        continue;
+      for (u32 entity_index = 0; entity_index < fighter_entity_count[slot]; ++entity_index)
+      {
+        if (!AddFighterSlices(system, slot, entity_index,
+                              fighter_entity_pointers[slot][entity_index]))
+          return false;
+      }
+      if (!AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1,
+                    static_cast<u16>(slot)) ||
+          !AddSlice(system, SliceTag::Hud, 0x804a10c8 + slot * 0x64, 0x11,
+                    static_cast<u16>(slot)) ||
+          !AddSlice(system, SliceTag::Magnifier, 0x804a1de0 + 0x14 + slot * 0x10 + 0xc, 1,
+                    static_cast<u16>(slot)))
         return false;
     }
     if (!AddSlice(system, SliceTag::Camera, 0x80452c68, 0x4c))
@@ -1437,6 +1641,11 @@ struct Observer::Impl
         prize_mode_exit_seen = false;
         fighter_present.fill(false);
         fighter_pointers.fill(0);
+        for (auto& entities : fighter_entity_pointers)
+          entities.fill(0);
+        for (auto& kinds : fighter_entity_kinds)
+          kinds.fill(0);
+        fighter_entity_count.fill(0);
         cpu_slots.fill(false);
         draw_ordinal = 0;
         const auto* setup = system->GetMemory().GetPointerForRange(setup_pointer, 0x138);
@@ -1487,17 +1696,23 @@ struct Observer::Impl
     {
       if (!match_active)
         return;
-      u32 pointer = 0;
+      const u32 gobj = state->gpr[3];
+      u32 fighter = 0;
+      u32 kind = 0;
       u8 slot = 0xff;
-      if (!AddSlice(system, SliceTag::FighterCreateContext, state->gpr[3], 0x30) ||
-          !ReadU32(system, state->gpr[3] + 0x2c, &pointer) || !pointer ||
-          !ReadBytes(system, pointer + 0xc, 1, &slot) || slot >= active_slot_count ||
-          fighter_present[slot])
-        return SetInvalid("fighter creation exposed an invalid source slot"), void();
-      fighter_pointers[slot] = pointer;
-      fighter_present[slot] = true;
-      if (!AddSlice(system, SliceTag::FighterHead, pointer, 0x100,
-                    static_cast<u16>(slot)))
+      u32 entity_index = 0;
+      if (!IsMem1Range(gobj, 0x30) || !ReadU32(system, gobj + 0x2c, &fighter) || !fighter ||
+          !ReadFighterSourceSlot(system, fighter, &slot) ||
+          !ReadU32(system, fighter + 0x4, &kind))
+        return SetInvalid("fighter creation returned an unreadable GObj/Fighter identity"), void();
+      if (slot >= active_slot_count)
+        return SetInvalid("fighter creation exposed an out-of-range source slot"), void();
+      if (!RegisterFighterEntity(slot, fighter, kind, &entity_index))
+        return SetInvalid("fighter creation repeated or exceeded source-slot entity identity"),
+               void();
+      const u16 flags = FighterEntitySliceFlags(slot, entity_index);
+      if (!AddSlice(system, SliceTag::FighterCreateContext, gobj, 0x30, flags) ||
+          !AddSlice(system, SliceTag::FighterHead, fighter, 0x100, flags))
         return SetInvalid("fighter creation slices escaped the pinned ranges"), void();
     }
     else if (boundary == Boundary::SourceTick || boundary == Boundary::DrawEnter ||
@@ -1669,6 +1884,11 @@ struct Observer::Impl
           setup_ready = false;
           fighter_present.fill(false);
           fighter_pointers.fill(0);
+          for (auto& entities : fighter_entity_pointers)
+            entities.fill(0);
+          for (auto& kinds : fighter_entity_kinds)
+            kinds.fill(0);
+          fighter_entity_count.fill(0);
           return;
         }
         if (reset == SceneResetAction::Invalid)
@@ -1938,7 +2158,68 @@ struct Observer::Impl
             !AppendHexBytes(json, fighter.flags.data(), fighter.flags.size()) || !append("\"}"))
           return false;
       }
-      if (!append("]}"))
+      if (!append("]"))
+        return false;
+      if (record.effect_group_present)
+      {
+        if (!append(",\"samus_effect_group\":{\"bank_base\":\"0x") ||
+            !append_hex32(record.effect_bank_base) ||
+            !append("\",\"group_address\":\"0x") ||
+            !append_hex32(record.effect_group_address) ||
+            !append("\",\"palette_offset\":\"0x") ||
+            !append_hex32(record.effect_palette_offset) ||
+            !append("\",\"palette_address\":\"0x") ||
+            !append_hex32(record.effect_palette_address) ||
+            !append("\",\"palette_readable\":") ||
+            !append(record.effect_palette_readable ? "true" : "false"))
+          return false;
+        if (!append(",\"literal_palette_address\":\"0x") ||
+            !append_hex32(record.effect_palette_offset) ||
+            !append("\",\"literal_palette_readable\":") ||
+            !append(record.effect_literal_palette_readable ? "true" : "false"))
+          return false;
+        if (record.effect_literal_palette_readable &&
+            (!append(",\"literal_palette_512\":\"0x") ||
+             !AppendHexBytes(json, record.effect_literal_palette.data(),
+                             record.effect_literal_palette.size()) ||
+             !append("\"")))
+          return false;
+        if (record.effect_palette_readable &&
+            (!append(",\"palette_512\":\"0x") ||
+             !AppendHexBytes(json, record.effect_palette.data(),
+                             record.effect_palette.size()) ||
+             !append("\"")))
+          return false;
+        if (!append("}"))
+          return false;
+      }
+      if (record.samus_effect_loaded_group_present)
+      {
+        if (!append(",\"samus_effect_loaded_group\":{\"bank\":") ||
+            !append_number(record.samus_effect_loaded_bank) ||
+            !append(",\"texture_base\":\"0x") ||
+            !append_hex32(record.samus_effect_loaded_texture_base) ||
+            !append("\",\"group_address\":\"0x") ||
+            !append_hex32(record.samus_effect_loaded_group_address) ||
+            !append("\",\"image_address\":\"0x") ||
+            !append_hex32(record.samus_effect_loaded_image_address) ||
+            !append("\",\"palette_address\":\"0x") ||
+            !append_hex32(record.samus_effect_loaded_palette_address) || !append("\"}"))
+          return false;
+      }
+      if (record.samus_effect_gx_tlut_call &&
+          (!append(",\"samus_effect_gx_tlut\":{\"palette_address\":\"0x") ||
+           !append_hex32(record.samus_effect_gx_tlut_address) || !append("\"}")))
+        return false;
+      if (record.samus_effect_particle_spawn &&
+          (!append(",\"samus_effect_particle_spawn\":{\"bank\":") ||
+           !append_number(record.samus_effect_particle_bank) ||
+           !append(",\"kind\":") ||
+           !append_number(record.samus_effect_particle_kind) ||
+           !append(",\"texture_group\":") ||
+           !append_number(record.samus_effect_particle_group) || !append("}")))
+        return false;
+      if (!append("}"))
         return false;
     }
     return append("]}\n");
@@ -2176,6 +2457,10 @@ struct Observer::Impl
   size_t raw_size = 0;
   std::array<u32, 4> fighter_pointers{};
   std::array<bool, 4> fighter_present{};
+  std::array<std::array<u32, 2>, 4> fighter_entity_pointers{};
+  std::array<std::array<u32, 2>, 4> fighter_entity_kinds{};
+  std::array<u8, 4> fighter_entity_count{};
+  u32 cpu_probe_samus_effect_palette_address = 0;
   std::array<bool, 4> cpu_slots{};
   u32 setup_pointer = 0;
   u32 active_slot_count = 0;
@@ -2188,6 +2473,7 @@ struct Observer::Impl
   bool cpu_probe_valid = false;
   bool cpu_probe_closed = false;
   bool cpu_probe_written = false;
+  bool cpu_probe_effect_group_found = false;
   std::atomic<bool> cpu_probe_published{false};
   std::string cpu_probe_output_path;
   u32 cpu_probe_match = 0;

@@ -86,10 +86,12 @@ For each declared workload:
    makes no accuracy claim.
 5. Freeze the browser build with `scripts/prepare_prototype.py`, serve it with
    `scripts/serve.py`, and run `scripts/capture_cpu_browser.mjs` against the
-   real HTTP `runtime.html` URL with `--headed`. Arrange this foreground session
-   with the user or use a separate test machine. The script launches visible Chrome, imports
-   the local disc, uses the existing development replay controls, and retains
-   exports, errors and playing/ending screenshots. It hashes each frozen
+   real HTTP `runtime.html` URL with exactly one of `--headless` or `--headed`.
+   Use `--headless` for functional comparison; the same source draw traversal,
+   canvas-buffer bounds, exports, errors and playing/ending screenshots are
+   checked and retained. Use `--headed` only for an explicitly arranged
+   foreground session. The runner imports the local disc,
+   uses the existing development replay controls and hashes each frozen
    artifact through real browser HTTP fetches before and after the match.
 6. Join the evidence with `scripts/check_cpu_match.py --manifest PATH
    --output PATH`. Run `scripts/analyze_cpu_coverage.py` for a standalone
@@ -161,9 +163,10 @@ its owned fighters; both sidecars require that no match fighters remain owned.
 
 The native trace excludes source drawing. Its result is retained separately:
 original drawing can affect later gameplay, including magnifier-related
-state. The visible browser must independently execute the compiled CPU logic
-and original draw traversal. A headless pass alone is insufficient, and a
-headless divergence is not hidden by a browser pass.
+state. The browser must independently execute the compiled CPU logic and
+original draw traversal. Headless Chrome is valid for this functional state
+comparison because it renders the source canvas; a trace that omits source
+drawing is not. A headless divergence is not hidden by another browser pass.
 
 The four-player trace demonstrates this dependency. Original
 `ifMagnify_802FBBDC` sets the offscreen flag during scene-camera drawing.

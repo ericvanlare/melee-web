@@ -192,11 +192,23 @@ struct GameplayWorld::Storage {
         };
         for(const char* name:{"PlCo.dat","ItCo.usd","EfCoData.dat","PdPm.dat","LbRb.dat"})load(name);
         if(stage)load(stage->archive);
-        for(unsigned slot=0;slot<selection.player_count;++slot)
-            selected_costumes[selection.fighter_kinds[slot]].insert(selection.costume_indices[slot]);
         for(unsigned slot=0;slot<selection.player_count;++slot){
-            const auto kind=selection.fighter_kinds[slot];
-            if(!melee_web_fighter_content_by_kind(kind))throw DatError("No runtime owner for selected source fighter kind");
+            const auto primary=selection.fighter_kinds[slot];
+            const auto* dependency=melee_web_fighter_content_by_kind(primary);
+            if(!dependency)throw DatError("No runtime owner for selected source fighter kind");
+            for(unsigned identity=0;identity<melee_web_fighter_kind_count(dependency->character_kind);++identity){
+                const auto kind=static_cast<unsigned>(melee_web_fighter_kind_at(dependency->character_kind,identity));
+                if(!melee_web_fighter_content_by_kind(kind))throw DatError("No runtime owner for source alternate fighter kind");
+                selected_costumes[kind].insert(selection.costume_indices[slot]);
+            }
+        }
+        std::set<unsigned> requested_kinds;
+        for(unsigned slot=0;slot<selection.player_count;++slot){
+            const auto* dependency=melee_web_fighter_content_by_kind(selection.fighter_kinds[slot]);
+            if(!dependency)throw DatError("No runtime owner for selected source fighter kind");
+            for(unsigned identity=0;identity<melee_web_fighter_kind_count(dependency->character_kind);++identity){
+            const auto kind=static_cast<unsigned>(melee_web_fighter_kind_at(dependency->character_kind,identity));
+            if(!requested_kinds.insert(kind).second)continue;
             for(const auto& costume:fighter_costumes())if(costume.fighter_kind==kind){
                 if(costume.costume_index==0){
                     identities[kind]=&costume;
@@ -216,9 +228,13 @@ struct GameplayWorld::Storage {
                 }
             }
             if(!identities.contains(kind))throw DatError("Pinned fighter identity missing");
+            }
         }
         // Fighter effect dependencies are selected below from source identities.
-        for(const auto& [kind,identity]:identities)load(melee_web_fighter_content_by_kind(kind)->effect_archive);
+        for(const auto& [kind,identity]:identities){
+            const auto* dependency=melee_web_fighter_content_by_kind(kind);
+            if(dependency->effect_archive)load(dependency->effect_archive);
+        }
         for(const auto& [kind,identity]:identities)identity_order.push_back(kind);
         // Decode before acquiring the source world whenever possible.
         DatCommon common_data(*archive("PlCo.dat"));
@@ -304,8 +320,23 @@ struct GameplayWorld::Storage {
             if(fighter_at<identity_order.size()){
                 const unsigned kind=identity_order[fighter_at++];
                 const auto* identity=identities.at(kind);
+            std::shared_ptr<const DatArchive> nana_popo_fighter;
+            const FighterCostume* nana_popo_identity=nullptr;
+            std::span<const uint8_t> nana_popo_animation;
+            if(kind==FTKIND_NANA){
+                const auto popo=std::find_if(fighter_costumes().begin(),fighter_costumes().end(),
+                    [](const FighterCostume& value){
+                        return value.fighter_kind==FTKIND_POPO&&value.costume_index==0;
+                    });
+                if(popo==fighter_costumes().end())
+                    throw DatError("Nana source fallback is missing the authored Popo identity");
+                nana_popo_identity=&*popo;
+                nana_popo_fighter=archive(popo->fighter_filename);
+                nana_popo_animation=file(*runtime_files,popo->animation_filename);
+            }
             auto owner=std::make_unique<GameplayFighterAssets>(archive(identity->fighter_filename),
-                archive(identity->model_filename),file(*runtime_files,identity->animation_filename),*identity);
+                archive(identity->model_filename),file(*runtime_files,identity->animation_filename),*identity,
+                std::move(nana_popo_fighter),nana_popo_identity,nana_popo_animation);
             for(const auto& costume:fighter_costumes())
                 if(costume.fighter_kind==kind&&costume.costume_index!=0&&
                    selected_costumes[kind].contains(costume.costume_index)&&
@@ -320,18 +351,23 @@ struct GameplayWorld::Storage {
             check(purpose==GameplayWorldPurpose::Results?
                 melee_web_effect_runtime_prepare(error,sizeof(error)):
                 melee_web_effect_runtime_begin(error,sizeof(error)),error);effect_started=true;
-            common_effects=std::make_unique<DatEffectEntries>(archive("EfCoData.dat"),"effCommonDataTable",0,47,true);
+            const std::vector<NativeDatSourceRegion> particle_source_regions{{
+                gale01r2_itco_data_address,archive("ItCo.usd")}};
+            common_effects=std::make_unique<DatEffectEntries>(archive("EfCoData.dat"),
+                "effCommonDataTable",0,47,true,particle_source_regions);
             check(purpose==GameplayWorldPurpose::Results?
                 common_effects->publish_for_source(error,sizeof(error)):
                 common_effects->load(error,sizeof(error)),error);
             std::set<unsigned> effect_banks;
             for(const auto& [kind,identity]:identities){
                 const auto* dependency=melee_web_fighter_content_by_kind(kind);
+                if(!dependency->effect_archive)continue;
                 if(!effect_banks.insert(dependency->effect_bank).second)continue;
                 /* Fighter effect tables may carry the original packed particle
                  * callback channel (Falco bank 3 entry 1 does). */
                 auto effect=std::make_unique<DatEffectEntries>(archive(dependency->effect_archive),
-                    dependency->effect_symbol,dependency->effect_bank,dependency->effect_count,true);
+                    dependency->effect_symbol,dependency->effect_bank,dependency->effect_count,
+                    true,particle_source_regions);
                 check(purpose==GameplayWorldPurpose::Results?effect->publish_for_source(error,sizeof(error)):
                     effect->load(error,sizeof(error)),error);effects.push_back(std::move(effect));
             }
@@ -438,7 +474,7 @@ struct GameplayWorld::Storage {
                 throw DatError("Original source mutated immutable archive: "+name);
         }
     }
-    void close(){
+    void close(const std::function<void()>& after_effect_runtime_end = {}){
         for(const auto& [kind,fighter]:fighters)
             if(fighter->live_fighters())throw DatError("Close all fighter/render contexts before the runtime world");
         end_stage();
@@ -449,6 +485,7 @@ struct GameplayWorld::Storage {
         stage_items.reset();
         item_colors.reset();item_arena.reset();
         if(effect_started){check(melee_web_effect_runtime_end(error,sizeof(error)),error);effect_started=false;}
+        if(after_effect_runtime_end)after_effect_runtime_end();
         if(stage_map){check(melee_web_stage_map_close(stage_map,error,sizeof(error)),error);stage_map=nullptr;}
         stage_effects.reset();
         if(stage_native){check(melee_web_native_joint_destroy(stage_native,error,sizeof(error)),error);stage_native=nullptr;}
@@ -510,7 +547,9 @@ void GameplayWorld::verify_result_source_loads()const{
     check(storage_->common_effects->verify_source_load(error,sizeof(error)),error);
     for(const auto& effect:storage_->effects)check(effect->verify_source_load(error,sizeof(error)),error);
 }
-void GameplayWorld::close(){storage_->close();}
+void GameplayWorld::close(const std::function<void()>& after_effect_runtime_end){
+    storage_->close(after_effect_runtime_end);
+}
 MeleeWebCollision* GameplayWorld::collision()const{return storage_->collision;}
 float GameplayWorld::floor_height(float x)const{
     MeleeWebCollisionFloorResult floor;char error[256];

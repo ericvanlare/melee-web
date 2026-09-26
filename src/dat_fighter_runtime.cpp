@@ -262,6 +262,36 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #undef READ_PEACH
         require(peach_->absorb_bone >= 0 && peach_->absorb_bone < 140 && peach_->absorb_size > 0,
                 "Peach absorb descriptor is outside checked part bounds");
+    } else if (costume_->fighter_kind == 13) {
+        region(data, extension_, MELEE_WEB_SAMUS_ATTRIBUTE_BYTES);
+        samus_.emplace();
+#define READ_SAMUS(at, type, name, original) samus_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_SAMUS_ATTRIBUTE_FIELDS(READ_SAMUS)
+#undef READ_SAMUS
+    } else if (costume_->fighter_kind == 4) {
+        // Kirby's special-state callbacks consume the complete source ABI,
+        // including donor-specific copy-state attributes.
+        region(data, extension_, 0x424);
+    } else if (costume_->fighter_kind == 10 || costume_->fighter_kind == 11) {
+        // Popo and Nana share ftIceClimberAttributes, but consume different
+        // source fields during their OnLoad routines.
+        region(data, extension_, 0x15C);
+    } else if (costume_->fighter_kind == 14) {
+        // Yoshi's 0x138 extension is also viewed through ftYs_DatAttrs by
+        // special-N/Hi/Lw callbacks. Preserve those authored overlay lanes.
+        region(data, extension_, MELEE_WEB_YOSHI_ATTRIBUTE_BYTES);
+        yoshi_.emplace();
+#define READ_YOSHI(at, type, name, original) yoshi_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_YOSHI_ATTRIBUTE_FIELDS(READ_YOSHI)
+#undef READ_YOSHI
+    } else if (costume_->fighter_kind == 7) {
+        // Sheik's independent 0x74 ftSeakAttributes record is live after the
+        // source Zelda/Sheik transformation; retain its exact source extent.
+        region(data, extension_, 0x74);
+    } else if (costume_->fighter_kind == 19) {
+        // Zelda has a distinct 0xA8 ftZelda_DatAttrs record, including the
+        // trailing ReflectDesc byte lane.
+        region(data, extension_, 0xA8);
     }
     // ftColl_8007B320 enforces 15 hurt capsules and 11 dynamics spheres;
     // ftCo_8009CF84 enforces strictly fewer than 10 dynamics sets.

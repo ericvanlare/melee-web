@@ -33,6 +33,16 @@ class NativeJointDescriptorTests(unittest.TestCase):
                 result=subprocess.run([str(output),str(fighter),str(costume)],capture_output=True,text=True,timeout=20)
                 self.assertEqual(result.returncode,0,result.stdout+result.stderr)
                 self.assertIn("Local Mario metal graph:61 matching joints,8 DObj occurrences,21 PObjs passed",result.stdout)
+            samus=ROOT/"assets-local/next-gate/PlSs.dat"
+            if samus.is_file():
+                result=subprocess.run([str(output),"--samus",str(samus)],capture_output=True,text=True,timeout=20)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertIn("Samus grapple native graph:",result.stdout)
+            yoshi=ROOT/"assets-local/next-gate/PlYs.dat"
+            if yoshi.is_file():
+                result=subprocess.run([str(output),"--yoshi",str(yoshi)],capture_output=True,text=True,timeout=20)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertIn("Yoshi EggThrow native model:",result.stdout)
 
 
 class NativeFighterOutputGuardTests(unittest.TestCase):

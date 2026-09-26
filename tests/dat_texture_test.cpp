@@ -329,6 +329,17 @@ void native_bump_descriptor()
     (void) owner;
 }
 
+void native_hilight_texgen()
+{
+    Fixture fixture;
+    put32(fixture.data, Fixture::tobj + 12, 5); // Original GX_TG_TEX1 source.
+    put32(fixture.data, Fixture::tobj + 64, 0x00040082); // HILIGHT, EXT, MODULATE.
+    const auto native = fixture.read(true);
+    check(native.second.source == 5 && native.second.source_flags == 0x00040082,
+          "native HSD retains source HILIGHT texgen and authored flags");
+    rejects([&] { (void) fixture.read(false); });
+}
+
 void unsupported_graphs_and_transforms()
 {
     for (const auto offset : {0U, 4U, 88U}) {
@@ -492,6 +503,7 @@ int main(int argc, char** argv)
         {"palette_indices", palette_indices}, {"lod_sampler", lod_sampler},
         {"operations_and_modes", operations_and_modes},
         {"native_bump_descriptor", native_bump_descriptor},
+        {"native_hilight_texgen", native_hilight_texgen},
         {"reflection_srt_and_chains", reflection_srt_and_chains},
         {"inactive_tev_descriptors", inactive_tev_descriptors},
         {"unsupported_graphs_and_transforms", unsupported_graphs_and_transforms},

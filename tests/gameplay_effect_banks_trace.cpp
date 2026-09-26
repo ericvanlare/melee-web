@@ -98,6 +98,38 @@ static Bytes fixture(){
     std::fill(b.begin()+32+0xc0,b.begin()+32+0xe0,0x73);
     put32(b,32+0xe0,0);put32(b,32+0xe0+4,4);b[32+0xe0+16]='r';return b;
 }
+static Bytes null_command_fixture(){
+    auto b=fixture();
+    const Bytes command(b.begin()+32+0x30,b.begin()+32+0x80);
+    const Bytes texture(b.begin()+32+0x80,b.begin()+32+0xe0);
+    b.insert(b.begin()+32+0xe0,0x20,0);
+    put32(b,0,uint32_t(b.size()));put32(b,4,0x100);
+    std::copy(command.begin(),command.end(),b.begin()+32+0x38);
+    std::copy(texture.begin(),texture.end(),b.begin()+32+0xa0);
+    put32(b,32+4,0xa0);put32(b,32+0x28,2);
+    put32(b,32+0x2c,0x18);put32(b,32+0x30,0);
+    return b;
+}
+static void null_particle_command(){
+    auto archive=std::make_shared<melee_web::DatArchive>(null_command_fixture());
+    melee_web::DatEffectBanks owner(archive,"r",1);
+    MeleeWebEffectBankStats stats{};
+    check(melee_web_effect_bank_stats(owner.bank(),&stats,error,sizeof(error)),"null-row bank stats");
+    check(stats.first_command==1000&&stats.command_count==2,
+          "null command preserves its source command-table index");
+    const auto saved_ref=hsd_804D0948[1];const auto saved_tex=psTexGroupArray[1];
+    const auto saved_form=psNumCmdList[1];const auto saved_cmd=ptclref_804D0E5C[1];
+    const int saved_count=psCmdListArray[1];HSD_PSFormGroup** saved_groups=psFormGroupArray[1];
+    check(melee_web_gameplay_startup(4U*1024U*1024U,error,sizeof(error)),"null-row bank startup");
+    check(melee_web_effect_bank_attach(owner.bank(),error,sizeof(error)),"null-row bank registration");
+    check(melee_web_effect_bank_has_command(1,1000)&&!melee_web_effect_bank_has_command(1,1001),
+          "null command remains absent at its exact source index");
+    check(melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"null-row bank detach");
+    check(melee_web_gameplay_shutdown(error,sizeof(error)),"null-row bank teardown");
+    check(hsd_804D0948[1]==saved_ref&&psTexGroupArray[1]==saved_tex&&psNumCmdList[1]==saved_form&&
+          ptclref_804D0E5C[1]==saved_cmd&&psCmdListArray[1]==saved_count&&
+          psFormGroupArray[1]==saved_groups,"null-row bank restores original globals");
+}
 static Bytes palette_fixture(uint32_t format_word){
     // One C4 image and its palette, each in a bounded 32-byte region.
     auto b=fixture();b.resize(32+0x100+8+8+2);
@@ -322,6 +354,7 @@ int main(int argc,char** argv){
     try{
         null_effect_row_boundaries();
         registration(std::make_shared<melee_web::DatArchive>(fixture()),"r",false);
+        null_particle_command();
         palette_format_word();
         for(unsigned mutation=0;mutation<5;++mutation){
             auto bytes=fixture();

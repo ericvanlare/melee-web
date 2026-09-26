@@ -72,6 +72,7 @@ uint32_t results_seed=0,prize_seed=0;
 std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)>
     results_input{nullptr,melee_web_pad_state_free};
 std::string terminal_match_observation;
+std::string match_observer_error;
 bool results_route_active=false;
 bool prize_route_active=false;
 std::unique_ptr<melee_web::RetailReplayRecipe> replay;
@@ -104,6 +105,17 @@ int expected_replay_scene(const melee_web::RetailReplayRecipe& recipe,size_t cur
  for(const auto& span:recipe.spans)
   if(cursor>=span.first_frame&&cursor<=span.last_frame)return span.scene;
  return 0;
+}
+std::string replay_scene_mismatch(const char* boundary,size_t cursor,
+                                 int expected,int observed){
+ std::string message="Whole-session replay ";message+=boundary;
+ message+=" scene mismatch at input ";message+=std::to_string(cursor);
+ message+=" (expected ";message+=std::to_string(expected);
+ message+=", observed ";message+=std::to_string(observed);
+ if(match){message+=", match source frame ";message+=std::to_string(match->source_frames());}
+ if(results){message+=", Results source frame ";message+=std::to_string(results->source_frames());}
+ if(prize){message+=", Prize source frame ";message+=std::to_string(prize->source_frames());}
+ message+=")";return message;
 }
 melee_web::FixedTickClock menu_clock;
 melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::CatchUp};
@@ -254,7 +266,7 @@ PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
-constexpr std::array<std::string_view,239> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
+constexpr std::array<std::string_view,357> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
  "PlDr.dat","PlDrAJ.dat","PlDrNr.dat","PlDrRe.dat","PlDrBu.dat","PlDrGr.dat","PlDrBk.dat","drmario.ssm",
  "PlFe.dat","PlFeAJ.dat","PlFeNr.dat","PlFeRe.dat","PlFeBu.dat","PlFeGr.dat","PlFeYe.dat","EfFeData.dat","emblem.ssm",
  "PlLk.dat","PlLkAJ.dat","PlLkNr.dat","PlLkRe.dat","PlLkBu.dat","PlLkBk.dat","PlLkWh.dat",
@@ -293,7 +305,7 @@ constexpr std::array<std::string_view,239> keys={"LbBf.dat","GmPause.usd","IfAll
  "GmRstMMt.dat",
  "GmRstMPk.dat",
  "GmRstMPc.dat",
- "GmRstMPr.dat",
+ "GmRstMPr.dat","GmRstMGw.dat",
  "ff_mario.hps",
  "ff_fox.hps",
  "ff_emb.hps",
@@ -319,6 +331,31 @@ constexpr std::array<std::string_view,239> keys={"LbBf.dat","GmPause.usd","IfAll
  "PlPeGr.dat",
  "EfPeData.dat",
  "peach.ssm",
+ "PlKb.dat","PlKbAJ.dat","PlKbNr.dat","PlKbYe.dat","PlKbBu.dat","PlKbRe.dat",
+ "PlKbGr.dat","PlKbWh.dat","EfKbData.dat","kirby.ssm","GmRstMKb.dat",
+ // Kirby's source copy move and hat roots, plus copy-specific effect banks.
+ "PlKbCpMr.dat","PlKbCpFx.dat","PlKbCpCa.dat","PlKbCpDk.dat","PlKbCpKp.dat",
+ "PlKbCpLk.dat","PlKbCpSk.dat","PlKbCpNs.dat","PlKbCpPe.dat","PlKbCpPp.dat",
+ "PlKbCpPk.dat","PlKbCpSs.dat","PlKbCpYs.dat","PlKbCpPr.dat","PlKbCpMt.dat",
+ "PlKbCpLg.dat","PlKbCpMs.dat","PlKbCpZd.dat","PlKbCpCl.dat","PlKbCpDr.dat",
+ "PlKbCpFc.dat","PlKbCpPc.dat","PlKbCpGw.dat","PlKbCpGn.dat","PlKbCpFe.dat",
+ "PlKbNrCpDk.dat","PlKbNrCpPr.dat","PlKbNrCpMt.dat","PlKbNrCpFc.dat","PlKbNrCpGw.dat",
+ "EfKbMs.dat","EfKbZd.dat","EfKbMr.dat","EfKbFx.dat","EfKbSs.dat","EfKbPk.dat",
+ "EfKbLg.dat","EfKbCa.dat","EfKbDk.dat","EfKbKp.dat","EfKbIc.dat","EfKbGn.dat","EfKbFe.dat",
+ "samus.ssm","yoshi.ssm","zs.ssm","GmRstMSs.dat","GmRstMZd.dat","GmRstMSk.dat",
+ "PlGw.dat","PlGwAJ.dat","PlGwNr.dat","gw.ssm",
+ "PlSs.dat","PlSsAJ.dat","PlSsNr.dat","PlSsPi.dat","PlSsBk.dat","PlSsGr.dat","PlSsLa.dat","EfSsData.dat",
+ "PlYs.dat","PlYsAJ.dat","PlYsNr.dat","PlYsRe.dat","PlYsBu.dat","PlYsYe.dat","PlYsPi.dat","PlYsAq.dat","EfYsData.dat","GmRstMYs.dat",
+ "PlZd.dat","PlZdAJ.dat","PlZdNr.dat","PlZdRe.dat","PlZdBu.dat","PlZdGr.dat","PlZdWh.dat",
+ "PlSk.dat","PlSkAJ.dat","PlSkNr.dat","PlSkRe.dat","PlSkBu.dat","PlSkGr.dat","PlSkWh.dat","EfZdData.dat",
+ "PlPp.dat","PlPpAJ.dat","PlPpNr.dat","PlPpGr.dat","PlPpOr.dat","PlPpRe.dat",
+ "PlNn.dat","PlNnAJ.dat","PlNnNr.dat","PlNnYe.dat","PlNnAq.dat","PlNnWh.dat","EfIcData.dat","GmRstMPn.dat","ice.ssm",
+ "ff_flat.hps","ff_ice.hps","ff_kirby.hps","ff_samus.hps","ff_yoshi.hps",
+};
+constexpr std::array<std::string_view,18> zelda_sheik_keys={
+ "PlZd.dat","PlZdAJ.dat","PlZdNr.dat","PlZdRe.dat","PlZdBu.dat","PlZdGr.dat","PlZdWh.dat",
+ "PlSk.dat","PlSkAJ.dat","PlSkNr.dat","PlSkRe.dat","PlSkBu.dat","PlSkGr.dat","PlSkWh.dat",
+ "EfZdData.dat","GmRstMZd.dat","GmRstMSk.dat","zs.ssm",
 };
 constexpr unsigned kDiagnosticPadButtons=PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT|PAD_BUTTON_DOWN|PAD_BUTTON_UP|
  PAD_TRIGGER_Z|PAD_TRIGGER_R|PAD_TRIGGER_L|PAD_BUTTON_A|PAD_BUTTON_B|PAD_BUTTON_X|PAD_BUTTON_Y|PAD_BUTTON_START;
@@ -1079,8 +1116,11 @@ void tick(){
    const bool replay_whole=replay&&replay->whole_session();
    if(replay_whole){
     check(replay_cursor<replay->frames.size(),"Whole-session replay ran past its declared timeline");
-    check(observed_replay_scene()==expected_replay_scene(*replay,replay_cursor),
-          "Whole-session replay source scene disagrees before input consumption");
+    const int expected=expected_replay_scene(*replay,replay_cursor);
+    const int observed=observed_replay_scene();
+    if(observed!=expected)
+     throw std::runtime_error(replay_scene_mismatch("pre-consumption",replay_cursor,
+                                                    expected,observed));
     sample=replay->frames[replay_cursor].pads.data();
     if(!replay_started){
      if(replay_trace)melee_web::retail_replay_session_initial(*replay);
@@ -1132,7 +1172,9 @@ void tick(){
     // recipe declared for this frame.
     const int expected=expected_replay_scene(*replay,replay_cursor);
     const int observed=observed_replay_scene();
-    check(observed==expected,"Whole-session replay drove an unexpected scene");
+    if(observed!=expected)
+     throw std::runtime_error(replay_scene_mismatch("post-consumption",replay_cursor,
+                                                    expected,observed));
     if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor,observed);
     ++replay_cursor;
     ++replay_steps;
@@ -1354,6 +1396,7 @@ if(scoped_assets)throw std::runtime_error("Scoped disc imports require an asset 
  if(std::string_view{name}=="dsp_coef.bin")throw std::runtime_error("Public audio-disabled runtime does not accept DSP coefficient input");
 #endif
  bool known=false;for(auto key:keys)known|=key==name;
+ for(auto key:zelda_sheik_keys)known|=key==name;
  if(!known)throw std::runtime_error("Unknown native menu file: "+std::string(name));
  archive_cache.reset();
  files[name]={data,data+size};return 1;
@@ -1483,7 +1526,7 @@ int melee_web_native_menu_player_state(unsigned player,int* fighter_kind,int* mo
                                        int* ground_or_air,unsigned* source_frame,
                                        float* position_x,float* position_y){try{
  if(!fighter_kind||!motion_id||!ground_or_air||!source_frame||!position_x||!position_y||
-    player>1||!match||!match->ready())
+    player>=4||!match||!match->ready())
   throw std::runtime_error("Player state requires a ready source match and valid output storage");
  const auto stats=match->player_stats(player);*fighter_kind=match->fighter_kind(player);
  *motion_id=stats.motion_id;*ground_or_air=stats.ground_or_air;*source_frame=match->source_frames();
@@ -1493,6 +1536,8 @@ const char* melee_web_native_menu_match_observe(){
  static char text[1024];
  if(!match)return terminal_match_observation.empty()?"{}":terminal_match_observation.c_str();
  if(!match->construction_complete())return "{}";
+ try{
+ match_observer_error.clear();
  const auto p0=match->player_stats(0),p1=match->player_stats(1);
  int winner=-1;const int outcome=match->outcome(winner);
  std::snprintf(text,sizeof(text),
@@ -1506,6 +1551,11 @@ const char* melee_web_native_menu_match_observe(){
   match->fighter_kind(0),p0.stocks,p0.motion_id,p0.ground_or_air,p0.position[0],p0.position[1],
   match->fighter_kind(1),p1.stocks,p1.motion_id,p1.ground_or_air,p1.position[0],p1.position[1]);
  return text;
+ }catch(const std::exception& e){
+  match_observer_error=e.what();
+  std::snprintf(text,sizeof(text),"{\"ready\":false,\"observer_error\":true}");
+  return text;
+ }
 }
 int melee_web_native_menu_drive_fighter(int character_kind){try{
  if(!host||melee_web_menu_host_phase(host)!=1)throw std::runtime_error("Fighter selection drive requires the original CSS");
@@ -1574,6 +1624,11 @@ const char* melee_web_native_menu_diagnostics(){
  static char text[640];
  std::snprintf(text,sizeof(text),"Completed matches: %u · stock check: %d · ticks: %u · stocks: %d · respawns: %d",
   completed_matches,stock_check,stock_tick,stock_count,stock_respawns);
+ if(!match_observer_error.empty()){
+  const auto length=std::char_traits<char>::length(text);
+  std::snprintf(text+length,sizeof(text)-length," · match observer error: %.320s",match_observer_error.c_str());
+  return text;
+ }
  const auto length=std::char_traits<char>::length(text);
  if(diagnostic_pad_remaining)
   std::snprintf(text+length,sizeof(text)-length," · raw PAD: port %u buttons 0x%04x stick [%d,%d] remaining %u",

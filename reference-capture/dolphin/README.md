@@ -25,6 +25,15 @@ reported as interrupted. Ring overflow, a bounded read or serialization
 failure, stream failure, or status failure latches `invalid: true`; no record
 is silently dropped.
 
+At each `Fighter_Create` return, the observer retains the GObj context and the
+returned Fighter head. Source player slots can own paired entities (for
+example Zelda/Sheik or Popo/Nana), so every fighter slice carries identity in
+its flags: the low byte is the exact source slot and the high byte is the
+entity index in source creation order. Entity zero keeps the legacy slot-only
+flag value. Per-player stock, HUD, and magnifier slices remain keyed by source
+slot alone. The observer accepts at most two distinct fighter kinds per slot;
+out-of-range slots, duplicate identities, and excess entities remain errors.
+
 The JIT callback flushes cached guest registers and only copies bounded raw
 memory slices. It never writes guest memory, single steps, or uses the debugger.
 The writer is a separate thread. The stream is opened with exclusive creation,
