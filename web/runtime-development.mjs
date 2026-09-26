@@ -260,7 +260,13 @@ $('pause').onclick=()=>{
   const state=owner.handle.getState();
   (state.paused?owner.handle.resume():owner.handle.pause()).catch(error=>log(error.message));
 };
-$('unload').onclick=async()=>{$('status').dataset.runtimeError='';try{await owner.handle.unload();stockCheckActive=false;}catch(error){log(error.message);$('status').dataset.runtimeError=error.message;}};
+$('unload').onclick=async()=>{$('status').dataset.runtimeError='';try{
+  // A diagnostic replay owns its collected rows until finishRetailReplay
+  // exports them. Ordinary owner unload alone would lose a bounded prefix.
+  if(retailRun)await finishRetailReplay('Manual unload stopped the replay');
+  else await owner.handle.unload();
+  stockCheckActive=false;
+}catch(error){log(error.message);$('status').dataset.runtimeError=error.message;}};
 controllerSettings = mountControllerSettings({
   container: $('controls-dialog'),
   storage: window.parent === window ? undefined : null,
