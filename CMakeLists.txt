@@ -223,7 +223,7 @@ if(EMSCRIPTEN)
   add_executable(gameplay_probe src/gameplay_probe.cpp src/dat_archive.cpp src/dat_common.cpp
     src/dat_collision.cpp src/dat_stage.cpp src/dat_fighter_runtime.cpp src/dat_fighter.cpp
     src/fighter_binding.cpp src/dat_animation.cpp)
-  target_link_libraries(gameplay_probe PRIVATE gameplay_runtime)
+  target_link_libraries(gameplay_probe PRIVATE hsd_native_runtime)
   target_compile_options(gameplay_probe PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
   target_link_options(gameplay_probe PRIVATE -sENVIRONMENT=node -sNODERAWFS=1 -sEXIT_RUNTIME=1
     -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)

@@ -132,17 +132,21 @@ int melee_web_archive_sections_close(MeleeWebArchiveSections* h,char* e,size_t n
     if(!h)return 1;
     MeleeWebArchiveSections** link=&scopes;while(*link&&*link!=h)link=&(*link)->next;
     if(!*link)return fail(e,n,"Native archive scope is not registered");
+    const int world_live=melee_web_gameplay_world_exists();
     if(h->heap_generation) {
-        if(melee_web_gameplay_world_exists())
+        if(world_live)
             return fail(e,n,"Scene-heap archive consumers must be destroyed before scope release");
-        /* Original lbArchive_80016DBC handles may be discarded by their
-         * callers and freed with the scene heap. Only this explicitly owned
-         * catalog may reclaim them, after the SDK world has been destroyed. */
+    }
+    if(!world_live) {
+        /* Source archives have no retail close call: their object is reclaimed
+         * with the world heap. Drop its typed owner at the same post-shutdown
+         * scope boundary, including for static symbol catalogs. */
         ArchiveHandle* opened=handles;
         while(opened) {
             ArchiveHandle* next=opened->next;
             for(size_t i=0;i<h->count;i++)if(!strcmp(opened->filename,h->entries[i].filename)) {
-                remove_handle(opened);break;
+                if(h->heap_generation || opened->source_archive) remove_handle(opened);
+                break;
             }
             opened=next;
         }

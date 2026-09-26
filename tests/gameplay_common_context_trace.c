@@ -2,6 +2,7 @@
 #include "gameplay_bootstrap.h"
 #include "gameplay_archive_sections.h"
 #include "gameplay_rumble.h"
+#include "gameplay_source_files.h"
 #include "hsd_native_joint.h"
 #include <melee/lb/types.h>
 #include <melee/ft/fighter.h>
@@ -23,6 +24,10 @@ static unsigned cpu_destroyed;
 extern void gm_801A4BD4(void);
 static struct Fighter_804D653C_t vs_rumble_rows[40];
 static MeleeWebArchiveSections* vs_archive_scope;
+static MeleeWebSourceFileScope* vs_source_files;
+/* Source loader needs an owned archive header; this trace's rumble rows are
+ * supplied separately through its explicit typed-symbol fixture. */
+static const uint8_t vs_rumble_archive_bytes[0x20] = {0};
 static int start_vs_manager(char* error, size_t size)
 {
     if(!melee_web_native_world_prepare_vs_manager(error,size))return 0;
@@ -78,6 +83,10 @@ int main(void)
             const MeleeWebArchiveSymbol rumble_symbol={"LbRb.dat","lbRumbleData",vs_rumble_rows};
             vs_archive_scope=melee_web_archive_sections_register(&rumble_symbol,1,error,sizeof(error));
             CHECK(vs_archive_scope);
+            const MeleeWebSourceFileInput rumble_file={"LbRb.dat",vs_rumble_archive_bytes,
+                                                       sizeof(vs_rumble_archive_bytes)};
+            vs_source_files=melee_web_source_files_begin(&rumble_file,1,error,sizeof(error));
+            CHECK(vs_source_files);
             CHECK(melee_web_gameplay_prepare_vs_startup(start_vs_manager,stop_vs_sis,
                                                         error,sizeof(error)));
         }
@@ -123,6 +132,8 @@ int main(void)
             CHECK(melee_web_rumble_clear_source_rows(vs_rumble_rows,error,sizeof(error)));
             CHECK(melee_web_archive_sections_close(vs_archive_scope,error,sizeof(error)));
             vs_archive_scope=NULL;
+            CHECK(melee_web_source_files_end(vs_source_files,error,sizeof(error)));
+            vs_source_files=NULL;
         }
         CHECK(melee_web_common_context_destroy(context,error,sizeof(error)));
         CHECK(melee_web_native_joint_destroy(root16,error,sizeof(error)));

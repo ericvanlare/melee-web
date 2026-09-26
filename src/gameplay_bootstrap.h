@@ -3,7 +3,6 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <sysdolphin/baselib/forward.h>
 
 #ifdef __cplusplus
 extern "C" {

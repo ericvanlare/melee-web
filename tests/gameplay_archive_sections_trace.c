@@ -76,5 +76,15 @@ int main(int argc,char** argv) {
     test_heap_exists=0;
     assert(melee_web_archive_sections_close(declared,error,sizeof(error)));
     if(argc==2&&!strcmp(argv[1],"heap_released"))melee_web_archive_sections_public(extra,"absent");
+    test_generation=2;test_heap_exists=1;
+    MeleeWebArchiveSymbol source_catalog={"Source.dat","source_root",&a};
+    MeleeWebArchiveSections* source_scope=melee_web_archive_sections_register(
+        &source_catalog,1,error,sizeof(error));assert(source_scope);
+    int source_archive_storage=0;
+    assert(melee_web_archive_sections_attach_source(&source_archive_storage,"Source.dat"));
+    assert(!melee_web_archive_sections_close(source_scope,error,sizeof(error)));
+    test_heap_exists=0;
+    assert(melee_web_archive_sections_close(source_scope,error,sizeof(error)));
+    assert(!melee_web_archive_sections_is_handle(&source_archive_storage));
     puts("Typed archive sections copied names, resolved aliases, rejected duplicates and restarted");
 }
