@@ -23,9 +23,13 @@ static uint32_t fighter_source;
 static uint64_t fighter_allocation_generation;
 static uint8_t fighter_valid;
 static MeleeWebSourceRegisterWord r5;
+static const char* r5_boundary = "reset";
+static uint32_t r5_line;
 
 static void clear_r5(void)
 {
+    r5_boundary = "reset";
+    r5_line = 0;
     memset(&r5, 0, sizeof(r5));
     r5.kind = MELEE_WEB_SOURCE_REGISTER_UNKNOWN;
     r5.world_generation = world_generation;
@@ -277,6 +281,8 @@ int melee_web_source_context_publish_floor_r5(void)
         return 0;
     }
     r5.source_word = current_sp + MELEE_WEB_GALE01R2_FLOOR_LOCAL_Y0;
+    r5_boundary = "floor-local";
+    r5_line = 0;
     r5.kind = MELEE_WEB_SOURCE_REGISTER_STACK_LOCAL;
     r5.known = 1;
     r5.world_generation = world_generation;
@@ -292,6 +298,8 @@ int melee_web_source_context_publish_seed_r5(void)
         return 0;
     }
     r5.source_word = MELEE_WEB_GALE01R2_SEED_WORD;
+    r5_boundary = "seed-global";
+    r5_line = 0;
     r5.kind = MELEE_WEB_SOURCE_REGISTER_SEED_GLOBAL;
     r5.known = 1;
     r5.world_generation = world_generation;
@@ -329,6 +337,16 @@ void melee_web_source_context_invalidate_r5(void)
 {
     clear_r5();
 }
+
+void melee_web_source_context_invalidate_r5_at(const char* boundary, uint32_t line)
+{
+    clear_r5();
+    r5_boundary = boundary ? boundary : "unknown";
+    r5_line = line;
+}
+
+const char* melee_web_source_context_r5_boundary(void) { return r5_boundary; }
+uint32_t melee_web_source_context_r5_line(void) { return r5_line; }
 
 MeleeWebSourceRegisterWord melee_web_source_context_r5(void)
 {

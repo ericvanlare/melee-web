@@ -67,6 +67,7 @@ const diagnostic=()=>page.evaluate(()=>{
     status:document.querySelector('#status')?.textContent||'',
     error:document.querySelector('#status')?.dataset.runtimeError||null,
     diagnostics:Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()),
+    runtimeLog:document.querySelector('#log')?.textContent||'',
     nativeCommandError:window.__meleeWebUnsupportedCommand||null,
     assetFatal:window.__meleeWebFighterAssetFatal||null,
     memory:JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_memory())),
@@ -489,13 +490,12 @@ try{
   if(page&&!page.isClosed()){
     await diagnostic().then(state=>{report.failure.diagnostics=state;}).catch(()=>{});
     await screenshot('failure').catch(()=>{});
-    await page.locator('body').innerText().then(text=>fs.writeFile(path.join(output,'page.txt'),text)).catch(()=>{});
+    await page.locator('body').textContent().then(text=>fs.writeFile(path.join(output,'page.txt'),text)).catch(()=>{});
   }
 }finally{
   report.final_diagnostics=page&&!page.isClosed()?await diagnostic().catch(error=>({error:error.message})):null;
   report.controller_inputs=report.controller_inputs||[];
   report.controller_input_summary={pad_samples:report.pad_sample_count,first_samples:report.controller_inputs.slice(0,48),last_samples:report.controller_inputs.slice(-24)};
-  report.controller_inputs=undefined;
   const artifactFailures=(await Promise.all(artifactReads)).filter(Boolean);
   report.provenance.source_end=sourceProvenance();
   report.provenance.source_unchanged=JSON.stringify(report.provenance.source_start)===

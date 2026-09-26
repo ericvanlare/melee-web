@@ -2,6 +2,7 @@
 #include "source_ppc_profile_gale01r2.h"
 
 #include <stdio.h>
+#include <string.h>
 
 static unsigned char fighter_storage[0x3000] __attribute__((aligned(32)));
 static unsigned char fighter_storage_variant[0x3000] __attribute__((aligned(32)));
@@ -94,6 +95,16 @@ int main(void)
 
     if (!melee_web_source_context_begin_tick(world_generation))
         return fail("source stack context did not begin for route rejection");
+    melee_web_source_context_invalidate_r5_at("trace-clobber", 123);
+    if (melee_web_source_context_r5().known ||
+        strcmp(melee_web_source_context_r5_boundary(), "trace-clobber") ||
+        melee_web_source_context_r5_line() != 123 ||
+        melee_web_source_context_resolve_skipped((void*) fighter_host,
+                                                  &stick_x, &stick_y))
+        return fail("clobber diagnostics changed rejection or lost the call site");
+    if (strcmp(melee_web_source_context_r5_boundary(), "reset") ||
+        melee_web_source_context_r5_line())
+        return fail("invalid carry metadata survived reset");
     ENTER(gobj_again, MELEE_WEB_SOURCE_FRAME_GOBJ_DISPATCH, 0x804EEAC8u);
     ENTER(fighter_again, MELEE_WEB_SOURCE_FRAME_FIGHTER_CPU_CALLBACK,
           0x804EEAB0u);

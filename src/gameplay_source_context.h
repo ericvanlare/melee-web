@@ -79,6 +79,11 @@ int melee_web_source_context_resolve_skipped(void* host_fighter,
                                              int8_t* stick_x,
                                              int8_t* stick_y);
 void melee_web_source_context_invalidate_r5(void);
+/* Diagnostic call-site identity only. Neither this tag nor its line is used
+ * when resolving a carry. boundary must have static storage duration. */
+void melee_web_source_context_invalidate_r5_at(const char* boundary, uint32_t line);
+const char* melee_web_source_context_r5_boundary(void);
+uint32_t melee_web_source_context_r5_line(void);
 MeleeWebSourceRegisterWord melee_web_source_context_r5(void);
 uint32_t melee_web_source_context_current_sp(void);
 uint64_t melee_web_source_context_generation(void);
