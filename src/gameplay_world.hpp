@@ -39,6 +39,10 @@ struct GameplayWorldSelection {
     bool begin_source_match=false;
     uint32_t source_camera_subjects=0;
     uint32_t source_random_seed=0;
+    // Complete menu payload retained by the match session. SourceOrdered
+    // startup applies fn_8016DCC0 between the original camera and refraction
+    // boundaries, before it loads effects and stage-owned services.
+    const StartMeleeData* source_start_data=nullptr;
     std::array<MeleeWebPlayerSettings,4> source_players{};
 };
 // Shared by the browser and source regression harness. Owns one original SDK

@@ -51,6 +51,7 @@ static uint64_t native_generation;
 extern HSD_IDTable default_table;
 extern HSD_ObjAllocData zlist_alloc_data;
 HSD_JObj* melee_web_native_common_load(HSD_Joint* descriptor, const uint8_t diffuse[4]);
+void melee_web_native_common_release_all(void);
 static int fail(char* error, size_t size, const char* message)
 {
     if (error && size) snprintf(error, size, "%s", message);
@@ -58,6 +59,10 @@ static int fail(char* error, size_t size, const char* message)
 }
 static void finish_native_world(void)
 {
+    /* Common material consumers discard their real loader roots without
+     * creating source GObjs. Release those explicit roots while HSD classes,
+     * descriptor IDs and the native heap are still live. */
+    melee_web_native_common_release_all();
     /* The source heap-reset callback forgets static display-list chains, but
      * live allocations still belong to the caller. Drop only an empty pool so
      * teardown cannot hide an ownership leak behind a reset. */

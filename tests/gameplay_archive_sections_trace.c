@@ -52,9 +52,24 @@ int main(int argc,char** argv) {
         void* owned=melee_web_archive_sections_open("Second.dat");
         assert(!melee_web_archive_sections_close_owned(other,&a,error,sizeof(error)));
         assert(melee_web_archive_sections_public(owned,"second")==&b);
-        assert(melee_web_archive_sections_close_owned(other,owned,error,sizeof(error)));
-        filename[0]='A';symbol[0]='f';
+    assert(melee_web_archive_sections_close_owned(other,owned,error,sizeof(error)));
+    filename[0]='A';symbol[0]='f';
     }
+    MeleeWebArchiveSymbol preloaded_symbol={"Preloaded.dat","root",&a};
+    MeleeWebArchiveSections* preload_scope=melee_web_archive_sections_register(
+        &preloaded_symbol,1,error,sizeof(error));assert(preload_scope);
+    assert(!melee_web_archive_sections_open_preloaded("Absent.dat"));
+    void* preloaded=melee_web_archive_sections_open_preloaded("Preloaded.dat");
+    assert(preloaded&&melee_web_archive_sections_open_preloaded("Preloaded.dat")==preloaded);
+    assert(melee_web_archive_sections_open_preloaded("/Preloaded.dat")==preloaded);
+    assert(melee_web_archive_sections_public(preloaded,"root")==&a);
+    void* ordinary=melee_web_archive_sections_open("Preloaded.dat");
+    assert(ordinary!=preloaded);
+    assert(!melee_web_archive_sections_close(preload_scope,error,sizeof(error)));
+    assert(melee_web_archive_sections_is_handle(preloaded));
+    assert(melee_web_archive_sections_close_owned(preload_scope,ordinary,error,sizeof(error)));
+    assert(!melee_web_archive_sections_is_handle(ordinary));
+    assert(!melee_web_archive_sections_is_handle(preloaded));
     MeleeWebArchiveSymbol catalog={"Extra.dat","source_options_root",NULL};
     MeleeWebArchiveSections* declared=melee_web_archive_sections_register(&catalog,1,error,sizeof(error));
     assert(declared && !melee_web_archive_sections_register(&catalog,1,error,sizeof(error)));
@@ -69,7 +84,8 @@ int main(int argc,char** argv) {
     declared=melee_web_archive_sections_register_heap(&catalog,1,error,sizeof(error));assert(declared);
     MeleeWebArchiveSymbol same_file={"Extra.dat","another_root",&a};
     assert(!melee_web_archive_sections_register(&same_file,1,error,sizeof(error)));
-    extra=melee_web_archive_sections_open("Extra.dat");
+    extra=melee_web_archive_sections_open_preloaded("/Extra.dat");
+    assert(extra&&melee_web_archive_sections_is_handle(extra));
     assert(!melee_web_archive_sections_close(declared,error,sizeof(error)));
     test_generation=0;
     assert(!melee_web_archive_sections_close(declared,error,sizeof(error)));
@@ -77,6 +93,24 @@ int main(int argc,char** argv) {
     assert(melee_web_archive_sections_close(declared,error,sizeof(error)));
     if(argc==2&&!strcmp(argv[1],"heap_released"))melee_web_archive_sections_public(extra,"absent");
     test_generation=2;test_heap_exists=1;
+    int pdpm_owner=41;void* pdpm_root=&pdpm_owner;
+    MeleeWebArchiveSymbol pdpm_symbol={"PdPm.dat","plLoadCommonData",&pdpm_root};
+    MeleeWebArchiveSections* pdpm_scope=melee_web_archive_sections_register(
+        &pdpm_symbol,1,error,sizeof(error));assert(pdpm_scope);
+    void* pdpm_preloaded=melee_web_archive_sections_open_preloaded("PdPm.dat");
+    assert(pdpm_preloaded&&pdpm_preloaded==
+        melee_web_archive_sections_open_preloaded("PdPm.dat"));
+    int pdpm_source_archive=0;
+    assert(melee_web_archive_sections_attach_source(&pdpm_source_archive,"PdPm.dat"));
+    void* pdpm_public=melee_web_archive_sections_public(&pdpm_source_archive,"plLoadCommonData");
+    assert(pdpm_public==&pdpm_root&&*(void**)pdpm_public==&pdpm_owner);
+    assert(!melee_web_archive_sections_close(pdpm_scope,error,sizeof(error)));
+    assert(melee_web_archive_sections_is_handle(pdpm_preloaded));
+    test_heap_exists=0;
+    assert(melee_web_archive_sections_close(pdpm_scope,error,sizeof(error)));
+    assert(!melee_web_archive_sections_is_handle(pdpm_preloaded));
+    assert(!melee_web_archive_sections_is_handle(&pdpm_source_archive));
+    test_heap_exists=1;
     MeleeWebArchiveSymbol source_catalog={"Source.dat","source_root",&a};
     MeleeWebArchiveSections* source_scope=melee_web_archive_sections_register(
         &source_catalog,1,error,sizeof(error));assert(source_scope);

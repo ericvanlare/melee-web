@@ -8,10 +8,11 @@ extern "C" {
 typedef struct MeleeWebStageLast MeleeWebStageLast;
 /* Begin a source-owned stage callback scope for one supported StKind. The
  * caller must have published that stage's GroundParam, native map archive,
- * lights, collision and effect bank first. The native descriptors, material
- * programs and particle bank must outlive this scope. */
+ * lights and effect bank first. source_ordered selects the original
+ * Stage_802251E8/Stage_8022524C setup and adopts its collision owner. Native
+ * descriptors, material programs and particle bank must outlive this scope. */
 MeleeWebStageLast* melee_web_stage_begin_kind(int stage_kind, void* yakumono,
-    MeleeWebEffectBank*, int defer_start, char*, size_t);
+    MeleeWebEffectBank*, int defer_start, int source_ordered, char*, size_t);
 /* Requires full native map/overrides, stage particle bank64, original effect
  * runtime, numeric stage/collision and original camera contexts already live.
  * These compatibility wrappers select Final Destination. */

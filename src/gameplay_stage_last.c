@@ -1,7 +1,9 @@
 #include "gameplay_stage_last.h"
 #include "gameplay_stage_map.h"
 #include "gameplay_effect_runtime.h"
+#include "gameplay_stage_context.h"
 #include "gameplay_bootstrap.h"
+#include "gameplay_collision.h"
 #include "gameplay_stage_profile.h"
 #include <melee/gr/ground.h>
 #include <melee/gr/grlast.h>
@@ -20,7 +22,6 @@ extern int melee_web_ground_map_storage_begin(void);
 extern int melee_web_ground_map_storage_end(void);
 extern int melee_web_ground_remove_unmapped(HSD_GObj*);
 extern void melee_web_ground_remove_camera(HSD_GObj*);
-extern void melee_web_ground_load_map_lights(void);
 struct MeleeWebStageLast {
     StageInfo saved;
     struct ftDeviceUnk3 device1[1],device3[1];
@@ -32,48 +33,62 @@ struct MeleeWebStageLast {
     HSD_GObj* manager;
     HSD_GObj* map_lights;
     uint64_t generation;
+    int source_ordered;
+    int lights_adopted;
+    const void* collision_map;
 };
 static MeleeWebStageLast* active;
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
-static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,void* yaku,MeleeWebEffectBank* map_bank,int defer_start,char* e,size_t n){
+static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,void* yaku,MeleeWebEffectBank* map_bank,int defer_start,int source_ordered,char* e,size_t n){
  MeleeWebEffectBankStats bank;
  if(!definition){fail(e,n,"Stage has no complete source callback profile");return NULL;}
  if(!map_bank&&!definition->allow_absent_particle_bank){fail(e,n,"Stage requires its actual registered particle bank64");return NULL;}
  if(map_bank&&!melee_web_effect_bank_stats(map_bank,&bank,e,n)||map_bank&&(bank.bank!=64||!bank.particle_bank_ready)){fail(e,n,"Stage requires its actual registered particle bank64");return NULL;}
- if(active||!yaku||!definition->source||!melee_web_effect_runtime_active()||!melee_web_stage_map_archives()||!stage_info.param||stage_info.grkind!=definition->ground_kind){fail(e,n,"Stage requires original effects and published native map/numeric stage contexts");return NULL;}
+ if(active||!yaku||!definition->source||!melee_web_effect_runtime_active()||!melee_web_stage_map_archives()||(!source_ordered&&(!stage_info.param||stage_info.grkind!=definition->ground_kind))){fail(e,n,"Stage requires original effects and published native map/numeric stage contexts");return NULL;}
  for(unsigned i=0;i<sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0]);i++)if(stage_info.map_gobjs[i]){fail(e,n,"Stage requires an empty source stage object registry");return NULL;}
  for(HSD_GObj* obj=((HSD_GObj**)HSD_GObj_Entities)[5];obj;obj=obj->next)
   if(obj->classifier==HSD_GOBJ_CLASS_STAGE){fail(e,n,"Stage requires exclusive ownership of source stage objects");return NULL;}
  if(Ground_801C498C()){fail(e,n,"Stage requires exclusive ownership of selected map lights");return NULL;}
+ if(source_ordered&&!melee_web_collision_source_available()){fail(e,n,"Source stage construction requires unowned collision storage");return NULL;}
  MeleeWebStageLast* h=calloc(1,sizeof(*h));if(!h){fail(e,n,"Cannot allocate stage ownership scope");return NULL;}
  h->saved=stage_info;h->generation=melee_web_gameplay_stats().generation;
- h->definition=definition;
+ h->definition=definition;h->source_ordered=source_ordered;
  memcpy(h->device1,ft_80459A68,sizeof(h->device1));memcpy(h->device2,ftDevice_BuryThings,sizeof(h->device2));memcpy(h->device3,ft_80459A8C,sizeof(h->device3));h->device4=ft_804D6578;h->count1=ft_804D6570;h->count2=ftDevice_BuryThingCount;
  if(!melee_web_ground_map_storage_begin()){free(h);fail(e,n,"Original Ground collision-state storage is already owned");return NULL;}
  if(!melee_web_stage_selection_begin(definition->stage_kind)){melee_web_ground_map_storage_end();free(h);fail(e,n,"Original selected stage is already owned");return NULL;}
  h->yaku=definition->exchange_yakumono?definition->exchange_yakumono(yaku):NULL;stage_info.yakumono_param=yaku;active=h;
- /* Ground_801C0800 constructs the selected map lights before on_init.
-  * Reuse that original owner without repeating the already-owned collision,
-  * item and particle setup performed by the typed world boundaries. */
- melee_web_ground_load_map_lights();
+ if(source_ordered){
+  /* The retail scene enters Ground's state buffer and stage archive before
+   * Ground_801C0800 loads collision, lights and the stage callback. */
+  Stage_802251E8((StKind)definition->stage_kind,NULL);
+  Stage_8022524C();
+  h->collision_map=stage_info.coll_data;
+ }else{
+  /* Isolated native-stage probes already own collision and item setup. */
+  extern void melee_web_ground_load_map_lights(void);
+  melee_web_ground_load_map_lights();
+ }
  h->map_lights=Ground_801C498C();
  if(!h->map_lights){melee_web_stage_last_end(h,NULL,0);fail(e,n,"Original selected map-light owner was not created");return NULL;}
- definition->source->on_init();
+ if(source_ordered){
+  if(!melee_web_stage_lights_adopt_source(h->map_lights,e,n)){melee_web_stage_last_end(h,NULL,0);return NULL;}
+  h->lights_adopted=1;
+ }else definition->source->on_init();
  for(unsigned i=0;i<definition->required_map_count;i++)if(definition->required_map_ids[i]>=sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0])||!stage_info.map_gobjs[definition->required_map_ids[i]]){melee_web_stage_last_end(h,NULL,0);fail(e,n,"Original stage initializer did not create every required map object");return NULL;}
  Stage_80225298();
  if(!defer_start)Stage_802252E4((StKind)definition->stage_kind,NULL);
  ok(e,n);return h;
 }
-MeleeWebStageLast* melee_web_stage_begin_kind(int stage_kind,void* yaku,MeleeWebEffectBank* bank,int defer_start,char* e,size_t n){
+MeleeWebStageLast* melee_web_stage_begin_kind(int stage_kind,void* yaku,MeleeWebEffectBank* bank,int defer_start,int source_ordered,char* e,size_t n){
  const MeleeWebStageProfile* definition=melee_web_stage_profile(stage_kind);
- return begin_stage(definition,yaku,bank,defer_start,e,n);
+ return begin_stage(definition,yaku,bank,defer_start,source_ordered,e,n);
 }
 MeleeWebStageLast* melee_web_stage_last_begin(void* yaku,MeleeWebEffectBank* bank,char* e,size_t n){
- return melee_web_stage_begin_kind(St_Kind_Last,yaku,bank,0,e,n);
+ return melee_web_stage_begin_kind(St_Kind_Last,yaku,bank,0,0,e,n);
 }
 MeleeWebStageLast* melee_web_stage_last_begin_intro(void* yaku,MeleeWebEffectBank* bank,char* e,size_t n){
- return melee_web_stage_begin_kind(St_Kind_Last,yaku,bank,1,e,n);
+ return melee_web_stage_begin_kind(St_Kind_Last,yaku,bank,1,0,e,n);
 }
 int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
  if(!h)return ok(e,n);
@@ -129,8 +144,11 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
  for(size_t i=0;i<camera_count;i++)melee_web_ground_remove_camera(cameras[i]);
  if(h->map_lights){
   if(Ground_801C498C()!=h->map_lights)return fail(e,n,"Original selected map-light owner was replaced");
+  if(h->lights_adopted&&!melee_web_stage_lights_retire_source(h->map_lights,e,n))return 0;
+  h->lights_adopted=0;
   HSD_GObjPLink_80390228(h->map_lights);h->map_lights=NULL;
  }
+ if(h->collision_map&&!melee_web_collision_retire_unadopted(h->collision_map,e,n))return 0;
  if(!melee_web_ground_map_storage_end())return fail(e,n,"Original stage objects remain during collision-state release");
  memcpy(ft_80459A68,h->device1,sizeof(h->device1));memcpy(ftDevice_BuryThings,h->device2,sizeof(h->device2));memcpy(ft_80459A8C,h->device3,sizeof(h->device3));ft_804D6578=h->device4;ft_804D6570=h->count1;ftDevice_BuryThingCount=h->count2;
  if(h->definition&&h->definition->exchange_yakumono)h->definition->exchange_yakumono(h->yaku);

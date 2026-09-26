@@ -141,13 +141,10 @@ int melee_web_stage_numeric_source_stage_ready(MeleeWebStageNumeric* h,char* e,s
         return fail(e,n,"Source marker readiness requires a pending source-stage numeric context");
     for(unsigned i=0;i<4;i++)if(!stage_info.x280[i])return fail(e,n,"Source stage did not publish every player spawn marker");
     for(unsigned i=148;i<=152;i++)if(!stage_info.x280[i])return fail(e,n,"Source stage did not publish every camera/blast marker");
-    for(unsigned i=0;i<h->markers->pair_count;i++){
-        const unsigned id=h->markers->pairs[i][1];
-        if(id>3&& (id<148||id>152))continue;
-        Vec3 pos;
-        if(!Ground_801C2D24(id,&pos)||!isfinite(pos.x)||!isfinite(pos.y)||!isfinite(pos.z))
-            return fail(e,n,"Source stage marker has an invalid world position");
-    }
+    /* Ground_801C2D24 lazily builds matrices and allocates their scale vectors.
+     * Player_80036DA4 initializes fighters before fn_8016DEEC first reads the
+     * spawn positions. Readiness must not pull those allocations forward;
+     * descriptors were checked at decode and spawn() checks the consumed value. */
     StageBlastZone* camera=&stage_info.cam_info.cam_bounds;StageBlastZone* blast=&stage_info.blast_zone;
     float ranges[8];memcpy(ranges,camera,16);memcpy(ranges+4,blast,16);
     for(unsigned i=0;i<8;i++)if(!isfinite(ranges[i]))return fail(e,n,"Source stage camera/blast range is nonfinite");

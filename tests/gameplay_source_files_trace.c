@@ -23,14 +23,19 @@ int main(void)
 
     assert(melee_web_source_file_size("LbRf.dat", &size));
     assert(size == sizeof(bytes));
+    assert(melee_web_source_file_size("/LbRf.dat", &size));
+    assert(size == sizeof(bytes));
     uint8_t copy[sizeof(bytes)] = {0};
-    assert(melee_web_source_file_copy("LbRf.dat", copy, &size));
+    assert(melee_web_source_file_copy("/LbRf.dat", copy, &size));
     assert(size == sizeof(bytes) && memcmp(copy, bytes, sizeof(bytes)) == 0);
     assert(strcmp(melee_web_source_file_take_name(copy), "LbRf.dat") == 0);
     assert(melee_web_source_file_take_name(copy) == NULL);
     assert(melee_web_source_file_size("zero-length.bin", &size) && size == 0);
     assert(!melee_web_source_file_size("lbRf.dat", &size));
     assert(!melee_web_source_file_size("missing.dat", &size));
+    assert(!melee_web_source_file_size("//LbRf.dat", &size));
+    assert(!melee_web_source_file_size("/lbrf.dat", &size));
+    assert(!melee_web_source_file_size("/missing/LbRf.dat", &size));
     assert(!melee_web_source_file_copy("LbRf.dat", NULL, &size));
 
     assert(!melee_web_source_files_begin(input, 2, error, sizeof(error)));
@@ -45,6 +50,6 @@ int main(void)
     };
     assert(!melee_web_source_files_begin(duplicate, 2, error, sizeof(error)));
     assert(strstr(error, "Duplicate exact") != NULL);
-    puts("source RuntimeFiles exact-name and lifecycle trace: passed");
+    puts("source RuntimeFiles DVD-root-path, exact-name, and lifecycle trace: passed");
     return 0;
 }

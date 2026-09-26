@@ -80,7 +80,7 @@ add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
   src/gameplay_replay_transport.cpp src/gameplay_replay_session.cpp
   src/runtime_archive_cache.cpp
   src/gameplay_audio_bank.cpp src/gameplay_audio_stream_asset.cpp src/dat_audio_stream.cpp src/dat_audio.cpp src/dat_audio_programs.cpp
-  src/gameplay_hud_assets.cpp src/gameplay_asset_manifest.cpp src/dat_scene.cpp src/gameplay_menu_world.cpp src/gameplay_match_session.cpp src/dat_menu_support.cpp src/dat_shape_animation.cpp src/dat_sis.cpp src/dat_native_menu.cpp src/dat_item_article.cpp src/dat_stage_items.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
+  src/gameplay_hud_assets.cpp src/gameplay_asset_manifest.cpp src/dat_scene.cpp src/gameplay_menu_world.cpp src/gameplay_match_session.cpp src/dat_menu_support.cpp src/dat_shape_animation.cpp src/dat_sis.cpp src/dat_native_menu.cpp src/dat_item_article.cpp src/dat_stage_items.cpp src/dat_stage_yaku.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
   src/dat_texture.cpp src/dat_material.cpp src/dat_material_animation.cpp
   src/native_dat.cpp src/gameplay_fighter_assets.cpp src/gameplay_action_store.cpp
   src/dat_commands.cpp src/dat_fighter_runtime.cpp src/dat_fighter.cpp
@@ -167,6 +167,9 @@ foreach(trace bonus_data stage_numeric)
     -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
   set_target_properties(gameplay_${trace}_trace PROPERTIES SUFFIX ".js")
 endforeach()
+target_sources(gameplay_stage_numeric_trace PRIVATE tests/gameplay_stage_numeric_state.c)
+target_compile_options(gameplay_stage_numeric_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
 
 add_executable(gameplay_browser EXCLUDE_FROM_ALL src/gameplay_browser.cpp src/browser_input.cpp src/browser_controllers.cpp)
 target_link_libraries(gameplay_browser PRIVATE fighter_asset_runtime aurora::main)
@@ -231,6 +234,15 @@ target_compile_options(gameplay_pikachu_articles_trace PRIVATE -UNDEBUG
 target_link_options(gameplay_pikachu_articles_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_pikachu_articles_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_random_article_trace EXCLUDE_FROM_ALL
+  tests/gameplay_random_article_trace.cpp tests/gameplay_random_article_fields.c)
+target_link_libraries(gameplay_random_article_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_random_article_trace PRIVATE -UNDEBUG
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_random_article_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_random_article_trace PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_koopa_flame_trace EXCLUDE_FROM_ALL
   tests/koopa_flame_article_trace.cpp tests/koopa_flame_article_fields.c)

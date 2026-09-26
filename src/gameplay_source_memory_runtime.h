@@ -21,7 +21,7 @@ int melee_web_source_memory_alloc(int source_heap, void* host_payload,
 int melee_web_source_memory_free(int source_heap, void* host_payload);
 int melee_web_source_memory_healthy(void);
 
-/* Fighter_Create and Fighter_Unload bind the source object allocation to its
+/* Fighter_Create / ftDemo_CreateFighter and Fighter_Unload bind the allocation to its
  * live host owner. Reuse advances allocation_generation even if an HSD free
  * chain returns the same object address. */
 typedef struct MeleeWebSourceFighterAddress {

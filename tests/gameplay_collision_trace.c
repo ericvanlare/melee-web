@@ -27,6 +27,72 @@ static MeleeWebCollisionLine lines[] = {
 static const MeleeWebCollisionJoint joint = {{{0, 3}, {3, 1}, {4, 0}, {4, 0}, {0, 0}}, -10, 0, 10, 5, {0, 4}};
 static MeleeWebCollisionInput input = {
     vertices, 4, lines, 4, &joint, 1, {{0, 3}, {3, 1}, {4, 0}, {4, 0}, {0, 0}}, 0, Gr_Kind_Last, 2.0F};
+static Vec2 source_vertices[] = {{-10, 0}, {0, 0}, {0, 0}, {10, 5}};
+static MapLine source_lines[] = {
+    {0, 1, -1, 1, -1, 1, 1, 0x104},
+    {1, 2, 0, 2, 0, 2, 1, 0x104},
+    {2, 3, 1, -1, 1, -1, 1, 0x205},
+    {3, 0, -1, -1, -1, -1, 2, 6},
+};
+static MapJoint source_joints[] = {
+    {0, 3, 3, 1, 4, 0, 4, 0, 0, 0, -10, 0, 10, 5, 0, 4},
+};
+static MapCollData source_map = {
+    source_vertices, 4, source_lines, 4, 0, 3, 3, 1, 4, 0, 4, 0, 0, 0,
+    source_joints, 1, 0,
+};
+
+static void source_loaded_case(void)
+{
+    GroundParam saved = {0}; saved.y = 2.0F;
+    GroundParam* prior_param = stage_info.param;
+    MapCollData* prior_data = stage_info.coll_data;
+    GrKind prior_kind = stage_info.grkind;
+    stage_info.param = &saved;
+    stage_info.grkind = Gr_Kind_Last;
+    stage_info.coll_data = &source_map;
+
+    /* Match retail Stage_8022524C: load the source descriptor and construct
+     * the original updater before attaching the explicit storage owner. */
+    mpLibLoad(&source_map);
+    mpLib_80058820();
+    MeleeWebCollision* owner = melee_web_collision_adopt_loaded(
+        &input, error, sizeof(error));
+    check(owner != NULL, "retail-loaded MapCollData and updater are adopted");
+    check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
+          "stage retirement leaves successfully adopted collision alive");
+    check(mpLib_8004D164() == &source_map &&
+              ((HSD_GObj**) HSD_GObj_Entities)[6]->user_data == owner,
+          "adopted owner retains the source descriptor and original updater");
+    MeleeWebCollisionLineResult line;
+    check(melee_web_collision_line(owner, 0, &line, error, sizeof(error)) &&
+              line.v0[0] == -20 && line.v1[0] == 0 && line.next == 2,
+          "adopted source lines retain original load/prune results");
+    check(melee_web_collision_destroy(owner, error, sizeof(error)),
+          "adopted source updater releases its loaded storage");
+    check(mpLib_8004D164() == NULL && mpGetGroundCollVtx() == NULL &&
+              mpGetGroundCollLine() == NULL && mpGetGroundCollJoint() == NULL,
+          "adopted source teardown clears original collision globals");
+    const MeleeWebGameplayStats before=melee_web_gameplay_stats();
+    mpLibLoad(&source_map);
+    mpLib_80058820();
+    MeleeWebCollisionInput invalid=input; invalid.stage_scale=INFINITY;
+    check(!melee_web_collision_adopt_loaded(&invalid,error,sizeof(error)),
+          "invalid input rejects after original source loading");
+    check(!melee_web_collision_retire_unadopted(&input,error,sizeof(error)),
+          "rollback rejects a different source map identity");
+    check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
+          "failed source adoption rolls back original storage and updater");
+    check(melee_web_collision_source_available()&&
+              melee_web_gameplay_stats().objects==before.objects&&
+              melee_web_gameplay_stats().processes==before.processes,
+          "rollback leaves collision ready for another construction");
+    check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
+          "already retired source collision rollback is idempotent");
+    stage_info.param = prior_param;
+    stage_info.coll_data = prior_data;
+    stage_info.grkind = prior_kind;
+}
 
 static void source_dummy_case(void)
 {
@@ -86,6 +152,7 @@ int main(void)
     invalid = input; invalid.line_count = 1537;
     check(!melee_web_collision_create(&invalid, error, sizeof(error)), "source line capacity enforced before reads");
     source_dummy_case();
+    source_loaded_case();
     lines[2].next0 = 0;
     check(!melee_web_collision_create(&input, error, sizeof(error)), "cyclic island chains reject before original traversal");
     lines[2].next0 = -1;

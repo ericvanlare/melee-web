@@ -10,6 +10,7 @@
 #include "dat_native_animation.hpp"
 #include "dat_material_animation.hpp"
 #include "dat_stage.hpp"
+#include "dat_trophy_data.hpp"
 #include "dat_native_stage.hpp"
 #include "dat_scene.hpp"
 #include "gameplay_stage_last.h"
@@ -18,6 +19,8 @@
 #include "gameplay_effect_runtime.h"
 #include "dat_lights.hpp"
 #include "dat_collision.hpp"
+#include "dat_item_article.hpp"
+#include "dat_item_registry.hpp"
 #include "dat_item_registry_native.hpp"
 #include "dat_stage_items.hpp"
 #include "dat_effect_entries.hpp"
@@ -41,7 +44,15 @@
 #include "hsd_native_joint.h"
 extern "C" {
 #include <sysdolphin/baselib/sislib.h>
+#include <melee/lb/lbarchive.h>
 }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wwrite-strings"
+extern "C" {
+#include <melee/it/forward.h>
+}
+#pragma GCC diagnostic pop
+#include <melee/ty/types.h>
 #include "gameplay_fighter_assets.hpp"
 #include <iostream>
 #include <algorithm>
@@ -49,7 +60,10 @@ extern "C" {
 #include <set>
 extern "C" void gm_801A4BD4(void);
 extern "C" void lbRefract_800222A4(void);
+extern "C" void Player_80036DD8(void);
 using namespace melee_web;
+static_assert(It_Kind_Kuriboh==MELEE_WEB_ITEM_REGISTRY_FIRST_KIND);
+static_assert(It_PKind_Random-It_Kind_Kuriboh==MELEE_WEB_ITEM_REGISTRY_COUNT-1);
 namespace {
 int start_vs_scene_manager(char* error, size_t size)
 {
@@ -95,7 +109,9 @@ struct SourceRefractData {
 };
 #pragma pack(pop)
 static_assert(offsetof(SourceRefractData,parameters)==4);
-MeleeWebCollision* load_collision(const melee_web::DatCollision& data, int stage_kind, float scale)
+MeleeWebCollision* own_collision(const melee_web::DatCollision& data,
+                                 int stage_kind, float scale,
+                                 bool already_loaded)
 {
     // The C boundary copies these typed arrays into its owned SDK allocation.
     // No native pointers or bitfields are overlaid onto archive bytes.
@@ -122,9 +138,21 @@ MeleeWebCollision* load_collision(const melee_web::DatCollision& data, int stage
     for (std::size_t k = 0; k < 5; ++k)
         input.ranges[k] = {data.line_ranges[k].start, data.line_ranges[k].count};
     char error[256];
-    MeleeWebCollision* owner=melee_web_collision_create(&input, error, sizeof(error));
+    MeleeWebCollision* owner=already_loaded?
+        melee_web_collision_adopt_loaded(&input,error,sizeof(error)):
+        melee_web_collision_create(&input, error, sizeof(error));
     if (!owner) throw std::runtime_error(error);
     return owner;
+}
+MeleeWebCollision* load_collision(const melee_web::DatCollision& data,
+                                  int stage_kind, float scale)
+{
+    return own_collision(data,stage_kind,scale,false);
+}
+MeleeWebCollision* adopt_collision(const melee_web::DatCollision& data,
+                                   int stage_kind, float scale)
+{
+    return own_collision(data,stage_kind,scale,true);
 }
 }
 namespace melee_web {
@@ -142,6 +170,7 @@ struct GameplayWorld::Storage {
     RuntimeArchiveCache* archive_cache=nullptr;
     std::unique_ptr<NativeDatArena> stage_arena,bonus_arena,item_arena,rumble_arena;
     std::unique_ptr<DatItemRegistryNative> items;
+    std::unique_ptr<DatItemArticle> random_item_article;
     std::unique_ptr<DatStageItems> stage_items;
     MeleeWebStageItems* stage_item_scope=nullptr;
     std::map<unsigned,std::unique_ptr<GameplayFighterAssets>> fighters;
@@ -166,6 +195,11 @@ struct GameplayWorld::Storage {
     MeleeWebStageVisual* stage_visual=nullptr;
     std::unique_ptr<DatNativeStage> full_stage;
     std::unique_ptr<DatScene> quake_model;
+    std::unique_ptr<DatTrophyData> trophy_data;
+    std::vector<TrophyData> trophy_models,trophy_models_d;
+    std::vector<ToyNameData> trophy_names;
+    std::vector<TyDspEntry> trophy_display,trophy_display_us;
+    MeleeWebArchiveSections* trophy_scope=nullptr;
     std::unique_ptr<DatEffectBanks> stage_effects;
     MeleeWebStageMap* stage_map=nullptr;
     MeleeWebStageLast* stage_last=nullptr;
@@ -174,16 +208,21 @@ struct GameplayWorld::Storage {
     MeleeWebRender* render_context=nullptr;
     MeleeWebFontAtlas* font=nullptr;
     MeleeWebCommonContext* common=nullptr;
+    MeleeWebArchiveSections* common_scope=nullptr;
+    HSD_Archive* common_source_archive=nullptr;
     MeleeWebStageLights* lights=nullptr;
     MeleeWebStageNumeric* numeric=nullptr;
     MeleeWebCollision* collision=nullptr;
     std::unique_ptr<DatCollision> collision_data;
     bool collision_deferred=false;
+    bool source_ordered=false;
+    const StartMeleeData* source_start_data=nullptr;
     MeleeWebItemRegistry* registry=nullptr;
     MeleeWebBonusData* bonus=nullptr;
     MeleeWebRumble* rumble=nullptr;
     MeleeWebArchiveSections* rumble_scope=nullptr;
     MeleeWebArchiveSections* refract_scope=nullptr;
+    MeleeWebArchiveSections* bonus_scope=nullptr;
     MeleeWebSourceFileScope* source_files=nullptr;
     std::vector<float> refract_parameters;
     SourceRefractData refract_data{};
@@ -201,6 +240,17 @@ struct GameplayWorld::Storage {
     int floor_start=0;
     char error[256]{};
     std::shared_ptr<const DatArchive> archive(std::string_view name)const{return archives.at(std::string(name));}
+    static void** load_common_source(void* context){
+        auto& self=*static_cast<Storage*>(context);
+        check(self.common_scope&&!self.common_source_archive,
+              "Original common archive requires its fresh typed owner");
+        void** roots=nullptr;
+        self.common_source_archive=lbArchive_LoadSymbols(
+            "PlCo.dat",&roots,"ftLoadCommonData",0);
+        check(self.common_source_archive&&roots,
+              "Original common archive load did not publish its roots");
+        return roots;
+    }
     void start(const RuntimeFiles& files,const GameplayWorldSelection& selection,
                RuntimeArchiveCache* cache,bool defer=false,bool source_ordered=false){
         if(selection.player_count < MELEE_WEB_MENU_MIN_PLAYERS ||
@@ -209,7 +259,10 @@ struct GameplayWorld::Storage {
         runtime_files=&files;
         archive_cache=cache;
         collision_deferred=source_ordered;
+        this->source_ordered=source_ordered;
         purpose=selection.purpose;
+        source_start_data=source_ordered&&selection.begin_source_match?
+            selection.source_start_data:nullptr;
         if(purpose==GameplayWorldPurpose::Match){
             stage=melee_web_stage_content_by_ground(selection.ground_kind);
             if(!stage)throw DatError("No runtime owner for selected source ground kind");
@@ -228,6 +281,7 @@ struct GameplayWorld::Storage {
             archives.emplace(name,std::move(value));
         };
         for(const char* name:{"PlCo.dat","ItCo.usd","EfCoData.dat","PdPm.dat","LbRb.dat"})load(name);
+        if(purpose==GameplayWorldPurpose::Match)load("TyDatai.usd");
         if(selection.begin_source_match)
             load("LbRf.dat",DatExternalPolicy::ResolveNull);
         if(stage)load(stage->archive);
@@ -266,6 +320,13 @@ struct GameplayWorld::Storage {
         items=std::make_unique<DatItemRegistryNative>(archive("ItCo.usd"));
         bonus_arena=std::make_unique<NativeDatArena>(archive("PdPm.dat"));
         bonus=melee_web_bonus_data_decode(bonus_arena->reader(),symbol(*archive("PdPm.dat"),"plLoadCommonData"));
+        if(source_start_data){
+            MeleeWebArchiveSymbol bonus_symbol={
+                "PdPm.dat","plLoadCommonData",melee_web_bonus_data_public_data(bonus)};
+            bonus_scope=melee_web_archive_sections_register(
+                &bonus_symbol,1,error,sizeof(error));
+            check(bonus_scope!=nullptr,error);
+        }
         rumble_arena=std::make_unique<NativeDatArena>(archive("LbRb.dat"));
         const auto rumble_root=symbol(*archive("LbRb.dat"),"lbRumbleData");
         const auto rumble_bytes=archive("LbRb.dat")->next_target_offset(rumble_root)-rumble_root;
@@ -296,10 +357,70 @@ struct GameplayWorld::Storage {
         font=melee_web_font_atlas_register(font_bytes.data(),font_bytes.size(),error,sizeof(error));check(font!=nullptr,error);
         source_files=begin_source_files(files,error,sizeof(error));
         check(source_files!=nullptr,error);
+        /* The source VS manager calls lb_80014534 before scene OnEnter. Publish
+         * the exact decoded rows here so its loader can reuse them without a
+         * duplicate main-heap archive copy; initialize the rumble interpreter
+         * at its original post-startup point below. */
+        if(purpose==GameplayWorldPurpose::Match){
+            check(melee_web_rumble_publish_source(rumble,error,sizeof(error)),error);
+            rumble_published=true;
+        }
         if(purpose==GameplayWorldPurpose::Match)
             check(melee_web_gameplay_prepare_vs_startup(start_vs_scene_manager,stop_vs_sis,error,sizeof(error)),error);
         check(melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)),error);started=true;
-        check(melee_web_rumble_begin(rumble,error,sizeof(error)),error);rumble_published=true;
+        if(purpose==GameplayWorldPurpose::Match){
+            const DatItemRegistry item_registry(*archive("ItCo.usd"));
+            const auto random_index=static_cast<size_t>(
+                It_PKind_Random-It_Kind_Kuriboh);
+            if(!item_registry.articles[random_index])
+                throw DatError("Original Random Pokémon Article root is absent");
+            void* random_article=items->articles()[random_index];
+            if(!random_article)
+                throw DatError("Original Random Pokémon Article registration is absent");
+            random_item_article=std::make_unique<DatItemArticle>(
+                archive("ItCo.usd"),*item_registry.articles[random_index],
+                It_PKind_Random,random_article);
+            trophy_data=std::make_unique<DatTrophyData>(archive("TyDatai.usd"));
+            auto models=[](auto entries){
+                std::vector<TrophyData> result;
+                result.reserve(entries.size());
+                for(const auto& row:entries)
+                    result.push_back({row.id,row.x04,row.x08,row.x0c,row.x10,row.x14,
+                                      row.x18,row.x1c,row.x20,row.x21,row.x22,row.x23});
+                return result;
+            };
+            trophy_models=models(trophy_data->init_model_table());
+            trophy_models_d=models(trophy_data->init_model_d_table());
+            trophy_names.reserve(trophy_data->model_sort_table().size());
+            for(const auto& row:trophy_data->model_sort_table())
+                trophy_names.push_back({row.x0,row.x2,row.x4,row.x6,row.x8,row.xa});
+            auto displays=[](auto entries){
+                std::vector<TyDspEntry> result;
+                result.reserve(entries.size());
+                for(const auto& row:entries)
+                    result.push_back({row.x00,row.x04,row.x05,{row.pad06,row.pad07},
+                                      row.x08,row.x0c});
+                return result;
+            };
+            trophy_display=displays(trophy_data->display_model_table());
+            trophy_display_us=displays(trophy_data->display_model_us_table());
+            const MeleeWebArchiveSymbol symbols[]={
+                {"TyDatai.usd","tyInitModelTbl",trophy_models.data()},
+                {"TyDatai.usd","tyInitModelDTbl",trophy_models_d.data()},
+                {"TyDatai.usd","tyModelSortTbl",trophy_names.data()},
+                {"TyDatai.usd","tyExpDifferentTbl",
+                 const_cast<std::int16_t*>(trophy_data->exp_different_table().data())},
+                {"TyDatai.usd","tyNoGetUsTbl",
+                 const_cast<std::int16_t*>(trophy_data->no_get_us_table().data())},
+                {"TyDatai.usd","tyDisplayModelTbl",trophy_display.data()},
+                {"TyDatai.usd","tyDisplayModelUsTbl",trophy_display_us.data()},
+            };
+            trophy_scope=melee_web_archive_sections_register_heap(
+                symbols,std::size(symbols),error,sizeof(error));
+            check(trophy_scope!=nullptr,error);
+        }
+        check(melee_web_rumble_begin(rumble,error,sizeof(error)),error);
+        rumble_published=true;
         if(stage){rules=melee_web_match_rules_begin(error,sizeof(error));check(rules!=nullptr,error);}
         if(selection.begin_source_match){
             if(purpose!=GameplayWorldPurpose::Match||!stage||
@@ -320,6 +441,10 @@ struct GameplayWorld::Storage {
             check(match_context!=nullptr,error);
             render_context=melee_web_render_prepare_match_camera(error,sizeof(error));
             check(render_context!=nullptr,error);
+            if(source_start_data){
+                check(melee_web_match_rules_prepare_from_menu(
+                    rules,source_start_data,error,sizeof(error)),error);
+            }
             const MeleeWebArchiveSymbol refract_symbol={
                 "LbRf.dat","lbRefData",&refract_data};
             refract_scope=melee_web_archive_sections_register_heap(
@@ -329,6 +454,16 @@ struct GameplayWorld::Storage {
              * Camera_80030688. Keep that source continuation ahead of native
              * common/root hydration; lbArchive owns its source allocations. */
             lbRefract_800222A4();
+            if(source_start_data){
+                check(melee_web_gameplay_initialize_vs_dynamics(error,sizeof(error)),error);
+                check(melee_web_effect_runtime_begin(error,sizeof(error)),error);
+                effect_started=true;
+                check(melee_web_bonus_data_begin(bonus,error,sizeof(error)),error);
+                bonus_published=true;
+                Player_80036DD8();
+                check(melee_web_bonus_data_ready(bonus),
+                    "Original Player_80036DD8 did not retain its registered PdPm owner");
+            }
         }
         common=melee_web_common_context_create(&common_data.scalars,&common_data.tables,&common_joint.graph(),error,sizeof(error));
         check(common!=nullptr,error);
@@ -351,6 +486,12 @@ struct GameplayWorld::Storage {
         respawn_animation=std::make_unique<DatNativeAnimation>(archive("PlCo.dat"),*animation_offset,respawn_model.graph());
         check(melee_web_common_context_set_respawn(common,melee_web_native_joint_descriptor(respawn_native,error,sizeof(error)),respawn_animation->descriptor(),error,sizeof(error)),error);
         check(melee_web_common_context_attach(common,error,sizeof(error)),error);
+        const MeleeWebArchiveSymbol common_symbol={
+            "PlCo.dat","ftLoadCommonData",melee_web_common_context_source_roots()};
+        common_scope=melee_web_archive_sections_register(&common_symbol,1,error,sizeof(error));
+        check(common_scope!=nullptr,error);
+        check(melee_web_common_context_set_source_loader(
+            common,load_common_source,this,error,sizeof(error)),error);
         if(stage){
             stage_arena=std::make_unique<NativeDatArena>(archive(stage->archive));
             auto* ground=melee_web_ground_data_decode(stage_arena->reader(),symbol(*archive(stage->archive),"grGroundParam"));
@@ -404,9 +545,12 @@ struct GameplayWorld::Storage {
             construction_phase=2;
         }
         if(construction_phase==2){
-            check(purpose==GameplayWorldPurpose::Results?
-                melee_web_effect_runtime_prepare(error,sizeof(error)):
-                melee_web_effect_runtime_begin(error,sizeof(error)),error);effect_started=true;
+            if(!effect_started){
+                check(purpose==GameplayWorldPurpose::Results?
+                    melee_web_effect_runtime_prepare(error,sizeof(error)):
+                    melee_web_effect_runtime_begin(error,sizeof(error)),error);
+                effect_started=true;
+            }
             common_effects=std::make_unique<DatEffectEntries>(archive("EfCoData.dat"),"effCommonDataTable",0,47,true);
             check(purpose==GameplayWorldPurpose::Results?
                 common_effects->publish_for_source(error,sizeof(error)):
@@ -452,7 +596,10 @@ struct GameplayWorld::Storage {
                     check(stage_item_scope!=nullptr,error);
                 }
             }
-            check(melee_web_bonus_data_begin(bonus,error,sizeof(error)),error);bonus_published=true;
+            if(!bonus_published){
+                check(melee_web_bonus_data_begin(bonus,error,sizeof(error)),error);
+                bonus_published=true;
+            }
             construction_phase=4;
         }
         return construction_phase==4;
@@ -502,7 +649,8 @@ struct GameplayWorld::Storage {
         if(!stage)throw DatError("Results uses the original dummy stage during scene entry");
         if(stage_last)return;
         if(stage_visual)throw DatError("Close selected stage visual before full initialization");
-        check(melee_web_stage_lights_load(lights,error,sizeof(error)),error);
+        if(!source_ordered)
+            check(melee_web_stage_lights_load(lights,error,sizeof(error)),error);
         auto source=archive(stage->archive);
         if(!full_stage)full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind);
         const auto* profile=melee_web_stage_profile(stage->stage_kind);
@@ -520,6 +668,16 @@ struct GameplayWorld::Storage {
             // publishes the same map data at bank30 for authored joint events.
             check(melee_web_effect_bank_attach(stage_effects->alias(30),error,sizeof(error)),error);
         }
+        full_stage->set_particle_roots(stage_effects?stage_effects->command_root():nullptr,
+                                       stage_effects?stage_effects->texture_root():nullptr);
+        if(!quake_model)throw DatError("Source stage quake descriptor owner is missing");
+        full_stage->set_quake_model(quake_model->single_model());
+        if(source_ordered){
+            const auto counts=full_stage->source_light_counts();
+            check(melee_web_stage_lights_set_source_counts(
+                lights,counts.data(),static_cast<uint32_t>(counts.size()),
+                error,sizeof(error)),error);
+        }
         for(const auto& event:full_stage->particle_events())
             if(!melee_web_effect_bank_has_command(event.bank,event.command))
                 throw DatError("Stage animation requires unpublished particle bank/command "+
@@ -529,18 +687,28 @@ struct GameplayWorld::Storage {
         check(melee_web_stage_map_set_public(stage_map,symbols.data(),symbols.size(),error,sizeof(error)),error);
         const auto& overrides=full_stage->light_overrides();
         check(melee_web_stage_map_set_overrides(stage_map,overrides.data(),overrides.size(),error,sizeof(error)),error);
-        /* Retail initializes its match camera subjects before Ground calls
-         * mpLibLoad. The SourceOrdered runtime path keeps this original
-         * allocator consumer at that same boundary, immediately before the
-         * authored stage initializer can query collision. */
-        if(!collision){
+        /* Non-ordered tooling retains its isolated collision seam. Match
+         * startup leaves allocation and ownership to Stage_8022524C below. */
+        if(!collision&&!collision_deferred){
             if(!collision_data)throw DatError("Source-ordered stage has no decoded collision input");
             collision=load_collision(*collision_data,stage->ground_kind,
                                      read_dat_stage_scale(*source));
             floor_start=collision_data->line_ranges[0].start;
             collision_data.reset();
         }
-        stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),stage_effects?stage_effects->bank():nullptr,defer_start,error,sizeof(error));check(stage_last!=nullptr,error);
+        stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),
+            stage_effects?stage_effects->bank():nullptr,defer_start,source_ordered,
+            error,sizeof(error));check(stage_last!=nullptr,error);
+        if(!collision){
+            if(!collision_data)throw DatError("Source-ordered stage has no decoded collision input");
+            collision=source_ordered?
+                adopt_collision(*collision_data,stage->ground_kind,
+                                read_dat_stage_scale(*source)):
+                load_collision(*collision_data,stage->ground_kind,
+                               read_dat_stage_scale(*source));
+            floor_start=collision_data->line_ranges[0].start;
+            collision_data.reset();
+        }
         check(melee_web_stage_numeric_source_stage_ready(numeric,error,sizeof(error)),error);
     }
     void end_stage(){
@@ -570,6 +738,7 @@ struct GameplayWorld::Storage {
         }
         check(melee_web_crowd_end(error,sizeof(error)),error);
         if(item_runtime){check(melee_web_item_runtime_end(item_runtime,error,sizeof(error)),error);item_runtime=nullptr;}
+        random_item_article.reset();
         if(item_scope){check(melee_web_archive_sections_close(item_scope,error,sizeof(error)),error);item_scope=nullptr;}
         if(stage_item_scope){check(melee_web_stage_items_end(stage_item_scope,error,sizeof(error)),error);stage_item_scope=nullptr;}
         stage_items.reset();
@@ -591,14 +760,30 @@ struct GameplayWorld::Storage {
         if(numeric){check(melee_web_stage_numeric_end(numeric,error,sizeof(error)),error);numeric=nullptr;}
         quake_model.reset();
         if(common){check(melee_web_common_context_destroy(common,error,sizeof(error)),error);common=nullptr;}
+        if(common_source_archive){
+            lbArchive_80016EFC(common_source_archive);
+            common_source_archive=nullptr;
+        }
+        if(common_scope){
+            check(melee_web_archive_sections_close(common_scope,error,sizeof(error)),error);
+            common_scope=nullptr;
+        }
         if(root16_native){check(melee_web_native_joint_destroy(root16_native,error,sizeof(error)),error);root16_native=nullptr;}
         if(respawn_native){check(melee_web_native_joint_destroy(respawn_native,error,sizeof(error)),error);respawn_native=nullptr;}
         respawn_animation.reset();extra_colors.reset();common_colors.reset();
         if(rules){check(melee_web_match_rules_end(rules,error,sizeof(error)),error);rules=nullptr;}
         if(started){check(melee_web_gameplay_shutdown(error,sizeof(error)),error);started=false;}
+        if(bonus_scope){
+            check(melee_web_archive_sections_close(bonus_scope,error,sizeof(error)),error);
+            bonus_scope=nullptr;
+        }
         if(refract_scope){
             check(melee_web_archive_sections_close(refract_scope,error,sizeof(error)),error);
             refract_scope=nullptr;
+        }
+        if(trophy_scope){
+            check(melee_web_archive_sections_close(trophy_scope,error,sizeof(error)),error);
+            trophy_scope=nullptr;
         }
         if(rumble_scope){
             check(melee_web_rumble_clear_source(rumble,error,sizeof(error)),error);
@@ -615,6 +800,9 @@ struct GameplayWorld::Storage {
             check(melee_web_source_files_end(source_files,error,sizeof(error)),error);
             source_files=nullptr;
         }
+        trophy_data.reset();
+        trophy_models.clear();trophy_models_d.clear();trophy_names.clear();
+        trophy_display.clear();trophy_display_us.clear();
         verify();
     }
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Runtime teardown: %s\n",e.what());std::abort();}}
@@ -693,8 +881,16 @@ bool GameplayWorld::advance_construction(){return storage_->advance_construction
 bool GameplayWorld::construction_complete()const{return storage_->construction_phase==4;}
 void GameplayWorld::initialize_match(const StartMeleeData& start) {
     check(storage_!=nullptr,"Gameplay world is closed");char error[256]{};
-    check(melee_web_match_rules_init_from_menu(storage_->rules,&start,error,sizeof(error)),error);
+    if(storage_->source_start_data&&storage_->source_start_data!=&start)
+        throw DatError("Match source initialization must finish with its published menu payload owner");
+    /* fn_8016E2BC calls Player_80036DA4 (Fighter_FirstInitialize) before
+     * fn_8016DEEC computes the authored spawn matrices and player directions. */
     check(melee_web_common_context_initialize_fighters(storage_->common,error,sizeof(error)),error);
+    if(storage_->source_start_data){
+        check(melee_web_match_rules_finish_from_menu(storage_->rules,error,sizeof(error)),error);
+    }else{
+        check(melee_web_match_rules_init_from_menu(storage_->rules,&start,error,sizeof(error)),error);
+    }
     storage_->create_fighter_assets_after_source_init();
 }
 

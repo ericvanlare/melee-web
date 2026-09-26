@@ -136,6 +136,15 @@ static const SourceFile* find_file(const char* name)
         if (!strcmp(active_scope->files[i].name, name))
             return &active_scope->files[i];
     }
+    /* Retail FST paths for root files begin with '/'; RuntimeFiles keys are
+     * the same exact root-relative names without that DVD path marker. */
+    if (name[0] == '/' && name[1] != '\0' && name[1] != '/') {
+        const char* root_name = name + 1;
+        for (size_t i = 0; i < active_scope->count; ++i) {
+            if (!strcmp(active_scope->files[i].name, root_name))
+                return &active_scope->files[i];
+        }
+    }
     return NULL;
 }
 

@@ -168,17 +168,42 @@ int melee_web_effect_bank_attach(MeleeWebEffectBank* h,char* e,size_t n)
     psInitDataBankLoad(b,h->commands,h->textures,NULL,NULL);
     published[b]=h;h->attached=1;h->stats.particle_bank_ready=1;return success(e,n);
 }
-int melee_web_effect_bank_detach(MeleeWebEffectBank* h,char* e,size_t n)
+static int bank_matches(const MeleeWebEffectBank* h)
 {
-    if(!h)return fail(e,n,"Particle bank owner is absent");
-    if(!h->attached)return success(e,n);
     const uint32_t b=h->stats.bank;
     HSD_PSCmdList** commands=((u16*)h->commands)[0]?
         (HSD_PSCmdList**)(h->commands+3)-h->stats.first_command:
         (HSD_PSCmdList**)(h->commands+2);
     int texture_count;memcpy(&texture_count,&psFormGroupArray[b],4);
-    if(published[b]!=h||hsd_804D0948[b]||psNumCmdList[b]||texture_count!=(int)h->stats.texture_groups||psTexGroupArray[b]!=(HSD_PSTexGroup**)(h->textures+1)||ptclref_804D0E5C[b]!=commands||
-       psCmdListArray[b]!=(int)(h->stats.first_command+h->stats.command_count))
+    return published[b]==h&&!hsd_804D0948[b]&&!psNumCmdList[b]&&
+        texture_count==(int)h->stats.texture_groups&&
+        psTexGroupArray[b]==(HSD_PSTexGroup**)(h->textures+1)&&
+        ptclref_804D0E5C[b]==commands&&
+        psCmdListArray[b]==(int)(h->stats.first_command+h->stats.command_count);
+}
+int melee_web_effect_bank_load_owned(uint32_t b,const void* commands,
+    const void* textures,char* e,size_t n)
+{
+    if(!melee_web_effect_bank_is_published(b))
+        return fail(e,n,"Source particle load has no typed owner");
+    MeleeWebEffectBank* h=published[b];
+    if(commands!=h->commands||textures!=h->textures)
+        return fail(e,n,"Source particle load does not match its typed roots");
+    /* Accept the existing publication or the complete reset performed by
+     * hsd_80398A08. A partial or foreign replacement is still an owner error. */
+    if(!bank_matches(h)&&(hsd_804D0948[b]||psNumCmdList[b]||
+        psFormGroupArray[b]||psTexGroupArray[b]||ptclref_804D0E5C[b]||
+        psCmdListArray[b]))
+        return fail(e,n,"Source particle load found another bank publication");
+    psInitDataBankLoad(b,h->commands,h->textures,NULL,NULL);
+    return success(e,n);
+}
+int melee_web_effect_bank_detach(MeleeWebEffectBank* h,char* e,size_t n)
+{
+    if(!h)return fail(e,n,"Particle bank owner is absent");
+    if(!h->attached)return success(e,n);
+    const uint32_t b=h->stats.bank;
+    if(!bank_matches(h))
         return fail(e,n,"Particle bank publication was replaced by another owner");
     if(hsd_804D78E0)return fail(e,n,"Remove original generators before releasing their banks");
     for(unsigned i=0;i<16;++i)if(hsd_804D0908[i])

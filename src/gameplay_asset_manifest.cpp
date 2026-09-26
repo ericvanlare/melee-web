@@ -245,10 +245,10 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection)
 
     std::vector<std::string> result;
     result.reserve(64);
-    for (const auto name : std::array<std::string_view, 12>{
+    for (const auto name : std::array<std::string_view, 13>{
              "PlCo.dat", "ItCo.usd", "EfCoData.dat", "PdPm.dat", "LbRb.dat",
              "LbRf.dat", "sislib_font.bin", "IfAll.usd", "IfCoGet.dat",
-             "SdIntro.dat", "GmPause.usd", "LbBf.dat"})
+             "SdIntro.dat", "GmPause.usd", "LbBf.dat", "TyDatai.usd"})
         add_unique(result, name);
     for (const auto name : kMatchCommonAudio) add_unique(result, name);
 

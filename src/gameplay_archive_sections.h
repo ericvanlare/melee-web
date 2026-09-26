@@ -24,8 +24,9 @@ MeleeWebArchiveSections* melee_web_archive_sections_register(const MeleeWebArchi
  * then releases any source handles discarded by those original callers. */
 MeleeWebArchiveSections* melee_web_archive_sections_register_heap(const MeleeWebArchiveSymbol*, size_t, char*, size_t);
 int melee_web_archive_sections_close(MeleeWebArchiveSections*, char*, size_t);
-/* Atomically release the scope's one owned handle and close it. Any other
- * open consumer rejects without changing the handle or scope. */
+/* Atomically release the scope's one owned handle and close it. Its stable
+ * preloaded handle, if any, is released with the scope; any other open
+ * consumer rejects without changing the handle or scope. */
 int melee_web_archive_sections_close_owned(MeleeWebArchiveSections*,void* handle,char*,size_t);
 /* Opaque source archive handles resolve only registered, owned typed symbols.
  * No archive bytes are reinterpreted or relocated in place. Every open must be
@@ -33,6 +34,10 @@ int melee_web_archive_sections_close_owned(MeleeWebArchiveSections*,void* handle
  * and unregistered filenames fail explicitly. A missing public name returns NULL
  * like the original HSD query; required-section loading fails atomically. */
 void* melee_web_archive_sections_open(const char* filename);
+/* Return one stable source-preload handle for a uniquely registered filename.
+ * The handle belongs to that symbol scope and is released when the scope
+ * closes; NULL means the caller must use the checked source-file path. */
+void* melee_web_archive_sections_open_preloaded(const char* filename);
 int melee_web_archive_sections_attach_source(void* archive,
                                               const char* filename);
 int melee_web_archive_sections_is_handle(const void* handle);

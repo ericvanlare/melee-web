@@ -10,53 +10,6 @@
 #include <string>
 #include <vector>
 
-#if defined(__EMSCRIPTEN__)
-#include <emscripten.h>
-EM_JS(void, trace_source_fighter_owner,
-      (uint32_t host, uint32_t source, uint32_t allocation_host,
-       uint32_t allocation_source, uint32_t requested, uint32_t offset), {
-    if (typeof window !== 'undefined' &&
-        Array.isArray(window.__meleeSourceOwnerTrace)) {
-        window.__meleeSourceOwnerTrace.push({
-            host: host >>> 0,
-            source: source >>> 0,
-            allocation_host: allocation_host >>> 0,
-            allocation_source: allocation_source >>> 0,
-            requested: requested >>> 0,
-            offset: offset >>> 0,
-        });
-    }
-});
-EM_JS(void, trace_source_main_alloc,
-      (int operation, int heap, uint32_t host, uint32_t source,
-       uint32_t requested, uint32_t generation), {
-    if (typeof window !== 'undefined') {
-        const capacity = 16384;
-        const sequence = window.__meleeSourceAllocationTraceTotal || 0;
-        window.__meleeSourceAllocationTraceTotal = sequence + 1;
-        if (Array.isArray(window.__meleeSourceAllocationTrace)) {
-            const event = {
-                sequence: sequence,
-                operation: operation,
-                heap: heap,
-                host: host >>> 0,
-                source: source >>> 0,
-                requested: requested >>> 0,
-                generation: generation >>> 0,
-            };
-            if (window.__meleeSourceAllocationTrace.length < capacity)
-                window.__meleeSourceAllocationTrace.push(event);
-            else
-                window.__meleeSourceAllocationTrace[sequence % capacity] = event;
-        }
-    }
-});
-#else
-static void trace_source_fighter_owner(uint32_t, uint32_t, uint32_t,
-                                       uint32_t, uint32_t, uint32_t) {}
-static void trace_source_main_alloc(int, int, uint32_t, uint32_t, uint32_t,
-                                    uint32_t) {}
-#endif
 
 namespace {
 using melee_web::source::Address;
@@ -211,10 +164,6 @@ extern "C" int melee_web_source_memory_alloc(int heap, void* host_payload,
         return fail("source main heap rejected a live OSAllocFromHeap request");
     allocations.push_back({host, static_cast<uint32_t>(requested_bytes),
                            result.address, next_id()});
-    trace_source_main_alloc(1, heap, static_cast<uint32_t>(host),
-                            result.address.value(),
-                            static_cast<uint32_t>(requested_bytes),
-                            static_cast<uint32_t>(world_generation));
     return 1;
 }
 
@@ -230,9 +179,6 @@ extern "C" int melee_web_source_memory_free(int heap, void* host_payload)
         return fail("source main heap free has no matching live allocation");
     if (source_address_heap.release(found->source) != Status::ok)
         return fail("source main heap rejected a live OSFreeToHeap request");
-    trace_source_main_alloc(0, heap, static_cast<uint32_t>(host),
-                            found->source.value(), found->requested,
-                            static_cast<uint32_t>(world_generation));
     allocations.erase(found);
     return 1;
 }
@@ -275,11 +221,6 @@ extern "C" int melee_web_source_memory_fighter_acquire(
     out->world_generation = lease->world_generation;
     out->allocation_generation = lease->allocation_generation;
     out->live = 1;
-    trace_source_fighter_owner(
-        static_cast<uint32_t>(host), lease->source,
-        static_cast<uint32_t>(allocation->host), allocation->source.value(),
-        allocation->requested,
-        static_cast<uint32_t>(host - allocation->host));
     return 1;
 }
 

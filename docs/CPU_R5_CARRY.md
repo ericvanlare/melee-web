@@ -1,5 +1,9 @@
 # CPU r5 source carry boundary
 
+> Historical component checkpoint. The [runtime integration](CPU_SOURCE_CONTEXT_RUNTIME.md)
+> supersedes the statements below about missing live hooks and Fighter bindings.
+> Its scoped receipt records current evidence and remaining limits.
+
 This component is a narrow compiled-source compatibility boundary for the
 near-zero CPU stick path. It carries the signed low bytes consumed by the
 source CPU writer through one live fighter allocation and accepts the

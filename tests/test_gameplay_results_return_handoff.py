@@ -138,6 +138,17 @@ char error[256] = {};
 
 
 class GameplayResultsReturnHandoffTests(unittest.TestCase):
+    def test_results_retires_toy_aliases_before_the_idle_owner_gate(self):
+        source = (ROOT / "src" / "gameplay_results_context.c").read_text(encoding="utf-8")
+        begin = source.index("MeleeWebResultsContext* melee_web_results_context_begin(")
+        end = source.index("\nint melee_web_results_context_tick(", begin)
+        body = source[begin:end]
+        retire_toy = body.index("Toy_803127D4();")
+        retire_display = body.index("tyDisplay_8031C8B8();")
+        idle_gate = body.index("if (_Toy_sbss_804D6ED0")
+        self.assertLess(retire_toy, retire_display)
+        self.assertLess(retire_display, idle_gate)
+
     def test_production_branch_accepts_css_and_rejects_unrecorded_prize(self):
         compiler = shutil.which("clang++") or shutil.which("c++")
         if compiler is None:

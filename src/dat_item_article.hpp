@@ -4,7 +4,8 @@
 namespace melee_web {
 // Owns source item model/state/command graphs, published into an existing
 // registration identity only after complete validation. The current native
-// article schemas cover Mario Fire/Cape, Dr. Mario Vitamin/Sheet, the shared Fox/Falco
+// article schemas cover the Random Pokémon stage-state table, Mario Fire/Cape,
+// Dr. Mario Vitamin/Sheet, the shared Fox/Falco
 // laser/blaster/illusion/phantasm family, Yoshi's Story's Heiho article, and Link/Young
 // Link's Bomb, Boomerang, Hookshot, Arrow, Bow and (for Young Link) Milk articles.
 class DatItemArticle {

@@ -99,6 +99,7 @@ struct GameplayMatchSession::Storage {
         content.begin_source_match=true;
         content.source_camera_subjects=70;
         content.source_random_seed=selection.random_seed;
+        content.source_start_data=&selected.start;
         check(melee_web_vs_mode_begin(),"Original VS mode is already owned");mode_owned=true;
         if(selected.save_profile_present){
             saved_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
@@ -183,10 +184,6 @@ struct GameplayMatchSession::Storage {
             world->enable_full_stage(true);
             check(melee_web_match_attach_collision(match,world->collision(),error,sizeof(error)),error);
             if(initial_input){check(melee_web_match_restore_input(match,initial_input,error,sizeof(error)),error);initial_input=nullptr;}
-            for(unsigned i=0;i<content.player_count;i++){
-                const auto spawn=world->player_spawn(i);
-                check(melee_web_match_set_player_start(match,i,spawn.data(),spawn[0]<0?1.0f:-1.0f,error,sizeof(error)),error);
-            }
             world->initialize_match(selected.start);
             construction_phase=3;
             return false;

@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 static unsigned char fighter_storage[0x3000] __attribute__((aligned(32)));
+static unsigned char fighter_storage_variant[0x3000] __attribute__((aligned(32)));
 
 static int fail(const char* message)
 {
@@ -122,6 +123,53 @@ int main(void)
         return fail("reused Fighter address did not advance its allocation generation");
     if (!melee_web_source_memory_fighter_release((void*) fighter_host))
         return fail("reused Fighter lease did not retire");
+
+    if (!melee_web_source_memory_alloc(19, fighter_storage_variant,
+                                      sizeof(fighter_storage_variant)))
+        return fail("second source Fighter allocation was not mirrored");
+    const uintptr_t variant_host =
+        (uintptr_t) fighter_storage_variant + 0x80u;
+    MeleeWebSourceFighterAddress variant = {0};
+    if (!melee_web_source_memory_fighter_acquire((void*) variant_host, 0x23ecu,
+                                                  &variant) ||
+        variant.source_address == fighter.source_address ||
+        variant.allocation_generation == fighter.allocation_generation)
+        return fail("second Fighter did not receive an independent source identity");
+    if (!melee_web_source_context_begin_tick(world_generation))
+        return fail("second source Fighter context did not begin");
+    ENTER(gobj_variant, MELEE_WEB_SOURCE_FRAME_GOBJ_DISPATCH, 0x804EEAC8u);
+    ENTER(fighter_variant_frame, MELEE_WEB_SOURCE_FRAME_FIGHTER_CPU_CALLBACK,
+          0x804EEAB0u);
+    if (!melee_web_source_context_enter_fighter((void*) variant_host))
+        return fail("second live Fighter did not bind its own source lease");
+    ENTER(cpu_variant, MELEE_WEB_SOURCE_FRAME_CPU_CALLBACK, 0x804EEA90u);
+    ENTER(dispatch_variant, MELEE_WEB_SOURCE_FRAME_CPU_STATE_DISPATCH,
+          0x804EE9C8u);
+    ENTER(state_variant, MELEE_WEB_SOURCE_FRAME_CPU_STATE_18, 0x804EE980u);
+    ENTER(floor_variant, MELEE_WEB_SOURCE_FRAME_CPU_FLOOR_QUERY, 0x804EE8F0u);
+    if (!melee_web_source_context_publish_seed_r5() ||
+        !melee_web_source_context_resolve_skipped((void*) variant_host,
+                                                   &stick_x, &stick_y) ||
+        stick_x != (int8_t) variant.source_address || stick_y != (int8_t) 0x90)
+        return fail("seed-global route did not use the second live Fighter identity");
+    ENTER(mp_variant, MELEE_WEB_SOURCE_FRAME_MP_CHECK_FLOOR, 0x804EE800u);
+    if (!melee_web_source_context_publish_floor_r5())
+        return fail("second callee-local floor route was not accepted");
+    melee_web_source_frame_leave(&mp_variant);
+    if (!melee_web_source_context_resolve_skipped((void*) variant_host,
+                                                   &stick_x, &stick_y) ||
+        stick_x != (int8_t) variant.source_address || stick_y != 68)
+        return fail("callee-local route lost the second Fighter identity");
+    melee_web_source_frame_leave(&floor_variant);
+    melee_web_source_frame_leave(&state_variant);
+    melee_web_source_frame_leave(&dispatch_variant);
+    melee_web_source_frame_leave(&cpu_variant);
+    melee_web_source_frame_leave(&fighter_variant_frame);
+    melee_web_source_frame_leave(&gobj_variant);
+    if (!melee_web_source_context_end_tick() ||
+        !melee_web_source_memory_fighter_release((void*) variant_host))
+        return fail("second source Fighter context did not retire cleanly");
+
     if (!melee_web_source_memory_end(world_generation))
         return fail("healthy source address heap did not end");
     if (!melee_web_source_context_reset_world(world_generation))

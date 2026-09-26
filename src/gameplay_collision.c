@@ -129,10 +129,8 @@ static int collision_input(const MeleeWebCollisionInput* in, char* error, size_t
     return 1;
 }
 
-static void collision_release(void* data)
+static void collision_release_storage(void)
 {
-    MeleeWebCollision* owner = data;
-    if (collision_owner != owner) { fputs("Collision global ownership changed during destruction\n", stderr); abort(); }
     mp_UnkStruct0* lists[] = {mpIsland_80458E88.next, mpIsland_80458E88.x4};
     for (unsigned i = 0; i < 2; ++i)
         while (lists[i]) { mp_UnkStruct0* next = lists[i]->next; HSD_Free(lists[i]); lists[i] = next; }
@@ -141,6 +139,13 @@ static void collision_release(void* data)
     groundCollVtx = NULL; groundCollLine = NULL; groundCollJoint = NULL;
     jointListStart = jointListEnd = NULL; mpLib_804D64B4 = NULL; didCheckBounding = false;
     grDynamicAttr_801CA0B4();
+}
+
+static void collision_release(void* data)
+{
+    MeleeWebCollision* owner = data;
+    if (collision_owner != owner) { fputs("Collision global ownership changed during destruction\n", stderr); abort(); }
+    collision_release_storage();
     free(owner->map.verts); free(owner->map.lines); free(owner->map.joints);
     owner->map = (MapCollData) {0}; owner->object = NULL; collision_owner = NULL;
 }
@@ -150,6 +155,32 @@ int melee_web_collision_source_available(void)
     return !collision_owner && !mpLib_804D64B4 && !groundCollVtx &&
         !groundCollLine && !groundCollJoint && !mpIsland_80458E88.next &&
         !mpIsland_80458E88.x4 && !HSD_GObj_804D781C;
+}
+
+int melee_web_collision_retire_unadopted(const void* source_map,
+                                         char* error, size_t size)
+{
+    if (!source_map || !melee_web_gameplay_generation() ||
+        HSD_GObj_804D781C || HSD_GObj_804D7814)
+        return collision_fail(error, size, "Source collision rollback requires an idle live stage owner");
+    if (melee_web_collision_source_available()) return collision_success(error, size);
+    if (mpLib_804D64B4 != source_map || stage_info.coll_data != source_map ||
+        !groundCollVtx || !groundCollLine || !groundCollJoint)
+        return collision_fail(error, size, "Source collision rollback lost its loaded map owner");
+    /* Successful adoption transfers retirement to the collision owner. */
+    if (collision_owner) return collision_live(collision_owner, error, size);
+    HSD_GObj* updater = NULL;
+    for (HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[6];
+         object; object = object->next) {
+        if (!object->proc || object->proc->on_invoke != mpLib_800587FC) continue;
+        if (updater || object->classifier != 1 || object->user_data ||
+            object->proc->child || object->proc->s_link != 4)
+            return collision_fail(error, size, "Source collision rollback found a foreign updater");
+        updater = object;
+    }
+    if (updater) HSD_GObjPLink_80390228(updater);
+    collision_release_storage();
+    return collision_success(error, size);
 }
 
 MeleeWebCollision* melee_web_collision_adopt_dummy(char* error,size_t size)
@@ -186,6 +217,47 @@ MeleeWebCollision* melee_web_collision_adopt_dummy(char* error,size_t size)
     (to).dynamic_start = (from)[4].start; (to).dynamic_count = (from)[4].count; \
 } while (0)
 
+static void collision_map_clear(MeleeWebCollision* owner)
+{
+    if (!owner) return;
+    free(owner->map.verts); free(owner->map.lines); free(owner->map.joints);
+    owner->map = (MapCollData) {0};
+}
+
+static int collision_map_copy(MeleeWebCollision* owner,
+                              const MeleeWebCollisionInput* in,
+                              char* error, size_t size)
+{
+    owner->map.verts = malloc(in->vertex_count * sizeof(Vec2));
+    owner->map.lines = malloc(in->line_count * sizeof(MapLine));
+    owner->map.joints = malloc(in->joint_count * sizeof(MapJoint));
+    if (!owner->map.verts || !owner->map.lines || !owner->map.joints) {
+        collision_map_clear(owner);
+        return collision_fail(error, size, "Unable to allocate owned collision descriptors");
+    }
+    owner->map.vert_count = (int) in->vertex_count;
+    owner->map.line_count = (int) in->line_count;
+    owner->map.joint_count = (int) in->joint_count;
+    memcpy(&owner->map.x2C, &in->source_reserved_2c, sizeof(owner->map.x2C));
+    COPY_RANGES(owner->map, in->ranges);
+    for (size_t i = 0; i < in->vertex_count; ++i)
+        owner->map.verts[i] = (Vec2) {in->vertices[i].x, in->vertices[i].y};
+    for (size_t i = 0; i < in->line_count; ++i) {
+        const MeleeWebCollisionLine* line = &in->lines[i];
+        owner->map.lines[i] = (MapLine) {line->v0, line->v1, line->prev0,
+            line->next0, line->prev1, line->next1, line->hi_flags, line->lo_flags};
+    }
+    for (size_t i = 0; i < in->joint_count; ++i) {
+        const MeleeWebCollisionJoint* src = &in->joints[i];
+        MapJoint* dst = &owner->map.joints[i];
+        COPY_RANGES(*dst, src->ranges);
+        dst->left_bound = src->left; dst->bottom_bound = src->bottom;
+        dst->right_bound = src->right; dst->top_bound = src->top;
+        dst->vtx_start = src->vertices.start; dst->vtx_count = src->vertices.count;
+    }
+    return 1;
+}
+
 MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput* in, char* error, size_t size)
 {
     uint64_t generation = melee_web_gameplay_generation();
@@ -206,33 +278,8 @@ MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput* in, 
         collision_fail(error, size, "Gameplay heap has insufficient free space for original collision capacities"); return NULL;
     }
     MeleeWebCollision* owner = calloc(1, sizeof(*owner));
-    if (owner) {
-        owner->map.verts = malloc(in->vertex_count * sizeof(Vec2));
-        owner->map.lines = malloc(in->line_count * sizeof(MapLine));
-        owner->map.joints = malloc(in->joint_count * sizeof(MapJoint));
-    }
-    if (!owner || !owner->map.verts || !owner->map.lines || !owner->map.joints) {
-        if (owner) { free(owner->map.verts); free(owner->map.lines); free(owner->map.joints); free(owner); }
-        collision_fail(error, size, "Unable to allocate owned collision descriptors"); return NULL;
-    }
-    owner->map.vert_count = (int) in->vertex_count; owner->map.line_count = (int) in->line_count;
-    owner->map.joint_count = (int) in->joint_count;
-    memcpy(&owner->map.x2C, &in->source_reserved_2c, sizeof(owner->map.x2C));
-    COPY_RANGES(owner->map, in->ranges);
-    for (size_t i = 0; i < in->vertex_count; ++i)
-        owner->map.verts[i] = (Vec2) {in->vertices[i].x, in->vertices[i].y};
-    for (size_t i = 0; i < in->line_count; ++i) {
-        const MeleeWebCollisionLine* line = &in->lines[i];
-        owner->map.lines[i] = (MapLine) {line->v0, line->v1, line->prev0, line->next0,
-                                       line->prev1, line->next1, line->hi_flags, line->lo_flags};
-    }
-    for (size_t i = 0; i < in->joint_count; ++i) {
-        const MeleeWebCollisionJoint* src = &in->joints[i];
-        MapJoint* dst = &owner->map.joints[i];
-        COPY_RANGES(*dst, src->ranges);
-        dst->left_bound = src->left; dst->bottom_bound = src->bottom;
-        dst->right_bound = src->right; dst->top_bound = src->top;
-        dst->vtx_start = src->vertices.start; dst->vtx_count = src->vertices.count;
+    if (!owner || !collision_map_copy(owner, in, error, size)) {
+        free(owner); return NULL;
     }
     owner->generation = generation; collision_owner = owner;
     GroundParam param = {0}; param.y = in->stage_scale;
@@ -254,6 +301,65 @@ MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput* in, 
                 if (++steps > owner->map.line_count) {
                     melee_web_collision_destroy(owner, NULL, 0);
                     collision_fail(error, size, "Cyclic resolved floor-query chains are unsupported"); return NULL;
+                }
+                current = direction ? mpLineGetPrev(current) : mpLineGetNext(current);
+            }
+        }
+    collision_success(error, size);
+    return owner;
+}
+
+MeleeWebCollision* melee_web_collision_adopt_loaded(
+    const MeleeWebCollisionInput* in, char* error, size_t size)
+{
+    const uint64_t generation = melee_web_gameplay_generation();
+    HSD_GObj* object = NULL;
+    if (!generation || collision_owner || !mpLib_804D64B4 ||
+        mpLib_804D64B4 != stage_info.coll_data || !groundCollVtx ||
+        !groundCollLine || !groundCollJoint || HSD_GObj_804D781C ||
+        stage_info.grkind != (GrKind) (in ? in->stage_kind : -1)) {
+        collision_fail(error, size, "Loaded source collision has no exclusive active stage context");
+        return NULL;
+    }
+    if (!collision_input(in, error, size)) return NULL;
+    for (HSD_GObj* candidate = ((HSD_GObj**) HSD_GObj_Entities)[6];
+         candidate; candidate = candidate->next) {
+        if (candidate->classifier != 1 || !candidate->proc ||
+            candidate->proc->on_invoke != mpLib_800587FC)
+            continue;
+        if (object || candidate->proc->child || candidate->proc->s_link != 4 ||
+            candidate->user_data) {
+            collision_fail(error, size, "Original collision updater ownership is ambiguous");
+            return NULL;
+        }
+        object = candidate;
+    }
+    if (!object) {
+        collision_fail(error, size, "Original source collision updater is missing");
+        return NULL;
+    }
+    MeleeWebCollision* owner = calloc(1, sizeof(*owner));
+    if (!owner || !collision_map_copy(owner, in, error, size)) {
+        free(owner); return NULL;
+    }
+    for (int i = 0; i < owner->map.line_count; ++i) {
+        if (!groundCollLine[i].x0) {
+            collision_map_clear(owner); free(owner);
+            collision_fail(error, size, "Original collision line lost its loaded source descriptor");
+            return NULL;
+        }
+        owner->map.lines[i] = *groundCollLine[i].x0;
+    }
+    owner->generation = generation; owner->object = object; collision_owner = owner;
+    GObj_InitUserData(object, 0, collision_release, owner);
+    for (int start = 0; start < owner->map.line_count; ++start)
+        for (int direction = 0; direction < 2; ++direction) {
+            int current = start, steps = 0;
+            while (current != -1 && mpLineGetKind(current) == CollLine_Floor) {
+                if (++steps > owner->map.line_count) {
+                    melee_web_collision_destroy(owner, NULL, 0);
+                    collision_fail(error, size, "Cyclic resolved source floor-query chains are unsupported");
+                    return NULL;
                 }
                 current = direction ? mpLineGetPrev(current) : mpLineGetNext(current);
             }

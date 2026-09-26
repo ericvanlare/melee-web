@@ -25,8 +25,10 @@ MeleeWebSourceFileScope* melee_web_source_files_begin(
 int melee_web_source_files_end(MeleeWebSourceFileScope* scope, char* error,
                               size_t error_size);
 
-/* Exact FST-name lookup. Missing files and an inactive scope return failure;
- * callers must surface that failure rather than fabricate a success value. */
+/* Exact RuntimeFiles-name lookup, also accepting one retail DVD root-path
+ * slash (for example /GrNLa.dat -> GrNLa.dat). Missing files and an inactive
+ * scope return failure; callers must surface that failure rather than
+ * fabricate a success value. */
 int melee_web_source_file_size(const char* name, size_t* size);
 int melee_web_source_file_copy(const char* name, void* destination,
                                size_t* size);

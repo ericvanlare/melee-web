@@ -723,8 +723,8 @@ diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
  {
      void** pData;
 +#if defined(MELEE_WEB_GAMEPLAY)
-+    extern void** melee_web_common_context_source_roots(void);
-+    pData = melee_web_common_context_source_roots();
++    extern void** melee_web_common_context_load_source_roots(void);
++    pData = melee_web_common_context_load_source_roots();
 +#else
      lbArchive_LoadSymbols("PlCo.dat", (void**) &pData, "ftLoadCommonData", 0);
 +#endif
@@ -1527,7 +1527,7 @@ index cd7e31a..98fa9d4 100644
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2319,175 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2319,154 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -1627,79 +1627,58 @@ index cd7e31a..98fa9d4 100644
 +#include "gameplay_content.h"
 +#include "gameplay_match_rules.h"
 +#include "gameplay_player_selection.h"
-+int melee_web_match_init_source(StartMeleeData* start)
++static int melee_web_match_validate_source_start(StartMeleeData* start)
 +{
 +    const StartMeleeRules* rules;
 +    int i;
-+
-+    if (start == NULL) {
-+        return 0;
-+    }
++    if (start == NULL) return 0;
 +    rules = &start->rules;
-+
-+    /* These are the exact host rules currently supported by the match/HUD
-+     * consumers.  In particular, do not silently turn a timer, item mask,
-+     * team match, callback, or unsupported stage into another configuration. */
 +    if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
 +        !rules->is_vs || rules->is_teams || !melee_web_match_timer_supported(rules) ||
 +        !melee_web_stage_content(rules->stkind) || rules->x20 != (u64) -1 || rules->xB != -1 ||
 +        rules->game_speed != 1.0F || rules->x54 != NULL ||
 +        rules->on_match_start != NULL || rules->on_frame_start != NULL ||
-+        rules->on_frame_end != NULL || rules->on_match_end != NULL) {
-+        return 0;
-+    }
-+
-+    /* Source fn_8016DCC0 always resets all six player slots.  Refuse a live
-+     * fighter rather than destroying an unrelated owner while doing so. */
-+    for (i = 0; i < 6; ++i) {
-+        if (Player_GetEntity(i) != NULL) {
-+            return 0;
-+        }
-+    }
-+
-+    /* Keep the ordinary VS slice bounded to the first four source players.
-+     * Source slot==0 means "use this player index"; a nonzero slot is port+1.
-+     * Requiring the resulting source player id to equal the player index
-+     * preserves the current contiguous slot-to-port mapping. */
++        rules->on_frame_end != NULL || rules->on_match_end != NULL) return 0;
++    for (i = 0; i < 6; ++i)
++        if (Player_GetEntity(i) != NULL) return 0;
 +    for (i = 0; i < 4; ++i) {
-+        if (start->players[i].slot_type == Gm_PKind_NA) {
-+            break;
-+        }
++        if (start->players[i].slot_type == Gm_PKind_NA) break;
 +        const PlayerInitData* player = &start->players[i];
 +        const int player_id = player->slot == 0 ? i : (int) player->slot - 1;
 +        const MeleeWebFighterContent* content = melee_web_fighter_content(player->ckind);
-+        if (content == NULL ||
-+            !melee_web_match_player_supported(player) || player->stocks < 1 ||
-+            player->stocks > 5 ||
-+            player->color >= content->costumes || player->sub_color > 4 || player->team != 0 ||
-+            player->slot > 4 || player_id != i) {
-+            return 0;
-+        }
++        if (content == NULL || !melee_web_match_player_supported(player) ||
++            player->stocks < 1 || player->stocks > 5 ||
++            player->color >= content->costumes || player->sub_color > 4 ||
++            player->team != 0 || player->slot > 4 || player_id != i) return 0;
 +    }
-+    if (i < 2) {
-+        return 0;
-+    }
-+    for (; i < 6; ++i) {
-+        if (start->players[i].slot_type != Gm_PKind_NA) {
-+            return 0;
-+        }
-+    }
-+
-+    /* This is the original initialization boundary.  It sets
-+     * lbl_8046B6A0.{rules,FighterMatchInfo,state}, calls Camera_80030E34, and
-+     * invokes fn_8016D8AC for all six slots.  Do not replace it with the
-+     * existing per-player setters or with fn_8016E730: the latter also starts
-+     * stage/items/audio and is outside this host's initialization boundary. */
-+    fn_8016DCC0(start);
-+    /* The same ordinary-VS preparation used by fn_8016E2BC. Its fighter
-+     * creation remains with the checked resident match owner immediately
-+     * after this call. These fighters have no Kirby costume publication. */
-+    /* GameplayWorld already owns Fighter_FirstInitialize_80067A84. */
-+    fn_8016DEEC();
-+    for (i = 0; i < 4 && start->players[i].slot_type != Gm_PKind_NA; ++i) {
-+        gm_prepare_player_start_position(i);
-+    }
++    if (i < 2) return 0;
++    for (; i < 6; ++i)
++        if (start->players[i].slot_type != Gm_PKind_NA) return 0;
 +    return 1;
++}
++/* Original fn_8016DCC0 boundary, placed after camera creation and before
++ * refraction. The caller owns the later dynamics/effect and stage boundaries. */
++int melee_web_match_prepare_source(StartMeleeData* start)
++{
++    if (!melee_web_match_validate_source_start(start)) return 0;
++    fn_8016DCC0(start);
++    return 1;
++}
++/* Stage-dependent continuation from the original fn_8016DEEC path. */
++int melee_web_match_finish_source(StartMeleeData* start)
++{
++    int i;
++    if (start == NULL) return 0;
++    fn_8016DEEC();
++    for (i = 0; i < 4 && start->players[i].slot_type != Gm_PKind_NA; ++i)
++        gm_prepare_player_start_position(i);
++    return 1;
++}
++int melee_web_match_init_source(StartMeleeData* start)
++{
++    if (!melee_web_match_prepare_source(start)) return 0;
++    if (!melee_web_gameplay_initialize_vs_dynamics(NULL, 0)) return 0;
++    return melee_web_match_finish_source(start);
 +}
 +
 +#endif
@@ -1923,18 +1902,91 @@ index af393e2..409c872 100644
  /* 1CD4A0 */ void grCastle_801CD4A0(void);
  /* 1CD4A4 */ void grCastle_801CD4A4(void);
 diff --git a/src/melee/gr/grdatfiles.c b/src/melee/gr/grdatfiles.c
-index ff1989d..6973b66 100644
+index ff1989d..aa985ed 100644
 --- a/src/melee/gr/grdatfiles.c
 +++ b/src/melee/gr/grdatfiles.c
-@@ -1,4 +1,7 @@
+@@ -1,4 +1,8 @@
  #include "grdatfiles.h"
 +#ifdef TARGET_PC
 +#include "gameplay_stage_map.h"
++#include "gameplay_effect_banks.h"
 +#endif
  
  #include "ground.h"
  #include "types.h"
-@@ -129,11 +132,19 @@ UnkArchiveStruct* grDatFiles_801C62B4(void)
+@@ -28,7 +32,14 @@ void grDatFiles_801C5FC0(HSD_Archive* archive, void* data, size_t length)
+     map_texg = HSD_ArchiveGetPublicAddress(archive, "map_texg");
+ 
+     if (map_ptcl != NULL && map_texg != NULL) {
++#if defined(TARGET_PC)
++        if (melee_web_stage_map_archives() == NULL ||
++            !melee_web_effect_bank_is_published(0x40)) {
++#endif
+         psInitDataBankLocate(map_ptcl, map_texg, NULL);
++#if defined(TARGET_PC)
++        }
++#endif
+     }
+ }
+ 
+@@ -51,10 +62,22 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
+         if (arg1 == 0) {
+             stage_info.coll_data =
+                 HSD_ArchiveGetPublicAddress(sp14, "coll_data");
++#if defined(TARGET_PC)
++            if (melee_web_stage_map_archives() == NULL) {
++#endif
+             stage_info.param =
+                 HSD_ArchiveGetPublicAddress(sp14, "grGroundParam");
++#if defined(TARGET_PC)
++            }
++#endif
++#if defined(TARGET_PC)
++            if (melee_web_stage_map_archives() == NULL) {
++#endif
+             stage_info.itemdata =
+                 HSD_ArchiveGetPublicAddress(sp14, "itemdata");
++#if defined(TARGET_PC)
++            }
++#endif
+             stage_info.ald_yaku_all =
+                 HSD_ArchiveGetPublicAddress(sp14, "ALDYakuAll");
+             stage_info.map_ptcl =
+@@ -63,13 +86,23 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
+                 HSD_ArchiveGetPublicAddress(sp14, "map_texg");
+             stage_info.yakumono_param =
+                 HSD_ArchiveGetPublicAddress(sp14, "yakumono_param");
++#if defined(TARGET_PC)
++            if (melee_web_stage_map_archives() == NULL) {
++#endif
+             stage_info.map_plit =
+                 HSD_ArchiveGetPublicAddress(sp14, "map_plit");
++#if defined(TARGET_PC)
++            }
++#endif
+             stage_info.quake_model_set =
+                 HSD_ArchiveGetPublicAddress(sp14, "quake_model_set");
+         }
+         temp_r3->unk0 = sp14;
+         if (stage_info.map_ptcl != NULL && stage_info.map_texg != NULL) {
++#if defined(TARGET_PC)
++            if (melee_web_stage_map_archives() == NULL ||
++                !melee_web_effect_bank_is_published(0x40)) {
++#endif
+             if (phi_r28 != 0) {
+                 psInitDataBankLoad(0x40, stage_info.map_ptcl,
+                                    stage_info.map_texg, 0, 0);
+@@ -77,6 +110,9 @@ void grDatFiles_801C6038(void* arg0, s32 arg1, s32 arg2)
+                 psInitDataBank(0x40, stage_info.map_ptcl, stage_info.map_texg,
+                                0, 0);
+             }
++#if defined(TARGET_PC)
++            }
++#endif
+         }
+         grDatFiles_801C6228(temp_r3->unk4);
+     } else {
+@@ -129,11 +165,19 @@ UnkArchiveStruct* grDatFiles_801C62B4(void)
  
  UnkArchiveStruct* grDatFiles_GetArchive(void)
  {
@@ -2388,6 +2440,21 @@ diff --git a/src/melee/lb/lb_013B.c b/src/melee/lb/lb_013B.c
 index 75dfb9c..3275ae3 100644
 --- a/src/melee/lb/lb_013B.c
 +++ b/src/melee/lb/lb_013B.c
+@@ -236,8 +236,14 @@ bool lb_800144C8(ColorOverlay* arg0, Fighter_804D653C_t* arg1, int arg2,
+     return false;
+ }
+ 
+ void lb_80014534(void)
+ {
++#ifdef TARGET_PC
++    /* Reuse the exact table already decoded and published by the browser
++     * runtime; retain the original loader whenever that owner is absent. */
++    extern int melee_web_rumble_source_ready(void);
++    if (melee_web_rumble_source_ready()) return;
++#endif
+     lbArchive_80017040(NULL, "LbRb.dat", &lb_804D63C0, "lbRumbleData", 0);
+ }
+ 
 @@ -169,7 +169,12 @@ bool lb_80014258(Fighter_GObj* gobj, void* arg1, FtCmd2 cmd)
  
      while (co->x8_ptr1 != NULL && co->x0_timer == 0) {
@@ -2401,11 +2468,16 @@ index 75dfb9c..3275ae3 100644
              if (opcode < 0x15U) {
                  u32 idx = opcode - 0xA;
                  if (lb_803BA248[idx](co)) {
-@@ -247,6 +247,15 @@
+@@ -247,6 +247,20 @@
                       lb_804D63C0[arg2].unk);
  }
  
 +#ifdef TARGET_PC
++int melee_web_rumble_source_table_matches(const void* expected)
++{
++    return expected != NULL && (const void*) lb_804D63C0 == expected;
++}
++
 +struct Fighter_804D653C_t* melee_web_rumble_exchange(struct Fighter_804D653C_t* data)
 +{
 +    struct Fighter_804D653C_t* previous = lb_804D63C0;
@@ -5378,7 +5450,7 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
  #include <sysdolphin/baselib/gobjproc.h>
  #include <sysdolphin/baselib/hsd_3924.h>
  #include <sysdolphin/baselib/hsd_392C.h>
-@@ -376,3 +377,220 @@
+@@ -376,3 +377,245 @@
      }
      HSD_VIWaitXFBFlush();
  }
@@ -5389,10 +5461,7 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 + * the HSD process-mask pointer around its scoped source world. The pointer
 + * is an ownership capability: a changed pointer is an explicit failure, not
 + * a value to overwrite during rollback. */
-+enum {
-+    MELEE_WEB_SOURCE_CLOCK_MENU = 1,
-+    MELEE_WEB_SOURCE_CLOCK_MATCH = 2,
-+};
++#include "gameplay_match_clock.h"
 +extern int melee_web_controller_map_begin(void);
 +extern int melee_web_controller_map_end(void);
 +static struct gm_80479D58_t melee_source_clock_saved;
@@ -5402,6 +5471,7 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 +static u64* melee_source_clock_saved_mask_ptr;
 +static u64 melee_source_clock_saved_mask;
 +static int melee_source_clock_in_callback;
++static int melee_source_clock_end_failure;
 +
 +static int melee_source_clock_owned(void)
 +{
@@ -5450,6 +5520,7 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 +    melee_source_clock_process_mask = 0;
 +    melee_source_clock_prepared = 0;
 +    melee_source_clock_in_callback = 0;
++    melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_NONE;
 +    melee_source_clock_owner = owner;
 +    HSD_GObjLibInitData.unk_2 = &melee_source_clock_process_mask;
 +    return 1;
@@ -5552,13 +5623,34 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 +
 +int melee_web_source_clock_end(void)
 +{
-+    if (!melee_source_clock_owned() || melee_source_clock_in_callback ||
-+        HSD_GObj_804D781C || HSD_GObj_804D7814 || HSD_GObj_804D7818)
++    melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_NONE;
++    if (!melee_source_clock_owned()) {
++        melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_OWNER;
 +        return 0;
++    }
++    if (melee_source_clock_in_callback) {
++        melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_CALLBACK;
++        return 0;
++    }
++    if (HSD_GObj_804D781C || HSD_GObj_804D7814 || HSD_GObj_804D7818) {
++        melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_GOBJ;
++        return 0;
++    }
++    /* gm_801A4BD4 installs this source-owned field as the process-mask
++     * pointer. The match clock legitimately updates it every tick; restoring
++     * the saved gm_80479D58 record below restores its prior value. Other
++     * pointers remain immutable ownership snapshots and must not have been
++     * changed behind the clock. */
 +    if (melee_source_clock_saved_mask_ptr != NULL &&
-+        *melee_source_clock_saved_mask_ptr != melee_source_clock_saved_mask)
++        melee_source_clock_saved_mask_ptr != &gm_80479D58.unk_10.unk_28 &&
++        *melee_source_clock_saved_mask_ptr != melee_source_clock_saved_mask) {
++        melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_MASK_VALUE;
 +        return 0;
-+    if (!melee_web_controller_map_end()) return 0;
++    }
++    if (!melee_web_controller_map_end()) {
++        melee_source_clock_end_failure = MELEE_WEB_SOURCE_CLOCK_END_FAILURE_CONTROLLER_MAP;
++        return 0;
++    }
 +    HSD_GObjLibInitData.unk_2 = melee_source_clock_saved_mask_ptr;
 +    gm_80479D58 = melee_source_clock_saved;
 +    melee_source_clock_saved_mask_ptr = NULL;
@@ -5568,6 +5660,11 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 +    melee_source_clock_in_callback = 0;
 +    melee_source_clock_owner = 0;
 +    return 1;
++}
++
++int melee_web_source_clock_end_failure(void)
++{
++    return melee_source_clock_end_failure;
 +}
 +
 +int melee_web_menu_clock_begin(void)
@@ -8254,17 +8351,34 @@ diff --git a/src/melee/ft/ftdemo.c b/src/melee/ft/ftdemo.c
 index 6c6e71e..561b857 100644
 --- a/src/melee/ft/ftdemo.c
 +++ b/src/melee/ft/ftdemo.c
-@@ -1,5 +1,9 @@
+@@ -1,5 +1,10 @@
  #include "ftdemo.h"
  
 +#if defined(MELEE_WEB_GAMEPLAY)
 +#include "gameplay_fighter_assets.h"
++#include "gameplay_source_memory_runtime.h"
 +#endif
 +
  #include <Runtime/platform.h>
  
  #include <melee/pl/forward.h>
-@@ -68,8 +72,10 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
+@@ -60,7 +65,15 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
+     Fighter_GObj* gobj = GObj_Create(HSD_GOBJ_CLASS_FIGHTER, 8, 0);
+     GObj_SetupGXLink(gobj, ftDrawCommon_80080E18, 5, 0);
+     {
+         Fighter* fp = HSD_ObjAlloc(&fighter_alloc_data);
++#if defined(MELEE_WEB_GAMEPLAY)
++        MeleeWebSourceFighterAddress source_address = {0};
++        if (!melee_web_source_memory_fighter_acquire(fp, sizeof(*fp),
++                                                     &source_address)) {
++            __builtin_trap();
++        }
++        (void) source_address;
++#endif
+         fp->dat_attrs_backup = HSD_ObjAlloc(&fighter_dat_attrs_alloc_data);
+         GObj_InitUserData(gobj, 4, Fighter_Unload_8006DABC, fp);
+         ftData_8008572C(alloc_info->internal_id);
+@@ -68,8 +81,10 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
          fp->x18 = 14;
          fp->x1C_actionStateList = ftData_803C52A0;
          fp->x20_actionStateList = ftData_UnkMotionStates0[fp->kind];
@@ -8275,7 +8389,7 @@ index 6c6e71e..561b857 100644
          efAsync_LoadSync(ftData_UnkBytePerCharacter[fp->kind]);
          if (!alloc_info->b0) {
              ftData_80085820(fp->kind, fp->x619_costume_id);
-@@ -94,7 +100,13 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
+@@ -94,7 +109,13 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
                  a = 0;
                  b = 9;
              }
@@ -8289,7 +8403,7 @@ index 6c6e71e..561b857 100644
          }
          ftParts_80074E58(fp);
          ftParts_SetupParts(gobj);
-@@ -129,7 +141,13 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
+@@ -129,7 +150,13 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
  
  void ftDemo_ObjAllocInit(void)
  {
@@ -9126,19 +9240,24 @@ index f1de40c..af85d21 100644
  #include "efasync.h"
  
  #include <math.h>
-@@ -1303,6 +1307,11 @@ void efAsync_LoadSync(int idx)
+@@ -1303,6 +1307,16 @@ void efAsync_LoadSync(int idx)
          bool chk = lbArchive_80017040(NULL, lookup->ef_DAT_file, &spC,
                                        lookup->effDataTable_name, 0);
          if ((u32) spC->ef_DAT_file | (u32) spC->effDataTable_name) {
 +#if defined(MELEE_WEB_GAMEPLAY)
-+            if (!melee_web_effect_bank_is_published((u32) idx)) {
-+                /* The registered typed bank is already installed; these are
-+                 * native pointers, not source-DAT offsets for Locate. */
++            if (melee_web_effect_bank_is_published((u32) idx)) {
++                /* Results reserves native roots before efLib_Init clears the
++                 * source lookup tables. Reload that owner without Locate. */
++                if (!melee_web_effect_bank_load_owned((u32) idx,
++                        spC->ef_DAT_file, spC->effDataTable_name, NULL, 0)) {
++                    __builtin_trap();
++                }
++            } else {
 +#endif
              if (chk) {
                  psInitDataBankLoad(idx, (void*) spC->ef_DAT_file,
                                     (void*) spC->effDataTable_name, NULL, NULL);
-@@ -1310,6 +1319,9 @@ void efAsync_LoadSync(int idx)
+@@ -1310,6 +1324,9 @@ void efAsync_LoadSync(int idx)
                  psInitDataBank(idx, (void*) spC->ef_DAT_file,
                                 (void*) spC->effDataTable_name, NULL, NULL);
              }
@@ -9267,16 +9386,6 @@ index 98fa9d4..ad14efd 100644
  
  #include <string.h>
  
-@@ -2479,6 +2480,9 @@ int melee_web_match_init_source(StartMeleeData* start)
-      * existing per-player setters or with fn_8016E730: the latter also starts
-      * stage/items/audio and is outside this host's initialization boundary. */
-     fn_8016DCC0(start);
-+    if (!melee_web_gameplay_initialize_vs_dynamics(NULL, 0)) {
-+        return 0;
-+    }
-     /* The same ordinary-VS preparation used by fn_8016E2BC. Its fighter
-      * creation remains with the checked resident match owner immediately
-      * after this call. These fighters have no Kirby costume publication. */
 diff --git a/src/melee/if/textdraw.c b/src/melee/if/textdraw.c
 index dfa76cc..b847075 100644
 --- a/src/melee/if/textdraw.c
@@ -9481,24 +9590,31 @@ diff --git a/src/melee/lb/lbdvd.c b/src/melee/lb/lbdvd.c
 index d5b38ac..514c99c 100644
 --- a/src/melee/lb/lbdvd.c
 +++ b/src/melee/lb/lbdvd.c
-@@ -1,5 +1,9 @@
+@@ -1,5 +1,10 @@
  #include <string.h>
  
 +#if defined(MELEE_WEB_GAMEPLAY)
 +#include "gameplay_source_files.h"
++#include "gameplay_archive_sections.h"
 +#endif
 +
  #include "lb_0195.h"
  #include "lbarchive.h"
  #include "lbdvd.static.h"
-@@ -463,6 +467,13 @@ HSD_Archive* lbDvd_8001819C(const char* basename)
+@@ -463,6 +468,19 @@ HSD_Archive* lbDvd_8001819C(const char* basename)
  {
      HSD_Archive* archive;
      char* filename = lbFileGetFullName(basename);
 +#if defined(MELEE_WEB_GAMEPLAY)
 +    size_t source_size;
 +    if (melee_web_source_file_size(filename, &source_size)) {
-+        /* The active checked source scope supplies this file through lbFile. */
++        HSD_Archive* typed = (HSD_Archive*)
++            melee_web_archive_sections_open_preloaded(filename);
++        /* Exact registered source symbols are the native owner of an archive
++         * already resident in the original preload cache. Keep lbArchive's
++         * public-section lookup on its original source call path. */
++        if (typed != NULL) return typed;
++        /* Unregistered source files still use the checked byte-copy path. */
 +        return NULL;
 +    }
 +#endif
@@ -9594,20 +9710,22 @@ index ca6583e..66a55c4 100644
  #include <string.h>
  
  #include <dolphin/os.h>
-@@ -70,9 +74,9 @@ s32 HSD_ArchiveParse(HSD_Archive* archive, u8* src, size_t file_size)
+@@ -70,9 +74,11 @@ s32 HSD_ArchiveParse(HSD_Archive* archive, u8* src, size_t file_size)
  void* HSD_ArchiveGetPublicAddress(HSD_Archive* archive, const char* symbols)
  {
  #if defined(MELEE_WEB_GAMEPLAY)
 -    extern void* melee_web_archive_sections_public(void*, const char*);
 -    return melee_web_archive_sections_public(archive, symbols);
 -#else
-+    if (melee_web_archive_sections_is_handle(archive))
-+        return melee_web_archive_sections_public(archive, symbols);
++    if (melee_web_archive_sections_is_handle(archive)) {
++        void* result = melee_web_archive_sections_public(archive, symbols);
++        return result;
++    }
 +#endif
      u32 i;
  
      for (i = 0; i < archive->header.nb_public; i++) {
-@@ -86,9 +90,7 @@ void* HSD_ArchiveGetPublicAddress(HSD_Archive* archive, const char* symbols)
+@@ -86,9 +96,7 @@ void* HSD_ArchiveGetPublicAddress(HSD_Archive* archive, const char* symbols)
      }
  
      return NULL;
@@ -9629,3 +9747,61 @@ index fadbc3f..ae4b789 100644
      HSD_GObj_804D783C += 1;
      if (HSD_GObj_804D783C > 2) {
          HSD_GObj_804D783C = 0;
+
+diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
+index 6c26c02..7a8fa10 100644
+--- a/src/melee/gr/ground.c
++++ b/src/melee/gr/ground.c
+@@ -1,5 +1,10 @@
+ #include "ground.h"
+ 
++#ifdef TARGET_PC
++#include "gameplay_effect_banks.h"
++#include "gameplay_stage_map.h"
++#include "gameplay_stage_context.h"
++#endif
+ #include <Runtime/platform.h>
+ 
+ #include <math.h>
+@@ -501,4 +505,11 @@
+     if (stage_info.map_ptcl != NULL && stage_info.map_texg != NULL) {
++#if defined(TARGET_PC)
++        if (melee_web_stage_map_archives() == NULL ||
++            !melee_web_effect_bank_is_published(0x1E)) {
++#endif
+         psInitDataBankLoad(0x1E, stage_info.map_ptcl, stage_info.map_texg, 0,
+                            0);
++#if defined(TARGET_PC)
++        }
++#endif
+     }
+@@ -2646,5 +2652,6 @@ void Ground_801C466C(void)
+     int i;
+     int count;
+     HSD_GObj* temp_r3;
++    int selected_entry = -1;
+     HSD_LObj* temp_r3_2;
+     LightList** var_r27_2;
+@@ -2665,5 +2672,6 @@ void Ground_801C466C(void)
+         if (callbacks->flags_b0 == 1) {
+             archive = grDatFiles_801C6330(i);
+             selected = Ground_801C20E0(archive, archive->unk4->unk8[i].x18);
++            selected_entry = i;
+             goto light_selected;
+         }
+@@ -2673,4 +2681,15 @@ void Ground_801C466C(void)
+     if ((r28_carrier.lights = selected) == NULL) {
+         r28_carrier.lights = Ground_803E06C8;
++        selected_entry = -1;
+     }
++#if defined(TARGET_PC)
++    /* The selected source row is bounded by its authored LightList** table in
++     * map_head. Compare Ground's live HSD chain to that entry count instead of
++     * borrowing the unrelated global map_plit count. */
++    if (!melee_web_stage_lights_select_source_entry(selected_entry)) {
++        OSReport("%s:%d: source Ground light entry has no checked bound\n",
++                 __FILE__, __LINE__);
++        while (true) {}
++    }
++#endif
+     temp_r3 = GObj_Create(0xD, 3, 0);

@@ -22,8 +22,9 @@
 MELEE_WEB_COMMON_ASSERT_LAYOUT(ftCommonData);
 int melee_web_native_common_capture_begin(void*, void (*)(void*, void*), void*);
 int melee_web_native_common_capture_end(void*);
+int melee_web_native_common_retain_root(void*, HSD_JObj*);
+int melee_web_native_common_release_roots(void*);
 typedef struct Payload { struct Payload* next; void* bytes; } Payload;
-typedef struct CommonObject { struct MeleeWebCommonContext* context; HSD_GObj* owner; } CommonObject;
 struct MeleeWebCommonContext {
     ftCommonData scalars;
     MeleeWebCommonNative* tables;
@@ -35,10 +36,11 @@ struct MeleeWebCommonContext {
     void* saved[23];
     HSD_MObj* saved_materials[2];
     HSD_MObj* owned_materials[2];
-    CommonObject objects[2];
     uint32_t ready_mask, captured;
     uint64_t generation;
     unsigned attached, initialized;
+    MeleeWebCommonSourceLoad source_load;
+    void* source_load_owner;
 };
 static MeleeWebCommonContext* published;
 static int fail(char* error,size_t size,const char* why) { if(error&&size)snprintf(error,size,"%s",why);return 0; }
@@ -160,18 +162,15 @@ int melee_web_common_context_set_respawn(MeleeWebCommonContext* h,void* joint,vo
     if(!h->roots[8])return fail(error,size,"Cannot own respawn descriptor table");
     h->ready_mask|=1u<<8;return success(error,size);
 }
-static void removed(void* data) { ((CommonObject*)data)->owner=NULL; }
 static void captured(void* data,void* root)
 {
     MeleeWebCommonContext* h=data;
     if(!h->attached||h!=published||h->generation!=melee_web_gameplay_stats().generation||h->captured>=2||!root)
         HSD_Panic(__FILE__,__LINE__,"Unexpected original common material constructor");
     h->owned_materials[h->captured]=HSD_JObjGetDObj(root)->mobj;
-    CommonObject* o=&h->objects[h->captured++];o->context=h;
-    o->owner=GObj_Create(HSD_GOBJ_CLASS_UI,0,0);
-    if(!o->owner)HSD_Panic(__FILE__,__LINE__,"Cannot retain common material joint owner");
-    HSD_GObjObject_80390A70(o->owner,HSD_GObj_JObjKind,root);
-    GObj_InitUserData(o->owner,0,removed,o);
+    if(!melee_web_native_common_retain_root(h,root))
+        HSD_Panic(__FILE__,__LINE__,"Cannot retain common material joint");
+    ++h->captured;
 }
 int melee_web_common_context_require(MeleeWebCommonContext* h,uint32_t mask,char* error,size_t size)
 {
@@ -201,6 +200,22 @@ void** melee_web_common_context_source_roots(void)
         HSD_Panic(__FILE__,__LINE__,"Fighter_LoadCommonData requires attached checked common roots");
     return published->roots;
 }
+int melee_web_common_context_set_source_loader(MeleeWebCommonContext* h,
+    MeleeWebCommonSourceLoad load,void* owner,char* error,size_t size)
+{
+    if(!h||h!=published||h->generation!=melee_web_gameplay_stats().generation||
+       h->initialized||h->captured||h->source_load||!load||!owner)
+        return fail(error,size,"Source common loader requires a fresh attached owner");
+    h->source_load=load;h->source_load_owner=owner;
+    return success(error,size);
+}
+void** melee_web_common_context_load_source_roots(void)
+{
+    void** roots=melee_web_common_context_source_roots();
+    if(published->source_load&&published->source_load(published->source_load_owner)!=roots)
+        HSD_Panic(__FILE__,__LINE__,"Original common archive changed its typed root owner");
+    return roots;
+}
 int melee_web_common_context_initialize_materials(MeleeWebCommonContext* h,char* error,size_t size)
 {
     if(!h||h!=published||h->generation!=melee_web_gameplay_stats().generation||h->captured||h->initialized)
@@ -221,29 +236,27 @@ int melee_web_common_context_destroy(MeleeWebCommonContext* h,char* error,size_t
 {
     if(!h)return success(error,size);
     if(h->attached){
+        if(HSD_GObj_804D781C||HSD_GObj_804D7814)
+            return fail(error,size,"Common context teardown must run outside source object callbacks");
         if(h!=published)return fail(error,size,"Common context publication ownership was lost");
 #define CHECK_ROOT(index,name) if((void*)name!=h->roots[index])return fail(error,size,"Common global was replaced: " #name);
         MELEE_WEB_COMMON_ROOTS(CHECK_ROOT)
 #undef CHECK_ROOT
         if(ft_804D6580!=h->owned_materials[0]||ft_804D6588!=h->owned_materials[1])
             return fail(error,size,"Common material publication was replaced by another owner");
-        if((h->objects[0].owner||h->objects[1].owner)&&h->generation!=melee_web_gameplay_stats().generation)
-            return fail(error,size,"Common teardown lost its original heap ownership");
         if(h->generation==melee_web_gameplay_stats().generation){
             for(unsigned link=0;link<=HSD_GObjLibInitData.p_link_max;++link)
                 for(HSD_GObj* o=((HSD_GObj**)HSD_GObj_Entities)[link];o;o=o->next)
                     if(o->classifier==HSD_GOBJ_CLASS_FIGHTER)return fail(error,size,"Remove original fighters before their common context");
-            if((h->objects[0].owner&&h->objects[0].owner==HSD_GObj_804D781C)||
-               (h->objects[1].owner&&h->objects[1].owner==HSD_GObj_804D781C))
-                return fail(error,size,"Common context cannot be destroyed inside its current callback");
         }
+        if(!melee_web_native_common_release_roots(h))
+            return fail(error,size,"Common material joint ownership was replaced");
         if(!melee_web_native_common_capture_end(h))return fail(error,size,"Common material capture ownership was lost");
 #define RESTORE_ROOT(index,name) name=h->saved[index];
         MELEE_WEB_COMMON_ROOTS(RESTORE_ROOT)
 #undef RESTORE_ROOT
         ft_804D6580=h->saved_materials[0];ft_804D6588=h->saved_materials[1];
         published=NULL;h->attached=0;
-        for(unsigned i=0;i<2;++i)if(h->objects[i].owner)HSD_GObjPLink_80390228(h->objects[i].owner);
     }
     release(h);return success(error,size);
 }
