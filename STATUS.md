@@ -14,15 +14,19 @@ hosted/native release scope.
 
 **Compiled / Source identified / Native traced / Retail compared** within the
 [CPU source-context runtime boundary](docs/CPU_SOURCE_CONTEXT_RUNTIME.md).
-The [scoped receipt](docs/evidence/cpu-source-context-runtime-v1.json) supersedes
-the paused component-only checkpoint: live source Fighter identities and both
-known register-carry routes execute in the browser. The inactive-TEV descriptor
-repair restores all four original Fighter identities. Fresh probe-free v61
-agrees on every first-match setup/tick record (13,482 records through reference
-tick 13480), plus 2,251 second-match records through tick 2249. This covers
-ticks 1776, 1778 and 4598 with unchanged exact state fields, original Results →
-CSS return and second-match reconstruction. Full-session, draw-cadence, pixel,
-PCM and foreground-timing equivalence remain unclaimed.
+The [scoped receipt](docs/evidence/cpu-source-context-runtime-v2.json) records
+live source Fighter identities and both known register-carry routes in the
+browser. The inactive-TEV descriptor repair restores all four original Fighter
+identities. Independent review then exposed false carry admission on pruned and
+sloped floor queries; publication now follows executed definitions and clobbers,
+including all three caller RNG sites and the audited continuation.
+Fresh probe-free v63 agrees on every first-match setup/tick record (13,482
+records through reference tick 13480), plus 2,351 second-match records through
+tick 2349. This covers ticks 1776, 1778 and 4598 with unchanged exact state fields,
+original Results → CSS return and second-match reconstruction. Integrated floor,
+callback and joint-lookup regressions pass; the full suite ran 1,461 tests with
+89 skipped (1,372 executed successfully). Full-session, draw-cadence, pixel, PCM
+and foreground-timing equivalence remain unclaimed.
 No merge or deployment.
 
 The earlier [audio/memory fixture](docs/SOURCE_LBAUDIO_MEMORY_STARTUP.md) and

@@ -77,6 +77,23 @@ class SourceStackProfileTests(unittest.TestCase):
         offsets = {signed16(w) for site in sites for w in body[max(0, site-16):site]
                    if w & 0xffff0000 == 0x38a10000}  # addi r5,r1,offset
         self.assertEqual(offsets, {profile["FLOOR_LOCAL_Y0"]})
+        # The floor-local setup is not a return invariant. Sloped-line tests
+        # execute mpLineIntersection, whose two reaching definitions are 0/1.
+        intersection = words(dol, table["mpLineIntersection"])
+        self.assertEqual(intersection[4], 0x38a00000)  # li r5,0
+        self.assertIn(0x38a00001, intersection)  # li r5,1
+        _, slope_sites = calls(dol, table["mpCheckFloor"],
+                               table["mpLineIntersection"]["address"])
+        self.assertEqual(len(slope_sites), 1)
+        self.assertLess(sites[0], slope_sites[0])
+        # All three source Randf call sites can overwrite a floor carry. The
+        # periodic sites must be tracked as well as the state-18 entry site.
+        _, rand_sites = calls(dol, table["ftCo_800ADE48"],
+                              table["HSD_Randf"]["address"])
+        self.assertEqual(len(rand_sites), 3)
+        self.assertEqual([table["ftCo_800ADE48"]["address"] + 4*i
+                          for i in rand_sites],
+                         [0x800ae110, 0x800ae170, 0x800ae21c])
         seed = int.from_bytes(dol.read(table["seed_ptr"]["address"], 4), "big")
         self.assertEqual(seed, table["seed"]["address"])
         self.assertEqual(seed, profile["SEED_WORD"])

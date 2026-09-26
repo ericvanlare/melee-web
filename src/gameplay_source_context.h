@@ -63,7 +63,7 @@ void melee_web_source_frame_leave(MeleeWebSourceFrameGuard* guard);
  * come from the original allocator's shadow, never from pointer arithmetic. */
 int melee_web_source_context_enter_fighter(void* host_fighter);
 
-/* Called by the original mpCheckFloor source body after its floor scan. The
+/* Called only at the executed mpCheckFloor eligible-line r5 definition. The
  * provider accepts only the DOL-audited CPU route and derives the local from
  * the active logical PPC r1, never from the Wasm stack or a captured value. */
 int melee_web_source_context_publish_floor_r5(void);

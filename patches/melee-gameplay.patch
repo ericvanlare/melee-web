@@ -9319,10 +9319,9 @@ index e1ffdce..86c1b19 100644
  #else
      FighterKind kind = fp->kind;
 diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
-index 3649261..139cde2 100644
 --- a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
 +++ b/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
-@@ -5654,6 +5654,9 @@ void ftCo_800AC5A0(Fighter* fp)
+@@ -5654,6 +5654,9 @@
                  stick_y = 127.0F * +y;
                  stick_x = 127.0F * -x;
              }
@@ -9332,7 +9331,50 @@ index 3649261..139cde2 100644
          }
          /// @bug These can be called with stick_x and stick_y being
          /// uninitialized.
-@@ -6077,6 +6080,7 @@ static bool ftCo_800ADE48(Fighter* fp, s32 switch_cmd)
+@@ -6003,30 +6006,42 @@
+ 
+     if (fp->kind == FTKIND_DONKEY) {
+         if (fp->motion_id == ftDk_MS_SpecialNLoop) {
++            /* Executed charge-cancel commands overwrite original r5. */
++            melee_web_source_context_invalidate_r5();
+             ftCo_CpuTapR(fp);
+         }
+     } else if (fp->kind == FTKIND_SAMUS) {
+         if (fp->motion_id == ftSs_MS_SpecialNHold) {
++            /* Executed charge-cancel commands overwrite original r5. */
++            melee_web_source_context_invalidate_r5();
+             ftCo_CpuTapRAndWait(fp);
+         }
+     } else if (fp->kind == FTKIND_MEWTWO) {
+         if (fp->motion_id == ftMt_MS_SpecialNLoop ||
+             fp->motion_id == ftMt_MS_SpecialNLoopFull)
+         {
++            /* Executed charge-cancel commands overwrite original r5. */
++            melee_web_source_context_invalidate_r5();
+             ftCo_CpuTapRAndWait(fp);
+         }
+     } else if (fp->kind == FTKIND_KIRBY) {
+         FighterKind kind = fp->u.kb.hat.kind;
+         if (kind == FTKIND_DONKEY && fp->motion_id == ftKb_MS_DkSpecialNLoop) {
++            /* Executed charge-cancel commands overwrite original r5. */
++            melee_web_source_context_invalidate_r5();
+             ftCo_CpuTapRAndWait(fp);
+         } else if (kind == FTKIND_SAMUS &&
+                    fp->motion_id == ftKb_MS_SsSpecialNHold)
+         {
++            /* Executed charge-cancel commands overwrite original r5. */
++            melee_web_source_context_invalidate_r5();
+             ftCo_CpuTapRAndWait(fp);
+         } else if (kind == FTKIND_MEWTWO &&
+                    (fp->motion_id == ftKb_MS_MtSpecialNLoop ||
+                     fp->motion_id == ftKb_MS_MtSpecialNLoopFull))
+         {
++            /* Executed charge-cancel commands overwrite original r5. */
++            melee_web_source_context_invalidate_r5();
+             ftCo_CpuTapRAndWait(fp);
+         }
+     }
+@@ -6072,6 +6087,7 @@
      f32 above;
      f32 dy;
      PAD_STACK(8);
@@ -9340,7 +9382,28 @@ index 3649261..139cde2 100644
  
      data = &fp->cpu;
      found = 0;
-@@ -6185,7 +6189,9 @@ static bool ftCo_800ADE48(Fighter* fp, s32 switch_cmd)
+@@ -6154,14 +6170,18 @@
+     }
+     if (data->xC == 0xE) {
+         if (data->x7C % 120 == 0) {
+-            if (HSD_Randf() > 0.5) {
++            f32 randf_value = HSD_Randf();
++            (void) melee_web_source_context_publish_seed_r5();
++            if (randf_value > 0.5) {
+                 data->xF8_b5 = true;
+             } else {
+                 data->xF8_b5 = false;
+             }
+         }
+     } else if (data->x7C % 400 == 0) {
+-        if (HSD_Randf() > 0.5) {
++        f32 randf_value = HSD_Randf();
++        (void) melee_web_source_context_publish_seed_r5();
++        if (randf_value > 0.5) {
+             data->xF8_b5 = true;
+         } else {
+             data->xF8_b5 = false;
+@@ -6180,7 +6200,9 @@
              switch_cmd = 0;
          } else {
              data2->xF9_b0 = false;
@@ -9351,7 +9414,18 @@ index 3649261..139cde2 100644
                  data2->xFA_b1 = true;
              } else {
                  data2->xFA_b1 = false;
-@@ -7907,6 +7913,7 @@ void ftCo_800B24B8(Fighter* fp)
+@@ -6194,6 +6216,10 @@
+     } else {
+         return true;
+     }
++    /* Only the already-selected/newly-selected state-18 returns above
++     * preserve the audited carry. Later command-specific calls are outside
++     * that reaching-definition route. */
++    melee_web_source_context_invalidate_r5();
+     cur_cmd = data->x18;
+     if (cur_cmd != 0x11) {
+         motion_id = fp->motion_id;
+@@ -7901,6 +7927,7 @@
      s32 cmd;
      Fighter* target;
      PAD_STACK(0x14);
@@ -9359,7 +9433,7 @@ index 3649261..139cde2 100644
  
      cmd = ftCo_800A229C(fp, &sp28);
      if (cmd != 0) {
-@@ -8068,6 +8075,7 @@ static inline bool ftCo_800B2AFC_IsIgnoredFloor(int line)
+@@ -8062,6 +8089,7 @@
  void ftCo_800B2AFC(Fighter* fp)
  {
      UNUSED u8 pad_high[8];
@@ -9367,7 +9441,7 @@ index 3649261..139cde2 100644
  
      switch (fp->cpu.xC) {
      case 0: {
-@@ -8611,6 +8619,7 @@ void ftCo_800B3900(Fighter_GObj* gobj)
+@@ -8605,6 +8633,7 @@
  {
      Fighter* fp = GET_FIGHTER(gobj);
      PAD_STACK(8);
@@ -9677,25 +9751,56 @@ index b3a8127..ac666c6 100644
  
  static void lbFile_80016760_inline(int heap_id, const char* basename,
 diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
-index a7bd4c5..c97fc4f 100644
 --- a/src/melee/mp/mplib.c
 +++ b/src/melee/mp/mplib.c
-@@ -1622,6 +1622,7 @@ bool mpCheckFloor(float ax, float ay, float bx, float by, float y_offset,
+@@ -1620,6 +1620,10 @@
      bool result_r27;
      bool already_checked;
      PAD_STACK(8);
 +    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_MP_CHECK_FLOOR);
++    /* The incoming r5 is the caller's flags_out argument, not any previous
++     * carry. Only an executed eligible-line definition below is supported. */
++    melee_web_source_context_invalidate_r5();
  
      result_r27 = false;
      min_dist2_f30 = F32_MAX;
-@@ -1752,6 +1753,7 @@ bool mpCheckFloor(float ax, float ay, float bx, float by, float y_offset,
-         mpUncheckBounding();
-     }
+@@ -1659,8 +1663,16 @@
+             float dist2;
+             int line_offset;
+         block_8:
+-            if (cb != NULL && !cb(gobj, line_r26 - groundCollLine)) {
+-                continue;
++            if (cb != NULL) {
++                bool accepted;
++                /* Arbitrary callbacks have no audited r5 preservation. Even
++                 * a rejected or subsequently skipped line can clobber it. */
++                melee_web_source_context_invalidate_r5();
++                accepted = cb(gobj, line_r26 - groundCollLine);
++                melee_web_source_context_invalidate_r5();
++                if (!accepted) {
++                    continue;
++                }
+             }
  
-+    (void) melee_web_source_context_publish_floor_r5();
-     return result_r27;
- }
+             if (line_id_skip ==
+@@ -1676,11 +1688,17 @@
+                 continue;
+             }
  
++            /* GALE01r2 8004f188: addi r5,r1,0x44. The endpoint helper
++             * and horizontal intersection preserve this definition, whether
++             * the query hits or misses. A later line may overwrite it. */
++            (void) melee_web_source_context_publish_floor_r5();
+             mpLib_8004ED5C(line_offset / 8, &x0_sp48, &y0_sp44, &x1_sp40,
+                            &y1_sp3C);
+             y0_sp44 += y_offset;
+             y1_sp3C += y_offset;
+             if (ABS(y0_sp44 - y1_sp3C) > 0.0001) {
++                /* mpLineIntersection defines r5=0/1, not a local address. */
++                melee_web_source_context_invalidate_r5();
+                 if (mpLineIntersection(x0_sp48, y0_sp44, x1_sp40, y1_sp3C, ax,
+                                        ay, bx, by, &px_sp54, &py_sp50))
+                 {
 diff --git a/src/sysdolphin/baselib/archive.c b/src/sysdolphin/baselib/archive.c
 index ca6583e..66a55c4 100644
 --- a/src/sysdolphin/baselib/archive.c
@@ -9805,3 +9910,29 @@ index 6c26c02..7a8fa10 100644
 +    }
 +#endif
      temp_r3 = GObj_Create(0xD, 3, 0);
+diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
+--- a/src/melee/mp/mplib.c
++++ b/src/melee/mp/mplib.c
+@@ -5229,6 +5229,9 @@
+         v0_idx = groundCollLine[line_id].x0->v0_idx;
+         count = mpLib_804D64B4->joint_count;
+         joint = groundCollJoint;
++        /* GALE01r2 80056bdc loads this joint-array address into r5.
++         * The -1 early return preserves it; valid-line queries do not. */
++        melee_web_source_context_invalidate_r5();
+         for (i = 0; i < count; i++) {
+             if (joint->inner->vtx_start <= v0_idx &&
+                 v0_idx < joint->inner->vtx_start + joint->inner->vtx_count)
+diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
+--- a/src/melee/gm/gm_16AE.c
++++ b/src/melee/gm/gm_16AE.c
+@@ -996,6 +996,9 @@
+     if (tmp->x0 != (UNK_T) gm_801A4BA8()) {
+         tmp->x0 = (UNK_T) gm_801A4BA8();
+         gm_80166378(tmp);
++        /* Recomputing standings clobbers r5. The cached return preserves it;
++         * this refresh can happen on either of the CPU caller's queries. */
++        melee_web_source_context_invalidate_r5();
+     }
+     return tmp->x58[ftLib_80086BE0(arg0)].x20;
+ }
