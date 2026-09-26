@@ -7831,7 +7831,22 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftComm
  }
  
  /// @todo Maybe a macro?
-@@ -7636,7 +7641,7 @@
+@@ -7294,8 +7299,12 @@
+ static inline u8 inlineM0(float x)
+ {
++    /* The original fctiwz produces a signed word before stb selects its
++     * low byte. A negative float directly converted to u8 is undefined C
++     * and loses Nana's delayed down/left inputs in Wasm. Normalized axes
++     * fit the signed intermediate; preserve the original byte conversion. */
+     if (x >= 0) {
+-        return 127.0F * x;
++        return (u8) (s32) (127.0F * x);
+     } else {
+-        return 128.0F * x;
++        return (u8) (s32) (128.0F * x);
+     }
+ }
+@@ -7636,7 +7645,7 @@
              ftCo_800A8940(fp);
          }
      }
