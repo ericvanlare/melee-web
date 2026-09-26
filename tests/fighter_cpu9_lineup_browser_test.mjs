@@ -423,7 +423,8 @@ try{
     if(/Unsupported native fighter command opcode|Bound fighter/.test(message)&&
        report.native_command_errors.length<24)
       report.native_command_errors.push({type:m.type(),message});
-    if(m.type()==='error'||message.startsWith('SHEIK_FINISH_'))
+    if(m.type()==='error'||message.startsWith('SHEIK_FINISH_')||
+        message.startsWith('Unsupported source CPU carry:'))
       report.page_errors.push({kind:'console',message});
   });
   driver=createBrowserDriver(page,{timeoutMs:60000,deadline:Date.now()+65*60*1000});

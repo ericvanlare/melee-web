@@ -9468,13 +9468,23 @@ index e1ffdce..86c1b19 100644
 diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
 --- a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
 +++ b/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
-@@ -5654,6 +5654,9 @@
+@@ -5654,6 +5654,19 @@
                  stick_y = 127.0F * +y;
                  stick_x = 127.0F * -x;
              }
-+        } else if (!melee_web_source_context_resolve_skipped(fp, &stick_x,
-+                                                              &stick_y)) {
-+            __builtin_trap();
++        } else {
++            const MeleeWebSourceRegisterWord reaching =
++                melee_web_source_context_r5();
++            if (!melee_web_source_context_resolve_skipped(fp, &stick_x, &stick_y)) {
++                OSReport("Unsupported source CPU carry: kind=%d slot=%u secondary=%u "
++                         "motion=%d cpu_state=%d cpu_tick=%u r5_known=%u "
++                         "r5_kind=%u r5_word=%08x logical_sp=%08x\n",
++                         fp->kind, fp->player_id, fp->x221F_b4, fp->motion_id,
++                         data->x18, data->x7C, reaching.known, reaching.kind,
++                         reaching.source_word, melee_web_source_context_current_sp());
++                /* Keep the hard rejection; diagnostics never supply a carry. */
++                __builtin_trap();
++            }
          }
          /// @bug These can be called with stick_x and stick_y being
          /// uninitialized.
