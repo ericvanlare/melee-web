@@ -1,32 +1,35 @@
 # Melee Web
 
+**[Play the public alpha at webmelee.gg](https://webmelee.gg)**
+
 Melee Web is a source port of vanilla Super Smash Bros. Melee for a desktop
 browser. Recovered game code is compiled to WebAssembly; Aurora supplies the
-source-level GX-to-WebGPU path. The original GameCube build remains the
-behavioral reference.
+source-level GX-to-WebGPU path. The goal is the complete original game without
+a PowerPC CPU interpreter or JIT.
 
-Start with [Developer entry](docs/DEVELOPMENT.md) for setup, commands and the
-change-boundary map. [Build, play and inspect](docs/BUILD_AND_PLAY.md) keeps the
-reproducible local player and asset commands. The entry pages are intentionally
-short. [STATUS.md](STATUS.md) is the
-single current index of observed evidence, open failures and measured results;
-historical reports and receipts linked there remain authoritative for their
-declared scope. This README does not repeat pass counts, timings or deployment
-state that can go stale.
+## Play online
 
-The product goal is full vanilla Melee without a PowerPC interpreter or JIT. The
-next acceptance deliverable is original in-game CSS → original SSS → a four-stock
-Mario-versus-Mario Final Destination match → original CSS. Accuracy, performance,
-rendering, audio, input and lifecycle are separate gates. Read the [accuracy
-contract](docs/ACCURACY_CONTRACT.md) before broadening the supported path.
+1. Open [webmelee.gg](https://webmelee.gg) in a desktop browser with WebGPU support.
+2. Choose **Disc** and select your own unmodified USA revision 1.02
+   (GALE01 revision-2) Melee disc image in ISO, GCM or CISO format. RVZ is not
+   supported.
+3. Choose **Play**. Open **Controls** to see keyboard bindings and input options.
 
-Game content is supplied locally from an owned USA revision 1.02 GALE01 revision-2
-disc. The browser reads required ranges in the tab; disc images and extracted
-assets stay local and outside Git. RVZ is not supported. The public player and
-private macOS [Reference Capture application](docs/REFERENCE_CAPTURE_APP.md) are
-separate surfaces.
+Game content is supplied by your local disc image. The browser reads required
+ranges on your device; the disc and extracted game data are not uploaded.
+Disc images and extracted game archives are not included in this repository.
 
-## Build the development target
+This is a work-in-progress alpha with limited playable integration. Features,
+accuracy and performance are still being developed; errors can interrupt play.
+The live release and the latest repository code may differ. See
+[current status](STATUS.md) for tested scenarios, known failures and the
+supporting evidence, and the [roadmap](docs/ROADMAP.md) for planned work.
+
+## Develop locally
+
+Start with [Contributing](CONTRIBUTING.md) and the
+[developer entry](docs/DEVELOPMENT.md) for prerequisites and the checks relevant
+to your change. Bootstrap installs the pinned source and build dependencies.
 
 ```sh
 python3 scripts/bootstrap.py
@@ -34,40 +37,48 @@ python3 scripts/build.py
 python3 scripts/serve.py --directory build/browser
 ```
 
-Open `http://127.0.0.1:8787` in a desktop browser with WebGPU. `runtime.html`
-is the original CSS/SSS player; `viewer.html` is the separate asset inspector.
+Open `http://127.0.0.1:8787/runtime.html` in a desktop browser with WebGPU.
+Choose your local disc and **Open character select** to enter the original
+in-game character select screen. `viewer.html` is the separate asset inspector.
 
-For the full validation matrix, focused gameplay targets, local asset extraction,
-public packaging and reference capture, use [Developer entry](docs/DEVELOPMENT.md)
-and the linked boundary documents.
-For contribution and pull-request requirements, read [Contributing](CONTRIBUTING.md).
+The [build, play and inspect guide](docs/BUILD_AND_PLAY.md) covers local assets
+and inspection commands. Keep disc images, extracted assets and generated
+captures outside Git; use ignored `assets-local/` and `work/` directories for
+local inputs and evidence. The private macOS
+[Reference Capture application](docs/REFERENCE_CAPTURE_APP.md) supports
+original-game comparisons separately from the browser player.
 
-## Evidence and scope
+## Accuracy and contribution priorities
 
-The [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md) defines
-the evidence labels, numerical rules and admission workflow. The [bounded
-hitch-capture guide](docs/HITCH_CAPTURE.md) separates native deadline misses from
-browser callback gaps. [Original comparison](docs/ORIGINAL_COMPARISON.md),
-[recorded-queue replay](docs/RECORDED_QUEUE_REPLAY.md), and the [reference capture
-procedure](docs/REFERENCE_CAPTURE_APP.md) define their own evidence boundaries.
+The original GameCube build is the behavioral reference. The next acceptance
+deliverable is original character select → original stage select → a four-stock
+Mario-versus-Mario Final Destination match → original character select.
+Accuracy, rendering, audio, input, lifecycle and performance have separate gates;
+the public alpha is not an accepted accurate or tournament-ready port.
 
-Adding a fighter or stage requires its dedicated gate first: [source fighter
-checkpoints](docs/ADDING_CHARACTERS.md) and [source stage checkpoints](docs/ADDING_STAGES.md).
-Do not treat a compile, synthetic scene, short trace or average FPS as gameplay
-validation, and do not call a partial browser route tournament-ready.
+Use the [accuracy contract](docs/ACCURACY_CONTRACT.md) and
+[performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md) when
+changing runtime behavior. Adding a fighter or stage starts with the
+[source fighter checkpoints](docs/ADDING_CHARACTERS.md) or
+[source stage checkpoints](docs/ADDING_STAGES.md).
 
-## Public packaging
+[Original comparison](docs/ORIGINAL_COMPARISON.md),
+[recorded-queue replay](docs/RECORDED_QUEUE_REPLAY.md) and
+[hitch capture](docs/HITCH_CAPTURE.md) describe the validation procedures.
+A successful build or short trace does not establish full gameplay equivalence.
+[STATUS.md](STATUS.md) is the evidence index for measured results and open gates.
+
+## Release documentation
 
 The public release has two separate audited Release profiles: `audio-player`
-for the authorized production-audio path and `player` as the silent rollback
-identity. The audio profile has a source-bound package and byte-preserving
-promotion path; see [production audio](docs/AUDIO_PRODUCTION.md), [public release review](docs/PUBLIC_RELEASE_REVIEW.md)
-and [public deployment](docs/PUBLIC_DEPLOYMENT.md). These documents do not
-widen gameplay acceptance or substitute for the release receipt.
-The [development audio replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md)
-tracks implementation provenance, compatibility checks and remaining accuracy
-limits, while the [audio listening preview](docs/AUDIO_PREVIEW.md) links the
-bounded PR #42 browser evidence.
+for the production-audio path and `player` as the silent rollback identity.
+See [production audio](docs/AUDIO_PRODUCTION.md),
+[public release review](docs/PUBLIC_RELEASE_REVIEW.md) and
+[public deployment](docs/PUBLIC_DEPLOYMENT.md) for packaging, validation and
+release procedures. A successful deployment does not establish gameplay
+accuracy or performance.
+
+## Credits and licensing
 
 This project is independent of Nintendo, doldecomp and Aurora. Preserve upstream
 source provenance and notices; see [third-party notices](THIRD_PARTY.md).

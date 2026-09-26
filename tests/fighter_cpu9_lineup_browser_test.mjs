@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {parseArgs} from 'node:util';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
@@ -28,6 +29,14 @@ const sha256=async filename=>{
   for await(const bytes of (await import('node:fs')).createReadStream(filename))hash.update(bytes);
   return hash.digest('hex');
 };
+const repository=path.resolve(import.meta.dirname,'..');
+function sourceProvenance(){
+  const git=(...args)=>execFileSync('git',args,{cwd:repository,encoding:'utf8'}).trim();
+  return {commit:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}'),
+    status:git('status','--porcelain=v1'),
+    tracked_diff_sha256:createHash('sha256').update(
+      execFileSync('git',['diff','--binary','HEAD'],{cwd:repository})).digest('hex')};
+}
 const lineup=values.lineup==='A'?
   [{name:'Game & Watch',kind:3,position:[7.1,2.5]},
    {name:'Kirby',kind:4,position:[0.1,9.5]},
@@ -43,6 +52,9 @@ const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
   matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[]};
 report.source_timing_disruptions=[];
 report.native_command_errors=[];
+report.provenance={source_start:sourceProvenance(),
+  harness_sha256:await sha256(new URL(import.meta.url)),served_artifacts:[]};
+const artifactReads=[];
 let browser,page,driver;
 const buttonA=0x0100,buttonStart=0x1000;
 const phase=()=>page.evaluate(()=>Module._melee_web_native_menu_phase());
@@ -394,6 +406,16 @@ try{
   browser=await chromium.launch({...browserLaunchOptions(launchOptions),headless:true});
   report.browser={name:'headless Chrome',executable:path.basename(browserPath),version:browser.version(),playwright:playwrightPath};
   page=await browser.newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});
+  // Hash the bytes actually served to this page, not a guessed build directory.
+  // Null-video references and these rendered functional runs remain separate.
+  page.on('response',response=>{
+    const address=new URL(response.url());
+    if(address.origin!==url.origin||! /\.(?:html|css|m?js|wasm)$/.test(address.pathname))return;
+    artifactReads.push(response.body().then(bytes=>{
+      report.provenance.served_artifacts.push({url:response.url(),status:response.status(),
+        bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});
+    }).catch(error=>({url:response.url(),error:error.message})));
+  });
   page.setDefaultTimeout(30000);page.setDefaultNavigationTimeout(60000);
   page.on('pageerror',e=>report.page_errors.push({kind:'pageerror',message:e.stack||e.message}));
   page.on('console',m=>{
@@ -447,6 +469,15 @@ try{
   report.controller_inputs=report.controller_inputs||[];
   report.controller_input_summary={pad_samples:report.pad_sample_count,first_samples:report.controller_inputs.slice(0,48),last_samples:report.controller_inputs.slice(-24)};
   report.controller_inputs=undefined;
+  const artifactFailures=(await Promise.all(artifactReads)).filter(Boolean);
+  report.provenance.source_end=sourceProvenance();
+  report.provenance.source_unchanged=JSON.stringify(report.provenance.source_start)===
+    JSON.stringify(report.provenance.source_end);
+  report.provenance.artifact_read_failures=artifactFailures;
+  if(artifactFailures.length){
+    report.result='fail';process.exitCode=1;
+    report.failure??={message:'Failed to retain served artifact provenance'};
+  }
   if(page&&!page.isClosed())driver?.dispose();
   if(browser)await browser.close();
   await fs.writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n');

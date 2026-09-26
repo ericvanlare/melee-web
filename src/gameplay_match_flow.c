@@ -109,8 +109,24 @@ int melee_web_match_flow_complete(const MeleeWebMatchFlow* flow)
 int melee_web_match_flow_end(MeleeWebMatchFlow* flow, char* error, size_t size)
 {
     if (!flow) return 1;
-    if (!live(flow) || !melee_web_source_clock_end())
-        return fail(error, size, "Original match clock cannot restore its owner");
+    if (!live(flow))
+        return fail(error, size, "Original match flow lost its world owner");
+    if (!melee_web_source_clock_end()) {
+        switch (melee_web_source_clock_end_failure()) {
+        case MELEE_WEB_SOURCE_CLOCK_END_FAILURE_OWNER:
+            return fail(error, size, "Original match clock process-mask owner changed");
+        case MELEE_WEB_SOURCE_CLOCK_END_FAILURE_CALLBACK:
+            return fail(error, size, "Original match clock cannot close inside its source callback");
+        case MELEE_WEB_SOURCE_CLOCK_END_FAILURE_GOBJ:
+            return fail(error, size, "Original match clock cannot close with an active GObj callback");
+        case MELEE_WEB_SOURCE_CLOCK_END_FAILURE_MASK_VALUE:
+            return fail(error, size, "Original match process-mask value changed");
+        case MELEE_WEB_SOURCE_CLOCK_END_FAILURE_CONTROLLER_MAP:
+            return fail(error, size, "Original controller-map owner changed");
+        default:
+            return fail(error, size, "Original match clock cannot restore its owner");
+        }
+    }
     if (!melee_web_source_cadence_end())
         return fail(error, size, "Original PAD cadence cannot restore its owner");
     owner = NULL;

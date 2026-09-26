@@ -27,6 +27,7 @@
 extern "C" {
 #include <melee/gm/forward.h>
 #include <melee/pl/forward.h>
+#include <melee/lb/lblanguage.h>
 #include <sysdolphin/baselib/gobj.h>
 }
 #include <filesystem>
@@ -196,6 +197,11 @@ int main(int argc,char** argv){try{
           "Source trailing-dot filename silently fell back to another locale");
     check(melee_web::melee_web_runtime_file_name(resolver_files,"PlMsNr.dat")=="PlMsNr.dat",
           "Exact source filename resolution changed");
+    // This fixture imports the US archives and enters below normal boot.
+    // Preserve the original language selection, rather than aliasing a
+    // requested JP file to the supplied US bytes in the file service.
+    lbLang_SetLanguageSetting(LANG_US);
+    lbLang_SetSavedLanguage(LANG_US);
     char error[256]{};
     MeleeWebMenuRuntime services{nullptr,
         [](void*,MeleeWebMenuScene,char*,size_t){return 1;},

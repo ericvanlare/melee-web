@@ -9,7 +9,9 @@ class ArchiveSectionsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             binary=Path(folder)/'sections'
             subprocess.run([shutil.which('clang') or 'cc','-std=gnu11','-Wall','-Wextra','-Werror',
-                '-I',str(ROOT/'src'),str(ROOT/'src/gameplay_archive_sections.c'),
+                '-include',str(ROOT/'tests/gameplay_bootstrap_test_stub.h'),
+                '-I',str(ROOT/'src'),
+                str(ROOT/'src/gameplay_archive_sections.c'),
                 str(ROOT/'tests/gameplay_archive_sections_trace.c'),'-o',str(binary)],check=True,capture_output=True)
             result=subprocess.run([str(binary)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stderr)

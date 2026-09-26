@@ -1,5 +1,9 @@
 # Source allocation identity prerequisite
 
+> Historical component checkpoint. The [runtime integration](CPU_SOURCE_CONTEXT_RUNTIME.md)
+> supersedes the statements below about missing live hooks and Fighter bindings.
+> Its scoped receipt records current evidence and remaining limits.
+
 `src/source_address_context.hpp` and `.cpp` implement an address-only model of
 original SDK heap allocation and the ordinary OS-backed HSD object pool. The
 same C++ implementation is tested as native code and Wasm. This is a reusable

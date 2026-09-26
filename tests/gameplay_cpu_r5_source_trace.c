@@ -37,7 +37,8 @@ int main(int argc, char** argv)
         .independently_derived = 1,
     };
     const MeleeWebCpuSourceFighterIdentity fighter = {
-        .source_word = parse_word(argv[3]),
+        .low_byte = (int8_t)expected_low(parse_word(argv[3])),
+        .host_owner = 1,
         .world_generation = 1,
         .allocation_generation = 1,
         .live = 1,
@@ -70,7 +71,7 @@ int main(int argc, char** argv)
         fprintf(stderr, "%s\n", error);
         return 6;
     }
-    if (x != expected_low(seed.source_word) || y != expected_low(fighter.source_word)) {
+    if (x != expected_low(seed.source_word) || y != fighter.low_byte) {
         fputs("source seed/fighter carry did not reach the consumer bytes\n", stderr);
         return 7;
     }

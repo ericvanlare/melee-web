@@ -52,6 +52,7 @@ struct MeleeWebMatchContext {
     HSD_RumbleData saved_rumble[4];
     HSD_PadRumbleListData rumble_lists[12];
     CmSubject* pool;
+    uint8_t start_published[MELEE_WEB_MATCH_MAX_PLAYERS];
     int crowd_started,input_restored;
 };
 static MeleeWebMatchContext* owner;
@@ -63,8 +64,17 @@ static int live(MeleeWebMatchContext* h,char* e,size_t n)
         return fail(e,n,"Match context requires its live owned source world");
     if(seed_ptr!=&h->seed||cm_804D645C!=h->pool)
         return fail(e,n,"Match source RNG or camera ownership changed");
+    if(!h->collision)return fail(e,n,"Match collision owner has not been attached");
     MeleeWebCollisionReadiness r;
     return melee_web_collision_readiness(h->collision,&r,e,n);
+}
+static int owned(MeleeWebMatchContext* h,char* e,size_t n)
+{
+    if(!h||h!=owner||h->generation!=melee_web_gameplay_generation())
+        return fail(e,n,"Match context requires its live owned source world");
+    if(seed_ptr!=&h->seed||cm_804D645C!=h->pool)
+        return fail(e,n,"Match source RNG or camera ownership changed");
+    return 1;
 }
 MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings* s,
     MeleeWebCollision* collision,char* e,size_t n)
@@ -86,8 +96,10 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
             fail(e,n,"Match players require distinct slots and controller ports");return NULL;
         }
     }
-    if(!melee_web_collision_readiness(collision,&r,e,n))return NULL;
-    if(!r.storage_owned||!r.original_indices_initialized){fail(e,n,"Match requires original collision indices");return NULL;}
+    if(collision){
+        if(!melee_web_collision_readiness(collision,&r,e,n))return NULL;
+        if(!r.storage_owned||!r.original_indices_initialized){fail(e,n,"Match requires original collision indices");return NULL;}
+    }
     for(int slot=0;slot<6;slot++) {
         StaticPlayer* p=Player_GetPtrForSlot(slot);
         if(p->player_entity[0]||p->player_entity[1]) {
@@ -142,6 +154,23 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
     Camera_80028B9C(camera_subjects);h->pool=cm_804D645C;
     owner=h;ok(e,n);return h;
 }
+int melee_web_match_attach_collision(MeleeWebMatchContext* h,MeleeWebCollision* collision,char* e,size_t n)
+{
+    if(!owned(h,e,n))return 0;
+    if(!collision||h->collision||h->ticks||h->crowd_started)
+        return fail(e,n,"Match collision must be attached once before stepping");
+    for(uint32_t i=0;i<h->player_count;i++){
+        StaticPlayer* p=Player_GetPtrForSlot(h->slots[i]);
+        if(p->player_entity[0]||p->player_entity[1])
+            return fail(e,n,"Match collision must be attached before fighter creation");
+    }
+    MeleeWebCollisionReadiness r;
+    if(!melee_web_collision_readiness(collision,&r,e,n))return 0;
+    if(!r.storage_owned||!r.original_indices_initialized)
+        return fail(e,n,"Match requires original collision indices");
+    h->collision=collision;
+    return ok(e,n);
+}
 int melee_web_match_create_fighter(MeleeWebMatchContext* h,char* e,size_t n)
 {
     return melee_web_match_create_fighters(h,e,n);
@@ -155,6 +184,26 @@ int melee_web_match_restore_input(MeleeWebMatchContext* h,const MeleeWebPadState
         if(Player_GetPtrForSlot(h->slots[i])->player_entity[0])
             return fail(e,n,"Input history cannot be restored after fighter creation");
     melee_web_pad_state_apply(state);h->input_restored=1;
+    return ok(e,n);
+}
+int melee_web_match_set_player_start(MeleeWebMatchContext* h,uint32_t player_index,
+    const float position[3],float facing,char* e,size_t n)
+{
+    if(!live(h,e,n))return 0;
+    if(player_index>=h->player_count||!position||!isfinite(facing)||(facing!=1.0f&&facing!=-1.0f))
+        return fail(e,n,"Source player start requires a valid match player, finite position and facing +/-1");
+    if(h->ticks||h->crowd_started||h->start_published[player_index])
+        return fail(e,n,"Source player start may be published once before fighter creation and stepping");
+    for(unsigned axis=0;axis<3;axis++)if(!isfinite(position[axis]))
+        return fail(e,n,"Source player start coordinates must be finite");
+    const uint32_t slot=h->slots[player_index];
+    StaticPlayer* p=Player_GetPtrForSlot(slot);
+    if(p->player_entity[0]||p->player_entity[1])
+        return fail(e,n,"Source player start cannot move an existing fighter");
+    Vec3 source={position[0],position[1],position[2]};
+    Player_80032768(slot,&source);
+    Player_SetFacingDirection(slot,facing);
+    h->start_published[player_index]=1;
     return ok(e,n);
 }
 static int create_fighters(MeleeWebMatchContext* h,int activate,char* e,size_t n)
@@ -489,7 +538,9 @@ int melee_web_match_player_stats(MeleeWebMatchContext* h,uint32_t index,MeleeWeb
 int melee_web_match_end(MeleeWebMatchContext* h,char* e,size_t n)
 {
     if(!h)return ok(e,n);
-    if(!live(h,e,n))return 0;
+    /* A source-ordered startup can fail after camera creation but before
+     * Ground attaches collision; still retire the scoped player/camera owner. */
+    if(!owned(h,e,n))return 0;
     /* Items may retain their fighter owner during source destruction. */
     while(((HSD_GObj**)HSD_GObj_Entities)[9])Item_8026A8EC(((HSD_GObj**)HSD_GObj_Entities)[9]);
     if(h->crowd_started){

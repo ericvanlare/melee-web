@@ -1,0 +1,615 @@
+{
+  "schema": "melee-web-cpu-source-context-runtime-v1",
+  "date": "2026-09-26",
+  "labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Retail compared",
+    "Browser exercised"
+  ],
+  "scope": "Original four-Mario CPU9/Final Destination first match and bounded second-match prefix under recorded controller queues; exact declared state fields only.",
+  "pr": "https://github.com/ericvanlare/melee-web/pull/89",
+  "source_base_commit": "924aa418043174bba46f8b3100a3e36be663901a",
+  "validated_runtime_files": {
+    "CMakeLists.txt": {
+      "path": "CMakeLists.txt",
+      "bytes": 22105,
+      "sha256": "87464d23d20a36031442ef57867ba835b2bb92329171af98d2da9c1539b623f6"
+    },
+    "cmake/FighterRuntime.cmake": {
+      "path": "cmake/FighterRuntime.cmake",
+      "bytes": 46855,
+      "sha256": "75d71fc15bf62fa7907c82831570f3bc7e3ac4bc8ebfd667b978d9b28fae7250"
+    },
+    "patches/melee-gameplay.patch": {
+      "path": "patches/melee-gameplay.patch",
+      "bytes": 369417,
+      "sha256": "125263f340ea857cbfacfd2d7d61904592e10f040bd736b66f0692a048c14380"
+    },
+    "src/dat_effect_banks.cpp": {
+      "path": "src/dat_effect_banks.cpp",
+      "bytes": 2420,
+      "sha256": "79bc5bbf6bdcb1bf1724495eb1e975361e031f96dc93184a37a89238d2138aa9"
+    },
+    "src/dat_effect_banks.hpp": {
+      "path": "src/dat_effect_banks.hpp",
+      "bytes": 1164,
+      "sha256": "552e29158125b28c9771dcbccd3ad5895c56d8de57326f9cd1a46fa7a6a8efdf"
+    },
+    "src/dat_item_article.cpp": {
+      "path": "src/dat_item_article.cpp",
+      "bytes": 20399,
+      "sha256": "1d39aa28022915b6a737bca6dc940fa92a6b7218f70b60cddd5bd6d5b403112a"
+    },
+    "src/dat_item_article.hpp": {
+      "path": "src/dat_item_article.hpp",
+      "bytes": 922,
+      "sha256": "7ce66a6c606afcccd96f78c6e1304a3c089540b86ea30729f877501f6aaa3024"
+    },
+    "src/dat_native_stage.cpp": {
+      "path": "src/dat_native_stage.cpp",
+      "bytes": 32906,
+      "sha256": "7035f0625b3ed3710e3073d998e6eeee99b360722a029b06f5f0c51e4ca2ffc7"
+    },
+    "src/dat_native_stage.hpp": {
+      "path": "src/dat_native_stage.hpp",
+      "bytes": 1765,
+      "sha256": "9a8ca3b9618ae62e57dc0256bcc7a3ad9ef91894e6372b993e8504f6c0ffd602"
+    },
+    "src/dat_stage_yaku.cpp": {
+      "path": "src/dat_stage_yaku.cpp",
+      "bytes": 1514,
+      "sha256": "11b2959ba3ec68bf535a30db6e0bf9f34056e07a0a9543380b252f30ad17ff91"
+    },
+    "src/dat_stage_yaku.hpp": {
+      "path": "src/dat_stage_yaku.hpp",
+      "bytes": 809,
+      "sha256": "4a0078cf72d608b8683978f48aa2fc654a40c26a0c7c062539b5a68d3ca60cdb"
+    },
+    "src/dat_texture.cpp": {
+      "path": "src/dat_texture.cpp",
+      "bytes": 16303,
+      "sha256": "1965e30a740b7e8e0d75290dfb3bd2e9bed3bc90757845b084e6b3c365cad1e0"
+    },
+    "src/dat_texture.hpp": {
+      "path": "src/dat_texture.hpp",
+      "bytes": 3561,
+      "sha256": "830a87a102947efc8db4584d7dd558a64b88dee162c90589fb4d77c5e9bb638e"
+    },
+    "src/gameplay_archive_sections.c": {
+      "path": "src/gameplay_archive_sections.c",
+      "bytes": 12078,
+      "sha256": "e6be3fdba0d3fd5de6ce14f64cf20c3f07824039ea6b2c995415c00bd06c31e2"
+    },
+    "src/gameplay_archive_sections.h": {
+      "path": "src/gameplay_archive_sections.h",
+      "bytes": 3247,
+      "sha256": "22d43fb36e6b2a487c32f7fa37aa8d9c657ad5028469212244110f27d996f8db"
+    },
+    "src/gameplay_article_data.c": {
+      "path": "src/gameplay_article_data.c",
+      "bytes": 7172,
+      "sha256": "f7d721a6af968d43c8b7c8fa887b8845d4a2ca2c368eccf702301c53c083ccf8"
+    },
+    "src/gameplay_article_data.h": {
+      "path": "src/gameplay_article_data.h",
+      "bytes": 1424,
+      "sha256": "019f9ab1ff1ae04d8b0f9a7adf6f5c7bc4434cec93fa3064f2b6951651907f6d"
+    },
+    "src/gameplay_asset_manifest.cpp": {
+      "path": "src/gameplay_asset_manifest.cpp",
+      "bytes": 13482,
+      "sha256": "f345875e9f78fbd398379df28f01fd08ec219e5dfb6df5d9ebd4f50fb3e75d51"
+    },
+    "src/gameplay_bonus_data.c": {
+      "path": "src/gameplay_bonus_data.c",
+      "bytes": 3042,
+      "sha256": "4c878bc48a8a96373bac75329d9e54c1df066974435ad05fc25e5ddfc324ba69"
+    },
+    "src/gameplay_bonus_data.h": {
+      "path": "src/gameplay_bonus_data.h",
+      "bytes": 947,
+      "sha256": "7ce6419de041e4d18ebb1e17b94e168f72366493ce405492efc64555c4cacbe8"
+    },
+    "src/gameplay_collision.c": {
+      "path": "src/gameplay_collision.c",
+      "bytes": 23505,
+      "sha256": "e17b5a8721d04701e02d0a0d4771b63164dcbb0ff00da1e6877ed380017e226d"
+    },
+    "src/gameplay_collision.h": {
+      "path": "src/gameplay_collision.h",
+      "bytes": 4192,
+      "sha256": "49355b08430408008c8a5d1aa3b32e139bad51754025de4c4c141f188b6b608b"
+    },
+    "src/gameplay_common_context.c": {
+      "path": "src/gameplay_common_context.c",
+      "bytes": 13730,
+      "sha256": "c2e02208d211f5a4e199d35ef1e1be8369ce9262d1cf946136eb3467e13cfa93"
+    },
+    "src/gameplay_common_context.h": {
+      "path": "src/gameplay_common_context.h",
+      "bytes": 3112,
+      "sha256": "1e9ee41694e68cc668d00b4258592895849d0040de6b291a790bc580d071d3b4"
+    },
+    "src/gameplay_cpu_observation.c": {
+      "path": "src/gameplay_cpu_observation.c",
+      "bytes": 20364,
+      "sha256": "a504518808ee58f02a1bd9b5895aae0bdb79a0c6dfd50e14d0a908f635ebefa7"
+    },
+    "src/gameplay_cpu_observation.h": {
+      "path": "src/gameplay_cpu_observation.h",
+      "bytes": 949,
+      "sha256": "be156c794e140c94a222cfecb42bcf28808384d4f9394880af8a206e8037d2ff"
+    },
+    "src/gameplay_effect_banks.c": {
+      "path": "src/gameplay_effect_banks.c",
+      "bytes": 12384,
+      "sha256": "369f934680c1e6d7b4fcd6a2f2b32e32e20bf4511df4ed868b7fb759d0e0035a"
+    },
+    "src/gameplay_effect_banks.h": {
+      "path": "src/gameplay_effect_banks.h",
+      "bytes": 2360,
+      "sha256": "183470354d0699d339a49c8ea47b1b3a8141487876d6499fece2de4b50c5a75e"
+    },
+    "src/gameplay_match_clock.h": {
+      "path": "src/gameplay_match_clock.h",
+      "bytes": 2444,
+      "sha256": "b65bed9600bb8de77d38e9348017e841d9bd2da70568f368c31db17a6f7db554"
+    },
+    "src/gameplay_match_flow.c": {
+      "path": "src/gameplay_match_flow.c",
+      "bytes": 5544,
+      "sha256": "14183810afddbd11155df21d0c0e9a864b36c590e0aa890b15fde85a3f0967f6"
+    },
+    "src/gameplay_match_rules.c": {
+      "path": "src/gameplay_match_rules.c",
+      "bytes": 8638,
+      "sha256": "0107dc51a1d551686f17af9f77c7c93cab1839a25466ebdfa6fab0bdcb38e174"
+    },
+    "src/gameplay_match_rules.h": {
+      "path": "src/gameplay_match_rules.h",
+      "bytes": 2505,
+      "sha256": "a7a98efb59b3603a1bf7f186835eca5b3fea633e42633d9451e7521f8f177df0"
+    },
+    "src/gameplay_match_session.cpp": {
+      "path": "src/gameplay_match_session.cpp",
+      "bytes": 20527,
+      "sha256": "11990c214fb183ebb7da8095f4d6bcb1575ad708f0f0b606d6479db71a8b7a5b"
+    },
+    "src/gameplay_results_context.c": {
+      "path": "src/gameplay_results_context.c",
+      "bytes": 23037,
+      "sha256": "fe4f6313593e739bfe204bb742ac78e1eb142fe986b902b685fd0f8267aedc1c"
+    },
+    "src/gameplay_retail_recipe.cpp": {
+      "path": "src/gameplay_retail_recipe.cpp",
+      "bytes": 16700,
+      "sha256": "bdb2f59eb17e10daea8de4d8c23ce428c3db25c3101586ba62ddaed494cf0db8"
+    },
+    "src/gameplay_rumble.c": {
+      "path": "src/gameplay_rumble.c",
+      "bytes": 6696,
+      "sha256": "bbdd3d248edad5baa546235ad0ca0870d6977e4656c0efc9cc1bcbe8b081cf2a"
+    },
+    "src/gameplay_rumble.h": {
+      "path": "src/gameplay_rumble.h",
+      "bytes": 1248,
+      "sha256": "f7d67301dc7f87a5eb1ee3217fb548c84d5d77a519d1e9c8245ab4d9043b989e"
+    },
+    "src/gameplay_source_context.c": {
+      "path": "src/gameplay_source_context.c",
+      "bytes": 11932,
+      "sha256": "f212b3ac1d4b59f3316b78926b0c9fb6205ab7771d7cdb17cd9a5416fa456955"
+    },
+    "src/gameplay_source_context.h": {
+      "path": "src/gameplay_source_context.h",
+      "bytes": 3976,
+      "sha256": "9a2a408f2acd5bd670df3e9420f7c38a6795d8f0c5530f1d11974c6bfc1c589a"
+    },
+    "src/gameplay_source_files.c": {
+      "path": "src/gameplay_source_files.c",
+      "bytes": 5944,
+      "sha256": "359c055d06bfc92de88f927b0be90e180b8f1f201a50e75975053a551fc2209f"
+    },
+    "src/gameplay_source_files.h": {
+      "path": "src/gameplay_source_files.h",
+      "bytes": 1571,
+      "sha256": "6439a7e08e97dbfa80e9b3125231cbc02c193b02c7d74e2d5e8e4eaf4735f8b1"
+    },
+    "src/gameplay_source_memory_runtime.cpp": {
+      "path": "src/gameplay_source_memory_runtime.cpp",
+      "bytes": 9361,
+      "sha256": "69c6c55dfc343ec3a5bd0297c531f12b172f5998e0eb65c32d90d382cf59fe57"
+    },
+    "src/gameplay_source_memory_runtime.h": {
+      "path": "src/gameplay_source_memory_runtime.h",
+      "bytes": 1818,
+      "sha256": "9927fdac9943043e616299402bc4d767cd9dc4eaddbea40544ec758603ae12d5"
+    },
+    "src/gameplay_stage_context.c": {
+      "path": "src/gameplay_stage_context.c",
+      "bytes": 9946,
+      "sha256": "0d8ba86852dcf0a1dbecad57d3e75b569506d79ec40518838da5366dabb627c6"
+    },
+    "src/gameplay_stage_context.h": {
+      "path": "src/gameplay_stage_context.h",
+      "bytes": 3291,
+      "sha256": "71a69803ee49332acb296fc72919f643b64e15f153c8e07e97866de25a461e63"
+    },
+    "src/gameplay_stage_last.c": {
+      "path": "src/gameplay_stage_last.c",
+      "bytes": 9720,
+      "sha256": "0d8f41d6263606d49bf1eff76abb4e1d865a76255fe13fc33bab3806c93ee92a"
+    },
+    "src/gameplay_stage_last.h": {
+      "path": "src/gameplay_stage_last.h",
+      "bytes": 1435,
+      "sha256": "0a07730ec092151def4aff642b9ab6952da5f05235505e08a944ee5765977468"
+    },
+    "src/gameplay_stage_numeric.c": {
+      "path": "src/gameplay_stage_numeric.c",
+      "bytes": 13517,
+      "sha256": "d6c7e376a9c003b530fb18975adca7ca0a4a8a5cf46ea10285d73be6dc327ed1"
+    },
+    "src/gameplay_world.cpp": {
+      "path": "src/gameplay_world.cpp",
+      "bytes": 52916,
+      "sha256": "dbdfe495a1eb719372a1f3d1601e078932b122fc383e13b58bf012d68202c397"
+    },
+    "src/gameplay_world.hpp": {
+      "path": "src/gameplay_world.hpp",
+      "bytes": 3676,
+      "sha256": "295e32d6c8568454d7c51748cc13dd398556859eb74da88b4532600c3dd5514e"
+    },
+    "src/hsd_native_common.c": {
+      "path": "src/hsd_native_common.c",
+      "bytes": 4125,
+      "sha256": "a8302fbdcdffff25674a28b1aefa2c4a871618e1fd9b2848e63af6cd60bb026f"
+    },
+    "src/hsd_native_joint.c": {
+      "path": "src/hsd_native_joint.c",
+      "bytes": 35678,
+      "sha256": "7cb26eca385be5eeae289bc03754ac1a2c3f4fd989cf78f4fe7f89a62f8225e1"
+    },
+    "src/source_ppc_profile_gale01r2.h": {
+      "path": "src/source_ppc_profile_gale01r2.h",
+      "bytes": 1043,
+      "sha256": "c60e3855fdcc86aded0b4f425a68c8b9223bcbe04cbec15af7e0bfe257158963"
+    }
+  },
+  "browser": {
+    "engine": "installed headless Google Chrome",
+    "version": "153.0.8010.54",
+    "playwright": "1.56.1",
+    "build": {
+      "gameplay_menu_browser.js": {
+        "bytes": 583874,
+        "sha256": "a2d885467b86729009e312f1b93381a2b11c0cb1df877a9ae8760b76b775d820"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 118070943,
+        "sha256": "743e4decfd6e42a7bbd21f6ddfd43143a04a6fa53a774d354b773cef2287b125"
+      },
+      "runtime.html": {
+        "bytes": 5007,
+        "sha256": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172"
+      }
+    },
+    "run": "work/session-equivalence-runtime-v61",
+    "build_identity": {
+      "path": "work/session-equivalence-runtime-v61/build-identity.json",
+      "bytes": 2019,
+      "sha256": "48756e63cfe7d038f9d2aefe519a754bb4d9ddf7caac892651c1b73c9eabf9e1"
+    },
+    "trace": {
+      "path": "work/session-equivalence-runtime-v61/retail-port.jsonl",
+      "bytes": 71745835,
+      "sha256": "125cb3d02e72f6fe7bedff84bf487a7a4c6dbb1a24dabe03fde5e41e8919d461"
+    },
+    "report": {
+      "path": "work/session-equivalence-runtime-v61/report.json",
+      "bytes": 6725851,
+      "sha256": "26283afc7e483ffefe5b66957f2d885ff93de28eee38b00cd8251a49a7d9a44b"
+    },
+    "intentional_stop": {
+      "requested_cursor": 18000,
+      "observed_cursor": 18029,
+      "reason": "Bounded first-divergence diagnostic; incomplete replay expected"
+    },
+    "temporary_allocation_probes": false
+  },
+  "input_identities": {
+    "disc": {
+      "bytes": 1449165376,
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "recipe": {
+      "bytes": 1877246,
+      "sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e"
+    },
+    "retail_reference": {
+      "bytes": 1555401454,
+      "sha256": "18531db0d92fead60044deacef9eedc22d7cb5c19773faa63a6c9df7528546f5"
+    }
+  },
+  "comparison": {
+    "fields": [
+      "rng",
+      "match_frame",
+      "pad_state_hex",
+      "fighters"
+    ],
+    "method": "Exact JSON/string equality with no numeric tolerance; each complete fighter record and every field in it is compared.",
+    "first_match": {
+      "records": 13482,
+      "first_differences": {},
+      "last_reference_tick": 13480,
+      "complete_match": true,
+      "report": {
+        "path": "work/session-equivalence-runtime-v61/first-match-comparison.json",
+        "bytes": 1479,
+        "sha256": "20b555e35551a84040609dbe0192256dc84829b4afd7b7e87121249e676b008c"
+      }
+    },
+    "second_match": {
+      "records": 2251,
+      "last_compared": {
+        "boundary": "source_tick",
+        "port_index": 18030,
+        "reference_seq": 87802,
+        "reference_tick": 2249
+      },
+      "first_differences": {},
+      "next_uncaptured": {
+        "seq": 87807,
+        "source_tick": 2250
+      },
+      "report": {
+        "path": "work/session-equivalence-runtime-v61/second-match-comparison.json",
+        "bytes": 1713,
+        "sha256": "4e5170795dc5b3533b829d3b9a5de2e5f83ede36657b9851c53809690c9bfcf4"
+      }
+    },
+    "draw_ordinals_compared": false,
+    "comparator": {
+      "path": "work/compare-indexed-match.py",
+      "bytes": 7191,
+      "sha256": "97d7ec064a3e6ae6be692a6f0fec32868181cff7d8fe49bb4f6c556e55e9edb4"
+    },
+    "control": {
+      "path": "work/session-equivalence-runtime-v60/indexed-comparator-control.json",
+      "bytes": 1646,
+      "sha256": "b36b8a1d51248c93d395af6bbcfcd981ea72e98066f71020abc5bc88ba800a6f"
+    }
+  },
+  "causal_evidence": {
+    "original_piece_trace": {
+      "path": "work/hsd-piece-probe-v1/original-v2/allocations.jsonl",
+      "bytes": 275799220,
+      "sha256": "ce93f61e60725127b6a569ca01e1e8b451a5cc0defea6f911f5ffdb0d3bba6f4"
+    },
+    "original_prior_prefix_validation": {
+      "path": "work/hsd-piece-probe-v1/original-v2/prior-allocation-validation.json",
+      "bytes": 178,
+      "sha256": "94e82a6031986bf40b2bbf5b8d8ebaa362b9a35c1d7506756680fb57918cd97e"
+    },
+    "port_piece_trace": {
+      "path": "work/session-equivalence-piece-v58/hsd-piece-trace.json",
+      "bytes": 23286387,
+      "sha256": "b0cee952f1a8c66d6ab5e3ca15e9782971e428ba3b1411bdc4b59472f9c2f852"
+    },
+    "first_piece_mismatch": {
+      "index": 1614,
+      "main_operations_before": 563,
+      "owner": "PlCo root20 material texture",
+      "missing_allocation_bytes": 32,
+      "cause": "Present inactive TEV descriptor omitted by native texture hydration."
+    },
+    "v59_main_allocations": {
+      "path": "work/session-equivalence-inactive-tev-v59/main-allocation-comparison.json",
+      "bytes": 686,
+      "sha256": "d07012a882442c7dfb999001529f75bb53f224ae6fec5796ba79f410f7b94b72"
+    },
+    "v59_fighter_owners": {
+      "path": "work/session-equivalence-inactive-tev-v59/source-owner-trace.json",
+      "bytes": 675,
+      "sha256": "577caa7d84f7d13ac8aa22564d1e6739f0b7c874291cb3993efbc8b482b63605"
+    },
+    "first_vs_fighter_words_comparison_only": [
+      "0x80c6b9e0",
+      "0x80ca6f60",
+      "0x80ce1980",
+      "0x80d1bf80"
+    ],
+    "v59_state_comparison": {
+      "path": "work/session-equivalence-inactive-tev-v59/first-match-comparison.json",
+      "bytes": 1552,
+      "sha256": "d0f36696d399d0bb022704a4f68c2cc212fa8aee84940367f3d9aa35077c3e24"
+    },
+    "tick4598_original_prefix_validation": {
+      "path": "work/register4598-reference-validation.json",
+      "bytes": 1170,
+      "sha256": "ea6b59797a6a9e9d9146a408de1f3c55064662da0030c51abca5ebb7e57d031e"
+    },
+    "probe_restoration": "Generated HSD piece wrappers and original diagnostic observer edits restored before acceptance build; temporary main allocation/Fighter hooks removed."
+  },
+  "validation": {
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "tests": 1461,
+      "skipped": 89,
+      "seconds": 391.019,
+      "pass": true,
+      "log": {
+        "path": "work/inactive-tev-cleanup-full-tests.log",
+        "bytes": 258236,
+        "sha256": "b6cd502020570c65a51dc7f5717597f922b7b99284aa1fc970a5c4f9ef576d15"
+      },
+      "skip_messages_in_log": {
+        "build output unavailable": 1,
+        "Owned Dr. Mario/Roy revision-2 assets are absent": 1,
+        "ccache 4.9 and a C compiler are required": 1,
+        "owned DOL/disc/source inputs not configured": 1,
+        "Optional user-owned main.ssm and mario.ssm are unavailable": 1,
+        "Optional user-owned sp_end.hps is unavailable": 1,
+        "Local PlCo.dat is unavailable": 2,
+        "owned Donkey fighter archive is unavailable": 1,
+        "owned Koopa fighter archive is unavailable": 1,
+        "owned Luigi fighter/effect archives are unavailable": 1,
+        "owned Mewtwo fighter archive is unavailable": 1,
+        "owned Ness fighter archive is unavailable": 1,
+        "owned Peach fighter archive is unavailable": 1,
+        "owned Pichu fighter archive is unavailable": 1,
+        "owned Pikachu fighter archive is unavailable": 1,
+        "owned Purin fighter archive is unavailable": 1,
+        "Optional local GrNLa.dat unavailable": 1,
+        "Build the native stage-map publication trace": 1,
+        "Optional local stage asset unavailable": 1,
+        "Optional complete local runtime assets unavailable": 1,
+        "Build dat_scene_trace before the typed scene check": 1,
+        "Owned common effect archive and pinned SDK required": 1,
+        "Owned stage selection archive and pinned SDK required": 1,
+        "Owned Dream Land revision-2 asset is absent": 1,
+        "Owned Falco revision 2 assets are absent": 1,
+        "Owned Fountain and common runtime fixtures are required": 1,
+        "Owned Fox revision 2 assets are absent": 2,
+        "Owned Gr* archives unavailable: REPO/assets-local/link-verification/GrNLa.dat, REPO/assets-local/link-verification/GrNBa.dat, REPO/assets-local/link-verification/GrSt.dat, REPO/assets-local/link-verification/GrOp.dat, REPO/assets-local/full-game-stage-hyrule-temple/GrSh.dat, REPO/assets-local/full-game-stage-fountain/GrIz.dat, REPO/assets-local/full-game-stage-yoshis-island-64/GrOy.dat": 1,
+        "Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures": 2,
+        "Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs": 1,
+        "Build the HPS trace and supply the owned Prize music fixtures": 1,
+        "Optional user-owned PdPm.dat is unavailable": 1,
+        "Optional built combat trace and owned runtime assets required": 1,
+        "Owned menu, Fox/Falco and stage fixtures are required": 1,
+        "Owned Battlefield fixtures are required": 1,
+        "Owned Captain/Mario, English costumes, menu and FD fixtures are required": 1,
+        "Owned Donkey/Mario, English costumes, menu and FD fixtures are required": 1,
+        "Owned Dr. Mario/Roy and stage fixtures are required": 1,
+        "Owned Ganondorf/Mario, menu and FD fixtures are required": 1,
+        "Owned Temple and common Mario/runtime fixtures are required": 1,
+        "Owned Koopa/Mario, costumes, menu and FD fixtures are required": 1,
+        "Owned Luigi/Mario, English costumes, menu and FD fixtures are required": 1,
+        "Owned Mewtwo/Mario, costumes, menu and FD fixtures are required": 1,
+        "Owned Old Yoshi, Mario and menu fixtures are required": 1,
+        "Owned common Mario, menu and FD fixtures are required": 1,
+        "Owned Purin/Mario, English costumes, menu and FD fixtures are required": 1,
+        "Owned common effect archive unavailable": 1,
+        "Local EfLkData.dat unavailable; proprietary assets are optional": 1,
+        "Local EfMrData.dat unavailable; proprietary assets are optional": 1,
+        "Local EfPkData.dat unavailable; proprietary assets are optional": 1,
+        "Built stock trace and owned Mario costume archives required": 1,
+        "Built original player context trace required": 1,
+        "Optional built source trace and owned runtime assets required": 2,
+        "Optional built full-stage edge trace and owned runtime assets required": 2,
+        "Optional built timer trace and owned runtime assets required": 1,
+        "Build gameplay_music_profile_trace and provide owned menu/game assets": 1,
+        "Build the native menu host and supply owned Link audio fixtures": 1,
+        "Original CSS target and owned local fixtures are required": 1,
+        "Build the native menu host and supply owned menu/game fixtures": 1,
+        "Build gameplay_rumble_trace and provide owned LbRb.dat": 1,
+        "Ignored GrSt.dat fixture unavailable": 1,
+        "Optional user-owned GrNLa.dat is unavailable": 1,
+        "Optional local PlCo.dat unavailable": 2,
+        "Owned Koopa fighter archive is required": 1,
+        "Owned Marth revision-2 assets are absent": 1,
+        "Build the native_audio_banks fighter target first": 1,
+        "Owned Old Yoshi and common runtime fixtures are required": 1,
+        "Owned Yoshi's Island 64 GrOy.dat is absent": 1,
+        "Owned Pikachu and Pichu fighter archives are required": 1,
+        "compiled private provenance fixture not supplied": 1,
+        "Optional pinned Dolphin source checkout is not installed": 2,
+        "Build gameplay_retail_trace to test the shared decoder": 4,
+        "Owned Captain model fixtures are required": 1,
+        "pinned slippi-js fixtures are not checked out": 2,
+        "owned DOL not configured (MELEE_CPU_DOL)": 1,
+        "owned DOL or symbol map unavailable": 3,
+        "Owned Yoshi's Story revision 2 asset is absent": 1
+      }
+    },
+    "focused_logs": [
+      {
+        "path": "work/hsd-piece-probe-v1/texture-tests.log",
+        "bytes": 2149,
+        "sha256": "479336973537bf10c6929841a0b9c292c02bc341fad968a206c1912938efbb3b"
+      },
+      {
+        "path": "work/hsd-piece-probe-v1/native-joint-tests-v3.log",
+        "bytes": 258,
+        "sha256": "73d21c6ac41b9ce7ba71bde11fc494f8802dbe7d5c52faed09fa04ca5862fcb3"
+      },
+      {
+        "path": "work/hsd-piece-probe-v1/source-stack-profile-v2.log",
+        "bytes": 240,
+        "sha256": "44e8ea973ac8c49af0e90cbdeae0e879a4b7b349755b031517cc771065852f55"
+      },
+      {
+        "path": "work/hsd-piece-probe-v1/final-source-context.log",
+        "bytes": 38,
+        "sha256": "9d8fc7406f37cbdcf175f580250a764611962a018bebc62226890489ba202888"
+      },
+      {
+        "path": "work/hsd-piece-probe-v1/final-numeric.log",
+        "bytes": 299,
+        "sha256": "45b3a86a94ebb642b64f2f9471f1b85f8f0376482e0ed16d4c0372bc5e681591"
+      },
+      {
+        "path": "work/hsd-piece-probe-v1/final-effect-bank.log",
+        "bytes": 629,
+        "sha256": "6ec89956ec01c51d7275678a3160ac46cd092560af0b5cf52c068947ce447660"
+      },
+      {
+        "path": "work/cleanup-collision-test.log",
+        "bytes": 60,
+        "sha256": "623834efd45839f8a251cb228ea316904f887f2a8ab6a9824b6f1bb0c2d2a905"
+      },
+      {
+        "path": "work/cleanup-common-test.log",
+        "bytes": 85,
+        "sha256": "7ece147fdd2bbf36e5ca45f73bd2b5ab7291886a11f815520edc3ccc2d692e04"
+      },
+      {
+        "path": "work/cleanup-results-test.log",
+        "bytes": 655,
+        "sha256": "4d801c7a1fe7ff19ba8815a22088585aa3582433bdfdf7101dd96872fe43f2e0"
+      }
+    ],
+    "build_logs": [
+      {
+        "path": "work/inactive-tev-final-build.log",
+        "bytes": 15232,
+        "sha256": "6ad68f33d135f8622411f010bc36a477886f79c6dd5d475c7682bb5d01334a64"
+      },
+      {
+        "path": "work/inactive-tev-runtime-build.log",
+        "bytes": 11554,
+        "sha256": "f891de8bbc94b17d1e3ede14e38ba4d2c0c2e6454d7824a0cc76c9668fb47197"
+      },
+      {
+        "path": "work/inactive-tev-affected-traces-build.log",
+        "bytes": 4432,
+        "sha256": "aeb9b255cdcbeb4c07e053aa226be9fd4475b9a547243465331fa90863f74b0e"
+      },
+      {
+        "path": "work/inactive-tev-cleanup-build.log",
+        "bytes": 17838,
+        "sha256": "875cf2cddf5249d5ef00813897d360b973d4a627e7609105c8032dc7f00e00bd"
+      }
+    ],
+    "review": {
+      "path": "work/cpu-runtime-final-review.md",
+      "bytes": 1254,
+      "sha256": "2e16f7876dd0f14126fee7b183e8943d9e12c3f88a738939783573066c034a62",
+      "result": "three cleanup findings fixed; scoped independent re-review found no definite remaining ownership blocker"
+    },
+    "skip_reason_scope": "Skip messages include nested child unittest output; their counts are not added to the final suite count of89. Required owned profile, common/collision/Results and browser checks ran separately."
+  },
+  "remaining_limits": [
+    "No full-session equivalence; final run intentionally stops during the second match.",
+    "Main allocation comparison remains different after operation3441: retail requests32896, port56 at3442, after all first-match Fighter identities. No complete allocation-equivalence claim.",
+    "Historical v54 second-Results scene disagreement at source cursor28481 has not been repeated on this implementation; it is not claimed fixed.",
+    "Port draw ordinals are not captured. Original tick1816 draw-cadence observation is not evidence of a port mismatch.",
+    "Pixels, PCM, live input/controller latency, foreground timing/performance and content admission remain separate gates.",
+    "Only the audited seed-global and callee-floor-local carry routes are supported; no general PowerPC register emulation."
+  ],
+  "accuracy": "No captured addresses/register values/CPU outputs or expected states supplied to runtime; no widened tolerances or removed state fields; no merge or deployment."
+}

@@ -38,6 +38,9 @@ void hex(std::span<const uint8_t> bytes, std::ostream& out = std::cout) {
     for (auto byte : bytes) out << digits[byte >> 4] << digits[byte & 15];
 }
 bool timer_audit_active = false;
+bool whole_session_cpu_observation_requested = false;
+bool whole_session_cpu_observation_started = false;
+bool whole_session_cpu_observation_finished = false;
 void timer_state(const char* record, size_t index = 0) {
     if (!timer_audit_active) return;
     // Separate diagnostic stream: never add fields to an older state schema,
@@ -218,9 +221,13 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
 void retail_replay_session_initial(const RetailReplayRecipe& recipe) {
     check(recipe.whole_session(), "Session diagnostics require MWRC v8");
     timer_audit_active = false;
+    whole_session_cpu_observation_requested = melee_web_cpu_observation_available() != 0;
+    whole_session_cpu_observation_started = false;
+    whole_session_cpu_observation_finished = false;
     std::cout << "{\"record\":\"header\",\"schema\":\"melee-web-port-session-diagnostic\","
         "\"version\":1,\"frames_requested\":" << recipe.frames.size()
-        << ",\"comparison\":\"not_run\",\"cpu_observations\":\"not_captured\","
+        << ",\"comparison\":\"not_run\",\"cpu_observations\":\""
+        << (whole_session_cpu_observation_requested ? "first_match_only" : "not_captured") << "\","
         "\"draw_state\":\"not_captured\"}\n";
 }
 
@@ -228,6 +235,13 @@ void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing
     if (recipe.whole_session()) {
         std::cout << "{\"record\":\"session_match_enter_complete\",";
         melee_web_retail_state(); history(recipe); std::cout << "}\n";
+        if (whole_session_cpu_observation_requested &&
+            !whole_session_cpu_observation_started &&
+            !whole_session_cpu_observation_finished) {
+            melee_web_cpu_observation_begin(recipe.setup.data(), recipe.frames.size(),
+                                             source_drawing);
+            whole_session_cpu_observation_started = true;
+        }
         return;
     }
     timer_audit_active = recipe.selection.start.rules.timer_enabled;
@@ -274,7 +288,17 @@ void retail_replay_frame(const RetailReplayRecipe& recipe, size_t index, unsigne
     else
         std::cout << "\"rng\":" << melee_web_retail_rng();
     history(recipe); std::cout << "}\n";
-    if (!recipe.whole_session()) {
+    if (recipe.whole_session()) {
+        if (whole_session_cpu_observation_started) {
+            if (scene == kRetailReplayMatch) {
+                melee_web_cpu_observation_tick(index);
+            } else {
+                melee_web_cpu_observation_end(index);
+                whole_session_cpu_observation_started = false;
+                whole_session_cpu_observation_finished = true;
+            }
+        }
+    } else {
         timer_state("frame", index);
         if (recipe.version >= 3) melee_web_cpu_observation_tick(index);
     }
@@ -286,7 +310,15 @@ void retail_replay_preparation_draw(const RetailReplayRecipe& recipe) {
     if (!recipe.whole_session() && recipe.version >= 3) melee_web_cpu_observation_preparation_draw();
 }
 void retail_replay_end(size_t frames, bool whole_session) {
-    if (!whole_session) melee_web_cpu_observation_end(frames);
+    if (whole_session) {
+        if (whole_session_cpu_observation_started)
+            melee_web_cpu_observation_end(frames);
+        whole_session_cpu_observation_requested = false;
+        whole_session_cpu_observation_started = false;
+        whole_session_cpu_observation_finished = false;
+    } else {
+        melee_web_cpu_observation_end(frames);
+    }
     std::cout << "{\"record\":\"end\",\"frames\":" << frames << ",\"status\":\"captured\"}\n";
     if (timer_audit_active) {
         std::cerr << "TIMER_AUDIT {\"record\":\"end\",\"frames\":" << frames << ",\"status\":\"captured\"}\n";

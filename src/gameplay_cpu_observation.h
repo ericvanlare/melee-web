@@ -5,8 +5,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* Read-only match diagnostics. Enabled only by an instrumented v3 recipe.
- * CPU outputs never feed the input recipe or the simulation. */
+/* Read-only match diagnostics. CPU outputs never feed the input recipe or
+ * the simulation. Whole-session capture is opt-in through a browser callback. */
+int melee_web_cpu_observation_available(void);
 void melee_web_cpu_observation_begin(const uint8_t setup[0x138], size_t frames,
                                      int source_drawing);
 /* One-shot native diagnostic opt-in. This only emits read-only HITLAG_AUDIT

@@ -18,6 +18,10 @@ typedef struct MeleeWebRenderSettings {
 MeleeWebRender* melee_web_render_begin(const MeleeWebRenderSettings*,char*,size_t);
 /* Original standard/fixed match camera initialization and scheduled controller. */
 MeleeWebRender* melee_web_render_begin_match(const MeleeWebRenderSettings*,char*,size_t);
+/* Source-ordered VS startup allocates Camera_80030688 before Ground and shared
+ * runtime owners finish construction. Complete the render settings later. */
+MeleeWebRender* melee_web_render_prepare_match_camera(char*,size_t);
+int melee_web_render_finish_match_camera(MeleeWebRender*,const MeleeWebRenderSettings*,char*,size_t);
 /* Enable the camera's original complete draw callback after full stage setup. */
 int melee_web_render_use_match_passes(MeleeWebRender*,char*,size_t);
 /* Use original top-level camera ordering, including the match HUD, magnifiers

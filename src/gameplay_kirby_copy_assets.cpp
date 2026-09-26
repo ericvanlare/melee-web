@@ -25,7 +25,6 @@ extern "C" {
 #include "hsd_native_joint.h"
 void ftKb_Init_800EE528(void);
 void ftData_800857E0(FighterKind);
-void lbArchive_InitializeDAT(HSD_Archive*, void*, size_t);
 struct MeleeWebKirbyCopyName { char* filename; char* name; };
 struct MeleeWebKirbyCostumeStrings {
     char* dat_filename;
@@ -528,8 +527,19 @@ struct GameplayKirbyCopyAssets::Storage {
                                                  kirby_costumes);
             owned.native = std::make_unique<HSD_Archive>();
             std::memset(owned.native.get(), 0, sizeof(HSD_Archive));
-            lbArchive_InitializeDAT(owned.native.get(), owned.bytes.data(),
-                                    owned.bytes.size());
+            // This is the checked native descriptor owner, not a source
+            // lbFile/lbHeap copy. Keep its original HSD relocation separate
+            // from lbArchive_InitializeDAT's source-file ownership contract;
+            // the source loader later borrows the published typed roots.
+            if (HSD_ArchiveParse(owned.native.get(), owned.bytes.data(),
+                                 owned.bytes.size()) == -1)
+                reject("Original HSD parser rejected Kirby archive " +
+                       requirement.filename);
+            for (int external = 0;; ++external) {
+                const char* symbol = HSD_ArchiveGetExtern(owned.native.get(), external);
+                if (!symbol) break;
+                HSD_ArchiveLocateExtern(owned.native.get(), symbol, nullptr);
+            }
             if (!owned.native->data)
                 reject("Original HSD parser did not initialize Kirby archive " +
                        requirement.filename);
