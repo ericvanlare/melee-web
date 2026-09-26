@@ -8441,6 +8441,58 @@ diff --git a/src/melee/pl/player.c b/src/melee/pl/player.c
 index 288afe9..b6394ed 100644
 --- a/src/melee/pl/player.c
 +++ b/src/melee/pl/player.c
+@@ -359,4 +359,5 @@ void Player_80032070(int slot, bool bool_arg)
+     StaticPlayer* player;
+-    struct Unk_Struct_w_Array* unkStruct =
+-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
++    /* Native globals do not retain the retail string/table adjacency. Use
++     * the actual owner, including the partner's transformation flag. */
++    ftMapping* mapping = ftMapping_list;
+     Player_CheckSlot(slot);
+@@ -368,3 +369,3 @@ void Player_80032070(int slot, bool bool_arg)
+         if (player->flags.b2 &&
+-            unkStruct->vec_arr[player->player_character].z == 0 &&
++            mapping[player->player_character].has_transformation == 0 &&
+             ftLib_8008701C(player->player_entity[player->transformed[1]]))
+@@ -448,4 +449,3 @@ Gm_PKind Player_8003248C(s32 slot, bool arg1)
+     Gm_PKind slot_type;
+-    struct Unk_Struct_w_Array* unk_struct =
+-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
++    ftMapping* mapping = ftMapping_list;
+     StaticPlayer* player;
+@@ -457,3 +457,3 @@ Gm_PKind Player_8003248C(s32 slot, bool arg1)
+     if (arg1 == 1) {
+-        if (unk_struct->vec_arr[player->player_character].z == 0) {
++        if (mapping[player->player_character].has_transformation == 0) {
+             if (player->slot_type == Gm_PKind_Human ||
+@@ -492,4 +492,3 @@ s8 Player_80032610(s32 slot, bool arg1)
+ 
+-    struct Unk_Struct_w_Array* some_struct =
+-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
++    ftMapping* mapping = ftMapping_list;
+     StaticPlayer* player;
+@@ -503,6 +502,6 @@ s8 Player_80032610(s32 slot, bool arg1)
+     if (arg1 == 0) {
+-        return some_struct->vec_arr[player->player_character].x;
++        return mapping[player->player_character].internal_id;
+     }
+     if (arg1 == 1) {
+-        return some_struct->vec_arr[player->player_character].y;
++        return mapping[player->player_character].extra_internal_id;
+     }
+@@ -1298,4 +1297,3 @@ s32 Player_GetFalls(s32 slot)
+     StaticPlayer* player;
+-    struct Unk_Struct_w_Array* unkStruct =
+-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
++    ftMapping* mapping = ftMapping_list;
+     Player_CheckSlot(slot);
+@@ -1303,4 +1301,4 @@ s32 Player_GetFalls(s32 slot)
+ 
+-    if (unkStruct->vec_arr[player->player_character].y != -1 &&
+-        unkStruct->vec_arr[player->player_character].z != 0)
++    if (mapping[player->player_character].extra_internal_id != -1 &&
++        mapping[player->player_character].has_transformation != 0)
+     {
 @@ -2053,6 +2053,15 @@ void Player_80036DD8(void)
  
  void Player_80036E20(CharacterKind ckind, HSD_Archive* archive, s32 arg2)
