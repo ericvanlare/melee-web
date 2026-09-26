@@ -228,6 +228,71 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 _run_source(path, source, pads)
 
+    def test_every_declared_match_field_is_exact_at_setup_and_tick(self):
+        source, pads, _, _ = _source_rows()
+        payload = source[9]["payload"]
+        state = _state_from_payload(payload, "fixture")
+        state.update(_snapshot_values(payload, "fixture"))
+
+        def different(value):
+            if isinstance(value, str):
+                return ("1" if value[0] == "0" else "0") + value[1:]
+            if isinstance(value, list):
+                return [different(value[0]), *value[1:]]
+            return value + 1
+
+        fields = ["rng", "match_frame", "pad_state_hex"]
+        fields += ["fighters." + key for key in state["fighters"][0]]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl"
+            for record in (0, 1):
+                for field in fields:
+                    with self.subTest(record=record, field=field):
+                        def alter(setup, frame):
+                            target = (setup, frame)[record]
+                            key = field
+                            if field.startswith("fighters."):
+                                target = target["fighters"][0]
+                                key = field.split(".", 1)[1]
+                            target[key] = different(target[key])
+                        _browser_trace(path, pads, state, alter=alter)
+                        with self.assertRaises(ValueError):
+                            _run_source(path, source, pads)
+
+    def test_raw_source_envelope_requires_zero_origin_and_announcement_order(self):
+        source, pads, _, _ = _source_rows()
+        payload = source[9]["payload"]
+        state = _state_from_payload(payload, "fixture")
+        state.update(_snapshot_values(payload, "fixture"))
+        variants = []
+        shifted = copy.deepcopy(source)
+        for row in shifted:
+            row["seq"] += 1
+        variants.append(shifted)
+        reordered = copy.deepcopy(source)
+        reordered[0], reordered[1] = reordered[1], reordered[0]
+        for index, row in enumerate(reordered):
+            row["seq"] = index
+        variants.append(reordered)
+        missing_start = copy.deepcopy(source)
+        del missing_start[1]
+        for index, row in enumerate(missing_start):
+            row["seq"] = index
+        variants.append(missing_start)
+        gapped = copy.deepcopy(source)
+        gapped[9]["seq"] += 1
+        variants.append(gapped)
+        variants.append(copy.deepcopy(source[:-1]))
+        after_end = copy.deepcopy(source)
+        after_end.append({"seq": len(source), "event": "boundary", "payload": {}})
+        variants.append(after_end)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl"
+            _browser_trace(path, pads, state)
+            for index, rows in enumerate(variants):
+                with self.subTest(variant=index), self.assertRaises(ValueError):
+                    _run_source(path, rows, pads)
+
     def test_real_comparator_rejects_missing_or_extra_terminal_records(self):
         source, pads, _, _ = _source_rows()
         state = _state_from_payload({"slices": source[9]["payload"]["slices"]}, "fixture")

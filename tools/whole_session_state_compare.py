@@ -530,6 +530,7 @@ class SourceCollector:
         self.setup_bytes: list[bytes] = []
         self.final_css: dict[str, Any] | None = None
         self.last_source_tick: dict[int, int] = {}
+        self.record_count = 0
 
     def _lifecycle(self, boundary: str, row: Mapping[str, Any]) -> None:
         payload = row["payload"]
@@ -651,6 +652,15 @@ class SourceCollector:
         event = row.get("event")
         if self.end is not None:
             raise ComparisonError("source stream contains records after end")
+        # The raw decoder checks continuity after its first record. This
+        # complete-session consumer also requires the original zero origin
+        # and announcement order; lifecycle filtering must not repair them.
+        sequence = _int(row.get("seq"), "source sequence", 0, (1 << 64) - 1)
+        if sequence != self.record_count:
+            raise ComparisonError(f"source sequence must equal record index {self.record_count}")
+        if self.record_count < 2 and event != ("handshake", "start")[self.record_count]:
+            raise ComparisonError("source stream must begin with handshake then start")
+        self.record_count += 1
         if event == "handshake":
             if self.handshake is not None:
                 raise ComparisonError("source has duplicate handshake")
