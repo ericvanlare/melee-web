@@ -219,8 +219,12 @@ void adapt_kirby_copy_parts_count(std::vector<std::uint8_t>& bytes,
                    root.symbol);
         for(const auto costume_value:costume_ids) {
             const auto costume=static_cast<std::uint32_t>(costume_value);
-            const auto list=archive.pointer(*rows+costume*4U,
-                                             std::size_t{tobj_count}*2U);
+            auto list=archive.pointer(*rows+costume*4U,
+                                       std::size_t{tobj_count}*2U);
+            // ftAnim_80070200 falls back to costume zero when the selected
+            // costume has no texture-index list of its own.
+            if(!list)
+                list=archive.pointer(*rows,std::size_t{tobj_count}*2U);
             if(tobj_count&&!list)
                 reject("Kirby copy source texture-animation list is missing: "+
                        root.symbol);
@@ -230,8 +234,16 @@ void adapt_kirby_copy_parts_count(std::vector<std::uint8_t>& bytes,
         }
     }
 
-    // ftKb_CostumeList is the source's six-entry Kirby costume table. Each
-    // FtPartsDesc visibility row has four FtPartsVisLookup pointers; each
+    // ftKb_LoadHat (and the common hat loader) passes costume zero for a
+    // joint-backed KirbyHatStruct, independent of Kirby's body costume.
+    // Only the FtPartsDesc-only LOAD_HAT path passes x619_costume_id. The
+    // joint-backed archives need not author any further visibility rows.
+    const std::vector<unsigned> visibility_costumes =
+        model_count_offset != 0 ? std::vector<unsigned>{0} : costume_ids;
+    const auto max_visibility_costume = *std::max_element(
+        visibility_costumes.begin(), visibility_costumes.end());
+
+    // Each FtPartsDesc visibility row has four FtPartsVisLookup pointers; each
     // lookup then owns model_num {variant_count, TempS*} rows. The PPC HSD
     // archive loader relocates those pointers but does not byte-swap the
     // counts, so the original ftParts routines otherwise interpret (for
@@ -246,21 +258,24 @@ void adapt_kirby_copy_parts_count(std::vector<std::uint8_t>& bytes,
         visibility_slots_per_costume * visibility_pointer_bytes;
     const auto table = archive.pointer(
         descriptor + 4,
-        (max_costume + 1U) * costume_row_bytes);
+        (max_visibility_costume + 1U) * costume_row_bytes);
     if (!table)
         reject("Kirby copy FtPartsDesc visibility table is missing: " +
                root.symbol);
-    // Rows are source-selected by Kirby's actual CSS costume id. Several are
-    // themselves relocation targets (notably Popo's), so next_target_offset
-    // is not an array extent here. Validate only the selected rows' byte range
-    // and leave every unconsumed source row untouched.
-    for (const auto costume_value : costume_ids) {
+    // Relocation targets can alias rows, so next_target_offset is not an
+    // array extent. Validate the source-selected rows and their per-category
+    // row-zero fallback, as consumed by ftParts_8007487C.
+    for (const auto costume_value : visibility_costumes) {
         const auto costume = static_cast<std::uint32_t>(costume_value);
         for (std::uint32_t slot = 0; slot < visibility_slots_per_costume; ++slot) {
             const auto pointer_slot = *table + costume * costume_row_bytes +
                                       slot * visibility_pointer_bytes;
-            const auto lookup = archive.pointer(
+            auto lookup = archive.pointer(
                 pointer_slot, std::size_t{count} * lookup_row_bytes);
+            if (!lookup)
+                lookup = archive.pointer(
+                    *table + slot * visibility_pointer_bytes,
+                    std::size_t{count} * lookup_row_bytes);
             if (!lookup || count == 0) continue;
 
             for (std::uint32_t model = 0; model < count; ++model) {
