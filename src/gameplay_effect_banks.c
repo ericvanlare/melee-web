@@ -22,6 +22,11 @@ struct MeleeWebEffectBank {
     unsigned attached;
 };
 static MeleeWebEffectBank* published[65];
+int melee_web_effect_bank_is_published(uint32_t bank)
+{
+    return bank<65&&published[bank]&&published[bank]->attached&&
+        published[bank]->stats.bank==bank;
+}
 int melee_web_effect_bank_has_command(uint32_t bank,uint32_t command)
 {
     if(bank>=65||!published[bank])return 0;

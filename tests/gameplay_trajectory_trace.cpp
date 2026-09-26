@@ -20,13 +20,15 @@ int main(int argc,char** argv){try{
     }
     GameplayWorld world(files);char error[256];
     if(stock_mode){
-        const auto p0=world.player_spawn(0),p1=world.player_spawn(1);
-        MeleeWebPlayerSettings players[2]={{0,0,4,{p0[0],p0[1],p0[2]},1},{1,1,4,{p1[0],p1[1],p1[2]},-1}};
+        MeleeWebPlayerSettings players[2]={{0,0,4,{0,0,0},1},{1,1,4,{0,0,0},1}};
         auto* match=melee_web_match_begin_players(players,2,70,1,world.collision(),error,sizeof(error));check(match!=nullptr,error);
+        world.enable_full_stage();
+        const auto p0=world.player_spawn(0),p1=world.player_spawn(1);
+        check(melee_web_match_set_player_start(match,0,p0.data(),p0[0]<0?1.0f:-1.0f,error,sizeof(error)),error);
+        check(melee_web_match_set_player_start(match,1,p1.data(),p1[0]<0?1.0f:-1.0f,error,sizeof(error)),error);
         check(melee_web_match_create_fighters(match,error,sizeof(error)),error);
         MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(UINT64_C(1)<<3)|(UINT64_C(1)<<5)};
         auto* camera=melee_web_render_begin_match(&settings,error,sizeof(error));check(camera!=nullptr,error);
-        world.enable_full_stage();
         PADStatus pads[4]={{0}};
         for(unsigned i=0;i<120;i++)check(melee_web_match_step_raw(match,pads,error,sizeof(error)),error);
         melee_web_trajectory_sample_stock(0);
@@ -45,6 +47,7 @@ int main(int argc,char** argv){try{
     }
     MeleeWebPlayerSettings players[2]={{0,0,4,{-40,world.floor_height(-40)+1,0},1},{1,1,4,{40,world.floor_height(40)+1,0},-1}};
     auto* match=melee_web_match_begin_players(players,2,70,1,world.collision(),error,sizeof(error));check(match!=nullptr,error);
+    world.enable_full_stage();
     check(melee_web_match_create_fighters(match,error,sizeof(error)),error);
     PADStatus pads[4]={};
     for(unsigned i=0;i<120;i++)check(melee_web_match_step_raw(match,pads,error,sizeof(error)),error);

@@ -9114,3 +9114,518 @@ diff --git a/src/melee/gm/gmmain_lib.c b/src/melee/gm/gmmain_lib.c
  void HSD_Init_803755A8(void)
  {
      // Does nothing, but need to force a comparison to make this match
+diff --git a/src/melee/ef/efasync.c b/src/melee/ef/efasync.c
+index f1de40c..af85d21 100644
+--- a/src/melee/ef/efasync.c
++++ b/src/melee/ef/efasync.c
+@@ -1,3 +1,7 @@
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_effect_banks.h"
++#endif
++
+ #include "efasync.h"
+ 
+ #include <math.h>
+@@ -1303,6 +1307,11 @@ void efAsync_LoadSync(int idx)
+         bool chk = lbArchive_80017040(NULL, lookup->ef_DAT_file, &spC,
+                                       lookup->effDataTable_name, 0);
+         if ((u32) spC->ef_DAT_file | (u32) spC->effDataTable_name) {
++#if defined(MELEE_WEB_GAMEPLAY)
++            if (!melee_web_effect_bank_is_published((u32) idx)) {
++                /* The registered typed bank is already installed; these are
++                 * native pointers, not source-DAT offsets for Locate. */
++#endif
+             if (chk) {
+                 psInitDataBankLoad(idx, (void*) spC->ef_DAT_file,
+                                    (void*) spC->effDataTable_name, NULL, NULL);
+@@ -1310,6 +1319,9 @@ void efAsync_LoadSync(int idx)
+                 psInitDataBank(idx, (void*) spC->ef_DAT_file,
+                                (void*) spC->effDataTable_name, NULL, NULL);
+             }
++#if defined(MELEE_WEB_GAMEPLAY)
++            }
++#endif
+         }
+         lookup->data = &spC->data;
+     }
+diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
+index d311d68..2250eb6 100644
+--- a/src/melee/ft/fighter.c
++++ b/src/melee/ft/fighter.c
+@@ -865,6 +865,14 @@ Fighter_GObj* Fighter_Create(struct plAllocInfo* input)
+      * contents. For example, Luigi's @c x222C_cycloneCharge.
+      */
+     fp = HSD_ObjAlloc(&fighter_alloc_data);
++    {
++        MeleeWebSourceFighterAddress source_address = {0};
++        if (!melee_web_source_memory_fighter_acquire(fp, sizeof(*fp),
++                                                     &source_address)) {
++            __builtin_trap();
++        }
++        (void) source_address;
++    }
+     fp->dat_attrs_backup = HSD_ObjAlloc(&fighter_dat_attrs_alloc_data);
+     GObj_InitUserData(gobj, 4U, &Fighter_Unload_8006DABC, fp);
+     ftData_8008572C(input->internal_id);
+@@ -1711,6 +1719,8 @@ void Fighter_8006A360(Fighter_GObj* gobj)
+ void Fighter_8006ABA0(Fighter_GObj* gobj)
+ {
+     Fighter* fp = GET_FIGHTER(gobj);
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_FIGHTER_CPU_CALLBACK);
++    (void) melee_web_source_context_enter_fighter(fp);
+     if (!fp->x221F_b3 && ftCo_800A2040(fp)) {
+         ftCo_800B3900(gobj);
+     }
+@@ -3135,5 +3145,8 @@ void Fighter_Unload_8006DABC(void* user_data)
+     HSD_ObjFree(&fighter_dobj_list_alloc_data, fp->dobj_list.data);
+     HSD_ObjFree(&fighter_x2040_alloc_data, fp->x203C.data);
+     HSD_ObjFree(&fighter_dat_attrs_alloc_data, fp->dat_attrs_backup);
++    if (!melee_web_source_memory_fighter_release(fp)) {
++        __builtin_trap();
++    }
+     HSD_ObjFree(&fighter_alloc_data, fp);
+ }
+diff --git a/src/melee/ft/ftdata.c b/src/melee/ft/ftdata.c
+index e1ffdce..86c1b19 100644
+--- a/src/melee/ft/ftdata.c
++++ b/src/melee/ft/ftdata.c
+@@ -1714,6 +1714,9 @@ void ftData_80085A14(FighterKind kind)
+ void ftData_80085B10(Fighter* fp)
+ {
+ #if defined(MELEE_WEB_GAMEPLAY)
++    /* Preserve source-owned HSD cells while binding native DAT storage. */
++    fp->x59C = HSD_ObjAlloc(&fighter_x59C_alloc_data);
++    fp->x5A0 = HSD_ObjAlloc(&fighter_x59C_alloc_data);
+     melee_web_fighter_assets_bind_created(fp);
+ #else
+     FighterKind kind = fp->kind;
+diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
+index 3649261..139cde2 100644
+--- a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
++++ b/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
+@@ -5654,6 +5654,9 @@ void ftCo_800AC5A0(Fighter* fp)
+                 stick_y = 127.0F * +y;
+                 stick_x = 127.0F * -x;
+             }
++        } else if (!melee_web_source_context_resolve_skipped(fp, &stick_x,
++                                                              &stick_y)) {
++            __builtin_trap();
+         }
+         /// @bug These can be called with stick_x and stick_y being
+         /// uninitialized.
+@@ -6077,6 +6080,7 @@ static bool ftCo_800ADE48(Fighter* fp, s32 switch_cmd)
+     f32 above;
+     f32 dy;
+     PAD_STACK(8);
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_CPU_FLOOR_QUERY);
+ 
+     data = &fp->cpu;
+     found = 0;
+@@ -6185,7 +6189,9 @@ static bool ftCo_800ADE48(Fighter* fp, s32 switch_cmd)
+             switch_cmd = 0;
+         } else {
+             data2->xF9_b0 = false;
+-            if (0.1f * data2->level > HSD_Randf()) {
++            f32 randf_value = HSD_Randf();
++            (void) melee_web_source_context_publish_seed_r5();
++            if (0.1f * data2->level > randf_value) {
+                 data2->xFA_b1 = true;
+             } else {
+                 data2->xFA_b1 = false;
+@@ -7907,6 +7913,7 @@ void ftCo_800B24B8(Fighter* fp)
+     s32 cmd;
+     Fighter* target;
+     PAD_STACK(0x14);
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_CPU_STATE_18);
+ 
+     cmd = ftCo_800A229C(fp, &sp28);
+     if (cmd != 0) {
+@@ -8068,6 +8075,7 @@ static inline bool ftCo_800B2AFC_IsIgnoredFloor(int line)
+ void ftCo_800B2AFC(Fighter* fp)
+ {
+     UNUSED u8 pad_high[8];
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_CPU_STATE_DISPATCH);
+ 
+     switch (fp->cpu.xC) {
+     case 0: {
+@@ -8611,6 +8619,7 @@ void ftCo_800B3900(Fighter_GObj* gobj)
+ {
+     Fighter* fp = GET_FIGHTER(gobj);
+     PAD_STACK(8);
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_CPU_CALLBACK);
+ 
+     ftCo_800B33B0(fp);
+     ftCo_800B2AFC(fp);
+diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
+index 98fa9d4..ad14efd 100644
+--- a/src/melee/gm/gm_16AE.c
++++ b/src/melee/gm/gm_16AE.c
+@@ -1,5 +1,6 @@
+ #include "gm_16AE.h"
+ #include <stddef.h>
++#include "gameplay_bootstrap.h"
+ 
+ #include <string.h>
+ 
+@@ -2479,6 +2480,9 @@ int melee_web_match_init_source(StartMeleeData* start)
+      * existing per-player setters or with fn_8016E730: the latter also starts
+      * stage/items/audio and is outside this host's initialization boundary. */
+     fn_8016DCC0(start);
++    if (!melee_web_gameplay_initialize_vs_dynamics(NULL, 0)) {
++        return 0;
++    }
+     /* The same ordinary-VS preparation used by fn_8016E2BC. Its fighter
+      * creation remains with the checked resident match owner immediately
+      * after this call. These fighters have no Kirby costume publication. */
+diff --git a/src/melee/if/textdraw.c b/src/melee/if/textdraw.c
+index dfa76cc..b847075 100644
+--- a/src/melee/if/textdraw.c
++++ b/src/melee/if/textdraw.c
+@@ -323,6 +323,22 @@ HSD_GObj* DevText_Setup(int classifier, int p_link, int priority, int gx_link,
+     return devtext_gobj;
+ }
+ 
++/* Return only the DevText camera whose source owner still belongs to the live
++ * GObj world. Gameplay rendering uses this narrow ownership query when a
++ * DevText callback leaves its separately allocated CObj current. */
++HSD_CObj* melee_web_source_devtext_camera(void)
++{
++    if (devtext_cobj == NULL || devtext_gobj == NULL || HSD_GObj_Entities == NULL)
++        return NULL;
++    HSD_GObj** entities = (HSD_GObj**) HSD_GObj_Entities;
++    for (unsigned link = 0; link <= HSD_GObjLibInitData.p_link_max; ++link) {
++        for (HSD_GObj* object = entities[link]; object; object = object->next) {
++            if (object == devtext_gobj) return devtext_cobj;
++        }
++    }
++    return NULL;
++}
++
+ void DevText_AddToList(DevText** list, DevText* text)
+ {
+     if (*list) {
+diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
+index ed281ad..4a018eb 100644
+--- a/src/melee/lb/lbarchive.c
++++ b/src/melee/lb/lbarchive.c
+@@ -1,5 +1,13 @@
+ #include "lbarchive.h"
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_source_files.h"
++#endif
++
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_archive_sections.h"
++#endif
++
+ #include <stdarg.h>
+ #include <string.h>
+ 
+@@ -16,6 +24,22 @@
+ #endif
+ void lbArchive_InitializeDAT(HSD_Archive* archive, void* data, size_t length)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    const char* filename = melee_web_source_file_take_name(data);
++    if (!archive || !data || length < sizeof(HSD_ArchiveHeader) || !filename) {
++        OSReport("Source archive has no matching RuntimeFiles copy.\n");
++        HSD_Panic(__FILE__, __LINE__, "Source archive file ownership failed.\n");
++    }
++    memset(archive, 0, sizeof(*archive));
++    archive->flags |= 1;
++    archive->data = (u8*) data + sizeof(HSD_ArchiveHeader);
++    archive->top_ptr = data;
++    if (!melee_web_archive_sections_attach_source(archive, filename)) {
++        OSReport("Source archive has no registered native public symbols: %s\n",
++                 filename);
++        HSD_Panic(__FILE__, __LINE__, "Source archive hydration is unavailable.\n");
++    }
++#else
+     const char* symbol;
+     int i = 0;
+ 
+@@ -33,6 +57,7 @@ void lbArchive_InitializeDAT(HSD_Archive* archive, void* data, size_t length)
+             return;
+         }
+     }
++#endif
+ }
+ #ifdef MUST_MATCH
+ #pragma pop
+@@ -55,6 +80,7 @@ void lbArchive_LoadSections(HSD_Archive* archive, void** symbol, ...)
+     va_end(symbols);
+ }
+ 
++
+ static inline HSD_Archive* lbArchive_LoadArchive_inline(const char* filename)
+ {
+     HSD_Archive* archive;
+@@ -70,12 +96,7 @@ static inline HSD_Archive* lbArchive_LoadArchive_inline(const char* filename)
+ 
+ HSD_Archive* lbArchive_LoadArchive(const char* filename)
+ {
+-#if defined(MELEE_WEB_GAMEPLAY)
+-    extern void* melee_web_archive_sections_open(const char*);
+-    return melee_web_archive_sections_open(lbFileGetFullName(filename));
+-#else
+     return lbArchive_LoadArchive_inline(filename);
+-#endif
+ }
+ 
+ static inline void lbArchive_vLoadSectionsFatal(HSD_Archive* archive,
+@@ -119,15 +140,11 @@ HSD_Archive* lbArchive_LoadSymbols(const char* filename, void* symbols, ...)
+ 
+     va_start(sections, symbols);
+ 
+-#if defined(MELEE_WEB_GAMEPLAY)
+-    extern void* melee_web_archive_sections_open(const char*);
+-    archive = melee_web_archive_sections_open(lbFileGetFullName(filename));
+-#else
+     data = lbHeap_80015BD0(0, OSRoundUp32B(lbFileGetSize(filename)));
+     archive = lbHeap_80015BD0(0, sizeof(HSD_Archive));
+     lbFile_8001668C(filename, data, &length);
+     lbArchive_InitializeDAT(archive, data, length);
+-#endif
++
+     lbArchive_vLoadSectionsFatal(archive, symbols, sections);
+ 
+     va_end(sections);
+@@ -144,15 +161,11 @@ HSD_Archive* lbArchive_80016DBC(const char* filename, void* symbols, ...)
+ 
+     va_start(sections, symbols);
+ 
+-#if defined(MELEE_WEB_GAMEPLAY)
+-    extern void* melee_web_archive_sections_open(const char*);
+-    archive = melee_web_archive_sections_open(lbFileGetFullName(filename));
+-#else
+     data = lbHeap_80015BD0(0, OSRoundUp32B(lbFileGetSize(filename)));
+     archive = lbHeap_80015BD0(0, sizeof(HSD_Archive));
+     lbFile_8001668C(filename, data, &length);
+     lbArchive_InitializeDAT(archive, data, length);
+-#endif
++
+     lbArchive_vLoadSections(archive, symbols, sections);
+ 
+     va_end(sections);
+@@ -162,26 +175,22 @@ HSD_Archive* lbArchive_80016DBC(const char* filename, void* symbols, ...)
+ void lbArchive_80016EFC(HSD_Archive* archive)
+ {
+ #if defined(MELEE_WEB_GAMEPLAY)
+-    extern void melee_web_archive_sections_release(void*);
+-    melee_web_archive_sections_release(archive);
+-#else
++    if (melee_web_archive_sections_is_handle(archive)) {
++        const int source_archive =
++            melee_web_archive_sections_is_source_archive(archive);
++        melee_web_archive_sections_release(archive);
++        if (!source_archive) return;
++        lbHeap_80015CA8(0, (u32*) archive->top_ptr);
++        lbHeap_80015CA8(0, (u32*) archive);
++        return;
++    }
++#endif
+     HSD_ASSERT(0xFC, archive);
+     HSD_ASSERT(0xFD, archive->flags & HSD_ARCHIVE_DONT_FREE);
+     lbHeap_80015CA8(0, (u32*) (archive->data - 0x20));
+     lbHeap_80015CA8(0, (u32*) archive);
+-#endif
+-}
+-
+-bool lbArchive_80016F80(HSD_Archive** archive, const char* filename)
++}bool lbArchive_80016F80(HSD_Archive** archive, const char* filename)
+ {
+-#if defined(MELEE_WEB_GAMEPLAY)
+-    /* Each resident typed open has a fresh source handle. It was not returned
+-     * from the retail preload cache, so preserve the non-preloaded result. */
+-    extern void* melee_web_archive_sections_open(const char*);
+-    HSD_Archive* opened = melee_web_archive_sections_open(lbFileGetFullName(filename));
+-    if (archive != NULL) *archive = opened;
+-    return false;
+-#else
+     void* data;
+     size_t length;
+     HSD_Archive* var_r3;
+@@ -204,20 +213,12 @@ bool lbArchive_80016F80(HSD_Archive** archive, const char* filename)
+         *archive = var_r3;
+     }
+     return result;
+-#endif
++
+ }
+ 
+ bool lbArchive_80017040(HSD_Archive** dst, const char* filename, void* symbols,
+                         ...)
+ {
+-#if defined(MELEE_WEB_GAMEPLAY)
+-    extern void melee_web_archive_sections_load(void*, const char*, void*, va_list);
+-    va_list native_args;
+-    va_start(native_args, symbols);
+-    melee_web_archive_sections_load(dst, lbFileGetFullName(filename), symbols, native_args);
+-    va_end(native_args);
+-    return true;
+-#else
+     void* tmp;
+     HSD_Archive* archive2;
+     HSD_Archive* archive;
+@@ -254,7 +255,7 @@ bool lbArchive_80017040(HSD_Archive** dst, const char* filename, void* symbols,
+         *dst = archive;
+     }
+     return preloaded;
+-#endif
++
+ }
+ 
+ bool lbArchive_800171CC(HSD_Archive** dst, const char* filename, void* symbols,
+diff --git a/src/melee/lb/lbdvd.c b/src/melee/lb/lbdvd.c
+index d5b38ac..514c99c 100644
+--- a/src/melee/lb/lbdvd.c
++++ b/src/melee/lb/lbdvd.c
+@@ -1,5 +1,9 @@
+ #include <string.h>
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_source_files.h"
++#endif
++
+ #include "lb_0195.h"
+ #include "lbarchive.h"
+ #include "lbdvd.static.h"
+@@ -463,6 +467,13 @@ HSD_Archive* lbDvd_8001819C(const char* basename)
+ {
+     HSD_Archive* archive;
+     char* filename = lbFileGetFullName(basename);
++#if defined(MELEE_WEB_GAMEPLAY)
++    size_t source_size;
++    if (melee_web_source_file_size(filename, &source_size)) {
++        /* The active checked source scope supplies this file through lbFile. */
++        return NULL;
++    }
++#endif
+     archive = lbDvd_GetPreloadedArchive(DVDConvertPathToEntrynum(filename));
+     if (DbLevel != DbLKind_Master && preloadCache.preloaded && archive == NULL)
+     {
+diff --git a/src/melee/lb/lbfile.c b/src/melee/lb/lbfile.c
+index b3a8127..ac666c6 100644
+--- a/src/melee/lb/lbfile.c
++++ b/src/melee/lb/lbfile.c
+@@ -1,5 +1,9 @@
+ #include "lbfile.h"
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_source_files.h"
++#endif
++
+ #include <placeholder.h>
+ #include <string.h>
+ 
+@@ -108,12 +112,22 @@ size_t lbFile_8001634C(int fileno)
+ 
+ size_t lbFileGetSize(const char* basename)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    size_t length;
++    char* filename = lbFileGetFullName(basename);
++    if (!melee_web_source_file_size(filename, &length)) {
++        OSReport("Source RuntimeFiles has no exact file %s.\n", filename);
++        HSD_Panic(__FILE__, __LINE__, "Source file service lookup failed.\n");
++    }
++    return length;
++#else
+     int entry_num;
+     char* filename = lbFileGetFullName(basename);
+     entry_num = DVDConvertPathToEntrynum(filename);
+     HSD_ASSERTREPORT(0xEE, entry_num != -1, "file isn't exist %s = %d\n",
+                      filename, entry_num);
+     return lbFile_8001634C(entry_num);
++#endif
+ }
+ 
+ #define ROUND_UP_32(x) (((x) + 31) & ~31)
+@@ -143,9 +157,17 @@ void lbFile_80016580(const char* basename, void* dst, size_t* size,
+ 
+ void lbFile_8001668C(const char* basename, void* dst, size_t* size)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    char* filename = lbFileGetFullName(basename);
++    if (!melee_web_source_file_copy(filename, dst, size)) {
++        OSReport("Source RuntimeFiles could not copy exact file %s.\n", filename);
++        HSD_Panic(__FILE__, __LINE__, "Source file service copy failed.\n");
++    }
++#else
+     cancel = false;
+     lbFile_80016580(basename, dst, size, lbFile_8001615C, NULL);
+     waitForDisc();
++#endif
+ }
+ 
+ static void lbFile_80016760_inline(int heap_id, const char* basename,
+diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
+index a7bd4c5..c97fc4f 100644
+--- a/src/melee/mp/mplib.c
++++ b/src/melee/mp/mplib.c
+@@ -1622,6 +1622,7 @@ bool mpCheckFloor(float ax, float ay, float bx, float by, float y_offset,
+     bool result_r27;
+     bool already_checked;
+     PAD_STACK(8);
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_MP_CHECK_FLOOR);
+ 
+     result_r27 = false;
+     min_dist2_f30 = F32_MAX;
+@@ -1752,6 +1753,7 @@ bool mpCheckFloor(float ax, float ay, float bx, float by, float y_offset,
+         mpUncheckBounding();
+     }
+ 
++    (void) melee_web_source_context_publish_floor_r5();
+     return result_r27;
+ }
+ 
+diff --git a/src/sysdolphin/baselib/archive.c b/src/sysdolphin/baselib/archive.c
+index ca6583e..66a55c4 100644
+--- a/src/sysdolphin/baselib/archive.c
++++ b/src/sysdolphin/baselib/archive.c
+@@ -1,5 +1,9 @@
+ #include "archive.h"
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_archive_sections.h"
++#endif
++
+ #include <string.h>
+ 
+ #include <dolphin/os.h>
+@@ -70,9 +74,9 @@ s32 HSD_ArchiveParse(HSD_Archive* archive, u8* src, size_t file_size)
+ void* HSD_ArchiveGetPublicAddress(HSD_Archive* archive, const char* symbols)
+ {
+ #if defined(MELEE_WEB_GAMEPLAY)
+-    extern void* melee_web_archive_sections_public(void*, const char*);
+-    return melee_web_archive_sections_public(archive, symbols);
+-#else
++    if (melee_web_archive_sections_is_handle(archive))
++        return melee_web_archive_sections_public(archive, symbols);
++#endif
+     u32 i;
+ 
+     for (i = 0; i < archive->header.nb_public; i++) {
+@@ -86,9 +90,7 @@ void* HSD_ArchiveGetPublicAddress(HSD_Archive* archive, const char* symbols)
+     }
+ 
+     return NULL;
+-#endif
+ }
+-
+ char* HSD_ArchiveGetExtern(HSD_Archive* archive, int offset)
+ {
+     if (offset < 0 || archive->header.nb_extern <= (unsigned) offset) {
+diff --git a/src/sysdolphin/baselib/gobj.c b/src/sysdolphin/baselib/gobj.c
+index fadbc3f..ae4b789 100644
+--- a/src/sysdolphin/baselib/gobj.c
++++ b/src/sysdolphin/baselib/gobj.c
+@@ -96,6 +96,7 @@ void HSD_GObj_80390CFC(void)
+ 
+     u64 var_r31 =
+         HSD_GObjLibInitData.unk_2 != NULL ? *HSD_GObjLibInitData.unk_2 : 0;
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_GOBJ_DISPATCH);
+     HSD_GObj_804D783C += 1;
+     if (HSD_GObj_804D783C > 2) {
+         HSD_GObj_804D783C = 0;

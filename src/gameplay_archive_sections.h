@@ -33,6 +33,10 @@ int melee_web_archive_sections_close_owned(MeleeWebArchiveSections*,void* handle
  * and unregistered filenames fail explicitly. A missing public name returns NULL
  * like the original HSD query; required-section loading fails atomically. */
 void* melee_web_archive_sections_open(const char* filename);
+int melee_web_archive_sections_attach_source(void* archive,
+                                              const char* filename);
+int melee_web_archive_sections_is_handle(const void* handle);
+int melee_web_archive_sections_is_source_archive(const void* archive);
 void* melee_web_archive_sections_public(void* handle, const char* symbol);
 void melee_web_archive_sections_release(void* handle);
 /* Resolves every requested symbol before publishing any outputs. A non-NULL

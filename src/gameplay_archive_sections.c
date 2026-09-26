@@ -9,6 +9,8 @@ static size_t total;
 typedef struct ArchiveHandle {
     struct ArchiveHandle* next;
     char* filename;
+    const void* object;
+    int source_archive;
 } ArchiveHandle;
 static ArchiveHandle* handles;
 static size_t handle_count;
@@ -37,8 +39,14 @@ static int has_archive(const char* filename) {
     return 0;
 }
 static ArchiveHandle* checked_handle(void* candidate) {
-    for(ArchiveHandle* h=handles;h;h=h->next)if(h==candidate)return h;
+    for(ArchiveHandle* h=handles;h;h=h->next)if(h->object==candidate)return h;
     fatal(NULL,NULL,"Unknown or released typed archive handle");return NULL;
+}
+static void remove_handle(ArchiveHandle* handle) {
+    ArchiveHandle** link=&handles;
+    while(*link&&*link!=handle)link=&(*link)->next;
+    if(!*link)fatal(NULL,NULL,"Typed archive handle is not registered");
+    *link=handle->next;--handle_count;free(handle->filename);free(handle);
 }
 void* melee_web_archive_sections_open(const char* filename) {
     if(!has_archive(filename))fatal(filename,NULL,"Typed archive is not registered");
@@ -47,7 +55,29 @@ void* melee_web_archive_sections_open(const char* filename) {
     if(!h)fatal(filename,NULL,"Typed archive handle allocation failed");
     h->filename=strdup(filename);
     if(!h->filename){free(h);fatal(filename,NULL,"Typed archive name allocation failed");}
+    h->object=h;
     h->next=handles;handles=h;++handle_count;return h;
+}
+int melee_web_archive_sections_attach_source(void* archive,const char* filename) {
+    if(!archive||!has_archive(filename)||handle_count>=256||
+       melee_web_archive_sections_is_handle(archive))return 0;
+    ArchiveHandle* h=calloc(1,sizeof(*h));
+    if(!h)return 0;
+    h->filename=strdup(filename);
+    if(!h->filename){free(h);return 0;}
+    h->object=archive;
+    h->source_archive=1;
+    h->next=handles;handles=h;++handle_count;
+    return 1;
+}
+int melee_web_archive_sections_is_handle(const void* candidate) {
+    for(const ArchiveHandle* h=handles;h;h=h->next)if(h->object==candidate)return 1;
+    return 0;
+}
+int melee_web_archive_sections_is_source_archive(const void* candidate) {
+    for(const ArchiveHandle* h=handles;h;h=h->next)
+        if(h->object==candidate)return h->source_archive;
+    return 0;
 }
 void* melee_web_archive_sections_public(void* candidate,const char* symbol) {
     ArchiveHandle* h=checked_handle(candidate);
@@ -56,8 +86,7 @@ void* melee_web_archive_sections_public(void* candidate,const char* symbol) {
 }
 void melee_web_archive_sections_release(void* candidate) {
     ArchiveHandle* h=checked_handle(candidate);
-    ArchiveHandle** link=&handles;while(*link!=h)link=&(*link)->next;
-    *link=h->next;--handle_count;free(h->filename);free(h);
+    remove_handle(h);
 }
 MeleeWebArchiveSections* melee_web_archive_sections_register(const MeleeWebArchiveSymbol* input,size_t count,char* e,size_t n) {
     if(!input||!count||count>256-total){fail(e,n,"Native archive symbol budget exceeded");return NULL;}
@@ -113,7 +142,7 @@ int melee_web_archive_sections_close(MeleeWebArchiveSections* h,char* e,size_t n
         while(opened) {
             ArchiveHandle* next=opened->next;
             for(size_t i=0;i<h->count;i++)if(!strcmp(opened->filename,h->entries[i].filename)) {
-                melee_web_archive_sections_release(opened);break;
+                remove_handle(opened);break;
             }
             opened=next;
         }

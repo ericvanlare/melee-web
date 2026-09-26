@@ -19,6 +19,13 @@ int main(int argc,char** argv) {
         filename[0]='x';symbol[0]='x';
         MeleeWebArchiveSymbol second={"Second.dat","second",&b};
         MeleeWebArchiveSections* other=melee_web_archive_sections_register(&second,1,error,sizeof(error));assert(other);
+        int source_archive_storage=0;
+        assert(melee_web_archive_sections_attach_source(&source_archive_storage,"Second.dat"));
+        assert(melee_web_archive_sections_is_handle(&source_archive_storage));
+        assert(melee_web_archive_sections_is_source_archive(&source_archive_storage));
+        assert(melee_web_archive_sections_public(&source_archive_storage,"second")==&b);
+        melee_web_archive_sections_release(&source_archive_storage);
+        assert(!melee_web_archive_sections_is_handle(&source_archive_storage));
         void* one=NULL;void* alias=NULL;
         if(argc==2&&!strcmp(argv[1],"missing"))load(NULL,"Authored.dat",&one,"first",&alias,"absent",NULL);
         if(argc==2&&!strcmp(argv[1],"unknown"))melee_web_archive_sections_open("Absent.dat");

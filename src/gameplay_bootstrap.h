@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <sysdolphin/baselib/forward.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +41,19 @@ MeleeWebGameplayAllocation melee_web_gameplay_allocation(void);
  * HSD render object until the full object-kind initialization is integrated.
  * Startup rejects an existing HSD object world or SDK heap. */
 int melee_web_gameplay_startup(size_t heap_bytes, char* error, size_t error_size);
+/* Configure the next world for original VS scene-manager startup. The callback
+ * prepares source HSD components, starts the source SIS owner, and invokes the
+ * original gm_801A4BD4 manager, which creates the GObj tables itself. */
+typedef int (*MeleeWebGameplayVSStartup)(char* error, size_t error_size);
+typedef void (*MeleeWebGameplayVSShutdown)(void);
+int melee_web_gameplay_prepare_vs_startup(MeleeWebGameplayVSStartup startup,
+                                          MeleeWebGameplayVSShutdown shutdown,
+                                          char* error, size_t error_size);
+int melee_web_gameplay_vs_startup_active(void);
+/* True only while the configured VS callback owns the heap and generation,
+ * before the original scene manager publishes its GObj tables. */
+int melee_web_gameplay_vs_manager_preparing(void);
+int melee_web_gameplay_initialize_vs_dynamics(char* error, size_t error_size);
 int melee_web_gameplay_step(char* error, size_t error_size);
 int melee_web_gameplay_shutdown(char* error, size_t error_size);
 MeleeWebGameplayStats melee_web_gameplay_stats(void);

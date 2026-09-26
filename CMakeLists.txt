@@ -70,6 +70,9 @@ if(EMSCRIPTEN)
     message(FATAL_ERROR "Generated gameplay source missing; use scripts/build.py")
   endif()
   add_library(gameplay_runtime STATIC src/gameplay_bootstrap.c src/gameplay_abi.c
+    src/gameplay_source_context.c src/gameplay_source_files.c
+    src/gameplay_source_memory_runtime.cpp
+    src/source_address_context.cpp src/source_game_heap_context.cpp
     src/gameplay_ps_math.c
     src/gameplay_heap.cpp src/gameplay_fighter_probe.c src/gameplay_collision.c src/hsd_debug.c
     src/common_tables.c src/gameplay_fighter_attributes.c src/gameplay_fighter_data.c
@@ -90,7 +93,7 @@ if(EMSCRIPTEN)
   set_source_files_properties("${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lb_00F9.c"
     PROPERTIES COMPILE_OPTIONS
     "-fno-builtin-sinf;-fno-builtin-cosf;-fno-builtin-tanf;-fno-builtin-atanf;-fno-builtin-atan2f;-fno-builtin-acosf")
-  foreach(unit gobj gobjproc gobjplink gobjgxlink gobjobject gobjuserdata objalloc memory initialize)
+  foreach(unit gobj gobjinit gobjproc gobjplink gobjgxlink gobjobject gobjuserdata objalloc memory initialize)
     target_sources(gameplay_runtime PRIVATE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/${unit}.c")
   endforeach()
   target_include_directories(gameplay_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}")
@@ -102,7 +105,7 @@ if(EMSCRIPTEN)
   # real SDK providers even when the diagnostic exercises load/free only.
   add_library(hsd_native_runtime STATIC src/hsd_texture_bounds.c src/hsd_native_camera.c src/hsd_native_arrays.c src/hsd_native_pobj.c src/hsd_native_joint.c src/hsd_native_common.c
     src/gameplay_stage_context.c src/gameplay_common_context.c "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c")
-  foreach(unit class object hash id list jobj dobj mobj tobj texp texpdag tev
+  foreach(unit class object hash id list jobj dobj mobj tobj texp texpdag tev sobjlib hsd_3924
       displayfunc state aobj fobj robj shadow wobj lobj spline mtx util quatlib
       bytecode perf random)
     target_sources(hsd_native_runtime PRIVATE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/${unit}.c")
@@ -201,7 +204,9 @@ if(EMSCRIPTEN)
   add_executable(gameplay_scheduler_trace tests/gameplay_bootstrap_trace.c)
   add_executable(gameplay_abi_trace tests/gameplay_abi_trace.c)
   add_executable(gameplay_collision_trace tests/gameplay_collision_trace.c)
-  foreach(target gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace)
+  add_executable(gameplay_source_context_trace tests/gameplay_source_context_trace.c)
+  foreach(target gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace
+      gameplay_source_context_trace)
     target_link_libraries(${target} PRIVATE gameplay_runtime)
     target_compile_options(${target} PRIVATE -ffp-contract=off
       -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
@@ -209,6 +214,12 @@ if(EMSCRIPTEN)
       -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
     set_target_properties(${target} PROPERTIES SUFFIX ".js")
   endforeach()
+  add_executable(gameplay_source_files_trace tests/gameplay_source_files_trace.c
+    src/gameplay_source_files.c)
+  target_include_directories(gameplay_source_files_trace PRIVATE src)
+  target_link_options(gameplay_source_files_trace PRIVATE -sENVIRONMENT=node
+    -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1)
+  set_target_properties(gameplay_source_files_trace PROPERTIES SUFFIX ".js")
   add_executable(gameplay_probe src/gameplay_probe.cpp src/dat_archive.cpp src/dat_common.cpp
     src/dat_collision.cpp src/dat_stage.cpp src/dat_fighter_runtime.cpp src/dat_fighter.cpp
     src/fighter_binding.cpp src/dat_animation.cpp)
@@ -218,7 +229,28 @@ if(EMSCRIPTEN)
     -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
   set_target_properties(gameplay_probe PROPERTIES SUFFIX ".js")
   include(cmake/FighterRuntime.cmake)
-  add_custom_target(gameplay_checks DEPENDS gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace gameplay_probe hsd_native_trace hsd_native_dat_probe gameplay_stage_lights_trace gameplay_common_context_trace original_startup_alloc_trace source_devcom_trace)
+  target_link_libraries(gameplay_collision_trace PRIVATE hsd_native_runtime)
+  add_executable(gameplay_fighter_input_trace tests/gameplay_fighter_trace.cpp
+    src/gameplay_fighter_probe.c src/dat_archive.cpp src/dat_common.cpp)
+  target_link_libraries(gameplay_fighter_input_trace PRIVATE fighter_source_runtime)
+  target_compile_options(gameplay_fighter_input_trace PRIVATE -ffp-contract=off
+    -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+  target_link_options(gameplay_fighter_input_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+    -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
+    -sSTACK_SIZE=8388608)
+  set_target_properties(gameplay_fighter_input_trace PROPERTIES SUFFIX ".js")
+  add_executable(gameplay_fighter_asset_trace tests/gameplay_fighter_assets_trace.cpp
+    tests/gameplay_fighter_assets_trace.c)
+  target_link_libraries(gameplay_fighter_asset_trace PRIVATE fighter_asset_runtime)
+  target_compile_options(gameplay_fighter_asset_trace PRIVATE -ffp-contract=off
+    -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+  target_link_options(gameplay_fighter_asset_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+    -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
+    -sSTACK_SIZE=8388608)
+  set_target_properties(gameplay_fighter_asset_trace PROPERTIES SUFFIX ".js")
+  target_link_libraries(gameplay_scheduler_trace PRIVATE fighter_source_runtime)
+  target_link_libraries(gameplay_common_context_trace PRIVATE fighter_source_runtime)
+  add_custom_target(gameplay_checks DEPENDS gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace gameplay_source_context_trace gameplay_source_files_trace gameplay_probe hsd_native_trace hsd_native_dat_probe gameplay_stage_lights_trace gameplay_common_context_trace original_startup_alloc_trace source_devcom_trace)
 endif()
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/CMakeLists.txt")

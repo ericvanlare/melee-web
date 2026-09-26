@@ -91,7 +91,14 @@ struct GameplayMatchSession::Storage {
                   "Match requires supported source player stock/costume selections");
             content.fighter_kinds[i]=fighter->fighter_kind;
             content.costume_indices[i]=selection.players[i].costume;
+            content.source_players[i]={i,selection.players[i].controller,
+                selection.players[i].stocks,{0,0,0},1.0f,
+                selection.players[i].costume,selection.players[i].sub_color,
+                content.fighter_kinds[i]};
         }
+        content.begin_source_match=true;
+        content.source_camera_subjects=70;
+        content.source_random_seed=selection.random_seed;
         check(melee_web_vs_mode_begin(),"Original VS mode is already owned");mode_owned=true;
         if(selected.save_profile_present){
             saved_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
@@ -102,9 +109,12 @@ struct GameplayMatchSession::Storage {
         }
         if(archive_cache)
             world=std::make_unique<GameplayWorld>(files,content,*archive_cache,
-                                                  GameplayWorldConstruction::Deferred);
+                                                  GameplayWorldConstruction::SourceOrdered);
         else
-            world=std::make_unique<GameplayWorld>(files,content);
+            world=std::make_unique<GameplayWorld>(files,content,
+                                                  GameplayWorldConstruction::SourceOrdered);
+        match=world->take_match_context();
+        render=world->take_render_context();
     }
     void prepare_music(){
         // fn_8016E730 selects music after constructing stage and fighters.
@@ -126,7 +136,7 @@ struct GameplayMatchSession::Storage {
     bool advance_construction(){
         char error[256]{};
         if(construction_phase==0){
-            if(runtime_cache&&!world->advance_construction())return false;
+            if(!world->advance_construction())return false;
             construction_phase=1;
             return false;
         }
@@ -167,15 +177,16 @@ struct GameplayMatchSession::Storage {
             return false;
         }
         if(construction_phase==2){
-            MeleeWebPlayerSettings players[MELEE_WEB_MENU_MAX_PLAYERS]{};
-            for(unsigned i=0;i<content.player_count;i++){
-                const auto spawn=world->player_spawn(i);const auto& player=selected.players[i];
-                players[i]={i,player.controller,player.stocks,{spawn[0],spawn[1],spawn[2]},spawn[0]<0?1.0f:-1.0f,
-                            player.costume,player.sub_color,content.fighter_kinds[i]};
-            }
-            match=melee_web_match_begin_players(players,content.player_count,70,selected.random_seed,world->collision(),error,sizeof(error));check(match!=nullptr,error);
-            if(initial_input){check(melee_web_match_restore_input(match,initial_input,error,sizeof(error)),error);initial_input=nullptr;}
+            check(match!=nullptr,"Source VS match context was not created at scene entry");
+            /* Keep source RNG initialization ahead of stage on_init, then hand
+             * spawn lookup to the authored map JObjs before any Fighter exists. */
             world->enable_full_stage(true);
+            check(melee_web_match_attach_collision(match,world->collision(),error,sizeof(error)),error);
+            if(initial_input){check(melee_web_match_restore_input(match,initial_input,error,sizeof(error)),error);initial_input=nullptr;}
+            for(unsigned i=0;i<content.player_count;i++){
+                const auto spawn=world->player_spawn(i);
+                check(melee_web_match_set_player_start(match,i,spawn.data(),spawn[0]<0?1.0f:-1.0f,error,sizeof(error)),error);
+            }
             world->initialize_match(selected.start);
             construction_phase=3;
             return false;
@@ -187,7 +198,7 @@ struct GameplayMatchSession::Storage {
         }
         if(construction_phase==4){
             MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
-            render=melee_web_render_begin_match(&settings,error,sizeof(error));check(render!=nullptr,error);
+            check(melee_web_render_finish_match_camera(render,&settings,error,sizeof(error)),error);
             check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
             hud=melee_web_hud_begin_with_music(selected.hud_layout,
                 [](void* context,char* message,size_t size)->int{

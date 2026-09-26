@@ -26,9 +26,11 @@
 #include "gameplay_rumble.h"
 #include "gameplay_match_context.h"
 #include "gameplay_match_rules.h"
+#include "gameplay_render.h"
 #include "gameplay_menu.h"
 #include "gameplay_item_runtime.h"
 #include "gameplay_archive_sections.h"
+#include "gameplay_source_files_runtime.hpp"
 #include "gameplay_stage_items.h"
 #include "gameplay_font_atlas.h"
 #include "gameplay_ground_data.h"
@@ -36,12 +38,28 @@
 #include "gameplay_crowd.h"
 #include "gameplay_stage_context.h"
 #include "gameplay_bootstrap.h"
+#include "hsd_native_joint.h"
+extern "C" {
+#include <sysdolphin/baselib/sislib.h>
+}
 #include "gameplay_fighter_assets.hpp"
 #include <iostream>
 #include <algorithm>
+#include <cstddef>
 #include <set>
+extern "C" void gm_801A4BD4(void);
+extern "C" void lbRefract_800222A4(void);
 using namespace melee_web;
 namespace {
+int start_vs_scene_manager(char* error, size_t size)
+{
+    if (!melee_web_native_world_prepare_vs_manager(error, size)) return 0;
+    HSD_SisLib_803A6048(0x4800);
+    gm_801A4BD4();
+    if (error && size) error[0] = '\0';
+    return 1;
+}
+void stop_vs_sis(void) { HSD_SisLib_803A5FBC(); }
 void check(int ok,const char* error){if(!ok)throw DatError(error);}
 std::string_view melee_web_runtime_file_name_impl(const RuntimeFiles& files,
                                                   std::string_view authored_name,
@@ -69,6 +87,14 @@ bool has_symbol(const DatArchive& a,std::string_view name) {
     for(const auto& s:a.public_symbols())if(s.name==name)return true;
     return false;
 }
+#pragma pack(push,4)
+struct SourceRefractData {
+    uint8_t count;
+    uint8_t padding[3];
+    float* parameters;
+};
+#pragma pack(pop)
+static_assert(offsetof(SourceRefractData,parameters)==4);
 MeleeWebCollision* load_collision(const melee_web::DatCollision& data, int stage_kind, float scale)
 {
     // The C boundary copies these typed arrays into its owned SDK allocation.
@@ -144,14 +170,23 @@ struct GameplayWorld::Storage {
     MeleeWebStageMap* stage_map=nullptr;
     MeleeWebStageLast* stage_last=nullptr;
     MeleeWebMatchRules* rules=nullptr;
+    MeleeWebMatchContext* match_context=nullptr;
+    MeleeWebRender* render_context=nullptr;
     MeleeWebFontAtlas* font=nullptr;
     MeleeWebCommonContext* common=nullptr;
     MeleeWebStageLights* lights=nullptr;
     MeleeWebStageNumeric* numeric=nullptr;
     MeleeWebCollision* collision=nullptr;
+    std::unique_ptr<DatCollision> collision_data;
+    bool collision_deferred=false;
     MeleeWebItemRegistry* registry=nullptr;
     MeleeWebBonusData* bonus=nullptr;
     MeleeWebRumble* rumble=nullptr;
+    MeleeWebArchiveSections* rumble_scope=nullptr;
+    MeleeWebArchiveSections* refract_scope=nullptr;
+    MeleeWebSourceFileScope* source_files=nullptr;
+    std::vector<float> refract_parameters;
+    SourceRefractData refract_data{};
     void* previous_ground=nullptr;
     bool effect_started=false;
     bool started=false,ground_published=false,bonus_published=false;
@@ -161,17 +196,19 @@ struct GameplayWorld::Storage {
     std::map<unsigned,std::set<unsigned>> selected_costumes;
     std::vector<unsigned> identity_order;
     size_t fighter_at=0;
+    bool fighter_assets_ready=false;
     unsigned construction_phase=0;
     int floor_start=0;
     char error[256]{};
     std::shared_ptr<const DatArchive> archive(std::string_view name)const{return archives.at(std::string(name));}
     void start(const RuntimeFiles& files,const GameplayWorldSelection& selection,
-               RuntimeArchiveCache* cache,bool defer=false){
+               RuntimeArchiveCache* cache,bool defer=false,bool source_ordered=false){
         if(selection.player_count < MELEE_WEB_MENU_MIN_PLAYERS ||
            selection.player_count > MELEE_WEB_MENU_MAX_PLAYERS)
             throw DatError("Gameplay world requires two through four active fighters");
         runtime_files=&files;
         archive_cache=cache;
+        collision_deferred=source_ordered;
         purpose=selection.purpose;
         if(purpose==GameplayWorldPurpose::Match){
             stage=melee_web_stage_content_by_ground(selection.ground_kind);
@@ -191,6 +228,8 @@ struct GameplayWorld::Storage {
             archives.emplace(name,std::move(value));
         };
         for(const char* name:{"PlCo.dat","ItCo.usd","EfCoData.dat","PdPm.dat","LbRb.dat"})load(name);
+        if(selection.begin_source_match)
+            load("LbRf.dat",DatExternalPolicy::ResolveNull);
         if(stage)load(stage->archive);
         for(unsigned slot=0;slot<selection.player_count;++slot)
             selected_costumes[selection.fighter_kinds[slot]].insert(selection.costume_indices[slot]);
@@ -232,11 +271,65 @@ struct GameplayWorld::Storage {
         const auto rumble_bytes=archive("LbRb.dat")->next_target_offset(rumble_root)-rumble_root;
         if(rumble_bytes!=40*8)throw DatError("GALE01r2 rumble table must contain 40 source rows");
         rumble=melee_web_rumble_decode(rumble_arena->reader(),rumble_root,40);
+        if(selection.begin_source_match){
+            const auto& source=*archive("LbRf.dat");
+            const auto root=symbol(source,"lbRefData");
+            const auto count=source.range(root,1)[0];
+            if(!count)throw DatError("Original lbRefData table is empty");
+            const auto parameters=source.pointer(root+4,static_cast<size_t>(count)*2*sizeof(float));
+            if(!parameters)throw DatError("Original lbRefData parameter array is absent");
+            refract_data.count=count;
+            refract_data.padding[0]=refract_data.padding[1]=refract_data.padding[2]=0;
+            refract_parameters.reserve(static_cast<size_t>(count)*2);
+            for(size_t i=0;i<static_cast<size_t>(count)*2;i++)
+                refract_parameters.push_back(source.f32(*parameters+static_cast<uint32_t>(i*sizeof(float))));
+            refract_data.parameters=refract_parameters.data();
+        }
+        if(purpose==GameplayWorldPurpose::Match){
+            const MeleeWebArchiveSymbol rumble_symbol={
+                "LbRb.dat","lbRumbleData",melee_web_rumble_source_rows(rumble)};
+            rumble_scope=melee_web_archive_sections_register(
+                &rumble_symbol,1,error,sizeof(error));
+            check(rumble_scope!=nullptr,error);
+        }
         const auto& font_bytes=file(files,"sislib_font.bin");
         font=melee_web_font_atlas_register(font_bytes.data(),font_bytes.size(),error,sizeof(error));check(font!=nullptr,error);
+        source_files=begin_source_files(files,error,sizeof(error));
+        check(source_files!=nullptr,error);
+        if(purpose==GameplayWorldPurpose::Match)
+            check(melee_web_gameplay_prepare_vs_startup(start_vs_scene_manager,stop_vs_sis,error,sizeof(error)),error);
         check(melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)),error);started=true;
         check(melee_web_rumble_begin(rumble,error,sizeof(error)),error);rumble_published=true;
         if(stage){rules=melee_web_match_rules_begin(error,sizeof(error));check(rules!=nullptr,error);}
+        if(selection.begin_source_match){
+            if(purpose!=GameplayWorldPurpose::Match||!stage||
+               selection.player_count<MELEE_WEB_MENU_MIN_PLAYERS||
+               selection.player_count>MELEE_WEB_MENU_MAX_PLAYERS||
+               !selection.source_camera_subjects)
+                throw DatError("Source match context requires an active VS world and camera pool");
+            for(unsigned i=0;i<selection.player_count;i++){
+                const auto& player=selection.source_players[i];
+                if(player.slot!=i||player.controller>=4||player.stocks<1||player.stocks>5||
+                   player.fighter_kind!=selection.fighter_kinds[i]||
+                   player.costume!=selection.costume_indices[i])
+                    throw DatError("Source match settings differ from the selected VS players");
+            }
+            match_context=melee_web_match_begin_players(selection.source_players.data(),
+                selection.player_count,selection.source_camera_subjects,
+                selection.source_random_seed,nullptr,error,sizeof(error));
+            check(match_context!=nullptr,error);
+            render_context=melee_web_render_prepare_match_camera(error,sizeof(error));
+            check(render_context!=nullptr,error);
+            const MeleeWebArchiveSymbol refract_symbol={
+                "LbRf.dat","lbRefData",&refract_data};
+            refract_scope=melee_web_archive_sections_register_heap(
+                &refract_symbol,1,error,sizeof(error));
+            check(refract_scope!=nullptr,error);
+            /* fn_8016E730 invokes the original refraction owner directly after
+             * Camera_80030688. Keep that source continuation ahead of native
+             * common/root hydration; lbArchive owns its source allocations. */
+            lbRefract_800222A4();
+        }
         common=melee_web_common_context_create(&common_data.scalars,&common_data.tables,&common_joint.graph(),error,sizeof(error));
         check(common!=nullptr,error);
         if(!common_data.roots[16].data_offset)throw DatError("Missing common root16 accessory");
@@ -262,7 +355,7 @@ struct GameplayWorld::Storage {
             stage_arena=std::make_unique<NativeDatArena>(archive(stage->archive));
             auto* ground=melee_web_ground_data_decode(stage_arena->reader(),symbol(*archive(stage->archive),"grGroundParam"));
             auto* markers=melee_web_stage_markers_decode(stage_arena->reader(),symbol(*archive(stage->archive),"map_head"));
-            DatCollision collision_data(*archive(stage->archive));
+            collision_data=std::make_unique<DatCollision>(*archive(stage->archive));
             DatLights light_data(*archive(stage->archive),"map_plit",true);
             lights=melee_web_stage_lights_create(light_data.lights.data(),light_data.lights.size(),error,sizeof(error));check(lights!=nullptr,error);
             for(uint32_t i=0;i<light_data.lights.size();i++){
@@ -276,7 +369,7 @@ struct GameplayWorld::Storage {
             }
             check(melee_web_stage_lights_attach(lights,error,sizeof(error)),error);
             previous_ground=melee_web_ground_data_publish(ground);ground_published=true;
-            numeric=melee_web_stage_numeric_begin_kind(markers,stage->stage_kind,error,sizeof(error));check(numeric!=nullptr,error);
+            numeric=melee_web_stage_numeric_begin_source_stage_kind(markers,stage->stage_kind,error,sizeof(error));check(numeric!=nullptr,error);
             // grDatFiles_801C6038 publishes this shared stage dependency before any
             // hit can request grLib_801C9CEC. Reuse checked native scene animation
             // descriptors; the original quake GObj owns animation and camera input.
@@ -291,9 +384,11 @@ struct GameplayWorld::Storage {
                 throw DatError("Stage quake animation table exceeds its source variants");
             quake_model=std::make_unique<DatScene>(archive(stage->archive),"quake_model_set",DatSceneRootKind::DynamicModel);
             check(melee_web_stage_numeric_set_quake(numeric,quake_model->single_model(),error,sizeof(error)),error);
-            collision=load_collision(collision_data,stage->ground_kind,read_dat_stage_scale(*archive(stage->archive)));
-            floor_start=collision_data.line_ranges[0].start;
-            check(melee_web_common_context_initialize_fighters(common,error,sizeof(error)),error);
+            if(!collision_deferred){
+                collision=load_collision(*collision_data,stage->ground_kind,read_dat_stage_scale(*archive(stage->archive)));
+                floor_start=collision_data->line_ranges[0].start;
+                collision_data.reset();
+            }
         }
         construction_phase=1;
         if(!defer)while(!advance_construction()){}
@@ -301,19 +396,11 @@ struct GameplayWorld::Storage {
     bool advance_construction(){
         if(construction_phase==0)return false;
         if(construction_phase==1){
-            if(fighter_at<identity_order.size()){
-                const unsigned kind=identity_order[fighter_at++];
-                const auto* identity=identities.at(kind);
-            auto owner=std::make_unique<GameplayFighterAssets>(archive(identity->fighter_filename),
-                archive(identity->model_filename),file(*runtime_files,identity->animation_filename),*identity);
-            for(const auto& costume:fighter_costumes())
-                if(costume.fighter_kind==kind&&costume.costume_index!=0&&
-                   selected_costumes[kind].contains(costume.costume_index)&&
-                   archives.contains(costume.model_filename))
-                    owner->add_costume(archive(costume.model_filename),costume);
-            fighters.emplace(kind,std::move(owner));
+            if(purpose==GameplayWorldPurpose::Results&&fighter_at<identity_order.size()){
+                create_fighter_asset(identity_order[fighter_at++]);
                 return false;
             }
+            if(purpose==GameplayWorldPurpose::Results)fighter_assets_ready=true;
             construction_phase=2;
         }
         if(construction_phase==2){
@@ -370,6 +457,25 @@ struct GameplayWorld::Storage {
         }
         return construction_phase==4;
     }
+    void create_fighter_asset(unsigned kind){
+        const auto* identity=identities.at(kind);
+        auto owner=std::make_unique<GameplayFighterAssets>(archive(identity->fighter_filename),
+            archive(identity->model_filename),file(*runtime_files,identity->animation_filename),*identity);
+        for(const auto& costume:fighter_costumes())
+            if(costume.fighter_kind==kind&&costume.costume_index!=0&&
+               selected_costumes[kind].contains(costume.costume_index)&&
+               archives.contains(costume.model_filename))
+                owner->add_costume(archive(costume.model_filename),costume);
+        fighters.emplace(kind,std::move(owner));
+    }
+    void create_fighter_assets_after_source_init(){
+        if(fighter_assets_ready)return;
+        if(purpose!=GameplayWorldPurpose::Match||construction_phase!=4)
+            throw DatError("Match fighter assets require completed source scene initialization");
+        while(fighter_at<identity_order.size())
+            create_fighter_asset(identity_order[fighter_at++]);
+        fighter_assets_ready=true;
+    }
     void enable_stage_visual(){
         if(!stage)throw DatError("Results uses the original dummy stage during scene entry");
         if(stage_visual)return;
@@ -423,7 +529,19 @@ struct GameplayWorld::Storage {
         check(melee_web_stage_map_set_public(stage_map,symbols.data(),symbols.size(),error,sizeof(error)),error);
         const auto& overrides=full_stage->light_overrides();
         check(melee_web_stage_map_set_overrides(stage_map,overrides.data(),overrides.size(),error,sizeof(error)),error);
+        /* Retail initializes its match camera subjects before Ground calls
+         * mpLibLoad. The SourceOrdered runtime path keeps this original
+         * allocator consumer at that same boundary, immediately before the
+         * authored stage initializer can query collision. */
+        if(!collision){
+            if(!collision_data)throw DatError("Source-ordered stage has no decoded collision input");
+            collision=load_collision(*collision_data,stage->ground_kind,
+                                     read_dat_stage_scale(*source));
+            floor_start=collision_data->line_ranges[0].start;
+            collision_data.reset();
+        }
         stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),stage_effects?stage_effects->bank():nullptr,defer_start,error,sizeof(error));check(stage_last!=nullptr,error);
+        check(melee_web_stage_numeric_source_stage_ready(numeric,error,sizeof(error)),error);
     }
     void end_stage(){
         if(numeric)check(melee_web_stage_numeric_clear_quakes(numeric,error,sizeof(error)),error);
@@ -442,6 +560,14 @@ struct GameplayWorld::Storage {
         for(const auto& [kind,fighter]:fighters)
             if(fighter->live_fighters())throw DatError("Close all fighter/render contexts before the runtime world");
         end_stage();
+        if(render_context){
+            check(melee_web_render_end(render_context,error,sizeof(error)),error);
+            render_context=nullptr;
+        }
+        if(match_context){
+            check(melee_web_match_end(match_context,error,sizeof(error)),error);
+            match_context=nullptr;
+        }
         check(melee_web_crowd_end(error,sizeof(error)),error);
         if(item_runtime){check(melee_web_item_runtime_end(item_runtime,error,sizeof(error)),error);item_runtime=nullptr;}
         if(item_scope){check(melee_web_archive_sections_close(item_scope,error,sizeof(error)),error);item_scope=nullptr;}
@@ -470,12 +596,25 @@ struct GameplayWorld::Storage {
         respawn_animation.reset();extra_colors.reset();common_colors.reset();
         if(rules){check(melee_web_match_rules_end(rules,error,sizeof(error)),error);rules=nullptr;}
         if(started){check(melee_web_gameplay_shutdown(error,sizeof(error)),error);started=false;}
+        if(refract_scope){
+            check(melee_web_archive_sections_close(refract_scope,error,sizeof(error)),error);
+            refract_scope=nullptr;
+        }
+        if(rumble_scope){
+            check(melee_web_rumble_clear_source(rumble,error,sizeof(error)),error);
+            check(melee_web_archive_sections_close(rumble_scope,error,sizeof(error)),error);
+            rumble_scope=nullptr;
+        }
         if(ground_published){melee_web_ground_data_publish(previous_ground);ground_published=false;}
         if(lights){check(melee_web_stage_lights_destroy(lights,error,sizeof(error)),error);lights=nullptr;}
         // Global stage-light animations borrow the stage descriptor arena.
         // Keep it until both original and host light GObjs have retired.
         full_stage.reset();
         if(font){check(melee_web_font_atlas_close(font,error,sizeof(error)),error);font=nullptr;}
+        if(source_files){
+            check(melee_web_source_files_end(source_files,error,sizeof(error)),error);
+            source_files=nullptr;
+        }
         verify();
     }
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Runtime teardown: %s\n",e.what());std::abort();}}
@@ -484,17 +623,40 @@ GameplayWorld::GameplayWorld(const RuntimeFiles& files):GameplayWorld(files,Game
 GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelection& selection)
     :storage_(std::make_unique<Storage>()){storage_->start(files,selection,nullptr,false);}
 GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelection& selection,
+                             GameplayWorldConstruction construction)
+    :storage_(std::make_unique<Storage>()){
+    const bool deferred=construction!=GameplayWorldConstruction::Immediate;
+    storage_->start(files,selection,nullptr,deferred,
+                    construction==GameplayWorldConstruction::SourceOrdered);
+}
+GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelection& selection,
                              RuntimeArchiveCache& cache)
     :storage_(std::make_unique<Storage>()){storage_->start(files,selection,&cache,false);}
 GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelection& selection,
                              RuntimeArchiveCache& cache,GameplayWorldConstruction construction)
     :storage_(std::make_unique<Storage>()){
-    storage_->start(files,selection,&cache,construction==GameplayWorldConstruction::Deferred);
+    const bool deferred=construction!=GameplayWorldConstruction::Immediate;
+    storage_->start(files,selection,&cache,deferred,
+                    construction==GameplayWorldConstruction::SourceOrdered);
 }
 GameplayWorld::~GameplayWorld()=default;
 void GameplayWorld::enable_stage_visual(){storage_->enable_stage_visual();}
 void GameplayWorld::enable_full_stage(bool defer_start){storage_->enable_full_stage(defer_start);}
 void GameplayWorld::end_stage(){storage_->end_stage();}
+MeleeWebMatchContext* GameplayWorld::take_match_context(){
+    if(!storage_||!storage_->match_context)
+        throw DatError("Gameplay world has no unclaimed source match context");
+    auto* match=storage_->match_context;
+    storage_->match_context=nullptr;
+    return match;
+}
+MeleeWebRender* GameplayWorld::take_render_context(){
+    if(!storage_||!storage_->render_context)
+        throw DatError("Gameplay world has no unclaimed source render context");
+    auto* render=storage_->render_context;
+    storage_->render_context=nullptr;
+    return render;
+}
 void GameplayWorld::install_result_demo(unsigned kind,std::shared_ptr<const DatArchive> archive){
     if(storage_->purpose!=GameplayWorldPurpose::Results||!construction_complete()||!archive)
         throw DatError("Result demo publication requires a prepared Results world");
@@ -532,6 +694,8 @@ bool GameplayWorld::construction_complete()const{return storage_->construction_p
 void GameplayWorld::initialize_match(const StartMeleeData& start) {
     check(storage_!=nullptr,"Gameplay world is closed");char error[256]{};
     check(melee_web_match_rules_init_from_menu(storage_->rules,&start,error,sizeof(error)),error);
+    check(melee_web_common_context_initialize_fighters(storage_->common,error,sizeof(error)),error);
+    storage_->create_fighter_assets_after_source_init();
 }
 
 }

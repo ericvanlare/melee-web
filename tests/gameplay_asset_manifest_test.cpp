@@ -130,6 +130,8 @@ void source_fighter_closure()
         auto value = selection(St_Kind_Last, character, CKIND_MARIO,
                                content->costumes - 1, 0);
         const auto names = match_asset_names(value);
+        check(has(names, "LbRf.dat"),
+              "VS source startup omits the original refraction archive");
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
         check(!has(names,"dsp_coef.bin"), "Public match must not request DSP coefficients");
 #else

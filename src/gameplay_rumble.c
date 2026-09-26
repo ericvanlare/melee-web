@@ -100,3 +100,33 @@ int melee_web_rumble_end(MeleeWebRumble* h, char* e, size_t n)
     melee_web_rumble_exchange(h->previous); active = NULL;
     return 1;
 }
+
+void* melee_web_rumble_source_rows(MeleeWebRumble* h)
+{
+    return h ? h->rows : NULL;
+}
+
+int melee_web_rumble_clear_source(MeleeWebRumble* h, char* e, size_t n)
+{
+    if (!h) {
+        if (e && n) snprintf(e, n, "Rumble source rows cannot be cleared while their owner is active");
+        return 0;
+    }
+    return melee_web_rumble_clear_source_rows(h->rows, e, n);
+}
+
+int melee_web_rumble_clear_source_rows(void* expected_rows, char* e, size_t n)
+{
+    if (!expected_rows || active) {
+        if (e && n) snprintf(e, n, "Rumble source rows cannot be cleared while their owner is active");
+        return 0;
+    }
+    struct Fighter_804D653C_t* previous = melee_web_rumble_exchange(NULL);
+    if (previous != expected_rows) {
+        melee_web_rumble_exchange(previous);
+        if (e && n) snprintf(e, n, "Source rumble manager no longer points at this world's typed rows");
+        return 0;
+    }
+    if (e && n) e[0] = '\0';
+    return 1;
+}

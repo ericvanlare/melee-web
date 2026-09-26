@@ -1,3 +1,4 @@
+#include "gameplay_effect_banks_bootstrap_test_stub.h"
 #include "dat_effect_banks.hpp"
 #include "dat_effect_entries.hpp"
 #include "hsd_native_joint.h"
@@ -145,7 +146,10 @@ static void registration(std::shared_ptr<const melee_web::DatArchive> archive,co
     const auto saved_alias_tex=psTexGroupArray[30];
     for(unsigned pass=0;pass<2;++pass){
         check(melee_web_gameplay_startup(4U*1024U*1024U,error,sizeof(error)),"source world startup");
+        check(!melee_web_effect_bank_is_published(1),"native particle bank starts unpublished");
         check(melee_web_effect_bank_attach(owner.bank(),error,sizeof(error)),"original psInitDataBankLoad");
+        check(melee_web_effect_bank_is_published(1)&&!melee_web_effect_bank_is_published(65),
+              "checked native particle bank publishes only its owned source slot");
         auto* alias=owner.alias(30);
         check(!melee_web_effect_bank_has_command(30,1000),"unpublished authored dependency rejected");
         check(melee_web_effect_bank_attach(alias,error,sizeof(error)),"second source bank registration");
@@ -165,6 +169,7 @@ static void registration(std::shared_ptr<const melee_web::DatArchive> archive,co
         check(!melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"live particle prevents bank release");hsd_804D0908[0]=nullptr;
         hsd_804D78E0=1;check(!melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"live generator prevents bank release");hsd_804D78E0=0;
         check(melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"bank detach");
+        check(!melee_web_effect_bank_is_published(1),"detached native particle bank is no longer a source-load candidate");
         check(ptclref_804D0E5C[30]!=saved_alias,"alias remains registered independently");
         check(melee_web_effect_bank_detach(alias,error,sizeof(error)),"alias detach");
         check(ptclref_804D0E5C[30]==saved_alias&&psTexGroupArray[30]==saved_alias_tex,"alias restored");
@@ -262,6 +267,8 @@ static void deferred_effect_entries(std::shared_ptr<const melee_web::DatArchive>
     check(melee_web_effect_runtime_prepare(error,sizeof(error)),"reserve deferred original effect runtime");
     check(!melee_web_effect_runtime_active(),"deferred effect reservation is not source initialization");
     check(owner.publish_for_source(error,sizeof(error)),"publish deferred effect descriptors");
+    check(melee_web_effect_bank_is_published(1),
+        "source effect table publishes its checked native particle bank before original LoadSync");
     check(!owner.entries_ready()&&!efAsync_DatEntries[1].data,
         "deferred publication waits for the original source loader");
     /* This is the authored scene boundary: one source initializer creates both
@@ -282,6 +289,8 @@ static void deferred_effect_entries(std::shared_ptr<const melee_web::DatArchive>
     check(melee_web_effect_runtime_end(error,sizeof(error)),"deferred effect runtime teardown");
     check(!links[11]&&!links[12],"deferred effect processes tear down with source runtime");
     check(owner.detach(error,sizeof(error))&&!owner.entries_ready(),"deferred effect descriptor detach");
+    check(!melee_web_effect_bank_is_published(1),
+        "source LoadSync bank ownership is removed with the matching descriptor scope");
     check(efAsync_DatEntries[1].data==previous,"deferred effect lookup restored");
     check(melee_web_gameplay_shutdown(error,sizeof(error)),"deferred effect world shutdown");
     std::cout<<"Deferred Mario effects: source initializer, GObj/process publication, source LoadSync and teardown passed\n";

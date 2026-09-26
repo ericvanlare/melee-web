@@ -82,6 +82,40 @@ static void finish_native_world(void)
     hsdForgetClassLibrary(NULL);
     native_generation = 0;
 }
+
+static int native_components_begin(uint64_t generation, char* error, size_t size)
+{
+    if (!generation)
+        return fail(error, size, "Native HSD components require an owned gameplay generation");
+    if (native_generation == generation) return 1;
+    if (HSD_IDGetAllocData()->used || HSD_ShadowGetAllocData()->used || zlist_alloc_data.used)
+        return fail(error, size, "Native HSD cannot replace an existing descriptor, shadow or Z-list context");
+    /* This is the allocation-only portion of original HSD_ObjInit, in source
+     * order. The VS scene manager creates real camera objects immediately
+     * after this boundary, so their original ID and object pools must exist. */
+    HSD_IDSetup();
+    HSD_ListInitAllocData();
+    HSD_AObjInitAllocData();
+    HSD_FObjInitAllocData();
+    HSD_IDInitAllocData();
+    HSD_VecInitAllocData();
+    HSD_MtxInitAllocData();
+    HSD_RObjInitAllocData();
+    HSD_RenderInitAllocData();
+    HSD_ShadowInitAllocData();
+    HSD_ZListInitAllocData();
+    _HSD_DispForgetMemory(NULL, NULL);
+    native_generation = generation;
+    return 1;
+}
+
+int melee_web_native_world_prepare_vs_manager(char* error, size_t size)
+{
+    if (!melee_web_gameplay_vs_manager_preparing())
+        return fail(error, size,
+                    "VS native component preparation requires the owned pre-manager startup boundary");
+    return native_components_begin(melee_web_gameplay_generation(), error, size);
+}
 static void owner_removed(void* data)
 {
     /* Original GObj deletion calls user-data cleanup before object cleanup.
@@ -528,29 +562,13 @@ int melee_web_native_world_enable(char* error, size_t size)
     const MeleeWebGameplayStats world = melee_web_gameplay_stats();
     if (!world.generation || world.heap_free_bytes < 1024 * 1024)
         return fail(error, size, "Native HSD requires an owned world with at least 1 MiB free");
-    if (native_generation != world.generation &&
-        (HSD_IDGetAllocData()->used || HSD_ShadowGetAllocData()->used || zlist_alloc_data.used))
-        return fail(error, size, "Native HSD cannot replace an existing descriptor, shadow or Z-list context");
-    if (!melee_web_gameplay_enable_hsd_objects(finish_native_world, error, size)) return 0;
     if (native_generation != world.generation) {
-        /* Keep the source HSD_ObjInit order.  HSD_InitComponent itself cannot
-         * be reused here: gameplay_bootstrap already owns the Aurora OS heap
-         * and does not publish retail XFB/FIFO storage.  These public component
-         * initializers are the allocation-only portion of initialize.c's
-         * HSD_ObjInit, with the source ID table setup immediately before it. */
-        HSD_IDSetup();
-        HSD_ListInitAllocData();
-        HSD_AObjInitAllocData();
-        HSD_FObjInitAllocData();
-        HSD_IDInitAllocData();
-        HSD_VecInitAllocData();
-        HSD_MtxInitAllocData();
-        HSD_RObjInitAllocData();
-        HSD_RenderInitAllocData();
-        HSD_ShadowInitAllocData();
-        HSD_ZListInitAllocData();
-        _HSD_DispForgetMemory(NULL, NULL);
-        native_generation = world.generation;
+        if (!native_components_begin(world.generation, error, size)) return 0;
+        if (!melee_web_gameplay_enable_hsd_objects(finish_native_world,
+                                                   error, size)) return 0;
+    } else if (!melee_web_gameplay_enable_hsd_objects(finish_native_world,
+                                                       error, size)) {
+        return 0;
     }
     if (error && size) error[0] = 0;
     return 1;

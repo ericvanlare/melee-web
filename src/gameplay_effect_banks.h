@@ -26,6 +26,8 @@ MeleeWebEffectBank* melee_web_effect_bank_alias(const MeleeWebNativeDat*,
 int melee_web_effect_bank_attach(MeleeWebEffectBank*, char*, size_t);
 int melee_web_effect_bank_detach(MeleeWebEffectBank*, char*, size_t);
 int melee_web_effect_bank_stats(const MeleeWebEffectBank*, MeleeWebEffectBankStats*, char*, size_t);
+/* True only while this checked native descriptor graph owns the original slot. */
+int melee_web_effect_bank_is_published(uint32_t bank);
 int melee_web_effect_bank_has_command(uint32_t bank,uint32_t command);
 #ifdef __cplusplus
 }
