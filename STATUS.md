@@ -4,21 +4,18 @@
 
 Current per-character coverage, original CPU9 references, rendered browser
 match loops, comparison limits, and explicit open gates are recorded in
-[Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md). Both
-original A/B references are repeatable over their verified source-consumed PAD
-workloads. Headless Chrome completed two natural Results→CSS loops per lineup
-with no page errors on the historical character branch. These runs predate
-reconciliation with main's PR #89. The per-tick whole-session harness checks
-scene progression and completion counters, but does not compare fighter state
-or capture port draw state. It stops at scene mismatches (A: input 13,414, port
-match frame 11,916; B: input 13,329, port match frame 11,971; source expects
-Results while the port remains in Match). An earlier claim of state/draw
-comparison was incorrect. Scheduling equivalence is not evaluated, and the new fighters remain an
-unfinished development candidate: broader move/recovery/damage/KO and donor
-coverage remain open. The five-donor Kirby acquisition/use/loss/replacement
-matrix now passes, including Samus's checked ItCo external palette owner; its
-effect-specific particle pixels are not established. The final full suite
-passes (1,465 tests, 78 optional skips). No admission or merge is claimed.
+[Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md).
+Main including PR #89 is merged and its ownership/carry guarantees retained.
+Reconciled checks exposed and repaired the Player mapping owner, Nana's signed
+input history and partner-correction rounding. The original-consistent partner
+death/rejoin check passes. Current B rendered match/return loops pass with live
+Zelda/Sheik observations; A still has an explicit CPU-carry rejection under
+investigation. Exact all-entity comparison advances to a screen-KO position
+divergence owned by the broader camera-math investigation. Original references,
+historical scene-only replay and newer exact bounded state checks are explicitly
+separated in the notes; none establishes draw/pixel/timing equivalence. Final
+donor checks, reconciled full-suite validation and remaining character/action
+gates are still open. No admission or merge is claimed.
 
 ## Repository public; main changes restricted to the owner
 
