@@ -7846,7 +7846,19 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftComm
 +        return (u8) (s32) (128.0F * x);
      }
  }
-@@ -7636,7 +7645,7 @@
+@@ -7360,7 +7369,9 @@
+         if (fp->x2225_b3) {
++            /* GALE01r2 fmadd is double precision, followed by frsp. Keep
++             * the product/add fused without changing the source constants. */
+             fp->cur_pos.x =
+-                0.95 * fp->cur_pos.x + 0.05 * data->x448->cur_pos.x;
++                fma(0.95, fp->cur_pos.x, 0.05 * data->x448->cur_pos.x);
+             fp->cur_pos.y =
+-                0.95 * fp->cur_pos.y + 0.05 * data->x448->cur_pos.y;
++                fma(0.95, fp->cur_pos.y, 0.05 * data->x448->cur_pos.y);
+             if (fp->motion_id != ftPp_MS_SpecialLw &&
+                 fp->motion_id != ftPp_MS_SpecialAirLw)
+@@ -7636,7 +7647,7 @@
              ftCo_800A8940(fp);
          }
      }
