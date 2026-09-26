@@ -141,18 +141,6 @@ int main() {
             checked = subprocess.run([str(path / "reader")], capture_output=True, text=True)
             self.assertEqual(checked.returncode, 0, checked.stderr)
 
-    def test_patch_applies_to_clean_pinned_checkout(self) -> None:
-        checkout = ROOT / ".deps" / "reference-dolphin"
-        if not checkout.exists():
-            self.skipTest("Optional pinned Dolphin source checkout is not installed")
-        result = subprocess.run(
-            ["git", "-C", str(checkout), "apply", "--check", str(PATCH)],
-            text=True,
-            capture_output=True,
-            check=False,
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-
     def test_complete_observer_and_input_patch_series_applies_in_order(self) -> None:
         checkout = ROOT / ".deps" / "reference-dolphin"
         if not checkout.exists():
