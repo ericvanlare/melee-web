@@ -40,6 +40,11 @@ SOURCE_ALIGNMENT_EVIDENCE = (
 )
 ORIGINAL_ALLOCATOR_FUNCTIONS = {"OSAllocFromHeap", "OSFreeToHeap"}
 SOURCE_ALLOCATION_TRACE_CAPACITY = 16384
+ALLOCATION_OPERATIONS = frozenset({"allocate", "pool_allocate", "arena_allocate"})
+FREE_OPERATIONS = frozenset({"free", "pool_free", "arena_free"})
+# `pool_init` is recognized as a different operation, but normalized v1 does
+# not carry enough pool descriptor state to claim that two such events match.
+RECOGNIZED_OPERATIONS = ALLOCATION_OPERATIONS | FREE_OPERATIONS | {"pool_init"}
 
 
 class CompareProblem(Exception):
@@ -76,6 +81,16 @@ def _u32(value: Any, context: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 0xFFFFFFFF:
         raise CompareProblem("input", f"{context} must be a source u32 integer")
     return value
+
+
+def _source_address_value(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if 0 <= value <= 0xFFFFFFFF else None
+    if isinstance(value, str) and re.fullmatch(r"0x[0-9a-fA-F]{1,8}", value):
+        return int(value[2:], 16)
+    return None
 
 
 def _jsonl_rows(path: Path) -> Iterator[tuple[int, str, dict[str, Any], bool]]:
@@ -442,6 +457,8 @@ def _parse_normalized_trace(path: Path, side: str, selector_world: str | None,
                 raise CompareProblem("malformed", f"{path}:{line_no}: noncontiguous event sequence {sequence!r}; expected {expected_sequence}")
             expected_sequence += 1
             status["event_count"] += 1
+            if not _nonempty(row.get("operation")):
+                raise CompareProblem("malformed", f"{path}:{line_no}: event operation must be a nonempty string")
             world = row.get("world")
             boundary = row.get("boundary")
             if isinstance(world, dict) and _nonempty(world.get("id")):
@@ -560,13 +577,25 @@ def _compare_event(left: dict[str, Any], right: dict[str, Any],
                    ) -> tuple[list[dict[str, Any]], list[str], dict[str, Any]]:
     differences: list[dict[str, Any]] = []
     unsupported: list[str] = []
-
-    if left.get("operation") != right.get("operation"):
-        differences.append({"field": "operation", "original": left.get("operation"), "browser": right.get("operation")})
+    left_operation = left.get("operation")
+    right_operation = right.get("operation")
+    if not _nonempty(left_operation) or not _nonempty(right_operation):
+        unsupported.append("operation is missing or is not a nonempty string")
         return differences, unsupported, {}
-    operation = left.get("operation")
-    if not _nonempty(operation):
-        unsupported.append("operation is missing")
+    for operation in (left_operation, right_operation):
+        if operation not in RECOGNIZED_OPERATIONS:
+            unsupported.append(f"operation {operation!r} has no defined comparison semantics")
+    if unsupported:
+        return differences, unsupported, {}
+    if left_operation != right_operation:
+        differences.append({"field": "operation", "original": left_operation,
+                            "browser": right_operation})
+        return differences, unsupported, {}
+    operation = left_operation
+    if operation == "pool_init":
+        unsupported.append(
+            "pool_init has no comparable pool descriptor semantics in normalized schema v1"
+        )
         return differences, unsupported, {}
 
     left_owner = _identity(left.get("owner"), "original owner")
@@ -578,18 +607,26 @@ def _compare_event(left: dict[str, Any], right: dict[str, Any],
     elif left_owner[0] != right_owner[0]:
         differences.append({"field": "owner.identity", "original": left_owner[0], "browser": right_owner[0]})
 
-    if operation in ("allocate", "pool_allocate", "arena_allocate"):
+    if operation in ALLOCATION_OPERATIONS:
         for field in ("size", "alignment"):
             lreq = left.get("request")
             rreq = right.get("request")
             lv = lreq.get(field) if isinstance(lreq, dict) else None
             rv = rreq.get(field) if isinstance(rreq, dict) else None
-            if isinstance(lv, bool) or not isinstance(lv, int) or isinstance(rv, bool) or not isinstance(rv, int):
+            valid_left = isinstance(lv, int) and not isinstance(lv, bool)
+            valid_right = isinstance(rv, int) and not isinstance(rv, bool)
+            if field == "size":
+                valid_left = valid_left and lv >= 0
+                valid_right = valid_right and rv >= 0
+            else:
+                valid_left = valid_left and lv > 0 and (lv & (lv - 1)) == 0
+                valid_right = valid_right and rv > 0 and (rv & (rv - 1)) == 0
+            if not valid_left or not valid_right:
                 unsupported.append(f"request.{field} is unknown on one or both sides")
             elif lv != rv:
                 differences.append({"field": f"request.{field}", "original": lv, "browser": rv})
 
-    if operation in ("allocate", "pool_allocate", "arena_allocate", "free", "pool_free"):
+    if operation in (ALLOCATION_OPERATIONS | FREE_OPERATIONS):
         lalloc = left.get("allocation")
         ralloc = right.get("allocation")
         lid = lalloc.get("local_id") if isinstance(lalloc, dict) else None
@@ -606,9 +643,14 @@ def _compare_event(left: dict[str, Any], right: dict[str, Any],
     ld, rd = _identity(left_domain, "original address domain"), _identity(right_domain, "browser address domain")
     if laddr is not None and raddr is not None:
         if ld is not None and rd is not None and ld == rd:
-            address_context["compared"] = True
-            if laddr != raddr:
-                differences.append({"field": "source_address", "original": laddr, "browser": raddr})
+            left_address = _source_address_value(laddr)
+            right_address = _source_address_value(raddr)
+            if left_address is None or right_address is None:
+                unsupported.append("source_address is not a source u32 value")
+            else:
+                address_context["compared"] = True
+                if left_address != right_address:
+                    differences.append({"field": "source_address", "original": laddr, "browser": raddr})
         else:
             address_context["reason"] = "address domains lack the same explicit evidence id; values were not compared"
     elif laddr is not None or raddr is not None:
@@ -761,6 +803,7 @@ def compare_streams(left: ReadResult, right: ReadResult, *, window: int,
                      "first_difference": None, "first_unsupported": first_unsupported,
                      "comparison_notes": sorted(notes)}, windows)
 
+        operation_mismatch = levent.get("operation") != revent.get("operation")
         differences, gaps, context = _compare_event(levent, revent,
                                                      left.metadata.get("header_address_domain"),
                                                      right.metadata.get("header_address_domain"))
@@ -773,7 +816,14 @@ def compare_streams(left: ReadResult, right: ReadResult, *, window: int,
             differences, gaps, context = _compare_event(levent, revent, *domains)
 
         if gaps:
-            first_unsupported = {"event_index": matched, "reason": gaps[0],
+            paired_operations = (levent.get("operation"), revent.get("operation"))
+            operation_gap = any(
+                not _nonempty(operation) or operation not in RECOGNIZED_OPERATIONS
+                or operation == "pool_init"
+                for operation in paired_operations
+            )
+            field = "operation" if operation_gap else "event_semantics"
+            first_unsupported = {"event_index": matched, "field": field, "reason": gaps[0],
                                  "original": levent, "browser": revent}
             left_after = _take(left_it, window)
             right_after = _take(right_it, window)
@@ -791,7 +841,7 @@ def compare_streams(left: ReadResult, right: ReadResult, *, window: int,
             notes.add(context["caller_note"])
 
         operation = levent.get("operation")
-        if operation in ("allocate", "pool_allocate", "arena_allocate"):
+        if not operation_mismatch and operation in ALLOCATION_OPERATIONS:
             la = levent.get("allocation") or {}
             ra = revent.get("allocation") or {}
             if not _nonempty(la.get("local_id")) or not _nonempty(ra.get("local_id")):
@@ -805,7 +855,7 @@ def compare_streams(left: ReadResult, right: ReadResult, *, window: int,
             elif not differences:
                 left_active[la["local_id"]] = matched
                 right_active[ra["local_id"]] = matched
-        elif operation in ("free", "pool_free"):
+        elif not operation_mismatch and operation in FREE_OPERATIONS:
             la = levent.get("allocation") or {}
             ra = revent.get("allocation") or {}
             lid, rid = la.get("local_id"), ra.get("local_id")

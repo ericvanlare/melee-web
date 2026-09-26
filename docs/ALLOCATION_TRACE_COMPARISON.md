@@ -70,7 +70,12 @@ fixtures or exports, each header must declare
 `melee-web-normalized-allocation-trace` v1 and whether initial events are
 present. Each event carries its world/boundary and source-evidenced owner
 identity; allocation operations also carry request size, alignment, and a
-trace-local lifetime id. Supply explicit world/boundary selectors when a file
+trace-local lifetime id. Supported comparable operation types are `allocate`,
+`free`, `pool_allocate`, `pool_free`, `arena_allocate`, and `arena_free`.
+`pool_init` is recognized as an operation difference, but matching two
+`pool_init` events is unsupported because normalized v1 has no pool descriptor
+schema. Unknown operation labels and missing semantic fields stop the
+comparable prefix. Supply explicit world/boundary selectors when a file
 contains multiple values. A common address-domain id and evidence id are
 required before source addresses are compared.
 
