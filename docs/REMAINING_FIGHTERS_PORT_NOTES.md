@@ -32,6 +32,51 @@ remains independently bound to the preserved capture/recipe identities.
 
 ### Reconciled baseline (in progress)
 
+Frozen runtime checkpoint `2943d8f` now passes the owned-input full suite:
+1,545 tests, 73 explicit skips, zero failures in 557.565 seconds
+(`work/pr86-reconciled-full-suite-r1.log`, exit 0). Its A scenario passes two
+natural matches at 13,218/14,292 source frames, rendered Results at 182/184
+frames and both original CSS returns
+(`work/pr86-final-frozen-a-two-match-r1/report.json`). Source documentation
+changed during that run, but the retained served-artifact hashes identify the
+unchanged frozen runtime. This is rendered functional evidence, not timing.
+
+B's longer original-input replay on the same runtime stops at input 28,298:
+original Results versus port Match during the second match. The exact state
+comparison, not that downstream scene difference, identifies the first
+observable mismatch: second-match tick 2395, source sequence 80313, port input
+16561. Yoshi is the captured victim in `CapturePulledLw` (motion 226), while
+Samus is in `CatchDashPull` (215). Only the victim's Z position first differs:
+original `c010e3fa`, port `c010e3f8`. All 12,095 captured first-match rows agree,
+as do the preceding 2,395 second-match rows
+(`work/pr86-final-b-state-match{0,1}-r1.json`). These remain bounded all-entity
+state comparisons, with CPU decisions recomputed and port draws uncaptured.
+The failing replay tears down all source owners cleanly. A's longer replay
+completes all three scene/return loops, with 12,040/14,366 exact first/second
+match rows. Its third match first differs at tick 6099, source sequence 173013,
+input 35555: Popo in screen-KO motion 7, X `4185222b` original versus
+`4185222a` port (`work/pr86-final-a-state-match{0,1,2}-r1.json`). This is why
+passing scene traversal is not called state equivalence.
+
+The owned-DOL Samus reduction proves missing fused chain-placement and gravity
+operations, with 531 of 1,024 synthetic production-function cases failing
+before and all passing after `10bb09d`. The standalone normalizer's original
+unfused sum and source RNG/collision-history order are unchanged. The broader
+owner's separately committed camera-shake depth-scaling repair is adopted as
+`ae57018`; its source-function and owned-DOL checks pass. New rendered checks
+test these repairs against the captured mismatch boundaries; their causal
+effect on these particular lineups is still pending.
+
+An additional B functional run reaches natural Results after 11,725 gameplay
+frames with Sheik winning, then fails the camera-pool ownership guard at
+Results frame 560 on return to CSS
+(`work/pr86-final-frozen-b-two-match-r1/report.json`). This is an unresolved
+runtime failure, not a comparison-only limitation. The new four-CPU,
+Sheik-winner native Results confirmation/close control passes
+(`work/pr86-sheik-results-repro-r1.log`), so the investigation continues at the
+rendered/mode-exit ownership boundary. Neither a Sheik-specific cause nor PR
+readiness is claimed.
+
 Latest validation checkpoint: `d5695c9` includes the existing shared-runtime
 owner's committed motion-flag, camera/inverse, reciprocal-square-root and
 combo-push arithmetic fixes (`1ca4430`, `4fd8f9d`, `4f70b84`, `d5695c9`). It

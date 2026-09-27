@@ -14,12 +14,16 @@ the broader task clear the observed screen-KO mismatch in a fresh exact
 all-entity prefix. Expanded costume checks also repair held-A startup input
 ordering and joint-backed Kirby hat selection. Actual colored G&W copy testing
 then exposed missing selected-color model cache ownership; the source-loader
-repair now passes every Kirby color's copy lifecycle. Fresh B match/return loops
-pass with repeated Zelda/Sheik switching. Final-candidate A loops, longer original
-replays and the owned-input full suite are running. Original references,
+repair now passes every Kirby color's copy lifecycle. Reconciled owned-input
+full-suite and A match/return checks pass. Longer exact comparison reaches a
+third-match A screen-KO rounding difference and a second-match B grapple-position
+difference. Reduced arithmetic regressions and candidate repairs are recorded
+in the notes. A fresh B Sheik-winner Results return exposes a camera-pool
+ownership failure; the focused native control passes and reduction continues.
+Original references,
 historical scene-only replay and newer exact bounded state checks are explicitly
 separated in the notes; none establishes draw/pixel/timing equivalence. Final
-donor checks, reconciled full-suite validation and remaining character/action
+candidate integration checks, comparison and remaining character/action
 gates are still open. No admission or merge is claimed.
 
 ## Repository public; main changes restricted to the owner
