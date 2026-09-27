@@ -15,7 +15,9 @@ const invalidCacheService = process.argv.includes('--invalid-cache-service');
 const missingCacheService = process.argv.includes('--missing-cache-service');
 if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
-const source = original.replace("import {loadNativeGameDisc} from './runtime-assets.mjs';", 'const loadNativeGameDisc = globalThis.testDiscReader;');
+const source = original.replace(
+  "import {loadNativeGameDisc, openNativeGameDiscSession} from './runtime-assets.mjs';",
+  'const loadNativeGameDisc = globalThis.testDiscReader; const openNativeGameDiscSession = globalThis.testOpenNativeGameDiscSession;');
 let phase = 0, running = false, nextPointer = 16,
   cacheWaits = startupCacheDelay ? 2 : startupCacheTimeout ? Number.MAX_SAFE_INTEGER : 0, audioClosed = false;
 let rendererStarted = false, cacheIdleCalls = 0;
@@ -32,9 +34,10 @@ globalThis.document = {hidden: false, activeElement: canvas, hasFocus: () => tru
   createElement: () => ({}), head: {append(loader) { calls.push(['loader', loader.src]); }}};
 globalThis.AudioContext = class {
   sampleRate = 32000;
+  state = 'suspended';
   audioWorklet = {addModule: async url => { calls.push(['worklet', url]); }};
   destination = {};
-  async resume() { calls.push(['audioResume']); }
+  async resume() { calls.push(['audioResume']); this.state = 'running'; }
   async close() { audioClosed = true; }
 };
 globalThis.AudioWorkletNode = class {
@@ -68,7 +71,7 @@ await fs.writeFile(sourcePath, source);
 const {mountMeleeRuntime} = await import(pathToFileURL(sourcePath));
 await fs.rm(temporary, {recursive: true});
 let owner;
-const mounted = mountMeleeRuntime({canvas, createAudio: withAudio ? createRuntimeAudio : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
+const mounted = mountMeleeRuntime({canvas, openDisc: null, createAudio: withAudio ? createRuntimeAudio : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
   configureModule: cacheUnavailable ? module => {
     module.preRun = () => {
       assert.ok(directories.has('/melee-render-cache'), 'Required setup precedes entry callbacks');
@@ -80,6 +83,8 @@ const mounted = mountMeleeRuntime({canvas, createAudio: withAudio ? createRuntim
   startupTimeout: startupCacheTimeout ? 10 : undefined});
 assert.equal(states.at(-1).state, 'booting');
 assert.deepEqual(states[0].loading, {phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
+assert.equal(states.at(-1).canSelectDisc, true,
+  'File selection is available while the native module is starting');
 const directories = new Set();
 Module.FS = {
   mkdirTree(directory) {
@@ -142,6 +147,9 @@ if (startupCacheDelay) assert.equal(Module._melee_web_native_menu_cache_idle(), 
   'The pre-main cache status is not used as startup readiness');
 Module.onRuntimeInitialized();
 let player = await mounted;
+assert.equal(player.getState().ready, true);
+assert.equal(player.getState().canSelectDisc, true,
+  'Disc selection stays available before the first renderer-cache readiness frame');
 const cacheCallsBeforeMainFrame = cacheIdleCalls;
 assert.equal(cacheCallsBeforeMainFrame, startupCacheDelay ? 1 : 0,
   'Runtime initialization must not poll cache readiness before the main frame');
@@ -158,6 +166,8 @@ if (startupCacheTimeout) {
   process.exit(0);
 } else if (startupCacheDelay) {
   assert.equal(states.at(-1).canImport, false, 'Initial import stays disabled while native cache work is pending');
+  assert.equal(states.at(-1).canSelectDisc, true, 'A local File may still be selected while native cache work is pending');
+  assert.equal(states.at(-1).graphicsReady, false);
   assert.equal(states.at(-1).loading?.phase, 'catalog');
   await assert.rejects(player.importDisc({name: 'too-early.iso'}), /still preparing/);
   for (let i = 0; !player.getState().canImport && i < 20; i++) {
@@ -186,11 +196,20 @@ if (startupCacheTimeout) {
   process.exit(0);
 }
 assert.equal(player.getState().canImport, true);
+await assert.rejects(player.openDiscSession({name: 'unsupported.iso'}), /no local disc session loader/,
+  'the public shell can request validation only through a configured profile adapter');
+await assert.rejects(player.importDisc({name: 'forged.iso'}, {preopenedSession: {
+  close() {}, readScope: async () => new Map(),
+}}), /not opened by this player/,
+  'a structurally plausible session cannot bypass the configured profile loader');
 if (startupCacheError) assert.equal(player.getState().canImport, true, 'Native cache error remains optional for import eligibility');
 Module.pipelinePreparation = {ready: false, selected: 4, pending: 4};
 window.menuFrame(false);
 assert.deepEqual(player.getState().loading, {phase: 'catalog', message: 'Preparing graphics…', complete: 0, total: 4});
 assert.equal(player.getState().canImport, true, 'Catalog preparation does not block disc selection');
+assert.equal(player.getState().canSelectDisc, true);
+assert.equal(player.getState().graphicsReady, false, 'Pending pipeline preparation remains an explicit start barrier');
+assert.equal(player.getState().canStart, false);
 Module.pipelinePreparation.pending = 2;
 window.menuFrame(false);
 assert.equal(player.getState().loading.complete, 2);
@@ -200,6 +219,7 @@ assert.deepEqual(player.getState().loading, {phase: 'catalog', message: 'Prepari
 Module.pipelinePreparation.ready = true;
 window.menuFrame(false);
 assert.equal(player.getState().loading, null, 'Ready catalog clears startup loading');
+assert.equal(player.getState().graphicsReady, true);
 assert.equal(player.Module, undefined, 'Native module is not on the public handle');
 await assert.rejects(mountMeleeRuntime({canvas}), /Reload the page/);
 async function pump(promise) {
@@ -244,6 +264,15 @@ await pump(player.importDisc({name: 'owned.iso'}));
 const importCalls = calls.slice(begin).filter(row => ['unload', 'readDisc', 'put', 'prepare'].includes(row[0])).map(row => row[0]);
 assert.deepEqual(importCalls, ['unload', 'readDisc', 'put', 'prepare']);
 assert.equal(player.getState().canStart, true);
+Module.pipelinePreparation.ready = false;
+window.menuFrame(false);
+assert.equal(player.getState().canImport, true, 'Graphics work does not revoke the native import gate');
+assert.equal(player.getState().canSelectDisc, true, 'A prepared or pending disc can be replaced while graphics are preparing');
+assert.equal(player.getState().graphicsReady, false);
+assert.equal(player.getState().canStart, false, 'A prepared disc cannot launch before graphics readiness');
+Module.pipelinePreparation.ready = true;
+window.menuFrame(false);
+assert.equal(player.getState().canStart, true, 'Graphics completion releases the start barrier');
 const ownedLoading = states.filter(state => state.loading).map(state => [state.loading.phase, state.loading.message]);
 assert.ok(ownedLoading.some(([phase]) => phase === 'disc'));
 assert.ok(ownedLoading.some(([phase]) => phase === 'handoff'));
@@ -284,11 +313,21 @@ assert.equal(calls.slice(failedStart).filter(row => row[0] === 'free').length, f
   'A native transfer error frees the current batch allocations');
 failedFile = null;
 await pump(player.importDisc({name: 'owned.iso'}));
+const staleLaunchStart = calls.length;
+await assert.rejects(pump(player.start({isCurrent: () => false})), /Disc selection changed before launch/);
+assert.equal(calls.slice(staleLaunchStart).some(row => row[0] === 'launch'), false,
+  'A stale selection is rejected after preparation and before native launch');
 const startCalls = calls.length;
 const starting = player.start();
-if (withAudio) assert.ok(calls.slice(startCalls).some(row => row[0] === 'worklet'),
-  'Play must initialize Web Audio before yielding to native preparation');
+if (withAudio) {
+  assert.ok(calls.slice(startCalls).some(row => row[0] === 'audioResume'),
+    'Starting must initiate Web Audio resume before yielding to native preparation');
+}
 await pump(starting);
+if (withAudio) {
+  const beforeLaunch = calls.slice(startCalls);
+  assert.ok(beforeLaunch.findIndex(row => row[0] === 'audioResume') < beforeLaunch.findIndex(row => row[0] === 'prepare'));
+}
 assert.equal(player.getState().scene, 'css');
 assert.equal(player.getState().canPause, true);
 if (withAudio) assert.ok(calls.findIndex(row => row[0] === 'audioResume') < calls.findIndex(row => row[0] === 'launch'));

@@ -95,8 +95,15 @@ try {
   assert(report.gpu.isolated && report.gpu.vendor, 'Isolated real WebGPU player');
   await driver.waitForImport();
   await driver.selectDisc(values.disc);
-  await driver.waitForStart();
-  await driver.launch();
+  const cssEntry = await driver.waitForPublicCss();
+  if (cssEntry === 'audio-recovery-required') {
+    report.audio_activation_recovery = 'The player showed its specific suspended-audio message; the test used the separate Play gesture only for that recovery.';
+    await driver.recoverAudioActivation();
+    report.css_entry = 'Audio activation recovery';
+  } else {
+    report.audio_activation_recovery = 'Automatic public launch entered CSS without a Play click.';
+    report.css_entry = 'Automatic public launch';
+  }
   // Allow the authored CSS entry animation to reveal the complete screen.
   await page.waitForTimeout(1500);
   for (const [name, width, height] of [

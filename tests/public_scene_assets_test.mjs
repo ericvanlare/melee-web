@@ -128,6 +128,16 @@ try {
 }
 
 const shell = await fs.readFile(new URL('web/player/player-shell.mjs', root), 'utf8');
-assert.match(shell, /openDisc:\s*openNativeGameDiscSession/,
-  'public shell must hand the neutral session to the shared owner');
+assert.doesNotMatch(shell, /runtime-assets\.mjs|openDisc\s*:/,
+  'public shell must not choose a profile-specific disc loader');
+const runtime = await fs.readFile(new URL('web/melee-runtime.mjs', root), 'utf8');
+assert.match(runtime, /openDisc\s*=\s*openNativeGameDiscSession/,
+  'the generic public profile defaults to its silent adapter');
+assert.match(runtime, /async openDiscSession\(file\)/,
+  'preopening is exposed through the shared runtime owner');
+assert.match(runtime, /openedDiscSessions\.has\(preopenedSession\)/,
+  'the shared owner adopts only sessions it opened through its selected adapter');
+const audioRuntime = await fs.readFile(new URL('web/audio-preview-runtime.mjs', root), 'utf8');
+assert.match(audioRuntime, /openDisc:\s*openNativeGameSession/,
+  'the audio profile selects its audio-aware session adapter');
 console.log('Public scene disc scope maps exact files, stays audio-free, preflights names, and closes cleanly.');
