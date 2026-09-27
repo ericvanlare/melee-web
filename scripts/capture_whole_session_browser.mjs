@@ -14,6 +14,7 @@ import {createHash} from 'node:crypto';
 import {parseArgs} from 'node:util';
 import {loadBrowserTools, browserLaunchOptions} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
+import {finalizeSessionCapture} from './whole_session_capture_result.mjs';
 
 const {values} = parseArgs({options: {
   url: {type: 'string'},
@@ -157,7 +158,12 @@ async function phase(name, task, timeoutMs = phaseTimeoutMs) {
   const row = {name, started_at: new Date(started).toISOString(), timeout_ms: timeoutMs, result: 'fail'};
   report.phases.push(row);
   await snapshot('phase-start:' + name);
-  const timer = setInterval(() => { void snapshot('phase-poll:' + name); }, pollMs);
+  const pendingPolls = new Set();
+  const timer = setInterval(() => {
+    const pending = snapshot('phase-poll:' + name);
+    pendingPolls.add(pending);
+    void pending.finally(() => pendingPolls.delete(pending));
+  }, pollMs);
   let timeout;
   try {
     await Promise.race([
@@ -171,6 +177,7 @@ async function phase(name, task, timeoutMs = phaseTimeoutMs) {
   } finally {
     clearInterval(timer);
     clearTimeout(timeout);
+    await Promise.all(pendingPolls);
     row.elapsed_ms = Date.now() - started;
     await snapshot('phase-end:' + name);
   }
@@ -217,6 +224,7 @@ try {
   page.on('console', message => { if (message.type() === 'error') { const row = {kind: 'console', message: message.text()}; pageErrors.push(row); firstError(row.kind, row.message); } });
   page.on('request', request => { if (request.method() !== 'GET') report.unexpected_requests.push({method: request.method(), url: request.url()}); });
   page.on('response', response => { if (response.status() >= 400) { const row = {kind: 'http', status: response.status(), url: response.url()}; pageErrors.push(row); firstError(row.kind, `${response.status()} ${response.url()}`); } });
+  page.on('requestfailed', request => { const row = {kind: 'requestfailed', message: request.failure()?.errorText || 'Request failed', url: request.url()}; pageErrors.push(row); firstError(row.kind, `${row.message} ${row.url}`); });
   await phase('http-load', async () => {
     const response = await page.goto(values.url, {waitUntil: 'domcontentloaded'});
     if (response?.status() !== 200) throw Error(`runtime.html returned HTTP ${response?.status()}`);
@@ -274,7 +282,6 @@ try {
     }
     throw Error(`whole-session replay exceeded ${replayTimeoutMs} ms; last snapshot ${JSON.stringify(last)}`);
   }, replayTimeoutMs);
-  report.result = 'pass';
 } catch (error) {
   firstError(currentPhase, error.message || error, await snapshot('fatal'));
   report.failure = String(error.stack || error);
@@ -287,12 +294,16 @@ try {
         const retained = [];
         for (const link of links) {
           if (!['retail-port.jsonl', 'retail-timer.jsonl', 'retail-browser-report.json'].includes(link.download) || !link.href.startsWith('blob:')) continue;
-          retained.push({name: link.download, text: await (await fetch(link.href)).text()});
+          const response = await fetch(link.href);
+          if (!response.ok) throw Error(`Artifact ${link.download} returned HTTP ${response.status}`);
+          retained.push({name: link.download, text: await response.text()});
         }
         return retained;
       });
       report.saved_downloads = [];
       for (const artifact of artifacts) {
+        if (report.saved_downloads.some(row => row.name === artifact.name))
+          throw Error(`Duplicate exported artifact: ${artifact.name}`);
         await write(artifact.name, artifact.text);
         report.saved_downloads.push({name: artifact.name, bytes: Buffer.byteLength(artifact.text), sha256: createHash('sha256').update(artifact.text).digest('hex')});
       }
@@ -300,14 +311,16 @@ try {
     try { const rows = await page.evaluate(() => window.__cpuPrefixRows || []); if(rows.length) await write('cpu-prefix.jsonl',rows.join('\n')+'\n'); } catch(error) { report.cpu_download_error = String(error); }
     try { await write('source-owner-trace.json', await page.evaluate(() => window.__meleeSourceOwnerTrace || [])); } catch(error) { report.owner_trace_error = String(error); }
     try { await write('source-main-allocation-trace.json', {total: await page.evaluate(() => window.__meleeSourceAllocationTraceTotal || 0), events: await page.evaluate(() => window.__meleeSourceAllocationTrace || [])}); } catch(error) { report.source_allocation_trace_error = String(error); }
-    try { await write('page.txt', await page.locator('body').innerText()); } catch {}
-    try { await page.screenshot({path: path.join(output, 'final.png'), fullPage: false}); } catch {}
+    try { await write('page.txt', await page.locator('body').innerText()); } catch (error) { report.page_dump_error = String(error); }
+    try { await page.screenshot({path: path.join(output, 'final.png'), fullPage: false}); } catch (error) { report.screenshot_error = String(error); }
   }
+  try { driver?.dispose(); } catch (error) { report.close_error = String(error); }
+  // Quiesce browser callbacks before deciding whether diagnostics permit success.
+  try { if (browser) await browser.close(); } catch (error) { report.close_error = String(error); }
   report.browser_errors = pageErrors.slice(0, 256);
+  finalizeSessionCapture(report);
   await write('report.json', report);
   if (report.failure) await write('failure.txt', report.failure + '\n');
-  try { driver?.dispose(); } catch {}
-  if (browser) await browser.close().catch(() => {});
 }
 
 if (report.result !== 'pass') process.exitCode = 1;
