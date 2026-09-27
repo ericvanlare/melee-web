@@ -16,6 +16,7 @@ import time
 
 
 LEASE_ENV = "MELEE_WORKSPACE_LEASE"
+CHECKOUTS_ENV = "MELEE_WORKSPACE_CHECKOUTS"
 DEFAULT_JOBS = 2
 
 
@@ -80,16 +81,13 @@ def _try_lock(handle):
         return False
 
 
-def _inherited_lease(root, directory):
-    """A nested command may share its live ancestor's operation, never a stale token."""
+def _live_ancestor_lock(path, token):
+    """Only a matching held lock from this process or a live ancestor is reusable."""
     import fcntl
     try:
-        token = json.loads(os.environ.get(LEASE_ENV, "null"))
-        if not isinstance(token, dict) or token.get("root") != str(root):
+        if not isinstance(token, dict):
             return False
-        if token.get("slot") not in (0, 1):
-            return False
-        with _open_lock(directory / f"slot-{token['slot']}.lock") as handle:
+        with _open_lock(path) as handle:
             if _try_lock(handle):
                 fcntl.flock(handle, fcntl.LOCK_UN)
                 return False
@@ -107,6 +105,24 @@ def _inherited_lease(root, directory):
     return False
 
 
+def _inherited_lease(directory):
+    try:
+        token = json.loads(os.environ.get(LEASE_ENV, "null"))
+        if (isinstance(token, dict) and token.get("slot") in (0, 1)
+                and _live_ancestor_lock(directory / f"slot-{token['slot']}.lock", token)):
+            return token
+    except ValueError:
+        pass
+    return None
+
+
+def _write_lock(handle, token):
+    handle.seek(0)
+    handle.truncate()
+    json.dump(token, handle)
+    handle.flush()
+
+
 @contextmanager
 def operation(root, label, *, heavy=True, timeout=300):
     """Serialize a checkout and allow at most two cooperating heavy operations per user."""
@@ -118,23 +134,38 @@ def operation(root, label, *, heavy=True, timeout=300):
         yield
         return
     directory = state_directory()
-    if _inherited_lease(root, directory):
+    key = hashlib.sha256(os.fsencode(root)).hexdigest()
+    checkout_path = directory / f"checkout-{key}.lock"
+    inherited = _inherited_lease(directory)
+    try:
+        checkouts = json.loads(os.environ.get(CHECKOUTS_ENV, "{}"))
+    except ValueError:
+        checkouts = {}
+    if not isinstance(checkouts, dict):
+        checkouts = {}
+    owns_checkout = ((inherited is not None and inherited.get("root") == str(root))
+                     or _live_ancestor_lock(checkout_path, checkouts.get(str(root))))
+    if owns_checkout and (not heavy or inherited is not None):
         yield
         return
-    key = hashlib.sha256(os.fsencode(root)).hexdigest()
     started = time.monotonic()
     locks = []
-    previous = os.environ.get(LEASE_ENV)
+    previous = {name: os.environ.get(name) for name in (LEASE_ENV, CHECKOUTS_ENV)}
     before = disk_status(root)
     print(f"workspace: {label}: {before['free_gb']:.1f} GB free", file=sys.stderr)
     try:
-        checkout = _open_lock(directory / f"checkout-{key}.lock")
-        locks.append(checkout)
-        while not _try_lock(checkout):
-            if time.monotonic() - started >= timeout:
-                raise ValueError("checkout is busy; retry after its current operation finishes")
-            time.sleep(0.2)
-        if heavy:
+        if not owns_checkout:
+            checkout = _open_lock(checkout_path)
+            locks.append(checkout)
+            while not _try_lock(checkout):
+                if time.monotonic() - started >= timeout:
+                    raise ValueError("checkout is busy; retry after its current operation finishes")
+                time.sleep(0.2)
+            token = {"pid": os.getpid(), "root": str(root), "nonce": secrets.token_hex(16)}
+            _write_lock(checkout, token)
+            checkouts[str(root)] = token
+            os.environ[CHECKOUTS_ENV] = json.dumps(checkouts)
+        if heavy and inherited is None:
             check_space(root)
             slots = []
             for n in range(2):
@@ -151,18 +182,15 @@ def operation(root, label, *, heavy=True, timeout=300):
             check_space(root)
             token = {"pid": os.getpid(), "root": str(root), "slot": acquired,
                      "nonce": secrets.token_hex(16)}
-            handle = slots[acquired]
-            handle.seek(0)
-            handle.truncate()
-            json.dump(token, handle)
-            handle.flush()
+            _write_lock(slots[acquired], token)
             os.environ[LEASE_ENV] = json.dumps(token)
         yield
     finally:
-        if previous is None:
-            os.environ.pop(LEASE_ENV, None)
-        else:
-            os.environ[LEASE_ENV] = previous
+        for name, value in previous.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
         for handle in reversed(locks):
             handle.close()
         after = disk_status(root)

@@ -94,6 +94,30 @@ with operation(sys.argv[1], 'fixture worker'):
                 self.assertNotEqual(os.environ[resources.LEASE_ENV], token)
         other.communicate("done\n", timeout=5)
 
+    def test_nested_fixture_checkout_borrows_slot_and_keeps_checkout_exclusion(self):
+        other = self.worker(self.root / "other")
+        fixture = self.root / "fixture"
+        fixture.mkdir()
+        nested = "from workspace_resources import operation; import sys; " \
+                 "\nwith operation(sys.argv[1], 'grandchild', timeout=0): print('nested-ok')"
+        command = """import os, subprocess, sys
+from workspace_resources import operation
+with operation(sys.argv[1], 'fixture', timeout=0):
+    subprocess.run([sys.executable, '-c', sys.argv[3], sys.argv[1]], check=True)
+    subprocess.run([sys.executable, '-c', sys.argv[3], sys.argv[2]], check=True)
+    independent = dict(os.environ)
+    independent.pop('MELEE_WORKSPACE_LEASE', None)
+    independent.pop('MELEE_WORKSPACE_CHECKOUTS', None)
+    blocked = subprocess.run([sys.executable, '-c', sys.argv[3], sys.argv[1]],
+                             env=independent, capture_output=True, text=True)
+    assert blocked.returncode != 0 and 'checkout is busy' in blocked.stderr
+"""
+        with resources.operation(self.root, "suite"):
+            output = subprocess.check_output([sys.executable, "-c", command, str(fixture),
+                                              str(self.root), nested], text=True)
+        self.assertEqual(output.count("nested-ok"), 2)
+        other.communicate("done\n", timeout=5)
+
     def test_disk_floor_and_invalid_configuration_fail_before_body(self):
         with patch.dict(os.environ, {"MELEE_MIN_FREE_GB": "99999"}):
             with self.assertRaisesRegex(ValueError, "free"):

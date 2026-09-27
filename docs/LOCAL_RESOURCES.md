@@ -20,9 +20,11 @@ python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests 
 ```
 
 On macOS and Linux, at most **two cooperating heavy operations per user** run at
-once, across worktrees, with one operation per checkout. Normal build commands
-default to two compiler jobs each. Nested commands reuse their live ancestor's
-lease; stale tokens do not bypass coordination. Kernel locks release when the
+once, across worktrees, with one operation tree per checkout. Normal build
+commands default to two compiler jobs each. Nested commands reuse their live
+ancestor's host slot, including builds inside temporary test checkouts; each
+checkout still has its own mutex. Stale tokens do not bypass coordination.
+Keep child builds sequential within a wrapped operation. Kernel locks release when the
 holding process exits. Busy operations wait up to five minutes and then stop
 with a retry message. Avoid abandoning a parent while its children are running;
 these cooperative locks do not manage arbitrary detached processes.
