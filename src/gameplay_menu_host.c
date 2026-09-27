@@ -241,11 +241,15 @@ static int source_scene_exit(void* data, MeleeWebMenuScene scene,
             }
         } else if (css->pending_scene_change == 1) {
             /* CSS -> SSS remains inside the same GM_VS owner. */
+            h->source_target_mode = -1;
         } else if (h->vs_mode_owned) {
             if (!melee_web_vs_mode_end()) {
                 return fail(e, n, "Original VS mode lease did not release after CSS");
             }
             h->vs_mode_owned = 0;
+            h->source_target_mode = -1;
+        } else {
+            h->source_target_mode = -1;
         }
     } else if (scene == MELEE_WEB_MENU_SCENE_SSS) {
         sss = (SSSData*) melee_web_menu_sss(h->session);
@@ -309,8 +313,13 @@ MeleeWebMenuHost* melee_web_menu_host_create(char* e,size_t n){
         if(!melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
         free(h);return NULL;
     }
+    /* Keep the browser's fresh source profile at the original prepared-save
+     * roster baseline. 0x07ff makes all 11 unlockable characters appear open
+     * while this newly initialized SaveData has none of their source claim
+     * flags; the original Title callback then correctly schedules a
+     * Challenger Approach instead of returning to GM_MENU. */
     if(!melee_web_save_profile_owner_initialize_default(h->profile,e,n)||
-       !melee_web_save_profile_owner_set_roster(h->profile,0x07ff,0x01c0,e,n)){
+       !melee_web_save_profile_owner_set_roster(h->profile,0x0024,0x01c0,e,n)){
         if(!melee_web_save_profile_owner_deactivate(h->profile,NULL,0)||
            !melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
         free(h);return NULL;

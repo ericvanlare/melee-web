@@ -67,12 +67,45 @@ const observePcm = async (name, before) => {
   report.audio_phases[name] = current;
   return current;
 };
-const waitForNativeScene = scene => page.waitForFunction(scene => {
-  const module = globalThis.Module;
-  return typeof module?._melee_web_native_menu_message === 'function' &&
-    module._melee_web_native_menu_running() &&
-    module.UTF8ToString(module._melee_web_native_menu_message()) === scene;
-}, scene, {timeout: 90000});
+async function readNativeMenuState() {
+  return page.evaluate(() => ({
+    message: typeof Module?._melee_web_native_menu_message === 'function'
+      ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null,
+    running: typeof Module?._melee_web_native_menu_running === 'function'
+      ? Module._melee_web_native_menu_running() : 0,
+    status: document.querySelector('#status')?.textContent || '',
+    runtimeError: document.querySelector('#status')?.dataset.runtimeError || null,
+  }));
+}
+async function resumeAfterTimingPause(label) {
+  const state = await readNativeMenuState();
+  if (!state.status.startsWith('Paused after a timing disruption')) return false;
+  report.timing_pause_recoveries ||= [];
+  report.timing_pause_recoveries.push({label, message: state.message, running: state.running, status: state.status});
+  await page.waitForFunction(() => {
+    const button = document.querySelector('#pause-game');
+    return button && !button.disabled;
+  }, null, {timeout: 10000});
+  await page.locator('#pause-game').click();
+  await page.waitForFunction(() => Module._melee_web_native_menu_running() &&
+    !String(document.querySelector('#status')?.textContent || '').startsWith('Paused'),
+  null, {timeout: 15000});
+  return true;
+}
+async function waitForNativeScene(scene) {
+  const deadline = Date.now() + 90000;
+  while (Date.now() < deadline) {
+    const state = await readNativeMenuState();
+    if (state.runtimeError) throw Error(`Runtime error while waiting for ${scene}: ${state.runtimeError}`);
+    if (state.status.startsWith('Paused after a timing disruption')) {
+      await resumeAfterTimingPause(`waiting-for-${scene}`);
+      continue;
+    }
+    if (state.running && state.message === scene) return state;
+    await page.waitForTimeout(50);
+  }
+  throw Error(`Timed out waiting for ${scene}: ${JSON.stringify(await readNativeMenuState())}`);
+}
 const captureUnload = async () => page.evaluate(() => {
   const nativeUnload = Module._melee_web_native_menu_unload.bind(Module);
   Module._melee_web_native_menu_unload = (...args) => {
@@ -94,6 +127,8 @@ const assertUnloadCompleted = async () => {
 async function collectViolations() { violations.push(...await page.evaluate(() => window.releaseCspViolations)); }
 const selectDisc = driver.selectDisc;
 async function armLaunchObserver() {
+  await page.waitForFunction(() => typeof globalThis.Module?._melee_web_native_menu_launch === 'function',
+    null, {timeout: 30000});
   await page.evaluate(() => {
     const nativeLaunch = Module._melee_web_native_menu_launch.bind(Module);
     window.nativeLaunchCalls = 0;
@@ -334,19 +369,16 @@ try {
       const eventOffset = audioEvents.length;
       await captureUnload();
       await collectViolations();
-      ejectReloadInProgress = true;
-      try {
-        try { await driver.unload(); }
-        catch (error) {
-          const attempted = await page.evaluate(() => {
-            try { return JSON.parse(window.name || 'null'); } catch { return null; }
-          }).catch(() => null);
-          throw Error(`${label} Eject failed before reload: ${JSON.stringify(attempted)}; ${error.message}`);
-        }
-        assert.deepEqual(await assertUnloadCompleted(),
-          {result: 1, message: 'Native menus unloaded.', phase: 0, running: 0});
-      } finally { ejectReloadInProgress = false; }
-      await closeObservedContexts(contextIds, eventOffset);
+      try { await driver.unload(); }
+      catch (error) {
+        const attempted = await page.evaluate(() => {
+          try { return JSON.parse(window.name || 'null'); } catch { return null; }
+        }).catch(() => null);
+        throw Error(`${label} Eject failed before reload: ${JSON.stringify(attempted)}; ${error.message}`);
+      }
+      assert.deepEqual(await assertUnloadCompleted(),
+        {result: 1, message: 'Native menus unloaded.', phase: 0, running: 0});
+      if (values.audio) await closeObservedContexts(contextIds, eventOffset);
       assert.equal(await page.evaluate(() => typeof window.nativeLaunchCalls), 'undefined');
       assert(await page.locator('#start-game').isDisabled());
       assert.equal(await page.locator('#keyboard-layout').inputValue(), 'boxx');
@@ -381,6 +413,7 @@ try {
       await page.waitForTimeout(500);
       await driver.pressChord(['q', '9', '7']);
       await waitForNativeScene('Original main menu');
+      await page.waitForTimeout(900);
       await press('o');
       await waitForNativeScene('Original title');
       if (values.audio) await observePcm('title-before-eject', await audioTrace());
@@ -394,14 +427,17 @@ try {
         await page.waitForTimeout(450);
         await driver.pressChord(['q', '9', '7']);
         await waitForNativeScene('Original main menu');
+        await page.waitForTimeout(900);
         if (values.audio) await observePcm(`route-${cycle}-main`, await audioTrace());
         await shot(`route-${cycle}-main`);
         await press('o');
         await waitForNativeScene('Original title');
+        await page.waitForTimeout(500);
         if (values.audio) await observePcm(`route-${cycle}-title`, await audioTrace());
         await shot(`route-${cycle}-title`);
         await press('7');
         await waitForNativeScene('Original main menu');
+        await page.waitForTimeout(700);
         if (values.audio) await observePcm(`route-${cycle}-main-after-title`, await audioTrace());
         await shot(`route-${cycle}-main-after-title`);
         await press('3');
@@ -471,11 +507,8 @@ try {
       await page.evaluate(() => { window.releaseOldDocumentMarker = true; });
       await captureUnload();
       await collectViolations();
-      ejectReloadInProgress = true;
-      try {
-        await driver.unload();
-        await assertUnloadCompleted();
-      } finally { ejectReloadInProgress = false; }
+      await driver.unload();
+      await assertUnloadCompleted();
       assert.equal(await page.evaluate(() => !!window.releaseOldDocumentMarker), false);
       assert(await page.locator('#start-game').isDisabled());
       report.css_eject = 'Native unload returned success, phase/running were zero before reload.';

@@ -282,6 +282,59 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
         PADStatus raw[4]{};
         unsigned audio_phase = 0;
         start_title(host, world, raw, audio_phase);
+        check(*gmMainLib_GetUnlockedCharactersBitmaskPtr() == 0x0024,
+              "Fresh source profile did not use the observed starting roster");
+        raw[0].button = PAD_BUTTON_START;
+        int result = 1;
+        for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
+            result = tick(host, *world, raw, audio_phase);
+        raw[0].button = 0;
+        check(result == 3, "Original Title did not expose its Start route");
+        check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        check(melee_web_menu_host_route_target_mode(host) == GM_MENU,
+              "Source Title Start did not preserve its GM_MENU destination");
+        world->close();
+        world = std::make_unique<melee_web::GameplayMenuWorld>(
+            files, melee_web::GameplayMenuScene::Main);
+        check(melee_web_menu_host_enter_main(host, world->audio(), error,
+                                             sizeof(error)), error);
+        raw[0].button = 0;
+        for (unsigned frame = 0; frame < 120; ++frame)
+            check(tick(host, *world, raw, audio_phase) == 1,
+                  "Original Main left before its Back input");
+        raw[0].button = PAD_BUTTON_B;
+        result = 1;
+        for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
+            result = tick(host, *world, raw, audio_phase);
+        raw[0].button = 0;
+        check(result == 3, "Original Main did not expose its Back route");
+        check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        check(melee_web_menu_host_route_target_mode(host) == GM_TITLE,
+              "Source Main Back did not preserve its GM_TITLE destination");
+        world->close();
+        world = std::make_unique<melee_web::GameplayMenuWorld>(
+            files, melee_web::GameplayMenuScene::Title);
+        check(melee_web_menu_host_enter_title(host, world->audio(), error,
+                                              sizeof(error)), error);
+        raw[0].button = 0;
+        for (unsigned frame = 0; frame < 120; ++frame)
+            check(tick(host, *world, raw, audio_phase) == 1,
+                  "Returned Title left before Eject");
+        abort_and_destroy(host, world, audio_phase,
+                          "Title/Main route before Eject");
+    }
+
+    {
+        MeleeWebMenuHost* host = nullptr;
+        std::unique_ptr<melee_web::GameplayMenuWorld> world;
+        PADStatus raw[4]{};
+        unsigned audio_phase = 0;
+        start_title(host, world, raw, audio_phase);
+        /* This controlled negative case uses the all-unlocked roster without
+         * the corresponding source claim flags, which legitimately schedules
+         * GM_CHALLENGER_APPROACH.  Keep the unsupported route explicit and
+         * verify that Eject can still restore a clean CSS owner. */
+        *gmMainLib_GetUnlockedCharactersBitmaskPtr() = 0x07ff;
         raw[0].button = PAD_BUTTON_START;
         int result = 1;
         for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
