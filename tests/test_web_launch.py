@@ -80,6 +80,23 @@ class WebLaunchTests(unittest.TestCase):
         self.assertIn("_melee_web_native_menu_pad_sample_full", cmake)
         self.assertIn("_melee_web_native_menu_player_state", cmake)
 
+    def test_kirby_copy_manifest_includes_every_authored_model_color(self):
+        source = ROOT / ".deps/melee/src/melee/ft/kinds/ftKirby/ftkirbydata.c"
+        if not source.is_file():
+            self.skipTest("Pinned Melee source checkout required")
+        authored = set(re.findall(r'"(PlKb[A-Za-z0-9]*Cp[A-Za-z0-9]+\.dat)"',
+                                  source.read_text()))
+        self.assertTrue(authored)
+        manifest = subprocess.run(
+            ["node", "--input-type=module", "-e",
+             "import {NATIVE_GAME_DISC_FILES} from './web/runtime-assets.mjs';"
+             "process.stdout.write(JSON.stringify(NATIVE_GAME_DISC_FILES));"],
+            cwd=ROOT, check=True, capture_output=True, text=True)
+        files = json.loads(manifest.stdout)
+        for name in authored:
+            with self.subTest(archive=name):
+                self.assertEqual(files.get(name), name)
+
     def test_marth_visible_action_inventory_is_versioned_and_broad(self):
         script = """
 import {actionInventory} from './web/action-sweep.mjs';

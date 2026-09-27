@@ -1,5 +1,6 @@
 """Owned source fixtures for new content; not keyboard, rendering or retail acceptance."""
 from pathlib import Path
+import json
 import os
 import subprocess
 import sys
@@ -31,9 +32,23 @@ class ContentMatchTests(unittest.TestCase):
         if not targets:
             self.skipTest("Build the source content trace targets")
         target = max(targets, key=lambda path: path.stat().st_mtime)
-        result = subprocess.run([str(node_runtime()), str(target), *map(str, arguments)],
+        command = [str(node_runtime()), str(target), *map(str, arguments)]
+        result = subprocess.run(command,
                                 cwd=ROOT, capture_output=True, text=True, timeout=180)
-        self.assertEqual(result.returncode, 0, (result.stdout + result.stderr)[-6000:])
+        if result.returncode:
+            # A minified Emscripten JS line can hide both the advancing source
+            # diagnostics and the stack in unittest's last-N-character tail.
+            # Retain the entire failure before making the displayed tail brief.
+            failure_root = ROOT / "work" / "content-test-failures"
+            failure_root.mkdir(parents=True, exist_ok=True)
+            evidence = Path(tempfile.mkdtemp(prefix=f"{name}-", dir=failure_root))
+            (evidence / "stdout.log").write_text(result.stdout)
+            (evidence / "stderr.log").write_text(result.stderr)
+            (evidence / "command.json").write_text(json.dumps(
+                {"command": command, "exit_code": result.returncode}, indent=2))
+            brief = "\n".join(line[:500] for line in
+                              (result.stdout + result.stderr).splitlines())[-12000:]
+            self.fail(f"Trace exit {result.returncode}; full logs: {evidence}\n{brief}")
         expectations = (expected,) if isinstance(expected, str) else expected
         for item in expectations:
             self.assertIn(item, result.stdout)
@@ -124,6 +139,43 @@ class ContentMatchTests(unittest.TestCase):
                 "Mario acquire/use, ordinary up-appeal copy loss, Fox distinct-donor acquire/use",
             ),
         )
+
+    def test_kirby_joint_hat_and_costume_parts_copy_lifecycle_all_colors(self):
+        menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
+        required = (menu / "MnSlChr.usd", game / "GrNLa.dat", game / "PlKb.dat",
+                    game / "PlKbCpFx.dat", game / "PlKbCpGw.dat")
+        if not all(path.is_file() for path in required):
+            self.skipTest("Owned Kirby, Fox and Game & Watch fixtures required")
+        # Fox's joint-backed hat consumes visibility row zero; Game & Watch's
+        # parts-only copy consumes the body costume and its source fallbacks.
+        for donor, name in ((2, "Fox"), (3, "Game & Watch")):
+            with self.subTest(donor=name):
+                self.run_trace(
+                    "gameplay_content_match_trace",
+                    [menu, game, 32, 4, donor, "--kirby-copy-costumes"],
+                    ("Construct mixed content stage=32 costume=5",
+                     f"Kirby action coverage: {name} acquire/use/loss/reacquisition",
+                     "repeat teardown passed"))
+
+    def test_remaining_fighter_all_costumes_both_orientations_entry_and_teardown(self):
+        menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
+        required = (menu / "MnSlChr.usd", menu / "main.ssm", menu / "smash2.sem",
+                    game / "GrNLa.dat", game / "PlFx.dat", game / "PlFxAJ.dat",
+                    *(game / f"Pl{prefix}.dat" for prefix in
+                      ("Gw", "Kb", "Pp", "Ss", "Ys", "Zd", "Sk")))
+        if not all(path.is_file() for path in required):
+            self.skipTest("Owned menu, FD, Fox and remaining-fighter fixtures required")
+        # The trace enumerates the source registry's costume count and creates
+        # a new match per color. This gate is construction/advancing entry,
+        # source pause/No Contest and repeated teardown, not move coverage.
+        # Zelda/Sheik P1 also uses the separate original held-A startup path;
+        # in-match transformation coverage belongs to the distinctive test.
+        for character in (3, 4, 14, 16, 17, 18, 19):
+            for fighter, opponent in ((character, 2), (2, character)):
+                with self.subTest(fighter=fighter, opponent=opponent):
+                    self.run_trace("gameplay_content_match_trace",
+                                   [menu, game, 32, fighter, opponent, "--entry-only"],
+                                   "Source content entry, costumes, stage lifecycle, pause and repeat teardown passed")
 
     def test_remaining_fighter_distinctive_actions_and_lifecycle(self):
         menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"

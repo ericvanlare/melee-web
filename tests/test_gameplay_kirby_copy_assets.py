@@ -22,6 +22,20 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory(prefix="melee-kirby-copy-")
         cls.addClassCleanup(cls.temp.cleanup)
         cls.binary = Path(cls.temp.name) / "kirby-copy.js"
+        env = dict(os.environ, EM_CONFIG=str(sdk / ".emscripten"),
+                   EMSDK=str(sdk), EMSDK_PYTHON=sys.executable)
+        source_tables = Path(cls.temp.name) / "kirby-source-tables.o"
+        result = subprocess.run([
+            sys.executable, str(sdk / "upstream/emscripten/emcc.py"),
+            "-O1", "-DTARGET_PC", "-ffunction-sections", "-fdata-sections",
+            "-I", str(ROOT / "src"), "-I", str(ROOT / ".deps/melee/src"),
+            "-I", str(ROOT / ".deps/aurora/include"),
+            "-include", str(ROOT / "src/gameplay_compat.h"),
+            "-c", str(ROOT / ".deps/melee/src/melee/ft/kinds/ftKirby/ftkirbydata.c"),
+            "-o", str(source_tables),
+        ], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120)
+        if result.returncode:
+            raise RuntimeError(result.stdout + result.stderr)
         command = [
             sys.executable, str(compiler), "-std=c++20", "-O1", "-fexceptions",
             "-DTARGET_PC", "-ffunction-sections", "-fdata-sections",
@@ -29,13 +43,13 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
             "-I", str(ROOT / ".deps/aurora/include"),
             str(ROOT / "src/dat_archive.cpp"),
             str(ROOT / "tests/gameplay_kirby_copy_assets_test.cpp"),
+            str(source_tables),
             "-sENVIRONMENT=node", "-sNODERAWFS=1", "-sEXIT_RUNTIME=1",
             "-Wl,--gc-sections", "-o", str(cls.binary),
         ]
         result = subprocess.run(
             command, cwd=ROOT, capture_output=True, text=True, timeout=120,
-            env=dict(os.environ, EM_CONFIG=str(sdk / ".emscripten"),
-                     EMSDK=str(sdk), EMSDK_PYTHON=sys.executable),
+            env=env,
         )
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)
@@ -54,6 +68,9 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
 
     def test_malformed_consumed_rows_still_reject(self):
         self.run_case("malformed_consumed_rows")
+
+    def test_source_costume_cache_rows_and_archive_manifest(self):
+        self.run_case("source_costume_cache_rows")
 
     def test_owned_copy_archives_all_costumes(self):
         donors = (("Fx", "Fox", 1), ("Mr", "Mario", 0), ("Pp", "Popo", 10),

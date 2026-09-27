@@ -162,6 +162,59 @@ void malformed_consumed_rows()
     rejects([&] { adapt(valid.bytes(), valid.root, {4}); });
 }
 
+void source_costume_cache_rows()
+{
+    // G&W's six source rows alias one archive, but acquisition indexes the
+    // cache by Kirby's body color. Archive deduplication must not drop rows.
+    for (unsigned color = 1; color < 6; ++color) {
+        const auto rows = copy_costume_requirements({FTKIND_GAMEWATCH}, {color});
+        check(rows.size() == 2 && rows[0].costume_id == 0 &&
+                  rows[1].costume_id == color,
+              "Selected Kirby copy cache row is missing from preload");
+        check(rows[1].source == &ftKb_Init_803CB3E8[FTKIND_GAMEWATCH][color],
+              "Copy cache row lost its original source identity");
+        check(std::strcmp(rows[0].source->dat_filename,
+                          rows[1].source->dat_filename) == 0,
+              "Expected original G&W archive alias");
+        check(copy_archive_requirements({FTKIND_GAMEWATCH}, rows).size() == 3,
+              "Aliased cache rows duplicated copy/joint/material roots");
+    }
+    const auto shared = copy_costume_requirements({FTKIND_GAMEWATCH}, {5, 1, 5});
+    check(shared.size() == 3 && shared[1].costume_id == 5 &&
+              shared[2].costume_id == 1,
+          "Multiple Kirby selections lost or duplicated cache rows");
+    check(copy_costume_requirements({FTKIND_FOX}, {1}).empty(),
+          "Joint-backed Fox copy unexpectedly needs body-costume cache rows");
+    rejects([] { copy_costume_requirements({FTKIND_GAMEWATCH}, {6}); });
+    const auto neutral = kirby_copy_archive_requirements(
+        std::vector<unsigned>{FTKIND_GAMEWATCH, FTKIND_FOX});
+    check(neutral.size() == 4 && neutral[0].symbol == "ftDataKirbyCopyGamewatch" &&
+              neutral[1].symbol == "PlyKirbyGw_Share_joint" &&
+              neutral[2].symbol == "PlyKirbyGw_Share_matanim_joint" &&
+              neutral[3].symbol == "ftDataKirbyCopyFox",
+          "Neutral donor archive/root publication order changed");
+
+    // Distinct filenames use the same owner contract: selected roots must
+    // be imported before the original selected-color loader can resolve them.
+    MeleeWebMenuMatchSelection selection{};
+    for (auto& player : selection.start.players) player.slot_type = Gm_PKind_NA;
+    selection.start.players[0].slot_type = Gm_PKind_Human;
+    selection.start.players[0].ckind = CKIND_KIRBY;
+    selection.start.players[0].color = 1;
+    selection.start.players[1].slot_type = Gm_PKind_Human;
+    selection.start.players[1].ckind = CKIND_DONKEY;
+    const auto roots = kirby_copy_archive_requirements(selection);
+    for (unsigned color : {0U, 1U}) {
+        const auto& source = ftKb_Init_803CB3E8[FTKIND_DONKEY][color];
+        for (const auto* symbol : {source.joint_name, source.matanim_joint_name})
+            check(std::any_of(roots.begin(), roots.end(), [&](const auto& root) {
+                return root.costume_root && root.filename == source.dat_filename &&
+                       root.symbol == symbol && root.fighter_kind == FTKIND_DONKEY;
+            }), "Selected source costume root is missing from the upload manifest");
+    }
+    check(roots.size() == 5, "Unselected source costume roots were requested");
+}
+
 void real_archive(const char* filename, const char* symbol, unsigned kind)
 {
     std::ifstream stream(filename, std::ios::binary);
@@ -201,6 +254,7 @@ int main(int argc, char** argv)
             if (name == "joint_row_zero") joint_row_zero();
             else if (name == "costume_fallback") costume_fallback();
             else if (name == "malformed_consumed_rows") malformed_consumed_rows();
+            else if (name == "source_costume_cache_rows") source_costume_cache_rows();
             else throw std::runtime_error("Unknown case");
             std::cout << name << ": passed\n";
         } else return 2;

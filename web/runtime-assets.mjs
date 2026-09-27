@@ -125,8 +125,9 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlKbYe.dat':'PlKbYe.dat','PlKbBu.dat':'PlKbBu.dat','PlKbRe.dat':'PlKbRe.dat',
   'PlKbGr.dat':'PlKbGr.dat','PlKbWh.dat':'PlKbWh.dat','EfKbData.dat':'EfKbData.dat',
   // Kirby's ftKb_Init_803CA9D0 source table names every copy-action DAT.
-  // The five source costume-zero hat roots come from ftKb_Init_803CB3E8 and
-  // its referenced Fighter_CostumeStrings rows.
+  // Copy-model costumes come from ftKb_Init_803CB3E8 and its referenced
+  // Fighter_CostumeStrings rows. G&W shares one DAT across six cache rows;
+  // Donkey, Purin, Mewtwo and Falco name distinct authored color archives.
   ...Object.fromEntries([
     'PlKbCpMr.dat','PlKbCpFx.dat','PlKbCpCa.dat','PlKbCpDk.dat',
     'PlKbCpKp.dat','PlKbCpLk.dat','PlKbCpSk.dat','PlKbCpNs.dat',
@@ -136,6 +137,10 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
     'PlKbCpFc.dat','PlKbCpPc.dat','PlKbCpGw.dat','PlKbCpGn.dat',
     'PlKbCpFe.dat','PlKbNrCpDk.dat','PlKbNrCpPr.dat','PlKbNrCpMt.dat',
     'PlKbNrCpFc.dat','PlKbNrCpGw.dat',
+    'PlKbYeCpDk.dat','PlKbBuCpDk.dat','PlKbReCpDk.dat','PlKbGrCpDk.dat','PlKbWhCpDk.dat',
+    'PlKbYeCpPr.dat','PlKbBuCpPr.dat','PlKbReCpPr.dat','PlKbGrCpPr.dat','PlKbWhCpPr.dat',
+    'PlKbYeCpMt.dat','PlKbBuCpMt.dat','PlKbReCpMt.dat','PlKbGrCpMt.dat','PlKbWhCpMt.dat',
+    'PlKbYeCpFc.dat','PlKbBuCpFc.dat','PlKbReCpFc.dat','PlKbGrCpFc.dat','PlKbWhCpFc.dat',
   ].map(name=>[name,name])),
   // Kirby's ftKb_Init_803CB46C and efAsync_DatEntries source tables name
   // these copy-specific effect banks independently of the donor's own bank.

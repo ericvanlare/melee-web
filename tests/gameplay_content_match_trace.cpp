@@ -154,6 +154,8 @@ int main(int argc,char** argv){try{
     const bool slot2_transform=argc==7&&std::string(argv[6])=="--slot2-transform";
     const bool kirby_mario_fox_replacement=argc==7&&
         std::string(argv[6])=="--kirby-mario-fox-replacement";
+    const bool kirby_copy_costumes=argc==7&&
+        std::string(argv[6])=="--kirby-copy-costumes";
     const bool ice_cpu_lifecycle=argc==7&&
         std::string(argv[6])=="--ice-cpu-lifecycle";
     const bool slot2_cpu_match=argc==7&&std::string(argv[6])=="--slot2-cpu-match";
@@ -168,7 +170,7 @@ int main(int argc,char** argv){try{
     const bool cpu9_match=slot2_cpu_match||lineup_a_cpu_match||lineup_b_catch_prefix||
                           natural_terminal||a_prefix_teardown||ice_cpu_lifecycle;
     const bool action_coverage=(argc==7&&std::string(argv[6])=="--character-actions")||
-        slot2_transform||kirby_mario_fox_replacement||cpu9_match||fox_cpu_prefix;
+        slot2_transform||kirby_mario_fox_replacement||kirby_copy_costumes||cpu9_match||fox_cpu_prefix;
     if(argc==7&&!entry_only&&!platform_pass&&!action_coverage)throw std::runtime_error("Unknown source match trace scope");
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]})for(const auto& entry:std::filesystem::directory_iterator(root)){
@@ -291,6 +293,8 @@ int main(int argc,char** argv){try{
         opponent.rumble_enabled=0;
     }
     const bool kirby_action_case=action_coverage&&fighter_ckind==CKIND_KIRBY;
+    check(!kirby_copy_costumes||kirby_action_case,
+          "Copy costume action coverage requires Kirby in slot zero");
     if(kirby_action_case){
         check(opponent_ckind==CKIND_CAPTAIN||opponent_ckind==CKIND_GAMEWATCH||
                   opponent_ckind==CKIND_POPONANA||
@@ -306,7 +310,7 @@ int main(int argc,char** argv){try{
             selection.start.players[1].rumble_enabled=0;
         }
     }
-    const unsigned costume_cycles=action_coverage?1:(fighter_content->costumes>opponent_content->costumes?
+    const unsigned costume_cycles=action_coverage&&!kirby_copy_costumes?1:(fighter_content->costumes>opponent_content->costumes?
         fighter_content->costumes:opponent_content->costumes);
     for(unsigned cycle=0;cycle<costume_cycles;cycle++){
         const unsigned fighter_color=cycle%fighter_content->costumes;

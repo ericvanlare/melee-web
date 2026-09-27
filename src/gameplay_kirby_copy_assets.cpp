@@ -24,6 +24,7 @@ extern "C" {
 #include <sysdolphin/baselib/archive.h>
 #include "hsd_native_joint.h"
 void ftKb_Init_800EE528(void);
+void ftKb_SpecialN_800EED50(s32, s32);
 void ftData_800857E0(FighterKind);
 struct MeleeWebKirbyCopyName { char* filename; char* name; };
 struct MeleeWebKirbyCostumeStrings {
@@ -362,10 +363,61 @@ void add_requirement(std::vector<KirbyCopyArchiveRequirement>& result,
     }
 }
 
-} // namespace
+struct CopyCostumeRequirement {
+    unsigned fighter_kind;
+    unsigned costume_id;
+    const MeleeWebKirbyCostumeStrings* source;
+};
+
+std::vector<unsigned> selected_kirby_costumes(
+    const MeleeWebMenuMatchSelection& selection)
+{
+    std::vector<unsigned> result;
+    for (const auto& slot : selection.start.players) {
+        if (slot.slot_type == Gm_PKind_NA) break;
+        if (slot.ckind != CKIND_KIRBY) continue;
+        const auto costume = static_cast<unsigned>(slot.color);
+        if (costume >= 6U)
+            reject("Kirby selected costume is outside ftKb_CostumeList");
+        if (std::find(result.begin(), result.end(), costume) == result.end())
+            result.push_back(costume);
+    }
+    return result;
+}
+
+std::vector<CopyCostumeRequirement> copy_costume_requirements(
+    const std::vector<unsigned>& fighter_kinds,
+    const std::vector<unsigned>& selected_costumes)
+{
+    // Player_80031DC8 preloads color zero. The original scene preload also
+    // calls Player_80031DA8 / ftKb_SpecialN_800EED50 for Kirby's selected
+    // colors (gm_16A2.c). Acquisition indexes that exact cache row in
+    // ftKb_SpecialN_800EF0E4/800EF35C, even when all rows name the same DAT.
+    std::vector<unsigned> colors{0};
+    for (const auto color : selected_costumes) {
+        if (color >= 6U)
+            reject("Kirby selected costume is outside ftKb_CostumeList");
+        if (std::find(colors.begin(), colors.end(), color) == colors.end())
+            colors.push_back(color);
+    }
+    std::vector<CopyCostumeRequirement> result;
+    for (const auto kind : fighter_kinds) {
+        if (kind >= FTKIND_MAX) reject("Kirby donor kind exceeds the source table");
+        const auto* costumes = ftKb_Init_803CB3E8[kind];
+        if (!costumes) continue;
+        for (const auto color : colors) {
+            const auto& source = costumes[color];
+            if (!source.dat_filename || !source.joint_name)
+                reject("Kirby donor source costume row is incomplete");
+            result.push_back({kind, color, &source});
+        }
+    }
+    return result;
+}
 
 std::vector<KirbyCopyArchiveRequirement>
-kirby_copy_archive_requirements(const std::vector<unsigned>& fighter_kinds)
+copy_archive_requirements(const std::vector<unsigned>& fighter_kinds,
+                          const std::vector<CopyCostumeRequirement>& costumes)
 {
     std::vector<KirbyCopyArchiveRequirement> result;
     for (const auto kind : fighter_kinds) {
@@ -373,23 +425,20 @@ kirby_copy_archive_requirements(const std::vector<unsigned>& fighter_kinds)
         const auto& copy = ftKb_Init_803CA9D0[kind];
         if (copy.filename || copy.name)
             add_requirement(result, copy.filename, copy.name, kind, false);
-
-        const auto* costumes = ftKb_Init_803CB3E8[kind];
-        if (!costumes) continue;
-        const auto& costume = costumes[0]; // Player_80031DC8 passes color zero.
-        if (!costume.dat_filename || !costume.joint_name)
-            reject("Kirby donor costume-zero source row is incomplete");
-        add_requirement(result, costume.dat_filename, costume.joint_name,
-                        kind, true);
-        if (costume.matanim_joint_name)
-            add_requirement(result, costume.dat_filename,
-                            costume.matanim_joint_name, kind, true);
+        for (const auto& costume : costumes) {
+            if (costume.fighter_kind != kind) continue;
+            const auto& source = *costume.source;
+            add_requirement(result, source.dat_filename, source.joint_name,
+                            kind, true);
+            if (source.matanim_joint_name)
+                add_requirement(result, source.dat_filename,
+                                source.matanim_joint_name, kind, true);
+        }
     }
     return result;
 }
 
-std::vector<KirbyCopyArchiveRequirement>
-kirby_copy_archive_requirements(const MeleeWebMenuMatchSelection& selection)
+std::vector<unsigned> selected_copy_kinds(const MeleeWebMenuMatchSelection& selection)
 {
     if (!contains_kirby(selection)) return {};
     std::vector<unsigned> selected_kinds;
@@ -407,7 +456,24 @@ kirby_copy_archive_requirements(const MeleeWebMenuMatchSelection& selection)
                 selected_kinds.push_back(kind);
         }
     }
-    return kirby_copy_archive_requirements(selected_kinds);
+    return selected_kinds;
+}
+
+} // namespace
+
+std::vector<KirbyCopyArchiveRequirement>
+kirby_copy_archive_requirements(const std::vector<unsigned>& fighter_kinds)
+{
+    return copy_archive_requirements(
+        fighter_kinds, copy_costume_requirements(fighter_kinds, {0}));
+}
+
+std::vector<KirbyCopyArchiveRequirement>
+kirby_copy_archive_requirements(const MeleeWebMenuMatchSelection& selection)
+{
+    const auto kinds = selected_copy_kinds(selection);
+    return copy_archive_requirements(kinds, copy_costume_requirements(
+        kinds, selected_kirby_costumes(selection)));
 }
 
 bool selection_uses_kirby(const MeleeWebMenuMatchSelection& selection)
@@ -470,6 +536,7 @@ struct GameplayKirbyCopyAssets::Storage {
             native_costume_model{nullptr, &destroy_joint};
         std::unique_ptr<DatMaterialAnimation> costume_matanim;
         void* costume_joint_descriptor = nullptr;
+        const MeleeWebKirbyCostumeStrings* costume_source = nullptr;
         std::map<std::string, std::uint32_t, std::less<>> public_offsets;
     };
     struct OwnedEffect {
@@ -478,6 +545,7 @@ struct GameplayKirbyCopyAssets::Storage {
     };
 
     std::vector<KirbyCopyArchiveRequirement> requirements;
+    std::vector<CopyCostumeRequirement> costume_requirements;
     std::vector<KirbyCopyEffectRequirement> effect_requirements;
     std::vector<NativeDatSourceRegion> particle_source_regions;
     std::vector<unsigned> kirby_costumes;
@@ -492,21 +560,13 @@ struct GameplayKirbyCopyAssets::Storage {
     {
         if (!contains_kirby(selection)) return;
 
-        for (unsigned player = 0; player < GM_MAX_PLAYERS; ++player) {
-            const auto& slot = selection.start.players[player];
-            if (slot.slot_type == Gm_PKind_NA) break;
-            if (slot.ckind != CKIND_KIRBY) continue;
-            const auto costume = static_cast<unsigned>(slot.color);
-            if (costume >= 6U)
-                reject("Kirby selected costume is outside ftKb_CostumeList");
-            if (std::find(kirby_costumes.begin(), kirby_costumes.end(), costume) ==
-                kirby_costumes.end())
-                kirby_costumes.push_back(costume);
-        }
+        kirby_costumes = selected_kirby_costumes(selection);
         if (kirby_costumes.empty())
             reject("Kirby copy assets have no source-selected Kirby costume");
 
-        requirements = kirby_copy_archive_requirements(selection);
+        const auto kinds = selected_copy_kinds(selection);
+        costume_requirements = copy_costume_requirements(kinds, kirby_costumes);
+        requirements = copy_archive_requirements(kinds, costume_requirements);
         effect_requirements = kirby_copy_effect_requirements(selection);
         if (const auto common_items = files.find("ItCo.usd");
             common_items != files.end()) {
@@ -705,38 +765,33 @@ struct GameplayKirbyCopyAssets::Storage {
             effects.push_back(std::move(owned));
         }
 
-        for (const auto& requirement : requirements) {
-            if (!requirement.costume_root) continue;
-            auto& archive = archives.at(requirement.filename);
-            const auto* costume = ftKb_Init_803CB3E8[
-                requirement.fighter_kind];
-            if (!costume) reject("Kirby costume source owner disappeared");
-            if (costume[0].joint_name == requirement.symbol) {
-                if (archive.costume_model)
-                    reject("Kirby donor archive owns multiple costume-zero joint roots");
-                archive.costume_model = std::make_unique<DatNativeJoint>(
-                    archive.checked,
-                    archive.public_offsets.at(requirement.symbol));
-                char error[256]{};
-                archive.native_costume_model.reset(
-                    melee_web_native_joint_hydrate(
-                        &archive.costume_model->graph(), error, sizeof(error)));
-                if (!archive.native_costume_model) reject(error);
-                archive.costume_joint_descriptor =
-                    melee_web_native_joint_descriptor(
-                        archive.native_costume_model.get(), error,
-                        sizeof(error));
-                if (!archive.costume_joint_descriptor) reject(error);
-            } else if (costume[0].matanim_joint_name == requirement.symbol) {
-                if (!archive.costume_model || archive.costume_matanim)
-                    reject("Kirby costume material root has no unique source joint owner");
+        for (const auto& costume : costume_requirements) {
+            const auto& source = *costume.source;
+            auto& archive = archives.at(source.dat_filename);
+            if (archive.costume_source) {
+                const auto& previous = *archive.costume_source;
+                if (std::strcmp(previous.joint_name, source.joint_name) != 0 ||
+                    std::string(previous.matanim_joint_name ? previous.matanim_joint_name : "") !=
+                    std::string(source.matanim_joint_name ? source.matanim_joint_name : ""))
+                    reject("Kirby donor archive owns multiple costume graphs");
+                continue; // Several source cache rows may borrow one graph.
+            }
+            archive.costume_source = &source;
+            archive.costume_model = std::make_unique<DatNativeJoint>(
+                archive.checked, archive.public_offsets.at(source.joint_name));
+            char error[256]{};
+            archive.native_costume_model.reset(melee_web_native_joint_hydrate(
+                &archive.costume_model->graph(), error, sizeof(error)));
+            if (!archive.native_costume_model) reject(error);
+            archive.costume_joint_descriptor = melee_web_native_joint_descriptor(
+                archive.native_costume_model.get(), error, sizeof(error));
+            if (!archive.costume_joint_descriptor) reject(error);
+            if (source.matanim_joint_name) {
                 archive.costume_matanim =
                     std::make_unique<DatMaterialAnimation>(
                         archive.checked,
-                        archive.public_offsets.at(requirement.symbol),
+                        archive.public_offsets.at(source.matanim_joint_name),
                         archive.costume_model->graph());
-            } else {
-                reject("Kirby costume root differs from the source costume-zero table");
             }
         }
 
@@ -746,12 +801,13 @@ struct GameplayKirbyCopyAssets::Storage {
             void* native_data = archive.native->data +
                                 archive.public_offsets.at(requirement.symbol);
             if (requirement.costume_root) {
-                const auto* costume = ftKb_Init_803CB3E8[
-                    requirement.fighter_kind];
-                if (costume[0].joint_name == requirement.symbol)
+                const auto* costume = archive.costume_source;
+                if (costume->joint_name == requirement.symbol)
                     native_data = archive.costume_joint_descriptor;
-                else if (costume[0].matanim_joint_name == requirement.symbol)
+                else if (costume->matanim_joint_name == requirement.symbol)
                     native_data = archive.costume_matanim->descriptor();
+                else
+                    reject("Kirby costume root differs from its checked graph owner");
             } else if (archive.copy_hat_joint_descriptor) {
                 // The checked owner replaced KirbyHatStruct::hat_joint in the
                 // mutable native HSD image; its public root remains the
@@ -783,6 +839,12 @@ struct GameplayKirbyCopyAssets::Storage {
         // slots. Mark first so a partial callback is reset by teardown.
         ftKb_Init_800EE528();
         ftData_800857E0(FTKIND_KIRBY);
+        // The per-kind callback above only loads row zero. Complete the
+        // source scene's selected-color preload through the original loader;
+        // do not alias cache rows by filename or change acquisition indexing.
+        for (const auto& costume : costume_requirements)
+            if (costume.costume_id != 0)
+                ftKb_SpecialN_800EED50(costume.fighter_kind, costume.costume_id);
 
         for (auto& effect : effects) {
             char error[256]{};
@@ -791,31 +853,26 @@ struct GameplayKirbyCopyAssets::Storage {
         }
 
         for (const auto& requirement : requirements) {
+            if (requirement.costume_root) continue;
             auto& archive = archives.at(requirement.filename);
             void* expected = archive.native->data +
                              archive.public_offsets.at(requirement.symbol);
-            void* actual = nullptr;
-            if (requirement.costume_root) {
-                auto* costumes = ftKb_Init_803C9FC8[requirement.fighter_kind];
-                if (!costumes) reject("Original Kirby costume root owner is absent");
-                const auto* source_costume = ftKb_Init_803CB3E8[
-                    requirement.fighter_kind];
-                if (source_costume[0].joint_name == requirement.symbol) {
-                    expected = archive.costume_joint_descriptor;
-                    actual = costumes[0].joint;
-                } else if (source_costume[0].matanim_joint_name == requirement.symbol) {
-                    expected = archive.costume_matanim->descriptor();
-                    actual = costumes[0].matanim;
-                } else {
-                    reject("Kirby costume root no longer matches its source table");
-                }
-            } else {
-                actual = reinterpret_cast<void**>(&ft_80459B88)[
-                    requirement.fighter_kind];
-            }
+            void* actual = reinterpret_cast<void**>(&ft_80459B88)[
+                requirement.fighter_kind];
             if (actual != expected)
                 reject("Original Kirby preload did not publish " +
                        requirement.symbol);
+        }
+        for (const auto& costume : costume_requirements) {
+            const auto* cached = ftKb_Init_803C9FC8[costume.fighter_kind];
+            if (!cached) reject("Original Kirby costume root owner is absent");
+            const auto& archive = archives.at(costume.source->dat_filename);
+            if (cached[costume.costume_id].joint != archive.costume_joint_descriptor ||
+                cached[costume.costume_id].matanim !=
+                    (archive.costume_matanim ? archive.costume_matanim->descriptor() : nullptr))
+                reject("Original Kirby preload did not publish selected costume " +
+                       std::to_string(costume.costume_id) + " of " +
+                       costume.source->dat_filename);
         }
     }
 
@@ -840,6 +897,7 @@ struct GameplayKirbyCopyAssets::Storage {
         // roots borrowed by the Kirby costume cache.
         archives.clear();
         requirements.clear();
+        costume_requirements.clear();
         effect_requirements.clear();
         kirby_costumes.clear();
         symbols.clear();

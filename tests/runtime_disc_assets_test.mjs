@@ -16,7 +16,13 @@ assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,41);
 assert.equal(NATIVE_MENU_DISC_FILES['LbRb.dat'],'LbRb.dat');
 for (const name of Object.keys(NATIVE_MENU_DISC_FILES).filter(name => name.endsWith('.ssm')))
   assert.equal(NATIVE_MENU_DISC_FILES[name], 'audio/us/' + name);
-assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,356);
+assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,376);
+for(const donor of ['Dk','Pr','Mt','Fc'])
+  for(const color of ['Nr','Ye','Bu','Re','Gr','Wh']) {
+    const name=`PlKb${color}Cp${donor}.dat`;
+    assert.equal(NATIVE_GAME_DISC_FILES[name],name);
+  }
+assert.equal(NATIVE_GAME_DISC_FILES['PlKbNrCpGw.dat'],'PlKbNrCpGw.dat');
 assert.equal(NATIVE_GAME_DISC_FILES['LbRf.dat'],'LbRf.dat');
 // The original Results and Prize scenes run over their own authored archives
 // and voice streams; the scoped import must find each at its authored path.
