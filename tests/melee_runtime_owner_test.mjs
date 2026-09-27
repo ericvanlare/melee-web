@@ -32,9 +32,10 @@ globalThis.document = {hidden: false, activeElement: canvas, hasFocus: () => tru
   createElement: () => ({}), head: {append(loader) { calls.push(['loader', loader.src]); }}};
 globalThis.AudioContext = class {
   sampleRate = 32000;
+  state = 'suspended';
   audioWorklet = {addModule: async url => { calls.push(['worklet', url]); }};
   destination = {};
-  async resume() { calls.push(['audioResume']); }
+  async resume() { calls.push(['audioResume']); this.state = 'running'; }
   async close() { audioClosed = true; }
 };
 globalThis.AudioWorkletNode = class {
@@ -284,11 +285,21 @@ assert.equal(calls.slice(failedStart).filter(row => row[0] === 'free').length, f
   'A native transfer error frees the current batch allocations');
 failedFile = null;
 await pump(player.importDisc({name: 'owned.iso'}));
+const staleLaunchStart = calls.length;
+await assert.rejects(pump(player.start({isCurrent: () => false})), /Disc selection changed before launch/);
+assert.equal(calls.slice(staleLaunchStart).some(row => row[0] === 'launch'), false,
+  'A stale selection is rejected after preparation and before native launch');
 const startCalls = calls.length;
 const starting = player.start();
-if (withAudio) assert.ok(calls.slice(startCalls).some(row => row[0] === 'worklet'),
-  'Play must initialize Web Audio before yielding to native preparation');
+if (withAudio) {
+  assert.ok(calls.slice(startCalls).some(row => row[0] === 'audioResume'),
+    'Starting must initiate Web Audio resume before yielding to native preparation');
+}
 await pump(starting);
+if (withAudio) {
+  const beforeLaunch = calls.slice(startCalls);
+  assert.ok(beforeLaunch.findIndex(row => row[0] === 'audioResume') < beforeLaunch.findIndex(row => row[0] === 'prepare'));
+}
 assert.equal(player.getState().scene, 'css');
 assert.equal(player.getState().canPause, true);
 if (withAudio) assert.ok(calls.findIndex(row => row[0] === 'audioResume') < calls.findIndex(row => row[0] === 'launch'));

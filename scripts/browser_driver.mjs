@@ -67,7 +67,53 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
     if(value.error)throw Error(value.error);
   }
   const waitForImport=()=>step('wait-for-import',()=>enabled(controls.import));
-  const waitForStart=()=>step('wait-for-start',()=>enabled(controls.start));
+  const waitForStart=()=>step('wait-for-start',async()=>{
+    if(surface!=='development')throw Error('Public players auto-launch; use waitForPublicCss()');
+    await enabled(controls.start);
+  });
+  const waitForPublicCss=()=>step('wait-for-public-css',async()=>{
+    if(surface!=='public')throw Error('waitForPublicCss() is only available on the public surface');
+    const result=await page.waitForFunction(({pause,start})=>{
+      const module=globalThis.Module;
+      const pauseControl=document.querySelector(pause);
+      if(typeof module?._melee_web_native_menu_phase==='function'&&
+        module._melee_web_native_menu_phase()===1&&module._melee_web_native_menu_running()&&
+        pauseControl&&!pauseControl.disabled)return {state:'autoplay'};
+      const dialog=document.querySelector('#error-dialog');
+      const message=document.querySelector('#error')?.textContent?.trim()||'';
+      const startControl=document.querySelector(start);
+      if(dialog?.open) {
+        if(message==='The browser kept game audio suspended. Close this message, then choose Play to enable audio and start the game.'&&
+          startControl&&!startControl.disabled)return {state:'audio-recovery-required'};
+        return {error:message||'Application error'};
+      }
+      const runtimeError=document.querySelector('#status')?.dataset.runtimeError;
+      if(runtimeError)return {error:runtimeError};
+      return false;
+    },{pause:controls.pause,start:controls.start},{timeout:remaining()});
+    const value=await result.jsonValue();await result.dispose();
+    if(value.error)throw Error(value.error);
+    return value.state;
+  });
+  const recoverAudioActivation=()=>step('recover-audio-activation',async()=>{
+    if(surface!=='public')throw Error('Audio activation recovery is only available on the public surface');
+    const recovery=await page.evaluate(()=>{
+      const message=document.querySelector('#error')?.textContent?.trim()||'';
+      const dialog=document.querySelector('#error-dialog');
+      const start=document.querySelector('#start-game');
+      const phase=globalThis.Module?._melee_web_native_menu_phase?.();
+      const running=globalThis.Module?._melee_web_native_menu_running?.();
+      return {recognized:dialog?.open&&message==='The browser kept game audio suspended. Close this message, then choose Play to enable audio and start the game.'&&start&&!start.disabled,
+        phase,running};
+    });
+    if(!recovery.recognized)throw Error('The public player is not showing its supported audio-activation recovery');
+    if(recovery.phase!==0||recovery.running!==0)throw Error('The game is no longer at its prelaunch state; refusing a duplicate Play launch');
+    await page.locator('#error-close').click({timeout:remaining()});
+    await enabled(controls.start);
+    await page.locator(controls.start).click({timeout:remaining()});
+    await waitForPhase(1);
+    return 'audio-recovered';
+  });
   const waitForPhase=phase=>step('wait-for-phase-'+phase,async()=>{
     if(!Number.isInteger(phase)||phase<0)throw Error('Invalid native scene phase');
     const result=await page.waitForFunction(({phase,pause})=>{
@@ -89,18 +135,18 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
         await page.locator(controls.import).setInputFiles(file,{timeout:remaining()});
       } else {
         await page.locator(controls.import).click({timeout:remaining()});
-        if(!await page.locator('#disc-continue').isDisabled())throw Error('Disc acknowledgement was bypassed');
-        await page.locator('#disc-ack').check({timeout:remaining()});
         const [chooser]=await Promise.all([
           page.waitForEvent('filechooser',{timeout:remaining()}),
-          page.locator('#disc-continue').click({timeout:remaining()}),
+          page.locator('#disc-choose-file').click({timeout:remaining()}),
         ]);
         await chooser.setFiles(file,{timeout:remaining()});
       }
-      // Invalid-input tests inspect their own error. Call waitForStart separately.
+      // Import errors are inspected by the caller. Public success is observed
+      // separately through waitForPublicCss(); development keeps manual Play.
     });
   }
   const launch=(phase=1)=>step('launch',async()=>{
+    if(surface!=='development')throw Error('Public players auto-launch; use waitForPublicCss() and its explicit recovery if needed');
     await enabled(controls.start);await page.locator(controls.start).click({timeout:remaining()});
     await waitForPhase(phase);
   });
@@ -150,6 +196,6 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
       if(value.error)throw Error(value.error);
     }
   });
-  return {waitForImport,waitForStart,waitForPhase,selectDisc,launch,pressChord,unload,diagnostics,
+  return {waitForImport,waitForStart,waitForPublicCss,recoverAudioActivation,waitForPhase,selectDisc,launch,pressChord,unload,diagnostics,
     dispose(){page.off('pageerror',pageError);page.off('console',consoleError);}};
 }

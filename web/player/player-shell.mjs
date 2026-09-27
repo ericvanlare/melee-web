@@ -4,6 +4,8 @@ import {openNativeGameDiscSession} from '../runtime-assets.mjs';
 
 const $ = id => document.getElementById(id);
 let player, state, settings, currentError = '', requiresReload = false, hasStarted = false;
+let discSelectionGeneration = 0, selectedDiscReady = false;
+let audioActivation = Promise.resolve(), audioActivationError = null;
 const busyStates = ['booting', 'importing', 'preparing', 'pausing', 'resuming', 'unloading'];
 
 function showError(error, fatal = false) {
@@ -24,7 +26,7 @@ function renderStatus(next) {
   state = next;
   if (next.running) hasStarted = true;
   $('choose-disc').disabled = !next.canImport;
-  $('start-game').disabled = !next.canStart;
+  $('start-game').disabled = !selectedDiscReady || !next.canStart;
   $('pause-game').disabled = !next.canPause;
   $('pause-game').textContent = next.paused ? 'Resume' : 'Pause';
   $('end-session').disabled = !next.canUnload;
@@ -54,24 +56,59 @@ function renderStatus(next) {
   settings?.setState(next);
 }
 
-$('choose-disc').onclick = () => { $('disc-ack').checked = false; $('disc-continue').disabled = true; $('disc-dialog').showModal(); };
-$('disc-ack').onchange = () => { $('disc-continue').disabled = !$('disc-ack').checked; };
+$('choose-disc').onclick = () => $('disc-dialog').showModal();
 $('disc-cancel').onclick = () => { $('disc-dialog').close(); player?.focus(); };
-$('disc-continue').onclick = () => {
-  if (!$('disc-ack').checked || !state?.canImport) return;
+$('disc-choose-file').onclick = () => {
+  if (!state?.canImport) return;
+  // Start/resume Web Audio directly from this user gesture, before import and
+  // native preparation can outlive the browser's transient activation window.
+  audioActivationError = null;
+  try {
+    audioActivation = Promise.resolve(player?.activateAudio()).then(() => {}, error => { audioActivationError = error; });
+  } catch (error) {
+    audioActivationError = error;
+    audioActivation = Promise.resolve();
+  }
   $('disc-dialog').close(); $('disc-file').click();
 };
 $('disc-file').onchange = async () => {
   const file = $('disc-file').files[0];
   if (!file) return;
+  const selection = ++discSelectionGeneration;
+  selectedDiscReady = false;
+  renderStatus(state);
   clearError();
-  try { await player.importDisc(file); $('start-game').focus(); }
-  catch (error) { showError(error); }
+  try {
+    await player.importDisc(file);
+    if (selection !== discSelectionGeneration) return;
+    if (!player.getState().canStart) throw Error('The selected disc is no longer ready to start. Choose it again.');
+    await audioActivation;
+    if (selection !== discSelectionGeneration) return;
+    selectedDiscReady = true;
+    renderStatus(player.getState());
+    if (player.getState().audio === 'enabled' && audioActivationError) {
+      showError(audioActivationError);
+      return;
+    }
+    await player.start({isCurrent: () => selection === discSelectionGeneration && selectedDiscReady});
+    if (selection === discSelectionGeneration) player.focus();
+  }
+  catch (error) { if (selection === discSelectionGeneration) showError(error); }
   finally { $('disc-file').value = ''; }
 };
-$('start-game').onclick = async () => { clearError(); try { await player.start(); } catch (error) { showError(error); } };
+$('disc-file').addEventListener('cancel', () => $('choose-disc').focus());
+$('start-game').onclick = async () => {
+  if (!selectedDiscReady || !state?.canStart) return;
+  const selection = discSelectionGeneration;
+  clearError();
+  try { await player.start({isCurrent: () => selection === discSelectionGeneration && selectedDiscReady}); }
+  catch (error) { if (selection === discSelectionGeneration) showError(error); }
+};
 $('pause-game').onclick = async () => { clearError(); try { await (state.paused ? player.resume() : player.pause()); } catch (error) { showError(error); } };
 $('end-session').onclick = async () => {
+  ++discSelectionGeneration;
+  selectedDiscReady = false;
+  renderStatus(state);
   $('end-session').disabled = true;
   try { await player.destroy(); location.reload(); }
   catch (error) { showError(error, true); }

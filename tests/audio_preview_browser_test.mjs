@@ -320,9 +320,16 @@ try {
 
   await check('authorized-disc import and original CSS emits nonzero PCM', async () => {
     await selectDisc(values.disc);
-    await driver.waitForStart();
+    const cssEntry = await driver.waitForPublicCss();
+    if (cssEntry === 'audio-recovery-required') {
+      report.audio_activation_recovery = 'The player showed its specific suspended-audio message; the test used the separate Play gesture only for that recovery.';
+      await driver.recoverAudioActivation();
+      report.css_entry = 'Audio activation recovery';
+    } else {
+      report.audio_activation_recovery = 'Automatic public launch entered CSS without a Play click.';
+      report.css_entry = 'Automatic public launch';
+    }
     assert(await page.locator('#error-dialog').isHidden());
-    await driver.launch();
     assert(await page.locator('#loading-panel').isHidden(), 'Loading feedback must retire before interactive CSS');
     await page.waitForFunction(() => document.activeElement?.id === 'canvas');
     const before = await trace();
@@ -375,6 +382,37 @@ try {
     await page.waitForTimeout(700);
     await screenshot('source-pause');
     await driver.pressChord(['q', '9', 'm', '7'], {holdMs: 250, releaseMs: 200});
+    await phase(8);
+    await page.waitForTimeout(4500);
+    // No Contest enters the original Results route. Confirm its panels with
+    // ordinary Start press/release edges, matching the bounded public return
+    // recipe; a single LRAS chord only reaches Results.
+    for (let confirmation = 0; confirmation < 8; confirmation++) {
+      if (await page.evaluate(() => Module._melee_web_native_menu_phase()) !== 8) break;
+      await phase(8);
+      await driver.pressChord(['7'], {holdMs: 120, releaseMs: 1380});
+    }
+    assert.notEqual(await page.evaluate(() => Module._melee_web_native_menu_phase()), 8,
+      'Original Results did not finish its bounded Start confirmation sequence');
+    const returnBoundary = await page.waitForFunction(() => {
+      const error = document.querySelector('#status')?.dataset.runtimeError;
+      if (error) return {error};
+      const currentPhase = Module._melee_web_native_menu_phase();
+      return (currentPhase === 1 || currentPhase === 9) && Module._melee_web_native_menu_running() ?
+        {phase: currentPhase} : false;
+    }, null, {timeout: 60000});
+    const returnState = await returnBoundary.jsonValue(); await returnBoundary.dispose();
+    if (returnState.error) throw Error(returnState.error);
+    if (returnState.phase === 9) {
+      for (let confirmation = 0; confirmation < 120; confirmation++) {
+        await phase(9);
+        await driver.pressChord(['7'], {holdMs: 120, releaseMs: 380});
+        const next = await page.evaluate(() => ({phase: Module._melee_web_native_menu_phase(),
+          error: document.querySelector('#status')?.dataset.runtimeError}));
+        if (next.error) throw Error(next.error);
+        if (next.phase !== 9) break;
+      }
+    }
     await phase(1);
     await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
     await observeAudio('css-after-no-contest', before);
@@ -487,6 +525,10 @@ try {
     url: location.href,
     status: document.querySelector('#status')?.textContent || null,
     error: document.querySelector('#error')?.textContent || null,
+    phase: typeof globalThis.Module?._melee_web_native_menu_phase === 'function' ?
+      Module._melee_web_native_menu_phase() : null,
+    running: typeof globalThis.Module?._melee_web_native_menu_running === 'function' ?
+      Module._melee_web_native_menu_running() : null,
     audio: window.audioPreviewTrace?.snapshot?.() || null,
   })).catch(() => null);
   await screenshot('failure').catch(() => {});
