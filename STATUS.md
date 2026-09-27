@@ -12,9 +12,11 @@ death/rejoin check passes. The audited Nana carry extension and exact-function
 patch anchoring now pass A's rendered match/return loops. Shared math fixes from
 the broader task clear the observed screen-KO mismatch in a fresh exact
 all-entity prefix. Expanded costume checks also repair held-A startup input
-ordering and joint-backed Kirby hat selection, but actual G&W copy acquisition
-in a non-neutral Kirby costume still crashes and is being reduced. Final B
-browser validation is advancing with live Zelda/Sheik observations. Original references,
+ordering and joint-backed Kirby hat selection. Actual colored G&W copy testing
+then exposed missing selected-color model cache ownership; the source-loader
+repair now passes every Kirby color's copy lifecycle. Fresh B match/return loops
+pass with repeated Zelda/Sheik switching. Final-candidate A loops, longer original
+replays and the owned-input full suite are running. Original references,
 historical scene-only replay and newer exact bounded state checks are explicitly
 separated in the notes; none establishes draw/pixel/timing equivalence. Final
 donor checks, reconciled full-suite validation and remaining character/action

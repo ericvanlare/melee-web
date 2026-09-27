@@ -69,12 +69,32 @@ and pass after, including malformed consumed-pointer rejection and six real
 donor archives (`work/pr86-kirby-copy-tests-{before,after}.log`). On `02b63aa`,
 all seven forms pass all-costume entry and teardown in both orientations.
 Fox's actual copied-move acquisition/use/loss/reacquisition passes all six
-Kirby colors. The equivalent G&W test exposes a remaining color-1 acquisition
+Kirby colors. The equivalent G&W test exposed a color-1 acquisition
 crash in `HSD_DObjSetFlags` through `ftParts_8007487C` and
 `ftKb_SpecialN_800F14B4` (`work/pr86-kirby-gw-colors-failure-r1.log`). This is
-unfinished copied-part work, not waived by the passing construction or neutral
-donor checks. All other focused character gates still pass in
+not waived by the passing construction or neutral donor checks. The reduced
+pre-operation probe found authored DObj index 0 accessing an empty copied list:
+the selected color's model/material cache was null. `2943d8f` imports the
+selected source costume roots and calls the original selected-color loader,
+then verifies all required cache pointers. Shared-filename rows remain distinct
+cache slots; neutral publication order and malformed-data rejection are retained.
+The rebuilt main trace now passes all six colors for both Fox and G&W copy
+acquisition/use/loss/reacquisition/teardown
+(`work/pr86-selected-copy-all-color-lifecycle-r1.log`). Five copy-owner tests and
+ten browser manifest tests pass; the latter is checked against every authored
+copy-model filename in the pinned source. All other focused character gates pass in
 `work/pr86-costume-copy-character-gates-r1.log`.
+
+The latest B rendered run on `02b63aa` completes natural matches at
+12,744/13,363 source frames, Results at 185/180 frames and both CSS returns.
+Both matches observe Zelda→Sheik→Zelda→Sheik, with zero page/native-command
+errors and no timing interruptions (`work/pr86-candidate-b-two-match-r1/`).
+Its separate reference comparison agrees exactly through tick 8780 (8,781
+ticks; `work/pr86-candidate-b-state-compare-r1.json`), still an incomplete
+per-tick state prefix. Final-candidate `2943d8f` is frozen in
+`work/pr86-final-candidate-frozen`; longer replay, A's final functional loops
+and the owned-input full suite are now running. These pending checks are not
+credited as passes.
 
 The following paragraphs retain the reconciliation chronology; a historical
 failure or passing prefix is not a claim about a later build.
