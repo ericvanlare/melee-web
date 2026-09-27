@@ -7,12 +7,14 @@
 #include "gameplay_source_memory_runtime.h"
 #include "gameplay_menu_host.h"
 #include "gameplay_menu_world.hpp"
+#include "gameplay_save_profile.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <array>
 #include <bit>
 #include <cstdint>
+#include <cstring>
 #include <memory>
 #include <span>
 #include <stdexcept>
@@ -32,7 +34,10 @@ extern "C" {
 #include <melee/gm/types.h>
 #include <melee/gm/gmvsmode.h>
 #include <melee/gm/gmvsmelee.h>
+#include <melee/gm/gmmain_lib.h>
 #include <melee/cm/forward.h>
+#include <melee/ft/forward.h>
+#include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/ef/types.h>
 #include <melee/ef/efasync.h>
 #include <melee/ef/efdata.h>
@@ -41,9 +46,15 @@ extern "C" {
 #include <melee/lb/lblanguage.h>
 #include <melee/ty/types.h>
 #include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/controller.h>
 extern EF_DAT_Entry efAsync_DatEntries[51];
 extern HSD_Archive* _Toy_sbss_804D6ED0;
 HSD_GObj* Player_GetEntity(s32 slot);
+// ftlib.h includes C-only Fighter fields (catch/throw). Use its existing
+// read-only C entry points rather than duplicating a Fighter layout in C++.
+enum_t ftLib_GetMotionId(HSD_GObj*);
+FighterKind ftLib_GetKind(HSD_GObj*);
+CmSubject* ftLib_80086B74(HSD_GObj*);
 extern void* it_804D6D28;
 extern void* it_804D6D40;
 extern void* it_804D6D04;
@@ -109,8 +120,46 @@ static ResultsMatchInfo make_results_match(int opponent_ckind,
 }
 
 static void check_results_teardown();
+static void check_results_fighter_leases(const ResultsMatchInfo&);
 static std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES>
-neutral_pad_snapshot();
+results_pad_snapshot(std::uint32_t copy_winner_buttons = 0);
+
+struct WinnerDemoControl {
+    const char* button_name;
+    std::uint32_t button;
+    int variant;
+    ftCommon_MotionState motion;
+    const char* motion_name;
+};
+// fn_8017A67C consumes CopyPAD B/Y/X, then Player_80036F34 passes the variant
+// to ftDemo_CreateFighter's on_create_fighter table. ft_0BEC supplies these
+// authored demo states; DeadUpStarIce is enum value 5, not DeadUpStar (4).
+static constexpr std::array<WinnerDemoControl, 3> winner_demo_controls{{
+    {"b", PAD_BUTTON_B, 0, ftCo_MS_DeadDown, "ftCo_MS_DeadDown"},
+    {"y", PAD_BUTTON_Y, 1, ftCo_MS_DeadRight, "ftCo_MS_DeadRight"},
+    {"x", PAD_BUTTON_X, 2, ftCo_MS_DeadUpStarIce, "ftCo_MS_DeadUpStarIce"},
+}};
+
+static void check_constructed_winner_demo(const ResultsMatchInfo& result,
+                                         const WinnerDemoControl& control)
+{
+    const auto& winner = result.match_end.player_standings[2];
+    auto* entity = Player_GetEntity(2);
+    if (result.match_end.n_winners != 1 || result.match_end.winners[0] != 2 ||
+        winner.ckind != CKIND_ZELDA || winner.ftkind != FTKIND_SEAK ||
+        HSD_PadCopyStatus[2].button != control.button || !entity || !entity->user_data)
+        throw std::runtime_error("Winner demo lost Zelda-origin Sheik/CopyPAD input identity");
+    const auto motion = ftLib_GetMotionId(entity);
+    if (ftLib_GetKind(entity) != FTKIND_SEAK || motion != control.motion ||
+        !ftLib_80086B74(entity))
+        throw std::runtime_error("Constructed winner demo motion/subject differs: expected " +
+            std::to_string(control.motion) + " observed " + std::to_string(motion));
+    check_results_fighter_leases(result);
+    std::cout << " winner_demo_variant=" << control.variant
+              << " CopyPAD[2].held=" << control.button_name
+              << " winner_demo_motion=" << motion
+              << " name=" << control.motion_name << '\n' << std::flush;
+}
 
 static void draw_results(melee_web::GameplayResultsSession& session)
 {
@@ -123,8 +172,8 @@ static void draw_results(melee_web::GameplayResultsSession& session)
     EM_ASM({ window.resultsFrame = $0; }, session.source_frames());
     emscripten_sleep(16);
 #else
-    // Source callback traversal only: no GPU submission in the Node target.
-    session.draw();
+    (void) session;
+    throw std::runtime_error("Results drawing requires an initialized rendered target");
 #endif
 }
 
@@ -211,13 +260,91 @@ static ResultsMatchInfo make_results_lineup(std::span<const int> ckind)
     return result;
 }
 
+static void (*handoff_original_mode_exit)(GameModeState*);
+static unsigned handoff_mode_exit_calls;
+static void count_handoff_mode_exit(GameModeState* state)
+{
+    ++handoff_mode_exit_calls;
+    handoff_original_mode_exit(state);
+}
+
+static void check_results_handoff_rejection(
+    MeleeWebMenuHost* host, melee_web::GameplayResultsSession& session)
+{
+    // Intentional entry faults, not a reproduction of the historical writer.
+    // The callback probe forwards the real body if invoked; both faulty calls
+    // must reject before reaching it. Restore faults only here in the fixture.
+    auto* const profile = gmMainLib_804D3EE0;
+    auto* const pool = cm_804D645C;
+    if (!profile || profile != gmMainLib_GetProfileRoot() || !pool)
+        throw std::runtime_error("Results handoff fixture has no owned profile/pool");
+    gmm_x0 foreign_profile = *profile;
+    std::array<std::uint8_t, sizeof(foreign_profile)> foreign_before{};
+    std::memcpy(foreign_before.data(), &foreign_profile, foreign_before.size());
+    std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES> profile_before{};
+    std::memcpy(profile_before.data(), profile, profile_before.size());
+    std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> pad_before{};
+    melee_web_pad_state_capture(pad_before.data());
+    const auto before = melee_web_gameplay_stats();
+    const auto frames = session.source_frames();
+    const auto seed = session.random_seed();
+    const int next = melee_web_vs_mode_next_state();
+    const int phase = melee_web_menu_host_phase(host);
+    handoff_original_mode_exit = gm_Mode_Vs_States[4].on_exit;
+    handoff_mode_exit_calls = 0;
+    struct RestoreFaults {
+        gmm_x0* profile;
+        CmSubject* pool;
+        ~RestoreFaults() {
+            gmMainLib_804D3EE0 = profile;
+            cm_804D645C = pool;
+            gm_Mode_Vs_States[4].on_exit = handoff_original_mode_exit;
+        }
+    } restore{profile, pool};
+    gm_Mode_Vs_States[4].on_exit = count_handoff_mode_exit;
+    const auto reject = [&](bool profile_fault) {
+        char error[256]{};
+        if (profile_fault) gmMainLib_804D3EE0 = &foreign_profile;
+        else cm_804D645C = nullptr;
+        const int accepted = melee_web_menu_host_results_exit(host, error, sizeof(error));
+        gmMainLib_804D3EE0 = profile;
+        cm_804D645C = pool;
+        const std::string failure = error;
+        const char* expected = profile_fault ?
+            "Results mode OnExit entry: Original save/profile root is not the owned backing" :
+            "Original Results camera pool ownership changed at mode OnExit entry";
+        if (accepted || !failure.starts_with(expected) || handoff_mode_exit_calls)
+            throw std::runtime_error("Results handoff did not reject before callback: " + failure);
+        if (!profile_fault && (failure.find("context_pool=") == std::string::npos ||
+                               failure.find("initial=") == std::string::npos))
+            throw std::runtime_error("Results handoff omitted camera triple");
+        std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> pad_after{};
+        melee_web_pad_state_capture(pad_after.data());
+        const auto after = melee_web_gameplay_stats();
+        if (std::memcmp(profile_before.data(), profile, profile_before.size()) ||
+            std::memcmp(foreign_before.data(), &foreign_profile, foreign_before.size()) ||
+            pad_after != pad_before || session.source_frames() != frames ||
+            session.random_seed() != seed || melee_web_vs_mode_next_state() != next ||
+            melee_web_menu_host_phase(host) != phase || before.ticks != after.ticks ||
+            before.generation != after.generation || before.objects != after.objects ||
+            before.processes != after.processes || before.heap_free_bytes != after.heap_free_bytes)
+            throw std::runtime_error("Rejected Results handoff changed profile/PAD/source state");
+        std::cout << " rejected " << (profile_fault ? "profile root" : "camera pool")
+                  << " before mode OnExit" << std::flush;
+    };
+    reject(true);
+    reject(false);
+}
+
 static int run_real_lineup(const melee_web::RuntimeFiles& files,
                            std::span<const int> roster,
                            const char* roster_name, bool sheik_confirm = false,
                            bool mode_exit = false, bool draw = false,
                            bool sheik_standing = false,
                            bool pool_guard = false, bool host_route = false,
-                           bool stock = false, bool delayed_confirmation = false)
+                           bool stock = false, bool delayed_confirmation = false,
+                           bool handoff_guard = false,
+                           const WinnerDemoControl* winner_demo = nullptr)
 {
     char error[256]{};
     if (!melee_web_gameplay_session_begin(32U * 1024U * 1024U,
@@ -225,7 +352,7 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
         throw std::runtime_error(error);
     bool ended = false;
     try {
-        const auto input_bytes = neutral_pad_snapshot();
+        const auto input_bytes = results_pad_snapshot(winner_demo ? winner_demo->button : 0);
         std::unique_ptr<MeleeWebPadState, decltype(&melee_web_pad_state_free)> input(
             melee_web_pad_state_decode(input_bytes.data(), input_bytes.size(),
                                        error, sizeof(error)),
@@ -268,6 +395,14 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
         }
         melee_web::GameplayResultsSession session(files, result, 0x13579bdfU,
                                                    *input);
+        if (winner_demo) {
+            check_constructed_winner_demo(result, *winner_demo);
+#if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
+            std::cout << "draw_scope=rendered-GPU\n" << std::flush;
+#else
+            std::cout << "draw_scope=unrun native-state-only\n" << std::flush;
+#endif
+        }
         const auto initial_pool = cm_804D645C;
         const auto check_pool = [&](const char* phase) {
             if (cm_804D645C != initial_pool) {
@@ -282,10 +417,16 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
             throw std::runtime_error("Results scene advanced during construction");
         PADStatus neutral[4]{};
         neutral[2].err = neutral[3].err = -1;
+        unsigned draw_api_calls = 0;
+        const auto draw_frame = [&] {
+            draw_results(session);
+            ++draw_api_calls;
+            check_pool("draw/submission");
+        };
         for (unsigned tick = 0; tick < 2; ++tick) {
             session.tick(neutral);
             check_pool("tick");
-            if (draw) { draw_results(session); check_pool("draw/submission"); }
+            if (draw) draw_frame();
         }
         if (session.source_frames() != 2 || session.requested())
             throw std::runtime_error("Short Results tick changed source transition state");
@@ -321,14 +462,14 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
         }
         if (sheik_confirm) {
             float pcm[1068]; unsigned audio_phase = 0;
-            for (unsigned tick = 0; tick < 900 && !session.requested(); ++tick) {
+            for (unsigned tick = 0; !handoff_guard && tick < 900 && !session.requested(); ++tick) {
                 PADStatus pads[4]{};
                 pads[2].err = pads[3].err = -1;
                 if (tick >= (delayed_confirmation ? 600U : 240U) && tick % 90 == 0)
                     pads[0].button = pads[1].button = PAD_BUTTON_START;
                 session.tick(pads);
                 check_pool("tick");
-                if (draw) { draw_results(session); check_pool("draw/submission"); }
+                if (draw) draw_frame();
                 audio_phase += 32000;
                 const unsigned samples = audio_phase / 60;
                 audio_phase %= 60;
@@ -336,11 +477,20 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                                              error, sizeof(error)))
                     throw std::runtime_error(error);
             }
-            if (!session.requested())
+            if (!handoff_guard && !session.requested())
                 throw std::runtime_error("Four-CPU Sheik-winner Results confirmation did not finish");
+            if (winner_demo) {
+                if (session.source_frames() != 744 || draw_api_calls != (draw ? 744U : 0U))
+                    throw std::runtime_error("Winner demo did not cover its declared delayed Results frames/draw calls");
+                // Counts API calls, not GPU draws: source transition==2 retains
+                // the existing source draw suppression inside the context.
+                std::cout << " winner_demo_delayed_frames=" << session.source_frames()
+                          << " source_draw_api_calls=" << draw_api_calls << '\n';
+            }
             session.exit_scene();
             check_pool("scene OnExit");
             if (host) {
+                if (handoff_guard) check_results_handoff_rejection(host, session);
                 if (!melee_web_menu_host_results_exit(host, error, sizeof(error)))
                     throw std::runtime_error(error);
                 check_pool("host mode OnExit and route commit");
@@ -427,7 +577,8 @@ static void check_results_fighter_leases(const ResultsMatchInfo& result)
     }
 }
 
-static std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> neutral_pad_snapshot()
+static std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES>
+results_pad_snapshot(std::uint32_t copy_winner_buttons)
 {
     std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> bytes{};
     std::size_t offset = 0;
@@ -446,6 +597,18 @@ static std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> neutral_pad_snapshot(
     u8(1); u8(140); u8(0); u8(1); u8(140); u8(0);
     i8(80); u8(140); u8(140); u8(0); u8(0); u8(0);
     if (offset != 30) throw std::runtime_error("PAD snapshot encoder drifted");
+    for (unsigned bank = 0; bank < 3; ++bank) {
+        for (unsigned slot = 0; slot < 4; ++slot) {
+            // Semantic retained input, applied by the existing Results context
+            // before OnEnter. Never write a Fighter/Results variant or RNG.
+            u32(bank == 1 && slot == 2 ? copy_winner_buttons : 0);
+            for (unsigned field = 0; field < 5; ++field) u32(0);
+            for (unsigned field = 0; field < 8; ++field) u8(0);
+            for (unsigned field = 0; field < 8; ++field) f32(0.0f);
+            u8(0); i8(0);
+        }
+    }
+    if (offset != bytes.size()) throw std::runtime_error("PAD history encoder drifted");
     return bytes;
 }
 
@@ -459,7 +622,7 @@ static int run_real_roster(const melee_web::RuntimeFiles& files,
         throw std::runtime_error(error);
     bool ended = false;
     try {
-        auto input_bytes = neutral_pad_snapshot();
+        auto input_bytes = results_pad_snapshot();
         std::unique_ptr<MeleeWebPadState, decltype(&melee_web_pad_state_free)> input(
             melee_web_pad_state_decode(input_bytes.data(), input_bytes.size(),
                                        error, sizeof(error)),
@@ -600,27 +763,43 @@ int main(int argc,char** argv){try{
                          command == "--real-enabled-confirm";
     const bool lineup_a = command == "--lineup-a";
     const bool pool_guard = command == "--lineup-b-camera-pool-guard";
+    const bool handoff_guard = command == "--lineup-b-results-handoff-guard";
+    const WinnerDemoControl* winner_demo = nullptr;
+    bool variant_state_only = false;
+    for (const auto& control : winner_demo_controls) {
+        const std::string prefix =
+            std::string("--lineup-b-zelda-sheik-stock-delayed-demo-") + control.button_name;
+        if (command == prefix + "-host-state" || command == prefix + "-host-draw") {
+            winner_demo = &control;
+            variant_state_only = command == prefix + "-host-state";
+        }
+    }
     // Keep the Zelda-origin transformed standing distinct from an external
     // Sheik standing: Results world assets are selected using external ckind.
     const bool zelda_sheik_host =
-        command == "--lineup-b-zelda-sheik-stock-delayed-host-draw";
+        command == "--lineup-b-zelda-sheik-stock-delayed-host-draw" || winner_demo;
     const bool delayed_confirmation =
         command == "--lineup-b-sheik-stock-delayed-mode-exit" ||
         command == "--lineup-b-sheik-stock-delayed-host-draw" || zelda_sheik_host;
     const bool stock = command == "--lineup-b-sheik-stock-mode-exit" ||
-                       command == "--lineup-b-sheik-stock-host-draw" || delayed_confirmation;
-    const bool host_route = command == "--lineup-b-sheik-host-draw" ||
+                       command == "--lineup-b-sheik-stock-host-draw" || delayed_confirmation ||
+                       handoff_guard;
+    const bool host_draw = command == "--lineup-b-sheik-host-draw" ||
                             command == "--lineup-b-sheik-stock-host-draw" ||
                             command == "--lineup-b-sheik-stock-delayed-host-draw" ||
-                            zelda_sheik_host;
-    const bool draw = command == "--lineup-b-sheik-draw" || host_route;
+                            (zelda_sheik_host && !variant_state_only);
+    const bool host_route = host_draw || handoff_guard || variant_state_only;
+    const bool draw = command == "--lineup-b-sheik-draw" || host_draw;
 #if !defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
     if (draw)
         throw std::runtime_error("Draw diagnostics require MELEE_WEB_RESULTS_RENDERED_TRACE; Node does not submit GX frames");
+#else
+    if (variant_state_only)
+        throw std::runtime_error("Native state-only control requires the Node target; use -host-draw for rendered GPU");
 #endif
-    const bool sheik_standing = !zelda_sheik_host &&
+    const bool sheik_standing = !zelda_sheik_host && !handoff_guard &&
         (command == "--lineup-b-sheik-mode-exit" || stock || draw);
-    const bool mode_exit = sheik_standing || zelda_sheik_host ||
+    const bool mode_exit = sheik_standing || zelda_sheik_host || handoff_guard ||
                            command == "--lineup-b-zelda-sheik-mode-exit";
     const bool sheik_confirm = command == "--lineup-b-sheik-confirm" || mode_exit;
     const bool lineup_b = command == "--lineup-b" || sheik_confirm || pool_guard;
@@ -628,7 +807,7 @@ int main(int argc,char** argv){try{
                              lineup_a || lineup_b;
     if ((!real_roster && argc != 3) || (real_roster && argc != 5))
         throw std::runtime_error(real_roster ?
-            "Expected --real-mario/--real-eight/--real-enabled[-confirm]/--lineup-a/--lineup-b[-sheik-confirm/-zelda-sheik-mode-exit/-sheik-mode-exit/-sheik-draw/-sheik-host-draw/-camera-pool-guard] <common/fighter> <Results shared/music> <Results fighters>" :
+            "Expected --real-mario/--real-eight/--real-enabled[-confirm]/--lineup-a/--lineup-b[-sheik-confirm/-zelda-sheik-mode-exit/-sheik-mode-exit/-sheik-draw/-sheik-host-draw/-camera-pool-guard/-results-handoff-guard/-zelda-sheik-stock-delayed-demo-{b,y,x}-host-{state,draw}] <common/fighter> <Results shared/music> <Results fighters>" :
             "Expected common/fighter and Results asset directories");
     melee_web::RuntimeFiles files;
     const int first_directory = real_roster ? 2 : 1;
@@ -645,7 +824,7 @@ int main(int argc,char** argv){try{
                                                  std::span<const int>(b),
                                lineup_a ? "A" : "B", sheik_confirm, mode_exit, draw,
                                sheik_standing, pool_guard, host_route, stock,
-                               delayed_confirmation);
+                               delayed_confirmation, handoff_guard, winner_demo);
 #if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
         EM_ASM({ window.resultsDone = $0; }, status);
 #endif

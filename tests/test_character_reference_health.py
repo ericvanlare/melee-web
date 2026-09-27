@@ -17,6 +17,13 @@ class CharacterReferenceHealthTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn('rejects disconnected', result.stdout)
 
+    def test_received_preload_bytes_and_http_failure(self):
+        result = subprocess.run(
+            [str(node_runtime()), str(ROOT / 'tests/results_preload_observer_test.mjs')],
+            capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Exact received preload bytes/hash', result.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()

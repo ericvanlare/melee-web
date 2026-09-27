@@ -33,7 +33,9 @@ uint32_t melee_web_results_context_ticks(const MeleeWebResultsContext*);
 /* Run scene OnExit before the enclosing mode OnExit. Keep scene assets/heap
  * resident until end(), matching the original scene-manager ordering. */
 int melee_web_results_context_exit(MeleeWebResultsContext*, char*, size_t);
-int melee_web_results_context_exit_ready(void);
+/* Read-only enclosing-mode handoff check after scene OnExit and before end().
+ * Reuses the exact camera triple and reports the caller's boundary phase. */
+int melee_web_results_context_check_handoff(const char* phase, char*, size_t);
 int melee_web_results_context_end(MeleeWebResultsContext*, char* error, size_t error_size);
 
 #ifdef __cplusplus

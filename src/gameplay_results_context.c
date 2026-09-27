@@ -507,10 +507,14 @@ int melee_web_results_context_exit(MeleeWebResultsContext* context,
     return ok(error, error_size);
 }
 
-int melee_web_results_context_exit_ready(void)
+int melee_web_results_context_check_handoff(const char* phase,
+                                           char* error, size_t error_size)
 {
-    return owner && !owner->scene_entered && !owner->drawing &&
-        live(owner, NULL, 0);
+    if (!phase || !owner || owner->scene_entered || owner->drawing)
+        return fail(error, error_size, "Results mode exit requires its live source world");
+    if (!live(owner, error, error_size)) return 0;
+    if (!camera_pool_owned(owner, phase, NULL, error, error_size)) return 0;
+    return ok(error, error_size);
 }
 
 int melee_web_results_context_end(MeleeWebResultsContext* context,
