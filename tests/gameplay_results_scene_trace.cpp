@@ -1,6 +1,9 @@
 #include "gameplay_compat.h"
 #include "gameplay_results_assets.hpp"
 #include "gameplay_results_session.hpp"
+#include "gameplay_match_session.hpp"
+#include "gameplay_match_rules.h"
+#include "gameplay_asset_manifest.hpp"
 #include "gameplay_bootstrap.h"
 #include "gameplay_content.h"
 #include "gameplay_pad_state.h"
@@ -13,10 +16,12 @@
 #include <iostream>
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <span>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -38,6 +43,7 @@ extern "C" {
 #include <melee/cm/forward.h>
 #include <melee/ft/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
+#include <melee/ft/kinds/ftZelda/forward.h>
 #include <melee/ef/types.h>
 #include <melee/ef/efasync.h>
 #include <melee/ef/efdata.h>
@@ -65,6 +71,7 @@ extern void* it_804D6D38;
 void Item_80266FA8(void);
 void Item_80266FCC(void);
 extern CmSubject* cm_804D645C;
+extern ResultsData lbl_8046DBE8;
 int melee_web_vs_mode_begin(void);
 int melee_web_vs_mode_end(void);
 int melee_web_vs_mode_select_state(int);
@@ -336,6 +343,90 @@ static void check_results_handoff_rejection(
     reject(false);
 }
 
+// Reads the original typed Results/PAD state; never supplies a page, phase,
+// trigger, or confirmation flag. These source ticks are a chosen discriminator,
+// not a conversion of the historical browser's wall-clock Enter pulses.
+struct P1StatisticsControl {
+    std::array<unsigned, 2> auto_page_tick{};
+    std::array<unsigned, 4> last_pages{};
+    unsigned edges = 0, releases = 0, held_ticks = 0;
+    int last_phase = -1, last_stats_phase = -1;
+
+    static bool held(unsigned tick)
+    {
+        return (tick >= 180 && tick < 190) ||
+               (tick >= 360 && tick < 370) ||
+               (tick >= 600 && tick < 610);
+    }
+    void prepare(unsigned tick, PADStatus (&pads)[4]) const
+    {
+        if (tick == 600) {
+            const auto& data = lbl_8046DBE8;
+            if (!auto_page_tick[0] || !auto_page_tick[1] || data.x1 != 3 ||
+                data.player_data[2].page != 1 || data.player_data[3].page != 1)
+                throw std::runtime_error("P1 statistics: both disconnected CPU pages must auto-advance before confirmation");
+            std::cout << "p1-statistics before-confirm tick=600 auto_pages=1,1 auto_page_ticks="
+                      << auto_page_tick[0] << ',' << auto_page_tick[1] << '\n' << std::flush;
+        }
+        if (held(tick)) pads[0].button = PAD_BUTTON_START;
+    }
+    void observe(unsigned tick)
+    {
+        const auto& data = lbl_8046DBE8;
+        const bool edge = tick == 180 || tick == 360 || tick == 600;
+        const bool release = tick == 190 || tick == 370 || tick == 610;
+        for (unsigned slot = 0; slot < 4; ++slot) {
+            const auto& pad = HSD_PadCopyStatus[slot];
+            if (pad.err != (slot < 2 ? 0 : -1) ||
+                HSD_PadMasterStatus[slot].err != pad.err ||
+                pad.button != (slot == 0 && held(tick) ? PAD_BUTTON_START : 0) ||
+                pad.trigger != (slot == 0 && edge ? PAD_BUTTON_START : 0) ||
+                pad.release != (slot == 0 && release ? PAD_BUTTON_START : 0))
+                throw std::runtime_error("P1 statistics: source PAD edge/held/connectivity differs at tick " + std::to_string(tick));
+        }
+        edges += edge; releases += release; held_ticks += held(tick);
+        if (edge || release)
+            std::cout << "p1-statistics input tick=" << tick << " port=0 held="
+                      << held(tick) << " trigger=" << edge << " release=" << release
+                      << " phase=" << unsigned(data.x1) << '\n' << std::flush;
+        std::array<unsigned, 4> pages{};
+        for (unsigned slot = 0; slot < 4; ++slot) {
+            pages[slot] = data.player_data[slot].page;
+            if (slot < 2 && pages[slot] != 0)
+                throw std::runtime_error("P1 statistics: connected neutral CPU unexpectedly changed page");
+            if (slot >= 2 && pages[slot] != last_pages[slot]) {
+                if (last_pages[slot] != 0 || pages[slot] != 1 ||
+                    data.x1 != 3 || data.x0_23 != 2 || tick >= 600 ||
+                    HSD_PadCopyStatus[slot].err != -1)
+                    throw std::runtime_error("P1 statistics: disconnected CPU page transition is not the required source auto-advance");
+                auto_page_tick[slot - 2] = tick;
+                std::cout << "p1-statistics auto-page slot=" << slot
+                          << " from=0 to=1 tick=" << tick << '\n' << std::flush;
+            }
+        }
+        if (last_phase != data.x1 || last_stats_phase != data.x0_23 || pages != last_pages) {
+            std::cout << "p1-statistics state tick=" << tick << " phase=" << unsigned(data.x1)
+                      << " stats_phase=" << unsigned(data.x0_23) << " pages="
+                      << pages[0] << ',' << pages[1] << ',' << pages[2] << ',' << pages[3]
+                      << " timers=" << data.player_data[2].x2 << ',' << data.player_data[3].x2
+                      << '\n' << std::flush;
+            last_phase = data.x1; last_stats_phase = data.x0_23; last_pages = pages;
+        }
+        if (data.x1 == 4 && (tick < 600 || !auto_page_tick[0] || !auto_page_tick[1]))
+            throw std::runtime_error("P1 statistics: Results confirmed before both disconnected CPU pages advanced");
+    }
+    void finish(unsigned frames, unsigned draws, bool draw) const
+    {
+        if (frames <= 610 || frames > 900 || edges != 3 || releases != 3 || held_ticks != 30 ||
+            !auto_page_tick[0] || !auto_page_tick[1] || lbl_8046DBE8.x1 != 4 ||
+            draws != (draw ? frames : 0))
+            throw std::runtime_error("P1 statistics: incomplete held-input/page/exit coverage");
+        std::cout << "p1-statistics coverage frames=" << frames << " trigger_edges=" << edges
+                  << " releases=" << releases << " held_ticks=" << held_ticks
+                  << " auto_pages=1,1 source_draw_api_calls=" << draws << '\n' << std::flush;
+    }
+};
+
 static int run_real_lineup(const melee_web::RuntimeFiles& files,
                            std::span<const int> roster,
                            const char* roster_name, bool sheik_confirm = false,
@@ -344,7 +435,8 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                            bool pool_guard = false, bool host_route = false,
                            bool stock = false, bool delayed_confirmation = false,
                            bool handoff_guard = false,
-                           const WinnerDemoControl* winner_demo = nullptr)
+                           const WinnerDemoControl* winner_demo = nullptr,
+                           bool p1_statistics = false)
 {
     char error[256]{};
     if (!melee_web_gameplay_session_begin(32U * 1024U * 1024U,
@@ -395,6 +487,19 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
         }
         melee_web::GameplayResultsSession session(files, result, 0x13579bdfU,
                                                    *input);
+        P1StatisticsControl statistics_control;
+        if (p1_statistics) {
+            if (!host || result.match_end.match_kind != MatchKind_Stock ||
+                result.match_end.player_standings[2].ckind != CKIND_ZELDA ||
+                result.match_end.player_standings[2].ftkind != FTKIND_SEAK)
+                throw std::runtime_error("P1 statistics lost original synthetic Stock 18/7 host setup");
+            check_results_fighter_leases(result);
+            std::cout << "\np1-statistics seed=324508639 connected=0,1 disconnected=2,3"
+                         " pulse_ticks=180,360,600 hold_ticks=10 cap=900"
+                         " scope=chosen-source-ticks-not-historical-replay host_profile=default-CSS-subset"
+                      << " draw_scope=" << (draw ? "rendered-GPU" : "unrun native-state-only")
+                      << '\n' << std::flush;
+        }
         if (winner_demo) {
             check_constructed_winner_demo(result, *winner_demo);
 #if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
@@ -462,13 +567,17 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
         }
         if (sheik_confirm) {
             float pcm[1068]; unsigned audio_phase = 0;
-            for (unsigned tick = 0; !handoff_guard && tick < 900 && !session.requested(); ++tick) {
+            for (unsigned tick = 0; !handoff_guard && tick < 900 && !session.requested() &&
+                                   (!p1_statistics || session.source_frames() < 900); ++tick) {
                 PADStatus pads[4]{};
                 pads[2].err = pads[3].err = -1;
-                if (tick >= (delayed_confirmation ? 600U : 240U) && tick % 90 == 0)
+                if (p1_statistics)
+                    statistics_control.prepare(session.source_frames() + 1, pads);
+                else if (tick >= (delayed_confirmation ? 600U : 240U) && tick % 90 == 0)
                     pads[0].button = pads[1].button = PAD_BUTTON_START;
                 session.tick(pads);
                 check_pool("tick");
+                if (p1_statistics) statistics_control.observe(session.source_frames());
                 if (draw) draw_frame();
                 audio_phase += 32000;
                 const unsigned samples = audio_phase / 60;
@@ -479,6 +588,8 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
             }
             if (!handoff_guard && !session.requested())
                 throw std::runtime_error("Four-CPU Sheik-winner Results confirmation did not finish");
+            if (p1_statistics)
+                statistics_control.finish(session.source_frames(), draw_api_calls, draw);
             if (winner_demo) {
                 if (session.source_frames() != 744 || draw_api_calls != (draw ? 744U : 0U))
                     throw std::runtime_error("Winner demo did not cover its declared delayed Results frames/draw calls");
@@ -494,6 +605,8 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                 if (!melee_web_menu_host_results_exit(host, error, sizeof(error)))
                     throw std::runtime_error(error);
                 check_pool("host mode OnExit and route commit");
+                if (p1_statistics && melee_web_menu_host_results_destination(host) != gmVsMode_State_Css)
+                    throw std::runtime_error("P1 statistics: synthetic all-CPU host did not select CSS");
                 std::cout << " host OnExit+commit tick=" << session.source_frames()
                           << " initial_pool=" << initial_pool
                           << " source_pool=" << cm_804D645C << '\n' << std::flush;
@@ -551,6 +664,259 @@ static void check_results_teardown()
     if (melee_web_gameplay_world_exists() || HSD_GObj_Entities ||
         efAsync_DatEntries[0].data || efAsync_DatEntries[1].data)
         throw std::runtime_error("Real Results session retained source ownership");
+}
+
+static void draw_history_match(melee_web::GameplayMatchSession& match)
+{
+#if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
+    aurora_update();
+    if (!aurora_begin_frame())
+        throw std::runtime_error("Rendered match-history frame is unavailable");
+    match.draw();
+    aurora_end_frame();
+    EM_ASM({ window.matchFrame = $0; }, match.source_frames());
+    emscripten_sleep(16);
+#else
+    (void) match;
+    throw std::runtime_error("Match-history drawing requires an initialized rendered target");
+#endif
+}
+
+// Unlike run_real_lineup, this lane never manufactures standings. Only the
+// initial match configuration is fixture-authored; all subsequent changes come
+// from source ticks and raw PAD. The existing host retains its default CSS/save
+// profile, so this is explicitly not a four-player CSS or CPU9/reference replay.
+static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
+{
+    char error[256]{};
+    const auto require = [&](bool ok, const char* message) {
+        if (!ok) throw std::runtime_error(message);
+    };
+    require(melee_web_gameplay_session_begin(32U * 1024U * 1024U,
+                                               error, sizeof(error)), error);
+    auto* host = prepare_results_host(files);
+    const auto arena = melee_web_gameplay_allocation();
+    const auto check_arena = [&](const char* phase) {
+        const auto current = melee_web_gameplay_allocation();
+        require(arena.identity && current.identity == arena.identity &&
+                current.generation == arena.generation && current.bytes == arena.bytes,
+                phase);
+    };
+    MeleeWebMenuMatchSelection selection{};
+    require(melee_web_menu_host_selection(host, &selection, error, sizeof(error)), error);
+    const auto host_seed = selection.random_seed;
+    std::cout << "Match-history B host_profile=default-CSS-subset"
+              << " host_selected_players=" << selection.player_count
+              << " host_hud_layout=" << selection.hud_layout
+              << " host_seed=" << host_seed
+              << " arena=" << arena.identity << " arena_generation=" << arena.generation
+              << " draw_scope=" << (draw ? "rendered-GPU" : "unrun native-state-only")
+              << '\n' << std::flush;
+    constexpr std::array<int, 4> roster = {
+        CKIND_SAMUS, CKIND_YOSHI, CKIND_ZELDA, CKIND_FALCO,
+    };
+    // Configure the typed pre-construction payload, never live Player/Fighter
+    // fields. Preserve the actual host RNG and semantic initial PAD history.
+    const auto human_template = selection.start.players[0];
+    selection.player_count = 4;
+    require(selection.hud_layout == 4 && selection.start.rules.x0_3 == 4,
+            "Match-history host did not retain the original four-slot VS HUD");
+    selection.start.rules.match_kind = MatchKind_Stock;
+    selection.start.rules.is_stock = true;
+    selection.start.rules.is_vs = true;
+    selection.start.rules.xB = -1;
+    for (unsigned slot = 0; slot < 4; ++slot) {
+        auto& player = selection.start.players[slot];
+        player = human_template;
+        player.ckind = roster[slot];
+        player.slot_type = Gm_PKind_Human;
+        player.slot = slot + 1;
+        player.color = player.sub_color = 0;
+        player.stocks = 4;
+        player.rumble_enabled = 0;
+        selection.players[slot] = {slot, 4, 0, 0};
+    }
+    require(selection.start.rules.stkind == St_Kind_Last,
+            "Match-history host did not supply Final Destination");
+    // Let the private rendered pack use the actual production descriptors for
+    // this selection, not a whole asset corpus or a hand-maintained file list.
+    std::set<std::string> assets;
+    for (const auto& names : {melee_web::menu_asset_names(),
+                              melee_web::match_asset_names(selection),
+                              melee_web::results_asset_names(selection)})
+        assets.insert(names.begin(), names.end());
+    for (const auto& name : assets)
+        std::cout << "match-history asset=" << name << '\n';
+    const auto* initial_input = melee_web_menu_host_input(host);
+    require(initial_input != nullptr, "Match-history host did not retain source PAD");
+    melee_web::GameplayMatchSession match(files, selection, *initial_input);
+    check_arena("Match-history match construction replaced session arena");
+    const auto match_generation = melee_web_gameplay_generation();
+    unsigned match_ticks = 0, match_draws = 0, audio_phase = 0;
+    float pcm[1068];
+    PADStatus pads[4]{}; // Four connected human ports throughout this lane.
+    std::array<int, 4> stocks{4, 4, 4, 4};
+    std::array<unsigned, 4> losses{};
+    const auto tick_match = [&] {
+        require(match_ticks < 6000, "Match-history exceeded 6000 raw PAD ticks");
+        match.tick(pads); ++match_ticks;
+        audio_phase += 32000;
+        const unsigned samples = audio_phase / 60; audio_phase %= 60;
+        require(melee_web_audio_render(match.audio(), pcm, samples, error, sizeof(error)), error);
+        if (draw) { draw_history_match(match); ++match_draws; }
+        for (unsigned slot = 0; slot < 4; ++slot) {
+            const auto state = match.player_stats(slot);
+            require(std::isfinite(state.position[0]) && std::isfinite(state.position[1]),
+                    "Match-history produced a nonfinite source position");
+            require(state.stocks >= 0 && state.stocks <= stocks[slot],
+                    "Match-history stocks increased or became negative");
+            if (state.stocks != stocks[slot]) {
+                require(slot != 2 && state.stocks == stocks[slot] - 1,
+                        "Match-history lost winner stock or skipped a stock boundary");
+                ++losses[slot]; stocks[slot] = state.stocks;
+                std::cout << "match-history stock-loss slot=" << slot
+                          << " stocks=" << state.stocks << " motion=" << state.motion_id
+                          << " source_frame=" << match.source_frames() << '\n' << std::flush;
+            }
+        }
+    };
+    for (unsigned slot = 0; slot < 4; ++slot) {
+        require(match.player_stats(slot).stocks == 4 &&
+                match.fighter_kind(slot) == melee_web_fighter_content(roster[slot])->fighter_kind,
+                "Match-history source initialization changed roster/stocks");
+    }
+    for (unsigned n = 0; n < 600 && !match.ready(); ++n) tick_match();
+    require(match.ready(), "Match-history original Ready did not complete");
+    for (unsigned n = 0; n < 240 &&
+         (match.player_stats(2).ground_or_air != 0 ||
+          match.player_stats(2).motion_id != ftCo_MS_Wait); ++n) tick_match();
+    require(match.player_stats(2).motion_id == ftCo_MS_Wait &&
+            match.player_stats(2).ground_or_air == 0 && match.fighter_kind(2) == FTKIND_ZELDA,
+            "Match-history P3 (source slot 2) did not settle as grounded Zelda");
+    pads[2].stickY = -80; pads[2].button = PAD_BUTTON_B;
+    tick_match(); pads[2] = {};
+    bool down_b_observed = false;
+    for (unsigned n = 0; n < 240; ++n) {
+        const auto state = match.player_stats(2);
+        down_b_observed |= state.motion_id == ftZd_MS_SpecialLw ||
+                           state.motion_id == ftZd_MS_SpecialLw2;
+        if (state.fighter_kind == FTKIND_SEAK) break;
+        tick_match();
+    }
+    require(down_b_observed && match.fighter_kind(2) == FTKIND_SEAK,
+            "Match-history ordinary P3 (source slot 2) down-B did not transform Zelda to Sheik");
+    std::cout << "match-history P3 (source slot 2) down-B Zelda->Sheik source_frame="
+              << match.source_frames() << '\n' << std::flush;
+    // Steer each surviving loser away from the idle winner. Rebirth and all
+    // four stock losses are original source behavior, not placement/KO writes.
+    for (unsigned n = 0; n < 4200 && (stocks[0] || stocks[1] || stocks[3]); ++n) {
+        const auto winner = match.player_stats(2);
+        for (const unsigned slot : {0U, 1U, 3U}) {
+            pads[slot] = {};
+            if (stocks[slot])
+                pads[slot].stickX = match.player_stats(slot).position[0] < winner.position[0] ? -80 : 80;
+        }
+        tick_match();
+    }
+    require(losses == std::array<unsigned, 4>{4, 4, 0, 4} && stocks[2] == 4,
+            "Match-history raw walkoffs did not remove all twelve losing stocks");
+    for (auto& pad : pads) pad = {};
+    for (unsigned n = 0; n < 600 && !match.complete(); ++n) tick_match();
+    require(match.complete() && match.fighter_kind(2) == FTKIND_SEAK,
+            "Match-history did not reach source completion with P3 (source slot 2) Sheik active");
+    const auto match_seed = match.random_seed();
+    std::array<uint8_t, MELEE_WEB_PAD_STATE_BYTES> final_match_input{};
+    melee_web_pad_state_capture(final_match_input.data()); // Before close restores external PAD.
+    const auto source_frames = match.source_frames();
+    match.close();
+    require(!melee_web_gameplay_world_exists() && !HSD_GObj_Entities,
+            "Match-history teardown retained its source world");
+    check_arena("Match-history teardown replaced session arena");
+    MatchExitInfo terminal{};
+    require(melee_web_match_rules_terminal_data(&terminal),
+            "Match-history source close did not publish MatchExitInfo");
+    const auto& end = terminal.match_end;
+    require(end.outcome == OUTCOME_ELIMINATION && end.match_kind == MatchKind_Stock &&
+            end.n_winners == 1 && end.winners[0] == 2 &&
+            end.player_standings[2].ftkind == FTKIND_SEAK,
+            "Match-history source terminal was not sole P3 (source slot 2) Sheik Stock elimination");
+    std::cout << "match-history source-terminal winner=2 winner_ckind="
+              << int(end.player_standings[2].ckind) << " winner_ftkind="
+              << int(end.player_standings[2].ftkind) << " source_frame=" << source_frames
+              << " raw_ticks=" << match_ticks << " match_draw_api_calls=" << match_draws
+              << " match_exit_seed=" << match_seed << " losses=4,4,0,4\n" << std::flush;
+    ResultsMatchInfo result{};
+    require(melee_web_menu_host_results_begin(host, &terminal, match_seed, &result,
+                                                error, sizeof(error)), error);
+    std::unique_ptr<MeleeWebPadState, decltype(&melee_web_pad_state_free)> results_input(
+        melee_web_pad_state_decode(final_match_input.data(), final_match_input.size(),
+                                   error, sizeof(error)), melee_web_pad_state_free);
+    require(results_input != nullptr, error);
+    melee_web::GameplayResultsSession results(files, result, match_seed, *results_input);
+    check_arena("Match-history Results construction replaced session arena");
+    require(melee_web_gameplay_generation() != match_generation,
+            "Match-history Results reused the match world generation");
+    check_results_fighter_leases(result);
+    auto* winner = Player_GetEntity(2);
+    require(winner && ftLib_GetKind(winner) == FTKIND_SEAK && ftLib_80086B74(winner),
+            "Match-history Results lost its source Sheik winner/subject");
+    const auto pool = cm_804D645C;
+    const auto check_pool = [&](const char* phase) {
+        require(pool && cm_804D645C == pool, phase);
+    };
+    std::cout << "match-history Results winner_demo_motion=" << ftLib_GetMotionId(winner)
+              << " source_pool=" << pool << " arena_reused=1\n" << std::flush;
+    unsigned results_draws = 0;
+    audio_phase = 0;
+    for (unsigned tick = 0; tick < 1200 && !results.requested(); ++tick) {
+        for (auto& pad : pads) pad = {};
+        if (tick >= 600 && tick % 90 == 0)
+            for (auto& pad : pads) pad.button = PAD_BUTTON_START;
+        results.tick(pads);
+        check_pool("Match-history Results pool changed after tick");
+        audio_phase += 32000;
+        const unsigned samples = audio_phase / 60; audio_phase %= 60;
+        require(melee_web_audio_render(results.audio(), pcm, samples, error, sizeof(error)), error);
+        if (draw) { draw_results(results); ++results_draws; }
+        check_pool("Match-history Results pool changed after draw/audio");
+    }
+    require(results.requested() && results.source_frames() > 600,
+            "Match-history delayed ordinary Start did not complete Results");
+    const auto results_frames = results.source_frames();
+    require(results_draws == (draw ? results_frames : 0),
+            "Match-history Results draw API count differs from declared scope");
+    results.exit_scene();
+    require(melee_web_menu_host_results_exit(host, error, sizeof(error)), error);
+    check_pool("Match-history Results host OnExit/commit changed pool");
+    const auto destination = melee_web_menu_host_results_destination(host);
+    require(destination == gmVsMode_State_Css || destination == gmVsMode_State_Prize,
+            "Match-history Results requested an unsupported source route");
+    const auto result_seed = results.random_seed();
+    std::array<uint8_t, MELEE_WEB_PAD_STATE_BYTES> final_results_input{};
+    melee_web_pad_state_capture(final_results_input.data());
+    std::cout << "match-history host OnExit tick=" << results_frames
+              << " initial_pool=" << pool << " source_pool=" << cm_804D645C
+              << " results_draw_api_calls=" << results_draws
+              << " destination=" << destination
+              << " route_commit=" << (destination == gmVsMode_State_Css)
+              << " continuation=" << (destination == gmVsMode_State_Prize ?
+                                         "Prize-unrun" : "CSS-unrun")
+              << '\n' << std::flush;
+    results.close();
+    check_results_teardown();
+    check_arena("Match-history Results teardown replaced session arena");
+    require(melee_web_menu_host_results_end(host, result_seed, final_results_input.data(),
+                                              error, sizeof(error)), error);
+    // This is a Results ownership discriminator. A fresh human-match profile
+    // can legitimately request Prize; preserve it and dispose the host through
+    // its supported unload path, without entering Prize or claiming CSS return.
+    require(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+    require(melee_web_gameplay_session_end(error, sizeof(error)), error);
+    require(!melee_web_gameplay_allocation().identity,
+            "Match-history final session retained its arena");
+    std::cout << "match-history actual Match->Sheik Results host handoff and close passed;"
+                 " default-CSS/profile subset, no CPU9/reference/full-session equivalence\n";
+    return 0;
 }
 
 static void check_results_fighter_leases(const ResultsMatchInfo& result)
@@ -752,6 +1118,12 @@ int main(int argc,char** argv){try{
     GXInit(fifo, sizeof(fifo));
 #endif
     const std::string command = argc >= 2 ? argv[1] : "";
+    const bool history_state = command == "--lineup-b-match-history-host-state";
+    const bool history_draw = command == "--lineup-b-match-history-host-draw";
+    const bool match_history = history_state || history_draw;
+    const bool p1_statistics_state = command == "--lineup-b-zelda-sheik-stock-p1-statistics-host-state";
+    const bool p1_statistics_draw = command == "--lineup-b-zelda-sheik-stock-p1-statistics-host-draw";
+    const bool p1_statistics = p1_statistics_state || p1_statistics_draw;
     const bool real_mario = command == "--real-mario" ||
                             command == "--real-mario-confirm";
     const bool real_eight = command == "--real-eight" ||
@@ -765,7 +1137,7 @@ int main(int argc,char** argv){try{
     const bool pool_guard = command == "--lineup-b-camera-pool-guard";
     const bool handoff_guard = command == "--lineup-b-results-handoff-guard";
     const WinnerDemoControl* winner_demo = nullptr;
-    bool variant_state_only = false;
+    bool variant_state_only = p1_statistics_state;
     for (const auto& control : winner_demo_controls) {
         const std::string prefix =
             std::string("--lineup-b-zelda-sheik-stock-delayed-demo-") + control.button_name;
@@ -777,7 +1149,7 @@ int main(int argc,char** argv){try{
     // Keep the Zelda-origin transformed standing distinct from an external
     // Sheik standing: Results world assets are selected using external ckind.
     const bool zelda_sheik_host =
-        command == "--lineup-b-zelda-sheik-stock-delayed-host-draw" || winner_demo;
+        command == "--lineup-b-zelda-sheik-stock-delayed-host-draw" || winner_demo || p1_statistics;
     const bool delayed_confirmation =
         command == "--lineup-b-sheik-stock-delayed-mode-exit" ||
         command == "--lineup-b-sheik-stock-delayed-host-draw" || zelda_sheik_host;
@@ -789,12 +1161,12 @@ int main(int argc,char** argv){try{
                             command == "--lineup-b-sheik-stock-delayed-host-draw" ||
                             (zelda_sheik_host && !variant_state_only);
     const bool host_route = host_draw || handoff_guard || variant_state_only;
-    const bool draw = command == "--lineup-b-sheik-draw" || host_draw;
+    const bool draw = command == "--lineup-b-sheik-draw" || host_draw || history_draw;
 #if !defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
     if (draw)
         throw std::runtime_error("Draw diagnostics require MELEE_WEB_RESULTS_RENDERED_TRACE; Node does not submit GX frames");
 #else
-    if (variant_state_only)
+    if (variant_state_only || history_state)
         throw std::runtime_error("Native state-only control requires the Node target; use -host-draw for rendered GPU");
 #endif
     const bool sheik_standing = !zelda_sheik_host && !handoff_guard &&
@@ -804,15 +1176,22 @@ int main(int argc,char** argv){try{
     const bool sheik_confirm = command == "--lineup-b-sheik-confirm" || mode_exit;
     const bool lineup_b = command == "--lineup-b" || sheik_confirm || pool_guard;
     const bool real_roster = real_mario || real_eight || real_enabled ||
-                             lineup_a || lineup_b;
+                             lineup_a || lineup_b || match_history;
     if ((!real_roster && argc != 3) || (real_roster && argc != 5))
         throw std::runtime_error(real_roster ?
-            "Expected --real-mario/--real-eight/--real-enabled[-confirm]/--lineup-a/--lineup-b[-sheik-confirm/-zelda-sheik-mode-exit/-sheik-mode-exit/-sheik-draw/-sheik-host-draw/-camera-pool-guard/-results-handoff-guard/-zelda-sheik-stock-delayed-demo-{b,y,x}-host-{state,draw}] <common/fighter> <Results shared/music> <Results fighters>" :
+            "Expected --real-mario/--real-eight/--real-enabled[-confirm]/--lineup-a/--lineup-b[-sheik-confirm/-zelda-sheik-mode-exit/-sheik-mode-exit/-sheik-draw/-sheik-host-draw/-camera-pool-guard/-results-handoff-guard/-zelda-sheik-stock-delayed-demo-{b,y,x}-host-{state,draw}/-match-history-host-{state,draw}] <common/fighter> <Results shared/music> <Results fighters>" :
             "Expected common/fighter and Results asset directories");
     melee_web::RuntimeFiles files;
     const int first_directory = real_roster ? 2 : 1;
     for (int directory = first_directory; directory < argc; ++directory)
         load_directory(files, argv[directory]);
+    if (match_history) {
+        const int status = run_match_history(files, history_draw);
+#if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
+        EM_ASM({ window.resultsDone = $0; }, status);
+#endif
+        return status;
+    }
     if (lineup_a || lineup_b) {
         constexpr std::array<int, 4> a = {
             CKIND_GAMEWATCH, CKIND_KIRBY, CKIND_POPONANA, CKIND_FOX,
@@ -824,7 +1203,7 @@ int main(int argc,char** argv){try{
                                                  std::span<const int>(b),
                                lineup_a ? "A" : "B", sheik_confirm, mode_exit, draw,
                                sheik_standing, pool_guard, host_route, stock,
-                               delayed_confirmation, handoff_guard, winner_demo);
+                               delayed_confirmation, handoff_guard, winner_demo, p1_statistics);
 #if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
         EM_ASM({ window.resultsDone = $0; }, status);
 #endif

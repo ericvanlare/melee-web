@@ -50,7 +50,8 @@ const lineup=values.lineup==='A'?
 const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
   scope:'Headless Chrome rendered gameplay; live source CSS/SSS controller input, four CPU9 players, four stocks, Final Destination; natural Results→CSS→second match. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.',
   lineup:values.lineup,players:lineup.map(({name,kind})=>({name,kind,cpu:9,stocks:4})),
-  matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[]};
+  matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[],
+  results_input_events:[]};
 report.source_timing_disruptions=[];
 report.native_command_errors=[];
 report.results_entry_packets=[];
@@ -91,6 +92,37 @@ async function retainResultsEntry(reason){
   }catch(error){
     report.results_entry_packet_reads.push({reason,status:'capture-error',error:error.message});
   }
+}
+// Record source progress at ordinary P1 Enter key events without supplying or
+// changing input. The cursor is the last observed Results step at dispatch;
+// the exact consumed PAD sample may be the following source tick, so this is
+// an event bracket, not a reconstructed historical tick schedule.
+async function retainResultsInputEvents(){
+  try{
+    report.results_input_events=await page.evaluate(()=>
+      window.__meleeWebResultsInputEvents?.slice()||[]);
+  }catch(error){
+    report.results_input_event_read={status:'capture-error',error:error.message};
+  }
+}
+async function installResultsInputObserver(){
+  await page.evaluate(()=>{
+    const rows=[];
+    window.__meleeWebResultsInputEvents=rows;
+    const record=(kind,event)=>{
+      if(event.key!=='Enter')return;
+      const phase=Module._melee_web_native_menu_phase();
+      if(phase!==8&&phase!==9)return;
+      const diagnostics=Module.UTF8ToString(Module._melee_web_native_menu_diagnostics());
+      const cursor=diagnostics.match(/(?:Results|Prize) source frame: (\d+)/);
+      rows.push({kind,key:event.key,repeat:!!event.repeat,isTrusted:!!event.isTrusted,
+        eventTimeMs:event.timeStamp,nativeSourceSteps:Number(window.nativeSourceSteps),
+        phase,resultsSourceFrameAtEvent:cursor?Number(cursor[1]):null,
+        diagnostics});
+    };
+    window.addEventListener('keydown',event=>record('keydown',event),true);
+    window.addEventListener('keyup',event=>record('keyup',event),true);
+  });
 }
 const buttonA=0x0100,buttonStart=0x1000;
 const phase=()=>page.evaluate(()=>Module._melee_web_native_menu_phase());
@@ -497,6 +529,7 @@ try{
   assert(report.gpu.cross_origin_isolated&&report.gpu.adapter_available,
     'Rendered validation requires an isolated page and a WebGPU adapter');
   await driver.waitForImport();
+  await installResultsInputObserver();
   await driver.selectDisc(values.disc);
   await driver.waitForStart();
   await driver.launch(1);
@@ -531,6 +564,7 @@ try{
     await page.locator('body').textContent().then(text=>fs.writeFile(path.join(output,'page.txt'),text)).catch(()=>{});
   }
 }finally{
+  if(page&&!page.isClosed())await retainResultsInputEvents();
   report.final_diagnostics=page&&!page.isClosed()?await diagnostic().catch(error=>({error:error.message})):null;
   report.controller_inputs=report.controller_inputs||[];
   report.controller_input_summary={pad_samples:report.pad_sample_count,first_samples:report.controller_inputs.slice(0,48),last_samples:report.controller_inputs.slice(-24)};

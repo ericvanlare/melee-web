@@ -79,6 +79,9 @@ class ResultsEntryPacketTests(unittest.TestCase):
         harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text()
         self.assertIn('await retainResultsEntry(`match-${matchIndex}-results-entry`)', harness)
         self.assertIn("await retainResultsEntry('failure-latest-entry')", harness)
+        self.assertIn('await installResultsInputObserver()', harness)
+        self.assertIn('resultsSourceFrameAtEvent', harness)
+        self.assertIn('results_input_events=await page.evaluate', harness)
 
     def test_read_only_harness_observation_and_build_binding(self):
         result = subprocess.run([str(node_runtime()), str(ROOT / 'tests/results_entry_packet_test.mjs')],
