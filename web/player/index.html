@@ -18,7 +18,7 @@
         <progress id="loading-progress" aria-labelledby="loading-label"></progress>
         <p id="loading-detail">First use can take longer.</p>
       </div>
-      <p id="idle-hint" role="status" hidden>Select your local disc, then choose Play to start.</p>
+      <p id="idle-hint" role="status" hidden>Select your local disc to enter character select.</p>
     </div>
     <div id="toolbar" role="toolbar" aria-label="Game controls">
       <div id="toolbar-brand"><span id="brand">WEBMELEE.GG</span><span id="edition"><em>alpha</em></span></div>
@@ -37,10 +37,11 @@
     </div>
   </main>
   <dialog id="disc-dialog" aria-label="Select your game copy">
-    <p>Audio is disabled in this alpha. Some CPU actions can stop the player (opcode 63); restart may be required.</p>
-    <p>Select an unmodified USA 1.02 ISO, GCM or CISO. The selected file and game data stay on this device.</p>
-    <label><input id="disc-ack" type="checkbox"> I am selecting a copy of the game that I am legally authorized to use.</label>
-    <div class="dialog-actions"><button id="disc-cancel" type="button">Cancel</button><button id="disc-continue" type="button" disabled>Choose file</button></div>
+    <p>Some CPU actions can stop the player (opcode 63); restart may be required.</p>
+    <p>Choose a copy you are legally authorized to use. Select an unmodified USA 1.02 ISO, GCM or CISO. RVZ is not supported.</p>
+    <p>By choosing a game file, you acknowledge the disclosures in the linked <a href="/terms">Terms of Use</a>, <a href="/privacy">Privacy Notice</a>, <a href="/notices">About &amp; legal</a>, and <a href="/copyright">Copyright &amp; contact</a> pages and agree to the Terms of Use.</p>
+    <p>Your selected file and prepared game data stay in this browser on this device and are not uploaded by WebMelee. The hosting provider receives ordinary visit information described in the Privacy Notice.</p>
+    <div class="dialog-actions"><button id="disc-cancel" type="button">Cancel</button><button id="disc-choose-file" type="button">Choose file</button></div>
   </dialog>
   <dialog id="controls-dialog" aria-label="Controls">
     <div class="keyboard-options">

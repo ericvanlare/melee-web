@@ -40,6 +40,56 @@ const press = key => driver.pressChord([key]);
 const phase = driver.waitForPhase;
 async function collectViolations() { violations.push(...await page.evaluate(() => window.releaseCspViolations)); }
 const selectDisc = driver.selectDisc;
+async function armLaunchObserver() {
+  await page.evaluate(() => {
+    const nativeLaunch = Module._melee_web_native_menu_launch.bind(Module);
+    window.nativeLaunchCalls = 0;
+    Module._melee_web_native_menu_launch = (...args) => {
+      window.nativeLaunchCalls++;
+      return nativeLaunch(...args);
+    };
+  });
+}
+async function armAudioActivationObserver() {
+  if (!values.audio) return;
+  await page.evaluate(() => {
+    if (window.webMeleeAudioActivationObserved) return;
+    window.webMeleeAudioActivationObserved = true;
+    const NativeAudioContext = window.AudioContext;
+    window.audioActivation = [];
+    window.AudioContext = class extends NativeAudioContext {
+      constructor(...args) {
+        super(...args);
+        const nativeResume = this.resume.bind(this), context = this;
+        this.resume = () => {
+          const record = {gesture: navigator.userActivation?.isActive === true, before: context.state};
+          window.audioActivation.push(record);
+          return nativeResume().then(() => { record.after = context.state; });
+        };
+      }
+    };
+  });
+}
+async function waitForCssOrAudioRecovery() {
+  await page.waitForFunction(() => {
+    const dialog = document.querySelector('#error-dialog');
+    return !!dialog?.open || (Module._melee_web_native_menu_phase() === 1 && Module._melee_web_native_menu_running());
+  }, null, {timeout: 90000});
+  const recovery = await page.locator('#error-dialog').isVisible();
+  if (recovery) {
+    const failure = await page.locator('#error').innerText();
+    assert(values.audio && /browser kept game audio suspended.*choose Play to enable audio/i.test(failure),
+      `Unexpected first-start failure: ${failure}`);
+    assert(await page.locator('#start-game').isEnabled(), 'A browser that blocks activation exposes Play recovery');
+    assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 0,
+      'Blocked audio must stop before native launch');
+    await page.locator('#error-close').click();
+    await page.locator('#start-game').click();
+  }
+  await phase(1);
+  assert(await page.locator('#error-dialog').isHidden());
+  return recovery;
+}
 
 try {
   const response = await page.goto(values.url);
@@ -72,6 +122,8 @@ try {
     assert.equal(await page.locator('canvas').count(), 1);
     assert.equal(await page.locator('iframe,h1,header,footer,article').count(), 0);
     assert(await page.locator('#start-game').isDisabled());
+    assert.equal(await page.locator('#disc-ack').count(), 0,
+      'Disc selection must not have an acknowledgement checkbox gate');
     assert(await page.locator('#end-session').isDisabled());
     assert.equal(await page.locator('#brand').innerText(), 'WEBMELEE.GG');
     assert.equal(await page.locator('#edition').innerText(), 'alpha');
@@ -102,7 +154,18 @@ try {
     await collectViolations(); await page.reload(); await ready();
     assert.equal(await page.locator('#keyboard-layout').inputValue(), 'boxx');
   });
-  await check('acknowledgement, invalid-disc errors and selectable retry', async () => {
+  await check('disclosure before file selection, invalid-disc errors and selectable retry', async () => {
+    await armAudioActivationObserver();
+    await page.locator('#choose-disc').click();
+    assert(await page.locator('#disc-dialog').isVisible());
+    assert.equal(await page.locator('#disc-ack').count(), 0);
+    const disclosure = (await page.locator('#disc-dialog').textContent()).replace(/\s+/g, ' ');
+    assert.match(disclosure, /choosing a game file, you acknowledge the disclosures in the linked.*and agree to the Terms of Use/i);
+    for (const [href, text] of [['/terms', 'Terms of Use'], ['/privacy', 'Privacy Notice'],
+      ['/notices', 'About & legal'], ['/copyright', 'Copyright & contact']]) {
+      assert.equal(await page.locator(`#disc-dialog a[href="${href}"]`).innerText(), text);
+    }
+    await page.locator('#disc-cancel').click();
     await selectDisc({name: 'unsupported.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
     await page.locator('#error-dialog[open]').waitFor();
     assert.match(await page.locator('#error').innerText(), /RVZ is not supported/);
@@ -113,6 +176,13 @@ try {
     assert(await page.locator('#start-game').isDisabled());
     assert(await page.locator('#choose-disc').isEnabled());
     await page.locator('#error-close').click();
+    if (values.audio) {
+      const activation = await page.evaluate(() => window.audioActivation);
+      assert(activation.some(record => record.gesture), 'AudioContext.resume is initiated from the Choose file gesture');
+      report.audio_activation_before_import = activation;
+      report.audio_activation_before_import_state = activation.some(record => record.after === 'running') ?
+        'running' : 'the browser kept the context suspended; a valid-disc attempt will expose recovery';
+    }
   });
   await check('narrow layouts and fullscreen', async () => {
     await collectViolations(); await page.reload(); await ready();
@@ -131,13 +201,33 @@ try {
   });
   if (values.disc) {
     await check('owned-disc import, native preparation and original CSS', async () => {
+      await armAudioActivationObserver();
+      await armLaunchObserver();
+      const audioActivationStart = values.audio ? await page.evaluate(() => window.audioActivation.length) : 0;
       await selectDisc(values.disc);
-      await driver.waitForStart();
-      assert(await page.locator('#error-dialog').isHidden());
-      await driver.launch();
+      const audioRecovery = await waitForCssOrAudioRecovery();
+      if (audioRecovery) report.audio_activation_recovery = 'Browser required a separate Play gesture; first attempt did not launch or retry.';
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 1,
+        'A prepared disc must call native launch exactly once; the normal path does not click Play');
       assert(await page.locator('#loading-panel').isHidden(), 'Loading feedback must retire before interactive CSS');
       await page.waitForFunction(() => document.activeElement.id === 'canvas');
       assert(await page.locator('#pause-game').isEnabled());
+      assert(await page.locator('#start-game').isDisabled(), 'Play is not a required first-launch step');
+      await shot('css-after-import');
+      report.css_after_import = await page.evaluate(() => ({
+        phase: Module._melee_web_native_menu_phase(),
+        running: Module._melee_web_native_menu_running(),
+        launch_calls: window.nativeLaunchCalls,
+        loading_hidden: document.querySelector('#loading-panel').hidden,
+        error_open: document.querySelector('#error-dialog').open,
+      }));
+      if (values.audio) {
+        const activation = await page.evaluate(start => window.audioActivation.slice(start), audioActivationStart);
+        assert(activation.some(record => record.gesture), 'AudioContext.resume must be initiated by the Choose file user gesture');
+        assert(activation.some(record => record.after === 'running'), 'The browser audio context must be running after preparation');
+        report.audio_activation = activation;
+        if (!audioRecovery) report.audio_activation_recovery = 'Headless Chrome resumed audio from Choose file; no Play gesture was used.';
+      }
     });
     await check('pause/resume acknowledges the shared native owner', async () => {
       await page.locator('#pause-game').click();
@@ -158,21 +248,42 @@ try {
       assert.equal(await page.evaluate(() => !!window.releaseOldDocumentMarker), false);
       assert(await page.locator('#start-game').isDisabled());
       assert.equal(await page.locator('#keyboard-layout').inputValue(), 'boxx');
-      await selectDisc(values.disc); await driver.waitForStart();
-      await driver.launch();
+      await armAudioActivationObserver();
+      await armLaunchObserver();
+      await selectDisc(values.disc);
+      if (await waitForCssOrAudioRecovery()) {
+        report.second_audio_activation_recovery = 'A separate Play gesture was required after reload.';
+      }
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 1,
+        'A fresh document launches its selected disc once');
+      await shot('css-after-reselection');
+      report.css_after_reselection = await page.evaluate(() => ({
+        phase: Module._melee_web_native_menu_phase(),
+        running: Module._melee_web_native_menu_running(),
+        launch_calls: window.nativeLaunchCalls,
+        loading_hidden: document.querySelector('#loading-panel').hidden,
+      }));
       await driver.unload();
       assert(await page.locator('#start-game').isDisabled());
     });
     if (values.audio) {
       const created = audioEvents.filter(row => row.event === 'contextCreated');
-      assert.equal(created.length, 2, 'Each imported document must create exactly one audio context');
+      assert.equal(created.length, 3, 'The inspected cancellation/invalid-input document and each playable document create at most one audio context');
       assert(created.every(row => row.data.context.sampleRate === 32000));
-      report.audio = 'One 32 kHz context per imported document. PCM and match transitions are checked by the separate audio lifecycle test; no fidelity claim.';
+      report.audio = 'The page creates a single 32 kHz context on its first file-picker attempt; actual activation state is recorded above. PCM and match transitions are checked by the separate audio lifecycle test; no fidelity claim.';
     } else {
       assert.deepEqual(audioEvents, [], 'The audio-disabled public profile must never create a Web Audio context');
       report.audio = 'Audio explicitly disabled. No Web Audio contexts were created during import, menus, pause/resume or second launch. No audio fidelity claim.';
     }
-  } else report.disc = 'Not supplied; native import, menus and audio not exercised.';
+  } else {
+    report.disc = 'Not supplied; native import, menus and successful auto-launch not exercised.';
+    if (values.audio) {
+      const created = audioEvents.filter(row => row.event === 'contextCreated');
+      assert(created.length >= 1, 'Choosing a file must construct the audio context in the real browser');
+      assert.equal(created[0].data.context.sampleRate, 32000);
+      report.audio = 'The real browser created one 32 kHz Web Audio context from the Choose file path; activation state is recorded. No owned disc was supplied, so CSS launch, audible output and PCM were not exercised.';
+    } else report.audio = 'Audio disabled in this public profile; no owned disc supplied.';
+  }
   await check('legal pages use their readable document stylesheet and serve full notices', async () => {
     await collectViolations();
     for (const route of ['/terms', '/privacy', '/copyright', '/notices']) {
