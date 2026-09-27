@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,9 +58,10 @@ class GameplayBootstrapTests(unittest.TestCase):
         asset = ROOT / "assets-local/next-gate/PlCo.dat"
         if kind == "fighter" and asset.is_file():
             arguments = [str(asset)]
-        result = subprocess.run([str(self.node), str(ROOT / "build/browser" / f"{executable}.js"),
-                                 *arguments], cwd=ROOT, env=self.env,
-                                capture_output=True, text=True, timeout=60)
+        with tempfile.TemporaryDirectory(prefix="melee gameplay bootstrap run ") as run_directory:
+            result = subprocess.run([str(self.node), str(ROOT / "build/browser" / f"{executable}.js"),
+                                     *arguments], cwd=run_directory, env=self.env,
+                                    capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(expected, result.stdout)
         if kind == "fighter" and asset.is_file():
