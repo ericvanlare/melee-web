@@ -10,6 +10,8 @@
   "controller-panel.css",
   "controller-settings.mjs",
   "controller-settings.css",
+  "touch-controls.mjs",
+  "touch-controls.css",
   "prototype-keyboard-layouts.mjs",
   "runtime-cache.js",
   "audio-worklet.js",

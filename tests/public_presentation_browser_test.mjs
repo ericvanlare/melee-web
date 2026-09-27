@@ -21,7 +21,7 @@ const page = await browser.newPage({viewport: {width: 1000, height: 1400}, devic
 const driver = createBrowserDriver(page, {surface: 'public', timeoutMs: 90000});
 const report = {schema: 'webmelee-public-presentation-v1', browser: browser.version(),
   browser_mode: 'headless', dpr, url: values.url, observations: [], errors: [], layoutFailures: [],
-  scope: 'Original CSS in the public player: display geometry, WebGPU pixels, resize, DOM fullscreen and pointer coordinates. No OS fullscreen, timing or retail-equivalence claim.'};
+  scope: 'Original CSS in the public player with the touch overlay enabled: display geometry, WebGPU pixels, resize, DOM fullscreen and pointer coordinates. No OS fullscreen, timing or retail-equivalence claim.'};
 page.on('pageerror', error => report.errors.push(error.message));
 page.on('console', message => {if (message.type() === 'error') report.errors.push(message.text());});
 const frames = () => page.evaluate(() => new Promise(resolve =>
@@ -32,7 +32,7 @@ async function observe(name) {
   const observed = await page.evaluate(() => {
     const canvas = document.querySelector('#canvas');
     const rect = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
-    return {viewport: [innerWidth, innerHeight], canvas: rect('#canvas'),
+    return {viewport: [innerWidth, innerHeight], canvas: rect('#canvas'), touch: rect('#touch-controls'),
       host: rect('#runtime-host'), toolbar: rect('#toolbar'),
       buffer: [canvas.width, canvas.height], dpr: devicePixelRatio,
       scroll: [document.documentElement.scrollWidth, document.documentElement.scrollHeight],
@@ -73,6 +73,10 @@ async function observe(name) {
     const {canvas: c, host: h, toolbar: t, viewport: [w, height]} = observed;
     assert(c.width > 0 && c.height > 0);
     assert(Math.abs(c.width - c.height * 4 / 3) < 1, 'Game rectangle must be 4:3');
+    assert.equal(await page.locator('#touch-controls').isHidden(), false, 'touch overlay remains enabled');
+    assert(Math.abs(observed.touch.x - c.x) < 1 && Math.abs(observed.touch.y - c.y) < 1 &&
+      Math.abs(observed.touch.width - c.width) < 1 && Math.abs(observed.touch.height - c.height) < 1,
+      'Touch overlay stays inside the fitted game rectangle');
     assert(c.x >= h.x - 1 && c.y >= h.y - 1 && c.right <= h.right + 1 && c.bottom <= h.bottom + 1, 'Complete image inside player area');
     assert(Math.abs(c.x + c.width / 2 - h.x - h.width / 2) < 1 &&
       Math.abs(c.y + c.height / 2 - h.y - h.height / 2) < 1, 'Centered image');
@@ -94,6 +98,14 @@ try {
   });
   assert(report.gpu.isolated && report.gpu.vendor, 'Isolated real WebGPU player');
   await driver.waitForImport();
+  await page.locator('#controls-open').click();
+  await page.getByLabel('Player 1 input source', {exact: true}).selectOption('touch');
+  await page.waitForFunction(() => Module.meleeControllers.getPortSource(0) === 'touch');
+  await page.locator('#controls-close').click();
+  await page.waitForFunction(() => {
+    const overlay = document.querySelector('#touch-controls');
+    return !overlay.hidden && getComputedStyle(overlay).position === 'absolute';
+  });
   await driver.selectDisc(values.disc);
   const cssEntry = await driver.waitForPublicCss();
   if (cssEntry === 'audio-recovery-required') {

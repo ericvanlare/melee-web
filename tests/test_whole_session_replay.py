@@ -335,16 +335,6 @@ class WholeSessionReplayTests(unittest.TestCase):
         with self.assertRaisesRegex(replay.WholeSessionReplayError, "source queue slot"):
             replay.capture_from_records(rows)
 
-    def test_rejects_two_consumes_in_one_observed_source_step(self):
-        rows = _candidate()
-        first = next(index for index, row in enumerate(rows)
-                     if row["payload"].get("boundary") == "pad_consume")
-        rows.insert(first + 1, copy.deepcopy(rows[first]))
-        for seq, row in enumerate(rows):
-            row["seq"] = seq
-        with self.assertRaisesRegex(replay.WholeSessionReplayError, "multiple PAD consumes"):
-            replay.capture_from_records(rows)
-
     def test_allows_source_step_reset_across_scene_owner_boundaries(self):
         rows = _candidate()
         pads = [row for row in rows

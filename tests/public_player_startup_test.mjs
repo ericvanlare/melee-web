@@ -34,11 +34,23 @@ class FakeElement {
     this.title = '';
     this.files = [];
     this.clickCount = 0;
+    const classes = new Set();
+    this.classList = {
+      contains: name => classes.has(name),
+      add: name => classes.add(name),
+      remove: name => classes.delete(name),
+      toggle: (name, force) => {
+        const next = force === undefined ? !classes.has(name) : !!force;
+        if (next) classes.add(name); else classes.delete(name);
+        return next;
+      },
+    };
   }
 
   append(...children) { this.children.push(...children); }
   replaceChildren(...children) { this.children = children; }
   removeAttribute(name) { if (name === 'value') delete this.value; }
+  setAttribute(name, value) { this.attributes ||= new Map(); this.attributes.set(name, String(value)); }
   querySelector() { return null; }
   addEventListener(name, listener) {
     const listeners = this.listeners.get(name) || [];
@@ -50,7 +62,14 @@ class FakeElement {
     this.open = false;
     for (const listener of this.listeners.get('close') || []) listener();
   }
-  click() { this.clickCount++; globalThis.testClickTrace?.push(this.id); return this.onclick?.(); }
+  click() {
+    this.clickCount++;
+    globalThis.testClickTrace?.push(this.id);
+    const document = globalThis.document;
+    if (this.id === 'fullscreen') document.inFullscreenGesture = true;
+    try { return this.onclick?.(); }
+    finally { if (this.id === 'fullscreen') document.inFullscreenGesture = false; }
+  }
   dispatchEvent(event) {
     for (const listener of this.listeners.get(event.type) || []) listener(event);
   }
@@ -58,10 +77,10 @@ class FakeElement {
   requestFullscreen() { return Promise.resolve(); }
 }
 
-function makeDocument() {
+function makeDocument(fullscreen = 'unsupported') {
   const ids = [
   'canvas', 'player', 'choose-disc', 'disc-file', 'start-game', 'pause-game',
-  'controls-open', 'controls-close', 'controls-dialog', 'keyboard-layout',
+  'controls-open', 'toolbar-more-toggle', 'controls-close', 'controls-dialog', 'keyboard-layout',
     'player-one-source', 'player-two-source', 'player-one-source-status',
     'player-two-source-status', 'boxx-source-note', 'keyboard-bindings-details',
     'keyboard-bindings', 'controller-advanced', 'controllers', 'idle-hint', 'fullscreen', 'end-session', 'status',
@@ -72,28 +91,49 @@ function makeDocument() {
   ];
   const elements = new Map([...new Set([...markupIds, ...ids])]
     .map(id => [id, new FakeElement('div', id)]));
-  elements.get('canvas').focus = () => { document.activeElement = elements.get('canvas'); };
-  elements.get('player').requestFullscreen = () => Promise.resolve();
-  elements.get('player-one-source').value = 'auto';
-  elements.get('player-two-source').value = 'auto';
-  elements.get('keyboard-layout').disabled = true;
-
-  return {
+  const listeners = new Map();
+  const document = {
     hidden: false,
+    documentElement: new FakeElement('html'),
+    body: new FakeElement('body'),
     activeElement: elements.get('canvas'),
-    fullscreenEnabled: false,
+    fullscreenEnabled: fullscreen !== 'unsupported',
     fullscreenElement: null,
+    inFullscreenGesture: false,
     getElementById(id) {
       const element = elements.get(id);
       if (!element) throw Error(`Missing test element #${id}`);
       return element;
     },
     createElement(tagName) { return new FakeElement(tagName); },
-    addEventListener() {},
+    addEventListener(name, listener) {
+      const rows = listeners.get(name) || [];
+      rows.push(listener); listeners.set(name, rows);
+    },
+    dispatch(name) { for (const listener of listeners.get(name) || []) listener(); },
     hasFocus: () => true,
-    exitFullscreen: async () => {},
+    exitFullscreen: async () => {
+      document.fullscreenElement = null;
+      document.dispatch('fullscreenchange');
+    },
     elements,
   };
+  const player = elements.get('player');
+  elements.get('canvas').focus = () => { document.activeElement = elements.get('canvas'); };
+  player.requestCalls = 0;
+  player.requestWasGesture = false;
+  player.requestFullscreen = () => {
+    player.requestCalls++;
+    player.requestWasGesture = document.inFullscreenGesture;
+    if (fullscreen === 'rejected') return Promise.reject(Error('gesture rejected'));
+    document.fullscreenElement = player;
+    document.dispatch('fullscreenchange');
+    return Promise.resolve();
+  };
+  elements.get('player-one-source').value = 'auto';
+  elements.get('player-two-source').value = 'auto';
+  elements.get('keyboard-layout').disabled = true;
+  return document;
 }
 
 function installGlobals(document) {
@@ -143,8 +183,8 @@ async function importShellWithMocks(scenario) {
   }
 }
 
-async function runScenario({name, failStartup = false, behavior = {}}) {
-  const document = makeDocument();
+async function runScenario({name, failStartup = false, behavior = {}, fullscreen = 'unsupported', exerciseFullscreen = false}) {
+  const document = makeDocument(fullscreen);
   const restore = installGlobals(document);
   const trace = [];
   globalThis.testClickTrace = trace;
@@ -166,6 +206,7 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
     trace.push('settings');
     return {
       setState: next => trace.push(['settings-state', next?.state]),
+      clearTouchInputs: () => trace.push('clear-touch-inputs'),
       bindPlayer: async runtime => { trace.push(['settings-bind', runtime]); },
     };
   };
@@ -250,6 +291,47 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
 
   try {
     await importShellWithMocks({name});
+    if (exerciseFullscreen) {
+      const button = document.getElementById('fullscreen');
+      const status = document.getElementById('fullscreen-status');
+      const playerElement = document.getElementById('player');
+      assert.equal(button.disabled, false, 'Fullscreen or its labeled fallback remains enabled');
+      if (fullscreen === 'unsupported') {
+        assert.equal(button.textContent, 'Expand player');
+        assert.match(status.textContent, /element fullscreen is unavailable/);
+        button.click();
+        assert.equal(playerElement.classList.contains('player-expanded'), true);
+        assert.match(status.textContent, /browser controls remain visible/i);
+        const more = document.getElementById('toolbar-more-toggle');
+        more.click();
+        assert.equal(playerElement.classList.contains('toolbar-actions-open'), true);
+        assert.equal(more.attributes.get('aria-expanded'), 'true');
+        button.click();
+        assert.equal(playerElement.classList.contains('toolbar-actions-open'), false,
+          'Shrinking the player closes expanded secondary controls');
+        assert.equal(more.attributes.get('aria-expanded'), 'false');
+      } else if (fullscreen === 'supported') {
+        button.click();
+        assert.equal(playerElement.requestCalls, 1);
+        assert.equal(playerElement.requestWasGesture, true,
+          'requestFullscreen runs synchronously within the button activation');
+        assert.equal(button.textContent, 'Exit fullscreen');
+        button.click();
+        assert.equal(document.fullscreenElement, null);
+        assert.equal(button.textContent, 'Fullscreen');
+        document.getElementById('toolbar-more-toggle').click();
+        assert.equal(playerElement.classList.contains('toolbar-actions-open'), true,
+          'The toolbar disclosure remains operable on the player');
+      } else {
+        button.click();
+        await new Promise(resolve => setTimeout(resolve, 0));
+        assert.equal(playerElement.requestCalls, 1);
+        assert.equal(button.textContent, 'Expand player', 'a rejected request switches to the labeled fallback');
+        assert.match(status.textContent, /declined fullscreen/i);
+        button.click();
+        assert.equal(playerElement.classList.contains('player-expanded'), true);
+      }
+    }
     return {
       document,
       trace,
@@ -479,6 +561,9 @@ try {
   const importWork = selectThroughShell(ejectRace);
   await Promise.resolve();
   await ejectRace.document.getElementById('end-session').onclick();
+  assert(ejectRace.trace.indexOf('clear-touch-inputs') >= 0 &&
+    ejectRace.trace.indexOf('clear-touch-inputs') < ejectRace.trace.indexOf('destroy'),
+  'Eject clears all held touch input before waiting for native teardown');
   finishEjectedImport();
   await importWork;
   assert.equal(ejectRace.trace.filter(row => row === 'start').length, 0,
@@ -513,4 +598,7 @@ assert.equal(failedDocument.getElementById('error-dialog').open, true);
 assert.equal(failedDocument.getElementById('retry').hidden, false);
 assert.equal(failedDocument.getElementById('error').textContent, 'cache directory denied');
 assert.equal(failed.audioCreated, 0);
-console.log('Public player shell: legal disclosure, pre-readiness file validation, readiness-gated import/autoplay, invalid retry, replacement, cancellation, audio recovery and stale-selection guards pass.');
+await runScenario({name: 'fullscreen-unsupported', fullscreen: 'unsupported', exerciseFullscreen: true});
+await runScenario({name: 'fullscreen-supported', fullscreen: 'supported', exerciseFullscreen: true});
+await runScenario({name: 'fullscreen-rejected', fullscreen: 'rejected', exerciseFullscreen: true});
+console.log('Public player shell: profile-owned startup, pre-readiness disc selection, readiness-gated import/autoplay (exactly once), invalid retry, replacement, cancellation, audio recovery, stale-selection guards and fullscreen supported, unsupported, rejection and fallback cases pass.');

@@ -51,6 +51,8 @@ PLAYER_RUNTIME_FILES = (
     "controller-panel.css",
     "controller-settings.mjs",
     "controller-settings.css",
+    "touch-controls.mjs",
+    "touch-controls.css",
     "gameplay_public.js",
     "gameplay_public.wasm",
 )
@@ -66,6 +68,8 @@ PLAYER_SOURCE_RUNTIME_FILES = (
     "controller-panel.css",
     "controller-settings.mjs",
     "controller-settings.css",
+    "touch-controls.mjs",
+    "touch-controls.css",
 )
 RUNTIME_IDENTITY_SCHEMA = "melee-web-runtime-public-build-v2"
 RUNTIME_IDENTITY_NAME = "runtime-public-identity.json"
@@ -1013,7 +1017,8 @@ def _validate_runtime_graph(files: dict[str, bytes], *, audio: bool = False) -> 
         "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "./controller-input.mjs"),
         "runtime-assets.mjs": ("./disc-image.mjs", "./disc-session.mjs"),
         "disc-session.mjs": ("./disc-image.mjs",),
-        "controller-settings.mjs": ("./prototype-keyboard-layouts.mjs", "./controller-panel.mjs", "./controller-settings.css"),
+        "controller-settings.mjs": ("./prototype-keyboard-layouts.mjs", "./controller-panel.mjs", "./controller-settings.css", "./touch-controls.mjs"),
+        "touch-controls.mjs": ("./touch-controls.css",),
     }
     if audio:
         required_imports.update({
@@ -1263,6 +1268,8 @@ def build(
             "controller-panel.css": ROOT / "web" / "controller-panel.css",
             "controller-settings.mjs": ROOT / "web" / "controller-settings.mjs",
             "controller-settings.css": ROOT / "web" / "controller-settings.css",
+            "touch-controls.mjs": ROOT / "web" / "touch-controls.mjs",
+            "touch-controls.css": ROOT / "web" / "touch-controls.css",
         }
         for rel, path in source_runtime.items():
             if _is_symlink(path) or not path.is_file():

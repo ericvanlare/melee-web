@@ -292,10 +292,20 @@ try {
     await page.setViewportSize({width: 1280, height: 960});
     if (await page.locator('#fullscreen').isEnabled()) {
       await page.locator('#fullscreen').click();
-      await page.waitForFunction(() => !!document.fullscreenElement);
-      await page.locator('#fullscreen').click();
-      await page.waitForFunction(() => !document.fullscreenElement);
-    } else assert.match(await page.locator('#fullscreen').getAttribute('title'), /unavailable/);
+      await page.waitForFunction(() => !!document.fullscreenElement ||
+        document.querySelector('#player').classList.contains('player-expanded') ||
+        /declined fullscreen/i.test(document.querySelector('#fullscreen-status').textContent));
+      if (await page.evaluate(() => !!document.fullscreenElement)) {
+        await page.locator('#fullscreen').click();
+        await page.waitForFunction(() => !document.fullscreenElement);
+      } else {
+        if (!(await page.locator('#player').evaluate(element => element.classList.contains('player-expanded'))))
+          await page.locator('#fullscreen').click();
+        assert.match(await page.locator('#fullscreen-status').innerText(), /browser controls remain visible/i);
+        await page.locator('#fullscreen').click();
+        assert.equal(await page.locator('#player').evaluate(element => element.classList.contains('player-expanded')), false);
+      }
+    } else throw Error('Fullscreen fallback control must remain enabled');
   });
   if (values.disc) {
     await check('owned-disc import, native preparation and original CSS', async () => {
