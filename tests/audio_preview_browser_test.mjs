@@ -15,6 +15,7 @@ const {values} = parseArgs({
     ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
     headed: {type: 'boolean', default: false},
     'select-after-graphics': {type: 'boolean', default: false},
+    'async-inflight': {type: 'string'},
   },
 });
 if (!values.url || !values.disc || !values.out) {
@@ -49,6 +50,15 @@ const report = {
   verified_package_abort_events: verifiedPackageAborts,
   expected_navigation_aborts: expectedNavigationAborts,
 };
+
+if (values['async-inflight'] !== undefined) {
+  const maxInFlight = Number(values['async-inflight']);
+  assert.equal(maxInFlight, 1, 'Only the correctness-checked one-in-flight experiment is allowed here');
+  report.async_pipeline_policy = {mode: 'all', maxInFlight};
+  await page.addInitScript(({maxInFlight}) => {
+    window.__meleeWebAsyncPipelineTestPolicy = {mode: 'all', maxInFlight};
+  }, {maxInFlight});
+}
 
 // Install before the module graph runs. The trace observes the public Web
 // Audio boundary (context, worklet connection and PCM messages); it does not
@@ -447,6 +457,31 @@ try {
     assert.equal(afterCssAssets.launchCalls, 1,
       'Successful disc and graphics readiness must invoke the original CSS launch exactly once');
     report.launchesAtCss = afterCssAssets.launchCalls;
+    if (values['async-inflight'] !== undefined) {
+      const preparation = await page.evaluate(() => window.__meleeWebAsyncPipelineTestResults || null);
+      assert(preparation, 'Async pipeline preparation diagnostics are unavailable');
+      const events = preparation.events || [];
+      const identities = eventCode => events.filter(event => event.event === eventCode)
+        .map(event => `${event.type}:${event.hashHigh}:${event.hashLow}`);
+      const submitted = identities(0), completed = identities(1), failed = identities(2);
+      assert.equal(preparation.selected, 884, 'The full bundled startup seed must use the async path');
+      assert.equal(submitted.length, preparation.selected, 'Every selected cache entry must be submitted');
+      assert.equal(completed.length + failed.length, submitted.length, 'Every submission must settle before CSS');
+      assert.equal(failed.length, 0, 'A graphics pipeline failed during startup');
+      assert.equal(new Set(submitted).size, submitted.length, 'Duplicate cache identity submitted');
+      assert.deepEqual([...completed].sort(), [...submitted].sort(), 'A completion did not preserve its exact cache identity');
+      assert.equal(preparation.pendingPipelineLookupCount, 0,
+        'CSS startup queried a pipeline while it was still pending');
+      report.async_pipeline_preparation = {
+        selected: preparation.selected,
+        submitted: submitted.length,
+        completed: completed.length,
+        failed: failed.length,
+        peakInFlight: preparation.peakInFlight,
+        pendingPipelineLookupCount: preparation.pendingPipelineLookupCount,
+        identitiesSettleExactlyOnce: true,
+      };
+    }
     const preload = await page.evaluate(() => {
       let seedBytes = 0;
       try { seedBytes = Module.FS.stat('/initial_pipeline_cache.db').size; } catch {}

@@ -1698,8 +1698,9 @@ const char* melee_web_native_menu_diagnostics(){
 const char* melee_web_native_menu_message(){return message.c_str();}
 int melee_web_native_menu_running(){return running;}
 int melee_web_native_menu_cache_idle(){
- if(!render_cache_can_flush())return 0;
  const auto state=aurora_pipeline_cache_status();
+ if(state==AURORA_PIPELINE_CACHE_CREATION_ERROR)return -2;
+ if(!render_cache_can_flush())return 0;
  return state==AURORA_PIPELINE_CACHE_READY?1:state==AURORA_PIPELINE_CACHE_ERROR?-1:0;
 }
 int melee_web_native_menu_phase(){return match?7:results?8:prize?9:host?melee_web_menu_host_phase(host):0;}

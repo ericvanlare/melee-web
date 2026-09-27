@@ -50,6 +50,11 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     const idle = Module._melee_web_native_menu_cache_idle;
     if (typeof idle !== 'function') throw Error('The native renderer-cache readiness service is unavailable. Reload to recover.');
     const state = idle();
+    if (state === -2) {
+      const failure = window.__meleeWebAsyncPipelineTestResults?.events?.find(event => event.event === 2)?.error;
+      throw Error(failure ? `Required graphics pipeline preparation failed: ${failure}` :
+        'Required graphics pipeline preparation failed. Reload to recover.');
+    }
     if (![1, 0, -1].includes(state)) throw Error(`Invalid native cache idle state: ${state}`);
     return state;
   }

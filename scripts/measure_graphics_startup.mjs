@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Headless startup timing probe for the public audio player.
+ * Headless startup timing probe for a packaged public player.
  *
  * This is diagnostic only. It selects a real local disc while the graphics
  * panel is visible, records Aurora/WebGPU calls and ordinary browser callback
@@ -19,19 +19,35 @@ const {values} = parseArgs({options: {
   manifest: {type: 'string'}, playwright: {type: 'string'},
   condition: {type: 'string'}, runs: {type: 'string', default: '3'},
   'boundary-only': {type: 'boolean', default: false},
+  'async-mode': {type: 'string'}, 'async-inflight': {type: 'string'},
+  'async-test-stale-completion': {type: 'boolean', default: false},
+  'async-fail-first': {type: 'boolean', default: false},
+  'expect-async-failure': {type: 'boolean', default: false},
 }});
-if (!values.url || (!values.disc && !values['boundary-only']) || !values.out || !values.manifest ||
+if (!values.url || (!values.disc && !values['boundary-only'] && !values['expect-async-failure']) || !values.out || !values.manifest ||
     !['cold', 'warm'].includes(values.condition)) {
   throw Error('Use --url ORIGIN [--disc OWNED_DISC] --out DIR --manifest PACKAGE_MANIFEST --condition cold|warm [--runs 3] [--boundary-only] [--playwright DIR]');
 }
 const runCount = Number(values.runs);
 assert(Number.isInteger(runCount) && runCount >= 1 && runCount <= 10, '--runs must be between 1 and 10');
+const startupTimeoutMs = values['async-mode'] === 'all' ? 240000 : 90000;
+if (values['async-mode'] !== undefined) {
+  assert(['one', 'all'].includes(values['async-mode']), '--async-mode must be one|all');
+  assert(['1', '2'].includes(values['async-inflight']), '--async-inflight must be 1|2');
+}
+if (values['expect-async-failure']) {
+  assert(values['async-mode'] === 'one' && values['async-fail-first'],
+    '--expect-async-failure requires --async-mode one --async-fail-first');
+}
 const discPath = values.disc ? path.resolve(values.disc) : null;
 if (discPath) await fs.access(discPath);
 const manifestPath = path.resolve(values.manifest);
 const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
-assert.equal(manifest.schema, 'melee-web-audio-player-package-v1');
-assert.equal(manifest.profile, 'audio-player');
+const isAudioPackage = manifest.schema === 'melee-web-audio-player-package-v1' && manifest.profile === 'audio-player';
+const isSilentPlayerPackage = manifest.schema === 'melee-web-public-release-v1' && manifest.profile === 'player' &&
+  manifest.runtime?.identity?.audio_policy?.mode === 'disabled';
+assert(isAudioPackage || isSilentPlayerPackage, 'Manifest must identify a reviewed audio or silent public player package');
+const runtimeIdentity = isSilentPlayerPackage ? manifest.runtime.identity : null;
 await fs.mkdir(values.out, {recursive: true});
 const packageFiles = await fs.readdir(path.resolve(values.out));
 assert(packageFiles.length === 0, '--out must be a new or empty directory');
@@ -51,8 +67,10 @@ const report = {
     'One headless Chrome process and one browser context for all samples, preceded by one unscored real-disc startup. Each sample navigates to a fresh document; context HTTP and process GPU caches are retained. The public player has no IDBFS renderer-cache persistence; its bundled seed is constant.',
   build_identity: {
     schema: manifest.schema, profile: manifest.profile,
-    source_sha: manifest.source_sha, runtime_hash: manifest.runtime_hash,
-    identity_sha256: manifest.identity_sha256,
+    source_sha: manifest.source_sha ?? null,
+    runtime_hash: manifest.runtime_hash ?? manifest.runtime?.hash,
+    identity_sha256: manifest.identity_sha256 ?? manifest.runtime?.identity_sha256,
+    prepared_gameplay_pinned_commit: runtimeIdentity?.source_inputs?.prepared_gameplay?.pinned_commit ?? null,
     manifest_sha256: await sha256(await fs.readFile(manifestPath)),
   },
   machine: {
@@ -60,6 +78,15 @@ const report = {
     cpu_model: os.cpus()[0]?.model || null,
   },
   browser_mode: 'headless installed Chrome through scripts/browser_tools.mjs',
+  instrumentation_overhead: values['async-mode'] ?
+    'Candidate adds one Promise fulfillment/rejection observer per async pipeline, C++ submit/complete timestamps and compact native identity events, plus 250 ms JS/Wasm heap samples. The WebGPU wrapper observer adds one performance.now timestamp at submit and one at settlement; GPU memory is not browser-observable.' :
+    'The existing page observer records requestAnimationFrame/setTimeout timing, WebGPU call duration, UI boundaries and long tasks. It does not wait on the GPU or add pipeline compilation calls.',
+  async_experiment_policy: values['async-mode'] ? {
+    mode: values['async-mode'], maxInFlight: Number(values['async-inflight']),
+    failFirst: values['async-fail-first'],
+    testStaleCompletion: values['async-test-stale-completion'],
+    scheduling: 'Submit at most the configured number from a zero-delay browser task. Each completion schedules the next pump as a separate task; the existing frame worker keeps its synchronous batch cap and never consumes an async-pending entry.',
+  } : null,
   attempts: [],
   failures: [],
 };
@@ -72,6 +99,8 @@ function probeInstall() {
     startedAt: performance.now(),
     frameSeq: 0, callbackSeq: 0, lastFrameTimestamp: null,
     activeCallback: null, callbacks: [], api: [], nativeBatches: [], lastNativeApiIndex: 0,
+    asyncPipelineRequests: [], asyncPipelineInFlight: 0, asyncPipelinePeakInFlight: 0,
+    memorySamples: [],
     markers: [], ui: [], longTasks: [], frameGaps: [], frameGapEvents: [], rawFrameTimestampGaps: [],
     schedulerCounts: {raf: 0, timeout: 0, interval: 0},
     errors: [], hookErrors: [], orphanNativeFrames: 0,
@@ -142,6 +171,10 @@ function probeInstall() {
       for (const entry of list.getEntries()) p.longTasks.push({start: entry.startTime, duration: entry.duration});
     }).observe({type: 'longtask', buffered: true});
   } catch (error) { p.hookErrors.push(`longtask observer: ${error.message}`); }
+  window.setInterval(() => {
+    p.memorySamples.push({at: now(), jsHeapUsedBytes: Number(performance.memory?.usedJSHeapSize) || null,
+      wasmHeapBytes: Number(window.Module?.HEAPU8?.byteLength) || null});
+  }, 250);
 
   function beginScheduledCallback(kind, scheduledAt, delayMs, frameTimestamp = null) {
     const actualAt = now();
@@ -225,13 +258,33 @@ function probeInstall() {
           let result;
           try { result = Reflect.apply(original, this, args); }
           catch (error) {
-            const endAt = now();
-            const event = {name, at: startAt, durationMs: endAt - startAt, threw: String(error?.message || error)};
+          const endAt = now();
+          const event = {name, at: startAt, durationMs: endAt - startAt, threw: String(error?.message || error)};
             addApiEvent(event, enteredAt, endAt);
             throw error;
           }
           const endAt = now();
-          addApiEvent({name, at: startAt, durationMs: endAt - startAt}, enteredAt, endAt);
+          const apiEvent = {name, at: startAt, durationMs: endAt - startAt};
+          addApiEvent(apiEvent, enteredAt, endAt);
+          if (name === 'createRenderPipelineAsync' && result && typeof result.then === 'function') {
+            const asyncRequest = {at: startAt, submittedAt: endAt, label: String(args[0]?.label || ''),
+              completionAt: null, submissionToCompletionMs: null, status: 'pending', error: null};
+            p.asyncPipelineRequests.push(asyncRequest);
+            p.asyncPipelineInFlight++;
+            p.asyncPipelinePeakInFlight = Math.max(p.asyncPipelinePeakInFlight, p.asyncPipelineInFlight);
+            result.then(() => {
+              asyncRequest.completionAt = now();
+              asyncRequest.submissionToCompletionMs = asyncRequest.completionAt - asyncRequest.submittedAt;
+              asyncRequest.status = 'success';
+              p.asyncPipelineInFlight--;
+            }, error => {
+              asyncRequest.completionAt = now();
+              asyncRequest.submissionToCompletionMs = asyncRequest.completionAt - asyncRequest.submittedAt;
+              asyncRequest.status = 'error';
+              asyncRequest.error = String(error?.message || error);
+              p.asyncPipelineInFlight--;
+            });
+          }
           return result;
         }});
       } catch (error) { p.hookErrors.push(`${name} wrapper: ${error.message}`); }
@@ -378,6 +431,10 @@ function probeInstall() {
     errors: p.errors, hookErrors: p.hookErrors, nativeBatches: p.nativeBatches,
     frameGapEvents: p.frameGapEvents,
     cacheIdleTransitions: p.cacheIdleTransitions, pipelinePreparation: p.pipelinePreparation,
+    asyncPipelineRequests: p.asyncPipelineRequests,
+    asyncPipelineInFlight: p.asyncPipelineInFlight, asyncPipelinePeakInFlight: p.asyncPipelinePeakInFlight,
+    memorySamples: p.memorySamples,
+    asyncTestResults: window.__meleeWebAsyncPipelineTestResults || null,
     graphicsReadyAt: p.graphicsReadyAt, cssReadyAt: p.cssReadyAt,
     firstNativeFrameAt: p.firstNativeFrameAt ?? null,
     assetFileCalls: p.assetFileCalls || 0, assetBytes: p.assetBytes || 0,
@@ -438,6 +495,19 @@ function timedEvents(probe) {
   const pipelineCalls = callsBeforeGraphics.filter(event => event.name === 'createRenderPipeline');
   const shaderCalls = callsBeforeGraphics.filter(event => event.name === 'createShaderModule');
   const asyncCalls = callsBeforeGraphics.filter(event => event.name === 'createRenderPipelineAsync');
+  const asyncRequests = (probe.asyncPipelineRequests || []).filter(event =>
+    graphicsReady === null || event.at <= graphicsReady);
+  const asyncCompleted = asyncRequests.filter(event => event.status !== 'pending' &&
+    (graphicsReady === null || event.completionAt <= graphicsReady));
+  const asyncTestEvents = probe.asyncTestResults?.events || [];
+  const submittedIdentity = event => `${event.type}:${event.hashHigh}:${event.hashLow}`;
+  const asyncSubmittedIds = asyncTestEvents.filter(event => event.event === 0).map(submittedIdentity);
+  const asyncSettledIds = asyncTestEvents.filter(event => event.event === 1 || event.event === 2).map(submittedIdentity);
+  const identityCounts = ids => ids.reduce((counts, id) => counts.set(id, (counts.get(id) || 0) + 1), new Map());
+  const submittedCounts = identityCounts(asyncSubmittedIds);
+  const settledCounts = identityCounts(asyncSettledIds);
+  const asyncIdentitySettlementsMatch = submittedCounts.size === settledCounts.size &&
+    [...submittedCounts].every(([id, count]) => settledCounts.get(id) === count);
   const firstApi = graphicsBatches[0]?.firstAt ?? null;
   const lastApi = graphicsBatches.at(-1)?.lastAt ?? null;
   return {
@@ -452,10 +522,35 @@ function timedEvents(probe) {
       graphicsReadySource: probe.markers.find(event => event.name === 'graphics-ui-ready')?.source || null,
     },
     preparation: {
-      pipelineCount: pipelineCalls.length,
+      pipelineCount: pipelineCalls.length + asyncCalls.length,
+      synchronousPipelineCount: pipelineCalls.length,
       shaderModuleCount: shaderCalls.length,
       asyncPipelineCount: asyncCalls.length,
+      asyncPipelineCompletion: {
+        requestCount: asyncRequests.length,
+        completedBeforeGraphicsReady: asyncCompleted.length,
+        pendingAtGraphicsReady: asyncRequests.filter(event => event.status === 'pending' ||
+          (graphicsReady !== null && event.completionAt > graphicsReady)).length,
+        activeInFlightMax: probe.asyncPipelinePeakInFlight || 0,
+        measuredSubmissionToCompletionMs: summary(asyncCompleted.map(event => event.submissionToCompletionMs)),
+        submissionToCompletionSamplesMs: asyncCompleted.map(event => event.submissionToCompletionMs),
+        statuses: asyncRequests.reduce((counts, event) => {
+          counts[event.status] = (counts[event.status] || 0) + 1;
+          return counts;
+        }, {}),
+      },
+      asyncOwnership: {
+        selected: probe.asyncTestResults?.selected || 0,
+        submitted: asyncTestEvents.filter(event => event.event === 0).length,
+        completed: asyncTestEvents.filter(event => event.event === 1).length,
+        failed: asyncTestEvents.filter(event => event.event === 2).length,
+        peakInFlight: probe.asyncTestResults?.peakInFlight || 0,
+        pendingPipelineLookupCount: probe.asyncTestResults?.pendingPipelineLookupCount || 0,
+        identitiesSettleExactlyOnce: asyncIdentitySettlementsMatch,
+        duplicateSubmissionIdentities: submittedCounts.size !== asyncSubmittedIds.length,
+      },
       activeCreateRenderPipelineMs: pipelineCalls.reduce((sum, event) => sum + event.durationMs, 0),
+      activeAsyncSubmissionMs: asyncCalls.reduce((sum, event) => sum + event.durationMs, 0),
       activeCreateShaderModuleMs: shaderCalls.reduce((sum, event) => sum + event.durationMs, 0),
       activePipelineApiWallMs: [...pipelineCalls, ...shaderCalls, ...asyncCalls].reduce((sum, event) => sum + event.durationMs, 0),
       apiWrapperOverheadMs: [...pipelineCalls, ...shaderCalls, ...asyncCalls].reduce((sum, event) => sum + event.wrapperMs, 0),
@@ -475,7 +570,8 @@ function timedEvents(probe) {
       batchSchedule: graphicsBatches,
       batchScheduleToGraphicsReadyRemainderMs: graphicsReady !== null && lastApi !== null ? graphicsReady - lastApi : null,
       throughCss: {
-        pipelineCount: callsBeforeCss.filter(event => event.name === 'createRenderPipeline').length,
+        pipelineCount: callsBeforeCss.filter(event => event.name === 'createRenderPipeline' ||
+          event.name === 'createRenderPipelineAsync').length,
         shaderModuleCount: callsBeforeCss.filter(event => event.name === 'createShaderModule').length,
         asyncPipelineCount: callsBeforeCss.filter(event => event.name === 'createRenderPipelineAsync').length,
         batchCount: cssBatches.length,
@@ -516,8 +612,14 @@ async function runAttempt(browser, context, index, warmup = false) {
     stack: String(error.stack || '').slice(0, 1000)}));
   page.on('console', message => { if (message.type() === 'error') errors.push({kind: 'console', message: message.text()}); });
   page.on('requestfailed', request => failures.push({url: request.url(), error: request.failure()?.errorText || ''}));
+  if (values['async-mode']) {
+    await page.addInitScript(({mode, maxInFlight, failFirst}) => {
+      window.__meleeWebAsyncPipelineTestPolicy = {mode, maxInFlight, failFirst};
+    }, {mode: values['async-mode'], maxInFlight: Number(values['async-inflight']),
+      failFirst: values['async-fail-first']});
+  }
   await page.addInitScript(probeInstall);
-  const driver = createBrowserDriver(page, {surface: 'public', timeoutMs: 90000});
+  const driver = createBrowserDriver(page, {surface: 'public', timeoutMs: startupTimeoutMs});
   const startedAt = Date.now();
   let attempt = {index, warmup, status: 'running', screenshot: null};
   try {
@@ -527,13 +629,39 @@ async function runAttempt(browser, context, index, warmup = false) {
     assert.equal(headers['cross-origin-opener-policy'], 'same-origin');
     assert.equal(headers['cross-origin-embedder-policy'], 'require-corp');
     assert.match(headers['content-security-policy'] || '', /'wasm-unsafe-eval'/);
+    if (values['expect-async-failure']) {
+      await page.waitForFunction(() => document.querySelector('#error-dialog')?.open === true,
+        null, {timeout: 60000});
+      const failurePage = await page.evaluate(() => ({
+        error: document.querySelector('#error')?.textContent || '',
+        launchCalls: window.__graphicsStartupProbe.markers.filter(event => event.name === 'native-launch-call').length,
+        asyncTestResults: window.__meleeWebAsyncPipelineTestResults || null,
+        probe: window.__graphicsStartupProbe.snapshot(),
+      }));
+      attempt.browser = browser.version();
+      attempt.expectedFailure = failurePage;
+      const events = failurePage.asyncTestResults?.events || [];
+      assert.match(failurePage.error, /pipeline preparation failed/i,
+        'Async pipeline failure was not visible to the startup owner');
+      assert.equal(failurePage.launchCalls, 0, 'Native launch occurred after required pipeline failure');
+      assert.equal(events.filter(event => event.event === 0).length, 1, 'Expected one actual async submission');
+      assert.equal(events.filter(event => event.event === 2).length, 1, 'Expected one visible WebGPU rejection');
+      assert.equal(events.filter(event => event.event === 1).length, 0, 'Rejected pipeline was counted as ready');
+      assert(events.find(event => event.event === 2)?.error, 'WebGPU failure message was lost');
+      attempt.status = 'pass';
+      attempt.wallDurationMs = Date.now() - startedAt;
+      attempt.screenshot = path.join(values.out, `attempt-${index}-expected-failure.png`);
+      await page.screenshot({path: attempt.screenshot, fullPage: true});
+      await page.close();
+      return attempt;
+    }
     await page.locator('#loading-panel').waitFor({state: 'visible', timeout: 30000});
     await page.waitForFunction(() => {
       const panel = document.querySelector('#loading-panel');
       const label = document.querySelector('#loading-label')?.textContent || '';
       const choose = document.querySelector('#choose-disc');
       return panel && !panel.hidden && /Preparing graphics/i.test(label) && choose && !choose.disabled;
-    }, null, {timeout: 90000});
+    }, null, {timeout: startupTimeoutMs});
     const earlyBoundary = await page.evaluate(() => ({
       at: performance.now(), label: document.querySelector('#loading-label')?.textContent || '',
       hidden: document.querySelector('#loading-panel')?.hidden ?? null,
@@ -544,7 +672,7 @@ async function runAttempt(browser, context, index, warmup = false) {
     attempt.earlyBoundary = earlyBoundary;
     if (values['boundary-only']) {
       await page.waitForFunction(() => document.querySelector('#loading-panel')?.hidden === true,
-        null, {timeout: 90000});
+        null, {timeout: startupTimeoutMs});
     } else {
       await driver.selectDisc(discPath);
       await page.waitForFunction(() => /\.ciso\b/i.test(document.querySelector('#disc-selection-status')?.textContent || ''),
@@ -571,7 +699,12 @@ async function runAttempt(browser, context, index, warmup = false) {
       const module = globalThis.Module;
       let phase = null, running = null;
       try { phase = module._melee_web_native_menu_phase(); running = module._melee_web_native_menu_running(); } catch {}
-      return {probe, resources, final: {phase, running,
+      const memorySamples = probe.memorySamples;
+      const maxMetric = key => Math.max(0, ...memorySamples.map(sample => Number(sample[key]) || 0));
+      return {probe, resources, memory: {samples: memorySamples.length,
+        peakJsHeapUsedBytes: maxMetric('jsHeapUsedBytes') || null,
+        peakWasmHeapBytes: maxMetric('wasmHeapBytes') || null,
+        gpuMemoryObservable: false}, final: {phase, running,
         loadingHidden: document.querySelector('#loading-panel')?.hidden ?? null,
         discStatus: document.querySelector('#disc-selection-status')?.textContent || '',
         launchCalls: probe.markers.filter(event => event.name === 'native-launch-call').length}};
@@ -585,6 +718,35 @@ async function runAttempt(browser, context, index, warmup = false) {
       assert.equal(pageMetrics.final.phase, 1, 'Original CSS was not entered');
       assert.equal(pageMetrics.final.running, 1, 'CSS is not playable');
       assert.equal(pageMetrics.final.launchCalls, 1, 'Automatic launch did not invoke CSS exactly once');
+    }
+    if (values['async-mode'] && !values['async-fail-first']) {
+      const asyncPrep = attempt.metrics.preparation;
+      assert.equal(asyncPrep.asyncPipelineCompletion.pendingAtGraphicsReady, 0,
+        'Graphics readiness opened before every async WebGPU promise completed');
+      assert.equal(asyncPrep.asyncOwnership.identitiesSettleExactlyOnce, true,
+        'An async submission did not settle exactly once to its original cache identity');
+      assert.equal(asyncPrep.asyncOwnership.duplicateSubmissionIdentities, false,
+        'The same exact cache identity was submitted more than once');
+      assert(asyncPrep.asyncOwnership.peakInFlight <= Number(values['async-inflight']),
+        'The native async creation cap was exceeded');
+      assert.equal(asyncPrep.asyncOwnership.pendingPipelineLookupCount, 0,
+        'Renderer requested a pending pipeline before readiness; drawing would have been skipped');
+      assert.equal(asyncPrep.asyncOwnership.submitted,
+        asyncPrep.asyncOwnership.completed + asyncPrep.asyncOwnership.failed,
+        'A native async submission did not settle before the graphics barrier');
+      assert(asyncPrep.asyncOwnership.selected >= (values['async-mode'] === 'one' ? 1 : 1),
+        'The test-only policy did not select any actual game pipeline descriptor');
+      assert.equal(asyncPrep.asyncOwnership.failed, 0, 'Unexpected async pipeline failure');
+    }
+    if (values['async-test-stale-completion']) {
+      assert(values['async-mode'], '--async-test-stale-completion requires --async-mode');
+      const staleCheck = await page.evaluate(() => {
+        const check = Module._melee_web_async_pipeline_test_reject_stale_generation;
+        return typeof check === 'function' ? check() : null;
+      });
+      assert.equal(staleCheck, 1,
+        'A completion from a retired pipeline-cache generation changed the active owner');
+      attempt.metrics.preparation.asyncOwnership.staleRetiredGenerationRejected = true;
     }
     assert.equal(attempt.errors.length, 0, 'Browser emitted startup errors');
     assert(attempt.metrics.graphicsReadyAtMs !== null, 'No separate full graphics-ready UI boundary was observed');
@@ -670,6 +832,11 @@ report.summary = {
   pipelineCreateSpanMs: summary(report.attempts.map(attempt => attempt.metrics?.preparation.pipelineCreateSpanMs).filter(Number.isFinite)),
   animationGapMaxMs: summary(report.attempts.map(attempt => attempt.metrics?.responsiveness.animationCallbackGapMs.max).filter(Number.isFinite)),
   longTaskCount: summary(report.attempts.map(attempt => attempt.metrics?.responsiveness.longTaskMs.count).filter(Number.isFinite)),
+  asyncPipelineCompletionMs: summary(report.attempts.flatMap(attempt =>
+    attempt.metrics?.preparation.asyncPipelineCompletion.submissionToCompletionSamplesMs || [])),
+  asyncPeakInFlight: summary(report.attempts.map(attempt => attempt.metrics?.preparation.asyncOwnership.peakInFlight).filter(Number.isFinite)),
+  peakJsHeapUsedBytes: summary(report.attempts.map(attempt => attempt.page?.memory?.peakJsHeapUsedBytes).filter(Number.isFinite)),
+  peakWasmHeapBytes: summary(report.attempts.map(attempt => attempt.page?.memory?.peakWasmHeapBytes).filter(Number.isFinite)),
 };
 report.result = report.failures.length === 0 && report.attempts.length === runCount ? 'pass' : 'fail';
 await fs.writeFile(path.join(values.out, 'report.json'), JSON.stringify(report, null, 2));

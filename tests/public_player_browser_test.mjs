@@ -9,6 +9,7 @@ import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.m
 import {installBrowserAudioTrace} from './browser_audio_trace.mjs';
 const {values} = parseArgs({options: {
   ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
+  'async-inflight': {type: 'string'},
   audio: {type: 'boolean', default: false},
   headed: {type: 'boolean', default: false},
 }});
@@ -29,6 +30,11 @@ const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.ve
     identity_sha256: packageManifest.identity_sha256,
   } : null,
   scope: values.audio ? 'Production audio-enabled public entry, ordinary keyboard UI, original menu route, supported match/results lifecycle, Web Audio initialization and nonzero PCM transport. No retail pixel/PCM equivalence, audible-quality, physical-controller or foreground-timing claim.' : 'Production entry, ordinary keyboard UI, lifecycle and application network smoke. No retail comparison, physical-controller, PCM or performance claim.'};
+if (values['async-inflight'] !== undefined) {
+  const maxInFlight = Number(values['async-inflight']);
+  assert.equal(maxInFlight, 1, 'Only the correctness-checked one-in-flight experiment is allowed here');
+  report.async_pipeline_policy = {mode: 'all', maxInFlight};
+}
 page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData()}));
 page.on('pageerror', error => errors.push(error.message));
 page.on('websocket', socket => sockets.push(socket.url()));
@@ -142,6 +148,11 @@ const assertUnloadCompleted = async () => {
 };
 async function collectViolations() { violations.push(...await page.evaluate(() => window.releaseCspViolations)); }
 const selectDisc = driver.selectDisc;
+if (values['async-inflight'] !== undefined) {
+  await page.addInitScript(({maxInFlight}) => {
+    window.__meleeWebAsyncPipelineTestPolicy = {mode: 'all', maxInFlight};
+  }, {maxInFlight: Number(values['async-inflight'])});
+}
 async function armLaunchObserver() {
   await page.waitForFunction(() => typeof globalThis.Module?._melee_web_native_menu_launch === 'function',
     null, {timeout: 30000});
@@ -192,6 +203,31 @@ async function waitForCssOrAudioRecovery() {
   }
   await phase(1);
   assert(await page.locator('#error-dialog').isHidden());
+  if (values['async-inflight'] !== undefined) {
+    const preparation = await page.evaluate(() => window.__meleeWebAsyncPipelineTestResults || null);
+    assert(preparation, 'Async pipeline preparation diagnostics are unavailable');
+    const events = preparation.events || [];
+    const identities = eventCode => events.filter(event => event.event === eventCode)
+      .map(event => `${event.type}:${event.hashHigh}:${event.hashLow}`);
+    const submitted = identities(0), completed = identities(1), failed = identities(2);
+    assert.equal(preparation.selected, 884, 'The full bundled startup seed must use the async path');
+    assert.equal(submitted.length, preparation.selected, 'Every selected cache entry must be submitted');
+    assert.equal(completed.length + failed.length, submitted.length, 'Every submission must settle');
+    assert.equal(failed.length, 0, 'A graphics pipeline failed during startup');
+    assert.equal(new Set(submitted).size, submitted.length, 'Duplicate cache identity submitted');
+    assert.deepEqual([...completed].sort(), [...submitted].sort(), 'A completion did not preserve its exact cache identity');
+    assert.equal(preparation.pendingPipelineLookupCount, 0,
+      'The renderer queried a pipeline while it was still pending');
+    report.async_pipeline_preparation = {
+      selected: preparation.selected,
+      submitted: submitted.length,
+      completed: completed.length,
+      failed: failed.length,
+      peakInFlight: preparation.peakInFlight,
+      pendingPipelineLookupCount: preparation.pendingPipelineLookupCount,
+      identitiesSettleExactlyOnce: true,
+    };
+  }
   return recovery;
 }
 

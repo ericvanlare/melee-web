@@ -85,7 +85,7 @@ index f8f9461..dcaaf02 100644
  if (AURORA_ENABLE_RMLUI)
      target_sources(aurora_gx PRIVATE
 diff --git a/extern/CMakeLists.txt b/extern/CMakeLists.txt
-index e1feaca..5051b3e 100644
+index e1feaca..70e4b17 100644
 --- a/extern/CMakeLists.txt
 +++ b/extern/CMakeLists.txt
 @@ -213,11 +213,36 @@ if (AURORA_ENABLE_GX)
@@ -127,10 +127,10 @@ index e1feaca..5051b3e 100644
      target_link_libraries(imgui_backends PRIVATE imgui ${AURORA_SDL3_TARGET} dawn::webgpu_dawn)
      target_link_libraries(imgui PUBLIC imgui_backends)
 diff --git a/include/aurora/aurora.h b/include/aurora/aurora.h
-index 56c7aae..4a1c018 100644
+index 56c7aae..b8354db 100644
 --- a/include/aurora/aurora.h
 +++ b/include/aurora/aurora.h
-@@ -37,6 +37,12 @@ typedef enum {
+@@ -37,6 +37,13 @@ typedef enum {
    LOG_FATAL,
  } AuroraLogLevel;
  
@@ -138,12 +138,13 @@ index 56c7aae..4a1c018 100644
 +  AURORA_PIPELINE_CACHE_READY,
 +  AURORA_PIPELINE_CACHE_PENDING,
 +  AURORA_PIPELINE_CACHE_ERROR,
++  AURORA_PIPELINE_CACHE_CREATION_ERROR,
 +} AuroraPipelineCacheStatus;
 +
  typedef struct {
    int32_t x;
    int32_t y;
-@@ -131,6 +137,11 @@ void aurora_shutdown();
+@@ -131,6 +138,11 @@ void aurora_shutdown();
  const AuroraEvent* aurora_update();
  bool aurora_begin_frame();
  void aurora_end_frame();
@@ -347,10 +348,10 @@ index 252fca7..3e36937 100644
  void PADSetVirtualStatus(u32 port, const PADStatus* status);
  void PADClearVirtualStatus(u32 port);
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842..7d9b3a1 100644
+index 9430842..2b914e0 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
-@@ -1,6 +1,10 @@
+@@ -1,9 +1,14 @@
  #include <aurora/aurora.h>
  #include <aurora/time.hpp>
  
@@ -361,7 +362,11 @@ index 9430842..7d9b3a1 100644
  #ifdef AURORA_ENABLE_GX
  #include "gfx/resources.hpp"
  #include "gfx/frame.hpp"
-@@ -39,12 +43,57 @@ char g_gameName[4];
++#include "gfx/pipeline_cache.hpp"
+ #include "gfx/recording.hpp"
+ #include "gfx/render_worker.hpp"
+ #include "gx/command_processor.hpp"
+@@ -39,12 +44,57 @@ char g_gameName[4];
  namespace {
  constexpr Module Log{"aurora"};
  
@@ -419,7 +424,7 @@ index 9430842..7d9b3a1 100644
  uint32_t clamp_scissor_coord(double value, uint32_t maximum) noexcept {
    if (!std::isfinite(value)) {
      return 0;
-@@ -236,27 +285,47 @@ const AuroraEvent* update() noexcept {
+@@ -236,27 +286,47 @@ const AuroraEvent* update() noexcept {
  bool begin_frame() noexcept {
    ZoneScoped;
  #ifdef AURORA_ENABLE_GX
@@ -467,7 +472,7 @@ index 9430842..7d9b3a1 100644
  #endif
    return true;
  }
-@@ -264,10 +333,19 @@ bool begin_frame() noexcept {
+@@ -264,10 +334,19 @@ bool begin_frame() noexcept {
  void end_frame() noexcept {
    ZoneScoped;
  #ifdef AURORA_ENABLE_GX
@@ -487,7 +492,7 @@ index 9430842..7d9b3a1 100644
    auto imguiDrawData = imgui::freeze();
  
    const auto& presentSource = webgpu::present_source();
-@@ -284,10 +362,13 @@ void end_frame() noexcept {
+@@ -284,10 +363,13 @@ void end_frame() noexcept {
      rmlOverlay = rmlFrame.overlay;
    }
  #endif
@@ -504,7 +509,7 @@ index 9430842..7d9b3a1 100644
      wgpu::Texture currentTexture;
      wgpu::TextureView currentView;
      auto surfaceStatus = wgpu::SurfaceGetCurrentTextureStatus::Error;
-@@ -307,6 +388,13 @@ void end_frame() noexcept {
+@@ -307,6 +389,13 @@ void end_frame() noexcept {
  
      const bool canPresent = currentTexture && currentView;
      if (canPresent) {
@@ -518,7 +523,7 @@ index 9430842..7d9b3a1 100644
        wgpu::BindGroup presentBindGroup;
        if (rmlBindGroup && !rmlOverlay) {
          presentBindGroup = rmlBindGroup;
-@@ -332,8 +420,7 @@ void end_frame() noexcept {
+@@ -332,8 +421,7 @@ void end_frame() noexcept {
          // Copy EFB -> XFB (swapchain)
          pass.SetPipeline(webgpu::g_CopyPipeline);
          pass.SetBindGroup(0, presentBindGroup, 0, nullptr);
@@ -528,7 +533,7 @@ index 9430842..7d9b3a1 100644
  
          pass.Draw(3);
          if (rmlBindGroup && rmlOverlay) {
-@@ -358,8 +445,8 @@ void end_frame() noexcept {
+@@ -358,8 +446,8 @@ void end_frame() noexcept {
              .timestampWrites = webgpu::gpu_prof::pass_writes("ImGui"),
          };
          const auto pass = encoder.BeginRenderPass(&renderPassDescriptor);
@@ -539,7 +544,7 @@ index 9430842..7d9b3a1 100644
          imgui::render(pass, imguiDrawData);
          pass.End();
        }
-@@ -367,12 +454,21 @@ void end_frame() noexcept {
+@@ -367,12 +455,21 @@ void end_frame() noexcept {
        Log.info("Skipping present; window not presentable");
      }
      webgpu::gpu_prof::frame_end(encoder);
@@ -561,7 +566,7 @@ index 9430842..7d9b3a1 100644
      webgpu::gpu_prof::after_submit();
      if (canPresent && g_surface) {
        ZoneScopedN("Present");
-@@ -380,7 +476,12 @@ void end_frame() noexcept {
+@@ -380,7 +477,12 @@ void end_frame() noexcept {
        {
          window::SurfaceLock surfaceLock;
          if (window::is_presentable()) {
@@ -574,7 +579,7 @@ index 9430842..7d9b3a1 100644
          }
        }
        if (status) {
-@@ -429,7 +530,7 @@ void end_frame() noexcept {
+@@ -429,7 +531,7 @@ void end_frame() noexcept {
      TracyPlotConfig("aurora: lastStorageSize", tracy::PlotFormatType::Memory, false, true, 0);
      TracyPlotConfig("aurora: lastTextureUploadSize", tracy::PlotFormatType::Memory, false, true, 0);
  
@@ -583,7 +588,7 @@ index 9430842..7d9b3a1 100644
      TracyPlot("aurora: queuedPipelines", static_cast<int64_t>(stats.queuedPipelines));
      TracyPlot("aurora: createdPipelines", static_cast<int64_t>(stats.createdPipelines));
      TracyPlot("aurora: drawCallCount", static_cast<int64_t>(stats.drawCallCount));
-@@ -439,8 +540,25 @@ void end_frame() noexcept {
+@@ -439,8 +541,25 @@ void end_frame() noexcept {
      TracyPlot("aurora: lastIndexSize", static_cast<int64_t>(stats.lastIndexSize));
      TracyPlot("aurora: lastStorageSize", static_cast<int64_t>(stats.lastStorageSize));
      TracyPlot("aurora: lastTextureUploadSize", static_cast<int64_t>(stats.lastTextureUploadSize));
@@ -609,7 +614,7 @@ index 9430842..7d9b3a1 100644
  #endif
  }
  } // namespace
-@@ -454,6 +572,33 @@ void aurora_shutdown() { aurora::shutdown(); }
+@@ -454,6 +573,38 @@ void aurora_shutdown() { aurora::shutdown(); }
  const AuroraEvent* aurora_update() { return aurora::update(); }
  bool aurora_begin_frame() { return aurora::begin_frame(); }
  void aurora_end_frame() { aurora::end_frame(); }
@@ -629,6 +634,11 @@ index 9430842..7d9b3a1 100644
 +}
 +AuroraPipelineCacheStatus aurora_pipeline_cache_status() {
 +#ifdef AURORA_ENABLE_GX
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++  if (aurora::gfx::pipeline_cache_creation_failed()) {
++    return AURORA_PIPELINE_CACHE_CREATION_ERROR;
++  }
++#endif
 +  switch (aurora::gfx::pipeline_cache_status()) {
 +  case aurora::gfx::PipelineCacheStatus::Ready:
 +    return AURORA_PIPELINE_CACHE_READY;
@@ -722,6 +732,105 @@ index 0a35990..11a6faf 100644
    const auto controller = aurora::input::get_controller_for_player(chan);
    if (should_use_device_rumble(chan, controller)) {
      u16 low = 0;
+diff --git a/lib/gfx/clear.cpp b/lib/gfx/clear.cpp
+index cc73248..5315508 100644
+--- a/lib/gfx/clear.cpp
++++ b/lib/gfx/clear.cpp
+@@ -149,6 +149,73 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+   return g_device.CreateRenderPipeline(&pipelineDescriptor);
+ }
+ 
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++void create_pipeline_async_test(const PipelineConfig& config, PipelineCreationCompletion completion, bool failForTest) {
++  ZoneScoped;
++  const bool writesSceneColor = config.clearColor || config.clearAlpha;
++  const auto source = shader_source(writesSceneColor);
++  wgpu::ShaderSourceWGSL sourceDescriptor{};
++  sourceDescriptor.code = source.c_str();
++  const wgpu::ShaderModuleDescriptor moduleDescriptor{
++      .nextInChain = &sourceDescriptor,
++      .label = "EFB Clear Module",
++  };
++  auto module = g_device.CreateShaderModule(&moduleDescriptor);
++  constexpr wgpu::PipelineLayoutDescriptor layoutDescriptor{
++      .bindGroupLayoutCount = 0,
++      .bindGroupLayouts = nullptr,
++  };
++  auto pipelineLayout = g_device.CreatePipelineLayout(&layoutDescriptor);
++  constexpr wgpu::BlendState blendState{
++      .color = {.operation = wgpu::BlendOperation::Add, .srcFactor = wgpu::BlendFactor::Constant,
++                .dstFactor = wgpu::BlendFactor::Zero},
++      .alpha = {.operation = wgpu::BlendOperation::Add, .srcFactor = wgpu::BlendFactor::Constant,
++                .dstFactor = wgpu::BlendFactor::Zero},
++  };
++  std::array<wgpu::ColorTargetState, MaxColorAttachments> colorTargets{};
++  for (uint32_t i = 0; i < config.colorAttachmentCount; ++i) {
++    colorTargets[i] = {.format = config.colorFormats[i], .writeMask = wgpu::ColorWriteMask::None};
++  }
++  colorTargets[SceneColorAttachmentIndex].blend = &blendState;
++  colorTargets[SceneColorAttachmentIndex].writeMask = clear_write_mask(config.clearColor, config.clearAlpha);
++  const wgpu::FragmentState fragmentState{
++      .module = module,
++      .entryPoint = failForTest ? "__melee_async_pipeline_test_invalid_entry__" : "fs_main",
++      .targetCount = config.colorAttachmentCount,
++      .targets = colorTargets.data(),
++  };
++  const wgpu::DepthStencilState depthStencil{
++      .format = config.depthStencilFormat,
++      .depthWriteEnabled = config.clearDepth,
++      .depthCompare = wgpu::CompareFunction::Always,
++  };
++  const auto label = fmt::format("EFB Clear Pipeline (color {}, alpha {}, depth {})", config.clearColor,
++                                 config.clearAlpha, config.clearDepth);
++  const wgpu::RenderPipelineDescriptor descriptor{
++      .label = label.c_str(),
++      .layout = pipelineLayout,
++      .vertex = {.module = module, .entryPoint = "vs_main"},
++      .primitive = {.topology = wgpu::PrimitiveTopology::TriangleList},
++      .depthStencil = config.depthStencilFormat != wgpu::TextureFormat::Undefined ? &depthStencil : nullptr,
++      .multisample = {.count = config.msaaSamples},
++      .fragment = &fragmentState,
++  };
++  g_device.CreateRenderPipelineAsync(
++      &descriptor, wgpu::CallbackMode::AllowSpontaneous,
++      [module = std::move(module), pipelineLayout = std::move(pipelineLayout), completion = std::move(completion)]
++      (wgpu::CreatePipelineAsyncStatus status, wgpu::RenderPipeline pipeline, wgpu::StringView message) mutable {
++        (void)module;
++        (void)pipelineLayout;
++        std::string error;
++        if (status != wgpu::CreatePipelineAsyncStatus::Success) {
++          error = message.data != nullptr ? std::string(message.data, message.length) :
++              "WebGPU async pipeline creation failed";
++        }
++        completion(std::move(pipeline), error);
++      });
++}
++#endif
++
+ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass, const wgpu::Extent3D& targetSize) {
+   if (!bind_pipeline(data.pipeline, pass)) {
+     return;
+diff --git a/lib/gfx/clear.hpp b/lib/gfx/clear.hpp
+index 0f7a946..e498aae 100644
+--- a/lib/gfx/clear.hpp
++++ b/lib/gfx/clear.hpp
+@@ -3,6 +3,7 @@
+ #include <aurora/gfx.hpp>
+ 
+ #include "types.hpp"
++#include "pipeline_cache.hpp"
+ 
+ #include <array>
+ 
+@@ -33,5 +34,8 @@ static_assert(std::has_unique_object_representations_v<PipelineConfig>);
+ PipelineConfig make_pipeline_config(const RenderTargetLayout& layout, bool clearColor, bool clearAlpha,
+                                     bool clearDepth) noexcept;
+ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config);
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++void create_pipeline_async_test(const PipelineConfig& config, PipelineCreationCompletion completion, bool failForTest);
++#endif
+ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass, const wgpu::Extent3D& targetSize);
+ } // namespace aurora::gfx::clear
 diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
 index b3054be..9fe8bd7 100644
 --- a/lib/gfx/encoding.cpp
@@ -1524,7 +1633,7 @@ index d50ce6a..8f7ded5 100644
    std::deque<TextureCopy> textureCopies;
    std::deque<EncoderTask> encoderTasks;
 diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
-index bff9b47..52b5ffe 100644
+index bff9b47..598e0e3 100644
 --- a/lib/gfx/pipeline_cache.cpp
 +++ b/lib/gfx/pipeline_cache.cpp
 @@ -1,10 +1,20 @@
@@ -1548,7 +1657,7 @@ index bff9b47..52b5ffe 100644
  #ifdef AURORA_ENABLE_RMLUI
  #include "../rmlui/pipeline.hpp"
  #endif
-@@ -14,12 +24,16 @@
+@@ -14,18 +24,27 @@
  #include <algorithm>
  #include <atomic>
  #include <condition_variable>
@@ -1557,15 +1666,40 @@ index bff9b47..52b5ffe 100644
  #include <filesystem>
 +#include <list>
  #include <limits>
++#include <memory>
  #include <mutex>
  #include <optional>
  #include <thread>
++#include <type_traits>
 +#include <utility>
 +#include <vector>
  
  #include <SDL3/SDL_iostream.h>
  #include <absl/container/flat_hash_map.h>
-@@ -53,6 +67,33 @@ struct PipelineCacheWrite {
+ #include <absl/container/flat_hash_set.h>
+ #include <fmt/format.h>
+ #include <tracy/Tracy.hpp>
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++#include <emscripten.h>
++#endif
+ 
+ namespace aurora::gfx {
+ static Module Log("aurora::gfx::pipeline_cache");
+@@ -41,8 +60,13 @@ struct CachedPipeline {
+ 
+ struct PendingPipeline {
+   PipelineRef hash;
++  ShaderType type = ShaderType::Clear;
+   uint32_t firstFrameUsed = UINT32_MAX;
+   NewPipelineCallback create;
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++  NewAsyncPipelineCallback createAsync;
++  bool failForTest = false;
++#endif
+ };
+ 
+ struct PipelineCacheWrite {
+@@ -53,6 +77,33 @@ struct PipelineCacheWrite {
    uint32_t firstFrameUsed = UINT32_MAX;
  };
  
@@ -1599,7 +1733,7 @@ index bff9b47..52b5ffe 100644
  struct SdlVfsSqliteFile {
    sqlite3_file base;
    SDL_IOStream* io = nullptr;
-@@ -80,14 +121,56 @@ static std::atomic_bool g_gpuCachePrunePending = false;
+@@ -80,14 +131,69 @@ static std::atomic_bool g_gpuCachePrunePending = false;
  static sqlite3* g_pipelineCacheDb = nullptr;
  static sqlite3_stmt* g_pipelineCacheLoadStmt = nullptr;
  static sqlite3_stmt* g_pipelineCacheUpsertStmt = nullptr;
@@ -1610,6 +1744,19 @@ index bff9b47..52b5ffe 100644
 +/* Guards the prepare mode lifecycle against both ordinary and selective
 + * cache instances.  This is protected by g_pipelineMutex. */
 +static bool g_pipelineCacheInitialized = false;
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++static std::atomic<uint64_t> g_pipelineCacheGeneration{0};
++static std::atomic_bool g_pipelineCreationError{false};
++static bool g_asyncTestEnabled = false;
++static bool g_asyncTestFailFirst = false;
++static uint32_t g_asyncTestMode = 0;
++static uint32_t g_asyncTestLimit = 0;
++static uint32_t g_asyncTestSelected = 0;
++static uint32_t g_asyncTestInFlight = 0;
++static uint32_t g_asyncTestPeakInFlight = 0;
++static uint32_t g_asyncTestPendingLookups = 0;
++static bool g_asyncPumpScheduled = false;
++#endif
  static std::thread g_pipelineCacheWriterThread;
  static std::condition_variable g_pipelineCacheWriterCv;
  static std::mutex g_pipelineCacheWriterMutex;
@@ -1658,7 +1805,7 @@ index bff9b47..52b5ffe 100644
  static SdlVfsSqliteFile* sdl_vfs_file(sqlite3_file* file) { return reinterpret_cast<SdlVfsSqliteFile*>(file); }
  
  static sqlite3_vfs* default_vfs(sqlite3_vfs* vfs) { return static_cast<sqlite3_vfs*>(vfs->pAppData); }
-@@ -357,7 +440,13 @@ static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
+@@ -357,7 +463,13 @@ static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
  
    {
      std::lock_guard lock{g_pipelineCacheWriterMutex};
@@ -1673,12 +1820,13 @@ index bff9b47..52b5ffe 100644
    }
    g_pipelineCacheWriterCv.notify_one();
  }
-@@ -418,15 +507,147 @@ static std::optional<PendingPipeline> take_pending_pipeline(PipelineRef hash) {
+@@ -418,46 +530,362 @@ static std::optional<PendingPipeline> take_pending_pipeline(PipelineRef hash) {
    return std::nullopt;
  }
  
 -static void notify_pipeline_ready(bool queued) {
 -  ++createdPipelines;
+-  if (queued && --queuedPipelines == 0 && g_gpuCachePrunePending.exchange(false, std::memory_order_acq_rel)) {
 +#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
 +static void selective_refresh_status_locked() noexcept;
 +#endif
@@ -1687,7 +1835,11 @@ index bff9b47..52b5ffe 100644
 +  if (valid) {
 +    ++createdPipelines;
 +  }
-   if (queued && --queuedPipelines == 0 && g_gpuCachePrunePending.exchange(false, std::memory_order_acq_rel)) {
++  if (queued && --queuedPipelines == 0 && g_gpuCachePrunePending.exchange(false, std::memory_order_acq_rel)
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++      && !g_pipelineCreationError.load(std::memory_order_acquire)
++#endif
++  ) {
      // Prune GPU cache entries after fully loading the pipeline cache.
      webgpu::cache_prune();
    }
@@ -1697,8 +1849,144 @@ index bff9b47..52b5ffe 100644
 +    selective_refresh_status_locked();
 +  }
 +#endif
-+  g_pipelineReadyCv.notify_all();
+   g_pipelineReadyCv.notify_all();
+ }
+ 
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++static void schedule_async_pipeline_pump();
++static void async_pipeline_pump();
++
++static void report_async_test_event(uint32_t event, ShaderType type, PipelineRef hash, uint32_t firstFrameUsed,
++                                    uint32_t inFlight, const char* error = "") {
++  // Wasm32 Aurora builds use a 32-bit PipelineRef; type plus this full key is
++  // the exact cache identity in this test profile.
++  const uint32_t high = 0;
++  const uint32_t low = static_cast<uint32_t>(hash);
++  EM_ASM({
++    const report = window.__meleeWebAsyncPipelineTestResults;
++    if (!report) return;
++    const item = {};
++    item.event = $0;
++    item.type = $1;
++    item.hashHigh = $2;
++    item.hashLow = $3;
++    item.firstFrameUsed = $4;
++    item.inFlight = $5;
++    item.at = performance.now();
++    item.error = UTF8ToString($6);
++    report.events.push(item);
++  }, event, underlying(type), high, low, firstFrameUsed, inFlight, error);
 +}
++
++static void initialize_async_test_policy() {
++  const int32_t policy = EM_ASM_INT({
++    const value = window.__meleeWebAsyncPipelineTestPolicy;
++    if (!value || !Number.isInteger(value.maxInFlight) ||
++        (value.maxInFlight !== 1 && value.maxInFlight !== 2)) return 0;
++    if (value.mode === 'one') return value.maxInFlight;
++    if (value.mode === 'all') return 10 + value.maxInFlight;
++    return 0;
++  });
++  g_asyncTestEnabled = policy != 0;
++  g_asyncTestMode = policy >= 10 ? 2 : (policy != 0 ? 1 : 0);
++  g_asyncTestLimit = policy >= 10 ? static_cast<uint32_t>(policy - 10) :
++                     (policy != 0 ? static_cast<uint32_t>(policy) : 0);
++  g_asyncTestFailFirst = EM_ASM_INT({
++    const value = window.__meleeWebAsyncPipelineTestPolicy;
++    return value && value.failFirst === true ? 1 : 0;
++  }) != 0;
++  g_asyncTestSelected = 0;
++  g_asyncTestInFlight = 0;
++  g_asyncTestPeakInFlight = 0;
++  g_asyncTestPendingLookups = 0;
++  g_asyncPumpScheduled = false;
++  g_pipelineCreationError = false;
++  EM_ASM({
++    if (window.__meleeWebAsyncPipelineTestPolicy) {
++      const report = {};
++      report.mode = UTF8ToString($0);
++      report.maxInFlight = $1;
++      report.events = [];
++      report.peakInFlight = 0;
++      report.pendingPipelineLookupCount = 0;
++      window.__meleeWebAsyncPipelineTestResults = report;
++    }
++  }, g_asyncTestMode == 2 ? "all" : g_asyncTestMode == 1 ? "one" : "disabled", g_asyncTestLimit);
++}
++
++static void async_pipeline_finish(uint64_t generation, ShaderType type, PipelineRef hash, uint32_t firstFrameUsed,
++                                  double submittedAt, std::atomic_bool& settled, wgpu::RenderPipeline pipeline,
++                                  std::string error) {
++  if (settled.exchange(true, std::memory_order_acq_rel)) {
++    return;
++  }
++  if (generation != g_pipelineCacheGeneration.load(std::memory_order_acquire)) {
++    return;
++  }
++
++  const bool valid = error.empty() && static_cast<bool>(pipeline);
++  if (!valid && error.empty()) {
++    error = "WebGPU returned an empty render pipeline without an error message";
++  }
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    if (!g_pipelineCacheInitialized || generation != g_pipelineCacheGeneration.load(std::memory_order_relaxed)) {
++      return;
++    }
++    if (valid) {
++      g_pipelines.try_emplace(hash, CachedPipeline{.pipeline = std::move(pipeline), .firstFrameUsed = firstFrameUsed});
++    } else {
++      g_pipelineCreationError.store(true, std::memory_order_release);
++      g_pendingPipelines.erase(hash);
++      Log.error("Asynchronous render pipeline {:x} failed: {}", hash, error);
++      size_t canceled = 0;
++      for (const auto& pending : g_pipelineQueue) {
++        g_pendingPipelines.erase(pending.hash);
++        ++canceled;
++      }
++      for (const auto& pending : g_backgroundPipelineQueue) {
++        g_pendingPipelines.erase(pending.hash);
++        ++canceled;
++      }
++      g_pipelineQueue.clear();
++      g_backgroundPipelineQueue.clear();
++      if (canceled != 0) {
++        queuedPipelines -= canceled;
++      }
++    }
++    if (g_asyncTestInFlight > 0) {
++      --g_asyncTestInFlight;
++    }
++  }
++  const double completionMs = emscripten_get_now() - submittedAt;
++  report_async_test_event(valid ? 1U : 2U, type, hash, firstFrameUsed, g_asyncTestInFlight,
++                          error.c_str());
++  EM_ASM({
++    const report = window.__meleeWebAsyncPipelineTestResults;
++    if (report) report.events[report.events.length - 1].submissionToCompletionMs = $0;
++  }, completionMs);
++  notify_pipeline_ready(true, valid);
++  schedule_async_pipeline_pump();
++}
++
++static void schedule_async_pipeline_pump_callback(void* generationValue) {
++  std::unique_ptr<uint64_t> generation(static_cast<uint64_t*>(generationValue));
++  if (*generation != g_pipelineCacheGeneration.load(std::memory_order_acquire)) {
++    return;
++  }
++  g_asyncPumpScheduled = false;
++  async_pipeline_pump();
++}
++
++static void schedule_async_pipeline_pump() {
++  if (!g_asyncTestEnabled || g_asyncPumpScheduled || g_pipelineCreationError.load(std::memory_order_acquire)) {
++    return;
++  }
++  g_asyncPumpScheduled = true;
++  auto* generation = new uint64_t(g_pipelineCacheGeneration.load(std::memory_order_acquire));
++  emscripten_async_call(schedule_async_pipeline_pump_callback, generation, 0);
++}
++#endif
 +
 +#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
 +static void selective_mark_unknown_locked() noexcept {
@@ -1707,9 +1995,9 @@ index bff9b47..52b5ffe 100644
 +  ++g_selectivePrepareStatus.unknown_count;
 +  ++g_selectivePrepareStatus.error_count;
 +  g_selectivePrepareStatus.state = AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP;
-   g_pipelineReadyCv.notify_all();
- }
- 
++  g_pipelineReadyCv.notify_all();
++}
++
 +static void selective_mark_error_locked() noexcept {
 +  g_selectivePrepareStatus.valid = 0;
 +  g_selectivePrepareStatus.ready = 0;
@@ -1823,7 +2111,14 @@ index bff9b47..52b5ffe 100644
  static PipelineRef g_lastPipelineRef = std::numeric_limits<PipelineRef>::max();
  
  template <typename PipelineConfig>
-@@ -436,28 +657,65 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& config, NewPipelineCallback&& cb,
+                                       PipelinePriority priority = PipelinePriority::Normal,
+-                                      std::optional<uint32_t> firstFrameUsedOverride = std::nullopt) {
++                                      std::optional<uint32_t> firstFrameUsedOverride = std::nullopt
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++                                      , NewAsyncPipelineCallback&& asyncCb = {}
++#endif
++                                      ) {
    ZoneScoped;
  
    const PipelineRef hash = xxh3_hash(config, static_cast<HashType>(type));
@@ -1858,6 +2153,9 @@ index bff9b47..52b5ffe 100644
    const uint32_t firstFrameUsed = firstFrameUsedOverride.value_or(current_frame());
    bool notifyWorker = false;
 -  bool persist = priority != PipelinePriority::Background;
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++  bool scheduleAsyncPump = false;
++#endif
 +#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
 +  /* Selective mode has no writable cache database.  In particular, do not
 +   * allocate a persistence record merely because a live lookup is normal or
@@ -1890,7 +2188,7 @@ index bff9b47..52b5ffe 100644
        if (blocking && !g_hasPipelineThread) {
          auto pending = take_pending_pipeline(hash);
          if (pending) {
-@@ -467,12 +725,21 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -467,12 +895,21 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
                cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
              }
            }
@@ -1918,10 +2216,11 @@ index bff9b47..52b5ffe 100644
            createdPipeline = true;
            queued = true;
          }
-@@ -489,17 +756,32 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -488,22 +925,66 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+         }
          notifyWorker = priority != PipelinePriority::Background;
        }
-     } else if (!g_hasPipelineThread && (blocking || g_pipelinesPerFrame < BuildPipelinesPerFrame)) {
+-    } else if (!g_hasPipelineThread && (blocking || g_pipelinesPerFrame < BuildPipelinesPerFrame)) {
 -      g_pipelines.try_emplace(hash, CachedPipeline{
 -                                        .pipeline = cb(),
 -                                        .firstFrameUsed = firstFrameUsed,
@@ -1929,6 +2228,32 @@ index bff9b47..52b5ffe 100644
 -      pipelineReady = true;
 -      if (persist) {
 -        cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
++    }
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++    else if (g_asyncTestEnabled && !g_pipelineCreationError.load(std::memory_order_acquire) &&
++             priority == PipelinePriority::Background && asyncCb &&
++             (g_asyncTestMode == 2 || g_asyncTestSelected == 0)) {
++      const bool failForTest = g_asyncTestFailFirst && g_asyncTestSelected == 0;
++      ++g_asyncTestSelected;
++      PendingPipeline pending{
++          .hash = hash,
++          .type = type,
++          .firstFrameUsed = firstFrameUsed,
++          .create = std::move(cb),
++          .createAsync = std::move(asyncCb),
++          .failForTest = failForTest,
++      };
++      g_backgroundPipelineQueue.emplace_back(std::move(pending));
++      g_pendingPipelines.insert(hash);
++      ++queuedPipelines;
++      scheduleAsyncPump = true;
++      EM_ASM({
++        const report = window.__meleeWebAsyncPipelineTestResults;
++        if (report) report.selected = (report.selected || 0) + 1;
++      });
++    }
++#endif
++    else if (!g_hasPipelineThread && (blocking || g_pipelinesPerFrame < BuildPipelinesPerFrame)) {
 +#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 +      if (persist) observeLookup(MELEE_WEB_PIPELINE_EVENT_CREATE, MELEE_WEB_PIPELINE_OUTCOME_CREATED);
 +#endif
@@ -1959,8 +2284,16 @@ index bff9b47..52b5ffe 100644
 +#endif
        PendingPipeline pending{
            .hash = hash,
++          .type = type,
            .firstFrameUsed = firstFrameUsed,
-@@ -531,7 +813,7 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+           .create = std::move(cb),
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++          .createAsync = {},
++#endif
+       };
+       switch (priority) {
+       case PipelinePriority::Background:
+@@ -531,16 +1012,42 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
    }
  
    if (createdPipeline) {
@@ -1969,7 +2302,13 @@ index bff9b47..52b5ffe 100644
    }
  
    if (notifyWorker) {
-@@ -540,7 +822,28 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+     g_pipelineQueueCv.notify_one();
+   }
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++  if (scheduleAsyncPump) {
++    schedule_async_pipeline_pump();
++  }
++#endif
  
    if (blocking && !pipelineReady) {
      std::unique_lock lock{g_pipelineMutex};
@@ -1998,7 +2337,7 @@ index bff9b47..52b5ffe 100644
      auto pipelineIt = g_pipelines.find(hash);
      if (pipelineIt != g_pipelines.end() && persist && firstFrameUsed < pipelineIt->second.firstFrameUsed) {
        pipelineIt->second.firstFrameUsed = firstFrameUsed;
-@@ -620,6 +923,219 @@ static sqlite3* open_pipeline_cache_seed_db(const std::string& path) {
+@@ -620,6 +1127,219 @@ static sqlite3* open_pipeline_cache_seed_db(const std::string& path) {
    return seedDb;
  }
  
@@ -2218,7 +2557,7 @@ index bff9b47..52b5ffe 100644
  static void seed_pipeline_cache() {
    if (g_pipelineCacheBroken || g_pipelineCacheDb == nullptr || g_pipelineCacheUpsertStmt == nullptr) {
      return;
-@@ -703,7 +1219,7 @@ static void seed_pipeline_cache() {
+@@ -703,7 +1423,7 @@ static void seed_pipeline_cache() {
      }
  
      if (!writeFailed && !readFailed) {
@@ -2227,7 +2566,7 @@ index bff9b47..52b5ffe 100644
      }
    }
  
-@@ -792,7 +1308,7 @@ INSERT INTO aurora_schema VALUES ({});)",
+@@ -792,7 +1512,7 @@ INSERT INTO aurora_schema VALUES ({});)",
      }
  
      if (!schemaFailed) {
@@ -2236,7 +2575,7 @@ index bff9b47..52b5ffe 100644
      }
    }
  
-@@ -925,15 +1441,22 @@ static void pipeline_cache_writer() {
+@@ -925,15 +1645,22 @@ static void pipeline_cache_writer() {
  #endif
  
    while (true) {
@@ -2263,7 +2602,7 @@ index bff9b47..52b5ffe 100644
      }
  
      bool writeFailed = false;
-@@ -951,15 +1474,27 @@ static void pipeline_cache_writer() {
+@@ -951,15 +1678,27 @@ static void pipeline_cache_writer() {
          }
  
          if (!writeFailed) {
@@ -2292,7 +2631,16 @@ index bff9b47..52b5ffe 100644
    }
  }
  
-@@ -990,19 +1525,31 @@ static void pipeline_worker() {
+@@ -986,28 +1725,111 @@ static void pipeline_worker() {
+         break;
+       }
+       auto& source = !g_pipelineQueue.empty() ? g_pipelineQueue : g_backgroundPipelineQueue;
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++      if (!source.empty() && source.front().createAsync) {
++        return;
++      }
++#endif
+       pending = std::move(source.front());
        source.pop_front();
      }
      auto result = pending.create();
@@ -2329,7 +2677,123 @@ index bff9b47..52b5ffe 100644
    }
  }
  
-@@ -1075,16 +1622,83 @@ static size_t load_pipeline_cache() {
+-template <typename PipelineConfig, typename CreateFn>
+-static size_t load_pipeline_cache_entries(ShaderType type, uint32_t configVersion, CreateFn&& create) {
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++static void async_pipeline_pump() {
++  struct Dispatch {
++    PendingPipeline pending;
++    uint64_t generation;
++    double submittedAt;
++  };
++  std::vector<Dispatch> dispatches;
++  const uint64_t generation = g_pipelineCacheGeneration.load(std::memory_order_acquire);
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    if (!g_pipelineCacheInitialized || !g_asyncTestEnabled || g_asyncTestLimit == 0 ||
++        g_pipelineCreationError.load(std::memory_order_acquire)) {
++      return;
++    }
++    while (g_asyncTestInFlight < g_asyncTestLimit) {
++      auto& source = !g_pipelineQueue.empty() ? g_pipelineQueue : g_backgroundPipelineQueue;
++      if (source.empty() || !source.front().createAsync) {
++        break;
++      }
++      PendingPipeline pending = std::move(source.front());
++      source.pop_front();
++      ++g_asyncTestInFlight;
++    g_asyncTestPeakInFlight = std::max(g_asyncTestPeakInFlight, g_asyncTestInFlight);
++      dispatches.push_back({std::move(pending), generation, emscripten_get_now()});
++    }
++  }
++
++  EM_ASM({
++    const report = window.__meleeWebAsyncPipelineTestResults;
++    if (report) report.peakInFlight = Math.max(report.peakInFlight, $0);
++  }, g_asyncTestPeakInFlight);
++
++  for (auto& dispatch : dispatches) {
++    report_async_test_event(0, dispatch.pending.type, dispatch.pending.hash,
++                            dispatch.pending.firstFrameUsed, g_asyncTestInFlight);
++    auto settled = std::make_shared<std::atomic_bool>(false);
++    try {
++      dispatch.pending.createAsync(
++          [generation = dispatch.generation, type = dispatch.pending.type, hash = dispatch.pending.hash,
++           firstFrameUsed = dispatch.pending.firstFrameUsed, submittedAt = dispatch.submittedAt, settled]
++          (wgpu::RenderPipeline pipeline, std::string error) mutable {
++            async_pipeline_finish(generation, type, hash, firstFrameUsed, submittedAt, *settled,
++                                  std::move(pipeline), std::move(error));
++          },
++          dispatch.pending.failForTest);
++    } catch (const std::exception& error) {
++      async_pipeline_finish(dispatch.generation, dispatch.pending.type, dispatch.pending.hash,
++                            dispatch.pending.firstFrameUsed, dispatch.submittedAt, *settled, {}, error.what());
++    } catch (...) {
++      async_pipeline_finish(dispatch.generation, dispatch.pending.type, dispatch.pending.hash,
++                            dispatch.pending.firstFrameUsed, dispatch.submittedAt, *settled, {},
++                            "unknown exception while submitting asynchronous WebGPU pipeline");
++    }
++  }
++}
++#endif
++
++template <typename PipelineConfig, typename CreateFn
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++          , typename AsyncCreateFn
++#endif
++          >
++static size_t load_pipeline_cache_entries(ShaderType type, uint32_t configVersion, CreateFn&& create
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++                                          , AsyncCreateFn&& createAsync
++#endif
++                                          ) {
+   if (!prepare_pipeline_cache_db()) {
+     return 0;
+   }
+@@ -1040,7 +1862,18 @@ static size_t load_pipeline_cache_entries(ShaderType type, uint32_t configVersio
+       continue;
+     }
+ 
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++    NewAsyncPipelineCallback asyncCallback;
++    if constexpr (!std::is_same_v<std::decay_t<AsyncCreateFn>, std::nullptr_t>) {
++      asyncCallback = [config, createAsync](PipelineCreationCompletion completion, bool failForTest) mutable {
++        createAsync(config, std::move(completion), failForTest);
++      };
++    }
++    find_pipeline_impl(type, config, [=] { return create(config); }, PipelinePriority::Background,
++                       firstFrameUsed, std::move(asyncCallback));
++#else
+     find_pipeline_impl(type, config, [=] { return create(config); }, PipelinePriority::Background, firstFrameUsed);
++#endif
+     ++acceptedRows;
+   }
+ 
+@@ -1066,25 +1899,104 @@ static size_t load_pipeline_cache() {
+   size_t acceptedRows = 0;
+ #ifdef AURORA_ENABLE_RMLUI
+   acceptedRows += load_pipeline_cache_entries<rmlui::PipelineConfig>(ShaderType::Rml, rmlui::RmlPipelineConfigVersion,
+-                                                                     rmlui::create_pipeline);
++                                                                     rmlui::create_pipeline
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++                                                                     , nullptr
++#endif
++                                                                     );
+ #endif
+   acceptedRows += load_pipeline_cache_entries<clear::PipelineConfig>(
+-      ShaderType::Clear, clear::ClearPipelineConfigVersion, clear::create_pipeline);
++      ShaderType::Clear, clear::ClearPipelineConfigVersion, clear::create_pipeline
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++      , clear::create_pipeline_async_test
++#endif
++      );
+   acceptedRows +=
+-      load_pipeline_cache_entries<gx::PipelineConfig>(ShaderType::GX, gx::GXPipelineConfigVersion, gx::create_pipeline);
++      load_pipeline_cache_entries<gx::PipelineConfig>(ShaderType::GX, gx::GXPipelineConfigVersion, gx::create_pipeline
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++                                                     , gx::create_pipeline_async_test
++#endif
++                                                     );
    return acceptedRows;
  }
  
@@ -2413,7 +2877,7 @@ index bff9b47..52b5ffe 100644
    if (g_pipelineCacheWriterThread.joinable()) {
      {
        std::lock_guard lock{g_pipelineCacheWriterMutex};
-@@ -1096,7 +1710,11 @@ static void stop_pipeline_cache_writer() {
+@@ -1096,7 +2008,11 @@ static void stop_pipeline_cache_writer() {
      g_pipelineCacheWriterStop = false;
    }
  
@@ -2426,10 +2890,14 @@ index bff9b47..52b5ffe 100644
  }
  
  template <>
-@@ -1117,11 +1735,59 @@ PipelineRef find_pipeline(ShaderType type, const rmlui::PipelineConfig& config,
+@@ -1117,11 +2033,63 @@ PipelineRef find_pipeline(ShaderType type, const rmlui::PipelineConfig& config,
  #endif
  
  void initialize_pipeline_cache() {
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++  g_pipelineCacheGeneration.fetch_add(1, std::memory_order_acq_rel);
++  initialize_async_test_policy();
++#endif
 +  // A last-reference hit is valid only within this cache's lifetime.
 +  g_lastPipelineRef = std::numeric_limits<PipelineRef>::max();
    g_pipelineCacheBroken = false;
@@ -2486,7 +2954,7 @@ index bff9b47..52b5ffe 100644
    if (webgpu::g_backendType == wgpu::BackendType::WebGPU) {
      g_hasPipelineThread = false;
    } else {
-@@ -1129,17 +1795,31 @@ void initialize_pipeline_cache() {
+@@ -1129,17 +2097,38 @@ void initialize_pipeline_cache() {
      g_pipelineThread = std::thread(pipeline_worker);
    }
  
@@ -2516,11 +2984,18 @@ index bff9b47..52b5ffe 100644
  }
  
  void shutdown_pipeline_cache() {
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++  g_pipelineCacheGeneration.fetch_add(1, std::memory_order_acq_rel);
++  g_asyncPumpScheduled = false;
++  g_asyncTestEnabled = false;
++  g_asyncTestInFlight = 0;
++  g_pipelineCreationError = false;
++#endif
 +  g_completeDraws.store(false, std::memory_order_release);
    if (g_hasPipelineThread) {
      g_pipelineThreadEnd = true;
      g_pipelineQueueCv.notify_all();
-@@ -1157,6 +1837,34 @@ void shutdown_pipeline_cache() {
+@@ -1157,25 +2146,406 @@ void shutdown_pipeline_cache() {
    g_pipelineQueue.clear();
    g_backgroundPipelineQueue.clear();
    g_pendingPipelines.clear();
@@ -2555,7 +3030,40 @@ index bff9b47..52b5ffe 100644
  
    queuedPipelines = 0;
    createdPipelines = 0;
-@@ -1168,14 +1876,318 @@ void begin_pipeline_frame() {
+ }
+ 
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++extern "C" EMSCRIPTEN_KEEPALIVE int melee_web_async_pipeline_test_reject_stale_generation() {
++  if (!g_pipelineCacheInitialized) {
++    return 0;
++  }
++  const uint64_t retiredGeneration = g_pipelineCacheGeneration.load(std::memory_order_acquire);
++  if (retiredGeneration == 0) {
++    return 0;
++  }
++  PipelineRef testHash = std::numeric_limits<PipelineRef>::max();
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    while (g_pipelines.contains(testHash) || g_pendingPipelines.contains(testHash)) {
++      --testHash;
++    }
++  }
++  const size_t queuedBefore = queuedPipelines;
++  const size_t createdBefore = createdPipelines;
++  const uint64_t activeGeneration = g_pipelineCacheGeneration.fetch_add(1, std::memory_order_acq_rel);
++  std::atomic_bool settled{false};
++  async_pipeline_finish(retiredGeneration, ShaderType::Clear, testHash, 0, emscripten_get_now(), settled, {},
++                        "test completion from retired pipeline-cache generation");
++  std::lock_guard guard{g_pipelineMutex};
++  return activeGeneration == retiredGeneration && settled.load(std::memory_order_acquire) &&
++         !g_pipelines.contains(testHash) && !g_pendingPipelines.contains(testHash) &&
++         queuedPipelines == queuedBefore && createdPipelines == createdBefore && g_pipelineCacheInitialized;
++}
++#endif
++
+ void begin_pipeline_frame() {
+   if (!g_hasPipelineThread) {
+     g_pipelinesPerFrame = 0;
    }
  }
  
@@ -2564,6 +3072,11 @@ index bff9b47..52b5ffe 100644
 +}
 +
 +PipelineCacheStatus pipeline_cache_status() noexcept {
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++  if (g_pipelineCreationError.load(std::memory_order_acquire)) {
++    return PipelineCacheStatus::Error;
++  }
++#endif
 +  if (g_pipelineCachePersistenceError.load(std::memory_order_acquire) ||
 +      g_pipelineCacheBroken.load(std::memory_order_acquire)) {
 +    return PipelineCacheStatus::Error;
@@ -2573,6 +3086,12 @@ index bff9b47..52b5ffe 100644
 +  return g_pipelineCacheWriterActive || g_pipelineCacheWriteQueue.pending() ? PipelineCacheStatus::Pending
 +                                                                              : PipelineCacheStatus::Ready;
 +}
++
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++bool pipeline_cache_creation_failed() noexcept {
++  return g_pipelineCreationError.load(std::memory_order_acquire);
++}
++#endif
 +
 +bool flush_pipeline_cache() noexcept {
 +  if (pipeline_cache_status() == PipelineCacheStatus::Error) {
@@ -2848,6 +3367,15 @@ index bff9b47..52b5ffe 100644
 +
  bool get_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
    std::lock_guard guard{g_pipelineMutex};
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++  if (g_asyncTestEnabled && g_pendingPipelines.contains(ref)) {
++    ++g_asyncTestPendingLookups;
++    EM_ASM({
++      const report = window.__meleeWebAsyncPipelineTestResults;
++      if (report) report.pendingPipelineLookupCount = (report.pendingPipelineLookupCount || 0) + 1;
++    });
++  }
++#endif
 +#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
 +  if (g_selectivePipelineMode) {
 +    if (!g_selectivePipelineActive || g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_ERROR ||
@@ -2875,10 +3403,10 @@ index bff9b47..52b5ffe 100644
    if (it == g_pipelines.end()) {
      return false;
 diff --git a/lib/gfx/pipeline_cache.hpp b/lib/gfx/pipeline_cache.hpp
-index 7eb4723..de393fd 100644
+index 7eb4723..2b71898 100644
 --- a/lib/gfx/pipeline_cache.hpp
 +++ b/lib/gfx/pipeline_cache.hpp
-@@ -2,6 +2,11 @@
+@@ -2,7 +2,13 @@
  
  #include "types.hpp"
  
@@ -2888,18 +3416,25 @@ index 7eb4723..de393fd 100644
 +
 +#include <cstddef>
  #include <functional>
++#include <string>
  
  namespace aurora::gfx::clear {
-@@ -26,10 +31,19 @@ enum class ShaderType : uint8_t {
+ struct PipelineConfig;
+@@ -25,11 +31,27 @@ enum class ShaderType : uint8_t {
+ };
  
  using NewPipelineCallback = std::function<wgpu::RenderPipeline()>;
- 
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++using PipelineCreationCompletion = std::function<void(wgpu::RenderPipeline, std::string)>;
++using NewAsyncPipelineCallback = std::function<void(PipelineCreationCompletion, bool)>;
++#endif
++
 +enum class PipelineCacheStatus {
 +  Ready,
 +  Pending,
 +  Error,
 +};
-+
+ 
  void initialize_pipeline_cache();
  void shutdown_pipeline_cache();
  void begin_pipeline_frame();
@@ -2907,6 +3442,9 @@ index 7eb4723..de393fd 100644
 +void set_deferred_pipeline_cache_writes(bool enabled) noexcept;
 +bool flush_pipeline_cache() noexcept;
 +PipelineCacheStatus pipeline_cache_status() noexcept;
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++bool pipeline_cache_creation_failed() noexcept;
++#endif
  
  template <typename Config>
  PipelineRef find_pipeline(ShaderType type, const Config& config, NewPipelineCallback&& cb);
@@ -3869,10 +4407,74 @@ index 0d6a5d8..510e6e7 100644
      LIKELY {
        if (detail::sBufferSize < detail::sBufferCapacity)
 diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
-index b12b327..0fbfa77 100644
+index b12b327..ddb893a 100644
 --- a/lib/gx/gx.cpp
 +++ b/lib/gx/gx.cpp
-@@ -567,12 +567,17 @@ void initialize() noexcept {
+@@ -361,6 +361,63 @@ wgpu::RenderPipeline build_pipeline(const PipelineConfig& config, ArrayRef<wgpu:
+   return g_device.CreateRenderPipeline(&descriptor);
+ }
+ 
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++void create_pipeline_async_test(const PipelineConfig& config, gfx::PipelineCreationCompletion completion,
++                                bool failForTest) {
++  ZoneScoped;
++  auto shader = build_shader(config.shaderConfig);
++  const auto label = fmt::format("GX Pipeline {:x} shader {:x}",
++      xxh3_hash(config, static_cast<HashType>(gfx::ShaderType::GX)), xxh3_hash(config.shaderConfig));
++  const float depthBias = (UseReversedZ ? -1.0f : 1.0f) * std::bit_cast<float>(config.polygonOffsetBits);
++  const float depthBiasSlopeScale = (UseReversedZ ? -1.0f : 1.0f) * std::bit_cast<float>(config.polygonOffsetScaleBits);
++  const float depthBiasClamp = webgpu::g_hasCoreFeatures ? std::bit_cast<float>(config.polygonOffsetClampBits) : 0.0f;
++  const wgpu::DepthStencilState depthStencil{
++      .format = g_graphicsConfig.depthFormat,
++      .depthWriteEnabled = config.depthCompare && config.depthUpdate,
++      .depthCompare = config.depthCompare ? to_compare_function(config.depthFunc) : wgpu::CompareFunction::Always,
++      .depthBias = round_away_from_zero<int32_t>(depthBias),
++      .depthBiasSlopeScale = depthBiasSlopeScale,
++      .depthBiasClamp = depthBiasClamp,
++  };
++  const auto blendState = to_blend_state(config.blendMode, config.blendFacSrc, config.blendFacDst,
++                                         config.blendOp, config.dstAlpha);
++  const std::array colorTargets{wgpu::ColorTargetState{
++      .format = g_graphicsConfig.surfaceConfiguration.format,
++      .blend = &blendState,
++      .writeMask = to_write_mask(config.colorUpdate, config.alphaUpdate),
++  }};
++  const wgpu::FragmentState fragmentState{
++      .module = shader,
++      .entryPoint = failForTest ? "__melee_async_pipeline_test_invalid_entry__" : "fs_main",
++      .targetCount = colorTargets.size(),
++      .targets = colorTargets.data(),
++  };
++  const wgpu::RenderPipelineDescriptor descriptor{
++      .label = label.c_str(),
++      .layout = sPipelineLayout,
++      .vertex = {.module = shader, .entryPoint = "vs_main", .bufferCount = 0, .buffers = nullptr},
++      .primitive = to_primitive_state(config.cullMode),
++      .depthStencil = &depthStencil,
++      .multisample = {.count = config.msaaSamples},
++      .fragment = &fragmentState,
++  };
++  auto pipelineLayout = sPipelineLayout;
++  g_device.CreateRenderPipelineAsync(
++      &descriptor, wgpu::CallbackMode::AllowSpontaneous,
++      [shader = std::move(shader), pipelineLayout = std::move(pipelineLayout), completion = std::move(completion)]
++      (wgpu::CreatePipelineAsyncStatus status, wgpu::RenderPipeline pipeline, wgpu::StringView message) mutable {
++        (void)shader;
++        (void)pipelineLayout;
++        std::string error;
++        if (status != wgpu::CreatePipelineAsyncStatus::Success) {
++          error = message.data != nullptr ? std::string(message.data, message.length) :
++              "WebGPU async pipeline creation failed";
++        }
++        completion(std::move(pipeline), error);
++      });
++}
++#endif
++
+ void populate_pipeline_config(PipelineConfig& config, GXPrimitive primitive, GXVtxFmt fmt) noexcept {
+   ZoneScoped;
+ 
+@@ -567,12 +624,17 @@ void initialize() noexcept {
          gfx::detail::resources().staticBindGroupLayout,
          gfx::detail::resources().uniformBindGroupLayout,
          sTextureBindGroupLayout,
@@ -3890,6 +4492,31 @@ index b12b327..0fbfa77 100644
      };
      sPipelineLayout = g_device.CreatePipelineLayout(&desc);
    }
+diff --git a/lib/gx/gx.hpp b/lib/gx/gx.hpp
+index a97b987..fa44c06 100644
+--- a/lib/gx/gx.hpp
++++ b/lib/gx/gx.hpp
+@@ -5,6 +5,9 @@
+ #include "../internal.hpp"
+ #include "../gfx/types.hpp"
+ #include "../gfx/texture.hpp"
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++#include "../gfx/pipeline_cache.hpp"
++#endif
+ 
+ #include <absl/container/flat_hash_map.h>
+ #include <type_traits>
+@@ -538,6 +541,10 @@ wgpu::RenderPipeline build_pipeline(const PipelineConfig& config, ArrayRef<wgpu:
+                                     wgpu::ShaderModule shader, const char* label) noexcept;
+ std::string build_shader_source(const ShaderConfig& config) noexcept;
+ wgpu::ShaderModule build_shader(const ShaderConfig& config) noexcept;
++#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
++void create_pipeline_async_test(const PipelineConfig& config, gfx::PipelineCreationCompletion completion,
++                                bool failForTest);
++#endif
+ GXBindGroups build_bind_groups(const ShaderInfo& info) noexcept;
+ 
+ u8 comp_type_size(GXAttr attr, GXCompType type) noexcept;
 diff --git a/lib/gx/pipeline.cpp b/lib/gx/pipeline.cpp
 index 0c3631c..3cf50c4 100644
 --- a/lib/gx/pipeline.cpp

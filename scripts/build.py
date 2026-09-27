@@ -22,6 +22,7 @@ PUBLIC_RUNTIME_BUILD_DIR = "build/browser-public-release"
 AUDIO_PREVIEW_RUNTIME_TARGET = "runtime-audio-preview"
 AUDIO_PREVIEW_RUNTIME_CONFIGURATION = "Release"
 AUDIO_PREVIEW_RUNTIME_BUILD_DIR = "build/browser-audio-preview-release"
+ASYNC_AUDIO_PREVIEW_RUNTIME_BUILD_DIR = "build/browser-audio-preview-async-experiment"
 AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
 
 # These are the only lifecycle executables that the content-check workflow may
@@ -62,7 +63,8 @@ BUILD_TARGETS = {
 
 
 def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
-                    pipeline_provenance=False, selective_pipelines=False):
+                    pipeline_provenance=False, selective_pipelines=False,
+                    async_pipeline_experiment=False):
     """Return the build directory selected by the normal build contract.
 
     Trace targets use the private development build directory and intentionally
@@ -73,8 +75,13 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     root = Path(root)
     if target not in BUILD_TARGETS and target not in TRACE_TARGETS:
         raise ValueError(f"Unsupported build target: {target}")
-    if target in TRACE_TARGETS and (pipeline_provenance or selective_pipelines):
+    if target in TRACE_TARGETS and (pipeline_provenance or selective_pipelines or async_pipeline_experiment):
         raise ValueError("trace targets require the private development build")
+    if async_pipeline_experiment:
+        if target not in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} or configuration != "Release":
+            raise ValueError("--async-pipeline-experiment requires a public Release runtime profile")
+        return root / (ASYNC_AUDIO_PREVIEW_RUNTIME_BUILD_DIR if target == AUDIO_PREVIEW_RUNTIME_TARGET
+                       else "build/browser-public-async-experiment-release")
     if selective_pipelines:
         suffix = "-release" if configuration == "Release" else ""
         return root / ("build/browser-public-selective-release" if target == PUBLIC_RUNTIME_TARGET
@@ -756,7 +763,7 @@ def _write_audio_preview_identity(root, build_dir, version, cmake, ninja,
 
 def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
           pipeline_provenance=False, selective_pipelines=False, configure_only=False,
-          trace_targets=None):
+          trace_targets=None, async_pipeline_experiment=False):
     trace_targets = tuple(trace_targets or ())
     if trace_targets:
         if target != "all":
@@ -764,7 +771,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         unknown = [name for name in trace_targets if name not in TRACE_TARGETS]
         if unknown:
             raise ValueError(f"Unsupported trace target: {unknown[0]}")
-        if pipeline_provenance or selective_pipelines:
+        if pipeline_provenance or selective_pipelines or async_pipeline_experiment:
             raise ValueError("trace targets require the private development build")
     if configure_only and target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET}:
         # Release profiles write an identity sidecar only after a complete
@@ -773,6 +780,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError(f"--configure-only cannot be used with {target}")
     if selective_pipelines and (target not in {"runtime", PUBLIC_RUNTIME_TARGET} or pipeline_provenance):
         raise ValueError("--selective-pipelines requires runtime/runtime-public without --pipeline-provenance")
+    if async_pipeline_experiment and (target not in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} or
+                                     configuration != "Release" or pipeline_provenance or selective_pipelines):
+        raise ValueError("--async-pipeline-experiment requires a public Release runtime profile")
     if pipeline_provenance and target != "runtime":
         raise ValueError("--pipeline-provenance requires the private runtime target")
     if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} and configuration != "Release":
@@ -810,7 +820,8 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         build_target = trace_targets[0] if trace_targets else target
         build_dir = build_directory(root, target=build_target, configuration=configuration,
                                     pipeline_provenance=pipeline_provenance,
-                                    selective_pipelines=selective_pipelines)
+                                    selective_pipelines=selective_pipelines,
+                                    async_pipeline_experiment=async_pipeline_experiment)
         if (root / "build").is_symlink() or build_dir.is_symlink():
             raise ValueError("Build output must be a local directory, not a symlink")
         source_inputs_before = (
@@ -829,6 +840,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         )
         configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
         configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
+        configure.append(f"-DMELEE_WEB_ASYNC_PIPELINE_EXPERIMENT={'ON' if async_pipeline_experiment else 'OFF'}")
         record_build(root, build_dir, False)
         subprocess.run(configure, cwd=root, env=env, check=True)
         if configure_only:
@@ -867,6 +879,8 @@ def main():
                         help="Compile the private runtime recorder into a separate build directory")
     parser.add_argument("--selective-pipelines", action="store_true",
                         help="Prepare certified upcoming pipeline unions in a separate runtime build")
+    parser.add_argument("--async-pipeline-experiment", action="store_true",
+                        help="Build the explicit test-only bounded async WebGPU pipeline experiment")
     parser.add_argument("--configure-only", action="store_true",
                         help="Configure the selected build directory without compiling targets")
     args = parser.parse_args()
@@ -877,6 +891,7 @@ def main():
     try:
         build(args.jobs, target=args.target or "all", configuration=args.configuration,
               pipeline_provenance=args.pipeline_provenance, selective_pipelines=args.selective_pipelines,
+              async_pipeline_experiment=args.async_pipeline_experiment,
               configure_only=args.configure_only, trace_targets=args.trace_targets)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
