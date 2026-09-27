@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict';
 import {createControllerManager, normalizeController, validateProfile, STANDARD_PROFILE} from '../web/controller-input.mjs';
+import {applyTouchDeadZone} from '../web/touch-controls.mjs';
 import {detectBindingCandidate} from '../web/controller-panel.mjs';
 
 import {standardPad, rawPad, rawProfile, mayflashMacPad} from './controller-fixtures.mjs';
 
 const set = (p, index, value = 1, pressed = value > 0.5) => { p.buttons[index] = {pressed, value}; };
+assert.deepEqual(applyTouchDeadZone(0.1, 0.1), [0, 0], 'radial dead zone suppresses near-center drift');
+const diagonal = applyTouchDeadZone(0.6, -0.6);
+assert(Math.abs(Math.hypot(...diagonal) - (Math.hypot(0.6, 0.6) - 0.15) / 0.85) < 1e-9,
+  'radial dead zone preserves diagonal direction and rescales bounded magnitude');
+assert(Math.abs(Math.hypot(...applyTouchDeadZone(1, 1)) - 1) < 1e-9, 'diagonal travel is bounded to unit magnitude');
+for (const [x, y] of [[2, 0.5], [-2, -0.5]]) {
+  const clipped = applyTouchDeadZone(x, y);
+  assert(Math.abs(Math.hypot(...clipped) - 1) < 1e-9, 'off-axis travel beyond either stick rim clamps radially');
+  assert(Math.abs(clipped[0] / clipped[1] - x / y) < 1e-9,
+    'radial clamping preserves the original off-axis direction on both sticks');
+}
 const memoryStorage = () => { let data = null; return {getItem: () => data, setItem: (_, v) => { data = v; }}; };
 let current = [], manager = createControllerManager({getGamepads: () => current, storage: memoryStorage(), platform: 'test'});
 function sample() { return manager.sample()[0]; }
@@ -155,3 +167,34 @@ routed.setPortSource(0,'controller');assert.equal(routed.sample()[0].enabled,tru
 routed.setPortSource(0,'off');routed.writeSamples(routedHeap,0);assert.equal(routedHeap[0],0);
 assert.throws(()=>routed.setPortSource(4,'auto'));assert.throws(()=>routed.setPortSource(0,'invalid'));
 console.log('Mayflash trigger-origin activation and explicit per-player keyboard/controller routing pass.');
+
+// The touch overlay is represented as a virtual standard-layout Gamepad and
+// enters through the same PAD writer as browser controllers.
+const touchPads=[standardPad(0,'Physical controller')];
+const touchManager=createControllerManager({getGamepads:()=>touchPads,storage:null});
+touchManager.sample();
+touchManager.setPortSource(0,'touch');
+assert.equal(touchManager.sample()[0].port,1,'touch ownership routes Auto hardware away from P1');
+assert.throws(()=>touchManager.setPortSource(1,'touch'),/Player 1/,'only P1 may own touch');
+const touchRaw={buttons:Array.from({length:16},()=>({pressed:false,value:0})),axes:[0,0,0,0]};
+for(const index of [0,2,4,6,7,8,9,12,14]) touchRaw.buttons[index]={pressed:true,value:1};
+touchRaw.axes=[0.5,-0.25,-1,1];
+touchManager.setTouchGamepad(touchRaw);
+const touchHeap=new Int32Array(32);touchManager.writeSamples(touchHeap,0);
+assert.deepEqual([...touchHeap.slice(0,8)],[1,256|1024|64|32|4096|8|1,64,32,-128,-128,255,255],
+  'concurrent A/X/L/R/Start/dpad and both sticks map to P1 PAD');
+assert.deepEqual([...touchHeap.slice(8,16)],[1,0,0,0,0,0,0,0],
+  'physical controller input is isolated to P2 while touch owns P1');
+touchRaw.buttons[0]={pressed:false,value:0};touchManager.setTouchGamepad(touchRaw);
+touchManager.writeSamples(touchHeap,0);
+assert.equal(touchHeap[1]&256,0,'one release does not release another held button');
+assert.equal(touchHeap[1]&(1024|64|32|4096|8|1),1024|64|32|4096|8|1);
+touchManager.setTesting(true);touchManager.writeSamples(touchHeap,0);
+assert.equal(touchHeap[0],0,'controller-test mode suppresses virtual gameplay input');
+touchManager.setTesting(false);touchManager.setTouchGamepad(touchRaw);touchManager.writeSamples(touchHeap,0);
+touchManager.setPortSource(0,'keyboard');touchManager.writeSamples(touchHeap,0);
+assert.deepEqual([...touchHeap.slice(0,8)],[0,0,0,0,0,0,0,0],
+  'source switch clears every virtual button, axis and trigger');
+touchManager.setPortSource(0,'auto');touchManager.writeSamples(touchHeap,0);
+assert.equal(touchHeap[0],1,'Auto physical input reclaims P1 after touch is disabled');
+console.log('Touch PAD mapping, concurrent button/stick input, analog triggers, P1 ownership and source cleanup pass.');
