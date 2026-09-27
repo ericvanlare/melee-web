@@ -245,6 +245,20 @@ class ContentMatchTests(unittest.TestCase):
                                ("grounded up-special motion, continuation, landing and Article lifecycle passed",
                                 "aerial up-special motion, continuation, landing and Article lifecycle passed"))
 
+    def test_remaining_fighter_damage_ko_rebirth_and_identity(self):
+        menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
+        cases = ((3, "Gw"), (4, "Kb"), (16, "Ss"), (17, "Ys"), (18, "Zd"), (19, "Sk"))
+        required = (menu / "MnSlChr.usd", game / "GrNLa.dat", game / "PlMr.dat",
+                    *(game / f"Pl{prefix}.dat" for _, prefix in cases))
+        if not all(path.is_file() for path in required):
+            self.skipTest("Owned Mario and remaining-fighter damage/KO fixtures required")
+        for ckind, _ in cases:
+            with self.subTest(ckind=ckind):
+                self.run_trace("gameplay_content_match_trace",
+                               [menu, game, 32, ckind, 8, "--remaining-damage-ko"],
+                               ("ordinary damage, one-stock KO, Rebirth, identity and resumed gameplay passed",
+                                "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed"))
+
     def test_ice_nana_rejoins_after_popo_stock_loss_on_source_cpu9_lineup_a(self):
         menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
         required = (

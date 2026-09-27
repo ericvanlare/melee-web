@@ -66,6 +66,7 @@ const report = {
   first_mismatch: null,
   browser_errors: [],
   unexpected_requests: [],
+  screenshots: [],
 };
 let browser;
 let page;
@@ -264,12 +265,36 @@ try {
     await page.locator('#retail-replay-start').click();
     const deadline = Date.now() + replayTimeoutMs;
     let last = null;
+    let observedPhase = null;
+    let phaseEntryCursor = 0;
+    let capturedPhase = false;
     while (Date.now() < deadline) {
       requireConnectedPage(browser, page);
       last = await snapshot('replay-poll');
       await write('progress.json', {phase:last?.phase,cursor:last?.source_cursor,status:last?.status,error:last?.runtime_error || last?.snapshot_error,at_ms:last?.at_ms});
       requireReplaySnapshot(last);
       if (report.first_error) throw Error(report.first_error.message);
+      if (last.phase !== observedPhase) {
+        observedPhase = last.phase;
+        phaseEntryCursor = last.source_cursor;
+        capturedPhase = false;
+      }
+      // Retain an advancing rendered match/Results scene, not just the blank
+      // post-unload canvas. This is an observer operation, never a game call.
+      if (!capturedPhase && [7, 8].includes(last.phase) &&
+          last.source_cursor >= phaseEntryCursor + 120) {
+        const renderCanvas = page.locator('canvas').first();
+        const canvas = await renderCanvas.boundingBox();
+        if (!canvas || canvas.width < 1 || canvas.height < 1)
+          throw Error('Advancing replay has no visible render canvas');
+        const name = `scene-${report.screenshots.length + 1}-phase${last.phase}-input${last.source_cursor}.png`;
+        await renderCanvas.screenshot({path:path.join(output, name)});
+        const afterCapture = await snapshot('after-canvas-capture');
+        requireReplaySnapshot(afterCapture);
+        report.screenshots.push({name, phase:last.phase, cursor_before_capture:last.source_cursor,
+          cursor_after_capture:afterCapture.source_cursor, scope:'rendered canvas; no exact draw-ordinal attribution', canvas});
+        capturedPhase = true;
+      }
       const links = last?.replay_downloads || [];
       if (links.includes('retail-browser-report.json')) {
         report.browser_report = last.replay_report;

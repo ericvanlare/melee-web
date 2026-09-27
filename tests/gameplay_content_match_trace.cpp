@@ -159,6 +159,8 @@ int main(int argc,char** argv){try{
     const bool kirby_copy_ko=argc==7&&std::string(argv[6])=="--kirby-copy-ko";
     const bool remaining_up_special=argc==7&&
         std::string(argv[6])=="--remaining-up-special";
+    const bool remaining_damage_ko=argc==7&&
+        std::string(argv[6])=="--remaining-damage-ko";
     const bool ice_cpu_lifecycle=argc==7&&
         std::string(argv[6])=="--ice-cpu-lifecycle";
     const bool slot2_cpu_match=argc==7&&std::string(argv[6])=="--slot2-cpu-match";
@@ -173,7 +175,7 @@ int main(int argc,char** argv){try{
     const bool cpu9_match=slot2_cpu_match||lineup_a_cpu_match||lineup_b_catch_prefix||
                           natural_terminal||a_prefix_teardown||ice_cpu_lifecycle;
     const bool action_coverage=(argc==7&&std::string(argv[6])=="--character-actions")||
-        slot2_transform||kirby_mario_fox_replacement||kirby_copy_costumes||kirby_copy_ko||cpu9_match||fox_cpu_prefix||remaining_up_special;
+        slot2_transform||kirby_mario_fox_replacement||kirby_copy_costumes||kirby_copy_ko||cpu9_match||fox_cpu_prefix||remaining_up_special||remaining_damage_ko;
     if(argc==7&&!entry_only&&!platform_pass&&!action_coverage)throw std::runtime_error("Unknown source match trace scope");
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]})for(const auto& entry:std::filesystem::directory_iterator(root)){
@@ -458,7 +460,68 @@ int main(int argc,char** argv){try{
                       std::to_string(entity_motion)+"/"+std::to_string(entity_x)+","+
                       std::to_string(entity_y));
             };
-            if(fox_cpu_prefix){
+            if(remaining_damage_ko){
+                check(opponent_ckind==CKIND_MARIO&&
+                      (fighter_ckind==CKIND_GAMEWATCH||fighter_ckind==CKIND_KIRBY||
+                       fighter_ckind==CKIND_SAMUS||fighter_ckind==CKIND_YOSHI||
+                       fighter_ckind==CKIND_ZELDA||fighter_ckind==CKIND_SEAK),
+                      "Damage/KO fixture requires a remaining fighter and human-PAD Mario");
+                settle_primary();
+                const int initial_kind=melee_web_test_active_fighter_kind(0);
+                const auto before=match.player_stats(0);
+                // Mario approaches through the source controller path. No
+                // position, damage, motion, stock or RNG fields are written.
+                bool aligned=false;
+                for(unsigned n=0;n<360&&!aligned;n++){
+                    const auto victim=match.player_stats(0);
+                    const auto attacker=match.player_stats(1);
+                    const float dx=victim.position[0]-attacker.position[0];
+                    aligned=victim.ground_or_air==0&&attacker.ground_or_air==0&&
+                            std::fabs(dx)<7.0f;
+                    if(!aligned){raw[1].stickX=dx>0?45:-45;tick();}
+                }
+                neutral();
+                check(aligned,"Mario could not controller-position for the damage fixture");
+                for(unsigned n=0;n<20;n++)tick();
+                bool damaged=false;
+                int response_motion=-1;
+                for(unsigned n=0;n<180&&!damaged;n++){
+                    raw[1].button=n%30==0?PAD_BUTTON_A:0;tick();
+                    const auto victim=match.player_stats(0);
+                    damaged=victim.damage_percent>before.damage_percent;
+                    if(damaged)response_motion=victim.motion_id;
+                }
+                neutral();
+                check(damaged,"Mario's ordinary A input did not damage the selected fighter");
+                std::cout<<"Damage fixture "<<fighter_content->name<<" damage="
+                         <<before.damage_percent<<" -> "<<match.player_stats(0).damage_percent
+                         <<" response_motion="<<response_motion<<std::endl;
+                settle_primary();
+                check(match.player_stats(0).stocks==before.stocks,
+                      "Damage fixture unexpectedly lost a stock before the walkoff");
+                bool stock_lost=false;
+                for(unsigned n=0;n<900&&!stock_lost;n++){
+                    raw[0].stickX=80;tick();
+                    stock_lost=match.player_stats(0).stocks<before.stocks;
+                }
+                neutral();
+                check(stock_lost&&match.player_stats(0).stocks==before.stocks-1,
+                      "Ordinary-PAD walkoff did not consume exactly one source stock");
+                bool rebirth=false,resumed=false;
+                for(unsigned n=0;n<900&&!resumed;n++){
+                    const auto state=match.player_stats(0);
+                    rebirth|=state.motion_id==ftCo_MS_Rebirth||state.motion_id==ftCo_MS_RebirthWait;
+                    resumed=rebirth&&state.motion_id==ftCo_MS_Wait&&state.ground_or_air==0;
+                    check(state.stocks==before.stocks-1,"Neutral respawn lost an additional stock");
+                    if(!resumed)tick();
+                }
+                check(rebirth&&resumed&&match.player_stats(0).damage_percent==0.0f&&
+                      melee_web_test_active_fighter_kind(0)==initial_kind,
+                      "Respawn did not restore zero damage and the selected active fighter identity");
+                std::cout<<fighter_content->name
+                         <<" ordinary damage, one-stock KO, Rebirth, identity and resumed gameplay passed"
+                         <<" source_frame="<<match.source_frames()<<std::endl;
+            }else if(fox_cpu_prefix){
                 std::cout<<"Two-player Fox/Mario CPU9 command-prefix probe begin"<<std::endl;
                 for(unsigned n=0;n<8000;n++){
                     tick();

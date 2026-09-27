@@ -176,6 +176,32 @@ report drawing unrun, and actual drawing remains required in the separate
 initialized GPU fixture. No historical gameplay fix is inferred from these
 negative controls.
 
+All three variants also pass the initialized GPU fixture frozen at `1103bd6`
+(`work/pr86-results-demo-rendered-cow-qbtCof/{b,y,x}/report.json`). Installed
+headless Chrome renders the distinct Sheik poses, advances 744 Results frames
+and draw API calls, then completes host exit/commit and all four demo-owner
+closures with the same camera pool. Source transition-2 draw suppression is
+unchanged; API-call totals do not assert every callback ran. Each case retains
+frame-30/180/600 screenshots, zero page/network/HTTP errors, hardware WebGPU
+identity and exact served artifact hashes. The 74,213,141-byte preload is hashed
+from the actual received ArrayBuffer before construction and that same buffer
+is handed to Emscripten. A game-free reduction established CDP body eviction;
+the changed observation method preserves exact byte/hash checks and does not
+turn the older failed reports into passes. These are synthetic all-CPU Stock
+Results controls, not a reproduction or fix of the historical natural failure.
+
+The frozen `1103bd6` runtime also passes a fresh natural B two-match loop
+(`work/pr86-handoff-b-two-match-r1/report.json`): 13,393/14,989 gameplay frames,
+rendered Results at 181/184, both original CSS returns, and zero reported
+page/native errors or timing interruptions. Actual winners are Samus and Falco;
+the old Sheik-winner failure remains open. Both entry packets are hash-bound,
+gameplay/Results/CSS screenshots are retained, and final CSS has 33 objects /
+17 processes with no Match/Results/Prize owner. Served Wasm SHA-256:
+`90366cbde83f6ca929b6a0f8d77caabe77c5cceb4975230d52a3562513f7aa79`.
+The harness records a changed working-tree hash because documentation and
+unbuilt test fixtures were edited during the run; the frozen served bytes did
+not change. Absence of recorded interruptions is not live performance evidence.
+
 Frozen `facbb21` subsequently passes both requested natural two-match loops:
 A 15,796/11,917 source frames, B 14,783/14,820, both Results→CSS returns per
 lineup, zero page/native-command errors, two timing-interruption entries each
@@ -378,13 +404,22 @@ reset, resumes grounded Wait, and passes repeated match teardown
 copied-part and charge-Article families. KO-copy-loss for other donors and
 damage-triggered random copy loss remain unverified.
 
+The six single-fighter forms also pass `--remaining-damage-ko`
+(`work/pr86-damage-ko-r1.log`, six subcases). Ordinary Mario A input must
+actually increase the victim's damage; the victim then walks off using PAD,
+loses exactly one stock, enters Rebirth, restores zero damage and its original
+active identity, resumes grounded Wait, and completes repeated teardown.
+No position, damage, motion, stock or RNG field is injected. This supplements
+the rows below with targeted damage/KO lifecycle coverage at costume zero;
+other attacks, launch directions, costumes and off-stage recovery remain open.
+
 | Character | Content/construction | Targeted action coverage | Still unverified / failed |
 | --- | --- | --- | --- |
-| Game & Watch | **Native traced** in mixed-content lifecycle and rendered in both A matches. Ten authored Articles pass the real visibility/ownership regression. | Chef source motion, sausage Article creation/lifetime/teardown; ground/air Fire, Rescue Article lifetime and landing. | Other specials, defense, off-stage recovery, targeted damage/KO and broader action inventory. |
+| Game & Watch | **Native traced** in mixed-content lifecycle and rendered in both A matches. Ten authored Articles pass the real visibility/ownership regression. | Chef source motion, sausage Article creation/lifetime/teardown; ground/air Fire, Rescue Article lifetime and landing; ordinary damage/KO/Rebirth as scoped above. | Other specials, defense, off-stage recovery and broader action inventory. |
 | Kirby | **Native traced** against Fox across all six costumes with repeated construction/teardown; rendered in historical A matches. Copied-part visibility counts/IDs and Game & Watch's secondary texture-animation pair are source-adapted and checked against live DObj visibility. | Six donors pass acquisition, copied use, up-appeal loss, same-donor reacquisition and teardown: Mario, Popo/Nana, G&W, Fox, Samus and Captain. The first five create their copied Articles; Captain's Falcon Punch enters the copied motion and damages its victim. A separate three-player case verifies true Mario→Fox replacement and use. The Ice observer identifies actual victim ownership across both entities; Nana maps to the Popo copy family. G&W additionally checks Chef/Pan ownership and visibility. Ground/air Final Cutter, beam Article lifetime and landing pass; Fox/G&W/Samus copy KO loss, Rebirth and resumed gameplay pass. | Nineteen donor families listed below, other-donor KO loss and random damage-triggered copy loss remain unverified. Other normals/defense/off-stage recovery and copied-particle pixel equivalence remain open. |
 | Ice Climbers (Popo/Nana) | **Native traced** as two distinct source entities with repeated lifecycle; rendered in historical A matches. | Belay separates the pair. The strengthened CPU9 case observes Nana death→Sleep while Popo retains his stock, later Popo stock loss, both entities in Rebirth, Nana damage reset and resumed gameplay, then teardown. The original A capture also demonstrates paired rejoin after Sleep. | Other specials/recovery and broader damage/KO cases remain unverified. The earlier acceptance of Nana remaining permanently asleep after Popo's stock loss is withdrawn. |
 | Samus | **Native traced** in mixed-content lifecycle and rendered in both B matches. The authored fifth `x48` grapple joint owns its 34-joint graph and 25 sibling-instance references. | Down-B creates and clears Bomb. Raw-Z captures Mario into CatchWait; a fresh throw input consumes the grapple joint and enters the source throw path; mixed teardown passes. Ground/air Screw Attack continuation and landing pass. | Other specials, off-stage recovery, broader damage/KO coverage. The Kirby-copy palette owner is now resolved; effect-specific particle pixels remain unverified (Kirby row). |
-| Yoshi | **Native traced** in mixed-content lifecycle and rendered in both B matches. | Neutral-B captures Mario into `ftCo_MS_CaptureYoshi`, transitions to `ftCo_MS_YoshiEgg`, and naturally releases to `ftCo_MS_Fall` at action frame 243, with no injected fighter state. Ground/air Egg Throw, thrown-Egg Article lifetime and landing pass. | Other specials, off-stage recovery, targeted damage/KO; the tested Egg Lay path is fighter-victim capture, not its separate item-target branch. |
+| Yoshi | **Native traced** in mixed-content lifecycle and rendered in both B matches. | Neutral-B captures Mario into `ftCo_MS_CaptureYoshi`, transitions to `ftCo_MS_YoshiEgg`, and naturally releases to `ftCo_MS_Fall` at action frame 243, with no injected fighter state. Ground/air Egg Throw, thrown-Egg Article lifetime and landing pass; ordinary damage/KO/Rebirth as scoped above. | Other specials, off-stage recovery, broader damage/KO; the tested Egg Lay path is fighter-victim capture, not its separate item-target branch. |
 | Zelda | **Native traced** in mixed-content lifecycle and selected in both B browser matches. | Four in-match down-B transformations (two each direction) preserve grounded/four-stock lifecycle. Ground/air Farore's Wind continuation and landing pass. | Broader moves/off-stage recovery/damage/KO. Held-A startup form selection is not counted as down-B transformation coverage. |
 | Sheik | **Native traced** as an in-match Zelda form and as a starting form; no assertion during the rebuilt B browser run. | Repeated down-B both directions; ground and air side-B each consume their distinct authored pose roots, create the Chain Article, and pass source Article teardown. Ground/air Vanish continuation and landing pass. | Broader moves/off-stage recovery/damage/KO. B's CSS lineup selects Zelda at the shared icon, so the browser matches do not claim an independently selected Sheik CSS slot. |
 
@@ -504,8 +539,9 @@ comparisons pass.
    loops and synthetic negative controls do not establish its cause. Preserve
    the first-change ownership guards, actual entry packets and historical
    failure independently.
-2. Complete the shield-SDI candidate's full B reference replay and exact
-   declared-field comparisons, then final affected builds/full tests and fresh
+2. The shield-SDI candidate's full B reference replay and exact declared-field
+   comparisons now pass for every captured gameplay row. Complete final
+   affected builds/full tests and fresh
    natural A/B two-match loops. Main including #89 is already integrated;
    source-context, owned stack-profile and ownership checks pass on that base.
    Reduce any new first mismatch before extending another run. Keep the separate

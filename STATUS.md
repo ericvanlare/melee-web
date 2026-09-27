@@ -17,15 +17,18 @@ then exposed missing selected-color model cache ownership; the source-loader
 repair now passes every Kirby color's copy lifecycle. Reconciled owned-input
 full-suite and A match/return checks pass. Imported camera-shake and local Samus
 arithmetic repairs clear their observed differences; the exact declared-field
-comparison now agrees on every captured A gameplay row. B's next first mismatch
-exposed a byte-swapped Yoshi grab-frame table; its reduced and causal browser
-checks pass after repair. A B Sheik-winner Results return exposes a camera-pool
-ownership failure; controls and a fresh Samus-winner B two-match run pass, but
-that failure remains unresolved. The scoped receipts are in the notes.
+comparison agrees on every captured A gameplay row. B's later mismatches exposed
+a byte-swapped Yoshi grab-frame table and missing shield-SDI fused operations;
+reduced checks and a fresh complete recipe now agree on every captured B gameplay
+row in the declared state scope. A B Sheik-winner Results return exposes a
+camera-pool ownership failure; controls and fresh Samus-winner B loops pass, but
+that failure remains unresolved. New profile/camera handoff guards and three
+winner-animation state controls pass; they do not establish the historical
+writer. The scoped receipts and retained failures are in the notes.
 Original references,
 historical scene-only replay and newer exact bounded state checks are explicitly
 separated in the notes; none establishes draw/pixel/timing equivalence. Final
-candidate integration checks, comparison and remaining character/action
+candidate integration checks and remaining character/action
 gates are still open. No admission or merge is claimed.
 
 ## Repository public; main changes restricted to the owner
