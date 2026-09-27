@@ -183,12 +183,14 @@ The first proposed online infrastructure milestone is
 [two adapted desktop Slippi clients running headless on the same development machine](SLIPPI_SELF_HOSTING_RESEARCH.md#first-online-infrastructure-milestone-two-local-headless-clients),
 connected through our own local matchmaker. One command should launch isolated
 clients, drive a complete match and rematch through ordinary controller input,
-exercise rollback with controlled late inputs, retain synchronization evidence
-and clean up its processes. Use a pinned client/mod bundle and independent test
+verify bidirectional peer input consumption, retain lifecycle evidence and clean
+up its processes. Use a pinned client/mod bundle and independent test
 identities. The native emulator clients are development tools; they do not enter
 the browser product.
 
-This first result would establish a bounded local server/client integration.
+This first result would establish a bounded local server/client integration,
+not rollback correctness. A second milestone should force prediction corrections
+and compare finalized inputs and declared state against a controlled baseline.
 Same-machine traffic does not test Internet routing, NAT traversal, browser
 transport or real-world latency. Test distinct networks next, then a browser/ENet
 transport probe measuring actual input arrival under delay, loss, reordering and

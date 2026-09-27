@@ -162,40 +162,43 @@ gameplay and rollback before integrating Melee Web.
 The initial implementation should provide:
 
 1. **A pinned native headless client.** Select and build a Slippi client/mod
-   bundle for this machine. Verify that the chosen no-GUI platform creates no
-   visible windows, takes no focus and emits no audible output. Suppressing
+   bundle for this machine, including the client's recorded submodule revisions,
+   lockfiles, game modifications and runtime resources; independently sampled
+   repository heads are not a compatible bundle. Verify that the chosen no-GUI
+   platform creates no visible windows, takes no focus and emits no audible output. Suppressing
    presentation must preserve game update/draw callbacks and emulated scheduling.
    Record the video/audio profile; this run makes no pixel or PCM claim. Preserve
    upstream checkouts and explain the adaptation in downstream patches.
 2. **Two isolated instances.** Give each client its own user/configuration and
-   save directories, test identity, input channel, logs, replay output and UDP
-   port. The owned disc may be shared read-only. Keep all mutable test state in
+   save directories, test identity, input channel, logs, replay output, and network
+   and spectator ports. The owned disc may be shared read-only. Keep mutable state in
    ignored local directories; leave personal Slippi profiles untouched.
 3. **Our actual local service.** Exercise private direct-code pairing through
    the replacement matchmaking protocol and real ENet peer connections over
    loopback. Use independent test credentials and explicit local service
    endpoints, with no dependency on official accounts or production matchmaking.
-   Keep ordinary match initialization and the pinned gameplay modifications.
+   Audit identity refresh, reporting and other service attempts before online
+   boot; changing only the matchmaking hostname is insufficient. Provide an
+   explicit local identity boundary and retain runtime destination checks. Keep
+   ordinary match initialization and the pinned gameplay modifications.
 4. **Automated gameplay.** Drive each local player's ordinary controller input
    through Slippi's menus into a four-stock Mario/Final Destination match. Finish
-   the match and a rematch. Do not inject expected game state or add gameplay
+   the match and a rematch through the normal post-game flow in the same running
+   processes. Ordinary movement/self-destruct inputs are sufficient. Verify
+   distinguishable remote inputs are consumed on both clients, not merely sent.
+   Do not inject expected game state or add gameplay
    modifications merely to make the harness advance.
-5. **Observed rollback and synchronization.** Run a baseline and a bounded
-   impairment case using a local packet proxy, without changing machine-wide
-   network settings. Delay selected inputs enough to cause prediction correction;
-   retain evidence that restore/re-simulation actually occurred. Compare the
-   finalized input timeline and declared game-state fields on both clients and
-   against the baseline under the same initial conditions and scripted inputs.
-   Record frame, RNG, fighter state, stocks and outcome at explicit boundaries;
-   agreement of sparse network checksums alone is insufficient.
-6. **A repeatable pass/fail report.** Pin source, patches, binaries, codeset,
-   configuration, input scripts and fault schedule. Retain logs, replays and
-   first-divergence diagnostics locally. Bound startup and every run phase,
-   exercise disconnect and failed-pairing paths, and clean up only owned
-   processes. A timeout fails at its boundary; it is not silently retried.
+5. **A repeatable pass/fail report.** Pin source, patches, binaries, codeset,
+   configuration and input scripts. Retain logs, replays and lifecycle/input
+   evidence locally. Repeat from fresh profiles to exclude stale session state.
+   Bound startup and every run phase; exercise disconnect, harness interruption
+   and failed-pairing paths, and clean up only owned processes. A timeout fails at its boundary; it is not silently retried.
 
-The build and boot check is the first checkpoint within this milestone. No
-adapted Slippi binary has yet been built or launched by this research, and two
+Single-client boot, consumed scripted input, readable lifecycle signals and clean
+shutdown form the first checkpoint; prove them before implementing pairing.
+Reuse suitable capture utilities, but preserve the vanilla reference build and
+review its settings: disabling cheats blindly can disable required Slippi
+modifications. No adapted Slippi binary has yet been built or launched by this research, and two
 instances sustaining the required cadence on this machine remains unmeasured.
 The repository's [reference Dolphin builder](../scripts/build_reference_dolphin.py)
 already describes a headless build route, but that separately pinned vanilla
@@ -224,10 +227,26 @@ same-host CPU contention also differs from two players on separate machines.
 Cross-network operation and browser interoperability remain later gates. A
 passing headless pair does not admit Melee Web gameplay or foreground timing.
 
+## Second milestone: controlled rollback validation
+
+After local connectivity and lifecycle pass, run a baseline and a bounded
+impairment case using a local packet proxy without changing machine-wide network
+settings. Drive the same simulation-frame-indexed inputs under the same initial
+conditions; wall-clock scripts are not a deterministic comparison. Slippi repeats
+input history, so delaying one packet does not necessarily force rollback.
+Observe actual prediction correction and restore/re-simulation. Compare finalized
+input timelines and declared game-state fields on both clients and against the
+baseline, recording frame, RNG, fighter state, stocks and outcome at explicit
+boundaries. Sparse checksums or matching outcomes alone are insufficient. Retain
+the fault schedule and first-divergence diagnostics. This is a separate acceptance
+gate, not a prerequisite for the first connectivity PR or an initial cross-network
+probe.
+
 ## Smallest useful validation sequence
 
-1. Complete the same-machine headless pair above, including observed rollback
-   and a clean match/rematch outcome.
+1. Complete the same-machine headless pair above with verified bidirectional
+   input consumption and a clean match/rematch outcome. Follow with the separate
+   controlled rollback milestone; keep its evidence distinct from connectivity.
 2. Run the adapted desktop pair across distinct machines and networks. Exercise
    NAT/connection failures and measure delivery under real network conditions.
 3. Test the browser/ENet gateway with deterministic packet workloads, including
