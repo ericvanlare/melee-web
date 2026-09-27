@@ -7,8 +7,9 @@ east → B, west → X, north → Y. Right shoulder → Z; triggers → L/R.
 Controls allows an explicit custom mapping when that convention is unwanted.
 
 The public player and development `runtime.html` use the same compact **Controls**
-component to select the source separately
-for Player 1 and Player 2: **Auto**, **Keyboard**, **Controller only**, or **Off**.
+component to select the source separately for Player 1 and Player 2. Player 1 also
+has an optional **Touch controls** source. Available choices are **Auto**,
+**Keyboard**, **Controller only**, **Touch controls** (Player 1 only), or **Off**.
 Auto prefers a recognized controller and otherwise enables that player's keyboard.
 Keyboard overrides physical input for that slot; automatically assigned controllers
 move to another eligible slot. Both public slots can use the keyboard at once.
@@ -21,6 +22,67 @@ afterward. The browser validates and retains the selected file, starts native
 import when its owner and cache are ready, then waits for graphics before
 entering the original in-game character select automatically. **Play** remains
 available when the browser needs a separate audio activation gesture.
+
+The transparent touch overlay is disabled by default. It is positioned over the
+canvas's fitted 4:3 rectangle, uses 48px face/shoulder targets and 44px D-pad
+targets, and applies a radial 15% dead zone for both sticks while preserving diagonal direction and
+scaling travel from zero to the bounded unit range. The overlay maps to a
+standard-layout virtual Gamepad and then follows the same browser-controller
+normalization and original PAD writer. A button or stick can remain held while
+other pointer IDs operate other controls. Pointer up/cancel, lost capture,
+window blur, hidden document, page hide, opening Controls, source changes, Eject,
+and teardown release held state. Keyboard and gamepad source ownership is
+unchanged; when Touch controls owns P1, physical controllers route to another
+eligible player slot.
+
+| Touch control | GameCube input | Mapping |
+| --- | --- | --- |
+| Main stick | Main analog stick | Radial 15% dead zone; unit-bounded magnitude and diagonals |
+| C-stick | C-stick | Radial 15% dead zone; unit-bounded magnitude and diagonals |
+| A, B, X, Y | A `0x100`, B `0x200`, X `0x400`, Y `0x800` | Standard GameCube button indices through `TOUCH_PROFILE` |
+| Z, Start | Z `0x10`, Start `0x1000` | Standard digital button indices |
+| L, R | L `0x40`, R `0x20`, plus analog trigger | Press sets the digital bit and full 255 trigger pressure; release clears both |
+| D-pad | Up `0x8`, Down `0x4`, Left `0x1`, Right `0x2` | Independent digital directions; diagonals can be held together |
+| Main/C-stick | Signed 8-bit axes | Screen-down travel is inverted into original PAD Y direction |
+
+Touch source and overlay opacity (25–75%, initially 55%) are stored with the
+existing `melee-prototype-keyboard-v1` layout/source preferences. The Controls
+dialog explains the L/R pressure mapping. Touch input emits no synthetic mouse
+or keyboard gameplay events.
+
+## Fullscreen and mobile limits
+
+The public player's old Fullscreen control was disabled when either
+`document.fullscreenEnabled` was false or `#player.requestFullscreen` was absent.
+The control now remains enabled: standard Fullscreen API support is feature
+detected, a native request is made synchronously in the button's click handler,
+and the promise rejection path switches to a clearly labeled **Expand player**
+page-layout fallback. That fallback keeps browser controls visible and does not
+claim native fullscreen. The overlay stays inside `#player`/`#runtime-host`, so
+it remains with the game on native fullscreen entry, exit, viewport resize and
+orientation changes.
+
+The browser Fullscreen API requires user activation; Chrome lists fullscreen
+among activation-gated APIs, so the request is called synchronously inside the
+button handler ([Chrome user-activation guidance](https://developer.chrome.com/blog/user-activation)).
+Safari 16.4 documents the unprefixed API on macOS and iPadOS
+([WebKit Safari 16.4 notes](https://webkit.org/blog/13966/webkit-features-in-safari-16-4/));
+Apple staff noted iPhone support in Safari 17.2 beta, but that same thread
+records it being removed in 17.4 beta 4. The WebKit issue tracking iPhone
+element fullscreen is still open; its June 2026 report says it remained absent
+in Safari 27 beta ([WebKit issue 206854](https://bugs.webkit.org/show_bug.cgi?id=206854),
+[Apple Developer Forums](https://developer.apple.com/forums/thread/133248)).
+Safari 26.4 fixes fullscreen-session behavior on iOS, but does not announce
+general iPhone availability ([WebKit Safari 26.4 notes](https://webkit.org/blog/17862/webkit-features-for-safari-26-4/)).
+Treat live method/permission checks and request rejection as authoritative.
+Chrome for Android documents Fullscreen API support
+([Chrome for Android](https://developer.chrome.com/docs/android/overview)). A Home
+Screen web app's standalone presentation is a separate launch mode, not ordinary
+Safari-tab fullscreen ([WebKit Safari 26.0 web apps](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/));
+this change does not add installation or PWA setup. Headless Chrome tests cover
+DOM fullscreen and mocked unsupported/rejected requests; no physical iPhone or
+Android phone has been tested. WebGPU and runtime support are separate mobile
+prerequisites.
 
 The recognized Mayflash 0079:1843 raw layout on Chrome/macOS gets an automatic
 suggested mapping. Its binding list is visible before setup, and the live display

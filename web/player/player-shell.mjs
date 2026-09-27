@@ -231,7 +231,7 @@ $('end-session').onclick = async () => {
   renderDiscSelection();
   renderStatus(state);
   $('end-session').disabled = true;
-  try { await player.destroy(); location.reload(); }
+  try { await player.destroy(); settings?.destroy(); location.reload(); }
   catch (error) { showError(error, true); }
 };
 $('retry').onclick = () => location.reload();
@@ -260,14 +260,56 @@ settings = mountControllerSettings({
   onError: error => showError(error),
 });
 
-const fullscreenAvailable = !!document.fullscreenEnabled && typeof $('player').requestFullscreen === 'function';
-$('fullscreen').disabled = !fullscreenAvailable;
-$('fullscreen').title = fullscreenAvailable ? '' : 'Fullscreen unavailable in this browser';
-$('fullscreen').onclick = async () => {
-  try { if (document.fullscreenElement) await document.exitFullscreen(); else await $('player').requestFullscreen(); player?.focus(); }
-  catch { showError('Fullscreen was declined by the browser.'); }
+const fullscreenButton = $('fullscreen'), fullscreenStatus = $('fullscreen-status'), playerElement = $('player');
+let fullscreenMode = typeof playerElement.requestFullscreen === 'function' &&
+  typeof document.exitFullscreen === 'function' && document.fullscreenEnabled !== false ? 'native' : 'expand';
+function renderFullscreenControl() {
+  const native = document.fullscreenElement === playerElement;
+  const expanded = playerElement.classList.contains('player-expanded');
+  fullscreenButton.textContent = native ? 'Exit fullscreen' : expanded ? 'Shrink player' :
+    fullscreenMode === 'native' ? 'Fullscreen' : 'Expand player';
+  fullscreenButton.title = fullscreenMode === 'native' ? 'Enter or exit browser fullscreen' :
+    'Expand the game within this page. Browser controls remain visible.';
+}
+function fullscreenRejected(action) {
+  if (action === 'enter') fullscreenMode = 'expand';
+  fullscreenStatus.textContent = action === 'enter'
+    ? 'The browser declined fullscreen. Expand player enlarges the game within this page; browser controls remain visible.'
+    : 'The browser could not exit fullscreen. Use its fullscreen exit gesture or key.';
+  renderFullscreenControl();
+}
+fullscreenButton.disabled = false;
+if (fullscreenMode === 'expand') {
+  fullscreenStatus.textContent = 'Native fullscreen is unavailable here. Expand player enlarges the game within this page; browser controls remain visible.';
+}
+renderFullscreenControl();
+fullscreenButton.onclick = () => {
+  if (document.fullscreenElement) {
+    try { Promise.resolve(document.exitFullscreen()).catch(() => fullscreenRejected('exit')); }
+    catch { fullscreenRejected('exit'); }
+    return;
+  }
+  if (fullscreenMode === 'native') {
+    // requestFullscreen must be called synchronously from this trusted button
+    // activation; do not await player work or another browser prompt first.
+    try { Promise.resolve(playerElement.requestFullscreen()).then(() => player?.focus()).catch(() => fullscreenRejected('enter')); }
+    catch { fullscreenRejected('enter'); }
+    return;
+  }
+  const expanded = playerElement.classList.toggle('player-expanded');
+  document.documentElement.classList.toggle('player-expanded', expanded);
+  document.body.classList.toggle('player-expanded', expanded);
+  fullscreenStatus.textContent = expanded
+    ? 'Expanded within this page. Browser controls remain visible.'
+    : 'Expanded player closed.';
+  renderFullscreenControl();
+  player?.focus();
 };
-document.addEventListener('fullscreenchange', () => { $('fullscreen').textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'; });
+document.addEventListener('fullscreenchange', () => {
+  if (document.fullscreenElement === playerElement) fullscreenStatus.textContent = '';
+  renderFullscreenControl();
+});
+playerElement.addEventListener('fullscreenerror', () => fullscreenRejected('enter'));
 
 try {
   player = await mountMeleeRuntime({
