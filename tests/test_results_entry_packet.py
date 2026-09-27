@@ -95,6 +95,9 @@ class ResultsEntryPacketTests(unittest.TestCase):
         source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
         self.assertIn('kResultsPadTraceCapacity=8192', source)
         self.assertIn('results->source_frames(),sample', source)
+        self.assertIn('extern ResultsData lbl_8046DBE8', source)
+        self.assertIn('retain_results_state_after_tick', source)
+        self.assertIn('results_state_after_tick', source)
         self.assertIn('melee_web_native_menu_results_pad_trace()', source)
         cmake = (ROOT / 'cmake/FighterRuntime.cmake').read_text(encoding='utf-8')
         development = cmake.split('add_executable(gameplay_menu_browser', 1)[1].split(
@@ -105,6 +108,9 @@ class ResultsEntryPacketTests(unittest.TestCase):
         )[0]
         self.assertIn('_melee_web_native_menu_results_pad_trace', development)
         self.assertNotIn('_melee_web_native_menu_results_pad_trace', public)
+        harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
+        self.assertIn('results_page_transitions', harness)
+        self.assertIn('before P1 confirmation', harness)
 
 
 if __name__ == '__main__':

@@ -74,6 +74,7 @@ report.native_command_errors=[];
 report.results_entry_packets=[];
 report.results_entry_packet_reads=[];
 report.results_source_pad_traces=[];
+report.results_page_transition_checks=[];
 report.provenance={source_start:sourceProvenance(),
   harness_sha256:await sha256(new URL(import.meta.url)),
   results_entry_helper_sha256:await sha256(new URL('./results_entry_packet.mjs',import.meta.url)),
@@ -126,7 +127,20 @@ async function retainResultsInputEvents(){
 }
 function summarizeResultsPadTrace(trace){
   const startRuns=[];
+  const pageTransitions=[];
+  const previousPages=Array(4).fill(null);
   for(const row of trace.samples){
+    const state=row.results_state_after_tick;
+    if(state){
+      for(let slot=0;slot<4;slot++){
+        const page=state.players[slot].page;
+        if(previousPages[slot]!==null&&page!==previousPages[slot])
+          pageTransitions.push({slot,from:previousPages[slot],to:page,
+            source_frame:state.source_frame,phase:state.phase,
+            stats_phase:state.stats_phase,confirmed:state.players[slot].confirmed});
+        previousPages[slot]=page;
+      }
+    }
     if((row.pads[0].button&buttonStart)===0)continue;
     const last=startRuns.at(-1);
     if(last&&row.source_frame===last.last_source_frame+1)last.last_source_frame=row.source_frame;
@@ -137,16 +151,20 @@ function summarizeResultsPadTrace(trace){
     tick_failed:trace.samples.filter(row=>!row.tick_returned).map(row=>row.source_frame),
     p1_button_values:[...new Set(trace.samples.map(row=>row.pads[0].button))],
     p1_start_runs:startRuns,
+    results_page_transitions:pageTransitions,
     port_error_values:Array.from({length:4},(_,port)=>
       [...new Set(trace.samples.map(row=>row.pads[port].err))])};
 }
+async function readResultsSourcePadTrace(){
+  return page.evaluate(()=>{
+    if(typeof Module._melee_web_native_menu_results_pad_trace!=='function')
+      throw Error('Results raw-PAD trace getter is unavailable in the served development build');
+    return JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_results_pad_trace()));
+  });
+}
 async function retainResultsSourcePadTrace(match,reason){
   try{
-    const trace=await page.evaluate(()=>{
-      if(typeof Module._melee_web_native_menu_results_pad_trace!=='function')
-        throw Error('Results raw-PAD trace getter is unavailable in the served development build');
-      return JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_results_pad_trace()));
-    });
+    const trace=await readResultsSourcePadTrace();
     report.results_source_pad_traces.push({match,reason,
       summary:summarizeResultsPadTrace(trace),trace});
     return trace;
@@ -512,10 +530,11 @@ async function runMatch(matchIndex,expected){
     }
     throw Error(`${label}: Results source frame did not reach ${target}`);
   };
-  const queueSourceStart=async(target,label)=>{
+  const queueSourceStart=async(target,label,beforeQueue)=>{
     const ready=await waitForResultsFrame(target,`${label} source-tick gate`);
     assert(ready.phase===8||ready.phase===9,
       `${label}: Results exited before its scheduled P1 source input`);
+    const preQueue=beforeQueue?await beforeQueue(ready):null;
     const queued=await page.evaluate(({button,duration})=>{
       const diagnostics=Module.UTF8ToString(Module._melee_web_native_menu_diagnostics());
       const frame=diagnostics.match(/(?:Results|Prize) source frame: (\d+)/);
@@ -524,6 +543,12 @@ async function runMatch(matchIndex,expected){
       return {result,source_frame:Number(frame[1])};
     },{button:buttonStart,duration:10});
     assert.equal(queued.result,1,`${label}: raw P1 Start PAD queue failed`);
+    if(preQueue){
+      assert(preQueue.transitions.every(row=>row.source_frame<=queued.source_frame),
+        'Disconnected CPU pages must advance no later than the queued P1 confirmation tick');
+      report.results_page_transition_checks.push({...preQueue,
+        confirmation_source_frame:queued.source_frame});
+    }
     report.controller_inputs.push({device:'development raw PAD at source tick',port:0,
       buttons:buttonStart,duration:10,target_results_source_frame:target,
       queued_at_results_source_frame:queued.source_frame,label});
@@ -553,7 +578,26 @@ async function runMatch(matchIndex,expected){
     const starts=[];
     starts.push(await queueSourceStart(180,`results-${matchIndex}-source-start-1`));
     starts.push(await queueSourceStart(starts[0]+180,`results-${matchIndex}-source-start-2`));
-    starts.push(await queueSourceStart(starts[1]+240,`results-${matchIndex}-source-start-3`));
+    starts.push(await queueSourceStart(starts[1]+240,`results-${matchIndex}-source-start-3`,async ready=>{
+      const trace=await readResultsSourcePadTrace();
+      assert(!trace.overflow,'Pre-confirmation Results trace overflowed');
+      const transitions=summarizeResultsPadTrace(trace).results_page_transitions;
+      const cpuTransitions=transitions.filter(row=>row.from===0&&row.to===1&&row.slot>=2);
+      const beforeConfirmFrame=trace.samples.at(-1)?.results_state_after_tick?.source_frame;
+      assert(Number.isInteger(beforeConfirmFrame)&&beforeConfirmFrame>=readResultsFrame(ready),
+        'Results source trace did not reach the pre-confirmation source boundary');
+      assert.deepEqual(cpuTransitions.map(row=>row.slot),[2,3],
+        'Disconnected CPU statistics pages must auto-advance before the third P1 Start is queued');
+      assert(cpuTransitions.every(row=>row.phase===3&&row.stats_phase===2&&
+        row.source_frame<beforeConfirmFrame),
+        'Disconnected CPU page transitions must be observed in active statistics before P1 confirmation');
+      assert.deepEqual(transitions.map(row=>row.slot),[2,3],
+        'Connected neutral ports or another Results player page changed before P1 confirmation');
+      return {match:matchIndex,status:'pass',
+        input:'P1-only source-tick Start; historical keyboard path not used',
+        source_frame_before_confirmation:beforeConfirmFrame,
+        confirmation_queue_target:starts[1]+240,transitions:cpuTransitions};
+    }));
     result.results_source_start_pulse_frames=starts;
   }else{
     for(let pulse=0;pulse<48&&state.phase!==1;pulse++){
@@ -613,9 +657,19 @@ async function runMatch(matchIndex,expected){
       row.pads[2].button===0&&row.pads[2].err===-1&&
       row.pads[3].button===0&&row.pads[3].err===-1),
       'Results P1-only source input changed another port or its natural connectedness');
+    const cpuPageTransitions=sourcePadTrace.summary.results_page_transitions.filter(
+      row=>row.from===0&&row.to===1&&row.slot>=2);
+    assert.deepEqual(cpuPageTransitions.map(row=>row.slot),[2,3],
+      'Disconnected CPU statistics pages did not each auto-advance exactly once');
+    assert(cpuPageTransitions.every(row=>row.phase===3&&row.stats_phase===2&&
+      row.source_frame<result.results_source_start_pulse_frames[2]),
+      'Disconnected CPU pages must auto-advance in the active statistics phase before P1 confirmation');
+    assert.deepEqual(sourcePadTrace.summary.results_page_transitions.map(row=>row.slot),[2,3],
+      'Connected neutral ports or another Results player page changed unexpectedly');
     report.results_source_pad_verification={status:'pass',start_frames:result.results_source_start_pulse_frames,
       held_ticks:startRows.length,ports:{p1:'connected, P1 Start only',p2:'connected, neutral',
-        p3:'disconnected CPU PAD',p4:'disconnected CPU PAD'},tick_returned:true};
+        p3:'disconnected CPU PAD',p4:'disconnected CPU PAD'},
+      disconnected_cpu_page_transitions:cpuPageTransitions,tick_returned:true};
   }
 }
 

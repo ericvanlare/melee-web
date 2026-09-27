@@ -10,6 +10,7 @@ extern "C" const char* melee_web_native_menu_match_observe();
 extern "C" const char* melee_web_native_menu_memory();
 extern "C" {
 #include <melee/gm/types.h>
+extern ResultsData lbl_8046DBE8;
 }
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
@@ -91,6 +92,13 @@ bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_d
 struct ResultsPadTraceRow {
  uint32_t source_frame;
  bool tick_returned;
+ bool results_state_sampled;
+ uint32_t results_state_frame;
+ uint8_t results_phase;
+ uint8_t results_stats_phase;
+ uint8_t results_num_pages;
+ uint8_t results_player_pages[4];
+ uint8_t results_player_confirmed[4];
  PADStatus pads[4];
 };
 constexpr size_t kResultsPadTraceCapacity=8192;
@@ -109,6 +117,20 @@ size_t retain_results_pad_sample(uint32_t source_frame,const PADStatus pads[4]){
  row={};row.source_frame=source_frame;
  for(size_t port=0;port<4;++port)row.pads[port]=pads[port];
  return index;
+}
+void retain_results_state_after_tick(size_t index,uint32_t source_frame){
+ if(index>=results_pad_trace_count)return;
+ auto& row=results_pad_trace[index];
+ const ResultsData& state=lbl_8046DBE8;
+ row.results_state_sampled=true;
+ row.results_state_frame=source_frame;
+ row.results_phase=state.x1;
+ row.results_stats_phase=state.x0_23;
+ row.results_num_pages=state.num_pages;
+ for(size_t slot=0;slot<4;++slot){
+  row.results_player_pages[slot]=state.player_data[slot].page;
+  row.results_player_confirmed[slot]=state.player_data[slot].x0_0?1U:0U;
+ }
 }
 #endif
 // V2 recipes come from fresh original processes and do not carry heap history.
@@ -1211,6 +1233,7 @@ void tick(){
     results->tick(sample);
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
     if(trace_index<results_pad_trace_count)results_pad_trace[trace_index].tick_returned=true;
+    retain_results_state_after_tick(trace_index,results->source_frames());
 #endif
     source_frames.did_step();if(results->requested())result=3;
    }
@@ -1460,7 +1483,29 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
    if(length<0||static_cast<size_t>(length)>=sizeof(sample))continue;
    json.append(sample,static_cast<size_t>(length));
   }
-  json+="]}";
+  json+="],\"results_state_after_tick\":";
+  if(!row.results_state_sampled)json+="null";
+  else{
+   char state_sample[256];
+   int state_length=std::snprintf(state_sample,sizeof(state_sample),
+    "{\"source_frame\":%u,\"phase\":%u,\"stats_phase\":%u,\"num_pages\":%u,\"players\":[",
+    row.results_state_frame,static_cast<unsigned>(row.results_phase),
+    static_cast<unsigned>(row.results_stats_phase),
+    static_cast<unsigned>(row.results_num_pages));
+   if(state_length>=0&&static_cast<size_t>(state_length)<sizeof(state_sample))
+    json.append(state_sample,static_cast<size_t>(state_length));
+   for(size_t slot=0;slot<4;++slot){
+    if(slot)json+=',';
+    state_length=std::snprintf(state_sample,sizeof(state_sample),
+     "{\"page\":%u,\"confirmed\":%u}",
+     static_cast<unsigned>(row.results_player_pages[slot]),
+     static_cast<unsigned>(row.results_player_confirmed[slot]));
+    if(state_length>=0&&static_cast<size_t>(state_length)<sizeof(state_sample))
+     json.append(state_sample,static_cast<size_t>(state_length));
+   }
+   json+="]}";
+  }
+  json+="}";
  }
  json+="]}";
  return json.c_str();
