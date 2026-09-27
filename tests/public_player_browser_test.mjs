@@ -6,6 +6,7 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {parseMeleeGCI} from '../web/gamecube-save.mjs';
 const {values} = parseArgs({options: {
   ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
   audio: {type: 'boolean', default: false},
@@ -16,7 +17,7 @@ const {chromium,browser:launchOptions} = await loadBrowserTools(values.playwrigh
 const packageManifest = values.manifest ? JSON.parse(await fs.readFile(values.manifest, 'utf8')) : null;
 await fs.mkdir(values.out, {recursive: true});
 const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: values.headed}));
-const context = await browser.newContext({viewport: {width: 1280, height: 960}});
+const context = await browser.newContext({viewport: {width: 1280, height: 960}, acceptDownloads: true});
 const page = await context.newPage(), origin = new URL(values.url).origin;
 const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
 const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.version(), browser_mode: values.headed ? 'headed' : 'headless', checks: [],
@@ -105,6 +106,11 @@ try {
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await page.locator('#loading-panel').waitFor({state: 'visible', timeout: 30000});
   await check('disc validation is available before graphics readiness', async () => {
+    await page.waitForFunction(() => {
+      const selection = document.querySelector('#choose-disc');
+      const loading = document.querySelector('#loading-panel');
+      return selection && !selection.disabled && loading && !loading.hidden;
+    }, null, {timeout: 30000});
     assert(await page.locator('#choose-disc').isEnabled(), 'Selection stays available while startup is busy');
     await selectDisc({name: 'early-invalid.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
     await page.locator('#error-dialog[open]').waitFor();
@@ -154,6 +160,136 @@ try {
     assert.equal(await page.evaluate(() => typeof window.menuObservePlayer), 'undefined');
     assert.equal(await page.evaluate(() => typeof Module.runtimeCacheState), 'undefined');
     await shot('desktop');
+  });
+  await check('save settings export, import, persistence, compare-and-swap and recovery', async () => {
+    await page.locator('#settings-open').click();
+    await page.locator('#settings-dialog[open]').waitFor();
+    assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
+    await shot('settings');
+    const exported = page.waitForEvent('download');
+    await page.locator('#export-save').click();
+    const download = await exported;
+    const gciPath = path.join(values.out, 'everything-unlocked.gci');
+    await download.saveAs(gciPath);
+    const baseline = parseMeleeGCI(new Uint8Array(await fs.readFile(gciPath)));
+    assert.equal(baseline.byteLength, 0xF1C4);
+
+    await page.locator('#save-mode').selectOption('personal');
+    await page.locator('#save-confirm-dialog[open]').waitFor();
+    assert.match(await page.locator('#save-confirm-body').textContent(), /next launch/);
+    await page.locator('#save-confirm-accept').click();
+    await page.waitForFunction(() => document.querySelector('#save-mode').value === 'personal');
+    for (let generation = 0; generation < 2; generation++) {
+      await page.locator('#load-save').click();
+      await page.locator('#save-file').setInputFiles(gciPath);
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      await page.locator('#save-confirm-accept').click();
+      await page.waitForFunction(() => document.querySelector('#save-status').textContent.includes('Save loaded'));
+    }
+
+    const storageRace = await page.evaluate(async bytes => {
+      const storeUrl = performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+      if (!storeUrl) throw Error('Save profile store module was not loaded.');
+      const {SaveProfileStore} = await import(storeUrl);
+      const [left, right] = await Promise.all([SaveProfileStore.open(), SaveProfileStore.open()]);
+      try {
+        const revision = await left.getProfileRevision();
+        const first = Uint8Array.from(bytes), second = Uint8Array.from(bytes);
+        second[32] ^= 1;
+        const outcomes = await Promise.allSettled([
+          left.commitProfile(first, revision), right.commitProfile(second, revision),
+        ]);
+        const fulfilled = outcomes.filter(result => result.status === 'fulfilled').length;
+        const conflict = outcomes.find(result => result.status === 'rejected')?.reason?.name;
+        if (fulfilled !== 1 || conflict !== 'SaveProfileConflictError')
+          throw Error(`Expected one stale-writer conflict, got ${fulfilled} commits and ${conflict}.`);
+        const tx = left.db.transaction('profiles', 'readwrite');
+        const done = new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = tx.onabort = () => reject(tx.error); });
+        const request = tx.objectStore('profiles').get('personal');
+        request.onsuccess = () => {
+          const record = request.result;
+          record.active.data[0] ^= 1;
+          tx.objectStore('profiles').put(record, 'personal');
+        };
+        await done;
+        return {fulfilled, conflict};
+      } finally { left.close(); right.close(); }
+    }, Array.from(baseline));
+    assert.deepEqual(storageRace, {fulfilled: 1, conflict: 'SaveProfileConflictError'});
+
+    await page.reload(); await ready();
+    await page.locator('#settings-open').click();
+    assert.equal(await page.locator('#save-mode').inputValue(), 'personal');
+    await page.waitForFunction(() => /previous verified progress copy/.test(document.querySelector('#save-status').textContent));
+    const recovered = await page.evaluate(async () => {
+      const storeUrl = performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+      const {SaveProfileStore} = await import(storeUrl);
+      const store = await SaveProfileStore.open();
+      try { const profile = await store.getProfile(); return {recovered: profile.recovered, data: Array.from(profile.data)}; }
+      finally { store.close(); }
+    });
+    assert.equal(recovered.recovered, true);
+    assert.deepEqual(Buffer.from(recovered.data), Buffer.from(baseline));
+    await page.locator('#settings-close').click();
+    await page.locator('#settings-dialog').waitFor({state: 'hidden'});
+  });
+  await check('Personal autosave commits repeated changed snapshots', async () => {
+    const [settingsUrl, storeUrl] = await page.evaluate(() => ['save-profile-settings.mjs', 'save-profile-store.mjs']
+      .map(name => performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/' + name))?.name));
+    assert(settingsUrl && storeUrl);
+    const isolated = await browser.newContext({viewport: {width: 800, height: 600}});
+    const savePage = await isolated.newPage();
+    try {
+      await savePage.goto(origin + '/privacy');
+      await savePage.setContent(`<!doctype html><body>
+        <button id="settings-open">Settings</button>
+        <dialog id="settings-dialog"><label for="save-mode">Save mode</label>
+          <select id="save-mode"><option value="everything">Everything</option><option value="personal">Personal</option></select>
+          <p id="save-mode-description"></p><button id="export-save">Export</button><button id="load-save">Load</button>
+          <input id="save-file" type="file"><p id="save-status"></p><button id="settings-close">Close</button>
+        </dialog>
+        <dialog id="save-confirm-dialog"><h2 id="save-confirm-title"></h2><p id="save-confirm-body"></p>
+          <button id="save-confirm-cancel">Cancel</button><button id="save-confirm-accept">Accept</button>
+        </dialog></body>`);
+      await savePage.evaluate(async ({settingsUrl, storeUrl}) => {
+        const {mountSaveProfileSettings} = await import(settingsUrl);
+        const {SaveProfileStore} = await import(storeUrl);
+        window.saveSamples = 0;
+        window.saveController = mountSaveProfileSettings({onError: error => { window.saveFailure = error.message; }});
+        window.saveStore = await SaveProfileStore.open();
+        await window.saveController.bindPlayer({
+          configureSaveProfile: async () => {},
+          snapshotSaveProfile: async () => new Uint8Array(0xF1C4).fill(++window.saveSamples),
+        });
+      }, {settingsUrl, storeUrl});
+      await savePage.locator('#settings-open').click();
+      await savePage.locator('#save-mode').selectOption('personal');
+      await savePage.locator('#save-confirm-dialog[open]').waitFor();
+      await savePage.locator('#save-confirm-accept').click();
+      await savePage.waitForFunction(() => document.querySelector('#save-mode').value === 'personal');
+      await savePage.locator('#settings-close').click();
+      await savePage.evaluate(() => window.saveController.setState({scene: 'css'}));
+      let autosaved = null;
+      for (let attempt = 0; attempt < 80; attempt++) {
+        autosaved = await savePage.evaluate(async () => {
+          const profile = await window.saveStore.getProfile();
+          return profile ? {revision: profile.revision, firstByte: profile.data[0], recovered: profile.recovered,
+            status: document.querySelector('#save-status').textContent, failure: window.saveFailure || null,
+            samples: window.saveSamples} : null;
+        });
+        if (autosaved?.revision >= 2) break;
+        await savePage.waitForTimeout(100);
+      }
+      assert(autosaved?.revision >= 2,
+        `The timer should commit multiple changed samples; got ${JSON.stringify(autosaved)}`);
+      assert(autosaved.firstByte >= 2);
+      assert.equal(autosaved.recovered, false);
+      assert.match(autosaved.status, /Personal progress saved on this device/);
+      assert.equal(autosaved.failure, null);
+    } finally {
+      await savePage.evaluate(() => window.saveController?.close?.()).catch(() => {});
+      await isolated.close();
+    }
   });
   await check('controls, focus and preferences survive a fresh document', async () => {
     await page.locator('#controls-open').click();
@@ -330,7 +466,8 @@ try {
   await check('keyboard-only session persists its preferences; no application upload or background connections', async () => {
     const storage = await page.evaluate(async () => ({local: Object.keys(localStorage), session: Object.keys(sessionStorage),
       indexed: await indexedDB.databases(), caches: await caches.keys(), workers: (await navigator.serviceWorker.getRegistrations()).length}));
-    assert.deepEqual(storage, {local: ['melee-prototype-keyboard-v1'], session: [], indexed: [], caches: [], workers: 0});
+    assert.deepEqual(storage, {local: ['melee-prototype-keyboard-v1'], session: [],
+      indexed: [{name: 'webmelee-save-profiles-v1', version: 1}], caches: [], workers: 0});
     assert.equal((await context.cookies()).length, 0); report.storage = storage;
     await collectViolations();
     assert.deepEqual(violations, []); assert.deepEqual(errors, []); assert.deepEqual(sockets, []);

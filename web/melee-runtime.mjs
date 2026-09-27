@@ -221,6 +221,42 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   listen('error', event => stop(event.error || event.message));
   listen('unhandledrejection', event => stop(event.reason));
   const focus = () => { if (!fatal && !destroyed) { canvas.focus(); inputDirty = true; } };
+  function saveProfileBytes(cardData) {
+    if (cardData == null) return new Uint8Array();
+    if (!(cardData instanceof Uint8Array) || cardData.byteLength !== 0x1790 + 7 * 0x1F2C)
+      throw Error('Save profile must contain the exact original GameCube card data.');
+    return cardData;
+  }
+  async function configureSaveProfile(mode, cardData = null) {
+    if (!['everything', 'personal'].includes(mode)) throw Error('Unknown save mode.');
+    const bytes = saveProfileBytes(cardData);
+    if (mode === 'everything' && bytes.byteLength) throw Error('Everything unlocked does not use a personal save.');
+    if (!ready || fatal || destroyed) throw Error('The player is unavailable. Reload to recover.');
+    return operation('saving', async () => {
+      let ptr = 0;
+      try {
+        if (bytes.length) {
+          ptr = Module._malloc(bytes.length);
+          if (!ptr) throw Error('Unable to allocate save profile transfer memory.');
+          Module.HEAPU8.set(bytes, ptr);
+        }
+        await boundary(() => check(Module._melee_web_native_menu_set_save_profile(
+          mode === 'everything' ? 0 : 1, ptr, bytes.length)));
+      } finally { if (ptr) Module._free(ptr); }
+    });
+  }
+  async function snapshotSaveProfile({baseline = false} = {}) {
+    if (!ready || fatal || destroyed) throw Error('The player is unavailable. Reload to recover.');
+    const length = 0x1790 + 7 * 0x1F2C;
+    const ptr = Module._malloc(length);
+    if (!ptr) throw Error('Unable to allocate save snapshot memory.');
+    try {
+      await boundary(() => check(baseline ?
+        Module._melee_web_native_menu_snapshot_unlocked_baseline(ptr, length) :
+        Module._melee_web_native_menu_snapshot_save_profile(ptr, length, 0)));
+      return new Uint8Array(Module.HEAPU8.slice(ptr, ptr + length));
+    } finally { Module._free(ptr); }
+  }
   async function unloadAndSave() {
     const unloaded = await boundary(() => { syncAudio(); return Module._melee_web_native_menu_unload(); });
     if (!unloaded) return false;
@@ -392,6 +428,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     },
     pause() { if (!snapshot().canPause) return Promise.reject(Error('No active scene to pause.')); return operation('pausing', async () => { await boundary(() => Module._melee_web_native_menu_pause(1)); focus(); syncAudio(); }); },
     resume() { if (!snapshot().canPause) return Promise.reject(Error('No active scene to resume.')); return operation('resuming', async () => { await prepareAudio(); await boundary(() => Module._melee_web_native_menu_pause(0)); focus(); syncAudio(); }); },
+    configureSaveProfile,
+    snapshotSaveProfile,
     setKeyboard(slot, enabled) { if (![0, 1].includes(slot)) throw Error('Unknown keyboard port.'); keyboard[slot] = !!enabled; inputDirty = true; },
     setKeyboardLayout(value) {
       if (!['two', 'boxx'].includes(value)) return Promise.reject(Error('Unknown keyboard layout.'));

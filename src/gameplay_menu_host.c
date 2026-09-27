@@ -43,6 +43,9 @@ extern int melee_web_vs_mode_next_state(void);
 struct MeleeWebMenuHost {
     MeleeWebMenuSession* session;
     MeleeWebSaveProfileOwner* profile;
+    int save_mode;
+    int baseline_profile_ready;
+    uint8_t baseline_profile[MELEE_WEB_SAVE_PROFILE_CARD_BYTES];
     MeleeWebAudio* audio;
     uint64_t generation,audio_generation;
     u32 seed,*saved_seed;
@@ -94,8 +97,15 @@ static int runtime_transition(void* data,MeleeWebMenuScene scene,int* request,ch
     if(!live(h,e,n)||!melee_web_menu_clock_request(request))return fail(e,n,"Invalid original menu transition state");
     h->transition=*request;return 1;
 }
-MeleeWebMenuHost* melee_web_menu_host_create(char* e,size_t n){
+MeleeWebMenuHost* melee_web_menu_host_create_with_profile(
+    int save_mode,const uint8_t* card_data,size_t card_data_size,char* e,size_t n){
     if(owner||!seed_ptr){fail(e,n,"A menu host already exists or source RNG is unavailable");return NULL;}
+    if((save_mode!=MELEE_WEB_SAVE_MODE_EVERYTHING&&
+        save_mode!=MELEE_WEB_SAVE_MODE_PERSONAL)||
+       (card_data_size!=0&&(!card_data||card_data_size!=MELEE_WEB_SAVE_PROFILE_CARD_BYTES))||
+       (save_mode==MELEE_WEB_SAVE_MODE_EVERYTHING&&card_data_size!=0)){
+        fail(e,n,"Save mode/profile payload is not a supported source profile");return NULL;
+    }
     MeleeWebMenuHost* h=calloc(1,sizeof(*h));if(!h){fail(e,n,"Cannot allocate native menu host");return NULL;}
     MeleeWebMenuRuntime runtime={h,runtime_check,runtime_scheduler,runtime_transition};
     MeleeWebMenuConfig config={4,0,0};
@@ -105,12 +115,33 @@ MeleeWebMenuHost* melee_web_menu_host_create(char* e,size_t n){
         if(!melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
         free(h);return NULL;
     }
-    if(!melee_web_save_profile_owner_initialize_default(h->profile,e,n)||
-       !melee_web_save_profile_owner_set_roster(h->profile,0x07ff,0x01c0,e,n)){
+    if(!melee_web_save_profile_owner_initialize_default(h->profile,e,n)){
         if(!melee_web_save_profile_owner_deactivate(h->profile,NULL,0)||
            !melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
         free(h);return NULL;
     }
+    {
+        const u16 fresh_characters=gmMainLib_GetSaveData()->unlocked_characers_bitmask;
+        const u16 fresh_stages=gmMainLib_GetSaveData()->x186A;
+        if(!melee_web_save_profile_owner_set_roster(
+               h->profile,0x07ff,0x01c0,e,n)||
+           !melee_web_save_profile_owner_snapshot_card_data(
+               h->profile,h->baseline_profile,sizeof(h->baseline_profile),e,n)||
+           (save_mode==MELEE_WEB_SAVE_MODE_PERSONAL&&
+            (!melee_web_save_profile_owner_set_roster(
+                 h->profile,fresh_characters,fresh_stages,e,n)||
+             (card_data_size&&
+              !melee_web_save_profile_owner_apply_card_data(
+                  h->profile,card_data,card_data_size,e,n))))){
+            if(!melee_web_save_profile_owner_deactivate(h->profile,NULL,0)||
+               !melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
+            free(h);return NULL;
+        }
+    }
+    h->baseline_profile_ready=1;
+    h->save_mode=save_mode;
+    h->selected_characters=gmMainLib_GetSaveData()->unlocked_characers_bitmask;
+    h->selected_stages=gmMainLib_GetSaveData()->x186A;
     h->session=melee_web_menu_session_create(&runtime,&config,e,n);
     if(!h->session){
         if(!melee_web_save_profile_owner_deactivate(h->profile,NULL,0)||
@@ -119,6 +150,27 @@ MeleeWebMenuHost* melee_web_menu_host_create(char* e,size_t n){
     }
     h->saved_seed=seed_ptr;h->seed=*seed_ptr;seed_ptr=&h->seed;
     owner=h;ok(e,n);return h;
+}
+
+MeleeWebMenuHost* melee_web_menu_host_create(char* e,size_t n){
+    return melee_web_menu_host_create_with_profile(
+        MELEE_WEB_SAVE_MODE_EVERYTHING,NULL,0,e,n);
+}
+
+int melee_web_menu_host_snapshot_card_data(
+    const MeleeWebMenuHost* h,int baseline,uint8_t* output,
+    size_t output_size,char* e,size_t n){
+    if(!h||h!=owner||!output||output_size!=MELEE_WEB_SAVE_PROFILE_CARD_BYTES||
+       (baseline!=0&&baseline!=1))
+        return fail(e,n,"Save snapshot requires the current source menu owner and exact output size");
+    if(baseline){
+        if(!h->baseline_profile_ready)
+            return fail(e,n,"Original mode baseline is not ready");
+        memcpy(output,h->baseline_profile,sizeof(h->baseline_profile));
+        return ok(e,n);
+    }
+    return melee_web_save_profile_owner_snapshot_card_data(
+        h->profile,output,output_size,e,n);
 }
 
 int melee_web_menu_host_apply_replay_context(

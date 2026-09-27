@@ -22,6 +22,16 @@ typedef struct MeleeWebSaveProfileOwner MeleeWebSaveProfileOwner;
  * the generated typed gmm_x1868 view exposes only the first two rows. */
 #define MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES 0x10A30U
 
+/* Exact non-transient chunks in lbcardgame.c's GameData card manifest:
+ * SaveData[0..0x178f] followed by seven authored NameTagDataBank rows. */
+#define MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES 0x1790U
+#define MELEE_WEB_SAVE_PROFILE_NAME_BANK_BYTES 0x1F2CU
+#define MELEE_WEB_SAVE_PROFILE_CARD_BANK_COUNT 7U
+#define MELEE_WEB_SAVE_PROFILE_CARD_BYTES \
+    (MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES + \
+     MELEE_WEB_SAVE_PROFILE_CARD_BANK_COUNT * \
+         MELEE_WEB_SAVE_PROFILE_NAME_BANK_BYTES)
+
 /* Capture the already allocated original save/profile roots.  Creation does
  * not initialize, unlock, or claim anything. */
 MeleeWebSaveProfileOwner* melee_web_save_profile_owner_create(char* error,
@@ -55,6 +65,16 @@ int melee_web_save_profile_owner_set_roster(MeleeWebSaveProfileOwner*,
 int melee_web_save_profile_owner_apply_reference_context(
     MeleeWebSaveProfileOwner*, const uint8_t game_rules[0x18],
     const uint8_t save_data[0x55E8], char* error, size_t error_size);
+
+/* Copy/apply the complete original card-manifest data without pointers or
+ * transient runtime fields. Bytes use the GameCube card's big-endian scalar
+ * representation and are safe to keep outside the Wasm heap. */
+int melee_web_save_profile_owner_snapshot_card_data(
+    const MeleeWebSaveProfileOwner*, uint8_t* output, size_t output_size,
+    char* error, size_t error_size);
+int melee_web_save_profile_owner_apply_card_data(
+    MeleeWebSaveProfileOwner*, const uint8_t* input, size_t input_size,
+    char* error, size_t error_size);
 
 /* Run the source's once-per-session fresh-profile initialization while the
  * complete global and Toy backing snapshots are owned. This resets source

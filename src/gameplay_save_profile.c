@@ -205,6 +205,26 @@ static u64 read_be64(const unsigned char* bytes)
     return (u64) read_be32(bytes) << 32 | read_be32(bytes + 4);
 }
 
+static void write_be16(unsigned char* bytes, u16 value)
+{
+    bytes[0] = (unsigned char) (value >> 8);
+    bytes[1] = (unsigned char) value;
+}
+
+static void write_be32(unsigned char* bytes, u32 value)
+{
+    bytes[0] = (unsigned char) (value >> 24);
+    bytes[1] = (unsigned char) (value >> 16);
+    bytes[2] = (unsigned char) (value >> 8);
+    bytes[3] = (unsigned char) value;
+}
+
+static void write_be64(unsigned char* bytes, u64 value)
+{
+    write_be32(bytes, (u32) (value >> 32));
+    write_be32(bytes + 4, (u32) value);
+}
+
 static void decode16(unsigned char* target, const unsigned char* source)
 {
     u16 value = read_be16(source);
@@ -221,6 +241,71 @@ static void decode64(unsigned char* target, const unsigned char* source)
 {
     u64 value = read_be64(source);
     memcpy(target, &value, sizeof(value));
+}
+
+static void encode16(unsigned char* target, const unsigned char* source)
+{
+    u16 value;
+    memcpy(&value, source, sizeof(value));
+    write_be16(target, value);
+}
+
+static void encode32(unsigned char* target, const unsigned char* source)
+{
+    u32 value;
+    memcpy(&value, source, sizeof(value));
+    write_be32(target, value);
+}
+
+static void encode64(unsigned char* target, const unsigned char* source)
+{
+    u64 value;
+    memcpy(&value, source, sizeof(value));
+    write_be64(target, value);
+}
+
+static void decode_name_tag_bank(struct NameTagDataBank* target,
+                                 const unsigned char source[0x1F2C])
+{
+    unsigned char* bytes = (unsigned char*) target;
+    memcpy(bytes, source, 0x1F2C);
+    for (size_t tag = 0; tag < 19; ++tag) {
+        const size_t base = tag * sizeof(struct NameTagData);
+        for (size_t i = 0; i < 120; ++i)
+            decode16(bytes + base + i * 2, source + base + i * 2);
+        decode16(bytes + base + 0xF0, source + base + 0xF0);
+        for (size_t offset = 0xF4; offset <= 0x104; offset += 4)
+            decode32(bytes + base + offset, source + base + offset);
+        for (size_t offset = 0x108; offset <= 0x10E; offset += 2)
+            decode16(bytes + base + offset, source + base + offset);
+        for (size_t offset = 0x110; offset <= 0x130; offset += 4)
+            decode32(bytes + base + offset, source + base + offset);
+        for (size_t i = 0; i < SELKIND_COUNT; ++i)
+            decode32(bytes + base + 0x134 + i * 4,
+                     source + base + 0x134 + i * 4);
+    }
+}
+
+static void encode_name_tag_bank(unsigned char target[0x1F2C],
+                                 const struct NameTagDataBank* source)
+{
+    const unsigned char* bytes = (const unsigned char*) source;
+    memcpy(target, bytes, 0x1F2C);
+    for (size_t tag = 0; tag < 19; ++tag) {
+        const size_t base = tag * sizeof(struct NameTagData);
+        for (size_t i = 0; i < 120; ++i)
+            encode16(target + base + i * 2, bytes + base + i * 2);
+        encode16(target + base + 0xF0, bytes + base + 0xF0);
+        for (size_t offset = 0xF4; offset <= 0x104; offset += 4)
+            encode32(target + base + offset, bytes + base + offset);
+        for (size_t offset = 0x108; offset <= 0x10E; offset += 2)
+            encode16(target + base + offset, bytes + base + offset);
+        for (size_t offset = 0x110; offset <= 0x130; offset += 4)
+            encode32(target + base + offset, bytes + base + offset);
+        for (size_t i = 0; i < SELKIND_COUNT; ++i)
+            encode32(target + base + 0x134 + i * 4,
+                    bytes + base + 0x134 + i * 4);
+    }
 }
 
 static void decode_rules(GameRules* target, const unsigned char source[0x18])
@@ -355,6 +440,100 @@ static void decode_save_data(struct gmm_x1868* target,
     }
 }
 
+static void encode_save_data(unsigned char target[0x55E8],
+                             const struct gmm_x1868* source)
+{
+    const unsigned char* bytes = (const unsigned char*) source;
+    memcpy(target, bytes, 0x55E8);
+
+    encode16(target + 0x0000, bytes + 0x0000);
+    encode16(target + 0x0002, bytes + 0x0002);
+    encode32(target + 0x0008, bytes + 0x0008);
+    encode32(target + 0x000C, bytes + 0x000C);
+    encode32(target + 0x0010, bytes + 0x0010);
+    encode32(target + 0x0014, bytes + 0x0014);
+    encode32(target + 0x0018, bytes + 0x0018);
+    encode32(target + 0x001C, bytes + 0x001C);
+    encode32(target + 0x0028, bytes + 0x0028);
+    encode32(target + 0x002C, bytes + 0x002C);
+    for (size_t offset = 0x0030; offset <= 0x0044; offset += 4)
+        encode32(target + offset, bytes + offset);
+    for (size_t i = 0; i < SELKIND_COUNT; ++i)
+        encode16(target + 0x0048 + i * 2, bytes + 0x0048 + i * 2);
+    for (size_t i = 0; i < 4; ++i)
+        encode32(target + 0x007C + i * 4, bytes + 0x007C + i * 4);
+    for (size_t i = 0; i < SELKIND_COUNT; ++i) {
+        encode32(target + 0x00E0 + i * 4, bytes + 0x00E0 + i * 4);
+        encode32(target + 0x0144 + i * 4, bytes + 0x0144 + i * 4);
+    }
+
+    encode32(target + 0x01A8, bytes + 0x01A8);
+    for (size_t offset = 0x01B0; offset <= 0x01FC; offset += 4)
+        encode32(target + offset, bytes + offset);
+    encode64(target + 0x0200, bytes + 0x0200);
+    for (size_t i = 0; i < 4; ++i)
+        encode32(target + 0x0208 + i * 4, bytes + 0x0208 + i * 4);
+    for (size_t i = 0; i < 3; ++i) {
+        encode32(target + 0x02D8 + i * 4, bytes + 0x02D8 + i * 4);
+        encode32(target + 0x02E4 + i * 4, bytes + 0x02E4 + i * 4);
+        encode32(target + 0x02F0 + i * 4, bytes + 0x02F0 + i * 4);
+    }
+    for (size_t i = 0; i < 4; ++i)
+        encode32(target + 0x0318 + i * 4, bytes + 0x0318 + i * 4);
+    for (size_t i = 0; i < 3; ++i)
+        encode32(target + 0x0420 + i * 4, bytes + 0x0420 + i * 4);
+
+    encode64(target + 0x0450, bytes + 0x0450);
+    encode32(target + 0x0460, bytes + 0x0460);
+    encode16(target + 0x0468, bytes + 0x0468);
+    encode16(target + 0x046A, bytes + 0x046A);
+    for (size_t i = 0; i < TY_TROPHY_COUNT; ++i)
+        encode16(target + 0x046C + i * 2, bytes + 0x046C + i * 2);
+
+    for (size_t fighter = 0; fighter < SELKIND_COUNT; ++fighter) {
+        const size_t base = offsetof(struct gmm_x1868, x1F2C) +
+                            fighter * sizeof(struct FighterData);
+        for (size_t i = 0; i < SELKIND_COUNT; ++i)
+            encode16(target + base + i * 2, bytes + base + i * 2);
+        encode16(target + base + 0x34, bytes + base + 0x34);
+        for (size_t offset = 0x38; offset <= 0x48; offset += 4)
+            encode32(target + base + offset, bytes + base + offset);
+        for (size_t offset = 0x4C; offset <= 0x52; offset += 2)
+            encode16(target + base + offset, bytes + base + offset);
+        for (size_t offset = 0x54; offset <= 0x74; offset += 4)
+            encode32(target + base + offset, bytes + base + offset);
+        {
+            const struct FighterData* fighter_data =
+                (const struct FighterData*) (bytes + base);
+            const u16 flags =
+                ((u16) fighter_data->x7C.b0 << 15) |
+                ((u16) fighter_data->x7C.b1 << 14) |
+                ((u16) fighter_data->x7C.b2 << 13) |
+                ((u16) fighter_data->x7C.b3 << 12) |
+                ((u16) fighter_data->x7C.b4 << 11) |
+                ((u16) fighter_data->x7C.b5 << 10) |
+                ((u16) fighter_data->x7C.b6 << 9) |
+                ((u16) fighter_data->x7C.b789 << 6) |
+                ((u16) fighter_data->x7C.b10_to_12 << 3) |
+                (u16) fighter_data->x7C.b13_to_15;
+            write_be16(target + base + 0x7C, flags);
+        }
+        encode16(target + base + 0x7E, bytes + base + 0x7E);
+        for (size_t offset = 0x84; offset <= 0x9C; offset += 4)
+            encode32(target + base + offset, bytes + base + offset);
+        encode16(target + base + 0xA0, bytes + base + 0xA0);
+        encode16(target + base + 0xA2, bytes + base + 0xA2);
+        encode32(target + base + 0xA4, bytes + base + 0xA4);
+        encode32(target + base + 0xA8, bytes + base + 0xA8);
+    }
+    for (size_t bank = 0; bank < 2; ++bank) {
+        const size_t base = offsetof(struct gmm_x1868, x2FF8) +
+                            bank * sizeof(struct NameTagDataBank);
+        encode_name_tag_bank(target + base,
+            (const struct NameTagDataBank*) (bytes + base));
+    }
+}
+
 int melee_web_save_profile_owner_apply_reference_context(
     MeleeWebSaveProfileOwner* candidate, const uint8_t game_rules[0x18],
     const uint8_t save_data[0x55E8], char* error, size_t error_size)
@@ -373,6 +552,61 @@ int melee_web_save_profile_owner_apply_reference_context(
                     "Original save/profile root aliases changed");
     decode_rules(gmMainLib_GetGameRules(), game_rules);
     decode_save_data(save, save_data);
+    return aliases_match(candidate, error, error_size) && ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_snapshot_card_data(
+    const MeleeWebSaveProfileOwner* candidate, uint8_t* output,
+    size_t output_size, char* error, size_t error_size)
+{
+    unsigned char save_data[0x55E8];
+    struct NameTagDataBank* banks;
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size) ||
+        !output || output_size != MELEE_WEB_SAVE_PROFILE_CARD_BYTES)
+        return fail(error, error_size,
+                    "Save snapshot requires the exact original card-manifest extent");
+    banks = (struct NameTagDataBank*) gmMainLib_8015CC4C();
+    if ((unsigned char*) banks !=
+        (unsigned char*) candidate->source_global +
+            offsetof(struct gmm_x0, thing) +
+            offsetof(struct gmm_x1868, x2FF8))
+        return fail(error, error_size,
+                    "Original seven name-bank rows moved from their owned backing");
+    encode_save_data(save_data, candidate->source_save);
+    memcpy(output, save_data, MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES);
+    for (size_t bank = 0; bank < MELEE_WEB_SAVE_PROFILE_CARD_BANK_COUNT; ++bank)
+        encode_name_tag_bank(output + MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES +
+                                 bank * MELEE_WEB_SAVE_PROFILE_NAME_BANK_BYTES,
+                             &banks[bank]);
+    return aliases_match(candidate, error, error_size) && ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_apply_card_data(
+    MeleeWebSaveProfileOwner* candidate, const uint8_t* input,
+    size_t input_size, char* error, size_t error_size)
+{
+    unsigned char save_data[0x55E8];
+    struct NameTagDataBank* banks;
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size) ||
+        !input || input_size != MELEE_WEB_SAVE_PROFILE_CARD_BYTES)
+        return fail(error, error_size,
+                    "Imported save does not match the original card-manifest extent");
+    banks = (struct NameTagDataBank*) gmMainLib_8015CC4C();
+    if ((unsigned char*) banks !=
+        (unsigned char*) candidate->source_global +
+            offsetof(struct gmm_x0, thing) +
+            offsetof(struct gmm_x1868, x2FF8))
+        return fail(error, error_size,
+                    "Original seven name-bank rows moved from their owned backing");
+    /* Preserve fresh-source defaults for SaveData bytes beyond the original
+     * card manifest's 0x1790-byte extent, then install the imported prefix. */
+    encode_save_data(save_data, candidate->source_save);
+    memcpy(save_data, input, MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES);
+    decode_save_data(candidate->source_save, save_data);
+    for (size_t bank = 0; bank < MELEE_WEB_SAVE_PROFILE_CARD_BANK_COUNT; ++bank)
+        decode_name_tag_bank(&banks[bank],
+            input + MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES +
+                bank * MELEE_WEB_SAVE_PROFILE_NAME_BANK_BYTES);
     return aliases_match(candidate, error, error_size) && ok(error, error_size);
 }
 

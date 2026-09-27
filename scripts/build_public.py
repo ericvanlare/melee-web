@@ -42,6 +42,9 @@ SOURCE_ALLOWLIST = (
 PLAYER_SOURCE_ALLOWLIST = ("index.html", "player.css", "player-shell.mjs")
 PLAYER_RUNTIME_FILES = (
     "melee-runtime.mjs",
+    "save-profile-settings.mjs",
+    "save-profile-store.mjs",
+    "gamecube-save.mjs",
     "runtime-assets.mjs",
     "disc-image.mjs",
     "disc-session.mjs",
@@ -59,6 +62,9 @@ PLAYER_RUNTIME_FILES = (
 PLAYER_ALLOWED_ARTIFACTS = frozenset(PLAYER_RUNTIME_FILES) | {"gameplay_public.data"}
 PLAYER_SOURCE_RUNTIME_FILES = (
     "melee-runtime.mjs",
+    "save-profile-settings.mjs",
+    "save-profile-store.mjs",
+    "gamecube-save.mjs",
     "runtime-assets.mjs",
     "disc-image.mjs",
     "disc-session.mjs",
@@ -78,6 +84,10 @@ RUNTIME_SOURCE_FILES = (
     "cmake/FighterRuntime.cmake",
     "patches/melee-gameplay.patch",
     "src/gameplay_menu_browser.cpp",
+    "src/gameplay_menu_host.c",
+    "src/gameplay_menu_host.h",
+    "src/gameplay_save_profile.c",
+    "src/gameplay_save_profile.h",
     "src/gameplay_asset_manifest.cpp",
     "src/gameplay_asset_manifest.hpp",
     "src/runtime_asset_scope.hpp",
@@ -114,6 +124,8 @@ RUNTIME_REQUIRED_EXPORTS = (
     "_melee_web_native_menu_file",
     "_melee_web_native_menu_prepare", "_melee_web_native_menu_launch",
     "_melee_web_native_menu_unload", "_melee_web_native_menu_pause",
+    "_melee_web_native_menu_set_save_profile", "_melee_web_native_menu_snapshot_save_profile",
+    "_melee_web_native_menu_snapshot_unlocked_baseline",
     "_melee_web_native_menu_message", "_melee_web_native_menu_running",
     "_melee_web_native_menu_phase", "_melee_web_native_menu_cache_idle",
     "_melee_web_input_set_activity", "_melee_web_input_set_keyboard",
@@ -450,7 +462,8 @@ def _validate_player_source(source: Path) -> dict[str, bytes]:
     if not css_text.strip() or re.search(r"url\s*[(]", css_text, re.I):
         raise BuildError("player.css must be non-empty and contain no external or embedded URLs")
     shell = result["player-shell.mjs"].decode("utf-8")
-    for import_path in ("../melee-runtime.mjs", "../controller-settings.mjs"):
+    for import_path in ("../melee-runtime.mjs", "../controller-settings.mjs",
+                        "../save-profile-settings.mjs"):
         if not re.search(rf"(?:from|import)\s*[\"']{re.escape(import_path)}[\"']", shell):
             raise BuildError(f"player-shell.mjs is missing reviewed import {import_path}")
     return result
@@ -1015,6 +1028,7 @@ def _validate_runtime_graph(files: dict[str, bytes], *, audio: bool = False) -> 
                 raise BuildError(f"development audio module reference rejected in runtime JavaScript: {rel}")
     required_imports = {
         "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "./controller-input.mjs"),
+        "save-profile-settings.mjs": ("./gamecube-save.mjs", "./save-profile-store.mjs"),
         "runtime-assets.mjs": ("./disc-image.mjs", "./disc-session.mjs"),
         "disc-session.mjs": ("./disc-image.mjs",),
         "controller-settings.mjs": ("./prototype-keyboard-layouts.mjs", "./controller-panel.mjs", "./controller-settings.css", "./touch-controls.mjs"),
@@ -1259,6 +1273,9 @@ def build(
         runtime_files = dict(native_files)
         source_runtime = {
             "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
+            "save-profile-settings.mjs": ROOT / "web" / "save-profile-settings.mjs",
+            "save-profile-store.mjs": ROOT / "web" / "save-profile-store.mjs",
+            "gamecube-save.mjs": ROOT / "web" / "gamecube-save.mjs",
             "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
             "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
             "disc-session.mjs": ROOT / "web" / "disc-session.mjs",

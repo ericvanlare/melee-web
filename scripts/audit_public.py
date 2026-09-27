@@ -436,6 +436,9 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
         runtime_files[rel] = data
     source_map = {
         "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
+        "save-profile-settings.mjs": ROOT / "web" / "save-profile-settings.mjs",
+        "save-profile-store.mjs": ROOT / "web" / "save-profile-store.mjs",
+        "gamecube-save.mjs": ROOT / "web" / "gamecube-save.mjs",
         "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
         "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
         "disc-session.mjs": ROOT / "web" / "disc-session.mjs",

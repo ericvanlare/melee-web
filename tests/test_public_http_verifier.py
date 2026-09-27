@@ -161,6 +161,9 @@ def _player_fixture() -> tuple[dict[str, bytes], dict[str, object]]:
     runtime_root = "/runtime/0123456789abcdef"
     runtime_files = {
         "melee-runtime.mjs": b"export {};",
+        "save-profile-settings.mjs": b"export {};",
+        "save-profile-store.mjs": b"export {};",
+        "gamecube-save.mjs": b"export {};",
         "runtime-assets.mjs": b"export {};",
         "disc-image.mjs": b"export {};",
         "disc-session.mjs": b"export {};",
@@ -176,7 +179,7 @@ def _player_fixture() -> tuple[dict[str, bytes], dict[str, object]]:
         "gameplay_public.wasm": b"\x00asm\x01\x00\x00\x00",
         "gameplay_public.data": b"SQLite format 3\x00seed",
         "player/player.css": b"body { color: black; }",
-        "player/player-shell.mjs": b"import '../melee-runtime.mjs';",
+        "player/player-shell.mjs": b"import '../melee-runtime.mjs'; import '../save-profile-settings.mjs';",
     }
     for name, body in runtime_files.items():
         files[f"{runtime_root}/{name}"] = body

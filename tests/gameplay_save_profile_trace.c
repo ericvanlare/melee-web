@@ -51,6 +51,8 @@ int main(void)
 {
     char error[256] = { 0 };
     unsigned char source_before[MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES];
+    unsigned char card_profile[MELEE_WEB_SAVE_PROFILE_CARD_BYTES];
+    unsigned char card_profile_after[MELEE_WEB_SAVE_PROFILE_CARD_BYTES];
     unsigned char toy_before[sizeof(struct ToyRuntimeAggregate)];
     unsigned char toy_after[sizeof(struct ToyRuntimeAggregate)];
     MeleeWebSaveProfileOwner* profile;
@@ -161,6 +163,52 @@ int main(void)
           "explicit authored roster setup was not applied");
     check(save->x1B40[0] == 0 && save->x1B4C[0] == 0,
           "roster setup seeded achievement flags");
+    {
+        struct NameTagDataBank* banks =
+            (struct NameTagDataBank*) gmMainLib_8015CC4C();
+        save->time_matches = 0x12345678;
+        save->x1A68 = INT64_C(0x0123456789ABCDEF);
+        save->x1F2C[0].fighter_kos[0] = 0x2345;
+        save->x1F2C[0].x7C.b0 = 1;
+        save->x1F2C[0].x7C.b789 = 5;
+        banks[0].inner[0].sd_count = 0x1357;
+        banks[6].inner[18].victories = 0x2468;
+        check_error(melee_web_save_profile_owner_snapshot_card_data(
+                        profile, card_profile, sizeof(card_profile), error,
+                        sizeof(error)), error);
+        check(card_profile[0] == 0x07 && card_profile[1] == 0xFF &&
+                  card_profile[2] == 0x01 && card_profile[3] == 0xC0 &&
+                  card_profile[0x1B0] == 0x12 &&
+                  card_profile[0x1B1] == 0x34 &&
+                  card_profile[0x1B2] == 0x56 &&
+                  card_profile[0x1B3] == 0x78 &&
+                  card_profile[0x200] == 0x01 &&
+                  card_profile[0x207] == 0xEF,
+              "card profile snapshot did not encode source scalars as big-endian");
+        save->time_matches = 0;
+        save->x1A68 = 0;
+        save->x1F2C[0].fighter_kos[0] = 0;
+        save->x1F2C[0].x7C.b0 = 0;
+        save->x1F2C[0].x7C.b789 = 0;
+        banks[0].inner[0].sd_count = 0;
+        banks[6].inner[18].victories = 0;
+        check_error(melee_web_save_profile_owner_apply_card_data(
+                        profile, card_profile, sizeof(card_profile), error,
+                        sizeof(error)), error);
+        check(save->time_matches == 0x12345678 &&
+                  save->x1A68 == INT64_C(0x0123456789ABCDEF) &&
+                  save->x1F2C[0].fighter_kos[0] == 0x2345 &&
+                  save->x1F2C[0].x7C.b0 == 1 &&
+                  save->x1F2C[0].x7C.b789 == 5 &&
+                  banks[0].inner[0].sd_count == 0x1357 &&
+                  banks[6].inner[18].victories == 0x2468,
+              "card profile import did not restore persistent fields and all bank rows");
+        check_error(melee_web_save_profile_owner_snapshot_card_data(
+                        profile, card_profile_after, sizeof(card_profile_after),
+                        error, sizeof(error)), error);
+        check(!memcmp(card_profile, card_profile_after, sizeof(card_profile)),
+              "card profile snapshot/import was not byte-stable");
+    }
     {
         unsigned char source_rules[0x18] = { 0 };
         unsigned char source_save[0x55E8] = { 0 };

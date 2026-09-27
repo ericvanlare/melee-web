@@ -32,6 +32,8 @@
           <input id="disc-file" type="file" accept=".iso,.gcm,.ciso" aria-label="USA 1.02 disc image" hidden>
           <button id="start-game" type="button" disabled>Play</button>
           <button id="pause-game" type="button" disabled>Pause</button>
+          <button id="settings-open" type="button">Settings</button>
+          <input id="save-file" type="file" accept=".gci,application/octet-stream" aria-label="Load a GameCube save file" hidden>
           <button id="end-session" type="button" disabled>Eject</button>
           <button id="status" type="button" disabled aria-live="polite">Loading…</button>
           <progress id="progress" aria-label="Preparing local data" hidden></progress>
@@ -60,6 +62,27 @@
     <table id="keyboard-bindings" aria-label="Keyboard bindings"></table>
     <ul id="controllers" aria-label="Detected controllers"></ul>
     <div class="dialog-actions"><button id="controls-close" type="button">Close</button></div>
+  </dialog>
+  <dialog id="settings-dialog" aria-labelledby="settings-title">
+    <h2 id="settings-title">Settings</h2>
+    <label class="save-mode-label" for="save-mode">Save mode</label>
+    <select id="save-mode">
+      <option value="everything">Everything unlocked</option>
+      <option value="personal">Personal progress</option>
+    </select>
+    <p id="save-mode-description" class="settings-description"></p>
+    <div class="settings-actions">
+      <button id="export-save" type="button">Export save</button>
+      <button id="load-save" type="button">Load save file</button>
+    </div>
+    <p id="save-status" role="status" aria-live="polite">Checking local save storage…</p>
+    <p class="settings-note">Everything unlocked exports its completed supported baseline; session changes are discarded. Personal progress exports the latest available personal save.</p>
+    <div class="dialog-actions"><button id="settings-close" type="button">Close</button></div>
+  </dialog>
+  <dialog id="save-confirm-dialog" aria-labelledby="save-confirm-title" aria-describedby="save-confirm-body">
+    <h2 id="save-confirm-title"></h2>
+    <p id="save-confirm-body"></p>
+    <div class="dialog-actions"><button id="save-confirm-cancel" type="button">Cancel</button><button id="save-confirm-accept" type="button"></button></div>
   </dialog>
   <dialog id="error-dialog" aria-label="Player error">
     <p id="error" role="alert"></p>

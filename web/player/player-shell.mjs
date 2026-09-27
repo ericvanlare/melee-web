@@ -1,13 +1,15 @@
 import {mountMeleeRuntime} from '../melee-runtime.mjs';
 import {mountControllerSettings} from '../controller-settings.mjs';
+import {mountSaveProfileSettings} from '../save-profile-settings.mjs';
 
 const $ = id => document.getElementById(id);
-let player, state, settings, currentError = '', requiresReload = false, hasStarted = false;
+let player, state, settings, saveSettings, saveSettingsBinding = null;
+let saveSettingsReady = false, currentError = '', requiresReload = false, hasStarted = false;
 let discSelectionGeneration = 0, selectedDiscReady = false, selectedDiscFile = null;
 let selectedDiscSession = null, selectedDiscValidated = false, importingSelection = null, importedSelection = null;
 let selectedDiscMessage = '', validatingSelection = null;
 let audioActivation = Promise.resolve(), audioActivationError = null;
-const busyStates = ['booting', 'importing', 'preparing', 'pausing', 'resuming', 'unloading'];
+const busyStates = ['booting', 'importing', 'preparing', 'pausing', 'resuming', 'unloading', 'saving'];
 const startReadinessWaiters = new Set();
 
 function waitForStartReadiness(selection) {
@@ -75,7 +77,12 @@ async function validateSelectedDisc(selection, file) {
 
 function maybeImportSelectedDisc() {
   if (!player || !state?.canImport || !selectedDiscValidated || !selectedDiscFile ||
-      !selectedDiscSession || state.requiresReload) return;
+      !selectedDiscSession || state.requiresReload || !saveSettingsReady || saveSettings?.busy) return;
+  if (saveSettings?.blocked) {
+    selectedDiscMessage = 'Save settings required';
+    renderDiscSelection();
+    return;
+  }
   const selection = discSelectionGeneration;
   if (importingSelection === selection || importedSelection === selection) return;
   importingSelection = selection;
@@ -91,6 +98,8 @@ async function importAndStartSelectedDisc(selection, file, session) {
   try {
     await player.importDisc(file, {preopenedSession: session});
     if (selection !== discSelectionGeneration) return;
+    if (!saveSettingsReady || saveSettings?.blocked || saveSettings?.busy)
+      throw Error('Save settings are not ready. Resolve the save status in Settings before starting.');
     if (!await waitForStartReadiness(selection)) return;
     await audioActivation;
     if (selection !== discSelectionGeneration) return;
@@ -136,11 +145,13 @@ function renderStatus(next) {
   if (!next) return;
   state = next;
   if (next.running) hasStarted = true;
+  const saveBusy = !!saveSettings?.busy;
   $('choose-disc').disabled = !next.canSelectDisc;
-  $('start-game').disabled = !selectedDiscReady || !next.canStart;
-  $('pause-game').disabled = !next.canPause;
+  $('start-game').disabled = !selectedDiscReady || !next.canStart || !saveSettingsReady ||
+    !!saveSettings?.blocked || saveBusy;
+  $('pause-game').disabled = !next.canPause || saveBusy;
   $('pause-game').textContent = next.paused ? 'Resume' : 'Pause';
-  $('end-session').disabled = !next.canUnload;
+  $('end-session').disabled = !next.canUnload || saveBusy;
   const busy = busyStates.includes(next.state);
   const loading = !currentError && next.state !== 'error' && !next.paused ? next.loading : null;
   $('loading-panel').hidden = !loading;
@@ -162,7 +173,9 @@ function renderStatus(next) {
   else $('progress').removeAttribute('value');
   $('status').hidden = !busy && !next.paused && !currentError && next.state !== 'error';
   $('status').disabled = !currentError && !next.paused && next.state !== 'error';
-  $('status').textContent = currentError || next.state === 'error' ? 'Error' : next.paused ? 'Paused' : next.state === 'importing' ? 'Reading…' : next.state === 'unloading' ? 'Ejecting…' : 'Loading…';
+  $('status').textContent = currentError || next.state === 'error' ? 'Error' : next.paused ? 'Paused' :
+    next.state === 'importing' ? 'Reading…' : next.state === 'unloading' ? 'Ejecting…' :
+      next.state === 'saving' ? 'Saving…' : 'Loading…';
   $('status').title = currentError || next.message;
   if (next.requiresReload) {
     if (selectedDiscSession) selectedDiscSession.close();
@@ -175,8 +188,22 @@ function renderStatus(next) {
   }
   renderDiscSelection();
   settings?.setState(next);
+  saveSettings?.setState(next);
   wakeStartReadinessWaiters();
   maybeImportSelectedDisc();
+}
+
+function bindSaveSettings(runtime) {
+  if (saveSettingsBinding) return saveSettingsBinding;
+  saveSettingsBinding = saveSettings.bindPlayer(runtime).then(() => {
+    saveSettingsReady = true;
+    $('settings-open').disabled = false;
+    renderStatus(runtime.getState());
+  }).catch(error => {
+    showError(error, true);
+    throw error;
+  });
+  return saveSettingsBinding;
 }
 
 $('choose-disc').onclick = () => $('disc-dialog').showModal();
@@ -213,7 +240,7 @@ $('disc-file').onchange = async () => {
 };
 $('disc-file').addEventListener('cancel', () => $('choose-disc').focus());
 $('start-game').onclick = async () => {
-  if (!selectedDiscReady || !state?.canStart) return;
+  if (!selectedDiscReady || !state?.canStart || !saveSettingsReady || saveSettings?.blocked || saveSettings?.busy) return;
   const selection = discSelectionGeneration;
   clearError();
   try { await player.start({isCurrent: () => selection === discSelectionGeneration && selectedDiscReady}); }
@@ -234,8 +261,17 @@ $('end-session').onclick = async () => {
   renderDiscSelection();
   renderStatus(state);
   $('end-session').disabled = true;
-  try { await player.destroy(); settings?.destroy(); location.reload(); }
-  catch (error) { showError(error, true); }
+  let teardownStarted = false;
+  try {
+    await saveSettings.flushBeforeTeardown();
+    teardownStarted = true;
+    await player.destroy();
+    settings?.destroy();
+    location.reload();
+  } catch (error) {
+    showError(error, teardownStarted);
+    $('end-session').disabled = !state?.canUnload;
+  }
 };
 $('retry').onclick = () => location.reload();
 $('status').onclick = () => {
@@ -262,6 +298,8 @@ settings = mountControllerSettings({
   focus: () => player?.focus(),
   onError: error => showError(error),
 });
+saveSettings = mountSaveProfileSettings({onError: error => showError(error), onBusy: () => renderStatus(state)});
+$('settings-open').disabled = true;
 
 const fullscreenButton = $('fullscreen'), fullscreenStatus = $('fullscreen-status'), playerElement = $('player');
 const toolbarMore = $('toolbar-more-toggle');
@@ -330,9 +368,12 @@ try {
     onOwner: owner => {
       player = owner.handle;
       renderStatus(player.getState());
+      // Save storage is bound after the native startup boundary becomes usable.
+      // A prevalidated disc can wait here without entering an unconfigured session.
       if (selectedDiscFile && !selectedDiscValidated)
         void validateSelectedDisc(discSelectionGeneration, selectedDiscFile);
     },
   });
+  await bindSaveSettings(player);
   await settings.bindPlayer(player);
 } catch (error) { showError(error, true); }
