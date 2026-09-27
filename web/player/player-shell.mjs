@@ -41,8 +41,15 @@ async function validateSelectedDisc(selection, file) {
   validatingSelection = selection;
   try {
     const session = await player.openDiscSession(file);
-    if (selection !== discSelectionGeneration || state?.requiresReload) {
+    if (selection !== discSelectionGeneration) {
       session.close();
+      return;
+    }
+    if (state?.requiresReload) {
+      session.close();
+      selectedDiscMessage = 'Validation stopped';
+      renderDiscSelection();
+      if (!currentError) showError(state?.message || 'Player stopped while validating the selected disc.', true);
       return;
     }
     selectedDiscSession = session;
@@ -51,9 +58,15 @@ async function validateSelectedDisc(selection, file) {
     renderStatus(state);
   } catch (error) {
     if (selection === discSelectionGeneration) {
-      selectedDiscMessage = 'Invalid disc';
-      renderDiscSelection();
-      showError(error);
+      if (state?.requiresReload) {
+        selectedDiscMessage = 'Validation stopped';
+        renderStatus(state);
+        showError(error, true);
+      } else {
+        selectedDiscMessage = 'Invalid disc';
+        renderDiscSelection();
+        showError(error);
+      }
     }
   } finally {
     if (validatingSelection === selection) validatingSelection = null;
@@ -154,10 +167,10 @@ function renderStatus(next) {
   if (next.requiresReload) {
     if (selectedDiscSession) selectedDiscSession.close();
     selectedDiscSession = null;
-    selectedDiscFile = null;
     selectedDiscValidated = false;
     selectedDiscReady = false;
-    selectedDiscMessage = '';
+    if (selectedDiscFile)
+      selectedDiscMessage = validatingSelection !== null ? 'Validation stopped' : 'Preparation stopped';
     ++discSelectionGeneration;
   }
   renderDiscSelection();

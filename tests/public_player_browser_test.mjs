@@ -284,9 +284,10 @@ try {
     });
     if (values.audio) {
       const created = audioEvents.filter(row => row.event === 'contextCreated');
-      assert.equal(created.length, 3, 'The inspected cancellation/invalid-input document and each playable document create at most one audio context');
+      assert.equal(created.length, 4,
+        'The early-invalid, invalid-recovery and two playable documents create one audio context each');
       assert(created.every(row => row.data.context.sampleRate === 32000));
-      report.audio = 'The page creates a single 32 kHz context on its first file-picker attempt; actual activation state is recorded above. PCM and match transitions are checked by the separate audio lifecycle test; no fidelity claim.';
+      report.audio = 'The early-invalid, invalid-recovery and two playable documents each create one 32 kHz context; actual activation state is recorded above. PCM and match transitions are checked by the separate audio lifecycle test; no fidelity claim.';
     } else {
       assert.deepEqual(audioEvents, [], 'The audio-disabled public profile must never create a Web Audio context');
       report.audio = 'Audio explicitly disabled. No Web Audio contexts were created during import, menus, pause/resume or second launch. No audio fidelity claim.';

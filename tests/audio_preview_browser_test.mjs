@@ -28,7 +28,10 @@ const browser = await chromium.launch(browserLaunchOptions(launchOptions, {heade
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
 const page = await context.newPage();
 const origin = new URL(values.url).origin;
-const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
+const requests = [], errors = [], requestFailures = [], pendingPackageAborts = [],
+  verifiedPackageAborts = [], expectedNavigationAborts = [], violations = [], sockets = [], audioEvents = [];
+const startedAt = Date.now();
+let ejectReloadInProgress = false;
 const report = {
   schema: 'webmelee-audio-preview-browser-v1',
   browser: browser.version(),
@@ -42,6 +45,9 @@ const report = {
   checks: [],
   audio: {phases: {}, cdp: []},
   assets: {transactions: [], legacyCalls: 0},
+  request_failures: requestFailures,
+  verified_package_abort_events: verifiedPackageAborts,
+  expected_navigation_aborts: expectedNavigationAborts,
 };
 
 // Install before the module graph runs. The trace observes the public Web
@@ -175,7 +181,27 @@ await page.addInitScript(() => {
 });
 
 page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData()}));
-page.on('requestfailed', request => errors.push(`request failed: ${request.method()} ${request.url()} ${request.failure()?.errorText || ''}`));
+page.on('requestfailed', async request => {
+  const failure = request.failure()?.errorText || '';
+  let response = null;
+  try { response = await request.response(); } catch {}
+  const detail = {
+    url: request.url(), method: request.method(), resourceType: request.resourceType(), failure,
+    navigationRequest: request.isNavigationRequest(),
+    frameUrl: (() => { try { return request.frame()?.url() || null; } catch { return null; } })(),
+    responseStatus: response?.status() ?? null,
+    elapsedMs: Date.now() - startedAt, ejectReloadInProgress,
+  };
+  requestFailures.push(detail);
+  if (ejectReloadInProgress && failure === 'net::ERR_ABORTED' && new URL(request.url()).origin === origin) {
+    expectedNavigationAborts.push(detail);
+  } else if (failure === 'net::ERR_ABORTED' && request.resourceType() === 'fetch' &&
+      new URL(request.url()).pathname.endsWith('/gameplay_audio_preview.data') && response?.status() === 200) {
+    pendingPackageAborts.push(detail);
+  } else {
+    errors.push(`request failed: ${request.method()} ${request.url()} ${failure}`);
+  }
+});
 page.on('pageerror', error => errors.push(error.message));
 page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
 page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
@@ -421,6 +447,32 @@ try {
     assert.equal(afterCssAssets.launchCalls, 1,
       'Successful disc and graphics readiness must invoke the original CSS launch exactly once');
     report.launchesAtCss = afterCssAssets.launchCalls;
+    const preload = await page.evaluate(() => {
+      let seedBytes = 0;
+      try { seedBytes = Module.FS.stat('/initial_pipeline_cache.db').size; } catch {}
+      const resources = performance.getEntriesByType('resource')
+        .filter(entry => entry.name.endsWith('/gameplay_audio_preview.data'))
+        .map(entry => ({durationMs: entry.duration, transferSize: entry.transferSize,
+          encodedBodySize: entry.encodedBodySize, decodedBodySize: entry.decodedBodySize,
+          responseStart: entry.responseStart, responseEnd: entry.responseEnd}));
+      return {seedBytes, resources};
+    });
+    const packageBytes = packageManifest?.files?.find(file => file.path.endsWith('/gameplay_audio_preview.data'))?.size;
+    assert(Number.isInteger(packageBytes) && packageBytes > 0,
+      'Build manifest must bind the audio preload size');
+    assert.equal(preload.seedBytes, packageBytes,
+      'The runtime filesystem must contain the complete, manifest-sized pipeline cache package');
+    assert(preload.resources.some(entry => entry.decodedBodySize === packageBytes &&
+      entry.responseEnd >= entry.responseStart && entry.responseEnd > 0),
+    'Browser resource timing must confirm the full pipeline cache package arrived');
+    for (const detail of pendingPackageAborts) {
+      verifiedPackageAborts.push({
+        ...detail,
+        verification: 'HTTP 200; full manifest-sized response recorded by PerformanceResourceTiming and present in /initial_pipeline_cache.db',
+      });
+    }
+    assert.equal(pendingPackageAborts.length, verifiedPackageAborts.length);
+    report.pipeline_cache_preload = {...preload, manifestBytes: packageBytes};
     await page.waitForFunction(() => document.activeElement?.id === 'canvas');
     const before = await trace();
     await observeAudio('css', before);
@@ -432,7 +484,8 @@ try {
     await page.waitForFunction(() => document.querySelector('#pause-game').textContent === 'Resume' &&
       !document.querySelector('#pause-game').disabled);
     await page.locator('#pause-game').click();
-    await page.locator('#pause-game:not([disabled])').waitFor();
+    await page.waitForFunction(() => document.querySelector('#pause-game').textContent === 'Pause' &&
+      !document.querySelector('#pause-game').disabled);
     const before = await trace();
     await observeAudio('css-resume', before);
   });
@@ -575,10 +628,15 @@ try {
     const eventCount = audioEvents.length;
     const navigationCount = report.navigations || 0;
     await collectViolations();
-    await driver.unload();
-    assert((report.navigations || 0) > navigationCount, 'Eject must reload the player document');
-    await driver.waitForImport();
-    await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 90000});
+    ejectReloadInProgress = true;
+    try {
+      await driver.unload();
+      assert((report.navigations || 0) > navigationCount, 'Eject must reload the player document');
+      await driver.waitForImport();
+      await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 90000});
+    } finally {
+      ejectReloadInProgress = false;
+    }
     const fresh = await trace();
     assert(fresh && fresh.contexts.length === 0, 'Reloaded player must not retain the old AudioContext');
     // Closing a context releases its audio resources. Chrome may retain the
@@ -609,6 +667,9 @@ try {
     assert.deepEqual(sockets, []);
     assert.deepEqual(violations, []);
     assert.deepEqual(errors, []);
+    assert.equal(requestFailures.length,
+      verifiedPackageAborts.length + expectedNavigationAborts.length,
+      'Every Chrome request-aborted event must have a verified complete package transfer or be caused by Eject reload');
     report.requests = requests.map(({url, method}) => ({path: new URL(url).pathname, method}));
     report.audio.cdp = audioEvents;
   });
@@ -631,6 +692,8 @@ try {
 } finally {
   await collectViolations().catch(() => {});
   report.errors = errors;
+  report.request_failures = requestFailures;
+  report.expected_navigation_aborts = expectedNavigationAborts;
   report.csp = violations;
   report.audio.cdp = audioEvents;
   report.requests = report.requests || requests.map(({url, method}) => ({path: new URL(url).pathname, method}));

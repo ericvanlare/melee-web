@@ -149,6 +149,7 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
   const trace = [];
   globalThis.testClickTrace = trace;
   let stateCallback;
+  let errorCallback;
   let settingsOptions;
   let nativeMainCalled = false;
   let audioCreated = 0;
@@ -181,6 +182,7 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
   globalThis.testMountMeleeRuntime = async options => {
     trace.push('mount');
     stateCallback = options.onState;
+    errorCallback = options.onError;
     assert.equal(options.canvas, document.getElementById('canvas'));
     assert.equal(options.openDisc, undefined,
       'public shell delegates disc opening to the runtime profile adapter');
@@ -254,6 +256,12 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
       settingsOptions,
       stateCallback,
       getMockState: () => mockState,
+      failRuntime(error) {
+        mockState = {...mockState, state: 'error', ready: false, requiresReload: true,
+          canImport: false, canStart: false, loading: null, message: error.message};
+        stateCallback(mockState);
+        errorCallback(error);
+      },
       nativeMainCalled,
       audioCreated,
       player,
@@ -373,6 +381,40 @@ try {
     'Choosing another File clears the previous validation error');
   assert.equal(invalidRecovery.trace.filter(row => row === 'start').length, 1);
 } finally { delete globalThis.testClickTrace; restoreInvalidRecovery(); }
+
+let finishValidationDuringFailure;
+let validationStarted = false;
+const initializationFailure = await runScenario({name: 'initialization-failure-during-validation', behavior: {
+  graphicsPending: true,
+  validateDisc: () => new Promise(resolve => {
+    validationStarted = true;
+    finishValidationDuringFailure = resolve;
+  }),
+}});
+const restoreInitializationFailure = installGlobals(initializationFailure.document);
+try {
+  const input = initializationFailure.document.getElementById('disc-file');
+  input.files = [{name: 'pending-valid-disc.iso'}];
+  const selectionValidation = input.onchange();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(validationStarted, true);
+  initializationFailure.failRuntime(Error('Graphics initialization failed'));
+  finishValidationDuringFailure();
+  await selectionValidation;
+  const status = initializationFailure.document.getElementById('disc-selection-status');
+  assert.equal(status.hidden, false, 'The selected File remains acknowledged after initialization failure');
+  assert.match(status.textContent, /Validation stopped pending-valid-disc\.iso/);
+  assert.doesNotMatch(status.textContent, /Invalid disc/,
+    'A runtime failure must not be reported as invalid disc data');
+  assert.equal(initializationFailure.document.getElementById('error').textContent,
+    'Graphics initialization failed');
+  assert.equal(initializationFailure.document.getElementById('retry').hidden, false,
+    'The initialization failure keeps the reload recovery action visible');
+  assert.equal(initializationFailure.trace.filter(row => Array.isArray(row) && row[0] === 'close-session').length, 1,
+    'A session finishing after the runtime failure closes exactly once');
+  assert.equal(initializationFailure.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, 0);
+  assert.equal(initializationFailure.trace.filter(row => row === 'start').length, 0);
+} finally { restoreInitializationFailure(); }
 
 let finishFirstValidation;
 const replacement = await runScenario({name: 'replacement-during-validation', behavior: {

@@ -334,7 +334,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       }
       if (fatal || destroyed) {
         session.close();
-        throw Error('The player stopped while validating the local disc.');
+        throw Error('The player stopped while opening the local disc.');
       }
       openedDiscSessions.add(session);
       return session;
