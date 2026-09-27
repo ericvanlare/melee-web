@@ -43,6 +43,11 @@ int melee_web_menu_host_snapshot_card_data(
     const MeleeWebMenuHost*, int baseline, uint8_t* output,
     size_t output_size, char*, size_t);
 int melee_web_menu_host_enter(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
+/* Source title/main route.  These callbacks retain the host's persistent
+ * GameSceneInfo and authored mode payloads across the Aurora world boundary;
+ * they do not synthesize a browser menu. */
+int melee_web_menu_host_enter_title(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
+int melee_web_menu_host_enter_main(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
 /* Install the copied first-CSS source context before the initial scene is
  * entered.  Rules/save ranges are observer PowerPC bytes and are translated
  * by the save/profile owner; the PAD state is semantic wire data and is
@@ -59,6 +64,15 @@ int melee_web_menu_host_tick(MeleeWebMenuHost*,const PADStatus[4],char*,size_t);
 int melee_web_menu_host_draw(MeleeWebMenuHost*,char*,size_t);
 /* Call after the final Aurora frame has submitted, before closing its world. */
 int melee_web_menu_host_leave(MeleeWebMenuHost*,int abort_scene,char*,size_t);
+/* Re-enter the original CSS after a checked CSS LR+Start -> GM_MENU route,
+ * preserving the source VS payload and its mode lease. */
+int melee_web_menu_host_reenter_css_after_parent(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
+/* Current source scene: 0 when the host is between worlds, 1 CSS, 2 SSS,
+ * 3 title, 4 main. */
+int melee_web_menu_host_source_scene(const MeleeWebMenuHost*);
+/* Checked retail destination after leaving a title/main/CSS scene: -1 while
+ * active or unset, then GM_TITLE=0, GM_MENU=1, or GM_VS=2. */
+int melee_web_menu_host_route_target_mode(const MeleeWebMenuHost*);
 /* Reads the separate configuration produced by the original VS-entry rules
  * and player preparation after CSS/SSS OnExit. */
 int melee_web_menu_host_selection(const MeleeWebMenuHost*,MeleeWebMenuMatchSelection*,char*,size_t);

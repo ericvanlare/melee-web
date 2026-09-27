@@ -115,6 +115,14 @@ int melee_web_save_profile_owner_initialize_everything(
 int melee_web_save_profile_owner_restore_default(
     MeleeWebSaveProfileOwner*, char* error, size_t error_size);
 
+/* Build the bounded default used by the original CSS-first menu route. The
+ * unlockable-character mask, unlock notifications and reward ledger are
+ * initialized by their original routines; the supplied stage mask remains a
+ * browser capability boundary. */
+int melee_web_save_profile_owner_initialize_menu_roster(
+    MeleeWebSaveProfileOwner*, uint16_t stages, char* error,
+    size_t error_size);
+
 /* Restore every byte captured by activate.  Restoration is fail-closed if a
  * source alias moved, leaving the owner active for the caller to diagnose. */
 int melee_web_save_profile_owner_deactivate(MeleeWebSaveProfileOwner*, char* error,

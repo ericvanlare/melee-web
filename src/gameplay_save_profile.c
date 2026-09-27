@@ -1,9 +1,9 @@
 #include "gameplay_save_profile.h"
 #include "gameplay_compat.h"
 
-#include <melee/gm/gmmain_lib.h>
 #include <melee/gm/gm_1601.h>
 #include <melee/gm/gm_16F1.h>
+#include <melee/gm/gmmain_lib.h>
 #include <melee/gm/gm_16AE.h>
 #include <melee/gm/forward.h>
 #include <melee/gm/types.h>
@@ -803,6 +803,47 @@ int melee_web_save_profile_owner_restore_default(
            sizeof(struct ToyRuntimeAggregate));
     lbLang_SetLanguageSetting(candidate->fresh_language);
     lbLang_SetSavedLanguage(candidate->fresh_saved_language);
+    return aliases_match(candidate, error, error_size) && ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_initialize_menu_roster(
+    MeleeWebSaveProfileOwner* candidate, uint16_t stages, char* error,
+    size_t error_size)
+{
+    uint16_t* source_characters;
+    uint16_t expected_characters;
+
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size))
+        return 0;
+    if (!candidate->default_initialized)
+        return fail(error, error_size,
+                    "Original menu roster requires a fresh source profile");
+    if (!aliases_match(candidate, error, error_size))
+        return 0;
+    source_characters = gmMainLib_GetUnlockedCharactersBitmaskPtr();
+    if (source_characters !=
+        &candidate->source_save->unlocked_characers_bitmask)
+        return fail(error, error_size,
+                    "Original menu roster alias does not point into SaveData");
+    if (NUM_UNLOCKABLE_CHARACTERS >= 16)
+        return fail(error, error_size,
+                    "Original unlockable-character table exceeds its source mask");
+
+    /* Match the source debug-unlock initialization used for a fully open
+     * roster. These companion routines consume the authored 0x42 unlock
+     * notifications and 0x12C reward-ledger entries. Title still runs its
+     * ordinary checks; the initialized profile has no stale unlock/award
+     * work for those checks to route to Challenger Approach. */
+    gm_80164F18();
+    expected_characters = (uint16_t) ((1U << NUM_UNLOCKABLE_CHARACTERS) - 1U);
+    if (*source_characters != expected_characters)
+        return fail(error, error_size,
+                    "Original character unlock routine disagreed with its authored table bound");
+    if (!melee_web_save_profile_owner_set_roster(
+            candidate, *source_characters, stages, error, error_size))
+        return 0;
+    gm_8017297C();
+    gm_801741FC();
     return aliases_match(candidate, error, error_size) && ok(error, error_size);
 }
 
