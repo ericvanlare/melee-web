@@ -1,16 +1,19 @@
 # Current status
 
-## Original title/main-menu route is not yet integrated
+## Original title/main-menu route integrated
 
-**Source identified / Compiled** for a bounded fresh-DOL retail route driver
-that observes boot, title, main-menu, Versus CSS and a source-driven back/forward
-path. The generated driver and route verifier have focused checks, and the
-development and public Release runtimes build. The owned USA rev1.02 disc and
-private initial memory-card/profile inputs were unavailable, so no original
-route capture or production CSS-first menu lifecycle was run. The browser
-still closes its menu owner when CSS requests the parent menu. See the
-[route evidence ledger](docs/ORIGINAL_MENU_ROUTE_CAPTURE.md) for source scope
-and remaining gates.
+**Source identified / Retail compared / Browser exercised / Compiled** for the
+original title → Main/Versus → CSS route, CSS parent return, Main Back to Title,
+Title Start to Main, repeated CSS re-entry, and public Eject/reimport lifecycle.
+The retail capture starts from a cold Dolphin boot with an isolated copy of a
+retail-initialized card and records scoped source/PAD observations and labeled
+Metal frame screenshots. The headless public Release browser check keeps
+CSS-first startup, completes two repeated menu cycles, then reloads on Eject
+and re-enters CSS after disc reimport. The local Observer and browser receipts,
+input logs, and screenshots are indexed in the
+[route evidence ledger](docs/ORIGINAL_MENU_ROUTE_CAPTURE.md). This scope does
+not establish foreground timing, PCM, pixel equivalence, or full-game menu
+coverage.
 
 ## Repository public; main changes restricted to the owner
 

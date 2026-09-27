@@ -14,6 +14,7 @@ namespace melee_web {
 enum class DatMenuSupportKind {
     CardIcons,
     CardScene,
+    SnapshotIcons,
 };
 
 enum class DatMenuSupportLanguage {

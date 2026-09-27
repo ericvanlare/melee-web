@@ -25,6 +25,7 @@ BOOL OSRestoreInterrupts(BOOL level){int previous=interrupts_enabled;interrupts_
  * GPU upload/synchronization remains the renderer's responsibility. */
 void DCFlushRange(void* addr,u32 bytes){(void)addr;(void)bytes;atomic_signal_fence(memory_order_seq_cst);}
 void DCInvalidateRange(void* addr,u32 bytes){(void)addr;(void)bytes;atomic_signal_fence(memory_order_seq_cst);}
+void DCStoreRange(void* addr,u32 bytes){(void)addr;(void)bytes;atomic_signal_fence(memory_order_seq_cst);}
 void DCFlushRangeNoSync(void* addr,u32 bytes){(void)addr;(void)bytes;atomic_signal_fence(memory_order_seq_cst);}
 
 /* Aurora's SDK declarations are weak and its host implementation is disabled.

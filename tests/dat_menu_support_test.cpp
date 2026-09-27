@@ -1,4 +1,6 @@
 #include "gameplay_compat.h"
+#include "dat_audio_load_data.hpp"
+#include "dat_event_menu.hpp"
 #include "dat_menu_support.hpp"
 
 #pragma GCC diagnostic push
@@ -10,6 +12,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
+#include <cstring>
 #include <vector>
 
 namespace {
@@ -63,6 +66,45 @@ Bytes icon_fixture(std::vector<std::uint32_t> payload_sizes = {24, 24, 24, 24})
     return bytes;
 }
 
+Bytes snapshot_icon_fixture(std::uint32_t payload_size = 0x1800)
+{
+    constexpr std::string_view icon_name = "MemSnapIconData";
+    constexpr std::string_view banner_name = "MemSnapBanner_01";
+    constexpr std::string_view icon_image_name = "MemSnapIcon_01";
+    const std::uint32_t banner_size = payload_size;
+    const std::uint32_t icon_size = 0x600;
+    const std::uint32_t icon_offset = banner_size;
+    const std::uint32_t root = icon_offset + icon_size;
+    const std::uint32_t data_size = root + 12;
+    const std::size_t relocation_table = 0x20 + data_size;
+    const std::size_t public_table = relocation_table + 8;
+    const std::size_t names = public_table + 24;
+    Bytes bytes(names + icon_name.size() + 1 + banner_name.size() + 1 +
+                icon_image_name.size() + 1, 0);
+    put32(bytes, 0, static_cast<std::uint32_t>(bytes.size()));
+    put32(bytes, 4, data_size);
+    put32(bytes, 8, 2); // banner and card icon pointer entries
+    put32(bytes, 12, 3);
+    put32(bytes, 0x20 + root, 0);
+    put32(bytes, 0x20 + root + 4, icon_offset);
+    put32(bytes, relocation_table, root);
+    put32(bytes, relocation_table + 4, root + 4);
+    put32(bytes, public_table, 0);
+    put32(bytes, public_table + 4, 0);
+    put32(bytes, public_table + 8, icon_offset);
+    put32(bytes, public_table + 12,
+          static_cast<std::uint32_t>(banner_name.size() + 1));
+    put32(bytes, public_table + 16, root);
+    put32(bytes, public_table + 20,
+          static_cast<std::uint32_t>(banner_name.size() + 1 + icon_image_name.size() + 1));
+    std::copy(banner_name.begin(), banner_name.end(), bytes.begin() + names);
+    std::copy(icon_image_name.begin(), icon_image_name.end(),
+              bytes.begin() + names + banner_name.size() + 1);
+    std::copy(icon_name.begin(), icon_name.end(),
+              bytes.begin() + names + banner_name.size() + 1 + icon_image_name.size() + 1);
+    return bytes;
+}
+
 std::vector<std::uint8_t> read_file(const char* path)
 {
     std::ifstream stream(path, std::ios::binary);
@@ -110,6 +152,24 @@ void test_synthetic()
               icons.icon_payload(3).size() == 24,
           "synthetic pointer table preserves bounded payload spans");
     check(icons.descriptor() != nullptr, "synthetic icon descriptor is published");
+
+    auto snapshot_bytes = snapshot_icon_fixture();
+    auto snapshot_archive = std::make_shared<DatArchive>(snapshot_bytes);
+    DatMenuSupport snapshot(snapshot_archive, DatMenuSupportKind::SnapshotIcons);
+    check(snapshot.source_basename() == "LbMcSnap.",
+          "snapshot source basename is exact");
+    check(snapshot.resolved_filename() == "LbMcSnap.usd" &&
+              snapshot.symbol_name() == "MemSnapIconData",
+          "snapshot source archive identity is exact");
+    auto** snapshot_table = static_cast<void**>(snapshot.descriptor());
+    check(snapshot_table && snapshot_table[0] == snapshot_archive->data().data() &&
+              snapshot_table[1] == snapshot_archive->data().data() + 0x1800 &&
+              snapshot_table[2] == nullptr,
+          "snapshot owner publishes both authored image pointers and terminator");
+    rejects([&] {
+        auto malformed = std::make_shared<DatArchive>(snapshot_icon_fixture(0x1000));
+        DatMenuSupport ignored(malformed, DatMenuSupportKind::SnapshotIcons);
+    }, "short authored snapshot image is rejected");
 
     rejects([&] {
         auto bad = std::make_shared<DatArchive>(icon_fixture({24, 24, 24}));
@@ -188,18 +248,93 @@ void test_local_assets(const char* icon_path, const char* scene_path)
     }, "malformed card terminator is rejected");
 }
 
+void test_local_snapshot_icons(const char* path)
+{
+    using melee_web::DatArchive;
+    using melee_web::DatMenuSupport;
+    using melee_web::DatMenuSupportKind;
+    auto bytes = read_file(path);
+    auto archive = std::make_shared<DatArchive>(bytes);
+    DatMenuSupport icons(archive, DatMenuSupportKind::SnapshotIcons);
+    auto** table = static_cast<void**>(icons.descriptor());
+    check(icons.resolved_filename() == "LbMcSnap.usd" &&
+              icons.symbol_name() == "MemSnapIconData",
+          "retail snapshot archive identity is exact");
+    check(table && table[0] == archive->data().data() &&
+              table[1] == archive->data().data() + 0x1800 && !table[2],
+          "retail snapshot owner preserves the authored image table");
+}
+
+void test_local_event_menu_data(const char* path)
+{
+    using melee_web::DatArchive;
+    using melee_web::DatEventMenuData;
+    auto bytes = read_file(path);
+    auto archive = std::make_shared<DatArchive>(bytes);
+    DatEventMenuData event_data(archive);
+    auto** table = static_cast<void**>(event_data.descriptor());
+    check(event_data.level_count() == 0x33,
+          "GmEvent table has the retail source bound");
+    check(table && table[0] && table[0x32],
+          "GmEvent table publishes hydrated first and last records");
+    check(event_data.source_bytes().data() == archive->data().data(),
+          "GmEvent owner retains the exact parsed source archive");
+}
+
+void test_local_audio_load_data(const char* path)
+{
+    using melee_web::DatArchive;
+    using melee_web::DatAudioLoadData;
+    auto bytes = read_file(path);
+    auto archive = std::make_shared<DatArchive>(bytes);
+    DatAudioLoadData audio_data(archive);
+    struct AudioRoot {
+        std::int32_t** x0;
+        std::int32_t** x4;
+        std::int32_t** x8;
+        std::int32_t** xC;
+    };
+    auto* root = static_cast<AudioRoot*>(audio_data.descriptor());
+    check(audio_data.group_count() == 30,
+          "LbAd audio lookup uses the source 30-group bound");
+    check(root && root->x0 && root->x4 && root->x8 && root->xC,
+          "LbAd owner publishes all four authored language tables");
+    const std::int32_t expected_first[] = {0x4e22, 0x4e21, 0x4e22, 0x4e21};
+    std::int32_t** locales[] = {root->x0, root->x4, root->x8, root->xC};
+    for (std::size_t index = 0; index < std::size(locales); ++index)
+        check(locales[index][0] && locales[index][28] && locales[index][29] &&
+                  locales[index][0][0] == expected_first[index],
+              "LbAd group rows preserve authored values and sentinel bounds");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
 {
     try {
-        check(argc == 1 || (argc == 4 && std::string_view(argv[1]) == "--assets"),
-              "usage: [--assets LbMcGame.usd NtMemAc.usd]");
+        check(argc == 1 || (argc == 4 && std::string_view(argv[1]) == "--assets") ||
+                  (argc == 3 && (std::string_view(argv[1]) == "--snapshot" ||
+                                 std::string_view(argv[1]) == "--event" ||
+                                 std::string_view(argv[1]) == "--audio-load")),
+              "usage: [--assets LbMcGame.usd NtMemAc.usd] | [--snapshot LbMcSnap.usd] | [--event GmEvent.dat] | [--audio-load LbAd.dat]");
         test_synthetic();
         if (argc == 4)
             test_local_assets(argv[2], argv[3]);
-        std::cout << (argc == 1 ? "synthetic " : "typed ")
-                     << "CSS card support roots, normalization, ownership, and bounds passed\n";
+        if (argc == 3) {
+            if (std::string_view(argv[1]) == "--snapshot")
+                test_local_snapshot_icons(argv[2]);
+            else if (std::string_view(argv[1]) == "--event")
+                test_local_event_menu_data(argv[2]);
+            else
+                test_local_audio_load_data(argv[2]);
+        }
+        if (argc == 3 && std::string_view(argv[1]) == "--event")
+            std::cout << "typed retail GmEvent level table and record graph passed\n";
+        else if (argc == 3 && std::string_view(argv[1]) == "--audio-load")
+            std::cout << "typed retail LbAd audio-language table and sentinel rows passed\n";
+        else
+            std::cout << (argc == 1 ? "synthetic " : "typed ")
+                         << "CSS card/snapshot support roots, normalization, ownership, and bounds passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

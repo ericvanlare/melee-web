@@ -58,19 +58,29 @@ typedef int (*MeleeWebMenuScheduler)(void* user, char* error,
 /* The original scene owns its transition state in private statics.  The host
  * must read and clear the checked gm_801A4D34 request flag after OnFrame and
  * HSD scheduling instead of inferring readiness from CSSData/SSSData.  The
- * callback writes 0 when the source remains in-scene, or the original
+ * callback writes 0 when the source remains in-scene or the original
  * gm_801A4B60/74 request kind when it has finished its transition request.
- * The wrapper exposes that request as RESULT_TRANSITION_REQUESTED; the host
- * then calls leave_* so the source OnExit owns archive release. */
+ * The wrapper exposes the source request unchanged as
+ * RESULT_TRANSITION_REQUESTED; the host then calls leave_* so the source
+ * OnExit owns archive release. */
 typedef int (*MeleeWebMenuTransition)(void* user, MeleeWebMenuScene scene,
                                       int* requested, char* error,
                                       size_t error_size);
+
+/* Hooks for the enclosing original game-mode state.  They run immediately
+ * before the matching scene OnEnter and immediately after its OnExit.  A
+ * host that owns a real GM_VS lease uses these to run the source CSS/SSS
+ * state callbacks without replacing the scene's payload or exit routing. */
+typedef int (*MeleeWebMenuSceneLifecycle)(void* user, MeleeWebMenuScene scene,
+                                          char* error, size_t error_size);
 
 typedef struct MeleeWebMenuRuntime {
     void* user;
     MeleeWebMenuRuntimeCheck check;
     MeleeWebMenuScheduler scheduler;
     MeleeWebMenuTransition transition;
+    MeleeWebMenuSceneLifecycle scene_enter;
+    MeleeWebMenuSceneLifecycle scene_exit;
 } MeleeWebMenuRuntime;
 
 typedef struct MeleeWebMenuConfig {
@@ -113,9 +123,21 @@ int melee_web_menu_enter_css(MeleeWebMenuSession*, char* error,
  * used for the initial native scene. */
 int melee_web_menu_return_to_css(MeleeWebMenuSession*, char* error,
                                  size_t error_size);
+/* Reopen the retained CSS payload after the original CSS parent route has
+ * completed its GM_MENU scene.  The caller must have completed the checked
+ * CSS LR+Start exit; this does not synthesize a new VsModeData payload. */
+int melee_web_menu_reopen_css_after_parent(MeleeWebMenuSession*, char* error,
+                                            size_t error_size);
+int melee_web_menu_cancel_parent_route(MeleeWebMenuSession*, char* error,
+                                       size_t error_size);
+int melee_web_menu_parent_route_pending(const MeleeWebMenuSession*);
 int melee_web_menu_enter_sss(MeleeWebMenuSession*, char* error,
                              size_t error_size);
 int melee_web_menu_tick(MeleeWebMenuSession*, char* error, size_t error_size);
+/* Record a CSS -> GM_MENU destination after the host verifies the source's
+ * live GM_VS -> GM_MENU pending-mode request. This keeps the original
+ * transition request kind and CSS payload intact. */
+int melee_web_menu_mark_css_parent_route(MeleeWebMenuSession*, char*, size_t);
 int melee_web_menu_leave_css(MeleeWebMenuSession*, char* error,
                              size_t error_size);
 int melee_web_menu_leave_sss(MeleeWebMenuSession*, char* error,

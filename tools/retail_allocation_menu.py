@@ -338,7 +338,7 @@ def _record_menu_route_marker(name):
 
 
 _COLD_BOOT_MENU_ROUTE_HELPERS = r'''
-def _cold_boot_wait_main_menu(limit=1800):
+def _cold_boot_wait_main_menu(menu_kind=0,limit=1800):
     for _ in range(limit):
         kind=scene_kind()
         mode=mem(0x80479D30,1)[0]
@@ -346,7 +346,7 @@ def _cold_boot_wait_main_menu(limit=1800):
             _cold_boot_card_prompt()
             continue
         if kind==SCENE_MENU and mode==GM_MENU:
-            return _cold_boot_wait_menu(0,limit=limit)
+            return _cold_boot_wait_menu(menu_kind,limit=limit)
         step(1)
     raise RuntimeError(f'original GM_MENU did not reach the root menu: scene={_cold_boot_scene_name(scene_kind())} mode={mem(0x80479D30,1)[0]}')
 
@@ -371,17 +371,34 @@ def _cold_boot_css_to_title():
     for port in range(4):
         command(port,'SET MAIN .5 .5')
     step(12)
+    # Probe ordinary B first. In source, B is handled by the CSS character
+    # doors, while the scene-level parent return is the L+R+Start chord.
+    # Preserve both source snapshots so any CSS-local effect is visible in
+    # the capture without mistaking it for a parent-scene transition.
+    _record_menu_route_marker('css_before_b_back_probe')
+    pulse(0,'B',settle=24)
+    if scene_kind()!=SCENE_CSS or mem(0x80479D30,1)[0]!=GM_VS:
+        raise RuntimeError(f'ordinary CSS B left the CSS unexpectedly: scene={_cold_boot_scene_name(scene_kind())} mode={mem(0x80479D30,1)[0]}')
+    _record_menu_route_marker('css_b_back_probe_remained_css')
     # mnCharSel's retail parent-menu shortcut is L+R+Start. Keep the chord
     # source-owned; do not write the pending game-mode field directly.
     command(0,'PRESS L');command(0,'PRESS R');step(4)
     command(0,'PRESS START');step(12)
     command(0,'RELEASE L');command(0,'RELEASE R');command(0,'RELEASE START')
-    state=_cold_boot_wait_main_menu()
-    if state['cur']!=0:
-        raise RuntimeError(f'CSS back route did not reach the root main menu: {state}')
+    # GM_MENU inherits the VS submenu from GM_VS. Retail's CSS parent-menu
+    # shortcut therefore lands at MENU_KIND_VS (2), not the root menu (0).
+    state=_cold_boot_wait_main_menu(2)
+    if state['cur']!=2 or state['hovered']!=0:
+        raise RuntimeError(f'CSS back route did not reach the VS submenu at Melee: {state}')
+    _record_menu_route_marker('versus_submenu_ready_after_css')
+    # B is the ordinary submenu Back input. The first B returns to the root
+    # menu; the next B from the root requests GM_TITLE.
+    pulse(0,'B',settle=24)
+    state=_cold_boot_wait_main_menu(0)
+    if state['cur']!=0 or state['hovered']!=1:
+        raise RuntimeError(f'VS submenu Back did not return to root at Versus: {state}')
     _record_menu_route_marker('root_main_menu_ready')
-    # PAD_CANCEL is sourced from the normal B-button mapping. mnMain requests
-    # GM_TITLE from its root menu; this is ordinary menu navigation.
+    # PAD_CANCEL in the root menu requests GM_TITLE.
     pulse(0,'B',settle=30)
     for _ in range(900):
         kind=scene_kind()
@@ -410,10 +427,16 @@ def _cold_boot_title_to_css():
             _cold_boot_card_prompt()
             continue
         if kind==SCENE_MENU and mode==GM_MENU:
-            _cold_boot_wait_menu(0)
+            state=_cold_boot_wait_menu(0)
+            if state['cur']!=0 or state['hovered']!=0:
+                raise RuntimeError(f'title Start did not open the default 1P root menu: {state}')
+            _record_menu_route_marker('root_main_menu_ready_after_title')
             move_menu_selection(1)  # SEL_MAIN_VS
             pulse(0,'A',settle=24)
-            _cold_boot_wait_menu(2)  # MENU_KIND_VS
+            state=_cold_boot_wait_menu(2)  # MENU_KIND_VS
+            if state['cur']!=2 or state['hovered']!=0:
+                raise RuntimeError(f'root menu Versus did not open at Melee: {state}')
+            _record_menu_route_marker('versus_submenu_ready_after_title')
             pulse(0,'A',settle=30)  # SEL_VS_MELEE -> GM_VS
             _cold_boot_wait_css()
             _record_menu_route_marker('round_trip_css_ready')
@@ -445,6 +468,11 @@ def _record_input_command(port,text):
     row={{'event':'pad_command','port':port+1,'command':text,
          'scene_kind':scene_kind(),'game_mode':mem(0x80479D30,1)[0],
          'scene_frame':u32(0x80479D58)}}
+    if row['scene_kind']==SCENE_MENU:
+        menu_flow=mem(0x804A04F0,0x18)
+        row['menu_state']={{'cur':menu_flow[0],'prev':menu_flow[1],
+                           'hovered':struct.unpack_from('>H',menu_flow,2)[0],
+                           'confirmed':menu_flow[4],'entering':menu_flow[0x11]}}
     COMMAND_LOG.write(json.dumps(row,separators=(',',':'))+'\n')
     COMMAND_LOG.flush()
 '''
