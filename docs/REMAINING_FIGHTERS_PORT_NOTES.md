@@ -72,9 +72,20 @@ comparisons agree on all 12,040/14,366/12,626 captured gameplay rows in those
 matches, including former third-match tick 6099
 (`work/pr86-shake-a-state-match{0,1,2}-r1.json`). These are bounded declared-field
 state results, still `complete=false`: CPU decisions are recomputed, CPU blocks
-and port draws are not compared, and no pixel/PCM/cadence claim follows. B's
-extended replay is running; the separate functional Results failure below
-remains open.
+and port draws are not compared, and no pixel/PCM/cadence claim follows.
+
+B's extended replay still reaches the downstream input-28298 scene mismatch.
+The new first difference is much earlier: second-match tick 6718, sequence
+101920, input 20884. Yoshi enters CatchPull with animation frame 44 in the
+original versus 42 in the port; the other declared fields agree. The complete
+first match remains exact (12,095 rows), as do 6,718 second-match rows
+(`work/pr86-samus-shake-b-full-state-match{0,1}-r1.json`). The reduced native
+and portable decoder checks both fail before repair: Yoshi's authored `x12C`
+grab-frame byte table was mislabeled as three scalar words, reversing each
+four-byte group. It is now decoded as the original twelve bytes; all entries
+and both focused checks pass (`work/pr86-yoshi-grab-bytes-{before-r2,after-r1}.log`).
+Fresh rendered causal validation is pending. The separate functional Results
+failure below remains open.
 
 An additional B functional run reaches natural Results after 11,725 gameplay
 frames with Sheik winning, then fails the camera-pool ownership guard at

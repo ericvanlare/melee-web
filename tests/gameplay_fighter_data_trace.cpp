@@ -20,6 +20,7 @@ extern "C" void melee_web_test_purin_data(void*);
 extern "C" void melee_web_test_donkey_data(void*);
 extern "C" void melee_web_test_koopa_data(void*,int);
 extern "C" int melee_web_test_gamewatch_data(const MeleeWebNativeDat*,uint32_t,void*);
+extern "C" void melee_web_test_yoshi_grab_bytes(const MeleeWebNativeDat*,uint32_t,void*);
 namespace {
 /* Keep this focused check independent of the full source header graph. These
  * are the two native ABI prefixes needed to inspect ftData->x2C->x10. */
@@ -478,6 +479,19 @@ void verify_purin(const Bytes& source,const Bytes& container) {
 }
 int main(int argc,char**argv) {
     try {
+        if(argc==4&&std::string_view(argv[1])=="--yoshi-grab-bytes") {
+            auto archive=std::make_shared<const DatArchive>(read_file(argv[2]));
+            const auto& identity=resolve_fighter_costume("PlyYoshi5K_Share_joint");
+            GameplayActionStore actions(archive,identity,read_file(argv[3]));
+            uint32_t root=UINT32_MAX;
+            for(const auto& symbol:archive->public_symbols())
+                if(symbol.name=="ftDataYoshi")root=symbol.data_offset;
+            check(root!=UINT32_MAX,"Missing ftDataYoshi");
+            NativeDatArena owner(archive);uint32_t unresolved;
+            void* data=melee_web_fighter_data_decode(owner.reader(),root,14,6,
+                identity.motion_count,actions.action_rows(),actions.blend_rows(),actions.wait_choices(),&unresolved);
+            melee_web_test_yoshi_grab_bytes(owner.reader(),root,data);return 0;
+        }
         if(argc==4&&std::string_view(argv[1])=="--gamewatch") {
             verify_gamewatch(read_file(argv[2]),read_file(argv[3]));return 0;
         }

@@ -70,6 +70,10 @@ _Static_assert(sizeof(ftSs_DatAttrs) == MELEE_WEB_SAMUS_ATTRIBUTE_BYTES,
 _Static_assert(sizeof(ftYoshiAttributes) == MELEE_WEB_YOSHI_ATTRIBUTE_BYTES &&
                sizeof(struct ftYs_DatAttrs) == 0x120,
                "Yoshi extension and source overlay ABI");
+_Static_assert(offsetof(ftYoshiAttributes,x12C)==MELEE_WEB_YOSHI_GRAB_FRAME_OFFSET &&
+               offsetof(MeleeWebYoshiAttributes,grab_frames)==MELEE_WEB_YOSHI_GRAB_FRAME_OFFSET &&
+               sizeof(((ftYoshiAttributes*)0)->x12C)==MELEE_WEB_YOSHI_GRAB_FRAME_COUNT,
+               "Yoshi source grab-frame byte table ABI");
 _Static_assert(sizeof(ftZelda_DatAttrs) == 0xA8, "Zelda source extension ABI");
 _Static_assert(sizeof(ftSeakAttributes) == 0x74, "Sheik source extension ABI");
 #define CHECK_YOSHI_PORTABLE(offset,type,name,original) \
@@ -613,12 +617,14 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         at=required(r,root+4,MELEE_WEB_YOSHI_ATTRIBUTE_BYTES);
         ftYoshiAttributes* yoshi=NEW(ftYoshiAttributes,1); d->ext_attr=yoshi;
         /* Yoshi's original callbacks view this one allocation through both
-         * ftYoshiAttributes and ftYs_DatAttrs. Preserve every source word at
-         * its exact offset, including overlay-only fields and padding. */
-        for(uint32_t offset=0;offset<MELEE_WEB_YOSHI_ATTRIBUTE_BYTES;offset+=4) {
+         * ftYoshiAttributes and ftYs_DatAttrs. Preserve scalar words through
+         * x128, then the byte-indexed grab-frame table consumed by CatchPull. */
+        for(uint32_t offset=0;offset<offsetof(ftYoshiAttributes,x12C);offset+=4) {
             const uint32_t value=WORD(at+offset);
             memcpy((uint8_t*)yoshi+offset,&value,sizeof(value));
         }
+        for(unsigned i=0;i<sizeof(yoshi->x12C);++i)
+            yoshi->x12C[i]=BYTE(at+offsetof(ftYoshiAttributes,x12C)+i);
     } else if(kind==FTKIND_ZELDA) {
         at=required(r,root+4,sizeof(ftZelda_DatAttrs));
         ftZelda_DatAttrs* zelda=NEW(ftZelda_DatAttrs,1); d->ext_attr=zelda;

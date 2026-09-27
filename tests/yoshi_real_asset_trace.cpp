@@ -44,6 +44,15 @@ int main(int argc, char** argv)
         const auto fighter = root(*archive, "ftDataYoshi");
         const auto attributes = archive->pointer(fighter + 4, 0x138);
         if (!attributes) throw std::runtime_error("Yoshi's exact 0x138 source attribute root is absent");
+        // ftCo_CatchPull indexes x12C as twelve individual frame bytes.
+        // Treating these as three endian-swapped words changes the selected
+        // animation frame even though all scalar attribute checks pass.
+        const auto* decoded_bytes = reinterpret_cast<const uint8_t*>(&*runtime->yoshi_attributes());
+        for (unsigned i = 0; i < 12; ++i) {
+            if (decoded_bytes[0x12c + i] != archive->range(*attributes + 0x12c + i, 1)[0])
+                throw std::runtime_error("Yoshi portable grab-frame byte order differs at index " +
+                                         std::to_string(i));
+        }
         const auto guard = archive->pointer(fighter + 0x20, 4);
         if (!guard || archive->pointer(*guard, 4) || archive->f32(*guard + 4) != 0.0f)
             throw std::runtime_error("Yoshi source guard descriptor is not its null-joint/zero-scalar record");

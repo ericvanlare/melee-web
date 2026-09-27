@@ -7,6 +7,8 @@
  * callbacks also view portions of this allocation through ftYs_DatAttrs; keep
  * those alternate special-hi/star offsets as named scalar lanes. */
 #define MELEE_WEB_YOSHI_ATTRIBUTE_BYTES 0x138u
+#define MELEE_WEB_YOSHI_GRAB_FRAME_OFFSET 0x12cu
+#define MELEE_WEB_YOSHI_GRAB_FRAME_COUNT 12u
 #define MELEE_WEB_YOSHI_TYPE_F32 float
 #define MELEE_WEB_YOSHI_TYPE_I32 int32_t
 #define MELEE_WEB_YOSHI_TYPE_U32 uint32_t
@@ -86,15 +88,15 @@
     X(0x11c, F32, speciallw_star_offset_y, speciallw_star_offset.y) \
     X(0x120, F32, x120, x120) \
     X(0x124, F32, x124, x124) \
-    X(0x128, F32, x128, x128) \
-    X(0x12c, U32, padding_12c, padding_12C[0]) \
-    X(0x130, U32, padding_130, padding_12C[1]) \
-    X(0x134, U32, padding_134, padding_12C[2])
+    X(0x128, F32, x128, x128)
 
 #define MELEE_WEB_YOSHI_DECLARE_ATTRIBUTE(offset, type, name, original) \
     MELEE_WEB_YOSHI_TYPE_##type name;
 typedef struct MeleeWebYoshiAttributes {
     MELEE_WEB_YOSHI_ATTRIBUTE_FIELDS(MELEE_WEB_YOSHI_DECLARE_ATTRIBUTE)
+    /* ftCo_CatchPull indexes the authored x12C table by animation frame.
+     * These are byte values, not padding or endian-swapped scalar words. */
+    uint8_t grab_frames[MELEE_WEB_YOSHI_GRAB_FRAME_COUNT];
 } MeleeWebYoshiAttributes;
 #undef MELEE_WEB_YOSHI_DECLARE_ATTRIBUTE
 

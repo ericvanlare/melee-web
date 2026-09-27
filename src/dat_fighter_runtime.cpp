@@ -284,6 +284,8 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #define READ_YOSHI(at, type, name, original) yoshi_->name = read_##type(data, extension_ + at);
         MELEE_WEB_YOSHI_ATTRIBUTE_FIELDS(READ_YOSHI)
 #undef READ_YOSHI
+        for (unsigned i = 0; i < MELEE_WEB_YOSHI_GRAB_FRAME_COUNT; ++i)
+            yoshi_->grab_frames[i] = read_U8(data, extension_ + MELEE_WEB_YOSHI_GRAB_FRAME_OFFSET + i);
     } else if (costume_->fighter_kind == 7) {
         // Sheik's independent 0x74 ftSeakAttributes record is live after the
         // source Zelda/Sheik transformation; retain its exact source extent.

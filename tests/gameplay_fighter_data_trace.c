@@ -5,6 +5,7 @@
 #include <melee/ft/dobjlist.h>
 #include <melee/ft/kinds/ftDonkey/types.h>
 #include <melee/ft/kinds/ftKoopa/types.h>
+#include <melee/ft/kinds/ftYoshi/types.h>
 #include <melee/ft/ftwaitanim.h>
 #include "gameplay_article_data.h"
 #include <melee/it/types.h>
@@ -14,6 +15,19 @@
 #include <stdlib.h>
 #include <string.h>
 #define CHECK(c) do { if(!(c)) { fprintf(stderr,"fighter data check failed: %s\n",#c); abort(); } } while(0)
+void melee_web_test_yoshi_grab_bytes(const MeleeWebNativeDat* r,uint32_t root,void* data) {
+    const ftData* d=data;
+    CHECK(d&&d->ext_attr);
+    const ftYoshiAttributes* attrs=d->ext_attr;
+    const uint32_t at=r->pointer(r->context,root+4,sizeof(*attrs));
+    CHECK(at!=UINT32_MAX);
+    for(unsigned i=0;i<sizeof(attrs->x12C);i++) {
+        const unsigned expected=r->byte(r->context,at+offsetof(ftYoshiAttributes,x12C)+i);
+        printf("Yoshi grab frame byte[%u] source=%u native=%u\n",i,expected,attrs->x12C[i]);
+        CHECK(attrs->x12C[i]==expected);
+    }
+    printf("Native Yoshi twelve grab-frame bytes preserve source order: passed\n");
+}
 void melee_web_test_fighter_data(void* data,int actual) {
     ftData* d=data;
     CHECK(d && d->x0 && d->ext_attr && d->x8 && d->x30 && d->x3C);

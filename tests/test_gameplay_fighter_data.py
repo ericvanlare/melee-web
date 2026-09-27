@@ -65,6 +65,16 @@ class GameplayFighterDataTests(unittest.TestCase):
                                     cwd=directory, env=env, capture_output=True, text=True, timeout=120)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             asset = ROOT / "assets-local/next-gate/PlMr.dat"
+            yoshi_asset = ROOT / "assets-local/next-gate/PlYs.dat"
+            yoshi_container = ROOT / "assets-local/next-gate/PlYsAJ.dat"
+            if yoshi_asset.is_file() and yoshi_container.is_file():
+                result = subprocess.run([str(node), str(output), "--yoshi-grab-bytes",
+                                         str(yoshi_asset), str(yoshi_container)],
+                                        cwd=directory, env=env, capture_output=True,
+                                        text=True, timeout=30)
+                print(result.stdout, end="")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("Native Yoshi twelve grab-frame bytes preserve source order: passed", result.stdout)
             container = ROOT / "assets-local/next-gate/PlMrAJ.dat"
             args = [str(asset),str(container)] if asset.is_file() and container.is_file() else []
             roy_asset = ROOT / "assets-local/next-gate/PlFe.dat"
