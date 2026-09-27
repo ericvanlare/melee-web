@@ -38,11 +38,12 @@ async function observe(name) {
       scroll: [document.documentElement.scrollWidth, document.documentElement.scrollHeight],
       fullscreen: document.fullscreenElement?.id || null,
       phase: Module._melee_web_native_menu_phase(), running: Module._melee_web_native_menu_running(),
+      message: Module.UTF8ToString(Module._melee_web_native_menu_message()),
       error: document.querySelector('#error-dialog[open]')?.textContent || null};
   });
   // Screenshot readback observes the presented frame. WebGPU discards its
   // current texture after presentation, so drawImage(canvas) can read black.
-  const screenshot = await page.screenshot({path: path.join(values.out, name + '.png')});
+  const screenshot = await page.screenshot({path: path.join(values.out, name + '.png'), scale: 'css'});
   observed.pixels = await page.evaluate(async ({encoded, rect, viewportWidth}) => {
     const bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0));
     const bitmap = await createImageBitmap(new Blob([bytes], {type: 'image/png'}));
@@ -64,6 +65,7 @@ async function observe(name) {
   report.observations.push({name, ...observed});
   assert.equal(observed.error, null, 'No player error');
   assert.equal(observed.phase, 1, 'Original character select must remain loaded');
+  assert.equal(observed.running, 1, observed.message);
   assert(observed.pixels.lit > 500 && observed.pixels.colors > 100, 'Real game pixels must survive resize');
   assert.deepEqual(report.errors, [], 'No browser or WebGPU validation errors');
   // Retain every size on a failing baseline, then fail the run below.
