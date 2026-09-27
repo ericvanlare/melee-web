@@ -49,6 +49,17 @@ retain input sampling, RNG, initialization, and scene teardown ownership; no
 synthetic menu state replaces them. This route capture does not compare RNG
 values across retail and browser runs.
 
+The default profile keeps the source's full unlockable-character table open:
+`gm_80164F18()` derives the `0x07ff` mask from its 11 authored rows. It then
+runs `gm_8017297C()` and `gm_801741FC()`, the paired source debug-unlock helpers
+for the 0x42 unlock-notification entries and 0x12c reward-ledger entries. That
+gives Title's original save checks a settled unlock/award state; the source
+Title callback still decides whether it enters GM_MENU or requests Challenger
+Approach. The current browser stage mask remains `0x01c0`, limited to the
+supported stage set. This uses the source-owned initialization approach in
+PR #102 while keeping #96 independent of its broader Settings/save-profile
+feature.
+
 The final public Release checks use headless installed Chrome through
 `scripts/browser_tools.mjs` and `scripts/browser_driver.mjs`. The silent player
 and the separate production `audio-player` package were built and audited. The
@@ -63,10 +74,16 @@ CSS re-entry, and closed each live audio context during Eject. This is
 functional lifecycle and PCM-transport evidence, not PCM equivalence, audible
 quality, foreground timing, input latency or performance evidence.
 
-The native teardown regression covers Eject from Title and Main, then verifies
-that an unsupported all-unlocked Challenger Approach route remains an explicit
-error with a usable Eject/CSS recovery path. That does not enable Challenger
-Approach or claim full title/demo coverage.
+The native regression checks that the default mask is `0x07ff`, every source
+unlock-table character remains available to CSS, and the roster remains intact
+after Eject/reimport. It exercises Title Start from P1 and from P2 while P1 is
+neutral; a P2 Start held through the source guard is consumed as an ordinary
+input edge and requires release/repress. A separate source lock/reset/unlock
+sequence creates an authentic pending character notification, so the original
+Title routine requests unsupported Challenger Approach and the host reports
+that destination explicitly. Eject then recovers to CSS. A Title timeout is
+also checked to retain a zero payload and no fabricated destination. These
+checks do not enable Challenger Approach or claim full title/demo coverage.
 
 ## Retained local evidence
 
@@ -84,6 +101,8 @@ under ignored `work/` and are not committed:
 | `work/pr96-title-main/final/audio-player.manifest.json`, `audio-http.json` | Source-bound production audio package identity and local Pages HTTP inventory/header verification |
 | `work/pr96-title-main/final/silent-player.manifest.json` | Source-bound silent rollback package identity and production-package audit; audio route evidence uses the separate audio-enabled package |
 | `work/pr96-title-main/final/logs/native-title-main-focused.log`, `title-main-abort-trace.jsonl` | Focused Title/Main abort regression and retained native trace, including unsupported-route recovery |
+| `work/pr96-title-main/review-round2/logs/native-title-menu-roster-focused.log` | Updated focused regression for the full roster, CSS availability/re-entry, P1/P2 source Start edges, genuine unsupported Challenger request, timeout payload, and Title/Main Eject recovery; failed iterations are retained beside it |
+| `work/pr96-title-main/review-round2/public-audio-browser/report.json` | Production audio-enabled browser evidence rebuilt against this review head, including CSS-first startup, repeated menu cycles, Eject/reimport, routed match/Results, Web Audio, PCM, and errors |
 | `work/pr96-title-main/final/logs/full-tests.log` | Required full unittest discovery with owned DOL/disc/source/symbol inputs configured |
 | `work/pr96-title-main/final/logs/audio-build.log`, `public-build.log`, `public-audit.log` | Final-head audio and silent Release builds and silent package audit |
 | `work/pr96-title-main/public-audio-browser-reconciled-head-04/report.json` | Earlier diagnostic run on the same reconciled runtime before final package identity; superseded by the final-head report above |
@@ -103,9 +122,9 @@ capture, or generated public bundle enters Git.
 
 | Label | Supported claim | Not established here |
 | --- | --- | --- |
-| **Source identified** | Pinned title/Main source callbacks, mode routing, and authored resource owners | Full-game menu coverage |
+| **Source identified** | Pinned title/Main callbacks, mode routing, the 11-row `0x07ff` unlock mask, and authored notification/reward-ledger owners | Full-game menu coverage |
 | **Retail compared** | Cold-boot route order, ordinary inputs, observed source menu states, and labeled screenshots on the owned disc | Pixel/PCM equivalence, physical-controller acceptance, foreground timing, or performance |
-| **Browser exercised** | Audio-enabled public CSS-first startup; two original menu cycles; Main/Title Eject and CSS-first reimport; routed SSS, supported match, Results return; connected 32 kHz nonzero PCM transport and audio-context teardown | Retail/browser pixel or PCM comparison, audible quality, foreground input latency/timing, physical-controller acceptance, performance, or tournament acceptance |
+| **Browser exercised** | Audio-enabled public CSS-first startup with the full source roster; two original menu cycles; Main/Title Eject and CSS-first reimport; routed SSS, supported match, Results return; connected 32 kHz nonzero PCM transport and audio-context teardown | Retail/browser pixel or PCM comparison, audible quality, foreground input latency/timing, physical-controller acceptance, performance, or tournament acceptance |
 | **Compiled** | Reconciled silent and audio-enabled public Release targets and audited package graphs | Deployment or merge |
 
 The separate allocation-history GDB/Python route remains available for scopes

@@ -91,7 +91,7 @@ struct MeleeWebMenuHost {
     GameModeState vs_sss_state;
     MenuEnterData main_enter;
     MenuExitData main_exit;
-    int title_exit_buttons;
+    int title_exit_payload;
     int source_scene;
     int source_target_mode;
     int vs_mode_owned;
@@ -270,8 +270,7 @@ static int source_scene_exit(void* data, MeleeWebMenuScene scene,
     return ok(e, n);
 }
 
-static int source_scene_tick(MeleeWebMenuHost* h, uint16_t buttons,
-                             char* e, size_t n)
+static int source_scene_tick(MeleeWebMenuHost* h, char* e, size_t n)
 {
     int request = 0;
 
@@ -287,12 +286,6 @@ static int source_scene_tick(MeleeWebMenuHost* h, uint16_t buttons,
     }
     if (!melee_web_menu_clock_request(&request)) {
         return fail(e, n, "Invalid original title/main transition state");
-    }
-    if (request != 0 && h->source_scene == MELEE_WEB_HOST_SCENE_TITLE) {
-        /* Title's real mode OnExit consumes its button payload.  Retain the
-         * controller sample that caused this source transition; do not
-         * synthesize Start later when the browser rebuild is ready. */
-        h->title_exit_buttons = buttons;
     }
     h->transition = request;
     return request == 0 ? MELEE_WEB_MENU_RESULT_TICKED
@@ -313,13 +306,13 @@ MeleeWebMenuHost* melee_web_menu_host_create(char* e,size_t n){
         if(!melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
         free(h);return NULL;
     }
-    /* Keep the browser's fresh source profile at the original prepared-save
-     * roster baseline. 0x07ff makes all 11 unlockable characters appear open
-     * while this newly initialized SaveData has none of their source claim
-     * flags; the original Title callback then correctly schedules a
-     * Challenger Approach instead of returning to GM_MENU. */
+    /* Keep the original all-unlocked character roster. Source-owned unlock
+     * and notification routines establish the same completed notification
+     * state expected by the Title callback. The stage mask stays limited to
+     * the four authored stages supported by this browser route. */
     if(!melee_web_save_profile_owner_initialize_default(h->profile,e,n)||
-       !melee_web_save_profile_owner_set_roster(h->profile,0x0024,0x01c0,e,n)){
+       !melee_web_save_profile_owner_initialize_menu_roster(
+           h->profile,0x01c0,e,n)){
         if(!melee_web_save_profile_owner_deactivate(h->profile,NULL,0)||
            !melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
         free(h);return NULL;
@@ -515,14 +508,13 @@ static int host_enter_title_scene(MeleeWebMenuHost* h, char* e, size_t n)
     h->source_state = gm_Mode_Title_States[0];
     h->source_state.info.scene_kind = GS_TITLE;
     h->source_state.info.enter_data = NULL;
-    h->source_state.info.exit_data = &h->title_exit_buttons;
-    h->title_exit_buttons = 0;
+    h->source_state.info.exit_data = &h->title_exit_payload;
+    h->title_exit_payload = 0;
     h->source_target_mode = -1;
     h->source_state.on_enter(&h->source_state);
-    h->source_scene_info.scene_kind = GS_TITLE;
-    h->source_scene_info.enter_data = NULL;
-    h->source_scene_info.exit_data = &h->title_exit_buttons;
-    gm_801A4B88(&h->source_scene_info);
+    /* The GameModeState is persistent in the host, and its embedded
+     * GameSceneInfo owns the exact payload written by gm_Scene_Title_OnFrame. */
+    gm_801A4B88(&h->source_state.info);
     gm_Scene_Title_OnEnter(NULL);
     h->source_scene = MELEE_WEB_HOST_SCENE_TITLE;
     return ok(e, n);
@@ -617,7 +609,7 @@ int melee_web_menu_host_tick(MeleeWebMenuHost* h,const PADStatus raw[4],char* e,
     gm_EvaluateAllControllerInputs();
     if (h->source_scene == MELEE_WEB_HOST_SCENE_TITLE ||
         h->source_scene == MELEE_WEB_HOST_SCENE_MAIN) {
-        return source_scene_tick(h, raw[0].button, e, n);
+        return source_scene_tick(h, e, n);
     }
     return melee_web_menu_tick(h->session,e,n);
 }
@@ -653,12 +645,18 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
         return 0;
     }
     if (h->source_scene == MELEE_WEB_HOST_SCENE_TITLE) {
-        if ((h->title_exit_buttons & HSD_PAD_START) == 0) {
+        int* source_exit_payload = (int*) gm_GetCurrentSceneExitData();
+        if (source_exit_payload != &h->title_exit_payload ||
+            h->source_state.info.exit_data != source_exit_payload) {
+            melee_web_pad_state_free(next_input);
+            return fail(e, n,
+                        "Original title exit payload lost its persistent GameSceneInfo owner");
+        }
+        if ((*source_exit_payload & HSD_PAD_START) == 0) {
             melee_web_pad_state_free(next_input);
             return fail(e, n,
                         "Original title transition did not contain the retail Start route");
         }
-        h->source_state.info.exit_data = &h->title_exit_buttons;
         h->source_state.on_exit(&h->source_state);
         const int requested_mode = melee_web_vs_mode_pending_mode();
         if (requested_mode != GM_MENU) {
@@ -666,7 +664,7 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
             if (e && n)
                 snprintf(e, n,
                          "Original title requested unsupported destination %d from buttons 0x%x",
-                         requested_mode, h->title_exit_buttons);
+                         requested_mode, *source_exit_payload);
             return 0;
         }
         h->source_target_mode = requested_mode;
@@ -1013,7 +1011,8 @@ int melee_web_menu_host_destroy(MeleeWebMenuHost* h,char* e,size_t n){
        h->transition||h->audio||seed_ptr!=&h->seed)
         return fail(e,n,"Close native menu scene and restore RNG before destroying host");
     const int owns_scene_info =
-        melee_web_current_scene_info() == &h->source_scene_info;
+        melee_web_current_scene_info() == &h->source_scene_info ||
+        melee_web_current_scene_info() == &h->source_state.info;
     if (h->aborted_source_scene && !owns_scene_info) {
         return fail(e, n,
                     "Aborted source scene lost its checked GameSceneInfo ownership");

@@ -13,6 +13,8 @@
 #include <melee/ft/forward.h>
 #include <melee/gm/forward.h>
 extern "C" {
+#include <melee/gm/gm_1601.h>
+#include <melee/gm/gm_16F1.h>
 #include <melee/gm/gm_16AE.h>
 #include <melee/gm/gmresultplayer.h>
 #include <melee/gm/gmmain_lib.h>
@@ -202,6 +204,19 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
     float pcm[1068]{};
     const void* saved_scene_info = melee_web_current_scene_info();
 
+    auto check_full_roster = [] {
+        const uint16_t expected =
+            static_cast<uint16_t>((1U << NUM_UNLOCKABLE_CHARACTERS) - 1U);
+        check(expected == 0x07ff,
+              "Pinned source unlock table no longer declares the existing 0x07ff roster");
+        check(*gmMainLib_GetUnlockedCharactersBitmaskPtr() == expected,
+              "Original fresh menu profile did not retain the all-unlocked character mask");
+        for (int index = 0; index < NUM_UNLOCKABLE_CHARACTERS; ++index) {
+            check(gm_IsCKindUnlocked(gm_GetCKindByUnlockIndex(index)),
+                  "A source-unlocked character is unavailable to original CSS");
+        }
+    };
+
     auto tick = [&](MeleeWebMenuHost* host,
                     melee_web::GameplayMenuWorld& world, PADStatus raw[4],
                     unsigned& audio_phase) {
@@ -252,6 +267,7 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
                                         sizeof(error)), error);
         check(melee_web_menu_host_source_scene(css_host) == 1,
               "A new source session did not enter original CSS after Eject");
+        check_full_roster();
         PADStatus neutral[4]{};
         neutral[2].err = neutral[3].err = -1;
         for (unsigned frame = 0; frame < 4; ++frame) {
@@ -282,8 +298,7 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
         PADStatus raw[4]{};
         unsigned audio_phase = 0;
         start_title(host, world, raw, audio_phase);
-        check(*gmMainLib_GetUnlockedCharactersBitmaskPtr() == 0x0024,
-              "Fresh source profile did not use the observed starting roster");
+        check_full_roster();
         raw[0].button = PAD_BUTTON_START;
         int result = 1;
         for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
@@ -325,27 +340,92 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
     }
 
     {
+        MeleeWebMenuHost* host = melee_web_menu_host_create(error, sizeof(error));
+        check(host != nullptr, error);
+        std::unique_ptr<melee_web::GameplayMenuWorld> world =
+            std::make_unique<melee_web::GameplayMenuWorld>(
+                files, melee_web::GameplayMenuScene::Title);
+        PADStatus raw[4]{};
+        raw[2].err = raw[3].err = -1;
+        unsigned audio_phase = 0;
+        check(melee_web_menu_host_enter_title(host, world->audio(), error,
+                                              sizeof(error)), error);
+        check_full_roster();
+
+        /* A held Start edge during the source guard is consumed there. It
+         * cannot be replayed as a synthetic Start after the guard expires. */
+        raw[1].button = PAD_BUTTON_START;
+        for (unsigned frame = 0; frame < 120; ++frame)
+            check(tick(host, *world, raw, audio_phase) == 1,
+                  "Held P2 Start bypassed the original Title input guard");
+        raw[1].button = 0;
+        check(tick(host, *world, raw, audio_phase) == 1,
+              "Title left while Player 2 released Start");
+        raw[1].button = PAD_BUTTON_START;
+        check(raw[0].button == 0,
+              "Player 1 must stay neutral in the Player 2 Title route test");
+        check(tick(host, *world, raw, audio_phase) == 3,
+              "Original Title did not accept a fresh Start edge from Player 2");
+        check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        check(melee_web_menu_host_route_target_mode(host) == GM_MENU,
+              "Player 2 Title Start did not preserve the source GM_MENU destination");
+        raw[1].button = 0;
+        world->close();
+        world = std::make_unique<melee_web::GameplayMenuWorld>(
+            files, melee_web::GameplayMenuScene::Main);
+        check(melee_web_menu_host_enter_main(host, world->audio(), error,
+                                             sizeof(error)), error);
+        abort_and_destroy(host, world, audio_phase, "Player 2 Title route");
+    }
+
+    {
         MeleeWebMenuHost* host = nullptr;
         std::unique_ptr<melee_web::GameplayMenuWorld> world;
         PADStatus raw[4]{};
         unsigned audio_phase = 0;
         start_title(host, world, raw, audio_phase);
-        /* This controlled negative case uses the all-unlocked roster without
-         * the corresponding source claim flags, which legitimately schedules
-         * GM_CHALLENGER_APPROACH.  Keep the unsupported route explicit and
-         * verify that Eject can still restore a clean CSS owner. */
-        *gmMainLib_GetUnlockedCharactersBitmaskPtr() = 0x07ff;
-        raw[0].button = PAD_BUTTON_START;
+        /* Recreate an unclaimed character unlock through source state
+         * synchronization and award routines. The resulting notification is
+         * genuinely pending and Title therefore requests Challenger Approach. */
+        const u8 ckind = gm_GetCKindByUnlockIndex(0);
+        gm_80164A0C(ckind);
+        gm_801729EC();
+        gm_UnlockCKind(static_cast<CharacterKind>(ckind));
+        check(gm_801721EC(),
+              "Original character unlock routine did not create pending source work");
+        check_full_roster();
+        raw[1].button = PAD_BUTTON_START;
         int result = 1;
         for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
             result = tick(host, *world, raw, audio_phase);
-        raw[0].button = 0;
+        raw[1].button = 0;
         check(result == 3, "Original Title did not expose its Start route");
         check(!melee_web_menu_host_leave(host, 0, error, sizeof(error)) &&
                   std::string(error).find("unsupported destination 20") != std::string::npos,
               "An unsupported Title destination was not rejected explicitly");
+        check(std::string(error).find("buttons 0x") != std::string::npos,
+              "Unsupported Challenger route did not retain the source-written Title payload");
         abort_and_destroy(host, world, audio_phase,
                           "unsupported Title route recovery");
+    }
+
+    {
+        MeleeWebMenuHost* host = nullptr;
+        std::unique_ptr<melee_web::GameplayMenuWorld> world;
+        PADStatus raw[4]{};
+        unsigned audio_phase = 0;
+        start_title(host, world, raw, audio_phase);
+        int result = 1;
+        for (unsigned frame = 0; frame < 700 && result != 3; ++frame)
+            result = tick(host, *world, raw, audio_phase);
+        check(result == 3, "Original Title timeout did not request its source exit");
+        check(!melee_web_menu_host_leave(host, 0, error, sizeof(error)) &&
+                  std::string(error).find("did not contain the retail Start route") !=
+                      std::string::npos,
+              "Title timeout fabricated a Start payload or was accepted as Title Start");
+        check(melee_web_menu_host_route_target_mode(host) == -1,
+              "Title timeout fabricated a supported destination");
+        abort_and_destroy(host, world, audio_phase, "Title timeout");
     }
 
     {
@@ -369,6 +449,7 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
                   "Original Main left before Eject");
         abort_and_destroy(host, world, audio_phase, "Main");
     }
+    std::cout << "Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger and timeout recovery passed\n";
 }
 }
 int main(int argc,char** argv){try{
