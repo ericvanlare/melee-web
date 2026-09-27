@@ -32,6 +32,53 @@ remains independently bound to the preserved capture/recipe identities.
 
 ### Reconciled baseline (in progress)
 
+Latest validation checkpoint: `d5695c9` includes the existing shared-runtime
+owner's committed motion-flag, camera/inverse, reciprocal-square-root and
+combo-push arithmetic fixes (`1ca4430`, `4fd8f9d`, `4f70b84`, `d5695c9`). It
+passes 13 focused source/profile checks with the owned DOL, source-context and
+collision traces, 23 ownership tests, and both real-asset Results cases
+(`work/pr86-shared-math-*-r1.log`). After the startup/costume repairs below,
+the fresh A comparison agrees exactly for 7,144 ticks (0–7143), including the
+formerly failing tick 5606 (`work/pr86-candidate-a-state-compare-r1.json`).
+This establishes that the imported arithmetic fixes clear that observed
+boundary; the remaining session, port draw records and CPU blocks are still
+uncompared. The prefix remains incomplete, with per-tick recorded PAD and
+source CPU decisions recomputed.
+
+The rendered A run on this checkpoint completes natural matches at 11,273 and
+14,587 source frames, renders Results for 182/180 frames, and returns to CSS
+after each (`work/pr86-shared-math-a-two-match-r1/report.json`). Page and native
+command errors are empty; no timing interruptions occurred in this run. The
+report retains served hashes and dirty test-source provenance. This supersedes
+the A carry failures below for that runtime, but is not original comparison or
+performance evidence. Fresh final-candidate A/B runs and the full suite remain
+pending after the additional startup/costume fixes.
+
+Expanded all-costume validation found two preparation defects missed by the
+neutral-costume action cases. `245c4d4` restores the input snapshot before the
+original startup player-selection routine, preserving the new deferred stage
+ordering. Both held-A form directions now pass all five costumes. The reduced
+ordering and ownership tests retain one-shot, world, RNG, camera, queue and
+pre-Fighter guards. Separately, the Kirby copy adapter selected a body-costume
+row for a joint-backed hat whose original loader always selects row zero:
+Fox costume 1 followed unrelated data from `PlKbCpFx.dat` slot `0x240`, then
+rejected unrelocated word `0x20080008` at `0xc06c` (data-relative offsets).
+The source-family repair also follows the original per-category visibility and
+texture-index fallback for parts-only hats. Its four reduced tests fail before
+and pass after, including malformed consumed-pointer rejection and six real
+donor archives (`work/pr86-kirby-copy-tests-{before,after}.log`). On `02b63aa`,
+all seven forms pass all-costume entry and teardown in both orientations.
+Fox's actual copied-move acquisition/use/loss/reacquisition passes all six
+Kirby colors. The equivalent G&W test exposes a remaining color-1 acquisition
+crash in `HSD_DObjSetFlags` through `ftParts_8007487C` and
+`ftKb_SpecialN_800F14B4` (`work/pr86-kirby-gw-colors-failure-r1.log`). This is
+unfinished copied-part work, not waived by the passing construction or neutral
+donor checks. All other focused character gates still pass in
+`work/pr86-costume-copy-character-gates-r1.log`.
+
+The following paragraphs retain the reconciliation chronology; a historical
+failure or passing prefix is not a claim about a later build.
+
 Main including PR #89 is merged at `3b548b1`. The merge preserves deferred
 match fighter construction, live Fighter leases, logical source-stack and
 executed register tracking, common-data loading order, inactive TEV descriptors,
