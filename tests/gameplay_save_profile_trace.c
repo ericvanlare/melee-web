@@ -213,8 +213,8 @@ int main(void)
             gm_80160474(ckind, GM_ALLSTAR),
         };
         for (size_t mode = 0; mode < sizeof(clear_ids) / sizeof(clear_ids[0]); ++mode)
-                check(gmMainLib_8015DA1C(clear_ids[mode]),
-                      "Everything baseline omitted a source-mapped 1P mode clear");
+                check(gmMainLib_8015DA90(clear_ids[mode]) != 0,
+                      "Everything baseline omitted a source-mapped 1P reward from the persisted ledger");
     }
     {
         size_t completed_challenges = 0;
