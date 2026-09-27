@@ -353,6 +353,39 @@ try {
     await screenshot(values['select-after-graphics'] ? 'ready-before-selection' : 'graphics-preparing-before-selection');
   });
 
+  if (!values['select-after-graphics']) {
+    await check('replace an owned early selection before native import', async () => {
+      assert.equal(report.selection_boundary.loadingPanelHidden, false);
+      assert.equal(report.selection_boundary.cacheIdle, 0,
+        'The native filesystem/cache import prerequisite is still closed');
+      await selectDisc(values.disc);
+      const filename = path.basename(values.disc);
+      await page.waitForFunction(filename => {
+        const status = document.querySelector('#disc-selection-status');
+        return status && !status.hidden && status.textContent.includes(filename);
+      }, filename, {timeout: 30000});
+      const selected = await page.evaluate(() => ({
+        label: document.querySelector('#loading-label')?.textContent || '',
+        loadingPanelHidden: document.querySelector('#loading-panel')?.hidden ?? null,
+        phase: Module._melee_web_native_menu_phase(),
+        running: Module._melee_web_native_menu_running(),
+      }));
+      assert.equal(selected.loadingPanelHidden, false);
+      assert.equal(selected.phase, 0);
+      assert.equal(selected.running, 0);
+      await selectDisc({name: 'replacement-before-import.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
+      await page.locator('#error-dialog[open]').waitFor();
+      await page.waitForTimeout(300);
+      assert.match(await page.locator('#disc-selection-status').innerText(), /Invalid disc.*replacement-before-import\.rvz/);
+      assert.equal(await page.evaluate(() => Module._melee_web_native_menu_phase()), 0,
+        'The replaced session never entered native import or launch');
+      assert.equal((await assetTrace()).events.length, 0,
+        'No native asset scope begins for a selection replaced before the import gate');
+      report.replacement_before_import = {selected, current_status: await page.locator('#disc-selection-status').innerText(), native_asset_events: 0};
+      await page.locator('#error-close').click();
+    });
+  }
+
   await check('authorized-disc import and original CSS emits nonzero PCM', async () => {
     await selectDisc(values.disc);
     const filename = path.basename(values.disc);
@@ -441,8 +474,8 @@ try {
     await driver.pressChord(['q', '9', 'm', '7'], {holdMs: 250, releaseMs: 200});
     await phase(8);
     await page.waitForTimeout(4500);
-    const beforeResultsAudio = await trace();
-    await observeAudio('results', beforeResultsAudio);
+    const resultsAudio = await trace();
+    report.audio.results_transition = resultsAudio;
     await screenshot('results');
     // No Contest enters the original Results route. Confirm its panels with
     // ordinary Start press/release edges, matching the bounded public return
