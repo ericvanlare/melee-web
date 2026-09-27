@@ -134,6 +134,36 @@ Sheik-winner native Results confirmation/close control passes
 rendered/mode-exit ownership boundary. Neither a Sheik-specific cause nor PR
 readiness is claimed.
 
+### Reconciled rendered Results page-gate observations (2026-09-27)
+
+On the post-#101 branch at `390f27d`, the headless Chrome 153 functional route
+was rebuilt with development Wasm SHA-256
+`0e288debdc4fb4c3a75d64c0bf0bb7420ff726d8ebbdac6b04b9a9f537310529` and a
+capacity-8192 Results PAD/state trace. These runs are not a reproduction of the
+historical Sheik-winner failure and did not reach its camera guard.
+
+`work/pr86-results-padtick-b-natural-r2/report.json` retained a Samus-winning
+natural B match where the first P1 Start was sent at Results source frames
+182–191 while the original Results phase was still 1; it was ignored. The
+trace shows phase 2 only from source frame 201, so this run does not test the
+statistics transition. The phase-gated `r3` and `r4` runs queue the first
+P1-only ten-tick edge in phase 2 and record disconnected CPU pages 2/3 advancing
+to page 1 in active statistics at source frames 396 and 399 respectively,
+before the planned confirmation boundary at frame 600. The trace preserves
+P1/P2 connected and neutral, ports 2/3 disconnected, every consumed source
+tick and no overflow. `r3` ends with Falco winning; `r4` ends with Samus winning
+and retains Zelda-origin Sheik identity (`ckind=18`, `ftkind=7`).
+
+Neither rendered run consumed the subsequent P1 confirmation: the existing
+raw-PAD guard rejected queueing while the scene was stopped (`running=0`), so
+neither proves a Results→CSS return or reaches the camera-ownership boundary.
+The first atomic resume/queue helper inspected native diagnostics instead of
+the page's `#status` timing-pause banner; its focused regression now checks the
+DOM status before resuming. The native Results fixture separately consumes the
+P1 confirmation at source tick 600 after CPU-page transitions at 551, but its
+default-CSS synthetic standings are not a natural CPU9 Sheik win. The historical
+camera-pool failure remains open.
+
 Native controls for both external identity pairs `{18,7}` and `{19,7}` preserve
 the camera pool through the actual VS mode-exit callback. The smaller rendered
 Results/full-host fixture also passes 384 frames, confirmation, host route

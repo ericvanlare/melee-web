@@ -14,6 +14,7 @@ import {parseArgs} from 'node:util';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
+import {queueResultsP1StartAtCurrentSource} from './results_source_pad_input.mjs';
 
 const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input'].map(name=>[name,{type:'string'}])),
@@ -530,28 +531,56 @@ async function runMatch(matchIndex,expected){
     }
     throw Error(`${label}: Results source frame did not reach ${target}`);
   };
+  const waitForResultsInternalPhase=async(targetFrame,targetPhase,label)=>{
+    const waitDeadline=Date.now()+60000;
+    while(Date.now()<waitDeadline){
+      state=await resumeResultsIfPaused(await diagnostic());
+      if(state.error)throw Error(`${label}: ${state.error}`);
+      if(state.phase===1)return state;
+      assert(state.phase===8||state.phase===9,`${label}: unexpected scene phase ${state.phase}`);
+      if(readResultsFrame(state)>=targetFrame){
+        const trace=await readResultsSourcePadTrace();
+        assert(!trace.overflow,`${label}: Results source trace overflowed`);
+        const sourceState=trace.samples.at(-1)?.results_state_after_tick;
+        if(sourceState?.phase===targetPhase&&sourceState.source_frame>=targetFrame)return state;
+        if(sourceState?.phase>targetPhase)
+          throw Error(`${label}: original Results internal phase advanced past ${targetPhase} before P1 input (phase ${sourceState.phase})`);
+      }
+      await page.waitForTimeout(16);
+    }
+    throw Error(`${label}: Results internal phase ${targetPhase} was not observed by source frame ${targetFrame}`);
+  };
   const queueSourceStart=async(target,label,beforeQueue)=>{
     const ready=await waitForResultsFrame(target,`${label} source-tick gate`);
+    if(ready.phase===1)return {natural_css:true,source_frame:null};
     assert(ready.phase===8||ready.phase===9,
-      `${label}: Results exited before its scheduled P1 source input`);
+      `${label}: unexpected source phase ${ready.phase} before P1 input`);
     const preQueue=beforeQueue?await beforeQueue(ready):null;
-    const queued=await page.evaluate(({button,duration})=>{
-      const diagnostics=Module.UTF8ToString(Module._melee_web_native_menu_diagnostics());
-      const frame=diagnostics.match(/(?:Results|Prize) source frame: (\d+)/);
-      if(!frame)throw Error('Results source frame is unavailable at PAD queue boundary');
-      const result=Module._melee_web_native_menu_pad_sample(0,button,0,0,duration);
-      return {result,source_frame:Number(frame[1])};
-    },{button:buttonStart,duration:10});
-    assert.equal(queued.result,1,`${label}: raw P1 Start PAD queue failed`);
+    let pageTransitionCheck=null;
+    if(preQueue){
+      pageTransitionCheck={...preQueue,status:'passed-before-queue',
+        attempted_confirmation_source_frame:null,confirmation_consumed:false};
+      report.results_page_transition_checks.push(pageTransitionCheck);
+    }
+    const queued=await page.evaluate(queueResultsP1StartAtCurrentSource,
+      {button:buttonStart,duration:10});
+    assert.equal(queued.result,1,
+      `${label}: raw P1 Start PAD queue failed at Results frame ${queued.source_frame}`+
+      ` (running_before_queue=${queued.running_before_queue};`+
+      ` resumed_after_timing_pause=${queued.resumed_after_timing_pause};`+
+      ` status=${queued.status_before_queue}; ${queued.diagnostics})`);
     if(preQueue){
       assert(preQueue.transitions.every(row=>row.source_frame<=queued.source_frame),
         'Disconnected CPU pages must advance no later than the queued P1 confirmation tick');
-      report.results_page_transition_checks.push({...preQueue,
-        confirmation_source_frame:queued.source_frame});
+      pageTransitionCheck.status='pass';
+      pageTransitionCheck.attempted_confirmation_source_frame=queued.source_frame;
+      pageTransitionCheck.confirmation_consumed=true;
     }
     report.controller_inputs.push({device:'development raw PAD at source tick',port:0,
       buttons:buttonStart,duration:10,target_results_source_frame:target,
-      queued_at_results_source_frame:queued.source_frame,label});
+      queued_at_results_source_frame:queued.source_frame,
+      running_before_queue:queued.running_before_queue,
+      resumed_after_timing_pause:queued.resumed_after_timing_pause,label});
     await waitForResultsFrame(queued.source_frame+10,`${label} ten-tick P1 Start hold`);
     return queued.source_frame;
   };
@@ -571,14 +600,22 @@ async function runMatch(matchIndex,expected){
   }
   assert(resultsFrame>=180,`Results ${matchIndex} did not advance through its source fade`);
   result.rendered_results_source_frame=resultsFrame;
-  await writeProgress(`match-${matchIndex}-natural-results`);
-  await screenshot(`match-${matchIndex}-natural-results`);
   if(resultsInputMode==='source-tick'){
-    report.phases.push(`Results ${matchIndex}: P1 Start queued as three ten-source-tick pulses; keyboard path not used`);
+    report.phases.push(`Results ${matchIndex}: P1-only ten-source-tick pulses; keyboard path not used`);
     const starts=[];
-    starts.push(await queueSourceStart(180,`results-${matchIndex}-source-start-1`));
-    starts.push(await queueSourceStart(starts[0]+180,`results-${matchIndex}-source-start-2`));
-    starts.push(await queueSourceStart(starts[1]+240,`results-${matchIndex}-source-start-3`,async ready=>{
+    const firstReady=await waitForResultsInternalPhase(180,2,
+      `results-${matchIndex}-first-P1-start-phase-gate`);
+    const first=firstReady.phase===1?{natural_css:true,source_frame:null}:
+      await queueSourceStart(readResultsFrame(firstReady),`results-${matchIndex}-source-start-1`);
+    if(first.natural_css){
+      result.results_source_input_stop={reason:'natural CSS return before first P1 source sample',
+        source_frame:first.source_frame};
+    }else{
+      starts.push(first);
+      await writeProgress(`match-${matchIndex}-natural-results-after-first-start`);
+      await screenshot(`match-${matchIndex}-natural-results-after-first-start`);
+      const confirmation=await queueSourceStart(600,
+        `results-${matchIndex}-source-confirm-after-auto-page`,async ready=>{
       const trace=await readResultsSourcePadTrace();
       assert(!trace.overflow,'Pre-confirmation Results trace overflowed');
       const transitions=summarizeResultsPadTrace(trace).results_page_transitions;
@@ -587,7 +624,7 @@ async function runMatch(matchIndex,expected){
       assert(Number.isInteger(beforeConfirmFrame)&&beforeConfirmFrame>=readResultsFrame(ready),
         'Results source trace did not reach the pre-confirmation source boundary');
       assert.deepEqual(cpuTransitions.map(row=>row.slot),[2,3],
-        'Disconnected CPU statistics pages must auto-advance before the third P1 Start is queued');
+        'Disconnected CPU statistics pages must auto-advance before P1 confirmation');
       assert(cpuTransitions.every(row=>row.phase===3&&row.stats_phase===2&&
         row.source_frame<beforeConfirmFrame),
         'Disconnected CPU page transitions must be observed in active statistics before P1 confirmation');
@@ -596,10 +633,33 @@ async function runMatch(matchIndex,expected){
       return {match:matchIndex,status:'pass',
         input:'P1-only source-tick Start; historical keyboard path not used',
         source_frame_before_confirmation:beforeConfirmFrame,
-        confirmation_queue_target:starts[1]+240,transitions:cpuTransitions};
-    }));
+        confirmation_queue_target:600,transitions:cpuTransitions};
+      });
+      if(confirmation.natural_css){
+        result.results_source_input_stop={reason:'natural CSS return before the post-auto-page confirmation',
+          source_frame:confirmation.source_frame,
+          auto_page_gate:'not reached; inspect retained PAD trace'};
+      }else{
+        starts.push(confirmation);
+        // Some authored Results routes need another ordinary P1 confirmation.
+        // Stop as soon as original CSS returns; never queue into a later scene.
+        for(let pulse=2;pulse<3&&state.phase!==1;pulse++){
+          const next=await queueSourceStart(starts.at(-1)+240,
+            `results-${matchIndex}-source-start-${pulse+1}`);
+          if(next.natural_css){
+            result.results_source_input_stop={reason:'natural CSS return before optional continuation',
+              source_frame:next.source_frame};
+            break;
+          }
+          starts.push(next);
+        }
+      }
+    }
     result.results_source_start_pulse_frames=starts;
+    result.results_source_confirmation_count=starts.length;
   }else{
+    await writeProgress(`match-${matchIndex}-natural-results`);
+    await screenshot(`match-${matchIndex}-natural-results`);
     for(let pulse=0;pulse<48&&state.phase!==1;pulse++){
       state=await resumeResultsIfPaused(state);
       await driver.pressChord(['Enter'],{holdMs:160,releaseMs:120});
@@ -643,7 +703,7 @@ async function runMatch(matchIndex,expected){
     const expectedRows=result.results_source_start_pulse_frames.flatMap(first=>
       Array.from({length:10},(_,offset)=>first+offset));
     assert.deepEqual(startRows.map(row=>row.source_frame),expectedRows,
-      'Source-tick Results P1 Start samples differ from the three queued ten-tick pulses');
+      'Source-tick Results P1 Start samples differ from the queued ten-tick pulses');
     const p1ActiveRows=sourcePadTrace.samples.filter(row=>row.pads[0].button!==0);
     assert.deepEqual(p1ActiveRows.map(row=>row.source_frame),expectedRows,
       'Source-tick Results input emitted an unexpected P1 button or lost its neutral release edges');
@@ -659,14 +719,29 @@ async function runMatch(matchIndex,expected){
       'Results P1-only source input changed another port or its natural connectedness');
     const cpuPageTransitions=sourcePadTrace.summary.results_page_transitions.filter(
       row=>row.from===0&&row.to===1&&row.slot>=2);
-    assert.deepEqual(cpuPageTransitions.map(row=>row.slot),[2,3],
-      'Disconnected CPU statistics pages did not each auto-advance exactly once');
-    assert(cpuPageTransitions.every(row=>row.phase===3&&row.stats_phase===2&&
-      row.source_frame<result.results_source_start_pulse_frames[2]),
-      'Disconnected CPU pages must auto-advance in the active statistics phase before P1 confirmation');
-    assert.deepEqual(sourcePadTrace.summary.results_page_transitions.map(row=>row.slot),[2,3],
-      'Connected neutral ports or another Results player page changed unexpectedly');
-    report.results_source_pad_verification={status:'pass',start_frames:result.results_source_start_pulse_frames,
+    if(result.results_source_start_pulse_frames.length){
+      const firstStart=result.results_source_start_pulse_frames[0];
+      const preceding=sourcePadTrace.samples.find(row=>row.source_frame===firstStart-1);
+      assert(preceding&&preceding.results_state_after_tick?.phase===2,
+        'The first P1 Start edge must be consumed from original Results phase 2, not ignored during its fade');
+    }
+    if(report.results_page_transition_checks.some(row=>row.match===matchIndex&&row.status==='pass')){
+      assert.deepEqual(cpuPageTransitions.map(row=>row.slot),[2,3],
+        'Disconnected CPU statistics pages did not each auto-advance exactly once');
+      const confirmationFrame=result.results_page_transition_checks.find(
+        row=>row.match===matchIndex&&row.status==='pass').confirmation_source_frame;
+      assert(cpuPageTransitions.every(row=>row.phase===3&&row.stats_phase===2&&
+        row.source_frame<confirmationFrame),
+        'Disconnected CPU pages must auto-advance in the active statistics phase before P1 confirmation');
+    }
+    if(report.results_page_transition_checks.some(row=>row.match===matchIndex&&row.status==='pass'))
+      assert.deepEqual(sourcePadTrace.summary.results_page_transitions.map(row=>row.slot),[2,3],
+        'Connected neutral ports or another Results player page changed unexpectedly');
+    const autoPageStatus=report.results_page_transition_checks.some(
+      row=>row.match===matchIndex&&row.status==='pass')?'pass':
+      result.results_source_input_stop?.auto_page_gate||'not reached before natural CSS';
+    report.results_source_pad_verification={status:'pass',auto_page_gate:autoPageStatus,
+      start_frames:result.results_source_start_pulse_frames,
       held_ticks:startRows.length,ports:{p1:'connected, P1 Start only',p2:'connected, neutral',
         p3:'disconnected CPU PAD',p4:'disconnected CPU PAD'},
       disconnected_cpu_page_transitions:cpuPageTransitions,tick_returned:true};

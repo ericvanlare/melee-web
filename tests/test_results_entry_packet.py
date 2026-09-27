@@ -111,6 +111,16 @@ class ResultsEntryPacketTests(unittest.TestCase):
         harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
         self.assertIn('results_page_transitions', harness)
         self.assertIn('before P1 confirmation', harness)
+        self.assertIn('waitForResultsInternalPhase(180,2', harness)
+        self.assertIn('source-confirm-after-auto-page', harness)
+        self.assertIn('first P1 Start edge must be consumed from original Results phase 2', harness)
+        input_helper = (ROOT / 'tests/results_source_pad_input.mjs').read_text(encoding='utf-8')
+        self.assertLess(input_helper.index('Module._melee_web_native_menu_running()'),
+                        input_helper.index("status.startsWith('Paused after a timing disruption')"))
+        self.assertLess(input_helper.index("status.startsWith('Paused after a timing disruption')"),
+                        input_helper.index('Module._melee_web_native_menu_pause(0)'))
+        self.assertLess(input_helper.index('Module._melee_web_native_menu_pause(0)'),
+                        input_helper.index('Module._melee_web_native_menu_pad_sample'))
 
 
 if __name__ == '__main__':

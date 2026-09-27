@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {bindResultsEntryPacket,readResultsEntryPacket} from './results_entry_packet.mjs';
+import {queueResultsP1StartAtCurrentSource} from './results_source_pad_input.mjs';
 
 const packet={schema:'melee-web-results-entry-v1',abi:{target:'wasm32',byte_order:'little-endian',pointer_bytes:4},
   match_index:1,entry_seed:0xfedcba98,
@@ -26,4 +27,74 @@ Module._melee_web_native_menu_results_entry_packet=()=>{calls++;return JSON.stri
 assert.deepEqual((await readResultsEntryPacket(page)).packet,packet);
 assert.equal(calls,2);
 delete globalThis.Module;
-console.log('Results entry observer retains typed packets with served JS/Wasm identity; no mutation endpoints');
+
+const pauseEvents=[];
+const diagnostics=[
+  'Original Results · Results source frame: 600',
+  'Original Results · Results source frame: 600',
+];
+globalThis.document={querySelector:selector=>selector==='#status'?
+  {textContent:'Paused after a timing disruption. Resume to continue.'}:null};
+globalThis.Module={
+  UTF8ToString:text=>text,
+  _melee_web_native_menu_running:()=>{pauseEvents.push('running');return 0;},
+  _melee_web_native_menu_diagnostics:()=>{
+    pauseEvents.push('diagnostics');
+    return diagnostics.shift()||'Original Results · Results source frame: 600';
+  },
+  _melee_web_native_menu_pause:value=>pauseEvents.push(`pause:${value}`),
+  _melee_web_native_menu_pad_sample:(port,button,_x,_y,duration)=>{
+    pauseEvents.push(`pad:${port}:${button}:${duration}`);
+    return 1;
+  },
+};
+const afterTimingPause=queueResultsP1StartAtCurrentSource({button:4096,duration:10});
+assert.deepEqual(afterTimingPause,{result:1,source_frame:600,resumed_after_timing_pause:true,
+  running_before_queue:false,
+  status_before_queue:'Paused after a timing disruption. Resume to continue.',
+  diagnostics:'Original Results · Results source frame: 600'});
+assert.deepEqual(pauseEvents,['running','diagnostics','pause:0','diagnostics','pad:0:4096:10','diagnostics']);
+
+const normalEvents=[];
+globalThis.document={querySelector:selector=>selector==='#status'?
+  {textContent:'Original Results'}:null};
+globalThis.Module={
+  UTF8ToString:text=>text,
+  _melee_web_native_menu_running:()=>{normalEvents.push('running');return 1;},
+  _melee_web_native_menu_diagnostics:()=>{
+    normalEvents.push('diagnostics');
+    return 'Original Results · Results source frame: 601';
+  },
+  _melee_web_native_menu_pause:value=>normalEvents.push(`pause:${value}`),
+  _melee_web_native_menu_pad_sample:(port,button,_x,_y,duration)=>{
+    normalEvents.push(`pad:${port}:${button}:${duration}`);
+    return 1;
+  },
+};
+const withoutPause=queueResultsP1StartAtCurrentSource({button:4096,duration:10});
+assert.equal(withoutPause.resumed_after_timing_pause,false);
+assert.deepEqual(normalEvents,['running','diagnostics','pad:0:4096:10','diagnostics']);
+
+const unsupportedPauseEvents=[];
+globalThis.document={querySelector:selector=>selector==='#status'?
+  {textContent:'Paused.'}:null};
+globalThis.Module={
+  UTF8ToString:text=>text,
+  _melee_web_native_menu_running:()=>{unsupportedPauseEvents.push('running');return 0;},
+  _melee_web_native_menu_diagnostics:()=>{
+    unsupportedPauseEvents.push('diagnostics');
+    return 'Original Results · Results source frame: 602';
+  },
+  _melee_web_native_menu_pause:value=>unsupportedPauseEvents.push(`pause:${value}`),
+  _melee_web_native_menu_pad_sample:()=>{
+    unsupportedPauseEvents.push('pad');
+    return 0;
+  },
+};
+const unsupportedPause=queueResultsP1StartAtCurrentSource({button:4096,duration:10});
+assert.equal(unsupportedPause.result,0);
+assert.equal(unsupportedPause.resumed_after_timing_pause,false);
+assert.deepEqual(unsupportedPauseEvents,['running','diagnostics','pad','diagnostics']);
+delete globalThis.Module;
+delete globalThis.document;
+console.log('Results entry binding and atomic source-tick PAD resume/queue boundary pass');
