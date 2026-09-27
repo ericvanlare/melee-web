@@ -9,6 +9,16 @@ const finite = n => typeof n === 'number' && Number.isFinite(n);
 const empty = () => ({buttons: 0, stick: [0, 0], cstick: [0, 0], triggers: [0, 0]});
 const button = index => ({kind: 'button', index});
 const axis = (index, end = 1, rest = 0) => ({kind: 'axis', index, rest, end});
+const TOUCH_PROFILE = Object.freeze({version: 1, name: 'WebMelee touch controller', gamecube: true,
+  buttons: {A: button(0), B: button(1), X: button(2), Y: button(3), L: button(4), Z: button(5),
+    R: button(8), Start: button(9), Up: button(12), Down: button(13), Left: button(14), Right: button(15)},
+  axes: {stickX: axis(0), stickY: axis(1, -1), cstickX: axis(2), cstickY: axis(3, -1),
+    triggerL: button(6), triggerR: button(7)}});
+
+function emptyTouchGamepad() {
+  return {buttons: Array.from({length: 16}, () => ({pressed: false, value: 0})),
+    axes: [0, 0, 0, 0]};
+}
 export const STANDARD_PROFILE = Object.freeze({version: 1, name: 'Browser standard', gamecube: false,
   buttons: {A: button(0), B: button(1), X: button(2), Y: button(3), Z: button(5), Start: button(9),
     L: null, R: null, Up: button(12), Down: button(13), Left: button(14), Right: button(15)},
@@ -150,6 +160,7 @@ export function createControllerManager({getGamepads = () => navigator.getGamepa
   const browser = /Firefox\//.test(userAgent) ? 'Firefox' : /(?:Chrome|Chromium|Edg)\//.test(userAgent) ? 'Chromium' : 'Other';
   const records = new Map(), profiles = new Map();
   const portSources = ['auto', 'auto', 'auto', 'auto'];
+  let touchGamepad = emptyTouchGamepad();
   const acceptsController = port => port >= 0 && ['auto', 'controller'].includes(portSources[port]);
   function routeAutomaticControllers() {
     const occupied = new Set([...records.values()].filter(r => r.manualPort).map(r => r.port));
@@ -273,14 +284,26 @@ export function createControllerManager({getGamepads = () => navigator.getGamepa
       record.port = port; record.neutralRequired = true; record.manualPort = true;
     },
     setPortSource(port, mode) {
-      if (!Number.isInteger(port) || port < 0 || port > 3 || !['auto', 'keyboard', 'controller', 'off'].includes(mode))
-        throw Error('Choose Auto, Keyboard, Controller or Off for a player.');
+      if (!Number.isInteger(port) || port < 0 || port > 3 || !['auto', 'keyboard', 'controller', 'off', 'touch'].includes(mode) ||
+          (mode === 'touch' && port !== 0))
+        throw Error('Choose a supported input source for this player. Touch controls are available for Player 1.');
       if (portSources[port] === mode) return;
       portSources[port] = mode;
+      if (port !== 0 || mode !== 'touch') touchGamepad = emptyTouchGamepad();
       for (const record of records.values()) record.neutralRequired = true;
       routeAutomaticControllers();
     },
     getPortSource(port) { return portSources[port]; },
+    setTouchGamepad(raw) {
+      if (portSources[0] !== 'touch' || raw == null) {
+        touchGamepad = emptyTouchGamepad();
+        return;
+      }
+      touchGamepad = {buttons: Array.from({length: 16}, (_, i) => {
+        const source = raw.buttons?.[i], value = finite(source?.value) ? clamp(source.value, 0, 1) : Number(!!source?.pressed);
+        return {pressed: !!source?.pressed || value > 0.5, value};
+      }), axes: Array.from({length: 4}, (_, i) => finite(raw.axes?.[i]) ? clamp(raw.axes[i], -1, 1) : 0)};
+    },
     setTesting(value) { testing = !!value; for (const record of records.values()) record.neutralRequired = true; },
     // Narrow synchronous ABI, called once at the existing source PAD boundary.
     // Eight int32 values per port: connected, buttons, LX, LY, CX, CY, LT, RT.
@@ -290,6 +313,13 @@ export function createControllerManager({getGamepads = () => navigator.getGamepa
         if (!row.enabled) continue;
         const p = row.output, base = (pointer >> 2) + row.port * 8;
         heap.set([1, p.buttons, ...p.stick, ...p.cstick, ...p.triggers], base);
+      }
+      // Touch input is a virtual GameCube pad at the same original PAD
+      // sampling boundary as browser Gamepads. L/R overlay presses provide
+      // both the digital shoulder bit and full 0..255 analog pressure.
+      if (portSources[0] === 'touch' && !testing) {
+        const pad = normalizeController(touchGamepad, TOUCH_PROFILE);
+        heap.set([1, pad.buttons, ...pad.stick, ...pad.cstick, ...pad.triggers], pointer >> 2);
       }
     },
     get error() { return inputError; },

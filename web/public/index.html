@@ -17,12 +17,12 @@
       <button id="start-game" type="button" disabled>Play</button>
       <button id="pause-game" type="button" disabled>Pause</button>
       <button id="controls-open" type="button" disabled>Controls</button>
-      <button id="fullscreen" type="button" hidden>Fullscreen</button>
+      <button id="fullscreen" type="button" aria-describedby="fullscreen-status" hidden>Fullscreen</button>
       <button id="end-session" type="button" disabled>Eject</button>
       <span id="status">WIP. Gameplay is not available yet.</span>
+      <span id="fullscreen-status" role="status" aria-live="polite"></span>
       <a href="/notices">About / legal</a>
     </div>
-    <p id="fullscreen-status" role="status"></p>
   </main>
 </body>
 </html>

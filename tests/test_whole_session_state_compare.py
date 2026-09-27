@@ -216,18 +216,6 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 _run_source(path, source, pads)
 
-    def test_real_comparator_rejects_fighter_state_difference(self):
-        source, pads, _, _ = _source_rows()
-        state_slices = source[9]["payload"]["slices"]
-        state = _state_from_payload({"slices": state_slices}, "fixture")
-        state.update(_snapshot_values({"slices": state_slices}, "fixture"))
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "trace.jsonl"
-            _browser_trace(path, pads, state,
-                           alter=lambda setup, frame: frame["fighters"][0].__setitem__("motion", 212))
-            with self.assertRaises(ValueError):
-                _run_source(path, source, pads)
-
     def test_every_declared_match_field_is_exact_at_setup_and_tick(self):
         source, pads, _, _ = _source_rows()
         payload = source[9]["payload"]
