@@ -105,8 +105,13 @@ operand case and 249 additional synthetic cases fail; afterward the reduced
 case, all 1,024 synthetic cases, and both owned-DOL instruction profiles pass
 (`work/pr86-shield-sdi-{before-r1,after-r2}.log`). An intermediate patch-format
 preparation error is retained in `after-r1`, not called a runtime result.
-Fresh causal browser validation is pending. The separate functional Results
-failure below remains open.
+Frozen `4fe075e` causal browser validation now agrees exactly through all 8,411
+observed second-match rows (ticks 0–8410), clearing the former tick-8353
+difference (`work/pr86-shield-sdi-b-boundary-state-r3.json`). The rendered run
+advances to source input 22,566, retains its gameplay screenshot and unloads
+cleanly without a page/native error. This is an incomplete declared-field
+prefix, not whole-session equivalence. The separate functional Results failure
+below remains open.
 
 An additional B functional run reaches natural Results after 11,725 gameplay
 frames with Sheik winning, then fails the camera-pool ownership guard at
@@ -163,8 +168,17 @@ had 15,510 frames after concurrent build/render load
 (`work/pr86-shield-sdi-b-boundary-r2/report.json`). That is a retained runtime
 failure, not a state-comparison pass or evidence attributing it to the new math.
 An earlier `r1` invocation rejected a misspelled CLI option before launching.
-The next causal attempt runs without concurrent builds or other browser cases;
-simulation timing, input recipe and queue bounds remain unchanged.
+The next causal attempt, without concurrent builds or other browser cases,
+passes the bounded comparison above; simulation timing, input recipe and queue
+bounds remain unchanged. That does not establish the cause of the earlier
+audio overflow. A subsequent full-recipe attempt loses its Chrome connection
+during CSS (`work/pr86-shield-sdi-b-full-r1/report.json`), before gameplay.
+The retained operator-recovery log records stopping only the disconnected test
+loop so its in-memory failure report could be saved. No game state was changed.
+The tracked `tests/character_reference_browser_test.mjs` now rejects that
+closed/disconnected-page condition immediately, propagates snapshot errors,
+and hashes the actual served JS/Wasm. Its focused failure-propagation test
+passes (`work/pr86-reference-health-r1.log`); the full recipe remains pending.
 
 Latest validation checkpoint: `d5695c9` includes the existing shared-runtime
 owner's committed motion-flag, camera/inverse, reciprocal-square-root and
