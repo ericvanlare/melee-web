@@ -958,8 +958,11 @@ slot-2 Sheik-winner failure.
   frame 14,746 before Results. The 954-row Results trace records CPU pages
   changing at frame 493; trusted Enter attempts at frames 520, 615, 720, and
   827 had no consumed P1 Start, while the attempt bracketed by frames 931–938
-  contains the actual source Start at frame 932. All source ticks returned;
-  port errors remained `[0,0,-1,-1]`; the camera source/context/owner snapshots
+  contains the actual source Start at frame 932. At cursor 560 P1 was neutral,
+  Results was in phase 3 / statistics phase 2, disconnected pages were `[1,1]`,
+  and no player was confirmed; the old failing report lacks these fields. All
+  source ticks returned; port errors remained `[0,0,-1,-1]`; the camera
+  source/context/owner snapshots
   matched at `0xa59e6e0`; 44 timing interruptions; no page/native errors. The
   report is marked failed because the old final assertion required the *first*
   dispatched post-page pulse to be consumed, though the trace and screenshots
