@@ -31,10 +31,18 @@ export function bindResultsEntryPacket(packet, servedArtifacts) {
     const first=matches[0];
     assert(first.status===200&&Number.isInteger(first.bytes)&&first.bytes>0);
     assert.match(first.sha256,/^[0-9a-f]{64}$/);
+    if(first.hash_basis){
+      assert.equal(first.hash_basis.method,'same-origin-static-file-sha256-plus-http-metadata');
+      assert.equal(first.hash_basis.content_length,first.bytes);
+      assert.equal(first.hash_basis.content_encoding,null);
+      assert(typeof first.hash_basis.path==='string'&&first.hash_basis.path.length>0);
+    }
     assert(matches.every(row=>row.status===200&&row.sha256===first.sha256&&row.bytes===first.bytes),
       `Conflicting served ${name} identities`);
     return {...first};
   });
   return {scope:'Local ABI debug packet only; not a PPC image, exact replay or timing claim',
-    build_binding:{status:'bound',kind:'observed-http-response-sha256',artifacts},packet};
+    build_binding:{status:'bound',kind:artifacts.some(row=>row.hash_basis)
+      ?'http-response-metadata-plus-static-file-sha256'
+      :'observed-http-response-sha256',artifacts},packet};
 }

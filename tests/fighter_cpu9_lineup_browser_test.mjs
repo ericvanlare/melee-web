@@ -2,7 +2,9 @@
 /** Headless rendered four-CPU9 source-menu match/Results/CSS loop fixture.
  * Inputs are bounded raw PAD samples consumed by the live original CSS/SSS;
  * fighter setup and match state are read-only source observations. This does
- * not compare against retail, physical controllers, timing, pixels or PCM. */
+ * not compare against retail, physical controllers, timing, pixels or PCM.
+ * Results defaults to historical keyboard pulses; source-tick is a separate
+ * controlled PAD functional path, not a keyboard or reference-input claim. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -14,10 +16,13 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
 
 const {values}=parseArgs({options:{...Object.fromEntries(
-  ['url','disc','out','lineup','playwright'].map(name=>[name,{type:'string'}])),
+  ['url','disc','out','lineup','playwright','build-dir','results-input'].map(name=>[name,{type:'string'}])),
   matches:{type:'string'},'setup-only':{type:'boolean'}}});
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2] [--setup-only] [--playwright PACKAGE_DIR]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|source-tick]');
+const resultsInputMode=values['results-input']||'keyboard';
+if(!['keyboard','source-tick'].includes(resultsInputMode))
+  throw Error('--results-input must be keyboard or source-tick');
 const matchCount=Number(values.matches||2);
 if(![1,2].includes(matchCount))throw Error('--matches must be 1 or 2');
 const url=new URL(values.url);
@@ -31,6 +36,15 @@ const sha256=async filename=>{
   return hash.digest('hex');
 };
 const repository=path.resolve(import.meta.dirname,'..');
+const buildDirectory=values['build-dir']?path.resolve(values['build-dir']):null;
+let localWasmIdentity=null;
+if(buildDirectory){
+  const wasmPath=path.join(buildDirectory,'gameplay_menu_browser.wasm');
+  const wasmStat=await fs.stat(wasmPath);
+  if(!wasmStat.isFile())throw Error('--build-dir must contain gameplay_menu_browser.wasm');
+  localWasmIdentity={path:path.relative(repository,wasmPath),bytes:wasmStat.size,
+    sha256:await sha256(wasmPath)};
+}
 function sourceProvenance(){
   const git=(...args)=>execFileSync('git',args,{cwd:repository,encoding:'utf8'}).trim();
   return {commit:git('rev-parse','HEAD'),tree:git('rev-parse','HEAD^{tree}'),
@@ -50,7 +64,8 @@ const lineup=values.lineup==='A'?
 const continuationScope=matchCount===1?'natural Results→CSS only':
   'natural Results→CSS→second match';
 const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
-  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, four CPU9 players, four stocks, Final Destination; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
+  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, four CPU9 players, four stocks, Final Destination; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
+  results_input_mode:resultsInputMode,
   lineup:values.lineup,players:lineup.map(({name,kind})=>({name,kind,cpu:9,stocks:4})),
   matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[],
   results_input_events:[]};
@@ -58,12 +73,14 @@ report.source_timing_disruptions=[];
 report.native_command_errors=[];
 report.results_entry_packets=[];
 report.results_entry_packet_reads=[];
+report.results_source_pad_traces=[];
 report.provenance={source_start:sourceProvenance(),
   harness_sha256:await sha256(new URL(import.meta.url)),
   results_entry_helper_sha256:await sha256(new URL('./results_entry_packet.mjs',import.meta.url)),
+  local_artifacts:localWasmIdentity?[localWasmIdentity]:[],
   served_artifacts:[]};
 const artifactReads=[];
-let browser,page,driver;
+let browser,page,driver,activeMatchIndex=null;
 // Called only on Results entry or failure, never by the polling diagnostics.
 // Read independently of other observers so an unrelated observer failure does
 // not hide the last retained entry. Older frozen builds remain explicitly absent.
@@ -105,6 +122,37 @@ async function retainResultsInputEvents(){
       window.__meleeWebResultsInputEvents?.slice()||[]);
   }catch(error){
     report.results_input_event_read={status:'capture-error',error:error.message};
+  }
+}
+function summarizeResultsPadTrace(trace){
+  const startRuns=[];
+  for(const row of trace.samples){
+    if((row.pads[0].button&buttonStart)===0)continue;
+    const last=startRuns.at(-1);
+    if(last&&row.source_frame===last.last_source_frame+1)last.last_source_frame=row.source_frame;
+    else startRuns.push({first_source_frame:row.source_frame,last_source_frame:row.source_frame});
+  }
+  return {attempts:trace.attempts,retained:trace.retained,capacity:trace.capacity,
+    overflow:trace.overflow,tick_returned:trace.samples.filter(row=>row.tick_returned).length,
+    tick_failed:trace.samples.filter(row=>!row.tick_returned).map(row=>row.source_frame),
+    p1_button_values:[...new Set(trace.samples.map(row=>row.pads[0].button))],
+    p1_start_runs:startRuns,
+    port_error_values:Array.from({length:4},(_,port)=>
+      [...new Set(trace.samples.map(row=>row.pads[port].err))])};
+}
+async function retainResultsSourcePadTrace(match,reason){
+  try{
+    const trace=await page.evaluate(()=>{
+      if(typeof Module._melee_web_native_menu_results_pad_trace!=='function')
+        throw Error('Results raw-PAD trace getter is unavailable in the served development build');
+      return JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_results_pad_trace()));
+    });
+    report.results_source_pad_traces.push({match,reason,
+      summary:summarizeResultsPadTrace(trace),trace});
+    return trace;
+  }catch(error){
+    report.results_source_pad_traces.push({match,reason,status:'capture-error',error:error.message});
+    return null;
   }
 }
 async function installResultsInputObserver(){
@@ -362,6 +410,7 @@ async function chooseFinalDestination(){
   await waitFor('original four-player match entry',s=>s.phase===7,60000);
 }
 async function runMatch(matchIndex,expected){
+  activeMatchIndex=matchIndex;
   await chooseFinalDestination();
   const entry=await writeProgress(`match-${matchIndex}-entry`);
   await screenshot(`match-${matchIndex}-entry`);
@@ -445,6 +494,42 @@ async function runMatch(matchIndex,expected){
     if(resumed.error)throw Error(`Results ${matchIndex} resume: ${resumed.error}`);
     return resumed;
   };
+  const readResultsFrame=state=>{
+    const frame=state.diagnostics.match(/(?:Results|Prize) source frame: (\d+)/);
+    assert(frame,'Results/Prize source-frame diagnostic is unavailable');
+    return Number(frame[1]);
+  };
+  const waitForResultsFrame=async(target,label)=>{
+    const waitDeadline=Date.now()+60000;
+    while(Date.now()<waitDeadline){
+      state=await resumeResultsIfPaused(await diagnostic());
+      if(state.error)throw Error(`${label}: ${state.error}`);
+      if(state.phase===1)return state;
+      if(state.phase===5||state.phase===6){await page.waitForTimeout(8);continue;}
+      assert(state.phase===8||state.phase===9,`${label}: unexpected phase ${state.phase}`);
+      if(readResultsFrame(state)>=target)return state;
+      await page.waitForTimeout(8);
+    }
+    throw Error(`${label}: Results source frame did not reach ${target}`);
+  };
+  const queueSourceStart=async(target,label)=>{
+    const ready=await waitForResultsFrame(target,`${label} source-tick gate`);
+    assert(ready.phase===8||ready.phase===9,
+      `${label}: Results exited before its scheduled P1 source input`);
+    const queued=await page.evaluate(({button,duration})=>{
+      const diagnostics=Module.UTF8ToString(Module._melee_web_native_menu_diagnostics());
+      const frame=diagnostics.match(/(?:Results|Prize) source frame: (\d+)/);
+      if(!frame)throw Error('Results source frame is unavailable at PAD queue boundary');
+      const result=Module._melee_web_native_menu_pad_sample(0,button,0,0,duration);
+      return {result,source_frame:Number(frame[1])};
+    },{button:buttonStart,duration:10});
+    assert.equal(queued.result,1,`${label}: raw P1 Start PAD queue failed`);
+    report.controller_inputs.push({device:'development raw PAD at source tick',port:0,
+      buttons:buttonStart,duration:10,target_results_source_frame:target,
+      queued_at_results_source_frame:queued.source_frame,label});
+    await waitForResultsFrame(queued.source_frame+10,`${label} ten-tick P1 Start hold`);
+    return queued.source_frame;
+  };
   // Entry can be frame zero of the original fade. Retain a genuinely
   // advancing Results scene before sending the continuation controller input.
   const resultsDeadline=Date.now()+60000;
@@ -463,22 +548,42 @@ async function runMatch(matchIndex,expected){
   result.rendered_results_source_frame=resultsFrame;
   await writeProgress(`match-${matchIndex}-natural-results`);
   await screenshot(`match-${matchIndex}-natural-results`);
-  for(let pulse=0;pulse<48&&state.phase!==1;pulse++){
-    state=await resumeResultsIfPaused(state);
-    await driver.pressChord(['Enter'],{holdMs:160,releaseMs:120});
-    report.controller_inputs.push({device:'keyboard-to-source-PAD',key:'Enter',
-      hold_ms:160,release_ms:120,label:`results-${matchIndex}-continue-${pulse}`});
-    if(pulse===0)
-      report.phases.push(`Results ${matchIndex}: focused Enter sent through the ordinary keyboard-to-source-PAD path`);
-    const pulseDeadline=Date.now()+2500;
-    do{
+  if(resultsInputMode==='source-tick'){
+    report.phases.push(`Results ${matchIndex}: P1 Start queued as three ten-source-tick pulses; keyboard path not used`);
+    const starts=[];
+    starts.push(await queueSourceStart(180,`results-${matchIndex}-source-start-1`));
+    starts.push(await queueSourceStart(starts[0]+180,`results-${matchIndex}-source-start-2`));
+    starts.push(await queueSourceStart(starts[1]+240,`results-${matchIndex}-source-start-3`));
+    result.results_source_start_pulse_frames=starts;
+  }else{
+    for(let pulse=0;pulse<48&&state.phase!==1;pulse++){
+      state=await resumeResultsIfPaused(state);
+      await driver.pressChord(['Enter'],{holdMs:160,releaseMs:120});
+      report.controller_inputs.push({device:'keyboard-to-source-PAD',key:'Enter',
+        hold_ms:160,release_ms:120,label:`results-${matchIndex}-continue-${pulse}`});
+      if(pulse===0)
+        report.phases.push(`Results ${matchIndex}: focused Enter sent through the ordinary keyboard-to-source-PAD path`);
+      const pulseDeadline=Date.now()+2500;
+      do{
+        state=await resumeResultsIfPaused(await diagnostic());
+        if(state.error)throw Error(`Results ${matchIndex}: ${state.error}`);
+        if(state.phase===1)break;
+        if(state.phase!==5&&state.phase!==6&&state.phase!==8&&state.phase!==9)
+          throw Error(`Results ${matchIndex} entered unexpected source phase ${state.phase}`);
+        await page.waitForTimeout(100);
+      }while(Date.now()<pulseDeadline);
+    }
+  }
+  if(resultsInputMode==='source-tick'&&state.phase!==1){
+    const returnDeadline=Date.now()+60000;
+    while(Date.now()<returnDeadline&&state.phase!==1){
       state=await resumeResultsIfPaused(await diagnostic());
-      if(state.error)throw Error(`Results ${matchIndex}: ${state.error}`);
+      if(state.error)throw Error(`Results ${matchIndex} source-tick return: ${state.error}`);
       if(state.phase===1)break;
-      if(state.phase!==5&&state.phase!==6&&state.phase!==8&&state.phase!==9)
-        throw Error(`Results ${matchIndex} entered unexpected source phase ${state.phase}`);
-      await page.waitForTimeout(100);
-    }while(Date.now()<pulseDeadline);
+      assert([5,6,8,9].includes(state.phase),
+        `Results ${matchIndex} source-tick return entered unexpected phase ${state.phase}`);
+      await page.waitForTimeout(8);
+    }
   }
   assert.equal(state.phase,1,`Natural Results ${matchIndex} did not return to original CSS`);
   const returned=await writeProgress(`match-${matchIndex}-returned-css`);
@@ -486,6 +591,32 @@ async function runMatch(matchIndex,expected){
   assert(!returned.memory.match_present&&!returned.memory.results_present,
     'Prior match and Results owners must be torn down at CSS return');
   await screenshot(`match-${matchIndex}-returned-css`);
+  const sourcePadTrace=await retainResultsSourcePadTrace(matchIndex,'natural-results-to-css');
+  if(resultsInputMode==='source-tick'){
+    assert(sourcePadTrace&&!sourcePadTrace.overflow,
+      'Source-tick Results validation requires a complete raw PAD trace');
+    const startRows=sourcePadTrace.samples.filter(row=>row.pads[0].button===buttonStart);
+    const expectedRows=result.results_source_start_pulse_frames.flatMap(first=>
+      Array.from({length:10},(_,offset)=>first+offset));
+    assert.deepEqual(startRows.map(row=>row.source_frame),expectedRows,
+      'Source-tick Results P1 Start samples differ from the three queued ten-tick pulses');
+    const p1ActiveRows=sourcePadTrace.samples.filter(row=>row.pads[0].button!==0);
+    assert.deepEqual(p1ActiveRows.map(row=>row.source_frame),expectedRows,
+      'Source-tick Results input emitted an unexpected P1 button or lost its neutral release edges');
+    const releases=result.results_source_start_pulse_frames.map(frame=>
+      sourcePadTrace.samples.find(row=>row.source_frame===frame+10));
+    assert(releases.every(row=>row&&row.tick_returned&&row.pads[0].button===0&&row.pads[0].err===0),
+      'Each ten-tick P1 Start hold must be followed by a consumed neutral release sample');
+    assert(startRows.every(row=>row.tick_returned&&row.pads[0].err===0),
+      'Every scheduled P1 Start sample must return normally with a connected P1');
+    assert(startRows.every(row=>row.pads[1].button===0&&row.pads[1].err===0&&
+      row.pads[2].button===0&&row.pads[2].err===-1&&
+      row.pads[3].button===0&&row.pads[3].err===-1),
+      'Results P1-only source input changed another port or its natural connectedness');
+    report.results_source_pad_verification={status:'pass',start_frames:result.results_source_start_pulse_frames,
+      held_ticks:startRows.length,ports:{p1:'connected, P1 Start only',p2:'connected, neutral',
+        p3:'disconnected CPU PAD',p4:'disconnected CPU PAD'},tick_returned:true};
+  }
 }
 
 try{
@@ -501,6 +632,21 @@ try{
   page.on('response',response=>{
     const address=new URL(response.url());
     if(address.origin!==url.origin||! /\.(?:html|css|m?js|wasm)$/.test(address.pathname))return;
+    if(address.pathname.endsWith('/gameplay_menu_browser.wasm')&&localWasmIdentity){
+      const headers=response.headers();
+      const contentLength=Number(headers['content-length']||0);
+      const contentEncoding=headers['content-encoding']||null;
+      if(response.status()!==200||contentLength!==localWasmIdentity.bytes||contentEncoding){
+        artifactReads.push(Promise.resolve({url:response.url(),error:
+          'Wasm HTTP status/length/encoding does not match the local static artifact identity'}));
+        return;
+      }
+      report.provenance.served_artifacts.push({url:response.url(),status:response.status(),
+        bytes:localWasmIdentity.bytes,sha256:localWasmIdentity.sha256,
+        hash_basis:{method:'same-origin-static-file-sha256-plus-http-metadata',
+          path:localWasmIdentity.path,content_length:contentLength,content_encoding:contentEncoding}});
+      return;
+    }
     artifactReads.push(response.body().then(bytes=>{
       report.provenance.served_artifacts.push({url:response.url(),status:response.status(),
         bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});
@@ -566,7 +712,12 @@ try{
     await page.locator('body').textContent().then(text=>fs.writeFile(path.join(output,'page.txt'),text)).catch(()=>{});
   }
 }finally{
-  if(page&&!page.isClosed())await retainResultsInputEvents();
+  if(page&&!page.isClosed()){
+    await retainResultsInputEvents();
+    if(activeMatchIndex!==null&&report.matches.some(row=>row.match===activeMatchIndex)&&
+       !report.results_source_pad_traces.some(row=>row.match===activeMatchIndex))
+      await retainResultsSourcePadTrace(activeMatchIndex,'final-state-after-match-stop');
+  }
   report.final_diagnostics=page&&!page.isClosed()?await diagnostic().catch(error=>({error:error.message})):null;
   report.controller_inputs=report.controller_inputs||[];
   report.controller_input_summary={pad_samples:report.pad_sample_count,first_samples:report.controller_inputs.slice(0,48),last_samples:report.controller_inputs.slice(-24)};

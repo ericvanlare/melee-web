@@ -6,8 +6,12 @@ const packet={schema:'melee-web-results-entry-v1',abi:{target:'wasm32',byte_orde
   sizeof:{MatchExitInfo:2,ResultsMatchInfo:3},terminal_hex:'aa00',results_info_hex:'bb0000',pad:{bytes:822,hex:'00'.repeat(822)}};
 const artifacts=['js','wasm'].map(extension=>({url:`http://127.0.0.1:8871/gameplay_menu_browser.${extension}?v=1`,
   bytes:100,status:200,sha256:'a'.repeat(64)}));
+artifacts[1].hash_basis={method:'same-origin-static-file-sha256-plus-http-metadata',
+  path:'build/browser/gameplay_menu_browser.wasm',content_length:100,content_encoding:null};
 const bound=bindResultsEntryPacket(packet,artifacts);
 assert.equal(bound.build_binding.status,'bound');
+assert.equal(bound.build_binding.kind,'http-response-metadata-plus-static-file-sha256');
+assert.deepEqual(bound.build_binding.artifacts[1].hash_basis,artifacts[1].hash_basis);
 assert.deepEqual(bound.packet,packet);
 assert.throws(()=>bindResultsEntryPacket(packet,[]),/Missing served/);
 assert.throws(()=>bindResultsEntryPacket(packet,[...artifacts,{...artifacts[1],sha256:'b'.repeat(64)}]),/Conflicting/);

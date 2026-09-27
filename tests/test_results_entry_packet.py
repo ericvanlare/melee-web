@@ -91,6 +91,21 @@ class ResultsEntryPacketTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_results_pad_trace_is_bounded_and_development_only(self):
+        source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
+        self.assertIn('kResultsPadTraceCapacity=8192', source)
+        self.assertIn('results->source_frames(),sample', source)
+        self.assertIn('melee_web_native_menu_results_pad_trace()', source)
+        cmake = (ROOT / 'cmake/FighterRuntime.cmake').read_text(encoding='utf-8')
+        development = cmake.split('add_executable(gameplay_menu_browser', 1)[1].split(
+            '# The public player', 1
+        )[0]
+        public = cmake.split('# The public player', 1)[1].split(
+            '# Shared typed scene/model tables', 1
+        )[0]
+        self.assertIn('_melee_web_native_menu_results_pad_trace', development)
+        self.assertNotIn('_melee_web_native_menu_results_pad_trace', public)
+
 
 if __name__ == '__main__':
     unittest.main()

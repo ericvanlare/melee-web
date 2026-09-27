@@ -87,6 +87,30 @@ size_t replay_cursor=0;
 melee_web::SourceFrameSequence replay_source_frames;
 melee_web::ReplayCompletionState replay_completion;
 bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_draw=false;
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+struct ResultsPadTraceRow {
+ uint32_t source_frame;
+ bool tick_returned;
+ PADStatus pads[4];
+};
+constexpr size_t kResultsPadTraceCapacity=8192;
+std::array<ResultsPadTraceRow,kResultsPadTraceCapacity> results_pad_trace{};
+size_t results_pad_trace_count=0;
+uint64_t results_pad_trace_attempts=0;
+bool results_pad_trace_overflow=false;
+size_t retain_results_pad_sample(uint32_t source_frame,const PADStatus pads[4]){
+ ++results_pad_trace_attempts;
+ if(results_pad_trace_count==results_pad_trace.size()){
+  results_pad_trace_overflow=true;
+  return results_pad_trace.size();
+ }
+ const size_t index=results_pad_trace_count++;
+ auto& row=results_pad_trace[index];
+ row={};row.source_frame=source_frame;
+ for(size_t port=0;port<4;++port)row.pads[port]=pads[port];
+ return index;
+}
+#endif
 // V2 recipes come from fresh original processes and do not carry heap history.
 // Original stage callbacks can read uncleared allocation bytes (Shy Guy pattern).
 // Do not reset this eligibility on unload or normalize those gameplay bytes.
@@ -695,6 +719,9 @@ void advance(){
 #endif
   if(scoped_assets){pending=false;request_assets(AssetDestination::Results);return;}
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_pad_trace_count=0;results_pad_trace_attempts=0;results_pad_trace_overflow=false;
+#endif
   results=std::make_unique<melee_web::GameplayResultsSession>(files,results_info,seed,*results_input);
   results_input.reset();
   const double constructed=emscripten_get_now();
@@ -1177,7 +1204,16 @@ void tick(){
     }
     if(match->complete()&&(!replay||replay_whole)){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
    }
-   else if(results){results->tick(sample);source_frames.did_step();if(results->requested())result=3;}
+   else if(results){
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+    const size_t trace_index=retain_results_pad_sample(results->source_frames(),sample);
+#endif
+    results->tick(sample);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+    if(trace_index<results_pad_trace_count)results_pad_trace[trace_index].tick_returned=true;
+#endif
+    source_frames.did_step();if(results->requested())result=3;
+   }
    else if(prize){prize->tick(sample);source_frames.did_step();if(prize->requested())result=3;}
    else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);source_frames.did_step();}
    if(replay_whole){
@@ -1384,6 +1420,50 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_entry_packet(){
  static std::string json;
  try{json=results_entry_packet.json();return json.c_str();}
  catch(...){return "{\"error\":\"Results entry packet serialization failed\"}";}
+}
+EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
+ static std::string json;
+ json.clear();
+ json.reserve(128+results_pad_trace_count*360);
+ json+="{\"schema\":\"melee-web-results-pad-trace-v1\",\"source_frame_semantics\":\"zero-based Results source frame immediately before this tick attempt\",\"attempts\":";
+ json+=std::to_string(results_pad_trace_attempts);
+ json+=",\"retained\":";json+=std::to_string(results_pad_trace_count);
+ json+=",\"capacity\":";json+=std::to_string(kResultsPadTraceCapacity);
+ json+=",\"overflow\":";json+=results_pad_trace_overflow?"true":"false";
+ json+=",\"samples\":[";
+ for(size_t index=0;index<results_pad_trace_count;++index){
+  if(index)json+=',';
+  const auto& row=results_pad_trace[index];
+  char sample[512];
+  int length=std::snprintf(sample,sizeof(sample),
+    "{\"source_frame\":%u,\"tick_returned\":%s,\"pads\":[",
+    row.source_frame,row.tick_returned?"true":"false");
+  if(length<0||static_cast<size_t>(length)>=sizeof(sample))continue;
+  json.append(sample,static_cast<size_t>(length));
+  for(size_t port=0;port<4;++port){
+   if(port)json+=',';
+   const PADStatus& pad=row.pads[port];
+   length=std::snprintf(sample,sizeof(sample),
+    "{\"button\":%u,\"stick_x\":%d,\"stick_y\":%d,\"substick_x\":%d,\"substick_y\":%d,\"trigger_left\":%u,\"trigger_right\":%u,\"analog_a\":%u,\"analog_b\":%u,\"err\":%d"
+#if defined(TARGET_PC)
+    ",\"ext_button\":%u"
+#endif
+    "}",static_cast<unsigned>(pad.button),static_cast<int>(pad.stickX),
+    static_cast<int>(pad.stickY),static_cast<int>(pad.substickX),
+    static_cast<int>(pad.substickY),static_cast<unsigned>(pad.triggerLeft),
+    static_cast<unsigned>(pad.triggerRight),static_cast<unsigned>(pad.analogA),
+    static_cast<unsigned>(pad.analogB),static_cast<int>(pad.err)
+#if defined(TARGET_PC)
+    ,static_cast<unsigned>(pad.extButton)
+#endif
+   );
+   if(length<0||static_cast<size_t>(length)>=sizeof(sample))continue;
+   json.append(sample,static_cast<size_t>(length));
+  }
+  json+="]}";
+ }
+ json+="]}";
+ return json.c_str();
 }
 #endif
 unsigned melee_web_native_asset_begin(){try{
