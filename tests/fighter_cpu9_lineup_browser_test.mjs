@@ -3,8 +3,9 @@
  * Inputs are bounded raw PAD samples consumed by the live original CSS/SSS;
  * fighter setup and match state are read-only source observations. This does
  * not compare against retail, physical controllers, timing, pixels or PCM.
- * Results defaults to historical keyboard pulses; source-tick is a separate
- * controlled PAD functional path, not a keyboard or reference-input claim. */
+ * Results defaults to historical keyboard pulses; keyboard-gated preserves
+ * that key path while source-tick-gating the CPU page transition. Source-tick
+ * remains a separate controlled PAD path, not a keyboard/reference claim. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -15,15 +16,17 @@ import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.m
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
 import {queueResultsP1StartAtCurrentSource} from './results_source_pad_input.mjs';
+import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
+  summarizeResultsPadTrace} from './results_source_pad_trace.mjs';
 
 const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input'].map(name=>[name,{type:'string'}])),
   matches:{type:'string'},'setup-only':{type:'boolean'}}});
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|source-tick]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-gated|source-tick]');
 const resultsInputMode=values['results-input']||'keyboard';
-if(!['keyboard','source-tick'].includes(resultsInputMode))
-  throw Error('--results-input must be keyboard or source-tick');
+if(!['keyboard','keyboard-gated','source-tick'].includes(resultsInputMode))
+  throw Error('--results-input must be keyboard, keyboard-gated, or source-tick');
 const matchCount=Number(values.matches||2);
 if(![1,2].includes(matchCount))throw Error('--matches must be 1 or 2');
 const url=new URL(values.url);
@@ -78,7 +81,11 @@ report.results_source_pad_traces=[];
 report.results_page_transition_checks=[];
 report.provenance={source_start:sourceProvenance(),
   harness_sha256:await sha256(new URL(import.meta.url)),
+  browser_driver_helper_sha256:await sha256(new URL('../scripts/browser_driver.mjs',import.meta.url)),
+  browser_tools_helper_sha256:await sha256(new URL('../scripts/browser_tools.mjs',import.meta.url)),
   results_entry_helper_sha256:await sha256(new URL('./results_entry_packet.mjs',import.meta.url)),
+  results_source_pad_trace_helper_sha256:await sha256(new URL('./results_source_pad_trace.mjs',import.meta.url)),
+  results_source_pad_input_helper_sha256:await sha256(new URL('./results_source_pad_input.mjs',import.meta.url)),
   local_artifacts:localWasmIdentity?[localWasmIdentity]:[],
   served_artifacts:[]};
 const artifactReads=[];
@@ -126,36 +133,6 @@ async function retainResultsInputEvents(){
     report.results_input_event_read={status:'capture-error',error:error.message};
   }
 }
-function summarizeResultsPadTrace(trace){
-  const startRuns=[];
-  const pageTransitions=[];
-  const previousPages=Array(4).fill(null);
-  for(const row of trace.samples){
-    const state=row.results_state_after_tick;
-    if(state){
-      for(let slot=0;slot<4;slot++){
-        const page=state.players[slot].page;
-        if(previousPages[slot]!==null&&page!==previousPages[slot])
-          pageTransitions.push({slot,from:previousPages[slot],to:page,
-            source_frame:state.source_frame,phase:state.phase,
-            stats_phase:state.stats_phase,confirmed:state.players[slot].confirmed});
-        previousPages[slot]=page;
-      }
-    }
-    if((row.pads[0].button&buttonStart)===0)continue;
-    const last=startRuns.at(-1);
-    if(last&&row.source_frame===last.last_source_frame+1)last.last_source_frame=row.source_frame;
-    else startRuns.push({first_source_frame:row.source_frame,last_source_frame:row.source_frame});
-  }
-  return {attempts:trace.attempts,retained:trace.retained,capacity:trace.capacity,
-    overflow:trace.overflow,tick_returned:trace.samples.filter(row=>row.tick_returned).length,
-    tick_failed:trace.samples.filter(row=>!row.tick_returned).map(row=>row.source_frame),
-    p1_button_values:[...new Set(trace.samples.map(row=>row.pads[0].button))],
-    p1_start_runs:startRuns,
-    results_page_transitions:pageTransitions,
-    port_error_values:Array.from({length:4},(_,port)=>
-      [...new Set(trace.samples.map(row=>row.pads[port].err))])};
-}
 async function readResultsSourcePadTrace(){
   return page.evaluate(()=>{
     if(typeof Module._melee_web_native_menu_results_pad_trace!=='function')
@@ -166,9 +143,9 @@ async function readResultsSourcePadTrace(){
 async function retainResultsSourcePadTrace(match,reason){
   try{
     const trace=await readResultsSourcePadTrace();
-    report.results_source_pad_traces.push({match,reason,
-      summary:summarizeResultsPadTrace(trace),trace});
-    return trace;
+    const retained=buildResultsPadTraceRecord(match,reason,trace);
+    report.results_source_pad_traces.push(retained);
+    return retained;
   }catch(error){
     report.results_source_pad_traces.push({match,reason,status:'capture-error',error:error.message});
     return null;
@@ -584,6 +561,25 @@ async function runMatch(matchIndex,expected){
     await waitForResultsFrame(queued.source_frame+10,`${label} ten-tick P1 Start hold`);
     return queued.source_frame;
   };
+  const waitForCpuPagesBeforeKeyboard=async(targetFrame,label)=>{
+    const waitDeadline=Date.now()+60000;
+    let lastTraceFrame=-1;
+    while(Date.now()<waitDeadline){
+      state=await resumeResultsIfPaused(await diagnostic());
+      if(state.error)throw Error(`${label}: ${state.error}`);
+      if(state.phase===1)return {natural_css:true,source_frame:null,transitions:[]};
+      assert(state.phase===8||state.phase===9,`${label}: unexpected source phase ${state.phase}`);
+      const diagnosticFrame=readResultsFrame(state);
+      if(diagnosticFrame>=targetFrame&&diagnosticFrame-lastTraceFrame>=12){
+        const trace=await readResultsSourcePadTrace();
+        const gate=assertResultsCpuPagesAfterInitialP1Keyboard(trace,targetFrame);
+        if(gate)return {natural_css:false,...gate};
+        lastTraceFrame=trace.samples.at(-1)?.results_state_after_tick?.source_frame??diagnosticFrame;
+      }
+      await page.waitForTimeout(16);
+    }
+    throw Error(`${label}: disconnected CPU pages did not auto-advance after the consumed initial P1 Enter (last scheduled trigger lower bound ${targetFrame})`);
+  };
   // Entry can be frame zero of the original fade. Retain a genuinely
   // advancing Results scene before sending the continuation controller input.
   const resultsDeadline=Date.now()+60000;
@@ -657,6 +653,168 @@ async function runMatch(matchIndex,expected){
     }
     result.results_source_start_pulse_frames=starts;
     result.results_source_confirmation_count=starts.length;
+  }else if(resultsInputMode==='keyboard-gated'){
+    const inputEventStart=await page.evaluate(()=>
+      window.__meleeWebResultsInputEvents?.length||0);
+    const keyboardPhaseReady=await waitForResultsInternalPhase(180,2,
+      `results-${matchIndex}-first-keyboard-enter-phase-gate`);
+    if(keyboardPhaseReady.phase===1){
+      result.results_keyboard_input_stop={reason:'natural CSS return before phase-2 keyboard gate'};
+      throw Error(`Results ${matchIndex} returned to CSS before the original fade reached phase 2`);
+    }
+    result.results_keyboard_phase_gate={status:'passed',source_phase:2,
+      source_frame:readResultsFrame(keyboardPhaseReady)};
+    report.phases.push(`Results ${matchIndex}: original phase 2 observed before ordinary Enter`);
+    // Retain the ordinary trusted keyboard path, but stop retrying as soon as
+    // a P1 Start is actually consumed. Then wait with no further input until
+    // the disconnected CPU pages auto-advance in source statistics.
+    const initialEnterTargets=[198,296,394,509];
+    const initialEnterDispatches=[];
+    let initialCssReturn=false;
+    let initialStartObserved=false;
+    for(const targetFrame of initialEnterTargets){
+      const ready=await waitForResultsFrame(targetFrame,
+        `results-${matchIndex}-keyboard-prefix-${targetFrame}`);
+      if(ready.phase===1){initialCssReturn=true;break;}
+      assert(ready.phase===8||ready.phase===9,
+        `Results ${matchIndex} cannot send Enter in source phase ${ready.phase}`);
+      const sourceFrameBefore=readResultsFrame(ready);
+      await driver.pressChord(['Enter'],{holdMs:160,releaseMs:120});
+      report.controller_inputs.push({device:'keyboard-to-source-PAD',key:'Enter',
+        hold_ms:160,release_ms:120,target_source_frame:targetFrame,
+        source_frame_before:sourceFrameBefore,
+        label:`results-${matchIndex}-keyboard-prefix-${targetFrame}`});
+      initialEnterDispatches.push({target_source_frame:targetFrame,source_frame_before:sourceFrameBefore});
+      state=await resumeResultsIfPaused(await diagnostic());
+      if(state.error)throw Error(`Results ${matchIndex} Enter at ${targetFrame}: ${state.error}`);
+      if(state.phase===1){initialCssReturn=true;break;}
+      const trace=await readResultsSourcePadTrace();
+      initialStartObserved=summarizeResultsPadTrace(trace).p1_start_runs.length>0;
+      if(initialStartObserved)break;
+    }
+    if(initialCssReturn){
+      result.results_keyboard_input_stop={reason:'natural CSS return before the CPU auto-page gate',
+        initial_enter_dispatches:initialEnterDispatches};
+      throw Error(`Results ${matchIndex} returned to CSS before the disconnected CPU auto-page gate`);
+    }else{
+      await retainResultsInputEvents();
+      const initialInputEvents=(report.results_input_events||[]).slice(inputEventStart);
+      const initialKeydowns=initialInputEvents.filter(row=>row.kind==='keydown');
+      assert(initialStartObserved,
+        'The ordinary keyboard trigger attempts did not produce a source-consumed P1 Start');
+      assert.equal(initialKeydowns.length,initialEnterDispatches.length,
+        'Each scheduled initial ordinary keyboard Enter must retain one trusted keydown');
+      assert(initialKeydowns.every((row,index)=>row.isTrusted&&!row.repeat&&
+        row.resultsSourceFrameAtEvent>=initialEnterTargets[index]),
+        'The initial Results Enter edges must preserve their source-tick lower bounds');
+      assert.deepEqual(initialEnterDispatches.map(row=>row.target_source_frame),
+        initialEnterTargets.slice(0,initialEnterDispatches.length));
+      const initialDispatchFrame=initialEnterDispatches.at(-1).source_frame_before;
+      await writeProgress(`match-${matchIndex}-initial-start-before-auto-pages`);
+      await screenshot(`match-${matchIndex}-initial-start-before-auto-pages`);
+      const gate=await waitForCpuPagesBeforeKeyboard(
+        initialEnterDispatches.at(-1).target_source_frame,
+        `results-${matchIndex}-auto-pages-before-confirmation`);
+      if(gate.natural_css){
+        result.results_keyboard_input_stop={reason:'natural CSS return before both CPU pages auto-advanced'};
+        throw Error(`Results ${matchIndex} returned to CSS before both disconnected CPU pages auto-advanced`);
+      }
+      const pageCheck={match:matchIndex,status:'source-auto-pages-observed',
+        input:'ordinary trusted Enter trigger attempts stop on first consumed P1 Start; then source-gated 160ms/120ms Enter confirmation',
+        auto_page_gate_poll_lower_bound_source_frame:initialEnterDispatches.at(-1).target_source_frame,
+        initial_enter_pulse_count:initialEnterDispatches.length,
+        initial_enter_dispatches:initialEnterDispatches,
+        initial_dispatch_source_frame:initialDispatchFrame,
+        initial_keydown_source_frame:initialKeydowns.at(-1).resultsSourceFrameAtEvent,
+        initial_keydown_source_frames:initialKeydowns.map(row=>row.resultsSourceFrameAtEvent),
+        initial_consumed_p1_start:gate.initial_start,
+        stats_phase_start_source_frame:gate.stats_phase_start_source_frame,
+        cpu_page_delay_source_ticks:gate.cpu_page_delay_source_ticks,
+        source_frame_before_confirmation:gate.source_frame,
+        transitions:gate.transitions,post_page_start_runs:gate.post_page_start_runs,
+        post_gate_ordinary_enter_dispatch_source_frame:null,
+        confirmation_source_frame:null,keyboard_keydown_source_frame:null,
+        confirmation_consumed:false};
+      report.results_page_transition_checks.push(pageCheck);
+      result.results_keyboard_page_gate={source_frame:gate.source_frame,
+        initial_start:gate.initial_start,
+        stats_phase_start_source_frame:gate.stats_phase_start_source_frame,
+        cpu_page_delay_source_ticks:gate.cpu_page_delay_source_ticks,
+        transitions:gate.transitions,post_page_start_runs:gate.post_page_start_runs,
+        connectedness:gate.summary.port_error_values};
+      report.phases.push(`Results ${matchIndex}: CPU pages auto-advanced before next ordinary Enter confirmation`);
+      await writeProgress(`match-${matchIndex}-auto-pages-before-confirmation`);
+      await screenshot(`match-${matchIndex}-auto-pages-before-confirmation`);
+      const lastCpuPageTransition=Math.max(...gate.transitions.map(row=>row.source_frame));
+      state=await waitForResultsFrame(lastCpuPageTransition+1,
+        `results-${matchIndex}-confirmation-after-both-auto-pages`);
+      assert(state.phase===8||state.phase===9,
+        `Results ${matchIndex} returned to CSS before the post-page keyboard confirmation`);
+      const confirmationLowerBound=readResultsFrame(state);
+      assert(confirmationLowerBound>lastCpuPageTransition,
+        'Ordinary P1 confirmation must be dispatched at a source frame after both CPU page transitions');
+      pageCheck.source_frame_before_confirmation=confirmationLowerBound;
+      let pulses=initialEnterDispatches.length;
+      for(;pulses<48&&state.phase!==1;pulses++){
+        state=await resumeResultsIfPaused(await diagnostic());
+        if(state.error)throw Error(`Results ${matchIndex} before Enter pulse ${pulses}: ${state.error}`);
+        if(state.phase===1)break;
+        assert(state.phase===8||state.phase===9,
+          `Results ${matchIndex} cannot send ordinary Enter in source phase ${state.phase}`);
+        const sourceFrameBefore=readResultsFrame(state);
+        await driver.pressChord(['Enter'],{holdMs:160,releaseMs:120});
+        report.controller_inputs.push({device:'keyboard-to-source-PAD',key:'Enter',
+          hold_ms:160,release_ms:120,source_frame_before:sourceFrameBefore,
+          label:`results-${matchIndex}-keyboard-gated-continue-${pulses}`});
+        if(pulses===initialEnterDispatches.length)
+          pageCheck.post_gate_ordinary_enter_dispatch_source_frame=sourceFrameBefore;
+        const pulseDeadline=Date.now()+2500;
+        do{
+          state=await resumeResultsIfPaused(await diagnostic());
+          if(state.error)throw Error(`Results ${matchIndex} Enter pulse ${pulses}: ${state.error}`);
+          if(state.phase===1)break;
+          if(state.phase!==5&&state.phase!==6&&state.phase!==8&&state.phase!==9)
+            throw Error(`Results ${matchIndex} entered unexpected source phase ${state.phase}`);
+          await page.waitForTimeout(100);
+        }while(Date.now()<pulseDeadline);
+      }
+      result.results_keyboard_pulse_count=pulses;
+      await retainResultsInputEvents();
+      result.results_keyboard_events=(report.results_input_events||[]).slice(inputEventStart);
+      assert.equal(result.results_keyboard_events.length,pulses*2,
+        'Every ordinary keyboard pulse must retain one original Enter keydown and keyup');
+      assert(result.results_keyboard_events.every(row=>row.key==='Enter'&&
+          row.isTrusted&&!row.repeat),
+        'Keyboard confirmation events must remain trusted, non-repeat Enter edges');
+      const keydowns=result.results_keyboard_events.filter(row=>row.kind==='keydown');
+      const keyups=result.results_keyboard_events.filter(row=>row.kind==='keyup');
+      assert.equal(keydowns.length,pulses,
+        'Every scheduled keyboard pulse must retain one trusted Enter keydown');
+      assert.equal(keyups.length,pulses,
+        'Every scheduled keyboard pulse must retain one trusted Enter keyup');
+      const initialPulseCount=pageCheck.initial_enter_pulse_count;
+      const initialStart=gate.initial_start;
+      pageCheck.initial_keydown_source_frame=keydowns[initialPulseCount-1]?.resultsSourceFrameAtEvent??null;
+      const initialStartPulseIndex=keydowns.findIndex((row,index)=>
+        row.resultsSourceFrameAtEvent<=initialStart.first_source_frame&&
+        keyups[index]?.resultsSourceFrameAtEvent>=initialStart.first_source_frame);
+      assert(initialStartPulseIndex>=0,
+        'A trusted initial Enter down/up source-frame bracket must contain the first consumed P1 Start');
+      pageCheck.initial_start_keyboard_event_bracket={
+        keydown_source_frame:keydowns[initialStartPulseIndex].resultsSourceFrameAtEvent,
+        keyup_source_frame:keyups[initialStartPulseIndex].resultsSourceFrameAtEvent};
+      const lastPageTransition=Math.max(...gate.transitions.map(item=>item.source_frame));
+      const postPageKeydownIndex=keydowns.findIndex(row=>
+        row.resultsSourceFrameAtEvent>lastPageTransition);
+      assert(postPageKeydownIndex>=initialPulseCount,
+        'A new trusted ordinary Enter confirmation must be dispatched after both automatic CPU page transitions');
+      const postPageKeydown=keydowns[postPageKeydownIndex];
+      assert(keydowns.slice(initialPulseCount).every(row=>
+        row.resultsSourceFrameAtEvent>lastPageTransition),
+        'Every confirmation Enter edge after the initial trigger must follow both automatic CPU page transitions');
+      pageCheck.keyboard_keydown_source_frame=postPageKeydown.resultsSourceFrameAtEvent;
+      pageCheck.status='post-page-keyboard-dispatched';
+    }
   }else{
     await writeProgress(`match-${matchIndex}-natural-results`);
     await screenshot(`match-${matchIndex}-natural-results`);
@@ -695,9 +853,125 @@ async function runMatch(matchIndex,expected){
   assert(!returned.memory.match_present&&!returned.memory.results_present,
     'Prior match and Results owners must be torn down at CSS return');
   await screenshot(`match-${matchIndex}-returned-css`);
-  const sourcePadTrace=await retainResultsSourcePadTrace(matchIndex,'natural-results-to-css');
-  if(resultsInputMode==='source-tick'){
-    assert(sourcePadTrace&&!sourcePadTrace.overflow,
+  const sourcePadTraceRecord=await retainResultsSourcePadTrace(matchIndex,'natural-results-to-css');
+  if(resultsInputMode==='keyboard-gated'){
+    assert(result.results_keyboard_page_gate,
+      'Keyboard-gated Results cannot pass without the observed disconnected CPU auto-page gate');
+    const sourcePadTrace=sourcePadTraceRecord?.trace;
+    const sourcePadSummary=sourcePadTraceRecord?.summary;
+    assert(sourcePadTrace&&sourcePadSummary&&!sourcePadSummary.overflow,
+      'Keyboard-gated Results validation requires a complete raw PAD trace');
+    assert.deepEqual(sourcePadSummary.tick_failed,[],
+      'Every retained Results source tick must return before the CSS lifecycle check');
+    if(result.results_keyboard_page_gate){
+      assert.deepEqual(sourcePadSummary.results_page_transitions.filter(row=>
+        row.from===0&&row.to===1).map(row=>row.slot),[2,3],
+        'Both disconnected CPU pages must auto-advance from page zero before keyboard confirmation');
+      assert(sourcePadSummary.results_page_transitions.every(row=>
+        (row.slot===2||row.slot===3)&&row.to===row.from+1),
+        'Only disconnected CPU pages may auto-advance during the retained Results trace');
+    }
+    assert.deepEqual(sourcePadSummary.port_error_values,[[0],[0],[-1],[-1]],
+      'Natural P1/P2-connected and CPU-P3/P4-disconnected port status changed');
+    const neutralResultsAnalogFields=['stick_x','stick_y','substick_x','substick_y',
+      'trigger_left','trigger_right','analog_a','analog_b','ext_button'];
+    assert(sourcePadTrace.samples.every(row=>row.pads.every((pad,port)=>
+      (port===0?(pad.button===0||pad.button===buttonStart):pad.button===0)&&
+      pad.err===(port<2?0:-1)&&
+      neutralResultsAnalogFields.every(field=>pad[field]===0))),
+      'Only P1 Start may be pressed; keep every other button/axis neutral and preserve all four port statuses');
+    if(result.results_keyboard_page_gate){
+      const pageCheck=report.results_page_transition_checks.find(row=>
+        row.match===matchIndex&&row.status==='post-page-keyboard-dispatched');
+      assert(pageCheck,'The source-tick CPU page gate was not retained before the next keyboard confirmation');
+      const pageZeroTransitions=sourcePadSummary.results_page_transitions.filter(row=>
+        row.from===0&&row.to===1);
+      const latestTransition=Math.max(...pageZeroTransitions.map(row=>row.source_frame));
+      const firstTransition=Math.min(...pageZeroTransitions.map(row=>row.source_frame));
+      const initialStart=sourcePadSummary.p1_start_runs.find(row=>
+        row.last_source_frame<firstTransition);
+      assert(initialStart&&initialStart.last_source_frame<firstTransition,
+        'The initial P1 Start must enter statistics before the automatic CPU page transitions');
+      const beforeInitialStart=sourcePadTrace.samples.find(row=>
+        row.source_frame===initialStart.first_source_frame-1);
+      assert(beforeInitialStart?.results_state_after_tick?.phase===2,
+        'The first consumed keyboard Start must be preceded by the original Results fade phase');
+      const keyboardEvents=result.results_keyboard_events||[];
+      const keydowns=keyboardEvents.filter(row=>row.kind==='keydown');
+      const keyups=keyboardEvents.filter(row=>row.kind==='keyup');
+      assert.equal(keyboardEvents.length,result.results_keyboard_pulse_count*2,
+        'Each ordinary Results Enter pulse must retain one trusted keydown and keyup');
+      assert.equal(keydowns.length,result.results_keyboard_pulse_count,
+        'Retained keyboard keydown count must match sent historical Enter pulses');
+      assert.equal(keyups.length,result.results_keyboard_pulse_count,
+        'Retained keyboard keyup count must match sent historical Enter pulses');
+      const resultsKeyboardInputs=report.controller_inputs.filter(row=>
+        row.device==='keyboard-to-source-PAD'&&
+        row.label?.startsWith(`results-${matchIndex}-keyboard-`));
+      assert.equal(resultsKeyboardInputs.length,keydowns.length,
+        'Each retained ordinary Results Enter edge must have its original hold/release input record');
+      assert(resultsKeyboardInputs.every(row=>row.key==='Enter'&&
+          row.hold_ms===160&&row.release_ms===120),
+        'Ordinary keyboard Enter must preserve its 160ms hold and 120ms release semantics');
+      assert(keyboardEvents.every(row=>row.key==='Enter'&&row.isTrusted&&!row.repeat),
+        'Every retained ordinary keyboard edge must be a trusted non-repeat Enter');
+      const initialPulseCount=pageCheck.initial_enter_pulse_count;
+      const initialStartPulseIndex=keydowns.findIndex((row,index)=>
+        row.resultsSourceFrameAtEvent<=initialStart.first_source_frame&&
+        keyups[index]?.resultsSourceFrameAtEvent>=initialStart.first_source_frame);
+      assert(initialStartPulseIndex>=0&&initialStartPulseIndex<initialPulseCount,
+        'The initial consumed P1 Start must lie within one of the ordinary Enter down/up source-frame brackets');
+      pageCheck.initial_start_keyboard_event_bracket={
+        keydown_source_frame:keydowns[initialStartPulseIndex].resultsSourceFrameAtEvent,
+        keyup_source_frame:keyups[initialStartPulseIndex].resultsSourceFrameAtEvent};
+      const firstTransitionFrame=Math.min(...pageZeroTransitions.map(row=>row.source_frame));
+      assert(!keydowns.some(row=>row.resultsSourceFrameAtEvent>firstTransitionFrame&&
+          row.resultsSourceFrameAtEvent<=latestTransition),
+        'No ordinary Enter confirmation may be dispatched between staggered CPU page transitions');
+      const postPageKeydownIndex=keydowns.findIndex(row=>
+        row.resultsSourceFrameAtEvent>latestTransition);
+      assert(postPageKeydownIndex>=initialPulseCount,
+        'The ordinary Enter confirmation must be dispatched after both automatic CPU page transitions');
+      assert(keydowns.slice(initialPulseCount).every(row=>
+        row.resultsSourceFrameAtEvent>latestTransition),
+        'Every ordinary Enter confirmation must be dispatched after both automatic CPU page transitions');
+      const postPageStartRun=sourcePadSummary.p1_start_runs.find(row=>
+        row.first_source_frame>latestTransition&&
+        row.first_source_frame>=keydowns[postPageKeydownIndex].resultsSourceFrameAtEvent&&
+        keyups[postPageKeydownIndex]?.resultsSourceFrameAtEvent>=row.first_source_frame);
+      assert(postPageStartRun,
+        'The post-page Enter down/up source-frame bracket must contain a consumed P1 Start sample');
+      const postPageKeydown=keydowns[postPageKeydownIndex];
+      pageCheck.confirmation_source_frame=postPageStartRun.first_source_frame;
+      pageCheck.keyboard_keydown_source_frame=postPageKeydown.resultsSourceFrameAtEvent;
+      pageCheck.confirmation_consumed=pageCheck.confirmation_source_frame!==null;
+      pageCheck.status='pass-input-dispatched-after-pages';
+      result.results_keyboard_page_verification={
+        status:'pass-input-dispatched-after-pages',
+        initial_input_phase_gate:result.results_keyboard_phase_gate,
+        auto_page_gate_poll_lower_bound_source_frame:pageCheck.auto_page_gate_poll_lower_bound_source_frame,
+        initial_keyboard_keydown_source_frames:pageCheck.initial_keydown_source_frames,
+        source_frame_before_confirmation:result.results_keyboard_page_gate.source_frame,
+        initial_p1_start_source_frame:initialStart.first_source_frame,
+        stats_phase_start_source_frame:pageCheck.stats_phase_start_source_frame,
+        cpu_page_delay_source_ticks:pageCheck.cpu_page_delay_source_ticks,
+        keyboard_keydown_source_frame:pageCheck.keyboard_keydown_source_frame,
+        confirmation_p1_start_source_frame:pageCheck.confirmation_source_frame,
+        confirmation_consumed:pageCheck.confirmation_consumed,
+        cpu_page_transitions:sourcePadSummary.results_page_transitions,
+        p1_start_runs:sourcePadSummary.p1_start_runs,
+        post_page_start_runs:sourcePadSummary.p1_start_runs.filter(row=>
+          row.first_source_frame>latestTransition),
+        port_error_values:sourcePadSummary.port_error_values,
+        trusted_keydowns:keydowns.length,tick_failed_source_frames:sourcePadSummary.tick_failed};
+    }
+    assert.equal(result.results_keyboard_page_verification?.status,
+      'pass-input-dispatched-after-pages',
+      'Keyboard-gated Results cannot pass without a retained post-page keyboard confirmation');
+  }else if(resultsInputMode==='source-tick'){
+    const sourcePadTrace=sourcePadTraceRecord?.trace;
+    const sourcePadSummary=sourcePadTraceRecord?.summary;
+    assert(sourcePadTrace&&sourcePadSummary&&!sourcePadSummary.overflow,
       'Source-tick Results validation requires a complete raw PAD trace');
     const startRows=sourcePadTrace.samples.filter(row=>row.pads[0].button===buttonStart);
     const expectedRows=result.results_source_start_pulse_frames.flatMap(first=>
@@ -717,7 +991,7 @@ async function runMatch(matchIndex,expected){
       row.pads[2].button===0&&row.pads[2].err===-1&&
       row.pads[3].button===0&&row.pads[3].err===-1),
       'Results P1-only source input changed another port or its natural connectedness');
-    const cpuPageTransitions=sourcePadTrace.summary.results_page_transitions.filter(
+    const cpuPageTransitions=sourcePadSummary.results_page_transitions.filter(
       row=>row.from===0&&row.to===1&&row.slot>=2);
     if(result.results_source_start_pulse_frames.length){
       const firstStart=result.results_source_start_pulse_frames[0];
@@ -735,7 +1009,7 @@ async function runMatch(matchIndex,expected){
         'Disconnected CPU pages must auto-advance in the active statistics phase before P1 confirmation');
     }
     if(report.results_page_transition_checks.some(row=>row.match===matchIndex&&row.status==='pass'))
-      assert.deepEqual(sourcePadTrace.summary.results_page_transitions.map(row=>row.slot),[2,3],
+      assert.deepEqual(sourcePadSummary.results_page_transitions.map(row=>row.slot),[2,3],
         'Connected neutral ports or another Results player page changed unexpectedly');
     const autoPageStatus=report.results_page_transition_checks.some(
       row=>row.match===matchIndex&&row.status==='pass')?'pass':

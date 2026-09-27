@@ -106,6 +106,25 @@ std::array<ResultsPadTraceRow,kResultsPadTraceCapacity> results_pad_trace{};
 size_t results_pad_trace_count=0;
 uint64_t results_pad_trace_attempts=0;
 bool results_pad_trace_overflow=false;
+MeleeWebResultsCameraEntrySnapshot results_camera_entry_snapshot{};
+void append_pointer_json(std::string& json,const void* pointer){
+ char text[2+2*sizeof(void*)+4]{};
+ const int length=std::snprintf(text,sizeof(text),"%p",const_cast<void*>(pointer));
+ if(length<0||static_cast<size_t>(length)>=sizeof(text))
+  throw std::runtime_error("Results camera-entry pointer formatting failed");
+ json+='"';json.append(text,static_cast<size_t>(length));json+='"';
+}
+void append_camera_entry_json(std::string& json){
+ json+=",\"camera_entry\":{";
+ json+="\"saved_pool_at_context_begin\":";append_pointer_json(json,results_camera_entry_snapshot.saved_pool_at_context_begin);
+ json+=",\"source_pool_before_onenter\":";append_pointer_json(json,results_camera_entry_snapshot.source_pool_before_onenter);
+ json+=",\"owner_pool_before_onenter\":";append_pointer_json(json,results_camera_entry_snapshot.owner_pool_before_onenter);
+ json+=",\"source_pool_after_onenter\":";append_pointer_json(json,results_camera_entry_snapshot.source_pool_after_onenter);
+ json+=",\"source_pool_after_collision_adoption\":";append_pointer_json(json,results_camera_entry_snapshot.source_pool_after_collision_adoption);
+ json+=",\"context_pool_after_adoption\":";append_pointer_json(json,results_camera_entry_snapshot.context_pool_after_adoption);
+ json+=",\"owner_pool_after_adoption\":";append_pointer_json(json,results_camera_entry_snapshot.owner_pool_after_adoption);
+ json+='}';
+}
 size_t retain_results_pad_sample(uint32_t source_frame,const PADStatus pads[4]){
  ++results_pad_trace_attempts;
  if(results_pad_trace_count==results_pad_trace.size()){
@@ -739,12 +758,16 @@ void advance(){
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
   results_entry_packet.capture(completed_matches,terminal,results_info,results_seed,final_input);
 #endif
-  if(scoped_assets){pending=false;request_assets(AssetDestination::Results);return;}
-  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
   results_pad_trace_count=0;results_pad_trace_attempts=0;results_pad_trace_overflow=false;
+  results_camera_entry_snapshot={};
 #endif
+  if(scoped_assets){pending=false;request_assets(AssetDestination::Results);return;}
+  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
   results=std::make_unique<melee_web::GameplayResultsSession>(files,results_info,seed,*results_input);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_camera_entry_snapshot=results->camera_entry_snapshot();
+#endif
   results_input.reset();
   const double constructed=emscripten_get_now();
   report_construction("results-enter",started,constructed,constructed,before,aurora_stats_snapshot());
@@ -800,6 +823,9 @@ bool finish_asset_handoff(){
   check(results_input!=nullptr,"Original Results input was not retained across the asset handoff");
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
   results=std::make_unique<melee_web::GameplayResultsSession>(files,results_info,results_seed,*results_input);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_camera_entry_snapshot=results->camera_entry_snapshot();
+#endif
   results_input.reset();
   const double constructed=emscripten_get_now();
   report_construction("results-enter",started,constructed,constructed,before,aurora_stats_snapshot());
@@ -1453,6 +1479,7 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
  json+=",\"retained\":";json+=std::to_string(results_pad_trace_count);
  json+=",\"capacity\":";json+=std::to_string(kResultsPadTraceCapacity);
  json+=",\"overflow\":";json+=results_pad_trace_overflow?"true":"false";
+ append_camera_entry_json(json);
  json+=",\"samples\":[";
  for(size_t index=0;index<results_pad_trace_count;++index){
   if(index)json+=',';

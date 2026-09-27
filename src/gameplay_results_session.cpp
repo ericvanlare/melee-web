@@ -308,6 +308,14 @@ uint32_t GameplayResultsSession::source_frames() const
     return melee_web_results_context_ticks(storage_->context);
 }
 
+MeleeWebResultsCameraEntrySnapshot GameplayResultsSession::camera_entry_snapshot() const
+{
+    MeleeWebResultsCameraEntrySnapshot snapshot{};
+    check(melee_web_results_context_camera_entry_snapshot(storage_->context, &snapshot),
+          "Original Results camera entry snapshot is unavailable");
+    return snapshot;
+}
+
 MeleeWebAudio* GameplayResultsSession::audio() const
 {
     return storage_->bank ? storage_->bank->get() : nullptr;

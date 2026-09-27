@@ -1,6 +1,7 @@
 #pragma once
 
 #include "gameplay_world.hpp"
+#include "gameplay_results_context.h"
 #include "gameplay_audio.h"
 #include "gameplay_pad_state.h"
 #include "gameplay_compat.h"
@@ -26,6 +27,7 @@ public:
     int requested() const;
     uint32_t random_seed() const;
     uint32_t source_frames() const;
+    MeleeWebResultsCameraEntrySnapshot camera_entry_snapshot() const;
     MeleeWebAudio* audio() const;
     void close();
 private:

@@ -20,11 +20,14 @@ arithmetic repairs clear their observed differences; the exact declared-field
 comparison agrees on every captured A gameplay row. B's later mismatches exposed
 a byte-swapped Yoshi grab-frame table and missing shield-SDI fused operations;
 reduced checks and a fresh complete recipe now agree on every captured B gameplay
-row in the declared state scope. A B Sheik-winner Results return exposes a
-camera-pool ownership failure; controls and fresh Samus-winner B loops pass, but
-that failure remains unresolved. New profile/camera handoff guards and three
-winner-animation state controls pass; they do not establish the historical
-writer. The scoped receipts and retained failures are in the notes.
+row in the declared state scope. The historical B Sheik-winner Results return
+still exposes a camera-pool ownership failure. Fresh two-match B keyboard-gated
+controls complete Results→CSS, including a run where Sheik was active at Results
+entry but Yoshi won; those controls do not resolve the winner-specific failure.
+Scoped observer repairs now retain per-match PAD traces and actual camera-entry
+pointers. New profile/camera handoff guards and three winner-animation state
+controls pass; they do not establish the historical writer. The scoped receipts,
+corrected r7 observer caveat and retained failures are in the notes.
 Original references,
 historical scene-only replay and newer exact bounded state checks are explicitly
 separated in the notes; none establishes draw/pixel/timing equivalence. Final

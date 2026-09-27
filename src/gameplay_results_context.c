@@ -101,6 +101,8 @@ struct MeleeWebResultsContext {
     u16 saved_stale, saved_attack;
     int saved_language, saved_saved_language;
     CmSubject* camera_pool;
+    CmSubject *camera_pool_before_onenter, *camera_pool_after_onenter;
+    CmSubject *camera_pool_after_collision_adoption, *owner_camera_pool_before_onenter;
     MeleeWebCollision* collision;
     HSD_GObj *flash_overlay, *flash_camera;
     int scene_entered, drawing, transition, flash_saved;
@@ -400,12 +402,16 @@ MeleeWebResultsContext* melee_web_results_context_begin(
     lb_8001D1F4();
     melee_web_bg_flash_save_state();
     context->flash_saved = 1;
+    context->camera_pool_before_onenter = cm_804D645C;
+    context->owner_camera_pool_before_onenter = owner_camera_pool;
     gm_Scene_Results_OnEnter(&context->match);
+    context->camera_pool_after_onenter = cm_804D645C;
     context->collision=melee_web_collision_adopt_dummy(error,error_size);
     if(!context->collision){
         fprintf(stderr,"Results collision ownership failure: %s\n",error?error:"unavailable");
         abort();
     }
+    context->camera_pool_after_collision_adoption = cm_804D645C;
     context->camera_pool = cm_804D645C;
     owner_camera_pool = context->camera_pool;
     context->flash_overlay = melee_web_bg_flash_overlay_owner();
@@ -491,6 +497,21 @@ uint32_t melee_web_results_context_random_seed(const MeleeWebResultsContext* con
 uint32_t melee_web_results_context_ticks(const MeleeWebResultsContext* context)
 {
     return context && context == owner ? context->ticks : 0;
+}
+
+int melee_web_results_context_camera_entry_snapshot(
+    const MeleeWebResultsContext* context,
+    MeleeWebResultsCameraEntrySnapshot* snapshot)
+{
+    if (!context || context != owner || !context->scene_entered || !snapshot) return 0;
+    snapshot->saved_pool_at_context_begin = context->saved_camera_pool;
+    snapshot->source_pool_before_onenter = context->camera_pool_before_onenter;
+    snapshot->owner_pool_before_onenter = context->owner_camera_pool_before_onenter;
+    snapshot->source_pool_after_onenter = context->camera_pool_after_onenter;
+    snapshot->source_pool_after_collision_adoption = context->camera_pool_after_collision_adoption;
+    snapshot->context_pool_after_adoption = context->camera_pool;
+    snapshot->owner_pool_after_adoption = owner_camera_pool;
+    return 1;
 }
 
 int melee_web_results_context_exit(MeleeWebResultsContext* context,

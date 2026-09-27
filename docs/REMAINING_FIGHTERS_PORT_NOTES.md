@@ -604,6 +604,143 @@ comparisons pass.
 PR #86 remains the single open PR. No merge or deployment has been made.
 Evidence does not support “fully playable,” equivalence, or task completion.
 
+## Current natural Results checkpoint (2026-09-27)
+
+The retained natural Sheik-winner failure
+(`work/pr86-final-frozen-b-two-match-r1/report.json`) records harness/source
+checkout commit `607ff56428cc7c110c1ce2e552110351f2e8bcbb` and a local
+documentation-only edit. It served the frozen artifact
+`work/pr86-final-candidate-frozen/gameplay_menu_browser.wasm`, SHA-256
+`96592b3fdab21695b5209d41715e65b50f156b025b671860c776a9adec525faf`, also
+recorded in `prototype-build.json`. That manifest binds artifact bytes but not
+their source commit; the binary predates the harness commit timestamp. The
+terminal standings identify slot 2 as the winner; the retained screenshot and
+form evidence show Zelda-origin Sheik. The report fails at Results source
+cursor 560 with the generic camera-pool message, but has no raw Results PAD
+trace or pointer triple.
+
+In the 607ff source checkout (whose Results source files are unchanged from its
+parent), the only `cm_804D645C` equality failure was in the final
+`release_source_camera_and_ground` step, after scene OnExit,
+flash/object/collision teardown. The enclosing Results host called mode
+OnExit and committed the route without a camera-pool check. This identifies the
+old assertion as a late release-boundary observation, not the first invalid
+write; the frozen executable lacks commit-level build provenance. Current HEAD
+adds phase-labelled pool checks through tick/draw, scene OnExit, mode OnExit
+and route commit, but the natural Sheik-winner path has not yet been rerun on
+that instrumented code.
+
+Fresh current-HEAD natural control
+(`work/pr86-results-boundary-b-natural-r7/report.json`) used the B four-CPU9,
+four-stock Final Destination route in headless Chrome 153 with WebGPU. The
+served development Wasm was HTTP 200, 119,763,091 bytes, SHA-256
+`0e288debdc4fb4c3a75d64c0bf0bb7420ff726d8ebbdac6b04b9a9f537310529`; the
+report binds source HEAD `d1d5c26024efc0f5d2e6044b244d602800b2f9e3`, clean at
+capture. This match naturally reached Results at source frame 14,003; slot 0
+won (RNG `3303176909`), so it is not the Sheik-winner discriminator. P3
+transformed Zelda↔Sheik repeatedly.
+
+The passive trace retained 4,710/4,710 Results ticks without overflow or tick
+failure and preserved port errors `[0,0,-1,-1]`. At Results tick 560, P1 was
+neutral, stats phase was 2, and all result pages remained at 0. The only
+consumed P1 Start was ticks 509–515; 48 Enter pulses caused 96 trusted key
+events and 251 timing pause/resumes. Disconnected CPU pages advanced at ticks
+701 and 1703. No camera-pool guard fired; the harness failed its Results→CSS
+return check at source cursor 4708. This is a keyboard/timing control, not a
+camera-ownership resolution. The rendered synthetic control at
+`work/pr86-results-rendered-post93-r1/statistics/report.json` remains scoped to
+its default-CSS synthetic Results profile: pages advanced at tick 551 and the
+pool remained unchanged through 621 rendered ticks and route commit.
+
+### Natural P1-only auto-page control (2026-09-27)
+
+Two fresh B CPU9 captures exercised the source-tick P1-only Results control
+through the actual four-player menu/match path. The retained reports are
+`work/pr86-results-padtick-b-natural-r5/report.json` and
+`work/pr86-results-padtick-b-natural-r6/report.json`. Both served the current
+development Wasm SHA above in headless Chrome 153/WebGPU, preserved the natural
+port profile (`err=[0,0,-1,-1]`), retained all Results PAD samples, and reached
+the original CSS return screenshot. In r6 the natural winner was slot 2 at
+match frame 14,204 (RNG `1088324269`), but its typed Results identity was
+`ckind=18, ftkind=19` (Zelda), not Sheik. Slot 2 transformed to Sheik during
+gameplay, then back to Zelda at match frame 13,364. This remains a Zelda-win
+control and does not resolve the historical Sheik-winner failure.
+
+The r6 Results trace retained 631/631 ticks with no overflow or failed tick.
+Disconnected CPU pages 2 and 3 changed 0→1 at Results source frame 397 while
+`phase=3, stats_phase=2`; both transitions occurred before the consumed P1
+confirmation at source frame 609. P1 Start was held on ticks 205–214 and
+609–618, with consumed neutral releases and no unexpected P1 buttons. P1/P2
+were connected, neutral P2 stayed unchanged, and P3/P4 remained disconnected.
+The page-transition assertion passed and the browser returned to CSS without
+page/native errors or a camera-pool guard firing. This excludes a generic
+failure of CPU auto-page alone for this current Zelda-winner source-tick profile.
+It is not the old ordinary-keyboard route: the confirmation landed at tick 609
+(the historical close failure was observed at tick 560), and the old report
+does not retain consumed input ticks to establish exact timing parity.
+
+Both browser reports are correctly retained as runner failures caused after
+the successful CSS return by a harness trace-record shape mismatch, not as
+runtime/camera failures. The first expected a summary on a raw trace; the
+second expected samples on the new `{summary, trace}` record. The corrected
+call site and pure trace-record regression now pass the focused Node and
+four-test Results-entry Python suite. The r6 capture was independently
+revalidated offline against its retained raw trace, typed entry packet and
+returned-CSS screenshot; no fresh clean browser receipt has yet been produced
+after the final harness fix.
+
+### Passive Results entry pointer snapshots (2026-09-27)
+
+The Results context now copies read-only pointer values immediately before and
+after source `gm_Scene_Results_OnEnter`, after native collision adoption, and
+after the context/owner pointers are adopted. The development PAD-trace observer
+serializes those values with the retained raw four-port source-tick trace. This
+does not establish ownership, change teardown order, or weaken any existing
+guard. Focused static/source-order and Results-entry packet tests pass; the
+existing native Results handoff, pool-guard and winner-demo controls also pass
+(six focused checks). Those native binaries predate the observer. The affected
+development runtime was rebuilt successfully; its served Wasm SHA-256 is
+`ac42965282993856a312b2fc273c7c98c0be732a39dbdea63a9d0253369ebcd0`.
+Two fresh captures now contain the entry snapshots, but neither reached a
+camera guard or reproduced the historical Sheik-winner failure.
+
+The historical natural-keyboard control at
+`work/pr86-results-boundary-b-natural-r7/report.json` provides a source-tick
+prefix for the separate `keyboard-gated` diagnostic: trusted Enter keydowns at
+Results frames 198, 296, 394, and 509; only the frame-509 pulse was consumed as
+P1 Start (frames 509–515). Active statistics began at frame 520. Disconnected
+CPU slots 2 and 3 both auto-advanced from page 0 to page 1 at frame 701, 181
+source-frame ticks later, with port errors `[0,0,-1,-1]`. This matches the
+source counter `x2++ > 180` in `gmresultplayer.c`. Their next automatic page
+advance occurred at frame 1703. The 509 pulse and exact 160 ms hold / 120 ms
+release edge are retained; the new harness gates the *next* Enter until the
+first automatic page transition is observed. It is a bounded diagnostic, not
+full historical scheduling parity: the older Sheik-failure report contains no
+consumed PAD trace.
+
+Two rebuilt headless Chrome B captures reached natural Results but did not
+reproduce the camera failure. Falco won each match. The first no-input gate
+stopped at Results frame 516 in phase 2 / `stats_phase=0`; the second withheld
+Enter for 60 seconds and remained in that same phase through frame 1789. Both
+showed no page/button changes and correct port errors; all seven entry camera
+pointers were null. These results establish that a P1 Enter is required to
+enter active statistics; they do not implicate camera ownership. Reports and
+screenshots are preserved under
+`work/pr86-results-keyboard-gated-b-natural-r{2,3}/`.
+
+An earlier fixed-prefix helper required the consumed P1 Start after frame 509.
+That assumption was disproved by r4, where the first consumed Start was at 303.
+The current helper accepts the consumed initial Start at the actual source
+position, then waits for both slot-2/slot-3 page changes before allowing the
+next trusted Enter. Offline application to the r7 trace prefix through state
+frame 720 passes: initial Start 509–515, stats phase begins at 520, and both
+pages change 0→1 at 701 (181 ticks later), with ports `[0,0,-1,-1]`. The full
+r7 trace is intentionally not passed to this first-page gate: it also contains
+the later 1→2 transition at 1703, which occurs after the point where the
+controlled test must send confirmation. A fresh rendered capture of the
+adaptive gated path is still required; the historical Sheik-winner failure
+remains unresolved.
+
 ## Historical integration checks
 
 An earlier full-suite run recorded 1,442 tests (1,354 pass, 88 optional skips).
@@ -619,3 +756,183 @@ The final clean run passed: 1,465 tests in 445.966 seconds, 78 optional skips,
 zero failures (`work/pr86-final-suite-r3.log`). The affected Release runtime and
 content-trace builds also pass. The focused Wasm batch passes five Kirby donors
 plus all six distinctive-action branches.
+
+### Keyboard auto-page ordering correction (2026-09-27)
+
+The natural B capture `work/pr86-results-keyboard-gated-b-natural-r4/report.json`
+reached a Samus-win Results scene and retained 537/537 source PAD samples. Its
+old browser assertion failed because it rejected a second consumed P1 Start
+without checking when that Start occurred. Replaying the complete raw trace
+through the corrected helper now passes: the initial Start was consumed at
+Results source frames 303–315; active statistics began at frame 314; both
+disconnected CPU pages changed 0→1 at frame 495 (181 source-frame ticks after
+statistics began); and the next Start was consumed at frames 523–528, after
+both transitions. The corresponding trusted, non-repeat keyboard keydowns
+were observed at frames 303 and 523. All ordinary inputs retained the harness's
+160 ms hold / 120 ms release, and raw PAD errors remained `[0,0,-1,-1]`.
+
+The corrected source gate recognizes a consumed Start strictly after both
+page transitions as confirmation, while rejecting an extra Start before either
+page or between staggered page changes. The active-statistics phase may begin
+while the initial 160 ms key hold is still present; that overlap is retained
+instead of being misclassified as another confirmation. Focused Node and
+Python tests pass (5 Python cases), and offline reprocessing of r4 passes the
+source ordering checks. This is not a clean browser-runner pass: r4's report
+still correctly records the old harness assertion failure, so a fresh capture
+with the corrected harness must complete Results→CSS. Its winner was Samus and
+all seven camera-entry pointers were null; it neither reaches a camera guard
+failure nor resolves the historical natural Sheik-winner case.
+
+The remaining discriminator is unchanged: obtain a fresh natural slot-2
+Sheik-winner Results run with the corrected keyboard/PAD ordering checks and
+the camera ownership snapshots. Historical failure at cursor 560 remains
+separate evidence; the r4 helper correction is a test fix, not a runtime or
+camera-pool fix.
+
+The first fresh run using that helper revision,
+`work/pr86-results-keyboard-gated-b-natural-r5/report.json`, exposed a
+separate diagnostic false-pass: natural CSS return after three ordinary Enter
+pulses was treated as success even though neither disconnected CPU page had
+advanced. This Samus-win match did complete the rendered Results→CSS return,
+but its 417 retained Results ticks show no page transition; P1 Start was
+consumed at 213–218 and again at 395–401. The report's `result=pass` is not
+gate evidence and is superseded by this audit. No camera guard fired, and the
+entry pointer snapshots remained zero. The browser reported no page or native
+command errors and retained 12 timing interruptions; it was a rendered
+headless run, not a foreground timing test.
+
+The harness now stops the ordinary keyboard trigger attempts as soon as the
+first source-consumed Start appears, sends no more input while waiting for both
+CPU pages, and fails if CSS returns before the page gate. It then requires the
+next trusted Enter's source cursor to be later than both transitions, retains
+keydown/keyup source-frame brackets around the consumed PAD Start, and checks
+the 160/120 ms hold/release records. New captures also hash-bind the imported
+PAD-trace, keyboard-driver, and headless-browser helper sources. The corrected
+offline/Node/Python checks pass. Offline application to the r5 trace through
+frame 394 rejects its second Start before either CPU page changed. At the time
+this historical checkpoint was written, the adaptive gate had not yet been
+exercised in a fresh browser capture; the subsequent clean r7 result is
+recorded below.
+
+## Corrected natural keyboard Results gate (2026-09-27)
+
+The corrected browser harness was exercised in
+`work/pr86-results-keyboard-gated-b-natural-r7/report.json`. This is a clean
+headless Chrome 153 / WebGPU functional pass for one natural four-CPU9 B match
+on Final Destination through rendered Results and original CSS return. Samus
+(slot 0) won at match frame 14,163 with RNG 1,041,870,253. The renderer reported
+an Apple Metal adapter, no page/native-command errors, and 18 timing
+interruptions/resumes; these are not foreground timing or performance results.
+Its hash-bound Results entry packet,
+`work/pr86-results-keyboard-gated-b-natural-r7/results-entry-1-e6e6ca133f579ff6094c1b5e2701495a05314b804155fe2bbd9ad99bfbd7eda9.json`,
+records Samus as `ckind=16, ftkind=13` and slot-2 Zelda as
+`ckind=18, ftkind=19` at Results entry. Rendered gameplay, Results, auto-page,
+and CSS screenshots are retained in the same directory.
+
+The source-observed P1-only ordinary-keyboard route is now covered end to end:
+trusted Enter keydown/up brackets were at Results source frames 201/208 and
+429/435; P1 Start was consumed at 202–209 and 429–434. Active statistics began
+at frame 213, and disconnected slots 2/3 auto-advanced page 0→1 at frame 394,
+181 source ticks later and before the second confirmation. Port `err` values
+remained `[0,0,-1,-1]`, all other buttons and analog fields stayed neutral, and
+all 451 retained Results ticks returned without failure or overflow. Results
+returned to original CSS with the prior match/Results owners unloaded. The
+entry camera pointer snapshot fields serialized as zero/null and no ownership
+guard fired. A later scoped-assets audit found that these serialized values were
+the observer's default: Results is constructed in `finish_asset_handoff()`,
+which did not copy the camera snapshot. Do not treat r7's null/zero fields as
+entry-pointer evidence. The ownership guards were active and did not fire. This
+supersedes the earlier claim that only a two-port synthetic test had exercised
+the P1-only auto-page route.
+
+This natural control still does not reproduce the historical camera failure.
+The old report has a slot-2 Sheik winner at match frame 11,725/RNG
+2,897,689,676 and a failure at Results source cursor 560; it records three
+160ms/120ms Enter intentions but no trusted event brackets, consumed PAD
+samples, port status, Results phase/page state at tick 560, or pointer values.
+The new control has a slot-0 Samus winner at frame 14,163/RNG 1,041,870,253,
+two trusted Enter pulses, and page transitions at frame 394 followed by
+confirmation at 429. Therefore it demonstrates the natural keyboard/page
+mechanism and a non-Sheik CSS return, but cannot establish whether the old
+Sheik run had reached its CPU page transition by cursor 560 or locate its first
+invalid pool ownership boundary.
+
+The preceding corrected-harness retry,
+`work/pr86-results-keyboard-gated-b-natural-r6/report.json`, completed a
+similar Samus-win Results→CSS flow but is retained as a harness failure because
+the final validator referenced the PAD summary before loading it. The complete
+raw trace was independently checked offline. The source bookkeeping was fixed
+to defer its final pass until the post-return raw trace and trusted input
+brackets are both available; the new r7 report passes that final assertion.
+The earlier `padtick-r6` folder is a separate, older trace-record-shape failure
+and is not promoted to a pass.
+
+Next is a changed unforced natural B sample, preferably two matches in one
+fresh session, using the passing `keyboard-gated` harness. Continue until slot 2
+finishes as `ckind=18, ftkind=7`; then retain the live phase-labelled guard
+message (phase, tick, source/context/owner pool and actor pointers) and compare
+entry, auto-page, host handoff, exit and destruction. Until that exact winner
+reproduces or otherwise receives a defensible resolution, the historical
+camera-pool failure remains open and PR #86 is not ready to merge.
+
+## Scoped Results observer repair and fresh two-match control (2026-09-27)
+
+The failed two-match capture `work/pr86-results-keyboard-gated-b-natural-r8/`
+contains the complete first natural Samus-win Results→CSS loop, then a
+match-2 observer failure. Its raw Results trace had 683 attempts/rows: rows
+0–447 belonged to match 1 (source frames 1–448), while row 448 restarted at
+source frame 1 for match 2. The Results trace reset was below
+`advance()`'s `scoped_assets` early return, so the disc-backed handoff skipped
+it. The source reset and camera-snapshot reset now run before that return; the
+trace summarizer rejects any non-increasing source-frame boundary rather than
+folding separate Results sessions together. A static regression protects the
+reset ordering.
+
+The same audit found that scoped Results construction occurs in
+`finish_asset_handoff()`. That path did not copy
+`GameplayResultsSession::camera_entry_snapshot()`, so the earlier r7 zero/null
+pointer fields (and r8's) were defaults, not captured object ownership. The
+scoped constructor now records the snapshot after construction and before the
+retained PAD input is released. A source regression covers that ordering.
+
+Fresh headless capture
+`work/pr86-results-keyboard-gated-b-natural-r9/report.json` verified the trace
+reset: its single match had 1,803 monotonic rows and a nonzero constructed
+camera-pool snapshot. It then exposed a separate input-gate flaw. The first
+ordinary Enter produced P1 Start at Results frame 198 while the preceding
+source state was fade phase 1; the held input lasted through phase 2, but that
+phase remained at `stats_phase=0` for the retained 1,803 ticks. The CPU auto
+pages therefore never began, and the run correctly failed the gate rather
+than claiming a Results pass. Offline evaluation of that trace now rejects the
+phase-1 Start explicitly.
+
+The keyboard-gated harness now waits for original Results phase 2 before
+dispatching any Enter. On the fresh rebuilt runtime
+(development Wasm SHA-256
+`41bc87d7a1e09b1a4b54750fed606f4457b2f0d88c71252e83752d2f299fe0f4`),
+`work/pr86-results-keyboard-gated-b-natural-r10/report.json` passes two natural
+B CPU9, four-stock Final Destination matches through rendered Results→CSS
+returns. Both source traces are separate, monotonic 458-row sessions. Phase 2
+was observed at source frames 203 and 206; the initial P1 Start runs began at
+210 and 213, and disconnected slots 2/3 each changed page 0→1 at frames 402
+and 405 (181 ticks after active statistics began). Trusted post-page Enter
+confirmation, four-port errors `[0,0,-1,-1]`, all source tick returns, typed
+entry packets, original CSS returns, GPU availability, screenshots, diagnostics
+and 34 timing interruptions are retained. There were no page/native errors;
+headless functional success is not foreground timing or performance evidence.
+
+The first winner was Samus, slot 0, at match frame 14,058. The second was
+Yoshi, slot 1, at frame 14,669; slot 2 had naturally transformed to Sheik
+(`ckind=18, ftkind=7`) at Results entry but did not win. Both camera snapshots
+now capture the constructed pool (`source_pool_after_onenter`, adopted context
+pool and owner pool `0xa59e6e0` in this run); no ownership guard fired. This is
+a natural Sheik-loser control, not a reproduction or resolution of the
+historical slot-2 Sheik-winner failure at cursor 560.
+
+Focused coverage after these changes: runtime target build passed; Node
+observer/harness checks passed; `test_results_entry_packet.py` passed 6/6;
+`git diff --check` passed. The first Enter is now checked at the phase-2
+boundary before waiting for CPU auto-pages. The next browser sample remains an
+unforced B run until a typed slot-2 Sheik winner reaches the guarded Results
+path. The historical camera failure and first invalid ownership transition
+remain unresolved; PR #86 is not ready to merge.

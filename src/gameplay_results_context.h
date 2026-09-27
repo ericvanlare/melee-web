@@ -18,6 +18,18 @@ extern "C" {
 
 typedef struct MeleeWebResultsContext MeleeWebResultsContext;
 
+/* Read-only pointer snapshots around source Results OnEnter and native
+ * collision adoption. These do not establish ownership or relax its guards. */
+typedef struct MeleeWebResultsCameraEntrySnapshot {
+    const void* saved_pool_at_context_begin;
+    const void* source_pool_before_onenter;
+    const void* owner_pool_before_onenter;
+    const void* source_pool_after_onenter;
+    const void* source_pool_after_collision_adoption;
+    const void* context_pool_after_adoption;
+    const void* owner_pool_after_adoption;
+} MeleeWebResultsCameraEntrySnapshot;
+
 /* Owns one original Results scene inside an already prepared Results world.
  * The caller retains the prepared C++ world/assets/audio owners through end(). */
 MeleeWebResultsContext* melee_web_results_context_begin(
@@ -30,6 +42,8 @@ int melee_web_results_context_draw(MeleeWebResultsContext*, char* error, size_t 
 int melee_web_results_context_requested(const MeleeWebResultsContext*);
 uint32_t melee_web_results_context_random_seed(const MeleeWebResultsContext*);
 uint32_t melee_web_results_context_ticks(const MeleeWebResultsContext*);
+int melee_web_results_context_camera_entry_snapshot(
+    const MeleeWebResultsContext*, MeleeWebResultsCameraEntrySnapshot*);
 /* Run scene OnExit before the enclosing mode OnExit. Keep scene assets/heap
  * resident until end(), matching the original scene-manager ordering. */
 int melee_web_results_context_exit(MeleeWebResultsContext*, char*, size_t);

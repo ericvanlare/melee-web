@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {bindResultsEntryPacket,readResultsEntryPacket} from './results_entry_packet.mjs';
 import {queueResultsP1StartAtCurrentSource} from './results_source_pad_input.mjs';
+import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
+  summarizeResultsPadTrace} from './results_source_pad_trace.mjs';
 
 const packet={schema:'melee-web-results-entry-v1',abi:{target:'wasm32',byte_order:'little-endian',pointer_bytes:4},
   match_index:1,entry_seed:0xfedcba98,
@@ -27,6 +29,175 @@ Module._melee_web_native_menu_results_entry_packet=()=>{calls++;return JSON.stri
 assert.deepEqual((await readResultsEntryPacket(page)).packet,packet);
 assert.equal(calls,2);
 delete globalThis.Module;
+
+const resultsPadTrace={attempts:5,retained:5,capacity:8192,overflow:false,
+  camera_entry:{saved_pool_at_context_begin:'0x0',source_pool_before_onenter:'0x0',
+    owner_pool_before_onenter:'0x0',source_pool_after_onenter:'0x1234',
+    source_pool_after_collision_adoption:'0x1234',context_pool_after_adoption:'0x1234',
+    owner_pool_after_adoption:'0x1234'},
+  samples:[
+    {source_frame:408,tick_returned:true,pads:[0,0,0,0].map((_,port)=>({button:0,err:port<2?0:-1})),
+      results_state_after_tick:{source_frame:409,phase:3,stats_phase:2,
+        players:[0,1,2,3].map(()=>({page:0,confirmed:0}))}},
+    {source_frame:409,tick_returned:true,pads:[0,0,0,0].map((_,port)=>({button:0,err:port<2?0:-1})),
+      results_state_after_tick:{source_frame:410,phase:3,stats_phase:2,
+        players:[{page:0,confirmed:0},{page:0,confirmed:0},
+          {page:1,confirmed:0},{page:1,confirmed:0}]}},
+    ...[500,501,502].map(source_frame=>({source_frame,tick_returned:true,
+      pads:[0,0,0,0].map((_,port)=>({button:port===0&&source_frame<502?4096:0,err:port<2?0:-1})),
+      results_state_after_tick:null})),
+  ]};
+const retainedPadTrace=buildResultsPadTraceRecord(1,'natural-results-to-css',resultsPadTrace);
+assert.strictEqual(retainedPadTrace.trace,resultsPadTrace);
+assert.deepEqual(retainedPadTrace.trace.camera_entry,resultsPadTrace.camera_entry);
+assert.equal(retainedPadTrace.summary.tick_returned,5);
+assert.deepEqual(retainedPadTrace.summary.results_page_transitions.map(row=>row.slot),[2,3]);
+assert.deepEqual(retainedPadTrace.summary.p1_start_runs,
+  [{first_source_frame:500,last_source_frame:501}]);
+assert.deepEqual(retainedPadTrace.summary.port_error_values,[[0],[0],[-1],[-1]]);
+const reusedObserverTrace={...resultsPadTrace,attempts:7,retained:7,samples:[
+  ...resultsPadTrace.samples.slice(0,2),
+  {...resultsPadTrace.samples[0],source_frame:1,
+    results_state_after_tick:{...resultsPadTrace.samples[0].results_state_after_tick,
+      source_frame:2,phase:0,stats_phase:0}},
+]};
+assert.throws(()=>summarizeResultsPadTrace(reusedObserverTrace),/crossed a session boundary/,
+  'A retained trace spanning two Results contexts must not be treated as one session');
+const neutralPads=()=>[0,1,2,3].map(port=>({button:0,err:port<2?0:-1}));
+const firstStatsPageState=source_frame=>({source_frame,phase:3,stats_phase:2,
+  players:[0,1,2,3].map(()=>({page:0,confirmed:0}))});
+const preKeyboardTrace={attempts:4,retained:4,capacity:8192,overflow:false,samples:[
+  ...resultsPadTrace.samples.slice(0,2),
+  {source_frame:498,tick_returned:true,pads:neutralPads(),results_state_after_tick:firstStatsPageState(499)},
+  {source_frame:499,tick_returned:true,pads:neutralPads(),results_state_after_tick:firstStatsPageState(500)},
+]};
+const preStatisticsTrace={...preKeyboardTrace,samples:[
+  {source_frame:515,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{source_frame:516,phase:2,stats_phase:0,
+      players:[0,1,2,3].map(()=>({page:0,confirmed:0}))}},
+]};
+assert.equal(assertResultsCpuPagesAfterInitialP1Keyboard(preStatisticsTrace,509),null,
+  'The source-frame lower bound must not be mistaken for a consumed initial Enter or active statistics');
+const keyboardGateTrace={attempts:5,retained:5,capacity:8192,overflow:false,samples:[
+  {source_frame:508,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{source_frame:509,phase:2,stats_phase:0,
+      players:[0,1,2,3].map(()=>({page:0,confirmed:0}))}},
+  {source_frame:509,tick_returned:true,pads:[{button:4096,err:0},...neutralPads().slice(1)],
+    results_state_after_tick:{source_frame:510,phase:3,stats_phase:2,
+      players:[0,1,2,3].map(()=>({page:0,confirmed:0}))}},
+  {source_frame:510,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:firstStatsPageState(511)},
+  {source_frame:689,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{...firstStatsPageState(690),players:[{page:0,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:1,confirmed:0}]}},
+  {source_frame:690,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{...firstStatsPageState(691),players:[{page:0,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:1,confirmed:0}]}},
+]};
+const pageGate=assertResultsCpuPagesAfterInitialP1Keyboard(keyboardGateTrace,509);
+assert.equal(pageGate.source_frame,691);
+assert.deepEqual(pageGate.transitions.map(row=>row.slot),[2,3]);
+assert.deepEqual(pageGate.initial_start,{first_source_frame:509,last_source_frame:509});
+assert.deepEqual(pageGate.post_page_start_runs,[]);
+assert.equal(pageGate.stats_phase_start_source_frame,510);
+assert.deepEqual(pageGate.cpu_page_delay_source_ticks,[{slot:2,ticks:180},{slot:3,ticks:180}]);
+const fadeStartTrace={...keyboardGateTrace,samples:keyboardGateTrace.samples.map((row,index)=>
+  index===0?{...row,results_state_after_tick:{...row.results_state_after_tick,phase:1}}:row)};
+assert.throws(()=>assertResultsCpuPagesAfterInitialP1Keyboard(fadeStartTrace,509),
+  /first P1 Start edge must be consumed from original Results phase 2/,
+  'A Start consumed during phase 1 must not count as the statistics trigger');
+const nonNeutralResultsInput={...keyboardGateTrace,samples:keyboardGateTrace.samples.map((row,index)=>
+  index===0?{...row,pads:[{...row.pads[0],stick_x:1},...row.pads.slice(1)]}:row)};
+assert.throws(()=>assertResultsCpuPagesAfterInitialP1Keyboard(nonNeutralResultsInput,509),
+  /neutral analog controls/,
+  'The keyboard-only discriminator must reject an unrelated analog input');
+const postTransitionKeyboardTrace={attempts:6,retained:6,capacity:8192,overflow:false,samples:[
+  {source_frame:313,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{...firstStatsPageState(314),phase:2}},
+  {source_frame:314,tick_returned:true,
+    pads:[{button:4096,err:0},...neutralPads().slice(1)],
+    results_state_after_tick:firstStatsPageState(315)},
+  {source_frame:315,tick_returned:true,
+    pads:[{button:4096,err:0},...neutralPads().slice(1)],
+    results_state_after_tick:firstStatsPageState(316)},
+  {source_frame:493,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:firstStatsPageState(494)},
+  {source_frame:494,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{...firstStatsPageState(495),players:[{page:0,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:1,confirmed:0}]}},
+  {source_frame:523,tick_returned:true,
+    pads:[{button:4096,err:0},...neutralPads().slice(1)],
+    results_state_after_tick:{...firstStatsPageState(524),phase:4,players:[{page:0,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:1,confirmed:0}]}},
+  {source_frame:536,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{...firstStatsPageState(537),phase:4,players:[{page:0,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:1,confirmed:0}]}}
+]};
+const alreadyConfirmedAfterPages=assertResultsCpuPagesAfterInitialP1Keyboard(
+  postTransitionKeyboardTrace,509);
+assert.deepEqual(alreadyConfirmedAfterPages.initial_start,
+  {first_source_frame:314,last_source_frame:315});
+assert.equal(alreadyConfirmedAfterPages.stats_phase_start_source_frame,315,
+  'The statistics phase may begin during the held initial keyboard Start');
+assert.deepEqual(alreadyConfirmedAfterPages.cpu_page_delay_source_ticks,
+  [{slot:2,ticks:180},{slot:3,ticks:180}]);
+assert.deepEqual(alreadyConfirmedAfterPages.post_page_start_runs,
+  [{first_source_frame:523,last_source_frame:523}],
+  'A Start already consumed strictly after both CPU transitions is a valid confirmation');
+const oneCpuPageTrace={...preKeyboardTrace,samples:[
+  {source_frame:699,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:firstStatsPageState(700)},
+  {source_frame:700,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{...firstStatsPageState(701),players:[{page:0,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:0,confirmed:0}]}},
+  {source_frame:701,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{...firstStatsPageState(702),players:[{page:0,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:0,confirmed:0}]}},
+]};
+assert.equal(assertResultsCpuPagesAfterInitialP1Keyboard(oneCpuPageTrace,509),null,
+  'The source-tick gate must wait for both disconnected CPU page transitions');
+const connectedPageTrace={...preKeyboardTrace,samples:[
+  {source_frame:699,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:firstStatsPageState(700)},
+  {source_frame:700,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{...firstStatsPageState(701),players:[{page:1,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:1,confirmed:0}]}},
+]};
+assert.throws(()=>assertResultsCpuPagesAfterInitialP1Keyboard(connectedPageTrace,509),
+  /unexpected Results page changed/);
+const postPageKeyboardTrace={...keyboardGateTrace,samples:[...keyboardGateTrace.samples,
+  {...keyboardGateTrace.samples.at(-1),source_frame:692,
+    results_state_after_tick:{...keyboardGateTrace.samples.at(-1).results_state_after_tick,
+      source_frame:693,phase:4},pads:[{button:4096,err:0},...neutralPads().slice(1)]}]};
+assert.deepEqual(assertResultsCpuPagesAfterInitialP1Keyboard(postPageKeyboardTrace,509)
+  .post_page_start_runs,[{first_source_frame:692,last_source_frame:692}],
+  'A distinct ordinary P1 Start after both auto transitions is a valid confirmation');
+const prePageKeyboardTrace={...keyboardGateTrace,samples:[
+  ...keyboardGateTrace.samples.slice(0,3),
+  {source_frame:520,tick_returned:true,
+    pads:[{button:4096,err:0},...neutralPads().slice(1)],
+    results_state_after_tick:firstStatsPageState(521)},
+  ...keyboardGateTrace.samples.slice(3)
+]};
+assert.throws(()=>assertResultsCpuPagesAfterInitialP1Keyboard(prePageKeyboardTrace,509),
+  /additional P1 Start/,
+  'A distinct P1 Start before either CPU page transition is not confirmation');
+const confirmationDuringStaggeredPages={...keyboardGateTrace,samples:[
+  ...keyboardGateTrace.samples.slice(0,3),
+  {source_frame:519,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{...firstStatsPageState(520),players:[{page:0,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:0,confirmed:0}]}},
+  {source_frame:521,tick_returned:true,
+    pads:[{button:4096,err:0},...neutralPads().slice(1)],
+    results_state_after_tick:{...firstStatsPageState(522),players:[{page:0,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:0,confirmed:0}]}},
+  {source_frame:529,tick_returned:true,pads:neutralPads(),
+    results_state_after_tick:{...firstStatsPageState(530),players:[{page:0,confirmed:0},
+      {page:0,confirmed:0},{page:1,confirmed:0},{page:1,confirmed:0}]}}
+]};
+assert.throws(()=>assertResultsCpuPagesAfterInitialP1Keyboard(confirmationDuringStaggeredPages,509),
+  /additional P1 Start/,
+  'A confirmation between staggered CPU-page transitions must remain rejected');
 
 const pauseEvents=[];
 const diagnostics=[
