@@ -133,7 +133,7 @@ achieving game accuracy and implementing the port's rollback engine.
 
 | Infrastructure scope | Estimated engineering effort |
 | --- | --- |
-| Controlled desktop-to-desktop proof: private direct pairing, endpoint-adapted Slippi clients, known networks | 1–3 engineer-weeks |
+| Controlled same-machine proof: private direct pairing and two endpoint-adapted headless Slippi clients | 1–3 engineer-weeks |
 | Small independent community service: accounts, direct/unranked pairing, deployment and basic operational reliability | 4–8 engineer-weeks |
 | Browser-to-desktop service with a gateway, client integration, NAT/loss testing and useful diagnostics | 8–16 engineer-weeks |
 | Mature ranked service with reporting, moderation, regional operations and release maintenance | 6–12+ engineer-months, plus ongoing operation |
@@ -151,18 +151,75 @@ memory snapshots cannot simply be transplanted into our source runtime. Reserve
 a separate, potentially multi-month client effort; a tighter estimate needs an
 actual restore/re-simulate benchmark and state-ownership inventory.
 
+## First online infrastructure milestone: two local headless clients
+
+Run our matchmaker and two adapted desktop Slippi processes on the same
+development machine, controlled by one bounded command. This is the first
+online infrastructure milestone, separate from the port's active local-game
+acceptance milestone. It can isolate server feasibility using existing Slippi
+gameplay and rollback before integrating Melee Web.
+
+The initial implementation should provide:
+
+1. **A pinned native headless client.** Select and build a Slippi client/mod
+   bundle for this machine. Verify that the chosen no-GUI platform creates no
+   visible windows, takes no focus and emits no audible output. Suppressing
+   presentation must preserve game update/draw callbacks and emulated scheduling.
+   Record the video/audio profile; this run makes no pixel or PCM claim. Preserve
+   upstream checkouts and explain the adaptation in downstream patches.
+2. **Two isolated instances.** Give each client its own user/configuration and
+   save directories, test identity, input channel, logs, replay output and UDP
+   port. The owned disc may be shared read-only. Keep all mutable test state in
+   ignored local directories; leave personal Slippi profiles untouched.
+3. **Our actual local service.** Exercise private direct-code pairing through
+   the replacement matchmaking protocol and real ENet peer connections over
+   loopback. Use independent test credentials and explicit local service
+   endpoints, with no dependency on official accounts or production matchmaking.
+   Keep ordinary match initialization and the pinned gameplay modifications.
+4. **Automated gameplay.** Drive each local player's ordinary controller input
+   through Slippi's menus into a four-stock Mario/Final Destination match. Finish
+   the match and a rematch. Do not inject expected game state or add gameplay
+   modifications merely to make the harness advance.
+5. **Observed rollback and synchronization.** Run a baseline and a bounded
+   impairment case using a local packet proxy, without changing machine-wide
+   network settings. Delay selected inputs enough to cause prediction correction;
+   retain evidence that restore/re-simulation actually occurred. Compare the
+   finalized input timeline and declared game-state fields on both clients and
+   against the baseline under the same initial conditions and scripted inputs.
+   Record frame, RNG, fighter state, stocks and outcome at explicit boundaries;
+   agreement of sparse network checksums alone is insufficient.
+6. **A repeatable pass/fail report.** Pin source, patches, binaries, codeset,
+   configuration, input scripts and fault schedule. Retain logs, replays and
+   first-divergence diagnostics locally. Bound startup and every run phase,
+   exercise disconnect and failed-pairing paths, and clean up only owned
+   processes. A timeout fails at its boundary; it is not silently retried.
+
+The build and boot check is the first checkpoint within this milestone. No
+adapted Slippi binary has yet been built or launched by this research, and two
+instances sustaining the required cadence on this machine remains unmeasured.
+The repository's [reference Dolphin builder](../scripts/build_reference_dolphin.py)
+already describes a headless build route, but that separately pinned vanilla
+reference is not evidence that a selected Slippi build passes this gate.
+
+This milestone establishes local functional evidence only. Loopback does not
+exercise NAT hole punching, Internet path selection or geographic latency;
+same-host CPU contention also differs from two players on separate machines.
+Cross-network operation and browser interoperability remain later gates. A
+passing headless pair does not admit Melee Web gameplay or foreground timing.
+
 ## Smallest useful validation sequence
 
-1. Build a minimal independent matchmaker and connect two endpoint-adapted
-   desktop Slippi clients. Complete matches and rematches across distinct
-   networks. This isolates server feasibility from the unfinished browser port.
-2. Test the browser/ENet gateway with deterministic packet workloads, including
+1. Complete the same-machine headless pair above, including observed rollback
+   and a clean match/rematch outcome.
+2. Run the adapted desktop pair across distinct machines and networks. Exercise
+   NAT/connection failures and measure delivery under real network conditions.
+3. Test the browser/ENet gateway with deterministic packet workloads, including
    delay, jitter, loss, reordering and disconnects. Measure full-path input
    arrival, not merely gateway acknowledgements.
-3. Integrate a pinned Slippi-compatible port profile and compare complete matches
+4. Integrate a pinned Slippi-compatible port profile and compare complete matches
    against the pinned desktop reference under forced rollback. Diagnose the
    first divergence, including audio/presentation effects and restore history.
-4. Expand to queues and public operations after those boundaries pass.
+5. Expand to queues and public operations after those boundaries pass.
 
 The decisive first experiment can happen independently of achieving complete
 Melee Web accuracy. Architectural confidence is high that a basic replacement

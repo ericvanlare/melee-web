@@ -179,17 +179,23 @@ There is no combined delivery date yet. Those larger runtime efforts need
 state-ownership analysis, reference coverage and restore/re-simulation
 measurements before a useful schedule can be made.
 
-The smallest proposed experiment is a minimal independent matchmaker connecting
-two endpoint-adapted desktop Slippi clients. Use a pinned client/mod bundle and
-independent test identities. Success means complete matches and rematches across
-distinct networks, retained connection logs and explicit failures for unsupported
-conditions. It would establish a bounded server result without depending on
-Melee Web's unfinished gameplay work.
+The first proposed online infrastructure milestone is
+[two adapted desktop Slippi clients running headless on the same development machine](SLIPPI_SELF_HOSTING_RESEARCH.md#first-online-infrastructure-milestone-two-local-headless-clients),
+connected through our own local matchmaker. One command should launch isolated
+clients, drive a complete match and rematch through ordinary controller input,
+exercise rollback with controlled late inputs, retain synchronization evidence
+and clean up its processes. Use a pinned client/mod bundle and independent test
+identities. The native emulator clients are development tools; they do not enter
+the browser product.
 
-Follow it with a browser/ENet transport probe measuring actual input arrival
-under delay, loss, reordering and disconnects. Only then integrate the port and
-claim cross-play after full reference matches with forced rollback. Neither a
-successful pairing nor matching checksums alone proves general game accuracy.
+This first result would establish a bounded local server/client integration.
+Same-machine traffic does not test Internet routing, NAT traversal, browser
+transport or real-world latency. Test distinct networks next, then a browser/ENet
+transport probe measuring actual input arrival under delay, loss, reordering and
+disconnects. Integrate the port only with its accuracy and rollback prerequisites
+established, and claim cross-play after full reference matches with forced
+rollback. Neither a successful pairing nor matching checksums alone proves
+general game accuracy.
 
 The decisions still open are the exact Slippi release target, snapshot design,
 transport choice, acceptable measured latency, official-service integration,
