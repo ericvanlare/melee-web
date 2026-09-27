@@ -16,6 +16,11 @@
 [data-controller-settings] .source-status { grid-column: 2; margin: 0; color: #555; font-size: 12px; overflow-wrap: anywhere; }
 [data-controller-settings] .source-note { margin: 8px 0 0; color: #694d00; font-size: 12px; line-height: 1.4; }
 [data-controller-settings] .keyboard-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+[data-controller-settings] .touch-settings { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(120px, 2fr) auto; gap: 6px 10px; align-items: center; margin: 4px 0 14px; }
+[data-controller-settings] .touch-settings h3 { grid-column: 1 / -1; margin: 0 0 2px; font-size: 14px; }
+[data-controller-settings] .touch-settings input { width: 100%; accent-color: #345f7a; }
+[data-controller-settings] .touch-settings output { min-width: 38px; font-variant-numeric: tabular-nums; text-align: right; }
+[data-controller-settings] .touch-settings-note { grid-column: 1 / -1; margin: 0; color: #555; font-size: 12px; line-height: 1.4; }
 [data-controller-settings] details { margin-top: 12px; border-top: 1px solid #ddd; }
 [data-controller-settings] details summary { padding: 10px 0; cursor: pointer; font-weight: 600; }
 [data-controller-settings] details[open] summary { margin-bottom: 4px; }
@@ -27,4 +32,6 @@
   [data-controller-settings] .controls-heading { gap: 8px; }
   [data-controller-settings] .source-row { grid-template-columns: 1fr; }
   [data-controller-settings] .source-status { grid-column: 1; }
+  [data-controller-settings] .touch-settings { grid-template-columns: 1fr auto; }
+  [data-controller-settings] .touch-settings label { grid-column: 1 / -1; }
 }

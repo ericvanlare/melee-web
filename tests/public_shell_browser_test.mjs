@@ -62,12 +62,25 @@ try {
   await page.setViewportSize({width: 1280, height: 1000});
   if (await page.locator('#fullscreen').isVisible()) {
     await page.locator('#fullscreen').click();
-    await page.waitForFunction(() => Boolean(document.fullscreenElement));
-    assert.equal(await page.locator('#fullscreen').innerText(), 'Exit fullscreen');
-    await page.locator('#fullscreen').click();
-    await page.waitForFunction(() => !document.fullscreenElement);
-    pass('fullscreen enters and exits through real user control');
-  } else pass('fullscreen unsupported and control correctly hidden');
+    await page.waitForFunction(() => Boolean(document.fullscreenElement) ||
+      document.querySelector('#player').classList.contains('player-expanded') ||
+      /declined fullscreen/i.test(document.querySelector('#fullscreen-status').textContent));
+    if (await page.evaluate(() => Boolean(document.fullscreenElement))) {
+      await page.waitForFunction(() => document.querySelector('#fullscreen').textContent === 'Exit fullscreen');
+      assert.equal(await page.locator('#fullscreen').innerText(), 'Exit fullscreen');
+      await page.locator('#fullscreen').click();
+      await page.waitForFunction(() => !document.fullscreenElement);
+      pass('native fullscreen enters and exits through real user control');
+    } else {
+      if (!(await page.locator('#player').evaluate(element => element.classList.contains('player-expanded'))))
+        await page.locator('#fullscreen').click();
+      assert.match(await page.locator('#fullscreen-status').innerText(), /browser controls remain visible/i);
+      assert.equal(await page.locator('#fullscreen').innerText(), 'Shrink player');
+      await page.locator('#fullscreen').click();
+      assert.equal(await page.locator('#player').evaluate(element => element.classList.contains('player-expanded')), false);
+      pass('unsupported/rejected fullscreen exposes the labeled page expansion fallback');
+    }
+  } else throw Error('Fullscreen fallback control must remain visible and enabled');
   for (const [route, heading] of Object.entries({'/terms': 'Terms of Use', '/privacy': 'Privacy Notice',
       '/copyright': 'Copyright & contact', '/notices': 'About & legal'})) {
     const legalResponse = await page.goto(origin + route, {waitUntil: 'networkidle'});

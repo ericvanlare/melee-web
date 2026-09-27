@@ -157,6 +157,8 @@ class PublicReleaseTests(unittest.TestCase):
             "controller-panel.css": fixture_root / "web" / "controller-panel.css",
             "controller-settings.mjs": fixture_root / "web" / "controller-settings.mjs",
             "controller-settings.css": fixture_root / "web" / "controller-settings.css",
+            "touch-controls.mjs": fixture_root / "web" / "touch-controls.mjs",
+            "touch-controls.css": fixture_root / "web" / "touch-controls.css",
         }
         for name, path in source_map.items():
             shutil.copyfile(path, runtime / name)

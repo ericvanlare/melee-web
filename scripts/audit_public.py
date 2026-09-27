@@ -445,6 +445,8 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
         "controller-panel.css": ROOT / "web" / "controller-panel.css",
         "controller-settings.mjs": ROOT / "web" / "controller-settings.mjs",
         "controller-settings.css": ROOT / "web" / "controller-settings.css",
+        "touch-controls.mjs": ROOT / "web" / "touch-controls.mjs",
+        "touch-controls.css": ROOT / "web" / "touch-controls.css",
     }
     for rel in source_map:
         runtime_files[rel] = _read_output(output, f"{runtime_path}/{rel}", "player")

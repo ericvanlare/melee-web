@@ -170,6 +170,8 @@ def _player_fixture() -> tuple[dict[str, bytes], dict[str, object]]:
         "controller-panel.css": b".controller-panel {}",
         "controller-settings.mjs": b"export {};",
         "controller-settings.css": b".controller-settings {}",
+        "touch-controls.mjs": b"export {};",
+        "touch-controls.css": b".touch-controls {}",
         "gameplay_public.js": b"// gameplay_public.wasm",
         "gameplay_public.wasm": b"\x00asm\x01\x00\x00\x00",
         "gameplay_public.data": b"SQLite format 3\x00seed",

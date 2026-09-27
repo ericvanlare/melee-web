@@ -1,11 +1,13 @@
 import {keyboardRows} from './prototype-keyboard-layouts.mjs';
 import {mountControllerPanel} from './controller-panel.mjs';
+import {mountTouchControls} from './touch-controls.mjs';
 
-export const SOURCE_MODES = Object.freeze(['auto', 'keyboard', 'controller', 'off']);
+export const SOURCE_MODES = Object.freeze(['auto', 'keyboard', 'controller', 'touch', 'off']);
 export const SETTINGS_KEY = 'melee-prototype-keyboard-v1';
 
-const validSource = mode => SOURCE_MODES.includes(mode) ? mode : 'auto';
+const validSource = (mode, port = 0) => SOURCE_MODES.includes(mode) && !(mode === 'touch' && port !== 0) ? mode : 'auto';
 const validLayout = layout => ['two', 'boxx'].includes(layout) ? layout : 'two';
+const validTouchOpacity = opacity => Number.isFinite(opacity) ? Math.max(0.25, Math.min(0.75, opacity)) : 0.55;
 const sourceSelect = port => `player-${port ? 'two' : 'one'}-source`;
 const sourceStatus = port => `player-${port ? 'two' : 'one'}-source-status`;
 
@@ -15,14 +17,15 @@ function safeStorage(storage) {
 }
 
 function readSettings(storage, key, initialSources = ['auto', 'auto']) {
-  const fallback = {layout: 'two', sources: initialSources.map(validSource)};
+  const fallback = {layout: 'two', sources: initialSources.map((mode, port) => validSource(mode, port)), touchOpacity: 0.55};
   if (!storage || !key) return fallback;
   try {
     const saved = JSON.parse(storage.getItem(key) || 'null');
     if (!saved || typeof saved !== 'object') return fallback;
-    const result = {layout: validLayout(saved.layout), sources: fallback.sources.slice()};
+    const result = {layout: validLayout(saved.layout), sources: fallback.sources.slice(),
+      touchOpacity: validTouchOpacity(saved.touchOpacity)};
     if (Array.isArray(saved.sources)) {
-      for (let port = 0; port < 2; port++) result.sources[port] = validSource(saved.sources[port]);
+      for (let port = 0; port < 2; port++) result.sources[port] = validSource(saved.sources[port], port);
     } else {
       // Older public preferences stored whether each keyboard was enabled.
       // Preserve their effective source: enabled means Auto, disabled means
@@ -34,9 +37,9 @@ function readSettings(storage, key, initialSources = ['auto', 'auto']) {
   } catch { return fallback; }
 }
 
-function saveSettings(storage, key, layout, sources) {
+function saveSettings(storage, key, layout, sources, touchOpacity) {
   if (!storage || !key) return;
-  try { storage.setItem(key, JSON.stringify({layout, sources: sources.slice(0, 2)})); }
+  try { storage.setItem(key, JSON.stringify({layout, sources: sources.slice(0, 2), touchOpacity})); }
   catch { /* Session-only controls when storage is unavailable. */ }
 }
 
@@ -69,6 +72,7 @@ function controllerName(row) {
 function describeSource(mode, row, port, layout) {
   if (mode === 'off') return 'Off';
   if (mode === 'keyboard') return 'Keyboard';
+  if (mode === 'touch') return 'Touch controls · overlay enabled';
   if (mode === 'controller') {
     return row ? `Controller only · ${controllerName(row)}` : 'Controller only · waiting for a ready controller';
   }
@@ -98,6 +102,14 @@ function renderMarkup(container) {
         element('option', {value: 'boxx', textContent: '1 player · B0XX'}),
       ),
     ),
+    element('section', {className: 'touch-settings', 'aria-labelledby': 'touch-settings-title'},
+      element('h3', {id: 'touch-settings-title', textContent: 'Touch controls'}),
+      element('label', {for: 'touch-opacity', textContent: 'Overlay opacity'}),
+      element('input', {id: 'touch-opacity', type: 'range', min: '0.25', max: '0.75', step: '0.05',
+        value: '0.55', 'aria-label': 'Touch overlay opacity'}),
+      element('output', {id: 'touch-opacity-value', for: 'touch-opacity', textContent: '55%'}),
+      element('p', {className: 'touch-settings-note', textContent: 'Player 1 only. L/R presses send the digital shoulder button and full analog trigger pressure.'}),
+    ),
     element('details', {id: 'keyboard-bindings-details'},
       element('summary', {textContent: 'Keyboard bindings'}),
       element('table', {id: 'keyboard-bindings', 'aria-label': 'Keyboard bindings'}),
@@ -115,6 +127,7 @@ function renderMarkup(container) {
         element('option', {value: 'auto', textContent: 'Auto (controller if connected, keyboard otherwise)'}),
         element('option', {value: 'keyboard', textContent: 'Keyboard'}),
         element('option', {value: 'controller', textContent: 'Controller only'}),
+        ...(port === 0 ? [element('option', {value: 'touch', textContent: 'Touch controls'})] : []),
         element('option', {value: 'off', textContent: 'Off'}),
       ),
       element('p', {id: sourceStatus(port), className: 'source-status', role: 'status', 'aria-live': 'polite',
@@ -143,6 +156,7 @@ export function mountControllerSettings({container, storage,
   const loaded = readSettings(store, preferenceKey, initialSources);
   let layout = loaded.layout;
   const sources = loaded.sources;
+  let touchOpacity = loaded.touchOpacity;
   if (layout === 'boxx' && sources[1] === 'keyboard') sources[1] = 'auto';
   let player = null, applySequence = 0, applyPromise = Promise.resolve();
   let controllerPanel = null, lastRows = [], lastInspection = 0;
@@ -150,10 +164,25 @@ export function mountControllerSettings({container, storage,
   const dialog = container.matches?.('dialog') ? container : container.closest?.('dialog');
   const sourceElements = [$(sourceSelect(0)), $(sourceSelect(1))];
   const layoutElement = $('keyboard-layout');
+  const touchOpacityElement = $('touch-opacity');
   const closeElement = $('controls-close');
   const legacy = legacyKeyboard.filter(Boolean);
+  const touchContainer = container.ownerDocument?.getElementById?.('touch-controls') || document.getElementById('touch-controls');
+  const canvas = container.ownerDocument?.getElementById?.('canvas') || document.getElementById('canvas');
+  const touchControls = touchContainer && canvas ? mountTouchControls({container: touchContainer, canvas}) : null;
 
-  function save() { saveSettings(store, preferenceKey, layout, sources); }
+  function save() { saveSettings(store, preferenceKey, layout, sources, touchOpacity); }
+  function updateTouchOpacity() {
+    if (!touchOpacityElement) return;
+    touchOpacityElement.value = String(touchOpacity);
+    const value = `${Math.round(touchOpacity * 100)}%`;
+    $('touch-opacity-value').value = value;
+    $('touch-opacity-value').textContent = value;
+    touchControls?.setOpacity(touchOpacity);
+  }
+  function updateTouchSource() {
+    touchControls?.setEnabled(sources[0] === 'touch');
+  }
   function manager() { return player?.controllers; }
   function inspectControllers() {
     const current = manager();
@@ -190,7 +219,7 @@ export function mountControllerSettings({container, storage,
     for (let port = 0; port < 2; port++) {
       const select = sourceElements[port], statusElement = $(sourceStatus(port));
       if (!select || !statusElement) continue;
-      const mode = validSource(sources[port]);
+      const mode = validSource(sources[port], port);
       select.value = mode;
       statusElement.textContent = describeSource(mode, readyControllerForPort(rows, port), port, layout);
     }
@@ -208,18 +237,21 @@ export function mountControllerSettings({container, storage,
   }
   function disableControls(disabled) {
     if (layoutElement) layoutElement.disabled = disabled;
+    if (touchOpacityElement) touchOpacityElement.disabled = disabled;
     for (const select of sourceElements) if (select) select.disabled = disabled;
   }
   function applySources(ticket = applySequence) {
     const current = player, currentManager = current?.controllers;
     if (!current || ticket !== applySequence) return Promise.resolve();
     for (let port = 0; port < 2; port++) {
-      const mode = validSource(sources[port]);
+      const mode = validSource(sources[port], port);
       sources[port] = mode;
       currentManager?.setPortSource?.(port, mode);
       current.setKeyboard?.(port, mode === 'auto' || mode === 'keyboard');
     }
     if (disableExtraPorts) for (let port = 2; port < 4; port++) currentManager?.setPortSource?.(port, 'off');
+    touchControls?.setController(currentManager);
+    updateTouchSource();
     renderNotice(true);
     return Promise.resolve();
   }
@@ -242,13 +274,14 @@ export function mountControllerSettings({container, storage,
   }
   function setSource(port, mode, {persist = true} = {}) {
     if (![0, 1].includes(port)) throw Error('Unknown player port.');
-    let next = validSource(mode);
+    let next = validSource(mode, port);
     if (port === 1 && layout === 'boxx' && next === 'keyboard') next = 'auto';
     sources[port] = next;
     const ticket = ++applySequence;
     sourceElements[port].value = next;
     if (persist) save();
     renderSources();
+    if (port === 0) updateTouchSource();
     const current = player;
     if (!current) return Promise.resolve();
     applyPromise = Promise.resolve().then(() => applySources(ticket)).catch(error => { onError(error); throw error; });
@@ -271,9 +304,13 @@ export function mountControllerSettings({container, storage,
   }
   function setState(next) {
     disableControls(!next?.ready || !!next?.requiresReload || !!next?.busy);
+    if (next?.state === 'unloading' || next?.requiresReload) touchControls?.clearInputs();
     renderNotice();
   }
-  function open() { if (dialog && !dialog.open) dialog.showModal?.(); }
+  function open() {
+    touchControls?.clearInputs();
+    if (dialog && !dialog.open) dialog.showModal?.();
+  }
   function close() {
     const details = $('controller-advanced');
     if (details) details.open = false;
@@ -287,6 +324,7 @@ export function mountControllerSettings({container, storage,
     const details = $('controller-advanced');
     if (!details?.open || controllerPanel || !manager()) return;
     try {
+      touchControls?.clearInputs();
       controllerPanel = mountControllerPanel($('controllers'), manager());
       manager().setTesting?.(true);
     } catch (error) { onError(error); }
@@ -299,6 +337,10 @@ export function mountControllerSettings({container, storage,
     cleanup.push(() => target.removeEventListener?.(type, listener, options));
   };
   listen(layoutElement, 'change', () => { void setLayout(layoutElement.value).catch(() => {}); });
+  listen(touchOpacityElement, 'input', () => {
+    touchOpacity = validTouchOpacity(Number(touchOpacityElement.value));
+    updateTouchOpacity(); save();
+  });
   sourceElements.forEach((select, port) => listen(select, 'change', () => {
     void setSource(port, select.value).catch(() => {});
   }));
@@ -314,16 +356,18 @@ export function mountControllerSettings({container, storage,
   listen(dialog, 'close', onClose);
   listen(openButton, 'click', open);
   layoutElement.value = layout;
-  renderKeyboard(); renderSources(); setState(null);
+  renderKeyboard(); renderSources(); updateTouchOpacity(); updateTouchSource(); setState(null);
   const noticeTimer = setInterval(() => renderNotice(true), 1000);
   const pagehide = () => clearInterval(noticeTimer);
   listen(globalThis, 'pagehide', pagehide, {once: true});
 
   const api = {
     bindPlayer, setState, setLayout, setSource, open, close,
+    clearTouchInputs() { touchControls?.clearInputs(); },
+    getTouchOpacity: () => touchOpacity,
     inspect: () => inspectControllers(),
     destroy() {
-      unmountAdvanced(); clearInterval(noticeTimer);
+      unmountAdvanced(); clearInterval(noticeTimer); touchControls?.destroy();
       ++applySequence; player = null;
       for (const remove of cleanup.splice(0)) remove();
       if (expose && typeof window !== 'undefined' && window.meleeControllerSettings === api) delete window.meleeControllerSettings;
