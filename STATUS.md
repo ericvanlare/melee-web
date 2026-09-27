@@ -7,12 +7,18 @@ original title → Main/Versus → CSS route, CSS parent return, Main Back to Ti
 Title Start to Main, repeated CSS re-entry, and public Eject/reimport lifecycle.
 The retail capture starts from a cold Dolphin boot with an isolated copy of a
 retail-initialized card and records scoped source/PAD observations and labeled
-Metal frame screenshots. The headless public Release browser check keeps
-CSS-first startup, completes two repeated menu cycles, then reloads on Eject
-and re-enters CSS after disc reimport. The local Observer and browser receipts,
-input logs, and screenshots are indexed in the
+Metal frame screenshots. The final headless installed-Chrome check uses the
+production audio-enabled public package at the reconciled PR head. It preserves
+CSS-first startup, completes two repeated CSS → Main → Title → Main/Versus → CSS
+cycles, Ejects from Main and Title with CSS-first disc reimport, then completes
+CSS → SSS → supported Mario/Final Destination gameplay → Results → CSS. It
+records connected 32 kHz nonzero PCM transport and audio-context teardown.
+The silent rollback package is separately rebuilt and audited. The local
+Observer and final browser receipts, input logs, package identities, and
+screenshots are indexed in the
 [route evidence ledger](docs/ORIGINAL_MENU_ROUTE_CAPTURE.md). This scope does
-not establish foreground timing, PCM, pixel equivalence, or full-game menu
+not establish audible quality, PCM or pixel equivalence, foreground timing,
+input latency, physical-controller acceptance, performance, or full-game menu
 coverage.
 
 ## Repository public; main changes restricted to the owner

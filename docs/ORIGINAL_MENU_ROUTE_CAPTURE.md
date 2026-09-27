@@ -49,13 +49,24 @@ retain input sampling, RNG, initialization, and scene teardown ownership; no
 synthetic menu state replaces them. This route capture does not compare RNG
 values across retail and browser runs.
 
-The public Release browser check ran headless installed Chrome through
-`scripts/browser_tools.mjs` and `scripts/browser_driver.mjs`. It reached CSS
-first, verified ordinary B leaves CSS active, completed two CSS → Main → Title
-→ Main/Versus → CSS cycles, exercised Eject's page reload, then re-imported the
-owned disc and started at CSS again. That check records browser-visible source
-phase/message and screenshots. It is functional lifecycle evidence, not
-foreground timing or input-latency evidence.
+The final public Release checks use headless installed Chrome through
+`scripts/browser_tools.mjs` and `scripts/browser_driver.mjs`. The silent player
+and the separate production `audio-player` package were built and audited. The
+audio-enabled package check reached CSS first, completed two CSS → Main → Title
+→ Main/Versus → CSS cycles, and exercised Eject from Main and Title. Each
+native unload completed before reimport; each reimport started directly at CSS.
+It then completed CSS → SSS → Mario/Final Destination gameplay → Results → CSS.
+The browser report retains screenshots, source phase/message, Web Audio state,
+and PCM transport observations. Chrome observed connected 32 kHz worklet
+output with nonzero PCM through CSS, Main, Title, SSS, gameplay, Results and
+CSS re-entry, and closed each live audio context during Eject. This is
+functional lifecycle and PCM-transport evidence, not PCM equivalence, audible
+quality, foreground timing, input latency or performance evidence.
+
+The native teardown regression covers Eject from Title and Main, then verifies
+that an unsupported all-unlocked Challenger Approach route remains an explicit
+error with a usable Eject/CSS recovery path. That does not enable Challenger
+Approach or claim full title/demo coverage.
 
 ## Retained local evidence
 
@@ -68,10 +79,15 @@ under ignored `work/` and are not committed:
 | `.../retail-route-12-full/route-source-states.jsonl` | 1,874 decoded passive PAD/menu source-state observations |
 | `.../retail-route-12-full/capture.mwro`, `input.mwri`, `inputs.jsonl`, `dolphin.log` | Observer stream, input transport receipt, named controller commands, and emulator log |
 | `.../observer-build-menu-route-07.json` | Observer build receipt and source overlay hashes; Dolphin 2606a-dirty from commit `c77bbaa0f372c3f72281602a8b087206706542cb`, binary SHA-256 `a197b95a737ad1ad410738fdaab94985c48bdccd5063ce99f4134b849c82d1b1`, JITARM64, guest-memory writes disabled |
-| `.../browser-public-lifecycle-03/report.json` | Public Release identity SHA-256 `2760098b76ab200a3f2b7bc95dedb9dd86fa46c863dd2239020de137f78679c1`, headless Chrome `153.0.8010.54`, route boundaries, CSS B probe, two repeated cycles, Eject/reimport result, and screenshot inventory |
-| `.../browser-public-lifecycle-03/*.png` | Browser screenshots at the CSS, Main, Title, route-return, and post-reimport boundaries |
-| `.../menu-full-tests-with-owned-inputs.log` | Final full-suite run with owned DOL/disc/source/symbol inputs configured |
-| `.../menu-runtime-final-build.log`, `.../menu-public-release-final-build.log` | Final development runtime and public Release build logs |
+| `work/pr96-title-main/final/public-audio-browser/report.json` | Final-head audio-enabled public-player run in headless Chrome; 15 checks, two menu cycles, Main/Title Eject and reimport, supported match/Results return, Web Audio and PCM observations |
+| `work/pr96-title-main/final/public-audio-browser/*.png` | Screenshots for CSS, Title/Main, both route cycles, SSS, gameplay, Results, and post-reimport boundaries |
+| `work/pr96-title-main/final/audio-player.manifest.json`, `audio-http.json` | Source-bound production audio package identity and local Pages HTTP inventory/header verification |
+| `work/pr96-title-main/final/silent-player.manifest.json` | Source-bound silent rollback package identity and production-package audit; audio route evidence uses the separate audio-enabled package |
+| `work/pr96-title-main/final/logs/native-title-main-focused.log`, `title-main-abort-trace.jsonl` | Focused Title/Main abort regression and retained native trace, including unsupported-route recovery |
+| `work/pr96-title-main/final/logs/full-tests.log` | Required full unittest discovery with owned DOL/disc/source/symbol inputs configured |
+| `work/pr96-title-main/final/logs/audio-build.log`, `public-build.log`, `public-audit.log` | Final-head audio and silent Release builds and silent package audit |
+| `work/pr96-title-main/public-audio-browser-reconciled-head-04/report.json` | Earlier diagnostic run on the same reconciled runtime before final package identity; superseded by the final-head report above |
+| `.../browser-public-lifecycle-03/report.json` | Historical silent-only browser evidence from the earlier public-player lifecycle; superseded for this PR by the audio-enabled final-head run |
 
 The route uses the owned CISO directly (SHA-256
 `b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c`) and the
@@ -89,8 +105,8 @@ capture, or generated public bundle enters Git.
 | --- | --- | --- |
 | **Source identified** | Pinned title/Main source callbacks, mode routing, and authored resource owners | Full-game menu coverage |
 | **Retail compared** | Cold-boot route order, ordinary inputs, observed source menu states, and labeled screenshots on the owned disc | Pixel/PCM equivalence, physical-controller acceptance, foreground timing, or performance |
-| **Browser exercised** | CSS-first startup, original menu route, two repeated returns, public Eject/reimport teardown and CSS re-entry | Retail/browser pixel or PCM comparison, foreground input latency, or tournament acceptance |
-| **Compiled** | Development and public Release menu runtimes | Deployment or merge |
+| **Browser exercised** | Audio-enabled public CSS-first startup; two original menu cycles; Main/Title Eject and CSS-first reimport; routed SSS, supported match, Results return; connected 32 kHz nonzero PCM transport and audio-context teardown | Retail/browser pixel or PCM comparison, audible quality, foreground input latency/timing, physical-controller acceptance, performance, or tournament acceptance |
+| **Compiled** | Reconciled silent and audio-enabled public Release targets and audited package graphs | Deployment or merge |
 
 The separate allocation-history GDB/Python route remains available for scopes
 that need a stopped scheduler and allocation/RNG sampling. It is not a
