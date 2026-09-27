@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {bindResultsEntryPacket,readResultsEntryPacket} from './results_entry_packet.mjs';
-import {queueResultsP1StartAtCurrentSource} from './results_source_pad_input.mjs';
+import {queueResultsP1StartAtCurrentSource,queueResultsP1StartAtExactSourceTick}
+  from './results_source_pad_input.mjs';
 import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
   findConsumedResultsStartKeyboardAttempt,findResultsStartRunAtOrAfter,
   summarizeResultsPadTrace}
@@ -297,4 +298,71 @@ assert.equal(unsupportedPause.resumed_after_timing_pause,false);
 assert.deepEqual(unsupportedPauseEvents,['running','diagnostics','pad','diagnostics']);
 delete globalThis.Module;
 delete globalThis.document;
-console.log('Results entry binding and atomic source-tick PAD resume/queue boundary pass');
+
+const savedRaf=globalThis.requestAnimationFrame;
+const savedModule=globalThis.Module;
+const savedDocument=globalThis.document;
+let rafCallbacks=[];
+globalThis.requestAnimationFrame=callback=>{rafCallbacks.push(callback);return rafCallbacks.length;};
+const runRaf=()=>{
+  assert(rafCallbacks.length,'Expected the exact source-tick watcher to await an animation frame');
+  const callbacks=rafCallbacks.splice(0);
+  for(const callback of callbacks)callback(0);
+};
+let livePhase=8,liveFrame=179,liveRunning=true,liveStatus='Original Results';
+const exactEvents=[];
+globalThis.document={querySelector:selector=>selector==='#status'?{textContent:liveStatus}:null};
+globalThis.Module={
+  UTF8ToString:text=>text,
+  _melee_web_native_menu_phase:()=>livePhase,
+  _melee_web_native_menu_running:()=>liveRunning?1:0,
+  _melee_web_native_menu_diagnostics:()=>`Original Results · Results source frame: ${liveFrame}`,
+  _melee_web_native_menu_pause:value=>{exactEvents.push(`pause:${value}`);liveRunning=value===0;},
+  _melee_web_native_menu_pad_sample:(port,button,_x,_y,duration)=>{
+    exactEvents.push(`pad:${port}:${button}:${duration}`);return 1;
+  },
+};
+const waitingForExactTick=queueResultsP1StartAtExactSourceTick(
+  {targetFrame:180,button:4096,duration:10});
+runRaf();
+assert.deepEqual(exactEvents,[],
+  'The page-side watcher must not queue early while the source cursor precedes its target');
+assert.equal(rafCallbacks.length,1,'The exact watcher must continue waiting in the page RAF queue');
+liveFrame=180;
+runRaf();
+assert.deepEqual(await waitingForExactTick,{status:'queued',result:1,target_source_frame:180,
+  source_frame:180,running_before_queue:true,resumed_after_timing_pause:false,
+  status_before_queue:'Original Results',diagnostics:'Original Results · Results source frame: 180'});
+assert.deepEqual(exactEvents,['pad:0:4096:10']);
+
+liveFrame=211;
+const missedExactTick=queueResultsP1StartAtExactSourceTick(
+  {targetFrame:210,button:4096,duration:10});
+runRaf();
+assert.deepEqual(await missedExactTick,{status:'missed-source-tick',target_source_frame:210,
+  source_frame:211,status_before_queue:'Original Results'});
+assert.deepEqual(exactEvents,['pad:0:4096:10'],
+  'A missed source tick must never degrade into a late PAD injection');
+
+livePhase=1;
+const naturalCss=queueResultsP1StartAtExactSourceTick(
+  {targetFrame:240,button:4096,duration:10});
+runRaf();
+assert.deepEqual(await naturalCss,{status:'natural-css',target_source_frame:240});
+assert.deepEqual(exactEvents,['pad:0:4096:10']);
+
+livePhase=8;liveFrame=600;liveRunning=false;
+liveStatus='Paused after a timing disruption. Resume to continue.';
+const resumedAtExactTick=queueResultsP1StartAtExactSourceTick(
+  {targetFrame:600,button:4096,duration:10});
+runRaf();
+assert.deepEqual(await resumedAtExactTick,{status:'queued',result:1,target_source_frame:600,
+  source_frame:600,running_before_queue:false,resumed_after_timing_pause:true,
+  status_before_queue:'Paused after a timing disruption. Resume to continue.',
+  diagnostics:'Original Results · Results source frame: 600'});
+assert.deepEqual(exactEvents,['pad:0:4096:10','pause:0','pad:0:4096:10']);
+if(savedRaf===undefined)delete globalThis.requestAnimationFrame;
+else globalThis.requestAnimationFrame=savedRaf;
+if(savedModule===undefined)delete globalThis.Module;else globalThis.Module=savedModule;
+if(savedDocument===undefined)delete globalThis.document;else globalThis.document=savedDocument;
+console.log('Results entry binding and exact source-tick PAD queue boundary pass');

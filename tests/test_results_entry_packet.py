@@ -153,11 +153,31 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('before P1 confirmation', harness)
         self.assertIn('waitForResultsInternalPhase(180,2', harness)
         self.assertIn('source-confirm-after-auto-page', harness)
-        self.assertIn('first P1 Start edge must be consumed from original Results phase 2', harness)
+        self.assertIn('const expectedPhase=sourceTickThreePulse?1:2;', harness)
+        self.assertIn('The first P1 Start edge must be consumed from original Results phase ${expectedPhase}', harness)
         self.assertIn('findResultsStartRunAtOrAfter(sourcePadSummary.p1_start_runs,', harness)
         self.assertIn('pageCheck.confirmation_source_frame=confirmationRun.first_source_frame;', harness)
         self.assertNotIn('const confirmationFrame=report.results_page_transition_checks.find(', harness)
         self.assertNotIn('const confirmationFrame=result.results_page_transition_checks.find(', harness)
+        self.assertIn("const sourceTickThreePulse=resultsInputMode==='source-tick-three-pulse';", harness)
+        self.assertIn('await queueSourceStartAtExactTick(360,`results-${matchIndex}-source-start-2`)', harness)
+        self.assertIn('queueResultsP1StartAtExactSourceTick', harness)
+        self.assertIn("assert.equal(first,180,", harness)
+        self.assertIn("assert.equal(second,360,", harness)
+        self.assertIn("assert.equal(confirmation,600,", harness)
+        self.assertIn('assert.deepEqual(pulses,[180,360,600]', harness)
+        self.assertIn('Both disconnected CPU pages must auto-advance after the tick-360 pulse and before tick-600 confirmation', harness)
+        page_gate = harness.index('await waitForCpuPagesBeforeSourceFrame(600,')
+        confirmation_queue = harness.index(
+            'confirmation=await queueSourceStartAtExactTick(600,', page_gate)
+        self.assertLess(page_gate, confirmation_queue,
+                        'Both CPU auto-pages must be observed before the final P1 Start is queued')
+        self.assertIn("row.status==='queued-awaiting-consumed-trace'", harness)
+        self.assertIn("pageCheck.status='pass';", harness)
+        self.assertIn('A missed source tick must never degrade into a late PAD injection',
+                      (ROOT / 'tests/results_entry_packet_test.mjs').read_text(encoding='utf-8'))
+        self.assertIn('window.__meleeWebAudioDiagnostics={snapshot};', harness)
+        self.assertIn('report.failure.audio_diagnostics=await readAudioDiagnostics();', harness)
         self.assertIn("'keyboard-gated'", harness)
         gated_start = harness.index("}else if(resultsInputMode==='keyboard-gated'){")
         gated_end = harness.index("\n  }else{\n    await writeProgress(`match-${matchIndex}-natural-results`)",
@@ -183,7 +203,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn("row.status==='post-page-keyboard-dispatched'", harness)
         validation_start = harness.index("if(resultsInputMode==='keyboard-gated'){",
                                          harness.index('const sourcePadTraceRecord='))
-        validation_end = harness.index("}else if(resultsInputMode==='source-tick'){", validation_start)
+        validation_end = harness.index('}else if(sourceTickMode){', validation_start)
         validation = harness[validation_start:validation_end]
         self.assertIn('findConsumedResultsStartKeyboardAttempt(', validation)
         self.assertIn('pageCheck.post_page_confirmation_attempts=postPageConfirmation.attempts;', validation)
