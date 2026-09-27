@@ -537,7 +537,21 @@ try {
   report.result = 'fail'; report.failure = error.message;
   if (error.diagnostics) report.driverFailure = {step:error.step, ...error.diagnostics};
   report.state = await page.evaluate(() => ({status: document.querySelector('#status')?.textContent,
-    error: document.querySelector('#error')?.textContent, native: window.Module?._melee_web_native_menu_message ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null})).catch(() => null);
+    error: document.querySelector('#error')?.textContent,
+    disc: document.querySelector('#disc-selection-status')?.textContent,
+    loading: {hidden: document.querySelector('#loading-panel')?.hidden,
+      label: document.querySelector('#loading-label')?.textContent,
+      detail: document.querySelector('#loading-detail')?.textContent},
+    start_disabled: document.querySelector('#start-game')?.disabled ?? null,
+    pause_disabled: document.querySelector('#pause-game')?.disabled ?? null,
+    native_launch_calls: window.nativeLaunchCalls ?? null,
+    audio_activation: window.audioActivation ?? null,
+    native: window.Module?._melee_web_native_menu_message ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null,
+    native_phase: window.Module?._melee_web_native_menu_phase?.() ?? null,
+    native_running: window.Module?._melee_web_native_menu_running?.() ?? null,
+    native_cache_idle: window.Module?._melee_web_native_menu_cache_idle?.() ?? null,
+    pipeline_preparation: window.Module?.pipelinePreparation || null,
+    audio: window.audioPreviewTrace?.snapshot?.() || null})).catch(() => null);
   await shot('failure').catch(() => {}); throw error;
 } finally {
   report.errors = errors; report.csp = violations; report.audioEvents = audioEvents;
