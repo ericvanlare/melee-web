@@ -49,10 +49,12 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         (evidence / "stdout.log").write_text(result.stdout)
         (evidence / "stderr.log").write_text(result.stderr)
         scenario_scope = (
-            "actual source MatchExitInfo and source-generated Sheik winner, P1-only 180/360/600 "
-            "held-Start pulses, connected ports 0/1 and disconnected 2/3; not CPU9"
-            if "match-history-p1-statistics" in flag else
-            "source match history / default-CSS profile subset"
+            "synthetic Results standings; P1-only 180/360/600 held-Start pulses, "
+            "connected ports 0/1, disconnected CPU ports 2/3, automatic statistics "
+            "page advance before confirmation; chosen source ticks, not historical replay"
+            if "p1-statistics" in flag else
+            "actual source MatchExitInfo and source-generated Sheik winner, P1-only "
+            "180/360/600 held-Start pulses, connected ports 0/1 and disconnected 2/3; not CPU9"
             if "match-history" in flag else
             "synthetic Results standings / default-CSS profile subset"
         )
