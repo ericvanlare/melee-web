@@ -175,6 +175,27 @@ bool same_setup(const StartMeleeData& actual, const StartMeleeData& expected) {
     return true;
 }
 
+void report_setup_difference(unsigned match_index, const StartMeleeData& actual,
+                             const StartMeleeData& expected) {
+    std::cout << "MWRC v9 setup mismatch match=" << match_index;
+    if (!same_rules(actual.rules, expected.rules)) {
+        std::cout << " rules_actual=";
+        hex(std::span(reinterpret_cast<const uint8_t*>(&actual.rules), sizeof(actual.rules)));
+        std::cout << " rules_expected=";
+        hex(std::span(reinterpret_cast<const uint8_t*>(&expected.rules), sizeof(expected.rules)));
+    }
+    for (unsigned slot = 0; slot < GM_MAX_PLAYERS; ++slot) {
+        if (same_player(actual.players[slot], expected.players[slot])) continue;
+        std::cout << " player" << slot << "_actual=";
+        hex(std::span(reinterpret_cast<const uint8_t*>(&actual.players[slot]),
+                       sizeof(actual.players[slot])));
+        std::cout << " player" << slot << "_expected=";
+        hex(std::span(reinterpret_cast<const uint8_t*>(&expected.players[slot]),
+                       sizeof(expected.players[slot])));
+    }
+    std::cout << '\n' << std::flush;
+}
+
 void validate_milestone_setup(std::span<const uint8_t> raw,
                               const MeleeWebMenuMatchSelection& selection,
                               size_t match_index) {
@@ -430,6 +451,9 @@ void retail_replay_validate_match_setup(const RetailReplayRecipe& recipe,
     if (recipe.version != kRetailReplayVersion) return;
     check(match_index < recipe.match_selections.size(),
           "MWRC v9 observed a match setup beyond its declared setup table");
+    if (!same_setup(actual_setup, recipe.match_selections[match_index].start))
+        report_setup_difference(match_index, actual_setup,
+                                recipe.match_selections[match_index].start);
     check(same_setup(actual_setup, recipe.match_selections[match_index].start),
           "Original menu match setup differs from the MWRC v9 setup table");
 }

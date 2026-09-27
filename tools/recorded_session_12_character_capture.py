@@ -61,6 +61,20 @@ ROSTER: dict[str, tuple[int, tuple[float, float]]] = {
     "LUIGI": (7, (-13.9, 16.5)),
     "PIKACHU": (13, (-13.9, 2.5)),
 }
+ROSTER_ICON: dict[str, int] = {
+    "MARIO": 1,
+    "FOX": 10,
+    "FALCO": 9,
+    "MARTH": 23,
+    "DR_MARIO": 0,
+    "ROY": 24,
+    "LINK": 16,
+    "YOUNG_LINK": 17,
+    "CAPTAIN_FALCON": 7,
+    "GANONDORF": 8,
+    "LUIGI": 2,
+    "PIKACHU": 19,
+}
 LINEUPS: tuple[tuple[str, ...], ...] = (
     ("MARIO", "FOX", "FALCO", "MARTH"),
     ("DR_MARIO", "ROY", "LINK", "YOUNG_LINK"),
@@ -262,6 +276,23 @@ class Driver:
         if self.latest["players"][slot]["kind"] != wanted:
             raise CaptureFailure(f"door {slot} did not reach source kind {wanted}")
 
+    def set_costume(self, slot: int, name: str, port: int) -> None:
+        expected_icon = ROSTER_ICON[name]
+        self.wait(lambda: self.latest["doors"][slot]["icon"] == expected_icon,
+                  f"source hover confirmed {name} in slot {slot}")
+        for attempt in range(8):
+            current = self.latest["doors"][slot]["costume"]
+            if current == slot:
+                return
+            self.tap(port, "X", label=f"set-costume-{slot}-slot-{slot}")
+            self.wait(lambda: self.latest["doors"][slot]["costume"] != current,
+                      f"source costume change for {name} in slot {slot}", seconds=2.0)
+        if self.latest["doors"][slot]["costume"] != slot:
+            raise CaptureFailure(
+                f"source did not reach costume {slot} for {name} in slot {slot}; "
+                f"observed {self.latest['doors'][slot]['costume']} after 8 changes"
+            )
+
     def select_human(self, slot: int, name: str, *, initial: bool) -> None:
         character, point = ROSTER[name]
         if not initial:
@@ -293,8 +324,7 @@ class Driver:
                 self.wait(lambda: self.latest["cursors"][port]["state"] == 1,
                           f"human slot {slot} puck pickup for costume")
         self.move(*point, f"select-{name}-slot-{slot}", port)
-        for _ in range(slot):
-            self.tap(port, "X", label=f"set-costume-{slot}-slot-{slot}")
+        self.set_costume(slot, name, port)
         self.tap(port, "A", label=f"place-{name}-slot-{slot}")
         if (self.latest["cursors"][port]["state"] == 1 and
                 self.latest["cursors"][port]["held"] == slot):
@@ -322,8 +352,7 @@ class Driver:
                   self.latest["cursors"][0]["held"] == slot,
                   f"CPU slot {slot} puck pickup")
         self.move(*point, f"select-{name}-slot-{slot}")
-        for _ in range(slot):
-            self.tap(0, "X", label=f"set-costume-{slot}-slot-{slot}")
+        self.set_costume(slot, name, 0)
         self.tap(0, "A", label=f"place-{name}-slot-{slot}")
         if (self.latest["cursors"][0]["state"] == 1 and
                 self.latest["cursors"][0]["held"] == slot):
@@ -566,6 +595,10 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
             )
         latest.setdefault("boundary_match_indices", {})[boundary] = match_index
         latest.setdefault("boundaries", {})[boundary] = row["seq"]
+        if boundary == "return_css":
+            latest["expected_match_index"] = min(
+                match_index + 1, len(EXPECTED_ROSTER) - 1
+            )
     if boundary == "sss_enter":
         latest["stage_kind"] = None
     if boundary == "pad_poll":

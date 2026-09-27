@@ -26,6 +26,7 @@ const {values} = parseArgs({options: {
   'phase-timeout': {type: 'string', default: '120000'},
   'replay-timeout': {type: 'string', default: '900000'},
   'poll-ms': {type: 'string', default: '250'},
+  'replay-poll-ms': {type: 'string'},
   'stop-after-source-frames': {type: 'string'},
 }});
 
@@ -44,6 +45,8 @@ if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runt
 const phaseTimeoutMs = integer('phase-timeout', 1000, 300000);
 const replayTimeoutMs = integer('replay-timeout', 1000, 1800000);
 const pollMs = integer('poll-ms', 50, 2000);
+const replayPollMs = values['replay-poll-ms'] === undefined
+  ? pollMs : integer('replay-poll-ms', 1, 2000);
 const stopAfter = values['stop-after-source-frames'] ? integer('stop-after-source-frames',1,108000) : null;
 const output = path.resolve(values.out);
 const inputPaths = [values.disc, values.recipe, values.manifest].filter(Boolean).map(value => path.resolve(value));
@@ -51,13 +54,14 @@ const inputPaths = [values.disc, values.recipe, values.manifest].filter(Boolean)
 await fs.mkdir(output, {recursive: false});
 const report = {
   schema: 'melee-web-headless-whole-session-replay-v1',
-  scope: 'Single headless browser MWRC v8 diagnostic; no pixel, PCM, performance, or admission claim',
+  scope: 'Single headless browser MWRC v8/v9 diagnostic; no pixel, PCM, performance, or admission claim',
   result: 'fail',
   url: values.url,
   mode: 'state',
   phase_timeout_ms: phaseTimeoutMs,
   replay_timeout_ms: replayTimeoutMs,
   poll_ms: pollMs,
+  replay_poll_ms: replayPollMs,
   phases: [],
   snapshots: [],
   first_error: null,
@@ -70,6 +74,7 @@ let page;
 let driver;
 let currentPhase = 'startup';
 let lastSnapshotKey = '';
+let lastCssStateKey = '';
 const pageErrors = [];
 
 const write = async (name, value) => {
@@ -144,10 +149,21 @@ async function snapshot(reason = 'poll') {
   const key = JSON.stringify({phase: value.phase, running: value.running, cursor: value.source_cursor,
     error: value.runtime_error, report: value.replay_report?.result || null,
     report_pass: value.replay_report?.pass ?? null});
-  if (key !== lastSnapshotKey || reason !== 'poll') {
-    lastSnapshotKey = key;
+  // Keep a state transition that occurs between source-cursor increments too,
+  // while excluding animated geometry so focused CSS traces remain bounded.
+  const cssStateKey = value.phase === 1 ? JSON.stringify({
+    cursor: value.source_cursor,
+    css_ids: value.css?.map(row => row?.ids ?? null) ?? null,
+    cursors: value.css_setup?.cursors ?? null,
+    doors: value.css_setup?.doors ?? null,
+  }) : '';
+  const periodicPoll = reason === 'poll' || reason === 'replay-poll' ||
+    reason.startsWith('phase-poll:');
+  if (key !== lastSnapshotKey || cssStateKey !== lastCssStateKey || !periodicPoll) {
     if (report.snapshots.length < 2048) report.snapshots.push(value);
   }
+  lastSnapshotKey = key;
+  lastCssStateKey = cssStateKey;
   if (value.runtime_error) firstError('runtime', value.runtime_error, value);
   return value;
 }
@@ -278,7 +294,7 @@ try {
         report.deliberate_prefix_stop = {requested_cursor: stopAfter, observed_cursor: last.source_cursor, reason: 'Bounded first-divergence diagnostic; incomplete replay expected'};
         await page.locator('#unload').click();
       }
-      await new Promise(resolve => setTimeout(resolve, pollMs));
+      await new Promise(resolve => setTimeout(resolve, replayPollMs));
     }
     throw Error(`whole-session replay exceeded ${replayTimeoutMs} ms; last snapshot ${JSON.stringify(last)}`);
   }, replayTimeoutMs);
