@@ -47,8 +47,10 @@ const lineup=values.lineup==='A'?
    {name:'Yoshi',kind:17,position:[7.1,16.5]},
    {name:'Zelda',kind:18,position:[9.1,9.5]},
    {name:'Falco',kind:20,position:[-32.2,9.5]}];
+const continuationScope=matchCount===1?'natural Results→CSS only':
+  'natural Results→CSS→second match';
 const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
-  scope:'Headless Chrome rendered gameplay; live source CSS/SSS controller input, four CPU9 players, four stocks, Final Destination; natural Results→CSS→second match. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.',
+  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, four CPU9 players, four stocks, Final Destination; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
   lineup:values.lineup,players:lineup.map(({name,kind})=>({name,kind,cpu:9,stocks:4})),
   matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[],
   results_input_events:[]};

@@ -82,6 +82,9 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('await installResultsInputObserver()', harness)
         self.assertIn('resultsSourceFrameAtEvent', harness)
         self.assertIn('results_input_events=await page.evaluate', harness)
+        self.assertIn("const continuationScope=matchCount===1?'natural Results→CSS only':",
+                      harness)
+        self.assertIn("'natural Results→CSS→second match';", harness)
 
     def test_read_only_harness_observation_and_build_binding(self):
         result = subprocess.run([str(node_runtime()), str(ROOT / 'tests/results_entry_packet_test.mjs')],
