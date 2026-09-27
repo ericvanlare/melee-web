@@ -35,6 +35,8 @@ class ResultsCameraOwnershipTests(unittest.TestCase):
                  "rejected scene exit entry", "rejected close entry"),
             "--lineup-b-zelda-sheik-mode-exit": ("winner_ckind=18 winner_ftkind=7",),
             "--lineup-b-sheik-mode-exit": ("winner_ckind=19 winner_ftkind=7",),
+            "--lineup-b-sheik-stock-mode-exit":
+                ("match_kind=1", "winner_ckind=19 winner_ftkind=7"),
         }
         for command, markers in cases.items():
             with self.subTest(command=command):

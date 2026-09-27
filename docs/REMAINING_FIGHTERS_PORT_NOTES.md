@@ -84,8 +84,11 @@ and portable decoder checks both fail before repair: Yoshi's authored `x12C`
 grab-frame byte table was mislabeled as three scalar words, reversing each
 four-byte group. It is now decoded as the original twelve bytes; all entries
 and both focused checks pass (`work/pr86-yoshi-grab-bytes-{before-r2,after-r1}.log`).
-Fresh rendered causal validation is pending. The separate functional Results
-failure below remains open.
+Fresh rendered causal validation agrees on all 6,777 observed second-match
+ticks, clearing the former tick-6718 mismatch
+(`work/pr86-yoshi-grab-b-state-match1-r1.json`). The full recipe is now being
+extended on unchanged frozen bytes. The separate functional Results failure
+below remains open.
 
 An additional B functional run reaches natural Results after 11,725 gameplay
 frames with Sheik winning, then fails the camera-pool ownership guard at
@@ -107,7 +110,17 @@ draw, host/close or destructor boundary without correcting the value. A
 fault-injection component regression fails before and passes afterward; it
 proves guard coverage, not a gameplay fix. The focused three-test ownership and
 return-handoff check passes (`work/pr86-results-guard-regressions-r1.log`). A
-fresh natural B run is collecting these diagnostics. The retained first
+fresh natural B run passes both matches (14,661/13,431 source frames), rendered
+Results (185/184 frames) and both original CSS returns, with no page/native
+errors or timing interruptions (`work/pr86-results-guard-b-two-match-r1/report.json`).
+Both winners are Samus, so this does not clear the historical Sheik-winner
+failure. A reduced Stock Battle control also passes 384 Results ticks, mode
+exit and teardown (`work/pr86-results-stock-control-r1.log`); previous controls
+used Time Battle. A development-only, read-only Results entry packet now retains
+the actual typed terminal/Results payload, entry seed and existing pre-teardown
+PAD snapshot, bound by the harness to served JS/Wasm hashes. It is an ABI-labelled
+local debug snapshot, not a PPC image or exact replay. Three focused packet
+tests pass (`work/pr86-results-packet-main-r1.log`). The retained first
 rendered helper's shutdown assertion and second helper's missing-music
 preparation failure remain failures, superseded only for that synthetic
 fixture by the third run.

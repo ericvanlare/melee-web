@@ -216,7 +216,8 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                            const char* roster_name, bool sheik_confirm = false,
                            bool mode_exit = false, bool draw = false,
                            bool sheik_standing = false,
-                           bool pool_guard = false, bool host_route = false)
+                           bool pool_guard = false, bool host_route = false,
+                           bool stock = false)
 {
     char error[256]{};
     if (!melee_web_gameplay_session_begin(32U * 1024U * 1024U,
@@ -232,6 +233,9 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
         if (!input) throw std::runtime_error(error);
         auto* host = host_route ? prepare_results_host(files) : nullptr;
         auto result = make_results_lineup(roster);
+        // A categorical control for the observed natural Stock Battle failure;
+        // all other synthetic fixture inputs stay unchanged.
+        if (stock) result.match_end.match_kind = MatchKind_Stock;
         if (sheik_confirm) {
             for (unsigned slot = 0; slot < 4; ++slot) {
                 auto& p = result.match_end.player_standings[slot];
@@ -252,7 +256,9 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                     &result, error, sizeof(error)))
                 throw std::runtime_error(error);
         }
-        std::cout << "Results " << roster_name << " four-source lineup..."
+        std::cout << "Results " << roster_name << " match_kind="
+                  << static_cast<unsigned>(result.match_end.match_kind)
+                  << " four-source lineup..."
                   << std::flush;
         melee_web::GameplayResultsSession session(files, result, 0x13579bdfU,
                                                    *input);
@@ -588,13 +594,16 @@ int main(int argc,char** argv){try{
                          command == "--real-enabled-confirm";
     const bool lineup_a = command == "--lineup-a";
     const bool pool_guard = command == "--lineup-b-camera-pool-guard";
-    const bool host_route = command == "--lineup-b-sheik-host-draw";
+    const bool stock = command == "--lineup-b-sheik-stock-mode-exit" ||
+                       command == "--lineup-b-sheik-stock-host-draw";
+    const bool host_route = command == "--lineup-b-sheik-host-draw" ||
+                            command == "--lineup-b-sheik-stock-host-draw";
     const bool draw = command == "--lineup-b-sheik-draw" || host_route;
 #if !defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
     if (draw)
         throw std::runtime_error("Draw diagnostics require MELEE_WEB_RESULTS_RENDERED_TRACE; Node does not submit GX frames");
 #endif
-    const bool sheik_standing = command == "--lineup-b-sheik-mode-exit" || draw;
+    const bool sheik_standing = command == "--lineup-b-sheik-mode-exit" || stock || draw;
     const bool mode_exit = sheik_standing || command == "--lineup-b-zelda-sheik-mode-exit";
     const bool sheik_confirm = command == "--lineup-b-sheik-confirm" || mode_exit;
     const bool lineup_b = command == "--lineup-b" || sheik_confirm || pool_guard;
@@ -618,7 +627,7 @@ int main(int argc,char** argv){try{
         const int status = run_real_lineup(files, lineup_a ? std::span<const int>(a) :
                                                  std::span<const int>(b),
                                lineup_a ? "A" : "B", sheik_confirm, mode_exit, draw,
-                               sheik_standing, pool_guard, host_route);
+                               sheik_standing, pool_guard, host_route, stock);
 #if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
         EM_ASM({ window.resultsDone = $0; }, status);
 #endif

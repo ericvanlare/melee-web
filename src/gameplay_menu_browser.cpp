@@ -2,6 +2,9 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
 #include "gameplay_results_session.hpp"
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+#include "gameplay_results_entry_packet.hpp"
+#endif
 #include "gameplay_prize_session.hpp"
 extern "C" const char* melee_web_native_menu_match_observe();
 extern "C" const char* melee_web_native_menu_memory();
@@ -66,6 +69,10 @@ std::unique_ptr<melee_web::GameplayMatchSession> match;
 std::unique_ptr<melee_web::GameplayResultsSession> results;
 std::unique_ptr<melee_web::GameplayPrizeSession> prize;
 ResultsMatchInfo results_info{};
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+// Retained across teardown/failure; replaced only by the next Results entry.
+melee_web::ResultsEntryPacket results_entry_packet;
+#endif
 // The scoped asset boundary tears down the match owner before Results can be
 // constructed, so the original exit seed and retained PAD history stay here.
 uint32_t results_seed=0,prize_seed=0;
@@ -683,6 +690,9 @@ void advance(){
   results_input.reset(melee_web_pad_state_decode(final_input,sizeof(final_input),error,sizeof(error)));
   check(results_input!=nullptr,error);
   results_seed=seed;
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_entry_packet.capture(completed_matches,terminal,results_info,results_seed,final_input);
+#endif
   if(scoped_assets){pending=false;request_assets(AssetDestination::Results);return;}
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
   results=std::make_unique<melee_web::GameplayResultsSession>(files,results_info,seed,*results_input);
@@ -1367,6 +1377,15 @@ void tick(){
 }
 }
 extern "C" {
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_entry_packet(){
+ // Read-only observer: serialize copied diagnostic storage, never live source
+ // globals. KEEPALIVE exports only this getter; there is no injection endpoint.
+ static std::string json;
+ try{json=results_entry_packet.json();return json.c_str();}
+ catch(...){return "{\"error\":\"Results entry packet serialization failed\"}";}
+}
+#endif
 unsigned melee_web_native_asset_begin(){try{
  close();scoped_assets=true;
  request_assets(AssetDestination::InitialMenu);

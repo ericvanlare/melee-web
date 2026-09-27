@@ -11,6 +11,7 @@ import {execFileSync} from 'node:child_process';
 import {parseArgs} from 'node:util';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
+import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
 
 const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright'].map(name=>[name,{type:'string'}])),
@@ -52,10 +53,45 @@ const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
   matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[]};
 report.source_timing_disruptions=[];
 report.native_command_errors=[];
+report.results_entry_packets=[];
+report.results_entry_packet_reads=[];
 report.provenance={source_start:sourceProvenance(),
-  harness_sha256:await sha256(new URL(import.meta.url)),served_artifacts:[]};
+  harness_sha256:await sha256(new URL(import.meta.url)),
+  results_entry_helper_sha256:await sha256(new URL('./results_entry_packet.mjs',import.meta.url)),
+  served_artifacts:[]};
 const artifactReads=[];
 let browser,page,driver;
+// Called only on Results entry or failure, never by the polling diagnostics.
+// Read independently of other observers so an unrelated observer failure does
+// not hide the last retained entry. Older frozen builds remain explicitly absent.
+async function retainResultsEntry(reason){
+  try{
+    const read=await readResultsEntryPacket(page);
+    report.results_entry_packet_reads.push({reason,status:read.status});
+    if(read.status!=='captured')return;
+    await Promise.all(artifactReads);
+    let bound;
+    try{bound=bindResultsEntryPacket(read.packet,report.provenance.served_artifacts);}
+    catch(error){
+      // Preserve the packet even if response identity collection failed. Never
+      // label missing/conflicting served-byte evidence as a bound build.
+      bound={build_binding:{status:'unbound',error:error.message},packet:read.packet};
+    }
+    const bytes=JSON.stringify(bound,null,2)+'\n';
+    const digest=createHash('sha256').update(bytes).digest('hex');
+    let retained=report.results_entry_packets.find(row=>row.sha256===digest);
+    if(!retained){
+      const filename=`results-entry-${read.packet.match_index}-${digest}.json`;
+      await fs.writeFile(path.join(output,filename),bytes,{flag:'wx'});
+      retained={match_index:read.packet.match_index,sha256:digest,file:filename,
+        build_binding:bound.build_binding,reasons:[]};
+      report.results_entry_packets.push(retained);
+    }
+    retained.reasons.push(reason);
+  }catch(error){
+    report.results_entry_packet_reads.push({reason,status:'capture-error',error:error.message});
+  }
+}
 const buttonA=0x0100,buttonStart=0x1000;
 const phase=()=>page.evaluate(()=>Module._melee_web_native_menu_phase());
 const diagnostic=()=>page.evaluate(()=>{
@@ -356,6 +392,7 @@ async function runMatch(matchIndex,expected){
   let state=await diagnostic();
   if(state.phase!==8&&state.phase!==9)
     throw Error(`Match ${matchIndex} did not naturally reach Results/Prize before the 12-minute bound: ${JSON.stringify({phase:state.phase,p0:state.p0,p1:state.p1,status:state.status})}`);
+  await retainResultsEntry(`match-${matchIndex}-results-entry`);
   const result={match:matchIndex,entered_results_phase:state.phase,
     source_diagnostics:state.diagnostics,terminal_match:state.match,
     memory_at_results:state.memory,players:expected.map(({name,kind})=>({name,kind,cpu:9,stocks:4}))};
@@ -488,6 +525,7 @@ try{
   report.failure={message:error.message,stack:error.stack};
   process.exitCode=1;
   if(page&&!page.isClosed()){
+    await retainResultsEntry('failure-latest-entry');
     await diagnostic().then(state=>{report.failure.diagnostics=state;}).catch(()=>{});
     await screenshot('failure').catch(()=>{});
     await page.locator('body').textContent().then(text=>fs.writeFile(path.join(output,'page.txt'),text)).catch(()=>{});
