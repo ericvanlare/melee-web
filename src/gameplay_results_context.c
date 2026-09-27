@@ -207,6 +207,7 @@ static int delete_new_objects(MeleeWebResultsContext* context, char* error, size
                         "Results item teardown entered from an active source callback");
         Item_8026A8EC(item);
         if (!camera_pool_owned(context, "item destructor", item, error, size)) return 0;
+        if (!melee_web_fighter_assets_check_owned("Results item destructor", error, size)) return 0;
     }
     /* Release demo fighters through the registered original destructor before
      * releasing their asset/action owners or the source camera pool. */
@@ -217,6 +218,10 @@ static int delete_new_objects(MeleeWebResultsContext* context, char* error, size
             if (!fighter) continue;
             HSD_GObjPLink_80390228(fighter);
             if (!camera_pool_owned(context, "fighter destructor", fighter, error, size)) return 0;
+            char phase[96];
+            snprintf(phase, sizeof(phase),
+                     "Results fighter destructor slot=%u entity=%u", slot, entity);
+            if (!melee_web_fighter_assets_check_owned(phase, error, size)) return 0;
         }
     }
     for (unsigned pass = 0; pass < 2048; ++pass) {
@@ -233,6 +238,7 @@ static int delete_new_objects(MeleeWebResultsContext* context, char* error, size
             return fail(error, size, "Results GObj teardown entered from an active source callback");
         HSD_GObjPLink_80390228(target);
         if (!camera_pool_owned(context, "GObj destructor", target, error, size)) return 0;
+        if (!melee_web_fighter_assets_check_owned("Results GObj destructor", error, size)) return 0;
     }
     return fail(error, size, "Results source object teardown exceeded its bounded object set");
 }
@@ -523,6 +529,7 @@ int melee_web_results_context_exit(MeleeWebResultsContext* context,
     if (context->scene_entered) {
         gm_Scene_Results_OnExit(NULL);
         if (!camera_pool_owned(context, "scene OnExit", NULL, error, error_size)) return 0;
+        if (!melee_web_fighter_assets_check_owned("Results scene OnExit", error, error_size)) return 0;
         context->scene_entered = 0;
     }
     return ok(error, error_size);
@@ -552,11 +559,13 @@ int melee_web_results_context_end(MeleeWebResultsContext* context,
         melee_web_bg_flash_restore_state();
         context->flash_saved = 0;
         if (!camera_pool_owned(context, "flash teardown", NULL, error, error_size)) return 0;
+        if (!melee_web_fighter_assets_check_owned("Results flash teardown", error, error_size)) return 0;
     }
     if (!delete_new_objects(context, error, error_size)) return 0;
     if (!melee_web_collision_destroy(context->collision, error, error_size)) return 0;
     context->collision=NULL;
     if (!camera_pool_owned(context, "collision teardown", NULL, error, error_size)) return 0;
+    if (!melee_web_fighter_assets_check_owned("Results collision teardown", error, error_size)) return 0;
     if (!melee_web_fighter_assets_check_owned("Results OnExit", error, error_size)) return 0;
     if (!release_source_camera_and_ground(context, error, error_size)) return 0;
     HSD_SisLib_803A5FBC();

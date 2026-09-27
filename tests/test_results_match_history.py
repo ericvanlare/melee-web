@@ -115,6 +115,8 @@ class ResultsMatchHistoryTests(unittest.TestCase):
             "--lineup-b-cpu9-match-history-host-state")
         scope = json.loads((evidence / "command.json").read_text())["scope"]
         self.assertIn("natural source four-CPU9 Stock MatchExitInfo", scope)
+        self.assertIn("P1-only 180/360/600 ten-tick Start pulses", scope)
+        self.assertIn("connected ports 0/1 and disconnected CPU ports 2/3", scope)
         self.assertIn("no forced seed, form, terminal data, or winner", scope)
         self.assertIn("not rendered browser/reference evidence", scope)
         for marker in (
@@ -136,12 +138,23 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         self.assertLess(winner_slot, 4)
         self.assertGreater(int(terminal.group(5)), 0)
         self.assertGreater(int(terminal.group(6)), 0)
+        edges = re.findall(
+            r"p1-statistics input tick=(\d+) port=0 held=1 trigger=1 release=0", stdout)
+        releases = re.findall(
+            r"p1-statistics input tick=(\d+) port=0 held=0 trigger=0 release=1", stdout)
+        self.assertEqual(edges, ["180", "360", "600"])
+        self.assertEqual(releases, ["190", "370", "610"])
         auto_pages = re.findall(
             r"p1-statistics auto-page slot=(\d) from=0 to=1 tick=(\d+)", stdout)
         self.assertEqual([row[0] for row in auto_pages], ["2", "3"])
         for _, tick in auto_pages:
             self.assertGreater(int(tick), 360)
             self.assertLess(int(tick), 600)
+        before_confirm = re.search(
+            r"p1-statistics before-confirm tick=600 auto_pages=1,1 "
+            r"auto_page_ticks=(\d+),(\d+)", stdout)
+        self.assertIsNotNone(before_confirm, f"Retained {evidence}\n{brief}")
+        self.assertEqual(before_confirm.groups(), tuple(row[1] for row in auto_pages))
         target = winner_slot == 2 and winner_ckind == 18 and winner_ftkind == 7
         print(f"Natural CPU9 terminal winner={winner_slot} ckind={winner_ckind} "
               f"ftkind={winner_ftkind}; target Sheik winner observed={target}")
