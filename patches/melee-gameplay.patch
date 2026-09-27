@@ -2437,6 +2437,36 @@ diff --git a/src/melee/it/kinds/itlinkhookshot.c b/src/melee/it/kinds/itlinkhook
  
  s32 it_802A5320(ItemLink* link_0, Vec3* arg1, itLinkHookshotAttributes* attr,
                  Fighter* fp)
+@@ -1746,2 +1746,7 @@
++#ifdef TARGET_PC
++#define IT_HOOKSHOT_NORMALIZE_678C melee_web_hookshot_normalize
++#else
++#define IT_HOOKSHOT_NORMALIZE_678C it_802A3C98
++#endif
+ s32 it_802A678C(ItemLink* link_0, Vec3* arg1, itLinkHookshotAttributes* arg2,
+                 f32 arg8)
+@@ -1758,13 +1763,13 @@
+     while (link_1 != NULL && !link_0->x2C_b0) {
+         link_0 = link_1;
+         link_1 = link_0->prev;
+     }
+ 
+-    len = it_802A3C98(&link_0->pos, arg1, &vec);
++    len = IT_HOOKSHOT_NORMALIZE_678C(&link_0->pos, arg1, &vec);
+ 
+     while (link_1 != NULL && (arg8 > len)) {
+         link_0->x2C_b0 = 0;
+-        len = it_802A3C98(&link_1->pos, arg1, &vec);
++        len = IT_HOOKSHOT_NORMALIZE_678C(&link_1->pos, arg1, &vec);
+         link_0 = link_1;
+         link_1 = link_1->prev;
+     }
+@@ -1780,3 +1785,4 @@
+     return 1;
+ }
++#undef IT_HOOKSHOT_NORMALIZE_678C
+ 
+ void it_802A6944(Item* item, f32 scl)
 diff --git a/src/melee/it/kinds/itcoin.c b/src/melee/it/kinds/itcoin.c
 index 066959e..3f313a9 100644
 --- a/src/melee/it/kinds/itcoin.c
@@ -4722,7 +4752,7 @@ index 4a66512..2e85ce4 100644
  
  TextKerning* mnCharSel_8025BC20(TextKerning* arg0, u32 arg1)
  {
-@@ -2032,14 +2032,14 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
+@@ -2032,14 +2032,13 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
  {
      s32 icon_idx;
      s32 icon_offset;
@@ -4733,9 +4763,7 @@ index 4a66512..2e85ce4 100644
          s32 temp = HSD_Randi(0x19);
          icon_idx = temp;
          icon_offset = getIconOffset(icon_idx);
--    } while (icons[icon_idx].state == 0);
-+    } while (icons[icon_idx].state == 0 ||
-+             !MELEE_WEB_MENU_CHARACTER_AVAILABLE(icons[icon_idx].char_kind));
+     } while (icons[icon_idx].state == 0);
  
      mnCharSel_804D6CB0->vs.start.players[getPlayerForDoor(door)].ckind =
          (&icons[0].char_kind)[icon_offset];

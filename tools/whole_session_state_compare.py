@@ -272,6 +272,7 @@ def _fighter_entities(payload: Mapping[str, Any], context: str, match_index: int
     if set(heads) != set(range(4)):
         raise ComparisonError(f"{context}: entity coverage requires all four Fighter heads")
     fighter_player_ids: dict[int, int] = {}
+    fighter_gobjs: dict[int, int] = {}
     for item in slices:
         if isinstance(item, dict) and item.get("name") == "fighter_head":
             slot = item.get("flags")
@@ -284,10 +285,8 @@ def _fighter_entities(payload: Mapping[str, Any], context: str, match_index: int
             fighter_player_id = raw_head[0x0C]
             if fighter_player_id != slot:
                 raise ComparisonError(f"{context}: Fighter player_id is detached from player slot {slot}")
-            fighter_gobj = int.from_bytes(raw_head[:4], "big")
-            if fighter_gobj != heads[slot]:
-                raise ComparisonError(f"{context}: Fighter GObj backlink is detached from primary entity for slot {slot}")
             fighter_player_ids[slot] = fighter_player_id
+            fighter_gobjs[slot] = int.from_bytes(raw_head[:4], "big")
 
     seen_primary: set[int] = set()
     result: list[dict[str, int]] = []
@@ -311,6 +310,8 @@ def _fighter_entities(payload: Mapping[str, Any], context: str, match_index: int
         user_data = int.from_bytes(link_raw, "big")
         if not 0x80000000 <= primary < 0x81800000:
             raise ComparisonError(f"{context}: primary player entity for slot {slot} is outside source MEM1")
+        if fighter_gobjs[slot] != primary:
+            raise ComparisonError(f"{context}: Fighter GObj backlink is detached from primary entity for slot {slot}")
         if secondary != 0:
             raise ComparisonError(f"{context}: unsupported secondary entity in slot {slot}")
         if primary in seen_primary:

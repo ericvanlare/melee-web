@@ -599,6 +599,45 @@ int main(void)
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
         if (session == NULL || !melee_web_menu_enter_css(session, error,
                                                           sizeof(error)))
+            return 114;
+        /* The retail random default may temporarily land on an unsupported
+         * character before the user's recorded input selects an implemented
+         * one. CSS progress preserves that source state, while Start and the
+         * scene handoff remain fail-closed. */
+        active_css = (CSSData*) melee_web_menu_css(session);
+        active_css->vs.start.players[2].slot_type = Gm_PKind_Cpu;
+        active_css->vs.start.players[2].cpu_kind = CpuKind_4;
+        active_css->vs.start.players[2].cpu_level = 9;
+        active_css->vs.start.players[3].ckind = CKIND_POPONANA;
+        active_css->vs.start.players[3].slot = 0;
+        transition_request = 0;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TICKED ||
+            melee_web_menu_css_selection_valid(active_css))
+            return 115;
+        memset(&sss, 0, sizeof(sss));
+        sss.force_stage_id = -1;
+        sss.vs = active_css->vs;
+        if (melee_web_menu_sss_selection_valid(&sss)) return 118;
+        transition_request = 1;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+            melee_web_menu_leave_css(session, error, sizeof(error)) ||
+            melee_web_menu_phase(session) != MELEE_WEB_MENU_CSS)
+            return 116;
+        transition_request = 0;
+        if (!melee_web_menu_abort(session, error, sizeof(error)) ||
+            !melee_web_menu_session_destroy(session, error, sizeof(error)))
+            return 117;
+    }
+
+    {
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
+        char error[128];
+        MeleeWebMenuSession* session =
+            melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
+        if (session == NULL || !melee_web_menu_enter_css(session, error,
+                                                          sizeof(error)))
             return 9;
         /* gm_801A4D34 observes OnFrame, runs the scheduler, then publishes the
          * transition request. Keep this order visible to the host boundary so

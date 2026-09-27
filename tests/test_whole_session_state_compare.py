@@ -50,7 +50,7 @@ def _state_slices(motion=80, tick=0, rng=0x12345678):
                        "address": entity + 0x2C, "size": 4,
                        "hex": pointer.to_bytes(4, "big").hex()})
         head = bytearray(0x1000)
-        _word(head, 0, pointer)
+        _word(head, 0, entity)
         head[0x0C] = slot
         _word(head, 4, 0)
         _word(head, 0x10, motion)
@@ -273,6 +273,11 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             (lambda values: next(item for item in values
                                  if item["name"] == "fighter_head").__setitem__(
                                      "hex", "00000000" + "00" * (0x0C - 4) + "00" +
+                                     "00" * (0x1000 - 0x0D)),
+             "GObj backlink"),
+            (lambda values: next(item for item in values
+                                 if item["name"] == "fighter_head").__setitem__(
+                                     "hex", "80680100" + "00" * (0x0C - 4) + "00" +
                                      "00" * (0x1000 - 0x0D)),
              "GObj backlink"),
         ]
