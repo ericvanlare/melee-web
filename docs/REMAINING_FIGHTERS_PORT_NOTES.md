@@ -63,9 +63,18 @@ operations, with 531 of 1,024 synthetic production-function cases failing
 before and all passing after `10bb09d`. The standalone normalizer's original
 unfused sum and source RNG/collision-history order are unchanged. The broader
 owner's separately committed camera-shake depth-scaling repair is adopted as
-`ae57018`; its source-function and owned-DOL checks pass. New rendered checks
-test these repairs against the captured mismatch boundaries; their causal
-effect on these particular lineups is still pending.
+`ae57018`; its source-function and owned-DOL checks pass. The new frozen browser
+checks establish their effect at the captured boundaries. B's second-match
+prefix now agrees for all 2,464 observed ticks, including former tick 2395
+(`work/pr86-samus-shake-b-state-match1-r1.json`). A completes the entire
+42,492-input recipe and all three scene/return loops. Its separate exact
+comparisons agree on all 12,040/14,366/12,626 captured gameplay rows in those
+matches, including former third-match tick 6099
+(`work/pr86-shake-a-state-match{0,1,2}-r1.json`). These are bounded declared-field
+state results, still `complete=false`: CPU decisions are recomputed, CPU blocks
+and port draws are not compared, and no pixel/PCM/cadence claim follows. B's
+extended replay is running; the separate functional Results failure below
+remains open.
 
 An additional B functional run reaches natural Results after 11,725 gameplay
 frames with Sheik winning, then fails the camera-pool ownership guard at
@@ -224,6 +233,19 @@ not credited to the shared runtime task.
 Construction results refer to real-asset source traces that execute source ticks
 and teardown. Targeted action runs use costume zero unless noted. A passing
 browser match supplements these checks; it does not prove each listed action.
+
+The additional `--remaining-up-special` controller cases pass ground and air
+entry, source continuation, return to grounded Wait without stock loss, and
+teardown for G&W Fire, Kirby Final Cutter, Samus Screw Attack, Yoshi Egg Throw,
+Zelda Farore's Wind and Sheik Vanish. The first three rising/teleport families
+and Zelda/Sheik must advance upward; Yoshi is explicitly an Egg Throw check,
+not a claim that it provides the same recovery behavior. G&W Rescue, Kirby
+Cutter Beam and Yoshi thrown-Egg Articles must actually appear and retire.
+The focused test and individual source-transition logs are retained in
+`work/pr86-up-special-actions-r1.log` and `work/pr86-up-special-{3,4,16,17,18,19}-r1.log`.
+These on-stage native cases supplement the checklist below. Off-stage/ledge
+recovery, move-specific original comparison and broader action inventories
+remain unverified; Ice Climbers' paired Belay case remains separate.
 
 | Character | Content/construction | Targeted action coverage | Still unverified / failed |
 | --- | --- | --- | --- |

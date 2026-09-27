@@ -211,6 +211,25 @@ class ContentMatchTests(unittest.TestCase):
                 self.run_trace("gameplay_content_match_trace",
                                [menu, game, 32, ckind, 8, "--character-actions"], expected)
 
+    def test_remaining_fighter_ground_and_air_up_special_continuation(self):
+        menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
+        required = (menu / "MnSlChr.usd", menu / "main.ssm", menu / "mario.ssm",
+                    menu / "smash2.sem", menu / "dsp_coef.bin", game / "GrNLa.dat",
+                    game / "ItCo.usd", game / "PlMr.dat", game / "PlMrAJ.dat")
+        cases = (("Mr. Game & Watch", 3, "Gw"), ("Kirby", 4, "Kb"),
+                 ("Samus", 16, "Ss"), ("Yoshi", 17, "Ys"),
+                 ("Zelda", 18, "Zd"), ("Sheik", 19, "Sk"))
+        required += tuple(game / f"Pl{prefix}{suffix}.dat"
+                          for _, _, prefix in cases for suffix in ("", "AJ", "Nr"))
+        if not all(path.is_file() for path in required):
+            self.skipTest("Owned menu, FD, Mario and remaining-fighter up-special fixtures required")
+        for fighter, ckind, _ in cases:
+            with self.subTest(fighter=fighter):
+                self.run_trace("gameplay_content_match_trace",
+                               [menu, game, 32, ckind, 8, "--remaining-up-special"],
+                               ("grounded up-special motion, continuation, landing and Article lifecycle passed",
+                                "aerial up-special motion, continuation, landing and Article lifecycle passed"))
+
     def test_ice_nana_rejoins_after_popo_stock_loss_on_source_cpu9_lineup_a(self):
         menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
         required = (

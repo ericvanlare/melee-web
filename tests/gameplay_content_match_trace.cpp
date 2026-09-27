@@ -156,6 +156,8 @@ int main(int argc,char** argv){try{
         std::string(argv[6])=="--kirby-mario-fox-replacement";
     const bool kirby_copy_costumes=argc==7&&
         std::string(argv[6])=="--kirby-copy-costumes";
+    const bool remaining_up_special=argc==7&&
+        std::string(argv[6])=="--remaining-up-special";
     const bool ice_cpu_lifecycle=argc==7&&
         std::string(argv[6])=="--ice-cpu-lifecycle";
     const bool slot2_cpu_match=argc==7&&std::string(argv[6])=="--slot2-cpu-match";
@@ -170,7 +172,7 @@ int main(int argc,char** argv){try{
     const bool cpu9_match=slot2_cpu_match||lineup_a_cpu_match||lineup_b_catch_prefix||
                           natural_terminal||a_prefix_teardown||ice_cpu_lifecycle;
     const bool action_coverage=(argc==7&&std::string(argv[6])=="--character-actions")||
-        slot2_transform||kirby_mario_fox_replacement||kirby_copy_costumes||cpu9_match||fox_cpu_prefix;
+        slot2_transform||kirby_mario_fox_replacement||kirby_copy_costumes||cpu9_match||fox_cpu_prefix||remaining_up_special;
     if(argc==7&&!entry_only&&!platform_pass&&!action_coverage)throw std::runtime_error("Unknown source match trace scope");
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]})for(const auto& entry:std::filesystem::directory_iterator(root)){
@@ -662,6 +664,78 @@ int main(int argc,char** argv){try{
                 }
                 std::cout<<"Third-player active Player_GetEntity/session stats agreed after every form change"
                          <<std::endl;
+            }else if(remaining_up_special){
+                // Exercise real PAD entry, motion continuation, authored
+                // Articles, landing and cleanup. These are on-stage source
+                // component cases, not off-stage recovery or retail claims.
+                int first=-1,last=-1,article=-1;
+                switch(fighter_ckind){
+                case CKIND_GAMEWATCH:
+                    first=ftGw_MS_SpecialHi;last=ftGw_MS_SpecialAirHi;
+                    article=It_Kind_GameWatch_Rescue;break;
+                case CKIND_KIRBY:
+                    first=ftKb_MS_SpecialHi1;last=ftKb_MS_SpecialAirHi4;
+                    article=It_Kind_Kirby_CBeam;break;
+                case CKIND_SAMUS:
+                    first=ftSs_MS_SpecialHi;last=ftSs_MS_SpecialAirHi;break;
+                case CKIND_YOSHI:
+                    first=ftYs_MS_SpecialHi;last=ftYs_MS_SpecialAirHi;
+                    article=It_Kind_Yoshi_EggThrow;break;
+                case CKIND_ZELDA:
+                    first=ftZd_MS_SpecialHiStart_0;last=ftZd_MS_SpecialAirHi;break;
+                case CKIND_SEAK:
+                    first=ftSk_MS_SpecialHiStart_0;last=ftSk_MS_SpecialAirHi;break;
+                default:check(false,"No focused up-special fixture for this fighter");
+                }
+                for(bool air:{false,true}){
+                    settle_primary();
+                    if(air){
+                        raw[0].button=PAD_BUTTON_X;tick();neutral();
+                        for(unsigned n=0;n<30&&match.player_stats(0).ground_or_air==0;n++)tick();
+                        check(match.player_stats(0).ground_or_air!=0,
+                              "Up-special fixture jump did not become airborne");
+                        for(unsigned n=0;n<8;n++)tick();
+                    }
+                    const auto before=match.player_stats(0);
+                    bool entered=false,article_seen=false,landed=false;
+                    float peak=before.position[1];
+                    int previous_motion=-1;
+                    for(unsigned n=0;n<900;n++){
+                        // Up remains held through the teleport direction
+                        // window, then releases normally. Only one B edge.
+                        raw[0].stickY=n<40?80:0;
+                        raw[0].button=n==0?PAD_BUTTON_B:0;tick();
+                        const auto state=match.player_stats(0);
+                        entered|=state.motion_id>=first&&state.motion_id<=last;
+                        article_seen|=article>=0&&melee_web_test_item_count(article)>0;
+                        peak=std::max(peak,state.position[1]);
+                        check(state.stocks==before.stocks,
+                              "On-stage up-special lost a source stock");
+                        if(state.motion_id!=previous_motion){
+                            std::cout<<"Up-special "<<fighter_content->name
+                                     <<(air?" air":" ground")<<" tick="<<n
+                                     <<" motion="<<state.motion_id<<" y="<<state.position[1]
+                                     <<" article="<<(article>=0?melee_web_test_item_count(article):0)
+                                     <<std::endl;
+                            previous_motion=state.motion_id;
+                        }
+                        landed=entered&&n>=40&&state.ground_or_air==0&&
+                               state.motion_id==ftCo_MS_Wait;
+                        if(landed&&(article<0||melee_web_test_item_count(article)==0))break;
+                    }
+                    neutral();
+                    check(entered&&landed,
+                          "Up-special did not enter its source motion and return to grounded Wait");
+                    if(fighter_ckind!=CKIND_YOSHI)
+                        check(peak>before.position[1]+3.0f,
+                              "Up-special did not advance the source fighter upward");
+                    if(article>=0)
+                        check(article_seen&&melee_web_test_item_count(article)==0,
+                              "Up-special did not create and retire its authored Article");
+                    std::cout<<fighter_content->name<<(air?" aerial":" grounded")
+                             <<" up-special motion, continuation, landing and Article lifecycle passed"
+                             <<" peak="<<peak<<std::endl;
+                }
             }else if(fighter_ckind==CKIND_GAMEWATCH){
                 bool chef=false,sausage=false;
                 for(unsigned n=0;n<180&&!(chef&&sausage);n++){
