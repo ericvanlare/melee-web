@@ -23,6 +23,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
 PINNED_COMMIT = "c77bbaa0f372c3f72281602a8b087206706542cb"
 PATCH_DIR = ROOT / "reference-capture" / "dolphin" / "patches"
 SOURCE_OVERLAY = ROOT / "reference-capture" / "dolphin" / "source"
