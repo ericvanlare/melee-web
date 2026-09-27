@@ -5,6 +5,8 @@
 #include "gameplay_content.h"
 #include "gameplay_pad_state.h"
 #include "gameplay_source_memory_runtime.h"
+#include "gameplay_menu_host.h"
+#include "gameplay_menu_world.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -17,8 +19,20 @@
 #include <string>
 #include <vector>
 
+#if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
+#include <aurora/aurora.h>
+#include <aurora/main.h>
+#include <aurora/pipeline_prepare.h>
+#include <dolphin/gx.h>
+#include <emscripten.h>
+#include <SDL3/SDL_hints.h>
+#endif
+
 extern "C" {
 #include <melee/gm/types.h>
+#include <melee/gm/gmvsmode.h>
+#include <melee/gm/gmvsmelee.h>
+#include <melee/cm/forward.h>
 #include <melee/ef/types.h>
 #include <melee/ef/efasync.h>
 #include <melee/ef/efdata.h>
@@ -39,6 +53,15 @@ extern void* it_804D6D30;
 extern void* it_804D6D38;
 void Item_80266FA8(void);
 void Item_80266FCC(void);
+extern CmSubject* cm_804D645C;
+int melee_web_vs_mode_begin(void);
+int melee_web_vs_mode_end(void);
+int melee_web_vs_mode_select_state(int);
+int melee_web_vs_mode_next_state(void);
+/* The mode table retains preload callbacks outside this Results-only target.
+ * Reuse the existing fail-loud diagnostic boundary if one is reached. */
+#include "native_menu_alarm_unavailable.c"
+#include "native_menu_stage_input.c"
 }
 
 static void load_directory(melee_web::RuntimeFiles& files,
@@ -89,6 +112,78 @@ static void check_results_teardown();
 static std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES>
 neutral_pad_snapshot();
 
+static void draw_results(melee_web::GameplayResultsSession& session)
+{
+#if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
+    aurora_update();
+    if (!aurora_begin_frame())
+        throw std::runtime_error("Rendered Results frame is unavailable");
+    session.draw();
+    aurora_end_frame();
+    EM_ASM({ window.resultsFrame = $0; }, session.source_frames());
+    emscripten_sleep(16);
+#else
+    // Source callback traversal only: no GPU submission in the Node target.
+    session.draw();
+#endif
+}
+
+static MeleeWebMenuHost* prepare_results_host(const melee_web::RuntimeFiles& files)
+{
+    // Reach the real host's closed-SSS state using source input. No match runs:
+    // the caller explicitly supplies a synthetic MatchExitInfo afterwards.
+    char error[256]{};
+    const auto require = [&](int ok) {
+        if (!ok) throw std::runtime_error(error);
+    };
+    auto* host = melee_web_menu_host_create(error, sizeof(error));
+    require(host != nullptr);
+    melee_web::GameplayMenuWorld world(files);
+    require(melee_web_menu_host_enter(host, world.audio(), error, sizeof(error)));
+    PADStatus pads[4]{};
+    pads[2].err = pads[3].err = -1;
+    float pcm[1068]; unsigned audio_phase = 0;
+    const auto tick = [&] {
+        const int state = melee_web_menu_host_tick(host, pads, error, sizeof(error));
+        require(state == 1 || state == 3);
+        audio_phase += 32000;
+        const auto samples = audio_phase / 60; audio_phase %= 60;
+        require(melee_web_audio_render(world.audio(), pcm, samples, error, sizeof(error)));
+        return state;
+    };
+    const auto transition = [&] {
+        pads[0].button = PAD_BUTTON_START;
+        int state = tick(); pads[0].button = 0;
+        for (unsigned t = 0; t < 120 && state != 3; ++t) state = tick();
+        if (state != 3) throw std::runtime_error("Results host fixture menu did not transition");
+        require(melee_web_menu_host_leave(host, 0, error, sizeof(error)));
+    };
+    for (unsigned t = 0; t < 120; ++t) tick();
+    transition();
+    if (melee_web_menu_host_phase(host) != 2)
+        throw std::runtime_error("Results host fixture did not reach SSS");
+    world.rebuild_scene(melee_web::GameplayMenuScene::Stages);
+    require(melee_web_menu_host_enter(host, world.audio(), error, sizeof(error)));
+    for (unsigned t = 0; t < 120; ++t) tick();
+    bool at_target = false;
+    for (unsigned t = 0; t < 120; ++t) {
+        MeleeWebStageInputObservation observed{};
+        if (!melee_web_stage_input_observe(St_Kind_Last, &observed))
+            throw std::runtime_error("Results host fixture cannot observe FD");
+        const int state = melee_web_stage_input_drive(pads, &observed, St_Kind_Last);
+        if (state == MELEE_WEB_STAGE_INPUT_INVALID)
+            throw std::runtime_error("Results host fixture cannot drive FD");
+        if (state == MELEE_WEB_STAGE_INPUT_AT_TARGET) { at_target = true; break; }
+        tick();
+    }
+    if (!at_target) throw std::runtime_error("Results host fixture did not select FD");
+    transition();
+    if (melee_web_menu_host_phase(host) != 5)
+        throw std::runtime_error("Results host fixture did not close SSS");
+    world.close();
+    return host;
+}
+
 static ResultsMatchInfo make_results_lineup(std::span<const int> ckind)
 {
     ResultsMatchInfo result{};
@@ -118,7 +213,10 @@ static ResultsMatchInfo make_results_lineup(std::span<const int> ckind)
 
 static int run_real_lineup(const melee_web::RuntimeFiles& files,
                            std::span<const int> roster,
-                           const char* roster_name)
+                           const char* roster_name, bool sheik_confirm = false,
+                           bool mode_exit = false, bool draw = false,
+                           bool sheik_standing = false,
+                           bool pool_guard = false, bool host_route = false)
 {
     char error[256]{};
     if (!melee_web_gameplay_session_begin(32U * 1024U * 1024U,
@@ -132,20 +230,149 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                                        error, sizeof(error)),
             melee_web_pad_state_free);
         if (!input) throw std::runtime_error(error);
-        const auto result = make_results_lineup(roster);
+        auto* host = host_route ? prepare_results_host(files) : nullptr;
+        auto result = make_results_lineup(roster);
+        if (sheik_confirm) {
+            for (unsigned slot = 0; slot < 4; ++slot) {
+                auto& p = result.match_end.player_standings[slot];
+                p.slot_type = Gm_PKind_Cpu;
+                p.is_big_loser = p.is_small_loser = slot != 2;
+            }
+            result.match_end.winners[0] = 2;
+            result.match_end.player_standings[2].ftkind = FTKIND_SEAK;
+            if (sheik_standing)
+                result.match_end.player_standings[2].ckind = CKIND_SEAK;
+        }
+        if (host) {
+            MatchExitInfo exit_info{};
+            exit_info.match_end = result.match_end;
+            if (!melee_web_menu_host_match_finished(host, 0x13579bdfU,
+                    input_bytes.data(), error, sizeof(error)) ||
+                !melee_web_menu_host_results_begin(host, &exit_info, 0x13579bdfU,
+                    &result, error, sizeof(error)))
+                throw std::runtime_error(error);
+        }
         std::cout << "Results " << roster_name << " four-source lineup..."
                   << std::flush;
         melee_web::GameplayResultsSession session(files, result, 0x13579bdfU,
                                                    *input);
+        const auto initial_pool = cm_804D645C;
+        const auto check_pool = [&](const char* phase) {
+            if (cm_804D645C != initial_pool) {
+                std::cerr << "Results pool first changed at " << phase
+                          << " tick=" << session.source_frames()
+                          << " initial=" << initial_pool
+                          << " source=" << cm_804D645C << '\n';
+                throw std::runtime_error("Results source camera pool changed");
+            }
+        };
         if (session.source_frames() != 0)
             throw std::runtime_error("Results scene advanced during construction");
         PADStatus neutral[4]{};
         neutral[2].err = neutral[3].err = -1;
-        for (unsigned tick = 0; tick < 2; ++tick) session.tick(neutral);
+        for (unsigned tick = 0; tick < 2; ++tick) {
+            session.tick(neutral);
+            check_pool("tick");
+            if (draw) { draw_results(session); check_pool("draw/submission"); }
+        }
         if (session.source_frames() != 2 || session.requested())
             throw std::runtime_error("Short Results tick changed source transition state");
+        if (pool_guard) {
+            // Deliberate fault injection, not a reproduction of the browser's
+            // unknown writer. Each API must reject before advancing the scene
+            // or destroying its owners; restore the test fault before cleanup.
+            if (!initial_pool)
+                throw std::runtime_error("Results pool guard fixture has no camera pool");
+            const auto expect_rejected = [&](const char* phase, auto action) {
+                const auto frames = session.source_frames();
+                const auto seed = session.random_seed();
+                std::string failure;
+                cm_804D645C = nullptr;
+                try { action(); }
+                catch (const std::exception& e) { failure = e.what(); }
+                cm_804D645C = initial_pool;
+                const std::string prefix =
+                    std::string("Original Results camera pool ownership changed at ") + phase;
+                if (!failure.starts_with(prefix) ||
+                    failure.find("context_pool=") == std::string::npos ||
+                    failure.find("initial=") == std::string::npos)
+                    throw std::runtime_error("Results pool guard missed boundary: " +
+                                             std::string(phase) + " error=" + failure);
+                if (session.source_frames() != frames || session.random_seed() != seed)
+                    throw std::runtime_error("Rejected pool guard advanced Results state");
+                std::cout << " rejected " << phase << std::flush;
+            };
+            expect_rejected("tick entry", [&] { session.tick(neutral); });
+            expect_rejected("draw entry", [&] { session.draw(); });
+            expect_rejected("scene exit entry", [&] { session.exit_scene(); });
+            expect_rejected("close entry", [&] { session.close(); });
+        }
+        if (sheik_confirm) {
+            float pcm[1068]; unsigned audio_phase = 0;
+            for (unsigned tick = 0; tick < 900 && !session.requested(); ++tick) {
+                PADStatus pads[4]{};
+                pads[2].err = pads[3].err = -1;
+                if (tick >= 240 && tick % 90 == 0)
+                    pads[0].button = pads[1].button = PAD_BUTTON_START;
+                session.tick(pads);
+                check_pool("tick");
+                if (draw) { draw_results(session); check_pool("draw/submission"); }
+                audio_phase += 32000;
+                const unsigned samples = audio_phase / 60;
+                audio_phase %= 60;
+                if (!melee_web_audio_render(session.audio(), pcm, samples,
+                                             error, sizeof(error)))
+                    throw std::runtime_error(error);
+            }
+            if (!session.requested())
+                throw std::runtime_error("Four-CPU Sheik-winner Results confirmation did not finish");
+            session.exit_scene();
+            check_pool("scene OnExit");
+            if (host) {
+                if (!melee_web_menu_host_results_exit(host, error, sizeof(error)))
+                    throw std::runtime_error(error);
+                check_pool("host mode OnExit and route commit");
+                std::cout << " host OnExit+commit tick=" << session.source_frames()
+                          << " initial_pool=" << initial_pool
+                          << " source_pool=" << cm_804D645C << '\n' << std::flush;
+            } else if (mode_exit) {
+                const auto saved_exit = gmVsMelee_VsExitInfo;
+                const auto saved_enter = gmVsMelee_ResultsEnterData;
+                const auto saved_vs = *gmVsMelee_GetVsData();
+                gmVsMelee_VsExitInfo.match_end = result.match_end;
+                gmVsMelee_ResultsEnterData = result;
+                if (!melee_web_vs_mode_begin() ||
+                    !melee_web_vs_mode_select_state(gmVsMode_State_Results))
+                    throw std::runtime_error("Cannot own Results mode callback");
+                std::cout << " mode OnExit winner_ckind="
+                          << static_cast<int>(result.match_end.player_standings[2].ckind)
+                          << " winner_ftkind="
+                          << static_cast<int>(result.match_end.player_standings[2].ftkind)
+                          << " initial_pool=" << initial_pool << std::flush;
+                gm_Mode_Vs_States[4].on_exit(&gm_Mode_Vs_States[4]);
+                std::cout << " source_pool=" << cm_804D645C
+                          << " destination=" << melee_web_vs_mode_next_state()
+                          << " tick=" << session.source_frames() << '\n' << std::flush;
+                check_pool("mode OnExit");
+                if (melee_web_vs_mode_next_state() != gmVsMode_State_Css)
+                    throw std::runtime_error("Four-CPU Results mode did not request CSS");
+                if (!melee_web_vs_mode_end())
+                    throw std::runtime_error("Cannot release Results mode callback");
+                gmVsMelee_VsExitInfo = saved_exit;
+                gmVsMelee_ResultsEnterData = saved_enter;
+                *gmVsMelee_GetVsData() = saved_vs;
+            }
+        }
+        check_pool("before close");
+        std::array<uint8_t, MELEE_WEB_PAD_STATE_BYTES> final_input{};
+        const auto final_seed = session.random_seed();
+        if (host) melee_web_pad_state_capture(final_input.data());
         session.close();
         check_results_teardown();
+        if (host && (!melee_web_menu_host_results_end(host, final_seed,
+                          final_input.data(), error, sizeof(error)) ||
+                     !melee_web_menu_host_destroy(host, error, sizeof(error))))
+            throw std::runtime_error(error);
         if (!melee_web_gameplay_session_end(error, sizeof(error)))
             throw std::runtime_error(error);
         ended = true;
@@ -333,6 +560,22 @@ static void check_source_entry(const melee_web::GameplayWorld& world)
 }
 
 int main(int argc,char** argv){try{
+#if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
+    AuroraConfig config{};
+    config.appName = "Results-only ownership trace";
+    config.cachePath = "/melee-results-cache";
+    config.desiredBackend = BACKEND_WEBGPU;
+    config.windowWidth = 640; config.windowHeight = 480;
+    config.msaa = 1; config.vsync = true; config.logLevel = LOG_INFO;
+    if (!SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas"))
+        throw std::runtime_error("Cannot select Results trace canvas");
+    aurora_initialize(argc, argv, &config);
+    if (!aurora_pipeline_set_complete_draws(1))
+        throw std::runtime_error("Cannot require complete Results draws");
+    aurora_set_deferred_pipeline_cache_writes(true);
+    alignas(32) static unsigned char fifo[64 * 1024];
+    GXInit(fifo, sizeof(fifo));
+#endif
     const std::string command = argc >= 2 ? argv[1] : "";
     const bool real_mario = command == "--real-mario" ||
                             command == "--real-mario-confirm";
@@ -344,12 +587,22 @@ int main(int argc,char** argv){try{
                          command == "--real-eight-confirm" ||
                          command == "--real-enabled-confirm";
     const bool lineup_a = command == "--lineup-a";
-    const bool lineup_b = command == "--lineup-b";
+    const bool pool_guard = command == "--lineup-b-camera-pool-guard";
+    const bool host_route = command == "--lineup-b-sheik-host-draw";
+    const bool draw = command == "--lineup-b-sheik-draw" || host_route;
+#if !defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
+    if (draw)
+        throw std::runtime_error("Draw diagnostics require MELEE_WEB_RESULTS_RENDERED_TRACE; Node does not submit GX frames");
+#endif
+    const bool sheik_standing = command == "--lineup-b-sheik-mode-exit" || draw;
+    const bool mode_exit = sheik_standing || command == "--lineup-b-zelda-sheik-mode-exit";
+    const bool sheik_confirm = command == "--lineup-b-sheik-confirm" || mode_exit;
+    const bool lineup_b = command == "--lineup-b" || sheik_confirm || pool_guard;
     const bool real_roster = real_mario || real_eight || real_enabled ||
                              lineup_a || lineup_b;
     if ((!real_roster && argc != 3) || (real_roster && argc != 5))
         throw std::runtime_error(real_roster ?
-            "Expected --real-mario/--real-eight/--real-enabled[-confirm]/--lineup-a/--lineup-b <common/fighter> <Results shared/music> <Results fighters>" :
+            "Expected --real-mario/--real-eight/--real-enabled[-confirm]/--lineup-a/--lineup-b[-sheik-confirm/-zelda-sheik-mode-exit/-sheik-mode-exit/-sheik-draw/-sheik-host-draw/-camera-pool-guard] <common/fighter> <Results shared/music> <Results fighters>" :
             "Expected common/fighter and Results asset directories");
     melee_web::RuntimeFiles files;
     const int first_directory = real_roster ? 2 : 1;
@@ -362,9 +615,14 @@ int main(int argc,char** argv){try{
         constexpr std::array<int, 4> b = {
             CKIND_SAMUS, CKIND_YOSHI, CKIND_ZELDA, CKIND_FALCO,
         };
-        return run_real_lineup(files, lineup_a ? std::span<const int>(a) :
+        const int status = run_real_lineup(files, lineup_a ? std::span<const int>(a) :
                                                  std::span<const int>(b),
-                               lineup_a ? "A" : "B");
+                               lineup_a ? "A" : "B", sheik_confirm, mode_exit, draw,
+                               sheik_standing, pool_guard, host_route);
+#if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
+        EM_ASM({ window.resultsDone = $0; }, status);
+#endif
+        return status;
     }
     if (real_roster) {
         constexpr std::array<int, 1> real_mario_opponents = {CKIND_MARIO};
@@ -411,4 +669,11 @@ int main(int argc,char** argv){try{
             throw std::runtime_error("Results preparation retained its source world");
     }
     std::cout<<"Original Mario Results assets and prepared world constructed and closed twice; scene execution untested\n";
-}catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}}
+    return 0;
+}catch(const std::exception& error){
+    std::cerr<<error.what()<<'\n';
+#if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
+    EM_ASM({ window.resultsDone = 1; });
+#endif
+    return 1;
+}}

@@ -97,6 +97,21 @@ Sheik-winner native Results confirmation/close control passes
 rendered/mode-exit ownership boundary. Neither a Sheik-specific cause nor PR
 readiness is claimed.
 
+Native controls for both external identity pairs `{18,7}` and `{19,7}` preserve
+the camera pool through the actual VS mode-exit callback. The smaller rendered
+Results/full-host fixture also passes 384 frames, confirmation, host route
+commit and teardown (`work/pr86-results-rendered-host-r3/report.json`). Those
+synthetic standings do not reproduce the natural failure. New fail-fast guards
+retain the initial pool independently and identify the first changed tick,
+draw, host/close or destructor boundary without correcting the value. A
+fault-injection component regression fails before and passes afterward; it
+proves guard coverage, not a gameplay fix. The focused three-test ownership and
+return-handoff check passes (`work/pr86-results-guard-regressions-r1.log`). A
+fresh natural B run is collecting these diagnostics. The retained first
+rendered helper's shutdown assertion and second helper's missing-music
+preparation failure remain failures, superseded only for that synthetic
+fixture by the third run.
+
 Latest validation checkpoint: `d5695c9` includes the existing shared-runtime
 owner's committed motion-flag, camera/inverse, reciprocal-square-root and
 combo-push arithmetic fixes (`1ca4430`, `4fd8f9d`, `4f70b84`, `d5695c9`). It

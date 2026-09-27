@@ -107,6 +107,9 @@ struct MeleeWebResultsContext {
 };
 
 static MeleeWebResultsContext* owner;
+/* Retain the published allocation independently of the context being checked:
+ * a changed context field must be distinguishable from a source-global write. */
+static CmSubject* owner_camera_pool;
 
 static int fail(char* error, size_t size, const char* message)
 {
@@ -132,6 +135,23 @@ static int live(const MeleeWebResultsContext* context, char* error, size_t size)
     if (seed_ptr != &context->seed)
         return fail(error, size, "Original Results RNG ownership changed");
     return 1;
+}
+
+static int camera_pool_owned(const MeleeWebResultsContext* context,
+                             const char* phase, const void* actor,
+                             char* error, size_t size)
+{
+    if (cm_804D645C == context->camera_pool &&
+        context->camera_pool == owner_camera_pool) return 1;
+    char message[256];
+    snprintf(message, sizeof(message),
+             "Original Results camera pool ownership changed at %s tick=%u "
+             "source=%p context_pool=%p initial=%p context=%p actor=%p",
+             phase, context->ticks, (void*) cm_804D645C,
+             (void*) context->camera_pool, (void*) owner_camera_pool,
+             (const void*) context, actor);
+    fprintf(stderr, "%s\n", message);
+    return fail(error, size, message);
 }
 
 static int baseline_has(const MeleeWebResultsContext* context, HSD_GObj* object)
@@ -184,15 +204,18 @@ static int delete_new_objects(MeleeWebResultsContext* context, char* error, size
             return fail(error, size,
                         "Results item teardown entered from an active source callback");
         Item_8026A8EC(item);
+        if (!camera_pool_owned(context, "item destructor", item, error, size)) return 0;
     }
     /* Release demo fighters through the registered original destructor before
      * releasing their asset/action owners or the source camera pool. */
     for (unsigned slot = 0; slot < 6; ++slot) {
         StaticPlayer* player = Player_GetPtrForSlot(slot);
-        if (player->player_entity[0])
-            HSD_GObjPLink_80390228(player->player_entity[0]);
-        if (player->player_entity[1])
-            HSD_GObjPLink_80390228(player->player_entity[1]);
+        for (unsigned entity = 0; entity < 2; ++entity) {
+            HSD_GObj* fighter = player->player_entity[entity];
+            if (!fighter) continue;
+            HSD_GObjPLink_80390228(fighter);
+            if (!camera_pool_owned(context, "fighter destructor", fighter, error, size)) return 0;
+        }
     }
     for (unsigned pass = 0; pass < 2048; ++pass) {
         HSD_GObj* target = NULL;
@@ -207,6 +230,7 @@ static int delete_new_objects(MeleeWebResultsContext* context, char* error, size
         if (HSD_GObj_804D781C || HSD_GObj_804D7814 || HSD_GObj_804D7818)
             return fail(error, size, "Results GObj teardown entered from an active source callback");
         HSD_GObjPLink_80390228(target);
+        if (!camera_pool_owned(context, "GObj destructor", target, error, size)) return 0;
     }
     return fail(error, size, "Results source object teardown exceeded its bounded object set");
 }
@@ -216,10 +240,10 @@ static int release_source_camera_and_ground(MeleeWebResultsContext* context,
 {
     if (cm_804D6460 || cm_804D6468 || HSD_ShadowGetAllocData()->used)
         return fail(error, size, "Results camera subjects or shadows remain during teardown");
-    if (cm_804D645C != context->camera_pool)
-        return fail(error, size, "Original Results camera pool ownership changed");
+    if (!camera_pool_owned(context, "camera release", NULL, error, size)) return 0;
     if (context->camera_pool) HSD_Free(context->camera_pool);
     context->camera_pool = NULL;
+    owner_camera_pool = NULL;
     cm_804D6458 = context->saved_camera_free;
     cm_804D645C = context->saved_camera_pool;
     cm_804D6460 = context->saved_camera_active;
@@ -383,6 +407,7 @@ MeleeWebResultsContext* melee_web_results_context_begin(
         abort();
     }
     context->camera_pool = cm_804D645C;
+    owner_camera_pool = context->camera_pool;
     context->flash_overlay = melee_web_bg_flash_overlay_owner();
     context->flash_camera = melee_web_bg_flash_camera_owner();
     context->scene_entered = 1;
@@ -401,6 +426,7 @@ int melee_web_results_context_tick(MeleeWebResultsContext* context,
     int request = 0;
     if (!live(context, error, error_size) || !context->scene_entered || context->drawing || !raw)
         return fail(error, error_size, "Results tick requires a live idle scene and four raw ports");
+    if (!camera_pool_owned(context, "tick entry", NULL, error, error_size)) return 0;
     if (HSD_PadLibData.queue != &context->queue || HSD_PadLibData.qnum != 1 ||
         HSD_PadLibData.qcount)
         return fail(error, error_size, "Results raw PAD queue is not owned and idle");
@@ -416,7 +442,9 @@ int melee_web_results_context_tick(MeleeWebResultsContext* context,
         return fail(error, error_size, "Original Results PAD processing did not consume its sample");
     gm_EvaluateAllControllerInputs();
     lbAudioAx_80027DF8();
+    if (!camera_pool_owned(context, "input/audio", NULL, error, error_size)) return 0;
     if (!melee_web_gameplay_step(error, error_size)) return 0;
+    if (!camera_pool_owned(context, "source step", NULL, error, error_size)) return 0;
     if (!melee_web_menu_clock_tick())
         return fail(error, error_size, "Original Results scene clock lost frame ownership");
     if (!melee_web_menu_clock_request(&request))
@@ -431,6 +459,7 @@ int melee_web_results_context_draw(MeleeWebResultsContext* context,
 {
     if (!live(context, error, error_size) || !context->scene_entered || context->drawing)
         return fail(error, error_size, "Results draw requires a live idle scene");
+    if (!camera_pool_owned(context, "draw entry", NULL, error, error_size)) return 0;
     if (context->transition == 2) return ok(error, error_size);
     context->drawing = 1;
     GXRenderModeObj saved_mode = *HSD_VIGetRenderMode();
@@ -443,6 +472,7 @@ int melee_web_results_context_draw(MeleeWebResultsContext* context,
     HSD_Init_803755A8();
     *HSD_VIGetRenderMode() = saved_mode;
     context->drawing = 0;
+    if (!camera_pool_owned(context, "source draw", NULL, error, error_size)) return 0;
     if (!melee_web_menu_clock_present())
         return fail(error, error_size, "Results presentation clock lost ownership");
     return ok(error, error_size);
@@ -468,8 +498,10 @@ int melee_web_results_context_exit(MeleeWebResultsContext* context,
 {
     if (!live(context, error, error_size) || context->drawing)
         return fail(error, error_size, "Results exit requires a live idle scene");
+    if (!camera_pool_owned(context, "scene exit entry", NULL, error, error_size)) return 0;
     if (context->scene_entered) {
         gm_Scene_Results_OnExit(NULL);
+        if (!camera_pool_owned(context, "scene OnExit", NULL, error, error_size)) return 0;
         context->scene_entered = 0;
     }
     return ok(error, error_size);
@@ -487,16 +519,19 @@ int melee_web_results_context_end(MeleeWebResultsContext* context,
     if (!context) return ok(error, error_size);
     if (!live(context, error, error_size) || context->drawing)
         return fail(error, error_size, "Results end requires a live idle scene");
+    if (!camera_pool_owned(context, "close entry", NULL, error, error_size)) return 0;
     if (!melee_web_results_context_exit(context, error, error_size)) return 0;
     if (context->flash_saved) {
         if (!melee_web_bg_flash_destroy(context->flash_overlay, context->flash_camera))
             return fail(error, error_size, "Original Results screen-flash ownership changed");
         melee_web_bg_flash_restore_state();
         context->flash_saved = 0;
+        if (!camera_pool_owned(context, "flash teardown", NULL, error, error_size)) return 0;
     }
     if (!delete_new_objects(context, error, error_size)) return 0;
     if (!melee_web_collision_destroy(context->collision, error, error_size)) return 0;
     context->collision=NULL;
+    if (!camera_pool_owned(context, "collision teardown", NULL, error, error_size)) return 0;
     if (!melee_web_fighter_assets_check_owned("Results OnExit", error, error_size)) return 0;
     if (!release_source_camera_and_ground(context, error, error_size)) return 0;
     HSD_SisLib_803A5FBC();
