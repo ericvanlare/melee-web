@@ -110,6 +110,10 @@ melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::
 std::string message="Choose your local Melee disc image.";
 std::string match_message="Original source match";
 bool running=false,pending=false,host_entered=false,world_exposed=false,faulted=false;
+bool startup_pipeline_service_scheduled=false;
+bool startup_pipeline_service_failed=false;
+unsigned startup_pipeline_service_skip_frames=0;
+constexpr int kStartupPipelineServiceDelayMs=8;
 melee_web::MenuPreparationState preparation;
 unsigned audio_phase=0,diagnostic_start_ticks=0;
 int stock_check=0,stock_count=4,stock_respawns=0;
@@ -803,6 +807,40 @@ bool render_cache_can_flush(){
  return !world&&!match&&!results&&!prize&&!host&&!running&&!pending&&!preparation.busy()&&
         stats&&stats->queuedPipelines==0;
 }
+bool startup_pipeline_service_allowed(){
+ // Startup seed rows are ownerless and do not need a source draw. Keep this
+ // pump outside imported-disc scopes and live owners; ordinary first-use
+ // pipelines retain their existing source-frame scheduling.
+ return !world&&!match&&!results&&!prize&&!host&&!running&&!pending&&!scoped_assets&&
+        !preparation.busy()&&!faulted;
+}
+void schedule_startup_pipeline_service();
+void startup_pipeline_service_callback(void*){
+ startup_pipeline_service_scheduled=false;
+ if(!startup_pipeline_service_allowed())return;
+ const AuroraStats* stats=aurora_get_stats();
+ if(!stats||stats->queuedPipelines==0)return;
+ // Emscripten invokes async_call through a delayed timer task. Schedule one
+ // bounded Aurora batch between every sixth eligible rendered callback
+ // instead of chaining timer tasks or adding work to every display interval.
+ if(!aurora_pipeline_service_preparation()){
+  startup_pipeline_service_failed=true;
+ }
+}
+void schedule_startup_pipeline_service(){
+ if(startup_pipeline_service_scheduled||startup_pipeline_service_failed||
+    !startup_pipeline_service_allowed())return;
+ const AuroraStats* stats=aurora_get_stats();
+ if(!stats||stats->queuedPipelines==0)return;
+ if(startup_pipeline_service_skip_frames<5){
+  ++startup_pipeline_service_skip_frames;
+  return;
+ }
+ startup_pipeline_service_skip_frames=0;
+ startup_pipeline_service_scheduled=true;
+ emscripten_async_call(startup_pipeline_service_callback,nullptr,
+                       kStartupPipelineServiceDelayMs);
+}
 void service_render_cache_writes(){
  // SQLite fsync may Asyncify-yield. Run at the top-level main-loop boundary,
  // after source ownership is gone, never from a nested JS command/export or
@@ -845,6 +883,10 @@ void tick(){
  unsigned replay_steps=0;
  unsigned replay_draw_boundaries=0;
  try{
+  if(startup_pipeline_service_failed){
+   startup_pipeline_service_failed=false;
+   throw std::runtime_error("Renderer startup pipeline preparation failed");
+  }
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
   (void)melee_web::pipeline_preparation::status();
   (void)prepare_deferred_pipelines();
@@ -1224,6 +1266,7 @@ void tick(){
    running=false;menu_clock.reset();message="Preparing first-use rendering...";
   }
  }
+ schedule_startup_pipeline_service();
  char timing[4096];
  const uint32_t staging_used_bytes=callback_staging_used;
  const int timing_written=std::snprintf(timing,sizeof(timing),
