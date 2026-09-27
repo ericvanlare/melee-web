@@ -712,11 +712,13 @@ static void draw_history_match(melee_web::GameplayMatchSession& match)
 #endif
 }
 
-// Unlike run_real_lineup, this lane never manufactures standings. Only the
-// initial match configuration is fixture-authored; all subsequent changes come
-// from source ticks and raw PAD. The existing host retains its default CSS/save
-// profile, so this is explicitly not a four-player CSS or CPU9/reference replay.
-static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
+// Unlike run_real_lineup, this lane never manufactures standings. The human
+// control steers slot 2 and losers with raw PAD; natural_cpu9 instead runs the
+// source CPU simulation from a typed four-player payload. Both retain the
+// default host CSS/save subset; neither is the rendered original-menu browser
+// scenario or a retail/reference replay.
+static int run_match_history(const melee_web::RuntimeFiles& files, bool draw,
+                             bool natural_cpu9 = false)
 {
     char error[256]{};
     const auto require = [&](bool ok, const char* message) {
@@ -739,6 +741,7 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
               << " host_selected_players=" << selection.player_count
               << " host_hud_layout=" << selection.hud_layout
               << " host_seed=" << host_seed
+              << " match_mode=" << (natural_cpu9 ? "four-CPU9" : "four-human-controlled")
               << " arena=" << arena.identity << " arena_generation=" << arena.generation
               << " draw_scope=" << (draw ? "rendered-GPU" : "unrun native-state-only")
               << '\n' << std::flush;
@@ -759,11 +762,15 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
         auto& player = selection.start.players[slot];
         player = human_template;
         player.ckind = roster[slot];
-        player.slot_type = Gm_PKind_Human;
+        player.slot_type = natural_cpu9 ? Gm_PKind_Cpu : Gm_PKind_Human;
         player.slot = slot + 1;
         player.color = player.sub_color = 0;
         player.stocks = 4;
         player.rumble_enabled = 0;
+        if (natural_cpu9) {
+            player.cpu_kind = 4;
+            player.cpu_level = 9;
+        }
         selection.players[slot] = {slot, 4, 0, 0};
     }
     require(selection.start.rules.stkind == St_Kind_Last,
@@ -784,11 +791,19 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
     const auto match_generation = melee_web_gameplay_generation();
     unsigned match_ticks = 0, match_draws = 0, audio_phase = 0;
     float pcm[1068];
-    PADStatus pads[4]{}; // Four connected human ports throughout this lane.
+    PADStatus pads[4]{};
+    if (natural_cpu9) {
+        // Match the observed P1/P2-connected, CPU-slot-2/3-disconnected
+        // Results port profile without supplying input to any CPU fighter.
+        pads[2].err = PAD_ERR_NO_CONTROLLER;
+        pads[3].err = PAD_ERR_NO_CONTROLLER;
+    }
     std::array<int, 4> stocks{4, 4, 4, 4};
     std::array<unsigned, 4> losses{};
     const auto tick_match = [&] {
-        require(match_ticks < 6000, "Match-history exceeded 6000 raw PAD ticks");
+        require(match_ticks < (natural_cpu9 ? 60000U : 6000U),
+                natural_cpu9 ? "Natural CPU9 Match-history exceeded 60000 raw PAD ticks" :
+                               "Match-history exceeded 6000 raw PAD ticks");
         match.tick(pads); ++match_ticks;
         audio_phase += 32000;
         const unsigned samples = audio_phase / 60; audio_phase %= 60;
@@ -801,8 +816,9 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
             require(state.stocks >= 0 && state.stocks <= stocks[slot],
                     "Match-history stocks increased or became negative");
             if (state.stocks != stocks[slot]) {
-                require(slot != 2 && state.stocks == stocks[slot] - 1,
-                        "Match-history lost winner stock or skipped a stock boundary");
+                require(state.stocks == stocks[slot] - 1 &&
+                        (natural_cpu9 || slot != 2),
+                        "Match-history lost a winner stock or skipped a stock boundary");
                 ++losses[slot]; stocks[slot] = state.stocks;
                 std::cout << "match-history stock-loss slot=" << slot
                           << " stocks=" << state.stocks << " motion=" << state.motion_id
@@ -817,43 +833,69 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
     }
     for (unsigned n = 0; n < 600 && !match.ready(); ++n) tick_match();
     require(match.ready(), "Match-history original Ready did not complete");
-    for (unsigned n = 0; n < 240 &&
-         (match.player_stats(2).ground_or_air != 0 ||
-          match.player_stats(2).motion_id != ftCo_MS_Wait); ++n) tick_match();
-    require(match.player_stats(2).motion_id == ftCo_MS_Wait &&
-            match.player_stats(2).ground_or_air == 0 && match.fighter_kind(2) == FTKIND_ZELDA,
-            "Match-history P3 (source slot 2) did not settle as grounded Zelda");
-    pads[2].stickY = -80; pads[2].button = PAD_BUTTON_B;
-    tick_match(); pads[2] = {};
-    bool down_b_observed = false;
-    for (unsigned n = 0; n < 240; ++n) {
-        const auto state = match.player_stats(2);
-        down_b_observed |= state.motion_id == ftZd_MS_SpecialLw ||
-                           state.motion_id == ftZd_MS_SpecialLw2;
-        if (state.fighter_kind == FTKIND_SEAK) break;
-        tick_match();
-    }
-    require(down_b_observed && match.fighter_kind(2) == FTKIND_SEAK,
-            "Match-history ordinary P3 (source slot 2) down-B did not transform Zelda to Sheik");
-    std::cout << "match-history P3 (source slot 2) down-B Zelda->Sheik source_frame="
-              << match.source_frames() << '\n' << std::flush;
-    // Steer each surviving loser away from the idle winner. Rebirth and all
-    // four stock losses are original source behavior, not placement/KO writes.
-    for (unsigned n = 0; n < 4200 && (stocks[0] || stocks[1] || stocks[3]); ++n) {
-        const auto winner = match.player_stats(2);
-        for (const unsigned slot : {0U, 1U, 3U}) {
-            pads[slot] = {};
-            if (stocks[slot])
-                pads[slot].stickX = match.player_stats(slot).position[0] < winner.position[0] ? -80 : 80;
+    if (natural_cpu9) {
+        std::array<int, 4> observed_forms{};
+        for (unsigned slot = 0; slot < 4; ++slot)
+            observed_forms[slot] = match.fighter_kind(slot);
+        for (unsigned n = 0; n < 60000 && !match.complete(); ++n) {
+            tick_match();
+            for (unsigned slot = 0; slot < 4; ++slot) {
+                const int form = match.fighter_kind(slot);
+                if (form != observed_forms[slot]) {
+                    std::cout << "match-history CPU9 form-change slot=" << slot
+                              << " from=" << observed_forms[slot] << " to=" << form
+                              << " source_frame=" << match.source_frames() << '\n' << std::flush;
+                    observed_forms[slot] = form;
+                }
+            }
+            if (match_ticks % 600 == 0) {
+                std::cout << "match-history CPU9 progress frame=" << match.source_frames()
+                          << " stocks=";
+                for (unsigned slot = 0; slot < 4; ++slot)
+                    std::cout << (slot ? "," : "") << match.player_stats(slot).stocks;
+                std::cout << '\n' << std::flush;
+            }
         }
-        tick_match();
+        require(match.complete(), "Natural four-CPU9 Match-history did not complete");
+    } else {
+        for (unsigned n = 0; n < 240 &&
+             (match.player_stats(2).ground_or_air != 0 ||
+              match.player_stats(2).motion_id != ftCo_MS_Wait); ++n) tick_match();
+        require(match.player_stats(2).motion_id == ftCo_MS_Wait &&
+                match.player_stats(2).ground_or_air == 0 && match.fighter_kind(2) == FTKIND_ZELDA,
+                "Match-history P3 (source slot 2) did not settle as grounded Zelda");
+        pads[2].stickY = -80; pads[2].button = PAD_BUTTON_B;
+        tick_match(); pads[2] = {};
+        bool down_b_observed = false;
+        for (unsigned n = 0; n < 240; ++n) {
+            const auto state = match.player_stats(2);
+            down_b_observed |= state.motion_id == ftZd_MS_SpecialLw ||
+                               state.motion_id == ftZd_MS_SpecialLw2;
+            if (state.fighter_kind == FTKIND_SEAK) break;
+            tick_match();
+        }
+        require(down_b_observed && match.fighter_kind(2) == FTKIND_SEAK,
+                "Match-history ordinary P3 (source slot 2) down-B did not transform Zelda to Sheik");
+        std::cout << "match-history P3 (source slot 2) down-B Zelda->Sheik source_frame="
+                  << match.source_frames() << '\n' << std::flush;
+        // Steer each surviving loser away from the idle winner. Rebirth and all
+        // four stock losses are original source behavior, not placement/KO writes.
+        for (unsigned n = 0; n < 4200 && (stocks[0] || stocks[1] || stocks[3]); ++n) {
+            const auto winner = match.player_stats(2);
+            for (const unsigned slot : {0U, 1U, 3U}) {
+                pads[slot] = {};
+                if (stocks[slot])
+                    pads[slot].stickX = match.player_stats(slot).position[0] < winner.position[0] ? -80 : 80;
+            }
+            tick_match();
+        }
+        require(losses == std::array<unsigned, 4>{4, 4, 0, 4} && stocks[2] == 4,
+                "Match-history raw walkoffs did not remove all twelve losing stocks");
+        for (auto& pad : pads) pad = {};
+        for (unsigned n = 0; n < 600 && !match.complete(); ++n) tick_match();
+        require(match.complete() && match.fighter_kind(2) == FTKIND_SEAK,
+                "Match-history did not reach source completion with P3 (source slot 2) Sheik active");
     }
-    require(losses == std::array<unsigned, 4>{4, 4, 0, 4} && stocks[2] == 4,
-            "Match-history raw walkoffs did not remove all twelve losing stocks");
-    for (auto& pad : pads) pad = {};
-    for (unsigned n = 0; n < 600 && !match.complete(); ++n) tick_match();
-    require(match.complete() && match.fighter_kind(2) == FTKIND_SEAK,
-            "Match-history did not reach source completion with P3 (source slot 2) Sheik active");
     const auto match_seed = match.random_seed();
     std::array<uint8_t, MELEE_WEB_PAD_STATE_BYTES> final_match_input{};
     melee_web_pad_state_capture(final_match_input.data()); // Before close restores external PAD.
@@ -866,20 +908,31 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
     require(melee_web_match_rules_terminal_data(&terminal),
             "Match-history source close did not publish MatchExitInfo");
     const auto& end = terminal.match_end;
+    const unsigned winner_slot = end.n_winners == 1 ? end.winners[0] : 6U;
     require(end.outcome == OUTCOME_ELIMINATION && end.match_kind == MatchKind_Stock &&
-            end.n_winners == 1 && end.winners[0] == 2 &&
-            end.player_standings[2].ftkind == FTKIND_SEAK &&
-            end.player_standings[2].slot_type == Gm_PKind_Human &&
-            end.player_standings[2].is_big_loser == 0,
-            "Match-history source terminal was not sole P3 (source slot 2) Sheik Stock elimination");
-    std::cout << "match-history source-terminal winner=2 winner_ckind="
-              << int(end.player_standings[2].ckind) << " winner_ftkind="
-              << int(end.player_standings[2].ftkind) << " winner_slot_type="
-              << int(end.player_standings[2].slot_type)
-              << " winner_is_big_loser=" << int(end.player_standings[2].is_big_loser)
+            end.n_winners == 1 && winner_slot < 4,
+            "Match-history source terminal was not a sole four-player Stock elimination");
+    if (natural_cpu9) {
+        for (unsigned slot = 0; slot < 4; ++slot)
+            require(end.player_standings[slot].slot_type == Gm_PKind_Cpu,
+                    "Natural CPU9 MatchExitInfo did not preserve a CPU slot type");
+        require(end.player_standings[winner_slot].is_big_loser == 0,
+                "Natural CPU9 terminal winner is marked as a loser");
+    } else {
+        require(winner_slot == 2 && end.player_standings[2].ftkind == FTKIND_SEAK &&
+                end.player_standings[2].slot_type == Gm_PKind_Human &&
+                end.player_standings[2].is_big_loser == 0,
+                "Match-history source terminal was not sole P3 (source slot 2) Sheik Stock elimination");
+    }
+    std::cout << "match-history source-terminal winner=" << winner_slot << " winner_ckind="
+              << int(end.player_standings[winner_slot].ckind) << " winner_ftkind="
+              << int(end.player_standings[winner_slot].ftkind) << " winner_slot_type="
+              << int(end.player_standings[winner_slot].slot_type)
+              << " winner_is_big_loser=" << int(end.player_standings[winner_slot].is_big_loser)
               << " source_frame=" << source_frames
               << " raw_ticks=" << match_ticks << " match_draw_api_calls=" << match_draws
-              << " match_exit_seed=" << match_seed << " losses=4,4,0,4\n" << std::flush;
+              << " match_exit_seed=" << match_seed
+              << (natural_cpu9 ? " natural_cpu9=1" : " losses=4,4,0,4") << '\n' << std::flush;
     ResultsMatchInfo result{};
     require(melee_web_menu_host_results_begin(host, &terminal, match_seed, &result,
                                                 error, sizeof(error)), error);
@@ -892,9 +945,13 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
     require(melee_web_gameplay_generation() != match_generation,
             "Match-history Results reused the match world generation");
     check_results_fighter_leases(result);
-    auto* winner = Player_GetEntity(2);
-    require(winner && ftLib_GetKind(winner) == FTKIND_SEAK && ftLib_80086B74(winner),
-            "Match-history Results lost its source Sheik winner/subject");
+    auto* winner = Player_GetEntity(winner_slot);
+    require(winner && ftLib_GetKind(winner) ==
+            end.player_standings[winner_slot].ftkind && ftLib_80086B74(winner),
+            "Match-history Results lost the source terminal winner/subject");
+    const bool target_sheik_winner = natural_cpu9 && winner_slot == 2 &&
+        end.player_standings[2].ckind == CKIND_ZELDA &&
+        end.player_standings[2].ftkind == FTKIND_SEAK;
     const auto pool = cm_804D645C;
     const auto check_pool = [&](const char* phase) {
         require(pool && cm_804D645C == pool, phase);
@@ -903,11 +960,16 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
               << " source_pool=" << pool << " arena_reused=1\n" << std::flush;
     unsigned results_draws = 0;
     audio_phase = 0;
+    P1StatisticsControl cpu_statistics(false);
     for (unsigned tick = 0; tick < 1200 && !results.requested(); ++tick) {
         for (auto& pad : pads) pad = {};
-        if (tick >= 600 && tick % 90 == 0)
+        if (natural_cpu9) {
+            pads[2].err = pads[3].err = PAD_ERR_NO_CONTROLLER;
+            cpu_statistics.prepare(tick, pads);
+        } else if (tick >= 600 && tick % 90 == 0)
             for (auto& pad : pads) pad.button = PAD_BUTTON_START;
         results.tick(pads);
+        if (natural_cpu9) cpu_statistics.observe(tick);
         check_pool("Match-history Results pool changed after tick");
         audio_phase += 32000;
         const unsigned samples = audio_phase / 60; audio_phase %= 60;
@@ -918,6 +980,7 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
     require(results.requested() && results.source_frames() > 600,
             "Match-history delayed ordinary Start did not complete Results");
     const auto results_frames = results.source_frames();
+    if (natural_cpu9) cpu_statistics.finish(results_frames, results_draws, draw);
     require(results_draws == (draw ? results_frames : 0),
             "Match-history Results draw API count differs from declared scope");
     results.exit_scene();
@@ -949,8 +1012,13 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
     require(melee_web_gameplay_session_end(error, sizeof(error)), error);
     require(!melee_web_gameplay_allocation().identity,
             "Match-history final session retained its arena");
-    std::cout << "match-history actual Match->Sheik Results host handoff and close passed;"
-                 " default-CSS/profile subset, no CPU9/reference/full-session equivalence\n";
+    std::cout << (natural_cpu9 ?
+        "match-history natural four-CPU9 Match->Results host handoff and close passed;" :
+        "match-history actual Match->Sheik Results host handoff and close passed;")
+              << " default-CSS/profile subset, no rendered/browser/full-session equivalence"
+              << (target_sheik_winner ? "; target slot-2 Zelda-origin Sheik winner observed" :
+                  natural_cpu9 ? "; target slot-2 Zelda-origin Sheik winner not observed" : "")
+              << '\n';
     return 0;
 }
 
@@ -1155,7 +1223,8 @@ int main(int argc,char** argv){try{
     const std::string command = argc >= 2 ? argv[1] : "";
     const bool history_state = command == "--lineup-b-match-history-host-state";
     const bool history_draw = command == "--lineup-b-match-history-host-draw";
-    const bool match_history = history_state || history_draw;
+    const bool cpu9_history_state = command == "--lineup-b-cpu9-match-history-host-state";
+    const bool match_history = history_state || history_draw || cpu9_history_state;
     const bool p1_statistics_state = command == "--lineup-b-zelda-sheik-stock-p1-statistics-host-state";
     const bool p1_statistics_draw = command == "--lineup-b-zelda-sheik-stock-p1-statistics-host-draw";
     const bool p1_statistics_browser_cadence =
@@ -1217,14 +1286,14 @@ int main(int argc,char** argv){try{
                              lineup_a || lineup_b || match_history;
     if ((!real_roster && argc != 3) || (real_roster && argc != 5))
         throw std::runtime_error(real_roster ?
-            "Expected --real-mario/--real-eight/--real-enabled[-confirm]/--lineup-a/--lineup-b[-sheik-confirm/-zelda-sheik-mode-exit/-sheik-mode-exit/-sheik-draw/-sheik-host-draw/-camera-pool-guard/-results-handoff-guard/-zelda-sheik-stock-delayed-demo-{b,y,x}-host-{state,draw}/-match-history-host-{state,draw}] <common/fighter> <Results shared/music> <Results fighters>" :
+            "Expected --real-mario/--real-eight/--real-enabled[-confirm]/--lineup-a/--lineup-b[-sheik-confirm/-zelda-sheik-mode-exit/-sheik-mode-exit/-sheik-draw/-sheik-host-draw/-camera-pool-guard/-results-handoff-guard/-zelda-sheik-stock-delayed-demo-{b,y,x}-host-{state,draw}/-match-history-host-{state,draw}/-cpu9-match-history-host-state] <common/fighter> <Results shared/music> <Results fighters>" :
             "Expected common/fighter and Results asset directories");
     melee_web::RuntimeFiles files;
     const int first_directory = real_roster ? 2 : 1;
     for (int directory = first_directory; directory < argc; ++directory)
         load_directory(files, argv[directory]);
     if (match_history) {
-        const int status = run_match_history(files, history_draw);
+        const int status = run_match_history(files, history_draw, cpu9_history_state);
 #if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
         EM_ASM({ window.resultsDone = $0; }, status);
 #endif

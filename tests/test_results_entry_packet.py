@@ -94,7 +94,9 @@ class ResultsEntryPacketTests(unittest.TestCase):
     def test_three_pulse_prefix_is_source_bracketed_before_css_continuation(self):
         harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
         self.assertIn("resultsInputMode==='keyboard-three-prefix'", harness)
-        self.assertIn('keyboard-three-prefix is a one-match diagnostic mode', harness)
+        self.assertNotIn('keyboard-three-prefix is a one-match diagnostic mode', harness)
+        self.assertIn('const inputEventStart=await page.evaluate(()=>', harness)
+        self.assertIn('(report.results_input_events||[]).slice(inputEventStart).filter(row=>', harness)
         self.assertIn('const initialPulseLimit=resultsInputMode===\'keyboard-three-prefix\'?3:48;',
                       harness)
         prefix_loop = harness.index('const initialPulseLimit=')
@@ -107,9 +109,22 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('row.hold_ms===160&&row.release_ms===120', harness)
         self.assertIn('source_state_after_tick_560:sample560?.results_state_after_tick', harness)
         self.assertIn('pads_at_source_frame_560:sample560?.pads', harness)
+        pulse_sender = harness[harness.index('const sendOrdinaryKeyboardPulse='):
+                               harness.index("const initialPulseLimit=", harness.index('const sendOrdinaryKeyboardPulse='))]
+        self.assertIn('resumeResultsIfPaused(await diagnostic())', pulse_sender,
+                      'Continuation input must use live pause state, not a stale prior sample')
+        self.assertIn('waitForResultsFrame(sourceFrameBefore+1', pulse_sender,
+                      'Post-checkpoint ordinary input must be dispatched only after source advancement')
         self.assertIn('Exactly three ordinary keyboard intentions must precede the cursor-560 checkpoint',
                       harness)
         self.assertIn('P1/P2-connected, CPU-P3/P4-disconnected profile', harness)
+
+    def test_three_pulse_prefix_can_cover_both_natural_matches(self):
+        harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
+        self.assertIn("['url','disc','out','lineup','playwright','build-dir','results-input']", harness)
+        self.assertIn("if(![1,2].includes(matchCount))throw Error('--matches must be 1 or 2');", harness)
+        self.assertIn('for(let pulse=3;pulse<48&&state.phase!==1;pulse++)', harness)
+        self.assertIn('natural Results→CSS→second match', harness)
 
     def test_results_pad_trace_is_bounded_and_development_only(self):
         source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')

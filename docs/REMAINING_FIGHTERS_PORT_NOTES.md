@@ -1071,3 +1071,44 @@ The captured browser report binds the run to clean runtime Wasm SHA-256
 new harness SHA recorded in the report. No runtime source changed for this
 reduction. The next natural attempt must use this three-pulse prefix and retain
 the typed winner/form; do not treat another non-Sheik winner as a resolution.
+
+## Results natural-CPU9 auto-page reducer and continuation failure (2026-09-27)
+
+The new source-side reducer
+`work/results-match-history-tests/native-ytbc6aex/stdout.log` runs the actual
+four-CPU9 Stock match to its natural terminal and passes its real CPU-typed
+`MatchExitInfo` through Results. It makes no forced seed, form, terminal or
+winner assignment. Its P1-only PAD schedule uses separate 10-tick Start holds
+at source ticks 180, 360 and 600, with explicit release edges at 190, 370 and
+610. Ports 0/1 remain connected and neutral between P1 edges; CPU ports 2/3
+remain disconnected. Their page 0→1 auto-transitions occur at tick 551, before
+the confirmation trigger at 600. Results host close at tick 622 preserves
+camera pool `0x7090720`. This is native state-only Results coverage with the
+default CSS/save host subset, not browser/GPU or retail equivalence; the natural
+winner was Samus, not the slot-2 Zelda-origin Sheik target.
+
+Browser run
+`work/pr86-results-sheik-winner-b-three-pulse-two-matches-r2/report.json`
+reached the cursor-560 checkpoint in a natural B CPU9/4-stock/FD match. Samus
+won at gameplay frame 17,740 (RNG 143,578,268). The three trusted ordinary
+Enter pairs were bracketed at Results frames 186/186, 287/296 and 394/394;
+source PAD shows the second Start at frames 288–295, while the previous source
+state is Results phase 2. CPU slots 2/3 auto-advanced their first page at
+frame 480. At cursor 560, Results is in phase 3/statistics phase 2, pages are
+`[0,0,1,1]`, no player is confirmed, PAD is neutral, and port errors are
+`[0,0,-1,-1]`. All camera-entry pool observations are `0xa59e6e0`; no ownership
+guard fired. This excludes only a generic failure for this non-target
+winner/input route and does not resolve the historical Sheik-winner failure.
+
+That browser attempt failed later, before CSS return: after cursor 560 it
+retained only the original Start PAD run despite dozens of later trusted Enter
+events; the final sample was still Results frame 4,786. The report records 251
+timing interruptions and no source tick failures. Investigation found the
+continuation helper could pass a stale pre-pause state into its resume check
+and dispatch keyboard input without confirming source advancement. The tracked
+harness now reads fresh diagnostics before continuation and gates post-prefix
+keyboard input on an advancing source frame; the first three historical-prefix
+attempts remain unchanged. Syntax and focused harness-contract tests pass, but
+this correction still needs a fresh rendered-browser run after the shared lane
+is released. The failed report is preserved and is not counted as a completed
+Results→CSS loop.

@@ -21,7 +21,9 @@ from check_gameplay import node_runtime
                      "Explicit opt-in for bounded Results traces required")
 class ResultsMatchHistoryTests(unittest.TestCase):
     def run_trace(self, flag):
-        target = ROOT / "build/browser-release/gameplay_results_scene_trace.js"
+        target = Path(os.environ.get(
+            "MELEE_WEB_RESULTS_TRACE",
+            ROOT / "build/browser-release/gameplay_results_scene_trace.js")).resolve()
         roots = [ROOT / "assets-local" / name for name in
                  ("native-menus", "repro-results-v1", "next-gate")]
         required = [target, roots[0] / "MnSlChr.usd", roots[0] / "menu01.hps",
@@ -49,6 +51,12 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         (evidence / "stdout.log").write_text(result.stdout)
         (evidence / "stderr.log").write_text(result.stderr)
         scenario_scope = (
+            "natural source four-CPU9 Stock MatchExitInfo with CPU-typed standings; "
+            "P1-only 180/360/600 ten-tick Start pulses; connected ports 0/1 and "
+            "disconnected CPU ports 2/3; source CPU auto-page before confirmation; "
+            "no forced seed, form, terminal data, or winner; native state-only, "
+            "not rendered browser/reference evidence"
+            if "cpu9-match-history" in flag else
             "synthetic Results CPU standings; P1-only 180/360/539 ten-tick Start pulses, "
             "connected ports 0/1, disconnected CPU ports 2/3; source ticks bracket the "
             "fresh browser Enter dispatches, not consumed historical PAD or a historical replay"
@@ -101,6 +109,42 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         # The default profile's actual human-match stats select Prize. This
         # lane checks Results close/host unload, not Prize or a CSS return.
         self.assertEqual(handoff.groups()[3:], ("192", "0", "Prize-unrun"))
+
+    def test_natural_cpu9_terminal_flows_through_p1_cpu_auto_pages(self):
+        stdout, evidence, brief = self.run_trace(
+            "--lineup-b-cpu9-match-history-host-state")
+        scope = json.loads((evidence / "command.json").read_text())["scope"]
+        self.assertIn("natural source four-CPU9 Stock MatchExitInfo", scope)
+        self.assertIn("no forced seed, form, terminal data, or winner", scope)
+        self.assertIn("not rendered browser/reference evidence", scope)
+        for marker in (
+                "host_hud_layout=4", "match_mode=four-CPU9",
+                "before-confirm tick=600 auto_pages=1,1",
+                "p1-statistics auto-page slot=2 from=0 to=1 tick=",
+                "p1-statistics auto-page slot=3 from=0 to=1 tick=",
+                "p1-statistics coverage frames=", "natural_cpu9=1",
+                "natural four-CPU9 Match->Results host handoff and close passed"):
+            self.assertIn(marker, stdout, f"Retained {evidence}\n{brief}")
+        terminal = re.search(
+            r"match-history source-terminal winner=(\d) winner_ckind=(\d+) "
+            r"winner_ftkind=(\d+) winner_slot_type=(\d+) "
+            r"winner_is_big_loser=0 source_frame=(\d+) raw_ticks=(\d+) "
+            r"match_draw_api_calls=0 match_exit_seed=(\d+) natural_cpu9=1",
+            stdout)
+        self.assertIsNotNone(terminal, f"Retained {evidence}\n{brief}")
+        winner_slot, winner_ckind, winner_ftkind = map(int, terminal.groups()[:3])
+        self.assertLess(winner_slot, 4)
+        self.assertGreater(int(terminal.group(5)), 0)
+        self.assertGreater(int(terminal.group(6)), 0)
+        auto_pages = re.findall(
+            r"p1-statistics auto-page slot=(\d) from=0 to=1 tick=(\d+)", stdout)
+        self.assertEqual([row[0] for row in auto_pages], ["2", "3"])
+        for _, tick in auto_pages:
+            self.assertGreater(int(tick), 360)
+            self.assertLess(int(tick), 600)
+        target = winner_slot == 2 and winner_ckind == 18 and winner_ftkind == 7
+        print(f"Natural CPU9 terminal winner={winner_slot} ckind={winner_ckind} "
+              f"ftkind={winner_ftkind}; target Sheik winner observed={target}")
 
     def test_p1_held_start_disconnected_cpu_statistics(self):
         stdout, evidence, brief = self.run_trace(

@@ -32,8 +32,6 @@ if(!['keyboard','keyboard-three-prefix','keyboard-gated','source-tick'].includes
   throw Error('--results-input must be keyboard, keyboard-three-prefix, keyboard-gated, or source-tick');
 const matchCount=Number(values.matches||2);
 if(![1,2].includes(matchCount))throw Error('--matches must be 1 or 2');
-if(resultsInputMode==='keyboard-three-prefix'&&matchCount!==1)
-  throw Error('keyboard-three-prefix is a one-match diagnostic mode');
 const url=new URL(values.url);
 if(!['http:','https:'].includes(url.protocol)||!url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
@@ -416,6 +414,8 @@ async function chooseFinalDestination(){
 }
 async function runMatch(matchIndex,expected){
   activeMatchIndex=matchIndex;
+  const inputEventStart=await page.evaluate(()=>
+    window.__meleeWebResultsInputEvents?.length||0);
   await chooseFinalDestination();
   const entry=await writeProgress(`match-${matchIndex}-entry`);
   await screenshot(`match-${matchIndex}-entry`);
@@ -534,7 +534,7 @@ async function runMatch(matchIndex,expected){
     const intents=report.controller_inputs.filter(row=>
       row.device==='keyboard-to-source-PAD'&&
       row.label?.startsWith(`results-${matchIndex}-continue-`));
-    const keyboardEvents=(report.results_input_events||[]).filter(row=>
+    const keyboardEvents=(report.results_input_events||[]).slice(inputEventStart).filter(row=>
       row.phase===8||row.phase===9);
     const keydowns=keyboardEvents.filter(row=>row.kind==='keydown');
     const keyups=keyboardEvents.filter(row=>row.kind==='keyup');
@@ -881,8 +881,24 @@ async function runMatch(matchIndex,expected){
   }else{
     await writeProgress(`match-${matchIndex}-natural-results`);
     await screenshot(`match-${matchIndex}-natural-results`);
-    const sendOrdinaryKeyboardPulse=async pulse=>{
-      state=await resumeResultsIfPaused(state);
+    const sendOrdinaryKeyboardPulse=async(pulse,requireAdvancingSourceFrame=false)=>{
+      state=await resumeResultsIfPaused(await diagnostic());
+      if(state.error)throw Error(`Results ${matchIndex} before Enter pulse ${pulse}: ${state.error}`);
+      if(state.phase===1)return;
+      if(state.phase===5||state.phase===6){
+        const sourceFrameBefore=readResultsFrame(state);
+        state=await waitForResultsFrame(sourceFrameBefore+1,
+          `results-${matchIndex}-continue-${pulse}-scene-transition-gate`);
+        if(state.phase===1)return;
+      }
+      assert(state.phase===8||state.phase===9,
+        `Results ${matchIndex} cannot send ordinary Enter in source phase ${state.phase}`);
+      if(requireAdvancingSourceFrame){
+        const sourceFrameBefore=readResultsFrame(state);
+        state=await waitForResultsFrame(sourceFrameBefore+1,
+          `results-${matchIndex}-continue-${pulse}-advancing-source-gate`);
+        if(state.phase===1)return;
+      }
       await driver.pressChord(['Enter'],{holdMs:160,releaseMs:120});
       report.controller_inputs.push({device:'keyboard-to-source-PAD',key:'Enter',
         hold_ms:160,release_ms:120,label:`results-${matchIndex}-continue-${pulse}`});
@@ -904,7 +920,7 @@ async function runMatch(matchIndex,expected){
     if(resultsInputMode==='keyboard-three-prefix'&&state.phase!==1){
       await captureThreePulsePrefix();
       for(let pulse=3;pulse<48&&state.phase!==1;pulse++)
-        await sendOrdinaryKeyboardPulse(pulse);
+        await sendOrdinaryKeyboardPulse(pulse,true);
     }
   }
   if(resultsInputMode==='source-tick'&&state.phase!==1){
