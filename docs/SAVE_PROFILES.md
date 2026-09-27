@@ -23,6 +23,41 @@ boundary. **Eject** takes a final Personal snapshot and waits for its storage
 transaction before retiring the page. If storage rejects the write, Eject stops
 and leaves the current page running with the reported error.
 
+### Preserve saved preferences across browser startup
+
+The source menu host temporarily applies the browser's supported gameplay
+configuration on ordinary scene entry. It sets item frequency to the source
+default, enables every item in the item mask, enables rumble for controller
+ports 1 and 2, and selects the USA saved language. Those writes affect the live
+source profile; they are not edits made by the player to a Personal save. Before
+that entry, the native owner captures the persisted preferences from the active
+source profile and overlays only those typed fields onto each live source
+snapshot. The remaining SaveData and name-bank bytes still come from the current
+source state, so this does not freeze the imported profile or suppress progress
+autosaves.
+
+The captured fields are `gmm_x1CB0.item_freq`, `item_mask`, all four
+`rumble_enabled` bytes, and `saved_language`, at SaveData offsets `0x448`,
+`0x450–0x457`, `0x458–0x45B`, and `0x45E`. The same path captures source
+defaults for a genuinely fresh Personal profile before the first CSS entry, so
+its first commit does not inherit the temporary browser startup writes. Imports
+capture their values only after the validated profile has been applied.
+
+The startup audit found no browser-startup writes to `sound_balance`,
+`deflicker`, rumble ports 3–4, or the saved `stage_mask`; these continue to come
+from live source snapshots. The runtime language selector in `gmm_x0` is outside
+the card data and is restored at the scene boundary. This change does not add
+original Settings menus or claim that browser-supported runtime features match
+every saved option.
+
+The production audio-player regression uses a synthetic GCI with a non-default
+item mask, item frequency, and rumble pattern. It confirms the preferences,
+source progress fields, and name through confirmed Settings import, live
+autosave, export, browser reload, and source relaunch. Its separately scoped
+receipt is [`evidence/save-profile-startup-preferences-v1.json`](evidence/save-profile-startup-preferences-v1.json);
+the fixture is clearly distinguished from the game-written Dolphin evidence
+below.
+
 There is no manual save button. The browser samples persistent source fields at
 the existing native command boundary while a scene is active, every 1.5 seconds.
 It commits only when the bytes change and reports success after IndexedDB says
