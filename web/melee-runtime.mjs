@@ -1,5 +1,5 @@
 /** One player owner per document. Native source ticks remain owned by the compiled player. */
-import {loadNativeGameDisc} from './runtime-assets.mjs';
+import {loadNativeGameDisc, openNativeGameDiscSession} from './runtime-assets.mjs';
 import {createControllerManager} from './controller-input.mjs';
 
 let documentClaimed = false;
@@ -10,7 +10,7 @@ const IMPORT_BATCH_MAX_MS = 8;
 
 export async function mountMeleeRuntime({canvas, onState = () => {}, onError = () => {},
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
-  readDisc = loadNativeGameDisc, openDisc, createAudio,
+  readDisc = loadNativeGameDisc, openDisc = openNativeGameDiscSession, createAudio,
   loaderUrl = new URL('./gameplay_public.js', import.meta.url), startupTimeout = 60000} = {}) {
   if (!canvas || canvas.id !== 'canvas') throw Error('The player requires its own #canvas.');
   if (documentClaimed) throw Error('Reload the page to start a fresh player.');
@@ -26,6 +26,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let loading = Object.freeze({phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
   let preparationLabel = '', preparationKeepsAudio = false;
   let discSession = null, assetTransfer = null;
+  const openedDiscSessions = new WeakSet();
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
   const audio = createAudio?.({assetBase, onEvent: data => emit('audio', data),
@@ -323,10 +324,25 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     controllers: Module.meleeControllers,
     version: 1, getState: snapshot, focus,
     activateAudio() { return prepareAudio(); },
+    async openDiscSession(file) {
+      if (typeof openDisc !== 'function') throw Error('This player has no local disc session loader.');
+      const session = await openDisc(file);
+      if (!session || typeof session !== 'object' || typeof session.close !== 'function' ||
+          typeof session.readScope !== 'function') {
+        session?.close?.();
+        throw Error('The configured disc loader returned an invalid session.');
+      }
+      if (fatal || destroyed) {
+        session.close();
+        throw Error('The player stopped while validating the local disc.');
+      }
+      openedDiscSessions.add(session);
+      return session;
+    },
     importDisc(file, {preopenedSession = null} = {}) {
-      if (preopenedSession && (!openDisc || typeof preopenedSession.close !== 'function' ||
-          typeof preopenedSession.readScope !== 'function')) {
-        return Promise.reject(Error('The selected disc session is invalid. Choose the disc again.'));
+      if (preopenedSession && (!openedDiscSessions.has(preopenedSession) ||
+          typeof preopenedSession.close !== 'function' || typeof preopenedSession.readScope !== 'function')) {
+        return Promise.reject(Error('The selected disc session was not opened by this player. Choose the disc again.'));
       }
       let adoptedSession = false;
       const work = operation('importing', async () => {
@@ -336,7 +352,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           discSession?.close(); discSession = null;
           setLoading('disc', 'Reading game data…', 0, 1); publish();
           if (openDisc) {
-            const opened = preopenedSession || await openDisc(file);
+            const opened = preopenedSession || await handle.openDiscSession(file);
             if (fatal || destroyed) {
               opened.close();
               throw Error('The player stopped while opening the local disc.');

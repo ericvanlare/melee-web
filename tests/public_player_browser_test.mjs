@@ -7,12 +7,13 @@ import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 const {values} = parseArgs({options: {
-  ...Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}])),
+  ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
   audio: {type: 'boolean', default: false},
   headed: {type: 'boolean', default: false},
 }});
 if (!values.url || !values.out) throw Error('Use --url ORIGIN --out LOCAL_DIR [--playwright PACKAGE_DIR] [--disc OWNED_DISC] [--audio] [--headed]');
 const {chromium,browser:launchOptions} = await loadBrowserTools(values.playwright);
+const packageManifest = values.manifest ? JSON.parse(await fs.readFile(values.manifest, 'utf8')) : null;
 await fs.mkdir(values.out, {recursive: true});
 const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: values.headed}));
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
@@ -20,6 +21,11 @@ const page = await context.newPage(), origin = new URL(values.url).origin;
 const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
 const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.version(), browser_mode: values.headed ? 'headed' : 'headless', checks: [],
   profile: values.audio ? 'audio-player' : 'player',
+  build_identity: packageManifest ? {
+    schema: packageManifest.schema, profile: packageManifest.profile,
+    source_sha: packageManifest.source_sha, runtime_hash: packageManifest.runtime_hash,
+    identity_sha256: packageManifest.identity_sha256,
+  } : null,
   scope: 'Production entry, ordinary keyboard UI, lifecycle and application network smoke. No retail comparison, physical-controller, PCM or performance claim.'};
 page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData()}));
 page.on('pageerror', error => errors.push(error.message));

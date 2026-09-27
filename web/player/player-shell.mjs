@@ -1,12 +1,11 @@
 import {mountMeleeRuntime} from '../melee-runtime.mjs';
 import {mountControllerSettings} from '../controller-settings.mjs';
-import {openNativeGameDiscSession} from '../runtime-assets.mjs';
 
 const $ = id => document.getElementById(id);
 let player, state, settings, currentError = '', requiresReload = false, hasStarted = false;
 let discSelectionGeneration = 0, selectedDiscReady = false, selectedDiscFile = null;
 let selectedDiscSession = null, selectedDiscValidated = false, importingSelection = null, importedSelection = null;
-let selectedDiscMessage = '';
+let selectedDiscMessage = '', validatingSelection = null;
 let audioActivation = Promise.resolve(), audioActivationError = null;
 const busyStates = ['booting', 'importing', 'preparing', 'pausing', 'resuming', 'unloading'];
 const startReadinessWaiters = new Set();
@@ -34,6 +33,31 @@ function renderDiscSelection() {
   const status = $('disc-selection-status');
   status.hidden = !selectedDiscFile || !selectedDiscMessage;
   status.textContent = selectedDiscFile && selectedDiscMessage ? `${selectedDiscMessage} ${selectedDiscFile.name}` : '';
+}
+
+async function validateSelectedDisc(selection, file) {
+  if (!player || typeof player.openDiscSession !== 'function' ||
+      selection !== discSelectionGeneration || validatingSelection === selection || state?.requiresReload) return;
+  validatingSelection = selection;
+  try {
+    const session = await player.openDiscSession(file);
+    if (selection !== discSelectionGeneration || state?.requiresReload) {
+      session.close();
+      return;
+    }
+    selectedDiscSession = session;
+    selectedDiscValidated = true;
+    selectedDiscMessage = state?.canImport ? 'Disc validated; preparing' : 'Disc validated; waiting for graphics';
+    renderStatus(state);
+  } catch (error) {
+    if (selection === discSelectionGeneration) {
+      selectedDiscMessage = 'Invalid disc';
+      renderDiscSelection();
+      showError(error);
+    }
+  } finally {
+    if (validatingSelection === selection) validatingSelection = null;
+  }
 }
 
 function maybeImportSelectedDisc() {
@@ -171,25 +195,8 @@ $('disc-file').onchange = async () => {
   selectedDiscMessage = 'Checking local disc';
   clearError();
   renderStatus(state);
-  try {
-    const session = await openNativeGameDiscSession(file);
-    if (selection !== discSelectionGeneration || state?.requiresReload) {
-      session.close();
-      return;
-    }
-    selectedDiscSession = session;
-    selectedDiscValidated = true;
-    selectedDiscMessage = state?.canImport ? 'Disc validated; preparing' : 'Disc validated; waiting for graphics';
-    renderStatus(state);
-  }
-  catch (error) {
-    if (selection === discSelectionGeneration) {
-      selectedDiscMessage = 'Invalid disc';
-      renderDiscSelection();
-      showError(error);
-    }
-  }
-  finally { $('disc-file').value = ''; }
+  await validateSelectedDisc(selection, file);
+  $('disc-file').value = '';
 };
 $('disc-file').addEventListener('cancel', () => $('choose-disc').focus());
 $('start-game').onclick = async () => {
@@ -252,8 +259,12 @@ document.addEventListener('fullscreenchange', () => { $('fullscreen').textConten
 try {
   player = await mountMeleeRuntime({
     canvas: $('canvas'), onState: renderStatus, onError: error => showError(error),
-    onOwner: owner => { player = owner.handle; renderStatus(player.getState()); },
-    openDisc: openNativeGameDiscSession,
+    onOwner: owner => {
+      player = owner.handle;
+      renderStatus(player.getState());
+      if (selectedDiscFile && !selectedDiscValidated)
+        void validateSelectedDisc(discSelectionGeneration, selectedDiscFile);
+    },
   });
   await settings.bindPlayer(player);
 } catch (error) { showError(error, true); }

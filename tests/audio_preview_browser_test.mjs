@@ -12,8 +12,9 @@ import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.m
 
 const {values} = parseArgs({
   options: {
-    ...Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}])),
+    ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
     headed: {type: 'boolean', default: false},
+    'select-after-graphics': {type: 'boolean', default: false},
   },
 });
 if (!values.url || !values.disc || !values.out) {
@@ -21,6 +22,7 @@ if (!values.url || !values.disc || !values.out) {
 }
 
 const {chromium, browser: launchOptions} = await loadBrowserTools(values.playwright);
+const packageManifest = values.manifest ? JSON.parse(await fs.readFile(values.manifest, 'utf8')) : null;
 await fs.mkdir(values.out, {recursive: true});
 const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: values.headed}));
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
@@ -31,7 +33,12 @@ const report = {
   schema: 'webmelee-audio-preview-browser-v1',
   browser: browser.version(),
   browser_mode: values.headed ? 'headed' : 'headless',
-  scope: 'Authorized local disc through original CSS, SSS and supported Mario/Final Destination match; Web Audio lifecycle and PCM transport only. No long replay or performance claim.',
+  build_identity: packageManifest ? {
+    schema: packageManifest.schema, profile: packageManifest.profile,
+    source_sha: packageManifest.source_sha, runtime_hash: packageManifest.runtime_hash,
+    identity_sha256: packageManifest.identity_sha256,
+  } : null,
+  scope: 'Authorized local disc through original CSS, SSS, supported Mario/Final Destination match, Results return and Eject; Web Audio lifecycle and PCM transport only. No long replay or performance claim.',
   checks: [],
   audio: {phases: {}, cdp: []},
   assets: {transactions: [], legacyCalls: 0},
@@ -212,6 +219,13 @@ const installAssetTrace = async () => page.evaluate(() => {
   const file = module._melee_web_native_asset_file;
   const commit = module._melee_web_native_asset_commit;
   const abort = module._melee_web_native_asset_abort;
+  const launch = module._melee_web_native_menu_launch;
+  if (typeof launch !== 'function') throw Error('Audio preview does not expose the original menu launch boundary.');
+  let launchCalls = 0;
+  module._melee_web_native_menu_launch = function(...args) {
+    launchCalls++;
+    return launch.apply(this, args);
+  };
   const events = [];
   const legacy = module._melee_web_native_menu_file;
   const recordScope = generation => {
@@ -261,7 +275,8 @@ const installAssetTrace = async () => page.evaluate(() => {
     return assetsRequested.apply(this, [generation, ...args]);
   };
   globalThis.audioPreviewAssetTrace = {
-    snapshot: () => ({legacyAvailable: typeof legacy === 'function', events: events.map(event => ({...event}))}),
+    snapshot: () => ({legacyAvailable: typeof legacy === 'function', launchCalls,
+      events: events.map(event => ({...event}))}),
   };
 });
 const total = (snapshot, field) => (snapshot?.worklets || []).reduce((sum, worklet) => sum + Number(worklet[field] || 0), 0);
@@ -307,19 +322,57 @@ try {
       return typeof module?.['_melee_web_native_menu_diagnostics'];
     }), 'undefined',
       'The browser check must not depend on diagnostic native exports');
-    await installAssetTrace();
+    await page.waitForFunction(() => !document.querySelector('#keyboard-layout')?.disabled,
+      null, {timeout: 90000});
     // Match the public player's ordinary recipe: configure B0XX through the
     // visible controls before using its Start key on the original CSS.
     await page.locator('#controls-open').click();
     await page.locator('#keyboard-layout').selectOption('boxx');
     await page.locator('#controls-close').click();
     await page.waitForFunction(() => document.activeElement?.id === 'canvas');
-    await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
-    await screenshot('ready');
+    const boundary = await page.waitForFunction(({afterGraphics}) => {
+      const panel = document.querySelector('#loading-panel');
+      const label = document.querySelector('#loading-label')?.textContent || '';
+      const choose = document.querySelector('#choose-disc');
+      const module = globalThis.Module;
+      const ownerReady = typeof module?._melee_web_native_asset_begin === 'function' &&
+        typeof module?._melee_web_native_menu_launch === 'function' &&
+        typeof globalThis.menuAssetsRequested === 'function';
+      const graphicsReady = !!panel?.hidden;
+      const graphicsPreparing = !panel?.hidden && /Preparing graphics/i.test(label);
+      if (!ownerReady || (afterGraphics ? !graphicsReady : (!graphicsPreparing || !choose || choose.disabled))) return false;
+      return {loadingPanelHidden: graphicsReady, loadingLabel: label,
+        canSelectDisc: !!choose && !choose.disabled,
+        cacheIdle: typeof module._melee_web_native_menu_cache_idle === 'function' ?
+          module._melee_web_native_menu_cache_idle() : null};
+    }, {afterGraphics: values['select-after-graphics']}, {timeout: 90000});
+    report.selection_boundary = await boundary.jsonValue();
+    await boundary.dispose();
+    report.selection_boundary.when = values['select-after-graphics'] ? 'after-graphics-ready' : 'while-graphics-preparing';
+    await installAssetTrace();
+    await screenshot(values['select-after-graphics'] ? 'ready-before-selection' : 'graphics-preparing-before-selection');
   });
 
   await check('authorized-disc import and original CSS emits nonzero PCM', async () => {
     await selectDisc(values.disc);
+    const filename = path.basename(values.disc);
+    await page.waitForFunction(filename => {
+      const status = document.querySelector('#disc-selection-status');
+      return status && !status.hidden && status.textContent.includes(filename);
+    }, filename, {timeout: 30000});
+    report.disc_selection = await page.evaluate(() => ({
+      status: document.querySelector('#disc-selection-status')?.textContent || '',
+      loadingPanelHidden: document.querySelector('#loading-panel')?.hidden ?? null,
+      loadingLabel: document.querySelector('#loading-label')?.textContent || '',
+    }));
+    if (!values['select-after-graphics']) {
+      assert.equal(report.selection_boundary.loadingPanelHidden, false,
+        'The owned disc was selected while graphics preparation was visible');
+      assert.equal(report.selection_boundary.canSelectDisc, true);
+    } else {
+      assert.equal(report.selection_boundary.loadingPanelHidden, true,
+        'The late-selection variant starts only after graphics are ready');
+    }
     const cssEntry = await driver.waitForPublicCss();
     if (cssEntry === 'audio-recovery-required') {
       report.audio_activation_recovery = 'The player showed its specific suspended-audio message; the test used the separate Play gesture only for that recovery.';
@@ -331,6 +384,10 @@ try {
     }
     assert(await page.locator('#error-dialog').isHidden());
     assert(await page.locator('#loading-panel').isHidden(), 'Loading feedback must retire before interactive CSS');
+    const afterCssAssets = await assetTrace();
+    assert.equal(afterCssAssets.launchCalls, 1,
+      'Successful disc and graphics readiness must invoke the original CSS launch exactly once');
+    report.launchesAtCss = afterCssAssets.launchCalls;
     await page.waitForFunction(() => document.activeElement?.id === 'canvas');
     const before = await trace();
     await observeAudio('css', before);
@@ -384,6 +441,9 @@ try {
     await driver.pressChord(['q', '9', 'm', '7'], {holdMs: 250, releaseMs: 200});
     await phase(8);
     await page.waitForTimeout(4500);
+    const beforeResultsAudio = await trace();
+    await observeAudio('results', beforeResultsAudio);
+    await screenshot('results');
     // No Contest enters the original Results route. Confirm its panels with
     // ordinary Start press/release edges, matching the bounded public return
     // recipe; a single LRAS chord only reaches Results.
@@ -394,6 +454,7 @@ try {
     }
     assert.notEqual(await page.evaluate(() => Module._melee_web_native_menu_phase()), 8,
       'Original Results did not finish its bounded Start confirmation sequence');
+    const beforeCssReturnAudio = await trace();
     const returnBoundary = await page.waitForFunction(() => {
       const error = document.querySelector('#status')?.dataset.runtimeError;
       if (error) return {error};
@@ -415,7 +476,7 @@ try {
     }
     await phase(1);
     await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
-    await observeAudio('css-after-no-contest', before);
+    await observeAudio('css-after-no-contest', beforeCssReturnAudio);
     await screenshot('css-after-no-contest');
   });
 

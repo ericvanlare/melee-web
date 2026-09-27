@@ -126,12 +126,10 @@ async function importShellWithMocks(scenario) {
   const imports = [
     "import {mountMeleeRuntime} from '../melee-runtime.mjs';",
     "import {mountControllerSettings} from '../controller-settings.mjs';",
-    "import {openNativeGameDiscSession} from '../runtime-assets.mjs';",
   ].join('\n');
   const replacement = [
     'const mountMeleeRuntime = globalThis.testMountMeleeRuntime;',
     'const mountControllerSettings = globalThis.testMountControllerSettings;',
-    'const openNativeGameDiscSession = globalThis.testOpenNativeGameDiscSession;',
   ].join('\n');
   assert.notEqual(source.indexOf(imports), -1, 'shell imports must remain source-substitutable');
   const substituted = source.replace(imports, replacement);
@@ -170,7 +168,7 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
       bindPlayer: async runtime => { trace.push(['settings-bind', runtime]); },
     };
   };
-  globalThis.testOpenNativeGameDiscSession = async file => {
+  const testOpenNativeGameDiscSession = async file => {
     trace.push(['validate', file.name]);
     if (behavior.validateDisc) await behavior.validateDisc(file);
     if (file.invalid) throw Error('Invalid local disc');
@@ -179,12 +177,13 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
       async readScope() { return new Map(); },
     };
   };
+  globalThis.testOpenNativeGameDiscSession = testOpenNativeGameDiscSession;
   globalThis.testMountMeleeRuntime = async options => {
     trace.push('mount');
     stateCallback = options.onState;
     assert.equal(options.canvas, document.getElementById('canvas'));
-    assert.equal(options.openDisc, globalThis.testOpenNativeGameDiscSession,
-      'public shell must provide the audio-free scoped disc opener');
+    assert.equal(options.openDisc, undefined,
+      'public shell delegates disc opening to the runtime profile adapter');
     assert.equal(options.createAudio, undefined, 'public shell must not create an audio runtime');
     if (options.createAudio) audioCreated++;
     assert.equal(options.configureModule, undefined, 'required filesystem setup belongs to the shared owner');
@@ -220,6 +219,10 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
       getState: () => mockState,
       focus() { trace.push('focus'); },
       activateAudio() { trace.push('audio-activate'); return behavior.activateAudio?.() ?? Promise.resolve(); },
+      openDiscSession(file) {
+        trace.push(['open-session-through-runtime', file.name]);
+        return testOpenNativeGameDiscSession(file);
+      },
       importDisc(file, options = {}) {
         trace.push(['import', file.name, options.preopenedSession]);
         const complete = () => {
@@ -316,6 +319,8 @@ try {
     'A successfully prepared selection automatically starts exactly once');
   assert.equal(flow.trace.filter(row => Array.isArray(row) && row[0] === 'validate').length, 1,
     'The selected File is validated once before native import');
+  assert.equal(flow.trace.filter(row => Array.isArray(row) && row[0] === 'open-session-through-runtime').length, 1,
+    'Profile-specific preopening goes through the runtime handle');
   assert.equal(flow.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, 1);
   assert.ok(flow.trace.find(row => Array.isArray(row) && row[0] === 'import')[2],
     'The validated session is adopted instead of reopening the selected File');

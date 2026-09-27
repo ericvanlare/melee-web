@@ -15,7 +15,9 @@ const invalidCacheService = process.argv.includes('--invalid-cache-service');
 const missingCacheService = process.argv.includes('--missing-cache-service');
 if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
-const source = original.replace("import {loadNativeGameDisc} from './runtime-assets.mjs';", 'const loadNativeGameDisc = globalThis.testDiscReader;');
+const source = original.replace(
+  "import {loadNativeGameDisc, openNativeGameDiscSession} from './runtime-assets.mjs';",
+  'const loadNativeGameDisc = globalThis.testDiscReader; const openNativeGameDiscSession = globalThis.testOpenNativeGameDiscSession;');
 let phase = 0, running = false, nextPointer = 16,
   cacheWaits = startupCacheDelay ? 2 : startupCacheTimeout ? Number.MAX_SAFE_INTEGER : 0, audioClosed = false;
 let rendererStarted = false, cacheIdleCalls = 0;
@@ -69,7 +71,7 @@ await fs.writeFile(sourcePath, source);
 const {mountMeleeRuntime} = await import(pathToFileURL(sourcePath));
 await fs.rm(temporary, {recursive: true});
 let owner;
-const mounted = mountMeleeRuntime({canvas, createAudio: withAudio ? createRuntimeAudio : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
+const mounted = mountMeleeRuntime({canvas, openDisc: null, createAudio: withAudio ? createRuntimeAudio : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
   configureModule: cacheUnavailable ? module => {
     module.preRun = () => {
       assert.ok(directories.has('/melee-render-cache'), 'Required setup precedes entry callbacks');
@@ -194,6 +196,12 @@ if (startupCacheTimeout) {
   process.exit(0);
 }
 assert.equal(player.getState().canImport, true);
+await assert.rejects(player.openDiscSession({name: 'unsupported.iso'}), /no local disc session loader/,
+  'the public shell can request validation only through a configured profile adapter');
+await assert.rejects(player.importDisc({name: 'forged.iso'}, {preopenedSession: {
+  close() {}, readScope: async () => new Map(),
+}}), /not opened by this player/,
+  'a structurally plausible session cannot bypass the configured profile loader');
 if (startupCacheError) assert.equal(player.getState().canImport, true, 'Native cache error remains optional for import eligibility');
 Module.pipelinePreparation = {ready: false, selected: 4, pending: 4};
 window.menuFrame(false);
