@@ -10259,3 +10259,91 @@ diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
  }
  
  /// Combo count something + adjust FtPart_TopN
+--- a/src/melee/it/kinds/itsamusgrapple.c
++++ b/src/melee/it/kinds/itsamusgrapple.c
+@@ -1,4 +1,15 @@
+ #include "itsamusgrapple.h"
++
++#ifdef TARGET_PC
++#include <math.h>
++/* GALE01r2 Samus chain placement and gravity use fmadds/fnmsubs.
++ * Keep it_802A3C98: its standalone squared-length sum is unfused. */
++#define SAMUS_GRAPPLE_MADD(a, b, c) fmaf((a), (b), (c))
++#define SAMUS_GRAPPLE_NMSUB(a, b, c) (-fmaf((a), (b), -(c)))
++#else
++#define SAMUS_GRAPPLE_MADD(a, b, c) ((a) * (b) + (c))
++#define SAMUS_GRAPPLE_NMSUB(a, b, c) (-((a) * (b) - (c)))
++#endif
+ 
+ #include <melee/ft/forward.h>
+ #include <sysdolphin/baselib/forward.h>
+@@ -86,9 +97,9 @@
+ {
+     if (HSD_Randf() > 0.9) {
+         if (vel_y < 0.0) {
+-            return -((0.6f * HSD_Randf()) - vel_y);
+-        } else {
+-            return (0.6f * HSD_Randf()) + vel_y;
++            return SAMUS_GRAPPLE_NMSUB(0.6f, HSD_Randf(), vel_y);
++        } else {
++            return SAMUS_GRAPPLE_MADD(0.6f, HSD_Randf(), vel_y);
+         }
+     } else {
+         return 0.0f;
+@@ -971,9 +982,9 @@
+     f32 d;
+ 
+     it_802A3C98(&link->pos, pos, &dir);
+-    link->pos.x = (dir.x * dist) + pos->x;
+-    link->pos.y = (dir.y * dist) + pos->y;
+-    link->pos.z = (dir.z * dist) + pos->z;
++    link->pos.x = SAMUS_GRAPPLE_MADD(dir.x, dist, pos->x);
++    link->pos.y = SAMUS_GRAPPLE_MADD(dir.y, dist, pos->y);
++    link->pos.z = SAMUS_GRAPPLE_MADD(dir.z, dist, pos->z);
+ 
+     while (prev != NULL) {
+         prev->vel.y -= samus_grapple_calc_grav(prev->vel.y);
+@@ -982,13 +993,13 @@
+ 
+         d = it_802A3C98(&prev->pos, &link->pos, &dir);
+         if (d > attrs->x38) {
+-            prev->pos.x = (dir.x * attrs->x38) + link->pos.x;
+-            prev->pos.y = (dir.y * attrs->x38) + link->pos.y;
+-            prev->pos.z = (dir.z * attrs->x38) + link->pos.z;
++            prev->pos.x = SAMUS_GRAPPLE_MADD(dir.x, attrs->x38, link->pos.x);
++            prev->pos.y = SAMUS_GRAPPLE_MADD(dir.y, attrs->x38, link->pos.y);
++            prev->pos.z = SAMUS_GRAPPLE_MADD(dir.z, attrs->x38, link->pos.z);
+         } else if (d < attrs->x3C) {
+-            prev->pos.x = (dir.x * attrs->x3C) + link->pos.x;
+-            prev->pos.y = (dir.y * attrs->x3C) + link->pos.y;
+-            prev->pos.z = (dir.z * attrs->x3C) + link->pos.z;
++            prev->pos.x = SAMUS_GRAPPLE_MADD(dir.x, attrs->x3C, link->pos.x);
++            prev->pos.y = SAMUS_GRAPPLE_MADD(dir.y, attrs->x3C, link->pos.y);
++            prev->pos.z = SAMUS_GRAPPLE_MADD(dir.z, attrs->x3C, link->pos.z);
+         }
+ 
+         link = prev;
+@@ -1341,17 +1352,17 @@
+             it_802A4420(next);
+             if (it_802A3C98(&next->pos, &cur->pos, &dir) > attrs->x38) {
+                 dir_ptr = &dir;
+-                next->pos.x = (dir_ptr->x * attrs->x38) + cur->pos.x;
+-                next->pos.y = (dir_ptr->y * attrs->x38) + cur->pos.y;
+-                next->pos.z = (dir_ptr->z * attrs->x38) + cur->pos.z;
++                next->pos.x = SAMUS_GRAPPLE_MADD(dir_ptr->x, attrs->x38, cur->pos.x);
++                next->pos.y = SAMUS_GRAPPLE_MADD(dir_ptr->y, attrs->x38, cur->pos.y);
++                next->pos.z = SAMUS_GRAPPLE_MADD(dir_ptr->z, attrs->x38, cur->pos.z);
+             }
+             it_802A43EC(next);
+         } else {
+             if (it_802A3C98(pos, &cur->pos, &dir) > attrs->x38) {
+                 dir_ptr = &dir;
+-                next->pos.x = (dir_ptr->x * attrs->x38) + cur->pos.x;
+-                next->pos.y = (dir_ptr->y * attrs->x38) + cur->pos.y;
+-                next->pos.z = (dir_ptr->z * attrs->x38) + cur->pos.z;
++                next->pos.x = SAMUS_GRAPPLE_MADD(dir_ptr->x, attrs->x38, cur->pos.x);
++                next->pos.y = SAMUS_GRAPPLE_MADD(dir_ptr->y, attrs->x38, cur->pos.y);
++                next->pos.z = SAMUS_GRAPPLE_MADD(dir_ptr->z, attrs->x38, cur->pos.z);
+                 next->x2C_b0 = 1;
+                 it_802A43B8(next);
+             } else {
