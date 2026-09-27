@@ -53,8 +53,9 @@ class ResultsMatchHistoryTests(unittest.TestCase):
             "connected ports 0/1, disconnected CPU ports 2/3, automatic statistics "
             "page advance before confirmation; chosen source ticks, not historical replay"
             if "p1-statistics" in flag else
-            "actual source MatchExitInfo and source-generated Sheik winner, P1-only "
-            "180/360/600 held-Start pulses, connected ports 0/1 and disconnected 2/3; not CPU9"
+            "actual source MatchExitInfo and source-generated Sheik winner; four human PAD "
+            "ports active during Match, then all four receive one-tick delayed Start pulses "
+            "at chosen Results ticks; not CPU9 or historical replay"
             if "match-history" in flag else
             "synthetic Results standings / default-CSS profile subset"
         )
@@ -69,6 +70,10 @@ class ResultsMatchHistoryTests(unittest.TestCase):
 
     def test_source_pad_b_match_to_sheik_results(self):
         stdout, evidence, brief = self.run_trace("--lineup-b-match-history-host-state")
+        scope = json.loads((evidence / "command.json").read_text())["scope"]
+        self.assertIn("four human PAD ports active during Match", scope)
+        self.assertIn("all four receive one-tick delayed Start pulses", scope)
+        self.assertNotIn("P1-only", scope)
         for marker in ("host_profile=default-CSS-subset", "host_hud_layout=4",
                        "draw_scope=unrun native-state-only",
                        "P3 (source slot 2) down-B Zelda->Sheik", "source-terminal winner=2",
@@ -95,6 +100,9 @@ class ResultsMatchHistoryTests(unittest.TestCase):
     def test_p1_held_start_disconnected_cpu_statistics(self):
         stdout, evidence, brief = self.run_trace(
             "--lineup-b-zelda-sheik-stock-p1-statistics-host-state")
+        scope = json.loads((evidence / "command.json").read_text())["scope"]
+        self.assertIn("P1-only 180/360/600 held-Start pulses", scope)
+        self.assertIn("disconnected CPU ports 2/3", scope)
         for marker in ("match_kind=1", "winner_ckind=18 winner_ftkind=7",
                        "seed=324508639 connected=0,1 disconnected=2,3",
                        "pulse_ticks=180,360,600 hold_ticks=10 cap=900",
