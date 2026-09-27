@@ -1165,3 +1165,28 @@ consumed PAD brackets, page state or pointer values. The first invalid
 historical pointer transition remains unknown. Next discriminator is a fresh
 current-Wasm keyboard-prefix run with a natural slot-2 Zelda-origin Sheik win;
 do not seed or force the winner. PR #86 remains open and not ready to merge.
+
+## Current merged-main B Results control (2026-09-27)
+
+The fresh two-match headless Chrome control at
+`work/pr86-current-d1c519d-b-keyboard-gated-two-match-r1/report.json` was
+produced from clean source commit `d1c519d`. The served Wasm is SHA-256
+`c6851edeb7a48355fc164d9ca86b7d663a0f00b5537deb2c1e3e653069a3ce04`.
+Both natural lineup-B winners were Samus: match 1 frame 15,655/RNG
+1,289,946,642; match 2 frame 11,864/RNG 2,921,327,661. Both rendered Results
+loops returned to original CSS and entered the next match.
+
+With ordinary trusted P1 Enter (160ms held/120ms released), the current source
+trace records initial P1 Start at frames 208–217 and 207–216; disconnected CPU
+pages 2/3 advance at frames 400 and 399, respectively, before the ordinary
+confirmation at 418 and 423. Port errors remain `[0,0,-1,-1]`; all 440/445
+Results ticks return; no camera-owner failure occurs. This is a current
+non-target functional control. It does not reproduce the old three-pulse
+cursor-560 schedule or the natural Sheik-winner condition.
+
+The next current-build comparison uses the older r6 `source-tick` input mode,
+which previously produced a natural Zelda-origin Sheik win and captured the
+auto-page/confirmation path. It remains explicitly distinct from keyboard
+input and the chosen 180/360/600 native Results reducer. The existing #86
+instrumented context will retain camera entry/adoption pointers and the first
+changed source boundary if that natural outcome recurs.
