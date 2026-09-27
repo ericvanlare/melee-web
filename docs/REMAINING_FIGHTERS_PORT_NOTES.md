@@ -1190,3 +1190,23 @@ auto-page/confirmation path. It remains explicitly distinct from keyboard
 input and the chosen 180/360/600 native Results reducer. The existing #86
 instrumented context will retain camera entry/adoption pointers and the first
 changed source boundary if that natural outcome recurs.
+
+The first current-build source-tick attempt is retained at
+`work/pr86-current-d1c519d-b-source-tick-single-match-r1/report.json`. It uses
+the same served Wasm SHA as the keyboard-gated control and naturally ends with
+Samus at frame 13,143/RNG 1,008,858,508. P1-only source Start runs are 208–217
+and 610–619; CPU pages 2/3 auto-advance at Results frame 400 before the
+confirmation sample at 610. All 632 Results ticks return, ports remain
+`[0,0,-1,-1]`, CSS is live at the end, and the Results camera-entry/adoption
+pointers are all `0xa48ef20`; no camera ownership guard fires. It is not the
+Sheik-winner condition.
+
+The browser harness nevertheless exits nonzero after the CSS return because
+its source-tick summary dereferenced
+`result.results_page_transition_checks` instead of the report-level array. The
+captured report is retained as a serializer failure, not a clean scenario pass.
+The tracked fix reads from the correct report owner, and the focused Results
+packet/harness contract suite passes 8/8, including a regression against the
+wrong lookup. This fixes reporting only; a fresh browser rerun is still needed
+for a clean harness receipt, and the historical camera-pool cause remains
+unknown.

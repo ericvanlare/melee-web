@@ -1106,7 +1106,7 @@ async function runMatch(matchIndex,expected){
     if(report.results_page_transition_checks.some(row=>row.match===matchIndex&&row.status==='pass')){
       assert.deepEqual(cpuPageTransitions.map(row=>row.slot),[2,3],
         'Disconnected CPU statistics pages did not each auto-advance exactly once');
-      const confirmationFrame=result.results_page_transition_checks.find(
+      const confirmationFrame=report.results_page_transition_checks.find(
         row=>row.match===matchIndex&&row.status==='pass').confirmation_source_frame;
       assert(cpuPageTransitions.every(row=>row.phase===3&&row.stats_phase===2&&
         row.source_frame<confirmationFrame),

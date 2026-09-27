@@ -154,6 +154,8 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('waitForResultsInternalPhase(180,2', harness)
         self.assertIn('source-confirm-after-auto-page', harness)
         self.assertIn('first P1 Start edge must be consumed from original Results phase 2', harness)
+        self.assertIn('const confirmationFrame=report.results_page_transition_checks.find(', harness)
+        self.assertNotIn('const confirmationFrame=result.results_page_transition_checks.find(', harness)
         self.assertIn("'keyboard-gated'", harness)
         gated_start = harness.index("}else if(resultsInputMode==='keyboard-gated'){")
         gated_end = harness.index("\n  }else{\n    await writeProgress(`match-${matchIndex}-natural-results`)",
