@@ -13,6 +13,10 @@ const startupCacheError = process.argv.includes('--startup-cache-error');
 const startupCacheTimeout = process.argv.includes('--startup-cache-timeout');
 const invalidCacheService = process.argv.includes('--invalid-cache-service');
 const missingCacheService = process.argv.includes('--missing-cache-service');
+const adapterRace = process.argv.includes('--adapter-race');
+const adapterRetry = process.argv.includes('--adapter-retry');
+const adapterTimeoutLate = process.argv.includes('--adapter-timeout-late');
+const adapterDeadlineSpan = process.argv.includes('--adapter-deadline-span');
 if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
 const source = original.replace(
@@ -23,8 +27,11 @@ let phase = 0, running = false, nextPointer = 16,
 let rendererStarted = false, cacheIdleCalls = 0;
 let failedFile = null, serviceBatch = 0;
 const calls = [], states = [], listeners = new Map();
+let adapterRequests = 0, adapterImplementation = () => process.argv.includes('--no-webgpu-adapter') ? null : ({limits: {}});
+let resolveDeferredAdapter;
+const deferredAdapter = new Promise(resolve => { resolveDeferredAdapter = resolve; });
 Object.defineProperty(globalThis, 'navigator', {value: {gpu: {
-  requestAdapter: async () => process.argv.includes('--no-webgpu-adapter') ? null : ({limits: {}}),
+  requestAdapter: () => { ++adapterRequests; return adapterImplementation(); },
 }}, configurable: true});
 globalThis.window = globalThis;
 globalThis.isSecureContext = true;
@@ -72,6 +79,111 @@ await fs.copyFile(new URL('../web/controller-input.mjs', import.meta.url), path.
 await fs.writeFile(sourcePath, source);
 const {mountMeleeRuntime} = await import(pathToFileURL(sourcePath));
 await fs.rm(temporary, {recursive: true});
+if (adapterRace || adapterRetry || adapterTimeoutLate || adapterDeadlineSpan) {
+  let createdAudio = 0, owners = 0, configurations = 0, assignedModule = null, moduleAssignments = 0;
+  Object.defineProperty(globalThis, 'Module', {configurable: true,
+    get: () => assignedModule,
+    set: value => { ++moduleAssignments; assignedModule = value; }});
+  const options = (startupTimeout = 1000) => ({canvas, openDisc: null, startupTimeout,
+    loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
+    createAudio: () => { ++createdAudio; return {setEnabled() {}, fail() {}, destroy() {}}; },
+    onOwner: () => { ++owners; }, configureModule: () => { ++configurations; }});
+  const effects = () => ({audio: createdAudio, owners, configurations, modules: moduleAssignments,
+    loaders: calls.filter(row => row[0] === 'loader').length});
+  const assertEffects = expected => assert.deepEqual(effects(), expected,
+    'Only the current document reservation may construct or publish runtime owners');
+  const readyModule = () => {
+    assert.ok(assignedModule, 'The accepted attempt assigns its Emscripten module');
+    Object.assign(assignedModule, {
+      UTF8ToString: value => value,
+      _melee_web_native_menu_phase: () => 0,
+      _melee_web_native_menu_running: () => 0,
+      _melee_web_native_menu_message: () => 'Ready',
+      _melee_web_native_menu_cache_idle: () => 1,
+    });
+    assignedModule.onRuntimeInitialized();
+  };
+
+  if (adapterRace) {
+    adapterImplementation = () => deferredAdapter;
+    const first = mountMeleeRuntime(options());
+    await assert.rejects(mountMeleeRuntime(options()), /Reload the page/,
+      'A second mount is rejected while the first adapter request owns the document');
+    assertEffects({audio: 0, owners: 0, configurations: 0, modules: 0, loaders: 0});
+    resolveDeferredAdapter({limits: {}});
+    await new Promise(resolve => setImmediate(resolve));
+    assertEffects({audio: 1, owners: 1, configurations: 1, modules: 1, loaders: 1});
+    readyModule();
+    assert.equal((await first).getState().ready, true);
+    console.log('Shared runtime owner: deferred concurrent adapter requests reserve one document owner before audio, Module, or loader setup.');
+    process.exit(0);
+  }
+
+  if (adapterRetry) {
+    adapterImplementation = () => adapterRequests === 1 ? null : adapterRequests === 2 ?
+      Promise.reject(Error('controlled adapter rejection')) : ({limits: {}});
+    await assert.rejects(mountMeleeRuntime(options()), /No WebGPU adapter is available/);
+    assertEffects({audio: 0, owners: 0, configurations: 0, modules: 0, loaders: 0});
+    await assert.rejects(mountMeleeRuntime(options()), /controlled adapter rejection/);
+    assertEffects({audio: 0, owners: 0, configurations: 0, modules: 0, loaders: 0});
+    const retry = mountMeleeRuntime(options());
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(adapterRequests, 3, 'Null and rejected probes each permit a fresh preflight attempt');
+    assertEffects({audio: 1, owners: 1, configurations: 1, modules: 1, loaders: 1});
+    readyModule();
+    assert.equal((await retry).getState().ready, true);
+    console.log('Shared runtime owner: null and rejected adapter preflight releases only its reservation and allows retry.');
+    process.exit(0);
+  }
+
+  const nativeSetTimeout = globalThis.setTimeout;
+  const nativeClearTimeout = globalThis.clearTimeout;
+  const nativeNow = Date.now;
+  const timers = [];
+  let clockNow = nativeNow();
+  globalThis.setTimeout = (callback, delay) => { const timer = {callback, delay, cleared: false}; timers.push(timer); return timers.length; };
+  globalThis.clearTimeout = id => { if (timers[id - 1]) timers[id - 1].cleared = true; };
+  try {
+    if (adapterDeadlineSpan) Date.now = () => clockNow;
+    adapterImplementation = () => deferredAdapter;
+    const first = mountMeleeRuntime(options(60000));
+    assert.equal(timers.length, 1, 'The startup deadline is armed before awaiting the adapter');
+    if (adapterTimeoutLate) {
+      timers[0].callback();
+      await assert.rejects(first, /Player startup timed out/);
+      assertEffects({audio: 0, owners: 0, configurations: 0, modules: 0, loaders: 0});
+      adapterImplementation = () => ({limits: {}});
+      const retry = mountMeleeRuntime(options(60000));
+      await new Promise(resolve => setImmediate(resolve));
+      assertEffects({audio: 1, owners: 1, configurations: 1, modules: 1, loaders: 1});
+      resolveDeferredAdapter({limits: {late: true}});
+      await new Promise(resolve => setImmediate(resolve));
+      assertEffects({audio: 1, owners: 1, configurations: 1, modules: 1, loaders: 1});
+      readyModule();
+      assert.equal((await retry).getState().ready, true);
+      console.log('Shared runtime owner: timed-out adapter attempts release safely; late adapter results cannot start a runtime.');
+    } else {
+      resolveDeferredAdapter({limits: {}});
+      clockNow += 10000;
+      await new Promise(resolve => setImmediate(resolve));
+      assertEffects({audio: 1, owners: 1, configurations: 1, modules: 1, loaders: 1});
+      assert.equal(timers.length, 2, 'The same deadline is re-armed for native startup after preflight');
+      assert.equal(timers[0].cleared, true, 'Adapter success clears its preflight timer');
+      assert.equal(timers[1].delay, 50000, 'Native startup receives only the time remaining after preflight');
+      timers[1].callback();
+      await assert.rejects(first, /Player startup timed out/);
+      assertEffects({audio: 1, owners: 1, configurations: 1, modules: 1, loaders: 1});
+      await assert.rejects(mountMeleeRuntime(options()), /Reload the page/,
+        'An initialized runtime keeps ownership after startup timeout');
+      console.log('Shared runtime owner: one bounded startup deadline covers adapter preflight and native startup.');
+    }
+  } finally {
+    globalThis.setTimeout = nativeSetTimeout;
+    globalThis.clearTimeout = nativeClearTimeout;
+    Date.now = nativeNow;
+  }
+  process.exit(0);
+}
 let owner;
 const mounted = mountMeleeRuntime({canvas, openDisc: null, createAudio: withAudio ? options => {
   calls.push(['createAudio']); return createRuntimeAudio(options);

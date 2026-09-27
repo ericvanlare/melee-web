@@ -15,6 +15,22 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
         self.run_owner(['--no-webgpu-adapter'],
                        'missing WebGPU adapter stops before native download or audio setup')
 
+    def test_concurrent_adapter_requests_reserve_one_document_owner(self):
+        self.run_owner(['--adapter-race'],
+                       'deferred concurrent adapter requests reserve one document owner')
+
+    def test_null_and_rejected_adapter_preflight_allow_safe_retry(self):
+        self.run_owner(['--adapter-retry'],
+                       'null and rejected adapter preflight releases only its reservation and allows retry')
+
+    def test_timed_out_adapter_result_cannot_start_after_safe_retry(self):
+        self.run_owner(['--adapter-timeout-late'],
+                       'timed-out adapter attempts release safely; late adapter results cannot start a runtime')
+
+    def test_startup_deadline_includes_adapter_preflight(self):
+        self.run_owner(['--adapter-deadline-span'],
+                       'one bounded startup deadline covers adapter preflight and native startup')
+
     def test_explicit_silent_owner_never_opens_audio(self):
         self.run_owner(['--silent'])
 
