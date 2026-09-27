@@ -363,6 +363,7 @@ export function mountControllerSettings({container, storage,
 
   const api = {
     bindPlayer, setState, setLayout, setSource, open, close,
+    clearTouchInputs() { touchControls?.clearInputs(); },
     getTouchOpacity: () => touchOpacity,
     inspect: () => inspectControllers(),
     destroy() {

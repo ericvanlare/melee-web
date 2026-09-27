@@ -221,6 +221,9 @@ $('start-game').onclick = async () => {
 };
 $('pause-game').onclick = async () => { clearError(); try { await (state.paused ? player.resume() : player.pause()); } catch (error) { showError(error); } };
 $('end-session').onclick = async () => {
+  // Release virtual PAD state before profile teardown, which may be delayed
+  // while its native owner stops. Eject must never leave a held touch behind.
+  settings?.clearTouchInputs?.();
   ++discSelectionGeneration;
   selectedDiscSession?.close();
   selectedDiscSession = null;

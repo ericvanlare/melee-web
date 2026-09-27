@@ -27,10 +27,28 @@ await page.addInitScript(() => {
   window.__meleeTouchSyntheticInput = {mouseDown: 0, keyDown: 0};
   document.addEventListener('pointerdown', event => {
     const element = event.target?.closest?.('[data-touch-button], [data-touch-stick]');
-    if (!element) return;
     window.__meleeTouchPointerTrace.push({pointerId: event.pointerId, pointerType: event.pointerType,
-      action: element.dataset.touchButton || element.dataset.touchStick});
+      type: 'pointerdown', action: element?.dataset?.touchButton || element?.dataset?.touchStick || null,
+      target: event.target?.id || event.target?.className || event.target?.tagName || null,
+      x: event.clientX, y: event.clientY});
   }, true);
+  document.addEventListener('pointermove', event => {
+    const element = event.target?.closest?.('[data-touch-button], [data-touch-stick]');
+    window.__meleeTouchPointerTrace.push({type: 'pointermove', pointerId: event.pointerId,
+      pointerType: event.pointerType, action: element?.dataset?.touchButton || element?.dataset?.touchStick || null,
+      x: event.clientX, y: event.clientY});
+  }, true);
+  document.addEventListener('touchstart', event => {
+    const element = event.target?.closest?.('[data-touch-button], [data-touch-stick]');
+    window.__meleeTouchPointerTrace.push({type: 'touchstart', action:
+      element?.dataset?.touchButton || element?.dataset?.touchStick || null,
+      target: event.target?.id || event.target?.className || event.target?.tagName || null,
+      touches: [...event.changedTouches].map(touch => ({id: touch.identifier, x: touch.clientX, y: touch.clientY}))});
+  }, true);
+  for (const type of ['pointerup', 'pointercancel', 'gotpointercapture', 'lostpointercapture'])
+    document.addEventListener(type, event => window.__meleeTouchPointerTrace.push({type,
+      pointerId: event.pointerId, pointerType: event.pointerType,
+      action: event.target?.dataset?.touchButton || event.target?.dataset?.touchStick || null}), true);
   document.addEventListener('mousedown', event => {
     if (event.target?.closest?.('#touch-controls')) window.__meleeTouchSyntheticInput.mouseDown++;
   }, true);
@@ -57,6 +75,7 @@ const bitFor = Object.freeze({A: 0x100, B: 0x200, X: 0x400, Y: 0x800, L: 0x40, R
 
 let activeTouches = new Map();
 let nextTouchId = 10000;
+const nextFrame = () => page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
 function point(id, position, state) {
   return {id, x: position.x, y: position.y, radiusX: 1, radiusY: 1, force: 1, state};
 }
@@ -68,27 +87,34 @@ async function touchStart(id, x, y) {
   activeTouches.set(id, {x, y});
   await dispatch('touchStart', [...activeTouches].map(([touchId, position]) =>
     point(touchId, position, touchId === id && !existed ? 'touchPressed' : 'touchStationary')));
+  await nextFrame();
 }
 async function touchMove(id, x, y) {
   assert(activeTouches.has(id), `touch ${id} must already be active`);
   activeTouches.set(id, {x, y});
   await dispatch('touchMove', [...activeTouches].map(([touchId, position]) =>
     point(touchId, position, touchId === id ? 'touchMoved' : 'touchStationary')));
+  await nextFrame();
 }
 async function touchEnd(id) {
   assert(activeTouches.has(id), `touch ${id} must already be active`);
+  const released = activeTouches.get(id);
   activeTouches.delete(id);
-  if (activeTouches.size)
-    await dispatch('touchMove', [...activeTouches].map(([touchId, position]) => point(touchId, position, 'touchStationary')));
-  else await dispatch('touchEnd');
+  // CDP touchEnd applies to the listed IDs. Dispatch only the finger being
+  // lifted so the other active contacts remain down independently.
+  await dispatch('touchEnd', [point(id, released, 'touchReleased')]);
+  await nextFrame();
 }
 async function touchEndAll() {
+  const points = [...activeTouches].map(([id, position]) => point(id, position, 'touchReleased'));
   activeTouches.clear();
-  await dispatch('touchEnd');
+  await dispatch('touchEnd', points);
+  await nextFrame();
 }
 async function touchCancelAll() {
   activeTouches.clear();
   await dispatch('touchCancel');
+  await nextFrame();
 }
 async function rects() {
   return page.evaluate(() => {
@@ -125,6 +151,7 @@ async function setExpanded(enabled) {
     return Math.abs(canvas.left - overlay.left) < 1 && Math.abs(canvas.top - overlay.top) < 1 &&
       Math.abs(canvas.width - overlay.width) < 1 && Math.abs(canvas.height - overlay.height) < 1;
   });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 async function controlStateAt(control) {
   return page.evaluate(({selector, x, y}) => {
@@ -133,18 +160,46 @@ async function controlStateAt(control) {
     return {reachable: element === hit || element.contains(hit), hit: hit?.className || hit?.tagName || null};
   }, control);
 }
-async function assertPointerCapture(control, action) {
-  const pointer = await page.evaluate(action => [...window.__meleeTouchPointerTrace].reverse()
-    .find(record => record.action === action && record.pointerType === 'touch') || null, action);
-  assert(pointer, `${action} receives a browser touch pointer event`);
-  assert(await page.locator(`#touch-controls ${control.selector}`).evaluate((element, id) => element.hasPointerCapture(id), pointer.pointerId),
-    `${action} captures its active browser touch pointer`);
+async function refreshControl(control) {
+  return page.locator(`#touch-controls ${control.selector}`).evaluate((element, previous) => {
+    const r = element.getBoundingClientRect();
+    return {...previous, left: r.left, top: r.top, right: r.right, bottom: r.bottom,
+      width: r.width, height: r.height, x: r.left + r.width / 2, y: r.top + r.height / 2};
+  }, control);
+}
+async function assertPointerCapture(control, action, traceStart, position) {
+  await page.waitForFunction(({action, traceStart}) => window.__meleeTouchPointerTrace
+    .slice(traceStart).some(record => record.action === action && record.pointerType === 'touch'),
+  {action, traceStart}, {timeout: 1500}).catch(() => {});
+  const pointer = await page.evaluate(({action, traceStart}) => window.__meleeTouchPointerTrace
+    .slice(traceStart).reverse().find(record => record.action === action && record.pointerType === 'touch') || null,
+  {action, traceStart});
+  if (!pointer) {
+    const events = await page.evaluate(() => window.__meleeTouchPointerTrace.slice(-12));
+    const context = await page.evaluate(position => {
+      const r = document.querySelector(`#touch-controls ${position.selector}`).getBoundingClientRect();
+      const hit = document.elementFromPoint(position.x, position.y);
+      return {point: position, rect: {x: r.x, y: r.y, width: r.width, height: r.height},
+        hit: hit?.id || hit?.className || hit?.tagName || null, scroll: [scrollX, scrollY],
+        viewport: {width: visualViewport.width, height: visualViewport.height, scale: visualViewport.scale,
+          offsetLeft: visualViewport.offsetLeft, offsetTop: visualViewport.offsetTop}};
+    }, {...position, selector: control.selector});
+    assert(pointer, `${action} receives a new browser touch pointer event; trace=${JSON.stringify({events, context})}`);
+  }
+  const selector = `#touch-controls ${control.selector}`;
+  await page.waitForFunction(({selector, id}) => document.querySelector(selector)?.hasPointerCapture(id),
+    {selector, id: pointer.pointerId}, {timeout: 1500}).catch(() => {});
+  const captured = await page.locator(selector).evaluate((element, id) => element.hasPointerCapture(id), pointer.pointerId);
+  assert(captured, `${action} captures its active browser touch pointer; trace=${JSON.stringify(
+    await page.evaluate(() => window.__meleeTouchPointerTrace.slice(-8)))}`);
 }
 async function testButton(control, touchId) {
+  control = await refreshControl(control);
   const hit = await controlStateAt(control);
-  assert(hit.reachable, `${control.action} center is browser-hit-test reachable; got ${hit.hit}`);
+  assert(hit.reachable, `${control.action} live center is browser-hit-test reachable; got ${hit.hit}`);
+  const traceStart = await page.evaluate(() => window.__meleeTouchPointerTrace.length);
   await touchStart(touchId, control.x, control.y);
-  await assertPointerCapture(control, control.action);
+  await assertPointerCapture(control, control.action, traceStart, {x: control.x, y: control.y});
   let sample = await pad();
   assert.equal(sample[0], 1, `${control.action} has an active P1 PAD sample`);
   assert(sample[1] & bitFor[control.action], `${control.action} center produces the original PAD bit`);
@@ -157,10 +212,12 @@ async function testButton(control, touchId) {
   if (control.action === 'R') assert.equal(sample[7], 0, 'R release clears analog pressure');
 }
 async function testStick(control, touchId) {
+  control = await refreshControl(control);
   const hit = await controlStateAt(control);
-  assert(hit.reachable, `${control.action} center is browser-hit-test reachable; got ${hit.hit}`);
+  assert(hit.reachable, `${control.action} live center is browser-hit-test reachable; got ${hit.hit}`);
+  const traceStart = await page.evaluate(() => window.__meleeTouchPointerTrace.length);
   await touchStart(touchId, control.x, control.y);
-  await assertPointerCapture(control, control.action);
+  await assertPointerCapture(control, control.action, traceStart, {x: control.x, y: control.y});
   const radius = Math.min(control.width, control.height) * 0.42;
   const direction = control.action === 'main' ? 1 : -1;
   await touchMove(touchId, control.x + direction * radius * 0.32, control.y + radius * 0.27);
@@ -190,13 +247,21 @@ async function assertLayout(size, mode, captures = false) {
     // Exercise the real toolbar toggle as well as the page's collapsed
     // expanded state. The secondary row reserves additional game space.
     await page.locator('#toolbar-more-toggle').click();
-    await page.waitForFunction(() => document.querySelector('#player').classList.contains('toolbar-actions-open'));
+    await page.waitForFunction(() => {
+      if (!document.querySelector('#player').classList.contains('toolbar-actions-open')) return false;
+      const canvas = document.querySelector('#canvas').getBoundingClientRect();
+      const overlay = document.querySelector('#touch-controls').getBoundingClientRect();
+      return Math.abs(canvas.left - overlay.left) < 1 && Math.abs(canvas.top - overlay.top) < 1 &&
+        Math.abs(canvas.width - overlay.width) < 1 && Math.abs(canvas.height - overlay.height) < 1;
+    });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const menu = await rects();
     assert(menu.canvas.top >= menu.toolbar.bottom - 1,
       `${size.join('x')} expanded toolbar menu reserves its full height above gameplay`);
     assert(Math.abs(menu.canvas.width / menu.canvas.height - 4 / 3) < 0.01,
       `${size.join('x')} expanded toolbar menu preserves 4:3 rendering`);
-    assert(Math.abs(menu.overlay.width - menu.canvas.width) < 1 &&
+    assert(Math.abs(menu.overlay.left - menu.canvas.left) < 1 && Math.abs(menu.overlay.top - menu.canvas.top) < 1 &&
+      Math.abs(menu.overlay.width - menu.canvas.width) < 1 &&
       Math.abs(menu.overlay.height - menu.canvas.height) < 1,
     `${size.join('x')} expanded toolbar menu keeps touch overlay fitted to the game`);
     for (const id of ['fullscreen', 'controls-open', 'toolbar-more-toggle']) {
@@ -331,6 +396,7 @@ try {
   // Independent browser touch IDs can move both sticks while A attacks, X
   // jumps, and L shields. Removing one finger must not release its neighbors.
   const combined = (await rects()).controls;
+  const combinedTraceStart = await page.evaluate(() => window.__meleeTouchPointerTrace.length);
   const at = action => combined.find(row => row.action === action);
   await touchStart(801, at('main').x, at('main').y);
   await touchStart(802, at('cstick').x, at('cstick').y);
@@ -342,12 +408,15 @@ try {
   let sample = await pad();
   for (const action of ['A', 'X', 'L']) assert(sample[1] & bitFor[action], `${action} remains held concurrently`);
   assert(sample[2] > 0 && sample[3] < 0 && sample[4] < 0 && sample[5] < 0,
-    'main and C-stick move independently at the same time as face and shoulder input');
+    `main and C-stick move independently at the same time as face and shoulder input; axes=${sample.slice(2, 6)}; trace=${JSON.stringify(
+      await page.evaluate(start => window.__meleeTouchPointerTrace.slice(start), combinedTraceStart))}`);
   assert.deepEqual(sample.slice(6, 8), [255, 0], 'L maintains full analog shield pressure');
   await touchEnd(803);
   sample = await pad();
-  assert.equal(sample[1] & bitFor.A, 0, 'releasing the A finger independently clears only A');
-  assert(sample[1] & bitFor.X && sample[1] & bitFor.L, 'X jump and L shield remain held after A release');
+  assert.equal(sample[1] & bitFor.A, 0,
+    `releasing the A finger independently clears only A; buttons=${sample[1].toString(16)}; trace=${JSON.stringify(await page.evaluate(start => window.__meleeTouchPointerTrace.slice(start), combinedTraceStart))}`);
+  assert(sample[1] & bitFor.X && sample[1] & bitFor.L,
+    `X jump and L shield remain held after A release; buttons=${sample[1].toString(16)}; trace=${JSON.stringify(await page.evaluate(start => window.__meleeTouchPointerTrace.slice(start), combinedTraceStart))}`);
   assert.notEqual(sample[2], 0); assert.notEqual(sample[4], 0);
   await touchEnd(805);
   sample = await pad();
@@ -388,7 +457,7 @@ try {
   await page.waitForFunction(() => getComputedStyle(document.querySelector('#touch-controls')).width !== '0px');
   emptyPlayerPad(await pad());
   await touchEndAll();
-  assertLayout([667, 375], 'normal');
+  await assertLayout([667, 375], 'normal');
 
   const resized = (await rects()).controls.find(row => row.action === 'A');
   await touchStart(905, resized.x, resized.y);
@@ -400,13 +469,20 @@ try {
   await touchEndAll();
 
   await touchStart(906, resized.x, resized.y);
-  await source(1).selectOption('keyboard');
+  // Keep Controls closed while a touch is held so opening the dialog cannot
+  // itself clear the pointer before the source-change release path runs.
+  await source(1).evaluate(select => {
+    select.value = 'keyboard';
+    select.dispatchEvent(new Event('change', {bubbles: true}));
+  });
   await waitSource('keyboard');
   emptyPlayerPad(await pad());
   assert(await page.locator('#touch-controls').isHidden(), 'switching away from touch hides the overlay');
   await touchEndAll();
+  await page.locator('#controls-open').click();
   await source(1).selectOption('touch');
   await waitSource('touch');
+  await page.locator('#controls-close').click();
   const beforeTeardown = (await rects()).controls.find(row => row.action === 'A');
   await touchStart(907, beforeTeardown.x, beforeTeardown.y);
   if (values.surface === 'development') {
@@ -415,14 +491,31 @@ try {
     assert(await page.locator('#touch-controls').isHidden(), 'settings teardown removes the overlay');
     await touchEndAll();
   } else {
-    await page.evaluate(() => window.addEventListener('beforeunload', () => {
+    await page.evaluate(() => {
+      window.addEventListener('beforeunload', () => {
+        const samples = new Int32Array(32);
+        Module.meleeControllers.writeSamples(samples, 0);
+        sessionStorage.setItem('__touchPadBeforeEject', JSON.stringify([...samples.slice(0, 8)]));
+      }, {once: true});
+      const eject = document.querySelector('#end-session');
+      if (eject.disabled) throw Error('Eject became disabled before touch cleanup could be checked');
+      eject.click();
+    });
+    await page.waitForFunction(() => {
+      if (sessionStorage.getItem('__touchPadBeforeEject')) return true;
+      const manager = Module?.meleeControllers;
+      if (!manager) return false;
+      const samples = new Int32Array(32);
+      manager.writeSamples(samples, 0);
+      return samples.slice(1, 8).every(value => value === 0);
+    }, null, {timeout: 10000});
+    const ejectedPad = await page.evaluate(() => {
+      const saved = sessionStorage.getItem('__touchPadBeforeEject');
+      if (saved) return JSON.parse(saved);
       const samples = new Int32Array(32);
       Module.meleeControllers.writeSamples(samples, 0);
-      sessionStorage.setItem('__touchPadBeforeEject', JSON.stringify([...samples.slice(0, 8)]));
-    }, {once: true}));
-    await driver.unload();
-    const ejectedPad = await page.evaluate(() => JSON.parse(sessionStorage.getItem('__touchPadBeforeEject') || 'null'));
-    assert(ejectedPad, 'Eject reload retains the pre-navigation PAD cleanup sample');
+      return [...samples.slice(0, 8)];
+    });
     assert.deepEqual(ejectedPad.slice(1), [0, 0, 0, 0, 0, 0, 0], 'Eject releases all touch controls before teardown');
     await touchCancelAll();
   }

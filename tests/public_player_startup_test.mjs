@@ -206,6 +206,7 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
     trace.push('settings');
     return {
       setState: next => trace.push(['settings-state', next?.state]),
+      clearTouchInputs: () => trace.push('clear-touch-inputs'),
       bindPlayer: async runtime => { trace.push(['settings-bind', runtime]); },
     };
   };
@@ -560,6 +561,9 @@ try {
   const importWork = selectThroughShell(ejectRace);
   await Promise.resolve();
   await ejectRace.document.getElementById('end-session').onclick();
+  assert(ejectRace.trace.indexOf('clear-touch-inputs') >= 0 &&
+    ejectRace.trace.indexOf('clear-touch-inputs') < ejectRace.trace.indexOf('destroy'),
+  'Eject clears all held touch input before waiting for native teardown');
   finishEjectedImport();
   await importWork;
   assert.equal(ejectRace.trace.filter(row => row === 'start').length, 0,
