@@ -7363,6 +7363,31 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_Guard.c b/src/melee/ft/kinds/ftCom
          ftAnim_SetAnimRate(gobj,
                             (0.1f + lbGetJObjEndFrame(GET_JOBJ(gobj))) / f);
          if (!arg1) {
+@@ -725,8 +727,10 @@ void ftCo_80093240(Fighter_GObj* gobj)
+             float scl = p_ftCommonData->x4C0 * (fp->input.lstick[0].x *
+                                                 p_ftCommonData->sdi_pos_scale);
+-            fp->cur_pos.x += fp->coll_data.floor.normal.y * scl;
+-            fp->cur_pos.y += -fp->coll_data.floor.normal.x * scl;
++            /* GALE01r2 800932B8/CC: two rounded scale products precede
++             * the fused position writes, including on almost-flat floors. */
++            fp->cur_pos.x = fmaf(fp->coll_data.floor.normal.y, scl, fp->cur_pos.x);
++            fp->cur_pos.y = fmaf(-fp->coll_data.floor.normal.x, scl, fp->cur_pos.y);
+             fp->x670_timer_lstick_tilt_x = 254;
+         }
+     }
+ }
+@@ -742,8 +746,9 @@ void ftCo_800932DC(Fighter_GObj* gobj)
+             float scl = p_ftCommonData->x4C0 *
+                         (fp->input.lstick[0].x * p_ftCommonData->x4BC);
+-            fp->cur_pos.x += fp->coll_data.floor.normal.y * scl;
+-            fp->cur_pos.y += -fp->coll_data.floor.normal.x * scl;
++            /* GALE01r2 80093334/48 uses the same fmadds position writers. */
++            fp->cur_pos.x = fmaf(fp->coll_data.floor.normal.y, scl, fp->cur_pos.x);
++            fp->cur_pos.y = fmaf(-fp->coll_data.floor.normal.x, scl, fp->cur_pos.y);
+ 
+             /// @todo Fake.
+             !gobj;
+         }
 diff --git a/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c b/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
 --- a/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
 +++ b/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c

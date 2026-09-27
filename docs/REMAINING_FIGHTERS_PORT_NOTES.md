@@ -86,9 +86,27 @@ four-byte group. It is now decoded as the original twelve bytes; all entries
 and both focused checks pass (`work/pr86-yoshi-grab-bytes-{before-r2,after-r1}.log`).
 Fresh rendered causal validation agrees on all 6,777 observed second-match
 ticks, clearing the former tick-6718 mismatch
-(`work/pr86-yoshi-grab-b-state-match1-r1.json`). The full recipe is now being
-extended on unchanged frozen bytes. The separate functional Results failure
-below remains open.
+(`work/pr86-yoshi-grab-b-state-match1-r1.json`). The full 45,226-input recipe
+then completes all three natural match/Results/CSS loops on unchanged frozen
+bytes (`work/pr86-yoshi-grab-b-replay-r1/report.json`). Exact comparison still
+finds a later difference: second-match tick 8353, sequence 110091, input 22519,
+Samus in GuardSetOff, X `4145fcc5` original versus `4145fcc6` port. The third
+match's first difference is also Samus GuardSetOff, tick 12673, X `bfe3cbb6`
+versus `bfe3cbb4`. The first match's 12,095 rows remain exact; the second and
+third agree for 8,353 and 12,673 rows before their respective differences
+(`work/pr86-yoshi-grab-b-full-state-match{0,1,2}-r1.json`).
+
+The reduced actual shield-SDI callback reproduces the exact second-match X
+error. Original slices retain floor normal Y `3f7fffff`; the owned executable
+uses two rounded scale products followed by fused X/Y position updates in
+both shield SDI callbacks. Explicit `fmaf` restores those writes without
+changing the input gates or the scale-product order. Before repair the observed
+operand case and 249 additional synthetic cases fail; afterward the reduced
+case, all 1,024 synthetic cases, and both owned-DOL instruction profiles pass
+(`work/pr86-shield-sdi-{before-r1,after-r2}.log`). An intermediate patch-format
+preparation error is retained in `after-r1`, not called a runtime result.
+Fresh causal browser validation is pending. The separate functional Results
+failure below remains open.
 
 An additional B functional run reaches natural Results after 11,725 gameplay
 frames with Sheik winning, then fails the camera-pool ownership guard at
