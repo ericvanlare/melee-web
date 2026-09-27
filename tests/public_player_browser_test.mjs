@@ -7,12 +7,13 @@ import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 const {values} = parseArgs({options: {
-  ...Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}])),
+  ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
   audio: {type: 'boolean', default: false},
   headed: {type: 'boolean', default: false},
 }});
 if (!values.url || !values.out) throw Error('Use --url ORIGIN --out LOCAL_DIR [--playwright PACKAGE_DIR] [--disc OWNED_DISC] [--audio] [--headed]');
 const {chromium,browser:launchOptions} = await loadBrowserTools(values.playwright);
+const packageManifest = values.manifest ? JSON.parse(await fs.readFile(values.manifest, 'utf8')) : null;
 await fs.mkdir(values.out, {recursive: true});
 const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: values.headed}));
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
@@ -20,6 +21,11 @@ const page = await context.newPage(), origin = new URL(values.url).origin;
 const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
 const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.version(), browser_mode: values.headed ? 'headed' : 'headless', checks: [],
   profile: values.audio ? 'audio-player' : 'player',
+  build_identity: packageManifest ? {
+    schema: packageManifest.schema, profile: packageManifest.profile,
+    source_sha: packageManifest.source_sha, runtime_hash: packageManifest.runtime_hash,
+    identity_sha256: packageManifest.identity_sha256,
+  } : null,
   scope: 'Production entry, ordinary keyboard UI, lifecycle and application network smoke. No retail comparison, physical-controller, PCM or performance claim.'};
 page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData()}));
 page.on('pageerror', error => errors.push(error.message));
@@ -97,11 +103,21 @@ try {
   assert.equal(response.headers()['cross-origin-opener-policy'], 'same-origin');
   assert.equal(response.headers()['cross-origin-embedder-policy'], 'require-corp');
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
+  await page.locator('#loading-panel').waitFor({state: 'visible', timeout: 30000});
+  await check('disc validation is available before graphics readiness', async () => {
+    assert(await page.locator('#choose-disc').isEnabled(), 'Selection stays available while startup is busy');
+    await selectDisc({name: 'early-invalid.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
+    await page.locator('#error-dialog[open]').waitFor();
+    assert.match(await page.locator('#error').innerText(), /RVZ is not supported/);
+    assert.match(await page.locator('#disc-selection-status').innerText(), /Invalid disc.*early-invalid\.rvz/);
+    report.early_disc_validation = 'A file was selected and rejected while the full graphics loading panel was still visible; no import or launch occurred.';
+    await page.reload();
+  });
   await ready();
-  assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
-    'Import control must become enabled only after the native volatile cache is ready');
   await check('isolated WebGPU/Wasm startup and direct original-style player', async () => {
     await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
+    assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
+      'Full graphics readiness includes the native volatile cache being idle');
     const state = await page.evaluate(() => Module._melee_web_native_menu_cache_idle());
     assert.equal(state, 1,
       'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
@@ -268,9 +284,10 @@ try {
     });
     if (values.audio) {
       const created = audioEvents.filter(row => row.event === 'contextCreated');
-      assert.equal(created.length, 3, 'The inspected cancellation/invalid-input document and each playable document create at most one audio context');
+      assert.equal(created.length, 4,
+        'The early-invalid, invalid-recovery and two playable documents create one audio context each');
       assert(created.every(row => row.data.context.sampleRate === 32000));
-      report.audio = 'The page creates a single 32 kHz context on its first file-picker attempt; actual activation state is recorded above. PCM and match transitions are checked by the separate audio lifecycle test; no fidelity claim.';
+      report.audio = 'The early-invalid, invalid-recovery and two playable documents each create one 32 kHz context; actual activation state is recorded above. PCM and match transitions are checked by the separate audio lifecycle test; no fidelity claim.';
     } else {
       assert.deepEqual(audioEvents, [], 'The audio-disabled public profile must never create a Web Audio context');
       report.audio = 'Audio explicitly disabled. No Web Audio contexts were created during import, menus, pause/resume or second launch. No audio fidelity claim.';

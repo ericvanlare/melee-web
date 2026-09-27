@@ -23,7 +23,7 @@ class PublicPlayerStartupTests(unittest.TestCase):
             timeout=30,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("shared owner startup", result.stdout)
+        self.assertIn("readiness-gated import/autoplay", result.stdout)
 
 
 if __name__ == "__main__":

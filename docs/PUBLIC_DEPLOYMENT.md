@@ -344,10 +344,12 @@ or HTML with missing security headers is a failure. Wrangler 4.131.1 can return 
 reserved-configuration ENOTDIR/502 locally; this exception is recorded only for
 loopback and never accepted for a hosted URL.
 
-The player browser check runs the real public graph through startup, controls,
-preselection legal disclosure, invalid-disc retry, local owned-disc import,
-native preparation and automatic original CSS entry, followed by SSS navigation,
-pause/resume, Eject/reload and another import/launch. For the
+The player browser check selects and validates an invalid file while the full
+graphics loading panel is still visible, then waits for that panel to retire
+before recording startup readiness. It continues through controls, preselection
+legal disclosure, invalid-disc retry, local owned-disc import, native preparation
+and automatic original CSS entry, followed by SSS navigation, pause/resume,
+Eject/reload and another import/launch. For the
 silent profile it requires zero audio contexts and no audio output. The
 authorized audio profile uses its own audio validation procedure and does not
 inherit a silent-profile result.
