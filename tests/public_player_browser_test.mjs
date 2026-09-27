@@ -222,9 +222,11 @@ try {
     if (fullscreenAvailable) {
       await page.locator('#fullscreen').click();
       await page.waitForFunction(() => document.fullscreenElement === document.querySelector('#player'));
+      await page.waitForFunction(() => document.querySelector('#fullscreen').textContent === 'Exit fullscreen');
       assert.equal(await page.locator('#fullscreen').innerText(), 'Exit fullscreen');
       await page.locator('#fullscreen').click();
-      await page.waitForFunction(() => !document.fullscreenElement);
+      await page.waitForFunction(() => !document.fullscreenElement &&
+        document.querySelector('#fullscreen').textContent === 'Fullscreen');
       assert.equal(await page.locator('#fullscreen').innerText(), 'Fullscreen');
     }
   });

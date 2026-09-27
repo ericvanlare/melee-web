@@ -72,7 +72,8 @@ try {
     await page.waitForFunction(() => document.fullscreenElement === document.querySelector('#player'));
     await page.waitForFunction(() => document.querySelector('#fullscreen').textContent === 'Exit fullscreen');
     await page.locator('#fullscreen').click();
-    await page.waitForFunction(() => !document.fullscreenElement);
+    await page.waitForFunction(() => !document.fullscreenElement &&
+      document.querySelector('#fullscreen').textContent === 'Fullscreen');
     pass('native fullscreen enters and exits through real user control');
   } else pass('unsupported native fullscreen action is hidden');
 
