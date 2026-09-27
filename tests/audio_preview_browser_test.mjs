@@ -12,8 +12,9 @@ import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.m
 
 const {values} = parseArgs({
   options: {
-    ...Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}])),
+    ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
     headed: {type: 'boolean', default: false},
+    'select-after-graphics': {type: 'boolean', default: false},
   },
 });
 if (!values.url || !values.disc || !values.out) {
@@ -21,20 +22,32 @@ if (!values.url || !values.disc || !values.out) {
 }
 
 const {chromium, browser: launchOptions} = await loadBrowserTools(values.playwright);
+const packageManifest = values.manifest ? JSON.parse(await fs.readFile(values.manifest, 'utf8')) : null;
 await fs.mkdir(values.out, {recursive: true});
 const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: values.headed}));
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
 const page = await context.newPage();
 const origin = new URL(values.url).origin;
-const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
+const requests = [], errors = [], requestFailures = [], pendingPackageAborts = [],
+  verifiedPackageAborts = [], expectedNavigationAborts = [], violations = [], sockets = [], audioEvents = [];
+const startedAt = Date.now();
+let ejectReloadInProgress = false;
 const report = {
   schema: 'webmelee-audio-preview-browser-v1',
   browser: browser.version(),
   browser_mode: values.headed ? 'headed' : 'headless',
-  scope: 'Authorized local disc through original CSS, SSS and supported Mario/Final Destination match; Web Audio lifecycle and PCM transport only. No long replay or performance claim.',
+  build_identity: packageManifest ? {
+    schema: packageManifest.schema, profile: packageManifest.profile,
+    source_sha: packageManifest.source_sha, runtime_hash: packageManifest.runtime_hash,
+    identity_sha256: packageManifest.identity_sha256,
+  } : null,
+  scope: 'Authorized local disc through original CSS, SSS, supported Mario/Final Destination match, Results return and Eject; Web Audio lifecycle and PCM transport only. No long replay or performance claim.',
   checks: [],
   audio: {phases: {}, cdp: []},
   assets: {transactions: [], legacyCalls: 0},
+  request_failures: requestFailures,
+  verified_package_abort_events: verifiedPackageAborts,
+  expected_navigation_aborts: expectedNavigationAborts,
 };
 
 // Install before the module graph runs. The trace observes the public Web
@@ -168,7 +181,27 @@ await page.addInitScript(() => {
 });
 
 page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData()}));
-page.on('requestfailed', request => errors.push(`request failed: ${request.method()} ${request.url()} ${request.failure()?.errorText || ''}`));
+page.on('requestfailed', async request => {
+  const failure = request.failure()?.errorText || '';
+  let response = null;
+  try { response = await request.response(); } catch {}
+  const detail = {
+    url: request.url(), method: request.method(), resourceType: request.resourceType(), failure,
+    navigationRequest: request.isNavigationRequest(),
+    frameUrl: (() => { try { return request.frame()?.url() || null; } catch { return null; } })(),
+    responseStatus: response?.status() ?? null,
+    elapsedMs: Date.now() - startedAt, ejectReloadInProgress,
+  };
+  requestFailures.push(detail);
+  if (ejectReloadInProgress && failure === 'net::ERR_ABORTED' && new URL(request.url()).origin === origin) {
+    expectedNavigationAborts.push(detail);
+  } else if (failure === 'net::ERR_ABORTED' && request.resourceType() === 'fetch' &&
+      new URL(request.url()).pathname.endsWith('/gameplay_audio_preview.data') && response?.status() === 200) {
+    pendingPackageAborts.push(detail);
+  } else {
+    errors.push(`request failed: ${request.method()} ${request.url()} ${failure}`);
+  }
+});
 page.on('pageerror', error => errors.push(error.message));
 page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
 page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
@@ -212,6 +245,13 @@ const installAssetTrace = async () => page.evaluate(() => {
   const file = module._melee_web_native_asset_file;
   const commit = module._melee_web_native_asset_commit;
   const abort = module._melee_web_native_asset_abort;
+  const launch = module._melee_web_native_menu_launch;
+  if (typeof launch !== 'function') throw Error('Audio preview does not expose the original menu launch boundary.');
+  let launchCalls = 0;
+  module._melee_web_native_menu_launch = function(...args) {
+    launchCalls++;
+    return launch.apply(this, args);
+  };
   const events = [];
   const legacy = module._melee_web_native_menu_file;
   const recordScope = generation => {
@@ -261,7 +301,8 @@ const installAssetTrace = async () => page.evaluate(() => {
     return assetsRequested.apply(this, [generation, ...args]);
   };
   globalThis.audioPreviewAssetTrace = {
-    snapshot: () => ({legacyAvailable: typeof legacy === 'function', events: events.map(event => ({...event}))}),
+    snapshot: () => ({legacyAvailable: typeof legacy === 'function', launchCalls,
+      events: events.map(event => ({...event}))}),
   };
 });
 const total = (snapshot, field) => (snapshot?.worklets || []).reduce((sum, worklet) => sum + Number(worklet[field] || 0), 0);
@@ -307,23 +348,131 @@ try {
       return typeof module?.['_melee_web_native_menu_diagnostics'];
     }), 'undefined',
       'The browser check must not depend on diagnostic native exports');
-    await installAssetTrace();
+    await page.waitForFunction(() => !document.querySelector('#keyboard-layout')?.disabled,
+      null, {timeout: 90000});
     // Match the public player's ordinary recipe: configure B0XX through the
     // visible controls before using its Start key on the original CSS.
     await page.locator('#controls-open').click();
     await page.locator('#keyboard-layout').selectOption('boxx');
     await page.locator('#controls-close').click();
     await page.waitForFunction(() => document.activeElement?.id === 'canvas');
-    await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
-    await screenshot('ready');
+    const boundary = await page.waitForFunction(({afterGraphics}) => {
+      const panel = document.querySelector('#loading-panel');
+      const label = document.querySelector('#loading-label')?.textContent || '';
+      const choose = document.querySelector('#choose-disc');
+      const module = globalThis.Module;
+      const ownerReady = typeof module?._melee_web_native_asset_begin === 'function' &&
+        typeof module?._melee_web_native_menu_launch === 'function' &&
+        typeof globalThis.menuAssetsRequested === 'function';
+      const graphicsReady = !!panel?.hidden;
+      const graphicsPreparing = !panel?.hidden && /Preparing graphics/i.test(label);
+      if (!ownerReady || (afterGraphics ? !graphicsReady : (!graphicsPreparing || !choose || choose.disabled))) return false;
+      return {loadingPanelHidden: graphicsReady, loadingLabel: label,
+        canSelectDisc: !!choose && !choose.disabled,
+        cacheIdle: typeof module._melee_web_native_menu_cache_idle === 'function' ?
+          module._melee_web_native_menu_cache_idle() : null};
+    }, {afterGraphics: values['select-after-graphics']}, {timeout: 90000});
+    report.selection_boundary = await boundary.jsonValue();
+    await boundary.dispose();
+    report.selection_boundary.when = values['select-after-graphics'] ? 'after-graphics-ready' : 'while-graphics-preparing';
+    await installAssetTrace();
+    await screenshot(values['select-after-graphics'] ? 'ready-before-selection' : 'graphics-preparing-before-selection');
   });
+
+  if (!values['select-after-graphics']) {
+    await check('replace an owned early selection before native import', async () => {
+      assert.equal(report.selection_boundary.loadingPanelHidden, false);
+      assert.equal(report.selection_boundary.cacheIdle, 0,
+        'The native filesystem/cache import prerequisite is still closed');
+      await selectDisc(values.disc);
+      const filename = path.basename(values.disc);
+      await page.waitForFunction(filename => {
+        const status = document.querySelector('#disc-selection-status');
+        return status && !status.hidden && status.textContent.includes(filename);
+      }, filename, {timeout: 30000});
+      const selected = await page.evaluate(() => ({
+        label: document.querySelector('#loading-label')?.textContent || '',
+        loadingPanelHidden: document.querySelector('#loading-panel')?.hidden ?? null,
+        phase: Module._melee_web_native_menu_phase(),
+        running: Module._melee_web_native_menu_running(),
+      }));
+      assert.equal(selected.loadingPanelHidden, false);
+      assert.equal(selected.phase, 0);
+      assert.equal(selected.running, 0);
+      await selectDisc({name: 'replacement-before-import.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
+      await page.locator('#error-dialog[open]').waitFor();
+      await page.waitForTimeout(300);
+      assert.match(await page.locator('#disc-selection-status').innerText(), /Invalid disc.*replacement-before-import\.rvz/);
+      assert.equal(await page.evaluate(() => Module._melee_web_native_menu_phase()), 0,
+        'The replaced session never entered native import or launch');
+      assert.equal((await assetTrace()).events.length, 0,
+        'No native asset scope begins for a selection replaced before the import gate');
+      report.replacement_before_import = {selected, current_status: await page.locator('#disc-selection-status').innerText(), native_asset_events: 0};
+      await page.locator('#error-close').click();
+    });
+  }
 
   await check('authorized-disc import and original CSS emits nonzero PCM', async () => {
     await selectDisc(values.disc);
-    await driver.waitForStart();
+    const filename = path.basename(values.disc);
+    await page.waitForFunction(filename => {
+      const status = document.querySelector('#disc-selection-status');
+      return status && !status.hidden && status.textContent.includes(filename);
+    }, filename, {timeout: 30000});
+    report.disc_selection = await page.evaluate(() => ({
+      status: document.querySelector('#disc-selection-status')?.textContent || '',
+      loadingPanelHidden: document.querySelector('#loading-panel')?.hidden ?? null,
+      loadingLabel: document.querySelector('#loading-label')?.textContent || '',
+    }));
+    if (!values['select-after-graphics']) {
+      assert.equal(report.selection_boundary.loadingPanelHidden, false,
+        'The owned disc was selected while graphics preparation was visible');
+      assert.equal(report.selection_boundary.canSelectDisc, true);
+    } else {
+      assert.equal(report.selection_boundary.loadingPanelHidden, true,
+        'The late-selection variant starts only after graphics are ready');
+    }
+    const cssEntry = await driver.waitForPublicCss();
+    if (cssEntry === 'audio-recovery-required') {
+      report.audio_activation_recovery = 'The player showed its specific suspended-audio message; the test used the separate Play gesture only for that recovery.';
+      await driver.recoverAudioActivation();
+      report.css_entry = 'Audio activation recovery';
+    } else {
+      report.audio_activation_recovery = 'Automatic public launch entered CSS without a Play click.';
+      report.css_entry = 'Automatic public launch';
+    }
     assert(await page.locator('#error-dialog').isHidden());
-    await driver.launch();
     assert(await page.locator('#loading-panel').isHidden(), 'Loading feedback must retire before interactive CSS');
+    const afterCssAssets = await assetTrace();
+    assert.equal(afterCssAssets.launchCalls, 1,
+      'Successful disc and graphics readiness must invoke the original CSS launch exactly once');
+    report.launchesAtCss = afterCssAssets.launchCalls;
+    const preload = await page.evaluate(() => {
+      let seedBytes = 0;
+      try { seedBytes = Module.FS.stat('/initial_pipeline_cache.db').size; } catch {}
+      const resources = performance.getEntriesByType('resource')
+        .filter(entry => entry.name.endsWith('/gameplay_audio_preview.data'))
+        .map(entry => ({durationMs: entry.duration, transferSize: entry.transferSize,
+          encodedBodySize: entry.encodedBodySize, decodedBodySize: entry.decodedBodySize,
+          responseStart: entry.responseStart, responseEnd: entry.responseEnd}));
+      return {seedBytes, resources};
+    });
+    const packageBytes = packageManifest?.files?.find(file => file.path.endsWith('/gameplay_audio_preview.data'))?.size;
+    assert(Number.isInteger(packageBytes) && packageBytes > 0,
+      'Build manifest must bind the audio preload size');
+    assert.equal(preload.seedBytes, packageBytes,
+      'The runtime filesystem must contain the complete, manifest-sized pipeline cache package');
+    assert(preload.resources.some(entry => entry.decodedBodySize === packageBytes &&
+      entry.responseEnd >= entry.responseStart && entry.responseEnd > 0),
+    'Browser resource timing must confirm the full pipeline cache package arrived');
+    for (const detail of pendingPackageAborts) {
+      verifiedPackageAborts.push({
+        ...detail,
+        verification: 'HTTP 200; full manifest-sized response recorded by PerformanceResourceTiming and present in /initial_pipeline_cache.db',
+      });
+    }
+    assert.equal(pendingPackageAborts.length, verifiedPackageAborts.length);
+    report.pipeline_cache_preload = {...preload, manifestBytes: packageBytes};
     await page.waitForFunction(() => document.activeElement?.id === 'canvas');
     const before = await trace();
     await observeAudio('css', before);
@@ -335,7 +484,8 @@ try {
     await page.waitForFunction(() => document.querySelector('#pause-game').textContent === 'Resume' &&
       !document.querySelector('#pause-game').disabled);
     await page.locator('#pause-game').click();
-    await page.locator('#pause-game:not([disabled])').waitFor();
+    await page.waitForFunction(() => document.querySelector('#pause-game').textContent === 'Pause' &&
+      !document.querySelector('#pause-game').disabled);
     const before = await trace();
     await observeAudio('css-resume', before);
   });
@@ -375,9 +525,44 @@ try {
     await page.waitForTimeout(700);
     await screenshot('source-pause');
     await driver.pressChord(['q', '9', 'm', '7'], {holdMs: 250, releaseMs: 200});
+    await phase(8);
+    await page.waitForTimeout(4500);
+    const resultsAudio = await trace();
+    report.audio.results_transition = resultsAudio;
+    await screenshot('results');
+    // No Contest enters the original Results route. Confirm its panels with
+    // ordinary Start press/release edges, matching the bounded public return
+    // recipe; a single LRAS chord only reaches Results.
+    for (let confirmation = 0; confirmation < 8; confirmation++) {
+      if (await page.evaluate(() => Module._melee_web_native_menu_phase()) !== 8) break;
+      await phase(8);
+      await driver.pressChord(['7'], {holdMs: 120, releaseMs: 1380});
+    }
+    assert.notEqual(await page.evaluate(() => Module._melee_web_native_menu_phase()), 8,
+      'Original Results did not finish its bounded Start confirmation sequence');
+    const beforeCssReturnAudio = await trace();
+    const returnBoundary = await page.waitForFunction(() => {
+      const error = document.querySelector('#status')?.dataset.runtimeError;
+      if (error) return {error};
+      const currentPhase = Module._melee_web_native_menu_phase();
+      return (currentPhase === 1 || currentPhase === 9) && Module._melee_web_native_menu_running() ?
+        {phase: currentPhase} : false;
+    }, null, {timeout: 60000});
+    const returnState = await returnBoundary.jsonValue(); await returnBoundary.dispose();
+    if (returnState.error) throw Error(returnState.error);
+    if (returnState.phase === 9) {
+      for (let confirmation = 0; confirmation < 120; confirmation++) {
+        await phase(9);
+        await driver.pressChord(['7'], {holdMs: 120, releaseMs: 380});
+        const next = await page.evaluate(() => ({phase: Module._melee_web_native_menu_phase(),
+          error: document.querySelector('#status')?.dataset.runtimeError}));
+        if (next.error) throw Error(next.error);
+        if (next.phase !== 9) break;
+      }
+    }
     await phase(1);
     await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
-    await observeAudio('css-after-no-contest', before);
+    await observeAudio('css-after-no-contest', beforeCssReturnAudio);
     await screenshot('css-after-no-contest');
   });
 
@@ -443,9 +628,15 @@ try {
     const eventCount = audioEvents.length;
     const navigationCount = report.navigations || 0;
     await collectViolations();
-    await driver.unload();
-    assert((report.navigations || 0) > navigationCount, 'Eject must reload the player document');
-    await driver.waitForImport();
+    ejectReloadInProgress = true;
+    try {
+      await driver.unload();
+      assert((report.navigations || 0) > navigationCount, 'Eject must reload the player document');
+      await driver.waitForImport();
+      await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 90000});
+    } finally {
+      ejectReloadInProgress = false;
+    }
     const fresh = await trace();
     assert(fresh && fresh.contexts.length === 0, 'Reloaded player must not retain the old AudioContext');
     // Closing a context releases its audio resources. Chrome may retain the
@@ -476,6 +667,9 @@ try {
     assert.deepEqual(sockets, []);
     assert.deepEqual(violations, []);
     assert.deepEqual(errors, []);
+    assert.equal(requestFailures.length,
+      verifiedPackageAborts.length + expectedNavigationAborts.length,
+      'Every Chrome request-aborted event must have a verified complete package transfer or be caused by Eject reload');
     report.requests = requests.map(({url, method}) => ({path: new URL(url).pathname, method}));
     report.audio.cdp = audioEvents;
   });
@@ -487,6 +681,10 @@ try {
     url: location.href,
     status: document.querySelector('#status')?.textContent || null,
     error: document.querySelector('#error')?.textContent || null,
+    phase: typeof globalThis.Module?._melee_web_native_menu_phase === 'function' ?
+      Module._melee_web_native_menu_phase() : null,
+    running: typeof globalThis.Module?._melee_web_native_menu_running === 'function' ?
+      Module._melee_web_native_menu_running() : null,
     audio: window.audioPreviewTrace?.snapshot?.() || null,
   })).catch(() => null);
   await screenshot('failure').catch(() => {});
@@ -494,6 +692,8 @@ try {
 } finally {
   await collectViolations().catch(() => {});
   report.errors = errors;
+  report.request_failures = requestFailures;
+  report.expected_navigation_aborts = expectedNavigationAborts;
   report.csp = violations;
   report.audio.cdp = audioEvents;
   report.requests = report.requests || requests.map(({url, method}) => ({path: new URL(url).pathname, method}));

@@ -39,9 +39,28 @@ try {
   if(!await page.evaluate(()=>crossOriginIsolated&&!!navigator.gpu))throw Error('Cross-origin isolation and WebGPU are required');
   await driver.waitForImport();report.checks.push('import control ready');
   if(values.disc){
-    await driver.selectDisc(path.resolve(values.disc));await driver.waitForStart();
+    await driver.selectDisc(path.resolve(values.disc));
+    if(values.surface==='public'){
+      const entry=await driver.waitForPublicCss();
+      if(entry==='audio-recovery-required'){
+        report.audio_activation_recovery='The public player showed its specific suspended-audio message; the smoke used its one documented Play recovery gesture.';
+        await driver.recoverAudioActivation();
+        report.css_entry='Audio activation recovery';
+      }else {
+        report.audio_activation_recovery='Automatic launch entered CSS without a Play click.';
+        report.css_entry='Automatic public launch';
+      }
+    }else{
+      await driver.waitForStart();
+      await driver.launch();
+      report.css_entry='Development surface manual launch';
+    }
     report.checks.push('owned disc prepared');
-    await driver.launch();report.checks.push('original CSS running');
+    report.checks.push('original CSS running');
+    report.launch_state=await driver.diagnostics();
+    if(report.launch_state.unavailable||report.launch_state.error||report.launch_state.phase!==1||!report.launch_state.running)
+      throw Error(report.launch_state.unavailable||report.launch_state.error||'The selected disc did not remain in running original CSS');
+    await page.screenshot({path:path.join(values.out,'original-css.png'),fullPage:true});
     await driver.unload();report.checks.push('teardown and import control ready');
   }
   report.state=await driver.diagnostics();

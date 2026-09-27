@@ -10,10 +10,16 @@ a PowerPC CPU interpreter or JIT.
 ## Play online
 
 1. Open [webmelee.gg](https://webmelee.gg) in a desktop browser with WebGPU support.
-2. Choose **Disc** and select your own unmodified USA revision 1.02
-   (GALE01 revision-2) Melee disc image in ISO, GCM or CISO format. RVZ is not
-   supported.
-3. Choose **Play**. Open **Controls** to see keyboard bindings and input options.
+2. Choose **Disc** whenever you are ready, including while the **Preparing
+   graphics…** message is visible. Review the linked disclosures, then choose
+   your own unmodified USA revision 1.02 (GALE01 revision-2) Melee disc image
+   in ISO, GCM or CISO format. RVZ is not supported.
+3. The browser validates and keeps the selected file, then starts native disc
+   import when its filesystem and renderer-cache prerequisites are ready. Disc
+   and graphics preparation can overlap; the player enters the original
+   character select automatically when both are ready. Open **Controls** to
+   see keyboard bindings and input options. **Play** remains available if the
+   browser needs another user gesture to enable audio or retry a start.
 
 Game content is supplied by your local disc image. The browser reads required
 ranges on your device; the disc and extracted game data are not uploaded.
@@ -24,6 +30,10 @@ accuracy and performance are still being developed; errors can interrupt play.
 The live release and the latest repository code may differ. See
 [current status](STATUS.md) for tested scenarios, known failures and the
 supporting evidence, and the [roadmap](docs/ROADMAP.md) for planned work.
+
+The [project direction](docs/PROJECT_DIRECTION.md) connects the vanilla source
+port with later Slippi compatibility, rollback, cross-play and independent
+online services, including their dependencies and unresolved questions.
 
 ## Develop locally
 

@@ -10,6 +10,8 @@ import tempfile
 import venv
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from workspace_resources import operation
 
 # Pinned Aurora plus the reviewed patch preceding the ImGui timestamp fix.
 # Previous patch blob: 0bf4dc0e2e4370d4fbd01198c5851ccf23d0a26e.
@@ -168,7 +170,7 @@ def verify_sources(root, lock):
         raise ValueError("Aurora patch is missing. Run python3 scripts/bootstrap.py first.")
 
 
-def bootstrap(root=ROOT):
+def _bootstrap(root=ROOT):
     lock = read_lock(root)
     patch = root / "patches/aurora-browser.patch"
     if not patch.is_file():
@@ -193,6 +195,11 @@ def bootstrap(root=ROOT):
     run(sys.executable, deps / "emsdk/emsdk.py", "install", lock["emscripten"])
     run(sys.executable, deps / "emsdk/emsdk.py", "activate", lock["emscripten"])
     print("Ready. Run python3 scripts/build.py")
+
+
+def bootstrap(root=ROOT):
+    with operation(root, "bootstrap"):
+        return _bootstrap(root)
 
 
 def main():

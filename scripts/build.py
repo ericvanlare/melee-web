@@ -12,6 +12,7 @@ import sqlite3
 
 from bootstrap import read_lock, verify_sources
 from gameplay_sources import prepare_sources
+from workspace_resources import operation, record_build
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -776,77 +777,81 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError("--pipeline-provenance requires the private runtime target")
     if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} and configuration != "Release":
         raise ValueError(f"{target} is Release-only; pass --configuration Release")
-    lock = read_lock(root)
-    verify_sources(root, lock)
-    # Registry strings/counts are generated from the pinned source, not game
-    # bytes. Fail on source drift before compiling an outdated binding table.
-    subprocess.run([sys.executable, str(root / "scripts/generate_fighter_registry.py"), "--check"],
-                   cwd=root, check=True)
-    gameplay_source = prepare_sources(root, lock)
-    subprocess.run([sys.executable, str(root / "scripts/generate_common_schema.py"), "--check"],
-                   cwd=root, check=True)
-    if (root / ".venv").is_symlink():
-        raise ValueError(".venv must be a local directory, not a symlink")
-    bins = root / ".venv" / ("Scripts" if os.name == "nt" else "bin")
-    cmake = bins / ("cmake.exe" if os.name == "nt" else "cmake")
-    ninja = bins / ("ninja.exe" if os.name == "nt" else "ninja")
-    sdk = root / ".deps/emsdk"
-    emscripten = sdk / "upstream/emscripten"
-    emcmake = emscripten / ("emcmake.bat" if os.name == "nt" else "emcmake")
-    if not all(path.is_file() for path in (cmake, ninja, emcmake, sdk / ".emscripten")):
-        raise ValueError("Build tools are missing. Run python3 scripts/bootstrap.py first.")
-    version = (emscripten / "emscripten-version.txt").read_text().strip().strip('"')
-    if version != lock["emscripten"]:
-        raise ValueError(f"Expected Emscripten {lock['emscripten']}, got {version}. Run bootstrap.py.")
-    env = dict(os.environ)
-    env["PATH"] = str(bins) + os.pathsep + env.get("PATH", "")
-    # A separately activated SDK must not redirect this build to global tools/cache.
-    env["EMSDK"] = str(sdk)
-    env["EM_CONFIG"] = str(sdk / ".emscripten")
-    env["EM_CACHE"] = str(emscripten / "cache")
-    env["EMSDK_PYTHON"] = sys.executable
-    build_target = trace_targets[0] if trace_targets else target
-    build_dir = build_directory(root, target=build_target, configuration=configuration,
-                                pipeline_provenance=pipeline_provenance,
-                                selective_pipelines=selective_pipelines)
-    if (root / "build").is_symlink() or build_dir.is_symlink():
-        raise ValueError("Build output must be a local directory, not a symlink")
-    source_inputs_before = (
-        _source_inputs_record(root, gameplay_source)
-        if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} else None
-    )
-    configure = [str(emcmake), str(cmake), "-S", str(root), "-B", str(build_dir),
-                 "-G", "Ninja", f"-DCMAKE_BUILD_TYPE={configuration}",
-                 f"-DMELEE_WEB_GAMEPLAY_SOURCE_DIR={gameplay_source}",
-                 f"-DCMAKE_MAKE_PROGRAM={ninja}"]
-    configure.append(
-        f"-DMELEE_WEB_PUBLIC_RUNTIME={'ON' if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} else 'OFF'}"
-    )
-    configure.append(
-        f"-DMELEE_WEB_AUDIO_PREVIEW_RUNTIME={'ON' if target == AUDIO_PREVIEW_RUNTIME_TARGET else 'OFF'}"
-    )
-    configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
-    configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
-    subprocess.run(configure, cwd=root, env=env, check=True)
-    if configure_only:
-        return
-    targets = trace_targets if trace_targets else BUILD_TARGETS[target]
-    subprocess.run([str(cmake), "--build", str(build_dir), "--target", *targets, "-j", str(jobs)],
-                   cwd=root, env=env, check=True)
-    if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET}:
-        if _source_inputs_record(root, gameplay_source) != source_inputs_before:
-            raise ValueError(f"native source inputs changed during the {target} build")
-        if target == PUBLIC_RUNTIME_TARGET:
-            identity_path = _write_public_identity(
-                root, build_dir, version, cmake, ninja, gameplay_source,
-                expected_source_inputs=source_inputs_before,
-            )
-        else:
-            identity_path = _write_audio_preview_identity(
-                root, build_dir, version, cmake, ninja, gameplay_source,
-                expected_source_inputs=source_inputs_before,
-            )
-        print(f"Wrote {identity_path.relative_to(root)}")
+    with operation(root, "build " + target):
+        lock = read_lock(root)
+        verify_sources(root, lock)
+        # Registry strings/counts are generated from the pinned source, not game
+        # bytes. Fail on source drift before compiling an outdated binding table.
+        subprocess.run([sys.executable, str(root / "scripts/generate_fighter_registry.py"), "--check"],
+                       cwd=root, check=True)
+        gameplay_source = prepare_sources(root, lock)
+        subprocess.run([sys.executable, str(root / "scripts/generate_common_schema.py"), "--check"],
+                       cwd=root, check=True)
+        if (root / ".venv").is_symlink():
+            raise ValueError(".venv must be a local directory, not a symlink")
+        bins = root / ".venv" / ("Scripts" if os.name == "nt" else "bin")
+        cmake = bins / ("cmake.exe" if os.name == "nt" else "cmake")
+        ninja = bins / ("ninja.exe" if os.name == "nt" else "ninja")
+        sdk = root / ".deps/emsdk"
+        emscripten = sdk / "upstream/emscripten"
+        emcmake = emscripten / ("emcmake.bat" if os.name == "nt" else "emcmake")
+        if not all(path.is_file() for path in (cmake, ninja, emcmake, sdk / ".emscripten")):
+            raise ValueError("Build tools are missing. Run python3 scripts/bootstrap.py first.")
+        version = (emscripten / "emscripten-version.txt").read_text().strip().strip('"')
+        if version != lock["emscripten"]:
+            raise ValueError(f"Expected Emscripten {lock['emscripten']}, got {version}. Run bootstrap.py.")
+        env = dict(os.environ)
+        env["PATH"] = str(bins) + os.pathsep + env.get("PATH", "")
+        # A separately activated SDK must not redirect this build to global tools/cache.
+        env["EMSDK"] = str(sdk)
+        env["EM_CONFIG"] = str(sdk / ".emscripten")
+        env["EM_CACHE"] = str(emscripten / "cache")
+        env["EMSDK_PYTHON"] = sys.executable
+        build_target = trace_targets[0] if trace_targets else target
+        build_dir = build_directory(root, target=build_target, configuration=configuration,
+                                    pipeline_provenance=pipeline_provenance,
+                                    selective_pipelines=selective_pipelines)
+        if (root / "build").is_symlink() or build_dir.is_symlink():
+            raise ValueError("Build output must be a local directory, not a symlink")
+        source_inputs_before = (
+            _source_inputs_record(root, gameplay_source)
+            if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} else None
+        )
+        configure = [str(emcmake), str(cmake), "-S", str(root), "-B", str(build_dir),
+                     "-G", "Ninja", f"-DCMAKE_BUILD_TYPE={configuration}",
+                     f"-DMELEE_WEB_GAMEPLAY_SOURCE_DIR={gameplay_source}",
+                     f"-DCMAKE_MAKE_PROGRAM={ninja}"]
+        configure.append(
+            f"-DMELEE_WEB_PUBLIC_RUNTIME={'ON' if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} else 'OFF'}"
+        )
+        configure.append(
+            f"-DMELEE_WEB_AUDIO_PREVIEW_RUNTIME={'ON' if target == AUDIO_PREVIEW_RUNTIME_TARGET else 'OFF'}"
+        )
+        configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
+        configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
+        record_build(root, build_dir, False)
+        subprocess.run(configure, cwd=root, env=env, check=True)
+        if configure_only:
+            return
+        targets = trace_targets if trace_targets else BUILD_TARGETS[target]
+        subprocess.run([str(cmake), "--build", str(build_dir), "--target", *targets, "-j", str(jobs)],
+                       cwd=root, env=env, check=True)
+        if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET}:
+            if _source_inputs_record(root, gameplay_source) != source_inputs_before:
+                raise ValueError(f"native source inputs changed during the {target} build")
+            if target == PUBLIC_RUNTIME_TARGET:
+                identity_path = _write_public_identity(
+                    root, build_dir, version, cmake, ninja, gameplay_source,
+                    expected_source_inputs=source_inputs_before,
+                )
+            else:
+                identity_path = _write_audio_preview_identity(
+                    root, build_dir, version, cmake, ninja, gameplay_source,
+                    expected_source_inputs=source_inputs_before,
+                )
+            print(f"Wrote {identity_path.relative_to(root)}")
+
+        record_build(root, build_dir, True)
 
 
 def main():

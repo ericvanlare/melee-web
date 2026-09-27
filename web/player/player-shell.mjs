@@ -1,10 +1,123 @@
 import {mountMeleeRuntime} from '../melee-runtime.mjs';
 import {mountControllerSettings} from '../controller-settings.mjs';
-import {openNativeGameDiscSession} from '../runtime-assets.mjs';
 
 const $ = id => document.getElementById(id);
 let player, state, settings, currentError = '', requiresReload = false, hasStarted = false;
+let discSelectionGeneration = 0, selectedDiscReady = false, selectedDiscFile = null;
+let selectedDiscSession = null, selectedDiscValidated = false, importingSelection = null, importedSelection = null;
+let selectedDiscMessage = '', validatingSelection = null;
+let audioActivation = Promise.resolve(), audioActivationError = null;
 const busyStates = ['booting', 'importing', 'preparing', 'pausing', 'resuming', 'unloading'];
+const startReadinessWaiters = new Set();
+
+function waitForStartReadiness(selection) {
+  return new Promise(resolve => {
+    const wake = () => {
+      if (selection !== discSelectionGeneration || state?.requiresReload || state?.state === 'error') {
+        startReadinessWaiters.delete(wake);
+        resolve(false);
+      } else if (state?.canStart) {
+        startReadinessWaiters.delete(wake);
+        resolve(true);
+      }
+    };
+    startReadinessWaiters.add(wake);
+    wake();
+  });
+}
+function wakeStartReadinessWaiters() {
+  for (const wake of [...startReadinessWaiters]) wake();
+}
+
+function renderDiscSelection() {
+  const status = $('disc-selection-status');
+  status.hidden = !selectedDiscFile || !selectedDiscMessage;
+  status.textContent = selectedDiscFile && selectedDiscMessage ? `${selectedDiscMessage} ${selectedDiscFile.name}` : '';
+}
+
+async function validateSelectedDisc(selection, file) {
+  if (!player || typeof player.openDiscSession !== 'function' ||
+      selection !== discSelectionGeneration || validatingSelection === selection || state?.requiresReload) return;
+  validatingSelection = selection;
+  try {
+    const session = await player.openDiscSession(file);
+    if (selection !== discSelectionGeneration) {
+      session.close();
+      return;
+    }
+    if (state?.requiresReload) {
+      session.close();
+      selectedDiscMessage = 'Validation stopped';
+      renderDiscSelection();
+      if (!currentError) showError(state?.message || 'Player stopped while validating the selected disc.', true);
+      return;
+    }
+    selectedDiscSession = session;
+    selectedDiscValidated = true;
+    selectedDiscMessage = state?.canImport ? 'Disc validated; preparing' : 'Disc validated; waiting for graphics';
+    renderStatus(state);
+  } catch (error) {
+    if (selection === discSelectionGeneration) {
+      if (state?.requiresReload) {
+        selectedDiscMessage = 'Validation stopped';
+        renderStatus(state);
+        showError(error, true);
+      } else {
+        selectedDiscMessage = 'Invalid disc';
+        renderDiscSelection();
+        showError(error);
+      }
+    }
+  } finally {
+    if (validatingSelection === selection) validatingSelection = null;
+  }
+}
+
+function maybeImportSelectedDisc() {
+  if (!player || !state?.canImport || !selectedDiscValidated || !selectedDiscFile ||
+      !selectedDiscSession || state.requiresReload) return;
+  const selection = discSelectionGeneration;
+  if (importingSelection === selection || importedSelection === selection) return;
+  importingSelection = selection;
+  importedSelection = selection;
+  const file = selectedDiscFile, session = selectedDiscSession;
+  selectedDiscSession = null;
+  selectedDiscMessage = 'Preparing local data for';
+  renderDiscSelection();
+  void importAndStartSelectedDisc(selection, file, session);
+}
+
+async function importAndStartSelectedDisc(selection, file, session) {
+  try {
+    await player.importDisc(file, {preopenedSession: session});
+    if (selection !== discSelectionGeneration) return;
+    if (!await waitForStartReadiness(selection)) return;
+    await audioActivation;
+    if (selection !== discSelectionGeneration) return;
+    if (!player.getState().canStart && !await waitForStartReadiness(selection)) return;
+    selectedDiscReady = true;
+    selectedDiscMessage = 'Disc ready';
+    renderStatus(player.getState());
+    if (player.getState().audio === 'enabled' && audioActivationError) {
+      showError(audioActivationError);
+      return;
+    }
+    await player.start({isCurrent: () => selection === discSelectionGeneration && selectedDiscReady});
+    if (selection === discSelectionGeneration) {
+      selectedDiscMessage = 'Playing';
+      renderDiscSelection();
+      player.focus();
+    }
+  } catch (error) {
+    if (selection === discSelectionGeneration) {
+      selectedDiscMessage = 'Could not prepare';
+      renderDiscSelection();
+      showError(error);
+    }
+  } finally {
+    if (importingSelection === selection) importingSelection = null;
+  }
+}
 
 function showError(error, fatal = false) {
   currentError = error?.message || String(error);
@@ -23,8 +136,8 @@ function renderStatus(next) {
   if (!next) return;
   state = next;
   if (next.running) hasStarted = true;
-  $('choose-disc').disabled = !next.canImport;
-  $('start-game').disabled = !next.canStart;
+  $('choose-disc').disabled = !next.canSelectDisc;
+  $('start-game').disabled = !selectedDiscReady || !next.canStart;
   $('pause-game').disabled = !next.canPause;
   $('pause-game').textContent = next.paused ? 'Resume' : 'Pause';
   $('end-session').disabled = !next.canUnload;
@@ -51,27 +164,72 @@ function renderStatus(next) {
   $('status').disabled = !currentError && !next.paused && next.state !== 'error';
   $('status').textContent = currentError || next.state === 'error' ? 'Error' : next.paused ? 'Paused' : next.state === 'importing' ? 'Reading…' : next.state === 'unloading' ? 'Ejecting…' : 'Loading…';
   $('status').title = currentError || next.message;
+  if (next.requiresReload) {
+    if (selectedDiscSession) selectedDiscSession.close();
+    selectedDiscSession = null;
+    selectedDiscValidated = false;
+    selectedDiscReady = false;
+    if (selectedDiscFile)
+      selectedDiscMessage = validatingSelection !== null ? 'Validation stopped' : 'Preparation stopped';
+    ++discSelectionGeneration;
+  }
+  renderDiscSelection();
   settings?.setState(next);
+  wakeStartReadinessWaiters();
+  maybeImportSelectedDisc();
 }
 
-$('choose-disc').onclick = () => { $('disc-ack').checked = false; $('disc-continue').disabled = true; $('disc-dialog').showModal(); };
-$('disc-ack').onchange = () => { $('disc-continue').disabled = !$('disc-ack').checked; };
+$('choose-disc').onclick = () => $('disc-dialog').showModal();
 $('disc-cancel').onclick = () => { $('disc-dialog').close(); player?.focus(); };
-$('disc-continue').onclick = () => {
-  if (!$('disc-ack').checked || !state?.canImport) return;
+$('disc-choose-file').onclick = () => {
+  if (!state?.canSelectDisc) return;
+  // Start/resume Web Audio directly from this user gesture, before import and
+  // native preparation can outlive the browser's transient activation window.
+  audioActivationError = null;
+  try {
+    audioActivation = Promise.resolve(player?.activateAudio()).then(() => {}, error => { audioActivationError = error; });
+  } catch (error) {
+    audioActivationError = error;
+    audioActivation = Promise.resolve();
+  }
   $('disc-dialog').close(); $('disc-file').click();
 };
 $('disc-file').onchange = async () => {
   const file = $('disc-file').files[0];
   if (!file) return;
+  const selection = ++discSelectionGeneration;
+  selectedDiscSession?.close();
+  selectedDiscSession = null;
+  selectedDiscFile = file;
+  selectedDiscValidated = false;
+  selectedDiscReady = false;
+  importingSelection = null;
+  importedSelection = null;
+  selectedDiscMessage = 'Checking local disc';
   clearError();
-  try { await player.importDisc(file); $('start-game').focus(); }
-  catch (error) { showError(error); }
-  finally { $('disc-file').value = ''; }
+  renderStatus(state);
+  await validateSelectedDisc(selection, file);
+  $('disc-file').value = '';
 };
-$('start-game').onclick = async () => { clearError(); try { await player.start(); } catch (error) { showError(error); } };
+$('disc-file').addEventListener('cancel', () => $('choose-disc').focus());
+$('start-game').onclick = async () => {
+  if (!selectedDiscReady || !state?.canStart) return;
+  const selection = discSelectionGeneration;
+  clearError();
+  try { await player.start({isCurrent: () => selection === discSelectionGeneration && selectedDiscReady}); }
+  catch (error) { if (selection === discSelectionGeneration) showError(error); }
+};
 $('pause-game').onclick = async () => { clearError(); try { await (state.paused ? player.resume() : player.pause()); } catch (error) { showError(error); } };
 $('end-session').onclick = async () => {
+  ++discSelectionGeneration;
+  selectedDiscSession?.close();
+  selectedDiscSession = null;
+  selectedDiscFile = null;
+  selectedDiscValidated = false;
+  selectedDiscReady = false;
+  selectedDiscMessage = '';
+  renderDiscSelection();
+  renderStatus(state);
   $('end-session').disabled = true;
   try { await player.destroy(); location.reload(); }
   catch (error) { showError(error, true); }
@@ -114,7 +272,12 @@ document.addEventListener('fullscreenchange', () => { $('fullscreen').textConten
 try {
   player = await mountMeleeRuntime({
     canvas: $('canvas'), onState: renderStatus, onError: error => showError(error),
-    openDisc: openNativeGameDiscSession,
+    onOwner: owner => {
+      player = owner.handle;
+      renderStatus(player.getState());
+      if (selectedDiscFile && !selectedDiscValidated)
+        void validateSelectedDisc(discSelectionGeneration, selectedDiscFile);
+    },
   });
   await settings.bindPlayer(player);
 } catch (error) { showError(error, true); }

@@ -76,6 +76,7 @@ html, body {
   outline: none;
 }
 #toolbar a, #edition, #brand, #audio-note { color: #aaa; }
+#disc-selection-status { max-width: min(42vw, 360px); color: #ccc; overflow-wrap: anywhere; }
 #brand { font-weight: 600; letter-spacing: 0.08em; }
 #toolbar a { margin-left: 6px; }
 #brand, #edition { text-align: left; }

@@ -5,6 +5,11 @@ the detailed contracts, not a second status report. `STATUS.md` is the current
 evidence index; follow its links for measurements, retained failures and exact
 receipts instead of copying numbers into this page.
 
+For the relationship between the vanilla port, accuracy tooling and later
+Slippi/online projects, read [project direction](PROJECT_DIRECTION.md). It records
+strategy; the roadmap and boundary documents still govern implementation order
+and acceptance.
+
 ## Start with the task you are doing
 
 Use the [build, play and inspect guide](BUILD_AND_PLAY.md) for setup and player
@@ -12,6 +17,9 @@ commands, then choose the smallest relevant boundary check below.
 `scripts/build.py` checks pinned source and toolchain prerequisites before
 compilation. Build freshness remains the responsibility of the producer and
 frozen-build checks in [Hitch capture](HITCH_CAPTURE.md).
+
+Follow [local resource ownership](LOCAL_RESOURCES.md) for advisory disk reporting,
+mutation safety, test scratch, and explicit retirement of completed builds.
 
 For a browser check, serve a built directory over loopback so cross-origin
 isolation headers are present:
@@ -67,6 +75,7 @@ status separate from original-comparison and browser acceptance.
 | Native timing or retained capture | [Reference capture](REFERENCE_CAPTURE_APP.md) and [hitch capture](HITCH_CAPTURE.md) | Follow the owned-process capture procedure and verify the actual exported interval | A finalized trace is required; a failed or partial capture remains explicit evidence |
 | Retail comparison or controller input | [Reference capture](REFERENCE_CAPTURE_APP.md), [original comparison](ORIGINAL_COMPARISON.md) | Use the private capture workflow and its hash-bound reports | Retail compared only for declared fields and source boundaries |
 | Replay or recorded queue | [Recorded queue replay](RECORDED_QUEUE_REPLAY.md) | Validate the exact queue/draw/state inventory and first divergence | Conditional schedule evidence does not establish live timing or performance |
+| Recorded whole session | [Recorded-session state comparison](RECORDED_SESSION_STATE.md) | Replay the bound MWRC v8 input, then run the strict whole-session comparator | Exact declared match state plus complete input/scene order; separate from draw cadence and menu scalar state |
 | Allocation history comparison | [Allocation trace comparison](ALLOCATION_TRACE_COMPARISON.md) | `python3 scripts/compare_allocation_traces.py --original-trace ... --browser-trace ... --out work/...` | Strict selected-prefix comparison; incomplete or unmapped fields remain explicit |
 | Repository publication | [Public repository checklist](PUBLIC_REPOSITORY_CHECKLIST.md), [content guard](REPOSITORY_CONTENT_CHECK.md) | Stage intended content and run `python3 scripts/check_repository_content.py`; resolve provenance and audit the publication checkpoint and GitHub controls | The guard checks the index or a named commit; history and publication rights need their separate reviews |
 | Production audio player/package | [Production audio](AUDIO_PRODUCTION.md) | Build `runtime-audio-preview` in Release; run `scripts/release_audio_player.py prepare`, `audit` and `verify`; promote the same audited bytes | Audio package/hosted evidence is separate from gameplay admission and the silent rollback |
@@ -82,13 +91,16 @@ it does not replace browser, original-comparison or admission checks.
 `scripts/browser_driver.mjs` is the shared Playwright-facing orchestration layer.
 New browser jobs should use its `createBrowserDriver(page, {surface,
 timeoutMs, deadline})` and its readiness-aware methods (`waitForImport`,
-`selectDisc`, `waitForStart`, `launch`, `waitForPhase`, `pressChord`, `unload`
-and `diagnostics`). It serializes keyboard chords and waits for semantic
-readiness; it does not auto-resume, retry, or recover a timed-out run. Treat a
-timeout as a harness failure until the page state, captured diagnostics and
-console evidence show otherwise. The helper does not turn a diagnostic route
-into acceptance. Hitch profiles hash this helper; re-profile old manifests when
-it changes.
+`selectDisc`, `waitForPhase`, `pressChord`, `unload` and `diagnostics`). The
+development surface retains `waitForStart` and `launch` for its manual launch
+contract. The public surface auto-launches after a successful import; use
+`waitForPublicCss`, then call `recoverAudioActivation` only when that method
+reports the player's specific suspended-audio recovery state. The helper never
+clicks Play on a successful public load, retries an import/preparation failure,
+or recovers a timed-out run. Treat a timeout as a harness failure until the
+page state, captured diagnostics and console evidence show otherwise. The
+helper does not turn a diagnostic route into acceptance. Hitch profiles hash
+this helper; re-profile old manifests when it changes.
 
 Development-page failures use the explicit `#status[data-runtime-error]`
 channel; public-page failures use the error dialog. The driver reports the

@@ -1,10 +1,13 @@
 # Public player deployment runbook
 
 This is a Cloudflare Pages **Direct Upload** release. The player at `/` keeps
-the original prototype's black canvas and small bottom toolbar. Disc, Play,
-Pause, Controls, Fullscreen and Eject call the shared player owner directly.
-About and legal information lives on linked document pages. There is no landing
-page, iframe, developer host, account, analytics or upload endpoint.
+the original prototype's black canvas and small bottom toolbar. Disc opens the
+linked legal disclosure and file picker; successful import and preparation
+starts the original character select automatically. Play remains available to
+retry a failed start. Pause, Controls, Fullscreen and Eject call the shared
+player owner directly. About and legal information lives on linked document
+pages. There is no landing page, iframe, developer host, account, analytics or
+upload endpoint.
 
 The silent `player` profile packages a Release native build with a fixed public
 export surface. The authorized audio path packages a distinct `audio-player`
@@ -341,9 +344,12 @@ or HTML with missing security headers is a failure. Wrangler 4.131.1 can return 
 reserved-configuration ENOTDIR/502 locally; this exception is recorded only for
 loopback and never accepted for a hosted URL.
 
-The player browser check runs the real public graph through startup, controls,
-invalid-disc retry, acknowledged owned-disc import, native preparation, original
-CSS/SSS navigation, pause/resume, Eject/reload and another import/launch. For the
+The player browser check selects and validates an invalid file while the full
+graphics loading panel is still visible, then waits for that panel to retire
+before recording startup readiness. It continues through controls, preselection
+legal disclosure, invalid-disc retry, local owned-disc import, native preparation
+and automatic original CSS entry, followed by SSS navigation, pause/resume,
+Eject/reload and another import/launch. For the
 silent profile it requires zero audio contexts and no audio output. The
 authorized audio profile uses its own audio validation procedure and does not
 inherit a silent-profile result.

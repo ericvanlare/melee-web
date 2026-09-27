@@ -1,8 +1,8 @@
 """Fresh full original audio startup with synthetic boot/SRAM, source tables."""
 import json
 from pathlib import Path
-import tempfile
 import unittest
+from owned_test_workspace import OwnedWorkspaceTests
 from tools import source_synth_joined_runtime as runtime
 from tools import source_synth_joined_startup as startup
 from tools import source_lbaudio_startup as lbaudio
@@ -12,7 +12,7 @@ import test_source_synth_joined_runtime as synth_tests
 
 ROOT = Path(__file__).resolve().parents[1]
 
-class OriginalAudioStartupTests(unittest.TestCase):
+class OriginalAudioStartupTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
         required = [startup.EMXX, ROOT/'.venv/bin/cmake', ROOT/'.venv/bin/ninja',
@@ -20,8 +20,7 @@ class OriginalAudioStartupTests(unittest.TestCase):
                     ROOT/'build/browser/_deps/fmt-src/include/fmt/base.h']
         if not all(path.is_file() for path in required):
             raise unittest.SkipTest('configured pinned source/CMake dependencies unavailable')
-        (ROOT/'work').mkdir(exist_ok=True)
-        cls.work = Path(tempfile.mkdtemp(prefix='source-lbaudio-runtime-test-', dir=ROOT/'work'))
+        cls.work = cls.new_workspace(ROOT, prefix='source-lbaudio-runtime-test-')
         startup.build_profile(cls.work/'profile')
         lbaudio.build_profile(cls.work/'lbaudio')
         post_audio.compile_profile(cls.work/'post-audio')
