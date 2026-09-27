@@ -1,0 +1,1439 @@
+{
+  "schema": "melee-web-recorded-session-state-v1",
+  "date": "2026-09-26",
+  "labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Retail compared",
+    "Browser exercised"
+  ],
+  "scope": "Complete agreement for this three-match four-Mario CPU9/Final Destination recording and the declared exact match fields; full consumed input/scene order and final CSS endpoint verified.",
+  "source": {
+    "base_commit": "aecc3e64def3090bdfc33d0eb66058df998ef14d",
+    "runtime_and_comparator_commit": "a8fdf3bcdf95645f21d87684c6de240bf27a1af2",
+    "runtime_tree": "06a0bfa9499c393118e6451338ba9a94c60b4fa9",
+    "previous_receipt": {
+      "path": "docs/evidence/cpu-source-context-runtime-v2.json",
+      "bytes": 28442,
+      "sha256": "a113211941c347a5fc41493b439d89fa3e4a15468a3e6daffdd166ed3751540d"
+    },
+    "merged_pr89_runtime_files_verified": 53,
+    "dependencies": {
+      "schema": 1,
+      "repositories": {
+        "aurora": {
+          "url": "https://github.com/encounter/aurora.git",
+          "commit": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca"
+        },
+        "melee": {
+          "url": "https://github.com/doldecomp/melee.git",
+          "commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+        },
+        "emsdk": {
+          "url": "https://github.com/emscripten-core/emsdk.git",
+          "commit": "5eb0bde7585670252e8ba05e9d361627bffd08b5"
+        }
+      },
+      "emscripten": "6.0.9",
+      "reference_tools": {
+        "dolphin": {
+          "kind": "source",
+          "url": "https://github.com/dolphin-emu/dolphin.git",
+          "commit": "c77bbaa0f372c3f72281602a8b087206706542cb"
+        },
+        "slippi-js": {
+          "url": "https://github.com/project-slippi/slippi-js.git",
+          "commit": "ff815345e641836a331191320c0f6eae21542a5f",
+          "package": "@slippi/slippi-js",
+          "version": "9.1.3"
+        }
+      },
+      "python_build_packages": [
+        "cmake==3.31.6",
+        "ninja==1.13.0"
+      ]
+    },
+    "validated_tracked_files": {
+      "dependencies.lock.json": {
+        "bytes": 964,
+        "sha256": "b49bad1048d13ba05da31e5269bda4bed9fba04ed7a3fe96da8aa97390748d2d"
+      },
+      "scripts/browser_tools.mjs": {
+        "bytes": 3168,
+        "sha256": "38d1cd67daad46e4c6f35c64d7b28faeb3bad9ffa391d6a1eede3a5ee5243649"
+      },
+      "scripts/browser_driver.mjs": {
+        "bytes": 8665,
+        "sha256": "4cf0e9d013ed0a3bfa068847a98c0a56954c32220475420a14fb2c0fe8426249"
+      },
+      "tools/reference_capture_semantics.py": {
+        "bytes": 68176,
+        "sha256": "6fe275a481b4a5c9332175f75a7f90e809d3e772fad741b211e56209a7c3cec3"
+      },
+      "reference-capture/dolphin/reference_observer_stream.py": {
+        "bytes": 14939,
+        "sha256": "a6ea2d36ac1e9b076fc0bb2fcedb8b3e3b54e5440bad2927326f9e3a0e13af94"
+      },
+      "CMakeLists.txt": {
+        "bytes": 22105,
+        "sha256": "87464d23d20a36031442ef57867ba835b2bb92329171af98d2da9c1539b623f6"
+      },
+      "cmake/FighterRuntime.cmake": {
+        "bytes": 46855,
+        "sha256": "75d71fc15bf62fa7907c82831570f3bc7e3ac4bc8ebfd667b978d9b28fae7250"
+      },
+      "patches/melee-gameplay.patch": {
+        "bytes": 378620,
+        "sha256": "8ccac326dbae03272ed55954dc3ab6d028093daf26700608325bcb1762f69ca1"
+      },
+      "src/dat_effect_banks.cpp": {
+        "bytes": 2420,
+        "sha256": "79bc5bbf6bdcb1bf1724495eb1e975361e031f96dc93184a37a89238d2138aa9"
+      },
+      "src/dat_effect_banks.hpp": {
+        "bytes": 1164,
+        "sha256": "552e29158125b28c9771dcbccd3ad5895c56d8de57326f9cd1a46fa7a6a8efdf"
+      },
+      "src/dat_item_article.cpp": {
+        "bytes": 20399,
+        "sha256": "1d39aa28022915b6a737bca6dc940fa92a6b7218f70b60cddd5bd6d5b403112a"
+      },
+      "src/dat_item_article.hpp": {
+        "bytes": 922,
+        "sha256": "7ce66a6c606afcccd96f78c6e1304a3c089540b86ea30729f877501f6aaa3024"
+      },
+      "src/dat_native_stage.cpp": {
+        "bytes": 32906,
+        "sha256": "7035f0625b3ed3710e3073d998e6eeee99b360722a029b06f5f0c51e4ca2ffc7"
+      },
+      "src/dat_native_stage.hpp": {
+        "bytes": 1765,
+        "sha256": "9a8ca3b9618ae62e57dc0256bcc7a3ad9ef91894e6372b993e8504f6c0ffd602"
+      },
+      "src/dat_stage_yaku.cpp": {
+        "bytes": 1514,
+        "sha256": "11b2959ba3ec68bf535a30db6e0bf9f34056e07a0a9543380b252f30ad17ff91"
+      },
+      "src/dat_stage_yaku.hpp": {
+        "bytes": 809,
+        "sha256": "4a0078cf72d608b8683978f48aa2fc654a40c26a0c7c062539b5a68d3ca60cdb"
+      },
+      "src/dat_texture.cpp": {
+        "bytes": 16303,
+        "sha256": "1965e30a740b7e8e0d75290dfb3bd2e9bed3bc90757845b084e6b3c365cad1e0"
+      },
+      "src/dat_texture.hpp": {
+        "bytes": 3561,
+        "sha256": "830a87a102947efc8db4584d7dd558a64b88dee162c90589fb4d77c5e9bb638e"
+      },
+      "src/gameplay_archive_sections.c": {
+        "bytes": 12078,
+        "sha256": "e6be3fdba0d3fd5de6ce14f64cf20c3f07824039ea6b2c995415c00bd06c31e2"
+      },
+      "src/gameplay_archive_sections.h": {
+        "bytes": 3247,
+        "sha256": "22d43fb36e6b2a487c32f7fa37aa8d9c657ad5028469212244110f27d996f8db"
+      },
+      "src/gameplay_article_data.c": {
+        "bytes": 7172,
+        "sha256": "f7d721a6af968d43c8b7c8fa887b8845d4a2ca2c368eccf702301c53c083ccf8"
+      },
+      "src/gameplay_article_data.h": {
+        "bytes": 1424,
+        "sha256": "019f9ab1ff1ae04d8b0f9a7adf6f5c7bc4434cec93fa3064f2b6951651907f6d"
+      },
+      "src/gameplay_asset_manifest.cpp": {
+        "bytes": 13482,
+        "sha256": "f345875e9f78fbd398379df28f01fd08ec219e5dfb6df5d9ebd4f50fb3e75d51"
+      },
+      "src/gameplay_bonus_data.c": {
+        "bytes": 3042,
+        "sha256": "4c878bc48a8a96373bac75329d9e54c1df066974435ad05fc25e5ddfc324ba69"
+      },
+      "src/gameplay_bonus_data.h": {
+        "bytes": 947,
+        "sha256": "7ce6419de041e4d18ebb1e17b94e168f72366493ce405492efc64555c4cacbe8"
+      },
+      "src/gameplay_collision.c": {
+        "bytes": 23505,
+        "sha256": "e17b5a8721d04701e02d0a0d4771b63164dcbb0ff00da1e6877ed380017e226d"
+      },
+      "src/gameplay_collision.h": {
+        "bytes": 4192,
+        "sha256": "49355b08430408008c8a5d1aa3b32e139bad51754025de4c4c141f188b6b608b"
+      },
+      "src/gameplay_common_context.c": {
+        "bytes": 13730,
+        "sha256": "c2e02208d211f5a4e199d35ef1e1be8369ce9262d1cf946136eb3467e13cfa93"
+      },
+      "src/gameplay_common_context.h": {
+        "bytes": 3112,
+        "sha256": "1e9ee41694e68cc668d00b4258592895849d0040de6b291a790bc580d071d3b4"
+      },
+      "src/gameplay_cpu_observation.c": {
+        "bytes": 20364,
+        "sha256": "a504518808ee58f02a1bd9b5895aae0bdb79a0c6dfd50e14d0a908f635ebefa7"
+      },
+      "src/gameplay_cpu_observation.h": {
+        "bytes": 949,
+        "sha256": "be156c794e140c94a222cfecb42bcf28808384d4f9394880af8a206e8037d2ff"
+      },
+      "src/gameplay_effect_banks.c": {
+        "bytes": 12384,
+        "sha256": "369f934680c1e6d7b4fcd6a2f2b32e32e20bf4511df4ed868b7fb759d0e0035a"
+      },
+      "src/gameplay_effect_banks.h": {
+        "bytes": 2360,
+        "sha256": "183470354d0699d339a49c8ea47b1b3a8141487876d6499fece2de4b50c5a75e"
+      },
+      "src/gameplay_match_clock.h": {
+        "bytes": 2444,
+        "sha256": "b65bed9600bb8de77d38e9348017e841d9bd2da70568f368c31db17a6f7db554"
+      },
+      "src/gameplay_match_flow.c": {
+        "bytes": 5544,
+        "sha256": "14183810afddbd11155df21d0c0e9a864b36c590e0aa890b15fde85a3f0967f6"
+      },
+      "src/gameplay_match_rules.c": {
+        "bytes": 8638,
+        "sha256": "0107dc51a1d551686f17af9f77c7c93cab1839a25466ebdfa6fab0bdcb38e174"
+      },
+      "src/gameplay_match_rules.h": {
+        "bytes": 2505,
+        "sha256": "a7a98efb59b3603a1bf7f186835eca5b3fea633e42633d9451e7521f8f177df0"
+      },
+      "src/gameplay_match_session.cpp": {
+        "bytes": 20527,
+        "sha256": "11990c214fb183ebb7da8095f4d6bcb1575ad708f0f0b606d6479db71a8b7a5b"
+      },
+      "src/gameplay_results_context.c": {
+        "bytes": 23037,
+        "sha256": "fe4f6313593e739bfe204bb742ac78e1eb142fe986b902b685fd0f8267aedc1c"
+      },
+      "src/gameplay_retail_recipe.cpp": {
+        "bytes": 16700,
+        "sha256": "bdb2f59eb17e10daea8de4d8c23ce428c3db25c3101586ba62ddaed494cf0db8"
+      },
+      "src/gameplay_rumble.c": {
+        "bytes": 6696,
+        "sha256": "bbdd3d248edad5baa546235ad0ca0870d6977e4656c0efc9cc1bcbe8b081cf2a"
+      },
+      "src/gameplay_rumble.h": {
+        "bytes": 1248,
+        "sha256": "f7d67301dc7f87a5eb1ee3217fb548c84d5d77a519d1e9c8245ab4d9043b989e"
+      },
+      "src/gameplay_source_context.c": {
+        "bytes": 11932,
+        "sha256": "f212b3ac1d4b59f3316b78926b0c9fb6205ab7771d7cdb17cd9a5416fa456955"
+      },
+      "src/gameplay_source_context.h": {
+        "bytes": 3976,
+        "sha256": "e82b15d67602fc2bd1970d0e7ebd02aa9cee2f0b2b6818acd09b3e63691afc13"
+      },
+      "src/gameplay_source_files.c": {
+        "bytes": 5944,
+        "sha256": "359c055d06bfc92de88f927b0be90e180b8f1f201a50e75975053a551fc2209f"
+      },
+      "src/gameplay_source_files.h": {
+        "bytes": 1571,
+        "sha256": "6439a7e08e97dbfa80e9b3125231cbc02c193b02c7d74e2d5e8e4eaf4735f8b1"
+      },
+      "src/gameplay_source_memory_runtime.cpp": {
+        "bytes": 9361,
+        "sha256": "69c6c55dfc343ec3a5bd0297c531f12b172f5998e0eb65c32d90d382cf59fe57"
+      },
+      "src/gameplay_source_memory_runtime.h": {
+        "bytes": 1818,
+        "sha256": "9927fdac9943043e616299402bc4d767cd9dc4eaddbea40544ec758603ae12d5"
+      },
+      "src/gameplay_stage_context.c": {
+        "bytes": 9946,
+        "sha256": "0d8ba86852dcf0a1dbecad57d3e75b569506d79ec40518838da5366dabb627c6"
+      },
+      "src/gameplay_stage_context.h": {
+        "bytes": 3291,
+        "sha256": "71a69803ee49332acb296fc72919f643b64e15f153c8e07e97866de25a461e63"
+      },
+      "src/gameplay_stage_last.c": {
+        "bytes": 9720,
+        "sha256": "0d8f41d6263606d49bf1eff76abb4e1d865a76255fe13fc33bab3806c93ee92a"
+      },
+      "src/gameplay_stage_last.h": {
+        "bytes": 1435,
+        "sha256": "0a07730ec092151def4aff642b9ab6952da5f05235505e08a944ee5765977468"
+      },
+      "src/gameplay_stage_numeric.c": {
+        "bytes": 13517,
+        "sha256": "d6c7e376a9c003b530fb18975adca7ca0a4a8a5cf46ea10285d73be6dc327ed1"
+      },
+      "src/gameplay_world.cpp": {
+        "bytes": 52916,
+        "sha256": "dbdfe495a1eb719372a1f3d1601e078932b122fc383e13b58bf012d68202c397"
+      },
+      "src/gameplay_world.hpp": {
+        "bytes": 3676,
+        "sha256": "295e32d6c8568454d7c51748cc13dd398556859eb74da88b4532600c3dd5514e"
+      },
+      "src/hsd_native_common.c": {
+        "bytes": 4125,
+        "sha256": "a8302fbdcdffff25674a28b1aefa2c4a871618e1fd9b2848e63af6cd60bb026f"
+      },
+      "src/hsd_native_joint.c": {
+        "bytes": 35678,
+        "sha256": "7cb26eca385be5eeae289bc03754ac1a2c3f4fd989cf78f4fe7f89a62f8225e1"
+      },
+      "src/source_ppc_profile_gale01r2.h": {
+        "bytes": 1043,
+        "sha256": "c60e3855fdcc86aded0b4f425a68c8b9223bcbe04cbec15af7e0bfe257158963"
+      },
+      "src/gameplay_ps_math.c": {
+        "bytes": 7084,
+        "sha256": "a24e065fd01f80e7c72ab0586c2c2e7c869261b59b8680c1851be116307ce6e1"
+      },
+      "src/gameplay_ps_math.h": {
+        "bytes": 750,
+        "sha256": "a273bb289263d9020ad9a7fbe086a16cdb8d5a5ee9a321e48097f7aafaf9275f"
+      },
+      "src/gameplay_compat.h": {
+        "bytes": 3668,
+        "sha256": "24d1e84a2d08fcb83bf797807a21fa43d23e1e6e7ac6222716bcc9158cdd8383"
+      },
+      "scripts/capture_whole_session_browser.mjs": {
+        "bytes": 15978,
+        "sha256": "bccfad4b7cf4b828d8b264ce9ec46f87bab52ac7402ceaa9125b30837e2da993"
+      },
+      "scripts/compare_whole_session_state.py": {
+        "bytes": 1777,
+        "sha256": "dbc17677b8dba3eec954018dd0b2c069dd12c248d575e1743145e64d2b43a53a"
+      },
+      "tools/whole_session_state_compare.py": {
+        "bytes": 47503,
+        "sha256": "f555209e01f8e35efd31fbea6b942f7650e2c1482121f8fcdc5e0b3c8e3a8ffa"
+      },
+      "tests/test_whole_session_state_compare.py": {
+        "bytes": 17982,
+        "sha256": "61eb52d1d3a2e229358df6caeec3ffc53d26958baa1eebb5d1fe535763d23005"
+      },
+      "tests/gameplay_camera_math_trace.c": {
+        "bytes": 17122,
+        "sha256": "4881efdd0b5a5dba8eb6e7c40d0aa6bf102abaab726fe2128e3fedfd6232d812"
+      },
+      "tests/test_gameplay_camera_math.py": {
+        "bytes": 3755,
+        "sha256": "d4b2477f1111aad510fbbad5ebe3d83fdf9cb9c35244019f96eea6e2ee36b2a9"
+      },
+      "tests/gameplay_ps_inverse_trace.c": {
+        "bytes": 4574,
+        "sha256": "4ca974696d7580123bd0e89e742e10bcc9e336f1edec035ea7156bba4da0731b"
+      },
+      "tests/test_gameplay_ps_inverse.py": {
+        "bytes": 3111,
+        "sha256": "e3f2dfaa1f039103a27d60622757f8cf118053d63151ec444103a4166e012c36"
+      },
+      "tests/gameplay_combo_push_trace.c": {
+        "bytes": 2592,
+        "sha256": "209ba70bec8bf2c579c8e2901f583a32f58b5aaab030ee30994017602c1b3981"
+      },
+      "tests/test_gameplay_combo_push.py": {
+        "bytes": 2843,
+        "sha256": "7cd890ddb819895a7d286b91acefdcd8e03cfd60eaddeacfeb0402c921d2d702"
+      },
+      "tests/gameplay_motion_flags_trace.c": {
+        "bytes": 4033,
+        "sha256": "e42390fec46150fb2b5c3459107628289e8ccc9cf1041be4b944fec7950c84c8"
+      },
+      "tests/test_gameplay_motion_flags.py": {
+        "bytes": 3596,
+        "sha256": "e19eb25bedbed5746174236d3ab1c8b16ef3ac70112c469e4d0c8411a1fa3c96"
+      },
+      "tests/test_gameplay_camera_shake.py": {
+        "bytes": 2777,
+        "sha256": "e520f02f62ab806368edcedf9ede1f824659f894ffed3f9e48a13b60782403f8"
+      },
+      "tests/gameplay_camera_shake_trace.c": {
+        "bytes": 2972,
+        "sha256": "5aac0567162d4be9c4bf6a038e395adfe84a040bc75d82ed6f33653795663cd2"
+      }
+    }
+  },
+  "build": {
+    "target": "runtime",
+    "configuration": "RelWithDebInfo",
+    "commands": [
+      "python3 scripts/build.py --target runtime",
+      "python3 scripts/build.py --target gameplay"
+    ],
+    "frozen_artifacts": {
+      "build/browser/gameplay_menu_browser.js": {
+        "bytes": 582877,
+        "sha256": "b79671231af8d81ebf7244b45fbd30adba63fedecab9ab5755a9f9e29e12188c"
+      },
+      "build/browser/gameplay_menu_browser.wasm": {
+        "bytes": 118081923,
+        "sha256": "4051823577383ac8e60e6ff9a41d8a5272826c769f63ca4b350841635b9ff00b"
+      },
+      "build/browser/runtime.html": {
+        "bytes": 5007,
+        "sha256": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172"
+      },
+      "build/browser/CMakeCache.txt": {
+        "bytes": 57342,
+        "sha256": "b34efe506849169451fe181392aa4ddb1b658415d1d00b4e6410173478269f40"
+      },
+      "build/browser/build.ninja": {
+        "bytes": 4533054,
+        "sha256": "a645eafe0aa68520bff22be1fed39394eb501e392671708a1d77dac5d25318df"
+      },
+      "dependencies.lock.json": {
+        "bytes": 964,
+        "sha256": "b49bad1048d13ba05da31e5269bda4bed9fba04ed7a3fe96da8aa97390748d2d"
+      },
+      "work/session-equivalence-context-harness.mjs": {
+        "bytes": 15987,
+        "sha256": "3977aebb1557600466d07850ef9e602cce4a72ae8241020575f68314148d87b2"
+      },
+      "scripts/browser_tools.mjs": {
+        "bytes": 3168,
+        "sha256": "38d1cd67daad46e4c6f35c64d7b28faeb3bad9ffa391d6a1eede3a5ee5243649"
+      },
+      "scripts/browser_driver.mjs": {
+        "bytes": 8665,
+        "sha256": "4cf0e9d013ed0a3bfa068847a98c0a56954c32220475420a14fb2c0fe8426249"
+      },
+      "work/compare-indexed-match.py": {
+        "bytes": 7191,
+        "sha256": "97d7ec064a3e6ae6be692a6f0fec32868181cff7d8fe49bb4f6c556e55e9edb4"
+      },
+      "tools/reference_capture_semantics.py": {
+        "bytes": 68176,
+        "sha256": "6fe275a481b4a5c9332175f75a7f90e809d3e772fad741b211e56209a7c3cec3"
+      },
+      "reference-capture/dolphin/reference_observer_stream.py": {
+        "bytes": 14939,
+        "sha256": "a6ea2d36ac1e9b076fc0bb2fcedb8b3e3b54e5440bad2927326f9e3a0e13af94"
+      },
+      "CMakeLists.txt": {
+        "bytes": 22105,
+        "sha256": "87464d23d20a36031442ef57867ba835b2bb92329171af98d2da9c1539b623f6"
+      },
+      "cmake/FighterRuntime.cmake": {
+        "bytes": 46855,
+        "sha256": "75d71fc15bf62fa7907c82831570f3bc7e3ac4bc8ebfd667b978d9b28fae7250"
+      },
+      "patches/melee-gameplay.patch": {
+        "bytes": 378620,
+        "sha256": "8ccac326dbae03272ed55954dc3ab6d028093daf26700608325bcb1762f69ca1"
+      },
+      "src/dat_effect_banks.cpp": {
+        "bytes": 2420,
+        "sha256": "79bc5bbf6bdcb1bf1724495eb1e975361e031f96dc93184a37a89238d2138aa9"
+      },
+      "src/dat_effect_banks.hpp": {
+        "bytes": 1164,
+        "sha256": "552e29158125b28c9771dcbccd3ad5895c56d8de57326f9cd1a46fa7a6a8efdf"
+      },
+      "src/dat_item_article.cpp": {
+        "bytes": 20399,
+        "sha256": "1d39aa28022915b6a737bca6dc940fa92a6b7218f70b60cddd5bd6d5b403112a"
+      },
+      "src/dat_item_article.hpp": {
+        "bytes": 922,
+        "sha256": "7ce66a6c606afcccd96f78c6e1304a3c089540b86ea30729f877501f6aaa3024"
+      },
+      "src/dat_native_stage.cpp": {
+        "bytes": 32906,
+        "sha256": "7035f0625b3ed3710e3073d998e6eeee99b360722a029b06f5f0c51e4ca2ffc7"
+      },
+      "src/dat_native_stage.hpp": {
+        "bytes": 1765,
+        "sha256": "9a8ca3b9618ae62e57dc0256bcc7a3ad9ef91894e6372b993e8504f6c0ffd602"
+      },
+      "src/dat_stage_yaku.cpp": {
+        "bytes": 1514,
+        "sha256": "11b2959ba3ec68bf535a30db6e0bf9f34056e07a0a9543380b252f30ad17ff91"
+      },
+      "src/dat_stage_yaku.hpp": {
+        "bytes": 809,
+        "sha256": "4a0078cf72d608b8683978f48aa2fc654a40c26a0c7c062539b5a68d3ca60cdb"
+      },
+      "src/dat_texture.cpp": {
+        "bytes": 16303,
+        "sha256": "1965e30a740b7e8e0d75290dfb3bd2e9bed3bc90757845b084e6b3c365cad1e0"
+      },
+      "src/dat_texture.hpp": {
+        "bytes": 3561,
+        "sha256": "830a87a102947efc8db4584d7dd558a64b88dee162c90589fb4d77c5e9bb638e"
+      },
+      "src/gameplay_archive_sections.c": {
+        "bytes": 12078,
+        "sha256": "e6be3fdba0d3fd5de6ce14f64cf20c3f07824039ea6b2c995415c00bd06c31e2"
+      },
+      "src/gameplay_archive_sections.h": {
+        "bytes": 3247,
+        "sha256": "22d43fb36e6b2a487c32f7fa37aa8d9c657ad5028469212244110f27d996f8db"
+      },
+      "src/gameplay_article_data.c": {
+        "bytes": 7172,
+        "sha256": "f7d721a6af968d43c8b7c8fa887b8845d4a2ca2c368eccf702301c53c083ccf8"
+      },
+      "src/gameplay_article_data.h": {
+        "bytes": 1424,
+        "sha256": "019f9ab1ff1ae04d8b0f9a7adf6f5c7bc4434cec93fa3064f2b6951651907f6d"
+      },
+      "src/gameplay_asset_manifest.cpp": {
+        "bytes": 13482,
+        "sha256": "f345875e9f78fbd398379df28f01fd08ec219e5dfb6df5d9ebd4f50fb3e75d51"
+      },
+      "src/gameplay_bonus_data.c": {
+        "bytes": 3042,
+        "sha256": "4c878bc48a8a96373bac75329d9e54c1df066974435ad05fc25e5ddfc324ba69"
+      },
+      "src/gameplay_bonus_data.h": {
+        "bytes": 947,
+        "sha256": "7ce6419de041e4d18ebb1e17b94e168f72366493ce405492efc64555c4cacbe8"
+      },
+      "src/gameplay_collision.c": {
+        "bytes": 23505,
+        "sha256": "e17b5a8721d04701e02d0a0d4771b63164dcbb0ff00da1e6877ed380017e226d"
+      },
+      "src/gameplay_collision.h": {
+        "bytes": 4192,
+        "sha256": "49355b08430408008c8a5d1aa3b32e139bad51754025de4c4c141f188b6b608b"
+      },
+      "src/gameplay_common_context.c": {
+        "bytes": 13730,
+        "sha256": "c2e02208d211f5a4e199d35ef1e1be8369ce9262d1cf946136eb3467e13cfa93"
+      },
+      "src/gameplay_common_context.h": {
+        "bytes": 3112,
+        "sha256": "1e9ee41694e68cc668d00b4258592895849d0040de6b291a790bc580d071d3b4"
+      },
+      "src/gameplay_cpu_observation.c": {
+        "bytes": 20364,
+        "sha256": "a504518808ee58f02a1bd9b5895aae0bdb79a0c6dfd50e14d0a908f635ebefa7"
+      },
+      "src/gameplay_cpu_observation.h": {
+        "bytes": 949,
+        "sha256": "be156c794e140c94a222cfecb42bcf28808384d4f9394880af8a206e8037d2ff"
+      },
+      "src/gameplay_effect_banks.c": {
+        "bytes": 12384,
+        "sha256": "369f934680c1e6d7b4fcd6a2f2b32e32e20bf4511df4ed868b7fb759d0e0035a"
+      },
+      "src/gameplay_effect_banks.h": {
+        "bytes": 2360,
+        "sha256": "183470354d0699d339a49c8ea47b1b3a8141487876d6499fece2de4b50c5a75e"
+      },
+      "src/gameplay_match_clock.h": {
+        "bytes": 2444,
+        "sha256": "b65bed9600bb8de77d38e9348017e841d9bd2da70568f368c31db17a6f7db554"
+      },
+      "src/gameplay_match_flow.c": {
+        "bytes": 5544,
+        "sha256": "14183810afddbd11155df21d0c0e9a864b36c590e0aa890b15fde85a3f0967f6"
+      },
+      "src/gameplay_match_rules.c": {
+        "bytes": 8638,
+        "sha256": "0107dc51a1d551686f17af9f77c7c93cab1839a25466ebdfa6fab0bdcb38e174"
+      },
+      "src/gameplay_match_rules.h": {
+        "bytes": 2505,
+        "sha256": "a7a98efb59b3603a1bf7f186835eca5b3fea633e42633d9451e7521f8f177df0"
+      },
+      "src/gameplay_match_session.cpp": {
+        "bytes": 20527,
+        "sha256": "11990c214fb183ebb7da8095f4d6bcb1575ad708f0f0b606d6479db71a8b7a5b"
+      },
+      "src/gameplay_results_context.c": {
+        "bytes": 23037,
+        "sha256": "fe4f6313593e739bfe204bb742ac78e1eb142fe986b902b685fd0f8267aedc1c"
+      },
+      "src/gameplay_retail_recipe.cpp": {
+        "bytes": 16700,
+        "sha256": "bdb2f59eb17e10daea8de4d8c23ce428c3db25c3101586ba62ddaed494cf0db8"
+      },
+      "src/gameplay_rumble.c": {
+        "bytes": 6696,
+        "sha256": "bbdd3d248edad5baa546235ad0ca0870d6977e4656c0efc9cc1bcbe8b081cf2a"
+      },
+      "src/gameplay_rumble.h": {
+        "bytes": 1248,
+        "sha256": "f7d67301dc7f87a5eb1ee3217fb548c84d5d77a519d1e9c8245ab4d9043b989e"
+      },
+      "src/gameplay_source_context.c": {
+        "bytes": 11932,
+        "sha256": "f212b3ac1d4b59f3316b78926b0c9fb6205ab7771d7cdb17cd9a5416fa456955"
+      },
+      "src/gameplay_source_context.h": {
+        "bytes": 3976,
+        "sha256": "e82b15d67602fc2bd1970d0e7ebd02aa9cee2f0b2b6818acd09b3e63691afc13"
+      },
+      "src/gameplay_source_files.c": {
+        "bytes": 5944,
+        "sha256": "359c055d06bfc92de88f927b0be90e180b8f1f201a50e75975053a551fc2209f"
+      },
+      "src/gameplay_source_files.h": {
+        "bytes": 1571,
+        "sha256": "6439a7e08e97dbfa80e9b3125231cbc02c193b02c7d74e2d5e8e4eaf4735f8b1"
+      },
+      "src/gameplay_source_memory_runtime.cpp": {
+        "bytes": 9361,
+        "sha256": "69c6c55dfc343ec3a5bd0297c531f12b172f5998e0eb65c32d90d382cf59fe57"
+      },
+      "src/gameplay_source_memory_runtime.h": {
+        "bytes": 1818,
+        "sha256": "9927fdac9943043e616299402bc4d767cd9dc4eaddbea40544ec758603ae12d5"
+      },
+      "src/gameplay_stage_context.c": {
+        "bytes": 9946,
+        "sha256": "0d8ba86852dcf0a1dbecad57d3e75b569506d79ec40518838da5366dabb627c6"
+      },
+      "src/gameplay_stage_context.h": {
+        "bytes": 3291,
+        "sha256": "71a69803ee49332acb296fc72919f643b64e15f153c8e07e97866de25a461e63"
+      },
+      "src/gameplay_stage_last.c": {
+        "bytes": 9720,
+        "sha256": "0d8f41d6263606d49bf1eff76abb4e1d865a76255fe13fc33bab3806c93ee92a"
+      },
+      "src/gameplay_stage_last.h": {
+        "bytes": 1435,
+        "sha256": "0a07730ec092151def4aff642b9ab6952da5f05235505e08a944ee5765977468"
+      },
+      "src/gameplay_stage_numeric.c": {
+        "bytes": 13517,
+        "sha256": "d6c7e376a9c003b530fb18975adca7ca0a4a8a5cf46ea10285d73be6dc327ed1"
+      },
+      "src/gameplay_world.cpp": {
+        "bytes": 52916,
+        "sha256": "dbdfe495a1eb719372a1f3d1601e078932b122fc383e13b58bf012d68202c397"
+      },
+      "src/gameplay_world.hpp": {
+        "bytes": 3676,
+        "sha256": "295e32d6c8568454d7c51748cc13dd398556859eb74da88b4532600c3dd5514e"
+      },
+      "src/hsd_native_common.c": {
+        "bytes": 4125,
+        "sha256": "a8302fbdcdffff25674a28b1aefa2c4a871618e1fd9b2848e63af6cd60bb026f"
+      },
+      "src/hsd_native_joint.c": {
+        "bytes": 35678,
+        "sha256": "7cb26eca385be5eeae289bc03754ac1a2c3f4fd989cf78f4fe7f89a62f8225e1"
+      },
+      "src/source_ppc_profile_gale01r2.h": {
+        "bytes": 1043,
+        "sha256": "c60e3855fdcc86aded0b4f425a68c8b9223bcbe04cbec15af7e0bfe257158963"
+      },
+      "build/browser/action-sweep.mjs": {
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      "build/browser/audio-ring.mjs": {
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      "build/browser/audio-worklet.js": {
+        "bytes": 1128,
+        "sha256": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f"
+      },
+      "build/browser/controller-input.mjs": {
+        "bytes": 17498,
+        "sha256": "3388c3784717bea4b582a8fa66100880cbbcf4a0adb767c000e0a9cc779c31c8"
+      },
+      "build/browser/controller-panel.mjs": {
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      "build/browser/controller-settings.mjs": {
+        "bytes": 15510,
+        "sha256": "3679207e488927e1cbd30386123bc80f26b565bb84f29916506ab72074dbd4a2"
+      },
+      "build/browser/dat_menu_support_trace.js": {
+        "bytes": 346993,
+        "sha256": "8a0a0de9fbeca9e3f858bd6bbc3908f720f4b77c6b270731ba63a34b39e3bd8e"
+      },
+      "build/browser/dat_native_stage_map_trace.js": {
+        "bytes": 340456,
+        "sha256": "94d27e8c3e0ec60e8e491f96aa4087759b6fbf4d4b32468a38ecaba65f7ac85b"
+      },
+      "build/browser/disc-image.mjs": {
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      "build/browser/disc-session.mjs": {
+        "bytes": 6175,
+        "sha256": "34847f2c06f732e2de447ea4d696387b9f96f01ec26c931c6cfb79f827adb88b"
+      },
+      "build/browser/dsp-coefficients.mjs": {
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      "build/browser/fighter_runtime_probe.js": {
+        "bytes": 351739,
+        "sha256": "d0535f1e09b95ed3010c53233ee1220520269a1a5d8fdb1a0ee0922701bb2a07"
+      },
+      "build/browser/hitch-capture.mjs": {
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      },
+      "build/browser/hsd_native_dat_probe.js": {
+        "bytes": 337300,
+        "sha256": "c73e1644b13fe0829111bcebd5fe95138b07ce39b76e7ab503637020f2166aed"
+      },
+      "build/browser/hsd_native_trace.js": {
+        "bytes": 315876,
+        "sha256": "d9e783a9e75353001c95888334dcdc7f21a2ae733167c7b80166ac9ebcfaf9c2"
+      },
+      "build/browser/match-flow.mjs": {
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      "build/browser/match-menu.mjs": {
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      "build/browser/melee-runtime.mjs": {
+        "bytes": 22661,
+        "sha256": "243aa629bc4fe7dce5d85a1d517a11dabc53c2ebfe17c454a8f8477fe59d35bb"
+      },
+      "build/browser/prototype-keyboard-layouts.mjs": {
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      "build/browser/runtime-assets.mjs": {
+        "bytes": 11736,
+        "sha256": "1b95369da9972eb529f40c23d34717255f486fce49db9e254dbc6f75c355b114"
+      },
+      "build/browser/runtime-audio-assets.mjs": {
+        "bytes": 3217,
+        "sha256": "24e4d26a2af9a8d7df2d2ca8c40226875951ef677746a31fdb567d6f2bd2d336"
+      },
+      "build/browser/runtime-audio.mjs": {
+        "bytes": 2206,
+        "sha256": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545"
+      },
+      "build/browser/runtime-cache.js": {
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      "build/browser/runtime-development.mjs": {
+        "bytes": 52213,
+        "sha256": "81f064e90d398b2e86a4b9a44443d178dd02f3223d880cd13e7952c35dd68408"
+      },
+      "src/gameplay_ps_math.c": {
+        "bytes": 7084,
+        "sha256": "a24e065fd01f80e7c72ab0586c2c2e7c869261b59b8680c1851be116307ce6e1"
+      },
+      "src/gameplay_ps_math.h": {
+        "bytes": 750,
+        "sha256": "a273bb289263d9020ad9a7fbe086a16cdb8d5a5ee9a321e48097f7aafaf9275f"
+      },
+      "src/gameplay_compat.h": {
+        "bytes": 3668,
+        "sha256": "24d1e84a2d08fcb83bf797807a21fa43d23e1e6e7ac6222716bcc9158cdd8383"
+      },
+      "scripts/capture_whole_session_browser.mjs": {
+        "bytes": 15978,
+        "sha256": "bccfad4b7cf4b828d8b264ce9ec46f87bab52ac7402ceaa9125b30837e2da993"
+      },
+      "scripts/compare_whole_session_state.py": {
+        "bytes": 1777,
+        "sha256": "dbc17677b8dba3eec954018dd0b2c069dd12c248d575e1743145e64d2b43a53a"
+      },
+      "tools/whole_session_state_compare.py": {
+        "bytes": 47503,
+        "sha256": "f555209e01f8e35efd31fbea6b942f7650e2c1482121f8fcdc5e0b3c8e3a8ffa"
+      },
+      "tests/test_whole_session_state_compare.py": {
+        "bytes": 17982,
+        "sha256": "61eb52d1d3a2e229358df6caeec3ffc53d26958baa1eebb5d1fe535763d23005"
+      },
+      "build/gameplay-source/src/sysdolphin/baselib/cobj.c": {
+        "bytes": 36863,
+        "sha256": "ee17d98e21a3363cda4647fa0a919f9bb6a95390b0969ed09b4f879bd4935b7b"
+      },
+      "build/gameplay-source/src/melee/ft/ftdrawcommon.c": {
+        "bytes": 13797,
+        "sha256": "171be50e61d6d50c3cc35ce80122c3578cb499cd5776f5c3e8d26d16efe56699"
+      },
+      "tests/gameplay_camera_math_trace.c": {
+        "bytes": 17122,
+        "sha256": "4881efdd0b5a5dba8eb6e7c40d0aa6bf102abaab726fe2128e3fedfd6232d812"
+      },
+      "tests/test_gameplay_camera_math.py": {
+        "bytes": 3755,
+        "sha256": "d4b2477f1111aad510fbbad5ebe3d83fdf9cb9c35244019f96eea6e2ee36b2a9"
+      },
+      "tests/gameplay_ps_inverse_trace.c": {
+        "bytes": 4574,
+        "sha256": "4ca974696d7580123bd0e89e742e10bcc9e336f1edec035ea7156bba4da0731b"
+      },
+      "tests/test_gameplay_ps_inverse.py": {
+        "bytes": 3111,
+        "sha256": "e3f2dfaa1f039103a27d60622757f8cf118053d63151ec444103a4166e012c36"
+      },
+      "tests/gameplay_combo_push_trace.c": {
+        "bytes": 2592,
+        "sha256": "209ba70bec8bf2c579c8e2901f583a32f58b5aaab030ee30994017602c1b3981"
+      },
+      "tests/test_gameplay_combo_push.py": {
+        "bytes": 2843,
+        "sha256": "7cd890ddb819895a7d286b91acefdcd8e03cfd60eaddeacfeb0402c921d2d702"
+      },
+      "tests/gameplay_motion_flags_trace.c": {
+        "bytes": 4033,
+        "sha256": "e42390fec46150fb2b5c3459107628289e8ccc9cf1041be4b944fec7950c84c8"
+      },
+      "tests/test_gameplay_motion_flags.py": {
+        "bytes": 3596,
+        "sha256": "e19eb25bedbed5746174236d3ab1c8b16ef3ac70112c469e4d0c8411a1fa3c96"
+      },
+      "build/gameplay-source/src/melee/ft/ftcoll.c": {
+        "bytes": 115805,
+        "sha256": "6a365c05ba74225cd55bf68f6839049321dbfa860b3a957e647cb4950531a79a"
+      },
+      ".deps/aurora/include/dolphin/ppc_math.h": {
+        "bytes": 3881,
+        "sha256": "1c8d731af920d7f7716627b846b24985355c46ca04d57b2d43737bf8a4ffb718"
+      },
+      "tests/test_gameplay_camera_shake.py": {
+        "bytes": 2777,
+        "sha256": "e520f02f62ab806368edcedf9ede1f824659f894ffed3f9e48a13b60782403f8"
+      },
+      "tests/gameplay_camera_shake_trace.c": {
+        "bytes": 2972,
+        "sha256": "5aac0567162d4be9c4bf6a038e395adfe84a040bc75d82ed6f33653795663cd2"
+      },
+      "build/gameplay-source/src/melee/cm/camera.c": {
+        "bytes": 134306,
+        "sha256": "d2c4b289e77c8af5380c61a6a867931780362ad1e9200b3b7afb06ef576bbf93"
+      }
+    },
+    "post_validation_artifacts_checked": 111,
+    "differences": [],
+    "probe_free": true
+  },
+  "inputs": {
+    "disc": {
+      "local_input": "owned GALE01 revision-2 CISO",
+      "bytes": 1449165376,
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "dol": {
+      "local_input": "owned GALE01 revision-2 main.dol",
+      "sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+      "sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45"
+    },
+    "reference": {
+      "path": "local-input/session-equivalence-reference-v1/capture.mwro",
+      "bytes": 1555401454,
+      "sha256": "18531db0d92fead60044deacef9eedc22d7cb5c19773faa63a6c9df7528546f5"
+    },
+    "recipe": {
+      "path": "local-input/session-equivalence-reference-v1/candidate.mwrc",
+      "bytes": 1877246,
+      "sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e"
+    },
+    "reference_capture_report": {
+      "path": "local-input/session-equivalence-reference-v1/report.json",
+      "bytes": 112394,
+      "sha256": "e5c5e53740094e81a4ae4c9d5dfc9f5dfb0b9cdc0ccf46b723ba05ff65d63048"
+    },
+    "source_capture": {
+      "schema": "melee-web-passive-dolphin-observer",
+      "version": 1,
+      "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+      "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+      "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+      "cpu": "JITARM64",
+      "writes_guest_memory": false,
+      "ring_capacity": 128,
+      "whole_session": true,
+      "match_count": 3,
+      "capture_id": "session-equivalence-reference-v1",
+      "sequence_id": "session-equivalence-reference-v1"
+    },
+    "recipe_version": 8,
+    "scheduling": "source-consumed input fixture, existing per_tick traversal; separate from MWRC v6 queue-batch cadence"
+  },
+  "repair": [
+    {
+      "boundary": "camera-shake depth scaling",
+      "cause": "Camera_8002A0C0 used split multiply/add instead of the two owned fmadds; source translation is shared by both HSD cameras.",
+      "consumer": "quake input -> Camera_8002A0C0 -> Camera_8002AF68 -> secondary CObj screen-KO transform",
+      "regression": "512 synthetic cases, training scaling and near-zero depth range, published translation and reset ownership, old arithmetic 146-difference negative control, owned instruction hash"
+    },
+    {
+      "boundary": "authored motion word",
+      "cause": "Little-endian Struct2070 and UnkPlBonusBits field overlays disagreed with the numeric source word, changing Cape category response.",
+      "consumer": "ft_800895E0 -> ftCo_800C3538 and bonus-stat scalar alias",
+      "regression": "walking bits, named-field writes, all categories and override, producer remaps, original declaration negative control, owned instruction checks"
+    },
+    {
+      "boundary": "HSD camera arithmetic",
+      "cause": "Portable scalar vector/LookAt/inverse arithmetic differed from the owned paired-single operation order; frsqrte refinement also requires 25-bit FC operand rounding.",
+      "consumer": "original HSD CObj view/inverse cache -> ftDrawCommon_80080E18_inline2 screen-KO position write",
+      "regression": "64 synthetic vectors/cross products, aliasing, independent operand rounding oracle, original CObj consumers, 130 inverse cases/260 aliases/129 camera cases, scalar and unrounded negative controls, owned instruction hashes"
+    },
+    {
+      "boundary": "combo-counter position adjustment",
+      "cause": "Source expression separated multiply/subtract where owned ftColl_80076528 uses fnmsubs.",
+      "consumer": "original Fighter physics -> comboCount_Push",
+      "regression": "256 synthetic cases, both facing directions and magnitude branches, counter/gates, old split arithmetic negative control, owned instruction hash"
+    }
+  ],
+  "result": {
+    "complete_recorded_session_state_agreement": true,
+    "first_difference": null,
+    "exact_match_fields": [
+      "rng",
+      "match_frame",
+      "pad_state_hex",
+      "fighters"
+    ],
+    "fighter_scope": "Every key and value of the complete declared Fighter record; not the entire unobserved Fighter allocation.",
+    "input_frames": 42127,
+    "match_ticks": 38547,
+    "match_setups": 3,
+    "exact_match_state_records": 38550,
+    "nonmatch_input_scene_frames": 3580,
+    "match_state_records": [
+      13482,
+      14258,
+      10810
+    ],
+    "scene_spans": [
+      {
+        "scene": 1,
+        "first": 0,
+        "last": 1205,
+        "frames": 1206
+      },
+      {
+        "scene": 2,
+        "first": 1206,
+        "last": 1457,
+        "frames": 252
+      },
+      {
+        "scene": 3,
+        "first": 1458,
+        "last": 14938,
+        "frames": 13481
+      },
+      {
+        "scene": 4,
+        "first": 14939,
+        "last": 15374,
+        "frames": 436
+      },
+      {
+        "scene": 1,
+        "first": 15375,
+        "last": 15529,
+        "frames": 155
+      },
+      {
+        "scene": 2,
+        "first": 15530,
+        "last": 15780,
+        "frames": 251
+      },
+      {
+        "scene": 3,
+        "first": 15781,
+        "last": 30037,
+        "frames": 14257
+      },
+      {
+        "scene": 4,
+        "first": 30038,
+        "last": 30473,
+        "frames": 436
+      },
+      {
+        "scene": 1,
+        "first": 30474,
+        "last": 30625,
+        "frames": 152
+      },
+      {
+        "scene": 2,
+        "first": 30626,
+        "last": 30873,
+        "frames": 248
+      },
+      {
+        "scene": 3,
+        "first": 30874,
+        "last": 41682,
+        "frames": 10809
+      },
+      {
+        "scene": 4,
+        "first": 41683,
+        "last": 42126,
+        "frames": 444
+      }
+    ],
+    "historical_cursor_28481": "Exact second-match tick 12700; remains in match until Results starts at input index 30038.",
+    "final_css_scene": 1,
+    "final_repair_effect": "Against the prior probe-free trace, exactly one of 42132 rows changes: second-match tick10931/global26712 P0 position.x bf72b136 -> bf72b134; every other row is identical.",
+    "checks": {
+      "final_css": "report_pass",
+      "initial_css_rng": "pass",
+      "input_order": "pass",
+      "match_state": "pass",
+      "nonmatch_pad": "uncovered",
+      "recipe_binding": "pass",
+      "scene_order": "pass",
+      "source_stream": "pass"
+    },
+    "comparator": {
+      "path": "tools/whole_session_state_compare.py",
+      "bytes": 47503,
+      "sha256": "f555209e01f8e35efd31fbea6b942f7650e2c1482121f8fcdc5e0b3c8e3a8ffa"
+    },
+    "report": {
+      "path": "work/complete-recorded-session-v1/browser-shake/comparison.json",
+      "bytes": 4050,
+      "sha256": "5e7b6579108553df5a1463a6c11d5e2f72e7bce30cf7833ea33ff44cc5214f31"
+    },
+    "browser_report": {
+      "path": "work/complete-recorded-session-v1/browser-shake/retail-browser-report.json",
+      "bytes": 14339,
+      "sha256": "65575702ca2cd7a9ad6937314630816076dfe656755aab999464eb069ec98431"
+    },
+    "browser_harness_report": {
+      "path": "work/complete-recorded-session-v1/browser-shake/report.json",
+      "bytes": 10181785,
+      "sha256": "651c17b2c4cf5b636ec9f4e5a5d45a1f3c1e17d137d932a53d0fcf91884bb5fe"
+    }
+  },
+  "validation": {
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "owned_inputs": [
+        "MELEE_CPU_DOL",
+        "MELEE_CPU_DISC",
+        "MELEE_CPU_SYMBOLS",
+        "MELEE_CPU_SOURCE_ROOT"
+      ],
+      "tests": 1514,
+      "skipped": 86,
+      "elapsed_seconds": 346.861,
+      "result": "pass"
+    },
+    "browser": {
+      "executable": "Google Chrome",
+      "version": "153.0.8010.54",
+      "playwright": "1.56.1",
+      "headless": true,
+      "platform": "macOS-26.6-arm64-arm-64bit",
+      "resolution": [
+        640,
+        480
+      ],
+      "device_pixel_ratio": 1
+    },
+    "focused_regressions": [
+      "test_gameplay_motion_flags.py",
+      "test_gameplay_camera_math.py",
+      "test_gameplay_ps_inverse.py",
+      "test_gameplay_combo_push.py",
+      "test_gameplay_camera_shake.py",
+      "test_whole_session_state_compare.py"
+    ],
+    "retained_preparation_failure": "full-tests-runtime-v2: one existing provenance test rejected DOL without the other three required inputs; corrected full environment passed without assertion changes.",
+    "independent_receipt_review": "All 111 frozen artifacts, the original 65 retained artifacts, runtime tree, input/report hashes, counts and scope independently verified; audit retained in receipt-review.md."
+  },
+  "retained_divergences": [
+    {
+      "run": "browser-fc25-combo",
+      "match": 2,
+      "tick": 10931,
+      "input_index": 26712,
+      "difference": "screen-KO x originalbf72b134 / portbf72b136; diagnostic inventory found one mismatching second-match record; actual secondary-camera downstream arithmetic matched observed port operands"
+    },
+    {
+      "run": "browser-main",
+      "match": 2,
+      "tick": 4797,
+      "input_index": 20578,
+      "difference": "Cape hit left port victim in Catch; original DamageN3. Later input/scene mismatch at 28481."
+    },
+    {
+      "run": "browser-packed-flags",
+      "match": 2,
+      "tick": 7243,
+      "input_index": 23024,
+      "difference": "screen-KO position float bits"
+    },
+    {
+      "run": "browser-camera",
+      "match": 2,
+      "tick": 10879,
+      "input_index": 26660,
+      "difference": "screen-KO z original43668eda / port43668edc"
+    },
+    {
+      "run": "browser-camera third-match independent comparison",
+      "match": 3,
+      "tick": 455,
+      "input_index": 31329,
+      "difference": "combo-push x original3e21ed8f / port3e21ed8e; synthetic reduction did not observe the live original floor normal"
+    }
+  ],
+  "limitations": [
+    "Conditional exact agreement for this recording and declared fields; not general game or unobserved full-memory equivalence.",
+    "Menu scene/input transitions and final CSS endpoint verified; per-tick menu scalar state, assets, audio and process internals are not compared by this trace.",
+    "No draw-cadence, pixel, PCM, live-input, foreground-performance, character admission or tournament claim.",
+    "The final harness screenshot is after unload; it is not evidence of CSS pixels.",
+    "Independent audit recorded an unrelated extreme-range fres model difference from Dolphin for exponent fields >=253; current camera determinants are outside that range and this work does not resolve that separate contract.",
+    "PR89 unsupported register routes continue to fail explicitly; this work adds no character-specific carry admission."
+  ],
+  "artifacts": [
+    {
+      "path": "work/complete-recorded-session-v1/historical-boundary-checkpoints.json",
+      "bytes": 1522,
+      "sha256": "6d8a9804eabc201b7212ba0ef36e210685940d54cb1bbd00621ae7958e03c1fd"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/shake-versus-prior-trace.json",
+      "bytes": 7850,
+      "sha256": "d5ba7619cde89566b00a3cf7f24252141bdb0762c73180eed95e66988d111117"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/shake-post-suite-integrity.json",
+      "bytes": 107,
+      "sha256": "95d140d54560b1f687b43cf273fc45988299574994ce56cba0e14e4b3de5e5ae"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-shake-baseline.log",
+      "bytes": 2465,
+      "sha256": "e8a3e19358b7dfee18c6f7149e84ac9d92657eeac1efbb22b24fbc880245bf38"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-shake-baseline-v2.log",
+      "bytes": 1114,
+      "sha256": "54f036a7ffd1ceab532932f6a5c41af5e68ce4043ded3a456c19b8bf32fb7ddf"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-shake-tests.log",
+      "bytes": 396,
+      "sha256": "07d013b98a8e519bd54f4bc37297963d55de256cdf0753715bd072a0c04abe32"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-shake-scale-disassembly.txt",
+      "bytes": 5696,
+      "sha256": "2aa4b3b513ff0053be9f0cdbc0972bcccee102c0536eed7e7988ff1360893400"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-shake-review.md",
+      "bytes": 3933,
+      "sha256": "5797bc8ed143475efde8d7f82db1429d3d4522794dbf1efb045c6d6b9a2ae4cf"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-reduction/hitcamera-actual.py",
+      "bytes": 1401,
+      "sha256": "87317791e6750d3ca5634ddc1f2f9c3381f5db1672f689934276693d55cdeff5"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-reduction/hitcamera-actual.log",
+      "bytes": 5609,
+      "sha256": "cb4f52adf5b4b2eec408bca8fe2f3f5d76f5ef2ae79417e0163380e6214f2612"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-hit-probe/comparison.json",
+      "bytes": 3126,
+      "sha256": "39e5ef6f57c3822e40e71503f49e3752fdf1e4159d55d0403916c81b177dfa0c"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/second-all-differences.json",
+      "bytes": 12135,
+      "sha256": "0f2b130e55a6a311d4bfd27609cf04a2ad6680da50a751529fa12df16ba97d44"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/ps-mtx-inverse-audit.md",
+      "bytes": 3311,
+      "sha256": "9dfd83f17239efd8b65a1bea7c0e5ee092568f703b2b24fab12843fcf3697492"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/comparator-reviewed-tests.log",
+      "bytes": 2015,
+      "sha256": "55e610da37ad1275147819fb389d31a4fc5a7bdea85373f6d0ee39ebcf216ce2"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-shake/report.json",
+      "bytes": 10181785,
+      "sha256": "651c17b2c4cf5b636ec9f4e5a5d45a1f3c1e17d137d932a53d0fcf91884bb5fe"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-shake/retail-browser-report.json",
+      "bytes": 14339,
+      "sha256": "65575702ca2cd7a9ad6937314630816076dfe656755aab999464eb069ec98431"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-shake/retail-port.jsonl",
+      "bytes": 172021833,
+      "sha256": "47071cbad2cc1950817d65d44083aeb71d528ac7bda59e7dbe253580ee3abe4c"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-shake/comparison.json",
+      "bytes": 4050,
+      "sha256": "5e7b6579108553df5a1463a6c11d5e2f72e7bce30cf7833ea33ff44cc5214f31"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-shake/comparison.log",
+      "bytes": 2672,
+      "sha256": "1db52d0964f100c2e0674539aee0aee639d87caa058f38f79f87d7173c40b5a2"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/build-shake-runtime.log",
+      "bytes": 11973,
+      "sha256": "36f19e5e5f47ab2f300707246102c70aa18ef674759288f4b058cad49352d2b8"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/build-shake-gameplay.log",
+      "bytes": 13753,
+      "sha256": "d5b08920d86e85acb7fbf152f6a7f79c9345e5b7e2c87c36682dafef3907cfbc"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/full-tests-runtime-v3.log",
+      "bytes": 266739,
+      "sha256": "6417539abd183653d59d9c39302a0d9cd51b1940bf354299702aeaeb18008109"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/main-verification.json",
+      "bytes": 142,
+      "sha256": "29a9bc26ccfd5017fd04029ee36007380c9b462866df2ea4f3ea4d298f8bb05f"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/build-identity.json",
+      "bytes": 13761,
+      "sha256": "0d46f4b25654fdf73dda0e7ac5abd9648b1ce3542ca61bd4f714b2a1b1cdd4dd"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/build-runtime.log",
+      "bytes": 11554,
+      "sha256": "d91855a42c78b2ae6d00f0618102f4ed9af97475cb1df9a63068494f42499db5"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/build-gameplay.log",
+      "bytes": 13893,
+      "sha256": "1d07721b3d62a75b3cb7ccb7c7ee3f085a576ea739acd9a17cc248c4ca84c4ab"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/build-fc25-combo-gameplay.log",
+      "bytes": 14891,
+      "sha256": "36d00606a5ccf9e58f35ee3384d512e5d5b9470278926e502ec78079f4c5b07e"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/build-fc25-combo-runtime.log",
+      "bytes": 11995,
+      "sha256": "eb0fab51cdb3ca80bd25fe4f446d1967aba76a9b4e15a55ce0f02658929ac7d1"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/build-reviewed-runtime.log",
+      "bytes": 11690,
+      "sha256": "4cc013a48a96343996750744d822995293830a96f92b924c5140070ef015fd38"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/shake-build-identity.json",
+      "bytes": 17149,
+      "sha256": "cc018c40b0f30730bb4758ddfc7b2b4165b3da301ea2268ca00df82e3b9ebb18"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/shake-build-integrity.json",
+      "bytes": 4388,
+      "sha256": "3898b7b73d13c53978c74112d5651b6806f25f875ef7b66f85b9a21a5f1ef844"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/full-tests-runtime-v2.log",
+      "bytes": 267432,
+      "sha256": "3559e8a139404f54147dc42a3d1df5730b2a885201beb29e4c42e6402e3dc905"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/cpu-provenance-corrected-env.log",
+      "bytes": 516,
+      "sha256": "3f683f5dbac67b4c31a329705734083741874a4acfcaebe80c5a9d853f29c333"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/full-tests-runtime-v4.log",
+      "bytes": 267431,
+      "sha256": "064cf68183966df87309e0ee720ceb823d009e17b9faa2912ef67a4cd6f9c9ec"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/motion-flags-tests-v2.log",
+      "bytes": 376,
+      "sha256": "5cb96f3d6cc588541888c9301ca85ba45be4516684e2c5073efc08d59d6f9d67"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-math-source-check-force25.log",
+      "bytes": 428,
+      "sha256": "dc3f23dce78387ce94e77feb884a7440746891d727e83854b726f2d1a102c7c5"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/inverse-tests-camera.log",
+      "bytes": 406,
+      "sha256": "b7a3d9d16f418f363758d7eec848d24ee07cfd9532f78473490e42c2455361ea"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/combo-push-tests.log",
+      "bytes": 412,
+      "sha256": "30d88884a9bad4de12ef3b4b7eeb29e776a67e8f5fab82155df7fffbe9874b30"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/comparator-tests-root.log",
+      "bytes": 1614,
+      "sha256": "bc63be73708dbd76a3b7918b47996071ee605731a6c6a7a00a5d4919547ec3df"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/collision-regressions.log",
+      "bytes": 866,
+      "sha256": "0269960dcd636e9e86a8bce8a27db4be970b835810fbe5fd5483898b0e27b089"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/context-regressions.log",
+      "bytes": 38,
+      "sha256": "9d8fc7406f37cbdcf175f580250a764611962a018bebc62226890489ba202888"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/packed-flags-review.md",
+      "bytes": 5692,
+      "sha256": "8031cbc6a4f80c5d03505d951b7dc9f823041b7c0c61ab503cda9c445c6e209e"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/damage-audit.md",
+      "bytes": 6887,
+      "sha256": "b247b61fa9fe66891f791d83ae0709ff43129f6f02f919833b923d4ce10e7bf0"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/star-ko-audit.md",
+      "bytes": 6485,
+      "sha256": "ea299d92230b6d4f14daef9e493c22c2048d6c85b0a275a3ba8146b53ef6078c"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/star-ko-audit-addendum.md",
+      "bytes": 4692,
+      "sha256": "6ec412b3c4e1fa0cc35596a0157f6aa403da060c0452816d32488c00d4c47ad1"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/second-10879-numeric-review.md",
+      "bytes": 4798,
+      "sha256": "0bf2e1592d1aed8177b052a8e6c65d8e22f07d3da0640d8ce478b861aed1fe52"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/third-455-combo-push-review.md",
+      "bytes": 3231,
+      "sha256": "0a1fbe9697de2e03a676631bf43d6c4f405d2add5aadd381b298c11c686bbebe"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/whole-session-comparator-review.md",
+      "bytes": 3972,
+      "sha256": "c03c45e89b1a32810d53f5022fac4235a7900f73da0fd10b5384bc5be0abb856"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-reduction/nearby-original-comparison.json",
+      "bytes": 1074,
+      "sha256": "b8da5cf0baac02f997460da5f7bc5be2953ffc75ed1e83c400ecbab37f920f4f"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-reduction/late-force25.log",
+      "bytes": 1632,
+      "sha256": "09a84648ef6b30b937519a964fcd257ea0da7992accbb1522b8e6b255a795ccf"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/camera-reduction/late-production.log",
+      "bytes": 1632,
+      "sha256": "09a84648ef6b30b937519a964fcd257ea0da7992accbb1522b8e6b255a795ccf"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/combo-push-reduction/baseline.log",
+      "bytes": 64,
+      "sha256": "9b83e5773d1b68444dcd2884a2ab93feec76ae6b4cc18f2f99322889c1f41158"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-main/first-match-comparison.json",
+      "bytes": 1657,
+      "sha256": "e6258505dde43f8e4c9fa8ce959463b31c290abdd6dcb1bf2af8d605ccdecf40"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-main/second-match-comparison.json",
+      "bytes": 16992,
+      "sha256": "077224655eb3a11b77e0fcaf3691bdd9f89b74a4271e3702be01e442b7e9c497"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-main/report.json",
+      "bytes": 10081481,
+      "sha256": "090a2b588e156226187edb35c67c0d8604cae7b999226d84a6081e6b3d12dc5d"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-main/retail-browser-report.json",
+      "bytes": 14536,
+      "sha256": "0702e222d0fbf49a1f5d9d71f11fc245645213bceda4394fe0dc8a98edadbadf"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-packed-flags/second-match-comparison.json",
+      "bytes": 15920,
+      "sha256": "abe64404701e0a8d8846443e1a609c4a493e6715cfc5bb425a2cadc7ae026290"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-camera/comparison.json",
+      "bytes": 3106,
+      "sha256": "b34f49561e8dcf3f97ca27d52bf2f78d11ff6fe07f6811d8bba53911de7b867a"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-camera/third-match-comparison.json",
+      "bytes": 15683,
+      "sha256": "588116a8c880094b66755c03a064f60c353693d0af4ad2b84b7a131cfde70504"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-fc25-combo/report.json",
+      "bytes": 10188145,
+      "sha256": "05c34a8613f7d3e8d1301b8e1c9c8e7b60fdb2ecee381cfd6e26ee58d127de02"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-fc25-combo/retail-browser-report.json",
+      "bytes": 14329,
+      "sha256": "60de96f9bb644108721c5207904495d109204669f1f47d284b21d27724f56155"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-fc25-combo/retail-port.jsonl",
+      "bytes": 172021833,
+      "sha256": "7b0f07fcbfec2a4c27ab1d87e7b44f8bf2858b0807dd622bd330b1c716221982"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-fc25-combo/comparison.json",
+      "bytes": 3114,
+      "sha256": "5d5d47f9c1abdcf5ab00d355e08f063bc8c222d222627a5b4f6940a989312814"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/browser-fc25-combo/comparison.log",
+      "bytes": 1911,
+      "sha256": "609f2918b1bdd9fedaf4cdfe5a3b28327d8a332d64da8dbfed1c0e0ee8ea829a"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/recipe-inventory.json",
+      "bytes": 1216,
+      "sha256": "5c33d389f5489ebfdc9aa8fd5992d9bc6d3df5766237c913513d588225ef72c4"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/receipt-review.md",
+      "bytes": 3780,
+      "sha256": "7d4cb64c6a835fe055f98251ffe5325b4aa24b4b4b9df053d7ad98abb8547263"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/docs-validation.json",
+      "bytes": 314,
+      "sha256": "9aa417720b5b71857bbbb5f3dca36625414bfd99900480318fbd271d7ee65dd4"
+    },
+    {
+      "path": "work/complete-recorded-session-v1/repository-content.log",
+      "bytes": 70,
+      "sha256": "11e941c943ade711860f8baa7551d2355c8ec3f3b01e6d75a96f1f68ac14283a"
+    }
+  ],
+  "reproduction": "docs/RECORDED_SESSION_STATE.md"
+}

@@ -654,6 +654,20 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      depth_factor_y = Stage_GetCamZoomRate();
      depth_factor_x = Stage_GetCamMaxDepth() - depth_factor_y;
  
+@@ -954,10 +983,11 @@
+             (bounds->z_pos - Stage_GetCamZoomRate()) / depth_factor_x;
+     }
+ 
++    /* GALE01r2 8002A230/234: depth scaling uses fmadds before the fmuls. */
+     depth_factor_y =
+-        (depth_ratio * (cm_803BCCA0.x5C - cm_803BCCA0.x54)) + cm_803BCCA0.x54;
++        fmaf(depth_ratio, cm_803BCCA0.x5C - cm_803BCCA0.x54, cm_803BCCA0.x54);
+     depth_factor_x =
+-        (depth_ratio * (cm_803BCCA0.x60 - cm_803BCCA0.x58)) + cm_803BCCA0.x58;
++        fmaf(depth_ratio, cm_803BCCA0.x60 - cm_803BCCA0.x58, cm_803BCCA0.x58);
+     Camera_80030DE4(depth_factor_x * (input_x * viewport_x_scale),
+                     depth_factor_y * (input_y * viewport_y_scale));
+     cm_80452C68.xA4 = 0.0f;
 @@ -3524,8 +3553,12 @@
      cm_80452C68.x2D0.angle_left = Stage_GetCamAngleRadiansLeft();
      cm_80452C68.x2D0.unk28 = Stage_GetPauseCamZPosMin();
@@ -9936,3 +9950,106 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      }
      return tmp->x58[ftLib_80086BE0(arg0)].x20;
  }
+diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
+--- a/src/melee/ft/types.h
++++ b/src/melee/ft/types.h
+@@ -906,6 +906,28 @@
+ 
+ /// @todo Rename this and its members; investigate using it elsewhere.
+ /* fp+2070 */ union Struct2070 {
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++    /* This union aliases an authored numeric word (MotionState::x4_flags).
++     * Preserve that word's source masks when consumers access named fields.
++     * Reverse both byte order and each byte's bitfields on little endian. */
++    struct {
++        u8 x2073;
++        u8 count_specials : 1;
++        u8 count_x1A0 : 1;
++        u8 count_aerials : 1;
++        u8 count_thrown_items : 1;
++        u8 count_x1A4 : 1;
++        u8 x2072_b2 : 1;
++        u8 x2072_b1 : 1;
++        u8 x2072_b0 : 1;
++        u8 x2071_b7 : 1;
++        u8 x2071_b6 : 1;
++        u8 x2071_b5 : 1;
++        u8 x2071_b4 : 1;
++        u8 x2071_b0_3 : 4;
++        s8 x2070;
++    };
++#else
+     /* fp+2070 */ struct {
+         /* fp+2070 */ s8 x2070;
+         /* fp+2071:0 */ u8 x2071_b0_3 : 4;
+@@ -923,6 +945,7 @@
+         /* fp+2072:7 */ u8 count_specials : 1;
+         /* fp+2073 */ u8 x2073;
+     };
++#endif
+     /* fp+2070 */ int x2070_int;
+ };
+ 
+@@ -1091,6 +1114,19 @@
+ ASSERT_SIZE(struct Fighter_x59C_t, 0x8000);
+ 
+ struct UnkPlBonusBits {
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++    /* ft_0892/pltrick copy the same numeric word as Struct2070 into here. */
++    u8 x3;
++    u8 x2_b7 : 1;
++    u8 x2_b6 : 1;
++    u8 x2_b5 : 1;
++    u8 x2_b4 : 1;
++    u8 x2_b3 : 1;
++    u8 x2_b2 : 1;
++    u8 x2_b1 : 1;
++    u8 x2_b0 : 1;
++    u8 x1, x0;
++#else
+     u8 x0, x1;
+     u8 x2_b0 : 1;
+     u8 x2_b1 : 1;
+@@ -1101,6 +1137,7 @@
+     u8 x2_b6 : 1;
+     u8 x2_b7 : 1;
+     u8 x3;
++#endif
+ };
+ 
+ struct ft_800898B4_t {
+--- a/src/sysdolphin/baselib/cobj.c
++++ b/src/sysdolphin/baselib/cobj.c
+@@ -9,6 +9,17 @@
+ #include "displayfunc.h"
+ #include "initialize.h"
+ #include "mtx.h"
++#ifdef MELEE_WEB_GAMEPLAY
++/* The owned HSD camera path uses paired-single normalization, including
++ * vec_normalize_check below, and C_MTXLookAt calls PS vector routines.
++ * Keep this bridge local to the camera's audited SDK consumers. */
++#include "gameplay_ps_math.h"
++#undef PSVECNormalize
++#define PSVECNormalize melee_web_ps_vec_normalize
++#undef VECNormalize
++#define VECNormalize melee_web_ps_vec_normalize
++#define C_MTXLookAt melee_web_mtx_look_at
++#endif
+ #include "util.h"
+ #include "video.h"
+ #include "wobj.h"
+--- a/src/melee/ft/ftcoll.c
++++ b/src/melee/ft/ftcoll.c
+@@ -153,8 +153,10 @@
+         var_f2 = p_ftCommonData->x4D4;
+     }
+     temp_f2 = fp->facing_dir * var_f2;
+-    fp->cur_pos.x = -(pos->y * temp_f2 - fp->cur_pos.x);
+-    fp->cur_pos.y = -(-pos->x * temp_f2 - fp->cur_pos.y);
++    /* GALE01r2 8007658C / 800765A0: fnmsubs rounds the product and
++     * subtraction together, then negates that rounded result. */
++    fp->cur_pos.x = -fmaf(pos->y, temp_f2, -fp->cur_pos.x);
++    fp->cur_pos.y = -fmaf(-pos->x, temp_f2, -fp->cur_pos.y);
+ }
+ 
+ /// Combo count something + adjust FtPart_TopN
