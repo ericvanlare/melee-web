@@ -22,11 +22,27 @@
     "guest_state_injection": false,
     "project_code_contains_dolphin_implementation": false
   },
+  "commands": {
+    "dolphin_process_argv_template": [
+      "dolphin-emu-nogui", "-u", "<fresh-isolated-user>", "-v", "Null", "-a", "HLE",
+      "-C", "Dolphin.Core.SlotA=8",
+      "-C", "Dolphin.Core.GCIFolderAPath=<disposable-card-root>",
+      "-C", "Dolphin.Core.SIDevice0=6",
+      "-C", "Session.Core.SaveDataWritable=True",
+      "-C", "Dolphin.DSP.Backend=No Audio Output",
+      "-C", "Dolphin.Interface.ConfirmStop=False",
+      "-e", "<owned-GALE01-revision-2-disc>"
+    ],
+    "reproducible_settings_run": "python3 scripts/save_profile_dolphin_interop.py --dolphin <reviewed-dolphin-emu-nogui> --disc <owned-GALE01-revision-2-disc> --gci <WebMelee-exported-Personal-GCI> --out <new-ignored-work-directory> --dol-sha256 dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646 --capture-id pr102-review-final-roundtrip",
+    "reproducible_browser_reimport": "node tests/gamecube_save_interop_browser_test.mjs --url <locally-served-production-player> --disc <owned-GALE01-revision-2-disc> --gci <Dolphin-written-GCI> --out <new-ignored-work-directory> --playwright <installed-Playwright-package>",
+    "browser_runtime": "Headless installed Chrome selected by scripts/browser_tools.mjs; no foreground application and no audio output."
+  },
   "game_written_changes": [
     {
       "boundary": "Melee Name Entry",
       "webmelee_input_sha256": "9e2d32e3918d295f53e871668a46e85e29323d3429431810c57e6c3baa92b16c",
       "dolphin_gci_sha256_after_melee_save": "fec85d3faf3df55c1b3476f174f9d6885626ca660ae05321167e409948bfe286",
+      "webmelee_personal_export_after_import_and_reload_sha256": "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729",
       "observed_name": {
         "bank": 0,
         "record": 0,
@@ -35,17 +51,27 @@
         "normalized": "AABB"
       },
       "controller_sequence": [
-        "A acknowledge Progressive Scan default No",
-        "START from title",
-        "D-pad Down to VS",
-        "A enter VS",
-        "D-pad Up to Name Entry",
-        "A open Name Entry list and new-name editor",
-        "A and D-pad Right through the name editor variant choices",
-        "A commit the entered name",
-        "B return from Name Entry"
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A acknowledge Progressive Scan default No" },
+        { "button_hex": "0x1000", "duration_seconds": 0.15, "action": "START from title" },
+        { "button_hex": "0x0004", "duration_seconds": 0.15, "action": "D-pad Down to VS" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A enter VS" },
+        { "button_hex": "0x0008", "duration_seconds": 0.15, "action": "D-pad Up to Name Entry" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A open Name Entry list and new-name editor" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A opens variant chooser for A" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A selects A variant 0" },
+        { "button_hex": "0x0002", "duration_seconds": 0.15, "action": "D-pad Right to next glyph" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A opens variant chooser for B" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A selects B variant 0" },
+        { "button_hex": "0x0002", "duration_seconds": 0.15, "action": "D-pad Right to next glyph" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A opens variant chooser for C" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A selects C variant 0" },
+        { "button_hex": "0x0002", "duration_seconds": 0.15, "action": "D-pad Right to next glyph" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A opens variant chooser for D" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A selects D variant 0" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A commits the entered name" },
+        { "button_hex": "0x0200", "duration_seconds": 0.15, "action": "B returns from Name Entry" }
       ],
-      "input_log_notes": "The captured ordinary Pipe sequence selected A, B, C, and D variant choices and committed the name. The resulting stored name bytes decode to full-width AABB; the receipt records the observed result rather than assuming the intended Latin spelling was stored.",
+      "input_log_notes": "Ordinary Pipe controller input with release between pulses; the controller event log also records source ticks. The resulting stored name bytes decode to full-width AABB; this observed result is recorded rather than assuming the intended Latin spelling was stored.",
       "save_observed": true
     },
     {
