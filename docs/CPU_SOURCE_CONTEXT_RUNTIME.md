@@ -130,3 +130,13 @@ conditional state evidence. Port draw ordinals are not captured by this trace;
 the original tick-1816 cadence marker alone establishes no port draw divergence.
 Pixels, PCM, live input, foreground timing and full-session equivalence require
 their separate gates. Later failures remain explicit in the receipt.
+
+## Later recorded-session validation
+
+The [recorded-session comparison](RECORDED_SESSION_STATE.md) extends the bounded
+prefix with source-backed motion metadata and camera/combo arithmetic repairs.
+Its [separate receipt](evidence/recorded-session-state-v1.json) establishes
+complete agreement for that recording's declared match-state fields and full
+input/scene order. This preserves the allocation, lease and register ownership
+described here; it does not broaden this component's supported register routes
+or establish general game, rendering, audio or live-input equivalence.

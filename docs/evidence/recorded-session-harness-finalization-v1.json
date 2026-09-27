@@ -1,0 +1,574 @@
+{
+  "schema": "melee-web-recorded-session-harness-finalization-v1",
+  "date": "2026-09-26",
+  "scope": "Browser capture transport/failure classification only; no new gameplay replay or equivalence claim.",
+  "source": {
+    "reviewed_pr_head": "78dfb6042f0450974533cdfd4dbcb9f659f3076b",
+    "harness_fix_commit": "32539075ec5513d02b96a463cb0f9672b13f4099",
+    "files": [
+      {
+        "path": "scripts/capture_whole_session_browser.mjs",
+        "bytes": 17034,
+        "sha256": "654aaa99701cba65475a0a5321a6d79a1b754013893a35810c23f2ae564a3a39"
+      },
+      {
+        "path": "scripts/whole_session_capture_result.mjs",
+        "bytes": 2102,
+        "sha256": "f5a0067c87c4fbc2f83c85cb85fe446cccdbfa56c54f41f85a163874fb679f6a"
+      },
+      {
+        "path": "tests/test_whole_session_capture.py",
+        "bytes": 792,
+        "sha256": "d0da07a2e3b8f011dc62977fcc2249bc337888a38f7950948da1865525a9715c"
+      },
+      {
+        "path": "tests/whole_session_capture_result_test.mjs",
+        "bytes": 2960,
+        "sha256": "9c93c2c0663de8ada999be1d4c529b5857b8fb7069bdfe9bc9c6ffbdc7cebb47"
+      },
+      {
+        "path": "tests/whole_session_capture_browser_test.mjs",
+        "bytes": 7189,
+        "sha256": "899bda636aa871e93289984238b2184c73e6fe43840a413c7f1e3f83e074c754"
+      }
+    ]
+  },
+  "finding": "The earlier harness assigned pass after replay completion before checking browser diagnostics and required exports; a synthetic real page error reproduced exit0 and printed pass.",
+  "correction": {
+    "finalize_after": [
+      "replay phase",
+      "pending polling snapshots",
+      "artifact export",
+      "browser close",
+      "accumulated diagnostics"
+    ],
+    "required_exports": [
+      "retail-port.jsonl",
+      "retail-browser-report.json"
+    ],
+    "optional_export": "retail-timer.jsonl is not required by state mode",
+    "failure_result": "fail and nonzero exit with retained diagnostics",
+    "deliberate_prefix_result": "incomplete and nonzero exit",
+    "browser_failures": [
+      "pageerror",
+      "console error",
+      "HTTP error",
+      "requestfailed",
+      "runtime error"
+    ],
+    "malformed_failure_lists": "failures must be an array; optional errors must be an array"
+  },
+  "validation": {
+    "focused_gate_controls": 43,
+    "real_http_headless_browser": {
+      "scope": "Synthetic real HTTP/headless Chrome transport contract; no gameplay claim",
+      "browser": "Google Chrome",
+      "result": "pass",
+      "cases": [
+        {
+          "case": "clean",
+          "result": "pass",
+          "exit_code": 0
+        },
+        {
+          "case": "pageerror",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "console",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "http",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "request-failure",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "runtime",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "late-console",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "export-failure",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "missing-port",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "missing-report",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "empty-exports",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "empty-artifact",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "duplicate",
+          "result": "fail",
+          "exit_code": 1
+        },
+        {
+          "case": "prefix",
+          "result": "incomplete",
+          "exit_code": 1
+        }
+      ]
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "tests": 1515,
+      "skipped": 86,
+      "elapsed_seconds": 447.477,
+      "result": "pass",
+      "owned_cpu_inputs": [
+        "MELEE_CPU_DOL",
+        "MELEE_CPU_DISC",
+        "MELEE_CPU_SYMBOLS",
+        "MELEE_CPU_SOURCE_ROOT"
+      ]
+    },
+    "affected_target": "JavaScript CLI syntax checks and real HTTP/headless installed Chrome execution passed; no C/C++ target changed. Original runtime build bytes remain verified.",
+    "old_harness_negative_control": "Clean fixture passes; pageerror fixture incorrectly exits0/prints pass at reviewed head. Corrected CLI exits1 and retains diagnostics.",
+    "retained_preparation_failure": "First synthetic fixture used an incorrectly escaped newline and raised a pageerror; retained v1, corrected fixture uses String.raw.",
+    "review": "Initial bounded review findings for requestfailed and malformed lists were resolved and independently re-reviewed."
+  },
+  "preserved_evidence": {
+    "receipt": {
+      "path": "docs/evidence/recorded-session-state-v1.json",
+      "bytes": 55985,
+      "sha256": "138262767bbf733849a1430441268f2cb9996fdd0f50ef987cffb6fdb05f6d10"
+    },
+    "runtime_commit": "a8fdf3bcdf95645f21d87684c6de240bf27a1af2",
+    "frozen_artifacts_verified": 111,
+    "unchanged_workspace_artifacts": 110,
+    "historical_harness_verified_from": "reviewed 78dfb604 bytes retained outside Git",
+    "unchanged_retained_artifacts": 68,
+    "inputs": {
+      "inputs": {
+        "disc": {
+          "bytes": 1449165376,
+          "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+        },
+        "dol": {
+          "bytes": 4425184,
+          "sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+        },
+        "reference": {
+          "bytes": 1555401454,
+          "sha256": "18531db0d92fead60044deacef9eedc22d7cb5c19773faa63a6c9df7528546f5"
+        },
+        "recipe": {
+          "bytes": 1877246,
+          "sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e"
+        }
+      },
+      "differences": []
+    },
+    "accepted_report_under_new_gates": {
+      "scope": "Final corrected transport gates applied to a copy of retained report; no original evidence mutation or gameplay replay",
+      "original_report_sha256": "651c17b2c4cf5b636ec9f4e5a5d45a1f3c1e17d137d932a53d0fcf91884bb5fe",
+      "result": "pass",
+      "exit_code": 0,
+      "finalization_failures": []
+    },
+    "comparison_result_unchanged": {
+      "input_scene_frames": 42127,
+      "match_ticks": 38547,
+      "match_setups": 3,
+      "first_difference": null
+    },
+    "runtime_inputs_comparator_reports_unchanged": true,
+    "production_replay_repeated": false
+  },
+  "limitations": [
+    "Synthetic browser contract cases establish harness behavior only.",
+    "The original recorded-session receipt retains its original source, harness, build, input and report identities; the corrected harness did not produce that historical trace.",
+    "General game equivalence, menu scalar state, unobserved Fighter memory, draw cadence, pixels, PCM, live-input accuracy and foreground performance remain outside the accepted gameplay comparison.",
+    "The 12-distinct-character milestone is deferred until PR93 merges; it has not begun in this task."
+  ],
+  "artifacts": [
+    {
+      "path": "work/pr93-independent-review/review.md",
+      "bytes": 1840,
+      "sha256": "ccf12b44ae021ebb28372dd56240a1bd95ce4f8edf35c90e059952adf5035735"
+    },
+    {
+      "path": "work/pr93-harness-finalization-review.md",
+      "bytes": 3999,
+      "sha256": "9b63e4f0f3ab95bd4483a5467f8dac0ae4d9af7db31fcfabf060b56fda885be7"
+    },
+    {
+      "path": "work/pr93-harness-finalization-focused.log",
+      "bytes": 306,
+      "sha256": "38a1287de6e13c362b012e22534052c4c204778951e0b9e4a018371c543e1876"
+    },
+    {
+      "path": "work/pr93-harness-finalization-gates.log",
+      "bytes": 80,
+      "sha256": "71a4db1fa6c1757a7657ac9712dae970526361b636419c56614848eed9be29b6"
+    },
+    {
+      "path": "work/pr93-harness-finalization-full-tests.log",
+      "bytes": 267637,
+      "sha256": "260fc193eab719f05e9ea23db4f2a63b52cd0511631e830152493598508e31cf"
+    },
+    {
+      "path": "work/pr93-harness-finalization-content.log",
+      "bytes": 70,
+      "sha256": "ccbce91752eb602a3d0ced6115b2c907f41e416f6b8c7191e5042cefb00b57d6"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v1.log",
+      "bytes": 411,
+      "sha256": "320542964bc001938636798f003503a3230b787e91ca48022279571081a08033"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v1/clean/report.json",
+      "bytes": 88640,
+      "sha256": "f8a1c6b1b4ea9a7a37013a0e6a854cc269b51a0e7db3e9abf3df4bfb34c09b5e"
+    },
+    {
+      "path": "work/pr93-harness-finalization-old-control.log",
+      "bytes": 504,
+      "sha256": "c387d696392e9beab721400a244383d262d6046f2116eba198c0225fd1025681"
+    },
+    {
+      "path": "work/pr93-harness-finalization-old-control/pageerror/report.json",
+      "bytes": 13390,
+      "sha256": "c0c52b585111e7d21ca6dad09d1d26c4f99aec8e99d5670ed8ab54208842b55a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-old-control/pageerror/process.json",
+      "bytes": 110,
+      "sha256": "f3239408d823ca690fde93c3527ed6ce78aacd6cb5577ac6293d1c9f383f21ee"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4.log",
+      "bytes": 57,
+      "sha256": "e5e60c6ea88935b982787286b20ee05c0986842f8a169f7dc98a20dbd147054b"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/contract-report.json",
+      "bytes": 1369,
+      "sha256": "e57ba7b81830391ff93ea549f93a3d8b41edb6f0d1850c657498b9e780536f25"
+    },
+    {
+      "path": "work/pr93-harness-retained-report-gates-v2.json",
+      "bytes": 301,
+      "sha256": "dc59902cfced68f70a058689812ed7ba279a993f75a86709c698d7f9b32bb7e8"
+    },
+    {
+      "path": "work/pr93-harness-evidence-preservation.json",
+      "bytes": 13017,
+      "sha256": "8267cc5562f5d5a2991d3fa27e3ce8035f9ff86a57edb079e9c97a30639d7f5e"
+    },
+    {
+      "path": "work/pr93-harness-unchanged-inputs.json",
+      "bytes": 566,
+      "sha256": "1bad0ecdb50d935f5192ca2fc9df67a935e00880a5485895c482e1a8cde30fee"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/clean/report.json",
+      "bytes": 12667,
+      "sha256": "86e24de96f72f27bd59d2adba2eff4a3da23dfe975ac5cc25a179e4be5294b50"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/clean/process.json",
+      "bytes": 110,
+      "sha256": "f3239408d823ca690fde93c3527ed6ce78aacd6cb5577ac6293d1c9f383f21ee"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/clean/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/clean/final.png",
+      "bytes": 21037,
+      "sha256": "258a98354468b5a9e509df3c12b39abecd50838c9e01f5af75145654c1332844"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/pageerror/report.json",
+      "bytes": 13520,
+      "sha256": "ff36762bb731bb54615f0657fdbbda432aff715b7a7f224115b36304f8aed25b"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/pageerror/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/pageerror/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/pageerror/final.png",
+      "bytes": 21048,
+      "sha256": "f7d6a555b82e59b18955450a703a24b29544be01894d831730ae994cd8e2baf5"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/console/report.json",
+      "bytes": 12992,
+      "sha256": "8e3686530d4fc2a16af11227b74e842c453a550c638fefe39adb6e0dac948dcd"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/console/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/console/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/console/final.png",
+      "bytes": 21037,
+      "sha256": "258a98354468b5a9e509df3c12b39abecd50838c9e01f5af75145654c1332844"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/http/report.json",
+      "bytes": 14986,
+      "sha256": "e58a0efa9f6074566d9274c26ff9f2d31b80818bc38c2993add7655392162dfe"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/http/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/http/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/http/final.png",
+      "bytes": 21048,
+      "sha256": "f7d6a555b82e59b18955450a703a24b29544be01894d831730ae994cd8e2baf5"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/request-failure/report.json",
+      "bytes": 15833,
+      "sha256": "4073b7eca2c20f795f8c7aedb0a35f754d5a5c443ca1a0d4e4fe2c379884568f"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/request-failure/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/request-failure/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/request-failure/final.png",
+      "bytes": 21048,
+      "sha256": "f7d6a555b82e59b18955450a703a24b29544be01894d831730ae994cd8e2baf5"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/runtime/report.json",
+      "bytes": 13543,
+      "sha256": "b5b8af4cbe9e3e9824f6db14de83d04f92efbc7214d9094e4dc12d0d6fbc56d5"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/runtime/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/runtime/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/runtime/final.png",
+      "bytes": 21037,
+      "sha256": "258a98354468b5a9e509df3c12b39abecd50838c9e01f5af75145654c1332844"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/late-console/report.json",
+      "bytes": 13081,
+      "sha256": "f153426ffdcb9668248e53a953a74116ce1aefd9dc94e5b8198a1ef355cb04a3"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/late-console/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/late-console/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/late-console/final.png",
+      "bytes": 21037,
+      "sha256": "258a98354468b5a9e509df3c12b39abecd50838c9e01f5af75145654c1332844"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/export-failure/report.json",
+      "bytes": 14031,
+      "sha256": "98f83221e09b8bf9dba02a9adec580cea0e322e750f4671c85dfe83c17b8b35a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/export-failure/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/export-failure/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/export-failure/final.png",
+      "bytes": 21048,
+      "sha256": "f7d6a555b82e59b18955450a703a24b29544be01894d831730ae994cd8e2baf5"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/missing-port/report.json",
+      "bytes": 12376,
+      "sha256": "ac75ef58e522b57b290183fdcf5e7313bbc9f0f4d91f8117bffd7e6c3d4e26da"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/missing-port/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/missing-port/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/missing-port/final.png",
+      "bytes": 21048,
+      "sha256": "f7d6a555b82e59b18955450a703a24b29544be01894d831730ae994cd8e2baf5"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/missing-report/report.json",
+      "bytes": 13652,
+      "sha256": "6441f68063af844735ce07bfb8f0a8cefbebade24f959544d81651c9c2321d80"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/missing-report/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/missing-report/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/missing-report/final.png",
+      "bytes": 21048,
+      "sha256": "f7d6a555b82e59b18955450a703a24b29544be01894d831730ae994cd8e2baf5"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/empty-exports/report.json",
+      "bytes": 13428,
+      "sha256": "a9fcb5a018e8eda97ee37f82e7c6da964acd42e26e8c61fcc3f4b017e87b34e5"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/empty-exports/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/empty-exports/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/empty-exports/final.png",
+      "bytes": 21057,
+      "sha256": "635258dfe69f7d35f090aacff47b348b7d34712122216fa31f3e2b1404e63147"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/empty-artifact/report.json",
+      "bytes": 12820,
+      "sha256": "37c1b9eaad1d6605c7f003c59d731dd6b1f40e69738958b8f3c9dd5fdfd27f6e"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/empty-artifact/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/empty-artifact/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/empty-artifact/final.png",
+      "bytes": 21037,
+      "sha256": "258a98354468b5a9e509df3c12b39abecd50838c9e01f5af75145654c1332844"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/duplicate/report.json",
+      "bytes": 12951,
+      "sha256": "18ac638b5128dbc601b0081c12eae7eea35a4f127e15793b199674c0dae5424e"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/duplicate/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/duplicate/page.txt",
+      "bytes": 124,
+      "sha256": "726e60bf0c1b76c5259d7f68d251140926033e262785da65ed3860e22661175c"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/duplicate/final.png",
+      "bytes": 21048,
+      "sha256": "f7d6a555b82e59b18955450a703a24b29544be01894d831730ae994cd8e2baf5"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/prefix/report.json",
+      "bytes": 17809,
+      "sha256": "e089fd64aa8b8a3e821bd192c9040f729e686229c6b246ebe79097940a62b0d2"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/prefix/process.json",
+      "bytes": 48,
+      "sha256": "0f9f7d08e32c4dc6284dbdf98e8571593798272f61c8e3b923e82fa4bd374c2a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/prefix/page.txt",
+      "bytes": 145,
+      "sha256": "c2f11190d71ffb62a815995892e69d057ff62b18d924606f4d972027eae7489a"
+    },
+    {
+      "path": "work/pr93-harness-finalization-browser-v4/prefix/final.png",
+      "bytes": 21650,
+      "sha256": "5ef16304df6b1a0658e006afdc6b950a7daaf5f88604fccff23642189500d2a6"
+    }
+  ]
+}
