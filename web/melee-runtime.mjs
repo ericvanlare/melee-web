@@ -67,8 +67,11 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     // import the disc, and unloadAndSave preserves that failure explicitly.
     if (state !== 0) {
       startupCacheReady = true;
-      clearStartupTimeout();
     }
+  }
+  function graphicsPreparationReady() {
+    const preparation = Module.pipelinePreparation;
+    return !preparation || typeof preparation !== 'object' || preparation.ready === true;
   }
   function setLoading(phase, text, complete, total) {
     const normalizedTotal = Math.max(0, numericProgress(total));
@@ -78,6 +81,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   function refreshCatalogLoading() {
     if (fatal || destroyed) { loading = null; return; }
     if (!ready) return;
+    if (startupCacheReady && graphicsPreparationReady()) clearStartupTimeout();
     if (['disc', 'handoff', 'native'].includes(loading?.phase)) return;
     const preparation = Module.pipelinePreparation;
     if (!startupCacheReady) {
@@ -114,14 +118,17 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     const running = ready && !fatal && !destroyed && !!Module._melee_web_native_menu_running();
     const scene = SCENES[phase] || 'idle';
     const active = ['css', 'sss', 'match', 'results', 'prize'].includes(scene);
+    const graphicsReady = ready && startupCacheReady && graphicsPreparationReady();
     const paused = active && !running && !preparationLabel && !busy;
     const state = destroyed ? 'destroyed' : fatal ? 'error' : !ready ? 'booting' : busy ||
       (preparationLabel ? 'preparing' : paused ? 'paused' : active ? scene : prepared ? 'prepared' : 'idle');
     return Object.freeze({version: 1, state, scene, phase, running, paused, audio: audio ? 'enabled' : 'disabled',
       message: message || preparationLabel || status(), progress, loading,
       ready, bundle, busy: !!busy, requiresReload: destroyed || fatal,
+      graphicsReady,
+      canSelectDisc: !fatal && !destroyed && !busy && !preparationLabel && (!ready || !active),
       canImport: ready && startupCacheReady && !fatal && !destroyed && !busy && !preparationLabel,
-      canStart: ready && startupCacheReady && bundle && !active && !fatal && !destroyed && !busy && !preparationLabel,
+      canStart: graphicsReady && bundle && !active && !fatal && !destroyed && !busy && !preparationLabel,
       canPause: active && !fatal && !destroyed && !busy && !preparationLabel,
       canUnload: ready && (bundle || hasLocalData) && !fatal && !destroyed && !busy,
     });
@@ -316,20 +323,26 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     controllers: Module.meleeControllers,
     version: 1, getState: snapshot, focus,
     activateAudio() { return prepareAudio(); },
-    importDisc(file) {
-      return operation('importing', async () => {
+    importDisc(file, {preopenedSession = null} = {}) {
+      if (preopenedSession && (!openDisc || typeof preopenedSession.close !== 'function' ||
+          typeof preopenedSession.readScope !== 'function')) {
+        return Promise.reject(Error('The selected disc session is invalid. Choose the disc again.'));
+      }
+      let adoptedSession = false;
+      const work = operation('importing', async () => {
         bundle = false;
         try {
           if (!await unloadAndSave()) throw Error(status());
           discSession?.close(); discSession = null;
           setLoading('disc', 'Reading game data…', 0, 1); publish();
           if (openDisc) {
-            const opened = await openDisc(file);
+            const opened = preopenedSession || await openDisc(file);
             if (fatal || destroyed) {
               opened.close();
               throw Error('The player stopped while opening the local disc.');
             }
             discSession = opened;
+            adoptedSession = !!preopenedSession;
           }
           else {
             const files = await readDisc(file, reportDiscRead);
@@ -344,6 +357,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           if (['disc', 'handoff'].includes(loading?.phase)) { loading = null; refreshCatalogLoading(); }
         }
       }, true);
+      return work.catch(error => {
+        if (!adoptedSession) preopenedSession?.close();
+        throw error;
+      });
     },
     prepare() { return operation('preparing', async () => { if (!bundle) throw Error('Select a disc first.'); await prepareNativeResources(); }); },
     start({isCurrent = () => true} = {}) {
@@ -403,7 +420,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   publish();
   const loader = document.createElement('script'); loader.src = String(loaderUrl);
   loader.onerror = () => stop(Error('The player files could not load. Reload to retry.'));
-  startupTimeoutHandle = setTimeout(() => stop(Error(ready && !startupCacheReady ?
+  startupTimeoutHandle = setTimeout(() => stop(Error(ready && !startupCacheReady || ready && !graphicsPreparationReady() ?
     'Renderer preparation timed out. Reload to recover.' : 'Player startup timed out.')), startupTimeout);
   document.head.append(loader);
   try { await startup; return handle; }

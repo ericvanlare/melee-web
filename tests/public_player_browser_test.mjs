@@ -97,11 +97,21 @@ try {
   assert.equal(response.headers()['cross-origin-opener-policy'], 'same-origin');
   assert.equal(response.headers()['cross-origin-embedder-policy'], 'require-corp');
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
+  await page.locator('#loading-panel').waitFor({state: 'visible', timeout: 30000});
+  await check('disc validation is available before graphics readiness', async () => {
+    assert(await page.locator('#choose-disc').isEnabled(), 'Selection stays available while startup is busy');
+    await selectDisc({name: 'early-invalid.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
+    await page.locator('#error-dialog[open]').waitFor();
+    assert.match(await page.locator('#error').innerText(), /RVZ is not supported/);
+    assert.match(await page.locator('#disc-selection-status').innerText(), /Invalid disc.*early-invalid\.rvz/);
+    report.early_disc_validation = 'A file was selected and rejected while the full graphics loading panel was still visible; no import or launch occurred.';
+    await page.reload();
+  });
   await ready();
-  assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
-    'Import control must become enabled only after the native volatile cache is ready');
   await check('isolated WebGPU/Wasm startup and direct original-style player', async () => {
     await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
+    assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
+      'Full graphics readiness includes the native volatile cache being idle');
     const state = await page.evaluate(() => Module._melee_web_native_menu_cache_idle());
     assert.equal(state, 1,
       'The public renderer must open its volatile cache before consuming the bundled pipeline seed');

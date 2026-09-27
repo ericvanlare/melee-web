@@ -81,6 +81,8 @@ const mounted = mountMeleeRuntime({canvas, createAudio: withAudio ? createRuntim
   startupTimeout: startupCacheTimeout ? 10 : undefined});
 assert.equal(states.at(-1).state, 'booting');
 assert.deepEqual(states[0].loading, {phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
+assert.equal(states.at(-1).canSelectDisc, true,
+  'File selection is available while the native module is starting');
 const directories = new Set();
 Module.FS = {
   mkdirTree(directory) {
@@ -143,6 +145,9 @@ if (startupCacheDelay) assert.equal(Module._melee_web_native_menu_cache_idle(), 
   'The pre-main cache status is not used as startup readiness');
 Module.onRuntimeInitialized();
 let player = await mounted;
+assert.equal(player.getState().ready, true);
+assert.equal(player.getState().canSelectDisc, true,
+  'Disc selection stays available before the first renderer-cache readiness frame');
 const cacheCallsBeforeMainFrame = cacheIdleCalls;
 assert.equal(cacheCallsBeforeMainFrame, startupCacheDelay ? 1 : 0,
   'Runtime initialization must not poll cache readiness before the main frame');
@@ -159,6 +164,8 @@ if (startupCacheTimeout) {
   process.exit(0);
 } else if (startupCacheDelay) {
   assert.equal(states.at(-1).canImport, false, 'Initial import stays disabled while native cache work is pending');
+  assert.equal(states.at(-1).canSelectDisc, true, 'A local File may still be selected while native cache work is pending');
+  assert.equal(states.at(-1).graphicsReady, false);
   assert.equal(states.at(-1).loading?.phase, 'catalog');
   await assert.rejects(player.importDisc({name: 'too-early.iso'}), /still preparing/);
   for (let i = 0; !player.getState().canImport && i < 20; i++) {
@@ -192,6 +199,9 @@ Module.pipelinePreparation = {ready: false, selected: 4, pending: 4};
 window.menuFrame(false);
 assert.deepEqual(player.getState().loading, {phase: 'catalog', message: 'Preparing graphics…', complete: 0, total: 4});
 assert.equal(player.getState().canImport, true, 'Catalog preparation does not block disc selection');
+assert.equal(player.getState().canSelectDisc, true);
+assert.equal(player.getState().graphicsReady, false, 'Pending pipeline preparation remains an explicit start barrier');
+assert.equal(player.getState().canStart, false);
 Module.pipelinePreparation.pending = 2;
 window.menuFrame(false);
 assert.equal(player.getState().loading.complete, 2);
@@ -201,6 +211,7 @@ assert.deepEqual(player.getState().loading, {phase: 'catalog', message: 'Prepari
 Module.pipelinePreparation.ready = true;
 window.menuFrame(false);
 assert.equal(player.getState().loading, null, 'Ready catalog clears startup loading');
+assert.equal(player.getState().graphicsReady, true);
 assert.equal(player.Module, undefined, 'Native module is not on the public handle');
 await assert.rejects(mountMeleeRuntime({canvas}), /Reload the page/);
 async function pump(promise) {
@@ -245,6 +256,15 @@ await pump(player.importDisc({name: 'owned.iso'}));
 const importCalls = calls.slice(begin).filter(row => ['unload', 'readDisc', 'put', 'prepare'].includes(row[0])).map(row => row[0]);
 assert.deepEqual(importCalls, ['unload', 'readDisc', 'put', 'prepare']);
 assert.equal(player.getState().canStart, true);
+Module.pipelinePreparation.ready = false;
+window.menuFrame(false);
+assert.equal(player.getState().canImport, true, 'Graphics work does not revoke the native import gate');
+assert.equal(player.getState().canSelectDisc, true, 'A prepared or pending disc can be replaced while graphics are preparing');
+assert.equal(player.getState().graphicsReady, false);
+assert.equal(player.getState().canStart, false, 'A prepared disc cannot launch before graphics readiness');
+Module.pipelinePreparation.ready = true;
+window.menuFrame(false);
+assert.equal(player.getState().canStart, true, 'Graphics completion releases the start barrier');
 const ownedLoading = states.filter(state => state.loading).map(state => [state.loading.phase, state.loading.message]);
 assert.ok(ownedLoading.some(([phase]) => phase === 'disc'));
 assert.ok(ownedLoading.some(([phase]) => phase === 'handoff'));
