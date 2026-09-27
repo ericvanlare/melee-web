@@ -2,8 +2,10 @@
 #include "gameplay_save_profile.h"
 
 #include <melee/gm/gmmain_lib.h>
+#include <melee/gm/gm_1601.h>
 #include <melee/gm/types.h>
 #include <melee/lb/lblanguage.h>
+#include <melee/mn/mnname.h>
 #include <melee/ty/toy.h>
 
 #include <stdint.h>
@@ -74,6 +76,7 @@ int main(void)
      * gmMainLib_8015F600 -> Toy_80311960 path has observable mutations. */
     Toy_804A284C[5] = 0xBEEF;
     Toy_804A284C[6] = 0xCAFE;
+    memcpy(GetPersistentNameData(0)->namedata, "SAVE", 5);
     memcpy(source_before, source_root, sizeof(source_before));
     memcpy(toy_before, &melee_web_toy_state, sizeof(toy_before));
 
@@ -99,6 +102,38 @@ int main(void)
     check(save->x1CB0.saved_language == LANG_US &&
               lbLang_GetSavedLanguage() == LANG_US,
           "original saved language was not initialized to US");
+    {
+        struct PlayerInitData defaults;
+        struct NameTagDataBank* banks =
+            (struct NameTagDataBank*) gmMainLib_8015CC4C();
+        gm_SetupPlayerDefaults(&defaults);
+        check(defaults.nametag == GM_NAMETAG_NONE,
+              "Original player defaults did not select the no-name sentinel");
+        for (size_t bank = 0; bank < 7; ++bank) {
+            for (size_t name = 0; name < 19; ++name) {
+                check(banks[bank].inner[name].namedata[0] == '\0',
+                      "Fresh source name entry was not empty");
+            }
+        }
+        check(!IsNameValid(GM_NAMETAG_NONE) &&
+                  GetNameText(GM_NAMETAG_NONE) == NULL,
+              "Fresh no-name sentinel resolved to a saved name row");
+        memcpy(GetPersistentNameData(0)->namedata, "ALFA", 5);
+        memcpy(GetPersistentNameData(1)->namedata, "BETA", 5);
+        struct PlayerInitData players[GM_MAX_PLAYERS];
+        gm_SetupAllPlayerDefaults(players);
+        players[0].slot_type = Gm_PKind_Human;
+        players[1].slot_type = Gm_PKind_Cpu;
+        players[0].nametag = 0;
+        players[1].nametag = 1;
+        check(IsNameValid(players[0].nametag) &&
+                  IsNameValid(players[1].nametag) &&
+                  strcmp(GetNameText(players[0].nametag), "ALFA") == 0 &&
+                  strcmp(GetNameText(players[1].nametag), "BETA") == 0 &&
+                  players[2].slot_type == Gm_PKind_NA &&
+                  players[2].nametag == GM_NAMETAG_NONE,
+              "Independent saved name selections did not resolve their own profile rows");
+    }
     for (size_t port = 0; port < 4; ++port)
         check(save->x1CB0.rumble_enabled[port] == 1,
               "original packed rumble preference was not initialized");
@@ -178,6 +213,8 @@ int main(void)
                 error);
     check(!memcmp(source_root, source_before, sizeof(source_before)),
           "full original profile backing was not restored");
+    check(strcmp(GetPersistentNameData(0)->namedata, "SAVE") == 0,
+          "Existing saved name bytes were not restored with the source profile");
     memcpy(toy_after, &melee_web_toy_state, sizeof(toy_after));
     check(!memcmp(toy_after, toy_before, sizeof(toy_after)),
           "full linker-adjacent Toy aggregate was not restored");
