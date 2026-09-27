@@ -233,7 +233,7 @@ try {
     await page.locator('#settings-close').click();
     await page.locator('#settings-dialog').waitFor({state: 'hidden'});
   });
-  await check('Personal autosave commits repeated changed snapshots', async () => {
+  await check('Personal autosave skips identical snapshots and retains verified generations', async () => {
     const [settingsUrl, storeUrl] = await page.evaluate(() => ['save-profile-settings.mjs', 'save-profile-store.mjs']
       .map(name => performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/' + name))?.name));
     assert(settingsUrl && storeUrl);
@@ -254,12 +254,41 @@ try {
       await savePage.evaluate(async ({settingsUrl, storeUrl}) => {
         const {mountSaveProfileSettings} = await import(settingsUrl);
         const {SaveProfileStore} = await import(storeUrl);
+        const commitProfile = SaveProfileStore.prototype.commitProfile;
+        SaveProfileStore.prototype.commitProfile = function(...args) {
+          window.saveCommitCalls = (window.saveCommitCalls || 0) + 1;
+          return commitProfile.apply(this, args);
+        };
         window.saveSamples = 0;
+        window.saveCommitCalls = 0;
+        window.saveByte = 1;
         window.saveController = mountSaveProfileSettings({onError: error => { window.saveFailure = error.message; }});
         window.saveStore = await SaveProfileStore.open();
+        window.readSavedEnvelope = () => new Promise((resolve, reject) => {
+          const tx = window.saveStore.db.transaction('profiles', 'readonly');
+          const request = tx.objectStore('profiles').get('personal');
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error);
+        });
+        window.corruptCurrentEnvelope = () => new Promise((resolve, reject) => {
+          const tx = window.saveStore.db.transaction('profiles', 'readwrite');
+          tx.oncomplete = resolve;
+          tx.onerror = tx.onabort = () => reject(tx.error);
+          const profiles = tx.objectStore('profiles');
+          const request = profiles.get('personal');
+          request.onsuccess = () => {
+            const record = request.result;
+            record.active.data[0] ^= 0xFF;
+            profiles.put(record, 'personal');
+          };
+          request.onerror = () => tx.abort();
+        });
         await window.saveController.bindPlayer({
           configureSaveProfile: async () => {},
-          snapshotSaveProfile: async () => new Uint8Array(0xF1C4).fill(++window.saveSamples),
+          snapshotSaveProfile: async () => {
+            window.saveSamples++;
+            return new Uint8Array(0xF1C4).fill(window.saveByte);
+          },
         });
       }, {settingsUrl, storeUrl});
       await savePage.locator('#settings-open').click();
@@ -269,23 +298,72 @@ try {
       await savePage.waitForFunction(() => document.querySelector('#save-mode').value === 'personal');
       await savePage.locator('#settings-close').click();
       await savePage.evaluate(() => window.saveController.setState({scene: 'css'}));
-      let autosaved = null;
-      for (let attempt = 0; attempt < 80; attempt++) {
-        autosaved = await savePage.evaluate(async () => {
-          const profile = await window.saveStore.getProfile();
-          return profile ? {revision: profile.revision, firstByte: profile.data[0], recovered: profile.recovered,
-            status: document.querySelector('#save-status').textContent, failure: window.saveFailure || null,
-            samples: window.saveSamples} : null;
-        });
-        if (autosaved?.revision >= 2) break;
-        await savePage.waitForTimeout(100);
-      }
-      assert(autosaved?.revision >= 2,
-        `The timer should commit multiple changed samples; got ${JSON.stringify(autosaved)}`);
-      assert(autosaved.firstByte >= 2);
-      assert.equal(autosaved.recovered, false);
-      assert.match(autosaved.status, /Personal progress saved on this device/);
-      assert.equal(autosaved.failure, null);
+      await savePage.waitForFunction(async () => {
+        const profile = await window.saveStore.getProfile();
+        return window.saveSamples >= 1 && profile?.revision === 1;
+      }, null, {timeout: 10000});
+      const first = await savePage.evaluate(() => window.readSavedEnvelope());
+      assert.equal(first.revision, 1, 'The first Personal snapshot must commit');
+      assert.equal(first.active.data[0], 1);
+      assert.equal(first.previous, null);
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 1);
+
+      await savePage.waitForFunction(() => window.saveSamples >= 3, null, {timeout: 10000});
+      await savePage.waitForTimeout(100);
+      const unchanged = await savePage.evaluate(() => window.readSavedEnvelope());
+      assert.equal(unchanged.revision, 1, 'Unchanged samples must not advance the revision');
+      assert.equal(unchanged.active.generation, first.active.generation);
+      assert.equal(unchanged.previous, null, 'Unchanged samples must not replace recovery history');
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 1);
+
+      await savePage.evaluate(() => { window.saveByte = 2; });
+      await savePage.waitForFunction(async () => {
+        const record = await window.readSavedEnvelope();
+        return window.saveSamples >= 4 && record?.revision === 2 && record.active.data[0] === 2;
+      }, null, {timeout: 10000});
+      const second = await savePage.evaluate(() => window.readSavedEnvelope());
+      assert.equal(second.revision, 2, 'A changed snapshot commits once');
+      assert.equal(second.previous.generation, first.active.generation);
+      assert.equal(second.previous.data[0], 1);
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 2);
+
+      await savePage.waitForFunction(() => window.saveSamples >= 5, null, {timeout: 10000});
+      await savePage.waitForTimeout(100);
+      const repeated = await savePage.evaluate(() => window.readSavedEnvelope());
+      assert.equal(repeated.revision, 2, 'Repeated snapshots must preserve the committed revision');
+      assert.equal(repeated.active.generation, second.active.generation);
+      assert.equal(repeated.previous.generation, first.active.generation,
+        'Repeated snapshots must preserve the preceding verified generation');
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 2);
+
+      await savePage.evaluate(() => { window.saveByte = 3; });
+      await savePage.waitForFunction(async () => {
+        const record = await window.readSavedEnvelope();
+        return window.saveSamples >= 6 && record?.revision === 3 && record.active.data[0] === 3;
+      }, null, {timeout: 10000});
+      const third = await savePage.evaluate(() => window.readSavedEnvelope());
+      assert.equal(third.revision, 3, 'A later distinct snapshot commits once');
+      assert.equal(third.previous.generation, second.active.generation);
+      assert.equal(third.previous.data[0], 2,
+        'The preceding verified generation must remain available after a later change');
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 3);
+
+      await savePage.evaluate(() => window.saveController.flushBeforeTeardown());
+      const flushed = await savePage.evaluate(() => window.readSavedEnvelope());
+      assert.equal(flushed.revision, 3, 'Forced flush must not rewrite an identical committed snapshot');
+      assert.equal(flushed.active.generation, third.active.generation);
+      assert.equal(flushed.previous.generation, second.active.generation);
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 3);
+
+      await savePage.evaluate(() => window.corruptCurrentEnvelope());
+      const recovered = await savePage.evaluate(async () => {
+        const profile = await window.saveStore.getProfile();
+        return {revision: profile.revision, recovered: profile.recovered,
+          firstByte: profile.data[0], generation: profile.generation};
+      });
+      assert.deepEqual(recovered, {revision: 3, recovered: true, firstByte: 2,
+        generation: second.active.generation});
+      assert.equal(await savePage.evaluate(() => window.saveFailure || null), null);
     } finally {
       await savePage.evaluate(() => window.saveController?.close?.()).catch(() => {});
       await isolated.close();

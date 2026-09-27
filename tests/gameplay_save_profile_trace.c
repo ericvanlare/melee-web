@@ -3,10 +3,13 @@
 
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/gm_1601.h>
+#include <melee/gm/gm_16F1.h>
 #include <melee/gm/types.h>
+#include <melee/gm/forward.h>
 #include <melee/lb/lblanguage.h>
 #include <melee/mn/mnname.h>
 #include <melee/ty/toy.h>
+#include <melee/ty/forward.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -53,6 +56,7 @@ int main(void)
     unsigned char source_before[MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES];
     unsigned char card_profile[MELEE_WEB_SAVE_PROFILE_CARD_BYTES];
     unsigned char card_profile_after[MELEE_WEB_SAVE_PROFILE_CARD_BYTES];
+    unsigned char fresh_card_profile[MELEE_WEB_SAVE_PROFILE_CARD_BYTES];
     unsigned char toy_before[sizeof(struct ToyRuntimeAggregate)];
     unsigned char toy_after[sizeof(struct ToyRuntimeAggregate)];
     MeleeWebSaveProfileOwner* profile;
@@ -117,6 +121,9 @@ int main(void)
                       "Fresh source name entry was not empty");
             }
         }
+        check_error(melee_web_save_profile_owner_snapshot_card_data(
+                        profile, fresh_card_profile, sizeof(fresh_card_profile),
+                        error, sizeof(error)), error);
         check(!IsNameValid(GM_NAMETAG_NONE) &&
                   GetNameText(GM_NAMETAG_NONE) == NULL,
               "Fresh no-name sentinel resolved to a saved name row");
@@ -152,6 +159,67 @@ int main(void)
     }
     check(Toy_804A284C[5] == 0 && Toy_804A284C[6] == 0,
           "original fresh-profile init did not mutate the Toy table through F600");
+    check_error(melee_web_save_profile_owner_initialize_everything(
+                    profile, error, sizeof(error)), error);
+    check(gm_80164ABC() && gm_80164600(),
+          "Everything baseline did not unlock the source character/stage tables");
+    check(save->x1A68 == ((UINT64_C(1) << 51) - 1) &&
+              gmMainLib_8015CF94(),
+          "Everything baseline did not complete all 51 events and the final-event condition");
+    check(save->trophy_count == TY_TROPHY_COUNT,
+          "Everything baseline did not award the complete source trophy table");
+    for (size_t trophy = 0; trophy < TY_TROPHY_COUNT; ++trophy)
+        check((save->trophy_flags[trophy] & 0x8000) != 0 &&
+                  (save->trophy_flags[trophy] & 0x00FF) == 1,
+              "Everything baseline trophy flags do not match the original award routine");
+    check((save->x186C & 0x0F) == 0x0F && (save->x186C & 0xF0) == 0,
+          "Everything baseline did not derive only the four source-supported feature bits");
+    check(gmMainLib_8015EDC8()->x4 && gmMainLib_8015EDC8()->x5 &&
+              gmMainLib_8015EDC8()->x6,
+          "Everything baseline did not derive all authored roster/stage completion flags");
+    for (int selkind = 0; selkind < SELKIND_COUNT; ++selkind) {
+        const u8 ckind = gm_SelKindToCKind((u8) selkind);
+        const u16 clear_ids[] = {
+            gm_80160474(ckind, GM_CLASSIC),
+            gm_80160474(ckind, GM_ADVENTURE),
+            gm_80160474(ckind, GM_ALLSTAR),
+        };
+        for (size_t mode = 0; mode < sizeof(clear_ids) / sizeof(clear_ids[0]); ++mode)
+                check(gmMainLib_8015DA1C(clear_ids[mode]),
+                      "Everything baseline omitted a source-mapped 1P mode clear");
+    }
+    {
+        size_t completed_challenges = 0;
+        for (int challenge = 0; challenge < 0x100; ++challenge) {
+            const int excluded = challenge == 9 || challenge == 0x29 ||
+                challenge == 0x42 || challenge == 0x43 ||
+                challenge == 0xB9 || challenge == 0xC9 || challenge == 0xCA;
+            check((gmMainLib_8015DADC(challenge) != 0) == !excluded,
+                  "Everything baseline challenge flags diverged from the source inventory");
+            completed_challenges += !excluded;
+        }
+        check(completed_challenges == 249 && gmMainLib_8015D8D8(0x123),
+              "Everything baseline omitted the source all-challenges award");
+    }
+    check_error(melee_web_save_profile_owner_restore_default(
+                    profile, error, sizeof(error)), error);
+    check(save->unlocked_characers_bitmask == 0 && save->x186A == 0 &&
+              save->x1A68 == 0 && save->trophy_count == 0 && save->x186C == 0,
+          "restoring a fresh Personal profile retained completed baseline progress");
+    check_error(melee_web_save_profile_owner_snapshot_card_data(
+                    profile, card_profile_after, sizeof(card_profile_after),
+                    error, sizeof(error)), error);
+    if (memcmp(fresh_card_profile, card_profile_after, sizeof(fresh_card_profile))) {
+        for (size_t byte = 0; byte < sizeof(fresh_card_profile); ++byte) {
+            if (fresh_card_profile[byte] != card_profile_after[byte]) {
+                fprintf(stderr, "fresh profile differs at 0x%zx: %02x != %02x\n",
+                        byte, fresh_card_profile[byte], card_profile_after[byte]);
+                break;
+            }
+        }
+    }
+    check(!memcmp(fresh_card_profile, card_profile_after, sizeof(fresh_card_profile)),
+          "restoring Personal did not restore the exact fresh source card profile");
     check(!melee_web_save_profile_owner_initialize_default(profile, error,
                                                             sizeof(error)),
           "original fresh-profile init was allowed twice");

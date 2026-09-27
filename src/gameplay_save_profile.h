@@ -86,6 +86,19 @@ int melee_web_save_profile_owner_apply_card_data(
 int melee_web_save_profile_owner_initialize_default(
     MeleeWebSaveProfileOwner*, char* error, size_t error_size);
 
+/* Build the original source-owned completed/unlocked profile from a fresh
+ * original default. The inventory is constrained to source-authored unlock
+ * tables, trophy IDs, event-clear bits, eligible challenge-completion IDs,
+ * and 1P mode-clear IDs. Personal records and unknown/padding bytes remain at
+ * source fresh defaults. */
+int melee_web_save_profile_owner_initialize_everything(
+    MeleeWebSaveProfileOwner*, char* error, size_t error_size);
+
+/* Restore the complete original fresh source and Toy state captured after
+ * initialize_default(), including fields outside the GCI card manifest. */
+int melee_web_save_profile_owner_restore_default(
+    MeleeWebSaveProfileOwner*, char* error, size_t error_size);
+
 /* Restore every byte captured by activate.  Restoration is fail-closed if a
  * source alias moved, leaving the owner active for the caller to diagnose. */
 int melee_web_save_profile_owner_deactivate(MeleeWebSaveProfileOwner*, char* error,

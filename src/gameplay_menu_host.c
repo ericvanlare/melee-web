@@ -121,15 +121,13 @@ MeleeWebMenuHost* melee_web_menu_host_create_with_profile(
         free(h);return NULL;
     }
     {
-        const u16 fresh_characters=gmMainLib_GetSaveData()->unlocked_characers_bitmask;
-        const u16 fresh_stages=gmMainLib_GetSaveData()->x186A;
-        if(!melee_web_save_profile_owner_set_roster(
-               h->profile,0x07ff,0x01c0,e,n)||
+        if(!melee_web_save_profile_owner_initialize_everything(
+               h->profile,e,n)||
            !melee_web_save_profile_owner_snapshot_card_data(
                h->profile,h->baseline_profile,sizeof(h->baseline_profile),e,n)||
            (save_mode==MELEE_WEB_SAVE_MODE_PERSONAL&&
-            (!melee_web_save_profile_owner_set_roster(
-                 h->profile,fresh_characters,fresh_stages,e,n)||
+            (!melee_web_save_profile_owner_restore_default(
+                 h->profile,e,n)||
              (card_data_size&&
               !melee_web_save_profile_owner_apply_card_data(
                   h->profile,card_data,card_data_size,e,n))))){

@@ -1,8 +1,16 @@
 #include "gameplay_save_profile.h"
+#include "gameplay_compat.h"
 
 #include <melee/gm/gmmain_lib.h>
+#include <melee/gm/gm_1601.h>
+#include <melee/gm/gm_16F1.h>
+#include <melee/gm/gm_16AE.h>
+#include <melee/gm/forward.h>
 #include <melee/gm/types.h>
 #include <melee/lb/lblanguage.h>
+#include <melee/ty/toy.h>
+#include <melee/ty/forward.h>
+#include <melee/ty/types.h>
 
 extern GameRules gmMainLib_803D4A48;
 extern int melee_web_toy_profile_begin(void);
@@ -31,10 +39,14 @@ struct MeleeWebSaveProfileOwner {
     struct gmm_x1868* source_save;
     unsigned char* source_transient;
     unsigned char* source_snapshot;
+    unsigned char* fresh_state_snapshot;
     enum_t saved_language;
     enum_t saved_saved_language;
+    enum_t fresh_language;
+    enum_t fresh_saved_language;
     int active;
     int default_initialized;
+    int everything_initialized;
 };
 
 static MeleeWebSaveProfileOwner* owner;
@@ -631,8 +643,115 @@ int melee_web_save_profile_owner_initialize_default(
         gmMainLib_8015F600(i, 1);
 
     if (!aliases_match(candidate, error, error_size)) return 0;
+    candidate->fresh_state_snapshot = malloc(
+        MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES + sizeof(struct ToyRuntimeAggregate));
+    if (!candidate->fresh_state_snapshot)
+        return fail(error, error_size,
+                    "Cannot retain the original fresh profile for mode isolation");
+    memcpy(candidate->fresh_state_snapshot, candidate->source_global,
+           MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES);
+    memcpy(candidate->fresh_state_snapshot + MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES,
+           &melee_web_toy_state, sizeof(struct ToyRuntimeAggregate));
+    candidate->fresh_language = lbLang_GetLanguageSetting();
+    candidate->fresh_saved_language = lbLang_GetSavedLanguage();
     candidate->default_initialized = 1;
     return ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_initialize_everything(
+    MeleeWebSaveProfileOwner* candidate, char* error, size_t error_size)
+{
+    int selkind;
+    int event;
+    int trophy;
+    int challenge;
+
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size))
+        return 0;
+    if (!candidate->default_initialized)
+        return fail(error, error_size,
+                    "Everything unlocked requires a fresh original profile");
+    if (candidate->everything_initialized)
+        return fail(error, error_size,
+                    "Everything unlocked baseline is already initialized");
+
+    /* These source routines use the authored eleven-entry unlock tables;
+     * there is no guessed mask width or asset availability implication. */
+    gm_80164F18();
+    gm_8016468C();
+    (void) fn_80173510();
+    (void) fn_801735F0();
+    (void) fn_8017367C();
+
+    /* The 51 event-clear flags are the exact range consumed by the source's
+     * all-event completion check (gm_8017335C and gm_801721EC_2). Leave the
+     * four event score/high-score words at their fresh, valid defaults. */
+    for (event = 0; event < 0x33; ++event)
+        gmMainLib_8015CEB4(event);
+    /* The source grants this separate boolean only for the final event's
+     * three-stock clear. A completed baseline includes that known condition. */
+    gmMainLib_8015CF84();
+
+    /* The retail mode-clear path maps each selectable character and each of
+     * Classic, Adventure and All-Star to source challenge IDs. Calling that
+     * path records those clears without inventing match counts or scores.
+     * The source routine also mirrors Zelda/Sheik's shared selectable slot. */
+    for (selkind = 0; selkind < SELKIND_COUNT; ++selkind) {
+        const u8 ckind = gm_SelKindToCKind((u8) selkind);
+        fn_80173834(ckind, GM_CLASSIC, false);
+        fn_80173834(ckind, GM_ADVENTURE, false);
+        fn_80173834(ckind, GM_ALLSTAR, false);
+    }
+
+    /* The result path records challenge completions through fn_8016F140.
+     * Its source inventory is 0..255; gm_80173EEC's own complete-all test
+     * explicitly excludes these seven IDs because they are not required
+     * completion entries. Record every other authored challenge, then let
+     * that original aggregate routine derive the 0x123 all-challenges award. */
+    for (challenge = 0; challenge < 0x100; ++challenge) {
+        if (challenge != 9 && challenge != 0x29 && challenge != 0x42 &&
+            challenge != 0x43 && challenge != 0xB9 && challenge != 0xC9 &&
+            challenge != 0xCA)
+            fn_8016F140(challenge);
+    }
+    gm_80173EEC();
+
+    /* Trophy IDs and the ownership counter are maintained by the original
+     * award routine. The source table declares exactly TY_TROPHY_COUNT IDs. */
+    for (trophy = 0; trophy < TY_TROPHY_COUNT; ++trophy)
+        Toy_SetUnlockState(trophy, true);
+
+    /* These original debug-unlock helpers are also used together by
+     * gmMainLib_8015FA34: they mark source-bounded unlock notifications and
+     * the 300-slot trophy reward ledger as claimed. The latter ledger lives
+     * in SaveData's authored padding span; the source loop defines its bound. */
+    gm_8017297C();
+    gm_801741FC();
+
+    /* Recompute the four named feature bits from the source unlock tables.
+     * Do not copy the debug path's raw 0xFF, whose remaining bits are unknown. */
+    gm_80172898(0xFFFFU);
+    if (!aliases_match(candidate, error, error_size)) return 0;
+    candidate->everything_initialized = 1;
+    return ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_restore_default(
+    MeleeWebSaveProfileOwner* candidate, char* error, size_t error_size)
+{
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size))
+        return 0;
+    if (!candidate->default_initialized || !candidate->fresh_state_snapshot)
+        return fail(error, error_size,
+                    "Original fresh profile snapshot is unavailable");
+    memcpy(candidate->source_global, candidate->fresh_state_snapshot,
+           MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES);
+    memcpy(&melee_web_toy_state,
+           candidate->fresh_state_snapshot + MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES,
+           sizeof(struct ToyRuntimeAggregate));
+    lbLang_SetLanguageSetting(candidate->fresh_language);
+    lbLang_SetSavedLanguage(candidate->fresh_saved_language);
+    return aliases_match(candidate, error, error_size) && ok(error, error_size);
 }
 
 int melee_web_save_profile_owner_deactivate(MeleeWebSaveProfileOwner* candidate,
@@ -649,7 +768,10 @@ int melee_web_save_profile_owner_deactivate(MeleeWebSaveProfileOwner* candidate,
     lbLang_SetSavedLanguage(candidate->saved_saved_language);
     free(candidate->source_snapshot);
     candidate->source_snapshot = NULL;
+    free(candidate->fresh_state_snapshot);
+    candidate->fresh_state_snapshot = NULL;
     candidate->default_initialized = 0;
+    candidate->everything_initialized = 0;
     candidate->active = 0;
     return ok(error, error_size);
 }

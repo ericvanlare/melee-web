@@ -1,15 +1,18 @@
 # Browser save profiles
 
-This document describes the save controls in the browser player. It does not
-claim complete retail-game compatibility or a console transfer test.
+This document describes the save controls in the browser player and the
+source-owned fields that define its Everything unlocked baseline. Runtime
+support and validation remain separate from saved completion: a source unlock
+does not mean its feature works in this browser build.
 
 ## Modes
 
 Open **Settings** beside **Controls** to choose one of two modes:
 
-- **Everything unlocked** starts from the original source's supported roster
-  and stage baseline. Changes made during that session are discarded. Export
-  writes that baseline even if a different session was previously active.
+- **Everything unlocked** starts from the completed baseline below. Changes
+  made during that session are discarded. Export writes the same captured
+  baseline even if a different session was previously active; it does not
+  commit or replace Personal progress.
 - **Personal progress** applies the locally stored profile before the original
   menus start. It autosaves changed card data in the current browser profile.
 
@@ -44,6 +47,36 @@ The player requests persistent browser storage, but that request can be denied.
 Browser profile cleanup, site-data deletion, device loss and private browsing
 can still remove or prevent storage. Saves are not synced to an account or sent
 to the operator. Export a GCI backup to move progress between browser profiles.
+
+Each IndexedDB commit is atomic: after an interrupted transaction, the record
+is either the preceding committed generation or the new committed generation,
+and reads verify checksums before using either one. This protects committed
+generations only. A forced browser or device close can lose progress that had
+not yet reached a completed transaction. Browser profile cleanup, eviction,
+device failure and storage exhaustion can also prevent recovery.
+
+## Everything unlocked inventory
+
+The baseline is created by first running Melee's original fresh-profile
+initialization (`gmMainLib_8015F600(1..8, 1)`), then applying source routines to
+that fresh profile. Its fields and bounds come from the pinned Melee source
+(`dependencies.lock.json`), not from a retail save's unknown bytes:
+
+| State | Source representation and boundary | Baseline value |
+| --- | --- | --- |
+| Unlockable characters and stages | The source's eleven-entry character and stage unlock tables, through `gm_80164F18()` and `gm_8016468C()` | All table entries unlocked; `fn_80173510()` derives the corresponding standard-stage completion flag |
+| Event mode | `gmm_x1868.x1A68`; the source all-events check loops event IDs `0..50` | All 51 clear bits set; score/time fields remain fresh. `x1B3C` is set through the original setter for the final event's separately checked three-stock clear |
+| Classic, Adventure and All-Star | Clear IDs from `gm_80160474()` for every `SELKIND_COUNT` selection | Recorded through `fn_80173834()`, which applies the source Zelda/Sheik paired mapping |
+| Challenge completion | `gmm_x1868.x1C88`; result code records IDs through `fn_8016F140()`, and the aggregate check considers `0..255` | All 249 entries required by `gm_80173EEC()` are set. That source check explicitly omits IDs `9`, `0x29`, `0x42`, `0x43`, `0xB9`, `0xC9` and `0xCA`; it derives the all-challenges award `0x123` from the completed set |
+| Trophies | `TY_TROPHY_COUNT` IDs and `trophy_flags`/`trophy_count` | Every authored trophy is awarded through `Toy_SetUnlockState()`; the source maintains the count and flag encoding |
+| Other source unlocks and trophy rewards | The source debug-unlock helpers cover 66 notification IDs and its reward helper covers 300 ledger IDs | The same source routines (`gm_8017297C()` and `gm_801741FC()`) mark these completed. No save extent is filled with a guessed mask or maximum |
+| Derived feature bits | `gm_80172898(0xFFFF)` and its `fn_8017280C()` derivation | Only the four feature bits produced by the source derivation are present; unknown upper bits are left at fresh defaults |
+
+The baseline leaves match counts, per-fighter statistics, records, scores,
+play-time thresholds, unknown flags and padding at the original fresh defaults.
+It does not fabricate high scores or imply that every possible record has been
+set. Personal progress without a stored profile also begins with the complete
+original fresh initialization, not with this Everything unlocked baseline.
 
 ## Card data and GCI files
 

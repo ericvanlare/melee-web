@@ -50,7 +50,7 @@ export function mountSaveProfileSettings({onError = () => {}, onBusy = () => {}}
       return;
     }
     if (activeMode === 'everything') {
-      status('Everything unlocked uses the original supported roster and stage baseline. Session changes are discarded.');
+      status('Everything unlocked includes source-recorded unlocks and eligible completion flags. Session changes are discarded.');
     } else if (recovered) {
       status('Using the previous verified progress copy. The newer stored copy failed its checksum.');
     } else if (profileRevision !== null && profileData) {
@@ -76,7 +76,7 @@ export function mountSaveProfileSettings({onError = () => {}, onBusy = () => {}}
     if (!store || activeMode !== 'personal') return false;
     const nextWrite = writeQueue.then(async () => {
       if (!force && (frozen || snapshotEpoch !== epoch || activeMode !== 'personal')) return false;
-      if (sameBytes(bytes, profileData)) return false;
+      if (sameBytes(bytes, profileData?.data)) return false;
       const committed = await store.commitProfile(bytes, profileRevision);
       profileRevision = committed.revision;
       profileData = {data: new Uint8Array(bytes), committedAt: committed.committedAt,
