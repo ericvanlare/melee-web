@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 import unittest
+from workspace_resources import operation, record_build
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -208,7 +209,13 @@ def run_group(group, jobs):
         env = dict(os.environ, EMSDK=str(sdk), EM_CONFIG=str(sdk / ".emscripten"),
                    EM_CACHE=str(sdk / "upstream/emscripten/cache"), EMSDK_PYTHON=sys.executable)
         env["PATH"] = str(ROOT / ".venv/bin") + os.pathsep + env.get("PATH", "")
-        subprocess.run(list(map(str, args)), cwd=ROOT, env=env, check=True)
+        if "--build" in args:
+            with operation(ROOT, "CI compile"):
+                record_build(ROOT, ROOT / "build/browser", False)
+                subprocess.run(list(map(str, args)), cwd=ROOT, env=env, check=True)
+                record_build(ROOT, ROOT / "build/browser", True)
+        else:
+            subprocess.run(list(map(str, args)), cwd=ROOT, env=env, check=True)
 
     try:
         phase("configure", lambda: command(sys.executable, ROOT / "scripts/build.py",

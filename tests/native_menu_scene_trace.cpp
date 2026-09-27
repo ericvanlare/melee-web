@@ -8,15 +8,27 @@ extern "C" void melee_web_test_card_scene_forget(void);
 extern "C" int melee_web_test_texture_bounds(unsigned);
 #include "gameplay_archive_sections.h"
 #include "gameplay_bootstrap.h"
+#include "gameplay_source_files.h"
 extern "C" int melee_web_test_menu_scene_consume(void*, unsigned);
 extern "C" int melee_web_test_sis_consume(void*, unsigned);
+extern "C" int melee_web_test_player_name_sis_encoding(void);
 #include <fstream>
+#include <filesystem>
 #include <iostream>
+#include <iterator>
+#include <algorithm>
+#include <string>
+#include <vector>
+static std::vector<uint8_t> read_file(const char* path){
+ std::ifstream file(path,std::ios::binary);if(!file)throw std::runtime_error("Original menu file unavailable");
+ return {(std::istreambuf_iterator<char>(file)),{}};
+}
 int main(int argc,char** argv){try{
  if(argc==1 || (argc==2 && (std::strcmp(argv[1],"--bad-image-index")==0 || std::strcmp(argv[1],"--bad-palette-index")==0))){
   char error[256];
   if(!melee_web_gameplay_startup(4*1024*1024,error,sizeof(error)))throw std::runtime_error(error);
   if(!melee_web_native_world_enable(error,sizeof(error)))throw std::runtime_error(error);
+  if(!melee_web_test_player_name_sis_encoding())throw std::runtime_error("Original U.S. Mario name did not reach all five SIS glyphs");
   const unsigned bad=argc==1?0:std::strcmp(argv[1],"--bad-image-index")==0?1:10;
   if(!melee_web_test_texture_bounds(bad))throw std::runtime_error("Original texture bounds guard failed");
   if(!melee_web_test_sis_consume(nullptr,0))throw std::runtime_error("Original SIS bytecode consumer failed");
@@ -31,6 +43,19 @@ int main(int argc,char** argv){try{
   char error[256];
   if(!melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)))throw std::runtime_error(error);
   if(!melee_web_native_world_enable(error,sizeof(error)))throw std::runtime_error(error);
+  std::vector<std::string> runtime_names;
+  std::vector<std::vector<uint8_t>> runtime_bytes;
+  for(int i=1;i<std::min(argc,4);++i){
+   runtime_names.emplace_back(std::filesystem::path(argv[i]).filename().string());
+   runtime_bytes.push_back(read_file(argv[i]));
+  }
+  std::vector<MeleeWebSourceFileInput> runtime_inputs;
+  runtime_inputs.reserve(runtime_bytes.size());
+  for(size_t i=0;i<runtime_bytes.size();++i)
+   runtime_inputs.push_back({runtime_names[i].c_str(),runtime_bytes[i].data(),runtime_bytes[i].size()});
+  auto* runtime_scope=melee_web_source_files_begin(runtime_inputs.data(),runtime_inputs.size(),error,sizeof(error));
+  if(!runtime_scope)throw std::runtime_error(error);
+  if(!melee_web_test_player_name_sis_encoding())throw std::runtime_error("Original CSS player-name bytes failed after world re-entry");
   melee_web::DatNativeMenu menu(archive,melee_web::NativeMenuKind::Characters);
   if(menu.model_count()!=9)throw std::runtime_error("CSS model count mismatch");
   MeleeWebArchiveSymbol symbol={"MnSlChr.usd","MnSelectChrDataTable",menu.descriptor()};
@@ -77,6 +102,7 @@ int main(int argc,char** argv){try{
    if(melee_web_archive_sections_close(card_scope,error,sizeof(error)))throw std::runtime_error("Card scope released before source heap teardown");
   }
   if(!melee_web_gameplay_shutdown(error,sizeof(error)))throw std::runtime_error(error);
+  if(!melee_web_source_files_end(runtime_scope,error,sizeof(error)))throw std::runtime_error(error);
   if(card_scope){
    melee_web_test_card_scene_forget();
    if(!melee_web_archive_sections_close(card_scope,error,sizeof(error)))throw std::runtime_error(error);
@@ -86,5 +112,5 @@ int main(int argc,char** argv){try{
   melee_web_archive_sections_release(handle);
   if(!melee_web_archive_sections_close(scope,error,sizeof(error)))throw std::runtime_error(error);
  }
- std::cout<<"Original CSS nine complete model/animation descriptors loaded and animated by HSD, with camera/lights/fog and two world lifetimes; CSS callbacks/rendering not tested\n";
+ std::cout<<"Original CSS nine complete model/animation descriptors loaded and animated by HSD, with camera/lights/fog and two world lifetimes; player-name SIS bytes passed across both; CSS callbacks/rendering not tested\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}
