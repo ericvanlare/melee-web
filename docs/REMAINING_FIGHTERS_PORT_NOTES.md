@@ -1087,6 +1087,13 @@ camera pool `0x7090720`. This is native state-only Results coverage with the
 default CSS/save host subset, not browser/GPU or retail equivalence; the natural
 winner was Samus, not the slot-2 Zelda-origin Sheik target.
 
+Timing scope matters: the reducer's confirmation edge is at Results source
+tick 600, while the historical camera-pool report stops at tick 560. It proves
+both disconnected CPU pages advance before the chosen confirmation, but it
+does not reproduce the historical failure boundary or establish the old
+browser's consumed Enter/PAD schedule. The frozen failure still lacks that raw
+PAD trace and its page/pointer snapshots.
+
 Browser run
 `work/pr86-results-sheik-winner-b-three-pulse-two-matches-r2/report.json`
 reached the cursor-560 checkpoint in a natural B CPU9/4-stock/FD match. Samus
