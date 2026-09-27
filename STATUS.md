@@ -1,5 +1,17 @@
 # Current status
 
+## Original title/main-menu route is not yet integrated
+
+**Source identified / Compiled** for a bounded fresh-DOL retail route driver
+that observes boot, title, main-menu, Versus CSS and a source-driven back/forward
+path. The generated driver and route verifier have focused checks, and the
+development and public Release runtimes build. The owned USA rev1.02 disc and
+private initial memory-card/profile inputs were unavailable, so no original
+route capture or production CSS-first menu lifecycle was run. The browser
+still closes its menu owner when CSS requests the parent menu. See the
+[route evidence ledger](docs/ORIGINAL_MENU_ROUTE_CAPTURE.md) for source scope
+and remaining gates.
+
 ## Repository public; main changes restricted to the owner
 
 The [publication record](docs/PUBLICATION_CUTOVER.md) and
