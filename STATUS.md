@@ -39,6 +39,11 @@ game equivalence, draw cadence, pixels, PCM, live-input accuracy and foreground
 performance remain unclaimed. No merge or deployment was performed for this
 follow-up.
 
+A later independent review found a capture-command failure-classification gap.
+The [harness follow-up receipt](docs/evidence/recorded-session-harness-finalization-v1.json)
+records the corrected failure gates, synthetic browser controls and unchanged
+accepted gameplay evidence. It does not replace or relabel the original run.
+
 ## CPU source context integrated; bounded prerequisite evidence
 
 **Compiled / Source identified / Native traced / Retail compared** within the

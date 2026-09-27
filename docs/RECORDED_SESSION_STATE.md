@@ -156,6 +156,37 @@ searching for a later matching record. Keep both reports and their hashes.
 Run the comparator's negative controls with
 `python3 -m unittest discover -s tests -p test_whole_session_state_compare.py -v`.
 
+## Capture command failure gates
+
+The capture command reports success only after the replay completes, browser
+callbacks finish, and the required `retail-port.jsonl` and
+`retail-browser-report.json` files are exported exactly once with nonempty,
+hashed bytes. The state-mode protocol does not require the optional timer
+trace. Browser, runtime, export and diagnostic failures retain a failing report
+and return nonzero. A deliberate prefix stop reports `incomplete` and also
+returns nonzero; it cannot become complete-session evidence.
+
+PR #93's independent review found that the earlier harness could print `pass`
+despite recorded browser errors or missing exports. The correction changes
+capture failure classification, not runtime behavior, recorded inputs or the
+exact comparator. The accepted session already has clean diagnostics and both
+required artifacts; its original receipt and reports remain unchanged. The
+[follow-up receipt](evidence/recorded-session-harness-finalization-v1.json)
+binds the correction, negative controls and preserved evidence separately.
+
+Run the fast gates and the real HTTP/headless Chrome CLI contract:
+
+```sh
+python3 -m unittest discover -s tests -p test_whole_session_capture.py -v
+node tests/whole_session_capture_browser_test.mjs \
+  --out work/session-capture-contract
+```
+
+The browser contract uses synthetic transport fixtures and requires the same
+Playwright/installed Chrome configuration as the capture command. It retains
+each case's report, process exit, page dump and screenshot. Its success is
+harness evidence, not a gameplay comparison.
+
 ## Evidence scope
 
 Successful comparison is limited to this recording and the declared fields.
