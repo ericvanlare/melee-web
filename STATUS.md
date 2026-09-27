@@ -250,6 +250,12 @@ separate gates.
 
 ## Non-disruptive agent browser checks
 
+The public player preserves a centered 4:3 game rectangle above its wrapping
+toolbar. **Browser exercised** presentation evidence and retained failures for
+the production shell, DPR, resizing and DOM fullscreen are recorded in the
+[presentation receipt](docs/evidence/public-presentation-aspect-v1.json) and
+[resize guide](docs/PUBLIC_RESIZE.md). OS fullscreen/focus remains unrun.
+
 Routine browser checks default to headless installed Chrome; foreground
 captures require explicit `--headed`. Agent guidance also covers temporary
 scripts. **Browser exercised**, bounded functional utility: GPU output,
