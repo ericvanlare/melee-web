@@ -25,6 +25,10 @@ The live release and the latest repository code may differ. See
 [current status](STATUS.md) for tested scenarios, known failures and the
 supporting evidence, and the [roadmap](docs/ROADMAP.md) for planned work.
 
+The [project direction](docs/PROJECT_DIRECTION.md) connects the vanilla source
+port with later Slippi compatibility, rollback, cross-play and independent
+online services, including their dependencies and unresolved questions.
+
 ## Develop locally
 
 Start with [Contributing](CONTRIBUTING.md) and the
