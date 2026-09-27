@@ -12,7 +12,6 @@ import venv
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from workspace_resources import operation
-from share_toolchain import share_installed_toolchain
 
 # Pinned Aurora plus the reviewed patch preceding the ImGui timestamp fix.
 # Previous patch blob: 0bf4dc0e2e4370d4fbd01198c5851ccf23d0a26e.
@@ -195,7 +194,6 @@ def _bootstrap(root=ROOT):
     run(py, "-m", "pip", "install", "--disable-pip-version-check", *lock["python_build_packages"])
     run(sys.executable, deps / "emsdk/emsdk.py", "install", lock["emscripten"])
     run(sys.executable, deps / "emsdk/emsdk.py", "activate", lock["emscripten"])
-    print("Toolchain storage:", json.dumps(share_installed_toolchain(root)))
     print("Ready. Run python3 scripts/build.py")
 
 

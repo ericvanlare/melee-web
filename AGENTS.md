@@ -15,15 +15,21 @@ observed evidence and use the playbook's scoped evidence labels.
 
 Read [local resource ownership](docs/LOCAL_RESOURCES.md) before bootstrapping,
 building, or running expensive tests. Run `python3 scripts/agent_workspace.py
-status` at task start and handoff. Use the guarded build/bootstrap entry points;
-wrap other expensive commands with `python3 scripts/agent_workspace.py run --
-<command>`. Keep the default two build jobs and the host's two operation slots;
-do not bypass a disk-space refusal or raise limits without the user's direction.
+status` at task start and handoff. Use the build/bootstrap entry points, and wrap
+other commands that use the checkout's builds or tools with
+`python3 scripts/agent_workspace.py run -- <command>` so maintenance can detect
+active work. The checkout mutex protects mutations; it adds no host-wide job
+limit or queue. Compiler-job defaults are unchanged. Low space emits an advisory
+warning with available space and does not block an otherwise valid operation.
 After a test succeeds, remove only its owned disposable scratch. Preserve failed
-reproducers and explicitly retained evidence. When a task's builds are retired,
-run `python3 scripts/agent_workspace.py retire-builds` and then `--apply` for
-that checkout's eligible intermediates. Keep incremental builds while work is
-ongoing. Close browsers and servers you started when they are no longer needed.
+reproducers and explicitly retained evidence. Keep incremental builds while work
+is active. At handoff, consciously decide whether they are no longer needed;
+retirement trades disk space for future recompilation. To retire them, review
+`python3 scripts/agent_workspace.py retire-builds`, then use `--apply` for that
+checkout's eligible intermediates. Toolchain sharing is a separate opt-in action:
+`python3 scripts/agent_workspace.py dedup-toolchain`. It hashes large installed
+files and must run when the checkout is idle. Close browsers and servers you
+started when they are no longer needed.
 Never blanket-delete `work/`, ignored files, another task's output, source,
 recordings, local changes, or evidence that has not been safely archived.
 

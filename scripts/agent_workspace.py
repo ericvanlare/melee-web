@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Inspect disk space, coordinate expensive commands, or retire owned build intermediates."""
+"""Report space, protect active checkout mutations, or explicitly reclaim disposable storage."""
 import argparse
 import json
 from pathlib import Path
 import subprocess
 
-from workspace_resources import disk_status, operation, retire_builds
+from workspace_resources import operation, report_space, retire_builds
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -14,6 +14,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="action", required=True)
     commands.add_parser("status")
+    commands.add_parser("dedup-toolchain", help="opt in to verified APFS toolchain sharing")
     retire = commands.add_parser("retire-builds")
     retire.add_argument("--apply", action="store_true", help="remove journaled .o/.a files after open-file checks")
     run = commands.add_parser("run")
@@ -21,7 +22,10 @@ def main():
     args = parser.parse_args()
     try:
         if args.action == "status":
-            print(json.dumps(disk_status(ROOT), indent=2))
+            print(json.dumps(report_space(ROOT), indent=2))
+        elif args.action == "dedup-toolchain":
+            from share_toolchain import share_installed_toolchain
+            print(json.dumps(share_installed_toolchain(ROOT), indent=2))
         elif args.action == "retire-builds":
             print(json.dumps(retire_builds(ROOT, apply=args.apply), indent=2))
         else:

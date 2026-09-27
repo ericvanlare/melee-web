@@ -12,7 +12,7 @@ import sqlite3
 
 from bootstrap import read_lock, verify_sources
 from gameplay_sources import prepare_sources
-from workspace_resources import DEFAULT_JOBS, operation, record_build
+from workspace_resources import operation, record_build
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -856,7 +856,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--jobs", type=int, default=DEFAULT_JOBS)
+    parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
     parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "runtime",
                                               PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET, "all"))
     parser.add_argument("--trace-target", dest="trace_targets", choices=TRACE_TARGETS,

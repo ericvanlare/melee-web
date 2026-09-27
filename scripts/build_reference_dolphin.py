@@ -389,7 +389,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--generator", default="Unix Makefiles")
     result.add_argument("--target", default="build_final_bundle",
                         help="CMake target (build_final_bundle for a macOS app)")
-    result.add_argument("--jobs", type=int, default=2)
+    result.add_argument("--jobs", type=int, default=None)
     result.add_argument("--headless", action="store_true",
                         help="build DolphinNoGUI instead of the double-clickable Qt app")
     result.add_argument("--skip-submodules", action="store_true",

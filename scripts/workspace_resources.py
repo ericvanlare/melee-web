@@ -1,6 +1,6 @@
-"""Cooperative local build leases and a journal of disposable compiler products.
+"""Checkout mutation safety and a journal of disposable compiler products.
 
-Locks are per user across worktrees. They never stop processes or delete evidence.
+There are no host-wide compute limits, queues, or disk admission floors.
 """
 from contextlib import contextmanager
 import hashlib
@@ -12,12 +12,9 @@ import shutil
 import stat
 import subprocess
 import sys
-import time
 
 
-LEASE_ENV = "MELEE_WORKSPACE_LEASE"
 CHECKOUTS_ENV = "MELEE_WORKSPACE_CHECKOUTS"
-DEFAULT_JOBS = 2
 
 
 def state_directory():
@@ -51,15 +48,22 @@ def disk_status(root):
     return {"free_gb": round(usage.free / 1e9, 3), "total_gb": round(usage.total / 1e9, 3)}
 
 
-def check_space(root):
-    # Hosted runners are disposable and smaller; local agents keep a larger reserve.
-    reserve = float(os.environ.get("MELEE_MIN_FREE_GB", "5" if os.environ.get("CI") else "30"))
-    if not 0 < reserve < 100000:
-        raise ValueError("MELEE_MIN_FREE_GB must be a positive finite number")
-    free = shutil.disk_usage(root).free / 1e9
-    if free < reserve:
-        raise ValueError(f"Only {free:.1f} GB free; this operation requires {reserve:g} GB. "
-                         "Retire owned build output or free space before retrying.")
+def report_space(root):
+    """Report available space; the advisory threshold never blocks an operation."""
+    status = disk_status(root)
+    default = 5 if os.environ.get("CI") else 30
+    try:
+        threshold = float(os.environ.get("MELEE_WARN_FREE_GB", default))
+        if not 0 < threshold < 100000:
+            raise ValueError("invalid warning threshold")
+    except ValueError:
+        threshold = default
+        print(f"workspace: invalid MELEE_WARN_FREE_GB; using {default} GB warning threshold", file=sys.stderr)
+    if status["free_gb"] < threshold:
+        print(f"workspace: WARNING: {status['free_gb']:.1f} GB available "
+              f"(below {threshold:g} GB warning threshold); continuing. "
+              "Consider retiring completed builds before creating more output.", file=sys.stderr)
+    return status
 
 
 def _open_lock(path):
@@ -105,17 +109,6 @@ def _live_ancestor_lock(path, token):
     return False
 
 
-def _inherited_lease(directory):
-    try:
-        token = json.loads(os.environ.get(LEASE_ENV, "null"))
-        if (isinstance(token, dict) and token.get("slot") in (0, 1)
-                and _live_ancestor_lock(directory / f"slot-{token['slot']}.lock", token)):
-            return token
-    except ValueError:
-        pass
-    return None
-
-
 def _write_lock(handle, token):
     handle.seek(0)
     handle.truncate()
@@ -124,78 +117,47 @@ def _write_lock(handle, token):
 
 
 @contextmanager
-def operation(root, label, *, heavy=True, timeout=300):
-    """Serialize a checkout and allow at most two cooperating heavy operations per user."""
+def operation(root, label, *, reuse=True):
+    """Fail fast on conflicting checkout mutations; never schedule host compute.
+
+    Nested build steps may reuse a live ancestor's checkout mutex. Maintenance
+    must pass reuse=False so even cleanup invoked by an active build refuses.
+    """
     root = Path(root).resolve(strict=True)
     if os.name != "posix":
-        if heavy:
-            check_space(root)
-        print("workspace: host-wide build locks require macOS or Linux", file=sys.stderr)
+        if not reuse:
+            raise ValueError("safe checkout maintenance requires macOS or Linux locks")
+        report_space(root)
         yield
         return
     directory = state_directory()
     key = hashlib.sha256(os.fsencode(root)).hexdigest()
     checkout_path = directory / f"checkout-{key}.lock"
-    inherited = _inherited_lease(directory)
     try:
         checkouts = json.loads(os.environ.get(CHECKOUTS_ENV, "{}"))
     except ValueError:
         checkouts = {}
     if not isinstance(checkouts, dict):
         checkouts = {}
-    owns_checkout = ((inherited is not None and inherited.get("root") == str(root))
-                     or _live_ancestor_lock(checkout_path, checkouts.get(str(root))))
-    if owns_checkout and (not heavy or inherited is not None):
+    if reuse and _live_ancestor_lock(checkout_path, checkouts.get(str(root))):
         yield
         return
-    started = time.monotonic()
-    locks = []
-    previous = {name: os.environ.get(name) for name in (LEASE_ENV, CHECKOUTS_ENV)}
-    before = disk_status(root)
-    print(f"workspace: {label}: {before['free_gb']:.1f} GB free", file=sys.stderr)
-    try:
-        if not owns_checkout:
-            checkout = _open_lock(checkout_path)
-            locks.append(checkout)
-            while not _try_lock(checkout):
-                if time.monotonic() - started >= timeout:
-                    raise ValueError("checkout is busy; retry after its current operation finishes")
-                time.sleep(0.2)
-            token = {"pid": os.getpid(), "root": str(root), "nonce": secrets.token_hex(16)}
-            _write_lock(checkout, token)
-            checkouts[str(root)] = token
-            os.environ[CHECKOUTS_ENV] = json.dumps(checkouts)
-        if heavy and inherited is None:
-            check_space(root)
-            slots = []
-            for n in range(2):
-                handle = _open_lock(directory / f"slot-{n}.lock")
-                slots.append(handle)
-                locks.append(handle)
-            while True:
-                acquired = next((n for n, handle in enumerate(slots) if _try_lock(handle)), None)
-                if acquired is not None:
-                    break
-                if time.monotonic() - started >= timeout:
-                    raise ValueError("both build slots are occupied; retry after a build finishes")
-                time.sleep(0.2)
-            check_space(root)
-            token = {"pid": os.getpid(), "root": str(root), "slot": acquired,
-                     "nonce": secrets.token_hex(16)}
-            _write_lock(slots[acquired], token)
-            os.environ[LEASE_ENV] = json.dumps(token)
-        yield
-    finally:
-        for name, value in previous.items():
-            if value is None:
-                os.environ.pop(name, None)
+    with _open_lock(checkout_path) as checkout:
+        if not _try_lock(checkout):
+            raise ValueError(f"{label}: checkout is busy; no changes made by this operation")
+        previous = os.environ.get(CHECKOUTS_ENV)
+        token = {"pid": os.getpid(), "root": str(root), "nonce": secrets.token_hex(16)}
+        _write_lock(checkout, token)
+        checkouts[str(root)] = token
+        os.environ[CHECKOUTS_ENV] = json.dumps(checkouts)
+        try:
+            report_space(root)
+            yield
+        finally:
+            if previous is None:
+                os.environ.pop(CHECKOUTS_ENV, None)
             else:
-                os.environ[name] = value
-        for handle in reversed(locks):
-            handle.close()
-        after = disk_status(root)
-        print(f"workspace: {label}: finished with {after['free_gb']:.1f} GB free "
-              f"({after['free_gb'] - before['free_gb']:+.1f} GB)", file=sys.stderr)
+                os.environ[CHECKOUTS_ENV] = previous
 
 
 def _journal(root):
@@ -208,6 +170,12 @@ def file_hash(path):
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             result.update(chunk)
     return result.hexdigest()
+
+
+def fingerprint(info):
+    # ctime detects writes even when a caller restores the prior mtime. This is
+    # only a hash-cache key; retirement still verifies the actual file content.
+    return [info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns]
 
 
 def read_journal(root):
@@ -223,6 +191,8 @@ def read_journal(root):
         if (not isinstance(record, dict) or type(record.get("succeeded")) is not bool
                 or not isinstance(record.get("products"), dict)):
             raise ValueError("invalid build journal record")
+        if not isinstance(record.get("fingerprints", {}), dict):
+            raise ValueError("invalid build journal fingerprints")
         for expected in record["products"].values():
             if (not isinstance(expected, list) or len(expected) != 4
                     or any(type(value) is not int for value in expected[:3])
@@ -241,11 +211,21 @@ def record_build(root, build_dir, succeeded):
         raise ValueError("build journal requires an unredirected local build directory")
     path = _journal(root)
     journal = read_journal(root)
+    build_key = str(build_dir.relative_to(root))
+    previous = journal["builds"].get(build_key, {"products": {}, "fingerprints": {}})
+    if not succeeded:
+        # Failed/configure-only builds are ineligible for retirement. Retain the
+        # prior cache so the next success need not rehash unchanged products.
+        journal["builds"][build_key] = dict(previous, succeeded=False)
+        atomic_json(path, journal)
+        return
     products = {}
+    fingerprints = {}
     ninja_log = build_dir / ".ninja_log"
     if ninja_log.is_symlink() or ninja_log.resolve() != ninja_log:
         raise ValueError("refusing redirected Ninja output journal")
-    if succeeded and ninja_log.is_file():
+    if ninja_log.is_file():
+        outputs = set()
         for line in ninja_log.read_text().splitlines():
             fields = line.split("\t")
             if len(fields) != 5:
@@ -253,14 +233,26 @@ def record_build(root, build_dir, succeeded):
             output = Path(fields[3])
             if output.is_absolute() or ".." in output.parts or output.suffix not in {".o", ".a"}:
                 continue
+            outputs.add(output)
+        for output in sorted(outputs):
             product = build_dir / output
             if product.is_symlink() or product.resolve() != product or not product.is_file():
                 continue
             info = product.stat()
-            products[str(product.relative_to(root))] = [info.st_ino, info.st_size, info.st_mtime_ns,
-                                                       file_hash(product)]
-    journal["builds"][str(build_dir.relative_to(root))] = {
-        "succeeded": succeeded, "products": products,
+            name = str(product.relative_to(root))
+            key = fingerprint(info)
+            expected = previous["products"].get(name)
+            if (expected is not None and previous.get("fingerprints", {}).get(name) == key
+                    and expected[:3] == [info.st_ino, info.st_size, info.st_mtime_ns]):
+                digest = expected[3]
+            else:
+                digest = file_hash(product)
+            if fingerprint(product.stat()) != key:
+                continue  # A changing file is never journaled as disposable.
+            products[name] = [info.st_ino, info.st_size, info.st_mtime_ns, digest]
+            fingerprints[name] = key
+    journal["builds"][build_key] = {
+        "succeeded": True, "products": products, "fingerprints": fingerprints,
     }
     atomic_json(path, journal)
 
@@ -301,14 +293,19 @@ def open_files():
     return {line[1:] for line in opened.stdout.splitlines() if line.startswith("n/")}
 
 
+def refuse_open_paths(paths):
+    prefixes = tuple(str(path) for path in paths)
+    if any(name == prefix or name.startswith(prefix + "/")
+           for name in open_files() for prefix in prefixes):
+        raise ValueError("storage is still in use; no maintenance performed")
+
+
 def retire_builds(root, *, apply=False):
     root = Path(root).resolve()
-    with operation(root, "retire build intermediates", heavy=False, timeout=0):
+    with operation(root, "retire build intermediates", reuse=False):
         plan = retirement_plan(root)
         if apply and plan:
-            if any(name == str(root / "build") or name.startswith(str(root / "build") + "/")
-                   for name in open_files()):
-                raise ValueError("build directory is still in use; no cleanup performed")
+            refuse_open_paths([root / "build"])
             for row in plan:
                 p = root / row["path"]
                 info = p.lstat()

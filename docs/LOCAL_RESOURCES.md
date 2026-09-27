@@ -12,37 +12,40 @@ At task start and handoff, record the current free-space reading:
 python3 scripts/agent_workspace.py status
 ```
 
-Bootstrap and the browser/reference build entry points coordinate automatically.
-Use the wrapper for other expensive commands, including a full test suite:
+Bootstrap and the browser/reference build entry points hold a checkout mutation
+lock. Use the wrapper for other commands that use this checkout's builds or
+tools, including a full test suite:
 
 ```sh
 python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v
 ```
 
-On macOS and Linux, at most **two cooperating heavy operations per user** run at
-once, across worktrees, with one operation tree per checkout. Normal build
-commands default to two compiler jobs each. Nested commands reuse their live
-ancestor's host slot, including builds inside temporary test checkouts; each
-checkout still has its own mutex. Stale tokens do not bypass coordination.
-Keep child builds sequential within a wrapped operation. Kernel locks release when the
-holding process exits. Busy operations wait up to five minutes and then stop
-with a retry message. Avoid abandoning a parent while its children are running;
-these cooperative locks do not manage arbitrary detached processes.
+There is **no host-wide operation cap, queue, slot wait, or new compiler-job
+default**. Different checkouts run independently. Main's browser-build default
+remains `min(cpu_count or 2, 6)`; the reference builder continues to leave
+parallelism unspecified unless `--jobs` is supplied. Existing CI job defaults
+also remain unchanged.
 
-Each guarded operation prints free space before and after it runs. Local work
-requires at least **30 GB free** when admitted (5 GB on CI); this is an admission
-floor, not a reservation or a guarantee that the operation cannot fill a disk.
-Estimate additional space before large captures or full rebuilds. A 50 GB
-operating target leaves more room for simultaneous jobs and macOS swap. When
-space is low, retire eligible output or report the blocker; do not lower the
-floor to force a job through. A human-directed override can set
-`MELEE_MIN_FREE_GB`. Do not manually delete swap files.
+On macOS and Linux, a nonblocking mutex per checkout protects shared build and
+tool files. A conflicting mutation in that same checkout refuses immediately;
+it does not wait. Nested build/test steps can reuse a verified live ancestor's
+lock. Cleanup and toolchain deduplication cannot borrow that lock: they refuse
+while the checkout is active, even when invoked by an active build. Kernel locks
+release when the holder exits. Avoid abandoning a parent while its children are
+running; these cooperative locks do not manage arbitrary detached processes.
+
+The status command reports available disk space. Entry points warn below 30 GB
+locally or 5 GB on CI and continue; these thresholds are advisory, not admission
+floors or reservations. `MELEE_WARN_FREE_GB` customizes the warning threshold.
+Estimate space before large captures or rebuilds, and consider explicit
+retirement when appropriate. Do not manually delete swap files.
 
 The small coordination files live in `~/.local/state/melee-web` by default.
 `MELEE_RESOURCE_STATE` can select an isolated directory for tests; all normal
-agents on one host must use the same directory. Never delete live lock files.
-Windows retains the disk check and compiler-job defaults but does not currently
-provide the POSIX host-wide lock guarantee.
+agents sharing a checkout must use the same directory. Each lock is keyed by
+the canonical checkout path; no global lock or slot is acquired. Never delete
+live lock files. Windows retains advisory reporting and existing build defaults;
+maintenance refuses when POSIX mutation locks are unavailable.
 
 A repository change cannot coordinate older worktrees that do not contain it,
 arbitrary commands that bypass the wrapper, or the desktop app's own workers.
@@ -70,8 +73,10 @@ removing originals. Never delete the only copy of recordings or local inputs.
 
 ## Retire a completed build
 
-Keep the current incremental build while a task is active. When the build is no
-longer needed after completion, integration, or retirement of the checkout:
+Keep the current incremental build while a task is active. Retirement is a
+conscious end-of-task choice when the build is no longer needed, never an
+automatic action after a successful build. It trades disk space for future
+recompilation. Review the dry run before applying it:
 
 ```sh
 python3 scripts/agent_workspace.py retire-builds
@@ -85,17 +90,27 @@ guarded build. It checks content hashes, file identities, Git tracking, path
 boundaries, and open files. Changed products, tracked files, failed builds,
 symlinks, unjournaled files, final `.wasm`/application binaries, recordings, and
 reports remain. Missing `lsof` or an active build causes cleanup to refuse.
-Rebuilding recreates removed intermediates. No other checkout is modified.
+Rebuilding recreates removed intermediates and will take extra work. No other
+checkout is modified. Invoke maintenance directly, outside the `run` wrapper;
+an active wrapper intentionally prevents it from acquiring the checkout lock.
 
 This deliberately does not guess how to clean historical unjournaled builds.
 Their contents require a separate reviewed cleanup. It does not remove source
 worktrees, dependencies, or host applications.
 
-## Identical toolchains share storage
+## Opt in to toolchain sharing
 
-After normal pinned installation, bootstrap checks up to three compatible
-registered Git worktrees with the exact same dependency lockfile. On macOS it verifies
-identical large SDK and environment files and replaces only the new checkout's
+Ordinary bootstrap only installs the pinned tools. When the checkout is idle,
+explicitly opt in to APFS sharing with:
+
+```sh
+python3 scripts/agent_workspace.py dedup-toolchain
+```
+
+This command takes the checkout mutation lock and checks for open tool files.
+It checks up to three compatible registered Git worktrees with the exact same
+dependency lockfile. On macOS it verifies identical large SDK and environment
+files and replaces only the current checkout's
 copies with APFS clones. File paths, bytes, permissions, extended attributes and
 modification times are preserved. Copies have independent inodes and later
 writes stay local. Mutable caches are not shared through symlinks or hardlinks.
@@ -105,3 +120,16 @@ its peak disk usage still occur. The first checkout, incompatible files, and
 filesystems without APFS clone support use the normal installation. A peer
 changing during verification is skipped. No daemon, recurring deletion job, or
 background compression is installed.
+
+## Remaining overhead
+
+These safeguards are not free: disk reporting, lock metadata, Ninja-journal
+scans, file stats, hashing and deletion still cost time and I/O. Successful builds
+record disposable products but do not delete them. The journal hashes each
+distinct Ninja output once and reuses hashes across builds only when device,
+inode, size, mtime and ctime match; changed or legacy entries are hashed again.
+Retirement rechecks content hashes rather than trusting that cache. Dry run and
+apply each validate their own current snapshot. Explicit deduplication hashes
+and verifies large files and can be expensive. This PR makes no zero-overhead
+or build-performance claim. Compute tuning and mandatory disk admission belong
+in a separate, measured change.

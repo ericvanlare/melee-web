@@ -13,6 +13,8 @@ import stat
 import subprocess
 import sys
 
+from workspace_resources import operation, refuse_open_paths
+
 
 def digest(path):
     result = hashlib.sha256()
@@ -87,6 +89,14 @@ def share_installed_toolchain(root):
     root = Path(root).resolve()
     if sys.platform != "darwin":
         return {"shared_files": 0, "reason": "APFS optimization is macOS-only"}
+    # This is an explicit maintenance action, never a normal bootstrap step.
+    # Do not borrow a build's lock: maintenance must refuse an active checkout.
+    with operation(root, "deduplicate toolchain", reuse=False):
+        refuse_open_paths([root / ".deps/emsdk", root / ".venv"])
+        return _share_installed_toolchain(root)
+
+
+def _share_installed_toolchain(root):
     try:
         records = subprocess.check_output(["git", "worktree", "list", "--porcelain", "-z"], cwd=root)
     except subprocess.CalledProcessError:
