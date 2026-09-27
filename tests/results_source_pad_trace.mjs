@@ -39,6 +39,13 @@ export function summarizeResultsPadTrace(trace){
     [...new Set(trace.samples.map(row=>row.pads[port].err))])};
 }
 
+export function findResultsStartRunAtOrAfter(startRuns,sourceFrame){
+  if(!Array.isArray(startRuns)||!Number.isInteger(sourceFrame))
+    throw Error('Results confirmation lookup requires source PAD runs and an integer source frame');
+  return startRuns.find(run=>Number.isInteger(run?.first_source_frame)&&
+    run.first_source_frame>=sourceFrame)??null;
+}
+
 // Correlate every trusted keyboard pulse after the CPU page gate to the raw
 // source PAD trace. A dispatched pulse can be ignored by the source; only an
 // actual P1 Start sample inside that pulse's observed down/up source-frame

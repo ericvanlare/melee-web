@@ -1217,3 +1217,25 @@ packet/harness contract suite passes 8/8, including a regression against the
 wrong lookup. This fixes reporting only; a fresh browser rerun is still needed
 for a clean harness receipt, and the historical camera-pool cause remains
 unknown.
+
+## Current source-tick verifier boundary (2026-09-27)
+
+The fresh current-branch two-match attempt is retained at
+`work/pr86-current-8d61f5d-b-source-tick-two-match-r1/report.json`. Match 1
+naturally ended with Falco at gameplay frame 13,284 (RNG 621,935,433), reached
+Results and returned to original CSS. Its 632/632 Results source ticks returned;
+disconnected CPU slots 2/3 changed page 0→1 at source frame 398 in phase 3,
+statistics phase 2. The consumed P1-only Start confirmation run was 610–619;
+port errors stayed `[0,0,-1,-1]`, and all Results camera-entry/adoption pointers
+were `0xa48ef20`. No camera/page/native error occurred.
+
+The report is still marked `fail` because final harness validation read
+`confirmation_source_frame` from a source-tick gate record that only retained
+the queue target. The raw source PAD trace proves the actual confirmation frame
+is 610 and the page gate at 398 precedes it; this is a verifier false negative,
+not a game failure. A new helper now binds the queued target to the consumed P1
+Start run and records that observed frame. Regression checks, Node syntax and
+the focused Results packet tests pass (8/8). The two-match browser run stopped
+after match 1; a fresh rendered rerun is needed to validate the fixed verifier.
+Falco is not the target slot-2 Zelda-origin Sheik winner, and the historical
+camera-pool failure remains unexplained.

@@ -19,7 +19,8 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
 import {queueResultsP1StartAtCurrentSource} from './results_source_pad_input.mjs';
 import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
-  findConsumedResultsStartKeyboardAttempt,summarizeResultsPadTrace}
+  findConsumedResultsStartKeyboardAttempt,findResultsStartRunAtOrAfter,
+  summarizeResultsPadTrace}
   from './results_source_pad_trace.mjs';
 
 const {values}=parseArgs({options:{...Object.fromEntries(
@@ -1106,8 +1107,16 @@ async function runMatch(matchIndex,expected){
     if(report.results_page_transition_checks.some(row=>row.match===matchIndex&&row.status==='pass')){
       assert.deepEqual(cpuPageTransitions.map(row=>row.slot),[2,3],
         'Disconnected CPU statistics pages did not each auto-advance exactly once');
-      const confirmationFrame=report.results_page_transition_checks.find(
-        row=>row.match===matchIndex&&row.status==='pass').confirmation_source_frame;
+      const pageCheck=report.results_page_transition_checks.find(
+        row=>row.match===matchIndex&&row.status==='pass');
+      const confirmationRun=findResultsStartRunAtOrAfter(sourcePadSummary.p1_start_runs,
+        pageCheck.confirmation_queue_target);
+      assert(confirmationRun,
+        'The queued source-tick confirmation must match a consumed P1 Start in the retained PAD trace');
+      pageCheck.confirmation_source_frame=confirmationRun.first_source_frame;
+      pageCheck.confirmation_source_run=confirmationRun;
+      pageCheck.confirmation_consumed=true;
+      const confirmationFrame=pageCheck.confirmation_source_frame;
       assert(cpuPageTransitions.every(row=>row.phase===3&&row.stats_phase===2&&
         row.source_frame<confirmationFrame),
         'Disconnected CPU pages must auto-advance in the active statistics phase before P1 confirmation');

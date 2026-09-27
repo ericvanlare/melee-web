@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {bindResultsEntryPacket,readResultsEntryPacket} from './results_entry_packet.mjs';
 import {queueResultsP1StartAtCurrentSource} from './results_source_pad_input.mjs';
 import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
-  findConsumedResultsStartKeyboardAttempt,summarizeResultsPadTrace}
+  findConsumedResultsStartKeyboardAttempt,findResultsStartRunAtOrAfter,
+  summarizeResultsPadTrace}
   from './results_source_pad_trace.mjs';
 
 const packet={schema:'melee-web-results-entry-v1',abi:{target:'wasm32',byte_order:'little-endian',pointer_bytes:4},
@@ -56,6 +57,15 @@ assert.deepEqual(retainedPadTrace.summary.results_page_transitions.map(row=>row.
 assert.deepEqual(retainedPadTrace.summary.p1_start_runs,
   [{first_source_frame:500,last_source_frame:501}]);
 assert.deepEqual(retainedPadTrace.summary.port_error_values,[[0],[0],[-1],[-1]]);
+const sourceTickStartRuns=[{first_source_frame:206,last_source_frame:215},
+  {first_source_frame:610,last_source_frame:619}];
+assert.deepEqual(findResultsStartRunAtOrAfter(sourceTickStartRuns,600),
+  sourceTickStartRuns[1],
+  'Source-tick validation must bind confirmation to the actually consumed post-target PAD run');
+assert.equal(findResultsStartRunAtOrAfter(sourceTickStartRuns,611),null,
+  'A queued confirmation with no consumed source PAD run must not pass');
+assert.throws(()=>findResultsStartRunAtOrAfter(sourceTickStartRuns,NaN),
+  /integer source frame/);
 const reusedObserverTrace={...resultsPadTrace,attempts:7,retained:7,samples:[
   ...resultsPadTrace.samples.slice(0,2),
   {...resultsPadTrace.samples[0],source_frame:1,
