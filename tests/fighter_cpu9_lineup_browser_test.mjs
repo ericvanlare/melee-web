@@ -17,7 +17,8 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
 import {queueResultsP1StartAtCurrentSource} from './results_source_pad_input.mjs';
 import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
-  summarizeResultsPadTrace} from './results_source_pad_trace.mjs';
+  findConsumedResultsStartKeyboardAttempt,summarizeResultsPadTrace}
+  from './results_source_pad_trace.mjs';
 
 const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input'].map(name=>[name,{type:'string'}])),
@@ -928,22 +929,27 @@ async function runMatch(matchIndex,expected){
       assert(!keydowns.some(row=>row.resultsSourceFrameAtEvent>firstTransitionFrame&&
           row.resultsSourceFrameAtEvent<=latestTransition),
         'No ordinary Enter confirmation may be dispatched between staggered CPU page transitions');
-      const postPageKeydownIndex=keydowns.findIndex(row=>
+      const firstPostPageKeydownIndex=keydowns.findIndex(row=>
         row.resultsSourceFrameAtEvent>latestTransition);
-      assert(postPageKeydownIndex>=initialPulseCount,
+      assert(firstPostPageKeydownIndex>=initialPulseCount,
         'The ordinary Enter confirmation must be dispatched after both automatic CPU page transitions');
       assert(keydowns.slice(initialPulseCount).every(row=>
         row.resultsSourceFrameAtEvent>latestTransition),
         'Every ordinary Enter confirmation must be dispatched after both automatic CPU page transitions');
-      const postPageStartRun=sourcePadSummary.p1_start_runs.find(row=>
-        row.first_source_frame>latestTransition&&
-        row.first_source_frame>=keydowns[postPageKeydownIndex].resultsSourceFrameAtEvent&&
-        keyups[postPageKeydownIndex]?.resultsSourceFrameAtEvent>=row.first_source_frame);
-      assert(postPageStartRun,
-        'The post-page Enter down/up source-frame bracket must contain a consumed P1 Start sample');
+      const postPageConfirmation=findConsumedResultsStartKeyboardAttempt(
+        keydowns.slice(initialPulseCount),keyups.slice(initialPulseCount),
+        sourcePadSummary.p1_start_runs,latestTransition);
+      assert(postPageConfirmation.accepted,
+        'A post-page Enter down/up source-frame bracket must contain a consumed P1 Start sample');
+      const postPageStartFrame=postPageConfirmation.accepted.consumed_start_source_frame;
+      const postPageKeydownIndex=initialPulseCount+postPageConfirmation.accepted.index;
       const postPageKeydown=keydowns[postPageKeydownIndex];
-      pageCheck.confirmation_source_frame=postPageStartRun.first_source_frame;
+      pageCheck.post_page_confirmation_attempts=postPageConfirmation.attempts;
+      pageCheck.post_page_start_runs=sourcePadSummary.p1_start_runs.filter(row=>
+        row.first_source_frame>latestTransition);
+      pageCheck.confirmation_source_frame=postPageStartFrame;
       pageCheck.keyboard_keydown_source_frame=postPageKeydown.resultsSourceFrameAtEvent;
+      pageCheck.confirmation_attempt_index=postPageConfirmation.accepted.index;
       pageCheck.confirmation_consumed=pageCheck.confirmation_source_frame!==null;
       pageCheck.status='pass-input-dispatched-after-pages';
       result.results_keyboard_page_verification={
@@ -957,6 +963,8 @@ async function runMatch(matchIndex,expected){
         cpu_page_delay_source_ticks:pageCheck.cpu_page_delay_source_ticks,
         keyboard_keydown_source_frame:pageCheck.keyboard_keydown_source_frame,
         confirmation_p1_start_source_frame:pageCheck.confirmation_source_frame,
+        confirmation_attempt_index:pageCheck.confirmation_attempt_index,
+        post_page_confirmation_attempts:pageCheck.post_page_confirmation_attempts,
         confirmation_consumed:pageCheck.confirmation_consumed,
         cpu_page_transitions:sourcePadSummary.results_page_transitions,
         p1_start_runs:sourcePadSummary.p1_start_runs,

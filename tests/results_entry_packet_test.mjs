@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {bindResultsEntryPacket,readResultsEntryPacket} from './results_entry_packet.mjs';
 import {queueResultsP1StartAtCurrentSource} from './results_source_pad_input.mjs';
 import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
-  summarizeResultsPadTrace} from './results_source_pad_trace.mjs';
+  findConsumedResultsStartKeyboardAttempt,summarizeResultsPadTrace}
+  from './results_source_pad_trace.mjs';
 
 const packet={schema:'melee-web-results-entry-v1',abi:{target:'wasm32',byte_order:'little-endian',pointer_bytes:4},
   match_index:1,entry_seed:0xfedcba98,
@@ -78,6 +79,24 @@ const preStatisticsTrace={...preKeyboardTrace,samples:[
 ]};
 assert.equal(assertResultsCpuPagesAfterInitialP1Keyboard(preStatisticsTrace,509),null,
   'The source-frame lower bound must not be mistaken for a consumed initial Enter or active statistics');
+const retryKeydowns=[520,615,720,827,931].map(resultsSourceFrameAtEvent=>({
+  resultsSourceFrameAtEvent}));
+const retryKeyups=[524,616,721,828,938].map(resultsSourceFrameAtEvent=>({
+  resultsSourceFrameAtEvent}));
+const lateConsumedConfirmation=findConsumedResultsStartKeyboardAttempt(retryKeydowns,
+  retryKeyups,[{first_source_frame:932,last_source_frame:938}],493);
+assert.equal(lateConsumedConfirmation.accepted?.index,4,
+  'A later trusted Enter pulse may be the first one actually consumed after page auto-advance');
+assert.equal(lateConsumedConfirmation.accepted?.consumed_start_source_frame,932);
+assert.deepEqual(lateConsumedConfirmation.attempts.slice(0,4).map(row=>
+  row.consumed_start_source_frame),[null,null,null,null],
+  'Dispatched but unconsumed Enter attempts must remain distinguishable from source PAD');
+assert.equal(findConsumedResultsStartKeyboardAttempt(retryKeydowns,retryKeyups,
+  [{first_source_frame:493,last_source_frame:500}],493).accepted,null,
+  'A Start at the final CPU page transition is not a post-page confirmation');
+assert.equal(findConsumedResultsStartKeyboardAttempt(retryKeydowns,retryKeyups,
+  [{first_source_frame:932,last_source_frame:938}],950).accepted,null,
+  'No source-consumed Start after the required page boundary must still fail');
 const keyboardGateTrace={attempts:5,retained:5,capacity:8192,overflow:false,samples:[
   {source_frame:508,tick_returned:true,pads:neutralPads(),
     results_state_after_tick:{source_frame:509,phase:2,stats_phase:0,

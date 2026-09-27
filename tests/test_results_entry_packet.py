@@ -142,8 +142,15 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('retainResultsInputEvents()', gated)
         self.assertIn("pageCheck.status='post-page-keyboard-dispatched';", gated)
         self.assertIn("row.status==='post-page-keyboard-dispatched'", harness)
-        source_pad_summary = harness.index('const sourcePadSummary=sourcePadTraceRecord?.summary;')
-        self.assertGreaterEqual(harness.index('sourcePadSummary.p1_start_runs.find(', source_pad_summary),
+        validation_start = harness.index("if(resultsInputMode==='keyboard-gated'){",
+                                         harness.index('const sourcePadTraceRecord='))
+        validation_end = harness.index("}else if(resultsInputMode==='source-tick'){", validation_start)
+        validation = harness[validation_start:validation_end]
+        self.assertIn('findConsumedResultsStartKeyboardAttempt(', validation)
+        self.assertIn('pageCheck.post_page_confirmation_attempts=postPageConfirmation.attempts;', validation)
+        self.assertIn('assert(postPageConfirmation.accepted,', validation)
+        source_pad_summary = validation.index('const sourcePadSummary=sourcePadTraceRecord?.summary;')
+        self.assertGreaterEqual(validation.index('findConsumedResultsStartKeyboardAttempt(', source_pad_summary),
                                 source_pad_summary)
         self.assertIn("pageCheck.status='pass-input-dispatched-after-pages';", harness)
         trace_helper = (ROOT / 'tests/results_source_pad_trace.mjs').read_text(encoding='utf-8')

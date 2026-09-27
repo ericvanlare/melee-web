@@ -936,3 +936,79 @@ boundary before waiting for CPU auto-pages. The next browser sample remains an
 unforced B run until a typed slot-2 Sheik winner reaches the guarded Results
 path. The historical camera failure and first invalid ownership transition
 remain unresolved; PR #86 is not ready to merge.
+
+## Natural B controls r11/r12 and input-bracket correction (2026-09-27)
+
+Both captures served the Wasm built from source commit `a3d584f` (SHA-256
+`41bc87d7a1e09b1a4b54750fed606f4457b2f0d88c71252e83752d2f299fe0f4`) through
+installed headless Chrome 153/WebGPU. Neither reproduces the historical
+slot-2 Sheik-winner failure.
+
+- `work/pr86-results-sheik-winner-b-natural-r11/report.json`: one natural
+  B-lineup four-CPU9, four-stock Final Destination match. Falco slot 3 won at
+  source frame 13,597; slot 2 remained Zelda at Results entry. Results phase 2
+  was observed at frame 208, CPU pages changed 0→1 at 407, a trusted post-page
+  P1 Start was consumed at 449, and the 471-row trace returned to CSS. Entry
+  snapshot retained all seven ownership points; constructed source/context/
+  owner pool values matched at `0xa59e6e0`. Sixteen timing interruptions; no
+  page/native errors. This is a CSS-return control, not a Sheik-winner test.
+- `work/pr86-results-sheik-winner-b-natural-r12/report.json`: the match itself
+  and Results→CSS teardown completed, with Samus slot 0 winning at source frame
+  15,222. Slot 2 transformed to Sheik during gameplay, then back to Zelda at
+  frame 14,746 before Results. The 954-row Results trace records CPU pages
+  changing at frame 493; trusted Enter attempts at frames 520, 615, 720, and
+  827 had no consumed P1 Start, while the attempt bracketed by frames 931–938
+  contains the actual source Start at frame 932. All source ticks returned;
+  port errors remained `[0,0,-1,-1]`; the camera source/context/owner snapshots
+  matched at `0xa59e6e0`; 44 timing interruptions; no page/native errors. The
+  report is marked failed because the old final assertion required the *first*
+  dispatched post-page pulse to be consumed, though the trace and screenshots
+  show a later trusted pulse was consumed and CSS teardown completed. Do not
+  call the pre-fix report a harness pass.
+
+The keyboard-gated validator now correlates every retained post-page keydown/
+keyup bracket to raw source PAD and accepts only a bracket that actually
+contains a consumed P1 Start strictly after both page transitions. It retains
+all no-op attempts and the accepted attempt index; it does not turn a dispatched
+key into a source input. A focused Node regression models r12's four unconsumed
+attempts followed by the consumed fifth, and rejects missing/pre-boundary
+starts. Running the helper against the archived r12 trace finds accepted
+attempt 4 at frame 932. Node syntax and trace tests, `test_results_entry_packet.py`
+(6/6), and `git diff --check` pass. No browser rerun or runtime build has yet
+validated the updated harness; its acceptance logic is checked offline against
+the retained trace.
+
+After two further non-target natural samples, the next experiment changed to
+the tracked Match-history reducer rather than another long replay. The current
+branch's `gameplay_results_scene_trace` target rebuilt successfully from
+`a3d584f` (JS SHA-256
+`31875fe8cba542c56269494e583075c0bf44a532e103c9dccebced3bcbf8af83`, Wasm
+`6f3cd77ca0332c360ea5f6eb4e0b7e138b8d0f03c0e0497b0a54220ed928f6e4`). The
+focused `test_source_pad_b_match_to_sheik_results` passed in 2.172s; retained
+command/stdout/stderr are under
+`work/results-match-history-tests/native-gj5wrf8z/`. This current-branch case
+uses four controlled human PAD streams but advances an actual source Match:
+slot 2 performs down-B at frame 44, the source reports a Zelda-origin Sheik
+winner at frame 2,834 with losses `4,4,0,4`, and Results constructs the real
+winner demo. Camera pool stayed `0x7090540` through 732 Results frames, scene
+exit, mode OnExit, host unload and session teardown. The profile selected
+Prize 192, not CSS; no GPU draw, CPU9, natural-match, or reference claim.
+
+With the same rebuilt target, focused
+`test_results_camera_ownership.py` passed 4/4 in 10.326s, including the three
+source CopyPAD B/Y/X winner-demo variants, mode-exit/profile/camera guard
+faults, and non-repeatable callback checks. Those variants use controlled
+Results standings and are native-state-only; they are not natural-match
+reproductions. The earlier frozen
+`work/pr86-results-match-history-rendered-d6MV2r/HANDOFF.md` (commit `4ea6d46`)
+remains historical and its unbuilt four-slot-HUD correction is not evidence;
+the run above is the current-branch refresh of the bounded source Match path.
+
+The reducer shows that a source-generated Zelda-origin Sheik winner can pass
+current Match→Results ownership/close, but it does not reproduce the natural
+four-CPU9 cursor-560 failure. That historical report still lacks raw Results
+PAD, phase/page state, and all camera pointer snapshots. The first invalid
+ownership transition remains unknown; do not claim this issue resolved or PR
+#86 ready to merge. The next useful discriminator must retain the exact
+natural-winner route or identify a source difference between it and the
+controlled Match-history case before another long capture.

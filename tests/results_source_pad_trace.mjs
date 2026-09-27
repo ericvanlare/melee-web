@@ -39,6 +39,31 @@ export function summarizeResultsPadTrace(trace){
     [...new Set(trace.samples.map(row=>row.pads[port].err))])};
 }
 
+// Correlate every trusted keyboard pulse after the CPU page gate to the raw
+// source PAD trace. A dispatched pulse can be ignored by the source; only an
+// actual P1 Start sample inside that pulse's observed down/up source-frame
+// bracket counts as confirmation.
+export function findConsumedResultsStartKeyboardAttempt(keydowns,keyups,startRuns,
+  afterSourceFrame){
+  if(!Array.isArray(keydowns)||!Array.isArray(keyups)||!Array.isArray(startRuns)||
+    keydowns.length!==keyups.length)
+    throw Error('Results keyboard confirmation requires paired keydown/keyup events');
+  const attempts=keydowns.map((keydown,index)=>{
+    const keydownFrame=keydown?.resultsSourceFrameAtEvent;
+    const keyupFrame=keyups[index]?.resultsSourceFrameAtEvent;
+    const startRun=Number.isInteger(keydownFrame)&&Number.isInteger(keyupFrame)&&
+      keyupFrame>=keydownFrame
+      ?startRuns.find(run=>run.first_source_frame>afterSourceFrame&&
+        keydownFrame<=run.first_source_frame&&keyupFrame>=run.first_source_frame)
+      :undefined;
+    return {index,keydown_source_frame:keydownFrame??null,
+      keyup_source_frame:keyupFrame??null,
+      consumed_start_source_frame:startRun?.first_source_frame??null};
+  });
+  return {attempts,accepted:attempts.find(attempt=>
+    attempt.consumed_start_source_frame!==null)??null};
+}
+
 // The first valid P1 Start moves Results from its source fade into statistics.
 // Return null until that initial one-button pulse is observed and both
 // disconnected CPU pages have advanced. A later pulse is valid only after
