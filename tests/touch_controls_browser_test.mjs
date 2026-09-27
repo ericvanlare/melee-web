@@ -134,25 +134,6 @@ async function rects() {
       fullscreenEnabled: document.fullscreenEnabled === true};
   });
 }
-async function setExpanded(enabled) {
-  await page.evaluate(enabled => {
-    const player = document.querySelector('#player');
-    player.classList.toggle('player-expanded', enabled);
-    player.classList.remove('toolbar-actions-open');
-    document.documentElement.classList.toggle('player-expanded', enabled);
-    document.body.classList.toggle('player-expanded', enabled);
-    const more = document.querySelector('#toolbar-more-toggle');
-    more.setAttribute('aria-expanded', 'false');
-    more.textContent = 'More controls';
-  }, enabled);
-  await page.waitForFunction(() => {
-    const canvas = document.querySelector('#canvas').getBoundingClientRect();
-    const overlay = document.querySelector('#touch-controls').getBoundingClientRect();
-    return Math.abs(canvas.left - overlay.left) < 1 && Math.abs(canvas.top - overlay.top) < 1 &&
-      Math.abs(canvas.width - overlay.width) < 1 && Math.abs(canvas.height - overlay.height) < 1;
-  });
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-}
 async function controlStateAt(control) {
   return page.evaluate(({selector, x, y}) => {
     const element = document.querySelector(`#touch-controls ${selector}`);
@@ -229,67 +210,36 @@ async function testStick(control, touchId) {
   sample = await pad();
   assert.deepEqual(sample.slice(index, index + 2), [0, 0], `${control.action} release returns both axes to neutral`);
 }
-async function assertLayout(size, mode, captures = false) {
+async function assertLayout(size, captures = false) {
   await page.setViewportSize({width: size[0], height: size[1]});
-  await setExpanded(mode === 'expanded');
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const geometry = await rects();
   assert(Math.abs(geometry.canvas.width / geometry.canvas.height - 4 / 3) < 0.01,
-    `${size.join('x')} ${mode} canvas remains 4:3`);
+    `${size.join('x')} canvas remains 4:3`);
   assert(Math.abs(geometry.overlay.width - geometry.canvas.width) < 1 &&
-    Math.abs(geometry.overlay.height - geometry.canvas.height) < 1, `${size.join('x')} ${mode} overlay follows the fitted canvas`);
-  if (mode === 'expanded')
-    assert(geometry.canvas.top >= geometry.toolbar.bottom - 1, `${size.join('x')} expanded mode reserves toolbar space above the game`);
+    Math.abs(geometry.overlay.height - geometry.canvas.height) < 1, `${size.join('x')} overlay follows the fitted canvas`);
+  assert(geometry.canvas.bottom <= geometry.toolbar.top + 1,
+    `${size.join('x')} normal toolbar remains outside the rendered game area`);
   for (const control of geometry.controls) {
     if (control.kind === 'button') await testButton(control, nextTouchId++);
     else await testStick(control, nextTouchId++);
   }
-  if (mode === 'expanded') {
-    // Exercise the real toolbar toggle as well as the page's collapsed
-    // expanded state. The secondary row reserves additional game space.
-    await page.locator('#toolbar-more-toggle').click();
-    await page.waitForFunction(() => {
-      if (!document.querySelector('#player').classList.contains('toolbar-actions-open')) return false;
-      const canvas = document.querySelector('#canvas').getBoundingClientRect();
-      const overlay = document.querySelector('#touch-controls').getBoundingClientRect();
-      return Math.abs(canvas.left - overlay.left) < 1 && Math.abs(canvas.top - overlay.top) < 1 &&
-        Math.abs(canvas.width - overlay.width) < 1 && Math.abs(canvas.height - overlay.height) < 1;
+  for (const id of ['controls-open', 'choose-disc']) {
+    const reachable = await page.locator(`#${id}`).evaluate(element => {
+      const r = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return r.width > 0 && r.height > 0 && (hit === element || element.contains(hit));
     });
-    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    const menu = await rects();
-    assert(menu.canvas.top >= menu.toolbar.bottom - 1,
-      `${size.join('x')} expanded toolbar menu reserves its full height above gameplay`);
-    assert(Math.abs(menu.canvas.width / menu.canvas.height - 4 / 3) < 0.01,
-      `${size.join('x')} expanded toolbar menu preserves 4:3 rendering`);
-    assert(Math.abs(menu.overlay.left - menu.canvas.left) < 1 && Math.abs(menu.overlay.top - menu.canvas.top) < 1 &&
-      Math.abs(menu.overlay.width - menu.canvas.width) < 1 &&
-      Math.abs(menu.overlay.height - menu.canvas.height) < 1,
-    `${size.join('x')} expanded toolbar menu keeps touch overlay fitted to the game`);
-    for (const id of ['fullscreen', 'controls-open', 'toolbar-more-toggle']) {
-      const reachable = await page.locator(`#${id}`).evaluate(element => {
-        const r = element.getBoundingClientRect();
-        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        return !element.disabled && r.width > 0 && r.height > 0 && (hit === element || element.contains(hit));
-      });
-      assert(reachable, `${id} remains visible and reachable in the expanded toolbar menu`);
-    }
-    for (const control of menu.controls) {
-      const hit = await controlStateAt(control);
-      assert(hit.reachable, `${size.join('x')} expanded menu leaves ${control.action} reachable; got ${hit.hit}`);
-      if (control.kind === 'button') await testButton(control, nextTouchId++);
-      else await testStick(control, nextTouchId++);
-    }
-    report.layouts.push({viewport: size, mode: 'expanded-more', canvas: menu.canvas,
-      overlay: menu.overlay, target_count: menu.controls.length, toolbar_actions_reachable: true});
-    await page.locator('#toolbar-more-toggle').click();
+    assert(reachable, `${id} remains visible and reachable at ${size.join('x')}`);
   }
   if (captures) {
-    const directory = path.join(values.out, `${size[0]}x${size[1]}-${mode}`);
+    const directory = path.join(values.out, `${size[0]}x${size[1]}-normal`);
     await fs.mkdir(directory, {recursive: true});
     await page.screenshot({path: path.join(directory, 'overlay.png'), fullPage: true});
-    report.screenshots.push(`${size[0]}x${size[1]}-${mode}/overlay.png`);
+    report.screenshots.push(`${size[0]}x${size[1]}-normal/overlay.png`);
   }
-  report.layouts.push({viewport: size, mode, canvas: geometry.canvas, overlay: geometry.overlay,
-    target_count: geometry.controls.length, safe_area_css_px: geometry.safe});
+  report.layouts.push({viewport: size, mode: 'normal', canvas: geometry.canvas, overlay: geometry.overlay,
+    target_count: geometry.controls.length, toolbar_controls_reachable: true, safe_area_css_px: geometry.safe});
   return geometry;
 }
 
@@ -349,18 +299,14 @@ try {
   // Every rendered control is tapped at its center using browser coordinate
   // dispatch. This exercises real hit testing instead of dispatching to the
   // selected node and proves each intended location produces PAD state.
-  for (const [size, mode] of [
-    [[320, 568], 'normal'], [[320, 568], 'expanded'],
-    [[390, 844], 'normal'], [[390, 844], 'expanded'],
-    [[667, 375], 'normal'], [[667, 375], 'expanded'],
-    [[844, 390], 'normal'], [[844, 390], 'expanded'],
-  ]) await assertLayout(size, mode, size[0] === 320 && mode === 'normal' || size[0] === 844 && mode === 'expanded');
+  for (const size of [[320, 568], [390, 844], [667, 375], [844, 390]])
+    await assertLayout(size, size[0] === 320 || size[0] === 844);
 
   // Safari safe-area env values are 0 in headless Chrome. Apply a representative
   // inset at the real overlay root to exercise its edge anchors and retest every
   // hit target for a layout that Chrome itself cannot supply on this machine.
   await page.setViewportSize({width: 320, height: 568});
-  await setExpanded(false);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.evaluate(() => {
     const overlay = document.querySelector('#touch-controls');
     for (const side of ['left', 'top', 'right', 'bottom']) overlay.style.setProperty(`--touch-safe-${side}`, '12px');
@@ -529,35 +475,35 @@ try {
   await page.locator('#controls-close').click();
 
   // Native fullscreen uses the real button's user activation and the overlay
-  // stays within its element. Unsupported/rejected cases are covered in the
-  // shell tests; Chrome may legitimately omit the native path in a headless run.
+  // stays within its element. Unsupported/rejected cases are covered separately.
   await page.setViewportSize({width: 844, height: 390});
   const nativeAvailable = await page.evaluate(() => document.fullscreenEnabled === true &&
-    typeof document.querySelector('#player').requestFullscreen === 'function');
+    typeof document.querySelector('#player').requestFullscreen === 'function' &&
+    typeof document.exitFullscreen === 'function');
   if (nativeAvailable) {
+    assert.equal(await page.locator('#fullscreen').isVisible(), true);
     await page.locator('#fullscreen').click();
-    await page.waitForFunction(() => !!document.fullscreenElement ||
-      document.querySelector('#player').classList.contains('player-expanded') ||
-      /declined fullscreen/i.test(document.querySelector('#fullscreen-status').textContent));
-    if (await page.evaluate(() => !!document.fullscreenElement)) {
-      await page.waitForFunction(() => {
-        const c = document.querySelector('#canvas').getBoundingClientRect();
-        const o = document.querySelector('#touch-controls').getBoundingClientRect();
-        return Math.abs(c.width - o.width) < 1 && Math.abs(c.height - o.height) < 1;
-      });
-      const full = await rects();
-      assert(Math.abs(full.canvas.width / full.canvas.height - 4 / 3) < 0.01, 'native fullscreen retains 4:3 rendering');
-      for (const control of full.controls) {
-        const hit = await controlStateAt(control);
-        assert(hit.reachable, `native fullscreen leaves ${control.action} reachable; got ${hit.hit}`);
-        if (control.kind === 'button') await testButton(control, nextTouchId++);
-        else await testStick(control, nextTouchId++);
-      }
-      await page.locator('#fullscreen').click();
-      await page.waitForFunction(() => !document.fullscreenElement);
-      report.native_fullscreen = 'supported by headless installed Chrome; entered, exercised overlay, and exited from direct button gestures';
-    } else report.native_fullscreen = 'request rejected by headless browser; application displayed its page-expansion fallback';
-  } else report.native_fullscreen = 'unsupported in this headless Chrome configuration; native behavior remains device/browser dependent';
+    await page.waitForFunction(() => document.fullscreenElement === document.querySelector('#player'));
+    await page.waitForFunction(() => {
+      const c = document.querySelector('#canvas').getBoundingClientRect();
+      const o = document.querySelector('#touch-controls').getBoundingClientRect();
+      return Math.abs(c.width - o.width) < 1 && Math.abs(c.height - o.height) < 1;
+    });
+    const full = await rects();
+    assert(Math.abs(full.canvas.width / full.canvas.height - 4 / 3) < 0.01, 'native fullscreen retains 4:3 rendering');
+    for (const control of full.controls) {
+      const hit = await controlStateAt(control);
+      assert(hit.reachable, `native fullscreen leaves ${control.action} reachable; got ${hit.hit}`);
+      if (control.kind === 'button') await testButton(control, nextTouchId++);
+      else await testStick(control, nextTouchId++);
+    }
+    await page.locator('#fullscreen').click();
+    await page.waitForFunction(() => !document.fullscreenElement);
+    report.native_fullscreen = 'supported by headless installed Chrome; entered, exercised overlay, and exited from direct button gestures';
+  } else {
+    assert.equal(await page.locator('#fullscreen').isHidden(), true, 'unsupported native fullscreen has no visible action');
+    report.native_fullscreen = 'unsupported in this headless Chrome configuration; action hidden and no page expansion fallback';
+  }
 
   const synthetic = await page.evaluate(() => window.__meleeTouchSyntheticInput);
   assert.deepEqual(synthetic, {mouseDown: 0, keyDown: 0}, 'touch controls emit no duplicate synthetic mouse or keyboard gameplay input');

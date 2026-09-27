@@ -23,7 +23,9 @@ let phase = 0, running = false, nextPointer = 16,
 let rendererStarted = false, cacheIdleCalls = 0;
 let failedFile = null, serviceBatch = 0;
 const calls = [], states = [], listeners = new Map();
-Object.defineProperty(globalThis, 'navigator', {value: {gpu: {}}, configurable: true});
+Object.defineProperty(globalThis, 'navigator', {value: {gpu: {
+  requestAdapter: async () => process.argv.includes('--no-webgpu-adapter') ? null : ({limits: {}}),
+}}, configurable: true});
 globalThis.window = globalThis;
 globalThis.isSecureContext = true;
 globalThis.crossOriginIsolated = true;
@@ -71,7 +73,9 @@ await fs.writeFile(sourcePath, source);
 const {mountMeleeRuntime} = await import(pathToFileURL(sourcePath));
 await fs.rm(temporary, {recursive: true});
 let owner;
-const mounted = mountMeleeRuntime({canvas, openDisc: null, createAudio: withAudio ? createRuntimeAudio : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
+const mounted = mountMeleeRuntime({canvas, openDisc: null, createAudio: withAudio ? options => {
+  calls.push(['createAudio']); return createRuntimeAudio(options);
+} : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
   configureModule: cacheUnavailable ? module => {
     module.preRun = () => {
       assert.ok(directories.has('/melee-render-cache'), 'Required setup precedes entry callbacks');
@@ -81,6 +85,16 @@ const mounted = mountMeleeRuntime({canvas, openDisc: null, createAudio: withAudi
   } : undefined,
   onState: state => states.push(state), onOwner: context => { owner = context; },
   startupTimeout: startupCacheTimeout ? 10 : undefined});
+if (process.argv.includes('--no-webgpu-adapter')) {
+  await assert.rejects(mounted, /No WebGPU adapter is available/);
+  assert.equal(calls.some(row => row[0] === 'loader'), false,
+    'No adapter is detected before downloading the native player');
+  assert.equal(calls.some(row => row[0] === 'createAudio'), false,
+    'No adapter is detected before creating the audio owner');
+  console.log('Shared runtime owner: missing WebGPU adapter stops before native download or audio setup.');
+  process.exit(0);
+}
+await new Promise(resolve => setImmediate(resolve));
 assert.equal(states.at(-1).state, 'booting');
 assert.deepEqual(states[0].loading, {phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
 assert.equal(states.at(-1).canSelectDisc, true,

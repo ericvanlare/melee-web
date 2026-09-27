@@ -15,8 +15,15 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   if (!canvas || canvas.id !== 'canvas') throw Error('The player requires its own #canvas.');
   if (documentClaimed) throw Error('Reload the page to start a fresh player.');
   if (!globalThis.isSecureContext) throw Error('The player requires HTTPS or a local server.');
-  if (!navigator.gpu) throw Error('WebGPU is unavailable. Try a desktop browser with WebGPU enabled.');
+  if (!navigator.gpu) throw Error('WebGPU is unavailable in this browser or device. The player cannot start here.');
   if (!globalThis.crossOriginIsolated) throw Error('The player requires cross-origin isolation headers.');
+  if (typeof navigator.gpu.requestAdapter !== 'function')
+    throw Error('This browser exposes WebGPU without the required adapter API. The player cannot start here.');
+  // A present WebGPU object does not guarantee that this browser can provide
+  // an adapter (for example, when WebGPU is disabled or no usable GPU exists).
+  // Check before creating audio or loading the large native module.
+  if (!await navigator.gpu.requestAdapter())
+    throw Error('No WebGPU adapter is available. The player cannot start on this browser or device.');
   documentClaimed = true;
   const assetBase = new URL('.', loaderUrl);
   let ready = false, fatal = false, destroyed = false, bundle = false, prepared = false, hasLocalData = false;

@@ -11,6 +11,10 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
     def test_native_command_audio_and_teardown_boundaries(self):
         self.run_owner([])
 
+    def test_missing_webgpu_adapter_stops_before_audio_and_native_module_load(self):
+        self.run_owner(['--no-webgpu-adapter'],
+                       'missing WebGPU adapter stops before native download or audio setup')
+
     def test_explicit_silent_owner_never_opens_audio(self):
         self.run_owner(['--silent'])
 
