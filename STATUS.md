@@ -33,6 +33,32 @@ historical scene-only replay and newer exact bounded state checks are explicitly
 separated in the notes; none establishes draw/pixel/timing equivalence. Final
 candidate integration checks and remaining character/action
 gates are still open. No admission or merge is claimed.
+## Original title/main-menu route integrated
+
+**Source identified / Retail compared / Browser exercised / Compiled** for the
+original title → Main/Versus → CSS route, CSS parent return, Main Back to Title,
+Title Start to Main, repeated CSS re-entry, and public Eject/reimport lifecycle.
+The retail capture starts from a cold Dolphin boot with an isolated copy of a
+retail-initialized card and records scoped source/PAD observations and labeled
+Metal frame screenshots. The final headless installed-Chrome check uses the
+production audio-enabled public package at the reconciled PR head. It preserves
+CSS-first startup, completes two repeated CSS → Main → Title → Main/Versus → CSS
+cycles, Ejects from Main and Title with CSS-first disc reimport, then completes
+CSS → SSS → supported Mario/Final Destination gameplay → Results → CSS. It
+records connected 32 kHz nonzero PCM transport and audio-context teardown.
+The audio-disabled `runtime-public` and production audio-enabled
+`runtime-audio-preview` Release targets are both built; the audio package is
+prepared and audited for this route. The local Observer and final browser
+receipts, input logs, package identities, and screenshots are indexed in the
+[route evidence ledger](docs/ORIGINAL_MENU_ROUTE_CAPTURE.md). This scope does
+not establish audible quality, PCM or pixel equivalence, foreground timing,
+input latency, physical-controller acceptance, performance, or full-game menu
+coverage.
+
+The title/main-menu receipts above were produced on the PR #96 source revision
+before this PR #86 reconciliation. They remain scoped evidence for that route,
+not validation of the combined candidate; the combined candidate still needs
+an affected build and browser lifecycle run.
 
 ## Repository public; main changes restricted to the owner
 

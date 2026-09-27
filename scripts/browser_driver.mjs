@@ -159,11 +159,15 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
       if(![holdMs,releaseMs].every(ms=>Number.isFinite(ms)&&ms>=0&&ms<=5000))throw Error('Invalid keyboard hold/release duration');
       if(holdMs+releaseMs>=remaining())throw Error('Keyboard sequence exceeds remaining wall-time bound');
       await page.locator('#canvas').focus({timeout:remaining()});
-      const held=[];
+      const held=[...keys];
       try {
         // A transport rejection can arrive after delivery. Release attempted
-        // keys too, so an ambiguous down cannot leave a modifier held.
-        for(const key of keys){held.push(key);await page.keyboard.down(key);}
+        // keys too, so an ambiguous down cannot leave a modifier held. Send a
+        // chord's down edges together so the source samples one PAD chord.
+        const downs=await Promise.allSettled(keys.map(key=>page.keyboard.down(key)));
+        const failures=downs.filter(result=>result.status==='rejected');
+        if(failures.length)throw new AggregateError(failures.map(result=>result.reason),
+          'Keyboard chord down failed');
         await page.waitForTimeout(holdMs);
       } finally {
         // Always attempt every release, including after a down/hold failure.

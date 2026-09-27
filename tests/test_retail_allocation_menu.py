@@ -157,7 +157,10 @@ class RetailAllocationMenuTests(unittest.TestCase):
             old_work = os.environ.get("MELEE_REPLAY_REFERENCE_WORK")
             old_target = os.environ.get("MELEE_CHECKPOINT_TARGET_JSON")
             old_gdb = sys.modules.get("gdb")
-            sys.modules["gdb"] = types.ModuleType("gdb")
+            gdb_module = types.ModuleType("gdb")
+            gdb_module.selected_inferior = lambda: types.SimpleNamespace(
+                read_memory=lambda address, size: b"\x11" * size)
+            sys.modules["gdb"] = gdb_module
             os.environ["MELEE_REPLAY_REFERENCE_WORK"] = str(root / "evidence")
             os.environ["MELEE_CHECKPOINT_TARGET_JSON"] = str(target)
             namespace = {}
@@ -171,7 +174,8 @@ class RetailAllocationMenuTests(unittest.TestCase):
                 self.assertEqual(len(lines), 1)
                 self.assertEqual(json.loads(lines[0]), {
                     "event": "pad_command", "port": 1, "command": "PRESS A",
-                    "scene_kind": driver.SCENE_MEMCARD, "scene_frame": 17,
+                    "scene_kind": driver.SCENE_MEMCARD, "game_mode": 17,
+                    "scene_frame": 17,
                 })
             finally:
                 if "COMMAND_LOG" in namespace:
@@ -193,6 +197,26 @@ class RetailAllocationMenuTests(unittest.TestCase):
         self.assertIs(driver.render_driver, driver.render_source_driver)
         self.assertEqual(driver.render_driver(), driver.render_cold_boot_driver())
         self.assertEqual(driver.render_source_driver(), driver.DRIVER_SOURCE)
+
+    def test_round_trip_driver_captures_cold_boot_and_original_back_forward_route(self):
+        source = driver.render_menu_round_trip_driver()
+        compile(source, "cold_boot_menu_round_trip.py", "exec")
+        self.assertIn("cold_boot_css_menu_round_trip()", source)
+        self.assertIn("_record_menu_route_frame()", source)
+        self.assertIn("cold-boot-menu-route.jsonl", source)
+        self.assertIn("cold-boot-input-commands.jsonl", source)
+        self.assertIn("'css_cursors'", source)
+        self.assertIn("'menu_state'", source)
+        self.assertIn("current_hps_hex", source)
+        self.assertIn("hps_voice_word", source)
+        self.assertIn("_cold_boot_css_to_title()", source)
+        self.assertIn("pulse(0,'B',settle=30)", source)
+        self.assertIn("_cold_boot_title_to_css()", source)
+        self.assertNotIn("\nset_rules_via_original_menu()\n", source)
+        self.assertNotIn("CHECKPOINT READY", source)
+        self.assertNotIn("write_memory(", source)
+        self.assertNotIn("put_register", source)
+        self.assertNotIn("load_state", source.lower())
 
 
 if __name__ == "__main__":

@@ -5,16 +5,20 @@
 
 namespace melee_web {
 
-enum class GameplayMenuScene { Characters, Stages };
+enum class GameplayMenuScene { Characters, Stages, Main, Title };
 
-// Owns the native services shared by the original CSS and SSS scenes. Source
-// scene entry, input, ticking, rendering, and exit remain the caller's
-// responsibility; this object only establishes the archive/audio/SDK lifetime
-// that those source functions require.
+// Owns the native services shared by the original CSS, SSS, main-menu, and
+// title scenes. Source scene entry, input, ticking, rendering, and exit remain
+// the caller's responsibility; this object establishes the archive/audio/SDK
+// lifetime that those source functions require.
 class GameplayMenuWorld {
 public:
-    explicit GameplayMenuWorld(const RuntimeFiles&);
-    GameplayMenuWorld(const RuntimeFiles&, RuntimeArchiveCache&);
+    explicit GameplayMenuWorld(
+        const RuntimeFiles&,
+        GameplayMenuScene initial_scene = GameplayMenuScene::Characters);
+    GameplayMenuWorld(const RuntimeFiles&, RuntimeArchiveCache&,
+                      GameplayMenuScene initial_scene =
+                          GameplayMenuScene::Characters);
     ~GameplayMenuWorld();
 
     GameplayMenuWorld(const GameplayMenuWorld&) = delete;
@@ -23,11 +27,11 @@ public:
     // Call after the source scene's OnExit. The operation is idempotent.
     void close();
 
-    // Release a prepared owner that has never entered a source CSS/SSS scene.
-    // This deliberately skips source scene card/audio stop callbacks.
+    // Release a prepared owner that has never entered a source scene. This
+    // deliberately skips source scene card/audio stop callbacks.
     void close_prepared();
 
-    // Call after source OnExit when moving between CSS and SSS. Rebuilds all
+    // Call after source OnExit when moving between native menu scenes. Rebuilds
     // mutable scene/HSD state while retaining the original menu audio scope.
     void rebuild_scene(GameplayMenuScene);
 

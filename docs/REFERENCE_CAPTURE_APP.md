@@ -14,6 +14,12 @@ not rewrite the saved profile or relax incomplete-capture validation.
 
 ## Evidence boundary
 
+The separate [original menu-route diagnostic](ORIGINAL_MENU_ROUTE_CAPTURE.md)
+preserves a fresh-DOL boot/title/main-menu/CSS and back/forward capture driver.
+It is a source/allocation diagnostic only; it does not replace the operator's
+retail comparison bundle or provide screenshots, PCM or browser lifecycle
+acceptance.
+
 The current capture contract is a single ordinary boot with one human player
 and one CPU player. The observer requires a human P1 versus CPU P2 setup and
 records PAD consumption, source frames, draw audits, result publication, and
