@@ -261,8 +261,10 @@ settings = mountControllerSettings({
 });
 
 const fullscreenButton = $('fullscreen'), fullscreenStatus = $('fullscreen-status'), playerElement = $('player');
-let fullscreenMode = typeof playerElement.requestFullscreen === 'function' &&
-  typeof document.exitFullscreen === 'function' && document.fullscreenEnabled !== false ? 'native' : 'expand';
+const toolbarMore = $('toolbar-more-toggle');
+let fullscreenMode = document.fullscreenEnabled === true &&
+  typeof playerElement.requestFullscreen === 'function' && typeof document.exitFullscreen === 'function'
+  ? 'native' : 'expand';
 function renderFullscreenControl() {
   const native = document.fullscreenElement === playerElement;
   const expanded = playerElement.classList.contains('player-expanded');
@@ -280,9 +282,14 @@ function fullscreenRejected(action) {
 }
 fullscreenButton.disabled = false;
 if (fullscreenMode === 'expand') {
-  fullscreenStatus.textContent = 'Native fullscreen is unavailable here. Expand player enlarges the game within this page; browser controls remain visible.';
+  fullscreenStatus.textContent = 'Native element fullscreen is unavailable here. Expand player fills this page; browser controls remain visible.';
 }
 renderFullscreenControl();
+toolbarMore.onclick = () => {
+  const expanded = playerElement.classList.toggle('toolbar-actions-open');
+  toolbarMore.setAttribute('aria-expanded', String(expanded));
+  toolbarMore.textContent = expanded ? 'Hide controls' : 'More controls';
+};
 fullscreenButton.onclick = () => {
   if (document.fullscreenElement) {
     try { Promise.resolve(document.exitFullscreen()).catch(() => fullscreenRejected('exit')); }
@@ -297,6 +304,9 @@ fullscreenButton.onclick = () => {
     return;
   }
   const expanded = playerElement.classList.toggle('player-expanded');
+  playerElement.classList.remove('toolbar-actions-open');
+  toolbarMore.setAttribute('aria-expanded', 'false');
+  toolbarMore.textContent = 'More controls';
   document.documentElement.classList.toggle('player-expanded', expanded);
   document.body.classList.toggle('player-expanded', expanded);
   fullscreenStatus.textContent = expanded

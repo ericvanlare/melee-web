@@ -11,6 +11,12 @@ const diagonal = applyTouchDeadZone(0.6, -0.6);
 assert(Math.abs(Math.hypot(...diagonal) - (Math.hypot(0.6, 0.6) - 0.15) / 0.85) < 1e-9,
   'radial dead zone preserves diagonal direction and rescales bounded magnitude');
 assert(Math.abs(Math.hypot(...applyTouchDeadZone(1, 1)) - 1) < 1e-9, 'diagonal travel is bounded to unit magnitude');
+for (const [x, y] of [[2, 0.5], [-2, -0.5]]) {
+  const clipped = applyTouchDeadZone(x, y);
+  assert(Math.abs(Math.hypot(...clipped) - 1) < 1e-9, 'off-axis travel beyond either stick rim clamps radially');
+  assert(Math.abs(clipped[0] / clipped[1] - x / y) < 1e-9,
+    'radial clamping preserves the original off-axis direction on both sticks');
+}
 const memoryStorage = () => { let data = null; return {getItem: () => data, setItem: (_, v) => { data = v; }}; };
 let current = [], manager = createControllerManager({getGamepads: () => current, storage: memoryStorage(), platform: 'test'});
 function sample() { return manager.sample()[0]; }

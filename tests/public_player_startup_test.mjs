@@ -50,6 +50,7 @@ class FakeElement {
   append(...children) { this.children.push(...children); }
   replaceChildren(...children) { this.children = children; }
   removeAttribute(name) { if (name === 'value') delete this.value; }
+  setAttribute(name, value) { this.attributes ||= new Map(); this.attributes.set(name, String(value)); }
   querySelector() { return null; }
   addEventListener(name, listener) {
     const listeners = this.listeners.get(name) || [];
@@ -79,7 +80,7 @@ class FakeElement {
 function makeDocument(fullscreen = 'unsupported') {
   const ids = [
   'canvas', 'player', 'choose-disc', 'disc-file', 'start-game', 'pause-game',
-  'controls-open', 'controls-close', 'controls-dialog', 'keyboard-layout',
+  'controls-open', 'toolbar-more-toggle', 'controls-close', 'controls-dialog', 'keyboard-layout',
     'player-one-source', 'player-two-source', 'player-one-source-status',
     'player-two-source-status', 'boxx-source-note', 'keyboard-bindings-details',
     'keyboard-bindings', 'controller-advanced', 'controllers', 'idle-hint', 'fullscreen', 'end-session', 'status',
@@ -296,10 +297,18 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
       assert.equal(button.disabled, false, 'Fullscreen or its labeled fallback remains enabled');
       if (fullscreen === 'unsupported') {
         assert.equal(button.textContent, 'Expand player');
-        assert.match(status.textContent, /Native fullscreen is unavailable/);
+        assert.match(status.textContent, /element fullscreen is unavailable/);
         button.click();
         assert.equal(playerElement.classList.contains('player-expanded'), true);
         assert.match(status.textContent, /browser controls remain visible/i);
+        const more = document.getElementById('toolbar-more-toggle');
+        more.click();
+        assert.equal(playerElement.classList.contains('toolbar-actions-open'), true);
+        assert.equal(more.attributes.get('aria-expanded'), 'true');
+        button.click();
+        assert.equal(playerElement.classList.contains('toolbar-actions-open'), false,
+          'Shrinking the player closes expanded secondary controls');
+        assert.equal(more.attributes.get('aria-expanded'), 'false');
       } else if (fullscreen === 'supported') {
         button.click();
         assert.equal(playerElement.requestCalls, 1);
@@ -309,6 +318,9 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
         button.click();
         assert.equal(document.fullscreenElement, null);
         assert.equal(button.textContent, 'Fullscreen');
+        document.getElementById('toolbar-more-toggle').click();
+        assert.equal(playerElement.classList.contains('toolbar-actions-open'), true,
+          'The toolbar disclosure remains operable on the player');
       } else {
         button.click();
         await new Promise(resolve => setTimeout(resolve, 0));

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Touch UI and PAD boundary against the real development player and owned disc. */
+/** Browser-coordinate touch controls and PAD boundary against an owned disc. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -8,41 +8,198 @@ import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.m
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 
 const {values} = parseArgs({options: Object.fromEntries(
-  ['url', 'disc', 'playwright', 'out'].map(name => [name, {type: 'string'}]))});
-if (!values.url || !values.disc || !values.out)
-  throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
+  ['url', 'disc', 'playwright', 'out', 'surface'].map(name => [name, {type: 'string'}]))});
+values.surface ||= 'development';
+if (!values.url || !values.disc || !values.out || !['development', 'public'].includes(values.surface))
+  throw Error('Use --url PLAYER_URL --disc OWNED_DISC --out NEW_DIRECTORY [--surface development|public] [--playwright PACKAGE_DIR]');
 await fs.mkdir(path.dirname(values.out), {recursive: true});
 await fs.mkdir(values.out);
+
 const {chromium, browser: installedBrowser} = await loadBrowserTools(values.playwright);
 const browser = await chromium.launch(browserLaunchOptions(installedBrowser));
-const page = await browser.newPage({viewport: {width: 1280, height: 800}});
-const driver = createBrowserDriver(page, {surface: 'development', timeoutMs: 90000});
+const context = await browser.newContext({viewport: {width: 390, height: 844}, deviceScaleFactor: 1,
+  isMobile: true, hasTouch: true});
+const page = await context.newPage();
+const cdp = await context.newCDPSession(page);
+await cdp.send('Emulation.setTouchEmulationEnabled', {enabled: true, maxTouchPoints: 10});
+await page.addInitScript(() => {
+  window.__meleeTouchPointerTrace = [];
+  window.__meleeTouchSyntheticInput = {mouseDown: 0, keyDown: 0};
+  document.addEventListener('pointerdown', event => {
+    const element = event.target?.closest?.('[data-touch-button], [data-touch-stick]');
+    if (!element) return;
+    window.__meleeTouchPointerTrace.push({pointerId: event.pointerId, pointerType: event.pointerType,
+      action: element.dataset.touchButton || element.dataset.touchStick});
+  }, true);
+  document.addEventListener('mousedown', event => {
+    if (event.target?.closest?.('#touch-controls')) window.__meleeTouchSyntheticInput.mouseDown++;
+  }, true);
+  document.addEventListener('keydown', event => {
+    if (event.target?.closest?.('#touch-controls')) window.__meleeTouchSyntheticInput.keyDown++;
+  }, true);
+});
+const driver = createBrowserDriver(page, {surface: values.surface, timeoutMs: 120000});
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+
 const source = port => page.getByLabel(`Player ${port} input source`, {exact: true});
 const waitSource = mode => page.waitForFunction(mode => Module.meleeControllers.getPortSource(0) === mode, mode);
 const pad = () => page.evaluate(() => {
   const samples = new Int32Array(32);
   Module.meleeControllers.writeSamples(samples, 0);
-  return [...samples];
+  return [...samples.slice(0, 16)];
 });
-async function pointer(selector, type, pointerId, x, y) {
-  await page.locator(selector).evaluate((element, event) => {
-    const init = {bubbles: true, cancelable: true, pointerId: event.pointerId,
-      pointerType: 'touch', isPrimary: true, button: 0, clientX: event.x, clientY: event.y};
-    element.dispatchEvent(new PointerEvent(event.type, init));
-  }, {type, pointerId, x, y});
+const emptyPlayerPad = sample => assert.deepEqual(sample.slice(1, 8), [0, 0, 0, 0, 0, 0, 0],
+  'all held buttons, axes, and analog triggers return to neutral');
+const bitFor = Object.freeze({A: 0x100, B: 0x200, X: 0x400, Y: 0x800, L: 0x40, R: 0x20,
+  Z: 0x10, Start: 0x1000, Up: 0x8, Down: 0x4, Left: 0x1, Right: 0x2});
+
+let activeTouches = new Map();
+function point(id, position, state) {
+  return {id, x: position.x, y: position.y, radiusX: 1, radiusY: 1, force: 1, state};
 }
-async function stickPoint(selector, axisX, axisY) {
-  const rect = await page.locator(selector).boundingBox();
-  const radius = Math.min(rect.width, rect.height) * 0.42;
-  return {rect, x: rect.x + rect.width / 2 + radius * axisX,
-    y: rect.y + rect.height / 2 + radius * axisY};
+async function dispatch(type, points = []) {
+  await cdp.send('Input.dispatchTouchEvent', {type, touchPoints: points});
 }
-const report = {schema: 'webmelee-touch-controls-browser-v1', browser: browser.version(),
-  browser_mode: 'headless installed Chrome', url: values.url, disc: path.basename(values.disc),
-  screenshots: [], scope: 'Owned-disc original CSS screen, touch settings, emulated portrait/landscape layout and authored multi-pointer input through the shared PAD writer. No phone, iOS fullscreen, timing or retail-equivalence claim.'};
+async function touchStart(id, x, y) {
+  const existed = activeTouches.has(id);
+  activeTouches.set(id, {x, y});
+  await dispatch('touchStart', [...activeTouches].map(([touchId, position]) =>
+    point(touchId, position, touchId === id && !existed ? 'touchPressed' : 'touchStationary')));
+}
+async function touchMove(id, x, y) {
+  assert(activeTouches.has(id), `touch ${id} must already be active`);
+  activeTouches.set(id, {x, y});
+  await dispatch('touchMove', [...activeTouches].map(([touchId, position]) =>
+    point(touchId, position, touchId === id ? 'touchMoved' : 'touchStationary')));
+}
+async function touchEnd(id) {
+  assert(activeTouches.has(id), `touch ${id} must already be active`);
+  activeTouches.delete(id);
+  if (activeTouches.size)
+    await dispatch('touchMove', [...activeTouches].map(([touchId, position]) => point(touchId, position, 'touchStationary')));
+  else await dispatch('touchEnd');
+}
+async function touchEndAll() {
+  activeTouches.clear();
+  await dispatch('touchEnd');
+}
+async function touchCancelAll() {
+  activeTouches.clear();
+  await dispatch('touchCancel');
+}
+async function rects() {
+  return page.evaluate(() => {
+    const canvas = document.querySelector('#canvas'), overlay = document.querySelector('#touch-controls');
+    const json = element => {
+      const r = element.getBoundingClientRect();
+      return {left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height};
+    };
+    return {canvas: json(canvas), overlay: json(overlay), toolbar: json(document.querySelector('#toolbar')),
+      controls: [...document.querySelectorAll('#touch-controls [data-touch-button], #touch-controls [data-touch-stick]')].map(element => {
+        const r = json(element);
+        return {kind: element.dataset.touchButton ? 'button' : 'stick', action: element.dataset.touchButton || element.dataset.touchStick,
+          selector: element.dataset.touchButton ? `[data-touch-button="${element.dataset.touchButton}"]` : `[data-touch-stick="${element.dataset.touchStick}"]`,
+          ...r, x: r.left + r.width / 2, y: r.top + r.height / 2};
+      }), safe: ['left', 'top', 'right', 'bottom'].map(side =>
+        getComputedStyle(overlay).getPropertyValue(`--touch-safe-${side}`).trim()),
+      fullscreenEnabled: document.fullscreenEnabled === true};
+  });
+}
+async function setExpanded(enabled) {
+  await page.evaluate(enabled => {
+    const player = document.querySelector('#player');
+    player.classList.toggle('player-expanded', enabled);
+    player.classList.remove('toolbar-actions-open');
+    document.documentElement.classList.toggle('player-expanded', enabled);
+    document.body.classList.toggle('player-expanded', enabled);
+    const more = document.querySelector('#toolbar-more-toggle');
+    more.setAttribute('aria-expanded', 'false');
+    more.textContent = 'More controls';
+  }, enabled);
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector('#canvas').getBoundingClientRect();
+    const overlay = document.querySelector('#touch-controls').getBoundingClientRect();
+    return Math.abs(canvas.left - overlay.left) < 1 && Math.abs(canvas.top - overlay.top) < 1 &&
+      Math.abs(canvas.width - overlay.width) < 1 && Math.abs(canvas.height - overlay.height) < 1;
+  });
+}
+async function controlStateAt(control) {
+  return page.evaluate(({selector, x, y}) => {
+    const element = document.querySelector(`#touch-controls ${selector}`);
+    const hit = document.elementFromPoint(x, y);
+    return {reachable: element === hit || element.contains(hit), hit: hit?.className || hit?.tagName || null};
+  }, control);
+}
+async function assertPointerCapture(control, action) {
+  const pointer = await page.evaluate(action => [...window.__meleeTouchPointerTrace].reverse()
+    .find(record => record.action === action && record.pointerType === 'touch') || null, action);
+  assert(pointer, `${action} receives a browser touch pointer event`);
+  assert(await page.locator(`#touch-controls ${control.selector}`).evaluate((element, id) => element.hasPointerCapture(id), pointer.pointerId),
+    `${action} captures its active browser touch pointer`);
+}
+async function testButton(control, touchId) {
+  const hit = await controlStateAt(control);
+  assert(hit.reachable, `${control.action} center is browser-hit-test reachable; got ${hit.hit}`);
+  await touchStart(touchId, control.x, control.y);
+  await assertPointerCapture(control, control.action);
+  let sample = await pad();
+  assert.equal(sample[0], 1, `${control.action} has an active P1 PAD sample`);
+  assert(sample[1] & bitFor[control.action], `${control.action} center produces the original PAD bit`);
+  if (control.action === 'L') assert.equal(sample[6], 255, 'L sets full analog trigger pressure');
+  if (control.action === 'R') assert.equal(sample[7], 255, 'R sets full analog trigger pressure');
+  await touchEnd(touchId);
+  sample = await pad();
+  assert.equal(sample[1] & bitFor[control.action], 0, `${control.action} releases independently`);
+  if (control.action === 'L') assert.equal(sample[6], 0, 'L release clears analog pressure');
+  if (control.action === 'R') assert.equal(sample[7], 0, 'R release clears analog pressure');
+}
+async function testStick(control, touchId) {
+  const hit = await controlStateAt(control);
+  assert(hit.reachable, `${control.action} center is browser-hit-test reachable; got ${hit.hit}`);
+  await touchStart(touchId, control.x, control.y);
+  await assertPointerCapture(control, control.action);
+  const radius = Math.min(control.width, control.height) * 0.42;
+  const direction = control.action === 'main' ? 1 : -1;
+  await touchMove(touchId, control.x + direction * radius * 0.32, control.y + radius * 0.27);
+  let sample = await pad();
+  const index = control.action === 'main' ? 2 : 4;
+  assert.notEqual(sample[index], 0, `${control.action} coordinate movement reaches its PAD axis`);
+  assert.notEqual(sample[index + 1], 0, `${control.action} diagonal coordinate movement reaches its second PAD axis`);
+  await touchEnd(touchId);
+  sample = await pad();
+  assert.deepEqual(sample.slice(index, index + 2), [0, 0], `${control.action} release returns both axes to neutral`);
+}
+async function assertLayout(size, mode, captures = false) {
+  await page.setViewportSize({width: size[0], height: size[1]});
+  await setExpanded(mode === 'expanded');
+  const geometry = await rects();
+  assert(Math.abs(geometry.canvas.width / geometry.canvas.height - 4 / 3) < 0.01,
+    `${size.join('x')} ${mode} canvas remains 4:3`);
+  assert(Math.abs(geometry.overlay.width - geometry.canvas.width) < 1 &&
+    Math.abs(geometry.overlay.height - geometry.canvas.height) < 1, `${size.join('x')} ${mode} overlay follows the fitted canvas`);
+  if (mode === 'expanded')
+    assert(geometry.canvas.top >= geometry.toolbar.bottom - 1, `${size.join('x')} expanded mode reserves toolbar space above the game`);
+  for (const control of geometry.controls) {
+    if (control.kind === 'button') await testButton(control, 1000 + Math.floor(Math.random() * 100000));
+    else await testStick(control, 1000 + Math.floor(Math.random() * 100000));
+  }
+  if (captures) {
+    const directory = path.join(values.out, `${size[0]}x${size[1]}-${mode}`);
+    await fs.mkdir(directory, {recursive: true});
+    await page.screenshot({path: path.join(directory, 'overlay.png'), fullPage: true});
+    report.screenshots.push(`${size[0]}x${size[1]}-${mode}/overlay.png`);
+  }
+  report.layouts.push({viewport: size, mode, canvas: geometry.canvas, overlay: geometry.overlay,
+    target_count: geometry.controls.length, safe_area_css_px: geometry.safe});
+  return geometry;
+}
+
+const report = {schema: 'webmelee-touch-controls-coordinate-browser-v2', browser: browser.version(),
+  browser_mode: 'headless installed Chrome with mobile viewport/touch emulation', surface: values.surface,
+  url: values.url, disc: path.basename(values.disc), screenshots: [], layouts: [],
+  scope: 'Owned-disc original CSS on the requested player surface; coordinate-based Chrome DevTools touch dispatch through browser hit testing, pointer capture and the shared PAD writer. No physical phone, iOS fullscreen, timing or retail-equivalence claim.'};
 
 try {
   await page.goto(values.url);
@@ -52,9 +209,8 @@ try {
       vendor: adapter?.info?.vendor || null, architecture: adapter?.info?.architecture || null,
       fallback: adapter?.info?.isFallbackAdapter ?? null};
   });
-  assert(report.gpu.isolated && report.gpu.available, 'Actual development game needs an isolated WebGPU adapter');
+  assert(report.gpu.isolated && report.gpu.available, 'The actual player needs an isolated WebGPU adapter');
   await driver.waitForImport();
-  await page.setViewportSize({width: 390, height: 844});
   await page.locator('#controls-open').click();
   assert.equal(await source(1).inputValue(), 'auto');
   assert.equal(await source(2).locator('option[value="touch"]').count(), 0, 'P2 has no touch source option');
@@ -71,22 +227,19 @@ try {
   await page.locator('#touch-controls:not([hidden])').waitFor();
 
   await driver.selectDisc(values.disc);
-  await driver.waitForStart();
-  await driver.launch();
-  await page.waitForTimeout(900);
-  const gameState = await page.evaluate(() => ({
-    phase: Module._melee_web_native_menu_phase(), running: Module._melee_web_native_menu_running(),
-    input: Module.meleeControllers.getPortSource(0), gameRect: document.querySelector('#canvas').getBoundingClientRect().toJSON(),
-    overlayRect: document.querySelector('#touch-controls').getBoundingClientRect().toJSON(),
-    safe: ['left', 'top', 'right', 'bottom'].map(side => getComputedStyle(document.querySelector('#touch-controls')).getPropertyValue(`--touch-safe-${side}`).trim()),
-  }));
-  assert.equal(gameState.phase, 1, 'owned disc reached original CSS');
-  assert.equal(gameState.running, 1);
-  assert.equal(gameState.input, 'touch');
-  assert(Math.abs(gameState.gameRect.width / gameState.gameRect.height - 4 / 3) < 0.01, 'portrait game remains 4:3');
-  assert(Math.abs(gameState.overlayRect.width - gameState.gameRect.width) < 1 &&
-    Math.abs(gameState.overlayRect.height - gameState.gameRect.height) < 1, 'touch controls fit the displayed game rectangle');
-  assert(gameState.safe.every(value => Number.isFinite(parseFloat(value)) && parseFloat(value) >= 0), 'safe-area offsets are finite and nonnegative');
+  if (values.surface === 'development') {
+    await driver.waitForStart();
+    await driver.launch();
+  } else {
+    const state = await driver.waitForPublicCss();
+    if (state === 'audio-recovery-required') await driver.recoverAudioActivation();
+  }
+  await page.waitForFunction(() => Module._melee_web_native_menu_phase() === 1 &&
+    Module._melee_web_native_menu_running() === 1, null, {timeout: 120000});
+  let initial = await rects();
+  assert(Math.abs(initial.canvas.width / initial.canvas.height - 4 / 3) < 0.01, 'owned disc CSS is displayed at 4:3');
+  assert(Math.abs(initial.overlay.width - initial.canvas.width) < 1 &&
+    Math.abs(initial.overlay.height - initial.canvas.height) < 1, 'overlay matches the actual packaged/development canvas');
   await page.screenshot({path: path.join(values.out, 'touch-overlay-portrait.png'), fullPage: true});
   report.screenshots.push('touch-overlay-portrait.png');
   await page.locator('#controls-open').click();
@@ -96,112 +249,199 @@ try {
   report.screenshots.push('touch-settings-portrait.png');
   await page.locator('#controls-close').click();
 
-  await page.setViewportSize({width: 1280, height: 720});
-  await page.waitForTimeout(80);
-  const landscape = await page.evaluate(() => ({
-    game: document.querySelector('#canvas').getBoundingClientRect().toJSON(),
-    overlay: document.querySelector('#touch-controls').getBoundingClientRect().toJSON(),
-  }));
-  assert(Math.abs(landscape.game.width / landscape.game.height - 4 / 3) < 0.01, 'landscape game remains 4:3');
-  assert(Math.abs(landscape.overlay.width - landscape.game.width) < 1 &&
-    Math.abs(landscape.overlay.height - landscape.game.height) < 1, 'overlay follows canvas after orientation-size change');
-  await page.screenshot({path: path.join(values.out, 'touch-overlay-landscape.png'), fullPage: true});
-  report.screenshots.push('touch-overlay-landscape.png');
+  // Every rendered control is tapped at its center using browser coordinate
+  // dispatch. This exercises real hit testing instead of dispatching to the
+  // selected node and proves each intended location produces PAD state.
+  for (const [size, mode] of [
+    [[320, 568], 'normal'], [[320, 568], 'expanded'],
+    [[390, 844], 'normal'], [[390, 844], 'expanded'],
+    [[667, 375], 'normal'], [[667, 375], 'expanded'],
+    [[844, 390], 'normal'], [[844, 390], 'expanded'],
+  ]) await assertLayout(size, mode, size[0] === 320 && mode === 'normal' || size[0] === 844 && mode === 'expanded');
 
-  await page.locator('#pause').click();
-  await page.waitForFunction(() => Module._melee_web_native_menu_running() === 0);
-  // Keep the verified CSS paused while holding one touch through ordinary
-  // Eject teardown.
-  await pointer('[data-touch-button="A"]', 'pointerdown', 401, 0, 0);
-  await driver.unload();
-  assert.equal((await pad())[1], 0, 'Eject cleanup leaves virtual buttons neutral');
+  // Safari safe-area env values are 0 in headless Chrome. Apply a representative
+  // inset at the real overlay root to exercise its edge anchors and retest every
+  // hit target for a layout that Chrome itself cannot supply on this machine.
+  await page.setViewportSize({width: 320, height: 568});
+  await setExpanded(false);
+  await page.evaluate(() => {
+    const overlay = document.querySelector('#touch-controls');
+    for (const side of ['left', 'top', 'right', 'bottom']) overlay.style.setProperty(`--touch-safe-${side}`, '12px');
+  });
+  let safeGeometry = await rects();
+  for (const control of safeGeometry.controls) {
+    const hit = await controlStateAt(control);
+    assert(hit.reachable, `12px emulated safe-area inset keeps ${control.action} center reachable; got ${hit.hit}`);
+  }
+  report.safe_area_fixture = {insets_css_px: 12, targets_reachable: safeGeometry.controls.length,
+    limitation: 'Emulated CSS custom properties in desktop Chrome; physical cutout/browser safe-area behavior remains device-only.'};
+  await page.evaluate(() => {
+    const overlay = document.querySelector('#touch-controls');
+    for (const side of ['left', 'top', 'right', 'bottom']) overlay.style.removeProperty(`--touch-safe-${side}`);
+  });
 
-  // Exercise multi-touch through the controller manager after Eject; the PAD
-  // writer remains available for direct boundary assertions.
+  // Both sticks receive unclamped off-axis movement outside their visible rim.
+  for (const [name, id, sign, axisIndex] of [['main', 701, 1, 2], ['cstick', 702, -1, 4]]) {
+    const control = (await rects()).controls.find(row => row.action === name);
+    const hit = await controlStateAt(control);
+    assert(hit.reachable, `${name} center is reachable before off-axis drag`);
+    await touchStart(id, control.x, control.y);
+    const radius = Math.min(control.width, control.height) * 0.42;
+    await touchMove(id, control.x + sign * radius * 2, control.y + radius * 0.5);
+    const sample = await pad();
+    assert(Math.abs(sample[axisIndex]) >= 120, `${name} clamps magnitude to the PAD range beyond the rim`);
+    assert(Math.abs(Math.abs(sample[axisIndex] / sample[axisIndex + 1]) - 4) < 0.15,
+      `${name} preserves a 4:1 off-axis direction beyond the rim`);
+    await touchEnd(id);
+    assert.deepEqual((await pad()).slice(axisIndex, axisIndex + 2), [0, 0], `${name} release outside the rendered rim clears both axes`);
+  }
 
-  // Independent pointer IDs hold multiple buttons and both analog sticks.
-  const main = await stickPoint('[data-touch-stick="main"]', 0.68, 0.58);
-  const cstick = await stickPoint('[data-touch-stick="cstick"]', -0.68, 0.58);
-  await pointer('[data-touch-button="A"]', 'pointerdown', 101, 0, 0);
-  await pointer('[data-touch-button="B"]', 'pointerdown', 102, 0, 0);
-  await pointer('[data-touch-button="L"]', 'pointerdown', 103, 0, 0);
-  await pointer('[data-touch-button="R"]', 'pointerdown', 104, 0, 0);
-  await pointer('[data-touch-button="Z"]', 'pointerdown', 105, 0, 0);
-  await pointer('[data-touch-stick="main"]', 'pointerdown', 106, main.x, main.y);
-  await pointer('[data-touch-stick="cstick"]', 'pointerdown', 107, cstick.x, cstick.y);
-  await pointer('[data-touch-button="X"]', 'pointerdown', 108, 0, 0);
-  await pointer('[data-touch-button="Y"]', 'pointerdown', 109, 0, 0);
-  await pointer('[data-touch-button="Up"]', 'pointerdown', 110, 0, 0);
-  await pointer('[data-touch-button="Left"]', 'pointerdown', 111, 0, 0);
+  // Independent browser touch IDs can move both sticks while A attacks, X
+  // jumps, and L shields. Removing one finger must not release its neighbors.
+  const combined = (await rects()).controls;
+  const at = action => combined.find(row => row.action === action);
+  await touchStart(801, at('main').x, at('main').y);
+  await touchStart(802, at('cstick').x, at('cstick').y);
+  await touchStart(803, at('A').x, at('A').y);
+  await touchStart(804, at('X').x, at('X').y);
+  await touchStart(805, at('L').x, at('L').y);
+  await touchMove(801, at('main').x + 24, at('main').y + 20);
+  await touchMove(802, at('cstick').x - 22, at('cstick').y + 18);
   let sample = await pad();
-  assert.equal(sample[0], 1);
-  for (const bit of [256, 512, 1024, 2048, 64, 32, 16, 8, 1])
-    assert(sample[1] & bit, `concurrent attack/shield/jump/dpad button bit ${bit}`);
-  assert.deepEqual(sample.slice(6, 8), [255, 255], 'L and R press their digital bits and full analog pressure');
-  assert(sample[2] > 0 && sample[3] < 0, 'main stick supports magnitude and screen-down maps to original up-axis');
-  assert(sample[4] < 0 && sample[5] < 0, 'C-stick has independent diagonal axes');
-
-  await pointer('[data-touch-button="B"]', 'pointerup', 102, 0, 0);
-  await pointer('[data-touch-button="L"]', 'pointercancel', 103, 0, 0);
+  for (const action of ['A', 'X', 'L']) assert(sample[1] & bitFor[action], `${action} remains held concurrently`);
+  assert(sample[2] > 0 && sample[3] < 0 && sample[4] < 0 && sample[5] < 0,
+    'main and C-stick move independently at the same time as face and shoulder input');
+  assert.deepEqual(sample.slice(6, 8), [255, 0], 'L maintains full analog shield pressure');
+  await touchEnd(803);
   sample = await pad();
-  assert.equal(sample[1] & 512, 0, 'B release leaves other fingers held');
-  assert(sample[1] & 256 && sample[1] & 32 && sample[1] & 16, 'A/R/Z stay held after B and L release');
-  assert.deepEqual(sample.slice(6, 8), [0, 255], 'canceling L releases only the left analog trigger');
+  assert.equal(sample[1] & bitFor.A, 0, 'releasing the A finger independently clears only A');
+  assert(sample[1] & bitFor.X && sample[1] & bitFor.L, 'X jump and L shield remain held after A release');
+  assert.notEqual(sample[2], 0); assert.notEqual(sample[4], 0);
+  await touchEnd(805);
+  sample = await pad();
+  assert.equal(sample[1] & bitFor.L, 0, 'releasing L clears its digital shield bit');
+  assert.deepEqual(sample.slice(6, 8), [0, 0], 'independent L release clears trigger pressure');
+  assert(sample[1] & bitFor.X, 'the independent jump finger remains held');
+  await touchEnd(802);
+  sample = await pad();
+  assert.deepEqual(sample.slice(4, 6), [0, 0], 'C-stick finger release clears only its axes');
+  assert.notEqual(sample[2], 0); assert(sample[1] & bitFor.X);
+  await touchCancelAll();
+  emptyPlayerPad(await pad());
 
-  // Visibility and focus loss release all owners. Re-arm to test the other
-  // cleanup path, then opening Controls and changing the source clears input.
+  // Browser pointercancel, focus loss, visibility loss, geometry changes,
+  // Controls opening, source changes, and teardown all clear held contacts.
+  const normal = await rects();
+  const aButton = normal.controls.find(row => row.action === 'A');
+  await touchStart(901, aButton.x, aButton.y);
+  await touchCancelAll();
+  emptyPlayerPad(await pad());
+  await touchStart(902, aButton.x, aButton.y);
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));
-  sample = await pad();
-  assert.deepEqual(sample.slice(1, 8), [0, 0, 0, 0, 0, 0, 0], 'window blur clears all held buttons and axes');
-  await pointer('[data-touch-button="A"]', 'pointerdown', 201, 0, 0);
-  await pointer('[data-touch-button="L"]', 'pointerdown', 202, 0, 0);
-  await pointer('[data-touch-stick="main"]', 'pointerdown', 203, main.x, main.y);
+  emptyPlayerPad(await pad());
+  await touchEndAll();
+  await touchStart(903, aButton.x, aButton.y);
   await page.evaluate(() => {
     const original = Object.getOwnPropertyDescriptor(document, 'hidden');
     Object.defineProperty(document, 'hidden', {configurable: true, value: true});
     document.dispatchEvent(new Event('visibilitychange'));
-    if (original) Object.defineProperty(document, 'hidden', original);
-    else delete document.hidden;
+    if (original) Object.defineProperty(document, 'hidden', original); else delete document.hidden;
   });
-  sample = await pad();
-  assert.deepEqual(sample.slice(1, 8), [0, 0, 0, 0, 0, 0, 0], 'hidden-document transition clears all input');
-  await pointer('[data-touch-button="A"]', 'pointerdown', 301, 0, 0);
-  await page.evaluate(() => window.meleeControllerSettings.setSource(0, 'keyboard'));
-  await waitSource('keyboard');
-  assert(await page.locator('#touch-controls').isHidden(), 'source switch hides the overlay');
-  sample = await pad();
-  assert.deepEqual(sample.slice(0, 8), [0, 0, 0, 0, 0, 0, 0, 0], 'source switch releases touch from P1');
-  await page.evaluate(() => window.meleeControllerSettings.setSource(0, 'touch'));
-  await waitSource('touch');
-  await pointer('[data-touch-button="A"]', 'pointerdown', 302, 0, 0);
+  emptyPlayerPad(await pad());
+  await touchEndAll();
+
+  await touchStart(904, aButton.x, aButton.y);
+  await page.setViewportSize({width: 667, height: 375});
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('#touch-controls')).width !== '0px');
+  emptyPlayerPad(await pad());
+  await touchEndAll();
+  assertLayout([667, 375], 'normal');
+
+  const resized = (await rects()).controls.find(row => row.action === 'A');
+  await touchStart(905, resized.x, resized.y);
   await page.locator('#controls-open').click();
-  sample = await pad();
-  assert.deepEqual(sample.slice(1, 8), [0, 0, 0, 0, 0, 0, 0], 'opening Controls clears all touch input');
+  emptyPlayerPad(await pad());
+  assert.equal(await page.locator('#controls-dialog').evaluate(element => element.open), true,
+    'Controls opens above the game and touch overlay');
+  await page.locator('#controls-close').click();
+  await touchEndAll();
+
+  await touchStart(906, resized.x, resized.y);
   await source(1).selectOption('keyboard');
   await waitSource('keyboard');
-  assert(await page.locator('#touch-controls').isHidden(), 'Controls source selection hides the overlay');
+  emptyPlayerPad(await pad());
+  assert(await page.locator('#touch-controls').isHidden(), 'switching away from touch hides the overlay');
+  await touchEndAll();
   await source(1).selectOption('touch');
   await waitSource('touch');
-  await page.locator('#controls-close').click();
-  await pointer('[data-touch-button="A"]', 'pointerdown', 402, 0, 0);
-  await page.evaluate(() => window.meleeControllerSettings.destroy());
-  assert.equal((await pad())[1], 0, 'settings teardown releases virtual inputs');
-  assert(await page.locator('#touch-controls').isHidden(), 'settings teardown removes the overlay');
+  const beforeTeardown = (await rects()).controls.find(row => row.action === 'A');
+  await touchStart(907, beforeTeardown.x, beforeTeardown.y);
+  if (values.surface === 'development') {
+    await page.evaluate(() => window.meleeControllerSettings.destroy());
+    emptyPlayerPad(await pad());
+    assert(await page.locator('#touch-controls').isHidden(), 'settings teardown removes the overlay');
+    await touchEndAll();
+  } else {
+    await page.evaluate(() => window.addEventListener('beforeunload', () => {
+      const samples = new Int32Array(32);
+      Module.meleeControllers.writeSamples(samples, 0);
+      sessionStorage.setItem('__touchPadBeforeEject', JSON.stringify([...samples.slice(0, 8)]));
+    }, {once: true}));
+    await driver.unload();
+    const ejectedPad = await page.evaluate(() => JSON.parse(sessionStorage.getItem('__touchPadBeforeEject') || 'null'));
+    assert(ejectedPad, 'Eject reload retains the pre-navigation PAD cleanup sample');
+    assert.deepEqual(ejectedPad.slice(1), [0, 0, 0, 0, 0, 0, 0], 'Eject releases all touch controls before teardown');
+  }
 
+  // Rebind after the cleanup test and prove source/opacity persistence.
   await page.reload();
   await driver.waitForImport();
   await page.locator('#controls-open').click();
   assert.equal(await source(1).inputValue(), 'touch', 'touch source persists through reload');
   assert.equal(await page.locator('#touch-opacity').inputValue(), '0.65', 'opacity persists through reload');
-  await page.screenshot({path: path.join(values.out, 'touch-settings-persisted.png'), fullPage: true});
-  report.screenshots.push('touch-settings-persisted.png');
+  await page.locator('#controls-close').click();
+
+  // Native fullscreen uses the real button's user activation and the overlay
+  // stays within its element. Unsupported/rejected cases are covered in the
+  // shell tests; Chrome may legitimately omit the native path in a headless run.
+  await page.setViewportSize({width: 844, height: 390});
+  const nativeAvailable = await page.evaluate(() => document.fullscreenEnabled === true &&
+    typeof document.querySelector('#player').requestFullscreen === 'function');
+  if (nativeAvailable) {
+    await page.locator('#fullscreen').click();
+    await page.waitForFunction(() => !!document.fullscreenElement ||
+      document.querySelector('#player').classList.contains('player-expanded') ||
+      /declined fullscreen/i.test(document.querySelector('#fullscreen-status').textContent));
+    if (await page.evaluate(() => !!document.fullscreenElement)) {
+      await page.waitForFunction(() => {
+        const c = document.querySelector('#canvas').getBoundingClientRect();
+        const o = document.querySelector('#touch-controls').getBoundingClientRect();
+        return Math.abs(c.width - o.width) < 1 && Math.abs(c.height - o.height) < 1;
+      });
+      const full = await rects();
+      assert(Math.abs(full.canvas.width / full.canvas.height - 4 / 3) < 0.01, 'native fullscreen retains 4:3 rendering');
+      const a = full.controls.find(row => row.action === 'A');
+      await touchStart(1001, a.x, a.y);
+      assert((await pad())[1] & bitFor.A, 'coordinate touch reaches A in native fullscreen');
+      await touchEnd(1001);
+      assert.equal((await pad())[1] & bitFor.A, 0);
+      await page.locator('#fullscreen').click();
+      await page.waitForFunction(() => !document.fullscreenElement);
+      report.native_fullscreen = 'supported by headless installed Chrome; entered, exercised overlay, and exited from direct button gestures';
+    } else report.native_fullscreen = 'request rejected by headless browser; application displayed its page-expansion fallback';
+  } else report.native_fullscreen = 'unsupported in this headless Chrome configuration; native behavior remains device/browser dependent';
+
+  const synthetic = await page.evaluate(() => window.__meleeTouchSyntheticInput);
+  assert.deepEqual(synthetic, {mouseDown: 0, keyDown: 0}, 'touch controls emit no duplicate synthetic mouse or keyboard gameplay input');
   assert.deepEqual(errors, []);
   report.result = 'pass';
-  report.game = 'Owned disc reached original CSS (phase 1) in the development runtime';
-  report.layout = {portrait: [390, 844], landscape: [1280, 720], safeAreaValues: gameState.safe};
-  report.input = 'Independent synthetic PointerEvents; A/B/X/Y/L/R/Z/dpad + both sticks; independent up/cancel; blur/visibility/source-switch/Controls/Eject/teardown cleanup; PAD ABI readback.';
+  report.game = values.surface === 'development'
+    ? 'Owned disc reached original CSS in the development runtime'
+    : 'Owned disc reached original CSS in the production audio-player package';
+  report.input = 'CDP coordinate touch through browser hit testing and pointer capture; every rendered button/stick sampled through shared PAD writer; dual-stick plus A/X/L, independent release, off-axis radial clamp, cancel/blur/visibility/resize/Controls/source-switch/teardown cleanup; 4:1 direction preserved for both sticks.';
+  report.synthetic_mouse_keyboard_events = synthetic;
   await fs.writeFile(path.join(values.out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
-  console.log('Touch controls: owned-disc CSS, multi-pointer PAD mapping, cleanup, persistence and responsive 4:3 layout pass.');
+  console.log(`Touch controls: ${values.surface} owned-disc CSS, coordinate hit testing, multi-touch PAD input, cleanup, persistence and responsive 4:3 layouts pass.`);
 } catch (error) {
   report.result = 'fail'; report.failure = String(error);
   report.diagnostics = await driver.diagnostics();

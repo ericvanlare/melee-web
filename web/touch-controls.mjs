@@ -102,6 +102,7 @@ export function mountTouchControls({container, canvas} = {}) {
   const probe = document.createElement('div');
   probe.className = 'touch-safe-area-probe';
   document.body?.append(probe);
+  let lastLayout = null;
 
   function held(action) {
     for (const owner of pointerOwners.values()) if (owner.kind === 'button' && owner.action === action) return true;
@@ -165,8 +166,11 @@ export function mountTouchControls({container, canvas} = {}) {
     if (stickOwners.get(name) !== event.pointerId) return;
     const rect = element.getBoundingClientRect();
     const radius = Math.max(1, Math.min(rect.width, rect.height) * 0.42);
-    const x = clamp((event.clientX - (rect.left + rect.width / 2)) / radius, -1, 1);
-    const y = clamp((event.clientY - (rect.top + rect.height / 2)) / radius, -1, 1);
+    // Keep the unclamped displacement until radial normalization. Clamping
+    // axes independently before normalization changes the direction of an
+    // off-axis drag that crosses the stick rim.
+    const x = (event.clientX - (rect.left + rect.width / 2)) / radius;
+    const y = (event.clientY - (rect.top + rect.height / 2)) / radius;
     const [outX, outY] = applyTouchDeadZone(x, y);
     stickValues[name] = [outX, outY];
     element.style.setProperty('--stick-x', `${outX * 34}%`);
@@ -220,15 +224,19 @@ export function mountTouchControls({container, canvas} = {}) {
     if (!root.isConnected) return;
     const host = hostElement.getBoundingClientRect(), rect = canvas.getBoundingClientRect();
     if (!(rect.width > 0 && rect.height > 0)) return;
-    root.style.left = `${rect.left - host.left}px`;
-    root.style.top = `${rect.top - host.top}px`;
-    root.style.width = `${rect.width}px`;
-    root.style.height = `${rect.height}px`;
     const style = getComputedStyle(probe);
     const safeLeft = Math.max(0, (parseFloat(style.paddingLeft) || 0) - rect.left);
     const safeTop = Math.max(0, (parseFloat(style.paddingTop) || 0) - rect.top);
     const safeRight = Math.max(0, rect.right - (innerWidth - (parseFloat(style.paddingRight) || 0)));
     const safeBottom = Math.max(0, rect.bottom - (innerHeight - (parseFloat(style.paddingBottom) || 0)));
+    const layout = [rect.left, rect.top, rect.width, rect.height, safeLeft, safeTop, safeRight, safeBottom];
+    if (lastLayout && pointerOwners.size && layout.some((value, index) => Math.abs(value - lastLayout[index]) > 0.5))
+      releaseAll();
+    lastLayout = layout;
+    root.style.left = `${rect.left - host.left}px`;
+    root.style.top = `${rect.top - host.top}px`;
+    root.style.width = `${rect.width}px`;
+    root.style.height = `${rect.height}px`;
     root.style.setProperty('--touch-safe-left', `${safeLeft}px`);
     root.style.setProperty('--touch-safe-top', `${safeTop}px`);
     root.style.setProperty('--touch-safe-right', `${safeRight}px`);
