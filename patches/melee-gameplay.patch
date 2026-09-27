@@ -9413,9 +9413,9 @@ diff --git a/src/melee/gm/gmmain_lib.c b/src/melee/gm/gmmain_lib.c
 +        fp->u.kb.hat.x24.xC[4] == fp->x5AC.xC[4] &&
 +        fp->u.kb.hat.x24.model_num > 0 &&
 +        fp->u.kb.hat.x24.model_num < model_num) {
-+        /* PlKbCpGw authors one category-4 row, while Kirby's base FtPartsDesc
-+         * has two. Keep the body list/visibility owner, but scope this shared
-+         * row to the copy archive's declared model count. */
++        /* The copy adapter proves surplus body rows have empty original
++         * signed loops (including relocated MEM1 pointer/count aliases).
++         * Keep both owners; scope only this validated borrowed view. */
 +        fp->x5AC.model_num = fp->u.kb.hat.x24.model_num;
 +    }
      if (arg1 == 2) {

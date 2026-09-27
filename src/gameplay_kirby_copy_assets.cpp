@@ -169,7 +169,8 @@ void adapt_for_native_source_parser(std::vector<std::uint8_t>& bytes,
 void adapt_kirby_copy_parts_count(std::vector<std::uint8_t>& bytes,
                                   const DatArchive& archive,
                                   const KirbyCopyArchiveRequirement& root,
-                                  const std::vector<unsigned>& costume_ids)
+                                  const std::vector<unsigned>& costume_ids,
+                                  unsigned body_model_count)
 {
     if (root.costume_root || costume_ids.empty()) return;
 
@@ -322,6 +323,26 @@ void adapt_kirby_copy_parts_count(std::vector<std::uint8_t>& bytes,
             std::size_t{count} * lookup_row_bytes);
         if (!lookup)
             reject("Kirby Game & Watch secondary part-visibility lookup is missing");
+        // F14B4 lends this same lookup to Kirby's body (whose model count is
+        // independent). The original B6C/CA0/D7C inner loops use signed cmpw.
+        // Prove every omitted iteration is empty before 750C8 scopes that
+        // borrowed view to its owner's count. A relocated count aliases an
+        // adjacent pointer: GALE01's original archive lies in MEM1, so that
+        // word is negative, unlike its positive Wasm pointer. Never infer an
+        // empty row merely from a shorter descriptor or an asset filename.
+        if (!count || !body_model_count || body_model_count > 11U)
+            reject("Kirby borrowed visibility has no validated body model count");
+        for (std::uint32_t model = count; model < body_model_count; ++model) {
+            const auto row = *lookup + model * lookup_row_bytes;
+            if (archive.has_relocation(row)) {
+                if (!archive.pointer(row, 1))
+                    reject("Kirby borrowed visibility count alias has no source target");
+            } else {
+                const auto word = archive.be32(row);
+                if (word != 0 && word < 0x80000000U)
+                    reject("Kirby borrowed visibility tail has a nonempty original signed loop");
+            }
+        }
         for (std::uint32_t model = 0; model < count; ++model) {
             const auto row = *lookup + model * lookup_row_bytes;
             const auto groups = archive.be32(row);
@@ -568,6 +589,15 @@ struct GameplayKirbyCopyAssets::Storage {
         costume_requirements = copy_costume_requirements(kinds, kirby_costumes);
         requirements = copy_archive_requirements(kinds, costume_requirements);
         effect_requirements = kirby_copy_effect_requirements(selection);
+        const auto body_file = files.find("PlKb.dat");
+        if (body_file == files.end()) reject("Kirby body source archive was not imported");
+        const DatArchive body(body_file->second, DatExternalPolicy::ResolveNull);
+        const auto body_root = public_root(body, "ftDataKirby").data_offset;
+        const auto body_parts = body.pointer(body_root + 8U, 8);
+        if (!body_parts) reject("Kirby body FtPartsDesc is missing");
+        const auto body_model_count = body.be32(*body_parts);
+        if (!body_model_count || body_model_count > 11U)
+            reject("Kirby body model count exceeds source FtParts bounds");
         if (const auto common_items = files.find("ItCo.usd");
             common_items != files.end()) {
             auto item_archive = std::make_shared<const DatArchive>(
@@ -599,7 +629,7 @@ struct GameplayKirbyCopyAssets::Storage {
             for (const auto& root : requirements)
                 if (root.filename == requirement.filename)
                     adapt_kirby_copy_parts_count(owned.bytes, *checked, root,
-                                                 kirby_costumes);
+                                                 kirby_costumes, body_model_count);
             owned.native = std::make_unique<HSD_Archive>();
             std::memset(owned.native.get(), 0, sizeof(HSD_Archive));
             // This is the checked native descriptor owner, not a source

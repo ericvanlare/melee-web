@@ -194,7 +194,9 @@ The frozen `1103bd6` runtime also passes a fresh natural B two-match loop
 (`work/pr86-handoff-b-two-match-r1/report.json`): 13,393/14,989 gameplay frames,
 rendered Results at 181/184, both original CSS returns, and zero reported
 page/native errors or timing interruptions. Actual winners are Samus and Falco;
-the old Sheik-winner failure remains open. Both entry packets are hash-bound,
+the old Sheik-winner failure remains open. Ready-match observations contain
+both active P3 FighterKind 19 (Zelda) and 7 (Sheik), distinct from merely
+retaining a dormant secondary entity. Both entry packets are hash-bound,
 gameplay/Results/CSS screenshots are retained, and final CSS has 33 objects /
 17 processes with no Match/Results/Prize owner. Served Wasm SHA-256:
 `90366cbde83f6ca929b6a0f8d77caabe77c5cceb4975230d52a3562513f7aa79`.
@@ -271,6 +273,21 @@ texture-index fallback for parts-only hats. Its four reduced tests fail before
 and pass after, including malformed consumed-pointer rejection and six real
 donor archives (`work/pr86-kirby-copy-tests-{before,after}.log`). On `02b63aa`,
 all seven forms pass all-costume entry and teardown in both orientations.
+
+The borrowed G&W category-4 visibility view now has an additional original-code
+proof, rather than relying only on the copy descriptor's shorter count. Owned
+`PlKb.dat` supplies two body rows and `PlKbCpGw.dat` supplies one copy row. The
+next apparent count is an adjacent relocated pointer. Owned-DOL profiles verify
+signed `cmpw` in `ftParts_80074B6C`, `80074CA0`, and `80074D7C`: the original MEM1
+pointer makes that inner loop empty, while a native Wasm pointer is positive.
+The adapter derives both counts from the owned descriptors and rejects a tail
+with any nonempty original signed loop before permitting the scoped borrowed
+view. It does not rewrite pointer bits or infer a bound from an asset filename.
+Seven focused checks pass, including positive-tail rejection, scalar-zero and
+negative tails, all six owned donor archives/all colors, and the three owned
+executable profiles (`work/pr86-kirby-signed-visibility-r1.log`, exit0). Affected
+runtime and rendered validation of this additional rejection remain pending.
+
 Fox's actual copied-move acquisition/use/loss/reacquisition passes all six
 Kirby colors. The equivalent G&W test exposed a color-1 acquisition
 crash in `HSD_DObjSetFlags` through `ftParts_8007487C` and

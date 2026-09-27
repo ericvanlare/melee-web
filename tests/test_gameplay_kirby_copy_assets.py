@@ -1,7 +1,9 @@
 """Reduced copy-row adapter checks; no shared runtime or browser rebuild."""
+import hashlib
 import os
 from pathlib import Path
 import subprocess
+import struct
 import sys
 import tempfile
 import unittest
@@ -72,7 +74,13 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
     def test_source_costume_cache_rows_and_archive_manifest(self):
         self.run_case("source_costume_cache_rows")
 
+    def test_borrowed_rows_require_empty_original_signed_loops(self):
+        self.run_case("borrowed_signed_visibility_tail")
+
     def test_owned_copy_archives_all_costumes(self):
+        body = ROOT / "assets-local/next-gate/PlKb.dat"
+        if not body.is_file():
+            self.skipTest("Owned Kirby body archive unavailable")
         donors = (("Fx", "Fox", 1), ("Mr", "Mario", 0), ("Pp", "Popo", 10),
                   ("Ss", "Samus", 13), ("Ca", "Captain", 2), ("Gw", "Gamewatch", 24))
         for code, symbol, kind in donors:
@@ -80,7 +88,33 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
                 path = ROOT / f"assets-local/next-gate/PlKbCp{code}.dat"
                 if not path.is_file():
                     self.skipTest(f"Owned copy archive unavailable: {path.name}")
-                self.run_case(path, f"ftDataKirbyCopy{symbol}", kind)
+                self.run_case(path, f"ftDataKirbyCopy{symbol}", kind, body)
+
+
+class KirbyVisibilityOriginalProfileTests(unittest.TestCase):
+    def test_owned_original_visibility_loops_compare_signed_counts(self):
+        configured = os.environ.get("MELEE_CPU_DOL")
+        if not configured:
+            self.skipTest("owned DOL not configured (MELEE_CPU_DOL)")
+        sys.path.insert(0, str(ROOT / "tools"))
+        from retail_allocation_profile import Dol, read_symbols
+        dol = Dol(Path(configured))
+        symbols = read_symbols(ROOT / ".deps/melee/config/GALE01/symbols.txt")
+        for address, size, digest, compare, instruction in (
+                (0x80074B6C, 0x134, "ada0a905cc355c65bc8ee58080c772cf006c948ac7f73b61ac3a899ad3792b0e",
+                 0x80074C64, 0x7c180000),
+                (0x80074CA0, 0xDC, "fdeaab716b218690230cb0a45cd8584b03177221c951b51d75d7833b2465bce7",
+                 0x80074D44, 0x7c170000),
+                (0x80074D7C, 0xDC, "7fb36b9e80f88ee59f72072c285f16b4f97ddf548c5ffe040708413cab93bc3a",
+                 0x80074E20, 0x7c170000)):
+            symbol = symbols[f"ftParts_{address:08X}"]
+            self.assertEqual((symbol["address"], symbol["size"]), (address, size))
+            self.assertEqual(hashlib.sha256(dol.read(address, size)).hexdigest(), digest)
+            # lwz count; signed cmpw j,count (not cmplw); blt loop body.
+            words = struct.unpack(">III", dol.read(compare - 4, 12))
+            self.assertEqual(words, (0x801c0000 if address == 0x80074B6C else 0x801b0000,
+                                     instruction,
+                                     0x4180ff68 if address == 0x80074B6C else 0x4180ffb0))
 
 
 if __name__ == "__main__":

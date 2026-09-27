@@ -90,14 +90,14 @@ struct Fixture {
 };
 
 Bytes adapt(const Bytes& input, const KirbyCopyArchiveRequirement& root,
-            const std::vector<unsigned>& costumes)
+            const std::vector<unsigned>& costumes, unsigned body_models = 2)
 {
     const auto original = input;
     const DatArchive archive(input, DatExternalPolicy::ResolveNull);
     const Bytes checked_before(archive.data().begin(), archive.data().end());
     auto bytes = input;
     adapt_for_native_source_parser(bytes, archive);
-    adapt_kirby_copy_parts_count(bytes, archive, root, costumes);
+    adapt_kirby_copy_parts_count(bytes, archive, root, costumes, body_models);
     check(input == original, "Input archive changed");
     check(std::equal(checked_before.begin(), checked_before.end(), archive.data().begin()),
           "Checked archive changed");
@@ -215,8 +215,37 @@ void source_costume_cache_rows()
     check(roots.size() == 5, "Unselected source costume roots were requested");
 }
 
-void real_archive(const char* filename, const char* symbol, unsigned kind)
+void borrowed_signed_visibility_tail()
 {
+    Fixture fixture(false);
+    fixture.root.fighter_kind = FTKIND_GAMEWATCH;
+    fixture.link(40, 272); // source callback's secondary lookup, root + 0x18
+    put(fixture.data, 272, 1); fixture.link(276, 224);
+    fixture.link(280, 384); // next apparent count is an adjacent relocated pointer
+    (void)adapt(fixture.bytes(), fixture.root, {0}, 2);
+    rejects([&] { adapt(fixture.bytes(), fixture.root, {0}, 0); });
+    std::erase(fixture.reloc, 280);
+    // A shorter copy descriptor alone cannot justify omitting a body row.
+    rejects([&] { adapt(fixture.bytes(), fixture.root, {0}, 2); });
+    put(fixture.data, 280, 0);
+    (void)adapt(fixture.bytes(), fixture.root, {0}, 2);
+    put(fixture.data, 280, 0xffffffffU);
+    (void)adapt(fixture.bytes(), fixture.root, {0}, 2);
+    put(fixture.data, 280, 1);
+    rejects([&] { adapt(fixture.bytes(), fixture.root, {0}, 2); });
+}
+
+void real_archive(const char* filename, const char* symbol, unsigned kind,
+                  const char* body_filename)
+{
+    std::ifstream body_stream(body_filename, std::ios::binary);
+    check(bool(body_stream), "Owned Kirby body archive unavailable");
+    const Bytes body_input{std::istreambuf_iterator<char>(body_stream), {}};
+    const DatArchive body(body_input, DatExternalPolicy::ResolveNull);
+    const auto body_root = public_root(body, "ftDataKirby").data_offset;
+    const auto body_parts = body.pointer(body_root + 8U, 8);
+    check(bool(body_parts), "Owned Kirby FtPartsDesc unavailable");
+    const auto body_models = body.be32(*body_parts);
     std::ifstream stream(filename, std::ios::binary);
     check(bool(stream), "Owned copy archive unavailable");
     const Bytes input{std::istreambuf_iterator<char>(stream), {}};
@@ -224,9 +253,9 @@ void real_archive(const char* filename, const char* symbol, unsigned kind)
     const DatArchive archive(input, DatExternalPolicy::ResolveNull);
     const auto offset = public_root(archive, root.symbol).data_offset;
     const bool joint = archive.has_relocation(offset);
-    const auto neutral = adapt(input, root, {0});
+    const auto neutral = adapt(input, root, {0}, body_models);
     for (unsigned costume = 0; costume < 6; ++costume) {
-        const auto output = adapt(input, root, {costume});
+        const auto output = adapt(input, root, {costume}, body_models);
         if (joint) check(output == neutral, "Body costume changed joint-hat rows");
         else {
             // Independently check the authored row-zero fallback's scalar counts.
@@ -240,7 +269,15 @@ void real_archive(const char* filename, const char* symbol, unsigned kind)
             }
         }
     }
-    (void)adapt(input, root, {1, 5, 0, 2});
+    (void)adapt(input, root, {1, 5, 0, 2}, body_models);
+    if (kind == FTKIND_GAMEWATCH) {
+        const auto lookup = *archive.pointer(offset + 0x18, body_models * 8);
+        check(archive.be32(offset) == 1 && body_models == 2 &&
+                  archive.has_relocation(lookup + 8),
+              "Owned borrowed tail is not the audited pointer/count alias");
+        std::cout << "Owned borrowed visibility: body_models=" << body_models
+                  << " owner_models=1 tail_count_is_relocation=1\n";
+    }
     std::cout << symbol << ": all six costumes and shared selection passed\n";
 }
 } // namespace
@@ -248,13 +285,14 @@ void real_archive(const char* filename, const char* symbol, unsigned kind)
 int main(int argc, char** argv)
 {
     try {
-        if (argc == 4) real_archive(argv[1], argv[2], std::stoul(argv[3]));
+        if (argc == 5) real_archive(argv[1], argv[2], std::stoul(argv[3]), argv[4]);
         else if (argc == 2) {
             const std::string name = argv[1];
             if (name == "joint_row_zero") joint_row_zero();
             else if (name == "costume_fallback") costume_fallback();
             else if (name == "malformed_consumed_rows") malformed_consumed_rows();
             else if (name == "source_costume_cache_rows") source_costume_cache_rows();
+            else if (name == "borrowed_signed_visibility_tail") borrowed_signed_visibility_tail();
             else throw std::runtime_error("Unknown case");
             std::cout << name << ": passed\n";
         } else return 2;
