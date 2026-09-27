@@ -13,9 +13,10 @@ CSS-first startup, completes two repeated CSS → Main → Title → Main/Versus
 cycles, Ejects from Main and Title with CSS-first disc reimport, then completes
 CSS → SSS → supported Mario/Final Destination gameplay → Results → CSS. It
 records connected 32 kHz nonzero PCM transport and audio-context teardown.
-The silent rollback package is separately rebuilt and audited. The local
-Observer and final browser receipts, input logs, package identities, and
-screenshots are indexed in the
+The audio-disabled `runtime-public` and production audio-enabled
+`runtime-audio-preview` Release targets are both built; the audio package is
+prepared and audited for this route. The local Observer and final browser
+receipts, input logs, package identities, and screenshots are indexed in the
 [route evidence ledger](docs/ORIGINAL_MENU_ROUTE_CAPTURE.md). This scope does
 not establish audible quality, PCM or pixel equivalence, foreground timing,
 input latency, physical-controller acceptance, performance, or full-game menu

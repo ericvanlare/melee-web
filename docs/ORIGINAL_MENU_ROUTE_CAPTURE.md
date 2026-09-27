@@ -61,18 +61,22 @@ PR #102 while keeping #96 independent of its broader Settings/save-profile
 feature.
 
 The final public Release checks use headless installed Chrome through
-`scripts/browser_tools.mjs` and `scripts/browser_driver.mjs`. The silent player
-and the separate production `audio-player` package were built and audited. The
-audio-enabled package check reached CSS first, completed two CSS → Main → Title
-→ Main/Versus → CSS cycles, and exercised Eject from Main and Title. Each
-native unload completed before reimport; each reimport started directly at CSS.
-It then completed CSS → SSS → Mario/Final Destination gameplay → Results → CSS.
-The browser report retains screenshots, source phase/message, Web Audio state,
-and PCM transport observations. Chrome observed connected 32 kHz worklet
-output with nonzero PCM through CSS, Main, Title, SSS, gameplay, Results and
-CSS re-entry, and closed each live audio context during Eject. This is
-functional lifecycle and PCM-transport evidence, not PCM equivalence, audible
-quality, foreground timing, input latency or performance evidence.
+`scripts/browser_tools.mjs` and `scripts/browser_driver.mjs`. Both affected
+Release runtimes (`runtime-public` and `runtime-audio-preview`) were built; the
+production audio-enabled `audio-player` package was prepared and audited. The
+audio-enabled package check reached CSS first with the complete character
+roster visible, completed two CSS → Main → Title → Main/Versus → CSS cycles,
+and exercised Eject from Main and Title. Each native unload completed before
+reimport; each reimport started directly at CSS. It then completed CSS → SSS →
+Mario/Final Destination gameplay → Results → CSS. The browser report retains
+screenshots, source phase/message, Web Audio state, and PCM transport
+observations. Chrome observed connected 32 kHz worklet output with nonzero PCM
+through CSS, Main, Title, SSS, gameplay, Results and CSS re-entry, and observed
+the live audio contexts close during Eject. The production package also passed
+local Pages HTTP inventory/header verification; Wrangler reports its known
+local 502 responses for the reserved `_headers` and `_redirects` routes. This
+is functional lifecycle and PCM-transport evidence, not PCM equivalence,
+audible quality, foreground timing, input latency or performance evidence.
 
 The native regression checks that the default mask is `0x07ff`, every source
 unlock-table character remains available to CSS, and the roster remains intact
@@ -96,15 +100,13 @@ under ignored `work/` and are not committed:
 | `.../retail-route-12-full/route-source-states.jsonl` | 1,874 decoded passive PAD/menu source-state observations |
 | `.../retail-route-12-full/capture.mwro`, `input.mwri`, `inputs.jsonl`, `dolphin.log` | Observer stream, input transport receipt, named controller commands, and emulator log |
 | `.../observer-build-menu-route-07.json` | Observer build receipt and source overlay hashes; Dolphin 2606a-dirty from commit `c77bbaa0f372c3f72281602a8b087206706542cb`, binary SHA-256 `a197b95a737ad1ad410738fdaab94985c48bdccd5063ce99f4134b849c82d1b1`, JITARM64, guest-memory writes disabled |
-| `work/pr96-title-main/final/public-audio-browser/report.json` | Final-head audio-enabled public-player run in headless Chrome; 15 checks, two menu cycles, Main/Title Eject and reimport, supported match/Results return, Web Audio and PCM observations |
-| `work/pr96-title-main/final/public-audio-browser/*.png` | Screenshots for CSS, Title/Main, both route cycles, SSS, gameplay, Results, and post-reimport boundaries |
-| `work/pr96-title-main/final/audio-player.manifest.json`, `audio-http.json` | Source-bound production audio package identity and local Pages HTTP inventory/header verification |
-| `work/pr96-title-main/final/silent-player.manifest.json` | Source-bound silent rollback package identity and production-package audit; audio route evidence uses the separate audio-enabled package |
-| `work/pr96-title-main/final/logs/native-title-main-focused.log`, `title-main-abort-trace.jsonl` | Focused Title/Main abort regression and retained native trace, including unsupported-route recovery |
-| `work/pr96-title-main/review-round2/logs/native-title-menu-roster-focused.log` | Updated focused regression for the full roster, CSS availability/re-entry, P1/P2 source Start edges, genuine unsupported Challenger request, timeout payload, and Title/Main Eject recovery; failed iterations are retained beside it |
-| `work/pr96-title-main/review-round2/public-audio-browser/report.json` | Production audio-enabled browser evidence rebuilt against this review head, including CSS-first startup, repeated menu cycles, Eject/reimport, routed match/Results, Web Audio, PCM, and errors |
-| `work/pr96-title-main/final/logs/full-tests.log` | Required full unittest discovery with owned DOL/disc/source/symbol inputs configured |
-| `work/pr96-title-main/final/logs/audio-build.log`, `public-build.log`, `public-audit.log` | Final-head audio and silent Release builds and silent package audit |
+| `work/pr96-title-main/review-round2/review-head-public-audio-browser/report.json` | Headless installed Chrome report for 15 production audio-player checks on the menu fix, including the full CSS roster, two menu cycles, Main/Title Eject and reimport, supported match/Results return, audio initialization, teardown, PCM transport and zero runtime errors |
+| `work/pr96-title-main/review-round2/review-head-public-audio-browser/*.png` | Screenshots for CSS, Title/Main, both route cycles, SSS, gameplay, Results, and post-reimport boundaries |
+| `work/pr96-title-main/review-round2/review-head-audio-player.manifest.json`, `review-head-audio-http.json`, `review-head-audio-audit.json` | Source-bound production audio package identity, package audit, and local Pages HTTP inventory/header verification |
+| `work/pr96-title-main/review-round2/logs/review-head-native-menu-ownership.log` | Final-head focused roster, CSS availability/re-entry, P1/P2 Title Start edge, genuine unsupported Challenger request, timeout payload, and Title/Main Eject regression; failed iterations are retained beside it |
+| `work/pr96-title-main/review-round2/logs/full-tests.log` | Full unittest discovery on implementation commit `6456af7`: 1,547 tests, 94 skipped, no failures. The later PR commit changes documentation only; optional fixture/tool skips are listed in the log |
+| `work/pr96-title-main/review-round2/logs/review-head-audio-build.log`, `review-head-public-build.log`, and `review-head-audio-audit.log` | Final-head Release builds for `runtime-audio-preview` and `runtime-public`, plus production audio package audit |
+| `work/pr96-title-main/review-round2/review-head-audio-http.json`, `logs/pages-dev-review-head-audio.log` | Final-head local Pages HTTP verifier receipt and Wrangler output, including the documented reserved-route limitation |
 | `work/pr96-title-main/public-audio-browser-reconciled-head-04/report.json` | Earlier diagnostic run on the same reconciled runtime before final package identity; superseded by the final-head report above |
 | `.../browser-public-lifecycle-03/report.json` | Historical silent-only browser evidence from the earlier public-player lifecycle; superseded for this PR by the audio-enabled final-head run |
 
