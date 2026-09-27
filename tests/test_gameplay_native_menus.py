@@ -1,6 +1,7 @@
 """Original SIS bytecode behavior; runs without proprietary menu assets."""
 from pathlib import Path
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -34,7 +35,7 @@ class NativeMenuSourceTests(unittest.TestCase):
 
     def test_owned_original_menu_match_loop(self):
         targets = [ROOT / "build" / name / "native_menu_host_trace.js"
-                   for name in ("browser", "browser-release")]
+                   for name in ("browser", "browser-release", "browser-audio-preview-release")]
         targets = [path for path in targets if path.is_file()]
         menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
         if not targets or not (menu / "MnSlChr.usd").is_file() or not (game / "PlMr.dat").is_file():
@@ -62,7 +63,7 @@ class NativeMenuSourceTests(unittest.TestCase):
 
     def test_link_audio_registry_css_unload(self):
         targets = [ROOT / "build" / name / "native_menu_host_trace.js"
-                   for name in ("browser", "browser-release")]
+                   for name in ("browser", "browser-release", "browser-audio-preview-release")]
         targets = [path for path in targets if path.is_file()]
         menu = game = ROOT / "assets-local/issue34"
         if not targets or not (menu / "MnSlChr.usd").is_file() or not all(
@@ -80,6 +81,30 @@ class NativeMenuSourceTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
         self.assertIn("Original CSS Link audio registry entered, aborted and unloaded", run.stdout)
         self.assertIn("Original CSS Young Link audio registry entered, aborted and unloaded", run.stdout)
+
+    def test_title_and_main_checked_abort_teardown(self):
+        targets = [ROOT / "build" / name / "native_menu_host_trace.js"
+                   for name in ("browser", "browser-release", "browser-audio-preview-release")]
+        targets = [path for path in targets if path.is_file()]
+        fixture_root = Path(os.environ.get("MELEE_MENU_FIXTURE_ROOT", ROOT / "assets-local"))
+        if not fixture_root.is_absolute():
+            fixture_root = ROOT / fixture_root
+        menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
+        if not targets or not (menu / "MnSlChr.usd").is_file():
+            self.skipTest("Build the native menu host and supply owned menu fixtures")
+        target = max(targets, key=lambda path: path.stat().st_mtime)
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        with tempfile.TemporaryDirectory(prefix="title main abort trace ") as directory:
+            trace = Path(directory) / "port.jsonl"
+            run = subprocess.run(
+                [str(node_runtime()), str(target), str(menu), str(game), "32",
+                 str(trace), source_revision, "title-main-abort-v1"],
+                cwd=ROOT, capture_output=True, text=True, timeout=120)
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn("Original Title Eject released source ownership and allowed CSS re-entry", run.stdout)
+        self.assertIn("Original Main Eject released source ownership and allowed CSS re-entry", run.stdout)
+        self.assertIn("Native Title/Main checked abort and CSS re-entry smoke passed", run.stdout)
 
     def test_original_sis_layout_and_style_stack(self):
         candidates = [ROOT / "build" / directory / "native_menu_scene_trace.js"

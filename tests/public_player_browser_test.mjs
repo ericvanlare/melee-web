@@ -6,6 +6,7 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {installBrowserAudioTrace} from './browser_audio_trace.mjs';
 const {values} = parseArgs({options: {
   ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
   audio: {type: 'boolean', default: false},
@@ -26,7 +27,7 @@ const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.ve
     source_sha: packageManifest.source_sha, runtime_hash: packageManifest.runtime_hash,
     identity_sha256: packageManifest.identity_sha256,
   } : null,
-  scope: 'Production entry, ordinary keyboard UI, lifecycle and application network smoke. No retail comparison, physical-controller, PCM or performance claim.'};
+  scope: values.audio ? 'Production audio-enabled public entry, ordinary keyboard UI, original menu route, supported match/results lifecycle, Web Audio initialization and nonzero PCM transport. No retail pixel/PCM equivalence, audible-quality, physical-controller or foreground-timing claim.' : 'Production entry, ordinary keyboard UI, lifecycle and application network smoke. No retail comparison, physical-controller, PCM or performance claim.'};
 page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData()}));
 page.on('pageerror', error => errors.push(error.message));
 page.on('websocket', socket => sockets.push(socket.url()));
@@ -35,6 +36,7 @@ await page.addInitScript(() => {
   window.releaseCspViolations = [];
   document.addEventListener('securitypolicyviolation', event => window.releaseCspViolations.push({directive: event.violatedDirective, blocked: event.blockedURI}));
 });
+if (values.audio) await page.addInitScript(installBrowserAudioTrace);
 const cdp = await context.newCDPSession(page);
 await cdp.send('WebAudio.enable');
 for (const event of ['contextCreated', 'contextChanged', 'contextWillBeDestroyed']) cdp.on('WebAudio.' + event, data => audioEvents.push({event, data}));
@@ -44,6 +46,51 @@ const ready = driver.waitForImport;
 const shot = name => page.screenshot({path: path.join(values.out, name + '.png'), fullPage: true});
 const press = key => driver.pressChord([key]);
 const phase = driver.waitForPhase;
+const audioTrace = () => page.evaluate(() => window.audioPreviewTrace?.snapshot() || null);
+const pcmMessages = snapshot => (snapshot?.worklets || []).reduce((sum, worklet) => sum + worklet.nonzeroPcmMessages, 0);
+const observePcm = async (name, before) => {
+  if (!values.audio) return null;
+  const baseline = pcmMessages(before);
+  await page.waitForFunction(({baseline}) => {
+    const current = window.audioPreviewTrace?.snapshot?.();
+    return current?.contexts.some(context => context.sampleRate === 32000 && context.state === 'running') &&
+      current.worklets.some(worklet => worklet.name === 'melee-audio-output' &&
+        worklet.sampleRate === 32000 && worklet.connected && worklet.destinationConnected &&
+        worklet.nonzeroPcmMessages > baseline);
+  }, {baseline}, {timeout: 30000});
+  const current = await audioTrace();
+  assert(current, `${name}: Web Audio observer was not installed`);
+  assert(current.worklets.some(worklet => worklet.name === 'melee-audio-output' &&
+    worklet.sampleRate === 32000 && worklet.connected && worklet.destinationConnected &&
+    worklet.nonzeroPcmMessages > baseline), `${name}: no new nonzero PCM reached the connected worklet`);
+  report.audio_phases ||= {};
+  report.audio_phases[name] = current;
+  return current;
+};
+const waitForNativeScene = scene => page.waitForFunction(scene => {
+  const module = globalThis.Module;
+  return typeof module?._melee_web_native_menu_message === 'function' &&
+    module._melee_web_native_menu_running() &&
+    module.UTF8ToString(module._melee_web_native_menu_message()) === scene;
+}, scene, {timeout: 90000});
+const captureUnload = async () => page.evaluate(() => {
+  const nativeUnload = Module._melee_web_native_menu_unload.bind(Module);
+  Module._melee_web_native_menu_unload = (...args) => {
+    const result = nativeUnload(...args);
+    window.name = JSON.stringify({result,
+      message: Module.UTF8ToString(Module._melee_web_native_menu_message()),
+      phase: Module._melee_web_native_menu_phase(),
+      running: Module._melee_web_native_menu_running()});
+    return result;
+  };
+});
+const assertUnloadCompleted = async () => {
+  const result = await page.evaluate(() => JSON.parse(window.name || 'null'));
+  assert.deepEqual(result, {result: 1, message: 'Native menus unloaded.', phase: 0, running: 0},
+    'Eject must complete native teardown before the document reloads');
+  await page.evaluate(() => { window.name = ''; });
+  return result;
+};
 async function collectViolations() { violations.push(...await page.evaluate(() => window.releaseCspViolations)); }
 const selectDisc = driver.selectDisc;
 async function armLaunchObserver() {
@@ -243,6 +290,7 @@ try {
         assert(activation.some(record => record.after === 'running'), 'The browser audio context must be running after preparation');
         report.audio_activation = activation;
         if (!audioRecovery) report.audio_activation_recovery = 'Headless Chrome resumed audio from Choose file; no Play gesture was used.';
+        await observePcm('css-first-entry', null);
       }
     });
     await check('pause/resume acknowledges the shared native owner', async () => {
@@ -258,34 +306,184 @@ try {
       await page.waitForTimeout(700);
       await press('o'); await phase(1);
     });
-    await check('Eject retires the document; a second import can launch', async () => {
-      await page.evaluate(() => { window.releaseOldDocumentMarker = true; });
-      await collectViolations(); await driver.unload();
-      assert.equal(await page.evaluate(() => !!window.releaseOldDocumentMarker), false);
+
+    const closeObservedContexts = async (contextIds, fromEvent) => {
+      assert(contextIds.length > 0, 'The production audio session must create an AudioContext');
+      const closed = () => {
+        const closingEvents = audioEvents.slice(fromEvent);
+        return contextIds.every(id => closingEvents.some(row =>
+          (row.event === 'contextChanged' && row.data.context.contextId === id &&
+            row.data.context.contextState === 'closed') ||
+          (row.event === 'contextWillBeDestroyed' && row.data.contextId === id)));
+      };
+      const deadline = Date.now() + 5000;
+      while (!closed() && Date.now() < deadline)
+        await new Promise(resolve => setTimeout(resolve, 50));
+      assert(closed(), 'Eject must close every prior AudioContext before the new document is used');
+    };
+    const activeAudioContextIds = () => {
+      const closed = new Set(audioEvents.flatMap(row =>
+        row.event === 'contextWillBeDestroyed' ? [row.data.contextId] :
+          row.event === 'contextChanged' && row.data.context.contextState === 'closed' ?
+            [row.data.context.contextId] : []));
+      return [...new Set(audioEvents.filter(row => row.event === 'contextCreated')
+        .map(row => row.data.context.contextId))].filter(id => !closed.has(id));
+    };
+    const ejectAndReimport = async label => {
+      const contextIds = activeAudioContextIds();
+      const eventOffset = audioEvents.length;
+      await captureUnload();
+      await collectViolations();
+      ejectReloadInProgress = true;
+      try {
+        try { await driver.unload(); }
+        catch (error) {
+          const attempted = await page.evaluate(() => {
+            try { return JSON.parse(window.name || 'null'); } catch { return null; }
+          }).catch(() => null);
+          throw Error(`${label} Eject failed before reload: ${JSON.stringify(attempted)}; ${error.message}`);
+        }
+        assert.deepEqual(await assertUnloadCompleted(),
+          {result: 1, message: 'Native menus unloaded.', phase: 0, running: 0});
+      } finally { ejectReloadInProgress = false; }
+      await closeObservedContexts(contextIds, eventOffset);
+      assert.equal(await page.evaluate(() => typeof window.nativeLaunchCalls), 'undefined');
       assert(await page.locator('#start-game').isDisabled());
       assert.equal(await page.locator('#keyboard-layout').inputValue(), 'boxx');
       await armAudioActivationObserver();
       await armLaunchObserver();
       await selectDisc(values.disc);
-      if (await waitForCssOrAudioRecovery()) {
-        report.second_audio_activation_recovery = 'A separate Play gesture was required after reload.';
-      }
+      if (await waitForCssOrAudioRecovery())
+        report[`${label}_audio_activation_recovery`] = 'A separate Play gesture was required after Eject/reimport.';
       assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 1,
         'A fresh document launches its selected disc once');
-      await shot('css-after-reselection');
-      report.css_after_reselection = await page.evaluate(() => ({
-        phase: Module._melee_web_native_menu_phase(),
-        running: Module._melee_web_native_menu_running(),
-        launch_calls: window.nativeLaunchCalls,
-        loading_hidden: document.querySelector('#loading-panel').hidden,
-      }));
-      await driver.unload();
+      assert.equal(await page.evaluate(() => Module._melee_web_native_menu_phase()), 1,
+        'Owned-disc reimport must start directly in original CSS');
+      assert(await page.locator('#loading-panel').isHidden());
+      if (values.audio) await observePcm(`${label}-css-after-reimport`, null);
+      await shot(`${label}-css-after-reimport`);
+      report.eject_reimport ||= [];
+      report.eject_reimport.push({screen: label, native_unload: 'success before reload', css_first_start: true,
+        prior_audio_contexts_closed: contextIds.length});
+    };
+
+    await check('Eject from Main completes native cleanup before disc reimport', async () => {
+      await waitForNativeScene('Original character select');
+      await page.waitForTimeout(500);
+      await driver.pressChord(['q', '9', '7']);
+      await waitForNativeScene('Original main menu');
+      if (values.audio) await observePcm('main-before-eject', await audioTrace());
+      await shot('main-before-eject');
+      await ejectAndReimport('main');
+    });
+
+    await check('Eject from Title completes native cleanup before disc reimport', async () => {
+      await page.waitForTimeout(500);
+      await driver.pressChord(['q', '9', '7']);
+      await waitForNativeScene('Original main menu');
+      await press('o');
+      await waitForNativeScene('Original title');
+      if (values.audio) await observePcm('title-before-eject', await audioTrace());
+      await shot('title-before-eject');
+      await ejectAndReimport('title');
+    });
+
+    await check('retail CSS to Main to Title to Main to Versus to CSS route repeats twice', async () => {
+      for (let cycle = 1; cycle <= 2; cycle++) {
+        await waitForNativeScene('Original character select');
+        await page.waitForTimeout(450);
+        await driver.pressChord(['q', '9', '7']);
+        await waitForNativeScene('Original main menu');
+        if (values.audio) await observePcm(`route-${cycle}-main`, await audioTrace());
+        await shot(`route-${cycle}-main`);
+        await press('o');
+        await waitForNativeScene('Original title');
+        if (values.audio) await observePcm(`route-${cycle}-title`, await audioTrace());
+        await shot(`route-${cycle}-title`);
+        await press('7');
+        await waitForNativeScene('Original main menu');
+        if (values.audio) await observePcm(`route-${cycle}-main-after-title`, await audioTrace());
+        await shot(`route-${cycle}-main-after-title`);
+        await press('3');
+        await page.waitForTimeout(250);
+        await shot(`route-${cycle}-versus-choice`);
+        await press('m');
+        await page.waitForTimeout(750);
+        let scene = await page.evaluate(() => Module.UTF8ToString(Module._melee_web_native_menu_message()));
+        if (scene === 'Original main menu') {
+          await shot(`route-${cycle}-versus-menu`);
+          await press('m');
+          await waitForNativeScene('Original character select');
+        } else assert.equal(scene, 'Original character select',
+          `Main's original Versus selection returned unsupported screen ${scene}`);
+        if (values.audio) await observePcm(`route-${cycle}-css-return`, await audioTrace());
+        await shot(`route-${cycle}-css-return`);
+        const route = {cycle, sequence: ['Original character select', 'Original main menu',
+          'Original title', 'Original main menu', 'Original Versus selection',
+          'Original character select'], final_phase: await page.evaluate(() => Module._melee_web_native_menu_phase())};
+        assert.equal(route.final_phase, 1);
+        report.menu_routes ||= [];
+        report.menu_routes.push(route);
+      }
+    });
+
+    await check('CSS to SSS to supported Mario/Final Destination match to Results to CSS after menu route', async () => {
+      await page.waitForTimeout(900);
+      await press('7');
+      await phase(3);
+      if (values.audio) await observePcm('routed-sss', await audioTrace());
+      await shot('routed-sss');
+      await page.waitForTimeout(750);
+      await driver.pressChord(['4'], {holdMs: 75, releaseMs: 100});
+      await driver.pressChord([']'], {holdMs: 45, releaseMs: 100});
+      await shot('routed-final-destination');
+      await press('m');
+      await phase(7);
+      if (values.audio) await observePcm('routed-match', await audioTrace());
+      await shot('routed-match');
+      await page.waitForTimeout(5000);
+      await press('7');
+      await page.waitForTimeout(700);
+      await driver.pressChord(['q', '9', 'm', '7'], {holdMs: 250, releaseMs: 200});
+      await phase(8);
+      if (values.audio) await observePcm('routed-results', await audioTrace());
+      await shot('routed-results');
+      for (let confirmation = 0; confirmation < 8; confirmation++) {
+        if (await page.evaluate(() => Module._melee_web_native_menu_phase()) !== 8) break;
+        await phase(8);
+        await driver.pressChord(['7'], {holdMs: 120, releaseMs: 1380});
+      }
+      let currentPhase = await page.evaluate(() => Module._melee_web_native_menu_phase());
+      for (let confirmation = 0; currentPhase === 9 && confirmation < 120; confirmation++) {
+        await phase(9);
+        await driver.pressChord(['7'], {holdMs: 120, releaseMs: 380});
+        currentPhase = await page.evaluate(() => Module._melee_web_native_menu_phase());
+      }
+      await phase(1);
+      await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
+      if (values.audio) await observePcm('routed-css-after-results', await audioTrace());
+      await shot('routed-css-after-results');
+      assert.equal(await page.evaluate(() => Module._melee_web_native_menu_phase()), 1);
+      assert.equal(await page.evaluate(() => Module._melee_web_native_menu_running()), 1);
+    });
+
+    await check('CSS Eject still retires the original session', async () => {
+      await page.evaluate(() => { window.releaseOldDocumentMarker = true; });
+      await captureUnload();
+      await collectViolations();
+      ejectReloadInProgress = true;
+      try {
+        await driver.unload();
+        await assertUnloadCompleted();
+      } finally { ejectReloadInProgress = false; }
+      assert.equal(await page.evaluate(() => !!window.releaseOldDocumentMarker), false);
       assert(await page.locator('#start-game').isDisabled());
+      report.css_eject = 'Native unload returned success, phase/running were zero before reload.';
     });
     if (values.audio) {
       const created = audioEvents.filter(row => row.event === 'contextCreated');
-      assert.equal(created.length, 4,
-        'The early-invalid, invalid-recovery and two playable documents create one audio context each');
+      assert(created.length >= 4,
+        'The lifecycle creates audio contexts for invalid-selection recovery and public sessions');
       assert(created.every(row => row.data.context.sampleRate === 32000));
       report.audio = 'The early-invalid, invalid-recovery and two playable documents each create one 32 kHz context; actual activation state is recorded above. PCM and match transitions are checked by the separate audio lifecycle test; no fidelity claim.';
     } else {

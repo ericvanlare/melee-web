@@ -5464,7 +5464,28 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
  #include <sysdolphin/baselib/gobjproc.h>
  #include <sysdolphin/baselib/hsd_3924.h>
  #include <sysdolphin/baselib/hsd_392C.h>
-@@ -376,3 +377,245 @@
+@@ -180,11 +180,20 @@
+ void gm_801A4B88(struct GameSceneInfo* info)
+ {
+     gm_804D6720 = info;
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* The scoped browser host restores the caller's current scene owner after an
++ * explicit Eject abort, before freeing its persistent GameSceneInfo. */
++struct GameSceneInfo* melee_web_current_scene_info(void)
++{
++    return gm_804D6720;
++}
++#endif
++
+ /// @brief returns a pointer to the current scenes enter data
+ void* gm_GetCurrentSceneEnterData(void)
+ {
+     return gm_804D6720->enter_data;
+ }
+ 
+@@ -376,3 +386,245 @@
      }
      HSD_VIWaitXFBFlush();
  }
