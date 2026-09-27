@@ -107,6 +107,12 @@ that fresh profile. Its fields and bounds come from the pinned Melee source
 | Other source unlocks and trophy rewards | The source debug-unlock helpers cover 66 notification IDs and its reward helper covers 300 ledger IDs | The same source routines (`gm_8017297C()` and `gm_801741FC()`) mark these completed. No save extent is filled with a guessed mask or maximum |
 | Derived feature bits | `gm_80172898(0xFFFF)` and its `fn_8017280C()` derivation | Only the four feature bits produced by the source derivation are present; unknown upper bits are left at fresh defaults |
 
+Challenge completion also raises transient, out-of-card trophy notifications
+while the source routines run. The baseline clears those session-only notices
+with Melee's `gm_80172174()` after recording the completed state. This leaves
+the completed SaveData intact and avoids replaying newly-created completion
+notices on Title entry.
+
 The baseline leaves match counts, per-fighter statistics, records, scores,
 play-time thresholds, unknown flags and padding at the original fresh defaults.
 It does not fabricate high scores or imply that every possible record has been

@@ -783,6 +783,12 @@ int melee_web_save_profile_owner_initialize_everything(
     /* Recompute the four named feature bits from the source unlock tables.
      * Do not copy the debug path's raw 0xFF, whose remaining bits are unknown. */
     gm_80172898(0xFFFFU);
+    /* fn_8016F140() records completed challenges through the original source
+     * award path, which also sets session-only pending trophy notifications in
+     * gmm_x0's transient block. The completed baseline has already included
+     * those rewards; clear only that transient block with Melee's own reset
+     * routine so Title does not replay newly-created unlock notices. */
+    gm_80172174();
     if (!aliases_match(candidate, error, error_size)) return 0;
     candidate->everything_initialized = 1;
     return ok(error, error_size);

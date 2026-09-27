@@ -187,6 +187,8 @@ int main(void)
           "original fresh-profile init did not mutate the Toy table through F600");
     check_error(melee_web_save_profile_owner_initialize_everything(
                     profile, error, sizeof(error)), error);
+    check(!gm_801721EC(),
+          "Everything baseline retained transient new-completion notifications");
     check(gm_80164ABC() && gm_80164600(),
           "Everything baseline did not unlock the source character/stage tables");
     check(save->x1A68 == ((UINT64_C(1) << 51) - 1) &&
