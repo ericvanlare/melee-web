@@ -1,0 +1,232 @@
+/* The overlay is clipped to the fitted canvas, never the whole viewport. */
+#touch-controls {
+  position: absolute;
+  z-index: 12;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout paint;
+  container-type: size;
+  --touch-main-size: clamp(88px, 34cqh, 132px);
+  --touch-cstick-size: clamp(76px, 30cqh, 120px);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+#touch-controls[hidden] { display: none !important; }
+
+#touch-controls .touch-button,
+#touch-controls .touch-stick {
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#touch-controls .touch-button {
+  display: grid;
+  place-items: center;
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0;
+  border: 2px solid #ffffffc9;
+  border-radius: 50%;
+  color: #fff;
+  background: rgb(19 26 38 / var(--touch-opacity, 0.55));
+  box-shadow: 0 1px 4px #0009;
+  font: 700 15px/1 system-ui, sans-serif;
+  text-shadow: 0 1px 2px #000;
+  cursor: pointer;
+}
+
+#touch-controls .touch-button.is-active {
+  border-color: #c8edff;
+  background: rgb(76 155 199 / var(--touch-opacity, 0.55));
+  box-shadow: 0 0 0 2px #b8e9ff80, 0 1px 4px #0009;
+}
+
+#touch-controls .touch-shoulders {
+  position: absolute;
+  top: max(8px, var(--touch-safe-top, 0px));
+  display: flex;
+  gap: 6px;
+  z-index: 4;
+}
+
+#touch-controls .touch-shoulders-left {
+  left: max(8px, var(--touch-safe-left, 0px));
+}
+
+#touch-controls .touch-shoulders-right {
+  right: max(8px, var(--touch-safe-right, 0px));
+}
+
+#touch-controls .touch-start {
+  min-width: 58px;
+  border-radius: 14px;
+  font-size: 12px;
+}
+
+/* Leave a lower-left lane for the main stick. The D-pad is placed against
+   the actual game rectangle rather than the device's viewport orientation. */
+#touch-controls .touch-dpad {
+  position: absolute;
+  top: max(56px, calc(100% - 148px - var(--touch-main-size)));
+  left: max(8px, var(--touch-safe-left, 0px));
+  z-index: 2;
+  display: grid;
+  width: 132px;
+  height: 132px;
+  grid-template: repeat(3, 44px) / repeat(3, 44px);
+  pointer-events: none;
+}
+
+#touch-controls .touch-dpad .touch-button {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 19px;
+}
+
+#touch-controls .dpad-up { grid-area: 1 / 2; }
+#touch-controls .dpad-left { grid-area: 2 / 1; }
+#touch-controls .dpad-right { grid-area: 2 / 3; }
+#touch-controls .dpad-down { grid-area: 3 / 2; }
+
+#touch-controls .touch-stick {
+  position: absolute;
+  display: block;
+  width: var(--touch-main-size);
+  height: var(--touch-main-size);
+  border: 1px solid #ffffffa8;
+  border-radius: 50%;
+  background: rgb(12 18 28 / calc(var(--touch-opacity, 0.55) * 0.42));
+  box-shadow: inset 0 0 18px #0008, 0 1px 4px #0009;
+}
+
+#touch-controls .touch-stick-main {
+  left: max(8px, var(--touch-safe-left, 0px));
+  bottom: max(8px, var(--touch-safe-bottom, 0px));
+  z-index: 3;
+}
+
+#touch-controls .touch-stick-cstick {
+  top: max(8px, calc(100% - 142px - var(--touch-cstick-size)));
+  right: max(18px, var(--touch-safe-right, 0px));
+  width: var(--touch-cstick-size);
+  height: var(--touch-cstick-size);
+  z-index: 2;
+}
+
+#touch-controls .touch-stick-ring {
+  position: absolute;
+  inset: 22%;
+  border: 1px solid #ffffff75;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+#touch-controls .touch-stick-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 40%;
+  height: 40%;
+  transform: translate(calc(-50% + var(--stick-x, 0px)), calc(-50% + var(--stick-y, 0px)));
+  border: 1px solid #fff;
+  border-radius: 50%;
+  background: rgb(227 241 255 / calc(var(--touch-opacity, 0.55) + 0.18));
+  box-shadow: 0 1px 4px #0009;
+  color: #202a38;
+  font: 700 12px/1 system-ui, sans-serif;
+  pointer-events: none;
+}
+
+#touch-controls .touch-stick-caption {
+  position: absolute;
+  right: 0;
+  top: -18px;
+  left: 0;
+  color: #fff;
+  font: 600 11px/1 system-ui, sans-serif;
+  text-align: center;
+  text-shadow: 0 1px 3px #000;
+  pointer-events: none;
+}
+
+#touch-controls .touch-face {
+  position: absolute;
+  right: max(8px, var(--touch-safe-right, 0px));
+  bottom: max(8px, var(--touch-safe-bottom, 0px));
+  z-index: 4;
+  display: grid;
+  width: 132px;
+  height: 132px;
+  grid-template: repeat(3, 44px) / repeat(3, 44px);
+  pointer-events: none;
+}
+
+#touch-controls .touch-face .touch-button {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+}
+
+#touch-controls .face-y { grid-area: 1 / 2; }
+#touch-controls .face-x { grid-area: 2 / 1; }
+#touch-controls .face-b { grid-area: 2 / 3; }
+#touch-controls .face-a { grid-area: 3 / 2; }
+
+/* A 320px-wide 4:3 canvas is only 240px high. In that case the four groups
+   share the rectangle horizontally and vertically instead of colliding as
+   stacked corner clusters. All targets retain at least 44px button tracks. */
+@container (max-width: 350px) and (max-height: 280px) {
+  #touch-controls { --touch-main-size: 88px; --touch-cstick-size: 76px; }
+  #touch-controls .touch-dpad {
+    top: calc(50% - 68px);
+    left: calc(50% - 114px);
+  }
+  #touch-controls .touch-stick-main { left: max(8px, var(--touch-safe-left, 0px)); }
+  #touch-controls .touch-stick-cstick {
+    top: max(32px, calc(var(--touch-safe-top, 0px) + 32px));
+    right: max(82px, calc(var(--touch-safe-right, 0px) + 42px));
+  }
+  #touch-controls .touch-stick-caption { display: none; }
+  #touch-controls .touch-face {
+    right: max(4px, var(--touch-safe-right, 0px));
+    bottom: 22px;
+  }
+}
+
+/* A taller expanded toolbar can leave a 281px-wide 4:3 canvas. Move the D-pad
+   around the face buttons and C-stick, with a slightly smaller main stick. */
+@container (max-width: 300px) and (max-height: 280px) {
+  #touch-controls { --touch-main-size: 82px; }
+  #touch-controls .touch-dpad {
+    top: max(44px, calc(50% - 68px));
+    left: calc(50% - 112px);
+  }
+  #touch-controls .touch-stick-main { left: max(0px, var(--touch-safe-left, 0px)); }
+  #touch-controls .touch-face { bottom: 4px; }
+}
+
+.touch-safe-area-probe {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+@container (max-height: 320px) {
+  #touch-controls .touch-stick-caption { display: none; }
+}

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from owned_test_workspace import OwnedWorkspaceTests
 from tools import source_synth_joined_runtime as runtime
 from tools import source_synth_joined_startup as startup
 from test_original_startup_fixture import context
@@ -92,7 +93,7 @@ class JoinedRuntimeInputTests(unittest.TestCase):
             self.assertEqual(list(target.iterdir()), [])
 
 
-class JoinedRuntimeExecutionTests(unittest.TestCase):
+class JoinedRuntimeExecutionTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
         required = [startup.EMXX, ROOT/'.venv/bin/cmake', ROOT/'.venv/bin/ninja',
@@ -100,8 +101,7 @@ class JoinedRuntimeExecutionTests(unittest.TestCase):
                     ROOT/'build/browser/_deps/fmt-src/include/fmt/base.h']
         if not all(path.is_file() for path in required):
             raise unittest.SkipTest('configured pinned source/CMake runtime dependencies unavailable')
-        (ROOT/'work').mkdir(exist_ok=True)
-        cls.work = Path(tempfile.mkdtemp(prefix='source-synth-runtime-test-', dir=ROOT/'work'))
+        cls.work = cls.new_workspace(ROOT, prefix='source-synth-runtime-test-')
         profile = startup.build_profile(cls.work/'profile')
         cls.inputs = synthetic_inputs(cls.work/'inputs')
         cls.output = cls.work/'runtime'
