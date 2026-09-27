@@ -53,6 +53,50 @@ def _whole_session_v8_fixture() -> bytes:
             PAD_SNAPSHOT + bytes(44 * frame_count) + spans)
 
 
+def _v9_setup(lineup: tuple[int, int, int, int]) -> bytes:
+    setup = bytearray(0x138)
+    setup[:0x60] = bytes.fromhex(
+        '3000864cc3000000000000ffff6e002000000000000000000000000000000000'
+        'ffffffffffffffff000000003f8000003f8000003f8000000000000000000000'
+        '00000000000000000000000000000000000000000000000000000000')
+    active_player = bytearray.fromhex(
+        '0801040000ff000009007800400004090000000000000000'
+        '3f8000003f8000003f800000')
+    inactive_player = bytes.fromhex(
+        '2103040000ff000009007800400004000000000000000000'
+        '3f8000003f8000003f800000')
+    for slot in range(6):
+        base = 0x60 + slot * 0x24
+        if slot < 4:
+            row = bytearray(active_player)
+            row[0] = lineup[slot]
+            row[3] = slot
+            row[4] = 0
+            setup[base:base + 0x24] = row
+        else:
+            setup[base:base + 0x24] = inactive_player
+    return bytes(setup)
+
+
+def _whole_session_v9_fixture() -> bytes:
+    lineups = ((8, 2, 20, 9), (22, 23, 6, 21), (0, 25, 7, 13))
+    setups = b''.join(_v9_setup(lineup) for lineup in lineups)
+    characters, stages = 0x07FF, 0x01C0
+    context = (struct.pack('>HHI', 2, 0, 0x574E) +
+               bytes(0x18) + struct.pack('>HH', characters, stages) +
+               bytes(0x55E8 - 4) + bytes(0x148) + bytes(6))
+    frame_count = 32
+    scenes = ((1, 0, 3), (2, 4, 5), (3, 6, 9), (4, 10, 11),
+              (1, 12, 14), (2, 15, 16), (3, 17, 21), (4, 22, 23),
+              (1, 24, 24), (2, 25, 25), (3, 26, 29), (4, 30, 31))
+    spans = struct.pack('>H', len(scenes)) + b''.join(
+        struct.pack('>BBHII', scene, 0, 0, first, last)
+        for scene, first, last in scenes)
+    return (struct.pack('>4sIIIHH', b'MWRC', 9, 0x12345678, frame_count,
+                        characters, stages) + context + struct.pack('>HH', 3, 0) +
+            setups + PAD_SNAPSHOT + bytes(44 * frame_count) + spans)
+
+
 class RetailRecipeRuntimeTests(unittest.TestCase):
     def test_native_v8_rejects_unreachable_initial_and_final_owners(self):
         target = _native_target()
@@ -94,7 +138,7 @@ class RetailRecipeRuntimeTests(unittest.TestCase):
         examples = [
             (b'', 'size is outside'),
             (b'NOPE' + valid_size[4:], 'input format'),
-            (valid_size[:4] + struct.pack('>I', 9) + valid_size[8:], 'input version'),
+            (valid_size[:4] + struct.pack('>I', 10) + valid_size[8:], 'input version'),
             (valid_size[:-1], 'frame count'),
             (valid_size + b'\0', 'frame count'),
             (callback, 'callback/data pointer'),
@@ -175,3 +219,89 @@ class RetailRecipeRuntimeTests(unittest.TestCase):
                             player['cpu_kind'] == 4 and
                             player['cpu_level'] == 9
                             for player in decoded['players']))
+
+    def test_native_v9_decoder_preserves_three_distinct_cpu9_setups(self):
+        target = _native_target()
+        if not target.is_file():
+            self.skipTest('Build gameplay_retail_trace to test the shared decoder')
+        valid = _whole_session_v9_fixture()
+        with tempfile.TemporaryDirectory(prefix='melee-recipe-v9-') as directory:
+            root = Path(directory)
+            path = root / 'whole-session.mwrc'
+            path.write_bytes(valid)
+            result = subprocess.run([str(node_runtime()), str(target),
+                str(root / 'absent-menu'), str(root / 'absent-game'), str(path), '--decode-only'],
+                capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            decoded = json.loads(result.stdout)
+            self.assertEqual(decoded['version'], 9)
+            self.assertEqual(decoded['match_setup_count'], 3)
+            self.assertEqual(decoded['span_count'], 12)
+            self.assertEqual(len(decoded['players']), 4)
+            self.assertTrue(all(player['slot_type'] == 1 and
+                                player['cpu_kind'] == 4 and
+                                player['cpu_level'] == 9
+                                for player in decoded['players']))
+
+            context_size = 0x18 + 0x55E8 + 0x148 + 6
+            setup_table = 20 + 8 + context_size
+            invalid_count = bytearray(valid)
+            struct.pack_into('>H', invalid_count, setup_table, 2)
+            path.write_bytes(invalid_count)
+            result = subprocess.run([str(node_runtime()), str(target),
+                str(root / 'absent-menu'), str(root / 'absent-game'), str(path), '--decode-only'],
+                capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn('exactly three', result.stderr)
+
+            invalid_pointer = bytearray(valid)
+            second_setup = setup_table + 4 + 0x138
+            invalid_pointer[second_setup + 0x38] = 1
+            path.write_bytes(invalid_pointer)
+            result = subprocess.run([str(node_runtime()), str(target),
+                str(root / 'absent-menu'), str(root / 'absent-game'), str(path), '--decode-only'],
+                capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 2)
+            self.assertIn('callback/data pointer', result.stderr)
+
+    def test_native_v9_decoder_rejects_setup_profile_bypasses(self):
+        target = _native_target()
+        if not target.is_file():
+            self.skipTest('Build gameplay_retail_trace to test the shared decoder')
+        valid = _whole_session_v9_fixture()
+        setup_base = 20 + 8 + 0x574E + 4
+        cases = [
+            (setup_base + 0x60, 0, 'declared four-stock CPU9 roster'),
+            (setup_base + 0x60 + 15, 8, 'declared four-stock CPU9 roster'),
+            (setup_base + 0x60 + 3, 1, 'declared four-stock CPU9 roster'),
+            (setup_base + 0x0E, 0x21, 'rules differ from the accepted'),
+            (setup_base + 0x60 + 4 * 0x24 + 1, 1,
+             'outside the bounded four-player slice'),
+        ]
+        with tempfile.TemporaryDirectory(prefix='melee-recipe-v9-profile-') as directory:
+            root = Path(directory)
+            path = root / 'invalid.mwrc'
+            for offset, replacement, message in cases:
+                with self.subTest(offset=offset, replacement=replacement):
+                    data = bytearray(valid)
+                    data[offset] = replacement
+                    path.write_bytes(data)
+                    result = subprocess.run([str(node_runtime()), str(target),
+                        str(root / 'absent-menu'), str(root / 'absent-game'), str(path),
+                        '--decode-only'], capture_output=True, text=True, timeout=30)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(message, result.stderr)
+
+    def test_native_v9_match_setup_guard_checks_each_actual_menu_setup(self):
+        target = _native_target()
+        if not target.is_file():
+            self.skipTest('Build gameplay_retail_trace to test the shared decoder')
+        with tempfile.TemporaryDirectory(prefix='melee-recipe-v9-setup-guard-') as directory:
+            root = Path(directory)
+            recipe = root / 'valid.mwrc'
+            recipe.write_bytes(_whole_session_v9_fixture())
+            result = subprocess.run([str(node_runtime()), str(target),
+                str(root / 'absent-menu'), str(root / 'absent-game'), str(recipe),
+                '--setup-guard-test'], capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('setup_guard_verified', result.stdout)

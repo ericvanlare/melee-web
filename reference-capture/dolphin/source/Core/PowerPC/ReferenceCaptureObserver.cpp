@@ -201,6 +201,8 @@ enum class SliceTag : u16
   MenuCssSlider = 49,
   MenuCssContext = 50,
   MenuCssKoCounts = 51,
+  PlayerEntities = 52,
+  PlayerEntityUserData = 53,
 };
 
 struct SliceRef
@@ -798,6 +800,35 @@ struct Observer::Impl
     return true;
   }
 
+  bool AddPlayerEntitySlices(Core::System* system, u32 slot)
+  {
+    // StaticPlayer is the pinned GALE01r2 source table at 0x80453080 with
+    // 0xe90-byte records. Its two HSD_GObj* player_entity fields begin at
+    // +0xb0 (melee/pl/player.h). HSD_GObj::user_data is at +0x2c
+    // (sysdolphin/baselib/gobj.h). Record both the entity pair and the
+    // primary GObj's Fighter link; do not infer entity coverage from heads.
+    const u32 entities = 0x80453080 + slot * 0xe90 + 0xb0;
+    std::array<u8, 8> entity_bytes{};
+    if (!ReadBytes(system, entities, entity_bytes.size(), entity_bytes.data()))
+      return SetInvalid("StaticPlayer entity pair escaped its pinned source range"), false;
+    const u32 primary = ReadBE32(entity_bytes.data());
+    const u32 secondary = ReadBE32(entity_bytes.data() + 4);
+    if (!primary || secondary)
+      return SetInvalid("whole-session roster requires one primary entity and no secondary entity"),
+             false;
+    if (!IsMem1Range(primary, 0x30))
+      return SetInvalid("primary player GObj is outside source MEM1"), false;
+    u32 user_data = 0;
+    if (!ReadU32(system, primary + 0x2c, &user_data) || user_data != fighter_pointers[slot])
+      return SetInvalid("primary player GObj user_data does not name its observed Fighter"), false;
+    if (!AddSlice(system, SliceTag::PlayerEntities, entities, entity_bytes.size(),
+                  static_cast<u16>(slot)) ||
+        !AddSlice(system, SliceTag::PlayerEntityUserData, primary + 0x2c, 4,
+                  static_cast<u16>(slot)))
+      return SetInvalid("player entity relationship escaped the pinned source ranges"), false;
+    return true;
+  }
+
   bool AddMatchSlices(Core::System* system)
   {
     if (!AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e) ||
@@ -811,7 +842,9 @@ struct Observer::Impl
       return false;
     for (u32 slot = 0; slot < 4; ++slot)
     {
-      if (fighter_present[slot] && !AddFighterSlices(system, slot, fighter_pointers[slot]))
+      if (fighter_present[slot] &&
+          (!AddPlayerEntitySlices(system, slot) ||
+           !AddFighterSlices(system, slot, fighter_pointers[slot])))
         return false;
       if (fighter_present[slot] &&
           (!AddSlice(system, SliceTag::Hud, 0x804a10c8 + slot * 0x64, 0x11,

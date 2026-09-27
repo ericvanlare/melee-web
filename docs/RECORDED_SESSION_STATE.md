@@ -12,6 +12,45 @@ cadence. Match setup and every match tick retain the exact comparison fields:
 RNG, match frame, semantic PAD bytes and each complete declared Fighter record.
 Float values represented as hexadecimal bits receive no tolerance.
 
+## MWRC v9 setup and entity coverage
+
+MWRC v8 remains the four-Mario regression. MWRC v9 adds a three-entry table of
+the original `StartMeleeData`, one independently captured and checked setup for
+each match. The browser receives the constructed setup at each match entry; a
+recipe with fewer or more entries, a setup inconsistent with its source setup
+boundary, or a setup outside the predeclared milestone is rejected before match
+construction. The v8 one-setup wire format remains unchanged.
+
+The predeclared v9 roster is Mario/Fox/Falco/Marth, Dr. Mario/Roy/Link/Young
+Link, then Captain Falcon/Ganondorf/Luigi/Pikachu. Each row uses costume indices
+0–3, four CPU-kind-4 players at level 9, four stocks, Final Destination, rumble
+off, and the exact stock-match rule bytes copied from the accepted v8 Mario
+setup. This records twelve selected character kinds; forms, transformations,
+and secondary entities do not increase that count. The native decoder enforces
+this profile as well as the producer, and the original menu's typed
+`StartMeleeData` is compared field by field with the corresponding setup before
+match construction and again at match entry.
+
+For this roster, each slot must retain one primary StaticPlayer.player_entity
+GObj whose user_data points to that slot's Fighter head, whose Fighter gobj
+backlink points to the same GObj, and whose Fighter player_id equals the slot.
+The source and browser records carry the ordered slot/entity identity pairs,
+checked backlink status, primary user-data link, and Fighter slot identity.
+Generation starts at zero and increments if the primary GObj is
+replaced; the comparator checks every recorded generation against the browser.
+A secondary entity, detached link, slot mismatch, missing or extra row,
+reordered slot, or malformed identity is an explicit coverage failure. This
+milestone does not
+claim support for comparing a roster that creates secondary or transformed
+entities; such a roster needs those entities' source identities, lifetimes and
+state fields captured and compared before it can be admitted.
+
+The v9 envelope and its rejection controls are implementation checks. They do
+not establish that the mixed-character source session has been captured or that
+it agrees with the browser. That claim requires a fresh, uninterrupted original
+three-match capture and a complete comparison; the v8 recording cannot be
+relabelled as the v9 run.
+
 ## Cape reaction and packed motion metadata
 
 The merged runtime's first new state disagreement occurred during the second

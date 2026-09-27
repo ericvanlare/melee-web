@@ -80,6 +80,8 @@ extern "C" int melee_web_retail_setup(const uint8_t*, uint32_t,
     return 1;
 }
 extern "C" void melee_web_retail_state(void) { fake::write_state(); }
+extern "C" void melee_web_retail_entities(uint32_t) {}
+extern "C" void melee_web_retail_entities_reset(void) {}
 extern "C" uint32_t melee_web_retail_rng(void) { ++fake::rng; return 123; }
 extern "C" uint32_t gm_GetFrameCount(void) { return 0; }
 extern "C" uint32_t gm_8016AEEC(void) { return 0; }

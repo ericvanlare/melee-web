@@ -7,10 +7,15 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
+#include <sysdolphin/baselib/gobj.h>
 extern struct gm_80479D58_t gm_80479D58;
 extern u32 gm_GetFrameCount(void);
 static uint32_t bits(float f){uint32_t u;memcpy(&u,&f,4);return u;}
 static void vec(const Vec3* v){printf("[\"%08x\",\"%08x\",\"%08x\"]",bits(v->x),bits(v->y),bits(v->z));}
+static HSD_GObj* observed_entities[4];
+static uint32_t entity_generations[4];
+static uint32_t observed_match = UINT_MAX;
 uint32_t melee_web_retail_rng(void){
     if(!seed_ptr)abort();
     return *seed_ptr;
@@ -33,5 +38,41 @@ void melee_web_retail_state(void){
         for(unsigned i=0;i<0x1c;i++)printf("%02x",((const unsigned char*)&fp->x670_timer_lstick_tilt_x)[i]);
         printf("\"}");
     }
+    printf("]");
+}
+void melee_web_retail_entities_reset(void){
+    memset(observed_entities,0,sizeof(observed_entities));
+    memset(entity_generations,0,sizeof(entity_generations));
+    observed_match=UINT_MAX;
+}
+void melee_web_retail_entities(uint32_t match_index){
+    if(match_index>=3)abort();
+    if(observed_match==UINT_MAX||match_index!=observed_match){
+        if(observed_match!=UINT_MAX&&match_index!=observed_match+1)abort();
+        memset(observed_entities,0,sizeof(observed_entities));
+        memset(entity_generations,0,sizeof(entity_generations));
+        observed_match=match_index;
+    }
+    printf(",\"fighter_entities\":[");
+    for(unsigned slot=0;slot<4;slot++){
+        StaticPlayer* player=Player_GetPtrForSlot(slot);
+        if(!player||Player_GetPlayerSlotType(slot)!=Gm_PKind_Cpu||
+           !player->player_entity[0]||player->player_entity[1])abort();
+        HSD_GObj* entity=player->player_entity[0];
+        Fighter* fighter=entity->user_data;
+        if(!fighter||fighter->gobj!=entity||fighter->player_id!=slot)abort();
+        for(unsigned earlier=0;earlier<slot;earlier++)
+            if(observed_entities[earlier]==entity)abort();
+        if(observed_entities[slot]&&observed_entities[slot]!=entity){
+            if(entity_generations[slot]==UINT_MAX)abort();
+            entity_generations[slot]++;
+        }
+        observed_entities[slot]=entity;
+        if(slot)printf(",");
+        printf("{\"match_index\":%u,\"slot\":%u,\"entity_index\":0,\"generation\":%u,\"fighter_player_id\":%u,\"fighter_gobj_linked\":true}",
+               match_index,slot,entity_generations[slot],fighter->player_id);
+    }
+    if(Player_GetPlayerSlotType(4)!=Gm_PKind_NA||
+       Player_GetPlayerSlotType(5)!=Gm_PKind_NA)abort();
     printf("]");
 }

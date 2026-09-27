@@ -675,6 +675,9 @@ void advance(){
  report_owner_lifetime("menu-after-teardown");
  if(phase==5){
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
+  if(replay&&replay->version==melee_web::kRetailReplayVersion)
+   melee_web::retail_replay_validate_match_setup(
+       *replay,melee_web::retail_replay_next_match_index(*replay,replay_cursor),selection.start);
   match_message=selected_match_message(selection);
   if(scoped_assets){request_assets(AssetDestination::Match,&selection);return;}
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
@@ -749,7 +752,7 @@ bool advance_match_construction(){
  report_construction(complete?"match-enter":"match-enter-step",started,constructed,constructed,
                      before,aurora_stats_snapshot());
  if(complete){
-  if(replay&&replay_trace)melee_web::retail_replay_initial(*replay,true);
+  if(replay&&replay_trace)melee_web::retail_replay_initial(*replay,true,match->start_data());
   first_use_draw_pending=true;running=true;message=match_message;
  }
  return complete;
