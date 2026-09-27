@@ -158,7 +158,9 @@ try {
       assert.equal(await page.locator('#audio-note,#audio-info,#audio-details').count(), 0);
     } else assert.equal(await page.locator('#audio-note').textContent(), 'no audio ⓘlicensing issue, need to remove about 50 lines of Dolphin audio code still');
     assert.deepEqual(await page.locator('#toolbar > *').evaluateAll(nodes => nodes.map(node => node.id)),
-      ['toolbar-brand', 'toolbar-actions', 'toolbar-meta']);
+      ['toolbar-brand', 'toolbar-actions', 'fullscreen-status', 'toolbar-meta']);
+    assert.equal(await page.locator('#fullscreen-status').isVisible(), false,
+      'The empty fullscreen status message does not occupy visible toolbar space');
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_replay_begin), 'undefined');
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_diagnostics), 'undefined');
     assert.equal(await page.evaluate(() => typeof window.menuObservePlayer), 'undefined');

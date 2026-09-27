@@ -188,8 +188,10 @@ Dolphin implementation code was copied into project code.
 the original source card manifest. It contains no copied Dolphin implementation.
 The source extents were checked against a private local Melee GCI. The generated
 iconless GCI was previously accepted by Dolphin 2609's Memory Card Manager into
-an isolated test card, which establishes container acceptance only. The
-separate bounded boot attempt and its exact limit are recorded above.
+an isolated test card, which established container acceptance only. The
+subsequent no-input boot attempt also did not establish interoperability; both
+limited checks are superseded by the ordinary-input, game-written round trip
+above.
 
 The browser codec, IndexedDB store, Settings controller and codec tests are
 project-authored and listed in the root MIT file scope. The native owner/host
