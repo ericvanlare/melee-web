@@ -89,11 +89,9 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
         await page.locator(controls.import).setInputFiles(file,{timeout:remaining()});
       } else {
         await page.locator(controls.import).click({timeout:remaining()});
-        if(!await page.locator('#disc-continue').isDisabled())throw Error('Disc acknowledgement was bypassed');
-        await page.locator('#disc-ack').check({timeout:remaining()});
         const [chooser]=await Promise.all([
           page.waitForEvent('filechooser',{timeout:remaining()}),
-          page.locator('#disc-continue').click({timeout:remaining()}),
+          page.locator('#disc-choose-file').click({timeout:remaining()}),
         ]);
         await chooser.setFiles(file,{timeout:remaining()});
       }

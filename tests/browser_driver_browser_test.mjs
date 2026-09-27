@@ -14,7 +14,7 @@ const {chromium,browser:launchOptions,playwrightPath}=await loadBrowserTools(val
 const fixture=(surface,failUnload=false)=>`<!doctype html><html><body>
 <canvas id="canvas" tabindex="0"></canvas><div id="status">Localized startup wording</div>
 ${surface==='public'?'<dialog id="error-dialog"><div id="error"></div></dialog>':''}
-${surface==='public'?`<button id="choose-disc" disabled>Disc</button><dialog id="disc-dialog"><input type="checkbox" id="disc-ack"><button id="disc-continue" disabled>Continue</button></dialog><input type="file" id="disc-file" hidden><button id="start-game" disabled>Play</button><button id="pause-game" disabled>Pause</button><button id="end-session" disabled>Eject</button>`:`<input id="disc" type="file" disabled><button id="launch" disabled>Play</button><button id="pause" disabled>Pause</button><button id="unload" disabled>Unload</button>`}
+${surface==='public'?`<button id="choose-disc" disabled>Disc</button><dialog id="disc-dialog"><button id="disc-choose-file">Choose file</button></dialog><input type="file" id="disc-file" hidden><button id="start-game" disabled>Play</button><button id="pause-game" disabled>Pause</button><button id="end-session" disabled>Eject</button>`:`<input id="disc" type="file" disabled><button id="launch" disabled>Play</button><button id="pause" disabled>Pause</button><button id="unload" disabled>Unload</button>`}
 <script>
 const $=id=>document.getElementById(id),pub=${surface==='public'};
 const ids=pub?['choose-disc','start-game','pause-game','end-session','disc-file']:['disc','launch','pause','unload','disc'];
@@ -24,7 +24,7 @@ setTimeout(()=>$(ids[0]).disabled=false,100);
 $(ids[4]).onchange=()=>{if($(ids[0]).disabled)throw Error('Import before ready');$('status').dataset.runtimeError='';$(ids[1]).disabled=false;};
 $(ids[1]).onclick=()=>{phase=1;running=1;$(ids[2]).disabled=$(ids[3]).disabled=false;};
 $(ids[3]).onclick=()=>{if(pub){location.reload();return;}$('status').dataset.runtimeError='';phase=0;running=0;$(ids[1]).disabled=true;if(window.failUnload)$('status').dataset.runtimeError='Pending renderer work did not drain. Reload to recover.';};
-if(pub){$('choose-disc').onclick=()=>{$('disc-ack').checked=false;$('disc-continue').disabled=true;$('disc-dialog').showModal();};$('disc-ack').onchange=()=>{$('disc-continue').disabled=!$('disc-ack').checked;};$('disc-continue').onclick=()=>{$('disc-dialog').close();$('disc-file').click();};}
+if(pub){$('choose-disc').onclick=()=>$('disc-dialog').showModal();$('disc-choose-file').onclick=()=>{$('disc-dialog').close();$('disc-file').click();};}
 for(const type of ['keydown','keyup'])document.addEventListener(type,e=>events.push(type+':'+e.key));
 </script></body></html>`;
 const server=http.createServer((req,res)=>{

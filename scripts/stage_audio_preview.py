@@ -92,7 +92,7 @@ def replace_once(text, old, new):
 def player_html(text):
     text, count = re.subn(r'<span id="audio-note">.*?</span></span>', '', text)
     require(count == 1, 'Reviewed preview template boundary changed')
-    return replace_once(text, 'Audio is disabled in this alpha. ', '')
+    return text
 
 
 def notices(text, *, production=False):

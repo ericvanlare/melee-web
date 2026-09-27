@@ -10,10 +10,12 @@ a PowerPC CPU interpreter or JIT.
 ## Play online
 
 1. Open [webmelee.gg](https://webmelee.gg) in a desktop browser with WebGPU support.
-2. Choose **Disc** and select your own unmodified USA revision 1.02
-   (GALE01 revision-2) Melee disc image in ISO, GCM or CISO format. RVZ is not
-   supported.
-3. Choose **Play**. Open **Controls** to see keyboard bindings and input options.
+2. Choose **Disc**, review the linked disclosures, and choose your own
+   unmodified USA revision 1.02 (GALE01 revision-2) Melee disc image in ISO,
+   GCM or CISO format. RVZ is not supported.
+3. The player reads and prepares the disc, then enters the original in-game
+   character select automatically. Open **Controls** to see keyboard bindings
+   and input options. **Play** remains available if a start needs to be retried.
 
 Game content is supplied by your local disc image. The browser reads required
 ranges on your device; the disc and extracted game data are not uploaded.

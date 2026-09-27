@@ -14,6 +14,11 @@ const markupIds = new Set([...playerHtml.matchAll(/\bid="([^"]+)"/g)].map(match 
 for (const [, id] of shellSource.matchAll(/\$\('([^']+)'\)/g)) {
   assert(markupIds.has(id), `Public shell requires missing HTML element #${id}`);
 }
+assert(!markupIds.has('disc-ack'), 'The player must not render a mandatory acknowledgement checkbox');
+assert(!shellSource.includes('disc-ack'), 'The player must not gate import on hidden acknowledgement state');
+for (const href of ['/terms', '/privacy', '/notices', '/copyright']) {
+  assert(playerHtml.includes(`href="${href}"`), `The preselection notice must link ${href}`);
+}
 
 class FakeElement {
   constructor(tagName = 'div', id = '') {
@@ -24,11 +29,11 @@ class FakeElement {
     this.disabled = false;
     this.hidden = false;
     this.open = false;
-    this.checked = id !== 'disc-ack';
     this.value = id === 'keyboard-layout' ? 'two' : '';
     this.textContent = '';
     this.title = '';
     this.files = [];
+    this.clickCount = 0;
   }
 
   append(...children) { this.children.push(...children); }
@@ -45,7 +50,10 @@ class FakeElement {
     this.open = false;
     for (const listener of this.listeners.get('close') || []) listener();
   }
-  click() { return this.onclick?.(); }
+  click() { this.clickCount++; globalThis.testClickTrace?.push(this.id); return this.onclick?.(); }
+  dispatchEvent(event) {
+    for (const listener of this.listeners.get(event.type) || []) listener(event);
+  }
   focus() { globalThis.document.activeElement = this; }
   requestFullscreen() { return Promise.resolve(); }
 }
@@ -57,7 +65,7 @@ function makeDocument() {
     'player-one-source', 'player-two-source', 'player-one-source-status',
     'player-two-source-status', 'boxx-source-note', 'keyboard-bindings-details',
     'keyboard-bindings', 'controller-advanced', 'controllers', 'idle-hint', 'fullscreen', 'end-session', 'status',
-    'progress', 'disc-dialog', 'disc-ack', 'disc-cancel', 'disc-continue', 'error-dialog',
+  'progress', 'disc-dialog', 'disc-cancel', 'disc-choose-file', 'error-dialog',
     'error', 'retry', 'error-close',
     'loading-panel', 'loading-label', 'loading-progress', 'loading-detail',
   ];
@@ -136,14 +144,20 @@ async function importShellWithMocks(scenario) {
   }
 }
 
-async function runScenario({name, failStartup}) {
+async function runScenario({name, failStartup = false, behavior = {}}) {
   const document = makeDocument();
   const restore = installGlobals(document);
   const trace = [];
+  globalThis.testClickTrace = trace;
   let stateCallback;
   let settingsOptions;
   let nativeMainCalled = false;
   let audioCreated = 0;
+  const idle = {ready: true, requiresReload: false, busy: false, state: 'idle', paused: false,
+    canImport: true, canStart: false, canPause: false, canUnload: false, audio: behavior.audio ? 'enabled' : 'disabled',
+    progress: null, loading: null, message: 'Ready'};
+  let mockState = idle;
+  let player;
 
   globalThis.testMountControllerSettings = options => {
     settingsOptions = options;
@@ -168,8 +182,6 @@ async function runScenario({name, failStartup}) {
     if (failStartup) throw Error('cache directory denied');
     trace.push('native-main');
     nativeMainCalled = true;
-    const idle = {ready: true, requiresReload: false, busy: false, state: 'idle', paused: false,
-      canImport: true, canStart: false, canPause: false, canUnload: false, progress: null, loading: null, message: 'Ready'};
     options.onState({...idle, state: 'booting', ready: false, canImport: false,
       loading: {phase: 'engine', message: 'Starting player…', complete: null, total: null}});
     assert.equal(document.getElementById('loading-panel').hidden, false);
@@ -186,15 +198,34 @@ async function runScenario({name, failStartup}) {
     options.onState({...idle, state: 'error', loading: {message: 'Preparing graphics…'}});
     assert.equal(document.getElementById('loading-panel').hidden, true, 'Errors replace loading feedback');
     options.onState(idle);
+    mockState = idle;
     assert.equal(document.getElementById('loading-panel').hidden, true, 'Ready player has no loading overlay');
     assert.equal(document.getElementById('idle-hint').hidden, false, 'Ready player retains the disc instruction');
-    return {
+    player = {
       controllers: {
         inspect: () => [], sample: () => [],
       },
       setKeyboardLayout: async layout => { trace.push(['layout', layout]); },
       setKeyboard(slot, enabled) { trace.push(['keyboard', slot, enabled]); },
+      getState: () => mockState,
+      focus() { trace.push('focus'); },
+      activateAudio() { trace.push('audio-activate'); return behavior.activateAudio?.() ?? Promise.resolve(); },
+      importDisc(file) {
+        trace.push(['import', file.name]);
+        const complete = () => { mockState = {...idle, canStart: true, canUnload: true}; stateCallback(mockState); };
+        const imported = behavior.importDisc ? behavior.importDisc(file) : Promise.resolve();
+        return Promise.resolve(imported).then(complete);
+      },
+      start() {
+        trace.push('start');
+        if (behavior.start) return behavior.start();
+        mockState = {...mockState, state: 'css', canStart: false, canPause: true, running: true};
+        stateCallback(mockState);
+        return Promise.resolve();
+      },
+      destroy() { trace.push('destroy'); return Promise.resolve({requiresReload: true}); },
     };
+    return player;
   };
 
   try {
@@ -206,11 +237,13 @@ async function runScenario({name, failStartup}) {
       stateCallback,
       nativeMainCalled,
       audioCreated,
+      player,
     };
   } finally {
     delete globalThis.testMountMeleeRuntime;
     delete globalThis.testMountControllerSettings;
     delete globalThis.testOpenNativeGameDiscSession;
+    delete globalThis.testClickTrace;
     restore();
   }
 }
@@ -231,6 +264,112 @@ try {
     'native state is forwarded to the shared settings component');
 } finally { restoreSuccess(); }
 
+async function selectThroughShell(scenario, file = {name: 'owned.iso'}) {
+  globalThis.testClickTrace = scenario.trace;
+  scenario.document.getElementById('choose-disc').click();
+  assert.equal(scenario.document.getElementById('disc-dialog').open, true,
+    'Disc opens the disclosure before the file picker');
+  scenario.document.getElementById('disc-choose-file').click();
+  const input = scenario.document.getElementById('disc-file');
+  assert.equal(input.clickCount, 1, 'Choose file opens the picker with no checkbox gate');
+  input.files = [file];
+  return input.onchange();
+}
+
+const cancellation = await runScenario({name: 'picker-cancellation'});
+const restoreCancellation = installGlobals(cancellation.document);
+try {
+  globalThis.testClickTrace = cancellation.trace;
+  cancellation.document.getElementById('choose-disc').click();
+  cancellation.document.getElementById('disc-choose-file').click();
+  cancellation.document.getElementById('disc-file').dispatchEvent({type: 'cancel'});
+  assert.equal(cancellation.document.getElementById('disc-dialog').open, false);
+  assert.equal(cancellation.document.activeElement.id, 'choose-disc');
+  assert.equal(cancellation.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, 0,
+    'Cancelling the browser file picker does not import or launch');
+  assert.equal(cancellation.trace.filter(row => row === 'start').length, 0);
+} finally { delete globalThis.testClickTrace; restoreCancellation(); }
+
+const flow = await runScenario({name: 'automatic-launch'});
+const restoreFlow = installGlobals(flow.document);
+try {
+  await selectThroughShell(flow);
+  assert.equal(flow.trace.filter(row => row === 'start').length, 1,
+    'A successfully prepared selection automatically starts exactly once');
+  assert(flow.trace.indexOf('audio-activate') < flow.trace.indexOf('disc-file'),
+    'Audio activation starts during the Choose file gesture before opening the native picker');
+  assert(flow.document.getElementById('start-game').disabled,
+    'The normal first launch does not require the Play button');
+  const importCount = flow.trace.filter(row => Array.isArray(row) && row[0] === 'import').length;
+  assert.equal(flow.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, importCount);
+} finally { delete globalThis.testClickTrace; restoreFlow(); }
+
+const preparationFailure = await runScenario({name: 'preparation-failure', behavior: {
+  importDisc: async () => { throw Error('Native asset preparation failed'); },
+}});
+const restorePreparationFailure = installGlobals(preparationFailure.document);
+try {
+  await selectThroughShell(preparationFailure);
+  assert.equal(preparationFailure.document.getElementById('error-dialog').open, true);
+  assert.equal(preparationFailure.document.getElementById('error').textContent, 'Native asset preparation failed');
+  assert.equal(preparationFailure.trace.filter(row => row === 'start').length, 0,
+    'A preparation failure never calls launch');
+} finally { delete globalThis.testClickTrace; restorePreparationFailure(); }
+
+let recoveryAttempts = 0;
+const recovery = await runScenario({name: 'audio-recovery', behavior: {audio: true,
+  activateAudio: async () => { throw Error('The browser kept game audio suspended. Close this message, then choose Play to enable audio and start the game.'); },
+  start: async () => { recoveryAttempts++; },
+}});
+const restoreRecovery = installGlobals(recovery.document);
+try {
+  await selectThroughShell(recovery);
+  assert.match(recovery.document.getElementById('error').textContent, /choose Play to enable audio/);
+  assert.equal(recovery.trace.filter(row => row === 'start').length, 0,
+    'A failed activation does not auto-retry or launch without prepared audio');
+  assert.equal(recovery.document.getElementById('start-game').disabled, false,
+    'A browser audio gesture failure leaves the explicit recovery action available');
+  recovery.document.getElementById('error-close').click();
+  await recovery.document.getElementById('start-game').click();
+  assert.equal(recoveryAttempts, 1, 'Play starts only after the user requests recovery');
+} finally { delete globalThis.testClickTrace; restoreRecovery(); }
+
+let finishEjectedImport;
+const ejectRace = await runScenario({name: 'eject-race', behavior: {
+  importDisc: () => new Promise(resolve => { finishEjectedImport = resolve; }),
+}});
+const restoreEjectRace = installGlobals(ejectRace.document);
+try {
+  const importWork = selectThroughShell(ejectRace);
+  await Promise.resolve();
+  await ejectRace.document.getElementById('end-session').onclick();
+  finishEjectedImport();
+  await importWork;
+  assert.equal(ejectRace.trace.filter(row => row === 'start').length, 0,
+    'An import that finishes after Eject cannot start the ejected disc');
+} finally { delete globalThis.testClickTrace; restoreEjectRace(); }
+
+let finishSupersededImport;
+const superseded = await runScenario({name: 'superseded-race', behavior: {
+  importDisc: file => file.name === 'first.iso' ? new Promise(resolve => { finishSupersededImport = resolve; }) :
+    Promise.reject(Error('Replacement import rejected while earlier work is pending')),
+}});
+const restoreSuperseded = installGlobals(superseded.document);
+try {
+  globalThis.testClickTrace = superseded.trace;
+  const input = superseded.document.getElementById('disc-file');
+  input.files = [{name: 'first.iso'}];
+  const first = input.onchange();
+  await Promise.resolve();
+  input.files = [{name: 'second.iso'}];
+  const second = input.onchange();
+  await second;
+  finishSupersededImport();
+  await first;
+  assert.equal(superseded.trace.filter(row => row === 'start').length, 0,
+    'A superseded import completion cannot launch its stale selection');
+} finally { delete globalThis.testClickTrace; restoreSuperseded(); }
+
 const failed = await runScenario({name: 'mkdir-failure', failStartup: true});
 const failedDocument = failed.document;
 assert.equal(failed.nativeMainCalled, false, 'mkdir failure must prevent an unseeded native start');
@@ -238,4 +377,4 @@ assert.equal(failedDocument.getElementById('error-dialog').open, true);
 assert.equal(failedDocument.getElementById('retry').hidden, false);
 assert.equal(failedDocument.getElementById('error').textContent, 'cache directory denied');
 assert.equal(failed.audioCreated, 0);
-console.log('Public player shell startup: shared owner startup, no audio, and startup failure propagation pass.');
+console.log('Public player shell: shared owner startup, acknowledgement-free disclosure, automatic launch, cancellation, preparation failure and stale-selection guards pass.');

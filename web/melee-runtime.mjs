@@ -315,6 +315,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   const handle = Object.freeze({
     controllers: Module.meleeControllers,
     version: 1, getState: snapshot, focus,
+    activateAudio() { return prepareAudio(); },
     importDisc(file) {
       return operation('importing', async () => {
         bundle = false;
@@ -345,12 +346,14 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       }, true);
     },
     prepare() { return operation('preparing', async () => { if (!bundle) throw Error('Select a disc first.'); await prepareNativeResources(); }); },
-    start() {
+    start({isCurrent = () => true} = {}) {
+      if (typeof isCurrent !== 'function') return Promise.reject(Error('Invalid player start guard.'));
       if (!snapshot().canStart) return Promise.reject(Error('Prepare a valid local disc first.'));
       return operation('preparing', async () => {
-        // Create the audio context while still handling the user's Play click;
-        // native preparation may yield long enough to lose activation.
+        // The shell primes audio on Choose file; a recovery Play click supplies
+        // its own gesture. Resume before native preparation can yield.
         await prepareAudio(); await prepareNativeResources();
+        if (!isCurrent()) throw Error('Disc selection changed before launch.');
         await boundary(() => check(Module._melee_web_native_menu_launch())); prepared = false; focus(); syncAudio();
       });
     },

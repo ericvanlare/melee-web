@@ -16,7 +16,9 @@ The public player disables automatic ports 3/4, while the shared manager and pro
 retain four-port support. B0XX keyboard input remains Player 1 only.
 Source choices survive reload with the existing keyboard preferences. Detailed
 controller testing/remapping and keyboard bindings are collapsed settings sections,
-not a required step before play. **Disc**, then **Play** enters the original menus.
+not a required step before play. Choose **Disc** and select your local game
+file; after it is read and prepared, the player enters the original in-game
+character select automatically.
 
 The recognized Mayflash 0079:1843 raw layout on Chrome/macOS gets an automatic
 suggested mapping. Its binding list is visible before setup, and the live display
