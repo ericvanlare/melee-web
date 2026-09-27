@@ -91,6 +91,26 @@ class ResultsEntryPacketTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_three_pulse_prefix_is_source_bracketed_before_css_continuation(self):
+        harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
+        self.assertIn("resultsInputMode==='keyboard-three-prefix'", harness)
+        self.assertIn('keyboard-three-prefix is a one-match diagnostic mode', harness)
+        self.assertIn('const initialPulseLimit=resultsInputMode===\'keyboard-three-prefix\'?3:48;',
+                      harness)
+        prefix_loop = harness.index('const initialPulseLimit=')
+        capture = harness.index('await captureThreePulsePrefix();', prefix_loop)
+        continuation = harness.index('for(let pulse=3;pulse<48&&state.phase!==1;pulse++)', prefix_loop)
+        self.assertLess(prefix_loop, capture)
+        self.assertLess(capture, continuation)
+        self.assertIn('waitForResultsFrame(560', harness)
+        self.assertIn('resultsSourceFrameAtEvent<=560', harness)
+        self.assertIn('row.hold_ms===160&&row.release_ms===120', harness)
+        self.assertIn('source_state_after_tick_560:sample560?.results_state_after_tick', harness)
+        self.assertIn('pads_at_source_frame_560:sample560?.pads', harness)
+        self.assertIn('Exactly three ordinary keyboard intentions must precede the cursor-560 checkpoint',
+                      harness)
+        self.assertIn('P1/P2-connected, CPU-P3/P4-disconnected profile', harness)
+
     def test_results_pad_trace_is_bounded_and_development_only(self):
         source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
         self.assertIn('kResultsPadTraceCapacity=8192', source)

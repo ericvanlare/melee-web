@@ -4,8 +4,10 @@
  * fighter setup and match state are read-only source observations. This does
  * not compare against retail, physical controllers, timing, pixels or PCM.
  * Results defaults to historical keyboard pulses; keyboard-gated preserves
- * that key path while source-tick-gating the CPU page transition. Source-tick
- * remains a separate controlled PAD path, not a keyboard/reference claim. */
+ * that key path while source-tick-gating the CPU page transition. The
+ * keyboard-three-prefix mode retains the first three ordinary pulses through
+ * Results source frame 560 before continuing to CSS. Source-tick remains a
+ * separate controlled PAD path, not a keyboard/reference claim. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -24,12 +26,14 @@ const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input'].map(name=>[name,{type:'string'}])),
   matches:{type:'string'},'setup-only':{type:'boolean'}}});
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-gated|source-tick]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|source-tick]');
 const resultsInputMode=values['results-input']||'keyboard';
-if(!['keyboard','keyboard-gated','source-tick'].includes(resultsInputMode))
-  throw Error('--results-input must be keyboard, keyboard-gated, or source-tick');
+if(!['keyboard','keyboard-three-prefix','keyboard-gated','source-tick'].includes(resultsInputMode))
+  throw Error('--results-input must be keyboard, keyboard-three-prefix, keyboard-gated, or source-tick');
 const matchCount=Number(values.matches||2);
 if(![1,2].includes(matchCount))throw Error('--matches must be 1 or 2');
+if(resultsInputMode==='keyboard-three-prefix'&&matchCount!==1)
+  throw Error('keyboard-three-prefix is a one-match diagnostic mode');
 const url=new URL(values.url);
 if(!['http:','https:'].includes(url.protocol)||!url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
@@ -68,9 +72,12 @@ const lineup=values.lineup==='A'?
    {name:'Falco',kind:20,position:[-32.2,9.5]}];
 const continuationScope=matchCount===1?'natural Results→CSS only':
   'natural Results→CSS→second match';
+const resultsInputScope=resultsInputMode==='keyboard-three-prefix'?
+  'first three ordinary 160/120ms Enter pulses retained through source cursor 560, then ordinary continuation; not an exact historical consumed-PAD replay':null;
 const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
   scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, four CPU9 players, four stocks, Final Destination; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
   results_input_mode:resultsInputMode,
+  results_input_scope:resultsInputScope,
   lineup:values.lineup,players:lineup.map(({name,kind})=>({name,kind,cpu:9,stocks:4})),
   matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[],
   results_input_events:[]};
@@ -80,6 +87,7 @@ report.results_entry_packets=[];
 report.results_entry_packet_reads=[];
 report.results_source_pad_traces=[];
 report.results_page_transition_checks=[];
+report.results_three_pulse_prefixes=[];
 report.provenance={source_start:sourceProvenance(),
   harness_sha256:await sha256(new URL(import.meta.url)),
   browser_driver_helper_sha256:await sha256(new URL('../scripts/browser_driver.mjs',import.meta.url)),
@@ -509,6 +517,60 @@ async function runMatch(matchIndex,expected){
     }
     throw Error(`${label}: Results source frame did not reach ${target}`);
   };
+  const captureThreePulsePrefix=async()=>{
+    state=await waitForResultsFrame(560,
+      `Results ${matchIndex} historical three-pulse source checkpoint`);
+    assert(state.phase===8||state.phase===9,
+      `Results ${matchIndex} left Results/Prize before source frame 560`);
+    await writeProgress(`match-${matchIndex}-three-pulse-prefix-source-frame-560`);
+    await screenshot(`match-${matchIndex}-three-pulse-prefix-source-frame-560`);
+    await retainResultsInputEvents();
+    const trace=await readResultsSourcePadTrace();
+    const prefixSamples=trace.samples.filter(row=>row.source_frame<=560);
+    const prefixTrace={...trace,attempts:prefixSamples.length,
+      retained:prefixSamples.length,samples:prefixSamples};
+    const summary=summarizeResultsPadTrace(prefixTrace);
+    const sample560=prefixSamples.find(row=>row.source_frame===560);
+    const intents=report.controller_inputs.filter(row=>
+      row.device==='keyboard-to-source-PAD'&&
+      row.label?.startsWith(`results-${matchIndex}-continue-`));
+    const keyboardEvents=(report.results_input_events||[]).filter(row=>
+      row.phase===8||row.phase===9);
+    const keydowns=keyboardEvents.filter(row=>row.kind==='keydown');
+    const keyups=keyboardEvents.filter(row=>row.kind==='keyup');
+    const consumed=findConsumedResultsStartKeyboardAttempt(
+      keydowns,keyups,summary.p1_start_runs,-1);
+    const checkpoint={match:matchIndex,status:'captured-through-source-frame-560',
+      target_source_frame:560,observed_phase:state.phase,
+      observed_source_frame:readResultsFrame(state),
+      input_intentions:intents.map(({device,key,hold_ms,release_ms,label})=>
+        ({device,key,hold_ms,release_ms,label})),
+      keyboard_events:keyboardEvents.map(({kind,key,repeat,isTrusted,nativeSourceSteps,
+        resultsSourceFrameAtEvent})=>({kind,key,repeat,isTrusted,nativeSourceSteps,
+          resultsSourceFrameAtEvent})),
+      consumed_start_attempts:consumed.attempts,source_pad_summary:summary,
+      source_state_after_tick_560:sample560?.results_state_after_tick??null,
+      pads_at_source_frame_560:sample560?.pads??null,camera_entry:trace.camera_entry};
+    report.results_three_pulse_prefixes.push(checkpoint);
+    result.results_three_pulse_prefix=checkpoint;
+    assert.equal(intents.length,3,
+      'Exactly three ordinary keyboard intentions must precede the cursor-560 checkpoint');
+    assert.equal(keyboardEvents.length,6,
+      'The prefix must retain exactly three ordinary Enter down/up pairs');
+    assert.deepEqual(keyboardEvents.map(row=>row.kind),
+      ['keydown','keyup','keydown','keyup','keydown','keyup'],
+      'The historical input prefix must preserve distinct Enter press/release edges');
+    assert(keyboardEvents.every(row=>row.key==='Enter'&&row.isTrusted&&!row.repeat&&
+      Number.isInteger(row.resultsSourceFrameAtEvent)&&row.resultsSourceFrameAtEvent<=560),
+      'Every ordinary Enter edge must retain a trusted source-frame bracket through cursor 560');
+    assert(intents.every(row=>row.hold_ms===160&&row.release_ms===120),
+      'The prefix must preserve the historical 160ms hold/120ms release requests');
+    assert(!trace.overflow&&sample560&&summary.tick_failed.length===0,
+      'The Results trace must retain a returned source sample at cursor 560 without overflow');
+    assert.deepEqual(summary.port_error_values,[[0],[0],[-1],[-1]],
+      'The prefix must preserve the observed P1/P2-connected, CPU-P3/P4-disconnected profile');
+    checkpoint.status='pass';
+  };
   const waitForResultsInternalPhase=async(targetFrame,targetPhase,label)=>{
     const waitDeadline=Date.now()+60000;
     while(Date.now()<waitDeadline){
@@ -819,7 +881,7 @@ async function runMatch(matchIndex,expected){
   }else{
     await writeProgress(`match-${matchIndex}-natural-results`);
     await screenshot(`match-${matchIndex}-natural-results`);
-    for(let pulse=0;pulse<48&&state.phase!==1;pulse++){
+    const sendOrdinaryKeyboardPulse=async pulse=>{
       state=await resumeResultsIfPaused(state);
       await driver.pressChord(['Enter'],{holdMs:160,releaseMs:120});
       report.controller_inputs.push({device:'keyboard-to-source-PAD',key:'Enter',
@@ -835,6 +897,14 @@ async function runMatch(matchIndex,expected){
           throw Error(`Results ${matchIndex} entered unexpected source phase ${state.phase}`);
         await page.waitForTimeout(100);
       }while(Date.now()<pulseDeadline);
+    };
+    const initialPulseLimit=resultsInputMode==='keyboard-three-prefix'?3:48;
+    for(let pulse=0;pulse<initialPulseLimit&&state.phase!==1;pulse++)
+      await sendOrdinaryKeyboardPulse(pulse);
+    if(resultsInputMode==='keyboard-three-prefix'&&state.phase!==1){
+      await captureThreePulsePrefix();
+      for(let pulse=3;pulse<48&&state.phase!==1;pulse++)
+        await sendOrdinaryKeyboardPulse(pulse);
     }
   }
   if(resultsInputMode==='source-tick'&&state.phase!==1){
@@ -855,6 +925,16 @@ async function runMatch(matchIndex,expected){
     'Prior match and Results owners must be torn down at CSS return');
   await screenshot(`match-${matchIndex}-returned-css`);
   const sourcePadTraceRecord=await retainResultsSourcePadTrace(matchIndex,'natural-results-to-css');
+  if(resultsInputMode==='keyboard-three-prefix'){
+    const checkpoint=report.results_three_pulse_prefixes.find(row=>row.match===matchIndex);
+    assert(checkpoint&&checkpoint.status==='pass',
+      'The three-pulse Results prefix must be retained through source cursor 560');
+    const finalTrace=sourcePadTraceRecord?.trace;
+    const finalSample=finalTrace?.samples.find(row=>row.source_frame===560);
+    assert(finalSample,'The final Results trace must retain source cursor 560');
+    assert.deepEqual(checkpoint.pads_at_source_frame_560,finalSample.pads,
+      'The retained three-pulse cursor-560 PAD snapshot must match the completed trace');
+  }
   if(resultsInputMode==='keyboard-gated'){
     assert(result.results_keyboard_page_gate,
       'Keyboard-gated Results cannot pass without the observed disconnected CPU auto-page gate');

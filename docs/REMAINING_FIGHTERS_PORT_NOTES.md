@@ -1015,3 +1015,59 @@ ownership transition remains unknown; do not claim this issue resolved or PR
 #86 ready to merge. The next useful discriminator must retain the exact
 natural-winner route or identify a source difference between it and the
 controlled Match-history case before another long capture.
+
+## Results cursor-560 input-path reduction (2026-09-27)
+
+The fresh current-build source control
+`work/results-match-history-tests/p1-statistics-vxac9bsr/` passes the specific
+automatic-page-before-confirmation assertion: P1-only 10-source-tick Start
+holds at ticks 180, 360 and 600; connected ports 0/1 remain neutral while
+disconnected CPU ports 2/3 auto-advance 0→1 at tick 551. The final confirmation
+edge is consumed at 600, the host exits at 621, and the original pool remains
+`0x70903c0`. This is synthetic Results standings with chosen source ticks and
+native state only. It proves that controlled P1 input plus CPU auto-page and
+host close works; it is not the natural CPU9 input schedule.
+
+Added `keyboard-three-prefix` to the tracked browser harness. This one-match
+mode sends exactly three trusted ordinary Enter down/up pairs, preserving the
+historical 160ms/120ms requests, waits for Results source cursor 560, and
+retains the event source-frame brackets plus the raw PAD/state sample before
+resuming ordinary input for the natural CSS return. It does not infer consumed
+ticks from wall time and explicitly does not claim to replay the historical
+PAD stream.
+
+Fresh headless Chrome 153/WebGPU run
+`work/pr86-results-sheik-winner-b-three-pulse-prefix-r1/report.json` passes a
+natural B CPU9, four-stock Final Destination match and Results→CSS teardown.
+Samus wins at gameplay frame 13,677 (RNG 3,068,933,094), so this is not the
+Sheik-winner target. Through Results cursor 560, the three trusted Enter pairs
+were bracketed at source frames 192/192, 292/294 and 388/388; none contained a
+source-consumed P1 Start. The 561 retained source samples all returned without
+overflow. At cursor 560, Results was still in internal phase 2 / statistics
+phase 0, all four pages were 0, and P1/P2 were neutral; port errors were
+`[0,0,-1,-1]`. The first later consumed P1 Start was at source frame 765;
+disconnected CPU pages advanced at 957, after statistics began. The full trace
+retains 2,932 Results source ticks and the run returned to CSS with no
+page/native errors. The cursor-560 canvas screenshot was visually inspected.
+There were 143 Results timing interruptions; this headless functional run is
+not foreground timing or performance evidence.
+
+This differs from r13's standard 48-pulse loop, which had a P1 Start run at
+305–311 and both CPU pages advance at 497 before cursor 560. Together, the two
+current natural controls show that ordinary 160/120ms Enter requests do not
+map to a fixed source PAD schedule: r13's first three events include a
+consumed Start before the page transition, while the exact-three prefix above
+has none through cursor 560. The historical failed packet still records only
+three input intentions and lacks their event brackets, consumed PAD/trigger/
+release bytes, port status, Results page state and camera pointers. Therefore
+neither current Samus control establishes which input path the old Sheik
+failure actually consumed or identifies its first invalid ownership
+transition. The camera-pool failure remains unresolved; PR #86 is not ready to
+merge.
+
+Harness syntax, the focused prefix-contract test, and `git diff --check` pass.
+The captured browser report binds the run to clean runtime Wasm SHA-256
+`41bc87d7a1e09b1a4b54750fed606f4457b2f0d88c71252e83752d2f299fe0f4` and the
+new harness SHA recorded in the report. No runtime source changed for this
+reduction. The next natural attempt must use this three-pulse prefix and retain
+the typed winner/form; do not treat another non-Sheik winner as a resolution.
