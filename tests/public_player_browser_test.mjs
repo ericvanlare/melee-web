@@ -270,6 +270,17 @@ try {
     await page.locator('#settings-dialog').waitFor({state: 'hidden'});
   });
   await check('Personal autosave skips identical snapshots and retains verified generations', async () => {
+    const waitForSavedState = async (predicate, label) => {
+      const deadline = Date.now() + 10000;
+      let state;
+      while (Date.now() < deadline) {
+        state = await savePage.evaluate(async () => ({samples: window.saveSamples, commits: window.saveCommitCalls,
+          profile: await window.saveStore.getProfile(), envelope: await window.readSavedEnvelope()}));
+        if (predicate(state)) return state;
+        await savePage.waitForTimeout(50);
+      }
+      throw Error(`Timed out waiting for ${label}: ${JSON.stringify(state)}`);
+    };
     const [settingsUrl, storeUrl] = await page.evaluate(() => ['save-profile-settings.mjs', 'save-profile-store.mjs']
       .map(name => performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/' + name))?.name));
     assert(settingsUrl && storeUrl);
@@ -306,6 +317,7 @@ try {
         window.saveCommitCalls = 0;
         window.saveByte = 1;
         window.saveController = mountSaveProfileSettings({onError: error => { window.saveFailure = error.message; }});
+        window.mountSaveProfileSettings = mountSaveProfileSettings;
         window.saveStore = await SaveProfileStore.open();
         window.readSavedEnvelope = () => new Promise((resolve, reject) => {
           const tx = window.saveStore.db.transaction('profiles', 'readonly');
@@ -341,38 +353,35 @@ try {
       await savePage.waitForFunction(() => document.querySelector('#save-mode').value === 'personal');
       await savePage.locator('#settings-close').click();
       await savePage.evaluate(() => window.saveController.setState({scene: 'css'}));
-      await savePage.waitForFunction(async () => {
-        const profile = await window.saveStore.getProfile();
-        return window.saveSamples >= 1 && profile?.revision === 1;
-      }, null, {timeout: 10000});
-      const first = await savePage.evaluate(() => window.readSavedEnvelope());
+      const firstState = await waitForSavedState(state => state.samples >= 1 && state.profile?.revision === 1,
+        'the initial Personal snapshot');
+      const first = firstState.envelope;
+      assert(first, 'The initial Personal snapshot must have a committed IndexedDB envelope');
       assert.equal(first.revision, 1, 'The first Personal snapshot must commit');
       assert.equal(first.active.data[0], 1);
       assert.equal(first.previous, null);
       assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 1);
 
-      await savePage.waitForFunction(() => window.saveSamples >= 3, null, {timeout: 10000});
-      await savePage.waitForTimeout(100);
-      const unchanged = await savePage.evaluate(() => window.readSavedEnvelope());
+      const unchangedState = await waitForSavedState(state => state.samples >= 3 && state.profile?.revision === 1,
+        'repeated unchanged snapshots');
+      const unchanged = unchangedState.envelope;
       assert.equal(unchanged.revision, 1, 'Unchanged samples must not advance the revision');
       assert.equal(unchanged.active.generation, first.active.generation);
       assert.equal(unchanged.previous, null, 'Unchanged samples must not replace recovery history');
       assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 1);
 
       await savePage.evaluate(() => { window.saveByte = 2; });
-      await savePage.waitForFunction(async () => {
-        const record = await window.readSavedEnvelope();
-        return window.saveSamples >= 4 && record?.revision === 2 && record.active.data[0] === 2;
-      }, null, {timeout: 10000});
-      const second = await savePage.evaluate(() => window.readSavedEnvelope());
+      const secondState = await waitForSavedState(state => state.samples >= 4 && state.profile?.revision === 2 &&
+        state.envelope?.active?.data[0] === 2, 'the first changed snapshot');
+      const second = secondState.envelope;
       assert.equal(second.revision, 2, 'A changed snapshot commits once');
       assert.equal(second.previous.generation, first.active.generation);
       assert.equal(second.previous.data[0], 1);
       assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 2);
 
-      await savePage.waitForFunction(() => window.saveSamples >= 5, null, {timeout: 10000});
-      await savePage.waitForTimeout(100);
-      const repeated = await savePage.evaluate(() => window.readSavedEnvelope());
+      const repeatedState = await waitForSavedState(state => state.samples >= 5 && state.profile?.revision === 2,
+        'unchanged snapshots after the first change');
+      const repeated = repeatedState.envelope;
       assert.equal(repeated.revision, 2, 'Repeated snapshots must preserve the committed revision');
       assert.equal(repeated.active.generation, second.active.generation);
       assert.equal(repeated.previous.generation, first.active.generation,
@@ -380,22 +389,13 @@ try {
       assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 2);
 
       await savePage.evaluate(() => { window.saveByte = 3; });
-      await savePage.waitForFunction(async () => {
-        const record = await window.readSavedEnvelope();
-        return window.saveSamples >= 6 && record?.revision === 3 && record.active.data[0] === 3;
-      }, null, {timeout: 10000});
-      const third = await savePage.evaluate(() => window.readSavedEnvelope());
+      const thirdState = await waitForSavedState(state => state.samples >= 6 && state.profile?.revision === 3 &&
+        state.envelope?.active?.data[0] === 3, 'the later distinct snapshot');
+      const third = thirdState.envelope;
       assert.equal(third.revision, 3, 'A later distinct snapshot commits once');
       assert.equal(third.previous.generation, second.active.generation);
       assert.equal(third.previous.data[0], 2,
         'The preceding verified generation must remain available after a later change');
-      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 3);
-
-      await savePage.evaluate(() => window.saveController.flushBeforeTeardown());
-      const flushed = await savePage.evaluate(() => window.readSavedEnvelope());
-      assert.equal(flushed.revision, 3, 'Forced flush must not rewrite an identical committed snapshot');
-      assert.equal(flushed.active.generation, third.active.generation);
-      assert.equal(flushed.previous.generation, second.active.generation);
       assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 3);
 
       await savePage.evaluate(() => { window.failNextSaveCommit = true; window.saveByte = 4; });
@@ -415,6 +415,28 @@ try {
       assert.equal(writeFailure.record.previous.generation, second.active.generation,
         'A failed write must preserve the verified recovery generation');
       assert.equal(writeFailure.commits, 4);
+
+      const beforeFlushSamples = await savePage.evaluate(() => window.saveSamples);
+      await savePage.evaluate(async () => {
+        await window.saveController.close();
+        window.saveController = window.mountSaveProfileSettings({onError: error => { window.saveFailure = error.message; }});
+        await window.saveController.bindPlayer({
+          configureSaveProfile: async () => {},
+          snapshotSaveProfile: async () => {
+            window.saveSamples++;
+            return new Uint8Array(0xF1C4).fill(window.saveByte = 3);
+          },
+        });
+        window.saveController.setState({scene: 'css'});
+      });
+      await waitForSavedState(state => state.samples > beforeFlushSamples && state.profile?.revision === 3,
+        'an identical snapshot after reopening Personal progress');
+      await savePage.evaluate(() => window.saveController.flushBeforeTeardown());
+      const flushed = await savePage.evaluate(() => window.readSavedEnvelope());
+      assert.equal(flushed.revision, 3, 'Forced flush must not rewrite an identical committed snapshot');
+      assert.equal(flushed.active.generation, third.active.generation);
+      assert.equal(flushed.previous.generation, second.active.generation);
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 4);
 
       await savePage.evaluate(() => window.corruptCurrentEnvelope());
       const recovered = await savePage.evaluate(async () => {
@@ -561,7 +583,7 @@ try {
       await page.locator('#save-mode').selectOption('personal');
       await page.locator('#save-confirm-dialog[open]').waitFor();
       assert.match(await page.locator('#save-confirm-body').textContent(), /restart the game/i);
-      assert.match(await page.locator('#save-confirm-body').textContent(), /Personal progress is retained/);
+      assert.match(await page.locator('#save-confirm-body').textContent(), /Personal progress is kept/);
       await shot('loaded-mode-confirmation');
       await page.locator('#save-confirm-cancel').click();
       await page.locator('#save-confirm-dialog').waitFor({state: 'hidden'});
@@ -588,6 +610,7 @@ try {
       await page.waitForFunction(() => /source session restarted/.test(document.querySelector('#save-status').textContent),
         null, {timeout: 90000});
       await phase(1);
+      await page.locator('#status').waitFor({state: 'hidden', timeout: 90000});
       assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
       assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 3);
       assert.equal(await page.evaluate(() => window.discFileChanges), 1,
@@ -606,7 +629,10 @@ try {
       await page.locator('#settings-dialog').waitFor({state: 'hidden'});
     });
     await check('ordinary B0XX keyboard enters original SSS and cancels back to CSS', async () => {
-      await page.waitForTimeout(1200); await press('7'); await phase(3);
+      await page.waitForTimeout(1200); await press('7');
+      await page.waitForTimeout(300);
+      if (await page.evaluate(() => Module._melee_web_native_menu_phase()) === 1) await press('7');
+      await phase(3);
       await page.waitForTimeout(700);
       await press('o'); await phase(1);
     });

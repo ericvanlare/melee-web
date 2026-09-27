@@ -104,14 +104,57 @@ choose **Import Save File(s)**. A console transfer still needs compatible
 GameCube memory-card hardware and a transfer method such as homebrew. No
 physical-console test is claimed.
 
+Dolphin's GCI-folder mode can also load individual GCI files from the
+configured USA folder. These are container-loading workflows; they do not by
+themselves prove that Melee accepts or uses the save. Dolphin's guide describes
+transferring a Dolphin-created save back with GCMM and an SD card. No
+physical-console test is claimed. Reference workflow and format boundaries are
+documented in Dolphin's [Memory Card Manager](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/DolphinQt/GCMemcardManager.cpp),
+[GCI-folder loader](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp)
+and [save-transfer guide](https://dolphin-emu.org/docs/guides/ripping-games/).
+These references were inspected for interoperability behavior; no Dolphin
+implementation code was reused.
+
+## Dolphin interoperability evidence
+
+The earlier Memory Card Manager check established that Dolphin 2609 accepted
+the exported file as a GCI container. It did not establish that Melee loaded
+the expected progress or could write a later change back. The bounded test for
+this review is recorded in
+[`evidence/save-profile-dolphin-capability-v1.json`](evidence/save-profile-dolphin-capability-v1.json).
+It used an isolated Dolphin user directory, USA GCI-folder slot A, null video,
+and disabled audio output. The GCI was present before boot and had the same
+SHA-256 after the process was stopped at the 20-second bound. There was no
+controller or movie input, no observed gameplay or save screen, and no later
+GCI export or browser reimport. Therefore this is a bounded capability
+reproducer, not the required Melee/Dolphin save round trip.
+
+The shared pinned reference-capture tooling and its receipts were also
+inspected. That observer route intentionally sets
+`Session.Core.SaveDataWritable=False` and closes its SRAM and directory-card
+backing paths without writing; its existing capture evidence separately lists
+virtual memory-card comparison as untested. It is useful for original-game
+observation, but cannot supply the requested persistent-save change. Do not
+remove that read-only guard to turn this interoperability task into an
+unreviewed mutation of shared reference state. The reproduction used a
+separate Dolphin 2609 installation and an isolated profile.
+
+The actual cross-emulator check remains open: after importing a WebMelee GCI,
+Melee must visibly load the expected completed or personal state, persist an
+ordinary in-game change, and export a GCI that WebMelee then loads and preserves.
+The browser codec tests are independent format checks and are not a substitute
+for these observations. The output baseline in the bounded run used default
+name-bank contents; it does not demonstrate an identifiable user-created name
+or non-default settings crossing the emulator boundary.
+
 ## Provenance and licensing
 
 `gamecube-save.mjs` was authored independently from the observed card format and
 the original source card manifest. It contains no copied Dolphin implementation.
-The source extents were checked against a private local Melee GCI and the
-generated iconless GCI was accepted by Dolphin 2609's Memory Card Manager into
-an isolated test card. That check establishes container acceptance by that
-Dolphin version; it does not establish a complete Dolphin gameplay round trip.
+The source extents were checked against a private local Melee GCI. The generated
+iconless GCI was previously accepted by Dolphin 2609's Memory Card Manager into
+an isolated test card, which establishes container acceptance only. The
+separate bounded boot attempt and its exact limit are recorded above.
 
 The browser codec, IndexedDB store, Settings controller and codec tests are
 project-authored and listed in the root MIT file scope. The native owner/host
