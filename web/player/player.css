@@ -27,6 +27,7 @@ html, body {
 #runtime-host {
   flex: 1;
   min-height: 0;
+  container-type: size;
 }
 
 #runtime-host {
@@ -66,8 +67,11 @@ html, body {
 }
 #canvas {
   display: block;
-  width: 100%;
-  height: 100%;
+  /* Fit the original display inside the space left by the wrapping toolbar.
+     Keep both axes explicit: SDL updates the canvas's intrinsic buffer size. */
+  flex: none;
+  width: min(100cqw, calc(100cqh * 4 / 3));
+  height: min(100cqh, 75cqw);
   object-fit: contain;
   outline: none;
 }
@@ -99,6 +103,7 @@ html, body {
 
 #toolbar {
   display: flex;
+  flex-shrink: 0;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;

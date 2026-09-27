@@ -1,4 +1,53 @@
-# Acquired WebGPU presentation bounds
+# Public player presentation and resize
+
+## Preserve the original display proportions
+
+The public shell must fit a centered 4:3 canvas into `#runtime-host`, whose
+height is the space left after the wrapping toolbar and safe-area padding.
+The host is a size-query container; both canvas dimensions use its available
+width and height. The toolbar does not shrink. This keeps the complete game
+image visible with black bars, including in the player element's DOM
+fullscreen layout.
+
+Previously the canvas used `width: 100%; height: 100%`. Initially its 640×480
+buffer could be letterboxed by `object-fit: contain`, but a browser resize
+made SDL resize that buffer to the unrestricted CSS rectangle. Aurora's game
+framebuffer followed the window shape, so the image filled the tall or wide
+rectangle. `object-fit` cannot restore 4:3 proportions once the buffer has
+that shape. This is a shell sizing defect; the fix does not change the game
+projection or renderer.
+
+SDL continues to read the canvas CSS dimensions and apply its device pixel
+ratio when resizing the buffer. Its pointer handler scales canvas-relative
+coordinates using those same CSS dimensions. Keeping the bars outside the
+canvas avoids an additional pointer offset or custom backing-buffer owner.
+
+Run the owned-disc check against a locally served production package:
+
+```sh
+node tests/public_presentation_browser_test.mjs \
+  --url "$CANDIDATE_ORIGIN" --disc "$OWNED_DISC" \
+  --playwright "$PLAYWRIGHT_PACKAGE" --dpr 1 \
+  --out work/presentation-dpr1
+```
+
+Repeat with `--dpr 2` and a new output directory. The check uses headless
+installed Chrome and the actual public shell, imports the disc through its
+normal controls, and retains original character-select screenshots. It asserts
+4:3 geometry, centering, containment, toolbar clearance, absence of scrolling,
+backing dimensions, nonempty game imagery, and canvas-relative pointer offsets
+across tall, wide, desktop, narrow, short, repeated-resize and DOM fullscreen
+states. Screenshots use CSS-pixel resolution at both DPRs to bound capture work;
+the actual game backing buffers still use the selected DPR. The
+[presentation receipt](evidence/public-presentation-aspect-v1.json) records the
+deployed baseline, corrected production package, retained failures and checks.
+
+This is **Browser exercised** presentation evidence. OS fullscreen/focus,
+foreground timing and original-game pixel equivalence remain separate gates;
+headless DOM fullscreen does not establish them. Owned disc data and game
+screenshots remain in ignored local evidence directories.
+
+## Acquired WebGPU presentation bounds
 
 A browser resize during graphics preparation could stop the public player.
 The canvas had changed from 640×480 to 320×607, but Aurora still encoded the
