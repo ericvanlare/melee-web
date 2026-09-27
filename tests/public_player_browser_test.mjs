@@ -49,6 +49,10 @@ async function collectViolations() { violations.push(...await page.evaluate(() =
 const selectDisc = driver.selectDisc;
 async function armLaunchObserver() {
   await page.evaluate(() => {
+    if (window.discFileChanges === undefined) {
+      window.discFileChanges = 0;
+      document.querySelector('#disc-file').addEventListener('change', () => window.discFileChanges++);
+    }
     const nativeLaunch = Module._melee_web_native_menu_launch.bind(Module);
     window.nativeLaunchCalls = 0;
     Module._melee_web_native_menu_launch = (...args) => {
@@ -177,8 +181,40 @@ try {
     await page.locator('#save-mode').selectOption('personal');
     await page.locator('#save-confirm-dialog[open]').waitFor();
     assert.match(await page.locator('#save-confirm-body').textContent(), /next launch/);
+    await shot('mode-confirmation');
+    await page.locator('#save-confirm-cancel').click();
+    await page.locator('#save-confirm-dialog').waitFor({state: 'hidden'});
+    assert.equal(await page.locator('#save-mode').inputValue(), 'everything',
+      'Cancel restores the active mode selection');
+    const canceledMode = await page.evaluate(async () => {
+      const storeUrl = performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+      const {SaveProfileStore} = await import(storeUrl);
+      const store = await SaveProfileStore.open();
+      try { return await store.getMode(); } finally { store.close(); }
+    });
+    assert.equal(canceledMode.mode, 'everything', 'Cancel must not persist the proposed mode');
+
+    await page.locator('#save-mode').selectOption('personal');
+    await page.locator('#save-confirm-dialog[open]').waitFor();
     await page.locator('#save-confirm-accept').click();
     await page.waitForFunction(() => document.querySelector('#save-mode').value === 'personal');
+
+    await page.locator('#load-save').click();
+    await page.locator('#save-file').setInputFiles(gciPath);
+    await page.locator('#save-confirm-dialog[open]').waitFor();
+    assert.match(await page.locator('#save-confirm-body').textContent(), /Personal progress/);
+    await shot('load-confirmation');
+    await page.locator('#save-confirm-cancel').click();
+    await page.locator('#save-confirm-dialog').waitFor({state: 'hidden'});
+    const canceledImport = await page.evaluate(async () => {
+      const storeUrl = performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+      const {SaveProfileStore} = await import(storeUrl);
+      const store = await SaveProfileStore.open();
+      try { return {mode: (await store.getMode()).mode, profile: await store.getProfile()}; }
+      finally { store.close(); }
+    });
+    assert.equal(canceledImport.mode, 'personal');
+    assert.equal(canceledImport.profile, null, 'Cancel must not store a validated candidate save');
     for (let generation = 0; generation < 2; generation++) {
       await page.locator('#load-save').click();
       await page.locator('#save-file').setInputFiles(gciPath);
@@ -253,10 +289,17 @@ try {
         </dialog></body>`);
       await savePage.evaluate(async ({settingsUrl, storeUrl}) => {
         const {mountSaveProfileSettings} = await import(settingsUrl);
-        const {SaveProfileStore} = await import(storeUrl);
+        const {SaveProfileStore, SaveProfileStorageError} = await import(storeUrl);
         const commitProfile = SaveProfileStore.prototype.commitProfile;
+        window.failNextSaveCommit = false;
         SaveProfileStore.prototype.commitProfile = function(...args) {
           window.saveCommitCalls = (window.saveCommitCalls || 0) + 1;
+          if (window.failNextSaveCommit) {
+            window.failNextSaveCommit = false;
+            return Promise.reject(new SaveProfileStorageError(
+              'Browser save transaction did not commit. Previous committed progress remains available.',
+              {cause: new DOMException('Storage quota exceeded.', 'QuotaExceededError')}));
+          }
           return commitProfile.apply(this, args);
         };
         window.saveSamples = 0;
@@ -355,6 +398,24 @@ try {
       assert.equal(flushed.previous.generation, second.active.generation);
       assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 3);
 
+      await savePage.evaluate(() => { window.failNextSaveCommit = true; window.saveByte = 4; });
+      await savePage.waitForFunction(() => /Browser storage is full/.test(document.querySelector('#save-status').textContent),
+        null, {timeout: 10000});
+      const writeFailure = await savePage.evaluate(async () => ({
+        status: document.querySelector('#save-status').textContent,
+        record: await window.readSavedEnvelope(),
+        commits: window.saveCommitCalls,
+      }));
+      assert.match(writeFailure.status, /Free space in this browser profile, then reload/,
+        'Quota failures must explain how to recover');
+      assert.equal(writeFailure.record.revision, 3);
+      assert.equal(writeFailure.record.active.generation, third.active.generation,
+        'A failed write must preserve the last committed active generation');
+      assert.equal(writeFailure.record.active.data[0], 3);
+      assert.equal(writeFailure.record.previous.generation, second.active.generation,
+        'A failed write must preserve the verified recovery generation');
+      assert.equal(writeFailure.commits, 4);
+
       await savePage.evaluate(() => window.corruptCurrentEnvelope());
       const recovered = await savePage.evaluate(async () => {
         const profile = await window.saveStore.getProfile();
@@ -363,7 +424,8 @@ try {
       });
       assert.deepEqual(recovered, {revision: 3, recovered: true, firstByte: 2,
         generation: second.active.generation});
-      assert.equal(await savePage.evaluate(() => window.saveFailure || null), null);
+      assert.match(await savePage.evaluate(() => window.saveFailure), /Browser storage is full/,
+        'The storage error callback receives the actionable failure');
     } finally {
       await savePage.evaluate(() => window.saveController?.close?.()).catch(() => {});
       await isolated.close();
@@ -383,6 +445,21 @@ try {
     await page.waitForFunction(() => document.activeElement.id === 'canvas');
     await collectViolations(); await page.reload(); await ready();
     assert.equal(await page.locator('#keyboard-layout').inputValue(), 'boxx');
+    await page.locator('#settings-open').click();
+    assert.equal(await page.locator('#save-mode').inputValue(), 'personal');
+    await page.locator('#save-mode').selectOption('everything');
+    await page.locator('#save-confirm-dialog[open]').waitFor();
+    assert.match(await page.locator('#save-confirm-body').textContent(), /next launch/);
+    await page.locator('#save-confirm-accept').click();
+    await page.waitForFunction(() => document.querySelector('#save-mode').value === 'everything');
+    await page.locator('#settings-close').click();
+    await page.locator('#settings-dialog').waitFor({state: 'hidden'});
+    await page.reload(); await ready();
+    await page.locator('#settings-open').click();
+    assert.equal(await page.locator('#save-mode').inputValue(), 'everything',
+      'Everything unlocked remains the default selected mode across a fresh document');
+    await page.locator('#settings-close').click();
+    await page.locator('#settings-dialog').waitFor({state: 'hidden'});
   });
   await check('disclosure before file selection, invalid-disc errors and selectable retry', async () => {
     await armAudioActivationObserver();
@@ -476,6 +553,57 @@ try {
       await page.locator('#pause-game').click();
       await page.waitForFunction(() => Module._melee_web_native_menu_running());
       await page.locator('#pause-game:not([disabled])').waitFor();
+    });
+    await check('confirmed and canceled save-mode changes restart with the retained disc', async () => {
+      assert.equal(await page.evaluate(() => window.discFileChanges), 1);
+      await page.locator('#settings-open').click();
+      assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
+      await page.locator('#save-mode').selectOption('personal');
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      assert.match(await page.locator('#save-confirm-body').textContent(), /restart the game/i);
+      assert.match(await page.locator('#save-confirm-body').textContent(), /Personal progress is retained/);
+      await shot('loaded-mode-confirmation');
+      await page.locator('#save-confirm-cancel').click();
+      await page.locator('#save-confirm-dialog').waitFor({state: 'hidden'});
+      assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 1,
+        'Cancel must leave the running source session untouched');
+
+      await page.locator('#save-mode').selectOption('personal');
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      await page.locator('#save-confirm-accept').click();
+      await page.waitForFunction(() => /source session restarted/.test(document.querySelector('#save-status').textContent),
+        null, {timeout: 90000});
+      await phase(1);
+      assert.equal(await page.locator('#save-mode').inputValue(), 'personal');
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 2,
+        'Confirm must create exactly one fresh native launch');
+      assert.equal(await page.evaluate(() => window.discFileChanges), 1,
+        'Restart must reuse the selected disc without opening the file picker');
+      await shot('css-after-personal-restart');
+
+      await page.locator('#save-mode').selectOption('everything');
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      await page.locator('#save-confirm-accept').click();
+      await page.waitForFunction(() => /source session restarted/.test(document.querySelector('#save-status').textContent),
+        null, {timeout: 90000});
+      await phase(1);
+      assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 3);
+      assert.equal(await page.evaluate(() => window.discFileChanges), 1,
+        'Returning to Personal must also retain the selected disc');
+      const retainedPersonal = await page.evaluate(async () => {
+        const storeUrl = performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+        const {SaveProfileStore} = await import(storeUrl);
+        const store = await SaveProfileStore.open();
+        try { return await store.getProfile(); } finally { store.close(); }
+      });
+      assert(retainedPersonal?.data?.byteLength > 0, 'Everything must preserve the separate Personal profile');
+      await shot('css-after-everything-restart');
+      report.mode_restarts = {native_launches: 3, disc_file_changes: 1, default_mode: 'everything',
+        personal_profile_retained: true, cancel_restarted: false};
+      await page.locator('#settings-close').click();
+      await page.locator('#settings-dialog').waitFor({state: 'hidden'});
     });
     await check('ordinary B0XX keyboard enters original SSS and cancels back to CSS', async () => {
       await page.waitForTimeout(1200); await press('7'); await phase(3);

@@ -30,6 +30,15 @@ export function mountSaveProfileSettings({onError = () => {}, onBusy = () => {}}
 
   function status(message) { statusElement.textContent = message; }
   function showFailure(error) {
+    let cause = error, quotaFailure = false;
+    for (let depth = 0; cause && depth < 4; depth++, cause = cause.cause) {
+      if (cause.name === 'QuotaExceededError') { quotaFailure = true; break; }
+    }
+    if (quotaFailure) {
+      error = new SaveProfileStorageError(
+        'Browser storage is full. Previously committed progress remains available. Free space in this browser profile, then reload to resume autosaving.',
+        {cause: error, recoveryAvailable: error?.recoveryAvailable, revision: error?.revision});
+    }
     if (error instanceof SaveProfileStorageError) { storageFailure = error; cancelTimer(); }
     status(error?.message || String(error));
     onError(error);
