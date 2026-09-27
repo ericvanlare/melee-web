@@ -10,6 +10,7 @@
 #include "gameplay_source_memory_runtime.h"
 #include "gameplay_menu_host.h"
 #include "gameplay_menu_world.hpp"
+#include "results_source_pad_schedule.hpp"
 #include "gameplay_save_profile.h"
 #include <filesystem>
 #include <fstream>
@@ -351,13 +352,21 @@ struct P1StatisticsControl {
     std::array<unsigned, 4> last_pages{};
     const unsigned confirmation_tick;
     const bool browser_cadence;
+    melee_web::ResultsSourcePadSchedule pad_schedule;
+    unsigned scheduled_pad_buttons = 0;
+    unsigned scheduled_pad_remaining = 0;
     unsigned edges = 0, releases = 0, held_ticks = 0;
     int last_phase = -1, last_stats_phase = -1;
 
     explicit P1StatisticsControl(bool use_browser_cadence)
         : confirmation_tick(use_browser_cadence ? 539U : 600U),
           browser_cadence(use_browser_cadence)
-    {}
+    {
+        for (const unsigned tick : {180U, 360U, confirmation_tick}) {
+            if (!pad_schedule.enqueue({tick, 0, PAD_BUTTON_START, 10}))
+                throw std::runtime_error("P1 statistics: cannot arm exact source-tick Start schedule");
+        }
+    }
 
     bool held(unsigned tick) const
     {
@@ -365,17 +374,17 @@ struct P1StatisticsControl {
                (tick >= 360 && tick < 370) ||
                (tick >= confirmation_tick && tick < confirmation_tick + 10);
     }
-    void prepare(unsigned tick, PADStatus (&pads)[4]) const
+    void prepare(unsigned source_frame, PADStatus (&pads)[4])
     {
-        if (tick == confirmation_tick) {
+        if (source_frame == confirmation_tick) {
             const auto& data = lbl_8046DBE8;
             if (browser_cadence) {
-                std::cout << "p1-statistics before-confirm tick=" << confirmation_tick
+                std::cout << "p1-statistics before-confirm source_frame=" << confirmation_tick
                           << " phase=" << unsigned(data.x1) << " pages="
                           << unsigned(data.player_data[0].page) << ','
                           << unsigned(data.player_data[1].page) << ','
                           << unsigned(data.player_data[2].page) << ','
-                          << unsigned(data.player_data[3].page) << " auto_page_ticks="
+                          << unsigned(data.player_data[3].page) << " auto_page_source_frames="
                           << auto_page_tick[0] << ',' << auto_page_tick[1]
                           << " scope=browser-observed-dispatch-brackets-not-historical\n"
                           << std::flush;
@@ -383,30 +392,51 @@ struct P1StatisticsControl {
                 if (!auto_page_tick[0] || !auto_page_tick[1] || data.x1 != 3 ||
                     data.player_data[2].page != 1 || data.player_data[3].page != 1)
                     throw std::runtime_error("P1 statistics: both disconnected CPU pages must auto-advance before confirmation");
-                std::cout << "p1-statistics before-confirm tick=600 auto_pages=1,1 auto_page_ticks="
+                std::cout << "p1-statistics before-confirm source_frame=600 auto_pages=1,1 auto_page_source_frames="
                           << auto_page_tick[0] << ',' << auto_page_tick[1] << '\n' << std::flush;
             }
         }
-        if (held(tick)) pads[0].button = PAD_BUTTON_START;
+        melee_web::ResultsSourcePadEvent event{};
+        const auto boundary = pad_schedule.before_tick(source_frame, event);
+        if (boundary == melee_web::ResultsSourcePadSchedule::Boundary::missed)
+            throw std::runtime_error("P1 statistics: missed exact source-tick Start target " +
+                                     std::to_string(source_frame));
+        if (boundary == melee_web::ResultsSourcePadSchedule::Boundary::due) {
+            if (scheduled_pad_remaining || pads[event.port].err != 0)
+                throw std::runtime_error("P1 statistics: scheduled Start overlaps or P1 is disconnected");
+            scheduled_pad_buttons = event.buttons;
+            scheduled_pad_remaining = event.duration;
+        }
+        if (scheduled_pad_remaining) {
+            pads[0].button = static_cast<u16>(scheduled_pad_buttons);
+            --scheduled_pad_remaining;
+        }
     }
-    void observe(unsigned tick)
+    void observe(unsigned completed_frames)
     {
+        if (!completed_frames)
+            throw std::runtime_error("P1 statistics: cannot observe a PAD sample before the first source tick");
+        const unsigned source_frame = completed_frames - 1;
         const auto& data = lbl_8046DBE8;
-        const bool edge = tick == 180 || tick == 360 || tick == confirmation_tick;
-        const bool release = tick == 190 || tick == 370 || tick == confirmation_tick + 10;
+        const bool edge = source_frame == 180 || source_frame == 360 ||
+                          source_frame == confirmation_tick;
+        const bool release = source_frame == 190 || source_frame == 370 ||
+                             source_frame == confirmation_tick + 10;
         for (unsigned slot = 0; slot < 4; ++slot) {
             const auto& pad = HSD_PadCopyStatus[slot];
             if (pad.err != (slot < 2 ? 0 : -1) ||
                 HSD_PadMasterStatus[slot].err != pad.err ||
-                pad.button != (slot == 0 && held(tick) ? PAD_BUTTON_START : 0) ||
+                pad.button != (slot == 0 && held(source_frame) ? PAD_BUTTON_START : 0) ||
                 pad.trigger != (slot == 0 && edge ? PAD_BUTTON_START : 0) ||
                 pad.release != (slot == 0 && release ? PAD_BUTTON_START : 0))
-                throw std::runtime_error("P1 statistics: source PAD edge/held/connectivity differs at tick " + std::to_string(tick));
+                throw std::runtime_error("P1 statistics: source PAD edge/held/connectivity differs at source frame " + std::to_string(source_frame));
         }
-        edges += edge; releases += release; held_ticks += held(tick);
+        edges += edge; releases += release; held_ticks += held(source_frame);
         if (edge || release)
-            std::cout << "p1-statistics input tick=" << tick << " port=0 held="
-                      << held(tick) << " trigger=" << edge << " release=" << release
+            std::cout << "p1-statistics input source_frame=" << source_frame
+                      << " state_after_tick=" << completed_frames
+                      << " port=0 held=" << held(source_frame)
+                      << " trigger=" << edge << " release=" << release
                       << " phase=" << unsigned(data.x1) << '\n' << std::flush;
         std::array<unsigned, 4> pages{};
         for (unsigned slot = 0; slot < 4; ++slot) {
@@ -415,17 +445,20 @@ struct P1StatisticsControl {
                 throw std::runtime_error("P1 statistics: connected neutral CPU unexpectedly changed page");
             if (slot >= 2 && pages[slot] != last_pages[slot]) {
                 if (last_pages[slot] != 0 || pages[slot] != 1 ||
-                    (!browser_cadence && (data.x1 != 3 || tick >= confirmation_tick)) ||
+                    (!browser_cadence && (data.x1 != 3 || source_frame >= confirmation_tick)) ||
                     data.x0_23 != 2 ||
                     HSD_PadCopyStatus[slot].err != -1)
                     throw std::runtime_error("P1 statistics: disconnected CPU page transition is not the required source auto-advance");
-                auto_page_tick[slot - 2] = tick;
+                auto_page_tick[slot - 2] = source_frame;
                 std::cout << "p1-statistics auto-page slot=" << slot
-                          << " from=0 to=1 tick=" << tick << '\n' << std::flush;
+                          << " from=0 to=1 source_frame=" << source_frame
+                          << " state_after_tick=" << completed_frames << '\n' << std::flush;
             }
         }
         if (last_phase != data.x1 || last_stats_phase != data.x0_23 || pages != last_pages) {
-            std::cout << "p1-statistics state tick=" << tick << " phase=" << unsigned(data.x1)
+            std::cout << "p1-statistics state_after_tick=" << completed_frames
+                      << " last_input_source_frame=" << source_frame
+                      << " phase=" << unsigned(data.x1)
                       << " stats_phase=" << unsigned(data.x0_23) << " pages="
                       << pages[0] << ',' << pages[1] << ',' << pages[2] << ',' << pages[3]
                       << " timers=" << data.player_data[2].x2 << ',' << data.player_data[3].x2
@@ -433,7 +466,7 @@ struct P1StatisticsControl {
             last_phase = data.x1; last_stats_phase = data.x0_23; last_pages = pages;
         }
         if (!browser_cadence && data.x1 == 4 &&
-            (tick < confirmation_tick || !auto_page_tick[0] || !auto_page_tick[1]))
+            (source_frame < confirmation_tick || !auto_page_tick[0] || !auto_page_tick[1]))
             throw std::runtime_error("P1 statistics: Results confirmed before both disconnected CPU pages advanced");
     }
     void finish(unsigned frames, unsigned draws, bool draw) const
@@ -441,13 +474,14 @@ struct P1StatisticsControl {
         if (frames <= confirmation_tick + 10 ||
             frames > (browser_cadence ? 700U : 900U) ||
             edges != 3 || releases != 3 || held_ticks != 30 ||
+            !pad_schedule.all_consumed() || scheduled_pad_remaining ||
             (!browser_cadence && (!auto_page_tick[0] || !auto_page_tick[1])) ||
             lbl_8046DBE8.x1 != 4 ||
             draws != (draw ? frames : 0))
             throw std::runtime_error("P1 statistics: incomplete held-input/page/exit coverage");
         std::cout << "p1-statistics coverage frames=" << frames << " trigger_edges=" << edges
                   << " releases=" << releases << " held_ticks=" << held_ticks
-                  << " auto_page_ticks=" << auto_page_tick[0] << ',' << auto_page_tick[1]
+                  << " auto_page_source_frames=" << auto_page_tick[0] << ',' << auto_page_tick[1]
                   << " source_draw_api_calls=" << draws << '\n' << std::flush;
     }
 };
@@ -602,7 +636,7 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                 PADStatus pads[4]{};
                 pads[2].err = pads[3].err = -1;
                 if (p1_statistics)
-                    statistics_control.prepare(session.source_frames() + 1, pads);
+                    statistics_control.prepare(session.source_frames(), pads);
                 else if (tick >= (delayed_confirmation ? 600U : 240U) && tick % 90 == 0)
                     pads[0].button = pads[1].button = PAD_BUTTON_START;
                 session.tick(pads);

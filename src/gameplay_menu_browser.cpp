@@ -2,6 +2,7 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
 #include "gameplay_results_session.hpp"
+#include "results_source_pad_schedule.hpp"
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
 #include "gameplay_results_entry_packet.hpp"
 #endif
@@ -10,6 +11,7 @@ extern "C" const char* melee_web_native_menu_match_observe();
 extern "C" const char* melee_web_native_menu_memory();
 extern "C" {
 #include <melee/gm/types.h>
+#include <sysdolphin/baselib/controller.h>
 extern ResultsData lbl_8046DBE8;
 }
 #include "gameplay_match_rules.h"
@@ -100,6 +102,7 @@ struct ResultsPadTraceRow {
  uint8_t results_player_pages[4];
  uint8_t results_player_confirmed[4];
  PADStatus pads[4];
+ HSD_PadStatus source_consumed_pads[4];
 };
 constexpr size_t kResultsPadTraceCapacity=8192;
 std::array<ResultsPadTraceRow,kResultsPadTraceCapacity> results_pad_trace{};
@@ -141,6 +144,7 @@ void retain_results_state_after_tick(size_t index,uint32_t source_frame){
  if(index>=results_pad_trace_count)return;
  auto& row=results_pad_trace[index];
  const ResultsData& state=lbl_8046DBE8;
+ for(size_t port=0;port<4;++port)row.source_consumed_pads[port]=HSD_PadCopyStatus[port];
  row.results_state_sampled=true;
  row.results_state_frame=source_frame;
  row.results_phase=state.x1;
@@ -340,6 +344,7 @@ struct PreparationProfile {
 PreparationProfile preparation_profile;
 PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
+melee_web::ResultsSourcePadSchedule scheduled_results_pad;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
 constexpr std::array<std::string_view,378> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","LbRf.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
@@ -447,6 +452,23 @@ void begin_source_session(){
  source_session_owned=true;
 }
 void clear_diagnostic_pad(){diagnostic_pad={};diagnostic_pad_port=0;diagnostic_pad_remaining=0;}
+void clear_scheduled_results_pad(){scheduled_results_pad.clear();}
+void activate_scheduled_results_pad(unsigned source_frame,const PADStatus* raw){
+ melee_web::ResultsSourcePadEvent scheduled{};
+ const auto boundary=scheduled_results_pad.before_tick(source_frame,scheduled);
+ if(boundary==melee_web::ResultsSourcePadSchedule::Boundary::missed)
+  throw std::runtime_error("Missed scheduled Results PAD source tick; refusing late input");
+ if(boundary!=melee_web::ResultsSourcePadSchedule::Boundary::due)return;
+ check(raw&&raw[scheduled.port].err==PAD_ERR_NONE,
+       "Scheduled Results P1 PAD event requires the original connected port");
+ check(diagnostic_pad_remaining==0,
+       "Scheduled Results PAD event overlapped an active raw PAD sample");
+ diagnostic_pad={};diagnostic_pad.err=raw[scheduled.port].err;
+ diagnostic_pad.button=static_cast<u16>(scheduled.buttons);
+ diagnostic_pad_port=scheduled.port;diagnostic_pad_remaining=scheduled.duration;
+ EM_ASM({window.menuResultsSourcePadConsumed?.($0,$1,$2,$3);},
+        scheduled.source_frame,scheduled.port,scheduled.buttons,scheduled.duration);
+}
 void report_owner_lifetime(const char* boundary){
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  // Opt-in diagnostics run only at owner boundaries, never per live tick.
@@ -580,7 +602,7 @@ if(scoped_assets){
   melee_web::retail_replay_end(replay->frames.size(),replay->whole_session());
  replay.reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
- audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;audio_clock.reset();clear_diagnostic_pad();
+ audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();
  match_message="Original source match";
  terminal_match_observation.clear();
  if(had_lifetime){
@@ -1222,6 +1244,7 @@ void tick(){
    if(prepare_deferred_pipelines())break;
    PADStatus checked_input[4];const PADStatus* sample=input->raw;bool copied_input=false;
    bool diagnostic_start_pulse=false;
+   if(results)activate_scheduled_results_pad(results->source_frames(),input->raw);
    if(diagnostic_start_ticks){
     std::copy(input->raw,input->raw+4,checked_input);checked_input[0].button|=PAD_BUTTON_START;
     sample=checked_input;copied_input=true;diagnostic_start_pulse=true;--diagnostic_start_ticks;
@@ -1321,7 +1344,14 @@ void tick(){
     ++replay_steps;
     replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
    }
-   if(result==3){pending=true;clear_diagnostic_pad();break;}
+   if(result==3){
+    if(results){
+     check(scheduled_results_pad.all_consumed(),
+           "Results returned before every scheduled source PAD sample was consumed");
+     clear_scheduled_results_pad();
+    }
+    pending=true;clear_diagnostic_pad();break;
+   }
   }
   if(!audio_before_construction&&!audio_elapsed.stalled)
    for(unsigned step=0;step<audio_elapsed.steps;step++)
@@ -1356,7 +1386,7 @@ void tick(){
     message="Whole-session replay complete; final original character select entered.";
    }
   }
- }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
+ }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
   if(simulation_done<input_done)simulation_done=failed;
@@ -1516,7 +1546,7 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_entry_packet(){
 EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
  static std::string json;
  json.clear();
- json.reserve(128+results_pad_trace_count*360);
+ json.reserve(128+results_pad_trace_count*1024);
  json+="{\"schema\":\"melee-web-results-pad-trace-v1\",\"source_frame_semantics\":\"zero-based Results source frame immediately before this tick attempt\",\"attempts\":";
  json+=std::to_string(results_pad_trace_attempts);
  json+=",\"retained\":";json+=std::to_string(results_pad_trace_count);
@@ -1553,7 +1583,23 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
    if(length<0||static_cast<size_t>(length)>=sizeof(sample))continue;
    json.append(sample,static_cast<size_t>(length));
   }
-  json+="],\"results_state_after_tick\":";
+  json+="],\"source_consumed_pads\":";
+  if(!row.results_state_sampled)json+="null";
+  else{
+   json+='[';
+   for(size_t port=0;port<4;++port){
+    if(port)json+=',';
+    const HSD_PadStatus& consumed=row.source_consumed_pads[port];
+    length=std::snprintf(sample,sizeof(sample),
+     "{\"button\":%u,\"trigger\":%u,\"release\":%u,\"err\":%d}",
+     static_cast<unsigned>(consumed.button),static_cast<unsigned>(consumed.trigger),
+     static_cast<unsigned>(consumed.release),static_cast<int>(consumed.err));
+    if(length<0||static_cast<size_t>(length)>=sizeof(sample))continue;
+    json.append(sample,static_cast<size_t>(length));
+   }
+   json+=']';
+  }
+  json+=",\"results_state_after_tick\":";
   if(!row.results_state_sampled)json+="null";
   else{
    char state_sample[256];
@@ -1740,6 +1786,23 @@ int melee_web_native_menu_pad_sample_full(unsigned port,unsigned buttons,int sti
 int melee_web_native_menu_pad_sample(unsigned port,unsigned buttons,int stick_x,int stick_y,unsigned duration){
  return melee_web_native_menu_pad_sample_full(port,buttons,stick_x,stick_y,0,0,0,0,duration);
 }
+int melee_web_native_menu_results_pad_schedule(unsigned source_frame,unsigned port,
+                                                unsigned buttons,unsigned duration){try{
+ const int phase=host&&host_entered?melee_web_menu_host_phase(host):-1;
+ if(replay||faulted||preparation.busy()||pending||!running||!host_entered||match||
+    results||prize||(phase!=MELEE_WEB_MENU_CSS&&phase!=MELEE_WEB_MENU_CSS_READY&&
+                     phase!=MELEE_WEB_MENU_SSS&&phase!=MELEE_WEB_MENU_SSS_READY)||
+    diagnostic_pad_remaining||diagnostic_start_ticks||stock_check==-1)
+  throw std::runtime_error("Results PAD schedule requires an idle original CSS/SSS before Match construction");
+ if(port!=0||buttons!=PAD_BUTTON_START||duration<1||duration>120||source_frame>8191)
+  throw std::runtime_error("Results PAD schedule is outside the P1 Start source-tick bounds");
+ if(scheduled_results_pad.started()||scheduled_results_pad.full())
+  throw std::runtime_error("Results PAD schedule is already running or full");
+ if(!scheduled_results_pad.enqueue({source_frame,port,buttons,duration}))
+  throw std::runtime_error("Results PAD source tick is invalid, duplicated, or unordered");
+ message="Results P1 Start scheduled at an exact future source tick.";
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_player_state(unsigned player,int* fighter_kind,int* motion_id,
                                        int* ground_or_air,unsigned* source_frame,
                                        float* position_x,float* position_y){try{

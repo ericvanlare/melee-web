@@ -19,7 +19,7 @@ import {parseArgs} from 'node:util';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
-import {queueResultsP1StartAtCurrentSource,queueResultsP1StartAtExactSourceTick}
+import {queueResultsP1StartAtCurrentSource,scheduleResultsP1StartSequence}
   from './results_source_pad_input.mjs';
 import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
   findConsumedResultsStartKeyboardAttempt,findResultsStartRunAtOrAfter,
@@ -431,6 +431,21 @@ async function runMatch(matchIndex,expected){
   activeMatchIndex=matchIndex;
   const inputEventStart=await page.evaluate(()=>
     window.__meleeWebResultsInputEvents?.length||0);
+  let scheduledSourceTickInputs=[];
+  if(sourceTickThreePulse){
+    // Pre-queue through the source PAD boundary while original CSS is idle.
+    // The Results source loop owns exact consumption; page polling/screenshot
+    // callbacks cannot move these targets or inject a late sample.
+    const events=[180,360,600].map(targetFrame=>({targetFrame,port:0,
+      button:buttonStart,duration:10}));
+    const armed=await page.evaluate(scheduleResultsP1StartSequence,{events});
+    assert.equal(armed.status,'scheduled','The source Results PAD schedule must be armed before SSS');
+    scheduledSourceTickInputs=armed.events;
+    report.results_source_pad_schedules??=[];
+    report.results_source_pad_schedules.push({match:matchIndex,
+      method:'development source-boundary queue before SSS/match construction',
+      events:scheduledSourceTickInputs});
+  }
   await chooseFinalDestination();
   const entry=await writeProgress(`match-${matchIndex}-entry`);
   await screenshot(`match-${matchIndex}-entry`);
@@ -640,20 +655,11 @@ async function runMatch(matchIndex,expected){
     return queued.source_frame;
   };
   const queueSourceStartAtExactTick=async(target,label)=>{
-    const queued=await page.evaluate(queueResultsP1StartAtExactSourceTick,
-      {targetFrame:target,button:buttonStart,duration:10});
-    if(queued.status==='natural-css')
-      return {natural_css:true,source_frame:null,status:queued.status};
-    report.controller_inputs.push({device:'development raw PAD at exact source tick',port:0,
-      buttons:buttonStart,duration:10,target_results_source_frame:target,
-      queued_at_results_source_frame:queued.source_frame??null,
-      running_before_queue:queued.running_before_queue??null,
-      resumed_after_timing_pause:queued.resumed_after_timing_pause??false,
-      status:queued.status,label,...(queued.error?{error:queued.error}:{})});
-    assert.equal(queued.status,'queued',
-      `${label}: exact Results source tick ${target} was not queued: ${JSON.stringify(queued)}`);
-    assert.equal(queued.source_frame,target,
-      `${label}: PAD queue boundary must equal its requested Results source tick`);
+    assert(scheduledSourceTickInputs.some(event=>event.targetFrame===target),
+      `${label}: source-tick event was not pre-queued before gameplay`);
+    const state=await waitForResultsFrame(target+10,`${label} consumed ten-tick PAD hold`);
+    assert(state.phase===8||state.phase===9,
+      `${label}: Results left before the pre-queued source sample was observed`);
     return target;
   };
   const waitForCpuPagesBeforeKeyboard=async(targetFrame,label)=>{
@@ -1202,6 +1208,18 @@ async function runMatch(matchIndex,expected){
     const sourcePadSummary=sourcePadTraceRecord?.summary;
     assert(sourcePadTrace&&sourcePadSummary&&!sourcePadSummary.overflow,
       'Source-tick Results validation requires a complete raw PAD trace');
+    assert.equal(sourcePadSummary.source_consumed_pad_rows,sourcePadTrace.samples.length,
+      'Every returned Results tick must retain the source-consumed PAD trigger/release state');
+    assert.deepEqual(sourcePadSummary.source_p1_trigger_frames,
+      result.results_source_start_pulse_frames,
+      'Source-consumed P1 trigger edges must occur exactly at the declared source frames');
+    assert.deepEqual(sourcePadSummary.source_p1_release_frames,
+      result.results_source_start_pulse_frames.map(frame=>frame+10),
+      'Source-consumed P1 release edges must follow each ten-tick hold exactly');
+    const consumedPortErrors=Array.from({length:4},(_,port)=>
+      [...new Set(sourcePadTrace.samples.map(row=>row.source_consumed_pads[port].err))]);
+    assert.deepEqual(consumedPortErrors,[[0],[0],[-1],[-1]],
+      'Source-consumed PAD connectedness must remain P1/P2 connected and CPU P3/P4 disconnected');
     const startRows=sourcePadTrace.samples.filter(row=>row.pads[0].button===buttonStart);
     const expectedRows=result.results_source_start_pulse_frames.flatMap(first=>
       Array.from({length:10},(_,offset)=>first+offset));

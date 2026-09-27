@@ -121,9 +121,9 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         self.assertIn("not rendered browser/reference evidence", scope)
         for marker in (
                 "host_hud_layout=4", "match_mode=four-CPU9",
-                "before-confirm tick=600 auto_pages=1,1",
-                "p1-statistics auto-page slot=2 from=0 to=1 tick=",
-                "p1-statistics auto-page slot=3 from=0 to=1 tick=",
+                "before-confirm source_frame=600 auto_pages=1,1",
+                "p1-statistics auto-page slot=2 from=0 to=1 source_frame=",
+                "p1-statistics auto-page slot=3 from=0 to=1 source_frame=",
                 "p1-statistics coverage frames=", "natural_cpu9=1",
                 "natural four-CPU9 Match->Results host handoff and close passed"):
             self.assertIn(marker, stdout, f"Retained {evidence}\n{brief}")
@@ -139,20 +139,23 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         self.assertGreater(int(terminal.group(5)), 0)
         self.assertGreater(int(terminal.group(6)), 0)
         edges = re.findall(
-            r"p1-statistics input tick=(\d+) port=0 held=1 trigger=1 release=0", stdout)
+            r"p1-statistics input source_frame=(\d+) state_after_tick=\d+ "
+            r"port=0 held=1 trigger=1 release=0", stdout)
         releases = re.findall(
-            r"p1-statistics input tick=(\d+) port=0 held=0 trigger=0 release=1", stdout)
+            r"p1-statistics input source_frame=(\d+) state_after_tick=\d+ "
+            r"port=0 held=0 trigger=0 release=1", stdout)
         self.assertEqual(edges, ["180", "360", "600"])
         self.assertEqual(releases, ["190", "370", "610"])
         auto_pages = re.findall(
-            r"p1-statistics auto-page slot=(\d) from=0 to=1 tick=(\d+)", stdout)
+            r"p1-statistics auto-page slot=(\d) from=0 to=1 source_frame=(\d+) "
+            r"state_after_tick=\d+", stdout)
         self.assertEqual([row[0] for row in auto_pages], ["2", "3"])
         for _, tick in auto_pages:
             self.assertGreater(int(tick), 360)
             self.assertLess(int(tick), 600)
         before_confirm = re.search(
-            r"p1-statistics before-confirm tick=600 auto_pages=1,1 "
-            r"auto_page_ticks=(\d+),(\d+)", stdout)
+            r"p1-statistics before-confirm source_frame=600 auto_pages=1,1 "
+            r"auto_page_source_frames=(\d+),(\d+)", stdout)
         self.assertIsNotNone(before_confirm, f"Retained {evidence}\n{brief}")
         self.assertEqual(before_confirm.groups(), tuple(row[1] for row in auto_pages))
         target = winner_slot == 2 and winner_ckind == 18 and winner_ftkind == 7
@@ -170,22 +173,22 @@ class ResultsMatchHistoryTests(unittest.TestCase):
                        "pulse_ticks=180,360,600 hold_ticks=10 cap=900",
                        "scope=chosen-source-ticks-not-historical-replay",
                        "host_profile=default-CSS-subset", "draw_scope=unrun native-state-only",
-                       "before-confirm tick=600 auto_pages=1,1",
+                       "before-confirm source_frame=600 auto_pages=1,1",
                        "ok; all four participant demo owners constructed and closed"):
             self.assertIn(marker, stdout, f"Retained {evidence}\n{brief}")
-        edges = re.findall(r"p1-statistics input tick=(\d+) port=0 held=1 trigger=1 release=0", stdout)
-        releases = re.findall(r"p1-statistics input tick=(\d+) port=0 held=0 trigger=0 release=1", stdout)
+        edges = re.findall(r"p1-statistics input source_frame=(\d+) state_after_tick=\d+ port=0 held=1 trigger=1 release=0", stdout)
+        releases = re.findall(r"p1-statistics input source_frame=(\d+) state_after_tick=\d+ port=0 held=0 trigger=0 release=1", stdout)
         self.assertEqual(edges, ["180", "360", "600"])
         self.assertEqual(releases, ["190", "370", "610"])
-        auto_pages = re.findall(r"p1-statistics auto-page slot=(\d) from=0 to=1 tick=(\d+)", stdout)
+        auto_pages = re.findall(r"p1-statistics auto-page slot=(\d) from=0 to=1 source_frame=(\d+) state_after_tick=\d+", stdout)
         self.assertEqual([row[0] for row in auto_pages], ["2", "3"])
         for _, tick in auto_pages:
             self.assertGreater(int(tick), 360)
             self.assertLess(int(tick), 600)
-        phases = re.findall(r"p1-statistics state tick=\d+ phase=(\d)", stdout)
+        phases = re.findall(r"p1-statistics state_after_tick=\d+ last_input_source_frame=\d+ phase=(\d)", stdout)
         self.assertEqual(set(phases), set("01234"))
         coverage = re.search(r"p1-statistics coverage frames=(\d+) trigger_edges=3 releases=3 "
-                             r"held_ticks=30 auto_page_ticks=(\d+),(\d+) source_draw_api_calls=0", stdout)
+                             r"held_ticks=30 auto_page_source_frames=(\d+),(\d+) source_draw_api_calls=0", stdout)
         self.assertIsNotNone(coverage, f"Retained {evidence}\n{brief}")
         self.assertGreater(int(coverage[1]), 610)
         self.assertLessEqual(int(coverage[1]), 900)
@@ -204,21 +207,21 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         self.assertIn("not consumed historical PAD or a historical replay", scope)
         for marker in ("connected=0,1 disconnected=2,3 pulse_ticks=180,360,539 hold_ticks=10",
                        "scope=browser-observed-dispatch-brackets-not-historical",
-                       "before-confirm tick=539", "host_profile=default-CSS-subset",
+                       "before-confirm source_frame=539", "host_profile=default-CSS-subset",
                        "source_draw_api_calls=0", "host OnExit+commit",
                        "source_pool="):
             self.assertIn(marker, stdout, f"Retained {evidence}\n{brief}")
-        edges = re.findall(r"p1-statistics input tick=(\d+) port=0 held=1 trigger=1 release=0", stdout)
-        releases = re.findall(r"p1-statistics input tick=(\d+) port=0 held=0 trigger=0 release=1", stdout)
+        edges = re.findall(r"p1-statistics input source_frame=(\d+) state_after_tick=\d+ port=0 held=1 trigger=1 release=0", stdout)
+        releases = re.findall(r"p1-statistics input source_frame=(\d+) state_after_tick=\d+ port=0 held=0 trigger=0 release=1", stdout)
         self.assertEqual(edges, ["180", "360", "539"])
         self.assertEqual(releases, ["190", "370", "549"])
-        before = re.search(r"before-confirm tick=539 phase=(\d) pages=([0-3]),([0-3]),([0-3]),([0-3]) "
-                           r"auto_page_ticks=(\d+),(\d+)", stdout)
+        before = re.search(r"before-confirm source_frame=539 phase=(\d) pages=([0-3]),([0-3]),([0-3]),([0-3]) "
+                           r"auto_page_source_frames=(\d+),(\d+)", stdout)
         self.assertIsNotNone(before, f"Retained {evidence}\n{brief}")
         self.assertEqual(before.groups()[1:5], ("0", "0", "0", "0"))
         self.assertEqual(before.groups()[5:], ("0", "0"))
         coverage = re.search(r"p1-statistics coverage frames=(\d+) trigger_edges=3 releases=3 "
-                             r"held_ticks=30 auto_page_ticks=(\d+),(\d+) source_draw_api_calls=0",
+                             r"held_ticks=30 auto_page_source_frames=(\d+),(\d+) source_draw_api_calls=0",
                              stdout)
         self.assertIsNotNone(coverage, f"Retained {evidence}\n{brief}")
         self.assertGreater(int(coverage[1]), 549)

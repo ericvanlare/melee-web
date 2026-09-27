@@ -2,6 +2,9 @@ export function summarizeResultsPadTrace(trace){
   const startRuns=[];
   const pageTransitions=[];
   const previousPages=Array(4).fill(null);
+  const consumedRows=trace.samples.filter(row=>Array.isArray(row.source_consumed_pads));
+  const consumedEdges=(field)=>consumedRows.filter(row=>
+    (row.source_consumed_pads[0][field]&0x1000)!==0).map(row=>row.source_frame);
   let previousSourceFrame=null;
   for(let index=0;index<trace.samples.length;index++){
     const sourceFrame=trace.samples[index].source_frame;
@@ -33,6 +36,9 @@ export function summarizeResultsPadTrace(trace){
     overflow:trace.overflow,tick_returned:trace.samples.filter(row=>row.tick_returned).length,
     tick_failed:trace.samples.filter(row=>!row.tick_returned).map(row=>row.source_frame),
     p1_button_values:[...new Set(trace.samples.map(row=>row.pads[0].button))],
+    source_consumed_pad_rows:consumedRows.length,
+    source_p1_trigger_frames:consumedEdges('trigger'),
+    source_p1_release_frames:consumedEdges('release'),
     p1_start_runs:startRuns,
     results_page_transitions:pageTransitions,
     port_error_values:Array.from({length:4},(_,port)=>
