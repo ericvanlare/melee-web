@@ -201,6 +201,23 @@ The repository's [reference Dolphin builder](../scripts/build_reference_dolphin.
 already describes a headless build route, but that separately pinned vanilla
 reference is not evidence that a selected Slippi build passes this gate.
 
+Source inspection favors the newer `project-slippi/dolphin` fork for this Mac.
+Its [no-GUI build](https://github.com/project-slippi/dolphin/blob/41a7a3a110ed52999486ae1901c8fbb9a63d4f13/Source/Core/DolphinNoGUI/CMakeLists.txt)
+defines the `dolphin-nogui` target, emits `dolphin-emu-nogui`, and links the Slippi
+Rust extensions on Apple as well as other platforms. Its
+[platform selection](https://github.com/project-slippi/dolphin/blob/41a7a3a110ed52999486ae1901c8fbb9a63d4f13/Source/Core/DolphinNoGUI/MainNoGUI.cpp)
+requires explicit `-p headless`: the default Apple platform is `macos`, which is
+windowed. The older pinned Ishiiruka
+[no-GUI target](https://github.com/project-slippi/Ishiiruka/blob/60f7b63496fb6ec7b9180a04f16f3edc0ad89fe2/Source/Core/DolphinWX/CMakeLists.txt)
+is gated on X11/headless configuration, so its desktop Mac build is not an
+interchangeable starting point. These are source findings, not tested commands.
+
+The newer fork's [Pipes controller backend](https://github.com/project-slippi/dolphin/blob/41a7a3a110ed52999486ae1901c8fbb9a63d4f13/Source/Core/InputCommon/ControllerInterface/Pipes/Pipes.cpp)
+is a candidate scripted-input route. Its compile-time enablement and actual
+per-frame input delivery on this machine still need verification. Headless mode
+cannot be assumed to accept desktop keyboard automation. Prove the input bridge
+before attempting timed pairing or full matches.
+
 This milestone establishes local functional evidence only. Loopback does not
 exercise NAT hole punching, Internet path selection or geographic latency;
 same-host CPU contention also differs from two players on separate machines.
