@@ -357,6 +357,7 @@ try {
     const fullscreenAvailable = await page.evaluate(() => document.fullscreenEnabled === true &&
       typeof document.querySelector('#player').requestFullscreen === 'function' &&
       typeof document.exitFullscreen === 'function');
+    assert(fullscreenAvailable, 'Installed headless Chrome supports native fullscreen for the supported-path check');
     assert.equal(await page.locator('#fullscreen').isVisible(), fullscreenAvailable,
       'Fullscreen is visible only when the native API is supported');
     assert.equal(await page.locator('#fullscreen-status').count(), 0,
@@ -374,6 +375,7 @@ try {
         document.querySelector('#fullscreen').textContent === 'Fullscreen');
       assert.equal(await page.locator('#fullscreen').innerText(), 'Fullscreen');
     }
+    report.fullscreen_supported = {available: true, entered: true, exited: true};
     await page.addInitScript(() => Object.defineProperty(document, 'fullscreenEnabled', {configurable: true, value: false}));
     await page.reload(); await ready();
     const unsupportedFullscreen = await page.evaluate(() => {
@@ -392,6 +394,15 @@ try {
     assert.equal(await page.locator('#fullscreen-status').count(), 0);
     assert.doesNotMatch(await page.locator('body').innerText(), /browser controls remain visible|fullscreen unavailable/i);
     await shot('fullscreen-unsupported');
+    report.fullscreen_unsupported = {simulated: true, button_hidden: unsupportedFullscreen.hidden,
+      display: unsupportedFullscreen.display, width: unsupportedFullscreen.width, height: unsupportedFullscreen.height};
+    await page.removeAllInitScripts();
+    await page.addInitScript(() => {
+      window.releaseCspViolations = [];
+      document.addEventListener('securitypolicyviolation', event => window.releaseCspViolations.push({directive: event.violatedDirective, blocked: event.blockedURI}));
+    });
+    await page.reload(); await ready();
+    assert(await page.locator('#fullscreen').isVisible(), 'The simulated unsupported state does not leak into the gameplay capture');
     await page.locator('#controls-open').click();
     await page.locator('#player-one-source').selectOption('touch');
     await page.locator('#controls-close').click();
