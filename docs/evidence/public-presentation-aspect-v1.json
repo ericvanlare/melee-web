@@ -1,0 +1,356 @@
+{
+  "schema": "melee-web-public-presentation-aspect-v1",
+  "recorded_date_utc": "2026-09-27",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Browser exercised"
+  ],
+  "scope": "Production-shell display proportions and resize only. No gameplay equivalence, original-pixel comparison, performance or OS fullscreen claim.",
+  "base_commit": "aecc3e64def3090bdfc33d0eb66058df998ef14d",
+  "package": {
+    "schema": "melee-web-audio-player-package-v1",
+    "profile": "audio-player",
+    "project": "webmelee",
+    "source_sha": "6e82e17be24dc649671baf4e5ff13b6e37700ec6",
+    "runtime_hash": "729ef68d282a8364",
+    "identity_sha256": "b7f2df8df7b0a3acdae129ff53ad17f8f38f2f4e9fb576dc8302bae9dffb9f55",
+    "manifest_sha256": "023d43859f63d6002b259685846168e55be8d7b8758010c4b3fedf3306b8505a"
+  },
+  "deployed_baseline": {
+    "url": "https://webmelee.gg/",
+    "runtime_graph": "dd225834e115117f",
+    "stylesheet_sha256": "9187cf928a90c1a2b86d44c0672dee9931abe7410ab096e6568c84d31cd168e8",
+    "matches_origin_main_stylesheet": true,
+    "result": "Expected regression: all eight canvas aspect checks fail after resize; original CSS pixels present."
+  },
+  "machine": {
+    "os": "macOS 26.6",
+    "architecture": "arm64",
+    "browser": "153.0.8010.54",
+    "browser_mode": "headless",
+    "gpu": {
+      "isolated": true,
+      "vendor": "apple",
+      "architecture": "metal-3",
+      "fallback": false
+    }
+  },
+  "cause": "Unrestricted width:100%; height:100% canvas follows toolbar remainder. SDL resize adopts that CSS shape for its DPR-scaled buffer and Aurora framebuffer. object-fit cannot fix the shape after resize.",
+  "fix": "Size-query container on runtime-host, explicit maximal 4:3 canvas dimensions, nonshrinking toolbar. SDL retains backing/DPR and pointer ownership. No runtime, projection or source patch changes.",
+  "harness_sha256": "202b2646eda32ccb568c76f6e40cd6b16cf1dea8415f661a468d4c7079a39d1d",
+  "checks": [
+    {
+      "name": "dpr1",
+      "result": "pass",
+      "observations": 8,
+      "errors": [],
+      "maximum_aspect_error_css_px": 0.010416666666628771,
+      "backing_buffer_dpr_assertions": "pass",
+      "original_css_pixels": "pass in every screenshot",
+      "dom_fullscreen": "entry and exit pass",
+      "pointer_offsets": "pass"
+    },
+    {
+      "name": "dpr2",
+      "result": "pass",
+      "observations": 8,
+      "errors": [],
+      "maximum_aspect_error_css_px": 0.010416666666628771,
+      "backing_buffer_dpr_assertions": "pass",
+      "original_css_pixels": "pass in every screenshot",
+      "dom_fullscreen": "entry and exit pass",
+      "pointer_offsets": "pass"
+    },
+    {
+      "name": "startup-and-controls-resize",
+      "result": "pass",
+      "observations": 15
+    },
+    {
+      "name": "Release production-audio build and package audit",
+      "result": "pass",
+      "log": "work/presentation/build-audio.log"
+    },
+    {
+      "name": "focused public tests",
+      "result": "pass",
+      "tests": 56,
+      "log": "work/presentation/focused-public.log"
+    },
+    {
+      "name": "full unittest discovery",
+      "result": "failed initially: missing build/browser prerequisites",
+      "tests": 1458,
+      "skipped": 95,
+      "failures": 2,
+      "errors": 1,
+      "seconds": 381.959,
+      "log": "work/presentation/full-suite.log"
+    },
+    {
+      "name": "all affected prerequisite tests after development build",
+      "result": "pass",
+      "tests": 6,
+      "logs": [
+        "work/presentation/prerequisite-bootstrap-tests.log",
+        "work/presentation/prerequisite-collision-tests.log",
+        "work/presentation/prerequisite-fighter-assets-tests.log"
+      ]
+    },
+    {
+      "name": "diff, documentation paths and staged repository content",
+      "result": "pass"
+    }
+  ],
+  "remaining_gates": [
+    "Actual OS fullscreen/focus not run; only #player DOM fullscreen entered and exited in headless Chrome.",
+    "No foreground timing/performance or original-game pixel-equivalence claim.",
+    "Not deployed."
+  ],
+  "retained_failures": [
+    {
+      "path": "work/presentation/before/report.json",
+      "reason": "Initial harness drawImage(WebGPU canvas) read black after presentation despite visible screenshot. Corrected probe reads the screenshot bitmap."
+    },
+    {
+      "path": "work/presentation/after-dpr2/report.json",
+      "reason": "Device-resolution screenshot/readback sequence reached correct buffer dimensions but menu paused before wide capture, which was black. No auto-resume. Reduced screenshot work to CSS-pixel captures; isolated two-size probe and complete DPR2 sequence passed. Timing cause is inferred, not a performance finding."
+    },
+    {
+      "path": "work/presentation/package.log",
+      "reason": "Packager rejected uncommitted source; committed implementation before packaging/auditing."
+    },
+    {
+      "path": "work/presentation/full-suite.log",
+      "reason": "Fresh audio-only build lacked development build/browser prerequisites for bootstrap, collision and fighter-assets tests; development prerequisites built before rerunning affected checks."
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "work/presentation/after-dpr1/report.json",
+      "bytes": 8177,
+      "sha256": "623fc9573fcb5e523748aa2a9fa10dca7a8d35aa506c1fe5faac7298c2dbb574"
+    },
+    {
+      "path": "work/presentation/after-dpr1-css-capture/desktop.png",
+      "bytes": 796777,
+      "sha256": "d6e7dbeba2b6cba2479020be531566b075aef7f1c1967326f895cac047f40014"
+    },
+    {
+      "path": "work/presentation/after-dpr1-css-capture/report.json",
+      "bytes": 8545,
+      "sha256": "6ff3e857f117efcca12f2f92cbb9e61399c0a636e5a69421989af534a98d8f44"
+    },
+    {
+      "path": "work/presentation/after-dpr1-css-capture/tall.png",
+      "bytes": 608836,
+      "sha256": "ae35bcd34b109c162348ae5fa58e4a25de09ed1d6a299b3e14d27e31debb3636"
+    },
+    {
+      "path": "work/presentation/after-dpr1-css-capture/wide.png",
+      "bytes": 626443,
+      "sha256": "28ea7b75b770dc85b53cc1c79feb4e095661e579ecf35e7b9acaba549623f8b6"
+    },
+    {
+      "path": "work/presentation/after-dpr1-css-capture.log",
+      "bytes": 273,
+      "sha256": "dbe3119a2927975b383bf34cc4c23e7ffc838f2e53ec4fcba7785a6e29caba80"
+    },
+    {
+      "path": "work/presentation/after-dpr1.log",
+      "bytes": 273,
+      "sha256": "dbe3119a2927975b383bf34cc4c23e7ffc838f2e53ec4fcba7785a6e29caba80"
+    },
+    {
+      "path": "work/presentation/after-dpr2/failure.png",
+      "bytes": 37215,
+      "sha256": "f91c6d337805b17d3865c8117de9763c64f2a3349507b3caa3395806ce7212bb"
+    },
+    {
+      "path": "work/presentation/after-dpr2/report.json",
+      "bytes": 3084,
+      "sha256": "cd140637bd088adb1ab6a2bc29afb463d1fce134b65fe7904bd05a140a30646b"
+    },
+    {
+      "path": "work/presentation/after-dpr2/tall.png",
+      "bytes": 1680368,
+      "sha256": "d7635912180cd18ce435a6e0cf495897f2c184279a24880d3d04c84395bdb9cb"
+    },
+    {
+      "path": "work/presentation/after-dpr2/wide.png",
+      "bytes": 37215,
+      "sha256": "f91c6d337805b17d3865c8117de9763c64f2a3349507b3caa3395806ce7212bb"
+    },
+    {
+      "path": "work/presentation/after-dpr2-css-capture/desktop.png",
+      "bytes": 809047,
+      "sha256": "3a09422ac458196e8b7877c4903b01f8d6c933642972a3a791f46ce4adb790cb"
+    },
+    {
+      "path": "work/presentation/after-dpr2-css-capture/report.json",
+      "bytes": 8552,
+      "sha256": "cf212c006aeb45569668884d79e2adc0e802a1075e0af16be6ca5f229c984148"
+    },
+    {
+      "path": "work/presentation/after-dpr2-css-capture/tall.png",
+      "bytes": 608070,
+      "sha256": "5983a9bfe2fb8a3acc32a4e3df1ead2fa79d20d229cddc4d4e99631cd83cceb2"
+    },
+    {
+      "path": "work/presentation/after-dpr2-css-capture/wide.png",
+      "bytes": 630572,
+      "sha256": "ec614d496aec9c9cf7c5f3620ad63be8bc550d98045d1f94620158a189e65f0b"
+    },
+    {
+      "path": "work/presentation/after-dpr2-css-capture.log",
+      "bytes": 280,
+      "sha256": "67aa7f96ddcc360ffe5576e9a1dd6e5dc7af2bf500ebb0bc66181b8b1419fab6"
+    },
+    {
+      "path": "work/presentation/after-dpr2.log",
+      "bytes": 578,
+      "sha256": "17b338434c9acca3e2927867a8ddf28e8ac516056bd23cd5656d3195976e3f7c"
+    },
+    {
+      "path": "work/presentation/audit.log",
+      "bytes": 279,
+      "sha256": "95f8a313281dfa3a34deb368f8a855e4982edf6455e5c8a6164f700c0d6df0de"
+    },
+    {
+      "path": "work/presentation/before/failure.png",
+      "bytes": 602144,
+      "sha256": "49cc9dade2aa681634f68176eafc12511b8a4dad2c63c762ad18bf62e7616bde"
+    },
+    {
+      "path": "work/presentation/before/report.json",
+      "bytes": 2102,
+      "sha256": "131aed798be98f3082add856fd02627e4156a3c7981d7fa27447818c73f26c1a"
+    },
+    {
+      "path": "work/presentation/before/tall.png",
+      "bytes": 600421,
+      "sha256": "dbea20ff7f0435c2f6e4c788659b96eb8860fc928cb064126ad89a46ac272879"
+    },
+    {
+      "path": "work/presentation/before-resize/desktop.png",
+      "bytes": 819907,
+      "sha256": "d096b430edd4c7e5fe96ebb644cc9d3e8a2aa5d3bcc3a90c803557a7710a4f4f"
+    },
+    {
+      "path": "work/presentation/before-resize/failure.png",
+      "bytes": 893585,
+      "sha256": "3d854b36648fdc0b1af205b8ab5f6689cda4d26bc9bcaa68f583d61d6a15001f"
+    },
+    {
+      "path": "work/presentation/before-resize/report.json",
+      "bytes": 10178,
+      "sha256": "2eb3ddcb7575031be1af1a66cdb0d9c35bedab4b9f0c4ab6272efdb12fb19e5a"
+    },
+    {
+      "path": "work/presentation/before-resize/tall.png",
+      "bytes": 898169,
+      "sha256": "6fb515b091ce7e11b835b621960ddab61e35cd8590416c1674a5212acd88355e"
+    },
+    {
+      "path": "work/presentation/before-resize/wide.png",
+      "bytes": 882380,
+      "sha256": "ff42c22364949a06a3733a94df6d6c8c11b5efd76d8dd60d49fa5c566bcb8b48"
+    },
+    {
+      "path": "work/presentation/before-resize.log",
+      "bytes": 1932,
+      "sha256": "14b5893ee8e75c452abb196922b4874664d739ad777e17afc91377c132758260"
+    },
+    {
+      "path": "work/presentation/before.log",
+      "bytes": 545,
+      "sha256": "c3495335a3086d5b814c00aae2d4ec9f436ad7835bc9e64922af4b15fdebe6b2"
+    },
+    {
+      "path": "work/presentation/bootstrap.log",
+      "bytes": 1851,
+      "sha256": "5532927a86f2bd3fa144cc3181e63cb3c475775674359fa2e72214862a5e1acd"
+    },
+    {
+      "path": "work/presentation/build-audio.log",
+      "bytes": 855270,
+      "sha256": "f3ae140f72c6b814147c0bc20958edb50284446d8e39fb2a93a6c3e33c6872d0"
+    },
+    {
+      "path": "work/presentation/build-test-prerequisites.log",
+      "bytes": 852429,
+      "sha256": "8939455b336d488c7502257a79d007c66e6d5ca17a7f58cf593c42cb8469e3fd"
+    },
+    {
+      "path": "work/presentation/content-guard.log",
+      "bytes": 70,
+      "sha256": "cc9bcd236e60de8d6c47eb16c95c1787611f96413dddf20400133a2ccc9ac6d8"
+    },
+    {
+      "path": "work/presentation/dpr2-probe/report.json",
+      "bytes": 2550,
+      "sha256": "868eaa5ca182baee182a18568882ea94b51445ad122a0eef755a487003b464ca"
+    },
+    {
+      "path": "work/presentation/dpr2-probe.log",
+      "bytes": 67,
+      "sha256": "283385a3b18c706c8586436f53e1de2af9e39c9810a73b2c35c3fbc64aadf141"
+    },
+    {
+      "path": "work/presentation/focused-public.log",
+      "bytes": 9104,
+      "sha256": "2b674bd18ff1eaaa7d25f4f5d58a0e93fd124b11d446b79d892cc835405c57f5"
+    },
+    {
+      "path": "work/presentation/full-suite.log",
+      "bytes": 261672,
+      "sha256": "b626383d92f8af1d73dc6b8fcfd02148f30565966b1607227d293e6d702d2c63"
+    },
+    {
+      "path": "work/presentation/package-committed.log",
+      "bytes": 279,
+      "sha256": "95f8a313281dfa3a34deb368f8a855e4982edf6455e5c8a6164f700c0d6df0de"
+    },
+    {
+      "path": "work/presentation/package.log",
+      "bytes": 1477,
+      "sha256": "44aa8f6d7da54360fca61f25daded1917897558d51361b6d49236cf47a2e8e54"
+    },
+    {
+      "path": "work/presentation/prerequisite-bootstrap-tests.log",
+      "bytes": 725,
+      "sha256": "b5387aa1dc14e26ea3275225400086b83cf4b2abcee354da27a32248f26311ee"
+    },
+    {
+      "path": "work/presentation/prerequisite-collision-tests.log",
+      "bytes": 267,
+      "sha256": "73ae517adc0408812c458e9909460f15d2032c1e5af88868308eec38d11a5b27"
+    },
+    {
+      "path": "work/presentation/prerequisite-fighter-assets-tests.log",
+      "bytes": 245,
+      "sha256": "73e247d27bbc8495863479982791e59996364ab49f697d8dca8fd42d81ec4f78"
+    },
+    {
+      "path": "work/presentation/site.manifest.json",
+      "bytes": 5900,
+      "sha256": "023d43859f63d6002b259685846168e55be8d7b8758010c4b3fedf3306b8505a"
+    },
+    {
+      "path": "work/presentation/startup-resize/report.json",
+      "bytes": 2989,
+      "sha256": "f2c627ff1c8097bcbe101bdb5bff7fd8268553f8657595a205c5f2632a7a9cae"
+    },
+    {
+      "path": "work/presentation/startup-resize.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/presentation/two-size-probe.mjs",
+      "bytes": 6982,
+      "sha256": "feb75f77e5035df3f01157fb3b51116f3e3db40ec39a66134b39fad617fd8b2d"
+    }
+  ]
+}

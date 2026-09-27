@@ -59,6 +59,14 @@ MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings*,
  * processing computes input transitions. */
 MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings*,
     uint32_t count,uint32_t camera_subjects,uint32_t seed,MeleeWebCollision*,char*,size_t);
+/* Source-ordered startup may create the player/camera context before Ground
+ * loads collision through mpLibLoad. Attach that original collision owner
+ * before any collision-dependent match operation. */
+int melee_web_match_attach_collision(MeleeWebMatchContext*,MeleeWebCollision*,char*,size_t);
+/* Publish a source-authored stage spawn after stage on_init and before any
+ * fighter exists. player_index addresses the ordered match settings array. */
+int melee_web_match_set_player_start(MeleeWebMatchContext*,uint32_t player_index,
+    const float position[3],float facing,char*,size_t);
 int melee_web_match_create_fighters(MeleeWebMatchContext*,char*,size_t);
 /* Preserve Fighter_Create's disabled input until original Ready completes. */
 int melee_web_match_create_fighters_intro(MeleeWebMatchContext*,char*,size_t);

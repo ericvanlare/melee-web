@@ -12,6 +12,15 @@ enum {
     MELEE_WEB_SOURCE_CLOCK_MATCH = 2,
 };
 
+enum {
+    MELEE_WEB_SOURCE_CLOCK_END_FAILURE_NONE = 0,
+    MELEE_WEB_SOURCE_CLOCK_END_FAILURE_OWNER = 1,
+    MELEE_WEB_SOURCE_CLOCK_END_FAILURE_CALLBACK = 2,
+    MELEE_WEB_SOURCE_CLOCK_END_FAILURE_GOBJ = 3,
+    MELEE_WEB_SOURCE_CLOCK_END_FAILURE_MASK_VALUE = 4,
+    MELEE_WEB_SOURCE_CLOCK_END_FAILURE_CONTROLLER_MAP = 5,
+};
+
 typedef void (*MeleeWebSourceFrame)(void);
 
 /* These functions are implemented in the MELEE_WEB_GAMEPLAY section of
@@ -26,6 +35,7 @@ int melee_web_source_clock_post(void);
 int melee_web_source_clock_present(void);
 int melee_web_source_clock_request(int* request);
 int melee_web_source_clock_end(void);
+int melee_web_source_clock_end_failure(void);
 
 /* Compatibility entry points used by the current native menu host. They
  * retain the existing MENU ordering: scene OnFrame is called by the menu

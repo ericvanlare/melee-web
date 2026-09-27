@@ -1,4 +1,5 @@
 #include "dat_native_stage.hpp"
+#include "dat_stage.hpp"
 #include "gameplay_bootstrap.h"
 #include <fstream>
 #include <iostream>
@@ -13,6 +14,23 @@ int main(int argc,char** argv){try{
   check(melee_web_native_world_enable(error,sizeof(error)),error);
   {
    melee_web::DatNativeStage stage(archive);
+   const auto light_counts=stage.source_light_counts();
+   melee_web::DatStage stage_metadata(*archive);
+   check(light_counts.size()==stage_metadata.entries.size(),
+         "Native stage source-light bounds differ from the authored entry table");
+   for(const auto& entry:stage_metadata.entries){
+    uint32_t expected=0;
+    if(entry.light_table_offset){
+     const auto end=archive->next_target_offset(*entry.light_table_offset);
+     for(;*entry.light_table_offset+expected*4<end;expected++)
+      if(!archive->pointer(*entry.light_table_offset+expected*4,4))break;
+     check(*entry.light_table_offset+expected*4<end&&
+               !archive->pointer(*entry.light_table_offset+expected*4,4),
+           "Authored Ground light list lacks a bounded null terminator");
+    }
+    check(light_counts[entry.index]==expected,
+          "Native Ground light bound differs from its null-terminated DAT table");
+   }
    check(!stage.particle_events().empty(),"actual stage particle events retained");
    for(const auto& event:stage.particle_events())check(event.bank==30,"actual stage generator bank selector");
    check(melee_web_test_native_stage_map(stage.map_head(),stage.yakumono()),"original native map descriptors invalid");

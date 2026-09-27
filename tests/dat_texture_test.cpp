@@ -366,6 +366,12 @@ void inactive_tev_descriptors()
     check(result.second.inactive_tev_descriptor_offset == tev &&
           result.second.source_flags == 0x30010,
           "inactive custom expression retains identity and standard source behavior");
+    check(!result.second.native_tev,"viewer does not construct native TEV state");
+    const auto native=fixture.read(true);
+    check(native.second.native_tev && native.second.native_tev->active==0 &&
+          std::all_of(native.second.native_tev->fields.begin(),native.second.native_tev->fields.end(),
+                      [](uint8_t value){return value==0xff;}),
+          "native inactive TEV retains all uninterpreted source bytes");
     for (const auto active : {1U, 0x40000000U, 0x80000000U, 0xffffffffU}) {
         put32(fixture.data, tev + 28, active);
         rejects([&] { (void) fixture.read(); });

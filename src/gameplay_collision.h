@@ -7,6 +7,10 @@ extern "C" {
 #endif
 
 typedef struct MeleeWebCollision MeleeWebCollision;
+/* Stage construction owns the source load until adoption succeeds. After
+ * removing stage consumers, retire an unadopted load or leave its live owner. */
+int melee_web_collision_retire_unadopted(const void* source_map,
+                                         char* error, size_t size);
 typedef struct MeleeWebCollisionVertex { float x, y; } MeleeWebCollisionVertex;
 typedef struct MeleeWebCollisionRange { int16_t start, count; } MeleeWebCollisionRange;
 typedef struct MeleeWebCollisionLine {
@@ -56,6 +60,10 @@ typedef struct MeleeWebCollisionReadiness {
  * fully initialized stage or a fighter physics simulation. The original GObj
  * userdata destructor releases storage automatically on world shutdown. */
 MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput*, char* error, size_t error_size);
+/* Adopt collision arrays and the original link-6 updater after retail
+ * Stage_8022524C has called mpLibLoad/mpLib_80058820. Does not load or allocate
+ * another collision map. */
+MeleeWebCollision* melee_web_collision_adopt_loaded(const MeleeWebCollisionInput*, char* error, size_t error_size);
 /* Results' original dummy-stage entry calls mpLibLoad(NULL) itself. Adopt
  * its default-map arrays and original process so their ordinary GObj destructor
  * releases the same storage before another scene may construct collision. */

@@ -1,21 +1,29 @@
 # CPU r5 source carry boundary
 
-This component is a narrow compiled-source compatibility boundary for the
-near-zero CPU stick path. It carries a typed source word through one live
-fighter allocation and accepts the seed-global route only after the owned DOL,
-disc/apploader and pinned source adapter derives it. The C sidecar is a trusted
-caller boundary: `independently_derived` is an attestation supplied by that
-adapter, not proof that the sidecar inspected a DOL. Synthetic source words
-remain useful for unit tests and do not establish retail provenance.
+> Historical component checkpoint. The [runtime integration](CPU_SOURCE_CONTEXT_RUNTIME.md)
+> supersedes the statements below about missing live hooks and Fighter bindings.
+> Its scoped receipt records current evidence and remaining limits.
 
-World generation, allocation generation, source fighter identity and a
+This component is a narrow compiled-source compatibility boundary for the
+near-zero CPU stick path. It carries the signed low bytes consumed by the
+source CPU writer through one live fighter allocation and accepts the
+seed-global route only after the owned DOL, disc/apploader and pinned source
+adapter derives it. The C sidecar is a trusted caller boundary:
+`independently_derived` is an attestation supplied by that adapter, not proof
+that the sidecar inspected a DOL. The global binding retains its full source
+word for source-global validation; the consumer-facing carry stores only its
+observed signed low byte. Synthetic byte identities remain useful for unit
+tests and do not establish retail provenance.
+
+The explicit host-owner identity, world generation, allocation generation and
 monotonic sidecar lifetime are checked on every transition. Allocation
-generation is required because a fighter address can be reused within one
+generation is required because a fighter allocation can be reused within one
 world, and a fresh sidecar must reject an old token even when its local
 lifetime counter restarts. The source fighter identity must come from the
 authoritative live allocation binding; the current focused test supplies a
-relocated synthetic fighter identity while separately exercising the owned
-seed derivation.
+synthetic observed byte and owner identity while separately exercising the
+owned seed derivation. No full source Fighter pointer word is required by this
+consumer boundary.
 
 The sidecar preserves unknown values and explicit zero. It has no fallback for
 floor-query, standings-object or other source stack/object values, and those

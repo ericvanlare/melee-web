@@ -27,10 +27,20 @@ int main(int argc,char** argv){try{
   GameplayWorld world(files);
   MeleeWebMatchSettings match_settings{};match_settings.player={0,0,4,{0,world.floor_height(0)+1,0},1};match_settings.camera_subjects=70;match_settings.random_seed=0x13579bdf;
   auto* match=melee_web_match_begin(&match_settings,world.collision(),error,sizeof(error));check(match!=nullptr,error);
+  world.enable_full_stage();
+  const auto spawn0=world.player_spawn(0),spawn1=world.player_spawn(1);
+  check(spawn0[0]==-60.0f&&spawn1[0]==60.0f,
+        "Final Destination spawns did not come from the live source map joints");
+  check(melee_web_match_set_player_start(match,0,spawn0.data(),1.0f,error,sizeof(error)),error);
   check(melee_web_match_create_fighter(match,error,sizeof(error)),error);
+  MeleeWebMatchStats started{};
+  check(melee_web_match_player_stats(match,0,&started,error,sizeof(error)),error);
+  check(started.position[0]==spawn0[0]&&started.position[1]==spawn0[1]&&
+        started.position[2]==spawn0[2]&&started.facing_direction==1.0f,
+        "Original Fighter did not consume the authored source player start");
   MeleeWebRenderSettings render_settings{640,480,{0,35,190},{0,5,0},45,1,2000,(UINT64_C(1)<<3)|(UINT64_C(1)<<5)};
   auto* camera=melee_web_render_begin_match(&render_settings,error,sizeof(error));check(camera!=nullptr,error);
-  world.enable_full_stage();unsigned previous=0,transitions=0,seen=0,restarts=0;
+  unsigned previous=0,transitions=0,seen=0,restarts=0;
   try {
   for(unsigned tick=0;tick<tick_limit;tick++){
    check(melee_web_match_step(match,1,error,sizeof(error)),error);

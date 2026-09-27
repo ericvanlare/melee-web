@@ -15,9 +15,12 @@ int main(int argc,char** argv){
  std::ifstream f(argv[1],std::ios::binary);if(!f){std::cerr<<"Cannot read bonus asset\n";return 65;}std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)),{});auto a=std::make_shared<DatArchive>(bytes);uint32_t root=UINT32_MAX;
  for(auto symbol:a->public_symbols())if(symbol.name=="plLoadCommonData")root=symbol.data_offset;
  check(root!=UINT32_MAX);uint32_t thresholds=*a->pointer(root,0x184);NativeDatArena owner(a);auto* decoded=melee_web_bonus_data_decode(owner.reader(),root);char error[256];void* previous=pl_80038914();
+ void** public_root=(void**)melee_web_bonus_data_public_data(decoded);
+ check(public_root&&*public_root!=nullptr);
  for(int pass=0;pass<2;pass++){
   check(melee_web_bonus_data_begin(decoded,error,sizeof(error)));check(melee_web_bonus_data_ready(decoded));check(!melee_web_bonus_data_begin(decoded,error,sizeof(error)));
   auto* typed=(const uint8_t*)pl_80038914();check(typed&&typed!=previous);
+  check(typed==*public_root);
   for(unsigned i=0;i<0x184;i+=4){if(i==0xc0)check(!std::memcmp(typed+i,a->range(thresholds+i,4).data(),4));else{uint32_t bits;std::memcpy(&bits,typed+i,4);check(bits==a->be32(thresholds+i));}}
   check(melee_web_bonus_data_end(decoded,error,sizeof(error)));check(!melee_web_bonus_data_ready(decoded));check(pl_80038914()==previous);check(!melee_web_bonus_data_end(decoded,error,sizeof(error)));
  }

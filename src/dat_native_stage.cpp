@@ -1,4 +1,5 @@
 #include "dat_native_stage.hpp"
+#include "dat_collision.hpp"
 #include "dat_material_animation.hpp"
 #include "dat_shape_animation.hpp"
 #include "dat_stage.hpp"
@@ -21,6 +22,7 @@
 #include <sysdolphin/baselib/spline.h>
 #include <sysdolphin/baselib/tobj.h>
 #include <sysdolphin/baselib/wobj.h>
+#include <melee/mp/types.h>
 #pragma GCC diagnostic pop
 #include <cmath>
 #include <cstring>
@@ -38,11 +40,13 @@ struct DatNativeStage::Storage {
     std::vector<std::unique_ptr<DatNativeJoint>> graphs;
     std::vector<MeleeWebNativeJoint*> native;
     std::vector<std::unique_ptr<DatNativeAnimation>> animations;
+    std::unique_ptr<DatStageYaku> random_item_scripts;
     std::vector<std::unique_ptr<DatMaterialAnimation>> materials;
     std::vector<std::unique_ptr<DatShapeAnimation>> shapes;
     std::vector<DatParticleEvent> events;
     std::vector<MeleeWebMapLightOverride> overrides;
     std::vector<MeleeWebArchiveSymbol> public_symbols;
+    std::vector<uint32_t> source_light_counts;
     std::map<uint32_t,HSD_Joint*> joints;
     std::map<uint32_t,HSD_ImageDesc*> images;
     std::map<uint32_t,HSD_CObjDesc*> cameras;
@@ -52,7 +56,7 @@ struct DatNativeStage::Storage {
     std::map<uint32_t,HSD_Spline*> splines;
     std::map<uint32_t,HSD_LightAnim*> light_animations;
     std::set<uint32_t> active;
-    MeleeWebMapInput map{};void* native_map=nullptr;void* yaku=nullptr;
+    MeleeWebMapInput map{};void* native_map=nullptr;void* native_collision=nullptr;void* yaku=nullptr;
     explicit Storage(std::shared_ptr<const DatArchive> a):archive(a),arena(a),metadata(*a){}
     ~Storage(){for(auto* h:native)if(!melee_web_native_joint_destroy(h,nullptr,0))std::terminate();}
     template<class T>T* make(size_t count=1){require(count<=65536,"Native stage allocation count exceeds budget");auto p=std::shared_ptr<T[]>(new T[count]{});auto* out=p.get();memory.emplace_back(p,out);return out;}
@@ -125,7 +129,64 @@ struct DatNativeStage::Storage {
         for(uint32_t i=0;i<=64;i++){require(o+4*i<end,"Native scene pointer table lacks bounded terminator");auto p=archive->pointer(o+4*i,4);if(!p){auto** out=make<T*>(values.size()+1);std::copy(values.begin(),values.end(),out);return out;}require(i<64,"Native scene pointer table exceeds budget");values.push_back(hydrate(*p));}
         throw DatError("Native scene table is unterminated");
     }
-    void** light_table(uint32_t o){return table<void>(o,[&](uint32_t p){record(p,8);auto* desc=light(pointer(p,28));HSD_LightAnim** anims=nullptr;if(auto a=archive->pointer(p+4,4))anims=table<HSD_LightAnim>(*a,[&](uint32_t q){return light_anim(q);});return melee_web_stage_map_light_list(arena.reader(),desc,anims);});}
+    void** light_table(uint32_t o,uint32_t* count){
+        std::vector<void*> values;uint32_t end=archive->next_target_offset(o);
+        for(uint32_t i=0;i<=64;i++){
+            require(o+4*i<end,"Native stage light table lacks bounded terminator");
+            auto p=archive->pointer(o+4*i,4);
+            if(!p){
+                require(count!=nullptr,"Native stage light count output is missing");
+                *count=i;auto** out=make<void*>(values.size()+1);
+                std::copy(values.begin(),values.end(),out);return out;
+            }
+            require(i<64,"Native stage light table exceeds its descriptor budget");
+            record(*p,8);auto* desc=light(pointer(*p,28));HSD_LightAnim** anims=nullptr;
+            if(auto a=archive->pointer(*p+4,4))
+                anims=table<HSD_LightAnim>(*a,[&](uint32_t q){return light_anim(q);});
+            values.push_back(melee_web_stage_map_light_list(arena.reader(),desc,anims));
+        }
+        throw DatError("Native stage light table is unterminated");
+    }
+    void* collision(){
+        const DatCollision source(*archive);
+        const auto* r=arena.reader();
+        static_assert(sizeof(MapLine)==16&&sizeof(MapJoint)==40&&sizeof(MapCollData)==48,
+                      "Native MapCollData ABI differs from the original runtime");
+        auto* out=static_cast<MapCollData*>(r->allocate(r->context,1,sizeof(MapCollData)));
+        auto* vertices=static_cast<Vec2*>(r->allocate(r->context,source.vertices.size(),sizeof(Vec2)));
+        auto* lines=static_cast<MapLine*>(r->allocate(r->context,source.lines.size(),sizeof(MapLine)));
+        auto* joints=static_cast<MapJoint*>(r->allocate(r->context,source.joints.size(),sizeof(MapJoint)));
+        for(size_t i=0;i<source.vertices.size();i++){
+            vertices[i].x=source.vertices[i].x;vertices[i].y=source.vertices[i].y;
+        }
+        for(size_t i=0;i<source.lines.size();i++){
+            const auto& from=source.lines[i];auto& to=lines[i];
+            to.v0_idx=from.v0;to.v1_idx=from.v1;to.prev_id0=from.prev0;
+            to.next_id0=from.next0;to.prev_id1=from.prev1;to.next_id1=from.next1;
+            to.hi_flags=from.hi_flags;to.lo_flags=from.lo_flags;
+        }
+        for(size_t i=0;i<source.joints.size();i++){
+            const auto& from=source.joints[i];auto& to=joints[i];
+            to.floor_start=from.line_ranges[0].start;to.floor_count=from.line_ranges[0].count;
+            to.ceiling_start=from.line_ranges[1].start;to.ceiling_count=from.line_ranges[1].count;
+            to.right_wall_start=from.line_ranges[2].start;to.right_wall_count=from.line_ranges[2].count;
+            to.left_wall_start=from.line_ranges[3].start;to.left_wall_count=from.line_ranges[3].count;
+            to.dynamic_start=from.line_ranges[4].start;to.dynamic_count=from.line_ranges[4].count;
+            to.left_bound=from.left;to.bottom_bound=from.bottom;
+            to.right_bound=from.right;to.top_bound=from.top;
+            to.vtx_start=from.vertices.start;to.vtx_count=from.vertices.count;
+        }
+        out->verts=vertices;out->vert_count=static_cast<int>(source.vertices.size());
+        out->lines=lines;out->line_count=static_cast<int>(source.lines.size());
+        out->floor_start=source.line_ranges[0].start;out->floor_count=source.line_ranges[0].count;
+        out->ceiling_start=source.line_ranges[1].start;out->ceiling_count=source.line_ranges[1].count;
+        out->right_wall_start=source.line_ranges[2].start;out->right_wall_count=source.line_ranges[2].count;
+        out->left_wall_start=source.line_ranges[3].start;out->left_wall_count=source.line_ranges[3].count;
+        out->dynamic_start=source.line_ranges[4].start;out->dynamic_count=source.line_ranges[4].count;
+        out->joints=joints;out->joint_count=static_cast<int>(source.joints.size());
+        out->x2C=source.source_reserved_2c;
+        return out;
+    }
     HSD_FogDesc* fog(uint32_t o){record(o,20);auto* d=make<HSD_FogDesc>();d->type=archive->be32(o);require(d->type<=15,"Invalid source fog type");d->start=number(o+8);d->end=number(o+12);std::memcpy(&d->color,archive->range(o+16,4).data(),4);
         if(auto p=archive->pointer(o+4,68)){record(*p,68);auto* f=make<HSD_FogAdjDesc>();f->center=archive->be16(*p);f->width=archive->be16(*p+2);for(unsigned i=0;i<16;i++)f->mtx[i/4][i%4]=number(*p+4+4*i);d->fogadjdesc=f;}return d;}
     HSD_Joint* spline_joint(uint32_t o){
@@ -151,7 +212,11 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
  auto& s=*storage_;const auto& a=*archive;const auto& meta=s.metadata;
  const auto* profile=melee_web_stage_profile(stage_kind);
  require(profile,"Native stage has no complete source callback profile");
+ for(const auto& symbol:a.public_symbols())
+  if(symbol.name=="ALDYakuAll")
+   s.random_item_scripts=std::make_unique<DatStageYaku>(archive,symbol.data_offset);
  require(meta.entries.size()==profile->entry_count,"Native stage map entry count differs from source profile");
+ s.source_light_counts.assign(meta.entries.size(),0);
  require(profile->animation_count_count==profile->entry_count&&profile->animation_counts,
          "Native stage profile lacks animation consumer counts");
  auto* markers=melee_web_stage_markers_decode(s.arena.reader(),meta.root_offset);
@@ -208,7 +273,7 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
   require(e.index!=0||!e.shape_animation_table,"Native stage marker shape animation unsupported");
   if(e.camera_offset)out.x10=&s.camera(*e.camera_offset)->perspective;
   if(e.unknown_14_offset)out.x14=s.table<HSD_CameraAnim>(*e.unknown_14_offset,[&](uint32_t p){return s.camera_anim(p);});
-  if(e.light_table_offset)out.x18=s.light_table(*e.light_table_offset);
+  if(e.light_table_offset)out.x18=s.light_table(*e.light_table_offset,&s.source_light_counts[e.index]);
   if(e.fog_offset)out.x1C=s.fog(*e.fog_offset);
   out.unk24=e.collision_bindings.count;
   if(out.unk24){out.unk20=s.make<int16_t>(out.unk24*3);for(int i=0;i<out.unk24;i++){auto p=*e.collision_bindings.data_offset+6*i;auto* words=out.unk20+3*i;for(unsigned j=0;j<3;j++)words[j]=int16_t(a.be16(p+2*j));}}
@@ -271,12 +336,16 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
  for(const auto& [offset,light]:s.lights){auto flags=read_dat_light_override(a,offset);s.overrides.push_back({light,flags.has_value(),flags.value_or(0)});}
  require(s.yaku,"Native stage yakumono symbol absent");
  s.native_map=melee_web_stage_map_build(s.arena.reader(),&s.map);
+ s.native_collision=s.collision();
  const auto* content=melee_web_stage_content(stage_kind);
  require(content,"Native stage public catalog has no archive identity");
  for(const auto& symbol:a.public_symbols()){
   void* value=nullptr;
   if(symbol.name=="map_head")value=s.native_map;
+  else if(symbol.name=="coll_data")value=s.native_collision;
   else if(symbol.name=="yakumono_param")value=s.yaku;
+  else if(symbol.name=="ALDYakuAll"&&s.random_item_scripts)
+   value=s.random_item_scripts->native_data();
   for(size_t i=0;i<profile->public_symbol_count;i++){
    const auto& request=profile->public_symbols[i];
    if(symbol.name!=request.name)continue;
@@ -306,7 +375,27 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
 DatNativeStage::~DatNativeStage()=default;
 void* DatNativeStage::map_head()const noexcept{return storage_->native_map;}
 void* DatNativeStage::yakumono()const noexcept{return storage_->yaku;}
+void* DatNativeStage::random_item_scripts()const noexcept{return storage_->random_item_scripts?storage_->random_item_scripts->native_data():nullptr;}
+void DatNativeStage::set_particle_roots(void* commands,void* textures){
+ auto& symbols=storage_->public_symbols;bool has_commands=false,has_textures=false;
+ for(auto& symbol:symbols){
+  if(std::strcmp(symbol.symbol,"map_ptcl")==0){symbol.native_data=commands;has_commands=true;}
+  else if(std::strcmp(symbol.symbol,"map_texg")==0){symbol.native_data=textures;has_textures=true;}
+ }
+ require(has_commands==has_textures,"Source stage particle public roots are incomplete");
+ require(has_commands==(commands!=nullptr&&textures!=nullptr),
+         "Source stage particle public roots differ from their decoded owner");
+}
+void DatNativeStage::set_quake_model(void* descriptor){
+ require(descriptor,"Source stage quake descriptor is absent");
+ for(auto& symbol:storage_->public_symbols)
+  if(std::strcmp(symbol.symbol,"quake_model_set")==0){
+   symbol.native_data=descriptor;return;
+  }
+ throw DatError("Source stage quake public symbol is absent");
+}
 const std::vector<MeleeWebMapLightOverride>& DatNativeStage::light_overrides()const noexcept{return storage_->overrides;}
+std::span<const uint32_t> DatNativeStage::source_light_counts()const noexcept{return storage_->source_light_counts;}
 const std::vector<DatParticleEvent>& DatNativeStage::particle_events()const noexcept{return storage_->events;}
 const std::vector<MeleeWebArchiveSymbol>& DatNativeStage::public_symbols()const noexcept{return storage_->public_symbols;}
 void* DatNativeStage::light_animation_table(uint32_t offset){

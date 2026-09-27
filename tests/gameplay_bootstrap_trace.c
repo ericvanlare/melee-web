@@ -1,18 +1,41 @@
 #include "gameplay_bootstrap.h"
+#include "gameplay_archive_sections.h"
+#include "gameplay_rumble.h"
+#include "gameplay_render.h"
+#include "hsd_native_joint.h"
+#include <melee/lb/types.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjobject.h>
 #include <sysdolphin/baselib/gobjplink.h>
 #include <sysdolphin/baselib/gobjproc.h>
 #include <sysdolphin/baselib/gobjuserdata.h>
 #include <sysdolphin/baselib/objalloc.h>
+#include <sysdolphin/baselib/sislib.h>
+#include <sysdolphin/baselib/sobjlib.h>
 #include <dolphin/os/OSAlloc.h>
+#include <melee/cm/camera.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 static char error[256];
 static unsigned trace[128], trace_size, removals;
+static struct Fighter_804D653C_t vs_rumble_rows[40];
+static MeleeWebArchiveSections* vs_archive_scope;
 typedef struct TestObject { unsigned id, delete_self, remove_proc, reorder; } TestObject;
+
+extern void gm_801A4BD4(void);
+extern HSD_GObj* DevText_GetGObj(void);
+extern HSD_CObj* melee_web_source_devtext_camera(void);
+static int vs_manager_startup(char* error, size_t size)
+{
+    if (!melee_web_native_world_prepare_vs_manager(error, size)) return 0;
+    HSD_SisLib_803A6048(0x4800);
+    gm_801A4BD4();
+    if (error && size) error[0] = '\0';
+    return 1;
+}
+static void vs_sis_shutdown(void) { HSD_SisLib_803A5FBC(); }
 
 static void check(int condition, const char* message)
 {
@@ -144,10 +167,65 @@ static int retained_session_case(void)
     return 0;
 }
 
+static int vs_preload_case(void)
+{
+    const MeleeWebArchiveSymbol rumble_symbol={
+        "LbRb.dat","lbRumbleData",vs_rumble_rows};
+    vs_archive_scope=melee_web_archive_sections_register(
+        &rumble_symbol,1,error,sizeof(error));
+    check(vs_archive_scope!=NULL,"VS manager has its typed rumble source");
+    check(melee_web_gameplay_prepare_vs_startup(vs_manager_startup,
+                                                vs_sis_shutdown,
+                                                error, sizeof(error)),
+          "VS scene configures the original scene-manager owner");
+    check(!melee_web_gameplay_initialize_vs_dynamics(error, sizeof(error)),
+          "VS dynamics remain unavailable before scene initialization");
+    check(melee_web_gameplay_startup(4U * 1024U * 1024U, error, sizeof(error)),
+          "original VS scene manager starts inside the owned world");
+    check(melee_web_native_world_enable(error,sizeof(error)),
+          "source-created HSD kind registry adopts native lifetime cleanup");
+    check(DevText_GetGObj()!=NULL,
+          "original manager registers its DevText render owner");
+    check(melee_web_source_devtext_camera()==NULL,
+          "DevText camera ownership is not claimed before its lazy source draw allocation");
+    check(HSD_SObjLib_804D7960==0&&HSD_GObj_CameraKind==1&&
+          HSD_GObj_LightKind==2&&HSD_GObj_JObjKind==3&&HSD_GObj_FogKind==4,
+          "original manager publishes the source SObj/camera/light/JObj/fog IDs");
+    const unsigned objects_before_camera=melee_web_gameplay_stats().objects;
+    MeleeWebRender* camera=melee_web_render_prepare_match_camera(error,sizeof(error));
+    check(camera!=NULL,"source match camera can be prepared at the scene-entry boundary");
+    check(melee_web_gameplay_stats().objects==objects_before_camera+1&&
+          Camera_80030A50()!=NULL&&Camera_80030A50()->obj_kind==HSD_GObj_CameraKind,
+          "source camera preparation owns only Camera_80030688's original GObj");
+    check(!melee_web_render_use_match_passes(camera,error,sizeof(error)),
+          "source camera cannot render before Ground camera setup");
+    check(melee_web_render_end(camera,error,sizeof(error)),
+          "prepared source camera releases both source CObjs through their registered destructor");
+    check(melee_web_gameplay_stats().objects==objects_before_camera,
+          "prepared source camera teardown returns the original GObj count");
+    void* sis_block = HSD_SisLib_Alloc(0x4000);
+    check(sis_block != NULL, "original 0x4800 SIS heap serves an owned allocation");
+    HSD_SisLib_Free(sis_block);
+    check(melee_web_gameplay_initialize_vs_dynamics(error, sizeof(error)),
+          "original VS dynamics pool initializes at its scene boundary");
+    check(!melee_web_gameplay_initialize_vs_dynamics(error, sizeof(error)),
+          "VS dynamics pool cannot initialize twice in one world");
+    check(melee_web_gameplay_shutdown(error, sizeof(error)),
+          "VS startup owners release before the SDK heap");
+    check(melee_web_rumble_clear_source_rows(vs_rumble_rows,error,sizeof(error)),
+          "source manager's borrowed rumble rows release after world shutdown");
+    check(melee_web_archive_sections_close(vs_archive_scope,error,sizeof(error)),
+          "typed rumble archive scope closes after source manager teardown");
+    vs_archive_scope=NULL;
+    puts("Original VS scene manager, HSD kinds and dynamics lifecycle trace: passed");
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
     if (argc == 2 && !strcmp(argv[1], "replaced_heap")) return replaced_heap_case();
     if (argc == 2 && !strcmp(argv[1], "retained_session")) return retained_session_case();
+    if (argc == 2 && !strcmp(argv[1], "vs_preload")) return vs_preload_case();
     check(argc == 1, "unexpected bootstrap trace arguments");
     check(!melee_web_gameplay_step(error, sizeof(error)), "uninitialized ticks reject");
     check(melee_web_gameplay_generation() == 0, "uninitialized generation rejects");

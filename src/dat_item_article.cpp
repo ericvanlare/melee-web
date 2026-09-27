@@ -18,10 +18,18 @@ namespace melee_web {
 namespace {
 void require(bool c,const char* message){if(!c)throw DatError(message);}
 void destroy(MeleeWebNativeJoint* p){if(p&&!melee_web_native_joint_destroy(p,nullptr,0))std::terminate();}
-struct ArticleSchema { uint32_t special_bytes, state_count; bool special_required; };
+struct ArticleSchema {
+    uint32_t special_bytes, state_count;
+    bool special_required;
+    bool state_count_from_region = false;
+};
 ArticleSchema schema(uint32_t kind)
 {
     switch(kind) {
+    // Ground_801C0800 assigns the authored ALDYakuAll commands into rows of
+    // this Random Pokémon Article. Its state table is the final exact region
+    // in ItCo.usd, so derive its source row count from that DAT boundary.
+    case It_PKind_Random:return {0,0,false,true};
     case It_Kind_Mario_Fire:return {20,1,true};
     // Luigi's fireball uses the shared five-float source type selectively:
     // its callback consumes x0, x4 and xC, while x8/x10 belong to Mario's
@@ -225,13 +233,22 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
     MeleeWebNativeGraph empty_graph{};
     const MeleeWebNativeGraph* graph_ptr=&empty_graph;
     void* joint=nullptr;
+    int null_joint_form=0;
     std::vector<void*> descriptors;
     if(null_model) {
         /* item.c copies this authored null to xC8_joint; Item_802680CC then
-         * creates the source identity JObj. Keep the model descriptor and
-         * its scalar fields while requiring the zero-bone form below. */
-        require(bones==0&&attach==0,
+         * creates the source identity JObj. Random Pokémon's DAT describes
+         * that single identity root as one bone; all other currently owned
+         * null-joint articles use the zero-bone form. */
+        if(kind==It_PKind_Random){
+            require(bones==1&&attach==0,
+                    "Random Pokémon Article null joint is not its one-bone identity root");
+            null_joint_form=2;
+        }else{
+            require(bones==0&&attach==0,
                 "Null item model has nonzero bone or attachment fields");
+            null_joint_form=1;
+        }
     } else {
         record(*model_root,64);
         s.model=std::make_unique<DatNativeJoint>(archive,*model_root);
@@ -321,6 +338,15 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         special_material(0x58,yoyo_joint->graph());
     }
     s.count=article_schema.state_count;
+    if(article_schema.state_count_from_region){
+        const auto table=pointer(root+12,16);
+        const auto end=a.next_target_offset(table);
+        require(end>table&&(end-table)%16==0,
+                "Random Pokémon Article state region is malformed");
+        s.count=(end-table)/16;
+        require(s.count<=64,
+                "Random Pokémon Article state region exceeds the source descriptor bound");
+    }
     if(s.count){at=pointer(root+12,s.count*16);s.states=std::make_unique<MeleeWebItemStateDesc[]>(s.count);}
     else require(!a.pointer(root+12),"Animation-free item has an unexpected state descriptor table");
     for(uint32_t i=0;i<s.count;i++){
@@ -347,7 +373,7 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         if(auto p=a.pointer(row+12,4))state.commands=s.commands.decode(a,*p);
     }
     require(melee_web_article_publish(reader,article,special,s.states.get(),s.count,joint,bones,attach,flags,
-                                      null_model?1:0,error,sizeof(error)),error);
+                                      null_model?null_joint_form:0,error,sizeof(error)),error);
 }
 DatItemArticle::~DatItemArticle()=default;
 uint32_t DatItemArticle::state_count()const noexcept{return storage_->count;}

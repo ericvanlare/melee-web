@@ -9,6 +9,7 @@
 #include <string>
 using namespace melee_web;
 extern "C" void Ground_801C4368(float*, float*);
+extern "C" void melee_web_test_stage_numeric_readiness(MeleeWebStageMarkers*);
 static void put(std::vector<uint8_t>& b,uint32_t o,uint32_t v){for(int i=0;i<4;i++)b[32+o+i]=v>>(24-8*i);}
 int main(int argc,char** argv){
  if(argc!=2){std::cerr<<"Usage: gameplay_stage_numeric_trace.js PATH_TO_GrNLa.dat\n";return 64;}
@@ -22,6 +23,7 @@ int main(int argc,char** argv){
  for(int pass=0;pass<2;pass++){
   if(!melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)))throw std::runtime_error(error);
   void* previous=melee_web_ground_data_publish(param);
+  melee_web_test_stage_numeric_readiness(markers);
   float previous_floor,previous_delta;Ground_801C4368(&previous_floor,&previous_delta);
   auto* context=melee_web_stage_numeric_begin(markers,error,sizeof(error));if(!context)throw std::runtime_error(error);
   float floor,delta;Ground_801C4368(&floor,&delta);

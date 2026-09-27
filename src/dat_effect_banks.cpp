@@ -35,6 +35,8 @@ DatEffectBanks::~DatEffectBanks()
     if(bank_&&!melee_web_effect_bank_detach(bank_,nullptr,0))std::terminate();
 }
 MeleeWebEffectBank* DatEffectBanks::bank()const noexcept{return bank_;}
+void* DatEffectBanks::command_root()const noexcept{return melee_web_effect_bank_commands(bank_);}
+void* DatEffectBanks::texture_root()const noexcept{return melee_web_effect_bank_textures(bank_);}
 MeleeWebEffectBank* DatEffectBanks::alias(uint32_t bank)
 {
     for(auto [id,alias]:aliases_)if(id==bank)return alias;

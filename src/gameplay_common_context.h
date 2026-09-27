@@ -26,8 +26,16 @@ int melee_web_common_context_require(MeleeWebCommonContext*, uint32_t mask, char
 /* Exact initialized root table for the source Fighter_LoadCommonData storage
  * adapter. Requires an attached owned world; unsupported roots stay NULL. */
 void** melee_web_common_context_source_roots(void);
-/* Calls both original material consumers, retaining their real JObjs in GObjs.
- * This is a narrow consumer trace, not Fighter_800679B0 or full common loading. */
+/* Runtime worlds bind the original archive loader before Fighter initialization.
+ * Narrow descriptor fixtures may omit file IO; actual GameplayWorld always binds
+ * a loader and retains its source archive until all fighters have been removed. */
+typedef void** (*MeleeWebCommonSourceLoad)(void*);
+int melee_web_common_context_set_source_loader(MeleeWebCommonContext*,
+    MeleeWebCommonSourceLoad,void*,char*,size_t);
+void** melee_web_common_context_load_source_roots(void);
+/* Calls both original material consumers, retaining their real JObjs through
+ * the native HSD lifetime lane. This is a narrow consumer trace, not
+ * Fighter_800679B0 or full common loading. */
 int melee_web_common_context_initialize_materials(MeleeWebCommonContext*, char*, size_t);
 /* Original Fighter_FirstInitialize_80067A84 calls Fighter_800679B0 and adds
  * the x59C/x5A0 pool. Stage/light/archive services must

@@ -4,6 +4,7 @@
 #include "gameplay_bootstrap.h"
 #include "gameplay_content.h"
 #include "gameplay_pad_state.h"
+#include "gameplay_source_memory_runtime.h"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -22,9 +23,13 @@ extern "C" {
 #include <melee/ef/efasync.h>
 #include <melee/ef/efdata.h>
 #include <melee/ef/eflib.h>
+#include <melee/lb/lbarchive.h>
 #include <melee/lb/lblanguage.h>
+#include <melee/ty/types.h>
 #include <sysdolphin/baselib/gobj.h>
 extern EF_DAT_Entry efAsync_DatEntries[51];
+extern HSD_Archive* _Toy_sbss_804D6ED0;
+HSD_GObj* Player_GetEntity(s32 slot);
 extern void* it_804D6D28;
 extern void* it_804D6D40;
 extern void* it_804D6D04;
@@ -87,6 +92,30 @@ static void check_results_teardown()
         throw std::runtime_error("Real Results session retained source ownership");
 }
 
+static void check_results_fighter_leases(const ResultsMatchInfo& result)
+{
+    std::vector<std::uint32_t> source_owners;
+    for (unsigned slot = 0; slot < 4; ++slot) {
+        if (result.match_end.player_standings[slot].slot_type == Gm_PKind_NA)
+            continue;
+        auto* entity = Player_GetEntity(slot);
+        if (!entity)
+            throw std::runtime_error("Results participant has no source demo Fighter");
+        {
+            MeleeWebSourceFighterAddress lease{};
+            if (!melee_web_source_memory_fighter_read(entity->user_data, &lease) ||
+                !lease.live || !lease.source_address ||
+                !lease.allocation_generation ||
+                lease.world_generation != melee_web_gameplay_generation())
+                throw std::runtime_error("Results demo Fighter has no live source lease");
+            for (const auto source : source_owners)
+                if (source == lease.source_address)
+                    throw std::runtime_error("Results demo Fighters share a source owner");
+            source_owners.push_back(lease.source_address);
+        }
+    }
+}
+
 static std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> neutral_pad_snapshot()
 {
     std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> bytes{};
@@ -135,8 +164,16 @@ static int run_real_roster(const melee_web::RuntimeFiles& files,
                           << melee_web_fighter_content(opponent)->name
                           << (opponent_wins ? " wins" : " Mario wins") << "..."
                           << std::flush;
+                /* A source match may leave the TyDatai scene alias populated
+                 * until preloadState retires scene-heap aliases for Results. */
+                if (_Toy_sbss_804D6ED0 != nullptr)
+                    throw std::runtime_error("Trophy archive alias was not idle before the next Results scene");
+                _Toy_sbss_804D6ED0 = reinterpret_cast<HSD_Archive*>(uintptr_t(1));
                 melee_web::GameplayResultsSession session(files, result,
                                                            0x13579bdfU, *input);
+                if (_Toy_sbss_804D6ED0 == reinterpret_cast<HSD_Archive*>(uintptr_t(1)))
+                    throw std::runtime_error("Results preload did not retire the previous TyDatai alias");
+                check_results_fighter_leases(result);
                 if (session.source_frames() != 0)
                     throw std::runtime_error("Results scene advanced during construction");
                 for (unsigned tick = 0; tick < 2; ++tick)
@@ -225,22 +262,26 @@ static void check_source_entry(const melee_web::GameplayWorld& world)
 
 int main(int argc,char** argv){try{
     const std::string command = argc >= 2 ? argv[1] : "";
+    const bool real_mario = command == "--real-mario" ||
+                            command == "--real-mario-confirm";
     const bool real_eight = command == "--real-eight" ||
                             command == "--real-eight-confirm";
     const bool real_enabled = command == "--real-enabled" ||
                               command == "--real-enabled-confirm";
-    const bool confirm = command == "--real-eight-confirm" ||
+    const bool confirm = command == "--real-mario-confirm" ||
+                         command == "--real-eight-confirm" ||
                          command == "--real-enabled-confirm";
-    const bool real_roster = real_eight || real_enabled;
+    const bool real_roster = real_mario || real_eight || real_enabled;
     if ((!real_roster && argc != 3) || (real_roster && argc != 5))
         throw std::runtime_error(real_roster ?
-            "Expected --real-eight/--real-enabled[-confirm] <common/fighter> <Results shared/music> <Results fighters>" :
+            "Expected --real-mario/--real-eight/--real-enabled[-confirm] <common/fighter> <Results shared/music> <Results fighters>" :
             "Expected common/fighter and Results asset directories");
     melee_web::RuntimeFiles files;
     const int first_directory = real_roster ? 2 : 1;
     for (int directory = first_directory; directory < argc; ++directory)
         load_directory(files, argv[directory]);
     if (real_roster) {
+        constexpr std::array<int, 1> real_mario_opponents = {CKIND_MARIO};
         constexpr std::array<int, 8> real_eight_opponents = {
             CKIND_MARIO, CKIND_DRMARIO, CKIND_FOX, CKIND_FALCO,
             CKIND_MARS, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK,
@@ -252,10 +293,13 @@ int main(int argc,char** argv){try{
             CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY, CKIND_KOOPA,
             CKIND_MEWTWO, CKIND_NESS, CKIND_PEACH,
         };
-        const auto opponents = real_enabled
+        const auto opponents = real_mario
+            ? std::span<const int>(real_mario_opponents)
+            : real_enabled
             ? std::span<const int>(real_enabled_opponents)
             : std::span<const int>(real_eight_opponents);
         return run_real_roster(files, opponents,
+                               real_mario ? "Mario" :
                                real_enabled ? "enabled-roster" : "real-eight",
                                confirm);
     }

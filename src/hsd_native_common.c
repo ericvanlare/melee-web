@@ -9,6 +9,12 @@ static HSD_Joint* expected_descriptor;
 static HSD_JObj* captured_root;
 static void (*persistent_capture)(void*, void*);
 static void* persistent_context;
+typedef struct RetainedRoot {
+    void* context;
+    HSD_JObj* root;
+} RetainedRoot;
+static RetainedRoot retained_roots[2];
+static unsigned retained_root_count;
 static HSD_JObj* capture_joint_load(HSD_Joint* descriptor)
 {
     if (!expected_descriptor || descriptor != expected_descriptor || (captured_root && !persistent_capture))
@@ -19,8 +25,9 @@ static HSD_JObj* capture_joint_load(HSD_Joint* descriptor)
     return root;
 }
 /* The original consumer discards its returned root after retaining its MObj.
- * Capture that real loader return solely to give the native GObj ownership;
- * no constructor or common-material behavior is substituted. */
+ * Capture that real loader return so the common owner can retain and release
+ * the JObj explicitly; no constructor or common-material behavior is
+ * substituted. */
 #define HSD_JObjLoadJoint capture_joint_load
 #include <melee/ft/ft_0C8C.c>
 #include <melee/ft/ftCo_800C7CA0.c>
@@ -54,15 +61,52 @@ HSD_JObj* melee_web_native_common_load(HSD_Joint* descriptor, const uint8_t diff
 int melee_web_native_common_capture_begin(void* descriptor,
     void (*capture)(void*, void*), void* context)
 {
-    if (expected_descriptor || !descriptor || !capture || !context) return 0;
+    if (expected_descriptor || persistent_capture || retained_root_count ||
+        !descriptor || !capture || !context) return 0;
     expected_descriptor = descriptor;
     persistent_capture = capture;
     persistent_context = context;
     return 1;
 }
+
+int melee_web_native_common_retain_root(void* context, HSD_JObj* root)
+{
+    if (!persistent_capture || persistent_context != context || !root ||
+        retained_root_count >= sizeof(retained_roots) / sizeof(retained_roots[0]))
+        return 0;
+    /* HSD_JObjLoadJoint returns an unowned root. The individual reference is
+     * the explicit owner that survives the consumer's discarded return value
+     * until the common context or native world releases it. */
+    HSD_JObjRefThis(root);
+    retained_roots[retained_root_count++] = (RetainedRoot) {context, root};
+    return 1;
+}
+
+static void release_root(RetainedRoot* retained)
+{
+    if (!retained->root) return;
+    HSD_JObjRemoveAll(retained->root);
+    HSD_JObjUnrefThis(retained->root);
+    retained->context = NULL;
+    retained->root = NULL;
+}
+
+int melee_web_native_common_release_roots(void* context)
+{
+    if (!retained_root_count) return 1;
+    if (!context || persistent_context != context) return 0;
+    while (retained_root_count) release_root(&retained_roots[--retained_root_count]);
+    return 1;
+}
+
+void melee_web_native_common_release_all(void)
+{
+    while (retained_root_count) release_root(&retained_roots[--retained_root_count]);
+}
+
 int melee_web_native_common_capture_end(void* context)
 {
-    if (!persistent_capture || persistent_context != context) return 0;
+    if (!persistent_capture || persistent_context != context || retained_root_count) return 0;
     expected_descriptor = NULL;
     persistent_capture = NULL;
     persistent_context = NULL;

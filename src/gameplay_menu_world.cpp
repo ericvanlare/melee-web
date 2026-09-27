@@ -13,6 +13,7 @@
 #include "gameplay_audio_residency.h"
 #include "gameplay_audio_stream_asset.hpp"
 #include "gameplay_bootstrap.h"
+#include "gameplay_source_files_runtime.hpp"
 #include "gameplay_font_atlas.h"
 #include "gameplay_rumble.h"
 #include "hsd_native_joint.h"
@@ -88,6 +89,8 @@ struct GameplayMenuWorld::Storage {
     std::unique_ptr<GameplayAudioStream> music;
     MeleeWebAudioResidency* residency = nullptr;
     MeleeWebArchiveSections* archive_scope = nullptr;
+    MeleeWebSourceFileScope* source_files = nullptr;
+    const RuntimeFiles* runtime_files = nullptr;
     MeleeWebFontAtlas* font = nullptr;
 
     char error[256]{};
@@ -135,6 +138,10 @@ struct GameplayMenuWorld::Storage {
 
     void start_scene(GameplayMenuScene scene)
     {
+        if (!runtime_files) fail("Native menu RuntimeFiles owner is missing");
+        source_files = begin_source_files(*runtime_files, error, sizeof(error));
+        check(source_files != nullptr, error,
+              "Native menu source file service startup failed");
         check(melee_web_gameplay_startup(kWorldHeapBytes, error, sizeof(error)),
               error, "Native menu SDK world startup failed");
         world_started = true;
@@ -229,6 +236,7 @@ struct GameplayMenuWorld::Storage {
 
     void start(const RuntimeFiles& files, RuntimeArchiveCache* cache)
     {
+        runtime_files = &files;
         archive_cache = cache;
         load_archives(files);
 
@@ -336,6 +344,11 @@ struct GameplayMenuWorld::Storage {
         sis.reset();
         sss.reset();
         css.reset();
+        if (source_files) {
+            check(melee_web_source_files_end(source_files, error, sizeof(error)),
+                  error, "Native menu source file service close failed");
+            source_files = nullptr;
+        }
     }
 
     void begin_scene_rebuild()

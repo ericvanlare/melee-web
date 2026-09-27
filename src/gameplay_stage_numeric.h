@@ -15,6 +15,12 @@ void* melee_web_stage_markers_descriptor(MeleeWebStageMarkers*);
  * snapshot: close before removing any pre-existing stage resource owners. */
 MeleeWebStageNumeric* melee_web_stage_numeric_begin_kind(MeleeWebStageMarkers*,
     int stage_kind, char*, size_t);
+/* Source match startup has no temporary marker owner: it seeds Ground numeric
+ * state and waits for the selected stage's own on_init to publish x280. */
+MeleeWebStageNumeric* melee_web_stage_numeric_begin_source_stage_kind(
+    MeleeWebStageMarkers*,int stage_kind,char*,size_t);
+/* Called after the selected source stage on_init/load has populated x280. */
+int melee_web_stage_numeric_source_stage_ready(MeleeWebStageNumeric*,char*,size_t);
 /* Compatibility wrapper for the validated Final Destination path. */
 MeleeWebStageNumeric* melee_web_stage_numeric_begin(MeleeWebStageMarkers*,char*,size_t);
 int melee_web_stage_numeric_bounds(MeleeWebStageNumeric*,float camera[4],float blast[4],float offset[2],char*,size_t);

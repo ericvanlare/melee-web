@@ -18,7 +18,9 @@
 typedef struct NativeLight { HSD_LightDesc desc; HSD_WObjDesc position, interest; float shininess; LightList list; uint8_t override_ready, override_found, override_flags; } NativeLight;
 struct MeleeWebStageLights {
     NativeLight* lights; LightList** list; LightList** saved;
-    HSD_GObj* owner; uint32_t count; uint64_t generation; int attached, loaded;
+    uint32_t* source_counts;uint32_t source_count,source_bound,source_live_count;
+    HSD_GObj* owner; uint32_t count; uint64_t generation;
+    int attached, loaded, source_owner;
 };
 static MeleeWebStageLights* published;
 static int fail(char* e,size_t n,const char* s){if(e&&n)snprintf(e,n,"%s",s);return 0;}
@@ -67,6 +69,26 @@ int melee_web_stage_lights_set_animations(MeleeWebStageLights* h,uint32_t index,
     l->list.anims=(HSD_LightAnim**)checked_table;
     return ok(e,n);
 }
+int melee_web_stage_lights_set_source_counts(MeleeWebStageLights* h,
+    const uint32_t* counts,uint32_t count,char* e,size_t n){
+    if(!h||!h->attached||h->loaded||h->source_counts||!counts||!count||count>256)
+        return fail(e,n,"Source Ground light bounds require one attached, unselected stage context");
+    for(uint32_t i=0;i<count;i++)if(counts[i]>64)
+        return fail(e,n,"Source Ground light entry exceeds the checked descriptor budget");
+    h->source_counts=calloc(count,sizeof(*h->source_counts));
+    if(!h->source_counts)return fail(e,n,"Cannot retain source Ground light bounds");
+    memcpy(h->source_counts,counts,(size_t)count*sizeof(*counts));h->source_count=count;
+    return ok(e,n);
+}
+int melee_web_stage_lights_select_source_entry(int entry_index){
+    if(!published)return 1;
+    if(!published->attached||published->loaded)return 0;
+    if(!published->source_counts)return 1; /* isolated tooling uses retail Ground directly */
+    if(entry_index<0){published->source_bound=2;return 1;}
+    if((uint32_t)entry_index>=published->source_count||
+       !published->source_counts[entry_index])return 0;
+    published->source_bound=published->source_counts[entry_index];return 1;
+}
 int melee_web_stage_lights_lookup_override(void* descriptor,int* found,uint8_t* flags) {
     if(!published)return 0;
     for(uint32_t i=0;i<published->count;i++) {
@@ -94,12 +116,35 @@ int melee_web_stage_lights_load(MeleeWebStageLights* h,char* e,size_t n){
 }
 int melee_web_stage_lights_stats(MeleeWebStageLights* h,uint32_t* count,uint16_t* flags,uint8_t* rgba,uint32_t capacity,char* e,size_t n){
     if(!h||!h->owner||h->generation!=melee_web_gameplay_stats().generation)return fail(e,n,"Stage lights are not in their live owned world");
-    if(!count||!flags||!rgba||capacity<h->count)return fail(e,n,"Stage light stats capacity is insufficient");
+    const uint32_t required=h->source_owner?h->source_live_count:h->count;
+    if(!count||!flags||!rgba||capacity<required)return fail(e,n,"Stage light stats capacity is insufficient");
     *count=0;
     for(HSD_LObj* l=h->owner->hsd_obj;l;l=l->next){
         if(*count>=capacity)return fail(e,n,"Original light chain exceeds capacity");
         flags[*count]=l->flags;memcpy(rgba+4*(*count),&l->color,4);++*count;
     }
+    return ok(e,n);
+}
+int melee_web_stage_lights_adopt_source(void* value,char* e,size_t n){
+    MeleeWebStageLights* h=published;HSD_GObj* owner=value;
+    if(!h||!h->attached||h->loaded||h->owner||!owner||
+       owner->classifier!=HSD_GOBJ_CLASS_GROUND||!owner->hsd_obj||!h->source_bound)
+        return fail(e,n,"Source map-light adoption requires Ground's newly created original owner");
+    uint32_t count=0;
+    for(HSD_LObj* l=owner->hsd_obj;l;l=l->next){
+        if(++count>h->source_bound)return fail(e,n,"Original Ground light chain exceeds its selected DAT entry count");
+    }
+    if(!count)return fail(e,n,"Original Ground map-light owner has an empty LObj chain");
+    h->owner=owner;h->generation=melee_web_gameplay_stats().generation;
+    h->loaded=1;h->source_owner=1;h->source_live_count=count;h->source_bound=0;
+    return ok(e,n);
+}
+int melee_web_stage_lights_retire_source(void* value,char* e,size_t n){
+    MeleeWebStageLights* h=published;HSD_GObj* owner=value;
+    if(!h||!h->source_owner||!owner||h->owner!=owner||
+       h->generation!=melee_web_gameplay_stats().generation)
+        return fail(e,n,"Source map-light retirement lost its Ground owner");
+    h->owner=NULL;h->loaded=0;h->source_owner=0;
     return ok(e,n);
 }
 int melee_web_stage_lights_select_current(char* e,size_t n){
@@ -122,8 +167,9 @@ int melee_web_stage_lights_detach(MeleeWebStageLights* h,char* e,size_t n){
 }
 int melee_web_stage_lights_destroy(MeleeWebStageLights* h,char* e,size_t n){
     if(!h)return ok(e,n);
+    if(h->source_owner)return fail(e,n,"Retire Ground's original map-light owner before closing its descriptor context");
     if(h->owner&&(h->generation!=melee_web_gameplay_stats().generation||h->owner==HSD_GObj_804D781C))return fail(e,n,"Stage light teardown requires its live world outside its callback");
     if(!melee_web_stage_lights_detach(h,e,n))return 0;
     if(h->owner)HSD_GObjPLink_80390228(h->owner);
-    free(h->lights);free(h->list);free(h);return ok(e,n);
+    free(h->source_counts);free(h->lights);free(h->list);free(h);return ok(e,n);
 }

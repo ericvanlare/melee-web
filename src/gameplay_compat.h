@@ -8,6 +8,7 @@
  * declarations match Melee's pinned extern/dolphin/include/dolphin/mtx.h;
  * Aurora provides Vec but does not declare these gameplay vector types. */
 #include "hsd_probe_compat.h"
+#include "gameplay_source_context.h"
 #include <dolphin/gx.h>
 #include <dolphin/card.h>
 #include "gameplay_ps_math.h"

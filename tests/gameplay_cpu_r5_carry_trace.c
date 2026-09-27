@@ -27,7 +27,8 @@ int main(void)
         .independently_derived = 1,
     };
     const MeleeWebCpuSourceFighterIdentity fighter = {
-        .source_word = 0x80abc140u,
+        .low_byte = -64,
+        .host_owner = 0x1001,
         .world_generation = 17,
         .allocation_generation = 41,
         .live = 1,
@@ -53,16 +54,21 @@ int main(void)
     if (!melee_web_cpu_r5_resolve_skipped(&carry, &token, &x, &y, error,
                                          sizeof(error)))
         return fail(error);
-    if (x != expected_low(seed.source_word) || y != expected_low(fighter.source_word))
+    if (x != expected_low(seed.source_word) || y != fighter.low_byte)
         return fail("proven source low-byte carry differs from its source words");
 
     const MeleeWebCpuWord old_r5 = melee_web_cpu_r5_word(&carry);
+    if (old_r5.low_byte != expected_low(seed.source_word) ||
+        melee_web_cpu_r30_word(&carry).low_byte != fighter.low_byte)
+        return fail("consumer carry did not retain only its observed signed bytes");
     if (!melee_web_cpu_r5_set_zero(&carry, &token, error, sizeof(error)))
         return fail(error);
     if (melee_web_cpu_r5_resolve_skipped(&carry, &token, &x, &y, error,
                                          sizeof(error)))
         return fail("explicit neutral zero was admitted as the seed route");
-    if (melee_web_cpu_r5_word(&carry).kind != MELEE_WEB_CPU_WORD_ZERO)
+    if (melee_web_cpu_r5_word(&carry).kind != MELEE_WEB_CPU_WORD_ZERO ||
+        !melee_web_cpu_r5_word(&carry).known ||
+        melee_web_cpu_r5_word(&carry).low_byte != 0)
         return fail("explicit zero lost its typed provenance");
     if (!melee_web_cpu_r5_mark_unknown(&carry, &token, error, sizeof(error)))
         return fail(error);
@@ -86,7 +92,8 @@ int main(void)
         return fail("normal teardown retained a source word");
 
     const MeleeWebCpuSourceFighterIdentity replacement = {
-        .source_word = fighter.source_word,
+        .low_byte = fighter.low_byte,
+        .host_owner = fighter.host_owner,
         .world_generation = fighter.world_generation,
         .allocation_generation = fighter.allocation_generation + 1,
         .live = 1,
@@ -119,6 +126,22 @@ int main(void)
                                              sizeof(error)))
         return fail("retired token crossed into a fresh sidecar instance");
     if (!melee_web_cpu_r5_end(&fresh, &fresh_token, error, sizeof(error)))
+        return fail(error);
+
+    MeleeWebCpuSourceFighterIdentity other_owner = replacement;
+    other_owner.host_owner += 1;
+    MeleeWebCpuR5Carry owner_changed = {0};
+    MeleeWebCpuR5Token owner_token = {0};
+    if (!melee_web_cpu_r5_begin(&owner_changed, &other_owner, &owner_token,
+                                error, sizeof(error)))
+        return fail(error);
+    MeleeWebCpuR5Token wrong_owner = owner_token;
+    wrong_owner.host_owner += 1;
+    if (melee_web_cpu_r5_preserve(&owner_changed, &wrong_owner, error,
+                                  sizeof(error)))
+        return fail("changed host owner was accepted");
+    if (!melee_web_cpu_r5_end(&owner_changed, &owner_token, error,
+                              sizeof(error)))
         return fail(error);
 
     MeleeWebCpuSourceGlobalBinding bad = seed;

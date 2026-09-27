@@ -26,6 +26,13 @@ MeleeWebEffectBank* melee_web_effect_bank_alias(const MeleeWebNativeDat*,
 int melee_web_effect_bank_attach(MeleeWebEffectBank*, char*, size_t);
 int melee_web_effect_bank_detach(MeleeWebEffectBank*, char*, size_t);
 int melee_web_effect_bank_stats(const MeleeWebEffectBank*, MeleeWebEffectBankStats*, char*, size_t);
+/* True only while this checked native descriptor graph owns the original slot. */
+int melee_web_effect_bank_is_published(uint32_t bank);
+/* efLib_Init clears source lookup tables after Results reserves its typed
+ * descriptors. LoadSync must reinstall those same roots with the original
+ * Load routine, without relocating native pointers as source DAT offsets. */
+int melee_web_effect_bank_load_owned(uint32_t bank, const void* commands,
+    const void* textures, char* error, size_t error_size);
 int melee_web_effect_bank_has_command(uint32_t bank,uint32_t command);
 #ifdef __cplusplus
 }
