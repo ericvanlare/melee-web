@@ -134,6 +134,8 @@
   position: absolute;
   top: 50%;
   left: 50%;
+  display: grid;
+  place-items: center;
   width: 40%;
   height: 40%;
   transform: translate(calc(-50% + var(--stick-x, 0px)), calc(-50% + var(--stick-y, 0px)));
@@ -141,13 +143,15 @@
   border-radius: 50%;
   background: rgb(227 241 255 / calc(var(--touch-opacity, 0.55) + 0.18));
   box-shadow: 0 1px 4px #0009;
+  color: #202a38;
+  font: 700 12px/1 system-ui, sans-serif;
   pointer-events: none;
 }
 
 #touch-controls .touch-stick-caption {
   position: absolute;
   right: 0;
-  bottom: -20px;
+  top: -18px;
   left: 0;
   color: #fff;
   font: 600 11px/1 system-ui, sans-serif;
@@ -201,6 +205,18 @@
   }
 }
 
+/* A taller expanded toolbar can leave a 281px-wide 4:3 canvas. Move the D-pad
+   around the face buttons and C-stick, with a slightly smaller main stick. */
+@container (max-width: 300px) and (max-height: 280px) {
+  #touch-controls { --touch-main-size: 82px; }
+  #touch-controls .touch-dpad {
+    top: max(44px, calc(50% - 68px));
+    left: calc(50% - 112px);
+  }
+  #touch-controls .touch-stick-main { left: max(0px, var(--touch-safe-left, 0px)); }
+  #touch-controls .touch-face { bottom: 4px; }
+}
+
 .touch-safe-area-probe {
   position: fixed;
   z-index: -1;
@@ -209,4 +225,8 @@
     env(safe-area-inset-bottom) env(safe-area-inset-left);
   visibility: hidden;
   pointer-events: none;
+}
+
+@container (max-height: 320px) {
+  #touch-controls .touch-stick-caption { display: none; }
 }

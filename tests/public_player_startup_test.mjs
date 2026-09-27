@@ -597,4 +597,4 @@ assert.equal(failed.audioCreated, 0);
 await runScenario({name: 'fullscreen-unsupported', fullscreen: 'unsupported', exerciseFullscreen: true});
 await runScenario({name: 'fullscreen-supported', fullscreen: 'supported', exerciseFullscreen: true});
 await runScenario({name: 'fullscreen-rejected', fullscreen: 'rejected', exerciseFullscreen: true});
-console.log('Public player shell: profile-owned startup, pre-readiness disc selection, readiness-gated exactly-once autoplay, invalid retry, replacement, cancellation, audio recovery, stale-selection guards and fullscreen supported, unsupported, rejection and fallback cases pass.');
+console.log('Public player shell: profile-owned startup, pre-readiness disc selection, readiness-gated import/autoplay (exactly once), invalid retry, replacement, cancellation, audio recovery, stale-selection guards and fullscreen supported, unsupported, rejection and fallback cases pass.');

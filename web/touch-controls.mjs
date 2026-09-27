@@ -77,6 +77,8 @@ export function mountTouchControls({container, canvas} = {}) {
     ring.className = 'touch-stick-ring';
     const knob = document.createElement('span');
     knob.className = 'touch-stick-knob';
+    knob.textContent = name === 'main' ? 'M' : 'C';
+    knob.setAttribute('aria-hidden', 'true');
     const caption = document.createElement('span');
     caption.className = 'touch-stick-caption';
     caption.textContent = label;

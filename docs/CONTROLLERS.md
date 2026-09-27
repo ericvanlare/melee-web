@@ -23,17 +23,23 @@ import when its owner and cache are ready, then waits for graphics before
 entering the original in-game character select automatically. **Play** remains
 available when the browser needs a separate audio activation gesture.
 
-The transparent touch overlay is disabled by default. It is positioned over the
-canvas's fitted 4:3 rectangle, uses 48px face/shoulder targets and 44px D-pad
-targets, and applies a radial 15% dead zone for both sticks while preserving diagonal direction and
-scaling travel from zero to the bounded unit range. The overlay maps to a
-standard-layout virtual Gamepad and then follows the same browser-controller
-normalization and original PAD writer. A button or stick can remain held while
-other pointer IDs operate other controls. Pointer up/cancel, lost capture,
-window blur, hidden document, page hide, opening Controls, source changes, Eject,
-and teardown release held state. Keyboard and gamepad source ownership is
-unchanged; when Touch controls owns P1, physical controllers route to another
-eligible player slot.
+The transparent touch overlay is disabled by default. It is positioned from the
+canvas's fitted 4:3 rectangle and safe-area insets. Face and shoulder targets are
+48px, and D-pad targets are 44px. When the fitted game rectangle is too short
+for corner clusters, a compact arrangement keeps their centers separately
+reachable without changing the canvas proportions; a 281px-wide game area uses
+an 82px main stick to leave the D-pad clear. The page-expanded player
+reserves a header for Fullscreen/Shrink player and Controls; **More controls**
+reveals its other actions without covering gameplay controls. The overlay
+applies a radial 15% dead zone for both sticks and clamps magnitude radially, so
+off-axis drags preserve their direction. It maps to a standard-layout virtual
+Gamepad and then follows the same browser-controller normalization and original
+PAD writer. A button or stick can remain held while other pointer IDs operate
+other controls. Pointer up/cancel, lost capture, window blur, hidden document,
+page hide, canvas geometry changes (including orientation/size changes), opening
+Controls, source changes, Eject, and teardown release held state. Keyboard and
+gamepad source ownership is unchanged; when Touch controls owns P1, physical
+controllers route to another eligible player slot.
 
 | Touch control | GameCube input | Mapping |
 | --- | --- | --- |
@@ -72,19 +78,18 @@ records it being removed in 17.4 beta 4. The WebKit issue tracking iPhone
 element fullscreen is still open; its June 2026 report says it remained absent
 in Safari 27 beta ([WebKit issue 206854](https://bugs.webkit.org/show_bug.cgi?id=206854),
 [Apple Developer Forums](https://developer.apple.com/forums/thread/133248)).
-Safari 26.4 fixes fullscreen-session behavior on iOS, but does not announce
-general iPhone availability ([WebKit Safari 26.4 notes](https://webkit.org/blog/17862/webkit-features-for-safari-26-4/)).
-The current compatibility table lists Chrome for Android as supported and iOS
-Safari as partial ([MDN Fullscreen API compatibility](https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API));
-Chrome's release notes confirm the unprefixed `Element.requestFullscreen()` has
-been available since Chrome 71 ([Chrome 132 release notes](https://developer.chrome.com/blog/chrome-132-beta)).
-Treat live method/permission checks and request rejection as authoritative. A Home
-Screen web app's standalone presentation is a separate launch mode, not ordinary
-Safari-tab fullscreen ([WebKit Safari 26.0 web apps](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/));
+Safari 26.4 fixes fullscreen-session behavior on iOS, but its notes do not
+promise arbitrary-element fullscreen in every iPhone browser context
+([Apple Safari 26.4 notes](https://developer.apple.com/documentation/safari-release-notes/safari-26_4-release-notes)).
+MDN currently lists Chrome for Android as supported and iOS Safari as partial
+([Fullscreen API compatibility](https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API)).
+Treat live method/permission checks and request rejection as authoritative. An
+installed Home Screen web app's standalone launch presentation is separate from
+ordinary browser-tab fullscreen ([WebKit Safari 26.0 web apps](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/));
 this change does not add installation or PWA setup. Headless Chrome tests cover
-DOM fullscreen and mocked unsupported/rejected requests; no physical iPhone or
-Android phone has been tested. WebGPU and runtime support are separate mobile
-prerequisites.
+native DOM fullscreen when available and mocked unsupported/rejected requests;
+no physical iPhone or Android phone has been tested. WebGPU and runtime support
+are separate mobile prerequisites.
 
 The recognized Mayflash 0079:1843 raw layout on Chrome/macOS gets an automatic
 suggested mapping. Its binding list is visible before setup, and the live display
