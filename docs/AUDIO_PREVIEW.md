@@ -95,8 +95,10 @@ failures. The short stage-selection keyboard recipe is visually checked using
 the retained local `stage-target.png` and `match.png` captures; a phase number
 alone does not identify the stage.
 
-Open the supplied preview URL in a desktop WebGPU browser, select an owned
-USA 1.02 ISO/GCM/CISO, and press Play. Start with the CSS/SSS music, then a
-Mario/Final Destination match. Listen for missing music/effects, clicks,
-distortion, looping problems and pause/resume behavior. Keep any captured game
-audio or video local.
+Open the supplied preview URL in a desktop WebGPU browser and choose an owned
+USA 1.02 ISO/GCM/CISO. After preparation, the player starts at original CSS
+automatically. If the browser shows the specific suspended-audio message,
+close it and use Play as the displayed audio-activation recovery. Start with
+the CSS/SSS music, then a Mario/Final Destination match. Listen for missing
+music/effects, clicks, distortion, looping problems and pause/resume behavior.
+Keep any captured game audio or video local.

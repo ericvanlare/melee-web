@@ -81,13 +81,16 @@ it does not replace browser, original-comparison or admission checks.
 `scripts/browser_driver.mjs` is the shared Playwright-facing orchestration layer.
 New browser jobs should use its `createBrowserDriver(page, {surface,
 timeoutMs, deadline})` and its readiness-aware methods (`waitForImport`,
-`selectDisc`, `waitForStart`, `launch`, `waitForPhase`, `pressChord`, `unload`
-and `diagnostics`). It serializes keyboard chords and waits for semantic
-readiness; it does not auto-resume, retry, or recover a timed-out run. Treat a
-timeout as a harness failure until the page state, captured diagnostics and
-console evidence show otherwise. The helper does not turn a diagnostic route
-into acceptance. Hitch profiles hash this helper; re-profile old manifests when
-it changes.
+`selectDisc`, `waitForPhase`, `pressChord`, `unload` and `diagnostics`). The
+development surface retains `waitForStart` and `launch` for its manual launch
+contract. The public surface auto-launches after a successful import; use
+`waitForPublicCss`, then call `recoverAudioActivation` only when that method
+reports the player's specific suspended-audio recovery state. The helper never
+clicks Play on a successful public load, retries an import/preparation failure,
+or recovers a timed-out run. Treat a timeout as a harness failure until the
+page state, captured diagnostics and console evidence show otherwise. The
+helper does not turn a diagnostic route into acceptance. Hitch profiles hash
+this helper; re-profile old manifests when it changes.
 
 Development-page failures use the explicit `#status[data-runtime-error]`
 channel; public-page failures use the error dialog. The driver reports the
