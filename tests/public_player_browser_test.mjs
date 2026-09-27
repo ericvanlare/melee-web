@@ -376,33 +376,36 @@ try {
       assert.equal(await page.locator('#fullscreen').innerText(), 'Fullscreen');
     }
     report.fullscreen_supported = {available: true, entered: true, exited: true};
-    await page.addInitScript(() => Object.defineProperty(document, 'fullscreenEnabled', {configurable: true, value: false}));
-    await page.reload(); await ready();
-    const unsupportedFullscreen = await page.evaluate(() => {
-      const button = document.querySelector('#fullscreen'), rect = button.getBoundingClientRect();
-      const primary = new Set(['controls-open', 'choose-disc', 'start-game', 'pause-game', 'end-session']);
-      return {hidden: button.hidden, display: getComputedStyle(button).display, width: rect.width, height: rect.height,
-        actions: [...document.querySelectorAll('#toolbar-actions > button')]
-          .filter(node => primary.has(node.id) && !node.hidden && getComputedStyle(node).display !== 'none')
-          .map(node => node.id)};
-    });
-    assert(unsupportedFullscreen.hidden && unsupportedFullscreen.display === 'none' &&
-      unsupportedFullscreen.width === 0 && unsupportedFullscreen.height === 0,
-    'Unsupported native fullscreen leaves no toolbar slot');
-    assert.deepEqual(unsupportedFullscreen.actions, ['controls-open', 'choose-disc', 'start-game', 'pause-game', 'end-session'],
-      'The remaining controls flow together without a fullscreen gap');
-    assert.equal(await page.locator('#fullscreen-status').count(), 0);
-    assert.doesNotMatch(await page.locator('body').innerText(), /browser controls remain visible|fullscreen unavailable/i);
-    await shot('fullscreen-unsupported');
-    report.fullscreen_unsupported = {simulated: true, button_hidden: unsupportedFullscreen.hidden,
-      display: unsupportedFullscreen.display, width: unsupportedFullscreen.width, height: unsupportedFullscreen.height};
-    await page.removeAllInitScripts();
-    await page.addInitScript(() => {
-      window.releaseCspViolations = [];
-      document.addEventListener('securitypolicyviolation', event => window.releaseCspViolations.push({directive: event.violatedDirective, blocked: event.blockedURI}));
-    });
-    await page.reload(); await ready();
-    assert(await page.locator('#fullscreen').isVisible(), 'The simulated unsupported state does not leak into the gameplay capture');
+    const unsupportedPage = await context.newPage();
+    try {
+      await unsupportedPage.addInitScript(() => Object.defineProperty(document, 'fullscreenEnabled', {configurable: true, value: false}));
+      unsupportedPage.on('pageerror', error => errors.push(error.message));
+      unsupportedPage.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+      const unsupportedResponse = await unsupportedPage.goto(values.url);
+      assert.equal(unsupportedResponse.status(), 200);
+      await createBrowserDriver(unsupportedPage, {surface: 'public', timeoutMs: 90000}).waitForImport();
+      await unsupportedPage.locator('#loading-panel').waitFor({state: 'hidden', timeout: 60000});
+      const unsupportedFullscreen = await unsupportedPage.evaluate(() => {
+        const button = document.querySelector('#fullscreen'), rect = button.getBoundingClientRect();
+        const primary = new Set(['controls-open', 'choose-disc', 'start-game', 'pause-game', 'end-session']);
+        return {hidden: button.hidden, display: getComputedStyle(button).display, width: rect.width, height: rect.height,
+          actions: [...document.querySelectorAll('#toolbar-actions > button')]
+            .filter(node => primary.has(node.id) && !node.hidden && getComputedStyle(node).display !== 'none')
+            .map(node => node.id)};
+      });
+      assert(unsupportedFullscreen.hidden && unsupportedFullscreen.display === 'none' &&
+        unsupportedFullscreen.width === 0 && unsupportedFullscreen.height === 0,
+      'Unsupported native fullscreen leaves no toolbar slot');
+      assert.deepEqual(unsupportedFullscreen.actions, ['controls-open', 'choose-disc', 'start-game', 'pause-game', 'end-session'],
+        'The remaining controls flow together without a fullscreen gap');
+      assert.equal(await unsupportedPage.locator('#fullscreen-status').count(), 0);
+      assert.doesNotMatch(await unsupportedPage.locator('body').innerText(), /browser controls remain visible|fullscreen unavailable/i);
+      await unsupportedPage.screenshot({path: path.join(values.out, 'fullscreen-unsupported.png'), fullPage: true});
+      report.fullscreen_unsupported = {simulated: true, button_hidden: unsupportedFullscreen.hidden,
+        display: unsupportedFullscreen.display, width: unsupportedFullscreen.width, height: unsupportedFullscreen.height};
+    } finally {
+      await unsupportedPage.close();
+    }
     await page.locator('#controls-open').click();
     await page.locator('#player-one-source').selectOption('touch');
     await page.locator('#controls-close').click();
