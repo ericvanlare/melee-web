@@ -14,6 +14,7 @@ import sys
 import time
 
 from ci_verify import GROUPS, ninja_timings
+from workspace_resources import operation
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -166,7 +167,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     if args.jobs < 1:
         parser.error("--jobs must be positive")
-    run_seed(args.shard, args.jobs)
+    with operation(ROOT, "compiler cache seed"):
+        run_seed(args.shard, args.jobs)
 
 
 if __name__ == "__main__":
