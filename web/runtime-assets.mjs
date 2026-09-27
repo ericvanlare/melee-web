@@ -16,14 +16,25 @@ async function digest(kind,bytes){return Array.from(new Uint8Array(await crypto.
 
 export const NATIVE_MENU_DISC_FILES=Object.freeze({
   'MnSlChr.usd':'MnSlChr.usd','MnSlMap.usd':'MnSlMap.usd',
+  'MnMaAll.usd':'MnMaAll.usd','GmTtAll.usd':'GmTtAll.usd',
+  'SdMenu.usd':'SdMenu.usd','SdToy.dat':'SdToy.dat',
   'SdSlChr.usd':'SdSlChr.usd','MnExtAll.usd':'MnExtAll.usd',
   'LbMcGame.usd':'LbMcGame.usd','NtMemAc.usd':'NtMemAc.usd',
+  'LbMcSnap.usd':'LbMcSnap.usd',
+  'GmEvent.dat':'GmEvent.dat',
+  'LbAd.dat':'LbAd.dat',
   'LbRb.dat':'LbRb.dat',
   'menu01.hps':'audio/menu01.hps','smash2.sem':'audio/us/smash2.sem',
-  ...Object.fromEntries(['main','nr_select','nr_title','nr_name','pokemon','end',
-    'captain','dk','fox','koopa','link','luigi','mario','mars','ness','peach','pikachu','purin',
-    'mewtwo','falco','clink','drmario','emblem','pichu','ganon','pupupu']
-    .map(name=>[name+'.ssm','audio/us/'+name+'.ssm']))
+  ...Object.fromEntries([
+    'main', 'pokemon', 'nr_title', 'nr_select', 'nr_1p', 'nr_vs', 'captain',
+    'clink', 'dk', 'drmario', 'falco', 'fox', 'gkoopa', 'ice',
+    'kirby', 'koopa', 'link', 'luigi', 'mario', 'mars', 'mewtwo',
+    'ness', 'peach', 'pichu', 'pikachu', 'purin', 'samus', 'zs',
+    'yoshi', 'gw', 'ganon', 'emblem', 'mhands', 'kirbytm', 'castle',
+    'corneria', 'greatbay', 'kongo', 'mutecity', 'onett', 'zebes', 'garden',
+    'klaid', 'greens', 'venom', 'bigblue', 'fourside', 'pupupu', 'pstadium',
+    '1padv', 'ending', 'nr_name', '1pend', 'last', 'end',
+  ].map(name=>[name+'.ssm','audio/us/'+name+'.ssm']))
 });
 export const NATIVE_GAME_DISC_FILES=Object.freeze({
   ...NATIVE_MENU_DISC_FILES,...RUNTIME_DISC_FILES,

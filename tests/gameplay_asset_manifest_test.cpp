@@ -94,17 +94,19 @@ void menu_contract()
 {
     const auto names = menu_asset_names();
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
-    check(names.size()==36, "Silent menu descriptor excludes only DSP coefficients");
+    check(names.size()==72, "Silent menu descriptor excludes only DSP coefficients");
     check(!has(names,"dsp_coef.bin"), "Public scope must not request DSP coefficients");
 #else
-    check(names.size()==37, "Menu descriptor must include each admitted CSS voice bank");
+    check(names.size()==73, "Menu descriptor must include original title/main resources and the source audio-bank table");
     check(has(names,"dsp_coef.bin"), "Development scope requires DSP coefficients");
 #endif
-    for(const auto name:{"MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd",
+    for(const auto name:{"MnSlChr.usd","MnSlMap.usd","MnMaAll.usd","GmTtAll.usd",
+                         "SdMenu.usd","SdToy.dat","SdSlChr.usd","MnExtAll.usd",
                          "LbMcGame.usd","NtMemAc.usd","LbRb.dat","sislib_font.bin","smash2.sem",
-                         "menu01.hps"})
+                         "menu01.hps", "LbMcSnap.usd", "GmEvent.dat", "LbAd.dat"})
         check(std::find(names.begin(),names.end(),name)!=names.end(),"Missing menu resource");
     const auto banks=menu_audio_bank_names();
+    check(banks.size()==55, "Menu audio owner must include every GALE01r2 SSM table row");
     no_duplicates(banks);
     for(int kind=0;kind<CKIND_PLAYABLE_COUNT;++kind)
         if(const auto* fighter=melee_web_fighter_content(kind))
@@ -112,6 +114,8 @@ void menu_contract()
                   "CSS OnExit fighter voice bank is missing");
     for(const auto& name:banks)
         check(std::find(names.begin(),names.end(),name)!=names.end(),"Menu scope omits registered bank");
+    check(std::find(banks.begin(),banks.end(),"kongo.ssm")!=banks.end(),
+          "Title demo stage bank is missing");
     no_duplicates(names);
 }
 
