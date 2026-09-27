@@ -20,6 +20,7 @@ const browser = await chromium.launch(browserLaunchOptions(launchOptions, {heade
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
 const page = await context.newPage(), origin = new URL(values.url).origin;
 const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
+const activeDocumentAudioContexts = new Set();
 const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.version(), browser_mode: values.headed ? 'headed' : 'headless', checks: [],
   profile: values.audio ? 'audio-player' : 'player',
   build_identity: packageManifest ? {
@@ -39,7 +40,16 @@ await page.addInitScript(() => {
 if (values.audio) await page.addInitScript(installBrowserAudioTrace);
 const cdp = await context.newCDPSession(page);
 await cdp.send('WebAudio.enable');
-for (const event of ['contextCreated', 'contextChanged', 'contextWillBeDestroyed']) cdp.on('WebAudio.' + event, data => audioEvents.push({event, data}));
+page.on('framenavigated', frame => {
+  if (frame === page.mainFrame()) activeDocumentAudioContexts.clear();
+});
+for (const event of ['contextCreated', 'contextChanged', 'contextWillBeDestroyed']) cdp.on('WebAudio.' + event, data => {
+  audioEvents.push({event, data});
+  if (event === 'contextCreated') activeDocumentAudioContexts.add(data.context.contextId);
+  if (event === 'contextWillBeDestroyed') activeDocumentAudioContexts.delete(data.contextId);
+  if (event === 'contextChanged' && data.context.contextState === 'closed')
+    activeDocumentAudioContexts.delete(data.context.contextId);
+});
 const check = async (name, run) => { await run(); report.checks.push(name); console.log(name); };
 const driver = createBrowserDriver(page, {surface:'public', timeoutMs:90000});
 const ready = driver.waitForImport;
@@ -77,9 +87,12 @@ async function readNativeMenuState() {
     runtimeError: document.querySelector('#status')?.dataset.runtimeError || null,
   }));
 }
+const isTimingPaused = state =>
+  state.message?.startsWith('Paused after a timing disruption') ||
+  state.status.startsWith('Paused after a timing disruption');
 async function resumeAfterTimingPause(label) {
   const state = await readNativeMenuState();
-  if (!state.status.startsWith('Paused after a timing disruption')) return false;
+  if (!isTimingPaused(state)) return false;
   report.timing_pause_recoveries ||= [];
   report.timing_pause_recoveries.push({label, message: state.message, running: state.running, status: state.status});
   await page.waitForFunction(() => {
@@ -88,7 +101,10 @@ async function resumeAfterTimingPause(label) {
   }, null, {timeout: 10000});
   await page.locator('#pause-game').click();
   await page.waitForFunction(() => Module._melee_web_native_menu_running() &&
-    !String(document.querySelector('#status')?.textContent || '').startsWith('Paused'),
+    !Module.UTF8ToString(Module._melee_web_native_menu_message())
+      .startsWith('Paused after a timing disruption') &&
+    !String(document.querySelector('#status')?.textContent || '')
+      .startsWith('Paused after a timing disruption'),
   null, {timeout: 15000});
   return true;
 }
@@ -97,7 +113,7 @@ async function waitForNativeScene(scene) {
   while (Date.now() < deadline) {
     const state = await readNativeMenuState();
     if (state.runtimeError) throw Error(`Runtime error while waiting for ${scene}: ${state.runtimeError}`);
-    if (state.status.startsWith('Paused after a timing disruption')) {
+    if (isTimingPaused(state)) {
       await resumeAfterTimingPause(`waiting-for-${scene}`);
       continue;
     }
@@ -230,7 +246,7 @@ try {
       assert.equal(await page.locator('#audio-note,#audio-info,#audio-details').count(), 0);
     } else assert.equal(await page.locator('#audio-note').textContent(), 'no audio ⓘlicensing issue, need to remove about 50 lines of Dolphin audio code still');
     assert.deepEqual(await page.locator('#toolbar > *').evaluateAll(nodes => nodes.map(node => node.id)),
-      ['toolbar-brand', 'toolbar-actions', 'toolbar-meta']);
+      ['toolbar-brand', 'toolbar-actions', 'fullscreen-status', 'toolbar-meta']);
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_replay_begin), 'undefined');
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_diagnostics), 'undefined');
     assert.equal(await page.evaluate(() => typeof window.menuObservePlayer), 'undefined');
@@ -366,14 +382,7 @@ try {
         await new Promise(resolve => setTimeout(resolve, 50));
       assert(closed(), 'Eject must close every prior AudioContext before the new document is used');
     };
-    const activeAudioContextIds = () => {
-      const closed = new Set(audioEvents.flatMap(row =>
-        row.event === 'contextWillBeDestroyed' ? [row.data.contextId] :
-          row.event === 'contextChanged' && row.data.context.contextState === 'closed' ?
-            [row.data.context.contextId] : []));
-      return [...new Set(audioEvents.filter(row => row.event === 'contextCreated')
-        .map(row => row.data.context.contextId))].filter(id => !closed.has(id));
-    };
+    const activeAudioContextIds = () => [...activeDocumentAudioContexts];
     const ejectAndReimport = async label => {
       const contextIds = activeAudioContextIds();
       const eventOffset = audioEvents.length;
@@ -455,7 +464,12 @@ try {
         await shot(`route-${cycle}-versus-choice`);
         await press('m');
         await page.waitForTimeout(750);
-        let scene = await page.evaluate(() => Module.UTF8ToString(Module._melee_web_native_menu_message()));
+        let routeState = await readNativeMenuState();
+        if (isTimingPaused(routeState)) {
+          await resumeAfterTimingPause(`route-${cycle}-versus-selection`);
+          routeState = await readNativeMenuState();
+        }
+        let scene = routeState.message;
         if (scene === 'Original main menu') {
           await shot(`route-${cycle}-versus-menu`);
           await press('m');
