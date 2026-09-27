@@ -578,6 +578,7 @@ try {
     await driver.unload();
     assert((report.navigations || 0) > navigationCount, 'Eject must reload the player document');
     await driver.waitForImport();
+    await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 90000});
     const fresh = await trace();
     assert(fresh && fresh.contexts.length === 0, 'Reloaded player must not retain the old AudioContext');
     // Closing a context releases its audio resources. Chrome may retain the
