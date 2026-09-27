@@ -1112,3 +1112,56 @@ attempts remain unchanged. Syntax and focused harness-contract tests pass, but
 this correction still needs a fresh rendered-browser run after the shared lane
 is released. The failed report is preserved and is not counted as a completed
 Results→CSS loop.
+
+## Corrected continuation rerun and retained natural Sheik control (2026-09-27)
+
+The corrected one-match headless Chrome run is retained at
+`work/pr86-results-sheik-winner-b-three-pulse-single-match-r3/report.json`.
+It serves Wasm SHA-256
+`41bc87d7a1e09b1a4b54750fed606f4457b2f0d88c71252e83752d2f299fe0f4`
+and completes a natural B CPU9/four-stock/Final Destination match and
+Results→CSS return. Samus slot 0 wins at gameplay frame 12,552 (RNG
+2,414,528,033); this is not the target winner. The first three trusted Enter
+keydown/up brackets are source frames 221/230, 328/329 and 425/425. Only the
+first interval contains a source-consumed P1 Start (frame 224). Disconnected
+CPU slots 2/3 advance page 0→1 at Results frame 416 before confirmation.
+
+After tick 560, source state is Results phase 3/statistics phase 2, pages
+`[0,0,1,1]`, all unconfirmed, P1 neutral, and port errors `[0,0,-1,-1]`.
+All 561 source tick attempts through this checkpoint return without overflow
+or failure. The entry/adoption camera-pool pointers all equal `0xa59e6e0`;
+no tick/draw/exit/close ownership guard, page error or native error fires. The
+corrected continuation reads fresh diagnostics, waits for source advancement,
+then the ordinary keyboard path reaches CSS. The run records 29 timing
+interruptions; this is functional headless evidence only. It validates the
+harness freshness fix and a non-target route, not the historical Sheik-winner
+input schedule.
+
+The retained natural Sheik-winner run
+`work/pr86-results-padtick-b-natural-r6/report.json` is useful but older and
+must stay separately scoped. It records a B CPU9/4-stock/Final Destination
+slot-2 win at frame 14,204 (RNG 1,088,324,269); the typed terminal has
+Zelda-origin ckind 18 and Sheik-form ftkind 19. At Results cursor 560, P1 is
+neutral, pages are `[0,0,1,1]`, and nobody is confirmed. Disconnected CPU pages
+advanced at frame 397. Its P1-only source-tick confirmation begins at frame
+609; all 631 PAD ticks return, and the browser reaches CSS with Results/world
+ownership unloaded and no page or native error. Its served Wasm is the earlier
+`d1d5c26` build, SHA-256
+`0e288debdc4fb4c3a75d64c0bf0bb7420ff726d8ebbdac6b04b9a9f537310529`; that
+source already had the phase-labelled camera-pool guards. Between `d1d5c26`
+and current `a3d584f`, the Results source changes only add entry-pointer
+snapshots. However, r6 used injected source-tick PAD, not the historical
+ordinary keyboard path; its report is marked failed by a post-CSS serializer
+error (`Cannot read properties of undefined (reading 'filter')`) and has no
+camera pointer snapshot. Treat it as evidence that a natural Sheik winner can
+complete under a different input path, not as an exact replay or clean
+harness pass.
+
+Together, r3 and r6 show that neither generic disconnected-CPU page transition
+nor a natural slot-2 Sheik winner alone reproduces the historical camera
+failure on the guarded code. The frozen failure report still contains only
+three Enter intentions and the generic late `camera release` failure: no
+consumed PAD brackets, page state or pointer values. The first invalid
+historical pointer transition remains unknown. Next discriminator is a fresh
+current-Wasm keyboard-prefix run with a natural slot-2 Zelda-origin Sheik win;
+do not seed or force the winner. PR #86 remains open and not ready to merge.
