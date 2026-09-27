@@ -55,6 +55,7 @@ struct MeleeWebMenuHost {
     MeleeWebPadState* input;
     GameRules saved_rules;
     GameRules selected_rules, route_saved_rules;
+    MeleeWebSaveProfilePreferences persisted_preferences;
     struct gmm_x1CB0 saved_preferences;
     struct gmm_x1CB0 selected_preferences, route_saved_preferences;
     int saved_language,saved_saved_language;
@@ -136,6 +137,12 @@ MeleeWebMenuHost* melee_web_menu_host_create_with_profile(
             free(h);return NULL;
         }
     }
+    if(!melee_web_save_profile_owner_capture_preferences(
+           h->profile,&h->persisted_preferences,e,n)){
+        if(!melee_web_save_profile_owner_deactivate(h->profile,NULL,0)||
+           !melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
+        free(h);return NULL;
+    }
     h->baseline_profile_ready=1;
     h->save_mode=save_mode;
     h->selected_characters=gmMainLib_GetSaveData()->unlocked_characers_bitmask;
@@ -167,8 +174,11 @@ int melee_web_menu_host_snapshot_card_data(
         memcpy(output,h->baseline_profile,sizeof(h->baseline_profile));
         return ok(e,n);
     }
-    return melee_web_save_profile_owner_snapshot_card_data(
-        h->profile,output,output_size,e,n);
+    if(h->initial_replay_context)
+        return melee_web_save_profile_owner_snapshot_card_data(
+            h->profile,output,output_size,e,n);
+    return melee_web_save_profile_owner_snapshot_card_data_with_preferences(
+        h->profile,&h->persisted_preferences,output,output_size,e,n);
 }
 
 int melee_web_menu_host_apply_replay_context(

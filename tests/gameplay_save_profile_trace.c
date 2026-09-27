@@ -59,6 +59,7 @@ int main(void)
     unsigned char fresh_card_profile[MELEE_WEB_SAVE_PROFILE_CARD_BYTES];
     unsigned char toy_before[sizeof(struct ToyRuntimeAggregate)];
     unsigned char toy_after[sizeof(struct ToyRuntimeAggregate)];
+    MeleeWebSaveProfilePreferences fresh_preferences;
     MeleeWebSaveProfileOwner* profile;
     struct gmm_x1868* save;
     struct gmm_x0* source_root = gmMainLib_GetProfileRoot();
@@ -122,6 +123,31 @@ int main(void)
             }
         }
         check_error(melee_web_save_profile_owner_snapshot_card_data(
+                        profile, fresh_card_profile, sizeof(fresh_card_profile),
+                        error, sizeof(error)), error);
+        check_error(melee_web_save_profile_owner_capture_preferences(
+                        profile, &fresh_preferences, error, sizeof(error)), error);
+        check(fresh_preferences.item_frequency == 2 &&
+                  fresh_preferences.item_mask == UINT64_MAX &&
+                  fresh_preferences.saved_language == LANG_US &&
+                  !memcmp(fresh_preferences.rumble_enabled,
+                          (const uint8_t[4]) { 1, 1, 1, 1 }, 4),
+              "Fresh source preferences do not match the original initializer");
+        /* The first Personal snapshot has no stored browser profile to fall
+         * back on. Simulate temporary startup writes and require the captured
+         * source defaults to reproduce the original fresh card data. */
+        save->x1CB0.item_freq = 0xFF;
+        save->x1CB0.item_mask = UINT64_C(0x0102040810204080);
+        save->x1CB0.rumble_enabled[0] = 0;
+        save->x1CB0.rumble_enabled[1] = 0;
+        save->x1CB0.saved_language = LANG_JP;
+        check_error(melee_web_save_profile_owner_snapshot_card_data_with_preferences(
+                        profile, &fresh_preferences, card_profile_after,
+                        sizeof(card_profile_after), error, sizeof(error)), error);
+        check(!memcmp(fresh_card_profile, card_profile_after,
+                      sizeof(fresh_card_profile)),
+              "First fresh Personal snapshot persisted temporary startup preferences");
+        check_error(melee_web_save_profile_owner_apply_card_data(
                         profile, fresh_card_profile, sizeof(fresh_card_profile),
                         error, sizeof(error)), error);
         check(!IsNameValid(GM_NAMETAG_NONE) &&
@@ -294,6 +320,9 @@ int main(void)
         source_save[0x04] = 0x04;
         source_save[0x448] = 0x03; /* item frequency in gmm_x1CB0 */
         source_save[0x450] = 0x11; source_save[0x451] = 0x22;
+        source_save[0x458] = 0; source_save[0x459] = 1;
+        source_save[0x45A] = 0; source_save[0x45B] = 1;
+        source_save[0x45E] = LANG_JP;
         source_save[0x460] = 0x00; source_save[0x461] = 0x00;
         source_save[0x462] = 0x01; source_save[0x463] = 0xC0;
         source_save[0x468] = 0x00; source_save[0x469] = 0x05;
@@ -320,6 +349,42 @@ int main(void)
                   save->x1F2C[0].x7C.b789 == 5 &&
                   save->x1F2C[0].x7C.x7E == 0x1122,
               "first-CSS SaveData source endian translation failed");
+        {
+            MeleeWebSaveProfilePreferences imported_preferences;
+            check_error(melee_web_save_profile_owner_capture_preferences(
+                            profile, &imported_preferences, error,
+                            sizeof(error)), error);
+            check(imported_preferences.item_frequency == 3 &&
+                      imported_preferences.item_mask ==
+                          UINT64_C(0x1122000000000000) &&
+                      imported_preferences.saved_language == LANG_JP &&
+                      !memcmp(imported_preferences.rumble_enabled,
+                              (const uint8_t[4]) { 0, 1, 0, 1 }, 4),
+                  "Imported source preference capture lost a typed field");
+
+            /* Model the browser's runtime-only overrides after import. A
+             * source progress counter changes at the same time, so the
+             * snapshot must restore preferences without freezing progress. */
+            save->x1CB0.item_freq = 0xFF;
+            save->x1CB0.item_mask = UINT64_MAX;
+            save->x1CB0.rumble_enabled[0] = 1;
+            save->x1CB0.rumble_enabled[1] = 1;
+            save->x1CB0.saved_language = LANG_US;
+            save->x1A50 = 0x10203040;
+            check_error(melee_web_save_profile_owner_snapshot_card_data_with_preferences(
+                            profile, &imported_preferences, card_profile_after,
+                            sizeof(card_profile_after), error, sizeof(error)), error);
+            check(card_profile_after[0x448] == 3 &&
+                      !memcmp(card_profile_after + 0x450,
+                              (const uint8_t[8]) { 0x11, 0x22, 0, 0, 0, 0, 0, 0 }, 8) &&
+                      !memcmp(card_profile_after + 0x458,
+                              (const uint8_t[4]) { 0, 1, 0, 1 }, 4) &&
+                      card_profile_after[0x45E] == LANG_JP,
+                  "Runtime overrides replaced imported preferences in the card snapshot");
+            check(!memcmp(card_profile_after + 0x1E8,
+                          (const uint8_t[4]) { 0x10, 0x20, 0x30, 0x40 }, 4),
+                  "Preference snapshot overlay froze a changed source progress counter");
+        }
     }
     mutate_original_profile();
     check_error(melee_web_save_profile_owner_live(profile, error, sizeof(error)), error);

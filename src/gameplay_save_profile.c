@@ -593,6 +593,58 @@ int melee_web_save_profile_owner_snapshot_card_data(
     return aliases_match(candidate, error, error_size) && ok(error, error_size);
 }
 
+int melee_web_save_profile_owner_capture_preferences(
+    const MeleeWebSaveProfileOwner* candidate,
+    MeleeWebSaveProfilePreferences* preferences, char* error,
+    size_t error_size)
+{
+    const struct gmm_x1CB0* source;
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size) ||
+        !preferences)
+        return fail(error, error_size,
+                    "Save preference capture requires the live source owner and output");
+    source = &candidate->source_save->x1CB0;
+    preferences->item_frequency = source->item_freq;
+    preferences->item_mask = source->item_mask;
+    memcpy(preferences->rumble_enabled, source->rumble_enabled,
+           sizeof(preferences->rumble_enabled));
+    preferences->saved_language = source->saved_language;
+    return aliases_match(candidate, error, error_size) && ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_snapshot_card_data_with_preferences(
+    const MeleeWebSaveProfileOwner* candidate,
+    const MeleeWebSaveProfilePreferences* preferences, uint8_t* output,
+    size_t output_size, char* error, size_t error_size)
+{
+    const size_t base = offsetof(struct gmm_x1868, x1CB0);
+    const size_t frequency = base + offsetof(struct gmm_x1CB0, item_freq);
+    const size_t mask = base + offsetof(struct gmm_x1CB0, item_mask);
+    const size_t rumble = base + offsetof(struct gmm_x1CB0, rumble_enabled);
+    const size_t language = base + offsetof(struct gmm_x1CB0, saved_language);
+    if (!preferences || frequency >= MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES ||
+        mask + sizeof(preferences->item_mask) >
+            MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES ||
+        rumble + sizeof(preferences->rumble_enabled) >
+            MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES ||
+        language >= MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES)
+        return fail(error, error_size,
+                    "Source save preference fields exceed the card SaveData extent");
+    if (!melee_web_save_profile_owner_snapshot_card_data(
+            candidate, output, output_size, error, error_size))
+        return 0;
+
+    /* Scene startup supplies browser-supported runtime defaults for these
+     * original settings. Overlay only those typed preference fields onto the
+     * live snapshot so progress and every other source byte remain current. */
+    output[frequency] = preferences->item_frequency;
+    write_be64(output + mask, (u64) preferences->item_mask);
+    memcpy(output + rumble, preferences->rumble_enabled,
+           sizeof(preferences->rumble_enabled));
+    output[language] = preferences->saved_language;
+    return ok(error, error_size);
+}
+
 int melee_web_save_profile_owner_apply_card_data(
     MeleeWebSaveProfileOwner* candidate, const uint8_t* input,
     size_t input_size, char* error, size_t error_size)

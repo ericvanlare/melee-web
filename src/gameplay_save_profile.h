@@ -10,6 +10,15 @@ extern "C" {
 
 typedef struct MeleeWebSaveProfileOwner MeleeWebSaveProfileOwner;
 
+/* Preferences the browser menu host temporarily overrides at scene entry.
+ * Keep these source-typed rather than exposing opaque SaveData patch offsets. */
+typedef struct MeleeWebSaveProfilePreferences {
+    uint8_t item_frequency;
+    uint64_t item_mask;
+    uint8_t rumble_enabled[4];
+    uint8_t saved_language;
+} MeleeWebSaveProfilePreferences;
+
 /* This is the transient block cleared by the original gm_80172174.  It
  * contains pending trophy bits and the source trophy timestamps held outside
  * gmm_x1868. */
@@ -72,6 +81,13 @@ int melee_web_save_profile_owner_apply_reference_context(
 int melee_web_save_profile_owner_snapshot_card_data(
     const MeleeWebSaveProfileOwner*, uint8_t* output, size_t output_size,
     char* error, size_t error_size);
+int melee_web_save_profile_owner_capture_preferences(
+    const MeleeWebSaveProfileOwner*, MeleeWebSaveProfilePreferences*,
+    char* error, size_t error_size);
+int melee_web_save_profile_owner_snapshot_card_data_with_preferences(
+    const MeleeWebSaveProfileOwner*,
+    const MeleeWebSaveProfilePreferences*, uint8_t* output,
+    size_t output_size, char* error, size_t error_size);
 int melee_web_save_profile_owner_apply_card_data(
     MeleeWebSaveProfileOwner*, const uint8_t* input, size_t input_size,
     char* error, size_t error_size);

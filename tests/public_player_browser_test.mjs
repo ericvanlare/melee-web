@@ -455,12 +455,14 @@ try {
       await isolated.close();
     }
   });
-  await check('Personal imports retain source settings the browser runtime does not expose', async () => {
+  await check('Settings stores source snapshots without browser-side SaveData preference patches', async () => {
     const settingsPage = await browser.newPage({viewport: {width: 800, height: 600}, acceptDownloads: true});
     const profile = new Uint8Array(0x1790 + 7 * 0x1F2C);
     profile.fill(0x21);
-    profile[0x448] = 2; // gmm_x1CB0.item_freq
+    profile[0x448] = 3; // synthetic gmm_x1CB0.item_freq
+    new DataView(profile.buffer).setBigUint64(0x450, 0x0102040810204080n, false);
     profile.set([0, 1, 1, 1], 0x458); // gmm_x1CB0.rumble_enabled[4]
+    profile[0x45e] = 0; // synthetic saved_language (LANG_JP)
     const gci = createMeleeGCI(profile, new Date('2026-09-27T12:00:00Z')).bytes;
     try {
       await settingsPage.goto(origin + '/privacy');
@@ -486,11 +488,10 @@ try {
           return originalCommit.apply(this, args);
         };
         const imported = new Uint8Array(profile);
+        // This controller-level test treats the native source snapshot API as
+        // authoritative. Native startup preference overlays are covered by
+        // gameplay_save_profile_trace and the production-player scenario.
         window.runtimeSnapshot = new Uint8Array(imported);
-        // Model the observed source bootstrap defaults. The browser route does
-        // not include Melee's Item Switch or Rumble Settings screens.
-        window.runtimeSnapshot[0x448] = 0xff;
-        window.runtimeSnapshot.set([1, 1, 1, 1], 0x458);
         window.snapshotCount = 0;
         window.saveController = mountSaveProfileSettings();
         window.saveStore = await SaveProfileStore.open();
@@ -518,9 +519,11 @@ try {
         commits: window.profileCommitCount}));
       assert.equal(stored.record.revision, 1, 'Identical normalized snapshots do not replace the import generation');
       assert.equal(stored.record.previous, null);
-      assert.equal(stored.record.active.data[0x448], 2, 'Autosave retains the imported item-frequency value');
-      assert.equal(stored.record.active.data[0x458], 0, 'Autosave retains imported Controller 1 Rumble off');
+      assert.equal(stored.record.active.data[0x448], 3, 'Autosave retains the source snapshot item-frequency value');
+      assert.deepEqual([...stored.record.active.data.slice(0x450, 0x458)], [1, 2, 4, 8, 16, 32, 64, 128],
+        'Autosave retains the non-default source snapshot item mask');
       assert.deepEqual([...stored.record.active.data.slice(0x458, 0x45c)], [0, 1, 1, 1]);
+      assert.equal(stored.record.active.data[0x45e], 0, 'Autosave retains saved language from the source snapshot');
       assert(stored.samples >= 3);
       assert.equal(stored.commits, 1, 'The import is the only committed generation');
 
@@ -528,12 +531,14 @@ try {
       const exportedPath = path.join(values.out, 'imported-source-settings.gci');
       await download.saveAs(exportedPath);
       const exported = parseMeleeGCI(new Uint8Array(await fs.readFile(exportedPath)));
-      assert.equal(exported[0x448], 2);
+      assert.equal(exported[0x448], 3);
+      assert.deepEqual([...exported.slice(0x450, 0x458)], [1, 2, 4, 8, 16, 32, 64, 128]);
       assert.deepEqual([...exported.slice(0x458, 0x45c)], [0, 1, 1, 1]);
+      assert.equal(exported[0x45e], 0);
       await settingsPage.evaluate(() => window.saveController.flushBeforeTeardown());
       const flushed = await settingsPage.evaluate(() => window.readProfileRecord());
       assert.equal(flushed.revision, 1, 'Forced flush does not rewrite a profile equal to its source-preserved snapshot');
-      assert.equal(flushed.active.data[0x448], 2);
+      assert.equal(flushed.active.data[0x448], 3);
       assert.equal(flushed.active.data[0x458], 0);
     } finally {
       await settingsPage.evaluate(() => { window.saveController?.close?.(); window.saveStore?.close?.(); }).catch(() => {});

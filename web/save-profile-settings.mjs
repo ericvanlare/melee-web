@@ -3,14 +3,6 @@ import {SaveProfileStore, SaveProfileStorageError} from './save-profile-store.mj
 
 const $ = id => document.getElementById(id);
 const PROFILE_SCENES = new Set(['css', 'sss', 'match', 'results', 'prize']);
-// The browser currently runs the original CSS/SSS/gameplay route without the
-// original Settings menus. Its startup resets these source preferences to the
-// source defaults before a live snapshot. Keep the values from the committed
-// profile until the browser exposes the corresponding source settings UI.
-// gmm_x1CB0 is at SaveData + 0x448: item_freq is +0, rumble_enabled[4] +0x10.
-const SAVE_DATA_ITEM_FREQUENCY = 0x448;
-const SAVE_DATA_CONTROLLER_RUMBLE = 0x458;
-const SAVE_DATA_CONTROLLER_RUMBLE_BYTES = 4;
 const descriptions = {
   everything: 'Start with everything unlocked. Session changes aren’t saved.',
   personal: 'Your progress saves automatically in this browser on this device.',
@@ -61,17 +53,10 @@ export function mountSaveProfileSettings({onError = () => {}, onBusy = () => {}}
   function canSnapshot() { return !!player && (isLoaded() || hasScene()); }
   function restartOnTransition() { return isLoaded() || hasScene(); }
   async function snapshotPersonalProfile() {
-    const bytes = await player.snapshotSaveProfile();
-    if (activeMode === 'personal' && profileData?.data) {
-      // These byte fields are source-defined settings which the browser route
-      // does not let a player edit. Preserve the committed values while
-      // retaining all progress and other settings observed in the live source
-      // snapshot.
-      bytes[SAVE_DATA_ITEM_FREQUENCY] = profileData.data[SAVE_DATA_ITEM_FREQUENCY];
-      bytes.set(profileData.data.subarray(SAVE_DATA_CONTROLLER_RUMBLE,
-        SAVE_DATA_CONTROLLER_RUMBLE + SAVE_DATA_CONTROLLER_RUMBLE_BYTES), SAVE_DATA_CONTROLLER_RUMBLE);
-    }
-    return bytes;
+    // The native source owner restores only preferences temporarily replaced
+    // by its supported startup configuration. Keep browser storage agnostic
+    // to SaveData offsets so live progress remains owned by the source snapshot.
+    return player.snapshotSaveProfile();
   }
   function displaySavedState() {
     if (storageFailure) return;
