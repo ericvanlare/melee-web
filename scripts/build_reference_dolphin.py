@@ -389,7 +389,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--generator", default="Unix Makefiles")
     result.add_argument("--target", default="build_final_bundle",
                         help="CMake target (build_final_bundle for a macOS app)")
-    result.add_argument("--jobs", type=int, default=None)
+    result.add_argument("--jobs", type=int, default=2)
     result.add_argument("--headless", action="store_true",
                         help="build DolphinNoGUI instead of the double-clickable Qt app")
     result.add_argument("--skip-submodules", action="store_true",
@@ -402,7 +402,7 @@ def parser() -> argparse.ArgumentParser:
     return result
 
 
-def main(argv: list[str] | None = None) -> int:
+def _main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     source = args.source_dir.expanduser().resolve()
     work = args.work_dir.expanduser().resolve()
@@ -525,6 +525,12 @@ def main(argv: list[str] | None = None) -> int:
                           SOURCE_OVERLAY, PATCH_DIR)
     print(f"Built passive reference Dolphin; manifest: {manifest}")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    from workspace_resources import operation
+    with operation(ROOT, "reference Dolphin build"):
+        return _main(argv)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,9 @@ commands, then choose the smallest relevant boundary check below.
 compilation. Build freshness remains the responsibility of the producer and
 frozen-build checks in [Hitch capture](HITCH_CAPTURE.md).
 
+Follow [local resource ownership](LOCAL_RESOURCES.md) for disk checks, coordinated
+builds, test scratch, and retiring a completed checkout's compiler products.
+
 For a browser check, serve a built directory over loopback so cross-origin
 isolation headers are present:
 

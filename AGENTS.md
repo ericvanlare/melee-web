@@ -13,6 +13,20 @@ that supports any new claim. `STATUS.md` is the current evidence index; do not
 copy its changing measurements into another document. Keep status backed by
 observed evidence and use the playbook's scoped evidence labels.
 
+Read [local resource ownership](docs/LOCAL_RESOURCES.md) before bootstrapping,
+building, or running expensive tests. Run `python3 scripts/agent_workspace.py
+status` at task start and handoff. Use the guarded build/bootstrap entry points;
+wrap other expensive commands with `python3 scripts/agent_workspace.py run --
+<command>`. Keep the default two build jobs and the host's two operation slots;
+do not bypass a disk-space refusal or raise limits without the user's direction.
+After a test succeeds, remove only its owned disposable scratch. Preserve failed
+reproducers and explicitly retained evidence. When a task's builds are retired,
+run `python3 scripts/agent_workspace.py retire-builds` and then `--apply` for
+that checkout's eligible intermediates. Keep incremental builds while work is
+ongoing. Close browsers and servers you started when they are no longer needed.
+Never blanket-delete `work/`, ignored files, another task's output, source,
+recordings, local changes, or evidence that has not been safely archived.
+
 Before adding or enabling a fighter, read [Adding a source fighter](docs/ADDING_CHARACTERS.md),
 starting with its required checkpoints, failure lookup and handoff template.
 For a stage, read [Adding a source stage](docs/ADDING_STAGES.md). For a shared
@@ -75,9 +89,9 @@ original-game trace for simulation correctness. During iteration run the focused
 boundary check; before integration run `python3 -m unittest discover -s tests -v`,
 build the affected target, inspect the diff, and retain failures. Documentation
 only needs link/path and diff checks; it does not need a runtime build or full
-suite when executable behavior is unchanged. Defer cleanup that does not unblock
-the port. A dependency upgrade requires revalidation. Do not reset or overwrite
-unexplained changes.
+suite when executable behavior is unchanged. The resource-ownership cleanup
+above is part of completing a task; defer unrelated refactoring. A dependency
+upgrade requires revalidation. Do not reset or overwrite unexplained changes.
 
 Prioritize runnable milestones and bounded interfaces. Parallelize bounded work
 when useful; avoid duplicate audits or idle workers. Subagents may own bounded
