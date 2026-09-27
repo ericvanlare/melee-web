@@ -143,6 +143,29 @@ rendered helper's shutdown assertion and second helper's missing-music
 preparation failure remain failures, superseded only for that synthetic
 fixture by the third run.
 
+Frozen `facbb21` subsequently passes both requested natural two-match loops:
+A 15,796/11,917 source frames, B 14,783/14,820, both Results→CSS returns per
+lineup, zero page/native-command errors, two timing-interruption entries each
+(`work/pr86-entry-packet-{a,b}-two-match-r1/report.json`). Both B winners are
+Samus. Hash-bound entry packets and full-canvas Results screenshots are retained
+and inspected. This still does not clear the earlier Sheik-winner failure.
+Delayed synthetic controls advance 744 Results frames (past the historical
+frame-560 failure), including rendered Zelda-origin `{ckind18,ftkind7}` and
+external-Sheik `{19,7}` winners. Source ownership, host exit and teardown stay
+valid, but those two overall browser reports **fail** their `trace.data`
+network/body-retention assertion; they are not clean harness passes. Exact
+commands, copied-library hashes and screenshots are in each retained
+`work/pr86-results-*-stock-delayed-host-rendered-*/HANDOFF.md`.
+
+The first correctly invoked shield-SDI causal replay stops before its target
+at source cursor 10,628 with `Audio output queue overflow`; the worklet queue
+had 15,510 frames after concurrent build/render load
+(`work/pr86-shield-sdi-b-boundary-r2/report.json`). That is a retained runtime
+failure, not a state-comparison pass or evidence attributing it to the new math.
+An earlier `r1` invocation rejected a misspelled CLI option before launching.
+The next causal attempt runs without concurrent builds or other browser cases;
+simulation timing, input recipe and queue bounds remain unchanged.
+
 Latest validation checkpoint: `d5695c9` includes the existing shared-runtime
 owner's committed motion-flag, camera/inverse, reciprocal-square-root and
 combo-push arithmetic fixes (`1ca4430`, `4fd8f9d`, `4f70b84`, `d5695c9`). It
@@ -303,6 +326,14 @@ The focused test and individual source-transition logs are retained in
 These on-stage native cases supplement the checklist below. Off-stage/ledge
 recovery, move-specific original comparison and broader action inventories
 remain unverified; Ice Climbers' paired Belay case remains separate.
+
+The added `--kirby-copy-ko` cases acquire and use Fox, G&W and Samus copies,
+lose/reacquire them by up-appeal, then walk off Final Destination using ordinary
+PAD. Each consumes exactly one stock, observes Rebirth and the original copy
+reset, resumes grounded Wait, and passes repeated match teardown
+(`work/pr86-kirby-ko-r1.log`, three donor subcases). These cover joint-hat,
+copied-part and charge-Article families. KO-copy-loss for other donors and
+damage-triggered random copy loss remain unverified.
 
 | Character | Content/construction | Targeted action coverage | Still unverified / failed |
 | --- | --- | --- | --- |

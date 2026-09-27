@@ -37,6 +37,8 @@ class ResultsCameraOwnershipTests(unittest.TestCase):
             "--lineup-b-sheik-mode-exit": ("winner_ckind=19 winner_ftkind=7",),
             "--lineup-b-sheik-stock-mode-exit":
                 ("match_kind=1", "winner_ckind=19 winner_ftkind=7"),
+            "--lineup-b-sheik-stock-delayed-mode-exit":
+                ("match_kind=1", "winner_ckind=19 winner_ftkind=7", "tick=744"),
         }
         for command, markers in cases.items():
             with self.subTest(command=command):

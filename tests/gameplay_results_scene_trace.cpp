@@ -217,7 +217,7 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                            bool mode_exit = false, bool draw = false,
                            bool sheik_standing = false,
                            bool pool_guard = false, bool host_route = false,
-                           bool stock = false)
+                           bool stock = false, bool delayed_confirmation = false)
 {
     char error[256]{};
     if (!melee_web_gameplay_session_begin(32U * 1024U * 1024U,
@@ -260,6 +260,12 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                   << static_cast<unsigned>(result.match_end.match_kind)
                   << " four-source lineup..."
                   << std::flush;
+        if (sheik_confirm) {
+            const auto& winner = result.match_end.player_standings[2];
+            std::cout << " winner_ckind=" << static_cast<int>(winner.ckind)
+                      << " winner_ftkind=" << static_cast<int>(winner.ftkind)
+                      << std::flush;
+        }
         melee_web::GameplayResultsSession session(files, result, 0x13579bdfU,
                                                    *input);
         const auto initial_pool = cm_804D645C;
@@ -318,7 +324,7 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
             for (unsigned tick = 0; tick < 900 && !session.requested(); ++tick) {
                 PADStatus pads[4]{};
                 pads[2].err = pads[3].err = -1;
-                if (tick >= 240 && tick % 90 == 0)
+                if (tick >= (delayed_confirmation ? 600U : 240U) && tick % 90 == 0)
                     pads[0].button = pads[1].button = PAD_BUTTON_START;
                 session.tick(pads);
                 check_pool("tick");
@@ -594,17 +600,28 @@ int main(int argc,char** argv){try{
                          command == "--real-enabled-confirm";
     const bool lineup_a = command == "--lineup-a";
     const bool pool_guard = command == "--lineup-b-camera-pool-guard";
+    // Keep the Zelda-origin transformed standing distinct from an external
+    // Sheik standing: Results world assets are selected using external ckind.
+    const bool zelda_sheik_host =
+        command == "--lineup-b-zelda-sheik-stock-delayed-host-draw";
+    const bool delayed_confirmation =
+        command == "--lineup-b-sheik-stock-delayed-mode-exit" ||
+        command == "--lineup-b-sheik-stock-delayed-host-draw" || zelda_sheik_host;
     const bool stock = command == "--lineup-b-sheik-stock-mode-exit" ||
-                       command == "--lineup-b-sheik-stock-host-draw";
+                       command == "--lineup-b-sheik-stock-host-draw" || delayed_confirmation;
     const bool host_route = command == "--lineup-b-sheik-host-draw" ||
-                            command == "--lineup-b-sheik-stock-host-draw";
+                            command == "--lineup-b-sheik-stock-host-draw" ||
+                            command == "--lineup-b-sheik-stock-delayed-host-draw" ||
+                            zelda_sheik_host;
     const bool draw = command == "--lineup-b-sheik-draw" || host_route;
 #if !defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
     if (draw)
         throw std::runtime_error("Draw diagnostics require MELEE_WEB_RESULTS_RENDERED_TRACE; Node does not submit GX frames");
 #endif
-    const bool sheik_standing = command == "--lineup-b-sheik-mode-exit" || stock || draw;
-    const bool mode_exit = sheik_standing || command == "--lineup-b-zelda-sheik-mode-exit";
+    const bool sheik_standing = !zelda_sheik_host &&
+        (command == "--lineup-b-sheik-mode-exit" || stock || draw);
+    const bool mode_exit = sheik_standing || zelda_sheik_host ||
+                           command == "--lineup-b-zelda-sheik-mode-exit";
     const bool sheik_confirm = command == "--lineup-b-sheik-confirm" || mode_exit;
     const bool lineup_b = command == "--lineup-b" || sheik_confirm || pool_guard;
     const bool real_roster = real_mario || real_eight || real_enabled ||
@@ -627,7 +644,8 @@ int main(int argc,char** argv){try{
         const int status = run_real_lineup(files, lineup_a ? std::span<const int>(a) :
                                                  std::span<const int>(b),
                                lineup_a ? "A" : "B", sheik_confirm, mode_exit, draw,
-                               sheik_standing, pool_guard, host_route, stock);
+                               sheik_standing, pool_guard, host_route, stock,
+                               delayed_confirmation);
 #if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
         EM_ASM({ window.resultsDone = $0; }, status);
 #endif

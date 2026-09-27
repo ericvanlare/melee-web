@@ -156,6 +156,7 @@ int main(int argc,char** argv){try{
         std::string(argv[6])=="--kirby-mario-fox-replacement";
     const bool kirby_copy_costumes=argc==7&&
         std::string(argv[6])=="--kirby-copy-costumes";
+    const bool kirby_copy_ko=argc==7&&std::string(argv[6])=="--kirby-copy-ko";
     const bool remaining_up_special=argc==7&&
         std::string(argv[6])=="--remaining-up-special";
     const bool ice_cpu_lifecycle=argc==7&&
@@ -172,7 +173,7 @@ int main(int argc,char** argv){try{
     const bool cpu9_match=slot2_cpu_match||lineup_a_cpu_match||lineup_b_catch_prefix||
                           natural_terminal||a_prefix_teardown||ice_cpu_lifecycle;
     const bool action_coverage=(argc==7&&std::string(argv[6])=="--character-actions")||
-        slot2_transform||kirby_mario_fox_replacement||kirby_copy_costumes||cpu9_match||fox_cpu_prefix||remaining_up_special;
+        slot2_transform||kirby_mario_fox_replacement||kirby_copy_costumes||kirby_copy_ko||cpu9_match||fox_cpu_prefix||remaining_up_special;
     if(argc==7&&!entry_only&&!platform_pass&&!action_coverage)throw std::runtime_error("Unknown source match trace scope");
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]})for(const auto& entry:std::filesystem::directory_iterator(root)){
@@ -295,8 +296,8 @@ int main(int argc,char** argv){try{
         opponent.rumble_enabled=0;
     }
     const bool kirby_action_case=action_coverage&&fighter_ckind==CKIND_KIRBY;
-    check(!kirby_copy_costumes||kirby_action_case,
-          "Copy costume action coverage requires Kirby in slot zero");
+    check(!(kirby_copy_costumes||kirby_copy_ko)||kirby_action_case,
+          "Copy costume/KO action coverage requires Kirby in slot zero");
     if(kirby_action_case){
         check(opponent_ckind==CKIND_CAPTAIN||opponent_ckind==CKIND_GAMEWATCH||
                   opponent_ckind==CKIND_POPONANA||
@@ -1298,6 +1299,39 @@ int main(int argc,char** argv){try{
                         donor_kind==FTKIND_CAPTAIN?"Captain/Falcon Punch":"Fox";
                     std::cout<<"Kirby action coverage: "<<donor_name
                              <<" acquire/use/loss/reacquisition and match teardown path passed; other donor families unverified"
+                             <<std::endl;
+                }
+                if(kirby_copy_ko){
+                    settle_primary();
+                    check(melee_web_test_kirby_copy_kind(0)==donor_kind,
+                          "Kirby KO fixture lost its copy before leaving the stage");
+                    const int initial_stocks=match.player_stats(0).stocks;
+                    // Ordinary rightward PAD only: walk off FD, let the source
+                    // blast zone consume one stock, then release the stick.
+                    bool stock_lost=false;
+                    for(unsigned n=0;n<900&&!stock_lost;n++){
+                        raw[0].button=0;raw[0].stickX=80;raw[0].stickY=0;tick();
+                        stock_lost=match.player_stats(0).stocks<initial_stocks;
+                    }
+                    neutral();
+                    check(stock_lost&&match.player_stats(0).stocks==initial_stocks-1,
+                          "Kirby normal-PAD walkoff did not consume exactly one source stock");
+                    bool rebirth=false,copy_reset=false,resumed=false;
+                    for(unsigned n=0;n<900&&!resumed;n++){
+                        const auto state=match.player_stats(0);
+                        rebirth|=state.motion_id==ftCo_MS_Rebirth||state.motion_id==ftCo_MS_RebirthWait;
+                        copy_reset|=melee_web_test_kirby_copy_kind(0)==FTKIND_KIRBY;
+                        resumed=rebirth&&state.motion_id==ftCo_MS_Wait&&state.ground_or_air==0;
+                        check(state.stocks==initial_stocks-1,
+                              "Kirby lost a second stock during neutral respawn");
+                        if(!resumed)tick();
+                    }
+                    check(rebirth&&copy_reset&&resumed&&
+                          melee_web_test_kirby_copy_kind(0)==FTKIND_KIRBY,
+                          "Kirby did not reset its copied ability and resume grounded gameplay after KO");
+                    std::cout<<"Kirby copied ability KO loss, Rebirth and grounded gameplay passed; donor="
+                             <<donor_kind<<" stocks="<<initial_stocks<<" -> "
+                             <<match.player_stats(0).stocks<<" source_frame="<<match.source_frames()
                              <<std::endl;
                 }
             }else{

@@ -119,6 +119,21 @@ class ContentMatchTests(unittest.TestCase):
                     [menu, game, 32, 4, ckind, "--character-actions"],
                     expectations)
 
+    def test_kirby_copy_resets_on_ko_and_resumes_after_rebirth(self):
+        menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
+        if not all(path.is_file() for path in
+                   (menu / "MnSlChr.usd", game / "GrNLa.dat", game / "PlKb.dat")):
+            self.skipTest("Owned Kirby and Final Destination source fixtures required")
+        # Joint hat, copied parts, and charge-Article ownership families.
+        for ckind, archive in ((2, "PlFx.dat"), (3, "PlGw.dat"), (16, "PlSs.dat")):
+            with self.subTest(donor=ckind):
+                if not (game / archive).is_file():
+                    self.skipTest("Owned copy donor fixture required")
+                self.run_trace("gameplay_content_match_trace",
+                    [menu, game, 32, 4, ckind, "--kirby-copy-ko"],
+                    ("Kirby copied ability KO loss, Rebirth and grounded gameplay passed",
+                     "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed"))
+
     def test_kirby_mario_to_fox_distinct_donor_replacement(self):
         menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
         required = (
