@@ -74,9 +74,11 @@ in Safari 27 beta ([WebKit issue 206854](https://bugs.webkit.org/show_bug.cgi?id
 [Apple Developer Forums](https://developer.apple.com/forums/thread/133248)).
 Safari 26.4 fixes fullscreen-session behavior on iOS, but does not announce
 general iPhone availability ([WebKit Safari 26.4 notes](https://webkit.org/blog/17862/webkit-features-for-safari-26-4/)).
-Treat live method/permission checks and request rejection as authoritative.
-Chrome for Android documents Fullscreen API support
-([Chrome for Android](https://developer.chrome.com/docs/android/overview)). A Home
+The current compatibility table lists Chrome for Android as supported and iOS
+Safari as partial ([MDN Fullscreen API compatibility](https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API));
+Chrome's release notes confirm the unprefixed `Element.requestFullscreen()` has
+been available since Chrome 71 ([Chrome 132 release notes](https://developer.chrome.com/blog/chrome-132-beta)).
+Treat live method/permission checks and request rejection as authoritative. A Home
 Screen web app's standalone presentation is a separate launch mode, not ordinary
 Safari-tab fullscreen ([WebKit Safari 26.0 web apps](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/));
 this change does not add installation or PWA setup. Headless Chrome tests cover
