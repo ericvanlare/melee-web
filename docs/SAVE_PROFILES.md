@@ -117,35 +117,70 @@ implementation code was reused.
 
 ## Dolphin interoperability evidence
 
-The earlier Memory Card Manager check established that Dolphin 2609 accepted
-the exported file as a GCI container. It did not establish that Melee loaded
-the expected progress or could write a later change back. The bounded test for
-this review is recorded in
+The completed headless round trip and its exact identities, input, hashes,
+field comparisons and observations are recorded in
+[`evidence/save-profile-dolphin-roundtrip-v1.json`](evidence/save-profile-dolphin-roundtrip-v1.json).
+The reusable Dolphin and browser harnesses are
+[`scripts/save_profile_dolphin_interop.py`](../scripts/save_profile_dolphin_interop.py)
+and
+[`tests/gamecube_save_interop_browser_test.mjs`](../tests/gamecube_save_interop_browser_test.mjs).
+
+WebMelee exported its Everything unlocked baseline (characters `07ff`, stages
+`07ff`, derived features `0f`). An isolated Dolphin run used normal controller
+input in Name Entry and wrote the identifiable full-width name `ＡＡＢＢ`
+(normalized display `AABB`) into name bank 0, record 0. Settings imported that
+game-written GCI, confirmed the switch to Personal progress and restarted the
+player. The reloaded Personal export retained the completed masks, name, item
+frequency 2 and all four enabled rumble flags.
+
+A fresh isolated Dolphin user and USA GCI folder then loaded that re-exported
+Personal GCI. The observer recorded Melee reaching its title and main menu; no
+corrupt-save or reset path appeared. Ordinary Pipe controller input opened
+Settings → Rumble, toggled Controller 1 rumble off, then exited both menus. The
+resulting GCI changed from SHA-256
+`5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729` to
+`5aeb2c9dd8b274a66898ea7640feed36009422c55267d0eed252688cf8778fb3`.
+Melee's output retained character/stage masks `07ff`/`07ff`, feature byte
+`0f`, item frequency 2 and name bytes `8260826082618261` (`ＡＡＢＢ`). Its
+Controller 1 rumble value changed from 1 to 0. The source-named SaveData
+PowerCount and PowerTime fields also advanced from 2 to 3 and 16 to 28 during
+the game session. Melee's physical card slots held logical records 1 through 8
+in slots 1 through 8, the free marker in slot 9, and a redundant SaveData
+record 1 in slot 10. The duplicated SaveData records used sequence 2 while the
+unchanged name banks remained at sequence 0; import selected by logical ID and
+the source sequence ordering. The reader requires all eight logical records,
+one free-block marker and the redundant SaveData record. It ignores a
+checksum-invalid block only when the authenticated SaveData copy remains; a
+missing name bank, invalid marker, malformed identity or conflicting
+same-sequence copy still fails import. The wrap comparison follows HSD's
+`fn_803ACB74`.
+
+Settings then imported the Dolphin-written GCI with the confirmation dialog,
+switched to Personal progress and restarted. A browser reload retained Personal
+mode; its exported profile bytes matched the Dolphin-written profile across
+the full declared SaveData and seven name-bank extents. The visible headless
+Chrome capture shows the completed roster after the import. The receipt records
+the rendered-browser checks and the Melee observer's scene/menu trace
+separately; Dolphin video frames and audible fidelity were not measured.
+
+The isolated client reported `Dolphin 2606a-dirty`, binary SHA-256
+`087e212bc1537f0bb79c9e9375311f75d773aaa5cb36cf4bb32a864da21c185b`, based on
+source commit `c77bbaa0f372c3f72281602a8b087206706542cb`. It includes the
+repository's passive observer and Pipe controller test overlay plus a
+`SaveDataWritable` guard used by the shared read-only capture mode. This run
+explicitly set `Session.Core.SaveDataWritable=True`; it used a new Dolphin user
+directory and disposable USA GCI folder, `-v Null`, and `No Audio Output`. No
+personal Dolphin profile was used. The guard was not removed from shared
+fixtures. The Melee disc is USA revision 1.02, disc SHA-256
+`b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c`, and
+`main.dol` SHA-256
+`dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646`.
+
+The initial bounded, no-input boot attempt remains useful only as a capability
+reproducer; its earlier limitations are preserved in
 [`evidence/save-profile-dolphin-capability-v1.json`](evidence/save-profile-dolphin-capability-v1.json).
-It used an isolated Dolphin user directory, USA GCI-folder slot A, null video,
-and disabled audio output. The GCI was present before boot and had the same
-SHA-256 after the process was stopped at the 20-second bound. There was no
-controller or movie input, no observed gameplay or save screen, and no later
-GCI export or browser reimport. Therefore this is a bounded capability
-reproducer, not the required Melee/Dolphin save round trip.
-
-The shared pinned reference-capture tooling and its receipts were also
-inspected. That observer route intentionally sets
-`Session.Core.SaveDataWritable=False` and closes its SRAM and directory-card
-backing paths without writing; its existing capture evidence separately lists
-virtual memory-card comparison as untested. It is useful for original-game
-observation, but cannot supply the requested persistent-save change. Do not
-remove that read-only guard to turn this interoperability task into an
-unreviewed mutation of shared reference state. The reproduction used a
-separate Dolphin 2609 installation and an isolated profile.
-
-The actual cross-emulator check remains open: after importing a WebMelee GCI,
-Melee must visibly load the expected completed or personal state, persist an
-ordinary in-game change, and export a GCI that WebMelee then loads and preserves.
-The browser codec tests are independent format checks and are not a substitute
-for these observations. The output baseline in the bounded run used default
-name-bank contents; it does not demonstrate an identifiable user-created name
-or non-default settings crossing the emulator boundary.
+The successful round trip above supersedes it as compatibility evidence. No
+Dolphin implementation code was copied into project code.
 
 ## Provenance and licensing
 

@@ -18,6 +18,12 @@ const CARD_ENTRIES = [
   [0, 0], [SAVE_BYTES, 0], ...Array.from({length: BANK_COUNT}, () => [BANK_BYTES, 1]),
 ];
 const fail = message => { throw new Error(message); };
+class InvalidCardBlock extends Error {
+  constructor(message, recoverable = false) {
+    super(message);
+    this.recoverable = recoverable;
+  }
+}
 
 function digest(bytes) {
   const state = Uint8Array.from([1, 35, 69, 103, 137, 171, 205, 239, 254, 220, 186, 152, 118, 84, 50, 16]);
@@ -42,7 +48,7 @@ function encodeProtected(input) {
 }
 
 function decodeProtected(input) {
-  if (input.length < 16) fail('Save file contains a truncated protected card block.');
+  if (input.length < 16) throw new InvalidCardBlock('Save file contains a truncated protected card block.');
   const out = new Uint8Array(input);
   let previous = input[15];
   for (let i = 16; i < input.length; i++) {
@@ -54,7 +60,8 @@ function decodeProtected(input) {
     previous = current;
   }
   const actual = digest(out.subarray(16));
-  for (let i = 0; i < 16; i++) if (actual[i] !== out[i]) fail('Save file has an invalid Melee card-block checksum.');
+  for (let i = 0; i < 16; i++) if (actual[i] !== out[i])
+    throw new InvalidCardBlock('Save file has an invalid Melee card-block checksum.', true);
   return out;
 }
 
@@ -64,28 +71,70 @@ function equal(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+// Mirrors HSD's fn_803ACB74 sequence ordering, including the 0xff -> 0 wrap.
+function compareSequence(left, right) {
+  if (left === 0 && right === 0xff) return 1;
+  if (left === 0xff && right === 0) return -1;
+  if (left - right > 0x80) return -1;
+  if (left - right < -0x80) return 1;
+  return left - right;
+}
+
 function parseRecordBlocks(gci) {
-  const blocks = [];
-  for (let physical = 1; physical <= 8; physical++) {
+  const records = new Map(Array.from({length: 8}, (_, index) => [index + 1, []]));
+  let freeMarkers = 0;
+  let invalidChecksums = 0;
+  for (let physical = 1; physical <= 10; physical++) {
     const start = GCI_HEADER + physical * CARD_BLOCK;
-    const decoded = decodeProtected(gci.subarray(start, start + CARD_BLOCK));
+    let decoded;
+    try {
+      decoded = decodeProtected(gci.subarray(start, start + CARD_BLOCK));
+    } catch (error) {
+      // HSD excludes a bad-checksum block from its logical map. Only that
+      // authenticated-format failure is recoverable; truncation and any other
+      // parser error remain fatal.
+      if (!(error instanceof InvalidCardBlock) || !error.recoverable) throw error;
+      invalidChecksums++;
+      continue;
+    }
     const logical = be16(decoded, 0x10);
-    if (logical !== physical) fail(`Save file block ${physical} has an unexpected Melee data identity.`);
-    blocks.push(decoded);
+    if (logical === 0xffff) {
+      freeMarkers++;
+      continue;
+    }
+    if (!records.has(logical)) fail(`Save file physical block ${physical} has an unrecognized Melee data identity.`);
+    records.get(logical).push({decoded, sequence: decoded[0x12], physical});
   }
-  const markerStart = GCI_HEADER + 9 * CARD_BLOCK;
-  const marker = decodeProtected(gci.subarray(markerStart, markerStart + CARD_BLOCK));
-  if (be16(marker, 0x10) !== 0xffff) fail('Save file redundancy marker is not recognized.');
-  const spareStart = GCI_HEADER + 10 * CARD_BLOCK;
-  const spare = decodeProtected(gci.subarray(spareStart, spareStart + CARD_BLOCK));
-  if (be16(spare, 0x10) !== 1 || !equal(spare.subarray(0x20, 0x20 + SAVE_BYTES),
-      blocks[0].subarray(0x20, 0x20 + SAVE_BYTES)))
-    fail('Save file redundant primary data is invalid or inconsistent.');
+
+  if (freeMarkers !== 1) fail('Save file does not contain exactly one valid Melee free-block marker.');
+  if (records.get(1).length === 0) fail('Save file is missing Melee data record 1.');
+  // The authored Melee card manifest has one redundant SaveData chunk. A
+  // checksum-invalid block can occupy that redundant slot, but it cannot
+  // substitute for a missing logical record or the free-block marker.
+  if (records.get(1).length + invalidChecksums !== 2)
+    fail('Save file does not contain the expected redundant Melee SaveData record.');
+
+  const selected = new Map();
+  for (const [logical, candidates] of records) {
+    if (candidates.length === 0) fail(`Save file is missing Melee data record ${logical}.`);
+    let newest = candidates[0];
+    for (const candidate of candidates.slice(1)) {
+      const order = compareSequence(newest.sequence, candidate.sequence);
+      if (order < 0) {
+        newest = candidate;
+      } else if (order === 0 && !equal(
+          newest.decoded.subarray(0x20, 0x20 + (logical === 1 ? SAVE_BYTES : BANK_BYTES)),
+          candidate.decoded.subarray(0x20, 0x20 + (logical === 1 ? SAVE_BYTES : BANK_BYTES)))) {
+        fail(`Save file has conflicting current copies of Melee data record ${logical}.`);
+      }
+    }
+    selected.set(logical, newest.decoded);
+  }
 
   const profile = new Uint8Array(PROFILE_BYTES);
-  profile.set(blocks[0].subarray(0x20, 0x20 + SAVE_BYTES), 0);
+  profile.set(selected.get(1).subarray(0x20, 0x20 + SAVE_BYTES), 0);
   for (let bank = 0; bank < BANK_COUNT; bank++) {
-    const bytes = blocks[bank + 1].subarray(0x20, 0x20 + BANK_BYTES);
+    const bytes = selected.get(bank + 2).subarray(0x20, 0x20 + BANK_BYTES);
     profile.set(bytes, SAVE_BYTES + bank * BANK_BYTES);
   }
   return profile;

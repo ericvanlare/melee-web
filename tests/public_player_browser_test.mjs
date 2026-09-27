@@ -6,7 +6,7 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
-import {parseMeleeGCI} from '../web/gamecube-save.mjs';
+import {createMeleeGCI, parseMeleeGCI} from '../web/gamecube-save.mjs';
 const {values} = parseArgs({options: {
   ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
   audio: {type: 'boolean', default: false},
@@ -451,6 +451,91 @@ try {
     } finally {
       await savePage.evaluate(() => window.saveController?.close?.()).catch(() => {});
       await isolated.close();
+    }
+  });
+  await check('Personal imports retain source settings the browser runtime does not expose', async () => {
+    const settingsPage = await browser.newPage({viewport: {width: 800, height: 600}, acceptDownloads: true});
+    const profile = new Uint8Array(0x1790 + 7 * 0x1F2C);
+    profile.fill(0x21);
+    profile[0x448] = 2; // gmm_x1CB0.item_freq
+    profile.set([0, 1, 1, 1], 0x458); // gmm_x1CB0.rumble_enabled[4]
+    const gci = createMeleeGCI(profile, new Date('2026-09-27T12:00:00Z')).bytes;
+    try {
+      await settingsPage.goto(origin + '/privacy');
+      await settingsPage.setContent(`<!doctype html><body>
+        <button id="settings-open">Settings</button>
+        <dialog id="settings-dialog"><label for="save-mode">Save mode</label>
+          <select id="save-mode"><option value="everything">Everything</option><option value="personal">Personal</option></select>
+          <p id="save-mode-description"></p><button id="export-save">Export</button><button id="load-save">Load</button>
+          <input id="save-file" type="file"><p id="save-status"></p><button id="settings-close">Close</button>
+        </dialog>
+        <dialog id="save-confirm-dialog"><h2 id="save-confirm-title"></h2><p id="save-confirm-body"></p>
+          <button id="save-confirm-cancel">Cancel</button><button id="save-confirm-accept">Accept</button>
+        </dialog></body>`);
+      const [settingsUrl, storeUrl] = await page.evaluate(() => ['save-profile-settings.mjs', 'save-profile-store.mjs']
+        .map(name => performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/' + name))?.name));
+      await settingsPage.evaluate(async ({settingsUrl, storeUrl, profile}) => {
+        const {mountSaveProfileSettings} = await import(settingsUrl);
+        const {SaveProfileStore} = await import(storeUrl);
+        const originalCommit = SaveProfileStore.prototype.commitProfile;
+        window.profileCommitCount = 0;
+        SaveProfileStore.prototype.commitProfile = function(...args) {
+          window.profileCommitCount++;
+          return originalCommit.apply(this, args);
+        };
+        const imported = new Uint8Array(profile);
+        window.runtimeSnapshot = new Uint8Array(imported);
+        // Model the observed source bootstrap defaults. The browser route does
+        // not include Melee's Item Switch or Rumble Settings screens.
+        window.runtimeSnapshot[0x448] = 0xff;
+        window.runtimeSnapshot.set([1, 1, 1, 1], 0x458);
+        window.snapshotCount = 0;
+        window.saveController = mountSaveProfileSettings();
+        window.saveStore = await SaveProfileStore.open();
+        window.readProfileRecord = () => new Promise((resolve, reject) => {
+          const tx = window.saveStore.db.transaction('profiles', 'readonly');
+          const request = tx.objectStore('profiles').get('personal');
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error);
+        });
+        await window.saveController.bindPlayer({
+          unload: async () => {}, configureSaveProfile: async () => {}, start: async () => {},
+          snapshotSaveProfile: async () => { window.snapshotCount++; return new Uint8Array(window.runtimeSnapshot); },
+        });
+        window.saveController.setState({scene: 'css'});
+      }, {settingsUrl, storeUrl, profile: Array.from(profile)});
+      await settingsPage.locator('#settings-open').click();
+      await settingsPage.locator('#settings-dialog[open]').waitFor();
+      await settingsPage.locator('#save-file').setInputFiles({name: 'melee-save.gci', mimeType: 'application/octet-stream', buffer: Buffer.from(gci)});
+      await settingsPage.locator('#save-confirm-dialog[open]').waitFor();
+      await settingsPage.locator('#save-confirm-accept').click();
+      await settingsPage.waitForFunction(() => document.querySelector('#save-mode').value === 'personal' &&
+        /Save loaded/.test(document.querySelector('#save-status').textContent));
+      await settingsPage.waitForFunction(() => window.snapshotCount >= 3, null, {timeout: 10000});
+      const stored = await settingsPage.evaluate(async () => ({record: await window.readProfileRecord(), samples: window.snapshotCount,
+        commits: window.profileCommitCount}));
+      assert.equal(stored.record.revision, 1, 'Identical normalized snapshots do not replace the import generation');
+      assert.equal(stored.record.previous, null);
+      assert.equal(stored.record.active.data[0x448], 2, 'Autosave retains the imported item-frequency value');
+      assert.equal(stored.record.active.data[0x458], 0, 'Autosave retains imported Controller 1 Rumble off');
+      assert.deepEqual([...stored.record.active.data.slice(0x458, 0x45c)], [0, 1, 1, 1]);
+      assert(stored.samples >= 3);
+      assert.equal(stored.commits, 1, 'The import is the only committed generation');
+
+      const [download] = await Promise.all([settingsPage.waitForEvent('download'), settingsPage.locator('#export-save').click()]);
+      const exportedPath = path.join(values.out, 'imported-source-settings.gci');
+      await download.saveAs(exportedPath);
+      const exported = parseMeleeGCI(new Uint8Array(await fs.readFile(exportedPath)));
+      assert.equal(exported[0x448], 2);
+      assert.deepEqual([...exported.slice(0x458, 0x45c)], [0, 1, 1, 1]);
+      await settingsPage.evaluate(() => window.saveController.flushBeforeTeardown());
+      const flushed = await settingsPage.evaluate(() => window.readProfileRecord());
+      assert.equal(flushed.revision, 1, 'Forced flush does not rewrite a profile equal to its source-preserved snapshot');
+      assert.equal(flushed.active.data[0x448], 2);
+      assert.equal(flushed.active.data[0x458], 0);
+    } finally {
+      await settingsPage.evaluate(() => { window.saveController?.close?.(); window.saveStore?.close?.(); }).catch(() => {});
+      await settingsPage.close();
     }
   });
   await check('controls, focus and preferences survive a fresh document', async () => {
