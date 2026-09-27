@@ -349,32 +349,51 @@ static void check_results_handoff_rejection(
 struct P1StatisticsControl {
     std::array<unsigned, 2> auto_page_tick{};
     std::array<unsigned, 4> last_pages{};
+    const unsigned confirmation_tick;
+    const bool browser_cadence;
     unsigned edges = 0, releases = 0, held_ticks = 0;
     int last_phase = -1, last_stats_phase = -1;
 
-    static bool held(unsigned tick)
+    explicit P1StatisticsControl(bool use_browser_cadence)
+        : confirmation_tick(use_browser_cadence ? 539U : 600U),
+          browser_cadence(use_browser_cadence)
+    {}
+
+    bool held(unsigned tick) const
     {
         return (tick >= 180 && tick < 190) ||
                (tick >= 360 && tick < 370) ||
-               (tick >= 600 && tick < 610);
+               (tick >= confirmation_tick && tick < confirmation_tick + 10);
     }
     void prepare(unsigned tick, PADStatus (&pads)[4]) const
     {
-        if (tick == 600) {
+        if (tick == confirmation_tick) {
             const auto& data = lbl_8046DBE8;
-            if (!auto_page_tick[0] || !auto_page_tick[1] || data.x1 != 3 ||
-                data.player_data[2].page != 1 || data.player_data[3].page != 1)
-                throw std::runtime_error("P1 statistics: both disconnected CPU pages must auto-advance before confirmation");
-            std::cout << "p1-statistics before-confirm tick=600 auto_pages=1,1 auto_page_ticks="
-                      << auto_page_tick[0] << ',' << auto_page_tick[1] << '\n' << std::flush;
+            if (browser_cadence) {
+                std::cout << "p1-statistics before-confirm tick=" << confirmation_tick
+                          << " phase=" << unsigned(data.x1) << " pages="
+                          << unsigned(data.player_data[0].page) << ','
+                          << unsigned(data.player_data[1].page) << ','
+                          << unsigned(data.player_data[2].page) << ','
+                          << unsigned(data.player_data[3].page) << " auto_page_ticks="
+                          << auto_page_tick[0] << ',' << auto_page_tick[1]
+                          << " scope=browser-observed-dispatch-brackets-not-historical\n"
+                          << std::flush;
+            } else {
+                if (!auto_page_tick[0] || !auto_page_tick[1] || data.x1 != 3 ||
+                    data.player_data[2].page != 1 || data.player_data[3].page != 1)
+                    throw std::runtime_error("P1 statistics: both disconnected CPU pages must auto-advance before confirmation");
+                std::cout << "p1-statistics before-confirm tick=600 auto_pages=1,1 auto_page_ticks="
+                          << auto_page_tick[0] << ',' << auto_page_tick[1] << '\n' << std::flush;
+            }
         }
         if (held(tick)) pads[0].button = PAD_BUTTON_START;
     }
     void observe(unsigned tick)
     {
         const auto& data = lbl_8046DBE8;
-        const bool edge = tick == 180 || tick == 360 || tick == 600;
-        const bool release = tick == 190 || tick == 370 || tick == 610;
+        const bool edge = tick == 180 || tick == 360 || tick == confirmation_tick;
+        const bool release = tick == 190 || tick == 370 || tick == confirmation_tick + 10;
         for (unsigned slot = 0; slot < 4; ++slot) {
             const auto& pad = HSD_PadCopyStatus[slot];
             if (pad.err != (slot < 2 ? 0 : -1) ||
@@ -396,7 +415,8 @@ struct P1StatisticsControl {
                 throw std::runtime_error("P1 statistics: connected neutral CPU unexpectedly changed page");
             if (slot >= 2 && pages[slot] != last_pages[slot]) {
                 if (last_pages[slot] != 0 || pages[slot] != 1 ||
-                    data.x1 != 3 || data.x0_23 != 2 || tick >= 600 ||
+                    (!browser_cadence && (data.x1 != 3 || tick >= confirmation_tick)) ||
+                    data.x0_23 != 2 ||
                     HSD_PadCopyStatus[slot].err != -1)
                     throw std::runtime_error("P1 statistics: disconnected CPU page transition is not the required source auto-advance");
                 auto_page_tick[slot - 2] = tick;
@@ -412,18 +432,23 @@ struct P1StatisticsControl {
                       << '\n' << std::flush;
             last_phase = data.x1; last_stats_phase = data.x0_23; last_pages = pages;
         }
-        if (data.x1 == 4 && (tick < 600 || !auto_page_tick[0] || !auto_page_tick[1]))
+        if (!browser_cadence && data.x1 == 4 &&
+            (tick < confirmation_tick || !auto_page_tick[0] || !auto_page_tick[1]))
             throw std::runtime_error("P1 statistics: Results confirmed before both disconnected CPU pages advanced");
     }
     void finish(unsigned frames, unsigned draws, bool draw) const
     {
-        if (frames <= 610 || frames > 900 || edges != 3 || releases != 3 || held_ticks != 30 ||
-            !auto_page_tick[0] || !auto_page_tick[1] || lbl_8046DBE8.x1 != 4 ||
+        if (frames <= confirmation_tick + 10 ||
+            frames > (browser_cadence ? 700U : 900U) ||
+            edges != 3 || releases != 3 || held_ticks != 30 ||
+            (!browser_cadence && (!auto_page_tick[0] || !auto_page_tick[1])) ||
+            lbl_8046DBE8.x1 != 4 ||
             draws != (draw ? frames : 0))
             throw std::runtime_error("P1 statistics: incomplete held-input/page/exit coverage");
         std::cout << "p1-statistics coverage frames=" << frames << " trigger_edges=" << edges
                   << " releases=" << releases << " held_ticks=" << held_ticks
-                  << " auto_pages=1,1 source_draw_api_calls=" << draws << '\n' << std::flush;
+                  << " auto_page_ticks=" << auto_page_tick[0] << ',' << auto_page_tick[1]
+                  << " source_draw_api_calls=" << draws << '\n' << std::flush;
     }
 };
 
@@ -436,7 +461,8 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                            bool stock = false, bool delayed_confirmation = false,
                            bool handoff_guard = false,
                            const WinnerDemoControl* winner_demo = nullptr,
-                           bool p1_statistics = false)
+                           bool p1_statistics = false,
+                           bool p1_statistics_browser_cadence = false)
 {
     char error[256]{};
     if (!melee_web_gameplay_session_begin(32U * 1024U * 1024U,
@@ -487,7 +513,7 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
         }
         melee_web::GameplayResultsSession session(files, result, 0x13579bdfU,
                                                    *input);
-        P1StatisticsControl statistics_control;
+        P1StatisticsControl statistics_control(p1_statistics_browser_cadence);
         if (p1_statistics) {
             if (!host || result.match_end.match_kind != MatchKind_Stock ||
                 result.match_end.player_standings[2].ckind != CKIND_ZELDA ||
@@ -495,8 +521,12 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                 throw std::runtime_error("P1 statistics lost original synthetic Stock 18/7 host setup");
             check_results_fighter_leases(result);
             std::cout << "\np1-statistics seed=324508639 connected=0,1 disconnected=2,3"
-                         " pulse_ticks=180,360,600 hold_ticks=10 cap=900"
-                         " scope=chosen-source-ticks-not-historical-replay host_profile=default-CSS-subset"
+                         " pulse_ticks=180,360," << statistics_control.confirmation_tick
+                      << " hold_ticks=10 cap=" << (p1_statistics_browser_cadence ? 700 : 900)
+                      << " scope=" << (p1_statistics_browser_cadence ?
+                             "browser-observed-dispatch-brackets-not-historical" :
+                             "chosen-source-ticks-not-historical-replay")
+                      << " host_profile=default-CSS-subset"
                       << " draw_scope=" << (draw ? "rendered-GPU" : "unrun native-state-only")
                       << '\n' << std::flush;
         }
@@ -838,11 +868,16 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw)
     const auto& end = terminal.match_end;
     require(end.outcome == OUTCOME_ELIMINATION && end.match_kind == MatchKind_Stock &&
             end.n_winners == 1 && end.winners[0] == 2 &&
-            end.player_standings[2].ftkind == FTKIND_SEAK,
+            end.player_standings[2].ftkind == FTKIND_SEAK &&
+            end.player_standings[2].slot_type == Gm_PKind_Human &&
+            end.player_standings[2].is_big_loser == 0,
             "Match-history source terminal was not sole P3 (source slot 2) Sheik Stock elimination");
     std::cout << "match-history source-terminal winner=2 winner_ckind="
               << int(end.player_standings[2].ckind) << " winner_ftkind="
-              << int(end.player_standings[2].ftkind) << " source_frame=" << source_frames
+              << int(end.player_standings[2].ftkind) << " winner_slot_type="
+              << int(end.player_standings[2].slot_type)
+              << " winner_is_big_loser=" << int(end.player_standings[2].is_big_loser)
+              << " source_frame=" << source_frames
               << " raw_ticks=" << match_ticks << " match_draw_api_calls=" << match_draws
               << " match_exit_seed=" << match_seed << " losses=4,4,0,4\n" << std::flush;
     ResultsMatchInfo result{};
@@ -1123,7 +1158,10 @@ int main(int argc,char** argv){try{
     const bool match_history = history_state || history_draw;
     const bool p1_statistics_state = command == "--lineup-b-zelda-sheik-stock-p1-statistics-host-state";
     const bool p1_statistics_draw = command == "--lineup-b-zelda-sheik-stock-p1-statistics-host-draw";
-    const bool p1_statistics = p1_statistics_state || p1_statistics_draw;
+    const bool p1_statistics_browser_cadence =
+        command == "--lineup-b-zelda-sheik-stock-p1-statistics-browser-cadence-host-state";
+    const bool p1_statistics = p1_statistics_state || p1_statistics_draw ||
+                               p1_statistics_browser_cadence;
     const bool real_mario = command == "--real-mario" ||
                             command == "--real-mario-confirm";
     const bool real_eight = command == "--real-eight" ||
@@ -1137,7 +1175,7 @@ int main(int argc,char** argv){try{
     const bool pool_guard = command == "--lineup-b-camera-pool-guard";
     const bool handoff_guard = command == "--lineup-b-results-handoff-guard";
     const WinnerDemoControl* winner_demo = nullptr;
-    bool variant_state_only = p1_statistics_state;
+    bool variant_state_only = p1_statistics_state || p1_statistics_browser_cadence;
     for (const auto& control : winner_demo_controls) {
         const std::string prefix =
             std::string("--lineup-b-zelda-sheik-stock-delayed-demo-") + control.button_name;
@@ -1203,7 +1241,8 @@ int main(int argc,char** argv){try{
                                                  std::span<const int>(b),
                                lineup_a ? "A" : "B", sheik_confirm, mode_exit, draw,
                                sheik_standing, pool_guard, host_route, stock,
-                               delayed_confirmation, handoff_guard, winner_demo, p1_statistics);
+                               delayed_confirmation, handoff_guard, winner_demo, p1_statistics,
+                               p1_statistics_browser_cadence);
 #if defined(MELEE_WEB_RESULTS_RENDERED_TRACE)
         EM_ASM({ window.resultsDone = $0; }, status);
 #endif

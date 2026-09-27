@@ -49,6 +49,10 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         (evidence / "stdout.log").write_text(result.stdout)
         (evidence / "stderr.log").write_text(result.stderr)
         scenario_scope = (
+            "synthetic Results CPU standings; P1-only 180/360/539 ten-tick Start pulses, "
+            "connected ports 0/1, disconnected CPU ports 2/3; source ticks bracket the "
+            "fresh browser Enter dispatches, not consumed historical PAD or a historical replay"
+            if "p1-statistics-browser-cadence" in flag else
             "synthetic Results standings; P1-only 180/360/600 held-Start pulses, "
             "connected ports 0/1, disconnected CPU ports 2/3, automatic statistics "
             "page advance before confirmation; chosen source ticks, not historical replay"
@@ -77,7 +81,8 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         for marker in ("host_profile=default-CSS-subset", "host_hud_layout=4",
                        "draw_scope=unrun native-state-only",
                        "P3 (source slot 2) down-B Zelda->Sheik", "source-terminal winner=2",
-                       "winner_ftkind=7", "losses=4,4,0,4", "match_draw_api_calls=0",
+                       "winner_ftkind=7 winner_slot_type=0 winner_is_big_loser=0",
+                       "losses=4,4,0,4", "match_draw_api_calls=0",
                        "arena_reused=1", "results_draw_api_calls=0",
                        "actual Match->Sheik Results host handoff and close passed"):
             self.assertIn(marker, stdout, f"Retained {evidence}\n{brief}")
@@ -123,10 +128,45 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         phases = re.findall(r"p1-statistics state tick=\d+ phase=(\d)", stdout)
         self.assertEqual(set(phases), set("01234"))
         coverage = re.search(r"p1-statistics coverage frames=(\d+) trigger_edges=3 releases=3 "
-                             r"held_ticks=30 auto_pages=1,1 source_draw_api_calls=0", stdout)
+                             r"held_ticks=30 auto_page_ticks=(\d+),(\d+) source_draw_api_calls=0", stdout)
         self.assertIsNotNone(coverage, f"Retained {evidence}\n{brief}")
         self.assertGreater(int(coverage[1]), 610)
         self.assertLessEqual(int(coverage[1]), 900)
+        self.assertEqual(coverage.groups()[1:], tuple(row[1] for row in auto_pages))
+        handoff = re.search(r"host OnExit\+commit tick=(\d+) initial_pool=(0x[0-9a-f]+) "
+                            r"source_pool=(0x[0-9a-f]+)", stdout)
+        self.assertIsNotNone(handoff, f"Retained {evidence}\n{brief}")
+        self.assertEqual(handoff[1], coverage[1])
+        self.assertEqual(handoff[2], handoff[3])
+
+    def test_p1_browser_observed_cadence_before_cpu_auto_page(self):
+        stdout, evidence, brief = self.run_trace(
+            "--lineup-b-zelda-sheik-stock-p1-statistics-browser-cadence-host-state")
+        scope = json.loads((evidence / "command.json").read_text())["scope"]
+        self.assertIn("source ticks bracket the fresh browser Enter dispatches", scope)
+        self.assertIn("not consumed historical PAD or a historical replay", scope)
+        for marker in ("connected=0,1 disconnected=2,3 pulse_ticks=180,360,539 hold_ticks=10",
+                       "scope=browser-observed-dispatch-brackets-not-historical",
+                       "before-confirm tick=539", "host_profile=default-CSS-subset",
+                       "source_draw_api_calls=0", "host OnExit+commit",
+                       "source_pool="):
+            self.assertIn(marker, stdout, f"Retained {evidence}\n{brief}")
+        edges = re.findall(r"p1-statistics input tick=(\d+) port=0 held=1 trigger=1 release=0", stdout)
+        releases = re.findall(r"p1-statistics input tick=(\d+) port=0 held=0 trigger=0 release=1", stdout)
+        self.assertEqual(edges, ["180", "360", "539"])
+        self.assertEqual(releases, ["190", "370", "549"])
+        before = re.search(r"before-confirm tick=539 phase=(\d) pages=([0-3]),([0-3]),([0-3]),([0-3]) "
+                           r"auto_page_ticks=(\d+),(\d+)", stdout)
+        self.assertIsNotNone(before, f"Retained {evidence}\n{brief}")
+        self.assertEqual(before.groups()[1:5], ("0", "0", "0", "0"))
+        self.assertEqual(before.groups()[5:], ("0", "0"))
+        coverage = re.search(r"p1-statistics coverage frames=(\d+) trigger_edges=3 releases=3 "
+                             r"held_ticks=30 auto_page_ticks=(\d+),(\d+) source_draw_api_calls=0",
+                             stdout)
+        self.assertIsNotNone(coverage, f"Retained {evidence}\n{brief}")
+        self.assertGreater(int(coverage[1]), 549)
+        self.assertLessEqual(int(coverage[1]), 570)
+        self.assertEqual(coverage.groups()[1:], ("0", "0"))
         handoff = re.search(r"host OnExit\+commit tick=(\d+) initial_pool=(0x[0-9a-f]+) "
                             r"source_pool=(0x[0-9a-f]+)", stdout)
         self.assertIsNotNone(handoff, f"Retained {evidence}\n{brief}")
