@@ -13,6 +13,7 @@ import {
   preflightScope,
 } from "../web/disc-session.mjs";
 import {openNativeGameSession} from "../web/runtime-audio-assets.mjs";
+import {openNativeGameDiscSession} from "../web/runtime-assets.mjs";
 import {AUDIO_FILTER_SHA256} from "../web/dsp-coefficients.mjs";
 
 const entries = new Map([
@@ -156,7 +157,18 @@ if (discPath) {
     value => value.toString(16).padStart(2, "0"),
   ).join("");
   assert.equal(digest, AUDIO_FILTER_SHA256);
-  console.log("Disc session real-file validation, preflight, close, font, and DSP checks passed");
+
+  const silentSource = new PathFile(discPath);
+  const silentSession = await openNativeGameDiscSession(silentSource);
+  const readsBeforeRejectedDsp = silentSource.ranges.length;
+  await assert.rejects(silentSession.readScope(['dsp_coef.bin']), /Public native scenes do not accept DSP coefficients/);
+  assert.equal(silentSource.ranges.length, readsBeforeRejectedDsp,
+    'the silent profile rejects DSP before reading or exempting any asset');
+  const silent = await silentSession.readScope(['PlCo.dat']);
+  assert(silent.get('PlCo.dat') instanceof Uint8Array);
+  assert.equal(silent.has('dsp_coef.bin'), false);
+  silentSession.close();
+  console.log("Disc session real-file identity, audio DSP, silent rejection, preflight, font, and close checks passed");
 } else {
   console.log("Disc session pure preflight/File-ownership checks passed (set MELEE_DISC_PATH for real-disc scope checks)");
 }

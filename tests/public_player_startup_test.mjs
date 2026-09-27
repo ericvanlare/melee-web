@@ -68,6 +68,7 @@ function makeDocument() {
   'progress', 'disc-dialog', 'disc-cancel', 'disc-choose-file', 'error-dialog',
     'error', 'retry', 'error-close',
     'loading-panel', 'loading-label', 'loading-progress', 'loading-detail',
+    'disc-selection-status',
   ];
   const elements = new Map([...new Set([...markupIds, ...ids])]
     .map(id => [id, new FakeElement('div', id)]));
@@ -125,12 +126,10 @@ async function importShellWithMocks(scenario) {
   const imports = [
     "import {mountMeleeRuntime} from '../melee-runtime.mjs';",
     "import {mountControllerSettings} from '../controller-settings.mjs';",
-    "import {openNativeGameDiscSession} from '../runtime-assets.mjs';",
   ].join('\n');
   const replacement = [
     'const mountMeleeRuntime = globalThis.testMountMeleeRuntime;',
     'const mountControllerSettings = globalThis.testMountControllerSettings;',
-    'const openNativeGameDiscSession = globalThis.testOpenNativeGameDiscSession;',
   ].join('\n');
   assert.notEqual(source.indexOf(imports), -1, 'shell imports must remain source-substitutable');
   const substituted = source.replace(imports, replacement);
@@ -150,13 +149,16 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
   const trace = [];
   globalThis.testClickTrace = trace;
   let stateCallback;
+  let errorCallback;
   let settingsOptions;
   let nativeMainCalled = false;
   let audioCreated = 0;
   const idle = {ready: true, requiresReload: false, busy: false, state: 'idle', paused: false,
-    canImport: true, canStart: false, canPause: false, canUnload: false, audio: behavior.audio ? 'enabled' : 'disabled',
+    canSelectDisc: true, canImport: true, graphicsReady: true, canStart: false, canPause: false, canUnload: false, audio: behavior.audio ? 'enabled' : 'disabled',
     progress: null, loading: null, message: 'Ready'};
-  let mockState = idle;
+  const graphicsPending = { ...idle, graphicsReady: false, canImport: false,
+    loading: {phase: 'catalog', message: 'Preparing graphics…', complete: 0, total: 0} };
+  let mockState = behavior.graphicsPending ? graphicsPending : idle;
   let player;
 
   globalThis.testMountControllerSettings = options => {
@@ -167,15 +169,23 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
       bindPlayer: async runtime => { trace.push(['settings-bind', runtime]); },
     };
   };
-  globalThis.testOpenNativeGameDiscSession = async () => {
-    throw Error('public startup test must not open a disc during mount');
+  const testOpenNativeGameDiscSession = async file => {
+    trace.push(['validate', file.name]);
+    if (behavior.validateDisc) await behavior.validateDisc(file);
+    if (file.invalid) throw Error('Invalid local disc');
+    return {
+      close() { trace.push(['close-session', file.name]); },
+      async readScope() { return new Map(); },
+    };
   };
+  globalThis.testOpenNativeGameDiscSession = testOpenNativeGameDiscSession;
   globalThis.testMountMeleeRuntime = async options => {
     trace.push('mount');
     stateCallback = options.onState;
+    errorCallback = options.onError;
     assert.equal(options.canvas, document.getElementById('canvas'));
-    assert.equal(options.openDisc, globalThis.testOpenNativeGameDiscSession,
-      'public shell must provide the audio-free scoped disc opener');
+    assert.equal(options.openDisc, undefined,
+      'public shell delegates disc opening to the runtime profile adapter');
     assert.equal(options.createAudio, undefined, 'public shell must not create an audio runtime');
     if (options.createAudio) audioCreated++;
     assert.equal(options.configureModule, undefined, 'required filesystem setup belongs to the shared owner');
@@ -197,10 +207,11 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
     assert.equal(document.getElementById('loading-detail').textContent, '99% complete', 'Pending work must not round to 100%');
     options.onState({...idle, state: 'error', loading: {message: 'Preparing graphics…'}});
     assert.equal(document.getElementById('loading-panel').hidden, true, 'Errors replace loading feedback');
-    options.onState(idle);
-    mockState = idle;
-    assert.equal(document.getElementById('loading-panel').hidden, true, 'Ready player has no loading overlay');
-    assert.equal(document.getElementById('idle-hint').hidden, false, 'Ready player retains the disc instruction');
+    options.onState(mockState);
+    assert.equal(document.getElementById('loading-panel').hidden, !mockState.loading,
+      'Graphics preparation remains visible until ready');
+    assert.equal(document.getElementById('idle-hint').hidden, !!mockState.loading,
+      'The idle instruction yields to active startup preparation');
     player = {
       controllers: {
         inspect: () => [], sample: () => [],
@@ -210,10 +221,18 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
       getState: () => mockState,
       focus() { trace.push('focus'); },
       activateAudio() { trace.push('audio-activate'); return behavior.activateAudio?.() ?? Promise.resolve(); },
-      importDisc(file) {
-        trace.push(['import', file.name]);
-        const complete = () => { mockState = {...idle, canStart: true, canUnload: true}; stateCallback(mockState); };
-        const imported = behavior.importDisc ? behavior.importDisc(file) : Promise.resolve();
+      openDiscSession(file) {
+        trace.push(['open-session-through-runtime', file.name]);
+        return testOpenNativeGameDiscSession(file);
+      },
+      importDisc(file, options = {}) {
+        trace.push(['import', file.name, options.preopenedSession]);
+        const complete = () => {
+          mockState = {...mockState, state: 'prepared', canImport: true,
+            canStart: mockState.graphicsReady, canUnload: true, loading: null};
+          stateCallback(mockState);
+        };
+        const imported = behavior.importDisc ? behavior.importDisc(file, options) : Promise.resolve();
         return Promise.resolve(imported).then(complete);
       },
       start() {
@@ -225,6 +244,7 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
       },
       destroy() { trace.push('destroy'); return Promise.resolve({requiresReload: true}); },
     };
+    options.onOwner?.({handle: player});
     return player;
   };
 
@@ -235,6 +255,13 @@ async function runScenario({name, failStartup = false, behavior = {}}) {
       trace,
       settingsOptions,
       stateCallback,
+      getMockState: () => mockState,
+      failRuntime(error) {
+        mockState = {...mockState, state: 'error', ready: false, requiresReload: true,
+          canImport: false, canStart: false, loading: null, message: error.message};
+        stateCallback(mockState);
+        errorCallback(error);
+      },
       nativeMainCalled,
       audioCreated,
       player,
@@ -266,14 +293,16 @@ try {
 
 async function selectThroughShell(scenario, file = {name: 'owned.iso'}) {
   globalThis.testClickTrace = scenario.trace;
+  const input = scenario.document.getElementById('disc-file');
+  const before = input.clickCount;
   scenario.document.getElementById('choose-disc').click();
   assert.equal(scenario.document.getElementById('disc-dialog').open, true,
     'Disc opens the disclosure before the file picker');
   scenario.document.getElementById('disc-choose-file').click();
-  const input = scenario.document.getElementById('disc-file');
-  assert.equal(input.clickCount, 1, 'Choose file opens the picker with no checkbox gate');
+  assert.equal(input.clickCount, before + 1, 'Choose file opens the picker with no checkbox gate');
   input.files = [file];
-  return input.onchange();
+  await input.onchange();
+  await new Promise(resolve => setTimeout(resolve, 0));
 }
 
 const cancellation = await runScenario({name: 'picker-cancellation'});
@@ -296,6 +325,13 @@ try {
   await selectThroughShell(flow);
   assert.equal(flow.trace.filter(row => row === 'start').length, 1,
     'A successfully prepared selection automatically starts exactly once');
+  assert.equal(flow.trace.filter(row => Array.isArray(row) && row[0] === 'validate').length, 1,
+    'The selected File is validated once before native import');
+  assert.equal(flow.trace.filter(row => Array.isArray(row) && row[0] === 'open-session-through-runtime').length, 1,
+    'Profile-specific preopening goes through the runtime handle');
+  assert.equal(flow.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, 1);
+  assert.ok(flow.trace.find(row => Array.isArray(row) && row[0] === 'import')[2],
+    'The validated session is adopted instead of reopening the selected File');
   assert(flow.trace.indexOf('audio-activate') < flow.trace.indexOf('disc-file'),
     'Audio activation starts during the Choose file gesture before opening the native picker');
   assert(flow.document.getElementById('start-game').disabled,
@@ -303,6 +339,106 @@ try {
   const importCount = flow.trace.filter(row => Array.isArray(row) && row[0] === 'import').length;
   assert.equal(flow.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, importCount);
 } finally { delete globalThis.testClickTrace; restoreFlow(); }
+
+const earlySelection = await runScenario({name: 'selection-before-native-readiness', behavior: {graphicsPending: true}});
+const restoreEarlySelection = installGlobals(earlySelection.document);
+try {
+  await selectThroughShell(earlySelection, {name: 'early.iso'});
+  const status = earlySelection.document.getElementById('disc-selection-status');
+  assert.equal(status.hidden, false, 'The selected File remains acknowledged while graphics are preparing');
+  assert.match(status.textContent, /early\.iso/);
+  assert.match(status.textContent, /waiting for graphics/);
+  assert.equal(earlySelection.trace.filter(row => Array.isArray(row) && row[0] === 'validate').length, 1,
+    'Disc validation may run before native import readiness');
+  assert.equal(earlySelection.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, 0,
+    'A prevalidated File is retained without importing into the unready native owner');
+  assert.equal(earlySelection.trace.filter(row => row === 'start').length, 0);
+
+  const graphicsStillPending = {...earlySelection.getMockState(), canImport: true, graphicsReady: false, canStart: false};
+  earlySelection.stateCallback(graphicsStillPending);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const importRow = earlySelection.trace.find(row => Array.isArray(row) && row[0] === 'import');
+  assert.ok(importRow, 'Native import begins when its own readiness gate opens, before graphics finish');
+  assert.ok(importRow[2], 'Early native import adopts the already validated session');
+  assert.equal(earlySelection.trace.filter(row => row === 'start').length, 0,
+    'Import completion waits at the graphics readiness barrier');
+  earlySelection.stateCallback({...earlySelection.getMockState(), canImport: true, graphicsReady: true, canStart: true});
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(earlySelection.trace.filter(row => row === 'start').length, 1,
+    'Late graphics readiness releases exactly one automatic launch');
+} finally { delete globalThis.testClickTrace; restoreEarlySelection(); }
+
+const invalidRecovery = await runScenario({name: 'invalid-file-recovery'});
+const restoreInvalidRecovery = installGlobals(invalidRecovery.document);
+try {
+  await selectThroughShell(invalidRecovery, {name: 'bad.rvz', invalid: true});
+  assert.equal(invalidRecovery.document.getElementById('error-dialog').open, true);
+  assert.equal(invalidRecovery.document.getElementById('disc-selection-status').hidden, false);
+  assert.match(invalidRecovery.document.getElementById('disc-selection-status').textContent, /Invalid disc/);
+  assert.equal(invalidRecovery.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, 0);
+  await selectThroughShell(invalidRecovery, {name: 'recovered.iso'});
+  assert.equal(invalidRecovery.document.getElementById('error-dialog').open, false,
+    'Choosing another File clears the previous validation error');
+  assert.equal(invalidRecovery.trace.filter(row => row === 'start').length, 1);
+} finally { delete globalThis.testClickTrace; restoreInvalidRecovery(); }
+
+let finishValidationDuringFailure;
+let validationStarted = false;
+const initializationFailure = await runScenario({name: 'initialization-failure-during-validation', behavior: {
+  graphicsPending: true,
+  validateDisc: () => new Promise(resolve => {
+    validationStarted = true;
+    finishValidationDuringFailure = resolve;
+  }),
+}});
+const restoreInitializationFailure = installGlobals(initializationFailure.document);
+try {
+  const input = initializationFailure.document.getElementById('disc-file');
+  input.files = [{name: 'pending-valid-disc.iso'}];
+  const selectionValidation = input.onchange();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(validationStarted, true);
+  initializationFailure.failRuntime(Error('Graphics initialization failed'));
+  finishValidationDuringFailure();
+  await selectionValidation;
+  const status = initializationFailure.document.getElementById('disc-selection-status');
+  assert.equal(status.hidden, false, 'The selected File remains acknowledged after initialization failure');
+  assert.match(status.textContent, /Validation stopped pending-valid-disc\.iso/);
+  assert.doesNotMatch(status.textContent, /Invalid disc/,
+    'A runtime failure must not be reported as invalid disc data');
+  assert.equal(initializationFailure.document.getElementById('error').textContent,
+    'Graphics initialization failed');
+  assert.equal(initializationFailure.document.getElementById('retry').hidden, false,
+    'The initialization failure keeps the reload recovery action visible');
+  assert.equal(initializationFailure.trace.filter(row => Array.isArray(row) && row[0] === 'close-session').length, 1,
+    'A session finishing after the runtime failure closes exactly once');
+  assert.equal(initializationFailure.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, 0);
+  assert.equal(initializationFailure.trace.filter(row => row === 'start').length, 0);
+} finally { restoreInitializationFailure(); }
+
+let finishFirstValidation;
+const replacement = await runScenario({name: 'replacement-during-validation', behavior: {
+  validateDisc: file => file.name === 'first.iso' ? new Promise(resolve => { finishFirstValidation = resolve; }) : Promise.resolve(),
+}});
+const restoreReplacement = installGlobals(replacement.document);
+try {
+  globalThis.testClickTrace = replacement.trace;
+  const input = replacement.document.getElementById('disc-file');
+  input.files = [{name: 'first.iso'}];
+  const first = input.onchange();
+  input.files = [{name: 'replacement.iso'}];
+  const second = input.onchange();
+  await second;
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(replacement.trace.filter(row => row === 'start').length, 1,
+    'A replacement selection can finish while older file validation is pending');
+  finishFirstValidation();
+  await first;
+  assert.ok(replacement.trace.some(row => Array.isArray(row) && row[0] === 'close-session' && row[1] === 'first.iso'),
+    'A stale validation result closes its newly opened file session');
+  assert.equal(replacement.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, 1,
+    'Only the current selection reaches native import');
+} finally { delete globalThis.testClickTrace; restoreReplacement(); }
 
 const preparationFailure = await runScenario({name: 'preparation-failure', behavior: {
   importDisc: async () => { throw Error('Native asset preparation failed'); },
@@ -377,4 +513,4 @@ assert.equal(failedDocument.getElementById('error-dialog').open, true);
 assert.equal(failedDocument.getElementById('retry').hidden, false);
 assert.equal(failedDocument.getElementById('error').textContent, 'cache directory denied');
 assert.equal(failed.audioCreated, 0);
-console.log('Public player shell: shared owner startup, acknowledgement-free disclosure, automatic launch, cancellation, preparation failure and stale-selection guards pass.');
+console.log('Public player shell: legal disclosure, pre-readiness file validation, readiness-gated import/autoplay, invalid retry, replacement, cancellation, audio recovery and stale-selection guards pass.');
