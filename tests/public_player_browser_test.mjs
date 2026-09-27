@@ -202,15 +202,41 @@ try {
   assert.equal(response.headers()['cross-origin-embedder-policy'], 'require-corp');
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await page.locator('#loading-panel').waitFor({state: 'visible', timeout: 30000});
-  await check('disc validation is available before graphics readiness', async () => {
+  await check('disc selection during graphics preparation', async () => {
     assert(await page.locator('#choose-disc').isEnabled(), 'Selection stays available while startup is busy');
-    await selectDisc({name: 'early-invalid.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
-    await page.locator('#error-dialog[open]').waitFor();
-    assert.match(await page.locator('#error').innerText(), /RVZ is not supported/);
-    assert(await page.locator('#disc-selection-status').isHidden(), 'Validation errors do not occupy the toolbar');
-    assert.equal(await page.locator('#disc-selection-status').textContent(), '');
-    report.early_disc_validation = 'A file was selected and rejected while the full graphics loading panel was still visible; no import or launch occurred.';
-    await page.reload();
+    if (values.disc) {
+      await armAudioActivationObserver();
+      await selectDisc(values.disc);
+      await page.waitForFunction(() => {
+        const status = document.querySelector('#disc-selection-status');
+        return !status.hidden && /checking|waiting for graphics|preparing/i.test(status.textContent);
+      }, null, {timeout: 15000});
+      assert(await page.locator('#loading-panel').isVisible(), 'The valid disc is acknowledged while graphics are preparing');
+      const acknowledgement = await page.locator('#disc-selection-status').innerText();
+      assert(acknowledgement.includes(path.basename(values.disc)), 'The temporary acknowledgement identifies the selected file');
+      await armLaunchObserver();
+      const audioRecovery = await waitForCssOrAudioRecovery();
+      if (audioRecovery) report.early_audio_activation_recovery = 'Browser required a separate Play gesture after graphics preparation.';
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 1,
+        'A valid disc selected during graphics preparation auto-launches exactly once');
+      assert.equal(await page.evaluate(() => Module._melee_web_native_menu_phase()), 1);
+      assert(await page.locator('#loading-panel').isHidden());
+      assert(await page.locator('#disc-selection-status').isHidden(), 'The filename clears as CSS starts');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
+      await shot('css-after-early-selection');
+      report.early_disc_validation = `A valid file (${path.basename(values.disc)}) was selected while graphics preparation was visible; its acknowledgement cleared at CSS and native launch ran once.`;
+      await driver.unload();
+      assert(await page.locator('#disc-selection-status').isHidden(), 'Eject and reload leave no disc acknowledgement');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
+    } else {
+      await selectDisc({name: 'early-invalid.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
+      await page.locator('#error-dialog[open]').waitFor();
+      assert.match(await page.locator('#error').innerText(), /RVZ is not supported/);
+      assert(await page.locator('#disc-selection-status').isHidden(), 'Validation errors do not occupy the toolbar');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
+      report.early_disc_validation = 'A file was selected and rejected while the full graphics loading panel was still visible; no import or launch occurred.';
+      await page.reload();
+    }
   });
   await ready();
   await check('isolated WebGPU/Wasm startup and direct original-style player', async () => {
@@ -423,6 +449,10 @@ try {
       assert.doesNotMatch(await page.locator('#toolbar-meta').innerText(), /Playing\s+.+/,
         'The toolbar has no post-start filename/status narration');
       await shot('css-after-import');
+      await page.locator('#controls-open').click();
+      await page.locator('#player-one-source').selectOption('touch');
+      await page.locator('#controls-close').click();
+      await page.locator('#touch-controls:not([hidden])').waitFor();
       for (const [name, width, height] of [['portrait-gameplay', 390, 844], ['landscape-gameplay', 844, 390]]) {
         await page.setViewportSize({width, height});
         await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -431,20 +461,40 @@ try {
             const {left, top, right, bottom, width, height} = document.querySelector(selector).getBoundingClientRect();
             return {left, top, right, bottom, width, height};
           };
+          const targets = [...document.querySelectorAll('#touch-controls [data-touch-button], #touch-controls [data-touch-stick]')];
+          const actionButtons = [...document.querySelectorAll('#toolbar-actions > button')]
+            .filter(button => !button.hidden && getComputedStyle(button).display !== 'none');
+          const buttonRects = actionButtons.map(button => {
+            const {left, top, right, bottom} = button.getBoundingClientRect();
+            return {left, top, right, bottom};
+          });
+          const buttonsOverlap = buttonRects.some((a, index) => buttonRects.slice(index + 1).some(b =>
+            a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1));
           return {toolbar: rect('#toolbar'), runtime: rect('#runtime-host'), canvas: rect('#canvas'), overlay: rect('#touch-controls'),
-            overlayHidden: document.querySelector('#touch-controls').hidden, pageWidth: document.documentElement.scrollWidth};
+            buttonsOverlap,
+            targets: targets.map(element => {
+              const r = element.getBoundingClientRect();
+              const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+              return {visible: r.width > 0 && r.height > 0, reachable: hit === element || element.contains(hit)};
+            }),
+            pageWidth: document.documentElement.scrollWidth};
         });
         assert(geometry.pageWidth <= width, `${name} toolbar does not overflow the viewport`);
+        assert(!geometry.buttonsOverlap, `${name} toolbar buttons wrap without overlap`);
         assert(geometry.runtime.bottom <= geometry.toolbar.top + 1, `${name} toolbar stays below the game area`);
         assert(Math.abs(geometry.canvas.width / geometry.canvas.height - 4 / 3) < 0.01,
           `${name} keeps the original 4:3 game presentation`);
-        if (!geometry.overlayHidden) {
-          assert(geometry.overlay.left >= geometry.runtime.left && geometry.overlay.right <= geometry.runtime.right &&
-            geometry.overlay.top >= geometry.runtime.top && geometry.overlay.bottom <= geometry.runtime.bottom,
-          `${name} touch controls stay inside the game area`);
-        }
+        assert(geometry.overlay.left >= geometry.runtime.left && geometry.overlay.right <= geometry.runtime.right &&
+          geometry.overlay.top >= geometry.runtime.top && geometry.overlay.bottom <= geometry.runtime.bottom,
+        `${name} touch controls stay inside the game area`);
+        assert(geometry.targets.length > 0 && geometry.targets.every(target => target.visible && target.reachable),
+          `${name} touch controls remain visible and hit-test reachable during CSS`);
         await shot(name);
       }
+      await page.locator('#controls-open').click();
+      await page.locator('#player-one-source').selectOption('keyboard');
+      await page.locator('#controls-close').click();
+      await page.waitForFunction(() => document.querySelector('#touch-controls').hidden);
       await page.setViewportSize({width: 1280, height: 960});
       report.css_after_import = await page.evaluate(() => ({
         phase: Module._melee_web_native_menu_phase(),
@@ -470,6 +520,8 @@ try {
       await page.locator('#pause-game').click();
       await page.waitForFunction(() => Module._melee_web_native_menu_running());
       await page.locator('#pause-game:not([disabled])').waitFor();
+      assert(await page.locator('#disc-selection-status').isHidden(), 'Resume does not restore the disc filename');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
     });
     await check('ordinary B0XX keyboard enters original SSS and cancels back to CSS', async () => {
       await page.waitForTimeout(1200); await press('7'); await phase(3);
@@ -517,6 +569,15 @@ try {
         report[`${label}_audio_activation_recovery`] = 'A separate Play gesture was required after Eject/reimport.';
       assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 1,
         'A fresh document launches its selected disc once');
+      assert(await page.locator('#disc-selection-status').isHidden(), 'Reimport clears its filename after start');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
+      await shot('css-after-reselection');
+      report.css_after_reselection = await page.evaluate(() => ({
+        phase: Module._melee_web_native_menu_phase(),
+        running: Module._melee_web_native_menu_running(),
+        launch_calls: window.nativeLaunchCalls,
+        loading_hidden: document.querySelector('#loading-panel').hidden,
+      }));
       assert.equal(await page.evaluate(() => Module._melee_web_native_menu_phase()), 1,
         'Owned-disc reimport must start directly in original CSS');
       assert(await page.locator('#loading-panel').isHidden());
