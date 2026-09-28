@@ -461,6 +461,16 @@ try {
       'Successful disc and graphics readiness must invoke the original CSS launch exactly once');
     report.launchesAtCss = afterCssAssets.launchCalls;
     if (values['async-inflight'] !== undefined) {
+      const lookupCheck = await page.evaluate(() => {
+        const results = window.__meleeWebAsyncPipelineTestResults;
+        const completed = results?.events?.find(event => event.event === 1);
+        const lookup = Module._melee_web_async_pipeline_test_lookup_completed;
+        if (!completed || typeof lookup !== 'function') return null;
+        return {type: completed.type, hashLow: completed.hashLow, hashHigh: completed.hashHigh,
+          result: lookup(completed.type, completed.hashLow)};
+      });
+      assert.equal(lookupCheck?.result, 1,
+        'Aurora did not retrieve the exact completed pipeline as ready and not pending');
       const preparation = await page.evaluate(() => window.__meleeWebAsyncPipelineTestResults || null);
       assert(preparation, 'Async pipeline preparation diagnostics are unavailable');
       const events = preparation.events || [];
@@ -473,8 +483,23 @@ try {
       assert.equal(failed.length, 0, 'A graphics pipeline failed during startup');
       assert.equal(new Set(submitted).size, submitted.length, 'Duplicate cache identity submitted');
       assert.deepEqual([...completed].sort(), [...submitted].sort(), 'A completion did not preserve its exact cache identity');
+      const successfulEvents = events.filter(event => event.event === 1);
+      assert(successfulEvents.every(event => event.pendingBeforeSettlement === true &&
+        event.readyBeforeSettlement === false && event.pendingAfterSettlement === false &&
+        event.readyAfterSettlement === true),
+      'A successful completion did not atomically move its identity from pending to ready');
       assert.equal(preparation.pendingPipelineLookupCount, 0,
         'CSS startup queried a pipeline while it was still pending');
+      const successfulHashLows = new Set(successfulEvents.map(event => event.hashLow));
+      const completedPipelineLookups = (preparation.readyLookups || []).filter(lookup =>
+        lookup.readyAtLookup === true && lookup.pendingAtLookup === false &&
+        successfulHashLows.has(lookup.hashLow));
+      assert(completedPipelineLookups.length > 0,
+        'No successfully completed async identity was looked up by Aurora after completion');
+      assert((preparation.lookupChecks || []).some(check => check.type === lookupCheck.type &&
+        check.hashLow === lookupCheck.hashLow && check.lookupReady === true && check.ready === true &&
+        check.pending === false && check.ownerInitialized === true && lookupCheck.hashHigh === 0),
+      'Actual Aurora lookup did not preserve the completed identity and clear pending state');
       report.async_pipeline_preparation = {
         selected: preparation.selected,
         submitted: submitted.length,
@@ -482,6 +507,10 @@ try {
         failed: failed.length,
         peakInFlight: preparation.peakInFlight,
         pendingPipelineLookupCount: preparation.pendingPipelineLookupCount,
+        completedPipelineLookupCount: completedPipelineLookups.length,
+        completedPipelineLookupCheckCount: (preparation.lookupChecks || []).filter(check =>
+          successfulEvents.some(event => event.type === check.type && event.hashLow === check.hashLow) &&
+          check.lookupReady === true && check.ready === true && check.pending === false).length,
         identitiesSettleExactlyOnce: true,
       };
     }
@@ -554,9 +583,9 @@ try {
 
   await check('ordinary B0XX pause and No Contest return through original CSS with audio', async () => {
     const before = await trace();
-    // Phase 7 begins the source Ready countdown; let that bounded entry state
-    // finish before sending Start so the original match can accept the chord.
-    await page.waitForTimeout(5000);
+    // Phase 7 begins the source Ready countdown. Allow its observed eight-second
+    // window to finish before sending Start so the source accepts the chord.
+    await page.waitForTimeout(9000);
     // Source pause keeps the native loop running, so the outer player toolbar
     // still says Pause. Allow its input lockout to settle before the chord.
     await press('7');

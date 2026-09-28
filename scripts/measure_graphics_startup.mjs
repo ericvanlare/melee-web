@@ -506,6 +506,23 @@ function timedEvents(probe) {
   const asyncCompleted = asyncRequests.filter(event => event.status !== 'pending' &&
     (graphicsReady === null || event.completionAt <= graphicsReady));
   const asyncTestEvents = probe.asyncTestResults?.events || [];
+  const successfulAsyncEvents = asyncTestEvents.filter(event => event.event === 1);
+  const failedAsyncEvents = asyncTestEvents.filter(event => event.event === 2);
+  const stateTransitionMatches = successfulAsyncEvents.every(event =>
+    event.pendingBeforeSettlement === true && event.readyBeforeSettlement === false &&
+    event.pendingAfterSettlement === false && event.readyAfterSettlement === true) &&
+    failedAsyncEvents.every(event => event.pendingBeforeSettlement === true &&
+      event.readyBeforeSettlement === false && event.pendingAfterSettlement === false &&
+      event.readyAfterSettlement === false);
+  const readyLookups = probe.asyncTestResults?.readyLookups || [];
+  const lookupChecks = probe.asyncTestResults?.lookupChecks || [];
+  const successfulHashLows = new Set(successfulAsyncEvents.map(event => event.hashLow));
+  const completedPipelineLookups = readyLookups.filter(lookup => lookup.readyAtLookup === true &&
+    lookup.pendingAtLookup === false && successfulHashLows.has(lookup.hashLow));
+  const completedPipelineLookupChecks = lookupChecks.filter(check => check.lookupReady === true &&
+    check.ready === true && check.pending === false && check.ownerInitialized === true &&
+    successfulAsyncEvents.some(event => event.type === check.type && event.hashHigh === 0 &&
+      event.hashLow === check.hashLow));
   const submittedIdentity = event => `${event.type}:${event.hashHigh}:${event.hashLow}`;
   const asyncSubmittedIds = asyncTestEvents.filter(event => event.event === 0).map(submittedIdentity);
   const asyncSettledIds = asyncTestEvents.filter(event => event.event === 1 || event.event === 2).map(submittedIdentity);
@@ -552,6 +569,11 @@ function timedEvents(probe) {
         failed: asyncTestEvents.filter(event => event.event === 2).length,
         peakInFlight: probe.asyncTestResults?.peakInFlight || 0,
         pendingPipelineLookupCount: probe.asyncTestResults?.pendingPipelineLookupCount || 0,
+        readyLookupCount: readyLookups.length,
+        completedPipelineLookupCount: completedPipelineLookups.length,
+        lookupCheckCount: lookupChecks.length,
+        completedPipelineLookupCheckCount: completedPipelineLookupChecks.length,
+        completionStateTransitionsValid: stateTransitionMatches,
         identitiesSettleExactlyOnce: asyncIdentitySettlementsMatch,
         duplicateSubmissionIdentities: submittedCounts.size !== asyncSubmittedIds.length,
       },
@@ -742,6 +764,17 @@ async function runAttempt(browser, context, index, warmup = false) {
       }
       await driver.waitForPublicCss();
     }
+    if (values['async-mode'] && !values['async-test-retire-owner']) {
+      const lookupCheck = await page.evaluate(() => {
+        const results = window.__meleeWebAsyncPipelineTestResults;
+        const completed = results?.events?.find(event => event.event === 1);
+        const lookup = Module._melee_web_async_pipeline_test_lookup_completed;
+        if (!completed || typeof lookup !== 'function') return null;
+        return {type: completed.type, hashLow: completed.hashLow, result: lookup(completed.type, completed.hashLow)};
+      });
+      assert.equal(lookupCheck?.result, 1,
+        'Aurora did not retrieve the exact completed pipeline as ready and not pending');
+    }
     const pageMetrics = await page.evaluate(() => {
       const probe = window.__graphicsStartupProbe.snapshot();
       const resources = performance.getEntriesByType('resource').map(entry => ({
@@ -789,6 +822,12 @@ async function runAttempt(browser, context, index, warmup = false) {
           'The native async creation cap was exceeded');
         assert.equal(asyncPrep.asyncOwnership.pendingPipelineLookupCount, 0,
           'Renderer requested a pending pipeline before readiness; drawing would have been skipped');
+        assert.equal(asyncPrep.asyncOwnership.completionStateTransitionsValid, true,
+          'Async completion did not atomically transition pending to ready (or clear failure state)');
+        assert(asyncPrep.asyncOwnership.completedPipelineLookupCount > 0,
+          'No completed async pipeline was subsequently looked up through Aurora');
+        assert(asyncPrep.asyncOwnership.completedPipelineLookupCheckCount > 0,
+          'The actual Aurora lookup did not report the completed cache identity as ready and not pending');
         assert.equal(asyncPrep.asyncOwnership.submitted,
           asyncPrep.asyncOwnership.completed + asyncPrep.asyncOwnership.failed,
           'A native async submission did not settle before the graphics barrier');

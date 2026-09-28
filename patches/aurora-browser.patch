@@ -1633,7 +1633,7 @@ index d50ce6a..8f7ded5 100644
    std::deque<TextureCopy> textureCopies;
    std::deque<EncoderTask> encoderTasks;
 diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
-index bff9b47..c497c15 100644
+index bff9b47..f5196e3 100644
 --- a/lib/gfx/pipeline_cache.cpp
 +++ b/lib/gfx/pipeline_cache.cpp
 @@ -1,10 +1,20 @@
@@ -1733,7 +1733,7 @@ index bff9b47..c497c15 100644
  struct SdlVfsSqliteFile {
    sqlite3_file base;
    SDL_IOStream* io = nullptr;
-@@ -80,14 +131,83 @@ static std::atomic_bool g_gpuCachePrunePending = false;
+@@ -80,14 +131,85 @@ static std::atomic_bool g_gpuCachePrunePending = false;
  static sqlite3* g_pipelineCacheDb = nullptr;
  static sqlite3_stmt* g_pipelineCacheLoadStmt = nullptr;
  static sqlite3_stmt* g_pipelineCacheUpsertStmt = nullptr;
@@ -1755,6 +1755,8 @@ index bff9b47..c497c15 100644
 +static uint32_t g_asyncTestInFlight = 0;
 +static uint32_t g_asyncTestPeakInFlight = 0;
 +static uint32_t g_asyncTestPendingLookups = 0;
++static absl::flat_hash_map<PipelineRef, ShaderType> g_asyncTestSelectedPipelineTypes;
++static absl::flat_hash_set<PipelineRef> g_asyncTestReadyLookupRefs;
 +static bool g_asyncPumpScheduled = false;
 +static bool g_asyncTestRetireOwnerOnFirstCompletion = false;
 +struct AsyncTestRetiredCompletion {
@@ -1819,7 +1821,7 @@ index bff9b47..c497c15 100644
  static SdlVfsSqliteFile* sdl_vfs_file(sqlite3_file* file) { return reinterpret_cast<SdlVfsSqliteFile*>(file); }
  
  static sqlite3_vfs* default_vfs(sqlite3_vfs* vfs) { return static_cast<sqlite3_vfs*>(vfs->pAppData); }
-@@ -357,7 +477,13 @@ static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
+@@ -357,7 +479,13 @@ static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
  
    {
      std::lock_guard lock{g_pipelineCacheWriterMutex};
@@ -1834,7 +1836,7 @@ index bff9b47..c497c15 100644
    }
    g_pipelineCacheWriterCv.notify_one();
  }
-@@ -418,46 +544,488 @@ static std::optional<PendingPipeline> take_pending_pipeline(PipelineRef hash) {
+@@ -418,46 +546,510 @@ static std::optional<PendingPipeline> take_pending_pipeline(PipelineRef hash) {
    return std::nullopt;
  }
  
@@ -1863,9 +1865,9 @@ index bff9b47..c497c15 100644
 +    selective_refresh_status_locked();
 +  }
 +#endif
-   g_pipelineReadyCv.notify_all();
- }
- 
++  g_pipelineReadyCv.notify_all();
++}
++
 +#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
 +static void schedule_async_pipeline_pump();
 +static void async_pipeline_pump();
@@ -1917,6 +1919,8 @@ index bff9b47..c497c15 100644
 +  g_asyncTestInFlight = 0;
 +  g_asyncTestPeakInFlight = 0;
 +  g_asyncTestPendingLookups = 0;
++  g_asyncTestSelectedPipelineTypes.clear();
++  g_asyncTestReadyLookupRefs.clear();
 +  g_asyncPumpScheduled = false;
 +  g_pipelineCreationError = false;
 +  EM_ASM({
@@ -1927,6 +1931,8 @@ index bff9b47..c497c15 100644
 +      report.events = [];
 +      report.peakInFlight = 0;
 +      report.pendingPipelineLookupCount = 0;
++      report.readyLookups = [];
++      report.lookupChecks = [];
 +      window.__meleeWebAsyncPipelineTestResults = report;
 +    }
 +  }, g_asyncTestMode == 2 ? "all" : g_asyncTestMode == 1 ? "one" : "disabled", g_asyncTestLimit);
@@ -1946,13 +1952,20 @@ index bff9b47..c497c15 100644
 +  if (!valid && error.empty()) {
 +    error = "WebGPU returned an empty render pipeline without an error message";
 +  }
++  bool pendingBeforeSettlement = false;
++  bool readyBeforeSettlement = false;
++  bool pendingAfterSettlement = false;
++  bool readyAfterSettlement = false;
 +  {
 +    std::lock_guard guard{g_pipelineMutex};
 +    if (!g_pipelineCacheInitialized || generation != g_pipelineCacheGeneration.load(std::memory_order_relaxed)) {
 +      return;
 +    }
++    pendingBeforeSettlement = g_pendingPipelines.contains(hash);
++    readyBeforeSettlement = g_pipelines.contains(hash);
 +    if (valid) {
 +      g_pipelines.try_emplace(hash, CachedPipeline{.pipeline = std::move(pipeline), .firstFrameUsed = firstFrameUsed});
++      g_pendingPipelines.erase(hash);
 +    } else {
 +      g_pipelineCreationError.store(true, std::memory_order_release);
 +      g_pendingPipelines.erase(hash);
@@ -1972,6 +1985,8 @@ index bff9b47..c497c15 100644
 +        queuedPipelines -= canceled;
 +      }
 +    }
++    pendingAfterSettlement = g_pendingPipelines.contains(hash);
++    readyAfterSettlement = g_pipelines.contains(hash);
 +    if (g_asyncTestInFlight > 0) {
 +      --g_asyncTestInFlight;
 +    }
@@ -1981,8 +1996,17 @@ index bff9b47..c497c15 100644
 +                          error.c_str());
 +  EM_ASM({
 +    const report = window.__meleeWebAsyncPipelineTestResults;
-+    if (report) report.events[report.events.length - 1].submissionToCompletionMs = $0;
-+  }, completionMs);
++    if (report) {
++      const event = report.events[report.events.length - 1];
++      event.submissionToCompletionMs = $0;
++      event.pendingBeforeSettlement = $1 !== 0;
++      event.readyBeforeSettlement = $2 !== 0;
++      event.pendingAfterSettlement = $3 !== 0;
++      event.readyAfterSettlement = $4 !== 0;
++    }
++  }, completionMs, static_cast<uint32_t>(pendingBeforeSettlement),
++     static_cast<uint32_t>(readyBeforeSettlement), static_cast<uint32_t>(pendingAfterSettlement),
++     static_cast<uint32_t>(readyAfterSettlement));
 +  notify_pipeline_ready(true, valid);
 +  schedule_async_pipeline_pump();
 +}
@@ -2143,9 +2167,9 @@ index bff9b47..c497c15 100644
 +  g_selectivePrepareStatus.ready = 0;
 +  ++g_selectivePrepareStatus.error_count;
 +  g_selectivePrepareStatus.state = AURORA_PIPELINE_PREPARE_ERROR;
-+  g_pipelineReadyCv.notify_all();
-+}
-+
+   g_pipelineReadyCv.notify_all();
+ }
+ 
 +static void selective_refresh_status_locked() noexcept {
 +  if (!g_selectivePipelineMode || !g_selectivePipelineActive) {
 +    return;
@@ -2328,7 +2352,7 @@ index bff9b47..c497c15 100644
        if (blocking && !g_hasPipelineThread) {
          auto pending = take_pending_pipeline(hash);
          if (pending) {
-@@ -467,12 +1035,21 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -467,12 +1059,21 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
                cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
              }
            }
@@ -2356,7 +2380,7 @@ index bff9b47..c497c15 100644
            createdPipeline = true;
            queued = true;
          }
-@@ -488,22 +1065,66 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -488,22 +1089,67 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
          }
          notifyWorker = priority != PipelinePriority::Background;
        }
@@ -2385,6 +2409,7 @@ index bff9b47..c497c15 100644
 +      };
 +      g_backgroundPipelineQueue.emplace_back(std::move(pending));
 +      g_pendingPipelines.insert(hash);
++      g_asyncTestSelectedPipelineTypes.insert_or_assign(hash, type);
 +      ++queuedPipelines;
 +      scheduleAsyncPump = true;
 +      EM_ASM({
@@ -2433,7 +2458,7 @@ index bff9b47..c497c15 100644
        };
        switch (priority) {
        case PipelinePriority::Background:
-@@ -531,16 +1152,42 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -531,16 +1177,42 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
    }
  
    if (createdPipeline) {
@@ -2477,7 +2502,7 @@ index bff9b47..c497c15 100644
      auto pipelineIt = g_pipelines.find(hash);
      if (pipelineIt != g_pipelines.end() && persist && firstFrameUsed < pipelineIt->second.firstFrameUsed) {
        pipelineIt->second.firstFrameUsed = firstFrameUsed;
-@@ -620,6 +1267,219 @@ static sqlite3* open_pipeline_cache_seed_db(const std::string& path) {
+@@ -620,6 +1292,219 @@ static sqlite3* open_pipeline_cache_seed_db(const std::string& path) {
    return seedDb;
  }
  
@@ -2697,7 +2722,7 @@ index bff9b47..c497c15 100644
  static void seed_pipeline_cache() {
    if (g_pipelineCacheBroken || g_pipelineCacheDb == nullptr || g_pipelineCacheUpsertStmt == nullptr) {
      return;
-@@ -703,7 +1563,7 @@ static void seed_pipeline_cache() {
+@@ -703,7 +1588,7 @@ static void seed_pipeline_cache() {
      }
  
      if (!writeFailed && !readFailed) {
@@ -2706,7 +2731,7 @@ index bff9b47..c497c15 100644
      }
    }
  
-@@ -792,7 +1652,7 @@ INSERT INTO aurora_schema VALUES ({});)",
+@@ -792,7 +1677,7 @@ INSERT INTO aurora_schema VALUES ({});)",
      }
  
      if (!schemaFailed) {
@@ -2715,7 +2740,7 @@ index bff9b47..c497c15 100644
      }
    }
  
-@@ -925,15 +1785,22 @@ static void pipeline_cache_writer() {
+@@ -925,15 +1810,22 @@ static void pipeline_cache_writer() {
  #endif
  
    while (true) {
@@ -2742,7 +2767,7 @@ index bff9b47..c497c15 100644
      }
  
      bool writeFailed = false;
-@@ -951,15 +1818,27 @@ static void pipeline_cache_writer() {
+@@ -951,15 +1843,27 @@ static void pipeline_cache_writer() {
          }
  
          if (!writeFailed) {
@@ -2771,7 +2796,7 @@ index bff9b47..c497c15 100644
    }
  }
  
-@@ -986,28 +1865,129 @@ static void pipeline_worker() {
+@@ -986,28 +1890,129 @@ static void pipeline_worker() {
          break;
        }
        auto& source = !g_pipelineQueue.empty() ? g_pipelineQueue : g_backgroundPipelineQueue;
@@ -2908,7 +2933,7 @@ index bff9b47..c497c15 100644
    if (!prepare_pipeline_cache_db()) {
      return 0;
    }
-@@ -1040,7 +2020,18 @@ static size_t load_pipeline_cache_entries(ShaderType type, uint32_t configVersio
+@@ -1040,7 +2045,18 @@ static size_t load_pipeline_cache_entries(ShaderType type, uint32_t configVersio
        continue;
      }
  
@@ -2927,7 +2952,7 @@ index bff9b47..c497c15 100644
      ++acceptedRows;
    }
  
-@@ -1066,25 +2057,104 @@ static size_t load_pipeline_cache() {
+@@ -1066,25 +2082,104 @@ static size_t load_pipeline_cache() {
    size_t acceptedRows = 0;
  #ifdef AURORA_ENABLE_RMLUI
    acceptedRows += load_pipeline_cache_entries<rmlui::PipelineConfig>(ShaderType::Rml, rmlui::RmlPipelineConfigVersion,
@@ -3035,7 +3060,7 @@ index bff9b47..c497c15 100644
    if (g_pipelineCacheWriterThread.joinable()) {
      {
        std::lock_guard lock{g_pipelineCacheWriterMutex};
-@@ -1096,7 +2166,11 @@ static void stop_pipeline_cache_writer() {
+@@ -1096,7 +2191,11 @@ static void stop_pipeline_cache_writer() {
      g_pipelineCacheWriterStop = false;
    }
  
@@ -3048,7 +3073,7 @@ index bff9b47..c497c15 100644
  }
  
  template <>
-@@ -1117,11 +2191,63 @@ PipelineRef find_pipeline(ShaderType type, const rmlui::PipelineConfig& config,
+@@ -1117,11 +2216,63 @@ PipelineRef find_pipeline(ShaderType type, const rmlui::PipelineConfig& config,
  #endif
  
  void initialize_pipeline_cache() {
@@ -3112,7 +3137,7 @@ index bff9b47..c497c15 100644
    if (webgpu::g_backendType == wgpu::BackendType::WebGPU) {
      g_hasPipelineThread = false;
    } else {
-@@ -1129,17 +2255,38 @@ void initialize_pipeline_cache() {
+@@ -1129,17 +2280,38 @@ void initialize_pipeline_cache() {
      g_pipelineThread = std::thread(pipeline_worker);
    }
  
@@ -3153,7 +3178,7 @@ index bff9b47..c497c15 100644
    if (g_hasPipelineThread) {
      g_pipelineThreadEnd = true;
      g_pipelineQueueCv.notify_all();
-@@ -1157,25 +2304,406 @@ void shutdown_pipeline_cache() {
+@@ -1157,25 +2329,454 @@ void shutdown_pipeline_cache() {
    g_pipelineQueue.clear();
    g_backgroundPipelineQueue.clear();
    g_pendingPipelines.clear();
@@ -3216,6 +3241,41 @@ index bff9b47..c497c15 100644
 +  return activeGeneration == retiredGeneration && settled.load(std::memory_order_acquire) &&
 +         !g_pipelines.contains(testHash) && !g_pendingPipelines.contains(testHash) &&
 +         queuedPipelines == queuedBefore && createdPipelines == createdBefore && g_pipelineCacheInitialized;
++}
++extern "C" EMSCRIPTEN_KEEPALIVE int melee_web_async_pipeline_test_lookup_completed(uint32_t type,
++                                                                                     uint32_t hashLow) {
++  if (!g_asyncTestEnabled) {
++    return 0;
++  }
++  const PipelineRef ref = static_cast<PipelineRef>(hashLow);
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    const auto selected = g_asyncTestSelectedPipelineTypes.find(ref);
++    if (selected == g_asyncTestSelectedPipelineTypes.end() || underlying(selected->second) != type) {
++      return 0;
++    }
++  }
++
++  wgpu::RenderPipeline pipeline;
++  const bool lookupReady = get_pipeline(ref, pipeline);
++  bool pending = false;
++  bool ready = false;
++  bool ownerInitialized = false;
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    pending = g_pendingPipelines.contains(ref);
++    ready = g_pipelines.contains(ref);
++    ownerInitialized = g_pipelineCacheInitialized;
++  }
++  const bool passed = ownerInitialized && lookupReady && static_cast<bool>(pipeline) && ready && !pending;
++  EM_ASM({
++    const report = window.__meleeWebAsyncPipelineTestResults;
++    if (report) report.lookupChecks.push({type: $0, hashLow: $1, lookupReady: $2 !== 0,
++                                         ready: $3 !== 0, pending: $4 !== 0,
++                                         ownerInitialized: $5 !== 0});
++  }, type, hashLow, static_cast<uint32_t>(lookupReady), static_cast<uint32_t>(ready),
++     static_cast<uint32_t>(pending), static_cast<uint32_t>(ownerInitialized));
++  return passed ? 1 : 0;
 +}
 +#endif
 +
@@ -3286,8 +3346,8 @@ index bff9b47..c497c15 100644
 +    pipeline_cache_writer();
 +  }
 +#endif
-+}
-+
+ }
+ 
 +extern "C" int aurora_pipeline_set_complete_draws(int enabled) {
 +  if (enabled != 0 && enabled != 1) {
 +    return 0;
@@ -3444,8 +3504,8 @@ index bff9b47..c497c15 100644
 +    }
 +  }
 +  return 1;
- }
- 
++}
++
 +extern "C" int aurora_prepare_pipeline_catalog() {
 +  std::vector<AuroraPipelineDescriptor> descriptors;
 +  {
@@ -3526,12 +3586,25 @@ index bff9b47..c497c15 100644
  bool get_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
    std::lock_guard guard{g_pipelineMutex};
 +#if defined(MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT)
-+  if (g_asyncTestEnabled && g_pendingPipelines.contains(ref)) {
-+    ++g_asyncTestPendingLookups;
-+    EM_ASM({
-+      const report = window.__meleeWebAsyncPipelineTestResults;
-+      if (report) report.pendingPipelineLookupCount = (report.pendingPipelineLookupCount || 0) + 1;
-+    });
++  if (g_asyncTestEnabled) {
++    const bool pending = g_pendingPipelines.contains(ref);
++    const auto ready = g_pipelines.find(ref);
++    const auto selected = g_asyncTestSelectedPipelineTypes.find(ref);
++    if (selected != g_asyncTestSelectedPipelineTypes.end() && ready != g_pipelines.end() &&
++        g_asyncTestReadyLookupRefs.insert(ref).second) {
++      EM_ASM({
++        const report = window.__meleeWebAsyncPipelineTestResults;
++        if (report) report.readyLookups.push({type: $0, hashLow: $1, readyAtLookup: true,
++                                             pendingAtLookup: $2 !== 0, at: performance.now()});
++      }, underlying(selected->second), static_cast<uint32_t>(ref), static_cast<uint32_t>(pending));
++    }
++    if (pending) {
++      ++g_asyncTestPendingLookups;
++      EM_ASM({
++        const report = window.__meleeWebAsyncPipelineTestResults;
++        if (report) report.pendingPipelineLookupCount = (report.pendingPipelineLookupCount || 0) + 1;
++      });
++    }
 +  }
 +#endif
 +#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
