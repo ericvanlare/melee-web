@@ -50,15 +50,25 @@ export async function loadBrowserTools(requested) {
 /**
  * Build the one shared launch policy for routine browser checks.
  * Headless is the safe default; a visible run requires an explicit headed:true
- * option. The resolved executable comes from resolveBrowserTools, so there is
+ * option. Speaker output stays muted even when headed; audible:true is a
+ * separate opt-in for an arranged listening session. Audio processing continues.
+ * The resolved executable comes from resolveBrowserTools, so there is
  * no fallback to another browser or to a visible launch after a failure.
  */
-export function browserLaunchOptions(browser, {headed=false,timeout}={}) {
+export function browserLaunchOptions(browser, {headed=false,audible=false,timeout}={}) {
+  if(typeof audible!=='boolean')throw TypeError('audible must be a boolean');
+  if(browser.ignoreDefaultArgs===true)throw TypeError('ignoreDefaultArgs must be an array, not true');
+  const args=(browser.args||[]).filter(arg=>arg!=='--mute-audio');
+  const ignored=(browser.ignoreDefaultArgs||[]).filter(arg=>arg!=='--mute-audio');
+  if(audible)ignored.push('--mute-audio');
+  else args.push('--mute-audio');
   if(typeof headed!=='boolean')throw TypeError('headed must be a boolean');
   if(timeout!==undefined&&(!Number.isInteger(timeout)||timeout<0))
     throw TypeError('timeout must be a non-negative integer');
   return {
     ...browser,
+    args,
+    ...(ignored.length?{ignoreDefaultArgs:ignored}:browser.ignoreDefaultArgs?{ignoreDefaultArgs:[]}:{}),
     headless:!headed,
     chromiumSandbox:true,
     ...(timeout===undefined?{}:{timeout}),
