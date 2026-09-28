@@ -32,6 +32,62 @@ remains independently bound to the preserved capture/recipe identities.
 
 ### Reconciled baseline (in progress)
 
+Current branch baseline: PR #86 was semantically merged with `origin/main`
+`8671362` at commit `4cc63d7` (including #89 commit `aecc3e64` and PR #93
+merge `2e083bf`). This checkpoint is a fresh validation boundary; all older
+character and browser receipts below retain their original commit/build
+provenance and are not retroactively relabeled as tests of this merge.
+
+On the merged tree, the Results source-tick/entry Node contracts and focused
+Python entry suite pass (8/8). The `gameplay_results_scene_trace.js` and
+`native_menu_host_trace.js` C++ targets build after
+`python3 scripts/gameplay_sources.py` refreshes generated sources.
+The initial focused invocation stopped before simulation with
+`Missing required native menu runtime file: MnMaAll.usd`: the ignored local
+fixture then had 38 of the 73 files required by current `menu_asset_names()`.
+All 35 missing exact disc files are now extracted into ignored
+`assets-local/native-menus`, preserving existing files. With the complete
+fixture, the P1-only native reducer runs its synthetic Zelda-origin Sheik
+Results control, observes both disconnected CPU page transitions at source
+tick 551, P1 confirmation at 600, and Results exit at 622. It then fails
+`melee_web_menu_host_destroy()`'s
+precondition with `Close native menu scene and restore RNG before destroying
+host` (receipt `work/results-match-history-tests/p1-statistics-j4oi2h8y/`).
+The control flow isolated a retained nonzero CSS/SSS transition latch: normal
+leave marked the scene closed but did not clear that consumed latch. The tracked
+fix in `src/gameplay_menu_host.c` clears the latch and consumed parent-route
+flag after successful leave; `tests/native_menu_host_trace.cpp` adds a normal
+CSS→SSS leave-and-destroy regression. The rebuilt regression passes, as does
+the same P1-only synthetic reducer. Its receipt is
+`work/results-match-history-tests/p1-statistics-f6r54eej/stdout.log`: both
+disconnected CPU pages advance at source frame 551 before P1 confirms at 600;
+Results exits and host OnExit/commit complete at tick 622; the retained camera
+pool stays `0x81e5f00`, and all four demo owners are constructed and closed.
+This excludes a generic failure of that synthetic P1-only/auto-page/host-close
+route and fixes its later host-destruction precondition. It does not test draw,
+natural CPU9 outcomes, or the historical Sheik-winner camera-pool failure.
+
+Critically, do not treat the synthetic reducer's former destroy assertion as
+the cause of the historical camera failure. The historical report
+`work/pr86-final-frozen-b-two-match-r1/report.json` records a natural slot-2
+Sheik win (match frame 11,725, RNG 2,897,689,676) and reports camera-pool
+ownership changed at Results source frame 560. Its retained evidence has no
+consumed PAD samples/connectedness at that boundary and no camera-pointer
+snapshots or ownership-phase trace. Thus the first invalid transition cannot
+be recovered from that report. The source-entry packet from a different run
+is not a substitute. Current-main headless browser reproduction with the
+existing first-change guards remains the next discriminator. Historical
+rendered-browser reports remain bound to their original revisions; no fresh
+browser scenario has yet been run on `4cc63d7`.
+
+The current merged-runtime target build and focused gates pass: source-context
+and collision traces; owned-DOL `test_source_stack_profile.py`; common-context
+restore/restart; Final Destination numeric context; authored/local-common/
+Mario effect-bank cases; Nana's real nonzero Results root; and 44 texture,
+material, native-joint/animation, archive-cache and archive-section tests. The
+optional Link/Pikachu effect-archive checks were skipped because those local
+archives are absent. This is not the required full suite or rendered gameplay.
+
 Frozen runtime checkpoint `2943d8f` now passes the owned-input full suite:
 1,545 tests, 73 explicit skips, zero failures in 557.565 seconds
 (`work/pr86-reconciled-full-suite-r1.log`, exit 0). Its A scenario passes two

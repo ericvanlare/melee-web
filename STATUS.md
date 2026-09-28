@@ -5,6 +5,23 @@
 Current per-character coverage, original CPU9 references, rendered browser
 match loops, comparison limits, and explicit open gates are recorded in
 [Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md).
+The reconciled PR head is `4cc63d7`, with current `origin/main` `8671362`.
+Fresh Results entry contracts pass (8/8), and the merged C++ trace targets
+build after source preparation. The formerly incomplete menu fixture now has
+all 35 required exact disc files. The synthetic P1-only Results reducer passes:
+both disconnected CPU pages advance at source tick 551, P1 confirms at 600,
+Results exits at 622, and all demo owners close with the camera pool unchanged.
+A normal CSS→SSS host-leave/destroy regression also passes after clearing the
+consumed transition latch. The reducer is native-state-only with no draw calls;
+it is neither a natural CPU9 match nor a reproduction or resolution of the
+historical Sheik-winner camera-pool failure. The first invalid ownership
+transition in that historical run remains unknown.
+Focused current-main checks also pass for source-context/collision traces,
+owned-DOL source-stack profiling, common-context restore/restart, stage numeric
+context, effect-bank lifecycle, Nana's nonzero Results asset root, and the
+texture/material/native-joint/archive set (44 tests). Optional Link/Pikachu
+effect archives are absent locally and remain unverified. Fresh head-bound
+browser scenarios and the full suite remain open.
 Main including PR #89 is merged and its ownership/carry guarantees retained.
 Reconciled checks exposed and repaired the Player mapping owner, Nana's signed
 input history and partner-correction rounding. The original-consistent partner

@@ -449,6 +449,35 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
                   "Original Main left before Eject");
         abort_and_destroy(host, world, audio_phase, "Main");
     }
+
+    {
+        auto* host = melee_web_menu_host_create(error, sizeof(error));
+        check(host != nullptr, error);
+        auto world = std::make_unique<melee_web::GameplayMenuWorld>(files);
+        PADStatus raw[4]{};
+        raw[2].err = raw[3].err = -1;
+        unsigned audio_phase = 0;
+        check(melee_web_menu_host_enter(host, world->audio(), error,
+                                        sizeof(error)), error);
+        for (unsigned frame = 0; frame < 120; ++frame)
+            check(tick(host, *world, raw, audio_phase) == 1,
+                  "Original CSS left before the normal-close regression");
+        raw[0].button = PAD_BUTTON_START;
+        int result = tick(host, *world, raw, audio_phase);
+        raw[0].button = 0;
+        for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
+            result = tick(host, *world, raw, audio_phase);
+        check(result == 3, "Original CSS did not complete its SSS transition");
+        check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        check(melee_web_menu_host_phase(host) == 2,
+              "Normal CSS leave did not retain the closed SSS-ready session");
+        world->close();
+        world.reset();
+        check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+        check(!melee_web_gameplay_world_exists(),
+              "Normal CSS leave retained the owned source world");
+        std::cout << "Normal CSS->SSS leave cleared its consumed transition before host teardown\n";
+    }
     std::cout << "Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger and timeout recovery passed\n";
 }
 }
