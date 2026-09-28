@@ -116,7 +116,8 @@ it does not need the client patches:
 python3 scripts/agent_workspace.py run -- cmake \
   -S reference-capture/slippi/local_matchmaker \
   -B work/slippi-local-networking/matchmaker-build \
-  -G Ninja -DSLIPPI_DOLPHIN_SOURCE=.deps/slippi-dolphin
+  -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DSLIPPI_DOLPHIN_SOURCE=.deps/slippi-dolphin
 python3 scripts/agent_workspace.py run -- cmake --build \
   work/slippi-local-networking/matchmaker-build \
   --target slippi-local-matchmaker slippi-local-matchmaker-tests \
