@@ -5375,19 +5375,24 @@ index 4a66512..2e85ce4 100644
 diff --git a/src/melee/lb/lb_0195.c b/src/melee/lb/lb_0195.c
 --- a/src/melee/lb/lb_0195.c
 +++ b/src/melee/lb/lb_0195.c
-@@ -1,3 +1,6 @@
+@@ -1,3 +1,8 @@
 +#if defined(MELEE_WEB_GAMEPLAY)
 +#include "gameplay_audio_bank_transport.h"
++#include "gameplay_source_files.h"
++#include "gameplay_platform.h"
 +#endif
  #include "lb_0195.h"
  
  #include "lb_0192.h"
-@@ -46,6 +49,9 @@
+@@ -46,6 +51,12 @@
  
  void lb_800195D0(void)
  {
 +#if defined(MELEE_WEB_GAMEPLAY)
 +    melee_web_audio_bank_transport_pump();
++    if (!melee_web_source_files_pump(NULL, 0)) {
++        melee_web_platform_unavailable("source RuntimeFiles transfer pump");
++    }
 +#endif
      lb_800192A8(lb_8001955C);
      lb_8001CC84();
@@ -10006,9 +10011,10 @@ diff --git a/src/melee/mn/mninfo.c b/src/melee/mn/mninfo.c
      s32 i;
 
 diff --git a/extern/dolphin/src/dolphin/thp/THPDec.c b/extern/dolphin/src/dolphin/thp/THPDec.c
+index 40474db..9138296 100644
 --- a/extern/dolphin/src/dolphin/thp/THPDec.c
 +++ b/extern/dolphin/src/dolphin/thp/THPDec.c
-@@ -2705,6 +2705,7 @@
+@@ -2705,6 +2705,7 @@ static struct THPLCSizeEntry __THPLCSizeTableB[9] = {
      { 8, 0x200 },
  };
  
@@ -10016,7 +10022,7 @@ diff --git a/extern/dolphin/src/dolphin/thp/THPDec.c b/extern/dolphin/src/dolphi
  // clang-format off
  static inline void OSInitFastCast(void) {
  #ifdef __MWERKS__
-@@ -2729,6 +2730,7 @@
+@@ -2729,11 +2730,18 @@ static inline void OSInitFastCast(void) {
  #endif
  }
  // clang-format on
@@ -10024,6 +10030,59 @@ diff --git a/extern/dolphin/src/dolphin/thp/THPDec.c b/extern/dolphin/src/dolphi
  
  #ifdef __MWERKS__
  #pragma function_align 4
+ #endif
+ 
++#if defined(TARGET_PC)
++#define THP_LOCKED_CACHE_BASE() MELEE_WEB_THP_CPU_CACHE_BASE()
++#else
++#define THP_LOCKED_CACHE_BASE() ((u8*) 0xE0000000)
++#endif
++
+ void THPInit(void)
+ {
+     u8* base;
+@@ -2741,12 +2749,14 @@ void THPInit(void)
+     int j;
+     struct THPInitWork* work = (struct THPInitWork*) &__THPLC;
+ 
++#if !defined(TARGET_PC)
+     if ((PPCMfhid2() & 0x10000000) == 0) {
+         DCInvalidateRange((void*) 0xE0000000, 0x4000);
+         LCEnable();
+     }
++#endif
+ 
+-    base = (u8*) 0xE0000000;
++    base = THP_LOCKED_CACHE_BASE();
+     for (j = 0; j < 2; j++) {
+         for (i = 0; i < 5; i++) {
+             work->cache.offsets512[j][i] = base;
+@@ -2754,7 +2764,7 @@ void THPInit(void)
+         }
+     }
+ 
+-    base = (u8*) 0xE0000000;
++    base = THP_LOCKED_CACHE_BASE();
+     for (j = 0; j < 2; j++) {
+         for (i = 0; i < 9; i++) {
+             work->cache.offsets672[j][i] = base;
+@@ -2762,14 +2772,14 @@ void THPInit(void)
+         }
+     }
+ 
+-    base             = (u8*) 0xE0000000;
++    base             = THP_LOCKED_CACHE_BASE();
+     work->cache.work512[0] = base;
+     base += 0x2000;
+     work->cache.work512[1] = base;
+     base += 0x800;
+     work->cache.work512[2] = base;
+ 
+-    base             = (u8*) 0xE0000000;
++    base             = THP_LOCKED_CACHE_BASE();
+     work->work672[0] = base;
+     base += 0x2800;
+     work->work672[1] = base;
 diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
 --- a/src/melee/ft/types.h
 +++ b/src/melee/ft/types.h
@@ -10296,4 +10355,120 @@ diff --git a/src/melee/gm/gm_1601.c b/src/melee/gm/gm_1601.c
 +    "\x82\x87", /* Ｓａｎｄｂａｇ */
      NULL,
  };
+ 
+
+diff --git a/src/melee/lb/lbmthp.c b/src/melee/lb/lbmthp.c
+index fde5883..961cdbb 100644
+--- a/src/melee/lb/lbmthp.c
++++ b/src/melee/lb/lbmthp.c
+@@ -1,5 +1,12 @@
+ #include "lbmthp.h"
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_platform.h"
++#include "gameplay_source_alarm.h"
++#include "gameplay_source_files.h"
++#include "gameplay_thp_cpu.h"
++#endif
++
+ #include <placeholder.h>
+ 
+ #include "lbfile.h"
+@@ -92,6 +99,16 @@ struct lbl_803BAFE8_t {
+ /* 01F294 */ static s32 fn_8001F294(void);
+ /* 4333E0 */ static THPDecComp MoviePlayer;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++static void* melee_web_movie_buffer;
++static size_t melee_web_movie_buffer_size;
++
++static void melee_web_movie_require(int condition, const char* operation)
++{
++    if (!condition) melee_web_platform_unavailable(operation);
++}
++#endif
++
+ static void fn_8001E910(int arg0, int arg1, void* arg2, int cancelflag)
+ {
+     THPDecComp* streamPlayer = &MoviePlayer;
+@@ -165,7 +182,20 @@ static s32 fn_8001EB14(THPDecComp* data, const char* path)
+ {
+     THPInit();
+     data->file_entrynum = DVDConvertPathToEntrynum(path);
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_movie_require(
++        melee_web_source_file_entry_owned(data->file_entrynum),
++        "unowned original THP movie file");
++    melee_web_movie_require(
++        melee_web_source_file_region_register(data, 0x40, NULL, 0),
++        "original THP header destination registration");
++#endif
+     lbFile_800161C4(data->file_entrynum, 0, (u32) data, 0x40, 0x21, 1);
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_movie_require(
++        melee_web_source_file_region_unregister(data, 0x40, NULL, 0),
++        "original THP header destination release");
++#endif
+ 
+     data->unk_40 = data->num_frames;
+     data->width = data->x_size;
+@@ -525,6 +555,12 @@ void lbMthp_8001F410(const char* filename, u32* rate_table, void* buf,
+     streamPlayer = &MoviePlayer;
+ 
+     HSD_ASSERT(833, !MoviePlayer.power);
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_movie_require(melee_web_source_alarm_begin(),
++                            "original THP alarm owner startup");
++    melee_web_movie_require(melee_web_thp_cpu_begin(),
++                            "original THP CPU cache owner startup");
++#endif
+     MoviePlayer.power = 1;
+     fn_8001EB14(&MoviePlayer, filename);
+     MoviePlayer.rate_table = rate_table;
+@@ -536,6 +572,16 @@ void lbMthp_8001F410(const char* filename, u32* rate_table, void* buf,
+         buf = HSD_MemAlloc(memoryRequired);
+         MoviePlayer.unk_140 = buf;
+     }
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_movie_buffer = buf;
++    melee_web_movie_buffer_size = memoryRequired;
++    melee_web_movie_require(
++        melee_web_source_file_region_register(buf, memoryRequired, NULL, 0),
++        "original THP decoder transfer destination registration");
++    melee_web_movie_require(
++        melee_web_thp_cpu_output_register(buf, memoryRequired),
++        "original THP decoder output registration");
++#endif
+     MoviePlayer.unk_68 = loop;
+     fn_8001ECF4(&MoviePlayer, buf);
+     MoviePlayer.unk_144 = 0;
+@@ -645,11 +691,29 @@ void lbMthp_8001F800(void)
+         OSCancelAlarm(&MoviePlayer.alarm);
+         HSD_VIWaitXFBFlush();
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++        melee_web_movie_require(
++            melee_web_source_file_region_unregister(
++                melee_web_movie_buffer, melee_web_movie_buffer_size, NULL, 0),
++            "original THP decoder transfer destination release");
++        melee_web_movie_require(
++            melee_web_thp_cpu_output_unregister(
++                melee_web_movie_buffer, melee_web_movie_buffer_size),
++            "original THP decoder output release");
++#endif
+         if (MoviePlayer.unk_140 != NULL) {
+             HSD_Free(MoviePlayer.unk_140);
+         }
+ 
+         MoviePlayer.power = 0;
++#if defined(MELEE_WEB_GAMEPLAY)
++        melee_web_movie_buffer = NULL;
++        melee_web_movie_buffer_size = 0;
++        melee_web_movie_require(melee_web_thp_cpu_end(),
++                                "original THP CPU cache owner release");
++        melee_web_movie_require(melee_web_source_alarm_end(),
++                                "original THP alarm owner release");
++#endif
+     }
+ }
  

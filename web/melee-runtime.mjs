@@ -7,6 +7,7 @@ const SCENES = {1: 'css', 2: 'preparing', 3: 'sss', 4: 'preparing', 5: 'preparin
 const IMPORT_BATCH_MAX_FILES = 8;
 const IMPORT_BATCH_MAX_BYTES = 8 * 1024 * 1024;
 const IMPORT_BATCH_MAX_MS = 8;
+const SOURCE_STREAM_FILES = Object.freeze(['MvOpen.mth', 'MvHowto.mth', 'MvOmake15.mth']);
 
 export async function mountMeleeRuntime({canvas, onState = () => {}, onError = () => {},
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
@@ -26,6 +27,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let loading = Object.freeze({phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
   let preparationLabel = '', preparationKeepsAudio = false;
   let discSession = null, assetTransfer = null;
+  const sourceReadResults = new Map();
   const openedDiscSessions = new WeakSet();
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
@@ -181,6 +183,47 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     },
     // These two callbacks MUST remain synchronous at their native boundaries.
     menuAudioReadyForPreparation() { return preparationKeepsAudio || !audio || audio.readyForPreparation(); },
+    menuStartSourceRead(request, name, offset, size) {
+      if (!discSession || typeof discSession.readFile !== 'function' ||
+          !Number.isInteger(request) || typeof name !== 'string' || !name ||
+          !Number.isSafeInteger(offset) || offset < 0 ||
+          !Number.isInteger(size) || size <= 0 || size > 16 * 1024 * 1024 ||
+          sourceReadResults.has(request)) return false;
+      const session = discSession;
+      const result = {state: 0, bytes: null};
+      sourceReadResults.set(request, result);
+      Promise.resolve().then(() => session.readFile(name, offset, size)).then(bytes => {
+        if (sourceReadResults.get(request) !== result) return;
+        if (!(bytes instanceof Uint8Array) || bytes.byteLength !== size) {
+          result.state = -1;
+          emit('sourceReadError', {request, name, message: 'Disc range returned an invalid byte count.'});
+          return;
+        }
+        result.bytes = bytes;
+        result.state = 1;
+      }, error => {
+        if (sourceReadResults.get(request) !== result) return;
+        result.state = -1;
+        emit('sourceReadError', {request, name,
+          message: String(error?.message || error || 'Disc range read failed.')});
+      });
+      return true;
+    },
+    menuSourceReadStatus(request) { return sourceReadResults.get(request)?.state ?? -1; },
+    menuSourceReadTake(request) {
+      const result = sourceReadResults.get(request);
+      if (!result || result.state !== 1 || !result.bytes?.byteLength) return 0;
+      const pointer = Module._malloc(result.bytes.byteLength);
+      if (!pointer) {
+        result.state = -1;
+        result.bytes = null;
+        return 0;
+      }
+      Module.HEAPU8.set(result.bytes, pointer);
+      sourceReadResults.delete(request);
+      return pointer;
+    },
+    menuSourceReadDiscard(request) { sourceReadResults.delete(request); },
     menuServiceCommands() {
       if (fatal || destroyed) return;
       for (const c of commands.splice(0)) { try { c.resolve(c.run()); } catch (error) { c.reject(error); } }
@@ -305,6 +348,34 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       throw error;
     }
   }
+  async function configureSourceFileStreams(session) {
+    if (typeof session.fileInfo !== 'function' || typeof session.readFile !== 'function') {
+      throw Error('The selected disc session cannot provide bounded original movie reads.');
+    }
+    const metadata = SOURCE_STREAM_FILES.map(name => {
+      const info = session.fileInfo(name);
+      if (!info || info.name !== name || !Number.isSafeInteger(info.size) ||
+          info.size <= 0 || info.size > 0xffffffff) {
+        throw Error(`The validated disc is missing a supported source movie: ${name}`);
+      }
+      return {name, size: info.size};
+    });
+    await boundary(() => {
+      for (const {name, size} of metadata) {
+        const encoded = new TextEncoder().encode(name + '\0');
+        const pointer = Module._malloc(encoded.length);
+        try {
+          if (!pointer) throw Error('Unable to allocate source movie name.');
+          Module.HEAPU8.set(encoded, pointer);
+          check(Module._melee_web_native_source_file_external_set(pointer, size));
+        } finally { Module._free(pointer); }
+      }
+    });
+  }
+  async function clearSourceFileStreams() {
+    if (!ready || fatal || destroyed) return;
+    await boundary(() => check(Module._melee_web_native_source_files_external_clear()));
+  }
   async function prepareNativeResources() {
     callbacks.menuPreparation('Preparing native menu resources');
     try {
@@ -349,7 +420,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         bundle = false;
         try {
           if (!await unloadAndSave()) throw Error(status());
-          discSession?.close(); discSession = null;
+          if (discSession) {
+            await clearSourceFileStreams();
+            discSession.close(); discSession = null;
+          }
           setLoading('disc', 'Reading game data…', 0, 1); publish();
           if (openDisc) {
             const opened = preopenedSession || await handle.openDiscSession(file);
@@ -359,6 +433,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
             }
             discSession = opened;
             adoptedSession = !!preopenedSession;
+            await configureSourceFileStreams(discSession);
           }
           else {
             const files = await readDisc(file, reportDiscRead);
@@ -407,6 +482,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         throw error;
       } finally {
         clearStartupTimeout();
+        if (!fatal && discSession) {
+          try { await clearSourceFileStreams(); }
+          catch (error) { onLog(`Source movie catalog cleanup failed: ${error.message}`, true); }
+        }
         destroyed = true; syncAudio();
         discSession?.close(); discSession = null;
         try { await audio?.destroy(); }

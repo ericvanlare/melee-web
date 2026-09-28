@@ -112,6 +112,8 @@ RUNTIME_REQUIRED_EXPORTS = (
     "_melee_web_native_asset_commit",
     "_melee_web_native_asset_abort",
     "_melee_web_native_menu_file",
+    "_melee_web_native_source_file_external_set",
+    "_melee_web_native_source_files_external_clear",
     "_melee_web_native_menu_prepare", "_melee_web_native_menu_launch",
     "_melee_web_native_menu_unload", "_melee_web_native_menu_pause",
     "_melee_web_native_menu_message", "_melee_web_native_menu_running",

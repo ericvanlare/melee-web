@@ -141,6 +141,24 @@ export class DiscAssetSession {
     return result;
   }
 
+  /** Return immutable validated FST metadata without materializing payloads. */
+  fileInfo(path) {
+    this.#assertOpen();
+    relativeDiscPath(path);
+    return this.#entries.get(path) ?? null;
+  }
+
+  /** Read one exact FST file-relative range using the disc reader's bounds. */
+  async readFile(path, offset = 0, size = undefined) {
+    this.#assertOpen();
+    relativeDiscPath(path);
+    const entry = this.#entries.get(path);
+    if (!entry) throw new Error(`Required game data is missing: ${path}`);
+    const bytes = await this.#disc.readFile(path, offset, size);
+    this.#assertOpen();
+    return bytes;
+  }
+
   /** Return the source-derived font bytes, never an FST path. */
   fontBytes() {
     this.#assertOpen();

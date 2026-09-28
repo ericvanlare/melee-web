@@ -41,7 +41,7 @@ const report = {
     source_sha: packageManifest.source_sha, runtime_hash: packageManifest.runtime_hash,
     identity_sha256: packageManifest.identity_sha256,
   } : null,
-  scope: 'Authorized local disc through original CSS, SSS, supported Mario/Final Destination match, Results return and Eject; Web Audio lifecycle and PCM transport only. No long replay or performance claim.',
+  scope: 'Authorized local disc through original CSS, SSS, supported Mario/Final Destination match, Results return, and Title idle handoff to the source Opening state. The demo remains an explicit unsupported route with Eject/reimport recovery. Web Audio lifecycle and PCM transport only; no full attract-cycle, audible-quality, equivalence or performance claim.',
   checks: [],
   audio: {phases: {}, cdp: []},
   assets: {transactions: [], legacyCalls: 0},
@@ -232,6 +232,23 @@ const press = key => driver.pressChord([key]);
 const phase = driver.waitForPhase;
 const trace = () => page.evaluate(() => window.audioPreviewTrace?.snapshot() || null);
 const assetTrace = () => page.evaluate(() => window.audioPreviewAssetTrace?.snapshot() || null);
+const nativeMenuState = () => page.evaluate(() => ({
+  message: typeof Module?._melee_web_native_menu_message === 'function'
+    ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null,
+  running: typeof Module?._melee_web_native_menu_running === 'function'
+    ? Module._melee_web_native_menu_running() : 0,
+  runtimeError: document.querySelector('#status')?.dataset.runtimeError || null,
+}));
+const waitForNativeScene = async scene => {
+  const deadline = Date.now() + 60000;
+  while (Date.now() < deadline) {
+    const state = await nativeMenuState();
+    if (state.runtimeError) throw Error(`Runtime error while waiting for ${scene}: ${state.runtimeError}`);
+    if (state.running && state.message === scene) return state;
+    await page.waitForTimeout(50);
+  }
+  throw Error(`Timed out waiting for ${scene}: ${JSON.stringify(await nativeMenuState())}`);
+};
 const installAssetTrace = async () => page.evaluate(() => {
   const module = globalThis.Module;
   const names = ['_melee_web_native_asset_begin', '_melee_web_native_asset_count',
@@ -586,6 +603,113 @@ try {
     const before = await trace();
     await observeAudio('match-after-no-contest', before);
     await screenshot('match-after-no-contest');
+  });
+
+  await check('Title timeout follows the source Opening state and Eject recovers to CSS', async () => {
+    // The preceding check leaves the second match running. Return through the
+    // original Results confirmations before entering Main and Title so this
+    // probe exercises the same CSS-first public route as a player session.
+    await page.waitForTimeout(5000);
+    await press('7');
+    await page.waitForTimeout(700);
+    await driver.pressChord(['q', '9', 'm', '7'], {holdMs: 250, releaseMs: 200});
+    await phase(8);
+    await page.waitForTimeout(4500);
+    await screenshot('results-after-second-match');
+    for (let confirmation = 0; confirmation < 8; confirmation++) {
+      if (await page.evaluate(() => Module._melee_web_native_menu_phase()) !== 8) break;
+      await phase(8);
+      await driver.pressChord(['7'], {holdMs: 120, releaseMs: 1380});
+    }
+    assert.notEqual(await page.evaluate(() => Module._melee_web_native_menu_phase()), 8,
+      'Second original Results route did not finish its bounded Start confirmation sequence');
+    const returnState = await page.waitForFunction(() => {
+      const error = document.querySelector('#status')?.dataset.runtimeError;
+      if (error) return {error};
+      const currentPhase = Module._melee_web_native_menu_phase();
+      return (currentPhase === 1 || currentPhase === 9) && Module._melee_web_native_menu_running() ?
+        {phase: currentPhase} : false;
+    }, null, {timeout: 60000});
+    const returned = await returnState.jsonValue(); await returnState.dispose();
+    if (returned.error) throw Error(returned.error);
+    if (returned.phase === 9) {
+      for (let confirmation = 0; confirmation < 120; confirmation++) {
+        await phase(9);
+        await driver.pressChord(['7'], {holdMs: 120, releaseMs: 380});
+        const next = await page.evaluate(() => ({phase: Module._melee_web_native_menu_phase(),
+          error: document.querySelector('#status')?.dataset.runtimeError}));
+        if (next.error) throw Error(next.error);
+        if (next.phase !== 9) break;
+      }
+    }
+    await phase(1);
+    await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
+    await screenshot('css-before-title-idle');
+
+    await driver.pressChord(['q', '9', '7']);
+    await waitForNativeScene('Original main menu');
+    await page.waitForTimeout(700);
+    await press('o');
+    await waitForNativeScene('Original title');
+    await screenshot('title-before-idle-opening');
+    const titleAudioBefore = await trace();
+    await observeAudio('title-before-idle-opening', titleAudioBefore);
+
+    await page.waitForFunction(() => {
+      const dialog = document.querySelector('#error-dialog');
+      const text = document.querySelector('#error')?.textContent || '';
+      return dialog?.open && text.includes('GM_OPENING_MV state 1') &&
+        text.includes('four-player VS demo') && text.includes('Eject to recover');
+    }, null, {timeout: 45000});
+    const routeError = await page.locator('#error').innerText();
+    assert.match(routeError, /Original Title idle reached source GM_OPENING_MV state 1/);
+    const transitionState = await nativeMenuState();
+    report.title_idle_handoff = {
+      source_target: 'GM_OPENING_MV state 1',
+      browser_boundary: 'explicitly unsupported randomized four-player VS demo',
+      native_running_after_error: transitionState.running,
+      error: routeError,
+      full_cycle_supported: false,
+    };
+    await screenshot('title-idle-opening-unsupported');
+
+    const contextIds = audioEvents.filter(row => row.event === 'contextCreated')
+      .map(row => row.data.context.contextId);
+    const eventOffset = audioEvents.length;
+    const navigationCount = report.navigations || 0;
+    await page.locator('#error-close').click();
+    ejectReloadInProgress = true;
+    try {
+      await driver.unload();
+      assert((report.navigations || 0) > navigationCount,
+        'Eject after the Opening owner boundary must reload the player document');
+      await driver.waitForImport();
+      await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 90000});
+    } finally {
+      ejectReloadInProgress = false;
+    }
+    const teardownEvents = audioEvents.slice(eventOffset);
+    assert(contextIds.every(id => teardownEvents.some(row =>
+      (row.event === 'contextChanged' && row.data.context.contextId === id &&
+        row.data.context.contextState === 'closed') ||
+      (row.event === 'contextWillBeDestroyed' && row.data.contextId === id))),
+    'Eject after Title idle must close every prior AudioContext');
+    const freshTrace = await trace();
+    assert(freshTrace && freshTrace.contexts.length === 0,
+      'Eject after Title idle must retire prior Web Audio owners');
+
+    await selectDisc(values.disc);
+    const cssEntry = await driver.waitForPublicCss();
+    if (cssEntry === 'audio-recovery-required') {
+      await driver.recoverAudioActivation();
+      report.title_idle_handoff.audio_activation_recovery = true;
+    }
+    assert.equal(await page.evaluate(() => Module._melee_web_native_menu_phase()), 1,
+      'Disc reimport after Title idle must start directly in original CSS');
+    const beforeCss = await trace();
+    await observeAudio('css-after-title-idle-reimport', beforeCss);
+    await screenshot('css-after-title-idle-reimport');
+    report.title_idle_handoff.eject_reimport = 'CSS-first; prior audio contexts closed';
   });
 
   await check('scoped audio asset generations are complete and never use legacy file upload', async () => {
