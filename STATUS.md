@@ -4,14 +4,15 @@
 
 **Compiled / Browser exercised (headless diagnostic)** for a test-only Aurora
 path that creates actual game pipelines through Emscripten's asynchronous
-WebGPU binding. On the named M4/Chrome setup, one pipeline in flight reduced
-median full graphics readiness and playable CSS by about 0.55 seconds across
-three cold and three warm runs against the unchanged synchronous build. The
-same 910 pipeline calls and 911 shader modules completed, with no material
-animation-gap or long-task regression in these samples. Two in flight was
-faster but produced cold and warm responsiveness outliers, so it is not the
-recommended setting. The opt-in remains disabled by default. These headless
-measurements do not establish foreground smoothness or earn the
+WebGPU binding. The successful-completion path atomically moves the exact
+pipeline identity from pending to ready; a regression check calls Aurora's
+normal cache getter after completion. In three balanced runs per cache
+condition against current main, one in flight showed a 253 ms warm median
+reduction in graphics readiness and 270 ms in playable CSS. Cold medians moved
+only 45/64 ms amid overlapping, variable samples, so no robust cold-start gain
+is established. Two in flight reduced warm medians further but produced larger
+cold animation gaps and long tasks. The opt-in remains disabled by default.
+These headless measurements do not establish foreground smoothness or earn the
 **Performance passed** gate. Full set, boundary, lifecycle, build identities,
 measurements and retained failures are recorded in ignored
 `work/async-pipeline-probe/RESULTS.txt`.
