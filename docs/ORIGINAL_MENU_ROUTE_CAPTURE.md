@@ -167,11 +167,12 @@ under ignored `work/` and are not committed:
 | `work/pr96-title-main/review-round2/review-head-audio-http.json`, `logs/pages-dev-review-head-audio.log` | Final-head local Pages HTTP verifier receipt and Wrangler output, including the documented reserved-route limitation |
 | `work/pr96-title-main/public-audio-browser-reconciled-head-04/report.json` | Earlier diagnostic run on the same reconciled runtime before final package identity; superseded by the final-head report above |
 | `.../browser-public-lifecycle-03/report.json` | Historical silent-only browser evidence from the earlier public-player lifecycle; superseded for this PR by the audio-enabled final-head run |
-| `work/title-idle-attract/native-opening-state1.jsonl` | Native source-host trace of the zero-payload Title timeout, original `GM_OPENING_MV` state 1 selection, and clean owner retirement/CSS reimport |
+| `work/title-idle-attract/native-opening-state1-final.jsonl` | Reconciled-head native source-host trace of the zero-payload Title timeout, original `GM_OPENING_MV` state 1 selection, and clean owner retirement/CSS reimport |
 | `work/title-idle-attract/public-audio-browser/report.json` and `failure.png` | Retained failed first browser iteration: CSS and two supported matches passed, then Title timeout left the menu owner closed without surfacing an error dialog; the 45-second route assertion failed. Superseded by the final UI recovery check |
 | `work/title-idle-attract/public-audio-browser-final/report.json` and `*.png` | Headless Chrome run against the Release audio-player package: CSS → supported match → Results → CSS → Main → Title timeout, explicit unsupported Opening state 1 error, Eject/reimport to CSS, audio/PCM transport and teardown |
 | `work/title-idle-attract/audio-player-final.manifest.json` | Production package inventory and producer identity; `source_sha` binds the browser report to the tested commit |
-| `work/title-idle-attract/full-tests-after-public-error.log` | Final full unittest discovery after the public error-surfacing fix: 1,548 tests, 94 optional skips, no failures; earlier runs remain preserved |
+| `work/title-idle-attract/full-tests-after-public-error.log` | Pre-PR-109 full unittest discovery after the public error-surfacing fix: 1,548 tests, 94 optional skips, no failures; superseded by the reconciled-head suite below |
+| `work/title-idle-attract/full-tests-reconciled-final.log` | Full unittest discovery on the final reconciled head; exact test, skip, and failure counts are retained in the log |
 
 The route uses the owned CISO directly (SHA-256
 `b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c`) and the
@@ -189,7 +190,7 @@ capture, or generated public bundle enters Git.
 | --- | --- | --- |
 | **Source identified** | Pinned title/Main callbacks, mode routing, the 11-row `0x07ff` unlock mask, and authored notification/reward-ledger owners | Full-game menu coverage |
 | **Retail compared** | Cold-boot route order, ordinary inputs, observed source menu states, and labeled screenshots on the owned disc | Pixel/PCM equivalence, physical-controller acceptance, foreground timing, or performance |
-| **Browser exercised** | Audio-enabled public CSS-first startup with the full source roster; two original menu cycles; Main/Title Eject and CSS-first reimport; routed SSS, supported match, Results return; connected 32 kHz nonzero PCM transport and audio-context teardown | Retail/browser pixel or PCM comparison, audible quality, foreground input latency/timing, physical-controller acceptance, performance, or tournament acceptance |
+| **Browser exercised** | Audio-enabled public CSS-first startup with the full source roster; two original menu cycles; Main/Title Eject and CSS-first reimport; routed SSS, supported match, Results return; one Title idle timeout to the exact Opening state 1 error boundary, followed by Eject/reimport; connected 32 kHz nonzero PCM transport and audio-context teardown | Complete attract cycles, retail/browser pixel or PCM comparison, audible quality, foreground input latency/timing, physical-controller acceptance, performance, or tournament acceptance |
 | **Compiled** | Reconciled silent and audio-enabled public Release targets and audited package graphs | Deployment or merge |
 
 The separate allocation-history GDB/Python route remains available for scopes
