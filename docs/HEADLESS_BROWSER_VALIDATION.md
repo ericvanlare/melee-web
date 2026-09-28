@@ -43,6 +43,38 @@ minimized or background window does not substitute for a visible timing run.
 Changed harness hashes require fresh hitch profiles; keep historical receipts
 bound to their original scripts.
 
+## Silent host output
+
+`browserLaunchOptions` explicitly passes `--mute-audio`, including for headed
+checks. This leaves Web Audio processing enabled. For an arranged listening
+session, pass `{headed: true, audible: true}`; the helper removes both its own
+mute argument and Playwright's default mute argument. Existing harnesses remain
+silent unless they explicitly request audible output.
+
+Dolphin's headless video backend does not mute speakers. Both the reference
+capture app and retail replay launcher use `scripts/dolphin_audio.py`. Ad hoc
+Dolphin launchers must append `dolphin_audio_options()` to their command too:
+
+```python
+from dolphin_audio import dolphin_audio_options  # scripts/ on sys.path
+command += dolphin_audio_options()
+```
+
+This supplies `-C "Dolphin.DSP.Backend=No Audio Output"` and
+`-C Dolphin.DSP.Muted=True`. Use the exact DSP keys and backend spelling;
+`Dolphin.Core.AudioBackend` is not the audio-backend setting. `DumpAudioSilent`
+only controls the dump overwrite prompt, not speakers. An explicitly arranged
+listening run may call `dolphin_audio_options(audible=True)`, which unmutes the
+owned profile's configured backend; that profile must have a working sound
+backend and volume. These options never change global machine audio settings.
+
+Keep DSP emulation, game mixer settings, audio dumping and Web Audio execution
+unchanged. For PCM comparisons, retain and inspect the upstream samples; muted
+speakers are not evidence of silent PCM. Do not suspend AudioContext or replace
+audio services with no-ops. Record effective launch arguments with capture
+receipts. Existing running processes and already installed capture apps need
+an owned restart or app update to adopt this policy.
+
 ## Repeat the synthetic capability probe
 
 ```sh

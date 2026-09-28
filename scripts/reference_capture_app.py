@@ -22,6 +22,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "reference-capture/dolphin"))
+from dolphin_audio import dolphin_audio_options
 from reference_capture_environment import (EnvironmentError, read_settings, verify_environment,
     configured_controller, physical_devices, support_root, file_inventory, sha256)
 from reference_capture_semantics import SemanticSession
@@ -70,7 +71,7 @@ def prepare_user(root, identifier, profile, fixture_gc):
     return user
 
 
-def dolphin_command(settings, user):
+def dolphin_command(settings, user, *, audible=False):
     paths = settings["paths"]
     command = [paths["dolphin"], "-u", str(user), "-b", "-e", paths["disc"]]
     options = {
@@ -86,7 +87,7 @@ def dolphin_command(settings, user):
         "Dolphin.Core.GCIFolderAPathOverride": str(Path(paths["fixture_gc"]) / "USA/Card A"),
     }
     for key, value in options.items(): command.extend(("-C", key + "=" + value))
-    return command
+    return command + dolphin_audio_options(audible=audible)
 
 
 def validate_observer_status(status, previous=None):
@@ -498,7 +499,7 @@ class Supervisor:
                               "Dolphin replay finished with a comparison difference. The report and both recordings are preserved."))
 
     def tooling_identity(self):
-        names = ("scripts/reference_capture_app.py", "tools/reference_capture_environment.py",
+        names = ("scripts/reference_capture_app.py", "scripts/dolphin_audio.py", "tools/reference_capture_environment.py",
                  "tools/reference_controller_probe.py",
                  "tools/reference_input_stream.py", "tools/reference_dolphin_replay.py",
                  "tools/reference_session_comparison.py",
