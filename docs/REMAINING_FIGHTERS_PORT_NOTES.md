@@ -78,11 +78,13 @@ Critically, do not treat the synthetic reducer's former destroy assertion as
 the cause of the historical camera failure. The historical report
 `work/pr86-final-frozen-b-two-match-r1/report.json` records a natural slot-2
 Sheik win (match frame 11,725, RNG 2,897,689,676) and reports camera-pool
-ownership error surfaced at Results source cursor 560. In captured source
-revision `607ff56`, the equality check existed only in
+ownership error surfaced at Results source cursor 560. The report records
+checkout `607ff56`, but its served frozen artifact is hash-bound rather than
+commit-bound. In that checkout, the equality check existed only in
 `release_source_camera_and_ground()` during Results teardown; tick and draw
-paths had no camera-pool checks. Cursor 560 therefore identifies where cleanup
-detected the mismatch, not when the pointer first changed. The report retains
+paths had no camera-pool checks. Cursor 560 therefore identifies where the
+late cleanup check detected the mismatch, not when the pointer first changed.
+The report retains
 three P1 Enter intentions (160 ms held/120 ms released), but no Results-frame
 event brackets, consumed PAD rows, connected-port state, pointer values or
 ownership phase. Thus the first invalid transition cannot be recovered from
@@ -1347,11 +1349,12 @@ page state, or connected-port state. This control records event brackets
 193–203, 364–374 and 535–545, and confirms none was consumed as P1 Start before
 the observation. So it excludes a generic camera-pool failure for this
 current-head Samus-winner route, but cannot establish that the historical
-browser consumed equivalent button edges or had equivalent scheduling. In
-historical source `607ff56`, camera ownership was checked only when
+browser consumed equivalent button edges or had equivalent scheduling. The
+historical runner checkout `607ff56` checked camera ownership only when
 `release_source_camera_and_ground()` ran during Results teardown, not at each
-tick/draw boundary. Cursor 560 is therefore the late detection point, not
-evidence that the pointer changed at that frame. The first invalid historical
+tick/draw boundary; the served binary's source commit is unbound. Cursor 560 is
+therefore the late detection point, not evidence that the pointer changed at
+that frame. The first invalid historical
 ownership transition remains unknown. Next discriminator is another naturally
 reached Sheik-winner B Results path with first-change camera snapshots; do not
 call this control a resolution or equate the two incomplete input records.
