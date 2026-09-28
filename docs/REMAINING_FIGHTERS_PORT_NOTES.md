@@ -653,10 +653,13 @@ comparisons pass.
 
 ## Remaining gates
 
-1. Resolve the retained natural Results camera-pool failure. Fresh passing
-   loops and synthetic negative controls do not establish its cause. Preserve
-   the first-change ownership guards, actual entry packets and historical
-   failure independently.
+1. Resolve the historical natural Results camera-pool failure. A fresh
+   reconciled-head four-match B run includes a natural slot-2 Zelda-origin
+   Sheik win and completes Results→CSS without a guard failure, but confirms at
+   tick 600 after CPU auto-pages at 552. The older wall-clock keyboard packet
+   lacks consumed PAD/page state and camera-entry pointers, so its first
+   invalid transition remains unknown. Preserve both receipts and test a
+   source confirmation just after the page transition before claiming a fix.
 2. The shield-SDI candidate's full B reference replay and exact declared-field
    comparisons now pass for every captured gameplay row. Complete final
    affected builds/full tests and fresh
@@ -674,6 +677,62 @@ comparisons pass.
 
 PR #86 remains the single open PR. No merge or deployment has been made.
 Evidence does not support “fully playable,” equivalence, or task completion.
+
+## Reconciled-head natural Sheik-winner Results discriminator (2026-09-27)
+
+The current-head rendered receipt is
+`work/pr86-0c9b21a-b-four-match-source-tick-r1/report.json`. It binds to clean
+source HEAD `0c9b21afb59d50157da21f518290d20d0c82d430`, tree
+`eae066b2bd3e98e28a0c8179921fdc07cb7b6cbc`, with no tracked diff at start or
+end. The served Release artifacts are headless Chrome 153 / WebGPU Metal JS
+`62bf2d142fa0aaf8d7642cc2fbba39bf80c43355461d182de0eb9b2853f7f89a` and Wasm
+`8cf791ba7f8e558ab03f215b3f1be2565545eee97e899265ca4dd84d9e829406`.
+
+Four natural lineup-B matches (Samus, Yoshi, Zelda, Falco; all CPU9; four
+stocks; Final Destination) each reached Results, returned to original CSS,
+and entered the next match. Match 1 ended at gameplay frame 14,885 with slot 2
+as the sole terminal winner; the retained typed entry packet identifies
+`ckind=18, ftkind=7` (Zelda-origin Sheik), and
+`match-1-natural-results-after-first-start.png` visibly shows Sheik first.
+No winner, seed, form, or gameplay state was forced.
+
+The Results input was a development source-boundary PAD schedule, not ordinary
+keyboard event replay: P1-only ten-tick Start holds at Results ticks 180, 360,
+and 600; ports 0/1 were connected (P2 neutral), and CPU ports 2/3 disconnected.
+Both CPU pages advanced 0→1 at completed source frame 552 (the tick-551
+sample), before the consumed P1 confirmation at tick 600. All 622 Results
+source ticks returned. The source camera pool was null before Results OnEnter,
+became `0xb21b940` during OnEnter, and matched the context/owner after collision
+adoption. The phase-labelled ownership guards did not fire through Results
+draw/tick, close, host handoff, teardown, or CSS return. The report retains the
+consumed PAD rows, page checks, entry packets, screenshots, source progress,
+and zero page/native/timing-disruption errors. This is rendered functional
+evidence, not retail state/draw equivalence, pixel equivalence, or foreground
+timing/performance evidence.
+
+Comparison with the historical report
+`work/pr86-final-frozen-b-two-match-r1/report.json` leaves a real gap. That
+older run has three P1 Enter intentions (160 ms held / 120 ms released), a
+natural Sheik win, and a camera-pool error detected at Results cursor 560, but
+no served-binary source commit binding, trusted keyboard event brackets,
+consumed PAD edge/release rows, CPU page state, or camera-entry pointer
+snapshot. In the fresh run above the final confirmation is at 600, after the
+CPU page transition at 552; the historical failure is detected 40 ticks
+earlier. The old cursor therefore cannot be mapped to an equivalent input or
+first-corruption boundary. A source diff review from old checkout `607ff56` to
+this head finds the added Results pool observations/guards and per-destructor
+checks, but no change to the original Results OnEnter/OnExit routines that
+would explain a behavioral repair. The current run excludes a generic
+Sheik-winner teardown failure under its controlled source-tick route; it does
+not establish that the historical keyboard failure was fixed.
+
+Next discriminator: keep the same first two source-tick pulses but queue the
+final P1 edge at tick 553, immediately after both CPU page transitions at 552.
+If that current-head natural Sheik case also returns cleanly, proceed to a
+current-head ordinary-keyboard run that records event brackets and consumed
+PAD rows; do not infer its outcome from the controlled PAD case. The historical
+first invalid ownership transition remains unlocated until those differences
+are tested or a reviewable first-change packet establishes the boundary.
 
 ## Current natural Results checkpoint (2026-09-27)
 

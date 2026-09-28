@@ -8,8 +8,8 @@
  * keyboard-three-prefix mode retains the first three ordinary pulses through
  * Results source frame 560 before continuing to CSS. Source-tick remains a
  * separate controlled PAD path, not a keyboard/reference claim. The
- * source-tick-three-pulse mode preserves the focused 180/360/600 PAD schedule
- * and checks disconnected CPU auto-pages before the final pulse. */
+ * source-tick-three-pulse mode preserves the focused 180/360/final-tick PAD
+ * schedule and checks disconnected CPU auto-pages before the final pulse. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -28,14 +28,20 @@ import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
 
 const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input'].map(name=>[name,{type:'string'}])),
+  'results-confirm-frame':{type:'string'},
   matches:{type:'string'},'setup-only':{type:'boolean'}}});
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2|3|4] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|source-tick|source-tick-three-pulse]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2|3|4] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK]');
 const resultsInputMode=values['results-input']||'keyboard';
 if(!['keyboard','keyboard-three-prefix','keyboard-gated','source-tick','source-tick-three-pulse'].includes(resultsInputMode))
   throw Error('--results-input must be keyboard, keyboard-three-prefix, keyboard-gated, source-tick, or source-tick-three-pulse');
 const sourceTickMode=resultsInputMode==='source-tick'||resultsInputMode==='source-tick-three-pulse';
 const sourceTickThreePulse=resultsInputMode==='source-tick-three-pulse';
+const resultsConfirmFrame=Number(values['results-confirm-frame']||600);
+if(sourceTickThreePulse&&(!Number.isInteger(resultsConfirmFrame)||resultsConfirmFrame<=360||resultsConfirmFrame>8191))
+  throw Error('--results-confirm-frame must be an integer source tick after the tick-360 pulse and no later than 8191');
+if(!sourceTickThreePulse&&values['results-confirm-frame']!==undefined)
+  throw Error('--results-confirm-frame is only valid with --results-input source-tick-three-pulse');
 const matchCount=Number(values.matches||2);
 if(![1,2,3,4].includes(matchCount))throw Error('--matches must be 1, 2, 3 or 4');
 const url=new URL(values.url);
@@ -79,7 +85,7 @@ const continuationScope=matchCount===1?'natural Results→CSS only':
 const resultsInputScope=resultsInputMode==='keyboard-three-prefix'?
   'first three ordinary 160/120ms Enter pulses retained through source cursor 560, then ordinary continuation; not an exact historical consumed-PAD replay':
   sourceTickThreePulse?
-  'P1-only ten-source-tick Start holds queued no earlier than Results ticks 180/360/600; CPU page transitions must precede the tick-600 confirmation; connectedness and consumed edges retained; controlled PAD path, not literal keyboard-event replay':null;
+  `P1-only ten-source-tick Start holds queued at Results ticks 180/360/${resultsConfirmFrame}; disconnected CPU page transitions must precede the tick-${resultsConfirmFrame} confirmation; connectedness and consumed edges retained; controlled PAD path, not literal keyboard-event replay`:null;
 const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
   scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, four CPU9 players, four stocks, Final Destination; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
   results_input_mode:resultsInputMode,
@@ -445,7 +451,7 @@ async function runMatch(matchIndex,expected){
     // Pre-queue through the source PAD boundary while original CSS is idle.
     // The Results source loop owns exact consumption; page polling/screenshot
     // callbacks cannot move these targets or inject a late sample.
-    const events=[180,360,600].map(targetFrame=>({targetFrame,port:0,
+    const events=[180,360,resultsConfirmFrame].map(targetFrame=>({targetFrame,port:0,
       button:buttonStart,duration:10}));
     const armed=await page.evaluate(scheduleResultsP1StartSequence,{events});
     assert.equal(armed.status,'scheduled','The source Results PAD schedule must be armed before SSS');
@@ -751,7 +757,7 @@ async function runMatch(matchIndex,expected){
   }
   if(sourceTickMode){
     report.phases.push(sourceTickThreePulse?
-      `Results ${matchIndex}: P1-only Start holds at Results ticks 180/360/600; keyboard path not used`:
+      `Results ${matchIndex}: P1-only Start holds at Results ticks 180/360/${resultsConfirmFrame}; keyboard path not used`:
       `Results ${matchIndex}: P1-only ten-source-tick pulses; keyboard path not used`);
     const starts=[];
     const first=sourceTickThreePulse?
@@ -787,21 +793,21 @@ async function runMatch(matchIndex,expected){
       }
       const pagesBeforeConfirmation=stopBeforeConfirmation?null:
         sourceTickThreePulse?
-          await waitForCpuPagesBeforeSourceFrame(600,
-            `results-${matchIndex}-CPU-pages-before-tick-600`):null;
+          await waitForCpuPagesBeforeSourceFrame(resultsConfirmFrame,
+            `results-${matchIndex}-CPU-pages-before-tick-${resultsConfirmFrame}`):null;
       let confirmation=null;
       if(!stopBeforeConfirmation&&sourceTickThreePulse){
         assert(pagesBeforeConfirmation&&!pagesBeforeConfirmation.natural_css,
-          'Both disconnected CPU pages must be observed before the tick-600 confirmation');
+          `Both disconnected CPU pages must be observed before the tick-${resultsConfirmFrame} confirmation`);
         const pageCheck={match:matchIndex,status:'passed-before-queue',
-          input:'P1-only raw PAD Start holds at source ticks 180/360/600; ports 0/1 connected and neutral between pulses; CPU ports 2/3 disconnected',
+          input:`P1-only raw PAD Start holds at source ticks 180/360/${resultsConfirmFrame}; ports 0/1 connected and neutral between pulses; CPU ports 2/3 disconnected`,
           source_frame_before_confirmation:pagesBeforeConfirmation.source_frame,
-          confirmation_queue_target:600,attempted_confirmation_source_frame:null,
+          confirmation_queue_target:resultsConfirmFrame,attempted_confirmation_source_frame:null,
           confirmation_source_frame:null,confirmation_consumed:false,
           transitions:pagesBeforeConfirmation.transitions,
           connectedness:pagesBeforeConfirmation.connectedness};
         report.results_page_transition_checks.push(pageCheck);
-        confirmation=await queueSourceStartAtExactTick(600,
+        confirmation=await queueSourceStartAtExactTick(resultsConfirmFrame,
           `results-${matchIndex}-source-confirm-after-auto-page`);
         if(confirmation?.natural_css){
           pageCheck.status='natural-css-before-confirmation';
@@ -810,7 +816,7 @@ async function runMatch(matchIndex,expected){
           pageCheck.attempted_confirmation_source_frame=confirmation;
         }
       }else if(!stopBeforeConfirmation){
-        confirmation=await queueSourceStart(600,
+        confirmation=await queueSourceStart(resultsConfirmFrame,
           `results-${matchIndex}-source-confirm-after-auto-page`,async ready=>{
         const trace=await readResultsSourcePadTrace();
         assert(!trace.overflow,'Pre-confirmation Results trace overflowed');
@@ -829,7 +835,7 @@ async function runMatch(matchIndex,expected){
       return {match:matchIndex,status:'pass',
         input:'P1-only source-tick Start; historical keyboard path not used',
         source_frame_before_confirmation:beforeConfirmFrame,
-        confirmation_queue_target:600,transitions:cpuTransitions};
+        confirmation_queue_target:resultsConfirmFrame,transitions:cpuTransitions};
       });
       }
       if(confirmation?.natural_css){
@@ -837,8 +843,8 @@ async function runMatch(matchIndex,expected){
           source_frame:confirmation.source_frame,
           auto_page_gate:'not reached; inspect retained PAD trace'};
       }else if(confirmation){
-        if(sourceTickThreePulse)assert.equal(confirmation,600,
-          'The final held-Start edge must be queued at Results source tick 600');
+        if(sourceTickThreePulse)assert.equal(confirmation,resultsConfirmFrame,
+          `The final held-Start edge must be queued at Results source tick ${resultsConfirmFrame}`);
         starts.push(confirmation);
         // Some authored Results routes need another ordinary P1 confirmation.
         // Stop as soon as original CSS returns; never queue into a later scene.
@@ -1258,15 +1264,15 @@ async function runMatch(matchIndex,expected){
     }
     if(sourceTickThreePulse&&result.results_source_start_pulse_frames.length===3){
       const pulses=result.results_source_start_pulse_frames;
-      assert.deepEqual(pulses,[180,360,600],
-        'The focused Results reducer must retain the exact 180/360/600 source-tick pulse schedule');
+      assert.deepEqual(pulses,[180,360,resultsConfirmFrame],
+        'The focused Results reducer must retain its configured exact source-tick pulse schedule');
       const firstCpuTransition=Math.min(...cpuPageTransitions.map(row=>row.source_frame));
       const lastCpuTransition=Math.max(...cpuPageTransitions.map(row=>row.source_frame));
       assert(pulses[1]+9<firstCpuTransition&&lastCpuTransition<pulses[2],
-        'Both disconnected CPU pages must auto-advance after the tick-360 pulse and before tick-600 confirmation');
+        `Both disconnected CPU pages must auto-advance after the tick-360 pulse and before tick-${resultsConfirmFrame} confirmation`);
     }
     const pageCheck=report.results_page_transition_checks.find(row=>row.match===matchIndex&&
-      row.confirmation_queue_target===600&&
+      row.confirmation_queue_target===resultsConfirmFrame&&
       (row.status==='pass'||row.status==='queued-awaiting-consumed-trace'));
     if(pageCheck){
       assert.deepEqual(cpuPageTransitions.map(row=>row.slot),[2,3],
@@ -1276,10 +1282,10 @@ async function runMatch(matchIndex,expected){
       assert(confirmationRun,
         'The queued source-tick confirmation must match a consumed P1 Start in the retained PAD trace');
       if(sourceTickThreePulse){
-        assert.equal(pageCheck.attempted_confirmation_source_frame,600,
-          'The source-tick reducer must dispatch its final P1 Start at cursor 600');
-        assert.equal(confirmationRun.first_source_frame,600,
-          'The source-tick reducer must consume its final P1 Start at cursor 600');
+        assert.equal(pageCheck.attempted_confirmation_source_frame,resultsConfirmFrame,
+          `The source-tick reducer must dispatch its final P1 Start at cursor ${resultsConfirmFrame}`);
+        assert.equal(confirmationRun.first_source_frame,resultsConfirmFrame,
+          `The source-tick reducer must consume its final P1 Start at cursor ${resultsConfirmFrame}`);
       }
       pageCheck.confirmation_source_frame=confirmationRun.first_source_frame;
       pageCheck.confirmation_source_run=confirmationRun;

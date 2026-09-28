@@ -7,24 +7,27 @@ match loops, comparison limits, and explicit open gates are recorded in
 [Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md).
 The PR branch is reconciled to current `origin/main` `b542df7`, including
 shared runtime #89 (`aecc3e64`), PR #93 (`2e083bf`), PR #96 (`8671362`), and
-the later #109 audio-capture change. Fresh `ab798ed` Release runtime and
-headless Chrome evidence now cover two natural B CPU9, four-stock Final
-Destination matches, both Results→CSS returns, and entry into the next match.
-The rendered receipt records actual Zelda↔Sheik form changes, source-tick P1
-Start edges, disconnected CPU auto-pages and stable camera ownership, with no
-browser/runtime errors or timing interruptions. Winners were Samus and Falco,
-not Sheik, so this does not resolve the historical natural slot-2 Sheik-winner
-Results guard failure. Receipt: `work/pr86-ab798ed-b-source-tick-three-pulse-current-head-r1/report.json`.
-A current-head rendered A two-match loop, fresh natural Sheik-winner
-first-boundary capture, supported original comparison, and required final full
-suite remain open. The [per-character notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md)
-keep the gate classification and link to the scoped report.
+the later #109 audio-capture change. A fresh current-head B capture completed
+four natural CPU9, four-stock Final Destination matches and all four
+Results→CSS→next-match loops. Match 1 naturally ended with slot-2
+Zelda-origin Sheik; its rendered Results, source-tick P1 continuation, and
+return path passed without a camera guard, browser/native error, or timing
+interruption. The controlled confirmation was at Results tick 600, after CPU
+pages auto-advanced at 552. This shows the failure does not reproduce on the
+reconciled branch under that source-tick route; it does not establish the cause
+of the older wall-clock keyboard failure, whose capture lacks consumed PAD and
+camera-entry snapshots. Receipt: `work/pr86-0c9b21a-b-four-match-source-tick-r1/report.json`.
+A current-head A loop, a near-560 confirmation discriminator, the historical
+keyboard-path distinction, supported original comparison, and required final
+full suite remain open. The [per-character notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md)
+retain the scoped evidence and remaining gates.
 Focused current-main checks also pass for source-context/collision traces,
 owned-DOL source-stack profiling, common-context restore/restart, stage numeric
 context, effect-bank lifecycle, Nana's nonzero Results asset root, and the
 texture/material/native-joint/archive set (44 tests). Optional Link/Pikachu
-effect archives are absent locally and remain unverified. Fresh head-bound
-browser scenarios and the full suite remain open.
+effect archives are absent locally and remain unverified. The B receipt above
+is a current-head rendered functional scenario; a fresh A loop and the required
+full suite remain open.
 Main including PR #89 is merged and its ownership/carry guarantees retained.
 Reconciled checks exposed and repaired the Player mapping owner, Nana's signed
 input history and partner-correction rounding. The original-consistent partner
