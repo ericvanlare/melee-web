@@ -32,7 +32,9 @@ let releaseRead = null;
 let readCount = 0;
 let discClosed = false;
 
-Object.defineProperty(globalThis, 'navigator', {value: {gpu: {}}, configurable: true});
+Object.defineProperty(globalThis, 'navigator', {
+  value: {gpu: {requestAdapter: async () => ({limits: {}})}}, configurable: true,
+});
 globalThis.window = globalThis;
 globalThis.isSecureContext = true;
 globalThis.crossOriginIsolated = true;
@@ -204,6 +206,7 @@ const mounted = mountMeleeRuntime({
     installModule(context.Module);
   },
 });
+while (!owner) await Promise.resolve();
 owner.Module.onRuntimeInitialized();
 // The native cache service is sampled from the first post-main frame. Keep
 // this controlled owner on the same boundary as the real browser loop.
