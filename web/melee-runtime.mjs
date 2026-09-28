@@ -291,7 +291,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     menuPreparation(label, keepAudio = false) { preparationLabel = label || 'Preparing original scene'; preparationKeepsAudio = !!keepAudio; message = ''; setLoading('native', 'Preparing game data…', 0, 0); emit('preparation', {label: preparationLabel, keepAudio}); publish(); },
     menuPreparationDone() { preparationLabel = ''; message = ''; if (loading?.phase === 'native') { loading = null; refreshCatalogLoading(); } emit('preparationDone'); publish(); },
     menuPreparationCanceled() { preparationLabel = ''; preparationKeepsAudio = false; message = ''; if (loading?.phase === 'native') loading = null; emit('preparationCanceled'); publish(); },
-    menuPreparationFailed(error) { preparationLabel = ''; preparationKeepsAudio = false; message = error || 'Native preparation failed'; if (loading?.phase === 'native') loading = null; emit('preparationFailed', message); publish(); },
+    menuPreparationFailed(error) { preparationLabel = ''; preparationKeepsAudio = false; message = error || 'Native preparation failed'; if (loading?.phase === 'native') loading = null; emit('preparationFailed', message); publish(); onError(Error(message)); },
     menuAssetsRequested(generation) {
       // Native only requests after closing the outgoing owners. Keep its
       // Constructing gate stopped until the complete scope commits.

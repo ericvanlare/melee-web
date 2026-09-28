@@ -9,6 +9,7 @@ import {mountMeleeRuntime} from '../web/melee-runtime.mjs';
 const mode = process.argv[2] || '--lifecycle';
 const calls = [];
 const states = [];
+const surfacedErrors = [];
 const listeners = new Map();
 let phase = 0;
 let running = false;
@@ -216,6 +217,7 @@ const mounted = mountMeleeRuntime({
   createAudio: mode === '--destroy-unload-fail' ? createTestAudio : undefined,
   loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
   onState: state => states.push(state),
+  onError: error => surfacedErrors.push(String(error?.message || error)),
   onOwner: context => {
     owner = context;
     installModule(context.Module);
@@ -403,6 +405,22 @@ async function destroyUnloadFails() {
   console.log('Scoped runtime owner: failed native unload preserves the error and still closes File/audio.');
 }
 
+async function sourceTransitionFailure() {
+  await settle(player.importDisc({name: 'source-transition.iso'}),
+    'source-transition setup import did not settle');
+  const error = 'Original Title idle reached source GM_OPENING_MV state 1. Eject to recover.';
+  window.menuPreparation('Original source transition', false);
+  window.menuPreparationFailed(error);
+  assert.deepEqual(surfacedErrors, [error],
+    'A native source transition failure must reach the public error UI');
+  assert.equal(player.getState().message, error);
+  assert.equal(player.getState().canUnload, true,
+    'The explicit unsupported-route error must leave Eject available');
+  await settle(player.destroy(), 'Eject after source-transition failure did not settle');
+  assert.equal(discClosed, true, 'Eject closes the owned disc session');
+  console.log('Scoped runtime owner: unsupported source transition is surfaced and remains Eject-recoverable.');
+}
+
 if (mode === '--lifecycle') await lifecycle();
 else if (mode === '--duplicate') await duplicateRequest();
 else if (mode === '--commit-fail') await commitFails();
@@ -411,4 +429,5 @@ else if (mode === '--put-fail') await transferFails('put');
 else if (mode === '--late-open-stop') await lateOpen('stop');
 else if (mode === '--late-open-destroy') await lateOpen('destroy');
 else if (mode === '--destroy-unload-fail') await destroyUnloadFails();
+else if (mode === '--source-transition-fail') await sourceTransitionFailure();
 else throw Error(`Unknown scoped-owner mode: ${mode}`);
