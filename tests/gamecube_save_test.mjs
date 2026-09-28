@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import {createMeleeGCI, parseMeleeGCI, MELEE_GCI_PROFILE_BYTES} from '../web/gamecube-save.mjs';
+import {createMeleeGCI, parseMeleeGCI, MELEE_GCI_FILE_BYTES,
+  MELEE_GCI_PROFILE_BYTES} from '../web/gamecube-save.mjs';
 
 const HEADER = 0x40;
 const BLOCK = 0x2000;
@@ -56,7 +57,8 @@ profile[0] = 0x07; profile[1] = 0xff;
 profile[2] = 0x01; profile[3] = 0xc0;
 const at = new Date('2026-09-26T20:10:11.000Z');
 const {bytes, fileName} = createMeleeGCI(profile, at);
-assert.equal(bytes.length, 0x40 + 11 * 0x2000);
+assert.equal(MELEE_GCI_FILE_BYTES, 90_176);
+assert.equal(bytes.length, MELEE_GCI_FILE_BYTES);
 assert.equal(fileName, 'melee-save-GALE01-20260926T201011Z.gci');
 assert.deepEqual(parseMeleeGCI(bytes), profile);
 

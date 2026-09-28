@@ -1,4 +1,5 @@
-import {parseMeleeGCI, downloadMeleeGCI, MELEE_GCI_PROFILE_BYTES} from './gamecube-save.mjs';
+import {parseMeleeGCI, downloadMeleeGCI, MELEE_GCI_FILE_BYTES,
+  MELEE_GCI_PROFILE_BYTES} from './gamecube-save.mjs';
 import {SaveProfileStore, SaveProfileStorageError} from './save-profile-store.mjs';
 
 const $ = id => document.getElementById(id);
@@ -277,6 +278,11 @@ export function mountSaveProfileSettings({onError = () => {}, onBusy = () => {}}
     const file = event.currentTarget.files?.[0];
     event.currentTarget.value = '';
     if (!file) return;
+    if (file.size !== MELEE_GCI_FILE_BYTES) {
+      showFailure(new Error(
+        `Melee GCI must be exactly ${MELEE_GCI_FILE_BYTES} bytes; selected file has ${file.size} bytes.`));
+      return;
+    }
     let candidate;
     try { candidate = parseMeleeGCI(new Uint8Array(await file.arrayBuffer())); }
     catch (error) { showFailure(error); return; }

@@ -145,6 +145,27 @@ choose **Import Save File(s)**. A console transfer still needs compatible
 GameCube memory-card hardware and a transfer method such as homebrew. No
 physical-console test is claimed.
 
+The Settings file picker checks the selected file's exact 90,176-byte GCI
+extent using the codec's exported `MELEE_GCI_FILE_BYTES` constant before
+calling `File.arrayBuffer()`. Wrong-sized inputs are rejected before parsing,
+confirmation, save writes, or source restart; exact-size files still pass the
+full format and checksum validation above. The [bounded browser regression
+receipt](evidence/save-profile-oversized-import-v1.json) records an oversized
+input rejected without reading bytes and a synthetic exact-size GCI that
+continues through confirmed import. This fixture is controller-level input
+validation, not game-written interoperability evidence.
+
+Reproduce it with the installed headless browser runtime:
+
+```sh
+node tests/save_profile_oversized_import_browser_test.mjs \
+  --out work/save-profile-oversized-import \
+  --playwright <installed-Playwright-package>
+```
+
+The output directory must be new. `scripts/browser_tools.mjs` selects the
+installed Chrome binary and keeps host audio muted.
+
 Dolphin's GCI-folder mode can also load individual GCI files from the
 configured USA folder. These are container-loading workflows; they do not by
 themselves prove that Melee accepts or uses the save. Dolphin's guide describes

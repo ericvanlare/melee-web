@@ -1,6 +1,7 @@
 const GCI_HEADER = 0x40;
 const CARD_BLOCK = 0x2000;
 const BLOCK_COUNT = 11;
+export const MELEE_GCI_FILE_BYTES = GCI_HEADER + BLOCK_COUNT * CARD_BLOCK;
 const SAVE_BYTES = 0x1790;
 const BANK_BYTES = 0x1F2C;
 const BANK_COUNT = 7;
@@ -164,7 +165,7 @@ function cardImageBytes(gci) {
 
 function validateDirectoryHeader(gci) {
   if (!(gci instanceof Uint8Array)) fail('Choose a GameCube .gci save file.');
-  if (gci.length !== GCI_HEADER + BLOCK_COUNT * CARD_BLOCK ||
+  if (gci.length !== MELEE_GCI_FILE_BYTES ||
       be16(gci, 0x38) !== BLOCK_COUNT)
     fail('Unsupported save size or block count. Expected an 11-block Melee save file.');
   if (!equal(gci.subarray(0, 6), GAME_CODE))
@@ -241,7 +242,7 @@ export function createMeleeGCI(profile, date = new Date()) {
   header[0x3a] = 0xff; header[0x3b] = 0xff;
   new DataView(header.buffer).setUint32(0x3c, 0, false);
 
-  const gci = new Uint8Array(GCI_HEADER + BLOCK_COUNT * CARD_BLOCK);
+  const gci = new Uint8Array(MELEE_GCI_FILE_BYTES);
   gci.set(header, 0);
   const first = gci.subarray(GCI_HEADER, GCI_HEADER + CARD_BLOCK);
   const year = date.getUTCFullYear();
