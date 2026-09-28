@@ -55,18 +55,23 @@ class WebLaunchTests(unittest.TestCase):
              "process.stdout.write(JSON.stringify(Object.keys(NATIVE_GAME_DISC_FILES)));"],
             cwd=ROOT, check=True, capture_output=True, text=True,
         )
-        native_block = re.search(
-            r"constexpr std::array<std::string_view,(\d+)> keys=\{(.*?)\};",
-            browser, re.S,
-        )
-        self.assertIsNotNone(native_block)
+        native_blocks = {
+            match.group(2): (int(match.group(1)), re.findall(r'"([^"]*)"', match.group(3)))
+            for match in re.finditer(
+                r"constexpr std::array<std::string_view,(\d+)> (keys|route_asset_keys|zelda_sheik_keys)=\{(.*?)\};",
+                browser, re.S,
+            )
+        }
+        self.assertEqual(set(native_blocks), {"keys", "route_asset_keys", "zelda_sheik_keys"})
         manifest_keys = set(json.loads(manifest.stdout))
-        authored_keys = re.findall(r'"([^"]*)"', native_block.group(2))
-        self.assertEqual(int(native_block.group(1)), len(authored_keys),
-                         "native upload allowlist must not include implicit empty entries")
-        native_keys = set(authored_keys)
+        native_keys = set()
+        for name, (declared_count, authored_keys) in native_blocks.items():
+            with self.subTest(native_allowlist=name):
+                self.assertEqual(declared_count, len(authored_keys),
+                                 "native upload allowlist must not include implicit empty entries")
+            native_keys.update(authored_keys)
         self.assertEqual(native_keys, manifest_keys | {"dsp_coef.bin", "sislib_font.bin"},
-                         "native upload allowlist must match the disc manifest plus generated inputs")
+                         "native upload allowlist arrays must cover the disc manifest plus generated inputs")
 
     def test_runtime_builds_native_browser_target(self):
         sys.path.insert(0, str(ROOT / "scripts"))
