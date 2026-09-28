@@ -107,6 +107,7 @@ class CaptureRunnerTests(unittest.TestCase):
             "Dolphin.Input.BackgroundInput=True",
             "Dolphin.Core.CPUCore=0",
             "Dolphin.DSP.Backend=No Audio Output",
+            "Dolphin.DSP.Muted=True",
             "Dolphin.Core.CPUThread=False",
             "Dolphin.Core.EnableCheats=False",
             "Dolphin.Core.EnableCustomRTC=True",

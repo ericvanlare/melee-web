@@ -78,6 +78,12 @@ scenario's assertions. Do not open or focus a desktop browser, call
 computer work. Existing functional harnesses default to headless; `--headed`
 is an explicit opt-in for an authorized foreground session.
 
+Keep host speaker output silent for routine browser and Dolphin runs, including
+ad hoc captures. Use `browserLaunchOptions` and `scripts/dolphin_audio.py`;
+headless video does not imply silent audio. Do not disable DSP, PCM capture or
+Web Audio processing to mute speakers. Explicit `audible=True` / `audible:true`
+is only for an arranged listening session. Do not change system-wide volume.
+
 Foreground timing, OS focus/fullscreen, physical controllers and audible-output
 checks keep their own protocols. Arrange that session with the user (unless
 already authorized), or use a separate test machine; report the gate as unrun
