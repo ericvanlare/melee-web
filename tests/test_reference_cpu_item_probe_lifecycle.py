@@ -49,6 +49,7 @@ class ReferenceCpuItemProbeLifecycleTests(unittest.TestCase):
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
