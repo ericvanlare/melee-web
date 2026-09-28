@@ -1,12 +1,11 @@
-#include <dolphin/os/OSAlarm.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <dolphin/types.h>
 /* Explicit limits of the native menu browser target. Never synthesize a
  * successful alarm or snapshot transition when no provider ran it. */
-void OSCreateAlarm(OSAlarm* alarm){(void)alarm;fputs("Menu diagnostic reached unsupported scene-preload alarm\n",stderr);abort();}
-void OSSetAlarm(OSAlarm* alarm,OSTime tick,OSAlarmHandler handler){(void)alarm;(void)tick;(void)handler;fputs("Menu diagnostic reached unsupported scene-preload alarm\n",stderr);abort();}
-void OSSetPeriodicAlarm(OSAlarm* alarm,OSTime tick,OSTime period,OSAlarmHandler handler){(void)alarm;(void)tick;(void)period;(void)handler;fputs("Native title attract movie reached unsupported periodic alarm\n",stderr);abort();}
-void OSCancelAlarm(OSAlarm* alarm){(void)alarm;fputs("Native menu reached unsupported OS alarm cancellation\n",stderr);abort();}
+/* OSCreateAlarm and OSSetAlarm are provided by gameplay_source_alarm.c.
+ * They abort outside an owned movie alarm scope, and periodic alarms are
+ * accepted only inside that scope. */
 /* THP's retail decoder requires GameCube locked-cache hardware. The CSS-first
  * browser menu route does not enter GM_OPENING; stop if that boundary is ever
  * reached instead of mapping its 0xE0000000 cache to ordinary Wasm memory. */

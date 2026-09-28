@@ -27,6 +27,11 @@ export async function openNativeGameSession(file) {
   const session = await openDiscSession(file);
   return Object.freeze({
     close: () => session.close(),
+    fileInfo: path => {
+      const entry = session.fileInfo(path);
+      return entry ? Object.freeze({name: entry.path, size: entry.size}) : null;
+    },
+    readFile: (path, offset, size) => session.readFile(path, offset, size),
     async readScope(names, report = () => {}) {
       const paths = Object.create(null), seen = new Set();
       for (const name of names) {

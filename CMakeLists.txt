@@ -217,9 +217,26 @@ if(EMSCRIPTEN)
   add_executable(gameplay_source_files_trace tests/gameplay_source_files_trace.c
     src/gameplay_source_files.c)
   target_include_directories(gameplay_source_files_trace PRIVATE src)
+  target_compile_options(gameplay_source_files_trace PRIVATE -UNDEBUG)
   target_link_options(gameplay_source_files_trace PRIVATE -sENVIRONMENT=node
     -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1)
   set_target_properties(gameplay_source_files_trace PROPERTIES SUFFIX ".js")
+  add_executable(gameplay_source_alarm_trace tests/gameplay_source_alarm_trace.c
+    src/gameplay_source_alarm.c)
+  target_include_directories(gameplay_source_alarm_trace PRIVATE src
+    "${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/include")
+  target_compile_definitions(gameplay_source_alarm_trace PRIVATE TARGET_PC)
+  target_compile_options(gameplay_source_alarm_trace PRIVATE -UNDEBUG)
+  target_link_options(gameplay_source_alarm_trace PRIVATE -sENVIRONMENT=node
+    -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1)
+  set_target_properties(gameplay_source_alarm_trace PROPERTIES SUFFIX ".js")
+  add_executable(gameplay_thp_cpu_trace tests/gameplay_thp_cpu_trace.c
+    src/gameplay_thp_cpu.c)
+  target_include_directories(gameplay_thp_cpu_trace PRIVATE src)
+  target_compile_options(gameplay_thp_cpu_trace PRIVATE -UNDEBUG)
+  target_link_options(gameplay_thp_cpu_trace PRIVATE -sENVIRONMENT=node
+    -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1)
+  set_target_properties(gameplay_thp_cpu_trace PROPERTIES SUFFIX ".js")
   add_executable(gameplay_probe src/gameplay_probe.cpp src/dat_archive.cpp src/dat_common.cpp
     src/dat_collision.cpp src/dat_stage.cpp src/dat_fighter_runtime.cpp src/dat_fighter.cpp
     src/fighter_binding.cpp src/dat_animation.cpp)
@@ -250,7 +267,7 @@ if(EMSCRIPTEN)
   set_target_properties(gameplay_fighter_asset_trace PROPERTIES SUFFIX ".js")
   target_link_libraries(gameplay_scheduler_trace PRIVATE fighter_source_runtime)
   target_link_libraries(gameplay_common_context_trace PRIVATE fighter_source_runtime)
-  add_custom_target(gameplay_checks DEPENDS gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace gameplay_source_context_trace gameplay_source_files_trace gameplay_probe hsd_native_trace hsd_native_dat_probe gameplay_stage_lights_trace gameplay_common_context_trace gameplay_rumble_trace original_startup_alloc_trace source_devcom_trace)
+  add_custom_target(gameplay_checks DEPENDS gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace gameplay_source_context_trace gameplay_source_files_trace gameplay_source_alarm_trace gameplay_thp_cpu_trace gameplay_probe hsd_native_trace hsd_native_dat_probe gameplay_stage_lights_trace gameplay_common_context_trace gameplay_rumble_trace original_startup_alloc_trace source_devcom_trace)
 endif()
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/CMakeLists.txt")

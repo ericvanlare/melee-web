@@ -18,6 +18,7 @@ extern "C" {
 #include "runtime_archive_cache.hpp"
 #include "runtime_asset_scope.hpp"
 #include "gameplay_asset_manifest.hpp"
+#include "gameplay_source_files.h"
 #include "gameplay_content.h"
 #include "menu_preparation_state.hpp"
 #include "browser_input.h"
@@ -683,6 +684,13 @@ void advance(){
  }
  if((previous_source_scene==1||previous_source_scene==3||previous_source_scene==4)&&
     route_target>=0){
+  if(previous_source_scene==3){
+   const int opening_state=melee_web_menu_host_route_target_state(host);
+   if(opening_state>=0)
+    throw std::runtime_error("Original Title idle reached source GM_OPENING_MV state "+
+      std::to_string(opening_state)+" (the four-player VS demo); its randomized full-roster "+
+      "gameplay owner is not admitted by this browser runtime yet. Eject to recover.");
+  }
   throw std::runtime_error("Original title/main route requested an unsupported destination");
  }
  const int phase=melee_web_menu_host_phase(host);
@@ -1441,6 +1449,22 @@ if(scoped_assets)throw std::runtime_error("Scoped disc imports require an asset 
  if(!known)throw std::runtime_error("Unknown native menu file: "+std::string(name));
  archive_cache.reset();
  files[name]={data,data+size};return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_source_file_external_set(const char* name,unsigned size){try{
+ if(world||match||results||prize||host_entered)
+  throw std::runtime_error("Close native source owners before configuring streamed disc files");
+ char error[256]{};
+ check(melee_web_source_files_external_set(name,size,error,sizeof(error)),
+       error[0]?error:"Native streamed disc file configuration failed");
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_source_files_external_clear(){try{
+ if(world||match||results||prize||host_entered)
+  throw std::runtime_error("Close native source owners before clearing streamed disc files");
+ char error[256]{};
+ check(melee_web_source_files_external_clear(error,sizeof(error)),
+       error[0]?error:"Native streamed disc file catalog release failed");
+ return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_prepare(){try{
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)

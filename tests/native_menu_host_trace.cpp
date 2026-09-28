@@ -419,13 +419,38 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
         for (unsigned frame = 0; frame < 700 && result != 3; ++frame)
             result = tick(host, *world, raw, audio_phase);
         check(result == 3, "Original Title timeout did not request its source exit");
-        check(!melee_web_menu_host_leave(host, 0, error, sizeof(error)) &&
-                  std::string(error).find("did not contain the retail Start route") !=
-                      std::string::npos,
-              "Title timeout fabricated a Start payload or was accepted as Title Start");
-        check(melee_web_menu_host_route_target_mode(host) == -1,
-              "Title timeout fabricated a supported destination");
-        abort_and_destroy(host, world, audio_phase, "Title timeout");
+        check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        check(melee_web_menu_host_route_target_mode(host) == GM_OPENING_MV,
+              "Title timeout did not preserve the source GM_OPENING_MV destination");
+        check(melee_web_menu_host_route_target_state(host) == 1,
+              "Title timeout did not preserve the source VS-demo state selected by Title");
+        world->verify_immutable_archives();
+        world->close();
+        world.reset();
+        check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+        check(melee_web_current_scene_info() == saved_scene_info,
+              "Opening-mode handoff did not restore its caller GameSceneInfo owner");
+        check(!melee_web_gameplay_world_exists(),
+              "Opening-mode handoff retained the Title SDK world");
+
+        /* An unsupported next owner can retire the completed Title world and
+         * import the disc again without a page reload. */
+        auto* css_host = melee_web_menu_host_create(error, sizeof(error));
+        check(css_host != nullptr, error);
+        auto css_world = std::make_unique<melee_web::GameplayMenuWorld>(files);
+        check(melee_web_menu_host_enter(css_host, css_world->audio(), error,
+                                        sizeof(error)), error);
+        check(melee_web_menu_host_source_scene(css_host) == 1,
+              "Disc reimport after Title idle did not start at original CSS");
+        check_full_roster();
+        for (unsigned frame = 0; frame < 4; ++frame)
+            check(tick(css_host, *css_world, raw, audio_phase) == 1,
+                  "CSS after Title idle left before Eject");
+        check(melee_web_menu_host_leave(css_host, 1, error, sizeof(error)), error);
+        css_world->close();
+        css_world.reset();
+        check(melee_web_menu_host_destroy(css_host, error, sizeof(error)), error);
+        std::cout << "Original Title timeout selected GM_OPENING_MV state 1 and allowed clean CSS reimport\n";
     }
 
     {
@@ -449,7 +474,7 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
                   "Original Main left before Eject");
         abort_and_destroy(host, world, audio_phase, "Main");
     }
-    std::cout << "Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger and timeout recovery passed\n";
+    std::cout << "Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger, Title timeout to Opening state 1 and recovery passed\n";
 }
 }
 int main(int argc,char** argv){try{

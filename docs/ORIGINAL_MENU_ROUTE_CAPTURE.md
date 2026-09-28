@@ -26,6 +26,64 @@ latest headless Metal frame dumps retained at each label; each marker also
 retains the separate passive Observer state and the controller command log.
 This is visual route evidence, not a pixel comparison or a PCM/audio check.
 
+## Title idle and Opening-mode findings
+
+The retained retail idle capture shows that Title timeout is a source mode
+transition, not a Title-to-Title animation loop. After the Title callback's
+20-frame input guard, `gm_Scene_Title_OnFrame` counts source frames; when the
+counter exceeds 600 it writes a zero exit payload and requests scene exit.
+`gmTitleMode_OnExit` interprets that zero payload as `GM_OPENING_MV` and sets
+Opening state 1. `gm_Mode_Opening_OnLoad` selects the state through the source
+`gm_801BF718()` value. State 1 runs the original four-CPU VS demo. The captured
+idle sequence then reaches Title state 2, another VS demo at state 3, and the
+HowTo movie at state 4; the retained trace later wraps to Opening state 0.
+The `GM_OPENING_MV` state table also declares state 5 (`MvOmake15.mth`), which
+was not reached in this retained run.
+
+The capture at
+`work/original-menu-route-20260926-01/title-attract-20260927-full-01/` retained
+41,052 source-state observations and 194 labeled rendered Metal frame samples.
+It contains repeated visits through states 1, 2 and 3 and rendered moving
+samples from the VS demo and HowTo movie. It was terminated by the runner after
+the declared observation window (`scenario_complete=false`), so it does not
+establish a completed repeated-cycle run or controller interruption. The
+separate `title-attract-20260927-probe-title1` capture confirms the first
+timeout destination and Title return, but likewise ends at its bounded
+predicate. Do not describe these files as complete-cycle acceptance.
+
+The browser host now preserves the source Title timeout as
+`GM_OPENING_MV` state 1 and invokes the original Opening mode `OnLoad`. It does
+not turn the zero payload into Start. The browser still reports an explicit
+unsupported destination at the next owner boundary: the original randomized
+VS demo needs its full source player/content lifecycle, while this runtime has
+admitted only 19 fighters. The movie range reader and THP CPU/alarm owners are
+bounded infrastructure for the declared MTH dependencies; the Opening source
+scene callbacks and a rendered/PCM-complete attract cycle are not implemented
+by this increment.
+
+The follow-up is decomposed at the source boundaries:
+
+1. Own each `GM_OPENING_MV` state and its original mode/scene enter, frame,
+   draw, exit and preload callbacks, preserving the state-machine route across
+   resource-scope rebuilds.
+2. Run state 1/3 as source VS demos without changing their four-player
+   `StartMeleeData`, RNG/history selection, all-port input edges or 1200-frame
+   source exit. This requires admitting every source fighter the active save
+   and usage history can select; unsupported content must fail before drawing
+   and remain Eject-recoverable.
+3. Run the authored `MvOpen.mth`, `MvHowto.mth` and (when naturally selected)
+   `MvOmake15.mth` through the source THP callbacks, bounded DVD ranges,
+   source-frame alarm and audio/render owners. Their disc sizes exceed the
+   current per-asset cap, so they must remain streamed.
+4. Compare more than one complete retail/browser cycle at source-frame
+   boundaries, including the original return order and ordinary controller
+   interruption from every connected port.
+
+This increment implements and tests the exact Title timeout to Opening state 1
+mode handoff and clean owner retirement. It is a runnable source transition
+boundary, not acceptance of the attract sequence; the next blocking boundary
+is source VS demo ownership and content admission.
+
 ## Browser implementation and lifecycle
 
 The development and public player keep their CSS-first Play behavior. The
@@ -109,6 +167,10 @@ under ignored `work/` and are not committed:
 | `work/pr96-title-main/review-round2/review-head-audio-http.json`, `logs/pages-dev-review-head-audio.log` | Final-head local Pages HTTP verifier receipt and Wrangler output, including the documented reserved-route limitation |
 | `work/pr96-title-main/public-audio-browser-reconciled-head-04/report.json` | Earlier diagnostic run on the same reconciled runtime before final package identity; superseded by the final-head report above |
 | `.../browser-public-lifecycle-03/report.json` | Historical silent-only browser evidence from the earlier public-player lifecycle; superseded for this PR by the audio-enabled final-head run |
+| `work/title-idle-attract/native-opening-state1.jsonl` | Native source-host trace of the zero-payload Title timeout, original `GM_OPENING_MV` state 1 selection, and clean owner retirement/CSS reimport |
+| `work/title-idle-attract/public-audio-browser/report.json` and `*.png` | Headless Chrome run against the Release audio-player package: CSS → supported match → Results → CSS → Main → Title timeout, explicit unsupported Opening state 1 boundary, Eject/reimport to CSS, audio/PCM transport and teardown |
+| `work/title-idle-attract/audio-player.manifest.json` | Production package inventory and producer identity; `source_sha` binds the browser report to the tested commit |
+| `work/title-idle-attract/full-tests-final.log` | Final full unittest discovery: 1,547 tests, 94 optional skips, no failures; the earlier failed run is preserved as `full-tests.log` and its public-export mismatch was fixed |
 
 The route uses the owned CISO directly (SHA-256
 `b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c`) and the

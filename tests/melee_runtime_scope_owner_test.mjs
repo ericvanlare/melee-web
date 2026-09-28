@@ -73,6 +73,13 @@ async function openDisc(file) {
     await new Promise(resolve => { lateOpenResolve = resolve; });
   }
   return {
+    fileInfo(name) {
+      assert.ok(['MvOpen.mth', 'MvHowto.mth', 'MvOmake15.mth'].includes(name));
+      return {name, size: 128};
+    },
+    async readFile(name, offset, size) {
+      return new Uint8Array(size).fill((name.length + offset) & 0xff);
+    },
     async readScope(names) {
       ++readCount;
       readStarted = true;
@@ -148,6 +155,14 @@ function installModule(Module) {
       assert.notEqual(value, 0);
       generation = 0;
       pendingNames = [];
+      return 1;
+    },
+    _melee_web_native_source_file_external_set(namePointer, size) {
+      calls.push(['stream-file', nativeName(namePointer), size]);
+      return 1;
+    },
+    _melee_web_native_source_files_external_clear() {
+      calls.push(['stream-clear']);
       return 1;
     },
     _melee_web_native_menu_prepare() {
@@ -248,6 +263,16 @@ function assetFilesSince(index) {
 async function lifecycle() {
   generation = 0;
   await settle(player.importDisc({name: 'scoped.iso'}), 'initial scoped import did not settle');
+  assert.equal(window.menuStartSourceRead(77, 'MvOpen.mth', 32, 64), true);
+  await pumpUntil(() => window.menuSourceReadStatus(77) === 1,
+    'bounded original movie range did not finish');
+  const movieRange = window.menuSourceReadTake(77);
+  assert.ok(movieRange > 0);
+  assert.deepEqual([...owner.Module.HEAPU8.slice(movieRange, movieRange + 4)],
+    [42, 42, 42, 42], 'the async source bridge stages only the requested bytes');
+  owner.Module._free(movieRange);
+  assert.equal(window.menuSourceReadStatus(77), -1,
+    'taking the staged range retires its temporary owner');
   const initialFiles = assetFilesSince(0);
   assert.equal(initialFiles.length, 19);
   const batches = new Map();

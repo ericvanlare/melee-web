@@ -56,9 +56,13 @@ int melee_web_menu_host_reenter_css_after_parent(MeleeWebMenuHost*,MeleeWebAudio
 /* Current source scene: 0 when the host is between worlds, 1 CSS, 2 SSS,
  * 3 title, 4 main. */
 int melee_web_menu_host_source_scene(const MeleeWebMenuHost*);
-/* Checked retail destination after leaving a title/main/CSS scene: -1 while
- * active or unset, then GM_TITLE=0, GM_MENU=1, or GM_VS=2. */
+/* Checked retail destination after leaving a title/main/CSS scene. Known
+ * menu routes use the compact values GM_TITLE=0, GM_MENU=1, GM_VS=2; other
+ * source modes retain their original mode id. */
 int melee_web_menu_host_route_target_mode(const MeleeWebMenuHost*);
+/* Original opening-mode state selected by the source title callback, or -1
+ * unless the completed source route targets GM_OPENING_MV. */
+int melee_web_menu_host_route_target_state(const MeleeWebMenuHost*);
 /* Reads the separate configuration produced by the original VS-entry rules
  * and player preparation after CSS/SSS OnExit. */
 int melee_web_menu_host_selection(const MeleeWebMenuHost*,MeleeWebMenuMatchSelection*,char*,size_t);
