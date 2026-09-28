@@ -30,14 +30,14 @@ const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input'].map(name=>[name,{type:'string'}])),
   matches:{type:'string'},'setup-only':{type:'boolean'}}});
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|source-tick|source-tick-three-pulse]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2|3|4] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|source-tick|source-tick-three-pulse]');
 const resultsInputMode=values['results-input']||'keyboard';
 if(!['keyboard','keyboard-three-prefix','keyboard-gated','source-tick','source-tick-three-pulse'].includes(resultsInputMode))
   throw Error('--results-input must be keyboard, keyboard-three-prefix, keyboard-gated, source-tick, or source-tick-three-pulse');
 const sourceTickMode=resultsInputMode==='source-tick'||resultsInputMode==='source-tick-three-pulse';
 const sourceTickThreePulse=resultsInputMode==='source-tick-three-pulse';
 const matchCount=Number(values.matches||2);
-if(![1,2].includes(matchCount))throw Error('--matches must be 1 or 2');
+if(![1,2,3,4].includes(matchCount))throw Error('--matches must be 1, 2, 3 or 4');
 const url=new URL(values.url);
 if(!['http:','https:'].includes(url.protocol)||!url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
@@ -75,7 +75,7 @@ const lineup=values.lineup==='A'?
    {name:'Zelda',kind:18,position:[9.1,9.5]},
    {name:'Falco',kind:20,position:[-32.2,9.5]}];
 const continuationScope=matchCount===1?'natural Results→CSS only':
-  'natural Results→CSS→second match';
+  `natural Results→CSS→${matchCount-1} subsequent match${matchCount===2?'':'es'}`;
 const resultsInputScope=resultsInputMode==='keyboard-three-prefix'?
   'first three ordinary 160/120ms Enter pulses retained through source cursor 560, then ordinary continuation; not an exact historical consumed-PAD replay':
   sourceTickThreePulse?
@@ -1461,19 +1461,21 @@ try{
   await configureRoster(lineup);
   if(values['setup-only']){report.result='setup-only-pass';}
   else await runMatch(1,lineup);
-  if(!values['setup-only']&&matchCount===2){
-    let secondLineup=lineup;
-    if(values.lineup==='B'){
-      secondLineup=lineup.map(fighter=>({...fighter}));
-      // Zelda and Sheik share one source CSS icon/ckind. The visible icon row
-      // cannot select the alternate fighter identity by asking the geometry
-      // observer for a nonexistent second icon; exercise Sheik through the
-      // original in-match down-B transition in the dedicated form trace.
-      report.phases.push('B match 2 retains Zelda at the shared CSS icon; Sheik is covered by a separate in-match down-B scenario');
+  if(!values['setup-only']){
+    const retainedLineup=values.lineup==='B'?lineup.map(fighter=>({...fighter})):lineup;
+    for(let matchIndex=2;matchIndex<=matchCount;matchIndex++){
+      if(values.lineup==='B'&&matchIndex===2){
+        // Zelda and Sheik share one source CSS icon/ckind. The visible icon row
+        // cannot select the alternate fighter identity by asking the geometry
+        // observer for a nonexistent second icon; exercise Sheik through the
+        // original in-match down-B transition in the dedicated form trace.
+        report.phases.push('B subsequent matches retain Zelda at the shared CSS icon; Sheik is covered by a separate in-match down-B scenario');
+      }
+      const retained=await verifyRoster(retainedLineup,
+        `four-CPU9 retained roster before match ${matchIndex}`);
+      assert.equal(retained.length,4);
+      await runMatch(matchIndex,retainedLineup);
     }
-    const retained=await verifyRoster(secondLineup,'four-CPU9 retained roster before second match');
-    assert.equal(retained.length,4);
-    await runMatch(2,secondLineup);
   }
   if(!values['setup-only'])report.result='pass';
 }catch(error){

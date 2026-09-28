@@ -84,7 +84,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('results_input_events=await page.evaluate', harness)
         self.assertIn("const continuationScope=matchCount===1?'natural Results→CSS only':",
                       harness)
-        self.assertIn("'natural Results→CSS→second match';", harness)
+        self.assertIn('natural Results→CSS→${matchCount-1} subsequent match', harness)
 
     def test_read_only_harness_observation_and_build_binding(self):
         result = subprocess.run([str(node_runtime()), str(ROOT / 'tests/results_entry_packet_test.mjs')],
@@ -126,9 +126,9 @@ class ResultsEntryPacketTests(unittest.TestCase):
     def test_three_pulse_prefix_can_cover_both_natural_matches(self):
         harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
         self.assertIn("['url','disc','out','lineup','playwright','build-dir','results-input']", harness)
-        self.assertIn("if(![1,2].includes(matchCount))throw Error('--matches must be 1 or 2');", harness)
+        self.assertIn("if(![1,2,3,4].includes(matchCount))throw Error('--matches must be 1, 2, 3 or 4');", harness)
         self.assertIn('for(let pulse=3;pulse<48&&state.phase!==1;pulse++)', harness)
-        self.assertIn('natural Results→CSS→second match', harness)
+        self.assertIn('for(let matchIndex=2;matchIndex<=matchCount;matchIndex++)', harness)
 
     def test_results_pad_trace_is_bounded_and_development_only(self):
         source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
