@@ -43,6 +43,24 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `docs/COMPILER_CACHE_REVIEW.md`
 - `tools/allocation_trace_compare.py`
 - `tools/browser_failure_summary.py`
+- `tools/slippi_format.py`
+- `reference-capture/slippi/LICENSES.md`
+- `reference-capture/slippi/LOCAL_TESTBED.md`
+- `reference-capture/slippi/client.lock.json`
+- `reference-capture/slippi/local_matchmaker/CMakeLists.txt`
+- `reference-capture/slippi/local_matchmaker/integration_test.cpp`
+- `reference-capture/slippi/local_matchmaker/pairing.cpp`
+- `reference-capture/slippi/local_matchmaker/pairing.hpp`
+- `reference-capture/slippi/local_matchmaker/protocol.cpp`
+- `reference-capture/slippi/local_matchmaker/protocol.hpp`
+- `reference-capture/slippi/local_matchmaker/server.cpp`
+- `reference-capture/slippi/local_matchmaker/tests.cpp`
+- `reference-capture/slippi/process.py`
+- `reference-capture/slippi/run_local.py`
+- `reference-capture/slippi/runtime.py`
+- `reference-capture/slippi/test_process.py`
+- `reference-capture/slippi/test_run_local.py`
+- `reference-capture/slippi/test_runtime.py`
 
 The first five implementations were read and recorded in the
 [source inventory](docs/SOURCE_LICENSE_INVENTORY.md); their recorded authorship
@@ -60,6 +78,11 @@ rows, recovered game or SDK implementation, or generated capture output. This
 file-level provenance does not extend to the inputs read by the tool or other
 files in their directories.
 
+The Slippi timeline parser listed above is a separately authored reader of the
+public Slippi format specification. Its conformance checks compare behavior
+with pinned `slippi-js`; the parser does not import or copy that LGPL
+implementation. The tool-specific inventory identifies that distinction.
+
 ## Exclusions and existing terms
 
 An unlisted file receives no new permission from the root license. This is an
@@ -76,6 +99,14 @@ work. Review and add further separable project files individually.
 - The separate Dolphin observer, its patches and covered historical sources
   retain their declared GPL-2.0-or-later terms. See its
   [license inventory](reference-capture/dolphin/LICENSES.md).
+- The local Slippi matchmaking service and its bounded testbed orchestration
+  are project-authored MIT code listed above. The client adaptation patches
+  in `reference-capture/slippi/patches/`
+  modify pinned Dolphin GPL-2.0-or-later and Slippi Rust Extensions GPL-2.0
+  sources; they retain those upstream terms and are not covered by the root MIT
+  grant. The full upstream license texts in `reference-capture/slippi/licenses/`
+  are notices only and are not covered by the root MIT grant. See
+  `reference-capture/slippi/LICENSES.md` for exact source pins and boundaries.
 - Aurora, B0XX adaptations, native probe dependencies and other identified
   third-party components retain their own terms. See
   [THIRD_PARTY.md](THIRD_PARTY.md) and the linked full notices.
