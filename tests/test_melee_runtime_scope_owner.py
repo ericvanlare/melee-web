@@ -41,6 +41,9 @@ class ScopedRuntimeOwnerTests(unittest.TestCase):
     def test_destroy_closes_file_and_audio_after_native_unload_failure(self):
         self.run_mode("--destroy-unload-fail", "failed native unload")
 
+    def test_source_transition_error_is_visible_and_eject_recovers(self):
+        self.run_mode("--source-transition-fail", "unsupported source transition is surfaced")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -168,9 +168,10 @@ under ignored `work/` and are not committed:
 | `work/pr96-title-main/public-audio-browser-reconciled-head-04/report.json` | Earlier diagnostic run on the same reconciled runtime before final package identity; superseded by the final-head report above |
 | `.../browser-public-lifecycle-03/report.json` | Historical silent-only browser evidence from the earlier public-player lifecycle; superseded for this PR by the audio-enabled final-head run |
 | `work/title-idle-attract/native-opening-state1.jsonl` | Native source-host trace of the zero-payload Title timeout, original `GM_OPENING_MV` state 1 selection, and clean owner retirement/CSS reimport |
-| `work/title-idle-attract/public-audio-browser/report.json` and `*.png` | Headless Chrome run against the Release audio-player package: CSS → supported match → Results → CSS → Main → Title timeout, explicit unsupported Opening state 1 boundary, Eject/reimport to CSS, audio/PCM transport and teardown |
-| `work/title-idle-attract/audio-player.manifest.json` | Production package inventory and producer identity; `source_sha` binds the browser report to the tested commit |
-| `work/title-idle-attract/full-tests-final.log` | Final full unittest discovery: 1,547 tests, 94 optional skips, no failures; the earlier failed run is preserved as `full-tests.log` and its public-export mismatch was fixed |
+| `work/title-idle-attract/public-audio-browser/report.json` and `failure.png` | Retained failed first browser iteration: CSS and two supported matches passed, then Title timeout left the menu owner closed without surfacing an error dialog; the 45-second route assertion failed. Superseded by the final UI recovery check |
+| `work/title-idle-attract/public-audio-browser-final/report.json` and `*.png` | Headless Chrome run against the Release audio-player package: CSS → supported match → Results → CSS → Main → Title timeout, explicit unsupported Opening state 1 error, Eject/reimport to CSS, audio/PCM transport and teardown |
+| `work/title-idle-attract/audio-player-final.manifest.json` | Production package inventory and producer identity; `source_sha` binds the browser report to the tested commit |
+| `work/title-idle-attract/full-tests-after-public-error.log` | Final full unittest discovery after the public error-surfacing fix: 1,548 tests, 94 optional skips, no failures; earlier runs remain preserved |
 
 The route uses the owned CISO directly (SHA-256
 `b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c`) and the
