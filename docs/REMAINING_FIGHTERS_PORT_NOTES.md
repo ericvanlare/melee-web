@@ -63,6 +63,13 @@ the same P1-only synthetic reducer. Its receipt is
 disconnected CPU pages advance at source frame 551 before P1 confirms at 600;
 Results exits and host OnExit/commit complete at tick 622; the retained camera
 pool stays `0x81e5f00`, and all four demo owners are constructed and closed.
+These checks and the Release runtime/native builds ran with `HEAD=4cc63d7` plus
+the tracked source/test changes committed unchanged as `5e06c51`; the runtime
+artifacts then hashed to Wasm
+`86affc285908924423aa4d26aa550b072d51e56c0aa736241a6da4bd8a231dba` and JS
+`62bf2d142fa0aaf8d7642cc2fbba39bf80c43355461d182de0eb9b2853f7f89a`. A fresh
+build/test invocation from clean `5e06c51` remains pending before any
+commit-bound browser claim.
 This excludes a generic failure of that synthetic P1-only/auto-page/host-close
 route and fixes its later host-destruction precondition. It does not test draw,
 natural CPU9 outcomes, or the historical Sheik-winner camera-pool failure.
