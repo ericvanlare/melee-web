@@ -14,11 +14,21 @@ try {
   assert.equal(result.playwrightPath,packagePath);
   assert.deepEqual(result.browser,{executablePath:process.execPath});
   assert.deepEqual(browserLaunchOptions(result.browser),{
-    executablePath:process.execPath,headless:true,chromiumSandbox:true,
+    executablePath:process.execPath,headless:true,chromiumSandbox:true,args:['--mute-audio'],
   });
   assert.deepEqual(browserLaunchOptions(result.browser,{headed:true,timeout:321}),{
-    executablePath:process.execPath,headless:false,chromiumSandbox:true,timeout:321,
+    executablePath:process.execPath,headless:false,chromiumSandbox:true,timeout:321,args:['--mute-audio'],
   });
+  const custom={...result.browser,args:['--example','--mute-audio'],ignoreDefaultArgs:['--other','--mute-audio']};
+  const silent=browserLaunchOptions(custom);
+  assert.deepEqual(silent.args,['--example','--mute-audio']);
+  assert.deepEqual(silent.ignoreDefaultArgs,['--other']);
+  const audible=browserLaunchOptions(custom,{audible:true});
+  assert.deepEqual(audible.args,['--example']);
+  assert.deepEqual(audible.ignoreDefaultArgs,['--other','--mute-audio']);
+  assert.deepEqual(custom.args,['--example','--mute-audio']);
+  assert.throws(()=>browserLaunchOptions(result.browser,{audible:'true'}),/audible must be a boolean/);
+  assert.throws(()=>browserLaunchOptions({...result.browser,ignoreDefaultArgs:true}),/ignoreDefaultArgs/);
   assert.throws(()=>browserLaunchOptions(result.browser,{headed:'true'}),/headed must be a boolean/);
   assert.throws(()=>browserLaunchOptions(result.browser,{timeout:-1}),/timeout must be a non-negative integer/);
   await assert.rejects(resolveBrowserTools(path.join(temporary,'missing'),env),/Cannot load Playwright/);
