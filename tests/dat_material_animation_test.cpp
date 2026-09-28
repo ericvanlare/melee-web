@@ -149,7 +149,47 @@ int main() {
             melee_web::TextureIndexValidation::DispatchedValues);
         check(dispatch_guarded.image_count()==2 && bad.data[99]==64,
               "dispatch-checked policy preserves encoded unselected values and exact table capacity");
-        bad=Fixture();bad.data[96]=0x12;rejected(bad); // interpolated index could overshoot
+        Fixture interpolated_index;interpolated_index.data[96]=0x12;
+        interpolated_index.data[99]=48; // 1.5 truncates to source table index 1.
+        melee_web::DatMaterialAnimation original_linear_index(
+            interpolated_index.archive(),0,model);
+        check(original_linear_index.image_count()==2,
+              "source LIN index preserves fractional animation before integer table selection");
+        Fixture signed_fractional_index;signed_fractional_index.data[89]=0x65;
+        signed_fractional_index.data[96]=0x12;signed_fractional_index.data[99]=0xf0;
+        melee_web::DatMaterialAnimation signed_truncation(
+            signed_fractional_index.archive(),0,model);
+        check(signed_truncation.image_count()==2,
+              "source TIMG float-to-int truncation maps negative fractions above -1 to index zero");
+        Fixture linear_overflow;linear_overflow.data[96]=0x12;
+        linear_overflow.data[99]=64;rejected(linear_overflow); // source output reaches index2
+
+        Fixture spline_overflow;
+        spline_overflow.data.resize(640);
+        spline_overflow.relocations.erase(std::remove(
+            spline_overflow.relocations.begin(),spline_overflow.relocations.end(),92),
+            spline_overflow.relocations.end());
+        spline_overflow.link(92,512);put32(spline_overflow.data,80,14);
+        // Two in-range points followed by a Hermite point whose authored
+        // outgoing slope drives the interpolated table index above capacity.
+        const uint8_t spline_bytes[]{0x11,32,1,32,1,0x04,32,0,0,0xf0,0xc1,1,
+                                     0x01,32};
+        std::copy(spline_bytes,spline_bytes+sizeof(spline_bytes),
+                  spline_overflow.data.begin()+512);
+        rejected(spline_overflow);
+
+        Fixture slp_overflow;
+        slp_overflow.data.resize(640);
+        slp_overflow.relocations.erase(std::remove(
+            slp_overflow.relocations.begin(),slp_overflow.relocations.end(),92),
+            slp_overflow.relocations.end());
+        slp_overflow.link(92,512);put32(slp_overflow.data,80,12);
+        // SLP changes op_intrp for the following segment without changing its
+        // value. The source uses that slope-only datum in splGetHelmite.
+        const uint8_t slp_bytes[]{0x11,32,1,32,1,0x05,0,0,0xf0,0xc1,0x01,32};
+        std::copy(slp_bytes,slp_bytes+sizeof(slp_bytes),
+                  slp_overflow.data.begin()+512);
+        rejected(slp_overflow);
         bad=Fixture();put32(bad.data,80,2);rejected(bad); // packet advertises two values
         bad=Fixture();put32(bad.data,32,1);rejected(bad); // missing texture ID
         bad=Fixture();put32(bad.data,48,0);rejected(bad); // absent image table count

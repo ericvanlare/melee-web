@@ -130,6 +130,21 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('for(let pulse=3;pulse<48&&state.phase!==1;pulse++)', harness)
         self.assertIn('for(let matchIndex=2;matchIndex<=matchCount;matchIndex++)', harness)
 
+    def test_historical_two_pulse_prefix_waits_for_cpu_pages_before_third_enter(self):
+        harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
+        self.assertIn("const keyboardPrefixGatedMode=resultsInputMode==='keyboard-gated-two-prefix';", harness)
+        self.assertIn('const initialEnterTargets=keyboardPrefixGatedMode?[192,363]:[198,296,394,509];', harness)
+        self.assertIn("initialKeydowns.map(row=>row.resultsSourceFrameAtEvent),[192,363]", harness)
+        self.assertIn("initialKeyups.map(row=>row.resultsSourceFrameAtEvent),[202,373]", harness)
+        gate = harness.index('const gate=await waitForCpuPagesBeforeKeyboard(')
+        confirmation = harness.index('const lastCpuPageTransition=Math.max(', gate)
+        third_enter = harness.index("await driver.pressChord(['Enter'],{holdMs:160,releaseMs:120});", confirmation)
+        self.assertLess(gate, confirmation)
+        self.assertLess(confirmation, third_enter,
+                        'The historical third Enter must not dispatch before source-observed CPU page transitions')
+        self.assertIn('assertResultsCpuPagesAfterP1KeyboardPrefix(trace,[192,363]', harness)
+        self.assertIn('source ticks 192/363; wait for disconnected CPU auto-pages, then send the third P1 confirmation', harness)
+
     def test_cpu_page_waiter_refreshes_at_confirmation_boundary(self):
         harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
         start = harness.index('const waitForCpuPagesBeforeSourceFrame=')
@@ -224,6 +239,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('report.failure.audio_diagnostics=await readAudioDiagnostics();', harness)
         self.assertIn("'keyboard-gated'", harness)
         self.assertIn("'keyboard-gated-p1-enter'", harness)
+        self.assertIn("'keyboard-gated-two-prefix'", harness)
         self.assertIn('const keyboardPortErrors=[[0],[0],[-1],[-1]];', harness)
         self.assertIn('controllerProfile.keyboard_active_mask&~3,0', harness)
         self.assertIn('row.inputServiceStatusAtEvent?.keyboard_active_mask===3', harness)
@@ -237,13 +253,13 @@ class ResultsEntryPacketTests(unittest.TestCase):
                                   gated_start)
         gated = harness[gated_start:gated_end]
         first_enter = gated.index("driver.pressChord(['Enter'],{holdMs:160,releaseMs:120})")
-        self.assertIn('const initialEnterTargets=[198,296,394,509]', gated)
-        self.assertLess(gated.index('const initialEnterTargets=[198,296,394,509]'), first_enter)
+        self.assertIn('const initialEnterTargets=keyboardPrefixGatedMode?[192,363]:[198,296,394,509];', gated)
+        self.assertLess(gated.index('const initialEnterTargets=keyboardPrefixGatedMode?'), first_enter)
         phase_gate = gated.index('waitForResultsInternalPhase(180,2,')
         self.assertLess(phase_gate, gated.index('for(const targetFrame of initialEnterTargets)'))
         self.assertLess(phase_gate, first_enter)
         self.assertLess(first_enter, gated.index('summarizeResultsPadTrace(trace).p1_start_runs.length>0'))
-        self.assertIn('if(initialStartObserved)break;', gated)
+        self.assertIn('if(initialStartObserved&&!keyboardPrefixGatedMode)break;', gated)
         self.assertIn('returned to CSS before the disconnected CPU auto-page gate', gated)
         self.assertIn('returned to CSS before all expected disconnected CPU pages auto-advanced', gated)
         self.assertIn('cannot pass without the observed disconnected CPU auto-page gate', harness)
@@ -267,6 +283,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn("pageCheck.status='pass-input-dispatched-after-pages';", harness)
         trace_helper = (ROOT / 'tests/results_source_pad_trace.mjs').read_text(encoding='utf-8')
         self.assertIn('assertResultsCpuPagesAfterInitialP1Keyboard', trace_helper)
+        self.assertIn('assertResultsCpuPagesAfterP1KeyboardPrefix', trace_helper)
         self.assertIn('first P1 Start edge must be consumed from original Results phase 2', trace_helper)
         self.assertIn('expectedDisconnectedCpuSlots', trace_helper)
         self.assertIn('expectedPortErrors', trace_helper)
@@ -295,20 +312,25 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertLess(constructor, snapshot)
         self.assertLess(snapshot, release_input)
 
-    def test_camera_entry_observer_brackets_source_onenter_without_changing_guards(self):
+    def test_camera_entry_observer_brackets_onenter_and_collision_adoption_ownership(self):
         context = (ROOT / 'src/gameplay_results_context.c').read_text(encoding='utf-8')
         begin = context.index('MeleeWebResultsContext* melee_web_results_context_begin(')
         end = context.index('\nint melee_web_results_context_tick(', begin)
         body = context[begin:end]
         boundaries = [
+            'context->camera_allocation_generation_before_onenter =',
             'context->camera_pool_before_onenter = cm_804D645C;',
             'context->owner_camera_pool_before_onenter = owner_camera_pool;',
             'gm_Scene_Results_OnEnter(&context->match);',
+            'context->camera_allocation_generation_after_onenter =',
             'context->camera_pool_after_onenter = cm_804D645C;',
             'melee_web_collision_adopt_dummy(error,error_size)',
             'context->camera_pool_after_collision_adoption = cm_804D645C;',
-            'context->camera_pool = cm_804D645C;',
+            'context->camera_allocation_generation_after_collision_adoption =',
+            'context->camera_allocation_subject_count_after_collision_adoption =',
+            'context->camera_pool = context->camera_pool_after_onenter;',
             'owner_camera_pool = context->camera_pool;',
+            'camera_pool_owned(context, "collision adoption"',
         ]
         positions = [body.index(boundary) for boundary in boundaries]
         self.assertEqual(positions, sorted(positions))
@@ -316,6 +338,12 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('camera_pool_owned(context, "source draw"', context)
         self.assertIn('camera_pool_owned(context, "scene exit entry"', context)
         self.assertIn('camera_pool_owned(context, "close entry"', context)
+        self.assertIn('source_generation == context->camera_allocation_generation', context)
+        self.assertIn('source_allocation_generation=%u expected_generation=%u', context)
+        self.assertIn('source_camera_allocation_generation_after_onenter', context)
+        camera_patch = (ROOT / 'patches/melee-gameplay.patch').read_text(encoding='utf-8')
+        self.assertIn('melee_web_camera_pool_last_subject_count = n_subjects;', camera_patch)
+        self.assertIn('++melee_web_camera_pool_allocation_generation;', camera_patch)
 
         browser = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
         reset = browser.index('results_camera_entry_snapshot={};')
@@ -329,6 +357,12 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('source_pool_before_onenter', browser)
         self.assertIn('source_pool_after_onenter', browser)
         self.assertIn('source_pool_after_collision_adoption', browser)
+        self.assertIn('source_camera_allocation_generation_before_onenter', browser)
+        self.assertIn('source_camera_allocation_generation_after_onenter', browser)
+        self.assertIn('source_camera_allocation_generation_after_collision_adoption', browser)
+        harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
+        self.assertIn('source_camera_allocation_subject_count_after_onenter,8', harness)
+        self.assertIn('source_camera_allocation_generation_after_collision_adoption', harness)
 
 
 if __name__ == '__main__':

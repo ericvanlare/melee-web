@@ -36,7 +36,8 @@ ArticleSchema schema(uint32_t kind)
     // Luigi's fireball uses the shared five-float source type selectively:
     // its callback consumes x0, x4 and xC, while x8/x10 belong to Mario's
     // distinct fireball record. The authored Luigi region is four floats.
-    case It_Kind_Luigi_Fire:return {16,1,true};
+    case It_Kind_Luigi_Fire:
+    case It_Kind_Kirby_LuigiFire:return {16,1,true};
     // Koopa's Flame uses six source floats, one serialized state row, and
     // the source-valid null-joint ItemModelDesc form.
     case It_Kind_Koopa_Flame:return {24,1,true};
@@ -51,12 +52,14 @@ ArticleSchema schema(uint32_t kind)
     case It_Kind_Ness_PKFire:return {8,1,true};
     case It_Kind_Ness_PKFire_Flame:return {12,1,true};
     case It_Kind_Ness_PKFlush:return {0x2C,3,true};
+    case It_Kind_Kirby_NessPKFlush:return {0x2C,3,true};
     case It_Kind_Ness_PKThunder:return {0x14,1,true};
     case It_Kind_Ness_PKThunder1:
     case It_Kind_Ness_PKThunder2:
     case It_Kind_Ness_PKThunder3:
     case It_Kind_Ness_PKThunder4:return {4,1,true};
-    case It_Kind_Ness_PKFlush_Explode:return {0x14,1,true};
+    case It_Kind_Ness_PKFlush_Explode:
+    case It_Kind_Kirby_NessPKFlush_Explode:return {0x14,1,true};
     case It_Kind_Ness_Bat:return {4,1,true};
     case It_Kind_Ness_Yoyo:return {0x5C,0,true};
     // Peach's authored scalar extents come from the PlPe.dat article regions.
@@ -69,18 +72,22 @@ ArticleSchema schema(uint32_t kind)
     case It_Kind_Peach_Explode:return {0,2,false};
     case It_Kind_Peach_Turnip:return {0x48,3,true};
     case It_Kind_Peach_Parasol:return {4,2,true};
-    case It_Kind_Peach_Toad:return {4,2,true};
-    case It_Kind_Peach_ToadSpore:return {0x10,1,true};
+    case It_Kind_Peach_Toad:
+    case It_Kind_Kirby_PeachToad:return {4,2,true};
+    case It_Kind_Peach_ToadSpore:
+    case It_Kind_Kirby_PeachToadSpore:return {0x10,1,true};
     // Mewtwo's Disable is the authored two-float itMDisableAttributes record
     // (lifetime and horizontal velocity) with one serialized state row.
     case It_Kind_Mewtwo_Disable:return {8,1,true};
     // Shadow Ball's serialized special record is twelve words; the doldecomp
     // header's x30..x3C tail is not serialized by the disc record. Ten
     // serialized animation rows back the eighteen callback states.
-    case It_Kind_Mewtwo_ShadowBall:return {0x30,10,true};
+    case It_Kind_Mewtwo_ShadowBall:
+    case It_Kind_Kirby_MewtwoShadowBall:return {0x30,10,true};
     // Seven original pill motion states select six serialized animation rows,
     // including the throw/catch sequences used by Dr. Mario's taunt.
-    case It_Kind_DrMario_Vitamin:return {20,6,true};
+    case It_Kind_DrMario_Vitamin:
+    case It_Kind_Kirby_DrMarioVitamin:return {20,6,true};
     // Thunder has three source callbacks, but the callback state IDs are
     // [-1, 0, 0] and the DAT carries one serialized animation descriptor.
     case It_Kind_Pikachu_Thunder:
@@ -141,21 +148,29 @@ ArticleSchema schema(uint32_t kind)
     case It_Kind_Zelda_DinFire_Explode:return {0x14,1,true};
     // Sheik's Needle, held Needle, smoke and Chain use the source item tables;
     // the Chain retains its two model joints in its 0x6C attribute record.
-    case It_Kind_Seak_NeedleThrow:return {0x0C,5,true};
-    case It_Kind_Seak_NeedleHeld:return {4,1,true};
+    case It_Kind_Seak_NeedleThrow:
+    case It_Kind_Kirby_SeakNeedleThrow:return {0x0C,5,true};
+    case It_Kind_Seak_NeedleHeld:
+    case It_Kind_Kirby_SeakNeedleHeld:return {4,1,true};
     case It_Kind_Seak_Vanish:return {0,1,false};
     case It_Kind_Seak_Chain:return {0x6C,0,true};
     case It_Kind_Pikachu_TJolt_Ground:
-    case It_Kind_Pichu_TJolt_Ground:return {16,2,true};
+    case It_Kind_Pichu_TJolt_Ground:
+    case It_Kind_Kirby_PikachuTJolt_Ground:
+    case It_Kind_Kirby_PichuTJolt_Ground:return {16,2,true};
     case It_Kind_Pikachu_TJolt_Air:
-    case It_Kind_Pichu_TJolt_Air:return {4,1,true};
+    case It_Kind_Pichu_TJolt_Air:
+    case It_Kind_Kirby_PikachuTJolt_Air:
+    case It_Kind_Kirby_PichuTJolt_Air:return {4,1,true};
     case It_Kind_Mario_Cape:
     case It_Kind_DrMario_Sheet:return {4,2,true};
     case It_Kind_Fox_Laser:
     case It_Kind_Falco_Laser:
+    case It_Kind_Kirby_FalcoLaser:
     case It_Kind_Kirby_FoxLaser:return {40,2,true};
     case It_Kind_Fox_Blaster:
     case It_Kind_Falco_Blaster:
+    case It_Kind_Kirby_FalcoBlaster:
     case It_Kind_Kirby_FoxBlaster:return {40,9,true};
     case It_Kind_Fox_Illusion:
     case It_Kind_Falco_Phantasm:return {8,3,true};
@@ -170,9 +185,15 @@ ArticleSchema schema(uint32_t kind)
     case It_Kind_Link_HShot:
     case It_Kind_CLink_HShot:return {0x60,0,true};
     case It_Kind_Link_Arrow:
-    case It_Kind_CLink_Arrow:return {0x2c,1,true};
+    case It_Kind_CLink_Arrow:
+    case It_Kind_Kirby_LinkArrow:
+    case It_Kind_Kirby_CLinkArrow:return {0x2c,1,true};
     case It_Kind_Link_Bow:
-    case It_Kind_CLink_Bow:return {8,6,false};
+    case It_Kind_CLink_Bow:
+    case It_Kind_Kirby_LinkBow:
+    case It_Kind_Kirby_CLinkBow:return {8,6,false};
+    case It_Kind_Kirby_KoopaFlame:return {24,1,true};
+    case It_Kind_Kirby_YoshiEggLay:return {0,0,false};
     case It_Kind_CLink_Milk:return {4,2,false};
     default:throw DatError("Item kind has no checked native article schema");
     }
@@ -186,7 +207,9 @@ bool pointer_field(uint32_t kind,uint32_t offset)
     case It_Kind_CLink_Boomerang:return offset==0x44||offset==0x48||
         (offset>=0x4c&&offset<0x64&&((offset-0x4c)%4==0));
     case It_Kind_Link_Arrow:
-    case It_Kind_CLink_Arrow:return offset==0x24||offset==0x28;
+    case It_Kind_CLink_Arrow:
+    case It_Kind_Kirby_LinkArrow:
+    case It_Kind_Kirby_CLinkArrow:return offset==0x24||offset==0x28;
     case It_Kind_GameWatch_Greenhouse:
     case It_Kind_GameWatch_Manhole:
     case It_Kind_GameWatch_Fire:
@@ -552,7 +575,8 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
     };
     if(kind==It_Kind_Link_HShot||kind==It_Kind_CLink_HShot) {
         for(const auto offset:{0x54U,0x58U,0x5cU}) (void)special_joint(offset);
-    } else if(kind==It_Kind_Link_Arrow||kind==It_Kind_CLink_Arrow) {
+    } else if(kind==It_Kind_Link_Arrow||kind==It_Kind_CLink_Arrow||
+              kind==It_Kind_Kirby_LinkArrow||kind==It_Kind_Kirby_CLinkArrow) {
         for(const auto offset:{0x24U,0x28U}) (void)special_joint(offset);
     } else if(kind==It_Kind_Link_Boomerang||kind==It_Kind_CLink_Boomerang) {
         auto first=special_joint(0x44),second=special_joint(0x48);

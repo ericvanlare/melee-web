@@ -16,6 +16,25 @@ from check_gameplay import node_runtime
 
 
 class ResultsCameraOwnershipTests(unittest.TestCase):
+    def test_source_camera_pool_lease_includes_allocator_generation(self):
+        context = (ROOT / "src/gameplay_results_context.c").read_text(encoding="utf-8")
+        guard_start = context.index("static int camera_pool_owned(")
+        guard_end = context.index("\nstatic int baseline_has(", guard_start)
+        guard = context[guard_start:guard_end]
+        self.assertIn("source_generation == context->camera_allocation_generation", guard)
+        self.assertIn("last_subject_count=%d", guard)
+        begin_start = context.index("MeleeWebResultsContext* melee_web_results_context_begin(")
+        begin_end = context.index("\nint melee_web_results_context_tick(", begin_start)
+        begin = context[begin_start:begin_end]
+        self.assertIn("camera_allocation_generation_after_onenter !=", begin)
+        self.assertIn("camera_allocation_subject_count_after_onenter != 8", begin)
+        self.assertIn("Results OnEnter source camera allocation identity changed", begin)
+        self.assertIn('camera_pool_owned(context, "collision adoption"', begin)
+        self.assertIn("camera_pool = context->camera_pool_after_onenter", begin)
+        camera_patch = (ROOT / "patches/melee-gameplay.patch").read_text(encoding="utf-8")
+        self.assertIn("melee_web_camera_pool_last_subject_count = n_subjects;", camera_patch)
+        self.assertIn("++melee_web_camera_pool_allocation_generation;", camera_patch)
+
     def test_host_handoff_rejects_each_boundary_without_repeating_callback(self):
         """Production host dispatch, with faulting owner/commit seams only.
 

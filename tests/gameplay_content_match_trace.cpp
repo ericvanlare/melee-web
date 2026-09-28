@@ -124,6 +124,64 @@ static void dump_terminal_generators(){
 extern "C" int melee_web_test_quake_translated(void);
 extern "C" int melee_web_story_state(uint32_t*,unsigned*,int*,int*,int*,int*);
 static void check(bool value,const std::string& message){if(!value)throw std::runtime_error(message);}
+static std::array<int,2> kirby_copy_article_kinds(int fighter_kind){
+    switch(fighter_kind){
+    case FTKIND_MARIO:return {It_Kind_Kirby_MarioFire,-1};
+    case FTKIND_LUIGI:return {It_Kind_Kirby_LuigiFire,-1};
+    case FTKIND_PEACH:return {It_Kind_Kirby_PeachToad,It_Kind_Kirby_PeachToadSpore};
+    case FTKIND_POPO:return {It_Kind_Kirby_IceClimberIce,-1};
+    case FTKIND_FOX:return {It_Kind_Kirby_FoxLaser,It_Kind_Kirby_FoxBlaster};
+    case FTKIND_FALCO:return {It_Kind_Kirby_FalcoLaser,It_Kind_Kirby_FalcoBlaster};
+    case FTKIND_LINK:return {It_Kind_Kirby_LinkArrow,It_Kind_Kirby_LinkBow};
+    case FTKIND_CLINK:return {It_Kind_Kirby_CLinkArrow,It_Kind_Kirby_CLinkBow};
+    case FTKIND_MEWTWO:return {It_Kind_Kirby_MewtwoShadowBall,-1};
+    case FTKIND_NESS:return {It_Kind_Kirby_NessPKFlush,It_Kind_Kirby_NessPKFlush_Explode};
+    case FTKIND_PIKACHU:return {It_Kind_Kirby_PikachuTJolt_Ground,It_Kind_Kirby_PikachuTJolt_Air};
+    case FTKIND_PICHU:return {It_Kind_Kirby_PichuTJolt_Ground,It_Kind_Kirby_PichuTJolt_Air};
+    case FTKIND_SAMUS:return {It_Kind_Kirby_SamusCharge,-1};
+    case FTKIND_KOOPA:return {It_Kind_Kirby_KoopaFlame,-1};
+    case FTKIND_SEAK:return {It_Kind_Kirby_SeakNeedleThrow,It_Kind_Kirby_SeakNeedleHeld};
+    case FTKIND_DRMARIO:return {It_Kind_Kirby_DrMarioVitamin,-1};
+    case FTKIND_GAMEWATCH:return {It_Kind_Kirby_GameWatchChef,It_Kind_Kirby_GameWatchChefPan};
+    case FTKIND_YOSHI:return {It_Kind_Kirby_YoshiEggLay,-1};
+    // These source neutral specials are copied without Article registration
+    // in ftKb_SpecialN_800F16D0; their action probes inspect Kirby's motion.
+    case FTKIND_CAPTAIN:case FTKIND_DONKEY:case FTKIND_PURIN:
+    case FTKIND_MARS:case FTKIND_ZELDA:case FTKIND_GANON:
+    case FTKIND_EMBLEM:return {-1,-1};
+    default:return {-1,-1};
+    }
+}
+static bool kirby_copy_nonarticle_motion(int fighter_kind,int motion){
+    switch(fighter_kind){
+    case FTKIND_DONKEY:
+        return motion==ftKb_MS_DkSpecialNStart||motion==ftKb_MS_DkSpecialNLoop||
+            motion==ftKb_MS_DkSpecialN||motion==ftKb_MS_DkSpecialNFull||
+            motion==ftKb_MS_DkSpecialAirNStart||motion==ftKb_MS_DkSpecialAirNLoop||
+            motion==ftKb_MS_DkSpecialAirN||motion==ftKb_MS_DkSpecialAirNFull;
+    case FTKIND_PURIN:
+        return motion==ftKb_MS_PrSpecialNStartR||motion==ftKb_MS_PrSpecialNStartL||
+            motion==ftKb_MS_PrSpecialNLoop||motion==ftKb_MS_PrSpecialNFull||
+            motion==ftKb_MS_PrSpecialN1||motion==ftKb_MS_PrSpecialNEndR||
+            motion==ftKb_MS_PrSpecialNEndL||motion==ftKb_MS_PrSpecialAirNStartR||
+            motion==ftKb_MS_PrSpecialAirNStartL||motion==ftKb_MS_PrSpecialAirNLoop||
+            motion==ftKb_MS_PrSpecialAirNFull||motion==ftKb_MS_PrSpecialAirN||
+            motion==ftKb_MS_PrSpecialNHit;
+    case FTKIND_MARS:
+        return motion==ftKb_MS_MsSpecialNStart||motion==ftKb_MS_MsSpecialNLoop||
+            motion==ftKb_MS_MsSpecialNEnd0||motion==ftKb_MS_MsSpecialNEnd1||
+            motion==ftKb_MS_MsSpecialAirNStart||motion==ftKb_MS_MsSpecialAirNLoop||
+            motion==ftKb_MS_MsSpecialAirNEnd0||motion==ftKb_MS_MsSpecialAirNEnd1;
+    case FTKIND_ZELDA:
+        return motion==ftKb_MS_ZdSpecialN||motion==ftKb_MS_ZdSpecialAirN;
+    case FTKIND_EMBLEM:
+        return motion==ftKb_MS_FeSpecialNStart||motion==ftKb_MS_FeSpecialNLoop||
+            motion==ftKb_MS_FeSpecialNEnd0||motion==ftKb_MS_FeSpecialNEnd1||
+            motion==ftKb_MS_FeSpecialAirNStart||motion==ftKb_MS_FeSpecialAirNLoop||
+            motion==ftKb_MS_FeSpecialAirNEnd0||motion==ftKb_MS_FeSpecialAirNEnd1;
+    default:return false;
+    }
+}
 using PadStateOwner=std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)>;
 static PadStateOwner zelda_sheik_transform_input(){
     std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> bytes{};
@@ -298,19 +356,37 @@ int main(int argc,char** argv){try{
         opponent.rumble_enabled=0;
     }
     const bool kirby_action_case=action_coverage&&fighter_ckind==CKIND_KIRBY;
+    const bool kirby_form_donor_case=kirby_action_case&&
+        (opponent_ckind==CKIND_ZELDA||opponent_ckind==CKIND_SEAK);
     check(!(kirby_copy_costumes||kirby_copy_ko)||kirby_action_case,
           "Copy costume/KO action coverage requires Kirby in slot zero");
     if(kirby_action_case){
-        check(opponent_ckind==CKIND_CAPTAIN||opponent_ckind==CKIND_GAMEWATCH||
+        check(opponent_ckind==CKIND_CAPTAIN||opponent_ckind==CKIND_DONKEY||
+                  opponent_ckind==CKIND_GAMEWATCH||
                   opponent_ckind==CKIND_POPONANA||
-                  opponent_ckind==CKIND_MARIO||opponent_ckind==CKIND_SAMUS||
-              opponent_ckind==CKIND_FOX,
-              "Kirby copy action probe requires a scoped Captain, Game & Watch, Ice Climbers, Mario, Samus, or Fox donor");
+                  opponent_ckind==CKIND_MARIO||opponent_ckind==CKIND_MARS||
+                  opponent_ckind==CKIND_PURIN||opponent_ckind==CKIND_ZELDA||
+                  opponent_ckind==CKIND_GANON||opponent_ckind==CKIND_EMBLEM||
+                  opponent_ckind==CKIND_SAMUS||
+                  opponent_ckind==CKIND_FOX||opponent_ckind==CKIND_LUIGI||
+                  opponent_ckind==CKIND_PEACH||opponent_ckind==CKIND_FALCO||
+                  opponent_ckind==CKIND_LINK||opponent_ckind==CKIND_CLINK||
+                  opponent_ckind==CKIND_MEWTWO||opponent_ckind==CKIND_NESS||
+                  opponent_ckind==CKIND_PIKACHU||opponent_ckind==CKIND_PICHU||
+                  opponent_ckind==CKIND_KOOPA||opponent_ckind==CKIND_SEAK||
+                  opponent_ckind==CKIND_DRMARIO||opponent_ckind==CKIND_YOSHI,
+              "Kirby copy action probe requires a source-registered Article donor or an explicitly covered non-Article donor");
         if(opponent_ckind==CKIND_POPONANA){
             // Keep the Ice donor on a real neutral PAD instead of letting its
             // CPU drift off Final Destination between Kirby's first copy and
             // the reacquisition probe. Kirby still performs every action via
             // the ordinary source PAD path.
+            selection.start.players[1].slot_type=Gm_PKind_Human;
+            selection.start.players[1].rumble_enabled=0;
+        }
+        if(kirby_form_donor_case){
+            // Hold the exact Zelda/Sheik source identity under neutral input;
+            // a CPU down-B could change which donor Kirby is meant to copy.
             selection.start.players[1].slot_type=Gm_PKind_Human;
             selection.start.players[1].rumble_enabled=0;
         }
@@ -338,7 +414,7 @@ int main(int argc,char** argv){try{
         const unsigned match_player_count=cpu9_match?4U:
             ((slot2_transform||kirby_mario_fox_replacement)?3U:2U);
         PADStatus raw[4]{};if(match_player_count<3)raw[2].err=PAD_ERR_NO_CONTROLLER;
-        if(ice_action_case)raw[1].err=PAD_ERR_NO_CONTROLLER;
+        if(ice_action_case||kirby_form_donor_case)raw[1].err=PAD_ERR_NO_CONTROLLER;
         raw[3].err=PAD_ERR_NO_CONTROLLER;
         float pcm[1068];unsigned phase=0;
         auto tick=[&](){
@@ -1200,10 +1276,10 @@ int main(int argc,char** argv){try{
                     }
                 };
                 const auto use_copy=[&](int donor_kind){
-                    if(donor_kind==FTKIND_CAPTAIN){
-                        // Falcon Punch has no copied Article. Reposition only
-                        // through the normal controller path so the source
-                        // motion and its real victim response are observable.
+                    if(donor_kind==FTKIND_CAPTAIN||donor_kind==FTKIND_GANON){
+                        // Falcon Punch and Warlock Punch have no copied
+                        // Article. Reposition only through the normal source
+                        // controller path and require a live victim response.
                         for(unsigned n=0;n<240&&
                                 (match.player_stats(0).ground_or_air!=0||
                                  match.player_stats(1).ground_or_air!=0);n++){
@@ -1237,8 +1313,9 @@ int main(int argc,char** argv){try{
                         unsigned action_ticks=0;
                         const auto observe=[&](){
                             const int motion=match.player_stats(0).motion_id;
-                            source_motion|=motion==ftKb_MS_CaSpecialN||
-                                motion==ftKb_MS_CaSpecialAirN;
+                            source_motion|=donor_kind==FTKIND_CAPTAIN?
+                                (motion==ftKb_MS_CaSpecialN||motion==ftKb_MS_CaSpecialAirN):
+                                (motion==ftKb_MS_GnSpecialN||motion==ftKb_MS_GnSpecialAirN);
                             victim_hit|=match.player_stats(1).damage_percent>
                                 victim_damage_before;
                         };
@@ -1246,9 +1323,11 @@ int main(int argc,char** argv){try{
                         for(;action_ticks<120&&!(source_motion&&victim_hit);action_ticks++){
                             tick();observe();
                         }
-                        check(source_motion,"Kirby Captain copy did not enter ftKb_MS_CaSpecialN");
-                        check(victim_hit,"Kirby Falcon Punch did not damage its controller-positioned source victim");
-                        std::cout<<"Kirby copied Falcon Punch: source motion=ftKb_MS_CaSpecialN victim damage="
+                        check(source_motion,"Kirby copy did not enter the donor-specific Captain/Ganon neutral-special motion");
+                        check(victim_hit,"Kirby copied Captain/Ganon punch did not damage its controller-positioned source victim");
+                        std::cout<<"Kirby copied "<<(donor_kind==FTKIND_CAPTAIN?"Falcon Punch":"Warlock Punch")
+                                 <<": source motion="<<(donor_kind==FTKIND_CAPTAIN?"ftKb_MS_CaSpecialN":"ftKb_MS_GnSpecialN")
+                                 <<" victim damage="
                                  <<victim_damage_before<<" -> "
                                  <<match.player_stats(1).damage_percent<<" action_ticks="
                                  <<action_ticks<<std::endl;
@@ -1256,25 +1335,32 @@ int main(int argc,char** argv){try{
                     }
                     bool copied_move=false;
                     int copied_article_kind=-1;
+                    const auto article_kinds=kirby_copy_article_kinds(donor_kind);
+                    if(article_kinds[0]<0){
+                        int copied_motion=-1;
+                        for(unsigned n=0;n<180&&!copied_move;n++){
+                            raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                            copied_motion=match.player_stats(0).motion_id;
+                            copied_move=kirby_copy_nonarticle_motion(donor_kind,copied_motion);
+                        }
+                        neutral();
+                        check(copied_move,
+                              "Kirby non-Article donor did not enter its source neutral-special motion for FighterKind "+
+                              std::to_string(donor_kind));
+                        std::cout<<"Kirby copied source non-Article neutral special motion="
+                                 <<copied_motion<<" donor="<<donor_kind<<std::endl;
+                        return;
+                    }
                     const auto article_live=[&](int kind){
+                        if(kind<0)return false;
                         if(melee_web_test_item_count(kind)<=0)return false;
                         copied_article_kind=kind;
                         return true;
                     };
                     for(unsigned n=0;n<180&&!copied_move;n++){
                         raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
-                        if(donor_kind==FTKIND_GAMEWATCH)
-                            copied_move=article_live(It_Kind_Kirby_GameWatchChef)||
-                                article_live(It_Kind_Kirby_GameWatchChefPan);
-                        else if(donor_kind==FTKIND_MARIO)
-                            copied_move=article_live(It_Kind_Kirby_MarioFire);
-                        else if(donor_kind==FTKIND_SAMUS)
-                            copied_move=article_live(It_Kind_Kirby_SamusCharge);
-                        else if(donor_kind==FTKIND_POPO)
-                            copied_move=article_live(It_Kind_Kirby_IceClimberIce);
-                        else if(donor_kind==FTKIND_FOX)
-                            copied_move=article_live(It_Kind_Kirby_FoxLaser)||
-                                article_live(It_Kind_Kirby_FoxBlaster);
+                        copied_move=article_live(article_kinds[0])||
+                            article_live(article_kinds[1]);
                     }
                     neutral();
                     check(copied_move,"Kirby did not execute the source neutral special for donor "+
@@ -1283,12 +1369,7 @@ int main(int argc,char** argv){try{
                              <<copied_article_kind<<" live_count="
                              <<melee_web_test_item_count(copied_article_kind)<<std::endl;
                 };
-                const int donor_kind=kirby_mario_fox_replacement?FTKIND_MARIO:
-                    opponent_ckind==CKIND_POPONANA?FTKIND_POPO:
-                    opponent_ckind==CKIND_CAPTAIN?FTKIND_CAPTAIN:
-                    opponent_ckind==CKIND_GAMEWATCH?FTKIND_GAMEWATCH:
-                    opponent_ckind==CKIND_MARIO?FTKIND_MARIO:
-                    opponent_ckind==CKIND_SAMUS?FTKIND_SAMUS:FTKIND_FOX;
+                const int donor_kind=opponent_content->fighter_kind;
                 const auto center_ice_donor=[&](){
                     if(donor_kind!=FTKIND_POPO)return;
                     // Move the controlled Popo inward with a real stick input so
@@ -1356,10 +1437,7 @@ int main(int argc,char** argv){try{
                     check(melee_web_test_kirby_copy_kind(0)==donor_kind,
                           "Kirby did not reacquire its lost copy ability through the source path");
                     const char* donor_name=donor_kind==FTKIND_POPO?"Ice Climbers":
-                        donor_kind==FTKIND_GAMEWATCH?"Game & Watch":
-                        donor_kind==FTKIND_MARIO?"Mario":
-                        donor_kind==FTKIND_SAMUS?"Samus":
-                        donor_kind==FTKIND_CAPTAIN?"Captain/Falcon Punch":"Fox";
+                        opponent_content->name;
                     std::cout<<"Kirby action coverage: "<<donor_name
                              <<" acquire/use/loss/reacquisition and match teardown path passed; other donor families unverified"
                              <<std::endl;

@@ -431,11 +431,15 @@ index f8a271e..ccc61db 100644
 diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
 --- a/src/melee/cm/camera.c
 +++ b/src/melee/cm/camera.c
-@@ -52,6 +52,24 @@
+@@ -52,6 +52,28 @@
  
  /* 452C68 */ static Camera cm_80452C68;
  /* 453004 */ CameraDebugMode cm_80453004;
 +#if defined(MELEE_WEB_GAMEPLAY)
++static volatile u32 melee_web_camera_pool_allocation_generation;
++static volatile int melee_web_camera_pool_last_subject_count;
++u32 melee_web_camera_pool_allocation_generation_value(void) { return melee_web_camera_pool_allocation_generation; }
++int melee_web_camera_pool_last_subject_count_value(void) { return melee_web_camera_pool_last_subject_count; }
 +/* Host lifetime owner snapshots the actual source camera between matches. */
 +void* melee_web_camera_state(void) { return &cm_80452C68; }
 +/* Retail callbacks ignore these routines' integer results. Wasm requires
@@ -456,7 +460,14 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
  /* 3BCB18 */ static CameraModeCallbacks cm_803BCB18 = {
      Camera_8002B3D4,
-@@ -534,8 +552,9 @@
+@@ -212,2 +234,6 @@
+     cm_80452C68.gobj = NULL;
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_camera_pool_last_subject_count = n_subjects;
++    ++melee_web_camera_pool_allocation_generation;
++#endif
+     cam_box = HSD_MemAlloc(n_subjects * sizeof(CmSubject));
+@@ -534,8 +560,9 @@
                                  : base_ground;
                      }
                  }
@@ -467,7 +478,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
                  cam_bounds_flags = Camera_80029124(&test_pos, 0);
                  if (cam_bounds_flags != CAM_BOUNDS_INSIDE) {
                      Ground_801C4368(&x_extent_ground, &x_extent_intercept);
-@@ -562,8 +581,9 @@
+@@ -562,8 +589,9 @@
                  if (test_pos.x > max_x) {
                      max_x = test_pos.x;
                  }
@@ -478,7 +489,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
                  cam_bounds_flags = Camera_80029124(&test_pos, 0);
                  if (cam_bounds_flags != CAM_BOUNDS_INSIDE) {
                      Ground_801C4368(&alt_x_ground, &alt_x_intercept);
-@@ -590,8 +610,9 @@
+@@ -590,8 +618,9 @@
                  if (test_pos.x > max_x) {
                      max_x = test_pos.x;
                  }
@@ -489,7 +500,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
                  cam_bounds_flags = Camera_80029124(&test_pos, 0);
                  if (cam_bounds_flags != CAM_BOUNDS_INSIDE) {
                      Ground_801C4368(&y_extent_ground, &y_extent_intercept);
-@@ -618,8 +639,9 @@
+@@ -618,8 +647,9 @@
                  if (test_pos.y > max_y) {
                      max_y = test_pos.y;
                  }
@@ -500,7 +511,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
                  cam_bounds_flags = Camera_80029124(&test_pos, 0);
                  if (cam_bounds_flags != CAM_BOUNDS_INSIDE) {
                      Ground_801C4368(&alt_y_ground, &alt_y_intercept);
-@@ -667,7 +689,8 @@
+@@ -667,7 +697,8 @@
          z_factor = (z_pos - 80.0f) / 4920.0f;
      }
      new_bounds->x_min = min_x;
@@ -510,7 +521,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      new_bounds->x_max = max_x;
      new_bounds->y_max = max_y;
      new_bounds->total_subjects = subject_count;
-@@ -682,9 +705,10 @@
+@@ -682,9 +713,10 @@
      } else if (spread < globals->x34) {
          return globals->x2C;
      } else {
@@ -524,7 +535,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      }
  }
  
-@@ -737,8 +761,9 @@
+@@ -737,8 +769,9 @@
          lerp_factor = 0.0001f;
      }
  
@@ -536,7 +547,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  }
  
  #ifdef MUST_MATCH
-@@ -780,9 +805,10 @@
+@@ -780,9 +813,10 @@
          scale = 1.0f;
      }
  
@@ -550,7 +561,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  }
  #ifdef MUST_MATCH
  #pragma pop
-@@ -795,10 +821,11 @@
+@@ -795,10 +829,11 @@
      } else if (spread < cm_803BCCA0.x24) {
          return cm_803BCCA0.x1C;
      } else {
@@ -566,7 +577,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      }
  }
  
-@@ -844,7 +871,7 @@
+@@ -844,7 +879,7 @@
  
      t = get_y_bias(spread);
      y_sum = (bounds->y_min - sp24.y) + (bounds->y_max - sp24.y);
@@ -575,7 +586,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      angle = -MTXDegToRad((base + cm_803BCCA0.x8) * Stage_GetCamInfoX24());
  
      if (angle > MTXDegToRad(cm_803BCCA0.xC)) {
-@@ -856,9 +883,9 @@
+@@ -856,9 +891,9 @@
  
      angle += Stage_GetCamPanAngleRadians();
      y_angle = angle;
@@ -587,7 +598,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      HSD_ASSERT(1275, fov_d<MTXDegToRad(90.0F));
      tan_u = tanf(fov_u);
      tan_d = tanf(fov_d);
-@@ -866,7 +893,9 @@
+@@ -866,7 +901,9 @@
      Stage_GetCamBoundsBottomOffset();
      Stage_GetCamBoundsTopOffset();
      y_off = dist_y * tanf(y_angle);
@@ -598,7 +609,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      Stage_UnkSetVec3TCam_Offset(&sp14);
      x_center = 0.5f * (bounds->x_min + bounds->x_max);
      angle = -MTXDegToRad((x_center - sp14.x) * Stage_GetCamInfoX20());
-@@ -878,9 +907,9 @@
+@@ -878,9 +915,9 @@
          angle = MTXDegToRad(cm_803BCCA0.x18);
      }
  
@@ -610,7 +621,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      HSD_ASSERT(1289, fov_l<MTXDegToRad(90.0F));
      scaled_tan = cm_803BCB64.aspect * tanf(fov_r);
      tan_r = scaled_tan;
-@@ -889,7 +918,9 @@
+@@ -889,7 +926,9 @@
      Stage_GetCamBoundsLeftOffset();
      Stage_GetCamBoundsRightOffset();
      x_off = cm_803BCB64.aspect * (dist_x * tanf(angle));
@@ -621,7 +632,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      transform->target_interest.z = 0.0f;
      dist_y = (dist_y > dist_x) ? dist_y : dist_x;
      cam_dist = dist_y;
-@@ -916,12 +947,10 @@
+@@ -916,12 +955,10 @@
      f32 input_x;
      f32 input_y;
      f32 depth_ratio;
@@ -638,7 +649,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
      input_x = cm_80452C68.xA4 * cm_80452C68.xAC;
      input_y = cm_80452C68.xA8 * cm_80452C68.xAC;
-@@ -938,12 +967,12 @@
+@@ -938,12 +975,12 @@
      half_view_height =
          bounds->z_pos * tanf(0.5f * (0.017453292f * state->fov));
      viewport_x_scale =
@@ -654,7 +665,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      depth_factor_y = Stage_GetCamZoomRate();
      depth_factor_x = Stage_GetCamMaxDepth() - depth_factor_y;
  
-@@ -954,10 +983,11 @@
+@@ -954,10 +991,11 @@
              (bounds->z_pos - Stage_GetCamZoomRate()) / depth_factor_x;
      }
  
@@ -668,7 +679,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      Camera_80030DE4(depth_factor_x * (input_x * viewport_x_scale),
                      depth_factor_y * (input_y * viewport_y_scale));
      cm_80452C68.xA4 = 0.0f;
-@@ -3524,8 +3553,12 @@
+@@ -3524,8 +3561,12 @@
      cm_80452C68.x2D0.angle_left = Stage_GetCamAngleRadiansLeft();
      cm_80452C68.x2D0.unk28 = Stage_GetPauseCamZPosMin();
      cm_80452C68.x2D0.unk2C = Stage_GetPauseCamZPosMax();
@@ -681,7 +692,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
      switch (arg2) {
      case 0:
-@@ -3707,7 +3740,11 @@
+@@ -3707,7 +3748,11 @@
      scale = cm_80452C68.x32C * cm_803BCCA0.x8C + cm_803BCCA0.x90;
      cm_80452C68.x2D0.unk28 = scale * cm_803BCCA0.x94;
      cm_80452C68.x2D0.unk2C = scale * cm_803BCCA0.x98;
@@ -693,7 +704,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
      {
          s8 slot = cm_80452C68.x304;
-@@ -3789,7 +3826,11 @@
+@@ -3789,7 +3834,11 @@
      temp_f2 = (cm_80452C68.x32C * (*new_var).x8C) + (*new_var).x90;
      cm_80452C68.x2D0.unk28 = temp_f2 * (*new_var).x94;
      cm_80452C68.x2D0.unk2C = temp_f2 * (*new_var).x98;

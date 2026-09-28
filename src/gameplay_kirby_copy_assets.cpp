@@ -690,6 +690,13 @@ struct GameplayKirbyCopyAssets::Storage {
                     // ftKb_SpecialN_800F16D0 reads g->x0->xC directly.
                     {0x0C, It_Kind_Kirby_MarioFire},
                 };
+                static constexpr CopyArticle luigi_articles[]{
+                    {0x0C, It_Kind_Kirby_LuigiFire},
+                };
+                static constexpr CopyArticle peach_articles[]{
+                    {0x0C, It_Kind_Kirby_PeachToad},
+                    {0x10, It_Kind_Kirby_PeachToadSpore},
+                };
                 static constexpr CopyArticle samus_articles[]{
                     // The source registers hats[FTKIND_SAMUS]->
                     // hat_dynamics[0] as Kirby's copied Charge Shot.
@@ -710,6 +717,47 @@ struct GameplayKirbyCopyAssets::Storage {
                     {0x0C, It_Kind_Kirby_FoxLaser},
                     {0x10, It_Kind_Kirby_FoxBlaster},
                 };
+                static constexpr CopyArticle falco_articles[]{
+                    // Falco's source registration selects dynamics rows 3/4.
+                    {0x18, It_Kind_Kirby_FalcoLaser},
+                    {0x1C, It_Kind_Kirby_FalcoBlaster},
+                };
+                static constexpr CopyArticle link_articles[]{
+                    {0x0C, It_Kind_Kirby_LinkArrow},
+                    {0x10, It_Kind_Kirby_LinkBow},
+                };
+                static constexpr CopyArticle clink_articles[]{
+                    {0x0C, It_Kind_Kirby_CLinkArrow},
+                    {0x10, It_Kind_Kirby_CLinkBow},
+                };
+                static constexpr CopyArticle mewtwo_articles[]{
+                    {0x18, It_Kind_Kirby_MewtwoShadowBall},
+                };
+                static constexpr CopyArticle ness_articles[]{
+                    {0x0C, It_Kind_Kirby_NessPKFlush},
+                    {0x10, It_Kind_Kirby_NessPKFlush_Explode},
+                };
+                static constexpr CopyArticle pikachu_articles[]{
+                    {0x0C, It_Kind_Kirby_PikachuTJolt_Ground},
+                    {0x10, It_Kind_Kirby_PikachuTJolt_Air},
+                };
+                static constexpr CopyArticle pichu_articles[]{
+                    {0x0C, It_Kind_Kirby_PichuTJolt_Ground},
+                    {0x10, It_Kind_Kirby_PichuTJolt_Air},
+                };
+                static constexpr CopyArticle koopa_articles[]{
+                    {0x0C, It_Kind_Kirby_KoopaFlame},
+                };
+                static constexpr CopyArticle sheik_articles[]{
+                    {0x0C, It_Kind_Kirby_SeakNeedleThrow},
+                    {0x10, It_Kind_Kirby_SeakNeedleHeld},
+                };
+                static constexpr CopyArticle drmario_articles[]{
+                    {0x0C, It_Kind_Kirby_DrMarioVitamin},
+                };
+                static constexpr CopyArticle yoshi_articles[]{
+                    {0x20, It_Kind_Kirby_YoshiEggLay},
+                };
                 const CopyArticle* copy_articles = nullptr;
                 std::size_t copy_article_count = 0;
                 if (root.fighter_kind == FTKIND_MARIO &&
@@ -717,6 +765,16 @@ struct GameplayKirbyCopyAssets::Storage {
                     root.symbol == "ftDataKirbyCopyMario") {
                     copy_articles = mario_articles;
                     copy_article_count = 1;
+                } else if (root.fighter_kind == FTKIND_LUIGI &&
+                           requirement.filename == "PlKbCpLg.dat" &&
+                           root.symbol == "ftDataKirbyCopyLuigi") {
+                    copy_articles = luigi_articles;
+                    copy_article_count = 1;
+                } else if (root.fighter_kind == FTKIND_PEACH &&
+                           requirement.filename == "PlKbCpPe.dat" &&
+                           root.symbol == "ftDataKirbyCopyPeach") {
+                    copy_articles = peach_articles;
+                    copy_article_count = 2;
                 } else if (root.fighter_kind == FTKIND_SAMUS &&
                            requirement.filename == "PlKbCpSs.dat" &&
                            root.symbol == "ftDataKirbyCopySamus") {
@@ -737,6 +795,61 @@ struct GameplayKirbyCopyAssets::Storage {
                            root.symbol == "ftDataKirbyCopyFox") {
                     copy_articles = fox_articles;
                     copy_article_count = 2;
+                } else if (root.fighter_kind == FTKIND_FALCO &&
+                           requirement.filename == "PlKbCpFc.dat" &&
+                           root.symbol == "ftDataKirbyCopyFalco") {
+                    copy_articles = falco_articles;
+                    copy_article_count = 2;
+                } else if (root.fighter_kind == FTKIND_LINK &&
+                           requirement.filename == "PlKbCpLk.dat" &&
+                           root.symbol == "ftDataKirbyCopyLink") {
+                    copy_articles = link_articles;
+                    copy_article_count = 2;
+                } else if (root.fighter_kind == FTKIND_CLINK &&
+                           requirement.filename == "PlKbCpCl.dat" &&
+                           root.symbol == "ftDataKirbyCopyClink") {
+                    copy_articles = clink_articles;
+                    copy_article_count = 2;
+                } else if (root.fighter_kind == FTKIND_MEWTWO &&
+                           requirement.filename == "PlKbCpMt.dat" &&
+                           root.symbol == "ftDataKirbyCopyMewtwo") {
+                    copy_articles = mewtwo_articles;
+                    copy_article_count = 1;
+                } else if (root.fighter_kind == FTKIND_NESS &&
+                           requirement.filename == "PlKbCpNs.dat" &&
+                           root.symbol == "ftDataKirbyCopyNess") {
+                    copy_articles = ness_articles;
+                    copy_article_count = 2;
+                } else if (root.fighter_kind == FTKIND_PIKACHU &&
+                           requirement.filename == "PlKbCpPk.dat" &&
+                           root.symbol == "ftDataKirbyCopyPikachu") {
+                    copy_articles = pikachu_articles;
+                    copy_article_count = 2;
+                } else if (root.fighter_kind == FTKIND_PICHU &&
+                           requirement.filename == "PlKbCpPc.dat" &&
+                           root.symbol == "ftDataKirbyCopyPichu") {
+                    copy_articles = pichu_articles;
+                    copy_article_count = 2;
+                } else if (root.fighter_kind == FTKIND_KOOPA &&
+                           requirement.filename == "PlKbCpKp.dat" &&
+                           root.symbol == "ftDataKirbyCopyKoopa") {
+                    copy_articles = koopa_articles;
+                    copy_article_count = 1;
+                } else if (root.fighter_kind == FTKIND_SEAK &&
+                           requirement.filename == "PlKbCpSk.dat" &&
+                           root.symbol == "ftDataKirbyCopySeak") {
+                    copy_articles = sheik_articles;
+                    copy_article_count = 2;
+                } else if (root.fighter_kind == FTKIND_DRMARIO &&
+                           requirement.filename == "PlKbCpDr.dat" &&
+                           root.symbol == "ftDataKirbyCopyDrmario") {
+                    copy_articles = drmario_articles;
+                    copy_article_count = 1;
+                } else if (root.fighter_kind == FTKIND_YOSHI &&
+                           requirement.filename == "PlKbCpYs.dat" &&
+                           root.symbol == "ftDataKirbyCopyYoshi") {
+                    copy_articles = yoshi_articles;
+                    copy_article_count = 1;
                 } else {
                     continue;
                 }

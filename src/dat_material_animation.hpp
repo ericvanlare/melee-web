@@ -9,10 +9,13 @@ enum class TextureIndexValidation {
     DispatchedValues,
 };
 // Owned native HSD_MatAnimJoint descriptors, checked against the exact model
-// topology. This gate supports constant/key texture-image and palette indices plus numeric texture transforms/blend;
-// material alpha uses the original numeric channel; RGB/TEV uses original interpolation with guarded u8 conversion. Other active material/render
-// channels are rejected explicitly. Keep this
-// owner alive until all JObjs using its descriptors have been destroyed.
+// topology. Texture-image/palette indices retain original CON/LIN/SPL0/SPL/KEY
+// interpolation and are range-checked over their source curves before the
+// original integer table selection. Numeric texture transforms/blend and
+// material alpha use the original numeric channels; RGB/TEV uses original
+// interpolation with guarded u8 conversion. Other active material/render
+// channels are rejected explicitly. Keep this owner alive until all JObjs
+// using its descriptors have been destroyed.
 class DatMaterialAnimation {
 public:
     DatMaterialAnimation(std::shared_ptr<const DatArchive>, uint32_t root,

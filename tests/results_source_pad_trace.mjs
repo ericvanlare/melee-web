@@ -153,6 +153,71 @@ export function assertResultsCpuPagesAfterInitialP1Keyboard(trace,targetFrame,{
       ticks:row.source_frame-statsPhaseStart})),transitions:cpuTransitions,summary};
 }
 
+// Preserve the historical two-Enter prefix, but defer its third confirmation
+// until the raw Results trace proves both disconnected CPU pages advanced.
+export function assertResultsCpuPagesAfterP1KeyboardPrefix(trace,
+  expectedInitialStartFrames=[192,363],{
+    expectedPortErrors=[[0],[0],[-1],[-1]],expectedDisconnectedCpuSlots=[2,3]}={}){
+  if(expectedPortErrors.length!==4||expectedDisconnectedCpuSlots.length===0||
+     expectedPortErrors.some(values=>!Array.isArray(values)||values.length!==1||
+       !Number.isInteger(values[0]))||
+     expectedDisconnectedCpuSlots.some((slot,index)=>!Number.isInteger(slot)||slot<0||slot>3||
+       (index>0&&slot<=expectedDisconnectedCpuSlots[index-1]))||
+     JSON.stringify(expectedDisconnectedCpuSlots)!==JSON.stringify(
+       expectedPortErrors.flatMap((values,slot)=>values[0]===-1?[slot]:[]))||
+     !Array.isArray(expectedInitialStartFrames)||expectedInitialStartFrames.length<1||
+     expectedInitialStartFrames.some((frame,index)=>!Number.isInteger(frame)||frame<0||
+       (index>0&&frame<=expectedInitialStartFrames[index-1])))
+    throw Error('Results historical-prefix gate requires ordered source frames and an explicit four-port profile');
+  if(trace.overflow)throw Error('Results historical-prefix gate received an overflowed source trace');
+  const summary=summarizeResultsPadTrace(trace);
+  if(summary.tick_failed.length)
+    throw Error('Results source tick failed before the historical-prefix page gate');
+  if(JSON.stringify(summary.port_error_values)!==JSON.stringify(expectedPortErrors))
+    throw Error('Observed Results controller connectedness changed from the historical-prefix profile');
+  if(summary.results_page_transitions.some(row=>row.from!==0||row.to!==1||
+      !expectedDisconnectedCpuSlots.includes(row.slot)))
+    throw Error('Connected neutral ports or an unexpected Results page changed before confirmation');
+  const analogFields=['stick_x','stick_y','substick_x','substick_y','trigger_left',
+    'trigger_right','analog_a','analog_b','ext_button'];
+  if(trace.samples.some(row=>row.pads.some((pad,port)=>
+    (port===0?pad.button!==0&&pad.button!==0x1000:pad.button!==0)||
+    analogFields.some(field=>pad[field]!==undefined&&pad[field]!==0))))
+    throw Error('A Results input other than P1 Start or neutral analog controls was consumed');
+  const latest=trace.samples.at(-1)?.results_state_after_tick;
+  const initialRuns=summary.p1_start_runs.slice(0,expectedInitialStartFrames.length);
+  if(initialRuns.length<expectedInitialStartFrames.length||
+     initialRuns.some((run,index)=>run.first_source_frame!==expectedInitialStartFrames[index]||
+       run.last_source_frame!==expectedInitialStartFrames[index]+9))return null;
+  if(summary.p1_start_runs.length!==expectedInitialStartFrames.length)
+    throw Error('An additional P1 Start was consumed before the disconnected CPU page gate');
+  if(!latest)return null;
+  const transitions=summary.results_page_transitions;
+  if(transitions.length<expectedDisconnectedCpuSlots.length)return null;
+  if(JSON.stringify(transitions.map(row=>row.slot))!==JSON.stringify(expectedDisconnectedCpuSlots))
+    throw Error('Disconnected CPU pages did not each auto-advance exactly once');
+  const firstTransition=Math.min(...transitions.map(row=>row.source_frame));
+  const lastTransition=Math.max(...transitions.map(row=>row.source_frame));
+  if(initialRuns.some(run=>run.last_source_frame>=firstTransition))
+    throw Error('The historical P1 Enter prefix overlapped a CPU page transition');
+  const statsPhaseStart=trace.samples.find(row=>{
+    const state=row.results_state_after_tick;
+    return state?.phase===3&&state.stats_phase===2&&
+      expectedDisconnectedCpuSlots.every(slot=>state.players[slot].page===0);
+  })?.results_state_after_tick?.source_frame;
+  if(!Number.isInteger(statsPhaseStart)||statsPhaseStart<=initialRuns.at(-1).last_source_frame)
+    return null;
+  if(!transitions.every(row=>row.phase===3&&row.stats_phase===2&&row.confirmed===0&&
+      row.source_frame-statsPhaseStart>=180&&row.source_frame<=latest.source_frame))
+    throw Error('Disconnected CPU pages did not auto-advance in active statistics after 180 source ticks');
+  if(![3,4].includes(latest.phase)||latest.stats_phase!==2||
+      expectedDisconnectedCpuSlots.some(slot=>latest.players[slot].page!==1))return null;
+  return {source_frame:latest.source_frame,initial_start_runs:initialRuns,
+    stats_phase_start_source_frame:statsPhaseStart,
+    cpu_page_delay_source_ticks:transitions.map(row=>({slot:row.slot,
+      ticks:row.source_frame-statsPhaseStart})),transitions,summary};
+}
+
 export function buildResultsPadTraceRecord(match,reason,trace){
   return {match,reason,summary:summarizeResultsPadTrace(trace),trace};
 }

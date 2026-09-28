@@ -24,7 +24,8 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
 import {queueResultsP1StartAtCurrentSource,scheduleResultsP1StartSequence}
   from './results_source_pad_input.mjs';
-import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
+import {assertResultsCpuPagesAfterInitialP1Keyboard,
+  assertResultsCpuPagesAfterP1KeyboardPrefix,buildResultsPadTraceRecord,
   findConsumedResultsStartKeyboardAttempt,findResultsStartRunAtOrAfter,
   summarizeResultsPadTrace}
   from './results_source_pad_trace.mjs';
@@ -34,14 +35,17 @@ const {values}=parseArgs({options:{...Object.fromEntries(
   'results-confirm-frame':{type:'string'},
   matches:{type:'string'},'setup-only':{type:'boolean'}}});
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2|3|4] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2|3|4] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK]');
 const resultsInputMode=values['results-input']||'keyboard';
-if(!['keyboard','keyboard-three-prefix','keyboard-gated','keyboard-gated-p1-enter','source-tick','source-tick-three-pulse'].includes(resultsInputMode))
-  throw Error('--results-input must be keyboard, keyboard-three-prefix, keyboard-gated, keyboard-gated-p1-enter, source-tick, or source-tick-three-pulse');
+if(!['keyboard','keyboard-three-prefix','keyboard-gated','keyboard-gated-p1-enter',
+  'keyboard-gated-two-prefix','source-tick','source-tick-three-pulse'].includes(resultsInputMode))
+  throw Error('--results-input must be keyboard, keyboard-three-prefix, keyboard-gated, keyboard-gated-p1-enter, keyboard-gated-two-prefix, source-tick, or source-tick-three-pulse');
 const sourceTickMode=resultsInputMode==='source-tick'||resultsInputMode==='source-tick-three-pulse';
 const sourceTickThreePulse=resultsInputMode==='source-tick-three-pulse';
-const keyboardGatedMode=resultsInputMode==='keyboard-gated'||resultsInputMode==='keyboard-gated-p1-enter';
-const keyboardP1EnterMode=resultsInputMode==='keyboard-gated-p1-enter';
+const keyboardPrefixGatedMode=resultsInputMode==='keyboard-gated-two-prefix';
+const keyboardGatedMode=resultsInputMode==='keyboard-gated'||
+  resultsInputMode==='keyboard-gated-p1-enter'||keyboardPrefixGatedMode;
+const keyboardP1EnterMode=resultsInputMode==='keyboard-gated-p1-enter'||keyboardPrefixGatedMode;
 const keyboardPortErrors=[[0],[0],[-1],[-1]];
 const keyboardAutoPageSlots=[2,3];
 const resultsConfirmFrame=Number(values['results-confirm-frame']||600);
@@ -91,8 +95,10 @@ const continuationScope=matchCount===1?'natural Results→CSS only':
   `natural Results→CSS→${matchCount-1} subsequent match${matchCount===2?'':'es'}`;
 const resultsInputScope=resultsInputMode==='keyboard-three-prefix'?
   'first three ordinary 160/120ms Enter pulses retained through source cursor 560, then ordinary continuation; not an exact historical consumed-PAD replay':
+  keyboardPrefixGatedMode?
+    'P1/P2-connected split keyboard and disconnected CPU ports P3/P4; retain ordinary trusted 160/120ms Enter edges with P1 Start consumed at source ticks 192 and 363, then wait for both source-observed CPU page transitions before the third Enter confirmation. This is a timing discriminator, not a full historical replay':
   keyboardP1EnterMode?
-  'ordinary trusted 160/120ms Enter edges; preserve connected split-keyboard ports P1/P2 and disconnected CPU ports P3/P4; source PAD must show P1 Start only, and both disconnected CPU pages must advance before post-page confirmation. The historical failure report omitted Results port status':
+    'ordinary trusted 160/120ms Enter edges; preserve connected split-keyboard ports P1/P2 and disconnected CPU ports P3/P4; source PAD must show P1 Start only, and both disconnected CPU pages must advance before post-page confirmation. The historical failure report omitted Results port status':
   resultsInputMode==='keyboard-gated'?
   'ordinary trusted 160/120ms P1 Enter edges; ports P1/P2 connected and CPU ports P3/P4 disconnected; wait for both disconnected CPU pages before post-page confirmation':
   sourceTickThreePulse?
@@ -702,9 +708,13 @@ async function runMatch(matchIndex,expected){
       const diagnosticFrame=readResultsFrame(state);
       if(diagnosticFrame>=targetFrame&&diagnosticFrame-lastTraceFrame>=12){
         const trace=await readResultsSourcePadTrace();
-        const gate=assertResultsCpuPagesAfterInitialP1Keyboard(trace,targetFrame,{
-          expectedPortErrors:keyboardPortErrors,
-          expectedDisconnectedCpuSlots:keyboardAutoPageSlots});
+        const gate=keyboardPrefixGatedMode?
+          assertResultsCpuPagesAfterP1KeyboardPrefix(trace,[192,363],{
+            expectedPortErrors:keyboardPortErrors,
+            expectedDisconnectedCpuSlots:keyboardAutoPageSlots}):
+          assertResultsCpuPagesAfterInitialP1Keyboard(trace,targetFrame,{
+            expectedPortErrors:keyboardPortErrors,
+            expectedDisconnectedCpuSlots:keyboardAutoPageSlots});
         if(gate)return {natural_css:false,...gate};
         lastTraceFrame=trace.samples.at(-1)?.results_state_after_tick?.source_frame??diagnosticFrame;
       }
@@ -884,19 +894,24 @@ async function runMatch(matchIndex,expected){
   }else if(keyboardGatedMode){
     const inputEventStart=await page.evaluate(()=>
       window.__meleeWebResultsInputEvents?.length||0);
-    const keyboardPhaseReady=await waitForResultsInternalPhase(180,2,
-      `results-${matchIndex}-first-keyboard-enter-phase-gate`);
+    const keyboardPhaseReady=keyboardPrefixGatedMode?
+      await waitForResultsFrame(192,`results-${matchIndex}-historical-prefix-source-frame-192`):
+      await waitForResultsInternalPhase(180,2,
+        `results-${matchIndex}-first-keyboard-enter-phase-gate`);
     if(keyboardPhaseReady.phase===1){
       result.results_keyboard_input_stop={reason:'natural CSS return before phase-2 keyboard gate'};
-      throw Error(`Results ${matchIndex} returned to CSS before the original fade reached phase 2`);
+      throw Error(`Results ${matchIndex} returned to CSS before the keyboard input source-frame gate`);
     }
-    result.results_keyboard_phase_gate={status:'passed',source_phase:2,
+    result.results_keyboard_phase_gate={status:'passed',source_phase:keyboardPrefixGatedMode?
+      'source-frame-prefix':2,
       source_frame:readResultsFrame(keyboardPhaseReady)};
-    report.phases.push(`Results ${matchIndex}: original phase 2 observed before ordinary Enter`);
+    report.phases.push(keyboardPrefixGatedMode?
+      `Results ${matchIndex}: first historical Enter pulse source-gated at frame 192`:
+      `Results ${matchIndex}: original phase 2 observed before ordinary Enter`);
     // Retain the ordinary trusted keyboard path, but stop retrying as soon as
     // a P1 Start is actually consumed. Then wait with no further input until
     // the disconnected CPU pages auto-advance in source statistics.
-    const initialEnterTargets=[198,296,394,509];
+    const initialEnterTargets=keyboardPrefixGatedMode?[192,363]:[198,296,394,509];
     const initialEnterDispatches=[];
     let initialCssReturn=false;
     let initialStartObserved=false;
@@ -918,7 +933,7 @@ async function runMatch(matchIndex,expected){
       if(state.phase===1){initialCssReturn=true;break;}
       const trace=await readResultsSourcePadTrace();
       initialStartObserved=summarizeResultsPadTrace(trace).p1_start_runs.length>0;
-      if(initialStartObserved)break;
+      if(initialStartObserved&&!keyboardPrefixGatedMode)break;
     }
     if(initialCssReturn){
       result.results_keyboard_input_stop={reason:'natural CSS return before the CPU auto-page gate',
@@ -935,6 +950,15 @@ async function runMatch(matchIndex,expected){
       assert(initialKeydowns.every((row,index)=>row.isTrusted&&!row.repeat&&
         row.resultsSourceFrameAtEvent>=initialEnterTargets[index]),
         'The initial Results Enter edges must preserve their source-tick lower bounds');
+      if(keyboardPrefixGatedMode){
+        assert.equal(initialEnterDispatches.length,2,
+          'The historical Results prefix must retain exactly two Enter pulses before the page gate');
+        assert.deepEqual(initialKeydowns.map(row=>row.resultsSourceFrameAtEvent),[192,363],
+          'The two pre-confirmation Enter keydowns must retain their exact Results source-frame brackets');
+        const initialKeyups=initialInputEvents.filter(row=>row.kind==='keyup');
+        assert.deepEqual(initialKeyups.map(row=>row.resultsSourceFrameAtEvent),[202,373],
+          'Each 160ms Enter hold must retain its source-consumed release edge before the page gate');
+      }
       assert.deepEqual(initialEnterDispatches.map(row=>row.target_source_frame),
         initialEnterTargets.slice(0,initialEnterDispatches.length));
       const initialDispatchFrame=initialEnterDispatches.at(-1).source_frame_before;
@@ -948,7 +972,9 @@ async function runMatch(matchIndex,expected){
         throw Error(`Results ${matchIndex} returned to CSS before all expected disconnected CPU pages auto-advanced`);
       }
       const pageCheck={match:matchIndex,status:'source-auto-pages-observed',
-        input:'ordinary trusted Enter trigger attempts stop on first consumed P1 Start; then source-gated 160ms/120ms Enter confirmation',
+        input:keyboardPrefixGatedMode?
+          'historical two trusted 160/120ms Enter pulses at source ticks 192/363; wait for disconnected CPU auto-pages, then send the third P1 confirmation':
+          'ordinary trusted Enter trigger attempts stop on first consumed P1 Start; then source-gated 160ms/120ms Enter confirmation',
         expected_disconnected_cpu_slots:keyboardAutoPageSlots,
         controller_port_errors:keyboardPortErrors.map(values=>values[0]),
         auto_page_gate_poll_lower_bound_source_frame:initialEnterDispatches.at(-1).target_source_frame,
@@ -957,7 +983,9 @@ async function runMatch(matchIndex,expected){
         initial_dispatch_source_frame:initialDispatchFrame,
         initial_keydown_source_frame:initialKeydowns.at(-1).resultsSourceFrameAtEvent,
         initial_keydown_source_frames:initialKeydowns.map(row=>row.resultsSourceFrameAtEvent),
-        initial_consumed_p1_start:gate.initial_start,
+        initial_consumed_p1_start:keyboardPrefixGatedMode?
+          gate.initial_start_runs.at(-1):gate.initial_start,
+        initial_consumed_p1_starts:keyboardPrefixGatedMode?gate.initial_start_runs:undefined,
         stats_phase_start_source_frame:gate.stats_phase_start_source_frame,
         cpu_page_delay_source_ticks:gate.cpu_page_delay_source_ticks,
         source_frame_before_confirmation:gate.source_frame,
@@ -969,7 +997,9 @@ async function runMatch(matchIndex,expected){
       result.results_keyboard_page_gate={source_frame:gate.source_frame,
         expected_disconnected_cpu_slots:keyboardAutoPageSlots,
         controller_port_errors:keyboardPortErrors.map(values=>values[0]),
-        initial_start:gate.initial_start,
+        initial_start:keyboardPrefixGatedMode?
+          gate.initial_start_runs.at(-1):gate.initial_start,
+        initial_start_runs:keyboardPrefixGatedMode?gate.initial_start_runs:undefined,
         stats_phase_start_source_frame:gate.stats_phase_start_source_frame,
         cpu_page_delay_source_ticks:gate.cpu_page_delay_source_ticks,
         transitions:gate.transitions,post_page_start_runs:gate.post_page_start_runs,
@@ -1025,7 +1055,8 @@ async function runMatch(matchIndex,expected){
       assert.equal(keyups.length,pulses,
         'Every scheduled keyboard pulse must retain one trusted Enter keyup');
       const initialPulseCount=pageCheck.initial_enter_pulse_count;
-      const initialStart=gate.initial_start;
+      const initialStart=keyboardPrefixGatedMode?
+        gate.initial_start_runs.at(-1):gate.initial_start;
       pageCheck.initial_keydown_source_frame=keydowns[initialPulseCount-1]?.resultsSourceFrameAtEvent??null;
       const initialStartPulseIndex=keydowns.findIndex((row,index)=>
         row.resultsSourceFrameAtEvent<=initialStart.first_source_frame&&
@@ -1035,6 +1066,20 @@ async function runMatch(matchIndex,expected){
       pageCheck.initial_start_keyboard_event_bracket={
         keydown_source_frame:keydowns[initialStartPulseIndex].resultsSourceFrameAtEvent,
         keyup_source_frame:keyups[initialStartPulseIndex].resultsSourceFrameAtEvent};
+      if(keyboardPrefixGatedMode){
+        const prefixBrackets=gate.initial_start_runs.map(startRun=>{
+          const index=keydowns.findIndex((row,eventIndex)=>
+            row.resultsSourceFrameAtEvent<=startRun.first_source_frame&&
+            keyups[eventIndex]?.resultsSourceFrameAtEvent>=startRun.first_source_frame);
+          assert(index>=0&&index<initialPulseCount,
+            'Each historical pre-page P1 Start run must be enclosed by its own trusted Enter edge');
+          return {source_start_frame:startRun.first_source_frame,
+            keydown_source_frame:keydowns[index].resultsSourceFrameAtEvent,
+            keyup_source_frame:keyups[index].resultsSourceFrameAtEvent};
+        });
+        assert.deepEqual(prefixBrackets.map(row=>row.source_start_frame),[192,363]);
+        pageCheck.historical_prefix_keyboard_brackets=prefixBrackets;
+      }
       const lastPageTransition=Math.max(...gate.transitions.map(item=>item.source_frame));
       const postPageKeydownIndex=keydowns.findIndex(row=>
         row.resultsSourceFrameAtEvent>lastPageTransition);
@@ -1110,6 +1155,22 @@ async function runMatch(matchIndex,expected){
     'Prior match and Results owners must be torn down at CSS return');
   await screenshot(`match-${matchIndex}-returned-css`);
   const sourcePadTraceRecord=await retainResultsSourcePadTrace(matchIndex,'natural-results-to-css');
+  const cameraEntry=sourcePadTraceRecord?.trace?.camera_entry;
+  assert(cameraEntry,
+    `Results ${matchIndex} must retain source camera allocator identity at OnEnter`);
+  assert.equal(cameraEntry.source_camera_allocation_generation_after_onenter,
+    cameraEntry.source_camera_allocation_generation_before_onenter+1,
+    `Results ${matchIndex} must allocate exactly one source camera pool during OnEnter`);
+  assert.equal(cameraEntry.source_camera_allocation_subject_count_after_onenter,8,
+    `Results ${matchIndex} must retain the original eight-subject camera allocation`);
+  assert.equal(cameraEntry.source_pool_after_collision_adoption,
+    cameraEntry.source_pool_after_onenter,
+    `Results ${matchIndex} collision adoption must preserve the OnEnter camera pool`);
+  assert.equal(cameraEntry.source_camera_allocation_generation_after_collision_adoption,
+    cameraEntry.source_camera_allocation_generation_after_onenter,
+    `Results ${matchIndex} collision adoption must not allocate another source camera pool`);
+  assert.equal(cameraEntry.source_camera_allocation_subject_count_after_collision_adoption,8,
+    `Results ${matchIndex} collision adoption must retain the OnEnter allocation identity`);
   if(resultsInputMode==='keyboard-three-prefix'){
     const checkpoint=report.results_three_pulse_prefixes.find(row=>row.match===matchIndex);
     assert(checkpoint&&checkpoint.status==='pass',
@@ -1162,8 +1223,9 @@ async function runMatch(matchIndex,expected){
         'The initial P1 Start must enter statistics before the automatic CPU page transitions');
       const beforeInitialStart=sourcePadTrace.samples.find(row=>
         row.source_frame===initialStart.first_source_frame-1);
-      assert(beforeInitialStart?.results_state_after_tick?.phase===2,
-        'The first consumed keyboard Start must be preceded by the original Results fade phase');
+      if(!keyboardPrefixGatedMode)
+        assert(beforeInitialStart?.results_state_after_tick?.phase===2,
+          'The first consumed keyboard Start must be preceded by the original Results fade phase');
       const keyboardEvents=result.results_keyboard_events||[];
       const keydowns=keyboardEvents.filter(row=>row.kind==='keydown');
       const keyups=keyboardEvents.filter(row=>row.kind==='keyup');

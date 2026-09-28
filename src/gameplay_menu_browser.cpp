@@ -126,6 +126,11 @@ void append_camera_entry_json(std::string& json){
  json+=",\"source_pool_after_collision_adoption\":";append_pointer_json(json,results_camera_entry_snapshot.source_pool_after_collision_adoption);
  json+=",\"context_pool_after_adoption\":";append_pointer_json(json,results_camera_entry_snapshot.context_pool_after_adoption);
  json+=",\"owner_pool_after_adoption\":";append_pointer_json(json,results_camera_entry_snapshot.owner_pool_after_adoption);
+ json+=",\"source_camera_allocation_generation_before_onenter\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_generation_before_onenter);
+ json+=",\"source_camera_allocation_generation_after_onenter\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_generation_after_onenter);
+ json+=",\"source_camera_allocation_subject_count_after_onenter\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_subject_count_after_onenter);
+ json+=",\"source_camera_allocation_generation_after_collision_adoption\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_generation_after_collision_adoption);
+ json+=",\"source_camera_allocation_subject_count_after_collision_adoption\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_subject_count_after_collision_adoption);
  json+='}';
 }
 size_t retain_results_pad_sample(uint32_t source_frame,const PADStatus pads[4]){

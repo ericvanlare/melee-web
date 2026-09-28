@@ -607,6 +607,36 @@ target_link_options(gameplay_results_scene_trace PRIVATE --profiling-funcs -sENV
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_results_scene_trace PROPERTIES SUFFIX ".js")
 
+# Optional rendered discriminator for Results camera ownership. This is kept
+# separate from the Node state-only trace: the browser target runs the exact
+# same source Results reducer with Aurora/WebGPU draws and local real assets.
+option(MELEE_WEB_RESULTS_RENDERED_TRACE
+  "Build the headless-browser Results draw reducer" OFF)
+set(MELEE_WEB_RESULTS_TRACE_ASSET_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/assets-local"
+  CACHE PATH "Ignored local asset root for the rendered Results reducer")
+if(MELEE_WEB_RESULTS_RENDERED_TRACE)
+  foreach(_asset_dir native-menus repro-results-v1 next-gate)
+    if(NOT IS_DIRECTORY "${MELEE_WEB_RESULTS_TRACE_ASSET_ROOT}/${_asset_dir}")
+      message(FATAL_ERROR
+        "Rendered Results trace requires ${MELEE_WEB_RESULTS_TRACE_ASSET_ROOT}/${_asset_dir}")
+    endif()
+  endforeach()
+  add_executable(gameplay_results_scene_trace_rendered EXCLUDE_FROM_ALL
+    tests/gameplay_results_scene_trace.cpp)
+  target_compile_definitions(gameplay_results_scene_trace_rendered PRIVATE
+    MELEE_WEB_RESULTS_RENDERED_TRACE)
+  target_include_directories(gameplay_results_scene_trace_rendered SYSTEM PRIVATE
+    "${EMSCRIPTEN_SYSROOT}/include/compat")
+  target_link_libraries(gameplay_results_scene_trace_rendered PRIVATE
+    fighter_asset_runtime aurora::main)
+  target_link_options(gameplay_results_scene_trace_rendered PRIVATE
+    --profiling-funcs -sENVIRONMENT=web -sASYNCIFY=1
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728
+    -sEXIT_RUNTIME=0 -sASSERTIONS=2 -sSTACK_SIZE=8388608
+    --preload-file "${MELEE_WEB_RESULTS_TRACE_ASSET_ROOT}@/assets")
+  set_target_properties(gameplay_results_scene_trace_rendered PROPERTIES SUFFIX ".js")
+endif()
+
 add_executable(gameplay_prize_assets_test EXCLUDE_FROM_ALL tests/gameplay_prize_assets_test.cpp)
 target_link_libraries(gameplay_prize_assets_test PRIVATE fighter_asset_runtime)
 target_link_options(gameplay_prize_assets_test PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1

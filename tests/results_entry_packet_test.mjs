@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import {bindResultsEntryPacket,readResultsEntryPacket} from './results_entry_packet.mjs';
 import {queueResultsP1StartAtCurrentSource,scheduleResultsP1StartSequence}
   from './results_source_pad_input.mjs';
-import {assertResultsCpuPagesAfterInitialP1Keyboard,buildResultsPadTraceRecord,
+import {assertResultsCpuPagesAfterInitialP1Keyboard,
+  assertResultsCpuPagesAfterP1KeyboardPrefix,buildResultsPadTraceRecord,
   findConsumedResultsStartKeyboardAttempt,findResultsStartRunAtOrAfter,
   summarizeResultsPadTrace}
   from './results_source_pad_trace.mjs';
@@ -37,7 +38,12 @@ const resultsPadTrace={attempts:5,retained:5,capacity:8192,overflow:false,
   camera_entry:{saved_pool_at_context_begin:'0x0',source_pool_before_onenter:'0x0',
     owner_pool_before_onenter:'0x0',source_pool_after_onenter:'0x1234',
     source_pool_after_collision_adoption:'0x1234',context_pool_after_adoption:'0x1234',
-    owner_pool_after_adoption:'0x1234'},
+    owner_pool_after_adoption:'0x1234',
+    source_camera_allocation_generation_before_onenter:12,
+    source_camera_allocation_generation_after_onenter:13,
+    source_camera_allocation_subject_count_after_onenter:8,
+    source_camera_allocation_generation_after_collision_adoption:13,
+    source_camera_allocation_subject_count_after_collision_adoption:8},
   samples:[
     {source_frame:408,tick_returned:true,pads:[0,0,0,0].map((_,port)=>({button:0,err:port<2?0:-1})),
       results_state_after_tick:{source_frame:409,phase:3,stats_phase:2,
@@ -53,6 +59,14 @@ const resultsPadTrace={attempts:5,retained:5,capacity:8192,overflow:false,
 const retainedPadTrace=buildResultsPadTraceRecord(1,'natural-results-to-css',resultsPadTrace);
 assert.strictEqual(retainedPadTrace.trace,resultsPadTrace);
 assert.deepEqual(retainedPadTrace.trace.camera_entry,resultsPadTrace.camera_entry);
+assert.equal(retainedPadTrace.trace.camera_entry.source_camera_allocation_generation_after_onenter-
+  retainedPadTrace.trace.camera_entry.source_camera_allocation_generation_before_onenter,1);
+assert.equal(retainedPadTrace.trace.camera_entry.source_camera_allocation_subject_count_after_onenter,8);
+assert.equal(retainedPadTrace.trace.camera_entry.source_pool_after_collision_adoption,
+  retainedPadTrace.trace.camera_entry.source_pool_after_onenter);
+assert.equal(retainedPadTrace.trace.camera_entry.source_camera_allocation_generation_after_collision_adoption,
+  retainedPadTrace.trace.camera_entry.source_camera_allocation_generation_after_onenter);
+assert.equal(retainedPadTrace.trace.camera_entry.source_camera_allocation_subject_count_after_collision_adoption,8);
 assert.equal(retainedPadTrace.summary.tick_returned,5);
 assert.deepEqual(retainedPadTrace.summary.results_page_transitions.map(row=>row.slot),[2,3]);
 assert.deepEqual(retainedPadTrace.summary.p1_start_runs,
@@ -78,6 +92,55 @@ assert.throws(()=>summarizeResultsPadTrace(reusedObserverTrace),/crossed a sessi
 const neutralPads=()=>[0,1,2,3].map(port=>({button:0,err:port<2?0:-1}));
 const firstStatsPageState=source_frame=>({source_frame,phase:3,stats_phase:2,
   players:[0,1,2,3].map(()=>({page:0,confirmed:0}))});
+const historicalPrefixTrace=(thirdStartFrame=null)=>{
+  let previousP1Button=0;
+  const samples=[];
+  for(let source_frame=191;source_frame<=553;source_frame++){
+    const inFirst=source_frame>=192&&source_frame<=201;
+    const inSecond=source_frame>=363&&source_frame<=372;
+    const inThird=thirdStartFrame!==null&&source_frame>=thirdStartFrame&&
+      source_frame<thirdStartFrame+10;
+    const button=inFirst||inSecond||inThird?4096:0;
+    const trigger=button!==0&&previousP1Button===0?4096:0;
+    const release=button===0&&previousP1Button!==0?4096:0;
+    previousP1Button=button;
+    const pageAdvanced=source_frame>=553;
+    samples.push({source_frame,tick_returned:true,
+      pads:neutralPads().map((pad,port)=>({...pad,button:port===0?button:0})),
+      source_consumed_pads:neutralPads().map((pad,port)=>({...pad,
+        button:port===0?button:0,trigger:port===0?trigger:0,
+        release:port===0?release:0})),
+      results_state_after_tick:{source_frame:source_frame+1,
+        phase:source_frame<202?1:source_frame<363?2:3,
+        stats_phase:source_frame>=373?2:0,num_pages:3,
+        players:[0,1,2,3].map(slot=>({page:pageAdvanced&&slot>=2?1:0,confirmed:0}))}});
+  }
+  return {attempts:samples.length,retained:samples.length,capacity:8192,
+    overflow:false,samples};
+};
+const historicalPrefixBeforePage=historicalPrefixTrace();
+assert.equal(assertResultsCpuPagesAfterP1KeyboardPrefix({
+  ...historicalPrefixBeforePage,samples:historicalPrefixBeforePage.samples.slice(0,-1)},
+  [192,363]),null,
+  'Two historical Enter pulses must not pass until source-observed CPU page transitions occur');
+const historicalPrefixGate=assertResultsCpuPagesAfterP1KeyboardPrefix(
+  historicalPrefixBeforePage,[192,363]);
+assert.equal(historicalPrefixGate.source_frame,554);
+assert.deepEqual(historicalPrefixGate.initial_start_runs,
+  [{first_source_frame:192,last_source_frame:201},{first_source_frame:363,last_source_frame:372}]);
+assert.deepEqual(historicalPrefixGate.transitions.map(row=>row.slot),[2,3]);
+assert.deepEqual(historicalPrefixGate.cpu_page_delay_source_ticks,
+  [{slot:2,ticks:180},{slot:3,ticks:180}],
+  'The third historical Enter must remain gated until both disconnected CPU pages advance after 180 source ticks');
+assert.throws(()=>assertResultsCpuPagesAfterP1KeyboardPrefix(
+  historicalPrefixTrace(535),[192,363]),
+  /additional P1 Start/,
+  'The historical third Enter at source tick 535 must not count as a post-page confirmation');
+assert.throws(()=>assertResultsCpuPagesAfterP1KeyboardPrefix({
+  ...historicalPrefixBeforePage,samples:historicalPrefixBeforePage.samples.map(row=>({
+    ...row,pads:row.pads.map((pad,port)=>port===1?{...pad,err:-1}:pad)}))},[192,363]),
+  /connectedness changed/,
+  'The historical-prefix page gate must retain its connected P1/P2 and disconnected CPU profile');
 const preKeyboardTrace={attempts:4,retained:4,capacity:8192,overflow:false,samples:[
   ...resultsPadTrace.samples.slice(0,2),
   {source_frame:498,tick_returned:true,pads:neutralPads(),results_state_after_tick:firstStatsPageState(499)},

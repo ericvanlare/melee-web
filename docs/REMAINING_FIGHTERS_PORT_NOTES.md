@@ -721,9 +721,9 @@ Comparison with the historical report
 `work/pr86-final-frozen-b-two-match-r1/report.json` leaves a real gap. That
 older run has three P1 Enter intentions (160 ms held / 120 ms released), a
 natural Sheik win, and a camera-pool error detected at Results cursor 560, but
-no served-binary source commit binding, trusted keyboard event brackets,
-consumed PAD edge/release rows, CPU page state, or camera-entry pointer
-snapshot. In the fresh run above the final confirmation is at 600, after the
+no build-manifest link from its served Wasm hash to a source commit, trusted
+keyboard event brackets, consumed PAD edge/release rows, CPU page state, or
+camera-entry pointer snapshot. In the fresh run above the final confirmation is at 600, after the
 CPU page transition at 552; the historical failure is detected 40 ticks
 earlier. The old cursor therefore cannot be mapped to an equivalent input or
 first-corruption boundary. A source diff review from old checkout `607ff56` to
@@ -1419,9 +1419,10 @@ current-head Samus-winner route, but cannot establish that the historical
 browser consumed equivalent button edges or had equivalent scheduling. The
 historical runner checkout `607ff56` checked camera ownership only when
 `release_source_camera_and_ground()` ran during Results teardown, not at each
-tick/draw boundary; the served binary's source commit is unbound. Cursor 560 is
-therefore the late detection point, not evidence that the pointer changed at
-that frame. The first invalid historical
+tick/draw boundary. The report records that checkout and the served Wasm hash,
+but the frozen build manifest contains no source commit. Cursor 560 is therefore
+the late detection point, not evidence that the pointer changed at that frame.
+The first invalid historical
 ownership transition remains unknown. Next discriminator is another naturally
 reached Sheik-winner B Results path with first-change camera snapshots; do not
 call this control a resolution or equate the two incomplete input records.
@@ -1513,11 +1514,13 @@ It is native state-only: no source draw calls, rendered browser, CSS return or
 retail comparison.
 
 Comparison with the retained historical failure is limited by missing data.
-`work/pr86-final-frozen-b-two-match-r1/report.json` records a natural slot-2
-Zelda-origin Sheik win at frame 11,725 and three intended browser Enter pulses
-(160 ms down / 120 ms release), but its served Wasm
-`96592b3f…` is not bound to a source commit. It detects “Original Results
-camera pool ownership changed” at the late Results cursor 560. It does not
+`work/pr86-final-frozen-b-two-match-r1/report.json` records checkout
+`607ff564`, served Wasm SHA-256 `96592b3f…`, a natural slot-2 Zelda-origin
+Sheik win at frame 11,725, match-frame-0 RNG `2688366096`, and three intended
+browser Enter pulses (160 ms down / 120 ms release). The frozen Wasm still
+matches its recorded hash, but its build manifest contains no source commit.
+It detects “Original Results camera pool ownership changed” at the late
+Results cursor 560. It does not
 retain key event/source-frame brackets, consumed PAD edges/releases, CPU page
 state, connected-port bytes, or entry pointers; the cursor is not the first
 invalid pointer transition. The current reducer has exact source-tick PAD
@@ -1715,14 +1718,71 @@ destructor guards remained green. There were no browser page/target crashes,
 JS errors, native-command errors, or source-timing interruptions. This
 excludes a missing CPU auto-page for the ordinary P1-Enter path and a generic
 Samus Results-close failure on this merged build. It does not resolve the
-historical Sheik-specific camera failure: the winner and match frame differ,
-the old report is not bound to its Wasm, and it retains no event/PAD/page/
-camera snapshots.
+historical Sheik-specific camera failure: the winner and match frame differ.
+The old report is hash-bound to its served Wasm, but it retains no
+event/PAD/page/camera snapshots, and its build manifest does not bind that
+Wasm to a source commit.
 
 The task description's “P1-only” is treated as P1-only Enter/Start, not a
 P1-only controller-port profile. A port-disabled experiment broke original
 CSS's P2 Yoshi-door input and is retained only as a rejected profile
 interpretation. The bounded, read-only review request and comparison packet
-are in the ignored work note `work/pr86-results-camera-review-v1.md`. No
-additional unchanged full-match replay is planned until that review identifies
-a new discriminator.
+are in the ignored work note `work/pr86-results-camera-review-v1.md`; the
+review is complete. The next match will retain the new source allocator identity
+observation described below, not repeat an unchanged capture.
+
+## Bounded review and allocator-identity instrumentation (2026-09-28)
+
+The read-only Results-camera review confirmed that the historical report's
+served Wasm SHA-256
+`96592b3fdab21695b5209d41715e65b50f156b025b671860c776a9adec525faf` matches
+the retained `work/pr86-final-candidate-frozen/gameplay_menu_browser.wasm`.
+The report separately records source checkout `607ff564`; its
+`prototype-build.json` has artifact hashes but no source-commit field, so the
+binary's source-build lineage remains unproven. The report also retains the
+match-frame-0 RNG `2688366096`; the newer strict P1-Enter control began at
+`1661808323`. No save/card identity was retained, so reproducing the same
+natural RNG route is not established and the recorded value will not be
+injected. Historical Results PAD/page/camera pointers and the first invalid
+ownership transition remain absent.
+
+The review found the current pointer guards can miss an allocator call whose
+address is reused or restored before a boundary check. Source inspection found
+the only source assignment to `cm_804D645C` is in `Camera_80028B9C`, and Results
+OnEnter reaches `Camera_80028B9C(8)` through `fn_8017AA78`. The tracked camera
+patch now increments a source allocator generation and records the last subject
+count at every call. Results OnEnter requires exactly one original
+eight-subject allocation; each later ownership check validates both the
+pointer lease and generation. The entry packet records the generation bracket
+and subject count. Patch application and focused synthetic Python/Node tests
+pass. Affected native/browser builds and a fresh target scenario are pending;
+this instrumentation does not itself resolve the historical Sheik-winner
+failure.
+
+## Draw-enabled source Results reducer (2026-09-28)
+
+The preceding “builds and fresh target scenario pending” note is superseded for
+the synthetic reducer only by
+`work/pr86-results-draw-reducer-r4/report.json`. Built at source HEAD
+`8dc4dae` with tracked-diff fingerprint
+`2d0c877c40801a778b1eb4734c7eeede2c9d26f3597153d3cc7f1ec307fb08d1` and
+Release Wasm SHA-256
+`b01f0b765a40b9ef6571810188c06f699920f36cceba1b17b6cd4cc114883a5a`, installed
+headless Chrome 153 rendered the original Results scene with synthetic
+Zelda-origin Sheik standings and source-tick P1 Start at 180/360/600. It
+returned all 622 Results source ticks and all 622 draws. Disconnected CPU pages
+2/3 auto-advanced 0→1 at source frame 551, before P1's consumed post-page Start
+at 600. The original eight-subject camera allocation pointer and generation
+remained stable through every tick/draw, scene exit, host handoff and close.
+The GPU was available and screenshots are retained in the same directory.
+There were no page, native-command, source-tick, or camera-ownership failures;
+the report classifies one `.data` request cancellation after all bytes were
+consumed.
+
+This establishes that the guarded *drawn synthetic Results* route, its CPU
+auto-pages and later P1 confirmation do not alone cause the historical error.
+It is not a natural Match→Sheik-win→Results reproduction, and does not clear
+the historical slot-2 Sheik camera-pool failure. The historical report still
+lacks Results PAD/page and camera-pointer brackets, so the first invalid
+ownership transition remains unidentified. Do not treat this reducer as a
+natural match or original-versus-port comparison.

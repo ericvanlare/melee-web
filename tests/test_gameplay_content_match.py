@@ -84,6 +84,45 @@ class ContentMatchTests(unittest.TestCase):
             ("Mario", 8, ("PlMr.dat", "PlMrAJ.dat", "PlKbCpMr.dat", "EfKbMr.dat")),
             ("Samus", 16, ("PlSs.dat", "PlSsAJ.dat", "PlKbCpSs.dat", "EfKbSs.dat")),
             ("Fox", 2, ("PlFx.dat", "PlFxAJ.dat", "PlKbCpFx.dat", "EfKbFx.dat")),
+            ("Falco", 20, ("PlFc.dat", "PlFcAJ.dat", "PlKbCpFc.dat",
+                            "PlKbNrCpFc.dat", "EfFxData.dat", "EfKbFx.dat")),
+            ("Donkey Kong", 1, ("PlDk.dat", "PlDkAJ.dat", "PlKbCpDk.dat",
+                                  "PlKbNrCpDk.dat", "EfDkData.dat", "EfKbDk.dat")),
+            ("Jigglypuff", 15, ("PlPr.dat", "PlPrAJ.dat", "PlKbCpPr.dat",
+                                  "PlKbNrCpPr.dat", "EfPrData.dat")),
+            ("Marth", 9, ("PlMs.dat", "PlMsAJ.dat", "PlKbCpMs.dat",
+                            "EfMsData.dat", "EfKbMs.dat")),
+            ("Zelda", 18, ("PlZd.dat", "PlZdAJ.dat", "PlKbCpZd.dat",
+                            "EfSsData.dat", "EfZdData.dat",
+                            "EfKbZd.dat")),
+            ("Ganondorf", 24, ("PlGn.dat", "PlGnAJ.dat", "PlKbCpGn.dat",
+                                 "EfGnData.dat", "EfKbGn.dat")),
+            ("Roy", 25, ("PlFe.dat", "PlFeAJ.dat", "PlKbCpFe.dat",
+                          "EfFeData.dat", "EfKbFe.dat")),
+            ("Luigi", 7, ("PlLg.dat", "PlLgAJ.dat", "PlKbCpLg.dat",
+                           "EfLgData.dat", "EfKbLg.dat")),
+            ("Peach", 12, ("PlPe.dat", "PlPeAJ.dat", "PlKbCpPe.dat",
+                            "EfPeData.dat")),
+            ("Link", 6, ("PlLk.dat", "PlLkAJ.dat", "PlKbCpLk.dat",
+                          "EfLkData.dat")),
+            ("Young Link", 21, ("PlCl.dat", "PlClAJ.dat", "PlKbCpCl.dat",
+                                 "EfLkData.dat")),
+            ("Mewtwo", 10, ("PlMt.dat", "PlMtAJ.dat", "PlKbCpMt.dat",
+                             "PlKbNrCpMt.dat", "EfMtData.dat")),
+            ("Ness", 11, ("PlNs.dat", "PlNsAJ.dat", "PlKbCpNs.dat",
+                           "EfNsData.dat")),
+            ("Pikachu", 13, ("PlPk.dat", "PlPkAJ.dat", "PlKbCpPk.dat",
+                              "EfPkData.dat", "EfKbPk.dat")),
+            ("Pichu", 23, ("PlPc.dat", "PlPcAJ.dat", "PlKbCpPc.dat",
+                            "EfPkData.dat", "EfKbPk.dat")),
+            ("Bowser", 5, ("PlKp.dat", "PlKpAJ.dat", "PlKbCpKp.dat",
+                            "EfKpData.dat", "EfKbKp.dat")),
+            ("Sheik", 19, ("PlSk.dat", "PlSkAJ.dat", "PlKbCpSk.dat",
+                            "EfZdData.dat", "EfKbZd.dat")),
+            ("Dr. Mario", 22, ("PlDr.dat", "PlDrAJ.dat", "PlKbCpDr.dat",
+                                "EfMrData.dat", "EfKbMr.dat")),
+            ("Yoshi", 17, ("PlYs.dat", "PlYsAJ.dat", "PlKbCpYs.dat",
+                            "EfYsData.dat")),
         )
         if not all(path.is_file() for path in common):
             self.skipTest("Owned menu, Final Destination and Kirby source fixtures are required")
@@ -97,7 +136,19 @@ class ContentMatchTests(unittest.TestCase):
                 if ckind == 0:
                     expectations = (
                         "Kirby copied Falcon Punch: source motion=ftKb_MS_CaSpecialN",
-                        "Kirby action coverage: Captain/Falcon Punch acquire/use/loss/reacquisition and match teardown path passed",
+                        "Kirby action coverage: Captain Falcon acquire/use/loss/reacquisition and match teardown path passed",
+                        *phases,
+                    )
+                elif ckind in (1, 15, 9, 18, 25):
+                    expectations = (
+                        "Kirby copied source non-Article neutral special motion=",
+                        f"Kirby action coverage: {donor} acquire/use/loss/reacquisition and match teardown path passed",
+                        *phases,
+                    )
+                elif ckind == 24:
+                    expectations = (
+                        "Kirby copied Warlock Punch: source motion=ftKb_MS_GnSpecialN",
+                        "Kirby action coverage: Ganondorf acquire/use/loss/reacquisition and match teardown path passed",
                         *phases,
                     )
                 elif ckind == 14:
@@ -111,7 +162,7 @@ class ContentMatchTests(unittest.TestCase):
                 else:
                     expectations = (
                         "Kirby copied neutral special created source Article kind=",
-                        f"Kirby action coverage: {donor} acquire/use/loss/reacquisition and match teardown path passed",
+                        f"Kirby action coverage: {('Mr. Game & Watch' if ckind == 3 else donor)} acquire/use/loss/reacquisition and match teardown path passed",
                         *phases,
                     )
                 self.run_trace(

@@ -28,6 +28,11 @@ typedef struct MeleeWebResultsCameraEntrySnapshot {
     const void* source_pool_after_collision_adoption;
     const void* context_pool_after_adoption;
     const void* owner_pool_after_adoption;
+    uint32_t source_camera_allocation_generation_before_onenter;
+    uint32_t source_camera_allocation_generation_after_onenter;
+    int32_t source_camera_allocation_subject_count_after_onenter;
+    uint32_t source_camera_allocation_generation_after_collision_adoption;
+    int32_t source_camera_allocation_subject_count_after_collision_adoption;
 } MeleeWebResultsCameraEntrySnapshot;
 
 /* Owns one original Results scene inside an already prepared Results world.

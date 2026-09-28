@@ -10,6 +10,7 @@
 #include "gameplay_source_memory_runtime.h"
 #include "gameplay_menu_host.h"
 #include "gameplay_menu_world.hpp"
+#include "gameplay_fighter_assets.h"
 #include "results_source_pad_schedule.hpp"
 #include "gameplay_save_profile.h"
 #include <filesystem>
@@ -69,6 +70,8 @@ extern void* it_804D6D20;
 extern void* it_804D6D24;
 extern void* it_804D6D30;
 extern void* it_804D6D38;
+uint32_t melee_web_camera_pool_allocation_generation_value(void);
+int melee_web_camera_pool_last_subject_count_value(void);
 void Item_80266FA8(void);
 void Item_80266FCC(void);
 extern CmSubject* cm_804D645C;
@@ -548,6 +551,28 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
         melee_web::GameplayResultsSession session(files, result, 0x13579bdfU,
                                                    *input);
         P1StatisticsControl statistics_control(p1_statistics_browser_cadence);
+        const auto entry_camera = session.camera_entry_snapshot();
+        std::cout << "results-camera entry saved="
+                  << entry_camera.saved_pool_at_context_begin
+                  << " before_onenter=" << entry_camera.source_pool_before_onenter
+                  << " owner_before_onenter=" << entry_camera.owner_pool_before_onenter
+                  << " after_onenter=" << entry_camera.source_pool_after_onenter
+                  << " after_collision="
+                  << entry_camera.source_pool_after_collision_adoption
+                  << " context_after_collision="
+                  << entry_camera.context_pool_after_adoption
+                  << " owner_after_collision=" << entry_camera.owner_pool_after_adoption
+                  << " generation="
+                  << entry_camera.source_camera_allocation_generation_before_onenter
+                  << "->"
+                  << entry_camera.source_camera_allocation_generation_after_onenter
+                  << "->"
+                  << entry_camera.source_camera_allocation_generation_after_collision_adoption
+                  << " subjects="
+                  << entry_camera.source_camera_allocation_subject_count_after_onenter
+                  << "->"
+                  << entry_camera.source_camera_allocation_subject_count_after_collision_adoption
+                  << '\n' << std::flush;
         if (p1_statistics) {
             if (!host || result.match_end.match_kind != MatchKind_Stock ||
                 result.match_end.player_standings[2].ckind != CKIND_ZELDA ||
@@ -573,6 +598,16 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
 #endif
         }
         const auto initial_pool = cm_804D645C;
+        const auto trace_camera = [&](const char* phase) {
+            std::cout << "results-camera boundary=" << phase
+                      << " source_frame=" << session.source_frames()
+                      << " source_pool=" << static_cast<const void*>(cm_804D645C)
+                      << " allocation_generation="
+                      << melee_web_camera_pool_allocation_generation_value()
+                      << " last_subject_count="
+                      << melee_web_camera_pool_last_subject_count_value()
+                      << '\n' << std::flush;
+        };
         const auto check_pool = [&](const char* phase) {
             if (cm_804D645C != initial_pool) {
                 std::cerr << "Results pool first changed at " << phase
@@ -588,17 +623,29 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
         neutral[2].err = neutral[3].err = -1;
         unsigned draw_api_calls = 0;
         const auto draw_frame = [&] {
+            trace_camera("draw-before");
             draw_results(session);
             ++draw_api_calls;
+            trace_camera("draw-after");
             check_pool("draw/submission");
         };
         for (unsigned tick = 0; tick < 2; ++tick) {
+            trace_camera("tick-before");
             session.tick(neutral);
+            trace_camera("tick-after");
             check_pool("tick");
             if (draw) draw_frame();
         }
         if (session.source_frames() != 2 || session.requested())
             throw std::runtime_error("Short Results tick changed source transition state");
+        const auto report_fighter_owner = [&](const char* phase) {
+            char ownership_error[256]{};
+            if (melee_web_fighter_assets_check_owned(phase, ownership_error,
+                                                     sizeof(ownership_error)))
+                return;
+            std::cerr << "Results camera-guard diagnostic first fighter owner change at "
+                      << phase << ": " << ownership_error << '\n' << std::flush;
+        };
         if (pool_guard) {
             // Deliberate fault injection, not a reproduction of the browser's
             // unknown writer. Each API must reject before advancing the scene
@@ -613,6 +660,7 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                 try { action(); }
                 catch (const std::exception& e) { failure = e.what(); }
                 cm_804D645C = initial_pool;
+                report_fighter_owner(phase);
                 const std::string prefix =
                     std::string("Original Results camera pool ownership changed at ") + phase;
                 if (!failure.starts_with(prefix) ||
@@ -639,7 +687,9 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                     statistics_control.prepare(session.source_frames(), pads);
                 else if (tick >= (delayed_confirmation ? 600U : 240U) && tick % 90 == 0)
                     pads[0].button = pads[1].button = PAD_BUTTON_START;
+                trace_camera("tick-before");
                 session.tick(pads);
+                trace_camera("tick-after");
                 check_pool("tick");
                 if (p1_statistics) statistics_control.observe(session.source_frames());
                 if (draw) draw_frame();
@@ -662,12 +712,17 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
                 std::cout << " winner_demo_delayed_frames=" << session.source_frames()
                           << " source_draw_api_calls=" << draw_api_calls << '\n';
             }
-            session.exit_scene();
-            check_pool("scene OnExit");
+        trace_camera("scene-exit-before");
+        session.exit_scene();
+        trace_camera("scene-exit-after");
+        if (pool_guard) report_fighter_owner("after scene OnExit");
+        check_pool("scene OnExit");
             if (host) {
                 if (handoff_guard) check_results_handoff_rejection(host, session);
+                trace_camera("host-OnExit-commit-before");
                 if (!melee_web_menu_host_results_exit(host, error, sizeof(error)))
                     throw std::runtime_error(error);
+                trace_camera("host-OnExit-commit-after");
                 check_pool("host mode OnExit and route commit");
                 if (p1_statistics && melee_web_menu_host_results_destination(host) != gmVsMode_State_Css)
                     throw std::runtime_error("P1 statistics: synthetic all-CPU host did not select CSS");
@@ -706,7 +761,15 @@ static int run_real_lineup(const melee_web::RuntimeFiles& files,
         std::array<uint8_t, MELEE_WEB_PAD_STATE_BYTES> final_input{};
         const auto final_seed = session.random_seed();
         if (host) melee_web_pad_state_capture(final_input.data());
+        trace_camera("close-before");
         session.close();
+        std::cout << "results-camera boundary=close-after source_pool="
+                  << static_cast<const void*>(cm_804D645C)
+                  << " allocation_generation="
+                  << melee_web_camera_pool_allocation_generation_value()
+                  << " last_subject_count="
+                  << melee_web_camera_pool_last_subject_count_value()
+                  << '\n' << std::flush;
         check_results_teardown();
         if (host && (!melee_web_menu_host_results_end(host, final_seed,
                           final_input.data(), error, sizeof(error)) ||
