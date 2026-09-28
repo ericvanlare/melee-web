@@ -263,66 +263,30 @@ settings = mountControllerSettings({
   onError: error => showError(error),
 });
 
-const fullscreenButton = $('fullscreen'), fullscreenStatus = $('fullscreen-status'), playerElement = $('player');
-const toolbarMore = $('toolbar-more-toggle');
-let fullscreenMode = document.fullscreenEnabled === true &&
-  typeof playerElement.requestFullscreen === 'function' && typeof document.exitFullscreen === 'function'
-  ? 'native' : 'expand';
+const fullscreenButton = $('fullscreen'), playerElement = $('player');
+const nativeFullscreenAvailable = document.fullscreenEnabled === true &&
+  typeof playerElement.requestFullscreen === 'function' && typeof document.exitFullscreen === 'function';
+fullscreenButton.hidden = !nativeFullscreenAvailable;
 function renderFullscreenControl() {
-  const native = document.fullscreenElement === playerElement;
-  const expanded = playerElement.classList.contains('player-expanded');
-  fullscreenButton.textContent = native ? 'Exit fullscreen' : expanded ? 'Shrink player' :
-    fullscreenMode === 'native' ? 'Fullscreen' : 'Expand player';
-  fullscreenButton.title = fullscreenMode === 'native' ? 'Enter or exit browser fullscreen' :
-    'Expand the game within this page. Browser controls remain visible.';
-}
-function fullscreenRejected(action) {
-  if (action === 'enter') fullscreenMode = 'expand';
-  fullscreenStatus.textContent = action === 'enter'
-    ? 'The browser declined fullscreen. Expand player enlarges the game within this page; browser controls remain visible.'
-    : 'The browser could not exit fullscreen. Use its fullscreen exit gesture or key.';
-  renderFullscreenControl();
-}
-fullscreenButton.disabled = false;
-if (fullscreenMode === 'expand') {
-  fullscreenStatus.textContent = 'Native element fullscreen is unavailable here. Expand player fills this page; browser controls remain visible.';
+  if (nativeFullscreenAvailable)
+    fullscreenButton.textContent = document.fullscreenElement === playerElement ? 'Exit fullscreen' : 'Fullscreen';
 }
 renderFullscreenControl();
-toolbarMore.onclick = () => {
-  const expanded = playerElement.classList.toggle('toolbar-actions-open');
-  toolbarMore.setAttribute('aria-expanded', String(expanded));
-  toolbarMore.textContent = expanded ? 'Hide controls' : 'More controls';
-};
-fullscreenButton.onclick = () => {
-  if (document.fullscreenElement) {
-    try { Promise.resolve(document.exitFullscreen()).catch(() => fullscreenRejected('exit')); }
-    catch { fullscreenRejected('exit'); }
-    return;
-  }
-  if (fullscreenMode === 'native') {
-    // requestFullscreen must be called synchronously from this trusted button
-    // activation; do not await player work or another browser prompt first.
-    try { Promise.resolve(playerElement.requestFullscreen()).then(() => player?.focus()).catch(() => fullscreenRejected('enter')); }
-    catch { fullscreenRejected('enter'); }
-    return;
-  }
-  const expanded = playerElement.classList.toggle('player-expanded');
-  playerElement.classList.remove('toolbar-actions-open');
-  toolbarMore.setAttribute('aria-expanded', 'false');
-  toolbarMore.textContent = 'More controls';
-  document.documentElement.classList.toggle('player-expanded', expanded);
-  document.body.classList.toggle('player-expanded', expanded);
-  fullscreenStatus.textContent = expanded
-    ? 'Expanded within this page. Browser controls remain visible.'
-    : 'Expanded player closed.';
-  renderFullscreenControl();
-  player?.focus();
-};
-document.addEventListener('fullscreenchange', () => {
-  if (document.fullscreenElement === playerElement) fullscreenStatus.textContent = '';
-  renderFullscreenControl();
-});
-playerElement.addEventListener('fullscreenerror', () => fullscreenRejected('enter'));
+if (nativeFullscreenAvailable) {
+  fullscreenButton.onclick = () => {
+    if (document.fullscreenElement === playerElement) {
+      try { Promise.resolve(document.exitFullscreen()).catch(() => {}); }
+      catch {}
+      return;
+    }
+    // Keep requestFullscreen synchronous in this trusted button activation.
+    // A rejected request leaves the supported control in its ordinary state.
+    try { Promise.resolve(playerElement.requestFullscreen()).then(() => player?.focus(), () => {}); }
+    catch {}
+  };
+  document.addEventListener('fullscreenchange', renderFullscreenControl);
+  playerElement.addEventListener('fullscreenerror', renderFullscreenControl);
+}
 
 try {
   player = await mountMeleeRuntime({

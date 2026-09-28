@@ -759,7 +759,8 @@ int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t
     h->entered=0;h->source_scene=MELEE_WEB_HOST_SCENE_NONE;
     /* The source transition has been consumed by menu_leave_* above. Keep
      * only the separately captured route target; a closed READY host must
-     * not retain a stale transition that prevents its owned teardown. */
+     * not retain a stale transition or parent-route request that prevents
+     * owned teardown or contaminates a later scene entry. */
     h->transition=0;h->css_parent_route_requested=0;
     restore_context(h);return ok(e,n);
 }
