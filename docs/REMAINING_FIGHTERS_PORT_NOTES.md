@@ -653,17 +653,21 @@ comparisons pass.
 
 ## Remaining gates
 
-1. Resolve the historical natural Results camera-pool failure. A fresh
-   reconciled-head four-match B run includes a natural slot-2 Zelda-origin
-   Sheik win and completes Results→CSS without a guard failure, but confirms at
-   tick 600 after CPU auto-pages at 552. The older wall-clock keyboard packet
-   lacks consumed PAD/page state and camera-entry pointers, so its first
-   invalid transition remains unknown. Preserve both receipts and test a
-   source confirmation just after the page transition before claiming a fix.
+1. Resolve the historical natural Results camera-pool failure. The current
+   source-tick path now has both a rendered natural slot-2 Zelda-origin Sheik
+   winner (`work/pr86-0c9b21a-b-four-match-source-tick-r1/report.json`) and a
+   fresh native CPU9 MatchExitInfo→Results reducer at PR head; page transitions
+   and confirmation pass under that route. Current keyboard-gated browser
+   matches also pass, but their fresh winners were Samus. The old Sheik packet
+   lacks trusted key brackets, consumed PAD/page state, controller status and
+   camera-entry pointers. Its first invalid ownership transition remains
+   unknown. The remaining discriminator is the natural Sheik winner with the
+   trusted ordinary-Enter path and first-change camera snapshots; do not claim
+   resolution from either separately passing route.
 2. The shield-SDI candidate's full B reference replay and exact declared-field
-   comparisons now pass for every captured gameplay row. Complete final
-   affected builds/full tests and fresh
-   natural A/B two-match loops. Main including #89 is already integrated;
+   comparisons now pass for every captured gameplay row. The fresh A two-match
+   and B four-match browser loops are retained; complete final affected
+   builds/full tests and the supported original comparison. Main including #89 is already integrated;
    source-context, owned stack-profile and ownership checks pass on that base.
    Reduce any new first mismatch before extending another run. Keep the separate
    broader-equivalence/tick-1776 investigation with its existing owner.
@@ -1478,3 +1482,54 @@ equivalence, and its controlled development PAD schedule is not the historical
 keyboard replay. The historical natural slot-2 Sheik-winner camera failure
 remains unresolved; its first invalid transition is unknown. Do not claim this
 non-target control resolves it.
+
+## Current-head source-tick Results reducer (2026-09-28)
+
+Built `gameplay_results_scene_trace` from clean PR HEAD
+`978b9f43f4335046de44bb1689d09641e6f1dd38` and ran the single opt-in test
+`test_natural_cpu9_terminal_flows_through_p1_cpu_auto_pages`. Passing receipt:
+`work/results-match-history-tests/native-_pca52qm/` (`command.json`,
+`stdout.log`, `stderr.log`). The trace JS/Wasm hashes are
+`5d4a874466ddbbea1936fe250ac60c7a74d64c9f96df34deb657c16c80b751b4` /
+`03e9ea896eb8ee64f24fee4e722921057b4d6fd99ed9036aee76bb3cb9e4764e`; the
+tracked tree was clean.
+
+The reducer ran a natural four-CPU9, four-stock Lineup B Stock match into its
+actual typed `MatchExitInfo` and source Results session, with no forced seed,
+winner, form or terminal state. Samus (slot 0, `ckind=16`, `ftkind=13`) won at
+match frame 13,236. P1-only Start edges were held for ten source ticks at 180,
+360 and 600 and released at 190, 370 and 610; ports 0/1 stayed connected and
+neutral except P1's edges, while CPU ports 2/3 stayed disconnected. Both CPU
+statistics pages transitioned 0→1 at Results source frame 551 (visible after
+tick 552), before P1 confirmation at frame 600. Results completed at frame
+622. Camera pool `0x81e5fe0` remained stable through each Results tick/audio
+boundary and host OnExit/route commit; close, guarded owner destruction and
+session teardown completed. This excludes a generic natural-CPU9
+entry→auto-page→P1-confirm→native-host-close failure for the Samus standing.
+It is native state-only: no source draw calls, rendered browser, CSS return or
+retail comparison.
+
+Comparison with the retained historical failure is limited by missing data.
+`work/pr86-final-frozen-b-two-match-r1/report.json` records a natural slot-2
+Zelda-origin Sheik win at frame 11,725 and three intended browser Enter pulses
+(160 ms down / 120 ms release), but its served Wasm
+`96592b3f…` is not bound to a source commit. It detects “Original Results
+camera pool ownership changed” at the late Results cursor 560. It does not
+retain key event/source-frame brackets, consumed PAD edges/releases, CPU page
+state, connected-port bytes, or entry pointers; the cursor is not the first
+invalid pointer transition. The current reducer has exact source-tick PAD
+edges and topology but a Samus winner and no drawing. The current-head rendered
+Sheik-winner source-tick receipt at `0c9b21a` complements it, but is not a
+keyboard replay. The exact historical keyboard/Sheik combination therefore
+remains open.
+
+The r12 keyboard report is useful only as a separate observer correction.
+`work/pr86-results-sheik-winner-b-natural-r12/report.json` is from older source
+`a3d584f` and naturally ended with Samus. Its raw trace shows CPU pages 2/3
+transitioning at frame 493, then four post-page trusted Enter attempts not
+consumed by source; the fifth bracket (keydown 931, keyup 938) contains P1
+Start at frame 932. Reapplying the current correlation helper to the archived
+trace accepts that fifth attempt and preserves the four no-ops. The old report
+remains marked failed because its then-current assertion required the first
+post-page dispatch to be consumed; this derived check is not a fresh browser
+pass and does not reproduce the historical Sheik-winner failure.

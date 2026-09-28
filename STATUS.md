@@ -17,17 +17,25 @@ pages auto-advanced at 552. This shows the failure does not reproduce on the
 reconciled branch under that source-tick route; it does not establish the cause
 of the older wall-clock keyboard failure, whose capture lacks consumed PAD and
 camera-entry snapshots. Receipt: `work/pr86-0c9b21a-b-four-match-source-tick-r1/report.json`.
-A current-head A loop, a near-560 confirmation discriminator, the historical
-keyboard-path distinction, supported original comparison, and required final
-full suite remain open. The [per-character notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md)
-retain the scoped evidence and remaining gates.
+The fresh two-match Lineup A source-tick loop also passes at PR head `978b9f4`
+(`work/pr86-978b9f4-a-two-match-source-tick553-r1/report.json`). A focused
+native reducer rebuilt and passed at the same head: its natural CPU9
+MatchExitInfo→Results path records disconnected CPU-page transitions before
+the P1-only source-tick confirmation and no camera-pool change through host
+close (`work/results-match-history-tests/native-_pca52qm/`). This Samus-win,
+state-only result does not resolve the old Sheik-winner keyboard failure. The
+historical packet still lacks event/source brackets, consumed PAD, page/port
+state and entry pointers; its first invalid transition is unknown. The exact
+historical keyboard/Sheik combination, supported original comparison, and
+required final full suite remain open. The [per-character notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md)
+retain the scoped receipts and limits.
 Focused current-main checks also pass for source-context/collision traces,
 owned-DOL source-stack profiling, common-context restore/restart, stage numeric
 context, effect-bank lifecycle, Nana's nonzero Results asset root, and the
 texture/material/native-joint/archive set (44 tests). Optional Link/Pikachu
-effect archives are absent locally and remain unverified. The B receipt above
-is a current-head rendered functional scenario; a fresh A loop and the required
-full suite remain open.
+effect archives are absent locally and remain unverified. The A and B receipts
+above are current-head rendered functional scenarios; the required final full
+suite remains open.
 Main including PR #89 is merged and its ownership/carry guarantees retained.
 Reconciled checks exposed and repaired the Player mapping owner, Nana's signed
 input history and partner-correction rounding. The original-consistent partner
