@@ -1359,3 +1359,47 @@ that frame. The first invalid historical
 ownership transition remains unknown. Next discriminator is another naturally
 reached Sheik-winner B Results path with first-change camera snapshots; do not
 call this control a resolution or equate the two incomplete input records.
+
+## Natural CPU9 Results auto-page reducer on reconciled PR source (2026-09-27)
+
+The focused `--lineup-b-cpu9-match-history-host-state` reducer was rebuilt and
+rerun after correcting its observer to receive the completed source-frame
+count. Passing receipt: `work/results-match-history-tests/native-dai7mh1u/`.
+`command.json` binds the run to PR source `7d9170f` plus the exact one-line
+tracked diff (SHA-256 `accdc785d9e3d0a062ac5d6167e9c9f282f8194b9cf404268e750a882807b2a9`),
+trace JS `5d4a874466ddbbea1936fe250ac60c7a74d64c9f96df34deb657c16c80b751b4`,
+and trace Wasm `03e9ea896eb8ee64f24fee4e722921057b4d6fd99ed9036aee76bb3cb9e4764e`.
+The retained failed first attempt is separate at
+`work/results-match-history-tests/native-4kqexyux/`; it reached a natural
+terminal but the test driver passed a zero-based loop index to a completed-frame
+observer, so it failed before consuming Results input. It is not a game or
+camera-pool failure.
+
+The passing run executed a natural four-CPU9, four-stock B match with no forced
+seed, winner, form or terminal data. Samus (slot 0) won at source frame 13,236;
+the match exited with seed 1,239,287,788. The state-only Results trace consumed
+P1 Start press edges at source frames 180, 360 and 600, each held for ten source
+ticks with neutral releases at 190, 370 and 610. Ports 0/1 remained connected;
+CPU ports 2/3 remained disconnected. Their statistics pages each advanced
+0→1 at source frame 551, before the frame-600 confirmation. Results closed at
+frame 622, and camera-pool pointer `0x81e5fe0` remained unchanged through the
+host OnExit/route-commit check. It made no source draw calls and did not continue
+through rendered CSS.
+
+This excludes a generic failure in the natural CPU9 `MatchExitInfo` → Results
+entry → disconnected-CPU auto-page → later P1 confirmation → native host-close
+path for this Samus-winner state-only case. It does not test the target natural
+slot-2 Zelda-origin Sheik winner, draw/browser lifetime, or CSS continuation.
+The historical failure packet records only three intended P1 Enter presses
+(160 ms down / 120 ms up); it has no event-to-source-frame brackets, consumed
+PAD edges/releases, port state, Results pages or camera pointers. This reducer
+uses controlled source-tick PAD samples rather than literal keyboard events,
+so it is a useful input/auto-page discriminator, not a reconstruction of the
+historical consumed schedule. The first invalid ownership transition in the
+historical cursor-560 camera failure remains unknown.
+
+Next: run a fresh reconciled-head rendered B CPU9 browser case with the
+source-tick three-pulse schedule, retaining screenshots, consumed PAD/page
+traces, camera ownership phases and teardown. Keep any non-target natural
+winner as a control; do not force a Sheik terminal or treat this native pass as
+browser or original-comparison evidence.

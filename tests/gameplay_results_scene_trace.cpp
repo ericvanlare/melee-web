@@ -1003,7 +1003,7 @@ static int run_match_history(const melee_web::RuntimeFiles& files, bool draw,
         } else if (tick >= 600 && tick % 90 == 0)
             for (auto& pad : pads) pad.button = PAD_BUTTON_START;
         results.tick(pads);
-        if (natural_cpu9) cpu_statistics.observe(tick);
+        if (natural_cpu9) cpu_statistics.observe(results.source_frames());
         check_pool("Match-history Results pool changed after tick");
         audio_phase += 32000;
         const unsigned samples = audio_phase / 60; audio_phase %= 60;
