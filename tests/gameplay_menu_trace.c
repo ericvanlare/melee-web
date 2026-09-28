@@ -632,7 +632,7 @@ int main(void)
     }
 
     {
-        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
         char error[128];
         MeleeWebMenuSession* session =
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));

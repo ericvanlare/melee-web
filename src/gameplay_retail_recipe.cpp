@@ -441,7 +441,8 @@ void retail_replay_session_initial(const RetailReplayRecipe& recipe) {
     std::cout << "{\"record\":\"header\",\"schema\":\"melee-web-port-session-diagnostic\","
         "\"version\":1,\"frames_requested\":" << recipe.frames.size()
         << ",\"comparison\":\"not_run\",\"cpu_observations\":\""
-        << (whole_session_cpu_observation_requested ? "first_match_only" : "not_captured") << "\","
+        << (whole_session_cpu_observation_requested &&
+            recipe.version == kRetailReplayVersion ? "second_match_only" : "not_captured") << "\","
         "\"draw_state\":\"not_captured\"}\n";
 }
 
@@ -500,8 +501,13 @@ void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing
         std::cout << "}\n";
         if (whole_session_cpu_observation_requested &&
             !whole_session_cpu_observation_started &&
-            !whole_session_cpu_observation_finished) {
-            melee_web_cpu_observation_begin(recipe.setup.data(), recipe.frames.size(),
+            !whole_session_cpu_observation_finished &&
+            recipe.version == kRetailReplayVersion &&
+            whole_session_match_index == 2) {
+            // Bounded diagnostic for the second-match CPU branch. Keep the
+            // observer disabled through the first match, then bind its header
+            // to the independently recorded second setup.
+            melee_web_cpu_observation_begin(recipe.match_setups[1].data(), recipe.frames.size(),
                                              source_drawing);
             whole_session_cpu_observation_started = true;
         }

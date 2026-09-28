@@ -1,9 +1,10 @@
 # Recorded-session state comparison
 
-This check reuses the existing three-match, four-Mario CPU9 Final Destination
-recording. It begins in original character select, visits stage select and
-Results for each match, and ends on the intended original character-select
-return. [STATUS](../STATUS.md) indexes the observed result and its receipt.
+This check covers the three-match, four-Mario CPU9 Final Destination MWRC v8
+regression and the three-match, twelve-distinct-character CPU9 MWRC v9
+milestone. Both run through original character select, stage select, gameplay,
+Results and the intended final character-select return.
+[STATUS](../STATUS.md) indexes the observed results and their receipts.
 
 The MWRC v8 input contains source-consumed controller samples and their scene
 spans. The browser uses its existing per-tick traversal policy. This is separate
@@ -45,11 +46,19 @@ claim support for comparing a roster that creates secondary or transformed
 entities; such a roster needs those entities' source identities, lifetimes and
 state fields captured and compared before it can be admitted.
 
-The v9 envelope and its rejection controls are implementation checks. They do
-not establish that the mixed-character source session has been captured or that
-it agrees with the browser. That claim requires a fresh, uninterrupted original
-three-match capture and a complete comparison; the v8 recording cannot be
-relabelled as the v9 run.
+The v9 envelope and its rejection controls alone are implementation checks.
+The [12-character receipt](evidence/recorded-session-12-distinct-v1.json)
+binds the original v9 capture, its independently identified match setups, the
+fresh browser run, and the strict comparison. The claim covers exact consumed
+input and scene order, all three setup boundaries, declared Fighter fields,
+primary fighter-entity identities and lifetimes, and the final CSS endpoint.
+The v8 recording remains a separate four-Mario regression and is never
+relabelled as the v9 source run.
+
+Keep second-match CPU observations off for comparator input. They are focused
+diagnostics and make the browser trace an unsupported observation mode. The
+capture command enables them only with `--cpu-observations`; that option is
+restricted to v9 second-match investigations.
 
 ## Cape reaction and packed motion metadata
 
@@ -170,15 +179,17 @@ python3 scripts/build.py --target runtime
 python3 scripts/serve.py --directory build/browser --port 8813
 ```
 
-In another terminal, with `SESSION_DISC`, `SESSION_REFERENCE` and
-`SESSION_RECIPE` set to those local inputs, run the full recording. The output
-directory must not exist. Configure `MELEE_PLAYWRIGHT_DIR` for the installed
-Playwright package; the shared browser tools select installed Chrome.
+In another terminal, with `SESSION_DISC`, `SESSION_REFERENCE`, `SESSION_RECIPE`
+and `SESSION_MANIFEST` set to those local inputs, run the full recording. The
+output directory must not exist. Configure `MELEE_PLAYWRIGHT_DIR` for the
+installed Playwright package; the shared browser tools select installed Chrome.
 
 ```sh
 node scripts/capture_whole_session_browser.mjs \
   --url http://127.0.0.1:8813/runtime.html \
   --disc "$SESSION_DISC" --recipe "$SESSION_RECIPE" \
+  --manifest "$SESSION_MANIFEST" \
+  --runtime-data build/browser/gameplay_menu_browser.data \
   --out work/recorded-session-reproduction \
   --phase-timeout 180000 --replay-timeout 1500000 --poll-ms 500
 python3 scripts/compare_whole_session_state.py \
@@ -204,6 +215,14 @@ hashed bytes. The state-mode protocol does not require the optional timer
 trace. Browser, runtime, export and diagnostic failures retain a failing report
 and return nonzero. A deliberate prefix stop reports `incomplete` and also
 returns nonzero; it cannot become complete-session evidence.
+
+The explicit `--runtime-data` path binds the Emscripten preload package. Chromium
+can report `net::ERR_ABORTED` for this fetch after its complete bytes have been
+read into the virtual filesystem. The capture retains that event and clears it
+only when exactly one GET/fetch received HTTP 200, the response length, loaded
+byte count, virtual-file size and local artifact size agree, and the virtual
+file SHA-256 matches the supplied artifact. Missing identity, partial bytes,
+duplicates or any other request failure remain fatal.
 
 PR #93's independent review found that the earlier harness could print `pass`
 despite recorded browser errors or missing exports. The correction changes

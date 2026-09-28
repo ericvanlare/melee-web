@@ -5,6 +5,8 @@
 #include <melee/cm/camera.h>
 #include <melee/cm/types.h>
 #include <melee/ft/types.h>
+#include <melee/it/it_3F14.h>
+#include <melee/it/types.h>
 #include <melee/ft/ftparts.h>
 #include <melee/if/ifmagnify.h>
 #include <melee/if/ifstatus.h>
@@ -12,6 +14,7 @@
 #include <melee/pl/player.h>
 #include <sysdolphin/baselib/cobj.h>
 #include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjproc.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -37,6 +40,7 @@ _Static_assert(offsetof(struct CpuFighter, xA8_array) == 0xA8, "CpuFighter defen
 _Static_assert(offsetof(struct CpuFighter, xC8) == 0xC8, "CpuFighter defend count drift");
 _Static_assert(offsetof(struct CpuFighter, xCC_array) == 0xCC, "CpuFighter attack queue drift");
 _Static_assert(offsetof(struct CpuFighter, xEC) == 0xEC, "CpuFighter attack count drift");
+_Static_assert(offsetof(struct CpuFighter, xFC) == 0xFC, "CpuFighter decision flags drift");
 _Static_assert(offsetof(struct CpuFighter, command_duration) == 0x44C, "CpuFighter duration drift");
 _Static_assert(offsetof(struct CpuFighter, csP) == 0x450, "CpuFighter cursor drift");
 _Static_assert(offsetof(struct CpuFighter, buffer) == 0x454, "CpuFighter buffer drift");
@@ -87,6 +91,8 @@ static int enabled, drawing;
 static int hitlag_audit_requested, hitlag_audit;
 static unsigned count, types[6];
 static size_t draws, preparation_draws, used;
+static size_t source_event_cursor = (size_t)-1;
+static unsigned source_event_sequence;
 /* One matrix record contains the normalized chain twice (bone->root and
  * root->bone), including local SRT and 3x4 matrix values for every node. */
 static char line[65536];
@@ -188,11 +194,438 @@ static void cpu(const struct CpuFighter* c)
         (unsigned)c->buttons, c->lstick.x, c->lstick.y, c->cstick.x, c->cstick.y,
         c->ltrigger, c->rtrigger, c->command_duration, cursor ? (int)(cursor - base) : -1);
     for (size_t i = 0; i < write - base; ++i) put("%02x", (unsigned char)c->buffer[i]);
-    put("\",\"defend_queue\":[");
+    put("\",\"decision_flags\":{\"xF8\":[%d,%d,%d,%d,%d,%d],"
+        "\"xF9\":[%d,%d,%d,%d,%d,%d,%d,%d],"
+        "\"xFA\":[%d,%d,%d,%d,%d,%d,%d],"
+        "\"xFB\":[%d,%d,%d,%d,%d,%d,%d,%d]},\"defend_queue\":[",
+        c->xF8_b0, c->xF8_b12, c->xF8_b34, c->xF8_b5, c->xF8_b6, c->xF8_b7,
+        c->xF9_b0, c->xF9_b1, c->xF9_b2, c->xF9_b3,
+        c->xF9_b4, c->xF9_b5, c->xF9_b6, c->xF9_b7,
+        c->xFA_b0, c->xFA_b1, c->xFA_b2, c->xFA_b34,
+        c->xFA_b5, c->xFA_b6, c->xFA_b7,
+        c->xFB_b0, c->xFB_b1, c->xFB_b2, c->xFB_b3,
+        c->xFB_b4, c->xFB_b5, c->xFB_b6, c->xFB_b7);
     for (unsigned i = 0; i < c->xC8; ++i) put("%s%d", i ? "," : "", c->xA8_array[i]);
     put("],\"attack_queue\":[");
     for (unsigned i = 0; i < c->xEC; ++i) put("%s%d", i ? "," : "", c->xCC_array[i]);
     put("]}");
+}
+static int item_owner_slot(const HSD_GObj* owner)
+{
+    if (!owner) return -1;
+    int result = -1;
+    for (unsigned i = 0; i < count; ++i) {
+        StaticPlayer* player = Player_GetPtrForSlot(i);
+        if (player && player->player_entity[0] == owner) {
+            if (result >= 0) abort();
+            result = (int)i;
+        }
+    }
+    return result;
+}
+static void item_fields(const Item* item, int full)
+{
+    const int owner_slot = item_owner_slot(item->owner);
+    put("{\"kind\":%d,\"spawn_kind\":%d,\"owner_present\":%s,\"owner_slot\":",
+        (int)item->kind, (int)item->spawn_kind, item->owner ? "true" : "false");
+    if (owner_slot >= 0) put("%d", owner_slot); else put("null");
+    put(",\"damage_state\":{\"xC34_damageDealt\":%d,\"xC50\":%u,"
+        "\"xCF4_fighter_gobj\":\"%p\",\"xDCE_b5\":%u},"
+        "\"dispatch_state\":",
+        item->xC34_damageDealt, (unsigned)item->xC50,
+        (void*)item->xCF4_fighterGObjUnk, item->xDCE_flag.b5 ? 1u : 0u);
+    if (item->kind == 65) {
+        const ItemCommonData* common_data = it_804D6D28;
+        const ItemLogicTable* logic = item->xB8_itemLogicTable;
+        if (!common_data || !logic) abort();
+        put("{\"xDCE_raw\":%u,\"xDCE_b4\":%s,\"xDCE_b5\":%s,"
+            "\"ground_or_air\":%d,\"xC54_angle_bits\":\"0x%08x\","
+            "\"unk_degrees_bits\":\"0x%08x\",\"shield_bounced_present\":%s,"
+            "\"hit_shield_present\":%s}",
+            (unsigned)item->xDCE_flag.u8, item->xDCE_flag.b4 ? "true" : "false",
+            item->xDCE_flag.b5 ? "true" : "false", (int)item->ground_or_air,
+            bits(item->xC54), bits(common_data->unk_degrees),
+            logic->shield_bounced ? "true" : "false",
+            logic->hit_shield ? "true" : "false");
+    } else {
+        put("null");
+    }
+    put(",\"position_bits\":");
+    vec(&item->pos);
+    put(",\"velocity_bits\":"); vec(&item->x40_vel);
+    put(",\"facing_bits\":\"%08x\",\"scale_bits\":\"%08x\","
+        "\"anim_id\":%d,\"anim_frame_bits\":\"%08x\","
+        "\"anim_speed_bits\":\"%08x\",\"scheduler_priority\":%d,"
+        "\"scheduler_cycle\":%d,\"hitboxes\":[",
+        bits(item->facing_dir), bits(item->scl), (int)item->anim_id,
+        bits(item->x5CC_currentAnimFrame), bits(item->x5D0_animFrameSpeed),
+        (int)HSD_GObj_804D7834, (int)HSD_GObj_804D783C);
+    for (unsigned i = 0; i < 4; ++i) {
+        const HitCapsule* hit = &item->x5D4_hitboxes[i].hit;
+        const int active = hit->state != HitCapsule_Disabled &&
+                           hit->state != HitCapsule_Enabled;
+        put("%s{\"index\":%u,\"state\":%u",
+            i ? "," : "", i, (unsigned)hit->state);
+        if (full || active) {
+            put(",\"x4\":%u,\"damage_bits\":\"%08x\","
+                "\"x42_b0\":%u,\"x42_b3\":%u,\"x42_b4\":%u,"
+                "\"x42_b5\":%u,\"x43_b2\":%u,\"element\":%d",
+                hit->x4, bits(hit->damage), hit->x42_b0 ? 1u : 0u,
+                hit->x42_b3 ? 1u : 0u, hit->x42_b4 ? 1u : 0u,
+                hit->x42_b5 ? 1u : 0u, hit->x43_b2 ? 1u : 0u,
+                (int)hit->element);
+            put(",\"b_offset_bits\":"); vec(&hit->b_offset);
+            put(",\"scale_bits\":\"%08x\",\"x4c_bits\":", bits(hit->scale));
+            vec(&hit->x4C); put(",\"x58_bits\":"); vec(&hit->x58);
+            put(",\"hurt_coll_pos_bits\":"); vec(&hit->hurt_coll_pos);
+            put(",\"coll_distance_bits\":\"%08x\"", bits(hit->coll_distance));
+        }
+        put("}");
+    }
+    if (full) {
+        put("],\"p_link\":%u,\"process_priorities\":[",
+            (unsigned)item->entity->p_link);
+        unsigned process_count = 0;
+        for (HSD_GObjProc* proc = item->entity->proc; proc; proc = proc->child) {
+            if (process_count == 16) abort();
+            put("%s%u", process_count ? "," : "", (unsigned)proc->s_link);
+            ++process_count;
+        }
+        put("],\"process_count\":%u", process_count);
+    } else {
+        put("]");
+    }
+    put("}");
+}
+static void emit_source_event(void);
+void melee_web_cpu_observation_shield_overlap(const char* phase,
+                                             const Item* item,
+                                             const HitCapsule* hurt,
+                                             const Fighter* fp,
+                                             const void* transform,
+                                             int skip_update_pos,
+                                             float item_scale,
+                                             float fighter_scale_y,
+                                             float fighter_pos_z,
+                                             int overlap,
+                                             const Vec3* collision_pos,
+                                             float collision_angle)
+{
+    int hitbox_index = -1;
+    for (int index = 0; item && index < 4; ++index) {
+        if (&item->x5D4_hitboxes[index].hit == hurt) {
+            hitbox_index = index;
+            break;
+        }
+    }
+    if (!enabled || source_event_cursor < 27045 || source_event_cursor > 27060 ||
+        !item || !hurt || !fp || item->kind != 65 ||
+        hitbox_index < 0 || item_owner_slot(item->owner) != 3 || fp != fighter(0))
+        return;
+
+    put("{\"session_cursor\":%zu,\"sequence\":%u,\"label\":\"arrow_shield_overlap_%s\","
+        "\"hitbox_index\":%d,\"overlap\":%d,\"skip_update_pos\":%d,"
+        "\"item_scale_bits\":\"%08x\","
+        "\"fighter_scale_y_bits\":\"%08x\",\"fighter_pos_z_bits\":\"%08x\","
+        "\"fighter_position_bits\":",
+        source_event_cursor, source_event_sequence++, phase, hitbox_index, overlap, skip_update_pos,
+        bits(item_scale), bits(fighter_scale_y), bits(fighter_pos_z));
+    vec(&fp->cur_pos);
+    put(",\"fighter_flags\":{\"x221B_b0\":%u,\"x221B_b1\":%u,"
+        "\"x221B_b2\":%u,\"x221B_b3\":%u,\"x221B_b4\":%u},"
+        "\"shield_hit\":{\"bone\":\"%p\",\"skip_update_pos\":%u,"
+        "\"position_bits\":",
+        fp->x221B_b0 ? 1u : 0u, fp->x221B_b1 ? 1u : 0u,
+        fp->x221B_b2 ? 1u : 0u, fp->x221B_b3 ? 1u : 0u,
+        fp->x221B_b4 ? 1u : 0u, (void*)fp->shield_hit.bone,
+        fp->shield_hit.skip_update_pos ? 1u : 0u);
+    vec(&fp->shield_hit.pos);
+    put(",\"offset_bits\":"); vec(&fp->shield_hit.offset);
+    put(",\"size_bits\":\"%08x\"},\"transform\":",
+        bits(fp->shield_hit.size));
+    if (transform) {
+        const float (*matrix)[4] = (const float (*)[4])transform;
+        put("[[\"%08x\",\"%08x\",\"%08x\",\"%08x\"],"
+            "[\"%08x\",\"%08x\",\"%08x\",\"%08x\"],"
+            "[\"%08x\",\"%08x\",\"%08x\",\"%08x\"]]",
+            bits(matrix[0][0]), bits(matrix[0][1]), bits(matrix[0][2]), bits(matrix[0][3]),
+            bits(matrix[1][0]), bits(matrix[1][1]), bits(matrix[1][2]), bits(matrix[1][3]),
+            bits(matrix[2][0]), bits(matrix[2][1]), bits(matrix[2][2]), bits(matrix[2][3]));
+    } else {
+        put("null");
+    }
+    put(",\"shield_bone_matrix_bits\":");
+    if (fp->shield_hit.bone) {
+        const float (*matrix)[4] = (const float (*)[4])fp->shield_hit.bone->mtx;
+        put("[[\"%08x\",\"%08x\",\"%08x\",\"%08x\"],"
+            "[\"%08x\",\"%08x\",\"%08x\",\"%08x\"],"
+            "[\"%08x\",\"%08x\",\"%08x\",\"%08x\"]]",
+            bits(matrix[0][0]), bits(matrix[0][1]), bits(matrix[0][2]), bits(matrix[0][3]),
+            bits(matrix[1][0]), bits(matrix[1][1]), bits(matrix[1][2]), bits(matrix[1][3]),
+            bits(matrix[2][0]), bits(matrix[2][1]), bits(matrix[2][2]), bits(matrix[2][3]));
+    } else {
+        put("null");
+    }
+    if (collision_pos) {
+        put(",\"ftcoll_inputs\":{\"collision_pos_bits\":");
+        vec(collision_pos);
+        put(",\"collision_angle_bits\":\"%08x\"}", bits(collision_angle));
+    } else {
+        put(",\"ftcoll_inputs\":null");
+    }
+    put(",\"arrow\":"); item_fields(item, 1);
+    put("}");
+    emit_source_event();
+}
+static void item_diagnostic(const struct CpuFighter* cpu, size_t slot, size_t index)
+{
+    if (slot != 2 || index < 27040 || index > 27060) {
+        put("null");
+        return;
+    }
+    if (!HSD_GObj_Entities) abort();
+    HSD_GObj* nodes[64];
+    size_t item_count = 0, selected_order = 0;
+    int selected = 0;
+    for (HSD_GObj* gobj = HSD_GObj_Entities->items; gobj; gobj = gobj->next) {
+        if (item_count == 64) abort();
+        nodes[item_count] = gobj;
+        if (gobj->classifier == 6) {
+            if (!gobj->user_data) abort();
+            Item* item = (Item*)gobj->user_data;
+            if (item->entity != gobj) abort();
+            if (item == cpu->xF4) {
+                if (selected) abort();
+                selected = 1;
+                selected_order = item_count;
+            }
+        }
+        ++item_count;
+    }
+    put("{\"item_gobj_count\":%zu,\"xF4_present\":%s,\"xF4_member\":%s,"
+        "\"selected_order\":",
+        item_count, cpu->xF4 ? "true" : "false", selected ? "true" : "false");
+    if (selected) put("%zu", selected_order); else put("null");
+    put(",\"items\":[");
+    for (size_t i = 0; i < item_count; ++i) {
+        HSD_GObj* gobj = nodes[i];
+        if (i) put(",");
+        put("{\"list_order\":%zu,\"classifier\":%u,\"xF4_target\":%s,\"item\":",
+            i, (unsigned)gobj->classifier,
+            gobj->classifier == 6 && gobj->user_data == cpu->xF4 ? "true" : "false");
+        if (gobj->classifier == 6) {
+            Item* item = (Item*)gobj->user_data;
+            if (!item || item->entity != gobj) abort();
+            item_fields(item, item == cpu->xF4);
+        } else {
+            put("null");
+        }
+        put("}");
+    }
+    put("]}");
+}
+static Item* target_link_arrow(size_t* order, size_t* item_count)
+{
+    if (!HSD_GObj_Entities) abort();
+    Item* target = NULL;
+    size_t target_order = 0, visited = 0;
+    for (HSD_GObj* gobj = HSD_GObj_Entities->items; gobj; gobj = gobj->next) {
+        if (visited == 64) abort();
+        if (gobj->classifier == 6) {
+            if (!gobj->user_data) abort();
+            Item* item = (Item*)gobj->user_data;
+            if (item->entity != gobj) abort();
+            if (item->kind == 65 && item_owner_slot(item->owner) == 3) {
+                if (target) abort();
+                target = item;
+                target_order = visited;
+            }
+        }
+        ++visited;
+    }
+    if (order) *order = target_order;
+    if (item_count) *item_count = visited;
+    return target;
+}
+void melee_web_cpu_observation_set_event_cursor(size_t index)
+{
+    source_event_cursor = index;
+    source_event_sequence = 0;
+}
+static void emit_source_event(void)
+{
+#ifdef __EMSCRIPTEN__
+    EM_ASM({
+        const text = UTF8ToString($0);
+        if (typeof window !== 'undefined' && window.meleeCpuItemEvent)
+            window.meleeCpuItemEvent(text);
+        else err('CPU_ITEM_EVENT ' + text);
+    }, line);
+#else
+    fprintf(stderr, "CPU_ITEM_EVENT %s\n", line);
+#endif
+    used = 0;
+}
+
+int melee_web_cpu_observation_lb_collision_probe_active(void)
+{
+    return enabled && source_event_cursor == 27055;
+}
+
+void melee_web_cpu_observation_lb_collision_probe(const MeleeWebLbCollProbe* probe)
+{
+    if (!probe || !melee_web_cpu_observation_lb_collision_probe_active())
+        return;
+    /* This single selected capsule is the previously localized Link Arrow
+     * shield overlap. The observer does not feed these values back to source. */
+    if (bits(probe->b[0]) != 0xc22e70e6 || bits(probe->b[1]) != 0x3fdb54c5 ||
+        bits(probe->b[2]) != 0x00000000 || bits(probe->c[0]) != 0xc229058f ||
+        bits(probe->c[1]) != 0x3f4fe2eb || bits(probe->c[2]) != 0x00000000)
+        return;
+
+    put("{\"session_cursor\":%zu,\"sequence\":%u,"
+        "\"label\":\"arrow_lb_coll_800077a0_return\","
+        "\"a_address\":\"%p\",\"matrix_address\":\"%p\","
+        "\"b_address\":\"%p\",\"c_address\":\"%p\","
+        "\"d_address\":\"%p\",\"e_address\":\"%p\","
+        "\"angle_address\":\"%p\",\"radius_bits\":\"%08x\","
+        "\"distance_offset_bits\":\"%08x\",\"a_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"matrix_bits\":[",
+        source_event_cursor, source_event_sequence++, (void*)probe->a_address,
+        (void*)probe->matrix_address, (void*)probe->b_address, (void*)probe->c_address,
+        (void*)probe->d_address, (void*)probe->e_address, (void*)probe->angle_address,
+        bits(probe->radius), bits(probe->distance_offset), bits(probe->a[0]),
+        bits(probe->a[1]), bits(probe->a[2]));
+    for (size_t i = 0; i < 12; ++i)
+        put("%s\"%08x\"", i ? "," : "", bits(probe->matrix[i]));
+    put("],\"b_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"c_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"transformed_radius_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"transformed_origin_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"diff_cb_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"diff_ba_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"distance_bits\":\"%08x\",\"offset_distance_bits\":\"%08x\","
+        "\"dot_diff_cb_bits\":\"%08x\",\"n0_bits\":\"%08x\","
+        "\"ba_dot_bits\":\"%08x\",\"n1_bits\":\"%08x\",\"scale_bits\":\"%08x\","
+        "\"normalize_e_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"normal_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"collision_position_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"angle_bits\":\"%08x\"}",
+        bits(probe->b[0]), bits(probe->b[1]), bits(probe->b[2]),
+        bits(probe->c[0]), bits(probe->c[1]), bits(probe->c[2]),
+        bits(probe->transformed_radius[0]), bits(probe->transformed_radius[1]),
+        bits(probe->transformed_radius[2]), bits(probe->transformed_origin[0]),
+        bits(probe->transformed_origin[1]), bits(probe->transformed_origin[2]),
+        bits(probe->diff_cb[0]), bits(probe->diff_cb[1]), bits(probe->diff_cb[2]),
+        bits(probe->diff_ba[0]), bits(probe->diff_ba[1]), bits(probe->diff_ba[2]),
+        bits(probe->distance), bits(probe->offset_distance), bits(probe->dot_diff_cb),
+        bits(probe->n0), bits(probe->ba_dot), bits(probe->n1), bits(probe->scale),
+        bits(probe->normalize_e[0]), bits(probe->normalize_e[1]), bits(probe->normalize_e[2]),
+        bits(probe->normal[0]), bits(probe->normal[1]), bits(probe->normal[2]),
+        bits(probe->collision_position[0]), bits(probe->collision_position[1]),
+        bits(probe->collision_position[2]), bits(probe->angle));
+    emit_source_event();
+}
+
+void melee_web_cpu_observation_source_event(const char* label,
+                                           const Fighter* fp,
+                                           HSD_GObj* gobj)
+{
+    if (!enabled || source_event_cursor < 27035 || source_event_cursor > 27060)
+        return;
+
+    const Fighter* cpu_fp = NULL;
+    Item* observed_arrow = NULL;
+    if (gobj) {
+        if (gobj->classifier != 6 || !gobj->user_data) abort();
+        Item* item = (Item*)gobj->user_data;
+        if (item->entity != gobj) abort();
+        if (item->kind != 65 || item_owner_slot(item->owner) != 3) return;
+        observed_arrow = item;
+    } else if (fp) {
+        if (fp != fighter(2)) return;
+        cpu_fp = fp;
+    } else {
+        if (strcmp(label, "gameplay_step_return") != 0 &&
+            strcmp(label, "post_tick_observer") != 0)
+            abort();
+        if (!fighter(2)) abort();
+    }
+
+    size_t arrow_order = 0, item_count = 0;
+    Item* listed_arrow = target_link_arrow(&arrow_order, &item_count);
+    if (observed_arrow && listed_arrow != observed_arrow) abort();
+    if (!observed_arrow) observed_arrow = listed_arrow;
+
+    put("{\"session_cursor\":%zu,\"sequence\":%u,\"label\":\"%s\","
+        "\"item_gobj_count\":%zu,\"arrow_in_item_list\":%s,\"arrow_list_order\":",
+        source_event_cursor, source_event_sequence++, label, item_count,
+        listed_arrow ? "true" : "false");
+    if (listed_arrow) put("%zu", arrow_order); else put("null");
+    if (observed_arrow) {
+        put(",\"arrow_identity\":{\"gobj\":\"%p\",\"item\":\"%p\","
+            "\"owner_gobj\":\"%p\"}", (void*)observed_arrow->entity,
+            (void*)observed_arrow, (void*)observed_arrow->owner);
+        HSD_GObj* shield_target = observed_arrow->xCF4_fighterGObjUnk;
+        int shield_target_slot = -1;
+        if (shield_target) {
+            for (unsigned slot = 0; slot < count; ++slot) {
+                Fighter* target = fighter(slot);
+                if (!target) abort();
+                if (target->gobj == shield_target) {
+                    if (shield_target_slot >= 0) abort();
+                    shield_target_slot = (int)slot;
+                }
+            }
+        }
+        put(",\"arrow_collision\":{\"xC34_damageDealt\":%d,\"xC50\":%u,"
+            "\"xCF4_fighter_gobj\":\"%p\",\"xCF4_fighter_slot\":",
+            observed_arrow->xC34_damageDealt, (unsigned)observed_arrow->xC50,
+            (void*)shield_target);
+        if (shield_target_slot >= 0) put("%d", shield_target_slot);
+        else put("null");
+        put("}");
+    } else {
+        put(",\"arrow_identity\":null");
+        put(",\"arrow_collision\":null");
+    }
+    Fighter* slot2 = fighter(2);
+    put(",\"cpu_slot2_xF4_present\":");
+    if (slot2) put("%s", slot2->cpu.xF4 ? "true" : "false");
+    else put("null");
+    put(",\"cpu_slot2_xF4_points_to_arrow\":");
+    if (slot2 && observed_arrow)
+        put("%s", slot2->cpu.xF4 == observed_arrow ? "true" : "false");
+    else put("null");
+    if (cpu_fp) {
+        put(",\"cpu_scan_target_xF4_present\":%s,\"cpu_scan_xF8_b12\":%u",
+            cpu_fp->cpu.xF4 ? "true" : "false", cpu_fp->cpu.xF8_b12);
+    }
+    if (observed_arrow) {
+        put(",\"arrow\":");
+        item_fields(observed_arrow, 1);
+    } else {
+        put(",\"arrow\":null");
+    }
+    put("}");
+    emit_source_event();
+}
+void melee_web_cpu_observation_item_state_event(const char* phase,
+                                                HSD_GObj* gobj,
+                                                int msid,
+                                                unsigned flags)
+{
+    char label[96];
+    snprintf(label, sizeof(label), "%s_msid_%d_flags_%08x", phase, msid,
+             flags);
+    melee_web_cpu_observation_source_event(label, NULL, gobj);
+}
+void melee_web_cpu_observation_scheduler_return(void)
+{
+    if (!enabled || source_event_cursor < 27035 || source_event_cursor > 27060)
+        return;
+    if (!fighter(2)) abort();
+    melee_web_cpu_observation_source_event("gameplay_step_return", NULL, NULL);
 }
 static void hitlag_audit_line(size_t index, unsigned slot, const Fighter* fp)
 {
@@ -263,7 +696,7 @@ static void hitlag_audit_tick(size_t index)
         put("}"); fprintf(stderr, "MATRIX_AUDIT %s\n", line); used = 0;
     }
 }
-static void snapshot(void)
+static void snapshot(size_t index)
 {
     Vec3 position, interest;
     Camera_GetTransformPosition(&position); Camera_GetTransformInterest(&interest);
@@ -284,6 +717,10 @@ static void snapshot(void)
         const ifMagnifyPlayer* magnify = &ifMagnify_804A1DE0.player[slot];
         put("%s{\"slot\":%u,\"cpu\":", slot ? "," : "", slot);
         if (types[slot] == 1) cpu(&fp->cpu); else put("null");
+        if (slot == 2 && index >= 27040 && index <= 27060) {
+            put(",\"item_diagnostic\":");
+            item_diagnostic(&fp->cpu, slot, index);
+        }
         put(",\"subject\":");
         const CmSubject* subject = fp->x890_cameraBox;
         if (!subject) put("null");
@@ -323,7 +760,7 @@ void melee_web_cpu_observation_begin(const uint8_t setup[0x138], size_t frames, 
         "\"frames_requested\":%zu,\"source_drawing\":%s,\"setup_hex\":\"", frames, drawing ? "true" : "false");
     for (unsigned i = 0; i < 0x138; ++i) put("%02x", setup[i]);
     put("\"}"); emit();
-    put("{\"record\":\"initial\","); snapshot(); put("}"); emit();
+    put("{\"record\":\"initial\","); snapshot(0); put("}"); emit();
 #ifndef MELEE_WEB_PUBLIC_RUNTIME
     /* Keep native address diagnostics out of the public binary, even when
      * unexported replay support retains this observer in the link closure. */
@@ -353,14 +790,15 @@ void melee_web_cpu_observation_enable_hitlag_audit(void)
 void melee_web_cpu_observation_tick(size_t index)
 {
     if (!enabled) return;
-    put("{\"record\":\"frame\",\"index\":%zu,", index); snapshot(); put("}"); emit();
+    put("{\"record\":\"frame\",\"index\":%zu,", index); snapshot(index); put("}"); emit();
     hitlag_audit_tick(index);
+    melee_web_cpu_observation_source_event("post_tick_observer", NULL, NULL);
 }
 void melee_web_cpu_observation_draw(size_t index)
 {
     if (!enabled || !drawing) return;
     put("{\"record\":\"draw\",\"index\":%zu,\"source_index\":%zu,", draws++, index);
-    snapshot(); put("}"); emit();
+    snapshot(index); put("}"); emit();
 }
 void melee_web_cpu_observation_preparation_draw(void)
 {
@@ -370,7 +808,7 @@ void melee_web_cpu_observation_preparation_draw(void)
      * unmatched draws are an accuracy failure, not invisible warm-up work. */
     put("{\"schema\":\"melee-web-cpu-preparation-observation\",\"version\":1,"
         "\"phase\":\"after_source_preparation_draw\",\"index\":%zu,", preparation_draws++);
-    snapshot(); put("}");
+    snapshot((size_t)-1); put("}");
 #ifdef __EMSCRIPTEN__
     EM_ASM({
         const text = UTF8ToString($0);
