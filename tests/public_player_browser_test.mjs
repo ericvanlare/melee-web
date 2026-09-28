@@ -269,7 +269,7 @@ try {
     assert.equal(await page.locator('#brand').innerText(), 'WEBMELEE.GG');
     assert.equal(await page.locator('#edition').innerText(), 'alpha');
     assert.equal(await page.locator('#edition em').evaluate(node => getComputedStyle(node).fontStyle), 'italic');
-    const actionButtons = await page.locator('#toolbar-actions > button').evaluateAll(nodes => nodes.map(node => node.id));
+    const actionButtons = await page.locator('#toolbar-actions button').evaluateAll(nodes => nodes.map(node => node.id));
     const primaryActionOrder = ['choose-disc', 'start-game', 'pause-game', 'fullscreen', 'end-session'];
     assert.deepEqual(actionButtons.filter(id => primaryActionOrder.includes(id)), primaryActionOrder,
       'The compact toolbar keeps Disc, Play, Pause, Fullscreen and Eject in order');
@@ -389,9 +389,9 @@ try {
         const button = document.querySelector('#fullscreen'), rect = button.getBoundingClientRect();
         const primary = new Set(['controls-open', 'choose-disc', 'start-game', 'pause-game', 'end-session']);
         return {hidden: button.hidden, display: getComputedStyle(button).display, width: rect.width, height: rect.height,
-          actions: [...document.querySelectorAll('#toolbar-actions > button')]
+          actions: [...document.querySelectorAll('#toolbar-actions button')]
             .filter(node => primary.has(node.id) && !node.hidden && getComputedStyle(node).display !== 'none')
-            .map(node => node.id)};
+          .map(node => node.id)};
       });
       assert(unsupportedFullscreen.hidden && unsupportedFullscreen.display === 'none' &&
         unsupportedFullscreen.width === 0 && unsupportedFullscreen.height === 0,
@@ -476,7 +476,7 @@ try {
             return {left, top, right, bottom, width, height};
           };
           const targets = [...document.querySelectorAll('#touch-controls [data-touch-button], #touch-controls [data-touch-stick]')];
-          const actionButtons = [...document.querySelectorAll('#toolbar-actions > button')]
+          const actionButtons = [...document.querySelectorAll('#toolbar-actions button')]
             .filter(button => !button.hidden && getComputedStyle(button).display !== 'none');
           const buttonRects = actionButtons.map(button => {
             const {left, top, right, bottom} = button.getBoundingClientRect();
