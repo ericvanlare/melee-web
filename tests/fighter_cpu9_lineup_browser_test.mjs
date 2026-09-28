@@ -183,9 +183,18 @@ async function installResultsInputObserver(){
       if(phase!==8&&phase!==9)return;
       const diagnostics=Module.UTF8ToString(Module._melee_web_native_menu_diagnostics());
       const cursor=diagnostics.match(/(?:Results|Prize) source frame: (\d+)/);
+      if(typeof Module._melee_web_input_message!=='function')
+        throw Error('Controller-service diagnostics are unavailable for a Results Enter event');
+      const inputStatus=JSON.parse(Module.UTF8ToString(Module._melee_web_input_message()));
       rows.push({kind,key:event.key,repeat:!!event.repeat,isTrusted:!!event.isTrusted,
         eventTimeMs:event.timeStamp,nativeSourceSteps:Number(window.nativeSourceSteps),
         phase,resultsSourceFrameAtEvent:cursor?Number(cursor[1]):null,
+        target:{tagName:event.target?.tagName??null,id:event.target?.id??null},
+        activeElement:{tagName:document.activeElement?.tagName??null,
+          id:document.activeElement?.id??null},
+        canvasFocused:document.activeElement===document.querySelector('canvas'),
+        inputServiceStatusAtEvent:inputStatus,
+        inputServiceStatusScope:'read-only snapshot at DOM dispatch; PAD values are the most recent source sample, not this key event\'s consumed tick',
         diagnostics});
     };
     window.addEventListener('keydown',event=>record('keydown',event),true);
