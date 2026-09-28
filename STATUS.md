@@ -5,7 +5,8 @@
 Current per-character coverage, original CPU9 references, rendered browser
 match loops, comparison limits, and explicit open gates are recorded in
 [Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md).
-The reconciled PR head is `4cc63d7`, with current `origin/main` `8671362`.
+The reconciled source baseline is `4cc63d7` (PR #86 head `fc5e3cd`), with
+current `origin/main` `8671362`.
 Fresh Results entry contracts pass (8/8), and the merged C++ trace targets
 build after source preparation. The formerly incomplete menu fixture now has
 all 35 required exact disc files. The synthetic P1-only Results reducer passes:
