@@ -7,10 +7,13 @@ an unfinished development candidate, not admitted or fully playable. Real-asset
 construction, targeted distinctive actions, two rendered four-CPU9 match loops
 per requested lineup, and repeatable original references are now available.
 The browser matches are functional rendered evidence, not original equivalence.
-The historical whole-session replays stopped at scene mismatches; their harness
-did not establish the earliest gameplay-state divergence. The new exact
-all-entity prefix comparison does, within its bounded scope. The Samus-donor palette now resolves through a checked
-cross-archive source-address map; particle-pixel use remains unverified.
+The historical whole-session replays stopped at scene mismatches; their
+harness did not establish the earliest gameplay-state divergence. The recorded-
+session comparator identifies the first mismatch only among its declared
+captured gameplay fields and input scope; it does not compare raw CPU blocks,
+port draw state, pixels, or live scheduling. The Samus-donor palette now
+resolves through a checked cross-archive source-address map; particle-pixel use
+remains unverified.
 
 Evidence labels follow the
 [performance/accuracy playbook](PERFORMANCE_AND_ACCURACY.md). Raw disc data,
@@ -30,13 +33,13 @@ The legacy results below are historical until explicitly replaced by a fresh,
 commit-and-build-bound reconciliation receipt. Original capture repeatability
 remains independently bound to the preserved capture/recipe identities.
 
-### Reconciled baseline (in progress)
+### Earlier reconciliation checkpoint (historical)
 
-Current branch baseline: PR #86 was semantically merged with `origin/main`
+At this earlier checkpoint, PR #86 was semantically merged with `origin/main`
 `8671362` at commit `4cc63d7` (including #89 commit `aecc3e64` and PR #93
-merge `2e083bf`). This checkpoint is a fresh validation boundary; all older
-character and browser receipts below retain their original commit/build
-provenance and are not retroactively relabeled as tests of this merge.
+merge `2e083bf`). Its test/build results below retain that checkpoint's
+provenance and are not retroactively relabeled as validation of the newer
+merged tree.
 
 On the merged tree, the Results source-tick/entry Node contracts and focused
 Python entry suite pass (8/8). The `gameplay_results_scene_trace.js` and
@@ -1601,6 +1604,125 @@ statistics-page camera initialization is visible in the source call graph.
 This narrows the writer hypothesis but does not identify it: the native pass is
 a Samus winner with no source draws, whereas the historical failure is a
 browser-rendered Sheik winner with unbracketed keyboard input and no retained
-entry/page/PAD/pointer snapshots. The next useful discriminator remains a
-headless current-head keyboard-gated B match whose guard reports the first
-changed boundary and pointer triple, without forcing a seed or winner.
+entry/page/PAD/pointer snapshots. The current-head keyboard-gated control is
+recorded below; the next discriminator is the historical three-pulse keyboard
+prefix, with no forced seed or winner.
+
+## Fresh merged-head rendered Results control (2026-09-28)
+
+The current branch is `4924b28281ab7902ea9d6866ed3e596cf332b547`, merging
+`origin/main` `d22b50f83c1e7acff9a23bd274b210515935bea4`; PR #89 commit
+`aecc3e64def3090bdfc33d0eb66058df998ef14d` and PR #93 merge
+`2e083bf1367ca8900874a11ac7566433cfdf37a1` are ancestors. The Release runtime
+and both affected native trace targets were freshly built on this tree. Focused
+post-merge gates pass: runtime owner 14/14, runtime-scope/Results-entry 17/17,
+and natural Results plus native CSS teardown 2/2. These are not the required
+full suite.
+
+`work/pr86-4924b28-b-keyboard-gated-two-match-r2/report.json` binds the
+headless Chrome 153 capture to clean source commit
+`4924b28281ab7902ea9d6866ed3e596cf332b547`, tree
+`c13818c52dc06963c5f373a4a36b0a4fa683b686`, runtime JS SHA-256
+`62bf2d142fa0aaf8d7642cc2fbba39bf80c43355461d182de0eb9b2853f7f89a`, and
+Wasm SHA-256
+`66aed80ba10cb05a94c4d2d5d53529877b32b946684104cc52a6944a3f1cc3dd`. It
+renders two natural B matches with Samus, Yoshi, Zelda/Sheik and Falco all
+CPU9, four stocks, Final Destination. Samus won match 1 at frame 14,747;
+Falco won match 2 at frame 13,895. Slot 2 transformed Zelda↔Sheik in both.
+Match 1 Results returned to original CSS and launched match 2; match 2 Results
+returned to CSS. Screenshots, source progress and full Results source PAD/page
+traces are retained in that output directory/report.
+
+This `keyboard-gated` case intentionally uses two trusted P1 Enter pulses per
+Results visit, each requested as 160 ms down / 120 ms release. Ports 0/1 were
+connected, ports 2/3 disconnected. The automatic CPU-page transitions were
+observed before the separate confirmation: slots 2/3 advanced 0→1 after 181
+source ticks at Results frame 401, then P1 Start was consumed at 421 for match
+1; match 2 transitioned at 397 and consumed Start at 416. Entry snapshots
+record pool `0` before Results OnEnter and `0xb21b940` after OnEnter, collision
+adoption and context ownership. No retained camera guard failed through all
+443/438 Results ticks, rendered draws, route returns and owner teardown; no
+browser page error, native command error or source-timing interruption was
+recorded. The screenshots' callback/audio diagnostics still do not establish
+foreground timing, performance or PCM acceptance.
+
+This excludes a missing disconnected-CPU auto-page and a non-Sheik rendered
+Results-close failure on the merged baseline. It is not the historical input
+path: the historical report retains three Enter intentions, and this gated
+control retains two. Neither match ended with slot-2 Sheik, so the historical
+camera-pool failure and its first invalid ownership transition remain
+unresolved. The exact three-pulse merged-head rerun is recorded next.
+
+## Merged-head historical three-pulse prefix control (2026-09-28)
+
+`work/pr86-4924b28-b-keyboard-three-prefix-r1/report.json` uses the same
+merged-head Release Wasm as the gated run above. Its source commit is
+`4924b28`; provenance also records a docs-only tracked diff fingerprint and
+confirms the tree did not change during capture. One natural B CPU9/four-stock
+Final Destination match ended with Samus at frame 13,613. Zelda-origin slot 2
+transformed repeatedly but did not win.
+
+The three trusted, non-repeat Enter presses requested 160 ms down/120 ms up.
+Source-consumed P1 Start runs were 192–201, 363–372 and 535–544; releases were
+202, 373 and 545. Port errors remained `[0,0,-1,-1]`, and no CPU-page
+transition occurred. Results naturally returned to CSS at source frame 557
+(phase 4, all four pages still zero), after 557 returned pre-tick samples at
+frames 0–556 and before the harness's requested cursor-560 checkpoint. It
+therefore reports a failed prefix assertion, not a runtime failure. Every
+retained tick has its consumed-PAD/page state; no camera guard, native-command,
+page or source-timing error occurred. Camera-entry ownership was `0` before OnEnter
+and `0xb21b940` after OnEnter/adoption/context ownership. The report retains
+the failure screenshot, entry packet and complete partial PAD/page trace.
+
+This current-baseline run now binds the three-pulse timing class and
+connectedness that the older historical report omitted, but it remains a
+Samus-winner control and cannot clear the natural Sheik-winner failure. The
+ordinary-keyboard three-pulse control on `ccca20d` had the same natural CSS
+return at frame 557. To avoid repeating this boundary unchanged, the next
+discriminator is a current-head rendered B case using the distinct
+`source-tick-three-pulse` Results schedule (P1-only source-tick edges at 180,
+360 and 600; both disconnected CPU pages must advance before tick 600). If
+slot-2 Sheik naturally wins, this tests whether the merged camera guards
+tolerate that Results identity independently of keyboard scheduling; it is
+not presented as a replay of the historical keyboard path. If it does not
+naturally produce Sheik, retain that control and seek a bounded review with the
+old failure packet and both current input traces instead of looping identical
+matches.
+
+## Strict merged-head P1-Enter Results discriminator (2026-09-28)
+
+`work/pr86-4924b28-b-keyboard-gated-p1-enter-match-r1/report.json` is a fresh
+headless Chrome 153 rendered Lineup B match on source HEAD `4924b28`, with the
+same Release Wasm SHA-256
+`66aed80ba10cb05a94c4d2d5d53529877b32b946684104cc52a6944a3f1cc3dd`. All four
+fighters were verified CPU9, four stocks, Final Destination. Samus (slot 0)
+won naturally at match frame 13,752; the target slot-2 Zelda-origin Sheik did
+not win.
+
+This stricter `keyboard-gated-p1-enter` mode preserves the split keyboard
+ports used by original CSS setup (ports 0/1 connected, CPU ports 2/3
+disconnected) and verifies that Enter only produces P1 Start; P2 remains
+neutral. Trusted non-repeat Enter keydown/up retained 160 ms down / 120 ms
+release. P1 Start was consumed at Results source frames 207–216. Statistics
+phase began at 218; CPU pages 2/3 each advanced 0→1 at frame 399 (181 source
+ticks) before the next Enter keydown at 419 and consumed P1 Start at 419–428.
+All retained source ticks returned without overflow or failure, and Results
+naturally returned to CSS.
+
+The camera pool was `0` before Results OnEnter and `0xb21b940` after OnEnter,
+collision adoption and context ownership. The entry/tick/draw/OnExit/close/
+destructor guards remained green. There were no browser page/target crashes,
+JS errors, native-command errors, or source-timing interruptions. This
+excludes a missing CPU auto-page for the ordinary P1-Enter path and a generic
+Samus Results-close failure on this merged build. It does not resolve the
+historical Sheik-specific camera failure: the winner and match frame differ,
+the old report is not bound to its Wasm, and it retains no event/PAD/page/
+camera snapshots.
+
+The task description's “P1-only” is treated as P1-only Enter/Start, not a
+P1-only controller-port profile. A port-disabled experiment broke original
+CSS's P2 Yoshi-door input and is retained only as a rejected profile
+interpretation. The bounded, read-only review request and comparison packet
+are in the ignored work note `work/pr86-results-camera-review-v1.md`. No
+additional unchanged full-match replay is planned until that review identifies
+a new discriminator.

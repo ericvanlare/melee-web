@@ -78,11 +78,20 @@ export function findConsumedResultsStartKeyboardAttempt(keydowns,keyups,startRun
 }
 
 // The first valid P1 Start moves Results from its source fade into statistics.
-// Return null until that initial one-button pulse is observed and both
-// disconnected CPU pages have advanced. A later pulse is valid only after
-// both source-observed page transitions, even when ordinary keyboard timing
-// means it was already consumed before this observer was polled.
-export function assertResultsCpuPagesAfterInitialP1Keyboard(trace,targetFrame){
+// Return null until that initial one-button pulse is observed and every
+// declared disconnected CPU page has advanced. A later pulse is valid only
+// after those source-observed page transitions, even when ordinary keyboard
+// timing means it was already consumed before this observer was polled.
+export function assertResultsCpuPagesAfterInitialP1Keyboard(trace,targetFrame,{
+  expectedPortErrors=[[0],[0],[-1],[-1]],expectedDisconnectedCpuSlots=[2,3]}={}){
+  if(expectedPortErrors.length!==4||expectedDisconnectedCpuSlots.length===0||
+     expectedPortErrors.some(values=>!Array.isArray(values)||values.length===0||
+       values.some(value=>!Number.isInteger(value)))||
+     expectedDisconnectedCpuSlots.some((slot,index)=>!Number.isInteger(slot)||slot<0||slot>3||
+       (index>0&&slot<=expectedDisconnectedCpuSlots[index-1]))||
+     JSON.stringify(expectedDisconnectedCpuSlots)!==JSON.stringify(
+       expectedPortErrors.flatMap((values,slot)=>values.length===1&&values[0]===-1?[slot]:[])))
+    throw Error('Results CPU-page gate requires an explicit four-port profile and ordered disconnected CPU slots');
   if(trace.overflow)throw Error('Results CPU-page gate received an overflowed source trace');
   const summary=summarizeResultsPadTrace(trace);
   const latest=trace.samples.at(-1)?.results_state_after_tick;
@@ -90,7 +99,7 @@ export function assertResultsCpuPagesAfterInitialP1Keyboard(trace,targetFrame){
   if(summary.tick_failed.length)
     throw Error('Results source tick failed before the keyboard confirmation boundary');
   if(summary.results_page_transitions.some(row=>
-    row.from!==0||row.to!==1||row.slot<2||row.slot>3))
+    row.from!==0||row.to!==1||!expectedDisconnectedCpuSlots.includes(row.slot)))
     throw Error('Connected neutral ports or an unexpected Results page changed before keyboard confirmation');
   const analogFields=['stick_x','stick_y','substick_x','substick_y','trigger_left',
     'trigger_right','analog_a','analog_b','ext_button'];
@@ -98,8 +107,8 @@ export function assertResultsCpuPagesAfterInitialP1Keyboard(trace,targetFrame){
     port===0?pad.button!==0&&pad.button!==0x1000:pad.button!==0)||
     analogFields.some(field=>pad[field]!==undefined&&pad[field]!==0))))
     throw Error('A Results input other than P1 Start or neutral analog controls was consumed');
-  if(JSON.stringify(summary.port_error_values)!==JSON.stringify([[0],[0],[-1],[-1]]))
-    throw Error('Natural P1/P2-connected and CPU-P3/P4-disconnected controller status changed');
+  if(JSON.stringify(summary.port_error_values)!==JSON.stringify(expectedPortErrors))
+    throw Error('Observed Results controller connectedness changed from the declared keyboard profile');
   const startRuns=summary.p1_start_runs;
   if(!startRuns.length)return null;
   const cpuTransitions=summary.results_page_transitions;
@@ -111,7 +120,7 @@ export function assertResultsCpuPagesAfterInitialP1Keyboard(trace,targetFrame){
     throw Error('The first P1 Start edge must be consumed from original Results phase 2, not ignored during its fade');
   if(!firstCpuTransition){
     if(startRuns.length>1)
-      throw Error('An additional P1 Start was consumed before either disconnected CPU page auto-advanced');
+      throw Error('An additional P1 Start was consumed before a disconnected CPU page auto-advanced');
     return null;
   }
   const firstPageFrame=Math.min(...cpuTransitions.map(row=>row.source_frame));
@@ -122,14 +131,14 @@ export function assertResultsCpuPagesAfterInitialP1Keyboard(trace,targetFrame){
   const pageOverlapStarts=startRuns.filter(run=>run!==initialStart&&
     run.first_source_frame<=lastPageFrame);
   if(pageOverlapStarts.length)
-    throw Error('An additional P1 Start was consumed before both disconnected CPU pages auto-advanced');
+    throw Error('An additional P1 Start was consumed before all expected disconnected CPU pages auto-advanced');
   const statsPhaseStart=trace.samples.find(row=>{
     const state=row.results_state_after_tick;
     return state?.phase===3&&state.stats_phase===2&&
-      state.players[2].page===0&&state.players[3].page===0;
+      expectedDisconnectedCpuSlots.every(slot=>state.players[slot].page===0);
   })?.results_state_after_tick?.source_frame;
   if(!Number.isInteger(statsPhaseStart)||statsPhaseStart<initialStart.first_source_frame)return null;
-  if(JSON.stringify(cpuTransitions.map(row=>row.slot))!==JSON.stringify([2,3]))return null;
+  if(JSON.stringify(cpuTransitions.map(row=>row.slot))!==JSON.stringify(expectedDisconnectedCpuSlots))return null;
   if(!cpuTransitions.every(row=>row.phase===3&&row.stats_phase===2&&
        row.source_frame>statsPhaseStart&&
        row.source_frame>initialStart.last_source_frame&&

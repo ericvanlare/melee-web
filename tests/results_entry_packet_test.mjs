@@ -131,6 +131,42 @@ assert.deepEqual(pageGate.initial_start,{first_source_frame:509,last_source_fram
 assert.deepEqual(pageGate.post_page_start_runs,[]);
 assert.equal(pageGate.stats_phase_start_source_frame,510);
 assert.deepEqual(pageGate.cpu_page_delay_source_ticks,[{slot:2,ticks:180},{slot:3,ticks:180}]);
+const p1OnlyPads=()=>neutralPads().map((pad,port)=>({...pad,err:port===0?0:-1}));
+const p1OnlyKeyboardGateTrace={attempts:5,retained:5,capacity:8192,overflow:false,samples:[
+  {source_frame:508,tick_returned:true,pads:p1OnlyPads(),
+    results_state_after_tick:{source_frame:509,phase:2,stats_phase:0,
+      players:[0,1,2,3].map(()=>({page:0,confirmed:0}))}},
+  {source_frame:509,tick_returned:true,
+    pads:[{button:4096,err:0},...p1OnlyPads().slice(1)],
+    results_state_after_tick:{source_frame:510,phase:3,stats_phase:2,
+      players:[0,1,2,3].map(()=>({page:0,confirmed:0}))}},
+  {source_frame:510,tick_returned:true,pads:p1OnlyPads(),
+    results_state_after_tick:firstStatsPageState(511)},
+  {source_frame:689,tick_returned:true,pads:p1OnlyPads(),
+    results_state_after_tick:{...firstStatsPageState(690),players:[{page:0,confirmed:0},
+      {page:1,confirmed:0},{page:1,confirmed:0},{page:1,confirmed:0}]}},
+  {source_frame:690,tick_returned:true,pads:p1OnlyPads(),
+    results_state_after_tick:{...firstStatsPageState(691),players:[{page:0,confirmed:0},
+      {page:1,confirmed:0},{page:1,confirmed:0},{page:1,confirmed:0}]}}]};
+const p1OnlyPageGate=assertResultsCpuPagesAfterInitialP1Keyboard(
+  p1OnlyKeyboardGateTrace,509,{expectedPortErrors:[[0],[-1],[-1],[-1]],
+    expectedDisconnectedCpuSlots:[1,2,3]});
+assert.equal(p1OnlyPageGate.source_frame,691);
+assert.deepEqual(p1OnlyPageGate.transitions.map(row=>row.slot),[1,2,3]);
+assert.deepEqual(p1OnlyPageGate.cpu_page_delay_source_ticks,
+  [{slot:1,ticks:180},{slot:2,ticks:180},{slot:3,ticks:180}],
+  'A P1-only profile must wait for all three disconnected CPU pages');
+assert.throws(()=>assertResultsCpuPagesAfterInitialP1Keyboard(
+  p1OnlyKeyboardGateTrace,509,{expectedPortErrors:[[0],[-1],[-1],[-1]],
+    expectedDisconnectedCpuSlots:[2,3]}),
+  /explicit four-port profile/,
+  'The automatic-page gate must reject disconnected slots that disagree with PAD connectedness');
+assert.throws(()=>assertResultsCpuPagesAfterInitialP1Keyboard(
+  {...p1OnlyKeyboardGateTrace,samples:p1OnlyKeyboardGateTrace.samples.map(row=>({
+    ...row,pads:row.pads.map((pad,port)=>port===1?{...pad,err:0}:pad)}))},
+  509,{expectedPortErrors:[[0],[-1],[-1],[-1]],expectedDisconnectedCpuSlots:[1,2,3]}),
+  /connectedness changed/,
+  'The P1-only auto-page gate must reject an accidentally connected P2 keyboard port');
 const fadeStartTrace={...keyboardGateTrace,samples:keyboardGateTrace.samples.map((row,index)=>
   index===0?{...row,results_state_after_tick:{...row.results_state_after_tick,phase:1}}:row)};
 assert.throws(()=>assertResultsCpuPagesAfterInitialP1Keyboard(fadeStartTrace,509),

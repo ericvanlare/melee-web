@@ -223,7 +223,16 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('window.__meleeWebAudioDiagnostics={snapshot};', harness)
         self.assertIn('report.failure.audio_diagnostics=await readAudioDiagnostics();', harness)
         self.assertIn("'keyboard-gated'", harness)
-        gated_start = harness.index("}else if(resultsInputMode==='keyboard-gated'){")
+        self.assertIn("'keyboard-gated-p1-enter'", harness)
+        self.assertIn('const keyboardPortErrors=[[0],[0],[-1],[-1]];', harness)
+        self.assertIn('controllerProfile.keyboard_active_mask&~3,0', harness)
+        self.assertIn('row.inputServiceStatusAtEvent?.keyboard_active_mask===3', harness)
+        self.assertIn('historical_results_port_status', harness)
+        self.assertIn('expectedPortErrors:keyboardPortErrors', harness)
+        self.assertIn('expectedDisconnectedCpuSlots:keyboardAutoPageSlots', harness)
+        self.assertIn("page.on('crash',error=>report.page_crashes.push", harness)
+        self.assertIn("browserCdp.on('Target.targetCrashed'", harness)
+        gated_start = harness.index('}else if(keyboardGatedMode){')
         gated_end = harness.index("\n  }else{\n    await writeProgress(`match-${matchIndex}-natural-results`)",
                                   gated_start)
         gated = harness[gated_start:gated_end]
@@ -236,7 +245,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertLess(first_enter, gated.index('summarizeResultsPadTrace(trace).p1_start_runs.length>0'))
         self.assertIn('if(initialStartObserved)break;', gated)
         self.assertIn('returned to CSS before the disconnected CPU auto-page gate', gated)
-        self.assertIn('returned to CSS before both disconnected CPU pages auto-advanced', gated)
+        self.assertIn('returned to CSS before all expected disconnected CPU pages auto-advanced', gated)
         self.assertIn('cannot pass without the observed disconnected CPU auto-page gate', harness)
         self.assertIn('cannot pass without a retained post-page keyboard confirmation', harness)
         self.assertIn('lastCpuPageTransition+1', gated)
@@ -245,7 +254,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('retainResultsInputEvents()', gated)
         self.assertIn("pageCheck.status='post-page-keyboard-dispatched';", gated)
         self.assertIn("row.status==='post-page-keyboard-dispatched'", harness)
-        validation_start = harness.index("if(resultsInputMode==='keyboard-gated'){",
+        validation_start = harness.index('if(keyboardGatedMode){',
                                          harness.index('const sourcePadTraceRecord='))
         validation_end = harness.index('}else if(sourceTickMode){', validation_start)
         validation = harness[validation_start:validation_end]
@@ -259,6 +268,8 @@ class ResultsEntryPacketTests(unittest.TestCase):
         trace_helper = (ROOT / 'tests/results_source_pad_trace.mjs').read_text(encoding='utf-8')
         self.assertIn('assertResultsCpuPagesAfterInitialP1Keyboard', trace_helper)
         self.assertIn('first P1 Start edge must be consumed from original Results phase 2', trace_helper)
+        self.assertIn('expectedDisconnectedCpuSlots', trace_helper)
+        self.assertIn('expectedPortErrors', trace_helper)
         input_helper = (ROOT / 'tests/results_source_pad_input.mjs').read_text(encoding='utf-8')
         self.assertLess(input_helper.index('Module._melee_web_native_menu_running()'),
                         input_helper.index("status.startsWith('Paused after a timing disruption')"))
