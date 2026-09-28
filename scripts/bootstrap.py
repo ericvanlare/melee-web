@@ -13,9 +13,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from workspace_resources import operation
 
-# Pinned Aurora plus the exact main-branch browser patch before the bounded
-# asynchronous pipeline experiment. Recognize only that known source tree.
-AURORA_PREVIOUS_PATCH_TREE = "1f2ebff4c302baded19858a8be4d59919c8d3236"
+# Recognize the immediately previous downstream Aurora tree so bootstrap can
+# apply only the delta to the updated test experiment without touching upstream.
+AURORA_PREVIOUS_PATCH_TREE = "d3604720dccd544f6a0b929dc1561db613bd58ce"
 
 
 def run(*args, cwd=ROOT):

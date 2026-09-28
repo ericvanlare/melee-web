@@ -34,6 +34,17 @@ unchanged, avoiding needless backend recompilation and dependent target relinks.
 Existing checkouts transition from the exact previous reviewed patch by rerunning
 bootstrap, as described in [Bootstrap and build](BUILD_AND_PLAY.md#bootstrap-and-build).
 
+The downstream patch also contains an explicitly test-only WebGPU asynchronous
+pipeline experiment. It is compiled only for a public Release runtime when
+`MELEE_WEB_ASYNC_PIPELINE_EXPERIMENT=ON`; normal builds leave the option off.
+The browser harness limits submissions to one or two pipelines in flight and
+records each completion against Aurora's original shader type and pipeline hash.
+The experiment keeps pending entries out of the ready cache, waits for every
+completion before opening the preparation barrier, reports WebGPU failures, and
+rejects completions from a retired cache generation. This is an investigation
+surface, not the default player path. Its measured timing and lifecycle evidence
+is retained under ignored `work/async-pipeline-probe/RESULTS.txt`.
+
 Python package versions are pinned without wheel hashes. This is a pinned
 integration baseline, not a hermetic or bit-for-bit reproducible release build.
 Tool downloads, host tooling and release artifact reproducibility remain future

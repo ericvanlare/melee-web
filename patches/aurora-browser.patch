@@ -1633,7 +1633,7 @@ index d50ce6a..8f7ded5 100644
    std::deque<TextureCopy> textureCopies;
    std::deque<EncoderTask> encoderTasks;
 diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
-index bff9b47..598e0e3 100644
+index bff9b47..c497c15 100644
 --- a/lib/gfx/pipeline_cache.cpp
 +++ b/lib/gfx/pipeline_cache.cpp
 @@ -1,10 +1,20 @@
@@ -1733,7 +1733,7 @@ index bff9b47..598e0e3 100644
  struct SdlVfsSqliteFile {
    sqlite3_file base;
    SDL_IOStream* io = nullptr;
-@@ -80,14 +131,69 @@ static std::atomic_bool g_gpuCachePrunePending = false;
+@@ -80,14 +131,83 @@ static std::atomic_bool g_gpuCachePrunePending = false;
  static sqlite3* g_pipelineCacheDb = nullptr;
  static sqlite3_stmt* g_pipelineCacheLoadStmt = nullptr;
  static sqlite3_stmt* g_pipelineCacheUpsertStmt = nullptr;
@@ -1756,6 +1756,20 @@ index bff9b47..598e0e3 100644
 +static uint32_t g_asyncTestPeakInFlight = 0;
 +static uint32_t g_asyncTestPendingLookups = 0;
 +static bool g_asyncPumpScheduled = false;
++static bool g_asyncTestRetireOwnerOnFirstCompletion = false;
++struct AsyncTestRetiredCompletion {
++  uint64_t generation;
++  ShaderType type;
++  PipelineRef hash;
++  uint32_t firstFrameUsed;
++  double submittedAt;
++  std::shared_ptr<std::atomic_bool> settled;
++  wgpu::RenderPipeline pipeline;
++  bool pendingAtCompletion;
++  bool readyAtCompletion;
++};
++static std::unique_ptr<AsyncTestRetiredCompletion> g_asyncTestRetiredCompletion;
++static void async_pipeline_test_retire_and_complete(void*);
 +#endif
  static std::thread g_pipelineCacheWriterThread;
  static std::condition_variable g_pipelineCacheWriterCv;
@@ -1805,7 +1819,7 @@ index bff9b47..598e0e3 100644
  static SdlVfsSqliteFile* sdl_vfs_file(sqlite3_file* file) { return reinterpret_cast<SdlVfsSqliteFile*>(file); }
  
  static sqlite3_vfs* default_vfs(sqlite3_vfs* vfs) { return static_cast<sqlite3_vfs*>(vfs->pAppData); }
-@@ -357,7 +463,13 @@ static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
+@@ -357,7 +477,13 @@ static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
  
    {
      std::lock_guard lock{g_pipelineCacheWriterMutex};
@@ -1820,7 +1834,7 @@ index bff9b47..598e0e3 100644
    }
    g_pipelineCacheWriterCv.notify_one();
  }
-@@ -418,46 +530,362 @@ static std::optional<PendingPipeline> take_pending_pipeline(PipelineRef hash) {
+@@ -418,46 +544,488 @@ static std::optional<PendingPipeline> take_pending_pipeline(PipelineRef hash) {
    return std::nullopt;
  }
  
@@ -1895,6 +1909,10 @@ index bff9b47..598e0e3 100644
 +    const value = window.__meleeWebAsyncPipelineTestPolicy;
 +    return value && value.failFirst === true ? 1 : 0;
 +  }) != 0;
++  g_asyncTestRetireOwnerOnFirstCompletion = EM_ASM_INT({
++    const value = window.__meleeWebAsyncPipelineTestPolicy;
++    return value && value.retireOwnerOnFirstCompletion === true ? 1 : 0;
++  }) != 0;
 +  g_asyncTestSelected = 0;
 +  g_asyncTestInFlight = 0;
 +  g_asyncTestPeakInFlight = 0;
@@ -1967,6 +1985,128 @@ index bff9b47..598e0e3 100644
 +  }, completionMs);
 +  notify_pipeline_ready(true, valid);
 +  schedule_async_pipeline_pump();
++}
++
++static void async_pipeline_test_retire_and_complete(void*) {
++  const bool armed = EM_ASM_INT({
++    return window.__meleeWebAsyncPipelineTestRetireArmed === true ? 1 : 0;
++  }) != 0;
++  if (!armed) {
++    emscripten_async_call(async_pipeline_test_retire_and_complete, nullptr, 10);
++    return;
++  }
++
++  std::unique_ptr<AsyncTestRetiredCompletion> retired = std::move(g_asyncTestRetiredCompletion);
++  if (!retired) {
++    return;
++  }
++  g_asyncTestRetireOwnerOnFirstCompletion = false;
++  EM_ASM({
++    window.__meleeWebAsyncPipelineTestPolicy = null;
++    const report = window.__meleeWebAsyncPipelineTestResults;
++    if (report) {
++      report.retirementTriggered = {};
++      report.retirementTriggered.type = $0;
++      report.retirementTriggered.hashLow = $1;
++      report.retirementTriggered.generation = $2;
++      report.retirementTriggered.actualWebGPUCompletion = true;
++    }
++  }, underlying(retired->type), static_cast<uint32_t>(retired->hash),
++     static_cast<uint32_t>(retired->generation));
++
++  shutdown_pipeline_cache();
++  initialize_pipeline_cache();
++  const uint64_t activeGeneration = g_pipelineCacheGeneration.load(std::memory_order_acquire);
++  size_t beforeReady = 0;
++  size_t beforePending = 0;
++  size_t beforeQueued = 0;
++  size_t beforeCreated = 0;
++  bool beforeReadyIdentity = false;
++  bool beforePendingIdentity = false;
++  bool beforeHasRetiredIdentity = false;
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    beforeReady = g_pipelines.size();
++    beforePending = g_pendingPipelines.size();
++    beforeQueued = queuedPipelines;
++    beforeCreated = createdPipelines;
++    beforeReadyIdentity = g_pipelines.contains(retired->hash);
++    beforePendingIdentity = g_pendingPipelines.contains(retired->hash);
++    beforeHasRetiredIdentity = beforeReadyIdentity || beforePendingIdentity;
++  }
++  const bool initializedBefore = g_pipelineCacheInitialized;
++
++  async_pipeline_finish(retired->generation, retired->type, retired->hash, retired->firstFrameUsed,
++                        retired->submittedAt, *retired->settled, std::move(retired->pipeline), {});
++  async_pipeline_finish(retired->generation, retired->type, retired->hash, retired->firstFrameUsed,
++                        retired->submittedAt, *retired->settled, {},
++                        "duplicate completion used only to verify exactly-once settlement");
++  const bool settled = retired->settled->load(std::memory_order_acquire);
++  size_t afterReady = 0;
++  size_t afterPending = 0;
++  size_t afterQueued = 0;
++  size_t afterCreated = 0;
++  bool afterReadyIdentity = false;
++  bool afterPendingIdentity = false;
++  bool afterHasRetiredIdentity = false;
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    afterReady = g_pipelines.size();
++    afterPending = g_pendingPipelines.size();
++    afterQueued = queuedPipelines;
++    afterCreated = createdPipelines;
++    afterReadyIdentity = g_pipelines.contains(retired->hash);
++    afterPendingIdentity = g_pendingPipelines.contains(retired->hash);
++    afterHasRetiredIdentity = afterReadyIdentity || afterPendingIdentity;
++  }
++
++  const bool unchanged = initializedBefore && g_pipelineCacheInitialized &&
++                         beforeReady == afterReady && beforePending == afterPending &&
++                         beforeQueued == afterQueued && beforeCreated == afterCreated &&
++                         beforeHasRetiredIdentity == afterHasRetiredIdentity &&
++                         beforeReadyIdentity == afterReadyIdentity && beforePendingIdentity == afterPendingIdentity;
++  const uint32_t stateFlags = (retired->pendingAtCompletion ? 1U : 0U) |
++                              (retired->readyAtCompletion ? 2U : 0U) |
++                              (beforeHasRetiredIdentity ? 4U : 0U) |
++                              (afterHasRetiredIdentity ? 8U : 0U) |
++                              (settled ? 16U : 0U) |
++                              ((initializedBefore && g_pipelineCacheInitialized) ? 32U : 0U) |
++                              (unchanged ? 64U : 0U) |
++                              (beforeReadyIdentity ? 128U : 0U) |
++                              (afterReadyIdentity ? 256U : 0U) |
++                              (beforePendingIdentity ? 512U : 0U) |
++                              (afterPendingIdentity ? 1024U : 0U);
++  EM_ASM({
++    const report = window.__meleeWebAsyncPipelineTestResults;
++    if (report) {
++      report.retiredOwnerCheck = {};
++      report.retiredOwnerCheck.oldGeneration = $0;
++      report.retiredOwnerCheck.newGeneration = $1;
++      report.retiredOwnerCheck.pipelineType = $2;
++      report.retiredOwnerCheck.pipelineHashLow = $3;
++      report.retiredOwnerCheck.beforeReady = $4;
++      report.retiredOwnerCheck.afterReady = $5;
++      report.retiredOwnerCheck.beforePending = $6;
++      report.retiredOwnerCheck.afterPending = $7;
++      report.retiredOwnerCheck.beforeQueued = $8;
++      report.retiredOwnerCheck.afterQueued = $9;
++      report.retiredOwnerCheck.beforeCreated = $10;
++      report.retiredOwnerCheck.afterCreated = $11;
++      report.retiredOwnerCheck.pendingAtCompletion = ($12 & 1) !== 0;
++      report.retiredOwnerCheck.readyAtCompletion = ($12 & 2) !== 0;
++      report.retiredOwnerCheck.beforeHasRetiredIdentity = ($12 & 4) !== 0;
++      report.retiredOwnerCheck.afterHasRetiredIdentity = ($12 & 8) !== 0;
++      report.retiredOwnerCheck.settled = ($12 & 16) !== 0;
++      report.retiredOwnerCheck.initialized = ($12 & 32) !== 0;
++      report.retiredOwnerCheck.unchanged = ($12 & 64) !== 0;
++      report.retiredOwnerCheck.beforeReadyIdentity = ($12 & 128) !== 0;
++      report.retiredOwnerCheck.afterReadyIdentity = ($12 & 256) !== 0;
++      report.retiredOwnerCheck.beforePendingIdentity = ($12 & 512) !== 0;
++      report.retiredOwnerCheck.afterPendingIdentity = ($12 & 1024) !== 0;
++    }
++  }, static_cast<uint32_t>(retired->generation), static_cast<uint32_t>(activeGeneration),
++     underlying(retired->type), static_cast<uint32_t>(retired->hash), beforeReady, afterReady,
++     beforePending, afterPending, beforeQueued, afterQueued, beforeCreated, afterCreated, stateFlags);
 +}
 +
 +static void schedule_async_pipeline_pump_callback(void* generationValue) {
@@ -2188,7 +2328,7 @@ index bff9b47..598e0e3 100644
        if (blocking && !g_hasPipelineThread) {
          auto pending = take_pending_pipeline(hash);
          if (pending) {
-@@ -467,12 +895,21 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -467,12 +1035,21 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
                cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
              }
            }
@@ -2216,7 +2356,7 @@ index bff9b47..598e0e3 100644
            createdPipeline = true;
            queued = true;
          }
-@@ -488,22 +925,66 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -488,22 +1065,66 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
          }
          notifyWorker = priority != PipelinePriority::Background;
        }
@@ -2293,7 +2433,7 @@ index bff9b47..598e0e3 100644
        };
        switch (priority) {
        case PipelinePriority::Background:
-@@ -531,16 +1012,42 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+@@ -531,16 +1152,42 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
    }
  
    if (createdPipeline) {
@@ -2337,7 +2477,7 @@ index bff9b47..598e0e3 100644
      auto pipelineIt = g_pipelines.find(hash);
      if (pipelineIt != g_pipelines.end() && persist && firstFrameUsed < pipelineIt->second.firstFrameUsed) {
        pipelineIt->second.firstFrameUsed = firstFrameUsed;
-@@ -620,6 +1127,219 @@ static sqlite3* open_pipeline_cache_seed_db(const std::string& path) {
+@@ -620,6 +1267,219 @@ static sqlite3* open_pipeline_cache_seed_db(const std::string& path) {
    return seedDb;
  }
  
@@ -2557,7 +2697,7 @@ index bff9b47..598e0e3 100644
  static void seed_pipeline_cache() {
    if (g_pipelineCacheBroken || g_pipelineCacheDb == nullptr || g_pipelineCacheUpsertStmt == nullptr) {
      return;
-@@ -703,7 +1423,7 @@ static void seed_pipeline_cache() {
+@@ -703,7 +1563,7 @@ static void seed_pipeline_cache() {
      }
  
      if (!writeFailed && !readFailed) {
@@ -2566,7 +2706,7 @@ index bff9b47..598e0e3 100644
      }
    }
  
-@@ -792,7 +1512,7 @@ INSERT INTO aurora_schema VALUES ({});)",
+@@ -792,7 +1652,7 @@ INSERT INTO aurora_schema VALUES ({});)",
      }
  
      if (!schemaFailed) {
@@ -2575,7 +2715,7 @@ index bff9b47..598e0e3 100644
      }
    }
  
-@@ -925,15 +1645,22 @@ static void pipeline_cache_writer() {
+@@ -925,15 +1785,22 @@ static void pipeline_cache_writer() {
  #endif
  
    while (true) {
@@ -2602,7 +2742,7 @@ index bff9b47..598e0e3 100644
      }
  
      bool writeFailed = false;
-@@ -951,15 +1678,27 @@ static void pipeline_cache_writer() {
+@@ -951,15 +1818,27 @@ static void pipeline_cache_writer() {
          }
  
          if (!writeFailed) {
@@ -2631,7 +2771,7 @@ index bff9b47..598e0e3 100644
    }
  }
  
-@@ -986,28 +1725,111 @@ static void pipeline_worker() {
+@@ -986,28 +1865,129 @@ static void pipeline_worker() {
          break;
        }
        auto& source = !g_pipelineQueue.empty() ? g_pipelineQueue : g_backgroundPipelineQueue;
@@ -2721,6 +2861,24 @@ index bff9b47..598e0e3 100644
 +          [generation = dispatch.generation, type = dispatch.pending.type, hash = dispatch.pending.hash,
 +           firstFrameUsed = dispatch.pending.firstFrameUsed, submittedAt = dispatch.submittedAt, settled]
 +          (wgpu::RenderPipeline pipeline, std::string error) mutable {
++            if (g_asyncTestRetireOwnerOnFirstCompletion && error.empty() && pipeline) {
++              bool pendingAtCompletion = false;
++              bool readyAtCompletion = false;
++              {
++                std::lock_guard guard{g_pipelineMutex};
++                pendingAtCompletion = g_pendingPipelines.contains(hash);
++                readyAtCompletion = g_pipelines.contains(hash);
++              }
++
++              /* Hold the actual successful result until the harness has
++               * selected the real disc. The separate browser task then
++               * retires the owner before attempting cache publication. */
++              g_asyncTestRetiredCompletion = std::make_unique<AsyncTestRetiredCompletion>(
++                  AsyncTestRetiredCompletion{generation, type, hash, firstFrameUsed, submittedAt,
++                                             settled, std::move(pipeline), pendingAtCompletion, readyAtCompletion});
++              emscripten_async_call(async_pipeline_test_retire_and_complete, nullptr, 0);
++              return;
++            }
 +            async_pipeline_finish(generation, type, hash, firstFrameUsed, submittedAt, *settled,
 +                                  std::move(pipeline), std::move(error));
 +          },
@@ -2750,7 +2908,7 @@ index bff9b47..598e0e3 100644
    if (!prepare_pipeline_cache_db()) {
      return 0;
    }
-@@ -1040,7 +1862,18 @@ static size_t load_pipeline_cache_entries(ShaderType type, uint32_t configVersio
+@@ -1040,7 +2020,18 @@ static size_t load_pipeline_cache_entries(ShaderType type, uint32_t configVersio
        continue;
      }
  
@@ -2769,7 +2927,7 @@ index bff9b47..598e0e3 100644
      ++acceptedRows;
    }
  
-@@ -1066,25 +1899,104 @@ static size_t load_pipeline_cache() {
+@@ -1066,25 +2057,104 @@ static size_t load_pipeline_cache() {
    size_t acceptedRows = 0;
  #ifdef AURORA_ENABLE_RMLUI
    acceptedRows += load_pipeline_cache_entries<rmlui::PipelineConfig>(ShaderType::Rml, rmlui::RmlPipelineConfigVersion,
@@ -2877,7 +3035,7 @@ index bff9b47..598e0e3 100644
    if (g_pipelineCacheWriterThread.joinable()) {
      {
        std::lock_guard lock{g_pipelineCacheWriterMutex};
-@@ -1096,7 +2008,11 @@ static void stop_pipeline_cache_writer() {
+@@ -1096,7 +2166,11 @@ static void stop_pipeline_cache_writer() {
      g_pipelineCacheWriterStop = false;
    }
  
@@ -2890,7 +3048,7 @@ index bff9b47..598e0e3 100644
  }
  
  template <>
-@@ -1117,11 +2033,63 @@ PipelineRef find_pipeline(ShaderType type, const rmlui::PipelineConfig& config,
+@@ -1117,11 +2191,63 @@ PipelineRef find_pipeline(ShaderType type, const rmlui::PipelineConfig& config,
  #endif
  
  void initialize_pipeline_cache() {
@@ -2954,7 +3112,7 @@ index bff9b47..598e0e3 100644
    if (webgpu::g_backendType == wgpu::BackendType::WebGPU) {
      g_hasPipelineThread = false;
    } else {
-@@ -1129,17 +2097,38 @@ void initialize_pipeline_cache() {
+@@ -1129,17 +2255,38 @@ void initialize_pipeline_cache() {
      g_pipelineThread = std::thread(pipeline_worker);
    }
  
@@ -2995,7 +3153,7 @@ index bff9b47..598e0e3 100644
    if (g_hasPipelineThread) {
      g_pipelineThreadEnd = true;
      g_pipelineQueueCv.notify_all();
-@@ -1157,25 +2146,406 @@ void shutdown_pipeline_cache() {
+@@ -1157,25 +2304,406 @@ void shutdown_pipeline_cache() {
    g_pipelineQueue.clear();
    g_backgroundPipelineQueue.clear();
    g_pendingPipelines.clear();
@@ -3169,8 +3327,8 @@ index bff9b47..598e0e3 100644
 +    end_pipeline_frame();
 +  }
 +  return 1;
- }
- 
++}
++
 +#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
 +extern "C" int aurora_pipeline_prepare_enable(void) {
 +  std::lock_guard guard{g_pipelineMutex};
@@ -3286,8 +3444,8 @@ index bff9b47..598e0e3 100644
 +    }
 +  }
 +  return 1;
-+}
-+
+ }
+ 
 +extern "C" int aurora_prepare_pipeline_catalog() {
 +  std::vector<AuroraPipelineDescriptor> descriptors;
 +  {

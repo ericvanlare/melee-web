@@ -21,6 +21,7 @@ const {values} = parseArgs({options: {
   'boundary-only': {type: 'boolean', default: false},
   'async-mode': {type: 'string'}, 'async-inflight': {type: 'string'},
   'async-test-stale-completion': {type: 'boolean', default: false},
+  'async-test-retire-owner': {type: 'boolean', default: false},
   'async-fail-first': {type: 'boolean', default: false},
   'expect-async-failure': {type: 'boolean', default: false},
 }});
@@ -38,6 +39,10 @@ if (values['async-mode'] !== undefined) {
 if (values['expect-async-failure']) {
   assert(values['async-mode'] === 'one' && values['async-fail-first'],
     '--expect-async-failure requires --async-mode one --async-fail-first');
+}
+if (values['async-test-retire-owner']) {
+  assert(values['async-mode'] === 'all' && values['async-inflight'] === '1',
+    '--async-test-retire-owner requires --async-mode all --async-inflight 1');
 }
 const discPath = values.disc ? path.resolve(values.disc) : null;
 if (discPath) await fs.access(discPath);
@@ -85,6 +90,7 @@ const report = {
     mode: values['async-mode'], maxInFlight: Number(values['async-inflight']),
     failFirst: values['async-fail-first'],
     testStaleCompletion: values['async-test-stale-completion'],
+    testRetireOwner: values['async-test-retire-owner'],
     scheduling: 'Submit at most the configured number from a zero-delay browser task. Each completion schedules the next pump as a separate task; the existing frame worker keeps its synchronous batch cap and never consumes an async-pending entry.',
   } : null,
   attempts: [],
@@ -613,10 +619,11 @@ async function runAttempt(browser, context, index, warmup = false) {
   page.on('console', message => { if (message.type() === 'error') errors.push({kind: 'console', message: message.text()}); });
   page.on('requestfailed', request => failures.push({url: request.url(), error: request.failure()?.errorText || ''}));
   if (values['async-mode']) {
-    await page.addInitScript(({mode, maxInFlight, failFirst}) => {
-      window.__meleeWebAsyncPipelineTestPolicy = {mode, maxInFlight, failFirst};
+    await page.addInitScript(({mode, maxInFlight, failFirst, retireOwnerOnFirstCompletion}) => {
+      window.__meleeWebAsyncPipelineTestPolicy = {mode, maxInFlight, failFirst, retireOwnerOnFirstCompletion};
+      if (retireOwnerOnFirstCompletion) window.__meleeWebAsyncPipelineTestRetireArmed = false;
     }, {mode: values['async-mode'], maxInFlight: Number(values['async-inflight']),
-      failFirst: values['async-fail-first']});
+      failFirst: values['async-fail-first'], retireOwnerOnFirstCompletion: values['async-test-retire-owner']});
   }
   await page.addInitScript(probeInstall);
   const driver = createBrowserDriver(page, {surface: 'public', timeoutMs: startupTimeoutMs});
@@ -677,6 +684,9 @@ async function runAttempt(browser, context, index, warmup = false) {
       await driver.selectDisc(discPath);
       await page.waitForFunction(() => /\.ciso\b/i.test(document.querySelector('#disc-selection-status')?.textContent || ''),
         null, {timeout: 30000});
+      if (values['async-test-retire-owner']) {
+        await page.evaluate(() => { window.__meleeWebAsyncPipelineTestRetireArmed = true; });
+      }
       await page.waitForFunction(() => {
         const status = document.querySelector('#disc-selection-status')?.textContent || '';
         return /Disc validated; waiting for graphics|Disc validated; preparing|Preparing local data for/i.test(status) ||
@@ -686,6 +696,50 @@ async function runAttempt(browser, context, index, warmup = false) {
       assert.match(validatedStatus, /Disc validated|Preparing local data/,
         `Owned disc validation failed: ${validatedStatus}`);
       attempt.discValidationStatusAtCompletion = validatedStatus;
+      if (values['async-test-retire-owner']) {
+        await page.waitForFunction(() => Boolean(
+          window.__meleeWebAsyncPipelineTestResults?.retiredOwnerCheck), null, {timeout: 60000});
+        const retirementPage = await page.evaluate(() => ({
+          asyncTestResults: window.__meleeWebAsyncPipelineTestResults || null,
+          probe: window.__graphicsStartupProbe.snapshot(),
+          launchCalls: window.__graphicsStartupProbe.markers.filter(event => event.name === 'native-launch-call').length,
+        }));
+        const result = retirementPage.asyncTestResults;
+        const check = result?.retiredOwnerCheck;
+        const trigger = result?.retirementTriggered;
+        assert.equal(result?.events?.filter(event => event.event === 0).length, 1,
+          'Retirement must follow one actual game-pipeline submission');
+        assert.equal(result?.events?.filter(event => event.event === 1).length, 0,
+          'A retired pipeline completion was counted ready');
+        assert.equal(trigger?.actualWebGPUCompletion, true,
+          'Retirement did not retain a successfully completed real WebGPU pipeline');
+        assert.equal(check.pipelineType, trigger.type, 'Retired completion changed shader type identity');
+        assert.equal(check.pipelineHashLow, trigger.hashLow, 'Retired completion changed pipeline identity');
+        assert.equal(check.oldGeneration, trigger.generation, 'Retirement changed the original cache generation');
+        assert(check.oldGeneration < check.newGeneration, 'Cache owner was not reinitialized before completion publication');
+        assert.equal(check.pendingAtCompletion, true, 'The real pipeline was not pending at its completion boundary');
+        assert.equal(check.readyAtCompletion, false, 'A pending pipeline was already present in the ready map');
+        assert.equal(check.beforeReadyIdentity, check.afterReadyIdentity,
+          'The retired completion changed the exact ready-map state in the replacement owner');
+        assert.equal(check.beforePendingIdentity, check.afterPendingIdentity,
+          'The retired completion changed the exact pending-map state in the replacement owner');
+        assert.equal(check.settled, true, 'The retired completion did not settle');
+        assert.equal(check.initialized, true, 'The replacement cache owner did not remain initialized');
+        assert.equal(check.unchanged, true, 'The retired completion changed the replacement cache owner');
+        assert.equal(retirementPage.launchCalls, 0, 'The deliberately retired startup owner launched gameplay');
+        attempt.browser = browser.version();
+        attempt.page = retirementPage;
+        attempt.metrics = timedEvents(retirementPage.probe);
+        attempt.asyncRetirement = check;
+        attempt.errors = [...errors, ...failures.map(failure => ({kind: 'requestfailed', ...failure}))];
+        assert.equal(attempt.errors.length, 0, 'Browser emitted an error during deferred cache retirement');
+        attempt.wallDurationMs = Date.now() - startedAt;
+        attempt.status = 'pass';
+        attempt.screenshot = path.join(values.out, `attempt-${index}-retired-owner.png`);
+        await page.screenshot({path: attempt.screenshot, fullPage: true});
+        await page.close();
+        return attempt;
+      }
       await driver.waitForPublicCss();
     }
     const pageMetrics = await page.evaluate(() => {
@@ -704,7 +758,8 @@ async function runAttempt(browser, context, index, warmup = false) {
       return {probe, resources, memory: {samples: memorySamples.length,
         peakJsHeapUsedBytes: maxMetric('jsHeapUsedBytes') || null,
         peakWasmHeapBytes: maxMetric('wasmHeapBytes') || null,
-        gpuMemoryObservable: false}, final: {phase, running,
+        gpuMemoryObservable: false}, asyncTestResults: window.__meleeWebAsyncPipelineTestResults || null,
+        final: {phase, running,
         loadingHidden: document.querySelector('#loading-panel')?.hidden ?? null,
         discStatus: document.querySelector('#disc-selection-status')?.textContent || '',
         launchCalls: probe.markers.filter(event => event.name === 'native-launch-call').length}};
@@ -723,20 +778,24 @@ async function runAttempt(browser, context, index, warmup = false) {
       const asyncPrep = attempt.metrics.preparation;
       assert.equal(asyncPrep.asyncPipelineCompletion.pendingAtGraphicsReady, 0,
         'Graphics readiness opened before every async WebGPU promise completed');
-      assert.equal(asyncPrep.asyncOwnership.identitiesSettleExactlyOnce, true,
-        'An async submission did not settle exactly once to its original cache identity');
-      assert.equal(asyncPrep.asyncOwnership.duplicateSubmissionIdentities, false,
-        'The same exact cache identity was submitted more than once');
-      assert(asyncPrep.asyncOwnership.peakInFlight <= Number(values['async-inflight']),
-        'The native async creation cap was exceeded');
-      assert.equal(asyncPrep.asyncOwnership.pendingPipelineLookupCount, 0,
-        'Renderer requested a pending pipeline before readiness; drawing would have been skipped');
-      assert.equal(asyncPrep.asyncOwnership.submitted,
-        asyncPrep.asyncOwnership.completed + asyncPrep.asyncOwnership.failed,
-        'A native async submission did not settle before the graphics barrier');
-      assert(asyncPrep.asyncOwnership.selected >= (values['async-mode'] === 'one' ? 1 : 1),
-        'The test-only policy did not select any actual game pipeline descriptor');
-      assert.equal(asyncPrep.asyncOwnership.failed, 0, 'Unexpected async pipeline failure');
+      if (values['async-test-retire-owner']) {
+        assert.fail('Retirement test should have returned at its dedicated owner-lifecycle boundary');
+      } else {
+        assert.equal(asyncPrep.asyncOwnership.identitiesSettleExactlyOnce, true,
+          'An async submission did not settle exactly once to its original cache identity');
+        assert.equal(asyncPrep.asyncOwnership.duplicateSubmissionIdentities, false,
+          'The same exact cache identity was submitted more than once');
+        assert(asyncPrep.asyncOwnership.peakInFlight <= Number(values['async-inflight']),
+          'The native async creation cap was exceeded');
+        assert.equal(asyncPrep.asyncOwnership.pendingPipelineLookupCount, 0,
+          'Renderer requested a pending pipeline before readiness; drawing would have been skipped');
+        assert.equal(asyncPrep.asyncOwnership.submitted,
+          asyncPrep.asyncOwnership.completed + asyncPrep.asyncOwnership.failed,
+          'A native async submission did not settle before the graphics barrier');
+        assert(asyncPrep.asyncOwnership.selected >= 1,
+          'The test-only policy did not select any actual game pipeline descriptor');
+        assert.equal(asyncPrep.asyncOwnership.failed, 0, 'Unexpected async pipeline failure');
+      }
     }
     if (values['async-test-stale-completion']) {
       assert(values['async-mode'], '--async-test-stale-completion requires --async-mode');

@@ -15,6 +15,7 @@ const {values} = parseArgs({
     ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
     headed: {type: 'boolean', default: false},
     'select-after-graphics': {type: 'boolean', default: false},
+    'single-cycle': {type: 'boolean', default: false},
     'async-inflight': {type: 'string'},
   },
 });
@@ -42,7 +43,9 @@ const report = {
     source_sha: packageManifest.source_sha, runtime_hash: packageManifest.runtime_hash,
     identity_sha256: packageManifest.identity_sha256,
   } : null,
-  scope: 'Authorized local disc through original CSS, SSS, supported Mario/Final Destination match, Results return and Eject; Web Audio lifecycle and PCM transport only. No long replay or performance claim.',
+  scope: values['single-cycle'] ?
+    'Authorized local disc through original CSS, SSS, supported Mario/Final Destination match, Results return and CSS Eject; Web Audio lifecycle and PCM transport only. No long replay or performance claim.' :
+    'Authorized local disc through original CSS, SSS, supported Mario/Final Destination match, Results return and Eject; Web Audio lifecycle and PCM transport only. No long replay or performance claim.',
   checks: [],
   audio: {phases: {}, cdp: []},
   assets: {transactions: [], legacyCalls: 0},
@@ -601,27 +604,29 @@ try {
     await screenshot('css-after-no-contest');
   });
 
-  await check('second ordinary B0XX CSS to SSS transition emits audio', async () => {
-    await page.waitForTimeout(1200);
-    await press('7');
-    await phase(3);
-    const before = await trace();
-    await observeAudio('sss-after-no-contest', before);
-    await screenshot('sss-after-no-contest');
-  });
+  if (!values['single-cycle']) {
+    await check('second ordinary B0XX CSS to SSS transition emits audio', async () => {
+      await page.waitForTimeout(1200);
+      await press('7');
+      await phase(3);
+      const before = await trace();
+      await observeAudio('sss-after-no-contest', before);
+      await screenshot('sss-after-no-contest');
+    });
 
-  await check('second ordinary B0XX entry reaches Mario/Final Destination with audio', async () => {
-    await page.waitForTimeout(1000);
-    // Repeat the checked stage cursor recipe after the fresh SSS asset scope.
-    await driver.pressChord(['4'], {holdMs: 75, releaseMs: 100});
-    await driver.pressChord([']'], {holdMs: 45, releaseMs: 100});
-    await screenshot('stage-target-after-no-contest');
-    await press('m');
-    await phase(7);
-    const before = await trace();
-    await observeAudio('match-after-no-contest', before);
-    await screenshot('match-after-no-contest');
-  });
+    await check('second ordinary B0XX entry reaches Mario/Final Destination with audio', async () => {
+      await page.waitForTimeout(1000);
+      // Repeat the checked stage cursor recipe after the fresh SSS asset scope.
+      await driver.pressChord(['4'], {holdMs: 75, releaseMs: 100});
+      await driver.pressChord([']'], {holdMs: 45, releaseMs: 100});
+      await screenshot('stage-target-after-no-contest');
+      await press('m');
+      await phase(7);
+      const before = await trace();
+      await observeAudio('match-after-no-contest', before);
+      await screenshot('match-after-no-contest');
+    });
+  }
 
   await check('scoped audio asset generations are complete and never use legacy file upload', async () => {
     const observed = await assetTrace();
@@ -629,7 +634,9 @@ try {
     const begins = observed.events.filter(event => event.event === 'begin' || event.event === 'request');
     const commits = observed.events.filter(event => event.event === 'commit');
     const aborts = observed.events.filter(event => event.event === 'abort');
-    assert(begins.length >= 4, `Expected initial menu, match, return-menu and second match scopes; saw ${begins.length}`);
+    const minimumGenerations = values['single-cycle'] ? 3 : 4;
+    assert(begins.length >= minimumGenerations,
+      `Expected at least ${minimumGenerations} menu/match asset scopes; saw ${begins.length}`);
     assert.equal(new Set(begins.map(begin => begin.generation)).size, begins.length,
       'Scoped asset generations must be unique');
     assert.equal(aborts.length, 0, 'Audio preview must not abort a scoped asset transfer');
