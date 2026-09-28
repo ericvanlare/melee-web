@@ -1533,3 +1533,74 @@ trace accepts that fifth attempt and preserves the four no-ops. The old report
 remains marked failed because its then-current assertion required the first
 post-page dispatch to be consumed; this derived check is not a fresh browser
 pass and does not reproduce the historical Sheik-winner failure.
+
+## Current-head ordinary-Enter Results prefix (2026-09-28)
+
+The bounded headless Chrome run `work/pr86-ccca20d-b-keyboard-one-match-r1/report.json`
+uses current PR HEAD `ccca20d`, the existing hash-identified Release runtime,
+and the live CSS→SSS setup. It is one natural four-CPU9/four-stock Lineup B
+match; no winner or seed was forced. Samus (slot 0) won at frame 14,490.
+Zelda-origin Sheik in slot 2 repeatedly transformed, but was not the winner.
+This is functional gameplay and Results-input evidence, not original-game
+comparison or timing evidence.
+
+The three ordinary focused Enter pulses requested 160 ms down/120 ms release.
+Trusted non-repeat brackets were source frames 193–203, 365–375 and 536–546;
+source consumed Start at 193–202, 365–374 and 536–545. Connectedness stayed
+`[0,0,-1,-1]`. Results returned naturally to CSS at source frame 557 before
+the harness's cursor-560 prefix checkpoint; internal Results phase was 4 and
+all four pages remained at 0. Every retained source tick returned, the source
+trace did not overflow, and no native/page/camera ownership error occurred.
+The harness therefore reports its prefix-check assertion failure because CSS
+already returned; this is not a gameplay crash. The camera-entry packet records
+pool `0` before Results OnEnter and `0xb21b940` after OnEnter/adoption. The
+runtime ownership guards passed through this route.
+
+This fresh Samus-winner keyboard case still does not explain the historical
+natural Sheik-winner error, whose first invalid pointer transition is unknown.
+The current-head source-tick Sheik pass and native Samus auto-page pass remain
+separate controls. The next discriminating run must obtain a natural slot-2
+Sheik winner under ordinary keyboard input and retain its first camera-pointer
+change, page state, consumed PAD edges and close boundary; no seed or winner is
+to be forced.
+
+## Current-head source-tick Results reducer rerun and guard audit (2026-09-28)
+
+After the ordinary-Enter prefix returned to CSS too early, the opt-in native
+reducer was rerun against PR source HEAD `ccca20d` without rebuilding its
+unchanged trace artifacts. Passing receipt:
+`work/results-match-history-tests/native-wkthgua3/`. `command.json` records
+trace JavaScript/Wasm hashes `5d4a874466ddbbea1936fe250ac60c7a74d64c9f96df34deb657c16c80b751b4` /
+`03e9ea896eb8ee64f24fee4e722921057b4d6fd99ed9036aee76bb3cb9e4764e` and the
+documentation-only tracked diff present during the run.
+
+This natural four-CPU9, four-stock Lineup B match produced a typed source
+`MatchExitInfo`; Samus (slot 0, `ckind=16`, `ftkind=13`) won at source frame
+13,236. It used P1-only ten-source-tick Start edges at 180, 360 and 600, with
+releases at 190, 370 and 610. Ports 0/1 stayed connected, CPU ports 2/3
+disconnected. The disconnected CPU pages advanced 0→1 at source frame 551
+(visible after tick 552), before the frame-600 confirmation. Results closed at
+frame 622 with camera pool `0x81e60a0` unchanged; owner destruction and guarded
+teardown passed. This is a fresh native-state-only confirmation of the
+auto-page gate, not a rendered keyboard replay and not the historical Sheik
+winner.
+
+The guard-source audit clarifies why the historical cursor cannot identify the
+first bad transition. At runner source `607ff56`, the camera-pool equality
+check was only performed by `release_source_camera_and_ground()` during
+teardown. It did not sample Results entry, tick/input/audio, source step, draw,
+scene OnExit or intermediate object destructors. Current code records the
+entry pool before/after `gm_Scene_Results_OnEnter` and collision adoption, then
+checks those source boundaries and each teardown destructor. Thus the old
+`Original Results camera pool ownership changed` report is a late release
+detection; it does not establish that the pointer first changed at cursor 560.
+
+In the decomp source, the pool is allocated by `Camera_80028B9C`; Results calls
+it from `fn_8017AA78()` during `gm_Scene_Results_OnEnter`. No separate
+statistics-page camera initialization is visible in the source call graph.
+This narrows the writer hypothesis but does not identify it: the native pass is
+a Samus winner with no source draws, whereas the historical failure is a
+browser-rendered Sheik winner with unbracketed keyboard input and no retained
+entry/page/PAD/pointer snapshots. The next useful discriminator remains a
+headless current-head keyboard-gated B match whose guard reports the first
+changed boundary and pointer triple, without forcing a seed or winner.
