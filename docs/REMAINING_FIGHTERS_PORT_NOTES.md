@@ -1398,8 +1398,24 @@ so it is a useful input/auto-page discriminator, not a reconstruction of the
 historical consumed schedule. The first invalid ownership transition in the
 historical cursor-560 camera failure remains unknown.
 
-Next: run a fresh reconciled-head rendered B CPU9 browser case with the
-source-tick three-pulse schedule, retaining screenshots, consumed PAD/page
-traces, camera ownership phases and teardown. Keep any non-target natural
-winner as a control; do not force a Sheik terminal or treat this native pass as
-browser or original-comparison evidence.
+The next experiment proposed here was completed on `ab798ed`; its current-head
+rendered result and continuing Sheik-winner limitation are recorded below.
+
+## Reconciled-head rendered B source-tick loop (2026-09-27)
+
+The current-head rendered functional receipt is
+`work/pr86-ab798ed-b-source-tick-three-pulse-current-head-r1/report.json`;
+screenshots, progress, consumed-PAD/page traces and hash-bound Results-entry
+packets are retained beside it. It binds to clean source `ab798ed` and records
+two natural four-CPU9/four-stock B matches, each completing Results→original
+CSS→next match. Slot 2 repeatedly transformed Zelda↔Sheik, but Samus and Falco
+won; neither match is the historical Sheik-winner target. The source-tick
+P1-only Results continuation observed both disconnected CPU page transitions
+before confirmation. The entry pointer snapshot shows the source OnEnter pool
+creation and stable adoption; no camera guard fired.
+
+This is rendered browser functional evidence, not retail simulation or pixel
+equivalence, and its controlled development PAD schedule is not the historical
+keyboard replay. The historical natural slot-2 Sheik-winner camera failure
+remains unresolved; its first invalid transition is unknown. Do not claim this
+non-target control resolves it.

@@ -7,27 +7,18 @@ match loops, comparison limits, and explicit open gates are recorded in
 [Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md).
 The PR branch is reconciled to current `origin/main` `b542df7`, including
 shared runtime #89 (`aecc3e64`), PR #93 (`2e083bf`), PR #96 (`8671362`), and
-the later #109 audio-capture change. The latest clean, runtime-tested PR source
-head remains `a116abc`; a newer provenance-bound native Results reducer is
-recorded against `7d9170f` plus its exact test-driver diff.
-Fresh Results entry contracts pass (8/8), and the merged C++ trace targets
-build after source preparation. The formerly incomplete menu fixture now has
-all 35 required exact disc files. The synthetic and natural CPU9 P1-only
-source-tick Results reducers pass: in the natural run both disconnected CPU
-pages advance at source tick 551, P1 confirms at 600, Results exits at 622,
-and the camera pool stays unchanged. A normal CSS→SSS host-leave/destroy
-regression also passes after clearing the consumed transition latch. The
-natural reducer is state-only with no draw calls; it is not the natural
-slot-2 Sheik-winner browser case or a resolution of the historical failure.
-The historical packet lacks consumed PAD/page/pointer traces, and its first
-invalid ownership transition remains unknown. One clean-head rendered B
-browser match is now retained at `a116abc`: Samus won naturally, returned to
-CSS, and the three Enter pulses were not consumed as P1 Start; disconnected
-CPU statistics pages advanced by source frame 396 and the camera pool stayed
-stable through the frame-560 observation. This is a non-target control, not a
-reproduction of the historical Sheik-winner failure. The new native reducer
-receipt and exact historical differences are in the per-character notes.
-Fresh current-head rendered B/A loops and the full suite remain open.
+the later #109 audio-capture change. Fresh `ab798ed` Release runtime and
+headless Chrome evidence now cover two natural B CPU9, four-stock Final
+Destination matches, both Results→CSS returns, and entry into the next match.
+The rendered receipt records actual Zelda↔Sheik form changes, source-tick P1
+Start edges, disconnected CPU auto-pages and stable camera ownership, with no
+browser/runtime errors or timing interruptions. Winners were Samus and Falco,
+not Sheik, so this does not resolve the historical natural slot-2 Sheik-winner
+Results guard failure. Receipt: `work/pr86-ab798ed-b-source-tick-three-pulse-current-head-r1/report.json`.
+A current-head rendered A two-match loop, fresh natural Sheik-winner
+first-boundary capture, supported original comparison, and required final full
+suite remain open. The [per-character notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md)
+keep the gate classification and link to the scoped report.
 Focused current-main checks also pass for source-context/collision traces,
 owned-DOL source-stack profiling, common-context restore/restart, stage numeric
 context, effect-bank lifecycle, Nana's nonzero Results asset root, and the
