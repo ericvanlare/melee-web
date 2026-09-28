@@ -349,6 +349,18 @@ const observeAudio = async (name, before) => {
 const collectViolations = async () => {
   violations.push(...await page.evaluate(() => window.audioPreviewCspViolations || []));
 };
+const activeAudioContextIds = () => {
+  const contexts = new Map();
+  for (const row of audioEvents) {
+    if (row.event === 'contextCreated' || row.event === 'contextChanged') {
+      const context = row.data.context;
+      contexts.set(context.contextId, context.contextState);
+    } else if (row.event === 'contextWillBeDestroyed') {
+      contexts.delete(row.data.contextId);
+    }
+  }
+  return [...contexts].filter(([, state]) => state !== 'closed').map(([id]) => id);
+};
 
 try {
   const response = await page.goto(values.url);
@@ -674,8 +686,7 @@ try {
     };
     await screenshot('title-idle-opening-unsupported');
 
-    const contextIds = audioEvents.filter(row => row.event === 'contextCreated')
-      .map(row => row.data.context.contextId);
+    const contextIds = activeAudioContextIds();
     assetTraceBeforeTitleEject = await assetTrace();
     assert(assetTraceBeforeTitleEject,
       'Scoped asset trace must be retained before the Title Eject reload');
@@ -753,8 +764,7 @@ try {
   });
 
   await check('Eject closes Web Audio and reloads the player document', async () => {
-    const contextIds = audioEvents.filter(row => row.event === 'contextCreated')
-      .map(row => row.data.context.contextId);
+    const contextIds = activeAudioContextIds();
     assert(contextIds.length > 0, 'The session must have an observed AudioContext');
     const eventCount = audioEvents.length;
     const navigationCount = report.navigations || 0;
