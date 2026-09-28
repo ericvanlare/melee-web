@@ -72,7 +72,8 @@ entity identities and lifetimes, source-consumed input/scene order, and the
 final CSS endpoint. The earlier four-Mario MWRC v8 session remains a separate
 fresh browser regression. This evidence does not compare non-match PAD or menu
 scalar state and does not establish timing, performance, draw cadence, pixels,
-PCM, live input, or general game equivalence.
+PCM, live input, or general game equivalence. Repeatability across independent
+original-source captures was not evaluated.
 
 A later independent review found a capture-command failure-classification gap.
 The [harness follow-up receipt](docs/evidence/recorded-session-harness-finalization-v1.json)

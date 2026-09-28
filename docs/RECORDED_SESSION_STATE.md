@@ -53,7 +53,8 @@ fresh browser run, and the strict comparison. The claim covers exact consumed
 input and scene order, all three setup boundaries, declared Fighter fields,
 primary fighter-entity identities and lifetimes, and the final CSS endpoint.
 The v8 recording remains a separate four-Mario regression and is never
-relabelled as the v9 source run.
+relabelled as the v9 source run. The v9 MWRO is one original Dolphin
+execution; repeatability across independent source captures was not evaluated.
 
 Keep second-match CPU observations off for comparator input. They are focused
 diagnostics and make the browser trace an unsupported observation mode. The

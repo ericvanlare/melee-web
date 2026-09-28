@@ -27,6 +27,15 @@
         "bytes": 1567988792,
         "sha256": "ec926ea9018944f0bd00966f04f5a890da3be0a5b5191d991c430f6d24083328"
       },
+      "source_environment": {
+        "capture_id": "melee12-source-v3-20260927",
+        "source_revision": "GALE01r2",
+        "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+        "emulator": "Dolphin c77bbaa0f372c3f72281602a8b087206706542cb",
+        "cpu_mode": "JITARM64",
+        "source_consumed_workload": "pass",
+        "source_capture_repeatability": "not_evaluated"
+      },
       "frames": 43035,
       "roster_by_match": [
         {"match_index": 0, "character_kinds": [8, 2, 20, 9], "characters": ["Mario", "Fox", "Falco", "Marth"]},
@@ -51,24 +60,25 @@
     "browser": {
       "browser": "Installed headless Google Chrome 153.0.8010.54",
       "cpu_observations": "not_captured",
-    "runtime_artifacts": {
-        "javascript_sha256": "712245e75f19039c94c020d4a52918c6fd8605b23d534dbe33322745c457ca0e",
-        "wasm_sha256": "e2fa21ddd1f3a2bb043f901d37b026d29441a94e04dd72ccae23da948f76c28b",
+      "runtime_source_commit": "f8ad6f54129db087ca5340efe282ac765c1d68ba",
+      "runtime_artifacts": {
+        "javascript_sha256": "9bea572d57d0cc62db0cc53b78264c041cc4e27c0df21367bb65062fca302df5",
+        "wasm_sha256": "a58ef2390f3bd03bf0bdb67f94d4badad4efb8779e2fa0c5c5d8de8599885e5c",
         "preload_data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
       },
-      "capture_revision_note": "The v9 and v8 browser captures used this same runtime build. The only later runtime-source adjustment gates optional CPU-observation logging to the v9 second-match diagnostic path; both accepted captures report cpu_observations=not_captured. Fresh builds of the final source are recorded below.",
+      "capture_revision_note": "Both fresh browser comparisons were run after building the final runtime source at commit f8ad6f54129db087ca5340efe282ac765c1d68ba; these exact JavaScript, Wasm and preload-data hashes were served to both captures. Branch head d7f0114306ed259579b846fc8f43fadb5e1f7fe8 adds only a direct <limits> include to the isolated C++ test harness. CPU-observation diagnostics were disabled in both captures.",
       "capture_report": {
-        "local_artifact": "fresh v9 headless browser capture report",
-        "path": "work/recorded-session-12-distinct-cpu-item-browser-v20-clean/capture/report.json",
-        "bytes": 13208710,
-        "sha256": "8d6f984becb8da6cb07e62e7bae476b3c7ffe03aea629f8fd5b0d506c8b3708d",
+        "local_artifact": "fresh final-build v9 headless browser capture report",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v9/report.json",
+        "bytes": 13209431,
+        "sha256": "5dfbbccf5ce1477c672e5eb2b8aadee241617cf53bfb7c6dfced2b7fd6943b31",
         "result": "pass"
       },
       "browser_report": {
-        "local_artifact": "fresh v9 retail browser report",
-        "path": "work/recorded-session-12-distinct-cpu-item-browser-v20-clean/capture/retail-browser-report.json",
-        "bytes": 14387,
-        "sha256": "4a6571c871de044648f8f26e54b85ae6b1e3f7bd1a94acff68aa1edb12a23f36",
+        "local_artifact": "fresh final-build v9 retail browser report",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v9/retail-browser-report.json",
+        "bytes": 14362,
+        "sha256": "9ee5a3f8a344255b2f7299b785eb09aeec8f795a5b44d15361be07695fc6e168",
         "complete": true,
         "pass": true,
         "frames": 43035,
@@ -76,16 +86,16 @@
         "failures": 0
       },
       "port_trace": {
-        "local_artifact": "fresh v9 browser port trace",
-        "path": "work/recorded-session-12-distinct-cpu-item-browser-v20-clean/capture/retail-port.jsonl",
+        "local_artifact": "fresh final-build v9 browser port trace",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v9/retail-port.jsonl",
         "bytes": 190529586,
         "sha256": "0466f974982835d955100c987c811fb20346c65a68074d002a2837f6e47c94b2"
       },
       "comparison": {
-        "local_artifact": "strict v9 source/browser comparison",
-        "path": "work/recorded-session-12-distinct-cpu-item-browser-v20-clean/strict-comparison.json",
-        "bytes": 4062,
-        "sha256": "69e487adea24bfd7d699d7cb0878c60571ed646d9e4921491ee93249a1ef436b",
+        "local_artifact": "strict final-build v9 source/browser comparison",
+        "path": "work/recorded-session-12-distinct-final-build-v22/strict-v9.json",
+        "bytes": 4046,
+        "sha256": "b1a367a9590fde0d06e7ae7018ff6026609f3cac1e43de4d7d62c69f793a70d5",
         "result": "equivalent",
         "frames_requested": 43035,
         "frames_compared": 43035,
@@ -136,23 +146,24 @@
     "browser": {
       "browser": "Installed headless Google Chrome 153.0.8010.54",
       "cpu_observations": "not_captured",
+      "runtime_source_commit": "f8ad6f54129db087ca5340efe282ac765c1d68ba",
       "runtime_artifacts": {
-        "javascript_sha256": "712245e75f19039c94c020d4a52918c6fd8605b23d534dbe33322745c457ca0e",
-        "wasm_sha256": "e2fa21ddd1f3a2bb043f901d37b026d29441a94e04dd72ccae23da948f76c28b",
+        "javascript_sha256": "9bea572d57d0cc62db0cc53b78264c041cc4e27c0df21367bb65062fca302df5",
+        "wasm_sha256": "a58ef2390f3bd03bf0bdb67f94d4badad4efb8779e2fa0c5c5d8de8599885e5c",
         "preload_data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
       },
       "capture_report": {
-        "local_artifact": "fresh v8 regression browser capture report",
-        "path": "work/recorded-session-12-distinct-v8-regression-v21/capture/report.json",
-        "bytes": 13879159,
-        "sha256": "c91c78380945341c50f5d618bdbe3c0bec9e870bfb7760556960530bdaee2f82",
+        "local_artifact": "fresh final-build v8 regression browser capture report",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v8/report.json",
+        "bytes": 13876986,
+        "sha256": "8f73481d515963987e5f9bc2f034b55c97ad9969b80b287738332873e46eb280",
         "result": "pass"
       },
       "browser_report": {
-        "local_artifact": "fresh v8 regression retail browser report",
-        "path": "work/recorded-session-12-distinct-v8-regression-v21/capture/retail-browser-report.json",
-        "bytes": 14345,
-        "sha256": "e6e0bbb7bcc02517598bc6881451d2ae5df6723d622fcdde0f0791eeb2134a26",
+        "local_artifact": "fresh final-build v8 regression retail browser report",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v8/retail-browser-report.json",
+        "bytes": 14341,
+        "sha256": "a33b008d0cd7ff233b3b81252e92035f3c8bc352ff42ea0819cdb3b282c253ab",
         "complete": true,
         "pass": true,
         "frames": 42127,
@@ -160,16 +171,16 @@
         "failures": 0
       },
       "port_trace": {
-        "local_artifact": "fresh v8 regression browser port trace",
-        "path": "work/recorded-session-12-distinct-v8-regression-v21/capture/retail-port.jsonl",
+        "local_artifact": "fresh final-build v8 regression browser port trace",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v8/retail-port.jsonl",
         "bytes": 172021833,
         "sha256": "47071cbad2cc1950817d65d44083aeb71d528ac7bda59e7dbe253580ee3abe4c"
       },
       "comparison": {
-        "local_artifact": "strict v8 source/browser regression comparison",
-        "path": "work/recorded-session-12-distinct-v8-regression-v21/strict-comparison.json",
-        "bytes": 4074,
-        "sha256": "3d6399c99e156ed7d36d64ab670cdb94037ae44ce3805c15ddfede147489acf3",
+        "local_artifact": "strict final-build v8 source/browser regression comparison",
+        "path": "work/recorded-session-12-distinct-final-build-v22/strict-v8.json",
+        "bytes": 4076,
+        "sha256": "67e97b233a36499f83231cb4c78b9dd51d518b02ac987c68cf8b8327becc982b",
         "result": "equivalent",
         "frames_requested": 42127,
         "frames_compared": 42127,
@@ -195,6 +206,14 @@
       "command": "python3 -m unittest tests.test_gameplay_menu tests.test_retail_recipe_scene_trace -v",
       "result": "pass",
       "tests": 3
+    },
+    "portable_test_harness_fix": {
+      "change": "Added direct <limits> include to the extracted C++ item-probe lifecycle test harness.",
+      "focused_command": "python3 -m unittest tests.test_reference_cpu_item_probe_lifecycle -v",
+      "result": "pass",
+      "tests": 1,
+      "implementation_verify_run": "https://github.com/ericvanlare/melee-web/actions/runs/36469057349",
+      "verified_code_head": "d7f0114306ed259579b846fc8f43fadb5e1f7fe8"
     },
     "full_suite": {
       "command": "python3 -m unittest discover -s tests -v",
@@ -235,6 +254,7 @@
     "Non-match PAD state and menu scalar state are not compared.",
     "The v8 comparator checks four declared fields; the v9 comparator additionally checks primary fighter-entity records.",
     "The selected v9 roster creates no secondary or transformed entities; admitting such a roster requires source identities, lifetimes and compared fields for those entities.",
+    "The v9 source capture is one original Dolphin execution; reference repeatability and source-consumed PAD repeatability were not evaluated.",
     "No live timing, performance, draw-cadence, pixels, PCM, input-latency, or general game-equivalence claim is made.",
     "CPU observer diagnostics were disabled for both captures; instrumented timing metrics are not evidence for timing or performance."
   ]
