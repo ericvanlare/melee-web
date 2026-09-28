@@ -5,8 +5,8 @@
 Current per-character coverage, original CPU9 references, rendered browser
 match loops, comparison limits, and explicit open gates are recorded in
 [Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md).
-The reconciled source baseline is `4cc63d7` (PR #86 head `fc5e3cd`), with
-current `origin/main` `8671362`.
+The reconciled baseline is `4cc63d7` on current `origin/main` `8671362`; the
+latest clean, tested PR source head is `a116abc`.
 Fresh Results entry contracts pass (8/8), and the merged C++ trace targets
 build after source preparation. The formerly incomplete menu fixture now has
 all 35 required exact disc files. The synthetic P1-only Results reducer passes:
@@ -16,7 +16,13 @@ A normal CSS→SSS host-leave/destroy regression also passes after clearing the
 consumed transition latch. The reducer is native-state-only with no draw calls;
 it is neither a natural CPU9 match nor a reproduction or resolution of the
 historical Sheik-winner camera-pool failure. The first invalid ownership
-transition in that historical run remains unknown.
+transition in that historical run remains unknown. One clean-head rendered B
+browser match is now retained at `a116abc`: Samus won naturally, returned to
+CSS, and the three Enter pulses were not consumed as P1 Start; disconnected
+CPU statistics pages advanced by source frame 396 and the camera pool stayed
+stable through the frame-560 observation. This is a non-target control, not a
+reproduction of the historical Sheik-winner failure. Fresh two-match A/B loops
+and the full suite remain open.
 Focused current-main checks also pass for source-context/collision traces,
 owned-DOL source-stack profiling, common-context restore/restart, stage numeric
 context, effect-bank lifecycle, Nana's nonzero Results asset root, and the

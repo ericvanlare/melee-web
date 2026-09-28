@@ -82,10 +82,11 @@ ownership changed at Results source frame 560. Its retained evidence has no
 consumed PAD samples/connectedness at that boundary and no camera-pointer
 snapshots or ownership-phase trace. Thus the first invalid transition cannot
 be recovered from that report. The source-entry packet from a different run
-is not a substitute. Current-main headless browser reproduction with the
-existing first-change guards remains the next discriminator. Historical
-rendered-browser reports remain bound to their original revisions; no fresh
-browser scenario has yet been run on `4cc63d7`.
+is not a substitute. A fresh rendered-browser control now exists on clean
+source head `a116abc`, but it ends with Samus, not the historical slot-2
+Sheik winner. Its three Enter pulses were not consumed as P1 Start; historical
+consumed input is absent, so this control is not an exact replay. Historical
+rendered-browser reports remain bound to their original revisions.
 
 The current merged-runtime target build and focused gates pass: source-context
 and collision traces; owned-DOL `test_source_stack_profile.py`; common-context
@@ -1302,3 +1303,44 @@ the focused Results packet tests pass (8/8). The two-match browser run stopped
 after match 1; a fresh rendered rerun is needed to validate the fixed verifier.
 Falco is not the target slot-2 Zelda-origin Sheik winner, and the historical
 camera-pool failure remains unexplained.
+
+## Clean-current-head B browser control (2026-09-27)
+
+One fresh, rendered, installed-headless-Chrome B run was produced from clean
+source commit `a116abc7c5a38779e2e2cf8f672869f8bab000d8` (tree
+`7c795b841d1c54e37a5b7a46d7d2377215c3fba5`). The Release runtime built from
+that tree has Wasm SHA-256
+`eb2d2808050184a4fcedc3cb65be72cdd2a5e64818f0bb4c7ec32350ca4e5a56a` and JS
+SHA-256 `62bf2d142fa0aaf8d7642cc2fbba39bf80c43355461d182de0eb9b2853f7f89a`.
+The run verified the live CSS lineup as Samus/Yoshi/Zelda/Falco, all CPU9,
+selected Final Destination, naturally reached Results, and returned to the
+original CSS. Samus won at match frame 17,344 (RNG 1,054,490,748). It is one
+functional match, not the requested two-match loop or original comparison.
+
+Receipt: `work/pr86-results-current-head-b-three-prefix-r1/report.json`;
+the Results entry packet and all CSS/SSS/stage/gameplay/Results/return
+screenshots are in the same directory. The report passed with no browser/page
+or native command errors, no timing interruptions, and retained the CSS,
+canvas, GPU and source diagnostics. Its scenario scope is rendered functional
+behavior; it does not claim pixel equivalence, foreground timing, physical
+controller acceptance, or performance.
+
+The `keyboard-three-prefix` continuation sent three trusted ordinary Enter
+keydown/up pairs, bracketed at Results source frames 193–203, 364–374 and
+535–545. None was consumed as P1 Start in the first 561 Results source rows;
+P1 Start runs were empty. Port errors remained `[0,0,-1,-1]`; disconnected CPU
+slots 2/3 automatically advanced statistics page 0→1 at source frame 396,
+before the observation target 560. The target snapshot is after source tick
+560 (`source_frame=561`), and the camera pool stayed `0xb21b940` across source
+OnEnter, collision adoption, and the context/owner snapshots. No ownership
+guard fired through the observation and CSS return.
+
+This excludes a generic camera-pool failure for this current-head Samus-winner
+route and confirms the P1-only input did not trigger a consumed confirmation
+before the observation. It does not reproduce the historical Sheik-winner
+failure, whose report lacks the consumed PAD trace needed to establish that
+these pulses match its input path. The first invalid historical ownership
+transition remains unknown. Next discriminator is another naturally reached
+Sheik-winner B Results path with first-change camera snapshots; do not call
+this control a resolution or compare it as though its missing historical PAD
+stream were known.
