@@ -1215,15 +1215,17 @@ interruptions; this is functional headless evidence only. It validates the
 harness freshness fix and a non-target route, not the historical Sheik-winner
 input schedule.
 
-The retained natural Sheik-winner run
+The retained source-tick B control
 `work/pr86-results-padtick-b-natural-r6/report.json` is useful but older and
 must stay separately scoped. It records a B CPU9/4-stock/Final Destination
-slot-2 win at frame 14,204 (RNG 1,088,324,269); the typed terminal has
-Zelda-origin ckind 18 and Sheik-form ftkind 19. At Results cursor 560, P1 is
-neutral, pages are `[0,0,1,1]`, and nobody is confirmed. Disconnected CPU pages
-advanced at frame 397. Its P1-only source-tick confirmation begins at frame
-609; all 631 PAD ticks return, and the browser reaches CSS with Results/world
-ownership unloaded and no page or native error. Its served Wasm is the earlier
+slot-2 win at frame 14,204 (RNG 1,088,324,269). Slot 2 transformed between
+form kinds 19 and 7, then returned to kind 19 at frame 13,364 and remained
+there at the win; this is a Zelda-form win after in-match Sheik transformations,
+not a Sheik-form winner. At Results cursor 560, P1 is neutral, pages are
+`[0,0,1,1]`, and nobody is confirmed. Disconnected CPU pages advanced at frame
+397. Its P1-only source-tick confirmation begins at frame 609; all 631 PAD
+ticks return, and the browser reaches CSS with Results/world ownership
+unloaded and no page or native error. Its served Wasm is the earlier
 `d1d5c26` build, SHA-256
 `0e288debdc4fb4c3a75d64c0bf0bb7420ff726d8ebbdac6b04b9a9f537310529`; that
 source already had the phase-labelled camera-pool guards. Between `d1d5c26`
@@ -1231,13 +1233,12 @@ and current `a3d584f`, the Results source changes only add entry-pointer
 snapshots. However, r6 used injected source-tick PAD, not the historical
 ordinary keyboard path; its report is marked failed by a post-CSS serializer
 error (`Cannot read properties of undefined (reading 'filter')`) and has no
-camera pointer snapshot. Treat it as evidence that a natural Sheik winner can
-complete under a different input path, not as an exact replay or clean
-harness pass.
+camera pointer snapshot. Treat it as a non-target Zelda-form winner under a
+different input path, not as an exact replay or clean harness pass.
 
-Together, r3 and r6 show that neither generic disconnected-CPU page transition
-nor a natural slot-2 Sheik winner alone reproduces the historical camera
-failure on the guarded code. The frozen failure report still contains only
+The source-tick auto-page control and r6 do not reproduce the historical camera
+failure, but r6 is not a Sheik-form win and neither report matches the
+historical keyboard path. The frozen failure report still contains only
 three Enter intentions and the generic late `camera release` failure: no
 consumed PAD brackets, page state or pointer values. The first invalid
 historical pointer transition remains unknown. Next discriminator is a fresh
