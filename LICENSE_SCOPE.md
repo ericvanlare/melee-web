@@ -7,6 +7,7 @@ dependencies, generated third-party outputs, quoted material or programs they
 build or serve. Preserve the license and this scope when redistributing them.
 
 - `scripts/browser_tools.mjs`
+- `scripts/dolphin_audio.py`
 - `scripts/serve.py`
 - `scripts/ci_verify.py`
 - `scripts/ci_aggregate.py`
