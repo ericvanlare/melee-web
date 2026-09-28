@@ -3,6 +3,7 @@
 Enable with MELEE_WEB_RESULTS_MATCH_HISTORY=1 after building the Results trace.
 The ordinary suite does not implicitly start this bounded multi-stock match.
 """
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,41 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from check_gameplay import node_runtime
+
+
+def trace_provenance(target):
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True,
+        capture_output=True, text=True).stdout.strip()
+    diff = subprocess.run(
+        ["git", "diff", "HEAD", "--binary"], cwd=ROOT, check=True,
+        capture_output=True).stdout
+    tracked_status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=no"],
+        cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    paths = {
+        "trace_js": target,
+        "trace_wasm": target.with_suffix(".wasm"),
+        "gameplay_patch": ROOT / "patches/melee-gameplay.patch",
+        "fighter_assets_source": ROOT / "src/gameplay_fighter_assets.c",
+        "results_context_source": ROOT / "src/gameplay_results_context.c",
+        "trace_source": ROOT / "tests/gameplay_results_scene_trace.cpp",
+        "test_source": Path(__file__).resolve(),
+    }
+    return {
+        "repo_head": head,
+        "tracked_worktree_dirty": bool(tracked_status),
+        "tracked_worktree_diff_sha256": hashlib.sha256(diff).hexdigest(),
+        "artifacts": {
+            name: {
+                "path": str(path.relative_to(ROOT)),
+                "exists": path.is_file(),
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest()
+                if path.is_file() else None,
+            }
+            for name, path in paths.items()
+        },
+    }
 
 
 @unittest.skipUnless(os.environ.get("MELEE_WEB_RESULTS_MATCH_HISTORY") == "1",
@@ -39,6 +75,7 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         evidence_root.mkdir(parents=True, exist_ok=True)
         prefix = "p1-statistics-" if "p1-statistics" in flag else "native-"
         evidence = Path(tempfile.mkdtemp(prefix=prefix, dir=evidence_root))
+        provenance = trace_provenance(target)
         try:
             result = subprocess.run(command, cwd=ROOT, capture_output=True,
                                     text=True, timeout=180)
@@ -46,7 +83,8 @@ class ResultsMatchHistoryTests(unittest.TestCase):
             for name, data in (("stdout.log", error.stdout), ("stderr.log", error.stderr)):
                 (evidence / name).write_bytes(data.encode() if isinstance(data, str) else data or b"")
             (evidence / "command.json").write_text(json.dumps(
-                {"command": command, "result": "timeout", "timeout_seconds": 180}, indent=2))
+                {"command": command, "result": "timeout", "timeout_seconds": 180,
+                 "provenance": provenance}, indent=2))
             self.fail(f"Native Results timeout; retained {evidence}")
         (evidence / "stdout.log").write_text(result.stdout)
         (evidence / "stderr.log").write_text(result.stderr)
@@ -73,7 +111,8 @@ class ResultsMatchHistoryTests(unittest.TestCase):
         )
         (evidence / "command.json").write_text(json.dumps(
             {"command": command, "exit_code": result.returncode,
-             "scope": f"native-state-only, {scenario_scope}, no GPU or retail claim"}, indent=2))
+             "scope": f"native-state-only, {scenario_scope}, no GPU or retail claim",
+             "provenance": provenance}, indent=2))
         brief = "\n".join(line[:500] for line in
                           (result.stdout + result.stderr).splitlines())[-12000:]
         self.assertEqual(result.returncode, 0, f"Retained {evidence}\n{brief}")
