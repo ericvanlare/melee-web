@@ -705,7 +705,10 @@ async function runMatch(matchIndex,expected){
       if(state.phase===1)return {natural_css:true,source_frame:null,transitions:[]};
       assert(state.phase===8||state.phase===9,`${label}: unexpected source phase ${state.phase}`);
       const diagnosticFrame=readResultsFrame(state);
-      if(diagnosticFrame-lastTraceFrame>=12){
+      // Refresh once the confirmation boundary is near even if the ordinary
+      // 12-frame trace stride has not elapsed; otherwise a stale sample can
+      // make a real pre-confirmation CPU transition look late.
+      if(diagnosticFrame-lastTraceFrame>=12||diagnosticFrame>=targetFrame-1){
         const trace=await readResultsSourcePadTrace();
         assert(!trace.overflow,`${label}: Results source trace overflowed`);
         const summary=summarizeResultsPadTrace(trace);

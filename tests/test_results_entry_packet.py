@@ -130,6 +130,15 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('for(let pulse=3;pulse<48&&state.phase!==1;pulse++)', harness)
         self.assertIn('for(let matchIndex=2;matchIndex<=matchCount;matchIndex++)', harness)
 
+    def test_cpu_page_waiter_refreshes_at_confirmation_boundary(self):
+        harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
+        start = harness.index('const waitForCpuPagesBeforeSourceFrame=')
+        end = harness.index('// Source-tick-three-pulse waits inside the page', start)
+        gate = harness[start:end]
+        self.assertIn('diagnosticFrame-lastTraceFrame>=12||diagnosticFrame>=targetFrame-1', gate)
+        self.assertLess(gate.index('const trace=await readResultsSourcePadTrace();'),
+                        gate.index('if(diagnosticFrame>=targetFrame)'))
+
     def test_results_pad_trace_is_bounded_and_development_only(self):
         source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
         self.assertIn('kResultsPadTraceCapacity=8192', source)
