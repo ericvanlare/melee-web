@@ -1335,12 +1335,15 @@ before the observation target 560. The target snapshot is after source tick
 OnEnter, collision adoption, and the context/owner snapshots. No ownership
 guard fired through the observation and CSS return.
 
-This excludes a generic camera-pool failure for this current-head Samus-winner
-route and confirms the P1-only input did not trigger a consumed confirmation
-before the observation. It does not reproduce the historical Sheik-winner
-failure, whose report lacks the consumed PAD trace needed to establish that
-these pulses match its input path. The first invalid historical ownership
-transition remains unknown. Next discriminator is another naturally reached
-Sheik-winner B Results path with first-change camera snapshots; do not call
-this control a resolution or compare it as though its missing historical PAD
-stream were known.
+The historical report does retain three P1 Enter intentions at 160 ms held /
+120 ms released, matching this control's intended pulse count and durations.
+It does not retain their Results source-frame brackets, consumed PAD rows,
+page state, or connected-port state. This control records event brackets
+193–203, 364–374 and 535–545, and confirms none was consumed as P1 Start before
+the observation. So it excludes a generic camera-pool failure for this
+current-head Samus-winner route, but cannot establish that the historical
+browser consumed equivalent button edges or had equivalent scheduling. The
+first invalid historical ownership transition remains unknown. Next
+discriminator is another naturally reached Sheik-winner B Results path with
+first-change camera snapshots; do not call this control a resolution or equate
+the two incomplete input records.
