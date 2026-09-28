@@ -78,15 +78,20 @@ Critically, do not treat the synthetic reducer's former destroy assertion as
 the cause of the historical camera failure. The historical report
 `work/pr86-final-frozen-b-two-match-r1/report.json` records a natural slot-2
 Sheik win (match frame 11,725, RNG 2,897,689,676) and reports camera-pool
-ownership changed at Results source frame 560. Its retained evidence has no
-consumed PAD samples/connectedness at that boundary and no camera-pointer
-snapshots or ownership-phase trace. Thus the first invalid transition cannot
-be recovered from that report. The source-entry packet from a different run
-is not a substitute. A fresh rendered-browser control now exists on clean
-source head `a116abc`, but it ends with Samus, not the historical slot-2
-Sheik winner. Its three Enter pulses were not consumed as P1 Start; historical
-consumed input is absent, so this control is not an exact replay. Historical
-rendered-browser reports remain bound to their original revisions.
+ownership error surfaced at Results source cursor 560. In captured source
+revision `607ff56`, the equality check existed only in
+`release_source_camera_and_ground()` during Results teardown; tick and draw
+paths had no camera-pool checks. Cursor 560 therefore identifies where cleanup
+detected the mismatch, not when the pointer first changed. The report retains
+three P1 Enter intentions (160 ms held/120 ms released), but no Results-frame
+event brackets, consumed PAD rows, connected-port state, pointer values or
+ownership phase. Thus the first invalid transition cannot be recovered from
+that report. A source-entry packet from another run is not a substitute. A
+fresh rendered-browser control now exists on clean source head `a116abc`, but
+it ends with Samus, not the historical slot-2 Sheik winner. Its three Enter
+pulses were not consumed as P1 Start; the historical consumed PAD state is
+absent, so this control is not an exact replay. Historical rendered-browser
+reports remain bound to their original revisions.
 
 The current merged-runtime target build and focused gates pass: source-context
 and collision traces; owned-DOL `test_source_stack_profile.py`; common-context
@@ -1342,8 +1347,11 @@ page state, or connected-port state. This control records event brackets
 193–203, 364–374 and 535–545, and confirms none was consumed as P1 Start before
 the observation. So it excludes a generic camera-pool failure for this
 current-head Samus-winner route, but cannot establish that the historical
-browser consumed equivalent button edges or had equivalent scheduling. The
-first invalid historical ownership transition remains unknown. Next
-discriminator is another naturally reached Sheik-winner B Results path with
-first-change camera snapshots; do not call this control a resolution or equate
-the two incomplete input records.
+browser consumed equivalent button edges or had equivalent scheduling. In
+historical source `607ff56`, camera ownership was checked only when
+`release_source_camera_and_ground()` ran during Results teardown, not at each
+tick/draw boundary. Cursor 560 is therefore the late detection point, not
+evidence that the pointer changed at that frame. The first invalid historical
+ownership transition remains unknown. Next discriminator is another naturally
+reached Sheik-winner B Results path with first-change camera snapshots; do not
+call this control a resolution or equate the two incomplete input records.
