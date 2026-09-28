@@ -123,7 +123,19 @@ bool first_use_draw_pending=false;
 bool render_only_preparation=false;
 bool transition_audio_continues=false;
 bool menu_scene_rebuild_pending=false;
+int pending_menu_source_scene=0;
 melee_web::GameplayMenuScene pending_menu_scene=melee_web::GameplayMenuScene::Characters;
+enum class MenuRouteEntry { Session, Main, Title, ParentCss };
+MenuRouteEntry pending_menu_entry=MenuRouteEntry::Session;
+const char* source_menu_message(){
+ switch(pending_menu_scene){
+ case melee_web::GameplayMenuScene::Characters:return "Original character select";
+ case melee_web::GameplayMenuScene::Stages:return "Original stage select";
+ case melee_web::GameplayMenuScene::Main:return "Original main menu";
+ case melee_web::GameplayMenuScene::Title:return "Original title";
+ }
+ return "Original menu";
+}
 unsigned render_frame=0;
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
 double pipeline_bootstrap_started=0,pipeline_renderer_init_ms=0,pipeline_union_requested=0;
@@ -258,72 +270,47 @@ PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
-constexpr std::array<std::string_view,240> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","LbRf.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
- "PlDr.dat","PlDrAJ.dat","PlDrNr.dat","PlDrRe.dat","PlDrBu.dat","PlDrGr.dat","PlDrBk.dat","drmario.ssm",
- "PlFe.dat","PlFeAJ.dat","PlFeNr.dat","PlFeRe.dat","PlFeBu.dat","PlFeGr.dat","PlFeYe.dat","EfFeData.dat","emblem.ssm",
+constexpr std::array<std::string_view,276> keys={
+ "LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat",
+ "PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","LbAd.dat",
+ "LbRf.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat",
+ "PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm",
+ "GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat",
+ "PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat",
+ "PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm",
+ "GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","MnMaAll.usd","GmTtAll.usd",
+ "SdMenu.usd","SdToy.dat","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","LbMcSnap.usd",
+ "GmEvent.dat","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm",
+ "smash2.sem","main.ssm","kongo.ssm","mario.ssm","nr_1p.ssm","nr_vs.ssm","gkoopa.ssm","ice.ssm",
+ "kirby.ssm","samus.ssm","zs.ssm","yoshi.ssm","gw.ssm","mhands.ssm","kirbytm.ssm","castle.ssm",
+ "corneria.ssm","greatbay.ssm","mutecity.ssm","onett.ssm","zebes.ssm","garden.ssm","klaid.ssm",
+ "greens.ssm","venom.ssm","bigblue.ssm","fourside.ssm","pstadium.ssm","1padv.ssm","ending.ssm",
+ "1pend.ssm","last.ssm","dsp_coef.bin","sislib_font.bin","PlDr.dat","PlDrAJ.dat","PlDrNr.dat",
+ "PlDrRe.dat","PlDrBu.dat","PlDrGr.dat","PlDrBk.dat","drmario.ssm","PlFe.dat","PlFeAJ.dat",
+ "PlFeNr.dat","PlFeRe.dat","PlFeBu.dat","PlFeGr.dat","PlFeYe.dat","EfFeData.dat","emblem.ssm",
  "PlLk.dat","PlLkAJ.dat","PlLkNr.dat","PlLkRe.dat","PlLkBu.dat","PlLkBk.dat","PlLkWh.dat",
- "PlCl.dat","PlClAJ.dat","PlClNr.dat","PlClRe.dat","PlClBu.dat","PlClWh.dat","PlClBk.dat","EfLkData.dat","link.ssm","clink.ssm",
- "PlGn.dat","PlGnAJ.dat","PlGnNr.dat","PlGnRe.dat","PlGnBu.dat","PlGnGr.dat","PlGnLa.dat","EfGnData.dat","ganon.ssm",
- "PlCa.dat","PlCaAJ.dat","PlCaNr.dat","PlCaGy.dat","PlCaRe.usd","PlCaWh.dat","PlCaGr.dat","PlCaBu.dat","EfCaData.dat","captain.ssm",
- "GrSh.dat","shrine.hps","akaneia.hps","GrIz.dat","izumi.hps",
- "PlLg.dat","PlLgAJ.dat","PlLgNr.dat","PlLgWh.dat","PlLgAq.dat","PlLgPi.dat","EfLgData.dat","luigi.ssm",
- "PlPk.dat","PlPkAJ.dat","PlPkNr.dat","PlPkRe.dat","PlPkBu.dat","PlPkGr.dat",
- "PlPc.dat","PlPcAJ.dat","PlPcNr.dat","PlPcRe.dat","PlPcBu.dat","PlPcGr.dat",
- "EfPkData.dat","pikachu.ssm","pichu.ssm","GrOy.dat","old_ys.hps",
- "PlPr.dat","PlPrAJ.dat","PlPrNr.dat","PlPrRe.dat","PlPrBu.dat","PlPrGr.dat","PlPrYe.dat","EfPrData.dat","purin.ssm",
- "PlDk.dat","PlDkAJ.dat","PlDkNr.dat","PlDkBk.dat","PlDkRe.dat","PlDkBu.dat","PlDkGr.dat","EfDkData.dat","dk.ssm",
- "PlKp.dat","PlKpAJ.dat","PlKpNr.dat","PlKpRe.dat","PlKpBu.dat","PlKpBk.dat","EfKpData.dat","koopa.ssm",
- "GmRst.usd",
- "SdRst.usd",
- "TyDatai.usd",
- "IfPrize.usd",
- "SdPrize.usd",
- "s_info1.hps",
- "s_info2.hps",
- "s_info3.hps",
- "GmRstMMr.dat",
- "GmRstMDr.dat",
- "GmRstMFx.dat",
- "GmRstMFc.dat",
- "GmRstMMs.dat",
- "GmRstMFe.dat",
- "GmRstMLk.dat",
- "GmRstMCl.dat",
- "GmRstMCa.dat",
- "GmRstMDk.dat",
- "GmRstMGn.dat",
- "GmRstMKp.dat",
- "GmRstMLg.dat",
- "GmRstMMt.dat",
- "GmRstMPk.dat",
- "GmRstMPc.dat",
- "GmRstMPr.dat",
- "ff_mario.hps",
- "ff_fox.hps",
- "ff_emb.hps",
- "ff_link.hps",
- "ff_fzero.hps",
- "ff_dk.hps",
- "ff_poke.hps","GmRstMNs.dat","GmRstMPe.dat","ff_nes.hps",
- "PlMt.dat","PlMtAJ.dat","PlMtNr.dat","PlMtRe.dat","PlMtBu.dat","PlMtGr.dat","EfMtData.dat","mewtwo.ssm",
- "PlNs.dat",
- "PlNsAJ.dat",
- "PlNsNr.dat",
- "PlNsYe.dat",
- "PlNsBu.dat",
- "PlNsGr.dat",
- "EfNsData.dat",
- "ness.ssm",
- "PlPe.dat",
- "PlPeAJ.dat",
- "PlPeNr.dat",
- "PlPeYe.dat",
- "PlPeWh.dat",
- "PlPeBu.dat",
- "PlPeGr.dat",
- "EfPeData.dat",
- "peach.ssm",
-};
+ "PlCl.dat","PlClAJ.dat","PlClNr.dat","PlClRe.dat","PlClBu.dat","PlClWh.dat","PlClBk.dat",
+ "EfLkData.dat","link.ssm","clink.ssm","PlGn.dat","PlGnAJ.dat","PlGnNr.dat","PlGnRe.dat",
+ "PlGnBu.dat","PlGnGr.dat","PlGnLa.dat","EfGnData.dat","ganon.ssm","PlCa.dat","PlCaAJ.dat",
+ "PlCaNr.dat","PlCaGy.dat","PlCaRe.usd","PlCaWh.dat","PlCaGr.dat","PlCaBu.dat","EfCaData.dat",
+ "captain.ssm","GrSh.dat","shrine.hps","akaneia.hps","GrIz.dat","izumi.hps","PlLg.dat",
+ "PlLgAJ.dat","PlLgNr.dat","PlLgWh.dat","PlLgAq.dat","PlLgPi.dat","EfLgData.dat","luigi.ssm",
+ "PlPk.dat","PlPkAJ.dat","PlPkNr.dat","PlPkRe.dat","PlPkBu.dat","PlPkGr.dat","PlPc.dat",
+ "PlPcAJ.dat","PlPcNr.dat","PlPcRe.dat","PlPcBu.dat","PlPcGr.dat","EfPkData.dat","pikachu.ssm",
+ "pichu.ssm","GrOy.dat","old_ys.hps","PlPr.dat","PlPrAJ.dat","PlPrNr.dat","PlPrRe.dat",
+ "PlPrBu.dat","PlPrGr.dat","PlPrYe.dat","EfPrData.dat","purin.ssm","PlDk.dat","PlDkAJ.dat",
+ "PlDkNr.dat","PlDkBk.dat","PlDkRe.dat","PlDkBu.dat","PlDkGr.dat","EfDkData.dat","dk.ssm",
+ "PlKp.dat","PlKpAJ.dat","PlKpNr.dat","PlKpRe.dat","PlKpBu.dat","PlKpBk.dat","EfKpData.dat",
+ "koopa.ssm","GmRst.usd","SdRst.usd","TyDatai.usd","IfPrize.usd","SdPrize.usd","s_info1.hps",
+ "s_info2.hps","s_info3.hps","GmRstMMr.dat","GmRstMDr.dat","GmRstMFx.dat","GmRstMFc.dat",
+ "GmRstMMs.dat","GmRstMFe.dat","GmRstMLk.dat","GmRstMCl.dat","GmRstMCa.dat","GmRstMDk.dat",
+ "GmRstMGn.dat","GmRstMKp.dat","GmRstMLg.dat","GmRstMMt.dat","GmRstMPk.dat","GmRstMPc.dat",
+ "GmRstMPr.dat","ff_mario.hps","ff_fox.hps","ff_emb.hps","ff_link.hps","ff_fzero.hps","ff_dk.hps",
+ "ff_poke.hps","GmRstMNs.dat","GmRstMPe.dat","ff_nes.hps","PlMt.dat","PlMtAJ.dat","PlMtNr.dat",
+ "PlMtRe.dat","PlMtBu.dat","PlMtGr.dat","EfMtData.dat","mewtwo.ssm","PlNs.dat","PlNsAJ.dat",
+ "PlNsNr.dat","PlNsYe.dat","PlNsBu.dat","PlNsGr.dat","EfNsData.dat","ness.ssm","PlPe.dat",
+ "PlPeAJ.dat","PlPeNr.dat","PlPeYe.dat","PlPeWh.dat","PlPeBu.dat","PlPeGr.dat","EfPeData.dat",
+ "peach.ssm"};
 constexpr unsigned kDiagnosticPadButtons=PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT|PAD_BUTTON_DOWN|PAD_BUTTON_UP|
  PAD_TRIGGER_Z|PAD_TRIGGER_R|PAD_TRIGGER_L|PAD_BUTTON_A|PAD_BUTTON_B|PAD_BUTTON_X|PAD_BUTTON_Y|PAD_BUTTON_START;
 void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
@@ -370,6 +357,7 @@ void begin_preparation(){
  bool preserve_audio=false;
  if(!match&&!results&&!prize&&host_entered){
   char error[256]{};
+  pending_menu_source_scene=melee_web_menu_host_source_scene(host);
   check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);host_entered=false;
   const int phase=melee_web_menu_host_phase(host);
   preserve_audio=phase!=5&&phase!=6;
@@ -467,7 +455,7 @@ if(scoped_assets){
   melee_web::retail_replay_end(replay->frames.size(),replay->whole_session());
  replay.reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
- audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;audio_clock.reset();clear_diagnostic_pad();
+ audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;audio_clock.reset();clear_diagnostic_pad();
  match_message="Original source match";
  terminal_match_observation.clear();
  if(had_lifetime){
@@ -539,6 +527,19 @@ void enter_world(){
  first_use_draw_pending=true;
  menu_clock.reset();audio_phase=0;audio_clock.reset();running=true;
  message=melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+}
+void begin_menu_scene_rebuild(melee_web::GameplayMenuScene scene,
+                              MenuRouteEntry entry){
+ pending=false;menu_clock.reset();
+ pending_menu_scene=scene;pending_menu_entry=entry;
+ const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+ report_owner_lifetime("menu-before-scene-teardown");
+ world->begin_scene_rebuild();
+ report_owner_lifetime("menu-after-scene-teardown");
+ const double finished=emscripten_get_now();
+ report_construction("scene-rebuild-step",started,finished,finished,before,
+                     aurora_stats_snapshot());
+ menu_scene_rebuild_pending=true;running=false;
 }
 void advance(){
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
@@ -655,20 +656,41 @@ void advance(){
   first_use_draw_pending=true;pending=false;running=true;audio_phase=0;
   menu_clock.reset();audio_clock.reset();message="Original Results";return;
  }
+ const int previous_source_scene=pending_menu_source_scene!=0?
+     pending_menu_source_scene:melee_web_menu_host_source_scene(host);
+ pending_menu_source_scene=0;
  if(host_entered){check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);host_entered=false;}
+ const int route_target=melee_web_menu_host_route_target_mode(host);
+ if((previous_source_scene==1&&route_target==1)||
+    (previous_source_scene==3&&route_target==1)){
+  begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Main,MenuRouteEntry::Main);
+  return;
+ }
+ if(previous_source_scene==4&&route_target==0){
+  begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Title,MenuRouteEntry::Title);
+  return;
+ }
+ if(previous_source_scene==4&&route_target==1){
+  begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Main,MenuRouteEntry::Main);
+  return;
+ }
+ if(previous_source_scene==4&&route_target==2){
+  const int phase=melee_web_menu_host_phase(host);
+  const MenuRouteEntry entry=phase==MELEE_WEB_MENU_CLOSED?
+      MenuRouteEntry::ParentCss:MenuRouteEntry::Session;
+  begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Characters,entry);
+  return;
+ }
+ if((previous_source_scene==1||previous_source_scene==3||previous_source_scene==4)&&
+    route_target>=0){
+  throw std::runtime_error("Original title/main route requested an unsupported destination");
+ }
  const int phase=melee_web_menu_host_phase(host);
  if(phase!=5&&phase!=6){
-  pending=false;menu_clock.reset();
-  pending_menu_scene=phase==2?melee_web::GameplayMenuScene::Stages:
-                              melee_web::GameplayMenuScene::Characters;
-  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
-  report_owner_lifetime("menu-before-scene-teardown");
-  world->begin_scene_rebuild();
-  report_owner_lifetime("menu-after-scene-teardown");
-  const double finished=emscripten_get_now();
-  report_construction("scene-rebuild-step",started,finished,finished,before,
-                      aurora_stats_snapshot());
-  menu_scene_rebuild_pending=true;running=false;return;
+  begin_menu_scene_rebuild(phase==2?melee_web::GameplayMenuScene::Stages:
+                                    melee_web::GameplayMenuScene::Characters,
+                          MenuRouteEntry::Session);
+  return;
  }
  report_owner_lifetime("menu-before-teardown");
  world->close();world.reset();world_exposed=false;pending=false;menu_clock.reset();audio_phase=0;
@@ -763,18 +785,37 @@ void finish_menu_scene_rebuild(){
  char error[256]{};
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  if(pending_menu_scene==melee_web::GameplayMenuScene::Stages)melee_web::pipeline_preparation::sss();
- else melee_web::pipeline_preparation::css();
+ else if(pending_menu_scene==melee_web::GameplayMenuScene::Characters)
+  melee_web::pipeline_preparation::css();
 #endif
  world->finish_scene_rebuild(pending_menu_scene);
  const double constructed=emscripten_get_now();
- check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
+ int source_entered=0;
+ switch(pending_menu_entry){
+ case MenuRouteEntry::Session:
+  source_entered=melee_web_menu_host_enter(host,world->audio(),error,sizeof(error));break;
+ case MenuRouteEntry::Main:
+  source_entered=melee_web_menu_host_enter_main(host,world->audio(),error,sizeof(error));break;
+ case MenuRouteEntry::Title:
+  source_entered=melee_web_menu_host_enter_title(host,world->audio(),error,sizeof(error));break;
+ case MenuRouteEntry::ParentCss:
+  source_entered=melee_web_menu_host_reenter_css_after_parent(host,world->audio(),error,sizeof(error));break;
+ }
+ check(source_entered,error);
  host_entered=true;world_exposed=true;
  const double entered=emscripten_get_now();
  report_construction("scene-rebuild",started,constructed,entered,before,
                      aurora_stats_snapshot());
  menu_scene_rebuild_pending=false;first_use_draw_pending=true;
  menu_clock.reset();running=true;
- message=melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+ switch(pending_menu_entry){
+ case MenuRouteEntry::Title:message="Original title";break;
+ case MenuRouteEntry::Main:message="Original main menu";break;
+ case MenuRouteEntry::ParentCss:message="Original character select";break;
+ case MenuRouteEntry::Session:
+  message=melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";break;
+ }
+ pending_menu_entry=MenuRouteEntry::Session;
 }
 
 void begin_transition_construction(double& preparation_ms,int& suppress_draw){
@@ -1074,7 +1115,7 @@ void tick(){
     if(render_only_preparation)render_only_preparation=false;
     else EM_ASM({window.menuPreparationDone?.();});
     running=!pending;menu_clock.reset();suppress_draw=preparation.suppress_source_draw(pending);
-    message=match?match_message:results?"Original Results":prize?"Original unlock notification":melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+    message=match?match_message:results?"Original Results":prize?"Original unlock notification":source_menu_message();
    }else{
     ++preparation_profile.submission_wait_callbacks;
     check(emscripten_get_now()-preparation_profile.submission_wait_started<10000,
@@ -1501,7 +1542,7 @@ int melee_web_native_menu_replay_whole_session(){return replay&&replay->whole_se
 void melee_web_native_menu_pause(int paused){
  if(faulted||replay_final_draw||preparation.busy()||pending||(!host_entered&&!match&&!results&&!prize))return;
  running=(world||match||results||prize)&&!paused;menu_clock.reset();
- message=running?(match?match_message:results?"Original Results":prize?"Original unlock notification":melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select"):"Paused.";
+ message=running?(match?match_message:results?"Original Results":prize?"Original unlock notification":source_menu_message()):"Paused.";
 }
 void melee_web_native_menu_confirm_check(){
  if(!replay&&(host_entered||match)&&!faulted&&!preparation.busy()&&!pending&&stock_check!=-1&&diagnostic_pad_remaining==0)

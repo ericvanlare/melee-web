@@ -5492,7 +5492,28 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
  #include <sysdolphin/baselib/gobjproc.h>
  #include <sysdolphin/baselib/hsd_3924.h>
  #include <sysdolphin/baselib/hsd_392C.h>
-@@ -376,3 +377,245 @@
+@@ -180,11 +180,20 @@
+ void gm_801A4B88(struct GameSceneInfo* info)
+ {
+     gm_804D6720 = info;
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* The scoped browser host restores the caller's current scene owner after an
++ * explicit Eject abort, before freeing its persistent GameSceneInfo. */
++struct GameSceneInfo* melee_web_current_scene_info(void)
++{
++    return gm_804D6720;
++}
++#endif
++
+ /// @brief returns a pointer to the current scenes enter data
+ void* gm_GetCurrentSceneEnterData(void)
+ {
+     return gm_804D6720->enter_data;
+ }
+ 
+@@ -376,3 +386,245 @@
      }
      HSD_VIWaitXFBFlush();
  }
@@ -6018,7 +6039,7 @@ diff --git a/src/melee/gm/gm_1A3F.c b/src/melee/gm/gm_1A3F.c
 index 9fc7d6b..234ad51 100644
 --- a/src/melee/gm/gm_1A3F.c
 +++ b/src/melee/gm/gm_1A3F.c
-@@ -359,3 +359,37 @@ void gm_801A4510(void)
+@@ -359,3 +359,57 @@ void gm_801A4510(void)
          gamestate->routing.curr_mode = next_mode;
      }
  }
@@ -6054,6 +6075,26 @@ index 9fc7d6b..234ad51 100644
 +    if (!melee_web_vs_mode_owned || !state_machine.routing.next_state_id)
 +        return -1;
 +    return state_machine.routing.next_state_id - 1;
++}
++int melee_web_vs_mode_pending_mode(void)
++{
++    if (!melee_web_vs_mode_owned || !state_machine.pending_mode_change)
++        return -1;
++    return state_machine.routing.pending_mode;
++}
++int melee_web_vs_mode_set_route(int current_mode, int previous_mode)
++{
++    if (!melee_web_vs_mode_owned || current_mode < 0 ||
++        current_mode >= GM_COUNT || previous_mode < 0 ||
++        previous_mode >= GM_COUNT)
++        return 0;
++    state_machine.routing.curr_mode = current_mode;
++    state_machine.routing.prev_mode = previous_mode;
++    state_machine.routing.curr_state_id = 0;
++    state_machine.routing.prev_state_id = 0;
++    state_machine.routing.next_state_id = 0;
++    state_machine.pending_mode_change = false;
++    return 1;
 +}
 +#endif
 diff --git a/src/melee/gm/gm_1A36.c b/src/melee/gm/gm_1A36.c
@@ -9978,6 +10019,39 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      }
      return tmp->x58[ftLib_80086BE0(arg0)].x20;
  }
+
+diff --git a/src/melee/mn/mninfo.c b/src/melee/mn/mninfo.c
+--- a/src/melee/mn/mninfo.c
++++ b/src/melee/mn/mninfo.c
+@@ -277,7 +277,7 @@ static inline s32 mnInfo_CountUnlocked(void)
+     return count;
+ }
+ 
+-inline void mnInfo_CreateEntries(u32 id)
++static inline void mnInfo_CreateEntries(u32 id)
+ {
+     u8* trophy;
+     s32 i;
+
+diff --git a/extern/dolphin/src/dolphin/thp/THPDec.c b/extern/dolphin/src/dolphin/thp/THPDec.c
+--- a/extern/dolphin/src/dolphin/thp/THPDec.c
++++ b/extern/dolphin/src/dolphin/thp/THPDec.c
+@@ -2705,6 +2705,7 @@
+     { 8, 0x200 },
+ };
+ 
++#if !defined(TARGET_PC)
+ // clang-format off
+ static inline void OSInitFastCast(void) {
+ #ifdef __MWERKS__
+@@ -2729,6 +2730,7 @@
+ #endif
+ }
+ // clang-format on
++#endif
+ 
+ #ifdef __MWERKS__
+ #pragma function_align 4
 diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
 --- a/src/melee/ft/types.h
 +++ b/src/melee/ft/types.h

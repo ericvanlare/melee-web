@@ -16,6 +16,7 @@
 #pragma GCC diagnostic pop
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <map>
@@ -37,6 +38,16 @@ struct Names {
     const char* symbol;
 };
 
+union SnapshotIconDataEntry {
+    std::uint8_t* ptr;
+    std::int32_t offset;
+    std::int32_t size;
+};
+#ifdef __wasm__
+static_assert(sizeof(SnapshotIconDataEntry) == 4,
+              "Original snapshot icon union ABI");
+#endif
+
 Names names_for(DatMenuSupportKind kind)
 {
     switch (kind) {
@@ -44,6 +55,8 @@ Names names_for(DatMenuSupportKind kind)
         return {"LbMcGame.", "MemCardIconData"};
     case DatMenuSupportKind::CardScene:
         return {"NtMemAc", "ScNtcCommon_scene_data"};
+    case DatMenuSupportKind::SnapshotIcons:
+        return {"LbMcSnap.", "MemSnapIconData"};
     }
     throw DatError("Unknown menu support archive kind");
 }
@@ -107,6 +120,7 @@ struct DatMenuSupport::Storage {
     std::vector<SceneDesc::SceneCameraDesc> cameras;
     std::vector<HSD_CameraAnim*> camera_animation_table;
     std::vector<void*> icon_table;
+    std::array<SnapshotIconDataEntry, 3> snapshot_icons{};
     SceneDesc scene{};
 
     ~Storage()
@@ -293,6 +307,41 @@ struct DatMenuSupport::Storage {
         throw DatError("MemCardIconData table exceeds its bound");
     }
 
+    void decode_snapshot_icons(std::uint32_t root)
+    {
+        constexpr std::uint32_t banner_size = 0x1800;
+        constexpr std::uint32_t icon_size = 0x600;
+        record(root, 12, "MemSnapIconData descriptor is truncated");
+        const auto banner_offset = pointer(root, banner_size,
+                                           "MemSnapIconData banner payload is missing");
+        const auto icon_offset = pointer(root + 4, icon_size,
+                                         "MemSnapIconData icon payload is missing");
+        const auto banner = std::find_if(archive->public_symbols().begin(),
+                                         archive->public_symbols().end(),
+            [&](const DatPublicSymbol& symbol) {
+                return symbol.name == "MemSnapBanner_01";
+            });
+        const auto icon = std::find_if(archive->public_symbols().begin(),
+                                       archive->public_symbols().end(),
+            [&](const DatPublicSymbol& symbol) {
+                return symbol.name == "MemSnapIcon_01";
+            });
+        require(banner != archive->public_symbols().end() &&
+                    banner->data_offset == banner_offset &&
+                    icon != archive->public_symbols().end() &&
+                    icon->data_offset == icon_offset,
+                "MemSnapIconData does not point at its authored images");
+        require(archive->be32(root + 8) == 0 &&
+                    !archive->has_relocation(root + 8) &&
+                    archive->next_target_offset(root) == root + 12,
+                "MemSnapIconData does not match its authored pointer table");
+        const auto banner_bytes = archive->range(banner_offset, banner_size);
+        const auto icon_bytes = archive->range(icon_offset, icon_size);
+        snapshot_icons[0].ptr = const_cast<std::uint8_t*>(banner_bytes.data());
+        snapshot_icons[1].ptr = const_cast<std::uint8_t*>(icon_bytes.data());
+        snapshot_icons[2].ptr = nullptr;
+    }
+
     std::vector<HSD_AnimJoint*> decode_joint_animations(std::uint32_t table,
                                                         const MeleeWebNativeGraph& graph)
     {
@@ -475,8 +524,10 @@ DatMenuSupport::DatMenuSupport(std::shared_ptr<const DatArchive> archive,
     const auto& root = find_symbol(*storage.archive, storage.symbol);
     if (kind == DatMenuSupportKind::CardIcons)
         storage.decode_icons(root.data_offset);
-    else
+    else if (kind == DatMenuSupportKind::CardScene)
         storage.decode_scene(root.data_offset);
+    else
+        storage.decode_snapshot_icons(root.data_offset);
 }
 
 DatMenuSupport::~DatMenuSupport() = default;
@@ -485,6 +536,8 @@ void* DatMenuSupport::descriptor() const noexcept
 {
     if (storage_->kind == DatMenuSupportKind::CardIcons)
         return const_cast<void*>(static_cast<const void*>(storage_->icon_table.data()));
+    if (storage_->kind == DatMenuSupportKind::SnapshotIcons)
+        return const_cast<void*>(static_cast<const void*>(storage_->snapshot_icons.data()));
     return const_cast<SceneDesc*>(static_cast<const SceneDesc*>(&storage_->scene));
 }
 

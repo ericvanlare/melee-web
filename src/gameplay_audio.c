@@ -304,8 +304,15 @@ void melee_web_audio_source_sem_read(MeleeWebAudio* a,void* output,uint32_t size
  memcpy(output,a->words,size);a->source_sem=output;
 }
 
-/* This provider is configured for stereo, independently of console SRAM. */
-u32 OSGetSoundMode(void){if(!active)abort();return 1;}
+/* The browser audio owner starts with the source default (stereo). Preserve
+ * later source changes for this owner instead of consulting console SRAM. */
+static u32 source_sound_mode=OS_SOUND_MODE_STEREO;
+u32 OSGetSoundMode(void){if(!active)abort();return source_sound_mode;}
+void OSSetSoundMode(u32 mode){
+ if(!active)abort();
+ if(mode!=OS_SOUND_MODE_MONO&&mode!=OS_SOUND_MODE_STEREO)abort();
+ source_sound_mode=mode;
+}
 
 void melee_web_audio_source_finish(MeleeWebAudio* a){
  if(!live(a))abort();a->source_sem=NULL;a->source_closed=1;

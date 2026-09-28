@@ -30,6 +30,8 @@ struct MeleeWebMenuSession {
     int selection_rejected;
     int transition_failed;
     int transition_requested;
+    int css_parent_route_requested;
+    int css_parent_ready;
     HSD_GObj** gobj_snapshot;
     size_t gobj_snapshot_count;
     HSD_GObjList* gobj_snapshot_entities;
@@ -805,7 +807,7 @@ int melee_web_menu_session_destroy(MeleeWebMenuSession* session, char* error,
         return 0;
     }
     if (session->css_open || session->sss_open ||
-        session->gobj_snapshot_active) {
+        session->gobj_snapshot_active || session->css_parent_ready) {
         return fail(error, error_size,
                     "Leave or abort the live native menu scene before destroy");
     }
@@ -841,11 +843,19 @@ static int enter_css(MeleeWebMenuSession* session, int after_match,
                     "CSS transition request was pending before enter");
     }
     session->css.pending_scene_change = 0;
+    session->css_parent_route_requested = 0;
     session->css.match_type = VS_MELEE;
     session->selection_rejected = 0;
     session->transition_failed = 0;
     session->transition_requested = 0;
     if (!melee_web_menu_gobj_snapshot(session, error, error_size)) {
+        return 0;
+    }
+    if (session->runtime.scene_enter != NULL &&
+        !session->runtime.scene_enter(session->runtime.user,
+                                      MELEE_WEB_MENU_SCENE_CSS, error,
+                                      error_size)) {
+        melee_web_menu_gobj_snapshot_clear(session);
         return 0;
     }
     mnCharSel_Scene_OnEnter(&session->css);
@@ -871,6 +881,43 @@ int melee_web_menu_return_to_css(MeleeWebMenuSession* session, char* error,
                     "Returning to CSS requires a torn-down ready match");
     }
     return enter_css(session, 1, error, error_size);
+}
+
+int melee_web_menu_reopen_css_after_parent(MeleeWebMenuSession* session,
+                                            char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size)) {
+        return 0;
+    }
+    if (session->phase != MELEE_WEB_MENU_CLOSED ||
+        !session->css_parent_ready || session->css_open || session->sss_open) {
+        return fail(error, error_size,
+                    "CSS parent route has not completed a checked GM_MENU scene");
+    }
+    session->css_parent_ready = 0;
+    session->phase = MELEE_WEB_MENU_CSS_READY;
+    return enter_css(session, 1, error, error_size);
+}
+
+int melee_web_menu_cancel_parent_route(MeleeWebMenuSession* session,
+                                       char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size)) {
+        return 0;
+    }
+    if (session->phase != MELEE_WEB_MENU_CLOSED ||
+        !session->css_parent_ready || session->css_open || session->sss_open) {
+        return fail(error, error_size,
+                    "CSS parent route is not idle and cancellable");
+    }
+    session->css_parent_ready = 0;
+    return ok(error, error_size);
+}
+
+int melee_web_menu_parent_route_pending(const MeleeWebMenuSession* session)
+{
+    return session != NULL && session == owner && session->phase == MELEE_WEB_MENU_CLOSED &&
+           session->css_parent_ready;
 }
 
 int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
@@ -904,6 +951,13 @@ int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
     session->transition_failed = 0;
     session->transition_requested = 0;
     if (!melee_web_menu_gobj_snapshot(session, error, error_size)) {
+        return 0;
+    }
+    if (session->runtime.scene_enter != NULL &&
+        !session->runtime.scene_enter(session->runtime.user,
+                                      MELEE_WEB_MENU_SCENE_SSS, error,
+                                      error_size)) {
+        melee_web_menu_gobj_snapshot_clear(session);
         return 0;
     }
     mnStageSel_Scene_OnEnter(&session->sss);
@@ -994,10 +1048,26 @@ int melee_web_menu_tick(MeleeWebMenuSession* session, char* error,
     return MELEE_WEB_MENU_RESULT_TICKED;
 }
 
+int melee_web_menu_mark_css_parent_route(MeleeWebMenuSession* session,
+                                          char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size)) {
+        return 0;
+    }
+    if (session->phase != MELEE_WEB_MENU_CSS || !session->css_open ||
+        session->transition_failed || session->css_parent_route_requested) {
+        return fail(error, error_size,
+                    "CSS parent route marking requires one live CSS transition");
+    }
+    session->css_parent_route_requested = 1;
+    return ok(error, error_size);
+}
+
 int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
                              size_t error_size)
 {
     u8 pending;
+    int parent_route;
 
     if (!session_live(session, error, error_size)) {
         return 0;
@@ -1013,11 +1083,19 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
         return fail(error, error_size,
                     "CSS has no completed original transition request");
     }
+    parent_route = session->css_parent_route_requested;
     if (!css_selection_valid_internal(&session->css, 1, 0)) {
         return fail(error, error_size,
                     "Cannot commit an unavailable character selection");
     }
     mnCharSel_Scene_OnExit(NULL);
+    if (session->runtime.scene_exit != NULL &&
+        !session->runtime.scene_exit(session->runtime.user,
+                                     MELEE_WEB_MENU_SCENE_CSS, error,
+                                     error_size)) {
+        session->phase = MELEE_WEB_MENU_CLOSED;
+        return 0;
+    }
     session->css_open = 0;
     session->transition_requested = 0;
     if (!melee_web_menu_gobj_teardown(session, error, error_size)) {
@@ -1025,7 +1103,9 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
         return 0;
     }
     pending = session->css.pending_scene_change;
-    if (pending == CSSPendingSceneChange_2) {
+    if (pending == CSSPendingSceneChange_2 || parent_route) {
+        session->css_parent_route_requested = 0;
+        session->css_parent_ready = 1;
         session->phase = MELEE_WEB_MENU_CLOSED;
         return ok(error, error_size);
     }
@@ -1066,6 +1146,13 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
                     "Cannot commit an unavailable stage selection");
     }
     mnStageSel_Scene_OnExit(NULL);
+    if (session->runtime.scene_exit != NULL &&
+        !session->runtime.scene_exit(session->runtime.user,
+                                     MELEE_WEB_MENU_SCENE_SSS, error,
+                                     error_size)) {
+        session->phase = MELEE_WEB_MENU_CLOSED;
+        return 0;
+    }
     session->sss_open = 0;
     session->transition_requested = 0;
     if (!melee_web_menu_gobj_teardown(session, error, error_size)) {
@@ -1108,10 +1195,24 @@ int melee_web_menu_abort(MeleeWebMenuSession* session, char* error,
     }
     if (session->css_open) {
         mnCharSel_Scene_OnExit(NULL);
+        if (session->runtime.scene_exit != NULL &&
+            !session->runtime.scene_exit(session->runtime.user,
+                                         MELEE_WEB_MENU_SCENE_CSS, error,
+                                         error_size)) {
+            session->phase = MELEE_WEB_MENU_CLOSED;
+            return 0;
+        }
         session->css_open = 0;
     }
     if (session->sss_open) {
         mnStageSel_Scene_OnExit(NULL);
+        if (session->runtime.scene_exit != NULL &&
+            !session->runtime.scene_exit(session->runtime.user,
+                                         MELEE_WEB_MENU_SCENE_SSS, error,
+                                         error_size)) {
+            session->phase = MELEE_WEB_MENU_CLOSED;
+            return 0;
+        }
         session->sss_open = 0;
     }
     if (!melee_web_menu_gobj_teardown(session, error, error_size)) {
@@ -1119,6 +1220,7 @@ int melee_web_menu_abort(MeleeWebMenuSession* session, char* error,
         return 0;
     }
     session->phase = MELEE_WEB_MENU_CLOSED;
+    session->css_parent_ready = 0;
     return ok(error, error_size);
 }
 

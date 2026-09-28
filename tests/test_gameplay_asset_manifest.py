@@ -56,6 +56,13 @@ class GameplayAssetManifestTests(unittest.TestCase):
         script = "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; console.log(JSON.stringify(Object.keys(NATIVE_MENU_DISC_FILES)))"
         browser = json.loads(subprocess.check_output([str(node_runtime()), "--input-type=module", "-e", script], cwd=ROOT, text=True))
         self.assertEqual(set(native), set(browser) | {"sislib_font.bin", "dsp_coef.bin"})
+        source = (ROOT / ".deps/melee/src/melee/lb/lbaudio_ax.static.h").read_text()
+        table = re.search(r"static const char\* ssm_files\[\] = \{(.*?)\n\};", source, re.S)
+        self.assertIsNotNone(table, "Pinned source ssm_files[] table is missing")
+        source_banks = set(re.findall(r'"([^"\\]+\.ssm)"', table.group(1)))
+        self.assertEqual(len(source_banks), 55, "Pinned source ssm_files[] bound changed")
+        self.assertTrue(source_banks <= set(native), "Menu owner omits an authored title-demo audio bank")
+        self.assertTrue(source_banks <= set(browser), "Browser disc map omits an authored title-demo audio bank")
 
     def test_source_descriptor(self):
         result = subprocess.run([str(self.binary)], cwd=ROOT,
