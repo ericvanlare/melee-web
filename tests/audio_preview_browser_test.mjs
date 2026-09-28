@@ -32,6 +32,7 @@ const requests = [], errors = [], requestFailures = [], pendingPackageAborts = [
   verifiedPackageAborts = [], expectedNavigationAborts = [], violations = [], sockets = [], audioEvents = [];
 const startedAt = Date.now();
 let ejectReloadInProgress = false;
+let assetTraceBeforeTitleEject = null;
 const report = {
   schema: 'webmelee-audio-preview-browser-v1',
   browser: browser.version(),
@@ -675,6 +676,9 @@ try {
 
     const contextIds = audioEvents.filter(row => row.event === 'contextCreated')
       .map(row => row.data.context.contextId);
+    assetTraceBeforeTitleEject = await assetTrace();
+    assert(assetTraceBeforeTitleEject,
+      'Scoped asset trace must be retained before the Title Eject reload');
     const eventOffset = audioEvents.length;
     const navigationCount = report.navigations || 0;
     await page.locator('#error-close').click();
@@ -713,7 +717,10 @@ try {
   });
 
   await check('scoped audio asset generations are complete and never use legacy file upload', async () => {
-    const observed = await assetTrace();
+    // Title Eject intentionally reloads the document. Keep the initial
+    // document's completed source-scope history before that navigation clears
+    // its in-memory instrumentation object.
+    const observed = assetTraceBeforeTitleEject || await assetTrace();
     assert(observed, 'Scoped asset trace is unavailable');
     const begins = observed.events.filter(event => event.event === 'begin' || event.event === 'request');
     const commits = observed.events.filter(event => event.event === 'commit');
