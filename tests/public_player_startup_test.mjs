@@ -10,6 +10,18 @@ const SHELL_URL = new URL('web/player/player-shell.mjs', ROOT);
 const shellSource = await fs.readFile(SHELL_URL, 'utf8');
 const playerHtml = await fs.readFile(new URL('web/player/index.html', ROOT), 'utf8');
 const markupIds = new Set([...playerHtml.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
+const toolbarActions = playerHtml.match(/<div id="toolbar-actions">([\s\S]*?)<\/div>/)?.[1];
+assert.ok(toolbarActions, 'The player keeps one toolbar action group');
+const toolbarButtons = [...toolbarActions.matchAll(/<button\b[^>]*\bid="([^"]+)"/g)].map(match => match[1]);
+const primaryActionOrder = ['choose-disc', 'start-game', 'pause-game', 'fullscreen', 'end-session'];
+assert.deepEqual(toolbarButtons.filter(id => primaryActionOrder.includes(id)), primaryActionOrder,
+  'Disc, Play, Pause, Fullscreen and Eject keep their familiar order');
+assert.equal(toolbarButtons.indexOf('controls-open'), 0,
+  'Controls stays in its established leading position');
+assert.equal(toolbarButtons.indexOf('settings-open'), 1,
+  'Settings stays beside Controls before the game actions');
+assert.equal(toolbarButtons.indexOf('choose-disc'), 2,
+  'Disc starts the primary game-action group after Controls and Settings');
 // Exercise the real markup contract before mocks can hide a removed element.
 for (const [, id] of shellSource.matchAll(/\$\('([^']+)'\)/g)) {
   assert(markupIds.has(id), `Public shell requires missing HTML element #${id}`);
@@ -423,6 +435,9 @@ try {
     'Audio activation starts during the Choose file gesture before opening the native picker');
   assert(flow.document.getElementById('start-game').disabled,
     'The normal first launch does not require the Play button');
+  assert.equal(flow.document.getElementById('disc-selection-status').hidden, true,
+    'The temporary disc acknowledgement clears after play starts');
+  assert.equal(flow.document.getElementById('disc-selection-status').textContent, '');
   const importCount = flow.trace.filter(row => Array.isArray(row) && row[0] === 'import').length;
   assert.equal(flow.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, importCount);
 } finally { delete globalThis.testClickTrace; restoreFlow(); }
@@ -434,7 +449,7 @@ try {
   const status = earlySelection.document.getElementById('disc-selection-status');
   assert.equal(status.hidden, false, 'The selected File remains acknowledged while graphics are preparing');
   assert.match(status.textContent, /early\.iso/);
-  assert.match(status.textContent, /waiting for graphics/);
+  assert.match(status.textContent, /waiting for graphics/i);
   assert.equal(earlySelection.trace.filter(row => Array.isArray(row) && row[0] === 'validate').length, 1,
     'Disc validation may run before native import readiness');
   assert.equal(earlySelection.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, 0,
@@ -447,12 +462,22 @@ try {
   const importRow = earlySelection.trace.find(row => Array.isArray(row) && row[0] === 'import');
   assert.ok(importRow, 'Native import begins when its own readiness gate opens, before graphics finish');
   assert.ok(importRow[2], 'Early native import adopts the already validated session');
+  assert.equal(status.hidden, false, 'The filename stays acknowledged while native data prepares');
+  assert.match(status.textContent, /Preparing early\.iso/);
   assert.equal(earlySelection.trace.filter(row => row === 'start').length, 0,
     'Import completion waits at the graphics readiness barrier');
+
+  earlySelection.document.getElementById('choose-disc').click();
+  earlySelection.document.getElementById('disc-choose-file').click();
+  earlySelection.document.getElementById('disc-file').dispatchEvent({type: 'cancel'});
+  assert.equal(status.hidden, true, 'Cancelling the file picker clears its temporary acknowledgement');
+  assert.equal(status.textContent, '');
   earlySelection.stateCallback({...earlySelection.getMockState(), canImport: true, graphicsReady: true, canStart: true});
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(earlySelection.trace.filter(row => row === 'start').length, 1,
     'Late graphics readiness releases exactly one automatic launch');
+  assert.equal(status.hidden, true, 'The acknowledgement clears when the delayed game starts');
+  assert.equal(status.textContent, '');
 } finally { delete globalThis.testClickTrace; restoreEarlySelection(); }
 
 const invalidRecovery = await runScenario({name: 'invalid-file-recovery'});
@@ -460,8 +485,10 @@ const restoreInvalidRecovery = installGlobals(invalidRecovery.document);
 try {
   await selectThroughShell(invalidRecovery, {name: 'bad.rvz', invalid: true});
   assert.equal(invalidRecovery.document.getElementById('error-dialog').open, true);
-  assert.equal(invalidRecovery.document.getElementById('disc-selection-status').hidden, false);
-  assert.match(invalidRecovery.document.getElementById('disc-selection-status').textContent, /Invalid disc/);
+  assert.equal(invalidRecovery.document.getElementById('disc-selection-status').hidden, true,
+    'Actionable validation errors do not occupy the toolbar');
+  assert.notEqual(invalidRecovery.document.getElementById('error').textContent, '',
+    'The error dialog retains the actionable validation detail');
   assert.equal(invalidRecovery.trace.filter(row => Array.isArray(row) && row[0] === 'import').length, 0);
   await selectThroughShell(invalidRecovery, {name: 'recovered.iso'});
   assert.equal(invalidRecovery.document.getElementById('error-dialog').open, false,
@@ -489,10 +516,8 @@ try {
   finishValidationDuringFailure();
   await selectionValidation;
   const status = initializationFailure.document.getElementById('disc-selection-status');
-  assert.equal(status.hidden, false, 'The selected File remains acknowledged after initialization failure');
-  assert.match(status.textContent, /Validation stopped pending-valid-disc\.iso/);
-  assert.doesNotMatch(status.textContent, /Invalid disc/,
-    'A runtime failure must not be reported as invalid disc data');
+  assert.equal(status.hidden, true, 'A stopped selection does not leave a filename in the toolbar');
+  assert.equal(status.textContent, '');
   assert.equal(initializationFailure.document.getElementById('error').textContent,
     'Graphics initialization failed');
   assert.equal(initializationFailure.document.getElementById('retry').hidden, false,
@@ -571,6 +596,9 @@ try {
   'Eject clears all held touch input before waiting for native teardown');
   assert(ejectRace.trace.indexOf('save-flush') < ejectRace.trace.indexOf('destroy'),
     'Eject commits Personal progress before retiring the native owner');
+  assert.equal(ejectRace.document.getElementById('disc-selection-status').hidden, true,
+    'Eject clears the temporary disc acknowledgement');
+  assert.equal(ejectRace.document.getElementById('disc-selection-status').textContent, '');
   finishEjectedImport();
   await importWork;
   assert.equal(ejectRace.trace.filter(row => row === 'start').length, 0,
