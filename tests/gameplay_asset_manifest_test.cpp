@@ -139,15 +139,23 @@ void opening_match_asset_contract()
 {
     MeleeWebOpeningPreview preview{};
     preview.characters[0] = CKIND_GAMEWATCH;
-    preview.stage_kind = St_Kind_Last;
+    preview.characters[1] = CKIND_KIRBY;
+    preview.characters[2] = CKIND_POPONANA;
+    preview.characters[3] = CKIND_SAMUS;
+    preview.stage_kind = St_Kind_Kongo;
     preview.match_kind = 0;
     try {
         (void) opening_match_asset_names(preview);
     } catch (const std::exception& error) {
-        check(std::string(error.what()).find(
-                  "Opening demo source fighter 3 is not admitted") !=
-                  std::string::npos,
-              "Unsupported Opening identity did not report its exact source fighter");
+        const std::string message = error.what();
+        for (const int character : {CKIND_GAMEWATCH, CKIND_KIRBY,
+                                    CKIND_POPONANA, CKIND_SAMUS})
+            check(message.find("fighter " + std::to_string(character) +
+                               " is not admitted") != std::string::npos,
+                  "Opening scope error omitted a source-selected fighter");
+        check(message.find("stage " + std::to_string(St_Kind_Kongo) +
+                           " is not admitted") != std::string::npos,
+              "Opening scope error omitted the source-selected stage");
         return;
     }
     throw std::runtime_error("Unadmitted Opening fighter unexpectedly passed its asset scope");

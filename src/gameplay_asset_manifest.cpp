@@ -283,21 +283,34 @@ opening_match_asset_names(const MeleeWebOpeningPreview& preview)
 {
     std::vector<std::string> result = menu_asset_names();
     std::vector<unsigned> fighter_kinds;
+    std::vector<std::string> unsupported;
     if (preview.match_kind > 3)
         reject("Opening mode selected an unknown source match kind");
     for (const auto name : kMatchCommonAudio) add_unique(result, name);
     for (unsigned i = 0; i < 4; ++i) {
         const auto* fighter = melee_web_fighter_content(
             static_cast<int>(preview.characters[i]));
-        if (!fighter)
-            reject("Opening demo source fighter " +
-                   std::to_string(preview.characters[i]) +
-                   " is not admitted by the browser runtime");
-        if (preview.costumes[i] >= fighter->costumes)
-            reject("Opening demo source costume exceeds its authored fighter table");
+        if (!fighter) {
+            unsupported.emplace_back(
+                "fighter " + std::to_string(preview.characters[i]) +
+                " is not admitted by the browser runtime");
+            continue;
+        }
+        if (preview.costumes[i] >= fighter->costumes) {
+            unsupported.emplace_back(
+                "costume " + std::to_string(preview.costumes[i]) +
+                " exceeds the authored table for fighter " +
+                std::to_string(preview.characters[i]));
+            continue;
+        }
         if (!source_costume(fighter->fighter_kind, 0) ||
-            !source_costume(fighter->fighter_kind, preview.costumes[i]))
-            reject("Opening demo source costume is absent from the generated registry");
+            !source_costume(fighter->fighter_kind, preview.costumes[i])) {
+            unsupported.emplace_back(
+                "costume " + std::to_string(preview.costumes[i]) +
+                " for fighter " + std::to_string(preview.characters[i]) +
+                " is absent from the generated registry");
+            continue;
+        }
         if (std::find(fighter_kinds.begin(), fighter_kinds.end(),
                       static_cast<unsigned>(fighter->fighter_kind)) ==
             fighter_kinds.end())
@@ -306,9 +319,17 @@ opening_match_asset_names(const MeleeWebOpeningPreview& preview)
     const auto* stage = melee_web_stage_content(
         static_cast<int>(preview.stage_kind));
     if (!stage)
-        reject("Opening demo source stage " +
-               std::to_string(preview.stage_kind) +
-               " is not admitted by the browser runtime");
+        unsupported.emplace_back(
+            "stage " + std::to_string(preview.stage_kind) +
+            " is not admitted by the browser runtime");
+    if (!unsupported.empty()) {
+        std::string message = "Opening demo source selection has unadmitted ";
+        for (std::size_t i = 0; i < unsupported.size(); ++i) {
+            if (i != 0) message += "; ";
+            message += unsupported[i];
+        }
+        reject(message);
+    }
     for (const auto fighter_kind : fighter_kinds) {
         const auto* fighter = melee_web_fighter_content_by_kind(fighter_kind);
         const auto* neutral = source_costume(fighter_kind, 0);

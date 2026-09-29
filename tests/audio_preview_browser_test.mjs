@@ -678,7 +678,8 @@ try {
     assert.match(routeError, /Original Title idle reached source GM_OPENING_MV state 1/);
     assert.match(routeError, /four-player VS demo/);
     assert.match(routeError, /source-selected asset scope is unsupported/);
-    assert.match(routeError, /Opening demo source (fighter|costume|stage)/);
+    assert.match(routeError, /Opening demo source selection has unadmitted/);
+    assert.match(routeError, /(not admitted|exceeds|absent from the generated registry)/);
     const transitionState = await nativeMenuState();
     report.title_idle_handoff = {
       source_target: 'GM_OPENING_MV state 1',

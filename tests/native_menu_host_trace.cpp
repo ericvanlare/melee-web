@@ -416,9 +416,13 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
         unsigned audio_phase = 0;
         start_title(host, world, raw, audio_phase);
         int result = 1;
-        for (unsigned frame = 0; frame < 700 && result != 3; ++frame)
+        unsigned callbacks_to_timeout = 0;
+        for (; callbacks_to_timeout < 700 && result != 3;
+             ++callbacks_to_timeout)
             result = tick(host, *world, raw, audio_phase);
         check(result == 3, "Original Title timeout did not request its source exit");
+        check(callbacks_to_timeout == 501,
+              "Title timeout diverged from the 20-frame guard and 601-frame source timer");
         check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
         check(melee_web_menu_host_route_target_mode(host) == GM_OPENING_MV,
               "Title timeout did not preserve the source GM_OPENING_MV destination");

@@ -28,61 +28,111 @@ This is visual route evidence, not a pixel comparison or a PCM/audio check.
 
 ## Title idle and Opening-mode findings
 
-The retained retail idle capture shows that Title timeout is a source mode
-transition, not a Title-to-Title animation loop. After the Title callback's
-20-frame input guard, `gm_Scene_Title_OnFrame` counts source frames; when the
-counter exceeds 600 it writes a zero exit payload and requests scene exit.
-`gmTitleMode_OnExit` interprets that zero payload as `GM_OPENING_MV` and sets
-Opening state 1. `gm_Mode_Opening_OnLoad` selects the state through the source
-`gm_801BF718()` value. State 1 runs the original four-CPU VS demo. The captured
-idle sequence then reaches Title state 2, another VS demo at state 3, and the
-HowTo movie at state 4; the retained trace later wraps to Opening state 0.
-The `GM_OPENING_MV` state table also declares state 5 (`MvOmake15.mth`), which
-was not reached in this retained run.
+### Retail sequence and input
 
-The capture at
-`work/original-menu-route-20260926-01/title-attract-20260927-full-01/` retained
-41,052 source-state observations and 194 labeled rendered Metal frame samples.
-It contains repeated visits through states 1, 2 and 3 and rendered moving
-samples from the VS demo and HowTo movie. It was terminated by the runner after
-the declared observation window (`scenario_complete=false`), so it does not
-establish a completed repeated-cycle run or controller interruption. The
-separate `title-attract-20260927-probe-title1` capture confirms the first
-timeout destination and Title return, but likewise ends at its bounded
-predicate. Do not describe these files as complete-cycle acceptance.
+The pinned retail capture
+`/Volumes/AgentStorage/melee-web/runs/title-attract-repeat-20260928-204724-721ca350/retail-title-visits3-01/`
+boots cold with neutral input and reaches three Opening-mode Title visits. Its
+route trace records the no-input order
+`state 0 → 1 → 2 → 3 → 0 → 1 → 2 → 3 → 4 → 0 → 1 → 2`:
 
-The browser host now preserves the source Title timeout as
-`GM_OPENING_MV` state 1 and invokes the original Opening mode `OnLoad`. It does
-not turn the zero payload into Start. The browser still reports an explicit
-unsupported destination at the next owner boundary: the original randomized
-VS demo needs its full source player/content lifecycle, while this runtime has
-admitted only 19 fighters. The movie range reader and THP CPU/alarm owners are
-bounded infrastructure for the declared MTH dependencies; the Opening source
-scene callbacks and a rendered/PCM-complete attract cycle are not implemented
-by this increment.
+| Exiting source scene | Next Opening state and scene | Recorded source counter at handoff |
+| --- | --- | ---: |
+| `MvOpen.mth` | 1, four-CPU VS demo | 6131 |
+| State 1 VS demo | 2, Title | 1201 |
+| Title callback | 3, four-CPU VS demo | 621 |
+| State 3 VS demo | 0, `MvOpen.mth` | 1201 |
+| `MvOpen.mth` | 1, four-CPU VS demo | 6131 |
+| State 1 VS demo | 2, Title | 1201 |
+| Title callback | 3, four-CPU VS demo | 621 |
+| State 3 VS demo | 4, `MvHowto.mth` | 1201 |
+| HowTo movie | 0, `MvOpen.mth` | 4761 |
+| `MvOpen.mth` | 1, four-CPU VS demo | 6131 |
+| State 1 VS demo | 2, Title | 1201 |
 
-The follow-up is decomposed at the source boundaries:
+These are Observer source-counter values sampled at the route boundary; each
+counter belongs to the scene that just exited. They are not wall-clock
+durations. The repeated run covers two complete returns to Opening state 0 and
+part of a third route. It stops at Title visit 3 by declared predicate, so it
+does not claim a full unattended return to normal `GM_TITLE` or an Omake15
+visit. The captured save/session state routes the second state 3 through
+HowTo, then back to state 0. Source code shows that `gm_8015DB00()` controls
+this alternation: state 3 increments it and selects state 0 when even; HowTo
+increments and selects state 0 unless it is already 5, in which case the
+authored next state is Omake15. That later state-5 path is source-identified,
+but remains unobserved in this capture.
 
-1. Own each `GM_OPENING_MV` state and its original mode/scene enter, frame,
-   draw, exit and preload callbacks, preserving the state-machine route across
-   resource-scope rebuilds.
-2. Run state 1/3 as source VS demos without changing their four-player
-   `StartMeleeData`, RNG/history selection, all-port input edges or 1200-frame
-   source exit. This requires admitting every source fighter the active save
-   and usage history can select; unsupported content must fail before drawing
-   and remain Eject-recoverable.
-3. Run the authored `MvOpen.mth`, `MvHowto.mth` and (when naturally selected)
-   `MvOmake15.mth` through the source THP callbacks, bounded DVD ranges,
-   source-frame alarm and audio/render owners. Their disc sizes exceed the
-   current per-asset cap, so they must remain streamed.
-4. Compare more than one complete retail/browser cycle at source-frame
-   boundaries, including the original return order and ordinary controller
-   interruption from every connected port.
+The retail input captures
+`retail-interrupt-p1-opening-01/` and `retail-interrupt-p2-vs-01/` use the same
+cold-boot baseline with isolated profile/card copies. P1 Start at source tick
+125 interrupts `MvOpen.mth`, returns to normal Title, then ordinary P1 Start
+opens Main. In the second run P2 Start interrupts the state-1 VS demo while P1
+is neutral, returns to normal Title, and P1 Start opens Main. A retained P2
+Opening-movie probe is at
+`work/original-menu-route-20260926-01/title-attract-20260927-audio-p2-probe/`.
+The source callbacks use `gm_GetButtonsTriggered(PAD_MAX_CONTROLLERS)`: Opening
+movie accepts Start/A before its late cutoff, VS demo accepts Start/A, and the
+normal Title callback accepts Start only after its 20-callback guard. The held
+input is edge-consumed during that guard; it is not replayed later.
 
-This increment implements and tests the exact Title timeout to Opening state 1
-mode handoff and clean owner retirement. It is a runnable source transition
-boundary, not acceptance of the attract sequence; the next blocking boundary
-is source VS demo ownership and content admission.
+`gm_Scene_Title_OnFrame` then increments its source timer and times out when
+`frame_count > 600`, writing the source's zero exit payload. The focused native
+host check counts the exact 501 remaining callback steps after its first 120
+Title callbacks, for 621 total Title callback steps. Retail records 621 at the
+Title-to-state-3 route boundary. `gmTitleMode_OnExit` preserves the zero-payload
+route to `GM_OPENING_MV` state 1; Start is never fabricated. Opening state 1
+uses `gm_SetupTitleDemo`, which chooses four source CPUs and a stage from the
+source unlock/usage-history tables and RNG. The selected roster/stage therefore
+varies naturally; this capture does not claim identical RNG or demo identities
+between separate retail runs.
+
+The no-input run retained 30,924 decoded source-state observations, 61,441
+Observer events and 69 labeled Metal samples. I reviewed its moving MvOpen,
+VS-demo and HowTo images. The capture sampler's immediate state-2 marker is
+not synchronized to the source Title render, so that image is not used as
+Title visual evidence. Use the aligned normal-Title screenshot in
+`work/original-menu-route-20260926-01/retail-route-12-full/evidence/` and the
+post-interruption Title sample in the P2 capture for that scene. This is visual
+inspection, not a pixel comparison. The P1/P2 captures each end at Main after
+their declared input predicate; their MWRO end markers are interrupted by
+the runner's intentional stop.
+
+### Browser increment and remaining boundaries
+
+The browser preserves the original Title timeout payload and Opening state-1
+selection. It calls the source `gm_SetupTitleDemo` and derives an exact
+four-player asset closure without narrowing unlocks, RNG/history or selected
+identities. The production audio-player regression reaches that real boundary.
+The current runtime admits 19 of 26 source fighters and 7 of 29 stages; this
+source-selected demo chose unsupported content, so checked asset preparation
+fails explicitly with the identities listed in the error. Eject retires the
+source owners and reimport starts at CSS. This is the smallest runnable source
+increment at the first missing owner boundary, not an implemented or accepted
+attract cycle.
+
+Completing the retail route requires these bounded source owners:
+
+1. Complete the four-CPU VS demo lifecycle, including all 26 selectable source
+   characters, all 29 source stages, source camera/CPU-level phases, 1200-tick
+   exit, all-port interruption, and teardown/re-entry. The random source
+   selector may choose any unlocked identity; per-character or per-stage
+   overrides would change the source behavior.
+2. Run `MvOpen.mth`, `MvHowto.mth`, and naturally selected `MvOmake15.mth`
+   through original THP video/audio callbacks, streamed DVD ranges, source
+   timing/alarm, and owned graphics/audio services. The movie assets remain
+   bounded streams rather than whole-file imports.
+3. Carry the Opening state and source RNG/save/session owners through each
+   scene/resource rebuild, route P1/P2 input and Eject from every phase, and
+   prove repeated clean return/re-entry.
+4. Compare full retail and production-browser cycles at source-frame
+   boundaries, with transition screenshots and PCM transport evidence. The
+   existing audio test validates the menu/match route and the first explicit
+   unsupported Opening boundary; it does not stand in for this gate.
+
+The earlier `title-attract-20260927-full-01/` run also remains as a failed
+reproducer: it stopped emitting Observer events during a later state-3 demo
+and did not reach Omake15. The new visit-3 capture proves two repeat returns
+without claiming that failed route completed.
 
 ## Browser implementation and lifecycle
 
@@ -150,10 +200,16 @@ checks do not enable Challenger Approach or claim full title/demo coverage.
 ## Retained local evidence
 
 All captures, screenshots, private inputs, and generated runtime bundles remain
-under ignored `work/` and are not committed:
+outside Git and are not committed. Existing evidence stays under ignored
+`work/`; the repeated cold-boot capture set below is on the verified external
+NVMe:
 
 | Evidence | Retained material |
 | --- | --- |
+| /Volumes/AgentStorage/melee-web/runs/title-attract-repeat-20260928-204724-721ca350/retail-title-visits3-01/capture.json and route-source-states.jsonl | Successful neutral-input cold-boot capture through three Opening Title visits: 30,924 source-state observations, 61,441 Observer events, 69 Metal samples and the repeated state 0→1→2→3→0→1→2→3→4→0→1→2 trace; the third visit is the declared stop, not a full unattended return |
+| /Volumes/AgentStorage/melee-web/runs/title-attract-repeat-20260928-204724-721ca350/retail-title-visits3-01/capture.mwro, input.mwri, dolphin.log, and evidence/ | Passive Observer stream, named neutral P1/P2 Pipe input record, owned Dolphin log and sampled source/render evidence; the source-Title marker is not treated as an aligned Title screenshot |
+| /Volumes/AgentStorage/melee-web/runs/title-attract-repeat-20260928-204724-721ca350/retail-interrupt-p1-opening-01/capture.json, route-source-states.jsonl, inputs.jsonl, and evidence/ | P1 Start interrupted MvOpen, returned to normal Title, and P1 Start entered Main; scenario predicate completed, with the runner stopping the owned Dolphin afterward |
+| /Volumes/AgentStorage/melee-web/runs/title-attract-repeat-20260928-204724-721ca350/retail-interrupt-p2-vs-01/capture.json, route-source-states.jsonl, inputs.jsonl, and evidence/ | P2 Start with P1 neutral interrupted the four-CPU VS demo, returned to normal Title, and P1 Start entered Main; scenario predicate completed, with the runner stopping the owned Dolphin afterward |
 | `work/original-menu-route-20260926-01/retail-route-12-full/capture.json` | Complete cold-boot route manifest, input and build identities, 24 scoped screenshot/source markers, and completion status |
 | `.../retail-route-12-full/route-source-states.jsonl` | 1,874 decoded passive PAD/menu source-state observations |
 | `.../retail-route-12-full/capture.mwro`, `input.mwri`, `inputs.jsonl`, `dolphin.log` | Observer stream, input transport receipt, named controller commands, and emulator log |
