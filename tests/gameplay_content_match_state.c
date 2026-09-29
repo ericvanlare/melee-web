@@ -130,6 +130,12 @@ int melee_web_test_active_fighter_state(unsigned slot,int* kind,int* motion,
     *x=fighter->cur_pos.x;*y=fighter->cur_pos.y;
     return 1;
 }
+int melee_web_test_facing_dir(unsigned slot,float* facing){
+    HSD_GObj* entity=Player_GetEntity(slot);
+    if(!entity||!entity->user_data||!facing)return 0;
+    *facing=((Fighter*)entity->user_data)->facing_dir;
+    return 1;
+}
 int melee_web_test_invoke_dormant_zelda_transform(unsigned slot){
     HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,1);
     if(!entity||!entity->user_data||((Fighter*)entity->user_data)->kind!=FTKIND_ZELDA)
@@ -142,6 +148,16 @@ int melee_web_test_kirby_copy_kind(unsigned slot){
     if(!entity||!entity->user_data)return -1;
     Fighter* fighter=entity->user_data;
     return fighter->kind==FTKIND_KIRBY?fighter->u.kb.hat.kind:-1;
+}
+int melee_web_test_kirby_link_dynamics(int* present,unsigned* hat_address,
+                                       unsigned* dynamics_address,int* count){
+    KirbyHatStruct* hat=ft_80459B88.hats[FTKIND_LINK];
+    if(present)*present=hat!=NULL&&hat->hat_dynamics[2]!=NULL;
+    if(!hat||!hat->hat_dynamics[2])return 0;
+    if(hat_address)*hat_address=(unsigned)(uintptr_t)hat;
+    if(dynamics_address)*dynamics_address=(unsigned)(uintptr_t)hat->hat_dynamics[2];
+    if(count)*count=hat->hat_dynamics[2]->dynamicsNum;
+    return 1;
 }
 int melee_web_test_apply_kirby_copy_visibility(unsigned slot){
     HSD_GObj* entity=Player_GetEntity(slot);

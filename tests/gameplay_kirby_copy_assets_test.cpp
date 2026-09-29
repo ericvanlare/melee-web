@@ -3,6 +3,7 @@
 #include "../src/gameplay_kirby_copy_assets.cpp"
 
 #include <fstream>
+#include <filesystem>
 #include <iostream>
 #include <iterator>
 
@@ -103,6 +104,8 @@ Bytes adapt(const Bytes& input, const KirbyCopyArchiveRequirement& root,
     const Bytes checked_before(archive.data().begin(), archive.data().end());
     auto bytes = input;
     adapt_for_native_source_parser(bytes, archive);
+    adapt_kirby_copy_dynamics(bytes, archive, root);
+    adapt_kirby_copy_added_parts_mask(bytes, archive, root);
     adapt_kirby_copy_parts_count(bytes, archive, root, costumes, body_models);
     check(input == original, "Input archive changed");
     check(std::equal(checked_before.begin(), checked_before.end(), archive.data().begin()),
@@ -119,8 +122,11 @@ template<class Function> void rejects(Function function)
 void joint_row_zero()
 {
     Fixture fixture(true);
+    put(fixture.data, 32, 0x1800); // public root+0x10: added-parts mask
     const auto input = fixture.bytes();
     const auto neutral = adapt(input, fixture.root, {0});
+    check(native32(neutral, 32) == 0x1800,
+          "Unrelocated Kirby added-parts mask was not converted to host order");
     check(native32(neutral, 192) == 2 && native32(neutral, 224) == 2,
           "Neutral hat counts were not converted");
     for (unsigned costume = 1; costume < 6; ++costume)
@@ -128,6 +134,121 @@ void joint_row_zero()
               "Joint-backed hat did not select the original row zero");
     check(adapt(input, fixture.root, {5, 1, 0, 3}) == neutral,
           "Multiple Kirby costumes changed shared hat adaptation");
+}
+
+void sheik_copy_dynamics()
+{
+    Fixture fixture(false);
+    fixture.root.filename = "PlKbCpSk.dat";
+    fixture.root.symbol = "ftDataKirbyCopySeak";
+    fixture.root.fighter_kind = FTKIND_SEAK;
+    fixture.link(36, 384); // KirbyHatStruct::hat_dynamics[2]
+    put(fixture.data, 384, 1);
+    fixture.link(388, 416); // ftDynamics::ftDynamicBones
+    put(fixture.data, 416, 3); // BoneDynamicsDesc::bone_id
+    put(fixture.data, 420, 0); // nullable DynamicsDesc::data
+    put(fixture.data, 424, 2); // DynamicsDesc::count
+    put(fixture.data, 428, 0x3f800000);
+    put(fixture.data, 432, 0x3f000000);
+    put(fixture.data, 436, 0xbe800000);
+
+    const auto converted = adapt(fixture.bytes(), fixture.root, {0});
+    check(native32(converted, 384) == 1 && native32(converted, 416) == 3 &&
+              native32(converted, 424) == 2 &&
+              native32(converted, 428) == 0x3f800000 &&
+              native32(converted, 432) == 0x3f000000 &&
+              native32(converted, 436) == 0xbe800000,
+          "Sheik copy dynamics did not preserve authored PPC scalar values");
+
+    put(fixture.data, 384, 10);
+    rejects([&] { (void)adapt(fixture.bytes(), fixture.root, {0}); });
+    put(fixture.data, 384, 1);
+    std::erase(fixture.reloc, 388);
+    rejects([&] { (void)adapt(fixture.bytes(), fixture.root, {0}); });
+}
+
+void source_copy_dynamics_rows()
+{
+    struct Case {
+        unsigned kind;
+        const char* filename;
+        const char* symbol;
+        std::uint32_t index;
+    };
+    static constexpr Case cases[] = {
+        {FTKIND_SEAK, "PlKbCpSk.dat", "ftDataKirbyCopySeak", 2},
+        {FTKIND_ZELDA, "PlKbCpZd.dat", "ftDataKirbyCopyZelda", 0},
+        {FTKIND_KOOPA, "PlKbCpKp.dat", "ftDataKirbyCopyKoopa", 1},
+        {FTKIND_LINK, "PlKbCpLk.dat", "ftDataKirbyCopyLink", 2},
+        {FTKIND_CLINK, "PlKbCpCl.dat", "ftDataKirbyCopyClink", 2},
+        {FTKIND_PIKACHU, "PlKbCpPk.dat", "ftDataKirbyCopyPikachu", 2},
+        {FTKIND_PICHU, "PlKbCpPc.dat", "ftDataKirbyCopyPichu", 2},
+        {FTKIND_MARS, "PlKbCpMs.dat", "ftDataKirbyCopyMars", 1},
+        {FTKIND_MEWTWO, "PlKbCpMt.dat", "ftDataKirbyCopyMewtwo", 4},
+        {FTKIND_PURIN, "PlKbCpPr.dat", "ftDataKirbyCopyPurin", 3},
+        {FTKIND_EMBLEM, "PlKbCpFe.dat", "ftDataKirbyCopyEmblem", 1},
+    };
+    for (const auto& test : cases) {
+        Fixture fixture(false);
+        fixture.root.filename = test.filename;
+        fixture.root.symbol = test.symbol;
+        fixture.root.fighter_kind = test.kind;
+        const auto descriptor = 16U + 0x0CU + test.index * 4U;
+        std::erase(fixture.reloc, descriptor);
+        fixture.link(descriptor, 384);
+        put(fixture.data, 384, 1);
+        fixture.link(388, 416);
+        put(fixture.data, 416, 3);
+        put(fixture.data, 424, 2);
+        put(fixture.data, 428, 0x3f800000);
+        put(fixture.data, 432, 0x3f000000);
+        put(fixture.data, 436, 0xbe800000);
+
+        const auto input = fixture.bytes();
+        const DatArchive archive(input, DatExternalPolicy::ResolveNull);
+        auto converted = input;
+        adapt_kirby_copy_dynamics(converted, archive, fixture.root);
+        check(native32(converted, 384) == 1 &&
+                  native32(converted, 416) == 3 &&
+                  native32(converted, 424) == 2 &&
+                  native32(converted, 428) == 0x3f800000 &&
+                  native32(converted, 432) == 0x3f000000 &&
+                  native32(converted, 436) == 0xbe800000,
+              "Source Kirby copy dynamics row was not converted");
+    }
+
+    Fixture unrelated(false);
+    unrelated.root.filename = "unrelated.dat";
+    unrelated.root.symbol = "ftDataKirbyCopySeak";
+    unrelated.root.fighter_kind = FTKIND_SEAK;
+    unrelated.link(36, 384);
+    put(unrelated.data, 384, 1);
+    const auto input = unrelated.bytes();
+    const DatArchive archive(input, DatExternalPolicy::ResolveNull);
+    auto unchanged = input;
+    adapt_kirby_copy_dynamics(unchanged, archive, unrelated.root);
+    check(read_be32(unchanged, 32U + 384U) == 1,
+          "Kirby dynamics adapter converted an unowned source root");
+}
+
+void copy_effect_empty_source_bank()
+{
+    KirbyCopyEffectRequirement requirement;
+    check(!copy_effect_requirement_from_source(FTKIND_YOSHI, 40, nullptr,
+              nullptr, true, requirement),
+          "Yoshi's source-authored empty Kirby effect bank must remain empty");
+    check(copy_effect_requirement_from_source(FTKIND_FALCO, 32,
+              "EfFxData.dat", "effFoxDataTable", true, requirement) &&
+              requirement.filename == "EfFxData.dat" &&
+              requirement.symbol == "effFoxDataTable" &&
+              requirement.effect_bank == 32,
+          "Complete source Kirby effect identity was not retained");
+    rejects([&] { (void)copy_effect_requirement_from_source(
+        FTKIND_YOSHI, 40, nullptr, "effYoshiDataTable", true, requirement); });
+    rejects([&] { (void)copy_effect_requirement_from_source(
+        FTKIND_YOSHI, 40, nullptr, nullptr, false, requirement); });
+    rejects([&] { (void)copy_effect_requirement_from_source(
+        FTKIND_YOSHI, 51, nullptr, nullptr, true, requirement); });
 }
 
 void costume_fallback()
@@ -288,11 +409,32 @@ void real_archive(const char* filename, const char* symbol, unsigned kind,
     std::ifstream stream(filename, std::ios::binary);
     check(bool(stream), "Owned copy archive unavailable");
     const Bytes input{std::istreambuf_iterator<char>(stream), {}};
-    const KirbyCopyArchiveRequirement root{filename, symbol, kind, false};
+    const auto source_filename = std::filesystem::path(filename).filename().string();
+    const KirbyCopyArchiveRequirement root{source_filename, symbol, kind, false};
     const DatArchive archive(input, DatExternalPolicy::ResolveNull);
     const auto offset = public_root(archive, root.symbol).data_offset;
     const bool joint = archive.has_relocation(offset);
     const auto neutral = adapt(input, root, {0}, body_models);
+    if (!archive.has_relocation(offset + 0x10U))
+        check(native32(neutral, offset + 0x10U) ==
+                  archive.be32(offset + 0x10U),
+              "Owned Kirby added-parts mask was not converted");
+    if (kind == FTKIND_SEAK) {
+        const auto dynamics = archive.pointer(offset + 0x14U, 8);
+        check(bool(dynamics), "Owned Sheik copy dynamics pointer is missing");
+        const auto count = archive.be32(*dynamics);
+        check(native32(neutral, *dynamics) == count,
+              "Owned Sheik copy dynamics count was not converted");
+        if (count) {
+            const auto bones = archive.pointer(
+                *dynamics + 4U, std::size_t{count} * 24U);
+            check(bool(bones), "Owned Sheik copy dynamic bones are missing");
+            check(native32(neutral, *bones) == archive.be32(*bones) &&
+                      native32(neutral, *bones + 8U) ==
+                          archive.be32(*bones + 8U),
+                  "Owned Sheik copy dynamic row scalars were not converted");
+        }
+    }
     for (unsigned costume = 0; costume < 6; ++costume) {
         const auto output = adapt(input, root, {costume}, body_models);
         if (joint) check(output == neutral, "Body costume changed joint-hat rows");
@@ -316,6 +458,13 @@ void real_archive(const char* filename, const char* symbol, unsigned kind,
               "Owned borrowed tail is not the audited pointer/count alias");
         std::cout << "Owned borrowed visibility: body_models=" << body_models
                   << " owner_models=1 tail_count_is_relocation=1\n";
+    }
+    if (kind == FTKIND_FALCO) {
+        check(!archive.has_relocation(offset + 0x10U) &&
+                  archive.be32(offset + 0x10U) == 0x1800U &&
+                  native32(neutral, offset + 0x10U) == 0x1800U,
+              "Owned Falco copy added-parts mask lost its source bits");
+        std::cout << "Falco Kirby source added-parts mask=0x1800 converted=0x1800\n";
     }
     std::cout << symbol << ": all six costumes and shared selection passed\n";
 }
@@ -348,6 +497,9 @@ int main(int argc, char** argv)
         else if (argc == 2) {
             const std::string name = argv[1];
             if (name == "joint_row_zero") joint_row_zero();
+            else if (name == "sheik_copy_dynamics") sheik_copy_dynamics();
+            else if (name == "source_copy_dynamics_rows") source_copy_dynamics_rows();
+            else if (name == "copy_effect_empty_source_bank") copy_effect_empty_source_bank();
             else if (name == "costume_fallback") costume_fallback();
             else if (name == "malformed_consumed_rows") malformed_consumed_rows();
             else if (name == "source_costume_cache_rows") source_costume_cache_rows();

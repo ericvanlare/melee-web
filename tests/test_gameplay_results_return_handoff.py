@@ -46,6 +46,7 @@ _HARNESS_PREFIX = r'''
 struct RuntimeFiles {};
 struct ResultsMatchInfo {};
 struct AuroraStats {};
+struct MeleeWebResultsCameraEntrySnapshot {};
 struct MeleeWebMenuHost {
     int destination;
     const struct MeleeWebPadState* input;
@@ -64,6 +65,7 @@ class GameplayResultsSession {
 public:
     void exit_scene() { ++exit_calls; }
     std::uint32_t random_seed() const { return 17; }
+    MeleeWebResultsCameraEntrySnapshot camera_entry_snapshot() const { return {}; }
     void close() { ++close_calls; }
     static unsigned exit_calls;
     static unsigned close_calls;
@@ -95,6 +97,7 @@ RuntimeFiles files;
 MeleeWebMenuHost* host = nullptr;
 std::unique_ptr<melee_web::GameplayResultsSession> results;
 std::unique_ptr<melee_web::GameplayPrizeSession> prize;
+MeleeWebResultsCameraEntrySnapshot results_camera_entry_snapshot;
 ResultsMatchInfo results_info;
 ReplayCompletionState replay_completion;
 AssetDestination asset_destination = AssetDestination::None;

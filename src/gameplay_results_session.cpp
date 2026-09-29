@@ -125,6 +125,8 @@ struct GameplayResultsSession::Storage {
     std::unique_ptr<GameplayAudioBank> bank;
     std::unique_ptr<GameplayAudioStream> music;
     MeleeWebResultsContext* context = nullptr;
+    MeleeWebResultsCameraEntrySnapshot last_camera_entry_snapshot{};
+    bool camera_snapshot_available = false;
 
     void start(const RuntimeFiles& files, const ResultsMatchInfo& result,
                uint32_t seed, const MeleeWebPadState& input)
@@ -234,7 +236,9 @@ struct GameplayResultsSession::Storage {
     {
         char error[256]{};
         if (context) {
-            check(melee_web_results_context_end(context, error, sizeof(error)), error);
+            camera_snapshot_available = true;
+            check(melee_web_results_context_end(context, &last_camera_entry_snapshot,
+                                                error, sizeof(error)), error);
             context = nullptr;
         }
         music.reset();
@@ -310,6 +314,7 @@ uint32_t GameplayResultsSession::source_frames() const
 
 MeleeWebResultsCameraEntrySnapshot GameplayResultsSession::camera_entry_snapshot() const
 {
+    if (storage_->camera_snapshot_available) return storage_->last_camera_entry_snapshot;
     MeleeWebResultsCameraEntrySnapshot snapshot{};
     check(melee_web_results_context_camera_entry_snapshot(storage_->context, &snapshot),
           "Original Results camera entry snapshot is unavailable");

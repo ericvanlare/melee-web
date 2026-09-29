@@ -65,6 +65,15 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
     def test_joint_hat_uses_source_row_zero(self):
         self.run_case("joint_row_zero")
 
+    def test_sheik_copy_dynamics_are_native_but_source_bounded(self):
+        self.run_case("sheik_copy_dynamics")
+
+    def test_source_copy_dynamics_follow_original_callback_rows(self):
+        self.run_case("source_copy_dynamics_rows")
+
+    def test_authored_empty_kirby_effect_bank_is_not_a_fallback(self):
+        self.run_case("copy_effect_empty_source_bank")
+
     def test_costume_parts_and_textures_use_source_fallback(self):
         self.run_case("costume_fallback")
 

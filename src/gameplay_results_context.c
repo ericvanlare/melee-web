@@ -110,6 +110,15 @@ struct MeleeWebResultsContext {
     uint32_t camera_allocation_generation_after_collision_adoption;
     int camera_allocation_subject_count_after_onenter;
     int camera_allocation_subject_count_after_collision_adoption;
+    uint32_t camera_pool_event_count;
+    int camera_pool_event_overflow;
+    MeleeWebResultsCameraPoolEvent camera_pool_events[
+        MELEE_WEB_RESULTS_CAMERA_POOL_EVENT_CAPACITY];
+    uint32_t camera_subject_event_count;
+    int camera_subject_event_overflow;
+    MeleeWebResultsCameraSubjectEvent camera_subject_events[
+        MELEE_WEB_RESULTS_CAMERA_SUBJECT_EVENT_CAPACITY];
+    MeleeWebResultsCameraEntrySnapshot* camera_snapshot_sink;
     MeleeWebCollision* collision;
     HSD_GObj *flash_overlay, *flash_camera;
     int scene_entered, drawing, transition, flash_saved;
@@ -155,18 +164,118 @@ static int camera_pool_owned(const MeleeWebResultsContext* context,
     if (cm_804D645C == context->camera_pool &&
         context->camera_pool == owner_camera_pool &&
         source_generation == context->camera_allocation_generation) return 1;
-    char message[256];
+    const MeleeWebResultsCameraPoolEvent* last_event =
+        context->camera_pool_event_count ?
+            &context->camera_pool_events[context->camera_pool_event_count - 1] : NULL;
+    char message[512];
     snprintf(message, sizeof(message),
              "Original Results camera pool ownership changed at %s tick=%u "
              "source=%p context_pool=%p initial=%p context=%p actor=%p "
              "source_allocation_generation=%u expected_generation=%u "
-             "last_subject_count=%d",
+             "last_subject_count=%d camera_events=%u last_event=%s@%u "
+             "last_event_pool=%p last_event_generation=%u",
              phase, context->ticks, (void*) cm_804D645C,
              (void*) context->camera_pool, (void*) owner_camera_pool,
              (const void*) context, actor, source_generation,
-             context->camera_allocation_generation, last_subject_count);
+             context->camera_allocation_generation, last_subject_count,
+             context->camera_pool_event_count,
+             last_event ? last_event->phase : "none",
+             last_event ? last_event->source_tick : 0,
+             last_event ? (void*) last_event->source_pool : NULL,
+             last_event ? last_event->allocation_generation : 0);
     fprintf(stderr, "%s\n", message);
     return fail(error, size, message);
+}
+
+void melee_web_results_camera_pool_allocation_trace(const char* phase,
+                                                     int subject_count)
+{
+    MeleeWebResultsContext* context = owner;
+    if (!context) return;
+    if (context->camera_pool_event_count >=
+        MELEE_WEB_RESULTS_CAMERA_POOL_EVENT_CAPACITY) {
+        context->camera_pool_event_overflow = 1;
+        return;
+    }
+    MeleeWebResultsCameraPoolEvent* event =
+        &context->camera_pool_events[context->camera_pool_event_count++];
+    memset(event, 0, sizeof(*event));
+    snprintf(event->phase, sizeof(event->phase), "%s", phase);
+    event->source_tick = context->ticks;
+    event->scene_entered = context->scene_entered;
+    event->subject_count = subject_count;
+    event->source_free = cm_804D6458;
+    event->source_pool = cm_804D645C;
+    event->source_active = cm_804D6460;
+    event->source_tail = cm_804D6468;
+    event->owner_pool = owner_camera_pool;
+    event->context_pool = context->camera_pool;
+    event->expected_pool = context->camera_pool_after_onenter;
+    event->allocation_generation =
+        melee_web_camera_pool_allocation_generation_value();
+    event->generation_before_onenter =
+        context->camera_allocation_generation_before_onenter;
+    event->expected_generation = context->camera_allocation_generation;
+}
+
+static int camera_pool_contains(const void* pointer, int allow_null)
+{
+    if (!pointer) return allow_null;
+    if (!cm_804D645C) return 0;
+    const int count = melee_web_camera_pool_last_subject_count_value();
+    if (count <= 0) return 0;
+    const uintptr_t begin = (uintptr_t) cm_804D645C;
+    const uintptr_t address = (uintptr_t) pointer;
+    const uintptr_t bytes = (uintptr_t) count * sizeof(CmSubject);
+    return address >= begin && address - begin < bytes &&
+           (address - begin) % sizeof(CmSubject) == 0;
+}
+
+void melee_web_results_camera_subject_list_trace(const char* phase,
+                                                   const void* subject_pointer)
+{
+    MeleeWebResultsContext* context = owner;
+    if (!context) return;
+    if (context->camera_subject_event_count >=
+        MELEE_WEB_RESULTS_CAMERA_SUBJECT_EVENT_CAPACITY) {
+        context->camera_subject_event_overflow = 1;
+        if (context->camera_snapshot_sink)
+            context->camera_snapshot_sink->source_camera_subject_event_overflow = 1;
+        return;
+    }
+    const int subject_in_pool = camera_pool_contains(subject_pointer, 0);
+    const CmSubject* subject = subject_in_pool ? (const CmSubject*) subject_pointer : NULL;
+    MeleeWebResultsCameraSubjectEvent* event =
+        &context->camera_subject_events[context->camera_subject_event_count++];
+    memset(event, 0, sizeof(*event));
+    snprintf(event->phase, sizeof(event->phase), "%s", phase ? phase : "unknown");
+    event->source_tick = context->ticks;
+    event->scene_entered = context->scene_entered;
+    event->subject = subject_pointer;
+    event->subject_prev = subject ? subject->prev : NULL;
+    event->subject_next = subject ? subject->next : NULL;
+    event->source_free = cm_804D6458;
+    event->source_pool = cm_804D645C;
+    event->source_active = cm_804D6460;
+    event->source_tail = cm_804D6468;
+    event->owner_pool = owner_camera_pool;
+    event->context_pool = context->camera_pool;
+    event->allocation_generation =
+        melee_web_camera_pool_allocation_generation_value();
+    event->subject_in_pool = subject_in_pool;
+    event->subject_prev_in_pool = camera_pool_contains(event->subject_prev, 1);
+    event->subject_next_in_pool = camera_pool_contains(event->subject_next, 1);
+    event->free_in_pool = camera_pool_contains(event->source_free, 1);
+    event->active_in_pool = camera_pool_contains(event->source_active, 1);
+    event->tail_in_pool = camera_pool_contains(event->source_tail, 1);
+
+    MeleeWebResultsCameraEntrySnapshot* sink = context->camera_snapshot_sink;
+    if (sink) {
+        const uint32_t index = context->camera_subject_event_count - 1;
+        sink->source_camera_subject_events[index] = *event;
+        sink->source_camera_subject_event_count = context->camera_subject_event_count;
+        sink->source_camera_subject_event_overflow = context->camera_subject_event_overflow;
+    }
 }
 
 static int baseline_has(const MeleeWebResultsContext* context, HSD_GObj* object)
@@ -262,7 +371,9 @@ static int release_source_camera_and_ground(MeleeWebResultsContext* context,
     if (cm_804D6460 || cm_804D6468 || HSD_ShadowGetAllocData()->used)
         return fail(error, size, "Results camera subjects or shadows remain during teardown");
     if (!camera_pool_owned(context, "camera release", NULL, error, size)) return 0;
+    melee_web_results_camera_subject_list_trace("Results before HSD_Free", NULL);
     if (context->camera_pool) HSD_Free(context->camera_pool);
+    melee_web_results_camera_subject_list_trace("Results after HSD_Free", NULL);
     context->camera_pool = NULL;
     owner_camera_pool = NULL;
     cm_804D6458 = context->saved_camera_free;
@@ -270,6 +381,7 @@ static int release_source_camera_and_ground(MeleeWebResultsContext* context,
     cm_804D6460 = context->saved_camera_active;
     cm_804D6468 = context->saved_camera_tail;
     cm_804D6464 = context->saved_camera_object;
+    melee_web_results_camera_subject_list_trace("Results after camera-global restore", NULL);
     if (!melee_web_ground_map_storage_end())
         return fail(error, size, "Original Results Ground storage still owns stage objects");
     stage_info = context->saved_stage;
@@ -561,11 +673,10 @@ uint32_t melee_web_results_context_ticks(const MeleeWebResultsContext* context)
     return context && context == owner ? context->ticks : 0;
 }
 
-int melee_web_results_context_camera_entry_snapshot(
+static void copy_camera_entry_snapshot(
     const MeleeWebResultsContext* context,
     MeleeWebResultsCameraEntrySnapshot* snapshot)
 {
-    if (!context || context != owner || !context->scene_entered || !snapshot) return 0;
     snapshot->saved_pool_at_context_begin = context->saved_camera_pool;
     snapshot->source_pool_before_onenter = context->camera_pool_before_onenter;
     snapshot->owner_pool_before_onenter = context->owner_camera_pool_before_onenter;
@@ -583,6 +694,23 @@ int melee_web_results_context_camera_entry_snapshot(
         context->camera_allocation_generation_after_collision_adoption;
     snapshot->source_camera_allocation_subject_count_after_collision_adoption =
         context->camera_allocation_subject_count_after_collision_adoption;
+    snapshot->source_camera_pool_event_count = context->camera_pool_event_count;
+    snapshot->source_camera_pool_event_overflow = context->camera_pool_event_overflow;
+    memcpy(snapshot->source_camera_pool_events, context->camera_pool_events,
+           sizeof(snapshot->source_camera_pool_events));
+    snapshot->source_camera_subject_event_count = context->camera_subject_event_count;
+    snapshot->source_camera_subject_event_overflow = context->camera_subject_event_overflow;
+    memcpy(snapshot->source_camera_subject_events, context->camera_subject_events,
+           context->camera_subject_event_count * sizeof(context->camera_subject_events[0]));
+}
+
+int melee_web_results_context_camera_entry_snapshot(
+    const MeleeWebResultsContext* context,
+    MeleeWebResultsCameraEntrySnapshot* snapshot)
+{
+    if (!context || context != owner || !snapshot) return 0;
+    memset(snapshot, 0, sizeof(*snapshot));
+    copy_camera_entry_snapshot(context, snapshot);
     return 1;
 }
 
@@ -616,9 +744,15 @@ int melee_web_results_context_check_handoff(const char* phase,
 }
 
 int melee_web_results_context_end(MeleeWebResultsContext* context,
+                                  MeleeWebResultsCameraEntrySnapshot* snapshot,
                                   char* error, size_t error_size)
 {
+    if (snapshot) memset(snapshot, 0, sizeof(*snapshot));
     if (!context) return ok(error, error_size);
+    if (snapshot) {
+        copy_camera_entry_snapshot(context, snapshot);
+        context->camera_snapshot_sink = snapshot;
+    }
     if (!live(context, error, error_size)) return 0;
     if (context->drawing)
         return fail(error, error_size, "Results end requires an idle scene");
@@ -655,6 +789,8 @@ int melee_web_results_context_end(MeleeWebResultsContext* context,
         return fail(error, error_size, "Original Results stage selection cannot be restored");
     if (!melee_web_menu_clock_end())
         return fail(error, error_size, "Original Results scene clock cannot be restored");
+    if (snapshot) copy_camera_entry_snapshot(context, snapshot);
+    context->camera_snapshot_sink = NULL;
     owner = NULL;
     free(context->baseline);
     free(context);

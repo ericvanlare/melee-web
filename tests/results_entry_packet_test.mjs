@@ -92,10 +92,10 @@ assert.throws(()=>summarizeResultsPadTrace(reusedObserverTrace),/crossed a sessi
 const neutralPads=()=>[0,1,2,3].map(port=>({button:0,err:port<2?0:-1}));
 const firstStatsPageState=source_frame=>({source_frame,phase:3,stats_phase:2,
   players:[0,1,2,3].map(()=>({page:0,confirmed:0}))});
-const historicalPrefixTrace=(thirdStartFrame=null)=>{
+const historicalPrefixTrace=(thirdStartFrame=null,throughSourceFrame=553)=>{
   let previousP1Button=0;
   const samples=[];
-  for(let source_frame=191;source_frame<=553;source_frame++){
+  for(let source_frame=191;source_frame<=throughSourceFrame;source_frame++){
     const inFirst=source_frame>=192&&source_frame<=201;
     const inSecond=source_frame>=363&&source_frame<=372;
     const inThird=thirdStartFrame!==null&&source_frame>=thirdStartFrame&&
@@ -132,6 +132,19 @@ assert.deepEqual(historicalPrefixGate.transitions.map(row=>row.slot),[2,3]);
 assert.deepEqual(historicalPrefixGate.cpu_page_delay_source_ticks,
   [{slot:2,ticks:180},{slot:3,ticks:180}],
   'The third historical Enter must remain gated until both disconnected CPU pages advance after 180 source ticks');
+const historicalPrefixAtConfirmation=historicalPrefixTrace(null,559);
+const historicalPrefixConfirmationGate=assertResultsCpuPagesAfterP1KeyboardPrefix(
+  historicalPrefixAtConfirmation,[192,363]);
+assert.equal(historicalPrefixConfirmationGate.source_frame,560,
+  'The exact historical confirmation boundary must be reached in source ticks before dispatching P1 Enter');
+assert.deepEqual(historicalPrefixConfirmationGate.transitions.map(row=>row.source_frame),[554,554],
+  'Both disconnected CPU pages must have source-observed 0→1 transitions before cursor 560');
+assert.deepEqual(historicalPrefixConfirmationGate.initial_start_runs,
+  [{first_source_frame:192,last_source_frame:201},{first_source_frame:363,last_source_frame:372}],
+  'No third P1 Start may be source-consumed before the exact confirmation boundary');
+assert.deepEqual(historicalPrefixConfirmationGate.summary.p1_start_runs,
+  historicalPrefixConfirmationGate.initial_start_runs,
+  'The page-gated prefix must stop at cursor 560 before the third trusted keyboard pulse');
 assert.throws(()=>assertResultsCpuPagesAfterP1KeyboardPrefix(
   historicalPrefixTrace(535),[192,363]),
   /additional P1 Start/,

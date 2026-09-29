@@ -426,7 +426,8 @@ void melee_web_command_require_supported(uint32_t opcode)
                 const diagnostic = Object.create(null);
                 diagnostic.opcode = $0;
                 diagnostic.fighters = fighters;
-                window.__meleeWebUnsupportedCommand = diagnostic;
+                if (typeof window !== 'undefined')
+                    window.__meleeWebUnsupportedCommand = diagnostic;
             }, opcode, snapshot);
         }
 #endif

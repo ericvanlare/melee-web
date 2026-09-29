@@ -5,37 +5,76 @@
 Current per-character coverage, original CPU9 references, rendered browser
 match loops, comparison limits, and explicit open gates are recorded in
 [Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md).
-The PR branch is reconciled to current `origin/main` `b542df7`, including
-shared runtime #89 (`aecc3e64`), PR #93 (`2e083bf`), PR #96 (`8671362`), and
-the later #109 audio-capture change. A fresh current-head B capture completed
-four natural CPU9, four-stock Final Destination matches and all four
-Results→CSS→next-match loops. Match 1 naturally ended with slot-2
-Zelda-origin Sheik; its rendered Results, source-tick P1 continuation, and
-return path passed without a camera guard, browser/native error, or timing
-interruption. The controlled confirmation was at Results tick 600, after CPU
-pages auto-advanced at 552. This shows the failure does not reproduce on the
-reconciled branch under that source-tick route; it does not establish the cause
-of the older wall-clock keyboard failure, whose capture lacks consumed PAD and
-camera-entry snapshots. Receipt: `work/pr86-0c9b21a-b-four-match-source-tick-r1/report.json`.
-The fresh two-match Lineup A source-tick loop also passes at PR head `978b9f4`
-(`work/pr86-978b9f4-a-two-match-source-tick553-r1/report.json`). A focused
-native reducer rebuilt and passed at the same head: its natural CPU9
-MatchExitInfo→Results path records disconnected CPU-page transitions before
-the P1-only source-tick confirmation and no camera-pool change through host
-close (`work/results-match-history-tests/native-_pca52qm/`). This Samus-win,
-state-only result does not resolve the old Sheik-winner keyboard failure. The
-historical packet still lacks event/source brackets, consumed PAD, page/port
-state and entry pointers; its first invalid transition is unknown. The exact
-historical keyboard/Sheik combination, supported original comparison, and
-required final full suite remain open. The [per-character notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md)
-retain the scoped receipts and limits.
+
+Latest reconciled checkpoint (2026-09-29): PR #93 is merged and the worktree is
+based on `origin/main` `f670a3b` at merge `9c84690`. The final owned-DOL,
+disc and symbol full suite passed **1,642 tests, 73 skipped** (exit 0); its
+complete log is
+`/Volumes/AgentStorage/melee-web/runs/pr86-camera-list-trace-natural-b-20260929-20260929-114337-230bdcb1/final-suite/full-suite-final.log`.
+Both four-CPU9 character lineups completed two rendered matches each through
+Results→original CSS→the next match. The 25-row Kirby copy-lifecycle matrix and
+the targeted Ice Climbers, Yoshi, Zelda/Sheik, damage/KO and lifecycle checks
+also pass; these do not certify complete movesets or performance.
+
+A fresh no-retry instrumented Lineup B capture used Samus, Yoshi, Zelda, Falco;
+all CPU9, four stocks, Final Destination. The exact trusted P1 Enter edges were
+source ticks 192/202, 363/373 and 560/570; disconnected CPU pages advanced at
+555. Samus won at match frame 15,029 and slot 2 was Zelda (not Sheik) at
+Results. The 19-event source camera trace retained four free-pop/active-append
+and four active-remove/free-push transitions, no overflow, pool-contained
+subjects/links, empty active/tail roots before `HSD_Free`, and null restored
+camera globals after teardown. Results returned to CSS without another input;
+18 screenshots, GPU diagnostics and zero timing interruptions are retained.
+An earlier capture at the same boundary sent an unintended retry at tick 572,
+so it is not counted as the exact three-pulse control. A separate current-tree
+natural Sheik-winner keyboard control passed the same gate but predates typed
+subject-list events. None explains the first invalid transition in the
+historical Sheik-winner failure, so that gate remains open.
+
+Original-vs-port comparison remains limited to exact declared-field gameplay
+rows in the retained A/B recordings; it is not full simulation/draw equivalence.
+Pixels, PCM, foreground timing, physical-controller acceptance and performance
+remain separate open gates.
+
+The branch is reconciled with current `origin/main` `f670a3b` at merge commit
+`9c84690` (including shared runtime #89 `aecc3e64`, PR #93 `2e083bf`, and later
+mainline changes). Fresh headless-Chrome runs on the reconciled working tree
+completed both requested four-CPU9, four-stock Final Destination lineups for
+two natural matches each, including Results→original CSS→the next match. A:
+Kirby won at frame 13,107; Fox at 14,374. B: Falco won at 15,164; Yoshi at
+13,845. B recorded repeated in-match Sheik↔Zelda transitions. Both runs retain
+36 screenshots, CPU-page/P1 input traces, GPU and native diagnostics, and
+source-timing pauses; neither reported page/native-command/browser-target
+errors or crashes. The reports share served Wasm hash
+`8772e2c9af06db3ab493f505cd242adf5866ed3c91cdef5cb46865527384ffa6` and are
+indexed in the [per-character notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md).
+They are rendered functional evidence, not retail comparison, pixel/PCM
+equivalence, foreground timing or performance acceptance. A focused current-tree
+rendered run also naturally produced a Zelda-origin Sheik winner and completed
+the exact source-tick Results input/page gate and return to CSS without a camera
+ownership error. This is a current-baseline non-reproduction, not a diagnosis or
+fix attribution for the older failure; its first invalid transition remains
+unknown. A newer four-match Lineup B control binds the typed allocator-event
+trace: all four matches passed the tick-560 page/input gate and Results→CSS;
+the natural winners were Samus, Samus, Falco and Yoshi, so the Sheik-winner
+conjunction was not exercised. Each Results route recorded only the expected
+original eight-subject allocation and no later allocator call. This still does
+not locate the historical first invalid transition. The full suite and
+character checks have since passed; the historical camera and comparison gates
+remain open.
+The focused Kirby test matrix now passes all 25 non-null copy rows through
+acquisition, donor-specific use, up-appeal loss, same-donor reacquisition and
+teardown. Falco's copied part and neutral special were also observed in a
+rendered Chrome action prefix; Mewtwo's copied Shadow Ball reached full charge
+and released through ordinary A input. These scoped checks do not establish
+full movesets, every donor's KO/loss paths, pixels or performance.
 Focused current-main checks also pass for source-context/collision traces,
 owned-DOL source-stack profiling, common-context restore/restart, stage numeric
 context, effect-bank lifecycle, Nana's nonzero Results asset root, and the
 texture/material/native-joint/archive set (44 tests). Optional Link/Pikachu
 effect archives are absent locally and remain unverified. The A and B receipts
-above are current-head rendered functional scenarios; the required final full
-suite remains open.
+above are current-head rendered functional scenarios; the reconciled full-suite
+result is recorded above and detailed in the notes.
 Main including PR #89 is merged and its ownership/carry guarantees retained.
 Reconciled checks exposed and repaired the Player mapping owner, Nana's signed
 input history and partner-correction rounding. The original-consistent partner

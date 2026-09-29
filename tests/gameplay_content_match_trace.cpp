@@ -50,8 +50,10 @@ extern "C" int melee_web_test_entity_position(unsigned,unsigned,float*,float*);
 extern "C" int melee_web_test_entity_damage(unsigned,unsigned,float*);
 extern "C" int melee_web_test_active_fighter_kind(unsigned);
 extern "C" int melee_web_test_active_fighter_state(unsigned,int*,int*,float*,float*);
+extern "C" int melee_web_test_facing_dir(unsigned,float*);
 extern "C" int melee_web_test_invoke_dormant_zelda_transform(unsigned);
 extern "C" int melee_web_test_kirby_copy_kind(unsigned);
+extern "C" int melee_web_test_kirby_link_dynamics(int*,unsigned*,unsigned*,int*);
 extern "C" int melee_web_test_apply_kirby_copy_visibility(unsigned);
 extern "C" int melee_web_test_fighter_owns_victim(unsigned,unsigned);
 extern "C" int melee_web_test_entity_owns_entity(unsigned,unsigned,unsigned,unsigned);
@@ -152,6 +154,7 @@ static std::array<int,2> kirby_copy_article_kinds(int fighter_kind){
     default:return {-1,-1};
     }
 }
+
 static bool kirby_copy_nonarticle_motion(int fighter_kind,int motion){
     switch(fighter_kind){
     case FTKIND_DONKEY:
@@ -384,9 +387,15 @@ int main(int argc,char** argv){try{
             selection.start.players[1].slot_type=Gm_PKind_Human;
             selection.start.players[1].rumble_enabled=0;
         }
-        if(kirby_form_donor_case){
+        if(kirby_form_donor_case||opponent_ckind==CKIND_YOSHI||
+           (action_coverage&&fighter_ckind==CKIND_KIRBY)){
             // Hold the exact Zelda/Sheik source identity under neutral input;
             // a CPU down-B could change which donor Kirby is meant to copy.
+            // Kirby's Yoshi copy is a victim-capture move, so keep its source
+            // target stationary instead of letting CPU9 evade the tongue.
+            // The same neutral source-PAD control keeps donor lifecycle probes
+            // from becoming CPU chase tests after Kirby spits a victim behind
+            // itself; those probes validate the source copy path, not CPU AI.
             selection.start.players[1].slot_type=Gm_PKind_Human;
             selection.start.players[1].rumble_enabled=0;
         }
@@ -414,7 +423,8 @@ int main(int argc,char** argv){try{
         const unsigned match_player_count=cpu9_match?4U:
             ((slot2_transform||kirby_mario_fox_replacement)?3U:2U);
         PADStatus raw[4]{};if(match_player_count<3)raw[2].err=PAD_ERR_NO_CONTROLLER;
-        if(ice_action_case||kirby_form_donor_case)raw[1].err=PAD_ERR_NO_CONTROLLER;
+        if(ice_action_case||kirby_form_donor_case||opponent_ckind==CKIND_YOSHI)
+            raw[1].err=PAD_ERR_NO_CONTROLLER;
         raw[3].err=PAD_ERR_NO_CONTROLLER;
         float pcm[1068];unsigned phase=0;
         auto tick=[&](){
@@ -424,6 +434,18 @@ int main(int argc,char** argv){try{
                 check(std::isfinite(state.position[0])&&std::isfinite(state.position[1]),"Nonfinite fighter state");}};
         for(unsigned n=0;!match.ready()&&n<600;n++)tick();
         check(match.ready(),"Original Ready did not finish");
+        if(fighter_ckind==CKIND_KIRBY){
+            int present=0,count=-1;unsigned hat=0,dynamics=0;
+            const int observed=melee_web_test_kirby_link_dynamics(
+                &present,&hat,&dynamics,&count);
+            std::cout<<"Kirby Link-loader boundary present="<<present
+                     <<" observed="<<observed<<" hat=0x"<<std::hex<<hat
+                     <<" dynamics=0x"<<dynamics<<std::dec
+                     <<" authored_count_native="<<count<<std::endl;
+            if(opponent_ckind==CKIND_SEAK)
+                check(present&&observed&&count==2,
+                      "Kirby Sheik copy did not publish its source-owned two-row Link-loader dynamics");
+        }
         const int selected_fighter_ckind=cpu9_match?
             selection.start.players[0].ckind:fighter_ckind;
         const int active_fighter_ckind=startup_transform?
@@ -438,11 +460,12 @@ int main(int argc,char** argv){try{
         if(fighter_ckind==CKIND_POPONANA){
             int primary_kind=-1,partner_kind=-1,primary_motion=-1,partner_motion=-1;
             int primary_grounded=0,partner_grounded=0,primary_skeleton=0,partner_skeleton=0;
-            check(melee_web_test_entity_state(0,0,&primary_kind,&primary_motion,&primary_grounded,&primary_skeleton)&&
-                  melee_web_test_entity_state(0,1,&partner_kind,&partner_motion,&partner_grounded,&partner_skeleton)&&
+            const unsigned ice_slot=ice_cpu_lifecycle?2U:0U;
+            check(melee_web_test_entity_state(ice_slot,0,&primary_kind,&primary_motion,&primary_grounded,&primary_skeleton)&&
+                  melee_web_test_entity_state(ice_slot,1,&partner_kind,&partner_motion,&partner_grounded,&partner_skeleton)&&
                   primary_kind==FTKIND_POPO&&partner_kind==FTKIND_NANA&&primary_skeleton&&partner_skeleton,
                   "Ice Climbers source player must own distinct Popo and Nana fighter entities");
-            std::cout<<"Ice pair primary="<<primary_kind<<"/"<<primary_motion<<"/"<<primary_grounded
+            std::cout<<"Ice pair source slot="<<ice_slot<<" primary="<<primary_kind<<"/"<<primary_motion<<"/"<<primary_grounded
                      <<" partner="<<partner_kind<<"/"<<partner_motion<<"/"<<partner_grounded<<std::endl;
         }
         const int selected_opponent_ckind=cpu9_match?
@@ -1131,12 +1154,31 @@ int main(int argc,char** argv){try{
                     if(captured_entity_motion)*captured_entity_motion=-1;
                     const auto start_self=match.player_stats(0);
                     const auto start_target=match.player_stats(target_slot);
+                    float start_facing=0.0f,target_facing=0.0f;
+                    melee_web_test_facing_dir(0,&start_facing);
+                    melee_web_test_facing_dir(target_slot,&target_facing);
                     std::cout<<"Kirby donor acquisition phase="<<acquisition_phase
                              <<" donor="<<donor_kind<<" start self="<<start_self.motion_id
                              <<"/"<<start_self.position[0]<<","<<start_self.position[1]
                              <<" target="<<start_target.motion_id<<"/"
                              <<start_target.position[0]<<","<<start_target.position[1]
+                             <<" facing="<<start_facing<<"/"<<target_facing
                              <<std::endl;
+                    neutral();settle_primary();
+                    const auto approach_self=match.player_stats(0);
+                    const auto approach_target=match.player_stats(target_slot);
+                    if(approach_self.ground_or_air==0&&approach_target.ground_or_air==0&&
+                       std::fabs(approach_target.position[0]-approach_self.position[0])>0.01f){
+                        // A previous swallow can leave the donor behind Kirby.
+                        // A one-frame ordinary stick input turns toward that
+                        // live target even when it is already just inside the
+                        // approach radius; otherwise the next B edge can be
+                        // pointed away from it.
+                        raw[0].stickX=approach_target.position[0]>approach_self.position[0]?
+                            80.0f:-80.0f;
+                        for(unsigned turn_tick=0;turn_tick<3;turn_tick++)tick();
+                        neutral();settle_primary();
+                    }
                     const float approach_gap=donor_kind==FTKIND_FOX?4.0f:7.0f;
                     const float stick_dead_zone=donor_kind==FTKIND_FOX?3.0f:5.0f;
                     unsigned approach_ticks=0;
@@ -1146,20 +1188,33 @@ int main(int argc,char** argv){try{
                         const float dx=target.position[0]-self.position[0];
                         const float dy=target.position[1]-self.position[1];
                         if(std::fabs(dx)<approach_gap&&std::fabs(dy)<5.0f){
-                            in_range=true;break;
+                            float facing=0.0f;
+                            melee_web_test_facing_dir(0,&facing);
+                            if(dx*facing>0.0f){in_range=true;break;}
+                            // Close-range turning is still source PAD input.
+                            // Do not let the subsequent neutral settling window
+                            // carry Kirby across the stationary donor and turn
+                            // the inhale away from it.
+                            raw[0].stickX=dx>0.0f?80.0f:-80.0f;
+                            raw[0].stickY=0.0f;
+                            tick();
+                            continue;
                         }
                         raw[0].stickX=std::fabs(dx)<stick_dead_zone?0:(dx>0?80:-80);
                         raw[0].stickY=std::fabs(dy)<4.0f?0:(dy>0?60:-60);tick();
                     }
-                    neutral();settle_primary();
+                    neutral();
                     const auto capture_self=match.player_stats(0);
                     const auto capture_target=match.player_stats(target_slot);
+                    float capture_facing=0.0f;
+                    melee_web_test_facing_dir(0,&capture_facing);
                     std::cout<<"Kirby donor acquisition phase="<<acquisition_phase
                              <<" approach_ticks="<<approach_ticks<<" in_range="<<in_range
                              <<" before_inhale self="<<capture_self.motion_id<<"/"
                              <<capture_self.position[0]<<","<<capture_self.position[1]
                              <<" target="<<capture_target.motion_id<<"/"
                              <<capture_target.position[0]<<","<<capture_target.position[1]
+                             <<" facing="<<capture_facing
                              <<std::endl;
                     bool captured=false;
                     for(unsigned n=0;n<240&&!captured;n++){
@@ -1276,6 +1331,45 @@ int main(int argc,char** argv){try{
                     }
                 };
                 const auto use_copy=[&](int donor_kind){
+                    if(donor_kind==FTKIND_YOSHI){
+                        bool aligned=false;
+                        for(unsigned n=0;n<600&&!aligned;n++){
+                            const auto self=match.player_stats(0);
+                            const auto target=match.player_stats(1);
+                            const float dx=target.position[0]-self.position[0];
+                            const float dy=target.position[1]-self.position[1];
+                            aligned=self.ground_or_air==0&&target.ground_or_air==0&&
+                                std::fabs(dx)<=5.0f&&std::fabs(dy)<5.0f;
+                            if(aligned)break;
+                            if(self.ground_or_air==0&&target.ground_or_air==0){
+                                raw[0].stickX=std::fabs(dx)<=5.0f?0.0f:(dx>0?80.0f:-80.0f);
+                                raw[0].stickY=std::fabs(dy)<4.0f?0.0f:(dy>0?60.0f:-60.0f);
+                            }else raw[0].stickX=raw[0].stickY=0;
+                            raw[0].button=0;tick();
+                        }
+                        neutral();
+                        const auto self=match.player_stats(0);
+                        const auto target=match.player_stats(1);
+                        check(aligned,"Kirby Yoshi-copy victim did not settle into capture range; self="+
+                              std::to_string(self.position[0])+","+
+                              std::to_string(self.position[1])+" target="+
+                              std::to_string(target.position[0])+","+
+                              std::to_string(target.position[1])+" motions="+
+                              std::to_string(self.motion_id)+","+
+                              std::to_string(target.motion_id));
+                        // The first inhale ejects the target; after reacquiring
+                        // the copy, preserve the victim's new side and turn
+                        // toward it with ordinary PAD before pressing B.
+                        raw[0].stickX=target.position[0]>self.position[0]?60.0f:-60.0f;
+                        tick();
+                        neutral();
+                        const auto turned_self=match.player_stats(0);
+                        const auto turned_target=match.player_stats(1);
+                        std::cout<<"Kirby Yoshi-copy capture setup source-PAD aligned target at dx="
+                                 <<target.position[0]-self.position[0]<<" then turned toward victim; post-turn dx="
+                                 <<turned_target.position[0]-turned_self.position[0]<<std::endl;
+                        settle_primary();
+                    }
                     if(donor_kind==FTKIND_CAPTAIN||donor_kind==FTKIND_GANON){
                         // Falcon Punch and Warlock Punch have no copied
                         // Article. Reposition only through the normal source
@@ -1334,7 +1428,13 @@ int main(int argc,char** argv){try{
                         return;
                     }
                     bool copied_move=false;
+                    bool yoshi_copy_motion=false;
+                    bool yoshi_victim_egg=false;
+                    bool yoshi_capture_reaction=false;
+                    bool yoshi_capture_owned=false;
+                    int last_copy_motion=-1;
                     int copied_article_kind=-1;
+                    const auto yoshi_victim_stocks=match.player_stats(1).stocks;
                     const auto article_kinds=kirby_copy_article_kinds(donor_kind);
                     if(article_kinds[0]<0){
                         int copied_motion=-1;
@@ -1358,13 +1458,136 @@ int main(int argc,char** argv){try{
                         return true;
                     };
                     for(unsigned n=0;n<180&&!copied_move;n++){
-                        raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                        raw[0].button=(donor_kind==FTKIND_YOSHI?
+                            (n==0?PAD_BUTTON_B:0):(n%8==0?PAD_BUTTON_B:0));tick();
+                        last_copy_motion=match.player_stats(0).motion_id;
+                        yoshi_copy_motion|=donor_kind==FTKIND_YOSHI&&
+                            last_copy_motion==ftKb_MS_YsSpecialN1;
+                        if(donor_kind==FTKIND_YOSHI){
+                            const int victim_motion=match.player_stats(1).motion_id;
+                            // The common capture reaction may be transient
+                            // without the victim entering Egg. Treat only the
+                            // authored held-Egg state as capture coverage;
+                            // otherwise this donor path is the Egg Lay Article.
+                            yoshi_victim_egg|=victim_motion==ftCo_MS_YoshiEgg;
+                            yoshi_capture_reaction|=
+                                victim_motion==ftCo_MS_CaptureKirbyYoshi;
+                            yoshi_capture_owned|=
+                                melee_web_test_fighter_owns_victim(0,1)!=0;
+                        }
                         copied_move=article_live(article_kinds[0])||
-                            article_live(article_kinds[1]);
+                            article_live(article_kinds[1])||yoshi_victim_egg||
+                            (yoshi_copy_motion&&yoshi_capture_reaction);
                     }
                     neutral();
                     check(copied_move,"Kirby did not execute the source neutral special for donor "+
-                          std::to_string(donor_kind));
+                          std::to_string(donor_kind)+"; last_motion="+
+                          std::to_string(last_copy_motion)+" yoshi_motion="+
+                          std::to_string(yoshi_copy_motion)+" victim_motion="+
+                          std::to_string(match.player_stats(1).motion_id)+
+                          " expected_article_count="+
+                          std::to_string(melee_web_test_item_count(article_kinds[0])));
+                    if(donor_kind==FTKIND_MEWTWO){
+                        const int shadow_count=melee_web_test_item_count(
+                            It_Kind_Kirby_MewtwoShadowBall);
+                        check(copied_article_kind==It_Kind_Kirby_MewtwoShadowBall&&
+                                  shadow_count>0,
+                              "Kirby Mewtwo copied neutral did not create its held Shadow Ball; article="+
+                                  std::to_string(copied_article_kind)+" count="+
+                                  std::to_string(shadow_count));
+                        neutral();
+                        unsigned charge_ticks=0;
+                        for(;charge_ticks<900&&match.player_stats(0).motion_id!=
+                                ftKb_MS_MtSpecialNLoopFull;charge_ticks++)tick();
+                        const auto charged=match.player_stats(0);
+                        check(charged.motion_id==ftKb_MS_MtSpecialNLoopFull,
+                              "Kirby Mewtwo copied Shadow Ball did not reach held full charge under neutral source input; motion="+
+                                  std::to_string(charged.motion_id)+" ticks="+
+                                  std::to_string(charge_ticks)+" article_count="+
+                                  std::to_string(melee_web_test_item_count(
+                                      It_Kind_Kirby_MewtwoShadowBall)));
+                        // The copied Mewtwo charge loop intentionally persists
+                        // after B is released. Release it with a real A edge,
+                        // as the source IASA accepts A or B to enter End.
+                        raw[0].button=PAD_BUTTON_A;tick();
+                        const int release_motion=match.player_stats(0).motion_id;
+                        check(release_motion==ftKb_MS_MtSpecialNEnd,
+                              "Kirby Mewtwo full-charge A release did not enter source End; motion="+
+                                  std::to_string(release_motion));
+                        neutral();
+                        settle_primary();
+                        std::cout<<"Kirby copied Mewtwo Shadow Ball reached held full charge with source Article kind="
+                                 <<It_Kind_Kirby_MewtwoShadowBall<<" initial_count="<<shadow_count
+                                 <<" after "<<charge_ticks<<" neutral source ticks; ordinary A input entered "
+                                 <<"ftKb_MS_MtSpecialNEnd and returned to grounded Wait"
+                                 <<std::endl;
+                        return;
+                    }
+                    if(donor_kind==FTKIND_YOSHI){
+                        if(!yoshi_victim_egg){
+                            if(copied_article_kind!=It_Kind_Kirby_YoshiEggLay){
+                                check(yoshi_copy_motion&&yoshi_capture_reaction,
+                                      "Kirby Yoshi copy produced neither its held Egg state, source Article, nor capture reaction");
+                                unsigned release_ticks=0;
+                                for(;release_ticks<900&&
+                                        melee_web_test_fighter_owns_victim(0,1);release_ticks++)
+                                    tick();
+                                const auto released=match.player_stats(1);
+                                check(!melee_web_test_fighter_owns_victim(0,1)&&
+                                          released.motion_id!=ftCo_MS_CaptureKirbyYoshi&&
+                                          released.motion_id!=ftCo_MS_YoshiEgg&&
+                                          released.stocks==yoshi_victim_stocks,
+                                      "Kirby Yoshi copy capture reaction did not naturally release; motion="+
+                                          std::to_string(released.motion_id)+" ticks="+
+                                          std::to_string(release_ticks)+" ownership_seen="+
+                                          std::to_string(yoshi_capture_owned));
+                                std::cout<<"Kirby Yoshi copied source motion="
+                                         <<ftKb_MS_YsSpecialN1<<" produced CaptureKirbyYoshi and naturally returned the victim after "
+                                         <<release_ticks<<" source ticks; ownership_seen="
+                                         <<yoshi_capture_owned
+                                         <<" (held Egg/Article path not observed)"<<std::endl;
+                                return;
+                            }
+                            unsigned article_ticks=0;
+                            for(;article_ticks<900&&
+                                    melee_web_test_item_count(It_Kind_Kirby_YoshiEggLay)>0;
+                                article_ticks++)tick();
+                            check(melee_web_test_item_count(It_Kind_Kirby_YoshiEggLay)==0,
+                                  "Kirby copied Yoshi Egg Lay Article did not retire through its source lifecycle");
+                            std::cout<<"Kirby copied Yoshi Egg Lay created source Article kind="
+                                     <<copied_article_kind<<" and retired after "
+                                     <<article_ticks<<" source ticks; victim capture not observed"
+                                     <<std::endl;
+                            return;
+                        }
+                        const auto stocks=match.player_stats(1).stocks;
+                        bool yoshi_egg_entered=yoshi_victim_egg;
+                        unsigned capture_ticks=0;
+                        for(;capture_ticks<900;capture_ticks++){
+                            const int victim_motion=match.player_stats(1).motion_id;
+                            yoshi_egg_entered|=victim_motion==ftCo_MS_YoshiEgg;
+                            if(yoshi_egg_entered&&
+                               victim_motion!=ftCo_MS_YoshiEgg&&
+                               victim_motion!=ftCo_MS_CaptureKirbyYoshi)break;
+                            tick();
+                        }
+                        const auto released=match.player_stats(1);
+                        check(yoshi_egg_entered&&
+                                  released.motion_id!=ftCo_MS_YoshiEgg&&
+                                  released.motion_id!=ftCo_MS_CaptureKirbyYoshi&&
+                                  released.stocks==stocks,
+                              "Kirby copied Yoshi Egg Lay release mismatch: entered="+
+                                  std::to_string(yoshi_egg_entered)+" final_motion="+
+                                  std::to_string(released.motion_id)+" ticks="+
+                                  std::to_string(capture_ticks)+" stocks="+
+                                  std::to_string(released.stocks)+" initial_stocks="+
+                                  std::to_string(stocks));
+                        std::cout<<"Kirby copied Yoshi Egg Lay captured slot-1 victim in source motion "
+                                 <<ftCo_MS_YoshiEgg<<" and naturally released after "
+                                 <<capture_ticks<<" source ticks; stocks="<<released.stocks
+                                 <<std::endl;
+                        return;
+                    }
                     std::cout<<"Kirby copied neutral special created source Article kind="
                              <<copied_article_kind<<" live_count="
                              <<melee_web_test_item_count(copied_article_kind)<<std::endl;

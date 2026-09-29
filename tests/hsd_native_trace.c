@@ -279,7 +279,7 @@ static void descriptor_only_source_lifetime(void)
     MeleeWebNativeDObjDesc dobj = {0};
     joint.source_offset = 0x100;
     material.source_offset = 0x300;
-    material.material.rendermode = 0x40001000U;
+    material.material.rendermode = 0x40000000U;
     joint.child = joint.next = UINT32_MAX;
     joint.dobj = 0;
     joint.scale[0] = joint.scale[1] = joint.scale[2] = 1;
@@ -288,6 +288,7 @@ static void descriptor_only_source_lifetime(void)
     dobj.next = dobj.pobj = UINT32_MAX;
     MeleeWebNativeGraph graph = {&joint, &dobj, NULL, &material, 1, 1, 0, 1, 0};
     MeleeWebNativeJoint* descriptors = melee_web_native_joint_hydrate(&graph, error, sizeof(error));
+    if (!descriptors) fprintf(stderr, "Descriptor-only native HSD hydration failed: %s\n", error);
     CHECK(descriptors);
     HSD_Joint* descriptor = melee_web_native_joint_descriptor(descriptors, error, sizeof(error));
     CHECK(descriptor && !melee_web_native_joint_object(descriptors, error, sizeof(error)));
@@ -297,7 +298,7 @@ static void descriptor_only_source_lifetime(void)
     CHECK(material_descriptor && melee_web_native_joint_source_for_material_desc(
         material_descriptor, &joint_source, &material_source, &render_mode));
     CHECK(joint_source == 0x100 && material_source == 0x300 &&
-          render_mode == 0x40001000U);
+          render_mode == 0x40000000U);
     CHECK(!melee_web_native_joint_source_for_material_desc(
         &material, &joint_source, &material_source, &render_mode));
     for (unsigned pass = 0; pass < 2; ++pass) {

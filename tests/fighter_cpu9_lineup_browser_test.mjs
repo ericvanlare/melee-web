@@ -628,7 +628,7 @@ async function runMatch(matchIndex,expected){
   const waitForResultsPauseAtSourceFrame=async(target,label)=>{
     const waitDeadline=Date.now()+60000;
     while(Date.now()<waitDeadline){
-      state=await diagnostic();
+      state=await resumeResultsIfPaused(await diagnostic());
       if(state.error)throw Error(label+': '+state.error);
       if(state.phase===1)throw Error(label+': Results returned to CSS before its scheduled pause');
       assert(state.phase===8||state.phase===9,
@@ -1432,6 +1432,34 @@ async function runMatch(matchIndex,expected){
     `Results ${matchIndex} collision adoption must not allocate another source camera pool`);
   assert.equal(cameraEntry.source_camera_allocation_subject_count_after_collision_adoption,8,
     `Results ${matchIndex} collision adoption must retain the OnEnter allocation identity`);
+  const subjectEvents=cameraEntry.source_camera_subject_events;
+  assert(Array.isArray(subjectEvents),
+    "Results "+matchIndex+" must retain source camera subject-list mutations");
+  assert.equal(cameraEntry.source_camera_subject_event_overflow,false,
+    "Results "+matchIndex+" camera subject-list trace must not overflow");
+  for(const phase of [
+    'Camera_80029044 before free-pop','Camera_80029044 after active-append',
+    'Camera_800290D4 before active-remove','Camera_800290D4 after free-push',
+    'Results before HSD_Free','Results after HSD_Free',
+    'Results after camera-global restore'])
+    assert(subjectEvents.some(event=>event.phase===phase),
+      "Results "+matchIndex+" must retain "+phase);
+  for(const event of subjectEvents){
+    if(!event.phase.startsWith('Camera_80029044')&&
+       !event.phase.startsWith('Camera_800290D4'))continue;
+    assert.equal(event.subject_in_pool,true,
+      "Results "+matchIndex+" "+event.phase+" subject must belong to the original pool");
+    assert.equal(event.subject_prev_in_pool,true,
+      "Results "+matchIndex+" "+event.phase+" previous link must be null or pool-owned");
+    assert.equal(event.subject_next_in_pool,true,
+      "Results "+matchIndex+" "+event.phase+" next link must be null or pool-owned");
+    assert.equal(event.free_in_pool,true,
+      "Results "+matchIndex+" "+event.phase+" free root must be null or pool-owned");
+    assert.equal(event.active_in_pool,true,
+      "Results "+matchIndex+" "+event.phase+" active root must be null or pool-owned");
+    assert.equal(event.tail_in_pool,true,
+      "Results "+matchIndex+" "+event.phase+" tail root must be null or pool-owned");
+  }
   if(resultsInputMode==='keyboard-three-prefix'){
     const checkpoint=report.results_three_pulse_prefixes.find(row=>row.match===matchIndex);
     assert(checkpoint&&checkpoint.status==='pass',

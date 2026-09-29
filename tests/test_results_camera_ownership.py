@@ -16,6 +16,62 @@ from check_gameplay import node_runtime
 
 
 class ResultsCameraOwnershipTests(unittest.TestCase):
+    def test_camera_subject_lists_and_free_boundary_are_observed(self):
+        context = (ROOT / "src/gameplay_results_context.c").read_text(encoding="utf-8")
+        trace_start = context.index("void melee_web_results_camera_subject_list_trace(")
+        trace_end = context.index("\nstatic int baseline_has(", trace_start)
+        trace = context[trace_start:trace_end]
+        for field in ("camera_subject_event_count", "camera_subject_event_overflow",
+                      "subject_in_pool", "subject_prev_in_pool", "subject_next_in_pool",
+                      "source_free", "source_active", "source_tail",
+                      "context->camera_snapshot_sink"):
+            self.assertIn(field, trace)
+        for phase in ("Results before HSD_Free", "Results after HSD_Free",
+                      "Results after camera-global restore"):
+            self.assertIn(phase, context)
+
+        patch = (ROOT / "patches/melee-gameplay.patch").read_text(encoding="utf-8")
+        for phase in ("Camera_80029044 before free-pop",
+                      "Camera_80029044 after active-append",
+                      "Camera_800290D4 before active-remove",
+                      "Camera_800290D4 after free-push"):
+            self.assertIn(phase, patch)
+
+        browser = (ROOT / "src/gameplay_menu_browser.cpp").read_text(encoding="utf-8")
+        serializer = browser[browser.index("void append_camera_entry_json("):]
+        for field in ("source_camera_subject_events", "subject_prev_in_pool",
+                      "subject_next_in_pool", "source_camera_subject_event_overflow"):
+            self.assertIn(field, serializer)
+        harness = (ROOT / "tests/fighter_cpu9_lineup_browser_test.mjs").read_text(encoding="utf-8")
+        self.assertIn("source_camera_subject_event_overflow,false", harness)
+        self.assertIn("Results after camera-global restore", harness)
+
+    def test_source_camera_pool_allocation_writes_are_retained(self):
+        context = (ROOT / "src/gameplay_results_context.c").read_text(encoding="utf-8")
+        trace_start = context.index("void melee_web_results_camera_pool_allocation_trace(")
+        trace_end = context.index("\nstatic int baseline_has(", trace_start)
+        trace = context[trace_start:trace_end]
+        for field in ("camera_pool_event_count", "camera_pool_event_overflow",
+                      "context->ticks", "context->camera_allocation_generation_before_onenter",
+                      "cm_804D6458", "cm_804D645C", "cm_804D6460", "cm_804D6468"):
+            self.assertIn(field, trace)
+        self.assertIn("snapshot->source_camera_pool_event_count = context->camera_pool_event_count", context)
+        self.assertIn("memcpy(snapshot->source_camera_pool_events", context)
+
+        patch = (ROOT / "patches/melee-gameplay.patch").read_text(encoding="utf-8")
+        allocation = patch[patch.index("diff --git a/src/melee/cm/camera.c"):]
+        before = allocation.index("Camera_80028B9C before pool allocation")
+        root_write = allocation.index("cm_804D645C = cam_box;")
+        after = allocation.index("Camera_80028B9C after pool roots")
+        self.assertLess(before, root_write)
+        self.assertLess(root_write, after)
+
+        browser = (ROOT / "src/gameplay_menu_browser.cpp").read_text(encoding="utf-8")
+        serializer = browser[browser.index("void append_camera_entry_json("):]
+        for field in ("source_camera_pool_events", "source_tick", "scene_entered",
+                      "source_free", "source_pool", "owner_pool", "allocation_generation"):
+            self.assertIn(field, serializer)
+
     def test_source_camera_pool_lease_includes_allocator_generation(self):
         context = (ROOT / "src/gameplay_results_context.c").read_text(encoding="utf-8")
         guard_start = context.index("static int camera_pool_owned(")

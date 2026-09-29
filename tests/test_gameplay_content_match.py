@@ -95,9 +95,9 @@ class ContentMatchTests(unittest.TestCase):
             ("Zelda", 18, ("PlZd.dat", "PlZdAJ.dat", "PlKbCpZd.dat",
                             "EfSsData.dat", "EfZdData.dat",
                             "EfKbZd.dat")),
-            ("Ganondorf", 24, ("PlGn.dat", "PlGnAJ.dat", "PlKbCpGn.dat",
+            ("Ganondorf", 25, ("PlGn.dat", "PlGnAJ.dat", "PlKbCpGn.dat",
                                  "EfGnData.dat", "EfKbGn.dat")),
-            ("Roy", 25, ("PlFe.dat", "PlFeAJ.dat", "PlKbCpFe.dat",
+            ("Roy", 23, ("PlFe.dat", "PlFeAJ.dat", "PlKbCpFe.dat",
                           "EfFeData.dat", "EfKbFe.dat")),
             ("Luigi", 7, ("PlLg.dat", "PlLgAJ.dat", "PlKbCpLg.dat",
                            "EfLgData.dat", "EfKbLg.dat")),
@@ -113,7 +113,7 @@ class ContentMatchTests(unittest.TestCase):
                            "EfNsData.dat")),
             ("Pikachu", 13, ("PlPk.dat", "PlPkAJ.dat", "PlKbCpPk.dat",
                               "EfPkData.dat", "EfKbPk.dat")),
-            ("Pichu", 23, ("PlPc.dat", "PlPcAJ.dat", "PlKbCpPc.dat",
+            ("Pichu", 24, ("PlPc.dat", "PlPcAJ.dat", "PlKbCpPc.dat",
                             "EfPkData.dat", "EfKbPk.dat")),
             ("Bowser", 5, ("PlKp.dat", "PlKpAJ.dat", "PlKbCpKp.dat",
                             "EfKpData.dat", "EfKbKp.dat")),
@@ -139,16 +139,30 @@ class ContentMatchTests(unittest.TestCase):
                         "Kirby action coverage: Captain Falcon acquire/use/loss/reacquisition and match teardown path passed",
                         *phases,
                     )
-                elif ckind in (1, 15, 9, 18, 25):
+                elif ckind in (1, 15, 9, 18, 23):
                     expectations = (
                         "Kirby copied source non-Article neutral special motion=",
                         f"Kirby action coverage: {donor} acquire/use/loss/reacquisition and match teardown path passed",
                         *phases,
                     )
-                elif ckind == 24:
+                elif ckind == 25:
                     expectations = (
                         "Kirby copied Warlock Punch: source motion=ftKb_MS_GnSpecialN",
                         "Kirby action coverage: Ganondorf acquire/use/loss/reacquisition and match teardown path passed",
+                        *phases,
+                    )
+                elif ckind == 17:
+                    expectations = (
+                        "Kirby Yoshi copied source motion=413 produced CaptureKirbyYoshi",
+                        "held Egg/Article path not observed",
+                        "Kirby action coverage: Yoshi acquire/use/loss/reacquisition and match teardown path passed",
+                        *phases,
+                    )
+                elif ckind == 10:
+                    expectations = (
+                        "Kirby copied Mewtwo Shadow Ball reached held full charge",
+                        "ordinary A input entered ftKb_MS_MtSpecialNEnd",
+                        "Kirby action coverage: Mewtwo acquire/use/loss/reacquisition and match teardown path passed",
                         *phases,
                     )
                 elif ckind == 14:

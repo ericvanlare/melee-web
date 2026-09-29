@@ -177,6 +177,10 @@ class ResultsEntryPacketTests(unittest.TestCase):
                       harness)
         self.assertIn('P1/P2-connected split keyboard, CPU ports P3/P4 disconnected; trusted Enter down/up edges at source cursors 192/202 and 363/373; assert automatic CPU page transitions before source tick ${resultsConfirmFrame}',
                       harness)
+        exact_pause_helper = harness[harness.index('const waitForResultsPauseAtSourceFrame='):
+                                     harness.index('const captureThreePulsePrefix=')]
+        self.assertIn('resumeResultsIfPaused(await diagnostic())', exact_pause_helper,
+                      'Exact-source pause waits must recover from timing interruptions at the same cursor')
         exact_gate_start = harness.index('let gate;', harness.index('const initialEnterTargets='))
         exact_gate = harness.index('await waitForResultsPauseAtSourceFrame(resultsConfirmFrame,',
                                    exact_gate_start)
@@ -467,7 +471,8 @@ class ResultsEntryPacketTests(unittest.TestCase):
         browser = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
         reset = browser.index('results_camera_entry_snapshot={};')
         construct = browser.index('results=std::make_unique<melee_web::GameplayResultsSession>')
-        capture = browser.index('results_camera_entry_snapshot=results->camera_entry_snapshot();')
+        capture = browser.index('results_camera_entry_snapshot=results->camera_entry_snapshot();',
+                                construct)
         self.assertLess(reset, construct)
         self.assertLess(construct, capture)
         trace = browser.index('melee_web_native_menu_results_pad_trace()')

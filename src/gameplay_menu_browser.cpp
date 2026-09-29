@@ -131,6 +131,60 @@ void append_camera_entry_json(std::string& json){
  json+=",\"source_camera_allocation_subject_count_after_onenter\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_subject_count_after_onenter);
  json+=",\"source_camera_allocation_generation_after_collision_adoption\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_generation_after_collision_adoption);
  json+=",\"source_camera_allocation_subject_count_after_collision_adoption\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_subject_count_after_collision_adoption);
+ json+=",\"source_camera_pool_event_count\":"+std::to_string(results_camera_entry_snapshot.source_camera_pool_event_count);
+ json+=",\"source_camera_pool_event_overflow\":";
+ json+=results_camera_entry_snapshot.source_camera_pool_event_overflow?"true":"false";
+ json+=",\"source_camera_pool_events\":[";
+ for(uint32_t i=0;i<results_camera_entry_snapshot.source_camera_pool_event_count;++i){
+  if(i)json+=',';
+  const auto& event=results_camera_entry_snapshot.source_camera_pool_events[i];
+  json+="{\"phase\":\"";json+=event.phase;json+="\"";
+  json+=",\"source_tick\":"+std::to_string(event.source_tick);
+  json+=",\"scene_entered\":"+std::to_string(event.scene_entered);
+  json+=",\"subject_count\":"+std::to_string(event.subject_count);
+  json+=",\"source_free\":";append_pointer_json(json,event.source_free);
+  json+=",\"source_pool\":";append_pointer_json(json,event.source_pool);
+  json+=",\"source_active\":";append_pointer_json(json,event.source_active);
+  json+=",\"source_tail\":";append_pointer_json(json,event.source_tail);
+  json+=",\"owner_pool\":";append_pointer_json(json,event.owner_pool);
+  json+=",\"context_pool\":";append_pointer_json(json,event.context_pool);
+  json+=",\"expected_pool\":";append_pointer_json(json,event.expected_pool);
+  json+=",\"allocation_generation\":"+std::to_string(event.allocation_generation);
+  json+=",\"generation_before_onenter\":"+std::to_string(event.generation_before_onenter);
+  json+=",\"expected_generation\":"+std::to_string(event.expected_generation);
+  json+='}';
+ }
+ json+=']';
+ json+=",\"source_camera_subject_event_count\":";
+ json+=std::to_string(results_camera_entry_snapshot.source_camera_subject_event_count);
+ json+=",\"source_camera_subject_event_overflow\":";
+ json+=results_camera_entry_snapshot.source_camera_subject_event_overflow?"true":"false";
+ json+=",\"source_camera_subject_events\":[";
+ for(uint32_t i=0;i<results_camera_entry_snapshot.source_camera_subject_event_count;++i){
+  if(i)json+=',';
+  const auto& event=results_camera_entry_snapshot.source_camera_subject_events[i];
+  json+="{\"phase\":\"";json+=event.phase;json+="\"";
+  json+=",\"source_tick\":"+std::to_string(event.source_tick);
+  json+=",\"scene_entered\":"+std::to_string(event.scene_entered);
+  json+=",\"subject\":";append_pointer_json(json,event.subject);
+  json+=",\"subject_prev\":";append_pointer_json(json,event.subject_prev);
+  json+=",\"subject_next\":";append_pointer_json(json,event.subject_next);
+  json+=",\"source_free\":";append_pointer_json(json,event.source_free);
+  json+=",\"source_pool\":";append_pointer_json(json,event.source_pool);
+  json+=",\"source_active\":";append_pointer_json(json,event.source_active);
+  json+=",\"source_tail\":";append_pointer_json(json,event.source_tail);
+  json+=",\"owner_pool\":";append_pointer_json(json,event.owner_pool);
+  json+=",\"context_pool\":";append_pointer_json(json,event.context_pool);
+  json+=",\"allocation_generation\":"+std::to_string(event.allocation_generation);
+  json+=",\"subject_in_pool\":";json+=event.subject_in_pool?"true":"false";
+  json+=",\"subject_prev_in_pool\":";json+=event.subject_prev_in_pool?"true":"false";
+  json+=",\"subject_next_in_pool\":";json+=event.subject_next_in_pool?"true":"false";
+  json+=",\"free_in_pool\":";json+=event.free_in_pool?"true":"false";
+  json+=",\"active_in_pool\":";json+=event.active_in_pool?"true":"false";
+  json+=",\"tail_in_pool\":";json+=event.tail_in_pool?"true":"false";
+  json+='}';
+ }
+ json+=']';
  json+='}';
 }
 size_t retain_results_pad_sample(uint32_t source_frame,const PADStatus pads[4]){
@@ -641,7 +695,13 @@ void close(){
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  char error[256]{};running=false;pending=false;preparation.reset();menu_clock.reset();
  if(match){match->close();match.reset();}
- if(results){results->close();results.reset();}
+ if(results){
+  results->close();
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_camera_entry_snapshot=results->camera_entry_snapshot();
+#endif
+  results.reset();
+ }
  if(prize){prize->close();prize.reset();}
  if(world){
   if(host_entered){check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);host_entered=false;}
@@ -791,7 +851,11 @@ void advance(){
   check(melee_web_menu_host_results_exit(host,error,sizeof(error)),error);
   const uint32_t seed=results->random_seed();
   uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(final_input);
-  results->close();results.reset();
+  results->close();
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_camera_entry_snapshot=results->camera_entry_snapshot();
+#endif
+  results.reset();
   report_owner_lifetime("results-after-teardown");
   check(melee_web_menu_host_results_end(host,seed,final_input,error,sizeof(error)),error);
   results_route_active=false;
@@ -1453,6 +1517,7 @@ void tick(){
 #endif
     results->tick(sample);
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+    results_camera_entry_snapshot=results->camera_entry_snapshot();
     if(trace_index<results_pad_trace_count)results_pad_trace[trace_index].tick_returned=true;
     retain_results_state_after_tick(trace_index,results->source_frames());
 #endif
@@ -1679,7 +1744,12 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_entry_packet(){
 EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
  static std::string json;
  json.clear();
- json.reserve(128+results_pad_trace_count*1024);
+ if(results){
+  try{results_camera_entry_snapshot=results->camera_entry_snapshot();}
+  catch(...){/* Preserve the last copied observer packet after source failure. */}
+ }
+ json.reserve(128+results_pad_trace_count*1024+
+              results_camera_entry_snapshot.source_camera_subject_event_count*512);
  json+="{\"schema\":\"melee-web-results-pad-trace-v1\",\"source_frame_semantics\":\"zero-based Results source frame immediately before this tick attempt\",\"attempts\":";
  json+=std::to_string(results_pad_trace_attempts);
  json+=",\"retained\":";json+=std::to_string(results_pad_trace_count);
