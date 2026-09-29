@@ -2,6 +2,7 @@
 #include "gameplay_kirby_copy_assets.hpp"
 
 #include "dat_archive.hpp"
+#include "dat_material.hpp"
 #include "dat_effect_entries.hpp"
 #include "dat_material_animation.hpp"
 #include "dat_native_joint.hpp"
@@ -43,6 +44,7 @@ extern EF_DAT_Entry efAsync_DatEntries[51];
 #pragma GCC diagnostic pop
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <map>
 #include <stdexcept>
@@ -164,6 +166,149 @@ void adapt_for_native_source_parser(std::vector<std::uint8_t>& bytes,
     for (std::uint32_t index = 0; index < external_count * 2U; ++index)
         write_native32(bytes, external_start + std::size_t{index} * 4U,
                        read_be32(bytes, external_start + std::size_t{index} * 4U));
+}
+
+void adapt_native_source_pobj_fields(std::vector<std::uint8_t>& bytes,
+                                     const DatArchive& checked,
+                                     const MeleeWebNativeGraph& graph,
+                                     std::unordered_set<std::uint32_t>& adapted)
+{
+    // HSD_ArchiveParse relocates PObj pointers but does not convert PPC-native
+    // scalar fields on little-endian hosts. The source PObj loader reads both
+    // fields directly: flags select SKIN/ENVELOPE/SHAPE, and n_display bounds
+    // the display-list records. Only convert descriptors reached by the
+    // checked native-joint graph consumed by Kirby's original copy loader.
+    for (std::uint32_t index = 0; index < graph.pobj_count; ++index) {
+        const auto& pobj = graph.pobjs[index];
+        const auto source = pobj.source_offset;
+        if (source == UINT32_MAX)
+            reject("Kirby source PObj has no authored descriptor identity");
+        if (!adapted.insert(source).second) continue;
+        const auto flags = checked.be16(source + 12U);
+        const auto display_count = checked.be16(source + 14U);
+        if (flags != pobj.geometry.flags ||
+            std::uint64_t(display_count) * 32U !=
+                pobj.geometry.display_byte_size)
+            reject("Kirby source PObj scalar fields disagree with its checked graph at DAT+" +
+                   std::to_string(source));
+        write_native16(bytes, 0x20U + source + 12U, flags);
+        write_native16(bytes, 0x20U + source + 14U, display_count);
+    }
+}
+
+void adapt_native_source_material_modes(std::vector<std::uint8_t>& bytes,
+                                        std::shared_ptr<const DatArchive> checked,
+                                        const std::string& filename,
+                                        const std::vector<std::uint32_t>& joint_roots)
+{
+    // HSD_ArchiveParse relocates pointers but the source DObj loader also
+    // reads MObjDesc::rendermode as a native u32. Use the same checked joint
+    // graphs that own the source copy/costume models; a raw aligned scan can
+    // mistake overlapping DObj fields for another descriptor.
+    std::unordered_set<std::uint32_t> adapted_materials;
+    std::unordered_set<std::uint32_t> adapted_pobjs;
+    const auto adapt_material = [&](std::uint32_t material) {
+        if (!adapted_materials.insert(material).second) return;
+        const auto source_mode = checked->be32(material + 4U);
+        switch (source_mode & 0x60000000U) {
+        case 0:
+        case 0x40000000U:
+        case 0x60000000U:
+            break;
+        default:
+            reject("Kirby source DObj material in " + filename +
+                   " at DAT+" + std::to_string(material) +
+                   " has an invalid source blending mode");
+        }
+        if (filename == "PlKbCpFc.dat")
+            std::fprintf(stderr, "Kirby fallback material file=%s DAT+0x%x mode=0x%08x\n",
+                         filename.c_str(), material, source_mode);
+        write_native32(bytes, 0x20U + material + 4U, source_mode);
+    };
+
+    if (joint_roots.empty()) {
+        // Some copy roots are FtPartsDesc-only and have no joint pointer.
+        // Discover material candidates from checked DAT DObj/PObj pointer
+        // fields, rejecting overlapping records rather than treating every
+        // aligned pointer-shaped region as a native descriptor.
+        struct DObjMaterial {
+            std::uint32_t dobj;
+            std::uint32_t material;
+        };
+        std::vector<DObjMaterial> candidates;
+        std::unordered_set<std::uint32_t> dobjs;
+        const auto data_size = checked->data().size();
+        for (std::uint32_t dobj = 0; dobj + 16U <= data_size; dobj += 4U) {
+            if (!checked->has_relocation(dobj + 8U)) continue;
+            try {
+                if (checked->pointer(dobj)) continue;
+                (void)checked->pointer(dobj + 4U, 16);
+                const auto material = checked->pointer(dobj + 8U, 24);
+                (void)checked->pointer(dobj + 12U, 24);
+                if (!material) continue;
+                candidates.push_back({dobj, *material});
+                dobjs.insert(dobj);
+            } catch (const DatError&) {
+                continue;
+            }
+        }
+        for (const auto& candidate : candidates) {
+            if (dobjs.contains(candidate.material) ||
+                checked->has_relocation(candidate.material + 4U))
+                continue;
+            try {
+                if (checked->pointer(candidate.material)) continue;
+                const auto has_textures = checked->pointer(candidate.material + 8U);
+                const auto has_material = checked->pointer(candidate.material + 12U);
+                if (!has_textures && !has_material) continue;
+                (void)read_dat_material(*checked, candidate.material,
+                                        DatMaterialPolicy::NativeDescriptors);
+            } catch (const DatError&) {
+                continue;
+            }
+            adapt_material(candidate.material);
+        }
+        return;
+    }
+
+    for (const auto joint : joint_roots) {
+        std::unique_ptr<DatNativeJoint> model;
+        try {
+            model = std::make_unique<DatNativeJoint>(checked, joint);
+        } catch (const DatError& error) {
+            reject("Kirby source material graph in " + filename + " at joint DAT+" +
+                   std::to_string(joint) + ": " + error.what());
+        }
+        const auto& graph = model->graph();
+        if (filename == "PlKbCpFc.dat" && joint == 0xf954U) {
+            bool has_skin_target = false;
+            for (std::uint32_t index = 0; index < graph.joint_count; ++index)
+                has_skin_target |= graph.joints[index].source_offset == 0xc080U;
+            std::fprintf(stderr,
+                "Kirby copy graph root=0x%x joints=%u dobjs=%u pobjs=%u has_skin_target_0xc080=%u\n",
+                joint, graph.joint_count, graph.dobj_count, graph.pobj_count,
+                unsigned(has_skin_target));
+            for (std::uint32_t index = 0; index < graph.pobj_count; ++index)
+                std::fprintf(stderr,
+                    "Kirby copy PObj source=0x%x flags=0x%x display_bytes=0x%x\n",
+                    graph.pobjs[index].source_offset,
+                    graph.pobjs[index].geometry.flags,
+                    graph.pobjs[index].geometry.display_byte_size);
+            for (std::uint32_t index = 0; index < graph.dobj_count; ++index) {
+                const auto& dobj = graph.dobjs[index];
+                std::fprintf(stderr,
+                    "Kirby copy DObj source=0x%x pobj_index=0x%x pobj_source=0x%x\n",
+                    dobj.source_offset, dobj.pobj,
+                    dobj.pobj == UINT32_MAX ? UINT32_MAX :
+                        graph.pobjs[dobj.pobj].source_offset);
+            }
+        }
+        adapt_native_source_pobj_fields(bytes, *checked, graph, adapted_pobjs);
+        for (std::uint32_t index = 0; index < graph.material_count; ++index) {
+            const auto material = graph.materials[index].source_offset;
+            adapt_material(material);
+        }
+    }
 }
 
 void adapt_kirby_copy_parts_count(std::vector<std::uint8_t>& bytes,
@@ -521,8 +666,15 @@ kirby_copy_effect_requirements(const MeleeWebMenuMatchSelection& selection)
                 reject("Kirby copy source effect index exceeds efAsync_DatEntries");
             const auto& source = efAsync_DatEntries[bank];
             const auto* fighter = melee_web_fighter_content_by_kind(kind);
-            if (!source.ef_DAT_file || !source.effDataTable_name || !fighter)
-                reject("Kirby copy effect bank has no complete source identity");
+            if (!source.ef_DAT_file || !source.effDataTable_name || !fighter) {
+                std::string identity = "Kirby copy effect bank " +
+                    std::to_string(bank) + " for FighterKind " +
+                    std::to_string(kind) + " has incomplete source identity:";
+                if (!source.ef_DAT_file) identity += " archive=null;";
+                if (!source.effDataTable_name) identity += " table=null;";
+                if (!fighter) identity += " fighter-owner=missing;";
+                reject(identity);
+            }
 
             KirbyCopyEffectRequirement requirement{
                 source.ef_DAT_file, source.effDataTable_name, bank};
@@ -626,6 +778,65 @@ struct GameplayKirbyCopyAssets::Storage {
 
             owned.bytes = input->second;
             adapt_for_native_source_parser(owned.bytes, *checked);
+            std::vector<std::uint32_t> material_joint_roots;
+            for (const auto& root : requirements) {
+                if (root.filename != requirement.filename) continue;
+                const auto root_offset = owned.public_offsets.at(root.symbol);
+                if (requirement.filename == "PlKbCpFc.dat")
+                    std::fprintf(stderr,
+                        "Kirby copy root symbol=%s offset=0x%x costume=%u first=%u dynamic2=%u target=0x%x\n",
+                        root.symbol.c_str(), root_offset, unsigned(root.costume_root),
+                        unsigned(checked->has_relocation(root_offset)),
+                        unsigned(checked->has_relocation(root_offset + 0x14U)),
+                        checked->has_relocation(root_offset + 0x14U)
+                            ? checked->be32(root_offset + 0x14U) : 0U);
+                bool is_costume_joint = false;
+                if (root.costume_root) {
+                    is_costume_joint = std::any_of(
+                        costume_requirements.begin(), costume_requirements.end(),
+                        [&](const CopyCostumeRequirement& costume) {
+                            return costume.source->dat_filename == root.filename &&
+                                   root.symbol == costume.source->joint_name;
+                        });
+                    if (!is_costume_joint) continue;
+                    material_joint_roots.push_back(root_offset);
+                } else if (checked->has_relocation(root_offset)) {
+                    // KirbyHatStruct starts with its authored HSD_Joint
+                    // pointer. FtPartsDesc-only copy roots do not own a joint
+                    // graph at this field and are intentionally not guessed.
+                    const auto joint = checked->pointer(root_offset, 64);
+                    if (!joint)
+                        reject("Kirby copied hat source joint is missing: " +
+                               root.symbol);
+                    material_joint_roots.push_back(*joint);
+                }
+                if (!root.costume_root &&
+                    checked->has_relocation(root_offset + 0x14U)) {
+                    // The original copy-model consumer
+                    // ftKb_SpecialN_800EF438 reads hat_dynamics[2] at +0x14
+                    // as an HSD_Joint root, including for FtPartsDesc-first
+                    // public roots.
+                    const auto joint = checked->pointer(root_offset + 0x14U, 64);
+                    if (!joint)
+                        reject("Kirby copied hat dynamic joint is missing: " +
+                               root.symbol);
+                    material_joint_roots.push_back(*joint);
+                }
+            }
+            std::sort(material_joint_roots.begin(), material_joint_roots.end());
+            material_joint_roots.erase(
+                std::unique(material_joint_roots.begin(), material_joint_roots.end()),
+                material_joint_roots.end());
+            if (requirement.filename == "PlKbCpFc.dat") {
+                std::fprintf(stderr, "Kirby copy roots file=%s count=%zu",
+                             requirement.filename.c_str(), material_joint_roots.size());
+                for (const auto joint : material_joint_roots)
+                    std::fprintf(stderr, " 0x%x", joint);
+                std::fprintf(stderr, "\n");
+            }
+            adapt_native_source_material_modes(owned.bytes, checked,
+                                               requirement.filename,
+                                               material_joint_roots);
             for (const auto& root : requirements)
                 if (root.filename == requirement.filename)
                     adapt_kirby_copy_parts_count(owned.bytes, *checked, root,
@@ -648,6 +859,39 @@ struct GameplayKirbyCopyAssets::Storage {
             if (!owned.native->data)
                 reject("Original HSD parser did not initialize Kirby archive " +
                        requirement.filename);
+            if (requirement.filename == "PlKbCpFc.dat") {
+                std::uint32_t adapted_envelopes[3]{};
+                std::uint32_t parsed_envelopes[3]{};
+                for (std::uint32_t index = 0; index < 3; ++index) {
+                    std::memcpy(&adapted_envelopes[index],
+                                owned.bytes.data() + 0x20U + 0xc5a0U + index * 4U, 4);
+                    std::memcpy(&parsed_envelopes[index],
+                                owned.native->data + 0xc5a0U + index * 4U, 4);
+                }
+                std::fprintf(stderr,
+                    "Kirby envelope relocation data=0x%08x adapted=%08x,%08x,%08x parsed=%08x,%08x,%08x expected=%08x\n",
+                    static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(owned.native->data)),
+                    adapted_envelopes[0], adapted_envelopes[1], adapted_envelopes[2],
+                    parsed_envelopes[0], parsed_envelopes[1], parsed_envelopes[2],
+                    static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(owned.native->data + 0x9d88U)));
+                const auto* mode = reinterpret_cast<const std::uint32_t*>(
+                    owned.native->data + 0x9b18U + 4U);
+                std::fprintf(stderr, "Kirby parsed base archive data=0x%08x mode_at_9b18=0x%08x\n",
+                             static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(
+                                 owned.native->data)), *mode);
+                std::uint32_t adapted_pobj_target = 0;
+                std::uint32_t parsed_pobj_target = 0;
+                std::memcpy(&adapted_pobj_target,
+                            owned.bytes.data() + 0x20U + 0xcfc8U, 4);
+                std::memcpy(&parsed_pobj_target,
+                            owned.native->data + 0xcfbcU + 12U, 4);
+                std::fprintf(stderr,
+                    "Kirby DObj pointer source=0x%x adapted=0x%x parsed=0x%x expected=0x%x\n",
+                    checked->be32(0xcfc8U), adapted_pobj_target,
+                    parsed_pobj_target,
+                    static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(
+                        owned.native->data + 0xc0acU)));
+            }
             for (const auto& root : requirements) {
                 if (root.filename != requirement.filename || root.costume_root)
                     continue;

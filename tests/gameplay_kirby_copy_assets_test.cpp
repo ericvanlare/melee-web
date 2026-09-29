@@ -21,6 +21,12 @@ void put(Bytes& bytes, std::uint32_t offset, std::uint32_t value)
         bytes.at(offset + i) = value >> (24 - i * 8);
 }
 
+void put16(Bytes& bytes, std::uint32_t offset, std::uint16_t value)
+{
+    bytes.at(offset) = value >> 8;
+    bytes.at(offset + 1) = value;
+}
+
 std::uint32_t native32(const Bytes& bytes, std::uint32_t offset)
 {
     std::uint32_t value;
@@ -235,6 +241,39 @@ void borrowed_signed_visibility_tail()
     rejects([&] { adapt(fixture.bytes(), fixture.root, {0}, 2); });
 }
 
+void native_pobj_fields()
+{
+    Fixture fixture(false);
+    constexpr std::uint32_t source = 400;
+    put16(fixture.data, source + 12, 0xa001); // authored ENVELOPE + cull flag
+    put16(fixture.data, source + 14, 0x0106); // 262 32-byte display records
+    const auto input = fixture.bytes();
+    const DatArchive checked(input, DatExternalPolicy::ResolveNull);
+    Bytes converted = input;
+    adapt_for_native_source_parser(converted, checked);
+
+    MeleeWebNativePObjDesc pobj{};
+    pobj.source_offset = source;
+    pobj.geometry.flags = 0xa001;
+    pobj.geometry.display_byte_size = 0x0106U * 32U;
+    MeleeWebNativeGraph graph{};
+    graph.pobjs = &pobj;
+    graph.pobj_count = 1;
+    std::unordered_set<std::uint32_t> adapted;
+    adapt_native_source_pobj_fields(converted, checked, graph, adapted);
+    check(native16(converted, source + 12) == 0xa001 &&
+              native16(converted, source + 14) == 0x0106,
+          "PObj native scalar fields were not converted");
+    adapt_native_source_pobj_fields(converted, checked, graph, adapted);
+    check(adapted.size() == 1, "Shared PObj descriptor was adapted twice");
+
+    pobj.geometry.flags = 0;
+    rejects([&] {
+        std::unordered_set<std::uint32_t> invalid;
+        adapt_native_source_pobj_fields(converted, checked, graph, invalid);
+    });
+}
+
 void real_archive(const char* filename, const char* symbol, unsigned kind,
                   const char* body_filename)
 {
@@ -280,12 +319,32 @@ void real_archive(const char* filename, const char* symbol, unsigned kind,
     }
     std::cout << symbol << ": all six costumes and shared selection passed\n";
 }
+
+void real_all_copy_archives(const char* directory, const char* body_filename)
+{
+    unsigned donor_count = 0;
+    for (unsigned kind = 0; kind < FTKIND_MAX; ++kind) {
+        const auto& source = ftKb_Init_803CA9D0[kind];
+        if (!source.filename && !source.name) continue;
+        check(source.filename && source.name,
+              "Original Kirby copy table has a partial donor row");
+        const std::string filename = std::string(directory) + "/" + source.filename;
+        real_archive(filename.c_str(), source.name, kind, body_filename);
+        ++donor_count;
+    }
+    check(donor_count == 25,
+          "Original Kirby copy table donor count changed; update the explicit acceptance receipt");
+    std::cout << "All " << donor_count
+              << " non-null source Kirby copy rows passed structural adaptation for all six body costumes\n";
+}
 } // namespace
 
 int main(int argc, char** argv)
 {
     try {
-        if (argc == 5) real_archive(argv[1], argv[2], std::stoul(argv[3]), argv[4]);
+        if (argc == 4 && std::string(argv[1]) == "real_all_copy_archives")
+            real_all_copy_archives(argv[2], argv[3]);
+        else if (argc == 5) real_archive(argv[1], argv[2], std::stoul(argv[3]), argv[4]);
         else if (argc == 2) {
             const std::string name = argv[1];
             if (name == "joint_row_zero") joint_row_zero();
@@ -293,6 +352,7 @@ int main(int argc, char** argv)
             else if (name == "malformed_consumed_rows") malformed_consumed_rows();
             else if (name == "source_costume_cache_rows") source_costume_cache_rows();
             else if (name == "borrowed_signed_visibility_tail") borrowed_signed_visibility_tail();
+            else if (name == "native_pobj_fields") native_pobj_fields();
             else throw std::runtime_error("Unknown case");
             std::cout << name << ": passed\n";
         } else return 2;

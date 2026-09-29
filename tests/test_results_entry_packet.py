@@ -82,8 +82,8 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('await installResultsInputObserver()', harness)
         self.assertIn('resultsSourceFrameAtEvent', harness)
         self.assertIn('results_input_events=await page.evaluate', harness)
-        self.assertIn("const continuationScope=matchCount===1?'natural Results→CSS only':",
-                      harness)
+        self.assertIn('const continuationScope=resultsObserveAfterConfirmation?', harness)
+        self.assertIn("matchCount===1?'natural Results→CSS only':", harness)
         self.assertIn('natural Results→CSS→${matchCount-1} subsequent match', harness)
 
     def test_read_only_harness_observation_and_build_binding(self):
@@ -125,25 +125,137 @@ class ResultsEntryPacketTests(unittest.TestCase):
 
     def test_three_pulse_prefix_can_cover_both_natural_matches(self):
         harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
-        self.assertIn("['url','disc','out','lineup','playwright','build-dir','results-input']", harness)
+        self.assertIn("['url','disc','out','lineup','playwright','build-dir','results-input','cpu-levels']", harness)
+        self.assertIn("values['cpu-levels']===undefined?[9,9,9,9]", harness)
         self.assertIn("if(![1,2,3,4].includes(matchCount))throw Error('--matches must be 1, 2, 3 or 4');", harness)
         self.assertIn('for(let pulse=3;pulse<48&&state.phase!==1;pulse++)', harness)
         self.assertIn('for(let matchIndex=2;matchIndex<=matchCount;matchIndex++)', harness)
+        self.assertIn('assertResultsCpuPagesAfterP1KeyboardPrefix(trace,[192,363]', harness)
+        self.assertIn('source ticks 192/363; wait for disconnected CPU auto-pages, then send the third P1 confirmation', harness)
 
     def test_historical_two_pulse_prefix_waits_for_cpu_pages_before_third_enter(self):
         harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
-        self.assertIn("const keyboardPrefixGatedMode=resultsInputMode==='keyboard-gated-two-prefix';", harness)
+        self.assertIn("const keyboardPrefixGatedMode=resultsInputMode==='keyboard-gated-two-prefix'||", harness)
+        self.assertIn('keyboardSourceTickConfirmMode;', harness)
         self.assertIn('const initialEnterTargets=keyboardPrefixGatedMode?[192,363]:[198,296,394,509];', harness)
         self.assertIn("initialKeydowns.map(row=>row.resultsSourceFrameAtEvent),[192,363]", harness)
         self.assertIn("initialKeyups.map(row=>row.resultsSourceFrameAtEvent),[202,373]", harness)
-        gate = harness.index('const gate=await waitForCpuPagesBeforeKeyboard(')
+        gate = harness.index('gate=await waitForCpuPagesBeforeKeyboard(')
         confirmation = harness.index('const lastCpuPageTransition=Math.max(', gate)
         third_enter = harness.index("await driver.pressChord(['Enter'],{holdMs:160,releaseMs:120});", confirmation)
         self.assertLess(gate, confirmation)
         self.assertLess(confirmation, third_enter,
                         'The historical third Enter must not dispatch before source-observed CPU page transitions')
-        self.assertIn('assertResultsCpuPagesAfterP1KeyboardPrefix(trace,[192,363]', harness)
-        self.assertIn('source ticks 192/363; wait for disconnected CPU auto-pages, then send the third P1 confirmation', harness)
+
+    def test_optional_cpu_level_profile_is_source_confirmed_per_door(self):
+        harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
+        self.assertIn("--cpu-levels must contain exactly four comma-separated integer levels from 1 through 9", harness)
+        self.assertIn("players[door].cpu_level,cpuLevels[door]", harness)
+        self.assertIn("const direction=targetLevel>currentLevel?80:-80", harness)
+        self.assertIn("cpu:cpuLevels[door]", harness)
+
+    def test_historical_prefix_has_exact_source_tick_keyboard_confirmation_mode(self):
+        harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
+        self.assertIn("const keyboardSourceTickConfirmMode=resultsInputMode==='keyboard-gated-two-prefix-source-tick';",
+                      harness)
+        self.assertIn("(keyboardSourceTickConfirmMode?560:600)", harness)
+        self.assertIn('waitForCpuPagesBeforeSourceFrame(resultsConfirmFrame,', harness)
+        self.assertIn('Both disconnected CPU pages must advance before source tick ${resultsConfirmFrame}',
+                      harness)
+        self.assertIn('The source-tick keyboard pause boundary ${resultsConfirmFrame} was missed',
+                      harness)
+        self.assertIn('The trusted P1 Enter keydowns must occur at source ticks 192, 363 and the exact confirmation tick',
+                      harness)
+        self.assertIn('The source-consumed P1 confirmation must begin at the exact requested source tick',
+                      harness)
+        self.assertIn('pageCheck.confirmation_source_frame=firstThreeStarts[2]?.first_source_frame??null;',
+                      harness)
+        self.assertLess(
+            harness.index('pageCheck.confirmation_source_frame=firstThreeStarts[2]?.first_source_frame??null;'),
+            harness.index('assert.equal(pageCheck.confirmation_source_frame,resultsConfirmFrame,'))
+        self.assertIn('Each ten-source-tick held P1 Enter must retain its distinct keyup edge',
+                      harness)
+        self.assertIn('P1/P2-connected split keyboard, CPU ports P3/P4 disconnected; trusted Enter down/up edges at source cursors 192/202 and 363/373; assert automatic CPU page transitions before source tick ${resultsConfirmFrame}',
+                      harness)
+        exact_gate_start = harness.index('let gate;', harness.index('const initialEnterTargets='))
+        exact_gate = harness.index('await waitForResultsPauseAtSourceFrame(resultsConfirmFrame,',
+                                   exact_gate_start)
+        exact_trace = harness.index('const exactPrefixTrace=await readResultsSourcePadTrace();',
+                                    exact_gate)
+        exact_pause = harness.index('state=await waitForResultsPauseAtSourceFrame(resultsConfirmFrame,',
+                                    exact_trace)
+        self.assertIn('assertResultsCpuPagesAfterP1KeyboardPrefix(exactPrefixTrace,[192,363]', harness)
+        exact_input = harness.index("await page.keyboard.down('Enter');", exact_pause)
+        exact_resume = harness.index('Module._melee_web_native_menu_pause(0)', exact_input)
+        prefix_input = harness.index("await page.keyboard.down('Enter');", harness.index('const initialEnterTargets='))
+        prefix_resume = harness.index('Module._melee_web_native_menu_pause(0)', prefix_input)
+        prefix_release = harness.index('waitForResultsPauseAtSourceFrame(targetFrame+10', prefix_input)
+        release_pause = harness.index('state=await waitForResultsPauseAtSourceFrame(resultsConfirmFrame+10,',
+                                      exact_input)
+        exact_release = harness.index("await page.keyboard.up('Enter');", release_pause)
+        self.assertLess(exact_gate, exact_trace)
+        self.assertLess(exact_trace, exact_pause)
+        self.assertLess(exact_pause, exact_input)
+        self.assertLess(exact_input, release_pause)
+        self.assertLess(exact_input, exact_resume)
+        self.assertLess(exact_resume, release_pause)
+        self.assertLess(release_pause, exact_release)
+        self.assertLess(prefix_input, prefix_resume)
+        self.assertLess(prefix_resume, prefix_release,
+                        'The source must resume after keydown to consume the exact ten-sample hold')
+        self.assertIn('resultsSourceFrameAtEvent===resultsConfirmFrame', harness)
+        self.assertIn('resultsSourceFrameAtEvent===resultsConfirmFrame+10', harness)
+        run_match = harness.index('async function runMatch(matchIndex,expected){')
+        pause_schedule = harness.index('scheduleResultsSourceFramePauses,{frames}', run_match)
+        sss = harness.index('await chooseFinalDestination();', run_match)
+        self.assertLess(pause_schedule, sss,
+                        'Exact source pauses must be armed before the original SSS/match route')
+
+    def test_exact_results_confirmation_can_be_observed_without_a_retry(self):
+        harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
+        self.assertIn("'results-observe-after-confirmation':{type:'boolean'}", harness)
+        self.assertIn("!keyboardSourceTickConfirmMode||Number(values.matches||2)!==1", harness)
+        self.assertIn('resultsConfirmFrame+150', harness)
+        self.assertIn('const frames=[192,202,363,373,resultsConfirmFrame,resultsConfirmFrame+10];',
+                      harness,
+                      'Do not leave a future Results pause armed if the natural third pulse exits first')
+        self.assertIn('for(;!resultsObserveAfterConfirmation&&pulses<48&&state.phase!==1;pulses++)',
+                      harness,
+                      'The bounded observation must not dispatch another Enter after confirmation')
+        observation = harness.index('if(resultsObserveAfterConfirmation&&state.phase!==1)')
+        no_retry_assertion = harness.index('result.results_post_confirmation_observation=', observation)
+        css_assertion = harness.index(
+            "assert.equal(state.phase,1,`Natural Results ${matchIndex} did not return to original CSS`)",
+            observation)
+        self.assertLess(no_retry_assertion, css_assertion,
+                        'The partial observation must retain Results without claiming CSS return')
+        self.assertIn('post-confirmation-observation-before-any-retry', harness)
+        self.assertIn("'results-observation-pass'", harness)
+
+    def test_exact_results_pause_scheduler_is_a_dev_only_pre_step_control(self):
+        runtime = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
+        pause = runtime.index('int melee_web_native_menu_results_pause_schedule(')
+        loop = runtime.index('for(unsigned step=0;step<elapsed.steps;step++){')
+        boundary = runtime.index('scheduled_results_pauses.before_tick(results_source_frame)', loop)
+        source_step = runtime.index('source_frames.before_step(present_source);', loop)
+        self.assertLess(loop, boundary)
+        self.assertLess(boundary, source_step,
+                        'The pause must stop before the declared source sample is consumed')
+        self.assertIn('ResultsSourceFramePauseSchedule::Boundary::due', runtime)
+        self.assertIn('running=false;menu_clock.reset();', runtime[boundary:source_step])
+        self.assertIn('scheduled_results_pauses.all_consumed()', runtime)
+        self.assertIn('scheduled_results_pauses.clear()', runtime)
+        cmake = (ROOT / 'cmake/FighterRuntime.cmake').read_text(encoding='utf-8')
+        development = cmake.split('add_executable(gameplay_menu_browser', 1)[1].split(
+            '# The public player', 1
+        )[0]
+        public = cmake.split('# The public player', 1)[1].split(
+            '# Shared typed scene/model tables', 1
+        )[0]
+        self.assertIn('_melee_web_native_menu_results_pause_schedule', development)
+        self.assertNotIn('_melee_web_native_menu_results_pause_schedule', public)
+        self.assertIn('_melee_web_native_menu_results_pause_schedule',
+                      (ROOT / 'scripts/build.py').read_text(encoding='utf-8'))
 
     def test_cpu_page_waiter_refreshes_at_confirmation_boundary(self):
         harness = (ROOT / 'tests/fighter_cpu9_lineup_browser_test.mjs').read_text(encoding='utf-8')
@@ -188,7 +300,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertNotIn('const confirmationFrame=report.results_page_transition_checks.find(', harness)
         self.assertNotIn('const confirmationFrame=result.results_page_transition_checks.find(', harness)
         self.assertIn("const sourceTickThreePulse=resultsInputMode==='source-tick-three-pulse';", harness)
-        self.assertIn("const resultsConfirmFrame=Number(values['results-confirm-frame']||600);", harness)
+        self.assertIn("(keyboardSourceTickConfirmMode?560:600)", harness)
         self.assertIn('await queueSourceStartAtExactTick(360,`results-${matchIndex}-source-start-2`)', harness)
         self.assertIn('scheduleResultsP1StartSequence', harness)
         run_match = harness.index('async function runMatch(matchIndex,expected){')
@@ -341,6 +453,13 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('source_generation == context->camera_allocation_generation', context)
         self.assertIn('source_allocation_generation=%u expected_generation=%u', context)
         self.assertIn('source_camera_allocation_generation_after_onenter', context)
+        release_start = context.index('static int release_source_camera_and_ground(')
+        release_end = context.index('\nstatic void restore_pad_and_source_globals', release_start)
+        release = context[release_start:release_end]
+        self.assertIn('cm_804D645C != context->saved_camera_pool', release)
+        self.assertIn('Original Results camera globals were not restored after scene teardown', release)
+        self.assertLess(release.index('stage_info = context->saved_stage;'),
+                        release.index('Original Results camera globals were not restored after scene teardown'))
         camera_patch = (ROOT / 'patches/melee-gameplay.patch').read_text(encoding='utf-8')
         self.assertIn('melee_web_camera_pool_last_subject_count = n_subjects;', camera_patch)
         self.assertIn('++melee_web_camera_pool_allocation_generation;', camera_patch)

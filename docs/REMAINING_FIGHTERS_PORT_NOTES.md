@@ -537,7 +537,7 @@ other attacks, launch directions, costumes and off-stage recovery remain open.
 | Character | Content/construction | Targeted action coverage | Still unverified / failed |
 | --- | --- | --- | --- |
 | Game & Watch | **Native traced** in mixed-content lifecycle and rendered in both A matches. Ten authored Articles pass the real visibility/ownership regression. | Chef source motion, sausage Article creation/lifetime/teardown; ground/air Fire, Rescue Article lifetime and landing; ordinary damage/KO/Rebirth as scoped above. | Other specials, defense, off-stage recovery and broader action inventory. |
-| Kirby | **Native traced** against Fox across all six costumes with repeated construction/teardown; rendered in historical A matches. Copied-part visibility counts/IDs and Game & Watch's secondary texture-animation pair are source-adapted and checked against live DObj visibility. | Six donors pass acquisition, copied use, up-appeal loss, same-donor reacquisition and teardown: Mario, Popo/Nana, G&W, Fox, Samus and Captain. The first five create their copied Articles; Captain's Falcon Punch enters the copied motion and damages its victim. A separate three-player case verifies true Mario→Fox replacement and use. The Ice observer identifies actual victim ownership across both entities; Nana maps to the Popo copy family. G&W additionally checks Chef/Pan ownership and visibility. Ground/air Final Cutter, beam Article lifetime and landing pass; Fox/G&W/Samus copy KO loss, Rebirth and resumed gameplay pass. | Nineteen donor families listed below, other-donor KO loss and random damage-triggered copy loss remain unverified. Other normals/defense/off-stage recovery and copied-particle pixel equivalence remain open. |
+| Kirby | **Native traced** against Fox across all six costumes with repeated construction/teardown; rendered in historical A matches. The current focused real-asset adapter trace additionally checks every one of the 25 non-null decomp copy rows against the owned Kirby body for all six Kirby costume selections. Copied-part visibility counts/IDs and Game & Watch's secondary texture-animation pair are source-adapted and checked against live DObj visibility. The all-row adapter gate is structural coverage; it does not construct every donor's complete native costume graph or demonstrate every copied ability in a match. | Six donors pass acquisition, copied use, up-appeal loss, same-donor reacquisition and teardown: Mario, Popo/Nana, G&W, Fox, Samus and Captain. The first five create their copied Articles; Captain's Falcon Punch enters the copied motion and damages its victim. A separate three-player case verifies true Mario→Fox replacement and use. The Ice observer identifies actual victim ownership across both entities; Nana maps to the Popo copy family. G&W additionally checks Chef/Pan ownership and visibility. Ground/air Final Cutter, beam Article lifetime and landing pass; Fox/G&W/Samus copy KO loss, Rebirth and resumed gameplay pass. | Nineteen donor families listed below remain unverified for acquisition/use/loss/replacement; other-donor KO loss and random damage-triggered copy loss also remain open. Other normals/defense/off-stage recovery and copied-particle pixel equivalence remain open. |
 | Ice Climbers (Popo/Nana) | **Native traced** as two distinct source entities with repeated lifecycle; rendered in historical A matches. | Belay separates the pair. The strengthened CPU9 case observes Nana death→Sleep while Popo retains his stock, later Popo stock loss, both entities in Rebirth, Nana damage reset and resumed gameplay, then teardown. The original A capture also demonstrates paired rejoin after Sleep. | Other specials/recovery and broader damage/KO cases remain unverified. The earlier acceptance of Nana remaining permanently asleep after Popo's stock loss is withdrawn. |
 | Samus | **Native traced** in mixed-content lifecycle and rendered in both B matches. The authored fifth `x48` grapple joint owns its 34-joint graph and 25 sibling-instance references. | Down-B creates and clears Bomb. Raw-Z captures Mario into CatchWait; a fresh throw input consumes the grapple joint and enters the source throw path; mixed teardown passes. Ground/air Screw Attack continuation and landing pass. | Other specials, off-stage recovery, broader damage/KO coverage. The Kirby-copy palette owner is now resolved; effect-specific particle pixels remain unverified (Kirby row). |
 | Yoshi | **Native traced** in mixed-content lifecycle and rendered in both B matches. | Neutral-B captures Mario into `ftCo_MS_CaptureYoshi`, transitions to `ftCo_MS_YoshiEgg`, and naturally releases to `ftCo_MS_Fall` at action frame 243, with no injected fighter state. Ground/air Egg Throw, thrown-Egg Article lifetime and landing pass; ordinary damage/KO/Rebirth as scoped above. | Other specials, off-stage recovery, broader damage/KO; the tested Egg Lay path is fighter-victim capture, not its separate item-target branch. |
@@ -1786,3 +1786,82 @@ the historical slot-2 Sheik camera-pool failure. The historical report still
 lacks Results PAD/page and camera-pointer brackets, so the first invalid
 ownership transition remains unidentified. Do not treat this reducer as a
 natural match or original-versus-port comparison.
+
+## P1-only Results source-tick check at cursor 560 (2026-09-28)
+
+Current-head receipt:
+`work/pr86-6214e8a-b-p1-source-confirm560-r2/report.json` (SHA-256
+`41d2c4a5d0c973c54cd9917aee201d917123e14a39008cc1ee0e9301b50da298`). Source
+commit is `6214e8a30a2274475f2700e773a7f54cb2a5df43`; the rendered Wasm SHA-256
+is `087639f02dc76884ffde770124f9493b05daf12979934bef06832b41f9fcc8da`.
+Installed headless Chrome 153 / Apple Metal-3 ran two natural four-CPU9 B
+matches on Final Destination, each through Results→CSS→next-match. The
+controlled source PAD schedule held P1 Start for ten ticks at 180, 360, and
+560; P1/P2 stayed connected, P2 neutral, and disconnected CPU ports 3/4 kept
+their natural `err=-1`. This is source-tick evidence, not a literal replay of
+the historical 160/120-ms keyboard events, whose consumed PAD frames were not
+retained.
+
+Both retained Results traces contain all 582 ticks, no overflow, and no failed
+tick. CPU pages 2/3 auto-advanced together at source frame 552 while in active
+statistics (`phase=3`, `stats_phase=2`, `confirmed=0`), eight ticks before the
+P1 confirmation was consumed at 560. Camera pool was null before OnEnter;
+source, Results context, and owner agreed on `0xb21b940` after OnEnter and
+collision adoption. Allocation generation advanced once per scene (`1→2`,
+`3→4`) with eight subjects. Both Results→CSS returns and teardown completed;
+32 screenshots were retained with no page/native/target errors or timing
+interruptions.
+
+Natural winners were Samus (slot 0, match frame 13,775) and Falco (slot 3,
+frame 14,724), not Sheik. This excludes a generic current-head P1-only
+auto-page/tick-560 failure for those two natural winners, but does not
+reproduce the historical natural Zelda-origin Sheik winner. A separate
+current-head four-match keyboard-gated receipt does contain a natural Sheik
+winner, but its CPU pages advanced at tick 555 and confirmation was consumed
+at 583. The frozen failure receipt reports only three Enter intentions and a
+camera-pool error at cursor 560; it lacks consumed PAD, page-transition,
+connectedness, and camera-generation observations. Consequently the first
+historical invalid ownership transition remains unknown. Keep this boundary
+open; do not promote either the non-Sheik source-tick run or synthetic reducer
+to a Sheik-winner resolution.
+
+## Four-match source-tick-560 Results control (2026-09-28)
+
+Receipt:
+`work/pr86-6214e8a-b-p1-source-confirm560-natural-sheik-r1/report.json`
+(SHA-256
+`2a2dc5313f6d5dd9b95cdc153d239ddd64410fdc515cbdef0184aed989bbc756`). This
+is a fresh rendered functional run using source commit `6214e8a`, headless
+Chrome 153 / Apple Metal-3, and the retained Release Wasm SHA-256
+`087639f02dc76884ffde770124f9493b05daf12979934bef06832b41f9fcc8da`. Four
+natural B matches used source-confirmed Samus/Yoshi/Zelda/Falco, CPU9, four
+stocks and Final Destination; each completed Results→CSS→next-match. Natural
+winners were slot 0 Samus (frame 14,689; RNG 2,631,425,199), slot 1 Yoshi
+(frame 17,363; RNG 2,874,547,185), slot 0 Samus (frame 15,471; RNG
+2,056,215,623), and slot 0 Samus (frame 16,597; RNG 2,452,901,116). No match
+produced a Zelda-origin Sheik winner.
+
+The Results input was controlled raw P1 Start at source ticks 180, 360, and
+560, held for ten source samples each. P1/P2 were connected, P2 neutral, and
+CPU P3/P4 were disconnected. In all four runs, disconnected CPU pages 2/3
+advanced 0→1 together at source frame 552 in active statistics, unconfirmed;
+P1 Start was consumed at 560–569. Each trace retained 582/582 source PAD rows
+with no overflow or failed tick. Camera pool was null before OnEnter and
+`0xb21b940` after OnEnter, collision adoption, and context/owner assignment;
+generation advanced once per scene (`1→2`, `3→4`, `5→6`, `7→8`) with eight
+subjects. All four Results routes returned to CSS and passed teardown. The
+receipt retains 66 screenshots, no page/target/native-command errors, and two
+frame-0 pause/resume observations before source progress. This is a controlled
+source-PAD path, not a literal replay of trusted keyboard events.
+
+This excludes a generic current-head P1-only page-transition, tick-560
+confirmation, or camera-pool failure for these four natural non-Sheik winners.
+It does not explain the historical Sheik-winner release failure. The
+historical receipt still lacks consumed PAD, connectedness, page-transition,
+camera-entry, and camera-generation observations; its first invalid ownership
+transition cannot be localized. The current natural Sheik-winner keyboard
+control at confirmation tick 583 remains a separate passing route. The
+reconciled camera guards are present in the retained Wasm, but this artifact
+predates the uncommitted DAT texture/material edits and does not validate the
+Falco parser change. Do not call the historical issue fixed or the PR ready
+based on this control.

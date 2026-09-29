@@ -275,13 +275,31 @@ static void descriptor_only_source_lifetime(void)
 {
     char error[256];
     MeleeWebNativeJointDesc joint = {0};
-    joint.child = joint.next = joint.dobj = UINT32_MAX;
+    MeleeWebNativeMaterialDesc material = {0};
+    MeleeWebNativeDObjDesc dobj = {0};
+    joint.source_offset = 0x100;
+    material.source_offset = 0x300;
+    material.material.rendermode = 0x40001000U;
+    joint.child = joint.next = UINT32_MAX;
+    joint.dobj = 0;
     joint.scale[0] = joint.scale[1] = joint.scale[2] = 1;
-    MeleeWebNativeGraph graph = {&joint, NULL, NULL, NULL, 1, 0, 0, 0, 0};
+    dobj.source_offset = 0x200;
+    dobj.material = 0;
+    dobj.next = dobj.pobj = UINT32_MAX;
+    MeleeWebNativeGraph graph = {&joint, &dobj, NULL, &material, 1, 1, 0, 1, 0};
     MeleeWebNativeJoint* descriptors = melee_web_native_joint_hydrate(&graph, error, sizeof(error));
     CHECK(descriptors);
     HSD_Joint* descriptor = melee_web_native_joint_descriptor(descriptors, error, sizeof(error));
     CHECK(descriptor && !melee_web_native_joint_object(descriptors, error, sizeof(error)));
+    void* material_descriptor = melee_web_native_joint_material_descriptor(
+        descriptors, 0, error, sizeof(error));
+    uint32_t joint_source = 0, material_source = 0, render_mode = 0;
+    CHECK(material_descriptor && melee_web_native_joint_source_for_material_desc(
+        material_descriptor, &joint_source, &material_source, &render_mode));
+    CHECK(joint_source == 0x100 && material_source == 0x300 &&
+          render_mode == 0x40001000U);
+    CHECK(!melee_web_native_joint_source_for_material_desc(
+        &material, &joint_source, &material_source, &render_mode));
     for (unsigned pass = 0; pass < 2; ++pass) {
         CHECK(melee_web_gameplay_startup(4U * 1024U * 1024U, error, sizeof(error)));
         CHECK(melee_web_native_world_enable(error, sizeof(error)));
@@ -306,6 +324,8 @@ static void descriptor_only_source_lifetime(void)
         CHECK(melee_web_native_joint_descriptor(descriptors,error,sizeof(error)) == descriptor);
     }
     CHECK(melee_web_native_joint_destroy(descriptors,error,sizeof(error)));
+    CHECK(!melee_web_native_joint_source_for_material_desc(
+        material_descriptor, &joint_source, &material_source, &render_mode));
 }
 
 /* Authored data only. Tests original class allocation, descriptor identity,

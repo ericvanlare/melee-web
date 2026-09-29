@@ -9453,6 +9453,45 @@ diff --git a/src/melee/gm/gmmain_lib.c b/src/melee/gm/gmmain_lib.c
                          &(fp)->u.kb.x44, &(fp)->u.kb.hat.x14);                \
      } while (0)
  
+@@ -3030,10 +3033,14 @@ void ftKb_SpecialN_800EF438(Fighter_GObj* gobj, KirbyHatStruct* hat)
+     HSD_MObj* mobj;
+     HSD_DObj* tail;
+     s32 group_count;
++    extern void HSD_KirbyJObjLoadWatchBegin(HSD_Joint*);
++    extern void HSD_KirbyJObjLoadWatchCheck(void*, u32);
++    extern void HSD_KirbyJObjLoadWatchEnd(HSD_Joint*);
+ 
+     PAD_STACK(4);
+     if (root != NULL) {
+         s32 byte_base;
++        HSD_KirbyJObjLoadWatchBegin(root);
+         ftPartsPObjSetDefaultClass();
+         ftKb_SpecialN_insert_joint_refs(&total_dobjs, root, fp,
+                                         &insert_part_idx, &current_joint,
+@@ -3048,10 +3055,15 @@ void ftKb_SpecialN_800EF438(Fighter_GObj* gobj, KirbyHatStruct* hat)
+             }
+             jobj = fp->parts[insert_part_idx].joint;
+             dobj = HSD_DObjLoadDesc(current_joint->u.dobjdesc);
++            HSD_KirbyJObjLoadWatchCheck(current_joint, 8);
++            OSReport("Kirby source after DObj load joint=0x%x desc=0x%x pobjdesc=0x%x dobj=0x%x.", (u32) current_joint, (u32) current_joint->u.dobjdesc, (u32) current_joint->u.dobjdesc->pobjdesc, (u32) dobj);
+             if (dobj != NULL) {
+                 tail = HSD_JObjGetDObj(jobj);
+                 fp->parts[insert_part_idx].flags2_b7 = true;
++                HSD_KirbyJObjLoadWatchCheck(current_joint, 9);
++                OSReport("Kirby source before refs desc=0x%x pobjdesc=0x%x dobj=0x%x.", (u32) current_joint->u.dobjdesc, (u32) current_joint->u.dobjdesc->pobjdesc, (u32) dobj);
+                 HSD_DObjResolveRefsAll(dobj, current_joint->u.dobjdesc);
++                HSD_KirbyJObjLoadWatchCheck(current_joint, 10);
+                 if (tail == NULL) {
+                     HSD_JObjAddDObj(jobj, dobj);
+                 } else {
+@@ -3096,6 +3108,7 @@ void ftKb_SpecialN_800EF438(Fighter_GObj* gobj, KirbyHatStruct* hat)
+         }
+         fp->u.kb.hat.x1C.count = total_dobjs;
+         ftPartsPObjClearDefaultClass();
++        HSD_KirbyJObjLoadWatchEnd(root);
+     } else {
+         fp->u.kb.hat.x1C.data[0] = NULL;
+     }
 --- a/src/melee/ft/ftparts.c
 +++ b/src/melee/ft/ftparts.c
 @@ -731,2 +731,15 @@ void ftParts_800750C8(Fighter* fp, enum_t arg1, melee_source_bool arg2)
@@ -10475,7 +10514,7 @@ diff --git a/src/melee/it/kinds/itsamusgrapple.c b/src/melee/it/kinds/itsamusgra
 diff --git a/src/melee/gm/gm_1601.c b/src/melee/gm/gm_1601.c
 --- a/src/melee/gm/gm_1601.c
 +++ b/src/melee/gm/gm_1601.c
-@@ -44,76 +44,102 @@
+@@ -44,75 +44,101 @@
  /* 166A8C */ static f32 fn_80166A8C(Vec3*, Vec3*);
  
  /// JP character names
@@ -10641,4 +10680,436 @@ diff --git a/src/melee/gm/gm_1601.c b/src/melee/gm/gm_1601.c
 +    "\x82\x87", /* Ｓａｎｄｂａｇ */
      NULL,
  };
+
+diff --git a/src/sysdolphin/baselib/dobj.c b/src/sysdolphin/baselib/dobj.c
+index aa765eb..a12db8a 100644
+--- a/src/sysdolphin/baselib/dobj.c
++++ b/src/sysdolphin/baselib/dobj.c
+@@ -193,10 +193,29 @@ static int DObjLoad(HSD_DObj* dobj, HSD_DObjDesc* desc)
+             HSD_DObjModifyFlags(dobj, 4, 0xE);
+             break;
+         default:
++        {
++            u32 source_joint = 0, source_material = 0, authored_mode = 0;
++            extern int melee_web_native_joint_source_for_material_desc(
++                const void*, u32*, u32*, u32*);
++            if (melee_web_native_joint_source_for_material_desc(desc->mobjdesc,
++                    &source_joint, &source_material, &authored_mode))
++                OSReport("Native material source joint=0x%x material=0x%x authored_mode=0x%x runtime_mode=0x%x.",
++                         source_joint, source_material, authored_mode,
++                         dobj->mobj->rendermode);
++            else
++                OSReport("Unowned material descriptor=0x%x class=0x%x runtime_mode=0x%x.",
++                         (u32) desc->mobjdesc,
++                         (u32) desc->mobjdesc->class_name,
++                         dobj->mobj->rendermode);
++            OSReport("DObjDesc=0x%x raw_mode=0x%x material=0x%x texture=0x%x.",
++                     (u32) desc, desc->mobjdesc->rendermode,
++                     (u32) desc->mobjdesc->mat,
++                     (u32) desc->mobjdesc->texdesc);
+             OSReport("mobj has unexpected blending flags (0x%x).",
+                      dobj->mobj->rendermode);
+             HSD_Panic(HSD_DObj_804D5C78, 312, "\0");
+         }
++        }
+     }
+     return 0;
+ }
+@@ -275,9 +294,13 @@ void HSD_DObjResolveRefs(HSD_DObj* dobj, HSD_DObjDesc* desc)
  
+ void HSD_DObjResolveRefsAll(HSD_DObj* dobj, HSD_DObjDesc* desc)
+ {
++    extern void HSD_KirbyJObjLoadWatchCheck(void*, u32);
+     for (; dobj != NULL && desc != NULL; dobj = dobj->next, desc = desc->next)
+     {
++        OSReport("Kirby DObj refs dobj=0x%x desc=0x%x source_pobj=0x%x next=0x%x.\\n",
++                 (u32) dobj, (u32) desc, (u32) desc->pobjdesc, (u32) desc->next);
+         HSD_DObjResolveRefs(dobj, desc);
++        HSD_KirbyJObjLoadWatchCheck(desc, 17);
+     }
+ }
+ 
+diff --git a/src/sysdolphin/baselib/pobj.c b/src/sysdolphin/baselib/pobj.c
+index 8b16a28..11b3891 100644
+--- a/src/sysdolphin/baselib/pobj.c
++++ b/src/sysdolphin/baselib/pobj.c
+@@ -20,6 +20,8 @@
+ #include <dolphin/mtx.h>
+ #include <dolphin/os.h>
+ 
++extern void HSD_KirbyJObjLoadWatchCheck(void*, u32);
++
+ static void PObjInfoInit(void);
+ 
+ HSD_PObjInfo hsdPObj = { PObjInfoInit };
+@@ -228,6 +230,54 @@ static HSD_SList* loadEnvelopeDesc(HSD_EnvelopeDesc** edesc_p)
+     return list;
+ }
+ 
++enum { KIRBY_LOAD_WATCH_CAPACITY = 256 };
++static HSD_PObjDesc* kirby_load_watch_owner[KIRBY_LOAD_WATCH_CAPACITY];
++static HSD_EnvelopeDesc** kirby_load_watch_table[KIRBY_LOAD_WATCH_CAPACITY];
++static u32 kirby_load_watch_expected[KIRBY_LOAD_WATCH_CAPACITY];
++static u32 kirby_load_watch_count;
++static u32 kirby_load_depth;
++
++static void kirby_capture_load_watch(HSD_PObjDesc* desc)
++{
++    HSD_PObjDesc* current;
++    kirby_load_watch_count = 0;
++    for (current = desc; current != NULL; current = current->next) {
++        if ((current->flags & 0x3000) == POBJ_ENVELOPE &&
++            current->u.envelope_p != NULL) {
++            if (kirby_load_watch_count == KIRBY_LOAD_WATCH_CAPACITY) {
++                HSD_Panic(__FILE__, __LINE__,
++                          "Kirby PObj load watch capacity exceeded.\n");
++            }
++            kirby_load_watch_owner[kirby_load_watch_count] = current;
++            kirby_load_watch_table[kirby_load_watch_count] =
++                current->u.envelope_p;
++            kirby_load_watch_expected[kirby_load_watch_count] =
++                (u32) current->u.envelope_p[0];
++            kirby_load_watch_count++;
++        }
++    }
++    OSReport("Kirby load watch captured root=0x%x envelopes=%u.\n",
++             (u32) desc, kirby_load_watch_count);
++}
++
++static void kirby_check_load_watch(HSD_PObjDesc* current, u32 stage)
++{
++    u32 i;
++    for (i = 0; i < kirby_load_watch_count; i++) {
++        if (kirby_load_watch_table[i] != NULL &&
++            (u32) kirby_load_watch_table[i][0] !=
++                kirby_load_watch_expected[i]) {
++            OSReport("Kirby PObj load first table write stage=%u current=0x%x owner=0x%x table=0x%x expected=0x%x actual=0x%x.\n",
++                     stage, (u32) current,
++                     (u32) kirby_load_watch_owner[i],
++                     (u32) kirby_load_watch_table[i],
++                     kirby_load_watch_expected[i],
++                     (u32) kirby_load_watch_table[i][0]);
++            kirby_load_watch_table[i] = NULL;
++        }
++    }
++}
++
+ static void HSD_ShapeSetFree(HSD_ShapeSet* shape_set)
+ {
+     if (!shape_set) {
+@@ -280,7 +330,12 @@ static HSD_ShapeSet* loadShapeSetDesc(HSD_ShapeSetDesc* sdesc)
+ 
+ static s32 PObjLoad(HSD_PObj* pobj, HSD_PObjDesc* desc)
+ {
++    if (kirby_load_depth == 0) {
++        kirby_capture_load_watch(desc);
++    }
++    kirby_load_depth++;
+     pobj->next = HSD_PObjLoadDesc(desc->next);
++    kirby_check_load_watch(desc, 1);
+     pobj->verts = desc->verts;
+     pobj->flags = desc->flags;
+     pobj->n_display = desc->n_display;
+@@ -291,7 +346,16 @@ static s32 PObjLoad(HSD_PObj* pobj, HSD_PObjDesc* desc)
+         break;
+ 
+     case POBJ_ENVELOPE:
++        OSReport("Kirby PObj load begin desc=0x%x table=0x%x first=0x%x second=0x%x.",
++                 (u32) desc, (u32) desc->u.envelope_p,
++                 desc->u.envelope_p ? (u32) desc->u.envelope_p[0] : 0,
++                 desc->u.envelope_p ? (u32) desc->u.envelope_p[1] : 0);
+         pobj->u.envelope_list = loadEnvelopeDesc(desc->u.envelope_p);
++        kirby_check_load_watch(desc, 2);
++        OSReport("Kirby PObj load end desc=0x%x table=0x%x first=0x%x second=0x%x.",
++                 (u32) desc, (u32) desc->u.envelope_p,
++                 desc->u.envelope_p ? (u32) desc->u.envelope_p[0] : 0,
++                 desc->u.envelope_p ? (u32) desc->u.envelope_p[1] : 0);
+         break;
+ 
+     case POBJ_SKIN:
+@@ -301,6 +365,12 @@ static s32 PObjLoad(HSD_PObj* pobj, HSD_PObjDesc* desc)
+         HSD_Panic(__FILE__, 580, "pobj: unexected type.\n");
+     }
+ 
++    kirby_check_load_watch(desc, 3);
++    kirby_load_depth--;
++    if (kirby_load_depth == 0) {
++        kirby_load_watch_count = 0;
++    }
++
+     // _HSD_NeedCacheInvalidate(HSD_CACHE_VTX); // NOTE: This does not exist in
+     // Melee's sysdolphin, but is a potential optimization
+ 
+@@ -371,6 +441,22 @@ void HSD_PObjFree(HSD_PObj* pobj)
+     }
+ }
+ 
++static HSD_PObjDesc* kirby_watch_owner;
++static HSD_EnvelopeDesc** kirby_watch_table;
++static u32 kirby_watch_first;
++static void kirby_check_envelope_watch(u32 step)
++{
++    if (kirby_watch_table != NULL &&
++        (u32) kirby_watch_table[0] != kirby_watch_first) {
++        OSReport("Kirby first envelope table write owner=0x%x table=0x%x step=%u old=0x%x new=0x%x.",
++                 (u32) kirby_watch_owner, (u32) kirby_watch_table, step,
++                 kirby_watch_first, (u32) kirby_watch_table[0]);
++        OSReport("Kirby envelope table watch stage=%u owner=0x%x first=0x%x now=0x%x.",
++                 step, (u32) kirby_watch_owner, kirby_watch_first,
++                 (u32) kirby_watch_table[0]);
++        kirby_watch_table = NULL;
++    }
++}
+ static void resolveEnvelope(HSD_SList* list, HSD_EnvelopeDesc** edesc_p)
+ {
+     if (list == NULL || edesc_p == NULL) {
+@@ -380,12 +466,21 @@ static void resolveEnvelope(HSD_SList* list, HSD_EnvelopeDesc** edesc_p)
+     for (; list && *edesc_p; list = list->next, edesc_p++) {
+         HSD_Envelope* env = list->data;
+         HSD_EnvelopeDesc* edesc = *edesc_p;
++        OSReport("Kirby envelope group list=0x%x data=0x%x table=0x%x edesc=0x%x.", (u32) list, (u32) env, (u32) edesc_p, (u32) edesc);
+ 
+         while (env && edesc->joint) {
++            OSReport("Kirby envelope step env=0x%x edesc=0x%x joint=0x%x.", (u32) env, (u32) edesc, (u32) edesc->joint);
+             HSD_JObjUnrefThis(env->jobj);
++            kirby_check_envelope_watch(1);
++            HSD_KirbyJObjLoadWatchCheck(edesc, 11);
+             env->jobj = HSD_IDGetData((u32) edesc->joint, NULL);
++            kirby_check_envelope_watch(2);
++            HSD_KirbyJObjLoadWatchCheck(edesc, 12);
++            OSReport("Kirby envelope lookup result=0x%x.", (u32) env->jobj);
+             HSD_ASSERT(736, env->jobj);
+             HSD_JObjRefThis(env->jobj);
++            kirby_check_envelope_watch(3);
++            HSD_KirbyJObjLoadWatchCheck(edesc, 13);
+             env = env->next;
+             edesc++;
+         }
+@@ -400,6 +495,9 @@ void HSD_PObjResolveRefs(HSD_PObj* pobj, HSD_PObjDesc* pdesc)
+ 
+     switch (pobj_type(pobj)) {
+     case POBJ_ENVELOPE:
++        OSReport("Kirby PObj envelope entry pobj=0x%x desc=0x%x list=0x%x table=0x%x flags=0x%x.",
++                 (u32) pobj, (u32) pdesc, (u32) pobj->u.envelope_list,
++                 (u32) pdesc->u.envelope_p, pobj->flags);
+         resolveEnvelope(pobj->u.envelope_list, pdesc->u.envelope_p);
+         break;
+ 
+@@ -408,8 +506,13 @@ void HSD_PObjResolveRefs(HSD_PObj* pobj, HSD_PObjDesc* pdesc)
+         pobj->u.jobj = NULL;
+         if (pdesc->u.joint != NULL) {
+             pobj->u.jobj = HSD_IDGetData((u32) pdesc->u.joint, NULL);
++            HSD_KirbyJObjLoadWatchCheck(pdesc, 14);
++            if (pobj->u.jobj == NULL)
++                OSReport("Unresolved POBJ_SKIN reference desc=0x%x joint=0x%x pobj=0x%x.",
++                         (u32) pdesc, (u32) pdesc->u.joint, (u32) pobj);
+             HSD_ASSERT(0x2FB, pobj->u.jobj);
+             HSD_JObjRefThis(pobj->u.jobj);
++            HSD_KirbyJObjLoadWatchCheck(pdesc, 15);
+         }
+         break;
+ 
+@@ -423,7 +526,24 @@ void HSD_PObjResolveRefsAll(HSD_PObj* pobj, HSD_PObjDesc* pdesc)
+     for (; pobj != NULL && pdesc != NULL;
+          pobj = pobj->next, pdesc = pdesc->next)
+     {
++        kirby_watch_table = NULL;
++        for (HSD_PObjDesc* future = pdesc->next; future != NULL;
++             future = future->next) {
++            if ((future->flags & 0x3000) == POBJ_ENVELOPE &&
++                future->u.envelope_p != NULL) {
++                kirby_watch_owner = future;
++                kirby_watch_table = future->u.envelope_p;
++                kirby_watch_first = (u32) future->u.envelope_p[0];
++                OSReport("Kirby envelope table watch begin after=0x%x owner=0x%x table=0x%x first=0x%x.",
++                         (u32) pdesc, (u32) future,
++                         (u32) future->u.envelope_p, kirby_watch_first);
++                break;
++            }
++        }
+         HSD_PObjResolveRefs(pobj, pdesc);
++        HSD_KirbyJObjLoadWatchCheck(pdesc, 16);
++        kirby_check_envelope_watch(4);
++        kirby_watch_table = NULL;
+     }
+ }
+
+diff --git a/src/sysdolphin/baselib/jobj.c b/src/sysdolphin/baselib/jobj.c
+--- a/src/sysdolphin/baselib/jobj.c
++++ b/src/sysdolphin/baselib/jobj.c
+@@ -16,6 +16,7 @@
+ #include "robj.h"
+ #include "spline.h"
+ #include <dolphin/mtx.h>
++#include <dolphin/os.h>
+ 
+ void JObjInfoInit(void);
+ HSD_JObjInfo hsdJObj = { JObjInfoInit };
+@@ -27,6 +28,96 @@
+ static void (*jsound_callback)(s32);
+ static void (*ptcltgt_callback)(HSD_JObj*, s32);
+ static HSD_JObj* current_jobj;
+ 
++enum { KIRBY_JOBJ_WATCH_CAPACITY = 4096 };
++static HSD_PObjDesc* kirby_jobj_watch_owner[KIRBY_JOBJ_WATCH_CAPACITY];
++static HSD_EnvelopeDesc** kirby_jobj_watch_table[KIRBY_JOBJ_WATCH_CAPACITY];
++static u32 kirby_jobj_watch_table_address[KIRBY_JOBJ_WATCH_CAPACITY];
++static u32 kirby_jobj_watch_first[KIRBY_JOBJ_WATCH_CAPACITY];
++static u32 kirby_jobj_watch_count;
++static u32 kirby_jobj_watch_active;
++
++static void kirby_jobj_watch_pobj(HSD_PObjDesc* desc)
++{
++    for (; desc != NULL; desc = desc->next) {
++        if ((desc->flags & 0x3000) == POBJ_ENVELOPE &&
++            desc->u.envelope_p != NULL) {
++            if (kirby_jobj_watch_count == KIRBY_JOBJ_WATCH_CAPACITY) {
++                HSD_Panic(__FILE__, __LINE__,
++                          "Kirby JObj watch capacity exceeded.\n");
++            }
++            kirby_jobj_watch_owner[kirby_jobj_watch_count] = desc;
++            kirby_jobj_watch_table[kirby_jobj_watch_count] =
++                desc->u.envelope_p;
++            kirby_jobj_watch_table_address[kirby_jobj_watch_count] =
++                (u32) desc->u.envelope_p;
++            kirby_jobj_watch_first[kirby_jobj_watch_count] =
++                (u32) desc->u.envelope_p[0];
++            kirby_jobj_watch_count++;
++        }
++    }
++}
++
++static void kirby_jobj_watch_dobj(HSD_DObjDesc* desc)
++{
++    for (; desc != NULL; desc = desc->next) {
++        kirby_jobj_watch_pobj(desc->pobjdesc);
++    }
++}
++
++static void kirby_jobj_watch_joint(HSD_Joint* joint)
++{
++    if (joint == NULL) {
++        return;
++    }
++    if (!(joint->flags & (JOBJ_PTCL | JOBJ_SPLINE))) {
++        kirby_jobj_watch_dobj(joint->u.dobjdesc);
++    }
++    if (!(joint->flags & JOBJ_INSTANCE)) {
++        kirby_jobj_watch_joint(joint->child);
++    }
++    kirby_jobj_watch_joint(joint->next);
++}
++
++void HSD_KirbyJObjLoadWatchCheck(void* current, u32 stage)
++{
++    u32 i;
++    if (!kirby_jobj_watch_active) {
++        return;
++    }
++    for (i = 0; i < kirby_jobj_watch_count; i++) {
++        HSD_EnvelopeDesc** table = kirby_jobj_watch_table[i];
++        if (table != NULL &&
++            ((u32) kirby_jobj_watch_owner[i]->u.envelope_p !=
++                 kirby_jobj_watch_table_address[i] ||
++             (u32) table[0] != kirby_jobj_watch_first[i])) {
++            OSReport("Kirby JObj first envelope write stage=%u current=0x%x owner=0x%x table=0x%x table_now=0x%x expected=0x%x actual=0x%x.\n",
++                     stage, (u32) current,
++                     (u32) kirby_jobj_watch_owner[i],
++                     kirby_jobj_watch_table_address[i],
++                     (u32) kirby_jobj_watch_owner[i]->u.envelope_p,
++                     kirby_jobj_watch_first[i],
++                     (u32) table[0]);
++            kirby_jobj_watch_table[i] = NULL;
++        }
++    }
++}
++
++void HSD_KirbyJObjLoadWatchBegin(HSD_Joint* root)
++{
++    kirby_jobj_watch_active = 1;
++    kirby_jobj_watch_count = 0;
++    kirby_jobj_watch_joint(root);
++    OSReport("Kirby JObj watch captured root=0x%x envelopes=%u.\n",
++             (u32) root, kirby_jobj_watch_count);
++}
++
++void HSD_KirbyJObjLoadWatchEnd(HSD_Joint* root)
++{
++    HSD_KirbyJObjLoadWatchCheck(root, 12);
++    kirby_jobj_watch_active = 0;
++    kirby_jobj_watch_count = 0;
++}
++
+ void HSD_JObjCheckDepend(HSD_JObj* jobj)
+ {
+@@ -630,8 +721,10 @@
+ {
+     if (!(joint->flags & JOBJ_INSTANCE)) {
+         jobj->child = JObjLoadJointSub(joint->child, jobj);
++        HSD_KirbyJObjLoadWatchCheck(joint, 1);
+     }
+     jobj->next = JObjLoadJointSub(joint->next, parent);
++    HSD_KirbyJObjLoadWatchCheck(joint, 2);
+     jobj->parent = parent;
+     jobj->flags |= joint->flags;
+     if (union_type_spline(jobj)) {
+@@ -646,8 +739,10 @@
+         }
+     } else {
+         jobj->u.dobj = HSD_DObjLoadDesc(joint->u.dobjdesc);
++        HSD_KirbyJObjLoadWatchCheck(joint, 3);
+     }
+     jobj->robj = HSD_RObjLoadDesc(joint->robjdesc);
++    HSD_KirbyJObjLoadWatchCheck(joint, 4);
+     jobj->rotate.x = joint->rotation.x;
+     jobj->rotate.y = joint->rotation.y;
+     jobj->rotate.z = joint->rotation.z;
+@@ -660,14 +755,20 @@
+         memcpy(jobj->envelopemtx, joint->mtx, sizeof(Mtx));
+     }
+     HSD_IDInsertToTable(NULL, (u32) joint, jobj);
++    HSD_KirbyJObjLoadWatchCheck(joint, 5);
+     jobj->id = (u32) joint;
+     return 0;
+ }
+ 
+ HSD_JObj* HSD_JObjLoadJoint(HSD_Joint* arg0)
+ {
+-    HSD_JObj* jobj = JObjLoadJointSub(arg0, 0);
++    HSD_JObj* jobj;
++    HSD_KirbyJObjLoadWatchBegin(arg0);
++    jobj = JObjLoadJointSub(arg0, 0);
++    HSD_KirbyJObjLoadWatchCheck(arg0, 6);
+     HSD_JObjResolveRefsAll(jobj, arg0);
++    HSD_KirbyJObjLoadWatchCheck(arg0, 7);
++    HSD_KirbyJObjLoadWatchEnd(arg0);
+     return jobj;
+ }
+ 
+@@ -688,14 +789,18 @@ void HSD_JObjResolveRefs(HSD_JObj* jobj, HSD_Joint* joint)
+     }
+ 
+     HSD_RObjResolveRefsAll(jobj->robj, joint->robjdesc);
++    HSD_KirbyJObjLoadWatchCheck(joint, 18);
+     if (!!(jobj->flags & JOBJ_INSTANCE)) {
+         HSD_JObjUnref(jobj->child);
+         jobj->child = HSD_IDGetDataFromTable(NULL, (u32) joint->child, NULL);
++        HSD_KirbyJObjLoadWatchCheck(joint, 19);
+         HSD_ASSERT(1108, jobj->child);
+         HSD_JObjRef(jobj->child);
++        HSD_KirbyJObjLoadWatchCheck(joint, 20);
+     }
+     if (union_type_dobj(jobj)) {
+         HSD_DObjResolveRefsAll(jobj->u.dobj, joint->u.dobjdesc);
++        HSD_KirbyJObjLoadWatchCheck(joint, 21);
+     }
+ }
+ 
+@@ -705,6 +810,7 @@ void HSD_JObjResolveRefsAll(HSD_JObj* jobj, HSD_Joint* joint)
+ 
+     while (jobj != NULL && joint != NULL) {
+         HSD_JObjResolveRefs(jobj, joint);
++        HSD_KirbyJObjLoadWatchCheck(joint, 22);
+         if (!(jobj->flags & JOBJ_INSTANCE)) {
+             HSD_JObjResolveRefsAll(jobj->child, joint->child);
+         }

@@ -273,6 +273,13 @@ static int release_source_camera_and_ground(MeleeWebResultsContext* context,
     if (!melee_web_ground_map_storage_end())
         return fail(error, size, "Original Results Ground storage still owns stage objects");
     stage_info = context->saved_stage;
+    if (cm_804D6458 != context->saved_camera_free ||
+        cm_804D645C != context->saved_camera_pool ||
+        cm_804D6460 != context->saved_camera_active ||
+        cm_804D6468 != context->saved_camera_tail ||
+        cm_804D6464 != context->saved_camera_object || owner_camera_pool)
+        return fail(error, size,
+                    "Original Results camera globals were not restored after scene teardown");
     return ok(error, size);
 }
 

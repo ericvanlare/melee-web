@@ -77,18 +77,16 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
     def test_borrowed_rows_require_empty_original_signed_loops(self):
         self.run_case("borrowed_signed_visibility_tail")
 
-    def test_owned_copy_archives_all_costumes(self):
-        body = ROOT / "assets-local/next-gate/PlKb.dat"
+    def test_native_pobj_scalars_follow_checked_source_graph(self):
+        self.run_case("native_pobj_fields")
+
+    def test_all_source_copy_archives_all_costumes(self):
+        assets = ROOT / "assets-local/next-gate"
+        body = assets / "PlKb.dat"
         if not body.is_file():
             self.skipTest("Owned Kirby body archive unavailable")
-        donors = (("Fx", "Fox", 1), ("Mr", "Mario", 0), ("Pp", "Popo", 10),
-                  ("Ss", "Samus", 13), ("Ca", "Captain", 2), ("Gw", "Gamewatch", 24))
-        for code, symbol, kind in donors:
-            with self.subTest(donor=symbol):
-                path = ROOT / f"assets-local/next-gate/PlKbCp{code}.dat"
-                if not path.is_file():
-                    self.skipTest(f"Owned copy archive unavailable: {path.name}")
-                self.run_case(path, f"ftDataKirbyCopy{symbol}", kind, body)
+        output = self.run_case("real_all_copy_archives", assets, body)
+        self.assertIn("All 25 non-null source Kirby copy rows passed", output)
 
 
 class KirbyVisibilityOriginalProfileTests(unittest.TestCase):

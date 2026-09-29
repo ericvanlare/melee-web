@@ -198,6 +198,7 @@ void palette_formats_and_counts()
             fixture.add_palette(limit, palette_format);
             const auto result = fixture.read();
             check(result.second.palette->bytes.size() == std::size_t{limit} * 2 &&
+                  result.second.palette->entries == limit &&
                   result.second.palette->format == palette_format, "validated palette word span");
             put16(fixture.data, Fixture::tlut + 12, static_cast<std::uint16_t>(limit + 1));
             rejects([&] { (void) fixture.read(); });
@@ -213,6 +214,14 @@ void palette_formats_and_counts()
     fixture = Fixture();
     fixture.add_palette(1);
     rejects([&] { (void) fixture.read(); });
+
+    Fixture padded;
+    padded.dimensions(8, 8, 9);
+    padded.add_palette(255);
+    const auto padded_result = padded.read();
+    check(padded_result.second.palette->entries == 255 &&
+          padded_result.second.palette->bytes.size() == 510,
+          "C8 palette retains only the exact HSD/GX entry count, not alignment padding");
 }
 
 void palette_indices()
@@ -220,27 +229,37 @@ void palette_indices()
     for (const auto format : {8U, 9U, 10U}) {
         Fixture fixture;
         fixture.dimensions(1, 1, format);
-        fixture.add_palette(1);
-        if (format == 8) fixture.data[0] = 0x01; // Low nibble is an unused padded texel.
-        else if (format == 9) fixture.data[1] = 1;
-        else { put16(fixture.data, 0, 0xc000); put16(fixture.data, 2, 1); }
-        (void) fixture.read();
-        if (format == 8) fixture.data[0] = 0x10;
-        else if (format == 9) fixture.data[0] = 1;
-        else put16(fixture.data, 0, 0xc001);
-        rejects([&] { (void) fixture.read(); });
+        fixture.add_palette(16);
+        if (format == 8) {
+            fixture.data[0] = 0x0f;
+            (void) fixture.read(); // Maximum C4 index is the final authored entry.
+        } else if (format == 9) {
+            fixture.data[0] = 15;
+            (void) fixture.read();
+            fixture.data[0] = 16;
+            rejects([&] { (void) fixture.read(); });
+        } else {
+            put16(fixture.data, 0, 15);
+            (void) fixture.read();
+            put16(fixture.data, 0, 16);
+            rejects([&] { (void) fixture.read(); });
+        }
     }
     Fixture fixture;
-    fixture.dimensions(8, 8, 8);
+    fixture.dimensions(8, 8, 9);
     fixture.add_palette(1);
     put32(fixture.data, Fixture::image + 12, 1);
-    putf32(fixture.data, Fixture::image + 20, 2.F);
-    fixture.data[64] = 0x10; // First texel in the third mip, after two 32-byte tiles.
+    putf32(fixture.data, Fixture::image + 20, 3.F);
+    fixture.data[129] = 0xff; // Padded texels beyond the 1x1 fourth mip are ignored.
+    (void) fixture.read();
+    fixture.data[128] = 16; // First texel in the fourth mip, after 64+32+32 bytes.
     rejects([&] { (void) fixture.read(); });
     fixture = Fixture();
     fixture.dimensions(9, 5, 9);
     fixture.add_palette(1);
-    fixture.data[96] = 1; // First texel of the fourth C8 tile, x=8, y=4.
+    fixture.data[97] = 0xff; // Padded x=9 texel is outside the authored image.
+    (void) fixture.read();
+    fixture.data[96] = 16; // First texel of the fourth C8 tile, x=8, y=4.
     rejects([&] { (void) fixture.read(); });
 }
 

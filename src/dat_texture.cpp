@@ -119,10 +119,11 @@ DatTexturePalette palette_descriptor(const DatArchive& archive, std::uint32_t of
     const std::uint32_t capacity = image_format == 8 ? 16 : image_format == 9 ? 256 : 16384;
     if (result.format > 2) reject("Unsupported TLUT palette format");
     if (!result.entries || result.entries > capacity) reject("TLUT entry count is invalid for its image format");
-    result.data_offset = required(archive, offset, std::size_t{result.entries} * 2);
+    const std::size_t authored_bytes = std::size_t{result.entries} * 2;
+    result.data_offset = required(archive, offset, authored_bytes);
     if (result.data_offset % 32) reject("GameCube palette data is not 32-byte aligned");
-    region(archive, result.data_offset, std::size_t{result.entries} * 2);
-    result.bytes = archive.range(result.data_offset, std::size_t{result.entries} * 2);
+    region(archive, result.data_offset, authored_bytes);
+    result.bytes = archive.range(result.data_offset, authored_bytes);
 
     return result;
 }
@@ -174,7 +175,7 @@ DatTexturePalette palette(const DatArchive& archive, std::uint32_t offset,
     auto result = palette_descriptor(archive, offset, image.format);
     const auto maximum = maximum_palette_index(image);
     if (maximum >= result.entries)
-        throw DatError("Image references an index outside its TLUT palette: image=" +
+        throw DatError("Image references an index outside its authored TLUT entries: image=" +
                        std::to_string(image.descriptor_offset) + " palette=" +
                        std::to_string(offset) + " maximum=" + std::to_string(maximum) +
                        " entries=" + std::to_string(result.entries));

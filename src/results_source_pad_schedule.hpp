@@ -58,4 +58,49 @@ private:
     std::size_t cursor_ = 0;
 };
 
+// Development-only host control used to stop immediately before a declared
+// Results source sample. It never supplies PAD or mutates Results state; the
+// browser can deliver a trusted keyboard edge while source stepping is held.
+class ResultsSourceFramePauseSchedule {
+public:
+    static constexpr std::size_t capacity = 8;
+    enum class Boundary { waiting, due, missed };
+
+    bool enqueue(unsigned source_frame) noexcept
+    {
+        if (cursor_ != 0 || count_ == frames_.size() || source_frame > 8191 ||
+            (count_ && source_frame <= frames_[count_ - 1]))
+            return false;
+        frames_[count_++] = source_frame;
+        return true;
+    }
+
+    Boundary before_tick(unsigned source_frame) noexcept
+    {
+        if (cursor_ == count_) return Boundary::waiting;
+        const unsigned target = frames_[cursor_];
+        if (source_frame < target) return Boundary::waiting;
+        if (source_frame > target) return Boundary::missed;
+        ++cursor_;
+        return Boundary::due;
+    }
+
+    void clear() noexcept
+    {
+        frames_ = {};
+        count_ = 0;
+        cursor_ = 0;
+    }
+
+    bool all_consumed() const noexcept { return cursor_ == count_; }
+    bool started() const noexcept { return cursor_ != 0; }
+    bool full() const noexcept { return count_ == frames_.size(); }
+    std::size_t size() const noexcept { return count_; }
+
+private:
+    std::array<unsigned, capacity> frames_{};
+    std::size_t count_ = 0;
+    std::size_t cursor_ = 0;
+};
+
 } // namespace melee_web

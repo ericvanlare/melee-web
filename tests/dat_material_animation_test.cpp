@@ -91,10 +91,13 @@ int main() {
         Fixture f;auto archive=f.archive();
         melee_web::DatMaterialAnimation valid(archive,0,model);archive.reset();
         check(valid.descriptor()&&valid.texture_animation_count()==1&&valid.image_count()==2,"owned native animation graph");
+        unsigned rejected_fixture_index=0;
         auto rejected=[&](Fixture bad) {
+            const auto label="malformed material fixture "+std::to_string(++rejected_fixture_index)+
+                " must reject before native evaluation";
             bool failed=false;
             try {melee_web::DatMaterialAnimation invalid(bad.archive(),0,model);}catch(const melee_web::DatError&){failed=true;}
-            check(failed,"malformed material animation must reject before native evaluation");
+            check(failed,label.c_str());
         };
         auto rejected_for=[&](const auto& bad, const auto& checked_model) {
             bool failed=false;
@@ -233,15 +236,15 @@ int main() {
         repeated.data[195]=0; // independent TCLT keeps Cartesian validation
         melee_web::DatMaterialAnimation repeated_tables(repeated.archive(),0,model);
         check(repeated_tables.image_count()==256,"aliased image tables stay within actual validation work budget");
-        repeated.data[0x4000]=1;rejected(repeated); // still rejects invalid indices
+        repeated.data[0x4000]=16;rejected(repeated); // beyond the authored one-entry TLUT
 
-        // Matching TIMG/TCLT metadata and encoded streams activate the proven
-        // diagonal check. A divergent TCLT stream must fall back to Cartesian
-        // validation, and a bad selected diagonal texel remains rejected.
+        // Matching TIMG/TCLT metadata and encoded streams prove exact paired
+        // selections. A divergent TCLT stream requires Cartesian validation.
         PairedFixture paired;
         melee_web::DatMaterialAnimation synchronized(paired.archive(),0,model);
         check(synchronized.texture_animation_count()==1,
-              "synchronized index/palette tracks use diagonal validation");
+              "byte-identical index/palette tracks use the proven diagonal relation");
+
 
         // HSD keeps the authored TCLT table even when a selected TIMG image
         // is non-CI; setup ignores that TLUT for I/IA/RGB/CMPR images. The
@@ -259,10 +262,13 @@ int main() {
         mixed_bad_tclt.data[195]=64; // TCLT value 2, outside its two-entry table
         rejected(mixed_bad_tclt); // table-index bounds remain enforced before setup
         PairedFixture divergent;
+        divergent.data[768]=17;
+        put16(divergent.data,476,17);
         divergent.data[195]=0; // TCLT selects a different second index
         rejected(divergent);
         PairedFixture out_of_range;
-        put16(out_of_range.data,476,1); // selected image[1] index one is invalid
+        out_of_range.data[768]=17;
+        put16(out_of_range.data,476,1); // selected image[1] exceeds authored palette entries
         rejected(out_of_range);
 
         // An authored palette table alone does not select its entries.

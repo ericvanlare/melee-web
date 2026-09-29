@@ -47,3 +47,25 @@ export function scheduleResultsP1StartSequence({events}){
   }
   return {status:'scheduled',events:accepted};
 }
+
+// Hold only source stepping at declared Results cursors. This is a test
+// synchronization point for trusted DOM keyboard events; it never supplies
+// PAD or changes Results state.
+export function scheduleResultsSourceFramePauses({frames}){
+  if(!Array.isArray(frames)||frames.length<1||frames.length>8||
+     frames.some((frame,index)=>!Number.isInteger(frame)||frame<0||frame>8191||
+       (index>0&&frame<=frames[index-1])))
+    throw Error('Invalid or unordered Results source-frame pause schedule');
+  const schedule=Module._melee_web_native_menu_results_pause_schedule;
+  if(typeof schedule!=='function')
+    throw Error('Results source-frame pause scheduler is unavailable');
+  const accepted=[];
+  for(const sourceFrame of frames){
+    if(schedule(sourceFrame)!==1){
+      const diagnostics=Module.UTF8ToString(Module._melee_web_native_menu_diagnostics());
+      throw Error(`Results source-frame pause rejected at ${sourceFrame}: ${diagnostics}`);
+    }
+    accepted.push({source_frame:sourceFrame,status:'scheduled-before-match'});
+  }
+  return {status:'scheduled',pauses:accepted};
+}

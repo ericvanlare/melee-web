@@ -40,14 +40,16 @@ typedef struct NativeP { HSD_PObjDesc desc; HSD_VtxDescList* attributes; u8* dis
 typedef struct NativeT { HSD_TObjDesc desc; HSD_ImageDesc image;
     HSD_TlutDesc palette; HSD_TexLODDesc lod; HSD_TObjTevDesc tev; } NativeT;
 typedef struct NativeM { HSD_MObjDesc desc; HSD_Material material; HSD_PEDesc pixel_engine;
-    NativeT* textures; uint32_t texture_count; } NativeM;
+    NativeT* textures; uint32_t texture_count, source_offset; } NativeM;
 struct MeleeWebNativeJoint {
     NativeJ* joints; HSD_DObjDesc* dobjs; NativeP* pobjs; NativeM* materials;
     uint32_t joint_count, dobj_count, pobj_count, material_count, root;
     HSD_GObj* owner;
     uint64_t generation;
+    struct MeleeWebNativeJoint* registry_next;
 };
 static uint64_t native_generation;
+static MeleeWebNativeJoint* native_joint_registry;
 extern HSD_IDTable default_table;
 extern HSD_ObjAllocData zlist_alloc_data;
 HSD_JObj* melee_web_native_common_load(HSD_Joint* descriptor, const uint8_t diffuse[4]);
@@ -130,6 +132,10 @@ static void owner_removed(void* data)
 static void free_descriptors(MeleeWebNativeJoint* handle)
 {
     if (!handle) return;
+    MeleeWebNativeJoint** registered = &native_joint_registry;
+    while (*registered && *registered != handle)
+        registered = &(*registered)->registry_next;
+    if (*registered == handle) *registered = handle->registry_next;
     if (handle->pobjs) for (uint32_t i = 0; i < handle->pobj_count; ++i) {
         NativeP* p = &handle->pobjs[i];
         melee_web_native_arrays_remove(p->arrays);
@@ -473,6 +479,7 @@ static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uin
     }
     for (uint32_t i = 0; i < g->material_count; ++i) {
         const MeleeWebNativeMaterialDesc* s = &g->materials[i]; NativeM* m = &h->materials[i];
+        m->source_offset = s->source_offset;
         m->desc.rendermode = s->material.rendermode; m->desc.mat = &m->material;
         memcpy(&m->material.ambient, s->material.ambient, sizeof(GXColor));
         memcpy(&m->material.diffuse, s->material.diffuse, sizeof(GXColor));
@@ -512,6 +519,8 @@ static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uin
             }
         }
     }
+    h->registry_next = native_joint_registry;
+    native_joint_registry = h;
     if (!load) { if (error && size) error[0] = 0; return h; }
     if (!melee_web_native_world_enable(error, size)) { free_descriptors(h); return NULL; }
     HSD_JObj* loaded = diffuse ? melee_web_native_common_load(&h->joints[g->root].desc, diffuse) :
@@ -613,6 +622,27 @@ void* melee_web_native_joint_material_descriptor(MeleeWebNativeJoint* h,uint32_t
     if(!melee_web_native_joint_descriptor(h,error,size))return NULL;
     if(index>=h->material_count){fail(error,size,"Native material index exceeds owned descriptor graph");return NULL;}
     return &h->materials[index].desc;
+}
+int melee_web_native_joint_source_for_material_desc(const void* descriptor,
+    uint32_t* joint_source_offset, uint32_t* material_source_offset,
+    uint32_t* authored_render_mode)
+{
+    if (!descriptor) return 0;
+    for (MeleeWebNativeJoint* handle = native_joint_registry; handle;
+         handle = handle->registry_next) {
+        for (uint32_t index = 0; index < handle->material_count; ++index) {
+            const NativeM* material = &handle->materials[index];
+            if (&material->desc != descriptor) continue;
+            if (joint_source_offset)
+                *joint_source_offset = handle->joints[handle->root].source_offset;
+            if (material_source_offset)
+                *material_source_offset = material->source_offset;
+            if (authored_render_mode)
+                *authored_render_mode = material->desc.rendermode;
+            return 1;
+        }
+    }
+    return 0;
 }
 void* melee_web_native_joint_object(MeleeWebNativeJoint* h, char* error, size_t size)
 {

@@ -41,10 +41,10 @@ struct NativeTextureAnimation {
 };
 // Original TObjUpdateFunc converts the produced scalar to an integer, then
 // directly selects the TIMG/TCLT table entry. Validate the complete source
-// FObj curve, not only its authored points: LIN is linear and SPL0/SPL/SLP use
-// the exact Hermite polynomial from splGetHelmite. A small outward margin on
-// spline extrema covers single-precision evaluation at a boundary.
-bool validate_indices(const NativeTrack& track, uint32_t count, bool dispatched_only=false)
+// FObj curve, not only its authored points, before the native callback can
+// access those tables.
+bool validate_indices(const NativeTrack& track, uint32_t count,
+                      bool dispatched_only=false)
 {
     require(count > 0, "Texture animation index has no table");
     const auto format = track.descriptor.frac_value;
@@ -94,7 +94,13 @@ bool validate_indices(const NativeTrack& track, uint32_t count, bool dispatched_
                 high + guard <= 65535 &&
                 (track.descriptor.type != 10 || high + guard < consumer_limit) &&
                 (dispatched_only || high + guard < count);
-        require(valid, reason);
+        if (!valid) {
+            throw DatError(std::string(reason) + " (type=" +
+                std::to_string(track.descriptor.type) + " range=" +
+                std::to_string(low) + ".." + std::to_string(high) +
+                " guard=" + std::to_string(guard) + " table=" +
+                std::to_string(count) + ")");
+        }
     };
     auto check_value = [&](double value) {
         check_range(value, value, 0,
@@ -314,16 +320,11 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
         }
         require(!t.tracks.empty(), "Texture animation has no supported channels");
 
-        // TIMG and TCLT are evaluated independently by HSD_TObjUpdateFunc,
-        // but both FObj tracks read the same HSD_AObj clock. An exact track
-        // program match therefore proves that their selected image and
-        // palette indices are identical at every update. Only in that case
-        // may the image/palette capacity check follow the diagonal pairs.
-        // For any index interpolation, exact track equality proves their
-        // selected image and palette indices remain synchronized. The source
-        // FObj decoders then share the same channel program and clock.
-        // Otherwise retain the Cartesian validation required by independently
-        // animated channels.
+        // TIMG and TCLT are evaluated independently by HSD_TObjUpdateFunc.
+        // Only byte-identical FObj programs with identical clocks prove that
+        // both selections are the same at every update. Otherwise validate
+        // the full image/palette Cartesian product; endpoint proximity is not
+        // enough to establish which pairs the original float evaluator visits.
         const NativeTrack* image_track = nullptr;
         const NativeTrack* palette_track = nullptr;
         for (const auto& track : t.tracks) {
@@ -342,7 +343,6 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
              image_track->descriptor.frac_slope ==
                  palette_track->descriptor.frac_slope) &&
             image_track->bytes == palette_track->bytes;
-
         auto maximum_index = [&](const DatTextureImage& im) {
             auto found = image_max_indices.find(im.descriptor_offset);
             if (found == image_max_indices.end()) {
@@ -376,7 +376,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
             if (indexed) {
                 const auto maximum = maximum_index(im);
                 if (maximum >= pal.entries)
-                    throw DatError("Animated image references an index outside its TLUT palette: texture=" +
+                    throw DatError("Animated image references an index outside its authored TLUT entries: texture=" +
                         std::to_string(*offset) + " image=" + std::to_string(im.descriptor_offset) +
                         " palette=" + std::to_string(offset_palette) + " image_index=" +
                         std::to_string(image_index) + " palette_index=" + std::to_string(palette_index) +

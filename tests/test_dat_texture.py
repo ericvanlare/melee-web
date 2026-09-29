@@ -44,7 +44,7 @@ class DatTextureTests(unittest.TestCase):
     def test_palette_formats_counts_and_required_relationships(self):
         self.run_case("palette_formats_and_counts")
 
-    def test_palette_indices_across_tiles_and_mips_exclude_padding(self):
+    def test_palette_indices_check_visible_texels_against_authored_entries(self):
         self.run_case("palette_indices")
 
     def test_hsd_source_sampler_defaults_and_explicit_lod(self):

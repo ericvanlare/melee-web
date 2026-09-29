@@ -8,6 +8,10 @@
  * keyboard-gated-p1-enter preserves the connected split-keyboard ports used
  * for CSS setup, verifies that Enter produces only P1 Start, and observes the
  * disconnected CPU pages before the post-page confirmation.
+ * keyboard-gated-two-prefix-source-tick keeps the first two trusted Enter
+ * edges at source ticks 192/363, verifies CPU auto-pages, and uses a
+ * development-only source pause to dispatch trusted Enter at tick 560 and
+ * release it at tick 570. The pause supplies neither PAD nor game state.
  * keyboard-three-prefix mode retains the first three ordinary pulses through
  * Results source frame 560 before continuing to CSS. Source-tick remains a
  * separate controlled PAD path, not a keyboard/reference claim. The
@@ -22,7 +26,8 @@ import {parseArgs} from 'node:util';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
-import {queueResultsP1StartAtCurrentSource,scheduleResultsP1StartSequence}
+import {queueResultsP1StartAtCurrentSource,scheduleResultsP1StartSequence,
+  scheduleResultsSourceFramePauses}
   from './results_source_pad_input.mjs';
 import {assertResultsCpuPagesAfterInitialP1Keyboard,
   assertResultsCpuPagesAfterP1KeyboardPrefix,buildResultsPadTraceRecord,
@@ -31,28 +36,48 @@ import {assertResultsCpuPagesAfterInitialP1Keyboard,
   from './results_source_pad_trace.mjs';
 
 const {values}=parseArgs({options:{...Object.fromEntries(
-  ['url','disc','out','lineup','playwright','build-dir','results-input'].map(name=>[name,{type:'string'}])),
+  ['url','disc','out','lineup','playwright','build-dir','results-input','cpu-levels'].map(name=>[name,{type:'string'}])),
   'results-confirm-frame':{type:'string'},
+  'results-observe-after-confirmation':{type:'boolean'},
   matches:{type:'string'},'setup-only':{type:'boolean'}}});
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--matches 1|2|3|4] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK]');
+const cpuLevels=values['cpu-levels']===undefined?[9,9,9,9]:
+  values['cpu-levels'].split(',').map(Number);
+if(cpuLevels.length!==4||cpuLevels.some(level=>!Number.isInteger(level)||level<1||level>9))
+  throw Error('--cpu-levels must contain exactly four comma-separated integer levels from 1 through 9');
+const cpuProfileDescription=cpuLevels.every(level=>level===9)?'four CPU9 players':
+  `four CPU players at source-confirmed levels ${cpuLevels.join(',')}`;
 const resultsInputMode=values['results-input']||'keyboard';
 if(!['keyboard','keyboard-three-prefix','keyboard-gated','keyboard-gated-p1-enter',
-  'keyboard-gated-two-prefix','source-tick','source-tick-three-pulse'].includes(resultsInputMode))
-  throw Error('--results-input must be keyboard, keyboard-three-prefix, keyboard-gated, keyboard-gated-p1-enter, keyboard-gated-two-prefix, source-tick, or source-tick-three-pulse');
+  'keyboard-gated-two-prefix','keyboard-gated-two-prefix-source-tick','source-tick',
+  'source-tick-three-pulse'].includes(resultsInputMode))
+  throw Error('--results-input must be keyboard, keyboard-three-prefix, keyboard-gated, keyboard-gated-p1-enter, keyboard-gated-two-prefix, keyboard-gated-two-prefix-source-tick, source-tick, or source-tick-three-pulse');
 const sourceTickMode=resultsInputMode==='source-tick'||resultsInputMode==='source-tick-three-pulse';
 const sourceTickThreePulse=resultsInputMode==='source-tick-three-pulse';
-const keyboardPrefixGatedMode=resultsInputMode==='keyboard-gated-two-prefix';
+const keyboardSourceTickConfirmMode=resultsInputMode==='keyboard-gated-two-prefix-source-tick';
+const keyboardPrefixGatedMode=resultsInputMode==='keyboard-gated-two-prefix'||
+  keyboardSourceTickConfirmMode;
 const keyboardGatedMode=resultsInputMode==='keyboard-gated'||
   resultsInputMode==='keyboard-gated-p1-enter'||keyboardPrefixGatedMode;
 const keyboardP1EnterMode=resultsInputMode==='keyboard-gated-p1-enter'||keyboardPrefixGatedMode;
 const keyboardPortErrors=[[0],[0],[-1],[-1]];
 const keyboardAutoPageSlots=[2,3];
-const resultsConfirmFrame=Number(values['results-confirm-frame']||600);
-if(sourceTickThreePulse&&(!Number.isInteger(resultsConfirmFrame)||resultsConfirmFrame<=360||resultsConfirmFrame>8191))
+const resultsConfirmFrame=Number(values['results-confirm-frame']||
+  (keyboardSourceTickConfirmMode?560:600));
+if((sourceTickThreePulse||keyboardSourceTickConfirmMode)&&
+   (!Number.isInteger(resultsConfirmFrame)||resultsConfirmFrame<=360||resultsConfirmFrame>8191))
   throw Error('--results-confirm-frame must be an integer source tick after the tick-360 pulse and no later than 8191');
-if(!sourceTickThreePulse&&values['results-confirm-frame']!==undefined)
-  throw Error('--results-confirm-frame is only valid with --results-input source-tick-three-pulse');
+if(keyboardSourceTickConfirmMode&&resultsConfirmFrame+10>8191)
+  throw Error('The exact keyboard release pause must remain within the Results source cursor bound of 8191');
+const resultsObserveAfterConfirmation=values['results-observe-after-confirmation']===true;
+if(resultsObserveAfterConfirmation&&(!keyboardSourceTickConfirmMode||Number(values.matches||2)!==1))
+  throw Error('--results-observe-after-confirmation requires the exact source-tick keyboard mode and --matches 1');
+if(resultsObserveAfterConfirmation&&resultsConfirmFrame+150>8191)
+  throw Error('The post-confirmation observation target must remain within the Results source cursor bound of 8191');
+if(!sourceTickThreePulse&&!keyboardSourceTickConfirmMode&&
+   values['results-confirm-frame']!==undefined)
+  throw Error('--results-confirm-frame is only valid with a source-tick Results mode');
 const matchCount=Number(values.matches||2);
 if(![1,2,3,4].includes(matchCount))throw Error('--matches must be 1, 2, 3 or 4');
 const url=new URL(values.url);
@@ -91,10 +116,14 @@ const lineup=values.lineup==='A'?
    {name:'Yoshi',kind:17,position:[7.1,16.5]},
    {name:'Zelda',kind:18,position:[9.1,9.5]},
    {name:'Falco',kind:20,position:[-32.2,9.5]}];
-const continuationScope=matchCount===1?'natural Results→CSS only':
+const continuationScope=resultsObserveAfterConfirmation?
+  `natural Results→CPU-page gate→P1 confirmation at tick ${resultsConfirmFrame}→150 source ticks without retry; CSS return is observed if it occurs but is not required`:
+  matchCount===1?'natural Results→CSS only':
   `natural Results→CSS→${matchCount-1} subsequent match${matchCount===2?'':'es'}`;
 const resultsInputScope=resultsInputMode==='keyboard-three-prefix'?
   'first three ordinary 160/120ms Enter pulses retained through source cursor 560, then ordinary continuation; not an exact historical consumed-PAD replay':
+  keyboardSourceTickConfirmMode?
+  `P1/P2-connected split keyboard, CPU ports P3/P4 disconnected; trusted Enter down/up edges at source cursors 192/202 and 363/373; assert automatic CPU page transitions before source tick ${resultsConfirmFrame}; pause before samples 192,202,363,373,${resultsConfirmFrame},${resultsConfirmFrame+10} to dispatch trusted edges and retain ten consumed Start samples per pulse${resultsObserveAfterConfirmation?'; stop after three pulses and observe to source tick '+(resultsConfirmFrame+150)+' or natural CSS without a retry':''}; no PAD/game-state injection or live-timing claim`:
   keyboardPrefixGatedMode?
     'P1/P2-connected split keyboard and disconnected CPU ports P3/P4; retain ordinary trusted 160/120ms Enter edges with P1 Start consumed at source ticks 192 and 363, then wait for both source-observed CPU page transitions before the third Enter confirmation. This is a timing discriminator, not a full historical replay':
   keyboardP1EnterMode?
@@ -104,11 +133,11 @@ const resultsInputScope=resultsInputMode==='keyboard-three-prefix'?
   sourceTickThreePulse?
   `P1-only ten-source-tick Start holds queued at Results ticks 180/360/${resultsConfirmFrame}; disconnected CPU page transitions must precede the tick-${resultsConfirmFrame} confirmation; connectedness and consumed edges retained; controlled PAD path, not literal keyboard-event replay`:null;
 const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
-  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, four CPU9 players, four stocks, Final Destination; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
+  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, ${cpuProfileDescription}, four stocks, Final Destination; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
   results_input_mode:resultsInputMode,
   results_input_scope:resultsInputScope,
   controller_profile:null,
-  lineup:values.lineup,players:lineup.map(({name,kind})=>({name,kind,cpu:9,stocks:4})),
+  lineup:values.lineup,players:lineup.map(({name,kind},door)=>({name,kind,cpu:cpuLevels[door],stocks:4})),
   matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[],
   results_input_events:[]};
 report.source_timing_disruptions=[];
@@ -394,20 +423,23 @@ async function selectCpuCharacter(door,fighter){
   await waitFor(`CPU ${door} selected ${fighter.name}`,
     s=>row(s.css?.doors||[],door,10)[3]===fighter.kind,15000);
 }
-async function setCpuLevel9(door){
+async function setCpuLevel(door,targetLevel){
   let setup=await css(),g=row(setup.geometry,door,12);
-  if(row(setup.doors,door,10)[5]===9)return;
+  if(row(setup.doors,door,10)[5]===targetLevel)return;
   await move(0,g[8],g[9],`grab-CPU-slider-${door}`);
   await tap(0,buttonA,`grab-CPU-slider-${door}`);
   await waitFor(`CPU slider ${door} grabbed`,s=>row(s.css?.cursors||[],0,4)[2]===door+4,5000);
   for(let sample=0;sample<24;sample++){
     setup=await css();
-    if(row(setup.doors,door,10)[5]===9)break;
-    await pad(0,0,80,0,8,`raise-CPU-${door}-level`);
+    const currentLevel=row(setup.doors,door,10)[5];
+    if(currentLevel===targetLevel)break;
+    const direction=targetLevel>currentLevel?80:-80;
+    await pad(0,0,direction,0,8,`set-CPU-${door}-level-${targetLevel}`);
   }
   await pad(0,0,0,0,2,`CPU-${door}-slider-neutral`);
   setup=await css();
-  assert.equal(row(setup.doors,door,10)[5],9,`CPU ${door} level must be source-confirmed 9`);
+  assert.equal(row(setup.doors,door,10)[5],targetLevel,
+    `CPU ${door} level must be source-confirmed ${targetLevel}`);
   await tap(0,buttonA,`release-CPU-slider-${door}`);
   await waitFor(`CPU slider ${door} released`,s=>row(s.css?.cursors||[],0,4)[1]!==1,5000);
 }
@@ -421,7 +453,8 @@ async function verifyRoster(expected,label){
     assert.equal(players[door].kind,1,`${label}: door ${door} is not CPU`);
     assert.equal(players[door].character,expected[door].kind,`${label}: door ${door} fighter identity`);
     assert.equal(players[door].slot_type,1,`${label}: door ${door} slot type`);
-    assert.equal(players[door].cpu_level,9,`${label}: door ${door} CPU level`);
+    assert.equal(players[door].cpu_level,cpuLevels[door],
+      `${label}: door ${door} CPU level must match the requested profile`);
   }
   report.phases.push({label,players});
   return players;
@@ -433,8 +466,8 @@ async function configureRoster(expected){
   await chooseHuman(1,expected[1]);
   for(let door=0;door<4;door++)await setCpuDoor(door);
   for(const door of [2,3])await selectCpuCharacter(door,expected[door]);
-  for(let door=0;door<4;door++)await setCpuLevel9(door);
-  return verifyRoster(expected,'four-CPU9 Final Destination roster before SSS');
+  for(let door=0;door<4;door++)await setCpuLevel(door,cpuLevels[door]);
+  return verifyRoster(expected,`${cpuProfileDescription} Final Destination roster before SSS`);
 }
 async function chooseFinalDestination(){
   await tap(0,buttonStart,'CSS-to-SSS Start',8);
@@ -467,6 +500,16 @@ async function runMatch(matchIndex,expected){
   const inputEventStart=await page.evaluate(()=>
     window.__meleeWebResultsInputEvents?.length||0);
   let scheduledSourceTickInputs=[];
+  if(keyboardSourceTickConfirmMode){
+    const frames=[192,202,363,373,resultsConfirmFrame,resultsConfirmFrame+10];
+    const armed=await page.evaluate(scheduleResultsSourceFramePauses,{frames});
+    assert.equal(armed.status,'scheduled',
+      'The exact keyboard source boundaries must be armed before SSS');
+    report.results_source_frame_pause_schedules??=[];
+    report.results_source_frame_pause_schedules.push({match:matchIndex,
+      method:'development-only pause immediately before Results source samples; no PAD or game-state injection',
+      pauses:armed.pauses});
+  }
   if(sourceTickThreePulse){
     // Pre-queue through the source PAD boundary while original CSS is idle.
     // The Results source loop owns exact consumption; page polling/screenshot
@@ -581,6 +624,26 @@ async function runMatch(matchIndex,expected){
       await page.waitForTimeout(8);
     }
     throw Error(`${label}: Results source frame did not reach ${target}`);
+  };
+  const waitForResultsPauseAtSourceFrame=async(target,label)=>{
+    const waitDeadline=Date.now()+60000;
+    while(Date.now()<waitDeadline){
+      state=await diagnostic();
+      if(state.error)throw Error(label+': '+state.error);
+      if(state.phase===1)throw Error(label+': Results returned to CSS before its scheduled pause');
+      assert(state.phase===8||state.phase===9,
+        label+': unexpected Results phase '+state.phase);
+      const frame=readResultsFrame(state);
+      const expectedStatus='Paused at scheduled Results source frame '+target+'.';
+      if(state.status===expectedStatus){
+        assert.equal(state.running,0,label+': source stepping must be paused');
+        assert.equal(frame,target,label+': source pause must retain the exact cursor');
+        return state;
+      }
+      assert(frame<=target,label+': source cursor passed scheduled pause '+target+' at '+frame);
+      await page.waitForTimeout(8);
+    }
+    throw Error(label+': source loop did not pause before Results sample '+target);
   };
   const captureThreePulsePrefix=async()=>{
     state=await waitForResultsFrame(560,
@@ -916,6 +979,45 @@ async function runMatch(matchIndex,expected){
     let initialCssReturn=false;
     let initialStartObserved=false;
     for(const targetFrame of initialEnterTargets){
+      if(keyboardSourceTickConfirmMode){
+        state=await waitForResultsPauseAtSourceFrame(targetFrame,
+          `results-${matchIndex}-keyboard-prefix-pause-${targetFrame}`);
+        const sourceFrameBefore=readResultsFrame(state);
+        assert.equal(sourceFrameBefore,targetFrame,
+          'Each historical prefix Enter must be dispatched at its exact source cursor');
+        await page.keyboard.down('Enter');
+        await retainResultsInputEvents();
+        let prefixEvents=(report.results_input_events||[]).slice(inputEventStart);
+        const prefixKeydown=prefixEvents.filter(row=>row.kind==='keydown').at(-1);
+        assert(prefixKeydown?.isTrusted&&!prefixKeydown.repeat&&
+          prefixKeydown.resultsSourceFrameAtEvent===targetFrame,
+          'Trusted prefix Enter keydown must occur at its scheduled source cursor');
+        await page.evaluate(()=>Module._melee_web_native_menu_pause(0));
+        state=await waitForResultsPauseAtSourceFrame(targetFrame+10,
+          `results-${matchIndex}-keyboard-prefix-release-${targetFrame+10}`);
+        await page.keyboard.up('Enter');
+        await retainResultsInputEvents();
+        prefixEvents=(report.results_input_events||[]).slice(inputEventStart);
+        const prefixKeyup=prefixEvents.filter(row=>row.kind==='keyup').at(-1);
+        assert(prefixKeyup?.isTrusted&&!prefixKeyup.repeat&&
+          prefixKeyup.resultsSourceFrameAtEvent===targetFrame+10,
+          'Trusted prefix Enter keyup must occur after ten consumed source samples');
+        report.controller_inputs.push({device:'keyboard-to-source-PAD',key:'Enter',
+          hold_source_ticks:10,wall_interval_ms:null,
+          target_source_frame:targetFrame,source_frame_before:sourceFrameBefore,
+          release_source_frame:targetFrame+10,source_frame_pause_control:true,
+          label:`results-${matchIndex}-keyboard-prefix-${targetFrame}`});
+        initialEnterDispatches.push({target_source_frame:targetFrame,
+          source_frame_before:sourceFrameBefore});
+        const trace=await readResultsSourcePadTrace();
+        const startRun=summarizeResultsPadTrace(trace).p1_start_runs.find(row=>
+          row.first_source_frame===targetFrame&&row.last_source_frame===targetFrame+9);
+        initialStartObserved=!!startRun;
+        assert(initialStartObserved,
+          'Each exact prefix keyboard edge must produce one ten-source-tick P1 Start run');
+        await page.evaluate(()=>Module._melee_web_native_menu_pause(0));
+        continue;
+      }
       const ready=await waitForResultsFrame(targetFrame,
         `results-${matchIndex}-keyboard-prefix-${targetFrame}`);
       if(ready.phase===1){initialCssReturn=true;break;}
@@ -964,15 +1066,29 @@ async function runMatch(matchIndex,expected){
       const initialDispatchFrame=initialEnterDispatches.at(-1).source_frame_before;
       await writeProgress(`match-${matchIndex}-initial-start-before-auto-pages`);
       await screenshot(`match-${matchIndex}-initial-start-before-auto-pages`);
-      const gate=await waitForCpuPagesBeforeKeyboard(
-        initialEnterDispatches.at(-1).target_source_frame,
-        `results-${matchIndex}-auto-pages-before-confirmation`);
+      let gate;
+      if(keyboardSourceTickConfirmMode){
+        await waitForResultsPauseAtSourceFrame(resultsConfirmFrame,
+          `results-${matchIndex}-CPU-pages-source-boundary-${resultsConfirmFrame}`);
+        const exactPrefixTrace=await readResultsSourcePadTrace();
+        gate=assertResultsCpuPagesAfterP1KeyboardPrefix(exactPrefixTrace,[192,363],{
+          expectedPortErrors:keyboardPortErrors,
+          expectedDisconnectedCpuSlots:keyboardAutoPageSlots});
+        assert(gate,
+          'The source-paused trace must prove both automatic CPU page changes before confirmation');
+      }else{
+        gate=await waitForCpuPagesBeforeKeyboard(
+          initialEnterDispatches.at(-1).target_source_frame,
+          `results-${matchIndex}-auto-pages-before-confirmation`);
+      }
       if(gate.natural_css){
         result.results_keyboard_input_stop={reason:'natural CSS return before all expected CPU pages auto-advanced'};
         throw Error(`Results ${matchIndex} returned to CSS before all expected disconnected CPU pages auto-advanced`);
       }
       const pageCheck={match:matchIndex,status:'source-auto-pages-observed',
         input:keyboardPrefixGatedMode?
+          keyboardSourceTickConfirmMode?
+            'trusted Enter down/up edges paused at source cursors 192/202 and 363/373; assert disconnected CPU pages before source cursor 560; exact confirmation edges at 560/570 with ten consumed source samples and no host-time claim':
           'historical two trusted 160/120ms Enter pulses at source ticks 192/363; wait for disconnected CPU auto-pages, then send the third P1 confirmation':
           'ordinary trusted Enter trigger attempts stop on first consumed P1 Start; then source-gated 160ms/120ms Enter confirmation',
         expected_disconnected_cpu_slots:keyboardAutoPageSlots,
@@ -1005,21 +1121,90 @@ async function runMatch(matchIndex,expected){
         transitions:gate.transitions,post_page_start_runs:gate.post_page_start_runs,
         connectedness:gate.summary.port_error_values};
       report.phases.push(`Results ${matchIndex}: CPU pages auto-advanced before next ordinary Enter confirmation`);
-      await writeProgress(`match-${matchIndex}-auto-pages-before-confirmation`);
-      await screenshot(`match-${matchIndex}-auto-pages-before-confirmation`);
-      const lastCpuPageTransition=Math.max(...gate.transitions.map(row=>row.source_frame));
-      state=await waitForResultsFrame(lastCpuPageTransition+1,
-        `results-${matchIndex}-confirmation-after-expected-auto-pages`);
-      assert(state.phase===8||state.phase===9,
-        `Results ${matchIndex} returned to CSS before the post-page keyboard confirmation`);
-      const confirmationLowerBound=readResultsFrame(state);
-      assert(confirmationLowerBound>lastCpuPageTransition,
-        'Ordinary P1 confirmation must be dispatched at a source frame after every expected CPU page transition');
-      pageCheck.source_frame_before_confirmation=confirmationLowerBound;
-      let pulses=initialEnterDispatches.length;
-      for(;pulses<48&&state.phase!==1;pulses++){
-        state=await resumeResultsIfPaused(await diagnostic());
-        if(state.error)throw Error(`Results ${matchIndex} before Enter pulse ${pulses}: ${state.error}`);
+      let exactConfirmationReady=false;
+      if(keyboardSourceTickConfirmMode){
+        const exactGate=gate;
+        assert(!exactGate.natural_css&&
+          exactGate.transitions.length===keyboardAutoPageSlots.length&&
+          exactGate.transitions.every(row=>row.source_frame<resultsConfirmFrame),
+          `Both disconnected CPU pages must advance before source tick ${resultsConfirmFrame}`);
+        pageCheck.source_tick_page_gate={source_frame:exactGate.source_frame,
+          transitions:exactGate.transitions,
+          connectedness:exactGate.connectedness??exactGate.summary.port_error_values};
+        state=await waitForResultsPauseAtSourceFrame(resultsConfirmFrame,
+          `results-${matchIndex}-exact-keyboard-confirmation-tick-${resultsConfirmFrame}`);
+        assert(state.phase===8||state.phase===9,
+          `Results ${matchIndex} returned to CSS before the source-tick confirmation`);
+        assert.equal(readResultsFrame(state),resultsConfirmFrame,
+          `The source-tick keyboard pause boundary ${resultsConfirmFrame} was missed`);
+        const beforeEnter=await readResultsSourcePadTrace();
+        assert(!beforeEnter.overflow,'Pre-confirmation Results trace overflowed');
+        const beforeEnterSummary=summarizeResultsPadTrace(beforeEnter);
+        const beforeEnterTransitions=beforeEnterSummary.results_page_transitions.filter(row=>
+          row.from===0&&row.to===1);
+        assert.deepEqual(beforeEnterTransitions.map(row=>row.slot),keyboardAutoPageSlots,
+          'Both disconnected CPU pages must auto-advance before trusted confirmation');
+        assert(beforeEnterTransitions.every(row=>row.source_frame<resultsConfirmFrame&&
+          row.phase===3&&row.stats_phase===2&&row.confirmed===0),
+          'Disconnected CPU pages must transition in active statistics before the exact confirmation');
+        pageCheck.source_frame_before_confirmation=readResultsFrame(state);
+        pageCheck.confirmation_source_frame_target=resultsConfirmFrame;
+        pageCheck.post_gate_ordinary_enter_dispatch_source_frame=resultsConfirmFrame;
+        pageCheck.exact_boundary_pause={source_frame:resultsConfirmFrame,
+          running:state.running,status:state.status,automatic_cpu_pages_before_confirmation:true};
+        await page.keyboard.down('Enter');
+        await retainResultsInputEvents();
+        let exactEvents=(report.results_input_events||[]).slice(inputEventStart);
+        const confirmationDown=exactEvents.filter(row=>row.kind==='keydown').at(-1);
+        assert(confirmationDown?.isTrusted&&!confirmationDown.repeat&&
+          confirmationDown.resultsSourceFrameAtEvent===resultsConfirmFrame,
+          'Trusted Enter keydown must dispatch while source stepping is paused at the exact confirmation cursor');
+        await page.evaluate(()=>Module._melee_web_native_menu_pause(0));
+        state=await waitForResultsPauseAtSourceFrame(resultsConfirmFrame+10,
+          `results-${matchIndex}-exact-keyboard-release-tick-${resultsConfirmFrame+10}`);
+        await page.keyboard.up('Enter');
+        await retainResultsInputEvents();
+        exactEvents=(report.results_input_events||[]).slice(inputEventStart);
+        const confirmationUp=exactEvents.filter(row=>row.kind==='keyup').at(-1);
+        assert(confirmationUp?.isTrusted&&!confirmationUp.repeat&&
+          confirmationUp.resultsSourceFrameAtEvent===resultsConfirmFrame+10,
+          'Trusted Enter keyup must dispatch at the exact cursor after ten held source samples');
+        pageCheck.exact_boundary_release_pause={source_frame:resultsConfirmFrame+10,
+          running:state.running,status:state.status};
+        report.controller_inputs.push({device:'keyboard-to-source-PAD',key:'Enter',
+          hold_source_ticks:10,wall_interval_ms:null,
+          target_source_frame:resultsConfirmFrame,release_source_frame:resultsConfirmFrame+10,
+          source_frame_pause_control:true,
+          label:`results-${matchIndex}-keyboard-gated-continue-2`});
+        await page.evaluate(()=>Module._melee_web_native_menu_pause(0));
+        state=await waitForResultsFrame(resultsConfirmFrame+11,
+          `results-${matchIndex}-exact-keyboard-release-consumed-${resultsConfirmFrame+10}`);
+        assert(state.phase===1||state.phase===5||state.phase===6||
+          state.phase===8||state.phase===9,
+          `Results ${matchIndex} entered an unexpected phase after the exact keyup sample`);
+        exactConfirmationReady=true;
+      }else{
+        await writeProgress(`match-${matchIndex}-auto-pages-before-confirmation`);
+        await screenshot(`match-${matchIndex}-auto-pages-before-confirmation`);
+        const lastCpuPageTransition=Math.max(...gate.transitions.map(row=>row.source_frame));
+        state=await waitForResultsFrame(lastCpuPageTransition+1,
+          `results-${matchIndex}-confirmation-after-expected-auto-pages`);
+        assert(state.phase===8||state.phase===9,
+          `Results ${matchIndex} returned to CSS before the post-page keyboard confirmation`);
+        const confirmationLowerBound=readResultsFrame(state);
+        assert(confirmationLowerBound>lastCpuPageTransition,
+          'Ordinary P1 confirmation must be dispatched at a source frame after every expected CPU page transition');
+        pageCheck.source_frame_before_confirmation=confirmationLowerBound;
+      }
+      let pulses=exactConfirmationReady?3:initialEnterDispatches.length;
+      let useExactReadySample=false;
+      for(;!resultsObserveAfterConfirmation&&pulses<48&&state.phase!==1;pulses++){
+        if(useExactReadySample){
+          useExactReadySample=false;
+        }else{
+          state=await resumeResultsIfPaused(await diagnostic());
+          if(state.error)throw Error(`Results ${matchIndex} before Enter pulse ${pulses}: ${state.error}`);
+        }
         if(state.phase===1)break;
         assert(state.phase===8||state.phase===9,
           `Results ${matchIndex} cannot send ordinary Enter in source phase ${state.phase}`);
@@ -1091,6 +1276,82 @@ async function runMatch(matchIndex,expected){
         'Every confirmation Enter edge after the initial trigger must follow every expected CPU page transition');
       pageCheck.keyboard_keydown_source_frame=postPageKeydown.resultsSourceFrameAtEvent;
       pageCheck.status='post-page-keyboard-dispatched';
+      if(keyboardSourceTickConfirmMode){
+        const confirmationTrace=await readResultsSourcePadTrace();
+        assert(!confirmationTrace.overflow,
+          'Exact source-tick keyboard confirmation requires a complete Results PAD trace');
+        const confirmationSummary=summarizeResultsPadTrace(confirmationTrace);
+        assert.deepEqual(keydowns.slice(0,3).map(row=>row.resultsSourceFrameAtEvent),
+          [192,363,resultsConfirmFrame],
+          'The trusted P1 Enter keydowns must occur at source ticks 192, 363 and the exact confirmation tick');
+        assert.deepEqual(keyups.slice(0,3).map(row=>row.resultsSourceFrameAtEvent),
+          [202,373,resultsConfirmFrame+10],
+          'Each ten-source-tick held P1 Enter must retain its distinct keyup edge');
+        const firstThreeStarts=confirmationSummary.p1_start_runs.slice(0,3);
+        assert.deepEqual(firstThreeStarts.map(row=>row.first_source_frame),
+          [192,363,resultsConfirmFrame],
+          'Only the third source-consumed P1 Start may confirm after the CPU page transitions');
+        assert.deepEqual(firstThreeStarts.map(row=>row.last_source_frame),
+          [201,372,resultsConfirmFrame+9],
+          'The three historical P1 Start holds must each last exactly ten source ticks');
+        pageCheck.confirmation_source_frame=firstThreeStarts[2]?.first_source_frame??null;
+        pageCheck.confirmation_consumed=pageCheck.confirmation_source_frame!==null;
+        assert(pageCheck.transitions.every(row=>row.source_frame<resultsConfirmFrame&&
+          row.phase===3&&row.stats_phase===2&&row.confirmed===0),
+          'Both disconnected CPU pages must auto-advance in active statistics before confirmation');
+        assert.equal(pageCheck.source_frame_before_confirmation,resultsConfirmFrame);
+        assert.equal(pageCheck.confirmation_source_frame,resultsConfirmFrame,
+          'The source-consumed P1 confirmation must begin at the exact requested source tick');
+        assert.equal(pageCheck.keyboard_keydown_source_frame,resultsConfirmFrame,
+          'The trusted P1 Enter keydown must be bracketed at the exact source confirmation tick');
+      pageCheck.exact_source_tick_keyboard_confirmation='pass';
+      }
+    }
+    if(resultsObserveAfterConfirmation&&state.phase!==1){
+      const observationFrame=resultsConfirmFrame+150;
+      const observationDeadline=Date.now()+60000;
+      while(Date.now()<observationDeadline){
+        state=await resumeResultsIfPaused(await diagnostic());
+        if(state.error)throw Error(`Results ${matchIndex} post-confirmation observation: ${state.error}`);
+        if(state.phase===1)break;
+        if(state.phase===5||state.phase===6){await page.waitForTimeout(8);continue;}
+        assert(state.phase===8||state.phase===9,
+          `Results ${matchIndex} post-confirmation observation entered phase ${state.phase}`);
+        const sourceFrame=readResultsFrame(state);
+        if(sourceFrame>=observationFrame)break;
+        await page.waitForTimeout(8);
+      }
+      if(state.phase!==1){
+        assert(readResultsFrame(state)>=observationFrame,
+          `Results ${matchIndex} neither returned to CSS nor advanced through source tick ${observationFrame}`);
+        const label=`match-${matchIndex}-post-confirmation-no-retry-source-frame-${observationFrame}`;
+        const observation=await writeProgress(label);
+        await screenshot(label);
+        const retained=await retainResultsSourcePadTrace(matchIndex,
+          'post-confirmation-observation-before-any-retry');
+        assert(retained?.trace&&!retained.trace.overflow,
+          'The no-retry Results observation must retain a complete non-overflowed PAD trace');
+        assert.equal(retained.summary.tick_failed.length,0,
+          'Results source ticks must continue successfully without a retry pulse');
+        assert.deepEqual(retained.summary.p1_start_runs.map(row=>row.first_source_frame),
+          [192,363,resultsConfirmFrame],
+          'The no-retry observation must retain exactly the historical three P1 Start edges');
+        assert.deepEqual(retained.summary.p1_start_runs.map(row=>row.last_source_frame),
+          [201,372,resultsConfirmFrame+9],
+          'Each held P1 Start edge must retain exactly ten source samples');
+        result.results_post_confirmation_observation={status:'pass-no-retry',
+          target_source_frame:observationFrame,observed_source_frame:readResultsFrame(state),
+          phase:state.phase,running:state.running,
+          no_additional_input_after_source_frame:resultsConfirmFrame+9,
+          camera_entry:retained.trace.camera_entry,
+          last_source_state:retained.trace.samples.at(-1)?.results_state_after_tick??null,
+          memory:observation.memory};
+        report.results_observation_only=true;
+        report.results_observation_only_scope='Natural match and Results entry; exact P1 keyboard edges at 192/363/confirmation; no retry after confirmation; observe through 150 later Results source ticks or natural CSS return. If still in Results, no source exit/destructor claim.';
+        report.result='results-observation-pass';
+        activeMatchIndex=null;
+        return;
+      }
     }
   }else{
     await writeProgress(`match-${matchIndex}-natural-results`);
@@ -1249,9 +1510,21 @@ async function runMatch(matchIndex,expected){
         row.label?.startsWith(`results-${matchIndex}-keyboard-`));
       assert.equal(resultsKeyboardInputs.length,keydowns.length,
         'Each retained ordinary Results Enter edge must have its original hold/release input record');
-      assert(resultsKeyboardInputs.every(row=>row.key==='Enter'&&
-          row.hold_ms===160&&row.release_ms===120),
-        'Ordinary keyboard Enter must preserve its 160ms hold and 120ms release semantics');
+      if(keyboardSourceTickConfirmMode){
+        const sourcePausedInputs=resultsKeyboardInputs.filter(row=>row.source_frame_pause_control);
+        assert.equal(sourcePausedInputs.length,3,
+          'The two historical prefix pulses and exact confirmation must use source-boundary keyboard controls');
+        assert(sourcePausedInputs.every(row=>row.key==='Enter'&&row.hold_source_ticks===10&&
+          row.wall_interval_ms===null),
+          'Exact keyboard pulses must declare ten consumed source samples without claiming host-time duration');
+        assert(resultsKeyboardInputs.filter(row=>!row.source_frame_pause_control).every(row=>
+          row.key==='Enter'&&row.hold_ms===160&&row.release_ms===120),
+          'Any ordinary post-confirmation keyboard pulse must retain its 160/120ms host interval');
+      }else{
+        assert(resultsKeyboardInputs.every(row=>row.key==='Enter'&&
+            row.hold_ms===160&&row.release_ms===120),
+          'Ordinary keyboard Enter must preserve its 160ms hold and 120ms release semantics');
+      }
       assert(keyboardEvents.every(row=>row.key==='Enter'&&row.isTrusted&&!row.repeat),
         'Every retained ordinary keyboard edge must be a trusted non-repeat Enter');
       const initialPulseCount=pageCheck.initial_enter_pulse_count;
@@ -1610,12 +1883,13 @@ try{
         report.phases.push('B subsequent matches retain Zelda at the shared CSS icon; Sheik is covered by a separate in-match down-B scenario');
       }
       const retained=await verifyRoster(retainedLineup,
-        `four-CPU9 retained roster before match ${matchIndex}`);
+        `${cpuProfileDescription} retained roster before match ${matchIndex}`);
       assert.equal(retained.length,4);
       await runMatch(matchIndex,retainedLineup);
     }
   }
-  if(!values['setup-only'])report.result='pass';
+  if(!values['setup-only'])report.result=resultsObserveAfterConfirmation?
+    'results-observation-pass':'pass';
 }catch(error){
   report.failure={message:error.message,stack:error.stack};
   process.exitCode=1;
@@ -1650,7 +1924,7 @@ try{
   if(browser)await browser.close();
   await fs.writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n');
 }
-if(!['pass','setup-only-pass'].includes(report.result))
+if(!['pass','setup-only-pass','results-observation-pass'].includes(report.result))
   throw Error(report.failure?.message||'Headless CPU9 lineup scenario failed');
 console.log(JSON.stringify({result:report.result,lineup:report.lineup,matches:report.matches.length,
   browser:report.browser,output}));

@@ -362,6 +362,7 @@ PreparationProfile preparation_profile;
 PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
 melee_web::ResultsSourcePadSchedule scheduled_results_pad;
+melee_web::ResultsSourceFramePauseSchedule scheduled_results_pauses;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
 // Keep the expanded fighter/Kirby archive inventory separate from the
@@ -516,6 +517,7 @@ void begin_source_session(){
 }
 void clear_diagnostic_pad(){diagnostic_pad={};diagnostic_pad_port=0;diagnostic_pad_remaining=0;}
 void clear_scheduled_results_pad(){scheduled_results_pad.clear();}
+void clear_scheduled_results_pauses(){scheduled_results_pauses.clear();}
 void activate_scheduled_results_pad(unsigned source_frame,const PADStatus* raw){
  melee_web::ResultsSourcePadEvent scheduled{};
  const auto boundary=scheduled_results_pad.before_tick(source_frame,scheduled);
@@ -666,7 +668,7 @@ if(scoped_assets){
   melee_web::retail_replay_end(replay->frames.size(),replay->whole_session());
  replay.reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
- audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();
+ audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
  match_message="Original source match";
  terminal_match_observation.clear();
  if(had_lifetime){
@@ -1357,6 +1359,17 @@ void tick(){
   }
   for(unsigned step=0;step<elapsed.steps;step++){
    if(replay&&replay_cursor==replay->frames.size())break;
+   if(results){
+    const unsigned results_source_frame=results->source_frames();
+    const auto boundary=scheduled_results_pauses.before_tick(results_source_frame);
+    if(boundary==melee_web::ResultsSourceFramePauseSchedule::Boundary::missed)
+     throw std::runtime_error("Missed scheduled Results source-frame pause; refusing a late boundary");
+    if(boundary==melee_web::ResultsSourceFramePauseSchedule::Boundary::due){
+     running=false;menu_clock.reset();
+     message="Paused at scheduled Results source frame "+std::to_string(results_source_frame)+".";
+     break;
+    }
+   }
    source_frames.before_step(present_source);
    if(prepare_deferred_pipelines())break;
    PADStatus checked_input[4];const PADStatus* sample=input->raw;bool copied_input=false;
@@ -1465,7 +1478,10 @@ void tick(){
     if(results){
      check(scheduled_results_pad.all_consumed(),
            "Results returned before every scheduled source PAD sample was consumed");
+     check(scheduled_results_pauses.all_consumed(),
+           "Results returned before every scheduled source-frame pause was reached");
      clear_scheduled_results_pad();
+     clear_scheduled_results_pauses();
     }
     pending=true;clear_diagnostic_pad();break;
    }
@@ -1503,7 +1519,7 @@ void tick(){
     message="Whole-session replay complete; final original character select entered.";
    }
   }
- }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
+ }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
   if(simulation_done<input_done)simulation_done=failed;
@@ -1920,6 +1936,22 @@ int melee_web_native_menu_results_pad_schedule(unsigned source_frame,unsigned po
  if(!scheduled_results_pad.enqueue({source_frame,port,buttons,duration}))
   throw std::runtime_error("Results PAD source tick is invalid, duplicated, or unordered");
  message="Results P1 Start scheduled at an exact future source tick.";
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_results_pause_schedule(unsigned source_frame){try{
+ const int phase=host&&host_entered?melee_web_menu_host_phase(host):-1;
+ if(replay||faulted||preparation.busy()||pending||!running||!host_entered||match||
+    results||prize||(phase!=MELEE_WEB_MENU_CSS&&phase!=MELEE_WEB_MENU_CSS_READY&&
+                     phase!=MELEE_WEB_MENU_SSS&&phase!=MELEE_WEB_MENU_SSS_READY)||
+    diagnostic_pad_remaining||diagnostic_start_ticks||stock_check==-1)
+  throw std::runtime_error("Results source-frame pause schedule requires idle original CSS/SSS before Match construction");
+ if(source_frame>8191)
+  throw std::runtime_error("Results source-frame pause is outside the supported source cursor bounds");
+ if(scheduled_results_pauses.started()||scheduled_results_pauses.full())
+  throw std::runtime_error("Results source-frame pause schedule is already running or full");
+ if(!scheduled_results_pauses.enqueue(source_frame))
+  throw std::runtime_error("Results source-frame pause is invalid, duplicated, or unordered");
+ message="Results source-frame pause scheduled at an exact future cursor.";
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_player_state(unsigned player,int* fighter_kind,int* motion_id,

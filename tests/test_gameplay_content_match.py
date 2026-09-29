@@ -216,11 +216,12 @@ class ContentMatchTests(unittest.TestCase):
         # parts-only copy consumes the body costume and its source fallbacks.
         for donor, name in ((2, "Fox"), (3, "Game & Watch")):
             with self.subTest(donor=name):
+                action_name = "Mr. Game & Watch" if donor == 3 else name
                 self.run_trace(
                     "gameplay_content_match_trace",
                     [menu, game, 32, 4, donor, "--kirby-copy-costumes"],
                     ("Construct mixed content stage=32 costume=5",
-                     f"Kirby action coverage: {name} acquire/use/loss/reacquisition",
+                     f"Kirby action coverage: {action_name} acquire/use/loss/reacquisition",
                      "repeat teardown passed"))
 
     def test_remaining_fighter_all_costumes_both_orientations_entry_and_teardown(self):
