@@ -14,12 +14,34 @@ namespace melee_web {
 namespace {
 
 constexpr auto kMenuFiles = std::to_array<std::string_view>({
-    "MnSlChr.usd", "MnSlMap.usd", "SdSlChr.usd", "MnExtAll.usd",
-    "LbMcGame.usd", "NtMemAc.usd", "LbRb.dat", "sislib_font.bin", "smash2.sem",
+    "MnSlChr.usd", "MnSlMap.usd", "MnMaAll.usd", "GmTtAll.usd",
+    "SdSlChr.usd", "SdMenu.usd", "SdToy.dat", "MnExtAll.usd",
+    "LbMcGame.usd", "NtMemAc.usd", "LbMcSnap.usd", "GmEvent.dat", "LbAd.dat", "LbRb.dat",
+    "sislib_font.bin", "smash2.sem",
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
     "dsp_coef.bin",
 #endif
     "menu01.hps",
+});
+
+// This mirrors the pinned GALE01r2 `ssm_files[]` owner table in
+// .deps/melee/src/melee/lb/lbaudio_ax.static.h. Title entry calls
+// gm_PreloadTitleDemo(), whose source RNG selects unlocked fighters and a
+// stage before it requests the corresponding banks. Keep the complete source
+// table available so ordinary save/RNG state can choose any authored entry.
+constexpr auto kSourceSsmFiles = std::to_array<std::string_view>({
+    "main.ssm", "pokemon.ssm", "nr_title.ssm", "nr_select.ssm",
+    "nr_1p.ssm", "nr_vs.ssm", "captain.ssm", "clink.ssm", "dk.ssm",
+    "drmario.ssm", "falco.ssm", "fox.ssm", "gkoopa.ssm", "ice.ssm",
+    "kirby.ssm", "koopa.ssm", "link.ssm", "luigi.ssm", "mario.ssm",
+    "mars.ssm", "mewtwo.ssm", "ness.ssm", "peach.ssm", "pichu.ssm",
+    "pikachu.ssm", "purin.ssm", "samus.ssm", "zs.ssm", "yoshi.ssm",
+    "gw.ssm", "ganon.ssm", "emblem.ssm", "mhands.ssm", "kirbytm.ssm",
+    "castle.ssm", "corneria.ssm", "greatbay.ssm", "kongo.ssm",
+    "mutecity.ssm", "onett.ssm", "zebes.ssm", "garden.ssm", "klaid.ssm",
+    "greens.ssm", "venom.ssm", "bigblue.ssm", "fourside.ssm",
+    "pupupu.ssm", "pstadium.ssm", "1padv.ssm", "ending.ssm",
+    "nr_name.ssm", "1pend.ssm", "last.ssm", "end.ssm",
 });
 
 constexpr auto kMatchCommonAudio = std::to_array<std::string_view>({
@@ -223,18 +245,8 @@ std::vector<std::string> menu_asset_names()
 std::vector<std::string> menu_audio_bank_names()
 {
     std::vector<std::string> result;
-    for (const auto name : {"main.ssm", "nr_select.ssm", "nr_title.ssm",
-                            "nr_name.ssm", "pokemon.ssm", "end.ssm"})
-        add_unique(result, name);
-    // mnCharSel_Scene_OnExit uses lbAudioAx_80026E84 for each current source
-    // selection, then starts the original bank preload. Unload can reach that
-    // path too; retaining only the previous match's voices is insufficient.
-    for (int kind=0;kind<CKIND_PLAYABLE_COUNT;++kind)
-        if (const auto* fighter=melee_web_fighter_content(kind))
-            add_unique(result, fighter->audio_bank);
-    for (int kind=St_Kind_Izumi;kind<=St_Kind_Last;++kind)
-        if (const auto* stage=melee_web_stage_content(kind);stage&&stage->audio_bank)
-            add_unique(result, stage->audio_bank);
+    result.reserve(kSourceSsmFiles.size());
+    for (const auto name : kSourceSsmFiles) add_unique(result, name);
     return result;
 }
 

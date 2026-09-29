@@ -4,6 +4,8 @@
 #include "gameplay_asset_manifest.hpp"
 
 #include "dat_archive.hpp"
+#include "dat_audio_load_data.hpp"
+#include "dat_event_menu.hpp"
 #include "dat_menu_support.hpp"
 #include "dat_native_menu.hpp"
 #include "dat_sis.hpp"
@@ -62,6 +64,30 @@ const std::vector<std::uint8_t>& require_file(const RuntimeFiles& files,
     return it->second;
 }
 
+void append_public_symbols(std::vector<MeleeWebArchiveSymbol>& symbols,
+                           const char* filename,
+                           const std::shared_ptr<const DatArchive>& archive,
+                           const DatNativeMenu* native_menu = nullptr,
+                           const char* hydrated_symbol = nullptr,
+                           void* hydrated_data = nullptr)
+{
+    if (!archive) fail("Native menu archive is missing");
+    bool hydrated_symbol_found = false;
+    for (const auto& symbol : archive->public_symbols()) {
+        if (hydrated_symbol && symbol.name == hydrated_symbol) {
+            hydrated_symbol_found = true;
+            continue;
+        }
+        symbols.push_back({filename, symbol.name.c_str(),
+                           native_menu ? native_menu->export_data(symbol.name) : nullptr});
+    }
+    if (hydrated_symbol) {
+        if (!hydrated_symbol_found || !hydrated_data)
+            fail("Native menu hydrated symbol is not an owned public export");
+        symbols.push_back({filename, hydrated_symbol, hydrated_data});
+    }
+}
+
 } // namespace
 
 struct GameplayMenuWorld::Storage {
@@ -71,9 +97,16 @@ struct GameplayMenuWorld::Storage {
 
     std::unique_ptr<DatNativeMenu> css;
     std::unique_ptr<DatNativeMenu> sss;
+    std::unique_ptr<DatNativeMenu> main_menu;
+    std::unique_ptr<DatNativeMenu> title_menu;
     std::unique_ptr<DatSis> sis;
+    std::unique_ptr<DatSis> main_sis;
+    std::unique_ptr<DatSis> toy_sis;
     std::unique_ptr<DatMenuSupport> card_icons;
     std::unique_ptr<DatMenuSupport> card_scene;
+    std::unique_ptr<DatMenuSupport> snapshot_icons;
+    std::unique_ptr<DatEventMenuData> event_menu_data;
+    std::unique_ptr<DatAudioLoadData> audio_load_data;
     std::unique_ptr<NativeDatArena> rumble_arena;
     MeleeWebRumble* rumble = nullptr;
     bool rumble_published = false;
@@ -154,12 +187,15 @@ struct GameplayMenuWorld::Storage {
         // These owners hydrate the exact source roots before publication. The
         // source files still own scene state, object creation, and animation.
         std::vector<MeleeWebArchiveSymbol> symbols;
+        audio_load_data = std::make_unique<DatAudioLoadData>(archive("LbAd.dat"));
+        symbols.push_back({"LbAd.dat", "lbAudioLoadData",
+                           audio_load_data->descriptor()});
         if (scene == GameplayMenuScene::Stages) {
             sss = std::make_unique<DatNativeMenu>(archive("MnSlMap.usd"),
                                                   NativeMenuKind::Stages);
             symbols.push_back(
                 {"MnSlMap.usd", "MnSelectStageDataTable", sss->descriptor()});
-        } else {
+        } else if (scene == GameplayMenuScene::Characters) {
             css = std::make_unique<DatNativeMenu>(archive("MnSlChr.usd"),
                                                   NativeMenuKind::Characters);
             sis = std::make_unique<DatSis>(archive("SdSlChr.usd"),
@@ -175,8 +211,42 @@ struct GameplayMenuWorld::Storage {
                 {"NtMemAc.usd", "ScNtcCommon_scene_data", card_scene->descriptor()},
             };
             const auto extra = archive("MnExtAll.usd");
-            for (const auto& symbol : extra->public_symbols())
-                symbols.push_back({"MnExtAll.usd", symbol.name.c_str(), nullptr});
+            append_public_symbols(symbols, "MnExtAll.usd", extra);
+        } else if (scene == GameplayMenuScene::Main) {
+            const auto main = archive("MnMaAll.usd");
+            const auto menu_strings = archive("SdMenu.usd");
+            const auto toy_strings = archive("SdToy.dat");
+            card_icons = std::make_unique<DatMenuSupport>(
+                archive("LbMcGame.usd"), DatMenuSupportKind::CardIcons);
+            card_scene = std::make_unique<DatMenuSupport>(
+                archive("NtMemAc.usd"), DatMenuSupportKind::CardScene);
+            snapshot_icons = std::make_unique<DatMenuSupport>(
+                archive("LbMcSnap.usd"), DatMenuSupportKind::SnapshotIcons);
+            event_menu_data = std::make_unique<DatEventMenuData>(
+                archive("GmEvent.dat"));
+            main_menu = std::make_unique<DatNativeMenu>(main, NativeMenuKind::Main);
+            main_sis = std::make_unique<DatSis>(menu_strings, "SIS_MenuData");
+            toy_sis = std::make_unique<DatSis>(toy_strings, "SIS_ToyData");
+            append_public_symbols(symbols, "MnMaAll.usd", main, main_menu.get());
+            append_public_symbols(symbols, "SdMenu.usd", menu_strings,
+                                  nullptr, "SIS_MenuData", main_sis->descriptor());
+            append_public_symbols(symbols, "SdToy.dat", toy_strings,
+                                  nullptr, "SIS_ToyData", toy_sis->descriptor());
+            symbols.push_back(
+                {"LbMcGame.usd", "MemCardIconData", card_icons->descriptor()});
+            symbols.push_back(
+                {"NtMemAc.usd", "ScNtcCommon_scene_data", card_scene->descriptor()});
+            symbols.push_back(
+                {"LbMcSnap.usd", "MemSnapIconData", snapshot_icons->descriptor()});
+            append_public_symbols(symbols, "GmEvent.dat", archive("GmEvent.dat"),
+                                  nullptr, "sqEventInitDataLevelTbl",
+                                  event_menu_data->descriptor());
+        } else if (scene == GameplayMenuScene::Title) {
+            const auto title = archive("GmTtAll.usd");
+            title_menu = std::make_unique<DatNativeMenu>(title, NativeMenuKind::Title);
+            append_public_symbols(symbols, "GmTtAll.usd", title, title_menu.get());
+        } else {
+            fail("Unknown native menu scene kind");
         }
         archive_scope = melee_web_archive_sections_register_heap(
             symbols.data(), symbols.size(), error, sizeof(error));
@@ -234,7 +304,8 @@ struct GameplayMenuWorld::Storage {
             audio_bank->get(), "/audio/menu01.hps", hps);
     }
 
-    void start(const RuntimeFiles& files, RuntimeArchiveCache* cache)
+    void start(const RuntimeFiles& files, RuntimeArchiveCache* cache,
+               GameplayMenuScene initial_scene)
     {
         runtime_files = &files;
         archive_cache = cache;
@@ -264,7 +335,7 @@ struct GameplayMenuWorld::Storage {
         for (const auto& name : bank_names)
             bank_bytes.emplace_back(require_file(files, name));
 
-        start_scene(GameplayMenuScene::Characters);
+        start_scene(initial_scene);
         start_audio();
         fully_constructed = true;
     }
@@ -341,6 +412,12 @@ struct GameplayMenuWorld::Storage {
 
         card_scene.reset();
         card_icons.reset();
+        audio_load_data.reset();
+        event_menu_data.reset();
+        title_menu.reset();
+        main_menu.reset();
+        toy_sis.reset();
+        main_sis.reset();
         sis.reset();
         sss.reset();
         css.reset();
@@ -422,17 +499,19 @@ struct GameplayMenuWorld::Storage {
     }
 };
 
-GameplayMenuWorld::GameplayMenuWorld(const RuntimeFiles& files)
+GameplayMenuWorld::GameplayMenuWorld(const RuntimeFiles& files,
+                                     GameplayMenuScene initial_scene)
     : storage_(std::make_unique<Storage>())
 {
-    storage_->start(files, nullptr);
+    storage_->start(files, nullptr, initial_scene);
 }
 
 GameplayMenuWorld::GameplayMenuWorld(const RuntimeFiles& files,
-                                     RuntimeArchiveCache& cache)
+                                     RuntimeArchiveCache& cache,
+                                     GameplayMenuScene initial_scene)
     : storage_(std::make_unique<Storage>())
 {
-    storage_->start(files, &cache);
+    storage_->start(files, &cache, initial_scene);
 }
 
 GameplayMenuWorld::~GameplayMenuWorld() = default;

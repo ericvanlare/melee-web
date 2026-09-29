@@ -60,27 +60,62 @@ try {
   }
   pass('desktop and 320/390/768 pixel layouts have no horizontal overflow');
   await page.setViewportSize({width: 1280, height: 1000});
-  if (await page.locator('#fullscreen').isVisible()) {
+  const nativeFullscreenAvailable = await page.evaluate(() => document.fullscreenEnabled === true &&
+    typeof document.querySelector('#player').requestFullscreen === 'function' &&
+    typeof document.exitFullscreen === 'function');
+  assert.equal(await page.locator('#fullscreen').isVisible(), nativeFullscreenAvailable);
+  assert.equal(await page.locator('#fullscreen-status').count(), 0);
+  assert.equal(await page.getByRole('button', {name: 'Expand player'}).count(), 0);
+  assert.doesNotMatch(await page.locator('body').innerText(), /browser controls remain visible|fullscreen unavailable/i);
+  if (nativeFullscreenAvailable) {
     await page.locator('#fullscreen').click();
-    await page.waitForFunction(() => Boolean(document.fullscreenElement) ||
-      document.querySelector('#player').classList.contains('player-expanded') ||
-      /declined fullscreen/i.test(document.querySelector('#fullscreen-status').textContent));
-    if (await page.evaluate(() => Boolean(document.fullscreenElement))) {
-      await page.waitForFunction(() => document.querySelector('#fullscreen').textContent === 'Exit fullscreen');
-      assert.equal(await page.locator('#fullscreen').innerText(), 'Exit fullscreen');
-      await page.locator('#fullscreen').click();
-      await page.waitForFunction(() => !document.fullscreenElement);
-      pass('native fullscreen enters and exits through real user control');
-    } else {
-      if (!(await page.locator('#player').evaluate(element => element.classList.contains('player-expanded'))))
-        await page.locator('#fullscreen').click();
-      assert.match(await page.locator('#fullscreen-status').innerText(), /browser controls remain visible/i);
-      assert.equal(await page.locator('#fullscreen').innerText(), 'Shrink player');
-      await page.locator('#fullscreen').click();
-      assert.equal(await page.locator('#player').evaluate(element => element.classList.contains('player-expanded')), false);
-      pass('unsupported/rejected fullscreen exposes the labeled page expansion fallback');
-    }
-  } else throw Error('Fullscreen fallback control must remain visible and enabled');
+    await page.waitForFunction(() => document.fullscreenElement === document.querySelector('#player'));
+    await page.waitForFunction(() => document.querySelector('#fullscreen').textContent === 'Exit fullscreen');
+    await page.locator('#fullscreen').click();
+    await page.waitForFunction(() => !document.fullscreenElement &&
+      document.querySelector('#fullscreen').textContent === 'Fullscreen');
+    pass('native fullscreen enters and exits through real user control');
+  } else pass('unsupported native fullscreen action is hidden');
+
+  const unsupportedPage = await context.newPage();
+  await unsupportedPage.addInitScript(() => {
+    Object.defineProperty(Document.prototype, 'fullscreenEnabled', {configurable: true, value: false});
+  });
+  const unsupportedResponse = await unsupportedPage.goto(args.url, {waitUntil: 'networkidle'});
+  checkPageResponse(unsupportedResponse, '/');
+  assert.equal(await unsupportedPage.locator('#fullscreen').isHidden(), true);
+  assert.equal(await unsupportedPage.locator('#fullscreen-status').count(), 0);
+  assert.equal(await unsupportedPage.getByRole('button', {name: 'Expand player'}).count(), 0);
+  assert.doesNotMatch(await unsupportedPage.locator('body').innerText(), /fullscreen unavailable|browser controls remain visible/i);
+  await unsupportedPage.close();
+
+  const rejectedPage = await context.newPage(), rejectedErrors = [];
+  rejectedPage.on('pageerror', error => rejectedErrors.push(error.message));
+  await rejectedPage.addInitScript(() => {
+    window.__fullscreenRequestCalls = 0;
+    window.__fullscreenRequestWasGesture = false;
+    Object.defineProperty(Document.prototype, 'fullscreenEnabled', {configurable: true, value: true});
+    Object.defineProperty(Element.prototype, 'requestFullscreen', {configurable: true, value() {
+      window.__fullscreenRequestCalls++;
+      window.__fullscreenRequestWasGesture = navigator.userActivation?.isActive === true;
+      return Promise.reject(new DOMException('request denied by fixture', 'NotAllowedError'));
+    }});
+  });
+  const rejectedResponse = await rejectedPage.goto(args.url, {waitUntil: 'networkidle'});
+  checkPageResponse(rejectedResponse, '/');
+  assert.equal(await rejectedPage.locator('#fullscreen').isVisible(), true);
+  await rejectedPage.locator('#fullscreen').click();
+  await rejectedPage.waitForFunction(() => window.__fullscreenRequestCalls === 1);
+  await rejectedPage.waitForTimeout(0);
+  assert.equal(await rejectedPage.evaluate(() => window.__fullscreenRequestWasGesture), true);
+  assert.equal(await rejectedPage.locator('#fullscreen').innerText(), 'Fullscreen');
+  assert.equal(await rejectedPage.locator('#player').evaluate(player => player.classList.contains('player-expanded')), false);
+  assert.equal(await rejectedPage.locator('#fullscreen-status').count(), 0);
+  assert.equal(await rejectedPage.getByRole('button', {name: 'Expand player'}).count(), 0);
+  assert.doesNotMatch(await rejectedPage.locator('body').innerText(), /fullscreen unavailable|browser controls remain visible/i);
+  assert.deepEqual(rejectedErrors, []);
+  pass('unsupported action is hidden and rejected native request remains quiet and truthful');
+  await rejectedPage.close();
   for (const [route, heading] of Object.entries({'/terms': 'Terms of Use', '/privacy': 'Privacy Notice',
       '/copyright': 'Copyright & contact', '/notices': 'About & legal'})) {
     const legalResponse = await page.goto(origin + route, {waitUntil: 'networkidle'});

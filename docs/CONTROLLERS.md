@@ -28,18 +28,17 @@ canvas's fitted 4:3 rectangle and safe-area insets. Face and shoulder targets ar
 48px, and D-pad targets are 44px. When the fitted game rectangle is too short
 for corner clusters, a compact arrangement keeps their centers separately
 reachable without changing the canvas proportions; a 281px-wide game area uses
-an 82px main stick to leave the D-pad clear. The page-expanded player
-reserves a header for Fullscreen/Shrink player and Controls; **More controls**
-reveals its other actions without covering gameplay controls. The overlay
-applies a radial 15% dead zone for both sticks and clamps magnitude radially, so
-off-axis drags preserve their direction. It maps to a standard-layout virtual
-Gamepad and then follows the same browser-controller normalization and original
-PAD writer. A button or stick can remain held while other pointer IDs operate
-other controls. Pointer up/cancel, lost capture, window blur, hidden document,
-page hide, canvas geometry changes (including orientation/size changes), opening
-Controls, source changes, Eject, and teardown release held state. Keyboard and
-gamepad source ownership is unchanged; when Touch controls owns P1, physical
-controllers route to another eligible player slot.
+an 82px main stick to leave the D-pad clear. These placements apply to the
+ordinary responsive player and native fullscreen. The overlay applies a radial
+15% dead zone for both sticks and clamps magnitude radially, so off-axis drags
+preserve their direction. It maps to a standard-layout virtual Gamepad and then
+follows the same browser-controller normalization and original PAD writer. A
+button or stick can remain held while other pointer IDs operate other controls.
+Pointer up/cancel, lost capture, window blur, hidden document, page hide, canvas
+geometry changes (including orientation/size changes), opening Controls, source
+changes, Eject, and teardown release held state. Keyboard and gamepad source
+ownership is unchanged; when Touch controls owns P1, physical controllers route
+to another eligible player slot.
 
 | Touch control | GameCube input | Mapping |
 | --- | --- | --- |
@@ -58,15 +57,18 @@ or keyboard gameplay events.
 
 ## Fullscreen and mobile limits
 
-The public player's old Fullscreen control was disabled when either
-`document.fullscreenEnabled` was false or `#player.requestFullscreen` was absent.
-The control now remains enabled: standard Fullscreen API support is feature
-detected, a native request is made synchronously in the button's click handler,
-and the promise rejection path switches to a clearly labeled **Expand player**
-page-layout fallback. That fallback keeps browser controls visible and does not
-claim native fullscreen. The overlay stays inside `#player`/`#runtime-host`, so
-it remains with the game on native fullscreen entry, exit, viewport resize and
-orientation changes.
+The public player shows its Fullscreen control only when the document and player
+element expose the native Fullscreen API. It requests fullscreen synchronously
+from the button's user gesture. A rejected request leaves the control in its
+ordinary state without a page-expansion fallback or persistent explanation.
+Native fullscreen exit continues to use the browser's fullscreen-change state.
+The overlay stays inside `#player`/`#runtime-host`, so it remains with the game
+on native fullscreen entry, exit, viewport resize and orientation changes.
+
+The runtime checks for a usable WebGPU adapter before creating audio or loading
+the Wasm player. A missing adapter produces an early unsupported-runtime error;
+it does not determine whether an adapter has enough memory for a complete game
+session.
 
 The browser Fullscreen API requires user activation; Chrome lists fullscreen
 among activation-gated APIs, so the request is called synchronously inside the
@@ -83,7 +85,7 @@ promise arbitrary-element fullscreen in every iPhone browser context
 ([Apple Safari 26.4 notes](https://developer.apple.com/documentation/safari-release-notes/safari-26_4-release-notes)).
 MDN currently lists Chrome for Android as supported and iOS Safari as partial
 ([Fullscreen API compatibility](https://developer.mozilla.org/en-US/docs/Web/API/Fullscreen_API)).
-Treat live method/permission checks and request rejection as authoritative. An
+The Fullscreen button is hidden when the native capability check fails. An
 installed Home Screen web app's standalone launch presentation is separate from
 ordinary browser-tab fullscreen ([WebKit Safari 26.0 web apps](https://webkit.org/blog/17333/webkit-features-in-safari-26-0/));
 this change does not add installation or PWA setup. Headless Chrome tests cover

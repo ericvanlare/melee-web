@@ -22,7 +22,16 @@ class DatMenuSupportTests(unittest.TestCase):
             cwd=ROOT, capture_output=True, text=True, timeout=60,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("synthetic CSS card support roots", result.stdout)
+        self.assertIn("CSS card/snapshot support roots", result.stdout)
+
+        snapshot = ROOT / "assets-local" / "original-menu-route-20260926-01" / "LbMcSnap.usd"
+        if snapshot.is_file():
+            result = subprocess.run(
+                [str(node_runtime()), str(target), "--snapshot", str(snapshot)],
+                cwd=ROOT, capture_output=True, text=True, timeout=60,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CSS card/snapshot support roots", result.stdout)
 
         icons = ROOT / "assets-local" / "native-menus" / "LbMcGame.usd"
         scene = ROOT / "assets-local" / "native-menus" / "NtMemAc.usd"

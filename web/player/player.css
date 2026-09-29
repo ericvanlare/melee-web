@@ -118,87 +118,11 @@ html, body {
 }
 #toolbar-actions { flex-wrap: wrap; justify-content: center; }
 #toolbar-secondary-actions { flex-wrap: wrap; justify-content: center; }
-#toolbar-more-toggle { display: none; }
-#fullscreen-status:empty { display: none; }
-#fullscreen-status:not(:empty) {
-  flex: 1 0 100%;
-  max-width: min(100%, 720px);
-  color: #f2d68b;
-  line-height: 1.35;
-  text-align: center;
-}
 
 #player:fullscreen {
   width: 100vw;
   height: 100dvh;
 }
-
-#player.player-expanded {
-  position: fixed;
-  z-index: 100;
-  inset: 0;
-  width: 100vw;
-  height: 100dvh;
-}
-
-#player.player-expanded #runtime-host {
-  position: absolute;
-  inset: calc(84px + env(safe-area-inset-top)) env(safe-area-inset-right)
-    env(safe-area-inset-bottom) env(safe-area-inset-left);
-  flex: none;
-}
-
-#player.player-expanded #toolbar {
-  position: absolute;
-  z-index: 30;
-  right: max(8px, env(safe-area-inset-right));
-  top: max(4px, env(safe-area-inset-top));
-  left: max(8px, env(safe-area-inset-left));
-  width: auto;
-  max-height: 76px;
-  overflow-x: hidden;
-  overflow-y: auto;
-  align-content: flex-start;
-  padding: 4px 6px;
-  border: 1px solid #aaa9;
-  border-radius: 6px;
-  background: #000c;
-}
-
-#player.player-expanded #toolbar-brand,
-#player.player-expanded #toolbar-meta,
-#player.player-expanded #toolbar-secondary-actions { display: none; }
-
-#player.player-expanded #toolbar-actions {
-  width: 100%;
-  flex: 1 1 100%;
-  flex-wrap: nowrap;
-  justify-content: flex-start;
-}
-
-#player.player-expanded #toolbar-more-toggle { display: inline-flex; }
-
-#player.player-expanded #fullscreen-status:not(:empty) {
-  flex: 1 0 100%;
-  max-width: 100%;
-  font-size: 11px;
-  line-height: 1.2;
-}
-
-#player.player-expanded.toolbar-actions-open #toolbar { max-height: 148px; }
-
-#player.player-expanded.toolbar-actions-open #runtime-host {
-  top: calc(164px + env(safe-area-inset-top));
-}
-
-#player.player-expanded.toolbar-actions-open #toolbar-secondary-actions {
-  display: flex;
-  width: 100%;
-  flex: 1 1 100%;
-  justify-content: flex-start;
-}
-
-html.player-expanded, body.player-expanded { overflow: hidden; }
 
 #toolbar-brand { justify-content: flex-end; }
 #toolbar-meta { justify-content: flex-start; }

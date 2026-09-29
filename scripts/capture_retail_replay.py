@@ -44,6 +44,7 @@ TOOLS_ROOT = REPO_ROOT / "tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
+from dolphin_audio import dolphin_audio_options
 from retail_replay_validation import EXPECTED_PROVENANCE, CPU_PROFILES, MAX_FRAMES, load_capture
 from retail_draw_audit import load_draw_audit
 from retail_match_completion import load_match_completion
@@ -558,14 +559,14 @@ def write_gdb_script(path: Path, socket: Path, helper: Path, collector: Path,
 
 
 def dolphin_command(dolphin: Path, user: Path, snapshot: Path, disc: Path,
-                    *, cpu: str = "Interpreter64") -> list[str]:
+                    *, cpu: str = "Interpreter64", audible: bool = False) -> list[str]:
     if cpu not in CPU_PROFILES:
         raise CaptureRunnerError("Unsupported reference CPU profile")
     return [
         str(dolphin), "-u", str(user), "-b", "-d", "-s", str(snapshot), "-e", str(disc),
         "-C", "Dolphin.Input.BackgroundInput=True",
         "-C", "Dolphin.Display.Fullscreen=False",
-        "-C", "Dolphin.DSP.Backend=No Audio Output",
+        *dolphin_audio_options(audible=audible),
         "-C", f"Dolphin.Core.CPUCore={CPU_PROFILES[cpu]}",
         "-C", "Dolphin.Core.CPUThread=False",
         "-C", "Dolphin.Core.EnableCheats=False",

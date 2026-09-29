@@ -42,6 +42,7 @@ SCENE_MEMCARD = 0x2A
 SCENE_OPENING_MOVIE = 0x1C
 SCHEDULER_RETURN = 0x80390EB4
 COMMAND_LOG_NAME = "cold-boot-input-commands.jsonl"
+MENU_ROUTE_TRACE_NAME = "cold-boot-menu-route.jsonl"
 
 
 _COLD_BOOT_HELPERS = rf'''
@@ -250,6 +251,211 @@ def cold_boot_to_sss():
 '''
 
 
+_MENU_ROUTE_TRACE_HELPER = r'''
+# Read-only source-frame snapshots for a fresh boot/title/main-menu/CSS
+# round trip. Controller intent stays in the separate command log above.
+MENU_ROUTE_TRACE_NAME='cold-boot-menu-route.jsonl'
+MENU_ROUTE_TRACE_PATH=Path(os.environ['MELEE_REPLAY_REFERENCE_WORK'])/MENU_ROUTE_TRACE_NAME
+MENU_ROUTE_TRACE_PATH.parent.mkdir(parents=True,exist_ok=True)
+MENU_ROUTE_TRACE=MENU_ROUTE_TRACE_PATH.open('x',encoding='utf-8')
+MENU_ROUTE_TRACE_SEQUENCE=0
+MENU_ROUTE_TRACE_LIMIT=12000
+GM_TITLE=0
+GM_MENU=1
+GM_VS=2
+
+def _menu_route_snapshot(event):
+    kind=scene_kind()
+    row={'event':event,'scene_kind':kind,
+         'game_mode':mem(0x80479D30,1)[0],
+         'scene_frame':u32(0x80479D58),
+         'pad_copy_status_hex':mem(0x804C20BC,68).hex()}
+    rng_pointer=u32(0x804D5F94)
+    if 0x80000000<=rng_pointer<=0x81800000-4:
+        row['rng']={'pointer':hex(rng_pointer),'value':u32(rng_pointer)}
+    else:
+        row['rng']=None
+    if kind==SCENE_MENU:
+        menu_flow=mem(0x804A04F0,0x18)
+        row['menu_flow_hex']=menu_flow.hex()
+        row['menu_state']={'cur':menu_flow[0],'prev':menu_flow[1],
+                           'hovered':struct.unpack_from('>H',menu_flow,2)[0],
+                           'confirmed':menu_flow[4],'entering':menu_flow[0x11]}
+        row['menu_input_cooldown']=u32(0x804D6BC8)
+    elif kind==SCENE_CSS:
+        pointer=u32(0x804D6CB0)
+        if not 0x80000000<=pointer<=0x81800000-0x100:
+            raise RuntimeError('invalid original CSS data owner during route capture')
+        row['css_data_hex']=mem(pointer+0x10,0xF0).hex()
+        cursors=[]
+        for port in range(4):
+            cursor_pointer=u32(0x804A0BC0+port*4)
+            model_pointer=u32(0x804A0BD0+port*4)
+            if cursor_pointer==0 and model_pointer==0:
+                cursors.append(None)
+                continue
+            if ((cursor_pointer and not 0x80000000<=cursor_pointer<=0x81800000-20) or
+                    (model_pointer and not 0x80000000<=model_pointer<=0x81800000-24)):
+                raise RuntimeError(f'invalid source CSS cursor/model owner for port {port+1}')
+            if not cursor_pointer or not model_pointer:
+                cursors.append({'port':port+1,'cursor_present':bool(cursor_pointer),
+                                'model_present':bool(model_pointer)})
+                continue
+            cursor=mem(cursor_pointer,20)
+            model=mem(model_pointer,24)
+            icon_index=mem(0x803F0DFC+port*36+14,1)[0]
+            selected=-1
+            if icon_index<25:
+                selected=mem(0x803F0B24+icon_index*28+1,1)[0]
+            cursors.append({'port':cursor[4],'cursor_state':cursor[5],
+                            'cursor_target':cursor[6],
+                            'held':cursor[6] if cursor[5]==1 and cursor[6]<4 else -1,
+                            'selected':selected,'model_owner':model[5],
+                            'cursor':struct.unpack_from('>ff',cursor,12),
+                            'model':struct.unpack_from('>ff',model,8)})
+        row['css_cursors']=cursors
+    hps=mem(0x803BB300,0x40).split(b'\0',1)[0]
+    row['current_hps_hex']=hps.hex()
+    row['hps_voice_word']=hex(u32(0x804D6038))
+    return row
+
+def _record_menu_route_frame():
+    global MENU_ROUTE_TRACE_SEQUENCE
+    if MENU_ROUTE_TRACE_SEQUENCE>=MENU_ROUTE_TRACE_LIMIT:
+        raise RuntimeError('cold menu route source-frame trace budget exhausted')
+    row=_menu_route_snapshot('scheduler_return')
+    row['sequence']=MENU_ROUTE_TRACE_SEQUENCE
+    MENU_ROUTE_TRACE.write(json.dumps(row,separators=(',',':'))+'\n')
+    MENU_ROUTE_TRACE.flush()
+    MENU_ROUTE_TRACE_SEQUENCE+=1
+
+def _record_menu_route_marker(name):
+    row=_menu_route_snapshot(name)
+    row['sequence']=MENU_ROUTE_TRACE_SEQUENCE
+    MENU_ROUTE_TRACE.write(json.dumps(row,separators=(',',':'))+'\n')
+    MENU_ROUTE_TRACE.flush()
+'''
+
+
+_COLD_BOOT_MENU_ROUTE_HELPERS = r'''
+def _cold_boot_wait_main_menu(menu_kind=0,limit=1800):
+    for _ in range(limit):
+        kind=scene_kind()
+        mode=mem(0x80479D30,1)[0]
+        if kind==SCENE_MEMCARD:
+            _cold_boot_card_prompt()
+            continue
+        if kind==SCENE_MENU and mode==GM_MENU:
+            return _cold_boot_wait_menu(menu_kind,limit=limit)
+        step(1)
+    raise RuntimeError(f'original GM_MENU did not reach the root menu: scene={_cold_boot_scene_name(scene_kind())} mode={mem(0x80479D30,1)[0]}')
+
+def _cold_boot_wait_css(limit=900):
+    for _ in range(limit):
+        kind=scene_kind()
+        mode=mem(0x80479D30,1)[0]
+        if kind==SCENE_MEMCARD:
+            _cold_boot_card_prompt()
+            continue
+        if kind==SCENE_CSS and mode==GM_VS:
+            _cold_boot_check_character_availability()
+            return
+        if kind not in (SCENE_MENU,SCENE_CSS):
+            raise RuntimeError(f'VS selection reached unexpected source scene {_cold_boot_scene_name(kind)} mode={mode}')
+        step(1)
+    raise RuntimeError(f'original GM_VS did not reach CSS: scene={_cold_boot_scene_name(scene_kind())} mode={mem(0x80479D30,1)[0]}')
+
+def _cold_boot_css_to_title():
+    if scene_kind()!=SCENE_CSS or mem(0x80479D30,1)[0]!=GM_VS:
+        raise RuntimeError('CSS-to-title route requires live original GM_VS/GS_CSS')
+    for port in range(4):
+        command(port,'SET MAIN .5 .5')
+    step(12)
+    # Probe ordinary B first. In source, B is handled by the CSS character
+    # doors, while the scene-level parent return is the L+R+Start chord.
+    # Preserve both source snapshots so any CSS-local effect is visible in
+    # the capture without mistaking it for a parent-scene transition.
+    _record_menu_route_marker('css_before_b_back_probe')
+    pulse(0,'B',settle=24)
+    if scene_kind()!=SCENE_CSS or mem(0x80479D30,1)[0]!=GM_VS:
+        raise RuntimeError(f'ordinary CSS B left the CSS unexpectedly: scene={_cold_boot_scene_name(scene_kind())} mode={mem(0x80479D30,1)[0]}')
+    _record_menu_route_marker('css_b_back_probe_remained_css')
+    # mnCharSel's retail parent-menu shortcut is L+R+Start. Keep the chord
+    # source-owned; do not write the pending game-mode field directly.
+    command(0,'PRESS L');command(0,'PRESS R');step(4)
+    command(0,'PRESS START');step(12)
+    command(0,'RELEASE L');command(0,'RELEASE R');command(0,'RELEASE START')
+    # GM_MENU inherits the VS submenu from GM_VS. Retail's CSS parent-menu
+    # shortcut therefore lands at MENU_KIND_VS (2), not the root menu (0).
+    state=_cold_boot_wait_main_menu(2)
+    if state['cur']!=2 or state['hovered']!=0:
+        raise RuntimeError(f'CSS back route did not reach the VS submenu at Melee: {state}')
+    _record_menu_route_marker('versus_submenu_ready_after_css')
+    # B is the ordinary submenu Back input. The first B returns to the root
+    # menu; the next B from the root requests GM_TITLE.
+    pulse(0,'B',settle=24)
+    state=_cold_boot_wait_main_menu(0)
+    if state['cur']!=0 or state['hovered']!=1:
+        raise RuntimeError(f'VS submenu Back did not return to root at Versus: {state}')
+    _record_menu_route_marker('root_main_menu_ready')
+    # PAD_CANCEL in the root menu requests GM_TITLE.
+    pulse(0,'B',settle=30)
+    for _ in range(900):
+        kind=scene_kind()
+        mode=mem(0x80479D30,1)[0]
+        if kind==SCENE_TITLE and mode==GM_TITLE:
+            _record_menu_route_marker('title_ready')
+            _cold_boot_wait_neutral(24)
+            return
+        if kind==SCENE_MEMCARD:
+            _cold_boot_card_prompt()
+            continue
+        step(1)
+    raise RuntimeError(f'root-menu B did not reach original title: scene={_cold_boot_scene_name(scene_kind())} mode={mem(0x80479D30,1)[0]}')
+
+def _cold_boot_title_to_css():
+    if scene_kind()!=SCENE_TITLE or mem(0x80479D30,1)[0]!=GM_TITLE:
+        raise RuntimeError('title-to-CSS route requires live original GM_TITLE/GS_TITLE')
+    # The title callback has a source-owned 20-tick input cooldown. Let it
+    # expire before sending one ordinary Start edge.
+    _cold_boot_wait_neutral(24)
+    pulse(0,'START',settle=30)
+    for _ in range(1800):
+        kind=scene_kind()
+        mode=mem(0x80479D30,1)[0]
+        if kind==SCENE_MEMCARD:
+            _cold_boot_card_prompt()
+            continue
+        if kind==SCENE_MENU and mode==GM_MENU:
+            state=_cold_boot_wait_menu(0)
+            if state['cur']!=0 or state['hovered']!=0:
+                raise RuntimeError(f'title Start did not open the default 1P root menu: {state}')
+            _record_menu_route_marker('root_main_menu_ready_after_title')
+            move_menu_selection(1)  # SEL_MAIN_VS
+            pulse(0,'A',settle=24)
+            state=_cold_boot_wait_menu(2)  # MENU_KIND_VS
+            if state['cur']!=2 or state['hovered']!=0:
+                raise RuntimeError(f'root menu Versus did not open at Melee: {state}')
+            _record_menu_route_marker('versus_submenu_ready_after_title')
+            pulse(0,'A',settle=30)  # SEL_VS_MELEE -> GM_VS
+            _cold_boot_wait_css()
+            _record_menu_route_marker('round_trip_css_ready')
+            return
+        if kind not in (SCENE_TITLE,SCENE_OPENING_MOVIE):
+            raise RuntimeError(f'title Start reached unexpected source scene {_cold_boot_scene_name(kind)} mode={mode}')
+        step(1)
+    raise RuntimeError(f'title Start did not reach original GM_MENU: scene={_cold_boot_scene_name(scene_kind())} mode={mem(0x80479D30,1)[0]}')
+
+def cold_boot_css_menu_round_trip():
+    """Capture a continuous cold boot, CSS -> root menu -> title -> CSS route."""
+    _record_menu_route_marker('first_scheduler_return')
+    cold_boot_to_css()
+    _record_menu_route_marker('cold_css_ready')
+    _cold_boot_css_to_title()
+    _cold_boot_title_to_css()
+'''
+
+
 _COMMAND_LOG_HELPER = rf'''
 # Every controller command is retained as reproducible provenance.  The log
 # records the source scene/frame observed immediately before the pipe write;
@@ -260,7 +466,13 @@ COMMAND_LOG_PATH.parent.mkdir(parents=True,exist_ok=True)
 COMMAND_LOG=COMMAND_LOG_PATH.open('x',encoding='utf-8')
 def _record_input_command(port,text):
     row={{'event':'pad_command','port':port+1,'command':text,
-         'scene_kind':scene_kind(),'scene_frame':u32(0x80479D58)}}
+         'scene_kind':scene_kind(),'game_mode':mem(0x80479D30,1)[0],
+         'scene_frame':u32(0x80479D58)}}
+    if row['scene_kind']==SCENE_MENU:
+        menu_flow=mem(0x804A04F0,0x18)
+        row['menu_state']={{'cur':menu_flow[0],'prev':menu_flow[1],
+                           'hovered':struct.unpack_from('>H',menu_flow,2)[0],
+                           'confirmed':menu_flow[4],'entering':menu_flow[0x11]}}
     COMMAND_LOG.write(json.dumps(row,separators=(',',':'))+'\n')
     COMMAND_LOG.flush()
 '''
@@ -278,8 +490,8 @@ def _check_collector_failure():
 '''
 
 
-def _compose_driver() -> str:
-    """Compose the cold route around the existing source-menu body."""
+def _compose_driver(*, menu_round_trip: bool = False) -> str:
+    """Compose a cold route around the existing source-menu body."""
     marker = "\n# Preparation only, before a new checkpoint."
     if _BASE_DRIVER_SOURCE.count(marker) != 1:
         raise ValueError("retail CPU menu driver preparation marker changed")
@@ -299,19 +511,43 @@ def _compose_driver() -> str:
         "        gdb.execute('continue',to_string=True)\n        _check_collector_failure()\n        current=u32(0x80479D58)",
         1,
     )
-    source = source.replace(marker, _COLD_BOOT_HELPERS + marker, 1)
-    source = source.replace(
-        marker,
-        "\n# Fresh-DOL entry is complete only when source CSS/SSS is observed.\n"
+    route_helpers = _COLD_BOOT_HELPERS
+    if menu_round_trip:
+        if source.count("completed+=1;previous=current") != 1:
+            raise ValueError("retail CPU menu source-frame boundary changed")
+        source = source.replace(
+            "completed+=1;previous=current",
+            "completed+=1;previous=current\n        _record_menu_route_frame()",
+            1,
+        )
+        source = source.replace(marker, _MENU_ROUTE_TRACE_HELPER + marker, 1)
+        route_helpers += _COLD_BOOT_MENU_ROUTE_HELPERS
+    source = source.replace(marker, route_helpers + marker, 1)
+    route = ("cold_boot_css_menu_round_trip" if menu_round_trip else
+             "cold_boot_to_sss")
+    route_note = (
+        "# This is one continuous fresh-DOL route: cold boot, first CSS, "
+        "retail parent-menu/title return, then a second CSS.\n"
+        if menu_round_trip else
+        "# Fresh-DOL entry is complete only when source CSS/SSS is observed.\n"
         "# The existing rules routine starts from SSS; cold_boot_to_sss()\n"
         "# establishes that source boundary through ordinary CSS input.\n"
-        "cold_boot_to_sss()\n" + marker,
+    )
+    source = source.replace(
+        marker,
+        "\n" + route_note + route + "()\n" + marker,
         1,
     )
+    if menu_round_trip:
+        # This driver is a route capture, not the separate CSS/SSS setup
+        # recipe appended by the base module. Stop after the second source
+        # CSS so the retained route ends at its declared boundary.
+        source = source.split(marker, 1)[0]
     return source
 
 
 DRIVER_SOURCE = _compose_driver()
+MENU_ROUND_TRIP_DRIVER_SOURCE = _compose_driver(menu_round_trip=True)
 
 
 def render_cold_boot_driver() -> str:
@@ -319,15 +555,22 @@ def render_cold_boot_driver() -> str:
     return DRIVER_SOURCE
 
 
+def render_menu_round_trip_driver() -> str:
+    """Return a fresh-DOL CSS -> parent menus -> title -> CSS driver."""
+    return MENU_ROUND_TRIP_DRIVER_SOURCE
+
+
 # Compatibility aliases used by collector/preparation builders.
 render_source_driver = render_cold_boot_driver
 render_driver = render_cold_boot_driver
 
 
-def write_driver(path: str | Path) -> Path:
+def write_driver(path: str | Path, *, menu_round_trip: bool = False) -> Path:
     """Write one cold-boot driver copy and return its path."""
     destination = Path(path)
-    destination.write_text(DRIVER_SOURCE, encoding="utf-8")
+    source = (MENU_ROUND_TRIP_DRIVER_SOURCE if menu_round_trip else
+              DRIVER_SOURCE)
+    destination.write_text(source, encoding="utf-8")
     return destination
 
 
@@ -353,6 +596,21 @@ def validate_driver() -> None:
     if COMMAND_LOG_NAME not in DRIVER_SOURCE:
         raise ValueError("cold-boot route must retain its input command log")
     compile(DRIVER_SOURCE, "retail_allocation_menu.gdb.py", "exec")
+
+    round_trip = MENU_ROUND_TRIP_DRIVER_SOURCE
+    compile(round_trip, "retail_menu_round_trip.gdb.py", "exec")
+    if "write_memory(" in round_trip or "put_register" in round_trip:
+        raise ValueError("menu round-trip driver must not write source state")
+    if "load_state" in round_trip.lower() or "savestate" in round_trip.lower():
+        raise ValueError("menu round-trip driver must not load a saved state")
+    if MENU_ROUTE_TRACE_NAME not in round_trip:
+        raise ValueError("menu round-trip driver must retain source-frame state")
+    if "_cold_boot_css_to_title()" not in round_trip or "_cold_boot_title_to_css()" not in round_trip:
+        raise ValueError("menu round-trip driver lost an original back/forward route")
+    if "pulse(0,'B',settle=30)" not in round_trip:
+        raise ValueError("menu round-trip driver must use the original root-menu Back input")
+    if "PRESS L');command(0,'PRESS R'" not in round_trip:
+        raise ValueError("menu round-trip driver lost the CSS parent-menu chord")
 
 
 validate_driver()

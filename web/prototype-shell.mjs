@@ -174,17 +174,25 @@ function changeKeyboard() {
 for (const id of ['keyboard-layout', 'keyboard-one', 'keyboard-two']) $(id).onchange = changeKeyboard;
 renderKeyboard();
 
-const fullscreenAvailable = !!document.fullscreenEnabled && typeof $('player').requestFullscreen === 'function';
-$('fullscreen').disabled = !fullscreenAvailable;
-$('fullscreen').title = fullscreenAvailable ? '' : 'Fullscreen unavailable in this browser';
-$('fullscreen').onclick = async () => {
-  try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else await $('player').requestFullscreen();
-    player?.focus();
-  } catch { showError('Fullscreen was declined by the browser.'); }
-};
-document.addEventListener('fullscreenchange', () => {
-  $('fullscreen').textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen';
-});
+const fullscreenButton = $('fullscreen'), playerElement = $('player');
+const fullscreenAvailable = document.fullscreenEnabled === true &&
+  typeof playerElement.requestFullscreen === 'function' && typeof document.exitFullscreen === 'function';
+fullscreenButton.hidden = !fullscreenAvailable;
+if (fullscreenAvailable) {
+  const renderFullscreen = () => {
+    fullscreenButton.textContent = document.fullscreenElement === playerElement ? 'Exit fullscreen' : 'Fullscreen';
+  };
+  fullscreenButton.onclick = () => {
+    if (document.fullscreenElement === playerElement) {
+      try { Promise.resolve(document.exitFullscreen()).catch(() => {}); }
+      catch {}
+      return;
+    }
+    try { Promise.resolve(playerElement.requestFullscreen()).then(() => player?.focus(), () => {}); }
+    catch {}
+  };
+  document.addEventListener('fullscreenchange', renderFullscreen);
+  playerElement.addEventListener('fullscreenerror', renderFullscreen);
+  renderFullscreen();
+}
 void startPlayer();

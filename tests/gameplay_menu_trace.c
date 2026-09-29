@@ -339,7 +339,7 @@ int main(void)
     if (!melee_web_menu_sss_selection_valid(&sss)) return 54;
 
     {
-        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
         char error[128];
         MeleeWebMenuSession* session =
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
@@ -487,7 +487,7 @@ int main(void)
             !melee_web_menu_session_destroy(session, error, sizeof(error))) return 63;
     }
     {
-        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
         char error[128];
         MeleeWebMenuSession* session =
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
@@ -514,7 +514,7 @@ int main(void)
             return 107;
     }
     {
-        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
         char error[128];
         MeleeWebMenuSession* session =
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
@@ -563,7 +563,7 @@ int main(void)
             return 74;
     }
     {
-        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
         char error[128];
         MeleeWebMenuSession* session =
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
@@ -593,7 +593,7 @@ int main(void)
     }
 
     {
-        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
         char error[128];
         MeleeWebMenuSession* session =
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
@@ -618,7 +618,7 @@ int main(void)
     }
 
     {
-        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
         char error[128];
         MeleeWebMenuSession* session =
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
@@ -667,7 +667,7 @@ int main(void)
      * never expose a READY payload that was invalidated by that callback. */
     const int invalid_exit_cases = 3;
     for (invalid_exit = 1; invalid_exit <= invalid_exit_cases; ++invalid_exit) {
-        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
         char error[128];
         MeleeWebMenuSession* session =
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
@@ -691,7 +691,7 @@ int main(void)
             !melee_web_menu_session_destroy(session, error, sizeof(error))) return 24;
     }
     {
-        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, NULL};
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, NULL, NULL, NULL};
         char error[128];
         if (melee_web_menu_session_create(&runtime, NULL, error, sizeof(error)))
             return 25;

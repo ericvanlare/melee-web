@@ -450,6 +450,13 @@ class ReferenceCaptureAppTests(unittest.TestCase):
         self.assertIn("Dolphin.Core.CPUCore=4", command)
         self.assertIn("Dolphin.Interface.ConfirmStop=False", command)
         self.assertIn("Session.Core.SaveDataWritable=False", command)
+        self.assertIn("Dolphin.DSP.Backend=No Audio Output", command)
+        self.assertIn("Dolphin.DSP.Muted=True", command)
+        audible = APP.dolphin_command(settings, Path("/private/session"), audible=True)
+        self.assertIn("Dolphin.DSP.Muted=False", audible)
+        self.assertNotIn("Dolphin.DSP.Backend=No Audio Output", audible)
+        with self.assertRaises(TypeError):
+            APP.dolphin_command(settings, Path("/private/session"), audible="false")
 
     def test_dolphin_process_exit_preserves_incomplete_capture(self):
         class Process:
