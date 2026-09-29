@@ -2987,6 +2987,7 @@ diff --git a/src/melee/lb/lbaudio_ax.c b/src/melee/lb/lbaudio_ax.c
 +
 +#endif
 diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
+index 0e13b1a..ec16112 100644
 --- a/src/melee/lb/lbcollision.c
 +++ b/src/melee/lb/lbcollision.c
 @@ -18,6 +18,9 @@
@@ -2999,7 +3000,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
  
  /* 006E58 */ static bool
  lbColl_80006E58(Vec3* hit_start, Vec3* hit_end, Vec3* hurt_start,
-@@ -1479,6 +1482,7 @@
+@@ -1479,6 +1482,7 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
      Vec3 normalize_e;
      Vec3 normal_x;
      Vec3 multi_mtx;
@@ -3007,7 +3008,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
      volatile float sqrt_tmp[2];
  
      diff_cb.x = c->x - b->x;
-@@ -1497,7 +1501,7 @@
+@@ -1497,7 +1501,7 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
          PSMTXMultVec(arg1, &multi_mtx, &multi_mtx);
  
          dist = sqrDistance(&normal_x, &multi_mtx);
@@ -3016,7 +3017,22 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
  
          offset_dist = dist + dist_offset;
  
-@@ -1524,9 +1528,7 @@
+@@ -1508,8 +1512,14 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
+         dot_diff_cb = diff_cb.x * diff_cb.x + diff_cb.y * diff_cb.y +
+                       diff_cb.z * diff_cb.z;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++        int quadratic_intermediates_valid;
++#endif
+         if (approximatelyZero(dot_diff_cb)) {
+             scl = 0.0f;
++#if defined(MELEE_WEB_GAMEPLAY)
++            quadratic_intermediates_valid = 0;
++#endif
+         } else {
+             n0 = 2.0f * diff_cb.x * diff_ba.x + 2.0f * diff_cb.y * diff_ba.y +
+                  2.0f * diff_cb.z * diff_ba.z;
+@@ -1524,9 +1534,10 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
                  n1 = 0.0f;
              }
  
@@ -3024,10 +3040,13 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
 -            // array.
 -            scl = (-n0 - sqrtf_store(n1, sqrt_tmp - 1)) / (2.0f * dot_diff_cb);
 +            scl = (-n0 - sqrtf_store(n1, &sqrt_tmp[0])) / (2.0f * dot_diff_cb);
++#if defined(MELEE_WEB_GAMEPLAY)
++            quadratic_intermediates_valid = 1;
++#endif
          }
  
          normalize_e.x = scl * diff_cb.x + b->x - a->x;
-@@ -1539,6 +1541,44 @@
+@@ -1539,6 +1550,49 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
          d->x = dist * e->x + a->x;
          d->y = dist * e->y + a->y;
          d->z = dist * e->z + a->z;
@@ -3059,8 +3078,13 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
 +            probe.diff_ba[0] = diff_ba.x; probe.diff_ba[1] = diff_ba.y;
 +            probe.diff_ba[2] = diff_ba.z;
 +            probe.distance = dist; probe.offset_distance = offset_dist;
-+            probe.dot_diff_cb = dot_diff_cb; probe.n0 = n0; probe.ba_dot = ba_dot;
-+            probe.n1 = n1; probe.scale = scl;
++            probe.dot_diff_cb = dot_diff_cb; probe.scale = scl;
++            probe.branch = quadratic_intermediates_valid
++                ? MELEE_WEB_LB_COLL_BRANCH_QUADRATIC
++                : MELEE_WEB_LB_COLL_BRANCH_NEAR_ZERO;
++            if (quadratic_intermediates_valid) {
++                probe.n0 = n0; probe.ba_dot = ba_dot; probe.n1 = n1;
++            }
 +            probe.normalize_e[0] = normalize_e.x; probe.normalize_e[1] = normalize_e.y;
 +            probe.normalize_e[2] = normalize_e.z;
 +            probe.normal[0] = e->x; probe.normal[1] = e->y; probe.normal[2] = e->z;
@@ -3072,7 +3096,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
      } else {
          *angle = M_PI;
          e->z = 0.0f;
-@@ -2130,8 +2170,16 @@
+@@ -2130,8 +2184,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
      PSMTXConcat(sp44, sp74, sp74);
      GXSetCullMode(GX_CULL_BACK);
      GXClearVtxDesc();
@@ -3089,7 +3113,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2143,8 +2191,16 @@
+@@ -2143,8 +2205,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
      GXLoadNrmMtxImm(spD4, 0);
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      GXClearVtxDesc();
@@ -3106,7 +3130,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2157,8 +2213,16 @@
+@@ -2157,8 +2227,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      if (!isSmall(var_f31)) {
          GXClearVtxDesc();
@@ -3123,7 +3147,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
          GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
          GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
          GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2259,8 +2323,16 @@
+@@ -2259,8 +2337,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
      PSMTXConcat(arg0, sp78, sp78);
      GXSetCullMode(GX_CULL_BACK);
      GXClearVtxDesc();
@@ -3140,7 +3164,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2272,8 +2344,16 @@
+@@ -2272,8 +2358,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
      GXLoadNrmMtxImm(spD8, 0);
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      GXClearVtxDesc();
@@ -3157,7 +3181,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2286,8 +2366,16 @@
+@@ -2286,8 +2380,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      if (!isSmall(var_f31)) {
          GXClearVtxDesc();
@@ -10424,7 +10448,7 @@ index 105286c..12dec5a 100644
  /// @todo .sdata2 order hack
  #ifdef MUST_MATCH
  static void sdata2_order(void)
-@@ -2270,9 +2276,21 @@ void ftColl_8007925C(Fighter_GObj* gobj)
+@@ -2262,19 +2276,51 @@ void ftColl_8007925C(Fighter_GObj* gobj)
                  goto catch_elem_path;
              }
  
@@ -10447,9 +10471,17 @@ index 105286c..12dec5a 100644
 +#endif
 +            if (shield_overlap)
              {
++#if defined(MELEE_WEB_GAMEPLAY)
++                int shield_collision_outputs_valid = 0;
++#endif
                  if (!(u8) fp->x221B_b2) {
                      if ((u8) hurt->x42_b3 || (u8) fp->x221B_b1) {
-@@ -2282,7 +2300,19 @@ void ftColl_8007925C(Fighter_GObj* gobj)
+                         lbColl_80007DD8(hurt, &fp->shield_hit,
+                             ftCommon_8007F804(fp), &coll_pos,
+                             &coll_dist, item->scl);
++#if defined(MELEE_WEB_GAMEPLAY)
++                        shield_collision_outputs_valid = 1;
++#endif
                      }
                  }
  
@@ -10457,14 +10489,16 @@ index 105286c..12dec5a 100644
 +                melee_web_cpu_observation_shield_overlap(
 +                    "assignment_entry", item, hurt, fp, shield_transform, var_r22,
 +                    item->scl, fp->x34_scale.y, fp->cur_pos.z, shield_overlap,
-+                    &coll_pos, coll_dist);
++                    shield_collision_outputs_valid ? &coll_pos : NULL,
++                    shield_collision_outputs_valid ? coll_dist : 0.0f);
 +#endif
                  ftColl_80077688(item, hurt, fp, &coll_pos, coll_dist);
 +#if defined(MELEE_WEB_GAMEPLAY)
 +                melee_web_cpu_observation_shield_overlap(
 +                    "assignment_return", item, hurt, fp, shield_transform, var_r22,
 +                    item->scl, fp->x34_scale.y, fp->cur_pos.z, shield_overlap,
-+                    &coll_pos, coll_dist);
++                    shield_collision_outputs_valid ? &coll_pos : NULL,
++                    shield_collision_outputs_valid ? coll_dist : 0.0f);
 +#endif
                  continue;
              }

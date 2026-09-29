@@ -367,11 +367,11 @@ void melee_web_cpu_observation_shield_overlap(const char* phase,
         put("null");
     }
     if (collision_pos) {
-        put(",\"ftcoll_inputs\":{\"collision_pos_bits\":");
+        put(",\"ftcoll_inputs_valid\":true,\"ftcoll_inputs\":{\"collision_pos_bits\":");
         vec(collision_pos);
         put(",\"collision_angle_bits\":\"%08x\"}", bits(collision_angle));
     } else {
-        put(",\"ftcoll_inputs\":null");
+        put(",\"ftcoll_inputs_valid\":false,\"ftcoll_inputs\":null");
     }
     put(",\"arrow\":"); item_fields(item, 1);
     put("}");
@@ -505,12 +505,8 @@ void melee_web_cpu_observation_lb_collision_probe(const MeleeWebLbCollProbe* pro
         "\"diff_cb_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
         "\"diff_ba_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
         "\"distance_bits\":\"%08x\",\"offset_distance_bits\":\"%08x\","
-        "\"dot_diff_cb_bits\":\"%08x\",\"n0_bits\":\"%08x\","
-        "\"ba_dot_bits\":\"%08x\",\"n1_bits\":\"%08x\",\"scale_bits\":\"%08x\","
-        "\"normalize_e_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
-        "\"normal_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
-        "\"collision_position_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
-        "\"angle_bits\":\"%08x\"}",
+        "\"dot_diff_cb_bits\":\"%08x\",\"branch\":\"%s\","
+        "\"quadratic_intermediates\":",
         bits(probe->b[0]), bits(probe->b[1]), bits(probe->b[2]),
         bits(probe->c[0]), bits(probe->c[1]), bits(probe->c[2]),
         bits(probe->transformed_radius[0]), bits(probe->transformed_radius[1]),
@@ -519,7 +515,22 @@ void melee_web_cpu_observation_lb_collision_probe(const MeleeWebLbCollProbe* pro
         bits(probe->diff_cb[0]), bits(probe->diff_cb[1]), bits(probe->diff_cb[2]),
         bits(probe->diff_ba[0]), bits(probe->diff_ba[1]), bits(probe->diff_ba[2]),
         bits(probe->distance), bits(probe->offset_distance), bits(probe->dot_diff_cb),
-        bits(probe->n0), bits(probe->ba_dot), bits(probe->n1), bits(probe->scale),
+        probe->branch == MELEE_WEB_LB_COLL_BRANCH_NEAR_ZERO ? "near_zero" : "quadratic");
+    if (probe->branch == MELEE_WEB_LB_COLL_BRANCH_NEAR_ZERO) {
+        put("null,");
+    } else if (probe->branch == MELEE_WEB_LB_COLL_BRANCH_QUADRATIC) {
+        put("{\"n0_bits\":\"%08x\",\"ba_dot_bits\":\"%08x\","
+            "\"n1_bits\":\"%08x\"},",
+            bits(probe->n0), bits(probe->ba_dot), bits(probe->n1));
+    } else {
+        abort();
+    }
+    put("\"scale_bits\":\"%08x\","
+        "\"normalize_e_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"normal_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"collision_position_bits\":[\"%08x\",\"%08x\",\"%08x\"],"
+        "\"angle_bits\":\"%08x\"}",
+        bits(probe->scale),
         bits(probe->normalize_e[0]), bits(probe->normalize_e[1]), bits(probe->normalize_e[2]),
         bits(probe->normal[0]), bits(probe->normal[1]), bits(probe->normal[2]),
         bits(probe->collision_position[0]), bits(probe->collision_position[1]),

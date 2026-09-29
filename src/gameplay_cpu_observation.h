@@ -19,6 +19,10 @@ void melee_web_cpu_observation_preparation_draw(void);
 void melee_web_cpu_observation_end(size_t frames);
 
 /* Read-only, one-cursor trace of the Arrow shield-collision arithmetic. */
+enum {
+    MELEE_WEB_LB_COLL_BRANCH_NEAR_ZERO = 0,
+    MELEE_WEB_LB_COLL_BRANCH_QUADRATIC = 1
+};
 typedef struct {
     uintptr_t a_address, matrix_address, b_address, c_address;
     uintptr_t d_address, e_address, angle_address;
@@ -27,6 +31,7 @@ typedef struct {
     float transformed_radius[3], transformed_origin[3];
     float diff_cb[3], diff_ba[3];
     float distance, offset_distance, dot_diff_cb, n0, ba_dot, n1, scale;
+    uint8_t branch; /* n0, ba_dot and n1 are valid only on the quadratic branch. */
     float normalize_e[3], normal[3], collision_position[3], angle;
 } MeleeWebLbCollProbe;
 int melee_web_cpu_observation_lb_collision_probe_active(void);
