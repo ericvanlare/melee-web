@@ -353,10 +353,13 @@ std::vector<std::string> opening_state_asset_names(unsigned state_id)
 {
     std::vector<std::string> result = menu_asset_names();
     switch (state_id) {
-    case 0: add_unique(result, "MvOpen.mth"); break;
+    // The authored MTH files are registered as bounded external DVD streams
+    // when the validated disc session opens. Keep them out of this whole-file
+    // asset transaction; the original THP callbacks request aligned ranges.
+    case 0: break;
     case 2: break; // Original Title screen and its menu/audio dependencies.
-    case 4: add_unique(result, "MvHowto.mth"); break;
-    case 5: add_unique(result, "MvOmake15.mth"); break;
+    case 4: break;
+    case 5: break;
     default:
         reject("Opening state " + std::to_string(state_id) +
                " does not have a standalone menu/movie asset scope");

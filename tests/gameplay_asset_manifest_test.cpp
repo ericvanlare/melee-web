@@ -119,6 +119,21 @@ void menu_contract()
     no_duplicates(names);
 }
 
+void opening_state_asset_contract()
+{
+    for (const unsigned state : {0u, 2u, 4u, 5u}) {
+        const auto names = opening_state_asset_names(state);
+        check(has(names, "GmTtAll.usd"),
+              "Opening state omitted the original title/menu archive scope");
+        check(!has(names, "MvOpen.mth") && !has(names, "MvHowto.mth") &&
+                  !has(names, "MvOmake15.mth"),
+              "Original movie must remain on the bounded streamed DVD path");
+        no_duplicates(names);
+    }
+    for (const unsigned state : {1u, 3u, 6u})
+        rejects([&] { (void)opening_state_asset_names(state); });
+}
+
 void source_fighter_closure()
 {
     const std::vector<int> characters = {
@@ -296,6 +311,7 @@ int main(int argc, char** argv)
             return 0;
         }
         menu_contract();
+        opening_state_asset_contract();
         source_fighter_closure();
         results_fighter_closure();
         source_stage_music();
