@@ -136,6 +136,8 @@ void source_fighter_closure()
         const auto names = match_asset_names(value);
         check(has(names, "TyDatai.usd"),
               "VS match closure omits the original stage trophy data archive");
+        check(has(names, "TyDatai.dat"),
+              "VS match closure omits the saved-language trophy archive loaded by Toy_803124BC");
         check(has(names, "LbRf.dat"),
               "VS source startup omits the original refraction archive");
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
@@ -186,8 +188,18 @@ void results_fighter_closure()
               "Results fighter archive is absent from descriptor");
         check(has(names, expected.victory_theme),
               "Results victory theme is absent from descriptor");
+        check(has(names, "TyDatai.dat"),
+              "Results closure omits the saved-language trophy archive loaded by Toy_803124BC");
         no_duplicates(names);
     }
+}
+
+void source_prize_locale_closure()
+{
+    const auto names = prize_asset_names();
+    check(has(names, "TyDatai.usd") && has(names, "TyDatai.dat"),
+          "Prize closure must include both source-selected trophy archives");
+    no_duplicates(names);
 }
 
 void source_stage_music()
@@ -298,6 +310,7 @@ int main(int argc, char** argv)
         menu_contract();
         source_fighter_closure();
         results_fighter_closure();
+        source_prize_locale_closure();
         source_stage_music();
         rejects_invalid_without_mutation();
         std::cout << "Source menu/match/results asset descriptors, fighter/archive closure, authored music candidates, and rejection boundaries: passed\n";

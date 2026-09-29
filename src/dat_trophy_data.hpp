@@ -56,12 +56,11 @@ struct DatTrophyDisplayEntry {
 };
 static_assert(sizeof(DatTrophyDisplayEntry) == 0x10);
 
-// Typed owner for the seven public roots passed to
-// lbArchive_LoadSymbols("TyDatai.usd", ...). Every returned span includes
-// the authored terminator row/value, matching the source pointers that scan
-// these tables. The archive is retained for the owner's lifetime so callers
-// may publish the copied descriptors without an accidental early release of
-// the source archive.
+// Typed owner for the seven public roots in a source TyDatai locale archive.
+// Every returned span includes the authored terminator row/value, matching
+// the source pointers that scan these tables. The archive is retained for the
+// owner's lifetime so callers may publish the copied descriptors without an
+// accidental early release of the source archive.
 class DatTrophyData {
 public:
     explicit DatTrophyData(std::shared_ptr<const DatArchive> archive);

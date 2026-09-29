@@ -21,7 +21,7 @@ for (const name of ['MnMaAll.usd','GmTtAll.usd','SdMenu.usd','SdToy.dat','LbMcSn
 for (const name of Object.keys(NATIVE_MENU_DISC_FILES).filter(name => name.endsWith('.ssm')))
   assert.equal(NATIVE_MENU_DISC_FILES[name], 'audio/us/' + name);
 assert.equal(NATIVE_MENU_DISC_FILES['kongo.ssm'],'audio/us/kongo.ssm');
-assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,274);
+assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,275);
 assert.equal(NATIVE_GAME_DISC_FILES['LbRf.dat'],'LbRf.dat');
 // The original Results and Prize scenes run over their own authored archives
 // and voice streams; the scoped import must find each at its authored path.
