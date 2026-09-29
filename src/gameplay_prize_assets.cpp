@@ -6,6 +6,7 @@
 
 #include <melee/ft/forward.h>
 #include <melee/ty/types.h>
+#include "gameplay_trophy_roots.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -48,6 +49,8 @@ struct GameplayPrizeAssets::Storage {
     std::unique_ptr<DatScene> prize_scene;
     std::unique_ptr<DatSis> prize_text;
     std::unique_ptr<DatTrophyData> trophy_data;
+    std::unique_ptr<DatTrophyData> trophy_data_dat;
+    std::unique_ptr<GameplayTrophyRoots> trophy_roots_dat;
     std::unique_ptr<DatMenuSupport> card_icons;
     std::unique_ptr<DatMenuSupport> card_scene;
 
@@ -73,9 +76,10 @@ struct GameplayPrizeAssets::Storage {
     void start(const RuntimeFiles& files, RuntimeArchiveCache* cache)
     {
         archive_cache = cache;
-        // The source resolves all five basenames below to these US files when
-        // LANG_US is active.  No .dat fallback is allowed in this owner.
+        // The runtime scene roots stay English, while the original trophy
+        // loader selects TyDatai.dat when the saved language is Japanese.
         for (const auto* name : {"IfPrize.usd", "SdPrize.usd", "TyDatai.usd",
+                                 "TyDatai.dat",
                                  "LbMcGame.usd", "NtMemAc.usd"})
             load_archive(files, name);
 
@@ -84,6 +88,8 @@ struct GameplayPrizeAssets::Storage {
         prize_text = std::make_unique<DatSis>(
             archives.at("SdPrize.usd"), "SIS_PrizeData");
         trophy_data = std::make_unique<DatTrophyData>(archives.at("TyDatai.usd"));
+        trophy_data_dat = std::make_unique<DatTrophyData>(archives.at("TyDatai.dat"));
+        trophy_roots_dat = std::make_unique<GameplayTrophyRoots>(*trophy_data_dat);
         card_icons = std::make_unique<DatMenuSupport>(
             archives.at("LbMcGame.usd"), DatMenuSupportKind::CardIcons);
         card_scene = std::make_unique<DatMenuSupport>(
@@ -117,7 +123,7 @@ struct GameplayPrizeAssets::Storage {
         // Register every original public root before any source callback can
         // call lbArchive_LoadSymbols/lbArchive_80016DBC.  Native graph owners
         // and their source archive bytes remain alive until this scope closes.
-        const MeleeWebArchiveSymbol symbols[] = {
+        std::vector<MeleeWebArchiveSymbol> symbols = {
             {"IfPrize.usd", "ScInfPrize_scene_data", prize_scene->descriptor()},
             {"SdPrize.usd", "SIS_PrizeData", prize_text->descriptor()},
             {"LbMcGame.usd", "MemCardIconData", card_icons->descriptor()},
@@ -132,9 +138,10 @@ struct GameplayPrizeAssets::Storage {
             {"TyDatai.usd", "tyDisplayModelTbl", trophy_display.data()},
             {"TyDatai.usd", "tyDisplayModelUsTbl", trophy_display_us.data()},
         };
+        trophy_roots_dat->append_symbols("TyDatai.dat", symbols);
         char error[256]{};
         scope = melee_web_archive_sections_register_heap(
-            symbols, std::size(symbols), error, sizeof(error));
+            symbols.data(), symbols.size(), error, sizeof(error));
         if (!scope) throw DatError(error);
     }
 
@@ -168,6 +175,8 @@ struct GameplayPrizeAssets::Storage {
         prize_text.reset();
         prize_scene.reset();
         trophy_data.reset();
+        trophy_roots_dat.reset();
+        trophy_data_dat.reset();
         trophy_models.clear();
         trophy_models_d.clear();
         trophy_names.clear();

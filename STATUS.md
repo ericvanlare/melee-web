@@ -1076,6 +1076,29 @@ post-frame observations as a vanilla oracle. The existing modern Fox/Falco
 Battlefield fixture completes all 686 input frames and teardown in the source
 runner. That is workload evidence, not browser performance or equivalence.
 
+## Local desktop Slippi connectivity and lifecycle
+
+**Compiled / Source identified / Native traced** for the local networking
+boundary. Two fresh isolated pairs of pinned headless Slippi clients connected
+through the local ENet matchmaker, completed the original Direct opening game
+and a Final Destination rematch in the same two client processes, then returned
+through the expected CSS flow. Both clients' replay records identify Mario on
+the expected player ports with four starting stocks. The Direct opening follows
+the source's random-stage pool; the loser selects Final Destination through the
+original SSS for the rematch. The clients each consumed distinct non-neutral
+input from the other peer in both games. The final pair observed a peer
+disconnect; a separate interrupted harness run released its child process
+groups and ports. Runtime socket sampling observed loopback destinations only.
+
+The [hash-bound receipt](docs/evidence/local-slippi-connectivity-v1.json) links
+the pinned client and patches, configuration, replay and pairing summaries,
+remote-input observations, cleanup results, and hashes of the retained private
+receipts. Setup and the reproducible acceptance command are in the
+[local testbed guide](reference-capture/slippi/LOCAL_TESTBED.md). This is a
+local interoperability result; rollback correctness, browser cross-play,
+public Internet/NAT, rendering/audio accuracy and production readiness remain
+unclaimed.
+
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
 ticks, and the port matches their entry data, input vectors, declared fighter

@@ -53,6 +53,7 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 #include <melee/ty/types.h>
+#include "gameplay_trophy_roots.hpp"
 #include "gameplay_fighter_assets.hpp"
 #include <iostream>
 #include <algorithm>
@@ -195,10 +196,8 @@ struct GameplayWorld::Storage {
     MeleeWebStageVisual* stage_visual=nullptr;
     std::unique_ptr<DatNativeStage> full_stage;
     std::unique_ptr<DatScene> quake_model;
-    std::unique_ptr<DatTrophyData> trophy_data;
-    std::vector<TrophyData> trophy_models,trophy_models_d;
-    std::vector<ToyNameData> trophy_names;
-    std::vector<TyDspEntry> trophy_display,trophy_display_us;
+    std::unique_ptr<DatTrophyData> trophy_data,trophy_data_dat;
+    std::unique_ptr<GameplayTrophyRoots> trophy_roots,trophy_roots_dat;
     MeleeWebArchiveSections* trophy_scope=nullptr;
     std::unique_ptr<DatEffectBanks> stage_effects;
     MeleeWebStageMap* stage_map=nullptr;
@@ -281,7 +280,10 @@ struct GameplayWorld::Storage {
             archives.emplace(name,std::move(value));
         };
         for(const char* name:{"PlCo.dat","ItCo.usd","EfCoData.dat","PdPm.dat","LbRb.dat"})load(name);
-        if(purpose==GameplayWorldPurpose::Match)load("TyDatai.usd");
+        if(purpose==GameplayWorldPurpose::Match){
+            load("TyDatai.usd");
+            load("TyDatai.dat");
+        }
         if(selection.begin_source_match)
             load("LbRf.dat",DatExternalPolicy::ResolveNull);
         if(stage)load(stage->archive);
@@ -381,42 +383,15 @@ struct GameplayWorld::Storage {
                 archive("ItCo.usd"),*item_registry.articles[random_index],
                 It_PKind_Random,random_article);
             trophy_data=std::make_unique<DatTrophyData>(archive("TyDatai.usd"));
-            auto models=[](auto entries){
-                std::vector<TrophyData> result;
-                result.reserve(entries.size());
-                for(const auto& row:entries)
-                    result.push_back({row.id,row.x04,row.x08,row.x0c,row.x10,row.x14,
-                                      row.x18,row.x1c,row.x20,row.x21,row.x22,row.x23});
-                return result;
-            };
-            trophy_models=models(trophy_data->init_model_table());
-            trophy_models_d=models(trophy_data->init_model_d_table());
-            trophy_names.reserve(trophy_data->model_sort_table().size());
-            for(const auto& row:trophy_data->model_sort_table())
-                trophy_names.push_back({row.x0,row.x2,row.x4,row.x6,row.x8,row.xa});
-            auto displays=[](auto entries){
-                std::vector<TyDspEntry> result;
-                result.reserve(entries.size());
-                for(const auto& row:entries)
-                    result.push_back({row.x00,row.x04,row.x05,{row.pad06,row.pad07},
-                                      row.x08,row.x0c});
-                return result;
-            };
-            trophy_display=displays(trophy_data->display_model_table());
-            trophy_display_us=displays(trophy_data->display_model_us_table());
-            const MeleeWebArchiveSymbol symbols[]={
-                {"TyDatai.usd","tyInitModelTbl",trophy_models.data()},
-                {"TyDatai.usd","tyInitModelDTbl",trophy_models_d.data()},
-                {"TyDatai.usd","tyModelSortTbl",trophy_names.data()},
-                {"TyDatai.usd","tyExpDifferentTbl",
-                 const_cast<std::int16_t*>(trophy_data->exp_different_table().data())},
-                {"TyDatai.usd","tyNoGetUsTbl",
-                 const_cast<std::int16_t*>(trophy_data->no_get_us_table().data())},
-                {"TyDatai.usd","tyDisplayModelTbl",trophy_display.data()},
-                {"TyDatai.usd","tyDisplayModelUsTbl",trophy_display_us.data()},
-            };
+            trophy_data_dat=std::make_unique<DatTrophyData>(archive("TyDatai.dat"));
+            trophy_roots=std::make_unique<GameplayTrophyRoots>(*trophy_data);
+            trophy_roots_dat=std::make_unique<GameplayTrophyRoots>(*trophy_data_dat);
+            std::vector<MeleeWebArchiveSymbol> symbols;
+            symbols.reserve(14);
+            trophy_roots->append_symbols("TyDatai.usd",symbols);
+            trophy_roots_dat->append_symbols("TyDatai.dat",symbols);
             trophy_scope=melee_web_archive_sections_register_heap(
-                symbols,std::size(symbols),error,sizeof(error));
+                symbols.data(),symbols.size(),error,sizeof(error));
             check(trophy_scope!=nullptr,error);
         }
         check(melee_web_rumble_begin(rumble,error,sizeof(error)),error);
@@ -802,9 +777,8 @@ struct GameplayWorld::Storage {
             check(melee_web_source_files_end(source_files,error,sizeof(error)),error);
             source_files=nullptr;
         }
-        trophy_data.reset();
-        trophy_models.clear();trophy_models_d.clear();trophy_names.clear();
-        trophy_display.clear();trophy_display_us.clear();
+        trophy_roots_dat.reset();trophy_roots.reset();
+        trophy_data_dat.reset();trophy_data.reset();
         verify();
     }
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Runtime teardown: %s\n",e.what());std::abort();}}
