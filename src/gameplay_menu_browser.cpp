@@ -465,7 +465,7 @@ constexpr std::array<std::string_view,18> zelda_sheik_keys={
 };
 // PR #96's route-specific source inventory includes title, main-menu, and all
 // SSM table entries needed before those scenes can select their next route.
-constexpr std::array<std::string_view,276> route_asset_keys={
+constexpr std::array<std::string_view,277> route_asset_keys={
  "LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat",
  "PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","LbAd.dat",
  "LbRf.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat",
@@ -496,7 +496,7 @@ constexpr std::array<std::string_view,276> route_asset_keys={
  "PlPrBu.dat","PlPrGr.dat","PlPrYe.dat","EfPrData.dat","purin.ssm","PlDk.dat","PlDkAJ.dat",
  "PlDkNr.dat","PlDkBk.dat","PlDkRe.dat","PlDkBu.dat","PlDkGr.dat","EfDkData.dat","dk.ssm",
  "PlKp.dat","PlKpAJ.dat","PlKpNr.dat","PlKpRe.dat","PlKpBu.dat","PlKpBk.dat","EfKpData.dat",
- "koopa.ssm","GmRst.usd","SdRst.usd","TyDatai.usd","IfPrize.usd","SdPrize.usd","s_info1.hps",
+ "koopa.ssm","GmRst.usd","SdRst.usd","TyDatai.usd","TyDatai.dat","IfPrize.usd","SdPrize.usd","s_info1.hps",
  "s_info2.hps","s_info3.hps","GmRstMMr.dat","GmRstMDr.dat","GmRstMFx.dat","GmRstMFc.dat",
  "GmRstMMs.dat","GmRstMFe.dat","GmRstMLk.dat","GmRstMCl.dat","GmRstMCa.dat","GmRstMDk.dat",
  "GmRstMGn.dat","GmRstMKp.dat","GmRstMLg.dat","GmRstMMt.dat","GmRstMPk.dat","GmRstMPc.dat",

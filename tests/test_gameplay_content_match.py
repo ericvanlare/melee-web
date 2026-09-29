@@ -472,7 +472,8 @@ class ContentMatchTests(unittest.TestCase):
     def test_captain_source_lifecycles_both_orientations(self):
         common = ROOT / "assets-local/full-game-ganon"
         captain = ROOT / "assets-local/full-game-captain"
-        required_common = ("MnSlChr.usd", "PlMr.dat", "PlMrAJ.dat", "GrNLa.dat")
+        required_common = ("MnSlChr.usd", "PlMr.dat", "PlMrAJ.dat", "GrNLa.dat",
+                           "TyDatai.dat", "TyDatai.usd")
         required_captain = ("PlCa.dat", "PlCaAJ.dat", "EfCaData.dat", "captain.ssm",
                             "PlCaNr.dat", "PlCaGy.dat", "PlCaRe.usd", "PlCaWh.dat",
                             "PlCaGr.dat", "PlCaBu.dat")

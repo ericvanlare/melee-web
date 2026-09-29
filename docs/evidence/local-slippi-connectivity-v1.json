@@ -1,0 +1,772 @@
+{
+  "claim": "Two adapted, pinned desktop Slippi clients completed a match and rematch through our local pairing service, with verified bidirectional peer input exchange and bounded cleanup.",
+  "client": {
+    "asm_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+    "build_profile": {
+      "audio_backend": "No Audio Output",
+      "bundled_client_matches_build_output": true,
+      "cmake": "3.31.6",
+      "cmake_options_verified": true,
+      "compiler": "Apple clang 21.0.0 (clang-2100.1.1.101)",
+      "generator": "Ninja 1.13.0.git.kitware.jobserver-pipe-1",
+      "headless": true,
+      "matchmaker_release_build_verified": true,
+      "matchmaker_source_freshness_verified": true,
+      "patched_build_source_verified": true,
+      "rust_toolchain": "1.88.0",
+      "video_backend": "Null"
+    },
+    "bundled_sys_sha256": "525d3333b4eed701982ada34942b83cecd9accc6e96b18a27a1b6d863e499946",
+    "client_binary_sha256": "ee8d0256795824c13b8e2579dcd8cef3d8daf529b19fb137984a38f8bdda897e",
+    "client_lock_sha256": "0bcde3ecfd3912f8dfff0a879522f46080c7f8cce2818a20eaedde107f73e353",
+    "client_patches_sha256": {
+      "patches/0001-client-loopback-and-observation.patch": "2e599906c58920f4c5089c9749abee51f94ddccd7909fa39aadf78d5a4fa3150",
+      "patches/0002-rust-local-endpoints.patch": "a2a547fe9334edcc44ddd7686936743160aa5b51f66fd0f47a4af05df5b9a1ca"
+    },
+    "commit": "41a7a3a110ed52999486ae1901c8fbb9a63d4f13",
+    "disc_asset_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "generated_game_mod_sha256": "b30b294df5c0d92deb3129afdfbc894a48aabeb1bce0cf92cce8c4e5408a2587",
+    "local_matchmaker_binary_sha256": "a90172a0658af09023e0723f6934727113365cc95bad5b7e2ce84bc69bc9d252",
+    "recursive_submodule_pins_verified": true,
+    "repository": "https://github.com/project-slippi/dolphin",
+    "rust_extension_commit": "2d29e794de8497582675fb70877851f2cdd2f256",
+    "slippi_version": "4.0.0-mainline-beta.19"
+  },
+  "fresh_profile_cycles": [
+    {
+      "cleanup": [
+        {
+          "graceful_signal_sent": true,
+          "name": "client-p2",
+          "pid": 46813,
+          "process_group_released": true,
+          "returncode": 0
+        },
+        {
+          "graceful_signal_sent": true,
+          "name": "client-p1",
+          "pid": 46812,
+          "process_group_released": true,
+          "returncode": 0
+        },
+        {
+          "graceful_signal_sent": true,
+          "name": "local-matchmaker",
+          "pid": 46807,
+          "process_group_released": true,
+          "returncode": 0
+        }
+      ],
+      "clients": {
+        "p1": {
+          "configuration": {
+            "audio_backend": "No Audio Output",
+            "headless_platform": "headless",
+            "matchplay_controller_pipe": "Pipe/0/pad1",
+            "menu_controller_pipe": "Pipe/0/pad1",
+            "online_player_slot": 1,
+            "replays_enabled": true,
+            "spectators_enabled": false,
+            "video_backend": "Null"
+          },
+          "identity": "local-cycle-1-p1",
+          "peer_port": 41301,
+          "process_id": 46812,
+          "profile_config_sha256": "87c0a4d8600d3b66c4bda95c8ceefbbe61a40e92aa75ffaed798507464cd5496",
+          "profile_is_fresh": true,
+          "spectator_port": 41321
+        },
+        "p2": {
+          "configuration": {
+            "audio_backend": "No Audio Output",
+            "headless_platform": "headless",
+            "matchplay_controller_pipe": "Pipe/0/pad1",
+            "menu_controller_pipe": "Pipe/0/pad1",
+            "online_player_slot": 2,
+            "replays_enabled": true,
+            "spectators_enabled": false,
+            "video_backend": "Null"
+          },
+          "identity": "local-cycle-1-p2",
+          "peer_port": 41302,
+          "process_id": 46813,
+          "profile_config_sha256": "66fa162fae75b966755ddace81dac2e5eff2e061e986ff52fc240180f3cadbda",
+          "profile_is_fresh": true,
+          "spectator_port": 41322
+        }
+      },
+      "cycle": 1,
+      "final_destination_stage_selection": {
+        "cursor_bounds": {
+          "horizontal_frames": 19,
+          "max_step_per_source_frame": 2.9099999999999997,
+          "vertical_rows": 15,
+          "x": [
+            -27.0,
+            27.0
+          ],
+          "y": [
+            -19.0,
+            19.0
+          ]
+        },
+        "reached": true,
+        "selected_stage": [
+          25,
+          32
+        ],
+        "source_frame": 199,
+        "trace_step_count": 157
+      },
+      "games": [
+        {
+          "client_process_ids": {
+            "p1": 46812,
+            "p2": 46813
+          },
+          "game": 1,
+          "players": {
+            "p1": {
+              "character_ids": [
+                8,
+                8
+              ],
+              "final_stocks": {
+                "1": 0,
+                "2": 4
+              },
+              "frame_count": 1187,
+              "game_end_method": 2,
+              "local_left_stick_samples": 1110,
+              "local_port": 1,
+              "remote_a_button_samples": 30,
+              "remote_port": 2,
+              "replay_sha256": "6879d7779072151d4bf15957afc74a339812117de062755397fd2affc20f6eb7",
+              "stage_id": 32,
+              "starting_stocks": [
+                4,
+                4
+              ]
+            },
+            "p2": {
+              "character_ids": [
+                8,
+                8
+              ],
+              "final_stocks": {
+                "1": 0,
+                "2": 4
+              },
+              "frame_count": 1187,
+              "game_end_method": 2,
+              "local_a_button_samples": 30,
+              "local_port": 2,
+              "remote_left_stick_samples": 1109,
+              "remote_port": 1,
+              "replay_sha256": "2c6ab95d854468e75013adfd473cd7f00ec20e0b7a032e45cef2e072c29bc274",
+              "stage_id": 32,
+              "starting_stocks": [
+                4,
+                4
+              ]
+            }
+          },
+          "post_replay_source_state": {
+            "p1": {
+              "online_scene_code": 8,
+              "source_frame": 1301
+            },
+            "p2": {
+              "online_scene_code": 8,
+              "source_frame": 1301
+            }
+          },
+          "source_game_start": {
+            "p1": 520,
+            "p2": 520
+          }
+        },
+        {
+          "client_process_ids": {
+            "p1": 46812,
+            "p2": 46813
+          },
+          "game": 2,
+          "players": {
+            "p1": {
+              "character_ids": [
+                8,
+                8
+              ],
+              "final_stocks": {
+                "1": 0,
+                "2": 4
+              },
+              "frame_count": 1187,
+              "game_end_method": 2,
+              "local_left_stick_samples": 1110,
+              "local_port": 1,
+              "remote_a_button_samples": 30,
+              "remote_port": 2,
+              "replay_sha256": "efdde6e5578986abaa17d66a19194c29026fc01b5f6b8444fbf941e461735842",
+              "stage_id": 32,
+              "starting_stocks": [
+                4,
+                4
+              ]
+            },
+            "p2": {
+              "character_ids": [
+                8,
+                8
+              ],
+              "final_stocks": {
+                "1": 0,
+                "2": 4
+              },
+              "frame_count": 1187,
+              "game_end_method": 2,
+              "local_a_button_samples": 30,
+              "local_port": 2,
+              "remote_left_stick_samples": 1109,
+              "remote_port": 1,
+              "replay_sha256": "4ea2581811445588dc7161f1d0fd72eee84b28f2ef7224d4a231f437e383eb76",
+              "stage_id": 32,
+              "starting_stocks": [
+                4,
+                4
+              ]
+            }
+          },
+          "post_replay_source_state": {
+            "p1": {
+              "online_scene_code": 8,
+              "source_frame": 1301
+            },
+            "p2": {
+              "online_scene_code": 8,
+              "source_frame": 1301
+            }
+          },
+          "source_game_start": {
+            "p1": 520,
+            "p2": 520
+          }
+        }
+      ],
+      "local_api_events": [
+        {
+          "event": "local_api_connected",
+          "source_loopback": true
+        },
+        {
+          "event": "local_api_rejected",
+          "source_loopback": true
+        },
+        {
+          "event": "local_api_connected",
+          "source_loopback": true
+        },
+        {
+          "event": "local_api_rejected",
+          "source_loopback": true
+        }
+      ],
+      "local_api_policy": "127.0.0.1:43114; fail-closed HTTP 503",
+      "network_observations": {
+        "all_observed_peer_endpoints_loopback": true,
+        "sampled_socket_count": 110,
+        "unique_endpoints": [
+          "127.0.0.1:41301",
+          "127.0.0.1:41302",
+          "127.0.0.1:43113",
+          "127.0.0.1:43114"
+        ]
+      },
+      "pairing": [
+        {
+          "event": "ticket_accepted",
+          "uid": "local-cycle-1-p1"
+        },
+        {
+          "event": "ticket_accepted",
+          "uid": "local-cycle-1-p2"
+        },
+        {
+          "both_assignments_sent": true,
+          "event": "pair_assigned",
+          "first_peer": "127.0.0.1:41301",
+          "first_uid": "local-cycle-1-p1",
+          "match_id": "local.mode.direct.1",
+          "second_peer": "127.0.0.1:41302",
+          "second_uid": "local-cycle-1-p2"
+        }
+      ],
+      "peer_disconnect": null,
+      "ports_released": true,
+      "private_profiles_removed_after_cleanup": true,
+      "raw_receipt_sha256": "9d278442235b667d8d517bd6e43558243bafaa4f1300a636beedbe98bda9d90b",
+      "remote_input": {
+        "p1": {
+          "consumed_samples": 2000,
+          "distinct_pad_payloads": 9,
+          "first_frame_by_game": {
+            "0": 4,
+            "1": 4
+          },
+          "game_sequences": [
+            0,
+            1
+          ],
+          "local_port": 1,
+          "remote_port": 2
+        },
+        "p2": {
+          "consumed_samples": 2027,
+          "distinct_pad_payloads": 7,
+          "first_frame_by_game": {
+            "0": 4,
+            "1": 3
+          },
+          "game_sequences": [
+            0,
+            1
+          ],
+          "local_port": 2,
+          "remote_port": 1
+        }
+      },
+      "result": "passed",
+      "ticket_events": [
+        {
+          "client": "p1",
+          "confirm_item_observed": true,
+          "expected_target_code": "P2",
+          "source_confirm_item": 57,
+          "source_frame": 176,
+          "ticket_accepted": true
+        },
+        {
+          "client": "p2",
+          "confirm_item_observed": true,
+          "expected_target_code": "P1",
+          "source_confirm_item": 57,
+          "source_frame": 169,
+          "ticket_accepted": true
+        }
+      ]
+    },
+    {
+      "cleanup": [
+        {
+          "graceful_signal_sent": true,
+          "name": "client-p1",
+          "pid": 47439,
+          "process_group_released": true,
+          "returncode": 0
+        },
+        {
+          "graceful_signal_sent": true,
+          "name": "client-p2",
+          "pid": 47440,
+          "process_group_released": true,
+          "returncode": 0
+        },
+        {
+          "graceful_signal_sent": true,
+          "name": "local-matchmaker",
+          "pid": 47436,
+          "process_group_released": true,
+          "returncode": 0
+        }
+      ],
+      "clients": {
+        "p1": {
+          "configuration": {
+            "audio_backend": "No Audio Output",
+            "headless_platform": "headless",
+            "matchplay_controller_pipe": "Pipe/0/pad1",
+            "menu_controller_pipe": "Pipe/0/pad1",
+            "online_player_slot": 1,
+            "replays_enabled": true,
+            "spectators_enabled": false,
+            "video_backend": "Null"
+          },
+          "identity": "local-cycle-2-p1",
+          "peer_port": 41305,
+          "process_id": 47439,
+          "profile_config_sha256": "946666de16a6e6a08130cd84377cb7ab2fce25fe55a87776685ffff4b919d6cf",
+          "profile_is_fresh": true,
+          "spectator_port": 41325
+        },
+        "p2": {
+          "configuration": {
+            "audio_backend": "No Audio Output",
+            "headless_platform": "headless",
+            "matchplay_controller_pipe": "Pipe/0/pad1",
+            "menu_controller_pipe": "Pipe/0/pad1",
+            "online_player_slot": 2,
+            "replays_enabled": true,
+            "spectators_enabled": false,
+            "video_backend": "Null"
+          },
+          "identity": "local-cycle-2-p2",
+          "peer_port": 41306,
+          "process_id": 47440,
+          "profile_config_sha256": "1d35ae96f184518a66677a550729fdd4221d3a668135bc6b286b2b2e371173e6",
+          "profile_is_fresh": true,
+          "spectator_port": 41326
+        }
+      },
+      "cycle": 2,
+      "final_destination_stage_selection": {
+        "cursor_bounds": {
+          "horizontal_frames": 19,
+          "max_step_per_source_frame": 2.9099999999999997,
+          "vertical_rows": 15,
+          "x": [
+            -27.0,
+            27.0
+          ],
+          "y": [
+            -19.0,
+            19.0
+          ]
+        },
+        "reached": true,
+        "selected_stage": [
+          25,
+          32
+        ],
+        "source_frame": 146,
+        "trace_step_count": 104
+      },
+      "games": [
+        {
+          "client_process_ids": {
+            "p1": 47439,
+            "p2": 47440
+          },
+          "game": 1,
+          "players": {
+            "p1": {
+              "character_ids": [
+                8,
+                8
+              ],
+              "final_stocks": {
+                "1": 0,
+                "2": 4
+              },
+              "frame_count": 1107,
+              "game_end_method": 2,
+              "local_left_stick_samples": 1030,
+              "local_port": 1,
+              "remote_a_button_samples": 30,
+              "remote_port": 2,
+              "replay_sha256": "a3ea8367705eca30efa21f3e7972baae42835b1db637e3f58691d93030132329",
+              "stage_id": 31,
+              "starting_stocks": [
+                4,
+                4
+              ]
+            },
+            "p2": {
+              "character_ids": [
+                8,
+                8
+              ],
+              "final_stocks": {
+                "1": 0,
+                "2": 4
+              },
+              "frame_count": 1107,
+              "game_end_method": 2,
+              "local_a_button_samples": 30,
+              "local_port": 2,
+              "remote_left_stick_samples": 1029,
+              "remote_port": 1,
+              "replay_sha256": "8a6b9e6b16bcbef2290e601a53113901ca627b41efa9313b16d3b1f54a2cdfb4",
+              "stage_id": 31,
+              "starting_stocks": [
+                4,
+                4
+              ]
+            }
+          },
+          "post_replay_source_state": {
+            "p1": {
+              "online_scene_code": 8,
+              "source_frame": 1221
+            },
+            "p2": {
+              "online_scene_code": 8,
+              "source_frame": 1221
+            }
+          },
+          "source_game_start": {
+            "p1": 520,
+            "p2": 520
+          }
+        },
+        {
+          "client_process_ids": {
+            "p1": 47439,
+            "p2": 47440
+          },
+          "game": 2,
+          "players": {
+            "p1": {
+              "character_ids": [
+                8,
+                8
+              ],
+              "final_stocks": {
+                "1": 0,
+                "2": 4
+              },
+              "frame_count": 1187,
+              "game_end_method": 2,
+              "local_left_stick_samples": 1110,
+              "local_port": 1,
+              "remote_a_button_samples": 30,
+              "remote_port": 2,
+              "replay_sha256": "fba95fd43f69194925921b76deccc668cd26e432d8c94966bb16047ac3739907",
+              "stage_id": 32,
+              "starting_stocks": [
+                4,
+                4
+              ]
+            },
+            "p2": {
+              "character_ids": [
+                8,
+                8
+              ],
+              "final_stocks": {
+                "1": 0,
+                "2": 4
+              },
+              "frame_count": 1187,
+              "game_end_method": 2,
+              "local_a_button_samples": 30,
+              "local_port": 2,
+              "remote_left_stick_samples": 1109,
+              "remote_port": 1,
+              "replay_sha256": "239a700affa79b4f69ae9f001b98d240d1af9096ae62ef03c71d6cc652a8cdad",
+              "stage_id": 32,
+              "starting_stocks": [
+                4,
+                4
+              ]
+            }
+          },
+          "post_replay_source_state": {
+            "p1": {
+              "online_scene_code": 8,
+              "source_frame": 1301
+            },
+            "p2": {
+              "online_scene_code": 8,
+              "source_frame": 1301
+            }
+          },
+          "source_game_start": {
+            "p1": 520,
+            "p2": 520
+          }
+        }
+      ],
+      "local_api_events": [
+        {
+          "event": "local_api_connected",
+          "source_loopback": true
+        },
+        {
+          "event": "local_api_rejected",
+          "source_loopback": true
+        },
+        {
+          "event": "local_api_connected",
+          "source_loopback": true
+        },
+        {
+          "event": "local_api_rejected",
+          "source_loopback": true
+        }
+      ],
+      "local_api_policy": "127.0.0.1:43114; fail-closed HTTP 503",
+      "network_observations": {
+        "all_observed_peer_endpoints_loopback": true,
+        "sampled_socket_count": 110,
+        "unique_endpoints": [
+          "127.0.0.1:41305",
+          "127.0.0.1:41306",
+          "127.0.0.1:43113",
+          "127.0.0.1:43114"
+        ]
+      },
+      "pairing": [
+        {
+          "event": "ticket_accepted",
+          "uid": "local-cycle-2-p1"
+        },
+        {
+          "event": "ticket_accepted",
+          "uid": "local-cycle-2-p2"
+        },
+        {
+          "both_assignments_sent": true,
+          "event": "pair_assigned",
+          "first_peer": "127.0.0.1:41305",
+          "first_uid": "local-cycle-2-p1",
+          "match_id": "local.mode.direct.1",
+          "second_peer": "127.0.0.1:41306",
+          "second_uid": "local-cycle-2-p2"
+        }
+      ],
+      "peer_disconnect": {
+        "peer_log": "p2-dolphin.log",
+        "peer_log_observed_disconnect": true,
+        "stopped_client": "p1",
+        "surviving_peer_process_id": 47440
+      },
+      "ports_released": true,
+      "private_profiles_removed_after_cleanup": true,
+      "raw_receipt_sha256": "7f97bb86e6b4e2dacfa4fc2f52c41eb624dbd9de3aa44b47240a909290f83182",
+      "remote_input": {
+        "p1": {
+          "consumed_samples": 1838,
+          "distinct_pad_payloads": 12,
+          "first_frame_by_game": {
+            "0": 3,
+            "1": 3
+          },
+          "game_sequences": [
+            0,
+            1
+          ],
+          "local_port": 1,
+          "remote_port": 2
+        },
+        "p2": {
+          "consumed_samples": 1891,
+          "distinct_pad_payloads": 10,
+          "first_frame_by_game": {
+            "0": 3,
+            "1": 4
+          },
+          "game_sequences": [
+            0,
+            1
+          ],
+          "local_port": 2,
+          "remote_port": 1
+        }
+      },
+      "result": "passed",
+      "ticket_events": [
+        {
+          "client": "p1",
+          "confirm_item_observed": true,
+          "expected_target_code": "P2",
+          "source_confirm_item": 57,
+          "source_frame": 202,
+          "ticket_accepted": true
+        },
+        {
+          "client": "p2",
+          "confirm_item_observed": true,
+          "expected_target_code": "P1",
+          "source_confirm_item": 57,
+          "source_frame": 195,
+          "ticket_accepted": true
+        }
+      ]
+    }
+  ],
+  "harness_interruption": {
+    "checkpoint": "two clients paired over loopback before gameplay",
+    "child_exit": {
+      "graceful_signal_sent": true,
+      "name": "harness-interruption-probe",
+      "pid": 47696,
+      "process_group_released": true,
+      "returncode": 130
+    },
+    "child_receipt_sha256": "75e26779d65ba3c080220d597d537157cd937cc6d3af8b68ff0ba95bda16e016",
+    "nested_cleanup": [
+      {
+        "graceful_signal_sent": true,
+        "name": "client-p2",
+        "pid": 48036,
+        "process_group_released": true,
+        "returncode": 0
+      },
+      {
+        "graceful_signal_sent": true,
+        "name": "client-p1",
+        "pid": 48035,
+        "process_group_released": true,
+        "returncode": 0
+      },
+      {
+        "graceful_signal_sent": true,
+        "name": "local-matchmaker",
+        "pid": 48032,
+        "process_group_released": true,
+        "returncode": 0
+      }
+    ],
+    "ports_released": true,
+    "raw_receipt_sha256": "6779f68f404d0e6ed23c591ea762d95dee9a33b81b58cd20c209afe9f2acc82a",
+    "result": "passed"
+  },
+  "integration_receipt_sha256": "b01ef3c2a0ac8893f4124c52a42514e606600f61153bb65ea0d4acb7d24f8319",
+  "result": "passed",
+  "retained_local_run": "work/slippi-local-networking/runs/acceptance-final-cdebe1a0",
+  "schema": "melee-web-local-slippi-connectivity-evidence-v1",
+  "scope": {
+    "direct_mode_opening": "original pinned Direct random-stage pool",
+    "environment": "two local macOS arm64 headless desktop clients and local loopback service",
+    "not_established": [
+      "rollback correctness",
+      "browser interoperability",
+      "public Internet/NAT",
+      "official Slippi service integration",
+      "rendering or audio accuracy",
+      "physical controller usability",
+      "production readiness"
+    ],
+    "rematch_stage": "Final Destination, selected through original SSS"
+  },
+  "service": {
+    "assignments_use_reciprocal_loopback_endpoints": true,
+    "local_api_sink": "127.0.0.1:43114; fail-closed HTTP 503",
+    "matchmaker": "127.0.0.1:43113",
+    "official_service_claimed": false
+  },
+  "validation": {
+    "matchmaker_ctest": {
+      "count": 3,
+      "result": "passed"
+    },
+    "repository_python_suite": {
+      "affected_tests": [
+        "test_gameplay_bootstrap.GameplayBootstrapTests.setUpClass",
+        "test_gameplay_collision.GameplayCollisionTests.test_original_static_collision_load_queries_and_lifetime",
+        "test_gameplay_fighter_assets.GameplayFighterAssetsTests.test_scoped_constructor_storage_lifetime"
+      ],
+      "blocker": "build/browser is not a directory",
+      "errors": 1,
+      "failures": 2,
+      "ran": 1498,
+      "result": "failed outside Slippi testbed boundary",
+      "skipped": 103
+    },
+    "slippi_python_tests": {
+      "count": 25,
+      "result": "passed"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 #include "dat_archive.hpp"
 #include "gameplay_bootstrap.h"
+#include "gameplay_archive_sections.h"
 #include "gameplay_prize_assets.hpp"
 
 #include <fstream>
@@ -77,6 +78,7 @@ int main(int argc, char** argv)
                 {"IfPrize.usd", read_file(root + "/IfPrize.usd")},
                 {"SdPrize.usd", read_file(root + "/SdPrize.usd")},
                 {"TyDatai.usd", read_file(root + "/TyDatai.usd")},
+                {"TyDatai.dat", read_file(root + "/TyDatai.dat")},
                 {"LbMcGame.usd", read_file(root + "/LbMcGame.usd")},
                 {"NtMemAc.usd", read_file(root + "/NtMemAc.usd")},
             });
@@ -94,6 +96,18 @@ int main(int argc, char** argv)
             owner->card_scene().model_count() != 1 ||
             owner->card_scene().camera_count() != 1)
             throw std::runtime_error("Prize owner changed authored root bounds");
+        for (const char* filename : {"TyDatai.usd", "TyDatai.dat"}) {
+            void* archive = melee_web_archive_sections_open(filename);
+            if (!archive)
+                throw std::runtime_error(std::string("Prize did not publish ") + filename +
+                                         " trophy roots");
+            const bool has_root = melee_web_archive_sections_public(
+                                      archive, "tyInitModelTbl") != nullptr;
+            melee_web_archive_sections_release(archive);
+            if (!has_root)
+                throw std::runtime_error(std::string("Prize did not publish ") + filename +
+                                         " trophy roots");
+        }
         owner->verify();
         if (!melee_web_gameplay_shutdown(error, sizeof(error)))
             throw std::runtime_error(error);

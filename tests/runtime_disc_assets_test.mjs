@@ -20,8 +20,9 @@ for (const name of ['MnMaAll.usd','GmTtAll.usd','SdMenu.usd','SdToy.dat','LbMcSn
 }
 for (const name of Object.keys(NATIVE_MENU_DISC_FILES).filter(name => name.endsWith('.ssm')))
   assert.equal(NATIVE_MENU_DISC_FILES[name], 'audio/us/' + name);
+assert.equal(NATIVE_MENU_DISC_FILES['kongo.ssm'],'audio/us/kongo.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['kongo.ssm'],'audio/us/kongo.ssm');
-assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,406);
+assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,407);
 for(const donor of ['Dk','Pr','Mt','Fc'])
   for(const color of ['Nr','Ye','Bu','Re','Gr','Wh']) {
     const name=`PlKb${color}Cp${donor}.dat`;
