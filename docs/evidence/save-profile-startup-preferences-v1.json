@@ -1,13 +1,13 @@
 {
   "schema": "webmelee-save-startup-preferences-v1",
-  "scope": "Production audio-player browser regression for startup-overridden save preferences; synthetic custom-save input, not Dolphin interoperability evidence.",
-  "runtime_source_commit": "992372e10301d36e044b6870fb1d397f56cfa127",
+  "scope": "Production audio-player regression for source-owned startup preferences. It uses a synthetic custom-preference GCI, clearly distinguished from the accepted game-written Dolphin receipt.",
+  "runtime_source_commit": "1f26be22bd4c7721824994863c758d035701d808",
   "runtime_profile": "audio-player",
-  "runtime_hash": "cc4cd6dcf3717456",
-  "package_identity_sha256": "888f9fdb9b814b012dfa861f3d3645c21f9ffcc7df020210f31af7dbe87184cc",
-  "runtime_wasm_sha256": "3d35fc6e0e57d9544c898e97478f94c019d05fa882599bffc7b79a06105d53ac",
+  "runtime_hash": "a0d54e910d866d58",
+  "package_identity_sha256": "5580731e8e5739d25d27a4a1b50f7b4f17ede81e3fba4034f655eb524eda36bc",
+  "runtime_wasm_sha256": "08402072fc30c66d8147198bf7b611f74e24a4fe0ccf005da03dda74a16f4ef3",
   "browser_test_script_sha256": "4a817f2cdab01b6908d0ea6d5ff3f111e60f86fbe22d9f6f2481eaa43a5fd6fd",
-  "browser": "153.0.8010.54",
+  "browser": "154.0.8037.58",
   "browser_mode": "headless",
   "disc": {
     "identity": "Owned Super Smash Bros. Melee USA revision 1.02 (GALE01)",
@@ -37,10 +37,10 @@
       ],
       "savedLanguage": 1
     },
-    "gci_sha256": "4e57333527b9f0271f7e158d149a12fa918837875d975363fc705e5ca710d305"
+    "gci_sha256": "3b58f6bf8e87ec7f022ae20fb0b64424b20648bbe3f88bc96b4491be7ed0cf29"
   },
   "synthetic_custom_fixture": {
-    "sha256": "baae6c67cefdd28d119ef544fb004fe578a3633c39bbbd30c7fbd75782d552b7",
+    "sha256": "5d58718902f7499f780b786224cfda074f0671d20ca722f10249244af86aad0a",
     "fields": {
       "characters": "07ff",
       "stages": "07ff",
@@ -58,7 +58,7 @@
       "savedLanguage": 1,
       "name": "8260826082618261"
     },
-    "construction": "Started from this production player\u2019s Everything unlocked export; copied a source-valid name row and PowerCount/PowerTime from the accepted WebMelee export; changed only the tested item frequency, 8-byte item mask and rumble values; encoded with the project GCI codec. This is synthetic test input, not Dolphin-written evidence."
+    "construction": "Started from this production player’s Everything unlocked export; copied a source-valid name row and PowerCount/PowerTime from the accepted WebMelee export; changed only the tested item frequency, 8-byte item mask and rumble values; encoded with the project GCI codec. This is synthetic test input, not Dolphin-written evidence."
   },
   "production_player_scenario": {
     "default_mode": "everything",
@@ -90,7 +90,7 @@
       "savedLanguage": 1,
       "name": "8260826082618261"
     },
-    "export_gci_sha256": "474f80913d18510ce7ffc21d2e0d68e9fb6b25bd1f6ee6ef411e5ca916c0d367",
+    "export_gci_sha256": "74edb2ffecef89a1e013f9c84121066fb543c95b5c68961be6f7ececf49db4cf",
     "source_trophy_ledger_delta": {
       "category_flags_save_data_offset": "0x46A",
       "category_flags_before_after": {
@@ -198,7 +198,7 @@
         "savedLanguage": 1,
         "name": "8260826082618261"
       },
-      "export_gci_sha256": "045f08c1d556b7a78bc87c0ade56028e38450c399b21e6e55948d0e389f0e060",
+      "export_gci_sha256": "ac20fe78d7af65ccd7e58064e62f13ddb284debb29a5750e45eedebfc469f751",
       "full_declared_profile_equal_to_post_autosave_export": true
     }
   },
@@ -214,15 +214,17 @@
     "Atomic storage protects committed generations; it cannot guarantee preservation of progress that had not completed a commit before a forced close."
   ],
   "production_audio_player_validation": {
-    "source_commit": "992372e10301d36e044b6870fb1d397f56cfa127",
-    "runtime_hash": "cc4cd6dcf3717456",
-    "package_identity_sha256": "888f9fdb9b814b012dfa861f3d3645c21f9ffcc7df020210f31af7dbe87184cc",
-    "browser": "153.0.8010.54",
+    "source_commit": "1f26be22bd4c7721824994863c758d035701d808",
+    "runtime_hash": "a0d54e910d866d58",
+    "package_identity_sha256": "5580731e8e5739d25d27a4a1b50f7b4f17ede81e3fba4034f655eb524eda36bc",
+    "package_file_count": 38,
+    "package_total_bytes": 18208959,
+    "browser": "154.0.8037.58",
     "browser_mode": "headless",
     "result": "pass",
     "check_count": 19,
     "checks": [
-      "disc validation is available before graphics readiness",
+      "disc selection during graphics preparation",
       "isolated WebGPU/Wasm startup and direct original-style player",
       "save settings export, import, persistence, compare-and-swap and recovery",
       "Personal autosave skips identical snapshots and retains verified generations",
@@ -242,150 +244,197 @@
       "legal pages use their readable document stylesheet and serve full notices",
       "keyboard-only session persists its preferences; no application upload or background connections"
     ],
-    "menu_cycles": [
-      {
-        "cycle": 1,
-        "sequence": [
-          "Original character select",
-          "Original main menu",
-          "Original title",
-          "Original main menu",
-          "Original Versus selection",
-          "Original character select"
-        ],
-        "final_phase": 1
-      },
-      {
-        "cycle": 2,
-        "sequence": [
-          "Original character select",
-          "Original main menu",
-          "Original title",
-          "Original main menu",
-          "Original Versus selection",
-          "Original character select"
-        ],
-        "final_phase": 1
-      }
+    "default_mode": "everything",
+    "confirmed_import_retained_disc": true,
+    "canceled_import_unchanged": true,
+    "oversized_rejected_before_read": true,
+    "malformed_rejected_before_confirmation": true,
+    "imported_export_fields": [
+      "completion masks",
+      "feature unlocks",
+      "item frequency",
+      "item selections",
+      "rumble preferences",
+      "identifiable name"
     ],
     "audio_pcm_transport_by_phase": {
       "css-first-entry": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 13,
-        "nonzero_pcm_samples": 13864
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 24,
+        "nonzeroPcmSamples": 25596,
+        "pcmFrames": 12800
       },
       "main-before-eject": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 289,
-        "nonzero_pcm_samples": 308228
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 325,
+        "nonzeroPcmSamples": 346617,
+        "pcmFrames": 173332
       },
       "main-css-after-reimport": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 8,
-        "nonzero_pcm_samples": 8530
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 6,
+        "nonzeroPcmSamples": 6398,
+        "pcmFrames": 3200
       },
       "title-before-eject": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 145,
-        "nonzero_pcm_samples": 154606
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 112,
+        "nonzeroPcmSamples": 119438,
+        "pcmFrames": 59733
       },
       "title-css-after-reimport": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 2,
-        "nonzero_pcm_samples": 2130
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 6,
+        "nonzeroPcmSamples": 6398,
+        "pcmFrames": 3200
       },
       "route-1-main": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 117,
-        "nonzero_pcm_samples": 124785
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 100,
+        "nonzeroPcmSamples": 106646,
+        "pcmFrames": 53333
       },
       "route-1-title": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 185,
-        "nonzero_pcm_samples": 196964
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 152,
+        "nonzeroPcmSamples": 161781,
+        "pcmFrames": 81066
       },
       "route-1-main-after-title": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 279,
-        "nonzero_pcm_samples": 292816
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 218,
+        "nonzeroPcmSamples": 231791,
+        "pcmFrames": 116266
       },
       "route-1-css-return": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 523,
-        "nonzero_pcm_samples": 553032
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 361,
+        "nonzeroPcmSamples": 384298,
+        "pcmFrames": 192533
       },
       "route-2-main": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 627,
-        "nonzero_pcm_samples": 663961
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 460,
+        "nonzeroPcmSamples": 489889,
+        "pcmFrames": 245333
       },
       "route-2-title": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 716,
-        "nonzero_pcm_samples": 758466
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 514,
+        "nonzeroPcmSamples": 547085,
+        "pcmFrames": 274133
       },
       "route-2-main-after-title": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 817,
-        "nonzero_pcm_samples": 859457
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 578,
+        "nonzeroPcmSamples": 614934,
+        "pcmFrames": 308266
       },
       "route-2-css-return": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 1176,
-        "nonzero_pcm_samples": 1242327
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 719,
+        "nonzeroPcmSamples": 765316,
+        "pcmFrames": 383466
       },
       "routed-sss": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 1276,
-        "nonzero_pcm_samples": 1348984
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 798,
+        "nonzeroPcmSamples": 849575,
+        "pcmFrames": 425600
       },
       "routed-match": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 1493,
-        "nonzero_pcm_samples": 1580419
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 957,
+        "nonzeroPcmSamples": 1019156,
+        "pcmFrames": 510399
       },
       "routed-results": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 1910,
-        "nonzero_pcm_samples": 2025019
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 1335,
+        "nonzeroPcmSamples": 1421947,
+        "pcmFrames": 712532
       },
       "routed-css-after-results": {
-        "sample_rate": 32000,
-        "connected": true,
-        "nonzero_pcm_messages": 2146,
-        "nonzero_pcm_samples": 2271903
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 1577,
+        "nonzeroPcmSamples": 1674981,
+        "pcmFrames": 841598
       }
     },
-    "eject_reimport": [
-      {
-        "screen": "main",
-        "native_unload": "success before reload",
-        "css_first_start": true,
-        "prior_audio_contexts_closed": 1
+    "dedicated_audio_lifecycle": {
+      "result": "pass",
+      "check_count": 12,
+      "checks": [
+        "preview startup and reviewed native artifact names",
+        "replace an owned early selection before native import",
+        "authorized-disc import and original CSS emits nonzero PCM",
+        "pause and resume preserve the audio owner",
+        "ordinary B0XX input enters original SSS with audio",
+        "ordinary B0XX A confirms the supported Mario/Final Destination match",
+        "ordinary B0XX pause and No Contest return through original CSS with audio",
+        "second ordinary B0XX CSS to SSS transition emits audio",
+        "second ordinary B0XX entry reaches Mario/Final Destination with audio",
+        "scoped audio asset generations are complete and never use legacy file upload",
+        "Eject closes Web Audio and reloads the player document",
+        "same-origin GET-only session has no page, CSP, socket or upload failures"
+      ],
+      "pcm_transport_by_phase": {
+        "css": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 2,
+          "nonzeroPcmSamples": 2130,
+          "pcmFrames": 1066
+        },
+        "css-resume": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 10,
+          "nonzeroPcmSamples": 10664,
+          "pcmFrames": 5333
+        },
+        "sss": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 100,
+          "nonzeroPcmSamples": 106653,
+          "pcmFrames": 53333
+        },
+        "match": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 274,
+          "nonzeroPcmSamples": 292228,
+          "pcmFrames": 146133
+        },
+        "css-after-no-contest": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 936,
+          "nonzeroPcmSamples": 969146,
+          "pcmFrames": 578132
+        },
+        "sss-after-no-contest": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 1032,
+          "nonzeroPcmSamples": 1071531,
+          "pcmFrames": 629332
+        },
+        "match-after-no-contest": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 1206,
+          "nonzeroPcmSamples": 1257110,
+          "pcmFrames": 722132
+        }
       },
-      {
-        "screen": "title",
-        "native_unload": "success before reload",
-        "css_first_start": true,
-        "prior_audio_contexts_closed": 1
-      }
-    ],
-    "scope": "Production audio-enabled public entry, ordinary keyboard UI, original menu route, supported match/results lifecycle, Web Audio initialization and nonzero PCM transport. No retail pixel/PCM equivalence, audible-quality, physical-controller or foreground-timing claim."
+      "results_transition": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 877,
+        "nonzeroPcmSamples": 906713
+      },
+      "after_eject_contexts": 0,
+      "after_eject_worklets": 0
+    },
+    "scope": "Production audio-enabled public entry, ordinary keyboard UI, original menu route, supported match/results lifecycle, Web Audio initialization and nonzero PCM transport. No retail pixel/PCM equivalence, audible-quality, physical-controller or foreground-timing claim.",
+    "limits": [
+      "Headless Web Audio and PCM transport checks do not establish audible fidelity or retail PCM/pixel equivalence.",
+      "The production browser route covers the supported Mario/Final Destination match path, not full-game accuracy.",
+      "Atomic storage protects committed generations; it cannot guarantee preservation of progress that had not completed a commit before a forced close."
+    ]
   }
 }
