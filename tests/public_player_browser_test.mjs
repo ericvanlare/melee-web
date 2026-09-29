@@ -122,6 +122,15 @@ async function waitForNativeScene(scene) {
   }
   throw Error(`Timed out waiting for ${scene}: ${JSON.stringify(await readNativeMenuState())}`);
 }
+async function assertSourceMenuScene(scene, expectedPhase) {
+  const state = await page.evaluate(() => ({
+    phase: Module._melee_web_native_menu_phase(),
+    running: Module._melee_web_native_menu_running(),
+    pauseDisabled: document.querySelector('#pause-game')?.disabled ?? null,
+  }));
+  assert.deepEqual(state, {phase: expectedPhase, running: 1, pauseDisabled: false},
+    `Original ${scene} must retain an active, recoverable native owner`);
+}
 const captureUnload = async () => page.evaluate(() => {
   const nativeUnload = Module._melee_web_native_menu_unload.bind(Module);
   Module._melee_web_native_menu_unload = (...args) => {
@@ -607,6 +616,7 @@ try {
       await page.waitForTimeout(500);
       await driver.pressChord(['q', '9', '7']);
       await waitForNativeScene('Original main menu');
+      await assertSourceMenuScene('Main', 11);
       if (values.audio) await observePcm('main-before-eject', await audioTrace());
       await shot('main-before-eject');
       await ejectAndReimport('main');
@@ -619,6 +629,7 @@ try {
       await page.waitForTimeout(900);
       await press('o');
       await waitForNativeScene('Original title');
+      await assertSourceMenuScene('Title', 10);
       if (values.audio) await observePcm('title-before-eject', await audioTrace());
       await shot('title-before-eject');
       await ejectAndReimport('title');
@@ -630,16 +641,19 @@ try {
         await page.waitForTimeout(450);
         await driver.pressChord(['q', '9', '7']);
         await waitForNativeScene('Original main menu');
+        await assertSourceMenuScene('Main', 11);
         await page.waitForTimeout(900);
         if (values.audio) await observePcm(`route-${cycle}-main`, await audioTrace());
         await shot(`route-${cycle}-main`);
         await press('o');
         await waitForNativeScene('Original title');
+        await assertSourceMenuScene('Title', 10);
         await page.waitForTimeout(500);
         if (values.audio) await observePcm(`route-${cycle}-title`, await audioTrace());
         await shot(`route-${cycle}-title`);
         await press('7');
         await waitForNativeScene('Original main menu');
+        await assertSourceMenuScene('Main', 11);
         await page.waitForTimeout(700);
         if (values.audio) await observePcm(`route-${cycle}-main-after-title`, await audioTrace());
         await shot(`route-${cycle}-main-after-title`);

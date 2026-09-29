@@ -1895,7 +1895,21 @@ int melee_web_native_menu_cache_idle(){
  const auto state=aurora_pipeline_cache_status();
  return state==AURORA_PIPELINE_CACHE_READY?1:state==AURORA_PIPELINE_CACHE_ERROR?-1:0;
 }
-int melee_web_native_menu_phase(){return match?7:results?8:prize?9:host?melee_web_menu_host_phase(host):0;}
+int melee_web_native_menu_phase(){
+ if(match)return 7;
+ if(results)return 8;
+ if(prize)return 9;
+ if(host&&host_entered){
+  /* Keep source-owned Title/Main/Opening distinct from a closed CSS session. */
+  switch(melee_web_menu_host_source_scene(host)){
+  case MELEE_WEB_MENU_HOST_SCENE_TITLE:return 10;
+  case MELEE_WEB_MENU_HOST_SCENE_MAIN:return 11;
+  case MELEE_WEB_MENU_HOST_SCENE_OPENING:return 12;
+  case MELEE_WEB_MENU_HOST_SCENE_OPENING_VS:return 13;
+  }
+ }
+ return host?melee_web_menu_host_phase(host):0;
+}
 }
 int main(int argc,char** argv){
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)

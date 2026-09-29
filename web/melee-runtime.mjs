@@ -7,7 +7,11 @@ function releaseDocumentReservation(reservation) {
   reservation.active = false;
   if (documentOwner === reservation && !reservation.initialized) documentOwner = null;
 }
-const SCENES = {1: 'css', 2: 'preparing', 3: 'sss', 4: 'preparing', 5: 'preparing', 6: 'unloaded', 7: 'match', 8: 'results', 9: 'prize'};
+const SCENES = {
+  1: 'css', 2: 'preparing', 3: 'sss', 4: 'preparing', 5: 'preparing',
+  6: 'unloaded', 7: 'match', 8: 'results', 9: 'prize', 10: 'title',
+  11: 'main', 12: 'opening', 13: 'opening-vs',
+};
 const IMPORT_BATCH_MAX_FILES = 8;
 const IMPORT_BATCH_MAX_BYTES = 8 * 1024 * 1024;
 const IMPORT_BATCH_MAX_MS = 8;
@@ -172,7 +176,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     const phase = ready && !fatal && !destroyed ? Module._melee_web_native_menu_phase() : 0;
     const running = ready && !fatal && !destroyed && !!Module._melee_web_native_menu_running();
     const scene = SCENES[phase] || 'idle';
-    const active = ['css', 'sss', 'match', 'results', 'prize'].includes(scene);
+    const active = ['css', 'sss', 'title', 'main', 'opening', 'opening-vs',
+      'match', 'results', 'prize'].includes(scene);
     const graphicsReady = ready && startupCacheReady && graphicsPreparationReady();
     const paused = active && !running && !preparationLabel && !busy;
     const state = destroyed ? 'destroyed' : fatal ? 'error' : !ready ? 'booting' : busy ||
