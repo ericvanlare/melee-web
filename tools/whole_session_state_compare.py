@@ -5,8 +5,8 @@ The raw observer is the source of expected order.  Its ``pad_consume`` rows
 bind one-for-one to MWRC frames; no scene or input search is performed.  Menu
 rows validate browser field shape and exact scene/input order; their scalar
 state is explicitly outside this comparator's source-to-browser join. VS
-``setup`` and ``source_tick`` rows additionally carry the exact four-fighter
-state.
+``setup`` and ``source_tick`` rows additionally carry exact state for the two
+to four active fighters in the match.
 
 This module is intentionally separate from the older indexed-prefix
 comparator.  It checks the complete source-consumed timeline and reports the
@@ -171,6 +171,14 @@ def _snapshot_values(payload: Mapping[str, Any], context: str) -> dict[str, Any]
             "pad_state_hex": pad_snapshot_bytes(pad_raw)}
 
 
+def _validate_browser_fighters(fighters: Any, context: str) -> None:
+    if not isinstance(fighters, list) or not 2 <= len(fighters) <= 4:
+        raise ComparisonError(f"{context}: expected two to four fighters")
+    for slot, fighter in enumerate(fighters):
+        if not isinstance(fighter, dict) or set(fighter) != FIGHTER_KEYS or fighter.get("slot") != slot:
+            raise ComparisonError(f"{context}: malformed fighter {slot}")
+
+
 def _pad_value(payload: Mapping[str, Any], context: str) -> str:
     slices = payload.get("slices")
     if not isinstance(slices, list):
@@ -196,11 +204,11 @@ def _state_from_payload(payload: Mapping[str, Any], context: str) -> dict[str, A
             if type(slot) is not int or slot in heads or not 0 <= slot <= 3:
                 raise ComparisonError(f"{context}: invalid fighter head slot")
             heads[slot] = item.get("address")
-    if set(heads) != set(range(4)):
-        raise ComparisonError(f"{context}: expected all four fighter heads")
+    if not 2 <= len(heads) <= 4 or set(heads) != set(range(len(heads))):
+        raise ComparisonError(f"{context}: expected two to four contiguous fighter heads")
     state = state_snapshot(SliceMemory(slices), heads)
-    if len(state["fighters"]) != 4:
-        raise ComparisonError(f"{context}: expected all four fighter states")
+    if len(state["fighters"]) != len(heads):
+        raise ComparisonError(f"{context}: fighter state count disagrees with fighter heads")
     return state
 
 
@@ -412,12 +420,7 @@ class Comparator:
         _hex(row["pad_state_hex"], PAD_STATE_BYTES, f"browser frame {index}.pad_state_hex")
         if expected_scene == SCENES["match"]:
             _int(row["match_frame"], f"browser frame {index}.match_frame")
-            fighters = row["fighters"]
-            if not isinstance(fighters, list) or len(fighters) != 4:
-                raise ComparisonError(f"browser frame {index}: expected four fighters")
-            for slot, fighter in enumerate(fighters):
-                if not isinstance(fighter, dict) or set(fighter) != FIGHTER_KEYS or fighter.get("slot") != slot:
-                    raise ComparisonError(f"browser frame {index}: malformed fighter {slot}")
+            _validate_browser_fighters(row["fighters"], f"browser frame {index}")
         return row
 
     def on_setup(self, match_index: int, state: dict[str, Any], source_seq: int) -> None:
@@ -432,6 +435,8 @@ class Comparator:
         expected_keys = {"record", "rng", "match_frame", "pad_state_hex", "fighters"}
         BrowserReader._require(row, expected_keys,
                                f"browser match_enter_complete before match {match_index}")
+        _int(row["match_frame"], f"browser match setup {match_index}.match_frame")
+        _validate_browser_fighters(row["fighters"], f"browser match setup {match_index}")
         if row.get("record") != "session_match_enter_complete":
             self.fail("browser match setup record is missing or reordered", record=row.get("record"),
                       index=self.frame_index, expected="session_match_enter_complete",
