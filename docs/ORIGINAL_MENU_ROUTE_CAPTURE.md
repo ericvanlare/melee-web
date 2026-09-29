@@ -110,6 +110,15 @@ source owners and reimport starts at CSS. This is the smallest runnable source
 increment at the first missing owner boundary, not an implemented or accepted
 attract cycle.
 
+Retail captures establish the sequence through three Opening-mode Title visits,
+including two returns to Opening state 0, and separate P1/P2 interruption paths.
+They do not establish a complete unattended return to normal `GM_TITLE` or an
+Omake15 visit. The browser retains the original Title timeout payload, source
+state selection and `gm_Mode_Opening_OnLoad`, then fails explicitly at checked
+asset preparation when the randomized four-CPU demo selects content outside the
+current runtime's admitted 19 fighters and 7 stages. The source menu/match route
+remains usable, and Eject/reimport recovers to CSS.
+
 Completing the retail route requires these bounded source owners:
 
 1. Complete the four-CPU VS demo lifecycle, including all 26 selectable source
@@ -144,6 +153,13 @@ the source Main scene, and the CSS payload is reopened only after the later
 source route returns to `GM_VS`. Root-menu B runs the source exit to Title;
 Title Start runs its source exit back to Main. Unsupported or incomplete source
 routes still fail through the checked owner.
+
+The original idle callback's zero triggered-button payload selects
+`GM_OPENING_MV` state 1 and runs `gm_Mode_Opening_OnLoad`. Checked asset
+preparation then reports the exact unsupported source-selected demo contents;
+the route does not skip the demo, substitute another destination, or claim a
+completed attract cycle. Eject retires the source owner and reimport starts at
+CSS.
 
 The main/title world binds their authored scene exports through owned DAT
 decoders and the existing archive scope. The additional Main-menu resources are
@@ -228,6 +244,13 @@ NVMe:
 | `work/title-idle-attract/public-audio-browser-final-head/report.json` and `failure.png` | Retained harness failure after the menu route, Title Eject/reimport, audio and PCM checks passed: document reload discarded an in-memory scoped-asset observer before the final assertion. Superseded by the verified report below |
 | `work/title-idle-attract/public-audio-browser-verified-final-head/report.json` and `failure.png` | Retained second harness failure after Title Eject/reimport, audio/PCM checks, and scoped asset transactions passed: final Eject checked a retired AudioContext from the earlier document. Superseded by the final report below |
 | `work/title-idle-attract/public-audio-browser-complete-final-head/report.json` and `*.png` | Headless Chrome run against the Release audio-player package: CSS → supported match → Results → CSS → Main → Title timeout, explicit unsupported Opening state 1 error, Eject/reimport to CSS, scoped asset transactions, audio/PCM transport and teardown |
+| `work/title-idle-attract/public-player-audio-title-attract-resume-settled/report.json` and `*.png` | Final production audio-player browser route: 15 checks passed, including CSS-first start, two menu cycles, Main/Title Eject and CSS-first reimport, SSS → supported Mario/Final Destination → Results → CSS, nonzero 32 kHz PCM and audio-context retirement |
+| `work/title-idle-attract/audio-preview-title-idle-a05f5e3-after-graphics/report.json` and `*.png` | Same source-bound audio-player package, 12 checks passed; records the original idle timeout to state 1, exact unsupported source-selected fighter/stage error, nonzero PCM, Eject/reimport to CSS and closed prior audio context. The existing `--select-after-graphics` option skips only the older early RVZ wording assertion |
+| `work/title-idle-attract/audio-preview-title-idle-a05f5e3.log` | Preserved preliminary failure from that harness's optional early invalid-RVZ assertion, whose expected wording predates the current player error; the final Title idle scenario above ran with its supported after-graphics option |
+| `work/title-idle-attract/public-match-pause-probe-resume-settled/after-start.png` and `after-lras.png` | Focused headless public-player probe after UI resume: ordinary Start opened source P1 Pause and LRAS reached Results; it validates the input-settle delay without exposing development diagnostics |
+| `work/title-idle-attract/public-player-audio-title-attract-ready-phase/report.json`, `public-player-audio-title-attract-source-pause/report.json`, and `public-player-audio-title-attract-recovery-probe/report.json` | Preserved failed iterations found and corrected harness issues: missing phase in a shared state reader, unsupported use of a development-only diagnostics export, and a dropped input edge immediately after resume; the focused probe and final full route passed |
+| `work/title-idle-attract/full-tests-final-precommit.log` | Full repository unittest discovery with `MELEE_MENU_FIXTURE_ROOT=/Users/eric/.codex/worktrees/949c/melee-web/assets-local/pr96-title-main-fixtures`: 1,553 tests, 93 optional skips, no failures, 296.446 seconds |
+| `work/title-idle-attract/runtime-public-final-release-build.log`, `audio-release-final-a05f5e3-build.log`, `audio-player-title-attract-a05f5e3.manifest.json`, `audio-player-title-attract-a05f5e3-audit.log`, and `audio-player-title-attract-a05f5e3-http.json` | Release public/audio builds, audited source-bound audio package, and local Pages HTTP evidence. The package identity binds both browser reports to source `a05f5e3fbeed05639c4b71aba9fa66b6784dec19` |
 | `work/title-idle-attract/audio-player-complete-final-head.manifest.json`, `audio-player-complete-final-head-audit.json`, and `audio-http-complete-final-head.json` | Production package inventory, package audit, and local Pages HTTP verification; package `source_sha` binds the browser report to the final source head |
 | `work/title-idle-attract/full-tests-after-public-error.log` | Pre-PR-109 full unittest discovery after the public error-surfacing fix: 1,548 tests, 94 optional skips, no failures; superseded by the reconciled-head suite below |
 | `work/title-idle-attract/full-tests-reconciled-final.log` | Full unittest discovery on implementation head `1ec06d4`; follow-up commits correct evidence indexing and browser harness lifecycle assertions, with no runtime implementation changes |
@@ -248,7 +271,7 @@ capture, or generated public bundle enters Git.
 | --- | --- | --- |
 | **Source identified** | Pinned title/Main callbacks, mode routing, the 11-row `0x07ff` unlock mask, and authored notification/reward-ledger owners | Full-game menu coverage |
 | **Retail compared** | Cold-boot route order, ordinary inputs, observed source menu states, and labeled screenshots on the owned disc | Pixel/PCM equivalence, physical-controller acceptance, foreground timing, or performance |
-| **Browser exercised** | Audio-enabled public CSS-first startup with the full source roster; two original menu cycles; Main/Title Eject and CSS-first reimport; routed SSS, supported match, Results return; one Title idle timeout to the exact Opening state 1 error boundary, followed by Eject/reimport; connected 32 kHz nonzero PCM transport and audio-context teardown | Complete attract cycles, retail/browser pixel or PCM comparison, audible quality, foreground input latency/timing, physical-controller acceptance, performance, or tournament acceptance |
+| **Browser exercised** | Production audio-enabled public CSS-first startup with the full source roster; two original menu cycles; Main/Title Eject and CSS-first reimport; routed SSS, supported match and Results return; original Title idle handoff through checked source-selected Opening asset preparation, explicit failure for unadmitted assets, and Eject/reimport; connected 32 kHz nonzero PCM transport and audio-context teardown | A complete attract cycle, all randomized demo/movie destinations, retail/browser pixel or PCM comparison, audible quality, foreground input latency/timing, physical-controller acceptance, performance, or tournament acceptance |
 | **Compiled** | Reconciled silent and audio-enabled public Release targets and audited package graphs | Deployment or merge |
 
 The separate allocation-history GDB/Python route remains available for scopes

@@ -7,12 +7,13 @@ original title → Main/Versus → CSS route, CSS parent return, Main Back to Ti
 Title Start to Main, repeated CSS re-entry, and public Eject/reimport lifecycle.
 The retail capture starts from a cold Dolphin boot with an isolated copy of a
 retail-initialized card and records scoped source/PAD observations and labeled
-Metal frame screenshots. The final headless installed-Chrome check uses the
-production audio-enabled public package at the reconciled PR head. It preserves
-CSS-first startup, completes two repeated CSS → Main → Title → Main/Versus → CSS
-cycles, Ejects from Main and Title with CSS-first disc reimport, then completes
-CSS → SSS → supported Mario/Final Destination gameplay → Results → CSS. It
-records connected 32 kHz nonzero PCM transport and audio-context teardown.
+Metal frame screenshots. The latest headless installed-Chrome check uses the
+production audio-enabled player package built from source `a05f5e3`; its retained
+15-check report preserves CSS-first startup and completes two CSS → Main →
+Title → Main/Versus → CSS cycles, Ejects from Main and Title with CSS-first
+disc reimport, then completes CSS → SSS → supported Mario/Final Destination
+gameplay → Results → CSS. It records connected 32 kHz nonzero PCM transport
+and audio-context teardown.
 The audio-disabled `runtime-public` and production audio-enabled
 `runtime-audio-preview` Release targets are both built; the audio package is
 prepared and audited for this route. The local Observer and final browser
@@ -21,6 +22,22 @@ receipts, input logs, package identities, and screenshots are indexed in the
 not establish audible quality, PCM or pixel equivalence, foreground timing,
 input latency, physical-controller acceptance, performance, or full-game menu
 coverage.
+
+## Original Title idle handoff: bounded increment
+
+**Source identified / Retail compared / Browser exercised / Compiled** for the
+source Title timeout payload and its `GM_OPENING_MV` state-1 handoff. Retail
+Observer evidence records the cold-boot Opening sequence through three Title
+visits, two returns to Opening state 0, and separate P1/P2 interruption routes.
+The production browser runs the original timer and `gm_Mode_Opening_OnLoad`,
+then fails at checked preparation when the randomized four-CPU demo selects an
+unadmitted fighter or stage; it never fabricates a destination. Eject/reimport
+returns to CSS. The full VS demo and THP movie owners remain unsupported, so
+this is a runnable source increment rather than a completed attract cycle. See
+the [scoped capture and implementation ledger](docs/ORIGINAL_MENU_ROUTE_CAPTURE.md)
+for the source-frame observations, captures, browser report, and required next
+owners. No pixel/PCM equivalence, audible-quality, foreground-timing, or
+performance claim is made.
 
 ## Repository public; main changes restricted to the owner
 
