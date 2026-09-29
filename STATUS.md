@@ -1099,6 +1099,11 @@ local interoperability result; rollback correctness, browser cross-play,
 public Internet/NAT, rendering/audio accuracy and production readiness remain
 unclaimed.
 
+A separate [headless browser-to-desktop transport receipt](docs/evidence/slippi-browser-desktop-transport-v1.json)
+records one 24-frame raw PAD exchange through the loopback ENet relay and the
+desktop peer's existing input consumer. It does not establish browser gameplay,
+general cross-play, or rollback correctness.
+
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
 ticks, and the port matches their entry data, input vectors, declared fighter

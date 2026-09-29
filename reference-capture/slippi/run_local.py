@@ -29,11 +29,13 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(ROOT / "tools"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 from process import OwnedProcess, ProcessSupervisor  # noqa: E402
 from runtime import (CSS_MARIO_CHARACTER_KIND, ClientProfile, ControllerPipe, MemoryWatcher,
                      create_client_profile)  # noqa: E402
 import slippi_format  # noqa: E402
+from dolphin_audio import dolphin_audio_options  # noqa: E402
 
 
 LOCK_PATH = HERE / "client.lock.json"
@@ -53,6 +55,7 @@ SLIPPI_MARIO_CHARACTER_ID = 8
 DIRECT_FIRST_MATCH_STAGES = (3, 8, 28, 31, 32, 2)
 SLIPPI_UNFREEZE_INPUT_FRAME = 84
 SCRIPTED_INPUT_START_FRAME = 110
+BROWSER_FRAME_LEAD = 120
 SSS_ENTRY_SETTLE_FRAMES = 30
 SSS_CURSOR_X_BOUND = 27.0
 SSS_CURSOR_Y_BOUND = 19.0
@@ -188,7 +191,7 @@ def _lsof_destinations(pid: int) -> list[dict[str, str]]:
     if not lsof:
         raise RuntimeError("lsof is required for local network destination checks")
     completed = subprocess.run(
-        [lsof, "-nP", "-a", "-p", str(pid), "-i"],
+        [lsof, "-nP", "-a", "-g", str(pid), "-i"],
         check=False,
         capture_output=True,
         text=True,
@@ -199,8 +202,8 @@ def _lsof_destinations(pid: int) -> list[dict[str, str]]:
     return _parse_lsof_output(completed.stdout)
 
 
-def _verify_pinned_client_source(lock: dict) -> dict:
-    source = ROOT / ".deps" / "slippi-dolphin-local"
+def _verify_pinned_client_source(lock: dict, source_root: Path | None = None) -> dict:
+    source = (source_root or ROOT / ".deps" / "slippi-dolphin-local").resolve()
     rust = source / "Externals" / "SlippiRustExtensions"
     if not source.is_dir() or not rust.is_dir():
         raise FileNotFoundError("local pinned Slippi source checkout is missing")
@@ -306,10 +309,21 @@ def _verify_pinned_client_source(lock: dict) -> dict:
     }
 
 
-def _verify_build_profile(lock: dict, source_checkout: dict) -> dict:
-    dolphin_build = DEFAULT_WORK / "dolphin-build"
-    matchmaker_build = DEFAULT_WORK / "matchmaker-build"
-    dolphin_source = ROOT / ".deps" / "slippi-dolphin-local"
+def _verify_build_profile(
+    lock: dict,
+    source_checkout: dict,
+    *,
+    dolphin_build: Path | None = None,
+    matchmaker_build: Path | None = None,
+    dolphin_source: Path | None = None,
+    enet_source: Path | None = None,
+    client_binary: Path | None = None,
+    service_binary: Path | None = None,
+) -> dict:
+    dolphin_build = dolphin_build or DEFAULT_WORK / "dolphin-build"
+    matchmaker_build = matchmaker_build or DEFAULT_WORK / "matchmaker-build"
+    dolphin_source = (dolphin_source or ROOT / ".deps" / "slippi-dolphin-local").resolve()
+    enet_source = (enet_source or ROOT / ".deps" / "slippi-dolphin").resolve()
     matchmaker_source = HERE / "local_matchmaker"
 
     def read_cache(directory: Path) -> dict[str, str]:
@@ -362,16 +376,14 @@ def _verify_build_profile(lock: dict, source_checkout: dict) -> dict:
         if (f'set(CMAKE_CXX_COMPILER_ID "AppleClang")' not in compiler_info
                 or f'set(CMAKE_CXX_COMPILER_VERSION "{compiler_version}.' not in compiler_info):
             raise RuntimeError("local Apple Clang compiler identity differs from client.lock.json")
-    rust_toolchain = (ROOT / ".deps" / "slippi-dolphin-local" / "Externals"
-                      / "SlippiRustExtensions" / "rust-toolchain.toml")
+    rust_toolchain = (dolphin_source / "Externals" / "SlippiRustExtensions"
+                      / "rust-toolchain.toml")
     if not rust_toolchain.is_file() or f'channel = "{profile["rust_toolchain"]}"' \
             not in rust_toolchain.read_text(encoding="utf-8"):
         raise RuntimeError("Slippi Rust toolchain differs from client.lock.json")
     server_source = Path(server_cache.get("SLIPPI_DOLPHIN_SOURCE", "")).resolve()
-    try:
-        server_source.relative_to(ROOT.resolve())
-    except ValueError as error:
-        raise RuntimeError("local matchmaker source is outside the pinned repository checkouts") from error
+    if server_source != enet_source:
+        raise RuntimeError("local matchmaker does not use the pinned clean ENet source checkout")
     source_head = subprocess.run(["git", "-C", str(server_source), "rev-parse", "HEAD"],
                                  check=False, capture_output=True, text=True, timeout=15)
     source_status = subprocess.run(
@@ -393,7 +405,7 @@ def _verify_build_profile(lock: dict, source_checkout: dict) -> dict:
             or actual_enet[42:].split(" ", 1)[0] != "Externals/enet/enet"):
         raise RuntimeError("local matchmaker build is not bound to the pinned ENet checkout")
     built_client = dolphin_build / "Binaries" / "dolphin-emu-nogui"
-    bundled_client = DEFAULT_WORK / CLIENT_RELATIVE
+    bundled_client = client_binary or DEFAULT_WORK / CLIENT_RELATIVE
     if not built_client.is_file() or not bundled_client.is_file():
         raise FileNotFoundError("pinned headless client build output or staged bundle is missing")
     if _sha256(built_client) != _sha256(bundled_client):
@@ -407,12 +419,12 @@ def _verify_build_profile(lock: dict, source_checkout: dict) -> dict:
     ]
     if source_mtimes and max(source_mtimes) > built_client.stat().st_mtime_ns:
         raise RuntimeError("pinned Dolphin binary predates a local Slippi patch; rebuild it")
-    service_binary = DEFAULT_WORK / SERVICE_RELATIVE
+    service_binary = service_binary or DEFAULT_WORK / SERVICE_RELATIVE
     service_sources = tuple(
         (matchmaker_source / relative).stat().st_mtime_ns
         for relative in (
             "CMakeLists.txt", "server.cpp", "pairing.cpp", "pairing.hpp",
-            "protocol.cpp", "protocol.hpp",
+            "protocol.cpp", "protocol.hpp", "browser_relay.cpp", "browser_relay.hpp",
         )
     )
     if max(service_sources) > service_binary.stat().st_mtime_ns:
@@ -454,16 +466,39 @@ def _assert_no_owned_ports(ports: tuple[int, ...]) -> None:
 
 class PairRun:
     def __init__(self, *, root: Path, disc: Path, cycle: int, timeouts: dict[str, float],
-                 pause_after_pair: bool = False, input_probe_only: bool = False):
+                 pause_after_pair: bool = False, input_probe_only: bool = False,
+                 browser_transport_probe: bool = False, client_binary: Path | None = None,
+                 matchmaker_binary: Path | None = None, dolphin_build: Path | None = None,
+                 matchmaker_build: Path | None = None, dolphin_source: Path | None = None,
+                 enet_source: Path | None = None, browser_node: Path | None = None,
+                 browser_playwright: Path | None = None,
+                 profile_temp_root: Path | None = None):
         self.root = root
         self.disc = disc
         self.cycle = cycle
         self.timeouts = timeouts
         self.pause_after_pair = pause_after_pair
         self.input_probe_only = input_probe_only
+        self.browser_transport_probe = browser_transport_probe
+        self.client_binary = client_binary or DEFAULT_WORK / CLIENT_RELATIVE
+        self.matchmaker_binary = matchmaker_binary or DEFAULT_WORK / SERVICE_RELATIVE
+        self.dolphin_build = dolphin_build or DEFAULT_WORK / "dolphin-build"
+        self.matchmaker_build = matchmaker_build or DEFAULT_WORK / "matchmaker-build"
+        self.dolphin_source = dolphin_source or ROOT / ".deps" / "slippi-dolphin-local"
+        self.enet_source = enet_source or ROOT / ".deps" / "slippi-dolphin"
+        self.browser_node = browser_node
+        self.browser_playwright = browser_playwright
+        self.profile_temp_root = profile_temp_root
         self.work = root / f"cycle-{cycle:02d}"
         self.work.mkdir(parents=True, mode=0o700, exist_ok=False)
         self.work.chmod(0o700)
+        self.browser_input_log = self.work / "browser-pad-inputs.log"
+        self.browser_relay_event_log = self.work / "browser-relay-events.jsonl"
+        self.browser_service_event_log = self.work / "browser-transport-service.jsonl"
+        self.browser_frame_start: int | None = None
+        self.browser_frame_count = 24
+        self.browser_target_path: Path | None = None
+        self.browser_ready_path: Path | None = None
         self.profile_root: Path | None = None
         self.supervisor = ProcessSupervisor(graceful_timeout=10, term_timeout=3)
         self.children: dict[str, OwnedProcess] = {}
@@ -490,6 +525,7 @@ class PairRun:
             "direct_ticket_submissions": [],
             "games": [],
             "remote_input": {},
+            "browser_transport": None,
             "network_destinations": self.network_observations,
             "cleanup": self.cleanup,
             "result": "incomplete",
@@ -497,9 +533,13 @@ class PairRun:
 
     def run(self, *, disconnect_after_rematch: bool = False) -> dict:
         lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
-        mod = DEFAULT_WORK / MOD_RELATIVE
-        service = DEFAULT_WORK / SERVICE_RELATIVE
-        client = DEFAULT_WORK / CLIENT_RELATIVE
+        client = self.client_binary.expanduser().resolve()
+        service = self.matchmaker_binary.expanduser().resolve()
+        self.dolphin_source = self.dolphin_source.expanduser().resolve()
+        self.enet_source = self.enet_source.expanduser().resolve()
+        self.dolphin_build = self.dolphin_build.expanduser().resolve()
+        self.matchmaker_build = self.matchmaker_build.expanduser().resolve()
+        mod = client.parents[1] / "Resources" / "Sys" / "GameSettings" / "GALE01r2.ini"
         if not client.is_file() or not os.access(client, os.X_OK):
             raise FileNotFoundError("pinned headless Slippi client is not built; follow setup documentation")
         if not service.is_file() or not os.access(service, os.X_OK):
@@ -513,7 +553,7 @@ class PairRun:
         if _sha256(self.disc) != expected_disc:
             raise ValueError("--disc hash does not match the pinned owned Melee image")
         sys_root = client.parents[1] / "Resources" / "Sys"
-        source_sys_root = ROOT / ".deps" / "slippi-dolphin-local" / "Data" / "Sys"
+        source_sys_root = self.dolphin_source / "Data" / "Sys"
         required_resources = ("codehandler.bin", "totaldb.dsy", "GameSettings/GALE01r2.ini")
         missing_resources = [relative for relative in required_resources
                              if not (sys_root / relative).is_file()]
@@ -530,9 +570,13 @@ class PairRun:
         self.evidence["downstream_patch_sha256"] = {
             patch: _sha256(HERE / patch) for patch in lock["patches"]
         }
-        source_checkout = _verify_pinned_client_source(lock)
+        source_checkout = _verify_pinned_client_source(lock, self.dolphin_source)
         self.evidence["source_checkout"] = source_checkout
-        self.evidence["build_profile"] = _verify_build_profile(lock, source_checkout)
+        self.evidence["build_profile"] = _verify_build_profile(
+            lock, source_checkout, dolphin_build=self.dolphin_build,
+            matchmaker_build=self.matchmaker_build, dolphin_source=self.dolphin_source,
+            enet_source=self.enet_source, client_binary=client, service_binary=service,
+        )
         self.evidence["client_binary_sha256"] = _sha256(client)
         self.evidence["matchmaker_sha256"] = _sha256(service)
 
@@ -566,6 +610,8 @@ class PairRun:
             self.replay_baselines[1] = self._replay_file_snapshot()
             self._submit_direct_tickets()
             self._wait_paired()
+            if self.browser_transport_probe:
+                self._start_browser_probe()
             self._play_and_rematch()
             if self.input_probe_only:
                 self.evidence["result"] = "input_probe_complete"
@@ -603,7 +649,14 @@ class PairRun:
         return self.evidence
 
     def _make_profiles(self, mod: Path, expected_mod: str, latest_version: str) -> None:
-        self.profile_root = Path(tempfile.mkdtemp(prefix="slp-", dir="/tmp"))
+        profile_parent = self.profile_temp_root
+        if profile_parent is not None:
+            profile_parent = profile_parent.expanduser().resolve(strict=True)
+            if not profile_parent.is_dir():
+                raise NotADirectoryError("private profile scratch root must be a directory")
+        self.profile_root = Path(tempfile.mkdtemp(
+            prefix="slp-", dir=None if profile_parent is None else str(profile_parent)
+        ))
         self.profile_root.chmod(0o700)
         self.evidence["private_profile_temp_id"] = self.profile_root.name
         for index, name in enumerate(("p1", "p2")):
@@ -657,17 +710,146 @@ class PairRun:
             }
 
     def _start_service(self, service: Path) -> None:
+        if self.browser_transport_probe:
+            self.children["browser-bridge"] = self.supervisor.start(
+                "local-browser-transport",
+                [sys.executable, str(HERE / "browser_transport_server.py"),
+                 "--input-log", str(self.browser_input_log),
+                 "--relay-event-log", str(self.browser_relay_event_log),
+                 "--service-event-log", str(self.browser_service_event_log)],
+                log_path=self.work / "browser-transport.log",
+                graceful_signal=signal.SIGTERM,
+            )
+            self._wait_until(
+                lambda: any(row.get("event") == "browser_transport_started"
+                            for row in _json_lines(self.browser_service_event_log)),
+                timeout=10,
+                description="loopback browser WebSocket service startup",
+            )
+
         event_log = self.work / "matchmaker-events.jsonl"
+        command = [str(service), "--event-log", str(event_log),
+                   "--ticket-timeout-seconds", "45"]
+        if self.browser_transport_probe:
+            command.extend([
+                "--relay-peer-port", "43115",
+                "--browser-input-log", str(self.browser_input_log),
+                "--browser-event-log", str(self.browser_relay_event_log),
+            ])
         self.children["service"] = self.supervisor.start(
             "local-matchmaker",
-            [str(service), "--event-log", str(event_log), "--ticket-timeout-seconds", "45"],
+            command,
             log_path=self.work / "matchmaker.log",
             graceful_signal=signal.SIGTERM,
         )
         self._wait_until(
-            lambda: any(row.get("event") == "service_started" for row in _json_lines(event_log)),
+            lambda: (
+                any(row.get("event") == "service_started" for row in _json_lines(event_log))
+                and (not self.browser_transport_probe or any(
+                    row.get("event") == "peer_relay_started"
+                    for row in _json_lines(event_log)
+                ))
+            ),
             timeout=15,
             description="loopback matchmaking service startup",
+        )
+
+    def _start_browser_probe(self) -> None:
+        if not self.browser_node or not self.browser_playwright:
+            raise ValueError("browser transport probe requires installed Node and Playwright paths")
+        browser_out = self.work / "browser"
+        self.browser_target_path = browser_out / "frame-target.json"
+        self.browser_ready_path = browser_out / "browser-ready.json"
+        command = [
+            str(self.browser_node), str(HERE / "browser_transport_test.mjs"),
+            "--url", "http://127.0.0.1:43116/",
+            "--out", str(browser_out),
+            "--playwright", str(self.browser_playwright),
+            "--target-file", str(self.browser_target_path),
+            "--ready-file", str(self.browser_ready_path),
+            "--count", str(self.browser_frame_count),
+            "--timeout", "45000",
+        ]
+        environment = os.environ.copy()
+        environment["MELEE_BROWSER_PATH"] = environment.get(
+            "MELEE_BROWSER_PATH", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        )
+        self.children["browser-test"] = self.supervisor.start(
+            "headless-browser-transport",
+            command,
+            log_path=self.work / "browser-test.log",
+            env=environment,
+            graceful_signal=signal.SIGTERM,
+        )
+        self._wait_until(
+            lambda: self.browser_ready_path is not None
+            and self.browser_ready_path.is_file(),
+            timeout=30,
+            description="headless browser opening the local Slippi transport",
+        )
+        self.evidence["browser_transport"] = {
+            "mode": "loopback WebSocket to local ENet peer relay",
+            "origin": "http://127.0.0.1:43116",
+            "relay": "127.0.0.1:43115/udp",
+            "browser_input_player_port": 1,
+            "target_frame_selection": "live P1/P2 PAD sequence plus a 120-frame lead",
+            "browser_probe_evidence": "browser/browser-evidence.json",
+            "browser_screenshot": "browser/browser-transport.png",
+            "frame_input_log": "browser-pad-inputs.log",
+            "relay_event_log": "browser-relay-events.jsonl",
+        }
+
+    def _queue_browser_probe_frames(self) -> None:
+        if not self.browser_transport_probe:
+            return
+        if self.browser_target_path is None or self.browser_frame_start is not None:
+            raise RuntimeError("browser transport target state is invalid")
+
+        latest_frames: dict[str, int] = {}
+
+        def read_latest_frames() -> bool:
+            for name in ("p1", "p2"):
+                rows = _json_lines(self.work / f"{name}-local-pad-sent.jsonl")
+                frames = [row.get("frame") for row in rows
+                          if row.get("event") == "local_pad_sent"
+                          and isinstance(row.get("frame"), int)]
+                if not frames:
+                    return False
+                latest_frames[name] = frames[-1]
+            return True
+
+        self._wait_until(
+            read_latest_frames,
+            timeout=10,
+            description="both desktop clients reporting live Slippi PAD sequence numbers",
+        )
+        self.browser_frame_start = max(latest_frames.values()) + BROWSER_FRAME_LEAD
+        last_frame = self.browser_frame_start + self.browser_frame_count - 1
+        if self.browser_frame_start < 1 or last_frame > 1_000_000:
+            raise RuntimeError("live browser PAD target is outside the accepted Slippi frame range")
+        target = {
+            "first_frame": self.browser_frame_start,
+            "frame_count": self.browser_frame_count,
+            "observed_latest_frames": latest_frames,
+        }
+        target_temp_path = self.browser_target_path.with_suffix(".tmp")
+        with target_temp_path.open("x", encoding="utf-8") as stream:
+            os.chmod(target_temp_path, 0o600)
+            json.dump(target, stream, sort_keys=True)
+            stream.write("\n")
+        os.replace(target_temp_path, self.browser_target_path)
+
+        self.evidence["browser_transport"]["target_frames"] = list(
+            range(self.browser_frame_start, last_frame + 1)
+        )
+        self.evidence["browser_transport"]["observed_latest_frames"] = latest_frames
+        pad_count = self.browser_frame_count
+        self._wait_until(
+            lambda: len([line for line in self.browser_input_log.read_text(
+                encoding="ascii", errors="replace").splitlines()
+                         if line.startswith("PAD ")]) == pad_count,
+            timeout=20,
+            description="headless browser queuing exact tagged Slippi PAD records",
         )
 
     def _start_clients(self, client: Path) -> None:
@@ -682,7 +864,7 @@ class PairRun:
             self.children[name] = self.supervisor.start(
                 f"client-{name}",
                 [str(client), "-p", "headless", "-u", str(profile.user_root),
-                 "-v", "Null", "-e", str(self.disc)],
+                 "-v", "Null", *dolphin_audio_options(), "-e", str(self.disc)],
                 log_path=self.work / f"{name}-dolphin.log",
                 env=environment,
                 graceful_signal=signal.SIGINT,
@@ -1086,6 +1268,7 @@ class PairRun:
             "source_game_start": {name: self.watchers[name].online_scene_code() for name in ("p1", "p2")},
             "source_frame_counter": initial_frame,
         })
+        self._queue_browser_probe_frames()
         # The pinned ASM clears pad input until UNFREEZE_INPUTS_FRAME minus
         # Slippi delay. Start after that
         # sync window and hold across normal controller polling.
@@ -1146,6 +1329,8 @@ class PairRun:
                     "nonzero_samples": len(nonzero),
                     "first_nonzero_frame": nonzero[0]["frame"] if nonzero else None,
                 }
+            if self.browser_transport_probe:
+                self._verify_browser_remote_consumption()
             return
 
         left_input_writes = 1
@@ -1370,6 +1555,76 @@ class PairRun:
             if self.evidence["remote_input"][name]["distinct_pad_payloads"] < 2:
                 raise RuntimeError(f"{name} remote PAD observer saw no input-state change")
 
+    def _verify_browser_remote_consumption(self) -> None:
+        page_path = self.work / "browser" / "browser-evidence.json"
+        self._wait_until(
+            lambda: page_path.is_file()
+            and json.loads(page_path.read_text(encoding="utf-8")).get("result") == "passed",
+            timeout=55,
+            description="headless browser receiving relay and desktop peer PAD receipts",
+        )
+        browser = json.loads(page_path.read_text(encoding="utf-8"))
+        frames = list(range(self.browser_frame_start,
+                            self.browser_frame_start + self.browser_frame_count))
+        if sorted(set(browser.get("browser_applied_frames", []))) != frames:
+            raise RuntimeError("the ENet relay did not apply every browser frame tag exactly once")
+        if self.browser_frame_start not in browser.get("peer_frames_received", []):
+            raise RuntimeError("headless browser did not receive a Slippi PAD frame from the peer")
+
+        matchmaking_events = _json_lines(self.work / "matchmaker-events.jsonl")
+        injected = {row.get("frame"): row for row in matchmaking_events
+                    if row.get("event") == "browser_pad_injected"}
+        if any(frame not in injected for frame in frames):
+            raise RuntimeError("relay evidence is missing an exact browser PAD frame injection")
+        identified = {row.get("player_port") for row in matchmaking_events
+                      if row.get("event") == "peer_relay_player_identified"}
+        if identified != {1, 2}:
+            raise RuntimeError(f"ENet relay did not identify both assigned peer slots: {identified}")
+        peer_frames = {row.get("frame") for row in matchmaking_events
+                       if row.get("event") == "browser_peer_pad_received"}
+        if self.browser_frame_start not in peer_frames:
+            raise RuntimeError("relay evidence is missing the peer-to-browser PAD frame")
+
+        expected = "01007f0000000000" + "00000000"
+        rows = [row for row in _json_lines(self.work / "p2-remote-pad.jsonl")
+                if row.get("event") == "remote_pad_consumed"
+                and row.get("game_sequence") == 0
+                and row.get("remote_port") == 1
+                and isinstance(row.get("frame"), int)
+                and isinstance(row.get("pad_hex"), str)]
+        verified = []
+        for target in frames:
+            consumer = None
+            for row in rows:
+                block_index = row["frame"] - target
+                if block_index < 0:
+                    continue
+                begin = block_index * 24
+                block = row["pad_hex"].lower()[begin:begin + 24]
+                if block == expected:
+                    consumer = row
+                    break
+            if consumer is None:
+                raise RuntimeError(
+                    f"p2's remote-pad consumer did not expose browser frame {target} byte-for-byte"
+                )
+            verified.append({"browser_frame": target,
+                             "consumer_latest_frame": consumer["frame"],
+                             "pad_hex": expected})
+
+        self.evidence["browser_transport"].update({
+            "result": "passed",
+            "browser_session_id": browser.get("websocket_session_id"),
+            "browser_frames_applied_by_relay": browser["browser_applied_frames"],
+            "peer_frames_received_by_browser": browser["peer_frames_received"],
+            "remote_consumer": "p2 GetSlippiRemotePad observer",
+            "remote_port": 1,
+            "byte_exact_consumed_frames": verified,
+            "browser_build_claimed": False,
+            "rollback_correctness_claimed": False,
+            "public_internet_claimed": False,
+        })
+
     def _disconnect_peer(self) -> None:
         target = self.children["p1"]
         self.cleanup.append(self.supervisor.stop(target))
@@ -1452,6 +1707,11 @@ class PairRun:
     def _service_children(self) -> None:
         for name, child in self.children.items():
             if child.process.poll() is not None:
+                if name == "browser-test" and child.process.returncode == 0:
+                    evidence = self.work / "browser" / "browser-evidence.json"
+                    if evidence.is_file() and json.loads(
+                            evidence.read_text(encoding="utf-8")).get("result") == "passed":
+                        continue
                 raise RuntimeError(f"owned {name} process exited with status {child.process.returncode}")
 
     def _check_network(self) -> None:
@@ -1465,11 +1725,16 @@ class PairRun:
 
     def _save_evidence(self) -> None:
         self.evidence["network_destinations"] = self.network_observations
+        self.evidence["network_destination_scope"] = (
+            "all loopback sockets held by each owned process group, including headless Chrome"
+        )
         self.evidence["cleanup"] = self.cleanup
         try:
             first_peer = 41301 + (self.cycle - 1) * 4
-            _assert_no_owned_ports((43113, 43114, first_peer, first_peer + 1,
-                                    first_peer + 20, first_peer + 21))
+            ports = (43113, 43114, first_peer, first_peer + 1, first_peer + 20, first_peer + 21)
+            if self.browser_transport_probe:
+                ports += (43115, 43116)
+            _assert_no_owned_ports(ports)
             self.evidence["ports_released"] = True
         except BaseException as error:
             self.evidence["ports_released"] = False
@@ -1507,9 +1772,41 @@ def _arguments(argv=None):
     parser.add_argument("--pair-timeout", type=float, default=90)
     parser.add_argument("--game-timeout", type=float, default=420)
     parser.add_argument("--rematch-timeout", type=float, default=90)
+    parser.add_argument("--client-binary", type=Path,
+                        help="use a verified staged pinned headless Slippi binary")
+    parser.add_argument("--matchmaker-binary", type=Path,
+                        help="use a freshly built local matchmaker binary")
+    parser.add_argument("--dolphin-build", type=Path,
+                        help="build directory used for the pinned Dolphin binary")
+    parser.add_argument("--matchmaker-build", type=Path,
+                        help="build directory used for the local matchmaker binary")
+    parser.add_argument("--dolphin-source", type=Path,
+                        help="patched source checkout used for the pinned Dolphin build")
+    parser.add_argument("--enet-source", type=Path,
+                        help="clean pinned source checkout used to build ENet")
+    parser.add_argument("--browser-transport-probe", action="store_true",
+                        help="route Slippi peer traffic through a loopback relay and a real browser")
+    parser.add_argument("--browser-node", type=Path,
+                        help="installed Node.js binary for the headless browser probe")
+    parser.add_argument("--browser-playwright", type=Path,
+                        help="installed Playwright package directory for the browser probe")
+    parser.add_argument("--profile-temp-root", type=Path,
+                        help="short private-profile scratch directory, useful on external storage")
     parser.add_argument("--pause-after-pair", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--input-probe-only", action="store_true", help=argparse.SUPPRESS)
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.browser_transport_probe and (not args.input_probe_only or args.repeat != 1):
+        parser.error("--browser-transport-probe requires --input-probe-only --repeat 1")
+    if args.browser_transport_probe:
+        if args.browser_node is None:
+            found_node = shutil.which("node")
+            if found_node:
+                args.browser_node = Path(found_node)
+        if args.browser_playwright is None and os.environ.get("MELEE_PLAYWRIGHT_DIR"):
+            args.browser_playwright = Path(os.environ["MELEE_PLAYWRIGHT_DIR"])
+        if args.browser_node is None or args.browser_playwright is None:
+            parser.error("browser probe requires --browser-node and --browser-playwright or installed defaults")
+    return args
 
 
 def _run_interruption_probe(*, disc: Path, parent_root: Path, timeouts: dict[str, float]) -> dict:
@@ -1583,7 +1880,17 @@ def main(argv=None) -> int:
     for cycle in range(1, args.repeat + 1):
         run = PairRun(root=root, disc=disc, cycle=cycle, timeouts=timeouts,
                       pause_after_pair=args.pause_after_pair,
-                      input_probe_only=args.input_probe_only)
+                      input_probe_only=args.input_probe_only,
+                      browser_transport_probe=args.browser_transport_probe,
+                      client_binary=args.client_binary,
+                      matchmaker_binary=args.matchmaker_binary,
+                      dolphin_build=args.dolphin_build,
+                      matchmaker_build=args.matchmaker_build,
+                      dolphin_source=args.dolphin_source,
+                      enet_source=args.enet_source,
+                      browser_node=args.browser_node,
+                      browser_playwright=args.browser_playwright,
+                      profile_temp_root=args.profile_temp_root)
         print(f"cycle {cycle}/{args.repeat}: starting fresh local pair", flush=True)
         evidence = run.run(disconnect_after_rematch=(cycle == args.repeat))
         if args.pause_after_pair:

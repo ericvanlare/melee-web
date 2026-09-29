@@ -1,0 +1,241 @@
+{
+  "based_on_commit": "c8fddc93cee7d24d13ba50f6a78801af0821e87c",
+  "browser": {
+    "byte_exact_consumed_frame_count": 24,
+    "chrome_version": "154.0.8037.58",
+    "console_errors": [],
+    "consumer_payload_hex_with_source_padding": "01007f000000000000000000",
+    "desktop_consumer": "p2 GetSlippiRemotePad observer",
+    "desktop_consumer_port": 1,
+    "headless": true,
+    "input_payload_hex": "01007f0000000000",
+    "live_frame_selection": {
+      "first_frame": 180,
+      "last_frame": 203,
+      "lead_frames": 120,
+      "observed_latest_frames": {
+        "p1": 60,
+        "p2": 60
+      }
+    },
+    "origin": "http://127.0.0.1:43116",
+    "page_errors": [],
+    "peer_pad_frames": [
+      180,
+      181,
+      182,
+      183,
+      184,
+      185,
+      186,
+      187,
+      188,
+      189,
+      190,
+      191,
+      192,
+      193,
+      194,
+      195,
+      196,
+      197,
+      198,
+      199,
+      200,
+      201,
+      202,
+      203
+    ],
+    "peer_pad_frames_received_by_browser": 24,
+    "player_port": 1,
+    "relay_injected_frame_count": 24,
+    "relay_injected_frames": [
+      180,
+      181,
+      182,
+      183,
+      184,
+      185,
+      186,
+      187,
+      188,
+      189,
+      190,
+      191,
+      192,
+      193,
+      194,
+      195,
+      196,
+      197,
+      198,
+      199,
+      200,
+      201,
+      202,
+      203
+    ],
+    "screenshot": "browser/browser-transport.png",
+    "transport_endpoints": {
+      "browser_http_and_websocket": "127.0.0.1:43116/tcp",
+      "local_api_sink": "127.0.0.1:43114/tcp; fail-closed HTTP 503",
+      "matchmaker": "127.0.0.1:43113/udp",
+      "peer_relay": "127.0.0.1:43115/udp"
+    },
+    "webgl": {
+      "available": true,
+      "renderer": "WebKit WebGL",
+      "vendor": "WebKit",
+      "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+    },
+    "websocket_session_id": "587b3c196635967d5884e5002dcc8c0f"
+  },
+  "claim": "A headless local browser sent 24 exact frame-tagged PAD records through the loopback ENet relay into a pinned desktop Slippi peer stream; the browser also received real PAD records from the second desktop peer, and that peer\u2019s existing remote-PAD consumer exposed every injected record byte-for-byte.",
+  "client": {
+    "build_profile": {
+      "audio_backend": "No Audio Output",
+      "bundled_client_matches_build_output": true,
+      "cmake": "3.31.6",
+      "cmake_options_verified": true,
+      "compiler": "Apple clang 21.0.0 (clang-2100.1.1.101)",
+      "generator": "Ninja 1.13.0.git.kitware.jobserver-pipe-1",
+      "headless": true,
+      "matchmaker_release_build_verified": true,
+      "matchmaker_source_freshness_verified": true,
+      "patched_build_source_verified": true,
+      "rust_toolchain": "1.88.0",
+      "video_backend": "Null"
+    },
+    "client_binary_sha256": "ee8d0256795824c13b8e2579dcd8cef3d8daf529b19fb137984a38f8bdda897e",
+    "commit": "41a7a3a110ed52999486ae1901c8fbb9a63d4f13",
+    "downstream_patch_sha256": {
+      "patches/0001-client-loopback-and-observation.patch": "2e599906c58920f4c5089c9749abee51f94ddccd7909fa39aadf78d5a4fa3150",
+      "patches/0002-rust-local-endpoints.patch": "a2a547fe9334edcc44ddd7686936743160aa5b51f66fd0f47a4af05df5b9a1ca"
+    },
+    "game_image_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "game_modification_sha256": "b30b294df5c0d92deb3129afdfbc894a48aabeb1bce0cf92cce8c4e5408a2587",
+    "licensed_source_boundary": "Client patches and generated game modification retain their upstream GPL terms; project-authored relay and browser bridge remain MIT-scoped.",
+    "local_matchmaker_binary_sha256": "7e80c54baf048fd25d60eb2e30cc4d293cc1a6d8a6d33e27f2d261d11b0ce821",
+    "recursive_submodule_pins_verified": true,
+    "repository": "https://github.com/project-slippi/dolphin",
+    "slippi_version": "4.0.0-mainline-beta.19"
+  },
+  "result": "passed",
+  "retained_run": {
+    "artifacts": {
+      "browser-pad-inputs.log": "9dfcf3d766b122959336031d01bec2aa83dfb2408d58fac3997d3c19c9665aa8",
+      "browser-relay-events.jsonl": "3f618841ef724678c640239778afd0061ec7f2281509d31108855c536431f238",
+      "browser-transport-service.jsonl": "732c14c026525f868b76f90eeb457240eb9601364e9b0d0f8fdc4f2a1a4c818d",
+      "browser/browser-evidence.json": "1be66b35709bd25b9d35491651058c8bbda6a30bf47b7aca66e1e9ad94df28dd",
+      "browser/browser-transport.png": "0c9b3e6332fc70b1c2ed54406cdf2b303d0e6998a102092bd6e09c9c87bde454",
+      "evidence.json": "d2831b9cb5d1a197848f4f3b3e16dd0dc37293033eac9ccf0d31655ac613e394",
+      "matchmaker-events.jsonl": "e83eb25c32fa41020dbb1f7125bb06814f53b245a2bb81e81a4bbf01c81c386f",
+      "p1-local-pad-sent.jsonl": "6fae2f883aa82fda4583c776802748d62a6b7d2fc056c95a6112e8720651ac1b",
+      "p2-local-pad-sent.jsonl": "189370207d0ab10a19cf885fbcdf47f49d840e75601008a405ad6aded5a48fae",
+      "p2-remote-pad.jsonl": "794a9654ca3a18914d1eeeb31805d74998db89395ac1db54f16abfb78d9a44f9"
+    },
+    "storage": "external NVMe; absolute operator path intentionally excluded from Git"
+  },
+  "runtime": {
+    "all_observed_network_destinations_loopback_only": true,
+    "cleanup": [
+      {
+        "name": "headless-browser-transport",
+        "process_group_released": true,
+        "returncode": 0
+      },
+      {
+        "name": "client-p2",
+        "process_group_released": true,
+        "returncode": 0
+      },
+      {
+        "name": "client-p1",
+        "process_group_released": true,
+        "returncode": 0
+      },
+      {
+        "name": "local-matchmaker",
+        "process_group_released": true,
+        "returncode": 0
+      },
+      {
+        "name": "local-browser-transport",
+        "process_group_released": true,
+        "returncode": 0
+      }
+    ],
+    "ports_released": true,
+    "process_destinations": {
+      "browser-bridge": [
+        "127.0.0.1:43116",
+        "127.0.0.1:43116->127.0.0.1:61379"
+      ],
+      "browser-test": [],
+      "p1": [
+        "127.0.0.1:41301"
+      ],
+      "p2": [
+        "127.0.0.1:41302"
+      ],
+      "service": [
+        "127.0.0.1:43113",
+        "127.0.0.1:43114",
+        "127.0.0.1:43115"
+      ]
+    },
+    "run_result": "input_probe_complete"
+  },
+  "schema": "melee-web-slippi-browser-desktop-transport-evidence-v1",
+  "scope": {
+    "browser_gameplay_claimed": false,
+    "full_match_or_rematch_claimed": false,
+    "not_established": [
+      "Melee gameplay running in a browser",
+      "general browser-to-desktop cross-play",
+      "rollback correctness",
+      "public Internet or NAT traversal",
+      "official Slippi service integration",
+      "rendering, audio, or physical-controller accuracy"
+    ],
+    "official_service_or_production_claimed": false,
+    "public_internet_or_nat_claimed": false,
+    "rendering_or_audio_accuracy_claimed": false,
+    "rollback_correctness_claimed": false,
+    "scenario": "One fresh local two-client pair, during the first in-game input probe.",
+    "transport": "HTTP page and WebSocket on IPv4 loopback; actual desktop Slippi peer traffic relayed over loopback ENet."
+  },
+  "source_sha256": {
+    "reference-capture/slippi/browser_transport.html": "7d8849bca522e340e885056b5611653774463e4a2c1664a9f8b9032362d9f7a5",
+    "reference-capture/slippi/browser_transport_server.py": "ebdc9cfefe9537bfb1840f84800cca5ab762c9106596fb1431b94f93c389a998",
+    "reference-capture/slippi/browser_transport_test.mjs": "5b27ba35a5cfdcb0630f51396bff5c01f10e4334e6e2c4489252f5d29fb17072",
+    "reference-capture/slippi/local_matchmaker/CMakeLists.txt": "ebfdea970660b80960cfc6cf9cc288cb07b6fb2ee30560e23ba826238848a4f3",
+    "reference-capture/slippi/local_matchmaker/browser_relay.cpp": "583d9ba04238e4cd071793f38b0dd288f4455ab0286b0a327e7ebae1e8f7baea",
+    "reference-capture/slippi/local_matchmaker/browser_relay.hpp": "195851e1c802a2a178e88d4d6b31cb21f75bd1403df9d6f39faf0c2017586097",
+    "reference-capture/slippi/local_matchmaker/server.cpp": "c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a",
+    "reference-capture/slippi/local_matchmaker/tests.cpp": "affc65ba59211580ff8f0c21e2d1f6dcdb0f5b2152f36891981b6a7ae4f46b04",
+    "reference-capture/slippi/run_local.py": "b510a7695e25639c290c3c2f31ade5940fb90e78fe0b34b9c376c5d3453300c9",
+    "reference-capture/slippi/test_browser_transport.py": "a8e1b7e24aa1efe95b7c982680e2f35a0e990546a1963022d0562cfcffd3686e"
+  },
+  "validation": {
+    "browser_transport_python_tests": {
+      "count": 7,
+      "result": "passed"
+    },
+    "local_matchmaker_ctest": {
+      "count": 3,
+      "result": "passed"
+    },
+    "node_syntax_check": "passed",
+    "python_syntax_check": "passed",
+    "repository_unittest_suite": {
+      "environment_note": "The checkout lacks several unrelated pinned source/SDK dependencies, including Aurora and Melee source inputs required by unrelated tests.",
+      "errors": 40,
+      "failures": 8,
+      "ran": 1447,
+      "result": "failed",
+      "scope_note": "The focused Slippi checks passed; the full suite also exercises unrelated source and SDK targets.",
+      "skipped": 176
+    }
+  }
+}
