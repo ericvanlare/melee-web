@@ -20,6 +20,9 @@
 #include "gameplay_bootstrap.h"
 #include <melee/ft/kinds/ftCommon/forward.h>
 #endif
+extern "C" {
+#include <melee/gm/types.h>
+}
 extern "C" int lbAudioAx_80023F28(int);
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
@@ -61,6 +64,7 @@ struct GameplayMatchSession::Storage {
     const MeleeWebPadState* initial_input=nullptr;
     void begin(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
                RuntimeArchiveCache* archive_cache){
+        const bool opening_demo = selection.opening_demo != 0;
         unsigned player_count = selection.player_count != 0
                                     ? selection.player_count
                                     : melee_web_menu_active_player_count(&selection.start);
@@ -72,6 +76,16 @@ struct GameplayMatchSession::Storage {
               "Match player count does not match contiguous source slots");
         check(selection.hud_layout == selection.start.rules.x0_3,
               "Match compatibility settings differ from source payload");
+        if(opening_demo){
+            const auto& rules=selection.start.rules;
+            check(player_count==4&&rules.match_kind<=3&&!rules.timer_enabled&&
+                  rules.time_limit==0&&rules.x1_0==0&&rules.x1_2&&rules.x1_3&&
+                  rules.disable_pausing&&rules.x7==0&&rules.game_speed==1.0f&&
+                  rules.on_match_start!=nullptr&&rules.on_frame_start==nullptr&&
+                  rules.on_frame_end==nullptr&&rules.on_match_end==nullptr&&
+                  rules.x54==nullptr,
+                  "Opening demo requires the authored four-player source VS setup");
+        }
         runtime_files=&files;runtime_cache=archive_cache;selected=selection;
         stage=melee_web_stage_content(selection.start.rules.stkind);
         check(stage!=nullptr,"Match stage has no source runtime owner");
@@ -86,9 +100,17 @@ struct GameplayMatchSession::Storage {
                   "Match compatibility settings differ from source payload");
             const auto* fighter=melee_web_fighter_content(selection.start.players[i].ckind);
             check(fighter&&selection.players[i].controller==i&&
-                  selection.players[i].stocks>=1&&selection.players[i].stocks<=5&&
+                  selection.players[i].stocks>=1&&
+                  selection.players[i].stocks<=(opening_demo?99u:5u)&&
                   selection.players[i].costume<fighter->costumes&&selection.players[i].sub_color<=4,
                   "Match requires supported source player stock/costume selections");
+            if(opening_demo){
+                check(source.slot_type==Gm_PKind_Cpu&&source.cpu_kind==4&&
+                      source.cpu_level==9&&source.team==0&&
+                      (source.slot==0?i:source.slot-1u)==i&&
+                      source.stocks==selection.players[i].stocks,
+                      "Opening demo player differs from its source four-CPU setup");
+            }
             content.fighter_kinds[i]=fighter->fighter_kind;
             content.costume_indices[i]=selection.players[i].costume;
             content.source_players[i]={i,selection.players[i].controller,
@@ -97,10 +119,14 @@ struct GameplayMatchSession::Storage {
                 content.fighter_kinds[i]};
         }
         content.begin_source_match=true;
+        content.opening_demo=opening_demo;
         content.source_camera_subjects=70;
         content.source_random_seed=selection.random_seed;
         content.source_start_data=&selected.start;
-        check(melee_web_vs_mode_begin(),"Original VS mode is already owned");mode_owned=true;
+        if(!opening_demo){
+            check(melee_web_vs_mode_begin(),"Original VS mode is already owned");
+            mode_owned=true;
+        }
         if(selected.save_profile_present){
             saved_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
             saved_stages=*gmMainLib_8015EDA4();
@@ -203,7 +229,14 @@ struct GameplayMatchSession::Storage {
                     catch(const std::exception& e){if(message&&size)std::snprintf(message,size,"%s",e.what());return 0;}
                 },this,error,sizeof(error));check(hud!=nullptr,error);
             check(melee_web_render_use_scene_cameras(render,error,sizeof(error)),error);
-            flow=melee_web_match_flow_begin(error,sizeof(error));check(flow!=nullptr,error);
+            if(selected.opening_demo){
+                check(selected.start.rules.on_match_start!=nullptr,
+                      "Opening demo source callback was lost before its start boundary");
+                selected.start.rules.on_match_start();
+            }
+            flow=melee_web_match_flow_begin(selected.opening_demo,
+                                            error,sizeof(error));
+            check(flow!=nullptr,error);
             construction_phase=5;
         }
         return true;
@@ -220,7 +253,8 @@ struct GameplayMatchSession::Storage {
          * the original fighter state resident while publishing MatchEnd, then
          * let melee_web_match_end tear down the source objects. The rules
          * module retains a bounded terminal snapshot for post-close reports. */
-        if(match)(void)melee_web_match_rules_publish_result();
+        if(match&&!selected.opening_demo)
+            (void)melee_web_match_rules_publish_result();
         if(hud){check(melee_web_hud_end(hud,error,sizeof(error)),error);hud=nullptr;}
         if(world)world->end_stage();
         if(render){check(melee_web_render_end(render,error,sizeof(error)),error);render=nullptr;}
@@ -333,12 +367,14 @@ MeleeWebPipelineSourceContext GameplayMatchSession::provenance_context() const {
 #endif
 bool GameplayMatchSession::ending()const{return storage_&&melee_web_match_flow_ending(storage_->flow);}
 bool GameplayMatchSession::complete()const{return storage_&&melee_web_match_flow_complete(storage_->flow);}
+bool GameplayMatchSession::opening_demo()const{return storage_&&storage_->selected.opening_demo!=0;}
 bool GameplayMatchSession::paused()const{return storage_&&melee_web_match_flow_paused(storage_->flow);}
 uint32_t GameplayMatchSession::source_frames()const{return storage_?melee_web_match_flow_frames(storage_->flow):0;}
 int GameplayMatchSession::hud_damage(unsigned player)const{return storage_?melee_web_hud_damage(storage_->hud,player):-1;}
 bool GameplayMatchSession::ready()const{return storage_&&melee_web_hud_ready(storage_->hud);}
 int GameplayMatchSession::outcome(int& winner)const{
     check(storage_&&storage_->match,"Match session is closed");
+    if(storage_->selected.opening_demo){winner=-1;return 0;}
     const int result=melee_web_match_flow_result(storage_->flow);
     if(result==OUTCOME_NO_CONTEST){winner=-1;return result;}
     return melee_web_match_rules_outcome(&winner);

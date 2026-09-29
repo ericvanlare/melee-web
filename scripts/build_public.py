@@ -85,6 +85,7 @@ RUNTIME_SOURCE_FILES = (
     "src/gameplay_match_session.cpp",
     "src/gameplay_audio.c",
     "src/gameplay_audio_bank.cpp",
+    "src/gameplay_platform.c",
     "src/browser_input.cpp",
     "src/browser_input.h",
     "src/browser_controllers.cpp",

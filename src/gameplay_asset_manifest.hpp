@@ -21,6 +21,17 @@ namespace melee_web {
 [[nodiscard]] std::vector<std::string>
 match_asset_names(const MeleeWebMenuMatchSelection& selection);
 
+// Complete menu plus selected-fighter/stage assets needed to enter one
+// source-selected Opening VS state. The preview is read-only source data; it
+// is not a synthetic StartMeleeData payload.
+[[nodiscard]] std::vector<std::string>
+opening_match_asset_names(const MeleeWebOpeningPreview& preview);
+
+// Complete menu/audio scope plus the exact authored THP stream selected by
+// one Opening-mode movie state. VS states require opening_match_asset_names.
+[[nodiscard]] std::vector<std::string>
+opening_state_asset_names(unsigned state_id);
+
 // Logical RuntimeFiles names for the original Results scene that follows one
 // checked source VS selection. It repeats the match compatibility checks and
 // adds the authored GmRst roots, per-fighter result-motion archives and the

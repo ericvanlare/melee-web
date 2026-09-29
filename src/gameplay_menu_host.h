@@ -24,7 +24,24 @@ typedef struct MeleeWebMenuMatchSelection {
      * means an older diagnostic did not record a profile; it is not all-unlocked. */
     uint16_t unlocked_characters, unlocked_stages;
     uint8_t save_profile_present;
+    /* Set only for the source Title attract demo. This keeps its authored
+     * mode/callback and 99-stock payload separate from ordinary VS rules. */
+    uint8_t opening_demo;
 } MeleeWebMenuMatchSelection;
+typedef struct MeleeWebOpeningPreview {
+    uint32_t characters[4];
+    uint32_t costumes[4];
+    uint32_t stage_kind;
+    uint32_t match_kind;
+} MeleeWebOpeningPreview;
+enum {
+    MELEE_WEB_MENU_HOST_SCENE_CSS = 1,
+    MELEE_WEB_MENU_HOST_SCENE_SSS = 2,
+    MELEE_WEB_MENU_HOST_SCENE_TITLE = 3,
+    MELEE_WEB_MENU_HOST_SCENE_MAIN = 4,
+    MELEE_WEB_MENU_HOST_SCENE_OPENING = 5,
+    MELEE_WEB_MENU_HOST_SCENE_OPENING_VS = 6,
+};
 /* Owns source selection across separate CSS, SSS and match SDK worlds.
  * Enter only after GameplayMenuWorld has published its native assets. */
 MeleeWebMenuHost* melee_web_menu_host_create(char*,size_t);
@@ -34,6 +51,19 @@ int melee_web_menu_host_enter(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
  * they do not synthesize a browser menu. */
 int melee_web_menu_host_enter_title(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
 int melee_web_menu_host_enter_main(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
+/* Opening mode uses the original state table. Preview is read-only source
+ * selection data used to request the exact assets before preload/OnEnter. */
+int melee_web_menu_host_opening_preview(const MeleeWebMenuHost*,
+    MeleeWebOpeningPreview*,char*,size_t);
+int melee_web_menu_host_enter_opening(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
+int melee_web_menu_host_opening_selection(const MeleeWebMenuHost*,
+    MeleeWebMenuMatchSelection*,char*,size_t);
+int melee_web_menu_host_opening_match_suspend(MeleeWebMenuHost*,char*,size_t);
+int melee_web_menu_host_opening_match_finish(MeleeWebMenuHost*,uint32_t,
+    const uint8_t[MELEE_WEB_PAD_STATE_BYTES],char*,size_t);
+int melee_web_menu_host_opening_match_abort(MeleeWebMenuHost*,char*,size_t);
+const MeleeWebPadState* melee_web_menu_host_opening_input(const MeleeWebMenuHost*);
+int melee_web_menu_host_opening_target_state(const MeleeWebMenuHost*);
 /* Install the copied first-CSS source context before the initial scene is
  * entered.  Rules/save ranges are observer PowerPC bytes and are translated
  * by the save/profile owner; the PAD state is semantic wire data and is

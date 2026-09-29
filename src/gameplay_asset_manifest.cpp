@@ -57,6 +57,11 @@ constexpr auto kMatchCommonAudio = std::to_array<std::string_view>({
     throw DatError(message);
 }
 
+[[noreturn]] void reject(const std::string& message)
+{
+    throw DatError(message);
+}
+
 void add_unique(std::vector<std::string>& result, std::string_view name)
 {
     if (name.empty()) reject("Asset descriptor contains an empty logical name");
@@ -270,6 +275,92 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection)
     add_unique(result, stage->archive);
     if (stage->audio_bank) add_unique(result, stage->audio_bank);
     add_stage_music(result, stage->stage_kind);
+    return result;
+}
+
+std::vector<std::string>
+opening_match_asset_names(const MeleeWebOpeningPreview& preview)
+{
+    std::vector<std::string> result = menu_asset_names();
+    std::vector<unsigned> fighter_kinds;
+    if (preview.match_kind > 3)
+        reject("Opening mode selected an unknown source match kind");
+    for (const auto name : kMatchCommonAudio) add_unique(result, name);
+    for (unsigned i = 0; i < 4; ++i) {
+        const auto* fighter = melee_web_fighter_content(
+            static_cast<int>(preview.characters[i]));
+        if (!fighter)
+            reject("Opening demo source fighter " +
+                   std::to_string(preview.characters[i]) +
+                   " is not admitted by the browser runtime");
+        if (preview.costumes[i] >= fighter->costumes)
+            reject("Opening demo source costume exceeds its authored fighter table");
+        if (!source_costume(fighter->fighter_kind, 0) ||
+            !source_costume(fighter->fighter_kind, preview.costumes[i]))
+            reject("Opening demo source costume is absent from the generated registry");
+        if (std::find(fighter_kinds.begin(), fighter_kinds.end(),
+                      static_cast<unsigned>(fighter->fighter_kind)) ==
+            fighter_kinds.end())
+            fighter_kinds.push_back(static_cast<unsigned>(fighter->fighter_kind));
+    }
+    const auto* stage = melee_web_stage_content(
+        static_cast<int>(preview.stage_kind));
+    if (!stage)
+        reject("Opening demo source stage " +
+               std::to_string(preview.stage_kind) +
+               " is not admitted by the browser runtime");
+    for (const auto fighter_kind : fighter_kinds) {
+        const auto* fighter = melee_web_fighter_content_by_kind(fighter_kind);
+        const auto* neutral = source_costume(fighter_kind, 0);
+        if (!fighter || !neutral)
+            reject("Opening demo source fighter identity is incomplete");
+        add_unique(result, neutral->fighter_filename);
+        add_unique(result, neutral->animation_filename);
+        add_unique(result, runtime_name(neutral->model_filename));
+        add_unique(result, fighter->effect_archive);
+        add_unique(result, fighter->audio_bank);
+        for (unsigned i = 0; i < 4; ++i) {
+            const auto* selected = melee_web_fighter_content(
+                static_cast<int>(preview.characters[i]));
+            if (selected->fighter_kind != static_cast<int>(fighter_kind))
+                continue;
+            const auto* costume = source_costume(
+                fighter_kind, preview.costumes[i]);
+            if (!costume)
+                reject("Opening demo costume has no authored source model");
+            add_unique(result, runtime_name(costume->model_filename));
+        }
+    }
+    add_unique(result, "PlCo.dat");
+    add_unique(result, "ItCo.usd");
+    add_unique(result, "EfCoData.dat");
+    add_unique(result, "PdPm.dat");
+    add_unique(result, "LbRb.dat");
+    add_unique(result, "LbRf.dat");
+    add_unique(result, "sislib_font.bin");
+    add_unique(result, "IfAll.usd");
+    add_unique(result, "IfCoGet.dat");
+    add_unique(result, "SdIntro.dat");
+    add_unique(result, "GmPause.usd");
+    add_unique(result, "LbBf.dat");
+    add_unique(result, stage->archive);
+    if (stage->audio_bank) add_unique(result, stage->audio_bank);
+    add_stage_music(result, stage->stage_kind);
+    return result;
+}
+
+std::vector<std::string> opening_state_asset_names(unsigned state_id)
+{
+    std::vector<std::string> result = menu_asset_names();
+    switch (state_id) {
+    case 0: add_unique(result, "MvOpen.mth"); break;
+    case 2: break; // Original Title screen and its menu/audio dependencies.
+    case 4: add_unique(result, "MvHowto.mth"); break;
+    case 5: add_unique(result, "MvOmake15.mth"); break;
+    default:
+        reject("Opening state " + std::to_string(state_id) +
+               " does not have a standalone menu/movie asset scope");
+    }
     return result;
 }
 

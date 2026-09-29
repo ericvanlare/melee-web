@@ -53,13 +53,19 @@ extern "C" {
 namespace {
 melee_web::RuntimeFiles files;
 melee_web::RuntimeAssetScope asset_scope(files);
-enum class AssetDestination { None, InitialMenu, Match, ReturnMenu, Replay, Results, Prize };
+enum class AssetDestination {
+ None, InitialMenu, Match, ReturnMenu, Replay, Results, Prize,
+ OpeningScene, OpeningMatch, TitleReturn
+};
 AssetDestination asset_destination=AssetDestination::None;
 bool scoped_assets=false,asset_committed=false;
 uint32_t asset_generation=0;
 std::vector<std::string> requested_assets;
 MeleeWebMenuMatchSelection asset_selection{};
 bool asset_selection_valid=false;
+MeleeWebOpeningPreview asset_opening_preview{};
+bool asset_opening_preview_valid=false;
+int pending_opening_state=-1;
 std::unique_ptr<melee_web::RuntimeArchiveCache> archive_cache;
 std::unique_ptr<melee_web::GameplayMenuWorld> world;
 bool source_session_owned=false;
@@ -428,13 +434,24 @@ void close(){
 #endif
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  char error[256]{};running=false;pending=false;preparation.reset();menu_clock.reset();
- if(match){match->close();match.reset();}
+ if(match){
+  const bool opening_demo=match->opening_demo();
+  match->close();match.reset();
+  if(opening_demo&&host){
+   check(melee_web_menu_host_opening_match_abort(host,error,sizeof(error)),error);
+   pending_opening_state=-1;
+  }
+ }
  if(results){results->close();results.reset();}
  if(prize){prize->close();prize.reset();}
  if(world){
-  if(host_entered){check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);host_entered=false;}
+  if(host_entered){check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);host_entered=false;pending_opening_state=-1;}
   if(world_exposed)world->close();else world->close_prepared();
   world.reset();world_exposed=false;
+ }
+ if(host&&!host_entered&&pending_opening_state>=0){
+  check(melee_web_menu_host_opening_match_abort(host,error,sizeof(error)),error);
+  pending_opening_state=-1;
  }
  if(host){check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;}
 if(scoped_assets){
@@ -444,6 +461,7 @@ if(scoped_assets){
   asset_destination=AssetDestination::None;asset_generation=0;asset_committed=false;
   requested_assets.clear();
   asset_selection_valid=false;
+  asset_opening_preview_valid=false;
  }
  results_route_active=false;
  prize_route_active=false;
@@ -456,7 +474,7 @@ if(scoped_assets){
   melee_web::retail_replay_end(replay->frames.size(),replay->whole_session());
  replay.reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
- audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;audio_clock.reset();clear_diagnostic_pad();
+ audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();
  match_message="Original source match";
  terminal_match_observation.clear();
  if(had_lifetime){
@@ -467,7 +485,9 @@ if(scoped_assets){
  }
 }
 void request_assets(AssetDestination destination,
-                    const MeleeWebMenuMatchSelection* selection=nullptr){
+                    const MeleeWebMenuMatchSelection* selection=nullptr,
+                    const MeleeWebOpeningPreview* opening_preview=nullptr,
+                    int opening_state=-1){
  check(!world&&!match&&!host_entered&&!results&&!prize,
        "Close source asset owners before requesting a scope");
  std::vector<std::string> names;
@@ -480,6 +500,13 @@ void request_assets(AssetDestination destination,
   check(asset_selection_valid,"Results assets require the completed match selection");
   names=melee_web::results_asset_names(asset_selection);break;
  case AssetDestination::Prize: names=melee_web::prize_asset_names();break;
+ case AssetDestination::OpeningScene:
+  check(opening_state>=0,"Opening scene asset scope requires a source state");
+  names=melee_web::opening_state_asset_names(static_cast<unsigned>(opening_state));break;
+ case AssetDestination::OpeningMatch:
+  check(opening_preview!=nullptr,"Opening VS asset scope requires a source preview");
+  names=melee_web::opening_match_asset_names(*opening_preview);break;
+ case AssetDestination::TitleReturn: names=melee_web::menu_asset_names();break;
  default: names=melee_web::menu_asset_names();break;
  }
  // The host retains only its copied selection and RNG lease. All owners that
@@ -491,6 +518,8 @@ void request_assets(AssetDestination destination,
  asset_generation=asset_scope.request(requested_assets);
  asset_destination=destination;asset_committed=false;
  if(selection){asset_selection=*selection;asset_selection_valid=true;}
+ if(opening_preview){asset_opening_preview=*opening_preview;asset_opening_preview_valid=true;}
+ if(opening_state>=0)pending_opening_state=opening_state;
  running=false;menu_clock.reset();audio_clock.reset();
  EM_ASM({window.menuAssetScopeReleased?.({files:$0,bytes:$1,remainingFiles:$2});},
         released_files,released_bytes,files.size());
@@ -528,6 +557,92 @@ void enter_world(){
  first_use_draw_pending=true;
  menu_clock.reset();audio_phase=0;audio_clock.reset();running=true;
  message=melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+}
+void release_menu_world(){
+ if(!world)return;
+ check(!host_entered,"Release a source menu scene before retiring its world");
+ report_owner_lifetime("opening-before-menu-world-retire");
+ world->close();world.reset();world_exposed=false;
+ report_owner_lifetime("opening-after-menu-world-retire");
+}
+void enter_title_after_opening(){
+ char error[256]{};
+ if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
+ world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
+ const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+ check(melee_web_menu_host_enter_title(host,world->audio(),error,sizeof(error)),error);
+ host_entered=true;world_exposed=true;pending_opening_state=-1;
+ report_construction("opening-title-return",started,emscripten_get_now(),
+                     emscripten_get_now(),before,aurora_stats_snapshot());
+ first_use_draw_pending=true;menu_clock.reset();audio_phase=0;audio_clock.reset();
+ running=true;message="Original title";
+}
+void enter_opening_state(int state){
+ char error[256]{};
+ check(state>=0,"Original Opening route has no source-selected state");
+ pending_opening_state=state;
+ if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
+ world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
+ const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+ check(melee_web_menu_host_enter_opening(host,world->audio(),error,sizeof(error)),error);
+ host_entered=true;world_exposed=true;
+ report_construction("opening-state-enter",started,emscripten_get_now(),
+                     emscripten_get_now(),before,aurora_stats_snapshot());
+ if(state==1||state==3){
+  MeleeWebMenuMatchSelection selection{};
+  check(melee_web_menu_host_opening_selection(host,&selection,error,sizeof(error)),error);
+  if(asset_opening_preview_valid){
+   check(selection.start.rules.stkind==asset_opening_preview.stage_kind&&
+         selection.start.rules.match_kind==asset_opening_preview.match_kind,
+         "Opening VS assets differ from the retained source-selected preview");
+   for(unsigned i=0;i<4;++i)
+    check(selection.start.players[i].ckind==asset_opening_preview.characters[i]&&
+          selection.start.players[i].color==asset_opening_preview.costumes[i],
+          "Opening VS fighter assets differ from the retained source-selected preview");
+  }
+  asset_opening_preview_valid=false;
+  const MeleeWebPadState* input=melee_web_menu_host_opening_input(host);
+  check(input!=nullptr,"Opening source state did not retain its original PAD history");
+  check(melee_web_menu_host_opening_match_suspend(host,error,sizeof(error)),error);
+  host_entered=false;
+  world->close();world.reset();world_exposed=false;
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+  melee_web::pipeline_preparation::match(selection);
+#endif
+  const double match_started=emscripten_get_now();const AuroraStats match_before=aurora_stats_snapshot();
+  match=std::make_unique<melee_web::GameplayMatchSession>(
+      files,selection,*archive_cache,melee_web::GameplayMatchConstruction::Deferred,*input);
+  report_construction("opening-match-enter-step",match_started,
+                      emscripten_get_now(),emscripten_get_now(),match_before,
+                      aurora_stats_snapshot());
+  match_message=selected_match_message(selection);
+  running=false;message="Preparing original Title demo...";
+  return;
+ }
+ first_use_draw_pending=true;menu_clock.reset();audio_phase=0;audio_clock.reset();
+ running=true;message=state==2?"Original title":"Original Opening movie";
+ asset_opening_preview_valid=false;
+}
+void begin_opening_state(int state){
+ check(state>=0,"Original Title timeout did not select an Opening state");
+ release_menu_world();
+ pending_opening_state=state;
+ if(state==1||state==3){
+  MeleeWebOpeningPreview preview{};char error[256]{};
+  check(melee_web_menu_host_opening_preview(host,&preview,error,sizeof(error)),error);
+  if(scoped_assets){request_assets(AssetDestination::OpeningMatch,nullptr,&preview,state);return;}
+  asset_opening_preview=preview;asset_opening_preview_valid=true;
+  enter_opening_state(state);return;
+ }
+ asset_opening_preview_valid=false;
+ if(scoped_assets){request_assets(AssetDestination::OpeningScene,nullptr,nullptr,state);return;}
+ enter_opening_state(state);
+}
+void begin_title_return(){
+ release_menu_world();
+ pending_opening_state=-1;
+ if(scoped_assets){request_assets(AssetDestination::TitleReturn);return;}
+ enter_title_after_opening();
 }
 void begin_menu_scene_rebuild(melee_web::GameplayMenuScene scene,
                               MenuRouteEntry entry){
@@ -605,6 +720,21 @@ void advance(){
   pending=false;enter_world();return;
  }
  if(match){
+  if(match->opening_demo()){
+   report_owner_lifetime("opening-match-before-teardown");
+   const uint32_t seed=match->random_seed();
+   uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(final_input);
+   match->close();match.reset();
+   report_owner_lifetime("opening-match-after-teardown");
+   check(melee_web_menu_host_opening_match_finish(
+       host,seed,final_input,error,sizeof(error)),error);
+   const int target=melee_web_menu_host_route_target_mode(host);
+   if(target==GM_TITLE){begin_title_return();return;}
+   check(target==GM_OPENING_MV,
+         "Original Opening demo selected an unsupported source mode");
+   const int state=melee_web_menu_host_opening_target_state(host);
+   begin_opening_state(state);return;
+  }
   terminal_match_observation=melee_web_native_menu_match_observe();
   report_owner_lifetime("match-before-teardown");
   const bool checking_stock=stock_check==-1;
@@ -662,6 +792,8 @@ void advance(){
  pending_menu_source_scene=0;
  if(host_entered){check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);host_entered=false;}
  const int route_target=melee_web_menu_host_route_target_mode(host);
+ if(previous_source_scene==MELEE_WEB_MENU_HOST_SCENE_TITLE&&
+    route_target!=GM_OPENING_MV)pending_opening_state=-1;
  if((previous_source_scene==1&&route_target==1)||
     (previous_source_scene==3&&route_target==1)){
   begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Main,MenuRouteEntry::Main);
@@ -682,7 +814,16 @@ void advance(){
   begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Characters,entry);
   return;
  }
- if((previous_source_scene==1||previous_source_scene==3||previous_source_scene==4)&&
+ if((previous_source_scene==MELEE_WEB_MENU_HOST_SCENE_TITLE||
+     previous_source_scene==MELEE_WEB_MENU_HOST_SCENE_OPENING)&&
+    route_target==GM_OPENING_MV){
+  begin_opening_state(melee_web_menu_host_opening_target_state(host));
+  return;
+ }
+ if(previous_source_scene==MELEE_WEB_MENU_HOST_SCENE_OPENING&&
+    route_target==GM_TITLE){begin_title_return();return;}
+ if((previous_source_scene==1||previous_source_scene==3||previous_source_scene==4||
+     previous_source_scene==MELEE_WEB_MENU_HOST_SCENE_OPENING)&&
     route_target>=0){
   if(previous_source_scene==3){
    const int opening_state=melee_web_menu_host_route_target_state(host);
@@ -730,6 +871,17 @@ bool finish_asset_handoff(){
  const auto destination=asset_destination;
  asset_destination=AssetDestination::None;asset_committed=false;
  if(destination==AssetDestination::ReturnMenu){enter_world();return true;}
+ if(destination==AssetDestination::TitleReturn){enter_title_after_opening();return true;}
+ if(destination==AssetDestination::OpeningScene||
+    destination==AssetDestination::OpeningMatch){
+  check(pending_opening_state>=0,
+        "Opening asset handoff lost its source-selected state");
+  if(destination==AssetDestination::OpeningMatch)
+   check(asset_opening_preview_valid,
+         "Opening VS asset handoff lost its source-selected preview");
+  enter_opening_state(pending_opening_state);
+  return destination==AssetDestination::OpeningScene;
+ }
  if(destination==AssetDestination::Results){
   check(results_input!=nullptr,"Original Results input was not retained across the asset handoff");
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
@@ -1212,7 +1364,13 @@ void tick(){
      if(outcome)check(outcome==OUTCOME_ELIMINATION&&stock_count==0&&stock_respawns==3,"Stock diagnostic: unexpected source outcome");
      if(!match->complete())check(stock_tick<4000,"Stock diagnostic: no source exit after 4000 ticks");
     }
-    if(match->complete()&&(!replay||replay_whole)){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
+    if(match->complete()&&(!replay||replay_whole)){
+     if(match->opening_demo()){
+      pending=true;result=3;
+     }else{
+      check(outcome,"Original match transitioned without an outcome");pending=true;result=3;
+     }
+    }
    }
    else if(results){results->tick(sample);source_frames.did_step();if(results->requested())result=3;}
    else if(prize){prize->tick(sample);source_frames.did_step();if(prize->requested())result=3;}
