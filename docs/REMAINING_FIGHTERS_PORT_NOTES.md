@@ -5,15 +5,17 @@
 These six selectable characters (seven source forms including Zelda/Sheik) are
 an unfinished development candidate, not admitted or fully playable. Real-asset
 construction, targeted distinctive actions, two rendered four-CPU9 match loops
-per requested lineup, and repeatable original references are now available.
-The browser matches are functional rendered evidence, not original equivalence.
-The historical whole-session replays stopped at scene mismatches; their
-harness did not establish the earliest gameplay-state divergence. The recorded-
-session comparator identifies the first mismatch only among its declared
-captured gameplay fields and input scope; it does not compare raw CPU blocks,
-port draw state, pixels, or live scheduling. The Samus-donor palette now
-resolves through a checked cross-archive source-address map; particle-pixel use
-remains unverified.
+per requested lineup, repeatable original references, and exact declared-field
+gameplay comparison receipts are available. Those state receipts are hash-bound
+to earlier source builds and are not relabeled as current-main validation. The
+whole-session browser recipe harness checks consumed-input scene ownership and
+progress, not simulation fields or draw state; some recorded-input replays stop
+at scene mismatches. The exact state receipts do not compare raw CPU blocks,
+port draw state, pixels, PCM, or live scheduling. A full original A/B recipe
+comparison has not been rerun on the reconciled current tree. The historical
+Results camera-pool failure remains unresolved. The Samus-donor palette resolves
+through a checked cross-archive source-address map; particle-pixel use remains
+unverified.
 
 Evidence labels follow the
 [performance/accuracy playbook](PERFORMANCE_AND_ACCURACY.md). Raw disc data,
@@ -498,6 +500,30 @@ The isolated pre-change patch confirms the old placement was correct.
 placement check fails before and passes after. This failure remains retained,
 not credited to the shared runtime task.
 
+## Reduced browser crashes
+
+The former Lineup-A item-draw OOB was not attributed from lineup membership
+alone. At source cursor 1640, the failing object was item kind 114,
+`It_Kind_GameWatch_Greenhouse`, spawned by Game & Watch Attack11 motion 341.
+The item renderer reached its dynamic-hide bone walk after `it_8026EECC`'s
+draw dispatch; `DatItemArticle` had exposed big-endian source visibility
+fields as native counters/pointers. The source-faithful native article owner
+now decodes and retains those fields. Its real-asset regression covers all ten
+Game & Watch source Articles, order/bytes, source immutability and teardown;
+the A browser route advances beyond cursor 1640 without recurrence. This does
+not claim a pixel comparison.
+
+The former Lineup-B `ftCo_CatchWait_IASA` assertion was also reduced to the
+actual fighter and operation. Samus (kind 13) was in `ftCo_MS_CatchWait`
+(motion 216) with a live victim; the throw transition (motion 222) called
+`ftSs_Init_CreateThrowGrappleBeam`, which read absent `x48_items[4]`. The
+source `ftDataSamus.x48` has five entries; the fifth is the grapple joint plus
+four throw-animation references, including 25 sibling `JOBJ_INSTANCE`
+identities. The real-asset owner now preserves that joint graph and references;
+the focused regression validates its 34 joints and all 25 identities, and the
+B route advances beyond cursor 1614. These fixes are separate from the
+historical Sheik-winner Results camera-pool teardown failure below.
+
 ## Character action checklist
 
 Construction results refer to real-asset source traces that execute source ticks
@@ -655,37 +681,62 @@ or draw match. Its scheduling scope is also per-tick with equivalence not
 evaluated; this is a bounded control receipt, not evidence that the new-fighter
 comparisons pass.
 
-## Remaining gates
+## Remaining gates (reconciled checkpoint, 2026-09-29)
 
-1. Resolve the historical natural Results camera-pool failure. The current
-   source-tick path has a rendered natural slot-2 Zelda-origin Sheik winner and
-   a native MatchExitInfo→Results reducer; the exact tick-560 keyboard-gated
-   Sheik pass predates typed allocator-event telemetry. A newer four-match
-   all-CPU9 tick-560 event-telemetry capture passed Results→CSS every time but
-   produced Samus, Samus, Falco and Yoshi winners, not Sheik. The historical
-   packet lacks trusted key brackets, consumed PAD/page state, controller
-   status and camera-entry pointers. Neither current capture identifies its
-   first invalid transition. Do not repeat an unchanged long sample or claim
-   resolution from these separate non-reproductions; continue from a bounded
-   source-level review of the historical writer boundary.
-2. The shield-SDI candidate's full B reference replay and exact declared-field
-   comparisons now pass for every captured gameplay row. The fresh A two-match
-   and B four-match browser loops are retained; complete final affected
-   builds/full tests and the supported original comparison. Main including #89 is already integrated;
-   source-context, owned stack-profile and ownership checks pass on that base.
-   Reduce any new first mismatch before extending another run. Keep the separate
-   broader-equivalence/tick-1776 investigation with its existing owner.
-3. Broaden focused moves/recovery/damage/KO coverage where still listed above.
-   The 25-row Kirby acquisition/use/loss/reacquisition/teardown matrix is now
-   complete; do not infer full movesets, donor-specific KO paths, or particle
-   pixels from that result or CPU9 matches. The captured Samus copied-special
-   interval did not call the bank-34 particle generator or wrapped-address TLUT;
-   this scoped negative does not establish all particle visuals.
-4. Keep pixels, PCM, foreground scheduling, physical controllers, performance
-   and admission separate and unclaimed.
+1. The historical natural Sheik-winner Results camera-pool failure is
+   unresolved. Its retained report is from source checkout `607ff56`, has only
+   a served-Wasm hash rather than a source/build binding, and records the late
+   teardown ownership error without consumed PAD/page/port or camera-list
+   snapshots. Current-tree controls include a natural Sheik-winner return that
+   predates typed list telemetry and a newer exact three-pulse, no-retry
+   Lineup-B capture with 19 camera-subject events; the latter's natural winner
+   was Samus and its Zelda slot was not Sheik. All observed current-list links
+   were pool-contained and teardown restored null roots, but this does not
+   locate the historical first bad write. The bounded review in
+   `work/pr86-results-camera-review-v3.md` found no defensible causal
+   attribution or smaller discriminator from the retained historical packet.
+   Do not call the error fixed or repeat a non-target long match as a
+   substitute. This remains an explicit review limitation.
+2. Comparison claims remain harness-specific and source-bound. The repeatable
+   original A/B captures retain source-consumed input and source state/draw
+   records. The whole-session browser recipe harness replays recorded PAD
+   per tick, lets CPU decisions recompute, and checks scene/progress; older
+   attempts stopped at source Results versus port Match (A input 13,414; B
+   input 13,329). Later frozen-source comparisons agree on all captured
+   declared gameplay rows for their retained A/B scopes, but `complete=false`:
+   CPU blocks and port draw state are not captured or compared, and they
+   establish no pixel, PCM, cadence, or scheduling equivalence. A complete
+   original A/B recipe comparison has not been rerun on the reconciled current
+   tree; do not relabel the frozen-source results. Preserve these distinctions
+   rather than describing scene agreement as simulation or rendering
+   equivalence.
+3. Current reconciled validation is complete for the declared integration
+   checkpoint: affected builds and source-context/collision/owned-DOL stack,
+   common-context, archive, stage-numeric, effect-bank, texture/native-joint,
+   Results, and character tests passed; the owned-input full suite passed
+   1,642 tests with 73 skips. Both requested A/B lineups completed two natural
+   headless rendered CPU9 matches each through Results→original CSS→the next
+   match, and Zelda/Sheik repeated down-B transformations were recorded.
+   Kirby's 25 non-null donor rows passed targeted acquisition, donor-specific
+   use, up-appeal loss, reacquisition, and teardown. Ice Climbers separation,
+   Nana death/Popo continuation/rejoin, and Yoshi victim capture/release also
+   passed their targeted checks. These are scoped functional results, not full
+   movesets or performance acceptance.
+4. Per-character open action coverage remains as listed in the table above:
+   other normals/defense/off-stage recovery and broader damage/KO cases; other
+   donor-specific Kirby KO/random-loss paths and complete donor costume-graph
+   construction; effect-specific particle pixels; and optional Link/Pikachu
+   effect-archive checks whose local archives are absent. Do not infer these
+   from CPU9 matches or the 25-row copy lifecycle matrix.
+5. Pixels, PCM, foreground timing, physical controllers, live performance,
+   full simulation/draw equivalence, and roster admission remain separate and
+   unclaimed. The broader full-session/tick-1776 investigation belongs to its
+   existing task and is not duplicated here.
 
 PR #86 remains the single open PR. No merge or deployment has been made.
-Evidence does not support “fully playable,” equivalence, or task completion.
+Evidence does not support “fully playable,” full equivalence, or task
+completion while the historical Results failure and listed acceptance limits
+remain open.
 
 ## Reconciled-head natural Sheik-winner Results discriminator (2026-09-27)
 
