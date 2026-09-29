@@ -203,6 +203,10 @@ instances sustaining the required cadence on this machine remains unmeasured.
 The repository's [reference Dolphin builder](../scripts/build_reference_dolphin.py)
 already describes a headless build route, but that separately pinned vanilla
 reference is not evidence that a selected Slippi build passes this gate.
+The later pinned private-client runner and local launch command are documented
+in the [Slippi local testbed guide](../reference-capture/slippi/LOCAL_TESTBED.md).
+Its generated integration receipt is the acceptance evidence for the
+two-client match/rematch claim; a client build or pairing alone is not.
 
 Source inspection favors the newer `project-slippi/dolphin` fork for this Mac.
 Its [no-GUI build](https://github.com/project-slippi/dolphin/blob/41a7a3a110ed52999486ae1901c8fbb9a63d4f13/Source/Core/DolphinNoGUI/CMakeLists.txt)
@@ -221,11 +225,14 @@ per-frame input delivery on this machine still need verification. Headless mode
 cannot be assumed to accept desktop keyboard automation. Prove the input bridge
 before attempting timed pairing or full matches.
 
-This milestone establishes local functional evidence only. Loopback does not
-exercise NAT hole punching, Internet path selection or geographic latency;
-same-host CPU contention also differs from two players on separate machines.
-Cross-network operation and browser interoperability remain later gates. A
-passing headless pair does not admit Melee Web gameplay or foreground timing.
+The initial local connectivity and lifecycle milestone is now demonstrated by
+the [scoped receipt](evidence/local-slippi-connectivity-v1.json) and
+[testbed guide](../reference-capture/slippi/LOCAL_TESTBED.md). It establishes
+local functional evidence only. Loopback does not exercise NAT hole punching,
+Internet path selection or geographic latency; same-host CPU contention also
+differs from two players on separate machines. Cross-network operation and
+browser interoperability remain later gates. A passing headless pair does not
+admit Melee Web gameplay or foreground timing.
 
 ## Second milestone: controlled rollback validation
 
