@@ -983,6 +983,12 @@ try {
         'Oversized import leaves the committed mode and Personal profile unchanged');
       assert.equal(await page.evaluate(() => window.nativeLaunchCalls), launchCountBeforeRejectedFiles,
         'Oversized import does not restart the loaded source session');
+      assert(await page.locator('#error-dialog[open]').count(),
+        'The user receives an actionable error for an oversized import');
+      await page.locator('#error-close').click();
+      await page.locator('#error-dialog[open]').waitFor({state: 'hidden'});
+      assert(await page.locator('#status').isHidden(),
+        'Dismissing a recoverable oversized-import error clears its stale toolbar alert');
 
       await page.locator('#load-save').click();
       await page.locator('#save-file').setInputFiles({name: 'malformed.gci',
@@ -997,6 +1003,12 @@ try {
         'Malformed import leaves the committed mode and Personal profile unchanged');
       assert.equal(await page.evaluate(() => window.nativeLaunchCalls), launchCountBeforeRejectedFiles,
         'Malformed import does not restart the loaded source session');
+      assert(await page.locator('#error-dialog[open]').count(),
+        'The user receives an actionable error for malformed exact-size input');
+      await page.locator('#error-close').click();
+      await page.locator('#error-dialog[open]').waitFor({state: 'hidden'});
+      assert(await page.locator('#status').isHidden(),
+        'Dismissing a recoverable malformed-save error clears its stale toolbar alert');
 
       assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
       await page.locator('#save-mode').selectOption('personal');

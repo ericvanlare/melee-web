@@ -293,7 +293,7 @@ $('status').onclick = () => {
   if (currentError || state?.state === 'error') showError(currentError || state.message, state?.requiresReload);
   else if (state?.paused) showError(state.message);
 };
-$('error-close').onclick = () => { $('error-dialog').close(); player?.focus(); };
+$('error-close').onclick = () => { clearError(); renderStatus(state); player?.focus(); };
 const audioInfo = $('audio-info'), audioDetails = $('audio-details');
 function setAudioDetails(open) {
   audioDetails.classList.toggle('audio-details-open', open);

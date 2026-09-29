@@ -578,6 +578,8 @@ try {
   assert.equal(recovery.document.getElementById('start-game').disabled, false,
     'A browser audio gesture failure leaves the explicit recovery action available');
   recovery.document.getElementById('error-close').click();
+  assert.equal(recovery.document.getElementById('status').hidden, true,
+    'Dismissing a recoverable error clears the stale toolbar alert');
   await recovery.document.getElementById('start-game').click();
   assert.equal(recoveryAttempts, 1, 'Play starts only after the user requests recovery');
 } finally { delete globalThis.testClickTrace; restoreRecovery(); }
