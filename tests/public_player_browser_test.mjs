@@ -256,9 +256,7 @@ try {
       assert.equal(await page.locator('#audio-note,#audio-info,#audio-details').count(), 0);
     } else assert.equal(await page.locator('#audio-note').textContent(), 'no audio ⓘlicensing issue, need to remove about 50 lines of Dolphin audio code still');
     assert.deepEqual(await page.locator('#toolbar > *').evaluateAll(nodes => nodes.map(node => node.id)),
-      ['toolbar-brand', 'toolbar-actions', 'fullscreen-status', 'toolbar-meta']);
-    assert.equal(await page.locator('#fullscreen-status').isVisible(), false,
-      'The empty fullscreen status message does not occupy visible toolbar space');
+      ['toolbar-brand', 'toolbar-actions', 'toolbar-meta']);
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_replay_begin), 'undefined');
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_diagnostics), 'undefined');
     assert.equal(await page.evaluate(() => typeof window.menuObservePlayer), 'undefined');
@@ -711,22 +709,26 @@ try {
       if (width === 390) await shot('mobile');
     }
     await page.setViewportSize({width: 1280, height: 960});
-    if (await page.locator('#fullscreen').isEnabled()) {
+    const fullscreenAvailable = await page.evaluate(() => document.fullscreenEnabled === true &&
+      typeof document.querySelector('#player').requestFullscreen === 'function' &&
+      typeof document.exitFullscreen === 'function');
+    assert.equal(await page.locator('#fullscreen').isVisible(), fullscreenAvailable,
+      'Fullscreen is visible only when the native API is supported');
+    assert.equal(await page.locator('#fullscreen-status').count(), 0,
+      'The page has no persistent fullscreen explanation');
+    assert.equal(await page.getByRole('button', {name: 'Expand player'}).count(), 0,
+      'The page has no expansion fallback');
+    assert.doesNotMatch(await page.locator('body').innerText(), /browser controls remain visible|fullscreen unavailable/i);
+    if (fullscreenAvailable) {
       await page.locator('#fullscreen').click();
-      await page.waitForFunction(() => !!document.fullscreenElement ||
-        document.querySelector('#player').classList.contains('player-expanded') ||
-        /declined fullscreen/i.test(document.querySelector('#fullscreen-status').textContent));
-      if (await page.evaluate(() => !!document.fullscreenElement)) {
-        await page.locator('#fullscreen').click();
-        await page.waitForFunction(() => !document.fullscreenElement);
-      } else {
-        if (!(await page.locator('#player').evaluate(element => element.classList.contains('player-expanded'))))
-          await page.locator('#fullscreen').click();
-        assert.match(await page.locator('#fullscreen-status').innerText(), /browser controls remain visible/i);
-        await page.locator('#fullscreen').click();
-        assert.equal(await page.locator('#player').evaluate(element => element.classList.contains('player-expanded')), false);
-      }
-    } else throw Error('Fullscreen fallback control must remain enabled');
+      await page.waitForFunction(() => document.fullscreenElement === document.querySelector('#player'));
+      await page.waitForFunction(() => document.querySelector('#fullscreen').textContent === 'Exit fullscreen');
+      assert.equal(await page.locator('#fullscreen').innerText(), 'Exit fullscreen');
+      await page.locator('#fullscreen').click();
+      await page.waitForFunction(() => !document.fullscreenElement &&
+        document.querySelector('#fullscreen').textContent === 'Fullscreen');
+      assert.equal(await page.locator('#fullscreen').innerText(), 'Fullscreen');
+    }
   });
   if (values.disc) {
     await check('owned-disc import, native preparation and original CSS', async () => {

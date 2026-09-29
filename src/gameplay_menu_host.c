@@ -814,6 +814,10 @@ int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t
     }
     melee_web_pad_state_free(h->input);h->input=input;
     h->entered=0;h->source_scene=MELEE_WEB_HOST_SCENE_NONE;
+    /* The menu transition has been consumed by leave().  Retaining the old
+     * request makes host teardown mistake this closed menu for an active
+     * route after match ownership returns to the browser. */
+    h->transition=0;
     restore_context(h);return ok(e,n);
 }
 int melee_web_menu_host_phase(const MeleeWebMenuHost* h){return h&&h==owner?melee_web_menu_phase(h->session):MELEE_WEB_MENU_CLOSED;}

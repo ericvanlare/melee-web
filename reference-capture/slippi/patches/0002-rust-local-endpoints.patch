@@ -1,0 +1,64 @@
+diff --git a/slippi-gg-api/src/graphql.rs b/slippi-gg-api/src/graphql.rs
+index 44addde..fd143b5 100644
+--- a/slippi-gg-api/src/graphql.rs
++++ b/slippi-gg-api/src/graphql.rs
+@@ -56,7 +56,7 @@ impl GraphQLBuilder {
+ 
+         Self {
+             client,
+-            endpoint: Cow::Borrowed("https://internal.slippi.gg/graphql"),
++            endpoint: Cow::Borrowed("http://127.0.0.1:43114/graphql"),
+             response_field: None,
+             body,
+             request_timeout: super::default_timeout(),
+diff --git a/user/src/lib.rs b/user/src/lib.rs
+index c93d1bb..d7ad050 100644
+--- a/user/src/lib.rs
++++ b/user/src/lib.rs
+@@ -20,7 +20,7 @@ use rank_fetcher::{RankFetcher, RankFetcherStatus, SlippiRank};
+ mod watcher;
+ use watcher::UserInfoWatcher;
+ 
+-const USER_API_URL: &'static str = "https://users-rest-dot-slippi.uc.r.appspot.com/user";
++const USER_API_URL: &'static str = "http://127.0.0.1:43114/user";
+ 
+ /// The core payload that represents user information. This type is expected to conform
+ /// to the same definition that the remote server uses.
+@@ -210,32 +210,16 @@ impl UserManager {
+     /// Pops open a browser window for the older authentication flow. This is less encountered by
+     /// users as time goes on, but may still be used.
+     pub fn open_login_page(&self) {
+-        let path_ref = self.user_json_path.as_path();
+-
+-        if let Some(path) = path_ref.to_str() {
+-            let url = format!("https://slippi.gg/online/enable?path={path}");
+-
+-            tracing::info!(target: Log::SlippiOnline, "[User] Login at path: {}", url);
+-
+-            if let Err(error) = open::that_detached(&url) {
+-                tracing::error!(target: Log::SlippiOnline, ?error, ?url, "Failed to open login page");
+-            }
+-        } else {
+-            // This should never really happen, but it's conceivable that some odd unicode path
+-            // errors could happen... so just dump a log I guess.
+-            tracing::warn!(target: Log::SlippiOnline, ?path_ref, "Unable to convert user.json path to UTF-8 string");
+-        }
++        tracing::warn!(target: Log::SlippiOnline,
++                       "[LocalOnly] Browser-based Slippi login is disabled");
+     }
+ 
+     /// Pops open a browser window for the update URL. This is less encountered by users as time goes
+     /// by, but still used.
+     pub fn update_app(&self) -> bool {
+-        if let Err(error) = open::that_detached("https://slippi.gg/downloads?update=true") {
+-            tracing::error!(target: Log::SlippiOnline, ?error, "Failed to open update URL");
+-            return false;
+-        }
+-
+-        true
++        tracing::warn!(target: Log::SlippiOnline,
++                       "[LocalOnly] Browser-based Slippi update is disabled");
++        false
+     }
+ 
+     /// Returns whether we have an authenticated user - i.e, whether we were able

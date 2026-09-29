@@ -80,7 +80,7 @@ class FakeElement {
 function makeDocument(fullscreen = 'unsupported') {
   const ids = [
   'canvas', 'player', 'choose-disc', 'disc-file', 'start-game', 'pause-game',
-  'controls-open', 'toolbar-more-toggle', 'controls-close', 'controls-dialog', 'keyboard-layout',
+  'controls-open', 'controls-close', 'controls-dialog', 'keyboard-layout',
     'player-one-source', 'player-two-source', 'player-one-source-status',
     'player-two-source-status', 'boxx-source-note', 'keyboard-bindings-details',
     'keyboard-bindings', 'controller-advanced', 'controllers', 'idle-hint', 'fullscreen', 'end-session', 'status',
@@ -307,24 +307,13 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
     await importShellWithMocks({name});
     if (exerciseFullscreen) {
       const button = document.getElementById('fullscreen');
-      const status = document.getElementById('fullscreen-status');
       const playerElement = document.getElementById('player');
-      assert.equal(button.disabled, false, 'Fullscreen or its labeled fallback remains enabled');
       if (fullscreen === 'unsupported') {
-        assert.equal(button.textContent, 'Expand player');
-        assert.match(status.textContent, /element fullscreen is unavailable/);
-        button.click();
-        assert.equal(playerElement.classList.contains('player-expanded'), true);
-        assert.match(status.textContent, /browser controls remain visible/i);
-        const more = document.getElementById('toolbar-more-toggle');
-        more.click();
-        assert.equal(playerElement.classList.contains('toolbar-actions-open'), true);
-        assert.equal(more.attributes.get('aria-expanded'), 'true');
-        button.click();
-        assert.equal(playerElement.classList.contains('toolbar-actions-open'), false,
-          'Shrinking the player closes expanded secondary controls');
-        assert.equal(more.attributes.get('aria-expanded'), 'false');
+        assert.equal(button.hidden, true, 'Unsupported native fullscreen hides its action');
+        assert.equal(button.onclick, undefined, 'Unsupported fullscreen does not install a fallback action');
+        assert.equal(markupIds.has('fullscreen-status'), false, 'No persistent fullscreen explanation is rendered');
       } else if (fullscreen === 'supported') {
+        assert.equal(button.hidden, false);
         button.click();
         assert.equal(playerElement.requestCalls, 1);
         assert.equal(playerElement.requestWasGesture, true,
@@ -333,17 +322,14 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
         button.click();
         assert.equal(document.fullscreenElement, null);
         assert.equal(button.textContent, 'Fullscreen');
-        document.getElementById('toolbar-more-toggle').click();
-        assert.equal(playerElement.classList.contains('toolbar-actions-open'), true,
-          'The toolbar disclosure remains operable on the player');
       } else {
+        assert.equal(button.hidden, false);
         button.click();
         await new Promise(resolve => setTimeout(resolve, 0));
         assert.equal(playerElement.requestCalls, 1);
-        assert.equal(button.textContent, 'Expand player', 'a rejected request switches to the labeled fallback');
-        assert.match(status.textContent, /declined fullscreen/i);
-        button.click();
-        assert.equal(playerElement.classList.contains('player-expanded'), true);
+        assert.equal(button.textContent, 'Fullscreen', 'a rejected request leaves its native action truthful');
+        assert.equal(playerElement.classList.contains('player-expanded'), false);
+        assert.equal(markupIds.has('fullscreen-status'), false, 'A rejected request adds no persistent explanation');
       }
     }
     return {
@@ -622,4 +608,4 @@ assert.equal(failed.audioCreated, 0);
 await runScenario({name: 'fullscreen-unsupported', fullscreen: 'unsupported', exerciseFullscreen: true});
 await runScenario({name: 'fullscreen-supported', fullscreen: 'supported', exerciseFullscreen: true});
 await runScenario({name: 'fullscreen-rejected', fullscreen: 'rejected', exerciseFullscreen: true});
-console.log('Public player shell: profile-owned startup, pre-readiness disc selection, readiness-gated import/autoplay (exactly once), invalid retry, replacement, cancellation, audio recovery, stale-selection guards and fullscreen supported, unsupported, rejection and fallback cases pass.');
+console.log('Public player shell: profile-owned startup, pre-readiness disc selection, readiness-gated import/autoplay (exactly once), invalid retry, replacement, cancellation, audio recovery, stale-selection guards and native fullscreen supported, unsupported and rejection cases pass.');

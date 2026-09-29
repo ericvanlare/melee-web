@@ -1,0 +1,184 @@
+{
+  "client": {
+    "commit": "41a7a3a110ed52999486ae1901c8fbb9a63d4f13",
+    "slippi_semver": "4.0.0-mainline-beta.19",
+    "repository": "https://github.com/project-slippi/dolphin",
+    "submodules": [
+      {
+        "commit": "9bc087fbca36ce5a85eb4fd73f0c73813593e5a2",
+        "path": "Externals/FFmpeg-bin"
+      },
+      {
+        "commit": "495517af2b922c10c24f543e0fd6ea3ddf774e50",
+        "path": "Externals/Qt"
+      },
+      {
+        "commit": "c98c4fbff6d8f3016a3ce6685bf8f43433c3efcc",
+        "path": "Externals/SDL/SDL"
+      },
+      {
+        "commit": "7f1162dfea4969bc17417563ac55d93b72e84c1e",
+        "path": "Externals/SFML/SFML"
+      },
+      {
+        "commit": "2d29e794de8497582675fb70877851f2cdd2f256",
+        "path": "Externals/SlippiRustExtensions"
+      },
+      {
+        "commit": "39f924b810e561fd86b2558b6711ca68d4363f68",
+        "path": "Externals/Vulkan-Headers"
+      },
+      {
+        "commit": "3bab6924988e5f19bf36586a496156cf72f70d9f",
+        "path": "Externals/VulkanMemoryAllocator"
+      },
+      {
+        "commit": "b1fab721655c5c4b1b08a083d3cd29f163af75d0",
+        "path": "Externals/corrosion"
+      },
+      {
+        "commit": "54217bca3f3e0cd53c073690a23dd25d83557909",
+        "path": "Externals/cubeb/cubeb"
+      },
+      {
+        "commit": "aab6948fa863bc1cbe5d0850bc46b9ef02ed4c1a",
+        "path": "Externals/cubeb/cubeb/cmake/sanitizers-cmake"
+      },
+      {
+        "commit": "40412d85124f7c6f3d88454583c4633e5e10fc8c",
+        "path": "Externals/cubeb/cubeb/googletest"
+      },
+      {
+        "commit": "75a2079d5c28debb2eaa848ca9430f1fe0d7844c",
+        "path": "Externals/curl/curl"
+      },
+      {
+        "commit": "2a85cd64459f6ba038d233a634d9440490dbba12",
+        "path": "Externals/enet/enet"
+      },
+      {
+        "commit": "e69e5f977d458f2650bb346dadf2ad30c5320281",
+        "path": "Externals/fmt/fmt"
+      },
+      {
+        "commit": "58d77fa8070e8cec2dc1ed015d66b454c8d78850",
+        "path": "Externals/gtest"
+      },
+      {
+        "commit": "7011fa98af2dde00c298105735e470de800288c7",
+        "path": "Externals/hidapi/hidapi-src"
+      },
+      {
+        "commit": "18c72431f8265e2b0b5378a3a73d8a883b2175ff",
+        "path": "Externals/implot/implot"
+      },
+      {
+        "commit": "8fae8ce254dfc1344527e05301e43f37dea2df80",
+        "path": "Externals/libadrenotools"
+      },
+      {
+        "commit": "aa3975893d83ef1bc84c321ec60c65fbf1287887",
+        "path": "Externals/libadrenotools/lib/linkernsbypass"
+      },
+      {
+        "commit": "dc5b1032c08efac68ad30170f7ccbf0aa8dd55c9",
+        "path": "Externals/libspng/libspng"
+      },
+      {
+        "commit": "ba698478afc3d3a72644eef9fc4cd24ce8383a4c",
+        "path": "Externals/libusb/libusb"
+      },
+      {
+        "commit": "5fc0630a0ed55e9755b0fe3990cd021ae1c3edc1",
+        "path": "Externals/lz4/lz4"
+      },
+      {
+        "commit": "8739b22fbc90fdf0b4f6612ef9c0520f0ba44a51",
+        "path": "Externals/mGBA/mgba"
+      },
+      {
+        "commit": "55db144e03027b43263e5ebcb599bf0878ba58de",
+        "path": "Externals/minizip-ng/minizip-ng"
+      },
+      {
+        "commit": "0115d9198ff7a73ff6568027dfb948ef6031818c",
+        "path": "Externals/rcheevos/rcheevos"
+      },
+      {
+        "commit": "ebe2aa0cd80f5eb5cd8a605da604cacf72205f3b",
+        "path": "Externals/spirv_cross/SPIRV-Cross"
+      },
+      {
+        "commit": "c5641f2c22d117da7971504591a8f6a41ece488b",
+        "path": "Externals/tinygltf/tinygltf"
+      },
+      {
+        "commit": "e626a72bc2321cd320e953a0ccf1584cad60f363",
+        "path": "Externals/xxhash/xxHash"
+      },
+      {
+        "commit": "ce01b1e41da298334f8214389cc9369540a7560f",
+        "path": "Externals/zlib-ng/zlib-ng"
+      },
+      {
+        "commit": "f8745da6ff1ad1e7bab384bd1f9d742439278e99",
+        "path": "Externals/zstd/zstd"
+      }
+    ]
+  },
+  "build_profile": {
+    "audio_backend": "No Audio Output",
+    "cmake": "3.31.6",
+    "configuration": "Release",
+    "compiler": "Apple clang 21.0.0 (clang-2100.1.1.101)",
+    "generator": "Ninja 1.13.0.git.kitware.jobserver-pipe-1",
+    "platform": "macOS arm64",
+    "compiler_flags": {
+      "CMAKE_CXX_FLAGS": "-DFMT_CONSTEVAL=",
+      "CMAKE_OSX_DEPLOYMENT_TARGET": "11.0.0"
+    },
+    "cmake_options": {
+      "ENABLE_ANALYTICS": false,
+      "ENABLE_AUTOUPDATE": false,
+      "ENABLE_HEADLESS": true,
+      "ENABLE_LLVM": false,
+      "ENABLE_NOGUI": true,
+      "ENABLE_QT": false,
+      "ENABLE_SDL": true,
+      "ENABLE_TESTING": false,
+      "ENABLE_TESTS": false,
+      "ENABLE_VULKAN": false,
+      "USE_DISCORD_PRESENCE": false,
+      "USE_RETRO_ACHIEVEMENTS": false,
+      "USE_SANITIZERS": true,
+      "USE_UPNP": false
+    },
+    "rust_toolchain": "1.88.0",
+    "runtime_platform": "headless",
+    "video_backend": "Null"
+  },
+  "game_modifications": {
+    "commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+    "file": "Output/Netplay/GALE01r2.ini",
+    "license": "GPL-3.0-only",
+    "provenance": "generated by Gecko from the pinned source; copied only into private test profiles",
+    "repository": "https://github.com/project-slippi/slippi-ssbm-asm",
+    "sha256": "b30b294df5c0d92deb3129afdfbc894a48aabeb1bce0cf92cce8c4e5408a2587"
+  },
+  "owned_disc": {
+    "format": "CISO",
+    "game_id": "GALE01r2",
+    "path": "user-supplied local input; never recorded in repository evidence",
+    "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+  },
+  "patches": [
+    "patches/0001-client-loopback-and-observation.patch",
+    "patches/0002-rust-local-endpoints.patch"
+  ],
+  "rust_extensions": {
+    "commit": "2d29e794de8497582675fb70877851f2cdd2f256",
+    "repository": "https://github.com/project-slippi/slippi-rust-extensions",
+    "toolchain": "1.88.0"
+  },
+  "schema": "melee-web-slippi-local-client-pin-v1"
+}

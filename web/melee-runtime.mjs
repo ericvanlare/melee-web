@@ -2,7 +2,11 @@
 import {loadNativeGameDisc, openNativeGameDiscSession} from './runtime-assets.mjs';
 import {createControllerManager} from './controller-input.mjs';
 
-let documentClaimed = false;
+let documentOwner = null;
+function releaseDocumentReservation(reservation) {
+  reservation.active = false;
+  if (documentOwner === reservation && !reservation.initialized) documentOwner = null;
+}
 const SCENES = {1: 'css', 2: 'preparing', 3: 'sss', 4: 'preparing', 5: 'preparing', 6: 'unloaded', 7: 'match', 8: 'results', 9: 'prize'};
 const IMPORT_BATCH_MAX_FILES = 8;
 const IMPORT_BATCH_MAX_BYTES = 8 * 1024 * 1024;
@@ -13,15 +17,60 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   readDisc = loadNativeGameDisc, openDisc = openNativeGameDiscSession, createAudio,
   loaderUrl = new URL('./gameplay_public.js', import.meta.url), startupTimeout = 60000} = {}) {
   if (!canvas || canvas.id !== 'canvas') throw Error('The player requires its own #canvas.');
-  if (documentClaimed) throw Error('Reload the page to start a fresh player.');
+  if (documentOwner) throw Error('Reload the page to start a fresh player.');
   if (!globalThis.isSecureContext) throw Error('The player requires HTTPS or a local server.');
-  if (!navigator.gpu) throw Error('WebGPU is unavailable. Try a desktop browser with WebGPU enabled.');
+  if (!navigator.gpu) throw Error('WebGPU is unavailable in this browser or device. The player cannot start here.');
   if (!globalThis.crossOriginIsolated) throw Error('The player requires cross-origin isolation headers.');
-  documentClaimed = true;
+  if (typeof navigator.gpu.requestAdapter !== 'function')
+    throw Error('This browser exposes WebGPU without the required adapter API. The player cannot start here.');
+  // Claim the document before yielding. Every later startup side effect belongs
+  // to this one attempt, even while the browser's adapter promise is pending.
+  const reservation = {active: true, initialized: false, expired: false};
+  documentOwner = reservation;
+  const startupTimeoutMs = Number.isFinite(Number(startupTimeout)) ? Math.max(0, Number(startupTimeout)) : 60000;
+  const startupDeadlineAt = Date.now() + startupTimeoutMs;
+  let startupTimeoutHandle = null;
+  let rejectAdapterDeadline;
+  let failStartup = null;
+  const adapterDeadline = new Promise((_, reject) => { rejectAdapterDeadline = reject; });
+  const expireStartup = () => {
+    reservation.expired = true;
+    const error = reservation.initialized && ready && (!startupCacheReady || !graphicsPreparationReady()) ?
+      Error('Renderer preparation timed out. Reload to recover.') : Error('Player startup timed out.');
+    if (reservation.initialized) failStartup?.(error);
+    else {
+      releaseDocumentReservation(reservation);
+      rejectAdapterDeadline(error);
+    }
+  };
+  startupTimeoutHandle = setTimeout(expireStartup, startupTimeoutMs);
+  // A present WebGPU object does not guarantee that this browser can provide
+  // an adapter (for example, when WebGPU is disabled or no usable GPU exists).
+  // Check before creating audio or loading the large native module.
+  try {
+    const adapter = await Promise.race([Promise.resolve(navigator.gpu.requestAdapter()), adapterDeadline]);
+    if (!reservation.active || reservation.expired || documentOwner !== reservation)
+      throw Error('Player startup timed out.');
+    if (!adapter)
+      throw Error('No WebGPU adapter is available. The player cannot start on this browser or device.');
+  } catch (error) {
+    // Null, rejected, and timed-out adapter preflights are retryable. Release
+    // only this uninitialized reservation; later/initialized owners stay held.
+    releaseDocumentReservation(reservation);
+    clearTimeout(startupTimeoutHandle);
+    startupTimeoutHandle = null;
+    throw error;
+  }
+  // Preflight succeeded. Re-arm the same absolute deadline after synchronous
+  // owner setup so setup exceptions cannot leave an orphaned timer.
+  clearTimeout(startupTimeoutHandle);
+  startupTimeoutHandle = null;
+  // From here onward setup can have externally visible effects. Keep ownership
+  // for the document lifetime, including if audio or native setup later fails.
+  reservation.initialized = true;
   const assetBase = new URL('.', loaderUrl);
   let ready = false, fatal = false, destroyed = false, bundle = false, prepared = false, hasLocalData = false;
   let startupCacheReady = false;
-  let startupTimeoutHandle = null;
   let busy = '', message = '', progress = null, inputDirty = true, lastState = '';
   let loading = Object.freeze({phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
   let preparationLabel = '', preparationKeepsAudio = false;
@@ -41,7 +90,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     print: text => onLog(String(text), false),
     printErr: text => onLog(String(text), true),
     onAbort: error => stop(error),
-    onRuntimeInitialized() { ready = true; publish(); resolveStartup(); },
+    onRuntimeInitialized() {
+      if (fatal || destroyed || reservation.expired) return;
+      ready = true; publish(); resolveStartup();
+    },
   };
   const status = () => ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
   const check = result => { if (!result) throw Error(status()); return result; };
@@ -150,6 +202,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     audio?.fail(Error(message));
     rejectStartup(Error(message)); publish(); onError(Error(message)); emit('fatal', message);
   }
+  failStartup = stop;
   const boundary = run => fatal || destroyed ? Promise.reject(Error('Reload after the player stopped.')) :
     new Promise((resolve, reject) => commands.push({run, resolve, reject}));
   async function operation(name, run, requireStartupCache = false) {
@@ -474,8 +527,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   publish();
   const loader = document.createElement('script'); loader.src = String(loaderUrl);
   loader.onerror = () => stop(Error('The player files could not load. Reload to retry.'));
-  startupTimeoutHandle = setTimeout(() => stop(Error(ready && !startupCacheReady || ready && !graphicsPreparationReady() ?
-    'Renderer preparation timed out. Reload to recover.' : 'Player startup timed out.')), startupTimeout);
+  if (!fatal && !destroyed && !(ready && startupCacheReady && graphicsPreparationReady()))
+    startupTimeoutHandle = setTimeout(expireStartup, Math.max(0, startupDeadlineAt - Date.now()));
   document.head.append(loader);
   try { await startup; return handle; }
   finally {
