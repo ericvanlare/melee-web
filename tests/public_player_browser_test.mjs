@@ -58,7 +58,22 @@ let everythingUnlockedProfile = null;
 const ready = driver.waitForImport;
 const shot = name => page.screenshot({path: path.join(values.out, name + '.png'), fullPage: true});
 const press = key => driver.pressChord([key]);
-const phase = driver.waitForPhase;
+const phase = async expected => {
+  const deadline = Date.now() + 90000;
+  while (Date.now() < deadline) {
+    const state = await readNativeMenuState();
+    if (state.runtimeError) throw Error(`Runtime error while waiting for native phase ${expected}: ${state.runtimeError}`);
+    if (isTimingPaused(state)) {
+      await resumeAfterTimingPause(`wait-for-phase-${expected}`);
+      continue;
+    }
+    if (state.status === 'Error' || (state.status === 'Paused' && state.message))
+      throw Error(`Native player stopped before phase ${expected}: ${JSON.stringify(state)}`);
+    if (state.phase === expected) return state.phase;
+    await page.waitForTimeout(50);
+  }
+  throw Error(`Timed out waiting for native phase ${expected}: ${JSON.stringify(await readNativeMenuState())}`);
+};
 const audioTrace = () => page.evaluate(() => window.audioPreviewTrace?.snapshot() || null);
 const pcmMessages = snapshot => (snapshot?.worklets || []).reduce((sum, worklet) => sum + worklet.nonzeroPcmMessages, 0);
 const observePcm = async (name, before) => {
@@ -82,6 +97,8 @@ const observePcm = async (name, before) => {
 };
 async function readNativeMenuState() {
   return page.evaluate(() => ({
+    phase: typeof Module?._melee_web_native_menu_phase === 'function'
+      ? Module._melee_web_native_menu_phase() : 0,
     message: typeof Module?._melee_web_native_menu_message === 'function'
       ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null,
     running: typeof Module?._melee_web_native_menu_running === 'function'
@@ -97,18 +114,28 @@ async function resumeAfterTimingPause(label) {
   const state = await readNativeMenuState();
   if (!isTimingPaused(state)) return false;
   report.timing_pause_recoveries ||= [];
-  report.timing_pause_recoveries.push({label, message: state.message, running: state.running, status: state.status});
-  await page.waitForFunction(() => {
-    const button = document.querySelector('#pause-game');
-    return button && !button.disabled;
-  }, null, {timeout: 10000});
-  await page.locator('#pause-game').click();
-  await page.waitForFunction(() => Module._melee_web_native_menu_running() &&
-    !Module.UTF8ToString(Module._melee_web_native_menu_message())
-      .startsWith('Paused after a timing disruption') &&
-    !String(document.querySelector('#status')?.textContent || '')
-      .startsWith('Paused after a timing disruption'),
-  null, {timeout: 15000});
+  const recovery = {label, message: state.message, running: state.running, status: state.status,
+    phase: await page.evaluate(() => Module._melee_web_native_menu_phase())};
+  report.timing_pause_recoveries.push(recovery);
+  if (await page.locator('#pause-game').isEnabled()) {
+    await page.locator('#pause-game').click();
+    await page.waitForFunction(() => Module._melee_web_native_menu_running() &&
+      !Module.UTF8ToString(Module._melee_web_native_menu_message())
+        .startsWith('Paused after a timing disruption') &&
+      !String(document.querySelector('#status')?.textContent || '')
+        .startsWith('Paused after a timing disruption'),
+    null, {timeout: 15000});
+    recovery.action = 'resumed the active scene';
+  } else {
+    assert.equal(recovery.phase, 6,
+      `Timing pause left the native owner in an unexpected phase: ${JSON.stringify(recovery)}`);
+    assert(await page.locator('#start-game').isEnabled(),
+      'A closed inter-scene owner exposes Play so the retained local session can start CSS again');
+    await page.locator('#start-game').click();
+    await page.waitForFunction(() => Module._melee_web_native_menu_phase() === 1 &&
+      Module._melee_web_native_menu_running(), null, {timeout: 90000});
+    recovery.action = 'restarted the retained menu session at CSS';
+  }
   return true;
 }
 async function waitForNativeScene(scene) {
