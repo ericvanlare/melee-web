@@ -577,6 +577,17 @@ void enter_title_after_opening(){
  first_use_draw_pending=true;menu_clock.reset();audio_phase=0;audio_clock.reset();
  running=true;message="Original title";
 }
+void request_opening_match_assets(int state,
+                                  const MeleeWebOpeningPreview& preview){
+ try{
+  request_assets(AssetDestination::OpeningMatch,nullptr,&preview,state);
+ }catch(const std::exception& cause){
+  const std::string route=state==1?"Original Title idle":"Original Opening";
+  throw std::runtime_error(route+" reached source GM_OPENING_MV state "+
+      std::to_string(state)+" (the four-player VS demo), but its source-selected "+
+      "asset scope is unsupported: "+cause.what()+". Eject to recover.");
+ }
+}
 void enter_opening_state(int state){
  char error[256]{};
  check(state>=0,"Original Opening route has no source-selected state");
@@ -630,7 +641,7 @@ void begin_opening_state(int state){
  if(state==1||state==3){
   MeleeWebOpeningPreview preview{};char error[256]{};
   check(melee_web_menu_host_opening_preview(host,&preview,error,sizeof(error)),error);
-  if(scoped_assets){request_assets(AssetDestination::OpeningMatch,nullptr,&preview,state);return;}
+  if(scoped_assets){request_opening_match_assets(state,preview);return;}
   asset_opening_preview=preview;asset_opening_preview_valid=true;
   enter_opening_state(state);return;
  }

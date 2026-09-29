@@ -42,7 +42,7 @@ const report = {
     source_sha: packageManifest.source_sha, runtime_hash: packageManifest.runtime_hash,
     identity_sha256: packageManifest.identity_sha256,
   } : null,
-  scope: 'Authorized local disc through original CSS, SSS, supported Mario/Final Destination match, Results return, and Title idle handoff to the source Opening state. The demo remains an explicit unsupported route with Eject/reimport recovery. Web Audio lifecycle and PCM transport only; no full attract-cycle, audible-quality, equivalence or performance claim.',
+  scope: 'Authorized local disc through original CSS, SSS, supported Mario/Final Destination match, Results return, and Title idle into the source Opening VS asset boundary. If source RNG selects an unadmitted fighter or stage, the exact asset-scope failure remains explicit and recovers through Eject/reimport. Web Audio lifecycle and PCM transport only; no complete attract-cycle, audible-quality, equivalence or performance claim.',
   checks: [],
   audio: {phases: {}, cdp: []},
   assets: {transactions: [], legacyCalls: 0},
@@ -676,10 +676,14 @@ try {
     }, null, {timeout: 45000});
     const routeError = await page.locator('#error').innerText();
     assert.match(routeError, /Original Title idle reached source GM_OPENING_MV state 1/);
+    assert.match(routeError, /four-player VS demo/);
+    assert.match(routeError, /source-selected asset scope is unsupported/);
+    assert.match(routeError, /Opening demo source (fighter|costume|stage)/);
     const transitionState = await nativeMenuState();
     report.title_idle_handoff = {
       source_target: 'GM_OPENING_MV state 1',
-      browser_boundary: 'explicitly unsupported randomized four-player VS demo',
+      browser_boundary: 'source-selected four-player VS asset scope explicitly rejected',
+      asset_error: routeError,
       native_running_after_error: transitionState.running,
       error: routeError,
       full_cycle_supported: false,

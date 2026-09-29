@@ -3,6 +3,7 @@
 #include "dat_archive.hpp"
 #include "fighter_binding.hpp"
 #include "gameplay_content.h"
+#include "gameplay_menu_host.h"
 #include "gameplay_result_motion_table.hpp"
 #include <melee/pl/forward.h>
 
@@ -132,6 +133,24 @@ void opening_state_asset_contract()
     }
     for (const unsigned state : {1u, 3u, 6u})
         rejects([&] { (void)opening_state_asset_names(state); });
+}
+
+void opening_match_asset_contract()
+{
+    MeleeWebOpeningPreview preview{};
+    preview.characters[0] = CKIND_GAMEWATCH;
+    preview.stage_kind = St_Kind_Last;
+    preview.match_kind = 0;
+    try {
+        (void) opening_match_asset_names(preview);
+    } catch (const std::exception& error) {
+        check(std::string(error.what()).find(
+                  "Opening demo source fighter 3 is not admitted") !=
+                  std::string::npos,
+              "Unsupported Opening identity did not report its exact source fighter");
+        return;
+    }
+    throw std::runtime_error("Unadmitted Opening fighter unexpectedly passed its asset scope");
 }
 
 void source_fighter_closure()
@@ -312,6 +331,7 @@ int main(int argc, char** argv)
         }
         menu_contract();
         opening_state_asset_contract();
+        opening_match_asset_contract();
         source_fighter_closure();
         results_fighter_closure();
         source_stage_music();
