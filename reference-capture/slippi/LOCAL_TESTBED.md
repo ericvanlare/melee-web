@@ -1,15 +1,24 @@
 # Private Slippi local testbed
 
 This is a desktop interoperability testbed. It does not change Melee Web's
-browser architecture. The first networking claim is intentionally limited to a
-local match/rematch through the replacement matchmaker; rollback correctness,
-browser cross-play, public Internet/NAT, production Slippi services, ranking,
-rendering, audio and physical-controller usability are separate work.
+browser architecture. The local match/rematch receipt and the optional browser
+transport probe are separate scoped results. The probe proves one headless
+browser can exchange actual frame-tagged PAD records with adapted desktop
+clients through the loopback relay; it does not run Melee in the browser or
+establish general browser cross-play. Rollback correctness, public Internet/NAT,
+production Slippi services, ranking, rendering, audio and physical-controller
+usability remain separate work.
 
 The [scoped two-cycle receipt](../../docs/evidence/local-slippi-connectivity-v1.json)
 records the accepted run and hashes the retained local integration files. The
 underlying logs, replays and per-client receipts stay in the ignored run
 directory named in that receipt.
+
+The [browser-to-desktop transport receipt](../../docs/evidence/slippi-browser-desktop-transport-v1.json)
+records a separate one-pair input probe. Its retained external run includes the
+headless Chrome screenshot, WebSocket/relay events, both local PAD streams, and
+the second client's byte-exact remote-PAD observations. The evidence report
+contains hashes for the retained files without recording an operator path.
 
 ## Pinned inputs and licensing
 
@@ -20,8 +29,8 @@ independently. Apply the two files in [`patches/`](patches/) only to local
 working copies of the matching commits; keep clean upstream checkouts intact.
 The client patches retain their upstream GPL terms. The generated game
 modification retains the pinned ASM repository's GPL-3.0-only terms. The
-project-authored ENet matchmaker and Python orchestration have separate root
-MIT entries; see [`LICENSES.md`](LICENSES.md) and the root
+project-authored matchmaker, peer relay, browser bridge and Python orchestration
+have separate root MIT entries; see [`LICENSES.md`](LICENSES.md) and the root
 [`LICENSE_SCOPE.md`](../../LICENSE_SCOPE.md).
 
 The run requires these local, ignored artifacts:
@@ -167,6 +176,35 @@ so the harness can verify its nested process-group and port cleanup. Startup,
 pairing, gameplay and rematch each have deadlines. `--repeat 1` is useful for a
 single-profile diagnostic; use the default repeat count for the fresh-profile
 acceptance run.
+
+### Optional browser-to-desktop transport probe
+
+The optional probe starts one fresh local pair, waits for the original game
+scene, then has a real headless Chrome page send 24 fixed eight-byte PAD samples
+with frame tags selected from the live desktop PAD sequence. The local ENet
+relay replaces only those exact records on player 1's outgoing Slippi PAD
+packets, retains their ENet channel and packet flags, and forwards the peer's actual PAD
+records back to the browser. Player 2's existing remote-PAD consumer must expose
+all 24 browser samples byte-for-byte. The probe ends during the first game after
+its input observations; it does not validate a complete match/rematch or execute
+Melee in the browser.
+
+After preparing the pinned client, matchmaker, installed Node.js, Playwright,
+and headless Chrome, run:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 reference-capture/slippi/run_local.py \
+  --disc /path/to/your/owned/melee.ciso \
+  --repeat 1 --input-probe-only --browser-transport-probe \
+  --browser-node /path/to/node \
+  --browser-playwright /path/to/node_modules/playwright
+```
+
+The browser service accepts only IPv4 loopback connections from the page's exact
+origin. The runtime socket audit includes the headless Chrome process group and
+rejects non-loopback endpoints. This remains a local transport smoke test: it
+does not exercise public routing, NAT, delay, packet loss, reordering, rollback,
+or browser gameplay.
 
 The command exits nonzero at the first failed boundary. It does not retry a
 failed pair or reuse its profiles. Each invocation chooses a new evidence

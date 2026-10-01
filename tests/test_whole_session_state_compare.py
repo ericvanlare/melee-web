@@ -263,6 +263,7 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                                                                *copy.deepcopy(frame["fighters"])]),
                                   frame["fighters"].extend([*copy.deepcopy(frame["fighters"]),
                                                              *copy.deepcopy(frame["fighters"])])),
+                                                             *copy.deepcopy(frame["fighters"])])),
         )
         for alter in alterations:
             with self.subTest(alter=alter), tempfile.TemporaryDirectory() as directory:
@@ -285,7 +286,6 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             with self.subTest(flags=hex(invalid)):
                 with self.assertRaises(ValueError):
                     _state_from_payload({"slices": malformed}, "invalid auxiliary fixture")
-
     def test_v9_match_entry_binds_browser_to_that_matches_setup(self):
         source, pads, _, _ = _source_rows()
         payload = source[9]["payload"]

@@ -3,8 +3,9 @@
   "date": "2026-09-30",
   "scope": "Bounded corrected-producer MWRC v8 prefix. Exact source-consumed scene/input order and primary Fighter state are compared through the deliberate stop; completion, Results camera ownership, timing, draw cadence, pixels, PCM, performance and admission are unclaimed.",
   "runtime": {
-    "base_commit": "8f64a14cdd8cef60e68191c665f5732ab8dc2717",
-    "working_head": "361c6c2820cc5d541ed2812a673b470a3e2b0d60",
+    "comparison_base_commit": "8f64a14cdd8cef60e68191c665f5732ab8dc2717",
+    "build_commit": "361c6c2820cc5d541ed2812a673b470a3e2b0d60",
+    "comparison_base_was_ancestor_at_capture": false,
     "runtime_patch_identity_sha256": "b5cc66b72571fcc4a3b09341acec755316ae0e55ade62fc4d2a11b346746130a",
     "configuration": "Release",
     "javascript_sha256": "2bbd2da21e8ef7d36093a6a75b4ccb5aff42b32cdd3a321dfd16f187053e657e",
@@ -42,8 +43,8 @@
   },
   "retained_trace_primary_projection": {
     "path": "runs/pr86-original-ab-baseline-b1295ac-20260930/a/diagnostic-primary-v1",
-    "normalization": "Separate diagnostic copy only: v2 header/entity rows removed; original trace retained unchanged. Comparison is explicitly primary-row-only.",
-    "dropped_entity_rows": 39032,
+    "normalization": "Separate diagnostic copy only: v2 header/entity fields omitted; original trace retained unchanged and no JSONL rows removed. Comparison is explicitly primary-row-only.",
+    "auxiliary_entity_fields_omitted": 39032,
     "frames_compared": 42492,
     "match_frames_compared": 39032,
     "nonmatch_frames_compared": 3460,

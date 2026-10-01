@@ -39,15 +39,17 @@ remain separate open gates.
 The retained PR86 A trace was produced with an unscoped v2 entity field. The
 producer is now reconciled to the current v1 whole-session schema: v8 compares
 two-to-four primary fighters, while v9 uses its separate indexed identity
-records. A fresh corrected-producer prefix reached source cursor 3,014 without
-a runtime error and compared 1,374 menu rows plus 1,642 primary match rows with
-no first difference; the deliberate stop leaves the remainder unverified. The
-[scoped receipt](docs/evidence/pr86-primary-prefix-v1.json) records the hashes
-and limits. A separately hashed projection of the retained full A trace, with
-only its unscoped entity rows removed, compares all 42,492 frames and all
-39,032 declared match rows with no primary-state difference; it makes no
-follower/entity claim. These comparisons do not exercise Results camera
-ownership; the historical Sheik-winner writer remains unattributed.
+records. A fresh corrected-producer B prefix reached source cursor 3,014
+without a runtime error and compared 1,374 menu rows plus 1,642 primary match
+rows with no first difference; the deliberate stop leaves B incomplete and the
+remainder unverified. The [scoped receipt](docs/evidence/pr86-primary-prefix-v1.json)
+records the comparison base, pre-merge B build identity, hashes and limits. A
+separately hashed diagnostic projection of the retained full A trace, with only
+its unscoped entity fields omitted and no JSONL rows removed, compares all
+42,492 frames and all 39,032 declared match rows with no primary-state
+difference; it makes no follower/entity claim. These comparisons do not
+exercise Results camera ownership; the historical Sheik-winner writer remains
+unattributed.
 
 The branch is reconciled with current `origin/main` `f670a3b` at merge commit
 `9c84690` (including shared runtime #89 `aecc3e64`, PR #93 `2e083bf`, and later
@@ -142,6 +144,15 @@ The title/main-menu receipts above were produced on the PR #96 source revision
 before this PR #86 reconciliation. They remain scoped evidence for that route,
 not validation of the combined candidate; the combined candidate still needs
 an affected build and browser lifecycle run.
+
+## Current acceptance boundaries
+
+The supported CSS → SSS → Mario/Final Destination → Results → CSS route is
+covered by the scoped receipts below. Remaining acceptance is independent across
+original comparison, live and physical input, visual output, audio fidelity and
+sustained performance. The [roadmap](docs/ROADMAP.md), [accuracy contract](docs/ACCURACY_CONTRACT.md)
+and [performance/accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md) define
+those boundaries; this section adds no new runtime or deployment evidence.
 
 ## Repository public; main changes restricted to the owner
 
@@ -612,9 +623,12 @@ original English costume resolution, indexed vertex colors and particle palette
 metadata. The browser completes all 30 action cases over 5,200 drawn frames;
 the first diagnostic run fails timing/audio/pipeline gates. After a reviewed
 35-descriptor preload correction, both cold/warm action sweeps pass all 10,400
-frames with zero hard failures. Startup and broader performance remain separate,
-and independent original comparison is pending; see
-[Captain Falcon's measured scope](docs/CAPTAIN_PORT_NOTES.md).
+frames with zero hard failures. The first original CPU9 source/browser comparison
+has an exact Falcon-position divergence, and the human-input browser replay
+diverges at Results routing. No page/process crash was reproduced, so the user
+report remains unattributed; device/browser-specific checks are unrun. See the
+[investigation receipt](docs/evidence/captain-falcon-correctness-investigation-v1.json)
+and [Captain Falcon's measured scope](docs/CAPTAIN_PORT_NOTES.md).
 Hyrule Temple passes two native stage-owner lifetimes, including scaled geometry,
 original map callbacks, light identity overrides, music candidates and teardown.
 Two original Ready/pause/No Contest match lifetimes also pass. The browser
@@ -1129,8 +1143,8 @@ CPU holdout, multiplayer, pixel, audio, physical-input or performance admission.
 The browser runs original fighters and stages through compiled WebAssembly. The
 accepted first slice is two Marios on Final Destination; narrower raw-PAD runs
 also selected and rendered Falco versus Mario on Battlefield, Fox versus Mario
-on Yoshi's Story, and Marth versus Mario on Dream Land. The complete
-acceptance milestone below is still open:
+on Yoshi's Story, and Marth versus Mario on Dream Land. The remaining
+acceptance boundaries are:
 source stage and item rendering, stock/respawn/outcome flow, and the optional
 renderer cache are integrated, while clean cold-cache/full-match first-use
 stalls, audible and physical controller verification, and full original-game
@@ -1233,6 +1247,11 @@ receipts. Setup and the reproducible acceptance command are in the
 local interoperability result; rollback correctness, browser cross-play,
 public Internet/NAT, rendering/audio accuracy and production readiness remain
 unclaimed.
+
+A separate [headless browser-to-desktop transport receipt](docs/evidence/slippi-browser-desktop-transport-v1.json)
+records one 24-frame raw PAD exchange through the loopback ENet relay and the
+desktop peer's existing input consumer. It does not establish browser gameplay,
+general cross-play, or rollback correctness.
 
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
@@ -1506,7 +1525,8 @@ and Aurora's pipeline queue remain quiet for two callbacks. The live clock arms
 on a later callback. Pipelines or uploads first encountered during a match enter
 the same frozen render-preparation gate and resume automatically; unrelated clock
 overruns retain the explicit hitch pause. Preparation time is reported separately,
-and the scoped [scene-entry profile](work/scene-entry-profile.md) measured
+and the historical scene-entry profile (`work/scene-entry-profile.md`, an ignored
+local report unavailable in this checkout) was recorded as measuring
 106.555 ms for initial resource preparation, 83.140 ms for isolated SSS owner
 construction and 160.100 ms for isolated match construction. Its 7,604 active
 callbacks had a 24.200 ms worst callback, no callback above 33.3 ms and zero
