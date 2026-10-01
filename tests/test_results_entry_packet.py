@@ -65,7 +65,11 @@ class ResultsEntryPacketTests(unittest.TestCase):
 
     def test_capture_site_uses_existing_buffer_before_deferred_assets_return(self):
         source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text()
-        start = source.index('if(match){\n  terminal_match_observation=')
+        # Opening VS demos use a separate MatchEnd path. Anchor this contract
+        # at the ordinary results-producing branch so its deferred asset
+        # handoff is checked without depending on the surrounding branch
+        # layout.
+        start = source.index('terminal_match_observation=melee_web_native_menu_match_observe();')
         body = source[start:source.index('results_input.reset();', start)]
         order = ['melee_web_pad_state_capture(final_input)', 'match->close()',
                  'melee_web_menu_host_results_begin(', 'results_seed=seed;',
@@ -413,7 +417,10 @@ class ResultsEntryPacketTests(unittest.TestCase):
 
     def test_results_trace_resets_before_scoped_asset_early_return(self):
         source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
-        start = source.index('if(match){\n  terminal_match_observation=')
+        # Keep the assertion scoped to the ordinary Results entry. The
+        # Opening-demo branch now precedes it and intentionally bypasses this
+        # Results trace lifecycle.
+        start = source.index('terminal_match_observation=melee_web_native_menu_match_observe();')
         end = source.index('results=std::make_unique<melee_web::GameplayResultsSession>', start)
         body = source[start:end]
         trace_reset = body.index('results_pad_trace_count=0;results_pad_trace_attempts=0;')

@@ -29,10 +29,12 @@ struct Input { int button; };
 struct Selection {
     std::array<int, 4> source_players{};
     unsigned player_count=2, source_camera_subjects=70, source_random_seed=123;
+    bool opening_demo=false;
     const Input* source_initial_input=nullptr;
 };
 int context, camera, rules_owner, menu_owner;
 int pad=-1, form=-1, restore_count=0, prepare_count=0;
+bool opening_mode_seen=false;
 bool reject_restore=false;
 void check(bool value, const char* error) {
     if (!value) throw std::runtime_error(error);
@@ -49,9 +51,10 @@ int melee_web_match_restore_input(int* owner, const Input* input, char*, unsigne
 }
 int* melee_web_render_prepare_match_camera(char*, unsigned long) { return &camera; }
 int melee_web_match_rules_prepare_from_menu(int* rules, const int* menu,
-                                            char*, unsigned long) {
+                                            bool opening_demo, char*, unsigned long) {
     assert(rules==&rules_owner && menu==&menu_owner);
     ++prepare_count;
+    opening_mode_seen=opening_demo;
     // fn_8016D8AC consumes HSD_PadCopyStatus at this boundary, not later
     // during Fighter_Create or deferred spawn-matrix evaluation.
     form=pad; return 1;
@@ -66,6 +69,7 @@ void enter(const Selection& selection, const int* source_start_data) {
 
 SUFFIX = r'''
     assert(match_context==&context && render_context==&camera);
+    assert(opening_mode_seen==selection.opening_demo);
 }
 int main() {
     Selection selected;
@@ -73,6 +77,10 @@ int main() {
     selected.source_initial_input=&held_a;
     enter(selected,&menu_owner);
     assert(form==0x100 && restore_count==1 && prepare_count==1);
+    selected.opening_demo=true;
+    enter(selected,&menu_owner);
+    assert(form==0x100 && restore_count==1 && prepare_count==1);
+    selected.opening_demo=false;
     selected.source_initial_input=nullptr;
     enter(selected,&menu_owner);
     assert(form==0 && restore_count==0 && prepare_count==1);
@@ -155,9 +163,10 @@ int main(void){
             root = Path(directory)
             source, binary = root / "order.cpp", root / "order"
             source.write_text(PREFIX + world_entry() + SUFFIX)
-            subprocess.run([compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror",
+            compiled = subprocess.run([compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror",
                             str(source), "-o", str(binary)],
-                           check=True, capture_output=True, text=True, timeout=30)
+                           capture_output=True, text=True, timeout=30)
+            self.assertEqual(compiled.returncode, 0, compiled.stdout + compiled.stderr)
             subprocess.run([str(binary)], check=True, timeout=10)
 
 
