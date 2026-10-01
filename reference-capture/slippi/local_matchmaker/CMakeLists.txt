@@ -24,7 +24,7 @@ endif()
 set(ENET_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${SLIPPI_DOLPHIN_SOURCE}/Externals/enet/enet" "${CMAKE_CURRENT_BINARY_DIR}/enet")
 
-set(LOCAL_MATCHMAKER_SOURCES pairing.cpp protocol.cpp)
+set(LOCAL_MATCHMAKER_SOURCES pairing.cpp protocol.cpp browser_relay.cpp)
 add_executable(slippi-local-matchmaker server.cpp ${LOCAL_MATCHMAKER_SOURCES})
 target_compile_features(slippi-local-matchmaker PRIVATE cxx_std_20)
 target_include_directories(slippi-local-matchmaker PRIVATE
