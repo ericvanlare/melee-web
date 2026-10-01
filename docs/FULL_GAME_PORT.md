@@ -16,9 +16,9 @@ services, custom content and non-vanilla revisions are later scope. The
 inventory keeps those exclusions explicit so a missing offline feature cannot
 be mistaken for an online or product-extras task.
 
-The current local-versus priority and milestone are tracked in the
-[roadmap](ROADMAP.md); this inventory does not duplicate its changing acceptance
-details.
+The current route and bounded acceptance work are tracked in the
+[roadmap](ROADMAP.md); this inventory does not duplicate changing evidence or
+acceptance details.
 
 The fighter census has one row for each source selectable identity through
 `CKIND_PLAYABLE_COUNT` (including separate Zelda/Sheik identities and the

@@ -7,17 +7,18 @@ Tournament acceptance is an external organizer decision, not a label this
 project can award itself. Publication/provenance work is separate from both
 technical accuracy and event acceptance.
 
-## First deliverable
+## Supported route and acceptance scope
 
-Original in-game character select → original in-game stage select → three
-consecutive playable four-stock Mario versus Mario matches on Final Destination,
-returning through original Results after each match → original character select.
+The supported player route is original in-game character select → original
+in-game stage select → a four-stock Mario versus Mario match on Final Destination
+→ original Results → original character select. The route evidence in
+`STATUS.md` and `docs/ORIGINAL_MENU_ROUTE_CAPTURE.md` is scoped to its named
+builds, inputs and observations; it does not establish general game equivalence.
 Preserve the original menu assets, animation, cursor, confirmation and
 transition behavior for the supported path. HTML imitations, static screenshots
-and a forced-stage bypass do not satisfy this deliverable. The former
-Results-skipping route is historical partial evidence and does not satisfy this
-milestone.
-The current priority and milestone sequence are tracked in the [roadmap](ROADMAP.md).
+and a forced-stage bypass do not satisfy this route. The former Results-skipping
+route is historical partial evidence. The [roadmap](ROADMAP.md) orders the
+remaining bounded acceptance work.
 
 Both players use human input. Retain four stocks across the loop. All characters
 are unlocked in the intended default profile, while unsupported characters and
@@ -40,9 +41,9 @@ The native CSS/SSS chain is the canonical player path. The temporary HTML
 selection UI is removed from the player flow; useful developer diagnostics and
 the legacy native-menu URL redirect remain. The complete loop needs normal input
 testing, original selection/configuration handoff, KO/respawn/outcome, original
-Results confirmation and return after each match, and three consecutive matches
-in one session. A link probe or an automatically scripted match is only partial
-evidence.
+Results confirmation and return. Three consecutive matches without reload are a
+separate sustained-play gate; a link probe or an automatically scripted match
+is only partial evidence.
 
 Each requested CSS, SSS or match transition may enter an explicit preparation
 phase. The phase must be visible, wait for the audio transport's disabled-state
@@ -56,12 +57,12 @@ Entry/Ready, source pause/resume, No Contest, and match-ending checks in two
 Node cycles. Expanded native routes also complete Mario/Falco matches on Final
 Destination and Battlefield and exercise Falco's laser and special-action
 families across every hydrated costume. The evidence is recorded in
-`work/native-active-telemetry-run.log`. The Release browser also passes original pause/resume and two four-stock
-diagnostic loops with three respawns and return to CSS. These use raw-PAD
-diagnostics, not physical input; cold runs have shown timing pauses. This validates the
-historical Results-skipping Mario/Final Destination slice and narrower Falco/Battlefield
-source and rendering scopes. It does not establish the current three-match Results
-deliverable, full
+`work/native-active-telemetry-run.log`. The Release browser also passes original
+pause/resume and four-stock diagnostic loops with return to CSS. These use raw
+PAD diagnostics, not physical input; cold runs have shown timing pauses. Together
+with the scoped route and recorded-session receipts in STATUS, this establishes
+only the named Mario/Final Destination and narrower Falco/Battlefield source and
+rendering scopes. It does not establish general
 `gm_Scene_Vs_OnEnter` or retail scene-manager equivalence, and it is not
 tournament acceptance.
 
@@ -81,9 +82,7 @@ Original profile initialization and normal elimination also pass focused
 native checks. Keyboard-only input validation is accepted for this PR;
 physical-controller and latency acceptance remain separate. Repeatable original
 comparisons, repeated lifecycle memory bounds
-and whole-loop performance remain open. Further equivalence investigation is
-owner-paused; planning this milestone does not restart it. See the [current
-return-loop evidence](
+and whole-loop performance remain open. See the [current return-loop evidence](
 VERSUS_RETURN_LOOP.md#profile-and-prize-integration-2026-09-20) for the precise
 scope and retained failures.
 
@@ -176,11 +175,9 @@ behavior, including quirks relied upon in competitive play.
 ## Existing issue boundaries
 
 - [#1: deterministic comparison](https://github.com/ericvanlare/melee-web/issues/1)
-  is the basis for expanding state evidence when that investigation resumes.
-  Further equivalence investigation is owner-paused; planning this milestone
-  does not restart it. Reuse the existing reference setup and comparison work;
-  do not build a parallel oracle or claim the whole issue is complete from a menu
-  smoke test.
+  is the basis for expanding state evidence. Reuse the existing reference setup
+  and comparison work; do not build a parallel oracle or claim the whole issue
+  is complete from a menu smoke test.
 - [#2: publication readiness](https://github.com/ericvanlare/melee-web/issues/2)
   is closed after the authorized public transition. The [publication cutover
   record](PUBLICATION_CUTOVER.md) remains the source for licensing, provenance

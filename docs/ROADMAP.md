@@ -4,94 +4,84 @@ The goal is full vanilla Melee compiled to WebAssembly, preserving original
 behavior without a shipped PowerPC interpreter or JIT. Complete and verify the
 supported playing experience before expanding scope.
 
-This page owns priority and execution order. GitHub issues own bounded tasks and
-completion criteria; [STATUS](../STATUS.md) owns observed results and scoped
-receipts. Closed implementation issues do not establish every acceptance gate.
+This page orders work. GitHub issues own bounded tasks and completion criteria;
+[STATUS](../STATUS.md) owns observed results and scoped receipts. Do not copy
+changing measurements here, and do not treat a closed implementation issue,
+successful build or short replay as a complete acceptance result.
 
-## Now — Reliable local versus v1
+## Current supported route
 
-The active [milestone](https://github.com/ericvanlare/melee-web/milestone/1)
-targets one frozen desktop configuration and this ordinary player route:
+The ordinary player route is:
 
 **Original CSS → original SSS → four-stock Mario versus Mario on Final
-Destination → original Results → original CSS, for three consecutive matches
-without reloading.**
+Destination → original Results → original CSS.**
 
-Use two human players for physical-input and uninterrupted-play checks. The
-retained four-Mario CPU9 three-match reference is a separate original-versus-browser
-comparison. Neither substitutes for the other. Preserve source heap/RNG history;
-do not splice fresh-process captures or reset the page to make a sequence pass.
+The current route ledger and recorded-session receipt in [STATUS](../STATUS.md)
+establish only their declared builds, inputs, state fields and observations.
+They do not establish general game equivalence, exact pixels or PCM, live input,
+foreground timing, physical-controller acceptance or tournament readiness.
 
-| Work | Owner | Execution boundary |
+The acceptance work stays separate across these boundaries:
+
+| Boundary | Bounded goal | Evidence scope |
 | --- | --- | --- |
-| First session divergence and complete reference sequence | [#82](https://github.com/ericvanlare/melee-web/issues/82), child of [#6](https://github.com/ericvanlare/melee-web/issues/6) | Owner-paused until explicitly resumed; planning does not restart it |
-| One two-controller profile and measured latency | [#83](https://github.com/ericvanlare/melee-web/issues/83), child of [#35](https://github.com/ericvanlare/melee-web/issues/35) | Prepare the existing tools/profile, then arrange the physical session |
-| Uninterrupted three-match audio and performance | [#84](https://github.com/ericvanlare/melee-web/issues/84), child of #35 | Share the controller candidate/profile; use the existing cold/warm sequence protocol |
-| Fixed comparison of other browser ports | [#81](https://github.com/ericvanlare/melee-web/issues/81) | Parallel research outside the milestone; never blocks a known fix |
+| Original comparison | Extend source-phase state and menu/transition comparisons from the retained recorded session when a new divergence is observed. | Use the existing [comparison](ORIGINAL_COMPARISON.md) and [recorded-session](RECORDED_SESSION_STATE.md) tools; preserve first divergence, input order, source heap/RNG context and the complete failing sequence. |
+| Live and physical input | Establish one supported two-controller profile, including assignment, simultaneous input, analog thresholds, digital clicks, focus and reconnect behavior. | Replay input is conditional evidence. Physical input and end-to-end latency need their own arranged session and receipt under [#35](https://github.com/ericvanlare/melee-web/issues/35), coordinated with [#5](https://github.com/ericvanlare/melee-web/issues/5) and [#28](https://github.com/ericvanlare/melee-web/issues/28). |
+| Visual output | Compare named menu, stage, combat, HUD, KO/respawn, Results and return checkpoints on a frozen baseline. | Declare dimensions, camera, output assumptions, source phase, masks and tolerances; keep visual differences separate from state and timing claims. |
+| Audio | Validate sustained menu, gameplay, transition, Results and teardown playback against an independent reference. | Keep source requests, bank ownership, emitted PCM, audible observations and replacement limitations separate; production packaging is governed by [AUDIO_PRODUCTION](AUDIO_PRODUCTION.md). |
+| Sustained performance | Run the named Release route across cold and warm application/driver-cache conditions, including preparation, active play, repeated matches and teardown. | Use [hitch capture](HITCH_CAPTURE.md) and the [performance playbook](PERFORMANCE_AND_ACCURACY.md); report source deadlines, browser callback gaps, audio underruns and memory separately. |
 
-Start with retained evidence, profile/scenario preparation and known player
-failures. Reduce a failure before expanding instrumentation. Study relevant
-existing implementations with source/attribution links as part of each fix.
-Do not create another replay framework, general benchmark platform or open-ended
-competitor audit. After two experiments at one boundary, reduce the reproducer
-or request a bounded review before another long run.
+## Immediate work order
 
-### Finish line
+1. Start from the current candidate and retained receipts. Keep the player route
+   on the original CSS/SSS path and preserve current local-resource, audio and
+   headless-browser policies.
+2. When a comparison or player run fails, reduce the first failing boundary and
+   record the observable outcome, smallest experiment, pass criteria, exclusions,
+   existing solutions checked and stopping rule before another long run. Reuse
+   existing observers and transports; do not create a parallel replay or benchmark
+   framework.
+3. Complete the named physical-controller profile and the sustained audio/
+   performance campaign as independent gates. A headless functional result does
+   not satisfy foreground timing, physical input or audible checks.
+4. Revalidate relevant receipts after source, runtime, build, browser, controller
+   or package changes. Keep preparation, active play, teardown and failures
+   distinguishable in every report.
 
-Freeze Release artifacts, machine/OS/browser/display/power profile, controllers,
-input/scenario inventory and criteria before final runs. Existing protocols and
-thresholds apply; the issue bodies define finite attempt plans. A new failure
-needs a reduced diagnosis and an explicit new campaign, not silent retries.
+## Admission criteria for a named profile
 
-Close the milestone only when #82, #83 and #84 have their declared evidence and
-the final candidate retains all three gates. Link exact receipts from STATUS.
-Component fixes do not close acceptance issues; relevant changes after a receipt
-require scoped revalidation. Report source-state agreement, physical input/latency,
-audible continuity and performance separately.
+Freeze the Release artifact, source revision, machine, OS, browser, display and
+power settings, controller and mapping, disc identity, input/scenario inventory,
+and comparison schema before final runs. Report source-state agreement, menu and
+transition order, live/physical input, visuals, PCM/audio continuity, latency and
+performance as separate claims. A failure consumes its declared attempt; a repair
+requires a new scoped campaign and cannot erase the earlier result.
 
-Verify KO/respawn, outcome/Results, pause/resume, No Contest recovery, loading,
-audio ownership and teardown within the named profile. Report preparation,
-memory and failures separately from active play. Original framebuffer/hardware
-PCM equivalence, all-device support and tournament acceptance remain separate
-under #35 and the [accuracy contract](ACCURACY_CONTRACT.md).
+The profile is admitted only when its declared route and gates have receipts in
+STATUS, with preparation and active-play limits stated. Original hardware PCM or
+framebuffer equivalence, all-device support, complete roster/mode coverage and
+tournament acceptance remain broader work.
 
-Routine browser work stays headless through shared tools. Foreground timing,
-physical controllers and audible checks require an arranged foreground session
-or a separate machine; otherwise the gate remains unrun. See
-[browser validation](HEADLESS_BROWSER_VALIDATION.md) and
-[consecutive-match timing](HITCH_CAPTURE.md#consecutive-match-track-after-holdouts).
-Do not relax accuracy rules to meet the milestone.
+## Broaden the verified experience
 
-## Next — Broaden the verified experience
+Choose a named rotation from integrated fighters and stages before adding content.
+Use the [fighter](ADDING_CHARACTERS.md) and [stage](ADDING_STAGES.md) checkpoints,
+preserve source identities and authored bounds, and extend the same lifecycle,
+comparison, visual, audio, input and performance boundaries. Use the
+[full-game inventory](FULL_GAME_PORT.md) for remaining rules, menus, saves,
+single-player modes, movies, collections and service dependencies.
 
-Choose a named rotation from already integrated fighters/stages before adding
-content. Extend original comparisons, repeated-match ownership and physical
-cold/warm play using the [fighter](ADDING_CHARACTERS.md) and
-[stage](ADDING_STAGES.md) checkpoints.
+## Later scope and historical evidence
 
-Broaden live sampling/source-draw validation under
-[#28](https://github.com/ericvanlare/melee-web/issues/28), controller routing
-under [#5](https://github.com/ericvanlare/melee-web/issues/5), and independent
-visual/PCM/device acceptance under #35. Defects blocking v1 are fixed during Now;
-completing every broad umbrella is not a v1 prerequisite.
+Broader browser/device support follows a stable reference profile. Netplay,
+online services and custom content follow the vanilla boundary in
+[#9](https://github.com/ericvanlare/melee-web/issues/9). The bounded competitor
+comparison in [#81](https://github.com/ericvanlare/melee-web/issues/81) can inform
+implementation choices but is not an accuracy oracle or acceptance dependency.
 
-## Later — Complete vanilla, then optional features
-
-Use the [full-game inventory](FULL_GAME_PORT.md) for remaining content, rules,
-menus, saves, single-player modes, movies and collections. Broader browser/device
-support follows a stable reference profile. Netplay and custom content follow
-the vanilla boundary in [#9](https://github.com/ericvanlare/melee-web/issues/9).
-A coverage dashboard supports this work; it is not a playable-slice prerequisite.
-
-## Historical scope
-
-[#34](https://github.com/ericvanlare/melee-web/issues/34) is closed Results/return
-implementation history; #82–#84 own remaining v1 acceptance.
-[#33](https://github.com/ericvanlare/melee-web/issues/33) has a scoped
-[holdout result](CURRENT_RUNTIME_HOLDOUTS_20260919.md); preserve earlier failed
-campaigns and the unresolved historical cause. It does not validate new sequences.
-
-The earlier Mario/FD route skipped Results and the initial alpha was silent.
-Original Results is now required and [production audio](AUDIO_PRODUCTION.md)
-has an audited release path; these facts do not establish full-game fidelity.
-[Early menu notes](NEXT_PHASE.md) remain history, not an alternative work queue.
+The earlier Results-skipping Mario/Final Destination route and silent-alpha checks
+remain historical evidence for their original scopes. Merged Results and
+production-audio work provide implementation and package evidence; they do not
+by themselves establish the full route, general equivalence or full-game
+fidelity. [NEXT_PHASE](NEXT_PHASE.md) preserves the early menu integration notes
+and is not a second work queue.

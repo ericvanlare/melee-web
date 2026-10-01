@@ -1003,8 +1003,8 @@ CPU holdout, multiplayer, pixel, audio, physical-input or performance admission.
 The browser runs original fighters and stages through compiled WebAssembly. The
 accepted first slice is two Marios on Final Destination; narrower raw-PAD runs
 also selected and rendered Falco versus Mario on Battlefield, Fox versus Mario
-on Yoshi's Story, and Marth versus Mario on Dream Land. The complete
-acceptance milestone below is still open:
+on Yoshi's Story, and Marth versus Mario on Dream Land. The remaining
+acceptance boundaries are:
 source stage and item rendering, stock/respawn/outcome flow, and the optional
 renderer cache are integrated, while clean cold-cache/full-match first-use
 stalls, audible and physical controller verification, and full original-game
