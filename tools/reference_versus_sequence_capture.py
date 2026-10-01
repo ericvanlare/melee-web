@@ -369,12 +369,25 @@ class ObserverTail:
             return "observer was interrupted before the declared sequence ended"
         return None
 
-    def require_completed_status(self) -> None:
+    def require_completed_status(self, timeout: float = 5.0) -> None:
         if self.status_path is None:
             return
-        status = read_status(self.status_path)
-        if not status["completed"] or status["state"] != "completed":
-            raise CaptureError("observer ended without a completed status sidecar")
+        if not isinstance(timeout, (int, float)) or timeout <= 0:
+            raise CaptureError("observer completion timeout must be positive")
+        deadline = time.monotonic() + timeout
+        while True:
+            if self.status_path.exists():
+                status = read_status(self.status_path)
+                if status["invalid"] or status["state"] in {"invalid", "interrupted"} or status["error"]:
+                    raise CaptureError(
+                        "observer status invalid: " + str(status["error"] or status["state"])
+                    )
+                if status["completed"] and status["state"] == "completed":
+                    return
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise CaptureError("observer ended without a completed status sidecar")
+            time.sleep(min(self.poll, remaining))
 
     def _open(self, deadline: float) -> None:
         while self.stream is None:

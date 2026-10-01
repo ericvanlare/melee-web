@@ -9,6 +9,7 @@
 #include "dat_menu_support.hpp"
 #include <melee/ft/forward.h>
 #include <melee/ty/types.h>
+#include "gameplay_trophy_roots.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -103,6 +104,8 @@ struct GameplayResultsAssets::Storage {
     std::unique_ptr<DatScene> film;
     std::unique_ptr<DatSis> text;
     std::unique_ptr<DatTrophyData> trophy_data;
+    std::unique_ptr<DatTrophyData> trophy_data_dat;
+    std::unique_ptr<GameplayTrophyRoots> trophy_roots_dat;
     std::unique_ptr<DatMenuSupport> card_icons;
     std::unique_ptr<DatMenuSupport> card_scene;
     std::vector<TrophyData> trophy_models, trophy_models_d;
@@ -161,6 +164,7 @@ struct GameplayResultsAssets::Storage {
         archive_cache = cache;
         primary_kind = identities.front().fighter_kind;
         for (const auto* name : {"GmRst.usd", "SdRst.usd", "TyDatai.usd",
+                                 "TyDatai.dat",
                                  "LbMcGame.usd", "NtMemAc.usd"})
             load_archive(files, name);
 
@@ -190,6 +194,8 @@ struct GameplayResultsAssets::Storage {
         card_scene = std::make_unique<DatMenuSupport>(
             archives.at("NtMemAc.usd"), DatMenuSupportKind::CardScene);
         trophy_data = std::make_unique<DatTrophyData>(archives.at("TyDatai.usd"));
+        trophy_data_dat = std::make_unique<DatTrophyData>(archives.at("TyDatai.dat"));
+        trophy_roots_dat = std::make_unique<GameplayTrophyRoots>(*trophy_data_dat);
         auto models = [](auto entries) {
             std::vector<TrophyData> result;
             for (const auto& row : entries)
@@ -236,6 +242,7 @@ struct GameplayResultsAssets::Storage {
                            const_cast<std::int16_t*>(trophy_data->no_get_us_table().data())});
         symbols.push_back({"TyDatai.usd", "tyDisplayModelTbl", trophy_display.data()});
         symbols.push_back({"TyDatai.usd", "tyDisplayModelUsTbl", trophy_display_us.data()});
+        trophy_roots_dat->append_symbols("TyDatai.dat", symbols);
         char error[256]{};
         scope = melee_web_archive_sections_register_heap(
             symbols.data(), symbols.size(), error, sizeof(error));
@@ -269,6 +276,8 @@ struct GameplayResultsAssets::Storage {
         verify();
         fighters.clear();
         trophy_data.reset();
+        trophy_roots_dat.reset();
+        trophy_data_dat.reset();
         card_scene.reset();
         card_icons.reset();
         text.reset();

@@ -3,6 +3,22 @@ export const REQUIRED_SESSION_DOWNLOADS = Object.freeze([
   'retail-port.jsonl', 'retail-browser-report.json',
 ]);
 
+export function validateRuntimeDataAbort(evidence) {
+  if (!evidence || typeof evidence !== 'object') return false;
+  const positive = value => Number.isSafeInteger(value) && value > 0;
+  const digest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+  return evidence.requestCount === 1 && evidence.responseCount === 1 &&
+    evidence.failureCount === 1 && evidence.finishedCount === 0 &&
+    evidence.url === evidence.expectedUrl && evidence.method === 'GET' &&
+    evidence.resourceType === 'fetch' && evidence.errorText === 'net::ERR_ABORTED' &&
+    evidence.responseStatus === 200 && positive(evidence.expectedBytes) &&
+    positive(evidence.contentLength) && evidence.contentLength === evidence.expectedBytes &&
+    evidence.loadedBytes === evidence.expectedBytes &&
+    evidence.totalBytes === evidence.expectedBytes &&
+    evidence.fileBytes === evidence.expectedBytes && evidence.fromCache === false &&
+    digest(evidence.expectedSha256) && evidence.actualSha256 === evidence.expectedSha256;
+}
+
 export function finalizeSessionCapture(report) {
   const failures = [];
   if (!report.phases?.some(row => row.name === 'whole-session-replay' && row.result === 'pass'))
@@ -16,6 +32,10 @@ export function finalizeSessionCapture(report) {
     failures.push('A fatal harness diagnostic was recorded');
   if (report.browser_errors?.length)
     failures.push('Browser errors were recorded');
+  if (report.verified_runtime_data_aborts !== undefined &&
+      (!Array.isArray(report.verified_runtime_data_aborts) ||
+       report.verified_runtime_data_aborts.some(evidence => !validateRuntimeDataAbort(evidence))))
+    failures.push('Runtime package abort evidence was malformed or incomplete');
   if (report.unexpected_requests?.length)
     failures.push('Unexpected non-GET requests were recorded');
   for (const key of ['download_error', 'cpu_download_error', 'owner_trace_error',

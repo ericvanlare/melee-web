@@ -351,6 +351,10 @@ int GameplayMatchSession::fighter_kind(unsigned index)const{
     check(storage_&&storage_->match&&index<storage_->content.player_count,"Match player index is outside the active source match");
     return storage_->content.fighter_kinds[index];
 }
+const StartMeleeData& GameplayMatchSession::start_data()const{
+    check(storage_&&storage_->match,"Match session is closed");
+    return storage_->selected.start;
+}
 MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};MeleeWebMatchStats stats{};
     check(melee_web_match_player_stats(storage_->match,index,&stats,error,sizeof(error)),error);return stats;

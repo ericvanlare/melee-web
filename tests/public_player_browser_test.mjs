@@ -202,14 +202,41 @@ try {
   assert.equal(response.headers()['cross-origin-embedder-policy'], 'require-corp');
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await page.locator('#loading-panel').waitFor({state: 'visible', timeout: 30000});
-  await check('disc validation is available before graphics readiness', async () => {
+  await check('disc selection during graphics preparation', async () => {
     assert(await page.locator('#choose-disc').isEnabled(), 'Selection stays available while startup is busy');
-    await selectDisc({name: 'early-invalid.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
-    await page.locator('#error-dialog[open]').waitFor();
-    assert.match(await page.locator('#error').innerText(), /RVZ is not supported/);
-    assert.match(await page.locator('#disc-selection-status').innerText(), /Invalid disc.*early-invalid\.rvz/);
-    report.early_disc_validation = 'A file was selected and rejected while the full graphics loading panel was still visible; no import or launch occurred.';
-    await page.reload();
+    if (values.disc) {
+      await armAudioActivationObserver();
+      await selectDisc(values.disc);
+      await page.waitForFunction(() => {
+        const status = document.querySelector('#disc-selection-status');
+        return !status.hidden && /checking|waiting for graphics|preparing/i.test(status.textContent);
+      }, null, {timeout: 15000});
+      assert(await page.locator('#loading-panel').isVisible(), 'The valid disc is acknowledged while graphics are preparing');
+      const acknowledgement = await page.locator('#disc-selection-status').innerText();
+      assert(acknowledgement.includes(path.basename(values.disc)), 'The temporary acknowledgement identifies the selected file');
+      await armLaunchObserver();
+      const audioRecovery = await waitForCssOrAudioRecovery();
+      if (audioRecovery) report.early_audio_activation_recovery = 'Browser required a separate Play gesture after graphics preparation.';
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 1,
+        'A valid disc selected during graphics preparation auto-launches exactly once');
+      assert.equal(await page.evaluate(() => Module._melee_web_native_menu_phase()), 1);
+      assert(await page.locator('#loading-panel').isHidden());
+      assert(await page.locator('#disc-selection-status').isHidden(), 'The filename clears as CSS starts');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
+      await shot('css-after-early-selection');
+      report.early_disc_validation = `A valid file (${path.basename(values.disc)}) was selected while graphics preparation was visible; its acknowledgement cleared at CSS and native launch ran once.`;
+      await driver.unload();
+      assert(await page.locator('#disc-selection-status').isHidden(), 'Eject and reload leave no disc acknowledgement');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
+    } else {
+      await selectDisc({name: 'early-invalid.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
+      await page.locator('#error-dialog[open]').waitFor();
+      assert.match(await page.locator('#error').innerText(), /RVZ is not supported/);
+      assert(await page.locator('#disc-selection-status').isHidden(), 'Validation errors do not occupy the toolbar');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
+      report.early_disc_validation = 'A file was selected and rejected while the full graphics loading panel was still visible; no import or launch occurred.';
+      await page.reload();
+    }
   });
   await ready();
   await check('isolated WebGPU/Wasm startup and direct original-style player', async () => {
@@ -242,6 +269,12 @@ try {
     assert.equal(await page.locator('#brand').innerText(), 'WEBMELEE.GG');
     assert.equal(await page.locator('#edition').innerText(), 'alpha');
     assert.equal(await page.locator('#edition em').evaluate(node => getComputedStyle(node).fontStyle), 'italic');
+    const actionButtons = await page.locator('#toolbar-actions button').evaluateAll(nodes => nodes.map(node => node.id));
+    const primaryActionOrder = ['choose-disc', 'start-game', 'pause-game', 'fullscreen', 'end-session'];
+    assert.deepEqual(actionButtons.filter(id => primaryActionOrder.includes(id)), primaryActionOrder,
+      'The compact toolbar keeps Disc, Play, Pause, Fullscreen and Eject in order');
+    assert.equal(actionButtons.indexOf('controls-open'), 0,
+      'Controls stays in its established leading position');
     if (values.audio) {
       assert.equal(await page.locator('#audio-note,#audio-info,#audio-details').count(), 0);
     } else assert.equal(await page.locator('#audio-note').textContent(), 'no audio ⓘlicensing issue, need to remove about 50 lines of Dolphin audio code still');
@@ -305,10 +338,26 @@ try {
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `overflow at ${width}`);
       if (width === 390) await shot('mobile');
     }
+    await page.setViewportSize({width: 844, height: 390});
+    const landscapeGeometry = await page.evaluate(() => {
+      const rect = selector => {
+        const {top, bottom, width, height} = document.querySelector(selector).getBoundingClientRect();
+        return {top, bottom, width, height};
+      };
+      return {runtime: rect('#runtime-host'), toolbar: rect('#toolbar'), canvas: rect('#canvas'),
+        pageWidth: document.documentElement.scrollWidth};
+    });
+    assert(landscapeGeometry.pageWidth <= 844, 'landscape toolbar does not overflow the viewport');
+    assert(landscapeGeometry.runtime.bottom <= landscapeGeometry.toolbar.top + 1,
+      'landscape toolbar stays below the game area');
+    assert(Math.abs(landscapeGeometry.canvas.width / landscapeGeometry.canvas.height - 4 / 3) < 0.01,
+      'landscape keeps the original 4:3 canvas');
+    await shot('landscape-ready');
     await page.setViewportSize({width: 1280, height: 960});
     const fullscreenAvailable = await page.evaluate(() => document.fullscreenEnabled === true &&
       typeof document.querySelector('#player').requestFullscreen === 'function' &&
       typeof document.exitFullscreen === 'function');
+    assert(fullscreenAvailable, 'Installed headless Chrome supports native fullscreen for the supported-path check');
     assert.equal(await page.locator('#fullscreen').isVisible(), fullscreenAvailable,
       'Fullscreen is visible only when the native API is supported');
     assert.equal(await page.locator('#fullscreen-status').count(), 0,
@@ -326,6 +375,73 @@ try {
         document.querySelector('#fullscreen').textContent === 'Fullscreen');
       assert.equal(await page.locator('#fullscreen').innerText(), 'Fullscreen');
     }
+    report.fullscreen_supported = {available: true, entered: true, exited: true};
+    const unsupportedPage = await context.newPage();
+    try {
+      await unsupportedPage.addInitScript(() => Object.defineProperty(document, 'fullscreenEnabled', {configurable: true, value: false}));
+      unsupportedPage.on('pageerror', error => errors.push(error.message));
+      unsupportedPage.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+      const unsupportedResponse = await unsupportedPage.goto(values.url);
+      assert.equal(unsupportedResponse.status(), 200);
+      await createBrowserDriver(unsupportedPage, {surface: 'public', timeoutMs: 90000}).waitForImport();
+      await unsupportedPage.locator('#loading-panel').waitFor({state: 'hidden', timeout: 60000});
+      const unsupportedFullscreen = await unsupportedPage.evaluate(() => {
+        const button = document.querySelector('#fullscreen'), rect = button.getBoundingClientRect();
+        const primary = new Set(['controls-open', 'choose-disc', 'start-game', 'pause-game', 'end-session']);
+        return {hidden: button.hidden, display: getComputedStyle(button).display, width: rect.width, height: rect.height,
+          actions: [...document.querySelectorAll('#toolbar-actions button')]
+            .filter(node => primary.has(node.id) && !node.hidden && getComputedStyle(node).display !== 'none')
+          .map(node => node.id)};
+      });
+      assert(unsupportedFullscreen.hidden && unsupportedFullscreen.display === 'none' &&
+        unsupportedFullscreen.width === 0 && unsupportedFullscreen.height === 0,
+      'Unsupported native fullscreen leaves no toolbar slot');
+      assert.deepEqual(unsupportedFullscreen.actions, ['controls-open', 'choose-disc', 'start-game', 'pause-game', 'end-session'],
+        'The remaining controls flow together without a fullscreen gap');
+      assert.equal(await unsupportedPage.locator('#fullscreen-status').count(), 0);
+      assert.doesNotMatch(await unsupportedPage.locator('body').innerText(), /browser controls remain visible|fullscreen unavailable/i);
+      await unsupportedPage.screenshot({path: path.join(values.out, 'fullscreen-unsupported.png'), fullPage: true});
+      report.fullscreen_unsupported = {simulated: true, button_hidden: unsupportedFullscreen.hidden,
+        display: unsupportedFullscreen.display, width: unsupportedFullscreen.width, height: unsupportedFullscreen.height};
+    } finally {
+      await unsupportedPage.close();
+    }
+    await page.locator('#controls-open').click();
+    await page.locator('#player-one-source').selectOption('touch');
+    await page.locator('#controls-close').click();
+    await page.locator('#touch-controls:not([hidden])').waitFor();
+    for (const [name, width, height] of [['touch-portrait-ready', 390, 844], ['touch-landscape-ready', 844, 390]]) {
+      await page.setViewportSize({width, height});
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const touchLayout = await page.evaluate(() => {
+        const rect = selector => {
+          const {left, top, right, bottom, width, height} = document.querySelector(selector).getBoundingClientRect();
+          return {left, top, right, bottom, width, height};
+        };
+        const controls = [...document.querySelectorAll('#touch-controls [data-touch-button], #touch-controls [data-touch-stick]')];
+        return {runtime: rect('#runtime-host'), toolbar: rect('#toolbar'), canvas: rect('#canvas'), overlay: rect('#touch-controls'),
+          controls: controls.map(element => {
+            const r = element.getBoundingClientRect();
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+            return {visible: r.width > 0 && r.height > 0, reachable: hit === element || element.contains(hit)};
+          }), pageWidth: document.documentElement.scrollWidth};
+      });
+      assert(touchLayout.pageWidth <= width, `${name} toolbar does not overflow the viewport`);
+      assert(touchLayout.runtime.bottom <= touchLayout.toolbar.top + 1, `${name} toolbar stays below the game area`);
+      assert(Math.abs(touchLayout.canvas.width / touchLayout.canvas.height - 4 / 3) < 0.01,
+        `${name} keeps the original 4:3 canvas`);
+      assert(Math.abs(touchLayout.overlay.width - touchLayout.canvas.width) < 1 &&
+        Math.abs(touchLayout.overlay.height - touchLayout.canvas.height) < 1,
+      `${name} touch overlay follows the canvas`);
+      assert(touchLayout.controls.length > 0 && touchLayout.controls.every(control => control.visible && control.reachable),
+        `${name} touch controls remain visible and hit-test reachable`);
+      await shot(name);
+    }
+    await page.locator('#controls-open').click();
+    await page.locator('#player-one-source').selectOption('keyboard');
+    await page.locator('#controls-close').click();
+    await page.waitForFunction(() => document.querySelector('#touch-controls').hidden);
+    await page.setViewportSize({width: 1280, height: 960});
   });
   if (values.disc) {
     await check('owned-disc import, native preparation and original CSS', async () => {
@@ -341,7 +457,59 @@ try {
       await page.waitForFunction(() => document.activeElement.id === 'canvas');
       assert(await page.locator('#pause-game').isEnabled());
       assert(await page.locator('#start-game').isDisabled(), 'Play is not a required first-launch step');
+      assert(await page.locator('#disc-selection-status').isHidden(),
+        'The selected filename clears after play starts');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
+      assert.doesNotMatch(await page.locator('#toolbar-meta').innerText(), /Playing\s+.+/,
+        'The toolbar has no post-start filename/status narration');
       await shot('css-after-import');
+      await page.locator('#controls-open').click();
+      await page.locator('#player-one-source').selectOption('touch');
+      await page.locator('#controls-close').click();
+      await page.locator('#touch-controls:not([hidden])').waitFor();
+      for (const [name, width, height] of [['portrait-gameplay', 390, 844], ['landscape-gameplay', 844, 390]]) {
+        await page.setViewportSize({width, height});
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        const geometry = await page.evaluate(() => {
+          const rect = selector => {
+            const {left, top, right, bottom, width, height} = document.querySelector(selector).getBoundingClientRect();
+            return {left, top, right, bottom, width, height};
+          };
+          const targets = [...document.querySelectorAll('#touch-controls [data-touch-button], #touch-controls [data-touch-stick]')];
+          const actionButtons = [...document.querySelectorAll('#toolbar-actions button')]
+            .filter(button => !button.hidden && getComputedStyle(button).display !== 'none');
+          const buttonRects = actionButtons.map(button => {
+            const {left, top, right, bottom} = button.getBoundingClientRect();
+            return {left, top, right, bottom};
+          });
+          const buttonsOverlap = buttonRects.some((a, index) => buttonRects.slice(index + 1).some(b =>
+            a.left < b.right - 1 && a.right > b.left + 1 && a.top < b.bottom - 1 && a.bottom > b.top + 1));
+          return {toolbar: rect('#toolbar'), runtime: rect('#runtime-host'), canvas: rect('#canvas'), overlay: rect('#touch-controls'),
+            buttonsOverlap,
+            targets: targets.map(element => {
+              const r = element.getBoundingClientRect();
+              const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+              return {visible: r.width > 0 && r.height > 0, reachable: hit === element || element.contains(hit)};
+            }),
+            pageWidth: document.documentElement.scrollWidth};
+        });
+        assert(geometry.pageWidth <= width, `${name} toolbar does not overflow the viewport`);
+        assert(!geometry.buttonsOverlap, `${name} toolbar buttons wrap without overlap`);
+        assert(geometry.runtime.bottom <= geometry.toolbar.top + 1, `${name} toolbar stays below the game area`);
+        assert(Math.abs(geometry.canvas.width / geometry.canvas.height - 4 / 3) < 0.01,
+          `${name} keeps the original 4:3 game presentation`);
+        assert(geometry.overlay.left >= geometry.runtime.left && geometry.overlay.right <= geometry.runtime.right &&
+          geometry.overlay.top >= geometry.runtime.top && geometry.overlay.bottom <= geometry.runtime.bottom,
+        `${name} touch controls stay inside the game area`);
+        assert(geometry.targets.length > 0 && geometry.targets.every(target => target.visible && target.reachable),
+          `${name} touch controls remain visible and hit-test reachable during CSS`);
+        await shot(name);
+      }
+      await page.locator('#controls-open').click();
+      await page.locator('#player-one-source').selectOption('keyboard');
+      await page.locator('#controls-close').click();
+      await page.waitForFunction(() => document.querySelector('#touch-controls').hidden);
+      await page.setViewportSize({width: 1280, height: 960});
       report.css_after_import = await page.evaluate(() => ({
         phase: Module._melee_web_native_menu_phase(),
         running: Module._melee_web_native_menu_running(),
@@ -362,9 +530,12 @@ try {
       await page.locator('#pause-game').click();
       await page.waitForFunction(() => document.querySelector('#pause-game').textContent === 'Resume' && !document.querySelector('#pause-game').disabled);
       assert.equal(await page.evaluate(() => Module._melee_web_native_menu_running()), 0);
+      assert(await page.locator('#disc-selection-status').isHidden(), 'Pause does not restore the disc filename');
       await page.locator('#pause-game').click();
       await page.waitForFunction(() => Module._melee_web_native_menu_running());
       await page.locator('#pause-game:not([disabled])').waitFor();
+      assert(await page.locator('#disc-selection-status').isHidden(), 'Resume does not restore the disc filename');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
     });
     await check('ordinary B0XX keyboard enters original SSS and cancels back to CSS', async () => {
       await page.waitForTimeout(1200); await press('7'); await phase(3);
@@ -412,6 +583,15 @@ try {
         report[`${label}_audio_activation_recovery`] = 'A separate Play gesture was required after Eject/reimport.';
       assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 1,
         'A fresh document launches its selected disc once');
+      assert(await page.locator('#disc-selection-status').isHidden(), 'Reimport clears its filename after start');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
+      await shot('css-after-reselection');
+      report.css_after_reselection = await page.evaluate(() => ({
+        phase: Module._melee_web_native_menu_phase(),
+        running: Module._melee_web_native_menu_running(),
+        launch_calls: window.nativeLaunchCalls,
+        loading_hidden: document.querySelector('#loading-panel').hidden,
+      }));
       assert.equal(await page.evaluate(() => Module._melee_web_native_menu_phase()), 1,
         'Owned-disc reimport must start directly in original CSS');
       assert(await page.locator('#loading-panel').isHidden());

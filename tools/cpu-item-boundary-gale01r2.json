@@ -1,0 +1,252 @@
+{
+  "schema": "melee-web-retail-cpu-item-boundary-diagnostic",
+  "version": 5,
+  "source_revision": "GALE01r2",
+  "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+  "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+  "window": {
+    "match": 1,
+    "trigger": "young_link_arrow_launch",
+    "capture_ticks": 3
+  },
+  "target": {
+    "item_kind": 65,
+    "item_pointer": "0x80e1b920",
+    "gobj_pointer": "0x80e29760",
+    "owner_slot": 3,
+    "list_order": 1
+  },
+  "points": [
+    {
+      "label": "item_physics_wrapper_entry",
+      "address": "0x802697d4",
+      "expected_word": "0x7c0802a6",
+      "event": "CallbackEntry",
+      "pair": 1
+    },
+    {
+      "label": "item_physics_wrapper_return",
+      "address": "0x80269974",
+      "expected_word": "0x4e800020",
+      "event": "CallbackReturn",
+      "pair": 1
+    },
+    {
+      "label": "item_collision_wrapper_entry",
+      "address": "0x80269978",
+      "expected_word": "0x7c0802a6",
+      "event": "CallbackEntry",
+      "pair": 2
+    },
+    {
+      "label": "item_collision_wrapper_return",
+      "address": "0x80269a98",
+      "expected_word": "0x4e800020",
+      "event": "CallbackReturn",
+      "pair": 2
+    },
+    {
+      "label": "item_hitbox_wrapper_entry",
+      "address": "0x80269b60",
+      "expected_word": "0x7c0802a6",
+      "event": "CallbackEntry",
+      "pair": 3
+    },
+    {
+      "label": "item_hitbox_updater_call",
+      "address": "0x80269bc0",
+      "expected_word": "0x480077bd",
+      "event": "Call",
+      "pair": 4
+    },
+    {
+      "label": "item_hitbox_updater_return",
+      "address": "0x80269bc4",
+      "expected_word": "0x7fc3f378",
+      "event": "CallReturn",
+      "pair": 4
+    },
+    {
+      "label": "item_hitbox_wrapper_return",
+      "address": "0x80269be0",
+      "expected_word": "0x4e800020",
+      "event": "CallbackReturn",
+      "pair": 3
+    },
+    {
+      "label": "cpu_item_decision_entry",
+      "address": "0x800bb9b4",
+      "expected_word": "0x7c0802a6",
+      "event": "CpuEntry",
+      "pair": 5
+    },
+    {
+      "label": "cpu_item_decision_return",
+      "address": "0x800bbb88",
+      "expected_word": "0x4e800020",
+      "event": "CpuReturn",
+      "pair": 5
+    },
+    {
+      "label": "young_link_arrow_anim_entry",
+      "address": "0x802a8cc8",
+      "expected_word": "0x7c0802a6",
+      "event": "CallbackEntry",
+      "pair": 6
+    },
+    {
+      "label": "young_link_arrow_anim_return",
+      "address": "0x802a90ec",
+      "expected_word": "0x4e800020",
+      "event": "CallbackReturn",
+      "pair": 6
+    },
+    {
+      "label": "young_link_arrow_physics_entry",
+      "address": "0x802a90f0",
+      "expected_word": "0x80a3002c",
+      "event": "CallbackEntry",
+      "pair": 7
+    },
+    {
+      "label": "young_link_arrow_physics_return",
+      "address": "0x802a9134",
+      "expected_word": "0x4e800020",
+      "event": "CallbackReturn",
+      "pair": 7
+    },
+    {
+      "label": "young_link_arrow_collision_entry",
+      "address": "0x802a9138",
+      "expected_word": "0x7c0802a6",
+      "event": "CallbackEntry",
+      "pair": 8
+    },
+    {
+      "label": "young_link_arrow_collision_return",
+      "address": "0x802a9348",
+      "expected_word": "0x4e800020",
+      "event": "CallbackReturn",
+      "pair": 8
+    },
+    {
+      "label": "arrow_hit_shield_state_call",
+      "address": "0x802a9c08",
+      "expected_word": "0x4bfbf255",
+      "event": "Call",
+      "pair": 9
+    },
+    {
+      "label": "arrow_hit_shield_state_return",
+      "address": "0x802a9c0c",
+      "expected_word": "0x7f63db78",
+      "event": "CallReturn",
+      "pair": 9
+    },
+    {
+      "label": "young_link_arrow_spawn_return",
+      "address": "0x802a8508",
+      "expected_word": "0x4e800020",
+      "event": "CreationReturn",
+      "pair": 0
+    },
+    {
+      "label": "young_link_arrow_launch_entry",
+      "address": "0x802a850c",
+      "expected_word": "0x7c0802a6",
+      "event": "CallbackEntry",
+      "pair": 10
+    },
+    {
+      "label": "young_link_arrow_launch_return",
+      "address": "0x802a8980",
+      "expected_word": "0x4e800020",
+      "event": "CallbackReturn",
+      "pair": 10
+    },
+    {
+      "label": "arrow_shield_overlap_call",
+      "address": "0x80079810",
+      "expected_word": "0x4bf8e3bd",
+      "event": "ArrowShieldOverlapCallSite",
+      "pair": 11
+    },
+    {
+      "label": "arrow_shield_overlap_return",
+      "address": "0x80079814",
+      "expected_word": "0x2c030000",
+      "event": "ArrowShieldOverlapCallReturn",
+      "pair": 11
+    },
+    {
+      "label": "arrow_ftcoll_shield_assignment_entry",
+      "address": "0x80077688",
+      "expected_word": "0x7c0802a6",
+      "event": "ArrowItemCallEntry",
+      "pair": 12
+    },
+    {
+      "label": "arrow_ftcoll_shield_assignment_return",
+      "address": "0x8007796c",
+      "expected_word": "0x4e800020",
+      "event": "ArrowItemCallReturn",
+      "pair": 12
+    },
+    {
+      "label": "arrow_item_damage_dispatch_entry",
+      "address": "0x80269dc8",
+      "expected_word": "0x7c0802a6",
+      "event": "CallbackEntry",
+      "pair": 13
+    },
+    {
+      "label": "arrow_item_damage_dispatch_return",
+      "address": "0x80269f10",
+      "expected_word": "0x4e800020",
+      "event": "CallbackReturn",
+      "pair": 13
+    },
+    {
+      "label": "arrow_hit_shield_callback_entry",
+      "address": "0x802a9b08",
+      "expected_word": "0x7c0802a6",
+      "event": "CallbackEntry",
+      "pair": 14
+    },
+    {
+      "label": "arrow_hit_shield_callback_return",
+      "address": "0x802a9cdc",
+      "expected_word": "0x4e800020",
+      "event": "CallbackReturn",
+      "pair": 14
+    },
+    {
+      "label": "arrow_hit_shield_target_test_call",
+      "address": "0x802a9b30",
+      "expected_word": "0x4bfc9211",
+      "event": "ArrowTargetCheckCallSite",
+      "pair": 15
+    },
+    {
+      "label": "arrow_hit_shield_target_test_return",
+      "address": "0x802a9b34",
+      "expected_word": "0x2c030000",
+      "event": "ArrowTargetCheckCallReturn",
+      "pair": 15
+    },
+    {
+      "label": "source_tick_return",
+      "address": "0x80390eb4",
+      "expected_word": "0x4e800020",
+      "event": "Boundary",
+      "pair": 0
+    },
+    {
+      "label": "source_draw_return",
+      "address": "0x80391040",
+      "expected_word": "0x4e800020",
+      "event": "Boundary",
+      "pair": 0
+    }
+  ]
+}

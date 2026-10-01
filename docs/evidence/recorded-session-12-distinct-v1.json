@@ -1,0 +1,261 @@
+{
+  "schema": "melee-web-recorded-session-12-distinct-v1",
+  "date": "2026-09-28",
+  "scope": "Three-match twelve-distinct-character CPU9 Final Destination recorded-session comparison, with the four-Mario CPU9 v8 recording retained as a separate regression.",
+  "base": {
+    "main_commit": "d22b50f83c1e7acff9a23bd274b210515935bea4",
+    "pr_93_merge_commit": "2e083bf1367ca8900874a11ac7566433cfdf37a1"
+  },
+  "v9_milestone": {
+    "label": "Compiled / Source identified / Native traced / Retail compared / Browser exercised",
+    "source": {
+      "recipe": {
+        "local_artifact": "three-match twelve-character MWRC v9 recipe",
+        "path": "work/recorded-session-12-distinct-source-v3/candidate.mwrc",
+        "bytes": 1917826,
+        "sha256": "576ae189487b38d4087affb29101abd681f0fa9e620b7f4bc7c8c079255db962"
+      },
+      "provenance_manifest": {
+        "local_artifact": "MWRC v9 candidate provenance manifest",
+        "path": "work/recorded-session-12-distinct-source-v3/candidate.provenance.json",
+        "bytes": 64158,
+        "sha256": "a17d17e3f98f83156f6bfe58118796985f63ebb8cf444fb34cdbbfc3c9a76226"
+      },
+      "capture": {
+        "local_artifact": "independent original three-match MWRO v9 source capture",
+        "path": "work/recorded-session-12-distinct-source-v3/capture.mwro",
+        "bytes": 1567988792,
+        "sha256": "ec926ea9018944f0bd00966f04f5a890da3be0a5b5191d991c430f6d24083328"
+      },
+      "source_environment": {
+        "capture_id": "melee12-source-v3-20260927",
+        "source_revision": "GALE01r2",
+        "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+        "emulator": "Dolphin c77bbaa0f372c3f72281602a8b087206706542cb",
+        "cpu_mode": "JITARM64",
+        "source_consumed_workload": "pass",
+        "source_capture_repeatability": "not_evaluated"
+      },
+      "frames": 43035,
+      "roster_by_match": [
+        {"match_index": 0, "character_kinds": [8, 2, 20, 9], "characters": ["Mario", "Fox", "Falco", "Marth"]},
+        {"match_index": 1, "character_kinds": [22, 23, 6, 21], "characters": ["Dr. Mario", "Roy", "Link", "Young Link"]},
+        {"match_index": 2, "character_kinds": [0, 25, 7, 13], "characters": ["Captain Falcon", "Ganondorf", "Luigi", "Pikachu"]}
+      ],
+      "setup_profile": {
+        "players_per_match": 4,
+        "cpu_kind": 4,
+        "cpu_level": 9,
+        "stocks": 4,
+        "stage_kind": 32,
+        "costumes_by_slot": [0, 1, 2, 3],
+        "rumble": false,
+        "match_setups": [
+          {"match_index": 0, "source_sequence": 4238, "match_entry_frame": 1237, "fighters": 4},
+          {"match_index": 1, "source_sequence": 73898, "match_entry_frame": 15897, "fighters": 4},
+          {"match_index": 2, "source_sequence": 146492, "match_entry_frame": 31231, "fighters": 4}
+        ]
+      }
+    },
+    "browser": {
+      "browser": "Installed headless Google Chrome 153.0.8010.54",
+      "cpu_observations": "not_captured",
+      "runtime_source_commit": "f8ad6f54129db087ca5340efe282ac765c1d68ba",
+      "runtime_artifacts": {
+        "javascript_sha256": "9bea572d57d0cc62db0cc53b78264c041cc4e27c0df21367bb65062fca302df5",
+        "wasm_sha256": "a58ef2390f3bd03bf0bdb67f94d4badad4efb8779e2fa0c5c5d8de8599885e5c",
+        "preload_data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "capture_revision_note": "Both fresh browser comparisons were run after building the final runtime source at commit f8ad6f54129db087ca5340efe282ac765c1d68ba; these exact JavaScript, Wasm and preload-data hashes were served to both captures. Branch head d7f0114306ed259579b846fc8f43fadb5e1f7fe8 adds only a direct <limits> include to the isolated C++ test harness. CPU-observation diagnostics were disabled in both captures.",
+      "capture_report": {
+        "local_artifact": "fresh final-build v9 headless browser capture report",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v9/report.json",
+        "bytes": 13209431,
+        "sha256": "5dfbbccf5ce1477c672e5eb2b8aadee241617cf53bfb7c6dfced2b7fd6943b31",
+        "result": "pass"
+      },
+      "browser_report": {
+        "local_artifact": "fresh final-build v9 retail browser report",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v9/retail-browser-report.json",
+        "bytes": 14362,
+        "sha256": "9ee5a3f8a344255b2f7299b785eb09aeec8f795a5b44d15361be07695fc6e168",
+        "complete": true,
+        "pass": true,
+        "frames": 43035,
+        "final_scene": 1,
+        "failures": 0
+      },
+      "port_trace": {
+        "local_artifact": "fresh final-build v9 browser port trace",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v9/retail-port.jsonl",
+        "bytes": 190529586,
+        "sha256": "0466f974982835d955100c987c811fb20346c65a68074d002a2837f6e47c94b2"
+      },
+      "comparison": {
+        "local_artifact": "strict final-build v9 source/browser comparison",
+        "path": "work/recorded-session-12-distinct-final-build-v22/strict-v9.json",
+        "bytes": 4046,
+        "sha256": "b1a367a9590fde0d06e7ae7018ff6026609f3cac1e43de4d7d62c69f793a70d5",
+        "result": "equivalent",
+        "frames_requested": 43035,
+        "frames_compared": 43035,
+        "match_frames_compared": 38296,
+        "match_setups_compared": 3,
+        "nonmatch_frames_compared": 4739,
+        "fields_compared": ["rng", "match_frame", "pad_state_hex", "fighters", "fighter_entities"],
+        "checks": {
+          "source_stream": "pass",
+          "recipe_binding": "pass",
+          "input_order": "pass",
+          "scene_order": "pass",
+          "initial_css_rng": "pass",
+          "match_state": "pass",
+          "final_css": "report_pass",
+          "nonmatch_pad": "uncovered"
+        }
+      }
+    },
+    "primary_entity_coverage": {
+      "result": "pass",
+      "each_match_contains": 4,
+      "slots": [0, 1, 2, 3],
+      "fighter_player_ids": [0, 1, 2, 3],
+      "entity_index": 0,
+      "linked_gobj": true,
+      "generation": 0,
+      "secondary_or_transformed_entities_in_this_roster": 0,
+      "comparator_rejects": ["missing", "extra", "reordered", "duplicate", "malformed", "secondary", "detached-link", "slot-mismatch"]
+    }
+  },
+  "v8_four_mario_regression": {
+    "label": "Compiled / Source identified / Native traced / Retail compared / Browser exercised",
+    "source": {
+      "recipe": {
+        "local_artifact": "separate three-match four-Mario CPU9 MWRC v8 recipe",
+        "bytes": 1877246,
+        "sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e"
+      },
+      "capture": {
+        "local_artifact": "separate original three-match four-Mario MWRO v8 source capture",
+        "bytes": 1555401454,
+        "sha256": "18531db0d92fead60044deacef9eedc22d7cb5c19773faa63a6c9df7528546f5"
+      },
+      "frames": 42127,
+      "roster": "Mario CPU9 in all four slots in all three matches; four stocks; Final Destination"
+    },
+    "browser": {
+      "browser": "Installed headless Google Chrome 153.0.8010.54",
+      "cpu_observations": "not_captured",
+      "runtime_source_commit": "f8ad6f54129db087ca5340efe282ac765c1d68ba",
+      "runtime_artifacts": {
+        "javascript_sha256": "9bea572d57d0cc62db0cc53b78264c041cc4e27c0df21367bb65062fca302df5",
+        "wasm_sha256": "a58ef2390f3bd03bf0bdb67f94d4badad4efb8779e2fa0c5c5d8de8599885e5c",
+        "preload_data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "capture_report": {
+        "local_artifact": "fresh final-build v8 regression browser capture report",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v8/report.json",
+        "bytes": 13876986,
+        "sha256": "8f73481d515963987e5f9bc2f034b55c97ad9969b80b287738332873e46eb280",
+        "result": "pass"
+      },
+      "browser_report": {
+        "local_artifact": "fresh final-build v8 regression retail browser report",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v8/retail-browser-report.json",
+        "bytes": 14341,
+        "sha256": "a33b008d0cd7ff233b3b81252e92035f3c8bc352ff42ea0819cdb3b282c253ab",
+        "complete": true,
+        "pass": true,
+        "frames": 42127,
+        "final_scene": 1,
+        "failures": 0
+      },
+      "port_trace": {
+        "local_artifact": "fresh final-build v8 regression browser port trace",
+        "path": "work/recorded-session-12-distinct-final-build-v22/capture-v8/retail-port.jsonl",
+        "bytes": 172021833,
+        "sha256": "47071cbad2cc1950817d65d44083aeb71d528ac7bda59e7dbe253580ee3abe4c"
+      },
+      "comparison": {
+        "local_artifact": "strict final-build v8 source/browser regression comparison",
+        "path": "work/recorded-session-12-distinct-final-build-v22/strict-v8.json",
+        "bytes": 4076,
+        "sha256": "67e97b233a36499f83231cb4c78b9dd51d518b02ac987c68cf8b8327becc982b",
+        "result": "equivalent",
+        "frames_requested": 42127,
+        "frames_compared": 42127,
+        "match_frames_compared": 38547,
+        "match_setups_compared": 3,
+        "nonmatch_frames_compared": 3580,
+        "fields_compared": ["rng", "match_frame", "pad_state_hex", "fighters"],
+        "checks": {
+          "source_stream": "pass",
+          "recipe_binding": "pass",
+          "input_order": "pass",
+          "scene_order": "pass",
+          "initial_css_rng": "pass",
+          "match_state": "pass",
+          "final_css": "report_pass",
+          "nonmatch_pad": "uncovered"
+        }
+      }
+    }
+  },
+  "validation": {
+    "focused_tests": {
+      "command": "python3 -m unittest tests.test_gameplay_menu tests.test_retail_recipe_scene_trace -v",
+      "result": "pass",
+      "tests": 3
+    },
+    "portable_test_harness_fix": {
+      "change": "Added direct <limits> include to the extracted C++ item-probe lifecycle test harness.",
+      "focused_command": "python3 -m unittest tests.test_reference_cpu_item_probe_lifecycle -v",
+      "result": "pass",
+      "tests": 1,
+      "implementation_verify_run": "https://github.com/ericvanlare/melee-web/actions/runs/36469057349",
+      "verified_code_head": "d7f0114306ed259579b846fc8f43fadb5e1f7fe8"
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "local_artifact": "full-suite-final.log with all four owned CPU provenance inputs configured",
+      "path": "work/recorded-session-12-distinct-v8-regression-v21/full-suite-final.log",
+      "bytes": 281294,
+      "sha256": "dc18e717b83a97db589dd6826916e5a8bf471a4ec76ee00d06166be3b9f99975",
+      "result": "pass",
+      "tests": 1575,
+      "skipped": 85,
+      "failed": 0,
+      "seconds": 282.078
+    },
+    "gameplay_build": {
+      "command": "python3 scripts/build.py --target gameplay",
+      "local_artifact": "build-gameplay-final.log",
+      "path": "work/recorded-session-12-distinct-v8-regression-v21/build-gameplay-final.log",
+      "bytes": 12169,
+      "sha256": "bd88e87c7387eebf70cb115437ffe902695d276111d987c57b991ecf4675b64c",
+      "result": "pass"
+    },
+    "runtime_build": {
+      "command": "python3 scripts/build.py --target runtime",
+      "local_artifact": "build-runtime-final.log",
+      "path": "work/recorded-session-12-distinct-v8-regression-v21/build-runtime-final.log",
+      "bytes": 11964,
+      "sha256": "7acf12832301771f35fefd3f9c13c25c9a0592454fa341bec15f5e9a36bdb466",
+      "result": "pass",
+      "artifacts": {
+        "javascript": {"bytes": 583472, "sha256": "9bea572d57d0cc62db0cc53b78264c041cc4e27c0df21367bb65062fca302df5"},
+        "wasm": {"bytes": 121150069, "sha256": "a58ef2390f3bd03bf0bdb67f94d4badad4efb8779e2fa0c5c5d8de8599885e5c"},
+        "preload_data": {"bytes": 3674112, "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"}
+      }
+    }
+  },
+  "limits": [
+    "State agreement applies only to the source-consumed input/scene order and declared match fields in these recordings.",
+    "Non-match PAD state and menu scalar state are not compared.",
+    "The v8 comparator checks four declared fields; the v9 comparator additionally checks primary fighter-entity records.",
+    "The selected v9 roster creates no secondary or transformed entities; admitting such a roster requires source identities, lifetimes and compared fields for those entities.",
+    "The v9 source capture is one original Dolphin execution; reference repeatability and source-consumed PAD repeatability were not evaluated.",
+    "No live timing, performance, draw-cadence, pixels, PCM, input-latency, or general game-equivalence claim is made.",
+    "CPU observer diagnostics were disabled for both captures; instrumented timing metrics are not evidence for timing or performance."
+  ]
+}

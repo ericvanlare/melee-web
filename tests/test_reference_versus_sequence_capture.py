@@ -5,6 +5,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,6 +31,26 @@ def _whole_boundary(kind, match_index):
 
 
 class ReferenceVersusSequenceCaptureTest(unittest.TestCase):
+    def test_completed_status_waits_for_the_final_sidecar_after_end(self):
+        with tempfile.TemporaryDirectory() as temp:
+            status_path = Path(temp) / "status.json"
+            status_path.write_text("{}", encoding="utf-8")
+            tail = runner.ObserverTail(Path(temp) / "capture.mwro", status_path, poll=0.001)
+            recording = {
+                "state": "recording", "event_count": 12, "last_seq": 11,
+                "source_tick": 4, "draw_ordinal": 4, "completed": False,
+                "invalid": False, "error": None,
+            }
+            completed = {
+                **recording, "state": "completed", "completed": True,
+                "event_count": 13, "last_seq": 12,
+            }
+            with mock.patch.object(runner, "read_status", side_effect=(recording, completed)), \
+                 mock.patch.object(runner.time, "monotonic", side_effect=(0.0, 0.0)), \
+                 mock.patch.object(runner.time, "sleep") as sleep:
+                tail.require_completed_status(timeout=1.0)
+            sleep.assert_called_once_with(0.001)
+
     def test_inventory_requires_an_explicit_ordinary_recipe(self):
         inventory = runner.load_inventory("repeatMario")
         self.assertEqual(len(inventory), 3)

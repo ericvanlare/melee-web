@@ -31,6 +31,30 @@ def _raw_pad_snapshot() -> bytes:
     return bytes(raw)
 
 
+def _whole_session_cpu_setup(match_index: int) -> bytes:
+    """Four ordinary CPU9 players with the selected per-match roster."""
+    lineups = replay.V9_MILESTONE_ROSTER
+    raw = bytearray.fromhex(_whole_setup()["start_melee_hex"])
+    raw[0] = (raw[0] & 0x1F) | 0x20  # accepted four-Mario MatchKind
+    raw[2] |= 0x80  # stock rules
+    raw[0x0B] = 0xFF  # accepted item-frequency off setting
+    raw[0x0E:0x10] = (0x20).to_bytes(2, "big")  # Final Destination
+    raw[0x20:0x28] = bytes.fromhex("ffffffffffffffff")
+    raw[0x30:0x34] = bytes.fromhex("3f800000")
+    raw[0x34:0x38] = bytes.fromhex("3f800000")
+    for slot in range(6):
+        base = 0x60 + slot * 0x24
+        if slot < 4:
+            raw[base:base + 5] = bytes((lineups[match_index][slot], 1, 4, slot, 0))
+            raw[base + 14] = 4
+            raw[base + 15] = 9
+            for offset in (0x18, 0x1C, 0x20):
+                raw[base + offset:base + offset + 4] = bytes.fromhex("3f800000")
+        else:
+            raw[base + 1] = 3
+    return bytes(raw)
+
+
 def _pad_consume(match_index: int, value: int, source_tick: int) -> dict:
     address = 0x80500000
     slot = b"".join(bytes([value + port]) * 11 + b"\0" for port in range(4))
@@ -59,7 +83,8 @@ def _pad_consume(match_index: int, value: int, source_tick: int) -> dict:
     }
 
 
-def _candidate(capture_id: str = "capture-a", sequence_id: str = "sequence-a"):
+def _candidate(capture_id: str = "capture-a", sequence_id: str = "sequence-a",
+               *, v9_milestone: bool = False):
     rows = copy.deepcopy(_decoded_observer_rows())
     # Keep the fixture's published masks consistent with its typed SaveData,
     # as the v8 reader checks both source ranges at the transport boundary.
@@ -90,8 +115,8 @@ def _candidate(capture_id: str = "capture-a", sequence_id: str = "sequence-a"):
         announcement.update({"capture_id": capture_id, "sequence_id": sequence_id,
                              "match_count": 3, "whole_session": True})
 
-    setup = bytes.fromhex(_whole_setup()["start_melee_hex"]).hex()
     raw_pad = _raw_pad_snapshot().hex()
+    setup = _whole_setup()["start_melee_hex"]
     for row in rows:
         payload = row.get("payload", {})
         boundary = payload.get("boundary")
@@ -105,10 +130,12 @@ def _candidate(capture_id: str = "capture-a", sequence_id: str = "sequence-a"):
                  "hex": "12345678"},
             ])
         if boundary == "entry":
+            setup_hex = (_whole_session_cpu_setup(payload.get("match_index", 0)).hex()
+                         if v9_milestone else setup)
             payload["gprs"][3] = 0x80520000
             payload["slices"].append(
                 {"name": "match_setup", "address": 0x80520000, "size": 0x138,
-                 "hex": setup})
+                 "hex": setup_hex})
 
     augmented = []
     value = 0x10
@@ -315,16 +342,19 @@ class WholeSessionReplayTests(unittest.TestCase):
         with self.assertRaisesRegex(replay.WholeSessionReplayError, "no source-consumed"):
             replay.capture_from_records(rows)
 
-    def test_rejects_changed_setup_between_matches(self):
-        rows = _candidate()
-        for row in rows:
-            if row["payload"].get("boundary") == "entry" and row["payload"]["match_index"] == 2:
-                setup = row["payload"]["slices"][-1]
-                changed = bytearray.fromhex(setup["hex"])
-                changed[0x0E] = 1
-                setup["hex"] = changed.hex()
-        with self.assertRaisesRegex(replay.WholeSessionReplayError, "changed between matches"):
-            replay.capture_from_records(rows)
+    def test_v9_accepts_and_retains_changed_setup_between_matches(self):
+        rows = _candidate(v9_milestone=True)
+        capture = replay.capture_from_records(rows)
+        self.assertNotEqual(capture["setup_hexes"][0], capture["setup_hexes"][2])
+        payload, _ = replay.encode_v9(capture)
+        setup_cursor = replay.HEADER.size + replay.CONTEXT_HEADER.size + replay.CONTEXT_BYTES
+        count, reserved = struct.unpack_from(">HH", payload, setup_cursor)
+        self.assertEqual((count, reserved), (3, 0))
+        setup_cursor += 4 + 2 * replay.GAME_INFO_SIZE
+        third = replay._decode_setup(
+            payload[setup_cursor:setup_cursor + replay.GAME_INFO_SIZE].hex())
+        self.assertEqual(tuple(player["character_kind"] for player in third["players"]),
+                         replay.V9_MILESTONE_ROSTER[2])
 
     def test_rejects_pad_queue_slot_mismatch(self):
         rows = _candidate()
@@ -391,8 +421,8 @@ class WholeSessionReplayTests(unittest.TestCase):
                 replay.capture_from_path(path)
 
     def test_export_pair_reads_raw_mwro_and_writes_sidecar(self):
-        rows_a = _candidate()
-        rows_b = _candidate("capture-b", "sequence-a")
+        rows_a = _candidate(v9_milestone=True)
+        rows_b = _candidate("capture-b", "sequence-a", v9_milestone=True)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             first = root / "a.mwro"
@@ -406,9 +436,96 @@ class WholeSessionReplayTests(unittest.TestCase):
             self.assertTrue(sidecar.is_file())
             self.assertEqual(json.loads(sidecar.read_text())["claims"]
                              ["source_consumed_pad_repeatability"], "pass")
-        self.assertEqual(result["transport"]["version"], 8)
+        self.assertEqual(result["transport"]["version"], 9)
         self.assertEqual(result["claims"]["runtime_initial_css_context"],
                          replay.RUNTIME_CONTEXT_STATUS)
+
+    def test_export_pair_keeps_v8_for_identical_match_setups(self):
+        rows_a = _candidate()
+        rows_b = _candidate("capture-b", "sequence-a")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = root / "a.mwro"
+            second = root / "b.mwro"
+            output = root / "candidate.mwrc"
+            _write_raw(first, rows_a)
+            _write_raw(second, rows_b)
+            result = replay.export_pair(first, second, output)
+            self.assertEqual(result["transport"]["version"], 8)
+            self.assertEqual(replay.HEADER.unpack_from(output.read_bytes())[1], 8)
+
+    def test_v9_preserves_each_match_setup_and_v8_rejects_changes(self):
+        rows = _candidate(v9_milestone=True)
+        capture = replay.capture_from_records(rows)
+        expected = [_whole_session_cpu_setup(index).hex() for index in range(3)]
+        self.assertEqual(capture["setup_hexes"], expected)
+        self.assertEqual([tuple(player["character_kind"] for player in setup["players"])
+                          for setup in capture["declared_setups"]],
+                         list(replay.V9_MILESTONE_ROSTER))
+        payload, transport = replay.encode_v9(capture)
+        self.assertEqual(transport["version"], 9)
+        self.assertEqual(replay.HEADER.unpack_from(payload)[1], 9)
+
+        setup_cursor = replay.HEADER.size + replay.CONTEXT_HEADER.size + replay.CONTEXT_BYTES
+        setup_count, reserved = struct.unpack_from(">HH", payload, setup_cursor)
+        self.assertEqual((setup_count, reserved), (3, 0))
+        setup_cursor += 4
+        actual = [payload[setup_cursor + index * replay.GAME_INFO_SIZE:
+                           setup_cursor + (index + 1) * replay.GAME_INFO_SIZE].hex()
+                  for index in range(setup_count)]
+        self.assertEqual(actual, expected)
+        with self.assertRaisesRegex(replay.WholeSessionReplayError,
+                                    "v8 requires identical StartMeleeData"):
+            replay.encode_v8(capture)
+
+    def test_v9_rejects_wrong_roster_cpu_level_rules_or_setup_count(self):
+        capture = replay.capture_from_records(_candidate(v9_milestone=True))
+        for mutate, message in (
+            (lambda setup: setup.__setitem__(0x60, 1), "character lineup"),
+            (lambda setup: setup.__setitem__(0x60 + 0x24 + 15, 8), "CPU9 profile"),
+            (lambda setup: setup.__setitem__(0x0E, 0x21), "Final Destination"),
+        ):
+            with self.subTest(message=message):
+                changed = dict(capture)
+                changed["setup_hexes"] = list(capture["setup_hexes"])
+                raw = bytearray.fromhex(changed["setup_hexes"][0])
+                mutate(raw)
+                changed["setup_hexes"][0] = raw.hex()
+                with self.assertRaisesRegex(replay.WholeSessionReplayError, message):
+                    replay.encode_v9(changed)
+        changed = dict(capture)
+        changed["setup_hexes"] = []
+        for setup_hex in capture["setup_hexes"]:
+            raw = bytearray.fromhex(setup_hex)
+            raw[0x0B] = 0
+            changed["setup_hexes"].append(raw.hex())
+        with self.assertRaisesRegex(replay.WholeSessionReplayError,
+                                    "accepted four-Mario stock-match profile"):
+            replay.encode_v9(changed)
+        changed = dict(capture)
+        changed["setup_hexes"] = capture["setup_hexes"][:2]
+        with self.assertRaisesRegex(replay.WholeSessionReplayError, "exactly three"):
+            replay.encode_v9(changed)
+
+    def test_independent_pair_rejects_match_setup_change(self):
+        rows_a = _candidate(v9_milestone=True)
+        rows_b = _candidate("capture-b", "sequence-a", v9_milestone=True)
+        entry = next(row for row in rows_b if row.get("event") == "boundary" and
+                     row.get("payload", {}).get("boundary") == "entry" and
+                     row["payload"]["match_index"] == 1)
+        setup = next(value for value in entry["payload"]["slices"]
+                     if value["name"] == "match_setup")
+        raw = bytearray.fromhex(setup["hex"])
+        raw[0x60 + 3] = 1
+        setup["hex"] = raw.hex()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first, second = root / "a.mwro", root / "b.mwro"
+            _write_raw(first, rows_a)
+            _write_raw(second, rows_b)
+            with self.assertRaisesRegex(replay.WholeSessionReplayError,
+                                        "not source-consumed repeatable"):
+                replay.export_pair(first, second, root / "candidate.mwrc")
 
     def test_export_single_marks_repeatability_as_unevaluated(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -416,7 +533,7 @@ class WholeSessionReplayTests(unittest.TestCase):
             source = root / "single.mwro"
             output = root / "single.mwrc"
             sidecar = root / "single.json"
-            _write_raw(source, _candidate())
+            _write_raw(source, _candidate(v9_milestone=True))
             result = replay.export_single(source, output, sidecar)
             self.assertEqual(result["claims"]["source_consumed_workload"], "pass")
             self.assertEqual(result["claims"]["source_consumed_pad_repeatability"],
@@ -425,6 +542,16 @@ class WholeSessionReplayTests(unittest.TestCase):
                              replay.RUNTIME_CONTEXT_STATUS)
             self.assertEqual(json.loads(sidecar.read_text())["claims"]
                              ["independent_execution_identity"], "not_evaluated")
+
+    def test_export_single_keeps_v8_for_identical_match_setups(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "single.mwro"
+            output = root / "single.mwrc"
+            _write_raw(source, _candidate())
+            result = replay.export_single(source, output)
+            self.assertEqual(result["transport"]["version"], 8)
+            self.assertEqual(replay.HEADER.unpack_from(output.read_bytes())[1], 8)
 
 
 if __name__ == "__main__":

@@ -25,9 +25,12 @@ class ReferenceCpuProbeTests(unittest.TestCase):
         constants = source[source.index("constexpr size_t CPU_PROBE_TICK_WINDOW_MAX"):
                            source.index("constexpr std::array<u8, 32> EXPECTED_DOL_SHA256_BYTES")]
         constants = "\n".join(line for line in constants.splitlines()
-                              if "TICK_WINDOW_MAX" in line or "MAX_JSON_BYTES" in line)
+                              if "CPU_PROBE_TICK_WINDOW_MAX" in line or
+                              "CPU_PROBE_MAX_JSON_BYTES" in line)
         helpers = source[source.index("struct CpuProbePoint"):
                          source.index("}  // namespace", source.index("struct CpuProbePoint"))]
+        stream_policy = source[source.index("enum class Event"):
+                               source.index("enum class Boundary")]
         harness = r'''
 #include <array>
 #include <cassert>
@@ -36,14 +39,33 @@ class ReferenceCpuProbeTests(unittest.TestCase):
 #include <limits>
 #include <string>
 #include <string_view>
-using u8 = uint8_t; using u32 = uint32_t; using u64 = uint64_t;
+using u8 = uint8_t; using u16 = uint16_t; using u32 = uint32_t; using u64 = uint64_t;
 constexpr u32 WHOLE_SESSION_MAX_MATCHES = 64;
 std::string Env(const char* key) { const char* value = std::getenv(key); return value ? value : ""; }
 bool ActivationRequested() { return Env("MWRC_ENABLE") == "1"; }
-''' + constants + helpers + r'''
+''' + constants + stream_policy + helpers + r'''
 int main(int argc, char** argv) {
   assert(argc == 2);
   const std::string action(argv[1]);
+  if (action == "stream-policy") {
+    assert(ShouldWriteObserverEvent(Event::Handshake, true));
+    assert(ShouldWriteObserverEvent(Event::Start, true));
+    assert(!ShouldWriteObserverEvent(Event::Boundary, true));
+    assert(!ShouldWriteObserverEvent(Event::Progress, true));
+    assert(ShouldWriteObserverEvent(Event::Boundary, false));
+    assert(ShouldWriteObserverEvent(Event::Progress, false));
+    return 0;
+  }
+  if (action.rfind("item-", 0) == 0) {
+    const auto& settings = ItemProbeEnvironment();
+    if (action == "item-absent") assert(!settings.present && !ItemProbeEnabled());
+    else if (action == "item-invalid")
+      assert(settings.present && !settings.valid && !ItemProbeEnabled() && !settings.error.empty());
+    else if (action == "item-disabled") assert(settings.valid && !ItemProbeEnabled());
+    else if (action == "item-enabled") assert(settings.valid && ItemProbeEnabled());
+    else assert(false);
+    return 0;
+  }
   if (action == "helpers") {
     u32 result = 42;
     for (const auto bad : {"", "-1", "+1", "1 ", " 1", "0x10", "1.0", "4294967296"})
@@ -96,6 +118,13 @@ int main(int argc, char** argv) {
     def test_compiled_bounds_and_bit_serialization(self):
         self.run_probe("helpers")
 
+    def test_item_probe_summary_stream_is_opt_in_and_keeps_full_mode(self):
+        self.run_probe("stream-policy")
+        source = SOURCE.read_text()
+        self.assertIn('Env("MWRC_ITEM_PROBE_SUMMARY_STREAM")', source)
+        self.assertIn('MWRC_ITEM_PROBE_SUMMARY_STREAM requires a configured item probe', source)
+        self.assertIn('ShouldWriteObserverEvent(slot.event, item_probe_summary_stream)', source)
+
     def test_opt_in_requires_complete_bounded_configuration(self):
         self.run_probe("absent")
         good = dict(MWRC_ENABLE="1", MWRC_CPU_PROBE_OUTPUT="probe.json",
@@ -110,6 +139,25 @@ int main(int argc, char** argv) {
             with self.subTest(patch=patch):
                 self.run_probe("invalid", **dict(good, **patch))
 
+    def test_item_boundary_probe_requires_complete_bounded_configuration(self):
+        self.run_probe("item-absent")
+        good = dict(MWRC_ENABLE="1", MWRC_ITEM_PROBE_OUTPUT="item-probe.json",
+                    MWRC_ITEM_PROBE_MATCH="1", MWRC_ITEM_PROBE_FIRST_TICK="11144",
+                    MWRC_ITEM_PROBE_LAST_TICK="11159")
+        self.run_probe("item-enabled", **good)
+        self.run_probe("item-disabled", **dict(good, MWRC_ENABLE="0"))
+        for patch in (
+            {"MWRC_ITEM_PROBE_OUTPUT": ""},
+            {"MWRC_ITEM_PROBE_MATCH": "64"},
+            {"MWRC_ITEM_PROBE_FIRST_TICK": "-1"},
+            {"MWRC_ITEM_PROBE_LAST_TICK": "11143"},
+            {"MWRC_ITEM_PROBE_LAST_TICK": "11208"},
+            {"MWRC_ITEM_PROBE_MATCH": ""},
+            {"MWRC_ITEM_PROBE_LAST_TICK": "4294967296"},
+        ):
+            with self.subTest(patch=patch):
+                self.run_probe("item-invalid", **dict(good, **patch))
+
     def test_compiled_probe_inventory_matches_verified_profile(self):
         source = SOURCE.read_text()
         found = re.findall(r'\{"([a-z0-9_]+)", (0x[0-9a-f]+), (0x[0-9a-f]+)\}', source)
@@ -117,3 +165,21 @@ int main(int argc, char** argv) {
         self.assertEqual([(label, int(pc, 16), int(word, 16)) for label, pc, word in found],
                          [(row["label"], int(row["address"], 16), int(row["expected_word"], 16))
                           for row in expected])
+
+    def test_item_boundary_inventory_matches_pinned_profile(self):
+        source = SOURCE.read_text()
+        found = re.findall(
+            r'\{"([a-z0-9_]+)", (0x[0-9a-f]+), (0x[0-9a-f]+), '
+            r'ItemProbeEvent::([A-Za-z]+), ([0-9]+)\}',
+            source,
+        )
+        expected = json.loads(
+            (ROOT / "tools/cpu-item-boundary-gale01r2.json").read_text()
+        )["points"]
+        self.assertEqual(
+            [(label, int(pc, 16), int(word, 16), event, int(pair))
+             for label, pc, word, event, pair in found],
+            [(row["label"], int(row["address"], 16), int(row["expected_word"], 16),
+              row["event"], row["pair"])
+             for row in expected],
+        )
