@@ -26,6 +26,131 @@ latest headless Metal frame dumps retained at each label; each marker also
 retains the separate passive Observer state and the controller command log.
 This is visual route evidence, not a pixel comparison or a PCM/audio check.
 
+## Title idle and Opening-mode findings
+
+### Retail sequence and input
+
+The pinned retail capture
+`/Volumes/AgentStorage/melee-web/runs/title-attract-repeat-20260928-204724-721ca350/retail-title-visits3-01/`
+boots cold with neutral input and reaches three Opening-mode Title visits. Its
+route trace records the no-input order
+`state 0 → 1 → 2 → 3 → 0 → 1 → 2 → 3 → 4 → 0 → 1 → 2`:
+
+| Exiting source scene | Next Opening state and scene | Recorded source counter at handoff |
+| --- | --- | ---: |
+| `MvOpen.mth` | 1, four-CPU VS demo | 6131 |
+| State 1 VS demo | 2, Title | 1201 |
+| Title callback | 3, four-CPU VS demo | 621 |
+| State 3 VS demo | 0, `MvOpen.mth` | 1201 |
+| `MvOpen.mth` | 1, four-CPU VS demo | 6131 |
+| State 1 VS demo | 2, Title | 1201 |
+| Title callback | 3, four-CPU VS demo | 621 |
+| State 3 VS demo | 4, `MvHowto.mth` | 1201 |
+| HowTo movie | 0, `MvOpen.mth` | 4761 |
+| `MvOpen.mth` | 1, four-CPU VS demo | 6131 |
+| State 1 VS demo | 2, Title | 1201 |
+
+These are Observer source-counter values sampled at the route boundary; each
+counter belongs to the scene that just exited. They are not wall-clock
+durations. The repeated run covers two complete returns to Opening state 0 and
+part of a third route. It stops at Title visit 3 by declared predicate, so it
+does not claim a full unattended return to normal `GM_TITLE` or an Omake15
+visit. The captured save/session state routes the second state 3 through
+HowTo, then back to state 0. Source code shows that `gm_8015DB00()` controls
+this alternation: state 3 increments it and selects state 0 when even; HowTo
+increments and selects state 0 unless it is already 5, in which case the
+authored next state is Omake15. That later state-5 path is source-identified,
+but remains unobserved in this capture.
+
+The retail input captures
+`retail-interrupt-p1-opening-01/` and `retail-interrupt-p2-vs-01/` use the same
+cold-boot baseline with isolated profile/card copies. P1 Start at source tick
+125 interrupts `MvOpen.mth`, returns to normal Title, then ordinary P1 Start
+opens Main. In the second run P2 Start interrupts the state-1 VS demo while P1
+is neutral, returns to normal Title, and P1 Start opens Main. A retained P2
+Opening-movie probe is at
+`work/original-menu-route-20260926-01/title-attract-20260927-audio-p2-probe/`.
+The source callbacks use `gm_GetButtonsTriggered(PAD_MAX_CONTROLLERS)`: Opening
+movie accepts Start/A before its late cutoff, VS demo accepts Start/A, and the
+normal Title callback accepts Start only after its 20-callback guard. The held
+input is edge-consumed during that guard; it is not replayed later.
+
+`gm_Scene_Title_OnFrame` then increments its source timer and times out when
+`frame_count > 600`, writing the source's zero exit payload. The focused native
+host check counts the exact 501 remaining callback steps after its first 120
+Title callbacks, for 621 total Title callback steps. Retail records 621 at the
+Title-to-state-3 route boundary. `gmTitleMode_OnExit` preserves the zero-payload
+route to `GM_OPENING_MV` state 1; Start is never fabricated. Opening state 1
+uses `gm_SetupTitleDemo`, which chooses four source CPUs and a stage from the
+source unlock/usage-history tables and RNG. The selected roster/stage therefore
+varies naturally; this capture does not claim identical RNG or demo identities
+between separate retail runs.
+
+The no-input run retained 30,924 decoded source-state observations, 61,441
+Observer events and 69 labeled Metal samples. I reviewed its moving MvOpen,
+VS-demo and HowTo images. The capture sampler's immediate state-2 marker is
+not synchronized to the source Title render, so that image is not used as
+Title visual evidence. Use the aligned normal-Title screenshot in
+`work/original-menu-route-20260926-01/retail-route-12-full/evidence/` and the
+post-interruption Title sample in the P2 capture for that scene. This is visual
+inspection, not a pixel comparison. The P1/P2 captures each end at Main after
+their declared input predicate; their MWRO end markers are interrupted by
+the runner's intentional stop.
+
+### Browser increment and remaining boundaries
+
+The browser preserves the original Title timeout payload and Opening state-1
+selection. It calls the source `gm_SetupTitleDemo` and derives an exact
+four-player asset closure without narrowing unlocks, RNG/history or selected
+identities. The production audio-player regression reaches that real boundary.
+The current runtime admits 19 of 26 source fighters and 7 of 29 stages; this
+source-selected demo chose unsupported content, so checked asset preparation
+fails explicitly with the identities listed in the error. Eject retires the
+source owners and reimport starts at CSS. The reconciled native host now also
+has a deterministic supported VS handoff diagnostic: it checks the authored
+four-CPU payload, retained PAD input across suspension, finish to Opening state
+2 Title, and owner teardown. That diagnostic is scoped lifecycle evidence; it
+does not make the browser's unsupported asset boundary or the attract route
+accepted.
+
+Retail captures establish the sequence through three Opening-mode Title visits,
+including two returns to Opening state 0, and separate P1/P2 interruption paths.
+They do not establish a complete unattended return to normal `GM_TITLE` or an
+Omake15 visit. The browser retains the original Title timeout payload, source
+state selection and `gm_Mode_Opening_OnLoad`, then fails explicitly at checked
+asset preparation when the randomized four-CPU demo selects content outside the
+current runtime's admitted 19 fighters and 7 stages. The source menu/match route
+remains usable, and Eject/reimport recovers to CSS. The native diagnostic
+exercises the supported state handoff separately, without substituting for
+browser asset publication or a full attract run.
+
+Completing the retail route requires these bounded source owners:
+
+1. Extend the supported four-CPU VS demo lifecycle to every source-selected
+   identity: all 26 selectable source characters, all 29 source stages, source
+   camera/CPU-level phases, 1200-tick exit, all-port interruption, and
+   teardown/re-entry. The random source selector may choose any unlocked
+   identity; per-character or per-stage overrides would change the source
+   behavior. The current native receipt covers one deterministic supported
+   handoff and does not close this broader acceptance goal.
+2. Run `MvOpen.mth`, `MvHowto.mth`, and naturally selected `MvOmake15.mth`
+   through original THP video/audio callbacks, streamed DVD ranges, source
+   timing/alarm, and owned graphics/audio services. The movie assets remain
+   bounded streams rather than whole-file imports.
+3. Carry the Opening state and source RNG/save/session owners through each
+   scene/resource rebuild, route P1/P2 input and Eject from every phase, and
+   prove repeated clean return/re-entry.
+4. Compare full retail and production-browser cycles at source-frame
+   boundaries, with transition screenshots and PCM transport evidence. The
+   existing audio test validates the menu/match route and the explicit
+   unsupported Opening boundary; the native handoff receipt does not stand in
+   for this browser/retail gate.
+
+The earlier `title-attract-20260927-full-01/` run also remains as a failed
+reproducer: it stopped emitting Observer events during a later state-3 demo
+and did not reach Omake15. The new visit-3 capture proves two repeat returns
+without claiming that failed route completed.
+
 ## Browser implementation and lifecycle
 
 The development and public player keep their CSS-first Play behavior. The
@@ -36,6 +161,13 @@ the source Main scene, and the CSS payload is reopened only after the later
 source route returns to `GM_VS`. Root-menu B runs the source exit to Title;
 Title Start runs its source exit back to Main. Unsupported or incomplete source
 routes still fail through the checked owner.
+
+The original idle callback's zero triggered-button payload selects
+`GM_OPENING_MV` state 1 and runs `gm_Mode_Opening_OnLoad`. Checked asset
+preparation then reports the exact unsupported source-selected demo contents;
+the route does not skip the demo, substitute another destination, or claim a
+completed attract cycle. Eject retires the source owner and reimport starts at
+CSS.
 
 The main/title world binds their authored scene exports through owned DAT
 decoders and the existing archive scope. The additional Main-menu resources are
@@ -92,10 +224,16 @@ checks do not enable Challenger Approach or claim full title/demo coverage.
 ## Retained local evidence
 
 All captures, screenshots, private inputs, and generated runtime bundles remain
-under ignored `work/` and are not committed:
+outside Git and are not committed. Existing evidence stays under ignored
+`work/`; the repeated cold-boot capture set below is on the verified external
+NVMe:
 
 | Evidence | Retained material |
 | --- | --- |
+| /Volumes/AgentStorage/melee-web/runs/title-attract-repeat-20260928-204724-721ca350/retail-title-visits3-01/capture.json and route-source-states.jsonl | Successful neutral-input cold-boot capture through three Opening Title visits: 30,924 source-state observations, 61,441 Observer events, 69 Metal samples and the repeated state 0→1→2→3→0→1→2→3→4→0→1→2 trace; the third visit is the declared stop, not a full unattended return |
+| /Volumes/AgentStorage/melee-web/runs/title-attract-repeat-20260928-204724-721ca350/retail-title-visits3-01/capture.mwro, input.mwri, dolphin.log, and evidence/ | Passive Observer stream, named neutral P1/P2 Pipe input record, owned Dolphin log and sampled source/render evidence; the source-Title marker is not treated as an aligned Title screenshot |
+| /Volumes/AgentStorage/melee-web/runs/title-attract-repeat-20260928-204724-721ca350/retail-interrupt-p1-opening-01/capture.json, route-source-states.jsonl, inputs.jsonl, and evidence/ | P1 Start interrupted MvOpen, returned to normal Title, and P1 Start entered Main; scenario predicate completed, with the runner stopping the owned Dolphin afterward |
+| /Volumes/AgentStorage/melee-web/runs/title-attract-repeat-20260928-204724-721ca350/retail-interrupt-p2-vs-01/capture.json, route-source-states.jsonl, inputs.jsonl, and evidence/ | P2 Start with P1 neutral interrupted the four-CPU VS demo, returned to normal Title, and P1 Start entered Main; scenario predicate completed, with the runner stopping the owned Dolphin afterward |
 | `work/original-menu-route-20260926-01/retail-route-12-full/capture.json` | Complete cold-boot route manifest, input and build identities, 24 scoped screenshot/source markers, and completion status |
 | `.../retail-route-12-full/route-source-states.jsonl` | 1,874 decoded passive PAD/menu source-state observations |
 | `.../retail-route-12-full/capture.mwro`, `input.mwri`, `inputs.jsonl`, `dolphin.log` | Observer stream, input transport receipt, named controller commands, and emulator log |
@@ -109,6 +247,24 @@ under ignored `work/` and are not committed:
 | `work/pr96-title-main/review-round2/review-head-audio-http.json`, `logs/pages-dev-review-head-audio.log` | Final-head local Pages HTTP verifier receipt and Wrangler output, including the documented reserved-route limitation |
 | `work/pr96-title-main/public-audio-browser-reconciled-head-04/report.json` | Earlier diagnostic run on the same reconciled runtime before final package identity; superseded by the final-head report above |
 | `.../browser-public-lifecycle-03/report.json` | Historical silent-only browser evidence from the earlier public-player lifecycle; superseded for this PR by the audio-enabled final-head run |
+| `work/title-idle-attract/native-title-main-smoke-final-head.log` | Final-head native menu-host regression output; with the explicit owned fixture root, it checks the full CSS roster, P1/P2 Title Start input edges, authentic unsupported Challenger request, zero-payload Title timeout to `GM_OPENING_MV` state 1, Eject, owner retirement, and CSS reimport |
+| `work/title-idle-attract/pr110-native-opening-handoff.stdout.log` and `pr110-native-opening-handoff.jsonl` | Reconciled Release native handoff receipt: the authored Opening VS selection publishes four CPU/level-9/stock rows, suspends with retained PAD input, finishes into Opening state 2 Title, and retires its owner; the same build's compiled source-file bridge and source-frame alarm traces pass. This is a deterministic native boundary diagnostic, not retail capture, browser equivalence, or a complete attract-cycle claim |
+| `work/title-idle-attract/pr110-full-suite-final.log`, `pr110-audio-release-build-final.log`, and `pr110-public-release-build-final.log` | Final reconciled validation: full unittest discovery ran 1,583 tests with 96 optional skips and no failures; affected audio-preview and public Release targets rebuilt cleanly, including the native handoff, source-file bridge, source alarm, and public runtime targets |
+| `work/title-idle-attract/pr110-browser-smoke/report.json` and `pr110-browser-runtime-build.log` | Rebuilt development runtime reached its import-ready boundary through a real loopback HTTP server and headless installed Chrome. No disc was supplied, so this is browser transport/readiness evidence only and makes no gameplay or attract claim |
+| `work/title-idle-attract/public-audio-browser/report.json` and `failure.png` | Retained failed first browser iteration: CSS and two supported matches passed, then Title timeout left the menu owner closed without surfacing an error dialog; the 45-second route assertion failed. Superseded by the final UI recovery check |
+| `work/title-idle-attract/public-audio-browser-final-head/report.json` and `failure.png` | Retained harness failure after the menu route, Title Eject/reimport, audio and PCM checks passed: document reload discarded an in-memory scoped-asset observer before the final assertion. Superseded by the verified report below |
+| `work/title-idle-attract/public-audio-browser-verified-final-head/report.json` and `failure.png` | Retained second harness failure after Title Eject/reimport, audio/PCM checks, and scoped asset transactions passed: final Eject checked a retired AudioContext from the earlier document. Superseded by the final report below |
+| `work/title-idle-attract/public-audio-browser-complete-final-head/report.json` and `*.png` | Headless Chrome run against the Release audio-player package: CSS → supported match → Results → CSS → Main → Title timeout, explicit unsupported Opening state 1 error, Eject/reimport to CSS, scoped asset transactions, audio/PCM transport and teardown |
+| `work/title-idle-attract/public-player-audio-title-attract-resume-settled/report.json` and `*.png` | Final production audio-player browser route: 15 checks passed, including CSS-first start, two menu cycles, Main/Title Eject and CSS-first reimport, SSS → supported Mario/Final Destination → Results → CSS, nonzero 32 kHz PCM and audio-context retirement |
+| `work/title-idle-attract/audio-preview-title-idle-a05f5e3-after-graphics/report.json` and `*.png` | Same source-bound audio-player package, 12 checks passed; records the original idle timeout to state 1, exact unsupported source-selected fighter/stage error, nonzero PCM, Eject/reimport to CSS and closed prior audio context. The existing `--select-after-graphics` option skips only the older early RVZ wording assertion |
+| `work/title-idle-attract/audio-preview-title-idle-a05f5e3.log` | Preserved preliminary failure from that harness's optional early invalid-RVZ assertion, whose expected wording predates the current player error; the final Title idle scenario above ran with its supported after-graphics option |
+| `work/title-idle-attract/public-match-pause-probe-resume-settled/after-start.png` and `after-lras.png` | Focused headless public-player probe after UI resume: ordinary Start opened source P1 Pause and LRAS reached Results; it validates the input-settle delay without exposing development diagnostics |
+| `work/title-idle-attract/public-player-audio-title-attract-ready-phase/report.json`, `public-player-audio-title-attract-source-pause/report.json`, and `public-player-audio-title-attract-recovery-probe/report.json` | Preserved failed iterations found and corrected harness issues: missing phase in a shared state reader, unsupported use of a development-only diagnostics export, and a dropped input edge immediately after resume; the focused probe and final full route passed |
+| `work/title-idle-attract/full-tests-final-precommit.log` | Full repository unittest discovery with the owned menu fixture root explicitly configured through `MELEE_MENU_FIXTURE_ROOT`: 1,553 tests, 93 optional skips, no failures, 296.446 seconds |
+| `work/title-idle-attract/runtime-public-final-release-build.log`, `audio-release-final-a05f5e3-build.log`, `audio-player-title-attract-a05f5e3.manifest.json`, `audio-player-title-attract-a05f5e3-audit.log`, and `audio-player-title-attract-a05f5e3-http.json` | Release public/audio builds, audited source-bound audio package, and local Pages HTTP evidence. The package identity binds both browser reports to source `a05f5e3fbeed05639c4b71aba9fa66b6784dec19` |
+| `work/title-idle-attract/audio-player-complete-final-head.manifest.json`, `audio-player-complete-final-head-audit.json`, and `audio-http-complete-final-head.json` | Production package inventory, package audit, and local Pages HTTP verification; package `source_sha` binds the browser report to the final source head |
+| `work/title-idle-attract/full-tests-after-public-error.log` | Pre-PR-109 full unittest discovery after the public error-surfacing fix: 1,548 tests, 94 optional skips, no failures; superseded by the reconciled-head suite below |
+| `work/title-idle-attract/full-tests-reconciled-final.log` | Full unittest discovery on implementation head `1ec06d4`; follow-up commits correct evidence indexing and browser harness lifecycle assertions, with no runtime implementation changes |
 
 The route uses the owned CISO directly (SHA-256
 `b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c`) and the
@@ -126,7 +282,7 @@ capture, or generated public bundle enters Git.
 | --- | --- | --- |
 | **Source identified** | Pinned title/Main callbacks, mode routing, the 11-row `0x07ff` unlock mask, and authored notification/reward-ledger owners | Full-game menu coverage |
 | **Retail compared** | Cold-boot route order, ordinary inputs, observed source menu states, and labeled screenshots on the owned disc | Pixel/PCM equivalence, physical-controller acceptance, foreground timing, or performance |
-| **Browser exercised** | Audio-enabled public CSS-first startup with the full source roster; two original menu cycles; Main/Title Eject and CSS-first reimport; routed SSS, supported match, Results return; connected 32 kHz nonzero PCM transport and audio-context teardown | Retail/browser pixel or PCM comparison, audible quality, foreground input latency/timing, physical-controller acceptance, performance, or tournament acceptance |
+| **Browser exercised** | Production audio-enabled public CSS-first startup with the full source roster; two original menu cycles; Main/Title Eject and CSS-first reimport; routed SSS, supported match and Results return; original Title idle handoff through checked source-selected Opening asset preparation, explicit failure for unadmitted assets, and Eject/reimport; connected 32 kHz nonzero PCM transport and audio-context teardown | A complete attract cycle, all randomized demo/movie destinations, retail/browser pixel or PCM comparison, audible quality, foreground input latency/timing, physical-controller acceptance, performance, or tournament acceptance |
 | **Compiled** | Reconciled silent and audio-enabled public Release targets and audited package graphs | Deployment or merge |
 
 The separate allocation-history GDB/Python route remains available for scopes

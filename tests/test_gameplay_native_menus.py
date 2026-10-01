@@ -104,7 +104,11 @@ class NativeMenuSourceTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
         self.assertIn("Original Title Eject released source ownership and allowed CSS re-entry", run.stdout)
         self.assertIn("Original Main Eject released source ownership and allowed CSS re-entry", run.stdout)
-        self.assertIn("Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger and timeout recovery passed", run.stdout)
+        self.assertIn(
+            "Original Opening VS handoff selected four CPUs, suspended with retained PAD input, and cleaned up",
+            run.stdout,
+        )
+        self.assertIn("Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger, Title timeout to Opening state 1 and recovery passed", run.stdout)
         self.assertIn("Native Title/Main checked abort and CSS re-entry smoke passed", run.stdout)
 
     def test_original_sis_layout_and_style_stack(self):

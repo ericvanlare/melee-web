@@ -464,6 +464,14 @@ else {
 }
 await pump(player.pause()); assert.equal(player.getState().paused, true);
 await pump(player.resume()); assert.equal(player.getState().running, true);
+for (const [menuPhase, menuScene] of [[10, 'title'], [11, 'main']]) {
+  phase = menuPhase; running = true; window.menuFrame(true);
+  assert.equal(player.getState().scene, menuScene);
+  assert.equal(player.getState().canPause, true,
+    `The original ${menuScene} scene remains recoverable after a source-clock timing pause`);
+  await pump(player.pause()); assert.equal(player.getState().paused, true);
+  await pump(player.resume()); assert.equal(player.getState().running, true);
+}
 phase = 8; running = true; window.menuFrame(true);
 assert.equal(player.getState().scene, 'results');
 assert.equal(player.getState().canPause, true, 'Results remains an active pausable scene');

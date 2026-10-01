@@ -416,16 +416,110 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
         unsigned audio_phase = 0;
         start_title(host, world, raw, audio_phase);
         int result = 1;
-        for (unsigned frame = 0; frame < 700 && result != 3; ++frame)
+        unsigned callbacks_to_timeout = 0;
+        for (; callbacks_to_timeout < 700 && result != 3;
+             ++callbacks_to_timeout)
             result = tick(host, *world, raw, audio_phase);
         check(result == 3, "Original Title timeout did not request its source exit");
-        check(!melee_web_menu_host_leave(host, 0, error, sizeof(error)) &&
-                  std::string(error).find("did not contain the retail Start route") !=
-                      std::string::npos,
-              "Title timeout fabricated a Start payload or was accepted as Title Start");
-        check(melee_web_menu_host_route_target_mode(host) == -1,
-              "Title timeout fabricated a supported destination");
-        abort_and_destroy(host, world, audio_phase, "Title timeout");
+        check(callbacks_to_timeout == 501,
+              "Title timeout diverged from the 20-frame guard and 601-frame source timer");
+        check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        check(melee_web_menu_host_route_target_mode(host) == GM_OPENING_MV,
+              "Title timeout did not preserve the source GM_OPENING_MV destination");
+        check(melee_web_menu_host_route_target_state(host) == 1,
+              "Title timeout did not preserve the source VS-demo state selected by Title");
+        world->verify_immutable_archives();
+        world->close();
+        world.reset();
+
+        /* Reduce the supported Opening VS handoff to its deterministic
+         * boundary.  The retail demo match itself needs its separate match
+         * assets and capture; this fixture verifies the source-selected
+         * payload, the host's suspend boundary, and the retained PAD owner
+         * before retiring the route. */
+        MeleeWebOpeningPreview opening_preview{};
+        check(melee_web_menu_host_opening_preview(host, &opening_preview,
+                                                  error, sizeof(error)), error);
+        auto opening_world = std::make_unique<melee_web::GameplayMenuWorld>(
+            files, melee_web::GameplayMenuScene::Title);
+        check(melee_web_menu_host_enter_opening(host, opening_world->audio(),
+                                                error, sizeof(error)), error);
+        MeleeWebMenuMatchSelection opening_selection{};
+        check(melee_web_menu_host_opening_selection(
+                  host, &opening_selection, error, sizeof(error)), error);
+        check(opening_selection.opening_demo == 1 &&
+                  opening_selection.player_count == 4 &&
+                  opening_selection.start.rules.stkind == opening_preview.stage_kind &&
+                  opening_selection.start.rules.match_kind == opening_preview.match_kind,
+              "Opening VS handoff did not preserve its source-selected demo payload");
+        const unsigned expected_opening_stocks =
+            opening_selection.start.rules.match_kind == 1 ? 99u : 0u;
+        for (unsigned i = 0; i < opening_selection.player_count; ++i) {
+            const PlayerInitData& player = opening_selection.start.players[i];
+            check(player.slot_type == Gm_PKind_Cpu && player.cpu_kind == CpuKind_4 &&
+                      player.cpu_level == 9 && player.stocks == expected_opening_stocks,
+                  "Opening VS handoff changed its authored four-CPU setup");
+        }
+        check(melee_web_menu_host_opening_input(host) == nullptr,
+              "Opening VS exposed retained PAD input before source suspend");
+        uint8_t opening_input_bytes[MELEE_WEB_PAD_STATE_BYTES];
+        melee_web_pad_state_capture(opening_input_bytes);
+        check(melee_web_menu_host_opening_match_suspend(host, error, sizeof(error)),
+              error);
+        const MeleeWebPadState* opening_input =
+            melee_web_menu_host_opening_input(host);
+        check(opening_input != nullptr,
+              "Opening VS suspend did not retain a PAD input owner");
+        opening_world->verify_immutable_archives();
+        opening_world->close();
+        opening_world.reset();
+        check(melee_web_menu_host_opening_match_finish(
+                  host, 0x13579bdfU, opening_input_bytes, error, sizeof(error)),
+              error);
+        check(melee_web_menu_host_opening_target_state(host) == 2 &&
+                  melee_web_menu_host_opening_input(host) == nullptr,
+              "Opening VS finish did not release the completed state owner");
+        auto continuation_world = std::make_unique<melee_web::GameplayMenuWorld>(
+            files, melee_web::GameplayMenuScene::Title);
+        check(melee_web_menu_host_enter_opening(
+                  host, continuation_world->audio(), error, sizeof(error)), error);
+        check(melee_web_menu_host_opening_target_state(host) == 2 &&
+                  melee_web_menu_host_source_scene(host) ==
+                      MELEE_WEB_MENU_HOST_SCENE_TITLE,
+              "Opening VS finish could not enter the authored next Title state");
+        check(melee_web_menu_host_leave(host, 1, error, sizeof(error)), error);
+        continuation_world->verify_immutable_archives();
+        continuation_world->close();
+        continuation_world.reset();
+        check(melee_web_menu_host_opening_input(host) == nullptr,
+              "Opening next-state cleanup retained a PAD input route");
+        check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+        host = nullptr;
+        check(melee_web_current_scene_info() == saved_scene_info,
+              "Opening-mode handoff did not restore its caller GameSceneInfo owner");
+        check(!melee_web_gameplay_world_exists(),
+              "Opening-mode handoff retained the Title SDK world");
+
+        std::cout << "Original Opening VS handoff selected four CPUs, suspended with retained PAD input, and cleaned up\n";
+
+        /* An unsupported next owner can retire the completed Title world and
+         * import the disc again without a page reload. */
+        auto* css_host = melee_web_menu_host_create(error, sizeof(error));
+        check(css_host != nullptr, error);
+        auto css_world = std::make_unique<melee_web::GameplayMenuWorld>(files);
+        check(melee_web_menu_host_enter(css_host, css_world->audio(), error,
+                                        sizeof(error)), error);
+        check(melee_web_menu_host_source_scene(css_host) == 1,
+              "Disc reimport after Title idle did not start at original CSS");
+        check_full_roster();
+        for (unsigned frame = 0; frame < 4; ++frame)
+            check(tick(css_host, *css_world, raw, audio_phase) == 1,
+                  "CSS after Title idle left before Eject");
+        check(melee_web_menu_host_leave(css_host, 1, error, sizeof(error)), error);
+        css_world->close();
+        css_world.reset();
+        check(melee_web_menu_host_destroy(css_host, error, sizeof(error)), error);
+        std::cout << "Original Title timeout selected GM_OPENING_MV state 1 and allowed clean CSS reimport\n";
     }
 
     {
@@ -449,7 +543,7 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
                   "Original Main left before Eject");
         abort_and_destroy(host, world, audio_phase, "Main");
     }
-    std::cout << "Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger and timeout recovery passed\n";
+    std::cout << "Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger, Title timeout to Opening state 1 and recovery passed\n";
 }
 }
 int main(int argc,char** argv){try{

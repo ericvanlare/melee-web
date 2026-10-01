@@ -97,10 +97,10 @@ const observePcm = async (name, before) => {
 };
 async function readNativeMenuState() {
   return page.evaluate(() => ({
-    phase: typeof Module?._melee_web_native_menu_phase === 'function'
-      ? Module._melee_web_native_menu_phase() : 0,
     message: typeof Module?._melee_web_native_menu_message === 'function'
       ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null,
+    phase: typeof Module?._melee_web_native_menu_phase === 'function'
+      ? Module._melee_web_native_menu_phase() : 0,
     running: typeof Module?._melee_web_native_menu_running === 'function'
       ? Module._melee_web_native_menu_running() : 0,
     status: document.querySelector('#status')?.textContent || '',
@@ -136,6 +136,10 @@ async function resumeAfterTimingPause(label) {
       Module._melee_web_native_menu_running(), null, {timeout: 90000});
     recovery.action = 'restarted the retained menu session at CSS';
   }
+  // The toolbar click can finish native resume before the browser input
+  // service has sampled its next source edge. Let that UI/input handoff settle
+  // before the caller sends the next ordinary controller button.
+  await page.waitForTimeout(350);
   return true;
 }
 async function waitForNativeScene(scene) {
@@ -151,6 +155,29 @@ async function waitForNativeScene(scene) {
     await page.waitForTimeout(50);
   }
   throw Error(`Timed out waiting for ${scene}: ${JSON.stringify(await readNativeMenuState())}`);
+}
+async function waitForNativePhase(phase, label) {
+  const deadline = Date.now() + 90000;
+  while (Date.now() < deadline) {
+    const state = await readNativeMenuState();
+    if (state.runtimeError) throw Error(`Runtime error while waiting for phase ${phase}: ${state.runtimeError}`);
+    if (isTimingPaused(state)) {
+      await resumeAfterTimingPause(label);
+      continue;
+    }
+    if (state.phase === phase && state.running) return state;
+    await page.waitForTimeout(50);
+  }
+  throw Error(`Timed out waiting for phase ${phase}: ${JSON.stringify(await readNativeMenuState())}`);
+}
+async function assertSourceMenuScene(scene, expectedPhase) {
+  const state = await page.evaluate(() => ({
+    phase: Module._melee_web_native_menu_phase(),
+    running: Module._melee_web_native_menu_running(),
+    pauseDisabled: document.querySelector('#pause-game')?.disabled ?? null,
+  }));
+  assert.deepEqual(state, {phase: expectedPhase, running: 1, pauseDisabled: false},
+    `Original ${scene} must retain an active, recoverable native owner`);
 }
 const captureUnload = async () => page.evaluate(() => {
   const nativeUnload = Module._melee_web_native_menu_unload.bind(Module);
@@ -1209,6 +1236,7 @@ try {
       await page.waitForTimeout(500);
       await driver.pressChord(['q', '9', '7']);
       await waitForNativeScene('Original main menu');
+      await assertSourceMenuScene('Main', 11);
       if (values.audio) await observePcm('main-before-eject', await audioTrace());
       await shot('main-before-eject');
       await ejectAndReimport('main');
@@ -1221,6 +1249,7 @@ try {
       await page.waitForTimeout(900);
       await press('o');
       await waitForNativeScene('Original title');
+      await assertSourceMenuScene('Title', 10);
       if (values.audio) await observePcm('title-before-eject', await audioTrace());
       await shot('title-before-eject');
       await ejectAndReimport('title');
@@ -1232,16 +1261,19 @@ try {
         await page.waitForTimeout(450);
         await driver.pressChord(['q', '9', '7']);
         await waitForNativeScene('Original main menu');
+        await assertSourceMenuScene('Main', 11);
         await page.waitForTimeout(900);
         if (values.audio) await observePcm(`route-${cycle}-main`, await audioTrace());
         await shot(`route-${cycle}-main`);
         await press('o');
         await waitForNativeScene('Original title');
+        await assertSourceMenuScene('Title', 10);
         await page.waitForTimeout(500);
         if (values.audio) await observePcm(`route-${cycle}-title`, await audioTrace());
         await shot(`route-${cycle}-title`);
         await press('7');
         await waitForNativeScene('Original main menu');
+        await assertSourceMenuScene('Main', 11);
         await page.waitForTimeout(700);
         if (values.audio) await observePcm(`route-${cycle}-main-after-title`, await audioTrace());
         await shot(`route-${cycle}-main-after-title`);
@@ -1288,24 +1320,27 @@ try {
       if (values.audio) await observePcm('routed-match', await audioTrace());
       await shot('routed-match');
       await page.waitForTimeout(5000);
+      await waitForNativePhase(7, 'match-start-input-ready');
       await press('7');
+      await waitForNativePhase(7, 'match-source-pause-edge');
       await page.waitForTimeout(700);
+      await waitForNativePhase(7, 'match-no-contest-input-ready');
       await driver.pressChord(['q', '9', 'm', '7'], {holdMs: 250, releaseMs: 200});
-      await phase(8);
+      await waitForNativePhase(8, 'match-to-results');
       if (values.audio) await observePcm('routed-results', await audioTrace());
       await shot('routed-results');
       for (let confirmation = 0; confirmation < 8; confirmation++) {
         if (await page.evaluate(() => Module._melee_web_native_menu_phase()) !== 8) break;
-        await phase(8);
+        await waitForNativePhase(8, 'results-confirmation');
         await driver.pressChord(['7'], {holdMs: 120, releaseMs: 1380});
       }
       let currentPhase = await page.evaluate(() => Module._melee_web_native_menu_phase());
       for (let confirmation = 0; currentPhase === 9 && confirmation < 120; confirmation++) {
-        await phase(9);
+        await waitForNativePhase(9, 'prize-confirmation');
         await driver.pressChord(['7'], {holdMs: 120, releaseMs: 380});
         currentPhase = await page.evaluate(() => Module._melee_web_native_menu_phase());
       }
-      await phase(1);
+      await waitForNativePhase(1, 'css-after-results');
       await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
       if (values.audio) await observePcm('routed-css-after-results', await audioTrace());
       await shot('routed-css-after-results');

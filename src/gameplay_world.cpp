@@ -405,7 +405,8 @@ struct GameplayWorld::Storage {
                 throw DatError("Source match context requires an active VS world and camera pool");
             for(unsigned i=0;i<selection.player_count;i++){
                 const auto& player=selection.source_players[i];
-                if(player.slot!=i||player.controller>=4||player.stocks<1||player.stocks>5||
+                if(player.slot!=i||player.controller>=4||player.stocks<1||
+                   player.stocks>(selection.opening_demo?99u:5u)||
                    player.fighter_kind!=selection.fighter_kinds[i]||
                    player.costume!=selection.costume_indices[i])
                     throw DatError("Source match settings differ from the selected VS players");
@@ -418,7 +419,8 @@ struct GameplayWorld::Storage {
             check(render_context!=nullptr,error);
             if(source_start_data){
                 check(melee_web_match_rules_prepare_from_menu(
-                    rules,source_start_data,error,sizeof(error)),error);
+                    rules,source_start_data,selection.opening_demo,
+                    error,sizeof(error)),error);
             }
             const MeleeWebArchiveSymbol refract_symbol={
                 "LbRf.dat","lbRefData",&refract_data};
