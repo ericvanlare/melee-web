@@ -146,7 +146,10 @@ void sheik_copy_dynamics()
     put(fixture.data, 384, 1);
     fixture.link(388, 416); // ftDynamics::ftDynamicBones
     put(fixture.data, 416, 3); // BoneDynamicsDesc::bone_id
-    put(fixture.data, 420, 0); // nullable DynamicsDesc::data
+    fixture.data.resize(640);
+    fixture.link(420, 512); // lb_80011710 requires the parameter records
+    for (unsigned i = 0; i < 30; ++i)
+        put(fixture.data, 512 + i * 4, 0x3f000000U + i * 0x1000U);
     put(fixture.data, 424, 2); // DynamicsDesc::count
     put(fixture.data, 428, 0x3f800000);
     put(fixture.data, 432, 0x3f000000);
@@ -159,6 +162,24 @@ void sheik_copy_dynamics()
               native32(converted, 432) == 0x3f000000 &&
               native32(converted, 436) == 0xbe800000,
           "Sheik copy dynamics did not preserve authored PPC scalar values");
+
+    for (unsigned i = 0; i < 30; ++i)
+        check(native32(converted, 512 + i * 4) == 0x3f000000U + i * 0x1000U,
+              "Copy dynamics inner parameter float bits were not converted");
+
+    auto malformed = fixture;
+    std::erase(malformed.reloc, 420);
+    put(malformed.data, 420, 0);
+    rejects([&] { (void)adapt(malformed.bytes(), malformed.root, {0}); });
+    malformed = fixture;
+    malformed.data.resize(620);
+    rejects([&] { (void)adapt(malformed.bytes(), malformed.root, {0}); });
+    malformed = fixture;
+    malformed.link(512, 0);
+    rejects([&] { (void)adapt(malformed.bytes(), malformed.root, {0}); });
+    malformed = fixture;
+    put(malformed.data, 512, 0x7fc00000);
+    rejects([&] { (void)adapt(malformed.bytes(), malformed.root, {0}); });
 
     put(fixture.data, 384, 10);
     rejects([&] { (void)adapt(fixture.bytes(), fixture.root, {0}); });
@@ -199,6 +220,10 @@ void source_copy_dynamics_rows()
         put(fixture.data, 384, 1);
         fixture.link(388, 416);
         put(fixture.data, 416, 3);
+        fixture.data.resize(640);
+        fixture.link(420, 512);
+        for (unsigned i = 0; i < 30; ++i)
+            put(fixture.data, 512 + i * 4, 0x3f000000U + i * 0x1000U);
         put(fixture.data, 424, 2);
         put(fixture.data, 428, 0x3f800000);
         put(fixture.data, 432, 0x3f000000);
@@ -215,6 +240,9 @@ void source_copy_dynamics_rows()
                   native32(converted, 432) == 0x3f000000 &&
                   native32(converted, 436) == 0xbe800000,
               "Source Kirby copy dynamics row was not converted");
+        for (unsigned i = 0; i < 30; ++i)
+            check(native32(converted, 512 + i * 4) == 0x3f000000U + i * 0x1000U,
+                  "Source Kirby copy dynamics parameter bits were not converted");
     }
 
     Fixture unrelated(false);
@@ -440,20 +468,37 @@ void real_archive(const char* filename, const char* symbol, unsigned kind,
         check(native32(neutral, offset + 0x10U) ==
                   archive.be32(offset + 0x10U),
               "Owned Kirby added-parts mask was not converted");
-    if (kind == FTKIND_SEAK) {
-        const auto dynamics = archive.pointer(offset + 0x14U, 8);
-        check(bool(dynamics), "Owned Sheik copy dynamics pointer is missing");
+    int dynamics_index = -1;
+    switch (kind) {
+    case FTKIND_ZELDA: dynamics_index = 0; break;
+    case FTKIND_KOOPA: case FTKIND_MARS: case FTKIND_EMBLEM:
+        dynamics_index = 1; break;
+    case FTKIND_SEAK: case FTKIND_LINK: case FTKIND_CLINK:
+    case FTKIND_PIKACHU: case FTKIND_PICHU: dynamics_index = 2; break;
+    case FTKIND_PURIN: dynamics_index = 3; break;
+    case FTKIND_MEWTWO: dynamics_index = 4; break;
+    }
+    if (dynamics_index >= 0) {
+        const auto dynamics = archive.pointer(offset + 0x0cU + dynamics_index * 4U, 8);
+        check(bool(dynamics), "Owned copy dynamics pointer is missing");
         const auto count = archive.be32(*dynamics);
         check(native32(neutral, *dynamics) == count,
-              "Owned Sheik copy dynamics count was not converted");
+              "Owned copy dynamics count was not converted");
         if (count) {
-            const auto bones = archive.pointer(
-                *dynamics + 4U, std::size_t{count} * 24U);
-            check(bool(bones), "Owned Sheik copy dynamic bones are missing");
-            check(native32(neutral, *bones) == archive.be32(*bones) &&
-                      native32(neutral, *bones + 8U) ==
-                          archive.be32(*bones + 8U),
-                  "Owned Sheik copy dynamic row scalars were not converted");
+            const auto bones = archive.pointer(*dynamics + 4U, std::size_t{count} * 24U);
+            check(bool(bones), "Owned copy dynamic bones are missing");
+            for (unsigned i = 0; i < count; ++i) {
+                const auto row = *bones + i * 24U;
+                const auto records = archive.be32(row + 8U);
+                const auto parameters = archive.pointer(row + 4U, records * 0x3cU);
+                check(bool(parameters), "Owned copy dynamics parameters are missing");
+                if (kind == FTKIND_PURIN)
+                    check(*parameters == 0, "Purin parameter relocation-to-zero fixture changed");
+                for (unsigned j = 0; j < records * 15U; ++j)
+                    check(native32(neutral, *parameters + j * 4U) ==
+                              archive.be32(*parameters + j * 4U),
+                          "Owned copy dynamics parameter float bits were not preserved");
+            }
         }
     }
     for (unsigned costume = 0; costume < 6; ++costume) {

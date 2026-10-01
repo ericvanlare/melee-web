@@ -44,6 +44,7 @@ extern EF_DAT_Entry efAsync_DatEntries[51];
 #pragma GCC diagnostic pop
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <map>
 #include <stdexcept>
@@ -453,6 +454,23 @@ void adapt_kirby_copy_dynamics(std::vector<std::uint8_t>& bytes,
         for (std::uint32_t component = 0; component < 3; ++component)
             write_native32(bytes, 0x20U + row + 12U + component * 4U,
                            archive.be32(row + 12U + component * 4U));
+        // lb_80011710 reads count lb_00F9_UnkDesc1Inner records through
+        // DynamicsDesc::data. Relocating that pointer does not convert its
+        // fifteen float words. A relocated zero is a valid data-section root
+        // (including the original Purin copy archive), not a null pointer.
+        constexpr std::uint32_t parameter_bytes = 0x3CU;
+        const auto parameters = archive.pointer(
+            row + 4U, std::size_t{descriptor_count} * parameter_bytes);
+        if (!parameters || (*parameters & 3U))
+            reject("Kirby copy dynamics parameters are missing or unaligned");
+        for (std::uint32_t parameter = 0; parameter < descriptor_count; ++parameter) {
+            for (std::uint32_t field = 0; field < parameter_bytes; field += 4U) {
+                const auto offset = *parameters + parameter * parameter_bytes + field;
+                if (archive.has_relocation(offset) || !std::isfinite(archive.f32(offset)))
+                    reject("Kirby copy dynamics parameter is not a finite source scalar");
+                write_native32(bytes, 0x20U + offset, archive.be32(offset));
+            }
+        }
     }
 }
 
