@@ -13,6 +13,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static int interrupts_enabled=1;
 int melee_web_platform_interrupts_enabled(void){return interrupts_enabled;}
@@ -60,6 +61,37 @@ _Noreturn void melee_web_platform_unavailable(const char* operation)
     fprintf(stderr,"Unsupported gameplay platform operation: %s\n",operation);
     fflush(stderr);
     abort();
+}
+/* A browser has no physical GameCube reset switch; external Eject owns the
+ * equivalent clean session teardown. Keep this hardware-only input neutral. */
+BOOL OSGetResetSwitchState(void){return 0;}
+/* Aurora uses its fixed WebGPU surface format. A source request to enable
+ * GameCube progressive scan is outside that renderer contract and fails. */
+void OSSetProgressiveMode(u32 enabled)
+{
+    if(enabled)melee_web_platform_unavailable("GameCube progressive-scan output mode");
+}
+/* The recovered PowerPC runtime supplies this conversion as assembly. Its
+ * source translation is compiled for TARGET_PC, so provide the same bit-level
+ * conversion here for the supported runtime target. */
+u64 __cvt_dbl_usll(double x)
+{
+    u64 bits, significand, magnitude;
+    unsigned exponent;
+    int shift, negative;
+    memcpy(&bits, &x, sizeof(bits));
+    exponent = (unsigned) ((bits >> 52) & 0x7FF);
+    negative = (int) (bits >> 63);
+    if (exponent < 1023)
+        return 0;
+    if (exponent >= 1086)
+        return negative ? (u64) 0x8000000000000000ULL
+                        : (u64) 0x7FFFFFFFFFFFFFFFULL;
+    significand = ((u64) 1 << 52) | (bits & 0x000FFFFFFFFFFFFFULL);
+    shift = (int) exponent - 1075;
+    magnitude = shift >= 0 ? significand << shift
+                           : significand >> -shift;
+    return negative ? (u64) (0 - magnitude) : magnitude;
 }
 /* These unavailable systems are deliberately excluded from this target's
  * provider libraries. Do not link this boundary alongside real replacements.

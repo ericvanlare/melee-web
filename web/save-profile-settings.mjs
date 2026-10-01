@@ -3,10 +3,11 @@ import {parseMeleeGCI, downloadMeleeGCI, MELEE_GCI_FILE_BYTES,
 import {SaveProfileStore, SaveProfileStorageError} from './save-profile-store.mjs';
 
 const $ = id => document.getElementById(id);
-const PROFILE_SCENES = new Set(['css', 'sss', 'match', 'results', 'prize']);
+const PROFILE_SCENES = new Set(['css', 'sss', 'title', 'main', 'opening', 'opening-vs',
+  'match', 'results', 'prize']);
 const descriptions = {
-  everything: 'Start with everything unlocked. Session changes aren’t saved.',
-  personal: 'Your progress saves automatically in this browser on this device.',
+  everything: 'Everything is unlocked. Changes aren’t saved.',
+  personal: 'Progress saves automatically on this device.',
 };
 const modeLabel = mode => mode === 'personal' ? 'Personal progress' : 'Everything unlocked';
 const modeBytes = bytes => bytes?.byteLength === MELEE_GCI_PROFILE_BYTES ? new Uint8Array(bytes) : null;
@@ -66,7 +67,7 @@ export function mountSaveProfileSettings({onError = () => {}, onBusy = () => {}}
       return;
     }
     if (activeMode === 'everything') {
-      status('Everything unlocked includes source-recorded unlocks and eligible completion flags. Session changes are discarded.');
+      status('');
     } else if (recovered) {
       status('Using the previous verified progress copy. The newer stored copy failed its checksum.');
     } else if (profileRevision !== null && profileData) {

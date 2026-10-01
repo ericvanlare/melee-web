@@ -37,6 +37,15 @@ globalThis.testFontFileRange = () => { throw Error('public wrapper must use sess
 globalThis.testOpenDiscSession = async file => {
   assert.equal(file, 'owned-disc');
   return {
+    fileInfo(name) {
+      if (closed) throw Error('DiscAssetSession is closed');
+      if (!['MvOpen.mth', 'MvHowto.mth', 'MvOmake15.mth'].includes(name)) return null;
+      return {path: name, size: 128};
+    },
+    async readFile(name, offset, size) {
+      if (closed) throw Error('DiscAssetSession is closed');
+      return new Uint8Array(size).fill((name.length + offset) & 0xff);
+    },
     async readScope(scope, {beforeRead}) {
       if (closed) throw Error('DiscAssetSession is closed');
       ++readCalls;
@@ -101,6 +110,10 @@ try {
   assert.equal(progress.at(-1).complete, 3);
   assert.equal(readCalls, 1);
   assert.equal(metadataCalls, 1);
+  assert.deepEqual(session.fileInfo('MvOpen.mth'),
+    {name: 'MvOpen.mth', size: 128});
+  assert.equal(session.fileInfo('not-present.mth'), null);
+  assert.equal((await session.readFile('MvOpen.mth', 32, 32)).byteLength, 32);
 
   for (const names of [['PlCo.dat', 'PlCo.dat'], ['unknown-native-name'], ['dsp_coef.bin']]) {
     await assert.rejects(session.readScope(names), names[0] === 'dsp_coef.bin'

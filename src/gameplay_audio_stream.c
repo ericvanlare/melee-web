@@ -1,6 +1,7 @@
 #include "gameplay_audio_bank_transport.h"
 #include "gameplay_audio_stream.h"
 #include "gameplay_io.h"
+#include "gameplay_source_files.h"
 #include <dolphin/ax.h>
 #include <dolphin/dvd.h>
 #include <sysdolphin/baselib/devcom.h>
@@ -126,11 +127,12 @@ MeleeWebAudioStream* melee_web_audio_stream_begin(MeleeWebAudio* audio,const Mel
 /* Only the owned local audio registry implements disc requests here. Its
  * pending queue determines busy/end; no hardware-cover state is fabricated. */
 s32 DVDGetDriveStatus(void){
- if(!active&&!melee_web_audio_bank_transport_active())stop("Drive status requested without owned disc files");
- return (active&&(active->requests||active->pumping))||melee_web_audio_bank_transport_busy()?DVD_STATE_BUSY:DVD_STATE_END;
+ if(!active&&!melee_web_audio_bank_transport_active()&&!melee_web_source_files_active())stop("Drive status requested without owned disc files");
+ return (active&&(active->requests||active->pumping))||melee_web_audio_bank_transport_busy()||melee_web_source_file_drive_busy()?DVD_STATE_BUSY:DVD_STATE_END;
 }
 s32 DVDConvertPathToEntrynum(const char* path){
  int entry=melee_web_audio_bank_transport_path(path);if(entry>=0)return entry;
+ entry=melee_web_source_file_entry(path);if(entry>=0)return entry;
  if(!active)stop("DVD path requested without an owned file registry");
  if(!melee_web_audio_stream_pump_for(active->audio,NULL,0))stop("pending HPS transfer failed before file selection");
  const StreamFile* file=file_for_path(path);if(file){active->selected_file=(unsigned)(file-active->files)+1;return (s32)active->selected_file;}
@@ -139,6 +141,12 @@ s32 DVDConvertPathToEntrynum(const char* path){
 }
 int HSD_DevComRequest(int file,uintptr_t src,uintptr_t dest,size_t size,int type,int priority,HSD_DevComCallback callback,void* args){
  if(melee_web_audio_bank_transport_file(file)||(type==0x1B&&melee_web_audio_bank_transport_active()))return melee_web_audio_bank_transport_request(file,src,dest,size,type,priority,callback,args);
+ if(melee_web_source_file_entry_owned(file)){
+  int request;
+  if(!melee_web_source_file_request(file,src,dest,size,type,priority,callback,args,&request,NULL,0))
+   stop("unsupported or unowned source DVD/DevCom transfer");
+  return request;
+ }
  const StreamFile* selected=active?file_at((unsigned)file):NULL;
  if(!active||!selected||priority<0||priority>2||src%32||size%32||!size||!callback){
   fprintf(stderr,"DevCom file=%d src=%lu dest=%lu size=%lu type=%d priority=%d callback=%p stream=%p bank=%d\n",
@@ -161,6 +169,7 @@ int HSD_DevComRequest(int file,uintptr_t src,uintptr_t dest,size_t size,int type
 }
 int HSD_DevComCancelEx(int id,u32 flags,HSD_DevComCallback callback,void* args){
  if(melee_web_audio_bank_transport_cancel(id,flags,callback,args))return 0;
+ if(melee_web_source_file_cancel(id,flags,callback,args))return 0;
  if(!active||flags&~3u)stop("unsupported DevCom cancellation");
  for(Request* r=active->requests;r;r=r->next)if(r->id==id){if(flags&1)r->callback=callback;if(flags&2)r->args=(uintptr_t)args;r->cancelled=1;break;}return 0;
 }

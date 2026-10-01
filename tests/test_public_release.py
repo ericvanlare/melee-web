@@ -357,6 +357,17 @@ class PublicReleaseTests(unittest.TestCase):
         self.assertNotEqual(first_hash, second_hash)
         owner_source = self.fixture_repo / "web/melee-runtime.mjs"
         owner_source.write_text(owner_source.read_text() + "\n// reviewed owner change\n")
+        # The owner source is part of the producer fingerprint set. Refresh
+        # the synthetic identity for this intentional source change so this
+        # case continues to exercise the runtime-graph hash rather than the
+        # stale-identity rejection covered below.
+        identity_path = runtime.parent / "runtime-public-identity.json"
+        identity = json.loads(identity_path.read_text())
+        identity["source_inputs"]["files_sha256"]["web/melee-runtime.mjs"] = hashlib.sha256(
+            owner_source.read_bytes()).hexdigest()
+        identity_bytes = json.dumps(identity).encode()
+        identity_path.write_bytes(identity_bytes)
+        (self.fixture_repo / "build/runtime-public-identity.json").write_bytes(identity_bytes)
         third_manifest = self.root / "third-player.manifest.json"
         build(source=player_source, output=self.root / "third-player", manifest=third_manifest,
               profile="player", runtime_dir=runtime)

@@ -1,6 +1,7 @@
 #include "gameplay_match_rules.h"
 #include "gameplay_content.h"
 #include "gameplay_bootstrap.h"
+#include "gameplay_player_selection.h"
 #include <melee/gm/gm_1601.h>
 #include <melee/gm/gm_16AE.h>
 #include <melee/gm/types.h>
@@ -11,13 +12,14 @@
 #include <string.h>
 extern void melee_web_match_source_refresh_ratio(void);
 extern int melee_web_match_init_source(StartMeleeData*);
-extern int melee_web_match_prepare_source(StartMeleeData*);
+extern int melee_web_match_prepare_source(StartMeleeData*,int opening_demo);
 extern int melee_web_match_finish_source(StartMeleeData*);
+extern void melee_web_match_source_demo_end(void);
 extern int melee_web_match_source_publish_result(void);
 extern void melee_web_match_source_result_reset(void);
 extern int melee_web_match_source_result_winners(int*, int[6]);
 extern int melee_web_match_source_result_data(MatchExitInfo*);
-struct MeleeWebMatchRules {lbl_8046B6A0_t saved;StaticPlayer players[6];StartMeleeData start;uint64_t generation;int prepared;int initialized;};
+struct MeleeWebMatchRules {lbl_8046B6A0_t saved;StaticPlayer players[6];StartMeleeData start;uint64_t generation;int prepared;int initialized;int opening_demo;};
 static MeleeWebMatchRules* active;
 static struct {
     int valid;
@@ -57,6 +59,7 @@ MeleeWebMatchRules* melee_web_match_rules_begin(char* e,size_t n){
 }
 int melee_web_match_rules_prepare_from_menu(MeleeWebMatchRules* h,
                                             const StartMeleeData* menu,
+                                            int opening_demo,
                                             char* e,size_t n)
 {
     if(!h||h!=active||h->generation!=melee_web_gameplay_stats().generation)
@@ -67,13 +70,37 @@ int melee_web_match_rules_prepare_from_menu(MeleeWebMatchRules* h,
     for(int i=0;i<6;i++)if(Player_GetEntity(i))
         return fail(e,n,"Initialize original match data before source fighters");
     StartMeleeData candidate=*menu;
-    if(candidate.rules.match_kind!=MatchKind_Stock||!candidate.rules.is_stock||
+    if(opening_demo){
+        const StartMeleeRules* rules=&candidate.rules;
+        int active=0;
+        if(rules->match_kind>MatchKind_Bonus||rules->timer_enabled||
+           rules->time_limit!=0||rules->x1_0||!rules->x1_2||!rules->x1_3||
+           !rules->disable_pausing||rules->x7!=0||rules->xB!=2||
+           rules->x20!=UINT64_MAX||rules->game_speed!=1.0f||rules->on_match_start==NULL||
+           rules->on_frame_start!=NULL||rules->on_frame_end!=NULL||
+           rules->on_match_end!=NULL||rules->x54!=NULL||
+           !melee_web_stage_content(rules->stkind))
+            return fail(e,n,"Opening source payload differs from its authored VS demo setup");
+        for(int i=0;i<4;i++){
+            const PlayerInitData* player=&candidate.players[i];
+            if(player->slot_type==Gm_PKind_NA)break;
+            if(player->slot_type!=Gm_PKind_Cpu||player->cpu_kind!=4||
+               player->cpu_level!=9||player->stocks<1||player->stocks>99||
+               player->team!=0||(player->slot!=0&&player->slot!=i+1)||
+               !melee_web_match_player_supported(player))
+                return fail(e,n,"Opening source payload differs from its four CPU player setup");
+            active++;
+        }
+        if(active!=4||candidate.players[4].slot_type!=Gm_PKind_NA)
+            return fail(e,n,"Opening source payload exceeds its authored four-player demo slots");
+    }else if(candidate.rules.match_kind!=MatchKind_Stock||!candidate.rules.is_stock||
        !candidate.rules.is_vs||candidate.rules.is_teams||
        !melee_web_match_timer_supported(&candidate.rules)||candidate.rules.xB!=-1||
        candidate.rules.x20!=UINT64_MAX||!melee_web_stage_content(candidate.rules.stkind))
         return fail(e,n,"Menu payload does not match the supported stock/stage rules");
     h->start=candidate;
-    if(!melee_web_match_prepare_source(&h->start)){
+    h->opening_demo=opening_demo!=0;
+    if(!melee_web_match_prepare_source(&h->start,h->opening_demo)){
         memset(&h->start,0,sizeof(h->start));
         return fail(e,n,"Original per-match source preparation rejected menu payload");
     }
@@ -167,6 +194,7 @@ int melee_web_match_rules_end(MeleeWebMatchRules* h,char* e,size_t n){
     if(!h)return 1;
     if(active!=h||h->generation!=melee_web_gameplay_stats().generation)return fail(e,n,"Original rules ownership changed");
     for(int i=0;i<6;i++)if(Player_GetEntity(i))return fail(e,n,"Unload source fighters before restoring rules");
+    if(h->opening_demo)melee_web_match_source_demo_end();
     for(int i=0;i<6;i++)*Player_GetPtrForSlot(i)=h->players[i];
     *gm_16AE_GetUnkData_0()=h->saved;active=NULL;free(h);if(e&&n)*e=0;return 1;
 }

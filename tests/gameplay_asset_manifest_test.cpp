@@ -3,6 +3,7 @@
 #include "dat_archive.hpp"
 #include "fighter_binding.hpp"
 #include "gameplay_content.h"
+#include "gameplay_menu_host.h"
 #include "gameplay_result_motion_table.hpp"
 #include "gameplay_kirby_copy_assets.hpp"
 #include <melee/pl/forward.h>
@@ -156,6 +157,47 @@ void menu_contract()
     check(std::find(banks.begin(),banks.end(),"kongo.ssm")!=banks.end(),
           "Title demo stage bank is missing");
     no_duplicates(names);
+}
+
+void opening_state_asset_contract()
+{
+    for (const unsigned state : {0u, 2u, 4u, 5u}) {
+        const auto names = opening_state_asset_names(state);
+        check(has(names, "GmTtAll.usd"),
+              "Opening state omitted the original title/menu archive scope");
+        check(!has(names, "MvOpen.mth") && !has(names, "MvHowto.mth") &&
+                  !has(names, "MvOmake15.mth"),
+              "Original movie must remain on the bounded streamed DVD path");
+        no_duplicates(names);
+    }
+    for (const unsigned state : {1u, 3u, 6u})
+        rejects([&] { (void)opening_state_asset_names(state); });
+}
+
+void opening_match_asset_contract()
+{
+    MeleeWebOpeningPreview preview{};
+    preview.characters[0] = CKIND_GAMEWATCH;
+    preview.characters[1] = CKIND_KIRBY;
+    preview.characters[2] = CKIND_POPONANA;
+    preview.characters[3] = CKIND_SAMUS;
+    preview.stage_kind = St_Kind_Kongo;
+    preview.match_kind = 0;
+    try {
+        (void) opening_match_asset_names(preview);
+    } catch (const std::exception& error) {
+        const std::string message = error.what();
+        for (const int character : {CKIND_GAMEWATCH, CKIND_KIRBY,
+                                    CKIND_POPONANA, CKIND_SAMUS})
+            check(message.find("fighter " + std::to_string(character) +
+                               " is not admitted") != std::string::npos,
+                  "Opening scope error omitted a source-selected fighter");
+        check(message.find("stage " + std::to_string(St_Kind_Kongo) +
+                           " is not admitted") != std::string::npos,
+              "Opening scope error omitted the source-selected stage");
+        return;
+    }
+    throw std::runtime_error("Unadmitted Opening fighter unexpectedly passed its asset scope");
 }
 
 void source_fighter_closure()
@@ -378,6 +420,8 @@ int main(int argc, char** argv)
             return 0;
         }
         menu_contract();
+        opening_state_asset_contract();
+        opening_match_asset_contract();
         source_fighter_closure();
         results_fighter_closure();
         source_prize_locale_closure();

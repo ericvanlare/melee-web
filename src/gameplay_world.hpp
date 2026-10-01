@@ -47,6 +47,9 @@ struct GameplayWorldSelection {
     // Borrowed only during construction, including SourceOrdered: restore the
     // menu PAD history before fn_8016D8AC selects the held-A startup form.
     const MeleeWebPadState* source_initial_input=nullptr;
+    // Opening demos retain their authored four-CPU/99-stock setup and
+    // gm_80183218 source callback. This never applies to public VS matches.
+    bool opening_demo=false;
     std::array<MeleeWebPlayerSettings,4> source_players{};
 };
 // Shared by the browser and source regression harness. Owns one original SDK
