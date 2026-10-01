@@ -1495,7 +1495,7 @@ int melee_web_native_menu_snapshot_unlocked_baseline(uint8_t* output,unsigned si
  try{
   check(melee_web_save_profile_owner_activate(profile,error,sizeof(error)),error);active=true;
   check(melee_web_save_profile_owner_initialize_default(profile,error,sizeof(error)),error);
-  check(melee_web_save_profile_owner_set_roster(profile,0x07ff,0x01c0,error,sizeof(error)),error);
+  check(melee_web_save_profile_owner_initialize_everything(profile,error,sizeof(error)),error);
   check(melee_web_save_profile_owner_snapshot_card_data(profile,output,size,error,sizeof(error)),error);
   check(melee_web_save_profile_owner_deactivate(profile,error,sizeof(error)),error);active=false;
   check(melee_web_save_profile_owner_destroy(profile,error,sizeof(error)),error);profile=nullptr;
