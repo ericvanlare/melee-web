@@ -4,7 +4,12 @@ Captain Falcon is being integrated on `codex/full-game-integration`. This is
 development work. Native source lifecycles pass both Captain/Mario orientations
 and all six costumes on Final Destination, including combat, original pause,
 No Contest and reconstruction. The browser completes original CSS/SSS entry and all 30 declared action cases.
-Independent original comparison and broader fighter gates remain pending.
+The first original CPU9 comparison is diagnostic and diverges in Falcon's exact
+position state. A separate human-P1 versus CPU9-P2 source capture completes, but
+its browser replay reaches Prize where the source returns to CSS. Neither run
+reproduces a browser or process crash or attributes the reported Falcon-versus-
+Falcon failure. See the
+[correctness investigation receipt](evidence/captain-falcon-correctness-investigation-v1.json).
 
 ## Source and ownership
 
