@@ -8745,6 +8745,21 @@ index 6c6e71e..561b857 100644
  #include <Runtime/platform.h>
  
  #include <melee/pl/forward.h>
+@@ -49,6 +54,14 @@ static void initFighter(HSD_GObj* gobj, plAllocInfo2* alloc_info)
+     temp1.internal_id = alloc_info->internal_id;
+     temp1.slot = alloc_info->slot;
+     temp1.b0 = alloc_info->has_transformation;
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* Native demo actions have an owned binding, not a legacy animation-cache
++     * slot. Use the source Player_80031AD0 no-slot sentinel so the original
++     * Fighter destructor cannot release a cache entry from stack garbage.
++     * Fighter_UnkInitLoad copies this field before demo binding begins. */
++    temp1.x5 = -1;
++#endif
++
+     Fighter_UnkInitLoad_80068914(gobj, &temp1);
+ }
+ 
 @@ -60,7 +65,15 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
      Fighter_GObj* gobj = GObj_Create(HSD_GOBJ_CLASS_FIGHTER, 8, 0);
      GObj_SetupGXLink(gobj, ftDrawCommon_80080E18, 5, 0);
