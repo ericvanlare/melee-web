@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import {finalizeSessionCapture, REQUIRED_SESSION_DOWNLOADS} from '../scripts/whole_session_capture_result.mjs';
+import {finalizeSessionCapture, REQUIRED_SESSION_DOWNLOADS,
+  validateRuntimeDataAbort} from '../scripts/whole_session_capture_result.mjs';
 
 const clean = () => ({
   result: 'fail', first_error: null, browser_errors: [], unexpected_requests: [],
@@ -22,6 +23,28 @@ const success = clean();
 assert.equal(finalizeSessionCapture(success), 0);
 assert.equal(success.result, 'pass');
 assert.deepEqual(success.finalization_failures, []);
+const validRuntimeDataAbort = {
+  requestCount: 1, responseCount: 1, failureCount: 1, finishedCount: 0,
+  url: 'http://127.0.0.1:8813/gameplay_menu_browser.data',
+  expectedUrl: 'http://127.0.0.1:8813/gameplay_menu_browser.data',
+  method: 'GET', resourceType: 'fetch', errorText: 'net::ERR_ABORTED',
+  responseStatus: 200, contentLength: 3674112, loadedBytes: 3674112,
+  totalBytes: 3674112, fileBytes: 3674112, expectedBytes: 3674112,
+  expectedSha256: 'a'.repeat(64), actualSha256: 'a'.repeat(64), fromCache: false,
+};
+assert.equal(validateRuntimeDataAbort(validRuntimeDataAbort), true);
+for (const [key, value] of [
+  ['requestCount', 2], ['responseCount', 0], ['failureCount', 2], ['finishedCount', 1],
+  ['url', 'http://127.0.0.1:8813/other.data'], ['method', 'POST'], ['resourceType', 'xhr'],
+  ['errorText', 'net::ERR_FAILED'], ['responseStatus', 206], ['contentLength', 3674111],
+  ['loadedBytes', 3674111], ['totalBytes', 3674111], ['fileBytes', 3674111],
+  ['expectedBytes', 3674111], ['actualSha256', 'b'.repeat(64)], ['fromCache', true],
+]) {
+  assert.equal(validateRuntimeDataAbort({...validRuntimeDataAbort, [key]: value}), false, key);
+  checks++;
+}
+rejects(r => { r.verified_runtime_data_aborts = [{...validRuntimeDataAbort, actualSha256:'b'.repeat(64)}]; },
+  'Runtime package abort evidence');
 for (const kind of ['pageerror', 'console', 'http', 'requestfailed'])
   rejects(r => { r.browser_errors.push({kind, message: 'fixture'}); }, 'Browser errors');
 for (const key of ['first_error', 'failure', 'first_mismatch'])

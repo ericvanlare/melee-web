@@ -19,11 +19,12 @@ const scope = {};
 vm.createContext(scope);
 vm.runInContext(`${declarations.join('\n')}\nresult=RETAIL_REPLAY_MAX_BYTES;`, scope);
 
-// This is the native v8 envelope at 108,000 frames and all 32 admitted spans.
+// This is the native v9 envelope with its exact three-match setup table,
+// 108,000 frames and all 32 admitted spans.
 // The 32-span table is 372 bytes larger than the one-span minimum.
 const expected = 16 + 4 + 8 + (0x18 + 0x55E8 + 0x148 + 6) +
-  0x138 + 822 + 108000 * 44 + 2 + 32 * 12;
-assert.equal(expected, 4_775_898);
+  4 + 3 * 0x138 + 822 + 108000 * 44 + 2 + 32 * 12;
+assert.equal(expected, 4_776_526);
 assert.equal(scope.result, expected);
 assert.equal(scope.result - (expected - 31 * 12), 372);
-console.log('Whole-session browser bound admits the exact 32-span v8 envelope');
+console.log('Whole-session browser bound admits the exact three-setup v9 envelope');

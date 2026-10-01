@@ -57,12 +57,14 @@ struct RetailReplayRecipe {
     std::vector<RetailReplayInput> frames;
     std::vector<bool> draw_boundaries;
     std::vector<RetailReplaySpan> spans;
+    std::vector<std::array<uint8_t, 0x138>> match_setups;
+    std::vector<MeleeWebMenuMatchSelection> match_selections;
     std::unique_ptr<RetailReplayInitialCssContext> initial_css;
-    // Version 8 is the opt-in whole-session form: one continuous pad history
+    // Versions 8 and 9 are opt-in whole-session forms: one continuous pad history
     // with a declared scene span table and copied first-CSS source context. It
     // starts from the fresh prepared CSS owner and retains one source arena
     // across the menu chain and matches. A used source heap is rejected.
-    bool whole_session() const { return version == 8; }
+    bool whole_session() const { return version == 8 || version == 9; }
     unsigned scheduling_mode() const { return version == 6 ? 2 : version == 5 ? 1 : 0; }
     std::size_t expected_draws() const {
         if (draw_boundaries.empty()) return frames.size();
@@ -84,8 +86,11 @@ struct RetailReplayRecipe {
  * the v4 envelope, then adds a fixed context header (u16 schema=2, u16
  * flags=0, u32 context_bytes), the source GameRules, SaveData, complete
  * CSSData entry object and six-byte KO array, and finally the whole-session
- * span table. Schema 1 is rejected because it cannot initialize CSS. */
-constexpr uint32_t kRetailReplayVersion = 8;
+ * span table. V9 replaces the one setup payload with a bounded, ordered setup
+ * table so each match selection is independently bound. Schema 1 is rejected
+ * because it cannot initialize CSS. */
+constexpr uint32_t kRetailReplayVersion = 9;
+constexpr uint32_t kRetailReplayV8Version = 8;
 constexpr uint16_t kRetailReplayContextVersion = 2;
 constexpr size_t kRetailReplayGameRulesBytes = 0x18;
 constexpr size_t kRetailReplaySaveDataBytes = 0x55E8;
@@ -97,13 +102,15 @@ constexpr size_t kRetailReplayContextBytes = kRetailReplayGameRulesBytes +
     kRetailReplayKoCountsBytes;
 constexpr size_t kRetailReplayMaxSpans = 32;
 constexpr size_t kRetailReplaySpanBytes = 12;
+constexpr size_t kRetailReplayMaxMatchSetups = 3;
 constexpr uint32_t kRetailReplayLegacyMaxFrames = 36000;
 constexpr uint32_t kRetailReplayWholeSessionMaxFrames = 108000;
 constexpr size_t kRetailReplayLegacyMaxBytes = 20 + 8 +
     kRetailReplayLegacyMaxFrames * 9 + 0x138 + MELEE_WEB_PAD_STATE_BYTES +
     kRetailReplayLegacyMaxFrames * 44;
 constexpr size_t kRetailReplayWholeSessionMaxBytes = 16 + 4 +
-    kRetailReplayContextHeaderBytes + kRetailReplayContextBytes + 0x138 +
+    kRetailReplayContextHeaderBytes + kRetailReplayContextBytes + 4 +
+    kRetailReplayMaxMatchSetups * 0x138 +
     MELEE_WEB_PAD_STATE_BYTES + kRetailReplayWholeSessionMaxFrames * 44 + 2 +
     kRetailReplayMaxSpans * kRetailReplaySpanBytes;
 // The browser must admit the largest supported format before the native
@@ -118,6 +125,11 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t>);
 // end is emitted only after the complete input timeline and successful teardown.
 void retail_replay_session_initial(const RetailReplayRecipe&);
 void retail_replay_initial(const RetailReplayRecipe&, bool source_drawing);
+void retail_replay_initial(const RetailReplayRecipe&, bool source_drawing,
+                           const StartMeleeData& actual_setup);
+void retail_replay_validate_match_setup(const RetailReplayRecipe&, unsigned match_index,
+                                        const StartMeleeData& actual_setup);
+unsigned retail_replay_next_match_index(const RetailReplayRecipe&, size_t next_frame);
 void retail_replay_frame(const RetailReplayRecipe&, size_t index, unsigned scene = 0);
 void retail_replay_draw(const RetailReplayRecipe&, size_t index);
 void retail_replay_preparation_draw(const RetailReplayRecipe&);

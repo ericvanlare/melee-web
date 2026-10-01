@@ -23,7 +23,37 @@ scene teardown publish `{"status":"completed","natural":true}` and a
 sidecar with `completed: true, invalid: false`. Operator termination is
 reported as interrupted. Ring overflow, a bounded read or serialization
 failure, stream failure, or status failure latches `invalid: true`; no record
-is silently dropped.
+is silently dropped. An overflow error includes the attempted event's PC,
+source tick and steady-clock time, producer/consumer indices, ring occupancy,
+maximum observed occupancy, and writer dequeue/write durations. These fields
+diagnose the observer itself and do not affect the guest or convert an
+overflow into a valid capture.
+
+For a bounded Link Arrow callback investigation, the optional compact companion
+trace uses `MWRC_ITEM_PROBE_OUTPUT` and `MWRC_ITEM_PROBE_MATCH`. Fixed windows
+use `MWRC_ITEM_PROBE_FIRST_TICK` and `MWRC_ITEM_PROBE_LAST_TICK`; a dynamically
+triggered window instead uses `MWRC_ITEM_PROBE_TRIGGER` set to
+`young_link_arrow_creation` or `young_link_arrow_launch`, plus
+`MWRC_ITEM_PROBE_CAPTURE_TICKS` from 1 through 16. The match index is zero
+based. Its instruction words are pinned in
+`tools/cpu-item-boundary-gale01r2.json`; each observed instruction is checked
+against the resident Rev 2 DOL. The trace records paired item/Arrow/CPU callbacks
+and source tick/draw returns, plus stable item identity, owner, scheduler
+priority, registered process priorities, position/velocity bits, hitbox-0
+endpoints, and CPU xF4/xF8 fields. It fails closed if the observed item pointer,
+GObj, kind, or owner changes, and is bounded to 2,048 records and 4 MiB. Its
+output path must be separate from both MWRO and any CPU register-probe output.
+Schema version 5 also records the paired-single angle argument, collision
+position, shield HitResult bytes, and shield-bone matrix at the Link Arrow
+`ftColl_80077688` assignment entry. These fields support a narrow source/browser
+input comparison and do not broaden the probe's equivalence claim.
+This diagnostic does not change guest memory or constitute gameplay
+equivalence evidence.
+
+For a companion-only bounded probe, `MWRC_ITEM_PROBE_SUMMARY_STREAM=1` keeps
+only the observer handshake/start and error/end records in the MWRO path while
+the status sidecar continues to report progress. This is not a complete MWRO
+session stream and must not be passed to the whole-session comparator.
 
 The JIT callback flushes cached guest registers and only copies bounded raw
 memory slices. It never writes guest memory, single steps, or uses the debugger.
