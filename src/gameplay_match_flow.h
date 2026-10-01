@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 typedef struct MeleeWebMatchFlow MeleeWebMatchFlow;
-MeleeWebMatchFlow* melee_web_match_flow_begin(char*, size_t);
+MeleeWebMatchFlow* melee_web_match_flow_begin(int opening_demo, char*, size_t);
 int melee_web_match_flow_renew(void*, char*, size_t);
 int melee_web_match_flow_pre(void*, char*, size_t);
 int melee_web_match_flow_post(void*, char*, size_t);

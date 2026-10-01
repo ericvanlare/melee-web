@@ -32,6 +32,7 @@ public:
     bool ready() const;
     bool ending() const;
     bool complete() const;
+    bool opening_demo() const;
     bool paused() const;
     uint32_t source_frames() const;
     int hud_damage(unsigned player) const;

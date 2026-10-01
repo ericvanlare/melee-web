@@ -14,6 +14,7 @@ extern int melee_web_match_end_state(void);
 struct MeleeWebMatchFlow {
     uint64_t generation;
     int source_valid, complete;
+    int opening_demo;
 };
 static MeleeWebMatchFlow* owner;
 static int fail(char* error, size_t size, const char* message)
@@ -30,7 +31,8 @@ static void source_frame(void)
 {
     owner->source_valid = melee_web_match_source_frame();
 }
-MeleeWebMatchFlow* melee_web_match_flow_begin(char* error, size_t size)
+MeleeWebMatchFlow* melee_web_match_flow_begin(int opening_demo,
+                                              char* error, size_t size)
 {
     const uint64_t generation = melee_web_gameplay_generation();
     if (owner || !generation) {
@@ -54,6 +56,7 @@ MeleeWebMatchFlow* melee_web_match_flow_begin(char* error, size_t size)
         return NULL;
     }
     flow->generation = generation;
+    flow->opening_demo = opening_demo != 0;
     owner = flow;
     return flow;
 }
@@ -84,7 +87,8 @@ int melee_web_match_flow_post(void* context, char* error, size_t size)
         !melee_web_source_clock_request(&request))
         return fail(error, size, "Original match clock lost its frame ownership");
     if (request != 0) {
-        if (request != 1 || (melee_web_match_end_state() != 3 &&
+        if (request != 1 || (!flow->opening_demo &&
+            melee_web_match_end_state() != 3 &&
             !(melee_web_match_end_state() == 0 &&
               melee_web_match_source_result() == OUTCOME_NO_CONTEST)))
             return fail(error, size, "Unexpected original match transition request");

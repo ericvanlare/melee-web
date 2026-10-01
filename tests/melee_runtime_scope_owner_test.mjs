@@ -9,6 +9,7 @@ import {mountMeleeRuntime} from '../web/melee-runtime.mjs';
 const mode = process.argv[2] || '--lifecycle';
 const calls = [];
 const states = [];
+const surfacedErrors = [];
 const listeners = new Map();
 let phase = 0;
 let running = false;
@@ -73,6 +74,13 @@ async function openDisc(file) {
     await new Promise(resolve => { lateOpenResolve = resolve; });
   }
   return {
+    fileInfo(name) {
+      assert.ok(['MvOpen.mth', 'MvHowto.mth', 'MvOmake15.mth'].includes(name));
+      return {name, size: 128};
+    },
+    async readFile(name, offset, size) {
+      return new Uint8Array(size).fill((name.length + offset) & 0xff);
+    },
     async readScope(names) {
       ++readCount;
       readStarted = true;
@@ -150,6 +158,14 @@ function installModule(Module) {
       pendingNames = [];
       return 1;
     },
+    _melee_web_native_source_file_external_set(namePointer, size) {
+      calls.push(['stream-file', nativeName(namePointer), size]);
+      return 1;
+    },
+    _melee_web_native_source_files_external_clear() {
+      calls.push(['stream-clear']);
+      return 1;
+    },
     _melee_web_native_menu_prepare() {
       calls.push(['prepare']);
       assert.equal(committed, true, 'menu preparation follows a committed scope');
@@ -201,6 +217,7 @@ const mounted = mountMeleeRuntime({
   createAudio: mode === '--destroy-unload-fail' ? createTestAudio : undefined,
   loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
   onState: state => states.push(state),
+  onError: error => surfacedErrors.push(String(error?.message || error)),
   onOwner: context => {
     owner = context;
     installModule(context.Module);
@@ -248,6 +265,16 @@ function assetFilesSince(index) {
 async function lifecycle() {
   generation = 0;
   await settle(player.importDisc({name: 'scoped.iso'}), 'initial scoped import did not settle');
+  assert.equal(window.menuStartSourceRead(77, 'MvOpen.mth', 32, 64), true);
+  await pumpUntil(() => window.menuSourceReadStatus(77) === 1,
+    'bounded original movie range did not finish');
+  const movieRange = window.menuSourceReadTake(77);
+  assert.ok(movieRange > 0);
+  assert.deepEqual([...owner.Module.HEAPU8.slice(movieRange, movieRange + 4)],
+    [42, 42, 42, 42], 'the async source bridge stages only the requested bytes');
+  owner.Module._free(movieRange);
+  assert.equal(window.menuSourceReadStatus(77), -1,
+    'taking the staged range retires its temporary owner');
   const initialFiles = assetFilesSince(0);
   assert.equal(initialFiles.length, 19);
   const batches = new Map();
@@ -378,6 +405,22 @@ async function destroyUnloadFails() {
   console.log('Scoped runtime owner: failed native unload preserves the error and still closes File/audio.');
 }
 
+async function sourceTransitionFailure() {
+  await settle(player.importDisc({name: 'source-transition.iso'}),
+    'source-transition setup import did not settle');
+  const error = 'Original Title idle reached source GM_OPENING_MV state 1. Eject to recover.';
+  window.menuPreparation('Original source transition', false);
+  window.menuPreparationFailed(error);
+  assert.deepEqual(surfacedErrors, [error],
+    'A native source transition failure must reach the public error UI');
+  assert.equal(player.getState().message, error);
+  assert.equal(player.getState().canUnload, true,
+    'The explicit unsupported-route error must leave Eject available');
+  await settle(player.destroy(), 'Eject after source-transition failure did not settle');
+  assert.equal(discClosed, true, 'Eject closes the owned disc session');
+  console.log('Scoped runtime owner: unsupported source transition is surfaced and remains Eject-recoverable.');
+}
+
 if (mode === '--lifecycle') await lifecycle();
 else if (mode === '--duplicate') await duplicateRequest();
 else if (mode === '--commit-fail') await commitFails();
@@ -386,4 +429,5 @@ else if (mode === '--put-fail') await transferFails('put');
 else if (mode === '--late-open-stop') await lateOpen('stop');
 else if (mode === '--late-open-destroy') await lateOpen('destroy');
 else if (mode === '--destroy-unload-fail') await destroyUnloadFails();
+else if (mode === '--source-transition-fail') await sourceTransitionFailure();
 else throw Error(`Unknown scoped-owner mode: ${mode}`);

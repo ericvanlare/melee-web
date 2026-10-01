@@ -1541,7 +1541,7 @@ index cd7e31a..98fa9d4 100644
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2319,154 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2319,188 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -1549,9 +1549,21 @@ index cd7e31a..98fa9d4 100644
 +#if defined(MELEE_WEB_GAMEPLAY)
 +/* Run the original active/pause/ending scene callback only after the resident
 + * owner has initialized its complete supported StartMeleeData. */
++static bool melee_web_opening_demo_active;
 +int melee_web_match_source_frame(void)
 +{
 +    lbl_8046B6A0_t* data = &lbl_8046B6A0;
++    if (melee_web_opening_demo_active) {
++        if (gm_GetCurrentGameMode() != GM_OPENING_MV ||
++            data->x24C8.on_frame_start || data->x24C8.on_frame_end ||
++            (data->unk_0 != 0 && data->unk_0 != 1 && data->unk_0 != 3))
++            return 0;
++        gm_Scene_Vs_OnFrame();
++        return data->match_result == OUTCOME_NONE ||
++               data->match_result == OUTCOME_TIMEOUT ||
++               data->match_result == OUTCOME_ELIMINATION ||
++               data->match_result == OUTCOME_NO_CONTEST;
++    }
 +    if (gm_GetCurrentGameMode() != GM_VS || !data->x24C8.is_vs ||
 +        data->x24C8.match_kind != MatchKind_Stock || data->x24C8.is_teams ||
 +        data->x24C8.x4_4 || data->is_singleplayer ||
@@ -1641,18 +1653,32 @@ index cd7e31a..98fa9d4 100644
 +#include "gameplay_content.h"
 +#include "gameplay_match_rules.h"
 +#include "gameplay_player_selection.h"
-+static int melee_web_match_validate_source_start(StartMeleeData* start)
++extern void gm_80183218(void);
++static int melee_web_match_validate_source_start(StartMeleeData* start,
++                                                  int opening_demo)
 +{
 +    const StartMeleeRules* rules;
 +    int i;
 +    if (start == NULL) return 0;
 +    rules = &start->rules;
-+    if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
-+        !rules->is_vs || rules->is_teams || !melee_web_match_timer_supported(rules) ||
-+        !melee_web_stage_content(rules->stkind) || rules->x20 != (u64) -1 || rules->xB != -1 ||
-+        rules->game_speed != 1.0F || rules->x54 != NULL ||
-+        rules->on_match_start != NULL || rules->on_frame_start != NULL ||
-+        rules->on_frame_end != NULL || rules->on_match_end != NULL) return 0;
++    if (opening_demo) {
++        if (rules->match_kind > MatchKind_Bonus || rules->timer_enabled ||
++            rules->time_limit != 0 || rules->x1_0 || !rules->x1_2 ||
++            !rules->x1_3 || !rules->disable_pausing || rules->x7 != 0 ||
++            rules->x20 != (u64) -1 || rules->xB != 2 ||
++            rules->game_speed != 1.0F || rules->x54 != NULL ||
++            rules->on_match_start != gm_80183218 ||
++            rules->on_frame_start != NULL || rules->on_frame_end != NULL ||
++            rules->on_match_end != NULL || !melee_web_stage_content(rules->stkind))
++            return 0;
++    } else if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
++               !rules->is_vs || rules->is_teams ||
++               !melee_web_match_timer_supported(rules) ||
++               !melee_web_stage_content(rules->stkind) ||
++               rules->x20 != (u64) -1 || rules->xB != -1 ||
++               rules->game_speed != 1.0F || rules->x54 != NULL ||
++               rules->on_match_start != NULL || rules->on_frame_start != NULL ||
++               rules->on_frame_end != NULL || rules->on_match_end != NULL) return 0;
 +    for (i = 0; i < 6; ++i)
 +        if (Player_GetEntity(i) != NULL) return 0;
 +    for (i = 0; i < 4; ++i) {
@@ -1661,22 +1687,30 @@ index cd7e31a..98fa9d4 100644
 +        const int player_id = player->slot == 0 ? i : (int) player->slot - 1;
 +        const MeleeWebFighterContent* content = melee_web_fighter_content(player->ckind);
 +        if (content == NULL || !melee_web_match_player_supported(player) ||
-+            player->stocks < 1 || player->stocks > 5 ||
++            player->stocks < 1 || player->stocks > (opening_demo ? 99 : 5) ||
 +            player->color >= content->costumes || player->sub_color > 4 ||
 +            player->team != 0 || player->slot > 4 || player_id != i) return 0;
++        if (opening_demo &&
++            (player->slot_type != Gm_PKind_Cpu || player->cpu_kind != 4 ||
++             player->cpu_level != 9)) return 0;
 +    }
-+    if (i < 2) return 0;
++    if (opening_demo ? i != 4 : i < 2) return 0;
 +    for (; i < 6; ++i)
 +        if (start->players[i].slot_type != Gm_PKind_NA) return 0;
 +    return 1;
 +}
 +/* Original fn_8016DCC0 boundary, placed after camera creation and before
 + * refraction. The caller owns the later dynamics/effect and stage boundaries. */
-+int melee_web_match_prepare_source(StartMeleeData* start)
++int melee_web_match_prepare_source(StartMeleeData* start, int opening_demo)
 +{
-+    if (!melee_web_match_validate_source_start(start)) return 0;
++    if (!melee_web_match_validate_source_start(start, opening_demo)) return 0;
 +    fn_8016DCC0(start);
++    melee_web_opening_demo_active = opening_demo != 0;
 +    return 1;
++}
++void melee_web_match_source_demo_end(void)
++{
++    melee_web_opening_demo_active = false;
 +}
 +/* Stage-dependent continuation from the original fn_8016DEEC path. */
 +int melee_web_match_finish_source(StartMeleeData* start)
@@ -1690,7 +1724,7 @@ index cd7e31a..98fa9d4 100644
 +}
 +int melee_web_match_init_source(StartMeleeData* start)
 +{
-+    if (!melee_web_match_prepare_source(start)) return 0;
++    if (!melee_web_match_prepare_source(start, 0)) return 0;
 +    if (!melee_web_gameplay_initialize_vs_dynamics(NULL, 0)) return 0;
 +    return melee_web_match_finish_source(start);
 +}
@@ -5509,19 +5543,24 @@ index 4a66512..2e85ce4 100644
 diff --git a/src/melee/lb/lb_0195.c b/src/melee/lb/lb_0195.c
 --- a/src/melee/lb/lb_0195.c
 +++ b/src/melee/lb/lb_0195.c
-@@ -1,3 +1,6 @@
+@@ -1,3 +1,8 @@
 +#if defined(MELEE_WEB_GAMEPLAY)
 +#include "gameplay_audio_bank_transport.h"
++#include "gameplay_source_files.h"
++#include "gameplay_platform.h"
 +#endif
  #include "lb_0195.h"
  
  #include "lb_0192.h"
-@@ -46,6 +49,9 @@
+@@ -46,6 +51,12 @@
  
  void lb_800195D0(void)
  {
 +#if defined(MELEE_WEB_GAMEPLAY)
 +    melee_web_audio_bank_transport_pump();
++    if (!melee_web_source_files_pump(NULL, 0)) {
++        melee_web_platform_unavailable("source RuntimeFiles transfer pump");
++    }
 +#endif
      lb_800192A8(lb_8001955C);
      lb_8001CC84();
@@ -6145,7 +6184,7 @@ diff --git a/src/melee/gm/gm_1A3F.c b/src/melee/gm/gm_1A3F.c
 index 9fc7d6b..234ad51 100644
 --- a/src/melee/gm/gm_1A3F.c
 +++ b/src/melee/gm/gm_1A3F.c
-@@ -359,3 +359,57 @@ void gm_801A4510(void)
+@@ -359,3 +359,100 @@ void gm_801A4510(void)
          gamestate->routing.curr_mode = next_mode;
      }
  }
@@ -6201,6 +6240,49 @@ index 9fc7d6b..234ad51 100644
 +    state_machine.routing.next_state_id = 0;
 +    state_machine.pending_mode_change = false;
 +    return 1;
++}
++/* Opening-mode states are authored in gm_Mode_Opening_States and use the
++ * source table's sentinel/next-state rules. Keep the browser adapter on those
++ * callbacks instead of maintaining a parallel state list. */
++GameModeState* melee_web_opening_mode_state(int id)
++{
++    GameModeState* state;
++    if (!melee_web_vs_mode_owned ||
++        state_machine.routing.curr_mode != GM_OPENING_MV || id < 0 || id >= 255)
++        return NULL;
++    for (state = gm_Mode_Opening_States; state->id != (u8) -1; ++state) {
++        if (state->id == (u8) id) return state;
++    }
++    return NULL;
++}
++int melee_web_opening_mode_preload(int id)
++{
++    GameModeState* state = melee_web_opening_mode_state(id);
++    if (state == NULL) return 0;
++    preloadState(state);
++    return 1;
++}
++int melee_web_opening_mode_next_state(void)
++{
++    if (!melee_web_vs_mode_owned ||
++        state_machine.routing.curr_mode != GM_OPENING_MV)
++        return -1;
++    if (state_machine.routing.next_state_id != 0)
++        return state_machine.routing.next_state_id - 1;
++    return nextState(gm_Mode_Opening_States);
++}
++int melee_web_opening_mode_advance_state(void)
++{
++    int next;
++    if (!melee_web_vs_mode_owned ||
++        state_machine.routing.curr_mode != GM_OPENING_MV)
++        return -1;
++    next = melee_web_opening_mode_next_state();
++    if (next < 0 || melee_web_opening_mode_state(next) == NULL) return -1;
++    state_machine.routing.prev_state_id = state_machine.routing.curr_state_id;
++    state_machine.routing.curr_state_id = (u8) next;
++    state_machine.routing.next_state_id = 0;
++    return next;
 +}
 +#endif
 diff --git a/src/melee/gm/gm_1A36.c b/src/melee/gm/gm_1A36.c
@@ -10140,9 +10222,10 @@ diff --git a/src/melee/mn/mninfo.c b/src/melee/mn/mninfo.c
      s32 i;
 
 diff --git a/extern/dolphin/src/dolphin/thp/THPDec.c b/extern/dolphin/src/dolphin/thp/THPDec.c
+index 40474db..9138296 100644
 --- a/extern/dolphin/src/dolphin/thp/THPDec.c
 +++ b/extern/dolphin/src/dolphin/thp/THPDec.c
-@@ -2705,6 +2705,7 @@
+@@ -2705,6 +2705,7 @@ static struct THPLCSizeEntry __THPLCSizeTableB[9] = {
      { 8, 0x200 },
  };
  
@@ -10150,7 +10233,7 @@ diff --git a/extern/dolphin/src/dolphin/thp/THPDec.c b/extern/dolphin/src/dolphi
  // clang-format off
  static inline void OSInitFastCast(void) {
  #ifdef __MWERKS__
-@@ -2729,6 +2730,7 @@
+@@ -2729,11 +2730,18 @@ static inline void OSInitFastCast(void) {
  #endif
  }
  // clang-format on
@@ -10158,6 +10241,59 @@ diff --git a/extern/dolphin/src/dolphin/thp/THPDec.c b/extern/dolphin/src/dolphi
  
  #ifdef __MWERKS__
  #pragma function_align 4
+ #endif
+ 
++#if defined(TARGET_PC)
++#define THP_LOCKED_CACHE_BASE() MELEE_WEB_THP_CPU_CACHE_BASE()
++#else
++#define THP_LOCKED_CACHE_BASE() ((u8*) 0xE0000000)
++#endif
++
+ void THPInit(void)
+ {
+     u8* base;
+@@ -2741,12 +2749,14 @@ void THPInit(void)
+     int j;
+     struct THPInitWork* work = (struct THPInitWork*) &__THPLC;
+ 
++#if !defined(TARGET_PC)
+     if ((PPCMfhid2() & 0x10000000) == 0) {
+         DCInvalidateRange((void*) 0xE0000000, 0x4000);
+         LCEnable();
+     }
++#endif
+ 
+-    base = (u8*) 0xE0000000;
++    base = THP_LOCKED_CACHE_BASE();
+     for (j = 0; j < 2; j++) {
+         for (i = 0; i < 5; i++) {
+             work->cache.offsets512[j][i] = base;
+@@ -2754,7 +2764,7 @@ void THPInit(void)
+         }
+     }
+ 
+-    base = (u8*) 0xE0000000;
++    base = THP_LOCKED_CACHE_BASE();
+     for (j = 0; j < 2; j++) {
+         for (i = 0; i < 9; i++) {
+             work->cache.offsets672[j][i] = base;
+@@ -2762,14 +2772,14 @@ void THPInit(void)
+         }
+     }
+ 
+-    base             = (u8*) 0xE0000000;
++    base             = THP_LOCKED_CACHE_BASE();
+     work->cache.work512[0] = base;
+     base += 0x2000;
+     work->cache.work512[1] = base;
+     base += 0x800;
+     work->cache.work512[2] = base;
+ 
+-    base             = (u8*) 0xE0000000;
++    base             = THP_LOCKED_CACHE_BASE();
+     work->work672[0] = base;
+     base += 0x2800;
+     work->work672[1] = base;
 diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
 --- a/src/melee/ft/types.h
 +++ b/src/melee/ft/types.h
@@ -10431,6 +10567,150 @@ diff --git a/src/melee/gm/gm_1601.c b/src/melee/gm/gm_1601.c
      NULL,
  };
  
+
+diff --git a/src/melee/lb/lbmthp.c b/src/melee/lb/lbmthp.c
+index fde5883..961cdbb 100644
+--- a/src/melee/lb/lbmthp.c
++++ b/src/melee/lb/lbmthp.c
+@@ -1,5 +1,12 @@
+ #include "lbmthp.h"
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_platform.h"
++#include "gameplay_source_alarm.h"
++#include "gameplay_source_files.h"
++#include "gameplay_thp_cpu.h"
++#endif
++
+ #include <placeholder.h>
+ 
+ #include "lbfile.h"
+@@ -92,6 +99,16 @@ struct lbl_803BAFE8_t {
+ /* 01F294 */ static s32 fn_8001F294(void);
+ /* 4333E0 */ static THPDecComp MoviePlayer;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++static void* melee_web_movie_buffer;
++static size_t melee_web_movie_buffer_size;
++
++static void melee_web_movie_require(int condition, const char* operation)
++{
++    if (!condition) melee_web_platform_unavailable(operation);
++}
++#endif
++
+ static void fn_8001E910(int arg0, int arg1, void* arg2, int cancelflag)
+ {
+     THPDecComp* streamPlayer = &MoviePlayer;
+@@ -165,7 +182,20 @@ static s32 fn_8001EB14(THPDecComp* data, const char* path)
+ {
+     THPInit();
+     data->file_entrynum = DVDConvertPathToEntrynum(path);
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_movie_require(
++        melee_web_source_file_entry_owned(data->file_entrynum),
++        "unowned original THP movie file");
++    melee_web_movie_require(
++        melee_web_source_file_region_register(data, 0x40, NULL, 0),
++        "original THP header destination registration");
++#endif
+     lbFile_800161C4(data->file_entrynum, 0, (u32) data, 0x40, 0x21, 1);
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_movie_require(
++        melee_web_source_file_region_unregister(data, 0x40, NULL, 0),
++        "original THP header destination release");
++#endif
+ 
+     data->unk_40 = data->num_frames;
+     data->width = data->x_size;
+@@ -525,6 +555,12 @@ void lbMthp_8001F410(const char* filename, u32* rate_table, void* buf,
+     streamPlayer = &MoviePlayer;
+ 
+     HSD_ASSERT(833, !MoviePlayer.power);
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_movie_require(melee_web_source_alarm_begin(),
++                            "original THP alarm owner startup");
++    melee_web_movie_require(melee_web_thp_cpu_begin(),
++                            "original THP CPU cache owner startup");
++#endif
+     MoviePlayer.power = 1;
+     fn_8001EB14(&MoviePlayer, filename);
+     MoviePlayer.rate_table = rate_table;
+@@ -536,6 +572,16 @@ void lbMthp_8001F410(const char* filename, u32* rate_table, void* buf,
+         buf = HSD_MemAlloc(memoryRequired);
+         MoviePlayer.unk_140 = buf;
+     }
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_movie_buffer = buf;
++    melee_web_movie_buffer_size = memoryRequired;
++    melee_web_movie_require(
++        melee_web_source_file_region_register(buf, memoryRequired, NULL, 0),
++        "original THP decoder transfer destination registration");
++    melee_web_movie_require(
++        melee_web_thp_cpu_output_register(buf, memoryRequired),
++        "original THP decoder output registration");
++#endif
+     MoviePlayer.unk_68 = loop;
+     fn_8001ECF4(&MoviePlayer, buf);
+     MoviePlayer.unk_144 = 0;
+@@ -645,10 +691,28 @@ void lbMthp_8001F800(void)
+         OSCancelAlarm(&MoviePlayer.alarm);
+         HSD_VIWaitXFBFlush();
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++        melee_web_movie_require(
++            melee_web_source_file_region_unregister(
++                melee_web_movie_buffer, melee_web_movie_buffer_size, NULL, 0),
++            "original THP decoder transfer destination release");
++        melee_web_movie_require(
++            melee_web_thp_cpu_output_unregister(
++                melee_web_movie_buffer, melee_web_movie_buffer_size),
++            "original THP decoder output release");
++#endif
+         if (MoviePlayer.unk_140 != NULL) {
+             HSD_Free(MoviePlayer.unk_140);
+         }
+ 
+         MoviePlayer.power = 0;
++#if defined(MELEE_WEB_GAMEPLAY)
++        melee_web_movie_buffer = NULL;
++        melee_web_movie_buffer_size = 0;
++        melee_web_movie_require(melee_web_thp_cpu_end(),
++                                "original THP CPU cache owner release");
++        melee_web_movie_require(melee_web_source_alarm_end(),
++                                "original THP alarm owner release");
++#endif
+     }
+ }
+
+diff --git a/src/melee/gm/gmopeningmode.c b/src/melee/gm/gmopeningmode.c
+--- a/src/melee/gm/gmopeningmode.c
++++ b/src/melee/gm/gmopeningmode.c
+@@ -665,3 +665,24 @@
+ {
+     lbMthp_8001F800();
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Title callbacks choose these identities with the source history/RNG. The
++ * browser reads them only to request their authored assets before the next
++ * state's preload and OnEnter callbacks run. */
++int melee_web_opening_preview(int characters[4], unsigned char costumes[4],
++                              int* stage_kind, int* match_kind)
++{
++    int i;
++    if (characters == NULL || costumes == NULL || stage_kind == NULL ||
++        match_kind == NULL)
++        return 0;
++    for (i = 0; i < 4; ++i) {
++        characters[i] = gm_801BF648(i);
++        costumes[i] = gm_801BF670(i);
++    }
++    *stage_kind = gm_801BF694();
++    *match_kind = gm_801BF6B8();
++    return 1;
++}
++#endif
 diff --git a/src/melee/ft/ftcoll.c b/src/melee/ft/ftcoll.c
 index 105286c..12dec5a 100644
 --- a/src/melee/ft/ftcoll.c

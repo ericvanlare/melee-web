@@ -6,10 +6,15 @@
 #include "gameplay_results_context.h"
 #include "gameplay_prize_context.h"
 #include "gameplay_audio_bank_transport.h"
+#include "gameplay_source_files.h"
 #include "hsd_native_joint.h"
 #include <melee/gm/gm_1A36.h>
 #include <melee/gm/gm_1A3F.h>
 #include <melee/gm/gm_1A45.h>
+#include <melee/gm/forward.h>
+#include <melee/gm/gmevent.h>
+#include <melee/gm/gmmenu.h>
+#include <melee/gm/gmscdata.h>
 #include <melee/gm/gmmenumode.h>
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/gmtitle.h>
@@ -19,7 +24,12 @@
 #include <melee/gm/gm_unsplit.h>
 #include <melee/lb/lbaudio_ax.h>
 #include <melee/lb/lbcardgame.h>
+#include <melee/lb/lbcardnew.h>
 #include <melee/lb/lblanguage.h>
+#include <melee/lb/lbdvd.h>
+#include <melee/lb/lbsnap.h>
+#include <melee/ty/toy.h>
+#include <melee/ty/tydisplay.h>
 #include <sysdolphin/baselib/controller.h>
 #include <sysdolphin/baselib/rumble.h>
 #include <sysdolphin/baselib/gobj.h>
@@ -47,6 +57,12 @@ extern int melee_web_vs_mode_select_state(int);
 extern int melee_web_vs_mode_next_state(void);
 extern int melee_web_vs_mode_pending_mode(void);
 extern int melee_web_vs_mode_set_route(int current_mode, int previous_mode);
+extern GameModeState* melee_web_opening_mode_state(int id);
+extern int melee_web_opening_mode_preload(int id);
+extern int melee_web_opening_mode_next_state(void);
+extern int melee_web_opening_mode_advance_state(void);
+extern int melee_web_opening_preview(int characters[4], unsigned char costumes[4],
+                                     int* stage_kind, int* match_kind);
 extern struct GameSceneInfo* melee_web_current_scene_info(void);
 enum {
     MELEE_WEB_HOST_SCENE_NONE = 0,
@@ -54,6 +70,8 @@ enum {
     MELEE_WEB_HOST_SCENE_SSS = 2,
     MELEE_WEB_HOST_SCENE_TITLE = 3,
     MELEE_WEB_HOST_SCENE_MAIN = 4,
+    MELEE_WEB_HOST_SCENE_OPENING = 5,
+    MELEE_WEB_HOST_SCENE_OPENING_VS = 6,
 };
 struct MeleeWebMenuHost {
     MeleeWebMenuSession* session;
@@ -90,6 +108,7 @@ struct MeleeWebMenuHost {
      * observes a stack object or a browser-owned substitute. */
     struct GameSceneInfo* saved_scene_info;
     GameModeState source_state;
+    GameScene* opening_scene_handler;
     GameSceneInfo source_scene_info;
     GameModeState vs_css_state;
     GameModeState vs_sss_state;
@@ -98,7 +117,13 @@ struct MeleeWebMenuHost {
     int title_exit_payload;
     int source_scene;
     int source_target_mode;
+    int source_previous_mode;
     int vs_mode_owned;
+    int opening_active;
+    int opening_scene_entered;
+    int opening_match_suspended;
+    int opening_state_id;
+    int opening_state_exit_called;
     int aborted_source_scene;
     int css_parent_route_requested;
     int results_active,results_exited,results_committed,prize_active;
@@ -107,6 +132,17 @@ struct MeleeWebMenuHost {
 static MeleeWebMenuHost* owner;
 static int fail(char* e,size_t n,const char* text){if(e&&n)snprintf(e,n,"%s",text);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
+static void host_reset_preload_scene_aliases(void)
+{
+    /* These are the non-heap side effects of gm_1A3F's preloadState. The
+     * narrow menu owner has no source DVD heap/cache, but its scene aliases
+     * must still start clean before an authored Opening OnEnter callback. */
+    lb_8001C5A4();
+    lb_8001D1F4();
+    lbSnap_8001E27C();
+    Toy_803127D4();
+    tyDisplay_8031C8B8();
+}
 static int live(MeleeWebMenuHost* h,char* e,size_t n){
     if(!h||h!=owner||!h->audio||!h->generation||
        h->generation!=melee_web_gameplay_stats().generation||
@@ -119,6 +155,7 @@ static int runtime_check(void* data,MeleeWebMenuScene scene,char* e,size_t n){
 }
 static int runtime_scheduler(void* data,char* e,size_t n){
     if(!live(data,e,n))return 0;
+    if(!melee_web_source_files_pump(e,n))return 0;
     lbAudioAx_80027DF8();
     if(!melee_web_gameplay_step(e,n))return 0;
     if(!melee_web_menu_clock_tick())return fail(e,n,"Unsupported native menu pause/control state");
@@ -283,6 +320,11 @@ static int source_scene_tick(MeleeWebMenuHost* h, char* e, size_t n)
         gm_Scene_Title_OnFrame();
     } else if (h->source_scene == MELEE_WEB_HOST_SCENE_MAIN) {
         mnMain_Scene_OnFrame();
+    } else if (h->source_scene == MELEE_WEB_HOST_SCENE_OPENING &&
+               h->opening_scene_handler != NULL) {
+        if (h->opening_scene_handler->on_frame != NULL) {
+            h->opening_scene_handler->on_frame();
+        }
     } else {
         return fail(e, n, "Original title/main tick has no live source scene");
     }
@@ -547,7 +589,9 @@ static int host_enter_title_scene(MeleeWebMenuHost* h, char* e, size_t n)
     if (h->source_scene != MELEE_WEB_HOST_SCENE_NONE) {
         return fail(e, n, "A source menu scene is already active");
     }
-    previous = h->source_target_mode == GM_TITLE ? GM_MENU : GM_TITLE;
+    previous = h->source_target_mode == GM_TITLE
+        ? (h->source_previous_mode >= 0 ? h->source_previous_mode : GM_MENU)
+        : GM_TITLE;
     if (!h->vs_mode_owned) {
         if (!melee_web_vs_mode_begin()) {
             return fail(e, n, "Original VS mode is already owned by another route");
@@ -592,7 +636,7 @@ static int host_enter_main_scene(MeleeWebMenuHost* h, char* e, size_t n)
                     "Original GM_MENU entry has no retained source mode lease");
     }
     if (h->vs_mode_owned && previous != GM_VS && previous != GM_TITLE &&
-        previous != GM_MENU) {
+        previous != GM_MENU && previous != GM_OPENING_MV) {
         return fail(e, n,
                     "Original GM_MENU entry lacks a supported previous-mode route");
     }
@@ -606,6 +650,7 @@ static int host_enter_main_scene(MeleeWebMenuHost* h, char* e, size_t n)
     memset(&h->main_enter, 0, sizeof(h->main_enter));
     memset(&h->main_exit, 0, sizeof(h->main_exit));
     h->source_target_mode = -1;
+    h->source_previous_mode = previous;
     h->source_state.on_enter(&h->source_state);
     h->source_scene_info.scene_kind = GS_MENU;
     h->source_scene_info.enter_data = &h->main_enter;
@@ -649,6 +694,273 @@ int melee_web_menu_host_enter_main(MeleeWebMenuHost* h, MeleeWebAudio* audio,
     }
     h->entered = 1;
     lb_8001CF18();
+    return ok(e, n);
+}
+
+int melee_web_menu_host_opening_preview(const MeleeWebMenuHost* h,
+                                        MeleeWebOpeningPreview* out,
+                                        char* e, size_t n)
+{
+    int characters[4];
+    unsigned char costumes[4];
+    int stage_kind, match_kind;
+    if (!h || h != owner || !out || h->entered || h->audio ||
+        !h->vs_mode_owned ||
+        melee_web_vs_mode_pending_mode() != -1 ||
+        gm_GetCurrentGameMode() != GM_OPENING_MV ||
+        (gm_GetCurrentSceneIndex() != 1 && gm_GetCurrentSceneIndex() != 3) ||
+        h->source_target_mode != GM_OPENING_MV || seed_ptr != &h->seed ||
+        !melee_web_opening_preview(characters, costumes, &stage_kind,
+                                   &match_kind)) {
+        return fail(e, n, "Opening preview requires the source-selected demo route");
+    }
+    for (unsigned i = 0; i < 4; ++i) {
+        out->characters[i] = (uint32_t) characters[i];
+        out->costumes[i] = costumes[i];
+    }
+    out->stage_kind = (uint32_t) stage_kind;
+    out->match_kind = (uint32_t) match_kind;
+    return ok(e, n);
+}
+
+int melee_web_menu_host_enter_opening(MeleeWebMenuHost* h,
+                                      MeleeWebAudio* audio,
+                                      char* e, size_t n)
+{
+    const MeleeWebMenuPhase phase = melee_web_menu_phase(h ? h->session : NULL);
+    const int id = gm_GetCurrentSceneIndex();
+    GameModeState* source;
+    GameScene* scene;
+    if (!h || h != owner || !h->vs_mode_owned ||
+        gm_GetCurrentGameMode() != GM_OPENING_MV ||
+        h->source_target_mode != GM_OPENING_MV || h->opening_active ||
+        melee_web_gameplay_vs_startup_active() ||
+        melee_web_gameplay_vs_manager_preparing() ||
+        (source = melee_web_opening_mode_state(id)) == NULL ||
+        !host_prepare_world(h, audio, phase, 1, e, n)) {
+        return fail(e, n,
+                    "Opening mode entry requires its selected source state, a fresh narrow world, and no live source VS preload owner");
+    }
+    h->source_state = *source;
+    h->opening_state_id = id;
+    h->opening_scene_handler = gm_FindGameSceneHandler(source->info.scene_kind);
+    if (h->opening_scene_handler == NULL ||
+        h->opening_scene_handler->kind != source->info.scene_kind) {
+        HSD_SisLib_803A5FBC();
+        restore_context(h);
+        return fail(e, n, "Opening mode state has no authored scene handler");
+    }
+    /* Keep the exit data inside this persistent GameModeState owner. Source
+     * Title callbacks write it through gm_GetCurrentSceneExitData(). */
+    if (source->info.scene_kind == GS_TITLE) {
+        h->source_state.info.exit_data = &h->title_exit_payload;
+        h->title_exit_payload = 0;
+    }
+    /* host_prepare_world already performed preloadState's 0x4800 SIS setup
+     * for every source-scene entry. Preserve its other scene-global resets
+     * below, but do not run its DVD heap/cache half for the supported VS and
+     * Title handoffs: the browser has scoped those assets before publication,
+     * and this narrow world deliberately does not run gmMain's
+     * lbMemory_8001564C/lbHeap_80015F3C bootstrap. The guard above verifies
+     * that no full source VS owner is active, so lbDvd_80018CF4's persistent
+     * heap flags and lbDvd_80018254's cache transition have no owner here.
+     * GS_VS still runs its authored OnEnter to build StartMeleeData, and
+     * GS_TITLE still runs gmTitleMode_OnEnter. Movie/how-to/omake states
+     * remain explicitly unsupported until this host has a source heap lease. */
+    if (source->info.scene_kind == GS_VS || source->info.scene_kind == GS_TITLE) {
+        host_reset_preload_scene_aliases();
+    } else {
+        /* The narrow browser host does not own gmMain's lbMemory/lbHeap
+         * bootstrap. Movie/how-to/omake preloadState and OnEnter callbacks
+         * require that source owner before touching their DVD heaps, so keep
+         * this boundary explicit until a checked source heap lease exists. */
+        HSD_SisLib_803A5FBC();
+        restore_context(h);
+        h->opening_scene_handler = NULL;
+        return fail(e, n,
+                    "Opening movie preload requires an active source lbMemory/lbHeap owner");
+    }
+    if (h->source_state.on_enter != NULL) {
+        h->source_state.on_enter(&h->source_state);
+    }
+    gm_801A4B88(&h->source_state.info);
+    h->opening_active = 1;
+    h->opening_scene_entered = 0;
+    h->opening_match_suspended = 0;
+    h->opening_state_exit_called = 0;
+    if (source->info.scene_kind == GS_VS) {
+        if (id != 1 && id != 3) {
+            HSD_SisLib_803A5FBC();
+            restore_context(h);
+            h->opening_active = 0;
+            h->opening_scene_handler = NULL;
+            return fail(e, n, "Unsupported Opening VS state");
+        }
+        /* GameplayMatchSession owns the source VS scene's supported runtime
+         * services. The original mode OnEnter above produced its exact start
+         * payload; its source on_match_start callback is dispatched there. */
+        h->source_scene = MELEE_WEB_HOST_SCENE_OPENING_VS;
+    } else {
+        if (source->info.scene_kind == GS_TITLE) {
+            h->source_scene = MELEE_WEB_HOST_SCENE_TITLE;
+        } else {
+            h->source_scene = MELEE_WEB_HOST_SCENE_OPENING;
+        }
+        if (h->opening_scene_handler->on_enter != NULL) {
+            h->opening_scene_handler->on_enter(h->source_state.info.enter_data);
+        }
+        h->opening_scene_entered = 1;
+    }
+    h->entered = 1;
+    lb_8001CF18();
+    return ok(e, n);
+}
+
+int melee_web_menu_host_opening_selection(const MeleeWebMenuHost* h,
+    MeleeWebMenuMatchSelection* out, char* e, size_t n)
+{
+    StartMeleeData* start;
+    int characters[4];
+    unsigned char costumes[4];
+    int stage_kind, match_kind;
+    if (!h || h != owner || !out || !h->entered || !h->audio ||
+        !h->opening_active || h->opening_state_id != gm_GetCurrentSceneIndex() ||
+        (h->opening_state_id != 1 && h->opening_state_id != 3) ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_OPENING_VS ||
+        h->opening_scene_entered ||
+        (start = (StartMeleeData*) h->source_state.info.enter_data) == NULL ||
+        !melee_web_opening_preview(characters, costumes, &stage_kind,
+                                   &match_kind)) {
+        return fail(e, n, "Opening match selection requires the live source VS mode payload");
+    }
+    if (start->rules.stkind != stage_kind || start->rules.match_kind != match_kind) {
+        return fail(e, n, "Opening VS payload differs from its Title-selected source preview");
+    }
+    memset(out, 0, sizeof(*out));
+    out->start = *start;
+    out->player_count = 4;
+    out->hud_layout = start->rules.x0_3;
+    out->random_seed = h->seed;
+    out->opening_demo = 1;
+    for (unsigned i = 0; i < 4; ++i) {
+        const PlayerInitData* player = &start->players[i];
+        const unsigned port = player->slot ? player->slot - 1u : i;
+        if (player->slot_type == Gm_PKind_NA || port != i ||
+            player->ckind != characters[i] || player->color != costumes[i]) {
+            return fail(e, n, "Opening VS player data differs from the source-selected demo");
+        }
+        out->players[i].controller = port;
+        out->players[i].stocks = player->stocks;
+        out->players[i].costume = player->color;
+        out->players[i].sub_color = player->sub_color;
+    }
+    if (start->players[4].slot_type != Gm_PKind_NA) {
+        return fail(e, n, "Opening VS source payload exceeds its authored four CPU slots");
+    }
+    return ok(e, n);
+}
+
+int melee_web_menu_host_opening_match_suspend(MeleeWebMenuHost* h,
+                                               char* e, size_t n)
+{
+    if (!live(h, e, n) || !h->entered || !h->opening_active ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_OPENING_VS ||
+        h->opening_scene_entered || h->opening_match_suspended ||
+        gm_GetCurrentGameMode() != GM_OPENING_MV ||
+        gm_GetCurrentSceneIndex() != h->opening_state_id) {
+        return fail(e, n, "Opening VS handoff requires its prepared source mode payload");
+    }
+    h->source_scene = MELEE_WEB_HOST_SCENE_NONE;
+    h->entered = 0;
+    h->transition = 0;
+    h->opening_match_suspended = 1;
+    restore_context(h);
+    return ok(e, n);
+}
+
+const MeleeWebPadState* melee_web_menu_host_opening_input(
+    const MeleeWebMenuHost* h)
+{
+    return h && h == owner && h->opening_active &&
+        h->opening_match_suspended ? h->input : NULL;
+}
+
+int melee_web_menu_host_opening_match_finish(MeleeWebMenuHost* h,
+    uint32_t seed, const uint8_t bytes[MELEE_WEB_PAD_STATE_BYTES],
+    char* e, size_t n)
+{
+    MeleeWebPadState* next_input;
+    int pending_mode;
+    int next;
+    if (!h || h != owner || h->entered || h->source_scene != MELEE_WEB_HOST_SCENE_NONE ||
+        !h->opening_active || !h->opening_match_suspended || h->audio ||
+        (h->opening_state_id != 1 && h->opening_state_id != 3) ||
+        gm_GetCurrentGameMode() != GM_OPENING_MV ||
+        gm_GetCurrentSceneIndex() != h->opening_state_id ||
+        melee_web_gameplay_generation() != 0 || seed_ptr != &h->seed) {
+        return fail(e, n,
+            "Opening demo finish requires a closed match and its retained mode owner");
+    }
+    next_input = melee_web_pad_state_decode(bytes, MELEE_WEB_PAD_STATE_BYTES, e, n);
+    if (next_input == NULL) return 0;
+    pending_mode = melee_web_vs_mode_pending_mode();
+    if (pending_mode == GM_TITLE) {
+        h->source_target_mode = GM_TITLE;
+        h->source_previous_mode = GM_OPENING_MV;
+        h->opening_active = 0;
+        h->opening_state_id = -1;
+        if (!melee_web_vs_mode_set_route(GM_TITLE, GM_OPENING_MV)) {
+            melee_web_pad_state_free(next_input);
+            return fail(e, n,
+                "Opening demo interruption could not transfer its source GM_TITLE route");
+        }
+    } else if (pending_mode < 0) {
+        next = melee_web_opening_mode_advance_state();
+        if (next < 0) {
+            melee_web_pad_state_free(next_input);
+            return fail(e, n,
+                "Opening demo has no authored state after its source exit");
+        }
+        h->source_target_mode = GM_OPENING_MV;
+        h->opening_state_id = next;
+    } else {
+        melee_web_pad_state_free(next_input);
+        if (e && n) snprintf(e, n,
+            "Opening demo requested unsupported mode %d", pending_mode);
+        return 0;
+    }
+    /* The completed VS world no longer owns an entered Opening scene. Keep
+     * the authored next mode/state route, but release the current state's
+     * active flag so the next world can enter it through the source table. */
+    h->opening_active = 0;
+    h->opening_scene_entered = 0;
+    h->opening_state_exit_called = 0;
+    h->opening_scene_handler = NULL;
+    melee_web_pad_state_free(h->input);
+    h->input = next_input;
+    h->seed = seed;
+    h->opening_match_suspended = 0;
+    return ok(e, n);
+}
+
+int melee_web_menu_host_opening_match_abort(MeleeWebMenuHost* h,
+                                             char* e, size_t n)
+{
+    if (!h || h != owner || h->entered ||
+        h->source_scene != MELEE_WEB_HOST_SCENE_NONE || h->audio ||
+        (!h->opening_active && h->source_target_mode != GM_OPENING_MV) ||
+        melee_web_gameplay_generation() != 0) {
+        return fail(e, n,
+            "Opening route abort requires an inactive scene and closed match owner");
+    }
+    h->opening_active = 0;
+    h->opening_match_suspended = 0;
+    h->opening_scene_entered = 0;
+    h->opening_state_exit_called = 0;
+    h->opening_state_id = -1;
+    h->opening_scene_handler = NULL;
+    h->source_target_mode = -1;
+    h->aborted_source_scene = 1;
     return ok(e, n);
 }
 
@@ -696,6 +1008,101 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
     if (h->transition == 0) {
         return fail(e, n, "Original title/main scene has no completed transition");
     }
+    if (h->opening_active) {
+        int request = 0;
+        int pending_mode;
+        int* source_exit_payload = NULL;
+        melee_web_pad_state_capture(bytes);
+        next_input = melee_web_pad_state_decode(bytes, sizeof(bytes), e, n);
+        if (next_input == NULL) return 0;
+        if (h->source_scene == MELEE_WEB_HOST_SCENE_TITLE &&
+            h->opening_state_id == 2) {
+            source_exit_payload = (int*) gm_GetCurrentSceneExitData();
+            if (source_exit_payload != &h->title_exit_payload ||
+                h->source_state.info.exit_data != source_exit_payload) {
+                melee_web_pad_state_free(next_input);
+                return fail(e, n,
+                    "Opening Title exit payload lost its persistent GameSceneInfo owner");
+            }
+        } else if (h->source_scene != MELEE_WEB_HOST_SCENE_OPENING) {
+            melee_web_pad_state_free(next_input);
+            return fail(e, n,
+                "Opening state exit requires its authored Title/movie scene owner");
+        }
+        if (h->opening_scene_handler != NULL &&
+            h->opening_scene_handler->on_exit != NULL) {
+            h->opening_scene_handler->on_exit(h->source_state.info.exit_data);
+        }
+        if (!h->opening_state_exit_called && h->source_state.on_exit != NULL) {
+            h->source_state.on_exit(&h->source_state);
+            h->opening_state_exit_called = 1;
+        }
+        if (!melee_web_menu_clock_request(&request) || request == 0) {
+            melee_web_pad_state_free(next_input);
+            return fail(e, n,
+                "Opening source exit lost its authored menu-clock request");
+        }
+        pending_mode = melee_web_vs_mode_pending_mode();
+        if (pending_mode >= 0) {
+            if (pending_mode == GM_MENU && h->opening_state_id == 2) {
+                h->source_target_mode = GM_MENU;
+                h->source_previous_mode = GM_OPENING_MV;
+                h->opening_active = 0;
+                h->opening_state_id = -1;
+                h->opening_scene_handler = NULL;
+                if (!melee_web_vs_mode_set_route(GM_MENU, GM_OPENING_MV)) {
+                    melee_web_pad_state_free(next_input);
+                    return fail(e, n,
+                        "Opening Title Start could not transfer its source GM_MENU route");
+                }
+            } else if (pending_mode == GM_TITLE) {
+                h->source_target_mode = GM_TITLE;
+                h->source_previous_mode = GM_OPENING_MV;
+                h->opening_active = 0;
+                h->opening_state_id = -1;
+                h->opening_scene_handler = NULL;
+                if (!melee_web_vs_mode_set_route(GM_TITLE, GM_OPENING_MV)) {
+                    melee_web_pad_state_free(next_input);
+                    return fail(e, n,
+                        "Opening interruption could not transfer its source GM_TITLE route");
+                }
+            } else {
+                if (e && n) {
+                    if (source_exit_payload != NULL) {
+                        snprintf(e, n,
+                            "Opening Title requested unsupported destination %d from buttons 0x%x",
+                            pending_mode, *source_exit_payload);
+                    } else {
+                        snprintf(e, n,
+                            "Opening state %d requested unsupported destination %d",
+                            h->opening_state_id, pending_mode);
+                    }
+                }
+                melee_web_pad_state_free(next_input);
+                return 0;
+            }
+        } else {
+            const int next = melee_web_opening_mode_advance_state();
+            if (next < 0) {
+                melee_web_pad_state_free(next_input);
+                return fail(e, n,
+                    "Opening source state has no authored continuation");
+            }
+            h->source_target_mode = GM_OPENING_MV;
+            h->opening_state_id = next;
+            h->opening_scene_handler = NULL;
+            h->opening_active = 0;
+        }
+        h->source_scene = MELEE_WEB_HOST_SCENE_NONE;
+        h->entered = 0;
+        h->transition = 0;
+        h->opening_scene_entered = 0;
+        h->opening_state_exit_called = 0;
+        melee_web_pad_state_free(h->input);
+        h->input = next_input;
+        restore_context(h);
+        return ok(e, n);
+    }
     melee_web_pad_state_capture(bytes);
     next_input = melee_web_pad_state_decode(bytes, sizeof(bytes), e, n);
     if (next_input == NULL) {
@@ -709,25 +1116,36 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
             return fail(e, n,
                         "Original title exit payload lost its persistent GameSceneInfo owner");
         }
-        if ((*source_exit_payload & HSD_PAD_START) == 0) {
-            melee_web_pad_state_free(next_input);
-            return fail(e, n,
-                        "Original title transition did not contain the retail Start route");
-        }
         h->source_state.on_exit(&h->source_state);
         const int requested_mode = melee_web_vs_mode_pending_mode();
-        if (requested_mode != GM_MENU) {
+        if (requested_mode == GM_MENU &&
+            (*source_exit_payload & HSD_PAD_START) != 0) {
+            h->source_target_mode = requested_mode;
+            h->source_previous_mode = GM_TITLE;
+            if (!melee_web_vs_mode_set_route(requested_mode, GM_TITLE)) {
+                melee_web_pad_state_free(next_input);
+                return fail(e, n, "Original title exit could not set GM_MENU provenance");
+            }
+        } else if (requested_mode == GM_OPENING_MV &&
+                   *source_exit_payload == 0) {
+            /* Retail Title timeout enters Opening mode using the mode state
+             * selected by gmTitleMode_OnExit.  Let its own OnLoad callback
+             * install that state; do not reinterpret the timeout as Start. */
+            if (gm_801BF718() != 1 ||
+                !melee_web_vs_mode_set_route(GM_OPENING_MV, GM_TITLE)) {
+                melee_web_pad_state_free(next_input);
+                return fail(e, n,
+                            "Original title idle requested an unsupported Opening mode state");
+            }
+            gm_Mode_Opening_OnLoad();
+            h->source_target_mode = requested_mode;
+        } else {
             melee_web_pad_state_free(next_input);
             if (e && n)
                 snprintf(e, n,
                          "Original title requested unsupported destination %d from buttons 0x%x",
                          requested_mode, *source_exit_payload);
             return 0;
-        }
-        h->source_target_mode = requested_mode;
-        if (!melee_web_vs_mode_set_route(requested_mode, GM_TITLE)) {
-            melee_web_pad_state_free(next_input);
-            return fail(e, n, "Original title exit could not set GM_MENU provenance");
         }
     } else if (h->source_scene == MELEE_WEB_HOST_SCENE_MAIN) {
         const int requested_mode = h->main_exit.pending_mode;
@@ -743,6 +1161,7 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
             return fail(e, n, "Original main exit changed its checked destination");
         }
         h->source_target_mode = requested_mode;
+        h->source_previous_mode = GM_MENU;
         if (!melee_web_vs_mode_set_route(requested_mode, GM_MENU)) {
             melee_web_pad_state_free(next_input);
             return fail(e, n, "Original main exit could not set mode provenance");
@@ -769,9 +1188,32 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
 static int host_abort_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
 {
     if ((h->source_scene != MELEE_WEB_HOST_SCENE_TITLE &&
-         h->source_scene != MELEE_WEB_HOST_SCENE_MAIN) ||
+         h->source_scene != MELEE_WEB_HOST_SCENE_MAIN &&
+         h->source_scene != MELEE_WEB_HOST_SCENE_OPENING &&
+         h->source_scene != MELEE_WEB_HOST_SCENE_OPENING_VS) ||
         !h->entered || h->drawing) {
-        return fail(e, n, "Source-scene abort requires an idle live title or main scene");
+        return fail(e, n,
+            "Source-scene abort requires an idle live Title/Main/Opening scene");
+    }
+    if (h->opening_active) {
+        /* Opening's movie-state OnExit owns the THP reader/alarm cleanup.
+         * State 2 is the Title mode callback: Eject must not turn its current
+         * exit payload into an ordinary GM_MENU/Challenger transition. */
+        if (h->source_scene == MELEE_WEB_HOST_SCENE_OPENING &&
+            h->opening_scene_handler != NULL &&
+            h->opening_scene_handler->on_exit != NULL) {
+            h->opening_scene_handler->on_exit(h->source_state.info.exit_data);
+        }
+        if (!h->opening_state_exit_called && h->opening_state_id != 2 &&
+            h->source_state.on_exit != NULL) {
+            h->source_state.on_exit(&h->source_state);
+        }
+        h->opening_active = 0;
+        h->opening_scene_entered = 0;
+        h->opening_match_suspended = 0;
+        h->opening_state_exit_called = 0;
+        h->opening_state_id = -1;
+        h->opening_scene_handler = NULL;
     }
     h->source_scene = MELEE_WEB_HOST_SCENE_NONE;
     h->entered = 0;
@@ -786,7 +1228,9 @@ static int host_abort_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
 int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t n){
     if(!live(h,e,n)||!h->entered||h->drawing)return fail(e,n,"Native menu leave requires an idle live scene");
     if (h->source_scene == MELEE_WEB_HOST_SCENE_TITLE ||
-        h->source_scene == MELEE_WEB_HOST_SCENE_MAIN) {
+        h->source_scene == MELEE_WEB_HOST_SCENE_MAIN ||
+        h->source_scene == MELEE_WEB_HOST_SCENE_OPENING ||
+        h->source_scene == MELEE_WEB_HOST_SCENE_OPENING_VS) {
         if (abort_scene) {
             return host_abort_source_scene(h, e, n);
         }
@@ -827,6 +1271,16 @@ int melee_web_menu_host_source_scene(const MeleeWebMenuHost* h){
 int melee_web_menu_host_route_target_mode(const MeleeWebMenuHost* h){
     return h&&h==owner&&!h->entered&&
         h->source_scene==MELEE_WEB_HOST_SCENE_NONE?h->source_target_mode:-1;
+}
+int melee_web_menu_host_route_target_state(const MeleeWebMenuHost* h){
+    return h&&h==owner&&!h->entered&&
+        h->source_scene==MELEE_WEB_HOST_SCENE_NONE&&
+        h->source_target_mode==GM_OPENING_MV?gm_GetCurrentSceneIndex():-1;
+}
+int melee_web_menu_host_opening_target_state(const MeleeWebMenuHost* h){
+    if(!h||h!=owner)return -1;
+    if(h->opening_active)return h->opening_state_id;
+    return melee_web_menu_host_route_target_state(h);
 }
 
 int melee_web_menu_host_reenter_css_after_parent(MeleeWebMenuHost* h,
@@ -1069,7 +1523,8 @@ int melee_web_menu_host_prize_end(MeleeWebMenuHost* h,uint32_t seed,
 }
 int melee_web_menu_host_destroy(MeleeWebMenuHost* h,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->source_scene!=MELEE_WEB_HOST_SCENE_NONE||
-       h->transition||h->audio||seed_ptr!=&h->seed)
+       h->transition||h->audio||h->opening_active||h->opening_match_suspended||
+       seed_ptr!=&h->seed)
         return fail(e,n,"Close native menu scene and restore RNG before destroying host");
     const int owns_scene_info =
         melee_web_current_scene_info() == &h->source_scene_info ||
