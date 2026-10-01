@@ -263,7 +263,6 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                                                                *copy.deepcopy(frame["fighters"])]),
                                   frame["fighters"].extend([*copy.deepcopy(frame["fighters"]),
                                                              *copy.deepcopy(frame["fighters"])])),
-                                                             *copy.deepcopy(frame["fighters"])])),
         )
         for alter in alterations:
             with self.subTest(alter=alter), tempfile.TemporaryDirectory() as directory:
