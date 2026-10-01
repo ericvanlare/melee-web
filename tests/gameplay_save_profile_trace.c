@@ -262,8 +262,20 @@ int main(void)
     {
         struct NameTagDataBank* banks =
             (struct NameTagDataBank*) gmMainLib_8015CC4C();
+        uint32_t* achievement_timestamps =
+            (uint32_t*) ((unsigned char*) save + offsetof(struct gmm_x1868, x1B80));
+        *gmMainLib_8015D450(0) = 0x11223344;
+        *gmMainLib_8015D450(24) = 0x55667788;
+        gmMainLib_8015CF70(0, 0x13579BDF);
+        gmMainLib_8015CF70(0x32, 0x2468ACE0);
+        gmMainLib_8015DA40(0);
+        gmMainLib_8015DA40(299);
+        gmMainLib_8015DAB4(0);
+        gmMainLib_8015DAB4(255);
         save->time_matches = 0x12345678;
         save->x1A68 = INT64_C(0x0123456789ABCDEF);
+        achievement_timestamps[0] = 0x01020304;
+        achievement_timestamps[0x41] = 0xA1B2C3D4;
         save->x1F2C[0].fighter_kos[0] = 0x2345;
         save->x1F2C[0].x7C.b0 = 1;
         save->x1F2C[0].x7C.b789 = 5;
@@ -278,11 +290,57 @@ int main(void)
                   card_profile[0x1B1] == 0x34 &&
                   card_profile[0x1B2] == 0x56 &&
                   card_profile[0x1B3] == 0x78 &&
+                  card_profile[0x318] == 0x01 &&
+                  card_profile[0x319] == 0x02 &&
+                  card_profile[0x31A] == 0x03 &&
+                  card_profile[0x31B] == 0x04 &&
+                  card_profile[0x41C] == 0xA1 &&
+                  card_profile[0x41D] == 0xB2 &&
+                  card_profile[0x41E] == 0xC3 &&
+                  card_profile[0x41F] == 0xD4 &&
+                  card_profile[0x07C] == 0x11 &&
+                  card_profile[0x07D] == 0x22 &&
+                  card_profile[0x07E] == 0x33 &&
+                  card_profile[0x07F] == 0x44 &&
+                  card_profile[0x0DC] == 0x55 &&
+                  card_profile[0x0DD] == 0x66 &&
+                  card_profile[0x0DE] == 0x77 &&
+                  card_profile[0x0DF] == 0x88 &&
+                  card_profile[0x208] == 0x13 &&
+                  card_profile[0x209] == 0x57 &&
+                  card_profile[0x20A] == 0x9B &&
+                  card_profile[0x20B] == 0xDF &&
+                  card_profile[0x2D0] == 0x24 &&
+                  card_profile[0x2D1] == 0x68 &&
+                  card_profile[0x2D2] == 0xAC &&
+                  card_profile[0x2D3] == 0xE0 &&
+                  card_profile[0x2F3] == 0x01 &&
+                  card_profile[0x314] == 0x00 &&
+                  card_profile[0x315] == 0x00 &&
+                  card_profile[0x316] == 0x08 &&
+                  card_profile[0x317] == 0x00 &&
+                  card_profile[0x420] == 0x00 &&
+                  card_profile[0x421] == 0x00 &&
+                  card_profile[0x422] == 0x00 &&
+                  card_profile[0x423] == 0x01 &&
+                  card_profile[0x43C] == 0x80 &&
+                  card_profile[0x43D] == 0x00 &&
+                  card_profile[0x43E] == 0x00 &&
+                  card_profile[0x43F] == 0x00 &&
                   card_profile[0x200] == 0x01 &&
                   card_profile[0x207] == 0xEF,
               "card profile snapshot did not encode source scalars as big-endian");
         save->time_matches = 0;
         save->x1A68 = 0;
+        *gmMainLib_8015D450(0) = 0;
+        *gmMainLib_8015D450(24) = 0;
+        gmMainLib_8015CF70(0, 0);
+        gmMainLib_8015CF70(0x32, 0);
+        gmMainLib_8015DA68(0);
+        gmMainLib_8015DA68(299);
+        memset((unsigned char*) save + 0x420, 0, 8 * sizeof(uint32_t));
+        achievement_timestamps[0] = 0;
+        achievement_timestamps[0x41] = 0;
         save->x1F2C[0].fighter_kos[0] = 0;
         save->x1F2C[0].x7C.b0 = 0;
         save->x1F2C[0].x7C.b789 = 0;
@@ -293,6 +351,14 @@ int main(void)
                         sizeof(error)), error);
         check(save->time_matches == 0x12345678 &&
                   save->x1A68 == INT64_C(0x0123456789ABCDEF) &&
+                  *gmMainLib_8015D450(0) == 0x11223344 &&
+                  *gmMainLib_8015D450(24) == 0x55667788 &&
+                  gmMainLib_8015CF5C(0) == 0x13579BDF &&
+                  gmMainLib_8015CF5C(0x32) == 0x2468ACE0 &&
+                  gmMainLib_8015DA90(0) && gmMainLib_8015DA90(299) &&
+                  gmMainLib_8015DADC(0) && gmMainLib_8015DADC(255) &&
+                  achievement_timestamps[0] == 0x01020304 &&
+                  achievement_timestamps[0x41] == 0xA1B2C3D4 &&
                   save->x1F2C[0].fighter_kos[0] == 0x2345 &&
                   save->x1F2C[0].x7C.b0 == 1 &&
                   save->x1F2C[0].x7C.b789 == 5 &&

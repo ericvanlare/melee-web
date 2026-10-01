@@ -354,7 +354,9 @@ static void decode_save_data(struct gmm_x1868* target,
     decode32(bytes + 0x0044, source + 0x0044);
     for (size_t i = 0; i < SELKIND_COUNT; ++i)
         decode16(bytes + 0x0048 + i * 2, source + 0x0048 + i * 2);
-    for (size_t i = 0; i < 4; ++i)
+    /* gmMainLib_8015D450 consumes one best-score word for each selectable
+     * character, despite the generated ABI view naming only four words. */
+    for (size_t i = 0; i < SELKIND_COUNT; ++i)
         decode32(bytes + 0x007C + i * 4, source + 0x007C + i * 4);
     for (size_t i = 0; i < SELKIND_COUNT; ++i) {
         decode32(bytes + 0x00E0 + i * 4, source + 0x00E0 + i * 4);
@@ -366,16 +368,25 @@ static void decode_save_data(struct gmm_x1868* target,
     for (size_t offset = 0x01B0; offset <= 0x01FC; offset += 4)
         decode32(bytes + offset, source + offset);
     decode64(bytes + 0x0200, source + 0x0200);
-    for (size_t i = 0; i < 4; ++i)
+    /* The source event table has one best-score word for each of its 0x33
+     * authored events; the generated ABI view names only its first four. */
+    for (size_t i = 0; i < 0x33; ++i)
         decode32(bytes + 0x0208 + i * 4, source + 0x0208 + i * 4);
     for (size_t i = 0; i < 3; ++i) {
         decode32(bytes + 0x02D8 + i * 4, source + 0x02D8 + i * 4);
         decode32(bytes + 0x02E4 + i * 4, source + 0x02E4 + i * 4);
-        decode32(bytes + 0x02F0 + i * 4, source + 0x02F0 + i * 4);
     }
-    for (size_t i = 0; i < 4; ++i)
+    /* gm_8015DA40/DA90 address all 300 source reward-ledger bits. */
+    for (size_t i = 0; i < 10; ++i)
+        decode32(bytes + 0x02F0 + i * 4, source + 0x02F0 + i * 4);
+    /* gm_8017297C owns the complete 0x42-entry achievement timestamp
+     * table at x1B80.  The generated struct names the first four entries and
+     * leaves the authored tail as padding, but those tail words are still
+     * persistent card data and must use the source card's endian encoding. */
+    for (size_t i = 0; i < 0x42; ++i)
         decode32(bytes + 0x0318 + i * 4, source + 0x0318 + i * 4);
-    for (size_t i = 0; i < 3; ++i)
+    /* gm_8015DAB4/DADC consume the complete 256-entry challenge inventory. */
+    for (size_t i = 0; i < 8; ++i)
         decode32(bytes + 0x0420 + i * 4, source + 0x0420 + i * 4);
 
     /* gmm_x1CB0 at +0x448. */
@@ -472,7 +483,7 @@ static void encode_save_data(unsigned char target[0x55E8],
         encode32(target + offset, bytes + offset);
     for (size_t i = 0; i < SELKIND_COUNT; ++i)
         encode16(target + 0x0048 + i * 2, bytes + 0x0048 + i * 2);
-    for (size_t i = 0; i < 4; ++i)
+    for (size_t i = 0; i < SELKIND_COUNT; ++i)
         encode32(target + 0x007C + i * 4, bytes + 0x007C + i * 4);
     for (size_t i = 0; i < SELKIND_COUNT; ++i) {
         encode32(target + 0x00E0 + i * 4, bytes + 0x00E0 + i * 4);
@@ -483,16 +494,20 @@ static void encode_save_data(unsigned char target[0x55E8],
     for (size_t offset = 0x01B0; offset <= 0x01FC; offset += 4)
         encode32(target + offset, bytes + offset);
     encode64(target + 0x0200, bytes + 0x0200);
-    for (size_t i = 0; i < 4; ++i)
+    for (size_t i = 0; i < 0x33; ++i)
         encode32(target + 0x0208 + i * 4, bytes + 0x0208 + i * 4);
     for (size_t i = 0; i < 3; ++i) {
         encode32(target + 0x02D8 + i * 4, bytes + 0x02D8 + i * 4);
         encode32(target + 0x02E4 + i * 4, bytes + 0x02E4 + i * 4);
-        encode32(target + 0x02F0 + i * 4, bytes + 0x02F0 + i * 4);
     }
-    for (size_t i = 0; i < 4; ++i)
+    for (size_t i = 0; i < 10; ++i)
+        encode32(target + 0x02F0 + i * 4, bytes + 0x02F0 + i * 4);
+    /* Keep the full source-bounded achievement timestamp table symmetric with
+     * decode_save_data(); the tail is authored SaveData despite its padding
+     * declaration in the generated ABI view. */
+    for (size_t i = 0; i < 0x42; ++i)
         encode32(target + 0x0318 + i * 4, bytes + 0x0318 + i * 4);
-    for (size_t i = 0; i < 3; ++i)
+    for (size_t i = 0; i < 8; ++i)
         encode32(target + 0x0420 + i * 4, bytes + 0x0420 + i * 4);
 
     encode64(target + 0x0450, bytes + 0x0450);
