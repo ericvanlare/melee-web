@@ -550,6 +550,17 @@ try {
       assert.equal(first.previous, null);
       assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 1);
 
+      const profileSceneSamples = ['title', 'main', 'opening', 'opening-vs'];
+      for (const scene of profileSceneSamples) {
+        const before = await savePage.evaluate(() => window.saveSamples);
+        await savePage.evaluate(nextScene => window.saveController.setState({scene: nextScene}), scene);
+        await waitForSavedState(state => state.samples > before,
+          `Personal autosave eligibility for the ${scene} scene`);
+      }
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 1,
+        'Scene eligibility checks must not rewrite an unchanged Personal snapshot');
+      await savePage.evaluate(() => window.saveController.setState({scene: 'css'}));
+
       const unchangedState = await waitForSavedState(state => state.samples >= 3 && state.profile?.revision === 1,
         'repeated unchanged snapshots');
       const unchanged = unchangedState.envelope;

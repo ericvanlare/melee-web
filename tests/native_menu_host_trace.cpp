@@ -40,6 +40,7 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 #include <stdexcept>
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
+extern "C" int melee_web_vs_mode_select_state(int);
 extern "C" int melee_web_vs_mode_set_route(int current_mode, int previous_mode);
 extern "C" void* melee_web_current_scene_info(void);
 static void check(int value,const char* error){if(!value){std::cerr<<"Check failed before teardown: "<<error<<"\n";throw std::runtime_error(error);}}
@@ -545,6 +546,75 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
     }
     std::cout << "Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger, Title timeout to Opening state 1 and recovery passed\n";
 }
+
+void run_opening_movie_preload_smoke(melee_web::RuntimeFiles files)
+{
+    char error[256]{};
+    float pcm[1068]{};
+    const void* saved_scene_info = melee_web_current_scene_info();
+    auto* host = melee_web_menu_host_create(error, sizeof(error));
+    check(host != nullptr, error);
+    auto title_world = std::make_unique<melee_web::GameplayMenuWorld>(
+        files, melee_web::GameplayMenuScene::Title);
+    check(melee_web_menu_host_enter_title(host, title_world->audio(), error,
+                                          sizeof(error)), error);
+    PADStatus raw[4]{};
+    raw[2].err = raw[3].err = -1;
+    unsigned audio_phase = 0;
+    for (unsigned frame = 0; frame < 120; ++frame) {
+        check(melee_web_menu_host_tick(host, raw, error, sizeof(error)) == 1,
+              error);
+        audio_phase += 32000;
+        const unsigned count = audio_phase / 60;
+        audio_phase %= 60;
+        check(melee_web_audio_render(title_world->audio(), pcm, count, error,
+                                     sizeof(error)), error);
+    }
+    int result = 1;
+    unsigned callbacks_to_timeout = 0;
+    for (; callbacks_to_timeout < 700 && result == 1; ++callbacks_to_timeout) {
+        result = melee_web_menu_host_tick(host, raw, error, sizeof(error));
+        check(result == 1 || result == 3, error);
+        audio_phase += 32000;
+        const unsigned count = audio_phase / 60;
+        audio_phase %= 60;
+        check(melee_web_audio_render(title_world->audio(), pcm, count, error,
+                                     sizeof(error)), error);
+    }
+    check(result == 3,
+          "Opening movie probe did not request its authored Opening route");
+    check(callbacks_to_timeout == 501,
+          "Opening movie probe diverged from the source Title timeout");
+    check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+    check(melee_web_menu_host_source_scene(host) == 0,
+          "Opening movie probe did not retire its Title source owner at timeout");
+    check(melee_web_menu_host_route_target_mode(host) == GM_OPENING_MV,
+          "Opening movie probe lost its authored Opening route");
+    check(melee_web_vs_mode_select_state(0),
+          "Opening movie probe could not select authored state 0");
+    title_world->close();
+    title_world.reset();
+
+    auto movie_world = std::make_unique<melee_web::GameplayMenuWorld>(
+        files, melee_web::GameplayMenuScene::Title);
+    check(!melee_web_menu_host_enter_opening(host, movie_world->audio(), error,
+                                             sizeof(error)),
+          "Opening movie probe entered without a source heap owner");
+    check(std::string(error).find("active source lbMemory/lbHeap owner") !=
+              std::string::npos,
+          "Opening movie probe did not reject its missing source heap owner explicitly");
+    check(melee_web_menu_host_source_scene(host) == 0,
+          "Rejected Opening movie probe retained a source scene owner");
+    movie_world->verify_immutable_archives();
+    movie_world->close();
+    movie_world.reset();
+    check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+    check(melee_web_current_scene_info() == saved_scene_info,
+          "Opening movie probe did not restore its caller scene owner");
+    check(!melee_web_gameplay_world_exists(),
+          "Opening movie probe retained its source world");
+    std::cout << "Original Opening movie route selected state 0 and rejected missing source heap/cache ownership explicitly; no movie decode or retail-route claim\n";
+}
 }
 int main(int argc,char** argv){try{
  if(argc<3||argc>7)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
@@ -556,13 +626,16 @@ int main(int argc,char** argv){try{
  const bool results_mario_recipe=input_recipe&&std::string(input_recipe)=="results-mario-v1";
  const bool link_css_unload_recipe=input_recipe&&std::string(input_recipe)=="link-css-unload-v1";
  const bool title_main_abort_recipe=input_recipe&&std::string(input_recipe)=="title-main-abort-v1";
- if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&!title_main_abort_recipe)throw std::runtime_error("Unknown transition input recipe");
+ const bool opening_movie_preload_recipe=input_recipe&&std::string(input_recipe)=="opening-movie-preload-v1";
+ if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
+    !title_main_abort_recipe&&!opening_movie_preload_recipe)throw std::runtime_error("Unknown transition input recipe");
  if((retail_fd_recipe||results_mario_recipe)&&stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(title_main_abort_recipe)keys=melee_web::menu_asset_names();
+ if(title_main_abort_recipe||opening_movie_preload_recipe)
+  keys=melee_web::menu_asset_names();
  for(const auto& key:melee_web::menu_asset_names())
   if(std::find(keys.begin(),keys.end(),key)==keys.end())keys.push_back(key);
  for(const auto& key:keys){
@@ -584,6 +657,12 @@ int main(int argc,char** argv){try{
   run_title_main_abort_smoke(files);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   std::cout<<"Native Title/Main checked abort and CSS re-entry smoke passed; no browser or retail-route claim\n";
+  return 0;
+ }
+ if(opening_movie_preload_recipe){
+  run_opening_movie_preload_smoke(files);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  std::cout<<"Native Opening movie preload ownership probe passed; no movie decode or retail-route claim\n";
   return 0;
  }
  const unsigned cycle_count=results_mario_recipe?1:2;

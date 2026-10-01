@@ -765,25 +765,20 @@ int melee_web_menu_host_enter_opening(MeleeWebMenuHost* h,
      * that no full source VS owner is active, so lbDvd_80018CF4's persistent
      * heap flags and lbDvd_80018254's cache transition have no owner here.
      * GS_VS still runs its authored OnEnter to build StartMeleeData, and
-     * GS_TITLE still runs gmTitleMode_OnEnter. Movie states retain the
-     * authored preload path after creating its cache. */
+     * GS_TITLE still runs gmTitleMode_OnEnter. Movie/how-to/omake states
+     * remain explicitly unsupported until this host has a source heap lease. */
     if (source->info.scene_kind == GS_VS || source->info.scene_kind == GS_TITLE) {
         host_reset_preload_scene_aliases();
     } else {
-        /* preloadState allocates and owns the SIS block it installs. Retire
-         * the preparation block first: HSD_SisLib_803A6048 overwrites its
-         * global free_head without freeing the old block, so allowing both
-         * calls would leak the host's block on every movie handoff. The
-         * authored preload then performs the single SIS allocation and its
-         * complete alias/reset sequence. */
+        /* The narrow browser host does not own gmMain's lbMemory/lbHeap
+         * bootstrap. Movie/how-to/omake preloadState and OnEnter callbacks
+         * require that source owner before touching their DVD heaps, so keep
+         * this boundary explicit until a checked source heap lease exists. */
         HSD_SisLib_803A5FBC();
-        lbDvd_SetupVsPreloadCache();
-        if (!melee_web_opening_mode_preload(id)) {
-            HSD_SisLib_803A5FBC();
-            restore_context(h);
-            h->opening_scene_handler = NULL;
-            return fail(e, n, "Opening source preload rejected its authored state");
-        }
+        restore_context(h);
+        h->opening_scene_handler = NULL;
+        return fail(e, n,
+                    "Opening movie preload requires an active source lbMemory/lbHeap owner");
     }
     if (h->source_state.on_enter != NULL) {
         h->source_state.on_enter(&h->source_state);

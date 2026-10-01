@@ -111,6 +111,33 @@ class NativeMenuSourceTests(unittest.TestCase):
         self.assertIn("Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger, Title timeout to Opening state 1 and recovery passed", run.stdout)
         self.assertIn("Native Title/Main checked abort and CSS re-entry smoke passed", run.stdout)
 
+    def test_opening_movie_entry_requires_source_heap_owner(self):
+        targets = [ROOT / "build" / name / "native_menu_host_trace.js"
+                   for name in ("browser", "browser-release", "browser-public-release",
+                                "browser-audio-preview-release")]
+        targets = [path for path in targets if path.is_file()]
+        fixture_root = Path(os.environ.get("MELEE_MENU_FIXTURE_ROOT", ROOT / "assets-local"))
+        if not fixture_root.is_absolute():
+            fixture_root = ROOT / fixture_root
+        menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
+        if not targets or not (menu / "MnSlChr.usd").is_file():
+            self.skipTest("Build the native menu host and supply owned menu fixtures")
+        target = max(targets, key=lambda path: path.stat().st_mtime)
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        with tempfile.TemporaryDirectory(prefix="opening movie preload trace ") as directory:
+            trace = Path(directory) / "port.jsonl"
+            run = subprocess.run(
+                [str(node_runtime()), str(target), str(menu), str(game), "32",
+                 str(trace), source_revision, "opening-movie-preload-v1"],
+                cwd=ROOT, capture_output=True, text=True, timeout=120)
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn(
+            "Original Opening movie route selected state 0 and rejected missing source heap/cache ownership explicitly",
+            run.stdout,
+        )
+        self.assertIn("no movie decode or retail-route claim", run.stdout)
+
     def test_original_sis_layout_and_style_stack(self):
         candidates = [ROOT / "build" / directory / "native_menu_scene_trace.js"
                       for directory in ("browser", "browser-release")]

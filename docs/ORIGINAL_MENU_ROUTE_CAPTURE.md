@@ -113,6 +113,12 @@ four-CPU payload, retained PAD input across suspension, finish to Opening state
 does not make the browser's unsupported asset boundary or the attract route
 accepted.
 
+The native Opening probe also follows the real Title timeout to authored state
+0, then rejects movie entry before source preload because the narrow browser
+host has no checked `lbMemory`/`lbHeap` owner. It restores the menu/world owner
+and leaves `MvOpen.mth` unread; this is an explicit unsupported movie boundary,
+not a THP playback or retail movie capture.
+
 Retail captures establish the sequence through three Opening-mode Title visits,
 including two returns to Opening state 0, and separate P1/P2 interruption paths.
 They do not establish a complete unattended return to normal `GM_TITLE` or an
