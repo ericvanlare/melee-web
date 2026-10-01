@@ -257,10 +257,14 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection)
 
     std::vector<std::string> result;
     result.reserve(64);
-    for (const auto name : std::array<std::string_view, 13>{
+    for (const auto name : std::array<std::string_view, 14>{
              "PlCo.dat", "ItCo.usd", "EfCoData.dat", "PdPm.dat", "LbRb.dat",
              "LbRf.dat", "sislib_font.bin", "IfAll.usd", "IfCoGet.dat",
-             "SdIntro.dat", "GmPause.usd", "LbBf.dat", "TyDatai.usd"})
+             "SdIntro.dat", "GmPause.usd", "LbBf.dat", "TyDatai.usd",
+             // Toy_803124BC chooses TyDatai.dat or TyDatai.usd from the
+             // original saved-language setting, which may differ from the
+             // runtime's English asset-resolution setting.
+             "TyDatai.dat"})
         add_unique(result, name);
     for (const auto name : kMatchCommonAudio) add_unique(result, name);
 
@@ -282,10 +286,10 @@ results_asset_names(const MeleeWebMenuMatchSelection& selection)
     result.reserve(64);
     // gmResult runs over the same source world as the match it reports on, so
     // the shared item/effect/HUD compatibility files are requested again.
-    for (const auto name : std::array<std::string_view, 11>{
+    for (const auto name : std::array<std::string_view, 12>{
              "PlCo.dat", "ItCo.usd", "EfCoData.dat", "PdPm.dat", "LbRb.dat",
              "sislib_font.bin", "IfAll.usd", "IfCoGet.dat", "SdIntro.dat",
-             "GmPause.usd", "LbBf.dat"})
+             "GmPause.usd", "LbBf.dat", "TyDatai.dat"})
         add_unique(result, name);
     for (const auto name : kMatchCommonAudio) add_unique(result, name);
     add_selection_fighter_assets(result, selection);
@@ -321,6 +325,7 @@ std::vector<std::string> prize_asset_names()
     // Prize runs its own source world over the authored IfPrize/SdPrize
     // scene data, the trophy tables and the card/name-entry archives.
     for (const auto* name : {"IfPrize.usd", "SdPrize.usd", "TyDatai.usd",
+                             "TyDatai.dat",
                              "LbMcGame.usd", "NtMemAc.usd", "sislib_font.bin"})
         add_unique(result, name);
     for (const auto name : kMatchCommonAudio) add_unique(result, name);

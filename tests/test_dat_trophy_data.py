@@ -26,8 +26,14 @@ class DatTrophyDataTests(unittest.TestCase):
             result = subprocess.run([str(binary)], capture_output=True, text=True,
                                     timeout=20)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            asset = ROOT / "assets-local" / "results-mario" / "TyDatai.usd"
-            if asset.is_file():
+            assets = [
+                ROOT / "assets-local" / "full-game-ganon" / "TyDatai.usd",
+                ROOT / "assets-local" / "full-game-ganon" / "TyDatai.dat",
+                ROOT / "assets-local" / "results-mario" / "TyDatai.usd",
+            ]
+            for asset in dict.fromkeys(assets):
+                if not asset.is_file():
+                    continue
                 result = subprocess.run([str(binary), "--assets", str(asset)],
                                         capture_output=True, text=True, timeout=20)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
