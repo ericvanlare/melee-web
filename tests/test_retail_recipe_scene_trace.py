@@ -84,6 +84,8 @@ extern "C" void melee_web_retail_entities(void) {
     if (!fake::state_allowed) std::abort();
     std::cout << ",\"fighter_entities\":[]";
 }
+extern "C" void melee_web_retail_entities_index(uint32_t) {}
+extern "C" void melee_web_retail_entities_reset(void) {}
 extern "C" uint32_t melee_web_retail_rng(void) { ++fake::rng; return 123; }
 extern "C" uint32_t gm_GetFrameCount(void) { return 0; }
 extern "C" uint32_t gm_8016AEEC(void) { return 0; }
@@ -125,7 +127,7 @@ int main() {
 
     retail_replay_frame(whole, 0, kRetailReplayCss);
     retail_replay_frame(whole, 0, kRetailReplaySss);
-    // Each match has a state snapshot; only the first owns CPU diagnostics.
+    // The v8 regression emits state snapshots but does not capture CPU diagnostics.
     fake::state_allowed = true;
     retail_replay_initial(whole, true);
     retail_replay_frame(whole, 0, kRetailReplayMatch);
@@ -226,9 +228,9 @@ class RetailRecipeSceneTraceTests(unittest.TestCase):
                    if line.startswith("{")]
         self.assertEqual(records[0]["record"], "header")
         self.assertEqual(records[0]["schema"], "melee-web-port-session-diagnostic")
-        self.assertEqual(records[0]["version"], 2)
-        self.assertEqual(records[0]["fighter_entities"], "all_player_entity_slots")
-        self.assertEqual(records[0]["cpu_observations"], "first_match_only")
+        self.assertEqual(records[0]["version"], 1)
+        self.assertNotIn("fighter_entities", records[0])
+        self.assertEqual(records[0]["cpu_observations"], "not_captured")
         self.assertEqual(
             [record["record"] for record in records[1:10]],
             ["session_frame", "session_frame", "session_match_enter_complete",
@@ -243,12 +245,12 @@ class RetailRecipeSceneTraceTests(unittest.TestCase):
 
         # session_initial: no state or CPU observer is reachable before CSS.
         self.assertEqual(counts["session_initial"], (0, 0, 0, 0, 0, 0, 0))
-        # Two matches emit state, but CPU observations end once at first Results.
-        self.assertEqual(counts["whole"], (4, 4, 1, 1, 0, 0, 1))
-        self.assertEqual(counts["restart"], (2, 0, 1, 1, 0, 0, 1))
+        # Two matches emit state, while the v8 regression stays CPU-observer free.
+        self.assertEqual(counts["whole"], (4, 4, 0, 0, 0, 0, 0))
+        self.assertEqual(counts["restart"], (2, 0, 0, 0, 0, 0, 0))
         self.assertEqual(counts["disabled"], (2, 0, 0, 0, 0, 0, 0))
         self.assertEqual([r["cpu_observations"] for r in records
                           if r.get("schema") == "melee-web-port-session-diagnostic"],
-                         ["first_match_only", "first_match_only", "not_captured"])
+                         ["not_captured", "not_captured", "not_captured"])
         # legacy: preserve the existing initial/frame/draw/preparation/end calls.
         self.assertEqual(counts["legacy"], (2, 0, 1, 1, 1, 1, 1))

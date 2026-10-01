@@ -362,6 +362,27 @@ void borrowed_signed_visibility_tail()
     rejects([&] { adapt(fixture.bytes(), fixture.root, {0}, 2); });
 }
 
+void ft_parts_desc_owner_is_structural()
+{
+    Fixture fixture(false);
+    fixture.link(40, 272); // FtPartsDesc-only secondary lookup at +0x18.
+    const auto input = fixture.bytes();
+    auto checked = std::make_shared<const DatArchive>(
+        input, DatExternalPolicy::ResolveNull);
+    check(source_root_is_ft_parts_desc_only(*checked, fixture.root.symbol),
+          "FtPartsDesc-only owner was not established from checked source fields");
+
+    Fixture missing_visibility = fixture;
+    std::erase(missing_visibility.reloc, 40);
+    put(missing_visibility.data, 40, 0);
+    const auto malformed = missing_visibility.bytes();
+    const auto malformed_checked = std::make_shared<const DatArchive>(
+        malformed, DatExternalPolicy::ResolveNull);
+    check(!source_root_is_ft_parts_desc_only(*malformed_checked,
+                                              missing_visibility.root.symbol),
+          "Unresolved FtPartsDesc visibility was accepted as an owner");
+}
+
 void native_pobj_fields()
 {
     Fixture fixture(false);
@@ -504,6 +525,7 @@ int main(int argc, char** argv)
             else if (name == "malformed_consumed_rows") malformed_consumed_rows();
             else if (name == "source_costume_cache_rows") source_costume_cache_rows();
             else if (name == "borrowed_signed_visibility_tail") borrowed_signed_visibility_tail();
+            else if (name == "ft_parts_desc_owner_is_structural") ft_parts_desc_owner_is_structural();
             else if (name == "native_pobj_fields") native_pobj_fields();
             else throw std::runtime_error("Unknown case");
             std::cout << name << ": passed\n";

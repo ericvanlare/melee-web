@@ -1,6 +1,7 @@
 #include "dat_item_commands.h"
 #include <melee/lb/types.h>
 #include <stdlib.h>
+#include <string.h>
 _Static_assert(sizeof(union CmdUnion)==4,"Original item command word ABI");
 static int signed_bits(uint32_t v,unsigned n){uint32_t sign=1U<<(n-1);return (int)(v^sign)-(int)sign;}
 void* melee_web_item_commands_create(const uint32_t* words,size_t count){
@@ -86,7 +87,19 @@ void* melee_web_item_commands_create(const uint32_t* words,size_t count){
         /* Opcode 12 updates one enabled item hitbox's damage. */
         case 12:
             if(((w>>23)&7)>=4)goto fail;
-            out[i].set_hitbox_damage=(struct set_hitbox_damage){op,(w>>23)&7,w&0x7fffff};break;
+            /* it_80279544 reads ((u16*)cmd->u)[1] & 0x1fff rather than the
+             * typed 23-bit field. Preserve those source low bits in the
+             * native second halfword on little-endian gameplay targets. */
+#if defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+            out[i].set_hitbox_damage=(struct set_hitbox_damage){op,(w>>23)&7,0};
+            {
+                const uint16_t value=(uint16_t)(w&0x1fff);
+                memcpy((uint8_t*)&out[i]+sizeof(uint16_t),&value,sizeof(value));
+            }
+#else
+            out[i].set_hitbox_damage=(struct set_hitbox_damage){op,(w>>23)&7,w&0x1fff};
+#endif
+            break;
         case 13:
             if(((w>>23)&7)>=4)goto fail;
             out[i].set_hitbox_scale=(struct set_hitbox_scale){op,(w>>23)&7,w&0x7fffff};break;

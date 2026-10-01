@@ -230,7 +230,8 @@ bool validate_indices(NativeTrack& track, uint32_t count,
                 }
                 track.index_curve.push_back({
                     static_cast<std::uint8_t>(opcode),
-                    std::bit_cast<std::uint32_t>(static_cast<float>(value)), 0,
+                    std::bit_cast<std::uint32_t>(static_cast<float>(value)),
+                    opcode == 4 ? std::bit_cast<std::uint32_t>(static_cast<float>(incoming_slope)) : 0,
                     curve_wait});
             }
             previous_opcode = opcode;

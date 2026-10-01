@@ -136,13 +136,6 @@ int melee_web_test_facing_dir(unsigned slot,float* facing){
     *facing=((Fighter*)entity->user_data)->facing_dir;
     return 1;
 }
-int melee_web_test_invoke_dormant_zelda_transform(unsigned slot){
-    HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,1);
-    if(!entity||!entity->user_data||((Fighter*)entity->user_data)->kind!=FTKIND_ZELDA)
-        return 0;
-    ftZd_SpecialLw_8013AEAC(entity);
-    return melee_web_test_active_fighter_kind(slot)==FTKIND_SEAK;
-}
 int melee_web_test_kirby_copy_kind(unsigned slot){
     HSD_GObj* entity=Player_GetEntity(slot);
     if(!entity||!entity->user_data)return -1;

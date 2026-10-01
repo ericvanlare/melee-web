@@ -76,9 +76,13 @@ struct PairedFixture : Fixture {
         link(448,544); put16(data,460,1); // palette[0]: one entry
         link(464,576); put16(data,476,2); // palette[1]: two entries
         link(76,160); // append a synchronized TCLT FObj after TIMG
-        put32(data,164,4); data[172]=10; data[173]=0x85; data[174]=0x50; // unused slope format differs
-        link(176,192);
-        std::copy(data.begin()+96,data.begin()+100,data.begin()+192);
+        put32(data,164,6); data[172]=10; data[173]=0x62; data[174]=0x62;
+        link(176,544);
+        put32(data,80,6); data[89]=0x62; data[90]=0x62;
+        put32(data,92,512);
+        const uint8_t slope_curve[]{0x14,1,0,1,5,0};
+        std::copy(slope_curve,slope_curve+sizeof(slope_curve),data.begin()+512);
+        std::copy(slope_curve,slope_curve+sizeof(slope_curve),data.begin()+544);
     }
 };
 int main() {
@@ -243,7 +247,14 @@ int main() {
         PairedFixture paired;
         melee_web::DatMaterialAnimation synchronized(paired.archive(),0,model);
         check(synchronized.texture_animation_count()==1,
-              "byte-identical index/palette tracks use the proven diagonal relation");
+              "byte-identical index/palette spline tracks use the proven diagonal relation");
+        auto distinct_slope = paired;
+        distinct_slope.data[544 + 5] = 1;
+        bool rejected_distinct_slope = false;
+        try { melee_web::DatMaterialAnimation invalid(distinct_slope.archive(),0,model); }
+        catch (const melee_web::DatError&) { rejected_distinct_slope = true; }
+        check(rejected_distinct_slope,
+              "different opcode-4 slopes require Cartesian image/palette validation");
 
 
         // HSD keeps the authored TCLT table even when a selected TIMG image
@@ -259,12 +270,12 @@ int main() {
         put16(mixed_bad_tlut.data,476,0);
         rejected(mixed_bad_tlut); // non-CI still requires a valid authored TLUT descriptor
         auto mixed_bad_tclt = mixed_nonindexed;
-        mixed_bad_tclt.data[195]=64; // TCLT value 2, outside its two-entry table
+        mixed_bad_tclt.data[544 + 4]=8; // TCLT value 2, outside its two-entry table
         rejected(mixed_bad_tclt); // table-index bounds remain enforced before setup
         PairedFixture divergent;
         divergent.data[768]=17;
         put16(divergent.data,476,17);
-        divergent.data[195]=0; // TCLT selects a different second index
+        divergent.data[544 + 4]=0; // TCLT selects a different second index
         rejected(divergent);
         PairedFixture out_of_range;
         out_of_range.data[768]=17;

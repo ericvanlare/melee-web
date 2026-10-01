@@ -2,7 +2,6 @@
 #include "gameplay_kirby_copy_assets.hpp"
 
 #include "dat_archive.hpp"
-#include "dat_material.hpp"
 #include "dat_effect_entries.hpp"
 #include "dat_material_animation.hpp"
 #include "dat_native_joint.hpp"
@@ -45,7 +44,6 @@ extern EF_DAT_Entry efAsync_DatEntries[51];
 #pragma GCC diagnostic pop
 
 #include <algorithm>
-#include <cstdio>
 #include <cstring>
 #include <map>
 #include <stdexcept>
@@ -203,6 +201,29 @@ std::vector<KirbyCopyJointField> kirby_copy_joint_fields(
     return result;
 }
 
+bool source_root_is_ft_parts_desc_only(const DatArchive& archive,
+                                       const std::string& symbol)
+{
+    const auto root = public_root(archive, symbol).data_offset;
+    (void)archive.range(root, 0x1cU);
+    // An FtPartsDesc-only copy root has no KirbyHatStruct joint at +0 and no
+    // secondary native joint at +0x14. Its owned visibility table, texture
+    // animation list and Game & Watch secondary lookup are still checked
+    // source pointers; this classification never depends on a filename.
+    if (archive.has_relocation(root) || archive.has_relocation(root + 0x14U))
+        return false;
+    if (archive.be32(root) > 11U || !archive.pointer(root + 4U, 4U))
+        return false;
+    constexpr auto tobj_capacity = sizeof(
+        ((CostumeTObjList*)nullptr)->costume_tobjs) / sizeof(HSD_TObj*);
+    const auto tobj_count = archive.be32(root + 8U);
+    if (tobj_count > tobj_capacity ||
+        (tobj_count && !archive.pointer(root + 12U, 4U)) ||
+        !archive.pointer(root + 0x18U, 1U))
+        return false;
+    return true;
+}
+
 std::uint32_t read_be32(const std::vector<std::uint8_t>& bytes,
                         std::size_t offset)
 {
@@ -296,7 +317,9 @@ void adapt_native_source_pobj_fields(std::vector<std::uint8_t>& bytes,
 void adapt_native_source_material_modes(std::vector<std::uint8_t>& bytes,
                                         std::shared_ptr<const DatArchive> checked,
                                         const std::string& filename,
-                                        const std::vector<std::uint32_t>& joint_roots)
+                                        const std::vector<std::uint32_t>& joint_roots,
+                                        const std::vector<std::string>&
+                                            ft_parts_desc_only_symbols)
 {
     // HSD_ArchiveParse relocates pointers but the source DObj loader also
     // reads MObjDesc::rendermode as a native u32. Use the same checked joint
@@ -317,54 +340,19 @@ void adapt_native_source_material_modes(std::vector<std::uint8_t>& bytes,
                    " at DAT+" + std::to_string(material) +
                    " has an invalid source blending mode");
         }
-        if (filename == "PlKbCpFc.dat")
-            std::fprintf(stderr, "Kirby fallback material file=%s DAT+0x%x mode=0x%08x\n",
-                         filename.c_str(), material, source_mode);
         write_native32(bytes, 0x20U + material + 4U, source_mode);
     };
 
+    for (const auto& symbol : ft_parts_desc_only_symbols) {
+        if (!source_root_is_ft_parts_desc_only(*checked, symbol))
+            reject("Kirby source material owner " + filename + " root " +
+                   symbol + " is neither a checked native joint nor an "
+                   "FtPartsDesc-only owner");
+    }
     if (joint_roots.empty()) {
-        // Some copy roots are FtPartsDesc-only and have no joint pointer.
-        // Discover material candidates from checked DAT DObj/PObj pointer
-        // fields, rejecting overlapping records rather than treating every
-        // aligned pointer-shaped region as a native descriptor.
-        struct DObjMaterial {
-            std::uint32_t dobj;
-            std::uint32_t material;
-        };
-        std::vector<DObjMaterial> candidates;
-        std::unordered_set<std::uint32_t> dobjs;
-        const auto data_size = checked->data().size();
-        for (std::uint32_t dobj = 0; dobj + 16U <= data_size; dobj += 4U) {
-            if (!checked->has_relocation(dobj + 8U)) continue;
-            try {
-                if (checked->pointer(dobj)) continue;
-                (void)checked->pointer(dobj + 4U, 16);
-                const auto material = checked->pointer(dobj + 8U, 24);
-                (void)checked->pointer(dobj + 12U, 24);
-                if (!material) continue;
-                candidates.push_back({dobj, *material});
-                dobjs.insert(dobj);
-            } catch (const DatError&) {
-                continue;
-            }
-        }
-        for (const auto& candidate : candidates) {
-            if (dobjs.contains(candidate.material) ||
-                checked->has_relocation(candidate.material + 4U))
-                continue;
-            try {
-                if (checked->pointer(candidate.material)) continue;
-                const auto has_textures = checked->pointer(candidate.material + 8U);
-                const auto has_material = checked->pointer(candidate.material + 12U);
-                if (!has_textures && !has_material) continue;
-                (void)read_dat_material(*checked, candidate.material,
-                                        DatMaterialPolicy::NativeDescriptors);
-            } catch (const DatError&) {
-                continue;
-            }
-            adapt_material(candidate.material);
-        }
+        if (ft_parts_desc_only_symbols.empty())
+            reject("Kirby source material owner " + filename +
+                   " has no checked native joint or FtPartsDesc root");
         return;
     }
 
@@ -378,29 +366,6 @@ void adapt_native_source_material_modes(std::vector<std::uint8_t>& bytes,
                    std::to_string(joint) + ": " + error.what());
         }
         const auto& graph = model->graph();
-        if (filename == "PlKbCpFc.dat" && joint == 0xf954U) {
-            bool has_skin_target = false;
-            for (std::uint32_t index = 0; index < graph.joint_count; ++index)
-                has_skin_target |= graph.joints[index].source_offset == 0xc080U;
-            std::fprintf(stderr,
-                "Kirby copy graph root=0x%x joints=%u dobjs=%u pobjs=%u has_skin_target_0xc080=%u\n",
-                joint, graph.joint_count, graph.dobj_count, graph.pobj_count,
-                unsigned(has_skin_target));
-            for (std::uint32_t index = 0; index < graph.pobj_count; ++index)
-                std::fprintf(stderr,
-                    "Kirby copy PObj source=0x%x flags=0x%x display_bytes=0x%x\n",
-                    graph.pobjs[index].source_offset,
-                    graph.pobjs[index].geometry.flags,
-                    graph.pobjs[index].geometry.display_byte_size);
-            for (std::uint32_t index = 0; index < graph.dobj_count; ++index) {
-                const auto& dobj = graph.dobjs[index];
-                std::fprintf(stderr,
-                    "Kirby copy DObj source=0x%x pobj_index=0x%x pobj_source=0x%x\n",
-                    dobj.source_offset, dobj.pobj,
-                    dobj.pobj == UINT32_MAX ? UINT32_MAX :
-                        graph.pobjs[dobj.pobj].source_offset);
-            }
-        }
         adapt_native_source_pobj_fields(bytes, *checked, graph, adapted_pobjs);
         for (std::uint32_t index = 0; index < graph.material_count; ++index) {
             const auto material = graph.materials[index].source_offset;
@@ -982,6 +947,7 @@ struct GameplayKirbyCopyAssets::Storage {
             owned.bytes = input->second;
             adapt_for_native_source_parser(owned.bytes, *checked);
             std::vector<std::uint32_t> material_joint_roots;
+            std::vector<std::string> ft_parts_desc_only_symbols;
             for (const auto& root : requirements) {
                 if (root.filename != requirement.filename) continue;
                 const auto root_offset = owned.public_offsets.at(root.symbol);
@@ -996,8 +962,11 @@ struct GameplayKirbyCopyAssets::Storage {
                     if (!is_costume_joint) continue;
                     material_joint_roots.push_back(root_offset);
                 } else {
-                    for (const auto& field :
-                         kirby_copy_joint_fields(*checked, root.symbol))
+                    const auto fields = kirby_copy_joint_fields(*checked,
+                                                                root.symbol);
+                    if (fields.empty())
+                        ft_parts_desc_only_symbols.push_back(root.symbol);
+                    for (const auto& field : fields)
                         material_joint_roots.push_back(field.joint_root);
                 }
             }
@@ -1006,8 +975,8 @@ struct GameplayKirbyCopyAssets::Storage {
                 std::unique(material_joint_roots.begin(), material_joint_roots.end()),
                 material_joint_roots.end());
             adapt_native_source_material_modes(owned.bytes, checked,
-                                               requirement.filename,
-                                               material_joint_roots);
+                                               requirement.filename, material_joint_roots,
+                                               ft_parts_desc_only_symbols);
             for (const auto& root : requirements)
                 if (root.filename == requirement.filename) {
                     adapt_kirby_copy_dynamics(owned.bytes, *checked, root);

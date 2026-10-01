@@ -50,7 +50,7 @@ class ReferenceCpuProbeLifecycleTests(unittest.TestCase):
         )
         records = source[
             source.index("struct CpuProbeFighterRecord") : source.index(
-                "constexpr bool IsGuestRange", source.index("struct CpuProbeFighterRecord")
+                "enum class ItemProbeEvent", source.index("struct CpuProbeFighterRecord")
             )
         ]
         ranges = source[
@@ -77,9 +77,9 @@ class ReferenceCpuProbeLifecycleTests(unittest.TestCase):
                 _method(source, "  bool ReadU32", "  bool ReadMem1"),
                 _method(source, "  bool ReadMem1", "  void CloseCpuProbe"),
                 _method(source, "  void CloseCpuProbe", "  void RecordCpuProbe"),
-                _method(source, "  void RecordCpuProbe", "  bool AddSlice"),
+                _method(source, "  void RecordCpuProbe", "  void CloseItemProbe"),
                 _method(source, "  bool BuildCpuProbeJson", "  bool WriteCpuProbe"),
-                _method(source, "  bool WriteCpuProbe", "  void WriterMain"),
+                _method(source, "  bool WriteCpuProbe", "  bool BuildItemProbeJson"),
             ]
         )
 

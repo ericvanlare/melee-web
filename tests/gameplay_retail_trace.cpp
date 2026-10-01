@@ -27,11 +27,13 @@ int main(int argc,char** argv){try{
     bool require_match_complete=false;
     bool cpu_hitlag_diagnostic=false;
     bool decode_only=false;
+    bool setup_guard_test=false;
     for(int i=4;i<argc;i++){
         const std::string option=argv[i];
         if(option=="--require-match-complete") require_match_complete=true;
         else if(option=="--cpu-hitlag-diagnostic") cpu_hitlag_diagnostic=true;
         else if(option=="--decode-only") decode_only=true;
+        else if(option=="--setup-guard-test") setup_guard_test=true;
         else throw std::runtime_error("Unknown gameplay_retail_trace option: "+option);
     }
     if(cpu_hitlag_diagnostic) melee_web_cpu_observation_enable_hitlag_audit();
@@ -41,10 +43,43 @@ int main(int argc,char** argv){try{
     std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(stream),{}};
     check(bytes.size()==size,"Reference input read was incomplete");
     auto recipe=melee_web::read_retail_replay(bytes);
+    if(setup_guard_test){
+        check(recipe.version==melee_web::kRetailReplayVersion&&
+              recipe.match_selections.size()==3,
+              "Setup guard test requires a valid v9 three-setup recipe");
+        for(unsigned index=0;index<recipe.match_selections.size();index++){
+            const auto& expected=recipe.match_selections[index].start;
+            melee_web::retail_replay_validate_match_setup(recipe,index,expected);
+            auto changed=expected;
+            changed.players[0].ckind++;
+            bool rejected=false;
+            try{melee_web::retail_replay_validate_match_setup(recipe,index,changed);}
+            catch(const std::exception&){rejected=true;}
+            check(rejected,"Setup guard accepted a changed character");
+            changed=expected;changed.players[0].color++;
+            rejected=false;
+            try{melee_web::retail_replay_validate_match_setup(recipe,index,changed);}
+            catch(const std::exception&){rejected=true;}
+            check(rejected,"Setup guard accepted a changed costume");
+            changed=expected;changed.players[0].cpu_level--;
+            rejected=false;
+            try{melee_web::retail_replay_validate_match_setup(recipe,index,changed);}
+            catch(const std::exception&){rejected=true;}
+            check(rejected,"Setup guard accepted a changed CPU level");
+            changed=expected;changed.rules.stkind++;
+            rejected=false;
+            try{melee_web::retail_replay_validate_match_setup(recipe,index,changed);}
+            catch(const std::exception&){rejected=true;}
+            check(rejected,"Setup guard accepted a changed stage");
+        }
+        std::cout << "setup_guard_verified\n";
+        return 0;
+    }
     if(decode_only){
         std::cout << "{\"schema\":\"melee-web-retail-replay-decode\",\"version\":"
                   << recipe.version << ",\"frame_count\":" << recipe.frames.size()
                   << ",\"span_count\":" << recipe.spans.size()
+                  << ",\"match_setup_count\":" << recipe.match_setups.size()
                   << ",\"initial_css_context\":"
                   << (recipe.initial_css != nullptr ? "true" : "false")
                   << ",\"players\":[";
@@ -71,7 +106,7 @@ int main(int argc,char** argv){try{
         std::make_unique<melee_web::GameplayMatchSession>(files,recipe.selection,*recipe.initial_input):
         std::make_unique<melee_web::GameplayMatchSession>(files,recipe.selection);
     auto& match=*owned_match;
-    melee_web::retail_replay_initial(recipe,false);
+    melee_web::retail_replay_initial(recipe,false,match.start_data());
     unsigned audio_phase=0;float pcm[1068];char error[256]{};
     const auto check_ownership=[&](const char* phase,uint32_t frame){
         char ownership_error[256]{};

@@ -91,6 +91,12 @@ constexpr u32 WHOLE_SESSION_MAX_MATCHES = 64;
 constexpr size_t CPU_PROBE_TICK_WINDOW_MAX = 64;
 constexpr size_t CPU_PROBE_MAX_RECORDS = 4096;
 constexpr size_t CPU_PROBE_MAX_JSON_BYTES = 64 * 1024 * 1024;
+constexpr size_t ITEM_PROBE_MAX_RECORDS = 2048;
+constexpr size_t ITEM_PROBE_MAX_JSON_BYTES = 4 * 1024 * 1024;
+constexpr size_t ITEM_PROBE_MAX_PROCESSES = 16;
+constexpr u32 ITEM_PROBE_ARROW_GOBJ = 0x80e29760;
+constexpr u32 ITEM_PROBE_ARROW_ITEM = 0x80e1b920;
+constexpr u32 ITEM_PROBE_ARROW_KIND = 65;
 constexpr u32 CPU_PROBE_STACK_SIZE = 0x100;
 constexpr u32 CPU_PROBE_FIGHTER_HEAD_SIZE = 0x100;
 constexpr u32 CPU_PROBE_FIGHTER_CPU_SIZE = 0x57c;
@@ -114,6 +120,11 @@ enum class Event : u16
   Error = 5,
   End = 6,
 };
+
+constexpr bool ShouldWriteObserverEvent(Event event, bool item_probe_summary_stream)
+{
+  return !item_probe_summary_stream || event == Event::Handshake || event == Event::Start;
+}
 
 enum class Boundary : u16
 {
@@ -204,6 +215,8 @@ enum class SliceTag : u16
   MenuCssSlider = 49,
   MenuCssContext = 50,
   MenuCssKoCounts = 51,
+  PlayerEntities = 52,
+  PlayerEntityUserData = 53,
 };
 
 struct SliceRef
@@ -271,6 +284,138 @@ struct CpuProbeRecord
   u32 samus_effect_particle_group = 0;
   std::array<bool, 4> fighter_present{};
   std::array<CpuProbeFighterRecord, 4> fighters{};
+};
+
+enum class ItemProbeEvent : u8
+{
+  Boundary,
+  CreationReturn,
+  CallbackEntry,
+  CallbackReturn,
+  Call,
+  CallReturn,
+  CpuEntry,
+  CpuReturn,
+  ArrowShieldOverlapCallSite,
+  ArrowShieldOverlapCallReturn,
+  ArrowItemCallEntry,
+  ArrowItemCallReturn,
+  ArrowTargetCheckCallSite,
+  ArrowTargetCheckCallReturn,
+};
+
+struct ItemProbePoint
+{
+  const char* label;
+  u32 address;
+  u32 expected_word;
+  ItemProbeEvent event;
+  u8 pair;
+};
+
+// A bounded diagnostic only.  These PCs are instruction-word checked against
+// the pinned Rev 2 DOL at every hit.  Pair IDs associate wrapper entries and
+// returns without trusting caller-owned or renderer timing.
+constexpr std::array<ItemProbePoint, 33> ITEM_PROBE_POINTS = {{
+    {"item_physics_wrapper_entry", 0x802697d4, 0x7c0802a6, ItemProbeEvent::CallbackEntry, 1},
+    {"item_physics_wrapper_return", 0x80269974, 0x4e800020, ItemProbeEvent::CallbackReturn, 1},
+    {"item_collision_wrapper_entry", 0x80269978, 0x7c0802a6, ItemProbeEvent::CallbackEntry, 2},
+    {"item_collision_wrapper_return", 0x80269a98, 0x4e800020, ItemProbeEvent::CallbackReturn, 2},
+    {"item_hitbox_wrapper_entry", 0x80269b60, 0x7c0802a6, ItemProbeEvent::CallbackEntry, 3},
+    {"item_hitbox_updater_call", 0x80269bc0, 0x480077bd, ItemProbeEvent::Call, 4},
+    {"item_hitbox_updater_return", 0x80269bc4, 0x7fc3f378, ItemProbeEvent::CallReturn, 4},
+    {"item_hitbox_wrapper_return", 0x80269be0, 0x4e800020, ItemProbeEvent::CallbackReturn, 3},
+    {"cpu_item_decision_entry", 0x800bb9b4, 0x7c0802a6, ItemProbeEvent::CpuEntry, 5},
+    {"cpu_item_decision_return", 0x800bbb88, 0x4e800020, ItemProbeEvent::CpuReturn, 5},
+    {"young_link_arrow_anim_entry", 0x802a8cc8, 0x7c0802a6, ItemProbeEvent::CallbackEntry, 6},
+    {"young_link_arrow_anim_return", 0x802a90ec, 0x4e800020, ItemProbeEvent::CallbackReturn, 6},
+    {"young_link_arrow_physics_entry", 0x802a90f0, 0x80a3002c, ItemProbeEvent::CallbackEntry, 7},
+    {"young_link_arrow_physics_return", 0x802a9134, 0x4e800020, ItemProbeEvent::CallbackReturn, 7},
+    {"young_link_arrow_collision_entry", 0x802a9138, 0x7c0802a6, ItemProbeEvent::CallbackEntry, 8},
+    {"young_link_arrow_collision_return", 0x802a9348, 0x4e800020, ItemProbeEvent::CallbackReturn, 8},
+    {"arrow_hit_shield_state_call", 0x802a9c08, 0x4bfbf255, ItemProbeEvent::Call, 9},
+    {"arrow_hit_shield_state_return", 0x802a9c0c, 0x7f63db78, ItemProbeEvent::CallReturn, 9},
+    {"young_link_arrow_spawn_return", 0x802a8508, 0x4e800020, ItemProbeEvent::CreationReturn, 0},
+    {"young_link_arrow_launch_entry", 0x802a850c, 0x7c0802a6, ItemProbeEvent::CallbackEntry, 10},
+    {"young_link_arrow_launch_return", 0x802a8980, 0x4e800020, ItemProbeEvent::CallbackReturn, 10},
+    {"arrow_shield_overlap_call", 0x80079810, 0x4bf8e3bd, ItemProbeEvent::ArrowShieldOverlapCallSite, 11},
+    {"arrow_shield_overlap_return", 0x80079814, 0x2c030000, ItemProbeEvent::ArrowShieldOverlapCallReturn, 11},
+    {"arrow_ftcoll_shield_assignment_entry", 0x80077688, 0x7c0802a6, ItemProbeEvent::ArrowItemCallEntry, 12},
+    {"arrow_ftcoll_shield_assignment_return", 0x8007796c, 0x4e800020, ItemProbeEvent::ArrowItemCallReturn, 12},
+    {"arrow_item_damage_dispatch_entry", 0x80269dc8, 0x7c0802a6, ItemProbeEvent::CallbackEntry, 13},
+    {"arrow_item_damage_dispatch_return", 0x80269f10, 0x4e800020, ItemProbeEvent::CallbackReturn, 13},
+    {"arrow_hit_shield_callback_entry", 0x802a9b08, 0x7c0802a6, ItemProbeEvent::CallbackEntry, 14},
+    {"arrow_hit_shield_callback_return", 0x802a9cdc, 0x4e800020, ItemProbeEvent::CallbackReturn, 14},
+    {"arrow_hit_shield_target_test_call", 0x802a9b30, 0x4bfc9211, ItemProbeEvent::ArrowTargetCheckCallSite, 15},
+    {"arrow_hit_shield_target_test_return", 0x802a9b34, 0x2c030000, ItemProbeEvent::ArrowTargetCheckCallReturn, 15},
+    {"source_tick_return", 0x80390eb4, 0x4e800020, ItemProbeEvent::Boundary, 0},
+    {"source_draw_return", 0x80391040, 0x4e800020, ItemProbeEvent::Boundary, 0},
+}};
+
+const ItemProbePoint* FindItemProbePoint(u32 address)
+{
+  for (const ItemProbePoint& point : ITEM_PROBE_POINTS)
+  {
+    if (point.address == address)
+      return &point;
+  }
+  return nullptr;
+}
+
+struct ItemProbeRecord
+{
+  u32 ordinal = 0;
+  u32 pc = 0;
+  u32 expected_word = 0;
+  u32 source_tick = 0;
+  u32 match = 0;
+  u32 lr = 0;
+  u32 gpr3 = 0;
+  u32 gpr4 = 0;
+  u32 gpr5 = 0;
+  u32 gpr6 = 0;
+  std::array<u64, 3> shield_fpr{};
+  bool shield_inputs_present = false;
+  bool shield_transform_present = false;
+  std::array<u8, 0x64> shield_capsule{};
+  std::array<u8, 0x24> shield_result{};
+  std::array<u8, 0x30> shield_transform{};
+  bool arrow_ftcoll_inputs_present = false;
+  u64 arrow_ftcoll_angle = 0;
+  std::array<u8, 0x0c> arrow_ftcoll_position{};
+  std::array<u8, 0x24> arrow_shield_hit{};
+  std::array<u8, 0x30> arrow_shield_bone_matrix{};
+  u32 scheduler_priority = 0;
+  u32 fighter_slot0_pointer = 0;
+  u32 fighter_slot0_gobj = 0;
+  u32 fighter_slot2_pointer = 0;
+  u32 fighter_slot2_gobj = 0;
+  u32 decision_item = 0;
+  u32 decision_item_status = 0;
+  bool arrow_present = false;
+  u32 arrow_gobj = 0;
+  u32 arrow_item = 0;
+  u32 arrow_owner_gobj = 0;
+  u32 arrow_kind = 0;
+  u32 arrow_list_order = 0;
+  u32 arrow_p_link = 0;
+  u32 arrow_process_count = 0;
+  std::array<u32, ITEM_PROBE_MAX_PROCESSES> arrow_process_priorities{};
+  u32 arrow_anim_id = 0;
+  u32 arrow_damage_dealt = 0;
+  u32 arrow_pending_shield_damage = 0;
+  u32 arrow_shield_target_gobj = 0;
+  u8 arrow_damage_flags = 0;
+  u32 arrow_ground_or_air = 0;
+  u32 arrow_shield_angle_bits = 0;
+  u32 arrow_common_shield_degrees_bits = 0;
+  bool arrow_shield_bounced_present = false;
+  bool arrow_hit_shield_present = false;
+  std::array<u32, 3> velocity_bits{};
+  std::array<u32, 3> position_bits{};
+  u32 hitbox0_state = 0;
+  std::array<u32, 3> hitbox0_previous_endpoint_bits{};
+  std::array<u32, 3> hitbox0_current_endpoint_bits{};
 };
 
 constexpr bool IsGuestRange(u32 address, size_t size)
@@ -529,6 +674,91 @@ bool CpuProbeEnabled()
   return ActivationRequested() && settings.present && settings.valid;
 }
 
+struct ItemProbeSettings
+{
+  bool present = false;
+  bool valid = false;
+  std::string output_path;
+  std::string error;
+  u32 match = 0;
+  u32 first_tick = 0;
+  u32 last_tick = 0;
+  bool trigger_on_arrow_creation = false;
+  bool trigger_on_arrow_launch = false;
+  u32 capture_ticks = 0;
+};
+
+const ItemProbeSettings& ItemProbeEnvironment()
+{
+  static const ItemProbeSettings settings = [] {
+    ItemProbeSettings result;
+    const std::string output = Env("MWRC_ITEM_PROBE_OUTPUT");
+    const std::string match = Env("MWRC_ITEM_PROBE_MATCH");
+    const std::string first_tick = Env("MWRC_ITEM_PROBE_FIRST_TICK");
+    const std::string last_tick = Env("MWRC_ITEM_PROBE_LAST_TICK");
+    const std::string trigger = Env("MWRC_ITEM_PROBE_TRIGGER");
+    const std::string capture_ticks = Env("MWRC_ITEM_PROBE_CAPTURE_TICKS");
+    result.present = !output.empty() || !match.empty() || !first_tick.empty() ||
+                     !last_tick.empty() || !trigger.empty() || !capture_ticks.empty();
+    if (!result.present)
+      return result;
+    if (output.empty() || output.size() > 4096)
+    {
+      result.error = "MWRC_ITEM_PROBE_OUTPUT must be a non-empty path of at most 4096 bytes";
+      return result;
+    }
+    result.output_path = output;
+    if (!ParseBoundedDecimal(match, WHOLE_SESSION_MAX_MATCHES - 1, &result.match))
+    {
+      result.error = "MWRC_ITEM_PROBE_MATCH must be an unsigned decimal match index";
+      return result;
+    }
+    if (!trigger.empty())
+    {
+      if ((trigger != "young_link_arrow_creation" &&
+           trigger != "young_link_arrow_launch") ||
+          !first_tick.empty() || !last_tick.empty() ||
+          !ParseBoundedDecimal(capture_ticks, 16, &result.capture_ticks) ||
+          result.capture_ticks == 0)
+      {
+        result.error =
+            "triggered item probe requires an Arrow creation/launch trigger and "
+            "CAPTURE_TICKS from 1 through 16, with no fixed tick bounds";
+        return result;
+      }
+      result.trigger_on_arrow_creation = trigger == "young_link_arrow_creation";
+      result.trigger_on_arrow_launch = trigger == "young_link_arrow_launch";
+    }
+    else
+    {
+      if (!capture_ticks.empty() ||
+          !ParseBoundedDecimal(first_tick, std::numeric_limits<u32>::max(),
+                               &result.first_tick) ||
+          !ParseBoundedDecimal(last_tick, std::numeric_limits<u32>::max(), &result.last_tick))
+      {
+        result.error =
+            "MWRC_ITEM_PROBE_FIRST_TICK and LAST_TICK must be unsigned decimal values";
+        return result;
+      }
+      if (result.first_tick > result.last_tick ||
+          static_cast<u64>(result.last_tick) - result.first_tick >= CPU_PROBE_TICK_WINDOW_MAX)
+      {
+        result.error = "item probe tick window must contain at most 64 source ticks";
+        return result;
+      }
+    }
+    result.valid = true;
+    return result;
+  }();
+  return settings;
+}
+
+bool ItemProbeEnabled()
+{
+  const ItemProbeSettings& settings = ItemProbeEnvironment();
+  return ActivationRequested() && settings.present && settings.valid;
+}
+
 bool AppendBounded(std::string* output, std::string_view value)
 {
   if (output->size() > CPU_PROBE_MAX_JSON_BYTES ||
@@ -608,6 +838,33 @@ struct Observer::Impl
         cpu_probe_error = "CPU probe record buffer allocation failed";
       }
     }
+    const ItemProbeSettings& item_probe = ItemProbeEnvironment();
+    item_probe_configured = item_probe.present;
+    item_probe_valid = item_probe.valid;
+    if (item_probe.valid)
+    {
+      item_probe_output_path = item_probe.output_path;
+      item_probe_match = item_probe.match;
+      item_probe_first_tick = item_probe.first_tick;
+      item_probe_last_tick = item_probe.last_tick;
+      item_probe_trigger_on_arrow_creation = item_probe.trigger_on_arrow_creation;
+      item_probe_trigger_on_arrow_launch = item_probe.trigger_on_arrow_launch;
+      item_probe_capture_ticks = item_probe.capture_ticks;
+      item_probe_records.reset(new (std::nothrow) ItemProbeRecord[ITEM_PROBE_MAX_RECORDS]);
+      if (!item_probe_records)
+      {
+        item_probe_valid = false;
+        item_probe_error = "item probe record buffer allocation failed";
+      }
+    }
+    const std::string item_probe_summary_stream_setting =
+        Env("MWRC_ITEM_PROBE_SUMMARY_STREAM");
+    if (!item_probe_summary_stream_setting.empty() &&
+        item_probe_summary_stream_setting != "1")
+      SetInvalid("MWRC_ITEM_PROBE_SUMMARY_STREAM must be 1 when set");
+    item_probe_summary_stream = item_probe_summary_stream_setting == "1";
+    if (item_probe_summary_stream && !item_probe_configured)
+      SetInvalid("MWRC_ITEM_PROBE_SUMMARY_STREAM requires a configured item probe");
     // Dolphin builds with exceptions disabled.  std::thread reports an
     // unavailable worker by terminating; there is no catchable error path.
     writer = std::thread([this] { WriterMain(); });
@@ -638,6 +895,27 @@ struct Observer::Impl
           (!whole_session_enabled() && cpu_probe_match != 0))
       {
         SetInvalid("CPU probe match is outside the configured whole-session matches");
+        return false;
+      }
+    }
+    if (item_probe_configured)
+    {
+      if (!item_probe_valid)
+      {
+        SetInvalid("invalid item probe configuration: " +
+                   (item_probe_error.empty() ? item_probe.error : item_probe_error));
+        return false;
+      }
+      if (item_probe_output_path == output_path ||
+          (cpu_probe_configured && item_probe_output_path == cpu_probe_output_path))
+      {
+        SetInvalid("item probe output must be separate from other capture outputs");
+        return false;
+      }
+      if ((whole_session_enabled() && item_probe_match >= whole_session_matches) ||
+          (!whole_session_enabled() && item_probe_match != 0))
+      {
+        SetInvalid("item probe match is outside the configured whole-session matches");
         return false;
       }
     }
@@ -963,6 +1241,480 @@ struct Observer::Impl
     ++cpu_probe_record_count;
   }
 
+  void CloseItemProbe()
+  {
+    if (!item_probe_configured || item_probe_closed)
+      return;
+    item_probe_closed = true;
+    item_probe_published.store(true, std::memory_order_release);
+  }
+
+  bool ReadTrackedArrow(Core::System* system, ItemProbeRecord* record)
+  {
+    if (!fighter_present[2] || !fighter_present[3] || !fighter_pointers[2] ||
+        !fighter_pointers[3])
+    {
+      SetInvalid("item probe cannot bind the Link Arrow without CPU slots 2 and 3");
+      return false;
+    }
+    u32 owner_gobj = 0;
+    if (!IsMem1Range(fighter_pointers[3], 4) ||
+        !ReadU32(system, fighter_pointers[3], &owner_gobj) || !IsMem1Range(owner_gobj, 4))
+    {
+      SetInvalid("item probe slot-3 owner GObj is outside MEM1");
+      return false;
+    }
+    u32 entities = 0;
+    if (!ReadU32(system, 0x804d782c, &entities) || !IsMem1Range(entities, 0x28))
+    {
+      SetInvalid("item probe HSD_GObj_Entities pointer is outside MEM1");
+      return false;
+    }
+    u32 gobj = 0;
+    if (!ReadU32(system, entities + 0x24, &gobj))
+    {
+      SetInvalid("item probe item-list head could not be read from MEM1");
+      return false;
+    }
+    u32 list_order = 0;
+    bool found = false;
+    while (gobj != 0 && list_order < 64)
+    {
+      std::array<u8, 0x30> gobj_bytes{};
+      if (!IsMem1Range(gobj, gobj_bytes.size()) ||
+          !ReadMem1(system, gobj, gobj_bytes.size(), gobj_bytes.data()))
+      {
+        SetInvalid("item probe item GObj list escaped MEM1");
+        return false;
+      }
+      const u16 classifier = static_cast<u16>((static_cast<u16>(gobj_bytes[0]) << 8) |
+                                               gobj_bytes[1]);
+      const u32 item = ReadBE32(gobj_bytes.data() + 0x2c);
+      if (gobj == ITEM_PROBE_ARROW_GOBJ || item == ITEM_PROBE_ARROW_ITEM)
+      {
+        if (found || classifier != 0x6 || gobj != ITEM_PROBE_ARROW_GOBJ ||
+            item != ITEM_PROBE_ARROW_ITEM)
+        {
+          SetInvalid("item probe tracked Link Arrow GObj was reused or duplicated");
+          return false;
+        }
+        found = true;
+        record->arrow_gobj = gobj;
+        record->arrow_item = item;
+        record->arrow_list_order = list_order;
+      }
+      gobj = ReadBE32(gobj_bytes.data() + 0x8);
+      ++list_order;
+    }
+    if (gobj != 0)
+    {
+      SetInvalid("item probe item list exceeds its explicit 64-GObj bound");
+      return false;
+    }
+    if (!found)
+    {
+      SetInvalid("item probe tracked Link Arrow is missing from the item list");
+      return false;
+    }
+    if (!item_probe_trigger_on_arrow_creation && !item_probe_trigger_on_arrow_launch &&
+        record->arrow_list_order != 1)
+    {
+      SetInvalid("item probe tracked Link Arrow item-list order changed");
+      return false;
+    }
+    if (!IsMem1Range(record->arrow_item, 0xdd0))
+    {
+      SetInvalid("item probe tracked Link Arrow damage-state extent is outside MEM1");
+      return false;
+    }
+    std::array<u8, 0x30> tracked_gobj{};
+    if (!ReadMem1(system, record->arrow_gobj, tracked_gobj.size(), tracked_gobj.data()))
+    {
+      SetInvalid("item probe tracked Link Arrow GObj could not be read from MEM1");
+      return false;
+    }
+    record->arrow_p_link = tracked_gobj[2];
+    if (record->arrow_p_link != 9 ||
+        !ReadU32(system, 0x804d7834, &record->scheduler_priority) ||
+        record->scheduler_priority > 0x18)
+    {
+      SetInvalid("item probe tracked Arrow scheduler or item-list priority is invalid");
+      return false;
+    }
+    u32 process = ReadBE32(tracked_gobj.data() + 0x18);
+    while (process != 0)
+    {
+      if (record->arrow_process_count >= ITEM_PROBE_MAX_PROCESSES)
+      {
+        SetInvalid("item probe tracked Arrow exceeds its explicit process-chain bound");
+        return false;
+      }
+      std::array<u8, 0x18> process_bytes{};
+      if (!IsMem1Range(process, process_bytes.size()) ||
+          !ReadMem1(system, process, process_bytes.size(), process_bytes.data()))
+      {
+        SetInvalid("item probe tracked Arrow process chain escaped MEM1");
+        return false;
+      }
+      const u32 process_owner = ReadBE32(process_bytes.data() + 0x10);
+      const u32 process_priority = process_bytes[0x0c];
+      if (process_owner != record->arrow_gobj || process_priority > 0x18)
+      {
+        SetInvalid("item probe tracked Arrow process owner or priority is invalid");
+        return false;
+      }
+      record->arrow_process_priorities[record->arrow_process_count++] = process_priority;
+      process = ReadBE32(process_bytes.data());
+    }
+    if (record->arrow_process_count == 0)
+    {
+      SetInvalid("item probe tracked Arrow has no registered scheduler processes");
+      return false;
+    }
+    u32 owner = 0;
+    if (!ReadU32(system, record->arrow_item + 0x10, &record->arrow_kind) ||
+        !ReadU32(system, record->arrow_item + 0x518, &owner) ||
+        record->arrow_kind != ITEM_PROBE_ARROW_KIND || owner != owner_gobj)
+    {
+      SetInvalid("item probe tracked Link Arrow kind or slot-3 owner changed");
+      return false;
+    }
+    record->arrow_owner_gobj = owner;
+    if (!IsMem1Range(fighter_pointers[2], 0x1a88 + 0x100))
+    {
+      SetInvalid("item probe slot-2 CPU state is outside MEM1");
+      return false;
+    }
+    record->fighter_slot2_pointer = fighter_pointers[2];
+    if (!ReadU32(system, fighter_pointers[2], &record->fighter_slot2_gobj))
+    {
+      SetInvalid("item probe slot-2 Fighter GObj could not be read");
+      return false;
+    }
+    const u32 cpu_state = fighter_pointers[2] + 0x1a88;
+    if (!IsMem1Range(cpu_state + 0xf4, 8) ||
+        !ReadU32(system, cpu_state + 0xf4, &record->decision_item) ||
+        !ReadU32(system, cpu_state + 0xf8, &record->decision_item_status))
+    {
+      SetInvalid("item probe slot-2 CPU item-selection fields are outside MEM1");
+      return false;
+    }
+    u32 item_logic_table = 0;
+    u32 common_data = 0;
+    u32 shield_bounced = 0;
+    u32 hit_shield = 0;
+    if (!ReadU32(system, record->arrow_item + 0x28, &record->arrow_anim_id) ||
+        !ReadU32(system, record->arrow_item + 0xc34, &record->arrow_damage_dealt) ||
+        !ReadU32(system, record->arrow_item + 0xc50,
+                 &record->arrow_pending_shield_damage) ||
+        !ReadU32(system, record->arrow_item + 0xcf4,
+                 &record->arrow_shield_target_gobj) ||
+        !ReadMem1(system, record->arrow_item + 0xdce, 1, &record->arrow_damage_flags) ||
+        !ReadU32(system, record->arrow_item + 0xc0, &record->arrow_ground_or_air) ||
+        !ReadU32(system, record->arrow_item + 0xc54, &record->arrow_shield_angle_bits) ||
+        !ReadU32(system, record->arrow_item + 0xb8, &item_logic_table) ||
+        !IsMem1Range(item_logic_table, 0x38) ||
+        !ReadU32(system, item_logic_table + 0x30, &shield_bounced) ||
+        !ReadU32(system, item_logic_table + 0x34, &hit_shield) ||
+        !ReadU32(system, 0x804d6d28, &common_data) ||
+        !IsMem1Range(common_data, 0xe4) ||
+        !ReadU32(system, common_data + 0xe0, &record->arrow_common_shield_degrees_bits))
+    {
+      SetInvalid("item probe tracked Link Arrow shield-dispatch fields could not be read");
+      return false;
+    }
+    record->arrow_shield_bounced_present = shield_bounced != 0;
+    record->arrow_hit_shield_present = hit_shield != 0;
+    for (u32 axis = 0; axis < 3; ++axis)
+    {
+      if (!ReadU32(system, record->arrow_item + 0x40 + axis * 4,
+                   &record->velocity_bits[axis]) ||
+          !ReadU32(system, record->arrow_item + 0x4c + axis * 4,
+                   &record->position_bits[axis]) ||
+          !ReadU32(system, record->arrow_item + 0x62c + axis * 4,
+                   &record->hitbox0_previous_endpoint_bits[axis]) ||
+          !ReadU32(system, record->arrow_item + 0x620 + axis * 4,
+                   &record->hitbox0_current_endpoint_bits[axis]))
+      {
+        SetInvalid("item probe tracked Link Arrow position or hitbox endpoint is outside MEM1");
+        return false;
+      }
+    }
+    if (!ReadU32(system, record->arrow_item + 0x5d4, &record->hitbox0_state))
+    {
+      SetInvalid("item probe tracked Link Arrow hitbox state could not be read");
+      return false;
+    }
+    record->arrow_present = true;
+    return true;
+  }
+
+  void RecordItemProbe(Core::System* system, u32 pc, const ItemProbePoint& point,
+                       PowerPC::PowerPCState* state, u32 source_tick)
+  {
+    if (!item_probe_configured || !item_probe_valid || item_probe_closed || !match_active ||
+        !setup_ready || match_index != item_probe_match)
+      return;
+    u32 instruction = 0;
+    if (!ReadU32(system, pc, &instruction) || instruction != point.expected_word)
+    {
+      SetInvalid("item probe instruction differs from the verified GALE01r2 word");
+      return;
+    }
+    const bool dynamic_window = item_probe_trigger_on_arrow_creation ||
+                                item_probe_trigger_on_arrow_launch;
+    if (dynamic_window)
+    {
+      if (!item_probe_window_triggered)
+      {
+        const bool creation_trigger = item_probe_trigger_on_arrow_creation &&
+                                      point.event == ItemProbeEvent::CreationReturn &&
+                                      state->gpr[3] == ITEM_PROBE_ARROW_GOBJ;
+        const bool launch_trigger = item_probe_trigger_on_arrow_launch &&
+                                    point.event == ItemProbeEvent::CallbackEntry &&
+                                    point.pair == 10 &&
+                                    state->gpr[3] == ITEM_PROBE_ARROW_GOBJ;
+        if (!creation_trigger && !launch_trigger)
+          return;
+        if (source_tick > std::numeric_limits<u32>::max() - item_probe_capture_ticks)
+        {
+          SetInvalid("item probe trigger window tick range overflowed");
+          return;
+        }
+        item_probe_window_triggered = true;
+        item_probe_first_tick = source_tick;
+        item_probe_last_tick = source_tick + item_probe_capture_ticks - 1;
+      }
+      else
+      {
+        if (source_tick > item_probe_last_tick)
+        {
+          CloseItemProbe();
+          return;
+        }
+        if ((point.event == ItemProbeEvent::CreationReturn ||
+             (point.event == ItemProbeEvent::CallbackEntry && point.pair == 10)) &&
+            state->gpr[3] == ITEM_PROBE_ARROW_GOBJ)
+        {
+          SetInvalid("tracked Link Arrow creation or launch repeated in its probe window");
+          return;
+        }
+        if (source_tick < item_probe_first_tick)
+          return;
+      }
+    }
+    else
+    {
+      // Pair tracking must be scoped to the selected interval. Otherwise an
+      // unrelated earlier call can be validated against a later return.
+      if (source_tick > item_probe_last_tick)
+      {
+        CloseItemProbe();
+        return;
+      }
+      if (source_tick < item_probe_first_tick)
+        return;
+    }
+    if (point.event == ItemProbeEvent::CallbackEntry || point.event == ItemProbeEvent::Call)
+    {
+      const u8 pair = point.pair;
+      item_probe_pair_active[pair] = state->gpr[3] == ITEM_PROBE_ARROW_GOBJ;
+      item_probe_pair_lr[pair] = state->spr[8];
+    }
+    else if (point.event == ItemProbeEvent::CallbackReturn ||
+             point.event == ItemProbeEvent::CallReturn)
+    {
+      if (!item_probe_pair_active[point.pair])
+        return;
+      if (point.event == ItemProbeEvent::CallbackReturn &&
+          item_probe_pair_lr[point.pair] != state->spr[8])
+      {
+        SetInvalid("item probe callback return did not match its tracked entry LR");
+        return;
+      }
+      item_probe_pair_active[point.pair] = false;
+    }
+    else if (point.event == ItemProbeEvent::CpuEntry)
+    {
+      item_probe_pair_active[point.pair] =
+          fighter_present[2] && state->gpr[3] == fighter_pointers[2];
+      item_probe_pair_lr[point.pair] = state->spr[8];
+    }
+    else if (point.event == ItemProbeEvent::CpuReturn)
+    {
+      if (!item_probe_pair_active[point.pair])
+        return;
+      if (item_probe_pair_lr[point.pair] != state->spr[8])
+      {
+        SetInvalid("item probe CPU decision return did not match its tracked entry LR");
+        return;
+      }
+      item_probe_pair_active[point.pair] = false;
+    }
+    else if (point.event == ItemProbeEvent::ArrowShieldOverlapCallSite)
+    {
+      constexpr u32 ITEM_HITBOX_OFFSET = 0x5d4;
+      constexpr u32 ITEM_HITBOX_STRIDE = 0x13c;
+      const u32 arrow_hitbox_begin = ITEM_PROBE_ARROW_ITEM + ITEM_HITBOX_OFFSET;
+      bool tracked_arrow_hitbox = false;
+      for (u32 hitbox = 0; hitbox < 4; ++hitbox)
+      {
+        if (state->gpr[3] == arrow_hitbox_begin + hitbox * ITEM_HITBOX_STRIDE)
+          tracked_arrow_hitbox = true;
+      }
+      item_probe_pair_active[point.pair] = tracked_arrow_hitbox;
+      item_probe_pair_lr[point.pair] = state->spr[8];
+    }
+    else if (point.event == ItemProbeEvent::ArrowShieldOverlapCallReturn)
+    {
+      if (!item_probe_pair_active[point.pair])
+        return;
+      // This is a call-site pair: the branch-and-link writes the return PC to
+      // LR, so the value at this point is expected to differ from call entry.
+      item_probe_pair_active[point.pair] = false;
+    }
+    else if (point.event == ItemProbeEvent::ArrowItemCallEntry)
+    {
+      item_probe_pair_active[point.pair] = state->gpr[3] == ITEM_PROBE_ARROW_ITEM;
+      item_probe_pair_lr[point.pair] = state->spr[8];
+    }
+    else if (point.event == ItemProbeEvent::ArrowItemCallReturn)
+    {
+      if (!item_probe_pair_active[point.pair])
+        return;
+      if (item_probe_pair_lr[point.pair] != state->spr[8])
+      {
+        SetInvalid("item probe Arrow damage-assignment return did not match its entry LR");
+        return;
+      }
+      item_probe_pair_active[point.pair] = false;
+    }
+    else if (point.event == ItemProbeEvent::ArrowTargetCheckCallSite)
+    {
+      item_probe_pair_active[point.pair] = item_probe_pair_active[14];
+      item_probe_pair_lr[point.pair] = state->spr[8];
+    }
+    else if (point.event == ItemProbeEvent::ArrowTargetCheckCallReturn)
+    {
+      if (!item_probe_pair_active[point.pair])
+        return;
+      // The call-site's `bl` replaces LR with its return PC. At this
+      // breakpoint the callee has returned to the instruction after the call,
+      // so validate that exact PC rather than the enclosing callback's LR.
+      if (state->spr[8] != point.address)
+      {
+        SetInvalid("item probe Arrow target-check returned to an unexpected address");
+        return;
+      }
+      item_probe_pair_active[point.pair] = false;
+    }
+    bool selected = point.event == ItemProbeEvent::Boundary;
+    if (point.event == ItemProbeEvent::CreationReturn)
+      selected = state->gpr[3] == ITEM_PROBE_ARROW_GOBJ;
+    else if (point.event == ItemProbeEvent::CallbackEntry || point.event == ItemProbeEvent::Call ||
+             point.event == ItemProbeEvent::CpuEntry ||
+             point.event == ItemProbeEvent::ArrowShieldOverlapCallSite ||
+             point.event == ItemProbeEvent::ArrowItemCallEntry ||
+             point.event == ItemProbeEvent::ArrowTargetCheckCallSite)
+      selected = item_probe_pair_active[point.pair];
+    else if (point.event == ItemProbeEvent::CallbackReturn ||
+             point.event == ItemProbeEvent::CallReturn ||
+             point.event == ItemProbeEvent::CpuReturn ||
+             point.event == ItemProbeEvent::ArrowShieldOverlapCallReturn ||
+             point.event == ItemProbeEvent::ArrowItemCallReturn ||
+             point.event == ItemProbeEvent::ArrowTargetCheckCallReturn)
+      selected = true;  // The paired target invocation was checked above.
+    if (!selected)
+      return;
+    if (item_probe_record_count >= ITEM_PROBE_MAX_RECORDS)
+    {
+      SetInvalid("item probe record bound exceeded");
+      return;
+    }
+
+    ItemProbeRecord& record = item_probe_records[item_probe_record_count];
+    record.ordinal = static_cast<u32>(item_probe_record_count);
+    record.pc = pc;
+    record.expected_word = point.expected_word;
+    record.source_tick = source_tick;
+    record.match = match_index;
+    record.lr = state->spr[8];
+    record.gpr3 = state->gpr[3];
+    record.gpr4 = state->gpr[4];
+    record.gpr5 = state->gpr[5];
+    record.gpr6 = state->gpr[6];
+    if (fighter_present[0])
+    {
+      std::array<u8, 4> fighter_gobj{};
+      record.fighter_slot0_pointer = fighter_pointers[0];
+      if (!ReadMem1(system, fighter_pointers[0], fighter_gobj.size(), fighter_gobj.data()))
+      {
+        SetInvalid("item probe slot-0 Fighter pointer escaped MEM1");
+        return;
+      }
+      record.fighter_slot0_gobj = ReadBE32(fighter_gobj.data());
+    }
+    else if (point.event == ItemProbeEvent::ArrowShieldOverlapCallSite)
+    {
+      SetInvalid("Arrow shield-overlap call has no checked slot-0 Fighter identity");
+      return;
+    }
+    if (point.event == ItemProbeEvent::ArrowShieldOverlapCallSite)
+    {
+      record.shield_inputs_present = true;
+      for (size_t index = 0; index < record.shield_fpr.size(); ++index)
+        record.shield_fpr[index] = state->ps[index].PS0AsU64();
+      if (!ReadMem1(system, state->gpr[3], record.shield_capsule.size(),
+                    record.shield_capsule.data()) ||
+          !ReadMem1(system, state->gpr[4], record.shield_result.size(),
+                    record.shield_result.data()))
+      {
+        SetInvalid("Arrow shield-overlap capsule or HitResult escaped MEM1");
+        return;
+      }
+      if (state->gpr[5] != 0)
+      {
+        record.shield_transform_present = true;
+        if (!ReadBytes(system, state->gpr[5], record.shield_transform.size(),
+                       record.shield_transform.data()))
+        {
+          SetInvalid("Arrow shield-overlap transform escaped guest memory");
+          return;
+        }
+      }
+    }
+    else if (point.event == ItemProbeEvent::ArrowItemCallEntry)
+    {
+      constexpr u32 FIGHTER_SHIELD_HIT_OFFSET = 0x19c0;
+      constexpr u32 JOBJ_MATRIX_OFFSET = 0x44;
+      if (state->gpr[5] != fighter_pointers[0] || state->gpr[6] == 0 ||
+          !ReadMem1(system, state->gpr[6], record.arrow_ftcoll_position.size(),
+                    record.arrow_ftcoll_position.data()) ||
+          !ReadMem1(system, state->gpr[5] + FIGHTER_SHIELD_HIT_OFFSET,
+                    record.arrow_shield_hit.size(), record.arrow_shield_hit.data()))
+      {
+        SetInvalid("Arrow ftColl assignment inputs escaped the checked Fighter or MEM1 range");
+        return;
+      }
+      const u32 shield_bone = ReadBE32(record.arrow_shield_hit.data());
+      if (!IsMem1Range(shield_bone + JOBJ_MATRIX_OFFSET,
+                       record.arrow_shield_bone_matrix.size()) ||
+          !ReadBytes(system, shield_bone + JOBJ_MATRIX_OFFSET,
+                     record.arrow_shield_bone_matrix.size(),
+                     record.arrow_shield_bone_matrix.data()))
+      {
+        SetInvalid("Arrow ftColl shield bone matrix escaped the checked guest range");
+        return;
+      }
+      record.arrow_ftcoll_angle = state->ps[1].PS0AsU64();
+      record.arrow_ftcoll_inputs_present = true;
+    }
+    record.scheduler_priority = 0;
+    if (!ReadTrackedArrow(system, &record))
+      return;
+    ++item_probe_record_count;
+  }
+
   bool AddSlice(Core::System* system, SliceTag tag, u32 address, size_t size, u16 flags = 0)
   {
     if (slice_count >= MAX_SLICES || size > MAX_RAW - raw_size || size > UINT32_MAX)
@@ -995,6 +1747,35 @@ struct Observer::Impl
     return true;
   }
 
+  bool AddPlayerEntitySlices(Core::System* system, u32 slot)
+  {
+    // StaticPlayer is the pinned GALE01r2 source table at 0x80453080 with
+    // 0xe90-byte records. Its two HSD_GObj* player_entity fields begin at
+    // +0xb0 (melee/pl/player.h). HSD_GObj::user_data is at +0x2c
+    // (sysdolphin/baselib/gobj.h). Record both the entity pair and the
+    // primary GObj's Fighter link; do not infer entity coverage from heads.
+    const u32 entities = 0x80453080 + slot * 0xe90 + 0xb0;
+    std::array<u8, 8> entity_bytes{};
+    if (!ReadBytes(system, entities, entity_bytes.size(), entity_bytes.data()))
+      return SetInvalid("StaticPlayer entity pair escaped its pinned source range"), false;
+    const u32 primary = ReadBE32(entity_bytes.data());
+    const u32 secondary = ReadBE32(entity_bytes.data() + 4);
+    if (!primary || secondary)
+      return SetInvalid("whole-session roster requires one primary entity and no secondary entity"),
+             false;
+    if (!IsMem1Range(primary, 0x30))
+      return SetInvalid("primary player GObj is outside source MEM1"), false;
+    u32 user_data = 0;
+    if (!ReadU32(system, primary + 0x2c, &user_data) || user_data != fighter_pointers[slot])
+      return SetInvalid("primary player GObj user_data does not name its observed Fighter"), false;
+    if (!AddSlice(system, SliceTag::PlayerEntities, entities, entity_bytes.size(),
+                  static_cast<u16>(slot)) ||
+        !AddSlice(system, SliceTag::PlayerEntityUserData, primary + 0x2c, 4,
+                  static_cast<u16>(slot)))
+      return SetInvalid("player entity relationship escaped the pinned source ranges"), false;
+    return true;
+  }
+
   bool AddMatchSlices(Core::System* system)
   {
     if (!AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e) ||
@@ -1010,6 +1791,8 @@ struct Observer::Impl
     {
       if (!fighter_present[slot])
         continue;
+      if (!AddPlayerEntitySlices(system, slot))
+        return false;
       for (u32 entity_index = 0; entity_index < fighter_entity_count[slot]; ++entity_index)
       {
         if (!AddFighterSlices(system, slot, entity_index,
@@ -1462,6 +2245,20 @@ struct Observer::Impl
   {
     if (!Start() || invalid.load() || finish_requested.load())
       return;
+    if (const ItemProbePoint* item_probe = FindItemProbePoint(pc))
+    {
+      u32 source_tick = 0;
+      if (!ReadU32(system, 0x80479d58, &source_tick))
+      {
+        SetInvalid("item probe source counter is outside the pinned RAM range");
+        return;
+      }
+      RecordItemProbe(system, pc, *item_probe, state, source_tick);
+      // Tick/draw returns are ordinary capture boundaries too.  Every other
+      // item diagnostic PC exists only to feed the compact companion trace.
+      if (pc != 0x80390eb4 && pc != 0x80391040)
+        return;
+    }
     if (whole_session_enabled() && pc == CSS_ENTER_RETURN)
     {
       u32 word = 0;
@@ -2017,23 +2814,58 @@ struct Observer::Impl
     finish_requested.store(true);
   }
 
+  static u64 SteadyNowNs()
+  {
+    return static_cast<u64>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count());
+  }
+
+  static void UpdateMaximum(std::atomic<u64>& maximum, u64 value)
+  {
+    u64 current = maximum.load(std::memory_order_relaxed);
+    while (current < value &&
+           !maximum.compare_exchange_weak(current, value, std::memory_order_relaxed))
+    {
+    }
+  }
+
   Slot* Reserve(Event event, u32 pc, u32 source_tick, u32 draw_count)
   {
     if (invalid.load() || finish_requested.load())
       return nullptr;
     const u64 head = head_index.load(std::memory_order_relaxed);
+    const u64 tail = tail_index.load(std::memory_order_acquire);
+    const u64 occupancy = head - tail;
+    const u64 timestamp_ns = SteadyNowNs();
+    UpdateMaximum(max_ring_occupancy, occupancy);
     Slot& slot = ring[head % RING_SIZE];
     if (slot.ready.load(std::memory_order_acquire))
     {
-      SetInvalid("observer ring overflow; no record was dropped");
+      const u64 last_dequeue_ns = writer_last_dequeue_ns.load(std::memory_order_acquire);
+      const u64 writer_gap_ns = last_dequeue_ns != 0 && timestamp_ns > last_dequeue_ns
+                                    ? timestamp_ns - last_dequeue_ns
+                                    : 0;
+      const u64 max_writer_gap_ns = max_writer_dequeue_gap_ns.load(std::memory_order_relaxed);
+      const u64 max_frame_write_ns = max_write_frame_ns.load(std::memory_order_relaxed);
+      SetInvalid("observer ring overflow; no record was dropped; ring_size=" +
+                 std::to_string(RING_SIZE) + "; event=" +
+                 std::to_string(static_cast<u16>(event)) + "; pc_dec=" +
+                 std::to_string(pc) + "; source_tick=" + std::to_string(source_tick) +
+                 "; attempted_timestamp_ns=" + std::to_string(timestamp_ns) +
+                 "; head=" + std::to_string(head) + "; tail=" + std::to_string(tail) +
+                 "; occupancy=" + std::to_string(occupancy) +
+                 "; max_occupancy=" + std::to_string(max_ring_occupancy.load(
+                     std::memory_order_relaxed)) +
+                 "; writer_gap_at_overflow_ns=" + std::to_string(writer_gap_ns) +
+                 "; max_writer_dequeue_gap_ns=" + std::to_string(max_writer_gap_ns) +
+                 "; max_frame_write_ns=" + std::to_string(max_frame_write_ns));
       return nullptr;
     }
     slot.event = event;
     slot.sequence = next_sequence++;
-    slot.timestamp_ns = static_cast<u64>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(
-            std::chrono::steady_clock::now().time_since_epoch())
-            .count());
+    slot.timestamp_ns = timestamp_ns;
     slot.guest_pc = pc;
     slot.source_tick = source_tick;
     slot.draw_ordinal = draw_count;
@@ -2254,8 +3086,235 @@ struct Observer::Impl
     return true;
   }
 
+  bool BuildItemProbeJson(std::string* json) const
+  {
+    if (!item_probe_records || !item_probe_published.load(std::memory_order_acquire) ||
+        item_probe_record_count == 0 || item_probe_record_count > ITEM_PROBE_MAX_RECORDS)
+      return false;
+    json->clear();
+    json->reserve(std::min(ITEM_PROBE_MAX_JSON_BYTES, size_t(1024)));
+    const auto append = [&](std::string_view value) { return AppendBounded(json, value); };
+    const auto append_number = [&](u64 value) { return append(std::to_string(value)); };
+    const auto append_hex32 = [&](u32 value) { return AppendHex(json, value, 8); };
+    const auto append_hex64 = [&](u64 value) { return AppendHex(json, value, 16); };
+    const auto append_hex_value = [&](u32 value) {
+      return append("\"0x") && append_hex32(value) && append("\"");
+    };
+    if (!append("{\"schema\":\"melee-web-cpu-item-boundary-probe\",\"version\":5,"
+                "\"diagnostic_only\":true,\"window_complete\":true,"
+                "\"source_revision\":\"GALE01r2\",\"dol_sha256\":\""))
+      return false;
+    if (!append(EXPECTED_DOL_SHA256) || !append("\",\"capture_id\":\"") ||
+        !append(JsonEscape(capture_id)) || !append("\",\"sequence_id\":\"") ||
+        !append(JsonEscape(sequence_id)) || !append("\",\"match\":"))
+      return false;
+    if (!append_number(item_probe_match) || !append(",\"first_tick\":") ||
+        !append_number(item_probe_first_tick) || !append(",\"last_tick\":") ||
+        !append_number(item_probe_last_tick) || !append(",\"trigger\":\"") ||
+        !append(item_probe_trigger_on_arrow_creation ? "young_link_arrow_creation" :
+                    (item_probe_trigger_on_arrow_launch ? "young_link_arrow_launch" :
+                                                         "fixed_tick_window")) ||
+        !append("\",\"capture_ticks\":") ||
+        !append_number((item_probe_trigger_on_arrow_creation ||
+                        item_probe_trigger_on_arrow_launch) ? item_probe_capture_ticks :
+                                                              item_probe_last_tick -
+                                                                  item_probe_first_tick + 1) ||
+        !append(",\"target\":{\"gobj\":\"0x") ||
+        !append_hex32(ITEM_PROBE_ARROW_GOBJ) || !append("\",\"item\":\"0x") ||
+        !append_hex32(ITEM_PROBE_ARROW_ITEM) || !append("\",\"kind\":") ||
+        !append_number(ITEM_PROBE_ARROW_KIND) || !append(",\"owner_slot\":3},\"record_count\":") ||
+        !append_number(item_probe_record_count) || !append(",\"records\":["))
+      return false;
+    for (size_t record_index = 0; record_index < item_probe_record_count; ++record_index)
+    {
+      const ItemProbeRecord& record = item_probe_records[record_index];
+      const ItemProbePoint* point = FindItemProbePoint(record.pc);
+      if (!point || !record.arrow_present || record.arrow_gobj != ITEM_PROBE_ARROW_GOBJ ||
+          record.arrow_item != ITEM_PROBE_ARROW_ITEM || record.arrow_kind != ITEM_PROBE_ARROW_KIND ||
+          record.arrow_list_order >= 64 ||
+          (!item_probe_trigger_on_arrow_creation && !item_probe_trigger_on_arrow_launch &&
+           record.arrow_list_order != 1))
+        return false;
+      if (record_index != 0 && !append(","))
+        return false;
+      if (!append("{\"ordinal\":") || !append_number(record.ordinal) ||
+          !append(",\"pc\":\"0x") || !append_hex32(record.pc) ||
+          !append("\",\"label\":\"") || !append(point->label) ||
+          !append("\",\"expected_word\":\"0x") || !append_hex32(record.expected_word) ||
+          !append("\",\"source_tick\":") || !append_number(record.source_tick) ||
+          !append(",\"match\":") || !append_number(record.match) ||
+          !append(",\"lr\":\"0x") || !append_hex32(record.lr) ||
+          !append("\",\"gpr3\":\"0x") || !append_hex32(record.gpr3) ||
+          !append("\",\"gpr4\":\"0x") || !append_hex32(record.gpr4) ||
+          !append("\",\"gpr5\":\"0x") || !append_hex32(record.gpr5) ||
+          !append("\",\"gpr6\":\"0x") || !append_hex32(record.gpr6) ||
+          !append("\",\"scheduler_priority\":") ||
+          !append_number(record.scheduler_priority) || !append(",\"arrow_p_link\":") ||
+          !append_number(record.arrow_p_link) || !append(",\"arrow_process_priorities\":["))
+        return false;
+      for (u32 process_index = 0; process_index < record.arrow_process_count; ++process_index)
+      {
+        if ((process_index != 0 && !append(",")) ||
+            !append_number(record.arrow_process_priorities[process_index]))
+          return false;
+      }
+      if (!append("],\"fighter_slot0_pointer\":\"0x") ||
+          !append_hex32(record.fighter_slot0_pointer) ||
+          !append("\",\"fighter_slot0_gobj\":\"0x") ||
+          !append_hex32(record.fighter_slot0_gobj) ||
+          !append("\",\"fighter_slot2_pointer\":\"0x") ||
+          !append_hex32(record.fighter_slot2_pointer) ||
+          !append("\",\"fighter_slot2_gobj\":\"0x") ||
+          !append_hex32(record.fighter_slot2_gobj) ||
+          !append("\",\"decision_item\":\"0x") ||
+          !append_hex32(record.decision_item) ||
+          !append("\",\"decision_item_status\":\"0x") ||
+          !append_hex32(record.decision_item_status) ||
+          !append("\",\"arrow_present\":true,\"arrow_gobj\":\"0x") ||
+          !append_hex32(record.arrow_gobj) || !append("\",\"arrow_item\":\"0x") ||
+          !append_hex32(record.arrow_item) || !append("\",\"arrow_owner_gobj\":\"0x") ||
+          !append_hex32(record.arrow_owner_gobj) || !append("\",\"arrow_kind\":") ||
+          !append_number(record.arrow_kind) || !append(",\"arrow_list_order\":") ||
+          !append_number(record.arrow_list_order) || !append(",\"arrow_anim_id\":\"0x") ||
+          !append_hex32(record.arrow_anim_id) || !append("\",\"velocity_bits\":["))
+        return false;
+      for (size_t axis = 0; axis < record.velocity_bits.size(); ++axis)
+      {
+        if ((axis != 0 && !append(",")) || !append_hex_value(record.velocity_bits[axis]))
+          return false;
+      }
+      if (!append("],\"position_bits\":["))
+        return false;
+      for (size_t axis = 0; axis < record.position_bits.size(); ++axis)
+      {
+        if ((axis != 0 && !append(",")) || !append_hex_value(record.position_bits[axis]))
+          return false;
+      }
+      if (!append("],\"hitbox0_state\":") || !append_number(record.hitbox0_state) ||
+          !append(",\"hitbox0_previous_endpoint_bits\":["))
+        return false;
+      for (size_t axis = 0; axis < record.hitbox0_previous_endpoint_bits.size(); ++axis)
+      {
+        if ((axis != 0 && !append(",")) ||
+            !append_hex_value(record.hitbox0_previous_endpoint_bits[axis]))
+          return false;
+      }
+      if (!append("],\"hitbox0_current_endpoint_bits\":["))
+        return false;
+      for (size_t axis = 0; axis < record.hitbox0_current_endpoint_bits.size(); ++axis)
+      {
+        if ((axis != 0 && !append(",")) ||
+            !append_hex_value(record.hitbox0_current_endpoint_bits[axis]))
+          return false;
+      }
+      if (!append("],\"arrow_damage_dealt\":\"0x") ||
+          !append_hex32(record.arrow_damage_dealt) ||
+          !append("\",\"arrow_pending_shield_damage\":\"0x") ||
+          !append_hex32(record.arrow_pending_shield_damage) ||
+          !append("\",\"arrow_shield_target_gobj\":\"0x") ||
+          !append_hex32(record.arrow_shield_target_gobj) ||
+          !append("\",\"arrow_damage_flags\":") ||
+          !append_number(record.arrow_damage_flags) ||
+          !append(",\"arrow_dispatch_state\":{\"ground_or_air\":") ||
+          !append_number(record.arrow_ground_or_air) ||
+          !append(",\"xDCE_raw\":") ||
+          !append_number(record.arrow_damage_flags) ||
+          !append(",\"xC54_angle_bits\":\"0x") ||
+          !append_hex32(record.arrow_shield_angle_bits) ||
+          !append("\",\"unk_degrees_bits\":\"0x") ||
+          !append_hex32(record.arrow_common_shield_degrees_bits) ||
+          !append("\",\"xDCE_b4\":") ||
+          !append((record.arrow_damage_flags & 0x08) ? "true" : "false") ||
+          !append(",\"xDCE_b5\":") ||
+          !append((record.arrow_damage_flags & 0x04) ? "true" : "false") ||
+          !append(",\"shield_bounced_present\":") ||
+          !append(record.arrow_shield_bounced_present ? "true" : "false") ||
+          !append(",\"hit_shield_present\":") ||
+          !append(record.arrow_hit_shield_present ? "true}" : "false}"))
+        return false;
+      if (!append(",\"shield_overlap_inputs\":"))
+        return false;
+      if (!record.shield_inputs_present)
+      {
+        if (!append("null"))
+          return false;
+      }
+      else
+      {
+        if (!append("{\"fpr1\":\"0x") || !append_hex64(record.shield_fpr[0]) ||
+            !append("\",\"fpr2\":\"0x") || !append_hex64(record.shield_fpr[1]) ||
+            !append("\",\"fpr3\":\"0x") || !append_hex64(record.shield_fpr[2]) ||
+            !append("\",\"capsule_bytes\":\"0x") ||
+            !AppendHexBytes(json, record.shield_capsule.data(), record.shield_capsule.size()) ||
+            !append("\",\"hit_result_bytes\":\"0x") ||
+            !AppendHexBytes(json, record.shield_result.data(), record.shield_result.size()) ||
+            !append("\",\"transform_bytes\":"))
+          return false;
+        if (record.shield_transform_present)
+        {
+          if (!append("\"0x") ||
+              !AppendHexBytes(json, record.shield_transform.data(), record.shield_transform.size()) ||
+              !append("\"}"))
+            return false;
+        }
+        else if (!append("null}"))
+          return false;
+      }
+      if (!append(",\"arrow_ftcoll_inputs\":"))
+        return false;
+      if (!record.arrow_ftcoll_inputs_present)
+      {
+        if (!append("null"))
+          return false;
+      }
+      else if (!append("{\"angle_fpr1\":\"0x") ||
+               !append_hex64(record.arrow_ftcoll_angle) ||
+               !append("\",\"collision_position_bytes\":\"0x") ||
+               !AppendHexBytes(json, record.arrow_ftcoll_position.data(),
+                               record.arrow_ftcoll_position.size()) ||
+               !append("\",\"shield_hit_bytes\":\"0x") ||
+               !AppendHexBytes(json, record.arrow_shield_hit.data(),
+                               record.arrow_shield_hit.size()) ||
+               !append("\",\"shield_bone_matrix_bytes\":\"0x") ||
+               !AppendHexBytes(json, record.arrow_shield_bone_matrix.data(),
+                               record.arrow_shield_bone_matrix.size()) ||
+               !append("\"}"))
+        return false;
+      if (!append("}"))
+        return false;
+    }
+    if (!append("]}\n") || json->size() > ITEM_PROBE_MAX_JSON_BYTES)
+      return false;
+    return true;
+  }
+
+  bool WriteItemProbe()
+  {
+    if (!item_probe_published.load(std::memory_order_acquire))
+    {
+      SetInvalid("item probe window did not close before capture completion");
+      return false;
+    }
+    std::string json;
+    if (!BuildItemProbeJson(&json))
+    {
+      SetInvalid("item probe JSON exceeded its bound or contained an invalid Arrow identity");
+      return false;
+    }
+    File::DirectIOFile output(item_probe_output_path, File::AccessMode::Write,
+                              File::OpenMode::Create);
+    if (!output.IsOpen() || !output.Write(reinterpret_cast<const u8*>(json.data()), json.size()) ||
+        !output.Flush() || !output.Close())
+    {
+      SetInvalid("item probe companion file could not be written");
+      return false;
+    }
+    return true;
+  }
+
   void WriterMain()
   {
+    writer_last_dequeue_ns.store(SteadyNowNs(), std::memory_order_release);
     File::DirectIOFile output(output_path, File::AccessMode::Write, File::OpenMode::Create);
     if (!output.IsOpen())
       SetInvalid("observer stream could not be opened");
@@ -2272,13 +3331,22 @@ struct Observer::Impl
         Slot& slot = ring[tail % RING_SIZE];
         if (!slot.ready.load(std::memory_order_acquire))
           break;
-        if (output.IsOpen())
+        const u64 dequeue_ns = SteadyNowNs();
+        const u64 previous_dequeue_ns =
+            writer_last_dequeue_ns.exchange(dequeue_ns, std::memory_order_acq_rel);
+        if (previous_dequeue_ns != 0 && dequeue_ns > previous_dequeue_ns)
+          UpdateMaximum(max_writer_dequeue_gap_ns, dequeue_ns - previous_dequeue_ns);
+        if (output.IsOpen() && ShouldWriteObserverEvent(slot.event, item_probe_summary_stream))
         {
+          const u64 write_start_ns = SteadyNowNs();
           if (!WriteFrame(output, slot))
           {
             SetInvalid("observer stream write failed");
             output.Close();
           }
+          const u64 write_end_ns = SteadyNowNs();
+          if (write_end_ns > write_start_ns)
+            UpdateMaximum(max_write_frame_ns, write_end_ns - write_start_ns);
         }
         last_seq = slot.sequence;
         last_tick = slot.source_tick;
@@ -2323,6 +3391,12 @@ struct Observer::Impl
         WriteCpuProbe();
         cpu_probe_written = true;
       }
+      if (item_probe_configured && item_probe_valid && !item_probe_written &&
+          item_probe_published.load(std::memory_order_acquire))
+      {
+        WriteItemProbe();
+        item_probe_written = true;
+      }
       const bool finished = finish_requested.load() && tail >= head_index.load();
       if (finished)
       {
@@ -2336,6 +3410,11 @@ struct Observer::Impl
         {
           WriteCpuProbe();
           cpu_probe_written = true;
+        }
+        if (item_probe_configured && item_probe_valid && !item_probe_written)
+        {
+          WriteItemProbe();
+          item_probe_written = true;
         }
         if (output.IsOpen())
         {
@@ -2441,6 +3520,10 @@ struct Observer::Impl
   std::array<Slot, RING_SIZE> ring{};
   std::atomic<u64> head_index{0};
   std::atomic<u64> tail_index{0};
+  std::atomic<u64> max_ring_occupancy{0};
+  std::atomic<u64> writer_last_dequeue_ns{0};
+  std::atomic<u64> max_writer_dequeue_gap_ns{0};
+  std::atomic<u64> max_write_frame_ns{0};
   u64 next_sequence = 0;
   std::thread writer;
   std::string output_path;
@@ -2482,6 +3565,25 @@ struct Observer::Impl
   size_t cpu_probe_record_count = 0;
   std::unique_ptr<CpuProbeRecord[]> cpu_probe_records;
   std::string cpu_probe_error;
+  bool item_probe_configured = false;
+  bool item_probe_valid = false;
+  bool item_probe_summary_stream = false;
+  bool item_probe_closed = false;
+  bool item_probe_written = false;
+  std::atomic<bool> item_probe_published{false};
+  std::string item_probe_output_path;
+  u32 item_probe_match = 0;
+  u32 item_probe_first_tick = 0;
+  u32 item_probe_last_tick = 0;
+  bool item_probe_trigger_on_arrow_creation = false;
+  bool item_probe_trigger_on_arrow_launch = false;
+  bool item_probe_window_triggered = false;
+  u32 item_probe_capture_ticks = 0;
+  size_t item_probe_record_count = 0;
+  std::unique_ptr<ItemProbeRecord[]> item_probe_records;
+  std::string item_probe_error;
+  std::array<bool, 16> item_probe_pair_active{};
+  std::array<u32, 16> item_probe_pair_lr{};
   u32 whole_session_matches = 0;
   u32 audio_owner_epoch = 0;
   u32 match_index = 0;
@@ -2607,7 +3709,8 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // Diagnostic CPU PCs are JIT boundaries only for the fully validated,
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
-    return CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr;
+    return (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr) ||
+           (ItemProbeEnabled() && FindItemProbePoint(guest_pc) != nullptr);
   }
 }
 

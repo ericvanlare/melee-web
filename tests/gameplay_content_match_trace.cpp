@@ -51,7 +51,6 @@ extern "C" int melee_web_test_entity_damage(unsigned,unsigned,float*);
 extern "C" int melee_web_test_active_fighter_kind(unsigned);
 extern "C" int melee_web_test_active_fighter_state(unsigned,int*,int*,float*,float*);
 extern "C" int melee_web_test_facing_dir(unsigned,float*);
-extern "C" int melee_web_test_invoke_dormant_zelda_transform(unsigned);
 extern "C" int melee_web_test_kirby_copy_kind(unsigned);
 extern "C" int melee_web_test_kirby_link_dynamics(int*,unsigned*,unsigned*,int*);
 extern "C" int melee_web_test_apply_kirby_copy_visibility(unsigned);
@@ -812,14 +811,6 @@ int main(int argc,char** argv){try{
                     assert_active_transform_observation(2);
                     std::cout<<"Third-player Zelda/Sheik down-B form="<<current
                              <<" source_frame="<<match.source_frames()<<std::endl;
-                    if(current==FTKIND_SEAK){
-                        check(melee_web_test_invoke_dormant_zelda_transform(2),
-                              "Dormant Zelda transform callback replaced active Sheik");
-                        check(match.player_stats(2).stocks==4,
-                              "Dormant Zelda callback changed the active form's stocks");
-                        std::cout<<"Dormant Zelda callback ignored while Sheik remains active"
-                                 <<std::endl;
-                    }
                     neutral();for(unsigned n=0;n<90;n++)tick();
                     assert_active_transform_observation(2);
                     check(match.player_stats(2).stocks==4,

@@ -86,6 +86,9 @@ class GameplayKirbyCopyAssetsTests(unittest.TestCase):
     def test_borrowed_rows_require_empty_original_signed_loops(self):
         self.run_case("borrowed_signed_visibility_tail")
 
+    def test_ft_parts_desc_owner_requires_checked_structure(self):
+        self.run_case("ft_parts_desc_owner_is_structural")
+
     def test_native_pobj_scalars_follow_checked_source_graph(self):
         self.run_case("native_pobj_fields")
 
