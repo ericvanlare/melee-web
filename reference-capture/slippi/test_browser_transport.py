@@ -141,6 +141,31 @@ class BrowserTransportWireTests(unittest.IsolatedAsyncioTestCase):
         await self.server._server.wait_closed()
         self.temp.cleanup()
 
+    async def test_failed_upgrade_releases_session_reservation(self):
+        class FailedWriter:
+            def write(self, data):
+                pass
+
+            async def drain(self):
+                # Reservation must precede any write that can yield.
+                self_test.assertIsNotNone(self_test.server._active_session)
+                raise ConnectionResetError("peer closed during upgrade")
+
+        self_test = self
+        headers = {"origin": self.server.origin, "upgrade": "websocket",
+                   "connection": "Upgrade", "sec-websocket-version": "13",
+                   "sec-websocket-key": base64.b64encode(b"0123456789abcdef").decode()}
+        with self.assertRaises(ConnectionResetError):
+            await self.server._upgrade(asyncio.StreamReader(), FailedWriter(), headers)
+        self.assertIsNone(self.server._active_session)
+        self.assertIsNone(self.server._active_writer)
+        reader, writer, _, response = await self._connect(self.server.origin)
+        self.assertIn(b"101 Switching Protocols", response)
+        _, payload = await asyncio.wait_for(_read_server_frame(reader), 2)
+        self.assertEqual(json.loads(payload)["event"], "session_ready")
+        writer.close()
+        await writer.wait_closed()
+
     async def test_websocket_parser_requires_masked_final_frames(self):
         reader = asyncio.StreamReader()
         reader.feed_data(b"\x81\x01x")

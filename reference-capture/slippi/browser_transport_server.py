@@ -221,23 +221,28 @@ class BrowserTransportServer:
             await self._http_reply(writer, 409, b"one browser session is allowed")
             return
 
-        accept = base64.b64encode(hashlib.sha1((key + WEBSOCKET_GUID).encode("ascii")).digest())
-        writer.write(
-            b"HTTP/1.1 101 Switching Protocols\r\n"
-            b"Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: "
-            + accept + b"\r\n\r\n"
-        )
-        await writer.drain()
+        # Reserve the single session before the first yielding write. Cleanup
+        # also covers a peer disappearing during the upgrade or ready message.
         session_id = secrets.token_hex(16)
         self._active_session = session_id
         self._active_writer = writer
-        self._append_input(session_id, "OPEN")
-        self._event({"event": "browser_transport_connected", "session_id": session_id})
-        await self._send_json(writer, {"event": "session_ready", "sessionId": session_id,
-                                       "maxBatchFrames": MAX_BATCH_FRAMES,
-                                       "playerPort": 1})
-        pump = asyncio.create_task(self._pump_relay_events(reader, writer, session_id))
+        pump = None
+        opened = False
         try:
+            accept = base64.b64encode(hashlib.sha1((key + WEBSOCKET_GUID).encode("ascii")).digest())
+            writer.write(
+                b"HTTP/1.1 101 Switching Protocols\r\n"
+                b"Upgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: "
+                + accept + b"\r\n\r\n"
+            )
+            await writer.drain()
+            self._append_input(session_id, "OPEN")
+            opened = True
+            self._event({"event": "browser_transport_connected", "session_id": session_id})
+            await self._send_json(writer, {"event": "session_ready", "sessionId": session_id,
+                                           "maxBatchFrames": MAX_BATCH_FRAMES,
+                                           "playerPort": 1})
+            pump = asyncio.create_task(self._pump_relay_events(reader, writer, session_id))
             last_frame = 0
             frame_total = 0
             while True:
@@ -277,14 +282,17 @@ class BrowserTransportServer:
                 for frame, pad_hex in frames:
                     self._append_input(session_id, "PAD", frame, pad_hex)
         finally:
-            pump.cancel()
-            try:
-                await pump
-            except asyncio.CancelledError:
-                pass
+            if pump is not None:
+                pump.cancel()
+                try:
+                    await pump
+                except (asyncio.CancelledError, OSError):
+                    # A disconnected event writer must still release the session.
+                    pass
             if session_id == self._active_session:
                 try:
-                    self._append_input(session_id, "CLOSE")
+                    if opened:
+                        self._append_input(session_id, "CLOSE")
                 except (OSError, ValueError):
                     pass
                 self._event({"event": "browser_transport_disconnected",

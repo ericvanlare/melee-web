@@ -150,6 +150,11 @@
       "ctest": "3/3 passed",
       "scenario_tests": "16 passed"
     },
+    "handshake_followup": {
+      "change": "Reserve the one-client session before yielding and release it after handshake/send failure.",
+      "scope": "After the recorded r4 E2E; does not relabel that run as covering this later change.",
+      "validation": "8 browser service tests passed, including failed upgrade followed by successful real HTTP/WebSocket reconnect; all 34 Slippi Python checks passed."
+    },
     "hashes": {
       "browser-pad-inputs.log": "dbcf98aff88c1301577c4f731ffc06e0e81561effd33d2100d995c8b212023fb",
       "browser-relay-events.jsonl": "ddd881e7e46f9008741d23b90c7cb09ac30df0a0f156a915bfd57fce33f5d0f3",
