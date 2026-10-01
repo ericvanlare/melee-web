@@ -302,7 +302,6 @@ std::vector<std::string>
 opening_match_asset_names(const MeleeWebOpeningPreview& preview)
 {
     std::vector<std::string> result = menu_asset_names();
-    std::vector<unsigned> fighter_kinds;
     std::vector<std::string> unsupported;
     if (preview.match_kind > 3)
         reject("Opening mode selected an unknown source match kind");
@@ -331,10 +330,6 @@ opening_match_asset_names(const MeleeWebOpeningPreview& preview)
                 " is absent from the generated registry");
             continue;
         }
-        if (std::find(fighter_kinds.begin(), fighter_kinds.end(),
-                      static_cast<unsigned>(fighter->fighter_kind)) ==
-            fighter_kinds.end())
-            fighter_kinds.push_back(static_cast<unsigned>(fighter->fighter_kind));
     }
     const auto* stage = melee_web_stage_content(
         static_cast<int>(preview.stage_kind));
@@ -350,28 +345,23 @@ opening_match_asset_names(const MeleeWebOpeningPreview& preview)
         }
         reject(message);
     }
-    for (const auto fighter_kind : fighter_kinds) {
-        const auto* fighter = melee_web_fighter_content_by_kind(fighter_kind);
-        const auto* neutral = source_costume(fighter_kind, 0);
-        if (!fighter || !neutral)
-            reject("Opening demo source fighter identity is incomplete");
-        add_unique(result, neutral->fighter_filename);
-        add_unique(result, neutral->animation_filename);
-        add_unique(result, runtime_name(neutral->model_filename));
-        add_unique(result, fighter->effect_archive);
-        add_unique(result, fighter->audio_bank);
-        for (unsigned i = 0; i < 4; ++i) {
-            const auto* selected = melee_web_fighter_content(
-                static_cast<int>(preview.characters[i]));
-            if (selected->fighter_kind != static_cast<int>(fighter_kind))
-                continue;
-            const auto* costume = source_costume(
-                fighter_kind, preview.costumes[i]);
-            if (!costume)
-                reject("Opening demo costume has no authored source model");
-            add_unique(result, runtime_name(costume->model_filename));
-        }
+    // This is an asset-only view of the original four-player preview, not
+    // a synthesized game-start payload. Reuse the match identity expansion so
+    // Nana, transform partners and Kirby donor resources have the same owner.
+    MeleeWebMenuMatchSelection asset_selection{};
+    for (auto& player : asset_selection.start.players)
+        player.slot_type = Gm_PKind_NA;
+    for (unsigned i = 0; i < 4; ++i) {
+        auto& player = asset_selection.start.players[i];
+        player.slot_type = Gm_PKind_Cpu;
+        player.ckind = static_cast<CharacterKind>(preview.characters[i]);
+        player.color = preview.costumes[i];
     }
+    add_selection_fighter_assets(result, asset_selection);
+    for (const auto& archive : kirby_copy_archive_requirements(asset_selection))
+        add_unique(result, archive.filename);
+    for (const auto& effect : kirby_copy_effect_requirements(asset_selection))
+        add_unique(result, effect.filename);
     add_unique(result, "PlCo.dat");
     add_unique(result, "ItCo.usd");
     add_unique(result, "EfCoData.dat");

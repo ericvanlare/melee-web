@@ -181,14 +181,37 @@ void opening_match_asset_contract()
     preview.characters[1] = CKIND_KIRBY;
     preview.characters[2] = CKIND_POPONANA;
     preview.characters[3] = CKIND_SAMUS;
-    preview.stage_kind = St_Kind_Kongo;
+    preview.stage_kind = St_Kind_Last;
     preview.match_kind = 0;
+    const auto names = opening_match_asset_names(preview);
+    for (const auto name : {"PlGw.dat", "PlKb.dat", "PlPp.dat", "PlNn.dat",
+                            "PlSs.dat", "PlKbCpGw.dat", "PlKbNrCpGw.dat", "EfKbIc.dat"})
+        check(has(names, name), "Opening omitted a primary, follower or Kirby-copy resource");
+    no_duplicates(names);
+    preview.characters[3] = CKIND_ZELDA;
+    const auto forms = opening_match_asset_names(preview);
+    check(has(forms, "PlZd.dat") && has(forms, "PlSk.dat"),
+          "Opening omitted a source transform partner");
+
+    preview.stage_kind = St_Kind_Kongo;
     try {
-        (void) opening_match_asset_names(preview);
-    } catch (const std::exception& error) {
+        (void)opening_match_asset_names(preview);
+        throw std::runtime_error("Unadmitted Opening stage unexpectedly passed its asset scope");
+    } catch (const DatError& error) {
         const std::string message = error.what();
-        for (const int character : {CKIND_GAMEWATCH, CKIND_KIRBY,
-                                    CKIND_POPONANA, CKIND_SAMUS})
+        check(message.find("stage " + std::to_string(St_Kind_Kongo) +
+                           " is not admitted") != std::string::npos,
+              "Opening scope error omitted the source-selected stage");
+        check(message.find("fighter ") == std::string::npos,
+              "Opening incorrectly rejected an integrated fighter");
+    }
+    const int unsupported[] = {CKIND_MASTERH, CKIND_BOY, CKIND_GIRL, CKIND_CREZYH};
+    for (unsigned i = 0; i < 4; ++i) preview.characters[i] = unsupported[i];
+    try {
+        (void)opening_match_asset_names(preview);
+    } catch (const DatError& error) {
+        const std::string message = error.what();
+        for (const int character : unsupported)
             check(message.find("fighter " + std::to_string(character) +
                                " is not admitted") != std::string::npos,
                   "Opening scope error omitted a source-selected fighter");
