@@ -1,125 +1,63 @@
 # Current status
 
-## Remaining fighter candidate — PR #86
+## Remaining fighter integration — PR #86
 
 Current per-character coverage, original CPU9 references, rendered browser
 match loops, comparison limits, and explicit open gates are recorded in
 [Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md).
 
-Latest reconciled checkpoint (2026-09-29): PR #93 is merged and the worktree is
-based on `origin/main` `f670a3b` at merge `9c84690`. The final owned-DOL,
-disc and symbol full suite passed **1,642 tests, 73 skipped** (exit 0); its
-complete log is
-`/Volumes/AgentStorage/melee-web/runs/pr86-camera-list-trace-natural-b-20260929-20260929-114337-230bdcb1/final-suite/full-suite-final.log`.
-Both four-CPU9 character lineups completed two rendered matches each through
-Results→original CSS→the next match. The 25-row Kirby copy-lifecycle matrix and
-the targeted Ice Climbers, Yoshi, Zelda/Sheik, damage/KO and lifecycle checks
-also pass; these do not certify complete movesets or performance.
+Final integration checkpoint (2026-10-01): runtime implementation is `5a9830b`, based on
+`origin/main` `3179aaa`. The copy-dynamics/parameter-endian repair at `3f8657f`,
+Opening follower and copy-asset closure at `4b1975b`, public-export and Opening
+reconciliation at `b03a653`, and the ftdemo `temp1.x5=-1` repair at `5a9830b`
+are covered by scoped receipts. The deterministic poisoned-stack regression
+fails with baseline `x5=-86` and passes with the original no-slot sentinel.
 
-A fresh no-retry instrumented Lineup B capture used Samus, Yoshi, Zelda, Falco;
-all CPU9, four stocks, Final Destination. The exact trusted P1 Enter edges were
-source ticks 192/202, 363/373 and 560/570; disconnected CPU pages advanced at
-555. Samus won at match frame 15,029 and slot 2 was Zelda (not Sheik) at
-Results. The 19-event source camera trace retained four free-pop/active-append
-and four active-remove/free-push transitions, no overflow, pool-contained
-subjects/links, empty active/tail roots before `HSD_Free`, and null restored
-camera globals after teardown. Results returned to CSS without another input;
-18 screenshots, GPU diagnostics and zero timing interruptions are retained.
-An earlier capture at the same boundary sent an unintended retry at tick 572,
-so it is not counted as the exact three-pulse control. A separate current-tree
-natural Sheik-winner keyboard control passed the same gate but predates typed
-subject-list events. None explains the first invalid transition in the
-historical Sheik-winner failure, so that gate remains open.
+The fixed original-A run completed cleanly: the strict comparison is equivalent
+over 42,492/42,492 frames (39,032 match and 3,460 nonmatch), with three timing
+recoveries and `nonmatch_pad=uncovered`. The browser report passed with no
+browser errors or finalization failures. The fixed Lineup-B run also compares
+equivalently over 45,226/45,226 frames (41,907 match and 3,319 nonmatch), with
+six timing recoveries and three setups; its nonmatch PAD field is uncovered.
+Receipts and hashes are indexed in
+`runs/pr86-demo-cache-fix-20261001/`.
 
-Original-vs-port comparison remains limited to exact declared-field gameplay
-rows in the retained A/B recordings; it is not full simulation/draw equivalence.
-Pixels, PCM, foreground timing, physical-controller acceptance and performance
-remain separate open gates.
+The 12-distinct recording also passed its capture and strict comparison over
+43,035/43,035 frames (38,296 match and 4,739 nonmatch), with 15 timing
+recoveries and three match setups. Its v9 comparison includes indexed fighter
+entities; the v8 A/B comparisons cover primary fighter fields. Runtime-data
+bytes and hashes were verified. All three return to final CSS; nonmatch scalar
+state remains outside the comparison scope. The earlier 12-distinct attempt
+that omitted runtime-data verification is retained as a capture-configuration
+failure, even though its declared-state comparison completed.
 
-The retained PR86 A trace was produced with an unscoped v2 entity field. The
-producer is now reconciled to the current v1 whole-session schema: v8 compares
-two-to-four primary fighters, while v9 uses its separate indexed identity
-records. A fresh corrected-producer candidate-port prefix against retained
-original A reached source cursor 3,014 without a runtime error and compared
-1,374 menu rows plus 1,642 primary match rows with no first difference; the
-deliberate stop leaves the candidate port incomplete and the remainder
-unverified. The [scoped receipt](docs/evidence/pr86-primary-prefix-v1.json)
-records the comparison base, pre-merge candidate build identity, hashes and
-limits. A
-separately hashed diagnostic projection of the retained full A trace, with only
-its unscoped entity fields omitted and no JSONL rows removed, compares all
-42,492 frames and all 39,032 declared match rows with no primary-state
-difference; it makes no follower/entity claim. These comparisons do not
-exercise Results camera ownership; the historical Sheik-winner writer remains
-unattributed.
+The final suite passed **1,679 tests with 76 skipped** (exit 0) with owned DOL, disc, symbols and source
+inputs configured; its receipt is `runs/pr86-demo-cache-fix-20261001/full-suite.log`.
+The clean public package passed 19/19 silent-public checks, and the clean
+production audio package passed 19/19 audio-public and 13/13 audio-preview
+checks in headless installed Chrome with muted output and the real disc. Their
+portable receipts are under `runs/pr86-demo-cache-fix-20261001/`. These are
+functional package and audio-transport checks; they do not establish
+foreground timing, audible quality, pixels, PCM equivalence, physical-
+controller support, performance, or admission.
 
-The branch is reconciled with current `origin/main` `f670a3b` at merge commit
-`9c84690` (including shared runtime #89 `aecc3e64`, PR #93 `2e083bf`, and later
-mainline changes). Fresh headless-Chrome runs on the reconciled working tree
-completed both requested four-CPU9, four-stock Final Destination lineups for
-two natural matches each, including Results→original CSS→the next match. A:
-Kirby won at frame 13,107; Fox at 14,374. B: Falco won at 15,164; Yoshi at
-13,845. B recorded repeated in-match Sheik↔Zelda transitions. Both runs retain
-36 screenshots, CPU-page/P1 input traces, GPU and native diagnostics, and
-source-timing pauses; neither reported page/native-command/browser-target
-errors or crashes. The reports share served Wasm hash
-`8772e2c9af06db3ab493f505cd242adf5866ed3c91cdef5cb46865527384ffa6` and are
-indexed in the [per-character notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md).
-They are rendered functional evidence, not retail comparison, pixel/PCM
-equivalence, foreground timing or performance acceptance. A focused current-tree
-rendered run also naturally produced a Zelda-origin Sheik winner and completed
-the exact source-tick Results input/page gate and return to CSS without a camera
-ownership error. This is a current-baseline non-reproduction, not a diagnosis or
-fix attribution for the older failure; its first invalid transition remains
-unknown. A newer four-match Lineup B control binds the typed allocator-event
-trace: all four matches passed the tick-560 page/input gate and Results→CSS;
-the natural winners were Samus, Samus, Falco and Yoshi, so the Sheik-winner
-conjunction was not exercised. Each Results route recorded only the expected
-original eight-subject allocation and no later allocator call. This still does
-not locate the historical first invalid transition. The full suite and
-character checks have since passed; the historical camera and comparison gates
-remain open.
-The focused Kirby test matrix now passes all 25 non-null copy rows through
-acquisition, donor-specific use, up-appeal loss, same-donor reacquisition and
-teardown. Falco's copied part and neutral special were also observed in a
-rendered Chrome action prefix; Mewtwo's copied Shadow Ball reached full charge
-and released through ordinary A input. These scoped checks do not establish
-full movesets, every donor's KO/loss paths, pixels or performance.
-Focused current-main checks also pass for source-context/collision traces,
-owned-DOL source-stack profiling, common-context restore/restart, stage numeric
-context, effect-bank lifecycle, Nana's nonzero Results asset root, and the
-texture/material/native-joint/archive set (44 tests). Optional Link/Pikachu
-effect archives are absent locally and remain unverified. The A and B receipts
-above are current-head rendered functional scenarios; the reconciled full-suite
-result is recorded above and detailed in the notes.
-Main including PR #89 is merged and its ownership/carry guarantees retained.
-Reconciled checks exposed and repaired the Player mapping owner, Nana's signed
-input history and partner-correction rounding. The original-consistent partner
-death/rejoin check passes. The audited Nana carry extension and exact-function
-patch anchoring now pass A's rendered match/return loops. Shared math fixes from
-the broader task clear the observed screen-KO mismatch in a fresh exact
-all-entity prefix. Expanded costume checks also repair held-A startup input
-ordering and joint-backed Kirby hat selection. Actual colored G&W copy testing
-then exposed missing selected-color model cache ownership; the source-loader
-repair now passes every Kirby color's copy lifecycle. Reconciled owned-input
-full-suite and A match/return checks pass. Imported camera-shake and local Samus
-arithmetic repairs clear their observed differences; the exact declared-field
-comparison agrees on every captured A gameplay row. B's later mismatches exposed
-a byte-swapped Yoshi grab-frame table and missing shield-SDI fused operations;
-reduced checks and a fresh complete recipe now agree on every captured B gameplay
-row in the declared state scope. The historical B Sheik-winner Results return
-still exposes a camera-pool ownership failure. Fresh two-match B keyboard-gated
-controls complete Results→CSS, including a run where Sheik was active at Results
-entry but Yoshi won; those controls do not resolve the winner-specific failure.
-Scoped observer repairs now retain per-match PAD traces and actual camera-entry
-pointers. New profile/camera handoff guards and three winner-animation state
-controls pass; they do not establish the historical writer. The scoped receipts,
-corrected r7 observer caveat and retained failures are in the notes.
-Original references,
-historical scene-only replay and newer exact bounded state checks are explicitly
-separated in the notes; none establishes draw/pixel/timing equivalence. Final
-candidate integration checks and remaining character/action
-gates are still open. No admission or merge is claimed.
+The first clean attempts are retained as superseded diagnostics: silent public
+reached 15 checks before a phase-7-to-8 timeout after three recoveries, preview
+reached six checks before the same timing pause, and audio public initially
+observed the shell’s asynchronous enabled-control race. The bounded test wait
+for published control readiness preserves the original startup assertion; the
+reruns passed without changing production timing. The historical pre-fix A
+failure is retained separately: its four-stock match completed with Fox as
+winner and Results began before the native camera-pool teardown error at source
+cursor 13,835. The fixed A run crosses that boundary and completes.
+
+The older Sheik-winner camera report remains an unattributed historical case;
+it lacks the observations needed to identify its writer retroactively. Fresh
+Results ownership/winner-demo checks and the current comparisons provide the
+integration evidence. Complete roster admission and full-game equivalence
+remain separate. No deployment is included. The [final integration receipt](docs/evidence/pr86-final-integration-v1.json)
+binds these results to their inputs and runtime artifacts.
+
 ## Save import size preflight
 
 **Browser exercised** for the Settings import boundary: the UI rejects a
@@ -173,10 +111,9 @@ not establish audible quality, PCM or pixel equivalence, foreground timing,
 input latency, physical-controller acceptance, performance, or full-game menu
 coverage.
 
-The title/main-menu receipts above were produced on the PR #96 source revision
-before this PR #86 reconciliation. They remain scoped evidence for that route,
-not validation of the combined candidate; the combined candidate still needs
-an affected build and browser lifecycle run.
+The original title/main-menu receipts above were produced on the PR #96 source
+revision. The current combined runtime also passes the public and audio
+browser lifecycle checks indexed in the PR #86 integration receipt above.
 
 ## Current acceptance boundaries
 

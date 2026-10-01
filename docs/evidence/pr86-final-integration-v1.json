@@ -1,0 +1,389 @@
+{
+  "schema": "melee-web-pr86-final-integration-v1",
+  "date": "2026-10-01",
+  "scope": "Reconciled fighter integration: declared source-consumed state comparisons, owned-input tests, public/audio browser lifecycle and runtime builds. Full-game equivalence and roster admission remain outside this receipt.",
+  "source": {
+    "integration_head": "5a9830bcaa3a29125061c8cefd1e1e6d8849ebfd",
+    "main_base": "3179aaaed728c24625e99336ff4450bc289e7148",
+    "public_runtime": {
+      "hash": "5ffd309d4175d722",
+      "identity_sha256": "8956019dbd67e64e3c7c6924e94f26d7dea54ed4dd169068d73bd5bd0e2f4a3f",
+      "manifest_sha256": "b543904399d9c24a2e4b72aa08d5dcc51f73dffdc2ca93575703eac2cd330ed2"
+    },
+    "audio_runtime": {
+      "hash": "58abd745768e5875",
+      "identity_sha256": "466ef855d4100178a8292d396b245f555c260ab038085914ec487ad62e0892c5",
+      "manifest_sha256": "2eb6920fcdb9bd1661fe038046bf5c04f545b0cad5f20fb789a304f6fe3b5833"
+    },
+    "repair_commit": "5a9830b",
+    "repair_scope": "ftdemo initFighter temp1.x5=-1; deterministic poisoned-stack baseline x5=-86 fails and repaired case passes.",
+    "runtime_package_commit": "5a9830b",
+    "validation_harness_note": "The browser package identities and Wasm are frozen from 5a9830b; the subsequent public-player startup wait is test-only and does not alter runtime artifacts.",
+    "subsequent_changes": "Test synchronization and evidence only; the development snapshot was built from the runtime changes committed as 5a9830b before that commit was recorded. Clean public/audio producers bind 5a9830b.",
+    "development_manifest": {
+      "path": "runs/pr86-demo-cache-fix-20261001/developer/prototype-build.json",
+      "sha256": "ffde59486ca4e1823639cfa6cb24829260430223af31d78c688842060bab0274"
+    },
+    "development_runtime_sha256": {
+      "gameplay_menu_browser.js": "3a44049dddbbe8972ab1f9d08d05a93bbd12ecc7962a29ca0db61d19e8e55615",
+      "gameplay_menu_browser.wasm": "a7077725e1122d6df941b658aeb92ca935cacfd6b57631af1dbc51c30f1029a7",
+      "gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    }
+  },
+  "verified_integration": [
+    {
+      "revision": "3f8657f",
+      "scope": "Copy-dynamics and final parameter-endian repair; verified in the reconciled runtime evidence."
+    },
+    {
+      "revision": "4b1975b",
+      "scope": "Opening follower and copy-asset closure, retained in the final runtime."
+    },
+    {
+      "revision": "b03a653",
+      "scope": "Public export policy and Opening integration reconciliation, including the producer/validator checks."
+    },
+    {
+      "revision": "5a9830b",
+      "scope": "Initialize ftdemo initFighter temp1.x5 to the original -1 no-slot sentinel; poisoned-stack regression fails at baseline x5=-86 and passes with the repair, and native A Results construction/close passes."
+    },
+    {
+      "revision": "test-harness",
+      "scope": "Bounded startup readiness wait for the asynchronously published public file control; original selection and preparation assertions remain unchanged."
+    }
+  ],
+  "full_suite": {
+    "result": "pass",
+    "tests_total": 1679,
+    "skipped": 76,
+    "exit_code": 0,
+    "receipt": "runs/pr86-demo-cache-fix-20261001/full-suite.log",
+    "receipt_sha256": "cb503b8db2aaa7f51dce28f22f632219f4d9f8fdcbd82187dca2eefdec128705",
+    "scope": "Full Python unittest suite with owned DOL, disc, symbols and source configured. Skips remain explicit; this is not full-game accuracy admission."
+  },
+  "browser_gates": [
+    {
+      "name": "silent-public-clean",
+      "result": "pass",
+      "checks_completed": 19,
+      "checks_expected": 19,
+      "receipt": "runs/pr86-demo-cache-fix-20261001/public-browser-clean-r2/report.json",
+      "receipt_sha256": "ec7de82e00be23d9c6a4b1ce3caa7a3f4e517f01178616f9bf2d8cf8e6d3177e",
+      "package_manifest": "runs/pr86-demo-cache-fix-20261001/public-site-clean.manifest.json",
+      "scope": "Headless installed Chrome, muted output, real disc, clean public package; no foreground timing, audible, pixel, PCM, or performance claim."
+    },
+    {
+      "name": "audio-public-clean",
+      "result": "pass",
+      "checks_completed": 19,
+      "checks_expected": 19,
+      "receipt": "runs/pr86-demo-cache-fix-20261001/audio-public-browser-clean-r2/report.json",
+      "receipt_sha256": "b314b614e06658367e0ab7c83b2f9fff42798cb2b81e1d2de9d49172fb8e0f51",
+      "package_manifest": "runs/pr86-demo-cache-fix-20261001/audio-site-clean.manifest.json",
+      "scope": "Headless production audio package, real disc, muted output; Web Audio lifecycle and transport assertions pass, no audible-quality or foreground-timing claim."
+    },
+    {
+      "name": "audio-preview-clean",
+      "result": "pass",
+      "checks_completed": 13,
+      "checks_expected": 13,
+      "receipt": "runs/pr86-demo-cache-fix-20261001/audio-preview-browser-clean-r2/report.json",
+      "receipt_sha256": "1fc5de4ed47c1c95d76dcdb3ade81d3b313c71ab64fb8561dca4b5a758651408",
+      "package_manifest": "runs/pr86-demo-cache-fix-20261001/audio-site-clean.manifest.json",
+      "scope": "Headless preview package, real disc, muted output; scoped audio lifecycle and asset checks pass, no complete-attract, audible-quality or foreground-timing claim."
+    }
+  ],
+  "strict_comparisons": [
+    {
+      "name": "original-a",
+      "result": "equivalent",
+      "complete": true,
+      "frames_compared": 42492,
+      "match_frames_compared": 39032,
+      "nonmatch_frames_compared": 3460,
+      "match_setups_compared": 3,
+      "checks": {
+        "final_css": "report_pass",
+        "initial_css_rng": "pass",
+        "input_order": "pass",
+        "match_state": "pass",
+        "nonmatch_pad": "uncovered",
+        "recipe_binding": "pass",
+        "scene_order": "pass",
+        "source_stream": "pass"
+      },
+      "scope": "Exact source-consumed scene/input state comparison; no timing, draw cadence, pixels, PCM, or admission claim",
+      "timing_pause_recoveries": 3,
+      "comparison": {
+        "path": "runs/pr86-demo-cache-fix-20261001/a-full/comparison.json",
+        "sha256": "e4d4b3ae87a747d22ae08a4295d3d350a8ae4deccb8176de3be5b46378e457ca"
+      },
+      "capture": {
+        "path": "runs/pr86-demo-cache-fix-20261001/a-full/report.json",
+        "sha256": "bcad64de5dc7694ca467d5d7d2343759d023e4baaedf05f7dc059bf91736c7c5"
+      },
+      "browser_report": {
+        "path": "runs/pr86-demo-cache-fix-20261001/a-full/retail-browser-report.json",
+        "sha256": "a1909f6a57a5ddb64109b6dcae8a749dc43c3b82c171ae06386f3324e59226e5"
+      },
+      "port_trace_sha256": "667fef820c62bbd085d8aacabbd932c799e9b99821d5d50d681927efed5d25e1",
+      "inputs": {
+        "recipe": {
+          "bytes": 1893306,
+          "sha256": "e0c4eb536d525df6823487d679dabcf90c28c5448a3917aaca622f11694d4ac7"
+        },
+        "reference": {
+          "bytes": 1899564951,
+          "sha256": "73080bb787c6279f5f4732094d65bfee88e9edeb0c12b4eba29e58665d97d9e7"
+        }
+      },
+      "lineup": [
+        "Game & Watch",
+        "Kirby",
+        "Ice Climbers",
+        "Fox"
+      ],
+      "reference_scope": "MWRO v8 declared primary fighter fields; follower/internal entity coverage is supplied by separate targeted lifecycle checks, not inferred from this comparison."
+    },
+    {
+      "name": "lineup-b",
+      "result": "equivalent",
+      "complete": true,
+      "frames_compared": 45226,
+      "match_frames_compared": 41907,
+      "nonmatch_frames_compared": 3319,
+      "match_setups_compared": 3,
+      "checks": {
+        "final_css": "report_pass",
+        "initial_css_rng": "pass",
+        "input_order": "pass",
+        "match_state": "pass",
+        "nonmatch_pad": "uncovered",
+        "recipe_binding": "pass",
+        "scene_order": "pass",
+        "source_stream": "pass"
+      },
+      "scope": "Exact source-consumed scene/input state comparison; no timing, draw cadence, pixels, PCM, or admission claim",
+      "timing_pause_recoveries": 6,
+      "comparison": {
+        "path": "runs/pr86-demo-cache-fix-20261001/b-full-corrected/comparison.json",
+        "sha256": "a252f65e0864c12d5455da9410fd8531f4b5016d8a6f65749f856ecbfe40faea"
+      },
+      "capture": {
+        "path": "runs/pr86-demo-cache-fix-20261001/b-full-corrected/report.json",
+        "sha256": "0dc01ae6558a94a6f74e3858cf3149cd2309e4c41b0eb5eedf66aaaf5cd31fdc"
+      },
+      "browser_report": {
+        "path": "runs/pr86-demo-cache-fix-20261001/b-full-corrected/retail-browser-report.json",
+        "sha256": "2fa4552b74610b1cb96af65dcea6c735acb6a36e609775b836eaf01234c209fc"
+      },
+      "port_trace_sha256": "b30777bf664f29e109533997b127a8e7120af85ed300bc2ece4e67d3d200bf90",
+      "inputs": {
+        "recipe": {
+          "bytes": 2013602,
+          "sha256": "fb89604a2dd35eb8ead17ba0ac9ecdcf9b783bcc2e15b1ed659acd8693405edd"
+        },
+        "reference": {
+          "bytes": 2037949489,
+          "sha256": "0eba1924caa961d415b8b15c51a6e0cf0f7ec70cc65a71b83986503dd35e99d3"
+        }
+      },
+      "lineup": [
+        "Samus",
+        "Yoshi",
+        "Zelda/Sheik",
+        "Falco"
+      ],
+      "reference_scope": "MWRO v8 declared primary fighter fields; follower/internal entity coverage is supplied by separate targeted lifecycle checks, not inferred from this comparison."
+    },
+    {
+      "name": "12-distinct",
+      "result": "equivalent",
+      "complete": true,
+      "frames_compared": 43035,
+      "match_frames_compared": 38296,
+      "nonmatch_frames_compared": 4739,
+      "match_setups_compared": 3,
+      "checks": {
+        "final_css": "report_pass",
+        "initial_css_rng": "pass",
+        "input_order": "pass",
+        "match_state": "pass",
+        "nonmatch_pad": "uncovered",
+        "recipe_binding": "pass",
+        "scene_order": "pass",
+        "source_stream": "pass"
+      },
+      "scope": "Exact source-consumed scene/input state comparison; no timing, draw cadence, pixels, PCM, or admission claim",
+      "fields_compared": [
+        "rng",
+        "match_frame",
+        "pad_state_hex",
+        "fighters",
+        "fighter_entities"
+      ],
+      "lineups": [
+        [
+          "Mario",
+          "Fox",
+          "Falco",
+          "Marth"
+        ],
+        [
+          "Dr. Mario",
+          "Roy",
+          "Link",
+          "Young Link"
+        ],
+        [
+          "Captain Falcon",
+          "Ganondorf",
+          "Luigi",
+          "Pikachu"
+        ]
+      ],
+      "reference_scope": "MWRO v9 declared primary fighter and indexed fighter-entity fields.",
+      "timing_pause_recoveries": 15,
+      "comparison": {
+        "path": "runs/pr86-demo-cache-fix-20261001/twelve-final/comparison.json",
+        "sha256": "5f84ccd9a7d99d17f17baa759f1d66e65c6a198505f90594f07b2d8a3ce09ea6"
+      },
+      "capture": {
+        "path": "runs/pr86-demo-cache-fix-20261001/twelve-final/report.json",
+        "sha256": "74cf4969b2046f71456989ad9f5eb7100e32449b503f82fb0530419b9a3106dc"
+      },
+      "browser_report": {
+        "path": "runs/pr86-demo-cache-fix-20261001/twelve-final/retail-browser-report.json",
+        "sha256": "7a8b108f5dc4c9c1c4f6435eab9b892c3e1919fb8664d4bcf6c286c2d10da8fe"
+      },
+      "port_trace_sha256": "0466f974982835d955100c987c811fb20346c65a68074d002a2837f6e47c94b2",
+      "inputs": {
+        "recipe": {
+          "bytes": 1917826,
+          "sha256": "576ae189487b38d4087affb29101abd681f0fa9e620b7f4bc7c8c079255db962"
+        },
+        "reference": {
+          "bytes": 1567988792,
+          "sha256": "ec926ea9018944f0bd00966f04f5a890da3be0a5b5191d991c430f6d24083328"
+        }
+      },
+      "runtime_data_load": {
+        "file_bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+        "loaded_bytes": 3674112,
+        "total_bytes": 3674112,
+        "from_cache": false
+      }
+    }
+  ],
+  "original_a_pre_fix": {
+    "status": "historical_pre_fix_failure",
+    "gameplay_completed": true,
+    "results_began": true,
+    "overall_replay_complete": false,
+    "winner": {
+      "slot": 3,
+      "name": "Fox",
+      "character_kind": 2,
+      "fighter_kind": 1
+    },
+    "source_cursor": 13835,
+    "results_tick": 421,
+    "receipt": "runs/pr86-original-a-corrected-20261001-state-recovery/diagnostic-packet.json",
+    "scope": "Pre-5a9830b retained diagnostic: native Results camera-pool teardown failure; not the current fixed-run result."
+  },
+  "open_gates": [
+    "Complete moveset/character admission, draw/pixel/PCM equivalence, foreground timing, physical controllers and performance remain outside these receipts.",
+    "The older Sheik-winner camera report remains unattributed; the current first-write reproduction does not retroactively prove that report had the same cause."
+  ],
+  "current_a_fixed": {
+    "status": "pass",
+    "repair_commit": "5a9830b",
+    "receipt": "runs/pr86-demo-cache-fix-20261001/a-full/report.json",
+    "receipt_sha256": "bcad64de5dc7694ca467d5d7d2343759d023e4baaedf05f7dc059bf91736c7c5",
+    "comparison_receipt": "runs/pr86-demo-cache-fix-20261001/a-full/comparison.json",
+    "comparison_receipt_sha256": "e4d4b3ae87a747d22ae08a4295d3d350a8ae4deccb8176de3be5b46378e457ca",
+    "scope": "Complete retained A capture and strict declared-field comparison; no pixel/PCM/live-timing/performance/admission claim.",
+    "cause": "Uninitialized native demo plAllocInfo.x5 propagated to Fighter.x61C=-76; ftData_800859A8 indexed before ft_8045993C and cleared a bit in the camera-pool pointer.",
+    "repair": "Set the original -1 no-slot sentinel before Fighter initialization; native demo actions have an owned binding and no legacy slot.",
+    "regression": {
+      "path": "runs/pr86-demo-cache-fix-20261001/initializer-regression.log",
+      "sha256": "009acdc32dde25ba52408e1da011d4a6a05cfd704897ff94c475408cc43dab88"
+    },
+    "native_results": {
+      "path": "runs/pr86-demo-cache-fix-20261001/native-results-a.log",
+      "sha256": "e5e4a3dd10ebcd9b5ff9fd2b821348b1f4f746c97f0c72e6710a42299adead51"
+    },
+    "watchpoint": {
+      "a-wat-watch/report.json": {
+        "path": "runs/pr86-results-camera-destructor-probe-20261001/a-wat-watch/report.json",
+        "sha256": "e08f0f73ec6ff6e19c87cb31f9d1e06f46350f058ac42c3917a7774015ce7732"
+      },
+      "wat-store-watch-transform.json": {
+        "path": "runs/pr86-results-camera-destructor-probe-20261001/wat-store-watch-transform.json",
+        "sha256": "c36aa37814c16e6a480b3eb087bed9dc4ff313ad3c62146195528867b6bf223b"
+      },
+      "wat-store-watch-layout-check.json": {
+        "path": "runs/pr86-results-camera-destructor-probe-20261001/wat-store-watch-layout-check.json",
+        "sha256": "ba0d28a843fa6984f627901c3a3ee058a3d3d927aa521755ed815dafec2bb9da"
+      },
+      "fighter-unload-watch.wat": {
+        "path": "runs/pr86-results-camera-destructor-probe-20261001/fighter-unload-watch.wat",
+        "sha256": "aeed0172f23e1255da2ade561a2135b8a4ec72d41bbcc82c89823fa82edb96b0"
+      }
+    }
+  },
+  "superseded_browser_attempts": [
+    {
+      "receipt": "runs/pr86-demo-cache-fix-20261001/public-browser-clean/report.json",
+      "receipt_sha256": "1ef022bbee133757237106174b5625780681750bfdedeb5560fa3152c9919655",
+      "result": "incomplete_failure",
+      "checks_completed": 15,
+      "reason": "Phase-7-to-8 timeout after three timing recoveries; no page/request/native error."
+    },
+    {
+      "receipt": "runs/pr86-demo-cache-fix-20261001/audio-public-browser-clean/report.json",
+      "receipt_sha256": "2ad62e184b9b43d7e88c3d466e29f4d57ae889962ded9362c96406cb2b55fb54",
+      "result": "superseded_harness_readiness_failure",
+      "checks_completed": 0,
+      "reason": "Shell enabled-control readiness race; fixed only by bounded test wait."
+    },
+    {
+      "receipt": "runs/pr86-demo-cache-fix-20261001/audio-preview-browser-clean/report.json",
+      "receipt_sha256": "ada8d1bfa5c87afb488084625a60b2596f6daea50b9ec3f48ac59167ad1cc598",
+      "result": "incomplete_failure",
+      "checks_completed": 6,
+      "reason": "Phase-7 timing pause before Results; no page/request/native error."
+    }
+  ],
+  "retained_capture_configuration_failures": [
+    {
+      "capture": {
+        "path": "runs/pr86-demo-cache-fix-20261001/b-full/report.json",
+        "sha256": "27903028689f184535c5289cccf8fc88ebb0cf49b34a92a95718c400323772a9"
+      },
+      "result": "fail",
+      "first_error": "runtime",
+      "scope": "Incorrect disc argument; no gameplay advanced."
+    },
+    {
+      "capture": {
+        "path": "runs/pr86-demo-cache-fix-20261001/twelve-full/report.json",
+        "sha256": "33001d9777a00c3b354878ca88b0f6d3721c5b4b338fecbc3b8d6a6649af7f18"
+      },
+      "result": "fail",
+      "first_error": "startup",
+      "scope": "Playwright path omitted; browser never started."
+    },
+    {
+      "capture": {
+        "path": "runs/pr86-demo-cache-fix-20261001/twelve-full-corrected/report.json",
+        "sha256": "c3920cc3e5683115047cc6fee8bce7a42e45b8896a2c81737ccd1a51545c2b71"
+      },
+      "result": "fail",
+      "first_error": "requestfailed",
+      "scope": "Runtime-data verification argument omitted; native replay and strict declared-state comparison completed, but outer capture cannot verify the data abort."
+    }
+  ],
+  "session_setup": "Original four-player, level-9 CPU, four-stock Final Destination recordings; source inputs and scene order are replayed and CPU choices recomputed."
+}

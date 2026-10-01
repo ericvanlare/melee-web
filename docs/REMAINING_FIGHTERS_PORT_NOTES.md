@@ -2,25 +2,21 @@
 
 ## Disposition
 
-These six selectable characters (seven source forms including Zelda/Sheik) are
-an unfinished development candidate, not admitted or fully playable. Real-asset
-construction, targeted distinctive actions, two rendered four-CPU9 match loops
-per requested lineup, repeatable original references, and exact declared-field
-gameplay comparison receipts are available. Those state receipts are hash-bound
-to earlier source builds and are not relabeled as current-main validation. The
-whole-session browser recipe harness checks consumed-input scene ownership and
-progress, not simulation fields or draw state; some recorded-input replays stop
-at scene mismatches. The exact state receipts do not compare raw CPU blocks,
-port draw state, pixels, PCM, or live scheduling. A full original A/B recipe
-comparison has not been rerun on the reconciled current tree. The historical
-Results camera-pool failure remains unresolved. The Samus-donor palette resolves
-through a checked cross-archive source-address map; particle-pixel use remains
-unverified.
+The remaining fighter source paths are integrated on the reconciled runtime.
+The current validation decision and totals are in [STATUS](../STATUS.md), with
+hash-bound results in the [final integration receipt](evidence/pr86-final-integration-v1.json).
+The [final integration checkpoint](#final-integration-checkpoint-2026-10-01)
+summarizes the repairs found during review. Earlier dated checkpoints below
+retain their original failures and conclusions; they do not describe the
+current merge decision.
 
-Evidence labels follow the
-[performance/accuracy playbook](PERFORMANCE_AND_ACCURACY.md). Raw disc data,
-extracts, captures, screenshots and run logs remain local and ignored under
-`work/` / `assets-local/`; this note contains no personal input paths.
+Full character admission still requires the separately declared moveset,
+rendering, audio, controller and performance gates. Recorded comparisons cover
+only their declared fields; the Samus-donor palette's particle-pixel use remains
+unverified. Evidence labels follow the
+[performance/accuracy playbook](PERFORMANCE_AND_ACCURACY.md). Raw owned inputs
+and captures remain outside Git. Receipt paths beginning `runs/` identify
+retained local validation artifacts, not files shipped in this repository.
 
 ## Baseline and evidence provenance
 
@@ -681,7 +677,7 @@ or draw match. Its scheduling scope is also per-tick with equivalence not
 evaluated; this is a bounded control receipt, not evidence that the new-fighter
 comparisons pass.
 
-## Remaining gates (reconciled checkpoint, 2026-09-29)
+## Historical remaining gates (reconciled checkpoint, 2026-09-29)
 
 1. The historical natural Sheik-winner Results camera-pool failure is
    unresolved. Its retained report is from source checkout `607ff56`, has only
@@ -733,7 +729,8 @@ comparisons pass.
    unclaimed. The broader full-session/tick-1776 investigation belongs to its
    existing task and is not duplicated here.
 
-PR #86 remains the single open PR. No merge or deployment has been made.
+At this historical checkpoint, PR #86 was the single open PR; no merge or
+deployment had been made.
 Evidence does not support “fully playable,” full equivalence, or task
 completion while the historical Results failure and listed acceptance limits
 remain open.
@@ -794,7 +791,7 @@ PAD rows; do not infer its outcome from the controlled PAD case. The historical
 first invalid ownership transition remains unlocated until those differences
 are tested or a reviewable first-change packet establishes the boundary.
 
-## Current natural Results checkpoint (2026-09-27)
+## Historical natural Results checkpoint (2026-09-27)
 
 The retained natural Sheik-winner failure
 (`work/pr86-final-frozen-b-two-match-r1/report.json`) records harness/source
@@ -1063,7 +1060,7 @@ finishes as `ckind=18, ftkind=7`; then retain the live phase-labelled guard
 message (phase, tick, source/context/owner pool and actor pointers) and compare
 entry, auto-page, host handoff, exit and destruction. Until that exact winner
 reproduces or otherwise receives a defensible resolution, the historical
-camera-pool failure remains open and PR #86 is not ready to merge.
+camera-pool failure remains open and PR #86 was not ready to merge at this checkpoint.
 
 ## Scoped Results observer repair and fresh two-match control (2026-09-27)
 
@@ -1125,7 +1122,7 @@ observer/harness checks passed; `test_results_entry_packet.py` passed 6/6;
 boundary before waiting for CPU auto-pages. The next browser sample remains an
 unforced B run until a typed slot-2 Sheik winner reaches the guarded Results
 path. The historical camera failure and first invalid ownership transition
-remain unresolved; PR #86 is not ready to merge.
+remain unresolved; PR #86 was not ready to merge at this checkpoint.
 
 ## Natural B controls r11/r12 and input-bracket correction (2026-09-27)
 
@@ -1252,8 +1249,8 @@ three input intentions and lacks their event brackets, consumed PAD/trigger/
 release bytes, port status, Results page state and camera pointers. Therefore
 neither current Samus control establishes which input path the old Sheik
 failure actually consumed or identifies its first invalid ownership
-transition. The camera-pool failure remains unresolved; PR #86 is not ready to
-merge.
+transition. The camera-pool failure remains unresolved; PR #86 was not ready to
+merge at this checkpoint.
 
 Harness syntax, the focused prefix-contract test, and `git diff --check` pass.
 The captured browser report binds the run to clean runtime Wasm SHA-256
@@ -1362,7 +1359,7 @@ three Enter intentions and the generic late `camera release` failure: no
 consumed PAD brackets, page state or pointer values. The first invalid
 historical pointer transition remains unknown. Next discriminator is a fresh
 current-Wasm keyboard-prefix run with a natural slot-2 Zelda-origin Sheik win;
-do not seed or force the winner. PR #86 remains open and not ready to merge.
+do not seed or force the winner. PR #86 was open and not ready to merge at this checkpoint.
 
 ## Current merged-main B Results control (2026-09-27)
 
@@ -1993,7 +1990,7 @@ Article was observed. Retained log:
 interaction/lifecycle evidence, not proof of the complete copied Egg path.
 The older truncated Falco trace is superseded by the reconciled Falco cycle and
 rendered visibility evidence below. The full suite, remaining character
-acceptance paths and PR review gates remain open; PR #86 is not ready to merge
+acceptance paths and PR review gates remain open; PR #86 was not ready to merge at this checkpoint
 or claim full playability.
 
 ## Fresh reconciled-branch rendered lineups (2026-09-29)
@@ -2241,8 +2238,9 @@ as pending. The natural two-match A/B lineups, full targeted Kirby copy matrix,
 Ice Climbers separation/death/rejoin, Yoshi Egg Lay capture/release and repeated
 Zelda/Sheik transformations remain distinct functional receipts. None is a
 full-moveset, pixel/PCM, foreground timing, physical-controller or performance
-acceptance claim. PR #86 remains open; do not merge or deploy while the historic
-Results failure and other declared acceptance limits remain unresolved.
+acceptance claim. The instruction at this historical checkpoint was to keep
+PR #86 open while the historic Results failure and other declared acceptance
+limits remained unresolved.
 
 ## Results list-transition checkpoint after camera instrumentation (2026-09-29)
 
@@ -2298,4 +2296,50 @@ rebuilt and focused tests passed. Next integration command is the owned-input
 full test suite on this instrumented checkpoint. Remaining gates include the
 natural slot-2 Sheik-winner trace under this instrumentation, the historical
 first-write cause, final character/runtime validation and the separately
-scoped recorded-state comparison; PR #86 remains unmerged.
+scoped recorded-state comparison; PR #86 was unmerged at this checkpoint.
+
+## Final integration checkpoint (2026-10-01)
+
+Runtime implementation `5a9830b` is reconciled with main `3179aaa`, including
+shared source-context and Fighter leases, menus, save ownership, Opening, and
+the public/audio player. The subsequent integration edits affect tests and
+evidence only. See [STATUS](../STATUS.md) for current validation totals and the
+[final receipt](evidence/pr86-final-integration-v1.json) for input, runtime and
+report hashes.
+
+The review fixed three additional source boundaries:
+
+- Kirby copy dynamics now decode every float in each authored dynamics record,
+  with pointer, extent, alignment, relocation and finiteness checks. Previously
+  the inner big-endian floats reached native simulation unchanged. Synthetic
+  multi-record checks and real donor acquisition/use/loss/reacquisition cover
+  the repair; no quaternion failure is masked.
+- Opening asset selection uses the same source-backed follower, transformation
+  and Kirby-copy closure as ordinary fighter selection. The source-selected
+  lineup and RNG remain unchanged.
+- Results demo construction now defines `plAllocInfo.x5` as the original `-1`
+  no-slot sentinel before `Fighter_UnkInitLoad` copies it to `Fighter.x61C`.
+  Native demo actions own a separate binding and acquire no `ft_8045993C` slot.
+  A layout-preserving Wasm store watchpoint caught the original failure:
+  Kirby's uninitialized slot was `-76`, and `ftData_800859A8` indexed before
+  that table, clearing a byte bit in the camera-pool pointer. The fix defines
+  ownership at construction; it does not clamp the invalid index or repair
+  the camera pointer after corruption. A compiled poisoned-stack regression
+  fails on the pristine initializer and passes with the sentinel. The fresh
+  original-A replay crosses the previously failing Results teardown and
+  completes its full comparison.
+
+The public export inventory and Opening-related test fixtures were reconciled
+with main. A browser test now waits for the shell to publish its Disc control
+before asserting that selection works during graphics preparation. It retains
+both the preparation-visible and early-selection assertions. Initial browser
+runs interrupted by timing pauses, and the startup readiness failure, remain
+in the receipt alongside the passing reruns; production timing was unchanged.
+
+The older Sheik-winner camera report lacks the consumed input and first-write
+observations needed to attribute that particular run. It remains an
+unattributed historical case. The current cache-slot write was independently
+reproduced and repaired, and fresh Results ownership/winner-demo controls and
+whole-session comparisons supply the current evidence. This does not
+retroactively identify the old report's writer or establish complete gameplay,
+pixel, PCM or foreground-timing equivalence.
