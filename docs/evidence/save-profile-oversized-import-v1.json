@@ -1,0 +1,54 @@
+{
+  "schema": "webmelee-save-oversized-import-v1",
+  "scope": "Settings file-size preflight and normal valid-import controller path in headless Chrome.",
+  "base_main_commit": "b542df78255668917d5666e273dc8f85732816d4",
+  "browser": {
+    "name": "Google Chrome",
+    "version": "153.0.8010.54",
+    "mode": "headless",
+    "host_audio": "muted through scripts/browser_tools.mjs"
+  },
+  "tested_source_sha256": {
+    "web/gamecube-save.mjs": "b0b9119695a9b4601ee7506c65ef70796a7ec44508e243676310339f067a1a8d",
+    "web/save-profile-settings.mjs": "974677cf1f5e316a544d9599043bd898756c47e8582fe7de9871160dd7ff3b6e",
+    "tests/save_profile_oversized_import_browser_test.mjs": "6bc47ae5b204e068c9ce6e2ddd04f67a91ab5740b21638fc9675e1ed768b14eb",
+    "scripts/browser_tools.mjs": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81"
+  },
+  "gci_extent_bytes": 90176,
+  "oversized_input": {
+    "file_size": 90177,
+    "array_buffer_calls": 0,
+    "confirmation_presented": false,
+    "stored_mode_unchanged": true,
+    "stored_profile_unchanged": true,
+    "storage_write_calls": {
+      "profile_commits": 0,
+      "standalone_mode_writes": 0
+    },
+    "source_session_actions_unchanged": true,
+    "status": "Melee GCI must be exactly 90176 bytes; selected file has 90177 bytes."
+  },
+  "valid_input": {
+    "file_size": 90176,
+    "fixture": "Synthetic valid-size GCI encoded by the project codec for this Settings-controller regression; not Melee-written or Dolphin-written.",
+    "fixture_sha256": "03416b8a9d1352a214c303a3fe76017b87a589b9dfce197d40d13a13d4dd3726",
+    "array_buffer_calls": 1,
+    "confirmation_presented": true,
+    "stored_mode_after_accept": "personal",
+    "profile_revision_after_accept": 1,
+    "stored_profile_sha256": "5f2aa764bb47ad3df85bd2e299dc800e592f9ef7d0855f0ffaf332cebe5d0afe",
+    "atomic_profile_commit_calls": 1,
+    "standalone_mode_write_calls": 0,
+    "source_configure_calls_after_initial_bind": 1,
+    "source_start_calls_after_initial_bind": 1
+  },
+  "checks": [
+    "Oversized GCI is rejected by File.size before File.arrayBuffer().",
+    "Rejected input presents no import confirmation and changes no stored profile, mode, or source-session actions.",
+    "An exact-size valid GCI is read, parsed, confirmed, atomically imported as Personal progress, and follows the source restart path."
+  ],
+  "limits": [
+    "The browser test uses the current Settings and storage modules over loopback with a stub source-session adapter; it does not launch Melee or replace the existing production-player lifecycle evidence.",
+    "The valid-size input is synthetic and establishes no Melee/Dolphin interoperability claim. The accepted Dolphin-written round-trip receipt is unchanged."
+  ]
+}

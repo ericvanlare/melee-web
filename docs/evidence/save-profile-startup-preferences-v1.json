@@ -1,0 +1,440 @@
+{
+  "schema": "webmelee-save-startup-preferences-v1",
+  "scope": "Production audio-player regression for source-owned startup preferences. It uses a synthetic custom-preference GCI, clearly distinguished from the accepted game-written Dolphin receipt.",
+  "runtime_source_commit": "1f26be22bd4c7721824994863c758d035701d808",
+  "runtime_profile": "audio-player",
+  "runtime_hash": "a0d54e910d866d58",
+  "package_identity_sha256": "5580731e8e5739d25d27a4a1b50f7b4f17ede81e3fba4034f655eb524eda36bc",
+  "runtime_wasm_sha256": "08402072fc30c66d8147198bf7b611f74e24a4fe0ccf005da03dda74a16f4ef3",
+  "browser_test_script_sha256": "4a817f2cdab01b6908d0ea6d5ff3f111e60f86fbe22d9f6f2481eaa43a5fd6fd",
+  "browser": "154.0.8037.58",
+  "browser_mode": "headless",
+  "disc": {
+    "identity": "Owned Super Smash Bros. Melee USA revision 1.02 (GALE01)",
+    "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+  },
+  "prior_game_written_input": {
+    "accepted_roundtrip_receipt": "save-profile-dolphin-roundtrip-v1.json",
+    "webmelee_export_sha256": "a07675a6ca8c7cc7f948f480ad7c3fcf285efa28f427c1e7a9d2ec3a32b06e41",
+    "fields_reused_in_synthetic_fixture": {
+      "powerCount": 3,
+      "powerTime": 28,
+      "name": "8260826082618261"
+    },
+    "note": "This input is an existing WebMelee export from the accepted Dolphin round trip. The custom-preference GCI was synthesized and re-encoded for this regression; no claim that it was Dolphin-written."
+  },
+  "fresh_personal_first_commit": {
+    "prior_profile_present": false,
+    "revision": 1,
+    "source_defaults": {
+      "itemFrequency": 2,
+      "itemMask": "ffffffffffffffff",
+      "rumble": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "savedLanguage": 1
+    },
+    "gci_sha256": "3b58f6bf8e87ec7f022ae20fb0b64424b20648bbe3f88bc96b4491be7ed0cf29"
+  },
+  "synthetic_custom_fixture": {
+    "sha256": "5d58718902f7499f780b786224cfda074f0671d20ca722f10249244af86aad0a",
+    "fields": {
+      "characters": "07ff",
+      "stages": "07ff",
+      "features": 15,
+      "powerCount": 3,
+      "powerTime": 28,
+      "itemFrequency": 1,
+      "itemMask": "0000000000000001",
+      "rumble": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "savedLanguage": 1,
+      "name": "8260826082618261"
+    },
+    "construction": "Started from this production player’s Everything unlocked export; copied a source-valid name row and PowerCount/PowerTime from the accepted WebMelee export; changed only the tested item frequency, 8-byte item mask and rumble values; encoded with the project GCI codec. This is synthetic test input, not Dolphin-written evidence."
+  },
+  "production_player_scenario": {
+    "default_mode": "everything",
+    "settings_import_confirmation": "Load this GameCube save file?\n\nThis becomes your Personal progress save. The import switches Save mode to Personal progress. The game will restart now.\n\nCancel\nLoad save and restart",
+    "import_status": "Save loaded. Personal progress is active and the game restarted.",
+    "input_configuration": "Player 1 keyboard / B0XX; Player 2 off",
+    "route": [
+      "ordinary browser keyboard input entered original CSS/SSS route and phase 7 match",
+      "waited while production Personal autosaver sampled native source snapshots",
+      "Settings export performed the final flush"
+    ],
+    "native_source_snapshots": 8,
+    "personal_revision_before_forced_export_flush": 2,
+    "personal_revision_after_forced_export_flush": 2,
+    "fields_after_autosave_and_export": {
+      "characters": "07ff",
+      "stages": "07ff",
+      "features": 15,
+      "powerCount": 3,
+      "powerTime": 28,
+      "itemFrequency": 1,
+      "itemMask": "0000000000000001",
+      "rumble": [
+        0,
+        1,
+        0,
+        1
+      ],
+      "savedLanguage": 1,
+      "name": "8260826082618261"
+    },
+    "export_gci_sha256": "74edb2ffecef89a1e013f9c84121066fb543c95b5c68961be6f7ececf49db4cf",
+    "source_trophy_ledger_delta": {
+      "category_flags_save_data_offset": "0x46A",
+      "category_flags_before_after": {
+        "before": 128,
+        "after": 132
+      },
+      "trophy_flags_save_data_offset": "0x46C",
+      "changed_entry_count": 72,
+      "raw_word_transitions": {
+        "0x8001->0xc001": 72
+      },
+      "changed_indices": [
+        88,
+        89,
+        90,
+        92,
+        94,
+        95,
+        99,
+        101,
+        102,
+        104,
+        106,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        122,
+        123,
+        124,
+        126,
+        128,
+        130,
+        135,
+        136,
+        138,
+        142,
+        143,
+        144,
+        151,
+        152,
+        156,
+        157,
+        158,
+        163,
+        165,
+        166,
+        180,
+        193,
+        198,
+        202,
+        206,
+        208,
+        212,
+        213,
+        215,
+        216,
+        224,
+        225,
+        229,
+        232,
+        233,
+        236,
+        237,
+        239,
+        245,
+        246,
+        247,
+        250,
+        251,
+        253,
+        254,
+        255,
+        259,
+        261,
+        271,
+        276,
+        279,
+        283,
+        286,
+        287,
+        289
+      ],
+      "note": "Observed original source trophy-ledger mutations during the supported route; not attributed to a player-earned trophy event."
+    },
+    "browser_reload_and_relaunch": {
+      "mode": "personal",
+      "revision": 2,
+      "fields": {
+        "characters": "07ff",
+        "stages": "07ff",
+        "features": 15,
+        "powerCount": 3,
+        "powerTime": 28,
+        "itemFrequency": 1,
+        "itemMask": "0000000000000001",
+        "rumble": [
+          0,
+          1,
+          0,
+          1
+        ],
+        "savedLanguage": 1,
+        "name": "8260826082618261"
+      },
+      "export_gci_sha256": "ac20fe78d7af65ccd7e58064e62f13ddb284debb29a5750e45eedebfc469f751",
+      "full_declared_profile_equal_to_post_autosave_export": true
+    }
+  },
+  "checks": [
+    "fresh Personal first commit uses source defaults",
+    "browser reload restores Personal and relaunch exports existing game-written progress",
+    "synthetic custom preferences survive production import, autosave, export, reload and relaunch"
+  ],
+  "limits": [
+    "The custom preference fixture is synthetic and does not replace or modify the accepted Dolphin interoperability receipt.",
+    "The tested preferences were verified through the production audio-player Settings UI, source snapshot, IndexedDB commit, GCI export, browser reload and source relaunch.",
+    "The browser test does not establish audible fidelity or full-match gameplay accuracy.",
+    "Atomic storage protects committed generations; it cannot guarantee preservation of progress that had not completed a commit before a forced close."
+  ],
+  "production_audio_player_validation": {
+    "source_commit": "1f26be22bd4c7721824994863c758d035701d808",
+    "runtime_hash": "a0d54e910d866d58",
+    "package_identity_sha256": "5580731e8e5739d25d27a4a1b50f7b4f17ede81e3fba4034f655eb524eda36bc",
+    "package_file_count": 38,
+    "package_total_bytes": 18208959,
+    "browser": "154.0.8037.58",
+    "browser_mode": "headless",
+    "result": "pass",
+    "check_count": 19,
+    "checks": [
+      "disc selection during graphics preparation",
+      "isolated WebGPU/Wasm startup and direct original-style player",
+      "save settings export, import, persistence, compare-and-swap and recovery",
+      "Personal autosave skips identical snapshots and retains verified generations",
+      "Settings stores source snapshots without browser-side SaveData preference patches",
+      "controls, focus and preferences survive a fresh document",
+      "disclosure before file selection, invalid-disc errors and selectable retry",
+      "narrow layouts and fullscreen",
+      "owned-disc import, native preparation and original CSS",
+      "pause/resume acknowledges the shared native owner",
+      "confirmed and canceled save-mode changes restart with the retained disc",
+      "ordinary B0XX keyboard enters original SSS and cancels back to CSS",
+      "Eject from Main completes native cleanup before disc reimport",
+      "Eject from Title completes native cleanup before disc reimport",
+      "retail CSS to Main to Title to Main to Versus to CSS route repeats twice",
+      "CSS to SSS to supported Mario/Final Destination match to Results to CSS after menu route",
+      "CSS Eject still retires the original session",
+      "legal pages use their readable document stylesheet and serve full notices",
+      "keyboard-only session persists its preferences; no application upload or background connections"
+    ],
+    "default_mode": "everything",
+    "confirmed_import_retained_disc": true,
+    "canceled_import_unchanged": true,
+    "oversized_rejected_before_read": true,
+    "malformed_rejected_before_confirmation": true,
+    "imported_export_fields": [
+      "completion masks",
+      "feature unlocks",
+      "item frequency",
+      "item selections",
+      "rumble preferences",
+      "identifiable name"
+    ],
+    "audio_pcm_transport_by_phase": {
+      "css-first-entry": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 24,
+        "nonzeroPcmSamples": 25596,
+        "pcmFrames": 12800
+      },
+      "main-before-eject": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 325,
+        "nonzeroPcmSamples": 346617,
+        "pcmFrames": 173332
+      },
+      "main-css-after-reimport": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 6,
+        "nonzeroPcmSamples": 6398,
+        "pcmFrames": 3200
+      },
+      "title-before-eject": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 112,
+        "nonzeroPcmSamples": 119438,
+        "pcmFrames": 59733
+      },
+      "title-css-after-reimport": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 6,
+        "nonzeroPcmSamples": 6398,
+        "pcmFrames": 3200
+      },
+      "route-1-main": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 100,
+        "nonzeroPcmSamples": 106646,
+        "pcmFrames": 53333
+      },
+      "route-1-title": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 152,
+        "nonzeroPcmSamples": 161781,
+        "pcmFrames": 81066
+      },
+      "route-1-main-after-title": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 218,
+        "nonzeroPcmSamples": 231791,
+        "pcmFrames": 116266
+      },
+      "route-1-css-return": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 361,
+        "nonzeroPcmSamples": 384298,
+        "pcmFrames": 192533
+      },
+      "route-2-main": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 460,
+        "nonzeroPcmSamples": 489889,
+        "pcmFrames": 245333
+      },
+      "route-2-title": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 514,
+        "nonzeroPcmSamples": 547085,
+        "pcmFrames": 274133
+      },
+      "route-2-main-after-title": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 578,
+        "nonzeroPcmSamples": 614934,
+        "pcmFrames": 308266
+      },
+      "route-2-css-return": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 719,
+        "nonzeroPcmSamples": 765316,
+        "pcmFrames": 383466
+      },
+      "routed-sss": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 798,
+        "nonzeroPcmSamples": 849575,
+        "pcmFrames": 425600
+      },
+      "routed-match": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 957,
+        "nonzeroPcmSamples": 1019156,
+        "pcmFrames": 510399
+      },
+      "routed-results": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 1335,
+        "nonzeroPcmSamples": 1421947,
+        "pcmFrames": 712532
+      },
+      "routed-css-after-results": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 1577,
+        "nonzeroPcmSamples": 1674981,
+        "pcmFrames": 841598
+      }
+    },
+    "dedicated_audio_lifecycle": {
+      "result": "pass",
+      "check_count": 12,
+      "checks": [
+        "preview startup and reviewed native artifact names",
+        "replace an owned early selection before native import",
+        "authorized-disc import and original CSS emits nonzero PCM",
+        "pause and resume preserve the audio owner",
+        "ordinary B0XX input enters original SSS with audio",
+        "ordinary B0XX A confirms the supported Mario/Final Destination match",
+        "ordinary B0XX pause and No Contest return through original CSS with audio",
+        "second ordinary B0XX CSS to SSS transition emits audio",
+        "second ordinary B0XX entry reaches Mario/Final Destination with audio",
+        "scoped audio asset generations are complete and never use legacy file upload",
+        "Eject closes Web Audio and reloads the player document",
+        "same-origin GET-only session has no page, CSP, socket or upload failures"
+      ],
+      "pcm_transport_by_phase": {
+        "css": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 2,
+          "nonzeroPcmSamples": 2130,
+          "pcmFrames": 1066
+        },
+        "css-resume": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 10,
+          "nonzeroPcmSamples": 10664,
+          "pcmFrames": 5333
+        },
+        "sss": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 100,
+          "nonzeroPcmSamples": 106653,
+          "pcmFrames": 53333
+        },
+        "match": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 274,
+          "nonzeroPcmSamples": 292228,
+          "pcmFrames": 146133
+        },
+        "css-after-no-contest": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 936,
+          "nonzeroPcmSamples": 969146,
+          "pcmFrames": 578132
+        },
+        "sss-after-no-contest": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 1032,
+          "nonzeroPcmSamples": 1071531,
+          "pcmFrames": 629332
+        },
+        "match-after-no-contest": {
+          "sampleRate": 32000,
+          "nonzeroPcmMessages": 1206,
+          "nonzeroPcmSamples": 1257110,
+          "pcmFrames": 722132
+        }
+      },
+      "results_transition": {
+        "sampleRate": 32000,
+        "nonzeroPcmMessages": 877,
+        "nonzeroPcmSamples": 906713
+      },
+      "after_eject_contexts": 0,
+      "after_eject_worklets": 0
+    },
+    "scope": "Production audio-enabled public entry, ordinary keyboard UI, original menu route, supported match/results lifecycle, Web Audio initialization and nonzero PCM transport. No retail pixel/PCM equivalence, audible-quality, physical-controller or foreground-timing claim.",
+    "limits": [
+      "Headless Web Audio and PCM transport checks do not establish audible fidelity or retail PCM/pixel equivalence.",
+      "The production browser route covers the supported Mario/Final Destination match path, not full-game accuracy.",
+      "Atomic storage protects committed generations; it cannot guarantee preservation of progress that had not completed a commit before a forced close."
+    ]
+  }
+}

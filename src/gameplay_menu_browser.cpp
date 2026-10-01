@@ -1,5 +1,6 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
+#include "gameplay_save_profile.h"
 #include "gameplay_match_session.hpp"
 #include "gameplay_results_session.hpp"
 #include "results_source_pad_schedule.hpp"
@@ -50,10 +51,12 @@ extern ResultsData lbl_8046DBE8;
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <vector>
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 #include "pipeline_provenance_runtime.h"
 #endif
@@ -225,6 +228,9 @@ unsigned reference_menu_preparations=0;
 bool replay_match_complete=false;
 int replay_outcome=0,replay_winner=-1;
 MeleeWebMenuHost* host=nullptr;
+int configured_save_mode=MELEE_WEB_SAVE_MODE_EVERYTHING;
+std::vector<uint8_t> configured_save_profile;
+constexpr size_t kSaveProfileBytes=MELEE_WEB_SAVE_PROFILE_CARD_BYTES;
 // The owner that is running right now, expressed in the recipe's scene codes.
 // Zero means the host is between scenes and cannot consume a replay sample.
 int observed_replay_scene(){
@@ -1873,6 +1879,60 @@ int melee_web_native_asset_commit(unsigned generation){try{
 int melee_web_native_asset_abort(unsigned generation){try{
  asset_scope.abort(generation);return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_set_save_profile(int mode,const uint8_t* data,unsigned size){try{
+ check(!host&&!world&&!match&&!results&&!prize&&!host_entered,
+       "Unload source owners before changing the staged save profile");
+ check(mode==MELEE_WEB_SAVE_MODE_EVERYTHING||mode==MELEE_WEB_SAVE_MODE_PERSONAL,
+       "Unsupported save mode");
+ check((size==0&&!data)||(size==kSaveProfileBytes&&data),
+       "Save profile must be empty or the exact original card-manifest extent");
+ check(mode!=MELEE_WEB_SAVE_MODE_EVERYTHING||size==0,
+       "Everything unlocked uses its original source baseline");
+ std::vector<uint8_t> next;
+ if(size)next.assign(data,data+size);
+ configured_save_profile=std::move(next);configured_save_mode=mode;
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_snapshot_save_profile(uint8_t* output,unsigned size,int baseline){try{
+ check(host!=nullptr,"A live source profile is unavailable for export");
+ char error[256]{};
+ check(melee_web_menu_host_snapshot_card_data(host,baseline,output,size,error,sizeof(error)),error);
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_snapshot_unlocked_baseline(uint8_t* output,unsigned size){try{
+ check(output&&size==MELEE_WEB_SAVE_PROFILE_CARD_BYTES,
+       "Baseline export requires the exact original card-manifest extent");
+ if(host){
+  char error[256]{};
+  check(melee_web_menu_host_snapshot_card_data(host,1,output,size,error,sizeof(error)),error);
+  return 1;
+ }
+ check(!world&&!match&&!results&&!prize&&!source_session_owned,
+       "Close source owners before establishing the original save baseline");
+ begin_source_session();
+ char error[256]{};
+ MeleeWebSaveProfileOwner* profile=melee_web_save_profile_owner_create(error,sizeof(error));
+ if(!profile)throw std::runtime_error(error);
+ bool active=false;
+ try{
+  check(melee_web_save_profile_owner_activate(profile,error,sizeof(error)),error);active=true;
+  check(melee_web_save_profile_owner_initialize_default(profile,error,sizeof(error)),error);
+  check(melee_web_save_profile_owner_initialize_everything(profile,error,sizeof(error)),error);
+  check(melee_web_save_profile_owner_snapshot_card_data(profile,output,size,error,sizeof(error)),error);
+  check(melee_web_save_profile_owner_deactivate(profile,error,sizeof(error)),error);active=false;
+  check(melee_web_save_profile_owner_destroy(profile,error,sizeof(error)),error);profile=nullptr;
+  check(melee_web_gameplay_session_end(error,sizeof(error)),error);source_session_owned=false;
+ }catch(...){
+  if(active&&!melee_web_save_profile_owner_deactivate(profile,nullptr,0))std::abort();
+  if(profile&&!melee_web_save_profile_owner_destroy(profile,nullptr,0))std::abort();
+  if(source_session_owned){
+   if(!melee_web_gameplay_session_end(nullptr,0))std::abort();
+   source_session_owned=false;
+  }
+  throw;
+ }
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_file(const char* name,const uint8_t* data,unsigned size){try{
 if(scoped_assets)throw std::runtime_error("Scoped disc imports require an asset transaction");
  if(world||match||results||prize||!name||!data||!size||size>64*1024*1024)
@@ -1906,7 +1966,9 @@ int melee_web_native_menu_prepare(){try{
  // simulation callback runs during this preparation phase.
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  begin_source_session();
- host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
+ host=melee_web_menu_host_create_with_profile(
+     configured_save_mode,configured_save_profile.empty()?nullptr:configured_save_profile.data(),
+     configured_save_profile.size(),error,sizeof(error));check(host!=nullptr,error);
  // One unentered menu preparation belongs to the canonical fresh import.
  // Repeating it changes allocation history even without entering a source scene.
  if(reference_menu_preparations++)reference_heap_used=true;
@@ -1930,7 +1992,9 @@ int melee_web_native_menu_launch(){try{
  if(match||results||prize||host_entered||(host&&!world))close();
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  begin_source_session();
- char error[256]{};if(!host){host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);}
+ char error[256]{};if(!host){host=melee_web_menu_host_create_with_profile(
+     configured_save_mode,configured_save_profile.empty()?nullptr:configured_save_profile.data(),
+     configured_save_profile.size(),error,sizeof(error));check(host!=nullptr,error);}
  VISetFrameBufferScale(1);enter_world();
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  // The initial owner has entered but has not advanced a source tick. Settle
