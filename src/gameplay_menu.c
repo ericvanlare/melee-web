@@ -560,7 +560,8 @@ static int stage_selection_valid(int stkind, int allow_unselected)
 }
 
 static int css_selection_valid_internal(const CSSData* css,
-                                        int allow_unselected_stage)
+                                        int allow_unselected_stage,
+                                        int allow_unavailable_progress_character)
 {
     int i;
     int count;
@@ -584,11 +585,31 @@ static int css_selection_valid_internal(const CSSData* css,
     for (i = 0; i < count; i++) {
         const PlayerInitData* player=&css->vs.start.players[i];
         const MeleeWebFighterContent* content=melee_web_fighter_content(player->ckind);
-        if(!melee_web_player_selection_supported(player) ||
-           !melee_web_menu_character_available(player->ckind) ||
-           player->stocks != 0 ||
-           !content || (player->slot?player->slot-1:i)!=i ||
-           player->color>=content->costumes || player->sub_color>4) return 0;
+        if (!melee_web_player_selection_supported(player) ||
+            player->stocks != 0 ||
+            (player->slot ? player->slot - 1 : i) != i ||
+            player->sub_color > 4)
+        {
+            return 0;
+        }
+        if (content == NULL) {
+            /* Retail can briefly choose an unimplemented roster entry while
+             * the user is still editing CSS. Preserve that menu
+             * state for progress observation, but never accept it at Start,
+             * OnExit, SSS commit, or match construction. */
+            if (!allow_unavailable_progress_character || player->ckind < 0 ||
+                player->ckind >= CKIND_PLAYABLE_COUNT)
+            {
+                return 0;
+            }
+        } else if (player->color >= content->costumes) {
+            return 0;
+        }
+        if (!allow_unavailable_progress_character &&
+            !melee_web_menu_character_available(player->ckind))
+        {
+            return 0;
+        }
     }
     for (i = count; i < GM_MAX_PLAYERS; i++) {
         if (css->vs.start.players[i].slot_type != Gm_PKind_NA) {
@@ -603,7 +624,7 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
     /* fn_80262F44 uses this guard before accepting Start. CSS has selected
      * fighters, but the following SSS still owns the stage selection. Keep
      * the original unset cache value until that scene commits its stage. */
-    return css_selection_valid_internal(css, 1);
+    return css_selection_valid_internal(css, 1, 0);
 }
 
 static int match_selection_valid(const StartMeleeData* start)
@@ -677,7 +698,7 @@ static int css_progress_valid(const CSSData* css)
             p->ckind = CKIND_MARIO;
         }
     }
-    return css_selection_valid_internal(&view, 1);
+    return css_selection_valid_internal(&view, 1, 1);
 }
 
 static int vs_selection_valid(const VsModeData* vs, int allow_unselected_stage)
@@ -689,7 +710,7 @@ static int vs_selection_valid(const VsModeData* vs, int allow_unselected_stage)
     memset(&view, 0, sizeof(view));
     view.match_type = VS_MELEE;
     view.vs = *vs;
-    return css_selection_valid_internal(&view, allow_unselected_stage);
+    return css_selection_valid_internal(&view, allow_unselected_stage, 0);
 }
 
 int melee_web_menu_sss_selection_valid(const SSSData* sss)
@@ -906,7 +927,7 @@ int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
         return 0;
     }
     if (session->phase != MELEE_WEB_MENU_SSS_READY ||
-        !css_selection_valid_internal(&session->css, 1))
+        !css_selection_valid_internal(&session->css, 1, 0))
     {
         return fail(error, error_size,
                     "SSS requires a valid committed Mario CSS selection");
@@ -1063,7 +1084,7 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
                     "CSS has no completed original transition request");
     }
     parent_route = session->css_parent_route_requested;
-    if (!css_selection_valid_internal(&session->css, 1)) {
+    if (!css_selection_valid_internal(&session->css, 1, 0)) {
         return fail(error, error_size,
                     "Cannot commit an unavailable character selection");
     }
@@ -1095,7 +1116,7 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
     }
     /* OnExit may publish source-private selection state. Validate that
      * payload before making the next scene available to the host. */
-    if (!css_selection_valid_internal(&session->css, 1)) {
+    if (!css_selection_valid_internal(&session->css, 1, 0)) {
         session->phase = MELEE_WEB_MENU_CLOSED;
         return fail(error, error_size, "CSS published an unavailable selection");
     }
