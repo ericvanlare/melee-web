@@ -172,6 +172,7 @@ struct ProbeHarness {
   bool cpu_probe_configured = true;
   bool cpu_probe_valid = true;
   bool cpu_probe_closed = false;
+  bool cpu_probe_effect_group_found = false;
   std::atomic<bool> cpu_probe_published{false};
   std::string cpu_probe_output_path = "probe.json";
   u32 cpu_probe_match = 2;
@@ -182,6 +183,10 @@ struct ProbeHarness {
       std::make_unique<CpuProbeRecord[]>(CPU_PROBE_MAX_RECORDS);
   std::array<u32, 4> fighter_pointers{};
   std::array<bool, 4> fighter_present{};
+  std::array<std::array<u32, 2>, 4> fighter_entity_pointers{};
+  std::array<std::array<u32, 2>, 4> fighter_entity_kinds{};
+  std::array<u8, 4> fighter_entity_count{};
+  u32 cpu_probe_samus_effect_palette_address = 0;
   bool match_active = true;
   bool setup_ready = true;
   u32 match_index = 2;
@@ -203,6 +208,29 @@ static void StoreBE32(Core::System* system, u32 address, u32 value) {
 
 static const ReferenceCapture::CpuProbePoint& ProbePoint() {
   return ReferenceCapture::CPU_PROBE_POINTS[0];
+}
+
+static const ReferenceCapture::CpuProbePoint& SamusEffectProbePoint() {
+  assert(ReferenceCapture::CPU_PROBE_POINTS[32].expected_word == 0xa0c30000);
+  return ReferenceCapture::CPU_PROBE_POINTS[32];
+}
+
+static const ReferenceCapture::CpuProbePoint& SamusEffectBankLoadProbePoint() {
+  assert(ReferenceCapture::CPU_PROBE_POINTS[33].address == 0x803984f4);
+  assert(ReferenceCapture::CPU_PROBE_POINTS[33].expected_word == 0x7c0802a6);
+  return ReferenceCapture::CPU_PROBE_POINTS[33];
+}
+
+static const ReferenceCapture::CpuProbePoint& SamusEffectTlutProbePoint() {
+  assert(ReferenceCapture::CPU_PROBE_POINTS[34].address == 0x8033f024);
+  assert(ReferenceCapture::CPU_PROBE_POINTS[34].expected_word == 0x38000000);
+  return ReferenceCapture::CPU_PROBE_POINTS[34];
+}
+
+static const ReferenceCapture::CpuProbePoint& SamusEffectParticleProbePoint() {
+  assert(ReferenceCapture::CPU_PROBE_POINTS[35].address == 0x80398c04);
+  assert(ReferenceCapture::CPU_PROBE_POINTS[35].expected_word == 0x7c0802a6);
+  return ReferenceCapture::CPU_PROBE_POINTS[35];
 }
 
 static void Prepare(ReferenceCapture::ProbeHarness* harness, Core::System* system,
@@ -331,6 +359,157 @@ int main() {
     assert(!missing_close.WriteCpuProbe());
     assert(missing_close.invalid);
     assert(missing_close.error.find("did not close") != std::string::npos);
+  }
+
+  // The Samus-only diagnostic reads the original relative group and palette
+  // target without mutating guest memory; low MEM1 aliases are sampled through
+  // their equivalent cached address.
+  {
+    Core::System system;
+    PowerPC::PowerPCState state;
+    ProbeHarness effect_probe;
+    Prepare(&effect_probe, &system, &state);
+    const auto& point = SamusEffectProbePoint();
+    StoreBE32(&system, point.address, point.expected_word);
+    state.gpr[4] = 0x80020000;
+    StoreBE32(&system, 0x80020000, 1);
+    StoreBE32(&system, 0x80020004, 0x100);
+    StoreBE32(&system, 0x80020100, 1);
+    StoreBE32(&system, 0x80020104, 9);
+    StoreBE32(&system, 0x8002010c, 64);
+    StoreBE32(&system, 0x80020110, 64);
+    StoreBE32(&system, 0x80020114, 0);
+    StoreBE32(&system, 0x80020118, 0x40);
+    StoreBE32(&system, 0x8002011c, 0x80a8812a);
+    std::fill(system.GetMemory().GetPointerForRange(0x80aa812a, 512),
+              system.GetMemory().GetPointerForRange(0x80aa812a, 512) + 512, 0x5a);
+    std::fill(system.GetMemory().GetPointerForRange(0x80a8812a, 512),
+              system.GetMemory().GetPointerForRange(0x80a8812a, 512) + 512, 0x6b);
+    effect_probe.RecordCpuProbe(&system, point.address, point, &state, 100);
+    assert(effect_probe.cpu_probe_record_count == 1);
+    const auto& record = effect_probe.cpu_probe_records[0];
+    assert(record.effect_group_present && record.effect_palette_readable);
+    assert(record.effect_bank_base == 0x80020000);
+    assert(record.effect_group_address == 0x80020100);
+    assert(record.effect_palette_address == 0x00aa812a);
+    assert(record.effect_palette[0] == 0x5a && record.effect_palette[511] == 0x5a);
+    assert(record.effect_literal_palette_readable);
+    assert(record.effect_literal_palette[0] == 0x6b && record.effect_literal_palette[511] == 0x6b);
+    std::string json;
+    effect_probe.CloseCpuProbe();
+    assert(effect_probe.BuildCpuProbeJson(&json));
+    assert(json.find("\"samus_effect_group\"") != std::string::npos);
+    assert(json.find("\"palette_address\":\"0x00aa812a\",\"palette_readable\":true") !=
+           std::string::npos);
+    assert(json.find("\"literal_palette_address\":\"0x80a8812a\",\"literal_palette_readable\":true") !=
+           std::string::npos);
+    assert(json.find("\"literal_palette_512\":\"0x6b6b") != std::string::npos);
+    assert(json.find("\"palette_readable\":true") != std::string::npos);
+    assert(json.find("\"palette_512\":\"0x5a5a") != std::string::npos);
+  }
+
+  // The Samus bank can be located before match setup or outside the selected
+  // CPU-register window. Preserve the first exact authored group there without
+  // admitting unrelated pre-match calls into the bounded probe stream.
+  {
+    Core::System system;
+    PowerPC::PowerPCState state;
+    ProbeHarness effect_probe;
+    Prepare(&effect_probe, &system, &state);
+    const auto& point = SamusEffectProbePoint();
+    StoreBE32(&system, point.address, point.expected_word);
+    state.gpr[4] = 0x80020000;
+    StoreBE32(&system, 0x80020000, 1);
+    StoreBE32(&system, 0x80020004, 0x100);
+    StoreBE32(&system, 0x80020100, 1);
+    StoreBE32(&system, 0x80020104, 9);
+    StoreBE32(&system, 0x8002010c, 64);
+    StoreBE32(&system, 0x80020110, 64);
+    StoreBE32(&system, 0x80020114, 0);
+    StoreBE32(&system, 0x80020118, 0x40);
+    StoreBE32(&system, 0x8002011c, 0x80a8812a);
+    std::fill(system.GetMemory().GetPointerForRange(0x80aa812a, 512),
+              system.GetMemory().GetPointerForRange(0x80aa812a, 512) + 512, 0x7c);
+    std::fill(system.GetMemory().GetPointerForRange(0x80a8812a, 512),
+              system.GetMemory().GetPointerForRange(0x80a8812a, 512) + 512, 0x3d);
+    effect_probe.match_active = false;
+    effect_probe.setup_ready = false;
+    effect_probe.match_index = 0;
+    effect_probe.RecordCpuProbe(&system, point.address, point, &state, 0);
+    assert(effect_probe.cpu_probe_record_count == 1);
+    assert(effect_probe.cpu_probe_effect_group_found);
+    const auto& record = effect_probe.cpu_probe_records[0];
+    assert(record.match == 0 && record.source_tick == 0);
+    assert(record.effect_group_present && record.effect_palette_readable);
+    assert(record.effect_palette[0] == 0x7c && record.effect_palette[511] == 0x7c);
+    assert(record.effect_literal_palette_readable);
+    assert(record.effect_literal_palette[0] == 0x3d && record.effect_literal_palette[511] == 0x3d);
+  }
+
+  // Trace the post-Locate texture-table pointer at bank registration, then
+  // require GXInitTlutObj to consume that exact pointer before reporting use.
+  {
+    Core::System system;
+    PowerPC::PowerPCState state;
+    ProbeHarness effect_probe;
+    Prepare(&effect_probe, &system, &state);
+    const auto& load = SamusEffectBankLoadProbePoint();
+    const auto& tlut = SamusEffectTlutProbePoint();
+    const auto& particle = SamusEffectParticleProbePoint();
+    StoreBE32(&system, load.address, load.expected_word);
+    StoreBE32(&system, tlut.address, tlut.expected_word);
+    StoreBE32(&system, particle.address, particle.expected_word);
+    state.gpr[3] = 34;
+    state.gpr[5] = 0x80030000;
+    StoreBE32(&system, state.gpr[5], 1);
+    StoreBE32(&system, state.gpr[5] + 4, 0x80030100);
+    StoreBE32(&system, 0x80030100, 1);
+    StoreBE32(&system, 0x80030104, 9);
+    StoreBE32(&system, 0x8003010c, 64);
+    StoreBE32(&system, 0x80030110, 64);
+    StoreBE32(&system, 0x80030114, 0);
+    StoreBE32(&system, 0x80030118, 0x80030200);
+    StoreBE32(&system, 0x8003011c, 0x01d3ac8a);
+    effect_probe.RecordCpuProbe(&system, load.address, load, &state, 99);
+    assert(effect_probe.cpu_probe_record_count == 1);
+    const auto& loaded = effect_probe.cpu_probe_records[0];
+    assert(loaded.samus_effect_loaded_group_present);
+    assert(loaded.samus_effect_loaded_bank == 34);
+    assert(loaded.samus_effect_loaded_texture_base == 0x80030000);
+    assert(loaded.samus_effect_loaded_group_address == 0x80030100);
+    assert(loaded.samus_effect_loaded_image_address == 0x80030200);
+    assert(loaded.samus_effect_loaded_palette_address == 0x01d3ac8a);
+
+    state.gpr[5] = 34;
+    state.gpr[6] = 34000;
+    state.gpr[7] = 0;
+    effect_probe.RecordCpuProbe(&system, particle.address, particle, &state, 102);
+    assert(effect_probe.cpu_probe_record_count == 2);
+    const auto& spawned = effect_probe.cpu_probe_records[1];
+    assert(spawned.samus_effect_particle_spawn);
+    assert(spawned.samus_effect_particle_bank == 34);
+    assert(spawned.samus_effect_particle_kind == 34000);
+    assert(spawned.samus_effect_particle_group == 0);
+
+    state.gpr[5] = 0x80030000;
+    state.gpr[4] = loaded.samus_effect_loaded_palette_address;
+    effect_probe.RecordCpuProbe(&system, tlut.address, tlut, &state, 102);
+    assert(effect_probe.cpu_probe_record_count == 3);
+    const auto& consumed = effect_probe.cpu_probe_records[2];
+    assert(consumed.samus_effect_gx_tlut_call);
+    assert(consumed.samus_effect_gx_tlut_address == 0x01d3ac8a);
+
+    effect_probe.CloseCpuProbe();
+    std::string json;
+    assert(effect_probe.BuildCpuProbeJson(&json));
+    assert(json.find("\"samus_effect_loaded_group\":{\"bank\":34") !=
+           std::string::npos);
+    assert(json.find("\"palette_address\":\"0x01d3ac8a\"}") !=
+           std::string::npos);
+    assert(json.find("\"samus_effect_gx_tlut\":{\"palette_address\":\"0x01d3ac8a\"}") !=
+           std::string::npos);
+    assert(json.find("\"samus_effect_particle_spawn\":{\"bank\":34,\"kind\":34000,\"texture_group\":0}") !=
+           std::string::npos);
   }
   return 0;
 }

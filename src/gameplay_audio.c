@@ -79,7 +79,6 @@ MeleeWebAudio* melee_web_audio_begin(const MeleeWebAudioInput* in,char* e,size_t
  uint32_t binding_count=0;
  for(uint32_t i=0;i<in->sample_count;i++){
   const MeleeWebAudioSample* s=&in->samples[i];if(s->id>65535||s->channels<1||s->channels>2||!s->rate||s->rate>192000){fail(e,n,"Invalid synth sample metadata");return NULL;}
-  for(uint32_t j=0;j<i;j++)if(in->samples[j].id==s->id){fail(e,n,"Duplicate synth sample ID");return NULL;}
   for(uint32_t j=0;j<s->channels;j++){const MeleeWebAudioChannel* c=&s->channel[j];if(!c->pcm||!c->frames||c->current_nibble%16<2||c->end_nibble%16<2||c->current_nibble>c->end_nibble||c->end_nibble>0xfffffff||c->looping>1||(c->looping&&(!c->loop_pcm||!c->loop_frames||c->loop_nibble%16<2||c->loop_nibble<c->current_nibble||c->loop_nibble>c->end_nibble))){fail(e,n,"Invalid PCM binding");return NULL;}}
   for(uint32_t j=0;j<s->channels;j++){
    const MeleeWebAudioChannel* c=&s->channel[j];uint32_t end=c->end_nibble/16*14+c->end_nibble%16-2,start=c->current_nibble/16*14+c->current_nibble%16-2;
@@ -97,7 +96,11 @@ MeleeWebAudio* melee_web_audio_begin(const MeleeWebAudioInput* in,char* e,size_t
  for(uint32_t i=0;i<in->program_count;i++)a->programs[i]=a->words+in->program_offsets[i]/4;
  void* buckets[32]={0};uint32_t bound=0;uint64_t base=0x10000;
  for(uint32_t i=0;i<in->sample_count;i++){
-  const MeleeWebAudioSample* s=&in->samples[i];SampleEntry* entry=&a->entries[i];entry->id=s->id;entry->channels=s->channels;entry->rate=s->rate;entry->next=buckets[s->id&31];buckets[s->id&31]=entry;
+  const MeleeWebAudioSample* s=&in->samples[i];SampleEntry* entry=&a->entries[i];entry->id=s->id;entry->channels=s->channels;entry->rate=s->rate;
+  /* Original HSD_Synth prepends each loaded SSM row to its ID bucket and
+   * resolves the first matching ID. Keep collisions and archive load order:
+   * character banks intentionally reuse sample IDs. */
+  entry->next=buckets[s->id&31];buckets[s->id&31]=entry;
   for(uint32_t j=0;j<s->channels;j++){
    const MeleeWebAudioChannel* c=&s->channel[j];if(base+c->end_nibble>=0x80000000u){free_owner(a);fail(e,n,"Audio address-key budget exceeded");return NULL;}
    VoiceParameters* v=&entry->voice[j];v->addr.loopFlag=c->looping;split(base+c->current_nibble,&v->addr.currentAddressHi,&v->addr.currentAddressLo);split(base+c->end_nibble,&v->addr.endAddressHi,&v->addr.endAddressLo);split(base+c->loop_nibble,&v->addr.loopAddressHi,&v->addr.loopAddressLo);

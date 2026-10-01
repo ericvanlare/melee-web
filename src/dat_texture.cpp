@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <string>
 
 namespace melee_web {
 namespace {
@@ -118,10 +119,11 @@ DatTexturePalette palette_descriptor(const DatArchive& archive, std::uint32_t of
     const std::uint32_t capacity = image_format == 8 ? 16 : image_format == 9 ? 256 : 16384;
     if (result.format > 2) reject("Unsupported TLUT palette format");
     if (!result.entries || result.entries > capacity) reject("TLUT entry count is invalid for its image format");
-    result.data_offset = required(archive, offset, std::size_t{result.entries} * 2);
+    const std::size_t authored_bytes = std::size_t{result.entries} * 2;
+    result.data_offset = required(archive, offset, authored_bytes);
     if (result.data_offset % 32) reject("GameCube palette data is not 32-byte aligned");
-    region(archive, result.data_offset, std::size_t{result.entries} * 2);
-    result.bytes = archive.range(result.data_offset, std::size_t{result.entries} * 2);
+    region(archive, result.data_offset, authored_bytes);
+    result.bytes = archive.range(result.data_offset, authored_bytes);
 
     return result;
 }
@@ -173,7 +175,7 @@ DatTexturePalette palette(const DatArchive& archive, std::uint32_t offset,
     auto result = palette_descriptor(archive, offset, image.format);
     const auto maximum = maximum_palette_index(image);
     if (maximum >= result.entries)
-        throw DatError("Image references an index outside its TLUT palette: image=" +
+        throw DatError("Image references an index outside its authored TLUT entries: image=" +
                        std::to_string(image.descriptor_offset) + " palette=" +
                        std::to_string(offset) + " maximum=" + std::to_string(maximum) +
                        " entries=" + std::to_string(result.entries));
@@ -248,9 +250,17 @@ DatTexture read_texture(const DatArchive& archive, std::uint32_t offset, bool na
     // for every non-bump texture.
     const bool native_bump_only = native_descriptors &&
         (result.source_flags & tex_bump) && !(result.source_flags & 0xf0U);
+    // HSD's native TObj path implements TEX_COORD_HILIGHT as a lighting-vector
+    // texgen. The viewer model path has no equivalent and remains UV/reflection
+    // only; preserve the authored mode for source descriptors instead of
+    // approximating it as a UV texture.
     if ((result.source_flags & ~allowed_flags) ||
-        (!(result.source_flags & 0xf0U) && !native_bump_only) || coordinates > 1)
-        reject("Unsupported texture coordinate, lightmap or behavior flags");
+        (!(result.source_flags & 0xf0U) && !native_bump_only) ||
+        coordinates > (native_descriptors ? 2U : 1U))
+        throw DatError("Unsupported texture coordinate, lightmap or behavior flags: source=" +
+            std::to_string(result.source) + " flags=" + std::to_string(result.source_flags) +
+            " coordinates=" + std::to_string(coordinates) +
+            " native=" + std::to_string(native_descriptors));
     if (coordinates == 0 && (result.source < 4 || result.source > 11))
         reject("UV texture requires a TEX0 through TEX7 vertex source");
     if (((result.source_flags >> 16) & 15U) > 8 || ((result.source_flags >> 20) & 15U) > 7)

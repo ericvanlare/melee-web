@@ -5,6 +5,7 @@
 #include "gameplay_content.h"
 #include "gameplay_menu_host.h"
 #include "gameplay_result_motion_table.hpp"
+#include "gameplay_kirby_copy_assets.hpp"
 #include <melee/pl/forward.h>
 
 #include <algorithm>
@@ -21,6 +22,44 @@
 #include <vector>
 
 using namespace melee_web;
+
+// The manifest test isolates the descriptor from source-runtime linkage. The
+// real source-table expansion and HSD owner are exercised by the compiled
+// match trace with disc-extracted Kirby donor archives.
+namespace melee_web {
+std::vector<KirbyCopyArchiveRequirement>
+kirby_copy_archive_requirements(const MeleeWebMenuMatchSelection& value)
+{
+    for (unsigned slot = 0; slot < GM_MAX_PLAYERS; ++slot) {
+        if (value.start.players[slot].slot_type == Gm_PKind_NA) break;
+        if (value.start.players[slot].ckind == CKIND_KIRBY)
+            return {{"PlKbCpGw.dat", "ftDataKirbyCopyGamewatch",
+                     FTKIND_GAMEWATCH, false},
+                    {"PlKbNrCpGw.dat", "PlyKirbyGw_Share_joint",
+                     FTKIND_GAMEWATCH, true},
+                    {"PlKbNrCpGw.dat", "PlyKirbyGw_Share_matanim_joint",
+                     FTKIND_GAMEWATCH, true}};
+    }
+    return {};
+}
+
+std::vector<KirbyCopyEffectRequirement>
+kirby_copy_effect_requirements(const MeleeWebMenuMatchSelection& value)
+{
+    bool has_kirby = false;
+    std::vector<KirbyCopyEffectRequirement> result;
+    for (unsigned slot = 0; slot < GM_MAX_PLAYERS; ++slot) {
+        const auto ckind = value.start.players[slot].ckind;
+        if (value.start.players[slot].slot_type == Gm_PKind_NA) break;
+        has_kirby |= ckind == CKIND_KIRBY;
+        if (ckind == CKIND_FOX)
+            result.push_back({"EfKbFx.dat", "effKirbyFoxDataTable", 33});
+        if (ckind == CKIND_POPONANA)
+            result.push_back({"EfKbIc.dat", "effKirbyIceDataTable", 46});
+    }
+    return has_kirby ? result : std::vector<KirbyCopyEffectRequirement>{};
+}
+} // namespace melee_web
 
 namespace {
 
@@ -142,14 +181,37 @@ void opening_match_asset_contract()
     preview.characters[1] = CKIND_KIRBY;
     preview.characters[2] = CKIND_POPONANA;
     preview.characters[3] = CKIND_SAMUS;
-    preview.stage_kind = St_Kind_Kongo;
+    preview.stage_kind = St_Kind_Last;
     preview.match_kind = 0;
+    const auto names = opening_match_asset_names(preview);
+    for (const auto name : {"PlGw.dat", "PlKb.dat", "PlPp.dat", "PlNn.dat",
+                            "PlSs.dat", "PlKbCpGw.dat", "PlKbNrCpGw.dat", "EfKbIc.dat"})
+        check(has(names, name), "Opening omitted a primary, follower or Kirby-copy resource");
+    no_duplicates(names);
+    preview.characters[3] = CKIND_ZELDA;
+    const auto forms = opening_match_asset_names(preview);
+    check(has(forms, "PlZd.dat") && has(forms, "PlSk.dat"),
+          "Opening omitted a source transform partner");
+
+    preview.stage_kind = St_Kind_Kongo;
     try {
-        (void) opening_match_asset_names(preview);
-    } catch (const std::exception& error) {
+        (void)opening_match_asset_names(preview);
+        throw std::runtime_error("Unadmitted Opening stage unexpectedly passed its asset scope");
+    } catch (const DatError& error) {
         const std::string message = error.what();
-        for (const int character : {CKIND_GAMEWATCH, CKIND_KIRBY,
-                                    CKIND_POPONANA, CKIND_SAMUS})
+        check(message.find("stage " + std::to_string(St_Kind_Kongo) +
+                           " is not admitted") != std::string::npos,
+              "Opening scope error omitted the source-selected stage");
+        check(message.find("fighter ") == std::string::npos,
+              "Opening incorrectly rejected an integrated fighter");
+    }
+    const int unsupported[] = {CKIND_MASTERH, CKIND_BOY, CKIND_GIRL, CKIND_CREZYH};
+    for (unsigned i = 0; i < 4; ++i) preview.characters[i] = unsupported[i];
+    try {
+        (void)opening_match_asset_names(preview);
+    } catch (const DatError& error) {
+        const std::string message = error.what();
+        for (const int character : unsupported)
             check(message.find("fighter " + std::to_string(character) +
                                " is not admitted") != std::string::npos,
                   "Opening scope error omitted a source-selected fighter");
@@ -168,7 +230,8 @@ void source_fighter_closure()
         CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK, CKIND_CAPTAIN, CKIND_GANON,
         CKIND_LUIGI, CKIND_PIKACHU, CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY,
         CKIND_KOOPA, CKIND_NESS, CKIND_PEACH,
-        CKIND_MEWTWO,
+        CKIND_MEWTWO, CKIND_GAMEWATCH, CKIND_KIRBY, CKIND_POPONANA, CKIND_SAMUS,
+        CKIND_YOSHI, CKIND_ZELDA, CKIND_SEAK,
     };
     for (const int character : characters) {
         const auto* content = melee_web_fighter_content(character);
@@ -195,7 +258,8 @@ void source_fighter_closure()
         check(selected != fighter_costumes().end(), "Selected costume is absent from registry");
         check(has(names, logical_model(selected->model_filename)),
               "Selected costume model is absent from descriptor");
-        check(has(names, content->effect_archive) && has(names, content->audio_bank),
+        check((!content->effect_archive || has(names, content->effect_archive)) &&
+              has(names, content->audio_bank),
               "Selected fighter effect/audio closure is incomplete");
         no_duplicates(names);
     }
@@ -219,6 +283,10 @@ void results_fighter_closure()
         {CKIND_DONKEY, "ff_dk.hps"}, {CKIND_KOOPA, "ff_mario.hps"},
         {CKIND_MEWTWO, "ff_poke.hps"}, {CKIND_NESS, "ff_nes.hps"},
         {CKIND_PEACH, "ff_mario.hps"},
+        {CKIND_GAMEWATCH, "ff_flat.hps"}, {CKIND_KIRBY, "ff_kirby.hps"},
+        {CKIND_POPONANA, "ff_ice.hps"}, {CKIND_SAMUS, "ff_samus.hps"},
+        {CKIND_YOSHI, "ff_yoshi.hps"}, {CKIND_ZELDA, "ff_link.hps"},
+        {CKIND_SEAK, "ff_link.hps"},
     };
     for (const auto& expected : fighters) {
         const auto* content = melee_web_fighter_content(expected.character);
@@ -265,6 +333,31 @@ void source_stage_music()
     }
 }
 
+void kirby_copy_manifest_closure()
+{
+    const auto kirby_vs_gw = selection(St_Kind_Last, CKIND_KIRBY,
+                                       CKIND_GAMEWATCH);
+    const auto match = match_asset_names(kirby_vs_gw);
+    check(has(match, "PlKbCpGw.dat") && has(match, "PlKbNrCpGw.dat"),
+          "Kirby match descriptor omitted the donor copy/costume archives");
+    check(!has(results_asset_names(kirby_vs_gw), "PlKbCpGw.dat"),
+          "Results descriptor incorrectly extends the Kirby match preload scope");
+    check(!has(match_asset_names(selection(St_Kind_Last, CKIND_GAMEWATCH,
+                                            CKIND_MARIO)), "PlKbCpGw.dat"),
+          "Non-Kirby match descriptor requested copy archives");
+    check(has(match_asset_names(selection(St_Kind_Last, CKIND_KIRBY,
+                                           CKIND_FOX)), "EfKbFx.dat"),
+          "Kirby/Fox match descriptor omitted its source copy-effect bank");
+    check(has(match_asset_names(selection(St_Kind_Last, CKIND_KIRBY,
+                                           CKIND_POPONANA)), "EfKbIc.dat"),
+          "Kirby/Ice Climbers match descriptor omitted its source copy-effect bank");
+    check(!has(match_asset_names(selection(St_Kind_Last, CKIND_FOX,
+                                            CKIND_POPONANA)), "EfKbFx.dat") &&
+          !has(match_asset_names(selection(St_Kind_Last, CKIND_FOX,
+                                            CKIND_POPONANA)), "EfKbIc.dat"),
+          "Non-Kirby match descriptor requested Kirby copy-effect banks");
+}
+
 void rejects_invalid_without_mutation()
 {
     auto value = selection(St_Kind_Last, CKIND_MARIO, CKIND_MARIO);
@@ -280,7 +373,7 @@ void rejects_invalid_without_mutation()
     value = selection(St_Kind_Last, CKIND_MARIO, CKIND_MARIO);
     value.player_count = 1;
     rejects([&] { (void)match_asset_names(value); });
-    value = selection(St_Kind_Last, CKIND_KIRBY, CKIND_MARIO);
+    value = selection(St_Kind_Last, CKIND_MASTERH, CKIND_MARIO);
     rejects([&] { (void)match_asset_names(value); });
     value = selection(St_Kind_Last, CKIND_MARIO, CKIND_MARIO, 5, 0);
     rejects([&] { (void)match_asset_names(value); });
@@ -356,6 +449,7 @@ int main(int argc, char** argv)
         results_fighter_closure();
         source_prize_locale_closure();
         source_stage_music();
+        kirby_copy_manifest_closure();
         rejects_invalid_without_mutation();
         std::cout << "Source menu/match/results asset descriptors, fighter/archive closure, authored music candidates, and rejection boundaries: passed\n";
         return 0;

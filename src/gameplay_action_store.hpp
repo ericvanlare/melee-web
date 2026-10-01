@@ -8,7 +8,10 @@ class GameplayActionStore {
 public:
     GameplayActionStore(std::shared_ptr<const DatArchive>, const FighterCostume&,
                         std::span<const uint8_t> container,
-                        std::shared_ptr<const DatArchive> result_motion = {});
+                        std::shared_ptr<const DatArchive> result_motion = {},
+                        std::shared_ptr<const DatArchive> nana_popo_archive = {},
+                        const FighterCostume* nana_popo_identity = nullptr,
+                        std::span<const uint8_t> nana_popo_container = {});
     ~GameplayActionStore();
     GameplayActionStore(const GameplayActionStore&) = delete;
     GameplayActionStore& operator=(const GameplayActionStore&) = delete;
@@ -41,6 +44,9 @@ private:
     // Result demo rows point at complete nested HSD archives in GmRstM*.dat.
     // They must remain a separate source from the ordinary Pl*AJ container.
     std::shared_ptr<const DatArchive> result_motion_;
+    // ftData_80085FD4 selects Popo's row whenever a non-demo Nana row has no
+    // animation archive. Keep that source identity and its command graph alive.
+    std::unique_ptr<GameplayActionStore> nana_popo_fallback_;
     std::map<uint32_t, DatSelectedAction> result_actions_;
     std::shared_ptr<MeleeWebNativeActionRows> result_rows_;
     std::vector<MeleeWebActionRow> result_row_specs_;
@@ -48,6 +54,8 @@ private:
     std::array<uint32_t, 2> motions_{UINT32_MAX, UINT32_MAX};
     Fighter* fighter_ = nullptr;
 
-    [[nodiscard]] DatSelectedAction select_source_action(uint32_t motion, bool result_domain);
+    [[nodiscard]] DatSelectedAction select_source_action(uint32_t motion, bool result_domain,
+        std::shared_ptr<MeleeWebNativeActionRows>* identity_rows,
+        std::shared_ptr<DatCommands>* command_owner);
 };
 }

@@ -7,11 +7,13 @@ namespace melee_web {
 // borrowed from its native owner. Both owners must outlive all source users.
 struct DatParticleEvent { uint32_t bank,command; };
 enum class DatNativeAnimationPolicy { Transforms, ParticleDescriptors };
+enum class DatNativeAnimationTopology { JointGraph, FighterParts };
 class DatNativeAnimation {
 public:
     DatNativeAnimation(std::shared_ptr<const DatArchive>,uint32_t root,const MeleeWebNativeGraph&,
                        DatNativeAnimationPolicy = DatNativeAnimationPolicy::Transforms,
-                       std::span<void* const> native_joint_descriptors = {});
+                       std::span<void* const> native_joint_descriptors = {},
+                       DatNativeAnimationTopology = DatNativeAnimationTopology::JointGraph);
     ~DatNativeAnimation();
     DatNativeAnimation(const DatNativeAnimation&)=delete;
     DatNativeAnimation& operator=(const DatNativeAnimation&)=delete;

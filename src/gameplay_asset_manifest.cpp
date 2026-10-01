@@ -3,6 +3,7 @@
 #include "dat_archive.hpp"
 #include "gameplay_content.h"
 #include "gameplay_result_motion_table.hpp"
+#include "gameplay_kirby_copy_assets.hpp"
 #include "fighter_binding.hpp"
 #include <melee/pl/forward.h>
 #include <algorithm>
@@ -142,6 +143,12 @@ void check_selection(const MeleeWebMenuMatchSelection& selection)
         if (!source_costume(content->fighter_kind, 0) ||
             !source_costume(content->fighter_kind, source.color))
             reject("Match selection costume is absent from the source registry");
+        for (unsigned identity = 1;
+             identity < melee_web_fighter_kind_count(source.ckind); ++identity) {
+            const auto kind = melee_web_fighter_kind_at(source.ckind, identity);
+            if (!source_costume(kind, 0) || !source_costume(kind, source.color))
+                reject("Match selection alternate fighter costume is absent from the source registry");
+        }
     }
 }
 
@@ -210,10 +217,12 @@ void add_selection_fighter_assets(std::vector<std::string>& result,
     const unsigned active = active_player_count(selection);
     std::vector<unsigned> fighter_kinds;
     for (unsigned i = 0; i < active; ++i) {
-        const auto* content = melee_web_fighter_content(selection.start.players[i].ckind);
-        if (std::find(fighter_kinds.begin(), fighter_kinds.end(),
-                      content->fighter_kind) == fighter_kinds.end())
-            fighter_kinds.push_back(content->fighter_kind);
+        const auto ckind = selection.start.players[i].ckind;
+        for (unsigned identity = 0; identity < melee_web_fighter_kind_count(ckind); ++identity) {
+            const auto kind = static_cast<unsigned>(melee_web_fighter_kind_at(ckind, identity));
+            if (std::find(fighter_kinds.begin(), fighter_kinds.end(), kind) == fighter_kinds.end())
+                fighter_kinds.push_back(kind);
+        }
     }
     for (const auto fighter_kind : fighter_kinds) {
         const auto* content = melee_web_fighter_content_by_kind(fighter_kind);
@@ -222,11 +231,14 @@ void add_selection_fighter_assets(std::vector<std::string>& result,
         add_unique(result, neutral->fighter_filename);
         add_unique(result, neutral->animation_filename);
         add_unique(result, runtime_name(neutral->model_filename));
-        add_unique(result, content->effect_archive);
+        if (content->effect_archive) add_unique(result, content->effect_archive);
         add_unique(result, content->audio_bank);
         for (unsigned i = 0; i < active; ++i) {
-            if (content->fighter_kind !=
-                melee_web_fighter_content(selection.start.players[i].ckind)->fighter_kind)
+            const auto ckind = selection.start.players[i].ckind;
+            bool selected = false;
+            for (unsigned identity = 0; identity < melee_web_fighter_kind_count(ckind); ++identity)
+                selected |= content->fighter_kind == melee_web_fighter_kind_at(ckind, identity);
+            if (!selected)
                 continue;
             const auto* costume = source_costume(fighter_kind,
                                                   selection.start.players[i].color);
@@ -274,6 +286,10 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection)
     for (const auto name : kMatchCommonAudio) add_unique(result, name);
 
     add_selection_fighter_assets(result, selection);
+    for (const auto& archive : kirby_copy_archive_requirements(selection))
+        add_unique(result, archive.filename);
+    for (const auto& effect : kirby_copy_effect_requirements(selection))
+        add_unique(result, effect.filename);
 
     const auto* stage = melee_web_stage_content(selection.start.rules.stkind);
     add_unique(result, stage->archive);
@@ -286,7 +302,6 @@ std::vector<std::string>
 opening_match_asset_names(const MeleeWebOpeningPreview& preview)
 {
     std::vector<std::string> result = menu_asset_names();
-    std::vector<unsigned> fighter_kinds;
     std::vector<std::string> unsupported;
     if (preview.match_kind > 3)
         reject("Opening mode selected an unknown source match kind");
@@ -315,10 +330,6 @@ opening_match_asset_names(const MeleeWebOpeningPreview& preview)
                 " is absent from the generated registry");
             continue;
         }
-        if (std::find(fighter_kinds.begin(), fighter_kinds.end(),
-                      static_cast<unsigned>(fighter->fighter_kind)) ==
-            fighter_kinds.end())
-            fighter_kinds.push_back(static_cast<unsigned>(fighter->fighter_kind));
     }
     const auto* stage = melee_web_stage_content(
         static_cast<int>(preview.stage_kind));
@@ -334,28 +345,23 @@ opening_match_asset_names(const MeleeWebOpeningPreview& preview)
         }
         reject(message);
     }
-    for (const auto fighter_kind : fighter_kinds) {
-        const auto* fighter = melee_web_fighter_content_by_kind(fighter_kind);
-        const auto* neutral = source_costume(fighter_kind, 0);
-        if (!fighter || !neutral)
-            reject("Opening demo source fighter identity is incomplete");
-        add_unique(result, neutral->fighter_filename);
-        add_unique(result, neutral->animation_filename);
-        add_unique(result, runtime_name(neutral->model_filename));
-        add_unique(result, fighter->effect_archive);
-        add_unique(result, fighter->audio_bank);
-        for (unsigned i = 0; i < 4; ++i) {
-            const auto* selected = melee_web_fighter_content(
-                static_cast<int>(preview.characters[i]));
-            if (selected->fighter_kind != static_cast<int>(fighter_kind))
-                continue;
-            const auto* costume = source_costume(
-                fighter_kind, preview.costumes[i]);
-            if (!costume)
-                reject("Opening demo costume has no authored source model");
-            add_unique(result, runtime_name(costume->model_filename));
-        }
+    // This is an asset-only view of the original four-player preview, not
+    // a synthesized game-start payload. Reuse the match identity expansion so
+    // Nana, transform partners and Kirby donor resources have the same owner.
+    MeleeWebMenuMatchSelection asset_selection{};
+    for (auto& player : asset_selection.start.players)
+        player.slot_type = Gm_PKind_NA;
+    for (unsigned i = 0; i < 4; ++i) {
+        auto& player = asset_selection.start.players[i];
+        player.slot_type = Gm_PKind_Cpu;
+        player.ckind = static_cast<CharacterKind>(preview.characters[i]);
+        player.color = preview.costumes[i];
     }
+    add_selection_fighter_assets(result, asset_selection);
+    for (const auto& archive : kirby_copy_archive_requirements(asset_selection))
+        add_unique(result, archive.filename);
+    for (const auto& effect : kirby_copy_effect_requirements(asset_selection))
+        add_unique(result, effect.filename);
     add_unique(result, "PlCo.dat");
     add_unique(result, "ItCo.usd");
     add_unique(result, "EfCoData.dat");
@@ -418,17 +424,24 @@ results_asset_names(const MeleeWebMenuMatchSelection& selection)
         for (unsigned i = 0; i < active; ++i) {
             const auto* content =
                 melee_web_fighter_content(selection.start.players[i].ckind);
-            const auto spec = result_motion_archive_spec(content->fighter_kind);
-            if (spec.archive.empty())
-                reject("Results fighter has no authored gm_1601 result archive");
-            add_unique(result, spec.archive);
+            for (unsigned identity = 0;
+                 identity < melee_web_fighter_kind_count(content->character_kind); ++identity) {
+                const auto kind = static_cast<unsigned>(
+                    melee_web_fighter_kind_at(content->character_kind, identity));
+                const auto spec = result_motion_archive_spec(kind);
+                if (spec.archive.empty())
+                    reject("Results fighter has no authored gm_1601 result archive");
+                add_unique(result, spec.archive);
+            }
         }
     }
     // Authored ckind victory themes in gm_1601; the winner is chosen by the
     // source Results callbacks after the scene runs.
     for (const auto* name : {"ff_mario.hps", "ff_fox.hps", "ff_emb.hps",
                              "ff_link.hps", "ff_fzero.hps", "ff_dk.hps",
-                             "ff_poke.hps", "ff_nes.hps"})
+                             "ff_poke.hps", "ff_nes.hps", "ff_flat.hps",
+                             "ff_ice.hps", "ff_kirby.hps", "ff_samus.hps",
+                             "ff_yoshi.hps"})
         add_unique(result, name);
     return result;
 }

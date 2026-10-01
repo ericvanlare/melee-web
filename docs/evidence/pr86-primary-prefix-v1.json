@@ -1,0 +1,67 @@
+{
+  "schema": "melee-web-pr86-primary-prefix-v1",
+  "date": "2026-09-30",
+  "scope": "Bounded corrected-producer candidate-port prefix against retained original-A MWRC v8 input. Exact source-consumed scene/input order and primary Fighter state are compared through the deliberate stop; completion, Results camera ownership, timing, draw cadence, pixels, PCM, performance and admission are unclaimed.",
+  "runtime": {
+    "comparison_base_commit": "8f64a14cdd8cef60e68191c665f5732ab8dc2717",
+    "build_commit": "361c6c2820cc5d541ed2812a673b470a3e2b0d60",
+    "comparison_base_was_ancestor_at_capture": false,
+    "runtime_patch_identity_sha256": "b5cc66b72571fcc4a3b09341acec755316ae0e55ade62fc4d2a11b346746130a",
+    "configuration": "Release",
+    "javascript_sha256": "2bbd2da21e8ef7d36093a6a75b4ccb5aff42b32cdd3a321dfd16f187053e657e",
+    "wasm_sha256": "90ce3d0ff00ba9a24dc58bcf655dbe7ea8390cf69072a079339cc45492547765",
+    "preload_data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+  },
+  "inputs": {
+    "source_capture": {
+      "path": "work/pr86-reconciled-original-a.mwro",
+      "bytes": 1899564951,
+      "sha256": "73080bb787c6279f5f4732094d65bfee88e9edeb0c12b4eba29e58665d97d9e7"
+    },
+    "recipe": {
+      "path": "work/fighter-reference-a-valid-pair.mwrc",
+      "bytes": 1893306,
+      "sha256": "e0c4eb536d525df6823487d679dabcf90c28c5448a3917aaca622f11694d4ac7"
+    },
+    "disc": "Super Smash Bros. Melee (USA) (En,Ja) (Rev 2).ciso"
+  },
+  "capture": {
+    "path": "runs/pr86-original-ab-prefix-v2-20260930",
+    "storage": "AgentStorage external NVMe",
+    "requested_source_frames": 3000,
+    "observed_source_cursor": 3014,
+    "browser_source_frames": 3016,
+    "result": "incomplete_deliberate_candidate_port_prefix",
+    "runtime_error": false,
+    "primary_match": {
+      "match_entry_frame": 1374,
+      "nonmatch_rows_compared": 1374,
+      "match_rows_compared": 1642,
+      "first_difference": null,
+      "result": "candidate_port_prefix_unverified"
+    }
+  },
+  "retained_trace_primary_projection": {
+    "path": "runs/pr86-original-ab-baseline-b1295ac-20260930/a/diagnostic-primary-v1",
+    "normalization": "Separate diagnostic copy only: v2 header/entity fields omitted; original trace retained unchanged and no JSONL rows removed. Comparison is explicitly primary-row-only.",
+    "auxiliary_entity_fields_omitted": 39032,
+    "frames_compared": 42492,
+    "match_frames_compared": 39032,
+    "nonmatch_frames_compared": 3460,
+    "match_setups_compared": 3,
+    "first_difference": null,
+    "result": "equivalent_in_primary_declared_fields",
+    "port_trace_sha256": "667fef820c62bbd085d8aacabbd932c799e9b99821d5d50d681927efed5d25e1",
+    "comparison_report_sha256": "36ffe16efbb0a4735d99eb7946c7e9eb44225a83877db900592112e1e4420c9c"
+  },
+  "artifacts": {
+    "port_trace_sha256": "5dec16320af3494404e1944b923d14e7e8c24bf9f0133f6d87d3d2282fa6b0e3",
+    "browser_report_sha256": "a6001768904427a2574152be9b381fc858ad6810f82d5df6b2ba901d7902b31b",
+    "capture_report_sha256": "2368b16f84f876eb4b02332ce34a949cfed19fae19e7709b88b0e7896c07e21a",
+    "comparison_sha256": "b671066de3bb7c33b52952481f874d98ac2f1106135d5a2d003669ec54887c17"
+  },
+  "camera": {
+    "historical_results_writer": "unattributed",
+    "current_prefix_camera_claim": "not_run"
+  }
+}

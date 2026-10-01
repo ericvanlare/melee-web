@@ -2,9 +2,11 @@
 #include "gameplay_compat.h"
 #include "dat_texture.hpp"
 #include "hsd_animation_bridge.h"
+#include <algorithm>
 #include <bit>
 #include <cmath>
 #include <functional>
+#include <limits>
 #include <map>
 #include <set>
 // Original C headers declare __assert with mutable strings. This diagnostic
@@ -19,7 +21,19 @@
 namespace melee_web {
 namespace {
 void require(bool condition, const char* reason) { if (!condition) throw DatError(reason); }
-struct NativeTrack { HSD_FObjDesc descriptor{}; std::vector<uint8_t> bytes; };
+struct IndexCurveToken {
+    std::uint8_t opcode = 0;
+    std::uint32_t value_bits = 0, slope_bits = 0;
+    std::uint32_t wait = std::numeric_limits<std::uint32_t>::max();
+    bool operator==(const IndexCurveToken&) const = default;
+};
+struct NativeTrack {
+    HSD_FObjDesc descriptor{};
+    std::vector<uint8_t> bytes;
+    std::vector<IndexCurveToken> index_curve;
+    std::optional<std::uint32_t> source_initial_index;
+    bool uses_slope = false;
+};
 struct NativeMaterialAnimation {
     HSD_AObjDesc descriptor{};
     std::vector<std::unique_ptr<NativeTrack>> tracks;
@@ -33,10 +47,12 @@ struct NativeTextureAnimation {
     std::vector<HSD_TlutDesc> palettes;
     std::vector<HSD_TlutDesc*> palette_table;
 };
-// Original TObjUpdateFunc directly indexes its tables. Restrict index channels
-// to constant/key opcodes. Strict consumers reject all out-of-table values;
-// native menus preserve unselected authoring values with a per-dispatch guard.
-void validate_indices(const NativeTrack& track, uint32_t count, bool normalized_color=false, bool dispatched_only=false)
+// Original TObjUpdateFunc converts the produced scalar to an integer, then
+// directly selects the TIMG/TCLT table entry. Validate the complete source
+// FObj curve, not only its authored points, before the native callback can
+// access those tables.
+bool validate_indices(NativeTrack& track, uint32_t count,
+                      bool dispatched_only=false)
 {
     require(count > 0, "Texture animation index has no table");
     const auto format = track.descriptor.frac_value;
@@ -53,35 +69,178 @@ void validate_indices(const NativeTrack& track, uint32_t count, bool normalized_
         }
         return result;
     };
-    size_t values = 0; unsigned first_opcode = 0;
+    auto scalar = [&](uint8_t scalar_format) {
+        require(scalar_format == 0 || ((scalar_format >> 5) >= 1 &&
+                (scalar_format >> 5) <= 4 && (scalar_format & 31) < 31),
+                "Unsupported texture animation scalar encoding");
+        double value;
+        if (scalar_format == 0) {
+            uint32_t bits = byte();
+            for (unsigned shift = 8; shift <= 24; shift += 8)
+                bits |= uint32_t(byte()) << shift;
+            value = std::bit_cast<float>(bits);
+        } else {
+            uint32_t bits = byte();
+            const unsigned kind = scalar_format >> 5;
+            if (kind == 1 || kind == 2) bits |= uint32_t(byte()) << 8;
+            const int32_t integer = kind == 1 ? int16_t(bits) :
+                kind == 3 ? int8_t(bits) : int32_t(bits);
+            value = double(integer) / double(uint32_t(1) << (scalar_format & 31));
+        }
+        require(std::isfinite(value), "Texture animation stream contains a nonfinite scalar");
+        return value;
+    };
+    auto check_range = [&](double low, double high, double guard,
+                           const char* reason) {
+        const double consumer_limit = track.descriptor.type == 10 ? 256.0 : 65535.0;
+        // TIMG uses a signed float-to-int conversion before indexing, so
+        // values in (-1, 0) truncate to index zero. TCLT narrows to u8 and
+        // therefore must stay nonnegative before its authored table lookup.
+        const bool lower_in_range = track.descriptor.type == 10
+            ? low - guard >= 0 : low - guard > -1.0;
+        const bool valid = std::isfinite(low) && std::isfinite(high) && lower_in_range &&
+                high + guard <= 65535 &&
+                (track.descriptor.type != 10 || high + guard < consumer_limit) &&
+                (dispatched_only || high + guard < count);
+        if (!valid) {
+            throw DatError(std::string(reason) + " (type=" +
+                std::to_string(track.descriptor.type) + " range=" +
+                std::to_string(low) + ".." + std::to_string(high) +
+                " guard=" + std::to_string(guard) + " table=" +
+                std::to_string(count) + ")");
+        }
+    };
+    auto check_value = [&](double value) {
+        check_range(value, value, 0,
+                    "Texture animation source curve selects outside its table");
+    };
+    auto check_linear = [&](double p0, double p1, double duration) {
+        if (duration == 0) {
+            check_value(p1);
+            return;
+        }
+        const double guard = 32 * std::numeric_limits<float>::epsilon() *
+            std::max({1.0, std::abs(p0), std::abs(p1)});
+        check_range(std::min(p0, p1), std::max(p0, p1), guard,
+                    "Texture animation linear curve can select outside its table");
+    };
+    auto check_spline = [&](double p0, double p1, double d0, double d1,
+                            double duration) {
+        if (duration == 0) {
+            check_value(p1);
+            return;
+        }
+        // splGetHelmite(1/duration, time, ...) expressed in u=time/duration.
+        const double a = 2 * p0 - 2 * p1 + duration * (d0 + d1);
+        const double b = -3 * p0 + 3 * p1 + duration * (-2 * d0 - d1);
+        const double c = duration * d0;
+        const double d = p0;
+        auto evaluate = [&](double u) {
+            return ((a * u + b) * u + c) * u + d;
+        };
+        double low = std::min(p0, p1), high = std::max(p0, p1);
+        auto include = [&](double u) {
+            if (u > 0 && u < 1) {
+                const double value = evaluate(u);
+                require(std::isfinite(value), "Texture animation spline has a nonfinite extremum");
+                low = std::min(low, value);
+                high = std::max(high, value);
+            }
+        };
+        const double discriminant = 4 * b * b - 12 * a * c;
+        if (a == 0) {
+            if (b != 0) include(-c / (2 * b));
+        } else if (discriminant >= 0) {
+            const double root = std::sqrt(discriminant);
+            include((-2 * b - root) / (6 * a));
+            include((-2 * b + root) / (6 * a));
+        }
+        const double magnitude = std::max({1.0, std::abs(a), std::abs(b),
+                                           std::abs(c), std::abs(d)});
+        const double guard = 32 * std::numeric_limits<float>::epsilon() *
+                             (1 + magnitude);
+        check_range(low, high, guard,
+                    "Texture animation spline can select outside its table");
+    };
+
+    double p0 = 0, p1 = 0, d0 = 0, d1 = 0;
+    unsigned previous_opcode = 0;
+    std::optional<uint32_t> previous_wait;
+    size_t values = 0;
+    unsigned first_value_opcode = 0;
+    bool uses_slope = false;
     while (cursor < track.bytes.size()) {
         const auto header = byte(); const auto opcode = header & 15;
-        require(opcode == 1 || opcode == 6, "Texture table animation requires constant or key interpolation");
-        if (!first_opcode) first_opcode = opcode;
+        require(opcode >= 1 && opcode <= 6,
+                "Texture table animation has an unsupported FObj opcode");
+        uses_slope |= opcode == 4 || opcode == 5;
         const auto entries = varint(((header >> 4) & 7) + 1, 3, header);
         for (uint32_t i = 0; i < entries; ++i) {
-            double value;
-            if (format == 0) {
-                uint32_t bits = byte();
-                for (unsigned s = 8; s <= 24; s += 8) bits |= uint32_t(byte()) << s;
-                value = std::bit_cast<float>(bits);
+            if (opcode == 5) {
+                d0 = d1;
+                d1 = scalar(track.descriptor.frac_slope);
+                track.index_curve.push_back({
+                    static_cast<std::uint8_t>(opcode), 0,
+                    std::bit_cast<std::uint32_t>(static_cast<float>(d1))});
             } else {
-                uint32_t bits = byte();
-                if ((format >> 5) <= 2) bits |= uint32_t(byte()) << 8;
-                const int32_t integer = (format >> 5) == 1 ? int16_t(bits) :
-                    (format >> 5) == 3 ? int8_t(bits) : int32_t(bits);
-                value = double(integer) / double(uint32_t(1) << (format & 31));
+                if (!first_value_opcode) first_value_opcode = opcode;
+                const double value = scalar(format);
+                double incoming_slope = 0;
+                if (opcode == 4) incoming_slope = scalar(track.descriptor.frac_slope);
+                p0 = p1;
+                p1 = value;
+                if (opcode == 3) {
+                    d0 = d1;
+                    d1 = 0;
+                } else if (opcode == 4) {
+                    d0 = d1;
+                    d1 = incoming_slope;
+                } else if (opcode != 6 && previous_opcode != 5) {
+                    d0 = d1;
+                    d1 = 0;
+                }
+
+                check_value(value);
+                if (previous_wait) {
+                    // FObjLoadData assigns op_intrp from the preceding
+                    // opcode before it reads this datum's opcode. SLP emits
+                    // no object update, but its slopes carry into the next
+                    // source interpolation exactly as in FObjInterpretAnim.
+                    if (previous_opcode == 3 || previous_opcode == 4 ||
+                        previous_opcode == 5)
+                        check_spline(p0, p1, d0, d1, *previous_wait);
+                    else if (previous_opcode == 1 || previous_opcode == 6) {
+                        // CON and KEY select only their endpoints.
+                        check_value(p0);
+                        check_value(p1);
+                    } else if (previous_opcode == 2) {
+                        // LIN stays between its endpoints; include an outward
+                        // float-evaluation margin before direct table access.
+                        check_linear(p0, p1, *previous_wait);
+                    }
+                }
+                ++values;
+                previous_wait.reset();
+                std::uint32_t curve_wait =
+                    std::numeric_limits<std::uint32_t>::max();
+                if (cursor < track.bytes.size()) {
+                    const auto first = byte();
+                    curve_wait = varint(first & 127, 7, first);
+                    previous_wait = curve_wait;
+                }
+                track.index_curve.push_back({
+                    static_cast<std::uint8_t>(opcode),
+                    std::bit_cast<std::uint32_t>(static_cast<float>(value)),
+                    opcode == 4 ? std::bit_cast<std::uint32_t>(static_cast<float>(incoming_slope)) : 0,
+                    curve_wait});
             }
-            require(std::isfinite(value) && value >= 0 &&
-                    (normalized_color ? value <= 1 :
-                     value <= 65535 && (dispatched_only || value < count) && std::floor(value) == value),
-                    "Texture animation index is outside its table");
-            ++values;
-            if (cursor < track.bytes.size()) { const auto first = byte(); (void)varint(first & 127, 7, first); }
+            previous_opcode = opcode;
             require(cursor < track.bytes.size() || i + 1 == entries, "Texture animation packet is truncated");
         }
     }
-    require(values >= 2 || (values == 1 && first_opcode == 6), "Texture animation requires a value pair or key");
+    require(values >= 2 || (values == 1 && first_value_opcode == 6),
+            "Texture animation requires a source value pair or key");
+    return uses_slope;
 }
 }
 struct DatMaterialAnimation::Storage {
@@ -102,8 +261,10 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
 {
     auto& s = *storage_; s.archive = std::move(archive);
     require(bool(s.archive), "Material animation requires its archive owner");
+    require(model.joint_count <= 256,
+            "Material animation model exceeds the native 256-joint budget");
     const auto& a = *s.archive;
-    std::set<uint32_t> joint_seen, material_seen, texture_seen;
+    std::set<uint32_t> material_seen, texture_seen;
     size_t stream_bytes = 0, palette_validation_bytes = 0;
     std::map<uint32_t,uint32_t> image_max_indices;
     auto record = [&](uint32_t offset, size_t length) {
@@ -170,24 +331,34 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
                 const MeleeWebAnimationTrack view{track->bytes.data(),track->bytes.size(),0,1,f.frac_value,f.frac_slope};
                 char error[256];
                 require(melee_web_animation_validate_native_track(&view,error,sizeof(error)),error);
-            } else validate_indices(*track,f.type==1?ni:np,false,
-                index_validation==TextureIndexValidation::DispatchedValues);
+            } else track->uses_slope=validate_indices(*track,f.type==1?ni:np,
+                index_validation!=TextureIndexValidation::AllEncodedValues);
+            if ((f.type == 1 || f.type == 10) &&
+                index_validation == TextureIndexValidation::StaticSourceFrameZero) {
+                const auto zero = std::bit_cast<std::uint32_t>(0.0F);
+                require(std::bit_cast<std::uint32_t>(f.startframe) == zero &&
+                            !track->index_curve.empty() &&
+                            track->index_curve.front().opcode != 5 &&
+                            track->index_curve.front().value_bits == zero &&
+                            track->index_curve.front().wait !=
+                                std::numeric_limits<std::uint32_t>::max() &&
+                            track->index_curve.front().wait > 0,
+                        "Static source TObj animation does not begin with a held zero table index");
+                track->source_initial_index = 0;
+            }
             if (!t.tracks.empty()) t.tracks.back()->descriptor.next = &f;
             else t.animation.fobjdesc = &f;
             t.tracks.push_back(std::move(track)); fo=a.pointer(*fo,20);
         }
         require(!t.tracks.empty(), "Texture animation has no supported channels");
 
-        // TIMG and TCLT are evaluated independently by HSD_TObjUpdateFunc,
-        // but both FObj tracks read the same HSD_AObj clock. An exact track
-        // program match therefore proves that their selected image and
-        // palette indices are identical at every update. Only in that case
-        // may the image/palette capacity check follow the diagonal pairs.
-        // validate_indices already restricts these tracks to CON/KEY, whose
-        // original FObj decoders never read frac_slope. Authoring metadata may
-        // differ there without changing either program's values or timing.
-        // Otherwise retain the Cartesian validation required by independently
-        // animated channels.
+        // TIMG and TCLT are evaluated independently by HSD_TObjUpdateFunc.
+        // Same-clock FObj programs with identical normalized opcode, decoded
+        // scalar, slope, and wait tokens prove that both selections match at
+        // every update, even when their fixed-point encodings differ. For
+        // other tracks validate the full image/palette Cartesian product;
+        // endpoint proximity alone cannot establish which pairs the original
+        // float evaluator visits.
         const NativeTrack* image_track = nullptr;
         const NativeTrack* palette_track = nullptr;
         for (const auto& track : t.tracks) {
@@ -198,11 +369,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
             ni == np && image_track != nullptr && palette_track != nullptr &&
             std::bit_cast<uint32_t>(image_track->descriptor.startframe) ==
                 std::bit_cast<uint32_t>(palette_track->descriptor.startframe) &&
-            image_track->descriptor.length == palette_track->descriptor.length &&
-            image_track->descriptor.frac_value ==
-                palette_track->descriptor.frac_value &&
-            image_track->bytes == palette_track->bytes;
-
+            image_track->index_curve == palette_track->index_curve;
         auto maximum_index = [&](const DatTextureImage& im) {
             auto found = image_max_indices.find(im.descriptor_offset);
             if (found == image_max_indices.end()) {
@@ -236,7 +403,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
             if (indexed) {
                 const auto maximum = maximum_index(im);
                 if (maximum >= pal.entries)
-                    throw DatError("Animated image references an index outside its TLUT palette: texture=" +
+                    throw DatError("Animated image references an index outside its authored TLUT entries: texture=" +
                         std::to_string(*offset) + " image=" + std::to_string(im.descriptor_offset) +
                         " palette=" + std::to_string(offset_palette) + " image_index=" +
                         std::to_string(image_index) + " palette_index=" + std::to_string(palette_index) +
@@ -246,7 +413,39 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
             store_palette(palette_index, pal);
         };
 
-        if (!palette_track) {
+        if (index_validation == TextureIndexValidation::StaticSourceFrameZero) {
+            for (uint32_t p = 0; p < np; ++p)
+                store_palette(p, read_dat_texture_palette_descriptor(
+                    a, required(*pt + 4*p, 16), 10));
+            if (image_track && palette_track) {
+                validate_image_palette(*image_track->source_initial_index,
+                                       *palette_track->source_initial_index);
+            } else if (image_track) {
+                const auto& im = images[*image_track->source_initial_index];
+                if (im.format == 8 || im.format == 9 || im.format == 10) {
+                    const auto& base = native_texture->texture;
+                    require(base.palette_data && base.palette_entries &&
+                                base.palette_bytes >= size_t(base.palette_entries) * 2,
+                            "Static animated image requires the source base palette");
+                    require(maximum_index(im) < base.palette_entries,
+                            "Static animated image references an index outside its source base TLUT palette");
+                }
+            } else if (palette_track) {
+                const auto base_chain = read_dat_texture_chain(
+                    a, native_texture->source_offset, true);
+                require(!base_chain.empty(),
+                        "Static animated palette has no source base texture");
+                const auto& im = base_chain.front().image;
+                const auto palette_index = *palette_track->source_initial_index;
+                const auto palette_offset = required(*pt + 4 * palette_index, 16);
+                const bool indexed = im.format == 8 || im.format == 9 || im.format == 10;
+                const auto pal = read_dat_texture_palette_descriptor(
+                    a, palette_offset, indexed ? im.format : 10);
+                if (indexed)
+                    require(dat_texture_max_palette_index(im) < pal.entries,
+                            "Static source image references an index outside its selected TLUT palette");
+            }
+        } else if (!palette_track) {
             // HSD_TObjAddAnim resets tlut_no to -1. TIMG only changes the
             // image; without TCLT, HSD_TObjSetup keeps the model's base TLUT.
             // Retain every authored table descriptor, but do not pair these
@@ -327,7 +526,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
     std::function<HSD_MatAnimJoint*(std::optional<uint32_t>,uint32_t)> joint_tree;
     joint_tree = [&](std::optional<uint32_t> offset,uint32_t joint) -> HSD_MatAnimJoint* {
         if (!offset) { require(joint==UINT32_MAX,"Material animation joint topology is incomplete"); return nullptr; }
-        require(joint<model.joint_count && s.joints.size()<256 && joint_seen.insert(*offset).second,
+        require(joint<model.joint_count && s.joints.size()<model.joint_count,
                 "Material animation joint topology/cycle/count is invalid"); record(*offset,12);
         auto j=std::make_unique<HSD_MatAnimJoint>(); auto* result=j.get();indices[result]=joint;contiguous=contiguous&&*offset==root+joint*12;s.joints.push_back(std::move(j));
         result->matanim=material_chain(a.pointer(*offset+8,16),model.joints[joint].dobj);

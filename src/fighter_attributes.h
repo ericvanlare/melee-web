@@ -2,6 +2,8 @@
 #define MELEE_WEB_FIGHTER_ATTRIBUTES_H
 
 #include <stdint.h>
+#include "gameplay_samus_schema.h"
+#include "gameplay_yoshi_schema.h"
 
 /* Scalar schema from pinned ft/types.h and ftMario/types.h. Each entry is
  * (body-relative byte offset, scalar type, portable name, original member).

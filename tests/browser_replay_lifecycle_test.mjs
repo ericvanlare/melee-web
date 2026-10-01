@@ -8,6 +8,29 @@ const pause=page.slice(page.indexOf("$('pause').onclick="),page.indexOf("\n$('un
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
 {
+ const unload=page.slice(page.indexOf("$('unload').onclick="),page.indexOf('\ncontrollerSettings ='));
+ for(const replayActive of [true,false]){
+  const elements={unload:{},status:{dataset:{}}},events=[];
+  let finishExport;
+  const exported=new Promise(resolve=>{finishExport=resolve;});
+  const scope={$:id=>elements[id],retailRun:replayActive?{}:null,stockCheckActive:true,
+   owner:{handle:{unload:async()=>{events.push('ordinary-unload');}}},
+   finishRetailReplay:async reason=>{events.push(reason);await exported;events.push('exported');},
+   log:error=>{throw Error(error);}};
+  vm.createContext(scope);vm.runInContext(unload,scope);
+  const stopped=elements.unload.onclick();
+  if(replayActive){
+   assert.deepEqual(events,['Manual unload stopped the replay']);
+   assert.equal(scope.stockCheckActive,true,'Unload must await partial replay export');
+   finishExport();
+  }
+  await stopped;
+  assert.equal(scope.stockCheckActive,false);
+  assert.deepEqual(events,replayActive?
+   ['Manual unload stopped the replay','exported']:['ordinary-unload']);
+ }
+}
+{
  // Construction can fail before menuReplayStarted publishes a baseline.
  // Its exact error must finish the replay on the next callback, not after
  // the 15-minute watchdog, and teardown must not run reentrantly in Wasm.

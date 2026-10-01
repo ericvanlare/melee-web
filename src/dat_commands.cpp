@@ -41,7 +41,12 @@ DatCommands::DatCommands(std::shared_ptr<const DatArchive> archive, std::span<co
             require(std::isfinite(root_info.animation_end_frame) && root_info.animation_end_frame > 0.0f &&
                     root_info.animation_end_frame <= 65535.0f,
                     "Fighter command animation end frame is outside the source range");
-        struct StackEntry { bool loop; uint32_t address; uint32_t remaining; };
+        struct StackEntry {
+            bool loop;
+            uint32_t address;
+            uint64_t remaining;
+            bool body_checked=false;
+        };
         std::vector<StackEntry> returns;
         auto stack_slots = [&] { size_t n=0;for(auto e:returns)n+=e.loop?2:1;return n; };
         uint32_t at = root;
@@ -54,7 +59,12 @@ DatCommands::DatCommands(std::shared_ptr<const DatArchive> archive, std::span<co
             require(!archive->has_relocation(at), "Command opcode is a relocated pointer");
             const uint32_t word = archive->be32(at), op = word >> 26;
             std::vector<uint32_t> state;
-            for(auto e:returns){state.push_back(e.loop);state.push_back(e.address);state.push_back(e.remaining);}
+            for(auto e:returns){
+                state.push_back(e.loop);state.push_back(e.address);
+                state.push_back(static_cast<uint32_t>(e.remaining));
+                state.push_back(static_cast<uint32_t>(e.remaining>>32));
+                state.push_back(e.body_checked);
+            }
             state.push_back(at);
             if (auto seen = visited.find(state); seen != visited.end()) {
                 bool relative = false, animation_wait = false;
@@ -94,14 +104,23 @@ DatCommands::DatCommands(std::shared_ptr<const DatArchive> archive, std::span<co
             }
             if (op == 3) {
                 const uint32_t count=word & 0x3ffffff;
-                require(count>0 && count<=4096,"Command loop count is zero or exceeds bound");
+                if (!count)
+                    throw DatError("Command loop count is zero (root " +
+                        std::to_string(root) + ", instruction " +
+                        std::to_string(at) + ")");
                 require(stack_slots()+2<=stack_capacity,"Command loop stack overflow");
                 returns.push_back({true,at+4,count});at+=4;continue;
             }
             if (op == 4) {
                 require(!returns.empty() && returns.back().loop,"Command loop end without matching start");
-                if(--returns.back().remaining)at=returns.back().address;
-                else {returns.pop_back();at+=4;}
+                auto& loop=returns.back();
+                if(loop.remaining>1&&!loop.body_checked) {
+                    // SetLoop/ExecuteLoop retain their exact source count in
+                    // the native graph. Validate the source body once, then
+                    // validate the terminating pass; walking every authored
+                    // iteration here duplicates no reachable command words.
+                    loop.remaining=1;loop.body_checked=true;at=loop.address;
+                } else {returns.pop_back();at+=4;}
                 continue;
             }
             if (op == 5 || op == 7) {

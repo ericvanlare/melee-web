@@ -3,6 +3,10 @@
 #include "gameplay_save_profile.h"
 #include "gameplay_match_session.hpp"
 #include "gameplay_results_session.hpp"
+#include "results_source_pad_schedule.hpp"
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+#include "gameplay_results_entry_packet.hpp"
+#endif
 #include "gameplay_prize_session.hpp"
 extern "C" const char* melee_web_native_menu_match_observe();
 extern "C" const char* melee_web_native_menu_memory();
@@ -10,6 +14,8 @@ extern "C" void melee_web_cpu_observation_set_event_cursor(size_t index);
 extern "C" void melee_web_cpu_observation_scheduler_return(void);
 extern "C" {
 #include <melee/gm/types.h>
+#include <sysdolphin/baselib/controller.h>
+extern ResultsData lbl_8046DBE8;
 }
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
@@ -78,12 +84,17 @@ std::unique_ptr<melee_web::GameplayMatchSession> match;
 std::unique_ptr<melee_web::GameplayResultsSession> results;
 std::unique_ptr<melee_web::GameplayPrizeSession> prize;
 ResultsMatchInfo results_info{};
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+// Retained across teardown/failure; replaced only by the next Results entry.
+melee_web::ResultsEntryPacket results_entry_packet;
+#endif
 // The scoped asset boundary tears down the match owner before Results can be
 // constructed, so the original exit seed and retained PAD history stay here.
 uint32_t results_seed=0,prize_seed=0;
 std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)>
     results_input{nullptr,melee_web_pad_state_free};
 std::string terminal_match_observation;
+std::string match_observer_error;
 bool results_route_active=false;
 bool prize_route_active=false;
 std::unique_ptr<melee_web::RetailReplayRecipe> replay;
@@ -91,6 +102,131 @@ size_t replay_cursor=0;
 melee_web::SourceFrameSequence replay_source_frames;
 melee_web::ReplayCompletionState replay_completion;
 bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_draw=false;
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+struct ResultsPadTraceRow {
+ uint32_t source_frame;
+ bool tick_returned;
+ bool results_state_sampled;
+ uint32_t results_state_frame;
+ uint8_t results_phase;
+ uint8_t results_stats_phase;
+ uint8_t results_num_pages;
+ uint8_t results_player_pages[4];
+ uint8_t results_player_confirmed[4];
+ PADStatus pads[4];
+ HSD_PadStatus source_consumed_pads[4];
+};
+constexpr size_t kResultsPadTraceCapacity=8192;
+std::array<ResultsPadTraceRow,kResultsPadTraceCapacity> results_pad_trace{};
+size_t results_pad_trace_count=0;
+uint64_t results_pad_trace_attempts=0;
+bool results_pad_trace_overflow=false;
+MeleeWebResultsCameraEntrySnapshot results_camera_entry_snapshot{};
+void append_pointer_json(std::string& json,const void* pointer){
+ char text[2+2*sizeof(void*)+4]{};
+ const int length=std::snprintf(text,sizeof(text),"%p",const_cast<void*>(pointer));
+ if(length<0||static_cast<size_t>(length)>=sizeof(text))
+  throw std::runtime_error("Results camera-entry pointer formatting failed");
+ json+='"';json.append(text,static_cast<size_t>(length));json+='"';
+}
+void append_camera_entry_json(std::string& json){
+ json+=",\"camera_entry\":{";
+ json+="\"saved_pool_at_context_begin\":";append_pointer_json(json,results_camera_entry_snapshot.saved_pool_at_context_begin);
+ json+=",\"source_pool_before_onenter\":";append_pointer_json(json,results_camera_entry_snapshot.source_pool_before_onenter);
+ json+=",\"owner_pool_before_onenter\":";append_pointer_json(json,results_camera_entry_snapshot.owner_pool_before_onenter);
+ json+=",\"source_pool_after_onenter\":";append_pointer_json(json,results_camera_entry_snapshot.source_pool_after_onenter);
+ json+=",\"source_pool_after_collision_adoption\":";append_pointer_json(json,results_camera_entry_snapshot.source_pool_after_collision_adoption);
+ json+=",\"context_pool_after_adoption\":";append_pointer_json(json,results_camera_entry_snapshot.context_pool_after_adoption);
+ json+=",\"owner_pool_after_adoption\":";append_pointer_json(json,results_camera_entry_snapshot.owner_pool_after_adoption);
+ json+=",\"source_camera_allocation_generation_before_onenter\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_generation_before_onenter);
+ json+=",\"source_camera_allocation_generation_after_onenter\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_generation_after_onenter);
+ json+=",\"source_camera_allocation_subject_count_after_onenter\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_subject_count_after_onenter);
+ json+=",\"source_camera_allocation_generation_after_collision_adoption\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_generation_after_collision_adoption);
+ json+=",\"source_camera_allocation_subject_count_after_collision_adoption\":"+std::to_string(results_camera_entry_snapshot.source_camera_allocation_subject_count_after_collision_adoption);
+ json+=",\"source_camera_pool_event_count\":"+std::to_string(results_camera_entry_snapshot.source_camera_pool_event_count);
+ json+=",\"source_camera_pool_event_overflow\":";
+ json+=results_camera_entry_snapshot.source_camera_pool_event_overflow?"true":"false";
+ json+=",\"source_camera_pool_events\":[";
+ for(uint32_t i=0;i<results_camera_entry_snapshot.source_camera_pool_event_count;++i){
+  if(i)json+=',';
+  const auto& event=results_camera_entry_snapshot.source_camera_pool_events[i];
+  json+="{\"phase\":\"";json+=event.phase;json+="\"";
+  json+=",\"source_tick\":"+std::to_string(event.source_tick);
+  json+=",\"scene_entered\":"+std::to_string(event.scene_entered);
+  json+=",\"subject_count\":"+std::to_string(event.subject_count);
+  json+=",\"source_free\":";append_pointer_json(json,event.source_free);
+  json+=",\"source_pool\":";append_pointer_json(json,event.source_pool);
+  json+=",\"source_active\":";append_pointer_json(json,event.source_active);
+  json+=",\"source_tail\":";append_pointer_json(json,event.source_tail);
+  json+=",\"owner_pool\":";append_pointer_json(json,event.owner_pool);
+  json+=",\"context_pool\":";append_pointer_json(json,event.context_pool);
+  json+=",\"expected_pool\":";append_pointer_json(json,event.expected_pool);
+  json+=",\"allocation_generation\":"+std::to_string(event.allocation_generation);
+  json+=",\"generation_before_onenter\":"+std::to_string(event.generation_before_onenter);
+  json+=",\"expected_generation\":"+std::to_string(event.expected_generation);
+  json+='}';
+ }
+ json+=']';
+ json+=",\"source_camera_subject_event_count\":";
+ json+=std::to_string(results_camera_entry_snapshot.source_camera_subject_event_count);
+ json+=",\"source_camera_subject_event_overflow\":";
+ json+=results_camera_entry_snapshot.source_camera_subject_event_overflow?"true":"false";
+ json+=",\"source_camera_subject_events\":[";
+ for(uint32_t i=0;i<results_camera_entry_snapshot.source_camera_subject_event_count;++i){
+  if(i)json+=',';
+  const auto& event=results_camera_entry_snapshot.source_camera_subject_events[i];
+  json+="{\"phase\":\"";json+=event.phase;json+="\"";
+  json+=",\"source_tick\":"+std::to_string(event.source_tick);
+  json+=",\"scene_entered\":"+std::to_string(event.scene_entered);
+  json+=",\"subject\":";append_pointer_json(json,event.subject);
+  json+=",\"subject_prev\":";append_pointer_json(json,event.subject_prev);
+  json+=",\"subject_next\":";append_pointer_json(json,event.subject_next);
+  json+=",\"source_free\":";append_pointer_json(json,event.source_free);
+  json+=",\"source_pool\":";append_pointer_json(json,event.source_pool);
+  json+=",\"source_active\":";append_pointer_json(json,event.source_active);
+  json+=",\"source_tail\":";append_pointer_json(json,event.source_tail);
+  json+=",\"owner_pool\":";append_pointer_json(json,event.owner_pool);
+  json+=",\"context_pool\":";append_pointer_json(json,event.context_pool);
+  json+=",\"allocation_generation\":"+std::to_string(event.allocation_generation);
+  json+=",\"subject_in_pool\":";json+=event.subject_in_pool?"true":"false";
+  json+=",\"subject_prev_in_pool\":";json+=event.subject_prev_in_pool?"true":"false";
+  json+=",\"subject_next_in_pool\":";json+=event.subject_next_in_pool?"true":"false";
+  json+=",\"free_in_pool\":";json+=event.free_in_pool?"true":"false";
+  json+=",\"active_in_pool\":";json+=event.active_in_pool?"true":"false";
+  json+=",\"tail_in_pool\":";json+=event.tail_in_pool?"true":"false";
+  json+='}';
+ }
+ json+=']';
+ json+='}';
+}
+size_t retain_results_pad_sample(uint32_t source_frame,const PADStatus pads[4]){
+ ++results_pad_trace_attempts;
+ if(results_pad_trace_count==results_pad_trace.size()){
+  results_pad_trace_overflow=true;
+  return results_pad_trace.size();
+ }
+ const size_t index=results_pad_trace_count++;
+ auto& row=results_pad_trace[index];
+ row={};row.source_frame=source_frame;
+ for(size_t port=0;port<4;++port)row.pads[port]=pads[port];
+ return index;
+}
+void retain_results_state_after_tick(size_t index,uint32_t source_frame){
+ if(index>=results_pad_trace_count)return;
+ auto& row=results_pad_trace[index];
+ const ResultsData& state=lbl_8046DBE8;
+ for(size_t port=0;port<4;++port)row.source_consumed_pads[port]=HSD_PadCopyStatus[port];
+ row.results_state_sampled=true;
+ row.results_state_frame=source_frame;
+ row.results_phase=state.x1;
+ row.results_stats_phase=state.x0_23;
+ row.results_num_pages=state.num_pages;
+ for(size_t slot=0;slot<4;++slot){
+  row.results_player_pages[slot]=state.player_data[slot].page;
+  row.results_player_confirmed[slot]=state.player_data[slot].x0_0?1U:0U;
+ }
+}
+#endif
 // V2 recipes come from fresh original processes and do not carry heap history.
 // Original stage callbacks can read uncleared allocation bytes (Shy Guy pattern).
 // Do not reset this eligibility on unload or normalize those gameplay bytes.
@@ -119,6 +255,17 @@ int expected_replay_scene(const melee_web::RetailReplayRecipe& recipe,size_t cur
  for(const auto& span:recipe.spans)
   if(cursor>=span.first_frame&&cursor<=span.last_frame)return span.scene;
  return 0;
+}
+std::string replay_scene_mismatch(const char* boundary,size_t cursor,
+                                 int expected,int observed){
+ std::string message="Whole-session replay ";message+=boundary;
+ message+=" scene mismatch at input ";message+=std::to_string(cursor);
+ message+=" (expected ";message+=std::to_string(expected);
+ message+=", observed ";message+=std::to_string(observed);
+ if(match){message+=", match source frame ";message+=std::to_string(match->source_frames());}
+ if(results){message+=", Results source frame ";message+=std::to_string(results->source_frames());}
+ if(prize){message+=", Prize source frame ";message+=std::to_string(prize->source_frames());}
+ message+=")";return message;
 }
 melee_web::FixedTickClock menu_clock;
 melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::CatchUp};
@@ -283,9 +430,111 @@ struct PreparationProfile {
 PreparationProfile preparation_profile;
 PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
+melee_web::ResultsSourcePadSchedule scheduled_results_pad;
+melee_web::ResultsSourceFramePauseSchedule scheduled_results_pauses;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
-constexpr std::array<std::string_view,277> keys={
+// Keep the expanded fighter/Kirby archive inventory separate from the
+// original title/main route inventory below. Both are accepted at the native
+// file boundary; neither list substitutes for the other's source assets.
+constexpr std::array<std::string_view,378> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","LbRf.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
+ "PlDr.dat","PlDrAJ.dat","PlDrNr.dat","PlDrRe.dat","PlDrBu.dat","PlDrGr.dat","PlDrBk.dat","drmario.ssm",
+ "PlFe.dat","PlFeAJ.dat","PlFeNr.dat","PlFeRe.dat","PlFeBu.dat","PlFeGr.dat","PlFeYe.dat","EfFeData.dat","emblem.ssm",
+ "PlLk.dat","PlLkAJ.dat","PlLkNr.dat","PlLkRe.dat","PlLkBu.dat","PlLkBk.dat","PlLkWh.dat",
+ "PlCl.dat","PlClAJ.dat","PlClNr.dat","PlClRe.dat","PlClBu.dat","PlClWh.dat","PlClBk.dat","EfLkData.dat","link.ssm","clink.ssm",
+ "PlGn.dat","PlGnAJ.dat","PlGnNr.dat","PlGnRe.dat","PlGnBu.dat","PlGnGr.dat","PlGnLa.dat","EfGnData.dat","ganon.ssm",
+ "PlCa.dat","PlCaAJ.dat","PlCaNr.dat","PlCaGy.dat","PlCaRe.usd","PlCaWh.dat","PlCaGr.dat","PlCaBu.dat","EfCaData.dat","captain.ssm",
+ "GrSh.dat","shrine.hps","akaneia.hps","GrIz.dat","izumi.hps",
+ "PlLg.dat","PlLgAJ.dat","PlLgNr.dat","PlLgWh.dat","PlLgAq.dat","PlLgPi.dat","EfLgData.dat","luigi.ssm",
+ "PlPk.dat","PlPkAJ.dat","PlPkNr.dat","PlPkRe.dat","PlPkBu.dat","PlPkGr.dat",
+ "PlPc.dat","PlPcAJ.dat","PlPcNr.dat","PlPcRe.dat","PlPcBu.dat","PlPcGr.dat",
+ "EfPkData.dat","pikachu.ssm","pichu.ssm","GrOy.dat","old_ys.hps",
+ "PlPr.dat","PlPrAJ.dat","PlPrNr.dat","PlPrRe.dat","PlPrBu.dat","PlPrGr.dat","PlPrYe.dat","EfPrData.dat","purin.ssm",
+ "PlDk.dat","PlDkAJ.dat","PlDkNr.dat","PlDkBk.dat","PlDkRe.dat","PlDkBu.dat","PlDkGr.dat","EfDkData.dat","dk.ssm",
+ "PlKp.dat","PlKpAJ.dat","PlKpNr.dat","PlKpRe.dat","PlKpBu.dat","PlKpBk.dat","EfKpData.dat","koopa.ssm",
+ "GmRst.usd",
+ "SdRst.usd",
+ "TyDatai.usd",
+ "IfPrize.usd",
+ "SdPrize.usd",
+ "s_info1.hps",
+ "s_info2.hps",
+ "s_info3.hps",
+ "GmRstMMr.dat",
+ "GmRstMDr.dat",
+ "GmRstMFx.dat",
+ "GmRstMFc.dat",
+ "GmRstMMs.dat",
+ "GmRstMFe.dat",
+ "GmRstMLk.dat",
+ "GmRstMCl.dat",
+ "GmRstMCa.dat",
+ "GmRstMDk.dat",
+ "GmRstMGn.dat",
+ "GmRstMKp.dat",
+ "GmRstMLg.dat",
+ "GmRstMMt.dat",
+ "GmRstMPk.dat",
+ "GmRstMPc.dat",
+ "GmRstMPr.dat","GmRstMGw.dat",
+ "ff_mario.hps",
+ "ff_fox.hps",
+ "ff_emb.hps",
+ "ff_link.hps",
+ "ff_fzero.hps",
+ "ff_dk.hps",
+ "ff_poke.hps","GmRstMNs.dat","GmRstMPe.dat","ff_nes.hps",
+ "PlMt.dat","PlMtAJ.dat","PlMtNr.dat","PlMtRe.dat","PlMtBu.dat","PlMtGr.dat","EfMtData.dat","mewtwo.ssm",
+ "PlNs.dat",
+ "PlNsAJ.dat",
+ "PlNsNr.dat",
+ "PlNsYe.dat",
+ "PlNsBu.dat",
+ "PlNsGr.dat",
+ "EfNsData.dat",
+ "ness.ssm",
+ "PlPe.dat",
+ "PlPeAJ.dat",
+ "PlPeNr.dat",
+ "PlPeYe.dat",
+ "PlPeWh.dat",
+ "PlPeBu.dat",
+ "PlPeGr.dat",
+ "EfPeData.dat",
+ "peach.ssm",
+ "PlKb.dat","PlKbAJ.dat","PlKbNr.dat","PlKbYe.dat","PlKbBu.dat","PlKbRe.dat",
+ "PlKbGr.dat","PlKbWh.dat","EfKbData.dat","kirby.ssm","GmRstMKb.dat",
+ // Kirby's source copy move and hat roots, plus copy-specific effect banks.
+ "PlKbCpMr.dat","PlKbCpFx.dat","PlKbCpCa.dat","PlKbCpDk.dat","PlKbCpKp.dat",
+ "PlKbCpLk.dat","PlKbCpSk.dat","PlKbCpNs.dat","PlKbCpPe.dat","PlKbCpPp.dat",
+ "PlKbCpPk.dat","PlKbCpSs.dat","PlKbCpYs.dat","PlKbCpPr.dat","PlKbCpMt.dat",
+ "PlKbCpLg.dat","PlKbCpMs.dat","PlKbCpZd.dat","PlKbCpCl.dat","PlKbCpDr.dat",
+ "PlKbCpFc.dat","PlKbCpPc.dat","PlKbCpGw.dat","PlKbCpGn.dat","PlKbCpFe.dat",
+ "PlKbNrCpDk.dat","PlKbNrCpPr.dat","PlKbNrCpMt.dat","PlKbNrCpFc.dat","PlKbNrCpGw.dat",
+ "PlKbYeCpDk.dat","PlKbBuCpDk.dat","PlKbReCpDk.dat","PlKbGrCpDk.dat","PlKbWhCpDk.dat",
+ "PlKbYeCpPr.dat","PlKbBuCpPr.dat","PlKbReCpPr.dat","PlKbGrCpPr.dat","PlKbWhCpPr.dat",
+ "PlKbYeCpMt.dat","PlKbBuCpMt.dat","PlKbReCpMt.dat","PlKbGrCpMt.dat","PlKbWhCpMt.dat",
+ "PlKbYeCpFc.dat","PlKbBuCpFc.dat","PlKbReCpFc.dat","PlKbGrCpFc.dat","PlKbWhCpFc.dat",
+ "EfKbMs.dat","EfKbZd.dat","EfKbMr.dat","EfKbFx.dat","EfKbSs.dat","EfKbPk.dat",
+ "EfKbLg.dat","EfKbCa.dat","EfKbDk.dat","EfKbKp.dat","EfKbIc.dat","EfKbGn.dat","EfKbFe.dat",
+ "samus.ssm","yoshi.ssm","zs.ssm","GmRstMSs.dat","GmRstMZd.dat","GmRstMSk.dat",
+ "PlGw.dat","PlGwAJ.dat","PlGwNr.dat","gw.ssm",
+ "PlSs.dat","PlSsAJ.dat","PlSsNr.dat","PlSsPi.dat","PlSsBk.dat","PlSsGr.dat","PlSsLa.dat","EfSsData.dat",
+ "PlYs.dat","PlYsAJ.dat","PlYsNr.dat","PlYsRe.dat","PlYsBu.dat","PlYsYe.dat","PlYsPi.dat","PlYsAq.dat","EfYsData.dat","GmRstMYs.dat",
+ "PlZd.dat","PlZdAJ.dat","PlZdNr.dat","PlZdRe.dat","PlZdBu.dat","PlZdGr.dat","PlZdWh.dat",
+ "PlSk.dat","PlSkAJ.dat","PlSkNr.dat","PlSkRe.dat","PlSkBu.dat","PlSkGr.dat","PlSkWh.dat","EfZdData.dat",
+ "PlPp.dat","PlPpAJ.dat","PlPpNr.dat","PlPpGr.dat","PlPpOr.dat","PlPpRe.dat",
+ "PlNn.dat","PlNnAJ.dat","PlNnNr.dat","PlNnYe.dat","PlNnAq.dat","PlNnWh.dat","EfIcData.dat","GmRstMPn.dat","ice.ssm",
+ "ff_flat.hps","ff_ice.hps","ff_kirby.hps","ff_samus.hps","ff_yoshi.hps",
+};
+constexpr std::array<std::string_view,18> zelda_sheik_keys={
+ "PlZd.dat","PlZdAJ.dat","PlZdNr.dat","PlZdRe.dat","PlZdBu.dat","PlZdGr.dat","PlZdWh.dat",
+ "PlSk.dat","PlSkAJ.dat","PlSkNr.dat","PlSkRe.dat","PlSkBu.dat","PlSkGr.dat","PlSkWh.dat",
+ "EfZdData.dat","GmRstMZd.dat","GmRstMSk.dat","zs.ssm",
+};
+// PR #96's route-specific source inventory includes title, main-menu, and all
+// SSM table entries needed before those scenes can select their next route.
+constexpr std::array<std::string_view,277> route_asset_keys={
  "LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat",
  "PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","LbAd.dat",
  "LbRf.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat",
@@ -336,6 +585,24 @@ void begin_source_session(){
  source_session_owned=true;
 }
 void clear_diagnostic_pad(){diagnostic_pad={};diagnostic_pad_port=0;diagnostic_pad_remaining=0;}
+void clear_scheduled_results_pad(){scheduled_results_pad.clear();}
+void clear_scheduled_results_pauses(){scheduled_results_pauses.clear();}
+void activate_scheduled_results_pad(unsigned source_frame,const PADStatus* raw){
+ melee_web::ResultsSourcePadEvent scheduled{};
+ const auto boundary=scheduled_results_pad.before_tick(source_frame,scheduled);
+ if(boundary==melee_web::ResultsSourcePadSchedule::Boundary::missed)
+  throw std::runtime_error("Missed scheduled Results PAD source tick; refusing late input");
+ if(boundary!=melee_web::ResultsSourcePadSchedule::Boundary::due)return;
+ check(raw&&raw[scheduled.port].err==PAD_ERR_NONE,
+       "Scheduled Results P1 PAD event requires the original connected port");
+ check(diagnostic_pad_remaining==0,
+       "Scheduled Results PAD event overlapped an active raw PAD sample");
+ diagnostic_pad={};diagnostic_pad.err=raw[scheduled.port].err;
+ diagnostic_pad.button=static_cast<u16>(scheduled.buttons);
+ diagnostic_pad_port=scheduled.port;diagnostic_pad_remaining=scheduled.duration;
+ EM_ASM({window.menuResultsSourcePadConsumed?.($0,$1,$2,$3);},
+        scheduled.source_frame,scheduled.port,scheduled.buttons,scheduled.duration);
+}
 void report_owner_lifetime(const char* boundary){
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  // Opt-in diagnostics run only at owner boundaries, never per live tick.
@@ -450,7 +717,13 @@ void close(){
    pending_opening_state=-1;
   }
  }
- if(results){results->close();results.reset();}
+ if(results){
+  results->close();
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_camera_entry_snapshot=results->camera_entry_snapshot();
+#endif
+  results.reset();
+ }
  if(prize){prize->close();prize.reset();}
  if(world){
   if(host_entered){check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);host_entered=false;pending_opening_state=-1;}
@@ -482,7 +755,7 @@ if(scoped_assets){
   melee_web::retail_replay_end(replay->frames.size(),replay->whole_session());
  replay.reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
- audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();
+ audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
  match_message="Original source match";
  terminal_match_observation.clear();
  if(had_lifetime){
@@ -713,7 +986,11 @@ void advance(){
   check(melee_web_menu_host_results_exit(host,error,sizeof(error)),error);
   const uint32_t seed=results->random_seed();
   uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(final_input);
-  results->close();results.reset();
+  results->close();
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_camera_entry_snapshot=results->camera_entry_snapshot();
+#endif
+  results.reset();
   report_owner_lifetime("results-after-teardown");
   check(melee_web_menu_host_results_end(host,seed,final_input,error,sizeof(error)),error);
   results_route_active=false;
@@ -797,9 +1074,19 @@ void advance(){
   results_input.reset(melee_web_pad_state_decode(final_input,sizeof(final_input),error,sizeof(error)));
   check(results_input!=nullptr,error);
   results_seed=seed;
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_entry_packet.capture(completed_matches,terminal,results_info,results_seed,final_input);
+#endif
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_pad_trace_count=0;results_pad_trace_attempts=0;results_pad_trace_overflow=false;
+  results_camera_entry_snapshot={};
+#endif
   if(scoped_assets){pending=false;request_assets(AssetDestination::Results);return;}
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
   results=std::make_unique<melee_web::GameplayResultsSession>(files,results_info,seed,*results_input);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_camera_entry_snapshot=results->camera_entry_snapshot();
+#endif
   results_input.reset();
   const double constructed=emscripten_get_now();
   report_construction("results-enter",started,constructed,constructed,before,aurora_stats_snapshot());
@@ -908,6 +1195,9 @@ bool finish_asset_handoff(){
   check(results_input!=nullptr,"Original Results input was not retained across the asset handoff");
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
   results=std::make_unique<melee_web::GameplayResultsSession>(files,results_info,results_seed,*results_input);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  results_camera_entry_snapshot=results->camera_entry_snapshot();
+#endif
   results_input.reset();
   const double constructed=emscripten_get_now();
   report_construction("results-enter",started,constructed,constructed,before,aurora_stats_snapshot());
@@ -1315,10 +1605,22 @@ void tick(){
   }
   for(unsigned step=0;step<elapsed.steps;step++){
    if(replay&&replay_cursor==replay->frames.size())break;
+   if(results){
+    const unsigned results_source_frame=results->source_frames();
+    const auto boundary=scheduled_results_pauses.before_tick(results_source_frame);
+    if(boundary==melee_web::ResultsSourceFramePauseSchedule::Boundary::missed)
+     throw std::runtime_error("Missed scheduled Results source-frame pause; refusing a late boundary");
+    if(boundary==melee_web::ResultsSourceFramePauseSchedule::Boundary::due){
+     running=false;menu_clock.reset();
+     message="Paused at scheduled Results source frame "+std::to_string(results_source_frame)+".";
+     break;
+    }
+   }
    source_frames.before_step(present_source);
    if(prepare_deferred_pipelines())break;
    PADStatus checked_input[4];const PADStatus* sample=input->raw;bool copied_input=false;
    bool diagnostic_start_pulse=false;
+   if(results)activate_scheduled_results_pad(results->source_frames(),input->raw);
    if(diagnostic_start_ticks){
     std::copy(input->raw,input->raw+4,checked_input);checked_input[0].button|=PAD_BUTTON_START;
     sample=checked_input;copied_input=true;diagnostic_start_pulse=true;--diagnostic_start_ticks;
@@ -1410,7 +1712,18 @@ void tick(){
      }
     }
    }
-   else if(results){results->tick(sample);source_frames.did_step();if(results->requested())result=3;}
+   else if(results){
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+    const size_t trace_index=retain_results_pad_sample(results->source_frames(),sample);
+#endif
+    results->tick(sample);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+    results_camera_entry_snapshot=results->camera_entry_snapshot();
+    if(trace_index<results_pad_trace_count)results_pad_trace[trace_index].tick_returned=true;
+    retain_results_state_after_tick(trace_index,results->source_frames());
+#endif
+    source_frames.did_step();if(results->requested())result=3;
+   }
    else if(prize){prize->tick(sample);source_frames.did_step();if(prize->requested())result=3;}
    else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);source_frames.did_step();}
    if(replay_whole){
@@ -1419,13 +1732,25 @@ void tick(){
     // recipe declared for this frame.
     const int expected=expected_replay_scene(*replay,replay_cursor);
     const int observed=observed_replay_scene();
-    check(observed==expected,"Whole-session replay drove an unexpected scene");
+    if(observed!=expected)
+     throw std::runtime_error(replay_scene_mismatch("post-consumption",replay_cursor,
+                                                    expected,observed));
     if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor,observed);
     ++replay_cursor;
     ++replay_steps;
     replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
    }
-   if(result==3){pending=true;clear_diagnostic_pad();break;}
+   if(result==3){
+    if(results){
+     check(scheduled_results_pad.all_consumed(),
+           "Results returned before every scheduled source PAD sample was consumed");
+     check(scheduled_results_pauses.all_consumed(),
+           "Results returned before every scheduled source-frame pause was reached");
+     clear_scheduled_results_pad();
+     clear_scheduled_results_pauses();
+    }
+    pending=true;clear_diagnostic_pad();break;
+   }
   }
   if(!audio_before_construction&&!audio_elapsed.stalled)
    for(unsigned step=0;step<audio_elapsed.steps;step++)
@@ -1460,7 +1785,7 @@ void tick(){
     message="Whole-session replay complete; final original character select entered.";
    }
   }
- }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
+ }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
   if(simulation_done<input_done)simulation_done=failed;
@@ -1609,6 +1934,103 @@ void tick(){
 }
 }
 extern "C" {
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_entry_packet(){
+ // Read-only observer: serialize copied diagnostic storage, never live source
+ // globals. KEEPALIVE exports only this getter; there is no injection endpoint.
+ static std::string json;
+ try{json=results_entry_packet.json();return json.c_str();}
+ catch(...){return "{\"error\":\"Results entry packet serialization failed\"}";}
+}
+EMSCRIPTEN_KEEPALIVE const char* melee_web_native_menu_results_pad_trace(){
+ static std::string json;
+ json.clear();
+ if(results){
+  try{results_camera_entry_snapshot=results->camera_entry_snapshot();}
+  catch(...){/* Preserve the last copied observer packet after source failure. */}
+ }
+ json.reserve(128+results_pad_trace_count*1024+
+              results_camera_entry_snapshot.source_camera_subject_event_count*512);
+ json+="{\"schema\":\"melee-web-results-pad-trace-v1\",\"source_frame_semantics\":\"zero-based Results source frame immediately before this tick attempt\",\"attempts\":";
+ json+=std::to_string(results_pad_trace_attempts);
+ json+=",\"retained\":";json+=std::to_string(results_pad_trace_count);
+ json+=",\"capacity\":";json+=std::to_string(kResultsPadTraceCapacity);
+ json+=",\"overflow\":";json+=results_pad_trace_overflow?"true":"false";
+ append_camera_entry_json(json);
+ json+=",\"samples\":[";
+ for(size_t index=0;index<results_pad_trace_count;++index){
+  if(index)json+=',';
+  const auto& row=results_pad_trace[index];
+  char sample[512];
+  int length=std::snprintf(sample,sizeof(sample),
+    "{\"source_frame\":%u,\"tick_returned\":%s,\"pads\":[",
+    row.source_frame,row.tick_returned?"true":"false");
+  if(length<0||static_cast<size_t>(length)>=sizeof(sample))continue;
+  json.append(sample,static_cast<size_t>(length));
+  for(size_t port=0;port<4;++port){
+   if(port)json+=',';
+   const PADStatus& pad=row.pads[port];
+   length=std::snprintf(sample,sizeof(sample),
+    "{\"button\":%u,\"stick_x\":%d,\"stick_y\":%d,\"substick_x\":%d,\"substick_y\":%d,\"trigger_left\":%u,\"trigger_right\":%u,\"analog_a\":%u,\"analog_b\":%u,\"err\":%d"
+#if defined(TARGET_PC)
+    ",\"ext_button\":%u"
+#endif
+    "}",static_cast<unsigned>(pad.button),static_cast<int>(pad.stickX),
+    static_cast<int>(pad.stickY),static_cast<int>(pad.substickX),
+    static_cast<int>(pad.substickY),static_cast<unsigned>(pad.triggerLeft),
+    static_cast<unsigned>(pad.triggerRight),static_cast<unsigned>(pad.analogA),
+    static_cast<unsigned>(pad.analogB),static_cast<int>(pad.err)
+#if defined(TARGET_PC)
+    ,static_cast<unsigned>(pad.extButton)
+#endif
+   );
+   if(length<0||static_cast<size_t>(length)>=sizeof(sample))continue;
+   json.append(sample,static_cast<size_t>(length));
+  }
+  json+="],\"source_consumed_pads\":";
+  if(!row.results_state_sampled)json+="null";
+  else{
+   json+='[';
+   for(size_t port=0;port<4;++port){
+    if(port)json+=',';
+    const HSD_PadStatus& consumed=row.source_consumed_pads[port];
+    length=std::snprintf(sample,sizeof(sample),
+     "{\"button\":%u,\"trigger\":%u,\"release\":%u,\"err\":%d}",
+     static_cast<unsigned>(consumed.button),static_cast<unsigned>(consumed.trigger),
+     static_cast<unsigned>(consumed.release),static_cast<int>(consumed.err));
+    if(length<0||static_cast<size_t>(length)>=sizeof(sample))continue;
+    json.append(sample,static_cast<size_t>(length));
+   }
+   json+=']';
+  }
+  json+=",\"results_state_after_tick\":";
+  if(!row.results_state_sampled)json+="null";
+  else{
+   char state_sample[256];
+   int state_length=std::snprintf(state_sample,sizeof(state_sample),
+    "{\"source_frame\":%u,\"phase\":%u,\"stats_phase\":%u,\"num_pages\":%u,\"players\":[",
+    row.results_state_frame,static_cast<unsigned>(row.results_phase),
+    static_cast<unsigned>(row.results_stats_phase),
+    static_cast<unsigned>(row.results_num_pages));
+   if(state_length>=0&&static_cast<size_t>(state_length)<sizeof(state_sample))
+    json.append(state_sample,static_cast<size_t>(state_length));
+   for(size_t slot=0;slot<4;++slot){
+    if(slot)json+=',';
+    state_length=std::snprintf(state_sample,sizeof(state_sample),
+     "{\"page\":%u,\"confirmed\":%u}",
+     static_cast<unsigned>(row.results_player_pages[slot]),
+     static_cast<unsigned>(row.results_player_confirmed[slot]));
+    if(state_length>=0&&static_cast<size_t>(state_length)<sizeof(state_sample))
+     json.append(state_sample,static_cast<size_t>(state_length));
+   }
+   json+="]}";
+  }
+  json+="}";
+ }
+ json+="]}";
+ return json.c_str();
+}
+#endif
 unsigned melee_web_native_asset_begin(){try{
  close();scoped_assets=true;
  request_assets(AssetDestination::InitialMenu);
@@ -1695,7 +2117,10 @@ if(scoped_assets)throw std::runtime_error("Scoped disc imports require an asset 
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  if(std::string_view{name}=="dsp_coef.bin")throw std::runtime_error("Public audio-disabled runtime does not accept DSP coefficient input");
 #endif
- bool known=false;for(auto key:keys)known|=key==name;
+ bool known=false;
+ for(auto key:keys)known|=key==name;
+ for(auto key:route_asset_keys)known|=key==name;
+ for(auto key:zelda_sheik_keys)known|=key==name;
  if(!known)throw std::runtime_error("Unknown native menu file: "+std::string(name));
  archive_cache.reset();
  files[name]={data,data+size};return 1;
@@ -1841,13 +2266,46 @@ int melee_web_native_menu_pad_sample_full(unsigned port,unsigned buttons,int sti
 int melee_web_native_menu_pad_sample(unsigned port,unsigned buttons,int stick_x,int stick_y,unsigned duration){
  return melee_web_native_menu_pad_sample_full(port,buttons,stick_x,stick_y,0,0,0,0,duration);
 }
+int melee_web_native_menu_results_pad_schedule(unsigned source_frame,unsigned port,
+                                                unsigned buttons,unsigned duration){try{
+ const int phase=host&&host_entered?melee_web_menu_host_phase(host):-1;
+ if(replay||faulted||preparation.busy()||pending||!running||!host_entered||match||
+    results||prize||(phase!=MELEE_WEB_MENU_CSS&&phase!=MELEE_WEB_MENU_CSS_READY&&
+                     phase!=MELEE_WEB_MENU_SSS&&phase!=MELEE_WEB_MENU_SSS_READY)||
+    diagnostic_pad_remaining||diagnostic_start_ticks||stock_check==-1)
+  throw std::runtime_error("Results PAD schedule requires an idle original CSS/SSS before Match construction");
+ if(port!=0||buttons!=PAD_BUTTON_START||duration<1||duration>120||source_frame>8191)
+  throw std::runtime_error("Results PAD schedule is outside the P1 Start source-tick bounds");
+ if(scheduled_results_pad.started()||scheduled_results_pad.full())
+  throw std::runtime_error("Results PAD schedule is already running or full");
+ if(!scheduled_results_pad.enqueue({source_frame,port,buttons,duration}))
+  throw std::runtime_error("Results PAD source tick is invalid, duplicated, or unordered");
+ message="Results P1 Start scheduled at an exact future source tick.";
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_results_pause_schedule(unsigned source_frame){try{
+ const int phase=host&&host_entered?melee_web_menu_host_phase(host):-1;
+ if(replay||faulted||preparation.busy()||pending||!running||!host_entered||match||
+    results||prize||(phase!=MELEE_WEB_MENU_CSS&&phase!=MELEE_WEB_MENU_CSS_READY&&
+                     phase!=MELEE_WEB_MENU_SSS&&phase!=MELEE_WEB_MENU_SSS_READY)||
+    diagnostic_pad_remaining||diagnostic_start_ticks||stock_check==-1)
+  throw std::runtime_error("Results source-frame pause schedule requires idle original CSS/SSS before Match construction");
+ if(source_frame>8191)
+  throw std::runtime_error("Results source-frame pause is outside the supported source cursor bounds");
+ if(scheduled_results_pauses.started()||scheduled_results_pauses.full())
+  throw std::runtime_error("Results source-frame pause schedule is already running or full");
+ if(!scheduled_results_pauses.enqueue(source_frame))
+  throw std::runtime_error("Results source-frame pause is invalid, duplicated, or unordered");
+ message="Results source-frame pause scheduled at an exact future cursor.";
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_player_state(unsigned player,int* fighter_kind,int* motion_id,
                                        int* ground_or_air,unsigned* source_frame,
                                        float* position_x,float* position_y){try{
  if(!fighter_kind||!motion_id||!ground_or_air||!source_frame||!position_x||!position_y||
-    player>1||!match||!match->ready())
+    player>=4||!match||!match->ready())
   throw std::runtime_error("Player state requires a ready source match and valid output storage");
- const auto stats=match->player_stats(player);*fighter_kind=match->fighter_kind(player);
+ const auto stats=match->player_stats(player);*fighter_kind=stats.fighter_kind;
  *motion_id=stats.motion_id;*ground_or_air=stats.ground_or_air;*source_frame=match->source_frames();
  *position_x=stats.position[0];*position_y=stats.position[1];return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
@@ -1855,6 +2313,8 @@ const char* melee_web_native_menu_match_observe(){
  static char text[1024];
  if(!match)return terminal_match_observation.empty()?"{}":terminal_match_observation.c_str();
  if(!match->construction_complete())return "{}";
+ try{
+ match_observer_error.clear();
  const auto p0=match->player_stats(0),p1=match->player_stats(1);
  int winner=-1;const int outcome=match->outcome(winner);
  std::snprintf(text,sizeof(text),
@@ -1865,9 +2325,14 @@ const char* melee_web_native_menu_match_observe(){
   match->ready()?"true":"false",match->paused()?"true":"false",
   match->ending()?"true":"false",match->complete()?"true":"false",
   match->source_frames(),match->random_seed(),outcome,winner,
-  match->fighter_kind(0),p0.stocks,p0.motion_id,p0.ground_or_air,p0.position[0],p0.position[1],
-  match->fighter_kind(1),p1.stocks,p1.motion_id,p1.ground_or_air,p1.position[0],p1.position[1]);
+  p0.fighter_kind,p0.stocks,p0.motion_id,p0.ground_or_air,p0.position[0],p0.position[1],
+  p1.fighter_kind,p1.stocks,p1.motion_id,p1.ground_or_air,p1.position[0],p1.position[1]);
  return text;
+ }catch(const std::exception& e){
+  match_observer_error=e.what();
+  std::snprintf(text,sizeof(text),"{\"ready\":false,\"observer_error\":true}");
+  return text;
+ }
 }
 int melee_web_native_menu_drive_fighter(int character_kind){try{
  if(!host||melee_web_menu_host_phase(host)!=1)throw std::runtime_error("Fighter selection drive requires the original CSS");
@@ -1936,6 +2401,11 @@ const char* melee_web_native_menu_diagnostics(){
  static char text[640];
  std::snprintf(text,sizeof(text),"Completed matches: %u · stock check: %d · ticks: %u · stocks: %d · respawns: %d",
   completed_matches,stock_check,stock_tick,stock_count,stock_respawns);
+ if(!match_observer_error.empty()){
+  const auto length=std::char_traits<char>::length(text);
+  std::snprintf(text+length,sizeof(text)-length," · match observer error: %.320s",match_observer_error.c_str());
+  return text;
+ }
  const auto length=std::char_traits<char>::length(text);
  if(diagnostic_pad_remaining)
   std::snprintf(text+length,sizeof(text)-length," · raw PAD: port %u buttons 0x%04x stick [%d,%d] remaining %u",

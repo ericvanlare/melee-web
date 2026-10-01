@@ -44,7 +44,8 @@ struct DatEffectEntries::Storage {
     bool ready=false,needs_particles=false;
     ~Storage(){std::free(table);}
 };
-DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std::string_view symbol,uint32_t bank,uint32_t count,bool particles)
+DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std::string_view symbol,
+    uint32_t bank,uint32_t count,bool particles,std::vector<NativeDatSourceRegion> source_regions)
     :storage_(std::make_unique<Storage>())
 {
     static_assert(sizeof(void*)==4&&sizeof(EF_EffectDesc)==20&&sizeof(Table)==8,"Original EF table layout");
@@ -54,12 +55,21 @@ DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std
     for(const auto& entry:s.archive->public_symbols())if(entry.name==symbol)root=entry.data_offset;
     if(!root)throw DatError("Exact effect entry symbol is absent");
     const auto& a=*s.archive;
-    if(8+size_t(count)*20>a.next_target_offset(*root)-*root)throw DatError("Effect entries cross their referenced region");
+    const auto source_region=a.next_target_offset(*root)-*root;
+    if(8+size_t(count)*20>source_region)throw DatError("Effect table bank "+std::to_string(bank)+" symbol "+std::string(symbol)+" declares "+std::to_string(count)+" entries but its source-referenced region is "+std::to_string(source_region)+" bytes");
     const auto commands=a.pointer(*root,8),textures=a.pointer(*root+4,4);
     if(bool(commands)!=bool(textures))throw DatError("Effect table has an incomplete particle bank pair");
     // efAsync_LoadSync permits model-only effect tables: both particle roots
     // are null (for example Link's authored sword effects).
-    if(commands)s.bank=std::make_unique<DatEffectBanks>(s.archive,symbol,bank);
+    if(commands) {
+        try {
+            s.bank=std::make_unique<DatEffectBanks>(s.archive,symbol,bank,
+                                                     std::move(source_regions));
+        } catch(const DatError& error) {
+            throw DatError("Effect particle bank "+std::to_string(bank)+" symbol "+
+                           std::string(symbol)+": "+error.what());
+        }
+    }
     s.table=static_cast<Table*>(std::calloc(1,8+size_t(count)*20));
     if(!s.table)throw DatError("Cannot allocate native effect entries");
     if(s.bank){

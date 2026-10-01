@@ -10,6 +10,7 @@
 #include "gameplay_hud.h"
 #include "gameplay_match_flow.h"
 #include "gameplay_fighter_assets.h"
+#include "gameplay_kirby_copy_assets.hpp"
 #include "gameplay_hud_assets.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -49,6 +50,7 @@ struct GameplayMatchSession::Storage {
     MeleeWebMatchContext* match=nullptr;
     MeleeWebRender* render=nullptr;
     std::unique_ptr<GameplayHudAssets> hud_assets;
+    std::unique_ptr<GameplayKirbyCopyAssets> kirby_copy_assets;
     MeleeWebHud* hud=nullptr;
     MeleeWebMatchFlow* flow=nullptr;
     bool mode_owned=false;
@@ -61,9 +63,8 @@ struct GameplayMatchSession::Storage {
     GameplayWorldSelection content{};
     const MeleeWebStageContent* stage=nullptr;
     unsigned construction_phase=0;
-    const MeleeWebPadState* initial_input=nullptr;
     void begin(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
-               RuntimeArchiveCache* archive_cache){
+               RuntimeArchiveCache* archive_cache,const MeleeWebPadState* initial_input=nullptr){
         const bool opening_demo = selection.opening_demo != 0;
         unsigned player_count = selection.player_count != 0
                                     ? selection.player_count
@@ -87,6 +88,8 @@ struct GameplayMatchSession::Storage {
                   "Opening demo requires the authored four-player source VS setup");
         }
         runtime_files=&files;runtime_cache=archive_cache;selected=selection;
+        if(selection_uses_kirby(selection))
+            kirby_copy_assets=std::make_unique<GameplayKirbyCopyAssets>(files,selection);
         stage=melee_web_stage_content(selection.start.rules.stkind);
         check(stage!=nullptr,"Match stage has no source runtime owner");
         content.ground_kind=stage->ground_kind;
@@ -123,6 +126,7 @@ struct GameplayMatchSession::Storage {
         content.source_camera_subjects=70;
         content.source_random_seed=selection.random_seed;
         content.source_start_data=&selected.start;
+        content.source_initial_input=initial_input;
         if(!opening_demo){
             check(melee_web_vs_mode_begin(),"Original VS mode is already owned");
             mode_owned=true;
@@ -140,6 +144,7 @@ struct GameplayMatchSession::Storage {
         else
             world=std::make_unique<GameplayWorld>(files,content,
                                                   GameplayWorldConstruction::SourceOrdered);
+        content.source_initial_input=nullptr;
         match=world->take_match_context();
         render=world->take_render_context();
     }
@@ -176,8 +181,12 @@ struct GameplayMatchSession::Storage {
             for(unsigned i=0;i<content.player_count;++i){
                 const auto kind=content.fighter_kinds[i];
                 const auto* dependency=melee_web_fighter_content_by_kind(kind);
-                if(fighter_banks.insert(dependency->audio_bank).second)
-                    bank_names.emplace_back(dependency->audio_bank);
+                for(unsigned identity=0;identity<melee_web_fighter_kind_count(dependency->character_kind);++identity){
+                    const auto* owner=melee_web_fighter_content_by_kind(
+                        melee_web_fighter_kind_at(dependency->character_kind,identity));
+                    if(fighter_banks.insert(owner->audio_bank).second)
+                        bank_names.emplace_back(owner->audio_bank);
+                }
             }
             if(stage->audio_bank)bank_names.emplace_back(stage->audio_bank);
             if(runtime_cache){
@@ -209,13 +218,13 @@ struct GameplayMatchSession::Storage {
              * spawn lookup to the authored map JObjs before any Fighter exists. */
             world->enable_full_stage(true);
             check(melee_web_match_attach_collision(match,world->collision(),error,sizeof(error)),error);
-            if(initial_input){check(melee_web_match_restore_input(match,initial_input,error,sizeof(error)),error);initial_input=nullptr;}
             world->initialize_match(selected.start);
             construction_phase=3;
             return false;
         }
         if(construction_phase==3){
             check(melee_web_match_create_fighters_intro(match,error,sizeof(error)),error);
+            if(kirby_copy_assets)kirby_copy_assets->activate();
             construction_phase=4;
             return false;
         }
@@ -242,8 +251,8 @@ struct GameplayMatchSession::Storage {
         return true;
     }
     void start(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
-               RuntimeArchiveCache* archive_cache){
-        begin(files,selection,archive_cache);
+               RuntimeArchiveCache* archive_cache,const MeleeWebPadState* initial_input=nullptr){
+        begin(files,selection,archive_cache,initial_input);
         while(!advance_construction()){}
     }
     void close(){
@@ -266,8 +275,16 @@ struct GameplayMatchSession::Storage {
         music.reset();
         if(world){
             check_fighter_asset_ownership("before-world-close");
-            world->verify_immutable_archives();world->close();world.reset();
+            world->verify_immutable_archives();
+            world->close([this]{
+                /* Kirby donor effect tables share HSD's global live-generator
+                 * guard. Release their banks only after the world's original
+                 * particle runtime has removed stage/fighter generators. */
+                if(kirby_copy_assets){kirby_copy_assets->close();kirby_copy_assets.reset();}
+            });
+            world.reset();
         }
+        if(kirby_copy_assets){kirby_copy_assets->close();kirby_copy_assets.reset();}
         if(hud_assets){hud_assets->close();hud_assets.reset();}
         bank.reset();
         if(profile_owned){
@@ -283,7 +300,7 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,const Melee
 GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
                                            const MeleeWebPadState& initial_input)
     :storage_(std::make_unique<Storage>()){
-    storage_->initial_input=&initial_input;storage_->start(files,selection,nullptr);
+    storage_->start(files,selection,nullptr,&initial_input);
 }
 GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
                                            const MeleeWebMenuMatchSelection& selection,
@@ -306,11 +323,10 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
                                            GameplayMatchConstruction construction,
                                            const MeleeWebPadState& initial_input)
     :storage_(std::make_unique<Storage>()){
-    storage_->initial_input=&initial_input;
     if(construction==GameplayMatchConstruction::Deferred)
-        storage_->begin(files,selection,&archive_cache);
+        storage_->begin(files,selection,&archive_cache,&initial_input);
     else
-        storage_->start(files,selection,&archive_cache);
+        storage_->start(files,selection,&archive_cache,&initial_input);
 }
 void GameplayMatchSession::close(){if(storage_){storage_->close();storage_.reset();}}
 void GameplayMatchSession::tick(const PADStatus raw[4]){
@@ -349,6 +365,7 @@ MeleeWebPipelineSourceContext GameplayMatchSession::provenance_context() const {
         player.motion_id=-1;player.stocks=selected.stocks;
         if(construction_complete()){
             const auto state=player_stats(i);
+            player.fighter_kind=state.fighter_kind;
             player.motion_id=state.motion_id;player.stocks=state.stocks;
             entry|=state.motion_id>=ftCo_MS_Entry&&state.motion_id<=ftCo_MS_EntryEnd;
             dead|=state.motion_id>=ftCo_MS_DeadDown&&state.motion_id<=ftCo_MS_DeadUpFallHitCameraIce;
@@ -385,7 +402,7 @@ uint32_t GameplayMatchSession::random_seed()const{
 }
 int GameplayMatchSession::fighter_kind(unsigned index)const{
     check(storage_&&storage_->match&&index<storage_->content.player_count,"Match player index is outside the active source match");
-    return storage_->content.fighter_kinds[index];
+    return player_stats(index).fighter_kind;
 }
 const StartMeleeData& GameplayMatchSession::start_data()const{
     check(storage_&&storage_->match,"Match session is closed");

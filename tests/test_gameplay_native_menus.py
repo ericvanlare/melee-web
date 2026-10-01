@@ -109,6 +109,7 @@ class NativeMenuSourceTests(unittest.TestCase):
             run.stdout,
         )
         self.assertIn("Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger, Title timeout to Opening state 1 and recovery passed", run.stdout)
+        self.assertIn("Normal CSS->SSS leave cleared its consumed transition before host teardown", run.stdout)
         self.assertIn("Native Title/Main checked abort and CSS re-entry smoke passed", run.stdout)
 
     def test_opening_movie_entry_requires_source_heap_owner(self):

@@ -262,7 +262,9 @@ std::optional<std::uint32_t> DatArchive::pointer(std::uint32_t slot,
         if (target == 0) {
             return std::nullopt;
         }
-        throw DatError("DAT nonzero pointer is missing a relocation entry");
+        throw DatError("DAT nonzero pointer at slot " + std::to_string(slot) +
+                       " (value " + std::to_string(target) +
+                       ") is missing a relocation entry");
     }
     (void) range(target, minbytes);
     return target;

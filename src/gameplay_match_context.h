@@ -46,6 +46,7 @@ typedef struct MeleeWebMatchStats {
     uint32_t player_slot;
     float damage_percent, shield_health;
     int32_t stocks;
+    int32_t fighter_kind; /* Current transformed source entity, not CSS identity. */
 } MeleeWebMatchStats;
 /* Requires the live bootstrap, native object destructors, initialized common,
  * published fighter/effect/stage assets and collision to remain owned through

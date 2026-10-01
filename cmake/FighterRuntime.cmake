@@ -86,7 +86,7 @@ add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
   src/gameplay_audio_bank.cpp src/gameplay_audio_stream_asset.cpp src/dat_audio_stream.cpp src/dat_audio.cpp src/dat_audio_programs.cpp
   src/gameplay_hud_assets.cpp src/gameplay_asset_manifest.cpp src/dat_scene.cpp src/gameplay_menu_world.cpp src/gameplay_match_session.cpp src/dat_menu_support.cpp src/dat_event_menu.cpp src/dat_audio_load_data.cpp src/dat_shape_animation.cpp src/dat_sis.cpp src/dat_native_menu.cpp src/dat_item_article.cpp src/dat_stage_items.cpp src/dat_stage_yaku.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
   src/dat_texture.cpp src/dat_material.cpp src/dat_material_animation.cpp
-  src/native_dat.cpp src/gameplay_fighter_assets.cpp src/gameplay_action_store.cpp
+  src/native_dat.cpp src/gameplay_fighter_assets.cpp src/gameplay_kirby_copy_assets.cpp src/gameplay_action_store.cpp
   src/dat_commands.cpp src/dat_fighter_runtime.cpp src/dat_fighter.cpp
   src/dat_animation.cpp src/fighter_binding.cpp src/dat_lights.cpp src/dat_collision.cpp src/dat_stage.cpp
   src/dat_item_registry.cpp src/dat_item_registry_native.cpp
@@ -239,6 +239,14 @@ target_compile_options(gameplay_pikachu_articles_trace PRIVATE -UNDEBUG
 target_link_options(gameplay_pikachu_articles_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_pikachu_articles_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_gamewatch_visibility_trace EXCLUDE_FROM_ALL
+  tests/gameplay_gamewatch_visibility_trace.cpp)
+target_link_libraries(gameplay_gamewatch_visibility_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_gamewatch_visibility_trace PRIVATE -UNDEBUG)
+target_link_options(gameplay_gamewatch_visibility_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_gamewatch_visibility_trace PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_random_article_trace EXCLUDE_FROM_ALL
   tests/gameplay_random_article_trace.cpp tests/gameplay_random_article_fields.c)
@@ -503,7 +511,7 @@ target_link_libraries(gameplay_menu_browser PRIVATE fighter_asset_runtime aurora
 # Emscripten's mallinfo declaration extends its normal malloc.h via include_next.
 target_include_directories(gameplay_menu_browser SYSTEM PRIVATE "${EMSCRIPTEN_SYSROOT}/include/compat")
 target_compile_options(gameplay_menu_browser PRIVATE -ffp-contract=off)
-set(gameplay_menu_browser_exports "_main,_malloc,_free,_melee_web_native_asset_begin,_melee_web_native_asset_count,_melee_web_native_asset_name,_melee_web_native_asset_file,_melee_web_native_asset_commit,_melee_web_native_asset_abort,_melee_web_native_menu_file,_melee_web_native_source_file_external_set,_melee_web_native_source_files_external_clear,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_replay_whole_session,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_set_save_profile,_melee_web_native_menu_snapshot_save_profile,_melee_web_native_menu_snapshot_unlocked_baseline,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_native_menu_memory,_melee_web_css_observe,_melee_web_css_observe_setup,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message,_melee_web_native_menu_match_observe,_melee_web_css_observe_port")
+set(gameplay_menu_browser_exports "_main,_malloc,_free,_melee_web_native_asset_begin,_melee_web_native_asset_count,_melee_web_native_asset_name,_melee_web_native_asset_file,_melee_web_native_asset_commit,_melee_web_native_asset_abort,_melee_web_native_menu_file,_melee_web_native_source_file_external_set,_melee_web_native_source_files_external_clear,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_replay_whole_session,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_set_save_profile,_melee_web_native_menu_snapshot_save_profile,_melee_web_native_menu_snapshot_unlocked_baseline,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_results_pad_schedule,_melee_web_native_menu_results_pause_schedule,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_native_menu_memory,_melee_web_native_menu_results_entry_packet,_melee_web_native_menu_results_pad_trace,_melee_web_css_observe,_melee_web_css_observe_setup,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message,_melee_web_native_menu_match_observe,_melee_web_css_observe_port")
 if(MELEE_WEB_PIPELINE_PROVENANCE)
   # Emscripten consumes one complete export list. Keep every existing root
   # and add the private collector commands only in this configuration.
@@ -599,6 +607,36 @@ target_link_libraries(gameplay_results_scene_trace PRIVATE fighter_asset_runtime
 target_link_options(gameplay_results_scene_trace PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_results_scene_trace PROPERTIES SUFFIX ".js")
+
+# Optional rendered discriminator for Results camera ownership. This is kept
+# separate from the Node state-only trace: the browser target runs the exact
+# same source Results reducer with Aurora/WebGPU draws and local real assets.
+option(MELEE_WEB_RESULTS_RENDERED_TRACE
+  "Build the headless-browser Results draw reducer" OFF)
+set(MELEE_WEB_RESULTS_TRACE_ASSET_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/assets-local"
+  CACHE PATH "Ignored local asset root for the rendered Results reducer")
+if(MELEE_WEB_RESULTS_RENDERED_TRACE)
+  foreach(_asset_dir native-menus repro-results-v1 next-gate)
+    if(NOT IS_DIRECTORY "${MELEE_WEB_RESULTS_TRACE_ASSET_ROOT}/${_asset_dir}")
+      message(FATAL_ERROR
+        "Rendered Results trace requires ${MELEE_WEB_RESULTS_TRACE_ASSET_ROOT}/${_asset_dir}")
+    endif()
+  endforeach()
+  add_executable(gameplay_results_scene_trace_rendered EXCLUDE_FROM_ALL
+    tests/gameplay_results_scene_trace.cpp)
+  target_compile_definitions(gameplay_results_scene_trace_rendered PRIVATE
+    MELEE_WEB_RESULTS_RENDERED_TRACE)
+  target_include_directories(gameplay_results_scene_trace_rendered SYSTEM PRIVATE
+    "${EMSCRIPTEN_SYSROOT}/include/compat")
+  target_link_libraries(gameplay_results_scene_trace_rendered PRIVATE
+    fighter_asset_runtime aurora::main)
+  target_link_options(gameplay_results_scene_trace_rendered PRIVATE
+    --profiling-funcs -sENVIRONMENT=web -sASYNCIFY=1
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728
+    -sEXIT_RUNTIME=0 -sASSERTIONS=2 -sSTACK_SIZE=8388608
+    --preload-file "${MELEE_WEB_RESULTS_TRACE_ASSET_ROOT}@/assets")
+  set_target_properties(gameplay_results_scene_trace_rendered PROPERTIES SUFFIX ".js")
+endif()
 
 add_executable(gameplay_prize_assets_test EXCLUDE_FROM_ALL tests/gameplay_prize_assets_test.cpp)
 target_link_libraries(gameplay_prize_assets_test PRIVATE fighter_asset_runtime)

@@ -41,6 +41,26 @@ const VictoryMusic* victory_music(int ckind)
         static constexpr VictoryMusic music{0x16, "/audio/ff_mario.hps"};
         return &music;
     }
+    case CKIND_GAMEWATCH: {
+        static constexpr VictoryMusic music{0x0f, "/audio/ff_flat.hps"};
+        return &music;
+    }
+    case CKIND_KIRBY: {
+        static constexpr VictoryMusic music{0x14, "/audio/ff_kirby.hps"};
+        return &music;
+    }
+    case CKIND_POPONANA: {
+        static constexpr VictoryMusic music{0x13, "/audio/ff_ice.hps"};
+        return &music;
+    }
+    case CKIND_SAMUS: {
+        static constexpr VictoryMusic music{0x19, "/audio/ff_samus.hps"};
+        return &music;
+    }
+    case CKIND_YOSHI: {
+        static constexpr VictoryMusic music{0x1d, "/audio/ff_yoshi.hps"};
+        return &music;
+    }
     case CKIND_FOX:
     case CKIND_FALCO: {
         static constexpr VictoryMusic music{0x10, "/audio/ff_fox.hps"};
@@ -53,7 +73,9 @@ const VictoryMusic* victory_music(int ckind)
     }
     case CKIND_LINK:
     case CKIND_CLINK:
-    case CKIND_GANON: {
+    case CKIND_GANON:
+    case CKIND_ZELDA:
+    case CKIND_SEAK: {
         static constexpr VictoryMusic music{0x15, "/audio/ff_link.hps"};
         return &music;
     }
@@ -103,6 +125,8 @@ struct GameplayResultsSession::Storage {
     std::unique_ptr<GameplayAudioBank> bank;
     std::unique_ptr<GameplayAudioStream> music;
     MeleeWebResultsContext* context = nullptr;
+    MeleeWebResultsCameraEntrySnapshot last_camera_entry_snapshot{};
+    bool camera_snapshot_available = false;
 
     void start(const RuntimeFiles& files, const ResultsMatchInfo& result,
                uint32_t seed, const MeleeWebPadState& input)
@@ -122,19 +146,22 @@ struct GameplayResultsSession::Storage {
             selection.fighter_kinds[i] = fighter->fighter_kind;
             selection.costume_indices[i] = player.x3;
             ++selection.player_count;
-            const auto identity = std::find_if(
-                fighter_costumes().begin(), fighter_costumes().end(),
-                [&](const auto& costume) {
-                    return costume.fighter_kind == fighter->fighter_kind &&
-                           costume.costume_index == 0;
-                });
-            check(identity != fighter_costumes().end(),
-                  "Results source fighter identity is unavailable");
-            if (std::none_of(identities.begin(), identities.end(),
-                             [&](const auto& value) {
-                                 return value.fighter_kind == identity->fighter_kind;
-                             }))
-                identities.push_back(*identity);
+            for(unsigned identity_index=0;
+                identity_index<melee_web_fighter_kind_count(player.ckind);++identity_index){
+                const auto kind=static_cast<unsigned>(melee_web_fighter_kind_at(player.ckind,identity_index));
+                const auto identity = std::find_if(
+                    fighter_costumes().begin(), fighter_costumes().end(),
+                    [&](const auto& costume) {
+                        return costume.fighter_kind == kind && costume.costume_index == 0;
+                    });
+                check(identity != fighter_costumes().end(),
+                      "Results source fighter identity is unavailable");
+                if (std::none_of(identities.begin(), identities.end(),
+                                 [&](const auto& value) {
+                                     return value.fighter_kind == identity->fighter_kind;
+                                 }))
+                    identities.push_back(*identity);
+            }
         }
         check(selection.player_count >= 2,
               "Results requires at least two participants");
@@ -165,7 +192,11 @@ struct GameplayResultsSession::Storage {
             if (player.slot_type == Gm_PKind_NA) continue;
             const auto* fighter = melee_web_fighter_content(player.ckind);
             check(fighter != nullptr, "Results fighter audio mapping is unavailable");
-            add_bank(fighter->audio_bank);
+            for(unsigned identity=0;identity<melee_web_fighter_kind_count(player.ckind);++identity){
+                const auto* owner=melee_web_fighter_content_by_kind(
+                    melee_web_fighter_kind_at(player.ckind,identity));
+                add_bank(owner->audio_bank);
+            }
         }
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
         bank = std::make_unique<GameplayAudioBank>(files.at("smash2.sem"), banks,
@@ -205,7 +236,9 @@ struct GameplayResultsSession::Storage {
     {
         char error[256]{};
         if (context) {
-            check(melee_web_results_context_end(context, error, sizeof(error)), error);
+            camera_snapshot_available = true;
+            check(melee_web_results_context_end(context, &last_camera_entry_snapshot,
+                                                error, sizeof(error)), error);
             context = nullptr;
         }
         music.reset();
@@ -277,6 +310,15 @@ uint32_t GameplayResultsSession::random_seed() const
 uint32_t GameplayResultsSession::source_frames() const
 {
     return melee_web_results_context_ticks(storage_->context);
+}
+
+MeleeWebResultsCameraEntrySnapshot GameplayResultsSession::camera_entry_snapshot() const
+{
+    if (storage_->camera_snapshot_available) return storage_->last_camera_entry_snapshot;
+    MeleeWebResultsCameraEntrySnapshot snapshot{};
+    check(melee_web_results_context_camera_entry_snapshot(storage_->context, &snapshot),
+          "Original Results camera entry snapshot is unavailable");
+    return snapshot;
 }
 
 MeleeWebAudio* GameplayResultsSession::audio() const

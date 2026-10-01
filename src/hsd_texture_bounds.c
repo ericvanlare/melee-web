@@ -38,8 +38,10 @@ int melee_web_texture_index_valid(const void* object,uint32_t channel,float valu
     const Binding* entry=*slot(object);
     if(!entry)return 0;
     uint32_t count=channel==1?entry->images:entry->palettes;
-    // Prove the original conversion and ensuing lookup are in range before
-    // either operation. Valid source values are passed through unchanged.
-    return isfinite(value) && value>=0 && value<(float)count;
+    // HSD_TObjUpdateFunc casts TIMG to signed int before indexing, so its
+    // negative fractions in (-1, 0) truncate to source image zero. TCLT's
+    // byte conversion has a distinct unsigned domain and stays nonnegative.
+    const int lower_in_range=channel==1?value>-1.0f:value>=0.0f;
+    return isfinite(value) && lower_in_range && value<(float)count;
 }
 uint32_t melee_web_texture_bounds_live(void){return live;}

@@ -12,7 +12,7 @@
 extern "C" int melee_web_retail_setup(const uint8_t*, uint32_t,
     MeleeWebMenuMatchSelection*, char*, size_t);
 extern "C" void melee_web_retail_state(void);
-extern "C" void melee_web_retail_entities(uint32_t);
+extern "C" void melee_web_retail_entities_index(uint32_t);
 extern "C" uint32_t melee_web_retail_rng(void);
 extern "C" uint32_t gm_GetFrameCount(void);
 extern "C" uint32_t gm_8016AEEC(void);
@@ -491,7 +491,7 @@ void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing
         std::cout << "{\"record\":\"session_match_enter_complete\",";
         melee_web_retail_state();
         if (recipe.version == kRetailReplayVersion)
-            melee_web_retail_entities(whole_session_match_index);
+            melee_web_retail_entities_index(whole_session_match_index);
         history(recipe);
         if (recipe.version == kRetailReplayVersion) {
             std::cout << ",";
@@ -559,7 +559,7 @@ void retail_replay_frame(const RetailReplayRecipe& recipe, size_t index, unsigne
     if (recipe.version == kRetailReplayVersion && scene == kRetailReplayMatch) {
         check(whole_session_match_index > 0,
               "MWRC v9 match tick preceded its match setup record");
-        melee_web_retail_entities(whole_session_match_index - 1);
+        melee_web_retail_entities_index(whole_session_match_index - 1);
     }
     history(recipe); std::cout << "}\n";
     if (recipe.whole_session()) {

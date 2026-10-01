@@ -22,6 +22,8 @@ typedef struct MeleeWebNativeJointDesc {
     float rotation[3], scale[3], translation[3], inverse_bind[3][4];
     uint8_t has_inverse_bind;
     const MeleeWebNativeSplineDesc* spline;
+    /* JOBJ_INSTANCE targets another descriptor identity in this graph. */
+    const struct MeleeWebNativeJointDesc* instance_target;
 } MeleeWebNativeJointDesc;
 typedef struct MeleeWebNativeDObjDesc {
     uint32_t source_offset, next, material, pobj;
@@ -75,6 +77,11 @@ void* melee_web_native_joint_descriptor_at(MeleeWebNativeJoint*,uint32_t index,u
 /* Same owner lifetime as the root. Index is the checked graph material index;
  * permits original pre-load storage flag initialization such as map shadows. */
 void* melee_web_native_joint_material_descriptor(MeleeWebNativeJoint*,uint32_t,char*,size_t);
+/* Resolve a native MObj descriptor to its archive source identities. Used by
+ * the original HSD failure report to distinguish authored flags from a bad
+ * descriptor pointer when DObjLoad rejects a blending mode. */
+int melee_web_native_joint_source_for_material_desc(const void*,uint32_t* joint_source_offset,
+    uint32_t* material_source_offset,uint32_t* authored_render_mode);
 void* melee_web_native_joint_object(MeleeWebNativeJoint*, char*, size_t);
 /* Material descriptors must come from DatMaterialAnimation and remain alive
  * through runtime removal. These calls execute original HSD animation code. */

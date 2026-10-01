@@ -3,11 +3,13 @@
 #include "gameplay_fighter_data.h"
 #include "gameplay_archive_sections.h"
 #include "dat_item_article.hpp"
+#include "dat_material_animation.hpp"
 #include "dat_native_animation.hpp"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 extern "C" {
 #include <melee/it/forward.h>
+#include <melee/ft/ftparts.h>
 }
 #pragma GCC diagnostic pop
 #include <array>
@@ -54,6 +56,68 @@ struct OwnedPartAnimationGroup {
     std::vector<uint8_t> parts;
     std::vector<std::unique_ptr<DatNativeAnimation>> owners;
     std::vector<void*> animations;
+};
+struct NativeSamusGrapple {
+    void* joint=nullptr;
+    void** throw_animations=nullptr;
+    void* animation=nullptr;
+    void* material_animation=nullptr;
+};
+static_assert(sizeof(NativeSamusGrapple)==4*sizeof(void*));
+struct OwnedSamusGrapple {
+    static constexpr uint32_t throw_count=4;
+    DatNativeJoint model;
+    std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> native_model{nullptr,destroy_joint};
+    std::vector<void*> joint_descriptors;
+    std::array<std::unique_ptr<DatNativeAnimation>,throw_count> throw_owners;
+    std::array<void*,throw_count> throw_descriptors{};
+    std::unique_ptr<DatNativeAnimation> animation_owner;
+    std::unique_ptr<DatMaterialAnimation> material_owner;
+    NativeSamusGrapple descriptor{};
+
+    OwnedSamusGrapple(std::shared_ptr<const DatArchive> archive,uint32_t root)
+        :model(archive,required_joint(archive,root))
+    {
+        const auto& graph=model.graph();
+        char error[256];
+        native_model.reset(melee_web_native_joint_hydrate(&graph,error,sizeof(error)));
+        if(!native_model)throw DatError(error);
+        joint_descriptors.reserve(graph.joint_count);
+        for(uint32_t i=0;i<graph.joint_count;++i) {
+            void* value=melee_web_native_joint_descriptor_at(native_model.get(),i,
+                graph.joints[i].source_offset,error,sizeof(error));
+            if(!value)throw DatError(error);
+            joint_descriptors.push_back(value);
+        }
+        const auto table=archive->pointer(root+4,throw_count*4);
+        if(!table)throw DatError("Samus grapple throw-animation table is missing");
+        for(uint32_t i=0;i<throw_count;++i) {
+            const auto source=archive->pointer(*table+i*4,20);
+            if(!source)throw DatError("Samus grapple throw animation is missing");
+            throw_owners[i]=std::make_unique<DatNativeAnimation>(archive,*source,graph,
+                DatNativeAnimationPolicy::Transforms,joint_descriptors);
+            throw_descriptors[i]=throw_owners[i]->descriptor();
+        }
+        if(const auto source=archive->pointer(root+8,20))
+            animation_owner=std::make_unique<DatNativeAnimation>(archive,*source,graph,
+                DatNativeAnimationPolicy::Transforms,joint_descriptors);
+        if(const auto source=archive->pointer(root+12,24))
+            material_owner=std::make_unique<DatMaterialAnimation>(archive,*source,graph);
+        descriptor={melee_web_native_joint_descriptor(native_model.get(),error,sizeof(error)),
+                    throw_descriptors.data(),
+                    animation_owner?animation_owner->descriptor():nullptr,
+                    material_owner?material_owner->descriptor():nullptr};
+        if(!descriptor.joint)throw DatError(error);
+    }
+
+private:
+    static uint32_t required_joint(const std::shared_ptr<const DatArchive>& archive,uint32_t root)
+    {
+        if(!archive)throw DatError("Samus grapple archive is missing");
+        const auto joint=archive->pointer(root,64);
+        if(!joint)throw DatError("Samus grapple joint root is missing");
+        return *joint;
+    }
 };
 }
 // The source Purin OnLoad resolves a costume hat from HSD_Archive, then
@@ -152,6 +216,9 @@ struct GameplayFighterAssets::Storage {
     FighterCostume identity;
     std::unique_ptr<OwnedCostumePart> part;
     std::vector<uint8_t> animation;
+    std::shared_ptr<const DatArchive> nana_popo_fighter;
+    const FighterCostume* nana_popo_identity=nullptr;
+    std::vector<uint8_t> nana_popo_animation;
     GameplayActionStore prototype;
     NativeDatArena arena;
     /* Ness's authored x48 table has eleven Article slots; every other
@@ -159,6 +226,12 @@ struct GameplayFighterAssets::Storage {
     std::array<std::unique_ptr<DatItemArticle>,11> articles;
     std::unique_ptr<DatNativeJoint> link_part_model;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> link_part_native{nullptr,destroy_joint};
+    std::unique_ptr<DatNativeJoint> kirby_copy_star_model;
+    std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> kirby_copy_star_native{nullptr,destroy_joint};
+    std::unique_ptr<OwnedSamusGrapple> samus_grapple;
+    std::unique_ptr<DatNativeJoint> seak_ground_chain_model,seak_air_chain_model;
+    std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> seak_ground_chain_native{nullptr,destroy_joint},
+        seak_air_chain_native{nullptr,destroy_joint};
     DatNativeJoint model;
     std::unique_ptr<DatMaterialAnimation> material;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> native;
@@ -175,8 +248,13 @@ struct GameplayFighterAssets::Storage {
     void* data=nullptr;
     MeleeWebFighterAssetScope* scope=nullptr;
     Storage(std::shared_ptr<const DatArchive> ft,std::shared_ptr<const DatArchive> costume,
-            std::span<const uint8_t> aj,const FighterCostume& id)
-      :fighter(std::move(ft)),identity(id),part(costume_part(costume,id)),animation(aj.begin(),aj.end()),prototype(fighter,id,aj),arena(fighter),
+            std::span<const uint8_t> aj,const FighterCostume& id,
+            std::shared_ptr<const DatArchive> popo_fighter,const FighterCostume* popo_identity,
+            std::span<const uint8_t> popo_aj)
+      :fighter(std::move(ft)),identity(id),part(costume_part(costume,id)),animation(aj.begin(),aj.end()),
+       nana_popo_fighter(std::move(popo_fighter)),nana_popo_identity(popo_identity),
+       nana_popo_animation(popo_aj.begin(),popo_aj.end()),
+       prototype(fighter,id,animation,{},nana_popo_fighter,nana_popo_identity,nana_popo_animation),arena(fighter),
        model(costume,root(*costume,id.model_symbol)),
        material(costume_material(costume,id,model.graph())),native(nullptr,destroy_joint),metal_native(nullptr,destroy_joint)
     {
@@ -191,10 +269,15 @@ struct GameplayFighterAssets::Storage {
             prototype.action_rows(),prototype.blend_rows(),prototype.wait_choices(),&unresolved);
         const bool link=id.fighter_kind==FTKIND_LINK||id.fighter_kind==FTKIND_CLINK;
         const uint32_t item_table_bytes=link?28:
+            id.fighter_kind==FTKIND_KIRBY?20:
+            (id.fighter_kind==FTKIND_POPO||id.fighter_kind==FTKIND_NANA)?12:
+            id.fighter_kind==FTKIND_ZELDA?8:
+            id.fighter_kind==FTKIND_SEAK?24:
             (id.fighter_kind==FTKIND_LUIGI||id.fighter_kind==FTKIND_KOOPA)?4:
             (id.fighter_kind==FTKIND_PURIN||id.fighter_kind==FTKIND_MEWTWO)?8:
             (id.fighter_kind==FTKIND_PIKACHU||id.fighter_kind==FTKIND_PICHU)?12:
-            id.fighter_kind==FTKIND_NESS?44:
+            (id.fighter_kind==FTKIND_NESS||id.fighter_kind==FTKIND_GAMEWATCH)?44:
+            id.fighter_kind==FTKIND_SAMUS?20:
             id.fighter_kind==FTKIND_PEACH?20:16;
         const auto item_table=fighter->pointer(fighter_root+0x48,item_table_bytes);
         struct ItemIdentity { uint32_t index,kind; };
@@ -229,6 +312,16 @@ struct GameplayFighterAssets::Storage {
             item_identities[item_count++]={4,static_cast<uint32_t>(attributes->x10)};
             if(id.fighter_kind==FTKIND_CLINK)
                 item_identities[item_count++]={5,static_cast<uint32_t>(It_Kind_CLink_Milk)};
+        } else if(id.fighter_kind==FTKIND_POPO) {
+            if(!item_table)throw DatError("Ice Climber item Article table is missing");
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_IceClimber_Ice)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_IceClimber_Blizzard)};
+            item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_IceClimber_GumStrings)};
+        } else if(id.fighter_kind==FTKIND_NANA) {
+            if(!item_table)throw DatError("Nana source x48 Article table is missing");
+            // Nana's OnLoad shares Popo's registered Articles and only reads
+            // her own ftIceClimberAttributes; its duplicate x48 roots are not
+            // independently registered by the original source routine.
         } else if(id.fighter_kind==FTKIND_LUIGI) {
             if(!item_table)throw DatError("Luigi item Article table is missing");
             item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Luigi_Fire)};
@@ -259,6 +352,47 @@ struct GameplayFighterAssets::Storage {
             item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_Peach_Parasol)};
             item_identities[item_count++]={3,static_cast<uint32_t>(It_Kind_Peach_Toad)};
             item_identities[item_count++]={4,static_cast<uint32_t>(It_Kind_Peach_ToadSpore)};
+        } else if(id.fighter_kind==FTKIND_GAMEWATCH) {
+            if(!item_table)throw DatError("Game & Watch Article/visibility table is missing");
+            /* The first ten source slots register Articles in ftGw_Init_OnLoad;
+             * slot 10 is the separate part-visibility descriptor graph. */
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_GameWatch_Greenhouse)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_GameWatch_Manhole)};
+            item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_GameWatch_Fire)};
+            item_identities[item_count++]={3,static_cast<uint32_t>(It_Kind_GameWatch_Parachute)};
+            item_identities[item_count++]={4,static_cast<uint32_t>(It_Kind_GameWatch_Turtle)};
+            item_identities[item_count++]={5,static_cast<uint32_t>(It_Kind_GameWatch_Breath)};
+            item_identities[item_count++]={6,static_cast<uint32_t>(It_Kind_GameWatch_Judge)};
+            item_identities[item_count++]={7,static_cast<uint32_t>(It_Kind_GameWatch_Panic)};
+            item_identities[item_count++]={8,static_cast<uint32_t>(It_Kind_GameWatch_Chef)};
+            item_identities[item_count++]={9,static_cast<uint32_t>(It_Kind_GameWatch_Rescue)};
+        } else if(id.fighter_kind==FTKIND_KIRBY) {
+            if(!item_table)throw DatError("Kirby item Article table is missing");
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Kirby_CBeam)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_Kirby_Hammer)};
+            item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_Unk1)};
+            item_identities[item_count++]={3,static_cast<uint32_t>(It_Kind_Unk2)};
+        } else if(id.fighter_kind==FTKIND_SAMUS) {
+            if(!item_table)throw DatError("Samus item Article table is missing");
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Samus_Bomb)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_Samus_Charge)};
+            item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_Samus_Missile)};
+            item_identities[item_count++]={3,static_cast<uint32_t>(It_Kind_Samus_GBeam)};
+        } else if(id.fighter_kind==FTKIND_YOSHI) {
+            if(!item_table)throw DatError("Yoshi item Article/joint table is missing");
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Yoshi_EggThrow)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_Yoshi_Star)};
+            item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_Yoshi_EggLay)};
+        } else if(id.fighter_kind==FTKIND_ZELDA) {
+            if(!item_table)throw DatError("Zelda item Article table is missing");
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Zelda_DinFire)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_Zelda_DinFire_Explode)};
+        } else if(id.fighter_kind==FTKIND_SEAK) {
+            if(!item_table)throw DatError("Sheik item Article table is missing");
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Seak_NeedleThrow)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_Seak_NeedleHeld)};
+            item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_Seak_Vanish)};
+            item_identities[item_count++]={3,static_cast<uint32_t>(It_Kind_Seak_Chain)};
         } else if(id.fighter_kind==FTKIND_MEWTWO) {
             if(!item_table)throw DatError("Mewtwo item Article table is missing");
             item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Mewtwo_Disable)};
@@ -288,6 +422,38 @@ struct GameplayFighterAssets::Storage {
             if(!registered)throw DatError("Fighter item Article registration identity is missing");
             articles[item.index]=std::make_unique<DatItemArticle>(fighter,*article_root,item.kind,registered);
         }
+        if(id.fighter_kind==FTKIND_KIRBY) {
+            const auto joint_root=fighter->pointer(*item_table+4*4,64);
+            if(!joint_root)throw DatError("Kirby swallowed-star x48 joint root is missing");
+            kirby_copy_star_model=std::make_unique<DatNativeJoint>(fighter,*joint_root);
+            kirby_copy_star_native.reset(melee_web_native_joint_hydrate(
+                &kirby_copy_star_model->graph(),error,sizeof(error)));
+            if(!kirby_copy_star_native)throw DatError(error);
+            void* joint=melee_web_native_joint_descriptor(kirby_copy_star_native.get(),error,sizeof(error));
+            if(!joint)throw DatError(error);
+            if(!melee_web_fighter_data_set_kirby_joint(data,joint,&unresolved,error,sizeof(error)))
+                throw DatError(error);
+        }
+        if(id.fighter_kind==FTKIND_SAMUS) {
+            const auto grapple_root=fighter->pointer(*item_table+4*4,16);
+            if(!grapple_root)throw DatError("Samus fifth x48 grapple descriptor root is missing");
+            samus_grapple=std::make_unique<OwnedSamusGrapple>(fighter,*grapple_root);
+            if(!melee_web_fighter_data_set_samus_grapple(data,&samus_grapple->descriptor,
+                    &unresolved,error,sizeof(error)))throw DatError(error);
+        }
+        if(id.fighter_kind==FTKIND_YOSHI) {
+            const auto joint_root=fighter->pointer(*item_table+3*4,64);
+            const auto egg_lay_root=fighter->pointer(*item_table+2*4,24);
+            const auto egg_lay_model=fighter->pointer(*egg_lay_root+16,16);
+            const auto egg_lay_joint=fighter->pointer(*egg_lay_model,64);
+            if(!joint_root||!egg_lay_joint||*joint_root!=*egg_lay_joint)
+                throw DatError("Yoshi x48 special-N joint no longer aliases Egg Lay's source model");
+            if(!articles[2]||!articles[2]->model_joint_descriptor())
+                throw DatError("Yoshi Egg Lay model joint owner is missing");
+            if(!melee_web_fighter_data_set_yoshi_joint(data,
+                articles[2]->model_joint_descriptor(),&unresolved,error,sizeof(error)))
+                throw DatError(error);
+        }
         if(link) {
             const auto part_root=fighter->pointer(*item_table+6*4,64);
             if(!part_root)throw DatError("Link family parts joint is missing");
@@ -297,6 +463,26 @@ struct GameplayFighterAssets::Storage {
             if(!melee_web_fighter_data_set_link_part(data,
                 melee_web_native_joint_descriptor(link_part_native.get(),error,sizeof(error)),
                 &unresolved,error,sizeof(error)))throw DatError(error);
+        }
+        if(id.fighter_kind==FTKIND_SEAK) {
+            const auto ground_root=fighter->pointer(*item_table+4*4,64);
+            const auto air_root=fighter->pointer(*item_table+5*4,64);
+            if(!ground_root||!air_root)
+                throw DatError("Sheik side-special ground/air pose joint roots are missing");
+            seak_ground_chain_model=std::make_unique<DatNativeJoint>(fighter,*ground_root);
+            seak_air_chain_model=std::make_unique<DatNativeJoint>(fighter,*air_root);
+            seak_ground_chain_native.reset(melee_web_native_joint_hydrate(
+                &seak_ground_chain_model->graph(),error,sizeof(error)));
+            if(!seak_ground_chain_native)throw DatError(error);
+            seak_air_chain_native.reset(melee_web_native_joint_hydrate(
+                &seak_air_chain_model->graph(),error,sizeof(error)));
+            if(!seak_air_chain_native)throw DatError(error);
+            if(!melee_web_fighter_data_set_seak_joint(data,4,
+                    melee_web_native_joint_descriptor(seak_ground_chain_native.get(),error,sizeof(error)),
+                    &unresolved,error,sizeof(error)))throw DatError(error);
+            if(!melee_web_fighter_data_set_seak_joint(data,5,
+                    melee_web_native_joint_descriptor(seak_air_chain_native.get(),error,sizeof(error)),
+                    &unresolved,error,sizeof(error)))throw DatError(error);
         }
         const auto metal_root=fighter->pointer(root(*fighter,id.fighter_symbol)+0x5c,64);
         if(!metal_root)throw DatError("Fighter constructor requires its original metal graph");
@@ -319,19 +505,31 @@ struct GameplayFighterAssets::Storage {
             melee_web_native_joint_descriptor(metal_native.get(),error,sizeof(error)),
             costume_count,metal_dobjs,&unresolved,error,sizeof(error)))throw DatError(error);
         const auto guard_data=fighter->pointer(root(*fighter,id.fighter_symbol)+0x20,4);
-        if(!guard_data)throw DatError("Fighter requires its original guard pose");
-        const auto guard_root=fighter->pointer(*guard_data,64);
-        if(!guard_root)throw DatError("Fighter guard pose descriptor is missing");
-        guard_model=std::make_unique<DatNativeJoint>(fighter,*guard_root);
-        const auto& guard=guard_model->graph();
-        if(guard.joint_count!=costume_graph.joint_count)throw DatError("Guard pose does not match costume joint count");
-        for(uint32_t j=0;j<guard.joint_count;j++)
-            if(guard.joints[j].child!=costume_graph.joints[j].child||guard.joints[j].next!=costume_graph.joints[j].next)
-                throw DatError("Guard pose does not match costume joint topology");
-        guard_native.reset(melee_web_native_joint_hydrate(&guard,error,sizeof(error)));
-        if(!guard_native)throw DatError(error);
-        melee_web_fighter_data_set_guard(arena.reader(),root(*fighter,id.fighter_symbol),data,
-            melee_web_native_joint_descriptor(guard_native.get(),error,sizeof(error)),&unresolved);
+        if(!guard_data) {
+            if(id.fighter_kind!=FTKIND_YOSHI)
+                throw DatError("Fighter requires its original guard pose");
+            // A null ftData.x20 field is already faithfully represented by
+            // the decoder and does not leave its unresolved bit set.
+        } else {
+            const auto guard_root=fighter->pointer(*guard_data,64);
+            if(!guard_root&&id.fighter_kind==FTKIND_YOSHI) {
+                melee_web_fighter_data_set_guard(arena.reader(),root(*fighter,id.fighter_symbol),
+                    id.fighter_kind,data,nullptr,&unresolved);
+            } else {
+                if(!guard_root)throw DatError("Fighter guard pose descriptor is missing");
+                guard_model=std::make_unique<DatNativeJoint>(fighter,*guard_root);
+                const auto& guard=guard_model->graph();
+                if(guard.joint_count!=costume_graph.joint_count)throw DatError("Guard pose does not match costume joint count");
+                for(uint32_t j=0;j<guard.joint_count;j++)
+                    if(guard.joints[j].child!=costume_graph.joints[j].child||guard.joints[j].next!=costume_graph.joints[j].next)
+                        throw DatError("Guard pose does not match costume joint topology");
+                guard_native.reset(melee_web_native_joint_hydrate(&guard,error,sizeof(error)));
+                if(!guard_native)throw DatError(error);
+                melee_web_fighter_data_set_guard(arena.reader(),root(*fighter,id.fighter_symbol),
+                    id.fighter_kind,data,
+                    melee_web_native_joint_descriptor(guard_native.get(),error,sizeof(error)),&unresolved);
+            }
+        }
         const auto part_table=fighter->pointer(fighter_root+0x1c,4);
         if(!part_table)throw DatError("Fighter part animation table is missing");
         const auto part_table_end=fighter->next_target_offset(*part_table);
@@ -347,14 +545,14 @@ struct GameplayFighterAssets::Storage {
             auto group=std::make_unique<OwnedPartAnimationGroup>();
             group->native.start_part=fighter->be16(*descriptor);
             group->native.part_count=fighter->be16(*descriptor+2);
-            if(group->native.start_part>=model.graph().joint_count||!group->native.part_count||
-               group->native.part_count>model.graph().joint_count)
-                throw DatError("Fighter part animation range exceeds the model graph");
+            if(group->native.start_part>=MAX_FT_PARTS||!group->native.part_count||
+               group->native.part_count>MAX_FT_PARTS)
+                throw DatError("Fighter part animation range exceeds source Fighter_Part storage");
             const auto part_indices=fighter->pointer(*descriptor+4,group->native.part_count);
             if(!part_indices)throw DatError("Fighter part animation index list is missing");
             const auto part_bytes=fighter->range(*part_indices,group->native.part_count);
-            for(const auto part:part_bytes)if(part>=model.graph().joint_count)
-                throw DatError("Fighter part animation index exceeds the model graph");
+            for(const auto part:part_bytes)if(part>=MAX_FT_PARTS)
+                throw DatError("Fighter part animation index exceeds source Fighter_Part storage");
             group->parts.assign(part_bytes.begin(),part_bytes.end());
             const auto animation_table=fighter->pointer(*descriptor+8,4);
             if(!animation_table)throw DatError("Fighter part animation root table is missing");
@@ -365,13 +563,33 @@ struct GameplayFighterAssets::Storage {
             if(!animation_count||animation_count>32)
                 throw DatError("Fighter part animation variant count exceeds source capacity");
             group->owners.reserve(animation_count);group->animations.reserve(animation_count);
-            auto partial_graph=model.graph();partial_graph.root=group->native.start_part;
+            std::vector<void*> native_joint_descriptors(model.graph().joint_count);
+            for(uint32_t joint=0;joint<model.graph().joint_count;++joint) {
+                native_joint_descriptors[joint]=melee_web_native_joint_descriptor_at(native.get(),joint,
+                    model.graph().joints[joint].source_offset,error,sizeof(error));
+                if(!native_joint_descriptors[joint])throw DatError(error);
+            }
             for(uint32_t animation_index=0;animation_index<animation_count;++animation_index) {
                 const auto animation_root=fighter->pointer(*animation_table+animation_index*4,20);
-                if(!animation_root)throw DatError("Fighter part animation root is missing");
-                auto animation=std::make_unique<DatNativeAnimation>(fighter,*animation_root,partial_graph);
-                group->animations.push_back(animation->descriptor());
-                group->owners.push_back(std::move(animation));
+                if(!animation_root) {
+                    // Kirby's first two authored part-animation groups each
+                    // begin with an empty variant before their two real
+                    // animations. Preserve that source index as null; later
+                    // variants and the group table remain fully owned.
+                    group->animations.push_back(nullptr);
+                    continue;
+                }
+                try {
+                    auto animation=std::make_unique<DatNativeAnimation>(fighter,*animation_root,model.graph(),
+                        DatNativeAnimationPolicy::Transforms,native_joint_descriptors,
+                        DatNativeAnimationTopology::FighterParts);
+                    group->animations.push_back(animation->descriptor());
+                    group->owners.push_back(std::move(animation));
+                } catch(const DatError& failure) {
+                    throw DatError("Fighter part animation group "+std::to_string(group_index)+
+                        " variant "+std::to_string(animation_index)+" root "+
+                        std::to_string(*animation_root)+": "+failure.what());
+                }
             }
             group->native.parts=group->parts.data();group->native.animations=group->animations.data();
             part_group_table.push_back(&group->native);part_groups.push_back(std::move(group));
@@ -401,7 +619,7 @@ struct GameplayFighterAssets::Storage {
             auto& s=*static_cast<Storage*>(context);
             for(size_t i=0;i<s.fighters.size();++i)if(!s.fighters[i]) {
                 auto actions=std::make_unique<GameplayActionStore>(s.fighter,s.identity,s.animation,
-                                                                    s.result_demo_archive);
+                    s.result_demo_archive,s.nana_popo_fighter,s.nana_popo_identity,s.nana_popo_animation);
                 actions->bind(fp);
                 *rows=actions->action_rows();*blends=actions->blend_rows();
                 s.bindings[i]=std::move(actions);s.fighters[i]=fp;return 1;
@@ -415,7 +633,7 @@ struct GameplayFighterAssets::Storage {
             auto& s=*static_cast<Storage*>(context);
             for(size_t i=0;i<s.fighters.size();++i)if(!s.fighters[i]) {
                 auto actions=std::make_unique<GameplayActionStore>(s.fighter,s.identity,s.animation,
-                                                                    s.result_demo_archive);
+                    s.result_demo_archive,s.nana_popo_fighter,s.nana_popo_identity,s.nana_popo_animation);
                 actions->bind(fp);*rows=actions->demo_action_rows();*blends=actions->demo_blend_rows();
                 if(!*rows || !*blends)
                     throw DatError("Result demo action tables are unavailable for this fighter");
@@ -431,10 +649,13 @@ struct GameplayFighterAssets::Storage {
     }
 };
 GameplayFighterAssets::GameplayFighterAssets(std::shared_ptr<const DatArchive> fighter,
-    std::shared_ptr<const DatArchive> costume,std::span<const uint8_t> animation,const FighterCostume& identity)
+    std::shared_ptr<const DatArchive> costume,std::span<const uint8_t> animation,const FighterCostume& identity,
+    std::shared_ptr<const DatArchive> nana_popo_fighter,const FighterCostume* nana_popo_identity,
+    std::span<const uint8_t> nana_popo_animation)
 {
     if(!fighter || !costume)throw DatError("Fighter asset archives are missing");
-    storage_=std::make_unique<Storage>(std::move(fighter),std::move(costume),animation,identity);
+    storage_=std::make_unique<Storage>(std::move(fighter),std::move(costume),animation,identity,
+        std::move(nana_popo_fighter),nana_popo_identity,nana_popo_animation);
 }
 void GameplayFighterAssets::add_costume(std::shared_ptr<const DatArchive> archive,const FighterCostume& id)
 {

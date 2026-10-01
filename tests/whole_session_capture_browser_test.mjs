@@ -15,7 +15,7 @@ await fs.mkdir(output, {recursive: false});
 const {playwrightPath, browserPath} = await loadBrowserTools(values.playwright);
 const cases = ['clean', 'pageerror', 'console', 'http', 'request-failure', 'runtime', 'late-console',
   'export-failure', 'missing-port', 'missing-report', 'empty-exports',
-  'empty-artifact', 'duplicate', 'prefix'];
+  'empty-artifact', 'duplicate', 'prefix', 'timing-pause'];
 const fixture = mode => String.raw`<!doctype html><html><body>
 <canvas id="canvas"></canvas><div id="status">Synthetic transport fixture</div><div id="log"></div>
 <input type="file" id="disc"><button id="launch" disabled>Play</button><button id="unload">Unload</button>
@@ -47,6 +47,10 @@ function publish(complete=true){
 $('retail-replay-start').onclick=async()=>{
  cursor=1;
  if(mode==='prefix')return;
+ if(mode==='timing-pause'){
+  $('status').textContent='Paused after a timing disruption. Resume to continue.';
+  return;
+ }
  if(mode==='pageerror'){
   setTimeout(()=>{throw Error('synthetic pageerror');},0);
   await new Promise(resolve=>setTimeout(resolve,30));
@@ -105,6 +109,11 @@ try {
     }
     if (mode === 'request-failure') assert(report.browser_errors.some(row => row.kind === 'requestfailed'));
     if (mode === 'runtime') assert.match(report.first_error.message, /synthetic runtime/);
+    if (mode === 'timing-pause') {
+      assert.match(report.first_error.message, /timing disruption at cursor 1/);
+      assert.deepEqual(report.timing_pause_resumes, []);
+      assert.match(report.final_snapshot.status, /Paused after a timing disruption/);
+    }
     if (mode === 'export-failure') assert(report.download_error);
     if (mode === 'prefix') assert(report.deliberate_prefix_stop && report.failure);
     await fs.access(path.join(out, 'page.txt'));

@@ -6,6 +6,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(__EMSCRIPTEN__) && !defined(__STRICT_ANSI__)
+#include <emscripten.h>
+#endif
 struct MeleeWebFighterAssetScope {
     uint32_t kind,costume,motion_count,demo_motion_count;
     unsigned demo_initialized;
@@ -40,7 +43,13 @@ static int fail_data_change(char* error,size_t size,uint32_t kind,const void* ex
     return 0;
 }
 static void fatal(const char* text)
-{ fprintf(stderr,"Owned fighter assets: %s\n",text);abort(); }
+{
+    fprintf(stderr,"Owned fighter assets: %s\n",text);
+#if defined(__EMSCRIPTEN__) && !defined(__STRICT_ANSI__)
+    EM_ASM({window.__meleeWebFighterAssetFatal=UTF8ToString($0);},text);
+#endif
+    abort();
+}
 MeleeWebFighterAssetScope* melee_web_fighter_assets_begin(uint32_t kind,uint32_t costume,
     void* data,void* joint,void* mat,void* archive,uint32_t count,void* context,
     MeleeWebFighterAssetBind bind,MeleeWebFighterAssetUnbind unbind,char* error,size_t size)

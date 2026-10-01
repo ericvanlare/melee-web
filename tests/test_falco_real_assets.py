@@ -1,5 +1,6 @@
 """Check Falco against the owned revision 2 DAT, animation and dependency assets."""
 from pathlib import Path
+import os
 import shutil
 import subprocess
 import tempfile
@@ -10,7 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class FalcoRealAssetTests(unittest.TestCase):
     def test_metadata_animation_effect_and_audio_dependencies(self):
-        assets = ROOT / "assets-local/next-gate"
+        assets = Path(os.environ.get(
+            "MELEE_FALCO_ASSET_DIR", ROOT / "assets-local/next-gate"))
         required = [assets / name for name in
                     ("PlFc.dat", "PlFcAJ.dat", "EfFxData.dat", "falco.ssm",
                      "PlFcNr.dat", "PlFcRe.dat", "PlFcBu.dat", "PlFcGr.dat")]
@@ -23,16 +25,24 @@ class FalcoRealAssetTests(unittest.TestCase):
             binary = Path(directory) / "falco_real_asset_trace"
             result = subprocess.run(
                 [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-O1",
-                 "-I", str(ROOT / "src"), *(str(ROOT / "src" / (name + ".cpp")) for name in
-                 ("dat_archive", "dat_animation", "fighter_binding", "dat_fighter_runtime")),
+                 "-DTARGET_PC", "-I", str(ROOT / "src"),
+                 "-I", str(ROOT / "build/gameplay-source/src"),
+                 "-I", str(ROOT / ".deps/aurora/include"),
+                 *(str(ROOT / "src" / (name + ".cpp")) for name in
+                 ("dat_archive", "dat_animation", "fighter_binding", "dat_fighter_runtime",
+                  "dat_texture", "dat_material", "rigid_model", "dat_native_joint",
+                  "dat_material_animation")),
                  str(ROOT / "tests/falco_real_asset_trace.cpp"), "-o", str(binary)],
                 capture_output=True, text=True, timeout=120)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             result = subprocess.run(
-                [str(binary), *(str(path) for path in required[:4])],
+                [str(binary), *(str(path) for path in required)],
                 capture_output=True, text=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("effect bank 3/count 6", result.stdout)
+            for costume_index in range(4):
+                self.assertIn(f"Falco costume {costume_index} native graph", result.stdout)
+            print(result.stdout, end="")
         checker = ROOT / "scripts/check_assets.py"
         symbols = ("PlyFalco5K_Share_joint", "PlyFalco5KRe_Share_joint",
                    "PlyFalco5KBu_Share_joint", "PlyFalco5KGr_Share_joint")

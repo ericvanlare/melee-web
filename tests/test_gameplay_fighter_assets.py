@@ -1,4 +1,6 @@
-"""Run the fighter-asset ownership trace with the production source closure."""
+"""Run the fighter-asset ownership trace with pinned tools and production sources."""
+import ast
+import json
 import os
 from pathlib import Path
 import shutil
@@ -14,12 +16,26 @@ class GameplayFighterAssetsTests(unittest.TestCase):
         sdk = ROOT / ".deps/emsdk"
         compiler = sdk / "upstream/emscripten"
         config = sdk / ".emscripten"
-        node = sdk / "node/24.19.0_64bit/bin/node"
         cmake = ROOT / ".venv/bin/cmake"
         if not cmake.is_file():
             cmake = Path(shutil.which("cmake") or "")
-        if not (compiler / "emcc.py").is_file() or not config.is_file() or not node.is_file() or not cmake.is_file():
+        if not (compiler / "emcc.py").is_file() or not config.is_file() or not cmake.is_file():
             self.skipTest("Project SDK and CMake dependencies unavailable; run bootstrap/build")
+
+        node_setting = None
+        for statement in ast.parse(config.read_text()).body:
+            if (isinstance(statement, ast.Assign) and
+                    any(isinstance(target, ast.Name) and target.id == "NODE_JS" for target in statement.targets)):
+                node_setting = ast.literal_eval(statement.value)
+        self.assertIsInstance(node_setting, str)
+        node = Path(node_setting.replace("$CFGDIR", str(sdk))).resolve()
+        self.assertTrue(node.is_relative_to(sdk.resolve()))
+        if not node.is_file():
+            self.skipTest("Pinned SDK Node executable unavailable; run bootstrap/build")
+        lock = json.loads((ROOT / "dependencies.lock.json").read_text())
+        self.assertEqual((compiler / "emscripten-version.txt").read_text().strip().strip('"'),
+                         lock["emscripten"])
+
         env = dict(os.environ, EMSDK=str(sdk), EM_CONFIG=str(config),
                    EM_CACHE=str(compiler / "cache"), EMSDK_PYTHON=sys.executable)
         result = subprocess.run([str(cmake), "--build", str(ROOT / "build/browser"),

@@ -42,7 +42,7 @@ class DatMenuSupportTests(unittest.TestCase):
             cwd=ROOT, capture_output=True, text=True, timeout=60,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("typed CSS card support roots", result.stdout)
+        self.assertIn("typed CSS card/snapshot support roots", result.stdout)
 
 
 if __name__ == "__main__":

@@ -191,6 +191,30 @@ def _validate_browser_fighters(fighters: Any, context: str) -> None:
             raise ComparisonError(f"{context}: malformed fighter {slot}")
 
 
+FIGHTER_IDENTITY_SLICES = {
+    "fighter_head", "fighter_input_anim", "fighter_damage_shield",
+    "fighter_subject", "cpu_state", "fighter_create_context",
+}
+
+
+def _validate_fighter_slice_flags(slices: list[Any], context: str) -> None:
+    seen: set[tuple[str, int]] = set()
+    for item in slices:
+        if not isinstance(item, dict) or item.get("name") not in FIGHTER_IDENTITY_SLICES:
+            continue
+        name = item["name"]
+        flags = item.get("flags")
+        if type(flags) is not int or not 0 <= flags <= 0xFFFF:
+            raise ComparisonError(f"{context}: invalid {name} flags")
+        slot, entity_index = flags & 0xFF, flags >> 8
+        if slot >= 4 or entity_index > 1:
+            raise ComparisonError(f"{context}: unsupported fighter identity flags {flags:#x}")
+        identity = (name, flags)
+        if identity in seen:
+            raise ComparisonError(f"{context}: duplicate {name} slice for flags {flags:#x}")
+        seen.add(identity)
+
+
 def _pad_value(payload: Mapping[str, Any], context: str) -> str:
     slices = payload.get("slices")
     if not isinstance(slices, list):
@@ -209,12 +233,18 @@ def _pad_value(payload: Mapping[str, Any], context: str) -> str:
 
 def _state_from_payload(payload: Mapping[str, Any], context: str) -> dict[str, Any]:
     slices = payload.get("slices", [])
+    if not isinstance(slices, list):
+        raise ComparisonError(f"{context}: missing typed slices")
+    _validate_fighter_slice_flags(slices, context)
     heads: dict[int, int] = {}
     for item in slices:
         if item.get("name") == "fighter_head":
-            slot = item.get("flags")
-            if type(slot) is not int or slot in heads or not 0 <= slot <= 3:
-                raise ComparisonError(f"{context}: invalid fighter head slot")
+            flags = item["flags"]
+            slot, entity_index = flags & 0xFF, flags >> 8
+            if entity_index:
+                continue
+            if slot in heads:
+                raise ComparisonError(f"{context}: duplicate primary fighter head slot")
             heads[slot] = item.get("address")
     if not 2 <= len(heads) <= 4 or set(heads) != set(range(len(heads))):
         raise ComparisonError(f"{context}: expected two to four contiguous fighter heads")
@@ -255,6 +285,7 @@ def _fighter_entities(payload: Mapping[str, Any], context: str, match_index: int
     slices = payload.get("slices")
     if not isinstance(slices, list):
         raise ComparisonError(f"{context}: missing typed entity slices")
+    _validate_fighter_slice_flags(slices, context)
     entity_rows = [item for item in slices
                    if isinstance(item, dict) and item.get("name") == "player_entities"]
     user_data_rows = [item for item in slices
@@ -270,7 +301,10 @@ def _fighter_entities(payload: Mapping[str, Any], context: str, match_index: int
     heads: dict[int, int] = {}
     for item in slices:
         if isinstance(item, dict) and item.get("name") == "fighter_head":
-            slot = item.get("flags")
+            flags = item["flags"]
+            slot, entity_index = flags & 0xFF, flags >> 8
+            if entity_index:
+                continue
             if type(slot) is not int or not 0 <= slot < 4 or slot in heads:
                 raise ComparisonError(f"{context}: invalid Fighter head while binding entity slots")
             address = item.get("address")
@@ -283,7 +317,10 @@ def _fighter_entities(payload: Mapping[str, Any], context: str, match_index: int
     fighter_gobjs: dict[int, int] = {}
     for item in slices:
         if isinstance(item, dict) and item.get("name") == "fighter_head":
-            slot = item.get("flags")
+            flags = item["flags"]
+            slot, entity_index = flags & 0xFF, flags >> 8
+            if entity_index:
+                continue
             try:
                 raw_head = bytes.fromhex(item.get("hex", ""))
             except (TypeError, ValueError) as error:

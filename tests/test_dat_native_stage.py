@@ -23,6 +23,31 @@ class NativeStageDescriptors(unittest.TestCase):
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertIn("FD complete nine visual graphs",result.stdout)
 
+class NativeFighterPartAnimations(unittest.TestCase):
+    def test_kirby_source_part_animation_trees(self):
+        assets=ROOT/"assets-local/next-gate"
+        required=("PlKb.dat","PlKbNr.dat","PlKbYe.dat","PlKbBu.dat",
+                  "PlKbRe.dat","PlKbGr.dat","PlKbWh.dat")
+        if not all((assets/name).is_file() for name in required):
+            self.skipTest("Optional local Kirby source assets unavailable")
+        if not (ROOT/"build/gameplay-source/src/sysdolphin/baselib/aobj.h").is_file():
+            self.skipTest("Prepared source headers unavailable")
+        compiler=shutil.which("clang++") or shutil.which("c++")
+        self.assertIsNotNone(compiler,"A C++20 compiler is required")
+        with tempfile.TemporaryDirectory() as directory:
+            binary=Path(directory)/"kirby-part-animation"
+            command=[compiler,"-std=c++20","-O1","-Wall","-Wextra","-Werror","-DTARGET_PC",
+                     "-Isrc","-Ibuild/gameplay-source/src","-I.deps/aurora/include"]
+            command += [f"src/{name}.cpp" for name in
+                        ("dat_archive","dat_texture","dat_material","rigid_model",
+                         "dat_native_joint","dat_native_animation","dat_animation")]
+            command += ["tests/dat_native_fighter_part_animation_test.cpp","-o",str(binary)]
+            result=subprocess.run(command,cwd=ROOT,capture_output=True,text=True,timeout=120)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            result=subprocess.run([str(binary),str(assets)],cwd=ROOT,capture_output=True,text=True,timeout=30)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            self.assertIn("42 descriptors passed",result.stdout)
+
 class NativeStageOriginalRuntime(unittest.TestCase):
     def test_map_publication_source_queries_and_lifetime(self):
         targets=[ROOT/"build"/directory/"gameplay_stage_map_trace.js"

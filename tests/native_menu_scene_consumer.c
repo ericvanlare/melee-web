@@ -147,11 +147,13 @@ int melee_web_test_texture_bounds(unsigned bad_channel)
     if(melee_web_texture_bounds_live()!=1 ||
        !melee_web_texture_index_valid(object,1,1) ||
        !melee_web_texture_index_valid(object,10,1) ||
+       !melee_web_texture_index_valid(object,1,-0.5f) ||
        melee_web_texture_index_valid(object,1,2) ||
        melee_web_texture_index_valid(object,10,2) ||
        melee_web_texture_index_valid(object,1,NAN) ||
        melee_web_texture_index_valid(object,10,INFINITY) ||
        melee_web_texture_index_valid(object,1,-1) ||
+       melee_web_texture_index_valid(object,10,-0.5f) ||
        melee_web_texture_index_valid(object,2,0))return 0;
     for(unsigned frame=0;frame<2;frame++){
         HSD_TObjReqAnim(object,(float)frame);HSD_TObjAnim(object);

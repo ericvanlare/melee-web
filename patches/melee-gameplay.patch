@@ -431,11 +431,17 @@ index f8a271e..ccc61db 100644
 diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
 --- a/src/melee/cm/camera.c
 +++ b/src/melee/cm/camera.c
-@@ -52,6 +52,24 @@
+@@ -52,6 +52,30 @@
  
  /* 452C68 */ static Camera cm_80452C68;
  /* 453004 */ CameraDebugMode cm_80453004;
 +#if defined(MELEE_WEB_GAMEPLAY)
++static volatile u32 melee_web_camera_pool_allocation_generation;
++static volatile int melee_web_camera_pool_last_subject_count;
++extern void melee_web_results_camera_pool_allocation_trace(const char*, int);
++extern void melee_web_results_camera_subject_list_trace(const char*, const void*);
++u32 melee_web_camera_pool_allocation_generation_value(void) { return melee_web_camera_pool_allocation_generation; }
++int melee_web_camera_pool_last_subject_count_value(void) { return melee_web_camera_pool_last_subject_count; }
 +/* Host lifetime owner snapshots the actual source camera between matches. */
 +void* melee_web_camera_state(void) { return &cm_80452C68; }
 +/* Retail callbacks ignore these routines' integer results. Wasm requires
@@ -456,7 +462,61 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
  /* 3BCB18 */ static CameraModeCallbacks cm_803BCB18 = {
      Camera_8002B3D4,
-@@ -534,8 +552,9 @@
+@@ -212,5 +234,15 @@
+     cm_80452C68.gobj = NULL;
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_results_camera_pool_allocation_trace(
++        "Camera_80028B9C before pool allocation", n_subjects);
++    melee_web_camera_pool_last_subject_count = n_subjects;
++    ++melee_web_camera_pool_allocation_generation;
++#endif
+     cam_box = HSD_MemAlloc(n_subjects * sizeof(CmSubject));
+     cm_804D6458 = cam_box;
+     cm_804D645C = cam_box;
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_results_camera_pool_allocation_trace(
++        "Camera_80028B9C after pool roots", n_subjects);
++#endif
+     memzero(cm_804D6458, n_subjects * sizeof(CmSubject));
+@@ -262,6 +296,9 @@
+ CmSubject* Camera_80029044(int arg0)
+ {
+     CmSubject* subject = cm_804D6458;
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_results_camera_subject_list_trace("Camera_80029044 before free-pop", subject);
++#endif
+ 
+     if (cm_804D6458 == NULL) {
+         OSReport("couldn't get CmSubject struct.\n", arg0);
+@@ -279,11 +316,17 @@
+     subject->prev = cm_804D6468;
+     cm_804D6468 = subject;
+     Camera_80028F5C(subject, arg0);
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_results_camera_subject_list_trace("Camera_80029044 after active-append", subject);
++#endif
+     return subject;
+ }
+ 
+ void Camera_800290D4(CmSubject* subject)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_results_camera_subject_list_trace("Camera_800290D4 before active-remove", subject);
++#endif
+     if (subject->next != 0) {
+         subject->next->prev = subject->prev;
+     } else {
+@@ -298,6 +341,9 @@
+ 
+     subject->prev = cm_804D6458;
+     cm_804D6458 = subject;
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_results_camera_subject_list_trace("Camera_800290D4 after free-push", subject);
++#endif
+ }
+ 
+ u32 Camera_80029124(Vec3* subject_pos, s32 distance)
+@@ -534,8 +560,9 @@
                                  : base_ground;
                      }
                  }
@@ -467,7 +527,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
                  cam_bounds_flags = Camera_80029124(&test_pos, 0);
                  if (cam_bounds_flags != CAM_BOUNDS_INSIDE) {
                      Ground_801C4368(&x_extent_ground, &x_extent_intercept);
-@@ -562,8 +581,9 @@
+@@ -562,8 +589,9 @@
                  if (test_pos.x > max_x) {
                      max_x = test_pos.x;
                  }
@@ -478,7 +538,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
                  cam_bounds_flags = Camera_80029124(&test_pos, 0);
                  if (cam_bounds_flags != CAM_BOUNDS_INSIDE) {
                      Ground_801C4368(&alt_x_ground, &alt_x_intercept);
-@@ -590,8 +610,9 @@
+@@ -590,8 +618,9 @@
                  if (test_pos.x > max_x) {
                      max_x = test_pos.x;
                  }
@@ -489,7 +549,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
                  cam_bounds_flags = Camera_80029124(&test_pos, 0);
                  if (cam_bounds_flags != CAM_BOUNDS_INSIDE) {
                      Ground_801C4368(&y_extent_ground, &y_extent_intercept);
-@@ -618,8 +639,9 @@
+@@ -618,8 +647,9 @@
                  if (test_pos.y > max_y) {
                      max_y = test_pos.y;
                  }
@@ -500,7 +560,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
                  cam_bounds_flags = Camera_80029124(&test_pos, 0);
                  if (cam_bounds_flags != CAM_BOUNDS_INSIDE) {
                      Ground_801C4368(&alt_y_ground, &alt_y_intercept);
-@@ -667,7 +689,8 @@
+@@ -667,7 +697,8 @@
          z_factor = (z_pos - 80.0f) / 4920.0f;
      }
      new_bounds->x_min = min_x;
@@ -510,7 +570,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      new_bounds->x_max = max_x;
      new_bounds->y_max = max_y;
      new_bounds->total_subjects = subject_count;
-@@ -682,9 +705,10 @@
+@@ -682,9 +713,10 @@
      } else if (spread < globals->x34) {
          return globals->x2C;
      } else {
@@ -524,7 +584,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      }
  }
  
-@@ -737,8 +761,9 @@
+@@ -737,8 +769,9 @@
          lerp_factor = 0.0001f;
      }
  
@@ -536,7 +596,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  }
  
  #ifdef MUST_MATCH
-@@ -780,9 +805,10 @@
+@@ -780,9 +813,10 @@
          scale = 1.0f;
      }
  
@@ -550,7 +610,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  }
  #ifdef MUST_MATCH
  #pragma pop
-@@ -795,10 +821,11 @@
+@@ -795,10 +829,11 @@
      } else if (spread < cm_803BCCA0.x24) {
          return cm_803BCCA0.x1C;
      } else {
@@ -566,7 +626,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      }
  }
  
-@@ -844,7 +871,7 @@
+@@ -844,7 +879,7 @@
  
      t = get_y_bias(spread);
      y_sum = (bounds->y_min - sp24.y) + (bounds->y_max - sp24.y);
@@ -575,7 +635,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      angle = -MTXDegToRad((base + cm_803BCCA0.x8) * Stage_GetCamInfoX24());
  
      if (angle > MTXDegToRad(cm_803BCCA0.xC)) {
-@@ -856,9 +883,9 @@
+@@ -856,9 +891,9 @@
  
      angle += Stage_GetCamPanAngleRadians();
      y_angle = angle;
@@ -587,7 +647,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      HSD_ASSERT(1275, fov_d<MTXDegToRad(90.0F));
      tan_u = tanf(fov_u);
      tan_d = tanf(fov_d);
-@@ -866,7 +893,9 @@
+@@ -866,7 +901,9 @@
      Stage_GetCamBoundsBottomOffset();
      Stage_GetCamBoundsTopOffset();
      y_off = dist_y * tanf(y_angle);
@@ -598,7 +658,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      Stage_UnkSetVec3TCam_Offset(&sp14);
      x_center = 0.5f * (bounds->x_min + bounds->x_max);
      angle = -MTXDegToRad((x_center - sp14.x) * Stage_GetCamInfoX20());
-@@ -878,9 +907,9 @@
+@@ -878,9 +915,9 @@
          angle = MTXDegToRad(cm_803BCCA0.x18);
      }
  
@@ -610,7 +670,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      HSD_ASSERT(1289, fov_l<MTXDegToRad(90.0F));
      scaled_tan = cm_803BCB64.aspect * tanf(fov_r);
      tan_r = scaled_tan;
-@@ -889,7 +918,9 @@
+@@ -889,7 +926,9 @@
      Stage_GetCamBoundsLeftOffset();
      Stage_GetCamBoundsRightOffset();
      x_off = cm_803BCB64.aspect * (dist_x * tanf(angle));
@@ -621,7 +681,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      transform->target_interest.z = 0.0f;
      dist_y = (dist_y > dist_x) ? dist_y : dist_x;
      cam_dist = dist_y;
-@@ -916,12 +947,10 @@
+@@ -916,12 +955,10 @@
      f32 input_x;
      f32 input_y;
      f32 depth_ratio;
@@ -638,7 +698,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
      input_x = cm_80452C68.xA4 * cm_80452C68.xAC;
      input_y = cm_80452C68.xA8 * cm_80452C68.xAC;
-@@ -938,12 +967,12 @@
+@@ -938,12 +975,12 @@
      half_view_height =
          bounds->z_pos * tanf(0.5f * (0.017453292f * state->fov));
      viewport_x_scale =
@@ -654,7 +714,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      depth_factor_y = Stage_GetCamZoomRate();
      depth_factor_x = Stage_GetCamMaxDepth() - depth_factor_y;
  
-@@ -954,10 +983,11 @@
+@@ -954,10 +991,11 @@
              (bounds->z_pos - Stage_GetCamZoomRate()) / depth_factor_x;
      }
  
@@ -668,7 +728,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      Camera_80030DE4(depth_factor_x * (input_x * viewport_x_scale),
                      depth_factor_y * (input_y * viewport_y_scale));
      cm_80452C68.xA4 = 0.0f;
-@@ -3524,8 +3553,12 @@
+@@ -3524,8 +3561,12 @@
      cm_80452C68.x2D0.angle_left = Stage_GetCamAngleRadiansLeft();
      cm_80452C68.x2D0.unk28 = Stage_GetPauseCamZPosMin();
      cm_80452C68.x2D0.unk2C = Stage_GetPauseCamZPosMax();
@@ -681,7 +741,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
      switch (arg2) {
      case 0:
-@@ -3707,7 +3740,11 @@
+@@ -3707,7 +3748,11 @@
      scale = cm_80452C68.x32C * cm_803BCCA0.x8C + cm_803BCCA0.x90;
      cm_80452C68.x2D0.unk28 = scale * cm_803BCCA0.x94;
      cm_80452C68.x2D0.unk2C = scale * cm_803BCCA0.x98;
@@ -693,7 +753,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
      {
          s8 slot = cm_80452C68.x304;
-@@ -3789,7 +3826,11 @@
+@@ -3789,7 +3834,11 @@
      temp_f2 = (cm_80452C68.x32C * (*new_var).x8C) + (*new_var).x90;
      cm_80452C68.x2D0.unk28 = temp_f2 * (*new_var).x94;
      cm_80452C68.x2D0.unk2C = temp_f2 * (*new_var).x98;
@@ -7620,6 +7680,31 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_Guard.c b/src/melee/ft/kinds/ftCom
          ftAnim_SetAnimRate(gobj,
                             (0.1f + lbGetJObjEndFrame(GET_JOBJ(gobj))) / f);
          if (!arg1) {
+@@ -725,8 +727,10 @@ void ftCo_80093240(Fighter_GObj* gobj)
+             float scl = p_ftCommonData->x4C0 * (fp->input.lstick[0].x *
+                                                 p_ftCommonData->sdi_pos_scale);
+-            fp->cur_pos.x += fp->coll_data.floor.normal.y * scl;
+-            fp->cur_pos.y += -fp->coll_data.floor.normal.x * scl;
++            /* GALE01r2 800932B8/CC: two rounded scale products precede
++             * the fused position writes, including on almost-flat floors. */
++            fp->cur_pos.x = fmaf(fp->coll_data.floor.normal.y, scl, fp->cur_pos.x);
++            fp->cur_pos.y = fmaf(-fp->coll_data.floor.normal.x, scl, fp->cur_pos.y);
+             fp->x670_timer_lstick_tilt_x = 254;
+         }
+     }
+ }
+@@ -742,8 +746,9 @@ void ftCo_800932DC(Fighter_GObj* gobj)
+             float scl = p_ftCommonData->x4C0 *
+                         (fp->input.lstick[0].x * p_ftCommonData->x4BC);
+-            fp->cur_pos.x += fp->coll_data.floor.normal.y * scl;
+-            fp->cur_pos.y += -fp->coll_data.floor.normal.x * scl;
++            /* GALE01r2 80093334/48 uses the same fmadds position writers. */
++            fp->cur_pos.x = fmaf(fp->coll_data.floor.normal.y, scl, fp->cur_pos.x);
++            fp->cur_pos.y = fmaf(-fp->coll_data.floor.normal.x, scl, fp->cur_pos.y);
+ 
+             /// @todo Fake.
+             !gobj;
+         }
 diff --git a/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c b/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
 --- a/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
 +++ b/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
@@ -8102,7 +8187,34 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftComm
  }
  
  /// @todo Maybe a macro?
-@@ -7636,7 +7641,7 @@
+@@ -7294,8 +7299,12 @@
+ static inline u8 inlineM0(float x)
+ {
++    /* The original fctiwz produces a signed word before stb selects its
++     * low byte. A negative float directly converted to u8 is undefined C
++     * and loses Nana's delayed down/left inputs in Wasm. Normalized axes
++     * fit the signed intermediate; preserve the original byte conversion. */
+     if (x >= 0) {
+-        return 127.0F * x;
++        return (u8) (s32) (127.0F * x);
+     } else {
+-        return 128.0F * x;
++        return (u8) (s32) (128.0F * x);
+     }
+ }
+@@ -7360,7 +7369,9 @@
+         if (fp->x2225_b3) {
++            /* GALE01r2 fmadd is double precision, followed by frsp. Keep
++             * the product/add fused without changing the source constants. */
+             fp->cur_pos.x =
+-                0.95 * fp->cur_pos.x + 0.05 * data->x448->cur_pos.x;
++                fma(0.95, fp->cur_pos.x, 0.05 * data->x448->cur_pos.x);
+             fp->cur_pos.y =
+-                0.95 * fp->cur_pos.y + 0.05 * data->x448->cur_pos.y;
++                fma(0.95, fp->cur_pos.y, 0.05 * data->x448->cur_pos.y);
+             if (fp->motion_id != ftPp_MS_SpecialLw &&
+                 fp->motion_id != ftPp_MS_SpecialAirLw)
+@@ -7636,7 +7647,7 @@
              ftCo_800A8940(fp);
          }
      }
@@ -8633,6 +8745,21 @@ index 6c6e71e..561b857 100644
  #include <Runtime/platform.h>
  
  #include <melee/pl/forward.h>
+@@ -49,6 +54,14 @@ static void initFighter(HSD_GObj* gobj, plAllocInfo2* alloc_info)
+     temp1.internal_id = alloc_info->internal_id;
+     temp1.slot = alloc_info->slot;
+     temp1.b0 = alloc_info->has_transformation;
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* Native demo actions have an owned binding, not a legacy animation-cache
++     * slot. Use the source Player_80031AD0 no-slot sentinel so the original
++     * Fighter destructor cannot release a cache entry from stack garbage.
++     * Fighter_UnkInitLoad copies this field before demo binding begins. */
++    temp1.x5 = -1;
++#endif
++
+     Fighter_UnkInitLoad_80068914(gobj, &temp1);
+ }
+ 
 @@ -60,7 +65,15 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
      Fighter_GObj* gobj = GObj_Create(HSD_GOBJ_CLASS_FIGHTER, 8, 0);
      GObj_SetupGXLink(gobj, ftDrawCommon_80080E18, 5, 0);
@@ -8692,6 +8819,58 @@ diff --git a/src/melee/pl/player.c b/src/melee/pl/player.c
 index 288afe9..b6394ed 100644
 --- a/src/melee/pl/player.c
 +++ b/src/melee/pl/player.c
+@@ -359,4 +359,5 @@ void Player_80032070(int slot, bool bool_arg)
+     StaticPlayer* player;
+-    struct Unk_Struct_w_Array* unkStruct =
+-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
++    /* Native globals do not retain the retail string/table adjacency. Use
++     * the actual owner, including the partner's transformation flag. */
++    ftMapping* mapping = ftMapping_list;
+     Player_CheckSlot(slot);
+@@ -368,3 +369,3 @@ void Player_80032070(int slot, bool bool_arg)
+         if (player->flags.b2 &&
+-            unkStruct->vec_arr[player->player_character].z == 0 &&
++            mapping[player->player_character].has_transformation == 0 &&
+             ftLib_8008701C(player->player_entity[player->transformed[1]]))
+@@ -448,4 +449,3 @@ Gm_PKind Player_8003248C(s32 slot, bool arg1)
+     Gm_PKind slot_type;
+-    struct Unk_Struct_w_Array* unk_struct =
+-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
++    ftMapping* mapping = ftMapping_list;
+     StaticPlayer* player;
+@@ -457,3 +457,3 @@ Gm_PKind Player_8003248C(s32 slot, bool arg1)
+     if (arg1 == 1) {
+-        if (unk_struct->vec_arr[player->player_character].z == 0) {
++        if (mapping[player->player_character].has_transformation == 0) {
+             if (player->slot_type == Gm_PKind_Human ||
+@@ -492,4 +492,3 @@ s8 Player_80032610(s32 slot, bool arg1)
+ 
+-    struct Unk_Struct_w_Array* some_struct =
+-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
++    ftMapping* mapping = ftMapping_list;
+     StaticPlayer* player;
+@@ -503,6 +502,6 @@ s8 Player_80032610(s32 slot, bool arg1)
+     if (arg1 == 0) {
+-        return some_struct->vec_arr[player->player_character].x;
++        return mapping[player->player_character].internal_id;
+     }
+     if (arg1 == 1) {
+-        return some_struct->vec_arr[player->player_character].y;
++        return mapping[player->player_character].extra_internal_id;
+     }
+@@ -1298,4 +1297,3 @@ s32 Player_GetFalls(s32 slot)
+     StaticPlayer* player;
+-    struct Unk_Struct_w_Array* unkStruct =
+-        (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
++    ftMapping* mapping = ftMapping_list;
+     Player_CheckSlot(slot);
+@@ -1303,4 +1301,4 @@ s32 Player_GetFalls(s32 slot)
+ 
+-    if (unkStruct->vec_arr[player->player_character].y != -1 &&
+-        unkStruct->vec_arr[player->player_character].z != 0)
++    if (mapping[player->player_character].extra_internal_id != -1 &&
++        mapping[player->player_character].has_transformation != 0)
+     {
 @@ -2053,6 +2053,15 @@ void Player_80036DD8(void)
  
  void Player_80036E20(CharacterKind ckind, HSD_Archive* archive, s32 arg2)
@@ -9499,6 +9678,48 @@ diff --git a/src/melee/gm/gmmain_lib.c b/src/melee/gm/gmmain_lib.c
  void HSD_Init_803755A8(void)
  {
      // Does nothing, but need to force a comparison to make this match
+--- a/src/melee/it/itanimlist.c
++++ b/src/melee/it/itanimlist.c
+@@ -48,8 +48,11 @@ void it_80278F2C(Item_GObj* item_gobj, CommandInfo* cmd)
+     s32 arg6;
+     PAD_STACK(4);
+ 
+-    arg2 = ((u16*) cmd->u)[0];
+-    arg2 = arg2 & 0x3FF;
++#ifdef TARGET_PC
++    arg2 = cmd->u->Command_00.value & 0x3FF;
++#else
++    arg2 = ((u16*) cmd->u)[0] & 0x3FF;
++#endif
+     ++cmd->u;
+     arg6 = (f32) ((u16*) cmd->u)[1];
+     ef_id = ((u16*) cmd->u)[0];
+
+--- a/src/melee/ft/ftparts.c
++++ b/src/melee/ft/ftparts.c
+@@ -731,2 +731,15 @@ void ftParts_800750C8(Fighter* fp, enum_t arg1, melee_source_bool arg2)
+ {
++    u32 model_num = fp->x5AC.model_num;
++    if (arg1 == 4 && fp->kind == FTKIND_KIRBY &&
++        fp->u.kb.hat.kind == FTKIND_GAMEWATCH &&
++        fp->u.kb.hat.x14.data != NULL &&
++        fp->u.kb.hat.x24.xC[4] != NULL &&
++        fp->u.kb.hat.x24.xC[4] == fp->x5AC.xC[4] &&
++        fp->u.kb.hat.x24.model_num > 0 &&
++        fp->u.kb.hat.x24.model_num < model_num) {
++        /* The copy adapter proves surplus body rows have empty original
++         * signed loops (including relocated MEM1 pointer/count aliases).
++         * Keep both owners; scope only this validated borrowed view. */
++        fp->x5AC.model_num = fp->u.kb.hat.x24.model_num;
++    }
+     if (arg1 == 2) {
+@@ -755,5 +768,6 @@ void ftParts_800750C8(Fighter* fp, enum_t arg1, melee_source_bool arg2)
+         if (ftData_UnkIntBoolFunc0.model_events[fp->kind] != NULL) {
+             ftData_UnkIntBoolFunc0.model_events[fp->kind](fp, arg1, arg2);
+         }
+     }
++    fp->x5AC.model_num = model_num;
+ }
 diff --git a/src/melee/ef/efasync.c b/src/melee/ef/efasync.c
 index f1de40c..af85d21 100644
 --- a/src/melee/ef/efasync.c
@@ -9592,13 +9813,27 @@ index e1ffdce..86c1b19 100644
 diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
 --- a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
 +++ b/src/melee/ft/kinds/ftCommon/ftCo_0A01.c
-@@ -5654,6 +5654,9 @@
+@@ -5654,6 +5654,23 @@
                  stick_y = 127.0F * +y;
                  stick_x = 127.0F * -x;
              }
-+        } else if (!melee_web_source_context_resolve_skipped(fp, &stick_x,
-+                                                              &stick_y)) {
-+            __builtin_trap();
++        } else {
++            const MeleeWebSourceRegisterWord reaching =
++                melee_web_source_context_r5();
++            const char* boundary = melee_web_source_context_r5_boundary();
++            const u32 boundary_line = melee_web_source_context_r5_line();
++            if (!melee_web_source_context_resolve_skipped(fp, &stick_x, &stick_y)) {
++                OSReport("Unsupported source CPU carry: kind=%d slot=%u secondary=%u "
++                         "motion=%d cpu_state=%d cpu_tick=%u r5_known=%u "
++                         "r5_kind=%u r5_word=%08x logical_sp=%08x "
++                         "r5_boundary=%s:%u\n",
++                         fp->kind, fp->player_id, fp->x221F_b4, fp->motion_id,
++                         data->x18, data->x7C, reaching.known, reaching.kind,
++                         reaching.source_word, melee_web_source_context_current_sp(),
++                         boundary, boundary_line);
++                /* Keep the hard rejection; diagnostics never supply a carry. */
++                __builtin_trap();
++            }
          }
          /// @bug These can be called with stick_x and stick_y being
          /// uninitialized.
@@ -9607,13 +9842,13 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftComm
      if (fp->kind == FTKIND_DONKEY) {
          if (fp->motion_id == ftDk_MS_SpecialNLoop) {
 +            /* Executed charge-cancel commands overwrite original r5. */
-+            melee_web_source_context_invalidate_r5();
++            melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
              ftCo_CpuTapR(fp);
          }
      } else if (fp->kind == FTKIND_SAMUS) {
          if (fp->motion_id == ftSs_MS_SpecialNHold) {
 +            /* Executed charge-cancel commands overwrite original r5. */
-+            melee_web_source_context_invalidate_r5();
++            melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
              ftCo_CpuTapRAndWait(fp);
          }
      } else if (fp->kind == FTKIND_MEWTWO) {
@@ -9621,27 +9856,27 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftComm
              fp->motion_id == ftMt_MS_SpecialNLoopFull)
          {
 +            /* Executed charge-cancel commands overwrite original r5. */
-+            melee_web_source_context_invalidate_r5();
++            melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
              ftCo_CpuTapRAndWait(fp);
          }
      } else if (fp->kind == FTKIND_KIRBY) {
          FighterKind kind = fp->u.kb.hat.kind;
          if (kind == FTKIND_DONKEY && fp->motion_id == ftKb_MS_DkSpecialNLoop) {
 +            /* Executed charge-cancel commands overwrite original r5. */
-+            melee_web_source_context_invalidate_r5();
++            melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
              ftCo_CpuTapRAndWait(fp);
          } else if (kind == FTKIND_SAMUS &&
                     fp->motion_id == ftKb_MS_SsSpecialNHold)
          {
 +            /* Executed charge-cancel commands overwrite original r5. */
-+            melee_web_source_context_invalidate_r5();
++            melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
              ftCo_CpuTapRAndWait(fp);
          } else if (kind == FTKIND_MEWTWO &&
                     (fp->motion_id == ftKb_MS_MtSpecialNLoop ||
                      fp->motion_id == ftKb_MS_MtSpecialNLoopFull))
          {
 +            /* Executed charge-cancel commands overwrite original r5. */
-+            melee_web_source_context_invalidate_r5();
++            melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
              ftCo_CpuTapRAndWait(fp);
          }
      }
@@ -9692,11 +9927,58 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftComm
 +    /* Only the already-selected/newly-selected state-18 returns above
 +     * preserve the audited carry. Later command-specific calls are outside
 +     * that reaching-definition route. */
-+    melee_web_source_context_invalidate_r5();
++    melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
      cur_cmd = data->x18;
      if (cur_cmd != 0x11) {
          motion_id = fp->motion_id;
-@@ -7901,6 +7927,7 @@
+@@ -7383,6 +7383,9 @@
+     s32 var_r0_4;
+ 
+     temp_r5 = fp1->motion_id;
++    /* 800B0CA8: the executed source lwz r5,0x10(r4). */
++    (void) melee_web_source_context_publish_nana_motion_r5(fp0, fp1,
++                                                          temp_r5);
+     if (ftCo_800A3200(fp1) != 0) {
+         goto jmp_9c;
+     } else {
+@@ -7429,6 +7432,13 @@
+                 return false;
+             }
+             temp_r5_2 = fp0->item_gobj;
++            if (temp_r5_2 == NULL) {
++                (void) melee_web_source_context_publish_nana_empty_item_r5(fp0);
++            } else {
++                /* 800B0DB8 loads Item user_data into r5. A host pointer is
++                 * not its source identity; reject this unmodeled owner. */
++                melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
++            }
+             if (temp_r5_2 != NULL) {
+                 temp_r0 = GET_ITEM(temp_r5_2)->kind;
+                 switch (temp_r0) {
+@@ -7483,6 +7493,7 @@
+ bool ftCo_800B0E98(Fighter* fp0, Fighter* fp1)
+ {
+     s32 temp_r0;
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW_CHECK);
+ 
+     if (ftCo_800B0CA8(fp0, fp1) != 0) {
+         struct CpuFighter* data = &fp0->cpu;
+@@ -7572,6 +7583,10 @@
+     Fighter* var_r29;
+ 
+     PAD_STACK(8);
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW);
++    /* Other follower branches have unaudited reaching definitions. Only
++     * the executed B0CA8 producer below may admit a Nana carry. */
++    melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
+ 
+     temp_r31 = &fp->cpu;
+     temp_r31->xF9_b2 = true;
+@@ -7897,10 +7923,11 @@
+ void ftCo_800B24B8(Fighter* fp)
+ {
+     struct CpuFighter* data = &fp->cpu;
+     Vec3 sp28;
      s32 cmd;
      Fighter* target;
      PAD_STACK(0x14);
@@ -10031,7 +10313,7 @@ diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
 +    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_MP_CHECK_FLOOR);
 +    /* The incoming r5 is the caller's flags_out argument, not any previous
 +     * carry. Only an executed eligible-line definition below is supported. */
-+    melee_web_source_context_invalidate_r5();
++    melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
  
      result_r27 = false;
      min_dist2_f30 = F32_MAX;
@@ -10045,9 +10327,9 @@ diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
 +                bool accepted;
 +                /* Arbitrary callbacks have no audited r5 preservation. Even
 +                 * a rejected or subsequently skipped line can clobber it. */
-+                melee_web_source_context_invalidate_r5();
++                melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
 +                accepted = cb(gobj, line_r26 - groundCollLine);
-+                melee_web_source_context_invalidate_r5();
++                melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
 +                if (!accepted) {
 +                    continue;
 +                }
@@ -10068,7 +10350,7 @@ diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
              y1_sp3C += y_offset;
              if (ABS(y0_sp44 - y1_sp3C) > 0.0001) {
 +                /* mpLineIntersection defines r5=0/1, not a local address. */
-+                melee_web_source_context_invalidate_r5();
++                melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
                  if (mpLineIntersection(x0_sp48, y0_sp44, x1_sp40, y1_sp3C, ax,
                                         ay, bx, by, &px_sp54, &py_sp50))
                  {
@@ -10190,7 +10472,7 @@ diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
          joint = groundCollJoint;
 +        /* GALE01r2 80056bdc loads this joint-array address into r5.
 +         * The -1 early return preserves it; valid-line queries do not. */
-+        melee_web_source_context_invalidate_r5();
++        melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
          for (i = 0; i < count; i++) {
              if (joint->inner->vtx_start <= v0_idx &&
                  v0_idx < joint->inner->vtx_start + joint->inner->vtx_count)
@@ -10203,7 +10485,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
          gm_80166378(tmp);
 +        /* Recomputing standings clobbers r5. The cached return preserves it;
 +         * this refresh can happen on either of the CPU caller's queries. */
-+        melee_web_source_context_invalidate_r5();
++        melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
      }
      return tmp->x58[ftLib_80086BE0(arg0)].x20;
  }
@@ -10397,10 +10679,99 @@ diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
  }
  
  /// Combo count something + adjust FtPart_TopN
+diff --git a/src/melee/it/kinds/itsamusgrapple.c b/src/melee/it/kinds/itsamusgrapple.c
+--- a/src/melee/it/kinds/itsamusgrapple.c
++++ b/src/melee/it/kinds/itsamusgrapple.c
+@@ -1,4 +1,15 @@
+ #include "itsamusgrapple.h"
++
++#ifdef TARGET_PC
++#include <math.h>
++/* GALE01r2 Samus chain placement and gravity use fmadds/fnmsubs.
++ * Keep it_802A3C98: its standalone squared-length sum is unfused. */
++#define SAMUS_GRAPPLE_MADD(a, b, c) fmaf((a), (b), (c))
++#define SAMUS_GRAPPLE_NMSUB(a, b, c) (-fmaf((a), (b), -(c)))
++#else
++#define SAMUS_GRAPPLE_MADD(a, b, c) ((a) * (b) + (c))
++#define SAMUS_GRAPPLE_NMSUB(a, b, c) (-((a) * (b) - (c)))
++#endif
+ 
+ #include <melee/ft/forward.h>
+ #include <sysdolphin/baselib/forward.h>
+@@ -86,9 +97,9 @@
+ {
+     if (HSD_Randf() > 0.9) {
+         if (vel_y < 0.0) {
+-            return -((0.6f * HSD_Randf()) - vel_y);
+-        } else {
+-            return (0.6f * HSD_Randf()) + vel_y;
++            return SAMUS_GRAPPLE_NMSUB(0.6f, HSD_Randf(), vel_y);
++        } else {
++            return SAMUS_GRAPPLE_MADD(0.6f, HSD_Randf(), vel_y);
+         }
+     } else {
+         return 0.0f;
+@@ -971,9 +982,9 @@
+     f32 d;
+ 
+     it_802A3C98(&link->pos, pos, &dir);
+-    link->pos.x = (dir.x * dist) + pos->x;
+-    link->pos.y = (dir.y * dist) + pos->y;
+-    link->pos.z = (dir.z * dist) + pos->z;
++    link->pos.x = SAMUS_GRAPPLE_MADD(dir.x, dist, pos->x);
++    link->pos.y = SAMUS_GRAPPLE_MADD(dir.y, dist, pos->y);
++    link->pos.z = SAMUS_GRAPPLE_MADD(dir.z, dist, pos->z);
+ 
+     while (prev != NULL) {
+         prev->vel.y -= samus_grapple_calc_grav(prev->vel.y);
+@@ -982,13 +993,13 @@
+ 
+         d = it_802A3C98(&prev->pos, &link->pos, &dir);
+         if (d > attrs->x38) {
+-            prev->pos.x = (dir.x * attrs->x38) + link->pos.x;
+-            prev->pos.y = (dir.y * attrs->x38) + link->pos.y;
+-            prev->pos.z = (dir.z * attrs->x38) + link->pos.z;
++            prev->pos.x = SAMUS_GRAPPLE_MADD(dir.x, attrs->x38, link->pos.x);
++            prev->pos.y = SAMUS_GRAPPLE_MADD(dir.y, attrs->x38, link->pos.y);
++            prev->pos.z = SAMUS_GRAPPLE_MADD(dir.z, attrs->x38, link->pos.z);
+         } else if (d < attrs->x3C) {
+-            prev->pos.x = (dir.x * attrs->x3C) + link->pos.x;
+-            prev->pos.y = (dir.y * attrs->x3C) + link->pos.y;
+-            prev->pos.z = (dir.z * attrs->x3C) + link->pos.z;
++            prev->pos.x = SAMUS_GRAPPLE_MADD(dir.x, attrs->x3C, link->pos.x);
++            prev->pos.y = SAMUS_GRAPPLE_MADD(dir.y, attrs->x3C, link->pos.y);
++            prev->pos.z = SAMUS_GRAPPLE_MADD(dir.z, attrs->x3C, link->pos.z);
+         }
+ 
+         link = prev;
+@@ -1341,17 +1352,17 @@
+             it_802A4420(next);
+             if (it_802A3C98(&next->pos, &cur->pos, &dir) > attrs->x38) {
+                 dir_ptr = &dir;
+-                next->pos.x = (dir_ptr->x * attrs->x38) + cur->pos.x;
+-                next->pos.y = (dir_ptr->y * attrs->x38) + cur->pos.y;
+-                next->pos.z = (dir_ptr->z * attrs->x38) + cur->pos.z;
++                next->pos.x = SAMUS_GRAPPLE_MADD(dir_ptr->x, attrs->x38, cur->pos.x);
++                next->pos.y = SAMUS_GRAPPLE_MADD(dir_ptr->y, attrs->x38, cur->pos.y);
++                next->pos.z = SAMUS_GRAPPLE_MADD(dir_ptr->z, attrs->x38, cur->pos.z);
+             }
+             it_802A43EC(next);
+         } else {
+             if (it_802A3C98(pos, &cur->pos, &dir) > attrs->x38) {
+                 dir_ptr = &dir;
+-                next->pos.x = (dir_ptr->x * attrs->x38) + cur->pos.x;
+-                next->pos.y = (dir_ptr->y * attrs->x38) + cur->pos.y;
+-                next->pos.z = (dir_ptr->z * attrs->x38) + cur->pos.z;
++                next->pos.x = SAMUS_GRAPPLE_MADD(dir_ptr->x, attrs->x38, cur->pos.x);
++                next->pos.y = SAMUS_GRAPPLE_MADD(dir_ptr->y, attrs->x38, cur->pos.y);
++                next->pos.z = SAMUS_GRAPPLE_MADD(dir_ptr->z, attrs->x38, cur->pos.z);
+                 next->x2C_b0 = 1;
+                 it_802A43B8(next);
+             } else {
 diff --git a/src/melee/gm/gm_1601.c b/src/melee/gm/gm_1601.c
 --- a/src/melee/gm/gm_1601.c
 +++ b/src/melee/gm/gm_1601.c
-@@ -44,76 +44,102 @@
+@@ -44,75 +44,101 @@
  /* 166A8C */ static f32 fn_80166A8C(Vec3*, Vec3*);
  
  /// JP character names
@@ -10566,6 +10937,41 @@ diff --git a/src/melee/gm/gm_1601.c b/src/melee/gm/gm_1601.c
 +    "\x82\x87", /* Ｓａｎｄｂａｇ */
      NULL,
  };
+
+diff --git a/src/sysdolphin/baselib/dobj.c b/src/sysdolphin/baselib/dobj.c
+index aa765eb..a12db8a 100644
+--- a/src/sysdolphin/baselib/dobj.c
++++ b/src/sysdolphin/baselib/dobj.c
+@@ -193,10 +193,29 @@ static int DObjLoad(HSD_DObj* dobj, HSD_DObjDesc* desc)
+             HSD_DObjModifyFlags(dobj, 4, 0xE);
+             break;
+         default:
++        {
++            u32 source_joint = 0, source_material = 0, authored_mode = 0;
++            extern int melee_web_native_joint_source_for_material_desc(
++                const void*, u32*, u32*, u32*);
++            if (melee_web_native_joint_source_for_material_desc(desc->mobjdesc,
++                    &source_joint, &source_material, &authored_mode))
++                OSReport("Native material source joint=0x%x material=0x%x authored_mode=0x%x runtime_mode=0x%x.",
++                         source_joint, source_material, authored_mode,
++                         dobj->mobj->rendermode);
++            else
++                OSReport("Unowned material descriptor=0x%x class=0x%x runtime_mode=0x%x.",
++                         (u32) desc->mobjdesc,
++                         (u32) desc->mobjdesc->class_name,
++                         dobj->mobj->rendermode);
++            OSReport("DObjDesc=0x%x raw_mode=0x%x material=0x%x texture=0x%x.",
++                     (u32) desc, desc->mobjdesc->rendermode,
++                     (u32) desc->mobjdesc->mat,
++                     (u32) desc->mobjdesc->texdesc);
+             OSReport("mobj has unexpected blending flags (0x%x).",
+                      dobj->mobj->rendermode);
+             HSD_Panic(HSD_DObj_804D5C78, 312, "\0");
+         }
++        }
+     }
+     return 0;
+ }
  
 
 diff --git a/src/melee/lb/lbmthp.c b/src/melee/lb/lbmthp.c

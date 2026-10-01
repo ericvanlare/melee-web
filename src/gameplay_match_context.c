@@ -177,7 +177,9 @@ int melee_web_match_create_fighter(MeleeWebMatchContext* h,char* e,size_t n)
 }
 int melee_web_match_restore_input(MeleeWebMatchContext* h,const MeleeWebPadState* state,char* e,size_t n)
 {
-    if(!live(h,e,n))return 0;
+    /* Source player selection consumes PAD before the stage has installed
+     * collision. Require the live world/RNG/camera lease, not stage readiness. */
+    if(!owned(h,e,n))return 0;
     if(!state||h->ticks||h->input_restored||HSD_PadLibData.qcount)
         return fail(e,n,"Input history may be restored once before match initialization");
     for(uint32_t i=0;i<h->player_count;i++)
@@ -516,10 +518,12 @@ int melee_web_match_player_stats(MeleeWebMatchContext* h,uint32_t index,MeleeWeb
     memset(out,0,sizeof(*out));out->ticks=h->ticks;out->random_seed=h->seed;
     StaticPlayer* p=Player_GetPtrForSlot(h->slots[index]);
     out->live_fighters=(p->player_entity[0]!=NULL)+(p->player_entity[1]!=NULL);
-    out->motion_id=-1;out->ground_or_air=-1;out->player_slot=h->slots[index];
+    out->motion_id=-1;out->ground_or_air=-1;out->fighter_kind=-1;out->player_slot=h->slots[index];
     out->stocks=Player_GetStocks(h->slots[index]);
-    if(p->player_entity[0]){
-        Fighter* fp=p->player_entity[0]->user_data;
+    HSD_GObj* active=Player_GetEntity(h->slots[index]);
+    if(active){
+        Fighter* fp=active->user_data;
+        out->fighter_kind=fp->kind;
         out->motion_id=fp->motion_id;out->ground_or_air=fp->ground_or_air;
         memcpy(out->position,&fp->cur_pos,sizeof(out->position));out->facing_direction=fp->facing_dir;
         out->animation_frame=fp->cur_anim_frame;

@@ -247,7 +247,8 @@ class WholeSessionStateCompareTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _state_from_payload({"slices": _state_slices(fighter_count=1)}, "one-player fixture")
         noncontiguous = _state_slices(fighter_count=2)
-        next(item for item in noncontiguous if item["name"] == "fighter_head" and item["flags"] == 1)["flags"] = 2
+        next(item for item in noncontiguous
+             if item["name"] == "fighter_head" and item["flags"] == 1)["flags"] = 2
         with self.assertRaises(ValueError):
             _state_from_payload({"slices": noncontiguous}, "noncontiguous fixture")
 
@@ -261,7 +262,7 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             lambda setup, frame: (setup["fighters"].extend([*copy.deepcopy(frame["fighters"]),
                                                                *copy.deepcopy(frame["fighters"])]),
                                   frame["fighters"].extend([*copy.deepcopy(frame["fighters"]),
-                                                            *copy.deepcopy(frame["fighters"])])),
+                                                             *copy.deepcopy(frame["fighters"])])),
         )
         for alter in alterations:
             with self.subTest(alter=alter), tempfile.TemporaryDirectory() as directory:
@@ -270,6 +271,20 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     _run_source(path, source, pads)
 
+    def test_auxiliary_fighter_flags_use_bounded_composite_identity(self):
+        slices = _state_slices(fighter_count=2)
+        auxiliary = copy.deepcopy(next(item for item in slices
+                                       if item["name"] == "fighter_head" and item["flags"] == 1))
+        auxiliary["flags"] = 0x101
+        slices.append(auxiliary)
+        state = _state_from_payload({"slices": slices}, "auxiliary fixture")
+        self.assertEqual([fighter["slot"] for fighter in state["fighters"]], [0, 1])
+        for invalid in (0x202, 0x104, 0x10000, 0x10001):
+            malformed = copy.deepcopy(slices)
+            malformed[-1]["flags"] = invalid
+            with self.subTest(flags=hex(invalid)):
+                with self.assertRaises(ValueError):
+                    _state_from_payload({"slices": malformed}, "invalid auxiliary fixture")
     def test_v9_match_entry_binds_browser_to_that_matches_setup(self):
         source, pads, _, _ = _source_rows()
         payload = source[9]["payload"]
@@ -517,6 +532,17 @@ class WholeSessionStateCompareTests(unittest.TestCase):
         self.assertTrue(_is_match_field("fighters[0].position_bits[0]"))
         self.assertTrue(_is_match_field("match_frame"))
         self.assertFalse(_is_match_field("supplied_inputs"))
+
+    def test_v8_primary_state_rejects_unscoped_entity_rows(self):
+        source, pads, _, _ = _source_rows()
+        state = _state_from_payload({"slices": source[9]["payload"]["slices"]}, "fixture")
+        state.update(_snapshot_values({"slices": source[9]["payload"]["slices"]}, "fixture"))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl"
+            _browser_trace(path, pads, state,
+                           rows_alter=lambda rows: rows[2].__setitem__("fighter_entities", []))
+            with self.assertRaisesRegex(ValueError, "fields differ"):
+                _run_source(path, source, pads)
 
     def test_browser_completion_report_requires_bound_final_css_endpoint(self):
         report = {

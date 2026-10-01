@@ -284,6 +284,23 @@ int action_test_opcode36_consumer(void)
     melee_web_command_require_supported(36);melee_web_commands_destroy(p);
     return valid;
 }
+void ftAction_80072CB0(HSD_GObj*,CommandInfo*);
+int action_test_opcode53_consumer(void)
+{
+    const uint32_t operands[]={0,1,2,0x3ffffff};
+    for(unsigned i=0;i<sizeof(operands)/sizeof(*operands);++i){
+        const MeleeWebCommandWord words[]={
+            {(53U<<26)|operands[i],UINT32_MAX},{0,UINT32_MAX}};
+        union CmdUnion* p=melee_web_commands_create(words,2);if(!p)return 0;
+        Fighter fighter={0};HSD_GObj gobj={0};gobj.user_data=&fighter;
+        CommandInfo command={0};command.u=p;
+        ftAction_80072CB0(&gobj,&command);
+        const int valid=fighter.x2225_b2==(operands[i]&1U)&&command.u==&p[1];
+        melee_web_command_require_supported(53);
+        melee_web_commands_destroy(p);if(!valid)return 0;
+    }
+    return 1;
+}
 int action_test_opcode50_consumer(void)
 {
     const MeleeWebCommandWord words[]={{(50U<<26)|50U,UINT32_MAX},{0,UINT32_MAX}};

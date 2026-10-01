@@ -1,4 +1,4 @@
-/** Foreground-only browser jobs must require an explicit visible-browser opt-in. */
+/** Capture modes must be explicit, and foreground-only jobs require --headed. */
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -35,11 +35,17 @@ try {
     '--playwright', path.join(temporary, 'missing-playwright'),
   ]);
   assert.notEqual(captureResult.status, 0);
-  assert.match(captureResult.stderr, /explicit --headed/);
+  assert.match(captureResult.stderr, /Choose exactly one browser mode/);
   assert.doesNotMatch(captureResult.stderr, /ENOENT|Playwright|missing-disc|missing-recipe/,
-    'capture guard must run before disc/recipe hashing or Playwright resolution');
+    'capture mode guard must run before disc/recipe hashing or Playwright resolution');
   assert.equal(await exists(captureOut), false,
-    'capture guard must run before creating its output directory');
+    'capture mode guard must run before creating its output directory');
+
+  const conflictingModeResult = run(captureCpu, ['--headed', '--headless']);
+  assert.notEqual(conflictingModeResult.status, 0);
+  assert.match(conflictingModeResult.stderr, /Choose exactly one browser mode/);
+  assert.doesNotMatch(conflictingModeResult.stderr, /Playwright|Use --url/,
+    'conflicting capture modes must fail before dependency or argument processing');
 
   const profileOut = path.join(temporary, 'profile-out');
   const profileResult = run(runHitch, [
@@ -57,8 +63,14 @@ try {
   const captureArgumentResult = run(captureCpu, ['--headed']);
   assert.notEqual(captureArgumentResult.status, 0);
   assert.match(captureArgumentResult.stderr, /Use --url/);
-  assert.doesNotMatch(captureArgumentResult.stderr, /explicit --headed|Playwright/,
+  assert.doesNotMatch(captureArgumentResult.stderr, /Choose exactly one browser mode|Playwright/,
     'explicit --headed must pass the foreground guard before normal argument validation');
+
+  const headlessArgumentResult = run(captureCpu, ['--headless']);
+  assert.notEqual(headlessArgumentResult.status, 0);
+  assert.match(headlessArgumentResult.stderr, /Use --url/);
+  assert.doesNotMatch(headlessArgumentResult.stderr, /Choose exactly one browser mode|Playwright/,
+    'explicit --headless must pass the mode guard before normal argument validation');
 
   const profileArgumentResult = run(runHitch, ['profile', '--headed']);
   assert.notEqual(profileArgumentResult.status, 0);
@@ -75,7 +87,7 @@ try {
   assert.doesNotMatch(runResult.stderr, /ENOENT|missing-plan|missing-disc/,
     'hitch run guard must run before reading a plan or disc');
 
-  console.log('Foreground browser guards reject missing --headed before browser, output or input work');
+  console.log('Capture mode guards reject implicit/conflicting modes; foreground jobs require explicit --headed');
 } finally {
   await fs.rm(temporary, {recursive: true, force: true});
 }

@@ -4,6 +4,7 @@
 #include "gameplay_render.h"
 #include "dat_menu_support.hpp"
 #include <array>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
@@ -43,6 +44,9 @@ struct GameplayWorldSelection {
     // startup applies fn_8016DCC0 between the original camera and refraction
     // boundaries, before it loads effects and stage-owned services.
     const StartMeleeData* source_start_data=nullptr;
+    // Borrowed only during construction, including SourceOrdered: restore the
+    // menu PAD history before fn_8016D8AC selects the held-A startup form.
+    const MeleeWebPadState* source_initial_input=nullptr;
     // Opening demos retain their authored four-CPU/99-stock setup and
     // gm_80183218 source callback. This never applies to public VS matches.
     bool opening_demo=false;
@@ -63,7 +67,7 @@ public:
     ~GameplayWorld();
     GameplayWorld(const GameplayWorld&) = delete;
     GameplayWorld& operator=(const GameplayWorld&) = delete;
-    void close();
+    void close(const std::function<void()>& after_effect_runtime_end = {});
     void enable_stage_visual();
     void enable_full_stage(bool defer_start = false);
     void end_stage();

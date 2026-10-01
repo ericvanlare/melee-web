@@ -80,7 +80,11 @@ extern "C" int melee_web_retail_setup(const uint8_t*, uint32_t,
     return 1;
 }
 extern "C" void melee_web_retail_state(void) { fake::write_state(); }
-extern "C" void melee_web_retail_entities(uint32_t) {}
+extern "C" void melee_web_retail_entities(void) {
+    if (!fake::state_allowed) std::abort();
+    std::cout << ",\"fighter_entities\":[]";
+}
+extern "C" void melee_web_retail_entities_index(uint32_t) {}
 extern "C" void melee_web_retail_entities_reset(void) {}
 extern "C" uint32_t melee_web_retail_rng(void) { ++fake::rng; return 123; }
 extern "C" uint32_t gm_GetFrameCount(void) { return 0; }
@@ -224,6 +228,8 @@ class RetailRecipeSceneTraceTests(unittest.TestCase):
                    if line.startswith("{")]
         self.assertEqual(records[0]["record"], "header")
         self.assertEqual(records[0]["schema"], "melee-web-port-session-diagnostic")
+        self.assertEqual(records[0]["version"], 1)
+        self.assertNotIn("fighter_entities", records[0])
         self.assertEqual(records[0]["cpu_observations"], "not_captured")
         self.assertEqual(
             [record["record"] for record in records[1:10]],

@@ -365,9 +365,12 @@ try {
     let last = null;
     while (Date.now() < deadline) {
       last = await snapshot('replay-poll');
+      if (!last) throw Error('Browser page closed before the recorded-session replay completed');
       await write('progress.json', {harness_phase:currentPhase,phase:last?.phase,cursor:last?.source_cursor,
         status:last?.status,error:last?.runtime_error,log:last?.log?.slice(-1600),
         browser_report:last?.replay_report,at_ms:last?.at_ms});
+      if (!resumeTimingPauses && last.status?.startsWith('Paused after a timing disruption'))
+        throw Error(`Recorded-session replay paused after a timing disruption at cursor ${last.source_cursor}`);
       if (resumeTimingPauses && last?.status?.startsWith('Paused after a timing disruption') &&
           (last?.running === 0 || last?.running === false)) {
         const cursor = last.source_cursor;

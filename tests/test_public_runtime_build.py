@@ -122,6 +122,10 @@ class PublicRuntimeBuildTests(unittest.TestCase):
                                    pipeline_provenance=recorder, selective_pipelines=True)
 
     def test_release_target_has_a_small_explicit_api(self):
+        import build_public
+
+        self.assertEqual(public_build.PUBLIC_RUNTIME_FORBIDDEN_EXPORTS,
+                         build_public.RUNTIME_FORBIDDEN_EXPORTS)
         cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text(encoding="utf-8")
         public = cmake.split("# The public player", 1)[1].split(
             "# Shared typed scene/model tables", 1

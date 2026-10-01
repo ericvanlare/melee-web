@@ -544,6 +544,35 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
                   "Original Main left before Eject");
         abort_and_destroy(host, world, audio_phase, "Main");
     }
+
+    {
+        auto* host = melee_web_menu_host_create(error, sizeof(error));
+        check(host != nullptr, error);
+        auto world = std::make_unique<melee_web::GameplayMenuWorld>(files);
+        PADStatus raw[4]{};
+        raw[2].err = raw[3].err = -1;
+        unsigned audio_phase = 0;
+        check(melee_web_menu_host_enter(host, world->audio(), error,
+                                        sizeof(error)), error);
+        for (unsigned frame = 0; frame < 120; ++frame)
+            check(tick(host, *world, raw, audio_phase) == 1,
+                  "Original CSS left before the normal-close regression");
+        raw[0].button = PAD_BUTTON_START;
+        int result = tick(host, *world, raw, audio_phase);
+        raw[0].button = 0;
+        for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
+            result = tick(host, *world, raw, audio_phase);
+        check(result == 3, "Original CSS did not complete its SSS transition");
+        check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+        check(melee_web_menu_host_phase(host) == 2,
+              "Normal CSS leave did not retain the closed SSS-ready session");
+        world->close();
+        world.reset();
+        check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+        check(!melee_web_gameplay_world_exists(),
+              "Normal CSS leave retained the owned source world");
+        std::cout << "Normal CSS->SSS leave cleared its consumed transition before host teardown\n";
+    }
     std::cout << "Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger, Title timeout to Opening state 1 and recovery passed\n";
 }
 
@@ -633,9 +662,8 @@ int main(int argc,char** argv){try{
    throw std::runtime_error("Explicit FD recipes require Final Destination");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
- std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(title_main_abort_recipe||opening_movie_preload_recipe)
-  keys=melee_web::menu_asset_names();
+ std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
+ if(title_main_abort_recipe||opening_movie_preload_recipe)keys=melee_web::menu_asset_names();
  for(const auto& key:melee_web::menu_asset_names())
   if(std::find(keys.begin(),keys.end(),key)==keys.end())keys.push_back(key);
  for(const auto& key:keys){
@@ -817,6 +845,14 @@ int main(int argc,char** argv){try{
   raw_selection.random_seed=selection_rng;
   trace.event("sss_exit_complete",world->audio(),"match",&raw_selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
+  for(const auto& name:melee_web::match_asset_names(selection)){
+   if(files.find(name)!=files.end())continue;
+   auto path=std::filesystem::path(argv[1])/name;
+   if(!std::filesystem::is_regular_file(path))path=std::filesystem::path(argv[2])/name;
+   std::ifstream input(path,std::ios::binary);
+   if(!input)throw std::runtime_error("Missing source match fixture: "+name);
+   files[name]={(std::istreambuf_iterator<char>(input)),{}};
+  }
   const MeleeWebPadState* menu_input=melee_web_menu_host_input(host);
   check(menu_input!=nullptr,"Original SSS did not retain PAD history for match entry");
   bool match_entry_recorded=false;

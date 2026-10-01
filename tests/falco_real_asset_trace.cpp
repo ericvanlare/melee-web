@@ -1,6 +1,9 @@
 #include "dat_fighter_runtime.hpp"
+#include "dat_material_animation.hpp"
+#include "dat_native_joint.hpp"
 #include "fighter_binding.hpp"
 
+#include <array>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -24,12 +27,25 @@ const FighterCostume& falco_costume()
         if (costume.fighter_kind == 22 && costume.costume_index == 0) return costume;
     throw std::runtime_error("FTKIND_FALCO costume 0 is absent from the generated registry");
 }
+
+std::uint32_t symbol_offset(const DatArchive& archive, std::string_view name)
+{
+    const DatPublicSymbol* found = nullptr;
+    for (const auto& symbol : archive.public_symbols()) {
+        if (symbol.name != name) continue;
+        if (found) throw std::runtime_error("duplicate Falco source symbol: " + std::string(name));
+        found = &symbol;
+    }
+    if (!found) throw std::runtime_error("missing Falco source symbol: " + std::string(name));
+    return found->data_offset;
+}
 }
 
 int main(int argc, char** argv)
 {
-    if (argc != 5) {
-        std::cerr << "usage: falco_real_asset_trace PlFc.dat PlFcAJ.dat EfFxData.dat falco.ssm\n";
+    if (argc != 9) {
+        std::cerr << "usage: falco_real_asset_trace PlFc.dat PlFcAJ.dat EfFxData.dat falco.ssm "
+                     "PlFcNr.dat PlFcRe.dat PlFcBu.dat PlFcGr.dat\n";
         return 2;
     }
     try {
@@ -63,7 +79,30 @@ int main(int argc, char** argv)
             effects->next_target_offset(effect_root) - effect_root >= 8 + 7 * 20)
             throw std::runtime_error("Falco effect table does not expose the six source entries");
         if (read_file(argv[4]).empty()) throw std::runtime_error("Falco source audio bank is empty");
-        std::cout << "Falco real DAT metadata, 327 action rows, Fox-family attributes, special animations, effect bank 3/count 6 and audio: passed\n";
+        constexpr std::array<std::string_view, 4> falco_model_files{
+            "PlFcNr.dat", "PlFcRe.dat", "PlFcBu.dat", "PlFcGr.dat"};
+        unsigned costume_count = 0;
+        for (const auto& costume : fighter_costumes()) {
+            if (costume.fighter_kind != 22) continue;
+            if (costume.costume_index >= falco_model_files.size() ||
+                costume.model_filename != falco_model_files[costume.costume_index])
+                throw std::runtime_error("Falco costume registry contains an unexpected costume identity");
+            auto model_archive = std::make_shared<const DatArchive>(
+                read_file(argv[5 + costume.costume_index]));
+            auto model = std::make_unique<DatNativeJoint>(model_archive,
+                symbol_offset(*model_archive, costume.model_symbol));
+            DatMaterialAnimation material(model_archive,
+                symbol_offset(*model_archive, costume.material_animation_symbol), model->graph());
+            std::cout << "Falco costume " << costume.costume_index
+                      << " native graph joints=" << model->graph().joint_count
+                      << " materials=" << model->graph().material_count
+                      << " texture_animations=" << material.texture_animation_count()
+                      << " images=" << material.image_count() << ": passed\n";
+            ++costume_count;
+        }
+        if (costume_count != falco_model_files.size())
+            throw std::runtime_error("Falco native material trace did not cover all four registered costumes");
+        std::cout << "Falco real DAT metadata, 327 action rows, Fox-family attributes, special animations, effect bank 3/count 6, audio and four native costume/material graphs: passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

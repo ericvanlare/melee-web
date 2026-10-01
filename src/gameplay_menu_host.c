@@ -1258,10 +1258,11 @@ int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t
     }
     melee_web_pad_state_free(h->input);h->input=input;
     h->entered=0;h->source_scene=MELEE_WEB_HOST_SCENE_NONE;
-    /* The menu transition has been consumed by leave().  Retaining the old
-     * request makes host teardown mistake this closed menu for an active
-     * route after match ownership returns to the browser. */
-    h->transition=0;
+    /* The source transition has been consumed by menu_leave_* above. Keep
+     * only the separately captured route target; a closed READY host must
+     * not retain a stale transition or parent-route request that prevents
+     * owned teardown or contaminates a later scene entry. */
+    h->transition=0;h->css_parent_route_requested=0;
     restore_context(h);return ok(e,n);
 }
 int melee_web_menu_host_phase(const MeleeWebMenuHost* h){return h&&h==owner?melee_web_menu_phase(h->session):MELEE_WEB_MENU_CLOSED;}
@@ -1457,19 +1458,31 @@ static int commit_results_route(MeleeWebMenuHost* h,char* e,size_t n){
     h->results_committed=1;
     return ok(e,n);
 }
+static int results_handoff_owned(MeleeWebMenuHost* h,const char* phase,char* e,size_t n){
+    char profile_error[256];
+    if(!melee_web_save_profile_owner_live(h->profile,profile_error,sizeof(profile_error))){
+        if(e&&n)snprintf(e,n,"Results %s: %s",phase,profile_error);
+        return 0;
+    }
+    return melee_web_results_context_check_handoff(phase,e,n);
+}
 int melee_web_menu_host_results_exit(MeleeWebMenuHost* h,char* e,size_t n){
-    if(!h||h!=owner||!h->results_active||h->results_exited||
-       !melee_web_results_context_exit_ready())
+    if(!h||h!=owner||!h->results_active||h->results_exited)
         return fail(e,n,"Results mode exit requires its live source world");
+    if(!results_handoff_owned(h,"mode OnExit entry",e,n))return 0;
     gm_Mode_Vs_States[4].on_exit(&gm_Mode_Vs_States[4]);
+    /* The callback is consumed even if its postcondition fails. Never replay
+     * its save writes, allocations or RNG on a rejected handoff. */
     h->results_exited=1;
+    if(!results_handoff_owned(h,"mode OnExit",e,n))return 0;
     const int next=melee_web_vs_mode_next_state();
     if(next==gmVsMode_State_Prize)return ok(e,n);
     if(next!=gmVsMode_State_Css){
         if(e&&n)snprintf(e,n,"Original Results requested unsupported state %d",next);
         return 0;
     }
-    return commit_results_route(h,e,n);
+    if(!commit_results_route(h,e,n))return 0;
+    return results_handoff_owned(h,"route commit",e,n);
 }
 int melee_web_menu_host_results_end(MeleeWebMenuHost* h,uint32_t seed,
     const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char* e,size_t n){

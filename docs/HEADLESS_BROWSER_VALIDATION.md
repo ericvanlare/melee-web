@@ -36,10 +36,13 @@ try {
 ```
 
 Do not use desktop `open` commands or `bringToFront()` for routine checks.
-`scripts/run_hitch_matrix.mjs` (both `profile` and `run`) and
-`scripts/capture_cpu_browser.mjs` require `--headed` before doing capture work.
-Their foreground protocols remain unchanged after that explicit opt-in. A
-minimized or background window does not substitute for a visible timing run.
+`scripts/run_hitch_matrix.mjs` (both `profile` and `run`) remains foreground-only
+and requires `--headed`. `scripts/capture_cpu_browser.mjs` requires exactly one
+explicit mode: `--headless` or `--headed`. Its headless mode still runs the real
+source draw path, checks that the canvas has a nonempty buffer in the viewport,
+and retains screenshots; it is functional state-comparison evidence, not visible
+timing evidence. A minimized or background window does not substitute for a
+visible timing run.
 Changed harness hashes require fresh hitch profiles; keep historical receipts
 bound to their original scripts.
 

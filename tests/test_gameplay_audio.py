@@ -17,6 +17,19 @@ class GameplayAudioTests(unittest.TestCase):
         self.assertIn(marker,result.stdout)
     def test_original_voice_pcm(self):
         self.run_audio_trace("gameplay_audio_trace.js", "partition invariance and scoped restart")
+
+    def test_character_banks_preserve_overlapping_source_sample_ids(self):
+        target=ROOT/"build/browser-release/gameplay_audio_trace.js"
+        common=ROOT/"assets-local/native-menus"
+        fighters=ROOT/"assets-local/next-gate"
+        assets=[common/name for name in ("main.ssm","mario.ssm","smash2.sem","dsp_coef.bin")]
+        extras=[fighters/name for name in ("kirby.ssm","ice.ssm")]
+        if not target.is_file() or not all(p.is_file() for p in [*assets,*extras]):
+            self.skipTest("Build gameplay_audio_trace and provide the owned Kirby/Ice audio banks")
+        result=subprocess.run([str(node_runtime()),str(target),*map(str,assets),*map(str,extras)],
+                              cwd=ROOT,capture_output=True,text=True,timeout=60)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn("Overlapping SSM sample IDs retained",result.stdout)
     def test_original_effect_callbacks_and_transport(self):
         self.run_audio_trace("gameplay_audio_fx_trace.js", "three-buffer latency/restart passed")
 if __name__=="__main__":unittest.main()

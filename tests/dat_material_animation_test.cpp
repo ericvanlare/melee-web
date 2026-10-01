@@ -76,9 +76,13 @@ struct PairedFixture : Fixture {
         link(448,544); put16(data,460,1); // palette[0]: one entry
         link(464,576); put16(data,476,2); // palette[1]: two entries
         link(76,160); // append a synchronized TCLT FObj after TIMG
-        put32(data,164,4); data[172]=10; data[173]=0x85; data[174]=0x50; // unused slope format differs
-        link(176,192);
-        std::copy(data.begin()+96,data.begin()+100,data.begin()+192);
+        put32(data,164,6); data[172]=10; data[173]=0x62; data[174]=0x62;
+        link(176,544);
+        put32(data,80,6); data[89]=0x62; data[90]=0x62;
+        put32(data,92,512);
+        const uint8_t slope_curve[]{0x14,1,0,1,5,0};
+        std::copy(slope_curve,slope_curve+sizeof(slope_curve),data.begin()+512);
+        std::copy(slope_curve,slope_curve+sizeof(slope_curve),data.begin()+544);
     }
 };
 int main() {
@@ -91,10 +95,13 @@ int main() {
         Fixture f;auto archive=f.archive();
         melee_web::DatMaterialAnimation valid(archive,0,model);archive.reset();
         check(valid.descriptor()&&valid.texture_animation_count()==1&&valid.image_count()==2,"owned native animation graph");
+        unsigned rejected_fixture_index=0;
         auto rejected=[&](Fixture bad) {
+            const auto label="malformed material fixture "+std::to_string(++rejected_fixture_index)+
+                " must reject before native evaluation";
             bool failed=false;
             try {melee_web::DatMaterialAnimation invalid(bad.archive(),0,model);}catch(const melee_web::DatError&){failed=true;}
-            check(failed,"malformed material animation must reject before native evaluation");
+            check(failed,label.c_str());
         };
         auto rejected_for=[&](const auto& bad, const auto& checked_model) {
             bool failed=false;
@@ -149,7 +156,47 @@ int main() {
             melee_web::TextureIndexValidation::DispatchedValues);
         check(dispatch_guarded.image_count()==2 && bad.data[99]==64,
               "dispatch-checked policy preserves encoded unselected values and exact table capacity");
-        bad=Fixture();bad.data[96]=0x12;rejected(bad); // interpolated index could overshoot
+        Fixture interpolated_index;interpolated_index.data[96]=0x12;
+        interpolated_index.data[99]=48; // 1.5 truncates to source table index 1.
+        melee_web::DatMaterialAnimation original_linear_index(
+            interpolated_index.archive(),0,model);
+        check(original_linear_index.image_count()==2,
+              "source LIN index preserves fractional animation before integer table selection");
+        Fixture signed_fractional_index;signed_fractional_index.data[89]=0x65;
+        signed_fractional_index.data[96]=0x12;signed_fractional_index.data[99]=0xf0;
+        melee_web::DatMaterialAnimation signed_truncation(
+            signed_fractional_index.archive(),0,model);
+        check(signed_truncation.image_count()==2,
+              "source TIMG float-to-int truncation maps negative fractions above -1 to index zero");
+        Fixture linear_overflow;linear_overflow.data[96]=0x12;
+        linear_overflow.data[99]=64;rejected(linear_overflow); // source output reaches index2
+
+        Fixture spline_overflow;
+        spline_overflow.data.resize(640);
+        spline_overflow.relocations.erase(std::remove(
+            spline_overflow.relocations.begin(),spline_overflow.relocations.end(),92),
+            spline_overflow.relocations.end());
+        spline_overflow.link(92,512);put32(spline_overflow.data,80,14);
+        // Two in-range points followed by a Hermite point whose authored
+        // outgoing slope drives the interpolated table index above capacity.
+        const uint8_t spline_bytes[]{0x11,32,1,32,1,0x04,32,0,0,0xf0,0xc1,1,
+                                     0x01,32};
+        std::copy(spline_bytes,spline_bytes+sizeof(spline_bytes),
+                  spline_overflow.data.begin()+512);
+        rejected(spline_overflow);
+
+        Fixture slp_overflow;
+        slp_overflow.data.resize(640);
+        slp_overflow.relocations.erase(std::remove(
+            slp_overflow.relocations.begin(),slp_overflow.relocations.end(),92),
+            slp_overflow.relocations.end());
+        slp_overflow.link(92,512);put32(slp_overflow.data,80,12);
+        // SLP changes op_intrp for the following segment without changing its
+        // value. The source uses that slope-only datum in splGetHelmite.
+        const uint8_t slp_bytes[]{0x11,32,1,32,1,0x05,0,0,0xf0,0xc1,0x01,32};
+        std::copy(slp_bytes,slp_bytes+sizeof(slp_bytes),
+                  slp_overflow.data.begin()+512);
+        rejected(slp_overflow);
         bad=Fixture();put32(bad.data,80,2);rejected(bad); // packet advertises two values
         bad=Fixture();put32(bad.data,32,1);rejected(bad); // missing texture ID
         bad=Fixture();put32(bad.data,48,0);rejected(bad); // absent image table count
@@ -193,15 +240,22 @@ int main() {
         repeated.data[195]=0; // independent TCLT keeps Cartesian validation
         melee_web::DatMaterialAnimation repeated_tables(repeated.archive(),0,model);
         check(repeated_tables.image_count()==256,"aliased image tables stay within actual validation work budget");
-        repeated.data[0x4000]=1;rejected(repeated); // still rejects invalid indices
+        repeated.data[0x4000]=16;rejected(repeated); // beyond the authored one-entry TLUT
 
-        // Matching TIMG/TCLT metadata and encoded streams activate the proven
-        // diagonal check. A divergent TCLT stream must fall back to Cartesian
-        // validation, and a bad selected diagonal texel remains rejected.
+        // Matching TIMG/TCLT metadata and encoded streams prove exact paired
+        // selections. A divergent TCLT stream requires Cartesian validation.
         PairedFixture paired;
         melee_web::DatMaterialAnimation synchronized(paired.archive(),0,model);
         check(synchronized.texture_animation_count()==1,
-              "synchronized index/palette tracks use diagonal validation");
+              "byte-identical index/palette spline tracks use the proven diagonal relation");
+        auto distinct_slope = paired;
+        distinct_slope.data[544 + 5] = 1;
+        bool rejected_distinct_slope = false;
+        try { melee_web::DatMaterialAnimation invalid(distinct_slope.archive(),0,model); }
+        catch (const melee_web::DatError&) { rejected_distinct_slope = true; }
+        check(rejected_distinct_slope,
+              "different opcode-4 slopes require Cartesian image/palette validation");
+
 
         // HSD keeps the authored TCLT table even when a selected TIMG image
         // is non-CI; setup ignores that TLUT for I/IA/RGB/CMPR images. The
@@ -216,13 +270,16 @@ int main() {
         put16(mixed_bad_tlut.data,476,0);
         rejected(mixed_bad_tlut); // non-CI still requires a valid authored TLUT descriptor
         auto mixed_bad_tclt = mixed_nonindexed;
-        mixed_bad_tclt.data[195]=64; // TCLT value 2, outside its two-entry table
+        mixed_bad_tclt.data[544 + 4]=8; // TCLT value 2, outside its two-entry table
         rejected(mixed_bad_tclt); // table-index bounds remain enforced before setup
         PairedFixture divergent;
-        divergent.data[195]=0; // TCLT selects a different second index
+        divergent.data[768]=17;
+        put16(divergent.data,476,17);
+        divergent.data[544 + 4]=0; // TCLT selects a different second index
         rejected(divergent);
         PairedFixture out_of_range;
-        put16(out_of_range.data,476,1); // selected image[1] index one is invalid
+        out_of_range.data[768]=17;
+        put16(out_of_range.data,476,1); // selected image[1] exceeds authored palette entries
         rejected(out_of_range);
 
         // An authored palette table alone does not select its entries.
