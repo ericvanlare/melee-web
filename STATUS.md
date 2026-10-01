@@ -39,11 +39,13 @@ remain separate open gates.
 The retained PR86 A trace was produced with an unscoped v2 entity field. The
 producer is now reconciled to the current v1 whole-session schema: v8 compares
 two-to-four primary fighters, while v9 uses its separate indexed identity
-records. A fresh corrected-producer B prefix reached source cursor 3,014
-without a runtime error and compared 1,374 menu rows plus 1,642 primary match
-rows with no first difference; the deliberate stop leaves B incomplete and the
-remainder unverified. The [scoped receipt](docs/evidence/pr86-primary-prefix-v1.json)
-records the comparison base, pre-merge B build identity, hashes and limits. A
+records. A fresh corrected-producer candidate-port prefix against retained
+original A reached source cursor 3,014 without a runtime error and compared
+1,374 menu rows plus 1,642 primary match rows with no first difference; the
+deliberate stop leaves the candidate port incomplete and the remainder
+unverified. The [scoped receipt](docs/evidence/pr86-primary-prefix-v1.json)
+records the comparison base, pre-merge candidate build identity, hashes and
+limits. A
 separately hashed diagnostic projection of the retained full A trace, with only
 its unscoped entity fields omitted and no JSONL rows removed, compares all
 42,492 frames and all 39,032 declared match rows with no primary-state

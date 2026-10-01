@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-pr86-primary-prefix-v1",
   "date": "2026-09-30",
-  "scope": "Bounded corrected-producer MWRC v8 prefix. Exact source-consumed scene/input order and primary Fighter state are compared through the deliberate stop; completion, Results camera ownership, timing, draw cadence, pixels, PCM, performance and admission are unclaimed.",
+  "scope": "Bounded corrected-producer candidate-port prefix against retained original-A MWRC v8 input. Exact source-consumed scene/input order and primary Fighter state are compared through the deliberate stop; completion, Results camera ownership, timing, draw cadence, pixels, PCM, performance and admission are unclaimed.",
   "runtime": {
     "comparison_base_commit": "8f64a14cdd8cef60e68191c665f5732ab8dc2717",
     "build_commit": "361c6c2820cc5d541ed2812a673b470a3e2b0d60",
@@ -31,14 +31,14 @@
     "requested_source_frames": 3000,
     "observed_source_cursor": 3014,
     "browser_source_frames": 3016,
-    "result": "incomplete_deliberate_prefix",
+    "result": "incomplete_deliberate_candidate_port_prefix",
     "runtime_error": false,
     "primary_match": {
       "match_entry_frame": 1374,
       "nonmatch_rows_compared": 1374,
       "match_rows_compared": 1642,
       "first_difference": null,
-      "result": "prefix_unverified"
+      "result": "candidate_port_prefix_unverified"
     }
   },
   "retained_trace_primary_projection": {
