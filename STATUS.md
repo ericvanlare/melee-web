@@ -521,9 +521,12 @@ original English costume resolution, indexed vertex colors and particle palette
 metadata. The browser completes all 30 action cases over 5,200 drawn frames;
 the first diagnostic run fails timing/audio/pipeline gates. After a reviewed
 35-descriptor preload correction, both cold/warm action sweeps pass all 10,400
-frames with zero hard failures. Startup and broader performance remain separate,
-and independent original comparison is pending; see
-[Captain Falcon's measured scope](docs/CAPTAIN_PORT_NOTES.md).
+frames with zero hard failures. The first original CPU9 source/browser comparison
+has an exact Falcon-position divergence, and the human-input browser replay
+diverges at Results routing. No page/process crash was reproduced, so the user
+report remains unattributed; device/browser-specific checks are unrun. See the
+[investigation receipt](docs/evidence/captain-falcon-correctness-investigation-v1.json)
+and [Captain Falcon's measured scope](docs/CAPTAIN_PORT_NOTES.md).
 Hyrule Temple passes two native stage-owner lifetimes, including scaled geometry,
 original map callbacks, light identity overrides, music candidates and teardown.
 Two original Ready/pause/No Contest match lifetimes also pass. The browser
