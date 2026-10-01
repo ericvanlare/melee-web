@@ -66,9 +66,10 @@ original-game comparisons separately from the browser player.
 
 ## Accuracy and contribution priorities
 
-The original GameCube build is the behavioral reference. The next acceptance
-deliverable is original character select → original stage select → a four-stock
-Mario-versus-Mario Final Destination match → original character select.
+The original GameCube build is the behavioral reference. The supported player
+route is original character select → original stage select → a four-stock
+Mario-versus-Mario Final Destination match → original Results → original
+character select.
 Accuracy, rendering, audio, input, lifecycle and performance have separate gates;
 the public alpha is not an accepted accurate or tournament-ready port.
 

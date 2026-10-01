@@ -16,8 +16,9 @@ The ordinary player route is:
 **Original CSS → original SSS → four-stock Mario versus Mario on Final
 Destination → original Results → original CSS.**
 
-The current route ledger and recorded-session receipt in [STATUS](../STATUS.md)
-establish only their declared builds, inputs, state fields and observations.
+The [route ledger](ORIGINAL_MENU_ROUTE_CAPTURE.md), [recorded-session receipt](evidence/recorded-session-state-v1.json)
+and [STATUS](../STATUS.md) establish only their declared builds, inputs, state
+fields and observations.
 They do not establish general game equivalence, exact pixels or PCM, live input,
 foreground timing, physical-controller acceptance or tournament readiness.
 
