@@ -127,6 +127,8 @@ SLICE_NAMES = {
     49: "menu_css_slider",
     50: "menu_css_context",
     51: "menu_css_ko_counts",
+    52: "player_entities",
+    53: "player_entity_user_data",
 }
 
 
