@@ -34,6 +34,7 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `docs/REPOSITORY_CONTENT_CHECK.md`
 - `docs/ALLOCATION_TRACE_COMPARISON.md`
 - `docs/DEVELOPMENT.md`
+- `docs/evidence/slippi-browser-desktop-transport-v1.json`
 - `docs/BROWSER_FAILURE_TRIAGE.md`
 - `docs/PUBLIC_REPOSITORY_CHECKLIST.md`
 - `docs/PUBLICATION_REVIEW_BRIEF.md`
@@ -49,6 +50,8 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `reference-capture/slippi/LOCAL_TESTBED.md`
 - `reference-capture/slippi/client.lock.json`
 - `reference-capture/slippi/local_matchmaker/CMakeLists.txt`
+- `reference-capture/slippi/local_matchmaker/browser_relay.cpp`
+- `reference-capture/slippi/local_matchmaker/browser_relay.hpp`
 - `reference-capture/slippi/local_matchmaker/integration_test.cpp`
 - `reference-capture/slippi/local_matchmaker/pairing.cpp`
 - `reference-capture/slippi/local_matchmaker/pairing.hpp`
@@ -56,10 +59,14 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `reference-capture/slippi/local_matchmaker/protocol.hpp`
 - `reference-capture/slippi/local_matchmaker/server.cpp`
 - `reference-capture/slippi/local_matchmaker/tests.cpp`
+- `reference-capture/slippi/browser_transport.html`
+- `reference-capture/slippi/browser_transport_server.py`
+- `reference-capture/slippi/browser_transport_test.mjs`
 - `reference-capture/slippi/process.py`
 - `reference-capture/slippi/run_local.py`
 - `reference-capture/slippi/runtime.py`
 - `reference-capture/slippi/test_process.py`
+- `reference-capture/slippi/test_browser_transport.py`
 - `reference-capture/slippi/test_run_local.py`
 - `reference-capture/slippi/test_runtime.py`
 - `web/gamecube-save.mjs`

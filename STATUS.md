@@ -52,6 +52,15 @@ not establish audible quality, PCM or pixel equivalence, foreground timing,
 input latency, physical-controller acceptance, performance, or full-game menu
 coverage.
 
+## Current acceptance boundaries
+
+The supported CSS → SSS → Mario/Final Destination → Results → CSS route is
+covered by the scoped receipts below. Remaining acceptance is independent across
+original comparison, live and physical input, visual output, audio fidelity and
+sustained performance. The [roadmap](docs/ROADMAP.md), [accuracy contract](docs/ACCURACY_CONTRACT.md)
+and [performance/accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md) define
+those boundaries; this section adds no new runtime or deployment evidence.
+
 ## Repository public; main changes restricted to the owner
 
 The [publication record](docs/PUBLICATION_CUTOVER.md) and
@@ -1041,8 +1050,8 @@ CPU holdout, multiplayer, pixel, audio, physical-input or performance admission.
 The browser runs original fighters and stages through compiled WebAssembly. The
 accepted first slice is two Marios on Final Destination; narrower raw-PAD runs
 also selected and rendered Falco versus Mario on Battlefield, Fox versus Mario
-on Yoshi's Story, and Marth versus Mario on Dream Land. The complete
-acceptance milestone below is still open:
+on Yoshi's Story, and Marth versus Mario on Dream Land. The remaining
+acceptance boundaries are:
 source stage and item rendering, stock/respawn/outcome flow, and the optional
 renderer cache are integrated, while clean cold-cache/full-match first-use
 stalls, audible and physical controller verification, and full original-game
@@ -1145,6 +1154,11 @@ receipts. Setup and the reproducible acceptance command are in the
 local interoperability result; rollback correctness, browser cross-play,
 public Internet/NAT, rendering/audio accuracy and production readiness remain
 unclaimed.
+
+A separate [headless browser-to-desktop transport receipt](docs/evidence/slippi-browser-desktop-transport-v1.json)
+records one 24-frame raw PAD exchange through the loopback ENet relay and the
+desktop peer's existing input consumer. It does not establish browser gameplay,
+general cross-play, or rollback correctness.
 
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
@@ -1418,7 +1432,8 @@ and Aurora's pipeline queue remain quiet for two callbacks. The live clock arms
 on a later callback. Pipelines or uploads first encountered during a match enter
 the same frozen render-preparation gate and resume automatically; unrelated clock
 overruns retain the explicit hitch pause. Preparation time is reported separately,
-and the scoped [scene-entry profile](work/scene-entry-profile.md) measured
+and the historical scene-entry profile (`work/scene-entry-profile.md`, an ignored
+local report unavailable in this checkout) was recorded as measuring
 106.555 ms for initial resource preparation, 83.140 ms for isolated SSS owner
 construction and 160.100 ms for isolated match construction. Its 7,604 active
 callbacks had a 24.200 ms worst callback, no callback above 33.3 ms and zero

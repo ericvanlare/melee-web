@@ -1,29 +1,37 @@
 // SPDX-License-Identifier: MIT
 #include "pairing.hpp"
 #include "protocol.hpp"
+#include "browser_relay.hpp"
 
 #include <enet/enet.h>
 #include <nlohmann/json.hpp>
 
 #include <arpa/inet.h>
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <cerrno>
 #include <charconv>
 #include <chrono>
 #include <csignal>
 #include <cstring>
+#include <deque>
 #include <fcntl.h>
 #include <fstream>
 #include <iostream>
+#include <iterator>
+#include <memory>
 #include <map>
 #include <mutex>
 #include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string_view>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <thread>
 #include <unistd.h>
+#include <vector>
 
 namespace
 {
@@ -75,12 +83,12 @@ std::uint64_t peer_id(const ENetPeer* peer)
   return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(peer));
 }
 
-std::string peer_endpoint(const Ticket& ticket)
+std::string peer_endpoint(const Ticket& ticket, std::uint16_t relay_port = 0)
 {
-  return "127.0.0.1:" + std::to_string(ticket.peer_port);
+  return "127.0.0.1:" + std::to_string(relay_port == 0 ? ticket.peer_port : relay_port);
 }
 
-Json player_json(const Ticket& ticket, int port, bool local)
+Json player_json(const Ticket& ticket, int port, bool local, std::uint16_t relay_port = 0)
 {
   return {{"uid", ticket.uid},
           {"displayName", ticket.display_name},
@@ -88,8 +96,8 @@ Json player_json(const Ticket& ticket, int port, bool local)
           {"port", port},
           {"isBot", false},
           {"isLocalPlayer", local},
-          {"ipAddress", peer_endpoint(ticket)},
-          {"ipAddressLan", peer_endpoint(ticket)}};
+          {"ipAddress", peer_endpoint(ticket, relay_port)},
+          {"ipAddressLan", peer_endpoint(ticket, relay_port)}};
 }
 
 bool send_json(ENetHost* host, ENetPeer* peer, const Json& message)
@@ -215,13 +223,14 @@ private:
   std::thread m_thread;
 };
 
-Json assignment(const std::string& match_id, const Pair& pair, bool first_player)
+Json assignment(const std::string& match_id, const Pair& pair, bool first_player,
+                std::uint16_t relay_port = 0)
 {
   return {{"type", "get-ticket-resp"},
           {"matchId", match_id},
           {"isHost", first_player},
-          {"players", Json::array({player_json(pair.first, 1, first_player),
-                                    player_json(pair.second, 2, !first_player)})},
+          {"players", Json::array({player_json(pair.first, 1, first_player, relay_port),
+                                    player_json(pair.second, 2, !first_player, relay_port)})},
           {"stages", Json::array({3, 8, 28, 31, 32, 2})},
           {"items", 0}};
 }
@@ -229,8 +238,9 @@ Json assignment(const std::string& match_id, const Pair& pair, bool first_player
 class MatchmakingService
 {
 public:
-  MatchmakingService(ENetHost* host, EventLog& events, std::chrono::seconds timeout)
-      : m_host(host), m_events(events), m_ticket_timeout(timeout)
+  MatchmakingService(ENetHost* host, EventLog& events, std::chrono::seconds timeout,
+                     std::uint16_t relay_port)
+      : m_host(host), m_events(events), m_ticket_timeout(timeout), m_relay_port(relay_port)
   {
   }
 
@@ -375,16 +385,19 @@ private:
       return;
     }
 
-    const bool first_sent = send_json(m_host, first_peer, assignment(match_id, *pair, true));
-    const bool second_sent = send_json(m_host, second_peer, assignment(match_id, *pair, false));
+    const bool first_sent =
+        send_json(m_host, first_peer, assignment(match_id, *pair, true, m_relay_port));
+    const bool second_sent =
+        send_json(m_host, second_peer, assignment(match_id, *pair, false, m_relay_port));
     m_peer_has_ticket[first_peer] = false;
     m_peer_has_ticket[second_peer] = false;
     m_events.write({{"event", "pair_assigned"},
                     {"match_id", match_id},
                     {"first_uid", pair->first.uid},
                     {"second_uid", pair->second.uid},
-                    {"first_peer", peer_endpoint(pair->first)},
-                    {"second_peer", peer_endpoint(pair->second)},
+                    {"first_peer", peer_endpoint(pair->first, m_relay_port)},
+                    {"second_peer", peer_endpoint(pair->second, m_relay_port)},
+                    {"relay_mode", m_relay_port != 0},
                     {"both_assignments_sent", first_sent && second_sent}});
   }
 
@@ -394,9 +407,445 @@ private:
   PairingRegistry m_registry;
   std::map<ENetPeer*, bool> m_peer_has_ticket;
   std::uint64_t m_next_match_id{};
+  std::uint16_t m_relay_port{};
 };
 
-int run(const std::string& event_log_path, std::chrono::seconds ticket_timeout)
+std::int32_t read_be_i32(const std::uint8_t* data)
+{
+  const auto value = (static_cast<std::uint32_t>(data[0]) << 24) |
+                     (static_cast<std::uint32_t>(data[1]) << 16) |
+                     (static_cast<std::uint32_t>(data[2]) << 8) |
+                     static_cast<std::uint32_t>(data[3]);
+  return static_cast<std::int32_t>(value);
+}
+
+class BrowserInputTail
+{
+public:
+  BrowserInputTail(const std::string& path, EventLog& events)
+      : m_path(path), m_events(events)
+  {
+  }
+
+  void refresh(local_matchmaker::BrowserPadQueue& queue)
+  {
+    if (!m_enabled)
+      return;
+    std::ifstream input(m_path, std::ios::binary);
+    if (!input)
+      return;
+    input.seekg(static_cast<std::streamoff>(m_offset));
+    std::string added((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+    if (m_offset > kMaximumBytes || added.size() > kMaximumBytes - m_offset)
+    {
+      m_enabled = false;
+      reject("input log limit");
+      return;
+    }
+    m_offset += added.size();
+    const auto lines = m_lines.append(added);
+    if (!lines)
+    {
+      m_enabled = false;
+      reject("input line limit");
+      return;
+    }
+
+    for (const auto& line : *lines)
+    {
+      if (m_enabled)
+        process(line, queue);
+    }
+  }
+
+private:
+  void process(const std::string& line, local_matchmaker::BrowserPadQueue& queue)
+  {
+    std::istringstream stream(line);
+    std::string command;
+    std::string session;
+    if (!(stream >> command >> session))
+    {
+      reject("malformed line");
+      return;
+    }
+
+    if (command == "OPEN")
+    {
+      std::string extra;
+      if (stream >> extra || !queue.open_session(session))
+      {
+        reject("invalid session open");
+        return;
+      }
+      m_events.write({{"event", "browser_session_opened"}, {"session_id", session}});
+      return;
+    }
+    if (command == "CLOSE")
+    {
+      std::string extra;
+      if (stream >> extra || !queue.close_session(session))
+      {
+        reject("stale session close");
+        return;
+      }
+      m_events.write({{"event", "browser_session_closed"}, {"session_id", session}});
+      return;
+    }
+    if (command != "PAD")
+    {
+      reject("unknown browser input command");
+      return;
+    }
+
+    std::string frame_text;
+    std::string payload_hex;
+    std::string extra;
+    if (!(stream >> frame_text >> payload_hex) || (stream >> extra))
+    {
+      reject("malformed browser PAD input");
+      return;
+    }
+    std::int32_t frame{};
+    const auto [end, error] = std::from_chars(frame_text.data(),
+                                               frame_text.data() + frame_text.size(), frame);
+    const auto bytes = local_matchmaker::parse_pad_hex(payload_hex);
+    if (error != std::errc{} || end != frame_text.data() + frame_text.size() || !bytes ||
+        !queue.add(session, frame, *bytes))
+    {
+      reject("invalid, duplicate, out-of-order, stale, or over-limit browser PAD frame");
+      return;
+    }
+    m_events.write({{"event", "browser_pad_queued"},
+                    {"session_id", session},
+                    {"frame", frame},
+                    {"pad_hex", local_matchmaker::pad_hex(*bytes)}});
+  }
+
+  void reject(std::string_view reason)
+  {
+    m_events.write({{"event", "browser_input_rejected"}, {"reason", reason}});
+  }
+
+  static constexpr std::size_t kMaximumBytes = 64 * 1024;
+  const std::string m_path;
+  EventLog& m_events;
+  std::uintmax_t m_offset{};
+  local_matchmaker::BrowserInputLineBuffer m_lines;
+  bool m_enabled{true};
+};
+
+class SlippiPeerRelay
+{
+public:
+  SlippiPeerRelay(std::uint16_t port, EventLog& events, const std::string& input_path,
+                  const std::string& browser_event_path)
+      : m_events(events), m_input(input_path, events), m_browser_events(browser_event_path,
+                                                                        std::ios::app)
+  {
+    if (!m_browser_events)
+      throw std::runtime_error("cannot open local browser relay event log");
+    ENetAddress address{};
+    if (enet_address_set_host_ip(&address, kBindIp.data()) != 0)
+      throw std::runtime_error("invalid loopback Slippi relay bind address");
+    address.port = port;
+    m_host = enet_host_create(&address, 4, 3, 0, 0);
+    if (!m_host)
+      throw std::runtime_error("cannot bind loopback Slippi relay");
+    m_events.write({{"event", "peer_relay_started"},
+                    {"endpoint", "127.0.0.1:" + std::to_string(port) + "/udp"}});
+  }
+
+  ~SlippiPeerRelay() { stop(); }
+
+  void start()
+  {
+    if (m_thread.joinable())
+      throw std::runtime_error("Slippi peer relay was started twice");
+    m_thread = std::thread([this] { serve(); });
+  }
+
+  void stop()
+  {
+    m_stopping.store(true, std::memory_order_release);
+    if (m_thread.joinable())
+      m_thread.join();
+    if (m_host)
+    {
+      enet_host_destroy(m_host);
+      m_host = nullptr;
+    }
+  }
+
+private:
+  struct PendingPacket
+  {
+    std::vector<std::uint8_t> bytes;
+    std::uint8_t channel{};
+    enet_uint32 flags{};
+  };
+
+  int slot_for(const ENetPeer* peer) const
+  {
+    for (int slot = 0; slot < static_cast<int>(m_peers.size()); ++slot)
+    {
+      if (m_peers[slot] == peer)
+        return slot;
+    }
+    return -1;
+  }
+
+  void serve()
+  {
+    while (!m_stopping.load(std::memory_order_acquire) &&
+           !g_stopping.load(std::memory_order_acquire))
+    {
+      m_input.refresh(m_pad_queue);
+      ENetEvent event{};
+      int result = enet_host_service(m_host, &event, 2);
+      while (result > 0)
+      {
+        process(event);
+        result = enet_host_service(m_host, &event, 0);
+      }
+      enet_host_flush(m_host);
+    }
+    m_events.write({{"event", "peer_relay_stopped"},
+                    {"packets_forwarded", m_packets_forwarded},
+                    {"browser_frames_injected", m_browser_frames_injected},
+                    {"pending_packets_discarded", m_pending_discarded}});
+  }
+
+  void process(const ENetEvent& event)
+  {
+    switch (event.type)
+    {
+    case ENET_EVENT_TYPE_CONNECT:
+      on_connect(event.peer);
+      break;
+    case ENET_EVENT_TYPE_RECEIVE:
+      on_receive(event);
+      enet_packet_destroy(event.packet);
+      break;
+    case ENET_EVENT_TYPE_DISCONNECT:
+      on_disconnect(event.peer, event.data);
+      break;
+    default:
+      break;
+    }
+  }
+
+  void on_connect(ENetPeer* peer)
+  {
+    const auto slot = std::find(m_peers.begin(), m_peers.end(), nullptr);
+    if (slot == m_peers.end())
+    {
+      m_events.write({{"event", "peer_relay_rejected"}, {"reason", "session already has two peers"}});
+      enet_peer_disconnect(peer, 1);
+      return;
+    }
+    const auto index = static_cast<std::size_t>(std::distance(m_peers.begin(), slot));
+    m_peers[index] = peer;
+    m_events.write({{"event", "peer_relay_client_connected"}, {"slot", index}});
+    if (m_peers[0] && m_peers[1])
+    {
+      for (std::size_t source = 0; source < m_pending.size(); ++source)
+      {
+        auto& queued = m_pending[source];
+        while (!queued.empty())
+        {
+          auto packet = std::move(queued.front());
+          queued.pop_front();
+          m_pending_bytes[source] -= packet.bytes.size();
+          (void)send_to_peer(1 - static_cast<int>(source), packet.bytes, packet.channel,
+                             packet.flags);
+        }
+      }
+    }
+  }
+
+  void on_receive(const ENetEvent& event)
+  {
+    const auto slot = slot_for(event.peer);
+    if (slot < 0 || !event.packet)
+      return;
+
+    std::vector<std::uint8_t> bytes(event.packet->data,
+                                    event.packet->data + event.packet->dataLength);
+    if (bytes.size() >= 5 && bytes[0] == 0x82 && bytes[4] <= 1)
+    {
+      const auto player_port = static_cast<std::uint8_t>(bytes[4] + 1);
+      const auto other_slot = 1 - slot;
+      if (m_player_ports[other_slot] == player_port)
+      {
+        m_events.write({{"event", "peer_relay_rejected"},
+                        {"reason", "both ENet peers claimed the same Slippi player port"}});
+        enet_peer_disconnect(event.peer, 2);
+        return;
+      }
+      m_player_ports[slot] = player_port;
+      m_events.write({{"event", "peer_relay_player_identified"},
+                      {"slot", slot},
+                      {"player_port", player_port}});
+    }
+
+    if (bytes.size() >= local_matchmaker::kSlippiPadHeaderBytes && bytes[0] == 0x80)
+    {
+      const auto claimed_port = static_cast<std::uint8_t>(bytes[5] + 1);
+      if (m_player_ports[slot] != 0 && claimed_port != m_player_ports[slot])
+      {
+        m_events.write({{"event", "peer_relay_rejected"},
+                        {"reason", "PAD packet player port did not match its ENet peer"}});
+        enet_peer_disconnect(event.peer, 2);
+        return;
+      }
+      const auto replacements = m_pad_queue.replace_pad_packet(
+          bytes, static_cast<std::uint8_t>(m_player_ports[slot] - 1));
+      for (const auto& replacement : replacements)
+      {
+        ++m_browser_frames_injected;
+        write_browser_event({{"event", "pad_applied"},
+                             {"session_id", replacement.session_id},
+                             {"frame", replacement.pad.frame},
+                             {"pad_hex", local_matchmaker::pad_hex(replacement.pad.bytes)}});
+        m_events.write({{"event", "browser_pad_injected"},
+                        {"session_id", replacement.session_id},
+                        {"frame", replacement.pad.frame},
+                        {"pad_hex", local_matchmaker::pad_hex(replacement.pad.bytes)}});
+      }
+      if (m_player_ports[slot] == 2)
+        observe_peer_pad(bytes);
+    }
+
+    const auto flags = event.packet->flags &
+                       (ENET_PACKET_FLAG_RELIABLE | ENET_PACKET_FLAG_UNSEQUENCED |
+                        ENET_PACKET_FLAG_UNRELIABLE_FRAGMENT);
+    const auto other_slot = 1 - slot;
+    if (!m_peers[other_slot])
+    {
+      queue_before_pair(slot, std::move(bytes), event.channelID, flags);
+      return;
+    }
+    (void)send_to_peer(other_slot, bytes, event.channelID, flags);
+  }
+
+  void observe_peer_pad(const std::vector<std::uint8_t>& packet)
+  {
+    if (packet.size() < local_matchmaker::kSlippiPadHeaderBytes ||
+        (packet.size() - local_matchmaker::kSlippiPadHeaderBytes) %
+                local_matchmaker::kSlippiPadRecordBytes !=
+            0)
+    {
+      return;
+    }
+    const auto latest = read_be_i32(packet.data() + 1);
+    const auto count = (packet.size() - local_matchmaker::kSlippiPadHeaderBytes) /
+                       local_matchmaker::kSlippiPadRecordBytes;
+    if (latest < 1 || count > local_matchmaker::kMaximumBrowserPadFrames ||
+        count > static_cast<std::size_t>(latest))
+    {
+      return;
+    }
+    for (std::size_t index = 0; index < count; ++index)
+    {
+      const auto frame = latest - static_cast<std::int32_t>(index);
+      if (!m_pad_queue.wants_peer_observation(frame) || !m_pad_queue.mark_peer_observed(frame))
+        continue;
+      std::array<std::uint8_t, local_matchmaker::kSlippiPadRecordBytes> pad{};
+      const auto offset = local_matchmaker::kSlippiPadHeaderBytes +
+                          index * local_matchmaker::kSlippiPadRecordBytes;
+      std::copy_n(packet.begin() + offset, pad.size(), pad.begin());
+      const auto session = std::string(m_pad_queue.session_id());
+      write_browser_event({{"event", "peer_pad"},
+                           {"session_id", session},
+                           {"frame", frame},
+                           {"pad_hex", local_matchmaker::pad_hex(pad)}});
+      m_events.write({{"event", "browser_peer_pad_received"},
+                      {"session_id", session},
+                      {"frame", frame},
+                      {"pad_hex", local_matchmaker::pad_hex(pad)}});
+    }
+  }
+
+  void queue_before_pair(int slot, std::vector<std::uint8_t> bytes, std::uint8_t channel,
+                         enet_uint32 flags)
+  {
+    constexpr std::size_t kMaximumQueuedPackets = 256;
+    constexpr std::size_t kMaximumQueuedBytes = 1024 * 1024;
+    if (m_pending[slot].size() >= kMaximumQueuedPackets ||
+        m_pending_bytes[slot] + bytes.size() > kMaximumQueuedBytes)
+    {
+      ++m_pending_discarded;
+      m_events.write({{"event", "peer_relay_queue_overflow"}, {"slot", slot}});
+      enet_peer_disconnect(m_peers[slot], 3);
+      return;
+    }
+    m_pending_bytes[slot] += bytes.size();
+    m_pending[slot].push_back({std::move(bytes), channel, flags});
+  }
+
+  bool send_to_peer(int slot, const std::vector<std::uint8_t>& bytes, std::uint8_t channel,
+                    enet_uint32 flags)
+  {
+    if (slot < 0 || slot >= static_cast<int>(m_peers.size()) || !m_peers[slot])
+      return false;
+    ENetPacket* packet = enet_packet_create(bytes.data(), bytes.size(), flags);
+    if (!packet)
+      return false;
+    if (enet_peer_send(m_peers[slot], channel, packet) < 0)
+    {
+      enet_packet_destroy(packet);
+      return false;
+    }
+    ++m_packets_forwarded;
+    return true;
+  }
+
+  void on_disconnect(ENetPeer* peer, enet_uint32 reason)
+  {
+    const auto slot = slot_for(peer);
+    if (slot < 0)
+      return;
+    const auto other_slot = 1 - slot;
+    m_events.write({{"event", "peer_relay_client_disconnected"},
+                    {"slot", slot},
+                    {"reason", reason}});
+    m_peers[slot] = nullptr;
+    m_player_ports[slot] = 0;
+    if (m_peers[other_slot])
+      enet_peer_disconnect(m_peers[other_slot], reason);
+    for (auto& pending : m_pending)
+      pending.clear();
+    m_pending_bytes = {};
+    if (!m_pad_queue.session_id().empty())
+      m_pad_queue.close_session(m_pad_queue.session_id());
+  }
+
+  void write_browser_event(const Json& event)
+  {
+    m_browser_events << event.dump() << '\n';
+    m_browser_events.flush();
+  }
+
+  EventLog& m_events;
+  BrowserInputTail m_input;
+  local_matchmaker::BrowserPadQueue m_pad_queue;
+  std::ofstream m_browser_events;
+  ENetHost* m_host{};
+  std::array<ENetPeer*, 2> m_peers{};
+  std::array<std::uint8_t, 2> m_player_ports{};
+  std::array<std::deque<PendingPacket>, 2> m_pending;
+  std::array<std::size_t, 2> m_pending_bytes{};
+  std::thread m_thread;
+  std::atomic<bool> m_stopping{false};
+  std::uint64_t m_packets_forwarded{};
+  std::uint64_t m_browser_frames_injected{};
+  std::uint64_t m_pending_discarded{};
+};
+
+int run(const std::string& event_log_path, std::chrono::seconds ticket_timeout,
+        std::uint16_t relay_port, const std::string& browser_input_path,
+        const std::string& browser_event_path)
 {
   EventLog events(event_log_path);
   if (enet_initialize() != 0)
@@ -415,12 +864,25 @@ int run(const std::string& event_log_path, std::chrono::seconds ticket_timeout)
 
   HttpSink http_sink(events);
   http_sink.start();
+  std::unique_ptr<SlippiPeerRelay> peer_relay;
+  if (relay_port != 0)
+  {
+    peer_relay = std::make_unique<SlippiPeerRelay>(relay_port, events, browser_input_path,
+                                                   browser_event_path);
+    peer_relay->start();
+  }
   events.write({{"event", "service_started"},
                 {"matchmaking", "127.0.0.1:43113/udp"},
-                {"local_api_sink", "127.0.0.1:43114/tcp"}});
-  std::cout << "local matchmaking ready at 127.0.0.1:43113; local API sink at 127.0.0.1:43114\n";
+                {"local_api_sink", "127.0.0.1:43114/tcp"},
+                {"peer_relay", relay_port == 0
+                                    ? Json(nullptr)
+                                    : Json("127.0.0.1:" + std::to_string(relay_port) + "/udp")}});
+  std::cout << "local matchmaking ready at 127.0.0.1:43113; local API sink at 127.0.0.1:43114";
+  if (relay_port != 0)
+    std::cout << "; Slippi peer relay at 127.0.0.1:" << relay_port;
+  std::cout << '\n';
 
-  MatchmakingService service(host, events, ticket_timeout);
+  MatchmakingService service(host, events, ticket_timeout, relay_port);
   while (!g_stopping.load(std::memory_order_relaxed))
   {
     ENetEvent event{};
@@ -430,6 +892,8 @@ int run(const std::string& event_log_path, std::chrono::seconds ticket_timeout)
   }
 
   service.cancel_all();
+  if (peer_relay)
+    peer_relay->stop();
   http_sink.stop();
   enet_host_destroy(host);
   enet_deinitialize();
@@ -440,35 +904,82 @@ int run(const std::string& event_log_path, std::chrono::seconds ticket_timeout)
 
 int main(int argc, char** argv)
 {
-  if ((argc != 3 && argc != 5) || std::string_view(argv[1]) != "--event-log")
-  {
-    std::cerr << "usage: slippi-local-matchmaker --event-log PATH [--ticket-timeout-seconds N]\n";
-    return 2;
-  }
-
   auto timeout = kDefaultTicketTimeout;
-  if (argc == 5)
+  std::string event_log_path;
+  std::string browser_input_path;
+  std::string browser_event_path;
+  std::uint16_t relay_port = 0;
+  for (int index = 1; index < argc;)
   {
-    if (std::string_view(argv[3]) != "--ticket-timeout-seconds")
-      return 2;
-    unsigned parsed_seconds = 0;
-    const std::string_view value(argv[4]);
-    const auto [end, error] = std::from_chars(value.data(), value.data() + value.size(),
-                                              parsed_seconds);
-    if (error != std::errc{} || end != value.data() + value.size() || parsed_seconds < 1 ||
-        parsed_seconds > 120)
+    const std::string_view option(argv[index++]);
+    if (index >= argc)
     {
-      std::cerr << "ticket timeout must be between 1 and 120 seconds\n";
       return 2;
     }
-    timeout = std::chrono::seconds(parsed_seconds);
+    const std::string_view value(argv[index++]);
+    if (option == "--event-log")
+    {
+      if (!event_log_path.empty())
+        return 2;
+      event_log_path = value;
+    }
+    else if (option == "--ticket-timeout-seconds")
+    {
+      unsigned parsed_seconds = 0;
+      const auto [end, error] =
+          std::from_chars(value.data(), value.data() + value.size(), parsed_seconds);
+      if (error != std::errc{} || end != value.data() + value.size() || parsed_seconds < 1 ||
+          parsed_seconds > 120)
+      {
+        std::cerr << "ticket timeout must be between 1 and 120 seconds\n";
+        return 2;
+      }
+      timeout = std::chrono::seconds(parsed_seconds);
+    }
+    else if (option == "--relay-peer-port")
+    {
+      unsigned parsed_port = 0;
+      const auto [end, error] =
+          std::from_chars(value.data(), value.data() + value.size(), parsed_port);
+      if (error != std::errc{} || end != value.data() + value.size() || parsed_port < 41000 ||
+          parsed_port > 51999 || parsed_port == kMatchmakingPort ||
+          parsed_port == kLocalHttpPort)
+      {
+        std::cerr << "relay peer port must be a reserved loopback port\n";
+        return 2;
+      }
+      relay_port = static_cast<std::uint16_t>(parsed_port);
+    }
+    else if (option == "--browser-input-log")
+    {
+      browser_input_path = value;
+    }
+    else if (option == "--browser-event-log")
+    {
+      browser_event_path = value;
+    }
+    else
+    {
+      std::cerr << "unknown local matchmaker option\n";
+      return 2;
+    }
+  }
+
+  if (event_log_path.empty() ||
+      ((relay_port == 0) != browser_input_path.empty()) ||
+      ((relay_port == 0) != browser_event_path.empty()))
+  {
+    std::cerr << "usage: slippi-local-matchmaker --event-log PATH "
+                 "[--ticket-timeout-seconds N] "
+                 "[--relay-peer-port PORT --browser-input-log PATH --browser-event-log PATH]\n";
+    return 2;
   }
 
   std::signal(SIGINT, stop_signal);
   std::signal(SIGTERM, stop_signal);
   try
   {
-    return run(argv[2], timeout);
+    return run(event_log_path, timeout, relay_port, browser_input_path, browser_event_path);
   }
   catch (const std::exception& error)
   {
