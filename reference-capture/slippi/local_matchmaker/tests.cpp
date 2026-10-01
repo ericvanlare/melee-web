@@ -157,6 +157,7 @@ void test_browser_frame_replacement_is_exact_and_session_scoped()
             packet.begin() + local_matchmaker::kSlippiPadHeaderBytes + 16, 0x22);
   std::fill(packet.begin() + local_matchmaker::kSlippiPadHeaderBytes + 16, packet.end(), 0x33);
 
+  const auto original_packet = packet;
   const auto replacements = queue.replace_pad_packet(packet, 0);
   check(replacements.size() == 1 && replacements.front().pad.frame == 160,
         "the browser record should match its exact frame inside a PAD packet");
@@ -170,6 +171,19 @@ void test_browser_frame_replacement_is_exact_and_session_scoped()
   check(queue.wants_peer_observation(160), "the peer observation should be frame tagged");
   check(queue.mark_peer_observed(160) && !queue.mark_peer_observed(160),
         "peer PAD observations should be emitted once per target frame");
+
+  auto retransmission = original_packet;
+  check(queue.replace_pad_packet(retransmission, 0).empty(),
+        "retransmission must not double-count an applied frame");
+  check(retransmission == packet,
+        "retransmitted PAD records must retain the browser input bytes");
+  auto later_packet = original_packet;
+  later_packet[4] = 200;
+  queue.replace_pad_packet(later_packet, 0);
+  auto reordered_packet = original_packet;
+  queue.replace_pad_packet(reordered_packet, 0);
+  check(reordered_packet == packet,
+        "reordered packets after newer frames must retain the browser input");
 
   auto wrong_port = packet;
   wrong_port[5] = 1;

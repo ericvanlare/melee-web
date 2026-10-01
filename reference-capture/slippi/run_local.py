@@ -1680,6 +1680,16 @@ class PairRun:
                          description=f"{name} advancing {count} game source frames")
 
     def _pulse(self, name: str, button: str) -> None:
+        # Queued observations predate this input edge. Do not count them as
+        # the three source frames for which the button must remain held.
+        watcher = self.watchers[name]
+        for _ in range(4096):
+            ready, _, _ = select.select([watcher.socket], [], [], 0)
+            if not ready:
+                break
+            watcher.receive(0)
+        else:
+            raise RuntimeError(f"{name} source observation backlog did not drain")
         self.pads[name].set_button(button, True)
         self._wait_frames(name, 3)
         self.pads[name].set_button(button, False)

@@ -73,6 +73,7 @@ bool BrowserPadQueue::open_session(std::string session_id)
   m_frames.clear();
   m_target_frames.clear();
   m_observed_frames.clear();
+  m_applied_frames.clear();
   return true;
 }
 
@@ -86,6 +87,7 @@ bool BrowserPadQueue::close_session(std::string_view session_id)
   m_frames.clear();
   m_target_frames.clear();
   m_observed_frames.clear();
+  m_applied_frames.clear();
   return true;
 }
 
@@ -148,17 +150,12 @@ std::vector<BrowserPadReplacement> BrowserPadQueue::replace_pad_packet(
 
     const auto offset = kSlippiPadHeaderBytes + record_index * kSlippiPadRecordBytes;
     std::copy(found->second.begin(), found->second.end(), packet.begin() + offset);
-    replacements.push_back({m_session_id, {frame, found->second}});
-    m_frames.erase(found);
+    // Redundant and reordered packets must carry the same browser PAD bytes.
+    // Report application once, but retain the bounded session payload.
+    if (m_applied_frames.emplace(frame, true).second)
+      replacements.push_back({m_session_id, {frame, found->second}});
   }
 
-  if (record_count > 0)
-  {
-    const auto oldest_frame = latest_frame - static_cast<std::int32_t>(record_count) + 1;
-    auto stale = m_frames.begin();
-    while (stale != m_frames.end() && stale->first < oldest_frame)
-      stale = m_frames.erase(stale);
-  }
   return replacements;
 }
 

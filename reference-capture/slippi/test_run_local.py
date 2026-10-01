@@ -2,8 +2,10 @@
 """Focused checks for the local Slippi scenario's state and network gates."""
 
 import unittest
+from unittest.mock import Mock, patch
 
 from run_local import (
+    PairRun,
     _menu_state,
     _menu_state_observation,
     _mario_cursor_confirmed,
@@ -24,6 +26,23 @@ from run_local import (
 
 
 class LocalScenarioGateTests(unittest.TestCase):
+    def test_button_pulse_drains_pre_edge_observations(self):
+        run = PairRun.__new__(PairRun)
+        watcher = Mock()
+        pad = Mock()
+        events = []
+        watcher.receive.side_effect = lambda timeout: events.append("old frame")
+        pad.set_button.side_effect = lambda button, held: events.append((button, held))
+        run.watchers = {"p1": watcher}
+        run.pads = {"p1": pad}
+        run._wait_frames = lambda name, count: events.append(("wait", count))
+        with patch("run_local.select.select", side_effect=[
+            ([watcher.socket], [], []), ([watcher.socket], [], []), ([], [], [])
+        ]):
+            run._pulse("p1", "A")
+        self.assertEqual(events, ["old frame", "old frame", ("A", True),
+                                  ("wait", 3), ("A", False), ("wait", 7)])
+
     def test_gameplay_controller_port_uses_local_si_slot_for_both_clients(self):
         self.assertEqual(_gameplay_controller_port("p1"), 1)
         self.assertEqual(_gameplay_controller_port("p2"), 1)

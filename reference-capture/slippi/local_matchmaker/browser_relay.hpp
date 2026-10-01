@@ -62,6 +62,7 @@ private:
   std::map<std::int32_t, std::array<std::uint8_t, kSlippiPadRecordBytes>> m_frames;
   std::map<std::int32_t, bool> m_target_frames;
   std::map<std::int32_t, bool> m_observed_frames;
+  std::map<std::int32_t, bool> m_applied_frames;
 };
 
 std::optional<std::array<std::uint8_t, kSlippiPadRecordBytes>> parse_pad_hex(
