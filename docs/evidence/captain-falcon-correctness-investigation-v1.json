@@ -1,0 +1,125 @@
+{
+  "schema": "melee-web-captain-falcon-correctness-investigation-v1",
+  "date": "2026-09-29",
+  "status": "bounded investigation; no runtime fix demonstrated",
+  "scope": "Original CPU9 mirror, source/browser whole-session state comparison, human-P1 versus CPU9-P2 capture and replay, and crash classification. This is not fighter admission, visual/audio equivalence, performance acceptance, or evidence about the user's unknown browser/device.",
+  "repository_change": {
+    "purpose": "Allow strict whole-session state comparison for valid two-player sessions. The prior comparator required four fighter heads and rejected the requested 1v1 evidence before comparing it.",
+    "runtime_falcon_fix": false,
+    "regression_coverage": [
+      "two active fighters compare successfully",
+      "one active fighter is rejected",
+      "noncontiguous fighter heads are rejected",
+      "browser fighter counts outside two through four are rejected"
+    ]
+  },
+  "retained_source_identity": {
+    "game": "GALE01 USA revision 2",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "dolphin_revision": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "dolphin_binary_sha256": "4d9ef9c6419e7b415dcf24600f9a7b96ab20b194743a6ee7728cd5d03574e5c1",
+    "capture_root": "AgentStorage/melee-web/runs"
+  },
+  "cpu9_mirror": {
+    "capture_id": "captain-falcon-cpu-reference-20260928-20260928-202411-f0f2e0e1/reference-05",
+    "scenario": "Two distinct-costume Captain Falcons, both CPU9, four stocks, no timer, Final Destination; three natural matches, Results returns to CSS and re-entry/teardown checked.",
+    "completed": true,
+    "capture_sha256": "f89a61dfae92cc086a7379d15300ce6400f6939fb33f4591a10c1214ae041f7f",
+    "report_sha256": "66fd7d240f56de12c2986cea221e25838aede3c89f5532ad9aa60c0a0ef725f5",
+    "recipe_sha256": "440f308e611a2715ef92b304fcf3e5613768f210f4799b3d64d5703c2881ec44",
+    "controller_input_sha256": "6b5f582b83c09649a5c3c51959bc6dfa9cb59bc3262910c0c5477cbc4f4d92a3",
+    "input_intentions_sha256": "df8f3fae5918eb52726bfd191feb7d880bec908f1a273b181206ee34f812f5fd",
+    "run_context_sha256": "d3bfbd00cd156ff0504a67223e32365b9b49cf13492aab1de7a17e4146b788b7",
+    "source_browser_comparison": {
+      "report": "browser-replay-02/whole-session-comparison-two-active.json",
+      "report_sha256": "843ce6931c6e1dc438c6561504b136cf064a520673f767ce23e3728a6bfd0377",
+      "scope": "Exact consumed scene/input order and declared RNG, match-frame, PAD snapshot, and fighter state; no timing, draw cadence, pixels, PCM, or admission claim.",
+      "status": "diverged",
+      "matched_frames_before_divergence": 25323,
+      "first_difference": {
+        "global_frame_index": 25323,
+        "match": 3,
+        "match_local_frame": 5691,
+        "source_tick": 5814,
+        "field": "fighters[1].position_bits[1]",
+        "source_bits": "c0286058",
+        "browser_bits": "c0286057",
+        "delta": "one ULP"
+      },
+      "root_cause": "unresolved"
+    },
+    "browser_replay": {
+      "report": "browser-replay-02/retail-browser-report.json",
+      "report_sha256": "6d8385e9b4d0cddc1902c96c6dc3ea0095a2e2f8f56a000c87ae12807495734c",
+      "frames": 29185,
+      "source_match_complete": true,
+      "reported_final_scene": "CSS",
+      "page_errors": [],
+      "scope": "Headless state capture; not a claim of exact session agreement, pixel/PCM equivalence, or performance."
+    }
+  },
+  "human_vs_cpu9": {
+    "capture_id": "captain-falcon-human-vs-cpu9-20260929-20260928-220332-b267448f/capture-02",
+    "scenario": "Human P1 Captain Falcon versus CPU9 P2 Captain Falcon, distinct costumes, four stocks, no timer, Final Destination; ordinary scripted controller input for movement, jumps, shields, grab/throw attempt, attacks/specials, dodge/offstage, damage, stock loss, respawn, Results and CSS re-entry.",
+    "source_capture_completed": true,
+    "natural_end": true,
+    "process_exit": 0,
+    "events": 69429,
+    "capture_sha256": "1da866931480355397b0b7955e49a1a17d68b608d8ff855d0e67ce4e59bf346d",
+    "capture_report_sha256": "e0da6d631bd6de06a4abc6ba67c6ebc5b84314fbc5b87596bc8686e9ea0c9f56",
+    "controller_input_sha256": "2f12c54cdbf5a37061a3f047874054743a613de03695b895be2f3a8b8926e20a",
+    "input_intentions_sha256": "f03952f881f44ea9f33e8a92953b551d94b6cccde8fdd65b169a80bc8aea0b18",
+    "recipe_sha256": "29f6dbbe9e8c8426d2971d9adef81cdfd31f049f4828a09a20f76246a0780719",
+    "browser_replay": {
+      "report": "capture-02/browser-replay-01/retail-browser-report.json",
+      "report_sha256": "fc00c118f062884a1218001c09e643d296c3952c71a111909b419ca8eef44e15",
+      "comparison_report": "capture-02/browser-replay-01/whole-session-comparison.json",
+      "comparison_sha256": "050201dbfa0291f9ee696c794c0913a950064f66c8c5b1266f7cfa06a31e78bc",
+      "status": "diverged",
+      "matched_source_frames": 6368,
+      "first_difference": {
+        "global_frame_index": 6368,
+        "source_expected_scene": "CSS",
+        "browser_observed_scene": "Prize",
+        "boundary": "after the first Results screen, before input consumption"
+      },
+      "browser_errors": [
+        "No page exception or Wasm trap was observed. A net::ERR_ABORTED request was logged during teardown after the diagnostic scene mismatch.",
+        "Native menus unloaded during harness cleanup."
+      ]
+    }
+  },
+  "crash_assessment": {
+    "browser_or_process_crash_reproduced": false,
+    "native_abort_reproduced": false,
+    "wasm_trap_reproduced": false,
+    "user_report_attributed": false,
+    "missing_reproduction_details": [
+      "browser and version",
+      "device and operating system",
+      "stage and match settings",
+      "approximate sequence before failure",
+      "visible error text or crash artifact"
+    ],
+    "physical_device_and_foreground_checks": "not run"
+  },
+  "validation": {
+    "commit": "a944c8b6287c5d9aeedf1a98fe93149bfab541a1",
+    "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+    "result": "passed",
+    "tests": 1549,
+    "skipped": 97,
+    "failures": 0,
+    "retained_log": "work/captain-falcon-investigation/full-suite-after-two-player-comparator.log",
+    "log_sha256": "1812c197ed29f7553e9aaf6ec49035f8bbf00dfc758483b58283a775a2e3e7d7"
+  },
+  "exclusions": [
+    "Falcon runtime correctness fix",
+    "resolution of the exact source/browser position divergence",
+    "resolution of the human replay Results-to-Prize route divergence",
+    "reproduction or attribution of the user-reported crash",
+    "physical controller/device/browser stability",
+    "pixels, PCM fidelity, and live performance"
+  ]
+}

@@ -26,7 +26,7 @@ def _word(raw, offset, value):
     struct.pack_into(">I", raw, offset, value)
 
 
-def _state_slices(motion=80, tick=0, rng=0x12345678):
+def _state_slices(motion=80, tick=0, rng=0x12345678, fighter_count=4):
     slices = [
         {"name": "pad_snapshot", "address": 0x804C1F84, "size": 0x358,
          "hex": _raw_pad_snapshot().hex()},
@@ -39,7 +39,7 @@ def _state_slices(motion=80, tick=0, rng=0x12345678):
         {"name": "match_frame", "address": 0x8046B6C4, "size": 4,
          "hex": tick.to_bytes(4, "big").hex()},
     ]
-    for slot in range(4):
+    for slot in range(fighter_count):
         pointer = 0x80580000 + slot * 0x3000
         entity = 0x80680000 + slot * 0x100
         slices.append({"name": "player_entities", "flags": slot,
@@ -101,12 +101,12 @@ def _profile_slices():
     ]
 
 
-def _source_rows():
+def _source_rows(fighter_count=4):
     consume = _pad_consume(0, 0x10, 0)
     consume["seq"] = 8
     consume["source_tick"] = 0
     consume["draw_ordinal"] = 8
-    state_slices = _state_slices()
+    state_slices = _state_slices(fighter_count=fighter_count)
     css_slices = [item for item in state_slices
                   if item["name"] in {"pad_snapshot", "rng_pointer", "rng_value"}]
     css_slices += _profile_slices()
@@ -229,6 +229,46 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertEqual(comparator.setup_count, 1)
             self.assertEqual(comparator.compared, 1)
             self.assertEqual(comparator.match_compared, 1)
+
+    def test_source_collector_compares_the_two_active_fighters_in_a_versus_match(self):
+        source, pads, _, _ = _source_rows(fighter_count=2)
+        state_slices = source[9]["payload"]["slices"]
+        state = _state_from_payload({"slices": state_slices}, "two-player fixture")
+        state.update(_snapshot_values({"slices": state_slices}, "two-player fixture"))
+        self.assertEqual([fighter["slot"] for fighter in state["fighters"]], [0, 1])
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl"
+            _browser_trace(path, pads, state)
+            comparator, _ = _run_source(path, source, pads)
+            self.assertEqual(comparator.setup_count, 1)
+            self.assertEqual(comparator.match_compared, 1)
+
+    def test_source_collector_rejects_fewer_than_two_or_noncontiguous_fighter_heads(self):
+        with self.assertRaises(ValueError):
+            _state_from_payload({"slices": _state_slices(fighter_count=1)}, "one-player fixture")
+        noncontiguous = _state_slices(fighter_count=2)
+        next(item for item in noncontiguous if item["name"] == "fighter_head" and item["flags"] == 1)["flags"] = 2
+        with self.assertRaises(ValueError):
+            _state_from_payload({"slices": noncontiguous}, "noncontiguous fixture")
+
+    def test_browser_trace_rejects_fighter_counts_outside_two_to_four(self):
+        source, pads, _, _ = _source_rows(fighter_count=2)
+        state_slices = source[9]["payload"]["slices"]
+        state = _state_from_payload({"slices": state_slices}, "two-player fixture")
+        state.update(_snapshot_values({"slices": state_slices}, "two-player fixture"))
+        alterations = (
+            lambda setup, frame: (setup["fighters"].pop(), frame["fighters"].pop()),
+            lambda setup, frame: (setup["fighters"].extend([*copy.deepcopy(frame["fighters"]),
+                                                               *copy.deepcopy(frame["fighters"])]),
+                                  frame["fighters"].extend([*copy.deepcopy(frame["fighters"]),
+                                                            *copy.deepcopy(frame["fighters"])])),
+        )
+        for alter in alterations:
+            with self.subTest(alter=alter), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "trace.jsonl"
+                _browser_trace(path, pads, state, alter=alter)
+                with self.assertRaises(ValueError):
+                    _run_source(path, source, pads)
 
     def test_v9_match_entry_binds_browser_to_that_matches_setup(self):
         source, pads, _, _ = _source_rows()
