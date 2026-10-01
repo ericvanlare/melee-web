@@ -136,6 +136,45 @@
     },
     "storage": "external NVMe; absolute operator path intentionally excluded from Git"
   },
+  "review_followup": {
+    "all_process_groups_released": true,
+    "browser_result": "passed",
+    "changes": [
+      "Retain the bounded session PAD mapping so redundant/reordered packets preserve browser bytes; emit application evidence once per frame.",
+      "Drain queued source observations before button press so pre-input frames cannot release the pulse prematurely."
+    ],
+    "consumed_frames": 24,
+    "date": "2026-09-30",
+    "focused_checks": {
+      "browser_service_tests": "7 passed",
+      "ctest": "3/3 passed",
+      "scenario_tests": "16 passed"
+    },
+    "hashes": {
+      "browser-pad-inputs.log": "dbcf98aff88c1301577c4f731ffc06e0e81561effd33d2100d995c8b212023fb",
+      "browser-relay-events.jsonl": "ddd881e7e46f9008741d23b90c7cb09ac30df0a0f156a915bfd57fce33f5d0f3",
+      "browser/browser-evidence.json": "ccae8faedff566114df0077f00cf9c98dd99e09500bb7adee68f2546c8af2905",
+      "evidence.json": "241cb8b2b7e1114d0b27957f805e9e362c5ebf66f24d11a9117699fe5054e02c"
+    },
+    "implementation_commit": "d82a4d8",
+    "implementation_file_hashes": {
+      "local_matchmaker/browser_relay.cpp": "048223303704c1008931da541c0ceb4fbf34f23ca6275307f28c19a55ed08105",
+      "local_matchmaker/browser_relay.hpp": "85b36ef65567cd7b3e8ea40e2f3c75e363e2494dc438732985111e5adc896a7d",
+      "local_matchmaker/tests.cpp": "8ae3d8d05d8716889b81e97a52bfe78e209ecd2097028b4de081171bfdc667cf",
+      "run_local.py": "559651294445ddbbc14af1f6a3e48ce15d83bc1e0c85c34de94857498becacc1",
+      "test_run_local.py": "1a5011441dbe0dd5a9518137951db40ab1929387779c491fab043c604b79dc7b"
+    },
+    "limits": "Same bounded input probe scope as original receipt; no browser gameplay, rollback, real-network impairment, full match or rematch claim.",
+    "private_profiles_removed": true,
+    "result": "input_probe_complete",
+    "retained_failures": [
+      "r1: missing explicitly selected profile scratch directory; no game validation.",
+      "r2: P2 ticket acknowledgement timed out; pre-edge observation backlog could shorten button hold.",
+      "r3: reached browser launch, failed because supplied Node executable path was absent; corrected operator path for r4."
+    ],
+    "returned_peer_frames": 24,
+    "run_id": "pr113-review-retransmission-20260930-r4"
+  },
   "runtime": {
     "all_observed_network_destinations_loopback_only": true,
     "cleanup": [
