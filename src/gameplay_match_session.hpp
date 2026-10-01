@@ -38,6 +38,7 @@ public:
     int hud_damage(unsigned player) const;
     uint32_t random_seed() const;
     int fighter_kind(unsigned index) const;
+    const StartMeleeData& start_data() const;
     MeleeWebMatchStats player_stats(unsigned index) const;
     MeleeWebAudio* audio() const;
     bool advance_construction();

@@ -2471,6 +2471,36 @@ diff --git a/src/melee/it/kinds/itlinkhookshot.c b/src/melee/it/kinds/itlinkhook
  
  s32 it_802A5320(ItemLink* link_0, Vec3* arg1, itLinkHookshotAttributes* attr,
                  Fighter* fp)
+@@ -1746,2 +1746,7 @@
++#ifdef TARGET_PC
++#define IT_HOOKSHOT_NORMALIZE_678C melee_web_hookshot_normalize
++#else
++#define IT_HOOKSHOT_NORMALIZE_678C it_802A3C98
++#endif
+ s32 it_802A678C(ItemLink* link_0, Vec3* arg1, itLinkHookshotAttributes* arg2,
+                 f32 arg8)
+@@ -1758,13 +1763,13 @@
+     while (link_1 != NULL && !link_0->x2C_b0) {
+         link_0 = link_1;
+         link_1 = link_0->prev;
+     }
+ 
+-    len = it_802A3C98(&link_0->pos, arg1, &vec);
++    len = IT_HOOKSHOT_NORMALIZE_678C(&link_0->pos, arg1, &vec);
+ 
+     while (link_1 != NULL && (arg8 > len)) {
+         link_0->x2C_b0 = 0;
+-        len = it_802A3C98(&link_1->pos, arg1, &vec);
++        len = IT_HOOKSHOT_NORMALIZE_678C(&link_1->pos, arg1, &vec);
+         link_0 = link_1;
+         link_1 = link_1->prev;
+     }
+@@ -1780,3 +1785,4 @@
+     return 1;
+ }
++#undef IT_HOOKSHOT_NORMALIZE_678C
+ 
+ void it_802A6944(Item* item, f32 scl)
 diff --git a/src/melee/it/kinds/itcoin.c b/src/melee/it/kinds/itcoin.c
 index 066959e..3f313a9 100644
 --- a/src/melee/it/kinds/itcoin.c
@@ -2991,10 +3021,116 @@ diff --git a/src/melee/lb/lbaudio_ax.c b/src/melee/lb/lbaudio_ax.c
 +
 +#endif
 diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
-index 0e13b1a..bf76903 100644
+index 0e13b1a..ec16112 100644
 --- a/src/melee/lb/lbcollision.c
 +++ b/src/melee/lb/lbcollision.c
-@@ -2130,8 +2130,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
+@@ -18,6 +18,9 @@
+ #include <sysdolphin/baselib/mtx.h>
+ #include <sysdolphin/baselib/state.h>
+ #include <sysdolphin/baselib/tev.h>
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_cpu_observation.h"
++#endif
+ 
+ /* 006E58 */ static bool
+ lbColl_80006E58(Vec3* hit_start, Vec3* hit_end, Vec3* hurt_start,
+@@ -1479,6 +1482,7 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
+     Vec3 normalize_e;
+     Vec3 normal_x;
+     Vec3 multi_mtx;
++    /* Preserve the two adjacent sqrtf scratch words inside the array. */
+     volatile float sqrt_tmp[2];
+ 
+     diff_cb.x = c->x - b->x;
+@@ -1497,7 +1501,7 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
+         PSMTXMultVec(arg1, &multi_mtx, &multi_mtx);
+ 
+         dist = sqrDistance(&normal_x, &multi_mtx);
+-        dist = sqrtf_store(dist, &sqrt_tmp[0]);
++        dist = sqrtf_store(dist, &sqrt_tmp[1]);
+ 
+         offset_dist = dist + dist_offset;
+ 
+@@ -1508,8 +1512,14 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
+         dot_diff_cb = diff_cb.x * diff_cb.x + diff_cb.y * diff_cb.y +
+                       diff_cb.z * diff_cb.z;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++        int quadratic_intermediates_valid;
++#endif
+         if (approximatelyZero(dot_diff_cb)) {
+             scl = 0.0f;
++#if defined(MELEE_WEB_GAMEPLAY)
++            quadratic_intermediates_valid = 0;
++#endif
+         } else {
+             n0 = 2.0f * diff_cb.x * diff_ba.x + 2.0f * diff_cb.y * diff_ba.y +
+                  2.0f * diff_cb.z * diff_ba.z;
+@@ -1524,9 +1534,10 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
+                 n1 = 0.0f;
+             }
+ 
+-            // The second sqrtf spill is allocated just below the scratch
+-            // array.
+-            scl = (-n0 - sqrtf_store(n1, sqrt_tmp - 1)) / (2.0f * dot_diff_cb);
++            scl = (-n0 - sqrtf_store(n1, &sqrt_tmp[0])) / (2.0f * dot_diff_cb);
++#if defined(MELEE_WEB_GAMEPLAY)
++            quadratic_intermediates_valid = 1;
++#endif
+         }
+ 
+         normalize_e.x = scl * diff_cb.x + b->x - a->x;
+@@ -1539,6 +1550,49 @@ void lbColl_800077A0(Vec3* a, MtxPtr arg1, Vec3* b, Vec3* c, Vec3* d, Vec3* e,
+         d->x = dist * e->x + a->x;
+         d->y = dist * e->y + a->y;
+         d->z = dist * e->z + a->z;
++#if defined(MELEE_WEB_GAMEPLAY)
++        if (melee_web_cpu_observation_lb_collision_probe_active()) {
++            MeleeWebLbCollProbe probe = {0};
++            probe.a_address = (uintptr_t) a;
++            probe.matrix_address = (uintptr_t) arg1;
++            probe.b_address = (uintptr_t) b;
++            probe.c_address = (uintptr_t) c;
++            probe.d_address = (uintptr_t) d;
++            probe.e_address = (uintptr_t) e;
++            probe.angle_address = (uintptr_t) angle;
++            probe.a[0] = a->x; probe.a[1] = a->y; probe.a[2] = a->z;
++            for (int row = 0; row < 3; ++row)
++                for (int column = 0; column < 4; ++column)
++                    probe.matrix[row * 4 + column] = arg1[row][column];
++            probe.b[0] = b->x; probe.b[1] = b->y; probe.b[2] = b->z;
++            probe.c[0] = c->x; probe.c[1] = c->y; probe.c[2] = c->z;
++            probe.radius = x; probe.distance_offset = dist_offset;
++            probe.transformed_radius[0] = normal_x.x;
++            probe.transformed_radius[1] = normal_x.y;
++            probe.transformed_radius[2] = normal_x.z;
++            probe.transformed_origin[0] = multi_mtx.x;
++            probe.transformed_origin[1] = multi_mtx.y;
++            probe.transformed_origin[2] = multi_mtx.z;
++            probe.diff_cb[0] = diff_cb.x; probe.diff_cb[1] = diff_cb.y;
++            probe.diff_cb[2] = diff_cb.z;
++            probe.diff_ba[0] = diff_ba.x; probe.diff_ba[1] = diff_ba.y;
++            probe.diff_ba[2] = diff_ba.z;
++            probe.distance = dist; probe.offset_distance = offset_dist;
++            probe.dot_diff_cb = dot_diff_cb; probe.scale = scl;
++            probe.branch = quadratic_intermediates_valid
++                ? MELEE_WEB_LB_COLL_BRANCH_QUADRATIC
++                : MELEE_WEB_LB_COLL_BRANCH_NEAR_ZERO;
++            if (quadratic_intermediates_valid) {
++                probe.n0 = n0; probe.ba_dot = ba_dot; probe.n1 = n1;
++            }
++            probe.normalize_e[0] = normalize_e.x; probe.normalize_e[1] = normalize_e.y;
++            probe.normalize_e[2] = normalize_e.z;
++            probe.normal[0] = e->x; probe.normal[1] = e->y; probe.normal[2] = e->z;
++            probe.collision_position[0] = d->x; probe.collision_position[1] = d->y;
++            probe.collision_position[2] = d->z; probe.angle = *angle;
++            melee_web_cpu_observation_lb_collision_probe(&probe);
++        }
++#endif
+     } else {
+         *angle = M_PI;
+         e->z = 0.0f;
+@@ -2130,8 +2184,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
      PSMTXConcat(sp44, sp74, sp74);
      GXSetCullMode(GX_CULL_BACK);
      GXClearVtxDesc();
@@ -3011,7 +3147,7 @@ index 0e13b1a..bf76903 100644
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2143,8 +2151,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
+@@ -2143,8 +2205,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
      GXLoadNrmMtxImm(spD4, 0);
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      GXClearVtxDesc();
@@ -3028,7 +3164,7 @@ index 0e13b1a..bf76903 100644
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2157,8 +2173,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
+@@ -2157,8 +2227,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      if (!isSmall(var_f31)) {
          GXClearVtxDesc();
@@ -3045,7 +3181,7 @@ index 0e13b1a..bf76903 100644
          GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
          GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
          GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2259,8 +2283,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
+@@ -2259,8 +2337,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
      PSMTXConcat(arg0, sp78, sp78);
      GXSetCullMode(GX_CULL_BACK);
      GXClearVtxDesc();
@@ -3062,7 +3198,7 @@ index 0e13b1a..bf76903 100644
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2272,8 +2304,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
+@@ -2272,8 +2358,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
      GXLoadNrmMtxImm(spD8, 0);
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      GXClearVtxDesc();
@@ -3079,7 +3215,7 @@ index 0e13b1a..bf76903 100644
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2286,8 +2326,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
+@@ -2286,8 +2380,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      if (!isSmall(var_f31)) {
          GXClearVtxDesc();
@@ -4756,7 +4892,7 @@ index 4a66512..2e85ce4 100644
  
  TextKerning* mnCharSel_8025BC20(TextKerning* arg0, u32 arg1)
  {
-@@ -2032,14 +2032,14 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
+@@ -2032,14 +2032,13 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
  {
      s32 icon_idx;
      s32 icon_offset;
@@ -4767,9 +4903,7 @@ index 4a66512..2e85ce4 100644
          s32 temp = HSD_Randi(0x19);
          icon_idx = temp;
          icon_offset = getIconOffset(icon_idx);
--    } while (icons[icon_idx].state == 0);
-+    } while (icons[icon_idx].state == 0 ||
-+             !MELEE_WEB_MENU_CHARACTER_AVAILABLE(icons[icon_idx].char_kind));
+     } while (icons[icon_idx].state == 0);
  
      mnCharSel_804D6CB0->vs.start.players[getPlayerForDoor(door)].ckind =
          (&icons[0].char_kind)[icon_offset];
@@ -10577,3 +10711,303 @@ diff --git a/src/melee/gm/gmopeningmode.c b/src/melee/gm/gmopeningmode.c
 +    return 1;
 +}
 +#endif
+diff --git a/src/melee/ft/ftcoll.c b/src/melee/ft/ftcoll.c
+index 105286c..12dec5a 100644
+--- a/src/melee/ft/ftcoll.c
++++ b/src/melee/ft/ftcoll.c
+@@ -45,6 +45,12 @@
+ #include <sysdolphin/baselib/gobj.h>
+ #include <sysdolphin/baselib/random.h>
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++extern void melee_web_cpu_observation_shield_overlap(
++    const char*, const Item*, const HitCapsule*, const Fighter*, const void*, int,
++    float, float, float, int, const Vec3*, float);
++#endif
++
+ /// @todo .sdata2 order hack
+ #ifdef MUST_MATCH
+ static void sdata2_order(void)
+@@ -2262,19 +2276,51 @@ void ftColl_8007925C(Fighter_GObj* gobj)
+                 goto catch_elem_path;
+             }
+ 
+-            if (lbColl_80007BCC(hurt, &fp->shield_hit,
+-                    ftCommon_8007F804(fp), var_r22, item->scl,
+-                    fp->x34_scale.y, fp->cur_pos.z))
++            void* shield_transform = ftCommon_8007F804(fp);
++#if defined(MELEE_WEB_GAMEPLAY)
++            melee_web_cpu_observation_shield_overlap(
++                "entry", item, hurt, fp, shield_transform, var_r22, item->scl,
++                fp->x34_scale.y, fp->cur_pos.z, -1, NULL, 0.0f);
++#endif
++            const int shield_overlap = lbColl_80007BCC(
++                hurt, &fp->shield_hit, shield_transform, var_r22, item->scl,
++                fp->x34_scale.y, fp->cur_pos.z);
++#if defined(MELEE_WEB_GAMEPLAY)
++            melee_web_cpu_observation_shield_overlap(
++                "return", item, hurt, fp, shield_transform, var_r22, item->scl,
++                fp->x34_scale.y, fp->cur_pos.z, shield_overlap, NULL, 0.0f);
++#endif
++            if (shield_overlap)
+             {
++#if defined(MELEE_WEB_GAMEPLAY)
++                int shield_collision_outputs_valid = 0;
++#endif
+                 if (!(u8) fp->x221B_b2) {
+                     if ((u8) hurt->x42_b3 || (u8) fp->x221B_b1) {
+                         lbColl_80007DD8(hurt, &fp->shield_hit,
+                             ftCommon_8007F804(fp), &coll_pos,
+                             &coll_dist, item->scl);
++#if defined(MELEE_WEB_GAMEPLAY)
++                        shield_collision_outputs_valid = 1;
++#endif
+                     }
+                 }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++                melee_web_cpu_observation_shield_overlap(
++                    "assignment_entry", item, hurt, fp, shield_transform, var_r22,
++                    item->scl, fp->x34_scale.y, fp->cur_pos.z, shield_overlap,
++                    shield_collision_outputs_valid ? &coll_pos : NULL,
++                    shield_collision_outputs_valid ? coll_dist : 0.0f);
++#endif
+                 ftColl_80077688(item, hurt, fp, &coll_pos, coll_dist);
++#if defined(MELEE_WEB_GAMEPLAY)
++                melee_web_cpu_observation_shield_overlap(
++                    "assignment_return", item, hurt, fp, shield_transform, var_r22,
++                    item->scl, fp->x34_scale.y, fp->cur_pos.z, shield_overlap,
++                    shield_collision_outputs_valid ? &coll_pos : NULL,
++                    shield_collision_outputs_valid ? coll_dist : 0.0f);
++#endif
+                 continue;
+             }
+ 
+diff --git a/src/melee/ft/ftcpuattack.c b/src/melee/ft/ftcpuattack.c
+index 7bd2973..cf0bd0b 100644
+--- a/src/melee/ft/ftcpuattack.c
++++ b/src/melee/ft/ftcpuattack.c
+@@ -26,6 +26,8 @@
+ #include <sysdolphin/baselib/gobj.h>
+ #include <sysdolphin/baselib/random.h>
+ 
++void melee_web_cpu_observation_source_event(const char*, const Fighter*, HSD_GObj*);
++
+ typedef struct ftCo_AttackEntry {
+     /* +00 */ s32 cmd;
+     /* +04 */ s32 x04;
+@@ -2901,14 +2903,18 @@ int ftCo_800BB9B4(Fighter* fp)
+ 
+     PAD_STACK(0x10);
+ 
++    melee_web_cpu_observation_source_event("cpu_item_scan_entry", fp, NULL);
++
+     temp_r31->xF8_b12 = false;
+     temp_r31->xF0 = NULL;
+     temp_r31->xF4 = NULL;
+ 
+     if (ftCo_800A1C44(fp)) {
++        melee_web_cpu_observation_source_event("cpu_item_scan_return_ineligible", fp, NULL);
+         return temp_r31->xF8_b12;
+     }
+     if (fp->kind == FTKIND_GKOOPS) {
++        melee_web_cpu_observation_source_event("cpu_item_scan_return_gkoops", fp, NULL);
+         return temp_r31->xF8_b12;
+     }
+ 
+@@ -2932,12 +2938,14 @@ int ftCo_800BB9B4(Fighter* fp)
+         temp_r31->xF8_b12 = ftCo_800BB104(fp, temp_r28_2, &sp24, temp_f31);
+         if (temp_r31->xF8_b12 != 0) {
+             temp_r31->xF0 = temp_r28_2;
++            melee_web_cpu_observation_source_event("cpu_item_scan_return_fighter_collision", fp, NULL);
+             return temp_r31->xF8_b12;
+         }
+ 
+         temp_r31->xF8_b12 = ftCo_800BB768(fp, temp_r28_2);
+         if (temp_r31->xF8_b12) {
+             temp_r31->xF0 = temp_r28_2;
++            melee_web_cpu_observation_source_event("cpu_item_scan_return_fighter_prediction", fp, NULL);
+             return temp_r31->xF8_b12;
+         }
+     }
+@@ -2949,11 +2957,13 @@ int ftCo_800BB9B4(Fighter* fp)
+             temp_r31->xF8_b12 = ftCo_800BB220(fp, temp_r28, &sp24, temp_f31);
+             if (temp_r31->xF8_b12 != 0) {
+                 temp_r31->xF4 = temp_r28;
++                melee_web_cpu_observation_source_event("cpu_item_scan_return_item_selected", fp, NULL);
+                 return temp_r31->xF8_b12;
+             }
+         }
+         var_r29_2 = var_r29_2->next;
+     }
+ 
++    melee_web_cpu_observation_source_event("cpu_item_scan_return_fallback", fp, NULL);
+     return temp_r31->xF8_b12;
+ }
+diff --git a/src/melee/it/item.c b/src/melee/it/item.c
+index c2bb666..195e4a1 100644
+--- a/src/melee/it/item.c
++++ b/src/melee/it/item.c
+@@ -46,6 +46,9 @@
+ #include <sysdolphin/baselib/gobjuserdata.h>
+ #include <sysdolphin/baselib/jobj.h>
+ 
++extern void melee_web_cpu_observation_source_event(const char*, const void*, HSD_GObj*);
++extern void melee_web_cpu_observation_item_state_event(const char*, HSD_GObj*, int, unsigned);
++
+ /* 267130 */ static void Item_80267130(HSD_GObj* gobj, SpawnItem* spawnItem);
+ /* 2674AC */ static void Item_802674AC(SpawnItem* spawnItem);
+ /* 2675A8 */ static void Item_802675A8(HSD_GObj* gobj);
+@@ -1162,6 +1165,8 @@ void Item_80268E40(Item* item_data, struct ItemStateDesc* itemStateDesc)
+ /// Change item state
+ void Item_80268E5C(HSD_GObj* gobj, enum_t msid, Item_StateChangeFlags flags)
+ {
++    melee_web_cpu_observation_item_state_event("item_state_change_entry", gobj,
++                                                msid, flags);
+     Vec3 sp4C;
+     Vec3 scl;
+     ItemStateTable* temp_r30;
+@@ -1282,6 +1287,8 @@ void Item_80268E5C(HSD_GObj* gobj, enum_t msid, Item_StateChangeFlags flags)
+     item_data->xD09 = 0;
+ 
+     it_802714C0(gobj);
++    melee_web_cpu_observation_item_state_event("item_state_change_return", gobj,
++                                                msid, flags);
+ }
+ 
+ void Item_802693E4(HSD_GObj* gobj)
+@@ -1489,8 +1496,11 @@ static void Item_80269B60(HSD_GObj* gobj)
+         Item_8026A8EC(gobj);
+         return;
+     }
++    melee_web_cpu_observation_source_event("item_updater_entry", NULL, gobj);
+     it_8027137C(gobj);
++    melee_web_cpu_observation_source_event("item_updater_return", NULL, gobj);
+     it_8027146C(gobj);
++    melee_web_cpu_observation_source_event("item_wrapper_return", NULL, gobj);
+ }
+ 
+ static /// @remarks Somewhat arbitrary. Does not run on Hook Shot / Grapple
+diff --git a/src/melee/it/kinds/itlinkarrow.c b/src/melee/it/kinds/itlinkarrow.c
+index c5da0f9..1d0a988 100644
+--- a/src/melee/it/kinds/itlinkarrow.c
++++ b/src/melee/it/kinds/itlinkarrow.c
+@@ -23,6 +23,8 @@
+ #include <sysdolphin/baselib/mtx.h>
+ #include <sysdolphin/baselib/random.h>
+ 
++void melee_web_cpu_observation_source_event(const char*, const Fighter*, HSD_GObj*);
++
+ #ifdef MUST_MATCH
+ static void sdata2_order(void)
+ {
+@@ -252,6 +254,7 @@ static inline void itLinkArrow_802A850C_inline_2(Item_GObj* gobj,
+ bool itLinkArrow_802A850C(Item_GObj* gobj, Vec3* arg1, Vec3* arg2, f32 arg3,
+                           f32 arg4, f32 arg5)
+ {
++    melee_web_cpu_observation_source_event("arrow_launch_entry", NULL, gobj);
+     Item* ip = GET_ITEM(gobj);
+     HSD_JObj* jobj = gobj->hsd_obj;
+     itLinkArrowAttributes* attr = ip->xC4_article_data->x4_specialAttributes;
+@@ -308,8 +311,11 @@ bool itLinkArrow_802A850C(Item_GObj* gobj, Vec3* arg1, Vec3* arg2, f32 arg3,
+             itLinkArrow_802A850C_inline(attr->x28);
+ 
+         ip->xDD4_itemVar.linkarrow.xB0 = 0;
+-        return it_8026EA20(gobj, &ip->xDD4_itemVar.linkarrow.x18, &ip->pos,
+-                           &sp68, &ip->xDD4_itemVar.linkarrow.xE4, &flags);
++        bool result = it_8026EA20(
++            gobj, &ip->xDD4_itemVar.linkarrow.x18, &ip->pos, &sp68,
++            &ip->xDD4_itemVar.linkarrow.xE4, &flags);
++        melee_web_cpu_observation_source_event("arrow_launch_return", NULL, gobj);
++        return result;
+     }
+ }
+ 
+@@ -477,6 +483,7 @@ itLinkarrow_UnkMotion1_Anim_inline2(HSD_GObj* gobj, Vec3* scale1, Vec3* scale2)
+ 
+ bool itLinkarrow_UnkMotion1_Anim(HSD_GObj* gobj)
+ {
++    melee_web_cpu_observation_source_event("arrow_anim_entry", NULL, gobj);
+     Item* ip = GET_ITEM(gobj);
+     Vec3 scale;
+     u8 pad[4];
+@@ -496,15 +503,19 @@ bool itLinkarrow_UnkMotion1_Anim(HSD_GObj* gobj)
+     }
+ 
+     itLinkarrow_UnkMotion1_Anim_inline2(gobj, &scale1, &scale2);
+-    return it_802A8330_inline(gobj);
++    bool result = it_802A8330_inline(gobj);
++    melee_web_cpu_observation_source_event("arrow_anim_exit", NULL, gobj);
++    return result;
+ }
+ 
+ void itLinkarrow_UnkMotion1_Phys(HSD_GObj* gobj)
+ {
++    melee_web_cpu_observation_source_event("arrow_phys_entry", NULL, gobj);
+     Item* ip = GET_ITEM(gobj);
+     itLinkArrowAttributes* attr = ip->xC4_article_data->x4_specialAttributes;
+     ip->xDD4_itemVar.linkarrow.x18 = ip->pos;
+     ip->x40_vel.y -= ABS(attr->x1C);
++    melee_web_cpu_observation_source_event("arrow_phys_exit", NULL, gobj);
+ }
+ 
+ static inline bool itLinkarrow_UnkMotion1_Coll_inline(Item_GObj* gobj)
+@@ -530,6 +541,7 @@ static inline bool itLinkarrow_UnkMotion1_Coll_inline(Item_GObj* gobj)
+ 
+ bool itLinkarrow_UnkMotion1_Coll(Item_GObj* gobj)
+ {
++    melee_web_cpu_observation_source_event("arrow_coll_entry", NULL, gobj);
+     Item* item = GET_ITEM(gobj);
+     itLinkArrowAttributes* attr = item->xC4_article_data->x4_specialAttributes;
+     HSD_JObj* jobj = GET_JOBJ(gobj);
+@@ -550,10 +562,15 @@ bool itLinkarrow_UnkMotion1_Coll(Item_GObj* gobj)
+             (item->xDD4_itemVar.linkarrow.x94 < 0.0f) ? -attr->x20 : attr->x20;
+     }
+     HSD_JObjSetRotationZ(jobj, item->xDD4_itemVar.linkarrow.x94);
+-    if (itLinkarrow_UnkMotion1_Coll_inline(gobj)) {
++    bool collided = itLinkarrow_UnkMotion1_Coll_inline(gobj);
++    melee_web_cpu_observation_source_event(collided ? "arrow_collide_true" : "arrow_collide_false", NULL, gobj);
++    if (collided) {
++        melee_web_cpu_observation_source_event("arrow_impact_call", NULL, gobj);
+         it_802A9458(gobj);
++        melee_web_cpu_observation_source_event("arrow_impact_return", NULL, gobj);
+     }
+     it_802A7E40(gobj);
++    melee_web_cpu_observation_source_event("arrow_coll_exit", NULL, gobj);
+     return false;
+ }
+ 
+@@ -614,6 +631,7 @@ void it_802A9458(HSD_GObj* gobj)
+     Vec3 scale;
+ 
+     item = GET_ITEM(gobj);
++    melee_web_cpu_observation_source_event("arrow_impact_entry", NULL, gobj);
+     jobj = HSD_GObjGetHSDObj(gobj);
+     temp_scale = item->xDD4_itemVar.linkarrow.xC0;
+     attr = item->xC4_article_data->x4_specialAttributes;
+@@ -626,7 +644,9 @@ void it_802A9458(HSD_GObj* gobj)
+     it_80275158(gobj, attr->x18);
+     item->xDD4_itemVar.linkarrow.x9C = HSD_Randi(4) + 3;
+     item->xDD4_itemVar.linkarrow.xF0 = 0;
++    melee_web_cpu_observation_source_event("arrow_before_impact_item_state", NULL, gobj);
+     Item_80268E5C(gobj, 4, ITEM_ANIM_UPDATE);
++    melee_web_cpu_observation_source_event("arrow_after_impact_item_state", NULL, gobj);
+     HSD_JObjSetRotationZ(jobj, item->xDD4_itemVar.linkarrow.x94);
+     it_802A8330(gobj);
+     switch (item->kind) { ///< @todo replace with enum names
+@@ -645,6 +665,7 @@ void it_802A9458(HSD_GObj* gobj)
+     default:
+         break;
+     }
++    melee_web_cpu_observation_source_event("arrow_impact_exit", NULL, gobj);
+ }
+ 
+ static bool inline itlinkarrow_inline_bool(Item_GObj* gobj)
+@@ -791,6 +812,7 @@ bool itLinkArrow_Logic98_HitShield(Item_GObj* gobj)
+     Vec3 scale;
+     PAD_STACK(4);
+ 
++    melee_web_cpu_observation_source_event("arrow_hit_shield_callback_entry", NULL, gobj);
+     if (ip->xCF4_fighterGObjUnk != NULL) {
+         if (it_80272D40(ip->xCF4_fighterGObjUnk) == 0) {
+             f32 temp_f31;

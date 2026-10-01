@@ -5,6 +5,8 @@
 #include "gameplay_prize_session.hpp"
 extern "C" const char* melee_web_native_menu_match_observe();
 extern "C" const char* melee_web_native_menu_memory();
+extern "C" void melee_web_cpu_observation_set_event_cursor(size_t index);
+extern "C" void melee_web_cpu_observation_scheduler_return(void);
 extern "C" {
 #include <melee/gm/types.h>
 }
@@ -857,6 +859,9 @@ void advance(){
  report_owner_lifetime("menu-after-teardown");
  if(phase==5){
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
+  if(replay&&replay->version==melee_web::kRetailReplayVersion)
+   melee_web::retail_replay_validate_match_setup(
+       *replay,melee_web::retail_replay_next_match_index(*replay,replay_cursor),selection.start);
   match_message=selected_match_message(selection);
   if(scoped_assets){request_assets(AssetDestination::Match,&selection);return;}
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
@@ -942,7 +947,7 @@ bool advance_match_construction(){
  report_construction(complete?"match-enter":"match-enter-step",started,constructed,constructed,
                      before,aurora_stats_snapshot());
  if(complete){
-  if(replay&&replay_trace)melee_web::retail_replay_initial(*replay,true);
+  if(replay&&replay_trace)melee_web::retail_replay_initial(*replay,true,match->start_data());
   first_use_draw_pending=true;running=true;message=match_message;
  }
  return complete;
@@ -1333,8 +1338,21 @@ void tick(){
    const bool replay_whole=replay&&replay->whole_session();
    if(replay_whole){
     check(replay_cursor<replay->frames.size(),"Whole-session replay ran past its declared timeline");
-    check(observed_replay_scene()==expected_replay_scene(*replay,replay_cursor),
-          "Whole-session replay source scene disagrees before input consumption");
+    const int expected=expected_replay_scene(*replay,replay_cursor);
+    const int observed=observed_replay_scene();
+    if(observed!=expected){
+     const char* owner=match?"match":results?"results":prize?"prize":host?"menu-host":"none";
+     const int host_phase=host?melee_web_menu_host_phase(host):-1;
+     throw std::runtime_error(
+         "Whole-session replay source scene disagrees before input consumption: cursor="+
+         std::to_string(replay_cursor)+" expected="+std::to_string(expected)+
+         " observed="+std::to_string(observed)+" owner="+owner+
+         " host_phase="+std::to_string(host_phase)+
+         " asset_destination="+std::to_string(static_cast<int>(asset_destination))+
+         " preparation_phase="+std::to_string(static_cast<int>(preparation.phase()))+
+         " pending="+std::to_string(pending?1:0)+
+         " running="+std::to_string(running?1:0));
+    }
     sample=replay->frames[replay_cursor].pads.data();
     if(!replay_started){
      if(replay_trace)melee_web::retail_replay_session_initial(*replay);
@@ -1353,7 +1371,10 @@ void tick(){
     }
     else if(replay_whole)
      check(!match->paused(),"Whole-session replay reached an unsupported source pause");
-    match->tick(sample);source_frames.did_step(!replay||replay->closes_draw_batch(replay_cursor));
+    if(replay_whole)melee_web_cpu_observation_set_event_cursor(replay_cursor);
+    match->tick(sample);
+    if(replay_whole)melee_web_cpu_observation_scheduler_return();
+    source_frames.did_step(!replay||replay->closes_draw_batch(replay_cursor));
     int winner=-1;const int outcome=match->outcome(winner);
     if(replay){
      replay_match_complete=match->complete();replay_outcome=outcome;replay_winner=winner;
@@ -1568,13 +1589,13 @@ void tick(){
    const text=UTF8ToString($0);
    if(window.menuRuntimeTimingError)window.menuRuntimeTimingError(text);
    else console.error(text);
-  },timing_written<0?"Native menu timing JSON formatting failed":"Native menu timing JSON exceeded 4096 bytes");
+ },timing_written<0?"Native menu timing JSON formatting failed":"Native menu timing JSON exceeded 4096 bytes");
  }
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
- EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
  if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3,$4);},
                                 replay_cursor,replay_match_complete?1:0,
                                 replay_outcome,replay_winner,observed_replay_scene());
+ EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
  // Preserve lifecycle records from callbacks that did not draw a source frame.
  drain_pipeline_provenance();

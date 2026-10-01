@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Slippi transport probe</title>
+  <style>
+    :root { color-scheme: dark; font: 16px/1.45 system-ui, sans-serif; }
+    body { margin: 0; padding: 2rem; background: #10151c; color: #eaf0f6; }
+    main { max-width: 42rem; margin: 8vh auto; padding: 1.5rem; border: 1px solid #354454; border-radius: 1rem; background: #18212b; }
+    h1 { font-size: 1.35rem; margin-top: 0; }
+    p { color: #bac8d6; }
+    output { display: block; margin-top: 1rem; padding: .75rem; border-radius: .5rem; background: #0d1117; color: #a9e6bc; overflow-wrap: anywhere; }
+    dl { display: grid; grid-template-columns: 10rem 1fr; gap: .4rem 1rem; }
+    dt { color: #9eb0c2; }
+    dd { margin: 0; font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Local Slippi browser transport probe</h1>
+    <p>This isolated page sends frame-tagged controller records to two local desktop clients through the ENet relay. It does not run Melee gameplay in the browser.</p>
+    <dl>
+      <dt>WebSocket state</dt><dd id="connection">Connecting</dd>
+      <dt>Browser session</dt><dd id="session">Waiting</dd>
+      <dt>Frames queued</dt><dd id="queued">0</dd>
+      <dt>Frames applied by relay</dt><dd id="applied">0</dd>
+      <dt>Peer frames received</dt><dd id="peer">0</dd>
+    </dl>
+    <output id="status" data-state="connecting">Connecting to loopback service</output>
+  </main>
+  <script>
+    (() => {
+      const state = {
+        socket: null,
+        sessionId: null,
+        events: [],
+        queued: 0,
+        appliedFrames: [],
+        peerFrames: [],
+        error: null,
+      };
+      const connection = document.getElementById('connection');
+      const session = document.getElementById('session');
+      const queued = document.getElementById('queued');
+      const applied = document.getElementById('applied');
+      const peer = document.getElementById('peer');
+      const status = document.getElementById('status');
+      const setStatus = (name, value) => {
+        status.dataset.state = name;
+        status.textContent = value;
+      };
+      const socket = new WebSocket(`ws://${location.host}/transport`);
+      state.socket = socket;
+      socket.addEventListener('open', () => { connection.textContent = 'Connected'; });
+      socket.addEventListener('message', event => {
+        let value;
+        try { value = JSON.parse(event.data); }
+        catch { state.error = 'invalid server JSON'; setStatus('error', state.error); return; }
+        state.events.push(value);
+        if (value.event === 'session_ready') {
+          state.sessionId = value.sessionId;
+          session.textContent = value.sessionId;
+          setStatus('ready', 'Connected to the local browser transport');
+        } else if (value.event === 'pad_queued') {
+          state.queued += value.count;
+          queued.textContent = String(state.queued);
+        } else if (value.event === 'pad_applied') {
+          state.appliedFrames.push(value.frame);
+          applied.textContent = String(state.appliedFrames.length);
+        } else if (value.event === 'peer_pad') {
+          state.peerFrames.push(value.frame);
+          peer.textContent = String(state.peerFrames.length);
+        } else if (value.event === 'error') {
+          state.error = value.reason || 'bridge error';
+          setStatus('error', state.error);
+        }
+      });
+      socket.addEventListener('close', event => {
+        connection.textContent = `Closed (${event.code})`;
+        if (!state.error) setStatus('closed', 'Loopback transport closed');
+      });
+      socket.addEventListener('error', () => {
+        state.error = 'WebSocket connection failed';
+        setStatus('error', state.error);
+      });
+      window.browserTransport = {
+        state,
+        sendFrames(frames) {
+          if (socket.readyState !== WebSocket.OPEN || !state.sessionId)
+            throw new Error('browser transport is not ready');
+          socket.send(JSON.stringify({
+            type: 'pad_batch', sessionId: state.sessionId,
+            playerPort: 1, frames,
+          }));
+          setStatus('sent', `Sent ${frames.length} browser-originated PAD frame records`);
+        },
+      };
+    })();
+  </script>
+</body>
+</html>

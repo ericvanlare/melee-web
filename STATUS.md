@@ -7,13 +7,12 @@ original title → Main/Versus → CSS route, CSS parent return, Main Back to Ti
 Title Start to Main, repeated CSS re-entry, and public Eject/reimport lifecycle.
 The retail capture starts from a cold Dolphin boot with an isolated copy of a
 retail-initialized card and records scoped source/PAD observations and labeled
-Metal frame screenshots. The latest headless installed-Chrome check uses the
-production audio-enabled player package built from source `a05f5e3`; its retained
-15-check report preserves CSS-first startup and completes two CSS → Main →
-Title → Main/Versus → CSS cycles, Ejects from Main and Title with CSS-first
-disc reimport, then completes CSS → SSS → supported Mario/Final Destination
-gameplay → Results → CSS. It records connected 32 kHz nonzero PCM transport
-and audio-context teardown.
+Metal frame screenshots. The final headless installed-Chrome check uses the
+production audio-enabled public package at the reconciled PR head. It preserves
+CSS-first startup, completes two repeated CSS → Main → Title → Main/Versus → CSS
+cycles, Ejects from Main and Title with CSS-first disc reimport, then completes
+CSS → SSS → supported Mario/Final Destination gameplay → Results → CSS. It
+records connected 32 kHz nonzero PCM transport and audio-context teardown.
 The audio-disabled `runtime-public` and production audio-enabled
 `runtime-audio-preview` Release targets are both built; the audio package is
 prepared and audited for this route. The local Observer and final browser
@@ -23,21 +22,14 @@ not establish audible quality, PCM or pixel equivalence, foreground timing,
 input latency, physical-controller acceptance, performance, or full-game menu
 coverage.
 
-## Original Title idle handoff: bounded increment
+## Current acceptance boundaries
 
-**Source identified / Retail compared / Browser exercised / Compiled** for the
-source Title timeout payload and its `GM_OPENING_MV` state-1 handoff. Retail
-Observer evidence records the cold-boot Opening sequence through three Title
-visits, two returns to Opening state 0, and separate P1/P2 interruption routes.
-The production browser runs the original timer and `gm_Mode_Opening_OnLoad`,
-then fails at checked preparation when the randomized four-CPU demo selects an
-unadmitted fighter or stage; it never fabricates a destination. Eject/reimport
-returns to CSS. The full VS demo and THP movie owners remain unsupported, so
-this is a runnable source increment rather than a completed attract cycle. See
-the [scoped capture and implementation ledger](docs/ORIGINAL_MENU_ROUTE_CAPTURE.md)
-for the source-frame observations, captures, browser report, and required next
-owners. No pixel/PCM equivalence, audible-quality, foreground-timing, or
-performance claim is made.
+The supported CSS → SSS → Mario/Final Destination → Results → CSS route is
+covered by the scoped receipts below. Remaining acceptance is independent across
+original comparison, live and physical input, visual output, audio fidelity and
+sustained performance. The [roadmap](docs/ROADMAP.md), [accuracy contract](docs/ACCURACY_CONTRACT.md)
+and [performance/accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md) define
+those boundaries; this section adds no new runtime or deployment evidence.
 
 ## Repository public; main changes restricted to the owner
 
@@ -75,8 +67,22 @@ This establishes complete agreement for this recorded session and these
 compared fields. Menu input/scene order and final CSS are verified; per-tick menu
 scalar state and unobserved Fighter memory are outside the comparison. General
 game equivalence, draw cadence, pixels, PCM, live-input accuracy and foreground
-performance remain unclaimed. No merge or deployment was performed for this
-follow-up.
+performance remain unclaimed. PR #93 was merged to `main` at
+`2e083bf1367ca8900874a11ac7566433cfdf37a1`; no deployment was performed.
+
+## Three-match, twelve-distinct-character CPU9 recording
+
+**Compiled / Source identified / Native traced / Retail compared / Browser exercised**
+for the separate MWRC v9 roster of twelve distinct CPU9 characters on Final
+Destination. The [comparison guide](docs/RECORDED_SESSION_STATE.md) and
+[scoped receipt](docs/evidence/recorded-session-12-distinct-v1.json) bind all
+three original match setups, the exact declared match fields, primary fighter
+entity identities and lifetimes, source-consumed input/scene order, and the
+final CSS endpoint. The earlier four-Mario MWRC v8 session remains a separate
+fresh browser regression. This evidence does not compare non-match PAD or menu
+scalar state and does not establish timing, performance, draw cadence, pixels,
+PCM, live input, or general game equivalence. Repeatability across independent
+original-source captures was not evaluated.
 
 A later independent review found a capture-command failure-classification gap.
 The [harness follow-up receipt](docs/evidence/recorded-session-harness-finalization-v1.json)
@@ -494,9 +500,12 @@ original English costume resolution, indexed vertex colors and particle palette
 metadata. The browser completes all 30 action cases over 5,200 drawn frames;
 the first diagnostic run fails timing/audio/pipeline gates. After a reviewed
 35-descriptor preload correction, both cold/warm action sweeps pass all 10,400
-frames with zero hard failures. Startup and broader performance remain separate,
-and independent original comparison is pending; see
-[Captain Falcon's measured scope](docs/CAPTAIN_PORT_NOTES.md).
+frames with zero hard failures. The first original CPU9 source/browser comparison
+has an exact Falcon-position divergence, and the human-input browser replay
+diverges at Results routing. No page/process crash was reproduced, so the user
+report remains unattributed; device/browser-specific checks are unrun. See the
+[investigation receipt](docs/evidence/captain-falcon-correctness-investigation-v1.json)
+and [Captain Falcon's measured scope](docs/CAPTAIN_PORT_NOTES.md).
 Hyrule Temple passes two native stage-owner lifetimes, including scaled geometry,
 original map callbacks, light identity overrides, music candidates and teardown.
 Two original Ready/pause/No Contest match lifetimes also pass. The browser
@@ -1011,8 +1020,8 @@ CPU holdout, multiplayer, pixel, audio, physical-input or performance admission.
 The browser runs original fighters and stages through compiled WebAssembly. The
 accepted first slice is two Marios on Final Destination; narrower raw-PAD runs
 also selected and rendered Falco versus Mario on Battlefield, Fox versus Mario
-on Yoshi's Story, and Marth versus Mario on Dream Land. The complete
-acceptance milestone below is still open:
+on Yoshi's Story, and Marth versus Mario on Dream Land. The remaining
+acceptance boundaries are:
 source stage and item rendering, stock/respawn/outcome flow, and the optional
 renderer cache are integrated, while clean cold-cache/full-match first-use
 stalls, audible and physical controller verification, and full original-game
@@ -1115,6 +1124,11 @@ receipts. Setup and the reproducible acceptance command are in the
 local interoperability result; rollback correctness, browser cross-play,
 public Internet/NAT, rendering/audio accuracy and production readiness remain
 unclaimed.
+
+A separate [headless browser-to-desktop transport receipt](docs/evidence/slippi-browser-desktop-transport-v1.json)
+records one 24-frame raw PAD exchange through the loopback ENet relay and the
+desktop peer's existing input consumer. It does not establish browser gameplay,
+general cross-play, or rollback correctness.
 
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
@@ -1388,7 +1402,8 @@ and Aurora's pipeline queue remain quiet for two callbacks. The live clock arms
 on a later callback. Pipelines or uploads first encountered during a match enter
 the same frozen render-preparation gate and resume automatically; unrelated clock
 overruns retain the explicit hitch pause. Preparation time is reported separately,
-and the scoped [scene-entry profile](work/scene-entry-profile.md) measured
+and the historical scene-entry profile (`work/scene-entry-profile.md`, an ignored
+local report unavailable in this checkout) was recorded as measuring
 106.555 ms for initial resource preparation, 83.140 ms for isolated SSS owner
 construction and 160.100 ms for isolated match construction. Its 7,604 active
 callbacks had a 24.200 ms worst callback, no callback above 33.3 ms and zero

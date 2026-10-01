@@ -191,12 +191,14 @@ The native emulator clients are development tools; they do not enter the browser
 product.
 
 This first result establishes a bounded local server/client integration, not
-rollback correctness. A second milestone should force prediction corrections
-and compare finalized inputs and declared state against a controlled baseline.
-Same-machine traffic does not test Internet routing, NAT traversal, browser
-transport or real-world latency. Test distinct networks next, then a browser/ENet
-transport probe measuring actual input arrival under delay, loss, reordering and
-disconnects. Integrate the port only with its accuracy and rollback prerequisites
+rollback correctness. A separate [headless browser-to-desktop transport
+probe](evidence/slippi-browser-desktop-transport-v1.json) now verifies
+24 tagged PAD records in each direction through a loopback relay and checks the
+desktop game's existing remote-PAD consumer. It does not run Melee in the
+browser or test network impairment. The next experiments should cover delay,
+loss, reordering, disconnects and distinct networks, then force prediction
+corrections and compare finalized inputs and declared state against a controlled
+baseline. Integrate the port only with its accuracy and rollback prerequisites
 established, and claim cross-play after full reference matches with forced
 rollback. Neither a successful pairing nor matching checksums alone proves
 general game accuracy.

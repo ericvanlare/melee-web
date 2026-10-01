@@ -33,6 +33,13 @@ started when they are no longer needed.
 Never blanket-delete `work/`, ignored files, another task's output, source,
 recordings, local changes, or evidence that has not been safely archived.
 
+Choose work from the [roadmap](docs/ROADMAP.md) and current evidence in
+`STATUS.md`. Complete and verify the supported playing experience before
+expanding scope. Each execution issue needs an observable failure or outcome,
+smallest next experiment, pass criteria, exclusions and a stopping rule. Check
+existing implementations for relevant solutions and record reuse or rejection.
+Component fixes do not close whole-session acceptance.
+
 Before adding or enabling a fighter, read [Adding a source fighter](docs/ADDING_CHARACTERS.md),
 starting with its required checkpoints, failure lookup and handoff template.
 For a stage, read [Adding a source stage](docs/ADDING_STAGES.md). For a shared
@@ -42,9 +49,11 @@ the [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md),
 
 ## Non-negotiable accuracy rules
 
-- The next deliverable is original in-game CSS → original SSS → four-stock
-  Mario/Final Destination gameplay → original CSS. Temporary HTML menus do not
-  satisfy it.
+- The supported player route is original CSS → original SSS → four-stock
+  Mario/Final Destination gameplay → original Results → original CSS. Temporary
+  HTML menus and historical Results-skipping checks are scoped evidence only;
+  follow the roadmap's separate original-comparison, physical-input,
+  uninterrupted-audio and performance gates.
 - Reuse original HSD/game routines behind checked ownership boundaries. Missing
   audio, thread, file, graphics or gameplay services fail explicitly; never add
   a silent success stub, guessed table bound or per-asset exemption.

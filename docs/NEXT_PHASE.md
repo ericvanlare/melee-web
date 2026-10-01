@@ -1,14 +1,22 @@
-# Core gameplay loop and the first menus
+# Historical core gameplay and first-menu integration
 
-The browser now runs a two-player Mario stock match on Final Destination.
-The active deliverable is original in-game CSS → original SSS → a playable
+The [roadmap](ROADMAP.md) and [STATUS](../STATUS.md) define current work and
+evidence. This page preserves early implementation notes; statements about the
+next step, missing menu integration, or a Results-skipping deliverable below
+describe that earlier checkpoint and are not current instructions.
+[STATUS](../STATUS.md) links current evidence. Do not restart these historical
+tasks without identifying a current issue and reproducer.
+
+At this historical checkpoint, the browser ran a two-player Mario stock match
+on Final Destination. The then-active deliverable was original CSS → original
+SSS → a playable
 four-stock Mario/FD match → original CSS, while preserving the
 [accuracy contract](ACCURACY_CONTRACT.md). Direct disc import, native menu
 archives, scene lifetime and transitions are integrated. The runtime also has
 narrower Falco/Battlefield source-loop and browser-rendering evidence. The full
-acceptance milestone remains open until the checks in [ROADMAP.md](ROADMAP.md)
-pass, including complete ordinary input, physical controllers, audible output,
-reference comparison, and cold and warm performance.
+route remains bounded by the separate ordinary-input, physical-controller,
+audible-output, reference-comparison and cold/warm performance checks in the
+roadmap.
 
 The implementation notes below preserve the sequence used to reach the current
 native-menu path. [STATUS.md](../STATUS.md) is the authority for current coverage.
