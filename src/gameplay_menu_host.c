@@ -24,7 +24,12 @@
 #include <melee/gm/gm_unsplit.h>
 #include <melee/lb/lbaudio_ax.h>
 #include <melee/lb/lbcardgame.h>
+#include <melee/lb/lbcardnew.h>
 #include <melee/lb/lblanguage.h>
+#include <melee/lb/lbdvd.h>
+#include <melee/lb/lbsnap.h>
+#include <melee/ty/toy.h>
+#include <melee/ty/tydisplay.h>
 #include <sysdolphin/baselib/controller.h>
 #include <sysdolphin/baselib/rumble.h>
 #include <sysdolphin/baselib/gobj.h>
@@ -123,6 +128,17 @@ struct MeleeWebMenuHost {
 static MeleeWebMenuHost* owner;
 static int fail(char* e,size_t n,const char* text){if(e&&n)snprintf(e,n,"%s",text);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
+static void host_reset_preload_scene_aliases(void)
+{
+    /* These are the non-heap side effects of gm_1A3F's preloadState. The
+     * narrow menu owner has no source DVD heap/cache, but its scene aliases
+     * must still start clean before an authored Opening OnEnter callback. */
+    lb_8001C5A4();
+    lb_8001D1F4();
+    lbSnap_8001E27C();
+    Toy_803127D4();
+    tyDisplay_8031C8B8();
+}
 static int live(MeleeWebMenuHost* h,char* e,size_t n){
     if(!h||h!=owner||!h->audio||!h->generation||
        h->generation!=melee_web_gameplay_stats().generation||
@@ -661,9 +677,12 @@ int melee_web_menu_host_enter_opening(MeleeWebMenuHost* h,
     if (!h || h != owner || !h->vs_mode_owned ||
         gm_GetCurrentGameMode() != GM_OPENING_MV ||
         h->source_target_mode != GM_OPENING_MV || h->opening_active ||
+        melee_web_gameplay_vs_startup_active() ||
+        melee_web_gameplay_vs_manager_preparing() ||
         (source = melee_web_opening_mode_state(id)) == NULL ||
         !host_prepare_world(h, audio, phase, 1, e, n)) {
-        return fail(e, n, "Opening mode entry requires its selected source state and a fresh world");
+        return fail(e, n,
+                    "Opening mode entry requires its selected source state, a fresh narrow world, and no live source VS preload owner");
     }
     h->source_state = *source;
     h->opening_state_id = id;
@@ -680,11 +699,34 @@ int melee_web_menu_host_enter_opening(MeleeWebMenuHost* h,
         h->source_state.info.exit_data = &h->title_exit_payload;
         h->title_exit_payload = 0;
     }
-    if (!melee_web_opening_mode_preload(id)) {
+    /* host_prepare_world already performed preloadState's 0x4800 SIS setup
+     * for every source-scene entry. Preserve its other scene-global resets
+     * below, but do not run its DVD heap/cache half for the supported VS and
+     * Title handoffs: the browser has scoped those assets before publication,
+     * and this narrow world deliberately does not run gmMain's
+     * lbMemory_8001564C/lbHeap_80015F3C bootstrap. The guard above verifies
+     * that no full source VS owner is active, so lbDvd_80018CF4's persistent
+     * heap flags and lbDvd_80018254's cache transition have no owner here.
+     * GS_VS still runs its authored OnEnter to build StartMeleeData, and
+     * GS_TITLE still runs gmTitleMode_OnEnter. Movie states retain the
+     * authored preload path after creating its cache. */
+    if (source->info.scene_kind == GS_VS || source->info.scene_kind == GS_TITLE) {
+        host_reset_preload_scene_aliases();
+    } else {
+        /* preloadState allocates and owns the SIS block it installs. Retire
+         * the preparation block first: HSD_SisLib_803A6048 overwrites its
+         * global free_head without freeing the old block, so allowing both
+         * calls would leak the host's block on every movie handoff. The
+         * authored preload then performs the single SIS allocation and its
+         * complete alias/reset sequence. */
         HSD_SisLib_803A5FBC();
-        restore_context(h);
-        h->opening_scene_handler = NULL;
-        return fail(e, n, "Opening source preload rejected its authored state");
+        lbDvd_SetupVsPreloadCache();
+        if (!melee_web_opening_mode_preload(id)) {
+            HSD_SisLib_803A5FBC();
+            restore_context(h);
+            h->opening_scene_handler = NULL;
+            return fail(e, n, "Opening source preload rejected its authored state");
+        }
     }
     if (h->source_state.on_enter != NULL) {
         h->source_state.on_enter(&h->source_state);
@@ -835,6 +877,13 @@ int melee_web_menu_host_opening_match_finish(MeleeWebMenuHost* h,
             "Opening demo requested unsupported mode %d", pending_mode);
         return 0;
     }
+    /* The completed VS world no longer owns an entered Opening scene. Keep
+     * the authored next mode/state route, but release the current state's
+     * active flag so the next world can enter it through the source table. */
+    h->opening_active = 0;
+    h->opening_scene_entered = 0;
+    h->opening_state_exit_called = 0;
+    h->opening_scene_handler = NULL;
     melee_web_pad_state_free(h->input);
     h->input = next_input;
     h->seed = seed;
@@ -990,6 +1039,7 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
             h->source_target_mode = GM_OPENING_MV;
             h->opening_state_id = next;
             h->opening_scene_handler = NULL;
+            h->opening_active = 0;
         }
         h->source_scene = MELEE_WEB_HOST_SCENE_NONE;
         h->entered = 0;

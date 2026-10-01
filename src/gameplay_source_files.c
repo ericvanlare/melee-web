@@ -10,19 +10,20 @@
 EM_JS(int, source_stream_start, (int request, const char* name,
                                 uint32_t offset, uint32_t size), {
     if (typeof window.menuStartSourceRead !== 'function') return 0;
-    return window.menuStartSourceRead($0, UTF8ToString($1), $2, $3) ? 1 : 0;
+    return window.menuStartSourceRead(request, UTF8ToString(name), offset, size)
+        ? 1 : 0;
 });
 EM_JS(int, source_stream_status, (int request), {
     if (typeof window.menuSourceReadStatus !== 'function') return -1;
-    return window.menuSourceReadStatus($0);
+    return window.menuSourceReadStatus(request);
 });
 EM_JS(uint32_t, source_stream_take, (int request), {
     if (typeof window.menuSourceReadTake !== 'function') return 0;
-    return window.menuSourceReadTake($0);
+    return window.menuSourceReadTake(request);
 });
 EM_JS(void, source_stream_discard, (int request), {
     if (typeof window.menuSourceReadDiscard === 'function')
-        window.menuSourceReadDiscard($0);
+        window.menuSourceReadDiscard(request);
 });
 #endif
 

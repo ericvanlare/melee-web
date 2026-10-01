@@ -4,6 +4,45 @@
 #include <stdio.h>
 #include <string.h>
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+
+/* Exercise the production EM_JS bridge through the C pump.  The real browser
+ * supplies these window functions; this deterministic Node fixture supplies
+ * the same staged-range contract and leaves the C owner responsible for the
+ * destination copy and temporary allocation. */
+EM_JS(void, install_source_stream_bridge, (), {
+    globalThis.window = globalThis;
+    const pending = new Map();
+    window.menuStartSourceRead = (request, name, offset, size) => {
+        if (name !== 'movies/MvOpen.mth' || offset !== 64 || size !== 32)
+            return false;
+        pending.set(request, {size, ready: true});
+        return true;
+    };
+    window.menuSourceReadStatus = request => {
+        const item = pending.get(request);
+        return item ? (item.ready ? 1 : 0) : -1;
+    };
+    window.menuSourceReadTake = request => {
+        const item = pending.get(request);
+        if (!item || !item.ready) return 0;
+        const pointer = Module._malloc(item.size);
+        for (let index = 0; index < item.size; ++index)
+            HEAPU8[pointer + index] = (0xd0 + index) & 0xff;
+        pending.delete(request);
+        return pointer;
+    };
+    window.menuSourceReadDiscard = request => { pending.delete(request); };
+});
+#endif
+
+#if defined(__EMSCRIPTEN__)
+enum { bridge_completion_count = 1 };
+#else
+enum { bridge_completion_count = 0 };
+#endif
+
 static unsigned completions;
 static int completion_request;
 static int completion_cancelled;
@@ -99,6 +138,24 @@ int main(void)
            !completion_cancelled);
     assert(memcmp(movie_output, movie_bytes, 32) == 0);
 
+#if defined(__EMSCRIPTEN__)
+    install_source_stream_bridge();
+    _Alignas(32) uint8_t bridge_output[64] = {0};
+    assert(melee_web_source_file_region_register(bridge_output,
+                                                 sizeof(bridge_output),
+                                                 error, sizeof(error)));
+    assert(melee_web_source_file_request(streamed_entry, 64,
+        (uintptr_t)bridge_output, 32, 0x21, 1, read_complete, NULL,
+        &request, error, sizeof(error)));
+    assert(melee_web_source_files_pump(error, sizeof(error)));
+    assert(completions == 2 && completion_request == request &&
+           !completion_cancelled);
+    for (size_t i = 0; i < 32; ++i)
+        assert(bridge_output[i] == (uint8_t)(0xd0 + i));
+    assert(melee_web_source_file_region_unregister(bridge_output,
+        sizeof(bridge_output), error, sizeof(error)));
+#endif
+
     _Alignas(32) uint8_t streamed_output[64] = {0};
     uint8_t streamed_bytes[32];
     for (size_t i = 0; i < sizeof(streamed_bytes); ++i)
@@ -118,7 +175,8 @@ int main(void)
     assert(!melee_web_source_file_supply(request, streamed_bytes,
         sizeof(streamed_bytes), error, sizeof(error)));
     assert(melee_web_source_files_pump(error, sizeof(error)));
-    assert(completions == 2 && completion_request == request &&
+    assert(completions == 2 + bridge_completion_count &&
+           completion_request == request &&
            !completion_cancelled);
     assert(memcmp(streamed_output, streamed_bytes, sizeof(streamed_bytes)) == 0);
     assert(melee_web_source_file_region_unregister(streamed_output,
@@ -129,7 +187,8 @@ int main(void)
         &request, error, sizeof(error)));
     assert(melee_web_source_file_cancel(request, 0, NULL, NULL));
     assert(melee_web_source_files_pump(error, sizeof(error)));
-    assert(completions == 3 && completion_request == request &&
+    assert(completions == 3 + bridge_completion_count &&
+           completion_request == request &&
            completion_cancelled);
     assert(movie_output[32] == 0);
     assert(melee_web_source_file_region_unregister(movie_output,

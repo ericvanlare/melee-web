@@ -614,10 +614,10 @@ void enter_opening_state(int state){
           "Opening VS fighter assets differ from the retained source-selected preview");
   }
   asset_opening_preview_valid=false;
-  const MeleeWebPadState* input=melee_web_menu_host_opening_input(host);
-  check(input!=nullptr,"Opening source state did not retain its original PAD history");
   check(melee_web_menu_host_opening_match_suspend(host,error,sizeof(error)),error);
   host_entered=false;
+  const MeleeWebPadState* input=melee_web_menu_host_opening_input(host);
+  check(input!=nullptr,"Opening source state did not retain its original PAD history");
   world->close();world.reset();world_exposed=false;
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
   melee_web::pipeline_preparation::match(selection);

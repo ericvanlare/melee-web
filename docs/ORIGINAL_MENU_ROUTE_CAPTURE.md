@@ -106,9 +106,12 @@ identities. The production audio-player regression reaches that real boundary.
 The current runtime admits 19 of 26 source fighters and 7 of 29 stages; this
 source-selected demo chose unsupported content, so checked asset preparation
 fails explicitly with the identities listed in the error. Eject retires the
-source owners and reimport starts at CSS. This is the smallest runnable source
-increment at the first missing owner boundary, not an implemented or accepted
-attract cycle.
+source owners and reimport starts at CSS. The reconciled native host now also
+has a deterministic supported VS handoff diagnostic: it checks the authored
+four-CPU payload, retained PAD input across suspension, finish to Opening state
+2 Title, and owner teardown. That diagnostic is scoped lifecycle evidence; it
+does not make the browser's unsupported asset boundary or the attract route
+accepted.
 
 Retail captures establish the sequence through three Opening-mode Title visits,
 including two returns to Opening state 0, and separate P1/P2 interruption paths.
@@ -117,15 +120,19 @@ Omake15 visit. The browser retains the original Title timeout payload, source
 state selection and `gm_Mode_Opening_OnLoad`, then fails explicitly at checked
 asset preparation when the randomized four-CPU demo selects content outside the
 current runtime's admitted 19 fighters and 7 stages. The source menu/match route
-remains usable, and Eject/reimport recovers to CSS.
+remains usable, and Eject/reimport recovers to CSS. The native diagnostic
+exercises the supported state handoff separately, without substituting for
+browser asset publication or a full attract run.
 
 Completing the retail route requires these bounded source owners:
 
-1. Complete the four-CPU VS demo lifecycle, including all 26 selectable source
-   characters, all 29 source stages, source camera/CPU-level phases, 1200-tick
-   exit, all-port interruption, and teardown/re-entry. The random source
-   selector may choose any unlocked identity; per-character or per-stage
-   overrides would change the source behavior.
+1. Extend the supported four-CPU VS demo lifecycle to every source-selected
+   identity: all 26 selectable source characters, all 29 source stages, source
+   camera/CPU-level phases, 1200-tick exit, all-port interruption, and
+   teardown/re-entry. The random source selector may choose any unlocked
+   identity; per-character or per-stage overrides would change the source
+   behavior. The current native receipt covers one deterministic supported
+   handoff and does not close this broader acceptance goal.
 2. Run `MvOpen.mth`, `MvHowto.mth`, and naturally selected `MvOmake15.mth`
    through original THP video/audio callbacks, streamed DVD ranges, source
    timing/alarm, and owned graphics/audio services. The movie assets remain
@@ -135,8 +142,9 @@ Completing the retail route requires these bounded source owners:
    prove repeated clean return/re-entry.
 4. Compare full retail and production-browser cycles at source-frame
    boundaries, with transition screenshots and PCM transport evidence. The
-   existing audio test validates the menu/match route and the first explicit
-   unsupported Opening boundary; it does not stand in for this gate.
+   existing audio test validates the menu/match route and the explicit
+   unsupported Opening boundary; the native handoff receipt does not stand in
+   for this browser/retail gate.
 
 The earlier `title-attract-20260927-full-01/` run also remains as a failed
 reproducer: it stopped emitting Observer events during a later state-3 demo
@@ -240,6 +248,8 @@ NVMe:
 | `work/pr96-title-main/public-audio-browser-reconciled-head-04/report.json` | Earlier diagnostic run on the same reconciled runtime before final package identity; superseded by the final-head report above |
 | `.../browser-public-lifecycle-03/report.json` | Historical silent-only browser evidence from the earlier public-player lifecycle; superseded for this PR by the audio-enabled final-head run |
 | `work/title-idle-attract/native-title-main-smoke-final-head.log` | Final-head native menu-host regression output; with the explicit owned fixture root, it checks the full CSS roster, P1/P2 Title Start input edges, authentic unsupported Challenger request, zero-payload Title timeout to `GM_OPENING_MV` state 1, Eject, owner retirement, and CSS reimport |
+| `work/title-idle-attract/pr110-native-opening-handoff.stdout.log` and `pr110-native-opening-handoff.jsonl` | Reconciled Release native handoff receipt: the authored Opening VS selection publishes four CPU/level-9/stock rows, suspends with retained PAD input, finishes into Opening state 2 Title, and retires its owner; the same build's compiled source-file bridge and source-frame alarm traces pass. This is a deterministic native boundary diagnostic, not retail capture, browser equivalence, or a complete attract-cycle claim |
+| `work/title-idle-attract/pr110-full-suite-final.log`, `pr110-audio-release-build-final.log`, and `pr110-public-release-build-final.log` | Final reconciled validation: full unittest discovery ran 1,583 tests with 96 optional skips and no failures; affected audio-preview and public Release targets rebuilt cleanly, including the native handoff, source-file bridge, source alarm, and public runtime targets |
 | `work/title-idle-attract/public-audio-browser/report.json` and `failure.png` | Retained failed first browser iteration: CSS and two supported matches passed, then Title timeout left the menu owner closed without surfacing an error dialog; the 45-second route assertion failed. Superseded by the final UI recovery check |
 | `work/title-idle-attract/public-audio-browser-final-head/report.json` and `failure.png` | Retained harness failure after the menu route, Title Eject/reimport, audio and PCM checks passed: document reload discarded an in-memory scoped-asset observer before the final assertion. Superseded by the verified report below |
 | `work/title-idle-attract/public-audio-browser-verified-final-head/report.json` and `failure.png` | Retained second harness failure after Title Eject/reimport, audio/PCM checks, and scoped asset transactions passed: final Eject checked a retired AudioContext from the earlier document. Superseded by the final report below |

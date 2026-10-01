@@ -219,7 +219,8 @@ if(EMSCRIPTEN)
   target_include_directories(gameplay_source_files_trace PRIVATE src)
   target_compile_options(gameplay_source_files_trace PRIVATE -UNDEBUG)
   target_link_options(gameplay_source_files_trace PRIVATE -sENVIRONMENT=node
-    -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1)
+    -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
+    -sEXPORTED_FUNCTIONS=_main,_malloc,_free)
   set_target_properties(gameplay_source_files_trace PROPERTIES SUFFIX ".js")
   add_executable(gameplay_source_alarm_trace tests/gameplay_source_alarm_trace.c
     src/gameplay_source_alarm.c)
