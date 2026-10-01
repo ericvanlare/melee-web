@@ -161,13 +161,32 @@ progress {
 }
 
 dialog {
-  width: min(520px, calc(100% - 24px));
-  max-height: calc(100dvh - 24px);
+  width: min(520px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   overflow: auto;
-  padding: 16px;
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom));
   border: 1px solid #888;
   background: #fff;
   color: #000;
+}
+
+dialog h2 { margin: 0 0 16px; font-size: 18px; }
+.save-mode-label { display: block; margin-bottom: 6px; font-weight: 600; }
+#save-mode { width: 100%; min-height: 40px; padding: 6px; }
+.settings-description, #save-status, .settings-note { line-height: 1.45; }
+.settings-description { margin: 8px 0 16px; }
+#save-status { min-height: 1.45em; margin: 12px 0 0; overflow-wrap: anywhere; }
+.settings-note { color: #555; font-size: 12px; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-actions button, .dialog-actions button { min-height: 40px; }
+
+@media (max-width: 460px) {
+  #toolbar-actions { gap: 4px; }
+  #toolbar-actions button { min-height: 40px; padding-inline: 8px; }
+  .settings-actions { flex-direction: column; }
+  .settings-actions button { width: 100%; }
+  .dialog-actions { flex-wrap: wrap; }
+  .dialog-actions button { flex: 1 1 auto; }
 }
 
 dialog::backdrop {

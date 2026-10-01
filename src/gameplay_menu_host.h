@@ -11,6 +11,10 @@
 extern "C" {
 #endif
 typedef struct MeleeWebMenuHost MeleeWebMenuHost;
+enum {
+    MELEE_WEB_SAVE_MODE_EVERYTHING = 0,
+    MELEE_WEB_SAVE_MODE_PERSONAL = 1,
+};
 typedef struct MeleeWebMenuMatchSelection {
     /* Complete source payload copied while the menu-owned VsModeData is still
      * live.  Match handoff consumes this typed value synchronously. */
@@ -28,6 +32,16 @@ typedef struct MeleeWebMenuMatchSelection {
 /* Owns source selection across separate CSS, SSS and match SDK worlds.
  * Enter only after GameplayMenuWorld has published its native assets. */
 MeleeWebMenuHost* melee_web_menu_host_create(char*,size_t);
+/* Browser owner entry. The optional card data is a validated, source-format
+ * profile and is applied before original CSS or gameplay can read SaveData. */
+MeleeWebMenuHost* melee_web_menu_host_create_with_profile(
+    int save_mode, const uint8_t* card_data, size_t card_data_size,
+    char*, size_t);
+/* Copy exact card-manifest bytes at a strict source command boundary. Pass
+ * baseline=1 to export the immutable mode baseline captured before CSS. */
+int melee_web_menu_host_snapshot_card_data(
+    const MeleeWebMenuHost*, int baseline, uint8_t* output,
+    size_t output_size, char*, size_t);
 int melee_web_menu_host_enter(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
 /* Source title/main route.  These callbacks retain the host's persistent
  * GameSceneInfo and authored mode payloads across the Aurora world boundary;

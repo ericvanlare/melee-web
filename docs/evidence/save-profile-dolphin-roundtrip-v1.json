@@ -1,0 +1,168 @@
+{
+  "purpose": "Observed WebMelee to Melee in Dolphin to WebMelee save interoperability",
+  "validated_runtime_source_commit": "94e235af3040faf3a82015731326ab9ae7a5ae35",
+  "integration_base": "ff6eceaf7698dc6716e2d02067c589352c555f8e",
+  "private_inputs_retained_outside_repository": true,
+  "disc": {
+    "game": "Super Smash Bros. Melee, GALE01, USA revision 1.02",
+    "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "main_dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+  },
+  "dolphin": {
+    "version": "Dolphin 2606a-dirty",
+    "executable": "dolphin-emu-nogui",
+    "name_entry_run_sha256": "a820c34b08b43c85f0784cb3d2bc73cce1a2ad2656c900ca670078500f6163ca",
+    "settings_run_sha256": "087e212bc1537f0bb79c9e9375311f75d773aaa5cb36cf4bb32a864da21c185b",
+    "source_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "build_scope": "Local reference build with passive observer and Pipe controller support; the shared SaveDataWritable guard remained in place and was explicitly enabled only in the isolated interoperability run.",
+    "user_profile": "Fresh isolated user directory per run; no personal Dolphin profile used.",
+    "card": "Disposable USA GCI folder and copy of each tested GCI.",
+    "video_backend": "Null",
+    "audio_backend": "No Audio Output",
+    "guest_state_injection": false,
+    "project_code_contains_dolphin_implementation": false
+  },
+  "commands": {
+    "dolphin_process_argv_template": [
+      "dolphin-emu-nogui", "-u", "<fresh-isolated-user>", "-v", "Null", "-a", "HLE",
+      "-C", "Dolphin.Core.SlotA=8",
+      "-C", "Dolphin.Core.GCIFolderAPath=<disposable-card-root>",
+      "-C", "Dolphin.Core.SIDevice0=6",
+      "-C", "Session.Core.SaveDataWritable=True",
+      "-C", "Dolphin.DSP.Backend=No Audio Output",
+      "-C", "Dolphin.Interface.ConfirmStop=False",
+      "-e", "<owned-GALE01-revision-2-disc>"
+    ],
+    "reproducible_settings_run": "python3 scripts/save_profile_dolphin_interop.py --dolphin <reviewed-dolphin-emu-nogui> --disc <owned-GALE01-revision-2-disc> --gci <WebMelee-exported-Personal-GCI> --out <new-ignored-work-directory> --dol-sha256 dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646 --capture-id pr102-review-final-roundtrip",
+    "reproducible_browser_reimport": "node tests/gamecube_save_interop_browser_test.mjs --url <locally-served-production-player> --disc <owned-GALE01-revision-2-disc> --gci <Dolphin-written-GCI> --out <new-ignored-work-directory> --playwright <installed-Playwright-package>",
+    "browser_runtime": "Headless installed Chrome selected by scripts/browser_tools.mjs; no foreground application and no audio output."
+  },
+  "game_written_changes": [
+    {
+      "boundary": "Melee Name Entry",
+      "webmelee_input_sha256": "9e2d32e3918d295f53e871668a46e85e29323d3429431810c57e6c3baa92b16c",
+      "dolphin_gci_sha256_after_melee_save": "fec85d3faf3df55c1b3476f174f9d6885626ca660ae05321167e409948bfe286",
+      "webmelee_personal_export_after_import_and_reload_sha256": "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729",
+      "observed_name": {
+        "bank": 0,
+        "record": 0,
+        "bytes_hex": "8260826082618261",
+        "text": "ＡＡＢＢ",
+        "normalized": "AABB"
+      },
+      "controller_sequence": [
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A acknowledge Progressive Scan default No" },
+        { "button_hex": "0x1000", "duration_seconds": 0.15, "action": "START from title" },
+        { "button_hex": "0x0004", "duration_seconds": 0.15, "action": "D-pad Down to VS" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A enter VS" },
+        { "button_hex": "0x0008", "duration_seconds": 0.15, "action": "D-pad Up to Name Entry" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A open Name Entry list and new-name editor" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A opens variant chooser for A" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A selects A variant 0" },
+        { "button_hex": "0x0002", "duration_seconds": 0.15, "action": "D-pad Right to next glyph" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A opens variant chooser for B" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A selects B variant 0" },
+        { "button_hex": "0x0002", "duration_seconds": 0.15, "action": "D-pad Right to next glyph" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A opens variant chooser for C" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A selects C variant 0" },
+        { "button_hex": "0x0002", "duration_seconds": 0.15, "action": "D-pad Right to next glyph" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A opens variant chooser for D" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A selects D variant 0" },
+        { "button_hex": "0x0100", "duration_seconds": 0.15, "action": "A commits the entered name" },
+        { "button_hex": "0x0200", "duration_seconds": 0.15, "action": "B returns from Name Entry" }
+      ],
+      "input_log_notes": "Ordinary Pipe controller input with release between pulses; the controller event log also records source ticks. The resulting stored name bytes decode to full-width AABB; this observed result is recorded rather than assuming the intended Latin spelling was stored.",
+      "save_observed": true
+    },
+    {
+      "boundary": "Melee Settings > Rumble",
+      "webmelee_input_sha256": "5184f7f9bfcbd35ea7cc07904cbed557b8a7fc9e624a05aa02c8d1d308d4d729",
+      "dolphin_gci_sha256_after_melee_save": "5aeb2c9dd8b274a66898ea7640feed36009422c55267d0eed252688cf8778fb3",
+      "output_bytes": 90176,
+      "controller_sequence_with_observed_source_ticks": [
+        { "tick": 60, "input": "A: acknowledge Progressive Scan default No" },
+        { "tick": 92, "input": "START: title screen" },
+        { "tick": 106, "input": "D-pad Down: main-menu item 1" },
+        { "tick": 113, "input": "D-pad Down: main-menu item 2" },
+        { "tick": 121, "input": "D-pad Down: Settings" },
+        { "tick": 128, "input": "A: enter Settings" },
+        { "tick": 139, "input": "A: enter Rumble" },
+        { "tick": 175, "input": "A: turn Controller 1 Rumble off" },
+        { "tick": 184, "input": "B: exit Rumble" },
+        { "tick": 195, "input": "B: exit Settings" }
+      ],
+      "save_observed": true
+    }
+  ],
+  "dolphin_observation": {
+    "second_run_source_ticks": 336,
+    "scene_transitions": [
+      { "tick": 0, "scene": 42 },
+      { "tick": 2, "scene": 28 },
+      { "tick": 62, "scene": 0 },
+      { "tick": 95, "scene": 1 }
+    ],
+    "menu_transitions": [
+      { "tick": 95, "menu": 0 },
+      { "tick": 130, "menu": 4 },
+      { "tick": 141, "menu": 19 },
+      { "tick": 186, "menu": 4 },
+      { "tick": 197, "menu": 0 }
+    ],
+    "observer_event_count": 1381,
+    "observer_invalid": false,
+    "observer_error": null,
+    "corrupt_or_reset_path_observed": false,
+    "stop_condition": "The expected ordinary-input sequence completed and the GCI changed. The harness then stopped Dolphin with SIGINT; observer status is interrupted because this bounded test ends after the settings save, not because the observed game path failed."
+  },
+  "gci_fields_before_and_after_settings_save": {
+    "characters_unlocked_mask": { "before": "07ff", "after": "07ff" },
+    "stages_unlocked_mask": { "before": "07ff", "after": "07ff" },
+    "derived_feature_byte": { "before": "0f", "after": "0f" },
+    "item_frequency": { "before": 2, "after": 2, "save_data_offset": "0x448" },
+    "controller_1_rumble": { "before": 1, "after": 0, "save_data_offset": "0x458" },
+    "name_bank_0_record_0": {
+      "before_hex": "8260826082618261",
+      "after_hex": "8260826082618261",
+      "display": "ＡＡＢＢ"
+    },
+    "source_named_power_count": { "before": 2, "after": 3, "save_data_offset": "0x1e8" },
+    "source_named_power_time": { "before": 16, "after": 28, "save_data_offset": "0x1ec" },
+    "changed_profile_byte_offsets": ["0x1eb", "0x1ef", "0x458"]
+  },
+  "physical_card_layout_observed": {
+    "slots_1_through_8": "Logical record IDs 1 through 8 in physical slots 1 through 8.",
+    "slot_9": "Logical FFFF free-block marker.",
+    "slot_10": "Redundant SaveData logical record 1, sequence 2.",
+    "unchanged_name_record_sequences": "Logical name-bank records remained sequence 0.",
+    "reader_behavior_verified_by_fixture_and_source": "Select records by logical identity and HSD sequence order (including wrap); require all eight records, a single free marker and a redundant SaveData record. A checksum-invalid SaveData copy is tolerated only when another authenticated SaveData copy exists; malformed identity, conflicting same-sequence payload, missing name bank or invalid marker remains fatal."
+  },
+  "webmelee_import_and_reload": {
+    "headless_browser": "Installed Chrome 153.0.8010.54 via scripts/browser_tools.mjs",
+    "final_browser_input_gci_sha256": "5aeb2c9dd8b274a66898ea7640feed36009422c55267d0eed252688cf8778fb3",
+    "default_mode_before_import": "everything",
+    "confirmation": "Load this GameCube save file? This becomes your Personal progress save. The import switches Save mode to Personal progress. The game will restart now.",
+    "import_status": "Save loaded. Personal progress is active and the game restarted.",
+    "mode_after_browser_reload": "personal",
+    "first_export_sha256": "a07675a6ca8c7cc7f948f480ad7c3fcf285efa28f427c1e7a9d2ec3a32b06e41",
+    "reload_export_sha256": "a07675a6ca8c7cc7f948f480ad7c3fcf285efa28f427c1e7a9d2ec3a32b06e41",
+    "full_declared_profile_equal_to_game_written_input": true,
+    "fields_after_reload": {
+      "characters_unlocked_mask": "07ff",
+      "stages_unlocked_mask": "07ff",
+      "derived_feature_byte": "0f",
+      "source_named_power_count": 3,
+      "source_named_power_time": 28,
+      "item_frequency": 2,
+      "controller_1_rumble": 0,
+      "name_bank_0_record_0": "ＡＡＢＢ"
+    },
+    "confirmation_and_restart_observed": true,
+    "personal_state_survived_document_reload": true
+  },
+  "limits": [
+    "The Dolphin video backend was Null; Dolphin frames were not visually validated.",
+    "Audio output was disabled. No audible-fidelity claim is made.",
+    "This save interoperability check does not establish physical-console compatibility or full-match gameplay accuracy."
+  ]
+}

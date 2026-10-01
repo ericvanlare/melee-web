@@ -160,6 +160,10 @@ class PublicRuntimeBuildTests(unittest.TestCase):
         required = {
             "patches/melee-gameplay.patch",
             "patches/aurora-browser.patch",
+            "src/gameplay_menu_host.c",
+            "src/gameplay_menu_host.h",
+            "src/gameplay_save_profile.c",
+            "src/gameplay_save_profile.h",
             "scripts/bootstrap.py",
             "scripts/build.py",
             "scripts/gameplay_bool.py",

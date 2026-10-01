@@ -69,6 +69,12 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `reference-capture/slippi/test_browser_transport.py`
 - `reference-capture/slippi/test_run_local.py`
 - `reference-capture/slippi/test_runtime.py`
+- `web/gamecube-save.mjs`
+- `web/save-profile-settings.mjs`
+- `web/save-profile-store.mjs`
+- `tests/gamecube_save_test.mjs`
+- `tests/test_gamecube_save.py`
+- `docs/SAVE_PROFILES.md`
 
 The first five implementations were read and recorded in the
 [source inventory](docs/SOURCE_LICENSE_INVENTORY.md); their recorded authorship
@@ -85,6 +91,13 @@ change to the existing developer guide. These files contain no retained trace
 rows, recovered game or SDK implementation, or generated capture output. This
 file-level provenance does not extend to the inputs read by the tool or other
 files in their directories.
+
+The browser save/profile modules and their codec tests are separately authored
+project code. The GCI reader/writer was implemented from the public card format,
+the source card manifest, and local format observations; it contains no copied
+Dolphin implementation. The documentation describes behavior and the observed
+interoperability boundary. This MIT grant does not extend to the native save
+owner/host bridge or upstream-derived source files that those modules call.
 
 The Slippi timeline parser listed above is a separately authored reader of the
 public Slippi format specification. Its conformance checks compare behavior

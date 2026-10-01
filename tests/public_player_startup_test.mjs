@@ -18,6 +18,10 @@ assert.deepEqual(toolbarButtons.filter(id => primaryActionOrder.includes(id)), p
   'Disc, Play, Pause, Fullscreen and Eject keep their familiar order');
 assert.equal(toolbarButtons.indexOf('controls-open'), 0,
   'Controls stays in its established leading position');
+assert.equal(toolbarButtons.indexOf('settings-open'), 1,
+  'Settings stays beside Controls before the game actions');
+assert.equal(toolbarButtons.indexOf('choose-disc'), 2,
+  'Disc starts the primary game-action group after Controls and Settings');
 // Exercise the real markup contract before mocks can hide a removed element.
 for (const [, id] of shellSource.matchAll(/\$\('([^']+)'\)/g)) {
   assert(markupIds.has(id), `Public shell requires missing HTML element #${id}`);
@@ -174,10 +178,12 @@ async function importShellWithMocks(scenario) {
   const imports = [
     "import {mountMeleeRuntime} from '../melee-runtime.mjs';",
     "import {mountControllerSettings} from '../controller-settings.mjs';",
+    "import {mountSaveProfileSettings} from '../save-profile-settings.mjs';",
   ].join('\n');
   const replacement = [
     'const mountMeleeRuntime = globalThis.testMountMeleeRuntime;',
     'const mountControllerSettings = globalThis.testMountControllerSettings;',
+    'const mountSaveProfileSettings = globalThis.testMountSaveProfileSettings;',
   ].join('\n');
   assert.notEqual(source.indexOf(imports), -1, 'shell imports must remain source-substitutable');
   const substituted = source.replace(imports, replacement);
@@ -199,6 +205,7 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
   let stateCallback;
   let errorCallback;
   let settingsOptions;
+  let saveSettingsOptions;
   let nativeMainCalled = false;
   let audioCreated = 0;
   const idle = {ready: true, requiresReload: false, busy: false, state: 'idle', paused: false,
@@ -216,6 +223,17 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
       setState: next => trace.push(['settings-state', next?.state]),
       clearTouchInputs: () => trace.push('clear-touch-inputs'),
       bindPlayer: async runtime => { trace.push(['settings-bind', runtime]); },
+    };
+  };
+  globalThis.testMountSaveProfileSettings = options => {
+    saveSettingsOptions = options;
+    trace.push('save-settings');
+    return {
+      get blocked() { return !!behavior.saveBlocked; },
+      get busy() { return false; },
+      setState: next => trace.push(['save-settings-state', next?.state]),
+      bindPlayer: async runtime => { trace.push(['save-settings-bind', runtime]); },
+      flushBeforeTeardown: async () => { trace.push('save-flush'); },
     };
   };
   const testOpenNativeGameDiscSession = async file => {
@@ -330,6 +348,7 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
       document,
       trace,
       settingsOptions,
+      saveSettingsOptions,
       stateCallback,
       getMockState: () => mockState,
       failRuntime(error) {
@@ -345,6 +364,7 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
   } finally {
     delete globalThis.testMountMeleeRuntime;
     delete globalThis.testMountControllerSettings;
+    delete globalThis.testMountSaveProfileSettings;
     delete globalThis.testOpenNativeGameDiscSession;
     delete globalThis.testClickTrace;
     restore();
@@ -352,12 +372,15 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
 }
 
 const success = await runScenario({name: 'success', failStartup: false});
-assert.deepEqual(success.trace.slice(0, 3), ['settings', 'mount', 'native-main']);
+assert.deepEqual(success.trace.slice(0, 3), ['settings', 'save-settings', 'mount']);
+assert.equal(success.trace[3], 'native-main');
 assert.equal(success.nativeMainCalled, true);
 assert.equal(success.audioCreated, 0);
 assert.equal(success.settingsOptions.disableExtraPorts, true, 'public settings keep developer-only ports disabled');
 assert.equal(success.settingsOptions.openButton, success.document.getElementById('controls-open'));
 assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'settings-bind'), 'shell binds settings after native startup');
+assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'save-settings-bind'), 'save settings bind before a disc can be imported');
+assert.equal(success.document.getElementById('settings-open').disabled, false, 'Settings unlocks after save mode initialization');
 const restoreSuccess = installGlobals(success.document);
 try {
   success.stateCallback({ready: true, running: true, requiresReload: false, busy: false, state: 'css', paused: false,
@@ -555,6 +578,8 @@ try {
   assert.equal(recovery.document.getElementById('start-game').disabled, false,
     'A browser audio gesture failure leaves the explicit recovery action available');
   recovery.document.getElementById('error-close').click();
+  assert.equal(recovery.document.getElementById('status').hidden, true,
+    'Dismissing a recoverable error clears the stale toolbar alert');
   await recovery.document.getElementById('start-game').click();
   assert.equal(recoveryAttempts, 1, 'Play starts only after the user requests recovery');
 } finally { delete globalThis.testClickTrace; restoreRecovery(); }
@@ -571,6 +596,8 @@ try {
   assert(ejectRace.trace.indexOf('clear-touch-inputs') >= 0 &&
     ejectRace.trace.indexOf('clear-touch-inputs') < ejectRace.trace.indexOf('destroy'),
   'Eject clears all held touch input before waiting for native teardown');
+  assert(ejectRace.trace.indexOf('save-flush') < ejectRace.trace.indexOf('destroy'),
+    'Eject commits Personal progress before retiring the native owner');
   assert.equal(ejectRace.document.getElementById('disc-selection-status').hidden, true,
     'Eject clears the temporary disc acknowledgement');
   assert.equal(ejectRace.document.getElementById('disc-selection-status').textContent, '');

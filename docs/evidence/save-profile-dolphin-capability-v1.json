@@ -1,0 +1,80 @@
+{
+  "schema": "melee-web-save-profile-dolphin-capability-v1",
+  "scope": "bounded headless boot attempt; not a completed save interoperability round trip",
+  "game": {
+    "game_id": "GALE01",
+    "region": "USA",
+    "disc_revision": "1.02",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "main_dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+    "main_dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+  },
+  "dolphin": {
+    "version": "2609",
+    "binary_sha256": "b3c369bca21c298e4bf56a567e060efeace1836a40d3a39546150d171d5d3ccf",
+    "profile": "new isolated --user directory",
+    "memory_card": "USA GCI-folder configured in Slot A",
+    "video_backend": "Null",
+    "audio_backend": "No Audio Output"
+  },
+  "browser_export": {
+    "mode": "Everything unlocked baseline",
+    "format": "iconless GameCube GCI",
+    "internal_filename": "SuperSmashBros0110290334",
+    "blocks": 11,
+    "file_bytes": 90176,
+    "profile_data_bytes": 61892,
+    "profile_data_sha256": "8fac32641d239197fb6a8455613a8e72a27726071b67dfcbbc62857010f91692",
+    "gci_sha256_before": "8754f7b236a807e30cb9b6ecd7fa794d66788106afed175e2551e1383d77f6dc",
+    "name_banks": "fresh defaults; all-zero bytes"
+  },
+  "command_shape": [
+    "Dolphin",
+    "--batch",
+    "--user",
+    "<new-isolated-user-directory>",
+    "--video_backend",
+    "Null",
+    "--config",
+    "Dolphin.Core.SlotA=8",
+    "--config",
+    "Dolphin.Core.GCIFolderAPath=<isolated-card-root>",
+    "--config",
+    "Dolphin.DSP.Backend=No Audio Output",
+    "--exec",
+    "<owned-GALE01-revision-2-disc>"
+  ],
+  "reproducible_command_template": "<Dolphin>/Contents/MacOS/Dolphin --batch --user <isolated-user> --video_backend Null -C Dolphin.Core.SlotA=8 -C Dolphin.Core.GCIFolderAPath=<isolated-card-root> -C 'Dolphin.DSP.Backend=No Audio Output' --exec <owned-GALE01-revision-2-disc>",
+  "input": {
+    "controller_or_movie_stream": false,
+    "gameplay_observed": false,
+    "save_change_requested": false,
+    "timeout_bound_seconds": 20
+  },
+  "outcome": {
+    "result": "terminated at bound after termination escalation",
+    "elapsed_wall_seconds": 30.05,
+    "process_return_code": -9,
+    "stdout_observation": "Dolphin printed signal-received messages; no gameplay, save-load prompt, or save screen was observed",
+    "gci_sha256_after": "8754f7b236a807e30cb9b6ecd7fa794d66788106afed175e2551e1383d77f6dc",
+    "gci_changed": false,
+    "gci_fields_compared": "none; byte identity shows the input GCI was not rewritten, but not that Melee loaded or accepted it",
+    "save_exported_from_dolphin": false,
+    "save_reimported_into_browser": false
+  },
+  "reference_tooling_review": {
+    "existing_route": "repository pinned Dolphin observer/input-stream tooling and isolated fixture receipts in a sibling worktree",
+    "pinned_dolphin_source_revision": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "input_stream_version": 1,
+    "write_policy": "the reference-capture launcher sets Session.Core.SaveDataWritable=False and suppresses card/SRAM backing writes",
+    "suitability": "not suitable for proving a persistent in-game save change"
+  },
+  "limitations": [
+    "No observation proves that Melee loaded the expected save state or avoided a corrupt-save/reset path.",
+    "No in-game progress, settings, or name change was made.",
+    "No Dolphin-produced GCI was returned to WebMelee.",
+    "The GCI default name banks do not supply an identifiable user-created name.",
+    "This evidence establishes only the bounded process/card-folder setup and unchanged input-file hash."
+  ],
+  "provenance": "The browser GCI codec is project-authored from the source card manifest and observed format. No Dolphin implementation was copied. Game, save, extracted DOL, Dolphin binary, and raw run data remain outside Git."
+}

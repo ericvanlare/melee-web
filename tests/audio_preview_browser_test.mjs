@@ -402,12 +402,18 @@ try {
       await selectDisc({name: 'replacement-before-import.rvz', mimeType: 'application/octet-stream', buffer: Buffer.from('invalid')});
       await page.locator('#error-dialog[open]').waitFor();
       await page.waitForTimeout(300);
-      assert.match(await page.locator('#disc-selection-status').innerText(), /Invalid disc.*replacement-before-import\.rvz/);
+      const errorDetail = await page.locator('#error').innerText();
+      assert.match(errorDetail, /RVZ is not supported/,
+        'The dialog keeps the actionable format error after the temporary filename clears');
+      assert(await page.locator('#disc-selection-status').isHidden(),
+        'Rejected selections do not persist their filename in the toolbar');
+      assert.equal(await page.locator('#disc-selection-status').textContent(), '');
       assert.equal(await page.evaluate(() => Module._melee_web_native_menu_phase()), 0,
         'The replaced session never entered native import or launch');
       assert.equal((await assetTrace()).events.length, 0,
         'No native asset scope begins for a selection replaced before the import gate');
-      report.replacement_before_import = {selected, current_status: await page.locator('#disc-selection-status').innerText(), native_asset_events: 0};
+      report.replacement_before_import = {selected, error_detail: errorDetail,
+        current_status: '', native_asset_events: 0};
       await page.locator('#error-close').click();
     });
   }

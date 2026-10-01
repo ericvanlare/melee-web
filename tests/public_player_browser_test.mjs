@@ -6,6 +6,7 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {createMeleeGCI, parseMeleeGCI} from '../web/gamecube-save.mjs';
 import {installBrowserAudioTrace} from './browser_audio_trace.mjs';
 const {values} = parseArgs({options: {
   ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
@@ -17,7 +18,7 @@ const {chromium,browser:launchOptions} = await loadBrowserTools(values.playwrigh
 const packageManifest = values.manifest ? JSON.parse(await fs.readFile(values.manifest, 'utf8')) : null;
 await fs.mkdir(values.out, {recursive: true});
 const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: values.headed}));
-const context = await browser.newContext({viewport: {width: 1280, height: 960}});
+const context = await browser.newContext({viewport: {width: 1280, height: 960}, acceptDownloads: true});
 const page = await context.newPage(), origin = new URL(values.url).origin;
 const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
 const activeDocumentAudioContexts = new Set();
@@ -52,10 +53,27 @@ for (const event of ['contextCreated', 'contextChanged', 'contextWillBeDestroyed
 });
 const check = async (name, run) => { await run(); report.checks.push(name); console.log(name); };
 const driver = createBrowserDriver(page, {surface:'public', timeoutMs:90000});
+let everythingUnlockedGciPath = null;
+let everythingUnlockedProfile = null;
 const ready = driver.waitForImport;
 const shot = name => page.screenshot({path: path.join(values.out, name + '.png'), fullPage: true});
 const press = key => driver.pressChord([key]);
-const phase = driver.waitForPhase;
+const phase = async expected => {
+  const deadline = Date.now() + 90000;
+  while (Date.now() < deadline) {
+    const state = await readNativeMenuState();
+    if (state.runtimeError) throw Error(`Runtime error while waiting for native phase ${expected}: ${state.runtimeError}`);
+    if (isTimingPaused(state)) {
+      await resumeAfterTimingPause(`wait-for-phase-${expected}`);
+      continue;
+    }
+    if (state.status === 'Error' || (state.status === 'Paused' && state.message))
+      throw Error(`Native player stopped before phase ${expected}: ${JSON.stringify(state)}`);
+    if (state.phase === expected) return state.phase;
+    await page.waitForTimeout(50);
+  }
+  throw Error(`Timed out waiting for native phase ${expected}: ${JSON.stringify(await readNativeMenuState())}`);
+};
 const audioTrace = () => page.evaluate(() => window.audioPreviewTrace?.snapshot() || null);
 const pcmMessages = snapshot => (snapshot?.worklets || []).reduce((sum, worklet) => sum + worklet.nonzeroPcmMessages, 0);
 const observePcm = async (name, before) => {
@@ -79,6 +97,8 @@ const observePcm = async (name, before) => {
 };
 async function readNativeMenuState() {
   return page.evaluate(() => ({
+    phase: typeof Module?._melee_web_native_menu_phase === 'function'
+      ? Module._melee_web_native_menu_phase() : 0,
     message: typeof Module?._melee_web_native_menu_message === 'function'
       ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null,
     running: typeof Module?._melee_web_native_menu_running === 'function'
@@ -94,18 +114,28 @@ async function resumeAfterTimingPause(label) {
   const state = await readNativeMenuState();
   if (!isTimingPaused(state)) return false;
   report.timing_pause_recoveries ||= [];
-  report.timing_pause_recoveries.push({label, message: state.message, running: state.running, status: state.status});
-  await page.waitForFunction(() => {
-    const button = document.querySelector('#pause-game');
-    return button && !button.disabled;
-  }, null, {timeout: 10000});
-  await page.locator('#pause-game').click();
-  await page.waitForFunction(() => Module._melee_web_native_menu_running() &&
-    !Module.UTF8ToString(Module._melee_web_native_menu_message())
-      .startsWith('Paused after a timing disruption') &&
-    !String(document.querySelector('#status')?.textContent || '')
-      .startsWith('Paused after a timing disruption'),
-  null, {timeout: 15000});
+  const recovery = {label, message: state.message, running: state.running, status: state.status,
+    phase: await page.evaluate(() => Module._melee_web_native_menu_phase())};
+  report.timing_pause_recoveries.push(recovery);
+  if (await page.locator('#pause-game').isEnabled()) {
+    await page.locator('#pause-game').click();
+    await page.waitForFunction(() => Module._melee_web_native_menu_running() &&
+      !Module.UTF8ToString(Module._melee_web_native_menu_message())
+        .startsWith('Paused after a timing disruption') &&
+      !String(document.querySelector('#status')?.textContent || '')
+        .startsWith('Paused after a timing disruption'),
+    null, {timeout: 15000});
+    recovery.action = 'resumed the active scene';
+  } else {
+    assert.equal(recovery.phase, 6,
+      `Timing pause left the native owner in an unexpected phase: ${JSON.stringify(recovery)}`);
+    assert(await page.locator('#start-game').isEnabled(),
+      'A closed inter-scene owner exposes Play so the retained local session can start CSS again');
+    await page.locator('#start-game').click();
+    await page.waitForFunction(() => Module._melee_web_native_menu_phase() === 1 &&
+      Module._melee_web_native_menu_running(), null, {timeout: 90000});
+    recovery.action = 'restarted the retained menu session at CSS';
+  }
   return true;
 }
 async function waitForNativeScene(scene) {
@@ -146,6 +176,10 @@ async function armLaunchObserver() {
   await page.waitForFunction(() => typeof globalThis.Module?._melee_web_native_menu_launch === 'function',
     null, {timeout: 30000});
   await page.evaluate(() => {
+    if (window.discFileChanges === undefined) {
+      window.discFileChanges = 0;
+      document.querySelector('#disc-file').addEventListener('change', () => window.discFileChanges++);
+    }
     const nativeLaunch = Module._melee_web_native_menu_launch.bind(Module);
     window.nativeLaunchCalls = 0;
     Module._melee_web_native_menu_launch = (...args) => {
@@ -275,6 +309,10 @@ try {
       'The compact toolbar keeps Disc, Play, Pause, Fullscreen and Eject in order');
     assert.equal(actionButtons.indexOf('controls-open'), 0,
       'Controls stays in its established leading position');
+    assert.equal(actionButtons.indexOf('settings-open'), 1,
+      'Settings is immediately beside Controls');
+    assert.equal(actionButtons.indexOf('choose-disc'), 2,
+      'The Disc action follows the Controls and Settings pair');
     if (values.audio) {
       assert.equal(await page.locator('#audio-note,#audio-info,#audio-details').count(), 0);
     } else assert.equal(await page.locator('#audio-note').textContent(), 'no audio ⓘlicensing issue, need to remove about 50 lines of Dolphin audio code still');
@@ -285,6 +323,386 @@ try {
     assert.equal(await page.evaluate(() => typeof window.menuObservePlayer), 'undefined');
     assert.equal(await page.evaluate(() => typeof Module.runtimeCacheState), 'undefined');
     await shot('desktop');
+  });
+  await check('save settings export, import, persistence, compare-and-swap and recovery', async () => {
+    await page.locator('#settings-open').click();
+    await page.locator('#settings-dialog[open]').waitFor();
+    assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
+    await shot('settings');
+    const exported = page.waitForEvent('download');
+    await page.locator('#export-save').click();
+    const download = await exported;
+    const gciPath = path.join(values.out, 'everything-unlocked.gci');
+    await download.saveAs(gciPath);
+    const baseline = parseMeleeGCI(new Uint8Array(await fs.readFile(gciPath)));
+    everythingUnlockedGciPath = gciPath;
+    everythingUnlockedProfile = new Uint8Array(baseline);
+    assert.equal(baseline.byteLength, 0xF1C4);
+
+    await page.locator('#save-mode').selectOption('personal');
+    await page.locator('#save-confirm-dialog[open]').waitFor();
+    assert.match(await page.locator('#save-confirm-body').textContent(), /next launch/);
+    await shot('mode-confirmation');
+    await page.locator('#save-confirm-cancel').click();
+    await page.locator('#save-confirm-dialog').waitFor({state: 'hidden'});
+    assert.equal(await page.locator('#save-mode').inputValue(), 'everything',
+      'Cancel restores the active mode selection');
+    const canceledMode = await page.evaluate(async () => {
+      const storeUrl = performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+      const {SaveProfileStore} = await import(storeUrl);
+      const store = await SaveProfileStore.open();
+      try { return await store.getMode(); } finally { store.close(); }
+    });
+    assert.equal(canceledMode.mode, 'everything', 'Cancel must not persist the proposed mode');
+
+    await page.locator('#save-mode').selectOption('personal');
+    await page.locator('#save-confirm-dialog[open]').waitFor();
+    await page.locator('#save-confirm-accept').click();
+    await page.waitForFunction(() => document.querySelector('#save-mode').value === 'personal');
+
+    await page.locator('#load-save').click();
+    await page.locator('#save-file').setInputFiles(gciPath);
+    await page.locator('#save-confirm-dialog[open]').waitFor();
+    assert.match(await page.locator('#save-confirm-body').textContent(), /Personal progress/);
+    await shot('load-confirmation');
+    await page.locator('#save-confirm-cancel').click();
+    await page.locator('#save-confirm-dialog').waitFor({state: 'hidden'});
+    const canceledImport = await page.evaluate(async () => {
+      const storeUrl = performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+      const {SaveProfileStore} = await import(storeUrl);
+      const store = await SaveProfileStore.open();
+      try { return {mode: (await store.getMode()).mode, profile: await store.getProfile()}; }
+      finally { store.close(); }
+    });
+    assert.equal(canceledImport.mode, 'personal');
+    assert.equal(canceledImport.profile, null, 'Cancel must not store a validated candidate save');
+    for (let generation = 0; generation < 2; generation++) {
+      await page.locator('#load-save').click();
+      await page.locator('#save-file').setInputFiles(gciPath);
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      await page.locator('#save-confirm-accept').click();
+      await page.waitForFunction(() => document.querySelector('#save-status').textContent.includes('Save loaded'));
+    }
+
+    const storageRace = await page.evaluate(async bytes => {
+      const storeUrl = performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+      if (!storeUrl) throw Error('Save profile store module was not loaded.');
+      const {SaveProfileStore} = await import(storeUrl);
+      const [left, right] = await Promise.all([SaveProfileStore.open(), SaveProfileStore.open()]);
+      try {
+        const revision = await left.getProfileRevision();
+        const first = Uint8Array.from(bytes), second = Uint8Array.from(bytes);
+        second[32] ^= 1;
+        const outcomes = await Promise.allSettled([
+          left.commitProfile(first, revision), right.commitProfile(second, revision),
+        ]);
+        const fulfilled = outcomes.filter(result => result.status === 'fulfilled').length;
+        const conflict = outcomes.find(result => result.status === 'rejected')?.reason?.name;
+        if (fulfilled !== 1 || conflict !== 'SaveProfileConflictError')
+          throw Error(`Expected one stale-writer conflict, got ${fulfilled} commits and ${conflict}.`);
+        const tx = left.db.transaction('profiles', 'readwrite');
+        const done = new Promise((resolve, reject) => { tx.oncomplete = resolve; tx.onerror = tx.onabort = () => reject(tx.error); });
+        const request = tx.objectStore('profiles').get('personal');
+        request.onsuccess = () => {
+          const record = request.result;
+          record.active.data[0] ^= 1;
+          tx.objectStore('profiles').put(record, 'personal');
+        };
+        await done;
+        return {fulfilled, conflict};
+      } finally { left.close(); right.close(); }
+    }, Array.from(baseline));
+    assert.deepEqual(storageRace, {fulfilled: 1, conflict: 'SaveProfileConflictError'});
+
+    await page.reload(); await ready();
+    await page.locator('#settings-open').click();
+    assert.equal(await page.locator('#save-mode').inputValue(), 'personal');
+    await page.waitForFunction(() => /previous verified progress copy/.test(document.querySelector('#save-status').textContent));
+    const recovered = await page.evaluate(async () => {
+      const storeUrl = performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+      const {SaveProfileStore} = await import(storeUrl);
+      const store = await SaveProfileStore.open();
+      try { const profile = await store.getProfile(); return {recovered: profile.recovered, data: Array.from(profile.data)}; }
+      finally { store.close(); }
+    });
+    assert.equal(recovered.recovered, true);
+    assert.deepEqual(Buffer.from(recovered.data), Buffer.from(baseline));
+    await page.locator('#settings-close').click();
+    await page.locator('#settings-dialog').waitFor({state: 'hidden'});
+  });
+  await check('Personal autosave skips identical snapshots and retains verified generations', async () => {
+    const waitForSavedState = async (predicate, label) => {
+      const deadline = Date.now() + 10000;
+      let state;
+      while (Date.now() < deadline) {
+        state = await savePage.evaluate(async () => ({samples: window.saveSamples, commits: window.saveCommitCalls,
+          profile: await window.saveStore.getProfile(), envelope: await window.readSavedEnvelope()}));
+        if (predicate(state)) return state;
+        await savePage.waitForTimeout(50);
+      }
+      throw Error(`Timed out waiting for ${label}: ${JSON.stringify(state)}`);
+    };
+    const [settingsUrl, storeUrl] = await page.evaluate(() => ['save-profile-settings.mjs', 'save-profile-store.mjs']
+      .map(name => performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/' + name))?.name));
+    assert(settingsUrl && storeUrl);
+    const isolated = await browser.newContext({viewport: {width: 800, height: 600}});
+    const savePage = await isolated.newPage();
+    try {
+      await savePage.goto(origin + '/privacy');
+      await savePage.setContent(`<!doctype html><body>
+        <button id="settings-open">Settings</button>
+        <dialog id="settings-dialog"><label for="save-mode">Save mode</label>
+          <select id="save-mode"><option value="everything">Everything</option><option value="personal">Personal</option></select>
+          <p id="save-mode-description"></p><button id="export-save">Export</button><button id="load-save">Load</button>
+          <input id="save-file" type="file"><p id="save-status"></p><button id="settings-close">Close</button>
+        </dialog>
+        <dialog id="save-confirm-dialog"><h2 id="save-confirm-title"></h2><p id="save-confirm-body"></p>
+          <button id="save-confirm-cancel">Cancel</button><button id="save-confirm-accept">Accept</button>
+        </dialog></body>`);
+      await savePage.evaluate(async ({settingsUrl, storeUrl}) => {
+        const {mountSaveProfileSettings} = await import(settingsUrl);
+        const {SaveProfileStore, SaveProfileStorageError} = await import(storeUrl);
+        const commitProfile = SaveProfileStore.prototype.commitProfile;
+        window.failNextSaveCommit = false;
+        SaveProfileStore.prototype.commitProfile = function(...args) {
+          window.saveCommitCalls = (window.saveCommitCalls || 0) + 1;
+          if (window.failNextSaveCommit) {
+            window.failNextSaveCommit = false;
+            return Promise.reject(new SaveProfileStorageError(
+              'Browser save transaction did not commit. Previous committed progress remains available.',
+              {cause: new DOMException('Storage quota exceeded.', 'QuotaExceededError')}));
+          }
+          return commitProfile.apply(this, args);
+        };
+        window.saveSamples = 0;
+        window.saveCommitCalls = 0;
+        window.saveByte = 1;
+        window.saveController = mountSaveProfileSettings({onError: error => { window.saveFailure = error.message; }});
+        window.mountSaveProfileSettings = mountSaveProfileSettings;
+        window.saveStore = await SaveProfileStore.open();
+        window.readSavedEnvelope = () => new Promise((resolve, reject) => {
+          const tx = window.saveStore.db.transaction('profiles', 'readonly');
+          const request = tx.objectStore('profiles').get('personal');
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error);
+        });
+        window.corruptCurrentEnvelope = () => new Promise((resolve, reject) => {
+          const tx = window.saveStore.db.transaction('profiles', 'readwrite');
+          tx.oncomplete = resolve;
+          tx.onerror = tx.onabort = () => reject(tx.error);
+          const profiles = tx.objectStore('profiles');
+          const request = profiles.get('personal');
+          request.onsuccess = () => {
+            const record = request.result;
+            record.active.data[0] ^= 0xFF;
+            profiles.put(record, 'personal');
+          };
+          request.onerror = () => tx.abort();
+        });
+        await window.saveController.bindPlayer({
+          configureSaveProfile: async () => {},
+          snapshotSaveProfile: async () => {
+            window.saveSamples++;
+            return new Uint8Array(0xF1C4).fill(window.saveByte);
+          },
+        });
+      }, {settingsUrl, storeUrl});
+      await savePage.locator('#settings-open').click();
+      await savePage.locator('#save-mode').selectOption('personal');
+      await savePage.locator('#save-confirm-dialog[open]').waitFor();
+      await savePage.locator('#save-confirm-accept').click();
+      await savePage.waitForFunction(() => document.querySelector('#save-mode').value === 'personal');
+      await savePage.locator('#settings-close').click();
+      await savePage.evaluate(() => window.saveController.setState({scene: 'css'}));
+      const firstState = await waitForSavedState(state => state.samples >= 1 && state.profile?.revision === 1,
+        'the initial Personal snapshot');
+      const first = firstState.envelope;
+      assert(first, 'The initial Personal snapshot must have a committed IndexedDB envelope');
+      assert.equal(first.revision, 1, 'The first Personal snapshot must commit');
+      assert.equal(first.active.data[0], 1);
+      assert.equal(first.previous, null);
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 1);
+
+      const unchangedState = await waitForSavedState(state => state.samples >= 3 && state.profile?.revision === 1,
+        'repeated unchanged snapshots');
+      const unchanged = unchangedState.envelope;
+      assert.equal(unchanged.revision, 1, 'Unchanged samples must not advance the revision');
+      assert.equal(unchanged.active.generation, first.active.generation);
+      assert.equal(unchanged.previous, null, 'Unchanged samples must not replace recovery history');
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 1);
+
+      await savePage.evaluate(() => { window.saveByte = 2; });
+      const secondState = await waitForSavedState(state => state.samples >= 4 && state.profile?.revision === 2 &&
+        state.envelope?.active?.data[0] === 2, 'the first changed snapshot');
+      const second = secondState.envelope;
+      assert.equal(second.revision, 2, 'A changed snapshot commits once');
+      assert.equal(second.previous.generation, first.active.generation);
+      assert.equal(second.previous.data[0], 1);
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 2);
+
+      const repeatedState = await waitForSavedState(state => state.samples >= 5 && state.profile?.revision === 2,
+        'unchanged snapshots after the first change');
+      const repeated = repeatedState.envelope;
+      assert.equal(repeated.revision, 2, 'Repeated snapshots must preserve the committed revision');
+      assert.equal(repeated.active.generation, second.active.generation);
+      assert.equal(repeated.previous.generation, first.active.generation,
+        'Repeated snapshots must preserve the preceding verified generation');
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 2);
+
+      await savePage.evaluate(() => { window.saveByte = 3; });
+      const thirdState = await waitForSavedState(state => state.samples >= 6 && state.profile?.revision === 3 &&
+        state.envelope?.active?.data[0] === 3, 'the later distinct snapshot');
+      const third = thirdState.envelope;
+      assert.equal(third.revision, 3, 'A later distinct snapshot commits once');
+      assert.equal(third.previous.generation, second.active.generation);
+      assert.equal(third.previous.data[0], 2,
+        'The preceding verified generation must remain available after a later change');
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 3);
+
+      await savePage.evaluate(() => { window.failNextSaveCommit = true; window.saveByte = 4; });
+      await savePage.waitForFunction(() => /Browser storage is full/.test(document.querySelector('#save-status').textContent),
+        null, {timeout: 10000});
+      const writeFailure = await savePage.evaluate(async () => ({
+        status: document.querySelector('#save-status').textContent,
+        record: await window.readSavedEnvelope(),
+        commits: window.saveCommitCalls,
+      }));
+      assert.match(writeFailure.status, /Free space in this browser profile, then reload/,
+        'Quota failures must explain how to recover');
+      assert.equal(writeFailure.record.revision, 3);
+      assert.equal(writeFailure.record.active.generation, third.active.generation,
+        'A failed write must preserve the last committed active generation');
+      assert.equal(writeFailure.record.active.data[0], 3);
+      assert.equal(writeFailure.record.previous.generation, second.active.generation,
+        'A failed write must preserve the verified recovery generation');
+      assert.equal(writeFailure.commits, 4);
+
+      const beforeFlushSamples = await savePage.evaluate(() => window.saveSamples);
+      await savePage.evaluate(async () => {
+        await window.saveController.close();
+        window.saveController = window.mountSaveProfileSettings({onError: error => { window.saveFailure = error.message; }});
+        await window.saveController.bindPlayer({
+          configureSaveProfile: async () => {},
+          snapshotSaveProfile: async () => {
+            window.saveSamples++;
+            return new Uint8Array(0xF1C4).fill(window.saveByte = 3);
+          },
+        });
+        window.saveController.setState({scene: 'css'});
+      });
+      await waitForSavedState(state => state.samples > beforeFlushSamples && state.profile?.revision === 3,
+        'an identical snapshot after reopening Personal progress');
+      await savePage.evaluate(() => window.saveController.flushBeforeTeardown());
+      const flushed = await savePage.evaluate(() => window.readSavedEnvelope());
+      assert.equal(flushed.revision, 3, 'Forced flush must not rewrite an identical committed snapshot');
+      assert.equal(flushed.active.generation, third.active.generation);
+      assert.equal(flushed.previous.generation, second.active.generation);
+      assert.equal(await savePage.evaluate(() => window.saveCommitCalls), 4);
+
+      await savePage.evaluate(() => window.corruptCurrentEnvelope());
+      const recovered = await savePage.evaluate(async () => {
+        const profile = await window.saveStore.getProfile();
+        return {revision: profile.revision, recovered: profile.recovered,
+          firstByte: profile.data[0], generation: profile.generation};
+      });
+      assert.deepEqual(recovered, {revision: 3, recovered: true, firstByte: 2,
+        generation: second.active.generation});
+      assert.match(await savePage.evaluate(() => window.saveFailure), /Browser storage is full/,
+        'The storage error callback receives the actionable failure');
+    } finally {
+      await savePage.evaluate(() => window.saveController?.close?.()).catch(() => {});
+      await isolated.close();
+    }
+  });
+  await check('Settings stores source snapshots without browser-side SaveData preference patches', async () => {
+    const settingsPage = await browser.newPage({viewport: {width: 800, height: 600}, acceptDownloads: true});
+    const profile = new Uint8Array(0x1790 + 7 * 0x1F2C);
+    profile.fill(0x21);
+    profile[0x448] = 3; // synthetic gmm_x1CB0.item_freq
+    new DataView(profile.buffer).setBigUint64(0x450, 0x0102040810204080n, false);
+    profile.set([0, 1, 1, 1], 0x458); // gmm_x1CB0.rumble_enabled[4]
+    profile[0x45e] = 0; // synthetic saved_language (LANG_JP)
+    const gci = createMeleeGCI(profile, new Date('2026-09-27T12:00:00Z')).bytes;
+    try {
+      await settingsPage.goto(origin + '/privacy');
+      await settingsPage.setContent(`<!doctype html><body>
+        <button id="settings-open">Settings</button>
+        <dialog id="settings-dialog"><label for="save-mode">Save mode</label>
+          <select id="save-mode"><option value="everything">Everything</option><option value="personal">Personal</option></select>
+          <p id="save-mode-description"></p><button id="export-save">Export</button><button id="load-save">Load</button>
+          <input id="save-file" type="file"><p id="save-status"></p><button id="settings-close">Close</button>
+        </dialog>
+        <dialog id="save-confirm-dialog"><h2 id="save-confirm-title"></h2><p id="save-confirm-body"></p>
+          <button id="save-confirm-cancel">Cancel</button><button id="save-confirm-accept">Accept</button>
+        </dialog></body>`);
+      const [settingsUrl, storeUrl] = await page.evaluate(() => ['save-profile-settings.mjs', 'save-profile-store.mjs']
+        .map(name => performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/' + name))?.name));
+      await settingsPage.evaluate(async ({settingsUrl, storeUrl, profile}) => {
+        const {mountSaveProfileSettings} = await import(settingsUrl);
+        const {SaveProfileStore} = await import(storeUrl);
+        const originalCommit = SaveProfileStore.prototype.commitProfile;
+        window.profileCommitCount = 0;
+        SaveProfileStore.prototype.commitProfile = function(...args) {
+          window.profileCommitCount++;
+          return originalCommit.apply(this, args);
+        };
+        const imported = new Uint8Array(profile);
+        // This controller-level test treats the native source snapshot API as
+        // authoritative. Native startup preference overlays are covered by
+        // gameplay_save_profile_trace and the production-player scenario.
+        window.runtimeSnapshot = new Uint8Array(imported);
+        window.snapshotCount = 0;
+        window.saveController = mountSaveProfileSettings();
+        window.saveStore = await SaveProfileStore.open();
+        window.readProfileRecord = () => new Promise((resolve, reject) => {
+          const tx = window.saveStore.db.transaction('profiles', 'readonly');
+          const request = tx.objectStore('profiles').get('personal');
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = () => reject(request.error);
+        });
+        await window.saveController.bindPlayer({
+          unload: async () => {}, configureSaveProfile: async () => {}, start: async () => {},
+          snapshotSaveProfile: async () => { window.snapshotCount++; return new Uint8Array(window.runtimeSnapshot); },
+        });
+        window.saveController.setState({scene: 'css'});
+      }, {settingsUrl, storeUrl, profile: Array.from(profile)});
+      await settingsPage.locator('#settings-open').click();
+      await settingsPage.locator('#settings-dialog[open]').waitFor();
+      await settingsPage.locator('#save-file').setInputFiles({name: 'melee-save.gci', mimeType: 'application/octet-stream', buffer: Buffer.from(gci)});
+      await settingsPage.locator('#save-confirm-dialog[open]').waitFor();
+      await settingsPage.locator('#save-confirm-accept').click();
+      await settingsPage.waitForFunction(() => document.querySelector('#save-mode').value === 'personal' &&
+        /Save loaded/.test(document.querySelector('#save-status').textContent));
+      await settingsPage.waitForFunction(() => window.snapshotCount >= 3, null, {timeout: 10000});
+      const stored = await settingsPage.evaluate(async () => ({record: await window.readProfileRecord(), samples: window.snapshotCount,
+        commits: window.profileCommitCount}));
+      assert.equal(stored.record.revision, 1, 'Identical normalized snapshots do not replace the import generation');
+      assert.equal(stored.record.previous, null);
+      assert.equal(stored.record.active.data[0x448], 3, 'Autosave retains the source snapshot item-frequency value');
+      assert.deepEqual([...stored.record.active.data.slice(0x450, 0x458)], [1, 2, 4, 8, 16, 32, 64, 128],
+        'Autosave retains the non-default source snapshot item mask');
+      assert.deepEqual([...stored.record.active.data.slice(0x458, 0x45c)], [0, 1, 1, 1]);
+      assert.equal(stored.record.active.data[0x45e], 0, 'Autosave retains saved language from the source snapshot');
+      assert(stored.samples >= 3);
+      assert.equal(stored.commits, 1, 'The import is the only committed generation');
+
+      const [download] = await Promise.all([settingsPage.waitForEvent('download'), settingsPage.locator('#export-save').click()]);
+      const exportedPath = path.join(values.out, 'imported-source-settings.gci');
+      await download.saveAs(exportedPath);
+      const exported = parseMeleeGCI(new Uint8Array(await fs.readFile(exportedPath)));
+      assert.equal(exported[0x448], 3);
+      assert.deepEqual([...exported.slice(0x450, 0x458)], [1, 2, 4, 8, 16, 32, 64, 128]);
+      assert.deepEqual([...exported.slice(0x458, 0x45c)], [0, 1, 1, 1]);
+      assert.equal(exported[0x45e], 0);
+      await settingsPage.evaluate(() => window.saveController.flushBeforeTeardown());
+      const flushed = await settingsPage.evaluate(() => window.readProfileRecord());
+      assert.equal(flushed.revision, 1, 'Forced flush does not rewrite a profile equal to its source-preserved snapshot');
+      assert.equal(flushed.active.data[0x448], 3);
+      assert.equal(flushed.active.data[0x458], 0);
+    } finally {
+      await settingsPage.evaluate(() => { window.saveController?.close?.(); window.saveStore?.close?.(); }).catch(() => {});
+      await settingsPage.close();
+    }
   });
   await check('controls, focus and preferences survive a fresh document', async () => {
     await page.locator('#controls-open').click();
@@ -300,6 +718,21 @@ try {
     await page.waitForFunction(() => document.activeElement.id === 'canvas');
     await collectViolations(); await page.reload(); await ready();
     assert.equal(await page.locator('#keyboard-layout').inputValue(), 'boxx');
+    await page.locator('#settings-open').click();
+    assert.equal(await page.locator('#save-mode').inputValue(), 'personal');
+    await page.locator('#save-mode').selectOption('everything');
+    await page.locator('#save-confirm-dialog[open]').waitFor();
+    assert.match(await page.locator('#save-confirm-body').textContent(), /next launch/);
+    await page.locator('#save-confirm-accept').click();
+    await page.waitForFunction(() => document.querySelector('#save-mode').value === 'everything');
+    await page.locator('#settings-close').click();
+    await page.locator('#settings-dialog').waitFor({state: 'hidden'});
+    await page.reload(); await ready();
+    await page.locator('#settings-open').click();
+    assert.equal(await page.locator('#save-mode').inputValue(), 'everything',
+      'Everything unlocked remains the default selected mode across a fresh document');
+    await page.locator('#settings-close').click();
+    await page.locator('#settings-dialog').waitFor({state: 'hidden'});
   });
   await check('disclosure before file selection, invalid-disc errors and selectable retry', async () => {
     await armAudioActivationObserver();
@@ -537,8 +970,177 @@ try {
       assert(await page.locator('#disc-selection-status').isHidden(), 'Resume does not restore the disc filename');
       assert.equal(await page.locator('#disc-selection-status').textContent(), '');
     });
+    await check('confirmed and canceled save-mode changes restart with the retained disc', async () => {
+      assert.equal(await page.evaluate(() => window.discFileChanges), 1);
+      const readStoredSave = () => page.evaluate(async () => {
+        const storeUrl = performance.getEntriesByType('resource')
+          .find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+        const {SaveProfileStore} = await import(storeUrl);
+        const store = await SaveProfileStore.open();
+        try {
+          const profile = await store.getProfile();
+          return {mode: (await store.getMode()).mode, profile: profile && {
+            revision: profile.revision, data: Array.from(profile.data),
+          }};
+        } finally { store.close(); }
+      });
+      assert(everythingUnlockedGciPath && everythingUnlockedProfile,
+        'The exported Everything baseline is available for the loaded-disc import check');
+      await page.evaluate(() => {
+        const arrayBuffer = File.prototype.arrayBuffer;
+        window.settingsFileArrayBufferCalls = 0;
+        File.prototype.arrayBuffer = function(...args) {
+          window.settingsFileArrayBufferCalls++;
+          return arrayBuffer.apply(this, args);
+        };
+      });
+      const unchangedEverything = await readStoredSave();
+      const launchCountBeforeRejectedFiles = await page.evaluate(() => window.nativeLaunchCalls);
+      await page.locator('#settings-open').click();
+      await page.locator('#load-save').click();
+      await page.locator('#save-file').setInputFiles({name: 'oversized.gci',
+        mimeType: 'application/octet-stream', buffer: Buffer.alloc(90177)});
+      await page.waitForFunction(() => /must be exactly 90176 bytes/.test(
+        document.querySelector('#save-status')?.textContent || ''), null, {timeout: 10000});
+      assert.equal(await page.locator('#save-confirm-dialog[open]').count(), 0,
+        'The loaded player rejects an oversized save before confirmation');
+      assert.equal(await page.evaluate(() => window.settingsFileArrayBufferCalls), 0,
+        'The production Settings flow rejects oversized saves before reading file bytes');
+      assert.deepEqual(await readStoredSave(), unchangedEverything,
+        'Oversized import leaves the committed mode and Personal profile unchanged');
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), launchCountBeforeRejectedFiles,
+        'Oversized import does not restart the loaded source session');
+      assert(await page.locator('#error-dialog[open]').count(),
+        'The user receives an actionable error for an oversized import');
+      await page.locator('#error-close').click();
+      await page.locator('#error-dialog[open]').waitFor({state: 'hidden'});
+      assert(await page.locator('#status').isHidden(),
+        'Dismissing a recoverable oversized-import error clears its stale toolbar alert');
+
+      await page.locator('#load-save').click();
+      await page.locator('#save-file').setInputFiles({name: 'malformed.gci',
+        mimeType: 'application/octet-stream', buffer: Buffer.alloc(90176)});
+      await page.waitForFunction(() => /Unsupported save size or block count/.test(
+        document.querySelector('#save-status')?.textContent || ''), null, {timeout: 10000});
+      assert.equal(await page.locator('#save-confirm-dialog[open]').count(), 0,
+        'Malformed exact-size input is rejected before confirmation');
+      assert.equal(await page.evaluate(() => window.settingsFileArrayBufferCalls), 1,
+        'Exact-size malformed input reaches format validation once');
+      assert.deepEqual(await readStoredSave(), unchangedEverything,
+        'Malformed import leaves the committed mode and Personal profile unchanged');
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), launchCountBeforeRejectedFiles,
+        'Malformed import does not restart the loaded source session');
+      assert(await page.locator('#error-dialog[open]').count(),
+        'The user receives an actionable error for malformed exact-size input');
+      await page.locator('#error-close').click();
+      await page.locator('#error-dialog[open]').waitFor({state: 'hidden'});
+      assert(await page.locator('#status').isHidden(),
+        'Dismissing a recoverable malformed-save error clears its stale toolbar alert');
+
+      assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
+      await page.locator('#save-mode').selectOption('personal');
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      assert.match(await page.locator('#save-confirm-body').textContent(), /restart the game/i);
+      assert.match(await page.locator('#save-confirm-body').textContent(), /Personal progress is kept/);
+      await shot('loaded-mode-confirmation');
+      await page.locator('#save-confirm-cancel').click();
+      await page.locator('#save-confirm-dialog').waitFor({state: 'hidden'});
+      assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 1,
+        'Cancel must leave the running source session untouched');
+
+      await page.locator('#save-mode').selectOption('personal');
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      await page.locator('#save-confirm-accept').click();
+      await page.waitForFunction(() => /source session restarted/.test(document.querySelector('#save-status').textContent),
+        null, {timeout: 90000});
+      await phase(1);
+      assert.equal(await page.locator('#save-mode').inputValue(), 'personal');
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 2,
+        'Confirm must create exactly one fresh native launch');
+      assert.equal(await page.evaluate(() => window.discFileChanges), 1,
+        'Restart must reuse the selected disc without opening the file picker');
+      await shot('css-after-personal-restart');
+
+      const personalBeforeCanceledImport = await readStoredSave();
+      assert.equal(personalBeforeCanceledImport.mode, 'personal');
+      const launchesBeforeCanceledImport = await page.evaluate(() => window.nativeLaunchCalls);
+      await page.locator('#load-save').click();
+      await page.locator('#save-file').setInputFiles(everythingUnlockedGciPath);
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      assert.match(await page.locator('#save-confirm-body').textContent(), /Personal progress/);
+      await page.locator('#save-confirm-cancel').click();
+      await page.locator('#save-confirm-dialog').waitFor({state: 'hidden'});
+      assert.deepEqual(await readStoredSave(), personalBeforeCanceledImport,
+        'Canceling an import leaves the loaded Personal mode and committed profile unchanged');
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), launchesBeforeCanceledImport,
+        'Canceling an import does not restart the loaded source session');
+
+      await page.locator('#load-save').click();
+      await page.locator('#save-file').setInputFiles(everythingUnlockedGciPath);
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      await page.locator('#save-confirm-accept').click();
+      await page.waitForFunction(() => /Save loaded/.test(
+        document.querySelector('#save-status')?.textContent || ''), null, {timeout: 90000});
+      await phase(1);
+      assert.equal(await page.locator('#save-mode').inputValue(), 'personal',
+        'A confirmed GCI import selects Personal progress');
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), launchesBeforeCanceledImport + 1,
+        'A confirmed GCI import restarts the loaded source exactly once');
+      assert.equal(await page.evaluate(() => window.discFileChanges), 1,
+        'A confirmed GCI import restarts with the retained disc, without another picker');
+      assert.equal(await page.evaluate(() => window.settingsFileArrayBufferCalls), 3,
+        'The confirmed exact-size GCI follows normal file-read and parser validation');
+
+      if (!await page.locator('#settings-dialog[open]').count())
+        await page.locator('#settings-open').click();
+      const [importDownload] = await Promise.all([
+        page.waitForEvent('download'), page.locator('#export-save').click(),
+      ]);
+      const importedExportPath = path.join(values.out, 'confirmed-import-after-restart.gci');
+      await importDownload.saveAs(importedExportPath);
+      const importedExport = parseMeleeGCI(new Uint8Array(await fs.readFile(importedExportPath)));
+      for (const [offset, length, label] of [[0, 4, 'completion masks'], [4, 1, 'feature unlocks'],
+        [0x448, 1, 'item frequency'], [0x450, 8, 'item selections'], [0x458, 4, 'rumble preferences'],
+        [0x1790 + 0x198, 8, 'identifiable name']]) {
+        assert.deepEqual(importedExport.subarray(offset, offset + length),
+          everythingUnlockedProfile.subarray(offset, offset + length),
+        `The loaded-player import/export retains ${label}`);
+      }
+
+      await page.locator('#save-mode').selectOption('everything');
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      await page.locator('#save-confirm-accept').click();
+      await page.waitForFunction(() => /source session restarted/.test(document.querySelector('#save-status').textContent),
+        null, {timeout: 90000});
+      await phase(1);
+      await page.locator('#status').waitFor({state: 'hidden', timeout: 90000});
+      assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
+      assert.equal(await page.evaluate(() => window.nativeLaunchCalls), 4);
+      assert.equal(await page.evaluate(() => window.discFileChanges), 1,
+        'Returning to Personal must also retain the selected disc');
+      const retainedPersonal = await page.evaluate(async () => {
+        const storeUrl = performance.getEntriesByType('resource').find(entry => entry.name.endsWith('/save-profile-store.mjs'))?.name;
+        const {SaveProfileStore} = await import(storeUrl);
+        const store = await SaveProfileStore.open();
+        try { return await store.getProfile(); } finally { store.close(); }
+      });
+      assert(retainedPersonal?.data?.byteLength > 0, 'Everything must preserve the separate Personal profile');
+      await shot('css-after-everything-restart');
+      report.mode_restarts = {native_launches: 4, disc_file_changes: 1, default_mode: 'everything',
+        personal_profile_retained: true, cancel_restarted: false,
+        oversized_rejected_before_read: true, malformed_rejected_before_confirmation: true,
+        canceled_import_unchanged: true, confirmed_import_retained_disc: true,
+        imported_export_fields: ['completion masks', 'feature unlocks', 'item frequency',
+          'item selections', 'rumble preferences', 'identifiable name']};
+      await page.locator('#settings-close').click();
+      await page.locator('#settings-dialog').waitFor({state: 'hidden'});
+    });
     await check('ordinary B0XX keyboard enters original SSS and cancels back to CSS', async () => {
-      await page.waitForTimeout(1200); await press('7'); await phase(3);
+      await page.waitForTimeout(1200); await press('7');
+      await page.waitForTimeout(300);
+      if (await page.evaluate(() => Module._melee_web_native_menu_phase()) === 1) await press('7');
+      await phase(3);
       await page.waitForTimeout(700);
       await press('o'); await phase(1);
     });
@@ -759,7 +1361,8 @@ try {
   await check('keyboard-only session persists its preferences; no application upload or background connections', async () => {
     const storage = await page.evaluate(async () => ({local: Object.keys(localStorage), session: Object.keys(sessionStorage),
       indexed: await indexedDB.databases(), caches: await caches.keys(), workers: (await navigator.serviceWorker.getRegistrations()).length}));
-    assert.deepEqual(storage, {local: ['melee-prototype-keyboard-v1'], session: [], indexed: [], caches: [], workers: 0});
+    assert.deepEqual(storage, {local: ['melee-prototype-keyboard-v1'], session: [],
+      indexed: [{name: 'webmelee-save-profiles-v1', version: 1}], caches: [], workers: 0});
     assert.equal((await context.cookies()).length, 0); report.storage = storage;
     await collectViolations();
     assert.deepEqual(violations, []); assert.deepEqual(errors, []); assert.deepEqual(sockets, []);

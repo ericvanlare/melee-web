@@ -1,10 +1,16 @@
 #include "gameplay_save_profile.h"
+#include "gameplay_compat.h"
 
 #include <melee/gm/gm_1601.h>
 #include <melee/gm/gm_16F1.h>
 #include <melee/gm/gmmain_lib.h>
+#include <melee/gm/gm_16AE.h>
+#include <melee/gm/forward.h>
 #include <melee/gm/types.h>
 #include <melee/lb/lblanguage.h>
+#include <melee/ty/toy.h>
+#include <melee/ty/forward.h>
+#include <melee/ty/types.h>
 
 extern GameRules gmMainLib_803D4A48;
 extern int melee_web_toy_profile_begin(void);
@@ -33,10 +39,14 @@ struct MeleeWebSaveProfileOwner {
     struct gmm_x1868* source_save;
     unsigned char* source_transient;
     unsigned char* source_snapshot;
+    unsigned char* fresh_state_snapshot;
     enum_t saved_language;
     enum_t saved_saved_language;
+    enum_t fresh_language;
+    enum_t fresh_saved_language;
     int active;
     int default_initialized;
+    int everything_initialized;
 };
 
 static MeleeWebSaveProfileOwner* owner;
@@ -207,6 +217,26 @@ static u64 read_be64(const unsigned char* bytes)
     return (u64) read_be32(bytes) << 32 | read_be32(bytes + 4);
 }
 
+static void write_be16(unsigned char* bytes, u16 value)
+{
+    bytes[0] = (unsigned char) (value >> 8);
+    bytes[1] = (unsigned char) value;
+}
+
+static void write_be32(unsigned char* bytes, u32 value)
+{
+    bytes[0] = (unsigned char) (value >> 24);
+    bytes[1] = (unsigned char) (value >> 16);
+    bytes[2] = (unsigned char) (value >> 8);
+    bytes[3] = (unsigned char) value;
+}
+
+static void write_be64(unsigned char* bytes, u64 value)
+{
+    write_be32(bytes, (u32) (value >> 32));
+    write_be32(bytes + 4, (u32) value);
+}
+
 static void decode16(unsigned char* target, const unsigned char* source)
 {
     u16 value = read_be16(source);
@@ -223,6 +253,71 @@ static void decode64(unsigned char* target, const unsigned char* source)
 {
     u64 value = read_be64(source);
     memcpy(target, &value, sizeof(value));
+}
+
+static void encode16(unsigned char* target, const unsigned char* source)
+{
+    u16 value;
+    memcpy(&value, source, sizeof(value));
+    write_be16(target, value);
+}
+
+static void encode32(unsigned char* target, const unsigned char* source)
+{
+    u32 value;
+    memcpy(&value, source, sizeof(value));
+    write_be32(target, value);
+}
+
+static void encode64(unsigned char* target, const unsigned char* source)
+{
+    u64 value;
+    memcpy(&value, source, sizeof(value));
+    write_be64(target, value);
+}
+
+static void decode_name_tag_bank(struct NameTagDataBank* target,
+                                 const unsigned char source[0x1F2C])
+{
+    unsigned char* bytes = (unsigned char*) target;
+    memcpy(bytes, source, 0x1F2C);
+    for (size_t tag = 0; tag < 19; ++tag) {
+        const size_t base = tag * sizeof(struct NameTagData);
+        for (size_t i = 0; i < 120; ++i)
+            decode16(bytes + base + i * 2, source + base + i * 2);
+        decode16(bytes + base + 0xF0, source + base + 0xF0);
+        for (size_t offset = 0xF4; offset <= 0x104; offset += 4)
+            decode32(bytes + base + offset, source + base + offset);
+        for (size_t offset = 0x108; offset <= 0x10E; offset += 2)
+            decode16(bytes + base + offset, source + base + offset);
+        for (size_t offset = 0x110; offset <= 0x130; offset += 4)
+            decode32(bytes + base + offset, source + base + offset);
+        for (size_t i = 0; i < SELKIND_COUNT; ++i)
+            decode32(bytes + base + 0x134 + i * 4,
+                     source + base + 0x134 + i * 4);
+    }
+}
+
+static void encode_name_tag_bank(unsigned char target[0x1F2C],
+                                 const struct NameTagDataBank* source)
+{
+    const unsigned char* bytes = (const unsigned char*) source;
+    memcpy(target, bytes, 0x1F2C);
+    for (size_t tag = 0; tag < 19; ++tag) {
+        const size_t base = tag * sizeof(struct NameTagData);
+        for (size_t i = 0; i < 120; ++i)
+            encode16(target + base + i * 2, bytes + base + i * 2);
+        encode16(target + base + 0xF0, bytes + base + 0xF0);
+        for (size_t offset = 0xF4; offset <= 0x104; offset += 4)
+            encode32(target + base + offset, bytes + base + offset);
+        for (size_t offset = 0x108; offset <= 0x10E; offset += 2)
+            encode16(target + base + offset, bytes + base + offset);
+        for (size_t offset = 0x110; offset <= 0x130; offset += 4)
+            encode32(target + base + offset, bytes + base + offset);
+        for (size_t i = 0; i < SELKIND_COUNT; ++i)
+            encode32(target + base + 0x134 + i * 4,
+                    bytes + base + 0x134 + i * 4);
+    }
 }
 
 static void decode_rules(GameRules* target, const unsigned char source[0x18])
@@ -259,7 +354,9 @@ static void decode_save_data(struct gmm_x1868* target,
     decode32(bytes + 0x0044, source + 0x0044);
     for (size_t i = 0; i < SELKIND_COUNT; ++i)
         decode16(bytes + 0x0048 + i * 2, source + 0x0048 + i * 2);
-    for (size_t i = 0; i < 4; ++i)
+    /* gmMainLib_8015D450 consumes one best-score word for each selectable
+     * character, despite the generated ABI view naming only four words. */
+    for (size_t i = 0; i < SELKIND_COUNT; ++i)
         decode32(bytes + 0x007C + i * 4, source + 0x007C + i * 4);
     for (size_t i = 0; i < SELKIND_COUNT; ++i) {
         decode32(bytes + 0x00E0 + i * 4, source + 0x00E0 + i * 4);
@@ -271,16 +368,25 @@ static void decode_save_data(struct gmm_x1868* target,
     for (size_t offset = 0x01B0; offset <= 0x01FC; offset += 4)
         decode32(bytes + offset, source + offset);
     decode64(bytes + 0x0200, source + 0x0200);
-    for (size_t i = 0; i < 4; ++i)
+    /* The source event table has one best-score word for each of its 0x33
+     * authored events; the generated ABI view names only its first four. */
+    for (size_t i = 0; i < 0x33; ++i)
         decode32(bytes + 0x0208 + i * 4, source + 0x0208 + i * 4);
     for (size_t i = 0; i < 3; ++i) {
         decode32(bytes + 0x02D8 + i * 4, source + 0x02D8 + i * 4);
         decode32(bytes + 0x02E4 + i * 4, source + 0x02E4 + i * 4);
-        decode32(bytes + 0x02F0 + i * 4, source + 0x02F0 + i * 4);
     }
-    for (size_t i = 0; i < 4; ++i)
+    /* gm_8015DA40/DA90 address all 300 source reward-ledger bits. */
+    for (size_t i = 0; i < 10; ++i)
+        decode32(bytes + 0x02F0 + i * 4, source + 0x02F0 + i * 4);
+    /* gm_8017297C owns the complete 0x42-entry achievement timestamp
+     * table at x1B80.  The generated struct names the first four entries and
+     * leaves the authored tail as padding, but those tail words are still
+     * persistent card data and must use the source card's endian encoding. */
+    for (size_t i = 0; i < 0x42; ++i)
         decode32(bytes + 0x0318 + i * 4, source + 0x0318 + i * 4);
-    for (size_t i = 0; i < 3; ++i)
+    /* gm_8015DAB4/DADC consume the complete 256-entry challenge inventory. */
+    for (size_t i = 0; i < 8; ++i)
         decode32(bytes + 0x0420 + i * 4, source + 0x0420 + i * 4);
 
     /* gmm_x1CB0 at +0x448. */
@@ -357,6 +463,104 @@ static void decode_save_data(struct gmm_x1868* target,
     }
 }
 
+static void encode_save_data(unsigned char target[0x55E8],
+                             const struct gmm_x1868* source)
+{
+    const unsigned char* bytes = (const unsigned char*) source;
+    memcpy(target, bytes, 0x55E8);
+
+    encode16(target + 0x0000, bytes + 0x0000);
+    encode16(target + 0x0002, bytes + 0x0002);
+    encode32(target + 0x0008, bytes + 0x0008);
+    encode32(target + 0x000C, bytes + 0x000C);
+    encode32(target + 0x0010, bytes + 0x0010);
+    encode32(target + 0x0014, bytes + 0x0014);
+    encode32(target + 0x0018, bytes + 0x0018);
+    encode32(target + 0x001C, bytes + 0x001C);
+    encode32(target + 0x0028, bytes + 0x0028);
+    encode32(target + 0x002C, bytes + 0x002C);
+    for (size_t offset = 0x0030; offset <= 0x0044; offset += 4)
+        encode32(target + offset, bytes + offset);
+    for (size_t i = 0; i < SELKIND_COUNT; ++i)
+        encode16(target + 0x0048 + i * 2, bytes + 0x0048 + i * 2);
+    for (size_t i = 0; i < SELKIND_COUNT; ++i)
+        encode32(target + 0x007C + i * 4, bytes + 0x007C + i * 4);
+    for (size_t i = 0; i < SELKIND_COUNT; ++i) {
+        encode32(target + 0x00E0 + i * 4, bytes + 0x00E0 + i * 4);
+        encode32(target + 0x0144 + i * 4, bytes + 0x0144 + i * 4);
+    }
+
+    encode32(target + 0x01A8, bytes + 0x01A8);
+    for (size_t offset = 0x01B0; offset <= 0x01FC; offset += 4)
+        encode32(target + offset, bytes + offset);
+    encode64(target + 0x0200, bytes + 0x0200);
+    for (size_t i = 0; i < 0x33; ++i)
+        encode32(target + 0x0208 + i * 4, bytes + 0x0208 + i * 4);
+    for (size_t i = 0; i < 3; ++i) {
+        encode32(target + 0x02D8 + i * 4, bytes + 0x02D8 + i * 4);
+        encode32(target + 0x02E4 + i * 4, bytes + 0x02E4 + i * 4);
+    }
+    for (size_t i = 0; i < 10; ++i)
+        encode32(target + 0x02F0 + i * 4, bytes + 0x02F0 + i * 4);
+    /* Keep the full source-bounded achievement timestamp table symmetric with
+     * decode_save_data(); the tail is authored SaveData despite its padding
+     * declaration in the generated ABI view. */
+    for (size_t i = 0; i < 0x42; ++i)
+        encode32(target + 0x0318 + i * 4, bytes + 0x0318 + i * 4);
+    for (size_t i = 0; i < 8; ++i)
+        encode32(target + 0x0420 + i * 4, bytes + 0x0420 + i * 4);
+
+    encode64(target + 0x0450, bytes + 0x0450);
+    encode32(target + 0x0460, bytes + 0x0460);
+    encode16(target + 0x0468, bytes + 0x0468);
+    encode16(target + 0x046A, bytes + 0x046A);
+    for (size_t i = 0; i < TY_TROPHY_COUNT; ++i)
+        encode16(target + 0x046C + i * 2, bytes + 0x046C + i * 2);
+
+    for (size_t fighter = 0; fighter < SELKIND_COUNT; ++fighter) {
+        const size_t base = offsetof(struct gmm_x1868, x1F2C) +
+                            fighter * sizeof(struct FighterData);
+        for (size_t i = 0; i < SELKIND_COUNT; ++i)
+            encode16(target + base + i * 2, bytes + base + i * 2);
+        encode16(target + base + 0x34, bytes + base + 0x34);
+        for (size_t offset = 0x38; offset <= 0x48; offset += 4)
+            encode32(target + base + offset, bytes + base + offset);
+        for (size_t offset = 0x4C; offset <= 0x52; offset += 2)
+            encode16(target + base + offset, bytes + base + offset);
+        for (size_t offset = 0x54; offset <= 0x74; offset += 4)
+            encode32(target + base + offset, bytes + base + offset);
+        {
+            const struct FighterData* fighter_data =
+                (const struct FighterData*) (bytes + base);
+            const u16 flags =
+                ((u16) fighter_data->x7C.b0 << 15) |
+                ((u16) fighter_data->x7C.b1 << 14) |
+                ((u16) fighter_data->x7C.b2 << 13) |
+                ((u16) fighter_data->x7C.b3 << 12) |
+                ((u16) fighter_data->x7C.b4 << 11) |
+                ((u16) fighter_data->x7C.b5 << 10) |
+                ((u16) fighter_data->x7C.b6 << 9) |
+                ((u16) fighter_data->x7C.b789 << 6) |
+                ((u16) fighter_data->x7C.b10_to_12 << 3) |
+                (u16) fighter_data->x7C.b13_to_15;
+            write_be16(target + base + 0x7C, flags);
+        }
+        encode16(target + base + 0x7E, bytes + base + 0x7E);
+        for (size_t offset = 0x84; offset <= 0x9C; offset += 4)
+            encode32(target + base + offset, bytes + base + offset);
+        encode16(target + base + 0xA0, bytes + base + 0xA0);
+        encode16(target + base + 0xA2, bytes + base + 0xA2);
+        encode32(target + base + 0xA4, bytes + base + 0xA4);
+        encode32(target + base + 0xA8, bytes + base + 0xA8);
+    }
+    for (size_t bank = 0; bank < 2; ++bank) {
+        const size_t base = offsetof(struct gmm_x1868, x2FF8) +
+                            bank * sizeof(struct NameTagDataBank);
+        encode_name_tag_bank(target + base,
+            (const struct NameTagDataBank*) (bytes + base));
+    }
+}
+
 int melee_web_save_profile_owner_apply_reference_context(
     MeleeWebSaveProfileOwner* candidate, const uint8_t game_rules[0x18],
     const uint8_t save_data[0x55E8], char* error, size_t error_size)
@@ -375,6 +579,113 @@ int melee_web_save_profile_owner_apply_reference_context(
                     "Original save/profile root aliases changed");
     decode_rules(gmMainLib_GetGameRules(), game_rules);
     decode_save_data(save, save_data);
+    return aliases_match(candidate, error, error_size) && ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_snapshot_card_data(
+    const MeleeWebSaveProfileOwner* candidate, uint8_t* output,
+    size_t output_size, char* error, size_t error_size)
+{
+    unsigned char save_data[0x55E8];
+    struct NameTagDataBank* banks;
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size) ||
+        !output || output_size != MELEE_WEB_SAVE_PROFILE_CARD_BYTES)
+        return fail(error, error_size,
+                    "Save snapshot requires the exact original card-manifest extent");
+    banks = (struct NameTagDataBank*) gmMainLib_8015CC4C();
+    if ((unsigned char*) banks !=
+        (unsigned char*) candidate->source_global +
+            offsetof(struct gmm_x0, thing) +
+            offsetof(struct gmm_x1868, x2FF8))
+        return fail(error, error_size,
+                    "Original seven name-bank rows moved from their owned backing");
+    encode_save_data(save_data, candidate->source_save);
+    memcpy(output, save_data, MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES);
+    for (size_t bank = 0; bank < MELEE_WEB_SAVE_PROFILE_CARD_BANK_COUNT; ++bank)
+        encode_name_tag_bank(output + MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES +
+                                 bank * MELEE_WEB_SAVE_PROFILE_NAME_BANK_BYTES,
+                             &banks[bank]);
+    return aliases_match(candidate, error, error_size) && ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_capture_preferences(
+    const MeleeWebSaveProfileOwner* candidate,
+    MeleeWebSaveProfilePreferences* preferences, char* error,
+    size_t error_size)
+{
+    const struct gmm_x1CB0* source;
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size) ||
+        !preferences)
+        return fail(error, error_size,
+                    "Save preference capture requires the live source owner and output");
+    source = &candidate->source_save->x1CB0;
+    preferences->item_frequency = source->item_freq;
+    preferences->item_mask = source->item_mask;
+    memcpy(preferences->rumble_enabled, source->rumble_enabled,
+           sizeof(preferences->rumble_enabled));
+    preferences->saved_language = source->saved_language;
+    return aliases_match(candidate, error, error_size) && ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_snapshot_card_data_with_preferences(
+    const MeleeWebSaveProfileOwner* candidate,
+    const MeleeWebSaveProfilePreferences* preferences, uint8_t* output,
+    size_t output_size, char* error, size_t error_size)
+{
+    const size_t base = offsetof(struct gmm_x1868, x1CB0);
+    const size_t frequency = base + offsetof(struct gmm_x1CB0, item_freq);
+    const size_t mask = base + offsetof(struct gmm_x1CB0, item_mask);
+    const size_t rumble = base + offsetof(struct gmm_x1CB0, rumble_enabled);
+    const size_t language = base + offsetof(struct gmm_x1CB0, saved_language);
+    if (!preferences || frequency >= MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES ||
+        mask + sizeof(preferences->item_mask) >
+            MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES ||
+        rumble + sizeof(preferences->rumble_enabled) >
+            MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES ||
+        language >= MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES)
+        return fail(error, error_size,
+                    "Source save preference fields exceed the card SaveData extent");
+    if (!melee_web_save_profile_owner_snapshot_card_data(
+            candidate, output, output_size, error, error_size))
+        return 0;
+
+    /* Scene startup supplies browser-supported runtime defaults for these
+     * original settings. Overlay only those typed preference fields onto the
+     * live snapshot so progress and every other source byte remain current. */
+    output[frequency] = preferences->item_frequency;
+    write_be64(output + mask, (u64) preferences->item_mask);
+    memcpy(output + rumble, preferences->rumble_enabled,
+           sizeof(preferences->rumble_enabled));
+    output[language] = preferences->saved_language;
+    return ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_apply_card_data(
+    MeleeWebSaveProfileOwner* candidate, const uint8_t* input,
+    size_t input_size, char* error, size_t error_size)
+{
+    unsigned char save_data[0x55E8];
+    struct NameTagDataBank* banks;
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size) ||
+        !input || input_size != MELEE_WEB_SAVE_PROFILE_CARD_BYTES)
+        return fail(error, error_size,
+                    "Imported save does not match the original card-manifest extent");
+    banks = (struct NameTagDataBank*) gmMainLib_8015CC4C();
+    if ((unsigned char*) banks !=
+        (unsigned char*) candidate->source_global +
+            offsetof(struct gmm_x0, thing) +
+            offsetof(struct gmm_x1868, x2FF8))
+        return fail(error, error_size,
+                    "Original seven name-bank rows moved from their owned backing");
+    /* Preserve fresh-source defaults for SaveData bytes beyond the original
+     * card manifest's 0x1790-byte extent, then install the imported prefix. */
+    encode_save_data(save_data, candidate->source_save);
+    memcpy(save_data, input, MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES);
+    decode_save_data(candidate->source_save, save_data);
+    for (size_t bank = 0; bank < MELEE_WEB_SAVE_PROFILE_CARD_BANK_COUNT; ++bank)
+        decode_name_tag_bank(&banks[bank],
+            input + MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES +
+                bank * MELEE_WEB_SAVE_PROFILE_NAME_BANK_BYTES);
     return aliases_match(candidate, error, error_size) && ok(error, error_size);
 }
 
@@ -399,8 +710,121 @@ int melee_web_save_profile_owner_initialize_default(
         gmMainLib_8015F600(i, 1);
 
     if (!aliases_match(candidate, error, error_size)) return 0;
+    candidate->fresh_state_snapshot = malloc(
+        MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES + sizeof(struct ToyRuntimeAggregate));
+    if (!candidate->fresh_state_snapshot)
+        return fail(error, error_size,
+                    "Cannot retain the original fresh profile for mode isolation");
+    memcpy(candidate->fresh_state_snapshot, candidate->source_global,
+           MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES);
+    memcpy(candidate->fresh_state_snapshot + MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES,
+           &melee_web_toy_state, sizeof(struct ToyRuntimeAggregate));
+    candidate->fresh_language = lbLang_GetLanguageSetting();
+    candidate->fresh_saved_language = lbLang_GetSavedLanguage();
     candidate->default_initialized = 1;
     return ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_initialize_everything(
+    MeleeWebSaveProfileOwner* candidate, char* error, size_t error_size)
+{
+    int selkind;
+    int event;
+    int trophy;
+    int challenge;
+
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size))
+        return 0;
+    if (!candidate->default_initialized)
+        return fail(error, error_size,
+                    "Everything unlocked requires a fresh original profile");
+    if (candidate->everything_initialized)
+        return fail(error, error_size,
+                    "Everything unlocked baseline is already initialized");
+
+    /* These source routines use the authored eleven-entry unlock tables;
+     * there is no guessed mask width or asset availability implication. */
+    gm_80164F18();
+    gm_8016468C();
+    (void) fn_80173510();
+    (void) fn_801735F0();
+    (void) fn_8017367C();
+
+    /* The 51 event-clear flags are the exact range consumed by the source's
+     * all-event completion check (gm_8017335C and gm_801721EC_2). Leave the
+     * four event score/high-score words at their fresh, valid defaults. */
+    for (event = 0; event < 0x33; ++event)
+        gmMainLib_8015CEB4(event);
+    /* The source grants this separate boolean only for the final event's
+     * three-stock clear. A completed baseline includes that known condition. */
+    gmMainLib_8015CF84();
+
+    /* The retail mode-clear path maps each selectable character and each of
+     * Classic, Adventure and All-Star to source challenge IDs. Calling that
+     * path records those clears without inventing match counts or scores.
+     * The source routine also mirrors Zelda/Sheik's shared selectable slot. */
+    for (selkind = 0; selkind < SELKIND_COUNT; ++selkind) {
+        const u8 ckind = gm_SelKindToCKind((u8) selkind);
+        fn_80173834(ckind, GM_CLASSIC, false);
+        fn_80173834(ckind, GM_ADVENTURE, false);
+        fn_80173834(ckind, GM_ALLSTAR, false);
+    }
+
+    /* The result path records challenge completions through fn_8016F140.
+     * Its source inventory is 0..255; gm_80173EEC's own complete-all test
+     * explicitly excludes these seven IDs because they are not required
+     * completion entries. Record every other authored challenge, then let
+     * that original aggregate routine derive the 0x123 all-challenges award. */
+    for (challenge = 0; challenge < 0x100; ++challenge) {
+        if (challenge != 9 && challenge != 0x29 && challenge != 0x42 &&
+            challenge != 0x43 && challenge != 0xB9 && challenge != 0xC9 &&
+            challenge != 0xCA)
+            fn_8016F140(challenge);
+    }
+    gm_80173EEC();
+
+    /* Trophy IDs and the ownership counter are maintained by the original
+     * award routine. The source table declares exactly TY_TROPHY_COUNT IDs. */
+    for (trophy = 0; trophy < TY_TROPHY_COUNT; ++trophy)
+        Toy_SetUnlockState(trophy, true);
+
+    /* These original debug-unlock helpers are also used together by
+     * gmMainLib_8015FA34: they mark source-bounded unlock notifications and
+     * the 300-slot trophy reward ledger as claimed. The latter ledger lives
+     * in SaveData's authored padding span; the source loop defines its bound. */
+    gm_8017297C();
+    gm_801741FC();
+
+    /* Recompute the four named feature bits from the source unlock tables.
+     * Do not copy the debug path's raw 0xFF, whose remaining bits are unknown. */
+    gm_80172898(0xFFFFU);
+    /* fn_8016F140() records completed challenges through the original source
+     * award path, which also sets session-only pending trophy notifications in
+     * gmm_x0's transient block. The completed baseline has already included
+     * those rewards; clear only that transient block with Melee's own reset
+     * routine so Title does not replay newly-created unlock notices. */
+    gm_80172174();
+    if (!aliases_match(candidate, error, error_size)) return 0;
+    candidate->everything_initialized = 1;
+    return ok(error, error_size);
+}
+
+int melee_web_save_profile_owner_restore_default(
+    MeleeWebSaveProfileOwner* candidate, char* error, size_t error_size)
+{
+    if (!melee_web_save_profile_owner_live(candidate, error, error_size))
+        return 0;
+    if (!candidate->default_initialized || !candidate->fresh_state_snapshot)
+        return fail(error, error_size,
+                    "Original fresh profile snapshot is unavailable");
+    memcpy(candidate->source_global, candidate->fresh_state_snapshot,
+           MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES);
+    memcpy(&melee_web_toy_state,
+           candidate->fresh_state_snapshot + MELEE_WEB_SAVE_PROFILE_SOURCE_BYTES,
+           sizeof(struct ToyRuntimeAggregate));
+    lbLang_SetLanguageSetting(candidate->fresh_language);
+    lbLang_SetSavedLanguage(candidate->fresh_saved_language);
+    return aliases_match(candidate, error, error_size) && ok(error, error_size);
 }
 
 int melee_web_save_profile_owner_initialize_menu_roster(
@@ -458,7 +882,10 @@ int melee_web_save_profile_owner_deactivate(MeleeWebSaveProfileOwner* candidate,
     lbLang_SetSavedLanguage(candidate->saved_saved_language);
     free(candidate->source_snapshot);
     candidate->source_snapshot = NULL;
+    free(candidate->fresh_state_snapshot);
+    candidate->fresh_state_snapshot = NULL;
     candidate->default_initialized = 0;
+    candidate->everything_initialized = 0;
     candidate->active = 0;
     return ok(error, error_size);
 }
