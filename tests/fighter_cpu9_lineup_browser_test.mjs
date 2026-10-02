@@ -22,6 +22,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import {Worker} from 'node:worker_threads';
 import {parseArgs} from 'node:util';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
@@ -39,9 +40,32 @@ const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input','cpu-levels'].map(name=>[name,{type:'string'}])),
   'results-confirm-frame':{type:'string'},
   'results-observe-after-confirmation':{type:'boolean'},
-  matches:{type:'string'},'setup-only':{type:'boolean'}}});
+  matches:{type:'string'},'setup-only':{type:'boolean'},
+  'stage-kind':{type:'string'},'wall-bound-seconds':{type:'string'},
+  'stop-on-timing-pause':{type:'boolean'},
+  'controlled-contention':{type:'boolean'},'user-data-dir':{type:'string'}}});
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--stage-kind final-destination|battlefield] [--wall-bound-seconds SECONDS] [--stop-on-timing-pause] [--controlled-contention] [--user-data-dir EXTERNAL_PROFILE] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK]');
+const stages=Object.freeze({
+  'final-destination':Object.freeze({id:'final-destination',name:'Final Destination',sourceId:0x20,slug:'fd'}),
+  battlefield:Object.freeze({id:'battlefield',name:'Battlefield',sourceId:0x01,slug:'battlefield'}),
+});
+const stageKind=values['stage-kind']||'final-destination';
+if(!Object.hasOwn(stages,stageKind))
+  throw Error('--stage-kind must be final-destination or battlefield');
+const stage=stages[stageKind];
+const campaignRequested=values['stage-kind']!==undefined||values['wall-bound-seconds']!==undefined||
+  values['stop-on-timing-pause']===true||values['controlled-contention']===true;
+const wallBoundSeconds=campaignRequested?Number(values['wall-bound-seconds']??600):null;
+if(campaignRequested&&(!Number.isInteger(wallBoundSeconds)||wallBoundSeconds<1||wallBoundSeconds>600))
+  throw Error('--wall-bound-seconds must be an integer from 1 through 600 in campaign mode');
+if(!campaignRequested&&values['wall-bound-seconds']!==undefined)
+  throw Error('--wall-bound-seconds requires campaign mode');
+const stopOnTimingPause=values['stop-on-timing-pause']===true;
+const controlledContention=values['controlled-contention']===true;
+const userDataDirectory=values['user-data-dir']?path.resolve(values['user-data-dir']):null;
+const campaignCondition=controlledContention?'controlled-contention':'shared-host-uncontrolled';
+const campaignDeadline=campaignRequested?Date.now()+wallBoundSeconds*1000:null;
 const cpuLevels=values['cpu-levels']===undefined?[9,9,9,9]:
   values['cpu-levels'].split(',').map(Number);
 if(cpuLevels.length!==4||cpuLevels.some(level=>!Number.isInteger(level)||level<1||level>9))
@@ -98,7 +122,9 @@ if(buildDirectory){
   const wasmStat=await fs.stat(wasmPath);
   if(!wasmStat.isFile())throw Error('--build-dir must contain gameplay_menu_browser.wasm');
   localWasmIdentity={path:path.relative(repository,wasmPath),bytes:wasmStat.size,
-    sha256:await sha256(wasmPath)};
+    sha256:await sha256(wasmPath),
+    artifact_scope:'private-development-artifact',
+    hash_scope:'exact SHA-256 of gameplay_menu_browser.wasm bytes; not the public runtime graph'};
 }
 function sourceProvenance(){
   const git=(...args)=>execFileSync('git',args,{cwd:repository,encoding:'utf8'}).trim();
@@ -133,13 +159,27 @@ const resultsInputScope=resultsInputMode==='keyboard-three-prefix'?
   sourceTickThreePulse?
   `P1-only ten-source-tick Start holds queued at Results ticks 180/360/${resultsConfirmFrame}; disconnected CPU page transitions must precede the tick-${resultsConfirmFrame} confirmation; connectedness and consumed edges retained; controlled PAD path, not literal keyboard-event replay`:null;
 const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
-  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, ${cpuProfileDescription}, four stocks, Final Destination; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
+  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, ${cpuProfileDescription}, four stocks, ${stage.name}; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
+  campaign:campaignRequested?{kind:'natural-incident',wall_bound_seconds:wallBoundSeconds,
+    stage_kind:stage.id,stage_source_id:stage.sourceId,stop_on_timing_pause:stopOnTimingPause,
+    contention:campaignCondition,condition:campaignCondition,audio:'enabled',
+    reducer_packet:{schema:'melee-web-runtime-incident-reducer-v1',experiments_per_boundary:2,
+      stop_on_first_unexpected_pause:true}}:null,
   results_input_mode:resultsInputMode,
   results_input_scope:resultsInputScope,
   controller_profile:null,
   lineup:values.lineup,players:lineup.map(({name,kind},door)=>({name,kind,cpu:cpuLevels[door],stocks:4})),
   matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[],
-  results_input_events:[]};
+  results_input_events:[],
+  browser_context:{kind:userDataDirectory?'persistent':'temporary',
+    cache_reuse:userDataDirectory?'campaign-shared-origin-profile':'temporary-context',
+    requested_cache:url.searchParams.get('render-cache')==='clear'?'cold':'warm',
+    cache_evidence:{status:'unavailable',observed:false,populated_observed:false,restore_observed:false},
+    driver_cache:'uncontrolled'}};
+report.timing_pause_receipts=[];
+report.runtime_diagnostics={schema:'melee-web-runtime-callback-capture-v1',identity:null,
+  max_samples:100,max_incidents:24,samples:[],incidents:[],dropped_samples:0,dropped_incidents:0,
+  callback_count:0,status:'not-installed'};
 report.source_timing_disruptions=[];
 report.native_command_errors=[];
 report.results_entry_packets=[];
@@ -159,8 +199,27 @@ report.provenance={source_start:sourceProvenance(),
   results_source_pad_input_helper_sha256:await sha256(new URL('./results_source_pad_input.mjs',import.meta.url)),
   local_artifacts:localWasmIdentity?[localWasmIdentity]:[],
   served_artifacts:[]};
+report.runtime_diagnostics.identity={schema_version:1,
+  source_commit:null,runtime_hash:null,build_profile:'unknown'};
+report.runtime_diagnostics.identity_scope={
+  status:'unavailable',
+  reason:'runtime.html is a private development artifact without the audited public diagnostic meta identity',
+  public_runtime_graph_bound:false,
+  private_artifact:localWasmIdentity?{
+    path:localWasmIdentity.path,bytes:localWasmIdentity.bytes,
+    sha256:localWasmIdentity.sha256,hash_scope:localWasmIdentity.hash_scope}:null};
 const artifactReads=[];
-let browser,page,driver,browserCdp,activeMatchIndex=null;
+let browser,browserContext,page,driver,browserCdp,activeMatchIndex=null,contentionWorker=null;
+function startControlledContention(){
+  if(!controlledContention||contentionWorker)return;
+  contentionWorker=new Worker(`setInterval(()=>{const end=Date.now()+35;while(Date.now()<end){}},50);`,{eval:true});
+  contentionWorker.unref();
+}
+async function stopControlledContention(){
+  if(!contentionWorker)return;
+  const worker=contentionWorker;contentionWorker=null;
+  await worker.terminate().catch(()=>{});
+}
 async function readAudioDiagnostics(){
   if(!page||page.isClosed())return null;
   try{return await page.evaluate(()=>window.__meleeWebAudioDiagnostics?.snapshot()||null);}
@@ -256,9 +315,94 @@ async function installResultsInputObserver(){
     window.addEventListener('keyup',event=>record('keyup',event),true);
   });
 }
+async function installRuntimeDiagnosticsCapture(identity,identityScope){
+  await page.evaluate(({identity,identityScope})=>{
+    const MAX_SAMPLES=100,MAX_INCIDENTS=24,SAMPLE_INTERVAL_MS=100;
+    const capture={schema:'melee-web-runtime-callback-capture-v1',identity,identity_scope:identityScope,
+      max_samples:MAX_SAMPLES,max_incidents:MAX_INCIDENTS,samples:[],incidents:[],
+      dropped_samples:0,dropped_incidents:0,status:'installed',last_at_ms:null,last_sample_at_ms:null,
+      callback_count:0,max_callback_ms:null,max_interval_ms:null,max_update_ms:null,max_draw_ms:null,
+      max_total_ms:null,max_preparation_ms:null};
+    const finite=value=>Number.isFinite(value)?value:null;
+    const integer=value=>Number.isFinite(value)&&Number.isInteger(value)?value:null;
+    const maximum=(current,value)=>value===null?current:current===null?value:Math.max(current,value);
+    const originalSample=globalThis.menuDiagnosticSample;
+    const originalIncident=globalThis.menuDiagnosticIncident;
+    globalThis.menuDiagnosticSample=(...args)=>{
+      const started=performance.now();
+      let result;
+      try{result=originalSample?.(...args);}
+      finally{
+        const ended=performance.now();
+        const callbackMs=finite(Math.max(0,ended-started));
+        const intervalMs=capture.last_at_ms===null?null:finite(Math.max(0,ended-capture.last_at_ms));
+        const updateMs=finite(args[9]),drawMs=finite(args[10]),totalMs=finite(args[11]),
+          preparationMs=finite(args[12]);
+        capture.callback_count++;
+        capture.max_callback_ms=maximum(capture.max_callback_ms,callbackMs);
+        capture.max_interval_ms=maximum(capture.max_interval_ms,intervalMs);
+        capture.max_update_ms=maximum(capture.max_update_ms,updateMs);
+        capture.max_draw_ms=maximum(capture.max_draw_ms,drawMs);
+        capture.max_total_ms=maximum(capture.max_total_ms,totalMs);
+        capture.max_preparation_ms=maximum(capture.max_preparation_ms,preparationMs);
+        const retain=capture.last_sample_at_ms===null||ended-capture.last_sample_at_ms>=SAMPLE_INTERVAL_MS;
+        capture.last_at_ms=ended;
+        if(retain){
+          capture.samples.push({at_ms:finite(ended),timestamp:finite(args[0]),source_frame:integer(args[1]),
+            scene:integer(args[2]),stage:integer(args[3]),fighter0:finite(args[4]),fighter1:finite(args[5]),
+            fighter2:finite(args[6]),fighter3:finite(args[7]),debt_ticks:finite(args[8]),update_ms:updateMs,
+            draw_ms:drawMs,total_ms:totalMs,preparation_ms:preparationMs,queued_delta:finite(args[13]),
+            created_delta:finite(args[14]),texture_upload_bytes:finite(args[15]),source_steps:finite(args[16]),
+            source_draws:finite(args[17]),running:args[18]===undefined?null:!!args[18],callback_ms:callbackMs,
+            interval_ms:intervalMs});
+          if(capture.samples.length>MAX_SAMPLES){capture.samples.shift();capture.dropped_samples++;}
+          capture.last_sample_at_ms=ended;
+        }else capture.dropped_samples++;
+      }
+      return result;
+    };
+    globalThis.menuDiagnosticIncident=(...args)=>{
+      const started=performance.now();
+      let result;
+      try{result=originalIncident?.(...args);}
+      finally{
+        const ended=performance.now();
+        const row={at_ms:finite(ended),reason_code:integer(args[0]),value:finite(args[1]),
+          threshold:finite(args[2]),source_frame:integer(args[3]),scene:integer(args[4]),
+          clock_owner_code:integer(args[5]),callback_ms:finite(Math.max(0,ended-started))};
+        if(capture.incidents.length<MAX_INCIDENTS)capture.incidents.push(row);else capture.dropped_incidents++;
+      }
+      return result;
+    };
+    globalThis.__meleeWebRuntimeIncidentCampaignCapture=capture;
+  },{identity,identityScope});
+}
+async function retainRuntimeDiagnosticsCapture(){
+  if(!page||page.isClosed())return;
+  try{
+    const capture=await page.evaluate(()=>{
+      const value=globalThis.__meleeWebRuntimeIncidentCampaignCapture;
+      if(!value)return {schema:'melee-web-runtime-callback-capture-v1',status:'unavailable',
+        samples:[],incidents:[],dropped_samples:0,dropped_incidents:0};
+      return {schema:value.schema,identity:value.identity,identity_scope:value.identity_scope,
+        max_samples:value.max_samples,
+        max_incidents:value.max_incidents,samples:value.samples.slice(),incidents:value.incidents.slice(),
+        dropped_samples:value.dropped_samples,dropped_incidents:value.dropped_incidents,
+        callback_count:value.callback_count,max_callback_ms:value.max_callback_ms,
+        max_interval_ms:value.max_interval_ms,max_update_ms:value.max_update_ms,max_draw_ms:value.max_draw_ms,
+        max_total_ms:value.max_total_ms,max_preparation_ms:value.max_preparation_ms,status:value.status};
+    });
+    report.runtime_diagnostics=capture;
+  }catch(error){
+    report.runtime_diagnostics={schema:'melee-web-runtime-callback-capture-v1',status:'capture-error',
+      identity:report.runtime_diagnostics.identity,identity_scope:report.runtime_diagnostics.identity_scope,
+      samples:[],incidents:[],dropped_samples:0,
+      dropped_incidents:0,callback_count:0,error:error.message};
+  }
+}
 const buttonA=0x0100,buttonStart=0x1000;
 const phase=()=>page.evaluate(()=>Module._melee_web_native_menu_phase());
-const diagnostic=()=>page.evaluate(()=>{
+const diagnostic=()=>page.evaluate(stageId=>{
   const phase=Module._melee_web_native_menu_phase();
   const match=JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_match_observe()));
   const readyMatch=phase===7&&match.ready===true;
@@ -281,26 +425,65 @@ const diagnostic=()=>page.evaluate(()=>{
     p1:readyMatch?window.menuObservePlayer?.(1)||null:null,
     p2:readyMatch?window.menuObservePlayer?.(2)||null:null,
     p3:readyMatch?window.menuObservePlayer?.(3)||null:null,
-    sss:window.menuObserveStage?.(32)||null,
+    sss:window.menuObserveStage?.(stageId)||null,
+    cache:Module.runtimeCacheState?{state:Module.runtimeCacheState.state,mounted:Module.runtimeCacheState.mounted,
+      populated:Module.runtimeCacheState.populated,saves:Module.runtimeCacheState.saves,
+      clears:Module.runtimeCacheState.clears,dirty:Module.runtimeCacheState.dirty,
+      file_bytes:Module.runtimeCacheState.fileBytes,message:Module.runtimeCacheState.message}:null,
   };
-});
+},stage.sourceId);
 async function screenshot(name){
   const file=path.join(output,`${name}.png`);
   await page.screenshot({path:file,fullPage:false});report.screenshots.push(file);
   const canvas=path.join(output,`${name}-canvas.png`);
   await page.locator('#canvas').screenshot({path:canvas});report.screenshots.push(canvas);
 }
+function isTimingPause(state){
+  return typeof state?.status==='string'&&state.status.startsWith('Paused after a timing disruption');
+}
+function timingPauseSourceFrame(state){
+  const match=String(state?.diagnostics||'').match(/(?:source frame|source cursor): (\d+)/i);
+  return match?Number(match[1]):state?.p0?.frame??null;
+}
+async function failOnTimingPause(label,state){
+  const receipt={schema:'melee-web-timing-pause-receipt-v1',label,
+    match:activeMatchIndex,phase:state?.phase??null,running:state?.running??null,
+    status:isTimingPause(state)?state.status:null,source_frame:timingPauseSourceFrame(state),
+    diagnostics:typeof state?.diagnostics==='string'?state.diagnostics:null,
+    observed_at:new Date().toISOString()};
+  report.timing_pause_receipts.push(receipt);
+  const suffix=activeMatchIndex===null?'unknown':String(activeMatchIndex);
+  await fs.writeFile(path.join(output,`timing-pause-${suffix}.json`),JSON.stringify(receipt,null,2)+'\n')
+    .catch(error=>{report.timing_pause_receipt_write_error=error.message;});
+  await screenshot(`timing-pause-${suffix}`).catch(error=>{
+    report.timing_pause_screenshot_error=error.message;
+  });
+  throw Error(`${label}: unexpected timing pause at source frame ${receipt.source_frame??'unknown'}`);
+}
 async function writeProgress(label){
   const state=await diagnostic();
+  const cache=state.cache;
+  const evidence=report.browser_context?.cache_evidence;
+  if(evidence&&cache){
+    evidence.observed=true;
+    evidence.last={state:cache.state,populated:cache.populated,clears:cache.clears,
+      file_bytes:cache.file_bytes,mounted:cache.mounted,dirty:cache.dirty};
+    if(cache.populated===true&&Number(cache.file_bytes)>0){
+      evidence.populated_observed=true;
+      if(report.browser_context.requested_cache==='warm'&&Number(cache.clears)===0){
+        evidence.restore_observed=true;evidence.status='observed-populated';
+      }else if(evidence.status==='unavailable')evidence.status='observed-after-clear';
+    }else if(evidence.status==='unavailable')evidence.status='observed-not-populated';
+  }
   report.source_progress.push({label,phase:state.phase,status:state.status,
     error:state.error,p0:state.p0,p1:state.p1,p2:state.p2,p3:state.p3,match:state.match,
     css:state.css,memory:state.memory,fighterParts:state.fighterParts,
     fighterPartsStep:state.fighterPartsStep,fighterPartsOwner:state.fighterPartsOwner,
-    kirbyHatLoad:state.kirbyHatLoad,assetFatal:state.assetFatal});
+    kirbyHatLoad:state.kirbyHatLoad,assetFatal:state.assetFatal,cache:state.cache});
   await fs.writeFile(path.join(output,'progress.json'),JSON.stringify({
     label,phase:state.phase,status:state.status,error:state.error,
     p0:state.p0,p1:state.p1,p2:state.p2,p3:state.p3,match:state.match,
-    assetFatal:state.assetFatal,at:new Date().toISOString()},null,2)+'\n');
+    assetFatal:state.assetFatal,cache:state.cache,at:new Date().toISOString()},null,2)+'\n');
   if(state.error)throw Error(state.error);
   return state;
 }
@@ -308,11 +491,13 @@ async function waitFor(label,predicate,timeoutMs=30000){
   const deadline=Date.now()+timeoutMs;
   while(Date.now()<deadline){
     const state=await diagnostic();
+    if(stopOnTimingPause&&isTimingPause(state))await failOnTimingPause(label,state);
     if(state.error)throw Error(`${label}: ${state.error}`);
     if(predicate(state))return state;
     await page.waitForTimeout(50);
   }
   const state=await diagnostic();
+  if(stopOnTimingPause&&isTimingPause(state))await failOnTimingPause(label,state);
   throw Error(`${label} timed out after ${timeoutMs} ms: ${JSON.stringify({phase:state.phase,status:state.status,p0:state.p0,p1:state.p1,match:state.match})}`);
 }
 async function pad(port,buttons=0,stickX=0,stickY=0,duration=1,label='input'){
@@ -467,9 +652,9 @@ async function configureRoster(expected){
   for(let door=0;door<4;door++)await setCpuDoor(door);
   for(const door of [2,3])await selectCpuCharacter(door,expected[door]);
   for(let door=0;door<4;door++)await setCpuLevel(door,cpuLevels[door]);
-  return verifyRoster(expected,`${cpuProfileDescription} Final Destination roster before SSS`);
+  return verifyRoster(expected,`${cpuProfileDescription} ${stage.name} roster before SSS`);
 }
-async function chooseFinalDestination(){
+async function chooseStage(){
   await tap(0,buttonStart,'CSS-to-SSS Start',8);
   const rawStart=await waitFor('original SSS entry after raw PAD Start',s=>s.phase===3,2000)
     .catch(()=>null);
@@ -481,18 +666,20 @@ async function chooseFinalDestination(){
   await screenshot(`match-${report.matches.length+1}-sss`);
   for(let attempt=0;attempt<360;attempt++){
     const state=await diagnostic();
+    if(stopOnTimingPause&&isTimingPause(state))await failOnTimingPause('stage selection',state);
     if(state.error)throw Error(`SSS source error: ${state.error}`);
     if(state.phase!==3)throw Error(`SSS exited before stage confirmation; phase=${state.phase}`);
-    const result=await page.evaluate(()=>Module._melee_web_native_menu_drive_stage(32));
+    const result=await page.evaluate(stageId=>Module._melee_web_native_menu_drive_stage(stageId),stage.sourceId);
     if(result===0)throw Error('Source SSS stage-driver failed: '+await page.evaluate(()=>Module.UTF8ToString(Module._melee_web_native_menu_diagnostics())));
     if(result===2)break;
     await page.waitForTimeout(45);
   }
-  const stage=await page.evaluate(()=>window.menuObserveStage(32));
-  assert(stage&&stage.ids[1]===32,'Final Destination was not highlighted by the live source SSS');
-  report.phases.push({label:'source SSS highlighted Final Destination',stage});
-  await screenshot(`match-${report.matches.length+1}-fd-highlighted`);
-  await tap(0,buttonA,'confirm-Final-Destination');
+  const selectedStage=await page.evaluate(stageId=>window.menuObserveStage(stageId),stage.sourceId);
+  assert(selectedStage&&selectedStage.ids[1]===stage.sourceId,
+    `${stage.name} was not highlighted by the live source SSS`);
+  report.phases.push({label:`source SSS highlighted ${stage.name}`,stage:selectedStage});
+  await screenshot(`match-${report.matches.length+1}-${stage.slug}-highlighted`);
+  await tap(0,buttonA,`confirm-${stage.name}`);
   await waitFor('original four-player match entry',s=>s.phase===7,60000);
 }
 async function runMatch(matchIndex,expected){
@@ -524,11 +711,13 @@ async function runMatch(matchIndex,expected){
       method:'development source-boundary queue before SSS/match construction',
       events:scheduledSourceTickInputs});
   }
-  await chooseFinalDestination();
+  await chooseStage();
+  startControlledContention();
   const entry=await writeProgress(`match-${matchIndex}-entry`);
   await screenshot(`match-${matchIndex}-entry`);
   const checkpoints=[600,2400,6000,10000,14000,18000,24000];
   let next=0,deadline=Date.now()+12*60*1000,stalledSince=0,terminalTransitionRecorded=false;
+  if(campaignDeadline!==null)deadline=Math.min(deadline,campaignDeadline);
   const lastKindBySlot=new Map();
   while(Date.now()<deadline){
     const state=await diagnostic();
@@ -559,6 +748,7 @@ async function runMatch(matchIndex,expected){
     assert.equal(state.phase,7,`Match ${matchIndex} left the source Match scene unexpectedly`);
     const frame=state.p0?.frame||0;
     if(state.status.startsWith('Paused after a timing disruption')){
+      if(stopOnTimingPause)await failOnTimingPause(`match ${matchIndex}`,state);
       if(!stalledSince){
         stalledSince=Date.now();
         report.source_timing_disruptions.push({match:matchIndex,frame,action:'pause-observed'});
@@ -586,8 +776,10 @@ async function runMatch(matchIndex,expected){
     await page.waitForTimeout(250);
   }
   let state=await diagnostic();
+  await stopControlledContention();
+  if(stopOnTimingPause&&isTimingPause(state))await failOnTimingPause(`match ${matchIndex}`,state);
   if(state.phase!==8&&state.phase!==9)
-    throw Error(`Match ${matchIndex} did not naturally reach Results/Prize before the 12-minute bound: ${JSON.stringify({phase:state.phase,p0:state.p0,p1:state.p1,status:state.status})}`);
+    throw Error(`Match ${matchIndex} did not naturally reach Results/Prize before the ${campaignRequested?wallBoundSeconds*1000:12*60*1000} ms bound: ${JSON.stringify({phase:state.phase,p0:state.p0,p1:state.p1,status:state.status})}`);
   await retainResultsEntry(`match-${matchIndex}-results-entry`);
   const result={match:matchIndex,entered_results_phase:state.phase,
     source_diagnostics:state.diagnostics,terminal_match:state.match,
@@ -598,6 +790,7 @@ async function runMatch(matchIndex,expected){
   // when the actual source menu returns to CSS; never force a scene reset.
   const resumeResultsIfPaused=async state=>{
     if(!state.status.startsWith('Paused after a timing disruption'))return state;
+    if(stopOnTimingPause)await failOnTimingPause(`Results ${matchIndex}`,state);
     const row={match:matchIndex,phase:state.phase,source_diagnostics:state.diagnostics,
       action:'resumed-at-same-source-frame-before-results-input'};
     report.source_timing_disruptions.push(row);
@@ -1711,19 +1904,33 @@ try{
   const discStat=await fs.stat(values.disc);
   report.disc={bytes:discStat.size,sha256:await sha256(values.disc)};
   report.url=values.url;
+  report.browser_context.kind=userDataDirectory?'persistent':'temporary';
+  report.browser_context.cache_reuse=userDataDirectory?'campaign-shared-origin-profile':'temporary-context';
+  report.browser_context.driver_cache='uncontrolled';
   const {chromium,browser:launchOptions,browserPath,playwrightPath}=await loadBrowserTools(values.playwright);
-  browser=await chromium.launch({...browserLaunchOptions(launchOptions),headless:true});
-  report.browser={name:'headless Chrome',executable:path.basename(browserPath),version:browser.version(),playwright:playwrightPath};
-  browserCdp=await browser.newBrowserCDPSession();
-  await browserCdp.send('Target.setDiscoverTargets',{discover:true});
+  const launchConfig={...browserLaunchOptions(launchOptions),headless:true};
+  if(userDataDirectory){
+    await fs.mkdir(userDataDirectory,{recursive:true});
+    browserContext=await chromium.launchPersistentContext(userDataDirectory,launchConfig);
+    browser=browserContext.browser();
+    for(const existing of browserContext.pages())await existing.close();
+  }else{
+    browser=await chromium.launch(launchConfig);
+    browserContext=null;
+  }
+  report.browser={name:'headless Chrome',executable:path.basename(browserPath),version:browser?.version()??'unknown',playwright:playwrightPath};
+  if(browser)browserCdp=await browser.newBrowserCDPSession();
+  if(browserCdp){
+    await browserCdp.send('Target.setDiscoverTargets',{discover:true});
+  }
   const lastSourceProgress=()=>{
     const row=report.source_progress.at(-1);
     return row?{label:row.label,phase:row.phase,match_frame:row.match?.frame??null,
       wasm_heap_bytes:row.memory?.wasm_heap_bytes??null}:null;
   };
-  browserCdp.on('Target.targetCrashed',event=>report.target_crashes.push({
+  browserCdp?.on('Target.targetCrashed',event=>report.target_crashes.push({
     at:new Date().toISOString(),...event,last_source_progress:lastSourceProgress()}));
-  page=await browser.newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});
+  page=await (browserContext||browser).newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});
   page.on('crash',error=>report.page_crashes.push({at:new Date().toISOString(),
     message:error?.message||null,last_source_progress:lastSourceProgress()}));
   // Retain WebAudio state and AudioWorklet queue reports/errors at Results
@@ -1865,6 +2072,8 @@ try{
   assert(report.gpu.cross_origin_isolated&&report.gpu.adapter_available,
     'Rendered validation requires an isolated page and a WebGPU adapter');
   await driver.waitForImport();
+  await installRuntimeDiagnosticsCapture(report.runtime_diagnostics.identity,
+    report.runtime_diagnostics.identity_scope);
   await installResultsInputObserver();
   await driver.selectDisc(values.disc);
   await driver.waitForStart();
@@ -1929,8 +2138,10 @@ try{
     await page.locator('body').textContent().then(text=>fs.writeFile(path.join(output,'page.txt'),text)).catch(()=>{});
   }
 }finally{
+  await stopControlledContention();
   if(page&&!page.isClosed()){
     await retainResultsInputEvents();
+    await retainRuntimeDiagnosticsCapture();
     if(activeMatchIndex!==null&&report.matches.some(row=>row.match===activeMatchIndex)&&
        !report.results_source_pad_traces.some(row=>row.match===activeMatchIndex))
       await retainResultsSourcePadTrace(activeMatchIndex,'final-state-after-match-stop');
@@ -1949,7 +2160,8 @@ try{
   }
   if(page&&!page.isClosed())driver?.dispose();
   if(browserCdp)await browserCdp.detach().catch(()=>{});
-  if(browser)await browser.close();
+  if(browserContext)await browserContext.close();
+  else if(browser)await browser.close();
   await fs.writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n');
 }
 if(!['pass','setup-only-pass','results-observation-pass'].includes(report.result))

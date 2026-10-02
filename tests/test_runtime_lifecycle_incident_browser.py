@@ -1,0 +1,38 @@
+"""Syntax and CLI contract for the bounded lifecycle browser detector."""
+from pathlib import Path
+import shutil
+import subprocess
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
+    def test_node_syntax_and_help_are_local_only(self):
+        script = ROOT / "tests" / "runtime_lifecycle_incident_browser_test.mjs"
+        node = shutil.which("node")
+        self.assertIsNotNone(node, "node is required for the local CLI contract")
+        checked = subprocess.run([node, "--check", str(script)],
+                                 capture_output=True, text=True, timeout=30)
+        self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
+        help_result = subprocess.run([node, str(script), "--help"],
+                                     capture_output=True, text=True, timeout=30)
+        self.assertEqual(help_result.returncode, 0, help_result.stdout + help_result.stderr)
+        self.assertIn("--site AUDITED_AUDIO_PLAYER", help_result.stdout)
+        self.assertIn("--manifest MANIFEST", help_result.stdout)
+        self.assertIn("--disc OWNED_ISO", help_result.stdout)
+        self.assertIn("--out FRESH_EVIDENCE_DIR", help_result.stdout)
+        self.assertIn("--synthetic", help_result.stdout)
+
+    def test_lifecycle_modes_are_explicitly_gated(self):
+        source = (ROOT / "tests" / "runtime_lifecycle_incident_browser_test.mjs").read_text()
+        self.assertNotIn("Emulation.setDocumentVisibilityState", source)
+        self.assertIn("Page.setWebLifecycleState", source)
+        self.assertIn("genuine_lifecycle_events_unavailable", source)
+        self.assertIn("game_imported: false", source)
+        self.assertIn("graphics_ready_timeout", source)
+        self.assertIn("no browser lifecycle or user-root-cause claim", source)
+
+
+if __name__ == "__main__":
+    unittest.main()

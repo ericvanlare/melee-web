@@ -1,0 +1,149 @@
+import json
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+HARNESS = ROOT / "tests" / "fighter_cpu9_lineup_browser_test.mjs"
+RUNNER = ROOT / "scripts" / "runtime_incident_campaign.mjs"
+
+
+class RuntimeIncidentCampaignTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.harness = HARNESS.read_text(encoding="utf-8")
+        cls.runner = RUNNER.read_text(encoding="utf-8")
+
+    def test_campaign_flags_and_authored_stage_ids(self):
+        self.assertIn("'stop-on-timing-pause':{type:'boolean'}", self.harness)
+        self.assertIn("'stage-kind':{type:'string'}", self.harness)
+        self.assertIn("'wall-bound-seconds':{type:'string'}", self.harness)
+        self.assertIn("sourceId:0x20", self.harness)
+        self.assertIn("sourceId:0x01", self.harness)
+        self.assertIn("const stageKind=values['stage-kind']||'final-destination'", self.harness)
+        self.assertIn("wallBoundSeconds=campaignRequested?Number(values['wall-bound-seconds']??600):null", self.harness)
+
+    def test_pause_mode_retains_receipt_and_blocks_resume_paths(self):
+        self.assertIn("timing-pause-receipt-v1", self.harness)
+        self.assertIn("timing-pause-${suffix}.json", self.harness)
+        self.assertIn("timing-pause-${suffix}", self.harness)
+        self.assertGreaterEqual(self.harness.count("failOnTimingPause"), 6)
+        self.assertIn("if(stopOnTimingPause)await failOnTimingPause(`Results ${matchIndex}`,state);", self.harness)
+
+    def test_callback_capture_is_bounded_and_scalar(self):
+        self.assertIn("max_samples:100,max_incidents:24", self.harness)
+        self.assertIn("SAMPLE_INTERVAL_MS=100", self.harness)
+        self.assertIn("globalThis.menuDiagnosticSample=(...args)=>", self.harness)
+        self.assertIn("globalThis.menuDiagnosticIncident=(...args)=>", self.harness)
+        self.assertIn("source_commit:null,runtime_hash:null,build_profile:'unknown'", self.harness)
+        self.assertIn("artifact_scope:'private-development-artifact'", self.harness)
+        self.assertIn("hash_scope:'exact SHA-256 of gameplay_menu_browser.wasm bytes; not the public runtime graph'", self.harness)
+        self.assertIn("public_runtime_graph_bound:false", self.harness)
+        self.assertIn("if(capture.samples.length>MAX_SAMPLES){capture.samples.shift();capture.dropped_samples++;}", self.harness)
+        self.assertNotIn("exportDiagnostics", self.harness)
+
+    def test_runner_has_frozen_four_attempt_plan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run(
+                [
+                    "node",
+                    str(RUNNER),
+                    "--url",
+                    "http://127.0.0.1:1234/runtime.html",
+                    "--disc",
+                    "owned.ciso",
+                    "--out-root",
+                    directory,
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            plan = json.loads(result.stdout)
+            plan_path = Path(plan["plan_path"])
+            self.assertTrue(plan_path.is_file())
+            self.assertEqual(json.loads(plan_path.read_text(encoding="utf-8")), plan)
+        self.assertEqual(plan["attempt_count"], 4)
+        self.assertEqual(plan["contention"], "shared-host-uncontrolled")
+        self.assertEqual(plan["condition"], "shared-host-uncontrolled")
+        self.assertEqual(Path(plan["receipt_path"]).name, "campaign-receipt.json")
+        self.assertEqual(plan["browser_context"]["kind"], "persistent-user-data-dir")
+        self.assertEqual(plan["browser_context"]["driver_cache"], "uncontrolled")
+        self.assertEqual(plan["reducer_packet"]["experiments_per_boundary"], 2)
+        self.assertEqual(
+            [(row["lineup"], row["stage_kind"], row["cache"]) for row in plan["attempts"]],
+            [
+                ("A", "final-destination", "cold"),
+                ("A", "final-destination", "warm"),
+                ("B", "battlefield", "cold"),
+                ("B", "battlefield", "warm"),
+            ],
+        )
+        for row in plan["attempts"]:
+            self.assertEqual(row["matches"], 2)
+            self.assertEqual(row["wall_bound_seconds"], 600)
+            self.assertTrue(row["stop_on_timing_pause"])
+            self.assertEqual(row["audio"], "enabled")
+            self.assertIn("--stop-on-timing-pause", row["args"])
+            self.assertIn("--user-data-dir", row["args"])
+        profile_args = [row["args"][row["args"].index("--user-data-dir") + 1] for row in plan["attempts"]]
+        self.assertEqual(len(set(profile_args)), 1)
+        self.assertEqual(Path(profile_args[0]).name, ".campaign-browser-profile")
+
+    def test_runner_contention_label_and_cache_request(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = subprocess.run(
+                [
+                    "node",
+                    str(RUNNER),
+                    "--url",
+                    "https://webmelee.gg/runtime.html",
+                    "--disc",
+                    "owned.ciso",
+                    "--out-root",
+                    directory,
+                    "--contention",
+                ],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        plan = json.loads(result.stdout)
+        self.assertEqual(plan["contention"], "controlled-contention")
+        self.assertEqual(plan["condition"], "controlled-contention")
+        self.assertTrue(all(row["label"] == "controlled-contention" for row in plan["attempts"]))
+        self.assertTrue(all("--controlled-contention" in row["args"] for row in plan["attempts"]))
+        cold, warm = plan["attempts"][0], plan["attempts"][1]
+        self.assertIn("render-cache=clear", cold["url"])
+        self.assertNotIn("render-cache=clear", warm["url"])
+
+    def test_harness_persistent_context_and_shared_host_label(self):
+        self.assertIn("'user-data-dir':{type:'string'}", self.harness)
+        self.assertIn("chromium.launchPersistentContext(userDataDirectory,launchConfig)", self.harness)
+        self.assertIn("cache_reuse:userDataDirectory?'campaign-shared-origin-profile':'temporary-context'", self.harness)
+        self.assertIn("driver_cache:'uncontrolled'", self.harness)
+        self.assertIn("campaignCondition=controlledContention?'controlled-contention':'shared-host-uncontrolled'", self.harness)
+        self.assertIn("if(browserContext)await browserContext.close();", self.harness)
+
+    def test_runner_freezes_plan_and_writes_stopping_receipt(self):
+        self.assertIn("campaign-plan.json", self.runner)
+        self.assertIn("campaign-receipt.json", self.runner)
+        self.assertIn("melee-web-runtime-incident-campaign-receipt-v1", self.runner)
+        self.assertIn("receipt.stop={reason:'attempt-failed'", self.runner)
+        self.assertIn("profile_cleanup='preserved-after-failure'", self.runner)
+        self.assertIn("if(receipt.status==='pass')", self.runner)
+
+    def test_cache_warmth_requires_observed_runtime_status(self):
+        self.assertIn("cache_evidence.restore_observed", self.runner)
+        self.assertIn("actual native warmth requires harness cache_evidence.restore_observed", self.runner)
+        self.assertIn("Module.runtimeCacheState?{state:Module.runtimeCacheState.state", self.harness)
+        self.assertIn("requested_cache:url.searchParams.get('render-cache')==='clear'?'cold':'warm'", self.harness)
+        self.assertIn("evidence.status='observed-populated'", self.harness)
+
+
+if __name__ == "__main__":
+    unittest.main()
