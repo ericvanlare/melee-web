@@ -33,6 +33,8 @@ export function createRuntimeAudio({assetBase, onEvent, onError, onFatal}) {
     async prepare() {
       if (!context) {
         context = new AudioContext({sampleRate: 32000, latencyHint: 'interactive'});
+        context.onstatechange = () => onEvent({type: 'context-state',
+          context_state: context.state, audio_clock_seconds: context.currentTime, enabled});
         if (context.sampleRate !== 32000) throw Error('Expected 32000 Hz audio context.');
       }
       // Invoke resume before yielding so the Choose file or recovery Play click
@@ -53,7 +55,8 @@ export function createRuntimeAudio({assetBase, onEvent, onError, onFatal}) {
                 for (const waiter of waiters.splice(0)) { clearTimeout(waiter.timer); waiter.resolve(); }
               }
               if (data.error) onError(Error(data.error));
-              onEvent(data);
+              onEvent({...data, context_state: context.state,
+                audio_clock_seconds: context.currentTime, enabled});
             };
             node.port.postMessage({type: 'state', enabled: false});
             node.connect(context.destination);

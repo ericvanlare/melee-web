@@ -68,6 +68,8 @@ try:
         _identity_repo_path,
         _runtime_graph_hash,
         _validate_audio_policy,
+        _diagnostic_identity,
+        _source_sha,
     )
 except ImportError as exc:  # pragma: no cover - only relevant to direct misuse
     raise SystemExit(f"audit_public must run with scripts/ on PYTHONPATH: {exc}") from exc
@@ -435,6 +437,7 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
             _fail(f"player runtime artifact identity mismatch: {rel}")
         runtime_files[rel] = data
     source_map = {
+        "runtime-diagnostics.mjs": ROOT / "web" / "runtime-diagnostics.mjs",
         "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
         "save-profile-settings.mjs": ROOT / "web" / "save-profile-settings.mjs",
         "save-profile-store.mjs": ROOT / "web" / "save-profile-store.mjs",
@@ -687,7 +690,11 @@ def audit(output: Path | str, manifest: Path | str, mode: str | None = None) -> 
             html_source = player_source["index.html"]
         expected_css = legal_css_path if profile == "player" and rel != "index.html" else css_path
         expected_html = _replace_html(html_source, operator, contact,
-                                      "/" + expected_css, "/" + js_path, mode)
+                                      "/" + expected_css, "/" + js_path, mode,
+                                      _diagnostic_identity(
+                                          source_commit=_source_sha(),
+                                          runtime_hash=runtime["hash"], build_profile="player",
+                                      ) if profile == "player" and rel == "index.html" else None)
         if _read_output(output, rel, profile) != expected_html:
             _fail(f"page differs from the current approved source: {rel}")
     if _read_output(output, LEGAL_NOTICE_OUTPUT, profile) != legal_notice:

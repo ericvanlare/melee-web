@@ -71,7 +71,8 @@ class PublicReleaseTests(unittest.TestCase):
 
         Native tools and prepared gameplay are deliberately tiny fixtures. The
         real provenance readers still hash files, trees, patches and Git state;
-        no validation function is mocked or skipped.
+        native provenance validation is not mocked. Source-commit metadata uses an
+        explicit fixture identity; its clean-Git checks have separate tests.
         """
         if hasattr(self, "fixture_repo"):
             return self.fixture_repo
@@ -136,6 +137,10 @@ class PublicReleaseTests(unittest.TestCase):
             root_patch = patch.object(module, "ROOT", repo)
             root_patch.start()
             self.addCleanup(root_patch.stop)
+        for module in (build_public, audit_public):
+            commit_patch = patch.object(module, "_source_sha", return_value="a" * 40)
+            commit_patch.start()
+            self.addCleanup(commit_patch.stop)
         self.ninja_deps_text = ninja_deps_text
         self.fixture_repo = repo
         return repo

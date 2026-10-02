@@ -162,15 +162,19 @@ def expected_files(*, production=False):
     files['player/player-shell.mjs'] = replace_once(
         shell, "from '../melee-runtime.mjs'", "from '../audio-preview-runtime.mjs'").encode()
     files['player/player.css'] = read(ROOT / 'web/player/player.css')
-    if production:
-        public._validate_runtime_graph(files, audio=True)
+    public._validate_runtime_graph(files, audio=True)
     for name, data in files.items():
         require(len(data) <= public.MAX_FILE_BYTES, f'Asset exceeds Pages limit: {name}')
         require(not any(marker in data for marker in (
             b'/Users/', b'/private/var/', b'CPU_ADDRESS_AUDIT', b'melee-web-native-cpu-address-audit',
-            b'__melee_evidence', b'sendBeacon(', b'runtime-diagnostics.mjs', b'runtime-cache.js',
+            b'__melee_evidence', b'sendBeacon(', b'runtime-cache.js',
         )), f'Private or diagnostic content in preview: {name}')
     group = public._runtime_graph_hash(files)
+    source_sha = source_commit()
+    diagnostic_identity = public._diagnostic_identity(
+        source_commit=source_sha, runtime_hash=group,
+        build_profile='audio-player' if production else 'audio-preview',
+    )
     output = {f'runtime/{group}/{name}': data for name, data in files.items()}
     css = read(ROOT / 'web/public/site.css')
     css_path = f'assets/site.{digest(css)[:16]}.css'
@@ -184,7 +188,8 @@ def expected_files(*, production=False):
         output[name] = public._replace_html(
             text.encode(), OPERATOR, CONTACT,
             f'/runtime/{group}/player/player.css' if name == 'index.html' else '/' + css_path,
-            f'/runtime/{group}/player/player-shell.mjs', mode)
+            f'/runtime/{group}/player/player-shell.mjs', mode,
+            diagnostic_identity if name == 'index.html' else None)
     output['licenses/runtime-third-party.txt'] = license_notice(
         read(ROOT / public.LEGAL_NOTICE_SOURCE).decode(), production=production).encode()
     output['licenses/dolphin-gpl-2.0-or-later.txt'] = read(ROOT / 'docs/licenses/dolphin-gpl-2.0-or-later.txt')
@@ -194,7 +199,7 @@ def expected_files(*, production=False):
     output['robots.txt'] = public._robots(mode, False).encode()
     require(all(len(data) <= public.MAX_FILE_BYTES for data in output.values()), 'Audio package asset exceeds Pages limit')
     require(sum(map(len, output.values())) <= public.RUNTIME_MAX_TOTAL_BYTES, 'Preview exceeds size limit')
-    return output, {'source_sha': source_commit(), 'runtime_hash': group, 'identity_sha256': identity_hash}
+    return output, {'source_sha': source_sha, 'runtime_hash': group, 'identity_sha256': identity_hash}
 
 
 def inventory(files):
@@ -286,7 +291,7 @@ def verify(origin, manifest, *, production=False):
     missing, limitations = [], []
     maps = tuple('/' + name + '.map' for name in paths if name.endswith(('.wasm', '.js', '.mjs')))
     for path in (*http.BLOCKED_PATHS, '/manifest.json', '/runtime-audio-preview-identity.json', '/src/',
-                 f'/runtime/{group}/dsp_coef.bin', f'/runtime/{group}/runtime-diagnostics.mjs', *maps):
+                 f'/runtime/{group}/dsp_coef.bin', *maps):
         status, headers, body, destination = http.get(origin + path)
         http.check_destination(origin, destination, {path})
         if loopback and path in ('/_headers', '/_redirects') and status == 502 and b'ENOTDIR' in body:
