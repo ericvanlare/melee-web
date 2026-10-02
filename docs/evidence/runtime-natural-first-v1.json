@@ -1,0 +1,96 @@
+{
+  "schema": "melee-web-natural-runtime-incident-receipt-v1",
+  "evidence_label": "Browser exercised",
+  "result": "pass",
+  "scope": "Headless installed Chrome, cold origin renderer cache, two natural four-stock CPU9 Final Destination matches through original CSS/SSS, Results and CSS; audio enabled; no automatic Resume.",
+  "condition": "shared-host-uncontrolled",
+  "source": {
+    "commit": "18e4d54b278df7a51af6848b85077e89544d65b9",
+    "tree": "cdefc8c84180941037fff3441478c68e6f2a4851",
+    "status": "",
+    "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source_unchanged": true,
+  "runtime_artifact": {
+    "path": "build/browser-release/gameplay_menu_browser.wasm",
+    "bytes": 15642870,
+    "sha256": "8f8a29c02c54cdd795d423d0f16efe16ac151b7b29eeeda6a59e7a2977afe0b6",
+    "artifact_scope": "private-development-artifact",
+    "hash_scope": "exact SHA-256 of gameplay_menu_browser.wasm bytes; not the public runtime graph"
+  },
+  "public_identity_available": false,
+  "browser_version": "154.0.8037.97",
+  "gpu": {
+    "cross_origin_isolated": true,
+    "adapter_available": true,
+    "info": {
+      "vendor": "apple",
+      "architecture": "metal-3",
+      "device": "",
+      "description": ""
+    }
+  },
+  "report": {
+    "path": "/Volumes/AgentStorage/melee-web/runs/runtime-natural-pause-campaign-20261001-200224-3fb17a67/A-final-destination-cold/shared-host-uncontrolled/report.json",
+    "sha256": "751cd4454a4d51414d366bda8ee6a7e5fce7aa6ebc0670b0393ffb31f2a8b3cd"
+  },
+  "attempt_wall_seconds": 518.4726901054382,
+  "matches": [
+    {
+      "match": 1,
+      "terminal_source_frame": 13626,
+      "entered_results_phase": 8,
+      "rendered_results_source_frame": 183
+    },
+    {
+      "match": 2,
+      "terminal_source_frame": 13236,
+      "entered_results_phase": 8,
+      "rendered_results_source_frame": 184
+    }
+  ],
+  "match_source_ticks": 26862,
+  "unexpected_timing_pause_receipts": 0,
+  "automatic_recoveries": 0,
+  "native_incidents": [],
+  "callback_observations": {
+    "callback_count": 30449,
+    "max_callback_ms": 0.05500006675720215,
+    "max_interval_ms": 3919.399999976158,
+    "max_update_ms": 7.490000009536743,
+    "max_draw_ms": 130.70000004768372,
+    "max_total_ms": 238.40499997138977,
+    "max_preparation_ms": 235.1449999809265
+  },
+  "callback_scope": "Whole-attempt maxima include startup/preparation/inactive work. These are not active gameplay performance admission metrics. Scalar hook callback_ms measures the JS observer, not whole native execution.",
+  "cache_evidence": {
+    "status": "observed-not-populated",
+    "observed": true,
+    "populated_observed": false,
+    "restore_observed": false,
+    "last": {
+      "state": "dirty",
+      "populated": true,
+      "clears": 1,
+      "file_bytes": 0,
+      "mounted": true,
+      "dirty": true
+    }
+  },
+  "owned_cleanup": {
+    "chrome": "closed",
+    "loopback_server": "closed",
+    "profile": "retained for a subsequent warm control; restored cache not demonstrated"
+  },
+  "unrun_gates": [
+    "natural unexplained pause reproduction",
+    "root-cause fix",
+    "quiet-machine performance",
+    "foreground timing",
+    "original state/pixel/PCM comparison",
+    "physical input",
+    "audible output",
+    "other campaign stage/lineups",
+    "verified persistent-profile warm restore"
+  ]
+}

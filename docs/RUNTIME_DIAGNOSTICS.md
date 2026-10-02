@@ -68,6 +68,33 @@ graph and producer. Environment is derived independently from exact known hosts;
 unknown hosts stay unknown. A production-profile package on a staging host is
 staging, so promotion does not require changing tested runtime bytes.
 
+## Natural campaign and lifecycle boundary
+
+The [natural first-pause receipt](evidence/runtime-natural-first-v1.json) is
+bounded **Browser exercised** evidence from source `18e4d54`: two CPU9 Final
+Destination four-stock matches completed through Results and CSS with 26,862
+source steps, zero forced pauses and zero automatic recoveries. The host was
+shared and uncontrolled, and the headless run kept speaker output silent. It
+does not establish quiet-machine or foreground timing, warm-profile restore,
+original-state/pixel/PCM agreement, physical input, audible quality, or a
+natural root cause.
+
+The controlled lifecycle baseline uses the 4e audio-player identity and keeps
+the hidden-interval case separate from the failed whole ownership predicate.
+The hidden case observed the expected native guard (`22 > 8`); the overall
+case failed because the browser manual-control predicate used a Node-scoped
+hold value. Its retained receipt is
+`/Volumes/AgentStorage/melee-web/runs/lifecycle-hidden-callback-baseline-20261001-202956-aab6e6ec/clock-boundary-evidence-v1.json`
+with SHA-256
+`0526ee7f2022779fca025c5bd3928685f97794c39a30ad1758a31d2ada856c23`.
+
+The lifecycle hypothesis is that a hidden/page lifecycle interval remains
+sticky until native handoff, neutral input does not overwrite the actual
+visible state, and a one-use return value lets C++ reset menu and audio fixed
+tick clocks before polling. The prepared two-file fix changes no thresholds,
+ticks, RNG, manual resume, audio ownership, or save behavior. It remains
+unverified until the sealed package, browser, and sustained checks pass.
+
 ## Focused verification
 
 Run `tests/test_runtime_diagnostics.py`, `tests/test_diagnostic_package_identity.py`

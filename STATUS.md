@@ -12,6 +12,18 @@ quiet-machine, foreground, physical-input, audible or pixels/PCM gates.
 Automatic reporting and the independent first-pause campaign remain separate
 prerequisites; no deployment is included in this checkpoint.
 
+The [natural first-pause receipt](docs/evidence/runtime-natural-first-v1.json)
+records two bounded CPU9 Final Destination matches from source `18e4d54`,
+26,862 source steps, and zero forced pauses or recoveries under a shared,
+uncontrolled headless host. This does not identify a natural cause or close
+quiet-machine, foreground, warm-restore, original-state, pixel/PCM, physical-
+input, or audible gates. The controlled 4e lifecycle baseline passes its
+hidden interval but retains a failed whole ownership predicate caused by a
+manual browser wait bug; the proposed two-file lifecycle correction remains
+pending sealed-package, browser, and sustained validation. Its scoped receipt
+is retained at `/Volumes/AgentStorage/melee-web/runs/lifecycle-hidden-callback-baseline-20261001-202956-aab6e6ec/clock-boundary-evidence-v1.json`
+(SHA-256 `0526ee7f2022779fca025c5bd3928685f97794c39a30ad1758a31d2ada856c23`).
+
 ## Remaining fighter integration — PR #86
 
 Current per-character coverage, original CPU9 references, rendered browser
