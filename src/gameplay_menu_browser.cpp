@@ -9,6 +9,7 @@
 #endif
 #include "gameplay_prize_session.hpp"
 extern "C" const char* melee_web_native_menu_match_observe();
+extern "C" const char* melee_web_native_menu_source_observe();
 extern "C" const char* melee_web_native_menu_memory();
 extern "C" int melee_web_native_menu_phase();
 extern "C" void melee_web_cpu_observation_set_event_cursor(size_t index);
@@ -769,6 +770,7 @@ if(scoped_assets){
   if(asset_scope.pending_generation())asset_scope.abort(asset_scope.pending_generation());
   asset_scope.release();
   asset_destination=AssetDestination::None;asset_generation=0;asset_committed=false;
+  scoped_assets=false;
   requested_assets.clear();
   asset_selection_valid=false;
   asset_opening_preview_valid=false;
@@ -2379,21 +2381,29 @@ int melee_web_native_menu_player_state(unsigned player,int* fighter_kind,int* mo
  *position_x=stats.position[0];*position_y=stats.position[1];return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 const char* melee_web_native_menu_match_observe(){
- static char text[1024];
+ static char text[1536];
  if(!match)return terminal_match_observation.empty()?"{}":terminal_match_observation.c_str();
  if(!match->construction_complete())return "{}";
  try{
  match_observer_error.clear();
  const auto p0=match->player_stats(0),p1=match->player_stats(1);
+ const StartMeleeData& start=match->start_data();
  int winner=-1;const int outcome=match->outcome(winner);
  std::snprintf(text,sizeof(text),
   "{\"ready\":%s,\"paused\":%s,\"ending\":%s,\"complete\":%s,"
-  "\"frame\":%u,\"rng\":%u,\"outcome\":%d,\"winner\":%d,\"players\":["
+  "\"frame\":%u,\"rng\":%u,\"outcome\":%d,\"winner\":%d,"
+  "\"rules\":{\"match_kind\":%d,\"stage\":%u,\"timer_enabled\":%u,"
+  "\"time_limit\":%u,\"item_frequency\":%d,\"item_mask_hex\":\"%016llx\","
+  "\"player_stocks\":[%d,%d]},\"players\":["
   "{\"fighter\":%d,\"stocks\":%d,\"motion\":%d,\"groundAir\":%d,\"x\":%.9g,\"y\":%.9g},"
   "{\"fighter\":%d,\"stocks\":%d,\"motion\":%d,\"groundAir\":%d,\"x\":%.9g,\"y\":%.9g}]}",
   match->ready()?"true":"false",match->paused()?"true":"false",
   match->ending()?"true":"false",match->complete()?"true":"false",
   match->source_frames(),match->random_seed(),outcome,winner,
+  (int) start.rules.match_kind,(unsigned) start.rules.stkind,
+  (unsigned) start.rules.timer_enabled,(unsigned) start.rules.time_limit,
+  (int) (int8_t) start.rules.xB,(unsigned long long) start.rules.x20,
+  (int) start.players[0].stocks,(int) start.players[1].stocks,
   p0.fighter_kind,p0.stocks,p0.motion_id,p0.ground_or_air,p0.position[0],p0.position[1],
   p1.fighter_kind,p1.stocks,p1.motion_id,p1.ground_or_air,p1.position[0],p1.position[1]);
  return text;
@@ -2435,6 +2445,42 @@ int melee_web_native_menu_stock_check(){
     match->player_stats(0).stocks!=4||match->player_stats(1).stocks!=4)return 0;
  stock_check=-1;stock_count=4;stock_respawns=0;stock_tick=0;stock_lost=stock_jump=false;
  running=true;menu_clock.reset();return 1;
+}
+const char* melee_web_native_menu_source_observe(){
+ static char text[1536];
+ MeleeWebMenuSourceObservation observed{};
+ StartMeleeData start{};
+ int source_valid=0,start_valid=0;
+ char error[256]{};
+ if(host&&host_entered&&melee_web_menu_host_source_observe(
+       host,&observed,error,sizeof(error)))source_valid=1;
+ if(host&&!host_entered&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
+    melee_web_menu_host_raw_selection(host,&start,error,sizeof(error)))start_valid=1;
+ if(!source_valid&&!start_valid)return "{}";
+ std::snprintf(text,sizeof(text),
+  "{\"source\":{\"valid\":%s,\"scene\":%d,\"menu_kind\":%d,"
+  "\"previous_menu_kind\":%d,\"hovered_selection\":%d,"
+  "\"confirmed_selection\":%d,\"buttons\":%llu,\"item_input_locked\":%d,"
+  "\"rules\":{\"mode\":%d,\"stock_count\":%d,\"time_limit\":%d,"
+  "\"stock_time_limit\":%d,\"handicap\":%d,\"damage_ratio\":%d,"
+  "\"friendly_fire\":%d},\"items\":{\"frequency\":%d,"
+  "\"mask_hex\":\"%016llx\"}},"
+  "\"start\":{\"valid\":%s,\"match_kind\":%d,\"stage\":%u,"
+  "\"item_frequency\":%d,\"item_mask_hex\":\"%016llx\","
+  "\"player_stocks\":[%d,%d]}}",
+  source_valid?"true":"false",observed.source_scene,observed.menu_kind,
+  observed.previous_menu_kind,observed.hovered_selection,
+  observed.confirmed_selection,(unsigned long long) observed.menu_buttons,
+  observed.item_input_locked,
+  observed.rule_mode,observed.stock_count,observed.time_limit,
+  observed.stock_time_limit,observed.handicap,observed.damage_ratio,
+  observed.friendly_fire,observed.item_frequency,
+  (unsigned long long) observed.item_mask,
+  start_valid?"true":"false",(int) start.rules.match_kind,
+  (unsigned) start.rules.stkind,(int) (int8_t) start.rules.xB,
+  (unsigned long long) start.rules.x20,
+  (int) start.players[0].stocks,(int) start.players[1].stocks);
+ return text;
 }
 const char* melee_web_native_menu_memory(){
  // Lifecycle diagnostics only: mallinfo walks the allocator's free lists.

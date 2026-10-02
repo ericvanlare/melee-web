@@ -176,6 +176,7 @@ class RetailAllocationMenuTests(unittest.TestCase):
                     "event": "pad_command", "port": 1, "command": "PRESS A",
                     "scene_kind": driver.SCENE_MEMCARD, "game_mode": 17,
                     "scene_frame": 17,
+                    "source_sequence": None,
                 })
             finally:
                 if "COMMAND_LOG" in namespace:
@@ -217,6 +218,26 @@ class RetailAllocationMenuTests(unittest.TestCase):
         self.assertNotIn("write_memory(", source)
         self.assertNotIn("put_register", source)
         self.assertNotIn("load_state", source.lower())
+
+    def test_vs_rules_items_driver_uses_only_original_controls_and_source_callbacks(self):
+        source = driver.render_vs_rules_items_round_trip_driver()
+        compile(source, "cold_boot_vs_rules_items_round_trip.py", "exec")
+        self.assertIn("_cold_boot_vs_rules_items_round_trip()", source)
+        self.assertIn("cold-boot-vs-rules-items-route.jsonl", source)
+        self.assertIn("vs_items_one_bit_toggled", source)
+        self.assertIn("vs_items_frequency_none", source)
+        self.assertIn("vs_rules_reentry_retained_items", source)
+        self.assertIn("css_after_rules_start_retained", source)
+        self.assertIn("pulse(0,'B',settle=30)", source)
+        self.assertNotIn("write_memory(", source)
+        self.assertNotIn("put_register", source)
+        self.assertNotIn("load_state", source.lower())
+        self.assertNotIn("savestate", source.lower())
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rules-items.py"
+            driver.write_driver(path, vs_rules_items_round_trip=True)
+            self.assertEqual(path.read_text(), source)
 
 
 if __name__ == "__main__":
