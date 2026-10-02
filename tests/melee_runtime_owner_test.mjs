@@ -378,6 +378,26 @@ if (diagnosticsKnownHost) {
   assert.match(JSON.parse(diagnosticFetches[0].body).incident_id, /^session-[a-z0-9]+:incident-[0-9]+$/,
     'Delivery uses the stable session-bound native incident id');
 
+  if (process.argv.includes('--diagnostics-fatal')) {
+    const beforeFatal = diagnosticFetches.length;
+    phase = 1; running = true; window.menuFrame(true);
+    const dispatch = type => { for (const listener of listeners.get(type) || []) listener(); };
+    document.hidden = true; dispatch('visibilitychange');
+    owner.stop(Error('private-user-path-must-not-be-reported'));
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, beforeFatal, 'Hidden fatal incidents remain local');
+    document.hidden = false; dispatch('visibilitychange');
+    assert.equal(player.getState().requiresReload, true);
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, beforeFatal + 1,
+      'A fatal stopped owner must deliver its sanitized failure without another native frame');
+    const report = JSON.parse(diagnosticFetches.at(-1).body);
+    assert.equal(report.incident.reason, 'runtime_failure');
+    assert.ok(!diagnosticFetches.at(-1).body.includes('private-user-path'));
+    console.log('Shared runtime owner: fatal failure delivers sanitized diagnostics while stopped.');
+    process.exit(0);
+  }
+
   if (lifecycleHandoff) {
     const dispatch = type => { for (const listener of listeners.get(type) || []) listener(); };
     const beforeLifecycleDelivery = diagnosticFetches.length;

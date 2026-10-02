@@ -96,8 +96,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let diagnosticGeneration = 0;
   let automaticDiagnostics = readDiagnosticsPreference();
   function diagnosticDeliveryBlocked() {
-    return document.hidden || lifecycleSuspended || fatal || destroyed || !!busy ||
-      !!preparationLabel || !!loading;
+    // Fatal owners cannot consume another native handoff. Once visible, their
+    // sanitized failure may be delivered despite abandoned preparation state.
+    return document.hidden || destroyed || (!fatal &&
+      (lifecycleSuspended || !!busy || !!preparationLabel || !!loading));
   }
   function cancelDiagnosticDelivery() {
     diagnosticGeneration++;
@@ -428,6 +430,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       // A paused document may already be inactive. Force the delivery adapter
       // back to its active state until native consumes the sticky handoff.
       diagnosticActivity(diagnosticActive);
+    } else if (fatal) {
+      diagnosticActivity(false);
     }
   });
   for (const type of ['pagehide', 'pageshow', 'freeze', 'resume']) listen(type, () => {

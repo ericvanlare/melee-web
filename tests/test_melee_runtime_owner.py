@@ -12,6 +12,10 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from check_gameplay import node_runtime
 
 class SharedRuntimeOwnerTests(unittest.TestCase):
+    def test_fatal_failure_delivers_sanitized_diagnostics(self):
+        self.run_owner(['--diagnostics-known-host', '--diagnostics-fatal'],
+                       'fatal failure delivers sanitized diagnostics while stopped')
+
     def test_native_command_audio_and_teardown_boundaries(self):
         self.run_owner([])
 
