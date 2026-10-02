@@ -134,6 +134,8 @@ const fixture = globalThis.__runtimeLifecycleFixture = {
   native_sample_count: 0, native_source_steps: 0, trace_sequence: 0,
   native_hooks: {activity: false, unload: false, cache: false}, native_hook_module: null,
   native_hook_timer: 0, native_hook_failure: null,
+  startup_timeout_ms: new URL(location.href).searchParams.has('startup-only') ? 5000 : 120000,
+  start_readiness: {checks: 0, result: null, reason: null}, last_error: null,
 };
 // The compiled Emscripten main loop schedules its runner through the browser's
 // requestAnimationFrame. Install this bounded shim before importing the runtime
@@ -185,6 +187,16 @@ for (const type of __LIFECYCLE_EVENTS__) {
 }
 
 const number = value => Number.isFinite(Number(value)) ? Number(value) : null;
+function safeFailureKind(error) {
+  const message = String(error?.message || error || '').toLowerCase();
+  if (/prepare a valid local disc|valid local disc/.test(message)) return 'start_prerequisite_unavailable';
+  if (/graphics.*prepar|prepar.*graphics/.test(message)) return 'graphics_preparation_failed';
+  if (/stopped responding/.test(message)) return 'runtime_operation_timeout';
+  if (/startup timed out/.test(message)) return 'runtime_startup_timeout';
+  if (/webgpu|adapter/.test(message)) return 'graphics_adapter_unavailable';
+  if (/source movie|disc session|disc range|local game data/.test(message)) return 'disc_preparation_failed';
+  return 'runtime_start_failed';
+}
 function recordSample(args, callbackMs) {
   const sourceSteps = number(args[16]);
   fixture.native_sample_count++;
@@ -231,6 +243,9 @@ function nativeState() {
 function nativeHooksReady() {
   return fixture.native_hooks.activity === true && fixture.native_hooks.unload === true;
 }
+function nativeHooksComplete(module = fixture.owner?.Module) {
+  return nativeHooksReady() && (fixture.native_hooks.cache === true || typeof module?.saveRuntimeCache !== 'function');
+}
 function installNativeHooks() {
   const module = fixture.owner?.Module;
   if (!module) return false;
@@ -260,7 +275,12 @@ function installNativeHooks() {
     module.saveRuntimeCache = (...args) => { fixture.cache_save_calls++; return save.apply(module, args); };
     fixture.native_hooks.cache = true;
   }
-  return nativeHooksReady();
+  const complete = nativeHooksComplete(module);
+  if (complete && fixture.native_hook_timer) {
+    clearInterval(fixture.native_hook_timer);
+    fixture.native_hook_timer = 0;
+  }
+  return complete;
 }
 function startNativeHookPolling() {
   if (fixture.native_hook_timer) return;
@@ -268,13 +288,39 @@ function startNativeHookPolling() {
 }
 fixture.waitForNativeHooks = (timeoutMs = NATIVE_HOOK_TIMEOUT_MS) => {
   installNativeHooks();
-  if (nativeHooksReady()) return Promise.resolve(true);
+  if (nativeHooksComplete()) return Promise.resolve(true);
   return new Promise(resolve => {
     const deadline = performance.now() + timeoutMs;
     const check = () => {
       if (installNativeHooks()) { resolve(true); return; }
       if (performance.now() >= deadline) {
         fixture.native_hook_failure = 'native_hooks_unavailable';
+        resolve(false); return;
+      }
+      setTimeout(check, 25);
+    };
+    check();
+  });
+};
+fixture.waitForCanStart = (timeoutMs = fixture.startup_timeout_ms) => {
+  fixture.start_readiness = {checks: 0, result: null, reason: null};
+  return new Promise(resolve => {
+    const deadline = performance.now() + timeoutMs;
+    const check = () => {
+      fixture.start_readiness.checks++;
+      const state = fixture.player?.getState?.();
+      if (state?.canStart === true) {
+        fixture.start_readiness.result = 'ready';
+        resolve(true); return;
+      }
+      if (state?.state === 'error') {
+        fixture.start_readiness.result = 'unavailable';
+        fixture.start_readiness.reason = fixture.last_error || 'start_prerequisite_unavailable';
+        resolve(false); return;
+      }
+      if (performance.now() >= deadline) {
+        fixture.start_readiness.result = 'timeout';
+        fixture.start_readiness.reason = 'start_prerequisite_timeout';
         resolve(false); return;
       }
       setTimeout(check, 25);
@@ -412,8 +458,10 @@ fixture.snapshot = () => {
   synthetic_callback_hold: fixture.synthetic_callback_hold,
   synthetic_native_callback_identified: fixture.synthetic_native_callback_identified,
   synthetic_held_callbacks: fixture.synthetic_held_callbacks, synthetic_released_callbacks: fixture.synthetic_released_callbacks,
-    native_sample_count: fixture.native_sample_count, native_source_steps: fixture.native_source_steps,
-    native_hooks: fixture.native_hooks, native_hook_failure: fixture.native_hook_failure,
+  native_sample_count: fixture.native_sample_count, native_source_steps: fixture.native_source_steps,
+  native_hooks: fixture.native_hooks, native_hook_failure: fixture.native_hook_failure,
+    startup_timeout_ms: fixture.startup_timeout_ms, start_readiness: fixture.start_readiness,
+    last_error: fixture.last_error,
     synthetic_hold_result: fixture.synthetic_hold_result,
     report: fixture.owner?.diagnostics?.exportReports?.() || null,
   };
@@ -423,9 +471,10 @@ try {
   ({mountMeleeRuntime} = await import("__RUNTIME_MODULE__"));
   fixture.player = await mountMeleeRuntime({canvas: document.getElementById('canvas'),
     diagnosticIdentity: __IDENTITY__, recordDiagnostics: true, onOwner: exposeOwner, onState: exposeState,
-    onEvent: (name, data) => { if (name === 'audio') safeAudio(data); }, onError: () => { fixture.errors++; }});
+    onEvent: (name, data) => { if (name === 'audio') safeAudio(data); },
+    onError: error => { fixture.errors++; fixture.last_error = safeFailureKind(error); }});
   fixture.ready = true; fixture.load = {state: 'ready'};
-} catch { fixture.load = {state: 'error'}; fixture.errors++; }
+} catch (error) { fixture.load = {state: 'error', reason: safeFailureKind(error)}; fixture.last_error = safeFailureKind(error); fixture.errors++; }
 const input = document.getElementById('disc-file');
 document.getElementById('choose-disc').onclick = () => input.click();
 input.onchange = async () => {
@@ -435,11 +484,20 @@ input.onchange = async () => {
     await fixture.player.configureSaveProfile('everything');
     fixture.load = {state: 'importing'}; await fixture.player.importDisc(file);
     if (!await fixture.waitForNativeHooks()) {
-      fixture.load = {state: 'error', reason: fixture.native_hook_failure || 'native_hooks_unavailable'};
+      fixture.last_error = fixture.native_hook_failure || 'native_hooks_unavailable';
+      fixture.load = {state: 'error', phase: 'native_hooks', reason: fixture.last_error};
+      return;
+    }
+    if (!await fixture.waitForCanStart()) {
+      fixture.last_error = fixture.start_readiness.reason || 'start_prerequisite_unavailable';
+      fixture.load = {state: 'error', phase: 'start_readiness', reason: fixture.last_error};
       return;
     }
     fixture.load = {state: 'starting'}; await fixture.player.start(); fixture.load = {state: 'started'};
-  } catch { fixture.load = {state: 'error'}; fixture.errors++; }
+  } catch (error) {
+    fixture.load = {state: 'error', phase: 'import_or_start', reason: safeFailureKind(error)};
+    fixture.last_error = safeFailureKind(error); fixture.errors++;
+  }
 };
 `;
   const script = source.replace('__RUNTIME_MODULE__', moduleUrl)
@@ -740,6 +798,7 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
       incidents: afterLifecycle.incidents, samples: afterLifecycle.samples.slice(-8),
       native_sample_count: afterLifecycle.native_sample_count, native_source_steps: afterLifecycle.native_source_steps,
       native_hooks: afterLifecycle.native_hooks,
+      start_readiness: afterLifecycle.start_readiness, last_error: afterLifecycle.last_error,
       manual_intent: afterLifecycle.manual_intent, synthetic_events: afterLifecycle.synthetic_events,
       synthetic_hold_result: afterLifecycle.synthetic_hold_result,
       unload_calls: afterLifecycle.unload_calls, cache_save_calls: afterLifecycle.cache_save_calls};
@@ -868,7 +927,8 @@ try {
     headed: false, audible: false, timeout: values['startup-only'] ? STARTUP_ONLY_TIMEOUT_MS : STARTUP_TIMEOUT_MS,
   }));
   report.browser = browser.version(); report.browser_mode = 'headless'; report.audio_output = 'muted_by_shared_policy';
-  context = await browser.newContext(); const fixtureUrl = server.origin + '/__runtime-lifecycle-fixture/';
+  context = await browser.newContext();
+  const fixtureUrl = server.origin + '/__runtime-lifecycle-fixture/' + (values['startup-only'] ? '?startup-only=1' : '');
   let skipGame = false;
   if (!syntheticMode) {
     const capability = await runCapabilityProbe(browser, server.origin + '/__runtime-lifecycle-capability/', out);

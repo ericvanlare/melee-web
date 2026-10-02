@@ -34,6 +34,9 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertIn("game_imported: false", source)
         self.assertIn("can_import_timeout", source)
         self.assertIn("native_hooks_unavailable", source)
+        self.assertIn("start_prerequisite_timeout", source)
+        self.assertIn("waitForCanStart", source)
+        self.assertIn("import_or_start", source)
         self.assertIn("no browser lifecycle or user-root-cause claim", source)
 
     def test_synthetic_hidden_hold_is_bounded_and_explicit(self):
@@ -52,6 +55,7 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertIn("manual-pause", source)
         self.assertIn("startup-only", source)
         self.assertIn("STARTUP_ONLY_TIMEOUT_MS = 5000", source)
+        self.assertIn("startup-only=1", source)
         self.assertNotIn("graphics_ready_timeout", source)
         self.assertNotIn("Emulation.setDocumentVisibilityState", source)
 
