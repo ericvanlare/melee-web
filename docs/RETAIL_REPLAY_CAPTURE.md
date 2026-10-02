@@ -189,11 +189,14 @@ validates completion and terminates only its own GDB/Dolphin process groups on
 success or failure. Its hidden `.retail-replay-run-*` directory preserves
 configuration, commands, hashes and logs. Captures and extracted assets remain
 local and ignored. The runtime now also requires the owned `LbRb.dat` file.
-GDB runs in hidden batch mode while retaining hardware observers. Dolphin is
-launched with `Dolphin.DSP.Backend=No Audio Output`; the old `Null` value is
-invalid and falls back to Cubeb. `No Audio Output` removes the host sink while
-retaining DSP and source audio execution, so the capture does not become a
-different source workload.
+GDB runs in hidden batch mode while retaining hardware observers. Dolphin uses
+the pinned `dolphin-emu-nogui` executable. Its no-GUI CLI omits the GUI-only
+`--batch` and `--debugger` switches; the capture starts the GDB stub through the
+owned `GDBSocket` setting. Dolphin is launched with
+`Dolphin.DSP.Backend=No Audio Output`; the old `Null` value is invalid and falls
+back to Cubeb. `No Audio Output` removes the host sink while retaining DSP and
+source audio execution, so the capture does not become a different source
+workload.
 Before launching, the runner also reads the executable from the supplied disc
 and requires its hash to match the independently pinned DOL. Supplying a correct
 standalone DOL beside a different game image is insufficient. The local CISO's
@@ -341,11 +344,12 @@ Save from Dolphin's main-window Emulation → Save State menu into an unused
 slot, then copy that snapshot, external GC files and controller configuration
 together. A hotkey sent only to the render window did not save this checkpoint.
 
-Use a non-batch Dolphin launch (omit `-b`) for checkpoint preparation so the
-main window and its Save State menu remain available. Fixed reference capture
-can retain its existing batch launch. Keep the preparation debugger connected;
-this pinned Dolphin reports that remote detach is unsupported and can leave a
-stopped target with no reconnectable debugger. Disable the preparation breakpoint
+Use a non-batch GUI Dolphin launch (omit `-b`) for checkpoint preparation so
+the main window and its Save State menu remain available. Fixed reference
+capture uses the pinned `dolphin-emu-nogui` executable, which runs headless
+without the GUI-only `-b` and `-d` options. Keep the preparation debugger
+connected; this pinned Dolphin reports that remote detach is unsupported and
+can leave a stopped target with no reconnectable debugger. Disable the preparation breakpoint
 and continue before the ordinary UI save, then verify the new state file before
 terminating the owned processes.
 
