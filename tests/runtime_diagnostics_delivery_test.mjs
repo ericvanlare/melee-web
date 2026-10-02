@@ -433,6 +433,19 @@ async function testRetainedCaptureCannotRestartExpiry() {
   delivery.dispose();
 }
 
+function testFallbackIdentifiersUseRandomBytes() {
+  const root = rootFor(async () => ({status: 201}));
+  root.crypto = {getRandomValues() { throw new Error('unavailable'); }};
+  const delivery = createDiagnosticsDelivery({globalThis: root,
+    origin: 'https://webmelee.gg', storage: storage(), random: () => 0.5});
+  assert.equal(delivery.enqueue(reportFor()).accepted, true);
+  const record = delivery.exportPending().records[0];
+  assert.equal(record.id, '80'.repeat(16), 'Random fallback is converted to bytes before rounding');
+  assert.match(record.report.session_id, /^session-(?:80){16}[a-z0-9]+$/);
+  delivery.dispose();
+}
+
+testFallbackIdentifiersUseRandomBytes();
 await testRetainedCaptureCannotRestartExpiry();
 await testTerminalWorkCannotResurrectFromPersistedMerge();
 await testKnownHostsAndAllowlist();

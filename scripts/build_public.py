@@ -1389,6 +1389,11 @@ def _diagnostics_backend_source_files() -> dict[str, bytes] | None:
         raise BuildError("diagnostics backend _routes.json is not valid UTF-8 JSON") from exc
     if routes != {"version": 1, "include": ["/api/diagnostics", "/api/diagnostics/*"], "exclude": []}:
         raise BuildError("diagnostics backend _routes.json is not the exact API-only route allowlist")
+    browser_schema = ROOT / "web/diagnostics-schema.mjs"
+    if _is_symlink(browser_schema) or not browser_schema.is_file():
+        raise BuildError("diagnostics browser wire schema is missing")
+    if browser_schema.read_bytes() != source_files["diagnostics/schema.mjs"]:
+        raise BuildError("diagnostics browser and backend wire schemas differ")
     return source_files
 
 

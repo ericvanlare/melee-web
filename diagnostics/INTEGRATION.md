@@ -166,6 +166,14 @@ query-time expiry continues to hide expired rows while physical deletion is
 paused. Restore the 30-minute trigger after investigation. Billing depends on
 the Cloudflare plan.
 
+A planning example, not observed traffic: 100 reports/day across both
+environments at 20 KiB/report would store about 1.95 MiB/day and 58.6 MiB
+over 30 days, before SQLite/index overhead. Each new intake performs bounded
+rate/budget bookkeeping and one report insert; retries still use request-rate
+capacity but do not add retained reports or daily intake bytes. Use the
+authenticated CLI to check actual intake before changing these caps or
+selecting a paid plan.
+
 The reusable local integration test applies the real migration, starts Pages
 Functions over HTTPS, and starts the scheduled Worker with Wrangler's local
 `--test-scheduled` endpoint. The pinned local runtime uses compatibility date

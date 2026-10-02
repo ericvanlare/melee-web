@@ -6,8 +6,11 @@ linked legal disclosure and file picker; successful import and preparation
 starts the original character select automatically. Play remains available to
 retry a failed start. Pause, Controls, Fullscreen and Eject call the shared
 player owner directly. About and legal information lives on linked document
-pages. There is no landing page, iframe, developer host, account, analytics or
-upload endpoint.
+pages. The player has no account or analytics. Known staging and production
+hosts support the bounded same-origin diagnostics endpoint described in
+[the reporting integration guide](../diagnostics/INTEGRATION.md); its audited
+Functions sidecar stays outside the static upload tree. Enabling that backend
+requires the separate deployment authorization and binding checks in the guide.
 
 The silent `player` profile packages a Release native build with a fixed public
 export surface. The authorized audio path packages a distinct `audio-player`

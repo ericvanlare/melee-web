@@ -128,12 +128,15 @@ function hashText(value) {
 
 function randomHex(root, random, byteCount = 16) {
   const bytes = new Uint8Array(byteCount);
+  const fallback = () => {
+    for (let index = 0; index < bytes.length; index += 1)
+      bytes[index] = Math.floor(Math.max(0, Math.min(0.999999999,
+        Number(random?.() ?? Math.random()))) * 256);
+  };
   try {
     if (root.crypto?.getRandomValues) root.crypto.getRandomValues(bytes);
-    else for (let index = 0; index < bytes.length; index += 1) bytes[index] = Math.floor(Math.max(0, Math.min(0.999999999, Number(random?.() ?? Math.random()))) * 256);
-  } catch {
-    for (let index = 0; index < bytes.length; index += 1) bytes[index] = (index * 73 + 41) & 0xff;
-  }
+    else fallback();
+  } catch { fallback(); }
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
 }
 

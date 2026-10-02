@@ -82,6 +82,19 @@ class DiagnosticsBackendPackagingTests(unittest.TestCase):
                     self.assertRaisesRegex(public.BuildError, 'API-only route allowlist'):
                 public._diagnostics_backend_source_files()
 
+    def test_release_audit_rejects_one_sided_wire_schema_changes(self):
+        with tempfile.TemporaryDirectory(prefix='diagnostics-schema-drift-') as directory:
+            fixture = Path(directory)
+            shutil.copytree(ROOT / 'diagnostics', fixture / 'diagnostics')
+            (fixture / 'web').mkdir()
+            schema = fixture / 'web/diagnostics-schema.mjs'
+            schema.write_bytes((ROOT / 'web/diagnostics-schema.mjs').read_bytes())
+            with patch.object(public, 'ROOT', fixture):
+                self.assertIsNotNone(public._diagnostics_backend_source_files())
+                schema.write_bytes(schema.read_bytes() + b'\n// one-sided change')
+                with self.assertRaisesRegex(public.BuildError, 'wire schemas differ'):
+                    public._diagnostics_backend_source_files()
+
     @unittest.skipUnless(_wrangler_path() is not None, 'set WRANGLER_BIN to the pinned Wrangler')
     def test_pinned_wrangler_compiles_exact_function_routes(self):
         with tempfile.TemporaryDirectory(prefix='diagnostics-wrangler-') as directory:

@@ -654,8 +654,18 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
     const state = globalThis.__nativeDeliveryFixture?.state;
     return state?.scene === 'css' && state.running === true;
   }, null, {timeout: timeoutMs});
-  const graphics = await page.evaluate(() => ({secure: globalThis.isSecureContext === true, gpu: !!globalThis.navigator?.gpu}));
-  assert(graphics.secure && graphics.gpu, 'native package did not reach a secure WebGPU page');
+  const graphics = await page.evaluate(async () => {
+    const requestAdapter = typeof globalThis.navigator?.gpu?.requestAdapter === 'function';
+    let adapterAvailable = false;
+    if (requestAdapter) {
+      try { adapterAvailable = !!await globalThis.navigator.gpu.requestAdapter(); } catch {}
+    }
+    return {secure: globalThis.isSecureContext === true, gpu: !!globalThis.navigator?.gpu,
+      crossOriginIsolated: globalThis.crossOriginIsolated === true, requestAdapter, adapterAvailable};
+  });
+  assert(graphics.secure && graphics.gpu && graphics.crossOriginIsolated &&
+    graphics.requestAdapter && graphics.adapterAvailable,
+  'native package did not reach a secure, isolated WebGPU page with an available adapter');
   await page.screenshot({path: path.join(evidence, 'native-css.png'), fullPage: true});
   receipt.graphics = graphics;
   receipt.checks.push('actual packaged CSS scene and native audio start');
