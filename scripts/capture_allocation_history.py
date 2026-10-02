@@ -8,6 +8,7 @@ replacement gold capture. Every attempted process retains its logs and hashes.
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime
 import json
 import os
@@ -111,8 +112,6 @@ def validate_setup_receipt(path, args, manifest):
         "template_source.cpu_thread": False,
         "template_source.cheats": False,
         "template_source.custom_rtc": 1704067200,
-        "initial_card.file_count": 0,
-        "initial_card.format": "empty GCI folder",
         "disc.game_id": "GALE01r2",
     }
     for dotted, value in expected.items():
@@ -126,10 +125,84 @@ def validate_setup_receipt(path, args, manifest):
     if receipt.get("disc", {}).get("dol_sha1_verified") != expected["dol.sha1"]:
         raise ValueError("owned-input setup receipt does not bind the DOL extracted from this disc")
     card = args.checkpoint_gc / "USA/Card A"
-    if not card.is_dir() or any(card.iterdir()):
-        raise ValueError("the declared empty GCI folder baseline is missing or contains save files")
-    if tree_hashes(args.checkpoint_gc) != receipt.get("external_save_hashes"):
+    initial_gci = getattr(args, "initial_gci", None)
+    if initial_gci is None:
+        if (receipt.get("initial_card", {}).get("file_count") != 0 or
+                receipt.get("initial_card", {}).get("format") != "empty GCI folder"):
+            raise ValueError("owned-input setup receipt does not declare the empty GCI folder baseline")
+        if not card.is_dir() or any(card.iterdir()):
+            raise ValueError("the declared empty GCI folder baseline is missing or contains save files")
+        card_baseline = "empty GCI folder"
+        initial_profile_hash = None
+    else:
+        initial_gci = Path(initial_gci).expanduser().resolve()
+        if not initial_gci.is_file() or initial_gci.suffix.lower() != ".gci":
+            raise ValueError("initial Everything unlocked profile must be a readable .gci file")
+        initial_profile_hash = retail._sha256(initial_gci)
+        expected_card = {
+            "file_count": 1,
+            "format": "single imported Everything unlocked GCI",
+            "gci_filename": initial_gci.name,
+            "gci_sha256": initial_profile_hash,
+            "save_mode": "Everything unlocked",
+        }
+        if receipt.get("initial_card") != expected_card:
+            raise ValueError("owned-input setup receipt does not bind the imported Everything unlocked GCI")
+        source_export = receipt.get("source_profile_export")
+        if not isinstance(source_export, dict):
+            raise ValueError("setup receipt lacks the source profile export receipt")
+        report_path = Path(source_export.get("source_run_report", "")).expanduser().resolve()
+        manifest_path = Path(source_export.get("source_run_manifest", "")).expanduser().resolve()
+        try:
+            source_report = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError(f"cannot read the Everything unlocked export report: {error}") from error
+        report_hash = retail._sha256(report_path)
+        try:
+            source_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError(f"cannot read the Everything unlocked runtime manifest: {error}") from error
+        manifest_hash = retail._sha256(manifest_path)
+        source_check = source_export.get("source_run_check")
+        if (source_export.get("source_run_report_sha256") != report_hash or
+                source_export.get("source_run_manifest_sha256") != manifest_hash or
+                source_manifest.get("schema") != "melee-web-public-release-v1" or
+                source_manifest.get("profile") != "player" or
+                not source_manifest.get("runtime", {}).get("identity_sha256") or
+                source_export.get("source_run_result") != "pass" or
+                source_export.get("source_run_result") != source_report.get("result") or
+                source_export.get("source_run_scope") != source_report.get("scope") or
+                source_check not in source_report.get("checks", []) or
+                source_export.get("profile_mode") != "Everything unlocked" or
+                source_export.get("exported_gci_sha256") != initial_profile_hash or
+                source_export.get("exported_gci_bytes") != initial_gci.stat().st_size):
+            raise ValueError("source profile export report, manifest, GCI hash, or save mode disagrees with the setup receipt")
+        card_files = sorted(card.iterdir()) if card.is_dir() else []
+        if (len(card_files) != 1 or card_files[0].name != initial_gci.name or
+                not card_files[0].is_file() or retail._sha256(card_files[0]) != initial_profile_hash):
+            raise ValueError("the isolated GCI folder does not contain the declared Everything unlocked profile")
+        card_baseline = "single imported Everything unlocked GCI"
+    external_hashes = tree_hashes(args.checkpoint_gc)
+    if external_hashes != receipt.get("external_save_hashes"):
         raise ValueError("checkpoint memory-card files differ from the setup receipt")
+    provenance_path = getattr(args, "provenance", None)
+    provenance_hash = None
+    if initial_profile_hash is not None and provenance_path is not None:
+        provenance_path = Path(provenance_path).expanduser().resolve()
+        source_provenance_receipt = receipt.get("retail_provenance")
+        try:
+            source_provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError(f"cannot read the imported profile provenance: {error}") from error
+        provenance_hash = retail._sha256(provenance_path)
+        if (not isinstance(source_provenance_receipt, dict) or
+                source_provenance_receipt.get("path") != str(provenance_path) or
+                source_provenance_receipt.get("sha256") != provenance_hash or
+                source_provenance_receipt.get("external_save_hashes") != external_hashes or
+                source_provenance.get("external_save_hashes") != external_hashes or
+                source_provenance.get("source_profile_mode") != "Everything unlocked" or
+                source_provenance.get("source_profile_gci_sha256") != initial_profile_hash):
+            raise ValueError("retail provenance does not bind the imported Everything unlocked GCI")
     configured_ini = args.template_user / "Config/Dolphin.ini"
     if receipt.get("template_source", {}).get("capture_dolphin_ini_sha256") != retail._sha256(configured_ini):
         raise ValueError("capture template Dolphin.ini differs from the setup receipt")
@@ -137,7 +210,13 @@ def validate_setup_receipt(path, args, manifest):
     if receipt.get("template_source", {}).get("capture_gcpad_ini_sha256") != retail._sha256(configured_pad):
         raise ValueError("capture template GCPadNew.ini differs from the setup receipt")
     return {"path": str(path.resolve()), "sha256": retail._sha256(path),
-            "card_baseline": "empty GCI folder", "external_save_hashes": tree_hashes(args.checkpoint_gc)}
+            "card_baseline": card_baseline, "initial_profile_sha256": initial_profile_hash,
+            "external_save_hashes": external_hashes,
+            "retail_provenance_sha256": provenance_hash,
+            "source_profile_export": (None if initial_profile_hash is None else {
+                "source_run_report": str(report_path), "source_run_report_sha256": report_hash,
+                "source_run_manifest": str(manifest_path), "source_run_manifest_sha256": manifest_hash,
+                "source_run_check": source_check})}
 
 
 def visual_capture_options(command):
@@ -396,7 +475,7 @@ def verify_vs_rules_items_route(path):
         raise RuntimeError("original Items A did not change exactly one source item-mask bit")
     if committed.get("rules_state", {}).get("item_mask") != toggled_mask:
         raise RuntimeError("Items B did not commit the one-bit mask change into original SaveData")
-    if committed.get("rules_state", {}).get("item_frequency") != 0xFF:
+    if committed.get("rules_state", {}).get("item_frequency") != -1:
         raise RuntimeError("Items B did not commit the source None frequency value")
     if retained.get("rules_state") != committed.get("rules_state"):
         raise RuntimeError("VS Rules re-entry did not retain source item preferences")
@@ -405,7 +484,7 @@ def verify_vs_rules_items_route(path):
     final_rules = final_css.get("rules_state", {})
     if (final_rules.get("stock_count") != 3 or
             final_rules.get("item_mask") != toggled_mask or
-            final_rules.get("item_frequency") != 0xFF):
+            final_rules.get("item_frequency") != -1):
         raise RuntimeError("Results/CSS return did not retain original source rules and item preferences")
     if markers[16].get("selected_stage_kind") != 0x20:
         raise RuntimeError("original SSS route did not retain source St_Kind_Last selection")
@@ -440,12 +519,92 @@ def verify_vs_rules_items_route(path):
     return {"source_scheduler_frames": len(frames), "markers": observed,
             "initial_item_mask": f"{before_mask:016x}",
             "committed_item_mask": f"{toggled_mask:016x}",
+            "committed_item_frequency": final_rules["item_frequency"],
             "stock_count_after_css_handoff": final_rules["stock_count"],
             "live_match_stage": match["stage"],
             "live_match_player_one_stocks": match["players"][0]["stocks"],
             "results_outcome": result["results_outcome"],
             "stock_count_after_results_css_return": markers[21]["rules_state"]["stock_count"],
             "trace_sha256": retail._sha256(path)}
+
+
+def parse_melee_gci_profiles(paths):
+    """Read original SaveData through the same checked GCI parser as the web app."""
+    node = shutil.which("node")
+    if node is None:
+        raise RuntimeError("Node.js is required to verify the original Melee GCI save effect")
+    script = (
+        "import fs from 'node:fs';\n"
+        "import {parseMeleeGCI} from './web/gamecube-save.mjs';\n"
+        "const profiles = process.argv.slice(1).map(path => {\n"
+        "  const data = new Uint8Array(fs.readFileSync(path));\n"
+        "  return Buffer.from(parseMeleeGCI(data)).toString('base64');\n"
+        "});\n"
+        "console.log(JSON.stringify(profiles));\n"
+    )
+    result = subprocess.run([node, "--input-type=module", "-e", script,
+                             *(str(Path(path).resolve()) for path in paths)],
+                            cwd=ROOT, check=False, capture_output=True, text=True,
+                            timeout=30)
+    if result.returncode:
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown parser failure"
+        raise RuntimeError(f"original Melee GCI parser rejected a retained source card: {detail}")
+    try:
+        profiles = [base64.b64decode(value, validate=True)
+                    for value in json.loads(result.stdout)]
+    except (ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError(f"original Melee GCI parser returned invalid profile data: {error}") from error
+    if len(profiles) != len(paths) or any(len(profile) != 0xF1C4 for profile in profiles):
+        raise RuntimeError("original Melee GCI parser returned an unexpected SaveData extent")
+    return profiles
+
+
+def verify_vs_rules_items_save_effect(initial_gci, final_gc, item_frequency,
+                                      item_mask):
+    """Verify that source Items B persisted the selected values into the card."""
+    initial_gci = Path(initial_gci).expanduser().resolve()
+    final_gc = Path(final_gc).expanduser().resolve()
+    expected_relative = f"USA/Card A/{initial_gci.name}"
+    final_hashes = tree_hashes(final_gc)
+    if set(final_hashes) != {expected_relative}:
+        raise RuntimeError("original menu route changed the owned card file set")
+    final_gci = final_gc / expected_relative
+    initial_profile, final_profile = parse_melee_gci_profiles((initial_gci, final_gci))
+    initial_frequency, final_frequency = initial_profile[0x448], final_profile[0x448]
+    initial_mask = int.from_bytes(initial_profile[0x450:0x458], "big")
+    final_mask = int.from_bytes(final_profile[0x450:0x458], "big")
+    # Retail menu observers expose this signed byte as -1; the card stores 0xff.
+    if (initial_frequency == final_frequency or initial_mask == final_mask or
+            final_frequency != (item_frequency & 0xFF) or final_mask != item_mask):
+        raise RuntimeError("retail memory-card SaveData does not contain the committed source Items values")
+    changed = [offset for offset, (before, after) in enumerate(zip(initial_profile, final_profile))
+               if before != after]
+    ranges = []
+    for offset in changed:
+        if not ranges or offset != ranges[-1][1]:
+            ranges.append([offset, offset + 1])
+        else:
+            ranges[-1][1] = offset + 1
+    item_bytes = {0x448, *range(0x450, 0x458)}
+    node = shutil.which("node")
+    node_version = subprocess.run([node, "--version"], check=True,
+                                  capture_output=True, text=True,
+                                  timeout=15).stdout.strip()
+    return {"status": "verified_source_save_effect",
+            "card_relative_path": expected_relative,
+            "initial_gci_sha256": retail._sha256(initial_gci),
+            "final_gci_sha256": final_hashes[expected_relative],
+            "item_frequency_before": initial_frequency,
+            "item_frequency_after": final_frequency,
+            "item_frequency_after_menu_value": item_frequency,
+            "item_mask_before": f"{initial_mask:016x}",
+            "item_mask_after": f"{final_mask:016x}",
+            "profile_changed_byte_count": len(changed),
+            "profile_changed_ranges": ranges,
+            "other_profile_changed_byte_count": sum(offset not in item_bytes for offset in changed),
+            "gci_parser_source_sha256": retail._sha256(ROOT / "web/gamecube-save.mjs"),
+            "gci_parser_runtime": {"node_path": node, "node_version": node_version},
+            "final_card_hashes": final_hashes}
 
 
 def verify_vs_rules_items_route_commands(path):
@@ -599,6 +758,8 @@ def capture(args):
                            args.vs_rules_items_round_trip))
         if route_flags > 1:
             raise ValueError("boot-only and original menu routes are separate diagnostic captures")
+        if args.vs_rules_items_round_trip and getattr(args, "initial_gci", None) is None:
+            raise ValueError("VS Rules/Items retail route requires its declared Everything unlocked GCI baseline")
         plan = scenario = plan_hash = None
         if not args.boot_only and not args.menu_round_trip and not args.vs_rules_items_round_trip:
             if args.input_plan is None or args.scenario is None:
@@ -612,6 +773,8 @@ def capture(args):
         for path in (args.disc, args.dol, args.provenance, args.input_plan, args.scenario,
                      args.dolphin_manifest,
                      args.setup_receipt,
+                     getattr(args, "initial_gci", None),
+                     ROOT / "web/gamecube-save.mjs",
                      ROOT / ".deps/melee/config/GALE01/symbols.txt",
                      Path(__file__), ROOT / "tools/original_boot_context.py",
                      ROOT / "tools/reference_allocation_capture.py",
@@ -653,6 +816,11 @@ def capture(args):
             metadata["owned_inputs"] = validate_setup_receipt(
                 args.setup_receipt.expanduser().resolve(), args, build_receipt)
             shutil.copy2(args.setup_receipt, evidence / "owned-inputs-setup-receipt.json")
+            source_export = metadata["owned_inputs"].get("source_profile_export")
+            if source_export is not None:
+                for key in ("source_run_report", "source_run_manifest"):
+                    artifact = Path(source_export[key])
+                    inputs[str(artifact)] = source_export[key + "_sha256"]
         if args.capture_images:
             (paths["user"] / "Dump/Frames").mkdir(parents=True, exist_ok=True)
         if plan is not None:
@@ -805,6 +973,10 @@ def capture(args):
             metadata["menu_route"] = verify_vs_rules_items_route(route_path)
             metadata["menu_route"]["input_commands"] = verify_vs_rules_items_route_commands(
                 evidence / "cold-boot-input-commands.jsonl")
+            metadata["menu_route"]["save_effect"] = verify_vs_rules_items_save_effect(
+                args.initial_gci, paths["user"] / "GC",
+                metadata["menu_route"]["committed_item_frequency"],
+                int(metadata["menu_route"]["committed_item_mask"], 16))
             if args.capture_images:
                 screenshots = retain_route_screenshots(
                     paths["user"] / "Dump/Frames", route_path, output,
@@ -859,6 +1031,8 @@ def main():
                         help="private pinned build receipt to hash and copy into evidence")
     parser.add_argument("--setup-receipt", type=Path,
                         help="private disc, profile, and memory-card setup receipt to hash and copy")
+    parser.add_argument("--initial-gci", type=Path,
+                        help="isolated source-generated Everything unlocked GCI matching the single file in USA/Card A")
     parser.add_argument("--capture-images", action="store_true",
                         help="use headless Dolphin OpenGL frame dumping and retain route screenshots")
     parser.add_argument("--boot-only", action="store_true", help="Stop at first scheduler return; diagnostic smoke only")

@@ -602,7 +602,7 @@ def _cold_boot_vs_rules_items_round_trip():
     pulse(0,'B',settle=30)
     _vs_rules_wait_menu(13,5)
     items_committed=rules_state()
-    if (items_committed['item_frequency']!=0xFF or
+    if (items_committed['item_frequency']!=-1 or
             items_committed['item_mask']!=item_toggle['item_mask']):
         raise RuntimeError(f'original Items B did not commit item mask/None frequency: {items_committed}')
     _record_menu_route_marker('vs_items_back_committed')
@@ -620,7 +620,7 @@ def _cold_boot_vs_rules_items_round_trip():
     pulse(0,'A',settle=30)
     _vs_rules_wait_menu(13,0)
     retained_before_stock=rules_state()
-    if (retained_before_stock['item_frequency']!=0xFF or
+    if (retained_before_stock['item_frequency']!=-1 or
             retained_before_stock['item_mask']!=item_toggle['item_mask']):
         raise RuntimeError(f'Rules re-entry did not retain original item preferences: {retained_before_stock}')
     _record_menu_route_marker('vs_rules_reentry_retained_items')
@@ -639,7 +639,7 @@ def _cold_boot_vs_rules_items_round_trip():
     pulse(0,'START',settle=12)
     _cold_boot_wait_css()
     final_rules=rules_state()
-    if (final_rules['stock_count']!=3 or final_rules['item_frequency']!=0xFF or
+    if (final_rules['stock_count']!=3 or final_rules['item_frequency']!=-1 or
             final_rules['item_mask']!=item_toggle['item_mask']):
         raise RuntimeError(f'GM_VS CSS handoff did not retain source Rules/Items values: {final_rules}')
     _record_menu_route_marker('css_after_rules_start_retained')
@@ -698,7 +698,7 @@ def _cold_boot_vs_rules_items_round_trip():
         raise RuntimeError('original Results Start did not return through the source VS route to CSS')
     retained_after_results=rules_state()
     if (retained_after_results['stock_count']!=3 or
-            retained_after_results['item_frequency']!=0xFF or
+            retained_after_results['item_frequency']!=-1 or
             retained_after_results['item_mask']!=item_toggle['item_mask']):
         raise RuntimeError(f'Results/CSS return did not retain source Rules/Items settings: {retained_after_results}')
     _record_menu_route_marker('css_after_results_retained')

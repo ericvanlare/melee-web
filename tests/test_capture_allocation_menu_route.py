@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -18,11 +19,13 @@ sys.path.insert(0, str(ROOT))
 from capture_allocation_history import (gdb_script, resolve_gdb_executable,
                                         retain_route_screenshots,
                                         retail as capture_retail,
+                                        tree_hashes,
                                         validate_reference_build_manifest,
                                         validate_setup_receipt,
                                         verify_menu_route, verify_menu_route_commands,
                                         verify_vs_rules_items_route,
                                         verify_vs_rules_items_route_commands,
+                                        verify_vs_rules_items_save_effect,
                                         visual_capture_options)  # noqa: E402
 from tools import retail_allocation_menu  # noqa: E402
 from tools import retail_replay_validation as retail  # noqa: E402
@@ -52,7 +55,7 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
     def test_vs_rules_items_verifier_requires_commit_reentry_and_css_retention(self):
         rules = {"stock_count": 4, "item_frequency": 3, "item_mask": 0x07}
         changed = {**rules, "item_mask": 0x0F}
-        committed = {**changed, "item_frequency": 0xFF}
+        committed = {**changed, "item_frequency": -1}
         expected = [
             ("first_scheduler_return", 0x2A, 0, None, None),
             ("cold_css_ready", 8, 2, None, None),
@@ -120,10 +123,64 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             self.assertEqual(result["stock_count_after_results_css_return"], 3)
             self.assertEqual(result["committed_item_mask"], "000000000000000f")
 
+            committed_row = next(row for row in rows if row["event"] == "vs_items_back_committed")
+            committed_row["rules_state"]["item_frequency"] = 0xFF
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            with self.assertRaisesRegex(RuntimeError, "Items B"):
+                verify_vs_rules_items_route(path)
+            committed_row["rules_state"]["item_frequency"] = -1
+
             rows[-1]["rules_state"]["stock_count"] = 4
             path.write_text("".join(json.dumps(row) + "\n" for row in rows))
             with self.assertRaisesRegex(RuntimeError, "Results/CSS return"):
                 verify_vs_rules_items_route(path)
+
+    def test_vs_rules_items_verifier_checks_committed_preferences_in_original_gci(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initial = root / "everything-unlocked.gci"
+            final_gc = root / "GC"
+            card = final_gc / "USA/Card A"
+            card.mkdir(parents=True)
+            initial_mask = 0xFFFFFFFFFFFFFFFF
+            committed_mask = initial_mask ^ 0x0100000000000000
+            create = """
+import fs from 'node:fs';
+import {createMeleeGCI, parseMeleeGCI} from './web/gamecube-save.mjs';
+const path = process.argv[1];
+const mode = process.argv[2];
+let profile;
+if (mode === 'initial') {
+  profile = new Uint8Array(0xF1C4);
+  profile[0x448] = 2;
+  new DataView(profile.buffer).setBigUint64(0x450, 0xFFFFFFFFFFFFFFFFn, false);
+} else {
+  profile = parseMeleeGCI(new Uint8Array(fs.readFileSync(process.argv[3])));
+  profile[0x448] = mode === 'bad-frequency' ? 2 : 0xFF;
+  new DataView(profile.buffer).setBigUint64(0x450, 0xFEFFFFFFFFFFFFFFn, false);
+}
+fs.writeFileSync(path, createMeleeGCI(profile, new Date('2026-01-01T00:00:00Z')).bytes);
+"""
+            subprocess.run(["node", "--input-type=module", "-e", create,
+                str(initial), "initial"], cwd=ROOT, check=True, capture_output=True, text=True)
+            final = card / initial.name
+            subprocess.run(["node", "--input-type=module", "-e", create,
+                str(final), "final", str(initial)], cwd=ROOT, check=True,
+                capture_output=True, text=True)
+            result = verify_vs_rules_items_save_effect(initial, final_gc, -1, committed_mask)
+            self.assertEqual(result["status"], "verified_source_save_effect")
+            self.assertEqual(result["item_frequency_before"], 2)
+            self.assertEqual(result["item_frequency_after"], 0xFF)
+            self.assertEqual(result["item_frequency_after_menu_value"], -1)
+            self.assertEqual(result["item_mask_before"], f"{initial_mask:016x}")
+            self.assertEqual(result["item_mask_after"], f"{committed_mask:016x}")
+            self.assertEqual(result["other_profile_changed_byte_count"], 0)
+
+            subprocess.run(["node", "--input-type=module", "-e", create,
+                str(final), "bad-frequency", str(initial)], cwd=ROOT, check=True,
+                capture_output=True, text=True)
+            with self.assertRaisesRegex(RuntimeError, "committed source Items values"):
+                verify_vs_rules_items_save_effect(initial, final_gc, -1, committed_mask)
 
     def test_vs_rules_items_input_verifier_binds_original_menu_choices(self):
         commands = []
@@ -335,13 +392,73 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             receipt_path = root / "setup-receipt.json"
             receipt_path.write_text(json.dumps(receipt))
             args = SimpleNamespace(disc=disc, dol=dol, dolphin=dolphin,
-                template_user=template, checkpoint_gc=checkpoint)
+                template_user=template, checkpoint_gc=checkpoint, initial_gci=None)
             result = validate_setup_receipt(receipt_path, args,
                 {"sha256": manifest_hash})
             self.assertEqual(result["card_baseline"], "empty GCI folder")
 
             (card / "unexpected.gci").write_bytes(b"not the declared baseline")
             with self.assertRaisesRegex(ValueError, "empty GCI folder baseline"):
+                validate_setup_receipt(receipt_path, args, {"sha256": manifest_hash})
+
+            (card / "unexpected.gci").unlink()
+            source_profile = root / "everything-unlocked.gci"
+            source_profile.write_bytes(b"source-generated Everything unlocked profile")
+            args.initial_gci = source_profile
+            profile_hash = capture_retail._sha256(source_profile)
+            (card / source_profile.name).write_bytes(source_profile.read_bytes())
+            source_report = root / "source-export-report.json"
+            source_manifest = root / "source-export-manifest.json"
+            source_check = "save settings export, import, persistence, compare-and-swap and recovery"
+            source_report.write_text(json.dumps({"result": "pass", "scope": "isolated save export",
+                "checks": [source_check]}))
+            source_manifest.write_text(json.dumps({"schema": "melee-web-public-release-v1",
+                "profile": "player", "runtime": {"identity_sha256": "bundle-identity"}}))
+            receipt["initial_card"] = {
+                "file_count": 1,
+                "format": "single imported Everything unlocked GCI",
+                "gci_filename": source_profile.name,
+                "gci_sha256": profile_hash,
+                "save_mode": "Everything unlocked",
+            }
+            receipt["source_profile_export"] = {
+                "source_run_report": str(source_report),
+                "source_run_report_sha256": capture_retail._sha256(source_report),
+                "source_run_manifest": str(source_manifest),
+                "source_run_manifest_sha256": capture_retail._sha256(source_manifest),
+                "source_run_result": "pass",
+                "source_run_scope": "isolated save export",
+                "source_run_check": source_check,
+                "exported_gci_sha256": profile_hash,
+                "exported_gci_bytes": source_profile.stat().st_size,
+                "profile_mode": "Everything unlocked",
+            }
+            receipt["external_save_hashes"] = tree_hashes(checkpoint)
+            provenance_path = root / "retail-provenance.json"
+            provenance = {"external_save_hashes": receipt["external_save_hashes"],
+                "source_profile_mode": "Everything unlocked",
+                "source_profile_gci_sha256": profile_hash}
+            provenance_path.write_text(json.dumps(provenance))
+            args.provenance = provenance_path
+            receipt["retail_provenance"] = {
+                "path": str(provenance_path.resolve()),
+                "sha256": capture_retail._sha256(provenance_path),
+                "external_save_hashes": receipt["external_save_hashes"],
+            }
+            receipt_path.write_text(json.dumps(receipt))
+            result = validate_setup_receipt(receipt_path, args,
+                {"sha256": manifest_hash})
+            self.assertEqual(result["card_baseline"],
+                "single imported Everything unlocked GCI")
+            self.assertEqual(result["initial_profile_sha256"], profile_hash)
+
+            (card / source_profile.name).write_bytes(b"changed profile")
+            with self.assertRaisesRegex(ValueError, "declared Everything unlocked profile"):
+                validate_setup_receipt(receipt_path, args, {"sha256": manifest_hash})
+            (card / source_profile.name).write_bytes(source_profile.read_bytes())
+            source_report.write_text(json.dumps({"result": "fail", "scope": "isolated save export",
+                "checks": [source_check]}))
+            with self.assertRaisesRegex(ValueError, "source profile export report"):
                 validate_setup_receipt(receipt_path, args, {"sha256": manifest_hash})
 
     def test_headless_visual_options_use_the_pinned_image_frame_dumper(self):
