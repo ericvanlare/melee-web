@@ -149,6 +149,12 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "Results/CSS return"):
                 verify_vs_rules_items_route(path)
 
+            rows[-1]["rules_state"]["stock_count"] = 3
+            match_players[1]["slot_type"] = 1
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            with self.assertRaisesRegex(RuntimeError, "StartMeleeData"):
+                verify_vs_rules_items_route(path)
+
     def test_vs_rules_items_verifier_checks_committed_preferences_in_original_gci(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
