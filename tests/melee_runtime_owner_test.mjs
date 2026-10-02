@@ -390,6 +390,25 @@ if (lifecycleHandoff) {
 
   document.hidden = true;
   assertHandoff(['visibilitychange'], 0, 'visibility hidden');
+
+  // A visible callback is allowed to arrive before the native boundary runs.
+  // The hidden edge remains sticky until that boundary consumes it; observing
+  // the visible edge must not erase the neutralization request.
+  const hiddenVisibleStart = calls.length;
+  document.hidden = true;
+  dispatch('visibilitychange');
+  document.hidden = false;
+  dispatch('visibilitychange');
+  assert.equal(window.menuServiceCommands(), 1,
+    'hidden then visible before service still consumes one clock handoff');
+  assert.deepEqual(activityRowsSince(hiddenVisibleStart).slice(-2), [[0, 0], [1, 1]],
+    'hidden then visible before service neutralizes before current activity');
+  const hiddenVisibleAfter = calls.length;
+  assert.equal(window.menuServiceCommands(), 0,
+    'hidden then visible handoff is consumed only once');
+  assert.deepEqual(activityRowsSince(hiddenVisibleAfter), [],
+    'hidden then visible does not emit another handoff');
+
   document.hidden = false;
   assertHandoff(['pagehide', 'pageshow'], 1, 'pagehide/pageshow');
   assertHandoff(['freeze', 'resume'], 1, 'freeze/resume');
@@ -406,6 +425,22 @@ if (lifecycleHandoff) {
   dispatch('focus');
   assert.equal(window.menuServiceCommands(), 0, 'foreground focus does not request a clock handoff');
   assert.deepEqual(activityRowsSince(baseline), [[1, 1]], 'foreground focus publishes current activity only');
+
+  const pauseBoundaryStart = calls.length;
+  const audioResumesBeforePause = calls.filter(row => row[0] === 'audioResume').length;
+  await pump(player.pause());
+  assert.equal(player.getState().paused, true, 'manual pause remains an explicit external state');
+  const pauseBoundaryCalls = calls.slice(pauseBoundaryStart);
+  assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 1), true,
+    'manual pause reaches the native pause boundary in lifecycle mode');
+  assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 0), false,
+    'manual pause does not implicitly resume the native scene in lifecycle mode');
+  assert.equal(pauseBoundaryCalls.some(row => ['unload', 'saveProfile', 'snapshot'].includes(row[0])), false,
+    'manual pause does not unload or save the native owner in lifecycle mode');
+  assert.equal(calls.filter(row => row[0] === 'audioResume').length, audioResumesBeforePause,
+    'manual pause does not resume Web Audio in lifecycle mode');
+  await pump(player.resume());
+  assert.equal(player.getState().running, true, 'manual resume restores running state in lifecycle mode');
 
   console.log('Shared runtime owner: hidden/page lifecycle handoff neutralizes once before current activity; foreground focus alone does not reset clocks.');
   process.exit(0);
