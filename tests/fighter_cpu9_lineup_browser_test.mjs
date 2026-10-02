@@ -724,7 +724,8 @@ async function configureRoster(expected){
   await chooseHuman(0,expected[0]);
   await chooseHuman(1,expected[1]);
   for(let door=0;door<4;door++)await setCpuDoor(door);
-  for(const door of [2,3])await selectCpuCharacter(door,expected[door]);
+  // Source CSS CPU conversion can reset an existing human fighter choice.
+  for(let door=0;door<4;door++)await selectCpuCharacter(door,expected[door]);
   for(let door=0;door<4;door++)await setCpuLevel(door,cpuLevels[door]);
   return verifyRoster(expected,`${cpuProfileDescription} ${stage.name} roster before SSS`);
 }

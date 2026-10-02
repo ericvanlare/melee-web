@@ -16,6 +16,10 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         cls.harness = HARNESS.read_text(encoding="utf-8")
         cls.runner = RUNNER.read_text(encoding="utf-8")
 
+    def test_cpu_conversion_reselects_every_requested_fighter(self):
+        self.assertIn("for(let door=0;door<4;door++)await selectCpuCharacter(door,expected[door]);", self.harness)
+        self.assertNotIn("for(const door of [2,3])await selectCpuCharacter(door,expected[door]);", self.harness)
+
     def test_campaign_flags_and_authored_stage_ids(self):
         self.assertIn("'stop-on-timing-pause':{type:'boolean'}", self.harness)
         self.assertIn("'stage-kind':{type:'string'}", self.harness)
