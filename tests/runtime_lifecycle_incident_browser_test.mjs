@@ -118,16 +118,59 @@ async function verifyPackage(site, manifest) {
 }
 
 function fixtureMarkup(runtimeModule, identity) {
-  const moduleUrl = '/' + runtimeModule;
-  const identityJson = JSON.stringify(identity);
+const moduleUrl = '/' + runtimeModule;
+const identityJson = JSON.stringify(identity);
   const source = String.raw`
-import {mountMeleeRuntime} from "__RUNTIME_MODULE__";
 const fixture = globalThis.__runtimeLifecycleFixture = {
   ready: false, load: {state: 'booting'}, errors: 0, states: [], samples: [],
   incidents: [], browser_events: [], input_activity: [], audio: [], owner: null, player: null,
   unload_calls: 0, cache_save_calls: 0, manual_intent: [], synthetic_events: [],
   synthetic_missed_callbacks: false, frame_callbacks: 0, dropped_frame_callbacks: 0,
+  synthetic_hidden: false, synthetic_visibility_override: false, synthetic_callback_hold: false,
+  synthetic_native_callback_identified: false, synthetic_held_callbacks: 0,
+  synthetic_released_callbacks: 0, synthetic_hold_result: null,
 };
+// The compiled Emscripten main loop schedules its runner through the browser's
+// requestAnimationFrame. Install this bounded shim before importing the runtime
+// so the experiment can identify that callback by an actual native sample.
+const originalRequestAnimationFrame = globalThis.requestAnimationFrame?.bind(globalThis);
+const originalCancelAnimationFrame = globalThis.cancelAnimationFrame?.bind(globalThis);
+const rafEntries = new Map();
+const heldRafEntries = [];
+const nativeRafCallbacks = new WeakSet();
+let nextRafId = 1;
+function invokeRafEntry(entry, timestamp) {
+  if (entry.cancelled) return;
+  if (fixture.synthetic_callback_hold && nativeRafCallbacks.has(entry.callback)) {
+    rafEntries.delete(entry.id);
+    fixture.synthetic_held_callbacks++;
+    heldRafEntries.push(entry);
+    return;
+  }
+  rafEntries.delete(entry.id);
+  const beforeSamples = fixture.samples.length;
+  fixture.synthetic_raf_invocations = Number(fixture.synthetic_raf_invocations || 0) + 1;
+  entry.callback.call(globalThis, timestamp);
+  if (fixture.samples.length > beforeSamples) {
+    nativeRafCallbacks.add(entry.callback);
+    fixture.synthetic_native_callback_identified = true;
+  }
+}
+function scheduleRaf(callback) {
+  if (typeof originalRequestAnimationFrame !== 'function' || typeof callback !== 'function') return 0;
+  const entry = {id: nextRafId++, callback, cancelled: false, nativeHandle: 0};
+  rafEntries.set(entry.id, entry);
+  entry.nativeHandle = originalRequestAnimationFrame(timestamp => invokeRafEntry(entry, timestamp));
+  return entry.id;
+}
+if (typeof originalRequestAnimationFrame === 'function') {
+  globalThis.requestAnimationFrame = scheduleRaf;
+  globalThis.cancelAnimationFrame = id => {
+    const entry = rafEntries.get(id);
+    if (entry) { entry.cancelled = true; rafEntries.delete(id); }
+    else if (typeof originalCancelAnimationFrame === 'function') originalCancelAnimationFrame(id);
+  };
+}
 for (const type of __LIFECYCLE_EVENTS__) {
   const target = type === 'visibilitychange' ? document : window;
   target.addEventListener(type, () => fixture.browser_events.push({
@@ -140,7 +183,8 @@ function recordSample(args, callbackMs) {
   if (fixture.samples.length >= 128) return;
   fixture.samples.push({timestamp: number(args[0]), source_frame: number(args[1]), scene: number(args[2]),
     debt_ticks: number(args[8]), total_ms: number(args[11]), source_steps: number(args[16]),
-    source_draws: number(args[17]), running: args[18] === true || args[18] === 1, callback_ms: callbackMs});
+    source_draws: number(args[17]), running: args[18] === true || args[18] === 1,
+    callback_ms: callbackMs, at: performance.now()});
 }
 function recordIncident(args) {
   if (fixture.incidents.length >= 32) return;
@@ -219,6 +263,33 @@ function setSyntheticActivity(focused, visible) {
   setter(focused, visible);
   return true;
 }
+function syntheticVisibilityOverride() {
+  if (fixture.synthetic_visibility_override) return true;
+  try {
+    Object.defineProperty(document, 'hidden', {configurable: true, get: () => fixture.synthetic_hidden});
+    Object.defineProperty(document, 'visibilityState', {configurable: true,
+      get: () => fixture.synthetic_hidden ? 'hidden' : 'visible'});
+    fixture.synthetic_visibility_override = true;
+    return true;
+  } catch { return false; }
+}
+function dispatchSyntheticVisibility(kind) {
+  fixture.synthetic_events.push({kind, at: performance.now(), hidden: fixture.synthetic_hidden,
+    visibility: document.visibilityState});
+  try { document.dispatchEvent(new Event('visibilitychange')); } catch { return false; }
+  return true;
+}
+function releaseHeldNativeRaf() {
+  if (!fixture.synthetic_native_callback_identified) return false;
+  fixture.synthetic_callback_hold = false;
+  const held = heldRafEntries.splice(0, heldRafEntries.length);
+  for (const entry of held) {
+    if (entry.cancelled) continue;
+    fixture.synthetic_released_callbacks++;
+    scheduleRaf(entry.callback);
+  }
+  return held.length > 0;
+}
 fixture.syntheticSuspend = () => {
   fixture.manual_intent.push('synthetic_suspend');
   fixture.synthetic_events.push({kind: 'synthetic_hidden_checkpoint', at: performance.now()});
@@ -233,6 +304,40 @@ fixture.syntheticResume = () => {
   try { fixture.owner?.callbacks?.menuServiceCommands?.(); } catch {}
   return changed;
 };
+fixture.syntheticHiddenHold = async () => {
+  if (typeof originalRequestAnimationFrame !== 'function')
+    return {available: false, unrun_reason: 'synthetic_request_animation_frame_unavailable'};
+  if (!fixture.synthetic_native_callback_identified)
+    return {available: false, unrun_reason: 'synthetic_main_loop_callback_unavailable'};
+  if (!syntheticVisibilityOverride())
+    return {available: false, unrun_reason: 'synthetic_visibility_override_unavailable'};
+  const beforeSamples = fixture.samples.length;
+  const beforeSourceSteps = fixture.samples.reduce((sum, sample) => sum + (sample.source_steps || 0), 0);
+  const startedAt = performance.now();
+  fixture.synthetic_hidden = true;
+  fixture.synthetic_callback_hold = true;
+  if (!dispatchSyntheticVisibility('synthetic_hidden_event')) {
+    fixture.synthetic_hidden = false;
+    fixture.synthetic_callback_hold = false;
+    return {available: false, unrun_reason: 'synthetic_visibility_event_unavailable'};
+  }
+  await new Promise(resolve => setTimeout(resolve, __HIDDEN_DWELL_MS__));
+  const duringSamples = fixture.samples.length;
+  const duringSourceSteps = fixture.samples.reduce((sum, sample) => sum + (sample.source_steps || 0), 0);
+  const hiddenAt = performance.now();
+  fixture.synthetic_hidden = false;
+  const visibleEvent = dispatchSyntheticVisibility('synthetic_visible_event');
+  const released = releaseHeldNativeRaf();
+  const visibleAt = performance.now();
+  const result = {available: visibleEvent && released, started_at: startedAt, hidden_at: hiddenAt,
+    visible_at: visibleAt, before_samples: beforeSamples, during_samples: duringSamples,
+    after_samples: fixture.samples.length, before_source_steps: beforeSourceSteps,
+    during_source_steps: duringSourceSteps, after_source_steps: fixture.samples.reduce((sum, sample) => sum + (sample.source_steps || 0), 0),
+    held_callbacks: fixture.synthetic_held_callbacks, released_callbacks: fixture.synthetic_released_callbacks,
+    hidden_sample_delta: duringSamples - beforeSamples, hidden_source_step_delta: duringSourceSteps - beforeSourceSteps};
+  fixture.synthetic_hold_result = result;
+  return result;
+};
 fixture.snapshot = () => ({
   load: fixture.load, state: (() => { const state = fixture.player?.getState?.(); return state ? {
     ready: !!state.ready, scene: state.scene, phase: Number.isInteger(state.phase) ? state.phase : null,
@@ -245,9 +350,16 @@ fixture.snapshot = () => ({
   manual_intent: fixture.manual_intent, synthetic_events: fixture.synthetic_events,
   synthetic_missed_callbacks: fixture.synthetic_missed_callbacks,
   frame_callbacks: fixture.frame_callbacks, dropped_frame_callbacks: fixture.dropped_frame_callbacks,
+  synthetic_hidden: fixture.synthetic_hidden, synthetic_visibility_override: fixture.synthetic_visibility_override,
+  synthetic_callback_hold: fixture.synthetic_callback_hold,
+  synthetic_native_callback_identified: fixture.synthetic_native_callback_identified,
+  synthetic_held_callbacks: fixture.synthetic_held_callbacks, synthetic_released_callbacks: fixture.synthetic_released_callbacks,
+  synthetic_hold_result: fixture.synthetic_hold_result,
   report: fixture.owner?.diagnostics?.exportReports?.() || null,
 });
+let mountMeleeRuntime;
 try {
+  ({mountMeleeRuntime} = await import("__RUNTIME_MODULE__"));
   fixture.player = await mountMeleeRuntime({canvas: document.getElementById('canvas'),
     diagnosticIdentity: __IDENTITY__, recordDiagnostics: true, onOwner: exposeOwner, onState: exposeState,
     onEvent: (name, data) => { if (name === 'audio') safeAudio(data); }, onError: () => { fixture.errors++; }});
@@ -267,6 +379,7 @@ input.onchange = async () => {
 `;
   const script = source.replace('__RUNTIME_MODULE__', moduleUrl)
     .replace('__IDENTITY__', identityJson).replace('__IDENTITY__', identityJson)
+    .replace('__HIDDEN_DWELL_MS__', String(HIDDEN_DWELL_MS))
     .replace('__LIFECYCLE_EVENTS__', JSON.stringify(LIFECYCLE_EVENTS));
   return '<!doctype html><html><head><meta charset="utf-8"><title>Runtime lifecycle fixture</title></head>' +
     '<body><button id="choose-disc" type="button">Choose local disc</button>' +
@@ -333,11 +446,16 @@ async function createServer(site, fixtureHtml, capabilityHtml) {
   return {server, requests, origin: 'http://127.0.0.1:' + address.port,
     close: () => new Promise(resolve => server.close(() => resolve()))};
 }
-function timeoutPromise(ms, code) {
-  return new Promise((_, reject) => setTimeout(() => reject(new HarnessFailure(code)), ms));
-}
 async function waitFor(page, predicate, timeout, code) {
-  await Promise.race([page.waitForFunction(predicate, null, {timeout}), timeoutPromise(timeout + 1000, code)]);
+  let timer;
+  const timeoutTask = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new HarnessFailure(code)), timeout + 1000);
+  });
+  try {
+    await Promise.race([page.waitForFunction(predicate, null, {timeout}), timeoutTask]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 async function installAudioTrace(page) {
   await page.addInitScript(() => {
@@ -374,11 +492,15 @@ async function startSession(page, disc) {
   await waitFor(page, () => {
     const state = globalThis.__runtimeLifecycleFixture?.player?.getState?.();
     return globalThis.__runtimeLifecycleFixture?.load?.state === 'error' ||
-      state?.canImport === true && state?.graphicsReady === true;
-  }, STARTUP_TIMEOUT_MS, 'graphics_ready_timeout');
+      state?.canImport === true;
+  }, STARTUP_TIMEOUT_MS, 'can_import_timeout');
   const chooser = page.waitForEvent('filechooser', {timeout: STARTUP_TIMEOUT_MS});
   await page.locator('#choose-disc').click({timeout: STARTUP_TIMEOUT_MS});
   await (await chooser).setFiles(disc, {timeout: STARTUP_TIMEOUT_MS});
+  await waitFor(page, () => {
+    const fixture = globalThis.__runtimeLifecycleFixture, state = fixture?.player?.getState?.();
+    return fixture?.load?.state === 'error' || state?.graphicsReady === true && state?.canStart === true;
+  }, STARTUP_TIMEOUT_MS, 'graphics_ready_timeout');
   await waitFor(page, () => {
     const fixture = globalThis.__runtimeLifecycleFixture, state = fixture?.player?.getState?.();
     return fixture?.load?.state === 'error' || state?.scene === 'css' && state?.phase === 1 && state?.running === true;
@@ -436,14 +558,22 @@ async function runCapabilityProbe(browser, capabilityUrl, out) {
 async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
   const page = await browser.newPage({viewport: {width: 1280, height: 960}});
   const synthetic = mode === 'synthetic';
+  const syntheticHold = mode === 'synthetic-hidden-hold';
+  const syntheticMode = synthetic || syntheticHold;
   const result = {mode, dwell_ms: HIDDEN_DWELL_MS, result: 'fail', cdp: [], failure_kind: null,
-    scope: synthetic ? 'Synthetic JS/native input handoff and missed-callback checkpoint only; no browser lifecycle or user-root-cause claim.' :
+    scope: syntheticHold ? 'Controlled Emscripten requestAnimationFrame hold with synthetic document visibility getters; no genuine lifecycle or user-root-cause claim.' :
+      synthetic ? 'Synthetic JS/native input handoff and missed-callback checkpoint only; no browser lifecycle or user-root-cause claim.' :
       'Real lifecycle mode is entered only after the installed-Chrome capability probe observes genuine lifecycle transitions.',
     experiment: {
-      hypothesis: synthetic ? 'A controlled hidden checkpoint can hand off input ownership and return on an explicit visible checkpoint.' :
+      hypothesis: syntheticHold ? 'Holding the identified native main-loop callback for 350 ms yields no native sample during the hold; the first visible callback observes visible input and records bounded simulation debt.' :
+        synthetic ? 'A controlled hidden checkpoint can hand off input ownership and return on an explicit visible checkpoint.' :
         'Installed Chrome can expose a genuine lifecycle transition through the supported protocol path.',
-      pass_criteria: synthetic ? ['hidden and visible input activity are both observed', 'native remains running',
-        'no unexpected incident, implicit save, or implicit unload', 'one active 32 kHz audio context remains owned'] :
+      pass_criteria: syntheticHold ? ['native main-loop rAF callback is identified by an actual sample',
+        'zero native samples and source steps during the 350 ms synthetic hold',
+        'first post-hold sample follows visible event and records reason 1 simulation debt above threshold 8',
+        'no automatic resume or implicit save/unload', 'one active 32 kHz audio context remains owned'] :
+        synthetic ? ['hidden and visible input activity are both observed', 'native remains running',
+          'no unexpected incident, implicit save, or implicit unload', 'one active 32 kHz audio context remains owned'] :
         ['genuine lifecycle events are observed', 'no unexpected incident or implicit save/unload'],
       fail_criteria: ['unexpected incident', 'manual pause resumes without explicit intent', 'bounded report validation fails'],
       stopping_rule: 'Stop at the first unexpected pause, failure, or missing required receipt; retain the structured receipt and screenshot.',
@@ -462,7 +592,31 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
     const before = await fixtureState(page);
     result.before = {native: before.native, input_activity: before.input_activity.length,
       audio_contexts: before.audio_owner?.contexts?.length || 0};
-    if (synthetic) {
+    if (syntheticHold) {
+      try {
+        await waitFor(page, () => globalThis.__runtimeLifecycleFixture.synthetic_native_callback_identified === true,
+          5000, 'synthetic_main_loop_callback_unavailable');
+      } catch {
+        result.result = 'unrun';
+        result.unrun_reason = 'synthetic_main_loop_callback_unavailable';
+        result.state = await fixtureState(page);
+        await page.screenshot({path: path.join(out, 'lifecycle-synthetic-hidden-hold-unrun.png'), fullPage: true});
+        return result;
+      }
+      const hold = await page.evaluate(() => globalThis.__runtimeLifecycleFixture.syntheticHiddenHold());
+      result.synthetic_hold = hold;
+      if (!hold?.available) {
+        result.result = 'unrun';
+        result.unrun_reason = hold?.unrun_reason || 'synthetic_main_loop_boundary_unavailable';
+        result.state = await fixtureState(page);
+        await page.screenshot({path: path.join(out, 'lifecycle-synthetic-hidden-hold-unrun.png'), fullPage: true});
+        return result;
+      }
+      await waitFor(page, () => {
+        const fixture = globalThis.__runtimeLifecycleFixture;
+        return fixture.samples.length > Number(fixture.synthetic_hold_result?.before_samples || 0);
+      }, SCENE_TIMEOUT_MS, 'synthetic_visible_native_sample_missing');
+    } else if (synthetic) {
       const suspended = await page.evaluate(() => globalThis.__runtimeLifecycleFixture.syntheticSuspend());
       requireValue(suspended === true, 'synthetic_hidden_activity_unavailable');
       await new Promise(resolve => setTimeout(resolve, HIDDEN_DWELL_MS));
@@ -491,15 +645,18 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
         event.type === 'resume' || event.type === 'pageshow'), SCENE_TIMEOUT_MS, 'lifecycle_resume_event_missing');
     }
     const afterLifecycle = await fixtureState(page);
-    const unexpected = afterLifecycle.incidents.filter(incident => UNEXPECTED_REASONS.has(incident.reason_code));
+    const controlledDebt = syntheticHold ? afterLifecycle.incidents.filter(incident => incident.reason_code === 1) : [];
+    const unexpected = afterLifecycle.incidents.filter(incident =>
+      UNEXPECTED_REASONS.has(incident.reason_code) && !(syntheticHold && incident.reason_code === 1));
     const safeReport = validateDiagnosticReport(afterLifecycle.report);
     result.after_lifecycle = {native: afterLifecycle.native, report: safeReport,
       browser_events: afterLifecycle.browser_events.slice(-12), input_activity: afterLifecycle.input_activity.slice(-12),
       audio: afterLifecycle.audio.slice(-12), audio_owner: afterLifecycle.audio_owner,
       incidents: afterLifecycle.incidents, samples: afterLifecycle.samples.slice(-8),
       manual_intent: afterLifecycle.manual_intent, synthetic_events: afterLifecycle.synthetic_events,
+      synthetic_hold_result: afterLifecycle.synthetic_hold_result,
       unload_calls: afterLifecycle.unload_calls, cache_save_calls: afterLifecycle.cache_save_calls};
-    result.candidate_reproduced = !synthetic && mode === 'frozen' && unexpected.length > 0;
+    result.candidate_reproduced = syntheticHold ? controlledDebt.length > 0 : !syntheticMode && mode === 'frozen' && unexpected.length > 0;
     if (mode === 'manual-pause') {
       requireValue(afterLifecycle.native.running === false, 'manual_pause_auto_resumed');
       requireValue(!unexpected.length, 'manual_pause_unexpected_incident');
@@ -512,6 +669,32 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
         SCENE_TIMEOUT_MS, 'manual_resume_failed');
       result.manual_recovery = 'explicit_resume_only';
       result.manual_intent = (await fixtureState(page)).manual_intent;
+    } else if (syntheticHold) {
+      const hold = afterLifecycle.synthetic_hold_result;
+      requireValue(hold?.available === true, 'synthetic_hold_unavailable');
+      requireValue(hold.hidden_sample_delta === 0 && hold.hidden_source_step_delta === 0,
+        'synthetic_hidden_native_progress');
+      requireValue(hold.held_callbacks > 0 && hold.released_callbacks > 0, 'synthetic_native_callback_gap_unobserved');
+      requireValue(controlledDebt.some(incident => incident.value > 8 && incident.threshold === 8),
+        'synthetic_simulation_debt_missing');
+      requireValue(afterLifecycle.native.running === false, 'synthetic_debt_not_paused');
+      requireValue(!afterLifecycle.manual_intent.includes('synthetic_resume') &&
+        !afterLifecycle.manual_intent.includes('manual_resume'), 'synthetic_hold_auto_resume');
+      requireValue(afterLifecycle.synthetic_events.some(event => event.kind === 'synthetic_hidden_event'),
+        'synthetic_hidden_event_missing');
+      requireValue(afterLifecycle.synthetic_events.some(event => event.kind === 'synthetic_visible_event'),
+        'synthetic_visible_event_missing');
+      const hiddenEvent = afterLifecycle.synthetic_events.find(event => event.kind === 'synthetic_hidden_event');
+      const visibleEvent = afterLifecycle.synthetic_events.find(event => event.kind === 'synthetic_visible_event');
+      const browserHidden = afterLifecycle.browser_events.find(event => event.type === 'visibilitychange' && event.hidden === true);
+      const browserVisible = afterLifecycle.browser_events.find(event => event.type === 'visibilitychange' && event.hidden === false &&
+        Number(event.at) >= Number(visibleEvent?.at || Infinity));
+      const postVisibleSample = afterLifecycle.samples.find(sample => Number(sample.at) >= Number(visibleEvent?.at || Infinity));
+      const postVisibleInput = afterLifecycle.input_activity.find(item => item.visible === 1 &&
+        Number(item.at) >= Number(visibleEvent?.at || Infinity));
+      requireValue(hiddenEvent && visibleEvent && browserHidden && browserVisible && hiddenEvent.at < visibleEvent.at &&
+        browserHidden.at <= visibleEvent.at && browserVisible.at >= visibleEvent.at && postVisibleSample && postVisibleInput,
+        'synthetic_hidden_visible_sample_order');
     } else if (synthetic) {
       requireValue(!unexpected.length, 'synthetic_unexpected_incident');
       requireValue(afterLifecycle.native.running === true, 'synthetic_auto_pause');
@@ -551,15 +734,20 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
 
 const {values} = parseArgs({options: {
   site: {type: 'string'}, manifest: {type: 'string'}, disc: {type: 'string'},
-  playwright: {type: 'string'}, out: {type: 'string'}, synthetic: {type: 'boolean'}, help: {type: 'boolean'},
+  playwright: {type: 'string'}, out: {type: 'string'}, synthetic: {type: 'boolean'},
+  'synthetic-hidden-hold': {type: 'boolean'}, help: {type: 'boolean'},
 }});
 if (values.help) {
-  console.log('Usage: node tests/runtime_lifecycle_incident_browser_test.mjs --site AUDITED_AUDIO_PLAYER --manifest MANIFEST --disc OWNED_ISO --out FRESH_EVIDENCE_DIR [--playwright PLAYWRIGHT_DIR] [--synthetic]');
+  console.log('Usage: node tests/runtime_lifecycle_incident_browser_test.mjs --site AUDITED_AUDIO_PLAYER --manifest MANIFEST --disc OWNED_ISO --out FRESH_EVIDENCE_DIR [--playwright PLAYWRIGHT_DIR] [--synthetic | --synthetic-hidden-hold]');
   process.exit(0);
 }
 for (const name of ['site', 'manifest', 'disc', 'out']) requireValue(values[name], name + '_required');
+requireValue(!(values.synthetic && values['synthetic-hidden-hold']), 'synthetic_mode_conflict');
+const syntheticMode = values.synthetic === true || values['synthetic-hidden-hold'] === true;
 const report = {schema: 'melee-web-runtime-lifecycle-browser-v1',
-  scope: values.synthetic ?
+  scope: values['synthetic-hidden-hold'] ?
+    'Bounded synthetic Emscripten requestAnimationFrame main-loop hold with synthetic document visibility getters, manual intent, audio ownership and explicit unload/save boundaries. It does not represent genuine browser lifecycle behavior or a user root cause.' :
+    values.synthetic ?
     'Bounded synthetic JS/native input handoff and missed-callback checkpoint with manual intent, audio ownership and explicit unload/save boundaries. It does not represent browser background/freeze behavior or a user root cause.' :
     'Bounded installed-Chrome lifecycle capability preflight followed by frozen/active detection with manual pause, source input activity, Web Audio ownership and explicit unload/save boundaries. No foreground, physical-input, audible-output, pixel, PCM-equivalence or sustained-gameplay claim.',
   result: 'fail', checks: [], started_at: new Date().toISOString(),
@@ -580,7 +768,7 @@ try {
   report.browser = browser.version(); report.browser_mode = 'headless'; report.audio_output = 'muted_by_shared_policy';
   context = await browser.newContext(); const fixtureUrl = server.origin + '/__runtime-lifecycle-fixture/';
   let skipGame = false;
-  if (!values.synthetic) {
+  if (!syntheticMode) {
     const capability = await runCapabilityProbe(browser, server.origin + '/__runtime-lifecycle-capability/', out);
     report.capability_probe = capability;
     if (capability.failure_kind || !capability.real_lifecycle_supported) {
@@ -590,10 +778,16 @@ try {
     }
   }
   if (!skipGame) {
-    const modes = values.synthetic ? ['synthetic'] : ['frozen', 'manual-pause'];
+    const modes = values['synthetic-hidden-hold'] ? ['synthetic-hidden-hold', 'manual-pause'] :
+      values.synthetic ? ['synthetic'] : ['frozen', 'manual-pause'];
     for (const mode of modes) {
       const item = await runLifecycleCase(browser, fixtureUrl, path.resolve(values.disc), out, mode);
       report[mode.replaceAll('-', '_')] = item;
+      if (item.result === 'unrun') {
+        report.result = 'unrun'; report.unrun_reason = item.unrun_reason || 'synthetic_main_loop_boundary_unavailable';
+        report.checks.push(mode + ' lifecycle case unavailable: ' + report.unrun_reason);
+        continue;
+      }
       if (item.result !== 'pass') throw new HarnessFailure(mode + '_' + (item.failure_kind || 'failed'));
       report.checks.push(mode + ' lifecycle case passed');
     }
@@ -603,7 +797,7 @@ try {
     /(?:upload|evidence|manifest|__melee_evidence)/i.test(request.path));
   requireValue(forbidden.length === 0, 'forbidden_network_request');
   report.network = {request_count: server.requests.length, application_uploads: 0};
-  if (!skipGame) report.result = 'pass';
+  if (!skipGame && report.result !== 'unrun') report.result = 'pass';
 } catch (error) {
   report.failure_kind = error?.code || 'harness_error'; process.exitCode = 1;
 } finally {

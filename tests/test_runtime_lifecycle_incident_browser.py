@@ -23,6 +23,7 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertIn("--disc OWNED_ISO", help_result.stdout)
         self.assertIn("--out FRESH_EVIDENCE_DIR", help_result.stdout)
         self.assertIn("--synthetic", help_result.stdout)
+        self.assertIn("--synthetic-hidden-hold", help_result.stdout)
 
     def test_lifecycle_modes_are_explicitly_gated(self):
         source = (ROOT / "tests" / "runtime_lifecycle_incident_browser_test.mjs").read_text()
@@ -32,6 +33,18 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertIn("game_imported: false", source)
         self.assertIn("graphics_ready_timeout", source)
         self.assertIn("no browser lifecycle or user-root-cause claim", source)
+
+    def test_synthetic_hidden_hold_is_bounded_and_explicit(self):
+        source = (ROOT / "tests" / "runtime_lifecycle_incident_browser_test.mjs").read_text()
+        self.assertIn("synthetic-hidden-hold", source)
+        self.assertIn("HIDDEN_DWELL_MS = 350", source)
+        self.assertIn("synthetic_main_loop_callback_unavailable", source)
+        self.assertIn("synthetic_visibility_override_unavailable", source)
+        self.assertIn("nativeRafCallbacks", source)
+        self.assertIn("synthetic_hidden_native_progress", source)
+        self.assertIn("synthetic_simulation_debt_missing", source)
+        self.assertIn("manual-pause", source)
+        self.assertNotIn("Emulation.setDocumentVisibilityState", source)
 
 
 if __name__ == "__main__":
