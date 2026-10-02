@@ -528,6 +528,11 @@ async function runFixturePreflight() {
   requireValue(script, 'fixture_preflight_script');
   const importLine = '  ({mountMeleeRuntime} = await import("/runtime/mock.mjs"));';
   const mockImport = `  mountMeleeRuntime = async ({onOwner, onState}) => {
+    const calls = {configure: 0, import: 0, start: 0, file_name: null};
+    globalThis.__fixturePreflightCalls = calls;
+    const state = {scene: 'idle', phase: 0, running: false, canStart: true,
+      ready: true, requiresReload: false, canPause: false, canUnload: true,
+      bundle: true, state: 'prepared'};
     const Module = {
       _melee_web_input_set_activity() {},
       _melee_web_native_menu_unload() {},
@@ -541,14 +546,11 @@ async function runFixturePreflight() {
     onState({scene: 'idle', phase: 0, running: false, canStart: true,
       ready: true, requiresReload: false, canPause: false, canUnload: true,
       bundle: true, state: 'prepared'});
-    const state = {scene: 'idle', phase: 0, running: false, canStart: true,
-      ready: true, requiresReload: false, canPause: false, canUnload: true,
-      bundle: true, state: 'prepared'};
     return {
       getState: () => state,
-      configureSaveProfile: async () => {},
-      importDisc: async () => {},
-      start: async () => {},
+      configureSaveProfile: async () => { calls.configure++; },
+      importDisc: async file => { calls.import++; calls.file_name = file?.name || null; },
+      start: async () => { calls.start++; state.running = true; state.scene = 'css'; state.phase = 1; },
       unload: async () => {},
     };
   };`;
@@ -577,8 +579,16 @@ async function runFixturePreflight() {
   await vm.runInContext(`(async () => {\n${executable}\n})()`, vmContext, {timeout: 2000});
   const fixture = vmContext.__runtimeLifecycleFixture;
   requireValue(fixture, 'fixture_preflight_missing_global');
-  requireValue(await fixture.waitForNativeHooks(25), 'fixture_preflight_hooks');
-  requireValue(await fixture.waitForCanStart(25), 'fixture_preflight_readiness');
+  requireValue(await fixture.waitForNativeHooks(), 'fixture_preflight_hooks');
+  elements.get('disc-file').files = [{name: 'mock.gci'}];
+  await elements.get('disc-file').onchange();
+  const calls = vmContext.__fixturePreflightCalls;
+  requireValue(calls && calls.configure === 1 && calls.import === 1 && calls.start === 1,
+    'fixture_preflight_operations');
+  requireValue(calls.file_name === 'mock.gci', 'fixture_preflight_file');
+  requireValue(fixture.load?.state === 'started', 'fixture_preflight_started');
+  requireValue(fixture.start_readiness?.result === 'ready' && fixture.start_readiness.checks >= 1,
+    'fixture_preflight_readiness');
   fixture.owner.Module._melee_web_input_set_activity(1, 1);
   fixture.owner.Module._melee_web_native_menu_unload();
   const snapshot = fixture.snapshot();
@@ -588,6 +598,8 @@ async function runFixturePreflight() {
     'fixture_preflight_wrappers');
   return {result: 'pass', native_hooks: snapshot.native_hooks,
     input_activity: snapshot.input_activity.length, unload_calls: snapshot.unload_calls,
+    configure_calls: calls.configure, import_calls: calls.import, start_calls: calls.start,
+    file_name: calls.file_name, load_state: fixture.load.state,
     start_readiness: snapshot.start_readiness};
 }
 

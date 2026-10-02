@@ -40,6 +40,11 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
                          {"activity": True, "unload": True, "cache": True})
         self.assertEqual(payload["input_activity"], 1)
         self.assertEqual(payload["unload_calls"], 1)
+        self.assertEqual(payload["configure_calls"], 1)
+        self.assertEqual(payload["import_calls"], 1)
+        self.assertEqual(payload["start_calls"], 1)
+        self.assertEqual(payload["file_name"], "mock.gci")
+        self.assertEqual(payload["load_state"], "started")
         self.assertEqual(payload["start_readiness"]["result"], "ready")
 
     def test_lifecycle_modes_are_explicitly_gated(self):
