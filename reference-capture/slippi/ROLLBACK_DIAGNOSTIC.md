@@ -121,7 +121,10 @@ duplication and reordering cases, actual browser simulation, cross-machine
 connectivity, pixels, PCM, foreground timing and physical input have separate
 acceptance gates. The [scoped receipt](../../docs/evidence/desktop-rollback-diagnostic-v1.json)
 records two fresh baseline pairs and two fresh held-packet pairs, each playing
-a match and rematch. The ordinary diagnostic-disabled match/rematch,
-disconnect and interruption regression also passes; loss-control remains
-pending. These native desktop results do not establish
+a match and rematch. Two fresh single-packet DROP pairs also pass the same
+finalized comparison through complete matches and rematches, with exact packet
+98 loss and redundant history retained. No native loads or speculative corrections
+were observed in that case; it proves tolerance of this loss, without a rollback
+claim. The ordinary diagnostic-disabled match/rematch, disconnect and interruption
+regression also passes. These native desktop results do not establish
 browser gameplay or the rest of the fault matrix.
