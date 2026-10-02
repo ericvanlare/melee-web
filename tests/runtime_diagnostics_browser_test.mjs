@@ -240,11 +240,11 @@ document.getElementById('choose-disc').onclick = () => {
 input.onchange = async () => {
   const file = input.files?.[0];
   if (!file || !fixture.player) return;
-  fixture.load = {state: 'importing', name: file.name};
+  fixture.load = {state: 'configuring'};
   try {
-    await fixture.player.importDisc(file);
-    fixture.load = {state: 'configuring'};
     await fixture.player.configureSaveProfile('everything');
+    fixture.load = {state: 'importing', name: file.name};
+    await fixture.player.importDisc(file);
     fixture.load = {state: 'starting'};
     await fixture.player.start();
     fixture.load = {state: 'started'};
@@ -656,6 +656,7 @@ async function runSupportedFailure(browser, url, disc, identity, timeout) {
 const {values} = parseArgs({options: {
   site: {type: 'string'}, manifest: {type: 'string'}, disc: {type: 'string'},
   playwright: {type: 'string'}, out: {type: 'string'}, help: {type: 'boolean'},
+  'startup-only': {type: 'boolean'},
 }});
 if (values.help) {
   console.log('Usage: node tests/runtime_diagnostics_browser_test.mjs --site AUDITED_AUDIO_PLAYER --manifest MANIFEST --disc OWNED_ISO --out FRESH_REPORT_DIR [--playwright PLAYWRIGHT_DIR]');
@@ -699,6 +700,21 @@ try {
   context = await browser.newContext();
   const fixtureUrl = `${localServer.origin}/__runtime-diagnostics-fixture/`;
   report.collection = [];
+  if (values['startup-only']) {
+    const page = await context.newPage({viewport: {width: 1280, height: 960}});
+    try {
+      await page.goto(`${fixtureUrl}?enabled=1`, {timeout: 120000});
+      await page.waitForFunction(() => globalThis.__runtimeDiagnosticsFixture?.ready === true ||
+        globalThis.__runtimeDiagnosticsFixture?.load?.state === 'error', null, {timeout: 120000});
+      await selectDiscAndStart(page, disc, 120000);
+      await assertStillCss(page, 'Reduced startup boundary');
+      await retainPage(page, 'startup-boundary');
+      report.checks.push('reduced fixture startup reaches original CSS');
+      report.scope = 'Reduced packaged fixture startup/readiness/save ownership boundary only; no overhead or induced-stall claim.';
+      report.result = 'pass';
+    } catch (error) { await retainPage(page, 'startup-boundary-failure'); throw error; }
+    finally { await page.close(); }
+  } else {
   for (const [index, enabled] of [true, false, false, true].entries()) {
     const label = `css-${index + 1}-${enabled ? 'enabled' : 'disabled'}`;
     report.collection.push(await runCollection(context, fixtureUrl, disc, expectedIdentity, enabled, 120000, label));
@@ -721,6 +737,7 @@ try {
     `Application issued forbidden network requests: ${JSON.stringify(forbiddenRequests)}`);
   report.network = {request_count: localServer.requests.length, application_uploads: 0};
   report.result = 'pass';
+  }
 } catch (error) {
   report.failure = String(error?.stack || error?.message || error);
   process.exitCode = 1;
