@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import tempfile
 import unittest
@@ -24,10 +25,42 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         self.assertIn("'stop-on-timing-pause':{type:'boolean'}", self.harness)
         self.assertIn("'stage-kind':{type:'string'}", self.harness)
         self.assertIn("'wall-bound-seconds':{type:'string'}", self.harness)
-        self.assertIn("sourceId:0x20", self.harness)
-        self.assertIn("sourceId:0x01", self.harness)
+        self.assertIn("'stage-setup-only':{type:'boolean'}", self.harness)
+        self.assertIn("'stage-map-preflight':{type:'boolean'}", self.harness)
+        self.assertIn("sourceId:0x1F", self.harness)
+        self.assertNotIn("battlefield:Object.freeze({id:'battlefield',name:'Battlefield',sourceId:0x01", self.harness)
         self.assertIn("const stageKind=values['stage-kind']||'final-destination'", self.harness)
-        self.assertIn("wallBoundSeconds=campaignRequested?Number(values['wall-bound-seconds']??600):null", self.harness)
+        self.assertIn("wallBoundSeconds=campaignRequested?Number(values['wall-bound-seconds']??(stageSetupOnly?120:600)):null", self.harness)
+
+    def test_stage_map_preflight_binds_to_authored_pinned_enum(self):
+        header = ROOT / ".deps" / "melee" / "src" / "melee" / "gr" / "forward.h"
+        if not header.is_file():
+            self.skipTest("pinned authored stage enum is unavailable in this checkout")
+        result = subprocess.run(
+            ["node", str(HARNESS), "--stage-map-preflight"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        preflight = json.loads(result.stdout)
+        self.assertEqual(preflight["result"], "pass")
+        authored = preflight["authored"]
+        self.assertEqual(authored["final-destination"], 0x20)
+        self.assertEqual(authored["battlefield"], 0x1F)
+        for name, expected in (("St_Kind_Last", 0x20), ("St_Kind_Battle", 0x1F)):
+            match = re.search(rf"/\*\s*0x([0-9A-Fa-f]+)\s*\*/\s*{name}\b", header.read_text())
+            self.assertIsNotNone(match, name)
+            self.assertEqual(int(match.group(1), 16), expected)
+
+    def test_stage_setup_only_has_bounded_sss_readiness_boundary(self):
+        self.assertIn("if(stageSetupOnly&&!stopOnTimingPause)", self.harness)
+        self.assertIn("const ready=await waitForMatchReady('original four-player match entry',stageSetupOnly?30000:60000);", self.harness)
+        self.assertIn("report.result='stage-setup-pass';", self.harness)
+        self.assertIn("stage_setup_only:stageSetupOnly", self.harness)
+        setup_branch = "else if(stageSetupOnly){\n    await chooseStage();\n    report.result='stage-setup-pass';\n  }"
+        self.assertIn(setup_branch, self.harness)
+        self.assertLess(self.harness.index("await chooseStage();"), self.harness.index("else await runMatch(1,lineup);"))
 
     def test_pause_mode_retains_receipt_and_blocks_resume_paths(self):
         self.assertIn("timing-pause-receipt-v1", self.harness)
@@ -47,9 +80,9 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         self.assertIn("melee-web-match-readiness-failure-v1", self.harness)
         self.assertIn("match-readiness-${suffix}.json", self.harness)
         self.assertIn("match_readiness_failures", self.harness)
-        self.assertIn("await waitForMatchReady('original four-player match entry',60000);", self.harness)
+        self.assertIn("const ready=await waitForMatchReady('original four-player match entry',stageSetupOnly?30000:60000);", self.harness)
         self.assertLess(
-            self.harness.index("await waitForMatchReady('original four-player match entry',60000);"),
+            self.harness.index("const ready=await waitForMatchReady('original four-player match entry',stageSetupOnly?30000:60000);"),
             self.harness.index("async function runMatch(matchIndex,expected)"),
         )
 
@@ -209,7 +242,7 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         self.assertNotIn("sourcepolicy", watchdog.lower())
 
     def test_successful_campaign_clears_watchdog_and_tears_down_cache(self):
-        self.assertIn("status=['pass','setup-only-pass','results-observation-pass'].includes(report.result)?", self.harness)
+        self.assertIn("status=['pass','setup-only-pass','stage-setup-pass','results-observation-pass'].includes(report.result)?", self.harness)
         self.assertIn("report.campaign_wall_bound.timer_status='cleared';", self.harness)
         self.assertIn("async function unloadAfterNaturalResultsCss()", self.harness)
         self.assertIn("if(!report.results_observation_only)\n      await unloadAfterNaturalResultsCss();", self.harness)

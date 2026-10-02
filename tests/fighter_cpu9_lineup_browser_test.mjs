@@ -41,33 +41,63 @@ const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input','cpu-levels'].map(name=>[name,{type:'string'}])),
   'results-confirm-frame':{type:'string'},
   'results-observe-after-confirmation':{type:'boolean'},
-  matches:{type:'string'},'setup-only':{type:'boolean'},
+  matches:{type:'string'},'setup-only':{type:'boolean'},'stage-setup-only':{type:'boolean'},
   'stage-kind':{type:'string'},'wall-bound-seconds':{type:'string'},
   'stop-on-timing-pause':{type:'boolean'},
   'controlled-contention':{type:'boolean'},'user-data-dir':{type:'string'},
-  'readiness-preflight':{type:'boolean'}}});
+  'readiness-preflight':{type:'boolean'},'stage-map-preflight':{type:'boolean'}}});
+const stages=Object.freeze({
+  'final-destination':Object.freeze({id:'final-destination',name:'Final Destination',sourceId:0x20,slug:'fd'}),
+  battlefield:Object.freeze({id:'battlefield',name:'Battlefield',sourceId:0x1F,slug:'battlefield'}),
+});
 if(values['readiness-preflight']){
   console.log(JSON.stringify(runReadinessPreflight()));
   process.exit(0);
 }
+if(values['stage-map-preflight']){
+  const header=path.resolve(import.meta.dirname,'../.deps/melee/src/melee/gr/forward.h');
+  try{
+    const source=await fs.readFile(header,'utf8');
+    const authored=name=>{
+      const match=source.match(new RegExp(`/\\*\\s*0x([0-9A-Fa-f]+)\\s*\\*/\\s*${name}\\b`));
+      return match?Number.parseInt(match[1],16):null;
+    };
+    const authoredStages={
+      'final-destination':authored('St_Kind_Last'),
+      battlefield:authored('St_Kind_Battle')};
+    assert.equal(authoredStages['final-destination'],stages['final-destination'].sourceId,
+      'Final Destination stage id must match the authored pinned St_Kind_Last enum');
+    assert.equal(authoredStages.battlefield,stages.battlefield.sourceId,
+      'Battlefield stage id must match the authored pinned St_Kind_Battle enum');
+    console.log(JSON.stringify({result:'pass',header,authored:authoredStages,stages}));
+  }catch(error){
+    if(error?.code==='ENOENT'){
+      console.log(JSON.stringify({result:'unavailable',reason:'authored_stage_enum_unavailable',header}));
+      process.exit(0);
+    }
+    throw error;
+  }
+  process.exit(0);
+}
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--stage-kind final-destination|battlefield] [--wall-bound-seconds SECONDS] [--stop-on-timing-pause] [--controlled-contention] [--user-data-dir EXTERNAL_PROFILE] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK] [--readiness-preflight]');
-const stages=Object.freeze({
-  'final-destination':Object.freeze({id:'final-destination',name:'Final Destination',sourceId:0x20,slug:'fd'}),
-  battlefield:Object.freeze({id:'battlefield',name:'Battlefield',sourceId:0x01,slug:'battlefield'}),
-});
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--stage-setup-only] [--stage-kind final-destination|battlefield] [--wall-bound-seconds SECONDS] [--stop-on-timing-pause] [--controlled-contention] [--user-data-dir EXTERNAL_PROFILE] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK] [--readiness-preflight] [--stage-map-preflight]');
 const stageKind=values['stage-kind']||'final-destination';
 if(!Object.hasOwn(stages,stageKind))
   throw Error('--stage-kind must be final-destination or battlefield');
 const stage=stages[stageKind];
-const campaignRequested=values['stage-kind']!==undefined||values['wall-bound-seconds']!==undefined||
+const stageSetupOnly=values['stage-setup-only']===true;
+if(stageSetupOnly&&values['setup-only']===true)
+  throw Error('--stage-setup-only cannot be combined with --setup-only');
+const campaignRequested=stageSetupOnly||values['stage-kind']!==undefined||values['wall-bound-seconds']!==undefined||
   values['stop-on-timing-pause']===true||values['controlled-contention']===true;
-const wallBoundSeconds=campaignRequested?Number(values['wall-bound-seconds']??600):null;
+const wallBoundSeconds=campaignRequested?Number(values['wall-bound-seconds']??(stageSetupOnly?120:600)):null;
 if(campaignRequested&&(!Number.isInteger(wallBoundSeconds)||wallBoundSeconds<1||wallBoundSeconds>600))
   throw Error('--wall-bound-seconds must be an integer from 1 through 600 in campaign mode');
 if(!campaignRequested&&values['wall-bound-seconds']!==undefined)
   throw Error('--wall-bound-seconds requires campaign mode');
 const stopOnTimingPause=values['stop-on-timing-pause']===true;
+if(stageSetupOnly&&!stopOnTimingPause)
+  throw Error('--stage-setup-only requires --stop-on-timing-pause');
 const controlledContention=values['controlled-contention']===true;
 const userDataDirectory=values['user-data-dir']?path.resolve(values['user-data-dir']):null;
 const campaignCondition=controlledContention?'controlled-contention':'shared-host-uncontrolled';
@@ -173,6 +203,7 @@ const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
       stop_on_first_unexpected_pause:true}}:null,
   results_input_mode:resultsInputMode,
   results_input_scope:resultsInputScope,
+  stage_setup_only:stageSetupOnly,
   controller_profile:null,
   lineup:values.lineup,players:lineup.map(({name,kind},door)=>({name,kind,cpu:cpuLevels[door],stocks:4})),
   matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[],
@@ -894,7 +925,14 @@ async function chooseStage(){
   report.phases.push({label:`source SSS highlighted ${stage.name}`,stage:selectedStage});
   await screenshot(`match-${report.matches.length+1}-${stage.slug}-highlighted`);
   await tap(0,buttonA,`confirm-${stage.name}`);
-  await waitForMatchReady('original four-player match entry',60000);
+  const ready=await waitForMatchReady('original four-player match entry',stageSetupOnly?30000:60000);
+  if(stageSetupOnly){
+    report.stage_setup={result:'pass',stage_kind:stage.id,stage_source_id:stage.sourceId,
+      selected_stage:selectedStage,phase:ready.phase,running:ready.running,
+      readiness:matchReadiness(ready),source_diagnostics:ready.diagnostics,
+      screenshot:'match-1-'+stage.slug+'-highlighted'};
+  }
+  return ready;
 }
 async function runMatch(matchIndex,expected){
   activeMatchIndex=matchIndex;
@@ -2328,8 +2366,11 @@ try{
   report.initial_css=await writeProgress('initial-css');
   await configureRoster(lineup);
   if(values['setup-only']){report.result='setup-only-pass';}
-  else await runMatch(1,lineup);
-  if(!values['setup-only']){
+  else if(stageSetupOnly){
+    await chooseStage();
+    report.result='stage-setup-pass';
+  }else await runMatch(1,lineup);
+  if(!values['setup-only']&&!stageSetupOnly){
     const retainedLineup=values.lineup==='B'?lineup.map(fighter=>({...fighter})):lineup;
     for(let matchIndex=2;matchIndex<=matchCount;matchIndex++){
       if(values.lineup==='B'&&matchIndex===2){
@@ -2347,7 +2388,7 @@ try{
     if(!report.results_observation_only)
       await unloadAfterNaturalResultsCss();
   }
-  if(!values['setup-only'])report.result=resultsObserveAfterConfirmation?
+  if(!values['setup-only']&&!stageSetupOnly)report.result=resultsObserveAfterConfirmation?
     'results-observation-pass':'pass';
 }catch(error){
   report.failure=campaignWallBoundExceeded?{
@@ -2373,7 +2414,7 @@ try{
     report.failure??={code:'campaign_wall_bound_exceeded',message:campaignWallBoundError().message};
   }
   if(report.campaign_wall_bound&&!campaignWallBoundExceeded){
-    report.campaign_wall_bound.status=['pass','setup-only-pass','results-observation-pass'].includes(report.result)?
+    report.campaign_wall_bound.status=['pass','setup-only-pass','stage-setup-pass','results-observation-pass'].includes(report.result)?
       'completed':'cleared';
     report.campaign_wall_bound.timer_status='cleared';
   }
@@ -2404,7 +2445,7 @@ try{
   else if(browser)await browser.close();
   await fs.writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n');
 }
-if(!['pass','setup-only-pass','results-observation-pass'].includes(report.result))
+if(!['pass','setup-only-pass','stage-setup-pass','results-observation-pass'].includes(report.result))
   throw Error(report.failure?.message||'Headless CPU9 lineup scenario failed');
 console.log(JSON.stringify({result:report.result,lineup:report.lineup,matches:report.matches.length,
   browser:report.browser,output}));
