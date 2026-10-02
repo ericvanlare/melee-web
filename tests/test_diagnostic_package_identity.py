@@ -88,6 +88,26 @@ class DiagnosticPackageIdentityTests(unittest.TestCase):
         changed = dict(base, **{"runtime-diagnostics.mjs": b"diagnostics changed"})
         self.assertNotEqual(public._runtime_graph_hash(base), public._runtime_graph_hash(changed))
 
+    def test_delivery_settings_and_shared_schema_are_in_the_audited_graph(self):
+        expected = {
+            'runtime-diagnostics-delivery.mjs',
+            'diagnostics-settings.mjs',
+            'diagnostics-schema.mjs',
+        }
+        self.assertTrue(expected.issubset(public.PLAYER_RUNTIME_FILES))
+        self.assertTrue(expected.issubset(public.PLAYER_SOURCE_RUNTIME_FILES))
+        self.assertTrue({f'web/{name}' for name in expected}.issubset(public.RUNTIME_SOURCE_FILES))
+        self.assertEqual(
+            (ROOT / 'web/diagnostics-schema.mjs').read_text().rstrip() + '\\n',
+            (ROOT / 'diagnostics/schema.mjs').read_text().rstrip() + '\\n',
+        )
+        delivery = (ROOT / 'web/runtime-diagnostics-delivery.mjs').read_text()
+        self.assertIn("from './diagnostics-schema.mjs'", delivery)
+        self.assertNotIn("from '../diagnostics/schema.mjs'", delivery)
+        cmake = (ROOT / 'cmake/FighterRuntime.cmake').read_text()
+        for name in expected:
+            self.assertIn(name.removesuffix('.mjs'), cmake)
+
     def test_commit_identity_rejects_modified_or_untracked_runtime_source(self):
         with tempfile.TemporaryDirectory(prefix="diagnostic-source-identity-") as temporary:
             root = Path(temporary)

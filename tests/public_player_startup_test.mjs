@@ -179,11 +179,13 @@ async function importShellWithMocks(scenario) {
     "import {mountMeleeRuntime} from '../melee-runtime.mjs';",
     "import {mountControllerSettings} from '../controller-settings.mjs';",
     "import {mountSaveProfileSettings} from '../save-profile-settings.mjs';",
+    "import {mountDiagnosticsSettings} from '../diagnostics-settings.mjs';",
   ].join('\n');
   const replacement = [
     'const mountMeleeRuntime = globalThis.testMountMeleeRuntime;',
     'const mountControllerSettings = globalThis.testMountControllerSettings;',
     'const mountSaveProfileSettings = globalThis.testMountSaveProfileSettings;',
+    'const mountDiagnosticsSettings = globalThis.testMountDiagnosticsSettings;',
   ].join('\n');
   assert.notEqual(source.indexOf(imports), -1, 'shell imports must remain source-substitutable');
   const substituted = source.replace(imports, replacement);
@@ -206,6 +208,7 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
   let errorCallback;
   let settingsOptions;
   let saveSettingsOptions;
+  let diagnosticsSettingsOptions;
   let nativeMainCalled = false;
   let audioCreated = 0;
   const idle = {ready: true, requiresReload: false, busy: false, state: 'idle', paused: false,
@@ -234,6 +237,14 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
       setState: next => trace.push(['save-settings-state', next?.state]),
       bindPlayer: async runtime => { trace.push(['save-settings-bind', runtime]); },
       flushBeforeTeardown: async () => { trace.push('save-flush'); },
+    };
+  };
+  globalThis.testMountDiagnosticsSettings = options => {
+    diagnosticsSettingsOptions = options;
+    trace.push('diagnostics-settings');
+    return {
+      setState: next => trace.push(['diagnostics-state', next?.state]),
+      bindPlayer: async runtime => { trace.push(['diagnostics-bind', runtime]); },
     };
   };
   const testOpenNativeGameDiscSession = async file => {
@@ -349,6 +360,7 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
       trace,
       settingsOptions,
       saveSettingsOptions,
+      diagnosticsSettingsOptions,
       stateCallback,
       getMockState: () => mockState,
       failRuntime(error) {
@@ -365,6 +377,7 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
     delete globalThis.testMountMeleeRuntime;
     delete globalThis.testMountControllerSettings;
     delete globalThis.testMountSaveProfileSettings;
+    delete globalThis.testMountDiagnosticsSettings;
     delete globalThis.testOpenNativeGameDiscSession;
     delete globalThis.testClickTrace;
     restore();
@@ -372,14 +385,17 @@ async function runScenario({name, failStartup = false, behavior = {}, fullscreen
 }
 
 const success = await runScenario({name: 'success', failStartup: false});
-assert.deepEqual(success.trace.slice(0, 3), ['settings', 'save-settings', 'mount']);
-assert.equal(success.trace[3], 'native-main');
+assert.deepEqual(success.trace.slice(0, 4), ['settings', 'save-settings', 'diagnostics-settings', 'mount']);
+assert.equal(success.trace[4], 'native-main');
 assert.equal(success.nativeMainCalled, true);
 assert.equal(success.audioCreated, 0);
+assert.equal(success.diagnosticsSettingsOptions, undefined,
+  'Public diagnostics settings use the isolated DOM owner without exposing runtime options');
 assert.equal(success.settingsOptions.disableExtraPorts, true, 'public settings keep developer-only ports disabled');
 assert.equal(success.settingsOptions.openButton, success.document.getElementById('controls-open'));
 assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'settings-bind'), 'shell binds settings after native startup');
 assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'save-settings-bind'), 'save settings bind before a disc can be imported');
+assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'diagnostics-bind'), 'diagnostics settings bind after native startup');
 assert.equal(success.document.getElementById('settings-open').disabled, false, 'Settings unlocks after save mode initialization');
 const restoreSuccess = installGlobals(success.document);
 try {

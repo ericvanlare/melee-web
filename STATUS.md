@@ -11,6 +11,7 @@ not identify a natural user pause cause or close sustained-play, original-state,
 quiet-machine, foreground, physical-input, audible or pixels/PCM gates.
 Automatic reporting and the independent first-pause campaign remain separate
 prerequisites; no deployment is included in this checkpoint.
+The [runtime reporting receipt](docs/evidence/runtime-reporting-v1.json) separates current 4e package, native, and full-suite evidence from prior b251 Pages and 4d5 behavioral evidence; its remaining acceptance boundaries stay explicit there.
 
 The [natural first-pause receipt](docs/evidence/runtime-natural-first-v1.json)
 records two bounded CPU9 Final Destination matches from source `18e4d54`,

@@ -187,6 +187,14 @@ int main() {{
     def test_explicit_silent_owner_never_opens_audio(self):
         self.run_owner(['--silent'])
 
+    def test_known_host_diagnostics_wiring_is_inactive_and_opt_out_safe(self):
+        self.run_owner(['--diagnostics-known-host'],
+                       'known-host diagnostics identity, scalar incident wiring, inactive delivery delay/cancel')
+
+    def test_known_host_delivery_waits_for_native_lifecycle_handoff(self):
+        self.run_owner(['--diagnostics-known-host', '--lifecycle-handoff'],
+                       'known-host diagnostics identity, scalar incident wiring, inactive delivery delay/cancel')
+
     def test_unavailable_persistence_keeps_required_directory(self):
         self.run_owner(['--cache-unavailable'])
 

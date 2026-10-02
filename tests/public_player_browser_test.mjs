@@ -7,6 +7,7 @@ import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createMeleeGCI, parseMeleeGCI} from '../web/gamecube-save.mjs';
+import {MAX_REPORT_BYTES, HISTORY_COLUMNS, normalizeDiagnosticReport, parseStrictJson} from '../web/diagnostics-schema.mjs';
 import {installBrowserAudioTrace} from './browser_audio_trace.mjs';
 const {values} = parseArgs({options: {
   ...Object.fromEntries(['url', 'playwright', 'disc', 'out', 'manifest'].map(name => [name, {type: 'string'}])),
@@ -14,6 +15,105 @@ const {values} = parseArgs({options: {
   headed: {type: 'boolean', default: false},
 }});
 if (!values.url || !values.out) throw Error('Use --url ORIGIN --out LOCAL_DIR [--playwright PACKAGE_DIR] [--disc OWNED_DISC] [--audio] [--headed]');
+
+const PRODUCTION_DIAGNOSTICS_HOSTS = new Set(['webmelee.gg', 'www.webmelee.gg', 'webmelee.pages.dev']);
+const STAGING_DIAGNOSTICS_HOSTS = new Set(['staging.webmelee.gg', 'webmelee-staging.pages.dev']);
+const PRODUCTION_PAGES_HOST = /^[0-9a-f]{8}\.webmelee\.pages\.dev$/;
+const STAGING_PAGES_HOST = /^[0-9a-f]{8}\.webmelee-staging\.pages\.dev$/;
+
+function diagnosticsEnvironmentForOrigin(origin) {
+  let parsed;
+  try { parsed = new URL(origin); } catch { return null; }
+  if (parsed.protocol !== 'https:' || parsed.origin !== origin || parsed.pathname !== '/' ||
+      parsed.search || parsed.hash || parsed.username || parsed.password || parsed.port) return null;
+  const host = parsed.hostname.toLowerCase();
+  if (PRODUCTION_DIAGNOSTICS_HOSTS.has(host) || PRODUCTION_PAGES_HOST.test(host)) return 'production';
+  if (STAGING_DIAGNOSTICS_HOSTS.has(host) || STAGING_PAGES_HOST.test(host)) return 'staging';
+  return null;
+}
+
+function diagnosticWireFixture(origin) {
+  const env = diagnosticsEnvironmentForOrigin(origin);
+  assert(env, `fixture origin must be a known diagnostics host: ${origin}`);
+  return {
+    schema: 'melee-web-diagnostics', version: 1, session_id: 'session-test', incident_id: 'session-test:incident-1',
+    identity: {source_commit: 'a'.repeat(40), runtime_hash: 'b'.repeat(16), build_profile: 'player'},
+    environment: {env, origin},
+    client: {browser_family: 'chrome', browser_major: 1, platform: 'linux'},
+    capabilities: {
+      native: {available: true, observed: true, reason: null},
+      audio: {available: false, observed: false, reason: 'unavailable'},
+      longtask: {available: false, observed: false, reason: 'unavailable'},
+    },
+    incident: {reason: 'simulation_debt', reason_code: 1, value: 9, threshold: 8,
+      source_frame: 1, scene: 'css', scene_code: 1, clock_owner: 'simulation', clock_owner_code: 1},
+    history: {columns: [...HISTORY_COLUMNS], rows: [], evicted: false, evicted_count: 0, truncated: false},
+    events: {pre: [], post: []}, flags: {incomplete: false, persistence_failure: false},
+  };
+}
+
+function validateDiagnosticPost(request, pageOrigin) {
+  const url = new URL(request.url);
+  const headers = request.headers || {};
+  assert.equal(request.method, 'POST', 'diagnostic delivery uses POST only');
+  assert.equal(diagnosticsEnvironmentForOrigin(pageOrigin) !== null, true,
+    'automatic reporting is eligible only on an allowlisted HTTPS host');
+  assert.equal(url.origin, pageOrigin, 'diagnostic delivery must stay same-origin');
+  assert.equal(url.pathname, '/api/diagnostics', 'diagnostic delivery has one exact endpoint');
+  assert.equal(url.search, '', 'diagnostic delivery must not use query strings');
+  assert.equal(url.hash, '', 'diagnostic delivery must not use fragments');
+  assert.equal(headers['content-type'], 'application/json', 'diagnostic delivery uses strict JSON content');
+  for (const name of ['cookie', 'authorization', 'proxy-authorization', 'referer'])
+    assert.equal(headers[name], undefined, `diagnostic delivery must omit ${name}`);
+  if (headers.origin !== undefined) assert.equal(headers.origin, pageOrigin, 'Origin must remain same-origin');
+  assert.equal(typeof request.body, 'string', 'diagnostic delivery must have a JSON body');
+  assert.equal(new TextEncoder().encode(request.body).byteLength <= MAX_REPORT_BYTES, true,
+    'diagnostic delivery body stays within the audited report bound');
+  const parsed = normalizeDiagnosticReport(parseStrictJson(request.body));
+  assert.equal(parsed.environment.origin, pageOrigin, 'report origin must match the page origin');
+  assert.equal(parsed.environment.env, diagnosticsEnvironmentForOrigin(pageOrigin),
+    'report environment must match the allowlisted host');
+  return parsed;
+}
+
+function assertDiagnosticsNetworkPolicy(requests, pageOrigin) {
+  const eligible = diagnosticsEnvironmentForOrigin(pageOrigin) !== null;
+  for (const request of requests) {
+    if (request.method === 'POST') {
+      assert(eligible, 'local and unknown hosts must never upload diagnostics');
+      validateDiagnosticPost(request, pageOrigin);
+      continue;
+    }
+    assert.equal(request.method, 'GET', `unexpected application network method ${request.method}`);
+  }
+  if (!eligible) assert.equal(requests.some(request => request.method === 'POST'), false,
+    'local and unknown hosts keep diagnostics local by default');
+}
+
+function testDiagnosticsNetworkPolicy() {
+  const known = 'https://webmelee.gg';
+  const body = JSON.stringify(diagnosticWireFixture(known));
+  const valid = {url: `${known}/api/diagnostics`, method: 'POST', body,
+    headers: {'content-type': 'application/json', origin: known}};
+  assert.equal(validateDiagnosticPost(valid, known).schema, 'melee-web-diagnostics');
+  for (const mutation of [
+    {url: `${known}/api/diagnostics/other`},
+    {url: `${known}/api/diagnostics?debug=1`},
+    {url: 'https://example.test/api/diagnostics'},
+    {method: 'PUT'},
+    {headers: {'content-type': 'application/json', cookie: 'session=private'}},
+    {headers: {'content-type': 'application/json', referer: known + '/'}},
+    {headers: {'content-type': 'text/plain'}},
+    {body: JSON.stringify({...diagnosticWireFixture(known), private: 'reject'})},
+  ]) {
+    const candidate = {...valid, ...mutation, headers: {...valid.headers, ...(mutation.headers || {})}};
+    assert.throws(() => validateDiagnosticPost(candidate, known),
+      'only the exact same-origin diagnostics POST is allowed');
+  }
+  assert.throws(() => assertDiagnosticsNetworkPolicy([valid], 'http://127.0.0.1:8813'), /local and unknown/);
+}
+
+testDiagnosticsNetworkPolicy();
 const {chromium,browser:launchOptions} = await loadBrowserTools(values.playwright);
 const packageManifest = values.manifest ? JSON.parse(await fs.readFile(values.manifest, 'utf8')) : null;
 await fs.mkdir(values.out, {recursive: true});
@@ -30,7 +130,7 @@ const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.ve
     identity_sha256: packageManifest.identity_sha256,
   } : null,
   scope: values.audio ? 'Production audio-enabled public entry, ordinary keyboard UI, original menu route, supported match/results lifecycle, Web Audio initialization and nonzero PCM transport. No retail pixel/PCM equivalence, audible-quality, physical-controller or foreground-timing claim.' : 'Production entry, ordinary keyboard UI, lifecycle and application network smoke. No retail comparison, physical-controller, PCM or performance claim.'};
-page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData()}));
+page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData(), headers: request.headers()}));
 page.on('pageerror', error => errors.push(error.message));
 page.on('websocket', socket => sockets.push(socket.url()));
 page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
@@ -1409,16 +1509,35 @@ try {
     const notices = await page.request.get(origin + '/licenses/runtime-third-party.txt');
     assert.equal(notices.status(), 200); assert.match(await notices.text(), /Permission is hereby granted/);
   });
-  await check('keyboard-only session persists its preferences; no application upload or background connections', async () => {
+  await check('keyboard-only preferences and isolated diagnostics obey the application network policy', async () => {
     const storage = await page.evaluate(async () => ({local: Object.keys(localStorage), session: Object.keys(sessionStorage),
       indexed: await indexedDB.databases(), caches: await caches.keys(), workers: (await navigator.serviceWorker.getRegistrations()).length}));
-    assert.deepEqual(storage, {local: ['melee-prototype-keyboard-v1'], session: [],
-      indexed: [{name: 'webmelee-save-profiles-v1', version: 1}], caches: [], workers: 0});
+    const diagnosticsEligible = diagnosticsEnvironmentForOrigin(origin) !== null;
+    assert(storage.local.includes('melee-prototype-keyboard-v1'));
+    assert(storage.local.every(key => ['melee-prototype-keyboard-v1',
+      'melee-web-automatic-diagnostics-v1'].includes(key)), 'Unexpected keyboard-session storage key');
+    assert.deepEqual(storage.session, []); assert.deepEqual(storage.caches, []); assert.equal(storage.workers, 0);
+    const allowedDatabases = new Set(['webmelee-save-profiles-v1', 'melee-web-runtime-diagnostics']);
+    if (diagnosticsEligible) allowedDatabases.add('melee-web-diagnostics-delivery');
+    assert(storage.indexed.some(database => database.name === 'webmelee-save-profiles-v1'));
+    assert(storage.indexed.every(database => allowedDatabases.has(database.name) && database.version === 1),
+      'Only Personal progress and the isolated, eligible diagnostics databases may persist');
     assert.equal((await context.cookies()).length, 0); report.storage = storage;
+    const diagnosticsControl = await page.evaluate(() => ({
+      checked: document.querySelector('#automatic-diagnostics')?.checked ?? null,
+      disabled: document.querySelector('#automatic-diagnostics')?.disabled ?? null,
+    }));
+    assert.equal(diagnosticsControl.disabled, !diagnosticsEligible,
+      'Automatic diagnostics are enabled only for audited staging/production hosts');
+    assert.equal(diagnosticsControl.checked, diagnosticsEligible,
+      'Known hosts enable reporting by default while local/unknown hosts remain local-only');
+    report.diagnostics_network = {eligible: diagnosticsEligible, control: diagnosticsControl};
     await collectViolations();
     assert.deepEqual(violations, []); assert.deepEqual(errors, []); assert.deepEqual(sockets, []);
+    assertDiagnosticsNetworkPolicy(requests, origin);
     for (const request of requests) {
       const url = new URL(request.url);
+      if (request.method === 'POST') continue;
       assert.equal(url.origin, origin); assert.equal(request.method, 'GET'); assert.equal(request.body, null);
       assert.equal(url.search, '');
       if (!values.audio) assert.doesNotMatch(url.pathname, /dsp-coefficients|runtime-audio|audio-worklet|audio-ring/);

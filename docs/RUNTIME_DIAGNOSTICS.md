@@ -59,8 +59,8 @@ without path/query/hash, explicit deployment environment, coarse browser/platfor
 ephemeral random identifiers, scalar source/render/audio observations and bounded
 lifecycle events. Disc names/contents/user-file hashes, saves, player names,
 controller histories, credentials, arbitrary logs and raw memory are excluded.
-The local recorder makes no network requests. Automatic delivery and Settings
-controls belong to the separate reporting prerequisite.
+The recorder itself makes no network requests. The optional delivery adapter
+below runs separately while the player is inactive.
 
 Packaging embeds schema version, actual committed source SHA, runtime graph hash
 and build profile in safe HTML metadata. Audits bind it to the exact runtime
@@ -94,6 +94,58 @@ visible state, and a one-use return value lets C++ reset menu and audio fixed
 tick clocks before polling. The prepared two-file fix changes no thresholds,
 ticks, RNG, manual resume, audio ownership, or save behavior. It remains
 unverified until the sealed package, browser, and sustained checks pass.
+
+## Automatic delivery and Settings
+
+`web/runtime-diagnostics-delivery.mjs` maps one incident into the strict shared
+wire schema. Known HTTPS staging/production hosts default to reporting enabled;
+local and unknown hosts retain evidence locally. Settings contains one toggle
+and an explicit local export action. The separate preference key is
+`melee-web-automatic-diagnostics-v1`; denied preference storage still permits
+turning reporting off for the current visit. A storage event propagates an
+off preference to other open tabs. Off clears unsent work and aborts in-flight
+requests; a request already received by the server cannot be retracted.
+
+The runtime schedules collection for delivery after the one-second post-event
+window. Entering gameplay, preparation or another busy operation cancels that
+task. Existing pending work is retried only while inactive, with a five-second
+request deadline, bounded exponential backoff, three attempts per queued
+record, and four total upload attempts per visit. Each request is an exact
+same-origin JSON POST to `/api/diagnostics`, at most 64 KiB, with credentials
+omitted, redirects rejected and no referrer. No upload is awaited by the native
+simulation or drawing callback.
+
+The isolated `melee-web-diagnostics-delivery` database keeps at most four
+pending records/256 KiB for seven days from capture and four small completed-incident tombstones
+with the same expiry. Source incident IDs remain stable as recovery history
+grows; the first queued packet is immutable for idempotent retry. Newest queued
+triggers evict older work; flags record eviction, truncation, expiry, rejection,
+malformed records and storage failure. Bounded cross-tab merge is best effort;
+storage denial or races can lose diagnostic work without touching saves.
+There is no persistent user identifier. A hard shutdown before inactive
+collection or persistence can still lose an incident.
+
+Manual export is available while gameplay and preparation are inactive. It
+includes the bounded current report and up to four bounded local retained
+records; this local download can be larger than one 64 KiB wire report. Off
+does not disable local retention or export. Neither storage nor reporting is
+required to play.
+
+The [Cloudflare backend](../diagnostics/README.md) strictly validates the
+allowlist, corroborates origin/environment with the host and an operator-set
+release allowlist, and applies transactional rate, intake and retention caps.
+Origin and release labels are not authentication. Authenticated developer
+retrieval uses [the CLI](../scripts/diagnostics_admin.py), with environment,
+source/runtime/profile, reason and time filters. Reports expire from retrieval
+at 30 days; the separate bounded maintenance Worker deletes expired rows.
+Provider failures can delay physical deletion. The deployment contract and
+rollback instructions are in [the integration guide](../diagnostics/INTEGRATION.md).
+Functions live in an audited sidecar outside the public static directory;
+only the two diagnostics API route patterns reach them. Static security
+headers, immutable runtime caching and blocked development routes retain
+their existing boundaries.
+
+The source-bound reporting receipt [separates current 4e package, native, and full-suite evidence from prior b251 Pages and 4d5 behavioral evidence](evidence/runtime-reporting-v1.json); its remaining acceptance boundaries stay explicit there.
 
 ## Focused verification
 

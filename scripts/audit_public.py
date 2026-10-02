@@ -54,6 +54,10 @@ try:
         RUNTIME_TOOLCHAIN_PATHS,
         PIPELINE_SEED_PATHS,
         RUNTIME_ARTIFACT_ROOTS,
+        DIAGNOSTICS_BACKEND_SCHEMA,
+        DIAGNOSTICS_BACKEND_OUTPUTS,
+        _diagnostics_backend_source_files,
+        audit_diagnostics_backend,
         _config,
         _headers,
         _redirects,
@@ -158,11 +162,13 @@ def _load_manifest(path: Path) -> dict[str, Any]:
         _fail(f"manifest is not valid UTF-8 JSON: {exc}")
     if not isinstance(value, dict):
         _fail("manifest root must be an object")
-    allowed = {"schema", "profile", "mode", "draft_preview", "index_production", "operator", "contact", "files", "runtime"}
-    if set(value) not in (allowed - {"runtime"}, allowed):
+    allowed = {"schema", "profile", "mode", "draft_preview", "index_production", "operator", "contact", "files", "runtime", "backend"}
+    if set(value) not in (allowed - {"runtime", "backend"}, allowed - {"backend"}, allowed - {"runtime"}, allowed):
         _fail("manifest has unexpected or missing top-level fields")
     if "runtime" not in value:
         value["runtime"] = None
+    if "backend" not in value:
+        value["backend"] = None
     return value
 
 
@@ -453,6 +459,9 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
         "controller-settings.css": ROOT / "web" / "controller-settings.css",
         "touch-controls.mjs": ROOT / "web" / "touch-controls.mjs",
         "touch-controls.css": ROOT / "web" / "touch-controls.css",
+        "runtime-diagnostics-delivery.mjs": ROOT / "web" / "runtime-diagnostics-delivery.mjs",
+        "diagnostics-settings.mjs": ROOT / "web" / "diagnostics-settings.mjs",
+        "diagnostics-schema.mjs": ROOT / "web" / "diagnostics-schema.mjs",
     }
     for rel in source_map:
         runtime_files[rel] = _read_output(output, f"{runtime_path}/{rel}", "player")
@@ -631,6 +640,11 @@ def audit(output: Path | str, manifest: Path | str, mode: str | None = None) -> 
         _fail("maintenance manifest must not contain runtime metadata")
     if profile == "player" and runtime is None:
         _fail("player manifest must contain runtime metadata")
+    backend = value.get("backend")
+    if profile == "maintenance" and backend is not None:
+        _fail("maintenance manifest must not contain diagnostics backend metadata")
+    if profile == "player" and _diagnostics_backend_source_files() is not None and backend is None:
+        _fail("player manifest must contain diagnostics backend metadata")
     paths, total = _output_files(output, profile)
     expected, css_path, js_path, legal_css_path = _expected_paths(paths, mode, profile, runtime)
     records = _records(output, expected, profile)
@@ -704,6 +718,10 @@ def audit(output: Path | str, manifest: Path | str, mode: str | None = None) -> 
         if css_data != player_source["player.css"] or js_data != player_source["player-shell.mjs"]:
             _fail("player entry assets differ from the current approved source")
         _validate_player_runtime(output, runtime, records)
+        try:
+            audit_diagnostics_backend(output, backend)
+        except BuildError as exc:
+            _fail(str(exc))
     return {"schema": SCHEMA, "profile": profile, "mode": mode, "files": records, "bytes": total}
 
 
