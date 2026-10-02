@@ -158,6 +158,32 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         self.assertIn("campaignCondition=controlledContention?'controlled-contention':'shared-host-uncontrolled'", self.harness)
         self.assertIn("if(browserContext)await browserContext.close();", self.harness)
 
+    def test_campaign_wall_watchdog_covers_setup_through_results(self):
+        self.assertIn("campaignWallBoundTimer=armCampaignWallWatchdog();", self.harness)
+        self.assertIn("function triggerCampaignWallBound()", self.harness)
+        self.assertIn("campaign_wall_bound_exceeded", self.harness)
+        self.assertIn("await bounded(retainRuntimeDiagnosticsCapture());", self.harness)
+        self.assertIn("await bounded(page.close());", self.harness)
+        self.assertIn("await bounded(browserContext.close());", self.harness)
+        self.assertIn("if(timer!==null)clearTimeout(timer);", self.harness)
+        self.assertIn("capture-timeout", self.harness)
+        self.assertIn("?'no-page-to-capture':", self.harness)
+        self.assertIn("if(campaignWallBoundExceeded){", self.harness)
+        self.assertIn("report.result='fail';process.exitCode=1;", self.harness)
+        self.assertIn("deadline:campaignDeadline===null?Date.now()+65*60*1000:campaignDeadline", self.harness)
+        self.assertIn("clearTimeout(campaignWallBoundTimer);campaignWallBoundTimer=null;", self.harness)
+        self.assertLess(
+            self.harness.index("checkCampaignWallBound();\n  report.browser={"),
+            self.harness.index("report.browser={"),
+        )
+        watchdog = self.harness[
+            self.harness.index("function triggerCampaignWallBound()"):
+            self.harness.index("function checkCampaignWallBound()")
+        ]
+        self.assertNotIn("menuDiagnosticPad", watchdog)
+        self.assertNotIn("menuDiagnostic", watchdog)
+        self.assertNotIn("sourcepolicy", watchdog.lower())
+
     def test_runner_freezes_plan_and_writes_stopping_receipt(self):
         self.assertIn("campaign-plan.json", self.runner)
         self.assertIn("campaign-receipt.json", self.runner)

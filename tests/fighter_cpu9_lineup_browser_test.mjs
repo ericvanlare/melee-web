@@ -209,8 +209,12 @@ report.runtime_diagnostics.identity_scope={
   private_artifact:localWasmIdentity?{
     path:localWasmIdentity.path,bytes:localWasmIdentity.bytes,
     sha256:localWasmIdentity.sha256,hash_scope:localWasmIdentity.hash_scope}:null};
+report.campaign_wall_bound=campaignRequested?{
+  status:'armed',wall_bound_seconds:wallBoundSeconds,deadline_at_ms:campaignDeadline,
+  failure_code:null,evidence_status:'pending'}:null;
 const artifactReads=[];
 let browser,browserContext,page,driver,browserCdp,activeMatchIndex=null,contentionWorker=null;
+let campaignWallBoundExceeded=false,campaignWallBoundTimer=null,wallBoundTask=null;
 function startControlledContention(){
   if(!controlledContention||contentionWorker)return;
   contentionWorker=new Worker(`setInterval(()=>{const end=Date.now()+35;while(Date.now()<end){}},50);`,{eval:true});
@@ -439,6 +443,79 @@ async function screenshot(name){
   await page.screenshot({path:file,fullPage:false});report.screenshots.push(file);
   const canvas=path.join(output,`${name}-canvas.png`);
   await page.locator('#canvas').screenshot({path:canvas});report.screenshots.push(canvas);
+}
+function campaignWallBoundError(){
+  const error=Error(`Campaign attempt wall bound exhausted after ${wallBoundSeconds} seconds`);
+  error.code='campaign_wall_bound_exceeded';
+  return error;
+}
+function triggerCampaignWallBound(){
+  if(campaignDeadline===null||campaignWallBoundExceeded)return;
+  campaignWallBoundExceeded=true;
+  report.result='fail';
+  process.exitCode=1;
+  report.failure??={code:'campaign_wall_bound_exceeded',message:campaignWallBoundError().message};
+  if(report.campaign_wall_bound){
+    report.campaign_wall_bound.status='exceeded';
+    report.campaign_wall_bound.failure_code='campaign_wall_bound_exceeded';
+  }
+  wallBoundTask=(async()=>{
+    // Keep the final evidence bounded. This task only reads the page and then
+    // closes the browser objects created by this invocation; it never resumes
+    // source execution, injects input, or changes source policy.
+    const watchdogTimeout=Symbol('campaign-watchdog-timeout');
+    const bounded=async operation=>{
+      let timer=null;
+      try{
+        return await Promise.race([
+          Promise.resolve(operation).catch(()=>undefined),
+          new Promise(resolve=>{timer=setTimeout(()=>resolve(watchdogTimeout),1500);}),
+        ]);
+      }finally{
+        if(timer!==null)clearTimeout(timer);
+      }
+    };
+    const hadPage=!!page&&!page.isClosed();
+    const runtimeCapture=await bounded(retainRuntimeDiagnosticsCapture());
+    const captureTimedOut=runtimeCapture===watchdogTimeout;
+    if(page&&!page.isClosed()){
+      const stateCapture=await bounded(page.evaluate(()=>({
+        status:document.querySelector('#status')?.textContent||'',
+        phase:typeof Module!=='undefined'&&typeof Module._melee_web_native_menu_phase==='function'?
+          Module._melee_web_native_menu_phase():null,
+      })));
+      if(stateCapture!==watchdogTimeout&&stateCapture!==undefined)
+        report.campaign_wall_bound.evidence_state=stateCapture;
+      await bounded(screenshot('campaign-wall-bound'));
+      await bounded(page.locator('body').textContent().then(text=>
+        fs.writeFile(path.join(output,'campaign-wall-bound-page.txt'),text)));
+    }
+    if(report.campaign_wall_bound){
+      const diagnosticCaptureAvailable=runtimeCapture!==watchdogTimeout&&
+        report.runtime_diagnostics?.status==='installed';
+      report.campaign_wall_bound.evidence_status=!hadPage?'no-page-to-capture':
+        captureTimedOut?'capture-timeout':diagnosticCaptureAvailable?'retained-before-close':'unavailable';
+      if(captureTimedOut)report.campaign_wall_bound.evidence_timeout_ms=1500;
+    }
+    if(page&&!page.isClosed())await bounded(page.close());
+    if(browserContext)await bounded(browserContext.close());
+    else if(browser)await bounded(browser.close());
+  })().catch(error=>{
+    if(report.campaign_wall_bound){
+      report.campaign_wall_bound.evidence_status='capture-error';
+      report.campaign_wall_bound.evidence_error=error.message;
+    }
+  });
+}
+function checkCampaignWallBound(){
+  if(campaignDeadline!==null&&(campaignWallBoundExceeded||Date.now()>=campaignDeadline)){
+    triggerCampaignWallBound();
+    throw campaignWallBoundError();
+  }
+}
+function armCampaignWallWatchdog(){
+  if(campaignDeadline===null)return null;
+  return setTimeout(()=>triggerCampaignWallBound(),Math.max(1,campaignDeadline-Date.now()));
 }
 function isTimingPause(state){
   return typeof state?.status==='string'&&state.status.startsWith('Paused after a timing disruption');
@@ -1975,7 +2052,9 @@ async function runMatch(matchIndex,expected){
   }
 }
 
+campaignWallBoundTimer=armCampaignWallWatchdog();
 try{
+  checkCampaignWallBound();
   const discStat=await fs.stat(values.disc);
   report.disc={bytes:discStat.size,sha256:await sha256(values.disc)};
   report.url=values.url;
@@ -1983,6 +2062,7 @@ try{
   report.browser_context.cache_reuse=userDataDirectory?'campaign-shared-origin-profile':'temporary-context';
   report.browser_context.driver_cache='uncontrolled';
   const {chromium,browser:launchOptions,browserPath,playwrightPath}=await loadBrowserTools(values.playwright);
+  checkCampaignWallBound();
   const launchConfig={...browserLaunchOptions(launchOptions),headless:true};
   if(userDataDirectory){
     await fs.mkdir(userDataDirectory,{recursive:true});
@@ -1993,6 +2073,7 @@ try{
     browser=await chromium.launch(launchConfig);
     browserContext=null;
   }
+  checkCampaignWallBound();
   report.browser={name:'headless Chrome',executable:path.basename(browserPath),version:browser?.version()??'unknown',playwright:playwrightPath};
   if(browser)browserCdp=await browser.newBrowserCDPSession();
   if(browserCdp){
@@ -2006,6 +2087,7 @@ try{
   browserCdp?.on('Target.targetCrashed',event=>report.target_crashes.push({
     at:new Date().toISOString(),...event,last_source_progress:lastSourceProgress()}));
   page=await (browserContext||browser).newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});
+  checkCampaignWallBound();
   page.on('crash',error=>report.page_crashes.push({at:new Date().toISOString(),
     message:error?.message||null,last_source_progress:lastSourceProgress()}));
   // Retain WebAudio state and AudioWorklet queue reports/errors at Results
@@ -2133,7 +2215,8 @@ try{
         message.startsWith('Unsupported source CPU carry:'))
       report.page_errors.push({kind:'console',message});
   });
-  driver=createBrowserDriver(page,{timeoutMs:60000,deadline:Date.now()+65*60*1000});
+  driver=createBrowserDriver(page,{timeoutMs:60000,
+    deadline:campaignDeadline===null?Date.now()+65*60*1000:campaignDeadline});
   const response=await page.goto(values.url,{waitUntil:'domcontentloaded'});
   assert.equal(response?.status(),200,'runtime.html must load through the real HTTP server');
   assert.equal(response.headers()['cross-origin-opener-policy'],'same-origin');
@@ -2203,9 +2286,12 @@ try{
   if(!values['setup-only'])report.result=resultsObserveAfterConfirmation?
     'results-observation-pass':'pass';
 }catch(error){
-  report.failure={message:error.message,stack:error.stack};
+  report.failure=campaignWallBoundExceeded?{
+    code:'campaign_wall_bound_exceeded',
+    message:campaignWallBoundError().message,stack:error.stack}: {
+    message:error.message,stack:error.stack};
   process.exitCode=1;
-  if(page&&!page.isClosed()){
+  if(page&&!page.isClosed()&&!campaignWallBoundExceeded){
     report.failure.audio_diagnostics=await readAudioDiagnostics();
     await retainResultsEntry('failure-latest-entry');
     await diagnostic().then(state=>{report.failure.diagnostics=state;}).catch(()=>{});
@@ -2214,14 +2300,24 @@ try{
   }
 }finally{
   await stopControlledContention();
-  if(page&&!page.isClosed()){
+  if(campaignWallBoundTimer!==null){
+    clearTimeout(campaignWallBoundTimer);campaignWallBoundTimer=null;
+  }
+  if(wallBoundTask)await wallBoundTask.catch(()=>{});
+  if(campaignWallBoundExceeded){
+    report.result='fail';process.exitCode=1;
+    report.failure??={code:'campaign_wall_bound_exceeded',message:campaignWallBoundError().message};
+  }
+  if(page&&!page.isClosed()&&!campaignWallBoundExceeded){
     await retainResultsInputEvents();
     await retainRuntimeDiagnosticsCapture();
     if(activeMatchIndex!==null&&report.matches.some(row=>row.match===activeMatchIndex)&&
        !report.results_source_pad_traces.some(row=>row.match===activeMatchIndex))
       await retainResultsSourcePadTrace(activeMatchIndex,'final-state-after-match-stop');
   }
-  report.final_diagnostics=page&&!page.isClosed()?await diagnostic().catch(error=>({error:error.message})):null;
+  report.final_diagnostics=page&&!page.isClosed()&&!campaignWallBoundExceeded?
+    await diagnostic().catch(error=>({error:error.message})):
+    report.campaign_wall_bound?.evidence_state??null;
   report.controller_inputs=report.controller_inputs||[];
   report.controller_input_summary={pad_samples:report.pad_sample_count,first_samples:report.controller_inputs.slice(0,48),last_samples:report.controller_inputs.slice(-24)};
   const artifactFailures=(await Promise.all(artifactReads)).filter(Boolean);
