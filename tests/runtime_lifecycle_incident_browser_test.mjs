@@ -214,6 +214,12 @@ function recordSample(args, callbackMs) {
     callback_ms: callbackMs, at: performance.now(), sequence: ++fixture.trace_sequence};
   if (fixture.samples.length >= 128) fixture.samples.shift();
   fixture.samples.push(row);
+  if (fixture.synthetic_hold_result &&
+      fixture.synthetic_hold_result.first_post_hold_native_sample_sequence === null &&
+      row.sample_index > Number(fixture.synthetic_hold_result.before_native_sample_count || 0) &&
+      row.sequence > Number(fixture.synthetic_hold_result.hold_release_sequence || Infinity)) {
+    fixture.synthetic_hold_result.first_post_hold_native_sample_sequence = row.sequence;
+  }
 }
 function recordIncident(args) {
   if (fixture.incidents.length >= 32) return;
@@ -397,6 +403,22 @@ function releaseHeldNativeRaf() {
   }
   return held.length > 0;
 }
+function foregroundHoldIntervalValid(hold, state) {
+  if (!hold || hold.available !== true || hold.visibility_emitted !== false ||
+      hold.baseline_input_visible !== true || hold.held_callbacks < 1 || hold.released_callbacks < 1) return false;
+  const start = Number(hold.hold_start_sequence);
+  const end = Number(hold.first_post_hold_native_sample_sequence);
+  if (!Number.isInteger(start) || !Number.isInteger(end) || end <= start) return false;
+  const input = Array.isArray(state?.input_activity) ? state.input_activity : [];
+  const events = Array.isArray(state?.browser_events) ? state.browser_events : [];
+  if (input.some(row => Number(row?.sequence) > start && Number(row?.sequence) <= end && row?.visible === 0)) return false;
+  if (events.some(event => Number(event?.sequence) > start && Number(event?.sequence) <= end &&
+      (event?.type === 'freeze' || event?.type === 'pagehide' ||
+       (event?.type === 'visibilitychange' && event?.hidden === true)))) return false;
+  return true;
+}
+fixture.assertForegroundHoldInterval = (hold = fixture.synthetic_hold_result,
+  state = fixture.snapshot()) => foregroundHoldIntervalValid(hold, state);
 fixture.syntheticSuspend = () => {
   fixture.manual_intent.push('synthetic_suspend');
   fixture.synthetic_events.push({kind: 'synthetic_hidden_checkpoint', at: performance.now()});
@@ -420,6 +442,8 @@ fixture.syntheticHiddenHold = async ({emitVisibility = true} = {}) => {
     return {available: false, unrun_reason: 'synthetic_visibility_override_unavailable'};
   const beforeSamples = fixture.native_sample_count;
   const beforeSourceSteps = fixture.native_source_steps;
+  const baselineInput = fixture.input_activity.at(-1) || null;
+  const holdStartSequence = ++fixture.trace_sequence;
   const startedAt = performance.now();
   fixture.synthetic_hidden = emitVisibility;
   fixture.synthetic_callback_hold = true;
@@ -435,6 +459,7 @@ fixture.syntheticHiddenHold = async ({emitVisibility = true} = {}) => {
   fixture.synthetic_hidden = false;
   const visibleEvent = emitVisibility ? dispatchSyntheticVisibility('synthetic_visible_event') : true;
   const released = releaseHeldNativeRaf();
+  const holdReleaseSequence = ++fixture.trace_sequence;
   const visibleAt = performance.now();
   const result = {available: visibleEvent && released, started_at: startedAt, hidden_at: hiddenAt,
     visible_at: visibleAt, before_native_sample_count: beforeSamples, during_native_sample_count: duringSamples,
@@ -443,6 +468,10 @@ fixture.syntheticHiddenHold = async ({emitVisibility = true} = {}) => {
     after_source_steps: fixture.native_source_steps,
     held_callbacks: fixture.synthetic_held_callbacks, released_callbacks: fixture.synthetic_released_callbacks,
     hidden_sample_delta: duringSamples - beforeSamples, hidden_source_step_delta: duringSourceSteps - beforeSourceSteps,
+    hold_start_sequence: holdStartSequence, hold_release_sequence: holdReleaseSequence,
+    first_post_hold_native_sample_sequence: null,
+    baseline_input_sequence: baselineInput?.sequence ?? null,
+    baseline_input_visible: baselineInput?.visible === 1,
     visibility_emitted: emitVisibility};
   fixture.synthetic_hold_result = result;
   return result;
@@ -609,6 +638,22 @@ async function runFixturePreflight() {
     'fixture_preflight_hook_flags');
   requireValue(snapshot.input_activity.length === 1 && snapshot.unload_calls === 1,
     'fixture_preflight_wrappers');
+  const vmHold = {available: true, visibility_emitted: false, held_callbacks: 1,
+    released_callbacks: 1, hold_start_sequence: 10, hold_release_sequence: 20,
+    first_post_hold_native_sample_sequence: 30, baseline_input_sequence: 9,
+    baseline_input_visible: true};
+  const vmState = {input_activity: [{sequence: 9, visible: 1}], browser_events: []};
+  const vmGood = fixture.assertForegroundHoldInterval(vmHold, vmState);
+  const vmHiddenInput = fixture.assertForegroundHoldInterval(vmHold,
+    {input_activity: [{sequence: 9, visible: 1}, {sequence: 25, visible: 0}], browser_events: []});
+  const vmFreeze = fixture.assertForegroundHoldInterval(vmHold, {input_activity: vmState.input_activity,
+    browser_events: [{sequence: 25, type: 'freeze', hidden: true}]});
+  const vmHiddenVisibility = fixture.assertForegroundHoldInterval(vmHold, {input_activity: vmState.input_activity,
+    browser_events: [{sequence: 25, type: 'visibilitychange', hidden: true}]});
+  requireValue(vmGood === true, 'fixture_preflight_foreground_interval_good');
+  requireValue(vmHiddenInput === false, 'fixture_preflight_foreground_interval_hidden_input');
+  requireValue(vmFreeze === false, 'fixture_preflight_foreground_interval_freeze');
+  requireValue(vmHiddenVisibility === false, 'fixture_preflight_foreground_interval_hidden_visibility');
   const requestedPlans = [
     {name: 'synthetic_hidden_hold', flags: {syntheticHiddenHold: true},
       modes: ['synthetic-hidden-hold', 'manual-pause-hidden'], manual: 'synthetic-hidden-hold'},
@@ -633,7 +678,9 @@ async function runFixturePreflight() {
     configure_calls: calls.configure, import_calls: calls.import, start_calls: calls.start,
     file_name: calls.file_name, load_state: fixture.load.state,
     post_hold_predicate: true, predicate_execution: true,
-    start_readiness: snapshot.start_readiness, mode_plan_protocols: modePlanProtocols};
+    start_readiness: snapshot.start_readiness, mode_plan_protocols: modePlanProtocols,
+    foreground_hold_vm_regression: {good: vmGood, hidden_input_rejected: vmHiddenInput,
+      freeze_rejected: vmFreeze, hidden_visibility_rejected: vmHiddenVisibility}};
 }
 
 function capabilityMarkup() {
@@ -1092,6 +1139,9 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode,
         'foreground_hold_debt_missing');
       requireValue(afterLifecycle.native.running === false, 'foreground_hold_not_paused');
       requireValue(!afterLifecycle.manual_intent.includes('manual_resume'), 'foreground_hold_auto_resume');
+      requireValue(await page.evaluate(() =>
+        globalThis.__runtimeLifecycleFixture.assertForegroundHoldInterval()),
+        'foreground_hold_hidden_activity_or_lifecycle_event');
     } else if (synthetic) {
       requireValue(!unexpected.length, 'synthetic_unexpected_incident');
       requireValue(afterLifecycle.native.running === true, 'synthetic_auto_pause');

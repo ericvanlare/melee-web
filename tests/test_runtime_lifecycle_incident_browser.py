@@ -57,6 +57,12 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertEqual(plans["synthetic_foreground"]["manual_protocol"], "synthetic-visible-hold")
         self.assertEqual(plans["genuine"]["manual_protocol"], "genuine-cdp")
         self.assertEqual(plans["capability_only"]["modes"], [])
+        self.assertEqual(payload["foreground_hold_vm_regression"], {
+            "good": True,
+            "hidden_input_rejected": False,
+            "freeze_rejected": False,
+            "hidden_visibility_rejected": False,
+        })
 
     def test_lifecycle_modes_are_explicitly_gated(self):
         source = (ROOT / "tests" / "runtime_lifecycle_incident_browser_test.mjs").read_text()
