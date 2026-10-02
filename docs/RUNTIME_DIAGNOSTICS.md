@@ -118,6 +118,8 @@ only the two diagnostics API route patterns reach them. Static security
 headers, immutable runtime caching and blocked development routes retain
 their existing boundaries.
 
+The source-bound reporting receipt [separates current 4e package, native, and full-suite evidence from prior b251 Pages and 4d5 behavioral evidence](evidence/runtime-reporting-v1.json); its remaining acceptance boundaries stay explicit there.
+
 ## Focused verification
 
 Run `tests/test_runtime_diagnostics.py`, `tests/test_diagnostic_package_identity.py`
