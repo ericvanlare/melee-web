@@ -330,6 +330,23 @@ target_link_options(gameplay_content_match_trace PRIVATE --profiling-funcs
   -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_content_match_trace PROPERTIES SUFFIX ".js")
 
+# Quiescent synchronous source-only API for the rollback feasibility experiment.
+# This never enters the browser/draw host and cannot certify that ownership.
+add_executable(gameplay_snapshot_probe EXCLUDE_FROM_ALL tests/gameplay_snapshot_probe.cpp)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+  "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_snapshot_probe.cpp")
+file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_snapshot_probe.cpp" GAMEPLAY_SNAPSHOT_PROBE_SHA256)
+target_compile_definitions(gameplay_snapshot_probe PRIVATE
+  MELEE_WEB_SNAPSHOT_PROBE_SHA256="${GAMEPLAY_SNAPSHOT_PROBE_SHA256}")
+target_link_libraries(gameplay_snapshot_probe PRIVATE fighter_asset_runtime)
+target_link_options(gameplay_snapshot_probe PRIVATE --no-entry --profiling-funcs
+  -sASYNCIFY=0
+  -sENVIRONMENT=node -sNODERAWFS=1 -sMODULARIZE=1 -sALLOW_MEMORY_GROWTH=1
+  -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2
+  -sEXPORTED_RUNTIME_METHODS=ccall,HEAPU8,UTF8ToString,stackSave,stackRestore
+  -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_rng_address,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_close)
+set_target_properties(gameplay_snapshot_probe PROPERTIES SUFFIX ".js")
+
 add_executable(gameplay_music_profile_trace EXCLUDE_FROM_ALL tests/gameplay_music_profile_trace.cpp)
 target_link_libraries(gameplay_music_profile_trace PRIVATE fighter_asset_runtime)
 target_link_options(gameplay_music_profile_trace PRIVATE --profiling-funcs

@@ -283,3 +283,80 @@ decoding, ordinary Pipe input, loopback socket gates and owned process cleanup.
 The run is accepted only when the generated receipt says `passed`; a client
 boot, connected peer, short replay prefix, successful build or average frame
 rate alone is not the integration result.
+
+## Source-runtime snapshot experiment
+
+The multiplayer workstream's two early questions are controlled desktop
+rollback and restoration of WebMelee's own source simulation. The latter has
+a separate **Compiled / Native traced** feasibility target. It uses the actual
+`GameplayMatchSession`, original raw PAD renewal and scheduler, Mario articles,
+Final Destination collision, and native audio synthesis. It does not draw or
+enter the browser player. Its [hash-bound receipt](../../docs/evidence/source-snapshot-feasibility-v1.json)
+records exact scope, repetitions, coverage, identities, costs and retained
+failed hypotheses. Execution issue
+[#115](https://github.com/ericvanlare/melee-web/issues/115) tracks acceptance.
+
+Prepare the reviewed source target and supply an operator-owned Mario/FD asset
+directory, including the common match, HUD, trophy, rumble and audio files
+required by current source ownership. The runtime reports missing files; it
+does not exempt assets. Use a new ignored output directory for every run:
+
+```sh
+python3 scripts/build.py --configuration Release --trace-target gameplay_snapshot_probe
+python3 scripts/agent_workspace.py run -- \
+  .deps/emsdk/node/24.19.0_64bit/bin/node scripts/check_source_snapshot.mjs \
+  --runtime build/browser-release/gameplay_snapshot_probe.js \
+  --assets assets-local/snapshot-mario \
+  --out work/source-snapshot/fresh-01
+python3 scripts/agent_workspace.py run -- \
+  python3 -m unittest discover -s tests -p test_source_snapshot.py -v
+```
+
+The fixture is one-shot per module and disables Asyncify. Capture occurs after
+a synchronous native
+export returns and the combined source-file/HPS/SSM drive owner reports idle.
+The host copies the entire Wasm memory and records the exported stack pointer.
+Restore requires the same module, full ArrayBuffer identity, capacity and stack
+boundary. Active calls, asynchronous calls, shared memory, changed views,
+growth and closed owners are refused. A failed initialization releases its
+owned files and partially constructed session; it cannot be reused as a fresh
+fixture. Source close releases the match, world and audio owners.
+
+The owned linear state includes native globals, C/C++ allocation metadata,
+pointer identities and source-address shadows; fighters, items, stage and
+collision; HSD objects and process ordering; source RNG and clocks; semantic
+PAD Master/Copy/Game history; match/HUD flow; native AX, SSM/HPS transport and
+PCM buffers. Restoring preserves pointers because it uses the same memory
+instance. No emulator savestate is transplanted. All fixture files are internal
+`RuntimeFiles`, so the asynchronous JavaScript file bridge is unreachable.
+Native audio is rendered into a copied comparison buffer without a host sound
+sink. Replay therefore has no audible commit to duplicate. Source drawing,
+GPU submission, Web Audio and persistent card commits are unreachable in this
+target; their ownership is still an implementation dependency for the player.
+
+For each checkpoint, the driver advances a known sample-indexed PAD stream,
+restores and replays depths 1, 2, 4 and 7 three times. It compares the entire
+native observation and PCM bytes at every replayed sample and all linear
+memory at each depth endpoint. Every forward sample retains full observation
+and PCM hashes. The observation includes both full match-stat
+records, semantic PAD history, source frame/RNG, stock/motion and lifecycle
+fields, article count and scheduler counts. It requires observed Mario fireball
+and both stock-loss coverage. A one-bit source RNG perturbation must diverge,
+then an intact restore must recover agreement. Raw input and forward-state
+logs, baseline observations, first-divergence details and preparation failures
+remain in the ignored run directory.
+
+This is a full-memory correctness baseline, not a production rollback ring.
+Wasm mutable globals beyond the exported stack, function tables, JavaScript
+module/event-loop state, host files/clock, browser input/clock queues, renderer
+resources, externally committed audio and saves are not restored. Endpoint
+memory equality does not claim hidden memory equality at every intermediate
+sample. No retail/Slippi semantic equivalence, full match/rematch, browser
+rollback, visual/audio accuracy, physical input or foreground performance is
+established. The next source experiment must account for actual draw and host
+ownership and reduce snapshot size/cost before enabling player rollback.
+
+Controlled desktop rollback remains a separate gate: retain identical
+frame-indexed inputs and initialization, a bounded fault schedule, actual
+prediction/load/resimulation observations and finalized state comparisons.
+Its diagnostic adaptation must remain part of the pinned client bundle.

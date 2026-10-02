@@ -1297,6 +1297,20 @@ records one 24-frame raw PAD exchange through the loopback ENet relay and the
 desktop peer's existing input consumer. It does not establish browser gameplay,
 general cross-play, or rollback correctness.
 
+The [source snapshot feasibility receipt](docs/evidence/source-snapshot-feasibility-v1.json)
+adds **Compiled / Native traced** evidence for a synchronous, source-only
+Mario/Final Destination prefix. Two fresh runs pass repeated same-instance
+restore/replay at depths 1, 2, 4 and 7, comparing full native observations and
+PCM each replayed sample and all linear memory at each depth endpoint. The
+script exercises a fireball and stock-loss transitions; a deliberately changed
+RNG bit is detected. Every forward observation/PCM hash repeats between the
+fresh runs. Cross-process raw-memory hashes differ and remain unclassified;
+cross-instance restoration is unsupported. The full-memory resource baseline
+is not practical player rollback admission. Drawing, JS/GPU/audio commits,
+mutable Wasm globals beyond the stack, whole matches, browser multiplayer and
+Slippi compatibility remain separate gates. Reproduction and ownership are in
+the [testbed guide](reference-capture/slippi/LOCAL_TESTBED.md#source-runtime-snapshot-experiment).
+
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
 ticks, and the port matches their entry data, input vectors, declared fighter
