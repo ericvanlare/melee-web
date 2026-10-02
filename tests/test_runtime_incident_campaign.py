@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = ROOT / "tests" / "fighter_cpu9_lineup_browser_test.mjs"
 RUNNER = ROOT / "scripts" / "runtime_incident_campaign.mjs"
+POSTFIX_HELPER = ROOT / "work" / "diagnostics" / "run-postfix-natural-attempt.py"
 
 
 class RuntimeIncidentCampaignTest(unittest.TestCase):
@@ -119,16 +120,60 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
     def test_callback_capture_is_bounded_and_scalar(self):
         self.assertIn("max_samples:100,max_incidents:24", self.harness)
         self.assertIn("SAMPLE_INTERVAL_MS=100", self.harness)
+        self.assertIn("reason_counts:Array(10).fill(0),unknown_reason_count:0", self.harness)
+        self.assertIn("dropped_reason_counts:Array(10).fill(0),dropped_unknown_reason_count:0", self.harness)
+        self.assertIn("invalid_preparation_count:0,dropped_invalid_preparation_count:0", self.harness)
+        self.assertIn("const reasonBucket=reasonCode!==null&&reasonCode>=0&&reasonCode<10?reasonCode:null;", self.harness)
+        self.assertIn("if(droppedBucket===null)capture.dropped_unknown_reason_count++;", self.harness)
         self.assertIn("globalThis.menuDiagnosticSample=(...args)=>", self.harness)
         self.assertIn("globalThis.menuDiagnosticIncident=(...args)=>", self.harness)
         self.assertIn("source_commit:null,runtime_hash:null,build_profile:'unknown'", self.harness)
         self.assertIn("artifact_scope:'private-development-artifact'", self.harness)
         self.assertIn("hash_scope:'exact SHA-256 of gameplay_menu_browser.wasm bytes; not the public runtime graph'", self.harness)
         self.assertIn("public_runtime_graph_bound:false", self.harness)
-        self.assertIn("if(capture.incidents.length>MAX_INCIDENTS){capture.incidents.shift();capture.dropped_incidents++;}", self.harness)
+        self.assertIn("if(capture.incidents.length>MAX_INCIDENTS){", self.harness)
+        self.assertIn("const dropped=capture.incidents.shift();capture.dropped_incidents++;", self.harness)
         self.assertIn("runtime_diagnostics:report.runtime_diagnostics", self.harness)
         self.assertIn("if(capture.samples.length>MAX_SAMPLES){capture.samples.shift();capture.dropped_samples++;}", self.harness)
         self.assertNotIn("exportDiagnostics", self.harness)
+
+    def test_incident_reason_preflight_preserves_ring_and_dropped_counts(self):
+        result = subprocess.run(
+            ["node", str(HARNESS), "--incident-capture-preflight"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        preflight = json.loads(result.stdout)
+        self.assertEqual(preflight["result"], "pass")
+        self.assertEqual(preflight["capture_status"], "installed")
+        preparation = preflight["preparation_only"]
+        self.assertEqual(preparation["reason_counts"][7], 25)
+        self.assertEqual(preparation["dropped_reason_counts"][7], 1)
+        guard = preflight["guard_after_preparation"]
+        self.assertEqual(guard["reason_counts"][1], 1)
+        self.assertEqual(guard["dropped_reason_counts"][1], 1)
+        self.assertEqual(preflight["invalid_preparation"]["invalid_preparation_count"], 1)
+        self.assertEqual(preflight["invalid_preparation"]["dropped_invalid_preparation_count"], 1)
+        self.assertEqual(preflight["unknown_reason"]["unknown_reason_count"], 1)
+
+    def test_campaign_quality_rejects_unexpected_or_missing_incident_accounting(self):
+        result = subprocess.run(
+            ["python3", str(POSTFIX_HELPER), "--preflight"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        preflight = json.loads(result.stdout)
+        self.assertEqual(preflight["result"], "pass")
+        negative = preflight["negative_quality_cases"]
+        for name in ("dropped-guard-reason", "invalid-preparation-reason", "unknown-reason", "missing-reason-counts"):
+            self.assertIn(name, negative)
+            self.assertTrue(any(item.startswith("runtime_incident") or item.startswith("unexpected_") for item in negative[name]))
+        self.assertIn("runtime_incident_reason_policy", negative["dropped-guard-reason"])
+        self.assertIn("runtime_incident_reason_counts_missing", negative["missing-reason-counts"])
 
     def test_runner_has_frozen_four_attempt_plan(self):
         with tempfile.TemporaryDirectory() as directory:

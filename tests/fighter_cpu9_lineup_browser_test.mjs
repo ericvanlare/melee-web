@@ -37,6 +37,9 @@ import {assertResultsCpuPagesAfterInitialP1Keyboard,
   from './results_source_pad_trace.mjs';
 
 const MATCH_PLAYER_SLOTS=Object.freeze(['p0','p1','p2','p3']);
+const INCIDENT_REASON_SLOTS=10;
+const zeroIncidentReasonCounts=()=>Array(INCIDENT_REASON_SLOTS).fill(0);
+const incidentReasonBucket=value=>Number.isInteger(value)&&value>=0&&value<INCIDENT_REASON_SLOTS?value:null;
 const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input','cpu-levels'].map(name=>[name,{type:'string'}])),
   'results-confirm-frame':{type:'string'},
@@ -45,7 +48,8 @@ const {values}=parseArgs({options:{...Object.fromEntries(
   'stage-kind':{type:'string'},'wall-bound-seconds':{type:'string'},
   'stop-on-timing-pause':{type:'boolean'},
   'controlled-contention':{type:'boolean'},'user-data-dir':{type:'string'},
-  'readiness-preflight':{type:'boolean'},'stage-map-preflight':{type:'boolean'}}});
+  'readiness-preflight':{type:'boolean'},'stage-map-preflight':{type:'boolean'},
+  'incident-capture-preflight':{type:'boolean'}}});
 const stages=Object.freeze({
   'final-destination':Object.freeze({id:'final-destination',name:'Final Destination',sourceId:0x20,slug:'fd'}),
   battlefield:Object.freeze({id:'battlefield',name:'Battlefield',sourceId:0x1F,slug:'battlefield'}),
@@ -77,6 +81,52 @@ if(values['stage-map-preflight']){
     }
     throw error;
   }
+  process.exit(0);
+}
+async function runIncidentCapturePreflight(){
+  const fakePage={evaluate:async(fn,argument)=>fn(argument)};
+  const previousSample=globalThis.menuDiagnosticSample;
+  const previousIncident=globalThis.menuDiagnosticIncident;
+  const previousCapture=globalThis.__meleeWebRuntimeIncidentCampaignCapture;
+  const snapshot=()=>JSON.parse(JSON.stringify(globalThis.__meleeWebRuntimeIncidentCampaignCapture));
+  try{
+    await installRuntimeDiagnosticsCapture({schema_version:1},
+      {status:'preflight'},fakePage);
+    if(globalThis.__meleeWebRuntimeIncidentCampaignCapture?.status!=='installed')
+      throw Error('preflight installer did not expose an installed capture');
+    const retain=(reason,value,threshold,sourceFrame=0,scene=7,clockOwner=0)=>
+      globalThis.menuDiagnosticIncident(reason,value,threshold,sourceFrame,scene,clockOwner);
+    for(let index=0;index<25;index++)retain(7,0,0);
+    const preparationOnly=snapshot();
+    retain(1,9,8,0,7,1);
+    for(let index=0;index<24;index++)retain(7,0,0);
+    const guardDropped=snapshot();
+    retain(7,1,0);
+    for(let index=0;index<24;index++)retain(7,0,0);
+    const invalidPreparation=snapshot();
+    retain(99,0,0);
+    const unknown=snapshot();
+    if(preparationOnly.dropped_reason_counts[7]!==1||preparationOnly.reason_counts[7]!==25)
+      throw Error('preflight did not preserve dropped preparation reason counts');
+    if(guardDropped.dropped_reason_counts[1]!==1||guardDropped.reason_counts[1]!==1)
+      throw Error('preflight did not preserve a dropped guard reason');
+    if(invalidPreparation.invalid_preparation_count!==1||invalidPreparation.dropped_invalid_preparation_count!==1)
+      throw Error('preflight did not preserve an evicted invalid preparation reason');
+    if(unknown.unknown_reason_count!==1)
+      throw Error('preflight did not count unknown reason codes');
+    return {result:'pass',capture_status:'installed',max_incidents:24,preparation_only:preparationOnly,
+      guard_after_preparation:guardDropped,invalid_preparation:invalidPreparation,unknown_reason:unknown};
+  }finally{
+    if(previousSample===undefined)delete globalThis.menuDiagnosticSample;
+    else globalThis.menuDiagnosticSample=previousSample;
+    if(previousIncident===undefined)delete globalThis.menuDiagnosticIncident;
+    else globalThis.menuDiagnosticIncident=previousIncident;
+    if(previousCapture===undefined)delete globalThis.__meleeWebRuntimeIncidentCampaignCapture;
+    else globalThis.__meleeWebRuntimeIncidentCampaignCapture=previousCapture;
+  }
+}
+if(values['incident-capture-preflight']){
+  console.log(JSON.stringify(await runIncidentCapturePreflight()));
   process.exit(0);
 }
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
@@ -217,6 +267,9 @@ report.timing_pause_receipts=[];
 report.match_readiness_failures=[];
 report.runtime_diagnostics={schema:'melee-web-runtime-callback-capture-v1',identity:null,
   max_samples:100,max_incidents:24,samples:[],incidents:[],dropped_samples:0,dropped_incidents:0,
+  reason_counts:zeroIncidentReasonCounts(),unknown_reason_count:0,
+  dropped_reason_counts:zeroIncidentReasonCounts(),dropped_unknown_reason_count:0,
+  invalid_preparation_count:0,dropped_invalid_preparation_count:0,
   callback_count:0,status:'not-installed'};
 report.source_timing_disruptions=[];
 report.native_command_errors=[];
@@ -357,16 +410,23 @@ async function installResultsInputObserver(){
     window.addEventListener('keyup',event=>record('keyup',event),true);
   });
 }
-async function installRuntimeDiagnosticsCapture(identity,identityScope){
-  await page.evaluate(({identity,identityScope})=>{
+async function installRuntimeDiagnosticsCapture(identity,identityScope,pageOverride=null){
+  const targetPage=pageOverride??page;
+  await targetPage.evaluate(({identity,identityScope})=>{
     const MAX_SAMPLES=100,MAX_INCIDENTS=24,SAMPLE_INTERVAL_MS=100;
     const capture={schema:'melee-web-runtime-callback-capture-v1',identity,identity_scope:identityScope,
       max_samples:MAX_SAMPLES,max_incidents:MAX_INCIDENTS,samples:[],incidents:[],
       dropped_samples:0,dropped_incidents:0,status:'installed',last_at_ms:null,last_sample_at_ms:null,
+      reason_counts:Array(10).fill(0),unknown_reason_count:0,
+      dropped_reason_counts:Array(10).fill(0),dropped_unknown_reason_count:0,
+      invalid_preparation_count:0,dropped_invalid_preparation_count:0,
       callback_count:0,max_callback_ms:null,max_interval_ms:null,max_update_ms:null,max_draw_ms:null,
       max_total_ms:null,max_preparation_ms:null};
     const finite=value=>Number.isFinite(value)?value:null;
     const integer=value=>Number.isFinite(value)&&Number.isInteger(value)?value:null;
+    const structuredPreparation=row=>row.reason_code===7&&row.value===0&&row.threshold===0&&
+      row.clock_owner_code===0&&Number.isInteger(row.source_frame)&&row.source_frame>=-1&&
+      Number.isInteger(row.scene)&&row.scene>=0;
     const maximum=(current,value)=>value===null?current:current===null?value:Math.max(current,value);
     const originalSample=globalThis.menuDiagnosticSample;
     const originalIncident=globalThis.menuDiagnosticIncident;
@@ -409,11 +469,22 @@ async function installRuntimeDiagnosticsCapture(identity,identityScope){
       try{result=originalIncident?.(...args);}
       finally{
         const ended=performance.now();
-        const row={at_ms:finite(ended),reason_code:integer(args[0]),value:finite(args[1]),
+        const reasonCode=integer(args[0]);
+        const reasonBucket=reasonCode!==null&&reasonCode>=0&&reasonCode<10?reasonCode:null;
+        if(reasonBucket===null)capture.unknown_reason_count++;else capture.reason_counts[reasonBucket]++;
+        const row={at_ms:finite(ended),reason_code:reasonCode,value:finite(args[1]),
           threshold:finite(args[2]),source_frame:integer(args[3]),scene:integer(args[4]),
           clock_owner_code:integer(args[5]),callback_ms:finite(Math.max(0,ended-started))};
+        if(reasonBucket===7&&!structuredPreparation(row))capture.invalid_preparation_count++;
         capture.incidents.push(row);
-        if(capture.incidents.length>MAX_INCIDENTS){capture.incidents.shift();capture.dropped_incidents++;}
+        if(capture.incidents.length>MAX_INCIDENTS){
+          const dropped=capture.incidents.shift();capture.dropped_incidents++;
+          const droppedReason=dropped.reason_code;
+          const droppedBucket=droppedReason!==null&&droppedReason>=0&&droppedReason<10?droppedReason:null;
+          if(droppedBucket===null)capture.dropped_unknown_reason_count++;
+          else capture.dropped_reason_counts[droppedBucket]++;
+          if(droppedBucket===7&&!structuredPreparation(dropped))capture.dropped_invalid_preparation_count++;
+        }
       }
       return result;
     };
@@ -426,11 +497,19 @@ async function retainRuntimeDiagnosticsCapture(){
     const capture=await page.evaluate(()=>{
       const value=globalThis.__meleeWebRuntimeIncidentCampaignCapture;
       if(!value)return {schema:'melee-web-runtime-callback-capture-v1',status:'unavailable',
-        samples:[],incidents:[],dropped_samples:0,dropped_incidents:0};
+        samples:[],incidents:[],dropped_samples:0,dropped_incidents:0,
+        reason_counts:Array(10).fill(0),unknown_reason_count:0,
+        dropped_reason_counts:Array(10).fill(0),dropped_unknown_reason_count:0,
+        invalid_preparation_count:0,dropped_invalid_preparation_count:0};
       return {schema:value.schema,identity:value.identity,identity_scope:value.identity_scope,
         max_samples:value.max_samples,
         max_incidents:value.max_incidents,samples:value.samples.slice(),incidents:value.incidents.slice(),
         dropped_samples:value.dropped_samples,dropped_incidents:value.dropped_incidents,
+        reason_counts:value.reason_counts.slice(),unknown_reason_count:value.unknown_reason_count,
+        dropped_reason_counts:value.dropped_reason_counts.slice(),
+        dropped_unknown_reason_count:value.dropped_unknown_reason_count,
+        invalid_preparation_count:value.invalid_preparation_count,
+        dropped_invalid_preparation_count:value.dropped_invalid_preparation_count,
         callback_count:value.callback_count,max_callback_ms:value.max_callback_ms,
         max_interval_ms:value.max_interval_ms,max_update_ms:value.max_update_ms,max_draw_ms:value.max_draw_ms,
         max_total_ms:value.max_total_ms,max_preparation_ms:value.max_preparation_ms,status:value.status};
@@ -440,7 +519,10 @@ async function retainRuntimeDiagnosticsCapture(){
     report.runtime_diagnostics={schema:'melee-web-runtime-callback-capture-v1',status:'capture-error',
       identity:report.runtime_diagnostics.identity,identity_scope:report.runtime_diagnostics.identity_scope,
       samples:[],incidents:[],dropped_samples:0,
-      dropped_incidents:0,callback_count:0,error:error.message};
+      dropped_incidents:0,reason_counts:zeroIncidentReasonCounts(),unknown_reason_count:0,
+      dropped_reason_counts:zeroIncidentReasonCounts(),dropped_unknown_reason_count:0,
+      invalid_preparation_count:0,dropped_invalid_preparation_count:0,
+      callback_count:0,error:error.message};
   }
 }
 const buttonA=0x0100,buttonStart=0x1000;

@@ -1861,16 +1861,23 @@ void tick(){
   preparation_profile.pending_staging_at_settle=
       aurora_browser_submission_status().pendingStagingBuffers;
  }
- // A texture upload is complete by the time it is reported here, so pausing
- // source simulation afterward cannot hide its cost. Newly constructed scenes
- // still settle both uploads and pipelines above. During live play, only an
- // outstanding asynchronous pipeline compilation justifies stopping the clock.
+ // A browser pipeline handle may be returned before driver compilation. The
+ // submitted complete draw owns that work even when Aurora's queue is empty.
+ // Stop before the next source callback and retain its image until completion;
+ // uploads and unassociated foreground stalls keep their existing guard.
+ const int created_pipelines=stat_delta(stats_after.createdPipelines,stats_before.createdPipelines);
+ const bool complete_draws=aurora_pipeline_complete_draws_enabled()!=0;
+ const bool created_gpu_pending=created_pipelines>0&&complete_draws&&
+     aurora_browser_submission_status().pendingStagingBuffers!=0;
  if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&running&&actual_source_draw&&
-    melee_web::MenuPreparationState::needs_live_render_settle(stats_after.queuedPipelines)){
-  if(preparation.request_render_settle(preparation_uses_source_draws())){
+    melee_web::MenuPreparationState::needs_live_render_settle(
+        stats_after.queuedPipelines,created_pipelines,complete_draws,created_gpu_pending)){
+  if(preparation.request_render_settle(created_gpu_pending?false:preparation_uses_source_draws())){
    preparation_profile.begin(false,finished);
-   render_only_preparation=true;
-   diagnostic_incident(7);running=false;menu_clock.reset();message="Preparing first-use rendering...";
+   render_only_preparation=false;
+   diagnostic_incident(7);running=false;menu_clock.reset();audio_clock.reset();
+   message="Preparing first-use rendering...";
+   EM_ASM({window.menuPreparation?.(UTF8ToString($0),false);},message.c_str());
   }
  }
  schedule_startup_pipeline_service();
