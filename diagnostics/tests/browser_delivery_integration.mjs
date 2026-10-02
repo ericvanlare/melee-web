@@ -63,6 +63,8 @@ if (args.help || !args['run-browser']) {
 
 const timeoutMs = Number(args.timeout);
 assert(Number.isInteger(timeoutMs) && timeoutMs >= 5000 && timeoutMs <= 120000, '--timeout must be 5000..120000');
+// Observe the existing 60-second runtime startup policy without shortening it.
+const nativeStartupWaitMs = Math.max(timeoutMs, 90000);
 const nativeArgs = [args.site, args.manifest, args.disc].filter(value => value !== undefined);
 assert(nativeArgs.length === 0 || nativeArgs.length === 3,
   'native packaged mode requires --site, --manifest and --disc together');
@@ -415,7 +417,10 @@ function startConnectProxy(targetPort) {
     client.once('error', () => target.destroy());
   });
   return new Promise((resolve, reject) => {
-    server.once('error', reject);
+    server.once('error', error => {
+      try { server.close(); } catch {}
+      reject(error);
+    });
     server.listen(0, '127.0.0.1', () => resolve({server, port: server.address().port}));
   });
 }
@@ -434,12 +439,18 @@ async function startPages(releases = RELEASES) {
   const bindings = ['--binding', `DIAGNOSTICS_ADMIN_TOKEN=${ADMIN_TOKEN}`,
     '--binding', `DIAGNOSTICS_ALLOWED_RELEASES=${releases}`, '--binding', 'DIAGNOSTICS_RATE_LIMIT=60',
     '--binding', 'DIAGNOSTICS_DAILY_REPORT_CAP=1000', '--binding', 'DIAGNOSTICS_DAILY_BYTE_CAP=16777216'];
-  const process = execFile(WRANGLER, ['--cwd', fixture, 'pages', 'dev', 'public', '--port', String(port),
-    '--local-protocol', 'https', '--persist-to', 'state', ...bindings, '--log-level', 'error',
-    '--show-interactive-dev-session', 'false']);
-  process.stderr?.resume(); process.stdout?.resume();
-  await waitForPort(port, 'https');
-  return {process, port};
+  let process;
+  try {
+    process = execFile(WRANGLER, ['--cwd', fixture, 'pages', 'dev', 'public', '--port', String(port),
+      '--local-protocol', 'https', '--persist-to', 'state', ...bindings, '--log-level', 'error',
+      '--show-interactive-dev-session', 'false']);
+    process.stderr?.resume(); process.stdout?.resume();
+    await waitForPort(port, 'https');
+    return {process, port};
+  } catch (error) {
+    await stopProcess(process);
+    throw error;
+  }
 }
 
 function requestAdmin(port, host, query = '') {
@@ -514,6 +525,39 @@ async function installNativeAudioTrace(page) {
   });
 }
 
+async function captureNativeStartupFailure(page, receipt, phase, waitMs = nativeStartupWaitMs) {
+  const details = await page.evaluate(() => {
+    const fixture = globalThis.__nativeDeliveryFixture;
+    return {
+      owner_count: fixture?.ownerCount ?? 0,
+      mount_error: fixture?.mountError || null,
+      state: fixture?.state || null,
+      errors: Array.isArray(fixture?.errors) ? fixture.errors.slice(0, 8) : [],
+      logs: Array.isArray(fixture?.logs) ? fixture.logs.slice(-64) : [],
+      frame_count: Number.isSafeInteger(fixture?.frameCount) ? fixture.frameCount : 0,
+    };
+  }).catch(snapshotError => ({snapshot_error: String(snapshotError?.message || snapshotError)}));
+  const screenshot = path.join(evidence, `native-${phase.replaceAll(/[^a-z0-9]+/gi, '-').toLowerCase()}-startup-failure.png`);
+  try { await page.screenshot({path: screenshot, fullPage: true}); }
+  catch (screenshotError) { details.screenshot_error = String(screenshotError?.message || screenshotError); }
+  receipt.native_startup_failure = {phase, timeout_ms: waitMs, ...details, screenshot};
+  return details;
+}
+
+async function waitNativeState(page, receipt, phase, predicate, waitMs = nativeStartupWaitMs) {
+  try {
+    await page.waitForFunction(predicate, null, {timeout: waitMs});
+    const failure = await page.evaluate(() => {
+      const fixture = globalThis.__nativeDeliveryFixture;
+      return fixture?.mountError || fixture?.errors?.[0] || null;
+    });
+    if (failure) throw new Error(failure);
+  } catch (error) {
+    const details = await captureNativeStartupFailure(page, receipt, phase, waitMs);
+    throw new Error(`native startup ${phase} failed: ${details.mount_error || details.state?.message || error?.message || error}`, {cause: error});
+  }
+}
+
 async function runNativeBrowser({page, pages, receipt, packaged}) {
   const origin = 'https://staging.webmelee.gg';
   const nativeRequests = [];
@@ -547,7 +591,7 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
   assert.equal(responseHeaders['cross-origin-embedder-policy'], 'require-corp');
   await page.evaluate(() => {
     document.cookie = 'diagnostic-fixture-cookie=present; Path=/; SameSite=Lax';
-    document.body.innerHTML = '<canvas id="canvas" tabindex="0"></canvas>' +
+    document.body.innerHTML = '<canvas id="canvas" width="640" height="480" tabindex="0"></canvas>' +
       '<input id="disc-file" type="file" accept=".iso,.gcm,.rvz">' +
       '<button id="start-player" type="button">Start</button>' +
       '<button id="pause-player" type="button">Pause</button>';
@@ -555,7 +599,8 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
   const moduleUrl = `/runtime/${packaged.identity.runtime_hash}/audio-preview-runtime.mjs`;
   await page.evaluate(async ({moduleUrl, identity}) => {
     const fixture = globalThis.__nativeDeliveryFixture = {
-      states: [], ownerCount: 0, guards: [], samples: [], errors: [], saveConfigured: false,
+      states: [], ownerCount: 0, guards: [], samples: [], errors: [], logs: [], frameCount: 0,
+      saveConfigured: false,
       started: false, paused: false, stallMs: null, player: null,
       upload: {armed: false, armAt: null, serializations: [], fetches: []},
     };
@@ -586,18 +631,30 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
       Promise.resolve(response).then(() => { row.await_ms = performance.now() - started; }, () => { row.await_ms = null; });
       return response;
     };
-    const imported = await import(moduleUrl);
-    fixture.player = await imported.mountMeleeRuntime({
-      canvas: document.querySelector('#canvas'), diagnosticIdentity: identity,
-      onOwner(owner) { fixture.ownerCount++; fixture.owner = owner; },
-      onState(state) {
-        fixture.state = {state: state.state, scene: state.scene, running: state.running,
-          paused: state.paused, graphicsReady: state.graphicsReady, canImport: state.canImport,
-          canStart: state.canStart, audio: state.audio};
-        if (fixture.states.length < 32) fixture.states.push(fixture.state);
-      },
-      onError(error) { if (fixture.errors.length < 8) fixture.errors.push(String(error?.message || error)); },
-    });
+    try {
+      const imported = await import(moduleUrl);
+      fixture.player = await imported.mountMeleeRuntime({
+        canvas: document.querySelector('#canvas'), diagnosticIdentity: identity,
+        onOwner(owner) { fixture.ownerCount++; fixture.owner = owner; },
+        onState(state) {
+          fixture.state = {state: state.state, scene: state.scene, running: state.running,
+            paused: state.paused, graphicsReady: state.graphicsReady, canImport: state.canImport,
+            canStart: state.canStart, audio: state.audio, ready: state.ready, busy: state.busy,
+            message: String(state.message || '').slice(0, 240), loading_phase: state.loading?.phase || null};
+          fixture.states.push(fixture.state);
+          if (fixture.states.length > 128) fixture.states.shift();
+        },
+        onEvent(name) { if (name === 'frame') fixture.frameCount++; },
+        onLog(message, isError) {
+          fixture.logs.push({error: !!isError, message: String(message).slice(0, 400)});
+          if (fixture.logs.length > 64) fixture.logs.shift();
+        },
+        onError(error) { if (fixture.errors.length < 8) fixture.errors.push(String(error?.message || error)); },
+      });
+    } catch (error) {
+      fixture.mountError = String(error?.message || error);
+      return;
+    }
     fixture.player.setAutomaticDiagnostics(true);
     const input = document.querySelector('#disc-file');
     input.addEventListener('change', () => {
@@ -624,12 +681,17 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
       });
     });
   }, {moduleUrl, identity: packaged.identity});
-  await page.waitForFunction(() => {
+  const mountState = await page.evaluate(() => ({error: globalThis.__nativeDeliveryFixture?.mountError || null}));
+  if (mountState.error) {
+    const details = await captureNativeStartupFailure(page, receipt, 'mount');
+    throw Error(`native mount failed: ${details.mount_error || mountState.error}`);
+  }
+  await waitNativeState(page, receipt, 'can-import-before-disc', () => {
     const fixture = globalThis.__nativeDeliveryFixture;
-    const state = fixture?.state;
-    return fixture?.ownerCount === 1 && state?.canImport === true && state?.graphicsReady === true;
-  }, null, {timeout: timeoutMs});
-  receipt.checks.push('single onOwner and canImport/graphicsReady gate before chooser');
+    return !!fixture?.mountError || fixture?.errors?.length > 0 ||
+      (fixture?.ownerCount === 1 && fixture?.state?.canImport === true);
+  });
+  receipt.checks.push('single onOwner and canImport gate before chooser');
   await page.evaluate(async () => {
     const fixture = globalThis.__nativeDeliveryFixture;
     await fixture.player.configureSaveProfile('everything', null);
@@ -642,8 +704,12 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
   }, null, {timeout: timeoutMs});
   const importState = await page.evaluate(() => ({error: globalThis.__nativeDeliveryFixture.importError || null}));
   assert.equal(importState.error, null, `native package import failed: ${importState.error}`);
-  await page.waitForFunction(() => globalThis.__nativeDeliveryFixture?.state?.canStart === true,
-    null, {timeout: timeoutMs});
+  await waitNativeState(page, receipt, 'graphics-ready-after-disc-import', () => {
+    const fixture = globalThis.__nativeDeliveryFixture;
+    const state = fixture?.state;
+    return !!fixture?.mountError || fixture?.errors?.length > 0 ||
+      (state?.graphicsReady === true && state?.canStart === true);
+  }, timeoutMs);
   await page.locator('#start-player').click({timeout: timeoutMs});
   await page.waitForFunction(() => {
     const fixture = globalThis.__nativeDeliveryFixture;
@@ -820,16 +886,13 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
 }
 
 async function runBrowser() {
-  await stageFixture(nativePackage);
   const nativeReleases = nativePackage ? JSON.stringify({
     staging: [{source_commit: nativePackage.identity.source_commit,
       runtime_hash: nativePackage.identity.runtime_hash, build_profile: nativePackage.identity.build_profile}],
     production: [{source_commit: nativePackage.identity.source_commit,
       runtime_hash: nativePackage.identity.runtime_hash, build_profile: nativePackage.identity.build_profile}],
   }) : RELEASES;
-  const pages = await startPages(nativeReleases);
-  const proxy = await startConnectProxy(pages.port);
-  let browser;
+  let pages = null, proxy = null, browser;
   const receipt = {
     schema: 'melee-web-diagnostics-browser-delivery-receipt-v1', result: 'running', fixture,
     mode: nativePackage ? 'packaged-native' : 'synthetic',
@@ -842,6 +905,9 @@ async function runBrowser() {
       'synthetic incident only; no token, cookie, raw request metadata, or hosted endpoint retained',
   };
   try {
+    await stageFixture(nativePackage);
+    pages = await startPages(nativeReleases);
+    proxy = await startConnectProxy(pages.port);
     receipt.source_hashes['runner.mjs'] = await sha256(fileURLToPath(import.meta.url));
     receipt.fixture_config_sha256 = await sha256(path.join(fixture, 'wrangler.jsonc'));
     for (const name of ['runtime-diagnostics.mjs', 'runtime-diagnostics-delivery.mjs', 'diagnostics-settings.mjs', 'diagnostics-schema.mjs']) receipt.source_hashes[name] = await sha256(path.join(WEB, name));
@@ -928,8 +994,8 @@ async function runBrowser() {
     } finally {
       try { await browser?.close(); }
       finally {
-        try { await new Promise(resolve => proxy.server.close(resolve)); }
-        finally { await stopProcess(pages.process); }
+        try { if (proxy?.server) await new Promise(resolve => proxy.server.close(resolve)); }
+        finally { await stopProcess(pages?.process); }
       }
     }
   }

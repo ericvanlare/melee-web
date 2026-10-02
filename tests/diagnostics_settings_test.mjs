@@ -38,6 +38,8 @@ assert.equal(automatic, false);
 assert.match(nodes.get('diagnostics-description').textContent, /Local diagnostics remain/);
 running = false; settings.setState({running: false, busy: true});
 assert.equal(nodes.get('export-diagnostics').disabled, true, 'preparation/saves also block export');
+settings.setState({running: false, busy: false, loading: {phase: 'catalog'}});
+assert.equal(nodes.get('export-diagnostics').disabled, true, 'startup graphics preparation also blocks export');
 settings.setState({running: false, busy: false});
 await nodes.get('export-diagnostics').onclick();
 assert.equal(exports, 1);

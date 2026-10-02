@@ -25,7 +25,8 @@ export function mountDiagnosticsSettings({document = globalThis.document, root =
     description.textContent = preference?.eligible ?
       'Send bounded technical reports after unexpected pauses. Local diagnostics remain available when reporting is off.' :
       'Diagnostics stay on this device at this address. Automatic reporting is available on WebMelee staging and production.';
-    exportButton.disabled = !player || exporting || state?.running === true || state?.busy === true;
+    exportButton.disabled = !player || exporting || state?.running === true || state?.busy === true ||
+      !!state?.loading || state?.state === 'preparing';
     exportButton.title = state?.running ? 'Pause gameplay to export diagnostics.' : '';
   }
   toggle.onchange = () => {

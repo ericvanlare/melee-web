@@ -1509,21 +1509,28 @@ try {
     const notices = await page.request.get(origin + '/licenses/runtime-third-party.txt');
     assert.equal(notices.status(), 200); assert.match(await notices.text(), /Permission is hereby granted/);
   });
-  await check('keyboard-only session persists its preferences; no application upload or background connections', async () => {
+  await check('keyboard-only preferences and isolated diagnostics obey the application network policy', async () => {
     const storage = await page.evaluate(async () => ({local: Object.keys(localStorage), session: Object.keys(sessionStorage),
       indexed: await indexedDB.databases(), caches: await caches.keys(), workers: (await navigator.serviceWorker.getRegistrations()).length}));
-    assert.deepEqual(storage, {local: ['melee-prototype-keyboard-v1'], session: [],
-      indexed: [{name: 'webmelee-save-profiles-v1', version: 1}], caches: [], workers: 0});
+    const diagnosticsEligible = diagnosticsEnvironmentForOrigin(origin) !== null;
+    assert(storage.local.includes('melee-prototype-keyboard-v1'));
+    assert(storage.local.every(key => ['melee-prototype-keyboard-v1',
+      'melee-web-automatic-diagnostics-v1'].includes(key)), 'Unexpected keyboard-session storage key');
+    assert.deepEqual(storage.session, []); assert.deepEqual(storage.caches, []); assert.equal(storage.workers, 0);
+    const allowedDatabases = new Set(['webmelee-save-profiles-v1', 'melee-web-runtime-diagnostics']);
+    if (diagnosticsEligible) allowedDatabases.add('melee-web-diagnostics-delivery');
+    assert(storage.indexed.some(database => database.name === 'webmelee-save-profiles-v1'));
+    assert(storage.indexed.every(database => allowedDatabases.has(database.name) && database.version === 1),
+      'Only Personal progress and the isolated, eligible diagnostics databases may persist');
     assert.equal((await context.cookies()).length, 0); report.storage = storage;
     const diagnosticsControl = await page.evaluate(() => ({
       checked: document.querySelector('#automatic-diagnostics')?.checked ?? null,
       disabled: document.querySelector('#automatic-diagnostics')?.disabled ?? null,
     }));
-    const diagnosticsEligible = diagnosticsEnvironmentForOrigin(origin) !== null;
     assert.equal(diagnosticsControl.disabled, !diagnosticsEligible,
       'Automatic diagnostics are enabled only for audited staging/production hosts');
     assert.equal(diagnosticsControl.checked, diagnosticsEligible,
-      'Known hosts use the opt-in default while local/unknown hosts remain local-only');
+      'Known hosts enable reporting by default while local/unknown hosts remain local-only');
     report.diagnostics_network = {eligible: diagnosticsEligible, control: diagnosticsControl};
     await collectViolations();
     assert.deepEqual(violations, []); assert.deepEqual(errors, []); assert.deepEqual(sockets, []);
