@@ -11,6 +11,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
+import vm from 'node:vm';
+import {performance} from 'node:perf_hooks';
 import {parseArgs} from 'node:util';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 
@@ -32,6 +34,10 @@ class HarnessFailure extends Error {
   constructor(code) { super(code); this.code = code; }
 }
 function requireValue(value, code) { if (!value) throw new HarnessFailure(code); }
+function safeHarnessErrorName(error) {
+  return ['Error', 'EvalError', 'RangeError', 'ReferenceError', 'SyntaxError', 'TypeError', 'URIError']
+    .includes(error?.name) ? error.name : 'Error';
+}
 function validateDiagnosticReport(report) {
   requireValue(report && typeof report === 'object' && !Array.isArray(report), 'diagnostic_report_missing');
   requireValue(report.schema === 'melee-web-runtime-diagnostics' && report.version === 1,
@@ -286,7 +292,7 @@ function startNativeHookPolling() {
   if (fixture.native_hook_timer) return;
   fixture.native_hook_timer = setInterval(() => { installNativeHooks(); }, 25);
 }
-fixture.waitForNativeHooks = (timeoutMs = NATIVE_HOOK_TIMEOUT_MS) => {
+fixture.waitForNativeHooks = (timeoutMs = __NATIVE_HOOK_TIMEOUT_MS__) => {
   installNativeHooks();
   if (nativeHooksComplete()) return Promise.resolve(true);
   return new Promise(resolve => {
@@ -502,13 +508,87 @@ input.onchange = async () => {
 `;
   const script = source.replace('__RUNTIME_MODULE__', moduleUrl)
     .replace('__IDENTITY__', identityJson).replace('__IDENTITY__', identityJson)
+    .replace('__NATIVE_HOOK_TIMEOUT_MS__', String(NATIVE_HOOK_TIMEOUT_MS))
     .replace('__HIDDEN_DWELL_MS__', String(HIDDEN_DWELL_MS))
     .replace('__LIFECYCLE_EVENTS__', JSON.stringify(LIFECYCLE_EVENTS));
+  const unresolved = script.match(/__[A-Z][A-Z0-9_]+__/g) || [];
+  requireValue(unresolved.length === 0, 'fixture_unresolved_placeholder');
   return '<!doctype html><html><head><meta charset="utf-8"><title>Runtime lifecycle fixture</title></head>' +
     '<body><button id="choose-disc" type="button">Choose local disc</button>' +
     '<input id="disc-file" type="file" accept=".iso,.gcm,.ciso" hidden>' +
     '<canvas id="canvas" width="640" height="480" tabindex="0"></canvas>' +
     '<script type="module">' + script + '</script></body></html>';
+}
+
+async function runFixturePreflight() {
+  const identity = {schema_version: 1, source_commit: '0'.repeat(40),
+    runtime_hash: '0'.repeat(16), build_profile: 'audio-player'};
+  const html = fixtureMarkup('runtime/mock.mjs', identity);
+  const script = html.match(/<script type="module">([\s\S]*)<\/script>/)?.[1];
+  requireValue(script, 'fixture_preflight_script');
+  const importLine = '  ({mountMeleeRuntime} = await import("/runtime/mock.mjs"));';
+  const mockImport = `  mountMeleeRuntime = async ({onOwner, onState}) => {
+    const Module = {
+      _melee_web_input_set_activity() {},
+      _melee_web_native_menu_unload() {},
+      saveRuntimeCache() {},
+      _melee_web_native_menu_phase: () => 0,
+      _melee_web_native_menu_running: () => 0,
+      _melee_web_input_message: () => 0,
+      UTF8ToString: () => '',
+    };
+    onOwner({Module, callbacks: {}});
+    onState({scene: 'idle', phase: 0, running: false, canStart: true,
+      ready: true, requiresReload: false, canPause: false, canUnload: true,
+      bundle: true, state: 'prepared'});
+    const state = {scene: 'idle', phase: 0, running: false, canStart: true,
+      ready: true, requiresReload: false, canPause: false, canUnload: true,
+      bundle: true, state: 'prepared'};
+    return {
+      getState: () => state,
+      configureSaveProfile: async () => {},
+      importDisc: async () => {},
+      start: async () => {},
+      unload: async () => {},
+    };
+  };`;
+  const executable = script.replace(importLine, mockImport);
+  requireValue(executable !== script, 'fixture_preflight_import');
+  const elements = new Map([
+    ['choose-disc', {onclick: null, click() {}}],
+    ['disc-file', {files: [], onchange: null}],
+    ['canvas', {id: 'canvas'}],
+  ]);
+  const document = {
+    hidden: false, visibilityState: 'visible',
+    addEventListener() {}, dispatchEvent() {},
+    getElementById(id) { return elements.get(id) || null; },
+  };
+  const context = {
+    URL, document, location: {href: 'http://127.0.0.1/__runtime-lifecycle-fixture/'},
+    performance, setTimeout, clearTimeout, setInterval, clearInterval,
+    Map, WeakSet, Promise, Number, Object, Array, JSON, console,
+    Event: class Event { constructor(type) { this.type = type; } },
+    addEventListener() {}, dispatchEvent() {},
+  };
+  context.globalThis = context;
+  context.window = context;
+  const vmContext = vm.createContext(context);
+  await vm.runInContext(`(async () => {\n${executable}\n})()`, vmContext, {timeout: 2000});
+  const fixture = vmContext.__runtimeLifecycleFixture;
+  requireValue(fixture, 'fixture_preflight_missing_global');
+  requireValue(await fixture.waitForNativeHooks(25), 'fixture_preflight_hooks');
+  requireValue(await fixture.waitForCanStart(25), 'fixture_preflight_readiness');
+  fixture.owner.Module._melee_web_input_set_activity(1, 1);
+  fixture.owner.Module._melee_web_native_menu_unload();
+  const snapshot = fixture.snapshot();
+  requireValue(snapshot.native_hooks.activity && snapshot.native_hooks.unload && snapshot.native_hooks.cache,
+    'fixture_preflight_hook_flags');
+  requireValue(snapshot.input_activity.length === 1 && snapshot.unload_calls === 1,
+    'fixture_preflight_wrappers');
+  return {result: 'pass', native_hooks: snapshot.native_hooks,
+    input_activity: snapshot.input_activity.length, unload_calls: snapshot.unload_calls,
+    start_readiness: snapshot.start_readiness};
 }
 
 function capabilityMarkup() {
@@ -891,11 +971,20 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
 const {values} = parseArgs({options: {
   site: {type: 'string'}, manifest: {type: 'string'}, disc: {type: 'string'},
   playwright: {type: 'string'}, out: {type: 'string'}, synthetic: {type: 'boolean'},
-  'synthetic-hidden-hold': {type: 'boolean'}, 'startup-only': {type: 'boolean'}, help: {type: 'boolean'},
+  'synthetic-hidden-hold': {type: 'boolean'}, 'startup-only': {type: 'boolean'},
+  'fixture-preflight': {type: 'boolean'}, help: {type: 'boolean'},
 }});
 if (values.help) {
-  console.log('Usage: node tests/runtime_lifecycle_incident_browser_test.mjs --site AUDITED_AUDIO_PLAYER --manifest MANIFEST --disc OWNED_ISO --out FRESH_EVIDENCE_DIR [--playwright PLAYWRIGHT_DIR] [--synthetic | --synthetic-hidden-hold | --startup-only]');
+  console.log('Usage: node tests/runtime_lifecycle_incident_browser_test.mjs --site AUDITED_AUDIO_PLAYER --manifest MANIFEST --disc OWNED_ISO --out FRESH_EVIDENCE_DIR [--playwright PLAYWRIGHT_DIR] [--synthetic | --synthetic-hidden-hold | --startup-only] [--fixture-preflight]');
   process.exit(0);
+}
+if (values['fixture-preflight']) {
+  try { console.log(JSON.stringify(await runFixturePreflight())); process.exit(0); }
+  catch (error) {
+    console.log(JSON.stringify({result: 'fail', failure_kind: 'fixture_preflight_failed',
+      error_name: safeHarnessErrorName(error)}));
+    process.exit(1);
+  }
 }
 for (const name of ['site', 'manifest', 'disc', 'out']) requireValue(values[name], name + '_required');
 const requestedSynthetic = values.synthetic === true || values['synthetic-hidden-hold'] === true;

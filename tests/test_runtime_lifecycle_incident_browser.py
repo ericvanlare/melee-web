@@ -1,4 +1,5 @@
 """Syntax and CLI contract for the bounded lifecycle browser detector."""
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -25,6 +26,21 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertIn("--synthetic", help_result.stdout)
         self.assertIn("--synthetic-hidden-hold", help_result.stdout)
         self.assertIn("--startup-only", help_result.stdout)
+        self.assertIn("--fixture-preflight", help_result.stdout)
+
+    def test_generated_fixture_preflight_executes_hooks_and_readiness(self):
+        script = ROOT / "tests" / "runtime_lifecycle_incident_browser_test.mjs"
+        node = shutil.which("node")
+        result = subprocess.run([node, str(script), "--fixture-preflight"],
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["result"], "pass")
+        self.assertEqual(payload["native_hooks"],
+                         {"activity": True, "unload": True, "cache": True})
+        self.assertEqual(payload["input_activity"], 1)
+        self.assertEqual(payload["unload_calls"], 1)
+        self.assertEqual(payload["start_readiness"]["result"], "ready")
 
     def test_lifecycle_modes_are_explicitly_gated(self):
         source = (ROOT / "tests" / "runtime_lifecycle_incident_browser_test.mjs").read_text()
