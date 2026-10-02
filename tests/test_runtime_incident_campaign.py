@@ -9,7 +9,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = ROOT / "tests" / "fighter_cpu9_lineup_browser_test.mjs"
 RUNNER = ROOT / "scripts" / "runtime_incident_campaign.mjs"
-POSTFIX_HELPER = ROOT / "work" / "diagnostics" / "run-postfix-natural-attempt.py"
 
 
 class RuntimeIncidentCampaignTest(unittest.TestCase):
@@ -158,9 +157,9 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         self.assertEqual(preflight["invalid_preparation"]["dropped_invalid_preparation_count"], 1)
         self.assertEqual(preflight["unknown_reason"]["unknown_reason_count"], 1)
 
-    def test_campaign_quality_rejects_unexpected_or_missing_incident_accounting(self):
+    def test_tracked_incident_observer_preserves_unexpected_and_missing_accounting(self):
         result = subprocess.run(
-            ["python3", str(POSTFIX_HELPER), "--preflight"],
+            ["node", str(HARNESS), "--incident-capture-preflight"],
             cwd=ROOT,
             check=True,
             capture_output=True,
@@ -168,12 +167,14 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         )
         preflight = json.loads(result.stdout)
         self.assertEqual(preflight["result"], "pass")
-        negative = preflight["negative_quality_cases"]
-        for name in ("dropped-guard-reason", "invalid-preparation-reason", "unknown-reason", "missing-reason-counts"):
-            self.assertIn(name, negative)
-            self.assertTrue(any(item.startswith("runtime_incident") or item.startswith("unexpected_") for item in negative[name]))
-        self.assertIn("runtime_incident_reason_policy", negative["dropped-guard-reason"])
-        self.assertIn("runtime_incident_reason_counts_missing", negative["missing-reason-counts"])
+        self.assertEqual(preflight["capture_status"], "installed")
+        guard = preflight["guard_after_preparation"]
+        self.assertEqual(guard["reason_counts"][1], 1)
+        self.assertEqual(guard["dropped_reason_counts"][1], 1)
+        invalid = preflight["invalid_preparation"]
+        self.assertEqual(invalid["invalid_preparation_count"], 1)
+        self.assertEqual(invalid["dropped_invalid_preparation_count"], 1)
+        self.assertEqual(preflight["unknown_reason"]["unknown_reason_count"], 1)
 
     def test_runner_has_frozen_four_attempt_plan(self):
         with tempfile.TemporaryDirectory() as directory:
