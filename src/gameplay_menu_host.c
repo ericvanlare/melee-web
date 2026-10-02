@@ -1320,6 +1320,16 @@ int melee_web_menu_host_source_observe(
     out->friendly_fire = rules->friendly_fire;
     out->item_frequency = (int) (int8_t) preferences->item_freq;
     out->item_mask = preferences->item_mask;
+    if (h->source_scene == MELEE_WEB_HOST_SCENE_CSS) {
+        const CSSData* css = melee_web_menu_css(h->session);
+        if (css == NULL) {
+            return fail(e, n, "CSS team observation requires the live original CSS payload");
+        }
+        out->css_setup_valid = 1;
+        out->css_is_teams = css->vs.start.rules.is_teams;
+        out->css_player_teams[0] = css->vs.start.players[0].team;
+        out->css_player_teams[1] = css->vs.start.players[1].team;
+    }
     return ok(e, n);
 }
 int melee_web_menu_host_route_target_mode(const MeleeWebMenuHost* h){

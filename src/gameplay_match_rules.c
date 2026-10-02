@@ -29,6 +29,17 @@ static struct {
     MatchExitInfo data;
 } terminal;
 static int fail(char* e,size_t n,const char* message){if(e&&n)snprintf(e,n,"%s",message);return 0;}
+static int supported_team_setup(const StartMeleeData* start){
+    if(!start||start->rules.is_teams>1)return 0;
+    if(!start->rules.is_teams)return 1;
+    int count=0;
+    for(int i=0;i<4;i++){
+        if(start->players[i].slot_type==Gm_PKind_NA)break;
+        if(start->players[i].team>=3)return 0;
+        count++;
+    }
+    return count==2&&start->players[0].team!=start->players[1].team;
+}
 int melee_web_match_timer_supported(const struct StartMeleeRules* rules)
 {
     if (!rules) return 0;
@@ -94,7 +105,7 @@ int melee_web_match_rules_prepare_from_menu(MeleeWebMatchRules* h,
         if(active!=4||candidate.players[4].slot_type!=Gm_PKind_NA)
             return fail(e,n,"Opening source payload exceeds its authored four-player demo slots");
     }else if(candidate.rules.match_kind!=MatchKind_Stock||!candidate.rules.is_stock||
-       !candidate.rules.is_vs||candidate.rules.is_teams||
+       !candidate.rules.is_vs||!supported_team_setup(&candidate)||
        !melee_web_match_timer_supported(&candidate.rules)||candidate.rules.xB!=-1||
        !melee_web_stage_content(candidate.rules.stkind))
         return fail(e,n,"Menu payload does not match the supported stock/stage rules");
@@ -131,7 +142,7 @@ int melee_web_match_rules_init_from_menu(MeleeWebMatchRules* h,
         return fail(e,n,"Initialize original match data before source fighters");
     StartMeleeData candidate=*menu;
     if(candidate.rules.match_kind!=MatchKind_Stock||!candidate.rules.is_stock||
-       !candidate.rules.is_vs||candidate.rules.is_teams||
+       !candidate.rules.is_vs||!supported_team_setup(&candidate)||
        !melee_web_match_timer_supported(&candidate.rules)||candidate.rules.xB!=-1||
        !melee_web_stage_content(candidate.rules.stkind))
         return fail(e,n,"Menu payload does not match the supported stock/stage rules");

@@ -54,27 +54,31 @@ int melee_web_match_init_source(StartMeleeData* start)
 }
 
 static void set_supported_vs_payload(StartMeleeData* start, int item_frequency,
-                                     uint64_t item_mask)
+                                     uint64_t item_mask, int is_teams,
+                                     int team0, int team1, int player_count)
 {
     memset(start, 0, sizeof(*start));
     start->rules.match_kind = MatchKind_Stock;
     start->rules.is_stock = 1;
     start->rules.is_vs = 1;
+    start->rules.is_teams = (u8) is_teams;
     start->rules.xB = (int8_t) item_frequency;
     start->rules.x20 = item_mask;
     start->rules.game_speed = 1.0f;
     start->rules.stkind = St_Kind_Last;
-    for (int i = 0; i < 2; ++i) {
+    for (int i = 0; i < GM_MAX_PLAYERS; ++i)
+        start->players[i].slot_type = Gm_PKind_NA;
+    for (int i = 0; i < player_count; ++i) {
         start->players[i].ckind = CKIND_MARIO;
         start->players[i].slot_type = Gm_PKind_Human;
         start->players[i].stocks = 4;
         start->players[i].slot = 0;
+        start->players[i].team = (u8) (i == 0 ? team0 : team1);
     }
-    for (int i = 2; i < GM_MAX_PLAYERS; ++i)
-        start->players[i].slot_type = Gm_PKind_NA;
 }
 
 static int check_route(int item_frequency, uint64_t item_mask,
+                       int is_teams, int team0, int team1, int player_count,
                        int should_prepare, int use_init)
 {
     char error[192] = {0};
@@ -82,7 +86,8 @@ static int check_route(int item_frequency, uint64_t item_mask,
     MeleeWebMatchRules* owner;
     int result;
 
-    set_supported_vs_payload(&start, item_frequency, item_mask);
+    set_supported_vs_payload(&start, item_frequency, item_mask, is_teams,
+                             team0, team1, player_count);
     owner = melee_web_match_rules_begin(error, sizeof(error));
     if (!owner) {
         fprintf(stderr, "begin source rules: %s\n", error);
@@ -122,12 +127,18 @@ static int check_route(int item_frequency, uint64_t item_mask,
 int main(void)
 {
     const uint64_t menu_mask = UINT64_MAX ^ UINT64_C(1);
-    if (!check_route(-1, menu_mask, 1, 0) ||
-        !check_route(-1, menu_mask, 1, 1) ||
-        !check_route(0, menu_mask, 0, 0) ||
-        !check_route(0, menu_mask, 0, 1) ||
-        !check_route(-1, UINT64_MAX, 1, 1))
+    if (!check_route(-1, menu_mask, 0, 0, 0, 2, 1, 0) ||
+        !check_route(-1, menu_mask, 0, 0, 0, 2, 1, 1) ||
+        !check_route(-1, menu_mask, 1, 0, 1, 2, 1, 0) ||
+        !check_route(-1, menu_mask, 1, 0, 1, 2, 1, 1) ||
+        !check_route(-1, menu_mask, 1, 0, 0, 2, 0, 0) ||
+        !check_route(-1, menu_mask, 1, 0, 3, 2, 0, 1) ||
+        !check_route(-1, menu_mask, 1, 0, 1, 3, 0, 0) ||
+        !check_route(-1, menu_mask, 2, 0, 1, 2, 0, 0) ||
+        !check_route(0, menu_mask, 0, 0, 0, 2, 0, 0) ||
+        !check_route(0, menu_mask, 0, 0, 0, 2, 0, 1) ||
+        !check_route(-1, UINT64_MAX, 0, 0, 0, 2, 1, 1))
         return 1;
-    puts("source match rules preserve item masks only when item frequency is None");
+    puts("source match rules preserve item masks and admit only opposing two-player teams");
     return 0;
 }

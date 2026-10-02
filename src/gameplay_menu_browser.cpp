@@ -2395,7 +2395,7 @@ const char* melee_web_native_menu_match_observe(){
   "\"frame\":%u,\"rng\":%u,\"outcome\":%d,\"winner\":%d,"
   "\"rules\":{\"match_kind\":%d,\"stage\":%u,\"timer_enabled\":%u,"
   "\"time_limit\":%u,\"item_frequency\":%d,\"item_mask_hex\":\"%016llx\","
-  "\"player_stocks\":[%d,%d]},\"players\":["
+  "\"is_teams\":%u,\"player_teams\":[%d,%d],\"player_stocks\":[%d,%d]},\"players\":["
   "{\"fighter\":%d,\"stocks\":%d,\"motion\":%d,\"groundAir\":%d,\"x\":%.9g,\"y\":%.9g},"
   "{\"fighter\":%d,\"stocks\":%d,\"motion\":%d,\"groundAir\":%d,\"x\":%.9g,\"y\":%.9g}]}",
   match->ready()?"true":"false",match->paused()?"true":"false",
@@ -2404,6 +2404,7 @@ const char* melee_web_native_menu_match_observe(){
   (int) start.rules.match_kind,(unsigned) start.rules.stkind,
   (unsigned) start.rules.timer_enabled,(unsigned) start.rules.time_limit,
   (int) (int8_t) start.rules.xB,(unsigned long long) start.rules.x20,
+  (unsigned) start.rules.is_teams,(int) start.players[0].team,(int) start.players[1].team,
   (int) start.players[0].stocks,(int) start.players[1].stocks,
   p0.fighter_kind,p0.stocks,p0.motion_id,p0.ground_or_air,p0.position[0],p0.position[1],
   p1.fighter_kind,p1.stocks,p1.motion_id,p1.ground_or_air,p1.position[0],p1.position[1]);
@@ -2501,7 +2502,9 @@ const char* melee_web_native_menu_source_observe(){
   "\"rules\":{\"mode\":%d,\"stock_count\":%d,\"time_limit\":%d,"
   "\"stock_time_limit\":%d,\"handicap\":%d,\"damage_ratio\":%d,"
   "\"friendly_fire\":%d},\"items\":{\"frequency\":%d,"
-  "\"mask_hex\":\"%016llx\"}},"
+  "\"mask_hex\":\"%016llx\"},"
+  "\"css_setup\":{\"valid\":%s,\"is_teams\":%d,"
+  "\"player_teams\":[%d,%d]}},"
   "\"items_menu\":{\"valid\":%s,\"cursor\":%d,"
   "\"selected_item_enabled\":%d,\"frequency_selector\":%d},"
   "\"start\":{\"valid\":%s,\"match_kind\":%d,\"stage\":%u,"
@@ -2515,6 +2518,8 @@ const char* melee_web_native_menu_source_observe(){
   observed.stock_time_limit,observed.handicap,observed.damage_ratio,
   observed.friendly_fire,observed.item_frequency,
   (unsigned long long) observed.item_mask,
+  observed.css_setup_valid ? "true" : "false", observed.css_is_teams,
+  observed.css_player_teams[0], observed.css_player_teams[1],
   live_items_valid?"true":"false",live_item_cursor,live_item_enabled,live_item_frequency,
   start_valid?"true":"false",(int) start.rules.match_kind,
   (unsigned) start.rules.stkind,(int) (int8_t) start.rules.xB,

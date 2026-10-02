@@ -18,12 +18,20 @@ options['rules-items-only'] = {type: 'boolean', default: false};
 options['css-sss-only'] = {type: 'boolean', default: false};
 options['stage-only'] = {type: 'boolean', default: false};
 options['no-contest-only'] = {type: 'boolean', default: false};
+options['team-battle'] = {type: 'boolean', default: false};
+options['team-setup-only'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
 const menuOnly = values['menu-only'];
 const rulesItemsOnly = values['rules-items-only'];
 const cssSssOnly = values['css-sss-only'];
 const stageOnly = values['stage-only'];
 const noContestOnly = values['no-contest-only'];
+const teamSetupOnly = values['team-setup-only'];
+const teamBattle = values['team-battle'] || teamSetupOnly;
+if (teamSetupOnly && values['team-battle'])
+  throw Error('--team-setup-only and --team-battle select different route lengths');
+if (teamBattle && (menuOnly || rulesItemsOnly || cssSssOnly || stageOnly || noContestOnly))
+  throw Error('--team-battle runs the full Rules/Items/match route and cannot be combined with a reduced-route flag');
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const output = path.resolve(values.out);
@@ -45,12 +53,18 @@ let browser, context, page, driver, browserPath, playwrightPath;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
   mode: noContestOnly ? 'source-no-contest-results-reproducer'
+    : teamSetupOnly ? 'source-team-setup-cancel-reentry-reproducer'
+    : teamBattle ? 'source-two-player-team-battle-results-route'
     : stageOnly ? 'source-sss-stage-driver-reproducer'
     : rulesItemsOnly ? 'source-rules-items-entry-reproducer'
     : cssSssOnly ? 'source-css-to-sss-cooldown-reproducer'
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
   scope: noContestOnly
     ? 'Headless rendered original CSS -> SSS -> Final Destination -> match; P1 Start opens the original source pause, then the held LRAS+Start No Contest chord enters Results and Eject verifies teardown.'
+    : teamSetupOnly
+    ? 'Headless rendered original CSS -> Main/VS/Rules/Items -> CSS; original CSS Teams toggle and P2 team-color input configure the two existing players, SSS B cancellation returns to CSS with Rules retained, SSS re-entry and a second B cancellation return to CSS, then Eject verifies teardown.'
+    : teamBattle
+    ? 'Headless rendered original CSS -> Main/VS/Rules/Items -> CSS; original CSS Teams toggle and team-color input configure two opposing players, SSS B cancellation returns to CSS, SSS re-entry starts a real team match, and original Results returns to CSS before Eject/reimport.'
     : stageOnly
     ? 'Headless rendered original CSS -> Main -> VS Rules/Items changes -> CSS -> SSS; the PAD-fed source stage driver reaches Final Destination, then B returns to CSS and Eject verifies teardown. No match is launched.'
     : rulesItemsOnly
@@ -65,8 +79,9 @@ const report = {
   viewport: {width: 1280, height: 960},
   discIdentity: 'USA Rev. 2 CISO',
   discSha256: null,
-  inputConfiguration: {playerOne: 'B0XX keyboard PAD', playerTwo: 'off', keyMap: {
-    confirm: 'm', back: 'o', start: '7', left: '2', down: '3', right: '4', up: ']'}},
+  inputConfiguration: {playerOne: 'B0XX keyboard PAD', playerTwo: 'off', teamBattle,
+    teamSetup: teamBattle ? 'P1 source stick moves to the original CSS Teams control and P2 team-color swatch; P1 A activates each' : null,
+    keyMap: {confirm: 'm', back: 'o', start: '7', left: '2', down: '3', right: '4', up: ']'}},
   saveMode: 'Everything unlocked (native runtime default, configured_save_mode = MELEE_WEB_SAVE_MODE_EVERYTHING; isolated Playwright context). No Personal profile is loaded; Personal autosave is not exercised by this route.',
   source: {
     modeScene: 'Original GM_MENU=1 / GS_MENU=1 owns Main/VS/Rules/Items; MenuKind Main=0, VS=2, Rules=13, Items=16',
@@ -85,6 +100,7 @@ const report = {
     rulesMatchHandoff: 'fn_8022F538 Start in GM_MENU commits GameRules then calls mn_80229860(GM_VS)',
     sourceModeHandoff: 'gmmenumode.c:onExit passes MenuExitData.pending_mode to gm_SetPendingGameMode and gm_SetNewGameModePending; host snapshots source globals after this callback',
     cssToMain: 'mnCharSel_Scene_OnFrame checks mn_8022F218 for PAD_LR_START; B0XX q+9+7 follows the original CSS parent route to GM_MENU',
+    teamsToggle: 'mnCharSel_CursorThink toggles StartMeleeData.rules.is_teams through PAD A when the original CSS cursor is at x<-25.5 and y>22; cycleTeam assigns one of the three authored team colors to the selected CSS door',
     matchNoContest: 'Original PAD_LR_START+A+Start; B0XX q+9+m+7 follows Results',
     routeMenuAssets: ['MnSlChr.usd and SdSlChr.usd:SIS_SelCharData (non-Japanese saved language; Japanese uses .dat)', 'MnSlMap.usd (non-Japanese saved language; Japanese uses .dat)', 'MnMaAll.usd:MenMainConRl_Top/MenMainCursorRl_Top/MenMainNmRl_Top/MenMainConIs_Top/MenMainCursorIs_Top'],
     textArchives: ['SdMenu.usd:SIS_MenuData (saved US language)', 'SdMenu.dat:SIS_MenuData (other saved languages)', 'SdToy.dat:SIS_ToyData'],
@@ -105,8 +121,8 @@ const report = {
     physicalInput: {status: 'not_run', reason: 'browser PAD keyboard routing only'},
     performance: {status: 'not_run', reason: 'functional route capture is not a performance campaign'},
   },
-  checks: [], screenshots: {}, input: [], timingPauses: [], timingPauseRecovery: [],
-  sourceObservations: [], matchObservations: [],
+  checks: [], screenshots: {}, input: [], sourcePadSamples: [], timingPauses: [], timingPauseRecovery: [],
+  sourceObservations: [], cssObservations: [], matchObservations: [],
   lifecycleObservations: [], errors: [],
 };
 const serializeReport = () => JSON.stringify(report, (_key, value) =>
@@ -154,6 +170,27 @@ const current = () => page.evaluate(() => ({
 }));
 const observeSource = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_source_observe())));
+const waitCssTeams = async (isTeams, teams, label) => {
+  const deadline = Date.now() + 15000;
+  let observation;
+  while (Date.now() < deadline) {
+    await resumeTimingPause(label);
+    observation = await observeSource();
+    const css = observation.source?.css_setup;
+    if (observation.source?.valid && observation.source.scene === 1 &&
+        css?.valid && css.is_teams === isTeams &&
+        JSON.stringify(css.player_teams) === JSON.stringify(teams)) break;
+    await ensureNoError(label);
+    await page.waitForTimeout(50);
+  }
+  const css = observation?.source?.css_setup;
+  assert(observation?.source?.valid && observation.source.scene === 1 && css?.valid &&
+    css.is_teams === isTeams && JSON.stringify(css.player_teams) === JSON.stringify(teams),
+    `Timed out waiting for original CSS Teams state ${isTeams}/${teams}: ${JSON.stringify(observation)}`);
+  report.cssObservations.push({label, ...observation});
+  return observation;
+};
+const observeCssSetup = () => page.evaluate(() => window.menuObserveCssSetup?.() ?? null);
 const observeMatch = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_match_observe())));
 const observeLifecycle = () => page.evaluate(() => JSON.parse(
@@ -245,6 +282,21 @@ const chord = async keys => {
   await driver.pressChord(keys, {holdMs: 120, releaseMs: 250});
   await ensureNoError(`after ${keys.join('+')}`);
   await resumeTimingPause(`after ${keys.join('+')}`);
+};
+const sourcePadSample = async (buttons, stickX, stickY, label) => {
+  await ensureNoError(`before source PAD ${label}`);
+  const accepted = await page.evaluate(args => window.menuDiagnosticPad(...args),
+    [0, buttons, stickX, stickY, 1]);
+  assert.equal(accepted, 1, `Source PAD rejected ${label}`);
+  report.sourcePadSamples.push({port: 0, buttons, stickX, stickY, duration: 1, label});
+  await waitForNoQueuedPad(`source PAD ${label} drains`);
+};
+const sourcePadTap = async (button, label) => {
+  await sourcePadSample(button, 0, 0, label);
+  await page.evaluate(args => window.menuDiagnosticPad(...args), [0, 0, 0, 0, 2]);
+  report.sourcePadSamples.push({port: 0, buttons: 0, stickX: 0, stickY: 0,
+    duration: 2, label: `${label}:release`});
+  await waitForNoQueuedPad(`source PAD ${label} release drains`);
 };
 const waitMessage = async (message, label) => {
   const deadline = Date.now() + 90000;
@@ -421,6 +473,53 @@ const enterVsRules = async label => {
   const rules = await waitMenu(RULES_MENU_KIND, 0, `${label}: open original VS Rules`);
   await shot(`${label}-rules`);
   return rules;
+};
+const moveCssCursor = async (label, isInside, directionFor) => {
+  for (let step = 0; step < 240; step++) {
+    const setup = await observeCssSetup();
+    assert(setup?.cursors?.length === 16 && setup?.doors?.length === 40 &&
+      setup?.geometry?.length === 48, 'Live original CSS cursor geometry is unavailable');
+    const [x, y] = setup.geometry;
+    if (isInside(x, y, setup)) return setup;
+    const [stickX, stickY] = directionFor(x, y, setup);
+    assert(stickX || stickY, `${label} cursor movement made no progress at (${x}, ${y})`);
+    await sourcePadSample(0, stickX, stickY, `${label} source cursor step ${step + 1}`);
+  }
+  const setup = await observeCssSetup();
+  throw Error(`${label} cursor did not reach its authored source bounds: ${JSON.stringify({
+    cursor: setup?.geometry?.slice(0, 2), door1: setup?.geometry?.slice(12, 24)})}`);
+};
+const configureCssTeamBattle = async () => {
+  // Follow the live original cursor and door bounds through the existing
+  // read-only CSS observer. Only single-tick raw PAD samples feed source input.
+  // This keeps the route inside the source Teams control and team-color box.
+  let setup = await moveCssCursor('CSS Teams control',
+    (x, y) => x < -25.5 && y > 22 && y < 24.6,
+    (x, y) => [0, y <= 22 ? 80 : -80]);
+  const activeKinds = [0, 1, 2, 3].map(door => setup.doors[door * 10]);
+  assert.deepEqual(activeKinds, [0, 1, 3, 3],
+    'Teams setup must leave the original two-player roster unchanged');
+  await shot('09-team-toggle-control');
+  await sourcePadTap(0x0100, 'original CSS Teams toggle A');
+  await waitCssTeams(1, [0, 0], 'CSS Teams control enabled with both players on team 0');
+
+  setup = await observeCssSetup();
+  const teamBounds = setup.geometry.slice(12, 24);
+  const left = teamBounds[6], right = teamBounds[7];
+  assert(Number.isFinite(left) && Number.isFinite(right) && right > left,
+    `Original P2 team-color bounds are invalid: ${JSON.stringify(teamBounds)}`);
+  await moveCssCursor('P2 team-color box',
+    (x, y) => x > left + 0.25 && x < right - 0.25 && y > -5.55 && y < -1.05,
+    (x, y) => [x <= left + 0.25 ? 80 : x >= right - 0.25 ? -80 : 0,
+      y <= -5.55 ? 80 : y >= -1.05 ? -80 : 0]);
+  await shot('10-second-door-team-color-control');
+  await sourcePadTap(0x0100, 'original CSS P2 team-color A');
+  await waitCssTeams(1, [0, 1], 'CSS P2 changed to the opposing team');
+  setup = await observeCssSetup();
+  assert.deepEqual([0, 1, 2, 3].map(door => setup.doors[door * 10]), [0, 1, 3, 3],
+    'Source team-color selection must preserve the original two-player roster');
+  await shot('11-css-team-battle-configured');
+  report.checks.push('Original CSS Teams toggle and P2 color control use source predicates, live CSS geometry, and single-tick source PAD samples');
 };
 let failure;
 let nativeSessionActive = false;
@@ -674,6 +773,52 @@ route: {
 
   // mnCharSel enters with its source-authored 30-frame Start cooldown.
   await page.waitForTimeout(800);
+  let teamSssReady = false;
+  if (teamBattle) {
+    await configureCssTeamBattle();
+    await page.waitForTimeout(400);
+    await press('7');
+    await waitPhase(3, 'original SSS after CSS Team Battle setup');
+    await shot('12-team-sss-before-cancellation');
+    // mnStageSel_Scene_OnFrame discards buttons while its source-authored
+    // 30-frame transition lock counts down.
+    await page.waitForTimeout(800);
+    await press('o');
+    await waitPhase(1, 'original CSS after SSS B cancellation in Team Battle');
+    await waitCssTeams(1, [0, 1], 'Team settings retained after SSS cancellation');
+    const cssAfterTeamCancel = await observeSource();
+    assert.equal(cssAfterTeamCancel.source.rules.stock_count, 3,
+      'SSS cancellation must retain the Rules stock setting');
+    assert.equal(cssAfterTeamCancel.source.items.frequency, -1);
+    report.sourceObservations.push({label: 'CSS after original Team Battle SSS cancellation', ...cssAfterTeamCancel});
+    await shot('13-css-after-team-sss-cancellation');
+    await page.waitForTimeout(500);
+    await press('7');
+    await waitPhase(3, 'original SSS re-entry after Team Battle cancellation');
+    await shot('14-team-sss-re-entry');
+    await page.waitForTimeout(800);
+    await press('o');
+    await waitPhase(1, 'CSS after repeated original SSS cancellation');
+    await waitCssTeams(1, [0, 1], 'Team settings retained after repeated SSS cancellation');
+    if (teamSetupOnly) {
+      const cssAfterRepeatedCancel = await observeSource();
+      assert.equal(cssAfterRepeatedCancel.source.rules.stock_count, 3);
+      assert.equal(cssAfterRepeatedCancel.source.items.frequency, -1);
+      report.sourceObservations.push({label: 'CSS after repeated SSS cancellation', ...cssAfterRepeatedCancel});
+      await shot('15-css-after-repeated-cancellation');
+      await driver.unload();
+      nativeSessionActive = false;
+      await verifyTeardown('Eject after repeated Team Battle menu cancellation');
+      report.checks.push('Repeated original SSS entry/cancellation returns to CSS with Rules retained and source owners released');
+      break route;
+    }
+    await page.waitForTimeout(500);
+    await press('7');
+    await waitPhase(3, 'original SSS third entry after Team Battle cancellation');
+    await shot('15-team-sss-match-entry');
+    teamSssReady = true;
+    report.checks.push('Repeated original SSS B cancellations retain opposing CSS Teams; CSS Start re-enters SSS');
+  }
   if (cssSssOnly) {
     await press('7');
     await waitPhase(3, 'original SSS after the source CSS cooldown');
@@ -696,9 +841,11 @@ route: {
     report.checks.push('SSS B returns through original CSS; CSS L/R/Start returns through Main; Eject clears owners');
     break route;
   }
-  await press('7');
-  await waitPhase(3, 'original SSS');
-  await shot('10-original-sss');
+  if (!teamSssReady) {
+    await press('7');
+    await waitPhase(3, 'original SSS');
+    await shot('10-original-sss');
+  }
   await waitForNoQueuedPad('CSS Start sample drains before source SSS stage driver');
   let stage = 1;
   for (let sample = 0; sample < 600; sample++) {
@@ -709,7 +856,7 @@ route: {
   }
   assert.equal(stage, 2, 'Original SSS cursor must reach Final Destination using PAD input');
   report.checks.push('SSS source geometry driver reaches Final Destination; source stage choice is not assigned directly');
-  await shot('11-sss-final-destination');
+  await shot(teamBattle ? '15-team-sss-final-destination' : '11-sss-final-destination');
   if (stageOnly) {
     await press('o');
     await waitPhase(1, 'SSS B cancellation after source stage selection');
@@ -737,6 +884,16 @@ route: {
     `Live match did not reach 180 frames: ${JSON.stringify(matchBeforeNoContest)}`);
   report.matchObservations.push({label: 'live source match after 180 gameplay frames', ...matchBeforeNoContest});
   assert.deepEqual(matchBeforeNoContest.rules.player_stocks, [3, 3]);
+  assert.equal(matchBeforeNoContest.rules.is_teams, teamBattle ? 1 : 0,
+    'The live source StartMeleeData team flag must match the original CSS selection');
+  if (teamBattle) {
+    assert.equal(matchBeforeNoContest.rules.player_teams.length, 2);
+    assert.ok(matchBeforeNoContest.rules.player_teams.every(team => team >= 0 && team <= 2));
+    assert.notEqual(matchBeforeNoContest.rules.player_teams[0],
+      matchBeforeNoContest.rules.player_teams[1],
+      'Original CSS Start requires the active players to belong to opposing teams');
+    report.checks.push(`Live source Team Battle has opposing source teams ${matchBeforeNoContest.rules.player_teams.join(' vs ')}`);
+  }
   assert.equal(matchBeforeNoContest.rules.item_frequency, -1);
   assert.equal(matchBeforeNoContest.rules.match_kind, 1);
   assert.equal(matchBeforeNoContest.rules.stage, 0x20,
@@ -754,7 +911,7 @@ route: {
   assert.equal(matchMaskDelta, 1n << 32n,
     'Source item preference bit 16 maps to StartMeleeData item-mask bit 32');
   report.checks.push('live StartMeleeData receives the Rules stock value, None frequency, custom item mask, and source-selected Final Destination');
-  await shot('12-live-three-stock-match');
+  await shot(teamBattle ? '16-live-two-player-team-match' : '12-live-three-stock-match');
 
   await press('7');
   const resultsPauseDeadline = Date.now() + 15000;
@@ -775,7 +932,7 @@ route: {
   await page.waitForTimeout(4500); // Match the established source Results presentation boundary.
   const resultObservation = await observeMatch();
   report.matchObservations.push({label: 'terminal No Contest payload used by Results', ...resultObservation});
-  await shot('13-original-results');
+  await shot(teamBattle ? '17-original-team-results' : '13-original-results');
   for (let confirmation = 0; confirmation < 8; confirmation++) {
     const state = await current();
     if (state.phase !== 8) break;
@@ -787,13 +944,15 @@ route: {
       await press('7', {releaseMs: 380});
   }
   await waitPhase(1, 'CSS after Results');
+  if (teamBattle)
+    await waitCssTeams(1, [0, 1], 'Team settings retained after Results return');
   const cssAfterResults = await observeSource();
   assert.equal(cssAfterResults.source.rules.stock_count, 3,
     'Results -> CSS must retain the source-committed stock count');
   assert.equal(cssAfterResults.source.items.frequency, -1);
   assert.equal(cssAfterResults.source.items.mask_hex, cssSetup.source.items.mask_hex);
   report.sourceObservations.push({label: 'CSS after original Results return', ...cssAfterResults});
-  await shot('14-css-after-results-settings-retained');
+  await shot(teamBattle ? '18-css-after-team-results-settings-retained' : '14-css-after-results-settings-retained');
 
   await chord(['q', '9', '7']);
   await waitMessage('Original main menu', 'CSS -> original Main after Results');

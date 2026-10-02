@@ -405,7 +405,7 @@ def verify_menu_route_commands(path):
     return {"commands": len(commands), "sha256": retail._sha256(path)}
 
 
-def verify_vs_rules_items_route(path):
+def verify_vs_rules_items_route(path, *, team_battle=False):
     """Require the cold-DOL original Rules/Items path and CSS settings retention."""
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     if not rows:
@@ -434,6 +434,13 @@ def verify_vs_rules_items_route(path):
         ("results_no_contest", 5, 2),
         ("css_after_results_retained", 8, 2),
     ]
+    if team_battle:
+        expected[15:15] = [
+            ("teams_toggle_before", 8, 2),
+            ("teams_toggle_after", 8, 2),
+            ("p2_team_color_before", 8, 2),
+            ("p2_team_color_after", 8, 2),
+        ]
     markers = [row for row in rows if row.get("event") != "scheduler_return"]
     if len(markers) != len(expected):
         raise RuntimeError("VS Rules/Items route trace has a missing or unexpected source marker")
@@ -474,7 +481,8 @@ def verify_vs_rules_items_route(path):
     committed = next(row for row in markers if row["event"] == "vs_items_back_committed")
     retained = next(row for row in markers if row["event"] == "vs_rules_reentry_retained_items")
     stock = next(row for row in markers if row["event"] == "vs_rules_stock_three_selected")
-    final_css = markers[-1]
+    by_event = {row["event"]: row for row in markers}
+    final_css = by_event["css_after_results_retained"]
     before_mask = entry.get("rules_state", {}).get("item_mask")
     toggled_mask = toggled.get("rules_state", {}).get("item_mask")
     delta = before_mask ^ toggled_mask if isinstance(before_mask, int) and isinstance(toggled_mask, int) else 0
@@ -493,22 +501,36 @@ def verify_vs_rules_items_route(path):
             final_rules.get("item_mask") != toggled_mask or
             final_rules.get("item_frequency") != -1):
         raise RuntimeError("Results/CSS return did not retain original source rules and item preferences")
-    if markers[16].get("selected_stage_kind") != 0x20:
+    if by_event["sss_final_destination_selected"].get("selected_stage_kind") != 0x20:
         raise RuntimeError("original SSS route did not retain source St_Kind_Last selection")
-    match = markers[17].get("match_start_data", {})
+    match = by_event["vs_match_entered"].get("match_start_data", {})
     players = match.get("players", [])
+    expected_teams = [0, 1] if team_battle else [0, 0]
     if (match.get("stage") != 0x20 or match.get("item_frequency") != -1 or
             match.get("item_mask_hex") != f"{toggled_mask:016x}" or
+            match.get("is_teams", 0) != int(team_battle) or
             len(players) != 6 or
             [(p.get("character_kind"), p.get("slot_type"), p.get("stocks"),
               p.get("color"), p.get("team")) for p in players[:2]] !=
-            [(8, 0, 3, 0, 0), (8, 0, 3, 0, 0)] or
+            [(8, 0, 3, 0, expected_teams[0]),
+             (8, 0, 3, 0, expected_teams[1])] or
             any(p.get("slot_type") != 3 for p in players[2:])):
         raise RuntimeError("GM_VS StartMeleeData did not contain the selected source Rules/Items values")
-    result = markers[20]
+    if team_battle:
+        for event, expected_state in (
+                ("teams_toggle_before", {"is_teams": 0, "player_teams": [0, 0]}),
+                ("teams_toggle_after", {"is_teams": 1, "player_teams": [0, 0]}),
+                ("p2_team_color_before", {"is_teams": 1, "player_teams": [0, 0]}),
+                ("p2_team_color_after", {"is_teams": 1, "player_teams": [0, 1]})):
+            if by_event[event].get("css_setup") != expected_state:
+                raise RuntimeError(f"original CSS marker {event} differs from its team state: "
+                                   f"{by_event[event].get('css_setup')}")
+        if final_css.get("css_setup") != {"is_teams": 1, "player_teams": [0, 1]}:
+            raise RuntimeError("Results/CSS return did not retain opposing original team selections")
+    result = by_event["results_no_contest"]
     if result.get("results_outcome") != 7:
         raise RuntimeError("source Results did not observe OUTCOME_NO_CONTEST")
-    if markers[21].get("scene_kind") != 8:
+    if final_css.get("scene_kind") != 8:
         raise RuntimeError("source Results did not return to original CSS")
     frames = [row for row in rows if row.get("event") == "scheduler_return"]
     sequences = [row.get("sequence") for row in frames]
@@ -539,8 +561,11 @@ def verify_vs_rules_items_route(path):
                  ("character_kind", "slot_type", "stocks", "color", "team",
                   "rumble_enabled", "cpu_kind", "cpu_level")}
                 for player in players],
+            "is_teams": match.get("is_teams", 0),
+            "team_battle": team_battle,
+            "css_after_results": final_css.get("css_setup"),
             "results_outcome": result["results_outcome"],
-            "stock_count_after_results_css_return": markers[21]["rules_state"]["stock_count"],
+            "stock_count_after_results_css_return": final_css["rules_state"]["stock_count"],
             "trace_sha256": retail._sha256(path)}
 
 
@@ -623,7 +648,8 @@ def verify_vs_rules_items_save_effect(initial_gci, final_gc, item_frequency,
             "final_card_hashes": final_hashes}
 
 
-def verify_vs_rules_items_route_commands(path):
+def verify_vs_rules_items_route_commands(path, *, team_battle=False,
+                                        route_path=None):
     """Bind each Rules/Items choice to its original source menu and PAD command."""
     commands = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
     if not commands or any(row.get("event") != "pad_command" for row in commands):
@@ -712,6 +738,25 @@ def verify_vs_rules_items_route_commands(path):
         raise RuntimeError("Results did not exit through an observed original P1 Start input")
     if commands[results_start].get("port") != 1:
         raise RuntimeError("Results confirmation was not routed through original P1 Start")
+    if team_battle:
+        if route_path is None:
+            raise RuntimeError("Team route input verification requires its source-state trace")
+        markers = {row["event"]: row for row in
+                   (json.loads(line) for line in Path(route_path).read_text(encoding="utf-8").splitlines())
+                   if row.get("event") != "scheduler_return"}
+        for before_event, after_event in (("teams_toggle_before", "teams_toggle_after"),
+                                          ("p2_team_color_before", "p2_team_color_after")):
+            before = markers.get(before_event, {}).get("sequence")
+            after = markers.get(after_event, {}).get("sequence")
+            if not isinstance(before, int) or not isinstance(after, int) or after <= before:
+                raise RuntimeError(f"original CSS {before_event}/{after_event} input window is missing")
+            action_rows = [row for row in commands
+                           if row.get("scene_kind") == 8 and row.get("game_mode") == 2 and
+                           row.get("port") == 1 and isinstance(row.get("source_sequence"), int) and
+                           before <= row["source_sequence"] <= after]
+            if [row.get("command") for row in action_rows] != ["PRESS A", "RELEASE A"]:
+                raise RuntimeError(f"original CSS {before_event} did not use one isolated P1 A pulse: "
+                                   f"{[row.get('command') for row in action_rows]}")
     return {"commands": len(commands), "sha256": retail._sha256(path)}
 
 
@@ -760,7 +805,9 @@ def capture(args):
                 "start": "original_dol_entry", "savestate_loaded": False,
                 "boot_only": args.boot_only, "menu_round_trip": args.menu_round_trip,
                 "vs_rules_items_round_trip": args.vs_rules_items_round_trip,
+                "team_battle": getattr(args, "team_battle", False),
                 "route_mode": "cold_boot_css_menu_round_trip" if args.menu_round_trip else
+                              "cold_boot_vs_rules_items_team_battle" if getattr(args, "team_battle", False) else
                               "cold_boot_vs_rules_items_route" if args.vs_rules_items_round_trip else
                               "first_scheduler_return" if args.boot_only else "fixed_allocation_replay",
                 "candidate_admission": "forbidden",
@@ -770,6 +817,8 @@ def capture(args):
     streams = []
     inputs = {}
     try:
+        if getattr(args, "team_battle", False) and not args.vs_rules_items_round_trip:
+            raise ValueError("--team-battle requires --vs-rules-items-round-trip")
         route_flags = sum((args.boot_only, args.menu_round_trip,
                            args.vs_rules_items_round_trip))
         if route_flags > 1:
@@ -868,13 +917,15 @@ def capture(args):
             # This target declares the first CSS roster and eventual stage.
             # The route uses source-driven availability and ordinary PAD
             # inputs; it never writes this target into game memory.
-            target = {"expected_setup": {"time_limit_seconds": 60,
+            teams_enabled = bool(getattr(args, "team_battle", False))
+            target = {"expected_setup": {"teams_enabled": teams_enabled,
+                "time_limit_seconds": 60,
                 "players": [
                     {"character_kind": 8, "costume": 0, "player_type": 0,
-                     "cpu_level": 0, "team": 0, "stocks": 4,
+                     "cpu_level": 0, "team": 0, "stocks": 3,
                      "rumble_enabled": True},
                     {"character_kind": 8, "costume": 0, "player_type": 0,
-                     "cpu_level": 0, "team": 0, "stocks": 4,
+                     "cpu_level": 0, "team": 1 if teams_enabled else 0, "stocks": 3,
                      "rumble_enabled": True}],
                 "disable_pausing": False, "stage": 32}}
         write_json(evidence / "menu-target.json", target)
@@ -992,9 +1043,12 @@ def capture(args):
                                        str(screenshots.get("reason", screenshots.get("status"))))
         elif args.vs_rules_items_round_trip:
             route_path = evidence / "cold-boot-vs-rules-items-route.jsonl"
-            metadata["menu_route"] = verify_vs_rules_items_route(route_path)
+            metadata["menu_route"] = verify_vs_rules_items_route(
+                route_path, team_battle=getattr(args, "team_battle", False))
             metadata["menu_route"]["input_commands"] = verify_vs_rules_items_route_commands(
-                evidence / "cold-boot-input-commands.jsonl")
+                evidence / "cold-boot-input-commands.jsonl",
+                team_battle=getattr(args, "team_battle", False),
+                route_path=route_path if getattr(args, "team_battle", False) else None)
             metadata["menu_route"]["save_effect"] = verify_vs_rules_items_save_effect(
                 args.initial_gci, paths["user"] / "GC",
                 metadata["menu_route"]["committed_item_frequency"],
@@ -1062,6 +1116,8 @@ def main():
                         help="Capture a cold-DOL CSS -> original menus -> title -> CSS route; diagnostic only")
     parser.add_argument("--vs-rules-items-round-trip", action="store_true",
                         help="Capture cold-DOL VS Rules/Items -> SSS -> live match -> Results -> retained CSS; diagnostic only")
+    parser.add_argument("--team-battle", action="store_true",
+                        help="Enable and verify original two-player opposing Teams inside the VS Rules/Items route")
     return capture(parser.parse_args())
 
 

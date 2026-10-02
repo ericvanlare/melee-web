@@ -2287,9 +2287,11 @@
         "docs/TRANSITION_EQUIVALENCE.md",
         "docs/REFERENCE_CAPTURE_APP.md",
         "docs/evidence/vs-rules-items-source-route-v1.json",
-        "docs/evidence/vs-rules-items-source-route-v2.json"
+        "docs/evidence/vs-rules-items-source-route-v2.json",
+        "docs/evidence/vs-team-battle-route-v1.json",
+        "docs/evidence/vs-team-battle-retail-boundary-reproducer-v1.json"
       ],
-      "next_step": "The original Main/VS/Rules/Items route has separate retail source-route evidence and headless rendered browser evidence for the item row toggle, frequency-selector save ordering, custom item-mask handoff with None frequency, three-stock match, Results/CSS retention, and teardown. The custom-mask comparison is not retail compared; keep that claim scoped. Continue with team rules and Rules Plus, then item-family services and source GCI persistence, each with bounded original/browser evidence.",
+      "next_step": "The rendered browser route now covers original CSS Teams input, opposing two-player team setup, a live Team Battle, No Contest Results, and retained Rules/Items on CSS return. Retail Teams match comparison remains incomplete because the retained capture driver clicked the CSS Human/CPU toggle bounds; the reduced packet preserves that source boundary and the corrected geometry decoder. Capture a bounded retail team-color/match route when the source-capture lane is available, then continue Rules Plus and missing item-family services with independent original/browser evidence.",
       "issue": null
     },
     {

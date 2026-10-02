@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import copy
 import subprocess
 import sys
 import tempfile
@@ -137,6 +138,36 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             self.assertEqual([p["slot_type"] for p in result["live_match_start_players"]],
                              [0, 0, 3, 3, 3, 3])
 
+            team_rows = copy.deepcopy(rows)
+            team_markers = [
+                ("teams_toggle_before", {"is_teams": 0, "player_teams": [0, 0]}),
+                ("teams_toggle_after", {"is_teams": 1, "player_teams": [0, 0]}),
+                ("p2_team_color_before", {"is_teams": 1, "player_teams": [0, 0]}),
+                ("p2_team_color_after", {"is_teams": 1, "player_teams": [0, 1]}),
+            ]
+            team_insert = next(index for index, row in enumerate(team_rows)
+                               if row["event"] == "sss_after_rules_start")
+            for offset, (event, css_setup) in enumerate(team_markers):
+                team_rows.insert(team_insert + offset, {
+                    "event": event, "scene_kind": 8, "game_mode": 2,
+                    "sequence": 100 + offset * 2, "css_setup": css_setup,
+                    "pad_copy_status_hex": "00"})
+            next(row for row in team_rows if row["event"] == "vs_match_entered")[
+                "match_start_data"]["is_teams"] = 1
+            next(row for row in team_rows if row["event"] == "vs_match_entered")[
+                "match_start_data"]["players"][1]["team"] = 1
+            next(row for row in team_rows if row["event"] == "css_after_results_retained")[
+                "css_setup"] = {"is_teams": 1, "player_teams": [0, 1]}
+            path.write_text("".join(json.dumps(row) + "\n" for row in team_rows))
+            team_result = verify_vs_rules_items_route(path, team_battle=True)
+            self.assertEqual(team_result["is_teams"], 1)
+            self.assertEqual(team_result["css_after_results"],
+                             {"is_teams": 1, "player_teams": [0, 1]})
+            team_rows[-1]["css_setup"]["player_teams"] = [0, 0]
+            path.write_text("".join(json.dumps(row) + "\n" for row in team_rows))
+            with self.assertRaisesRegex(RuntimeError, "opposing original team selections"):
+                verify_vs_rules_items_route(path, team_battle=True)
+
             committed_row = next(row for row in rows if row["event"] == "vs_items_back_committed")
             committed_row["rules_state"]["item_frequency"] = 0xFF
             path.write_text("".join(json.dumps(row) + "\n" for row in rows))
@@ -245,6 +276,29 @@ fs.writeFileSync(path, createMeleeGCI(profile, new Date('2026-01-01T00:00:00Z'))
             path = Path(directory) / "commands.jsonl"
             path.write_text("".join(json.dumps(row) + "\n" for row in commands))
             self.assertEqual(verify_vs_rules_items_route_commands(path)["commands"], 27)
+            team_commands = copy.deepcopy(commands)
+            team_commands.extend([
+                {"event": "pad_command", "scene_kind": 8, "game_mode": 2,
+                 "command": "PRESS A", "port": 1, "source_sequence": 100},
+                {"event": "pad_command", "scene_kind": 8, "game_mode": 2,
+                 "command": "RELEASE A", "port": 1, "source_sequence": 101},
+                {"event": "pad_command", "scene_kind": 8, "game_mode": 2,
+                 "command": "PRESS A", "port": 1, "source_sequence": 200},
+                {"event": "pad_command", "scene_kind": 8, "game_mode": 2,
+                 "command": "RELEASE A", "port": 1, "source_sequence": 201},
+            ])
+            team_command_path = Path(directory) / "team-commands.jsonl"
+            team_command_path.write_text("".join(json.dumps(row) + "\n" for row in team_commands))
+            team_route_path = Path(directory) / "team-route.jsonl"
+            team_route_path.write_text("".join(json.dumps(row) + "\n" for row in [
+                {"event": "teams_toggle_before", "sequence": 100},
+                {"event": "teams_toggle_after", "sequence": 102},
+                {"event": "p2_team_color_before", "sequence": 200},
+                {"event": "p2_team_color_after", "sequence": 202},
+            ]))
+            self.assertEqual(verify_vs_rules_items_route_commands(
+                team_command_path, team_battle=True, route_path=team_route_path)["commands"],
+                len(team_commands))
             commands[12]["menu_state"]["confirmed"] = 1
             path.write_text("".join(json.dumps(row) + "\n" for row in commands))
             with self.assertRaisesRegex(RuntimeError, "Items B"):
