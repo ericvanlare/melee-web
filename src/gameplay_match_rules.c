@@ -96,7 +96,7 @@ int melee_web_match_rules_prepare_from_menu(MeleeWebMatchRules* h,
     }else if(candidate.rules.match_kind!=MatchKind_Stock||!candidate.rules.is_stock||
        !candidate.rules.is_vs||candidate.rules.is_teams||
        !melee_web_match_timer_supported(&candidate.rules)||candidate.rules.xB!=-1||
-       candidate.rules.x20!=UINT64_MAX||!melee_web_stage_content(candidate.rules.stkind))
+       !melee_web_stage_content(candidate.rules.stkind))
         return fail(e,n,"Menu payload does not match the supported stock/stage rules");
     h->start=candidate;
     h->opening_demo=opening_demo!=0;
@@ -133,7 +133,7 @@ int melee_web_match_rules_init_from_menu(MeleeWebMatchRules* h,
     if(candidate.rules.match_kind!=MatchKind_Stock||!candidate.rules.is_stock||
        !candidate.rules.is_vs||candidate.rules.is_teams||
        !melee_web_match_timer_supported(&candidate.rules)||candidate.rules.xB!=-1||
-       candidate.rules.x20!=UINT64_MAX||!melee_web_stage_content(candidate.rules.stkind))
+       !melee_web_stage_content(candidate.rules.stkind))
         return fail(e,n,"Menu payload does not match the supported stock/stage rules");
     h->start=candidate;
     if(!melee_web_match_init_source(&h->start)){

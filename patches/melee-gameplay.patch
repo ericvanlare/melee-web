@@ -1735,7 +1735,7 @@ index cd7e31a..98fa9d4 100644
 +               !rules->is_vs || rules->is_teams ||
 +               !melee_web_match_timer_supported(rules) ||
 +               !melee_web_stage_content(rules->stkind) ||
-+               rules->x20 != (u64) -1 || rules->xB != -1 ||
++               rules->xB != -1 ||
 +               rules->game_speed != 1.0F || rules->x54 != NULL ||
 +               rules->on_match_start != NULL || rules->on_frame_start != NULL ||
 +               rules->on_frame_end != NULL || rules->on_match_end != NULL) return 0;
