@@ -546,6 +546,7 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
   assert.equal(responseHeaders['cross-origin-opener-policy'], 'same-origin');
   assert.equal(responseHeaders['cross-origin-embedder-policy'], 'require-corp');
   await page.evaluate(() => {
+    document.cookie = 'diagnostic-fixture-cookie=present; Path=/; SameSite=Lax';
     document.body.innerHTML = '<canvas id="canvas" tabindex="0"></canvas>' +
       '<input id="disc-file" type="file" accept=".iso,.gcm,.rvz">' +
       '<button id="start-player" type="button">Start</button>' +
@@ -841,6 +842,8 @@ async function runBrowser() {
       'synthetic incident only; no token, cookie, raw request metadata, or hosted endpoint retained',
   };
   try {
+    receipt.source_hashes['runner.mjs'] = await sha256(fileURLToPath(import.meta.url));
+    receipt.fixture_config_sha256 = await sha256(path.join(fixture, 'wrangler.jsonc'));
     for (const name of ['runtime-diagnostics.mjs', 'runtime-diagnostics-delivery.mjs', 'diagnostics-settings.mjs', 'diagnostics-schema.mjs']) receipt.source_hashes[name] = await sha256(path.join(WEB, name));
     receipt.source_hashes['pages-function-adapter.mjs'] = await sha256(path.join(SOURCE, 'pages-function-adapter.mjs'));
     receipt.source_hashes['worker.mjs'] = await sha256(path.join(SOURCE, 'worker.mjs'));
