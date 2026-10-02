@@ -427,6 +427,17 @@ function errorKind(error) {
   return 'failed';
 }
 
+function retryAfterDelay(value, timestamp) {
+  if (typeof value !== 'string') return 0;
+  const text = value.trim();
+  if (/^\d+$/.test(text)) return Number(text) * 1000;
+  // HTTP dates start with a weekday; do not let Date.parse interpret malformed
+  // numeric delays (such as 1.5) as dates. It accepts all three HTTP date forms.
+  if (!/^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*[, ]/.test(text)) return 0;
+  const retryAt = Date.parse(/^[A-Z][a-z]{2} [A-Z][a-z]{2} /.test(text) ? `${text} GMT` : text);
+  return Number.isFinite(retryAt) ? Math.max(0, retryAt - timestamp) : 0;
+}
+
 /** Create an inactive-only, bounded diagnostics delivery adapter. */
 export function createDiagnosticsDelivery(options = {}) {
   const root = options.globalThis || globalThis;
@@ -623,8 +634,14 @@ export function createDiagnosticsDelivery(options = {}) {
         flags.evicted_count += 1;
         break;
       }
-      const normalized = normalizeStoredRecord(value, now());
-      if (!normalized) { if (value) flags.malformed = true; continue; }
+      const timestamp = now();
+      const normalized = normalizeStoredRecord(value, timestamp);
+      if (!normalized) {
+        if (value && Number.isSafeInteger(value.expires_at) && value.expires_at <= timestamp) {
+          flags.expired = true; dirty = true; queueMutationGeneration += 1;
+        } else if (value) flags.malformed = true;
+        continue;
+      }
       const incidentId = normalized.report.incident_id;
       if (sentIncidentIds.has(incidentId) || tombstones.some(value => value.incident_id === incidentId)) continue;
       const duplicate = records.find(existing => existing.fingerprint === normalized.fingerprint || existing.report.incident_id === incidentId);
@@ -658,7 +675,9 @@ export function createDiagnosticsDelivery(options = {}) {
       }
       const normalized = normalizeTombstone(value, now());
       if (!normalized) {
-        if (value && Number.isSafeInteger(value.expires_at) && value.expires_at <= now()) flags.expired = true;
+        if (value && Number.isSafeInteger(value.expires_at) && value.expires_at <= now()) {
+          flags.expired = true; tombstoneDirty = true; queueMutationGeneration += 1;
+        }
         else if (value) flags.malformed = true;
         continue;
       }
@@ -819,7 +838,7 @@ export function createDiagnosticsDelivery(options = {}) {
   }
 
   function scheduleFlush(delay = 0) {
-    if (flushTimer !== null || disposed || optOut || !inactive || !environment) return;
+    if (flushTimer !== null || flushPromise || disposed || optOut || !inactive || !environment) return;
     flushTimer = schedule(() => {
       flushTimer = null;
       void flushWhenInactive();
@@ -913,8 +932,8 @@ export function createDiagnosticsDelivery(options = {}) {
   }
 
   async function sendRecord(record) {
-    if (!canDeliver()) return 'skipped';
-    if (typeof fetchImpl !== 'function') return 'unavailable';
+    if (!canDeliver()) return {kind: 'skipped'};
+    if (typeof fetchImpl !== 'function') return {kind: 'unavailable'};
     const controller = typeof root.AbortController === 'function' ? new root.AbortController() : null;
     if (controller) controllers.add(controller);
     const timeout = controller ? schedule(() => controller.abort(), DELIVERY_REQUEST_TIMEOUT_MS) : null;
@@ -930,11 +949,13 @@ export function createDiagnosticsDelivery(options = {}) {
         cache: 'no-store',
         referrerPolicy: 'no-referrer',
       });
-      if (response?.status >= 200 && response?.status < 300) return 'sent';
-      if (response?.status === 408 || response?.status === 425 || response?.status === 429 || response?.status >= 500) return 'retry';
-      return 'rejected';
+      if (response?.status >= 200 && response?.status < 300) return {kind: 'sent'};
+      if (response?.status === 408 || response?.status === 425 || response?.status === 429 || response?.status >= 500) {
+        return {kind: 'retry', retryAfter: response.headers?.get?.('retry-after')};
+      }
+      return {kind: 'rejected'};
     } catch {
-      return 'retry';
+      return {kind: 'retry'};
     } finally {
       if (timeout !== null) (root.clearTimeout || clearTimeout)(timeout);
       if (controller) controllers.delete(controller);
@@ -944,6 +965,7 @@ export function createDiagnosticsDelivery(options = {}) {
   async function flushWhenInactive() {
     if (flushPromise) return flushPromise;
     if (!canPersist()) return {sent: 0, skipped: true};
+    if (flushTimer !== null) { (root.clearTimeout || clearTimeout)(flushTimer); flushTimer = null; }
     flushPromise = (async () => {
       let sent = 0;
       try {
@@ -951,6 +973,11 @@ export function createDiagnosticsDelivery(options = {}) {
         await loadTombstones();
         if (!canPersist()) return {sent: 0, skipped: true};
         const timestamp = Math.max(0, Math.trunc(Number(now()) || 0));
+        for (let index = tombstones.length - 1; index >= 0; index -= 1) {
+          if (tombstones[index].expires_at <= timestamp) {
+            tombstones.splice(index, 1); flags.expired = true; tombstoneDirty = true; queueMutationGeneration += 1;
+          }
+        }
         for (let index = records.length - 1; index >= 0; index -= 1) {
           const record = records[index];
           if (record.expires_at <= timestamp) { records.splice(index, 1); flags.expired = true; dirty = true; queueMutationGeneration += 1; continue; }
@@ -972,13 +999,14 @@ export function createDiagnosticsDelivery(options = {}) {
           const result = await sendRecord(record);
           if (!canPersist()) return {sent, pending: records.length, skipped: true};
           if (!online) break;
-          if (result === 'skipped') return {sent, pending: records.length, skipped: true};
-          if (result === 'sent' || result === 'rejected') {
+          if (result.kind === 'skipped') return {sent, pending: records.length, skipped: true};
+          const completedAt = Math.max(0, Math.trunc(Number(now()) || 0));
+          if (result.kind === 'sent' || result.kind === 'rejected') {
             const index = records.indexOf(record);
             if (index >= 0) { records.splice(index, 1); queueMutationGeneration += 1; }
             dirty = true;
-            completeRecord(record, timestamp);
-            if (result === 'sent') {
+            completeRecord(record, completedAt);
+            if (result.kind === 'sent') {
               sent += 1;
             }
             else flags.rejected = true;
@@ -989,14 +1017,15 @@ export function createDiagnosticsDelivery(options = {}) {
             const index = records.indexOf(record);
             if (index >= 0) { records.splice(index, 1); queueMutationGeneration += 1; }
             flags.rejected = true;
-            completeRecord(record, timestamp);
+            completeRecord(record, completedAt);
             dirty = true;
           } else {
             const jitter = 0.8 + Math.max(0, Math.min(1, Number(random()) || 0)) * 0.4;
-            record.next_attempt_at = timestamp + Math.trunc(retryBaseMs * (2 ** (record.attempts - 1)) * jitter);
+            const backoff = Math.trunc(retryBaseMs * (2 ** (record.attempts - 1)) * jitter);
+            const serverDelay = retryAfterDelay(result.retryAfter, completedAt);
+            record.next_attempt_at = Math.min(record.expires_at, completedAt + Math.max(backoff, serverDelay));
             queueMutationGeneration += 1;
             dirty = true;
-            scheduleFlush(Math.max(0, record.next_attempt_at - timestamp));
           }
         }
         if (canPersist()) await persistOutbox();
@@ -1004,7 +1033,20 @@ export function createDiagnosticsDelivery(options = {}) {
       } catch {
         flags.persistence_failed = true;
         return {sent, pending: records.length};
-      } finally { flushPromise = null; }
+      } finally {
+        flushPromise = null;
+        // Arm only after persistence settles: a timer firing during this flush
+        // would just coalesce with it and lose the next wakeup. This also covers
+        // future-due rows loaded from storage and work enqueued during a flush.
+        if (canDeliver() && sessionUploadCount < DELIVERY_MAX_SESSION_UPLOADS) {
+          const pending = records.filter(record => record.environment === environment.env);
+          if (pending.length) {
+            const nextAttemptAt = Math.min(...pending.map(record => Math.min(record.next_attempt_at, record.expires_at)));
+            const settledAt = Math.max(0, Math.trunc(Number(now()) || 0));
+            scheduleFlush(Math.max(0, nextAttemptAt - settledAt));
+          }
+        }
+      }
     })();
     return flushPromise;
   }

@@ -445,10 +445,6 @@ async function deleteBefore(db, before, limit) {
 
 async function handlePublicPost(request, env, hostEnvironment) {
   const db = requireDatabase(env);
-  const now = Date.now();
-  const rate = await takeRateSlot(db, hostEnvironment, now, env);
-  if (!rate.allowed) return jsonResponse({ error: 'rate_limited' }, 429, { 'retry-after': String(rate.retryAfter) });
-  await purgeExpired(db, now, 100);
   let parsed;
   try {
     const text = await boundedBodyText(request);
@@ -467,6 +463,13 @@ async function handlePublicPost(request, env, hostEnvironment) {
   }
   if (report.environment.env !== hostEnvironment || !exactOrigin(request, report)) return errorResponse('origin_or_environment_mismatch', 403);
   if (!releaseIsAllowed(report.identity, hostEnvironment, env)) return errorResponse('unknown_release', 422);
+  // Malformed, mismatched and unknown-release packets must not consume the
+  // shared valid-report quota. The body size and total read deadline still bound
+  // validation before this transactional per-environment limit.
+  const now = Date.now();
+  const rate = await takeRateSlot(db, hostEnvironment, now, env);
+  if (!rate.allowed) return jsonResponse({ error: 'rate_limited' }, 429, { 'retry-after': String(rate.retryAfter) });
+  await purgeExpired(db, now, 100);
   const canonicalJson = canonicalizeReport(report);
   const reportId = await sha256Hex(`${hostEnvironment}\n${canonicalJson}`);
   const canonicalHash = reportId;

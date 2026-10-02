@@ -208,6 +208,26 @@ test('body deadline remains bounded when a client keeps sending fragments', asyn
   assert.equal(cancelled, true);
 });
 
+test('invalid reports do not consume the shared valid-report quota', async () => {
+  const env = environment();
+  env.DIAGNOSTICS_RATE_LIMIT = '1';
+  const valid = baseReport();
+  for (const [report, options, status] of [
+    [valid, {body: '{'}, 400],
+    [baseReport({unexpected: true}), {}, 422],
+    [baseReport({environment: {env: 'production', origin: 'https://webmelee.gg'}}),
+      {origin: 'https://staging.webmelee.gg'}, 403],
+    [baseReport({identity: {runtime_hash: 'a'.repeat(16)}}), {}, 422],
+  ]) {
+    assert.equal((await diagnosticsFetch(requestFor(report, options), env)).status, status);
+  }
+  assert.equal(env.DIAGNOSTICS_DB.database.prepare('SELECT count(*) AS count FROM diagnostic_rate_buckets').get().count, 0);
+  assert.equal((await diagnosticsFetch(requestFor(valid), env)).status, 201,
+    'a legitimate report still gets the one available quota slot');
+  assert.equal((await diagnosticsFetch(requestFor(baseReport({session_id: 'session-second'})), env)).status, 429,
+    'validated reports still share the configured transactional rate cap');
+});
+
 test('rate caps are transactional and admin reads remain private', async () => {
   const env = environment();
   env.DIAGNOSTICS_RATE_LIMIT = '2';
