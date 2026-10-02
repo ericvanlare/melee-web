@@ -655,5 +655,17 @@
     },
     "required_full_suite": "pending named bounded job",
     "affected_build": "pending named bounded job"
+  },
+  "runtime_build": {
+    "source_commit": "746569422830758ec4b90865b3e565d4d147541f",
+    "configuration": "Release",
+    "initial_memory_bytes": 67108864,
+    "stack_bytes": 8388608,
+    "asyncify": false,
+    "memory_growth": true,
+    "emscripten": "6.0.9",
+    "cmake_cache_sha256": "3e0ba0b9a8c51af79b474ee72d4ae6f77d93b27198f7b7e4d43af7f8bcd278f4",
+    "configuration_manifest_sha256": "084ffa187bdcb319f7e4b41dffb2e5f51e684bf5203c87c30c96b4b98b87676d",
+    "source_identity_sha256": "5ad1e5adca498246295ec1b5b40b0573eea2679b2814df61974fbfbc68621190"
   }
 }
