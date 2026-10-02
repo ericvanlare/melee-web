@@ -31,6 +31,23 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
         self.run_owner(['--adapter-deadline-span'],
                        'one bounded startup deadline covers adapter preflight and native startup')
 
+    def test_hidden_and_page_lifecycle_handoff_is_consumed_once(self):
+        self.run_owner(['--lifecycle-handoff'],
+                       'hidden/page lifecycle handoff neutralizes once before current activity')
+
+    def test_native_tick_consumes_lifecycle_handoff_before_clock_work(self):
+        source = (ROOT / "src" / "gameplay_menu_browser.cpp").read_text()
+        tick = source.index("void tick(){")
+        boundary = source.index("window.menuServiceCommands?.() === 1", tick)
+        reset = source.index("menu_clock.reset();audio_clock.reset();", boundary)
+        render_cache = source.index("service_render_cache_writes();", reset)
+        input_poll = source.index("const auto* input=melee_web_input_poll();", render_cache)
+        self.assertLess(boundary, reset)
+        self.assertLess(reset, render_cache,
+                        "Lifecycle handoff clocks reset before optional render-cache work")
+        self.assertLess(render_cache, input_poll,
+                        "Lifecycle handoff clocks reset before native input polling")
+
     def test_explicit_silent_owner_never_opens_audio(self):
         self.run_owner(['--silent'])
 

@@ -17,6 +17,7 @@ const adapterRace = process.argv.includes('--adapter-race');
 const adapterRetry = process.argv.includes('--adapter-retry');
 const adapterTimeoutLate = process.argv.includes('--adapter-timeout-late');
 const adapterDeadlineSpan = process.argv.includes('--adapter-deadline-span');
+const lifecycleHandoff = process.argv.includes('--lifecycle-handoff');
 if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
 const source = original.replace(
@@ -361,7 +362,54 @@ async function pump(promise) {
   return value;
 }
 const nativeServiceCommands = window.menuServiceCommands;
-window.menuServiceCommands = () => { ++serviceBatch; nativeServiceCommands(); };
+window.menuServiceCommands = () => { ++serviceBatch; return nativeServiceCommands(); };
+
+if (lifecycleHandoff) {
+  function dispatch(type) {
+    for (const listener of listeners.get(type) || []) listener();
+  }
+  function activityRowsSince(index) {
+    return calls.slice(index).filter(row => row[0] === 'activity').map(row => row.slice(1));
+  }
+  function assertHandoff(events, expectedVisible, label) {
+    const start = calls.length;
+    for (const event of events) dispatch(event);
+    assert.equal(window.menuServiceCommands(), 1, `${label} is consumed exactly at the native command boundary`);
+    assert.deepEqual(activityRowsSince(start).slice(-2), [[0, 0], [1, expectedVisible]],
+      `${label} neutralizes native activity before publishing current input`);
+    const after = calls.length;
+    assert.equal(window.menuServiceCommands(), 0, `${label} handoff is not replayed without another lifecycle event`);
+    assert.deepEqual(activityRowsSince(after), [], `${label} does not emit a second clock handoff`);
+  }
+
+  phase = 1; running = true; window.menuFrame(true);
+  window.menuServiceCommands();
+  let baseline = calls.length;
+  assert.equal(window.menuServiceCommands(), 0, 'ordinary foreground command service has no clock handoff');
+  assert.deepEqual(activityRowsSince(baseline), [], 'ordinary foreground service does not neutralize activity');
+
+  document.hidden = true;
+  assertHandoff(['visibilitychange'], 0, 'visibility hidden');
+  document.hidden = false;
+  assertHandoff(['pagehide', 'pageshow'], 1, 'pagehide/pageshow');
+  assertHandoff(['freeze', 'resume'], 1, 'freeze/resume');
+
+  // Foreground focus changes update input activity but do not reset either
+  // fixed-tick clock. The native handoff return remains zero.
+  document.activeElement = null;
+  baseline = calls.length;
+  dispatch('blur');
+  assert.equal(window.menuServiceCommands(), 0, 'foreground blur does not request a clock handoff');
+  assert.deepEqual(activityRowsSince(baseline), [[0, 1]], 'foreground blur publishes current activity only');
+  player.focus();
+  baseline = calls.length;
+  dispatch('focus');
+  assert.equal(window.menuServiceCommands(), 0, 'foreground focus does not request a clock handoff');
+  assert.deepEqual(activityRowsSince(baseline), [[1, 1]], 'foreground focus publishes current activity only');
+
+  console.log('Shared runtime owner: hidden/page lifecycle handoff neutralizes once before current activity; foreground focus alone does not reset clocks.');
+  process.exit(0);
+}
 const queuedLayout = player.setKeyboardLayout('boxx');
 assert.equal(calls.some(row => row[0] === 'layout'), false);
 window.menuServiceCommands();
@@ -463,7 +511,18 @@ else {
   assert.equal(player.getState().audio, 'disabled');
   assert.throws(() => window.menuAudio(new Float32Array(2)), /Audio output is disabled/);
 }
+const pauseBoundaryStart = calls.length;
+const audioResumesBeforePause = calls.filter(row => row[0] === 'audioResume').length;
 await pump(player.pause()); assert.equal(player.getState().paused, true);
+const pauseBoundaryCalls = calls.slice(pauseBoundaryStart);
+assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 1), true,
+  'Manual pause reaches the native pause boundary');
+assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 0), false,
+  'Manual pause does not implicitly resume the native scene');
+assert.equal(pauseBoundaryCalls.some(row => ['unload', 'saveProfile', 'snapshot'].includes(row[0])), false,
+  'Manual pause does not unload or save the native owner');
+assert.equal(calls.filter(row => row[0] === 'audioResume').length, audioResumesBeforePause,
+  'Manual pause does not resume Web Audio');
 await pump(player.resume()); assert.equal(player.getState().running, true);
 for (const [menuPhase, menuScene] of [[10, 'title'], [11, 'main']]) {
   phase = menuPhase; running = true; window.menuFrame(true);
