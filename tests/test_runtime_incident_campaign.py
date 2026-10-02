@@ -184,6 +184,21 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         self.assertNotIn("menuDiagnostic", watchdog)
         self.assertNotIn("sourcepolicy", watchdog.lower())
 
+    def test_successful_campaign_clears_watchdog_and_tears_down_cache(self):
+        self.assertIn("status=['pass','setup-only-pass','results-observation-pass'].includes(report.result)?", self.harness)
+        self.assertIn("report.campaign_wall_bound.timer_status='cleared';", self.harness)
+        self.assertIn("async function unloadAfterNaturalResultsCss()", self.harness)
+        self.assertIn("if(!report.results_observation_only)\n      await unloadAfterNaturalResultsCss();", self.harness)
+        self.assertIn("await driver.unload();", self.harness)
+        self.assertIn("melee-web-runtime-cache-teardown-v1", self.harness)
+        self.assertIn("module_save_runtime_cache_owner:'web/melee-runtime.mjs unloadAndSave'", self.harness)
+        self.assertIn("nativeCacheIdle===1?'pass':'cache-write-failed'", self.harness)
+        self.assertIn("receipt.save_observed=", self.harness)
+        self.assertIn("cache-teardown.json", self.harness)
+        self.assertIn("await retainRuntimeDiagnosticsCapture();\n    await persistReceipt();\n    throw error;", self.harness)
+        self.assertIn("Number(cache.file_bytes)>0", self.harness)
+        self.assertIn("Number(cache.clears)===0", self.harness)
+
     def test_runner_freezes_plan_and_writes_stopping_receipt(self):
         self.assertIn("campaign-plan.json", self.runner)
         self.assertIn("campaign-receipt.json", self.runner)

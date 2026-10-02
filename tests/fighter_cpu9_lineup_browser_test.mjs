@@ -608,6 +608,40 @@ async function writeProgress(label){
   if(state.error)throw Error(state.error);
   return state;
 }
+async function unloadAfterNaturalResultsCss(){
+  const before=await diagnostic();
+  assert.equal(before.phase,1,'Native cache teardown requires the original CSS owner after natural Results return');
+  const receipt={schema:'melee-web-runtime-cache-teardown-v1',status:'pending',
+    owner:'browser_driver.unload → web/melee-runtime.mjs unloadAndSave',
+    before:{phase:before.phase,running:before.running,cache:before.cache},
+    after:null,native_cache_idle:null,module_save_runtime_cache_owner:'web/melee-runtime.mjs unloadAndSave',
+    observed_at:new Date().toISOString()};
+  report.browser_context.cache_teardown=receipt;
+  const persistReceipt=()=>fs.writeFile(path.join(output,'cache-teardown.json'),
+    JSON.stringify(receipt,null,2)+'\n').catch(error=>{receipt.write_error=error.message;});
+  try{
+    await driver.unload();
+    const after=await diagnostic();
+    const nativeCacheIdle=await page.evaluate(()=>typeof Module._melee_web_native_menu_cache_idle==='function'?
+      Module._melee_web_native_menu_cache_idle():null);
+    receipt.after={phase:after.phase,running:after.running,cache:after.cache};
+    receipt.native_cache_idle=nativeCacheIdle;
+    receipt.cache_save_count={before:before.cache?.saves??null,after:after.cache?.saves??null};
+    receipt.save_observed=Number.isFinite(receipt.cache_save_count.before)&&
+      Number.isFinite(receipt.cache_save_count.after)&&
+      receipt.cache_save_count.after>receipt.cache_save_count.before;
+    receipt.status=nativeCacheIdle===1?'pass':'cache-write-failed';
+    if(nativeCacheIdle!==1)
+      throw Error(`Native renderer cache was not idle after unload: ${nativeCacheIdle}`);
+    await persistReceipt();
+  }catch(error){
+    if(receipt.status==='pending')receipt.status='failed';
+    receipt.error=error.message;
+    await retainRuntimeDiagnosticsCapture();
+    await persistReceipt();
+    throw error;
+  }
+}
 async function waitFor(label,predicate,timeoutMs=30000){
   const deadline=Date.now()+timeoutMs;
   while(Date.now()<deadline){
@@ -2282,6 +2316,8 @@ try{
       assert.equal(retained.length,4);
       await runMatch(matchIndex,retainedLineup);
     }
+    if(!report.results_observation_only)
+      await unloadAfterNaturalResultsCss();
   }
   if(!values['setup-only'])report.result=resultsObserveAfterConfirmation?
     'results-observation-pass':'pass';
@@ -2307,6 +2343,11 @@ try{
   if(campaignWallBoundExceeded){
     report.result='fail';process.exitCode=1;
     report.failure??={code:'campaign_wall_bound_exceeded',message:campaignWallBoundError().message};
+  }
+  if(report.campaign_wall_bound&&!campaignWallBoundExceeded){
+    report.campaign_wall_bound.status=['pass','setup-only-pass','results-observation-pass'].includes(report.result)?
+      'completed':'cleared';
+    report.campaign_wall_bound.timer_status='cleared';
   }
   if(page&&!page.isClosed()&&!campaignWallBoundExceeded){
     await retainResultsInputEvents();
