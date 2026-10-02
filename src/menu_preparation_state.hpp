@@ -31,12 +31,16 @@ public:
         return true;
     }
 
-    // Upload statistics describe work that has already completed. Only a
-    // pipeline still queued on the asynchronous renderer can benefit from
-    // stopping an otherwise live source scene.
-    static bool needs_live_render_settle(unsigned queued_pipelines) noexcept
+    // A browser pipeline handle can precede driver compilation. Complete
+    // source draws retain their image while submitted GPU work settles; a
+    // reset counter or an upload alone must not open this boundary.
+    static bool needs_live_render_settle(unsigned queued_pipelines,
+                                        int created_pipelines = 0,
+                                        bool complete_draws = false,
+                                        bool pending_gpu_work = false) noexcept
     {
-        return queued_pipelines != 0;
+        return queued_pipelines != 0 ||
+               (created_pipelines > 0 && complete_draws && pending_gpu_work);
     }
 
     bool waiting_for_audio() const noexcept

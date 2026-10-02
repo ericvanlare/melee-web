@@ -22,6 +22,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import {Worker} from 'node:worker_threads';
 import {parseArgs} from 'node:util';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
@@ -35,13 +36,122 @@ import {assertResultsCpuPagesAfterInitialP1Keyboard,
   summarizeResultsPadTrace}
   from './results_source_pad_trace.mjs';
 
+const MATCH_PLAYER_SLOTS=Object.freeze(['p0','p1','p2','p3']);
+const INCIDENT_REASON_SLOTS=10;
+const zeroIncidentReasonCounts=()=>Array(INCIDENT_REASON_SLOTS).fill(0);
+const incidentReasonBucket=value=>Number.isInteger(value)&&value>=0&&value<INCIDENT_REASON_SLOTS?value:null;
 const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input','cpu-levels'].map(name=>[name,{type:'string'}])),
   'results-confirm-frame':{type:'string'},
   'results-observe-after-confirmation':{type:'boolean'},
-  matches:{type:'string'},'setup-only':{type:'boolean'}}});
+  matches:{type:'string'},'setup-only':{type:'boolean'},'stage-setup-only':{type:'boolean'},
+  'stage-kind':{type:'string'},'wall-bound-seconds':{type:'string'},
+  'stop-on-timing-pause':{type:'boolean'},
+  'controlled-contention':{type:'boolean'},'user-data-dir':{type:'string'},
+  'readiness-preflight':{type:'boolean'},'stage-map-preflight':{type:'boolean'},
+  'incident-capture-preflight':{type:'boolean'}}});
+const stages=Object.freeze({
+  'final-destination':Object.freeze({id:'final-destination',name:'Final Destination',sourceId:0x20,slug:'fd'}),
+  battlefield:Object.freeze({id:'battlefield',name:'Battlefield',sourceId:0x1F,slug:'battlefield'}),
+});
+if(values['readiness-preflight']){
+  console.log(JSON.stringify(runReadinessPreflight()));
+  process.exit(0);
+}
+if(values['stage-map-preflight']){
+  const header=path.resolve(import.meta.dirname,'../.deps/melee/src/melee/gr/forward.h');
+  try{
+    const source=await fs.readFile(header,'utf8');
+    const authored=name=>{
+      const match=source.match(new RegExp(`/\\*\\s*0x([0-9A-Fa-f]+)\\s*\\*/\\s*${name}\\b`));
+      return match?Number.parseInt(match[1],16):null;
+    };
+    const authoredStages={
+      'final-destination':authored('St_Kind_Last'),
+      battlefield:authored('St_Kind_Battle')};
+    assert.equal(authoredStages['final-destination'],stages['final-destination'].sourceId,
+      'Final Destination stage id must match the authored pinned St_Kind_Last enum');
+    assert.equal(authoredStages.battlefield,stages.battlefield.sourceId,
+      'Battlefield stage id must match the authored pinned St_Kind_Battle enum');
+    console.log(JSON.stringify({result:'pass',header,authored:authoredStages,stages}));
+  }catch(error){
+    if(error?.code==='ENOENT'){
+      console.log(JSON.stringify({result:'unavailable',reason:'authored_stage_enum_unavailable',header}));
+      process.exit(0);
+    }
+    throw error;
+  }
+  process.exit(0);
+}
+async function runIncidentCapturePreflight(){
+  const fakePage={evaluate:async(fn,argument)=>fn(argument)};
+  const previousSample=globalThis.menuDiagnosticSample;
+  const previousIncident=globalThis.menuDiagnosticIncident;
+  const previousCapture=globalThis.__meleeWebRuntimeIncidentCampaignCapture;
+  const snapshot=()=>JSON.parse(JSON.stringify(globalThis.__meleeWebRuntimeIncidentCampaignCapture));
+  try{
+    await installRuntimeDiagnosticsCapture({schema_version:1},
+      {status:'preflight'},fakePage);
+    if(globalThis.__meleeWebRuntimeIncidentCampaignCapture?.status!=='installed')
+      throw Error('preflight installer did not expose an installed capture');
+    const retain=(reason,value,threshold,sourceFrame=0,scene=7,clockOwner=0)=>
+      globalThis.menuDiagnosticIncident(reason,value,threshold,sourceFrame,scene,clockOwner);
+    for(let index=0;index<25;index++)retain(7,0,0);
+    const preparationOnly=snapshot();
+    retain(1,9,8,0,7,1);
+    for(let index=0;index<24;index++)retain(7,0,0);
+    const guardDropped=snapshot();
+    retain(7,1,0);
+    for(let index=0;index<24;index++)retain(7,0,0);
+    const invalidPreparation=snapshot();
+    retain(99,0,0);
+    const unknown=snapshot();
+    if(preparationOnly.dropped_reason_counts[7]!==1||preparationOnly.reason_counts[7]!==25)
+      throw Error('preflight did not preserve dropped preparation reason counts');
+    if(guardDropped.dropped_reason_counts[1]!==1||guardDropped.reason_counts[1]!==1)
+      throw Error('preflight did not preserve a dropped guard reason');
+    if(invalidPreparation.invalid_preparation_count!==1||invalidPreparation.dropped_invalid_preparation_count!==1)
+      throw Error('preflight did not preserve an evicted invalid preparation reason');
+    if(unknown.unknown_reason_count!==1)
+      throw Error('preflight did not count unknown reason codes');
+    return {result:'pass',capture_status:'installed',max_incidents:24,preparation_only:preparationOnly,
+      guard_after_preparation:guardDropped,invalid_preparation:invalidPreparation,unknown_reason:unknown};
+  }finally{
+    if(previousSample===undefined)delete globalThis.menuDiagnosticSample;
+    else globalThis.menuDiagnosticSample=previousSample;
+    if(previousIncident===undefined)delete globalThis.menuDiagnosticIncident;
+    else globalThis.menuDiagnosticIncident=previousIncident;
+    if(previousCapture===undefined)delete globalThis.__meleeWebRuntimeIncidentCampaignCapture;
+    else globalThis.__meleeWebRuntimeIncidentCampaignCapture=previousCapture;
+  }
+}
+if(values['incident-capture-preflight']){
+  console.log(JSON.stringify(await runIncidentCapturePreflight()));
+  process.exit(0);
+}
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--stage-setup-only] [--stage-kind final-destination|battlefield] [--wall-bound-seconds SECONDS] [--stop-on-timing-pause] [--controlled-contention] [--user-data-dir EXTERNAL_PROFILE] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK] [--readiness-preflight] [--stage-map-preflight]');
+const stageKind=values['stage-kind']||'final-destination';
+if(!Object.hasOwn(stages,stageKind))
+  throw Error('--stage-kind must be final-destination or battlefield');
+const stage=stages[stageKind];
+const stageSetupOnly=values['stage-setup-only']===true;
+if(stageSetupOnly&&values['setup-only']===true)
+  throw Error('--stage-setup-only cannot be combined with --setup-only');
+const campaignRequested=stageSetupOnly||values['stage-kind']!==undefined||values['wall-bound-seconds']!==undefined||
+  values['stop-on-timing-pause']===true||values['controlled-contention']===true;
+const wallBoundSeconds=campaignRequested?Number(values['wall-bound-seconds']??(stageSetupOnly?120:600)):null;
+if(campaignRequested&&(!Number.isInteger(wallBoundSeconds)||wallBoundSeconds<1||wallBoundSeconds>600))
+  throw Error('--wall-bound-seconds must be an integer from 1 through 600 in campaign mode');
+if(!campaignRequested&&values['wall-bound-seconds']!==undefined)
+  throw Error('--wall-bound-seconds requires campaign mode');
+const stopOnTimingPause=values['stop-on-timing-pause']===true;
+if(stageSetupOnly&&!stopOnTimingPause)
+  throw Error('--stage-setup-only requires --stop-on-timing-pause');
+const controlledContention=values['controlled-contention']===true;
+const userDataDirectory=values['user-data-dir']?path.resolve(values['user-data-dir']):null;
+const campaignCondition=controlledContention?'controlled-contention':'shared-host-uncontrolled';
+const campaignDeadline=campaignRequested?Date.now()+wallBoundSeconds*1000:null;
 const cpuLevels=values['cpu-levels']===undefined?[9,9,9,9]:
   values['cpu-levels'].split(',').map(Number);
 if(cpuLevels.length!==4||cpuLevels.some(level=>!Number.isInteger(level)||level<1||level>9))
@@ -98,7 +208,9 @@ if(buildDirectory){
   const wasmStat=await fs.stat(wasmPath);
   if(!wasmStat.isFile())throw Error('--build-dir must contain gameplay_menu_browser.wasm');
   localWasmIdentity={path:path.relative(repository,wasmPath),bytes:wasmStat.size,
-    sha256:await sha256(wasmPath)};
+    sha256:await sha256(wasmPath),
+    artifact_scope:'private-development-artifact',
+    hash_scope:'exact SHA-256 of gameplay_menu_browser.wasm bytes; not the public runtime graph'};
 }
 function sourceProvenance(){
   const git=(...args)=>execFileSync('git',args,{cwd:repository,encoding:'utf8'}).trim();
@@ -133,13 +245,32 @@ const resultsInputScope=resultsInputMode==='keyboard-three-prefix'?
   sourceTickThreePulse?
   `P1-only ten-source-tick Start holds queued at Results ticks 180/360/${resultsConfirmFrame}; disconnected CPU page transitions must precede the tick-${resultsConfirmFrame} confirmation; connectedness and consumed edges retained; controlled PAD path, not literal keyboard-event replay`:null;
 const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
-  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, ${cpuProfileDescription}, four stocks, Final Destination; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
+  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, ${cpuProfileDescription}, four stocks, ${stage.name}; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
+  campaign:campaignRequested?{kind:'natural-incident',wall_bound_seconds:wallBoundSeconds,
+    stage_kind:stage.id,stage_source_id:stage.sourceId,stop_on_timing_pause:stopOnTimingPause,
+    contention:campaignCondition,condition:campaignCondition,audio:'enabled',
+    reducer_packet:{schema:'melee-web-runtime-incident-reducer-v1',experiments_per_boundary:2,
+      stop_on_first_unexpected_pause:true}}:null,
   results_input_mode:resultsInputMode,
   results_input_scope:resultsInputScope,
+  stage_setup_only:stageSetupOnly,
   controller_profile:null,
   lineup:values.lineup,players:lineup.map(({name,kind},door)=>({name,kind,cpu:cpuLevels[door],stocks:4})),
   matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[],
-  results_input_events:[]};
+  results_input_events:[],
+  browser_context:{kind:userDataDirectory?'persistent':'temporary',
+    cache_reuse:userDataDirectory?'campaign-shared-origin-profile':'temporary-context',
+    requested_cache:url.searchParams.get('render-cache')==='clear'?'cold':'warm',
+    cache_evidence:{status:'unavailable',observed:false,populated_observed:false,restore_observed:false},
+    driver_cache:'uncontrolled'}};
+report.timing_pause_receipts=[];
+report.match_readiness_failures=[];
+report.runtime_diagnostics={schema:'melee-web-runtime-callback-capture-v1',identity:null,
+  max_samples:100,max_incidents:24,samples:[],incidents:[],dropped_samples:0,dropped_incidents:0,
+  reason_counts:zeroIncidentReasonCounts(),unknown_reason_count:0,
+  dropped_reason_counts:zeroIncidentReasonCounts(),dropped_unknown_reason_count:0,
+  invalid_preparation_count:0,dropped_invalid_preparation_count:0,
+  callback_count:0,status:'not-installed'};
 report.source_timing_disruptions=[];
 report.native_command_errors=[];
 report.results_entry_packets=[];
@@ -159,8 +290,31 @@ report.provenance={source_start:sourceProvenance(),
   results_source_pad_input_helper_sha256:await sha256(new URL('./results_source_pad_input.mjs',import.meta.url)),
   local_artifacts:localWasmIdentity?[localWasmIdentity]:[],
   served_artifacts:[]};
+report.runtime_diagnostics.identity={schema_version:1,
+  source_commit:null,runtime_hash:null,build_profile:'unknown'};
+report.runtime_diagnostics.identity_scope={
+  status:'unavailable',
+  reason:'runtime.html is a private development artifact without the audited public diagnostic meta identity',
+  public_runtime_graph_bound:false,
+  private_artifact:localWasmIdentity?{
+    path:localWasmIdentity.path,bytes:localWasmIdentity.bytes,
+    sha256:localWasmIdentity.sha256,hash_scope:localWasmIdentity.hash_scope}:null};
+report.campaign_wall_bound=campaignRequested?{
+  status:'armed',wall_bound_seconds:wallBoundSeconds,deadline_at_ms:campaignDeadline,
+  failure_code:null,evidence_status:'pending'}:null;
 const artifactReads=[];
-let browser,page,driver,browserCdp,activeMatchIndex=null;
+let browser,browserContext,page,driver,browserCdp,activeMatchIndex=null,contentionWorker=null;
+let campaignWallBoundExceeded=false,campaignWallBoundTimer=null,wallBoundTask=null;
+function startControlledContention(){
+  if(!controlledContention||contentionWorker)return;
+  contentionWorker=new Worker(`setInterval(()=>{const end=Date.now()+35;while(Date.now()<end){}},50);`,{eval:true});
+  contentionWorker.unref();
+}
+async function stopControlledContention(){
+  if(!contentionWorker)return;
+  const worker=contentionWorker;contentionWorker=null;
+  await worker.terminate().catch(()=>{});
+}
 async function readAudioDiagnostics(){
   if(!page||page.isClosed())return null;
   try{return await page.evaluate(()=>window.__meleeWebAudioDiagnostics?.snapshot()||null);}
@@ -256,9 +410,124 @@ async function installResultsInputObserver(){
     window.addEventListener('keyup',event=>record('keyup',event),true);
   });
 }
+async function installRuntimeDiagnosticsCapture(identity,identityScope,pageOverride=null){
+  const targetPage=pageOverride??page;
+  await targetPage.evaluate(({identity,identityScope})=>{
+    const MAX_SAMPLES=100,MAX_INCIDENTS=24,SAMPLE_INTERVAL_MS=100;
+    const capture={schema:'melee-web-runtime-callback-capture-v1',identity,identity_scope:identityScope,
+      max_samples:MAX_SAMPLES,max_incidents:MAX_INCIDENTS,samples:[],incidents:[],
+      dropped_samples:0,dropped_incidents:0,status:'installed',last_at_ms:null,last_sample_at_ms:null,
+      reason_counts:Array(10).fill(0),unknown_reason_count:0,
+      dropped_reason_counts:Array(10).fill(0),dropped_unknown_reason_count:0,
+      invalid_preparation_count:0,dropped_invalid_preparation_count:0,
+      callback_count:0,max_callback_ms:null,max_interval_ms:null,max_update_ms:null,max_draw_ms:null,
+      max_total_ms:null,max_preparation_ms:null};
+    const finite=value=>Number.isFinite(value)?value:null;
+    const integer=value=>Number.isFinite(value)&&Number.isInteger(value)?value:null;
+    const structuredPreparation=row=>row.reason_code===7&&row.value===0&&row.threshold===0&&
+      row.clock_owner_code===0&&Number.isInteger(row.source_frame)&&row.source_frame>=-1&&
+      Number.isInteger(row.scene)&&row.scene>=0;
+    const maximum=(current,value)=>value===null?current:current===null?value:Math.max(current,value);
+    const originalSample=globalThis.menuDiagnosticSample;
+    const originalIncident=globalThis.menuDiagnosticIncident;
+    globalThis.menuDiagnosticSample=(...args)=>{
+      const started=performance.now();
+      let result;
+      try{result=originalSample?.(...args);}
+      finally{
+        const ended=performance.now();
+        const callbackMs=finite(Math.max(0,ended-started));
+        const intervalMs=capture.last_at_ms===null?null:finite(Math.max(0,ended-capture.last_at_ms));
+        const updateMs=finite(args[9]),drawMs=finite(args[10]),totalMs=finite(args[11]),
+          preparationMs=finite(args[12]);
+        capture.callback_count++;
+        capture.max_callback_ms=maximum(capture.max_callback_ms,callbackMs);
+        capture.max_interval_ms=maximum(capture.max_interval_ms,intervalMs);
+        capture.max_update_ms=maximum(capture.max_update_ms,updateMs);
+        capture.max_draw_ms=maximum(capture.max_draw_ms,drawMs);
+        capture.max_total_ms=maximum(capture.max_total_ms,totalMs);
+        capture.max_preparation_ms=maximum(capture.max_preparation_ms,preparationMs);
+        const retain=capture.last_sample_at_ms===null||ended-capture.last_sample_at_ms>=SAMPLE_INTERVAL_MS;
+        capture.last_at_ms=ended;
+        if(retain){
+          capture.samples.push({at_ms:finite(ended),timestamp:finite(args[0]),source_frame:integer(args[1]),
+            scene:integer(args[2]),stage:integer(args[3]),fighter0:finite(args[4]),fighter1:finite(args[5]),
+            fighter2:finite(args[6]),fighter3:finite(args[7]),debt_ticks:finite(args[8]),update_ms:updateMs,
+            draw_ms:drawMs,total_ms:totalMs,preparation_ms:preparationMs,queued_delta:finite(args[13]),
+            created_delta:finite(args[14]),texture_upload_bytes:finite(args[15]),source_steps:finite(args[16]),
+            source_draws:finite(args[17]),running:args[18]===undefined?null:!!args[18],callback_ms:callbackMs,
+            interval_ms:intervalMs});
+          if(capture.samples.length>MAX_SAMPLES){capture.samples.shift();capture.dropped_samples++;}
+          capture.last_sample_at_ms=ended;
+        }else capture.dropped_samples++;
+      }
+      return result;
+    };
+    globalThis.menuDiagnosticIncident=(...args)=>{
+      const started=performance.now();
+      let result;
+      try{result=originalIncident?.(...args);}
+      finally{
+        const ended=performance.now();
+        const reasonCode=integer(args[0]);
+        const reasonBucket=reasonCode!==null&&reasonCode>=0&&reasonCode<10?reasonCode:null;
+        if(reasonBucket===null)capture.unknown_reason_count++;else capture.reason_counts[reasonBucket]++;
+        const row={at_ms:finite(ended),reason_code:reasonCode,value:finite(args[1]),
+          threshold:finite(args[2]),source_frame:integer(args[3]),scene:integer(args[4]),
+          clock_owner_code:integer(args[5]),callback_ms:finite(Math.max(0,ended-started))};
+        if(reasonBucket===7&&!structuredPreparation(row))capture.invalid_preparation_count++;
+        capture.incidents.push(row);
+        if(capture.incidents.length>MAX_INCIDENTS){
+          const dropped=capture.incidents.shift();capture.dropped_incidents++;
+          const droppedReason=dropped.reason_code;
+          const droppedBucket=droppedReason!==null&&droppedReason>=0&&droppedReason<10?droppedReason:null;
+          if(droppedBucket===null)capture.dropped_unknown_reason_count++;
+          else capture.dropped_reason_counts[droppedBucket]++;
+          if(droppedBucket===7&&!structuredPreparation(dropped))capture.dropped_invalid_preparation_count++;
+        }
+      }
+      return result;
+    };
+    globalThis.__meleeWebRuntimeIncidentCampaignCapture=capture;
+  },{identity,identityScope});
+}
+async function retainRuntimeDiagnosticsCapture(){
+  if(!page||page.isClosed())return;
+  try{
+    const capture=await page.evaluate(()=>{
+      const value=globalThis.__meleeWebRuntimeIncidentCampaignCapture;
+      if(!value)return {schema:'melee-web-runtime-callback-capture-v1',status:'unavailable',
+        samples:[],incidents:[],dropped_samples:0,dropped_incidents:0,
+        reason_counts:Array(10).fill(0),unknown_reason_count:0,
+        dropped_reason_counts:Array(10).fill(0),dropped_unknown_reason_count:0,
+        invalid_preparation_count:0,dropped_invalid_preparation_count:0};
+      return {schema:value.schema,identity:value.identity,identity_scope:value.identity_scope,
+        max_samples:value.max_samples,
+        max_incidents:value.max_incidents,samples:value.samples.slice(),incidents:value.incidents.slice(),
+        dropped_samples:value.dropped_samples,dropped_incidents:value.dropped_incidents,
+        reason_counts:value.reason_counts.slice(),unknown_reason_count:value.unknown_reason_count,
+        dropped_reason_counts:value.dropped_reason_counts.slice(),
+        dropped_unknown_reason_count:value.dropped_unknown_reason_count,
+        invalid_preparation_count:value.invalid_preparation_count,
+        dropped_invalid_preparation_count:value.dropped_invalid_preparation_count,
+        callback_count:value.callback_count,max_callback_ms:value.max_callback_ms,
+        max_interval_ms:value.max_interval_ms,max_update_ms:value.max_update_ms,max_draw_ms:value.max_draw_ms,
+        max_total_ms:value.max_total_ms,max_preparation_ms:value.max_preparation_ms,status:value.status};
+    });
+    report.runtime_diagnostics=capture;
+  }catch(error){
+    report.runtime_diagnostics={schema:'melee-web-runtime-callback-capture-v1',status:'capture-error',
+      identity:report.runtime_diagnostics.identity,identity_scope:report.runtime_diagnostics.identity_scope,
+      samples:[],incidents:[],dropped_samples:0,
+      dropped_incidents:0,reason_counts:zeroIncidentReasonCounts(),unknown_reason_count:0,
+      dropped_reason_counts:zeroIncidentReasonCounts(),dropped_unknown_reason_count:0,
+      invalid_preparation_count:0,dropped_invalid_preparation_count:0,
+      callback_count:0,error:error.message};
+  }
+}
 const buttonA=0x0100,buttonStart=0x1000;
 const phase=()=>page.evaluate(()=>Module._melee_web_native_menu_phase());
-const diagnostic=()=>page.evaluate(()=>{
+const diagnostic=()=>page.evaluate(stageId=>{
   const phase=Module._melee_web_native_menu_phase();
   const match=JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_match_observe()));
   const readyMatch=phase===7&&match.ready===true;
@@ -281,51 +550,292 @@ const diagnostic=()=>page.evaluate(()=>{
     p1:readyMatch?window.menuObservePlayer?.(1)||null:null,
     p2:readyMatch?window.menuObservePlayer?.(2)||null:null,
     p3:readyMatch?window.menuObservePlayer?.(3)||null:null,
-    sss:window.menuObserveStage?.(32)||null,
+    sss:window.menuObserveStage?.(stageId)||null,
+    cache:Module.runtimeCacheState?{state:Module.runtimeCacheState.state,mounted:Module.runtimeCacheState.mounted,
+      populated:Module.runtimeCacheState.populated,saves:Module.runtimeCacheState.saves,
+      clears:Module.runtimeCacheState.clears,dirty:Module.runtimeCacheState.dirty,
+      file_bytes:Module.runtimeCacheState.fileBytes,message:Module.runtimeCacheState.message}:null,
   };
-});
+},stage.sourceId);
 async function screenshot(name){
   const file=path.join(output,`${name}.png`);
   await page.screenshot({path:file,fullPage:false});report.screenshots.push(file);
   const canvas=path.join(output,`${name}-canvas.png`);
   await page.locator('#canvas').screenshot({path:canvas});report.screenshots.push(canvas);
 }
+function campaignWallBoundError(){
+  const error=Error(`Campaign attempt wall bound exhausted after ${wallBoundSeconds} seconds`);
+  error.code='campaign_wall_bound_exceeded';
+  return error;
+}
+function triggerCampaignWallBound(){
+  if(campaignDeadline===null||campaignWallBoundExceeded)return;
+  campaignWallBoundExceeded=true;
+  report.result='fail';
+  process.exitCode=1;
+  report.failure??={code:'campaign_wall_bound_exceeded',message:campaignWallBoundError().message};
+  if(report.campaign_wall_bound){
+    report.campaign_wall_bound.status='exceeded';
+    report.campaign_wall_bound.failure_code='campaign_wall_bound_exceeded';
+  }
+  wallBoundTask=(async()=>{
+    // Keep the final evidence bounded. This task only reads the page and then
+    // closes the browser objects created by this invocation; it never resumes
+    // source execution, injects input, or changes source policy.
+    const watchdogTimeout=Symbol('campaign-watchdog-timeout');
+    const bounded=async operation=>{
+      let timer=null;
+      try{
+        return await Promise.race([
+          Promise.resolve(operation).catch(()=>undefined),
+          new Promise(resolve=>{timer=setTimeout(()=>resolve(watchdogTimeout),1500);}),
+        ]);
+      }finally{
+        if(timer!==null)clearTimeout(timer);
+      }
+    };
+    const hadPage=!!page&&!page.isClosed();
+    const runtimeCapture=await bounded(retainRuntimeDiagnosticsCapture());
+    const captureTimedOut=runtimeCapture===watchdogTimeout;
+    if(page&&!page.isClosed()){
+      const stateCapture=await bounded(page.evaluate(()=>({
+        status:document.querySelector('#status')?.textContent||'',
+        phase:typeof Module!=='undefined'&&typeof Module._melee_web_native_menu_phase==='function'?
+          Module._melee_web_native_menu_phase():null,
+      })));
+      if(stateCapture!==watchdogTimeout&&stateCapture!==undefined)
+        report.campaign_wall_bound.evidence_state=stateCapture;
+      await bounded(screenshot('campaign-wall-bound'));
+      await bounded(page.locator('body').textContent().then(text=>
+        fs.writeFile(path.join(output,'campaign-wall-bound-page.txt'),text)));
+    }
+    if(report.campaign_wall_bound){
+      const diagnosticCaptureAvailable=runtimeCapture!==watchdogTimeout&&
+        report.runtime_diagnostics?.status==='installed';
+      report.campaign_wall_bound.evidence_status=!hadPage?'no-page-to-capture':
+        captureTimedOut?'capture-timeout':diagnosticCaptureAvailable?'retained-before-close':'unavailable';
+      if(captureTimedOut)report.campaign_wall_bound.evidence_timeout_ms=1500;
+    }
+    if(page&&!page.isClosed())await bounded(page.close());
+    if(browserContext)await bounded(browserContext.close());
+    else if(browser)await bounded(browser.close());
+  })().catch(error=>{
+    if(report.campaign_wall_bound){
+      report.campaign_wall_bound.evidence_status='capture-error';
+      report.campaign_wall_bound.evidence_error=error.message;
+    }
+  });
+}
+function checkCampaignWallBound(){
+  if(campaignDeadline!==null&&(campaignWallBoundExceeded||Date.now()>=campaignDeadline)){
+    triggerCampaignWallBound();
+    throw campaignWallBoundError();
+  }
+}
+function armCampaignWallWatchdog(){
+  if(campaignDeadline===null)return null;
+  return setTimeout(()=>triggerCampaignWallBound(),Math.max(1,campaignDeadline-Date.now()));
+}
+function isTimingPause(state){
+  return typeof state?.status==='string'&&state.status.startsWith('Paused after a timing disruption');
+}
+async function checkTimingPause(label,state){
+  if(stopOnTimingPause&&isTimingPause(state))await failOnTimingPause(label,state);
+  return state;
+}
+function timingPauseSourceFrame(state){
+  const match=String(state?.diagnostics||'').match(/(?:source frame|source cursor): (\d+)/i);
+  return match?Number(match[1]):state?.p0?.frame??null;
+}
+async function failOnTimingPause(label,state){
+  await retainRuntimeDiagnosticsCapture();
+  const receipt={schema:'melee-web-timing-pause-receipt-v1',label,
+    match:activeMatchIndex,phase:state?.phase??null,running:state?.running??null,
+    status:isTimingPause(state)?state.status:null,source_frame:timingPauseSourceFrame(state),
+    runtime_diagnostics:report.runtime_diagnostics,
+    diagnostics:typeof state?.diagnostics==='string'?state.diagnostics:null,
+    observed_at:new Date().toISOString()};
+  report.timing_pause_receipts.push(receipt);
+  const suffix=activeMatchIndex===null?'unknown':String(activeMatchIndex);
+  await fs.writeFile(path.join(output,`timing-pause-${suffix}.json`),JSON.stringify(receipt,null,2)+'\n')
+    .catch(error=>{report.timing_pause_receipt_write_error=error.message;});
+  await screenshot(`timing-pause-${suffix}`).catch(error=>{
+    report.timing_pause_screenshot_error=error.message;
+  });
+  throw Error(`${label}: unexpected timing pause at source frame ${receipt.source_frame??'unknown'}`);
+}
+async function rethrowWithTimingPause(label,error){
+  if(stopOnTimingPause){
+    const state=await diagnostic().catch(()=>null);
+    if(isTimingPause(state))await failOnTimingPause(label,state);
+  }
+  throw error;
+}
+const matchPlayerSlots=MATCH_PLAYER_SLOTS;
+function validMatchPlayer(value){
+  return value&&Number.isInteger(value.fighterKind)&&Number.isInteger(value.motion)&&
+    Number.isInteger(value.groundAir)&&Number.isInteger(value.frame)&&Number.isFinite(value.x)&&
+    Number.isFinite(value.y);
+}
+function matchReadiness(state){
+  const missingPlayers=MATCH_PLAYER_SLOTS.filter(slot=>!validMatchPlayer(state?.[slot]));
+  return {phase:Number.isInteger(state?.phase)?state.phase:null,ready:state?.match?.ready===true,
+    observer_error:state?.match?.observer_error===true,missing_players:missingPlayers,
+    valid_players:MATCH_PLAYER_SLOTS.filter(slot=>validMatchPlayer(state?.[slot]))};
+}
+function matchReadinessFailureReason(state,sawPhase7){
+  const readiness=matchReadiness(state);
+  if(state?.error)return 'runtime-error';
+  if(state?.assetFatal)return 'asset-fatal';
+  if(state?.nativeCommandError)return 'native-command-error';
+  if(readiness.observer_error)return 'match-observer-error';
+  if(sawPhase7&&state?.phase!==7)return 'phase-left-before-ready';
+  return null;
+}
+function runReadinessPreflight(){
+  const cases=[
+    {name:'preparation',state:{phase:3,status:'preparing'},sawPhase7:false,expected:null},
+    {name:'runtime-error-outside-match',state:{phase:3,error:true},sawPhase7:false,expected:'runtime-error'},
+    {name:'phase-seven-left-before-ready',state:{phase:3,status:'loading'},sawPhase7:true,expected:'phase-left-before-ready'},
+    {name:'observer-error',state:{phase:7,match:{observer_error:true}},sawPhase7:true,expected:'match-observer-error'},
+  ];
+  const observed=cases.map(item=>({name:item.name,phase:item.state.phase,
+    reason:matchReadinessFailureReason(item.state,item.sawPhase7)}));
+  for(const [index,item] of cases.entries())
+    assert.equal(observed[index].reason,item.expected,`readiness preflight ${item.name}`);
+  assert.equal(matchReadinessFailureReason(cases[0].state,cases[0].sawPhase7),null,
+    'preparation remains pending until its bounded timeout receipt');
+  return {result:'pass',observed,timeout_phase:cases[0].state.phase,
+    timeout_reason:matchReadinessFailureReason(cases[0].state,cases[0].sawPhase7)??'timeout'};
+}
+async function failOnMatchReadiness(label,state,reason){
+  const readiness=matchReadiness(state);
+  const receipt={schema:'melee-web-match-readiness-failure-v1',label,match_index:activeMatchIndex,
+    reason,readiness,match_observation:state?.match??null,p0:state?.p0??null,p1:state?.p1??null,
+    p2:state?.p2??null,p3:state?.p3??null,status:state?.status??null,
+    error:state?.error??null,asset_fatal:state?.assetFatal??null,
+    diagnostics:typeof state?.diagnostics==='string'?state.diagnostics:null,
+    observed_at:new Date().toISOString()};
+  report.match_readiness_failures.push(receipt);
+  const suffix=activeMatchIndex===null?'unknown':String(activeMatchIndex);
+  await fs.writeFile(path.join(output,`match-readiness-${suffix}.json`),
+    JSON.stringify(receipt,null,2)+'\n').catch(error=>{report.match_readiness_receipt_write_error=error.message;});
+  await screenshot(`match-readiness-${suffix}`).catch(error=>{
+    report.match_readiness_screenshot_error=error.message;
+  });
+  throw Error(`${label}: source match readiness unavailable (${reason}; missing=${readiness.missing_players.join(',')||'none'})`);
+}
 async function writeProgress(label){
   const state=await diagnostic();
+  const cache=state.cache;
+  const evidence=report.browser_context?.cache_evidence;
+  if(evidence&&cache){
+    evidence.observed=true;
+    evidence.last={state:cache.state,populated:cache.populated,clears:cache.clears,
+      file_bytes:cache.file_bytes,mounted:cache.mounted,dirty:cache.dirty};
+    if(cache.populated===true&&Number(cache.file_bytes)>0){
+      evidence.populated_observed=true;
+      if(report.browser_context.requested_cache==='warm'&&Number(cache.clears)===0){
+        evidence.restore_observed=true;evidence.status='observed-populated';
+      }else if(evidence.status==='unavailable')evidence.status='observed-after-clear';
+    }else if(evidence.status==='unavailable')evidence.status='observed-not-populated';
+  }
   report.source_progress.push({label,phase:state.phase,status:state.status,
     error:state.error,p0:state.p0,p1:state.p1,p2:state.p2,p3:state.p3,match:state.match,
     css:state.css,memory:state.memory,fighterParts:state.fighterParts,
     fighterPartsStep:state.fighterPartsStep,fighterPartsOwner:state.fighterPartsOwner,
-    kirbyHatLoad:state.kirbyHatLoad,assetFatal:state.assetFatal});
+    kirbyHatLoad:state.kirbyHatLoad,assetFatal:state.assetFatal,cache:state.cache});
   await fs.writeFile(path.join(output,'progress.json'),JSON.stringify({
     label,phase:state.phase,status:state.status,error:state.error,
     p0:state.p0,p1:state.p1,p2:state.p2,p3:state.p3,match:state.match,
-    assetFatal:state.assetFatal,at:new Date().toISOString()},null,2)+'\n');
+    assetFatal:state.assetFatal,cache:state.cache,at:new Date().toISOString()},null,2)+'\n');
   if(state.error)throw Error(state.error);
   return state;
+}
+async function unloadAfterNaturalResultsCss(){
+  const before=await diagnostic();
+  assert.equal(before.phase,1,'Native cache teardown requires the original CSS owner after natural Results return');
+  const receipt={schema:'melee-web-runtime-cache-teardown-v1',status:'pending',
+    owner:'browser_driver.unload → web/melee-runtime.mjs unloadAndSave',
+    before:{phase:before.phase,running:before.running,cache:before.cache},
+    after:null,native_cache_idle:null,module_save_runtime_cache_owner:'web/melee-runtime.mjs unloadAndSave',
+    observed_at:new Date().toISOString()};
+  report.browser_context.cache_teardown=receipt;
+  const persistReceipt=()=>fs.writeFile(path.join(output,'cache-teardown.json'),
+    JSON.stringify(receipt,null,2)+'\n').catch(error=>{receipt.write_error=error.message;});
+  try{
+    await driver.unload();
+    const after=await diagnostic();
+    const nativeCacheIdle=await page.evaluate(()=>typeof Module._melee_web_native_menu_cache_idle==='function'?
+      Module._melee_web_native_menu_cache_idle():null);
+    receipt.after={phase:after.phase,running:after.running,cache:after.cache};
+    receipt.native_cache_idle=nativeCacheIdle;
+    receipt.cache_save_count={before:before.cache?.saves??null,after:after.cache?.saves??null};
+    receipt.save_observed=Number.isFinite(receipt.cache_save_count.before)&&
+      Number.isFinite(receipt.cache_save_count.after)&&
+      receipt.cache_save_count.after>receipt.cache_save_count.before;
+    receipt.status=nativeCacheIdle===1?'pass':'cache-write-failed';
+    if(nativeCacheIdle!==1)
+      throw Error(`Native renderer cache was not idle after unload: ${nativeCacheIdle}`);
+    await persistReceipt();
+  }catch(error){
+    if(receipt.status==='pending')receipt.status='failed';
+    receipt.error=error.message;
+    await retainRuntimeDiagnosticsCapture();
+    await persistReceipt();
+    throw error;
+  }
 }
 async function waitFor(label,predicate,timeoutMs=30000){
   const deadline=Date.now()+timeoutMs;
   while(Date.now()<deadline){
     const state=await diagnostic();
+    await checkTimingPause(label,state);
     if(state.error)throw Error(`${label}: ${state.error}`);
     if(predicate(state))return state;
     await page.waitForTimeout(50);
   }
   const state=await diagnostic();
+  await checkTimingPause(label,state);
   throw Error(`${label} timed out after ${timeoutMs} ms: ${JSON.stringify({phase:state.phase,status:state.status,p0:state.p0,p1:state.p1,match:state.match})}`);
+}
+async function waitForMatchReady(label,timeoutMs=60000){
+  const deadline=Date.now()+timeoutMs;
+  let sawPhase7=false;
+  while(Date.now()<deadline){
+    const state=await diagnostic();
+    await checkTimingPause(label,state);
+    const readiness=matchReadiness(state);
+    const failureReason=matchReadinessFailureReason(state,sawPhase7);
+    if(failureReason)await failOnMatchReadiness(label,state,failureReason);
+    if(state.phase===7){
+      sawPhase7=true;
+      if(readiness.ready&&readiness.missing_players.length===0)return state;
+    }
+    await page.waitForTimeout(50);
+  }
+  const state=await diagnostic();
+  await checkTimingPause(label,state);
+  const failureReason=matchReadinessFailureReason(state,sawPhase7)??'timeout';
+  await failOnMatchReadiness(label,state,failureReason);
 }
 async function pad(port,buttons=0,stickX=0,stickY=0,duration=1,label='input'){
   assert(port===0||port===1,'the live diagnostic PAD route supports only P1/P2');
   assert(Number.isInteger(duration)&&duration>=1&&duration<=120);
-  await page.evaluate(({port,buttons,stickX,stickY,duration})=>
-    window.menuDiagnosticPad(port,buttons,stickX,stickY,duration),
-    {port,buttons,stickX,stickY,duration});
+  if(stopOnTimingPause)await checkTimingPause(`${label} before PAD`,await diagnostic());
+  try{
+    await page.evaluate(({port,buttons,stickX,stickY,duration})=>
+      window.menuDiagnosticPad(port,buttons,stickX,stickY,duration),
+      {port,buttons,stickX,stickY,duration});
+  }catch(error){
+    await rethrowWithTimingPause(`${label} PAD`,error);
+  }
   report.pad_sample_count++;
   if(report.controller_inputs.length<4000)
     report.controller_inputs.push({port,buttons,stickX,stickY,duration,label});
   // Let the source consume the queued sample and resume ordinary neutral PAD.
   await page.waitForTimeout(Math.max(40,duration*18));
+  if(stopOnTimingPause)await checkTimingPause(`${label} after PAD`,await diagnostic());
 }
 async function tap(port,button,label,duration=1){
   await pad(port,button,0,0,duration,label);
@@ -367,6 +877,7 @@ async function driveFighter(port,door,fighter){
 }
 async function css(){
   const state=await diagnostic();
+  await checkTimingPause('CSS observation',state);
   assert.equal(state.phase,1,`CSS required; phase=${state.phase} status=${state.status}`);
   assert(state.css&&state.css.cursors?.length===16&&state.css.doors?.length===40&&
     state.css.geometry?.length===48,'Live source CSS observation unavailable');
@@ -465,11 +976,12 @@ async function configureRoster(expected){
   await chooseHuman(0,expected[0]);
   await chooseHuman(1,expected[1]);
   for(let door=0;door<4;door++)await setCpuDoor(door);
-  for(const door of [2,3])await selectCpuCharacter(door,expected[door]);
+  // Source CSS CPU conversion can reset an existing human fighter choice.
+  for(let door=0;door<4;door++)await selectCpuCharacter(door,expected[door]);
   for(let door=0;door<4;door++)await setCpuLevel(door,cpuLevels[door]);
-  return verifyRoster(expected,`${cpuProfileDescription} Final Destination roster before SSS`);
+  return verifyRoster(expected,`${cpuProfileDescription} ${stage.name} roster before SSS`);
 }
-async function chooseFinalDestination(){
+async function chooseStage(){
   await tap(0,buttonStart,'CSS-to-SSS Start',8);
   const rawStart=await waitFor('original SSS entry after raw PAD Start',s=>s.phase===3,2000)
     .catch(()=>null);
@@ -481,19 +993,28 @@ async function chooseFinalDestination(){
   await screenshot(`match-${report.matches.length+1}-sss`);
   for(let attempt=0;attempt<360;attempt++){
     const state=await diagnostic();
+    await checkTimingPause('stage selection',state);
     if(state.error)throw Error(`SSS source error: ${state.error}`);
     if(state.phase!==3)throw Error(`SSS exited before stage confirmation; phase=${state.phase}`);
-    const result=await page.evaluate(()=>Module._melee_web_native_menu_drive_stage(32));
+    const result=await page.evaluate(stageId=>Module._melee_web_native_menu_drive_stage(stageId),stage.sourceId);
     if(result===0)throw Error('Source SSS stage-driver failed: '+await page.evaluate(()=>Module.UTF8ToString(Module._melee_web_native_menu_diagnostics())));
     if(result===2)break;
     await page.waitForTimeout(45);
   }
-  const stage=await page.evaluate(()=>window.menuObserveStage(32));
-  assert(stage&&stage.ids[1]===32,'Final Destination was not highlighted by the live source SSS');
-  report.phases.push({label:'source SSS highlighted Final Destination',stage});
-  await screenshot(`match-${report.matches.length+1}-fd-highlighted`);
-  await tap(0,buttonA,'confirm-Final-Destination');
-  await waitFor('original four-player match entry',s=>s.phase===7,60000);
+  const selectedStage=await page.evaluate(stageId=>window.menuObserveStage(stageId),stage.sourceId);
+  assert(selectedStage&&selectedStage.ids[1]===stage.sourceId,
+    `${stage.name} was not highlighted by the live source SSS`);
+  report.phases.push({label:`source SSS highlighted ${stage.name}`,stage:selectedStage});
+  await screenshot(`match-${report.matches.length+1}-${stage.slug}-highlighted`);
+  await tap(0,buttonA,`confirm-${stage.name}`);
+  const ready=await waitForMatchReady('original four-player match entry',stageSetupOnly?30000:60000);
+  if(stageSetupOnly){
+    report.stage_setup={result:'pass',stage_kind:stage.id,stage_source_id:stage.sourceId,
+      selected_stage:selectedStage,phase:ready.phase,running:ready.running,
+      readiness:matchReadiness(ready),source_diagnostics:ready.diagnostics,
+      screenshot:'match-1-'+stage.slug+'-highlighted'};
+  }
+  return ready;
 }
 async function runMatch(matchIndex,expected){
   activeMatchIndex=matchIndex;
@@ -524,11 +1045,13 @@ async function runMatch(matchIndex,expected){
       method:'development source-boundary queue before SSS/match construction',
       events:scheduledSourceTickInputs});
   }
-  await chooseFinalDestination();
+  await chooseStage();
+  startControlledContention();
   const entry=await writeProgress(`match-${matchIndex}-entry`);
   await screenshot(`match-${matchIndex}-entry`);
   const checkpoints=[600,2400,6000,10000,14000,18000,24000];
   let next=0,deadline=Date.now()+12*60*1000,stalledSince=0,terminalTransitionRecorded=false;
+  if(campaignDeadline!==null)deadline=Math.min(deadline,campaignDeadline);
   const lastKindBySlot=new Map();
   while(Date.now()<deadline){
     const state=await diagnostic();
@@ -559,6 +1082,7 @@ async function runMatch(matchIndex,expected){
     assert.equal(state.phase,7,`Match ${matchIndex} left the source Match scene unexpectedly`);
     const frame=state.p0?.frame||0;
     if(state.status.startsWith('Paused after a timing disruption')){
+      if(stopOnTimingPause)await failOnTimingPause(`match ${matchIndex}`,state);
       if(!stalledSince){
         stalledSince=Date.now();
         report.source_timing_disruptions.push({match:matchIndex,frame,action:'pause-observed'});
@@ -586,8 +1110,10 @@ async function runMatch(matchIndex,expected){
     await page.waitForTimeout(250);
   }
   let state=await diagnostic();
+  await stopControlledContention();
+  if(stopOnTimingPause&&isTimingPause(state))await failOnTimingPause(`match ${matchIndex}`,state);
   if(state.phase!==8&&state.phase!==9)
-    throw Error(`Match ${matchIndex} did not naturally reach Results/Prize before the 12-minute bound: ${JSON.stringify({phase:state.phase,p0:state.p0,p1:state.p1,status:state.status})}`);
+    throw Error(`Match ${matchIndex} did not naturally reach Results/Prize before the ${campaignRequested?wallBoundSeconds*1000:12*60*1000} ms bound: ${JSON.stringify({phase:state.phase,p0:state.p0,p1:state.p1,status:state.status})}`);
   await retainResultsEntry(`match-${matchIndex}-results-entry`);
   const result={match:matchIndex,entered_results_phase:state.phase,
     source_diagnostics:state.diagnostics,terminal_match:state.match,
@@ -598,6 +1124,7 @@ async function runMatch(matchIndex,expected){
   // when the actual source menu returns to CSS; never force a scene reset.
   const resumeResultsIfPaused=async state=>{
     if(!state.status.startsWith('Paused after a timing disruption'))return state;
+    if(stopOnTimingPause)await failOnTimingPause(`Results ${matchIndex}`,state);
     const row={match:matchIndex,phase:state.phase,source_diagnostics:state.diagnostics,
       action:'resumed-at-same-source-frame-before-results-input'};
     report.source_timing_disruptions.push(row);
@@ -1707,23 +2234,42 @@ async function runMatch(matchIndex,expected){
   }
 }
 
+campaignWallBoundTimer=armCampaignWallWatchdog();
 try{
+  checkCampaignWallBound();
   const discStat=await fs.stat(values.disc);
   report.disc={bytes:discStat.size,sha256:await sha256(values.disc)};
   report.url=values.url;
+  report.browser_context.kind=userDataDirectory?'persistent':'temporary';
+  report.browser_context.cache_reuse=userDataDirectory?'campaign-shared-origin-profile':'temporary-context';
+  report.browser_context.driver_cache='uncontrolled';
   const {chromium,browser:launchOptions,browserPath,playwrightPath}=await loadBrowserTools(values.playwright);
-  browser=await chromium.launch({...browserLaunchOptions(launchOptions),headless:true});
-  report.browser={name:'headless Chrome',executable:path.basename(browserPath),version:browser.version(),playwright:playwrightPath};
-  browserCdp=await browser.newBrowserCDPSession();
-  await browserCdp.send('Target.setDiscoverTargets',{discover:true});
+  checkCampaignWallBound();
+  const launchConfig={...browserLaunchOptions(launchOptions),headless:true};
+  if(userDataDirectory){
+    await fs.mkdir(userDataDirectory,{recursive:true});
+    browserContext=await chromium.launchPersistentContext(userDataDirectory,launchConfig);
+    browser=browserContext.browser();
+    for(const existing of browserContext.pages())await existing.close();
+  }else{
+    browser=await chromium.launch(launchConfig);
+    browserContext=null;
+  }
+  checkCampaignWallBound();
+  report.browser={name:'headless Chrome',executable:path.basename(browserPath),version:browser?.version()??'unknown',playwright:playwrightPath};
+  if(browser)browserCdp=await browser.newBrowserCDPSession();
+  if(browserCdp){
+    await browserCdp.send('Target.setDiscoverTargets',{discover:true});
+  }
   const lastSourceProgress=()=>{
     const row=report.source_progress.at(-1);
     return row?{label:row.label,phase:row.phase,match_frame:row.match?.frame??null,
       wasm_heap_bytes:row.memory?.wasm_heap_bytes??null}:null;
   };
-  browserCdp.on('Target.targetCrashed',event=>report.target_crashes.push({
+  browserCdp?.on('Target.targetCrashed',event=>report.target_crashes.push({
     at:new Date().toISOString(),...event,last_source_progress:lastSourceProgress()}));
-  page=await browser.newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});
+  page=await (browserContext||browser).newPage({viewport:{width:1280,height:900},deviceScaleFactor:1});
+  checkCampaignWallBound();
   page.on('crash',error=>report.page_crashes.push({at:new Date().toISOString(),
     message:error?.message||null,last_source_progress:lastSourceProgress()}));
   // Retain WebAudio state and AudioWorklet queue reports/errors at Results
@@ -1851,7 +2397,8 @@ try{
         message.startsWith('Unsupported source CPU carry:'))
       report.page_errors.push({kind:'console',message});
   });
-  driver=createBrowserDriver(page,{timeoutMs:60000,deadline:Date.now()+65*60*1000});
+  driver=createBrowserDriver(page,{timeoutMs:60000,
+    deadline:campaignDeadline===null?Date.now()+65*60*1000:campaignDeadline});
   const response=await page.goto(values.url,{waitUntil:'domcontentloaded'});
   assert.equal(response?.status(),200,'runtime.html must load through the real HTTP server');
   assert.equal(response.headers()['cross-origin-opener-policy'],'same-origin');
@@ -1865,6 +2412,8 @@ try{
   assert(report.gpu.cross_origin_isolated&&report.gpu.adapter_available,
     'Rendered validation requires an isolated page and a WebGPU adapter');
   await driver.waitForImport();
+  await installRuntimeDiagnosticsCapture(report.runtime_diagnostics.identity,
+    report.runtime_diagnostics.identity_scope);
   await installResultsInputObserver();
   await driver.selectDisc(values.disc);
   await driver.waitForStart();
@@ -1899,8 +2448,11 @@ try{
   report.initial_css=await writeProgress('initial-css');
   await configureRoster(lineup);
   if(values['setup-only']){report.result='setup-only-pass';}
-  else await runMatch(1,lineup);
-  if(!values['setup-only']){
+  else if(stageSetupOnly){
+    await chooseStage();
+    report.result='stage-setup-pass';
+  }else await runMatch(1,lineup);
+  if(!values['setup-only']&&!stageSetupOnly){
     const retainedLineup=values.lineup==='B'?lineup.map(fighter=>({...fighter})):lineup;
     for(let matchIndex=2;matchIndex<=matchCount;matchIndex++){
       if(values.lineup==='B'&&matchIndex===2){
@@ -1915,13 +2467,18 @@ try{
       assert.equal(retained.length,4);
       await runMatch(matchIndex,retainedLineup);
     }
+    if(!report.results_observation_only)
+      await unloadAfterNaturalResultsCss();
   }
-  if(!values['setup-only'])report.result=resultsObserveAfterConfirmation?
+  if(!values['setup-only']&&!stageSetupOnly)report.result=resultsObserveAfterConfirmation?
     'results-observation-pass':'pass';
 }catch(error){
-  report.failure={message:error.message,stack:error.stack};
+  report.failure=campaignWallBoundExceeded?{
+    code:'campaign_wall_bound_exceeded',
+    message:campaignWallBoundError().message,stack:error.stack}: {
+    message:error.message,stack:error.stack};
   process.exitCode=1;
-  if(page&&!page.isClosed()){
+  if(page&&!page.isClosed()&&!campaignWallBoundExceeded){
     report.failure.audio_diagnostics=await readAudioDiagnostics();
     await retainResultsEntry('failure-latest-entry');
     await diagnostic().then(state=>{report.failure.diagnostics=state;}).catch(()=>{});
@@ -1929,13 +2486,30 @@ try{
     await page.locator('body').textContent().then(text=>fs.writeFile(path.join(output,'page.txt'),text)).catch(()=>{});
   }
 }finally{
-  if(page&&!page.isClosed()){
+  await stopControlledContention();
+  if(campaignWallBoundTimer!==null){
+    clearTimeout(campaignWallBoundTimer);campaignWallBoundTimer=null;
+  }
+  if(wallBoundTask)await wallBoundTask.catch(()=>{});
+  if(campaignWallBoundExceeded){
+    report.result='fail';process.exitCode=1;
+    report.failure??={code:'campaign_wall_bound_exceeded',message:campaignWallBoundError().message};
+  }
+  if(report.campaign_wall_bound&&!campaignWallBoundExceeded){
+    report.campaign_wall_bound.status=['pass','setup-only-pass','stage-setup-pass','results-observation-pass'].includes(report.result)?
+      'completed':'cleared';
+    report.campaign_wall_bound.timer_status='cleared';
+  }
+  if(page&&!page.isClosed()&&!campaignWallBoundExceeded){
     await retainResultsInputEvents();
+    await retainRuntimeDiagnosticsCapture();
     if(activeMatchIndex!==null&&report.matches.some(row=>row.match===activeMatchIndex)&&
        !report.results_source_pad_traces.some(row=>row.match===activeMatchIndex))
       await retainResultsSourcePadTrace(activeMatchIndex,'final-state-after-match-stop');
   }
-  report.final_diagnostics=page&&!page.isClosed()?await diagnostic().catch(error=>({error:error.message})):null;
+  report.final_diagnostics=page&&!page.isClosed()&&!campaignWallBoundExceeded?
+    await diagnostic().catch(error=>({error:error.message})):
+    report.campaign_wall_bound?.evidence_state??null;
   report.controller_inputs=report.controller_inputs||[];
   report.controller_input_summary={pad_samples:report.pad_sample_count,first_samples:report.controller_inputs.slice(0,48),last_samples:report.controller_inputs.slice(-24)};
   const artifactFailures=(await Promise.all(artifactReads)).filter(Boolean);
@@ -1949,10 +2523,11 @@ try{
   }
   if(page&&!page.isClosed())driver?.dispose();
   if(browserCdp)await browserCdp.detach().catch(()=>{});
-  if(browser)await browser.close();
+  if(browserContext)await browserContext.close();
+  else if(browser)await browser.close();
   await fs.writeFile(path.join(output,'report.json'),JSON.stringify(report,null,2)+'\n');
 }
-if(!['pass','setup-only-pass','results-observation-pass'].includes(report.result))
+if(!['pass','setup-only-pass','stage-setup-pass','results-observation-pass'].includes(report.result))
   throw Error(report.failure?.message||'Headless CPU9 lineup scenario failed');
 console.log(JSON.stringify({result:report.result,lineup:report.lineup,matches:report.matches.length,
   browser:report.browser,output}));

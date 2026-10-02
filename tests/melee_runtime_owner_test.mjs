@@ -17,6 +17,7 @@ const adapterRace = process.argv.includes('--adapter-race');
 const adapterRetry = process.argv.includes('--adapter-retry');
 const adapterTimeoutLate = process.argv.includes('--adapter-timeout-late');
 const adapterDeadlineSpan = process.argv.includes('--adapter-deadline-span');
+const lifecycleHandoff = process.argv.includes('--lifecycle-handoff');
 const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host');
 const diagnosticIdentity = {schema_version: 1, source_commit: 'a'.repeat(40), runtime_hash: 'b'.repeat(16), build_profile: 'player'};
 const diagnosticFetches = [];
@@ -377,13 +378,60 @@ if (diagnosticsKnownHost) {
   assert.match(JSON.parse(diagnosticFetches[0].body).incident_id, /^session-[a-z0-9]+:incident-[0-9]+$/,
     'Delivery uses the stable session-bound native incident id');
 
+  if (process.argv.includes('--diagnostics-fatal')) {
+    const beforeFatal = diagnosticFetches.length;
+    phase = 1; running = true; window.menuFrame(true);
+    const dispatch = type => { for (const listener of listeners.get(type) || []) listener(); };
+    document.hidden = true; dispatch('visibilitychange');
+    owner.stop(Error('private-user-path-must-not-be-reported'));
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, beforeFatal, 'Hidden fatal incidents remain local');
+    document.hidden = false; dispatch('visibilitychange');
+    assert.equal(player.getState().requiresReload, true);
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, beforeFatal + 1,
+      'A fatal stopped owner must deliver its sanitized failure without another native frame');
+    const report = JSON.parse(diagnosticFetches.at(-1).body);
+    assert.equal(report.incident.reason, 'runtime_failure');
+    assert.ok(!diagnosticFetches.at(-1).body.includes('private-user-path'));
+    console.log('Shared runtime owner: fatal failure delivers sanitized diagnostics while stopped.');
+    process.exit(0);
+  }
+
+  if (lifecycleHandoff) {
+    const dispatch = type => { for (const listener of listeners.get(type) || []) listener(); };
+    const beforeLifecycleDelivery = diagnosticFetches.length;
+    // Queue a fresh incident while the native scene is paused. The first
+    // inactive frame arms the delivery task, which the hidden edge must cancel
+    // until the native service boundary consumes the sticky handoff.
+    owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+    phase = 1; running = false; window.menuFrame(false);
+    assert.equal(player.getState().paused, true, 'The queued incident leaves manual native pause intent intact');
+    document.hidden = true; dispatch('visibilitychange');
+    document.hidden = false; dispatch('visibilitychange');
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, beforeLifecycleDelivery,
+      'Hidden then visible does not deliver while the native lifecycle handoff is pending');
+    assert.equal(window.menuServiceCommands(), 1,
+      'The first lifecycle service boundary consumes the handoff exactly once');
+    assert.equal(window.menuServiceCommands(), 0,
+      'A lifecycle handoff is not replayed without another hidden edge');
+    assert.equal(player.getState().paused, true, 'Lifecycle delivery gating does not resume the manually paused scene');
+    window.menuFrame(false);
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, beforeLifecycleDelivery + 1,
+      'Deferred delivery becomes eligible only after native handoff and a subsequent frame');
+  }
+
+  const beforeImmediateResume = diagnosticFetches.length;
   phase = 1; running = true; window.menuFrame(true);
   owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
   phase = 1; running = false; window.menuFrame(false);
   await wait(40);
   phase = 1; running = true; window.menuFrame(true);
   await wait(1200);
-  assert.equal(diagnosticFetches.length, 1, 'Immediate resume cancels deferred delivery');
+  const deliveredBeforeOptOut = diagnosticFetches.length;
+  assert.equal(diagnosticFetches.length, beforeImmediateResume, 'Immediate resume cancels deferred delivery');
 
   owner.callbacks.menuDiagnosticIncident(4, null, null, -1, 1, 0);
   player.setAutomaticDiagnostics(false);
@@ -392,7 +440,7 @@ if (diagnosticsKnownHost) {
     'Opt-out clears future work while known-host eligibility remains available');
   phase = 1; running = false; window.menuFrame(false);
   await wait(1200);
-  assert.equal(diagnosticFetches.length, 1, 'Opt-out prevents queued diagnostics from posting');
+  assert.equal(diagnosticFetches.length, deliveredBeforeOptOut, 'Opt-out prevents queued diagnostics from posting');
   diagnosticPreference = 'off';
   for (const listener of listeners.get('storage') || []) listener({key: 'melee-web-automatic-diagnostics-v1'});
   assert.deepEqual(player.getDiagnosticsSettings(), {eligible: true, automatic: false},
@@ -459,7 +507,89 @@ async function pump(promise) {
   return value;
 }
 const nativeServiceCommands = window.menuServiceCommands;
-window.menuServiceCommands = () => { ++serviceBatch; nativeServiceCommands(); };
+window.menuServiceCommands = () => { ++serviceBatch; return nativeServiceCommands(); };
+
+if (lifecycleHandoff) {
+  function dispatch(type) {
+    for (const listener of listeners.get(type) || []) listener();
+  }
+  function activityRowsSince(index) {
+    return calls.slice(index).filter(row => row[0] === 'activity').map(row => row.slice(1));
+  }
+  function assertHandoff(events, expectedVisible, label) {
+    const start = calls.length;
+    for (const event of events) dispatch(event);
+    assert.equal(window.menuServiceCommands(), 1, `${label} is consumed exactly at the native command boundary`);
+    assert.deepEqual(activityRowsSince(start).slice(-2), [[0, 0], [1, expectedVisible]],
+      `${label} neutralizes native activity before publishing current input`);
+    const after = calls.length;
+    assert.equal(window.menuServiceCommands(), 0, `${label} handoff is not replayed without another lifecycle event`);
+    assert.deepEqual(activityRowsSince(after), [], `${label} does not emit a second clock handoff`);
+  }
+
+  phase = 1; running = true; window.menuFrame(true);
+  window.menuServiceCommands();
+  let baseline = calls.length;
+  assert.equal(window.menuServiceCommands(), 0, 'ordinary foreground command service has no clock handoff');
+  assert.deepEqual(activityRowsSince(baseline), [], 'ordinary foreground service does not neutralize activity');
+
+  document.hidden = true;
+  assertHandoff(['visibilitychange'], 0, 'visibility hidden');
+
+  // A visible callback is allowed to arrive before the native boundary runs.
+  // The hidden edge remains sticky until that boundary consumes it; observing
+  // the visible edge must not erase the neutralization request.
+  const hiddenVisibleStart = calls.length;
+  document.hidden = true;
+  dispatch('visibilitychange');
+  document.hidden = false;
+  dispatch('visibilitychange');
+  assert.equal(window.menuServiceCommands(), 1,
+    'hidden then visible before service still consumes one clock handoff');
+  assert.deepEqual(activityRowsSince(hiddenVisibleStart).slice(-2), [[0, 0], [1, 1]],
+    'hidden then visible before service neutralizes before current activity');
+  const hiddenVisibleAfter = calls.length;
+  assert.equal(window.menuServiceCommands(), 0,
+    'hidden then visible handoff is consumed only once');
+  assert.deepEqual(activityRowsSince(hiddenVisibleAfter), [],
+    'hidden then visible does not emit another handoff');
+
+  document.hidden = false;
+  assertHandoff(['pagehide', 'pageshow'], 1, 'pagehide/pageshow');
+  assertHandoff(['freeze', 'resume'], 1, 'freeze/resume');
+
+  // Foreground focus changes update input activity but do not reset either
+  // fixed-tick clock. The native handoff return remains zero.
+  document.activeElement = null;
+  baseline = calls.length;
+  dispatch('blur');
+  assert.equal(window.menuServiceCommands(), 0, 'foreground blur does not request a clock handoff');
+  assert.deepEqual(activityRowsSince(baseline), [[0, 1]], 'foreground blur publishes current activity only');
+  player.focus();
+  baseline = calls.length;
+  dispatch('focus');
+  assert.equal(window.menuServiceCommands(), 0, 'foreground focus does not request a clock handoff');
+  assert.deepEqual(activityRowsSince(baseline), [[1, 1]], 'foreground focus publishes current activity only');
+
+  const pauseBoundaryStart = calls.length;
+  const audioResumesBeforePause = calls.filter(row => row[0] === 'audioResume').length;
+  await pump(player.pause());
+  assert.equal(player.getState().paused, true, 'manual pause remains an explicit external state');
+  const pauseBoundaryCalls = calls.slice(pauseBoundaryStart);
+  assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 1), true,
+    'manual pause reaches the native pause boundary in lifecycle mode');
+  assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 0), false,
+    'manual pause does not implicitly resume the native scene in lifecycle mode');
+  assert.equal(pauseBoundaryCalls.some(row => ['unload', 'saveProfile', 'snapshot'].includes(row[0])), false,
+    'manual pause does not unload or save the native owner in lifecycle mode');
+  assert.equal(calls.filter(row => row[0] === 'audioResume').length, audioResumesBeforePause,
+    'manual pause does not resume Web Audio in lifecycle mode');
+  await pump(player.resume());
+  assert.equal(player.getState().running, true, 'manual resume restores running state in lifecycle mode');
+
+  console.log('Shared runtime owner: hidden/page lifecycle handoff neutralizes once before current activity; foreground focus alone does not reset clocks.');
+  process.exit(0);
+}
 const queuedLayout = player.setKeyboardLayout('boxx');
 assert.equal(calls.some(row => row[0] === 'layout'), false);
 window.menuServiceCommands();
@@ -561,7 +691,18 @@ else {
   assert.equal(player.getState().audio, 'disabled');
   assert.throws(() => window.menuAudio(new Float32Array(2)), /Audio output is disabled/);
 }
+const pauseBoundaryStart = calls.length;
+const audioResumesBeforePause = calls.filter(row => row[0] === 'audioResume').length;
 await pump(player.pause()); assert.equal(player.getState().paused, true);
+const pauseBoundaryCalls = calls.slice(pauseBoundaryStart);
+assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 1), true,
+  'Manual pause reaches the native pause boundary');
+assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 0), false,
+  'Manual pause does not implicitly resume the native scene');
+assert.equal(pauseBoundaryCalls.some(row => ['unload', 'saveProfile', 'snapshot'].includes(row[0])), false,
+  'Manual pause does not unload or save the native owner');
+assert.equal(calls.filter(row => row[0] === 'audioResume').length, audioResumesBeforePause,
+  'Manual pause does not resume Web Audio');
 await pump(player.resume()); assert.equal(player.getState().running, true);
 for (const [menuPhase, menuScene] of [[10, 'title'], [11, 'main']]) {
   phase = menuPhase; running = true; window.menuFrame(true);
