@@ -25,7 +25,10 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertIn("--out FRESH_EVIDENCE_DIR", help_result.stdout)
         self.assertIn("--synthetic", help_result.stdout)
         self.assertIn("--synthetic-hidden-hold", help_result.stdout)
+        self.assertIn("--expect-lifecycle-recovery", help_result.stdout)
+        self.assertIn("--foreground-callback-hold", help_result.stdout)
         self.assertIn("--startup-only", help_result.stdout)
+        self.assertIn("--capability-only", help_result.stdout)
         self.assertIn("--fixture-preflight", help_result.stdout)
 
     def test_generated_fixture_preflight_executes_hooks_and_readiness(self):
@@ -45,6 +48,8 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertEqual(payload["start_calls"], 1)
         self.assertEqual(payload["file_name"], "mock.gci")
         self.assertEqual(payload["load_state"], "started")
+        self.assertTrue(payload["post_hold_predicate"])
+        self.assertTrue(payload["predicate_execution"])
         self.assertEqual(payload["start_readiness"]["result"], "ready")
 
     def test_lifecycle_modes_are_explicitly_gated(self):
@@ -74,7 +79,17 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertIn("synthetic_hidden_native_progress", source)
         self.assertIn("synthetic_simulation_debt_missing", source)
         self.assertIn("manual_hidden_hold", source)
-        self.assertIn("manual_hidden_native_progress", source)
+        self.assertIn("manual_visible_native_progress", source)
+        self.assertIn("hasPostHoldNativeSample", source)
+        self.assertIn("emitVisibility = true", source)
+        self.assertIn("foreground-callback-hold", source)
+        self.assertIn("expect-lifecycle-recovery", source)
+        self.assertIn("synthetic_recovery_input_handoff", source)
+        self.assertIn("capability-only", source)
+        self.assertIn("capabilityOnlyFixtureMarkup", source)
+        self.assertIn("caseProtocol = mode === 'manual-pause' ? 'genuine-cdp'", source)
+        self.assertIn("mode === 'manual-pause' ? 'genuine-cdp'", source)
+        self.assertIn("manual_lifecycle_resume_event_missing", source)
         self.assertIn("stable.unload_calls === before.unload_calls", source)
         self.assertIn("afterUnload.unload_calls === before.unload_calls + 1", source)
         self.assertIn("manual-pause", source)
