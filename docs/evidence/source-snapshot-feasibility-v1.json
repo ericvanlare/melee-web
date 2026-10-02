@@ -1,0 +1,536 @@
+{
+  "assets_sha256": {
+    "EfCoData.dat": "996d78e2c0f4f550f968e2bd8f5e0d18fb8a7525f7e1cb7849a0c836bd7691c0",
+    "EfMrData.dat": "39ccac18137b108b31bb4d832475ba60dc45e381dce9005e14116848e465c669",
+    "GmPause.usd": "3e8490299edf670af0aebb7f27117e0c61297d6b9e2af7ab5c443091e554907f",
+    "GrNLa.dat": "2a295a733414fb65a7061a5c092144fb197570682562b87ba5567ff3f08abb02",
+    "IfAll.usd": "cd957f032b09cf3b80ff725f177525a387efddc264d76cb28581b5da69723929",
+    "IfCoGet.dat": "00f4518c27372eec7a841e20c3adb1ff22041cc5c0257886640954f5c185f599",
+    "ItCo.usd": "5d62efd6437149335b9eef87624ae1253ba7bb260fb08cbae04a3d9215eacd11",
+    "LbBf.dat": "ed0ee6059791bbd7aea4075a039fecdda24698d8baf58052dec91b4d9a364255",
+    "LbRb.dat": "b4d2241deb42f29ffda94dc421641cd58afe290dc49740fcaf5cd7d4c4ce7936",
+    "LbRf.dat": "e8c275128fd0ff3c16f29e672b6df014eefc286c842950e86771175795df5ba8",
+    "MnSlChr.usd": "c9823393ece291429251cb3fc9fd508d59248733ee2667d846d2a5c3434329db",
+    "PdPm.dat": "240fc477461bcc20707be84c9cf82a465ed03cd080c6781cd5de6288102d94ea",
+    "PlCo.dat": "63841336337eb5a7366b06ccc60ea4bd37c3604ab56e19939d78b9aa9cdd234c",
+    "PlMr.dat": "929cdf08c31bc75156ccef05238f2b16dc4d0b187ed1bb4f0a628a2466fb7f7a",
+    "PlMrAJ.dat": "4bd9593e6f0d980b4441891b62ea84a08c099471d695a614974c67223ab5872f",
+    "PlMrBk.dat": "deeb3bc478d720ba432f15c731638629e132269922dd03f05b7f2a9fd07d8c4c",
+    "PlMrBu.dat": "6888f68e434817d336b13d29bbb3d79544941f9748a0aa84355ae22640d9d960",
+    "PlMrGr.dat": "cdb2ea9b7dac639d7aa602e48a4296fdace23ce9c64a4bb35df20fc8a2a019c5",
+    "PlMrNr.dat": "518df5b1d1ce6775a636f4ca8e8e62fb24be65013cd586451c21a181824903ae",
+    "PlMrYe.dat": "c6047de9aaa5f136f72e47cc4e12d2dd606fd1dba36ef773dd3f89007dc669f2",
+    "SdIntro.dat": "21432e0fc6186a67b3522d878846fa46db9171999be93421a88cfc10477a422d",
+    "TyDatai.dat": "1bd632a1f50027f8844e008f4d45e9c20987ce4b8c1e5aa1690a83b3f063c0f4",
+    "TyDatai.usd": "7e0eaf267000c2734d1ef47e718c923995dfb6cf8ab32ec4e4babc0a84fcca11",
+    "dsp_coef.bin": "d7741279c2e8ec5c5fb318f8fbdd6de6bf583520d288e836a5383233a4238179",
+    "end.ssm": "17381aa2d9a04f7c09ac52abf24eee1abc4686cb08f6c9d2733fab0b40b6fd2f",
+    "main.ssm": "949c005709bae3fc72480e76dd1700afa5ec07d0d417fea30cd5524cf55fff20",
+    "mario.ssm": "b9bb209caf8bdc372c077fd877c8bba975f3a8e3ba5062f2c4ec73b7ac1eafa9",
+    "nr_name.ssm": "9190ec1e1aef5e5934151faa6a7b66e44a7ab05de5052048ea60d4bf40dc4bd0",
+    "nr_select.ssm": "94e97f57cd6fbd3ae1b0a7ebc6d9d97648daa16d32386d0f379eebecbbf67a11",
+    "nr_title.ssm": "a055011291f9b7f7f8d30e07ba453d8106735761f1db10d0c789359381326406",
+    "pokemon.ssm": "2f793eee4d05654758bd4a03ec066d9857cb0e549884acf0a72e5fa4be4515de",
+    "sislib_font.bin": "e8d43d10b000e59a64653e8a1b7726bdf95f9102d3ee3307ed56d7c53cde05c1",
+    "smash2.sem": "e844649df8127553f53d2c422375b20f0b814b2f6cc60333028b398dae4854f8",
+    "sp_end.hps": "f0430a9a87ab0c0dae3c4b1644587ff0a92fdb91e21329d429af9f7f0dea6f42"
+  },
+  "based_on_commit": "72d37dc719c6f06d569985686c23f8f6d0cfd825",
+  "boundary": "synchronous-source-only-exported-call-return",
+  "build": {
+    "asyncify": false,
+    "browser_gameplay": false,
+    "configuration": "Release",
+    "emscripten": "6.0.9",
+    "growth": "enabled by target; refused by snapshots",
+    "initial_memory_bytes": 134217728,
+    "native_fixture_hash_embedded_and_checked": true,
+    "source_drawing": false,
+    "stack_bytes": 8388608,
+    "target": "gameplay_snapshot_probe"
+  },
+  "claim": "Two fresh source-only Mario/Final Destination prefixes passed repeated same-instance full-memory restore/replay, with exact per-sample native observations and PCM and exact endpoint linear memory.",
+  "comparison": "exact observation and PCM every replayed sample; entire linear memory at each depth endpoint; observation/PCM hashes for every forward sample",
+  "coverage": {
+    "minStocks": [
+      3,
+      3
+    ],
+    "motions": [
+      [
+        0,
+        12,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20,
+        21,
+        29,
+        42,
+        178,
+        179,
+        180,
+        322,
+        323,
+        324,
+        343,
+        344
+      ],
+      [
+        0,
+        12,
+        14,
+        15,
+        16,
+        17,
+        18,
+        20,
+        21,
+        29,
+        42,
+        60,
+        67,
+        178,
+        179,
+        180,
+        322,
+        323,
+        324
+      ]
+    ],
+    "objectCounts": [
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65
+    ],
+    "peakFireballs": 1,
+    "processCounts": [
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      99,
+      100,
+      101,
+      102,
+      103
+    ]
+  },
+  "evidence_labels": [
+    "Compiled",
+    "Native traced"
+  ],
+  "exclusions": [
+    "source draw traversal and hidden draw-dependent simulation",
+    "GPU and JS renderer ownership",
+    "browser input/clock/queue state",
+    "Web Audio and externally committed sound",
+    "persistent saves",
+    "memory growth after snapshot",
+    "asynchronous calls, workers and mutable function tables",
+    "retail or Slippi semantic equivalence",
+    "foreground timing, physical input and Internet connectivity",
+    "whole match/rematch and natural ending",
+    "intermediate hidden memory equality",
+    "cross-instance memory portability"
+  ],
+  "fixture": {
+    "checkpoints": [
+      300,
+      318,
+      420,
+      438,
+      500,
+      540,
+      558
+    ],
+    "depths": [
+      1,
+      2,
+      4,
+      7
+    ],
+    "entry_samples": 124,
+    "final_state": {
+      "complete": 0,
+      "ending": 0,
+      "fireballs": 0,
+      "frame": 449,
+      "motions": [
+        12,
+        12
+      ],
+      "objects": 60,
+      "outcome": 0,
+      "processes": 89,
+      "ready": 1,
+      "rng": 2000531142,
+      "stocks": [
+        3,
+        3
+      ],
+      "winner": -1
+    },
+    "forward_samples": 573,
+    "input_timing": "simulation sample index, no host-time gameplay writes",
+    "players": "two human Mario players",
+    "repeats_per_depth": 3,
+    "seed": "0x13579bdf",
+    "stage": "Final Destination",
+    "stocks": 4
+  },
+  "fresh_repeat": {
+    "baseline_observation_and_pcm_hash_files_exact": true,
+    "cross_instance_linear_memory_exact": false,
+    "cross_instance_memory_portability_claimed": false,
+    "every_forward_observation_and_pcm_hash_exact": true,
+    "first_cross_process_memory_hash_difference": {
+      "actual": "fc13cb3099cdb76b049a4629bbfdcaba6a1a8da1e79c69b6b2f95066b3e488e4",
+      "depth": 1,
+      "expected": "f3474286bebaee2297b60dde6c6dccbe80125434fdd30c05df9dec6c50a1ea77",
+      "sample": 300
+    },
+    "forward_state_file_sha256": "07d9a7de4e5f08653a11bfb6218c07b2542842b0751a3283cc6e77889fea1621",
+    "input_file_sha256": "1c7508ece22ebd69723a4569ea1f7bd7aa59c793468f799f4db6e03065f7083f",
+    "inputs_and_forward_states_exact": true,
+    "memory_difference_status": "Unclassified across fresh Node processes; same-instance full-memory restoration and declared future state/PCM agree. Cross-instance restoration is unsupported.",
+    "reduced_same_process_two_module_prefix": {
+      "artifact_sha256": {
+        "driver.log": "8b270edfb41a146708a2f93df31d5d65f0faa1bd592254fbbdd18403939d58cc",
+        "first-memory.bin": "8b368826a4ba0e117e9c338bd6491b0bc12a2ff90ccc97b6816e8f46b8b702e2",
+        "native-host.log": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+        "reduction.json": "16f0a179c4b9ce15fc68e1197fe8d44e771c3680660779f43942f36b33f31ea8",
+        "second-memory.bin": "8b368826a4ba0e117e9c338bd6491b0bc12a2ff90ccc97b6816e8f46b8b702e2"
+      },
+      "driver_sha256": "e8527990d424c2d6bf1057c9fb67cc6aa8ece6c341fa42f62fe3a48c28eb4fff",
+      "linear_memory_differing_bytes": 0,
+      "retained_external_run": "fresh-module-memory-reduction-20261001-154453-93964fa8",
+      "same_observation": true,
+      "same_pcm": true,
+      "scope": "Two new module factories in one Node process; does not resolve the cross-process difference.",
+      "source_samples": 301
+    }
+  },
+  "fresh_runs": [
+    {
+      "artifact_sha256": {
+        "baseline-300-1.json": "83b54a7c6d240982085ec1cf9fe15eafac5db589cd7934e4cf3501c905d35f2b",
+        "baseline-300-2.json": "24a905dcf4a92192dffd9132e088883cdbaa2110539da28ba3b6d84f92978de7",
+        "baseline-300-4.json": "63586b34f192c55ed1b1fe0456c1cbf43f59d92e78cbe39bfcbd0d2718c4ef42",
+        "baseline-300-7.json": "5bfa88cc3d3f5d34516053eac0909ba0676ccc21837ea1476c22549dd1e2eafb",
+        "baseline-318-1.json": "0933255362a4c0b31f3ff647f6b8d7be8c82c75f010b14bedc9a2bdab5134549",
+        "baseline-318-2.json": "23d19c31deb248e58a4c33482ed4fcb2152ccbed4d9898fc56934d1d122d7bd2",
+        "baseline-318-4.json": "0e005a84d1a5f6367c1ac1accef52385ca0de550bff6760b642959ce8948bc09",
+        "baseline-318-7.json": "5bd3278a78602d3cd9ff4b50ed47e2f98952e776127f67f6a32001a055e23f7e",
+        "baseline-420-1.json": "254e6872322a35859aa373b82ab071d063ff407fa51ac1e79bbbf0e03744ac21",
+        "baseline-420-2.json": "555037c5cdb345b03844c547ee2fe8d88715e370dccd34c90cc23b123bff8821",
+        "baseline-420-4.json": "7e2e02e21fe7b33617eb0d5a1a79e6992550ca637abaf86f909aee4a5eb3566d",
+        "baseline-420-7.json": "8956e3e41f5fba01047a54fcb0006861ea1242d2bf4f8884ca66cc27ac027292",
+        "baseline-438-1.json": "5674b4c1bafcc6cee6b49e6a39440b3d0835b1959b06f0d083973a97b0402811",
+        "baseline-438-2.json": "ba8eda6839283ee1137982a0221901c69e2232b761bee1a1e1028ca63ebda3ac",
+        "baseline-438-4.json": "c6e7f842a5114f550299db8ac8c92671a7d553025cf0a95f4558d12bb0897860",
+        "baseline-438-7.json": "9abfb05fa5ff8edf9736fbbcc719964c84ccd2a23f7d34f46bcee3d3f9a61f76",
+        "baseline-500-1.json": "29d8029dd916bb247e793f62aec1ca5130f57b78ffc534f9323b350883ca1265",
+        "baseline-500-2.json": "988af3e267124b9a249e688b4291c72fffa46fc1e0b370f817a4521454f0e391",
+        "baseline-500-4.json": "498e12e31bcb05334830b092dc160bce4b908faeccaadfe2ef1e1a9d2800c08e",
+        "baseline-500-7.json": "4f62c6c2816ce00d9ab352623e8bf918de810f7eb70bec613b7f518cb5cb62aa",
+        "baseline-540-1.json": "3f466a876976d462748fff018551f9927904811fe641f33c210048cf1fb32e2f",
+        "baseline-540-2.json": "12855cb51fc560b4ca32490d9edf41b7cfbd9f6086e8246c564f9b9d95c0891b",
+        "baseline-540-4.json": "982cafb3bfe39eb2b0581e0e75bb0788f1cc033c5c5cc0b446b29edc812638df",
+        "baseline-540-7.json": "7deb20d577aba0bd23f01c2c803012c8bf6b8ed14b133715970c4f1e88be36ec",
+        "baseline-558-1.json": "26b1b138703c8afd3160db442d1b5389ada03f87c888bb8f48b7ea7db1fb1e41",
+        "baseline-558-2.json": "0d61c362f510c8e50f29a1e7c9d3f3ce9d60e52e3efed77b95a7ae2b38d907d4",
+        "baseline-558-4.json": "d6663972ac16f986c68ef6ee8540b7a177178d1d2544fde1c957a27838f7f4a9",
+        "baseline-558-7.json": "524063e13a361379cb9ba2f30111fd33a6d1ba0d1dc5f19c51117886ee234a29",
+        "evidence.json": "e797596bd8c296cb036184cb21edfe4c665297b1674d154c7d0de290a85dfefd",
+        "forward-states.json": "07d9a7de4e5f08653a11bfb6218c07b2542842b0751a3283cc6e77889fea1621",
+        "input-samples.json": "1c7508ece22ebd69723a4569ea1f7bd7aa59c793468f799f4db6e03065f7083f",
+        "native-host.log": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "capture_ms": {
+        "max": 16.381,
+        "median": 5.649,
+        "min": 5.304
+      },
+      "cleanup": "source match/audio/world closed",
+      "costs_by_depth": {
+        "1": {
+          "replayMs": {
+            "max": 0.734,
+            "median": 0.353,
+            "min": 0.29
+          },
+          "restoreMs": {
+            "max": 15.986,
+            "median": 3.982,
+            "min": 3.503
+          }
+        },
+        "2": {
+          "replayMs": {
+            "max": 0.823,
+            "median": 0.528,
+            "min": 0.419
+          },
+          "restoreMs": {
+            "max": 12.308,
+            "median": 3.901,
+            "min": 3.657
+          }
+        },
+        "4": {
+          "replayMs": {
+            "max": 1.483,
+            "median": 0.988,
+            "min": 0.747
+          },
+          "restoreMs": {
+            "max": 8.055,
+            "median": 3.883,
+            "min": 3.336
+          }
+        },
+        "7": {
+          "replayMs": {
+            "max": 2.086,
+            "median": 1.638,
+            "min": 1.45
+          },
+          "restoreMs": {
+            "max": 4.502,
+            "median": 3.756,
+            "min": 3.51
+          }
+        }
+      },
+      "cycles": 28,
+      "host_peak_rss_bytes": 670105600,
+      "restore_replay_checks": 84,
+      "result": "passed",
+      "run": "source-snapshot-08",
+      "snapshot_bytes": 134217728
+    },
+    {
+      "artifact_sha256": {
+        "baseline-300-1.json": "83b54a7c6d240982085ec1cf9fe15eafac5db589cd7934e4cf3501c905d35f2b",
+        "baseline-300-2.json": "24a905dcf4a92192dffd9132e088883cdbaa2110539da28ba3b6d84f92978de7",
+        "baseline-300-4.json": "63586b34f192c55ed1b1fe0456c1cbf43f59d92e78cbe39bfcbd0d2718c4ef42",
+        "baseline-300-7.json": "5bfa88cc3d3f5d34516053eac0909ba0676ccc21837ea1476c22549dd1e2eafb",
+        "baseline-318-1.json": "0933255362a4c0b31f3ff647f6b8d7be8c82c75f010b14bedc9a2bdab5134549",
+        "baseline-318-2.json": "23d19c31deb248e58a4c33482ed4fcb2152ccbed4d9898fc56934d1d122d7bd2",
+        "baseline-318-4.json": "0e005a84d1a5f6367c1ac1accef52385ca0de550bff6760b642959ce8948bc09",
+        "baseline-318-7.json": "5bd3278a78602d3cd9ff4b50ed47e2f98952e776127f67f6a32001a055e23f7e",
+        "baseline-420-1.json": "254e6872322a35859aa373b82ab071d063ff407fa51ac1e79bbbf0e03744ac21",
+        "baseline-420-2.json": "555037c5cdb345b03844c547ee2fe8d88715e370dccd34c90cc23b123bff8821",
+        "baseline-420-4.json": "7e2e02e21fe7b33617eb0d5a1a79e6992550ca637abaf86f909aee4a5eb3566d",
+        "baseline-420-7.json": "8956e3e41f5fba01047a54fcb0006861ea1242d2bf4f8884ca66cc27ac027292",
+        "baseline-438-1.json": "5674b4c1bafcc6cee6b49e6a39440b3d0835b1959b06f0d083973a97b0402811",
+        "baseline-438-2.json": "ba8eda6839283ee1137982a0221901c69e2232b761bee1a1e1028ca63ebda3ac",
+        "baseline-438-4.json": "c6e7f842a5114f550299db8ac8c92671a7d553025cf0a95f4558d12bb0897860",
+        "baseline-438-7.json": "9abfb05fa5ff8edf9736fbbcc719964c84ccd2a23f7d34f46bcee3d3f9a61f76",
+        "baseline-500-1.json": "29d8029dd916bb247e793f62aec1ca5130f57b78ffc534f9323b350883ca1265",
+        "baseline-500-2.json": "988af3e267124b9a249e688b4291c72fffa46fc1e0b370f817a4521454f0e391",
+        "baseline-500-4.json": "498e12e31bcb05334830b092dc160bce4b908faeccaadfe2ef1e1a9d2800c08e",
+        "baseline-500-7.json": "4f62c6c2816ce00d9ab352623e8bf918de810f7eb70bec613b7f518cb5cb62aa",
+        "baseline-540-1.json": "3f466a876976d462748fff018551f9927904811fe641f33c210048cf1fb32e2f",
+        "baseline-540-2.json": "12855cb51fc560b4ca32490d9edf41b7cfbd9f6086e8246c564f9b9d95c0891b",
+        "baseline-540-4.json": "982cafb3bfe39eb2b0581e0e75bb0788f1cc033c5c5cc0b446b29edc812638df",
+        "baseline-540-7.json": "7deb20d577aba0bd23f01c2c803012c8bf6b8ed14b133715970c4f1e88be36ec",
+        "baseline-558-1.json": "26b1b138703c8afd3160db442d1b5389ada03f87c888bb8f48b7ea7db1fb1e41",
+        "baseline-558-2.json": "0d61c362f510c8e50f29a1e7c9d3f3ce9d60e52e3efed77b95a7ae2b38d907d4",
+        "baseline-558-4.json": "d6663972ac16f986c68ef6ee8540b7a177178d1d2544fde1c957a27838f7f4a9",
+        "baseline-558-7.json": "524063e13a361379cb9ba2f30111fd33a6d1ba0d1dc5f19c51117886ee234a29",
+        "evidence.json": "d681c2befe755ac4e1884aad1d03dc42e8fa08d6a6a46c8a251960de03654b27",
+        "forward-states.json": "07d9a7de4e5f08653a11bfb6218c07b2542842b0751a3283cc6e77889fea1621",
+        "input-samples.json": "1c7508ece22ebd69723a4569ea1f7bd7aa59c793468f799f4db6e03065f7083f",
+        "native-host.log": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+      },
+      "capture_ms": {
+        "max": 47.07,
+        "median": 5.837,
+        "min": 4.871
+      },
+      "cleanup": "source match/audio/world closed",
+      "costs_by_depth": {
+        "1": {
+          "replayMs": {
+            "max": 0.758,
+            "median": 0.628,
+            "min": 0.326
+          },
+          "restoreMs": {
+            "max": 12.184,
+            "median": 3.881,
+            "min": 3.207
+          }
+        },
+        "2": {
+          "replayMs": {
+            "max": 1.665,
+            "median": 0.549,
+            "min": 0.428
+          },
+          "restoreMs": {
+            "max": 10.825,
+            "median": 3.685,
+            "min": 3.217
+          }
+        },
+        "4": {
+          "replayMs": {
+            "max": 7.771,
+            "median": 1.236,
+            "min": 0.832
+          },
+          "restoreMs": {
+            "max": 7.708,
+            "median": 3.843,
+            "min": 3.186
+          }
+        },
+        "7": {
+          "replayMs": {
+            "max": 10.072,
+            "median": 2.027,
+            "min": 1.579
+          },
+          "restoreMs": {
+            "max": 8.834,
+            "median": 4.021,
+            "min": 3.266
+          }
+        }
+      },
+      "cycles": 28,
+      "host_peak_rss_bytes": 767950848,
+      "restore_replay_checks": 84,
+      "result": "passed",
+      "run": "source-snapshot-09",
+      "snapshot_bytes": 134217728
+    }
+  ],
+  "machine": {
+    "arch": "arm64",
+    "cpu": "Apple M4",
+    "node": "v24.19.0",
+    "os": "Darwin",
+    "release": "25.6.0"
+  },
+  "milestone_status": {
+    "actual_browser_multiplayer": "unrun",
+    "cross_machine": "unrun",
+    "desktop_controlled_rollback": "independent diagnostic implementation next",
+    "source_restoration": "bounded correctness baseline passed; practical player rollback budget remains open"
+  },
+  "negative_controls": {
+    "missing_asset_initialization": {
+      "cleanup": "source match/audio/world closed after failure",
+      "failure": "Missing runtime file: PlCo.dat",
+      "receipt_sha256": "b484b594c4bf4c006716b6a943542b3782fd0386ca1c09d08054cabf7ab5714c",
+      "result": "expected failure",
+      "run": "source-init-negative-02"
+    },
+    "restored_rng_bit": {
+      "firstDivergence": {
+        "actual": 57,
+        "expected": 198,
+        "offset": 4
+      },
+      "perturbation": "one restored source RNG bit",
+      "result": "detected",
+      "sample": 572
+    }
+  },
+  "next_experiment": "Controlled desktop rollback in a separately versioned diagnostic adaptation; source follow-up must reduce memory cost and account for actual drawing and JS/GPU/audio commit ownership before player integration.",
+  "ownership": {
+    "host_effects": "internal RuntimeFiles only; no external source file bridge, drawing/GPU, Web Audio sink or card commit is reachable",
+    "lifecycle": "one-shot native fixture; failed initialization unwinds session/files; close invalidates host snapshots; changed/shared/partial memory views and async/reentrant calls refused",
+    "native_linear": [
+      "native globals",
+      "C/C++ heaps and allocator metadata",
+      "same-instance pointers and source-address shadows",
+      "fighters/articles/items/collision/stage/RNG/timers",
+      "HSD object/process scheduling",
+      "source match/HUD flow",
+      "semantic PAD Master/Copy/Game history",
+      "native AX/SSM/HPS queues and PCM"
+    ],
+    "native_quiescence": "synchronous no-Asyncify exported-call return and combined source-file/HPS/SSM drive idle",
+    "uncaptured_wasm_state": {
+      "indirect_table": "fixed-size 13242 entries; no table mutation exercised",
+      "inventory_sha256": "a0bb13192b601f988d369c623102aa94c76d26fc09b330a224421fc11c024c2c",
+      "mutable_globals": [
+        "tempRet0",
+        "__stack_end",
+        "__stack_base",
+        "global$4",
+        "global$5"
+      ],
+      "restored_global": "__stack_pointer through stackSave/stackRestore",
+      "scope": "Full linear-memory comparison does not certify restoration of these runtime globals or table state. The fixture is discarded on a failure; no general snapshot API is admitted."
+    }
+  },
+  "resource_decision": {
+    "eight_snapshot_ring_bytes": 1073741824,
+    "practical_rollback_admitted": false,
+    "reason": "A full-memory ring alone retains 1 GiB for eight frames. These measurements exclude drawing, GPU, browser scheduling and external audio commits, so they are insufficient for practical player rollback admission.",
+    "snapshot_bytes": 134217728
+  },
+  "retained_artifacts_root": "work/multiplayer-rollback",
+  "retained_failed_hypotheses": [
+    {
+      "observation": "Missing TyDatai.usd in older owned fixture",
+      "receipt_sha256": "d61766b1bc2d9b82cf327b112d51a961c658a97abc93f66e6e024b2a5515308f",
+      "resolution": "Extracted the authored missing trophy/rumble archives from the owned pinned disc; no asset exemption",
+      "run": "source-snapshot-01"
+    },
+    {
+      "observation": "Restore/replay passed, but fireball coverage was zero: sideways B selected Cape",
+      "receipt_sha256": "51707e9832364ef0bf1508b86f805fb6b29b7aca06df2f37551703bbe8ad9e53",
+      "resolution": "Neutralized stick on B and required actual fireball plus both stock-loss coverage",
+      "run": "source-snapshot-04"
+    },
+    {
+      "log_sha256": "059d38d76924039bbb53e1cc426f58e86c7aad780ba15e41c95bb54103479b54",
+      "observation": "Default build directory unconfigured; two failures and one setup error",
+      "resolution": "Configured default build directory with normal build entry point",
+      "run": "full-suite-01"
+    }
+  ],
+  "runtime": {
+    "jsSha256": "baaae9d898b3d4d336876bfb75a8293bddea087267ea19ad380c9a9c4361a9e8",
+    "wasmSha256": "d73f9540a56c29f7728a712332f84a4f79aeac8674fbad2c1b83b3b5f0df1e15"
+  },
+  "schema": "melee-web-source-snapshot-feasibility-receipt-v1",
+  "source_sha256": {
+    "cmake/FighterRuntime.cmake": "6eca403a99ceb339137c020b902741a60b560f4296a4c6c5158fdcb222b508fc",
+    "dependencies.lock.json": "b49bad1048d13ba05da31e5269bda4bed9fba04ed7a3fe96da8aa97390748d2d",
+    "scripts/build.py": "4a771b1ed045234e6a3bd69b3ec9c5c788297f5fab3058ef79ef8658173c4c48",
+    "scripts/check_source_snapshot.mjs": "7176e19fc8b8afd614994be9e3082270c588538878d461985f4e55fa675fcb09",
+    "tests/gameplay_snapshot_probe.cpp": "ded6bf73ae92ea634f2898eeb39d2a3a49db733965548438ca57f3221585daa4",
+    "tests/quiescent_wasm_snapshot.mjs": "4a8250b744ac3d00fd4e6b09168829d4adec8a6ebc043e07121e5f3173836570"
+  },
+  "timing_scope": "capture includes native quiescence check and memory copy; restore is memory/stack restoration; baseline/replay are synchronous checked source steps, excluding host comparison/log copies",
+  "validation": {
+    "affected_build": {
+      "command": "python3 scripts/build.py --configuration Release --trace-target gameplay_snapshot_probe",
+      "log_sha256": "83aff2dd3c3640e97dc79e084f17bb62c0313f95a48a652fe57b7154339cbba3",
+      "result": "passed"
+    },
+    "full_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "log_sha256": "6b7cddb4e32717f783fa4fc47eb794651899a65060f4efa959e81a4e571bc132",
+      "result": "passed",
+      "skips": 136,
+      "tests": 1670
+    }
+  }
+}

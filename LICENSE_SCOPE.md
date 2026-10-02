@@ -17,11 +17,15 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `scripts/audit_compiler_cache.py`
 - `scripts/compare_allocation_traces.py`
 - `scripts/summarize_browser_failure.py`
+- `scripts/check_source_snapshot.mjs`
 - `tests/test_repository_content.py`
 - `tests/test_repository_history.py`
 - `tests/test_compiler_cache_audit.py`
 - `tests/test_allocation_trace_compare.py`
 - `tests/test_browser_failure_summary.py`
+- `tests/quiescent_wasm_snapshot.mjs`
+- `tests/quiescent_wasm_snapshot_test.mjs`
+- `tests/test_source_snapshot.py`
 - `.github/repository-content-policy.json`
 - `.github/pull_request_template.md`
 - `.github/publication/actions-policy.json`
@@ -103,6 +107,13 @@ The Slippi timeline parser listed above is a separately authored reader of the
 public Slippi format specification. Its conformance checks compare behavior
 with pinned `slippi-js`; the parser does not import or copy that LGPL
 implementation. The tool-specific inventory identifies that distinction.
+
+The diagnostic Wasm snapshot helper, source-snapshot host driver and rejection
+tests are separately authored project code. They copy opaque runtime bytes and
+compare observations supplied by the native fixture; they contain no recovered
+game/SDK implementation or copied emulator savestate code. This grant does not
+extend to the native gameplay fixture, its game declarations, compiled runtime,
+assets or generated evidence.
 
 ## Exclusions and existing terms
 

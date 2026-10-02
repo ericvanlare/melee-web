@@ -30,6 +30,7 @@ AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
 # surface for the workflow.
 TRACE_TARGETS = (
     "gameplay_content_match_trace",
+    "gameplay_snapshot_probe",
     "gameplay_stage_battlefield_trace",
     "gameplay_stage_temple_trace",
     "gameplay_stage_fountain_trace",
