@@ -356,6 +356,60 @@ rollback, visual/audio accuracy, physical input or foreground performance is
 established. The next source experiment must account for actual draw and host
 ownership and reduce snapshot size/cost before enabling player rollback.
 
+### Bounded shared-page follow-up
+
+The [shared-page receipt](../../docs/evidence/source-shared-page-snapshot-v1.json)
+records a Node-only diagnostic owner with at most eight snapshots and a hard
+256 MiB limit on unique owned page payload. Each snapshot covers every byte of
+linear memory. First capture hashes every page; later captures compare each
+page exactly against the most recent retained immutable snapshot. Changed
+pages use SHA-256 buckets followed by exact byte comparison. Released handles
+drop their page references, and failed captures roll back partial ownership.
+No guessed dirty flags or excluded address ranges are used.
+
+Native initialization may grow memory and leave transfers pending. This driver
+records the actual capacity, executes original neutral sample 0, requires
+native quiescence, then binds the owner. Every later capture and restore retains
+the same identity/capacity/stack guards. The complete entry sequence is logged.
+The driver repeats the existing depths and sensitivity control, then restores
+all eight retained states and verifies observation, PCM and full-memory hashes.
+It reports first and subsequent capture costs separately; the payload limit
+does not bound total Node RSS or establish browser performance.
+
+To reproduce the measured 64 MiB initial-capacity candidate, first configure
+the existing Release build through its normal entry point, set the diagnostic
+target's cache value with the checkout's pinned tools, then build it. This value
+does not shrink the authored native arenas or prevent growth:
+
+```sh
+python3 scripts/build.py --configuration Release --configure-only
+python3 scripts/agent_workspace.py run -- env \
+  PATH="$PWD/.venv/bin:$PATH" EMSDK="$PWD/.deps/emsdk" \
+  EM_CONFIG="$PWD/.deps/emsdk/.emscripten" \
+  EM_CACHE="$PWD/.deps/emsdk/upstream/emscripten/cache" \
+  EMSDK_PYTHON="$(command -v python3)" \
+  .venv/bin/cmake -S . -B build/browser-release \
+  -DMELEE_WEB_SNAPSHOT_INITIAL_MEMORY=67108864
+python3 scripts/build.py --configuration Release --trace-target gameplay_snapshot_probe
+python3 scripts/agent_workspace.py run -- \
+  .deps/emsdk/node/24.19.0_64bit/bin/node scripts/check_shared_page_snapshot.mjs \
+  --runtime build/browser-release/gameplay_snapshot_probe.js \
+  --assets assets-local/snapshot-mario \
+  --out work/source-snapshot/shared-pages-fresh-01
+python3 scripts/agent_workspace.py run -- \
+  python3 -m unittest tests.test_shared_page_snapshot -v
+```
+
+Use a second fresh output path for repetition. Initial capacity defaults to
+128 MiB in a new build; this is a persistent CMake cache value. Set it back to
+`134217728` through the same cache command before returning to the full-copy
+driver, which binds memory before initialization. The shared-page driver
+records whichever actual capacity was built. Both drivers
+remain correctness experiments for the declared source-only boundary. Mutable
+Wasm globals/table state outside memory and external browser effects retain
+the exclusions above. A first capture still exceeding one frame, and these
+headless Node costs, do not close player rollback admission.
+
 Controlled desktop rollback remains a separate gate: retain identical
 frame-indexed inputs and initialization, a bounded fault schedule, actual
 prediction/load/resimulation observations and finalized state comparisons.

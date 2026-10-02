@@ -1237,6 +1237,17 @@ mutable Wasm globals beyond the stack, whole matches, browser multiplayer and
 Slippi compatibility remain separate gates. Reproduction and ownership are in
 the [testbed guide](reference-capture/slippi/LOCAL_TESTBED.md#source-runtime-snapshot-experiment).
 
+The [shared-page follow-up receipt](docs/evidence/source-shared-page-snapshot-v1.json)
+adds **Compiled / Native traced** evidence for bounded immutable page sharing
+in the same source-only profile. Two fresh runs pass repeated exact
+restore/replay, eight retained-state restores, release-to-zero ownership and
+the RNG sensitivity/recovery control. All forward inputs, observations and PCM
+agree with the unoptimized run. Every page is compared exactly before sharing;
+changed pages retain hash-plus-byte comparison. The receipt distinguishes
+first-capture cost, subsequent retained-state cost, owned payload and Node RSS.
+Browser host/draw/audio/save ownership and practical rollback admission remain
+open.
+
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
 ticks, and the port matches their entry data, input vectors, declared fighter

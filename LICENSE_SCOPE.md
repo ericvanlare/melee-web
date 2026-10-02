@@ -18,6 +18,7 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `scripts/compare_allocation_traces.py`
 - `scripts/summarize_browser_failure.py`
 - `scripts/check_source_snapshot.mjs`
+- `scripts/check_shared_page_snapshot.mjs`
 - `tests/test_repository_content.py`
 - `tests/test_repository_history.py`
 - `tests/test_compiler_cache_audit.py`
@@ -26,6 +27,9 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `tests/quiescent_wasm_snapshot.mjs`
 - `tests/quiescent_wasm_snapshot_test.mjs`
 - `tests/test_source_snapshot.py`
+- `tests/shared_page_wasm_snapshot.mjs`
+- `tests/shared_page_snapshot_controls.mjs`
+- `tests/test_shared_page_snapshot.py`
 - `.github/repository-content-policy.json`
 - `.github/pull_request_template.md`
 - `.github/publication/actions-policy.json`
