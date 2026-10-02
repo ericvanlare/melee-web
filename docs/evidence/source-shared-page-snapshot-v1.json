@@ -653,8 +653,49 @@
       "tests": 2,
       "result": "passed"
     },
-    "required_full_suite": "pending named bounded job",
-    "affected_build": "pending named bounded job"
+    "required_full_suite": {
+      "result": "passed",
+      "tests": 1672,
+      "skipped": 136,
+      "unittest_seconds": 290.13,
+      "name": "full-suite",
+      "log": "full-suite.log",
+      "duration_seconds": 290.506,
+      "exit_code": 0,
+      "log_sha256": "a510a41d4689c6d6122306182808dba21cbdb8b8f4ca8d31b897330180cea5d1",
+      "timed_out": false
+    },
+    "affected_build": {
+      "name": "affected-build",
+      "log": "affected-build.log",
+      "duration_seconds": 10.317,
+      "exit_code": 0,
+      "log_sha256": "fc8fbd61e169b61c06dc5163f29c17aa2d68792c26dc52fb89830adffa276002",
+      "timed_out": false
+    },
+    "source_commit": "88fb607c81ac8138a9ab95cbbe435270e5c93698",
+    "source_sha256": {
+      "tests/gameplay_snapshot_probe.cpp": "ded6bf73ae92ea634f2898eeb39d2a3a49db733965548438ca57f3221585daa4",
+      "tests/shared_page_wasm_snapshot.mjs": "592694e1af7c250d745242d6f94872c59daf81a58b98cfbdff1a67eaf1d3619f",
+      "tests/shared_page_snapshot_controls.mjs": "53145b8c5f22e36d2aa9e1ec92bd565f8cfdb11370e9cf6138e5b339d746f24c",
+      "tests/test_shared_page_snapshot.py": "97d371ab041478b5b9d49c2018f47c8672375565c3cb1b134644ebdd044d2a0f",
+      "scripts/check_shared_page_snapshot.mjs": "e30dfdc79c9dfe6bcbdd073826664bc9ba53189b62e0317f391572b6b2d9d6b5",
+      "scripts/check_source_snapshot.mjs": "7176e19fc8b8afd614994be9e3082270c588538878d461985f4e55fa675fcb09",
+      "scripts/build.py": "4a771b1ed045234e6a3bd69b3ec9c5c788297f5fab3058ef79ef8658173c4c48",
+      "cmake/FighterRuntime.cmake": "48d9d6df279563c593d49a7fc605db144460be65962656ee813a6f1a4feaf675",
+      "dependencies.lock.json": "b49bad1048d13ba05da31e5269bda4bed9fba04ed7a3fe96da8aa97390748d2d"
+    },
+    "runtime_rebuilt_bytes_unchanged": true,
+    "default_configure": {
+      "name": "configure",
+      "log": "configure.log",
+      "duration_seconds": 3.156,
+      "exit_code": 0,
+      "log_sha256": "a4d7ea05f921d56a8c84356e5dd5ad78ec798939c76b147eb5780cbf11654454",
+      "timed_out": false
+    },
+    "whole_job_cap_seconds": 600,
+    "validation_receipt_sha256": "0bec3c220b28d57ebc8344bcaf7e11e96ef39f41e327c0f06f3083b4bc457fb3"
   },
   "runtime_build": {
     "source_commit": "746569422830758ec4b90865b3e565d4d147541f",
