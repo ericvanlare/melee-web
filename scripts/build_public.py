@@ -58,6 +58,9 @@ PLAYER_RUNTIME_FILES = (
     "touch-controls.mjs",
     "touch-controls.css",
     "runtime-diagnostics.mjs",
+    "runtime-diagnostics-delivery.mjs",
+    "diagnostics-settings.mjs",
+    "diagnostics-schema.mjs",
     "gameplay_public.js",
     "gameplay_public.wasm",
 )
@@ -79,6 +82,9 @@ PLAYER_SOURCE_RUNTIME_FILES = (
     "touch-controls.mjs",
     "touch-controls.css",
     "runtime-diagnostics.mjs",
+    "runtime-diagnostics-delivery.mjs",
+    "diagnostics-settings.mjs",
+    "diagnostics-schema.mjs",
 )
 DIAGNOSTIC_BUILD_SCHEMA_VERSION = 1
 DIAGNOSTIC_BUILD_META_ID = "runtime-diagnostic-identity"
@@ -118,6 +124,9 @@ RUNTIME_SOURCE_FILES = (
     "web/melee-runtime.mjs",
     "web/runtime-assets.mjs",
     "web/runtime-audio-assets.mjs",
+    "web/runtime-diagnostics-delivery.mjs",
+    "web/diagnostics-settings.mjs",
+    "web/diagnostics-schema.mjs",
     "patches/aurora-browser.patch",
     "dependencies.lock.json",
     "tests/native_menu_alarm_unavailable.c",
@@ -170,6 +179,16 @@ RUNTIME_TOOLCHAIN_PATHS = frozenset({
 })
 RUNTIME_ARTIFACT_ROOTS = frozenset({"build/browser-public-release",
                                     "build/browser-public-selective-release"})
+DIAGNOSTICS_BACKEND_SCHEMA = "melee-web-diagnostics-backend-v1"
+DIAGNOSTICS_BACKEND_SOURCE_MAP = (
+    ("diagnostics/pages-function-adapter.mjs", "functions/api/diagnostics.js"),
+    ("diagnostics/pages-function-catchall-adapter.mjs", "functions/api/diagnostics/[[report]].js"),
+    ("diagnostics/worker.mjs", "functions/api/worker.mjs"),
+    ("diagnostics/schema.mjs", "functions/api/schema.mjs"),
+    ("diagnostics/_routes.json", "_routes.json"),
+)
+DIAGNOSTICS_BACKEND_OUTPUTS = frozenset(output for _, output in DIAGNOSTICS_BACKEND_SOURCE_MAP)
+DIAGNOSTICS_BACKEND_ROOT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\.functions$")
 PIPELINE_SEED_PATHS = {
     "source": "web/initial_pipeline_cache.db.gz.b64",
     "materialized": "build/browser-public-release/initial_pipeline_cache.db",
@@ -1159,6 +1178,7 @@ def _validate_runtime_graph(files: dict[str, bytes], *, audio: bool = False) -> 
         "disc-session.mjs": ("./disc-image.mjs",),
         "controller-settings.mjs": ("./prototype-keyboard-layouts.mjs", "./controller-panel.mjs", "./controller-settings.css", "./touch-controls.mjs"),
         "touch-controls.mjs": ("./touch-controls.css",),
+        "runtime-diagnostics-delivery.mjs": ("./diagnostics-schema.mjs",),
     }
     if audio:
         required_imports.update({
@@ -1342,6 +1362,147 @@ def _replace_html(data: bytes, operator: str, contact: str, css_url: str, js_url
     return text.encode("utf-8")
 
 
+def _diagnostics_backend_source_files() -> dict[str, bytes] | None:
+    """Read the exact public Pages Function graph, excluding config/secrets."""
+    source_files: dict[str, bytes] = {}
+    source_root = ROOT / "diagnostics"
+    if _is_symlink(source_root):
+        raise BuildError("diagnostics backend source directory may not be a symlink")
+    if not source_root.is_dir():
+        return None
+    for source_rel, _ in DIAGNOSTICS_BACKEND_SOURCE_MAP:
+        path = ROOT / source_rel
+        if _is_symlink(path) or not path.is_file():
+            raise BuildError(f"diagnostics backend source is missing: {_display(path)}")
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            raise BuildError(f"cannot read diagnostics backend source {_display(path)}: {exc}") from exc
+        if len(data) > MAX_FILE_BYTES:
+            raise BuildError(f"diagnostics backend source exceeds Pages file limit: {source_rel}")
+        if any(marker in data for marker in (b"/Users/", b"/Volumes/", b"/private/var/", b"release-manifest", b"__melee_evidence")):
+            raise BuildError(f"diagnostics backend source contains private deployment material: {source_rel}")
+        source_files[source_rel] = data
+    try:
+        routes = json.loads(source_files["diagnostics/_routes.json"].decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BuildError("diagnostics backend _routes.json is not valid UTF-8 JSON") from exc
+    if routes != {"version": 1, "include": ["/api/diagnostics", "/api/diagnostics/*"], "exclude": []}:
+        raise BuildError("diagnostics backend _routes.json is not the exact API-only route allowlist")
+    browser_schema = ROOT / "web/diagnostics-schema.mjs"
+    if _is_symlink(browser_schema) or not browser_schema.is_file():
+        raise BuildError("diagnostics browser wire schema is missing")
+    if browser_schema.read_bytes() != source_files["diagnostics/schema.mjs"]:
+        raise BuildError("diagnostics browser and backend wire schemas differ")
+    return source_files
+
+
+def _diagnostics_graph_hash(files: dict[str, bytes]) -> str:
+    digest = hashlib.sha256()
+    for name in sorted(files):
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(files[name])
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _diagnostics_backend_descriptor(output: Path, files: dict[str, bytes], source_files: dict[str, bytes]) -> dict[str, object]:
+    output_name = output.name + ".functions"
+    if not DIAGNOSTICS_BACKEND_ROOT_RE.fullmatch(output_name):
+        raise BuildError("static output name cannot form a safe diagnostics Functions sidecar name")
+    records = []
+    for source_rel, output_rel in DIAGNOSTICS_BACKEND_SOURCE_MAP:
+        data = files[output_rel]
+        records.append({
+            "path": output_rel,
+            "source": source_rel,
+            "size": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        })
+    return {
+        "schema": DIAGNOSTICS_BACKEND_SCHEMA,
+        "directory": output_name,
+        "source_sha256": _diagnostics_graph_hash(source_files),
+        "graph_sha256": _diagnostics_graph_hash(files),
+        "routes": {"include": ["/api/diagnostics", "/api/diagnostics/*"], "exclude": []},
+        "files": records,
+    }
+
+
+def stage_diagnostics_backend(output: Path | str) -> dict[str, object] | None:
+    """Materialize the audited Functions sidecar beside a static output."""
+    output = Path(output)
+    source_files = _diagnostics_backend_source_files()
+    if source_files is None:
+        return None
+    sidecar = output.parent / (output.name + ".functions")
+    if _is_symlink(sidecar) or sidecar.exists():
+        raise BuildError(f"diagnostics Functions sidecar must be a fresh path: {_display(sidecar)}")
+    files = {output_rel: source_files[source_rel] for source_rel, output_rel in DIAGNOSTICS_BACKEND_SOURCE_MAP}
+    try:
+        for output_rel, data in files.items():
+            path = sidecar / output_rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            _write_new(path, data)
+    except Exception:
+        if sidecar.exists() and not sidecar.is_symlink():
+            shutil.rmtree(sidecar)
+        raise
+    return _diagnostics_backend_descriptor(output, files, source_files)
+
+
+def audit_diagnostics_backend(output: Path | str, descriptor: dict[str, object] | None) -> dict[str, object] | None:
+    """Audit a Functions sidecar and bind it to current source bytes."""
+    output = Path(output)
+    source_files = _diagnostics_backend_source_files()
+    if source_files is None:
+        if descriptor is not None:
+            raise BuildError("diagnostics backend metadata is present but its source graph is missing")
+        return None
+    if not isinstance(descriptor, dict) or set(descriptor) != {"schema", "directory", "source_sha256", "graph_sha256", "routes", "files"}:
+        raise BuildError("diagnostics backend manifest metadata is incomplete")
+    if descriptor.get("schema") != DIAGNOSTICS_BACKEND_SCHEMA or descriptor.get("directory") != output.name + ".functions":
+        raise BuildError("diagnostics backend manifest identity is invalid")
+    if (not isinstance(descriptor.get("source_sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", descriptor["source_sha256"])
+            or not isinstance(descriptor.get("graph_sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", descriptor["graph_sha256"])
+            or descriptor.get("routes") != {"include": ["/api/diagnostics", "/api/diagnostics/*"], "exclude": []}
+            or not isinstance(descriptor.get("files"), list)):
+        raise BuildError("diagnostics backend manifest metadata has invalid types")
+    sidecar = output.parent / str(descriptor["directory"])
+    if _is_symlink(sidecar) or not sidecar.is_dir():
+        raise BuildError("diagnostics Functions sidecar is missing")
+    expected_source_hash = _diagnostics_graph_hash(source_files)
+    if descriptor.get("source_sha256") != expected_source_hash:
+        raise BuildError("diagnostics backend source identity differs from current source")
+    actual_files: dict[str, bytes] = {}
+    for _, output_rel in DIAGNOSTICS_BACKEND_SOURCE_MAP:
+        path = sidecar / output_rel
+        if _is_symlink(path) or not path.is_file():
+            raise BuildError(f"diagnostics Functions sidecar is missing {output_rel}")
+        actual_files[output_rel] = path.read_bytes()
+    expected_files = {output_rel: source_files[source_rel] for source_rel, output_rel in DIAGNOSTICS_BACKEND_SOURCE_MAP}
+    if actual_files != expected_files:
+        raise BuildError("diagnostics Functions sidecar bytes differ from reviewed source")
+    found = set()
+    for path in sidecar.rglob("*"):
+        if _is_symlink(path):
+            raise BuildError("diagnostics Functions sidecar contains a symlink")
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            raise BuildError("diagnostics Functions sidecar contains a non-file entry")
+        found.add(path.relative_to(sidecar).as_posix())
+    if found != DIAGNOSTICS_BACKEND_OUTPUTS:
+        raise BuildError("diagnostics Functions sidecar contains unauthorized files")
+    expected = _diagnostics_backend_descriptor(output, expected_files, source_files)
+    if descriptor != expected:
+        raise BuildError("diagnostics backend manifest hash or route metadata differs from deployed bytes")
+    return expected
+
+
 def _file_records(output: Path, profile: str = "maintenance") -> list[dict[str, int | str]]:
     records: list[dict[str, int | str]] = []
     total = 0
@@ -1420,6 +1581,9 @@ def build(
             "touch-controls.mjs": ROOT / "web" / "touch-controls.mjs",
             "touch-controls.css": ROOT / "web" / "touch-controls.css",
             "runtime-diagnostics.mjs": ROOT / "web" / "runtime-diagnostics.mjs",
+            "runtime-diagnostics-delivery.mjs": ROOT / "web" / "runtime-diagnostics-delivery.mjs",
+            "diagnostics-settings.mjs": ROOT / "web" / "diagnostics-settings.mjs",
+            "diagnostics-schema.mjs": ROOT / "web" / "diagnostics-schema.mjs",
         }
         for rel, path in source_runtime.items():
             if _is_symlink(path) or not path.is_file():
@@ -1440,6 +1604,8 @@ def build(
         source_bytes = _validate_source(source)
         legal_bytes = source_bytes
         runtime_identity = runtime_files = runtime_hash = identity_bytes = diagnostic_identity = None
+    backend_descriptor = None
+    backend_sidecar_created = False
     legal_notice = _read_legal_notice()
     operator, contact = _config(mode, operator, contact)
     output.mkdir()
@@ -1490,6 +1656,9 @@ def build(
         if redirects is not None:
             _write_new(output / "_redirects", redirects.encode("utf-8"))
         _write_new(output / "robots.txt", _robots(mode, index_production).encode("utf-8"))
+        if profile == "player":
+            backend_descriptor = stage_diagnostics_backend(output)
+            backend_sidecar_created = backend_descriptor is not None
         records = _file_records(output, profile)
         manifest_value = {
             "schema": SCHEMA,
@@ -1508,6 +1677,8 @@ def build(
                 "identity_sha256": hashlib.sha256(identity_bytes).hexdigest(),
                 "identity": runtime_identity,
             }
+            if backend_descriptor is not None:
+                manifest_value["backend"] = backend_descriptor
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         _write_new(
             manifest_path,
@@ -1518,6 +1689,9 @@ def build(
         # data.  Remove only this fresh tree so a failed build cannot be used.
         if output.exists() and not output.is_symlink():
             shutil.rmtree(output)
+        sidecar = output.parent / (output.name + ".functions")
+        if backend_sidecar_created and sidecar.exists() and not sidecar.is_symlink():
+            shutil.rmtree(sidecar)
         if manifest_path.exists() and not manifest_path.is_symlink():
             manifest_path.unlink()
         raise

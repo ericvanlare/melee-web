@@ -205,7 +205,7 @@ function ephemeralSessionId(root) {
   } catch {
     // Fall through to a process-local random value and expose the limitation.
   }
-  const random = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${(++SESSION_SEQUENCE).toString(36)}`;
+  const random = `${Date.now().toString(36)}${Math.random().toString(36).slice(2).padEnd(16, '0')}${(++SESSION_SEQUENCE).toString(36)}`;
   return {id: `session-${random}`, fallback: true};
 }
 

@@ -213,11 +213,14 @@ def read_manifest(path):
     return record
 
 
-def package_record(files, meta, *, production=False):
-    return {'schema': PRODUCTION_SCHEMA if production else SCHEMA,
-            'project': 'webmelee' if production else 'webmelee-staging',
-            'profile': 'audio-player' if production else 'audio-preview',
-            **meta, 'files': inventory(files)}
+def package_record(files, meta, *, production=False, backend=None):
+    record = {'schema': PRODUCTION_SCHEMA if production else SCHEMA,
+              'project': 'webmelee' if production else 'webmelee-staging',
+              'profile': 'audio-player' if production else 'audio-preview',
+              **meta, 'files': inventory(files)}
+    if backend is not None:
+        record['backend'] = backend
+    return record
 
 
 def audit(output, manifest, *, production=False):
@@ -230,8 +233,9 @@ def audit(output, manifest, *, production=False):
         if path.is_file():
             actual[path.relative_to(output).as_posix()] = path.read_bytes()
     require(actual == expected, 'Preview bytes or inventory differ from reviewed sources')
+    backend = public.audit_diagnostics_backend(output, read_manifest(manifest).get('backend'))
     record = read_manifest(manifest)
-    require(record == package_record(expected, meta, production=production), 'Audio manifest mismatch')
+    require(record == package_record(expected, meta, production=production, backend=backend), 'Audio manifest mismatch')
     return record
 
 
@@ -245,7 +249,8 @@ def prepare(output, manifest, *, production=False):
         path = output / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
-    manifest.write_text(json.dumps(package_record(files, meta, production=production),
+    backend = public.stage_diagnostics_backend(output)
+    manifest.write_text(json.dumps(package_record(files, meta, production=production, backend=backend),
                                    indent=2, sort_keys=True) + '\n')
     return audit(output, manifest, production=production)
 
