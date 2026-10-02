@@ -16,6 +16,8 @@ import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.m
 
 const IDENTITY_META_ID = 'runtime-diagnostic-identity';
 const STARTUP_TIMEOUT_MS = 120000;
+const STARTUP_ONLY_TIMEOUT_MS = 5000;
+const NATIVE_HOOK_TIMEOUT_MS = 5000;
 const SCENE_TIMEOUT_MS = 60000;
 const HIDDEN_DWELL_MS = 350;
 const CAPABILITY_TIMEOUT_MS = 5000;
@@ -130,6 +132,8 @@ const fixture = globalThis.__runtimeLifecycleFixture = {
   synthetic_native_callback_identified: false, synthetic_held_callbacks: 0,
   synthetic_released_callbacks: 0, synthetic_hold_result: null,
   native_sample_count: 0, native_source_steps: 0, trace_sequence: 0,
+  native_hooks: {activity: false, unload: false, cache: false}, native_hook_module: null,
+  native_hook_timer: 0, native_hook_failure: null,
 };
 // The compiled Emscripten main loop schedules its runner through the browser's
 // requestAnimationFrame. Install this bounded shim before importing the runtime
@@ -224,8 +228,64 @@ function nativeState() {
   return {phase: Number(module?._melee_web_native_menu_phase?.() ?? -1),
     running: !!module?._melee_web_native_menu_running?.(), input: inputSnapshot()};
 }
+function nativeHooksReady() {
+  return fixture.native_hooks.activity === true && fixture.native_hooks.unload === true;
+}
+function installNativeHooks() {
+  const module = fixture.owner?.Module;
+  if (!module) return false;
+  if (fixture.native_hook_module !== module) {
+    fixture.native_hook_module = module;
+    fixture.native_hooks = {activity: false, unload: false, cache: false};
+  }
+  if (!fixture.native_hooks.activity && typeof module._melee_web_input_set_activity === 'function') {
+    const activity = module._melee_web_input_set_activity;
+    module._melee_web_input_set_activity = (focused, visible) => {
+      fixture.input_activity.push({focused: Number(focused) ? 1 : 0, visible: Number(visible) ? 1 : 0,
+        at: performance.now(), sequence: ++fixture.trace_sequence});
+      return activity.call(module, focused, visible);
+    };
+    fixture.native_hooks.activity = true;
+  }
+  if (!fixture.native_hooks.unload && typeof module._melee_web_native_menu_unload === 'function') {
+    const unload = module._melee_web_native_menu_unload;
+    module._melee_web_native_menu_unload = (...args) => {
+      fixture.unload_calls++;
+      return unload.apply(module, args);
+    };
+    fixture.native_hooks.unload = true;
+  }
+  if (!fixture.native_hooks.cache && typeof module.saveRuntimeCache === 'function') {
+    const save = module.saveRuntimeCache;
+    module.saveRuntimeCache = (...args) => { fixture.cache_save_calls++; return save.apply(module, args); };
+    fixture.native_hooks.cache = true;
+  }
+  return nativeHooksReady();
+}
+function startNativeHookPolling() {
+  if (fixture.native_hook_timer) return;
+  fixture.native_hook_timer = setInterval(() => { installNativeHooks(); }, 25);
+}
+fixture.waitForNativeHooks = (timeoutMs = NATIVE_HOOK_TIMEOUT_MS) => {
+  installNativeHooks();
+  if (nativeHooksReady()) return Promise.resolve(true);
+  return new Promise(resolve => {
+    const deadline = performance.now() + timeoutMs;
+    const check = () => {
+      if (installNativeHooks()) { resolve(true); return; }
+      if (performance.now() >= deadline) {
+        fixture.native_hook_failure = 'native_hooks_unavailable';
+        resolve(false); return;
+      }
+      setTimeout(check, 25);
+    };
+    check();
+  });
+};
 function exposeOwner(owner) {
   fixture.owner = owner;
+  startNativeHookPolling();
+  installNativeHooks();
   const sample = globalThis.menuDiagnosticSample;
   globalThis.menuDiagnosticSample = (...args) => {
     const started = performance.now(); let result;
@@ -245,27 +305,13 @@ function exposeOwner(owner) {
     };
     owner.callbacks.menuFrame = globalThis.menuFrame;
   }
-  const module = owner.Module;
-  const activity = module?._melee_web_input_set_activity;
-  if (typeof activity === 'function') module._melee_web_input_set_activity = (focused, visible) => {
-    fixture.input_activity.push({focused: Number(focused) ? 1 : 0, visible: Number(visible) ? 1 : 0,
-      at: performance.now(), sequence: ++fixture.trace_sequence});
-    return activity.call(module, focused, visible);
-  };
-  const unload = module?._melee_web_native_menu_unload;
-  if (typeof unload === 'function') module._melee_web_native_menu_unload = (...args) => {
-    fixture.unload_calls++; return unload.apply(module, args);
-  };
-  if (typeof module?.saveRuntimeCache === 'function') {
-    const save = module.saveRuntimeCache;
-    module.saveRuntimeCache = (...args) => { fixture.cache_save_calls++; return save.apply(module, args); };
-  }
 }
 function exposeState(next) {
   if (fixture.states.length < 128) fixture.states.push({at: performance.now(), scene: next.scene,
     phase: next.phase, running: !!next.running, requiresReload: !!next.requiresReload});
 }
 function setSyntheticActivity(focused, visible) {
+  installNativeHooks();
   const module = fixture.owner?.Module;
   const setter = module?._melee_web_input_set_activity;
   if (typeof setter !== 'function') return false;
@@ -348,7 +394,9 @@ fixture.syntheticHiddenHold = async () => {
   fixture.synthetic_hold_result = result;
   return result;
 };
-fixture.snapshot = () => ({
+fixture.snapshot = () => {
+  installNativeHooks();
+  return {
   load: fixture.load, state: (() => { const state = fixture.player?.getState?.(); return state ? {
     ready: !!state.ready, scene: state.scene, phase: Number.isInteger(state.phase) ? state.phase : null,
     running: !!state.running, requiresReload: !!state.requiresReload, canPause: !!state.canPause,
@@ -364,10 +412,12 @@ fixture.snapshot = () => ({
   synthetic_callback_hold: fixture.synthetic_callback_hold,
   synthetic_native_callback_identified: fixture.synthetic_native_callback_identified,
   synthetic_held_callbacks: fixture.synthetic_held_callbacks, synthetic_released_callbacks: fixture.synthetic_released_callbacks,
-  native_sample_count: fixture.native_sample_count, native_source_steps: fixture.native_source_steps,
-  synthetic_hold_result: fixture.synthetic_hold_result,
-  report: fixture.owner?.diagnostics?.exportReports?.() || null,
-});
+    native_sample_count: fixture.native_sample_count, native_source_steps: fixture.native_source_steps,
+    native_hooks: fixture.native_hooks, native_hook_failure: fixture.native_hook_failure,
+    synthetic_hold_result: fixture.synthetic_hold_result,
+    report: fixture.owner?.diagnostics?.exportReports?.() || null,
+  };
+};
 let mountMeleeRuntime;
 try {
   ({mountMeleeRuntime} = await import("__RUNTIME_MODULE__"));
@@ -384,6 +434,10 @@ input.onchange = async () => {
   try {
     await fixture.player.configureSaveProfile('everything');
     fixture.load = {state: 'importing'}; await fixture.player.importDisc(file);
+    if (!await fixture.waitForNativeHooks()) {
+      fixture.load = {state: 'error', reason: fixture.native_hook_failure || 'native_hooks_unavailable'};
+      return;
+    }
     fixture.load = {state: 'starting'}; await fixture.player.start(); fixture.load = {state: 'started'};
   } catch { fixture.load = {state: 'error'}; fixture.errors++; }
 };
@@ -464,6 +518,9 @@ async function waitFor(page, predicate, timeout, code) {
   });
   try {
     await Promise.race([page.waitForFunction(predicate, null, {timeout}), timeoutTask]);
+  } catch (error) {
+    if (error instanceof HarnessFailure) throw error;
+    throw new HarnessFailure(code);
   } finally {
     clearTimeout(timer);
   }
@@ -495,27 +552,31 @@ async function installAudioTrace(page) {
   });
 }
 async function fixtureState(page) { return page.evaluate(() => globalThis.__runtimeLifecycleFixture?.snapshot?.() || null); }
-async function startSession(page, disc) {
+function lifecyclePhase(state) {
+  return {load: state?.load?.state || null, scene: state?.state?.scene || null,
+    phase: Number.isInteger(state?.state?.phase) ? state.state.phase : null,
+    native_phase: Number.isFinite(Number(state?.native?.phase)) ? Number(state.native.phase) : null,
+    running: typeof state?.native?.running === 'boolean' ? state.native.running : null};
+}
+async function startSession(page, disc, timeout = STARTUP_TIMEOUT_MS) {
+  const deadline = Date.now() + timeout;
+  const remaining = () => Math.max(1, deadline - Date.now());
   await waitFor(page, () => globalThis.__runtimeLifecycleFixture?.ready === true ||
-    globalThis.__runtimeLifecycleFixture?.load?.state === 'error', STARTUP_TIMEOUT_MS, 'fixture_startup_timeout');
+    globalThis.__runtimeLifecycleFixture?.load?.state === 'error', remaining(), 'fixture_startup_timeout');
   const initial = await fixtureState(page);
   requireValue(initial?.load?.state === 'ready', 'fixture_load_failed');
   await waitFor(page, () => {
     const state = globalThis.__runtimeLifecycleFixture?.player?.getState?.();
     return globalThis.__runtimeLifecycleFixture?.load?.state === 'error' ||
       state?.canImport === true;
-  }, STARTUP_TIMEOUT_MS, 'can_import_timeout');
-  const chooser = page.waitForEvent('filechooser', {timeout: STARTUP_TIMEOUT_MS});
-  await page.locator('#choose-disc').click({timeout: STARTUP_TIMEOUT_MS});
-  await (await chooser).setFiles(disc, {timeout: STARTUP_TIMEOUT_MS});
-  await waitFor(page, () => {
-    const fixture = globalThis.__runtimeLifecycleFixture, state = fixture?.player?.getState?.();
-    return fixture?.load?.state === 'error' || state?.graphicsReady === true && state?.canStart === true;
-  }, STARTUP_TIMEOUT_MS, 'graphics_ready_timeout');
+  }, remaining(), 'can_import_timeout');
+  const chooser = page.waitForEvent('filechooser', {timeout: remaining()});
+  await page.locator('#choose-disc').click({timeout: remaining()});
+  await (await chooser).setFiles(disc, {timeout: remaining()});
   await waitFor(page, () => {
     const fixture = globalThis.__runtimeLifecycleFixture, state = fixture?.player?.getState?.();
     return fixture?.load?.state === 'error' || state?.scene === 'css' && state?.phase === 1 && state?.running === true;
-  }, STARTUP_TIMEOUT_MS, 'scene_startup_timeout');
+  }, remaining(), 'scene_startup_timeout');
   const state = await fixtureState(page);
   requireValue(state?.load?.state === 'started' && state?.native?.phase === 1 && state?.native?.running, 'scene_not_running');
 }
@@ -568,18 +629,24 @@ async function runCapabilityProbe(browser, capabilityUrl, out) {
 }
 async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
   const page = await browser.newPage({viewport: {width: 1280, height: 960}});
+  const startupOnly = mode === 'startup-only';
   const synthetic = mode === 'synthetic';
   const syntheticHold = mode === 'synthetic-hidden-hold';
-  const syntheticMode = synthetic || syntheticHold;
+  const syntheticMode = startupOnly || synthetic || syntheticHold;
   const result = {mode, dwell_ms: HIDDEN_DWELL_MS, result: 'fail', cdp: [], failure_kind: null,
-    scope: syntheticHold ? 'Controlled Emscripten requestAnimationFrame hold with synthetic document visibility getters; no genuine lifecycle or user-root-cause claim.' :
+    startup_timeout_ms: startupOnly ? STARTUP_ONLY_TIMEOUT_MS : STARTUP_TIMEOUT_MS,
+    scope: startupOnly ? 'Bounded startup/readiness probe through CSS with native hook installation; no lifecycle or gameplay claim.' :
+      syntheticHold ? 'Controlled Emscripten requestAnimationFrame hold with synthetic document visibility getters; no genuine lifecycle or user-root-cause claim.' :
       synthetic ? 'Synthetic JS/native input handoff and missed-callback checkpoint only; no browser lifecycle or user-root-cause claim.' :
       'Real lifecycle mode is entered only after the installed-Chrome capability probe observes genuine lifecycle transitions.',
     experiment: {
-      hypothesis: syntheticHold ? 'Holding the identified native main-loop callback for 350 ms yields no native sample during the hold; the first visible callback observes visible input and records bounded simulation debt.' :
+      hypothesis: startupOnly ? 'The audited package reaches running CSS within the five-second readiness bound and installs the native input/unload hooks before start.' :
+        syntheticHold ? 'Holding the identified native main-loop callback for 350 ms yields no native sample during the hold; the first visible callback observes visible input and records bounded simulation debt.' :
         synthetic ? 'A controlled hidden checkpoint can hand off input ownership and return on an explicit visible checkpoint.' :
         'Installed Chrome can expose a genuine lifecycle transition through the supported protocol path.',
-      pass_criteria: syntheticHold ? ['native main-loop rAF callback is identified by an actual sample',
+      pass_criteria: startupOnly ? ['CSS phase 1 is running', 'native activity and unload hooks are installed',
+        'no implicit save or unload'] :
+        syntheticHold ? ['native main-loop rAF callback is identified by an actual sample',
         'zero native samples and source steps during the 350 ms synthetic hold',
         'first post-hold sample follows visible event and records reason 1 simulation debt above threshold 8',
         'no automatic resume or implicit save/unload', 'one active 32 kHz audio context remains owned'] :
@@ -591,7 +658,8 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
     }};
   try {
     await installAudioTrace(page);
-    const response = await page.goto(fixtureUrl, {timeout: STARTUP_TIMEOUT_MS});
+    const startupTimeout = startupOnly ? STARTUP_ONLY_TIMEOUT_MS : STARTUP_TIMEOUT_MS;
+    const response = await page.goto(fixtureUrl, {timeout: startupTimeout});
     requireValue(response?.status() === 200, 'fixture_http_status');
     result.gpu = await page.evaluate(async () => {
       let adapter = null; try { adapter = await navigator.gpu?.requestAdapter(); } catch {}
@@ -599,11 +667,17 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
         max_texture_dimension_2d: Number(adapter?.limits?.maxTextureDimension2D || 0) || null};
     });
     requireValue(result.gpu.cross_origin_isolated && result.gpu.webgpu && result.gpu.adapter, 'gpu_precondition');
-    await startSession(page, disc);
+    await startSession(page, disc, startupTimeout);
+    const hooksReady = await page.evaluate(timeout => globalThis.__runtimeLifecycleFixture?.waitForNativeHooks?.(timeout),
+      NATIVE_HOOK_TIMEOUT_MS);
+    requireValue(hooksReady === true, 'native_hooks_unavailable');
     const before = await fixtureState(page);
     result.before = {native: before.native, input_activity: before.input_activity.length,
       audio_contexts: before.audio_owner?.contexts?.length || 0};
-    if (syntheticHold) {
+    if (startupOnly) {
+      result.startup_readiness = {native_hooks: before.native_hooks, native: before.native,
+        input_activity: before.input_activity.length};
+    } else if (syntheticHold) {
       try {
         await waitFor(page, () => globalThis.__runtimeLifecycleFixture.synthetic_native_callback_identified === true,
           5000, 'synthetic_main_loop_callback_unavailable');
@@ -664,11 +738,18 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
       browser_events: afterLifecycle.browser_events.slice(-12), input_activity: afterLifecycle.input_activity.slice(-12),
       audio: afterLifecycle.audio.slice(-12), audio_owner: afterLifecycle.audio_owner,
       incidents: afterLifecycle.incidents, samples: afterLifecycle.samples.slice(-8),
+      native_sample_count: afterLifecycle.native_sample_count, native_source_steps: afterLifecycle.native_source_steps,
+      native_hooks: afterLifecycle.native_hooks,
       manual_intent: afterLifecycle.manual_intent, synthetic_events: afterLifecycle.synthetic_events,
       synthetic_hold_result: afterLifecycle.synthetic_hold_result,
       unload_calls: afterLifecycle.unload_calls, cache_save_calls: afterLifecycle.cache_save_calls};
     result.candidate_reproduced = syntheticHold ? controlledDebt.length > 0 : !syntheticMode && mode === 'frozen' && unexpected.length > 0;
-    if (mode === 'manual-pause') {
+    if (startupOnly) {
+      requireValue(afterLifecycle.state?.scene === 'css' && afterLifecycle.state?.phase === 1 &&
+        afterLifecycle.native.running === true, 'startup_css_not_running');
+      requireValue(afterLifecycle.native_hooks?.activity === true && afterLifecycle.native_hooks?.unload === true,
+        'startup_native_hooks_missing');
+    } else if (mode === 'manual-pause') {
       requireValue(afterLifecycle.native.running === false, 'manual_pause_auto_resumed');
       requireValue(!unexpected.length, 'manual_pause_unexpected_incident');
       requireValue(afterLifecycle.manual_intent.includes('manual_pause'), 'manual_pause_intent_missing');
@@ -728,7 +809,7 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
     requireValue(activeContexts.length === 1 && activeContexts[0].sample_rate === 32000, 'audio_owner_closed');
     result.input_visibility = {observed_hidden: stable.input_activity.some(item => item.visible === 0),
       observed_visible: stable.input_activity.some(item => item.visible === 1), total: stable.input_activity.length};
-    requireValue(result.input_visibility.observed_visible, 'input_visible_not_restored');
+    if (!startupOnly) requireValue(result.input_visibility.observed_visible, 'input_visible_not_restored');
     if (synthetic) requireValue(result.input_visibility.observed_hidden, 'synthetic_hidden_not_observed');
     await page.evaluate(async () => { await globalThis.__runtimeLifecycleFixture.player.unload(); });
     const afterUnload = await fixtureState(page);
@@ -739,6 +820,7 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
   } catch (error) {
     result.failure_kind = error?.code || 'browser_error';
     result.state = await fixtureState(page).catch(() => null);
+    result.failure_phase = lifecyclePhase(result.state);
     await page.screenshot({path: path.join(out, 'lifecycle-' + mode + '-failure.png'), fullPage: true}).catch(() => {});
   } finally {
     try { await page.evaluate(async () => { try { await globalThis.__runtimeLifecycleFixture?.player?.unload?.(); } catch {} }); } catch {}
@@ -750,24 +832,29 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
 const {values} = parseArgs({options: {
   site: {type: 'string'}, manifest: {type: 'string'}, disc: {type: 'string'},
   playwright: {type: 'string'}, out: {type: 'string'}, synthetic: {type: 'boolean'},
-  'synthetic-hidden-hold': {type: 'boolean'}, help: {type: 'boolean'},
+  'synthetic-hidden-hold': {type: 'boolean'}, 'startup-only': {type: 'boolean'}, help: {type: 'boolean'},
 }});
 if (values.help) {
-  console.log('Usage: node tests/runtime_lifecycle_incident_browser_test.mjs --site AUDITED_AUDIO_PLAYER --manifest MANIFEST --disc OWNED_ISO --out FRESH_EVIDENCE_DIR [--playwright PLAYWRIGHT_DIR] [--synthetic | --synthetic-hidden-hold]');
+  console.log('Usage: node tests/runtime_lifecycle_incident_browser_test.mjs --site AUDITED_AUDIO_PLAYER --manifest MANIFEST --disc OWNED_ISO --out FRESH_EVIDENCE_DIR [--playwright PLAYWRIGHT_DIR] [--synthetic | --synthetic-hidden-hold | --startup-only]');
   process.exit(0);
 }
 for (const name of ['site', 'manifest', 'disc', 'out']) requireValue(values[name], name + '_required');
+const requestedSynthetic = values.synthetic === true || values['synthetic-hidden-hold'] === true;
+requireValue(!(requestedSynthetic && values['startup-only']), 'lifecycle_mode_conflict');
 requireValue(!(values.synthetic && values['synthetic-hidden-hold']), 'synthetic_mode_conflict');
-const syntheticMode = values.synthetic === true || values['synthetic-hidden-hold'] === true;
+const syntheticMode = requestedSynthetic || values['startup-only'] === true;
 const report = {schema: 'melee-web-runtime-lifecycle-browser-v1',
-  scope: values['synthetic-hidden-hold'] ?
+  scope: values['startup-only'] ?
+    'Bounded five-second startup/readiness probe through CSS with native hook installation. It does not represent lifecycle, sustained gameplay or a user root cause.' :
+    values['synthetic-hidden-hold'] ?
     'Bounded synthetic Emscripten requestAnimationFrame main-loop hold with synthetic document visibility getters, manual intent, audio ownership and explicit unload/save boundaries. It does not represent genuine browser lifecycle behavior or a user root cause.' :
     values.synthetic ?
     'Bounded synthetic JS/native input handoff and missed-callback checkpoint with manual intent, audio ownership and explicit unload/save boundaries. It does not represent browser background/freeze behavior or a user root cause.' :
     'Bounded installed-Chrome lifecycle capability preflight followed by frozen/active detection with manual pause, source input activity, Web Audio ownership and explicit unload/save boundaries. No foreground, physical-input, audible-output, pixel, PCM-equivalence or sustained-gameplay claim.',
   result: 'fail', checks: [], started_at: new Date().toISOString(),
   bounds: {startup_timeout_ms: STARTUP_TIMEOUT_MS, scene_timeout_ms: SCENE_TIMEOUT_MS,
-    capability_timeout_ms: CAPABILITY_TIMEOUT_MS, hidden_dwell_ms: HIDDEN_DWELL_MS}};
+    startup_only_timeout_ms: STARTUP_ONLY_TIMEOUT_MS, capability_timeout_ms: CAPABILITY_TIMEOUT_MS,
+    hidden_dwell_ms: HIDDEN_DWELL_MS}};
 let browser, context, server;
 try {
   const site = path.resolve(values.site), out = path.resolve(values.out);
@@ -778,7 +865,7 @@ try {
   report.origin = server.origin;
   const loaded = await loadBrowserTools(values.playwright);
   browser = await loaded.chromium.launch(browserLaunchOptions(loaded.browser, {
-    headed: false, audible: false, timeout: STARTUP_TIMEOUT_MS,
+    headed: false, audible: false, timeout: values['startup-only'] ? STARTUP_ONLY_TIMEOUT_MS : STARTUP_TIMEOUT_MS,
   }));
   report.browser = browser.version(); report.browser_mode = 'headless'; report.audio_output = 'muted_by_shared_policy';
   context = await browser.newContext(); const fixtureUrl = server.origin + '/__runtime-lifecycle-fixture/';
@@ -793,7 +880,8 @@ try {
     }
   }
   if (!skipGame) {
-    const modes = values['synthetic-hidden-hold'] ? ['synthetic-hidden-hold', 'manual-pause'] :
+    const modes = values['startup-only'] ? ['startup-only'] :
+      values['synthetic-hidden-hold'] ? ['synthetic-hidden-hold', 'manual-pause'] :
       values.synthetic ? ['synthetic'] : ['frozen', 'manual-pause'];
     for (const mode of modes) {
       const item = await runLifecycleCase(browser, fixtureUrl, path.resolve(values.disc), out, mode);
