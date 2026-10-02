@@ -453,6 +453,7 @@ export function createDiagnosticsDelivery(options = {}) {
   let loadingPromise = null;
   let flushPromise = null;
   let persistencePromise = null;
+  let activePersistenceGeneration = null;
   let optOutClearPromise = null;
   let flushTimer = null;
   let records = [];
@@ -465,6 +466,7 @@ export function createDiagnosticsDelivery(options = {}) {
   const sentIncidentIds = new Set();
   const rememberedIncidentIds = new Set();
   const controllers = new Set();
+  let queueMutationGeneration = 0;
   const flags = {
     evicted: false, evicted_count: 0, truncated: false, expired: false,
     rejected: false, persistence_failed: false, storage_unavailable: false,
@@ -631,6 +633,7 @@ export function createDiagnosticsDelivery(options = {}) {
           normalized.id = hashText(`${collision}:${incidentId}`) + hashText(`${collision}:${incidentId}:retry`);
         }
         records.push(normalized);
+        queueMutationGeneration += 1;
         rememberIncidentId(incidentId);
       }
     }
@@ -658,11 +661,13 @@ export function createDiagnosticsDelivery(options = {}) {
         else if (value) flags.malformed = true;
         continue;
       }
-      if (!tombstones.some(existing => existing.incident_id === normalized.incident_id)) tombstones.push(normalized);
+      if (!tombstones.some(existing => existing.incident_id === normalized.incident_id)) {
+        tombstones.push(normalized);
+        queueMutationGeneration += 1;
+      }
       rememberIncidentId(normalized.incident_id);
     }
-    tombstones.sort((left, right) => left.sent_at - right.sent_at);
-    while (tombstones.length > DELIVERY_MAX_TOMBSTONES) tombstones.shift();
+    boundTombstones();
   }
 
   async function loadTombstones() {
@@ -688,65 +693,95 @@ export function createDiagnosticsDelivery(options = {}) {
 
   function boundTombstones() {
     tombstones.sort((left, right) => left.sent_at - right.sent_at);
-    while (tombstones.length > DELIVERY_MAX_TOMBSTONES) tombstones.shift();
+    while (tombstones.length > DELIVERY_MAX_TOMBSTONES) {
+      tombstones.shift();
+      queueMutationGeneration += 1;
+    }
   }
 
   function boundRecords() {
     records.sort((left, right) => left.created_at - right.created_at);
     while (records.length > DELIVERY_MAX_RECORDS) {
-      records.shift(); flags.evicted = true; flags.evicted_count += 1; dirty = true;
+      records.shift(); flags.evicted = true; flags.evicted_count += 1; dirty = true; queueMutationGeneration += 1;
     }
     let bytes = 0;
     for (let index = records.length - 1; index >= 0; index -= 1) {
       let size;
       try { size = new TextEncoder().encode(JSON.stringify(records[index])).byteLength; } catch { size = DELIVERY_MAX_BYTES + 1; }
       if (size > DELIVERY_MAX_BYTES || bytes + size > DELIVERY_MAX_BYTES) {
-        records.splice(index, 1); flags.truncated = true; flags.evicted = true; flags.evicted_count += 1; dirty = true;
+        records.splice(index, 1); flags.truncated = true; flags.evicted = true; flags.evicted_count += 1; dirty = true; queueMutationGeneration += 1;
       } else bytes += size;
     }
   }
 
   async function persistOutbox(force = false, mergeStored = true) {
     if (!dirty && !tombstoneDirty && !force) return {persisted: false, reason: 'clean', count: records.length};
-    if (persistencePromise) return persistencePromise;
-    if (mergeStored && !loaded) await loadOutbox();
-    if (mergeStored && !tombstonesLoaded) await loadTombstones();
-    const adapter = storageAdapter();
-    if (!adapter || typeof adapter.save !== 'function') {
-      flags.storage_unavailable = true;
-      return {persisted: false, reason: 'unavailable', count: records.length};
+    if (persistencePromise) {
+      const priorPersistence = persistencePromise;
+      const priorGeneration = activePersistenceGeneration;
+      return priorPersistence.then(result =>
+        (dirty || tombstoneDirty) && queueMutationGeneration !== priorGeneration
+          ? persistOutbox(force, mergeStored)
+          : result);
     }
-    // Refresh before each write so two tabs that queue different incidents do
-    // not discard each other's bounded pending records.  The native IndexedDB
-    // adapter still bounds each read to four records; this merge happens only
-    // on the inactive persistence task.
-    if (mergeStored && typeof adapter.load === 'function') {
-      try { mergeStoredValues(await adapter.load()); }
-      catch { flags.storage_unavailable = true; flags.persistence_failed = true; }
-    }
-    if (mergeStored && typeof adapter.loadTombstones === 'function') {
-      try { mergeStoredTombstones(await adapter.loadTombstones()); }
-      catch { flags.storage_unavailable = true; flags.persistence_failed = true; }
-    }
-    if (!force && !canPersist()) return {persisted: false, reason: 'resumed', count: records.length};
-    records = records.filter(record => !sentIncidentIds.has(record.report.incident_id) &&
-      !tombstones.some(value => value.incident_id === record.report.incident_id));
-    boundRecords();
-    boundTombstones();
-    const values = records.map(record => clone(record));
-    const sentValues = tombstones.map(tombstone => clone(tombstone));
-    persistencePromise = (async () => {
+    const clearAtStart = optOutClearPromise;
+    const operationGeneration = queueMutationGeneration;
+    activePersistenceGeneration = operationGeneration;
+    persistencePromise = Promise.resolve().then(async () => {
       try {
+        // Opt-out clears are asynchronous.  A quick off -> on transition can
+        // enqueue a fresh report while the clear is still in flight; wait for
+        // that clear before reading or writing so its empty write cannot erase
+        // the new bounded outbox.
+        if (clearAtStart) await clearAtStart.catch(() => {});
+        if (mergeStored && !loaded) await loadOutbox();
+        if (mergeStored && !tombstonesLoaded) await loadTombstones();
+        const adapter = storageAdapter();
+        if (!adapter || typeof adapter.save !== 'function') {
+          flags.storage_unavailable = true;
+          return {persisted: false, reason: 'unavailable', count: records.length};
+        }
+        // Refresh before each write to reduce cross-tab loss when writes are
+        // sequential. This is best effort: concurrent tab writes can still
+        // race because the adapter contract does not provide a transaction
+        // spanning both bounded reads and the replacement writes.
+        if (mergeStored && typeof adapter.load === 'function') {
+          try { mergeStoredValues(await adapter.load()); }
+          catch { flags.storage_unavailable = true; flags.persistence_failed = true; }
+        }
+        if (mergeStored && typeof adapter.loadTombstones === 'function') {
+          try { mergeStoredTombstones(await adapter.loadTombstones()); }
+          catch { flags.storage_unavailable = true; flags.persistence_failed = true; }
+        }
+        if (!force && !canPersist()) return {persisted: false, reason: 'resumed', count: records.length};
+        const recordsBeforeFilter = records.length;
+        records = records.filter(record => !sentIncidentIds.has(record.report.incident_id) &&
+          !tombstones.some(value => value.incident_id === record.report.incident_id));
+        if (records.length !== recordsBeforeFilter) {
+          dirty = true;
+          queueMutationGeneration += 1;
+        }
+        boundRecords();
+        boundTombstones();
+        const writeGeneration = queueMutationGeneration;
+        activePersistenceGeneration = writeGeneration;
+        const values = records.map(record => clone(record));
+        const sentValues = tombstones.map(tombstone => clone(tombstone));
         await adapter.save(values);
         if (typeof adapter.saveTombstones === 'function') await adapter.saveTombstones(sentValues);
-        dirty = false;
-        tombstoneDirty = false;
+        if (queueMutationGeneration === writeGeneration) {
+          dirty = false;
+          tombstoneDirty = false;
+        }
         return {persisted: true, count: values.length};
       } catch (error) {
         flags.persistence_failed = true;
-        return {persisted: false, reason: errorKind(error), count: values.length};
-      } finally { persistencePromise = null; }
-    })();
+        return {persisted: false, reason: errorKind(error), count: records.length};
+      } finally {
+        persistencePromise = null;
+        activePersistenceGeneration = null;
+      }
+    });
     return persistencePromise;
   }
 
@@ -757,20 +792,28 @@ export function createDiagnosticsDelivery(options = {}) {
       flags.storage_unavailable = true;
       return {persisted: false, reason: 'unavailable'};
     }
-    optOutClearPromise = (async () => {
+    const priorPersistence = persistencePromise;
+    const clearGeneration = queueMutationGeneration;
+    optOutClearPromise = Promise.resolve().then(async () => {
       try {
-        if (persistencePromise) await persistencePromise.catch(() => {});
+        // Only wait for work that was already running when opt-out began.
+        // A newly re-enabled persistence task captures this clear promise and
+        // waits behind it; capturing prevents the two operations from forming
+        // a cycle.
+        if (priorPersistence) await priorPersistence.catch(() => {});
         await adapter.save([]);
         if (typeof adapter.saveTombstones === 'function') await adapter.saveTombstones([]);
-        dirty = false;
-        tombstoneDirty = false;
+        if (queueMutationGeneration === clearGeneration) {
+          dirty = false;
+          tombstoneDirty = false;
+        }
         loaded = true;
         return {persisted: true, count: 0};
       } catch (error) {
         flags.persistence_failed = true;
         return {persisted: false, reason: errorKind(error)};
       } finally { optOutClearPromise = null; }
-    })();
+    });
     return optOutClearPromise;
   }
 
@@ -832,6 +875,7 @@ export function createDiagnosticsDelivery(options = {}) {
         created_at: created, expires_at: Math.min(created,
           Number.isSafeInteger(capturedAt) && capturedAt >= 0 ? capturedAt : created) + retentionMs,
         attempts: 0, next_attempt_at: created});
+      queueMutationGeneration += 1;
       rememberIncidentId(incidentId);
       ids.push(id);
       dirty = true;
@@ -862,6 +906,7 @@ export function createDiagnosticsDelivery(options = {}) {
     tombstones = tombstones.filter(value => value.incident_id !== record.report.incident_id);
     tombstones.push({incident_id: record.report.incident_id, fingerprint: record.fingerprint,
       sent_at: timestamp, expires_at: timestamp + retentionMs});
+    queueMutationGeneration += 1;
     boundTombstones();
     tombstoneDirty = true;
   }
@@ -907,9 +952,9 @@ export function createDiagnosticsDelivery(options = {}) {
         const timestamp = Math.max(0, Math.trunc(Number(now()) || 0));
         for (let index = records.length - 1; index >= 0; index -= 1) {
           const record = records[index];
-          if (record.expires_at <= timestamp) { records.splice(index, 1); flags.expired = true; dirty = true; continue; }
+          if (record.expires_at <= timestamp) { records.splice(index, 1); flags.expired = true; dirty = true; queueMutationGeneration += 1; continue; }
           if (tombstones.some(tombstone => tombstone.incident_id === record.report.incident_id)) {
-            records.splice(index, 1); dirty = true;
+            records.splice(index, 1); dirty = true; queueMutationGeneration += 1;
           }
         }
         boundRecords();
@@ -929,7 +974,7 @@ export function createDiagnosticsDelivery(options = {}) {
           if (result === 'skipped') return {sent, pending: records.length, skipped: true};
           if (result === 'sent' || result === 'rejected') {
             const index = records.indexOf(record);
-            if (index >= 0) records.splice(index, 1);
+            if (index >= 0) { records.splice(index, 1); queueMutationGeneration += 1; }
             dirty = true;
             completeRecord(record, timestamp);
             if (result === 'sent') {
@@ -941,13 +986,14 @@ export function createDiagnosticsDelivery(options = {}) {
           record.attempts += 1;
           if (record.attempts >= DELIVERY_MAX_RETRIES) {
             const index = records.indexOf(record);
-            if (index >= 0) records.splice(index, 1);
+            if (index >= 0) { records.splice(index, 1); queueMutationGeneration += 1; }
             flags.rejected = true;
             completeRecord(record, timestamp);
             dirty = true;
           } else {
             const jitter = 0.8 + Math.max(0, Math.min(1, Number(random()) || 0)) * 0.4;
             record.next_attempt_at = timestamp + Math.trunc(retryBaseMs * (2 ** (record.attempts - 1)) * jitter);
+            queueMutationGeneration += 1;
             dirty = true;
             scheduleFlush(Math.max(0, record.next_attempt_at - timestamp));
           }
@@ -983,6 +1029,7 @@ export function createDiagnosticsDelivery(options = {}) {
     if (optOut) {
       abortControllers();
       records = [];
+      queueMutationGeneration += 1;
       if (flushTimer !== null) { (root.clearTimeout || clearTimeout)(flushTimer); flushTimer = null; }
       dirty = false;
       void clearPersistedOutbox();

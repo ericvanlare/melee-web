@@ -148,6 +148,12 @@ class StagingDeploymentTests(unittest.TestCase):
         self.assertNotIn('DIAGNOSTICS_ADMIN_TOKEN', generated['vars'])
         self.assertNotIn('opaque-test-secret', json.dumps(generated, sort_keys=True))
 
+        short_api_secret = self.project()
+        short_api_secret['deployment_configs']['production']['env_vars'][
+            'DIAGNOSTICS_ADMIN_TOKEN'] = {'type': 'secret_text', 'value': 'short'}
+        with self.assertRaisesRegex(ValueError, 'at least 16 characters'):
+            staging.validate_project(short_api_secret)
+
     def test_origin_cannot_escape_staging(self):
         self.assertEqual(staging.immutable_origin('https://1234abcd.webmelee-staging.pages.dev/'),
                          'https://1234abcd.webmelee-staging.pages.dev')

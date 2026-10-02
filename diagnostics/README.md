@@ -47,7 +47,9 @@ Known hosts are `staging.webmelee.gg`, `webmelee-staging.pages.dev`,
 `wrangler.jsonc` is a configuration template only. Replace the D1 name/id and
 configure the per-environment release allowlist during the parent deployment
 integration. Put the admin token in Wrangler secrets; do not add it to this
-file. Apply `migrations/0001_diagnostics.sql` through the selected D1 binding
+file. Use an admin token with at least 16 characters. Redacted Pages metadata
+may expose only `{"type":"secret_text"}`; operators must still configure a
+token meeting that minimum. Apply `migrations/0001_diagnostics.sql` through the selected D1 binding
 as a separate deployment operation.
 
 The Pages request path performs bounded lazy expiry, but strict physical

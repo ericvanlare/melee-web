@@ -66,6 +66,12 @@ printf '%s' "$DIAGNOSTICS_ADMIN_TOKEN" | "$WRANGLER_BIN" pages secret put DIAGNO
 unset DIAGNOSTICS_ADMIN_TOKEN
 ```
 
+Use an admin token with at least 16 characters. The deployment validator
+enforces that minimum whenever the Pages API returns an observable secret
+value. Redacted metadata containing only `{"type":"secret_text"}` is
+accepted because the value is unavailable to the validator; the operator
+still owns the requirement to configure a token meeting the same minimum.
+
 The Pages project read used by `scripts/deploy_staging.py` must report the
 allowlisted name with `type: "secret_text"`; it may include an API-provided
 value, but the validator never returns or copies that value. The generated

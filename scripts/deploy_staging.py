@@ -37,6 +37,7 @@ DIAGNOSTICS_ENV_VARS = frozenset({
     'DIAGNOSTICS_DAILY_BYTE_CAP', 'DIAGNOSTICS_ALLOWED_RELEASES',
 })
 DIAGNOSTICS_ADMIN_SECRET = 'DIAGNOSTICS_ADMIN_TOKEN'
+DIAGNOSTICS_ADMIN_SECRET_MIN_LENGTH = 16
 DIAGNOSTICS_ENV_KEYS = DIAGNOSTICS_ENV_VARS | {DIAGNOSTICS_ADMIN_SECRET}
 DIAGNOSTICS_BINDING = 'DIAGNOSTICS_DB'
 DIAGNOSTICS_FUNCTION_ROUTES = ('/api/diagnostics', '/api/diagnostics/*')
@@ -67,8 +68,9 @@ def _plain_env_vars(value, *, require_admin_secret=False):
                     item.get('type') == 'secret_text',
                     'Diagnostics admin token must be the configured secret_text')
             if 'value' in item:
-                require(isinstance(item['value'], str) and 0 < len(item['value']) <= 64 * 1024,
-                        'Diagnostics admin token metadata is invalid')
+                require(isinstance(item['value'], str) and
+                        DIAGNOSTICS_ADMIN_SECRET_MIN_LENGTH <= len(item['value']) <= 64 * 1024,
+                        'Diagnostics admin token metadata must be at least 16 characters')
             admin_secret_present = True
             continue
         if isinstance(item, dict):

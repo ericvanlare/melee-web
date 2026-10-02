@@ -379,6 +379,233 @@ async function testAttemptBudgetAndInitialOptOutClear() {
   optedOut.dispose();
 }
 
+async function testOptOutClearSerializesReenabledWrites() {
+  const state = {
+    values: [],
+    tombstones: [],
+    clearStarted: false,
+    clearReleased: false,
+    releaseClear: null,
+    saveLog: [],
+  };
+  const adapter = {
+    async load() { return structuredClone(state.values); },
+    async save(values) {
+      const next = structuredClone(values);
+      if (!next.length && !state.clearReleased) {
+        state.clearStarted = true;
+        state.saveLog.push('clear-start');
+        await new Promise(resolve => { state.releaseClear = resolve; });
+        state.clearReleased = true;
+      }
+      state.saveLog.push(next.length ? 'write' : 'clear-complete');
+      state.values = next;
+    },
+    async loadTombstones() { return structuredClone(state.tombstones); },
+    async saveTombstones(values) { state.tombstones = structuredClone(values); },
+  };
+  const delivery = createDiagnosticsDelivery({
+    globalThis: rootFor(async () => ({status: 201})), origin: 'https://webmelee.gg',
+    storage: adapter, now: () => 100, random: deterministicRandom(),
+  });
+  assert.equal(delivery.enqueue(reportFor({session_id: 'session-beforeoptout'})).accepted, true);
+  await delivery.persist();
+  assert.deepEqual(state.saveLog, ['write']);
+
+  delivery.setOptOut(true);
+  await tick();
+  assert.equal(state.clearStarted, true, 'opt-out starts its asynchronous clear task');
+  delivery.setOptOut(false);
+  assert.equal(delivery.enqueue(reportFor({session_id: 'session-afteroptout'})).accepted, true);
+  const pendingPersist = delivery.persist();
+  await tick();
+  assert.deepEqual(state.saveLog, ['write', 'clear-start'],
+    'reenabled persistence waits instead of writing while opt-out clear is pending');
+
+  state.releaseClear();
+  const result = await pendingPersist;
+  assert.equal(result.persisted, true);
+  assert.deepEqual(state.saveLog, ['write', 'clear-start', 'clear-complete', 'write']);
+  assert.equal(state.values.length, 1);
+  assert.equal(state.values[0].report.session_id, 'session-afteroptout');
+  delivery.dispose();
+
+  const inFlight = {
+    values: [],
+    tombstones: [],
+    oldStarted: false,
+    oldReleased: false,
+    clearStarted: false,
+    clearReleased: false,
+    releaseOld: null,
+    releaseClear: null,
+    saveLog: [],
+  };
+  const inFlightAdapter = {
+    async load() { return structuredClone(inFlight.values); },
+    async save(values) {
+      const next = structuredClone(values);
+      if (next.length && !inFlight.oldReleased) {
+        inFlight.oldStarted = true;
+        inFlight.saveLog.push('old-start');
+        await new Promise(resolve => { inFlight.releaseOld = resolve; });
+        inFlight.oldReleased = true;
+      }
+      if (!next.length && !inFlight.clearReleased) {
+        inFlight.clearStarted = true;
+        inFlight.saveLog.push('clear-start');
+        await new Promise(resolve => { inFlight.releaseClear = resolve; });
+        inFlight.clearReleased = true;
+      }
+      inFlight.saveLog.push(next.length ? 'write' : 'clear-complete');
+      inFlight.values = next;
+    },
+    async loadTombstones() { return structuredClone(inFlight.tombstones); },
+    async saveTombstones(values) { inFlight.tombstones = structuredClone(values); },
+  };
+  const concurrent = createDiagnosticsDelivery({
+    globalThis: rootFor(async () => ({status: 201})), origin: 'https://webmelee.gg',
+    storage: inFlightAdapter, now: () => 100, random: deterministicRandom(),
+  });
+  assert.equal(concurrent.enqueue(reportFor({session_id: 'session-oldwrite'})).accepted, true);
+  const oldPersist = concurrent.persist();
+  await tick();
+  assert.equal(inFlight.oldStarted, true);
+  concurrent.setOptOut(true);
+  concurrent.setOptOut(false);
+  assert.equal(concurrent.enqueue(reportFor({session_id: 'session-newwrite'})).accepted, true);
+  const newPersist = concurrent.persist();
+  await tick();
+  assert.deepEqual(inFlight.saveLog, ['old-start'], 'new persistence waits for the prior write');
+  inFlight.releaseOld();
+  await tick();
+  assert.deepEqual(inFlight.saveLog, ['old-start', 'write', 'clear-start'],
+    'opt-out clear waits for the write that was already in flight');
+  inFlight.releaseClear();
+  await Promise.all([oldPersist, newPersist]);
+  assert.deepEqual(inFlight.saveLog, ['old-start', 'write', 'clear-start', 'clear-complete', 'write']);
+  assert.equal(inFlight.values.length, 1);
+  assert.equal(inFlight.values[0].report.session_id, 'session-newwrite');
+  assert.equal(concurrent.getStatus().queued, 1, 'fresh queue remains dirty after the clear');
+  concurrent.dispose();
+}
+
+async function testPersistenceSettlementAfterSyncStorageFailure() {
+  const failingStorage = {
+    load() { return []; },
+    save() { throw Object.assign(new Error('denied'), {name: 'NotAllowedError'}); },
+    loadTombstones() { return []; },
+    saveTombstones() {},
+  };
+  const failing = createDiagnosticsDelivery({
+    globalThis: rootFor(async () => ({status: 201})), origin: 'https://webmelee.gg',
+    storage: failingStorage, now: () => 100,
+  });
+  await assert.doesNotReject(() => failing.persist());
+  await assert.doesNotReject(() => failing.persist());
+  assert.equal(failing.enqueue(reportFor({session_id: 'session-syncfresh'})).accepted, true);
+  const thirdPersist = failing.persist();
+  const settled = await Promise.race([
+    thirdPersist,
+    new Promise(resolve => setTimeout(() => resolve('timeout'), 100)),
+  ]);
+  assert.notEqual(settled, 'timeout', 'sync storage failures must not leave a stale persistence promise');
+  assert.equal(settled.persisted, false);
+  failing.dispose();
+
+  const recoveredState = {values: [], clears: 0};
+  const recoveredStorage = {
+    load() { return recoveredState.values; },
+    save(values) {
+      if (!values.length) {
+        recoveredState.clears += 1;
+        if (recoveredState.clears === 1) throw Object.assign(new Error('denied'), {name: 'NotAllowedError'});
+      }
+      recoveredState.values = structuredClone(values);
+    },
+    loadTombstones() { return []; },
+    saveTombstones() {},
+  };
+  const recovered = createDiagnosticsDelivery({
+    globalThis: rootFor(async () => ({status: 201})), origin: 'https://webmelee.gg',
+    storage: recoveredStorage, now: () => 100,
+  });
+  recovered.setOptOut(true);
+  await tick();
+  assert.equal(recoveredState.clears, 1);
+  recovered.setOptOut(false);
+  recovered.setOptOut(true);
+  await tick();
+  assert.equal(recoveredState.clears, 2, 'a later opt-out retries after a synchronous clear failure');
+  assert.deepEqual(recoveredState.values, [], 'the recovered clear removes persisted work');
+  recovered.dispose();
+}
+
+async function testFlushMutationSurvivesPendingWrite() {
+  const state = {
+    values: [],
+    tombstones: [],
+    saveStarted: false,
+    releaseSave: null,
+    outboxSaves: [],
+    tombstoneSaves: [],
+  };
+  const adapter = {
+    async load() { return structuredClone(state.values); },
+    async save(values) {
+      const next = structuredClone(values);
+      if (next.length && !state.saveStarted) {
+        state.saveStarted = true;
+        await new Promise(resolve => { state.releaseSave = resolve; });
+      }
+      state.outboxSaves.push(next.length);
+      state.values = next;
+    },
+    async loadTombstones() { return structuredClone(state.tombstones); },
+    async saveTombstones(values) {
+      const next = structuredClone(values);
+      state.tombstoneSaves.push(next.length);
+      state.tombstones = next;
+    },
+  };
+  let requests = 0;
+  const delivery = createDiagnosticsDelivery({
+    globalThis: rootFor(async () => { requests += 1; return {status: 201}; }),
+    origin: 'https://webmelee.gg', storage: adapter, now: () => 100,
+    random: deterministicRandom(),
+  });
+  assert.equal(delivery.enqueue(reportFor({session_id: 'session-reducer'})).accepted, true);
+  const pendingWrite = delivery.persist();
+  await tick();
+  await tick();
+  assert.equal(state.saveStarted, true);
+
+  delivery.setActive(false);
+  const flush = delivery.flushWhenInactive();
+  await tick();
+  assert.equal(requests, 1, 'flush can send while an older persistence write is deferred');
+  state.releaseSave();
+  const [persisted, flushed] = await Promise.all([pendingWrite, flush]);
+  assert.equal(persisted.persisted, true);
+  assert.equal(flushed.sent, 1);
+  assert.deepEqual(state.values, [], 'the post-send outbox mutation is persisted');
+  assert.equal(state.tombstones.length, 1);
+  assert.equal(state.tombstoneSaves.at(-1), 1);
+
+  let laterRequests = 0;
+  const freshVisit = createDiagnosticsDelivery({
+    globalThis: rootFor(async () => { laterRequests += 1; return {status: 201}; }),
+    origin: 'https://webmelee.gg', storage: adapter, now: () => 101,
+  });
+  assert.equal(freshVisit.enqueue(reportFor({session_id: 'session-reducer'})).accepted, true);
+  freshVisit.setActive(false);
+  const later = await freshVisit.flushWhenInactive();
+  assert.equal(later.sent, 0, 'fresh visit honors the persisted sent tombstone');
+  assert.equal(laterRequests, 0, 'a sent native incident is not retransmitted');
+  freshVisit.dispose();
+  delivery.dispose();
+}
+
 async function testTerminalWorkCannotResurrectFromPersistedMerge() {
   for (const status of [422, 503]) {
     let at = 0, calls = 0;
@@ -455,4 +682,7 @@ await testCallbackAndPersistenceFailure();
 await testResumeCancellationAndSessionBudget();
 await testIncidentIdentityStatusAndMultiTabMerge();
 await testAttemptBudgetAndInitialOptOutClear();
+await testOptOutClearSerializesReenabledWrites();
+await testPersistenceSettlementAfterSyncStorageFailure();
+await testFlushMutationSurvivesPendingWrite();
 console.log('Runtime diagnostics delivery bounds, privacy, scheduling, persistence and environment checks passed');

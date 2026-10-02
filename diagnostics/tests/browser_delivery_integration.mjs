@@ -584,6 +584,47 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
   assert.deepEqual(JSON.parse(identityMatch[1].replaceAll('&quot;', '"').replaceAll('&#x27;', "'")), packaged.identity);
   receipt.checks.push('audited packaged bytes and release identity');
 
+  // Exercise the actual audited Settings UI before the onOwner-only fixture.
+  // This route imports no disc and changes only the diagnostics preference.
+  const publicResponse = await page.goto(`${origin}/`, {waitUntil: 'load', timeout: timeoutMs});
+  assert.equal(publicResponse?.status(), 200);
+  await page.waitForFunction(() => document.querySelector('#settings-open')?.disabled === false,
+    null, {timeout: nativeStartupWaitMs});
+  await page.locator('#settings-open').click();
+  await page.waitForFunction(() => document.querySelector('#settings-dialog')?.open === true,
+    null, {timeout: timeoutMs});
+  assert.equal(await page.locator('#automatic-diagnostics').isEnabled(), true);
+  assert.equal(await page.locator('#automatic-diagnostics').isChecked(), true);
+  const preparationUi = await page.evaluate(() => ({
+    loading: document.querySelector('#loading-panel')?.hidden === false,
+    export_disabled: document.querySelector('#export-diagnostics')?.disabled,
+  }));
+  if (preparationUi.loading) assert.equal(preparationUi.export_disabled, true,
+    'public Settings export must remain disabled during startup preparation');
+  await page.locator('#automatic-diagnostics').uncheck();
+  assert.equal(await page.evaluate(() => localStorage.getItem('melee-web-automatic-diagnostics-v1')), 'off');
+  await page.waitForFunction(() => document.querySelector('#export-diagnostics')?.disabled === false,
+    null, {timeout: nativeStartupWaitMs});
+  const downloadReady = page.waitForEvent('download', {timeout: timeoutMs});
+  await page.locator('#export-diagnostics').click();
+  const download = await downloadReady;
+  assert.equal(download.suggestedFilename(), 'webmelee-diagnostics.json');
+  const exportPath = path.join(evidence, 'public-settings-export.json');
+  await download.saveAs(exportPath);
+  const exported = JSON.parse(await fs.readFile(exportPath, 'utf8'));
+  assert.equal(exported.current?.schema, 'melee-web-runtime-diagnostics');
+  assert.deepEqual(exported.current.identity, packaged.identity);
+  assert.equal(exported.retained?.schema, 'melee-web-runtime-diagnostics');
+  assert.equal(nativeRequests.length, 0, 'idle Settings without incidents must not upload');
+  await page.screenshot({path: path.join(evidence, 'public-settings.png'), fullPage: true});
+  await page.locator('#automatic-diagnostics').check();
+  assert.equal(await page.evaluate(() => localStorage.getItem('melee-web-automatic-diagnostics-v1')), 'on');
+  receipt.public_settings = {audited_root: true, default_on: true, opt_out_observed: true,
+    export_with_reporting_off: true, export_bytes: (await fs.stat(exportPath)).size,
+    preparation_export_disabled: preparationUi.loading ? preparationUi.export_disabled : null,
+    disc_imported: false};
+  receipt.checks.push('actual public Settings default, opt-out and local export');
+
   const response = await page.goto(`${origin}/notices.html`, {waitUntil: 'load', timeout: timeoutMs});
   assert.equal(response?.status(), 200);
   const responseHeaders = response?.headers() || {};
@@ -786,15 +827,13 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
   });
   receipt.checks.push('controlled native callback stall and source simulation guard');
 
-  await page.locator('#pause-player').click({timeout: timeoutMs});
+  // The source guard itself must publish inactive state and trigger delivery.
+  // No user pause click or automatic Resume is needed to make this report send.
   await page.waitForFunction(() => {
-    const fixture = globalThis.__nativeDeliveryFixture;
-    return fixture?.paused === true || fixture?.pauseError;
+    const state = globalThis.__nativeDeliveryFixture?.state;
+    return state?.paused === true && state?.running === false;
   }, null, {timeout: timeoutMs});
-  const pauseState = await page.evaluate(() => ({error: globalThis.__nativeDeliveryFixture.pauseError || null}));
-  assert.equal(pauseState.error, null, `native pause failed: ${pauseState.error}`);
-  await page.waitForFunction(() => globalThis.__nativeDeliveryFixture?.paused === true &&
-    globalThis.__nativeDeliveryFixture?.state?.running === false, null, {timeout: timeoutMs});
+  receipt.manual_pause_for_delivery = false;
   await page.waitForFunction(() => globalThis.__nativeAudioTrace?.contexts?.length >= 1,
     null, {timeout: timeoutMs});
   const audio = await page.evaluate(() => ({contexts: globalThis.__nativeAudioTrace.contexts.map(record => ({
@@ -807,7 +846,7 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
   assert.equal(audio.errors.length, 0, 'native audio ownership trace installation failed');
   receipt.audio = {context_count: audio.contexts.length, worklet_names: audio.worklets,
     live_contexts: audio.contexts.filter(record => !record.closed).length};
-  await page.waitForFunction(() => globalThis.__nativeDeliveryFixture?.paused === true &&
+  await page.waitForFunction(() =>
     globalThis.__nativeDeliveryFixture?.state?.running === false &&
     globalThis.__nativeDeliveryFixture?.state?.paused === true, null, {timeout: timeoutMs});
   const requestDeadline = Date.now() + timeoutMs;
@@ -821,10 +860,13 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
     serializations: globalThis.__nativeDeliveryFixture.upload.serializations,
     fetches: globalThis.__nativeDeliveryFixture.upload.fetches,
   }));
-  assert.equal(upload.serializations.length, 1, 'native delivery must serialize one strict wire report');
+  // Mapping measures strict wire size once; dispatch serializes it again.
+  // Account for both bounded, inactive calls instead of assuming one call.
+  assert(upload.serializations.length >= 1 && upload.serializations.length <= 8,
+    'native delivery strict wire serialization must stay bounded');
   assert.equal(upload.fetches.length, 1, 'native delivery must dispatch one diagnostics request');
-  const serialization = upload.serializations[0], fetchTiming = upload.fetches[0];
-  assert(serialization.inactive_processing && fetchTiming.inactive_processing,
+  const serialization = upload.serializations.at(-1), fetchTiming = upload.fetches[0];
+  assert(upload.serializations.every(row => row.inactive_processing) && fetchTiming.inactive_processing,
     'upload timing must be captured after native processing is inactive');
   assert(Number.isFinite(serialization.main_thread_ms) && serialization.main_thread_ms >= 0);
   assert(Number.isSafeInteger(serialization.serialized_bytes) && serialization.serialized_bytes <= 64 * 1024);
@@ -832,6 +874,8 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
   assert(Number.isFinite(fetchTiming.await_ms) && fetchTiming.await_ms >= fetchTiming.dispatch_ms);
   assert(Number.isFinite(fetchTiming.arm_to_dispatch_ms) && fetchTiming.arm_to_dispatch_ms >= 0);
   receipt.upload_timing = {
+    strict_wire_serialization_calls: upload.serializations.length,
+    strict_wire_serialization_total_main_thread_ms: upload.serializations.reduce((sum, row) => sum + row.main_thread_ms, 0),
     strict_wire_serialization_main_thread_ms: serialization.main_thread_ms,
     strict_wire_serialized_bytes: serialization.serialized_bytes,
     fetch_dispatch_main_thread_ms: fetchTiming.dispatch_ms,
@@ -874,6 +918,7 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
   inspect(report);
   const reportBytes = Buffer.from(JSON.stringify(report));
   assert(reportBytes.byteLength <= 64 * 1024, 'native wire report exceeds the 64 KiB bound');
+  await fs.writeFile(path.join(evidence, 'native-report.json'), JSON.stringify(report, null, 2) + '\n');
   receipt.report = {count: reports.length, sha256: crypto.createHash('sha256').update(reportBytes).digest('hex'),
     bytes: reportBytes.byteLength, reason: report.incident.reason, environment: report.environment.env,
     source_commit: report.identity.source_commit, runtime_hash: report.identity.runtime_hash};
@@ -892,7 +937,7 @@ async function runBrowser() {
     production: [{source_commit: nativePackage.identity.source_commit,
       runtime_hash: nativePackage.identity.runtime_hash, build_profile: nativePackage.identity.build_profile}],
   }) : RELEASES;
-  let pages = null, proxy = null, browser;
+  let pages = null, proxy = null, browser, page;
   const receipt = {
     schema: 'melee-web-diagnostics-browser-delivery-receipt-v1', result: 'running', fixture,
     mode: nativePackage ? 'packaged-native' : 'synthetic',
@@ -918,7 +963,7 @@ async function runBrowser() {
     browser = await loaded.chromium.launch({...browserLaunchOptions(loaded.browser, {timeout: timeoutMs}),
       proxy: {server: `http://127.0.0.1:${proxy.port}`}});
     const context = await browser.newContext({ignoreHTTPSErrors: true, viewport: {width: 900, height: 700}});
-    const page = await context.newPage();
+    page = await context.newPage();
     if (nativePackage) {
       await runNativeBrowser({page, pages, receipt, packaged: nativePackage});
       await context.close();
@@ -979,6 +1024,8 @@ async function runBrowser() {
     const stagingAfterProduction = await requestAdmin(pages.port, 'staging.webmelee.gg', '?environment=staging&limit=10');
     assert.equal(stagingAfterProduction.status, 200); assert.equal(stagingAfterProduction.body.reports.length, 1);
     receipt.checks.push('production origin isolation');
+    await fs.writeFile(path.join(evidence, 'synthetic-reports.json'), JSON.stringify({
+      staging: stagingAfterProduction.body.reports, production: productionRows.body.reports}, null, 2) + '\n');
       await production.close();
       await context.close();
       receipt.browser = {version: browser.version(), mode: 'headless', graphics_claim: 'none; synthetic DOM fixture only'};
@@ -986,16 +1033,32 @@ async function runBrowser() {
     }
   } catch (error) {
     receipt.result = 'fail'; receipt.failure = String(error?.stack || error);
+    if (nativePackage && page) {
+      receipt.native_failure_state = await page.evaluate(() => {
+        const f = globalThis.__nativeDeliveryFixture;
+        return {state: f?.state || null, guards: f?.guards || [], upload: f?.upload || null,
+          errors: f?.errors || [], mount_error: f?.mountError || null};
+      }).catch(() => null);
+      await page.screenshot({path: path.join(evidence, 'native-delivery-failure.png'), fullPage: true}).catch(() => {});
+    }
     throw error;
   } finally {
-    receipt.finished_at = new Date().toISOString();
-    try {
-      await fs.writeFile(path.join(evidence, 'receipt.json'), JSON.stringify(receipt, null, 2) + '\n');
-    } finally {
-      try { await browser?.close(); }
+    try { await browser?.close(); }
+    finally {
+      try { if (proxy?.server) await new Promise(resolve => proxy.server.close(resolve)); }
       finally {
-        try { if (proxy?.server) await new Promise(resolve => proxy.server.close(resolve)); }
-        finally { await stopProcess(pages?.process); }
+        await stopProcess(pages?.process);
+        // Remove only this successful run's disposable local Pages fixture.
+        // A failed reproducer or a default evidence directory inside it stays.
+        const evidenceRelative = path.relative(fixture, evidence);
+        const externalEvidence = evidenceRelative.startsWith(`..${path.sep}`) || path.isAbsolute(evidenceRelative);
+        receipt.fixture_cleanup = 'preserved';
+        if (receipt.result === 'pass' && externalEvidence) {
+          await fs.rm(fixture, {recursive: true, force: true});
+          receipt.fixture_cleanup = 'removed-successful-disposable';
+        }
+        receipt.finished_at = new Date().toISOString();
+        await fs.writeFile(path.join(evidence, 'receipt.json'), JSON.stringify(receipt, null, 2) + '\n');
       }
     }
   }
