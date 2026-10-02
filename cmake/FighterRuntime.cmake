@@ -353,19 +353,25 @@ if(MELEE_WEB_SNAPSHOT_INITIAL_MEMORY LESS 33554432 OR
     "MELEE_WEB_SNAPSHOT_INITIAL_MEMORY must be at least 32 MiB and 64 KiB aligned")
 endif()
 unset(_melee_web_snapshot_memory_remainder)
-add_executable(gameplay_snapshot_probe EXCLUDE_FROM_ALL tests/gameplay_snapshot_probe.cpp)
+set(MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE
+  "${CMAKE_CURRENT_SOURCE_DIR}/reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp")
+add_executable(gameplay_snapshot_probe EXCLUDE_FROM_ALL tests/gameplay_snapshot_probe.cpp
+  ${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE})
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-  "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_snapshot_probe.cpp")
+  "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_snapshot_probe.cpp"
+  "${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE}")
 file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_snapshot_probe.cpp" GAMEPLAY_SNAPSHOT_PROBE_SHA256)
+file(SHA256 "${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE}" MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256)
 target_compile_definitions(gameplay_snapshot_probe PRIVATE
-  MELEE_WEB_SNAPSHOT_PROBE_SHA256="${GAMEPLAY_SNAPSHOT_PROBE_SHA256}")
+  MELEE_WEB_SNAPSHOT_PROBE_SHA256="${GAMEPLAY_SNAPSHOT_PROBE_SHA256}"
+  MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256="${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256}")
 target_link_libraries(gameplay_snapshot_probe PRIVATE fighter_asset_runtime)
 target_link_options(gameplay_snapshot_probe PRIVATE --no-entry --profiling-funcs
   -sASYNCIFY=0
   -sENVIRONMENT=node -sNODERAWFS=1 -sMODULARIZE=1 -sALLOW_MEMORY_GROWTH=1
   -sINITIAL_MEMORY=${MELEE_WEB_SNAPSHOT_INITIAL_MEMORY} -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2
   -sEXPORTED_RUNTIME_METHODS=ccall,HEAPU8,UTF8ToString,stackSave,stackRestore
-  -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_rng_address,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_close)
+  -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_configure_seed,_melee_web_snapshot_configure_rng_profile,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_step_raw,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_rng_profile_observation,_melee_web_snapshot_rng_profile_observation_size,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_transfer_diagnostic,_melee_web_snapshot_transfer_diagnostic_size,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_rng_address,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_close)
 set_target_properties(gameplay_snapshot_probe PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_music_profile_trace EXCLUDE_FROM_ALL tests/gameplay_music_profile_trace.cpp)
