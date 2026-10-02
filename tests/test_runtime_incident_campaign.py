@@ -31,6 +31,29 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         self.assertIn("timing-pause-${suffix}", self.harness)
         self.assertGreaterEqual(self.harness.count("failOnTimingPause"), 6)
         self.assertIn("if(stopOnTimingPause)await failOnTimingPause(`Results ${matchIndex}`,state);", self.harness)
+        self.assertIn("if(stopOnTimingPause)await checkTimingPause(`${label} before PAD`,await diagnostic());", self.harness)
+        self.assertIn("if(stopOnTimingPause)await checkTimingPause(`${label} after PAD`,await diagnostic());", self.harness)
+        self.assertIn("await checkTimingPause('CSS observation',state);", self.harness)
+
+    def test_match_entry_requires_native_readiness_and_four_player_observations(self):
+        self.assertIn("async function waitForMatchReady(label,timeoutMs=60000)", self.harness)
+        self.assertIn("state?.match?.ready===true", self.harness)
+        self.assertIn("const matchPlayerSlots=Object.freeze(['p0','p1','p2','p3']);", self.harness)
+        self.assertIn("if(readiness.ready&&readiness.missing_players.length===0)return state;", self.harness)
+        self.assertIn("melee-web-match-readiness-failure-v1", self.harness)
+        self.assertIn("match-readiness-${suffix}.json", self.harness)
+        self.assertIn("match_readiness_failures", self.harness)
+        self.assertIn("await waitForMatchReady('original four-player match entry',60000);", self.harness)
+        self.assertLess(
+            self.harness.index("await waitForMatchReady('original four-player match entry',60000);"),
+            self.harness.index("async function runMatch(matchIndex,expected)"),
+        )
+
+    def test_readiness_receipt_distinguishes_runtime_and_observer_failures(self):
+        self.assertIn("if(state.phase===7)await failOnMatchReadiness(label,state,'runtime-error');", self.harness)
+        self.assertIn("state.assetFatal?'asset-fatal':'native-command-error'", self.harness)
+        self.assertIn("if(readiness.observer_error)await failOnMatchReadiness(label,state,'match-observer-error');", self.harness)
+        self.assertIn("if(state.phase===7)await failOnMatchReadiness(label,state,'timeout');", self.harness)
 
     def test_callback_capture_is_bounded_and_scalar(self):
         self.assertIn("max_samples:100,max_incidents:24", self.harness)
@@ -41,6 +64,8 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         self.assertIn("artifact_scope:'private-development-artifact'", self.harness)
         self.assertIn("hash_scope:'exact SHA-256 of gameplay_menu_browser.wasm bytes; not the public runtime graph'", self.harness)
         self.assertIn("public_runtime_graph_bound:false", self.harness)
+        self.assertIn("if(capture.incidents.length>MAX_INCIDENTS){capture.incidents.shift();capture.dropped_incidents++;}", self.harness)
+        self.assertIn("runtime_diagnostics:report.runtime_diagnostics", self.harness)
         self.assertIn("if(capture.samples.length>MAX_SAMPLES){capture.samples.shift();capture.dropped_samples++;}", self.harness)
         self.assertNotIn("exportDiagnostics", self.harness)
 

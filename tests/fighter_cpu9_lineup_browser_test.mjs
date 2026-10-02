@@ -177,6 +177,7 @@ const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
     cache_evidence:{status:'unavailable',observed:false,populated_observed:false,restore_observed:false},
     driver_cache:'uncontrolled'}};
 report.timing_pause_receipts=[];
+report.match_readiness_failures=[];
 report.runtime_diagnostics={schema:'melee-web-runtime-callback-capture-v1',identity:null,
   max_samples:100,max_incidents:24,samples:[],incidents:[],dropped_samples:0,dropped_incidents:0,
   callback_count:0,status:'not-installed'};
@@ -370,7 +371,8 @@ async function installRuntimeDiagnosticsCapture(identity,identityScope){
         const row={at_ms:finite(ended),reason_code:integer(args[0]),value:finite(args[1]),
           threshold:finite(args[2]),source_frame:integer(args[3]),scene:integer(args[4]),
           clock_owner_code:integer(args[5]),callback_ms:finite(Math.max(0,ended-started))};
-        if(capture.incidents.length<MAX_INCIDENTS)capture.incidents.push(row);else capture.dropped_incidents++;
+        capture.incidents.push(row);
+        if(capture.incidents.length>MAX_INCIDENTS){capture.incidents.shift();capture.dropped_incidents++;}
       }
       return result;
     };
@@ -441,14 +443,20 @@ async function screenshot(name){
 function isTimingPause(state){
   return typeof state?.status==='string'&&state.status.startsWith('Paused after a timing disruption');
 }
+async function checkTimingPause(label,state){
+  if(stopOnTimingPause&&isTimingPause(state))await failOnTimingPause(label,state);
+  return state;
+}
 function timingPauseSourceFrame(state){
   const match=String(state?.diagnostics||'').match(/(?:source frame|source cursor): (\d+)/i);
   return match?Number(match[1]):state?.p0?.frame??null;
 }
 async function failOnTimingPause(label,state){
+  await retainRuntimeDiagnosticsCapture();
   const receipt={schema:'melee-web-timing-pause-receipt-v1',label,
     match:activeMatchIndex,phase:state?.phase??null,running:state?.running??null,
     status:isTimingPause(state)?state.status:null,source_frame:timingPauseSourceFrame(state),
+    runtime_diagnostics:report.runtime_diagnostics,
     diagnostics:typeof state?.diagnostics==='string'?state.diagnostics:null,
     observed_at:new Date().toISOString()};
   report.timing_pause_receipts.push(receipt);
@@ -459,6 +467,42 @@ async function failOnTimingPause(label,state){
     report.timing_pause_screenshot_error=error.message;
   });
   throw Error(`${label}: unexpected timing pause at source frame ${receipt.source_frame??'unknown'}`);
+}
+async function rethrowWithTimingPause(label,error){
+  if(stopOnTimingPause){
+    const state=await diagnostic().catch(()=>null);
+    if(isTimingPause(state))await failOnTimingPause(label,state);
+  }
+  throw error;
+}
+const matchPlayerSlots=Object.freeze(['p0','p1','p2','p3']);
+function validMatchPlayer(value){
+  return value&&Number.isInteger(value.fighterKind)&&Number.isInteger(value.motion)&&
+    Number.isInteger(value.groundAir)&&Number.isInteger(value.frame)&&Number.isFinite(value.x)&&
+    Number.isFinite(value.y);
+}
+function matchReadiness(state){
+  const missingPlayers=matchPlayerSlots.filter(slot=>!validMatchPlayer(state?.[slot]));
+  return {phase:Number.isInteger(state?.phase)?state.phase:null,ready:state?.match?.ready===true,
+    observer_error:state?.match?.observer_error===true,missing_players:missingPlayers,
+    valid_players:matchPlayerSlots.filter(slot=>validMatchPlayer(state?.[slot]))};
+}
+async function failOnMatchReadiness(label,state,reason){
+  const readiness=matchReadiness(state);
+  const receipt={schema:'melee-web-match-readiness-failure-v1',label,match_index:activeMatchIndex,
+    reason,readiness,match_observation:state?.match??null,p0:state?.p0??null,p1:state?.p1??null,
+    p2:state?.p2??null,p3:state?.p3??null,status:state?.status??null,
+    error:state?.error??null,asset_fatal:state?.assetFatal??null,
+    diagnostics:typeof state?.diagnostics==='string'?state.diagnostics:null,
+    observed_at:new Date().toISOString()};
+  report.match_readiness_failures.push(receipt);
+  const suffix=activeMatchIndex===null?'unknown':String(activeMatchIndex);
+  await fs.writeFile(path.join(output,`match-readiness-${suffix}.json`),
+    JSON.stringify(receipt,null,2)+'\n').catch(error=>{report.match_readiness_receipt_write_error=error.message;});
+  await screenshot(`match-readiness-${suffix}`).catch(error=>{
+    report.match_readiness_screenshot_error=error.message;
+  });
+  throw Error(`${label}: source match readiness unavailable (${reason}; missing=${readiness.missing_players.join(',')||'none'})`);
 }
 async function writeProgress(label){
   const state=await diagnostic();
@@ -491,26 +535,55 @@ async function waitFor(label,predicate,timeoutMs=30000){
   const deadline=Date.now()+timeoutMs;
   while(Date.now()<deadline){
     const state=await diagnostic();
-    if(stopOnTimingPause&&isTimingPause(state))await failOnTimingPause(label,state);
+    await checkTimingPause(label,state);
     if(state.error)throw Error(`${label}: ${state.error}`);
     if(predicate(state))return state;
     await page.waitForTimeout(50);
   }
   const state=await diagnostic();
-  if(stopOnTimingPause&&isTimingPause(state))await failOnTimingPause(label,state);
+  await checkTimingPause(label,state);
   throw Error(`${label} timed out after ${timeoutMs} ms: ${JSON.stringify({phase:state.phase,status:state.status,p0:state.p0,p1:state.p1,match:state.match})}`);
+}
+async function waitForMatchReady(label,timeoutMs=60000){
+  const deadline=Date.now()+timeoutMs;
+  while(Date.now()<deadline){
+    const state=await diagnostic();
+    await checkTimingPause(label,state);
+    const readiness=matchReadiness(state);
+    if(state.error){
+      if(state.phase===7)await failOnMatchReadiness(label,state,'runtime-error');
+      throw Error(`${label}: ${state.error}`);
+    }
+    if(state.phase===7){
+      if(state.assetFatal||state.nativeCommandError)
+        await failOnMatchReadiness(label,state,state.assetFatal?'asset-fatal':'native-command-error');
+      if(readiness.observer_error)await failOnMatchReadiness(label,state,'match-observer-error');
+      if(readiness.ready&&readiness.missing_players.length===0)return state;
+    }
+    await page.waitForTimeout(50);
+  }
+  const state=await diagnostic();
+  await checkTimingPause(label,state);
+  if(state.phase===7)await failOnMatchReadiness(label,state,'timeout');
+  throw Error(`${label} timed out after ${timeoutMs} ms: ${JSON.stringify({phase:state.phase,status:state.status,match:state.match})}`);
 }
 async function pad(port,buttons=0,stickX=0,stickY=0,duration=1,label='input'){
   assert(port===0||port===1,'the live diagnostic PAD route supports only P1/P2');
   assert(Number.isInteger(duration)&&duration>=1&&duration<=120);
-  await page.evaluate(({port,buttons,stickX,stickY,duration})=>
-    window.menuDiagnosticPad(port,buttons,stickX,stickY,duration),
-    {port,buttons,stickX,stickY,duration});
+  if(stopOnTimingPause)await checkTimingPause(`${label} before PAD`,await diagnostic());
+  try{
+    await page.evaluate(({port,buttons,stickX,stickY,duration})=>
+      window.menuDiagnosticPad(port,buttons,stickX,stickY,duration),
+      {port,buttons,stickX,stickY,duration});
+  }catch(error){
+    await rethrowWithTimingPause(`${label} PAD`,error);
+  }
   report.pad_sample_count++;
   if(report.controller_inputs.length<4000)
     report.controller_inputs.push({port,buttons,stickX,stickY,duration,label});
   // Let the source consume the queued sample and resume ordinary neutral PAD.
   await page.waitForTimeout(Math.max(40,duration*18));
+  if(stopOnTimingPause)await checkTimingPause(`${label} after PAD`,await diagnostic());
 }
 async function tap(port,button,label,duration=1){
   await pad(port,button,0,0,duration,label);
@@ -552,6 +625,7 @@ async function driveFighter(port,door,fighter){
 }
 async function css(){
   const state=await diagnostic();
+  await checkTimingPause('CSS observation',state);
   assert.equal(state.phase,1,`CSS required; phase=${state.phase} status=${state.status}`);
   assert(state.css&&state.css.cursors?.length===16&&state.css.doors?.length===40&&
     state.css.geometry?.length===48,'Live source CSS observation unavailable');
@@ -666,7 +740,7 @@ async function chooseStage(){
   await screenshot(`match-${report.matches.length+1}-sss`);
   for(let attempt=0;attempt<360;attempt++){
     const state=await diagnostic();
-    if(stopOnTimingPause&&isTimingPause(state))await failOnTimingPause('stage selection',state);
+    await checkTimingPause('stage selection',state);
     if(state.error)throw Error(`SSS source error: ${state.error}`);
     if(state.phase!==3)throw Error(`SSS exited before stage confirmation; phase=${state.phase}`);
     const result=await page.evaluate(stageId=>Module._melee_web_native_menu_drive_stage(stageId),stage.sourceId);
@@ -680,7 +754,7 @@ async function chooseStage(){
   report.phases.push({label:`source SSS highlighted ${stage.name}`,stage:selectedStage});
   await screenshot(`match-${report.matches.length+1}-${stage.slug}-highlighted`);
   await tap(0,buttonA,`confirm-${stage.name}`);
-  await waitFor('original four-player match entry',s=>s.phase===7,60000);
+  await waitForMatchReady('original four-player match entry',60000);
 }
 async function runMatch(matchIndex,expected){
   activeMatchIndex=matchIndex;
