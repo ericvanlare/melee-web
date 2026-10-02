@@ -1510,17 +1510,25 @@ try {
     assert.equal(notices.status(), 200); assert.match(await notices.text(), /Permission is hereby granted/);
   });
   await check('keyboard-only preferences and isolated diagnostics obey the application network policy', async () => {
+    // The preceding checks leave the page on legal documents, which have no
+    // player settings. Read eligibility only after the player owner is ready.
+    await page.goto(origin, {waitUntil: 'networkidle'});
+    const diagnosticsEligible = diagnosticsEnvironmentForOrigin(origin) !== null;
+    await page.waitForFunction(eligible => {
+      const toggle = document.querySelector('#automatic-diagnostics');
+      return toggle && toggle.disabled === !eligible && toggle.checked === eligible;
+    }, diagnosticsEligible);
     const storage = await page.evaluate(async () => ({local: Object.keys(localStorage), session: Object.keys(sessionStorage),
       indexed: await indexedDB.databases(), caches: await caches.keys(), workers: (await navigator.serviceWorker.getRegistrations()).length}));
-    const diagnosticsEligible = diagnosticsEnvironmentForOrigin(origin) !== null;
+    report.storage = storage;
     assert(storage.local.includes('melee-prototype-keyboard-v1'));
     assert(storage.local.every(key => ['melee-prototype-keyboard-v1',
       'melee-web-automatic-diagnostics-v1'].includes(key)), 'Unexpected keyboard-session storage key');
     assert.deepEqual(storage.session, []); assert.deepEqual(storage.caches, []); assert.equal(storage.workers, 0);
-    const allowedDatabases = new Set(['webmelee-save-profiles-v1', 'melee-web-runtime-diagnostics']);
-    if (diagnosticsEligible) allowedDatabases.add('melee-web-diagnostics-delivery');
+    const allowedDatabases = new Map([['webmelee-save-profiles-v1', 1], ['melee-web-runtime-diagnostics', 1]]);
+    if (diagnosticsEligible) allowedDatabases.set('melee-web-diagnostics-delivery', 2);
     assert(storage.indexed.some(database => database.name === 'webmelee-save-profiles-v1'));
-    assert(storage.indexed.every(database => allowedDatabases.has(database.name) && database.version === 1),
+    assert(storage.indexed.every(database => allowedDatabases.get(database.name) === database.version),
       'Only Personal progress and the isolated, eligible diagnostics databases may persist');
     assert.equal((await context.cookies()).length, 0); report.storage = storage;
     const diagnosticsControl = await page.evaluate(() => ({
