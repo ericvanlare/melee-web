@@ -865,8 +865,9 @@ def capture(args):
             shutil.copy2(args.scenario, evidence / "scenario.json")
             target = scenario_target(scenario)
         else:
-            # This target declares the availability query at first CSS. The
-            # route driver never applies it to source game state.
+            # This target declares the first CSS roster and eventual stage.
+            # The route uses source-driven availability and ordinary PAD
+            # inputs; it never writes this target into game memory.
             target = {"expected_setup": {"time_limit_seconds": 60,
                 "players": [
                     {"character_kind": 8, "costume": 0, "player_type": 0,

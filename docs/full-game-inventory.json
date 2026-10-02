@@ -2285,9 +2285,10 @@
       "evidence": [
         "docs/ACCURACY_CONTRACT.md",
         "docs/TRANSITION_EQUIVALENCE.md",
-        "docs/REFERENCE_CAPTURE_APP.md"
+        "docs/REFERENCE_CAPTURE_APP.md",
+        "docs/evidence/vs-rules-items-source-route-v1.json"
       ],
-      "next_step": "Enumerate rule fields from the source structs and menu mode callers, then add a source/retail/browsing receipt per options family.",
+      "next_step": "The cold Main/VS/Rules/Items route now has source-menu, three-match StartMeleeData, and Results/CSS evidence for Stock and None item frequency. Add one receipt per remaining option family, including team rules, item-mask toggles, Rules Plus, and item services.",
       "issue": null
     },
     {
@@ -2317,7 +2318,8 @@
       "evidence": [
         "docs/ACCURACY_CONTRACT.md",
         "docs/TRANSITION_EQUIVALENCE.md",
-        "docs/CONTROLLERS.md"
+        "docs/CONTROLLERS.md",
+        "docs/evidence/vs-rules-items-source-route-v1.json"
       ],
       "next_step": "Decompose title, main menu, CSS, SSS, rules and name-entry screens into source mode rows and extend retail transition receipts beyond the current bounded route.",
       "issue": null
