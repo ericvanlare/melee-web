@@ -410,8 +410,9 @@ fs.writeFileSync(path, createMeleeGCI(profile, new Date('2026-01-01T00:00:00Z'))
             source_report = root / "source-export-report.json"
             source_manifest = root / "source-export-manifest.json"
             source_check = "save settings export, import, persistence, compare-and-swap and recovery"
-            source_report.write_text(json.dumps({"result": "pass", "scope": "isolated save export",
-                "checks": [source_check]}))
+            source_report.write_text(json.dumps({"schema": "webmelee-public-player-browser-v1",
+                "build_identity": {"schema": "melee-web-public-release-v1", "profile": "player"},
+                "result": "pass", "scope": "isolated save export", "checks": [source_check]}))
             source_manifest.write_text(json.dumps({"schema": "melee-web-public-release-v1",
                 "profile": "player", "runtime": {"identity_sha256": "bundle-identity"}}))
             receipt["initial_card"] = {
@@ -456,8 +457,9 @@ fs.writeFileSync(path, createMeleeGCI(profile, new Date('2026-01-01T00:00:00Z'))
             with self.assertRaisesRegex(ValueError, "declared Everything unlocked profile"):
                 validate_setup_receipt(receipt_path, args, {"sha256": manifest_hash})
             (card / source_profile.name).write_bytes(source_profile.read_bytes())
-            source_report.write_text(json.dumps({"result": "fail", "scope": "isolated save export",
-                "checks": [source_check]}))
+            source_report.write_text(json.dumps({"schema": "webmelee-public-player-browser-v1",
+                "build_identity": {"schema": "melee-web-public-release-v1", "profile": "player"},
+                "result": "fail", "scope": "isolated save export", "checks": [source_check]}))
             with self.assertRaisesRegex(ValueError, "source profile export report"):
                 validate_setup_receipt(receipt_path, args, {"sha256": manifest_hash})
 

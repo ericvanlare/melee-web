@@ -164,11 +164,18 @@ def validate_setup_receipt(path, args, manifest):
             raise ValueError(f"cannot read the Everything unlocked runtime manifest: {error}") from error
         manifest_hash = retail._sha256(manifest_path)
         source_check = source_export.get("source_run_check")
+        manifest_runtime = source_manifest.get("runtime")
+        source_build_identity = source_report.get("build_identity")
         if (source_export.get("source_run_report_sha256") != report_hash or
                 source_export.get("source_run_manifest_sha256") != manifest_hash or
                 source_manifest.get("schema") != "melee-web-public-release-v1" or
                 source_manifest.get("profile") != "player" or
-                not source_manifest.get("runtime", {}).get("identity_sha256") or
+                not isinstance(manifest_runtime, dict) or
+                not manifest_runtime.get("identity_sha256") or
+                source_report.get("schema") != "webmelee-public-player-browser-v1" or
+                not isinstance(source_build_identity, dict) or
+                source_build_identity.get("schema") != "melee-web-public-release-v1" or
+                source_build_identity.get("profile") != "player" or
                 source_export.get("source_run_result") != "pass" or
                 source_export.get("source_run_result") != source_report.get("result") or
                 source_export.get("source_run_scope") != source_report.get("scope") or
