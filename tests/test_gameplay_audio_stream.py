@@ -7,6 +7,22 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class GameplayAudioStreamTests(unittest.TestCase):
+    def test_original_menu_bgm_ids_select_owned_hps_candidates(self):
+        target = ROOT / "build/browser/gameplay_audio_stream_trace.js"
+        nodes = list((ROOT / ".deps/emsdk/node").glob("*/bin/node"))
+        menu = ROOT / "assets-local/native-menus"
+        audio = ROOT / "assets-local/next-gate"
+        assets = [audio / name for name in
+                  ("main.ssm", "mario.ssm", "smash2.sem", "dsp_coef.bin")]
+        assets += [menu / name for name in ("menu01.hps", "menu3.hps")]
+        if not target.is_file() or not nodes or not all(path.is_file() for path in assets):
+            self.skipTest("Build the HPS trace and provide the original menu music candidates")
+        result = subprocess.run([str(nodes[0]), str(target), *map(str, assets)],
+                                text=True, capture_output=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Original CSS/SSS BGM IDs selected and streamed menu01.hps/menu3.hps through one owner",
+                      result.stdout)
+
     def test_original_music_id_stream_loop_and_restart(self):
         target = ROOT / "build/browser/gameplay_audio_stream_trace.js"
         nodes = list((ROOT / ".deps/emsdk/node").glob("*/bin/node"))

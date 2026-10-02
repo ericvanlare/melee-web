@@ -113,7 +113,8 @@ struct GameplayMenuWorld::Storage {
 
     std::span<const std::uint8_t> sem;
     std::span<const std::uint8_t> coefficients;
-    std::span<const std::uint8_t> hps;
+    std::span<const std::uint8_t> menu01_hps;
+    std::span<const std::uint8_t> menu3_hps;
     std::span<const std::uint8_t> font_bytes;
     const std::vector<std::string> bank_names=menu_audio_bank_names();
     std::vector<std::span<const std::uint8_t>> bank_bytes;
@@ -153,7 +154,7 @@ struct GameplayMenuWorld::Storage {
             if (name == "dsp_coef.bin") continue;
 #endif
             if (name == "sislib_font.bin" || name == "smash2.sem" ||
-                name == "dsp_coef.bin" || name == "menu01.hps" ||
+                name == "dsp_coef.bin" || name.ends_with(".hps") ||
                 name.ends_with(".ssm")) {
                 require_file(files, name);
                 continue;
@@ -300,8 +301,12 @@ struct GameplayMenuWorld::Storage {
         check(melee_web_audio_enable_effects(audio_bank->get(), error,
                                              sizeof(error)),
               error, "Native menu source audio effects setup failed");
-        music = std::make_unique<GameplayAudioStream>(
-            audio_bank->get(), "/audio/menu01.hps", hps);
+        const std::array<GameplayAudioStreamFile, 2> menu_music = {{
+            {"/audio/menu01.hps", menu01_hps},
+            {"/audio/menu3.hps", menu3_hps},
+        }};
+        music = std::make_unique<GameplayAudioStream>(audio_bank->get(),
+                                                       menu_music);
     }
 
     void start(const RuntimeFiles& files, RuntimeArchiveCache* cache,
@@ -330,7 +335,10 @@ struct GameplayMenuWorld::Storage {
 #else
         coefficients = std::span<const std::uint8_t>{require_file(files, "dsp_coef.bin")};
 #endif
-        hps = std::span<const std::uint8_t>{require_file(files, "menu01.hps")};
+        menu01_hps = std::span<const std::uint8_t>{
+            require_file(files, "menu01.hps")};
+        menu3_hps = std::span<const std::uint8_t>{
+            require_file(files, "menu3.hps")};
         bank_bytes.reserve(bank_names.size());
         for (const auto& name : bank_names)
             bank_bytes.emplace_back(require_file(files, name));
@@ -361,8 +369,8 @@ struct GameplayMenuWorld::Storage {
     void drain_source_audio()
     {
         if (!transport_started || !melee_web_audio_bank_transport_configured()) return;
-        // The source stop/cancel transition must happen while menu01.hps still
-        // owns the nested stream. Transport requests can legitimately span
+        // The source stop/cancel transition must happen while the menu HPS
+        // registry still owns the nested stream. Transport requests can span
         // multiple 64-transfer pumps, so continue until the original queue is
         // empty rather than treating the first partial pump as failure.
         lbAudioAx_80027DBC();
