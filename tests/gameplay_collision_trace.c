@@ -9,6 +9,7 @@
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
 #include <sysdolphin/baselib/gobjproc.h>
+#include <sysdolphin/baselib/jobj.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -94,6 +95,124 @@ static void source_loaded_case(void)
     stage_info.param = prior_param;
     stage_info.coll_data = prior_data;
     stage_info.grkind = prior_kind;
+}
+
+static DynamicsDesc* source_dynamic_touch_line(int line_id)
+{
+    (void) line_id;
+    abort();
+}
+
+/* The shared owner may adopt a live dynamic range only after the retail map,
+ * joint binding and stage touch-line callback exist. Keep the negative
+ * synthetic-creation case above; this source-loaded fixture checks that an
+ * adopted owner queries the current original collision vertices, not the
+ * initial snapshot. The Kraid source-stage trace separately exercises the
+ * real stage callback that moves its dynamic joints. */
+static void source_dynamic_case(void)
+{
+    GroundParam param = {0};
+    param.y = 1.0F;
+    Vec2 source_vertices[] = {{-10, 0}, {0, 0}, {0, 10}, {10, 10}};
+    MapLine source_lines[] = {
+        {0, 1, -1, 1, -1, 1, 1, 0x104},
+        {1, 3, 0, 2, 0, 2, 1, 0x104},
+        {2, 3, 1, -1, 1, -1, 2, 0x205},
+        {1, 2, -1, -1, -1, -1, 0, 0},
+    };
+    MapJoint source_joints[] = {
+        {0, 2, 2, 1, 3, 0, 3, 0, 3, 1, -10, 0, 10, 10, 0, 4},
+    };
+    MapCollData source_map = {
+        .verts = source_vertices,
+        .vert_count = 4,
+        .lines = source_lines,
+        .line_count = 4,
+        .floor_start = 0,
+        .floor_count = 2,
+        .ceiling_start = 2,
+        .ceiling_count = 1,
+        .right_wall_start = 3,
+        .left_wall_start = 3,
+        .dynamic_start = 3,
+        .dynamic_count = 1,
+        .joints = source_joints,
+        .joint_count = 1,
+    };
+    const MeleeWebCollisionVertex input_vertices[] = {
+        {-10, 0}, {0, 0}, {0, 10}, {10, 10},
+    };
+    const MeleeWebCollisionLine input_lines[] = {
+        {0, 1, -1, 1, -1, 1, 1, 0x104},
+        {1, 3, 0, 2, 0, 2, 1, 0x104},
+        {2, 3, 1, -1, 1, -1, 2, 0x205},
+        {1, 2, -1, -1, -1, -1, 0, 0},
+    };
+    const MeleeWebCollisionJoint input_joints[] = {
+        {{{0, 2}, {2, 1}, {3, 0}, {3, 0}, {3, 1}}, -10, 0, 10, 10, {0, 4}},
+    };
+    const MeleeWebCollisionInput dynamic_input = {
+        .vertices = input_vertices,
+        .vertex_count = 4,
+        .lines = input_lines,
+        .line_count = 4,
+        .joints = input_joints,
+        .joint_count = 1,
+        .ranges = {{0, 2}, {2, 1}, {3, 0}, {3, 0}, {3, 1}},
+        .stage_kind = Gr_Kind_Last,
+        .stage_scale = 1.0F,
+    };
+    HSD_JObj root = {0}, bound_joint = {0};
+    root.child = &bound_joint;
+    bound_joint.parent = &root;
+    GroundParam* prior_param = stage_info.param;
+    MapCollData* prior_data = stage_info.coll_data;
+    GrKind prior_kind = stage_info.grkind;
+    GrTouchLineCallback prior_touch_line = stage_info.on_touch_line;
+    stage_info.param = &param;
+    stage_info.grkind = Gr_Kind_Last;
+    stage_info.coll_data = &source_map;
+    stage_info.on_touch_line = source_dynamic_touch_line;
+
+    mpLibLoad(&source_map);
+    mpLib_80058820();
+    stage_info.on_touch_line = NULL;
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)),
+          "source dynamic collision rejects a missing authored touch-line callback");
+    stage_info.on_touch_line = source_dynamic_touch_line;
+    source_map.dynamic_count = 0;
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)),
+          "source dynamic collision rejects a changed loaded-map descriptor");
+    source_map.dynamic_count = 1;
+    check(!melee_web_collision_adopt_loaded(&dynamic_input, error, sizeof(error)),
+          "source dynamic collision rejects an unbound authored joint");
+    mpLib_800552B0(0, &root, 0);
+    CollJoint* const source_joint_bindings = mpGetGroundCollJoint();
+    CollVtx* const source_collision_vertices = mpGetGroundCollVtx();
+    check(source_joint_bindings && source_joint_bindings[0].x20 == &bound_joint,
+          "original joint traversal binds the dynamic source JObj");
+    MeleeWebCollision* owner = melee_web_collision_adopt_loaded(
+        &dynamic_input, error, sizeof(error));
+    check(owner != NULL,
+          "source dynamic lines adopt only after map, joint and callback binding");
+    MeleeWebCollisionReadiness readiness;
+    check(melee_web_collision_readiness(owner, &readiness, error, sizeof(error)) &&
+              readiness.stage_joint_bindings_ready && readiness.stage_callbacks_ready,
+          "dynamic readiness reports the checked source bindings and callback");
+    MeleeWebCollisionLineResult before, after;
+    check(melee_web_collision_line(owner, 3, &before, error, sizeof(error)),
+          "source dynamic line is queryable after adoption");
+    source_collision_vertices[2].pos.x = 6.0F;
+    mpJointUpdateDynamics(0);
+    check(melee_web_collision_line(owner, 3, &after, error, sizeof(error)) &&
+              before.v1[0] == 0.0F && after.v1[0] == 6.0F,
+          "adopted dynamic query reads the current original vertex array");
+    check(melee_web_collision_destroy(owner, error, sizeof(error)),
+          "dynamic source collision teardown releases original storage");
+    stage_info.param = prior_param;
+    stage_info.coll_data = prior_data;
+    stage_info.grkind = prior_kind;
+    stage_info.on_touch_line = prior_touch_line;
 }
 
 static void source_dummy_case(void)
@@ -266,6 +385,7 @@ int main(void)
     check(!melee_web_collision_create(&invalid, error, sizeof(error)), "source line capacity enforced before reads");
     source_dummy_case();
     source_loaded_case();
+    source_dynamic_case();
     source_floor_carry_cases();
     lines[2].next0 = 0;
     check(!melee_web_collision_create(&input, error, sizeof(error)), "cyclic island chains reject before original traversal");
