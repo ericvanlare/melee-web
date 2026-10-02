@@ -196,7 +196,7 @@ const nativeRow = (timestamp, sourceFrame = 12) => [
   assert.notEqual(chromeAndroid.exportReports().session_id, edge.exportReports().session_id);
   const fallback = createRuntimeDiagnostics({globalThis: makeRoot('', '', {getRandomValues() { throw new Error('blocked'); }})});
   assert.equal(fallback.exportReports().flags.crypto_unavailable, true);
-  assert.match(fallback.exportReports().session_id, /^session-[a-z0-9-]{16,96}$/);
+  assert.match(fallback.exportReports().session_id, /^session-[a-z0-9]{16,64}$/);
 }
 
 // Native unavailable sentinels remain null, while valid transient deltas are

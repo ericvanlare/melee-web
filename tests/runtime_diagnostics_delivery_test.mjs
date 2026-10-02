@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import {createDiagnosticsDelivery, DELIVERY_MAX_BYTES, DELIVERY_MAX_RECORDS,
+import {createDiagnosticsDelivery, DELIVERY_MAX_BYTES, DELIVERY_MAX_RECORDS, DELIVERY_MAX_RETRIES,
   DELIVERY_MAX_SESSION_UPLOADS, DELIVERY_RETENTION_MS} from '../web/runtime-diagnostics-delivery.mjs';
 import {MAX_REPORT_BYTES, REASONS} from '../diagnostics/schema.mjs';
+import {createRuntimeDiagnostics} from '../web/runtime-diagnostics.mjs';
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -15,6 +16,39 @@ function rootFor(fetch, online = true) {
     setTimeout,
     clearTimeout,
     fetch,
+  };
+}
+
+function deliveryClock(fetch) {
+  let timestamp = 0;
+  let sequence = 0;
+  const timers = new Map();
+  const root = rootFor(fetch);
+  root.setTimeout = (callback, delay = 0) => {
+    const id = ++sequence;
+    timers.set(id, {callback, at: timestamp + delay});
+    return id;
+  };
+  root.clearTimeout = id => timers.delete(id);
+  return {
+    root,
+    now: () => timestamp,
+    pending: () => [...timers.values()].map(timer => timer.at).sort((a, b) => a - b),
+    async advanceTo(target) {
+      assert.ok(target >= timestamp, 'test clock cannot go backwards');
+      let callbacks = 0;
+      for (;;) {
+        const next = [...timers.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+        if (!next || next[1].at > target) break;
+        assert.ok(++callbacks <= 20, 'delivery must not spin through immediate retries');
+        timestamp = next[1].at;
+        timers.delete(next[0]);
+        next[1].callback();
+        await tick();
+      }
+      timestamp = target;
+      await tick();
+    },
   };
 }
 
@@ -280,6 +314,238 @@ async function testResumeCancellationAndSessionBudget() {
   assert.equal(sent, DELIVERY_MAX_SESSION_UPLOADS);
   assert.equal(budget.enqueue(reportFor({session_id: 'session-after-budget'})).reason, 'session_limit');
   budget.dispose();
+}
+
+async function testRetryWaitsForFetchAndPersistenceSettlement(gate = null) {
+  let requests = 0;
+  let releaseFetch;
+  let releaseSave;
+  const clock = deliveryClock(() => {
+    requests += 1;
+    return requests === 1 ? new Promise(resolve => { releaseFetch = () => resolve({status: 503}); })
+      : Promise.resolve({status: 201});
+  });
+  const adapter = storage();
+  const save = adapter.save;
+  adapter.save = async values => {
+    if (!releaseSave) await new Promise(resolve => { releaseSave = resolve; });
+    await save(values);
+  };
+  const delivery = createDiagnosticsDelivery({globalThis: clock.root, now: clock.now,
+    origin: 'https://webmelee.gg', storage: adapter, retryBaseMs: 100, random: () => 0.5});
+  delivery.enqueue(reportFor());
+  delivery.setActive(false);
+  await clock.advanceTo(0);
+  assert.equal(requests, 1);
+  await clock.advanceTo(250);
+  releaseFetch();
+  await tick();
+  assert.equal(typeof releaseSave, 'function', 'failed send reaches deferred persistence');
+  assert.equal(delivery.exportPending().records[0].next_attempt_at, 350,
+    'retry backoff starts after the delayed request completes');
+  delivery.setOnline(true);
+  await clock.advanceTo(500);
+  assert.equal(requests, 1, 'no second request while the first flush is persisting');
+  assert.deepEqual(clock.pending(), [], 'retry wakeup waits for the current flush to settle');
+  if (gate === 'active') delivery.setActive(true);
+  if (gate === 'offline') delivery.setOnline(false);
+  if (gate === 'opt_out') delivery.setOptOut(true);
+  if (gate === 'disposed') delivery.dispose();
+  releaseSave();
+  await tick();
+  assert.deepEqual(clock.pending(), gate ? [] : [500],
+    'settlement rearms the elapsed retry only when delivery remains eligible');
+  await clock.advanceTo(500);
+  assert.equal(requests, gate ? 1 : 2,
+    'pending retry sends without another transition only when delivery remains eligible');
+  assert.equal(delivery.getStatus().queued, !gate || gate === 'opt_out' ? 0 : 1);
+  assert.deepEqual(clock.pending(), []);
+  delivery.dispose();
+}
+
+async function testReloadSchedulesFutureRetry() {
+  let requests = 0;
+  const clock = deliveryClock(async () => { requests += 1; return {status: 201}; });
+  const adapter = storage();
+  const seed = createDiagnosticsDelivery({globalThis: clock.root, now: clock.now,
+    origin: 'https://webmelee.gg', storage: adapter});
+  seed.enqueue(reportFor());
+  await seed.persist();
+  seed.dispose();
+  adapter.state.values[0].attempts = 1;
+  adapter.state.values[0].next_attempt_at = 200;
+  await clock.advanceTo(20);
+  const reloaded = createDiagnosticsDelivery({globalThis: clock.root, now: clock.now,
+    origin: 'https://webmelee.gg', storage: adapter});
+  reloaded.setActive(false);
+  await clock.advanceTo(20);
+  assert.equal(requests, 0, 'reload does not send before the persisted retry is due');
+  assert.deepEqual(clock.pending(), [200], 'reload arms the stored future retry');
+  await clock.advanceTo(199);
+  assert.equal(requests, 0);
+  await clock.advanceTo(200);
+  assert.equal(requests, 1, 'future retry sends without a new activity or online transition');
+  assert.equal(reloaded.getStatus().queued, 0);
+  assert.deepEqual(clock.pending(), []);
+  reloaded.dispose();
+}
+
+async function testAutomaticRetryGatesAndBudgets() {
+  for (const gate of ['active', 'offline', 'opt_out', 'disposed']) {
+    let requests = 0;
+    const clock = deliveryClock(async () => { requests += 1; return {status: 503}; });
+    const delivery = createDiagnosticsDelivery({globalThis: clock.root, now: clock.now,
+      origin: 'https://webmelee.gg', storage: storage(), retryBaseMs: 100, random: () => 0.5});
+    delivery.enqueue(reportFor());
+    delivery.setActive(false);
+    await clock.advanceTo(0);
+    assert.equal(requests, 1);
+    assert.deepEqual(clock.pending(), [100]);
+    if (gate === 'active') delivery.setActive(true);
+    if (gate === 'offline') delivery.setOnline(false);
+    if (gate === 'opt_out') delivery.setOptOut(true);
+    if (gate === 'disposed') delivery.dispose();
+    await clock.advanceTo(1000);
+    assert.equal(requests, 1, `${gate} prevents the scheduled retry from sending`);
+    assert.deepEqual(clock.pending(), [], `${gate} prevents repeated retry wakeups`);
+    delivery.dispose();
+  }
+
+  for (const recordCount of [1, 2]) {
+    let requests = 0;
+    const clock = deliveryClock(async () => { requests += 1; return {status: 503}; });
+    const delivery = createDiagnosticsDelivery({globalThis: clock.root, now: clock.now,
+      origin: 'https://webmelee.gg', storage: storage(), retryBaseMs: 100, random: () => 0.5});
+    for (let index = 0; index < recordCount; index += 1) {
+      delivery.enqueue(reportFor({session_id: `session-autoretry${index}`}));
+    }
+    delivery.setActive(false);
+    await clock.advanceTo(1000);
+    assert.equal(requests, recordCount === 1 ? DELIVERY_MAX_RETRIES : DELIVERY_MAX_SESSION_UPLOADS,
+      'automatic retries respect both per-record and session attempt caps');
+    assert.equal(delivery.getStatus().queued, recordCount === 1 ? 0 : recordCount);
+    assert.deepEqual(clock.pending(), [], 'exhausted budgets do not keep scheduling wakeups');
+    delivery.dispose();
+  }
+}
+
+async function testServerRetryAfterAndRetention() {
+  for (const {header, due, expired = false} of [
+    {header: '86400', due: 86400000},
+    {header: new Date(2000).toUTCString(), due: 2000},
+    {header: 'Thursday, 01-Jan-70 00:00:02 GMT', due: 2000},
+    {header: 'Thu Jan  1 00:00:02 1970', due: 2000},
+    {header: '1.5', due: 100},
+    {header: '-1', due: 100},
+    {header: 'invalid', due: 100},
+    {header: '0', due: 100},
+    {header: new Date(-1000).toUTCString(), due: 100},
+    {header: '99999999999999999999999999999999999999', due: DELIVERY_RETENTION_MS, expired: true},
+  ]) {
+    let requests = 0;
+    const clock = deliveryClock(async () => {
+      requests += 1;
+      return requests === 1 ? {status: 429, headers: new Headers({'retry-after': header})} : {status: 201};
+    });
+    const adapter = storage();
+    const delivery = createDiagnosticsDelivery({globalThis: clock.root, now: clock.now,
+      origin: 'https://webmelee.gg', storage: adapter, retryBaseMs: 100, random: () => 0.5});
+    delivery.enqueue(reportFor());
+    delivery.setActive(false);
+    await clock.advanceTo(0);
+    assert.equal(requests, 1);
+    assert.equal(adapter.state.values[0].next_attempt_at, due, `Retry-After ${header} is persisted`);
+    await clock.advanceTo(due - 1);
+    assert.equal(requests, 1, 'server delay cannot consume rapid retries before its deadline');
+    assert.equal(delivery.exportPending().records[0].attempts, 1);
+    await clock.advanceTo(due);
+    assert.equal(requests, expired ? 1 : 2, 'retention expiry prevents a late retry');
+    assert.deepEqual(adapter.state.values, []);
+    assert.equal(delivery.getStatus().queued, 0);
+    assert.deepEqual(clock.pending(), []);
+    delivery.dispose();
+  }
+}
+
+async function testExpiredStorageIsPhysicallyCleared() {
+  for (const kind of ['outbox', 'tombstone', 'both']) {
+    let at = 0;
+    let requests = 0;
+    const adapter = storage();
+    const root = rootFor(async () => { requests += 1; return {status: 201}; });
+    const seed = createDiagnosticsDelivery({globalThis: root, origin: 'https://webmelee.gg',
+      storage: adapter, now: () => at, retentionMs: 10});
+    seed.enqueue(reportFor());
+    await seed.persist();
+    seed.dispose();
+    if (kind === 'tombstone') adapter.state.values = [];
+    if (kind !== 'outbox') adapter.state.tombstones = [{incident_id: 'incident-2',
+      fingerprint: 'a'.repeat(16), sent_at: 0, expires_at: 10}];
+    at = 10;
+    const reloaded = createDiagnosticsDelivery({globalThis: root, origin: 'https://webmelee.gg',
+      storage: adapter, now: () => at, online: false});
+    reloaded.setActive(false);
+    await reloaded.flushWhenInactive();
+    assert.equal(requests, 0, 'expiry cleanup does not upload or need a new report');
+    assert.deepEqual(adapter.state.values, [], `${kind} expiry is physically removed from the outbox`);
+    assert.deepEqual(adapter.state.tombstones, [], `${kind} expiry is physically removed from tombstones`);
+    assert.equal(reloaded.exportPending().flags.expired, true);
+    assert.equal(reloaded.exportPending().flags.malformed, false);
+    reloaded.dispose();
+  }
+
+  let at = 0;
+  const adapter = storage();
+  adapter.state.tombstones = [{incident_id: 'incident-2', fingerprint: 'a'.repeat(16),
+    sent_at: 0, expires_at: 10}];
+  const delivery = createDiagnosticsDelivery({globalThis: rootFor(async () => ({status: 201})),
+    origin: 'https://webmelee.gg', storage: adapter, now: () => at, online: false});
+  delivery.setActive(false);
+  await delivery.flushWhenInactive();
+  assert.equal(adapter.state.tombstones.length, 1, 'unexpired tombstones remain retained');
+  at = 10;
+  await delivery.flushWhenInactive();
+  assert.deepEqual(adapter.state.tombstones, [], 'already-loaded tombstones are physically cleared at expiry');
+  delivery.dispose();
+
+  let requests = 0;
+  const clock = deliveryClock(async () => { requests += 1; return {status: 201}; });
+  const future = storage();
+  const seed = createDiagnosticsDelivery({globalThis: clock.root, now: clock.now,
+    origin: 'https://webmelee.gg', storage: future, retentionMs: 10});
+  seed.enqueue(reportFor());
+  await seed.persist();
+  seed.dispose();
+  future.state.values[0].next_attempt_at = 100;
+  const reloaded = createDiagnosticsDelivery({globalThis: clock.root, now: clock.now,
+    origin: 'https://webmelee.gg', storage: future});
+  reloaded.setActive(false);
+  await clock.advanceTo(0);
+  assert.deepEqual(clock.pending(), [10], 'restored retries wake at expiry before an excessive stored delay');
+  await clock.advanceTo(10);
+  assert.equal(requests, 0);
+  assert.deepEqual(future.state.values, [], 'expiry cleanup does not wait for a later activity transition');
+  assert.deepEqual(clock.pending(), []);
+  reloaded.dispose();
+}
+
+async function testRecorderFallbackSessionRemainsDeliverable() {
+  const sent = [];
+  const root = rootFor(async (_url, options) => { sent.push(JSON.parse(options.body)); return {status: 201}; });
+  root.crypto = {getRandomValues() { throw new Error('unavailable'); }};
+  const recorder = createRuntimeDiagnostics({globalThis: root, origin: 'https://webmelee.gg',
+    identity: {sourceCommit: 'a'.repeat(40), runtimeHash: 'b'.repeat(16), buildProfile: 'player'}});
+  recorder.trigger(1, 9, 8, 12, 7, 1);
+  const report = recorder.exportReports();
+  assert.equal(report.flags.crypto_unavailable, true);
+  assert.match(report.session_id, /^session-[a-z0-9]{1,64}$/);
+  const delivery = createDiagnosticsDelivery({globalThis: root, origin: 'https://webmelee.gg', storage: storage()});
+  assert.equal(delivery.enqueue(report).accepted, true, 'fallback recorder session passes the wire schema');
+  delivery.setActive(false);
+  await delivery.flushWhenInactive();
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].session_id, report.session_id, 'delivery preserves the canonical recorder session identity');
+  delivery.dispose();
 }
 
 async function testIncidentIdentityStatusAndMultiTabMerge() {
@@ -737,6 +1003,14 @@ function testFallbackIdentifiersUseRandomBytes() {
 }
 
 testFallbackIdentifiersUseRandomBytes();
+for (const gate of [null, 'active', 'offline', 'opt_out', 'disposed']) {
+  await testRetryWaitsForFetchAndPersistenceSettlement(gate);
+}
+await testReloadSchedulesFutureRetry();
+await testAutomaticRetryGatesAndBudgets();
+await testServerRetryAfterAndRetention();
+await testExpiredStorageIsPhysicallyCleared();
+await testRecorderFallbackSessionRemainsDeliverable();
 await testRetainedCaptureCannotRestartExpiry();
 await testTerminalWorkCannotResurrectFromPersistedMerge();
 await testKnownHostsAndAllowlist();
