@@ -332,6 +332,27 @@ set_target_properties(gameplay_content_match_trace PROPERTIES SUFFIX ".js")
 
 # Quiescent synchronous source-only API for the rollback feasibility experiment.
 # This never enters the browser/draw host and cannot certify that ownership.
+#
+# This setting belongs only to the diagnostic snapshot target.  Memory growth
+# remains enabled: the value controls the initial Wasm capacity, while the
+# helper/report record the actual full HEAPU8 capacity at capture.  A grown
+# buffer therefore remains a larger snapshot and cannot be restored through a
+# smaller configured value.  Keep the reviewed experiment floor at 32 MiB and
+# require Wasm page alignment; each candidate is measured in a fresh module.
+set(MELEE_WEB_SNAPSHOT_INITIAL_MEMORY 134217728 CACHE STRING
+  "Initial Wasm capacity for gameplay_snapshot_probe (bytes, >=32 MiB, 64 KiB aligned)")
+if(NOT MELEE_WEB_SNAPSHOT_INITIAL_MEMORY MATCHES "^[0-9]+$")
+  message(FATAL_ERROR
+    "MELEE_WEB_SNAPSHOT_INITIAL_MEMORY must be a decimal byte count")
+endif()
+math(EXPR _melee_web_snapshot_memory_remainder
+  "${MELEE_WEB_SNAPSHOT_INITIAL_MEMORY} % 65536")
+if(MELEE_WEB_SNAPSHOT_INITIAL_MEMORY LESS 33554432 OR
+   _melee_web_snapshot_memory_remainder GREATER 0)
+  message(FATAL_ERROR
+    "MELEE_WEB_SNAPSHOT_INITIAL_MEMORY must be at least 32 MiB and 64 KiB aligned")
+endif()
+unset(_melee_web_snapshot_memory_remainder)
 add_executable(gameplay_snapshot_probe EXCLUDE_FROM_ALL tests/gameplay_snapshot_probe.cpp)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_snapshot_probe.cpp")
@@ -342,7 +363,7 @@ target_link_libraries(gameplay_snapshot_probe PRIVATE fighter_asset_runtime)
 target_link_options(gameplay_snapshot_probe PRIVATE --no-entry --profiling-funcs
   -sASYNCIFY=0
   -sENVIRONMENT=node -sNODERAWFS=1 -sMODULARIZE=1 -sALLOW_MEMORY_GROWTH=1
-  -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2
+  -sINITIAL_MEMORY=${MELEE_WEB_SNAPSHOT_INITIAL_MEMORY} -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2
   -sEXPORTED_RUNTIME_METHODS=ccall,HEAPU8,UTF8ToString,stackSave,stackRestore
   -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_rng_address,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_close)
 set_target_properties(gameplay_snapshot_probe PROPERTIES SUFFIX ".js")
