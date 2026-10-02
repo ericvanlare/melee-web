@@ -136,6 +136,7 @@ int main() {{
     menu_clock.reset();
     const Pair foreground_simulation = advance(0.0);
     assert_not_stalled(foreground_simulation);
+    tick(); // No suspension event at the real native command boundary.
     const Pair simulation_stall = advance(350.0);
     assert(simulation_stall.menu.stalled);
     assert(simulation_stall.menu.reason == FixedTickClock::StallReason::Debt);
@@ -144,6 +145,7 @@ int main() {{
     // The audio catch-up clock keeps its independent 60-step guard.
     audio_clock.reset();
     assert(!audio_clock.tick(0.0, true).stalled);
+    tick();
     const auto audio_stall = audio_clock.tick(1100.0, true);
     assert(audio_stall.stalled);
     assert(audio_stall.reason == FixedTickClock::StallReason::Debt);
@@ -158,6 +160,7 @@ int main() {{
     assert(pending_handoff == 0);
     assert(simulated_consumable_handoff() == 0);
     assert(!menu_clock.tick(350.0, true).stalled);
+    tick(); // A second boundary cannot consume the same lifecycle event.
     const auto after_double_service = menu_clock.tick(700.0, true);
     assert(after_double_service.stalled);
     assert(after_double_service.threshold == 8);
