@@ -118,8 +118,8 @@ async function verifyPackage(site, manifest) {
 }
 
 function fixtureMarkup(runtimeModule, identity) {
-const moduleUrl = '/' + runtimeModule;
-const identityJson = JSON.stringify(identity);
+  const moduleUrl = '/' + runtimeModule;
+  const identityJson = JSON.stringify(identity);
   const source = String.raw`
 const fixture = globalThis.__runtimeLifecycleFixture = {
   ready: false, load: {state: 'booting'}, errors: 0, states: [], samples: [],
@@ -129,6 +129,7 @@ const fixture = globalThis.__runtimeLifecycleFixture = {
   synthetic_hidden: false, synthetic_visibility_override: false, synthetic_callback_hold: false,
   synthetic_native_callback_identified: false, synthetic_held_callbacks: 0,
   synthetic_released_callbacks: 0, synthetic_hold_result: null,
+  native_sample_count: 0, native_source_steps: 0, trace_sequence: 0,
 };
 // The compiled Emscripten main loop schedules its runner through the browser's
 // requestAnimationFrame. Install this bounded shim before importing the runtime
@@ -148,10 +149,10 @@ function invokeRafEntry(entry, timestamp) {
     return;
   }
   rafEntries.delete(entry.id);
-  const beforeSamples = fixture.samples.length;
+  const beforeSamples = fixture.native_sample_count;
   fixture.synthetic_raf_invocations = Number(fixture.synthetic_raf_invocations || 0) + 1;
   entry.callback.call(globalThis, timestamp);
-  if (fixture.samples.length > beforeSamples) {
+  if (fixture.native_sample_count > beforeSamples) {
     nativeRafCallbacks.add(entry.callback);
     fixture.synthetic_native_callback_identified = true;
   }
@@ -174,22 +175,29 @@ if (typeof originalRequestAnimationFrame === 'function') {
 for (const type of __LIFECYCLE_EVENTS__) {
   const target = type === 'visibilitychange' ? document : window;
   target.addEventListener(type, () => fixture.browser_events.push({
-    type, at: performance.now(), hidden: document.hidden, visibility: document.visibilityState,
+    type, at: performance.now(), sequence: ++fixture.trace_sequence,
+    hidden: document.hidden, visibility: document.visibilityState,
   }), true);
 }
 
 const number = value => Number.isFinite(Number(value)) ? Number(value) : null;
 function recordSample(args, callbackMs) {
-  if (fixture.samples.length >= 128) return;
-  fixture.samples.push({timestamp: number(args[0]), source_frame: number(args[1]), scene: number(args[2]),
+  const sourceSteps = number(args[16]);
+  fixture.native_sample_count++;
+  if (sourceSteps !== null) fixture.native_source_steps += Math.max(0, sourceSteps);
+  const row = {sample_index: fixture.native_sample_count, timestamp: number(args[0]),
+    source_frame: number(args[1]), scene: number(args[2]),
     debt_ticks: number(args[8]), total_ms: number(args[11]), source_steps: number(args[16]),
     source_draws: number(args[17]), running: args[18] === true || args[18] === 1,
-    callback_ms: callbackMs, at: performance.now()});
+    callback_ms: callbackMs, at: performance.now(), sequence: ++fixture.trace_sequence};
+  if (fixture.samples.length >= 128) fixture.samples.shift();
+  fixture.samples.push(row);
 }
 function recordIncident(args) {
   if (fixture.incidents.length >= 32) return;
   fixture.incidents.push({reason_code: number(args[0]), value: number(args[1]), threshold: number(args[2]),
-    source_frame: number(args[3]), scene: number(args[4]), clock_owner: number(args[5])});
+    source_frame: number(args[3]), scene: number(args[4]), clock_owner: number(args[5]),
+    sequence: ++fixture.trace_sequence});
 }
 function safeAudio(data) {
   if (!data || typeof data !== 'object') return;
@@ -240,7 +248,8 @@ function exposeOwner(owner) {
   const module = owner.Module;
   const activity = module?._melee_web_input_set_activity;
   if (typeof activity === 'function') module._melee_web_input_set_activity = (focused, visible) => {
-    fixture.input_activity.push({focused: Number(focused) ? 1 : 0, visible: Number(visible) ? 1 : 0, at: performance.now()});
+    fixture.input_activity.push({focused: Number(focused) ? 1 : 0, visible: Number(visible) ? 1 : 0,
+      at: performance.now(), sequence: ++fixture.trace_sequence});
     return activity.call(module, focused, visible);
   };
   const unload = module?._melee_web_native_menu_unload;
@@ -274,7 +283,7 @@ function syntheticVisibilityOverride() {
   } catch { return false; }
 }
 function dispatchSyntheticVisibility(kind) {
-  fixture.synthetic_events.push({kind, at: performance.now(), hidden: fixture.synthetic_hidden,
+  fixture.synthetic_events.push({kind, at: performance.now(), sequence: ++fixture.trace_sequence, hidden: fixture.synthetic_hidden,
     visibility: document.visibilityState});
   try { document.dispatchEvent(new Event('visibilitychange')); } catch { return false; }
   return true;
@@ -311,8 +320,8 @@ fixture.syntheticHiddenHold = async () => {
     return {available: false, unrun_reason: 'synthetic_main_loop_callback_unavailable'};
   if (!syntheticVisibilityOverride())
     return {available: false, unrun_reason: 'synthetic_visibility_override_unavailable'};
-  const beforeSamples = fixture.samples.length;
-  const beforeSourceSteps = fixture.samples.reduce((sum, sample) => sum + (sample.source_steps || 0), 0);
+  const beforeSamples = fixture.native_sample_count;
+  const beforeSourceSteps = fixture.native_source_steps;
   const startedAt = performance.now();
   fixture.synthetic_hidden = true;
   fixture.synthetic_callback_hold = true;
@@ -322,17 +331,18 @@ fixture.syntheticHiddenHold = async () => {
     return {available: false, unrun_reason: 'synthetic_visibility_event_unavailable'};
   }
   await new Promise(resolve => setTimeout(resolve, __HIDDEN_DWELL_MS__));
-  const duringSamples = fixture.samples.length;
-  const duringSourceSteps = fixture.samples.reduce((sum, sample) => sum + (sample.source_steps || 0), 0);
+  const duringSamples = fixture.native_sample_count;
+  const duringSourceSteps = fixture.native_source_steps;
   const hiddenAt = performance.now();
   fixture.synthetic_hidden = false;
   const visibleEvent = dispatchSyntheticVisibility('synthetic_visible_event');
   const released = releaseHeldNativeRaf();
   const visibleAt = performance.now();
   const result = {available: visibleEvent && released, started_at: startedAt, hidden_at: hiddenAt,
-    visible_at: visibleAt, before_samples: beforeSamples, during_samples: duringSamples,
-    after_samples: fixture.samples.length, before_source_steps: beforeSourceSteps,
-    during_source_steps: duringSourceSteps, after_source_steps: fixture.samples.reduce((sum, sample) => sum + (sample.source_steps || 0), 0),
+    visible_at: visibleAt, before_native_sample_count: beforeSamples, during_native_sample_count: duringSamples,
+    retained_sample_count: fixture.samples.length, before_source_steps: beforeSourceSteps,
+    after_native_sample_count: fixture.native_sample_count, during_source_steps: duringSourceSteps,
+    after_source_steps: fixture.native_source_steps,
     held_callbacks: fixture.synthetic_held_callbacks, released_callbacks: fixture.synthetic_released_callbacks,
     hidden_sample_delta: duringSamples - beforeSamples, hidden_source_step_delta: duringSourceSteps - beforeSourceSteps};
   fixture.synthetic_hold_result = result;
@@ -354,6 +364,7 @@ fixture.snapshot = () => ({
   synthetic_callback_hold: fixture.synthetic_callback_hold,
   synthetic_native_callback_identified: fixture.synthetic_native_callback_identified,
   synthetic_held_callbacks: fixture.synthetic_held_callbacks, synthetic_released_callbacks: fixture.synthetic_released_callbacks,
+  native_sample_count: fixture.native_sample_count, native_source_steps: fixture.native_source_steps,
   synthetic_hold_result: fixture.synthetic_hold_result,
   report: fixture.owner?.diagnostics?.exportReports?.() || null,
 });
@@ -614,7 +625,7 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
       }
       await waitFor(page, () => {
         const fixture = globalThis.__runtimeLifecycleFixture;
-        return fixture.samples.length > Number(fixture.synthetic_hold_result?.before_samples || 0);
+        return fixture.native_sample_count > Number(fixture.synthetic_hold_result?.before_native_sample_count || 0);
       }, SCENE_TIMEOUT_MS, 'synthetic_visible_native_sample_missing');
     } else if (synthetic) {
       const suspended = await page.evaluate(() => globalThis.__runtimeLifecycleFixture.syntheticSuspend());
@@ -686,14 +697,18 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
         'synthetic_visible_event_missing');
       const hiddenEvent = afterLifecycle.synthetic_events.find(event => event.kind === 'synthetic_hidden_event');
       const visibleEvent = afterLifecycle.synthetic_events.find(event => event.kind === 'synthetic_visible_event');
-      const browserHidden = afterLifecycle.browser_events.find(event => event.type === 'visibilitychange' && event.hidden === true);
+      const browserHidden = afterLifecycle.browser_events.find(event => event.type === 'visibilitychange' && event.hidden === true &&
+        Number(event.sequence) > Number(hiddenEvent?.sequence ?? Infinity));
       const browserVisible = afterLifecycle.browser_events.find(event => event.type === 'visibilitychange' && event.hidden === false &&
-        Number(event.at) >= Number(visibleEvent?.at || Infinity));
-      const postVisibleSample = afterLifecycle.samples.find(sample => Number(sample.at) >= Number(visibleEvent?.at || Infinity));
+        Number(event.sequence) > Number(visibleEvent?.sequence ?? Infinity));
+      const postVisibleSample = afterLifecycle.samples.find(sample => Number(sample.sample_index) >
+        Number(hold?.before_native_sample_count ?? Infinity) && Number(sample.sequence) > Number(visibleEvent?.sequence ?? Infinity));
       const postVisibleInput = afterLifecycle.input_activity.find(item => item.visible === 1 &&
-        Number(item.at) >= Number(visibleEvent?.at || Infinity));
-      requireValue(hiddenEvent && visibleEvent && browserHidden && browserVisible && hiddenEvent.at < visibleEvent.at &&
-        browserHidden.at <= visibleEvent.at && browserVisible.at >= visibleEvent.at && postVisibleSample && postVisibleInput,
+        Number(item.sequence) > Number(visibleEvent?.sequence ?? Infinity));
+      requireValue(hiddenEvent && visibleEvent && browserHidden && browserVisible &&
+        hiddenEvent.sequence < browserHidden.sequence && browserHidden.sequence < visibleEvent.sequence &&
+        visibleEvent.sequence < browserVisible.sequence && browserVisible.sequence < postVisibleSample?.sequence &&
+        postVisibleSample && postVisibleInput,
         'synthetic_hidden_visible_sample_order');
     } else if (synthetic) {
       requireValue(!unexpected.length, 'synthetic_unexpected_incident');
