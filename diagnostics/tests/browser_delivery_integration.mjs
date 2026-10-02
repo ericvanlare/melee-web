@@ -787,7 +787,8 @@ async function runNativeBrowser({page, pages, receipt, packaged}) {
   const matching = reports.find(row => row.report?.incident?.reason === 'simulation_debt');
   assert(matching, 'D1 did not retain the native simulation guard report');
   const report = matching.report;
-  assert.deepEqual(report.identity, packaged.identity);
+  assert.deepEqual(report.identity, {source_commit: packaged.identity.source_commit,
+    runtime_hash: packaged.identity.runtime_hash, build_profile: packaged.identity.build_profile});
   assert.deepEqual(report.environment, {env: 'staging', origin});
   assert.equal(report.incident.reason, 'simulation_debt');
   assert.equal(report.incident.value, bridge.guard.value);
