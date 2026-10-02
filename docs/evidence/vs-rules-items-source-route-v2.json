@@ -1,0 +1,169 @@
+{
+  "schema": "melee-web-vs-rules-items-route-v2",
+  "status": "browser_route_passed_retail_source_comparison_not_run",
+  "scope": "Original-source VS Main/Rules/Items route with one item-row edit, frequency-selector save ordering, a three-stock Final Destination match, No Contest Results, retained Rules/CSS state, and Eject/reimport cleanup. Retail route observation and rendered-browser evidence are independent; no cross-runtime equivalence is claimed.",
+  "identity": {
+    "source_revision": "GALE01 Rev. 2",
+    "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "implementation_base": "641d40f3ba0601e952d00a604b70acda287978ed",
+    "implementation_branch": "codex/vs-rules-items-route-main"
+  },
+  "retail_reference": {
+    "menu_route_receipt": "docs/evidence/vs-rules-items-source-route-v1.json",
+    "menu_route_receipt_sha256": "eeb30afc1611150bf5ebeacc23671f06dbb607b3075a31758d42ee0c6e0181a9",
+    "capture_id": "melee-character-coverage-v10-source-20261002-r3",
+    "capture_artifact_root_relative_to_agent_storage_runs": "vs-rules-items-source-route-20261002-20261002-081531-69c8c10f/original-v10-source",
+    "observed_route": "Cold-boot Main -> VS -> Rules -> Items -> Rules -> CSS, then three original Final Destination CPU9 matches with natural Results and CSS return.",
+    "observed_defaults_and_edits": {
+      "stock_count": "3 -> 4 through original Rules input",
+      "item_frequency": "3 -> 2 -> 1 -> 0 in the source menu; all three resulting match setups report -1 (None)",
+      "item_mask": "ffffffffffffffff in all three match setups; a mask-row toggle was not exercised",
+      "renderer": "Null; no rendered retail visual evidence"
+    },
+    "custom_mask_route_follow_up": {
+      "status": "not_observed",
+      "interrupted_interpreter_capture": {
+        "artifact_root_relative_to_agent_storage_runs": "vs-rules-items-source-route-v2-20261002-20261002-112000-a2903691/original-route-retry",
+        "interruption_receipt": "interruption.json",
+        "interruption_receipt_sha256": "bafd3b51365180fbc2369dcb0642ad03b8158c469191f3d7667d8feaa3fd9924",
+        "signal": "SIGINT after 672.6 seconds without a first scheduler return",
+        "allocations_sha256": "cba4de366c30dbb56762cc7cd2fdccb6fc6a04d2e641937133af4bb518a78bb0",
+        "gdb_log_sha256": "ad697a01acd2548bae09fb0c73c8b4da7a6d985d8b5b4520686e6b8811f8a045"
+      },
+      "bounded_jitarm64_boot_diagnostic": {
+        "artifact_root_relative_to_agent_storage_runs": "vs-rules-items-source-route-v2-20261002-20261002-112000-a2903691/boot-only-jitarm64-attempt-05",
+        "result": "failed before first scheduler return; GDB timed out after 600 seconds",
+        "result_sha256": "6ef6643271a1461060b1fb63f9f1643e06bc4369cfb3cbad2aaf41e8d0b367476",
+        "allocations_sha256": "cba4de366c30dbb56762cc7cd2fdccb6fc6a04d2e641937133af4bb518a78bb0",
+        "gdb_log_sha256": "ad697a01acd2548bae09fb0c73c8b4da7a6d985d8b5b4520686e6b8811f8a045"
+      },
+      "comparison_claim": "Retail source state is observed for the v1 route. The browser custom-mask values below were not compared with a retail custom-mask capture. Source-card persistence of the edited mask is not claimed."
+    }
+  },
+  "source_route": {
+    "scene_and_menu_ids": {
+      "GM_MENU": 1,
+      "GS_MENU": 1,
+      "MenuKind_Main": 0,
+      "MenuKind_VS": 2,
+      "MenuKind_Rules": 13,
+      "MenuKind_Items": 16,
+      "GM_VS": 2,
+      "GS_CSS": 8,
+      "GS_SSS": 9,
+      "GS_RESULTS": 5
+    },
+    "callbacks_and_transitions": {
+      "main_to_vs": "mn_8022DB10 handles SEL_MAIN_VS and changes the original menu kind to VS.",
+      "vs_to_rules": "mn_8022D594 handles SEL_VS_RULES and calls mn_80231714.",
+      "rules": "fn_8022F538 handles Rules navigation, B to VS focus, and Start to commit GameRules before GM_VS handoff.",
+      "rules_to_items": "fn_8022F538 selection 5 calls mnItemSw_802358C0.",
+      "items": "fn_80233E10 owns source A/B/Start and directional input; fn_80234C24 handles the entry/exit animation and confirmed item/frequency updates.",
+      "item_frequency_save": "The source selector invokes mnItemSw_SaveSettings, which copies authored item flags and stores frequency as x21 - 1.",
+      "items_back": "MenuInput_Back calls mnItemSw_CommitItems, lbCardGame_UpdatePowerTime, and mn_8023164C to return to Rules.",
+      "mode_handoff": "gmmenumode.c:onExit passes MenuExitData.pending_mode through gm_SetPendingGameMode and gm_SetNewGameModePending.",
+      "css_to_main": "mnCharSel_Scene_OnFrame uses the source PAD_LR_START parent route to GM_MENU.",
+      "match_to_results": "The source PAD_LR_START + A + Start sequence produces the original No Contest Results route."
+    },
+    "source_authored_item_mask_mapping": {
+      "table": "gm_1601.c: lbl_803B7844",
+      "selected_source_items_cursor": 0,
+      "changed_saved_preference_bit": 16,
+      "mapped_StartMeleeData_item_mask_bit": 32,
+      "browser_assertion": "Both bit positions are asserted by the full-route browser harness against live source observations."
+    },
+    "assets": [
+      "MnMaAll.usd: MenMainConRl_Top, MenMainCursorRl_Top, MenMainNmRl_Top, MenMainConIs_Top, MenMainCursorIs_Top",
+      "MnSlChr.usd and SdSlChr.usd: SIS_SelCharData for non-Japanese saved language",
+      "MnSlMap.usd: source stage-select map menu data",
+      "SdMenu.usd: SIS_MenuData for US language; SdToy.dat: SIS_ToyData",
+      "GmEvent.dat: sqEventInitDataLevelTbl through gm_801BA8FC",
+      "LbAd.dat: lbAudioLoadData through lbAudioAx_8002392C"
+    ],
+    "save_effect_boundary": "Browser observations establish source GameRules/item preference state within the running session and its retention through Results/CSS. The route does not establish a card/GCI write or Personal-profile autosave for the edited item mask."
+  },
+  "browser": {
+    "result": "pass",
+    "artifact_root_relative_to_agent_storage_runs": "vs-rules-items-source-route-v2-20261002-20261002-112000-a2903691/browser-full-route-bit-map-v3",
+    "report": "report.json",
+    "report_sha256": "5e2f336cebb447c5e9f83615b58a080808c80fed97e0a3879b50850e337b7206",
+    "browser": "Headless installed Google Chrome 154.0.8037.97 through Playwright; real HTTP served the Release browser package.",
+    "input": "Original source PAD callbacks through the B0XX keyboard mapping; no physical controller.",
+    "save_mode": "Everything unlocked, native runtime default in a fresh isolated Playwright context. No Personal profile was loaded and no user browser save was mutated.",
+    "route": [
+      "Initial original CSS -> Main -> VS -> Rules -> Items.",
+      "Source A transiently toggles Items cursor 0. Source frequency controls move None -> Very High -> None; the original selector saves the pending row state before B returns to Rules.",
+      "Rules stock changes from 4 to 3; source Start commits the Rules and returns to CSS.",
+      "Source SSS geometry navigation selects Final Destination (St_Kind_Last, 0x20).",
+      "A live Mario vs Mario Stock match reaches 180+ source frames with three stocks, item frequency -1 (None), and the custom source item mask.",
+      "Source pause and PAD_LR_START + A + Start produce No Contest outcome 7 and original Results; original navigation returns to CSS, with Rules/item values retained on re-entry.",
+      "Eject tears down source owners, scoped assets, and audio banks; reimport returns to original CSS. A second Eject returns to idle import state."
+    ],
+    "match_values": {
+      "match_kind": "Stock",
+      "stage": 32,
+      "stocks": [3, 3],
+      "item_frequency": -1,
+      "match_item_mask_hex": "fffffffeffffffff",
+      "saved_preference_mask_hex": "fffffffffffeffff",
+      "source_item_family_spawn_or_behavior": "not_exercised; frequency None"
+    },
+    "screenshots": {
+      "00-initial-css.png": "128afb9b0bbfb26d82b61b8083ef8ac0bc2e3ed03ab7da327a960162b35026f7",
+      "02-first-rules.png": "d782cdba45e2d9bef77d544d1d65ebb87ce9ce216d4cd75f31c26de3037e8a28",
+      "03-items-first-entry.png": "20173d9cdf4e1953eb9e5a563e63e145f0164e7f8b11910e175ed62f7eed96e1",
+      "06-items-frequency-none.png": "a71b539894892d6154f3c8f5aa2303f6d7f2bda55d970789f4c8595875b6b8dc",
+      "08-rules-three-stock.png": "3148018c1884b2d9383155bb73286206a63daa4bd7e3c252a72d754d99ef6d3e",
+      "11-sss-final-destination.png": "79431952048bf90c42cbf6ecf7ceda4eb988ceb9667465ac74a434ab1a6718e6",
+      "12-live-three-stock-match.png": "5318e6d502daf624721d9f537bddbb687a2f0e31004b83b0f3def88fafc2024f",
+      "13-original-results.png": "e840bbcd8de8b2e038d341ea191f8a153e146520274ec07eabaa4d1091c3f0be",
+      "14-css-after-results-settings-retained.png": "422a03dd1e5e80bb908f237f6548a8ba14e7b6ed4e25037faaf7725f079ed88c",
+      "16-rules-retained-after-results.png": "bc4f08e9687f1f83365b47f246015ffa1167ab8bcb6a9b31e129cfcfa287a704",
+      "15-clean-reimport-css.png": "38960dae1867ec0864e4166c5843d75d5156b01eda5d977771505b453bbd5c9a"
+    },
+    "claims": {
+      "rendered_browser": "passed",
+      "source_state_and_navigation": "passed",
+      "retail_source_comparison": "not_run",
+      "visual_equivalence": "not_run",
+      "audio_equivalence": "not_run; host output muted by policy while DSP/audio processing remained enabled",
+      "physical_input": "not_run",
+      "performance": "not_run"
+    },
+    "rendered_observation": "The Items and Results screens render in Chrome. The live Final Destination screenshot contains prominent magenta stage-outline artifacts; rendered capture is evidence of a real browser match route, not visual parity."
+  },
+  "validation": {
+    "focused_unit_tests": "python3 -m unittest tests.test_gameplay_menu tests.test_gameplay_match_item_mask -v; 3 passed",
+    "full_unit_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "result": "1,733 tests, 133 skipped, exit 0",
+      "log_relative_to_agent_storage_runs": "vs-rules-items-source-route-v2-20261002-20261002-112000-a2903691/full-suite.log",
+      "log_sha256": "3e37194237fbd903101e9641746e6cffaf38f940a7b1462fae2deab2da44f13d"
+    },
+    "release_runtime_build": {
+      "command": "python3 scripts/build.py --target runtime --configuration Release",
+      "result": "passed",
+      "artifacts": {
+        "runtime.html": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d",
+        "runtime-development.mjs": "ecf35dd893bedf1ff6d0539f1ebce42aa5a3c9d389b9cee682c0b46b5101e397",
+        "gameplay_menu_browser.js": "969c213d5a7ba22bf3c80b7deb66fff7e3befd927773c6db8b0e0a0fd5149aa5",
+        "gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+        "gameplay_menu_browser.wasm": "3a3152cfac0e51ace811afb2bea6133a8af75a91e1ee4e24f7e250b27225f7a5"
+      }
+    },
+    "tested_file_sha256": {
+      "src/gameplay_menu.c": "78e3a52a59a63f8c67fcf1b0617b6c5f96ac4c490f2fef88dc597d81be49fcd1",
+      "src/gameplay_match_rules.c": "a6a0083f9ec0f170329aa3064d1e69931c41638b0408794414277d9856f93a00",
+      "src/gameplay_menu_browser.cpp": "99732a86e6d95dc98ec774a07dac20881f1245f8a5ca08f12f1d4eecab88984b",
+      "src/gameplay_menu_host.c": "192b0800d864d824f3a6666fc9d7b7ed657067a3dd0b3df8f860c37d78c717c3",
+      "src/gameplay_menu_host.h": "dbdb551cb5361106808f741bbd7905c65430c676501f3c08c5b2bf20458aa803",
+      "tests/gameplay_menu_trace.c": "c6230e8e266f2be7aeac4394ef5d7dce5e52ca4ba44fdb3e1e49fb4da227d43d",
+      "tests/gameplay_match_item_mask_trace.c": "b39c2d9ed0c9500584d3569fc30a1aeae3863412b7cf4edb62b6ecab7adf429b",
+      "tests/test_gameplay_match_item_mask.py": "1f357d0b10650e5852be39c4d940947cf3d32400e31978fe20db6edf88d6b72f",
+      "tests/vs_rules_item_menu_browser_test.mjs": "7432a5a301600565a9b250aa4ab9a53a46f6efff65651f939da4b389c717b60f"
+    },
+    "browser_harness": "node --check tests/vs_rules_item_menu_browser_test.mjs passed; browser route rerun passed with exact bit mapping assertions.",
+    "overall_boundary": "This is a rendered original-source route and source-state observation. It does not claim retail-to-browser equivalence, item spawning, source card persistence, pixel/PCM equivalence, physical input, or performance."
+  }
+}

@@ -106,6 +106,9 @@ void gm_InitVsMode(VsModeData* vs)
     }
 }
 
+static int source_item_frequency = -1;
+static uint64_t source_item_mask = UINT64_MAX;
+
 int melee_web_vs_prepare_start_source(StartMeleeData* start,
                                       const VsModeData* menu)
 {
@@ -113,7 +116,8 @@ int melee_web_vs_prepare_start_source(StartMeleeData* start,
     start->rules.match_kind = MatchKind_Stock;
     start->rules.is_stock = true;
     start->rules.is_vs = true;
-    start->rules.xB = -1;
+    start->rules.xB = (int8_t) source_item_frequency;
+    start->rules.x20 = source_item_mask;
     for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
         start->players[i].stocks = 4;
         start->players[i].rumble_enabled =
@@ -470,21 +474,40 @@ int main(void)
             return 110;
         active_sss->vs.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
         transition_request = 1;
-        if (melee_web_menu_tick(session, error, sizeof(error)) !=
-                MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
-            !melee_web_menu_leave_sss(session, error, sizeof(error)) ||
-            !menu_trace_link_only(15, retained_p15)) return 61;
+        /* The original VS OnExit applies committed item preferences after
+         * SSS validates its unchanged source-owned preview. */
+        source_item_mask = UINT64_MAX ^ UINT64_C(1);
+        {
+            const int tick_result = melee_web_menu_tick(session, error,
+                                                         sizeof(error));
+            const int leave_result = tick_result ==
+                    MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED
+                ? melee_web_menu_leave_sss(session, error, sizeof(error)) : 0;
+            const int links_valid = leave_result
+                ? menu_trace_link_only(15, retained_p15) : 0;
+            if (tick_result != MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+                !leave_result || !links_valid) {
+                fprintf(stderr, "SSS custom disabled-item mask handoff: tick=%d "
+                        "leave=%d links=%d phase=%d error=%s\n",
+                        tick_result, leave_result, links_valid,
+                        melee_web_menu_phase(session), error);
+                return 61;
+            }
+        }
         const VsModeData* ready = melee_web_menu_ready_vs(session);
         if (!ready || ready->start.players[1].slot_type != Gm_PKind_Cpu ||
             ready->start.players[1].cpu_kind != 4 ||
             ready->start.players[1].cpu_level != 9 ||
             ready->start.players[1].stocks != 4 ||
-            ready->start.players[1].rumble_enabled) return 62;
+            ready->start.players[1].rumble_enabled ||
+            ready->start.rules.xB != -1 ||
+            ready->start.rules.x20 != (UINT64_MAX ^ UINT64_C(1))) return 62;
         if (!melee_web_menu_return_to_css(session, error, sizeof(error)) ||
             active_css->vs.start.players[1].slot_type != Gm_PKind_Cpu ||
             active_css->vs.start.players[1].cpu_level != 9 ||
             !melee_web_menu_abort(session, error, sizeof(error)) ||
             !melee_web_menu_session_destroy(session, error, sizeof(error))) return 63;
+        source_item_mask = UINT64_MAX;
     }
     {
         MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};

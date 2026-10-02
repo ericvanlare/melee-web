@@ -2286,9 +2286,10 @@
         "docs/ACCURACY_CONTRACT.md",
         "docs/TRANSITION_EQUIVALENCE.md",
         "docs/REFERENCE_CAPTURE_APP.md",
-        "docs/evidence/vs-rules-items-source-route-v1.json"
+        "docs/evidence/vs-rules-items-source-route-v1.json",
+        "docs/evidence/vs-rules-items-source-route-v2.json"
       ],
-      "next_step": "The cold Main/VS/Rules/Items route now has source-menu, three-match StartMeleeData, and Results/CSS evidence for Stock and None item frequency. Add one receipt per remaining option family, including team rules, item-mask toggles, Rules Plus, and item services.",
+      "next_step": "The original Main/VS/Rules/Items route has separate retail source-route evidence and headless rendered browser evidence for the item row toggle, frequency-selector save ordering, custom item-mask handoff with None frequency, three-stock match, Results/CSS retention, and teardown. The custom-mask comparison is not retail compared; keep that claim scoped. Continue with team rules and Rules Plus, then item-family services and source GCI persistence, each with bounded original/browser evidence.",
       "issue": null
     },
     {
@@ -2319,9 +2320,10 @@
         "docs/ACCURACY_CONTRACT.md",
         "docs/TRANSITION_EQUIVALENCE.md",
         "docs/CONTROLLERS.md",
-        "docs/evidence/vs-rules-items-source-route-v1.json"
+        "docs/evidence/vs-rules-items-source-route-v1.json",
+        "docs/evidence/vs-rules-items-source-route-v2.json"
       ],
-      "next_step": "Decompose title, main menu, CSS, SSS, rules and name-entry screens into source mode rows and extend retail transition receipts beyond the current bounded route.",
+      "next_step": "Extend source and rendered-browser transition receipts beyond the bounded VS Rules/Items path to team/Rules Plus selection, name entry, and remaining original mode menus.",
       "issue": null
     },
     {

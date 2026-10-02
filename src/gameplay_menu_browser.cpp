@@ -16,6 +16,7 @@ extern "C" void melee_web_cpu_observation_set_event_cursor(size_t index);
 extern "C" void melee_web_cpu_observation_scheduler_return(void);
 extern "C" {
 #include <melee/gm/types.h>
+#include <melee/mn/mnitemsw.h>
 #include <sysdolphin/baselib/controller.h>
 extern ResultsData lbl_8046DBE8;
 }
@@ -2451,12 +2452,28 @@ const char* melee_web_native_menu_source_observe(){
  MeleeWebMenuSourceObservation observed{};
  StartMeleeData start{};
  int source_valid=0,start_valid=0;
+ int live_items_valid=0,live_item_cursor=-1,live_item_enabled=-1,live_item_frequency=-1;
  char error[256]{};
  if(host&&host_entered&&melee_web_menu_host_source_observe(
        host,&observed,error,sizeof(error)))source_valid=1;
  if(host&&!host_entered&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
     melee_web_menu_host_raw_selection(host,&start,error,sizeof(error)))start_valid=1;
  if(!source_valid&&!start_valid)return "{}";
+ /* The item mask is copied into global match preferences when the original
+  * Items routine commits its private MnItemSwData. Observe that live row
+  * separately so a source-confirmed A input is not mistaken for that commit. */
+ if(source_valid&&observed.source_scene==MELEE_WEB_MENU_HOST_SCENE_MAIN&&
+    observed.menu_kind==0x10&&mnItemSw_804D6BE8&&
+    mnItemSw_804D6BE8->user_data){
+  const auto* item_data=static_cast<const MnItemSwData*>(mnItemSw_804D6BE8->user_data);
+  if(item_data->cursor<=0x20&&item_data->x21<=5&&
+     item_data->cursor==static_cast<uint8_t>(observed.hovered_selection)){
+   live_items_valid=1;
+   live_item_cursor=item_data->cursor;
+   if(item_data->cursor<0x1f)live_item_enabled=item_data->items[item_data->cursor];
+   else live_item_frequency=item_data->x21;
+  }
+ }
  char start_players[1280]="[]";
  if(start_valid){
   size_t used=0;start_players[used++]='[';start_players[used]='\0';
@@ -2485,6 +2502,8 @@ const char* melee_web_native_menu_source_observe(){
   "\"stock_time_limit\":%d,\"handicap\":%d,\"damage_ratio\":%d,"
   "\"friendly_fire\":%d},\"items\":{\"frequency\":%d,"
   "\"mask_hex\":\"%016llx\"}},"
+  "\"items_menu\":{\"valid\":%s,\"cursor\":%d,"
+  "\"selected_item_enabled\":%d,\"frequency_selector\":%d},"
   "\"start\":{\"valid\":%s,\"match_kind\":%d,\"stage\":%u,"
   "\"item_frequency\":%d,\"item_mask_hex\":\"%016llx\","
   "\"player_stocks\":[%d,%d],\"players\":%s}}",
@@ -2496,6 +2515,7 @@ const char* melee_web_native_menu_source_observe(){
   observed.stock_time_limit,observed.handicap,observed.damage_ratio,
   observed.friendly_fire,observed.item_frequency,
   (unsigned long long) observed.item_mask,
+  live_items_valid?"true":"false",live_item_cursor,live_item_enabled,live_item_frequency,
   start_valid?"true":"false",(int) start.rules.match_kind,
   (unsigned) start.rules.stkind,(int) (int8_t) start.rules.xB,
   (unsigned long long) start.rules.x20,

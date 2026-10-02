@@ -15,9 +15,15 @@ const options = Object.fromEntries(['url', 'disc', 'out', 'playwright']
   .map(name => [name, {type: 'string'}]));
 options['menu-only'] = {type: 'boolean', default: false};
 options['rules-items-only'] = {type: 'boolean', default: false};
+options['css-sss-only'] = {type: 'boolean', default: false};
+options['stage-only'] = {type: 'boolean', default: false};
+options['no-contest-only'] = {type: 'boolean', default: false};
 const {values} = parseArgs({options, strict: true});
 const menuOnly = values['menu-only'];
 const rulesItemsOnly = values['rules-items-only'];
+const cssSssOnly = values['css-sss-only'];
+const stageOnly = values['stage-only'];
+const noContestOnly = values['no-contest-only'];
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const output = path.resolve(values.out);
@@ -38,12 +44,21 @@ const sha256File = file => new Promise((resolve, reject) => {
 let browser, context, page, driver, browserPath, playwrightPath;
 const report = {
   schema: 'melee-web-vs-rules-item-menu-browser-v1',
-  mode: rulesItemsOnly ? 'source-rules-items-entry-reproducer'
+  mode: noContestOnly ? 'source-no-contest-results-reproducer'
+    : stageOnly ? 'source-sss-stage-driver-reproducer'
+    : rulesItemsOnly ? 'source-rules-items-entry-reproducer'
+    : cssSssOnly ? 'source-css-to-sss-cooldown-reproducer'
     : menuOnly ? 'source-menu-boundary-reproducer' : 'source-rules-items-match-route',
-  scope: rulesItemsOnly
+  scope: noContestOnly
+    ? 'Headless rendered original CSS -> SSS -> Final Destination -> match; P1 Start opens the original source pause, then the held LRAS+Start No Contest chord enters Results and Eject verifies teardown.'
+    : stageOnly
+    ? 'Headless rendered original CSS -> Main -> VS Rules/Items changes -> CSS -> SSS; the PAD-fed source stage driver reaches Final Destination, then B returns to CSS and Eject verifies teardown. No match is launched.'
+    : rulesItemsOnly
     ? 'Headless rendered original CSS -> Main -> VS -> Rules -> Items, ending after the source Items input lock clears. This reduced route reproduces Rules-row navigation and original Items entry before another longer capture.'
+    : cssSssOnly
+    ? 'Headless rendered original CSS → Main → VS Rules/Items changes → CSS → SSS after the source-authored CSS Start cooldown → SSS B to CSS → CSS L/R/Start to Main and Eject. No match is launched.'
     : menuOnly
-    ? 'Headless rendered original Main -> VS -> Rules -> Items B -> Rules B -> VS -> Rules re-entry and Main exit. This reduced route exists to validate the source menu-focus boundary before the longer match capture.'
+    ? 'Headless rendered original Main -> VS -> Rules -> Items re-entry, A item toggle, frequency selector round-trip and save, B return to Rules, then Rules B -> VS -> Main exit. This reduced route validates transient and saved item settings before the longer match capture.'
     : 'Headless rendered original-source VS Rules and Items route, changed stock/item setup, source-selected match, No Contest Results return to CSS, and clean Eject/reimport. Keyboard PAD delivery only; retail/Dolphin, physical input, and performance equivalence are separate unrun claims.',
   url: values.url,
   browser: {executable: null, version: null, playwright: null},
@@ -134,6 +149,8 @@ const current = () => page.evaluate(() => ({
   running: Module?._melee_web_native_menu_running?.() ?? null,
   status: document.querySelector('#status')?.textContent || '',
   error: document.querySelector('#status')?.dataset.runtimeError || null,
+  diagnostics: Module?._melee_web_native_menu_diagnostics
+    ? Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()) : '',
 }));
 const observeSource = () => page.evaluate(() => JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_source_observe())));
@@ -145,6 +162,18 @@ const ensureNoError = async label => {
   const state = await current();
   if (state.error) throw Error(`${label}: ${state.error}`);
   return state;
+};
+const waitForNoQueuedPad = async label => {
+  const deadline = Date.now() + 3000;
+  let state;
+  while (Date.now() < deadline) {
+    await resumeTimingPause(label);
+    state = await current();
+    if (state.error) throw Error(`${label}: ${state.error}`);
+    if (state.diagnostics.includes('raw PAD: none')) return state;
+    await page.waitForTimeout(20);
+  }
+  throw Error(`${label}: raw PAD did not drain: ${JSON.stringify(state)}`);
 };
 const resumeTimingPause = async label => {
   const state = await current();
@@ -282,6 +311,84 @@ const waitItemInputReady = async label => {
   report.sourceObservations.push({label, ...observation});
   return observation;
 };
+const waitItemConfirmed = async (expected, label) => {
+  const deadline = Date.now() + 15000;
+  let observation;
+  while (Date.now() < deadline) {
+    await resumeTimingPause(label);
+    observation = await observeSource();
+    if (observation.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
+        observation.source.hovered_selection === 0 &&
+        observation.source.confirmed_selection === expected) break;
+    await ensureNoError(label);
+    await page.waitForTimeout(50);
+  }
+  assert(observation?.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
+    observation.source.hovered_selection === 0 &&
+    observation.source.confirmed_selection === expected,
+    `Timed out waiting for original item row confirmation ${expected}: ${JSON.stringify(observation)}`);
+  report.sourceObservations.push({label, ...observation});
+  return observation;
+};
+const waitLiveItemState = async (expected, label) => {
+  const deadline = Date.now() + 15000;
+  let observation;
+  while (Date.now() < deadline) {
+    await resumeTimingPause(label);
+    observation = await observeSource();
+    if (observation.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
+        observation.items_menu?.valid && observation.items_menu.cursor === 0 &&
+        observation.items_menu.selected_item_enabled === expected) break;
+    await ensureNoError(label);
+    await page.waitForTimeout(50);
+  }
+  assert(observation?.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
+    observation.items_menu?.valid && observation.items_menu.cursor === 0 &&
+    observation.items_menu.selected_item_enabled === expected,
+    `Timed out waiting for source MnItemSwData row value ${expected}: ${JSON.stringify(observation)}`);
+  report.sourceObservations.push({label, ...observation});
+  return observation;
+};
+const waitItemsCursor = async (expected, label) => {
+  const deadline = Date.now() + 15000;
+  let observation;
+  while (Date.now() < deadline) {
+    await resumeTimingPause(label);
+    observation = await observeSource();
+    if (observation.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
+        observation.source.hovered_selection === expected && observation.items_menu?.valid &&
+        observation.items_menu.cursor === expected) break;
+    await ensureNoError(label);
+    await page.waitForTimeout(50);
+  }
+  assert(observation?.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
+    observation.source.hovered_selection === expected && observation.items_menu?.valid &&
+    observation.items_menu.cursor === expected,
+    `Timed out waiting for source Items cursor ${expected}: ${JSON.stringify(observation)}`);
+  report.sourceObservations.push({label, ...observation});
+  return observation;
+};
+const waitItemFrequency = async (expected, label) => {
+  const deadline = Date.now() + 15000;
+  let observation;
+  while (Date.now() < deadline) {
+    await resumeTimingPause(label);
+    observation = await observeSource();
+    if (observation.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
+        observation.source.hovered_selection === 31 && observation.items_menu?.valid &&
+        observation.items_menu.cursor === 31 && observation.items_menu.frequency_selector === expected &&
+        observation.source.confirmed_selection === expected) break;
+    await ensureNoError(label);
+    await page.waitForTimeout(50);
+  }
+  assert(observation?.source?.valid && observation.source.menu_kind === ITEMS_MENU_KIND &&
+    observation.source.hovered_selection === 31 && observation.items_menu?.valid &&
+    observation.items_menu.cursor === 31 && observation.items_menu.frequency_selector === expected &&
+    observation.source.confirmed_selection === expected,
+    `Timed out waiting for source item frequency selector ${expected}: ${JSON.stringify(observation)}`);
+  report.sourceObservations.push({label, ...observation});
+  return observation;
+};
 const moveMenuCursor = async (menuKind, total, target) => {
   for (let attempt = 0; attempt < total * 2; attempt++) {
     const state = await observeSource();
@@ -318,6 +425,7 @@ const enterVsRules = async label => {
 let failure;
 let nativeSessionActive = false;
 try {
+route: {
   const response = await page.goto(values.url, {timeout: 30000});
   assert.equal(response?.status(), 200);
   await driver.waitForImport();
@@ -335,11 +443,62 @@ try {
   await waitMessage('Original character select', 'initial CSS');
   await shot('00-initial-css');
 
+  if (noContestOnly) {
+    await page.waitForTimeout(800);
+    await press('7');
+    await waitPhase(3, 'original SSS for No Contest reproducer');
+    await waitForNoQueuedPad('CSS Start sample drains before source SSS stage driver');
+    let selectedStage = 1;
+    for (let sample = 0; sample < 600; sample++) {
+      selectedStage = await page.evaluate(() => Module._melee_web_native_menu_drive_stage(32));
+      if (selectedStage === 2) break;
+      if (selectedStage !== 1) throw Error(`Original SSS source stage driver returned ${selectedStage}`);
+      await waitForNoQueuedPad(`source SSS direction sample ${sample + 1} drains`);
+    }
+    assert.equal(selectedStage, 2, 'No Contest reproducer must select Final Destination through source PAD');
+    await press('m');
+    await waitPhase(7, 'live VS match for No Contest reproducer');
+    const matchDeadline = Date.now() + 90000;
+    let liveMatch;
+    while (Date.now() < matchDeadline) {
+      await resumeTimingPause('No Contest reproducer live match');
+      liveMatch = await observeMatch();
+      if (liveMatch.ready && liveMatch.frame >= 180) break;
+      await ensureNoError('No Contest reproducer live match');
+      await page.waitForTimeout(100);
+    }
+    assert(liveMatch?.ready && liveMatch.frame >= 180,
+      `No Contest reproducer match did not reach 180 frames: ${JSON.stringify(liveMatch)}`);
+    report.matchObservations.push({label: 'live match before source pause and No Contest', ...liveMatch});
+    await press('7');
+    const pauseDeadline = Date.now() + 15000;
+    let pausedMatch;
+    while (Date.now() < pauseDeadline) {
+      await resumeTimingPause('No Contest reproducer source pause');
+      pausedMatch = await observeMatch();
+      if (pausedMatch.paused) break;
+      await ensureNoError('No Contest reproducer source pause');
+      await page.waitForTimeout(50);
+    }
+    assert.equal(pausedMatch?.paused, true,
+      `P1 Start did not open the source pause before LRAS: ${JSON.stringify(pausedMatch)}`);
+    await page.waitForTimeout(700);
+    await chord(['q', '9', 'm', '7'], {holdMs: 120, releaseMs: 150});
+    await waitPhase(8, 'original Results after source pause and LRAS No Contest');
+    const terminal = await observeMatch();
+    report.matchObservations.push({label: 'terminal No Contest result in original Results', ...terminal});
+    await shot('02-original-results');
+    await driver.unload();
+    nativeSessionActive = false;
+    await verifyTeardown('Eject after source No Contest Results reproducer');
+    report.checks.push('P1 Start opens source pause; held original LRAS+Start enters Results; Eject clears source owners');
+    break route;
+  }
+
   await chord(['q', '9', '7']);
   await waitMessage('Original main menu', 'CSS -> source Main');
   await waitMenu(MAIN_MENU_KIND, 0, 'source Main root');
   await shot('01-main-root');
-  route: {
   let rules = await enterVsRules('02-first');
 
   if (rulesItemsOnly) {
@@ -376,13 +535,62 @@ try {
   report.checks.push('original item/settings screen exits through B; VS Rules re-enters through original source callbacks');
 
   if (menuOnly) {
+    await moveMenuCursor(RULES_MENU_KIND, 7, 5);
+    await press('m');
+    await waitMenu(ITEMS_MENU_KIND, 0, 'reduced toggle route opens original Items');
+    await waitItemInputReady('reduced toggle route Items input lock released');
+    const toggleBefore = await observeSource();
+    assert.equal(toggleBefore.source.confirmed_selection, 1,
+      'Fresh Everything profile must enable the selected source item before A');
+    assert.equal(toggleBefore.items_menu?.valid, true,
+      'Original Items observer must expose its live MnItemSwData owner');
+    assert.equal(toggleBefore.items_menu.cursor, 0);
+    assert.equal(toggleBefore.items_menu.selected_item_enabled, 1);
+    await press('m');
+    await waitItemConfirmed(0, 'source Items A confirms row zero off');
+    const toggleAfterA = await waitLiveItemState(0, 'source Items update applies the row-zero toggle');
+    assert.equal(toggleAfterA.source.items.mask_hex, toggleBefore.source.items.mask_hex,
+      'A changes MnItemSwData only; the source GameRules mask remains unchanged at this point');
+    await press(']'); // Source mnItemSw maps Up at item row 0 to frequency row 31.
+    const frequencyEntry = await waitItemsCursor(31, 'source Items Up enters the frequency selector');
+    assert.equal(frequencyEntry.items_menu.frequency_selector, 0,
+      'Fresh Everything profile starts on the original None frequency option');
+    await press('2'); // Source mnItemSw Left advances the frequency selector from None to Very High.
+    await waitItemFrequency(1, 'source frequency selector moves from None to Very High');
+    await press('4'); // Source mnItemSw Right returns the selector to None.
+    const frequencySaved = await waitItemFrequency(0, 'source frequency selector returns to None');
+    const frequencySavedMaskDelta = BigInt(`0x${frequencySaved.source.items.mask_hex}`) ^
+      BigInt(`0x${toggleBefore.source.items.mask_hex}`);
+    assert.notEqual(frequencySavedMaskDelta, 0n,
+      'Original frequency selection must save the pending A-selected item row');
+    assert.equal(frequencySavedMaskDelta & (frequencySavedMaskDelta - 1n), 0n,
+      'Original frequency selection must save exactly the one A-selected item-mask bit');
+    assert.equal(frequencySavedMaskDelta, 1n << 16n,
+      'Source Items cursor zero maps to saved item preference bit 16');
+    assert.equal(frequencySaved.source.items.frequency, -1,
+      'Original frequency selection must save None as -1');
+    report.sourceObservations.push({label: 'source frequency selection saves pending item row', ...frequencySaved});
     await press('o');
-    await waitMenu(VS_MENU_KIND, 3, 'Rules B returns to VS selection in reduced route');
+    const toggleCommitted = await waitMenu(RULES_MENU_KIND, 5,
+      'reduced toggle route Items B returns to Rules');
+    const toggleMaskDelta = BigInt(`0x${toggleCommitted.source.items.mask_hex}`) ^
+      BigInt(`0x${toggleBefore.source.items.mask_hex}`);
+    assert.equal(toggleMaskDelta, frequencySavedMaskDelta,
+      'Items B must return the item mask previously saved by the original frequency control');
+    assert.equal(toggleMaskDelta & (toggleMaskDelta - 1n), 0n,
+      'Rules must retain exactly the one A-selected item-mask bit');
+    assert.equal(toggleCommitted.source.items.frequency, -1,
+      'Rules must retain the source None frequency as -1');
+    report.sourceObservations.push({label: 'source Items B returns saved item preferences to Rules', ...toggleCommitted});
+    report.checks.push('source Items A changes MnItemSwData transiently; original frequency controls round-trip None/Very High/None and save the one-bit item-mask change; B returns that mask and None frequency to Rules');
+    await shot('05-toggle-committed-mask');
     await press('o');
-    await waitMenu(MAIN_MENU_KIND, 1, 'VS B returns to Main in reduced route');
+    await waitMenu(VS_MENU_KIND, 3, 'Rules B returns to VS selection in reduced toggle route');
+    await press('o');
+    await waitMenu(MAIN_MENU_KIND, 1, 'VS B returns to Main in reduced toggle route');
     await driver.unload();
     nativeSessionActive = false;
-    await verifyTeardown('Eject after reduced source-menu route');
+    await verifyTeardown('Eject after reduced item-toggle route');
     break route;
   }
 
@@ -391,45 +599,53 @@ try {
   await waitMenu(ITEMS_MENU_KIND, 0, 'second original Items entry');
   await waitItemInputReady('source Items animation lock released');
   await shot('05-items-edit');
-  const itemsBefore = (await observeSource()).source.items;
+  const itemsMenuBefore = await observeSource();
+  const itemsBefore = itemsMenuBefore.source.items;
+  assert.equal(itemsMenuBefore.source.confirmed_selection, 1,
+    'Fresh Everything profile must enable the selected source item before A');
+  assert.equal(itemsMenuBefore.items_menu?.valid, true,
+    'Original Items observer must expose its live MnItemSwData owner');
+  assert.equal(itemsMenuBefore.items_menu.cursor, 0);
+  assert.equal(itemsMenuBefore.items_menu.selected_item_enabled, 1);
   await press('m');
-  await page.waitForFunction(({before, menuKind}) => {
-    const observation = JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_source_observe()));
-    return observation.source?.valid && observation.source.scene === 4 &&
-      observation.source.menu_kind === menuKind && observation.source.items.mask_hex !== before;
-  }, {before: itemsBefore.mask_hex, menuKind: ITEMS_MENU_KIND}, {timeout: 15000});
-  const itemsAfterToggle = await observeSource();
-  report.sourceObservations.push({label: 'source A toggles the selected item mask bit', ...itemsAfterToggle});
-  assert.notEqual(itemsAfterToggle.source.items.mask_hex, itemsBefore.mask_hex,
-    'Original A must change a real source item preference');
-  const toggledMaskBits = BigInt(`0x${itemsAfterToggle.source.items.mask_hex}`) ^
-    BigInt(`0x${itemsBefore.mask_hex}`);
-  assert.equal(toggledMaskBits & (toggledMaskBits - 1n), 0n,
-    'Original A on one item row must change exactly one item-mask bit');
+  await waitItemConfirmed(0, 'source Items A confirms row zero off');
+  const itemsAfterToggle = await waitLiveItemState(0, 'source Items update applies the row-zero toggle');
+  assert.equal(itemsAfterToggle.source.items.mask_hex, itemsBefore.mask_hex,
+    'A changes MnItemSwData only; the source GameRules mask remains unchanged at this point');
   await waitItemInputReady('source Items accepts navigation after the item toggle');
 
-  await press('2'); // Source mnItemSw maps D-left at item row 0 to frequency row 31.
-  await waitItemInputReady('source Items accepts frequency navigation');
-  let frequency = await observeSource();
-  assert.equal(frequency.source.menu_kind, ITEMS_MENU_KIND);
-  assert.equal(frequency.source.hovered_selection, 31);
-  // Source stores menu frequency as the selected x21 value minus one. Use
-  // original right inputs until x21=0, the source None value, to avoid item
-  // object services outside this route's ownership boundary.
-  for (let attempt = 0; frequency.source.confirmed_selection !== 0 && attempt < 5; attempt++) {
-    await press(']'); // Original Items Up decrements x21 toward source None (zero).
-    await waitItemInputReady('source frequency animation lock released');
-    frequency = await observeSource();
-    assert.equal(frequency.source.hovered_selection, 31);
-  }
-  assert.equal(frequency.source.confirmed_selection, 0,
-    'Original item-frequency selector must reach its source None option');
+  await press(']'); // Source mnItemSw maps Up at item row 0 to frequency row 31.
+  const frequencyEntry = await waitItemsCursor(31, 'source Items Up enters the frequency selector');
+  assert.equal(frequencyEntry.items_menu.frequency_selector, 0,
+    'Fresh Everything profile starts on the original None frequency option');
+  await press('2'); // Source mnItemSw Left advances the frequency selector from None to Very High.
+  await waitItemFrequency(1, 'source frequency selector moves from None to Very High');
+  await press('4'); // Source mnItemSw Right returns the selector to None.
+  const frequencySaved = await waitItemFrequency(0, 'source frequency selector returns to None');
+  const frequencySavedMaskDelta = BigInt(`0x${frequencySaved.source.items.mask_hex}`) ^
+    BigInt(`0x${itemsBefore.mask_hex}`);
+  assert.notEqual(frequencySavedMaskDelta, 0n,
+    'Original frequency selection must save the pending A-selected item row');
+  assert.equal(frequencySavedMaskDelta & (frequencySavedMaskDelta - 1n), 0n,
+    'Original frequency selection must save exactly the one A-selected item-mask bit');
+  assert.equal(frequencySavedMaskDelta, 1n << 16n,
+    'Source Items cursor zero maps to saved item preference bit 16');
+  assert.equal(frequencySaved.source.items.frequency, -1,
+    'Original frequency selection must save None as -1');
+  report.sourceObservations.push({label: 'source frequency selection saves pending item row', ...frequencySaved});
   await shot('06-items-frequency-none');
   await press('o');
-  rules = await waitMenu(RULES_MENU_KIND, 5, 'Items B commits preferences and returns to Rules');
-  assert.equal(rules.source.items.frequency, -1, 'Original Items B must commit item frequency None (-1)');
-  assert.notEqual(rules.source.items.mask_hex, itemsBefore.mask_hex,
-    'Original Items B must retain the changed item mask');
+  rules = await waitMenu(RULES_MENU_KIND, 5, 'Items B returns saved preferences to Rules');
+  assert.equal(rules.source.items.frequency, -1, 'Original Items B must return source None frequency (-1) to Rules');
+  assert.equal(rules.source.items.mask_hex, frequencySaved.source.items.mask_hex,
+    'Original Items B must return the mask saved by the frequency selector to Rules');
+  const toggledMaskBits = BigInt(`0x${rules.source.items.mask_hex}`) ^
+    BigInt(`0x${itemsBefore.mask_hex}`);
+  assert.equal(toggledMaskBits, frequencySavedMaskDelta,
+    'Rules must retain the one item-mask bit saved by the original frequency selector');
+  assert.equal(toggledMaskBits & (toggledMaskBits - 1n), 0n,
+    'Original A on one item row must result in exactly one item-mask bit in Rules');
+  report.sourceObservations.push({label: 'source Items B returns saved item preferences to Rules', ...rules});
   await shot('07-rules-after-items');
 
   // Rules layout in Stock mode uses selection 1 for the stock value; source
@@ -456,18 +672,55 @@ try {
   report.sourceObservations.push({label: 'CSS after original VS rules handoff', ...cssSetup});
   await shot('09-css-with-retained-settings');
 
+  // mnCharSel enters with its source-authored 30-frame Start cooldown.
+  await page.waitForTimeout(800);
+  if (cssSssOnly) {
+    await press('7');
+    await waitPhase(3, 'original SSS after the source CSS cooldown');
+    report.checks.push('CSS Start after the original 30-frame source cooldown enters the original SSS');
+    await shot('10-original-sss');
+    await press('o');
+    await waitPhase(1, 'SSS B cancellation to original CSS');
+    const cssAfterSss = await observeSource();
+    assert.equal(cssAfterSss.source?.valid, true);
+    assert.equal(cssAfterSss.source.scene, 1);
+    report.sourceObservations.push({label: 'CSS after original SSS B cancellation', ...cssAfterSss});
+    await shot('11-css-after-sss-cancel');
+    await chord(['q', '9', '7']);
+    await waitMessage('Original main menu', 'CSS L/R/Start route to original Main');
+    await waitMenu(MAIN_MENU_KIND, 0, 'original Main after SSS/CSS cancellation');
+    await shot('12-main-after-sss-cancel');
+    await driver.unload();
+    nativeSessionActive = false;
+    await verifyTeardown('Eject after CSS/SSS cooldown reproducer');
+    report.checks.push('SSS B returns through original CSS; CSS L/R/Start returns through Main; Eject clears owners');
+    break route;
+  }
   await press('7');
   await waitPhase(3, 'original SSS');
   await shot('10-original-sss');
+  await waitForNoQueuedPad('CSS Start sample drains before source SSS stage driver');
   let stage = 1;
   for (let sample = 0; sample < 600; sample++) {
     stage = await page.evaluate(() => Module._melee_web_native_menu_drive_stage(32));
     if (stage === 2) break;
     if (stage !== 1) throw Error(`Original SSS source stage driver returned ${stage}`);
+    await waitForNoQueuedPad(`source SSS direction sample ${sample + 1} drains`);
   }
   assert.equal(stage, 2, 'Original SSS cursor must reach Final Destination using PAD input');
   report.checks.push('SSS source geometry driver reaches Final Destination; source stage choice is not assigned directly');
   await shot('11-sss-final-destination');
+  if (stageOnly) {
+    await press('o');
+    await waitPhase(1, 'SSS B cancellation after source stage selection');
+    report.sourceObservations.push({label: 'CSS after SSS stage-driver reproducer', ...(await observeSource())});
+    await shot('12-css-after-sss-cancel');
+    await driver.unload();
+    nativeSessionActive = false;
+    await verifyTeardown('Eject after SSS stage-driver reproducer');
+    report.checks.push('Final Destination highlighted through source SSS PAD controls; B returns to CSS; Eject clears owners');
+    break route;
+  }
   await press('m');
   await waitPhase(7, 'live VS match');
   const matchDeadline = Date.now() + 90000;
@@ -488,25 +741,36 @@ try {
   assert.equal(matchBeforeNoContest.rules.match_kind, 1);
   assert.equal(matchBeforeNoContest.rules.stage, 0x20,
     'Source-selected SSS Final Destination must reach the match as St_Kind_Last');
-  const sourceStart = await observeSource();
-  assert.equal(sourceStart.start.valid, true, 'Closed SSS must expose the raw source StartMeleeData');
-  assert.equal(sourceStart.start.item_frequency, matchBeforeNoContest.rules.item_frequency);
-  assert.equal(sourceStart.start.item_mask_hex, matchBeforeNoContest.rules.item_mask_hex);
-  assert.equal(sourceStart.start.stage, 0x20,
-    'Closed SSS must commit original St_Kind_Last into StartMeleeData');
-  assert.deepEqual(sourceStart.start.player_stocks, [3, 3]);
-  assert.equal(sourceStart.start.players.length, 6,
-    'The checked StartMeleeData observer must expose every source player slot');
-  assert.deepEqual(sourceStart.start.players.slice(0, 2).map(player => [
-    player.character_kind, player.slot_type, player.stocks, player.color, player.team,
-  ]), [[8, 0, 3, 0, 0], [8, 0, 3, 0, 0]],
-  'The source CSS route must carry both selected human Mario slots into the match');
-  assert.deepEqual(sourceStart.start.players.slice(2).map(player => player.slot_type),
-    [3, 3, 3, 3], 'Unused source slots must remain Gm_PKind_NA');
-  report.sourceObservations.push({label: 'raw SSS StartMeleeData after original OnExit', ...sourceStart});
+  const saveMaskDelta = BigInt('0xffffffffffffffff') ^
+    BigInt(`0x${rules.source.items.mask_hex}`);
+  const matchMaskDelta = BigInt('0xffffffffffffffff') ^
+    BigInt(`0x${matchBeforeNoContest.rules.item_mask_hex}`);
+  assert.equal(saveMaskDelta & (saveMaskDelta - 1n), 0n,
+    'The committed source item mask must differ by exactly the A-selected row bit');
+  assert.notEqual(matchMaskDelta, 0n,
+    'The real match must receive the original VS menu item mask');
+  assert.equal(matchMaskDelta & (matchMaskDelta - 1n), 0n,
+    'The real match item setup must change exactly one authored item bit');
+  assert.equal(matchMaskDelta, 1n << 32n,
+    'Source item preference bit 16 maps to StartMeleeData item-mask bit 32');
+  report.checks.push('live StartMeleeData receives the Rules stock value, None frequency, custom item mask, and source-selected Final Destination');
   await shot('12-live-three-stock-match');
 
-  await chord(['q', '9', 'm', '7']);
+  await press('7');
+  const resultsPauseDeadline = Date.now() + 15000;
+  let resultsPause;
+  while (Date.now() < resultsPauseDeadline) {
+    await resumeTimingPause('Results route source pause');
+    resultsPause = await observeMatch();
+    if (resultsPause.paused) break;
+    await ensureNoError('Results route source pause');
+    await page.waitForTimeout(50);
+  }
+  assert.equal(resultsPause?.paused, true,
+    `P1 Start did not open the source pause before LRAS: ${JSON.stringify(resultsPause)}`);
+  report.matchObservations.push({label: 'original source pause before No Contest', ...resultsPause});
+  await page.waitForTimeout(700);
+  await chord(['q', '9', 'm', '7'], {holdMs: 120, releaseMs: 150});
   await waitPhase(8, 'original Results');
   await page.waitForTimeout(4500); // Match the established source Results presentation boundary.
   const resultObservation = await observeMatch();
