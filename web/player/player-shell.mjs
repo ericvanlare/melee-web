@@ -1,9 +1,10 @@
 import {mountMeleeRuntime} from '../melee-runtime.mjs';
 import {mountControllerSettings} from '../controller-settings.mjs';
 import {mountSaveProfileSettings} from '../save-profile-settings.mjs';
+import {mountDiagnosticsSettings} from '../diagnostics-settings.mjs';
 
 const $ = id => document.getElementById(id);
-let player, state, settings, saveSettings, saveSettingsBinding = null;
+let player, state, settings, saveSettings, diagnosticSettings, saveSettingsBinding = null;
 let saveSettingsReady = false, currentError = '', requiresReload = false, hasStarted = false;
 let discSelectionGeneration = 0, selectedDiscReady = false, selectedDiscFile = null;
 let selectedDiscSession = null, selectedDiscValidated = false, importingSelection = null, importedSelection = null;
@@ -189,6 +190,7 @@ function renderStatus(next) {
   renderDiscSelection();
   settings?.setState(next);
   saveSettings?.setState(next);
+  diagnosticSettings?.setState(next);
   wakeStartReadinessWaiters();
   maybeImportSelectedDisc();
 }
@@ -314,6 +316,7 @@ settings = mountControllerSettings({
   onError: error => showError(error),
 });
 saveSettings = mountSaveProfileSettings({onError: error => showError(error), onBusy: () => renderStatus(state)});
+diagnosticSettings = mountDiagnosticsSettings();
 $('settings-open').disabled = true;
 
 const fullscreenButton = $('fullscreen'), playerElement = $('player');
@@ -346,6 +349,7 @@ try {
     canvas: $('canvas'), onState: renderStatus, onError: error => showError(error),
     onOwner: owner => {
       player = owner.handle;
+      diagnosticSettings.bindPlayer(player);
       renderStatus(player.getState());
       // Save storage is bound after the native startup boundary becomes usable.
       // A prevalidated disc can wait here without entering an unconfigured session.

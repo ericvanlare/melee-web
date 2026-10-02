@@ -17,6 +17,22 @@ const adapterRace = process.argv.includes('--adapter-race');
 const adapterRetry = process.argv.includes('--adapter-retry');
 const adapterTimeoutLate = process.argv.includes('--adapter-timeout-late');
 const adapterDeadlineSpan = process.argv.includes('--adapter-deadline-span');
+const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host');
+const diagnosticIdentity = {schema_version: 1, source_commit: 'a'.repeat(40), runtime_hash: 'b'.repeat(16), build_profile: 'player'};
+const diagnosticFetches = [];
+let diagnosticPreference = 'on';
+if (diagnosticsKnownHost) {
+  globalThis.location = {origin: 'https://webmelee.gg'};
+  globalThis.fetch = async (url, options) => {
+    diagnosticFetches.push({url, method: options?.method, body: options?.body});
+    return {status: 201};
+  };
+  globalThis.indexedDB = {open() { throw Object.assign(new Error('denied'), {name: 'NotAllowedError'}); }};
+  globalThis.localStorage = {
+    getItem() { return diagnosticPreference; },
+    setItem(_key, value) { diagnosticPreference = value; },
+  };
+}
 if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
 const source = original.replace(
@@ -76,7 +92,9 @@ globalThis.testDiscReader = async (file, report) => {
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'melee-runtime-owner-'));
 const sourcePath = path.join(temporary, 'runtime.mjs');
 await fs.copyFile(new URL('../web/controller-input.mjs', import.meta.url), path.join(temporary, 'controller-input.mjs'));
-await fs.copyFile(new URL('../web/runtime-diagnostics.mjs', import.meta.url), path.join(temporary, 'runtime-diagnostics.mjs'));
+for (const module of ['runtime-diagnostics.mjs', 'runtime-diagnostics-delivery.mjs', 'diagnostics-settings.mjs', 'diagnostics-schema.mjs']) {
+  await fs.copyFile(new URL(`../web/${module}`, import.meta.url), path.join(temporary, module));
+}
 await fs.writeFile(sourcePath, source);
 const {mountMeleeRuntime} = await import(pathToFileURL(sourcePath));
 await fs.rm(temporary, {recursive: true});
@@ -189,6 +207,7 @@ let owner;
 const mounted = mountMeleeRuntime({canvas, openDisc: null, createAudio: withAudio ? options => {
   calls.push(['createAudio']); return createRuntimeAudio(options);
 } : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
+  diagnosticIdentity: diagnosticsKnownHost ? diagnosticIdentity : undefined,
   configureModule: cacheUnavailable ? module => {
     module.preRun = () => {
       assert.ok(directories.has('/melee-render-cache'), 'Required setup precedes entry callbacks');
@@ -323,6 +342,85 @@ if (startupCacheTimeout) {
   process.exit(0);
 }
 assert.equal(player.getState().canImport, true);
+if (diagnosticsKnownHost) {
+  const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
+  async function pumpBoundary(promise) {
+    let settled = false, failure, value;
+    promise.then(result => { value = result; settled = true; }, error => { failure = error; settled = true; });
+    for (let i = 0; !settled && i < 300; i++) {
+      window.menuServiceCommands();
+      await wait(1);
+    }
+    assert.equal(settled, true, 'Owner operation must finish through controlled native boundaries');
+    if (failure) throw failure;
+    return value;
+  }
+  const sample = [100, 12, 1, 2, 3, 4, 5, 6, 9, 1, 2, 3, 4, 5, 6, 7, 8, 1];
+  phase = 1; running = true; window.menuFrame(true);
+  owner.callbacks.menuDiagnosticSample(...sample);
+  const incidentId = owner.callbacks.menuDiagnosticIncident(1, 9, 8, 12, 1, 1);
+  assert.match(incidentId, /^incident-[0-9]+$/);
+  const activeReport = owner.diagnostics.exportReports();
+  assert.deepEqual(activeReport.identity, diagnosticIdentity, 'Known HTTPS host keeps caller-provided safe identity');
+  assert.equal(activeReport.native.callback_count, 1, 'Native scalar callback crosses the owner boundary');
+  assert.equal(activeReport.incidents.length, 1, 'Structured incident trigger crosses the owner boundary');
+  await owner.prepareAudio();
+  assert.ok(calls.some(row => row[0] === 'audioResume'), 'Audio ownership remains on the runtime owner');
+  window.menuPreparation('Controlled preparation', true);
+  await wait(40);
+  assert.equal(diagnosticFetches.length, 0, 'Active and preparing states never POST diagnostics');
+  window.menuPreparationDone();
+  phase = 1; running = false; window.menuFrame(false);
+  await wait(1200);
+  assert.equal(diagnosticFetches.length, 1, 'Inactive integration sends only after the bounded 1,100 ms task');
+  assert.equal(diagnosticFetches[0].method, 'POST');
+  assert.match(JSON.parse(diagnosticFetches[0].body).incident_id, /^session-[a-z0-9]+:incident-[0-9]+$/,
+    'Delivery uses the stable session-bound native incident id');
+
+  phase = 1; running = true; window.menuFrame(true);
+  owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+  phase = 1; running = false; window.menuFrame(false);
+  await wait(40);
+  phase = 1; running = true; window.menuFrame(true);
+  await wait(1200);
+  assert.equal(diagnosticFetches.length, 1, 'Immediate resume cancels deferred delivery');
+
+  owner.callbacks.menuDiagnosticIncident(4, null, null, -1, 1, 0);
+  player.setAutomaticDiagnostics(false);
+  await wait(40);
+  assert.deepEqual(player.getDiagnosticsSettings(), {eligible: true, automatic: false},
+    'Opt-out clears future work while known-host eligibility remains available');
+  phase = 1; running = false; window.menuFrame(false);
+  await wait(1200);
+  assert.equal(diagnosticFetches.length, 1, 'Opt-out prevents queued diagnostics from posting');
+  diagnosticPreference = 'off';
+  for (const listener of listeners.get('storage') || []) listener({key: 'melee-web-automatic-diagnostics-v1'});
+  assert.deepEqual(player.getDiagnosticsSettings(), {eligible: true, automatic: false},
+    'Cross-tab storage opt-out is honored by the owner');
+
+  const exported = await player.exportDiagnostics();
+  assert.ok(exported && exported.current && exported.retained,
+    'Inactive manual export includes current and retained sections despite denied storage');
+  assert.ok(exported.current.incidents.length <= 4);
+  assert.ok(Array.isArray(exported.retained.records) && exported.retained.records.length <= 4);
+  assert.equal(exported.current.flags.storage_denied, true, 'Denied storage is represented as an explicit flag');
+  const beforeUnload = calls.filter(row => row[0] === 'unload').length;
+  for (let i = 0; !window.menuAudioReadyForPreparation() && i < 20; i++) await wait(10);
+  assert.equal(window.menuAudioReadyForPreparation(), true, 'Audio ownership acknowledges inactive preparation before save/unload');
+  await pumpBoundary(owner.unloadAndSave());
+  assert.equal(calls.filter(row => row[0] === 'unload').length, beforeUnload + 1,
+    'Save/unload ownership remains on the native owner boundary');
+  document.hidden = true;
+  for (const listener of listeners.get('visibilitychange') || []) listener();
+  window.menuServiceCommands();
+  assert.deepEqual(calls.filter(row => row[0] === 'activity').at(-1), ['activity', 1, 0]);
+  document.hidden = false;
+  for (const listener of listeners.get('visibilitychange') || []) listener();
+  window.menuServiceCommands();
+  assert.deepEqual(calls.filter(row => row[0] === 'activity').at(-1), ['activity', 1, 1]);
+  console.log('Shared runtime owner: known-host diagnostics identity, scalar incident wiring, inactive delivery delay/cancel, opt-out storage event, denied persistence, audio/input/save ownership pass.');
+  process.exit(0);
+}
 await assert.rejects(player.openDiscSession({name: 'unsupported.iso'}), /no local disc session loader/,
   'the public shell can request validation only through a configured profile adapter');
 await assert.rejects(player.importDisc({name: 'forged.iso'}, {preopenedSession: {

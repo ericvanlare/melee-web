@@ -75,6 +75,12 @@
     </div>
     <p id="save-status" role="status" aria-live="polite">Checking local save storage…</p>
     <p class="settings-note">GCI saves are compatible with Dolphin.</p>
+    <section aria-label="Diagnostics">
+      <label><input id="automatic-diagnostics" type="checkbox" disabled> Automatic diagnostics</label>
+      <p id="diagnostics-description" class="settings-description"></p>
+      <div class="settings-actions"><button id="export-diagnostics" type="button" disabled>Export diagnostics</button></div>
+      <p id="diagnostics-export-status" role="status" aria-live="polite"></p>
+    </section>
     <div class="dialog-actions"><button id="settings-close" type="button">Close</button></div>
   </dialog>
   <dialog id="save-confirm-dialog" aria-labelledby="save-confirm-title" aria-describedby="save-confirm-body">

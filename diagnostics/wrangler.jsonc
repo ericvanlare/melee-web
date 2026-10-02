@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "webmelee-diagnostics",
+  "compatibility_date": "2026-10-01",
+  "pages_build_output_dir": "./build",
+  "d1_databases": [
+    {
+      "binding": "DIAGNOSTICS_DB",
+      "database_name": "webmelee-diagnostics-REPLACE",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "./diagnostics/migrations"
+    }
+  ],
+  "vars": {
+    "DIAGNOSTICS_RATE_LIMIT": "60",
+    "DIAGNOSTICS_DAILY_REPORT_CAP": "1000",
+    "DIAGNOSTICS_DAILY_BYTE_CAP": "16777216",
+    "DIAGNOSTICS_ALLOWED_RELEASES": "{\"staging\":[],\"production\":[]}"
+  }
+  // Set DIAGNOSTICS_ADMIN_TOKEN with `wrangler secret put`; never commit it.
+}
