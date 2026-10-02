@@ -1,0 +1,299 @@
+{
+  "schema": "melee-web-runtime-recorder-receipt-v1",
+  "date": "2026-10-01",
+  "result": "pass",
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised"
+  ],
+  "scope": "Shared-host headless CSS recorder collection and induced-stall detection/costs only. No natural pause cause established.",
+  "identity": {
+    "schema_version": 1,
+    "source_commit": "5dc4b3e9c15aa8d2d536b380b7972e263e620d61",
+    "runtime_hash": "490b992a291f4e99",
+    "build_profile": "audio-player"
+  },
+  "browser": "154.0.8037.93",
+  "retained_run": "runtime-incident-recorder-20261001-170043-c5b7d73b",
+  "reports": {
+    "browser-bridge": {
+      "file": "report.json",
+      "sha256": "2948a1b0c11c8ca3e0c8009ca10ca3c1f00518822771aa69b73c37e6379194bf",
+      "checks": [
+        "audited package inventory and HTML identity verified",
+        "bounded CSS callback collection completed with recorder enabled and disabled",
+        "simulation debt incident retained native value and manual recovery",
+        "audio debt incident retained native value on a fresh page",
+        "supported runtime error captured without arbitrary exception text",
+        "isolated IndexedDB retained bounded incidents across fresh pages"
+      ],
+      "runner_sha256": "a09b8ef2695c2e3e588aeb1029796e89d1777845ac72c48d0d0864fd1d6b5e96",
+      "browser_tools_sha256": null,
+      "network": {
+        "request_count": 34,
+        "application_uploads": 0
+      }
+    },
+    "browser-capture-cost": {
+      "file": "report.json",
+      "sha256": "6238beeeb45ea6edd87cc741a8500f249cd5e891b54fbed8c8438bb7d181beca",
+      "checks": [
+        "audited package inventory and HTML identity verified",
+        "simulation debt incident retained native value and manual recovery",
+        "audio debt incident retained native value on a fresh page",
+        "supported runtime error captured without arbitrary exception text",
+        "isolated IndexedDB retained bounded incidents across fresh pages"
+      ],
+      "runner_sha256": "abcde97471ec454504c9d1d58885f41497d8d19e3bf4e6118e7e3c558c66cf1b",
+      "browser_tools_sha256": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+      "network": {
+        "request_count": 22,
+        "application_uploads": 0
+      }
+    }
+  },
+  "collection": [
+    {
+      "enabled": true,
+      "samples": {
+        "callback_count": 610,
+        "worst_callback_ms": 0.03500008583068848,
+        "median_callback_ms": 0.004999995231628418,
+        "p95_callback_ms": 0.009999990463256836,
+        "worst_callback_gap_ms": 19.545000076293945,
+        "max_update_ms": 4.425000071525574,
+        "max_draw_ms": 11.06499993801117,
+        "max_total_ms": 15.524999976158142,
+        "max_preparation_ms": 0,
+        "max_debt_ticks": 0.5885000014304955,
+        "first_source_frame": -1,
+        "last_source_frame": -1,
+        "max_source_steps": 1,
+        "max_source_draws": 1,
+        "running_false_callbacks": 0
+      },
+      "memory": {
+        "used_js_heap_bytes": 19169971,
+        "total_js_heap_bytes": 28704531,
+        "js_heap_limit_bytes": 4395630592
+      }
+    },
+    {
+      "enabled": false,
+      "samples": {
+        "callback_count": 602,
+        "worst_callback_ms": 0.014999985694885254,
+        "median_callback_ms": 0,
+        "p95_callback_ms": 0.004999995231628418,
+        "worst_callback_gap_ms": 22.019999980926514,
+        "max_update_ms": 4.320000052452087,
+        "max_draw_ms": 10.659999966621399,
+        "max_total_ms": 15.039999961853027,
+        "max_preparation_ms": 0,
+        "max_debt_ticks": 0.8941999959945508,
+        "first_source_frame": -1,
+        "last_source_frame": -1,
+        "max_source_steps": 1,
+        "max_source_draws": 1,
+        "running_false_callbacks": 0
+      },
+      "memory": {
+        "used_js_heap_bytes": 18745237,
+        "total_js_heap_bytes": 23969485,
+        "js_heap_limit_bytes": 4395630592
+      }
+    },
+    {
+      "enabled": false,
+      "samples": {
+        "callback_count": 605,
+        "worst_callback_ms": 0.005000114440917969,
+        "median_callback_ms": 0,
+        "p95_callback_ms": 0.004999995231628418,
+        "worst_callback_gap_ms": 17.990000009536743,
+        "max_update_ms": 4.335000038146973,
+        "max_draw_ms": 10.169999957084656,
+        "max_total_ms": 14.52999997138977,
+        "max_preparation_ms": 0,
+        "max_debt_ticks": 0.6249999999999896,
+        "first_source_frame": -1,
+        "last_source_frame": -1,
+        "max_source_steps": 1,
+        "max_source_draws": 1,
+        "running_false_callbacks": 0
+      },
+      "memory": {
+        "used_js_heap_bytes": 21662993,
+        "total_js_heap_bytes": 26017485,
+        "js_heap_limit_bytes": 4395630592
+      }
+    },
+    {
+      "enabled": true,
+      "samples": {
+        "callback_count": 609,
+        "worst_callback_ms": 0.029999971389770508,
+        "median_callback_ms": 0.004999995231628418,
+        "p95_callback_ms": 0.009999990463256836,
+        "worst_callback_gap_ms": 21.335000038146973,
+        "max_update_ms": 4.349999904632568,
+        "max_draw_ms": 10.75,
+        "max_total_ms": 15.150000095367432,
+        "max_preparation_ms": 0,
+        "max_debt_ticks": 0.8394000005721864,
+        "first_source_frame": -1,
+        "last_source_frame": -1,
+        "max_source_steps": 1,
+        "max_source_draws": 1,
+        "running_false_callbacks": 0
+      },
+      "memory": {
+        "used_js_heap_bytes": 20563197,
+        "total_js_heap_bytes": 28704481,
+        "js_heap_limit_bytes": 4395630592
+      }
+    }
+  ],
+  "capture": {
+    "simulation_stall": {
+      "trigger": {
+        "reason": "simulation_debt",
+        "reason_code": 1,
+        "value": 13,
+        "threshold": 8,
+        "source_frame": null,
+        "scene": "css",
+        "scene_code": 1,
+        "clock_owner": "simulation",
+        "clock_owner_code": 1
+      },
+      "history_rows": 100,
+      "trigger_costs": [
+        {
+          "reason": 1,
+          "elapsed_ms": 0.3049999475479126
+        },
+        {
+          "reason": 6,
+          "elapsed_ms": 0.0700000524520874
+        }
+      ],
+      "failure_dispatch_ms": null,
+      "report_bytes": 26210,
+      "persistence": {
+        "persisted": {
+          "persisted": true,
+          "count": 1,
+          "bytes": 25749
+        },
+        "elapsed_ms": 1.8550000190734863,
+        "serialization_ms": 0.26499998569488525,
+        "export_bytes": 26209,
+        "record_count": 1,
+        "bytes": 25749
+      }
+    },
+    "audio_stall": {
+      "trigger": {
+        "reason": "audio_debt",
+        "reason_code": 2,
+        "value": 67,
+        "threshold": 60,
+        "source_frame": null,
+        "scene": "css",
+        "scene_code": 1,
+        "clock_owner": "audio",
+        "clock_owner_code": 2
+      },
+      "history_rows": 28,
+      "trigger_costs": [
+        {
+          "reason": 2,
+          "elapsed_ms": 0.2549999952316284
+        }
+      ],
+      "failure_dispatch_ms": null,
+      "report_bytes": 11518,
+      "persistence": {
+        "persisted": {
+          "persisted": true,
+          "count": 2,
+          "bytes": 36809
+        },
+        "elapsed_ms": 1.809999942779541,
+        "serialization_ms": 0.10500001907348633,
+        "export_bytes": 11518,
+        "record_count": 2,
+        "bytes": 36809
+      }
+    },
+    "supported_failure": {
+      "trigger": {
+        "reason": "runtime_failure",
+        "reason_code": 4,
+        "value": null,
+        "threshold": null,
+        "source_frame": null,
+        "scene": "css",
+        "scene_code": 1,
+        "clock_owner": "other",
+        "clock_owner_code": 0
+      },
+      "history_rows": 29,
+      "trigger_costs": [],
+      "failure_dispatch_ms": 0.48500001430511475,
+      "report_bytes": 10849,
+      "persistence": {
+        "persisted": {
+          "persisted": true,
+          "count": 3,
+          "bytes": 46986
+        },
+        "elapsed_ms": 3.3550000190734863,
+        "serialization_ms": 0.18999993801116943,
+        "export_bytes": 10846,
+        "record_count": 3,
+        "bytes": 46986
+      }
+    }
+  },
+  "bounds": {
+    "history_rows": 100,
+    "history_columns": 20,
+    "typed_ring_bytes": 16000,
+    "scratch_bytes": 160,
+    "native_stack_row_bytes": 152,
+    "incidents": 4,
+    "report_bytes": 65536,
+    "stored_records": 4,
+    "stored_bytes": 262144,
+    "pre_events": 32,
+    "post_events": 24,
+    "post_window_ms": 1000
+  },
+  "interpretation": {
+    "collection": "Balanced enabled/disabled order; both modes retain identical test wrappers and scalar bridge. Timings isolate recorder function cost at browser timer resolution, rather than native bridge removal. Native update/draw/whole-callback maxima are also retained.",
+    "memory": "Total JavaScript heap samples include the fixture, runtime and garbage-collection variation. They do not establish an exact recorder heap delta; numeric backing and report/storage limits are explicit.",
+    "trigger": "Native source receipts precede clock reset. Induced simulation/audio debt does not reproduce unexplained user pauses.",
+    "storage": "Awaited wall time includes IndexedDB transaction latency, not continuous CPU time. Serialization/export is separately measured while explicitly requested by the fixture.",
+    "uploads": "Local recorder issues no application uploads. Delivery costs belong to the reporting prerequisite."
+  },
+  "unrun_gates": [
+    "natural sustained CPU9 session",
+    "original-state comparison",
+    "quiet-machine timing",
+    "foreground performance admission",
+    "physical controller",
+    "audible quality",
+    "pixels/PCM agreement"
+  ],
+  "failures_retained": [
+    "browser-first: fixture imported before graphics readiness",
+    "browser-ready-import: fixture configured saves after creating source owners",
+    "browser-bounded: EM_ASM argument signature discarded the oversized scalar feed"
+  ],
+  "reduced_probes": [
+    "startup-reduced",
+    "bridge-reduced"
+  ]
+}

@@ -16,6 +16,13 @@ Float64 columns (16,000 bytes), plus one 160-byte scratch row. Each row retains
 the worst callback interval and timing costs in that sampling window and sums
 source steps/draws, pipeline changes and texture-upload bytes. This keeps brief
 spikes visible without recording every source frame.
+The native bridge uses one fixed 152-byte stack row to stay within the pinned
+Emscripten argument limit; it reads only these named numeric fields.
+
+The first [packaged browser receipt](evidence/runtime-recorder-v1.json) measures
+collection, a full 100-row capture, serialization and awaited isolated storage.
+It justifies these bounded defaults for the observed CSS diagnostic workload;
+match workloads and foreground performance still need their separate gates.
 
 Native clock observers capture the reason, triggering value and threshold
 before the clock resets its debt. Simulation debt, audio debt, nonfinite clocks,

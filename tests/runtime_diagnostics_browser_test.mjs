@@ -567,6 +567,11 @@ async function runSimulationStall(browser, url, disc, identity, timeout) {
     await page.waitForFunction(() => globalThis.__runtimeDiagnosticsFixture?.ready === true, null, {timeout});
     await selectDiscAndStart(page, disc, timeout);
     await assertStillCss(page, 'Simulation stall precondition');
+    await page.waitForFunction(() => {
+      const fixture = globalThis.__runtimeDiagnosticsFixture;
+      return fixture.owner.diagnostics.exportReports().native.callback_count >= 800 || fixture.errors.length;
+    }, null, {timeout: 20000, polling: 500});
+    await assertStillCss(page, 'Full-history simulation stall precondition');
     await page.evaluate(() => { const until = performance.now() + 200; while (performance.now() < until) {} });
     await page.waitForFunction(() => {
       const report = globalThis.__runtimeDiagnosticsFixture?.owner?.diagnostics?.exportReports?.();
@@ -589,7 +594,7 @@ async function runSimulationStall(browser, url, disc, identity, timeout) {
     }, null, {timeout: STALL_TIMEOUT_MS});
     const after = await readReport(page, identity, 'Simulation recovery');
     const persistence = await measurePersistence(page, identity, 'Simulation recovery');
-    return {incident: debt, before: before.samples, after: after.samples, report: after.report,
+    return {incident: debt, trigger_costs: after.trigger_costs, before: before.samples, after: after.samples, report: after.report,
       report_bytes: after.report_bytes, memory: after.memory, persistence};
   } catch (error) {
     await retainPage(page, 'simulation-stall-failure');
@@ -618,7 +623,7 @@ async function runAudioStall(browser, url, disc, identity, timeout) {
     const state = await page.evaluate(() => globalThis.__runtimeDiagnosticsFixture.player.getState());
     requireValue(state.running === false, 'Audio guard did not pause the native CSS owner');
     const persistence = await measurePersistence(page, identity, 'Audio debt');
-    return {incident: debt, report: result.report, report_bytes: result.report_bytes,
+    return {incident: debt, trigger_costs: result.trigger_costs, report: result.report, report_bytes: result.report_bytes,
       memory: result.memory, samples: result.samples, persistence};
   } catch (error) {
     await retainPage(page, 'audio-stall-failure');
@@ -635,9 +640,13 @@ async function runSupportedFailure(browser, url, disc, identity, timeout) {
     await page.waitForFunction(() => globalThis.__runtimeDiagnosticsFixture?.ready === true, null, {timeout});
     await selectDiscAndStart(page, disc, timeout);
     await assertStillCss(page, 'Runtime failure precondition');
-    await page.evaluate(() => window.dispatchEvent(new ErrorEvent('error', {
+    const failureDispatchMs = await page.evaluate(() => {
+      const started = performance.now();
+      window.dispatchEvent(new ErrorEvent('error', {
       message: 'Synthetic private /synthetic-private/tester/secret.gci https://private.invalid/?token=secret',
-    })));
+      }));
+      return performance.now() - started;
+    });
     const result = await readReport(page, identity, 'Supported browser failure');
     requireValue(result.report.incidents.some(incident => incident.reason === 'runtime_failure'),
       'Supported error did not create a generic runtime failure incident');
@@ -645,7 +654,7 @@ async function runSupportedFailure(browser, url, disc, identity, timeout) {
       !JSON.stringify(result.report).includes('secret.gci'), 'Exception text crossed the report boundary');
     const state = await page.evaluate(() => globalThis.__runtimeDiagnosticsFixture.player.getState());
     requireValue(state.requiresReload && !state.running, 'Error was hidden behind successful player state');
-    return {report: result.report, trigger_costs: result.trigger_costs,
+    return {report: result.report, failure_dispatch_ms: failureDispatchMs, trigger_costs: result.trigger_costs,
       report_bytes: result.report_bytes, persistence: await measurePersistence(page, identity, 'Runtime failure')};
   } catch (error) {
     await retainPage(page, 'runtime-failure-check-failure');
@@ -657,6 +666,7 @@ const {values} = parseArgs({options: {
   site: {type: 'string'}, manifest: {type: 'string'}, disc: {type: 'string'},
   playwright: {type: 'string'}, out: {type: 'string'}, help: {type: 'boolean'},
   'startup-only': {type: 'boolean'},
+  'incidents-only': {type: 'boolean'},
 }});
 if (values.help) {
   console.log('Usage: node tests/runtime_diagnostics_browser_test.mjs --site AUDITED_AUDIO_PLAYER --manifest MANIFEST --disc OWNED_ISO --out FRESH_REPORT_DIR [--playwright PLAYWRIGHT_DIR]');
@@ -695,6 +705,8 @@ try {
     headed: false, audible: false, timeout: 120000,
   }));
   report.browser = browser.version();
+  report.runner_sha256 = digest(await fs.readFile(new URL(import.meta.url)));
+  report.browser_tools_sha256 = digest(await fs.readFile(new URL('../scripts/browser_tools.mjs', import.meta.url)));
   report.browser_mode = 'headless';
   report.audio_output = 'muted by shared browser launch policy';
   context = await browser.newContext();
@@ -720,11 +732,12 @@ try {
     } catch (error) { await retainPage(page, 'startup-boundary-failure'); throw error; }
     finally { await page.close(); }
   } else {
-  for (const [index, enabled] of [true, false, false, true].entries()) {
+  for (const [index, enabled] of (values['incidents-only'] ? [] : [true, false, false, true]).entries()) {
     const label = `css-${index + 1}-${enabled ? 'enabled' : 'disabled'}`;
     report.collection.push(await runCollection(context, fixtureUrl, disc, expectedIdentity, enabled, 120000, label));
   }
-  report.checks.push('bounded CSS callback collection completed with recorder enabled and disabled');
+  if (!values['incidents-only']) report.checks.push('bounded CSS callback collection completed with recorder enabled and disabled');
+  else report.scope = 'Headless local HTTP full-history capture, serialization and storage costs and induced-stall detection only; no A/B, quiet-machine, foreground timing or sustained gameplay claim.';
   report.simulation_stall = await runSimulationStall(context, fixtureUrl, disc, expectedIdentity, 120000);
   report.checks.push('simulation debt incident retained native value and manual recovery');
   report.audio_stall = await runAudioStall(context, fixtureUrl, disc, expectedIdentity, 120000);
