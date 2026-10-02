@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
@@ -56,6 +57,7 @@ PLAYER_RUNTIME_FILES = (
     "controller-settings.css",
     "touch-controls.mjs",
     "touch-controls.css",
+    "runtime-diagnostics.mjs",
     "gameplay_public.js",
     "gameplay_public.wasm",
 )
@@ -76,7 +78,11 @@ PLAYER_SOURCE_RUNTIME_FILES = (
     "controller-settings.css",
     "touch-controls.mjs",
     "touch-controls.css",
+    "runtime-diagnostics.mjs",
 )
+DIAGNOSTIC_BUILD_SCHEMA_VERSION = 1
+DIAGNOSTIC_BUILD_META_ID = "runtime-diagnostic-identity"
+DIAGNOSTIC_BUILD_PROFILES = frozenset({"player", "audio-preview", "audio-player"})
 RUNTIME_IDENTITY_SCHEMA = "melee-web-runtime-public-build-v2"
 RUNTIME_IDENTITY_NAME = "runtime-public-identity.json"
 RUNTIME_SOURCE_FILES = (
@@ -485,6 +491,116 @@ def _identity_path(runtime_dir: Path) -> Path:
     raise BuildError(
         "runtime-dir must be the producer artifact root and its sibling must contain "
         f"{RUNTIME_IDENTITY_NAME}"
+    )
+
+
+def _source_sha() -> str:
+    """Bind public diagnostics to a clean, actual checkout commit."""
+    try:
+        top = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"], cwd=ROOT, text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        value = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise BuildError("diagnostic identity requires a committed source checkout") from exc
+    if Path(top).resolve() != ROOT.resolve() or not re.fullmatch(r"[0-9a-f]{40}", value):
+        raise BuildError("diagnostic identity requires this checkout's actual commit")
+    changed = subprocess.run(["git", "diff", "--quiet", "HEAD", "--"], cwd=ROOT)
+    if changed.returncode:
+        raise BuildError("commit source changes before packaging a source-bound diagnostic identity")
+    source_status = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=all", "--",
+         "web", "src", "scripts", "cmake", "patches", "CMakeLists.txt", "dependencies.lock.json"],
+        cwd=ROOT, text=True,
+    )
+    if source_status:
+        raise BuildError("uncommitted runtime source cannot carry the current commit identity")
+    return value
+
+
+def _diagnostic_identity(*, source_commit: str, runtime_hash: str,
+                         build_profile: str) -> dict[str, str | int]:
+    """Create the only build identity shape exposed to browser diagnostics."""
+    if (not isinstance(source_commit, str) or
+            not re.fullmatch(r"[0-9a-f]{40}", source_commit)):
+        raise BuildError("diagnostic source_commit must be a 40-character lowercase commit identity")
+    if not isinstance(runtime_hash, str) or not re.fullmatch(r"[0-9a-f]{16}", runtime_hash):
+        raise BuildError("diagnostic runtime_hash must be a 16-character lowercase graph identity")
+    if (not isinstance(build_profile, str) or
+            build_profile not in DIAGNOSTIC_BUILD_PROFILES):
+        raise BuildError("diagnostic build_profile is not an allowed public profile")
+    return {
+        "schema_version": DIAGNOSTIC_BUILD_SCHEMA_VERSION,
+        "source_commit": source_commit,
+        "runtime_hash": runtime_hash,
+        "build_profile": build_profile,
+    }
+
+
+def _diagnostic_meta(identity: dict[str, str | int]) -> str:
+    """Encode a validated identity in a harmless, parseable HTML meta tag."""
+    expected = _diagnostic_identity(
+        source_commit=identity.get("source_commit", ""),
+        runtime_hash=identity.get("runtime_hash", ""),
+        build_profile=identity.get("build_profile", ""),
+    )
+    if identity != expected:
+        raise BuildError("diagnostic identity has unexpected or missing fields")
+    payload = json.dumps(expected, sort_keys=True, separators=(",", ":"))
+    return (f'<meta id="{DIAGNOSTIC_BUILD_META_ID}" '
+            f'content="{html.escape(payload, quote=True)}">')
+
+
+def _read_diagnostic_meta(data: bytes) -> dict[str, str | int]:
+    """Read and validate the packaged identity from player HTML."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise BuildError("player HTML is not UTF-8") from exc
+    class _MetaParser(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.matches: list[str | None] = []
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            if tag.lower() != "meta":
+                return
+            ids = [value for name, value in attrs if name.lower() == "id"]
+            contents = [value for name, value in attrs if name.lower() == "content"]
+            if any(value == DIAGNOSTIC_BUILD_META_ID for value in ids):
+                # Preserve malformed duplicate attributes as a failed match;
+                # accepting one value would make a hidden duplicate mutable.
+                self.matches.append(contents[0] if len(ids) == len(contents) == 1 else None)
+
+    parser = _MetaParser()
+    try:
+        parser.feed(text)
+        parser.close()
+    except (TypeError, ValueError) as exc:
+        raise BuildError("player HTML contains malformed metadata") from exc
+    matches = parser.matches
+    if len(matches) != 1:
+        raise BuildError("player HTML must contain exactly one diagnostic build identity")
+    if matches[0] is None:
+        raise BuildError("player diagnostic build identity metadata is malformed")
+    try:
+        value = json.loads(matches[0])
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise BuildError("player diagnostic build identity is not valid JSON") from exc
+    if not isinstance(value, dict):
+        raise BuildError("player diagnostic build identity must be an object")
+    if set(value) != {"schema_version", "source_commit", "runtime_hash", "build_profile"}:
+        raise BuildError("player diagnostic build identity has unexpected or missing fields")
+    if value.get("schema_version") != DIAGNOSTIC_BUILD_SCHEMA_VERSION:
+        raise BuildError("player diagnostic build identity schema version is unsupported")
+    return _diagnostic_identity(
+        source_commit=value.get("source_commit", ""),
+        runtime_hash=value.get("runtime_hash", ""),
+        build_profile=value.get("build_profile", ""),
     )
 
 
@@ -996,6 +1112,8 @@ def _validate_runtime_graph(files: dict[str, bytes], *, audio: bool = False) -> 
     }
     if not audio and forbidden_modules.intersection(files):
         raise BuildError("public runtime graph contains a development audio module")
+    if "runtime-diagnostics.mjs" not in files:
+        raise BuildError("public runtime graph is missing runtime-diagnostics.mjs")
     loader = "gameplay_audio_preview.js" if audio else "gameplay_public.js"
     for rel, data in files.items():
         # Export checks alone cannot detect dormant diagnostics retained by
@@ -1200,7 +1318,8 @@ def _robots(mode: str, index_production: bool = False) -> str:
     return "# The apex production host is indexable; Pages preview hosts are blocked by _headers.\nUser-agent: *\nAllow: /\n"
 
 
-def _replace_html(data: bytes, operator: str, contact: str, css_url: str, js_url: str, mode: str) -> bytes:
+def _replace_html(data: bytes, operator: str, contact: str, css_url: str, js_url: str, mode: str,
+                  diagnostic_identity: dict[str, str | int] | None = None) -> bytes:
     text = data.decode("utf-8")
     replacements = {
         STYLE_TOKEN: css_url,
@@ -1210,6 +1329,11 @@ def _replace_html(data: bytes, operator: str, contact: str, css_url: str, js_url
     }
     for token, value in replacements.items():
         text = text.replace(token, value)
+    if diagnostic_identity is not None:
+        marker = _diagnostic_meta(diagnostic_identity)
+        if text.count("<head>") != 1:
+            raise BuildError("player HTML must contain one reviewed <head> boundary")
+        text = text.replace("<head>", f"<head>\n  {marker}", 1)
     text = text.replace('<html lang="en">', f'<html lang="en" data-environment="{mode}">', 1)
     if mode == "preview":
         text = text.replace('<title>', '<title>[staging] ', 1)
@@ -1295,6 +1419,7 @@ def build(
             "controller-settings.css": ROOT / "web" / "controller-settings.css",
             "touch-controls.mjs": ROOT / "web" / "touch-controls.mjs",
             "touch-controls.css": ROOT / "web" / "touch-controls.css",
+            "runtime-diagnostics.mjs": ROOT / "web" / "runtime-diagnostics.mjs",
         }
         for rel, path in source_runtime.items():
             if _is_symlink(path) or not path.is_file():
@@ -1306,10 +1431,15 @@ def build(
             "player/player.css": source_bytes["player.css"],
             "player/player-shell.mjs": source_bytes["player-shell.mjs"],
         })
+        diagnostic_identity = _diagnostic_identity(
+            source_commit=_source_sha(),
+            runtime_hash=runtime_hash,
+            build_profile="player",
+        )
     else:
         source_bytes = _validate_source(source)
         legal_bytes = source_bytes
-        runtime_identity = runtime_files = runtime_hash = identity_bytes = None
+        runtime_identity = runtime_files = runtime_hash = identity_bytes = diagnostic_identity = None
     legal_notice = _read_legal_notice()
     operator, contact = _config(mode, operator, contact)
     output.mkdir()
@@ -1346,7 +1476,13 @@ def build(
             page_css_url = css_url if profile == "player" and name == "index.html" else (
                 legal_css_url if profile == "player" else css_url
             )
-            _write_new(output / name, _replace_html(html_source[name], operator, contact, page_css_url, js_url, mode))
+            _write_new(
+                output / name,
+                _replace_html(
+                    html_source[name], operator, contact, page_css_url, js_url, mode,
+                    diagnostic_identity if profile == "player" and name == "index.html" else None,
+                ),
+            )
         (output / "licenses").mkdir()
         _write_new(output / LEGAL_NOTICE_OUTPUT, legal_notice)
         _write_new(output / "_headers", _headers(mode, index_production, profile).encode("utf-8"))

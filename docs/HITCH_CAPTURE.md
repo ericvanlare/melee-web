@@ -5,6 +5,10 @@ It does not admit content, close a red automatically, or open fresh holdouts.
 The gameplay clock, original source ordering, numerical behavior and existing
 hard gate remain unchanged.
 
+For the public player's bounded local incident recorder and its packaged-browser
+check, see [runtime diagnostics](RUNTIME_DIAGNOSTICS.md). Its scalar feed reuses
+existing counters; the full development profiler remains a separate tool.
+
 ## Measurements and decision boundary
 
 | Signal | Definition | Interpretation |

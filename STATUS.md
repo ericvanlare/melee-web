@@ -1,5 +1,17 @@
 # Current status
 
+## Bounded runtime pause diagnostics — issue #116
+
+The [local recorder contract](docs/RUNTIME_DIAGNOSTICS.md) and
+[source-bound packaged browser receipt](docs/evidence/runtime-recorder-v1.json)
+record same-build enabled/disabled CSS costs, native simulation/audio guard
+receipts, sanitized supported failures and isolated cross-page retention.
+This is **Browser exercised** headless diagnostic evidence. Induced stalls do
+not identify a natural user pause cause or close sustained-play, original-state,
+quiet-machine, foreground, physical-input, audible or pixels/PCM gates.
+Automatic reporting and the independent first-pause campaign remain separate
+prerequisites; no deployment is included in this checkpoint.
+
 ## Remaining fighter integration — PR #86
 
 Current per-character coverage, original CPU9 references, rendered browser

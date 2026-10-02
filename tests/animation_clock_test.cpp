@@ -26,6 +26,26 @@ int main() {
     assert(clock.tick(11000, true).steps == 0);
     assert(clock.tick(10999, true).stalled);
     assert(clock.tick(std::numeric_limits<double>::infinity(), true).stalled);
+    // A receipt retains the actual guard condition before the state resets.
+    AnimationClock observed;
+    observed.tick(0, true);
+    unsigned receipts = 0;
+    auto observe = [&](const AnimationClock::Tick& event) noexcept {
+        ++receipts;
+        assert(event.stalled && event.steps == 0);
+    };
+    auto debt = observed.tick(150, true, observe);
+    assert(receipts == 1 && debt.reason == AnimationClock::StallReason::Debt);
+    assert(debt.triggering_value == 9 && debt.threshold == 8 && debt.interval_ms == 150);
+    assert(observed.tick(150, true, observe).steps == 0 && receipts == 1);
+    auto backwards = observed.tick(149, true, observe);
+    assert(receipts == 2 && backwards.reason == AnimationClock::StallReason::ClockRegression);
+    assert(backwards.triggering_value == 149 && backwards.threshold == 150);
+    auto invalid = observed.tick(std::numeric_limits<double>::quiet_NaN(), true, observe);
+    assert(receipts == 3 && invalid.reason == AnimationClock::StallReason::NonFiniteClock);
+    assert(std::isnan(invalid.triggering_value));
+    observed.tick(0, false, observe);
+    assert(receipts == 3); // Expected suspension is not a guard failure.
     // A 200 ms presentation stall must retain all 12 source ticks, while no
     // individual callback can monopolize the browser with more than eight.
     AnimationClock recovering(AnimationClock::OverrunPolicy::CatchUp);

@@ -76,6 +76,7 @@ globalThis.testDiscReader = async (file, report) => {
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'melee-runtime-owner-'));
 const sourcePath = path.join(temporary, 'runtime.mjs');
 await fs.copyFile(new URL('../web/controller-input.mjs', import.meta.url), path.join(temporary, 'controller-input.mjs'));
+await fs.copyFile(new URL('../web/runtime-diagnostics.mjs', import.meta.url), path.join(temporary, 'runtime-diagnostics.mjs'));
 await fs.writeFile(sourcePath, source);
 const {mountMeleeRuntime} = await import(pathToFileURL(sourcePath));
 await fs.rm(temporary, {recursive: true});

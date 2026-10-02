@@ -173,6 +173,7 @@ def _player_fixture() -> tuple[dict[str, bytes], dict[str, object]]:
         "controller-panel.css": b".controller-panel {}",
         "controller-settings.mjs": b"export {};",
         "controller-settings.css": b".controller-settings {}",
+        "runtime-diagnostics.mjs": b"export {};",
         "touch-controls.mjs": b"export {};",
         "touch-controls.css": b".touch-controls {}",
         "gameplay_public.js": b"// gameplay_public.wasm",

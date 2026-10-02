@@ -39,6 +39,11 @@ FixedTickClock simulation_clock{FixedTickClock::OverrunPolicy::CatchUp};
 std::string message="Import local runtime assets to launch.";
 bool running=false,ready=false,exiting=false;
 unsigned frames=0;
+unsigned diagnostic_source_ticks=0;
+void diagnostic_incident(int reason,double value=0,double threshold=0){
+    EM_ASM({try{window.menuDiagnosticIncident?.($0,$1,$2,$3,7,1);}catch(_){}},
+           reason,value,threshold,diagnostic_source_ticks);
+}
 unsigned catchup_frames=0,max_backlog_ticks=0;
 SDL_Window* runtime_window=nullptr;
 int render_scale=1;
@@ -53,6 +58,7 @@ alignas(32) unsigned char fifo_buffer[64*1024];
 constexpr std::array<std::string_view,16> required={"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sislib_font.bin","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sp_end.hps"};
 void require(int value,const char* error){if(!value)throw std::runtime_error(error);}
 void close_game(){
+    diagnostic_source_ticks=0;
     running=false;finished=false;winner=-1;catchup_frames=0;max_backlog_ticks=0;combat_check=-1;stock_check_tick=-1;stock_check_total_ticks=0;stock_check_stocks=4;stock_check_respawns=0;stock_check_result=-1;stock_check_lost=false;stock_check_jump=false;simulation_clock.reset();char error[256];
     if(world)world->end_stage();
     if(render){require(melee_web_render_end(render,error,sizeof(error)),error);render=nullptr;}
@@ -86,7 +92,12 @@ void tick(){
     if(exiting){close_game();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();return;}
     try{
         EM_ASM({window.runtimeBoundary="simulation";});
-        const auto elapsed=simulation_clock.tick(started,running&&match&&input->visible);
+        const auto elapsed=simulation_clock.tick(started,running&&match&&input->visible,
+            [](const auto& event) noexcept {
+                using Reason=FixedTickClock::StallReason;
+                diagnostic_incident(event.reason==Reason::Debt?1:
+                    event.reason==Reason::ClockRegression?8:3,event.triggering_value,event.threshold);
+            });
         // Keep source audio ticking, but re-prime browser output after catch-up
         // instead of queuing an entire stalled interval of late sound.
         EM_ASM({if(window.runtimeAudioCatchup)window.runtimeAudioCatchup($0);},elapsed.pending_steps!=0);
@@ -118,6 +129,7 @@ void tick(){
                 sample=scripted;
             }
             require(melee_web_match_step_raw(match,sample,error,sizeof(error)),error);
+            ++diagnostic_source_ticks;
             if(stock_check_tick>=0){
                 MeleeWebMatchStats players[2]{};
                 require(melee_web_match_player_stats(match,0,&players[0],error,sizeof(error)),error);
@@ -182,7 +194,7 @@ void tick(){
             draw_done=begin_done;end_done=begin_done;
         }
     }catch(const std::exception& e){
-        running=false;simulation_clock.reset();message=e.what();timing_valid=0;
+        diagnostic_incident(4);running=false;simulation_clock.reset();message=e.what();timing_valid=0;
         if(stock_check_tick>=0){stock_check_result=2;stock_check_tick=-1;}
         const double failed_at=emscripten_get_now();
         if(simulation_done<input_done)simulation_done=failed_at;
@@ -195,6 +207,10 @@ void tick(){
     if(const AuroraStats* stats=aurora_get_stats())stats_after=*stats;
     const int queued_delta=int32_t(stats_after.queuedPipelines)-int32_t(stats_before.queuedPipelines);
     const int created_delta=int32_t(stats_after.createdPipelines)-int32_t(stats_before.createdPipelines);
+    EM_ASM({try{window.menuDiagnosticSample?.($0,$1,7,37,0,0,-1,-1,$2,$3,$4,$5,0,$6,$7,$8,-1,-1,$9);}catch(_){}},
+           started,diagnostic_source_ticks,simulation_clock.pending_ticks(),
+           simulation_done-input_done,end_done-simulation_done,finished_at-started,
+           queued_delta,created_delta,stats_after.lastTextureUploadSize,running);
     // Optional diagnostics only: no-op unless the page installs this callback.
     // Keep this after all native work so the callback observes the complete
     // synchronous WebGPU/pipeline-cache cost of this browser tick.
@@ -278,7 +294,7 @@ static int launch_game(bool fixture){
         require(melee_web_render_finish_match_camera(render,&settings,error,sizeof(error)),error);
         require(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
         running=true;simulation_clock.reset();message="Original two-player runtime running.";return 1;
-    }catch(const std::exception& e){message=e.what();running=false;return 0;}
+    }catch(const std::exception& e){diagnostic_incident(4);message=e.what();running=false;return 0;}
 }
 int melee_web_game_launch(){return launch_game(false);}
 int melee_web_game_launch_fixture(){return launch_game(true);}
@@ -286,7 +302,7 @@ int melee_web_game_unload(){
     try{close_game();message="Unloaded. Imported assets are retained for restart.";return 1;}
     catch(const std::exception& e){message=e.what();return 0;}
 }
-void melee_web_game_pause(int paused){if(finished)return;running=match&&render&&!paused;simulation_clock.reset();message=running?"Original two-player runtime running.":"Paused.";}
+void melee_web_game_pause(int paused){if(finished)return;diagnostic_incident(paused?5:6);running=match&&render&&!paused;simulation_clock.reset();message=running?"Original two-player runtime running.":"Paused.";}
 const char* melee_web_game_message(){return message.c_str();}
 int melee_web_game_running(){return running;}
 int melee_web_game_cache_idle(){

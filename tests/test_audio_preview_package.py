@@ -15,7 +15,8 @@ spec.loader.exec_module(preview)
 
 class AudioPreviewPackageTests(unittest.TestCase):
     def generated(self):
-        native = {name: b'fixture' for name in preview.NATIVE}
+        native = {name: (b'gameplay_audio_preview.wasm' if name.endswith('.js') else b'fixture')
+                  for name in preview.NATIVE}
         with patch.object(preview, 'runtime', return_value=(native, 'a' * 64)), \
                 patch.object(preview, 'source_commit', return_value='b' * 40):
             return preview.expected_files()
@@ -37,9 +38,18 @@ class AudioPreviewPackageTests(unittest.TestCase):
         self.assertNotIn(b'public alpha has no audio', files['notices.html'])
         self.assertNotIn(b'EXCLUDED FROM PUBLIC ALPHA', files['licenses/runtime-third-party.txt'])
         self.assertIn(b'20 compatibility values', files['notices.html'])
+        self.assertIn(b'id="runtime-diagnostic-identity"', files['index.html'])
+        self.assertEqual(
+            preview.public._read_diagnostic_meta(files['index.html']),
+            preview.public._diagnostic_identity(
+                source_commit=meta['source_sha'], runtime_hash=meta['runtime_hash'],
+                build_profile='audio-preview',
+            ),
+        )
         self.assertIn(b'X-Robots-Tag: noindex', files['_headers'])
-        for name in ('runtime.html', 'runtime-cache.js', 'runtime-diagnostics.mjs', 'dsp_coef.bin'):
+        for name in ('runtime.html', 'runtime-cache.js', 'dsp_coef.bin'):
             self.assertFalse(any(path.endswith('/' + name) or path == name for path in files))
+        self.assertTrue(any(path.endswith('/runtime-diagnostics.mjs') for path in files))
 
     def test_audit_rejects_changed_extra_and_symlink_files(self):
         files, meta = self.generated()
@@ -52,6 +62,13 @@ class AudioPreviewPackageTests(unittest.TestCase):
             index = output / 'index.html'
             original = index.read_bytes()
             index.write_bytes(original + b'changed')
+            with self.assertRaisesRegex(ValueError, 'bytes or inventory'):
+                preview.audit(output, manifest)
+            index.write_bytes(original)
+            identity_marker = b'&quot;source_commit&quot;:&quot;' + b'b' * 40 + b'&quot;'
+            self.assertIn(identity_marker, original)
+            index.write_bytes(original.replace(
+                identity_marker, b'&quot;source_commit&quot;:&quot;' + b'c' * 40 + b'&quot;'))
             with self.assertRaisesRegex(ValueError, 'bytes or inventory'):
                 preview.audit(output, manifest)
             index.write_bytes(original)
