@@ -4,6 +4,7 @@
 #include "native_menu_fighter_input.h"
 
 #include <melee/ft/forward.h>
+#include <melee/gr/forward.h>
 #include <melee/pl/forward.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjobject.h>
@@ -128,6 +129,8 @@ static int transition_request;
 static int invalid_exit;
 static int source_order_enabled;
 static int source_order;
+static int css_pending_override = -1;
+static int sss_start_override = -1;
 
 void mnCharSel_Scene_OnEnter(void* data)
 {
@@ -139,7 +142,9 @@ void mnCharSel_Scene_OnFrame(void) { if (source_order_enabled) source_order = 1;
 void mnCharSel_Scene_OnExit(void* data)
 {
     (void) data;
-    active_css->pending_scene_change = 1;
+    active_css->pending_scene_change = css_pending_override >= 0
+                                          ? (u8) css_pending_override
+                                          : 1;
     if (invalid_exit == 1) active_css->vs.start.players[0].ckind = CKIND_PLAYABLE_COUNT;
     active_css = NULL;
 }
@@ -153,7 +158,9 @@ void mnStageSel_Scene_OnFrame(void) { if (source_order_enabled) source_order = 1
 void mnStageSel_Scene_OnExit(void* data)
 {
     (void) data;
-    active_sss->start_game = true;
+    active_sss->start_game = sss_start_override < 0
+                                 ? true
+                                 : sss_start_override != 0;
     if (invalid_exit == 2) active_sss->vs.start.rules.stkind = St_Kind_Dummy;
     if (invalid_exit == 3) active_sss->vs.start.rules.stkind = 25;
     active_sss = NULL;
@@ -184,6 +191,50 @@ static int transition(void* user, MeleeWebMenuScene scene, int* requested,
         source_order = 3;
     *requested = transition_request;
     transition_request = 0;
+    if (error != NULL && n != 0) error[0] = '\0';
+    return 1;
+}
+
+typedef struct TrainingMenuTraceContext {
+    MeleeWebMenuSession* session;
+} TrainingMenuTraceContext;
+
+static int training_scene_enter(void* user, MeleeWebMenuScene scene,
+                                char* error, size_t n)
+{
+    TrainingMenuTraceContext* context = user;
+
+    if (scene == MELEE_WEB_MENU_SCENE_CSS) {
+        CSSData* css = (CSSData*) melee_web_menu_css(context->session);
+        css->match_type = TRAINING_MODE;
+        css->vs.start.rules.match_kind = MatchKind_Time;
+        css->vs.start.rules.is_stock = false;
+        css->vs.start.rules.is_vs = false;
+        css->vs.start.rules.is_teams = false;
+        css->vs.start.rules.timer_enabled = false;
+        css->vs.start.rules.xB = 2;
+        css->vs.start.rules.x20 = UINT64_MAX;
+        css->vs.start.rules.stkind = St_Kind_Dummy;
+        for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
+            css->vs.start.players[i].slot_type = Gm_PKind_NA;
+            css->vs.start.players[i].ckind = CHKIND_NONE;
+        }
+        css->vs.start.players[0].slot_type = Gm_PKind_Human;
+        css->vs.start.players[0].ckind = CKIND_MARIO;
+        css->vs.start.players[0].stocks = 1;
+        css->vs.start.players[1].slot_type = Gm_PKind_Cpu;
+        css->vs.start.players[1].ckind = CKIND_MARIO;
+        css->vs.start.players[1].stocks = 1;
+    }
+    if (error != NULL && n != 0) error[0] = '\0';
+    return 1;
+}
+
+static int training_scene_exit(void* user, MeleeWebMenuScene scene,
+                               char* error, size_t n)
+{
+    (void) user;
+    (void) scene;
     if (error != NULL && n != 0) error[0] = '\0';
     return 1;
 }
@@ -734,6 +785,83 @@ int main(void)
         char error[128];
         if (melee_web_menu_session_create(&runtime, NULL, error, sizeof(error)))
             return 25;
+    }
+    {
+        TrainingMenuTraceContext context = {NULL};
+        MeleeWebMenuRuntime runtime = {
+            &context, check, scheduler, transition,
+            training_scene_enter, training_scene_exit};
+        char error[128];
+        MeleeWebMenuSession* session =
+            melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
+        if (session == NULL) return 26;
+        context.session = session;
+        if (!melee_web_menu_enter_css(session, error, sizeof(error)) ||
+            melee_web_menu_css(session)->match_type != TRAINING_MODE)
+            return 27;
+        if (!melee_web_menu_css_selection_valid(
+                (const CSSData*) melee_web_menu_css(session)))
+            return 35;
+
+        transition_request = 1;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+            !melee_web_menu_leave_css(session, error, sizeof(error)) ||
+            !melee_web_menu_enter_sss(session, error, sizeof(error)))
+            return 28;
+        active_sss->vs.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
+        sss_start_override = 0;
+        transition_request = 1;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+            !melee_web_menu_leave_sss(session, error, sizeof(error)) ||
+            melee_web_menu_phase(session) != MELEE_WEB_MENU_CSS_READY)
+            return 29;
+
+        if (!melee_web_menu_enter_css(session, error, sizeof(error)))
+            return 30;
+        ((CSSData*) melee_web_menu_css(session))->vs.start.players[0].ckind =
+            CHKIND_NONE;
+        transition_request = 1;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+            !melee_web_menu_mark_css_parent_route(session, error, sizeof(error)))
+            return 31;
+        css_pending_override = 2;
+        if (!melee_web_menu_leave_css(session, error, sizeof(error)) ||
+            !melee_web_menu_parent_route_pending(session) ||
+            !melee_web_menu_reopen_css_after_parent(session, error, sizeof(error)))
+            return 32;
+        css_pending_override = -1;
+        if (!melee_web_menu_abort(session, error, sizeof(error)) ||
+            !melee_web_menu_session_destroy(session, error, sizeof(error)))
+            return 33;
+
+        context.session = NULL;
+        session = melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
+        if (session == NULL) return 34;
+        context.session = session;
+        if (!melee_web_menu_enter_css(session, error, sizeof(error))) return 35;
+        transition_request = 1;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+            !melee_web_menu_leave_css(session, error, sizeof(error)) ||
+            !melee_web_menu_enter_sss(session, error, sizeof(error)))
+            return 36;
+        active_sss->vs.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
+        sss_start_override = 1;
+        transition_request = 1;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+            !melee_web_menu_leave_sss(session, error, sizeof(error)) ||
+            melee_web_menu_phase(session) != MELEE_WEB_MENU_READY ||
+            melee_web_menu_ready_vs(session) == NULL ||
+            melee_web_menu_ready_vs(session)->start.rules.stkind !=
+                MELEE_WEB_MENU_FD_ST_KIND ||
+            !melee_web_menu_session_destroy(session, error, sizeof(error)))
+            return 37;
+        css_pending_override = -1;
+        sss_start_override = -1;
     }
     puts("native menu lifecycle contract trace: passed");
     return 0;

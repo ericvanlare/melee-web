@@ -2287,7 +2287,7 @@
         "docs/TRANSITION_EQUIVALENCE.md",
         "docs/REFERENCE_CAPTURE_APP.md"
       ],
-      "next_step": "Enumerate rule fields from the source structs and menu mode callers, then add a source/retail/browsing receipt per options family.",
+      "next_step": "Capture original mnmainrule/mnruleplus/mnitemsw entry and cancel/back routes; carry one selected rule through a real match, Results/CSS and retained settings, coordinated with item-family services.",
       "issue": null
     },
     {
@@ -2482,10 +2482,13 @@
       "id": "minigames-training-and-multiman",
       "category": "singleplayer",
       "title": "Training, How-To, Multi-Man, Target Test, Home-Run and Stadium minigames",
-      "implementation": "not_integrated",
+      "implementation": "partial",
       "acceptance": "not_evaluated",
       "source_refs": [
         "melee/gm/gmtrainingmode.c",
+        "melee/mn/mncharsel.c",
+        "melee/mn/mnmain.c",
+        "melee/mn/mnstagesel.c",
         "melee/gm/gmhowto.c",
         "melee/gm/gmmultiman.c",
         "melee/gm/gmhomerun.c",
@@ -2507,10 +2510,11 @@
         "Minigame result and unlock records survive repeated entry, failure, reset and browser unload."
       ],
       "evidence": [
+        "docs/evidence/training-menu-route-v1.json",
         "docs/ROADMAP.md",
         "docs/ACCURACY_CONTRACT.md"
       ],
-      "next_step": "Split this row by source mode and then by shared object runner, beginning with the mode tables and score/result owners.",
+      "next_step": "Capture the Training CSS/SSS route on retail with Observer-equipped Dolphin, then implement the separate GS_TRAINING state-2 simulation owner, HUD/options, item controls, reset/CPU services and Results/save route.",
       "issue": null
     },
     {

@@ -65,6 +65,14 @@ int melee_web_menu_host_enter(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
  * they do not synthesize a browser menu. */
 int melee_web_menu_host_enter_title(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
 int melee_web_menu_host_enter_main(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
+/* Enter the original Training mode's source CSS after its GM_MENU handoff.
+ * This is the original training CSS/SSS navigation owner; the training
+ * simulation state remains a separate checked runtime boundary. */
+int melee_web_menu_host_enter_training_css(
+    MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
+/* Current original game-mode route selected by the source mode owner. */
+int melee_web_menu_host_mode_kind(const MeleeWebMenuHost*);
+int melee_web_menu_host_training_start_pending(const MeleeWebMenuHost*);
 /* Opening mode uses the original state table. Preview is read-only source
  * selection data used to request the exact assets before preload/OnEnter. */
 int melee_web_menu_host_opening_preview(const MeleeWebMenuHost*,

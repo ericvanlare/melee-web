@@ -95,6 +95,10 @@ std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)>
     results_input{nullptr,melee_web_pad_state_free};
 std::string terminal_match_observation;
 std::string match_observer_error;
+MeleeWebFighterInputObservation last_css_fighter_observation{};
+int last_css_fighter_target=-1,last_css_fighter_drive_state=-1;
+bool last_css_fighter_observation_valid=false;
+int css_fighter_release_port=-1;
 bool results_route_active=false;
 bool prize_route_active=false;
 std::unique_ptr<melee_web::RetailReplayRecipe> replay;
@@ -287,11 +291,13 @@ bool transition_audio_continues=false;
 bool menu_scene_rebuild_pending=false;
 int pending_menu_source_scene=0;
 melee_web::GameplayMenuScene pending_menu_scene=melee_web::GameplayMenuScene::Characters;
-enum class MenuRouteEntry { Session, Main, Title, ParentCss };
+enum class MenuRouteEntry { Session, Main, Title, ParentCss, TrainingCss };
 MenuRouteEntry pending_menu_entry=MenuRouteEntry::Session;
 const char* source_menu_message(){
  switch(pending_menu_scene){
- case melee_web::GameplayMenuScene::Characters:return "Original character select";
+ case melee_web::GameplayMenuScene::Characters:
+  return host&&melee_web_menu_host_mode_kind(host)==GM_TRAINING?
+      "Original Training character select":"Original character select";
  case melee_web::GameplayMenuScene::Stages:return "Original stage select";
  case melee_web::GameplayMenuScene::Main:return "Original main menu";
  case melee_web::GameplayMenuScene::Title:return "Original title";
@@ -756,6 +762,7 @@ if(scoped_assets){
  replay.reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
+ css_fighter_release_port=-1;last_css_fighter_observation_valid=false;
  match_message="Original source match";
  terminal_match_observation.clear();
  if(had_lifetime){
@@ -1105,6 +1112,18 @@ void advance(){
   begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Main,MenuRouteEntry::Main);
   return;
  }
+ if(previous_source_scene==MELEE_WEB_MENU_HOST_SCENE_SSS&&route_target==GM_MENU){
+  begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Main,MenuRouteEntry::Main);
+  return;
+ }
+ if(previous_source_scene==MELEE_WEB_MENU_HOST_SCENE_MAIN&&
+    route_target==GM_TRAINING){
+  check(melee_web_menu_host_mode_kind(host)==GM_TRAINING,
+        "Original Main menu lost its checked GM_TRAINING owner");
+  begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Characters,
+                           MenuRouteEntry::TrainingCss);
+  return;
+ }
  if(previous_source_scene==4&&route_target==0){
   begin_menu_scene_rebuild(melee_web::GameplayMenuScene::Title,MenuRouteEntry::Title);
   return;
@@ -1151,6 +1170,12 @@ void advance(){
  world->close();world.reset();world_exposed=false;pending=false;menu_clock.reset();audio_phase=0;
  report_owner_lifetime("menu-after-teardown");
  if(phase==5){
+  if(melee_web_menu_host_mode_kind(host)==GM_TRAINING){
+   check(melee_web_menu_host_training_start_pending(host),
+         "Original Training SSS reached its simulation state without a checked start handoff");
+   throw std::runtime_error(
+       "Original Training stage selection reached GM_TRAINING state 2. Its one-player simulation, Training HUD/options, item controls, and reset/CPU services are not integrated yet; Eject to recover.");
+  }
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
   if(replay&&replay->version==melee_web::kRetailReplayVersion)
    melee_web::retail_replay_validate_match_setup(
@@ -1269,6 +1294,8 @@ void finish_menu_scene_rebuild(){
   source_entered=melee_web_menu_host_enter_title(host,world->audio(),error,sizeof(error));break;
  case MenuRouteEntry::ParentCss:
   source_entered=melee_web_menu_host_reenter_css_after_parent(host,world->audio(),error,sizeof(error));break;
+ case MenuRouteEntry::TrainingCss:
+  source_entered=melee_web_menu_host_enter_training_css(host,world->audio(),error,sizeof(error));break;
  }
  check(source_entered,error);
  host_entered=true;world_exposed=true;
@@ -1281,8 +1308,14 @@ void finish_menu_scene_rebuild(){
  case MenuRouteEntry::Title:message="Original title";break;
  case MenuRouteEntry::Main:message="Original main menu";break;
  case MenuRouteEntry::ParentCss:message="Original character select";break;
+ case MenuRouteEntry::TrainingCss:message="Original Training character select";break;
  case MenuRouteEntry::Session:
-  message=melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";break;
+  if(melee_web_menu_host_phase(host)==1&&
+     melee_web_menu_host_mode_kind(host)==GM_TRAINING)
+   message="Original Training character select";
+  else
+   message=melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+  break;
  }
  pending_menu_entry=MenuRouteEntry::Session;
 }
@@ -2336,16 +2369,27 @@ const char* melee_web_native_menu_match_observe(){
 }
 int melee_web_native_menu_drive_fighter(int character_kind){try{
  if(!host||melee_web_menu_host_phase(host)!=1)throw std::runtime_error("Fighter selection drive requires the original CSS");
+ if(css_fighter_release_port>=0){
+  const unsigned port=static_cast<unsigned>(css_fighter_release_port);
+  check(melee_web_native_menu_pad_sample_full(port,0,0,0,0,0,0,0,1),message.c_str());
+  css_fighter_release_port=-1;
+  return 1;
+ }
  MeleeWebFighterInputObservation observed{};check(melee_web_fighter_input_observe(character_kind,&observed),"CSS target observation is unavailable");
+ last_css_fighter_observation=observed;last_css_fighter_target=character_kind;
+ last_css_fighter_observation_valid=true;
  PADStatus raw[PAD_MAX_CONTROLLERS]{};const int state=melee_web_fighter_input_drive(raw,&observed,character_kind);
+ last_css_fighter_drive_state=state;
  check(state!=MELEE_WEB_FIGHTER_INPUT_INVALID,"CSS target observation is invalid");
  if(state==MELEE_WEB_FIGHTER_INPUT_ALREADY_SELECTED)return 2;
- if(state==MELEE_WEB_FIGHTER_INPUT_PICKUP_READY||state==MELEE_WEB_FIGHTER_INPUT_TARGET_READY)
-  check(melee_web_fighter_input_button(raw,PAD_BUTTON_A),"CSS target button sample failed");
+ const bool pressed=state==MELEE_WEB_FIGHTER_INPUT_PICKUP_READY||
+                    state==MELEE_WEB_FIGHTER_INPUT_TARGET_READY;
+ if(pressed)raw[observed.cursor_port].button|=PAD_BUTTON_A;
  check(melee_web_native_menu_pad_sample_full(observed.cursor_port,raw[observed.cursor_port].button,
        raw[observed.cursor_port].stickX,raw[observed.cursor_port].stickY,
        raw[observed.cursor_port].substickX,raw[observed.cursor_port].substickY,
        raw[observed.cursor_port].triggerLeft,raw[observed.cursor_port].triggerRight,1),message.c_str());
+ if(pressed)css_fighter_release_port=observed.cursor_port;
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_drive_stage(int stage_kind){try{
@@ -2373,7 +2417,7 @@ const char* melee_web_native_menu_memory(){
  const auto info=mallinfo();
 const auto allocation=melee_web_gameplay_allocation();
  const auto source=melee_web_gameplay_stats();
- static char text[1024];
+ static char text[2048];
  std::snprintf(text,sizeof(text),
   "{\"wasm_heap_bytes\":%zu,\"allocator_arena_bytes\":%zu,"
   "\"allocator_live_bytes\":%zu,\"allocator_free_bytes\":%zu,"
@@ -2383,6 +2427,18 @@ const auto allocation=melee_web_gameplay_allocation();
   "\"source_world_generation\":%llu,\"source_objects\":%u,\"source_processes\":%u,"
   "\"source_heap_free_bytes\":%d,\"cached_archives\":%zu,\"cached_audio_banks\":%zu,"
   "\"match_present\":%s,\"menu_present\":%s,\"results_present\":%s,\"prize_present\":%s,"
+  "\"menu_host_entered\":%s,\"menu_source_scene\":%d,\"menu_mode_kind\":%d,"
+  "\"menu_route_target\":%d,\"menu_phase\":%d,\"menu_scene_rebuild_pending\":%s,"
+  "\"css_input\":{\"valid\":%s,\"target\":%d,\"state\":%d,"
+  "\"cursor_port\":%d,\"held_door\":%d,\"selected_character\":%d,"
+  "\"source_active_port\":%d,\"source_start_cooldown\":%d,"
+  "\"source_active_cursor_count\":%d,\"source_pending_scene\":%d,"
+  "\"source_start_ready\":%d,\"source_selected_model_state\":%d,"
+  "\"source_confirm_callback_count\":%d,\"source_last_start_trigger\":%d,"
+  "\"source_last_start_ready\":%d,\"source_last_start_pending\":%d,"
+  "\"cursor\":[%.3f,%.3f],\"model\":[%.3f,%.3f],"
+  "\"target_bounds\":[%.3f,%.3f,%.3f,%.3f]},"
+  "\"source_pad0\":{\"err\":%d,\"button\":%u,\"trigger\":%u,\"last_button\":%u},"
   "\"scoped_assets\":%s,\"asset_files\":%zu,\"asset_bytes\":%zu,"
   "\"asset_source_bytes\":%zu,\"staged_asset_files\":%zu,"
   "\"staged_asset_bytes\":%zu,\"asset_generation\":%u}",
@@ -2392,6 +2448,32 @@ const auto allocation=melee_web_gameplay_allocation();
   (unsigned long long)source.generation,source.objects,source.processes,source.heap_free_bytes,
   archive_cache?archive_cache->archive_count():0,archive_cache?archive_cache->audio_bank_count():0,
   match?"true":"false",world?"true":"false",results?"true":"false",prize?"true":"false",
+  host_entered?"true":"false",host?melee_web_menu_host_source_scene(host):0,
+  host?melee_web_menu_host_mode_kind(host):-1,
+  host?melee_web_menu_host_route_target_mode(host):-1,
+  host?melee_web_menu_host_phase(host):0,
+  menu_scene_rebuild_pending?"true":"false",
+  last_css_fighter_observation_valid?"true":"false",
+  last_css_fighter_target,last_css_fighter_drive_state,
+  last_css_fighter_observation.cursor_port,last_css_fighter_observation.held_door,
+  last_css_fighter_observation.selected_character_kind,
+  last_css_fighter_observation.source_active_port,
+  last_css_fighter_observation.source_start_cooldown,
+  last_css_fighter_observation.source_active_cursor_count,
+  last_css_fighter_observation.source_pending_scene,
+  last_css_fighter_observation.source_start_ready,
+  last_css_fighter_observation.source_selected_model_state,
+  last_css_fighter_observation.source_confirm_callback_count,
+  last_css_fighter_observation.source_last_start_trigger,
+  last_css_fighter_observation.source_last_start_ready,
+  last_css_fighter_observation.source_last_start_pending,
+  last_css_fighter_observation.cursor_x,last_css_fighter_observation.cursor_y,
+  last_css_fighter_observation.model_x,last_css_fighter_observation.model_y,
+  last_css_fighter_observation.target_left,last_css_fighter_observation.target_right,
+  last_css_fighter_observation.target_top,last_css_fighter_observation.target_bottom,
+  HSD_PadCopyStatus[0].err,static_cast<unsigned>(HSD_PadCopyStatus[0].button),
+  static_cast<unsigned>(HSD_PadCopyStatus[0].trigger),
+  static_cast<unsigned>(HSD_PadCopyStatus[0].last_button),
   scoped_assets?"true":"false",
   asset_scope.active_file_count(),asset_scope.active_byte_count(),asset_scope.active_source_bytes(),
   asset_scope.staged_file_count(),asset_scope.staged_byte_count(),asset_scope.pending_generation());

@@ -32,6 +32,7 @@ struct MeleeWebMenuSession {
     int transition_requested;
     int css_parent_route_requested;
     int css_parent_ready;
+    int training_mode_scene;
     HSD_GObj** gobj_snapshot;
     size_t gobj_snapshot_count;
     HSD_GObjList* gobj_snapshot_entities;
@@ -619,11 +620,70 @@ static int css_selection_valid_internal(const CSSData* css,
     return 1;
 }
 
+static int training_css_selection_valid_internal(const CSSData* css,
+                                                 int require_character,
+                                                 int allow_unselected_stage)
+{
+    int active_humans = 0;
+    int active_cpus = 0;
+
+    if (css == NULL || css->match_type != TRAINING_MODE ||
+        css->vs.start.rules.match_kind != MatchKind_Time ||
+        css->vs.start.rules.is_stock || css->vs.start.rules.is_vs ||
+        css->vs.start.rules.is_teams || css->vs.start.rules.timer_enabled ||
+        css->vs.start.rules.xB != 2 || css->vs.start.rules.x20 != UINT64_MAX ||
+        !stage_selection_valid(css->vs.start.rules.stkind,
+                               allow_unselected_stage)) {
+        return 0;
+    }
+    for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
+        const PlayerInitData* player = &css->vs.start.players[i];
+
+        if (player->slot_type == Gm_PKind_NA) continue;
+        if (i > 1 || (player->slot_type != Gm_PKind_Human &&
+                      player->slot_type != Gm_PKind_Cpu)) {
+            return 0;
+        }
+        if (player->slot_type == Gm_PKind_Human) {
+            if (++active_humans > 1 ||
+                (player->slot != 0 && player->slot - 1 != i)) {
+                return 0;
+            }
+        } else if (++active_cpus > 1) {
+            return 0;
+        }
+        if (player->ckind == CHKIND_NONE ||
+            player->ckind == CKIND_PLAYABLE_COUNT) {
+            if (require_character) return 0;
+        } else if (player->ckind < 0 ||
+                   player->ckind >= CKIND_PLAYABLE_COUNT) {
+            return 0;
+        }
+    }
+    return active_humans == 1 && active_cpus == 1;
+}
+
+static int training_sss_selection_valid_internal(const SSSData* sss,
+                                                 int allow_unselected_stage)
+{
+    CSSData view;
+
+    if (sss == NULL || sss->force_stage_id != -1) return 0;
+    memset(&view, 0, sizeof(view));
+    view.match_type = TRAINING_MODE;
+    view.vs = sss->vs;
+    return training_css_selection_valid_internal(&view, 1,
+                                                 allow_unselected_stage);
+}
+
 int melee_web_menu_css_selection_valid(const CSSData* css)
 {
     /* fn_80262F44 uses this guard before accepting Start. CSS has selected
      * fighters, but the following SSS still owns the stage selection. Keep
      * the original unset cache value until that scene commits its stage. */
+    if (css != NULL && css->match_type == TRAINING_MODE) {
+        return training_css_selection_valid_internal(css, 1, 1);
+    }
     return css_selection_valid_internal(css, 1, 0);
 }
 
@@ -673,6 +733,9 @@ static int match_selection_valid(const StartMeleeData* start)
 static int css_progress_valid(const CSSData* css)
 {
     CSSData view = *css;
+    if (css->match_type == TRAINING_MODE) {
+        return training_css_selection_valid_internal(css, 0, 1);
+    }
     for (unsigned i = 0; i < MELEE_WEB_MENU_MAX_PLAYERS; i++) {
         PlayerInitData* p = &view.vs.start.players[i];
         /* Preserve the existing unplugged-controller allowance for the two
@@ -858,6 +921,7 @@ static int enter_css(MeleeWebMenuSession* session, int after_match,
         melee_web_menu_gobj_snapshot_clear(session);
         return 0;
     }
+    session->training_mode_scene = session->css.match_type == TRAINING_MODE;
     mnCharSel_Scene_OnEnter(&session->css);
     session->css_open = 1;
     session->phase = MELEE_WEB_MENU_CSS;
@@ -927,7 +991,9 @@ int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
         return 0;
     }
     if (session->phase != MELEE_WEB_MENU_SSS_READY ||
-        !css_selection_valid_internal(&session->css, 1, 0))
+        (session->training_mode_scene
+             ? !training_css_selection_valid_internal(&session->css, 1, 1)
+             : !css_selection_valid_internal(&session->css, 1, 0)))
     {
         return fail(error, error_size,
                     "SSS requires a valid committed Mario CSS selection");
@@ -1017,7 +1083,9 @@ int melee_web_menu_tick(MeleeWebMenuSession* session, char* error,
         if (!css_progress_valid(&session->css)) {
             rejected = 1;
         }
-    } else if (!melee_web_menu_sss_selection_valid(&session->sss)) {
+    } else if (session->training_mode_scene
+                   ? !training_sss_selection_valid_internal(&session->sss, 1)
+                   : !melee_web_menu_sss_selection_valid(&session->sss)) {
         rejected = 1;
     }
     if (rejected) {
@@ -1084,7 +1152,10 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
                     "CSS has no completed original transition request");
     }
     parent_route = session->css_parent_route_requested;
-    if (!css_selection_valid_internal(&session->css, 1, 0)) {
+    if (session->training_mode_scene
+            ? !training_css_selection_valid_internal(
+                  &session->css, parent_route == 0, 1)
+            : !css_selection_valid_internal(&session->css, 1, 0)) {
         return fail(error, error_size,
                     "Cannot commit an unavailable character selection");
     }
@@ -1116,7 +1187,9 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
     }
     /* OnExit may publish source-private selection state. Validate that
      * payload before making the next scene available to the host. */
-    if (!css_selection_valid_internal(&session->css, 1, 0)) {
+    if (session->training_mode_scene
+            ? !training_css_selection_valid_internal(&session->css, 1, 1)
+            : !css_selection_valid_internal(&session->css, 1, 0)) {
         session->phase = MELEE_WEB_MENU_CLOSED;
         return fail(error, error_size, "CSS published an unavailable selection");
     }
@@ -1141,7 +1214,9 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
         return fail(error, error_size,
                     "SSS has no completed original transition request");
     }
-    if (!melee_web_menu_sss_selection_valid(&session->sss)) {
+    if (session->training_mode_scene
+            ? !training_sss_selection_valid_internal(&session->sss, 1)
+            : !melee_web_menu_sss_selection_valid(&session->sss)) {
         return fail(error, error_size,
                     "Cannot commit an unavailable stage selection");
     }
@@ -1159,11 +1234,25 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
         session->phase = MELEE_WEB_MENU_CLOSED;
         return 0;
     }
-    if (!melee_web_menu_sss_selection_valid(&session->sss)) {
+    if (session->training_mode_scene
+            ? !training_sss_selection_valid_internal(&session->sss,
+                                                      !session->sss.start_game)
+            : !melee_web_menu_sss_selection_valid(&session->sss)) {
         session->phase = MELEE_WEB_MENU_CLOSED;
         return fail(error, error_size, "SSS published an unavailable selection");
     }
     if (session->sss.start_game) {
+        if (session->training_mode_scene) {
+            if (!training_sss_selection_valid_internal(&session->sss, 0)) {
+                session->phase = MELEE_WEB_MENU_CLOSED;
+                return fail(error, error_size,
+                            "Original Training entry committed an unavailable source stage or player");
+            }
+            session->css.vs = session->sss.vs;
+            session->match_vs = session->sss.vs;
+            session->phase = MELEE_WEB_MENU_READY;
+            return ok(error, error_size);
+        }
         if (!melee_web_menu_stage_available(session->sss.vs.start.rules.stkind)) {
             session->phase = MELEE_WEB_MENU_CLOSED;
             return fail(error, error_size,
