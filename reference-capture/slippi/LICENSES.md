@@ -25,7 +25,13 @@ source files declare GPL-2.0-or-later; the patch retains those terms.
 is GPL-2.0; the patch retains those terms. Apply it only to that exact clean
 submodule revision.
 
-The patches are separated from the MIT matchmaking service. Neither patch is
+`patches/0003-desktop-rollback-diagnostic.patch` adds an opt-in diagnostic to
+the same pinned Dolphin source, after patch 0001. Its new client source and
+changes retain GPL-2.0-or-later. The diagnostic's authored Python configuration,
+runner and exact replay comparator have separate root MIT scope; that grant
+does not include the combined native client.
+
+The patches are separated from the MIT matchmaking service. No client patch is
 an MIT grant for the Dolphin or Rust client source. Build and distribute a
 combined client only under the applicable upstream terms and with their required
 notices and corresponding source.

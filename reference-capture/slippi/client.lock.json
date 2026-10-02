@@ -173,7 +173,13 @@
   },
   "patches": [
     "patches/0001-client-loopback-and-observation.patch",
-    "patches/0002-rust-local-endpoints.patch"
+    "patches/0002-rust-local-endpoints.patch",
+    "patches/0003-desktop-rollback-diagnostic.patch"
+  ],
+  "patch_targets": [
+    "dolphin",
+    "rust",
+    "dolphin"
   ],
   "rust_extensions": {
     "commit": "2d29e794de8497582675fb70877851f2cdd2f256",

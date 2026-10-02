@@ -25,7 +25,8 @@ contains hashes for the retained files without recording an operator path.
 [`client.lock.json`](client.lock.json) is the source of truth for the client
 commit, recursive submodule revisions, build profile, Rust extensions, game
 modification and owned disc digest. Do not update one of these components
-independently. Apply the two files in [`patches/`](patches/) only to local
+independently. Apply the ordered files in [`patches/`](patches/) to their
+`patch_targets` from the lock, only in local
 working copies of the matching commits; keep clean upstream checkouts intact.
 The client patches retain their upstream GPL terms. The generated game
 modification retains the pinned ASM repository's GPL-3.0-only terms. The
@@ -76,6 +77,9 @@ python3 scripts/agent_workspace.py run -- git apply \
 python3 scripts/agent_workspace.py run -- git apply \
   --directory=.deps/slippi-dolphin-local/Externals/SlippiRustExtensions \
   reference-capture/slippi/patches/0002-rust-local-endpoints.patch
+python3 scripts/agent_workspace.py run -- git apply \
+  --directory=.deps/slippi-dolphin-local \
+  reference-capture/slippi/patches/0003-desktop-rollback-diagnostic.patch
 python3 scripts/agent_workspace.py run -- git clone --no-checkout \
   https://github.com/project-slippi/slippi-ssbm-asm .deps/slippi-ssbm-asm
 python3 scripts/agent_workspace.py run -- git -C .deps/slippi-ssbm-asm checkout --detach \
@@ -86,6 +90,10 @@ The generated `Output/Netplay/GALE01r2.ini` must match the lock hash. Install
 Rust 1.88.0 and use the locked CMake, Ninja and Apple Clang versions. The
 runner rejects mismatched revisions, patch trees, compiler/build settings, or
 generated game modification. Keep the clean Dolphin checkout unchanged.
+The third patch's controls are disabled unless an explicit diagnostic config
+is supplied; the ordinary match/rematch command retains its controller script.
+See [the bounded rollback diagnostic](ROLLBACK_DIAGNOSTIC.md) for the separate
+frame-indexed fixture and its comparison boundary.
 
 For the client build, configure with the profile recorded in `client.lock.json`
 and build the NoGUI executable:

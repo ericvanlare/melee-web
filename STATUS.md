@@ -1223,6 +1223,18 @@ records one 24-frame raw PAD exchange through the loopback ENet relay and the
 desktop peer's existing input consumer. It does not establish browser gameplay,
 general cross-play, or rollback correctness.
 
+A [frame-scripted desktop diagnostic receipt](docs/evidence/desktop-rollback-diagnostic-v1.json)
+records separate baseline and six-packet hold fresh repeats using fixed initial conditions
+and native source-frame PAD generation. The hold produced completed prediction-error
+loads and repeated source recording coverage; wrong input and post-state revisions
+were corrected to the finalized pair. Both peers agreed with the corresponding
+baseline games on every parsed declared finalized frame, including neutral startup,
+RNG, input, fighter state, stocks and outcome. Peer disconnect and cleanup passed.
+Both scenarios repeat from fresh profile pairs. Ordinary diagnostic-disabled
+match/rematch, disconnect and interruption cleanup also pass. Combat damage
+and the remaining fault cases are pending; see the
+[diagnostic command and observation boundary](reference-capture/slippi/ROLLBACK_DIAGNOSTIC.md).
+
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
 ticks, and the port matches their entry data, input vectors, declared fighter

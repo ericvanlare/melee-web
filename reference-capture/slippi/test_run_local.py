@@ -1,6 +1,10 @@
 # SPDX-License-Identifier: MIT
 """Focused checks for the local Slippi scenario's state and network gates."""
 
+import json
+from pathlib import Path
+from types import SimpleNamespace
+import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
@@ -22,10 +26,59 @@ from run_local import (
     _slippi_players_are_mario_mario,
     _stage_is_valid_for_game,
     _ticket_accepted,
+    _run_interruption_probe,
 )
 
 
 class LocalScenarioGateTests(unittest.TestCase):
+    def test_ordinary_clients_do_not_inherit_external_diagnostic_controls(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run = PairRun.__new__(PairRun)
+            run.rollback_diagnostic = None
+            run.work = root
+            run.disc = root / "disc"
+            run.profiles = {name: SimpleNamespace(user_root=root / name) for name in ("p1", "p2")}
+            run.evidence = {"clients": {name: {} for name in run.profiles}}
+            run.children = {}
+            run.supervisor = Mock()
+            run.supervisor.start.return_value = SimpleNamespace(pid=123)
+            run.timeouts = {"boot": 1}
+            run._wait_until = Mock()
+            run._record_menu_observation = Mock()
+            with patch.dict("os.environ", {"SLIPPI_ROLLBACK_DIAGNOSTIC_CONFIG": "external-fault-config"}):
+                run._start_clients(root / "client")
+            for call in run.supervisor.start.call_args_list:
+                self.assertNotIn("SLIPPI_ROLLBACK_DIAGNOSTIC_CONFIG", call.kwargs["env"])
+            self.assertFalse(list(root.glob("*-rollback-config.json")))
+
+    def test_interruption_child_keeps_explicit_artifacts_and_owned_profile_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            child_work = root / "interruption-child/cycle-01"
+            child_work.mkdir(parents=True)
+            (child_work / "paired.ready").touch()
+            (child_work / "evidence.json").write_text(json.dumps({
+                "result": "interrupted", "ports_released": True,
+                "cleanup": [{"process_group_released": True}],
+            }))
+            options = {name: root / name for name in
+                       ("client_binary", "matchmaker_binary", "dolphin_build",
+                        "matchmaker_build", "dolphin_source", "enet_source", "profile_temp_root")}
+            supervisor = Mock()
+            supervisor.stop.return_value = {"process_group_released": True, "returncode": 130}
+            with patch("run_local.ProcessSupervisor", return_value=supervisor):
+                receipt = _run_interruption_probe(
+                    disc=root / "disc", parent_root=root,
+                    timeouts={"boot": 1, "pair": 1, "game": 1, "rematch": 1},
+                    artifact_options=options)
+            argv = supervisor.start.call_args.args[1]
+            for name, path in options.items():
+                self.assertEqual(argv[argv.index("--" + name.replace("_", "-")) + 1], str(path))
+            self.assertIn("--pause-after-pair", argv)
+            self.assertEqual(receipt["result"], "passed")
+            supervisor.close.assert_called_once()
+
     def test_button_pulse_drains_pre_edge_observations(self):
         run = PairRun.__new__(PairRun)
         watcher = Mock()

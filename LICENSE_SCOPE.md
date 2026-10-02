@@ -35,6 +35,7 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `docs/ALLOCATION_TRACE_COMPARISON.md`
 - `docs/DEVELOPMENT.md`
 - `docs/evidence/slippi-browser-desktop-transport-v1.json`
+- `docs/evidence/desktop-rollback-diagnostic-v1.json`
 - `docs/BROWSER_FAILURE_TRIAGE.md`
 - `docs/PUBLIC_REPOSITORY_CHECKLIST.md`
 - `docs/PUBLICATION_REVIEW_BRIEF.md`
@@ -46,8 +47,12 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `tools/allocation_trace_compare.py`
 - `tools/browser_failure_summary.py`
 - `tools/slippi_format.py`
+- `tools/slippi_rollback_diagnostic.py`
+- `tests/test_slippi_rollback_diagnostic.py`
+- `tests/test_slippi_rollback_runner.py`
 - `reference-capture/slippi/LICENSES.md`
 - `reference-capture/slippi/LOCAL_TESTBED.md`
+- `reference-capture/slippi/ROLLBACK_DIAGNOSTIC.md`
 - `reference-capture/slippi/client.lock.json`
 - `reference-capture/slippi/local_matchmaker/CMakeLists.txt`
 - `reference-capture/slippi/local_matchmaker/browser_relay.cpp`
@@ -64,10 +69,13 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `reference-capture/slippi/browser_transport_test.mjs`
 - `reference-capture/slippi/process.py`
 - `reference-capture/slippi/run_local.py`
+- `reference-capture/slippi/run_rollback.py`
+- `reference-capture/slippi/compare_rollback.py`
 - `reference-capture/slippi/runtime.py`
 - `reference-capture/slippi/test_process.py`
 - `reference-capture/slippi/test_browser_transport.py`
 - `reference-capture/slippi/test_run_local.py`
+- `reference-capture/slippi/test_compare_rollback.py`
 - `reference-capture/slippi/test_runtime.py`
 - `web/gamecube-save.mjs`
 - `web/save-profile-settings.mjs`

@@ -240,21 +240,21 @@ def _verify_pinned_client_source(lock: dict, source_root: Path | None = None) ->
             or version_match.group(1) != lock["client"]["slippi_semver"]):
         raise RuntimeError("pinned Slippi semantic version differs from client.lock.json")
 
-    def verify_patch_tree(tree: Path, patch_relative: str, allowed_extra: set[str] | None = None):
-        patch = HERE / patch_relative
-        patch_paths = {
-            line.split("a/", 1)[1].split(" b/", 1)[0]
-            for line in patch.read_text(encoding="utf-8").splitlines()
-            if line.startswith("diff --git a/") and " b/" in line
-        }
-        if not patch_paths:
-            raise RuntimeError("pinned client patch has no auditable file list")
-        check = subprocess.run(
-            ["git", "-C", str(tree), "apply", "--reverse", "--check", str(patch)],
-            check=False, capture_output=True, text=True, timeout=15,
-        )
-        if check.returncode:
-            raise RuntimeError("downstream client patch is not applied to its pinned source")
+    def verify_patch_tree(tree: Path, patch_relatives: list[str],
+                          allowed_extra: set[str] | None = None):
+        if not patch_relatives:
+            raise RuntimeError("pinned client patch sequence is empty")
+        patches = [HERE / relative for relative in patch_relatives]
+        patch_paths: set[str] = set()
+        for patch in patches:
+            paths = {
+                line.split("a/", 1)[1].split(" b/", 1)[0]
+                for line in patch.read_text(encoding="utf-8").splitlines()
+                if line.startswith("diff --git a/") and " b/" in line
+            }
+            if not paths:
+                raise RuntimeError(f"pinned client patch has no auditable file list: {patch.name}")
+            patch_paths.update(paths)
         with tempfile.TemporaryDirectory(prefix="slippi-patch-index-") as scratch:
             env = os.environ.copy()
             env["GIT_INDEX_FILE"] = str(Path(scratch) / "index")
@@ -270,12 +270,15 @@ def _verify_pinned_client_source(lock: dict, source_root: Path | None = None) ->
 
             indexed_git("read-tree", "HEAD")
             indexed_git("write-tree")
-            applied = subprocess.run(
-                ["git", "-C", str(tree), "apply", "--cached", str(patch)],
-                check=False, capture_output=True, text=True, timeout=15, env=env,
-            )
-            if applied.returncode:
-                raise RuntimeError("reviewed downstream client patch cannot reproduce its source tree")
+            for patch in patches:
+                applied = subprocess.run(
+                    ["git", "-C", str(tree), "apply", "--cached", str(patch)],
+                    check=False, capture_output=True, text=True, timeout=15, env=env,
+                )
+                if applied.returncode:
+                    raise RuntimeError(
+                        f"reviewed downstream client patch cannot reproduce its source tree: {patch.name}"
+                    )
             expected_tree = indexed_git("write-tree")
             indexed_git("read-tree", "HEAD")
             indexed_git("add", "--all", "--", ".")
@@ -285,9 +288,15 @@ def _verify_pinned_client_source(lock: dict, source_root: Path | None = None) ->
         status = git(tree, "status", "--porcelain", "--untracked-files=all")
         changed = set()
         for line in status.splitlines():
-            if len(line) < 4 or line[0] != " ":
-                raise RuntimeError("pinned client source contains staged or untracked changes")
-            changed.add(line[3:])
+            if len(line) < 4:
+                raise RuntimeError("pinned client source status is malformed")
+            index_status, worktree_status, path = line[0], line[1], line[3:]
+            if index_status == "?":
+                if worktree_status != "?" or path not in patch_paths:
+                    raise RuntimeError("pinned client source contains unrelated untracked changes")
+            elif index_status != " ":
+                raise RuntimeError("pinned client source contains staged changes")
+            changed.add(path)
         if changed != patch_paths | (allowed_extra or set()):
             raise RuntimeError("local source changes extend beyond the reviewed client patch")
         cached = subprocess.run(["git", "-C", str(tree), "diff", "--cached", "--quiet"],
@@ -296,10 +305,19 @@ def _verify_pinned_client_source(lock: dict, source_root: Path | None = None) ->
             raise RuntimeError("pinned client source has staged changes")
         return sorted(patch_paths)
 
+    patch_targets = lock.get("patch_targets")
+    if not isinstance(patch_targets, list) or len(patch_targets) != len(lock["patches"]):
+        raise RuntimeError("client.lock.json patch_targets must match the ordered patch list")
+    if set(patch_targets) != {"dolphin", "rust"}:
+        raise RuntimeError("client.lock.json patch_targets must name dolphin and rust")
+    dolphin_patches = [patch for patch, target in zip(lock["patches"], patch_targets)
+                       if target == "dolphin"]
+    rust_patches = [patch for patch, target in zip(lock["patches"], patch_targets)
+                    if target == "rust"]
     dolphin_paths = verify_patch_tree(
-        source, lock["patches"][0], {"Externals/SlippiRustExtensions"}
+        source, dolphin_patches, {"Externals/SlippiRustExtensions"}
     )
-    rust_paths = verify_patch_tree(rust, lock["patches"][1])
+    rust_paths = verify_patch_tree(rust, rust_patches)
     return {
         "commit": client_pin,
         "slippi_semver": version_match.group(1),
@@ -472,7 +490,12 @@ class PairRun:
                  matchmaker_build: Path | None = None, dolphin_source: Path | None = None,
                  enet_source: Path | None = None, browser_node: Path | None = None,
                  browser_playwright: Path | None = None,
-                 profile_temp_root: Path | None = None):
+                 profile_temp_root: Path | None = None,
+                 rollback_diagnostic: str | None = None):
+        if rollback_diagnostic not in (None, "none", "hold", "drop"):
+            raise ValueError("unsupported bounded rollback diagnostic")
+        if rollback_diagnostic is not None and (input_probe_only or browser_transport_probe):
+            raise ValueError("rollback diagnostic requires completed desktop matches")
         self.root = root
         self.disc = disc
         self.cycle = cycle
@@ -489,6 +512,7 @@ class PairRun:
         self.browser_node = browser_node
         self.browser_playwright = browser_playwright
         self.profile_temp_root = profile_temp_root
+        self.rollback_diagnostic = rollback_diagnostic
         self.work = root / f"cycle-{cycle:02d}"
         self.work.mkdir(parents=True, mode=0o700, exist_ok=False)
         self.work.chmod(0o700)
@@ -856,6 +880,29 @@ class PairRun:
         for name in ("p1", "p2"):
             profile = self.profiles[name]
             environment = os.environ.copy()
+            # This harness owns each diagnostic config. Inherited controls
+            # must not contaminate ordinary or separately pinned scenarios.
+            environment.pop("SLIPPI_ROLLBACK_DIAGNOSTIC_CONFIG", None)
+            if self.rollback_diagnostic is not None:
+                from slippi_rollback_diagnostic import parse_config, write_config, SCHEMA, PROFILE_NAME
+                action = self.rollback_diagnostic if name == "p2" else "none"
+                config_path = self.work / f"{name}-rollback-config.json"
+                config = parse_config({
+                    "schema": SCHEMA, "enabled": True, "rng_offset": 0x1234,
+                    "log_path": str(self.work / f"{name}-rollback.jsonl"),
+                    "stage_id": 32,
+                    "input_profile": {"name": PROFILE_NAME, "role": 1 if name == "p1" else 2},
+                    "overlay": None,
+                    # Transport frames include the normal input delay. Holding
+                    # 98..103 covers role 2's first changed A input at source 96
+                    # with the pinned two-frame delay; the log proves mapping.
+                    "transport": {"action": action,
+                                  "frame": 98 if action != "none" else None,
+                                  "release_frame": 104 if action == "hold" else None},
+                })
+                write_config(config_path, config)
+                environment["SLIPPI_ROLLBACK_DIAGNOSTIC_CONFIG"] = str(config_path)
+                self.evidence["clients"][name]["rollback_config_sha256"] = _sha256(config_path)
             environment["SLIPPI_LOCAL_PAD_OBSERVATION"] = str(self.work / f"{name}-remote-pad.jsonl")
             environment["SLIPPI_LOCAL_SI_OBSERVATION"] = str(self.work / f"{name}-serial-input.jsonl")
             environment["SLIPPI_LOCAL_PAD_SENT_OBSERVATION"] = str(
@@ -1258,7 +1305,11 @@ class PairRun:
         start_files = self.replay_baselines.get(game_number)
         if start_files is None:
             raise RuntimeError(f"game {game_number} has no pre-launch replay-file baseline")
-        self.pads["p1"].set_axis("MAIN", 0.0, 0.5)
+        if self.rollback_diagnostic is None:
+            self.pads["p1"].set_axis("MAIN", 0.0, 0.5)
+        else:
+            for pad in self.pads.values():
+                pad.neutral()
         initial_frame = {
             name: self.watchers[name].values.get("80479d58") for name in ("p1", "p2")
         }
@@ -1272,18 +1323,21 @@ class PairRun:
         # The pinned ASM clears pad input until UNFREEZE_INPUTS_FRAME minus
         # Slippi delay. Start after that
         # sync window and hold across normal controller polling.
-        self._wait_game_frames("p2", SCRIPTED_INPUT_START_FRAME)
-        self.evidence["games"][-1]["p2_a_input_source_frame"] = (
-            self.watchers["p2"].values.get("80479d58")
-        )
-        self.pads["p2"].set_button("A", True)
-        self.pads["p2"].set_axis("MAIN", 1.0, 0.5)
-        self._wait_game_frames("p2", 30)
-        self.pads["p2"].set_button("A", False)
-        self.pads["p2"].set_axis("MAIN", 0.5, 0.5)
-        self.evidence["games"][-1]["p2_a_input_end_source_frame"] = (
-            self.watchers["p2"].values.get("80479d58")
-        )
+        if self.rollback_diagnostic is None:
+            self._wait_game_frames("p2", SCRIPTED_INPUT_START_FRAME)
+            self.evidence["games"][-1]["p2_a_input_source_frame"] = (
+                self.watchers["p2"].values.get("80479d58")
+            )
+            self.pads["p2"].set_button("A", True)
+            self.pads["p2"].set_axis("MAIN", 1.0, 0.5)
+            self._wait_game_frames("p2", 30)
+            self.pads["p2"].set_button("A", False)
+            self.pads["p2"].set_axis("MAIN", 0.5, 0.5)
+            self.evidence["games"][-1]["p2_a_input_end_source_frame"] = (
+                self.watchers["p2"].values.get("80479d58")
+            )
+        else:
+            self.evidence["games"][-1]["frame_input_profile"] = "mario-fd-rollback-v1"
         if self.input_probe_only:
             self._wait_game_frames("p1", 60)
             self.evidence["input_probe"] = {
@@ -1333,7 +1387,7 @@ class PairRun:
                 self._verify_browser_remote_consumption()
             return
 
-        left_input_writes = 1
+        left_input_writes = 1 if self.rollback_diagnostic is None else 0
         last_left_input_frame = self.watchers["p1"].values.get("80479d58")
 
         def returned_to_css():
@@ -1344,7 +1398,8 @@ class PairRun:
             if all(code == SCENE_CSS for code in scenes.values()):
                 return True
             frame = self.watchers["p1"].values.get("80479d58")
-            if frame is not None and frame != last_left_input_frame:
+            if (self.rollback_diagnostic is None and frame is not None
+                    and frame != last_left_input_frame):
                 self.pads["p1"].set_axis("MAIN", 0.0, 0.5)
                 left_input_writes += 1
                 last_left_input_frame = frame
@@ -1819,16 +1874,21 @@ def _arguments(argv=None):
     return args
 
 
-def _run_interruption_probe(*, disc: Path, parent_root: Path, timeouts: dict[str, float]) -> dict:
+def _run_interruption_probe(*, disc: Path, parent_root: Path, timeouts: dict[str, float],
+                            artifact_options: dict[str, Path | None] | None = None) -> dict:
     child_root = parent_root / "interruption-child"
     supervisor = ProcessSupervisor(graceful_timeout=timeouts["pair"] + 30, term_timeout=5)
+    artifact_arguments = []
+    for name, path in (artifact_options or {}).items():
+        if path is not None:
+            artifact_arguments.extend(["--" + name.replace("_", "-"), str(path)])
     child = supervisor.start(
         "harness-interruption-probe",
         [sys.executable, str(HERE / "run_local.py"), "--disc", str(disc),
          "--run-root", str(child_root), "--repeat", "1",
          "--boot-timeout", str(timeouts["boot"]), "--pair-timeout", str(timeouts["pair"]),
          "--game-timeout", str(timeouts["game"]), "--rematch-timeout", str(timeouts["rematch"]),
-         "--pause-after-pair"],
+         "--pause-after-pair", *artifact_arguments],
         log_path=parent_root / "interruption-harness.log",
         graceful_signal=signal.SIGINT,
     )
@@ -1915,7 +1975,12 @@ def main(argv=None) -> int:
         print(f"cycle {cycle}/{args.repeat}: passed; private evidence retained", flush=True)
     if args.repeat > 0 and not args.pause_after_pair and not args.input_probe_only:
         print("harness interruption probe: waiting for a fresh paired checkpoint", flush=True)
-        receipt = _run_interruption_probe(disc=disc, parent_root=root, timeouts=timeouts)
+        receipt = _run_interruption_probe(
+            disc=disc, parent_root=root, timeouts=timeouts,
+            artifact_options={name: getattr(args, name) for name in
+                              ("client_binary", "matchmaker_binary", "dolphin_build",
+                               "matchmaker_build", "dolphin_source", "enet_source",
+                               "profile_temp_root")})
         if receipt["result"] != "passed":
             raise RuntimeError("harness interruption probe failed")
         print("harness interruption probe: passed; child processes and ports released", flush=True)

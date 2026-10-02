@@ -1,0 +1,854 @@
+{
+  "based_on_commit": "72d37dc719c6f06d569985686c23f8f6d0cfd825",
+  "baseline_fresh_repeat": {
+    "cycles": [
+      {
+        "cycle": 1,
+        "games": [
+          {
+            "baseline_frames": {},
+            "depths": {
+              "p1": [],
+              "p2": []
+            },
+            "game": 1,
+            "peer_frames": 1342,
+            "result": "passed"
+          },
+          {
+            "baseline_frames": {},
+            "depths": {
+              "p1": [],
+              "p2": []
+            },
+            "game": 2,
+            "peer_frames": 1342,
+            "result": "passed"
+          }
+        ],
+        "groups_released": true,
+        "peer_disconnect_observed": null,
+        "ports_released": true,
+        "profiles_removed": true,
+        "result": "passed"
+      },
+      {
+        "cycle": 2,
+        "games": [
+          {
+            "baseline_frames": {
+              "p1": 1342,
+              "p2": 1342
+            },
+            "depths": {
+              "p1": [],
+              "p2": []
+            },
+            "game": 1,
+            "peer_frames": 1342,
+            "result": "passed"
+          },
+          {
+            "baseline_frames": {
+              "p1": 1342,
+              "p2": 1342
+            },
+            "depths": {
+              "p1": [],
+              "p2": []
+            },
+            "game": 2,
+            "peer_frames": 1342,
+            "result": "passed"
+          }
+        ],
+        "groups_released": true,
+        "peer_disconnect_observed": true,
+        "ports_released": true,
+        "profiles_removed": true,
+        "result": "passed"
+      }
+    ],
+    "fresh_profile_pairs": 2,
+    "prior_pilot_agreement": {
+      "comparisons": 4,
+      "each_compared_finalized_frames": 1342,
+      "result": "passed"
+    },
+    "result": "passed",
+    "retained_private_directory_name": "desktop-rollback-fresh-none-20261001-194930-a6801719",
+    "source_sha256_at_capture": {
+      "reference-capture/slippi/compare_rollback.py": "4d8d5f36ba2ab53c86ed489b168d2340d225bd96e73a8b0ce4eaee53e0963631",
+      "reference-capture/slippi/process.py": "5b769f0b3ed11fc087a3e0af6e83d1a23587103c4d461472886dc1325e8157aa",
+      "reference-capture/slippi/run_local.py": "268153c9e9b7021253963229f748db28e3797dc7fad8f3c235a91ee4f7da1b4d",
+      "reference-capture/slippi/run_rollback.py": "6a7a96e2192ab3637c29e4d938e76d86529a5a99472dcfa94a1300bea9ad3663",
+      "reference-capture/slippi/runtime.py": "1d653673df44b7574ef597c36ecd9ccba9ad2eac4b3c33ed3ce3e1341d1305c1",
+      "tools/slippi_format.py": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956",
+      "tools/slippi_rollback_diagnostic.py": "25875e5f13781e7fc819d4e7861865f48dd3921655c50f526b50073186a17868"
+    }
+  },
+  "baseline_pilot": {
+    "all_process_groups_released": true,
+    "combat_damage_observed": false,
+    "empty_owned_profile_parent_removed": true,
+    "fixture": {
+      "input_delay_frames": 2,
+      "name": "mario-fd-rollback-v1",
+      "recording_offset": 123,
+      "rng_seed": 4660,
+      "stage_id": 32,
+      "transport_action": "none"
+    },
+    "fresh_profile_pairs": 1,
+    "games": [
+      {
+        "compared_finalized_frames": 1342,
+        "duplicate_pre_post_updates": {
+          "p1": 0,
+          "p2": 0
+        },
+        "exact_declared_peer_agreement": true,
+        "final_stocks": [
+          0,
+          4
+        ],
+        "first_divergence": null,
+        "first_recorded_frame": -123,
+        "game": 1,
+        "last_recorded_frame": 1218,
+        "prediction_error_loads": {
+          "p1": [],
+          "p2": []
+        },
+        "result": "passed"
+      },
+      {
+        "compared_finalized_frames": 1342,
+        "duplicate_pre_post_updates": {
+          "p1": 0,
+          "p2": 0
+        },
+        "exact_declared_peer_agreement": true,
+        "final_stocks": [
+          0,
+          4
+        ],
+        "first_divergence": null,
+        "first_recorded_frame": -123,
+        "game": 2,
+        "last_recorded_frame": 1218,
+        "prediction_error_loads": {
+          "p1": [],
+          "p2": []
+        },
+        "result": "passed"
+      }
+    ],
+    "peer_disconnect_observed": true,
+    "ports_released": true,
+    "private_profiles_removed_after_cleanup": true,
+    "retained_directory_name": "desktop-rollback-baseline-20261001-183610-e8e4970e"
+  },
+  "claim": "Two fresh pinned adapted desktop pairs completed four six-packet hold match/rematch games, each with a completed prediction-error load (depth 4 or 5), repeated source recording coverage, wrong-input/post-state revisions corrected to finalized pairs, and exact parsed declared agreement across all 1342 finalized frames between both peers and both corresponding no-impairment baseline games. The baseline also passed two fresh pairs.",
+  "client": {
+    "build_profile": {
+      "audio_backend": "No Audio Output",
+      "bundled_client_matches_build_output": true,
+      "cmake": "3.31.6",
+      "cmake_options_verified": true,
+      "compiler": "Apple clang 21.0.0 (clang-2100.1.1.101)",
+      "generator": "Ninja 1.13.0.git.kitware.jobserver-pipe-1",
+      "headless": true,
+      "matchmaker_release_build_verified": true,
+      "matchmaker_source_freshness_verified": true,
+      "patched_build_source_verified": true,
+      "rust_toolchain": "1.88.0",
+      "video_backend": "Null"
+    },
+    "bundle_sys_sha256": "525d3333b4eed701982ada34942b83cecd9accc6e96b18a27a1b6d863e499946",
+    "client_binary_sha256": "3c4c45b5a17f35c650bf7338690a58ccfdba6bb0340ad3d5ca45110382091c53",
+    "dependency_lock_sha256": "45c97548d69d5124dfff77890756c4eea634d0bb83c9efa2f5b9b70785a168a1",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "downstream_patch_sha256": {
+      "patches/0001-client-loopback-and-observation.patch": "2e599906c58920f4c5089c9749abee51f94ddccd7909fa39aadf78d5a4fa3150",
+      "patches/0002-rust-local-endpoints.patch": "a2a547fe9334edcc44ddd7686936743160aa5b51f66fd0f47a4af05df5b9a1ca",
+      "patches/0003-desktop-rollback-diagnostic.patch": "9806f2502bdba799c802843b682effea47b2bd70ee63fba7031a75556bcbbadf"
+    },
+    "game_modification_sha256": "b30b294df5c0d92deb3129afdfbc894a48aabeb1bce0cf92cce8c4e5408a2587",
+    "matchmaker_sha256": "9b894f5e3c8dd2bb2acdd116515fd1dbb9a8f5be41acab113935f02f2c5d9941"
+  },
+  "comparison_boundary": {
+    "analog_a_b": "unrecorded; excluded",
+    "clock_scope": "no-pause profile; FrameStart payload callback fields are separate from later DMA-time rollback metadata",
+    "frame_coverage": "contiguous complete event-time finalized timeline; both ports, no followers; natural four-stock ending without LRAS",
+    "initial_conditions": "exact complete GameInfo, version, active players, fixes, seed, PAL/frozen flags, scenes, declared payload-size table",
+    "per_frame": "frame number, frame-start RNG, scene clock; both complete parsed pre-input and post-state records; exact float bits",
+    "post_state_fields": "character/action/position/facing/percent/shield/stocks; parsed flags, ground/air, ground identity, jumps, hurtbox, state counter, misc state, L-cancel",
+    "pre_input_fields": "RNG/action; position/facing bits; processed sticks/csticks/trigger/buttons; physical buttons/raw axes/normalized trigger bytes",
+    "private_receipts": "complete comparison/profile/clock/preservation/transport reports retained and SHA-256-bound below",
+    "resimulation_gate": "every loaded scene has repeated recording payload coverage and rewind; observed fixture coverage, not a universal recording invariant"
+  },
+  "decisions": [
+    "Reuse PairRun original-menu, completed replay, rematch, socket sampling and bounded cleanup gates; use the existing strict Slippi finalized-revision parser.",
+    "Replace wall-clock gameplay writes only in the explicitly enabled diagnostic with role-checked source-frame PAD generation, fixed opening stage and seed.",
+    "Keep frame/RNG/scene recording payloads separate from attached DMA-time ODB/RXB metadata; require native capture/load completion and repeated source payload coverage independently from finalized state agreement.",
+    "Compare all parsed declared finalized fields exactly, including float bits and startup raw PAD; keep unparsed fields, emulator memory, presentation and PCM excluded.",
+    "Require paired speculative wrong-input and changed post-state revisions followed by the exact finalized pair in every observed load interval; preserve the shared capture schema."
+  ],
+  "evidence_labels": [
+    "Compiled",
+    "Native traced"
+  ],
+  "exclusions": [
+    "undeclared emulator memory and unparsed replay payload fields",
+    "hit/damage interaction",
+    "source-runtime browser gameplay and Slippi semantic equivalence",
+    "pixels and PCM",
+    "physical controller hardware routing",
+    "foreground timing and performance admission",
+    "NAT, Internet and second-machine connectivity",
+    "rollback cases beyond the observed six-packet hold fixture"
+  ],
+  "failed_hypotheses_and_reductions": [
+    {
+      "boundary": "native diagnostic compilation",
+      "change": "Explicit abort-on-error parsing without exceptions and compatible keyed access; final incremental build passed.",
+      "observed_failure": "Initial parser used exceptions and nlohmann APIs unavailable in the pinned build.",
+      "scope": "compile/API component only"
+    },
+    {
+      "boundary": "source input and recording clocks",
+      "observed_failure": "Initial unmeasured delay/offset assumptions were inconsistent with retained producer edges.",
+      "reduction": "Pinned Config default and all 1,186 post-startup raw-PAD samples from both retained PR111 producer streams establish a delay of 2 and scene-minus-recording offset of 123; the new pilot rechecks all recorded payload clocks and generated PAD.",
+      "scope": "clock mapping; no rollback inference"
+    },
+    {
+      "boundary": "whole finalized old peer comparison",
+      "change": "The new diagnostic keeps startup Pipes neutral and compares initial raw input without an exception.",
+      "observed_failure": "Retained PR111 peers differ in initial frame -123 raw P1 stick X; later input/state samples agree.",
+      "scope": "old wall-clock session is not relabeled as deterministic baseline"
+    },
+    {
+      "boundary": "manual native configuration reducer",
+      "change": "Corrected only the reducer expectation and retained the failed first report; second reducer passed 11 cases.",
+      "observed_failure": "First reducer expected the wrong stderr prefix, although invalid native cases already aborted.",
+      "scope": "configuration parser/profile component, not gameplay"
+    },
+    {
+      "boundary": "required full-suite build preparation",
+      "observed_failure": "Configured Release build/browser-release, while three existing trace tests explicitly require build/browser; 1668 tests completed with 2 failures, 1 setup error and 140 skips.",
+      "reduction": "Read the failing paths, preserved the first run, configured default RelWithDebInfo build/browser, and reran the complete suite successfully: 1688 tests, 136 skips.",
+      "retained_log_sha256": "d3b8b899bc8faa43f5c1bbe5dcab9a913937d64e0e76b8265b37e11c1eca7724",
+      "retained_report_sha256": "bff5adc4416f74c40a090ef7def09cbd2cefd3dcda6eef9b9e06451f335bac78",
+      "scope": "test preparation; no passing integration-suite claim"
+    }
+  ],
+  "hold_fresh_repeat": {
+    "cycles": [
+      {
+        "cycle": 1,
+        "games": [
+          {
+            "corrected_wrong_input_and_state_revisions": {
+              "p1": 1,
+              "p2": 0
+            },
+            "first_divergence": null,
+            "game": 1,
+            "native_prediction_error_load_depths": {
+              "p1": [
+                4
+              ],
+              "p2": []
+            },
+            "peer_and_both_baseline_finalized_frames": 1342,
+            "result": "passed"
+          },
+          {
+            "corrected_wrong_input_and_state_revisions": {
+              "p1": 1,
+              "p2": 0
+            },
+            "first_divergence": null,
+            "game": 2,
+            "native_prediction_error_load_depths": {
+              "p1": [
+                5
+              ],
+              "p2": []
+            },
+            "peer_and_both_baseline_finalized_frames": 1342,
+            "result": "passed"
+          }
+        ],
+        "peer_disconnect_observed": null,
+        "ports_profiles_and_groups_released": true,
+        "result": "passed"
+      },
+      {
+        "cycle": 2,
+        "games": [
+          {
+            "corrected_wrong_input_and_state_revisions": {
+              "p1": 1,
+              "p2": 0
+            },
+            "first_divergence": null,
+            "game": 1,
+            "native_prediction_error_load_depths": {
+              "p1": [
+                5
+              ],
+              "p2": []
+            },
+            "peer_and_both_baseline_finalized_frames": 1342,
+            "result": "passed"
+          },
+          {
+            "corrected_wrong_input_and_state_revisions": {
+              "p1": 1,
+              "p2": 0
+            },
+            "first_divergence": null,
+            "game": 2,
+            "native_prediction_error_load_depths": {
+              "p1": [
+                5
+              ],
+              "p2": []
+            },
+            "peer_and_both_baseline_finalized_frames": 1342,
+            "result": "passed"
+          }
+        ],
+        "peer_disconnect_observed": true,
+        "ports_profiles_and_groups_released": true,
+        "result": "passed"
+      }
+    ],
+    "fresh_profile_pairs": 2,
+    "result": "passed",
+    "retained_private_directory_name": "desktop-rollback-fresh-hold-20261001-203343-ff75dfc5",
+    "source_sha256_at_capture": {
+      "reference-capture/slippi/compare_rollback.py": "4d8d5f36ba2ab53c86ed489b168d2340d225bd96e73a8b0ce4eaee53e0963631",
+      "reference-capture/slippi/process.py": "5b769f0b3ed11fc087a3e0af6e83d1a23587103c4d461472886dc1325e8157aa",
+      "reference-capture/slippi/run_local.py": "268153c9e9b7021253963229f748db28e3797dc7fad8f3c235a91ee4f7da1b4d",
+      "reference-capture/slippi/run_rollback.py": "8e959a22041bee1317683ace669c18913cfa4f83f6a4f377879538dc78f45b3d",
+      "reference-capture/slippi/runtime.py": "1d653673df44b7574ef597c36ecd9ccba9ad2eac4b3c33ed3ce3e1341d1305c1",
+      "tools/slippi_format.py": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956",
+      "tools/slippi_rollback_diagnostic.py": "25875e5f13781e7fc819d4e7861865f48dd3921655c50f526b50073186a17868"
+    }
+  },
+  "hold_pilot": {
+    "all_process_groups_released": true,
+    "combat_damage_observed": false,
+    "correction_analysis_scope": "post-capture assertion on preserved pilot; the runnable gate was added afterward",
+    "fixture": {
+      "held_packet_frames": [
+        98,
+        99,
+        100,
+        101,
+        102,
+        103
+      ],
+      "held_role": 2,
+      "input_delay_frames": 2,
+      "name": "mario-fd-rollback-v1",
+      "recording_offset": 123,
+      "release_packet_frame": 104,
+      "rng_seed": 4660,
+      "stage_id": 32
+    },
+    "fresh_profile_pairs": 1,
+    "fresh_profile_repeatability_verified": false,
+    "games": [
+      {
+        "compared_finalized_frames": 1342,
+        "duplicate_pre_post_updates": {
+          "p1": 20,
+          "p2": 0
+        },
+        "exact_declared_baseline_frames": {
+          "p1": 1342,
+          "p2": 1342
+        },
+        "exact_declared_peer_agreement": true,
+        "final_stocks": [
+          0,
+          4
+        ],
+        "first_divergence": null,
+        "first_recorded_frame": -123,
+        "game": 1,
+        "last_recorded_frame": 1218,
+        "prediction_error_loads": {
+          "p1": [
+            {
+              "depth": 5,
+              "end_scene_frame": 103,
+              "load_complete_event_sequence": 227,
+              "load_event_sequence": 226,
+              "normal_input_event_sequence": 234,
+              "repeated_scene_frames": [
+                98,
+                99,
+                100,
+                101,
+                102
+              ],
+              "state_scene_frame": 98
+            }
+          ],
+          "p2": []
+        },
+        "result": "passed"
+      },
+      {
+        "compared_finalized_frames": 1342,
+        "duplicate_pre_post_updates": {
+          "p1": 16,
+          "p2": 0
+        },
+        "exact_declared_baseline_frames": {
+          "p1": 1342,
+          "p2": 1342
+        },
+        "exact_declared_peer_agreement": true,
+        "final_stocks": [
+          0,
+          4
+        ],
+        "first_divergence": null,
+        "first_recorded_frame": -123,
+        "game": 2,
+        "last_recorded_frame": 1218,
+        "prediction_error_loads": {
+          "p1": [
+            {
+              "depth": 4,
+              "end_scene_frame": 102,
+              "load_complete_event_sequence": 4396,
+              "load_event_sequence": 4395,
+              "normal_input_event_sequence": 4402,
+              "repeated_scene_frames": [
+                98,
+                99,
+                100,
+                101
+              ],
+              "state_scene_frame": 98
+            }
+          ],
+          "p2": []
+        },
+        "result": "passed"
+      }
+    ],
+    "machine": {
+      "arch": "arm64",
+      "platform": "macOS-26.6-arm64-arm-64bit",
+      "python": "3.12.13 (main, Jul 23 2026, 14:33:47) [Clang 22.1.3 ]"
+    },
+    "peer_disconnect": {
+      "peer_log": "p2-dolphin.log",
+      "peer_log_observed_disconnect": true,
+      "stopped_client": "p1",
+      "surviving_peer_process_id": 71737
+    },
+    "ports_released": true,
+    "result": "passed",
+    "retained_private_directory_name": "desktop-rollback-hold-20261001-191306-794292d5",
+    "source_sha256_at_capture": {
+      "reference-capture/slippi/compare_rollback.py": "4d8d5f36ba2ab53c86ed489b168d2340d225bd96e73a8b0ce4eaee53e0963631",
+      "reference-capture/slippi/process.py": "5b769f0b3ed11fc087a3e0af6e83d1a23587103c4d461472886dc1325e8157aa",
+      "reference-capture/slippi/run_local.py": "20dc793c5003a374019a5338f9e5ae7fa80eb55988cd724d1cff4bb46f0965ad",
+      "reference-capture/slippi/run_rollback.py": "5a37319388f9f2d7625cb0ae30cfa1774860b974de885b01a8c8aaf0ddb87abe",
+      "reference-capture/slippi/runtime.py": "1d653673df44b7574ef597c36ecd9ccba9ad2eac4b3c33ed3ce3e1341d1305c1",
+      "tools/slippi_format.py": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956",
+      "tools/slippi_rollback_diagnostic.py": "25875e5f13781e7fc819d4e7861865f48dd3921655c50f526b50073186a17868"
+    },
+    "wrong_input_state_correction_analysis": {
+      "games": [
+        {
+          "game": 1,
+          "peers": {
+            "p1": {
+              "correction_count": 1,
+              "observed_corrections": [
+                {
+                  "corrected_revision_matches_finalized_pair": true,
+                  "input_difference": {
+                    "actual": 256,
+                    "expected": 0,
+                    "field": "physical_input.buttons"
+                  },
+                  "load_event_sequence": 226,
+                  "post_state_difference": {
+                    "actual": 50,
+                    "expected": 20,
+                    "field": "post_state.action_state"
+                  },
+                  "recorded_frame": -25,
+                  "remote_port": 2,
+                  "scene_frame": 98
+                }
+              ],
+              "scope": "paired remote pre/post revisions within each observed loaded scene interval"
+            },
+            "p2": {
+              "correction_count": 0,
+              "observed_corrections": [],
+              "scope": "paired remote pre/post revisions within each observed loaded scene interval"
+            }
+          }
+        },
+        {
+          "game": 2,
+          "peers": {
+            "p1": {
+              "correction_count": 1,
+              "observed_corrections": [
+                {
+                  "corrected_revision_matches_finalized_pair": true,
+                  "input_difference": {
+                    "actual": 256,
+                    "expected": 0,
+                    "field": "physical_input.buttons"
+                  },
+                  "load_event_sequence": 4395,
+                  "post_state_difference": {
+                    "actual": 50,
+                    "expected": 20,
+                    "field": "post_state.action_state"
+                  },
+                  "recorded_frame": -25,
+                  "remote_port": 2,
+                  "scene_frame": 98
+                }
+              ],
+              "scope": "paired remote pre/post revisions within each observed loaded scene interval"
+            },
+            "p2": {
+              "correction_count": 0,
+              "observed_corrections": [],
+              "scope": "paired remote pre/post revisions within each observed loaded scene interval"
+            }
+          }
+        }
+      ],
+      "result": "passed",
+      "schema": "private-desktop-hold-correction-revalidation-v1",
+      "scope": "post-capture analysis of preserved pilot; no new native run",
+      "source_sha256": "6a7a96e2192ab3637c29e4d938e76d86529a5a99472dcfa94a1300bea9ad3663"
+    }
+  },
+  "integration_validation": {
+    "affected_native_build": {
+      "result": "passed",
+      "retained_log_sha256": "8bcb8a91ae60f7ec813678837a26add7d40ea5ceed5c6315dfb7d322921580a4",
+      "retained_report_sha256": "55c83122cece6855a8caa115e47ebe5d2632baeceadb3d44021681f8380a9d8b",
+      "target": "dolphin-emu-nogui"
+    },
+    "required_full_suite": {
+      "build_directory": "build/browser",
+      "command": "python3 -m unittest discover -s tests -v",
+      "configuration": "RelWithDebInfo",
+      "duration_seconds": 359.57,
+      "log_sha256": "a943f50b7173fbe09292705ab1fc59467ec8d58268e817762247637b0f8dd373",
+      "report_sha256": "68cabe047e8d33e084b49fd2e7f13786fa45d70e3e6306fb50248bf4fd2461ad",
+      "skipped": 136,
+      "tests": 1688,
+      "timed_out": false
+    },
+    "result": "passed",
+    "source_sha256_at_validation": {
+      "reference-capture/slippi/client.lock.json": "45c97548d69d5124dfff77890756c4eea634d0bb83c9efa2f5b9b70785a168a1",
+      "reference-capture/slippi/compare_rollback.py": "4d8d5f36ba2ab53c86ed489b168d2340d225bd96e73a8b0ce4eaee53e0963631",
+      "reference-capture/slippi/patches/0003-desktop-rollback-diagnostic.patch": "9806f2502bdba799c802843b682effea47b2bd70ee63fba7031a75556bcbbadf",
+      "reference-capture/slippi/run_local.py": "268153c9e9b7021253963229f748db28e3797dc7fad8f3c235a91ee4f7da1b4d",
+      "reference-capture/slippi/run_rollback.py": "8e959a22041bee1317683ace669c18913cfa4f83f6a4f377879538dc78f45b3d",
+      "tests/test_slippi_rollback_diagnostic.py": "61f1a95b408e1dee89aa6b124719ba716016c8aee704d01fda7f7fce8fb917fe",
+      "tests/test_slippi_rollback_runner.py": "a8f04969fb061bdf2107bb37faca995eecd5c91832f670f162258d3f5124d594",
+      "tools/slippi_rollback_diagnostic.py": "25875e5f13781e7fc819d4e7861865f48dd3921655c50f526b50073186a17868"
+    }
+  },
+  "machine": {
+    "architecture": "arm64",
+    "cpu": "Apple M4"
+  },
+  "milestone": {
+    "current": "M1 no-impairment/hold fresh repeats and diagnostic-disabled ordinary lifecycle passed; required full suite and remaining fault cases pending",
+    "m2_dependency": "https://github.com/ericvanlare/melee-web/pull/117",
+    "m2_next": "The nominal 64 MiB candidate grew to 119799808 bytes during initialization. A 300-tick guard locator observed stable post-init capacity and native transfer quiescence after original sample 0; prepare the bounded shared-page restore/replay run with explicit sample-0 ownership, retaining the first rejected init-time capture boundary.",
+    "m3": "actual source-runtime browser-versus-desktop gameplay unrun",
+    "m4": "cross-machine harness and second-hardware gate unrun",
+    "next_experiment": "Run required full suite and publish the bounded HOLD diagnostic; then single-packet loss and the jitter/duplication/reordering cases. Stop and reduce the first failing boundary.",
+    "ordinary_match_rematch_and_interruption_revalidation": "passed with diagnostic controls absent on the exact new native build",
+    "pass_criteria": "Observed bounded native prediction-error load and source resimulation, exact finalized peer/baseline timelines, fresh-profile repeats and clean ordinary/failed lifecycle.",
+    "unrun_fault_cases": [
+      "single loss",
+      "jitter",
+      "duplication",
+      "reordering"
+    ]
+  },
+  "ordinary_diagnostic_disabled_regression": {
+    "cycles": [
+      {
+        "completed_matches": 2,
+        "cycle": 1,
+        "peer_disconnect_observed": null,
+        "ports_profiles_and_groups_released": true,
+        "result": "passed"
+      },
+      {
+        "completed_matches": 2,
+        "cycle": 2,
+        "peer_disconnect_observed": true,
+        "ports_profiles_and_groups_released": true,
+        "result": "passed"
+      }
+    ],
+    "diagnostic_configs_absent": true,
+    "empty_owned_profile_parent_removed": true,
+    "fresh_profile_pairs": 2,
+    "harness_interruption": {
+      "checkpoint": "two clients paired over loopback before gameplay",
+      "ports_released": true,
+      "result": "passed"
+    },
+    "result": "passed",
+    "retained_file_count": 64,
+    "retained_file_manifest_sha256": "899e7c5adf0e8baf99d130f8c7e321c0b427dcd33ec0c2026b81d17c00233ae4",
+    "retained_private_directory_name": "desktop-rollback-fresh-ordinary-20261001-205946-427f2d89",
+    "source_manifest_sha256": "acb7500618af8d7f13029a8683ed41cf65f33dde72a0808b03083b1015604f9f"
+  },
+  "result": "partial",
+  "retained_file_sha256": {
+    "harness-source/reference-capture/slippi/client.lock.json": "45c97548d69d5124dfff77890756c4eea634d0bb83c9efa2f5b9b70785a168a1",
+    "harness-source/reference-capture/slippi/compare_rollback.py": "4d8d5f36ba2ab53c86ed489b168d2340d225bd96e73a8b0ce4eaee53e0963631",
+    "harness-source/reference-capture/slippi/patches/0003-desktop-rollback-diagnostic.patch": "9806f2502bdba799c802843b682effea47b2bd70ee63fba7031a75556bcbbadf",
+    "harness-source/reference-capture/slippi/process.py": "5b769f0b3ed11fc087a3e0af6e83d1a23587103c4d461472886dc1325e8157aa",
+    "harness-source/reference-capture/slippi/run_local.py": "20dc793c5003a374019a5338f9e5ae7fa80eb55988cd724d1cff4bb46f0965ad",
+    "harness-source/reference-capture/slippi/run_rollback.py": "8fd56e8242c13ad3aab9e2d9ac0007195faf248e280209dbe20cccfb347ecc5a",
+    "harness-source/reference-capture/slippi/runtime.py": "1d653673df44b7574ef597c36ecd9ccba9ad2eac4b3c33ed3ce3e1341d1305c1",
+    "harness-source/tools/slippi_format.py": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956",
+    "harness-source/tools/slippi_rollback_diagnostic.py": "25875e5f13781e7fc819d4e7861865f48dd3921655c50f526b50073186a17868",
+    "harness.log": "aad089f44cefdd4338960eb8b06c3fb7cd89e09c769766a44fdecc7fe8f59614",
+    "launch.json": "27559e06199d4ee6849d2186646281639d048286cb5dfbfbf18e26034b28083f",
+    "run/cycle-01/evidence.json": "e8bf46a1baf936dcbc25c9e80f16c7a953f85a9dc054046fe00862cbb3e26437",
+    "run/cycle-01/game-01-comparison.json": "0077cda0137760f23d6f0e316da670eafb3c7a514fc28625d78689812e7fad25",
+    "run/cycle-01/game-02-comparison.json": "5d523d6f02ca41e00bf195bb9c95a7f25e456791aba0b236debb027e4fb7c510",
+    "run/cycle-01/matchmaker-events.jsonl": "da7f85b5cc96854af7140112669b809940cd43dcb02c502932a9888eefd49e67",
+    "run/cycle-01/matchmaker.log": "ac708e370b557a5582abe7988260106fe0923d3720d022a05a6d4adce276a649",
+    "run/cycle-01/p1-dolphin.log": "d90ecc2d58f34fab6626b0123fa56403a84ca51a76470c31ef26f3cebf0f026b",
+    "run/cycle-01/p1-local-pad-sent.jsonl": "cfc93f6b67012a43d29f20471f6006f2e0df6291b654cbedefbc79807a970cc0",
+    "run/cycle-01/p1-matchplay-pad-pipe.jsonl": "15d4dfd2ccaff16efa11111af43864913dec99ee790e79903c968b961e79b71e",
+    "run/cycle-01/p1-menu-pad-pipe.jsonl": "594bb33c2fb2604c4923baec48a28e40cac6f364dc239fe26f065a741cca2598",
+    "run/cycle-01/p1-remote-pad.jsonl": "9a965e39db54971afdabb2cbca4ae0ff22c26b084f9b352543754eb5ad38d6c7",
+    "run/cycle-01/p1-replays/Game_20261001T183704.slp": "01cd39f5fb26e0432607e98c6badf5f13cc728410aa31bc0f06dccb435b06fb8",
+    "run/cycle-01/p1-replays/Game_20261001T183734.slp": "08233108068decd88822eea29fbfa2446b571939a2ac7612fbb4d3bf3a946d05",
+    "run/cycle-01/p1-rollback-config.json": "4b8d9baa36a136dfd7e5ff5f76770553a57148a4a3268aae6bb211ad9a773f86",
+    "run/cycle-01/p1-rollback.jsonl": "79a795a8406b90707b16ec57ed933dab7d6e14da034172cfdc4948a123e424b9",
+    "run/cycle-01/p1-serial-input.jsonl": "c97163e603ff95094871c341389b9cb5190b0136c13ff640c88accc1e0b14559",
+    "run/cycle-01/p2-dolphin.log": "3f0ebb85f170ed65b90b7864ec979682d13b996f9b350278015c400c9b7e75c0",
+    "run/cycle-01/p2-local-pad-sent.jsonl": "79ece292c2b7d07a0e1ec46e6c253935964f2d732f73d94d2592e8db909ce964",
+    "run/cycle-01/p2-matchplay-pad-pipe.jsonl": "f6aaddc6d558dbe8ba4e906002c3b392e5fdd4eb12f1b1c61c784fe6ca9150ff",
+    "run/cycle-01/p2-menu-pad-pipe.jsonl": "8b1768b0111b755d3d635848154294bc2d84b7de071e68c1744b695ba3253371",
+    "run/cycle-01/p2-remote-pad.jsonl": "8bb47038296b12c2996df66b0ae002ad21c2a34f54575ea4652d79741242b9a0",
+    "run/cycle-01/p2-replays/Game_20261001T183704.slp": "451d3ca70e2573576108361e476f0c3fa04de59ff7ada0cfa3ddbc9afb33a72c",
+    "run/cycle-01/p2-replays/Game_20261001T183734.slp": "e8f46a577456afe768a96bdc662bd30cdaf29d66fba4889ee39955b779b88f76",
+    "run/cycle-01/p2-rollback-config.json": "589eb882ffd36718387cef4023226f29dd83c25311bda6b017c09486ed5ebc6b",
+    "run/cycle-01/p2-rollback.jsonl": "8e5610c8fb3495c0bb323481eb7726474a52e3f8c765592d026f7a349c2f2522",
+    "run/cycle-01/p2-serial-input.jsonl": "b99484ebc752df616b6b618687d2272705320451dde28011d70d17fe48171a45",
+    "run/rollback-run.json": "cb96c52e7b465ffe2ce1165b1d37851e7f5cdb5791fd4781601e8a0701f5b91b",
+    "source-manifest.json": "2bb8a5655d4ee7c7f81ee43e0b266120d8ab9c0fd4fe819e783b5353422db4eb"
+  },
+  "retained_fresh_baseline_file_sha256": {
+    "baseline-pilot-revalidation-01.json": "6d91760deba5782dda67fe3f51237476e4cbc044760518080df23958bc7359f4",
+    "harness.log": "a902fb3f63799960e7aa96822742911657a42bd737614cb9ca67666cad047dbd",
+    "launch-result.json": "7be3f03f667be0c4357cdd0208920e3d4594a41ff88954dfdfa3645db52f30cc",
+    "launch.json": "59d88d97fc12cab47553aad095d90670f5e7694574905a1c3728b00c6b37a7c3",
+    "post-capture-harness-source/reference-capture/slippi/compare_rollback.py": "4d8d5f36ba2ab53c86ed489b168d2340d225bd96e73a8b0ce4eaee53e0963631",
+    "post-capture-harness-source/reference-capture/slippi/process.py": "5b769f0b3ed11fc087a3e0af6e83d1a23587103c4d461472886dc1325e8157aa",
+    "post-capture-harness-source/reference-capture/slippi/run_local.py": "268153c9e9b7021253963229f748db28e3797dc7fad8f3c235a91ee4f7da1b4d",
+    "post-capture-harness-source/reference-capture/slippi/run_rollback.py": "6a7a96e2192ab3637c29e4d938e76d86529a5a99472dcfa94a1300bea9ad3663",
+    "post-capture-harness-source/reference-capture/slippi/runtime.py": "1d653673df44b7574ef597c36ecd9ccba9ad2eac4b3c33ed3ce3e1341d1305c1",
+    "post-capture-harness-source/tools/slippi_format.py": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956",
+    "post-capture-harness-source/tools/slippi_rollback_diagnostic.py": "25875e5f13781e7fc819d4e7861865f48dd3921655c50f526b50073186a17868",
+    "run/cycle-01/evidence.json": "ea50d21fc2756a1cd9fc5975b79aeb2f33c30275ef5b81fdb89e89a293bee50e",
+    "run/cycle-01/game-01-comparison.json": "b6f306a802616bede6be08776f9a53a853d01ecbede93e056490a1a4db5dbc12",
+    "run/cycle-01/game-02-comparison.json": "df48d4295b666bc95bee2a87549d3318a1a2ed03165b1ebcb7c9f0c72c94220f",
+    "run/cycle-01/matchmaker-events.jsonl": "88d61e527be8e83fcfef77ff51c2e8dafb08c1360efef41b9da921d546797329",
+    "run/cycle-01/matchmaker.log": "ac708e370b557a5582abe7988260106fe0923d3720d022a05a6d4adce276a649",
+    "run/cycle-01/p1-dolphin.log": "3bedaac62678985dd4742f9befe19dfd65fb8a639db0a1f5b407371b86453ae8",
+    "run/cycle-01/p1-local-pad-sent.jsonl": "cfc93f6b67012a43d29f20471f6006f2e0df6291b654cbedefbc79807a970cc0",
+    "run/cycle-01/p1-matchplay-pad-pipe.jsonl": "9dc3bf18e118869fb9600ca3a83d32c6ce159024a339fa62e495fcddc87ec9cf",
+    "run/cycle-01/p1-menu-pad-pipe.jsonl": "fc5ebc50cbadac37ada5b6382fa10a81526f2fb663d080ae6ab29d9f05fc5f26",
+    "run/cycle-01/p1-remote-pad.jsonl": "e535235ab50b256d360e49a996eed924037393108c868a661783b543a4632cd3",
+    "run/cycle-01/p1-replays/Game_20261001T194942.slp": "d56c0b50f7347edc0b06398c8235d0537c7494331ac23c4e57f696af06123df5",
+    "run/cycle-01/p1-replays/Game_20261001T195013.slp": "b7549b154d2aa7abfc81912eb1b540f2b63162d8d3c8bd6e9a210571060d2e28",
+    "run/cycle-01/p1-rollback-config.json": "612dca5d66b1ab4cd0e8e3533904bfdec61874f650393987fb19a715c04290b8",
+    "run/cycle-01/p1-rollback.jsonl": "bed3c03c9fb17728023293654e1f389e2efbda2f958832b32abce8d2b1ae4cf4",
+    "run/cycle-01/p1-serial-input.jsonl": "0bdbf67273c4e357aefc9462746e490c861d191f2377fbd1d1c0f7ad46d1b66b",
+    "run/cycle-01/p2-dolphin.log": "442a3a2d0a367c5baceb8dba3dbea7f1107ec23f0cef5b05c3170ca0e0570888",
+    "run/cycle-01/p2-local-pad-sent.jsonl": "79ece292c2b7d07a0e1ec46e6c253935964f2d732f73d94d2592e8db909ce964",
+    "run/cycle-01/p2-matchplay-pad-pipe.jsonl": "152ac3e9d20a1d1e88787653435b341e299fcff9cb62af0816bb7986566efad5",
+    "run/cycle-01/p2-menu-pad-pipe.jsonl": "21e030f9c69377d04743b817a30e71db1715f04c4cf066e4d867827060a85c15",
+    "run/cycle-01/p2-remote-pad.jsonl": "6aec89db4360843db5ae4f9e9c1b946ccd18ee43bee92282f571cb34ca203739",
+    "run/cycle-01/p2-replays/Game_20261001T194942.slp": "4955c879742b1aa99036e2bff49821a92184764f0177f5c072d89802ee577289",
+    "run/cycle-01/p2-replays/Game_20261001T195013.slp": "0078ef66bbc3b3dc2cf52fc49a6458d74cd90e3438306c2d4ddbc50bec1011d4",
+    "run/cycle-01/p2-rollback-config.json": "4940b6b5b6fb813a7f1fbc544ca4dab73a79c79f909c3dc754e45ea75f55f63b",
+    "run/cycle-01/p2-rollback.jsonl": "023d1c9f8089f87a4dde8ee671a0167c1d7ce070b2a1e9e9273ee30e59626866",
+    "run/cycle-01/p2-serial-input.jsonl": "149f32804be23734e25b72addf9d80b741e0d8b71cf6dfbe9cf84a8686259bba",
+    "run/cycle-02/evidence.json": "a4e61791d733a2bddde4ae877fe81bcf3e5d6f1456d8102af8db1ff1c37e880e",
+    "run/cycle-02/game-01-comparison.json": "9f012b2f605467d0789173aa5427e175724c7f4f74caf60f1003c47fdf5627f3",
+    "run/cycle-02/game-02-comparison.json": "031f1c8a7b4e87d1a77193bf1a5eaa1459f7e8031864cb4cf30bdcc875badd7b",
+    "run/cycle-02/matchmaker-events.jsonl": "4aa800896423c77c566732a307e9b792a9a37f1876c74599eaf7767b58ab4b70",
+    "run/cycle-02/matchmaker.log": "ac708e370b557a5582abe7988260106fe0923d3720d022a05a6d4adce276a649",
+    "run/cycle-02/p1-dolphin.log": "ac789c9101daecedd1b8b9a958fbff0949686dfd839a1a3bb5814e37286a46de",
+    "run/cycle-02/p1-local-pad-sent.jsonl": "cfc93f6b67012a43d29f20471f6006f2e0df6291b654cbedefbc79807a970cc0",
+    "run/cycle-02/p1-matchplay-pad-pipe.jsonl": "5dd3739ce0d2c306de9e5ab5ae64c095ab9ba198309f011afd57a4fb98208b1d",
+    "run/cycle-02/p1-menu-pad-pipe.jsonl": "9c19bb9fa914279b02660a70fe281c874eb8c91edabf0c879e77e904dc81cebd",
+    "run/cycle-02/p1-remote-pad.jsonl": "fe83c150eed05174037e3b36542ddb3f5039fb15eb7bc06b4974c19411d48258",
+    "run/cycle-02/p1-replays/Game_20261001T195051.slp": "0e3f417258023269c8d9a9992d8f173596aea1bda659dddd17641939ea5a2c40",
+    "run/cycle-02/p1-replays/Game_20261001T195122.slp": "869dde8eaf96ad8dfb6219947e15f1bea81c219a45d740f988b01db67da535d9",
+    "run/cycle-02/p1-rollback-config.json": "df1a00b118845c501a61abbae8c9ed01c466c1b0038ff33585ea2addaa88791e",
+    "run/cycle-02/p1-rollback.jsonl": "85ca969c0633243b5b45764417e8ece248621c9a0c2d925fa70e6db90bf7b243",
+    "run/cycle-02/p1-serial-input.jsonl": "eb632743576827af895062a75d9371f9dac0e841f228f394187e5623c446abdb",
+    "run/cycle-02/p2-dolphin.log": "2f05b3ce54d224f16b9f4be9037b13f0c305cdec7c42d26f017da5456113909c",
+    "run/cycle-02/p2-local-pad-sent.jsonl": "79ece292c2b7d07a0e1ec46e6c253935964f2d732f73d94d2592e8db909ce964",
+    "run/cycle-02/p2-matchplay-pad-pipe.jsonl": "157ef2f35423281f53b574b9771a1f1b51c2578a330f347ac1867b3a5dff11fc",
+    "run/cycle-02/p2-menu-pad-pipe.jsonl": "112fde3807126d2a30cf5594fa184c1c1c0aeed97f046995c5846cd92c43d514",
+    "run/cycle-02/p2-remote-pad.jsonl": "dbbfedfa7c19fb94c8f095f007881650488c34704bafd345dbcc4f55d9327aef",
+    "run/cycle-02/p2-replays/Game_20261001T195051.slp": "969dfd4e46ae0c87052af54f47a8beae0fdb73144bf17c4f4fc45d03f80bf0ff",
+    "run/cycle-02/p2-replays/Game_20261001T195122.slp": "99915169b945773bf53ce2ac1c691f0b998f337bb42e115530068f4519093032",
+    "run/cycle-02/p2-rollback-config.json": "955d4d7faf206572c249c73ae20ab371081c81777daeefe9e94e85bb3c019b4a",
+    "run/cycle-02/p2-rollback.jsonl": "2cc23ea3a2ba20edb3323be7060c8e95743e51b96a8ad75c3d8c1aca6b487d80",
+    "run/cycle-02/p2-serial-input.jsonl": "45e6ac4f8ca50df3743f3886d0784a218e4a50f0c8f07659c908ddf6ee7834c4",
+    "run/rollback-run.json": "7d29b847ab7a22b8be9c263e33f2da95ea1fa3458bcc01ad43355896b528121f"
+  },
+  "retained_fresh_hold_file_sha256": {
+    "harness-source/reference-capture/slippi/client.lock.json": "45c97548d69d5124dfff77890756c4eea634d0bb83c9efa2f5b9b70785a168a1",
+    "harness-source/reference-capture/slippi/compare_rollback.py": "4d8d5f36ba2ab53c86ed489b168d2340d225bd96e73a8b0ce4eaee53e0963631",
+    "harness-source/reference-capture/slippi/patches/0003-desktop-rollback-diagnostic.patch": "9806f2502bdba799c802843b682effea47b2bd70ee63fba7031a75556bcbbadf",
+    "harness-source/reference-capture/slippi/process.py": "5b769f0b3ed11fc087a3e0af6e83d1a23587103c4d461472886dc1325e8157aa",
+    "harness-source/reference-capture/slippi/run_local.py": "268153c9e9b7021253963229f748db28e3797dc7fad8f3c235a91ee4f7da1b4d",
+    "harness-source/reference-capture/slippi/run_rollback.py": "8e959a22041bee1317683ace669c18913cfa4f83f6a4f377879538dc78f45b3d",
+    "harness-source/reference-capture/slippi/runtime.py": "1d653673df44b7574ef597c36ecd9ccba9ad2eac4b3c33ed3ce3e1341d1305c1",
+    "harness-source/tools/slippi_format.py": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956",
+    "harness-source/tools/slippi_rollback_diagnostic.py": "25875e5f13781e7fc819d4e7861865f48dd3921655c50f526b50073186a17868",
+    "harness.log": "d79ddb640bf4c9f6935adfa42eaf507c5d4bd838e077a97834e495396ed23abf",
+    "launch-result.json": "7be3f03f667be0c4357cdd0208920e3d4594a41ff88954dfdfa3645db52f30cc",
+    "launch.json": "30329eb164d8d4a53bcd19a8c12080dc282a91a5e5e407938daf355a3c77f7f7",
+    "run/cycle-01/evidence.json": "6a4dcf182c21b674dc02e8240bfb69813e520313d1e4dfd084ba1129e28f722b",
+    "run/cycle-01/game-01-comparison.json": "7a65b804c0d7d876d171b6a578c8d7eed58d508d9bbc894172121e08b8e16263",
+    "run/cycle-01/game-02-comparison.json": "4958eaa024802e3f17a1438604e96e40da57144fea85379b008c6f9158f175af",
+    "run/cycle-01/matchmaker-events.jsonl": "05aae87b355c117eace14b367954106cc3793873c6e3d3a51f45eee0837da165",
+    "run/cycle-01/matchmaker.log": "ac708e370b557a5582abe7988260106fe0923d3720d022a05a6d4adce276a649",
+    "run/cycle-01/p1-dolphin.log": "aa8e9261c884d9d77972e88c226be774a1f852b208d492bd306c54af9e3338ff",
+    "run/cycle-01/p1-local-pad-sent.jsonl": "cfc93f6b67012a43d29f20471f6006f2e0df6291b654cbedefbc79807a970cc0",
+    "run/cycle-01/p1-matchplay-pad-pipe.jsonl": "cc39dbf36913d3e371931a0daa94c9740877165293f12b10fb734069385cf8bf",
+    "run/cycle-01/p1-menu-pad-pipe.jsonl": "79802f0811f78e365fbe1fb3d841d3a170a5eda1d633dbab7fe270626b6c29a7",
+    "run/cycle-01/p1-remote-pad.jsonl": "48fbd0ca77a05edf065474f86fbbabd314da8e2116212e0b4572d46df9ab988d",
+    "run/cycle-01/p1-replays/Game_20261001T203355.slp": "6324db0bfd58547b4b6052e0ce84ed47a5317390e201da35706d2abea23b398d",
+    "run/cycle-01/p1-replays/Game_20261001T203426.slp": "9672c973e05ec5dd889216bc18655dbfed44af159d1db505fea4618c61f57123",
+    "run/cycle-01/p1-rollback-config.json": "fb0c891ab34fbb3de30c2fbc775251634bb81963f572ba4d57433c65a95d5d2a",
+    "run/cycle-01/p1-rollback.jsonl": "8f4d332669ed1316ea3eface5a1d3993b4630fea4a48b319a1668564a38ef399",
+    "run/cycle-01/p1-serial-input.jsonl": "2805dbb41f006038d7667091e2ac3d8424eb2d066c4def254485d0576736ea80",
+    "run/cycle-01/p2-dolphin.log": "6382570946b7382e579df2f1ccd30215bd412fdbc802671f14916854567a4727",
+    "run/cycle-01/p2-local-pad-sent.jsonl": "79ece292c2b7d07a0e1ec46e6c253935964f2d732f73d94d2592e8db909ce964",
+    "run/cycle-01/p2-matchplay-pad-pipe.jsonl": "84a307233054225a9d9e5bc899130b87d0639b1a8ab23c847856e0e72022b51d",
+    "run/cycle-01/p2-menu-pad-pipe.jsonl": "67faf86d5570e9acd14f32ec9503842647e65f367ac9e2c1c7caa4c4389f27c8",
+    "run/cycle-01/p2-remote-pad.jsonl": "fc740b5eb722265a1466e449994d5fb1d605c03ee59aa8e8b531aa62f5f7b8de",
+    "run/cycle-01/p2-replays/Game_20261001T203355.slp": "3d6f3ab8f1824b974dd548eb289c9b04f5ec4ace89df4c604bfea0d38424e5c9",
+    "run/cycle-01/p2-replays/Game_20261001T203426.slp": "e09e7708b7711ecd70534a0560f1c69532bb2023623581eddd5db79e0bbba51c",
+    "run/cycle-01/p2-rollback-config.json": "d4991787e3e969750871e096b9c90bf29bbd4b80e040a9fccfe21ba74ff9aaf7",
+    "run/cycle-01/p2-rollback.jsonl": "22601f1c6aeaa5add6bcdb7b51df36746873b1ed1fe287a7ad1053278a159df4",
+    "run/cycle-01/p2-serial-input.jsonl": "18d3a96cce24db72813219677bb0dc7c22ec5b44034bda7de6e0036ca1477add",
+    "run/cycle-02/evidence.json": "c4c1967969d5d7dc06b5f7f4f23f2b64fc4634fc1eebf37bc3479b2dd54cb087",
+    "run/cycle-02/game-01-comparison.json": "a3a0e0c456de142419f1bd07624be37c582247c3fdb2bb7a19d72b27d7c5614b",
+    "run/cycle-02/game-02-comparison.json": "40f94eba19798d36d753bde22242b946251b4a04cde46157afb0c15e464ab30c",
+    "run/cycle-02/matchmaker-events.jsonl": "b41ab251bb12eac2d35f5dad813cfdd1cb3dd300bd82ba0c4da8fba629282c40",
+    "run/cycle-02/matchmaker.log": "ac708e370b557a5582abe7988260106fe0923d3720d022a05a6d4adce276a649",
+    "run/cycle-02/p1-dolphin.log": "d7023824616f6366451404e59491fc339cbf28845b21f1402d35c40d7427639f",
+    "run/cycle-02/p1-local-pad-sent.jsonl": "cfc93f6b67012a43d29f20471f6006f2e0df6291b654cbedefbc79807a970cc0",
+    "run/cycle-02/p1-matchplay-pad-pipe.jsonl": "6ed48a81df6107815b254e577f0974c99cfb9e012115641a7be4afac02e3127c",
+    "run/cycle-02/p1-menu-pad-pipe.jsonl": "3b5321953192b4ffd2a9b2cf8eeddc08ab09a1c3672658ef45cc751b9977e00e",
+    "run/cycle-02/p1-remote-pad.jsonl": "3a8775437a795132ea6e9155652907c917d50c47313cc297c8c6a66406f7c57d",
+    "run/cycle-02/p1-replays/Game_20261001T203505.slp": "b5505ce3be5e9f9f1f56aa2d4a5e05d424054a30c6ee6f2f8f91d861446570da",
+    "run/cycle-02/p1-replays/Game_20261001T203536.slp": "a27d3d4f31d4dc123da08c799c25352933e24249fea58e9d3bda40822c210c11",
+    "run/cycle-02/p1-rollback-config.json": "3253948c5826e16cb93f3a7801493010775e0cc8537974fc34fbd82743a3e5f1",
+    "run/cycle-02/p1-rollback.jsonl": "212ec92bd4b5027f9ce09f194963f5c7f03ac897ae89c26cf30c13f2958f8c9c",
+    "run/cycle-02/p1-serial-input.jsonl": "985ee894f2641eea7d029114858a28422480f39a01f3b9ff8aa5178b3621daf9",
+    "run/cycle-02/p2-dolphin.log": "5e9ff416ffbd03f8709de0ef60b973fc3f0cabfcc1c62a66405b4571a0247b41",
+    "run/cycle-02/p2-local-pad-sent.jsonl": "79ece292c2b7d07a0e1ec46e6c253935964f2d732f73d94d2592e8db909ce964",
+    "run/cycle-02/p2-matchplay-pad-pipe.jsonl": "f749de4fba68e36e27df85758ada89924b3a205ca91ec9c8bd325daccc3e90c1",
+    "run/cycle-02/p2-menu-pad-pipe.jsonl": "6e50c3d3e8e7cd3c60936b4433119f94e833814cb07d583b2751a00acef6c359",
+    "run/cycle-02/p2-remote-pad.jsonl": "4f74e597d6c45f6756d5ebb1b2e27c8e422836a162446ae3fe1591683ce4a189",
+    "run/cycle-02/p2-replays/Game_20261001T203505.slp": "fe8a946295a795d848a286e4a74201a3cafcc625a09c48c245d8d494a9677fe7",
+    "run/cycle-02/p2-replays/Game_20261001T203536.slp": "12d7ba6400237ea2a68d34e2fb8fdd78f03e27eb510c1b64da2e2a5d920a82bd",
+    "run/cycle-02/p2-rollback-config.json": "67d3624f1cdb741e1fa28cd66805769bb103557b580d9894fa4dbf06c12b0c3a",
+    "run/cycle-02/p2-rollback.jsonl": "e8c12e575ac99ec4da59627967354296730a643471f6a8d3e3e4582627bf92cd",
+    "run/cycle-02/p2-serial-input.jsonl": "861dd02efc685a018e0b1c737385bd8bf56665a68e356ffef5555dfba2be655c",
+    "run/rollback-run.json": "ef888d8eb308023327ef66bf3da2211517d5f4351ba39d9668d8d1dec835a348",
+    "source-manifest.json": "acb7500618af8d7f13029a8683ed41cf65f33dde72a0808b03083b1015604f9f"
+  },
+  "retained_hold_file_sha256": {
+    "correction-revalidation-01.json": "f26e904f817fa390dd97995a33ebf84f8b47373099b281f67173f3a9a9d8aa8d",
+    "harness.log": "8396db05edc492f2b6e0d9194aee1700f80813eebce4ea5b87992bdcb006a381",
+    "launch.json": "05964de2398ee5b1de7d2bfc9bac60908e57a024c248048cb56e9b2e8cd29007",
+    "post-capture-analysis-source/reference-capture/slippi/run_rollback.py": "6a7a96e2192ab3637c29e4d938e76d86529a5a99472dcfa94a1300bea9ad3663",
+    "run/cycle-01/evidence.json": "b90ae2d329125bbaf8cdd564d84d9b28e49f6b9bb798ce2299391466740d9ed6",
+    "run/cycle-01/game-01-comparison.json": "433f6660a6ce1287c98c8e86e98ed8b005b8c12527f0381f140b38affc4e1c9b",
+    "run/cycle-01/game-02-comparison.json": "28a3af981d0cb2d1ba415375c6105a854e58778235e945f6c538c3030692b23b",
+    "run/cycle-01/matchmaker-events.jsonl": "aee11502dbc3f8962e29b3b9daed4999a4da351522fca9e2428dd1b390311b27",
+    "run/cycle-01/matchmaker.log": "ac708e370b557a5582abe7988260106fe0923d3720d022a05a6d4adce276a649",
+    "run/cycle-01/p1-dolphin.log": "aca3ee67c2240d7dc3aec7ace80116ef28e2b85d819bcef39bb1048830eb5524",
+    "run/cycle-01/p1-local-pad-sent.jsonl": "cfc93f6b67012a43d29f20471f6006f2e0df6291b654cbedefbc79807a970cc0",
+    "run/cycle-01/p1-matchplay-pad-pipe.jsonl": "a3b7e096d2b888928a626bc1d3556fb8523df87f1b312d5a37c9a608de23c489",
+    "run/cycle-01/p1-menu-pad-pipe.jsonl": "44b542f3aba88cd78b4fc87cc6b340ec8d9bacf37c1bca61cf691993ee2345cf",
+    "run/cycle-01/p1-remote-pad.jsonl": "211bdc397525b480b0817fd13fdad4a9ab2ba252ea787974c81b142f37613bb8",
+    "run/cycle-01/p1-replays/Game_20261001T191335.slp": "e31908c7ea24ef34335bfa7e013d82119361c781d5d790cd252f9e72fc2f8fa7",
+    "run/cycle-01/p1-replays/Game_20261001T191405.slp": "e598bf4533761f181d04e61634a79bf9d93831da214f7e56c2d8599c01845933",
+    "run/cycle-01/p1-rollback-config.json": "f14726fdb4ba218f4fda8f2396fae71ef113e3146160f3749c991f63ad379ed8",
+    "run/cycle-01/p1-rollback.jsonl": "b73c211e257bff294d7253d86224a7cc1fad5d156382739067b223d3828a43a3",
+    "run/cycle-01/p1-serial-input.jsonl": "6debd2dc05053f864a63995b0934afb979d26603c9bd071a4ca4d80f3ca5d206",
+    "run/cycle-01/p2-dolphin.log": "797894445b0b28adfe477497dd1c8b3b12f8cad8c40c3f88e0bb1dc3da186a4e",
+    "run/cycle-01/p2-local-pad-sent.jsonl": "79ece292c2b7d07a0e1ec46e6c253935964f2d732f73d94d2592e8db909ce964",
+    "run/cycle-01/p2-matchplay-pad-pipe.jsonl": "aff5531575852e534412ab0e4fed5b1ba9f7ef05d3b602ce4a20a9b509de4f83",
+    "run/cycle-01/p2-menu-pad-pipe.jsonl": "818b1ed9ddbf5ac17ab143dd8db3bcf82a3c9a18395c93f63541c4cb7d7f47ab",
+    "run/cycle-01/p2-remote-pad.jsonl": "ab874268f14e53f3f7d009c7155265d88ea4066ff583e69dbc1052ea8ff5f456",
+    "run/cycle-01/p2-replays/Game_20261001T191335.slp": "621bc6d9b7dbd4c90ccd45be93db4c5ae975dba8e8c727f93dca05c972d8cc24",
+    "run/cycle-01/p2-replays/Game_20261001T191405.slp": "0a62648d541e379d934e89629af5e98f11bee58debb22713a93c487af5cbe568",
+    "run/cycle-01/p2-rollback-config.json": "120bc907b883d11326b3febc4bfc8344acf4ced4f0901c3b95b01d33ba96856a",
+    "run/cycle-01/p2-rollback.jsonl": "803aff4189e75f426fb56d3c09fbf5f7335100c09ea9b204da3159b3559d7415",
+    "run/cycle-01/p2-serial-input.jsonl": "a5a3c3f4c5e761168d2b5a902681c5d619202108f54988567eb87b2cad3472c0",
+    "run/rollback-run.json": "727c884e242ccd060748dce5d494c68409b8cfb695254e35e6801a8c1b092a3e",
+    "speculative-revision-reduction-01.json": "e0c0759e4c32a96abd86de5c094f9e250e0cb652c526173184f666063ac77478"
+  },
+  "retained_preparation_file_sha256": {
+    "work/desktop-rollback/build-01.log": "4a769fe2b8212c7d0b50df00e232a20345e9931a189e0ec77ab2e2eb2cdba66a",
+    "work/desktop-rollback/build-03.json": "55c83122cece6855a8caa115e47ebe5d2632baeceadb3d44021681f8380a9d8b",
+    "work/desktop-rollback/build-03.log": "8bcb8a91ae60f7ec813678837a26add7d40ea5ceed5c6315dfb7d322921580a4",
+    "work/desktop-rollback/native-config-01/report.json": "f2e686ce3af32926e4e60fb139d5f135247da487b98377bc1d6b9afec71e2302",
+    "work/desktop-rollback/native-config-02/report.json": "1500bc9b80791a6f110f61cd5a8321c417f4e67842e0f1305459789f0f153458",
+    "work/desktop-rollback/pr111-fd-field-reduction-01.json": "67e4027fa7ad0f01ff83c68ca6d2d3847ace7ee825c775a5cee3e76fbabf5ebf",
+    "work/desktop-rollback/pr111-fd-peer-comparison-01.json": "96e0712a0ab19cb52d66425b988eab8724af1f38fb5c01ceb72a416a12f7003e",
+    "work/desktop-rollback/pr111-frame-clock-reduction-01.json": "78be43a6628ab6288f7377e554fbe16675ace64ea6286819cab3d7aa63fa23e7",
+    "work/desktop-rollback/stage-02.json": "e3cbf5354c1ec56010e0bb5f23c83ce3e098560864ab0d42e67c457c2d40764b"
+  },
+  "schema": "melee-web-desktop-rollback-diagnostic-v1",
+  "source_sha256_at_pilot": {
+    "reference-capture/slippi/client.lock.json": "45c97548d69d5124dfff77890756c4eea634d0bb83c9efa2f5b9b70785a168a1",
+    "reference-capture/slippi/compare_rollback.py": "4d8d5f36ba2ab53c86ed489b168d2340d225bd96e73a8b0ce4eaee53e0963631",
+    "reference-capture/slippi/patches/0003-desktop-rollback-diagnostic.patch": "9806f2502bdba799c802843b682effea47b2bd70ee63fba7031a75556bcbbadf",
+    "reference-capture/slippi/process.py": "5b769f0b3ed11fc087a3e0af6e83d1a23587103c4d461472886dc1325e8157aa",
+    "reference-capture/slippi/run_local.py": "20dc793c5003a374019a5338f9e5ae7fa80eb55988cd724d1cff4bb46f0965ad",
+    "reference-capture/slippi/run_rollback.py": "8fd56e8242c13ad3aab9e2d9ac0007195faf248e280209dbe20cccfb347ecc5a",
+    "reference-capture/slippi/runtime.py": "1d653673df44b7574ef597c36ecd9ccba9ad2eac4b3c33ed3ce3e1341d1305c1",
+    "tools/slippi_format.py": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956",
+    "tools/slippi_rollback_diagnostic.py": "25875e5f13781e7fc819d4e7861865f48dd3921655c50f526b50073186a17868"
+  }
+}
