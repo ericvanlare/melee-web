@@ -1164,6 +1164,12 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode,
     if (!startupOnly) requireValue(result.input_visibility.observed_visible, 'input_visible_not_restored');
     if (synthetic || recoveryExpected || manualPauseHidden)
       requireValue(result.input_visibility.observed_hidden, 'synthetic_hidden_not_observed');
+    requireValue(stable.state?.scene === 'css' && stable.state?.phase === 1 &&
+      stable.unload_calls === before.unload_calls, 'before_unload_css_checkpoint');
+    const beforeUnloadScreenshot = path.join(out, 'lifecycle-' + mode + '-before-unload.png');
+    await page.screenshot({path: beforeUnloadScreenshot, fullPage: true});
+    result.visual_checkpoint = {status: 'captured-before-unload', file: beforeUnloadScreenshot,
+      scene: stable.state.scene, phase: stable.state.phase, owner_live: true};
     await page.evaluate(async () => { await globalThis.__runtimeLifecycleFixture.player.unload(); });
     const afterUnload = await fixtureState(page);
     requireValue(afterUnload.unload_calls === before.unload_calls + 1, 'explicit_unload_not_observed');
