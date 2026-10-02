@@ -70,30 +70,56 @@ staging, so promotion does not require changing tested runtime bytes.
 
 ## Natural campaign and lifecycle boundary
 
-The [natural first-pause receipt](evidence/runtime-natural-first-v1.json) is
-bounded **Browser exercised** evidence from source `18e4d54`: two CPU9 Final
-Destination four-stock matches completed through Results and CSS with 26,862
-source steps, zero forced pauses and zero automatic recoveries. The host was
-shared and uncontrolled, and the headless run kept speaker output silent. It
-does not establish quiet-machine or foreground timing, warm-profile restore,
-original-state/pixel/PCM agreement, physical input, audible quality, or a
-natural root cause.
+The [integrated owner-fix receipt](evidence/runtime-lifecycle-clock-v1.json)
+binds the current executable checkpoint to its Release builds, audited public
+packages, lifecycle controls, native browser-to-local-Pages delivery, cold/warm
+natural campaigns, separate controlled-contention attempt, original-state
+comparison and full-suite results. It preserves source identities for every
+historical failure and reduced experiment. The older
+[natural first-pause receipt](evidence/runtime-natural-first-v1.json) remains
+historical evidence; its limits and retained output are not rewritten as a
+current-build result.
 
-The controlled lifecycle baseline uses the 4e audio-player identity and keeps
-the hidden-interval case separate from the failed whole ownership predicate.
-The hidden case observed the expected native guard (`22 > 8`); the overall
-case failed because the browser manual-control predicate used a Node-scoped
-hold value. Its retained receipt is
-`/Volumes/AgentStorage/melee-web/runs/lifecycle-hidden-callback-baseline-20261001-202956-aab6e6ec/clock-boundary-evidence-v1.json`
-with SHA-256
-`0526ee7f2022779fca025c5bd3928685f97794c39a30ad1758a31d2ada856c23`.
+The lifecycle correction retains hidden/page state until native handoff, even
+when visibility returns before another callback. The owner supplies neutral
+input activity before the actual current state, and a one-use return resets both
+menu and audio fixed-tick clocks before polling. Manual pause intent remains
+paused. Synthetic hidden-interval recovery and ordinary foreground-stall
+controls are separate: a visible stall still trips the original guard. The
+earlier controlled hidden baseline and its failed whole ownership predicate
+remain indexed separately. Genuine Chrome background/freeze event pairs were
+unavailable in the headless capability probe.
 
-The lifecycle hypothesis is that a hidden/page lifecycle interval remains
-sticky until native handoff, neutral input does not overwrite the actual
-visible state, and a one-use return value lets C++ reset menu and audio fixed
-tick clocks before polling. The prepared two-file fix changes no thresholds,
-ticks, RNG, manual resume, audio ownership, or save behavior. It remains
-unverified until the sealed package, browser, and sustained checks pass.
+A natural local first-use GPU preparation delay also reproduced a timing pause.
+The retained packet aligns a native staging wait with Dawn pipeline creation
+and nested Metal compilation. A prior source draw created a pipeline; a
+subsequent offending callback waited for staging released by queue completion.
+The generic fix detects completed source drawing, newly created pipeline
+resources and pending staging, then uses the existing bounded source-free
+render-settle path. It retains the last image, waits for tracked queue/frame
+completion, resets both clocks and gates manual controls. No asset exemption,
+guessed table bound, new threshold, skipped source tick or automatic Resume is
+introduced. Direct identity between an individual pipeline and a driver
+compilation future is unavailable, profiling perturbs timing, and driver cache
+is uncontrolled; this is one demonstrated local preparation-wait cause.
+
+The current natural runs use original menus, natural Results and CSS returns,
+audio enabled and headless installed Chrome with silent host output. Both
+cold/warm pairs observe native cache restoration and explicit owner unload/save
+before their disposable profiles are removed. The natural harness uses the
+private development runtime: exact served Wasm bytes and clean source identity
+are bound separately from the audited public package graph. The public package
+checks exercise lifecycle and delivery behavior. Controlled contention uses a
+declared worker workload and remains separate from natural shared-host evidence.
+
+The relevant recorded original-state comparison passes its declared match
+RNG, frame, PAD and fighter fields. Nonmatch scalar/PAD state, menu/audio/process
+state, live timing, pixels and PCM remain uncovered. Retained audio snapshots
+show cumulative underruns increasing between Results observations without
+locating their first increase. Quiet-machine/foreground protocols, physical
+input, arranged listening, uninterrupted audio, pixel/PCM agreement and the
+separate whole-session acceptance gates remain open. Neither induced lifecycle
+holds nor the single local GPU wait classify users' remaining varied pauses.
 
 ## Automatic delivery and Settings
 

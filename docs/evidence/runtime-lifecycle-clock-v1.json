@@ -1,0 +1,1032 @@
+{
+  "schema": "melee-web-runtime-lifecycle-clock-evidence-v1",
+  "evidence_labels": [
+    "Compiled",
+    "Native traced",
+    "Retail compared",
+    "Browser exercised"
+  ],
+  "result": "scoped owner fixes validated; whole-session performance admission remains open",
+  "source": {
+    "commit": "fe2492be44e77a19ee281053d33fc9bd39f8ac48",
+    "tree": "d4fbbc6684cbf05385475338672025fe6ee8b1ec",
+    "dirty": false
+  },
+  "source_scope": "Frozen executable checkpoint. A later documentation-only commit does not change the tested code or relabel its packaged bytes.",
+  "owners": {
+    "lifecycle": "Hidden/page lifecycle state stays sticky through visibility restoration until native handoff. One neutral activity update then current activity, one paired menu/audio clock reset before polling; manual pause remains paused.",
+    "gpu_preparation": "A completed live source draw with newly created pipeline resources and pending staging enters existing source-free render settling. Retain the last image, wait for tracked queue/frame completion or the existing bounded failure, reset both clocks before live timing and gate manual controls.",
+    "preserved": [
+      "8-tick simulation guard",
+      "60-tick audio guard",
+      "source ticks and draw order",
+      "RNG and float bits",
+      "manual Resume",
+      "audio and save ownership"
+    ]
+  },
+  "integrated_validation": {
+    "builds": {
+      "log_sha256": {
+        "runtime": "2fab0baaefad74d66ccf2d49cb43376b5c5f4145014eaa936f7fa4e68e4d4dca",
+        "runtime-audio-preview": "f06eaa45e58af4ec8072ca99804ddeae26806477e2efc69b16ee8e77bcbe89db",
+        "runtime-public": "85daa8dfd3235e1819ede063e49337e6eda4358b9d339a6f242d87c9da2cd818"
+      },
+      "receipt": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/builds/receipt.json",
+      "receipt_sha256": "4ffde43d9269a837102045614a4b846725dd41666dfd29703a2136fbb330ebda",
+      "result": "pass",
+      "targets": [
+        "runtime-public Release",
+        "runtime-audio-preview Release",
+        "runtime Release"
+      ]
+    },
+    "lifecycle": {
+      "cases": {
+        "foreground_guard": {
+          "report_sha256": "122834fbbdf30a684bdeb5ec5a3038282d4a9efb09e0fbed06fa8e3fcb827537",
+          "result": "pass"
+        },
+        "hidden_recovery": {
+          "report_sha256": "af3964c1cf710c9e323ecc11bf1af98f8d9f37fb6327ce595536e3aaea178555",
+          "result": "pass"
+        }
+      },
+      "identity": {
+        "build_profile": "audio-player",
+        "runtime_hash": "3585c9a40240a2f0",
+        "schema_version": 1,
+        "source_commit": "fe2492be44e77a19ee281053d33fc9bd39f8ac48"
+      },
+      "receipt": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/lifecycle-r2/receipt.json",
+      "receipt_sha256": "2cd019765f1f29139b448754beaea1f8e6fe58c219d8417efe53dc6bcadf4b4e",
+      "result": "pass",
+      "scope": "Headless bounded synthetic hidden/visible callback holds and manual-pause checks; no genuine lifecycle, foreground-user-cause, gameplay, original-state, pixel, PCM, or sustained-performance claim."
+    },
+    "native_delivery": {
+      "browser_receipt": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/native-delivery/receipt.json",
+      "browser_receipt_sha256": "8a3c9b979aeabf023fcd6a3832a50cd0a4b4e860b3dcfcfc061de2e8c8a57eb7",
+      "browser_scope": {
+        "graphics": {
+          "adapterAvailable": true,
+          "crossOriginIsolated": true,
+          "gpu": true,
+          "requestAdapter": true,
+          "secure": true
+        },
+        "guard": {
+          "clock_owner": 1,
+          "reason": 1,
+          "scene": 1,
+          "stall_ms": 200,
+          "threshold": 8,
+          "value": 13
+        },
+        "headless": true,
+        "mode": "packaged-native",
+        "privacy": "Induced callback-stall incident only; no token, cookie, raw request metadata, or hosted endpoint retained.",
+        "settings": {
+          "default_on": true,
+          "export_bytes": 3647,
+          "export_with_reporting_off": true,
+          "opt_out_observed": true,
+          "preparation_export_disabled": true
+        },
+        "settings_export": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/native-delivery/public-settings-export.json",
+          "sha256": "727d9536475007dcd20a1173f77fe107d56f1685d4cebbf7bbe41aed12abbbc5"
+        },
+        "upload_timing_ms": {
+          "fetch_dispatch_main_thread": 0.32000017166137695,
+          "fetch_response_await": 16.414999961853027,
+          "inactive_to_fetch_dispatch": 1101.5699999332428,
+          "processing_active": false,
+          "strict_wire_serialization_calls": 2,
+          "strict_wire_serialization_main_thread": 0.02499985694885254,
+          "strict_wire_serialization_total_main_thread": 0.039999961853027344
+        },
+        "wire_report": {
+          "bytes": 9718,
+          "environment": "staging",
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/native-delivery/native-report.json",
+          "reason": "simulation_debt",
+          "runtime_hash": "3585c9a40240a2f0",
+          "sha256": "e87f79a3f2fe9a3daa79acf6edeac3b3251c368a44931a5d720c77144254b5da",
+          "source_commit": "fe2492be44e77a19ee281053d33fc9bd39f8ac48"
+        }
+      },
+      "identity": {
+        "build_profile": "audio-player",
+        "manifest_sha256": "05f38eca07dbad72df0c7e9c27c4cd56033ffa612550ca7633e476dc8cd4e08f",
+        "runtime_hash": "3585c9a40240a2f0",
+        "schema_version": 1,
+        "source_commit": "fe2492be44e77a19ee281053d33fc9bd39f8ac48"
+      },
+      "receipt": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/delivery/receipt.json",
+      "receipt_sha256": "792b9c1d2d99c0c568a4c661f05a4c674f25a15a750e6ca46e1e0d97c52115e2",
+      "result": "pass"
+    },
+    "packages": {
+      "audio_manifest": {
+        "identity_sha256": "9bd1f5b825d688789f61b365ab3d091cb0a7f9e7a63fa4ce3a949631fe470e3c",
+        "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/audio-manifest.json",
+        "profile": "audio-player",
+        "runtime_hash": "3585c9a40240a2f0",
+        "sha256": "05f38eca07dbad72df0c7e9c27c4cd56033ffa612550ca7633e476dc8cd4e08f",
+        "source_sha": "fe2492be44e77a19ee281053d33fc9bd39f8ac48"
+      },
+      "receipt": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/packages/receipt.json",
+      "receipt_sha256": "2553c188c4d93855f083a396e721f037b85c79705d19fa23c3fffeacff4d0e61",
+      "result": "pass",
+      "silent_manifest": {
+        "identity_sha256": "5023ea72732532ede2e23912cc0449587f931aaf2937491f8b8c8111cc100451",
+        "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/silent-manifest.json",
+        "profile": "player",
+        "runtime_hash": "ce8aab3e638fed0a",
+        "sha256": "037396540ea0e9e2525456f58de0b707130b4d8bfdb407e4fa6a7a38fce6cb44",
+        "source_sha": "fe2492be44e77a19ee281053d33fc9bd39f8ac48"
+      },
+      "steps": [
+        "audio-prepare",
+        "audio-audit",
+        "silent-prepare"
+      ]
+    }
+  },
+  "historical_failure_and_reducer_evidence": {
+    "a7_battlefield_reinspection": {
+      "limits": [
+        "Stage setup only; no gameplay, Results, unload, save, PCM, foreground, or acceptance claim.",
+        "GPU readiness counters are conservative queue/frame settling evidence, not a per-pipeline future identity.",
+        "The quality reinspection is separate from the a7 source/package identity."
+      ],
+      "observed": {
+        "gpu": "Metal 3",
+        "phase": 7,
+        "source_unchanged": true,
+        "stage_source_id": 31,
+        "valid_players": [
+          "p0",
+          "p1",
+          "p2",
+          "p3"
+        ]
+      },
+      "quality_reinspection": "/Volumes/AgentStorage/melee-web/runs/runtime-pipeline-clock-fix-20261002-000925-9f8542b9/pipelineFixEvidence/stage-setup/quality-reinspection.json",
+      "quality_reinspection_sha256": "a96840364090359da32f786ba3657c143c0f783df1b88addadcb7bd511f73686",
+      "result": "scoped_pass",
+      "review": "/Volumes/AgentStorage/melee-web/runs/runtime-pipeline-clock-fix-20261002-000925-9f8542b9/review/a7c6747-pipeline-fix-review.json",
+      "review_sha256": "7f1ba339dd907aa503190ff995070f1098c4cceda9033c5a76be0077daaaedec",
+      "stage_report": "/Volumes/AgentStorage/melee-web/runs/runtime-pipeline-clock-fix-20261002-000925-9f8542b9/stage-setup/browser/report.json",
+      "stage_report_sha256": "84855db421ac0de4a31784c812b8ac9d99623ea8f8378373633473980782a055",
+      "subject_identity": {
+        "subject_commit": "a7c67479d6f1d11cd0d0f616b169430c03b628d4",
+        "tree": "b664aecff122c60bd23d354b0d61bad209ccee48"
+      }
+    },
+    "baseline_4e_hidden_guard": {
+      "controlled_hidden_case": {
+        "clock_owner": 1,
+        "reason_code": 1,
+        "result": "pass",
+        "scene": 1,
+        "threshold": 8,
+        "value": 22
+      },
+      "evidence": "/Volumes/AgentStorage/melee-web/runs/lifecycle-hidden-callback-baseline-20261001-202956-aab6e6ec/clock-boundary-evidence-v1.json",
+      "evidence_sha256": "0526ee7f2022779fca025c5bd3928685f97794c39a30ad1758a31d2ada856c23",
+      "exclusions": [
+        "No genuine Chrome background/freeze evidence",
+        "No natural foreground user-cause claim",
+        "No gameplay, physical input, pixel, PCM, or performance-admission claim"
+      ],
+      "failure_boundary": "Whole ownership case failed on a manual visible native-sample predicate; the hidden synthetic guard evidence remains separate.",
+      "overall_result": "fail",
+      "source_identity": {
+        "build_profile": "audio-player",
+        "runtime_hash": "40af1053410ff4d8",
+        "schema_version": 1,
+        "source_commit": "4e76522b65931e57930ec17eea2ce2c611a120a9"
+      }
+    },
+    "profiled_gpu_trace_separate_identity": {
+      "alignment_revision": "/Volumes/AgentStorage/melee-web/runs/lifecycle-gpu-stage-trace-20261001-232746-508e424e/correlation-offline-r2/alignment-revision.json",
+      "alignment_revision_sha256": "88bad23a8fea364fcf5b88c81ff7ed76cac9550e10145926c6f0ad34450d878e",
+      "boundary": {
+        "draw_ms": 298.17000007629395,
+        "reason_code": 1,
+        "source_draws": 1,
+        "source_frame": 0,
+        "source_steps": 1,
+        "stage_source_id": 31,
+        "status": "correlated_diagnostic_only",
+        "texture_upload_bytes": 4096,
+        "threshold": 8,
+        "total_ms": 298.7150001525879,
+        "value": 18
+      },
+      "correlation": "/Volumes/AgentStorage/melee-web/runs/lifecycle-gpu-stage-trace-20261001-232746-508e424e/correlation-offline-r2/gpu-trace-correlation.json",
+      "correlation_sha256": "be6d6cc908d85b1a96132d12c42a521e2d98daa5c21640f5190d876d4a282a5f",
+      "limits": [
+        "The local first-use preparation wait is demonstrated by aligned native staging and Dawn/Metal timing; this is one local preparation-wait cause, not a classification of the users' varied unexplained pauses.",
+        "Direct per-pipeline future identity is unavailable; profiler timing is perturbing and driver-cache control is unavailable.",
+        "Runtime diagnostics identity was unavailable for this private development artifact.",
+        "No original comparison or broad acceptance claim follows from this profiled diagnostic run."
+      ],
+      "source_identity": {
+        "private_wasm_sha256": "1fbebcaea8029a99ced2272593ed99b19a44fedb2871b1eab60fef3dd1c5fc3f",
+        "public_identity": "unavailable",
+        "source_commit": "31a381abb93636214d961b0684912cb5b78fcfab",
+        "tree": "38275d1a687d89d9b6941c7c606e8bd883e092f1"
+      },
+      "stage_report": "/Volumes/AgentStorage/melee-web/runs/lifecycle-gpu-stage-trace-20261001-232746-508e424e/stage-setup-profiled/browser/report.json",
+      "stage_report_sha256": "dc0efc92a52036435750c5d8c0a7721f394e5dc290db09538bc70ff29a87fac8",
+      "trace_marker": {
+        "duration_ms": 327.355,
+        "name": "DeviceBase::APICreateRenderPipeline",
+        "nested_metal_shader_ms": 175.053,
+        "nested_new_library_ms": 174.292,
+        "pipeline_label": "GX Pipeline a1b8521 shader 7a22b3b2"
+      },
+      "trace_sha256": "db9be33403d6b9553bd9e2026617d220c65b710c69ba2cd746b376f725774f54",
+      "trace_summary": "/Volumes/AgentStorage/melee-web/runs/lifecycle-gpu-stage-trace-20261001-232746-508e424e/gpu-stage-trace/gpu-trace-summary.json",
+      "trace_summary_sha256": "512b3e46f87e7819b6025b8d3beabac2370f1d258aff285b3ae8a0ce58552f04",
+      "observed_local_preparation_wait": {
+        "reproduced": true,
+        "native_staging_wait_ms": 293.875,
+        "guard_value": 18,
+        "guard_threshold": 8,
+        "queue_submission_releases_staging_counter": true,
+        "interpretation": "one local first-use GPU preparation-wait cause",
+        "generic_owner_fix_reduced_boundary_pass": true,
+        "prior_pipeline_native_callback_id": 1772,
+        "offending_native_callback_id": 1775,
+        "gameplay_source_frame": 0
+      }
+    }
+  },
+  "natural_campaign": {
+    "result": "pass",
+    "attempt_count": 4,
+    "match_count": 8,
+    "match_source_ticks": 109674,
+    "unexpected_pause_count": 0,
+    "automatic_recoveries": 0,
+    "condition": "shared-host-uncontrolled; named peer heavy jobs voluntarily parked",
+    "driver_cache": "uncontrolled",
+    "profile_cleanup": "Each pair removed after both strict passes",
+    "attempts": [
+      {
+        "id": "A-final-destination-cold",
+        "condition": "shared-host-uncontrolled",
+        "result": "pass",
+        "receipt": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/A-final-destination-cold-orchestrator-receipt.json",
+          "sha256": "6ae37e53e647e9959e5259886f0cbcbf2d442da95b6ed3fcd5a5023aca84f17f"
+        },
+        "exit_code": 0,
+        "seconds": 544.3431959152222,
+        "harness_cap_seconds": 600,
+        "process_group_cap_seconds": 630,
+        "automatic_resume": false,
+        "quality": {
+          "result": "pass",
+          "valid": true,
+          "failures": []
+        },
+        "report": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/A-final-destination-cold/shared-host-uncontrolled/report.json",
+          "sha256": "5b102ec1fd6a636395b2cbf520cef86a1fe772aa83ffcae7f68cd3e8aafa5dca"
+        },
+        "stage_source_id": 32,
+        "terminal_match_source_frames": [
+          12811,
+          15196
+        ],
+        "unexpected_pause_count": 0,
+        "source_timing_disruption_count": 0,
+        "reason_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          76,
+          0,
+          0
+        ],
+        "dropped_reason_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          52,
+          0,
+          0
+        ],
+        "unknown_reason_count": 0,
+        "invalid_preparation_count": 0,
+        "callback_capture": {
+          "max_samples": 100,
+          "max_incidents": 24,
+          "callback_count": 31809,
+          "dropped_samples": 31709,
+          "dropped_incidents": 52,
+          "max_callback_ms": 0.04499983787536621,
+          "max_interval_ms": 3836.4049999713898,
+          "max_update_ms": 7.240000009536743,
+          "max_draw_ms": 21.450000047683716,
+          "max_total_ms": 246.00500011444092,
+          "max_preparation_ms": 242.76000022888184
+        },
+        "cache": {
+          "requested": "cold",
+          "status": "observed-not-populated",
+          "restore_observed": false,
+          "last_observed_file_bytes": 0,
+          "owner_unload_result": "pass",
+          "save_count": {
+            "before": 0,
+            "after": 1
+          },
+          "saved_file_bytes": 9474000,
+          "final_phase": 0,
+          "final_running": 0,
+          "native_cache_idle": 1
+        },
+        "audio_results_snapshots": [
+          {
+            "boundary": "match-1-results-entry",
+            "sample_rates": [
+              32000
+            ],
+            "context_states": [
+              "running"
+            ],
+            "worklets": [
+              {
+                "pcm_frames": 7776000,
+                "underruns": 0,
+                "overflows": 0,
+                "errors": []
+              }
+            ]
+          },
+          {
+            "boundary": "match-2-results-entry",
+            "sample_rates": [
+              32000
+            ],
+            "context_states": [
+              "running"
+            ],
+            "worklets": [
+              {
+                "pcm_frames": 16385066,
+                "underruns": 192,
+                "overflows": 0,
+                "errors": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "A-final-destination-warm",
+        "condition": "shared-host-uncontrolled",
+        "result": "pass",
+        "receipt": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/A-final-destination-warm-orchestrator-receipt.json",
+          "sha256": "c127bdfac19d3e6a0d7cf5866545273349285cff40535521f8d924df5a33d196"
+        },
+        "exit_code": 0,
+        "seconds": 534.260947227478,
+        "harness_cap_seconds": 600,
+        "process_group_cap_seconds": 630,
+        "automatic_resume": false,
+        "quality": {
+          "result": "pass",
+          "valid": true,
+          "failures": []
+        },
+        "report": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/A-final-destination-warm/shared-host-uncontrolled/report.json",
+          "sha256": "c5fb5068b7566ecbb4ddf0d4d4ae468420dc2781ca47036c82e00aed460d7da7"
+        },
+        "stage_source_id": 32,
+        "terminal_match_source_frames": [
+          15280,
+          12513
+        ],
+        "unexpected_pause_count": 0,
+        "source_timing_disruption_count": 0,
+        "reason_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          6,
+          0,
+          0
+        ],
+        "dropped_reason_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "unknown_reason_count": 0,
+        "invalid_preparation_count": 0,
+        "callback_capture": {
+          "max_samples": 100,
+          "max_incidents": 24,
+          "callback_count": 31439,
+          "dropped_samples": 31339,
+          "dropped_incidents": 0,
+          "max_callback_ms": 0.04500007629394531,
+          "max_interval_ms": 3801.4700000286102,
+          "max_update_ms": 6.065000057220459,
+          "max_draw_ms": 18.350000143051147,
+          "max_total_ms": 232.24000000953674,
+          "max_preparation_ms": 229.19000005722046
+        },
+        "cache": {
+          "requested": "warm",
+          "status": "observed-populated",
+          "restore_observed": true,
+          "last_observed_file_bytes": 9474000,
+          "owner_unload_result": "pass",
+          "save_count": {
+            "before": 0,
+            "after": 1
+          },
+          "saved_file_bytes": 9494600,
+          "final_phase": 0,
+          "final_running": 0,
+          "native_cache_idle": 1
+        },
+        "audio_results_snapshots": [
+          {
+            "boundary": "match-1-results-entry",
+            "sample_rates": [
+              32000
+            ],
+            "context_states": [
+              "running"
+            ],
+            "worklets": [
+              {
+                "pcm_frames": 9116266,
+                "underruns": 0,
+                "overflows": 0,
+                "errors": []
+              }
+            ]
+          },
+          {
+            "boundary": "match-2-results-entry",
+            "sample_rates": [
+              32000
+            ],
+            "context_states": [
+              "running"
+            ],
+            "worklets": [
+              {
+                "pcm_frames": 16367464,
+                "underruns": 86,
+                "overflows": 0,
+                "errors": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "B-battlefield-cold",
+        "condition": "shared-host-uncontrolled",
+        "result": "pass",
+        "receipt": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/B-battlefield-cold-orchestrator-receipt.json",
+          "sha256": "08f9e773442a72db795ef0f80e097c553722b520863b944b0d344b3e680725a0"
+        },
+        "exit_code": 0,
+        "seconds": 476.76615691185,
+        "harness_cap_seconds": 600,
+        "process_group_cap_seconds": 630,
+        "automatic_resume": false,
+        "quality": {
+          "result": "pass",
+          "valid": true,
+          "failures": []
+        },
+        "report": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/B-battlefield-cold/shared-host-uncontrolled/report.json",
+          "sha256": "26b31b692d47b0b74a7a07cf043224a0f94f8d1c926b0f6b4720ceb3776af3b2"
+        },
+        "stage_source_id": 31,
+        "terminal_match_source_frames": [
+          11622,
+          12573
+        ],
+        "unexpected_pause_count": 0,
+        "source_timing_disruption_count": 0,
+        "reason_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          33,
+          0,
+          0
+        ],
+        "dropped_reason_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          9,
+          0,
+          0
+        ],
+        "unknown_reason_count": 0,
+        "invalid_preparation_count": 0,
+        "callback_capture": {
+          "max_samples": 100,
+          "max_incidents": 24,
+          "callback_count": 27986,
+          "dropped_samples": 27886,
+          "dropped_incidents": 9,
+          "max_callback_ms": 0.05000019073486328,
+          "max_interval_ms": 3731.2400000095367,
+          "max_update_ms": 6.295000076293945,
+          "max_draw_ms": 17.269999980926514,
+          "max_total_ms": 227.82999992370605,
+          "max_preparation_ms": 223.47000002861023
+        },
+        "cache": {
+          "requested": "cold",
+          "status": "observed-not-populated",
+          "restore_observed": false,
+          "last_observed_file_bytes": 0,
+          "owner_unload_result": "pass",
+          "save_count": {
+            "before": 0,
+            "after": 1
+          },
+          "saved_file_bytes": 8661000,
+          "final_phase": 0,
+          "final_running": 0,
+          "native_cache_idle": 1
+        },
+        "audio_results_snapshots": [
+          {
+            "boundary": "match-1-results-entry",
+            "sample_rates": [
+              32000
+            ],
+            "context_states": [
+              "running"
+            ],
+            "worklets": [
+              {
+                "pcm_frames": 7179199,
+                "underruns": 0,
+                "overflows": 0,
+                "errors": []
+              }
+            ]
+          },
+          {
+            "boundary": "match-2-results-entry",
+            "sample_rates": [
+              32000
+            ],
+            "context_states": [
+              "running"
+            ],
+            "worklets": [
+              {
+                "pcm_frames": 14454398,
+                "underruns": 86,
+                "overflows": 0,
+                "errors": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "B-battlefield-warm",
+        "condition": "shared-host-uncontrolled",
+        "result": "pass",
+        "receipt": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/B-battlefield-warm-orchestrator-receipt.json",
+          "sha256": "1d4d12a2adc00d7a5aa8c598fa437a7919d5df07c184814787567e97b58059ed"
+        },
+        "exit_code": 0,
+        "seconds": 566.9073317050934,
+        "harness_cap_seconds": 600,
+        "process_group_cap_seconds": 630,
+        "automatic_resume": false,
+        "quality": {
+          "result": "pass",
+          "valid": true,
+          "failures": []
+        },
+        "report": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/B-battlefield-warm/shared-host-uncontrolled/report.json",
+          "sha256": "a84d4d2cf78cd0dcdb286bb4f0086fc617f0bb90c98b16402844ab0fdd27168f"
+        },
+        "stage_source_id": 31,
+        "terminal_match_source_frames": [
+          14964,
+          14715
+        ],
+        "unexpected_pause_count": 0,
+        "source_timing_disruption_count": 0,
+        "reason_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "dropped_reason_counts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "unknown_reason_count": 0,
+        "invalid_preparation_count": 0,
+        "callback_capture": {
+          "max_samples": 100,
+          "max_incidents": 24,
+          "callback_count": 33388,
+          "dropped_samples": 33288,
+          "dropped_incidents": 0,
+          "max_callback_ms": 0.04999995231628418,
+          "max_interval_ms": 3727.180000066757,
+          "max_update_ms": 6.420000076293945,
+          "max_draw_ms": 13.694999933242798,
+          "max_total_ms": 240.88500022888184,
+          "max_preparation_ms": 237.99499988555908
+        },
+        "cache": {
+          "requested": "warm",
+          "status": "observed-populated",
+          "restore_observed": true,
+          "last_observed_file_bytes": 8644520,
+          "owner_unload_result": "pass",
+          "save_count": {
+            "before": 0,
+            "after": 1
+          },
+          "saved_file_bytes": 8681600,
+          "final_phase": 0,
+          "final_running": 0,
+          "native_cache_idle": 1
+        },
+        "audio_results_snapshots": [
+          {
+            "boundary": "match-1-results-entry",
+            "sample_rates": [
+              32000
+            ],
+            "context_states": [
+              "running"
+            ],
+            "worklets": [
+              {
+                "pcm_frames": 8998399,
+                "underruns": 0,
+                "overflows": 0,
+                "errors": []
+              }
+            ]
+          },
+          {
+            "boundary": "match-2-results-entry",
+            "sample_rates": [
+              32000
+            ],
+            "context_states": [
+              "running"
+            ],
+            "worklets": [
+              {
+                "pcm_frames": 17421865,
+                "underruns": 86,
+                "overflows": 0,
+                "errors": []
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "callback_scope": "Whole-attempt maxima include startup, preparation and inactive work. The hook cost measures the scalar JS observer. These are not foreground performance-admission metrics.",
+    "artifact_scope": "Private development runtime: served Wasm SHA-256 is bound to the local Release build and clean source checkpoint, not to the audited public runtime graph."
+  },
+  "controlled_contention": {
+    "scope": "One separately executed cold A/Final Destination sensitivity attempt. Remaining planned contention entries are unrun. It does not attribute the users varied pauses or establish foreground admission.",
+    "workload": "Node worker busy-loops 35 ms every 50 ms during each match; no other declared root heavy job.",
+    "attempt": {
+      "id": "A-final-destination-cold",
+      "condition": "controlled-contention",
+      "result": "pass",
+      "receipt": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-controlled-contention-fe2492b-20261002-020249-ed89cb6f/A-final-destination-cold-orchestrator-receipt.json",
+        "sha256": "d21ed4535697ad845ed5c4a87465463c5d199dd16bdc4a0eeee91b4bde1e9094"
+      },
+      "exit_code": 0,
+      "seconds": 561.0011241436005,
+      "harness_cap_seconds": 600,
+      "process_group_cap_seconds": 630,
+      "automatic_resume": false,
+      "quality": {
+        "result": "pass",
+        "valid": true,
+        "failures": []
+      },
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-controlled-contention-fe2492b-20261002-020249-ed89cb6f/A-final-destination-cold/controlled-contention/report.json",
+        "sha256": "6d617cf6aa9dd5957ef1da918bda658edced58bf0bc4d00a68d199f0793aea18"
+      },
+      "stage_source_id": 32,
+      "terminal_match_source_frames": [
+        13466,
+        15365
+      ],
+      "unexpected_pause_count": 0,
+      "source_timing_disruption_count": 0,
+      "reason_counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        71,
+        0,
+        0
+      ],
+      "dropped_reason_counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        47,
+        0,
+        0
+      ],
+      "unknown_reason_count": 0,
+      "invalid_preparation_count": 0,
+      "callback_capture": {
+        "max_samples": 100,
+        "max_incidents": 24,
+        "callback_count": 32787,
+        "dropped_samples": 32687,
+        "dropped_incidents": 47,
+        "max_callback_ms": 0.034999847412109375,
+        "max_interval_ms": 3823.704999923706,
+        "max_update_ms": 6.690000057220459,
+        "max_draw_ms": 20.484999895095825,
+        "max_total_ms": 244.70000004768372,
+        "max_preparation_ms": 241.37000012397766
+      },
+      "cache": {
+        "requested": "cold",
+        "status": "observed-not-populated",
+        "restore_observed": false,
+        "last_observed_file_bytes": 0,
+        "owner_unload_result": "pass",
+        "save_count": {
+          "before": 0,
+          "after": 1
+        },
+        "saved_file_bytes": 9342544,
+        "final_phase": 0,
+        "final_running": 0,
+        "native_cache_idle": 1
+      },
+      "audio_results_snapshots": [
+        {
+          "boundary": "match-1-results-entry",
+          "sample_rates": [
+            32000
+          ],
+          "context_states": [
+            "running"
+          ],
+          "worklets": [
+            {
+              "pcm_frames": 8153599,
+              "underruns": 0,
+              "overflows": 0,
+              "errors": []
+            }
+          ]
+        },
+        {
+          "boundary": "match-2-results-entry",
+          "sample_rates": [
+            32000
+          ],
+          "context_states": [
+            "running"
+          ],
+          "worklets": [
+            {
+              "pcm_frames": 16921064,
+              "underruns": 43,
+              "overflows": 0,
+              "errors": []
+            }
+          ]
+        }
+      ]
+    },
+    "owned_cleanup": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-controlled-contention-fe2492b-20261002-020249-ed89cb6f/owned-single-attempt-cleanup.json",
+      "sha256": "af09e9e55daf36a0ae95bc8d61bf8d543a2ac50016373730d98058e4dbaffe83"
+    }
+  },
+  "original_state_comparison": {
+    "result": "scoped_equivalent_pass",
+    "source_identity": {
+      "commit": "fe2492be44e77a19ee281053d33fc9bd39f8ac48",
+      "dirty": false,
+      "source_unchanged": true,
+      "tree": "d4fbbc6684cbf05385475338672025fe6ee8b1ec"
+    },
+    "wrapper_receipt": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/original-state/receipt.json",
+    "wrapper_receipt_sha256": "f820acf3b8b672ad18a00de450a396d817e2e6ffc13fbf7647ea52bdc443bf4b",
+    "comparison": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/original-state/comparison.json",
+    "comparison_sha256": "c51a31aad69b45a8f1da9657470bbdf5532a6b79e8bd687767865935e474d61f",
+    "browser_report": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/original-state/browser/report.json",
+    "browser_report_sha256": "2a44c722e7097fb2de26292850e71cced2d80b1b92ad8cfffb9594e3e469ce1f",
+    "wrapper_steps": {
+      "capture_seconds": 719.6569,
+      "capture_exit_code": 0,
+      "compare_seconds": 22.2853,
+      "compare_exit_code": 0,
+      "server_cleanup": "closed",
+      "owned_scratch_cleanup": "removed-after-success",
+      "source_unchanged": true
+    },
+    "canonical_artifacts": {
+      "candidate_mwrc": {
+        "bytes": 1877246,
+        "sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e"
+      },
+      "reference_mwro": {
+        "bytes": 1555401454,
+        "sha256": "18531db0d92fead60044deacef9eedc22d7cb5c19773faa63a6c9df7528546f5"
+      },
+      "runtime_data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "wasm": {
+        "bytes": 15643376,
+        "sha256": "7a25fb7c2c84caf56cc09a9a35ea98443f9124267e563717c0539b892ff39342"
+      }
+    },
+    "comparison_scope": {
+      "frames_compared": 42127,
+      "frames_requested": 42127,
+      "match_frames_compared": 38547,
+      "nonmatch_frames_compared": 3580,
+      "match_setups_compared": 3,
+      "match_rows": "38547 exact RNG, match-frame, PAD, and fighter fields",
+      "nonmatch_rows": "3580 order rows retained; scalar/PAD state uncovered",
+      "checks": {
+        "final_css": "report_pass",
+        "initial_css_rng": "pass",
+        "input_order": "pass",
+        "match_state": "pass",
+        "nonmatch_pad": "uncovered",
+        "recipe_binding": "pass",
+        "scene_order": "pass",
+        "source_stream": "pass"
+      },
+      "complete": true,
+      "browser_resume_timing_pauses": false,
+      "browser_timing_pause_resumes": [],
+      "final_css": "report-bound pass"
+    },
+    "limits": [
+      "Source-consumed state comparison is complete only for the declared RNG, match-frame, PAD, and fighter fields and three setups.",
+      "Nonmatch scalar/PAD state is uncovered; final CSS is bound to the browser completion report.",
+      "No timing, draw cadence, pixels, PCM, performance, admission, or public lifecycle capability claim."
+    ]
+  },
+  "full_suite": {
+    "result": "pass",
+    "receipt": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/full-suite/full-suite-r2-receipt.json",
+    "receipt_sha256": "ae907fc2ffec59c4a466f4f51b15743e4d38666a8880c04decc5bc783abe2624",
+    "source_identity": {
+      "commit": "fe2492be44e77a19ee281053d33fc9bd39f8ac48",
+      "dirty": false,
+      "source_unchanged": true,
+      "tree": "d4fbbc6684cbf05385475338672025fe6ee8b1ec"
+    },
+    "wrapper_seconds": 320.6686158,
+    "unittest_seconds": 320.384,
+    "tests_run": 1725,
+    "skipped": 117,
+    "exit_code": 0,
+    "hard_cap_seconds": 360,
+    "log_sha256": "9e9cbf3177ea12e5207325d1db1270be5dea02e5f5e49c6e91b2170ecf80e207",
+    "scratch_cleanup": "removed_owned_successful_scratch"
+  },
+  "reviews": {
+    "audio_counter_review": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/audio-counter-review/audio-counter-review.json",
+      "sha256": "4e413d692f9302886c3331b08cfc0bdcde2fc7ba3e66fb645ddb95b283442bbf",
+      "result": "bounded-read-only-analysis",
+      "scope": "Four retained natural integrated validation reports.",
+      "observed": {
+        "contexts": "running with states [running, running] in every retained snapshot",
+        "overflows": "0 in every retained queue report",
+        "worklet_connections": "connected and destination_connected in every retained snapshot",
+        "worklet_errors": "empty in every retained snapshot",
+        "second_results_underruns": {
+          "A-final-destination-cold": 192,
+          "A-final-destination-warm": 86,
+          "B-battlefield-cold": 86,
+          "B-battlefield-warm": 86
+        }
+      },
+      "limits": "Retained snapshots bound the first underrun increase to intervals; they do not establish uninterrupted audio, silence, PCM continuity, or the increase cause."
+    },
+    "final_diff_review": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/review/fe2492b-final-diff-review.json",
+      "sha256": "5c18856d3da2b6a9a1735b4151e54e70e0b42ab95089f753355ae9b1893aa950",
+      "result": "no-actionable-findings; current-head-retained-passes-scoped",
+      "actionable_findings": 0,
+      "limits": "Direct driver pipeline-future correlation, quiet-machine, foreground, physical-input, audible, PCM, pixel, and genuine browser lifecycle gates remain open."
+    },
+    "final_documentation_review": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/review/runtime-lifecycle-doc-review.json",
+      "sha256": "be787fc54f646947f4d4136907b963c97f7d076ba4c5a516453e9fafd5c16a84",
+      "result": "no actionable findings",
+      "scope": "Final prose and receipt candidate before adding this review reference; no executable changes"
+    }
+  },
+  "visual_review": {
+    "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/visual-review.json",
+    "sha256": "73b855fad6853f6e78d116cb499b3ee4493b4184f11a12bbb70f5f8a8d8a263c"
+  },
+  "owned_natural_cleanup": {
+    "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/cleanup-natural-owned.json",
+    "sha256": "9c1a86d03558add098dc0e2f9a6cf1b70dd1a21cf8a8f04099d1a1fc9ce45b47"
+  },
+  "limits": [
+    "One natural local GPU preparation-wait cause is demonstrated; remaining users varied unexplained pauses are unclassified.",
+    "Synthetic hidden/foreground-stall tests validate detection and recovery policy. Genuine Chrome background/freeze event-pair coverage is unavailable.",
+    "Direct correlation of an individual created pipeline with a driver compilation future is unavailable; the profiled local packet aligns actual native staging wait and Dawn/Metal work.",
+    "Quiet-machine, foreground timing/focus/fullscreen, physical controllers and arranged audible-output protocols remain unrun.",
+    "No uninterrupted-audio or PCM/pixel equivalence claim. Cumulative underruns increased between retained Results snapshots; interval coverage cannot locate their first increase.",
+    "Original-state agreement is conditional on the recorded queue and declared fields. Nonmatch scalar/PAD state, menu/audio/process state, live timing, pixels and PCM remain uncovered.",
+    "Eight natural matches are four two-match browser attempts, not whole-session admission or the separate three-consecutive ordinary physical-input acceptance gate.",
+    "No GitHub PR merge, hosted deployment, paid provisioning, DNS change or real-user diagnostic upload."
+  ]
+}
