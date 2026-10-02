@@ -43,6 +43,7 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `docs/ALLOCATION_TRACE_COMPARISON.md`
 - `docs/DEVELOPMENT.md`
 - `docs/evidence/slippi-browser-desktop-transport-v1.json`
+- `docs/evidence/source-slippi-profile-prefix-v1.json`
 - `docs/BROWSER_FAILURE_TRIAGE.md`
 - `docs/PUBLIC_REPOSITORY_CHECKLIST.md`
 - `docs/PUBLICATION_REVIEW_BRIEF.md`
@@ -54,6 +55,11 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `tools/allocation_trace_compare.py`
 - `tools/browser_failure_summary.py`
 - `tools/slippi_format.py`
+- `tools/slippi_profile_prefix_check.py`
+- `tools/slippi_profile_prefix_runtime.mjs`
+- `tests/gameplay_snapshot_probe.cpp`
+- `tests/test_slippi_profile_prefix.py`
+- `cmake/FighterRuntime.cmake`
 - `reference-capture/slippi/LICENSES.md`
 - `reference-capture/slippi/LOCAL_TESTBED.md`
 - `reference-capture/slippi/client.lock.json`
@@ -111,6 +117,8 @@ The Slippi timeline parser listed above is a separately authored reader of the
 public Slippi format specification. Its conformance checks compare behavior
 with pinned `slippi-js`; the parser does not import or copy that LGPL
 implementation. The tool-specific inventory identifies that distinction.
+
+The source-profile checker and its fixture integration are separately authored diagnostic code. `reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp` is GPL-3.0-only material adapted from the pinned Slippi ASM profile and is excluded from this MIT allowlist; its upstream license and source authority remain controlling. The compiled runtime, replay, assets and local captures are generated or third-party inputs and receive no new license here.
 
 The diagnostic Wasm snapshot helper, source-snapshot host driver and rejection
 tests are separately authored project code. They copy opaque runtime bytes and

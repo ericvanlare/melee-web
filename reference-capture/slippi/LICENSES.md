@@ -14,6 +14,10 @@ pinned by [`client.lock.json`](client.lock.json). ENet and nlohmann JSON retain 
 notices from the pinned Dolphin source tree; this repository does not copy
 either dependency into the service directory.
 
+## Source-profile fixture
+
+`tests/gameplay_snapshot_probe.cpp` and its `cmake/FighterRuntime.cmake` integration are project-authored diagnostic code covered by the root MIT license, as enumerated in the root [license scope](../../LICENSE_SCOPE.md). `reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp` is GPL-3.0-only material adapted from the pinned `slippi-ssbm-asm` commit `fcf47f10dc244152c2ebaa3a9dec142ea42243b7`, specifically `Online/Core/InitOnlinePlay.asm` with source-file SHA-256 `d0a5df91c9b535b3c711880a4156769c2b3e799e7e72bc9d071be9fd90394067`. Preserve that upstream license and source authority; the helper, generated runtime and local assets are outside the root MIT grant and this repository grants no Melee, SDK, disc or game-data rights.
+
 ## Downstream client patches
 
 `patches/0001-client-loopback-and-observation.patch` modifies Dolphin files from

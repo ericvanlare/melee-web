@@ -20,6 +20,28 @@ headless Chrome screenshot, WebSocket/relay events, both local PAD streams, and
 the second client's byte-exact remote-PAD observations. The evidence report
 contains hashes for the retained files without recording an operator path.
 
+## Source Slippi profile prefix diagnostic
+
+The [bounded source-profile prefix receipt](../../docs/evidence/source-slippi-profile-prefix-v1.json) records a source-only check whose finalized raw PAD records are the sole step inputs. It pins the source probe, explicit RNG profile helper, runtime ABI and clean lifecycle boundary. The receipt does not claim a complete replay, pending-state snapshot, browser gameplay, draw/PCM agreement or rollback acceptance. Run the portable checker in `tools/slippi_profile_prefix_check.py` with a local `.slp`, runtime pair, assets and explicit source/profile identities; it fails at the first divergence and retains its failure directory.
+
+Its `queued_transfer_and_default_pair` section records a later root-audited source-only Node pair: a snapshot admitted at quiescent scene 106, raw scene 107 observed pending, scene 108 clear, three restores through scenes 107--110, and a separate old-baseline/candidate scripted/raw byte comparison. The `recorded_match_1342` section separately records the source/native comparison through scene 1341, ending at the fourth P1 stock loss; it does not include Results, rematch, browser, rollback or foreground timing. The portable checker defaults to scenes 0--110 and accepts the explicitly observed full endpoint with `--scene-last 1341`; that full command remains a source/native reproduction gate and does not imply browser/player rollback.
+
+Build `gameplay_snapshot_probe` with `python3 scripts/build.py --trace-target gameplay_snapshot_probe --configuration Release`. With locally owned assets and the pinned desktop replay, run the command below from the repository root. Replace the local input paths and runtime pair, and use their audited SHA-256 identities; `--out` must be absent. The measured identities and fresh full-suite/build/checker results are in the receipt's `required_validation` section. A different replay or build needs its own receipt.
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 tools/slippi_profile_prefix_check.py \
+  --replay /path/to/local.slp --runtime /path/to/gameplay_snapshot_probe.js \
+  --assets /path/to/local-assets \
+  --source-probe tests/gameplay_snapshot_probe.cpp --source-cmake cmake/FighterRuntime.cmake \
+  --profile-helper reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp \
+  --probe-sha256 AUDITED_PROBE_SHA256 --cmake-sha256 AUDITED_CMAKE_SHA256 \
+  --profile-helper-sha256 AUDITED_HELPER_SHA256 \
+  --runtime-sha256 AUDITED_JS_SHA256 --wasm-sha256 AUDITED_WASM_SHA256 \
+  --profile-offset 0x1234 --seed 0x13579bdf --scene-last 1341 \
+  --node /path/to/pinned-node --timeout 30 --cleanup-timeout 6 \
+  --out /path/to/fresh-check-directory
+```
+
 ## Pinned inputs and licensing
 
 [`client.lock.json`](client.lock.json) is the source of truth for the client
