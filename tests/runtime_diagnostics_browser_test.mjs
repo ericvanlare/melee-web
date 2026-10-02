@@ -413,7 +413,8 @@ async function waitForCss(page, timeout = 90000) {
   await page.waitForFunction(() => {
     const fixture = globalThis.__runtimeDiagnosticsFixture;
     const state = fixture?.player?.getState?.();
-    return fixture?.ready === true && fixture?.load?.state === 'started' &&
+    return fixture?.load?.state === 'error' || state?.requiresReload || fixture?.errors?.length ||
+      fixture?.ready === true && fixture?.load?.state === 'started' &&
       state?.scene === 'css' && state?.phase === 1 && state?.running === true;
   }, null, {timeout});
   const current = await fixtureState(page);
@@ -430,6 +431,10 @@ async function assertStillCss(page, label) {
 }
 
 async function selectDiscAndStart(page, disc, timeout = 90000) {
+  await page.waitForFunction(() => {
+    const fixture = globalThis.__runtimeDiagnosticsFixture;
+    return fixture?.player?.getState?.().canImport || fixture?.load?.state === 'error';
+  }, null, {timeout});
   const chooser = page.waitForEvent('filechooser', {timeout});
   await page.locator('#choose-disc').click({timeout});
   const fileChooser = await chooser;
