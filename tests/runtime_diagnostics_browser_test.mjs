@@ -707,7 +707,12 @@ try {
       await page.waitForFunction(() => globalThis.__runtimeDiagnosticsFixture?.ready === true ||
         globalThis.__runtimeDiagnosticsFixture?.load?.state === 'error', null, {timeout: 120000});
       await selectDiscAndStart(page, disc, 120000);
+      await page.waitForFunction(() => globalThis.__runtimeDiagnosticsFixture.samples.length >= 10 ||
+        globalThis.__runtimeDiagnosticsFixture.errors.length, null, {timeout: 10000});
       await assertStillCss(page, 'Reduced startup boundary');
+      const prefix = await fixtureState(page);
+      requireValue(prefix.samples.length >= 10 && prefix.report?.native?.callback_count >= 10 &&
+        prefix.report.capabilities.native.observed, 'Native scalar feed did not cross the compiled browser bridge');
       await retainPage(page, 'startup-boundary');
       report.checks.push('reduced fixture startup reaches original CSS');
       report.scope = 'Reduced packaged fixture startup/readiness/save ownership boundary only; no overhead or induced-stall claim.';

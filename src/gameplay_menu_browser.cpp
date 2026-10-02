@@ -286,6 +286,18 @@ void diagnostic_clock_stall(const melee_web::FixedTickClock::Tick& event,int own
                   event.reason==Reason::ClockRegression?8:3;
  diagnostic_incident(reason,event.triggering_value,event.threshold,owner);
 }
+template<class... Values>
+void diagnostic_sample(Values... values){
+ static_assert(sizeof...(values)==19);
+ // Pinned Emscripten's EM_ASM signature supports at most 16 arguments. This
+ // fixed stack row crosses once; JavaScript reads only its 19 named scalars.
+ const double data[]={static_cast<double>(values)...};
+ EM_ASM({try{const p=$0>>3;window.menuDiagnosticSample?.(
+  HEAPF64[p],HEAPF64[p+1],HEAPF64[p+2],HEAPF64[p+3],HEAPF64[p+4],
+  HEAPF64[p+5],HEAPF64[p+6],HEAPF64[p+7],HEAPF64[p+8],HEAPF64[p+9],
+  HEAPF64[p+10],HEAPF64[p+11],HEAPF64[p+12],HEAPF64[p+13],HEAPF64[p+14],
+  HEAPF64[p+15],HEAPF64[p+16],HEAPF64[p+17],HEAPF64[p+18]);}catch(_){}},data);
+}
 std::string message="Choose your local Melee disc image.";
 std::string match_message="Original source match";
 bool running=false,pending=false,host_entered=false,world_exposed=false,faulted=false;
@@ -1867,7 +1879,7 @@ void tick(){
  };
  // A compact, read-only feed reuses existing timing/resource counters. Public
  // builds omit the development JSON profiler and its unrestricted source text.
- EM_ASM({try{window.menuDiagnosticSample?.($0,$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18);}catch(_){}},
+ diagnostic_sample(
         started,diagnostic_source_frame(),melee_web_native_menu_phase(),
         diagnostic_start?diagnostic_start->rules.stkind:-1,
         diagnostic_character(0),diagnostic_character(1),
