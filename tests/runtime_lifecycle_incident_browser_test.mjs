@@ -609,12 +609,31 @@ async function runFixturePreflight() {
     'fixture_preflight_hook_flags');
   requireValue(snapshot.input_activity.length === 1 && snapshot.unload_calls === 1,
     'fixture_preflight_wrappers');
+  const requestedPlans = [
+    {name: 'synthetic_hidden_hold', flags: {syntheticHiddenHold: true},
+      modes: ['synthetic-hidden-hold', 'manual-pause-hidden'], manual: 'synthetic-hidden-hold'},
+    {name: 'synthetic_recovery', flags: {expectLifecycleRecovery: true},
+      modes: ['synthetic-hidden-hold-recovery', 'manual-pause-hidden'], manual: 'synthetic-hidden-hold'},
+    {name: 'synthetic_foreground', flags: {foregroundCallbackHold: true},
+      modes: ['foreground-callback-hold', 'manual-pause-foreground'], manual: 'synthetic-visible-hold'},
+    {name: 'genuine', flags: {}, modes: ['frozen', 'manual-pause'], manual: 'genuine-cdp'},
+    {name: 'capability_only', flags: {capabilityOnly: true}, modes: [], manual: null},
+  ];
+  const modePlanProtocols = requestedPlans.map(expected => {
+    const plan = lifecycleModePlan(expected.flags);
+    requireValue(JSON.stringify(plan.modes) === JSON.stringify(expected.modes),
+      'fixture_preflight_mode_plan_' + expected.name);
+    const manualMode = plan.modes.find(mode => mode.startsWith('manual-pause'));
+    requireValue((manualMode ? lifecycleCaseProtocol(manualMode) : null) === expected.manual,
+      'fixture_preflight_manual_protocol_' + expected.name);
+    return {name: expected.name, modes: plan.modes, manual_protocol: expected.manual};
+  });
   return {result: 'pass', native_hooks: snapshot.native_hooks,
     input_activity: snapshot.input_activity.length, unload_calls: snapshot.unload_calls,
     configure_calls: calls.configure, import_calls: calls.import, start_calls: calls.start,
     file_name: calls.file_name, load_state: fixture.load.state,
     post_hold_predicate: true, predicate_execution: true,
-    start_readiness: snapshot.start_readiness};
+    start_readiness: snapshot.start_readiness, mode_plan_protocols: modePlanProtocols};
 }
 
 function capabilityMarkup() {
@@ -634,6 +653,30 @@ globalThis.__runtimeLifecycleCapability = {
 }
 function capabilityOnlyFixtureMarkup() {
   return '<!doctype html><meta charset="utf-8"><title>Lifecycle capability blank page</title>';
+}
+function lifecycleCaseProtocol(mode) {
+  if (mode === 'manual-pause' || mode === 'frozen') return 'genuine-cdp';
+  if (mode === 'manual-pause-hidden') return 'synthetic-hidden-hold';
+  if (mode === 'manual-pause-foreground') return 'synthetic-visible-hold';
+  return mode;
+}
+function lifecycleModePlan(flags = {}) {
+  const capabilityOnly = flags.capabilityOnly === true;
+  const startupOnly = flags.startupOnly === true;
+  const syntheticFlags = [flags.synthetic === true, flags.syntheticHiddenHold === true,
+    flags.expectLifecycleRecovery === true, flags.foregroundCallbackHold === true].filter(Boolean);
+  requireValue(!(capabilityOnly && (startupOnly || syntheticFlags.length > 0)), 'capability_mode_conflict');
+  requireValue(!(startupOnly && syntheticFlags.length > 0), 'lifecycle_mode_conflict');
+  requireValue(syntheticFlags.length <= 1, 'synthetic_mode_conflict');
+  if (capabilityOnly) return {capabilityOnly: true, syntheticMode: false, modes: [], protocols: []};
+  if (startupOnly) return {capabilityOnly: false, syntheticMode: true,
+    modes: ['startup-only'], protocols: ['startup-only']};
+  const modes = flags.expectLifecycleRecovery ? ['synthetic-hidden-hold-recovery', 'manual-pause-hidden'] :
+    flags.syntheticHiddenHold ? ['synthetic-hidden-hold', 'manual-pause-hidden'] :
+    flags.foregroundCallbackHold ? ['foreground-callback-hold', 'manual-pause-foreground'] :
+    flags.synthetic ? ['synthetic'] : ['frozen', 'manual-pause'];
+  return {capabilityOnly: false, syntheticMode: syntheticFlags.length > 0,
+    modes, protocols: modes.map(lifecycleCaseProtocol)};
 }
 
 const MIME_TYPES = {
@@ -795,17 +838,20 @@ async function runCapabilityProbe(browser, capabilityUrl, out) {
   return result;
 }
 async function runLifecycleCase(browser, fixtureUrl, disc, out, mode,
-  caseProtocol = mode === 'manual-pause' ? 'genuine-cdp' : 'synthetic') {
+  caseProtocol = lifecycleCaseProtocol(mode)) {
   const page = await browser.newPage({viewport: {width: 1280, height: 960}});
   const startupOnly = mode === 'startup-only';
   const synthetic = mode === 'synthetic';
   const syntheticHold = mode === 'synthetic-hidden-hold';
   const recoveryExpected = mode === 'synthetic-hidden-hold-recovery';
   const foregroundHold = mode === 'foreground-callback-hold';
+  const manualPauseHidden = mode === 'manual-pause-hidden' && caseProtocol === 'synthetic-hidden-hold';
   const manualPauseForeground = mode === 'manual-pause-foreground' && caseProtocol === 'synthetic-visible-hold';
   const hiddenHold = syntheticHold || recoveryExpected;
-  const manualPause = (mode === 'manual-pause' && caseProtocol === 'genuine-cdp') || manualPauseForeground;
-  const syntheticMode = startupOnly || synthetic || hiddenHold || foregroundHold || manualPauseForeground;
+  const manualPause = (mode === 'manual-pause' && caseProtocol === 'genuine-cdp') ||
+    manualPauseHidden || manualPauseForeground;
+  const manualPauseSynthetic = manualPauseHidden || manualPauseForeground;
+  const syntheticMode = startupOnly || synthetic || hiddenHold || foregroundHold || manualPauseSynthetic;
   const result = {mode, protocol: caseProtocol, dwell_ms: HIDDEN_DWELL_MS, result: 'fail', cdp: [], failure_kind: null,
     startup_timeout_ms: startupOnly ? STARTUP_ONLY_TIMEOUT_MS : STARTUP_TIMEOUT_MS,
     scope: startupOnly ? 'Bounded startup/readiness probe through CSS with native hook installation; no lifecycle or gameplay claim.' :
@@ -813,7 +859,8 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode,
       syntheticHold ? 'Controlled Emscripten requestAnimationFrame hold with synthetic document visibility getters; no genuine lifecycle or user-root-cause claim.' :
       foregroundHold ? 'Controlled Emscripten requestAnimationFrame hold while document visibility remains visible; no browser lifecycle or user-root-cause claim.' :
       synthetic ? 'Synthetic JS/native input handoff and missed-callback checkpoint only; no browser lifecycle or user-root-cause claim.' :
-      manualPause ? (manualPauseForeground ? 'Explicit manual-pause control with a visible-page callback hold; no browser lifecycle or user-root-cause claim.' :
+      manualPause ? (manualPauseHidden ? 'Explicit manual-pause control with the same synthetic hidden callback hold; no browser lifecycle or user-root-cause claim.' :
+        manualPauseForeground ? 'Explicit manual-pause control with a visible-page callback hold; no browser lifecycle or user-root-cause claim.' :
         'Explicit manual-pause control through the genuine frozen/active lifecycle protocol; no browser lifecycle or user-root-cause claim.') :
       'Real lifecycle mode is entered only after the installed-Chrome capability probe observes genuine lifecycle transitions.',
     experiment: {
@@ -822,7 +869,8 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode,
         syntheticHold ? 'Holding the identified native main-loop callback for 350 ms yields no native sample during the hold; the first visible callback observes visible input and records bounded simulation debt.' :
         foregroundHold ? 'Holding the native main-loop callback for 350 ms while visibility stays visible preserves the original debt guard and pauses on reason 1.' :
         synthetic ? 'A controlled hidden checkpoint can hand off input ownership and return on an explicit visible checkpoint.' :
-        manualPause ? (manualPauseForeground ?
+        manualPause ? (manualPauseHidden ?
+          'An explicit manual pause remains stopped across the same 350 ms synthetic hidden callback hold and resumes only after an explicit resume.' : manualPauseForeground ?
           'An explicit manual pause remains stopped across the same 350 ms visible-page callback hold and resumes only after an explicit resume.' :
           'An explicit manual pause remains stopped across a genuine frozen/active lifecycle control and resumes only after an explicit resume.') :
         'Installed Chrome can expose a genuine lifecycle transition through the supported protocol path.',
@@ -843,7 +891,9 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode,
           'no automatic resume or implicit save/unload'] :
         synthetic ? ['hidden and visible input activity are both observed', 'native remains running',
           'no unexpected incident, implicit save, or implicit unload', 'one active 32 kHz audio context remains owned'] :
-        manualPause ? (manualPauseForeground ? ['manual pause remains stopped during the 350 ms visible-page callback hold',
+        manualPause ? (manualPauseHidden ? ['manual pause remains stopped during the 350 ms synthetic hidden callback hold',
+          'zero native samples and source steps during the hold', 'no automatic resume or unexpected incident',
+          'one active 32 kHz audio context remains owned'] : manualPauseForeground ? ['manual pause remains stopped during the 350 ms visible-page callback hold',
           'zero native samples and source steps during the hold', 'no automatic resume or unexpected incident',
           'one active 32 kHz audio context remains owned'] :
           ['manual pause remains stopped across the genuine frozen/active lifecycle control',
@@ -915,11 +965,12 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode,
       });
       await waitFor(page, () => globalThis.__runtimeLifecycleFixture.player.getState()?.running === false,
         SCENE_TIMEOUT_MS, 'manual_pause_not_stopped');
-      if (manualPauseForeground) {
-        const hold = await page.evaluate(() =>
-          globalThis.__runtimeLifecycleFixture.syntheticHiddenHold({emitVisibility: false}));
+      if (manualPauseHidden || manualPauseForeground) {
+        const hold = await page.evaluate(emitVisibility =>
+          globalThis.__runtimeLifecycleFixture.syntheticHiddenHold({emitVisibility}), manualPauseHidden);
         result.manual_hidden_hold = hold;
-        requireValue(hold?.available === true, hold?.unrun_reason || 'manual_visible_hold_unavailable');
+        requireValue(hold?.available === true && hold.visibility_emitted === manualPauseHidden,
+          hold?.unrun_reason || 'manual_hold_protocol_unavailable');
         await waitFor(page, () => globalThis.__runtimeLifecycleFixture.hasPostHoldNativeSample(),
           SCENE_TIMEOUT_MS, 'manual_visible_native_sample_missing');
       } else {
@@ -970,8 +1021,9 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode,
       requireValue(afterLifecycle.native.running === false, 'manual_pause_auto_resumed');
       requireValue(!unexpected.length, 'manual_pause_unexpected_incident');
       requireValue(afterLifecycle.manual_intent.includes('manual_pause'), 'manual_pause_intent_missing');
-      if (manualPauseForeground) requireValue(result.manual_hidden_hold?.hidden_sample_delta === 0 &&
-        result.manual_hidden_hold?.hidden_source_step_delta === 0, 'manual_visible_native_progress');
+      if (manualPauseSynthetic) requireValue(result.manual_hidden_hold?.hidden_sample_delta === 0 &&
+        result.manual_hidden_hold?.hidden_source_step_delta === 0,
+        manualPauseHidden ? 'manual_hidden_native_progress' : 'manual_visible_native_progress');
       requireValue(!afterLifecycle.manual_intent.includes('manual_resume'), 'manual_pause_implicit_resume');
       await page.evaluate(() => {
         globalThis.__runtimeLifecycleFixture.manual_intent.push('manual_resume');
@@ -1060,7 +1112,8 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode,
     result.input_visibility = {observed_hidden: stable.input_activity.some(item => item.visible === 0),
       observed_visible: stable.input_activity.some(item => item.visible === 1), total: stable.input_activity.length};
     if (!startupOnly) requireValue(result.input_visibility.observed_visible, 'input_visible_not_restored');
-    if (synthetic || recoveryExpected) requireValue(result.input_visibility.observed_hidden, 'synthetic_hidden_not_observed');
+    if (synthetic || recoveryExpected || manualPauseHidden)
+      requireValue(result.input_visibility.observed_hidden, 'synthetic_hidden_not_observed');
     await page.evaluate(async () => { await globalThis.__runtimeLifecycleFixture.player.unload(); });
     const afterUnload = await fixtureState(page);
     requireValue(afterUnload.unload_calls === before.unload_calls + 1, 'explicit_unload_not_observed');
@@ -1105,12 +1158,10 @@ for (const name of ['site', 'out']) requireValue(values[name], name + '_required
 if (!values['capability-only']) {
   for (const name of ['manifest', 'disc']) requireValue(values[name], name + '_required');
 }
-const requestedSynthetic = values.synthetic === true || values['synthetic-hidden-hold'] === true ||
-  values['expect-lifecycle-recovery'] === true || values['foreground-callback-hold'] === true;
-requireValue(!(requestedSynthetic && values['startup-only']), 'lifecycle_mode_conflict');
-requireValue([values.synthetic, values['synthetic-hidden-hold'], values['expect-lifecycle-recovery'],
-  values['foreground-callback-hold']].filter(Boolean).length <= 1, 'synthetic_mode_conflict');
-const syntheticMode = requestedSynthetic || values['startup-only'] === true;
+const modePlan = lifecycleModePlan({capabilityOnly: values['capability-only'], startupOnly: values['startup-only'],
+  synthetic: values.synthetic, syntheticHiddenHold: values['synthetic-hidden-hold'],
+  expectLifecycleRecovery: values['expect-lifecycle-recovery'], foregroundCallbackHold: values['foreground-callback-hold']});
+const syntheticMode = modePlan.syntheticMode;
 const report = {schema: 'melee-web-runtime-lifecycle-browser-v1',
   scope: values['capability-only'] ?
     'Bounded installed-Chrome lifecycle capability probe on a blank page. It does not import the game or claim a lifecycle cause.' :
@@ -1168,15 +1219,8 @@ try {
     }
   }
   if (!skipGame) {
-    const modes = values['startup-only'] ? ['startup-only'] :
-      values['expect-lifecycle-recovery'] ? ['synthetic-hidden-hold-recovery', 'manual-pause'] :
-      values['synthetic-hidden-hold'] ? ['synthetic-hidden-hold', 'manual-pause'] :
-      values['foreground-callback-hold'] ? ['foreground-callback-hold', 'manual-pause-foreground'] :
-      values.synthetic ? ['synthetic'] : ['frozen', 'manual-pause'];
-    for (const mode of modes) {
-      const caseProtocol = mode === 'manual-pause' ? 'genuine-cdp' :
-        mode === 'manual-pause-foreground' ? 'synthetic-visible-hold' :
-        mode === 'frozen' ? 'genuine-cdp' : mode;
+    for (const [index, mode] of modePlan.modes.entries()) {
+      const caseProtocol = modePlan.protocols[index];
       const item = await runLifecycleCase(browser, fixtureUrl, path.resolve(values.disc), out, mode, caseProtocol);
       report[mode.replaceAll('-', '_')] = item;
       if (item.result === 'unrun') {

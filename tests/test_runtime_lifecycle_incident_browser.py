@@ -51,6 +51,12 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertTrue(payload["post_hold_predicate"])
         self.assertTrue(payload["predicate_execution"])
         self.assertEqual(payload["start_readiness"]["result"], "ready")
+        plans = {item["name"]: item for item in payload["mode_plan_protocols"]}
+        self.assertEqual(plans["synthetic_hidden_hold"]["manual_protocol"], "synthetic-hidden-hold")
+        self.assertEqual(plans["synthetic_recovery"]["manual_protocol"], "synthetic-hidden-hold")
+        self.assertEqual(plans["synthetic_foreground"]["manual_protocol"], "synthetic-visible-hold")
+        self.assertEqual(plans["genuine"]["manual_protocol"], "genuine-cdp")
+        self.assertEqual(plans["capability_only"]["modes"], [])
 
     def test_lifecycle_modes_are_explicitly_gated(self):
         source = (ROOT / "tests" / "runtime_lifecycle_incident_browser_test.mjs").read_text()
@@ -87,8 +93,10 @@ class RuntimeLifecycleIncidentBrowserTests(unittest.TestCase):
         self.assertIn("synthetic_recovery_input_handoff", source)
         self.assertIn("capability-only", source)
         self.assertIn("capabilityOnlyFixtureMarkup", source)
-        self.assertIn("caseProtocol = mode === 'manual-pause' ? 'genuine-cdp'", source)
-        self.assertIn("mode === 'manual-pause' ? 'genuine-cdp'", source)
+        self.assertIn("lifecycleModePlan", source)
+        self.assertIn("manual-pause-hidden", source)
+        self.assertIn("capability_mode_conflict", source)
+        self.assertIn("mode === 'manual-pause' || mode === 'frozen'", source)
         self.assertIn("manual_lifecycle_resume_event_missing", source)
         self.assertIn("stable.unload_calls === before.unload_calls", source)
         self.assertIn("afterUnload.unload_calls === before.unload_calls + 1", source)
