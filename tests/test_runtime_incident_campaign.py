@@ -42,7 +42,7 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
     def test_match_entry_requires_native_readiness_and_four_player_observations(self):
         self.assertIn("async function waitForMatchReady(label,timeoutMs=60000)", self.harness)
         self.assertIn("state?.match?.ready===true", self.harness)
-        self.assertIn("const matchPlayerSlots=Object.freeze(['p0','p1','p2','p3']);", self.harness)
+        self.assertIn("const MATCH_PLAYER_SLOTS=Object.freeze(['p0','p1','p2','p3']);", self.harness)
         self.assertIn("if(readiness.ready&&readiness.missing_players.length===0)return state;", self.harness)
         self.assertIn("melee-web-match-readiness-failure-v1", self.harness)
         self.assertIn("match-readiness-${suffix}.json", self.harness)
@@ -54,10 +54,34 @@ class RuntimeIncidentCampaignTest(unittest.TestCase):
         )
 
     def test_readiness_receipt_distinguishes_runtime_and_observer_failures(self):
-        self.assertIn("if(state.phase===7)await failOnMatchReadiness(label,state,'runtime-error');", self.harness)
-        self.assertIn("state.assetFatal?'asset-fatal':'native-command-error'", self.harness)
-        self.assertIn("if(readiness.observer_error)await failOnMatchReadiness(label,state,'match-observer-error');", self.harness)
-        self.assertIn("if(state.phase===7)await failOnMatchReadiness(label,state,'timeout');", self.harness)
+        result = subprocess.run(
+            ["node", str(HARNESS), "--readiness-preflight"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        preflight = json.loads(result.stdout)
+        self.assertEqual(preflight["result"], "pass")
+        self.assertEqual(
+            [(row["name"], row["reason"]) for row in preflight["observed"]],
+            [
+                ("preparation", None),
+                ("runtime-error-outside-match", "runtime-error"),
+                ("phase-seven-left-before-ready", "phase-left-before-ready"),
+                ("observer-error", "match-observer-error"),
+            ],
+        )
+        self.assertEqual(preflight["timeout_phase"], 3)
+        self.assertEqual(preflight["timeout_reason"], "timeout")
+        self.assertIn("function matchReadinessFailureReason(state,sawPhase7)", self.harness)
+        self.assertIn("if(sawPhase7&&state?.phase!==7)return 'phase-left-before-ready';", self.harness)
+        self.assertIn("const failureReason=matchReadinessFailureReason(state,sawPhase7)??'timeout';", self.harness)
+        self.assertIn("await failOnMatchReadiness(label,state,failureReason);", self.harness)
+        self.assertIn("if(state?.assetFatal)return 'asset-fatal';", self.harness)
+        self.assertIn("if(state?.nativeCommandError)return 'native-command-error';", self.harness)
+        self.assertIn("if(readiness.observer_error)return 'match-observer-error';", self.harness)
+        self.assertIn("'phase-left-before-ready'", self.harness)
 
     def test_callback_capture_is_bounded_and_scalar(self):
         self.assertIn("max_samples:100,max_incidents:24", self.harness)

@@ -36,6 +36,7 @@ import {assertResultsCpuPagesAfterInitialP1Keyboard,
   summarizeResultsPadTrace}
   from './results_source_pad_trace.mjs';
 
+const MATCH_PLAYER_SLOTS=Object.freeze(['p0','p1','p2','p3']);
 const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input','cpu-levels'].map(name=>[name,{type:'string'}])),
   'results-confirm-frame':{type:'string'},
@@ -43,9 +44,14 @@ const {values}=parseArgs({options:{...Object.fromEntries(
   matches:{type:'string'},'setup-only':{type:'boolean'},
   'stage-kind':{type:'string'},'wall-bound-seconds':{type:'string'},
   'stop-on-timing-pause':{type:'boolean'},
-  'controlled-contention':{type:'boolean'},'user-data-dir':{type:'string'}}});
+  'controlled-contention':{type:'boolean'},'user-data-dir':{type:'string'},
+  'readiness-preflight':{type:'boolean'}}});
+if(values['readiness-preflight']){
+  console.log(JSON.stringify(runReadinessPreflight()));
+  process.exit(0);
+}
 if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--stage-kind final-destination|battlefield] [--wall-bound-seconds SECONDS] [--stop-on-timing-pause] [--controlled-contention] [--user-data-dir EXTERNAL_PROFILE] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--stage-kind final-destination|battlefield] [--wall-bound-seconds SECONDS] [--stop-on-timing-pause] [--controlled-contention] [--user-data-dir EXTERNAL_PROFILE] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK] [--readiness-preflight]');
 const stages=Object.freeze({
   'final-destination':Object.freeze({id:'final-destination',name:'Final Destination',sourceId:0x20,slug:'fd'}),
   battlefield:Object.freeze({id:'battlefield',name:'Battlefield',sourceId:0x01,slug:'battlefield'}),
@@ -552,17 +558,42 @@ async function rethrowWithTimingPause(label,error){
   }
   throw error;
 }
-const matchPlayerSlots=Object.freeze(['p0','p1','p2','p3']);
+const matchPlayerSlots=MATCH_PLAYER_SLOTS;
 function validMatchPlayer(value){
   return value&&Number.isInteger(value.fighterKind)&&Number.isInteger(value.motion)&&
     Number.isInteger(value.groundAir)&&Number.isInteger(value.frame)&&Number.isFinite(value.x)&&
     Number.isFinite(value.y);
 }
 function matchReadiness(state){
-  const missingPlayers=matchPlayerSlots.filter(slot=>!validMatchPlayer(state?.[slot]));
+  const missingPlayers=MATCH_PLAYER_SLOTS.filter(slot=>!validMatchPlayer(state?.[slot]));
   return {phase:Number.isInteger(state?.phase)?state.phase:null,ready:state?.match?.ready===true,
     observer_error:state?.match?.observer_error===true,missing_players:missingPlayers,
-    valid_players:matchPlayerSlots.filter(slot=>validMatchPlayer(state?.[slot]))};
+    valid_players:MATCH_PLAYER_SLOTS.filter(slot=>validMatchPlayer(state?.[slot]))};
+}
+function matchReadinessFailureReason(state,sawPhase7){
+  const readiness=matchReadiness(state);
+  if(state?.error)return 'runtime-error';
+  if(state?.assetFatal)return 'asset-fatal';
+  if(state?.nativeCommandError)return 'native-command-error';
+  if(readiness.observer_error)return 'match-observer-error';
+  if(sawPhase7&&state?.phase!==7)return 'phase-left-before-ready';
+  return null;
+}
+function runReadinessPreflight(){
+  const cases=[
+    {name:'preparation',state:{phase:3,status:'preparing'},sawPhase7:false,expected:null},
+    {name:'runtime-error-outside-match',state:{phase:3,error:true},sawPhase7:false,expected:'runtime-error'},
+    {name:'phase-seven-left-before-ready',state:{phase:3,status:'loading'},sawPhase7:true,expected:'phase-left-before-ready'},
+    {name:'observer-error',state:{phase:7,match:{observer_error:true}},sawPhase7:true,expected:'match-observer-error'},
+  ];
+  const observed=cases.map(item=>({name:item.name,phase:item.state.phase,
+    reason:matchReadinessFailureReason(item.state,item.sawPhase7)}));
+  for(const [index,item] of cases.entries())
+    assert.equal(observed[index].reason,item.expected,`readiness preflight ${item.name}`);
+  assert.equal(matchReadinessFailureReason(cases[0].state,cases[0].sawPhase7),null,
+    'preparation remains pending until its bounded timeout receipt');
+  return {result:'pass',observed,timeout_phase:cases[0].state.phase,
+    timeout_reason:matchReadinessFailureReason(cases[0].state,cases[0].sawPhase7)??'timeout'};
 }
 async function failOnMatchReadiness(label,state,reason){
   const readiness=matchReadiness(state);
@@ -657,26 +688,23 @@ async function waitFor(label,predicate,timeoutMs=30000){
 }
 async function waitForMatchReady(label,timeoutMs=60000){
   const deadline=Date.now()+timeoutMs;
+  let sawPhase7=false;
   while(Date.now()<deadline){
     const state=await diagnostic();
     await checkTimingPause(label,state);
     const readiness=matchReadiness(state);
-    if(state.error){
-      if(state.phase===7)await failOnMatchReadiness(label,state,'runtime-error');
-      throw Error(`${label}: ${state.error}`);
-    }
+    const failureReason=matchReadinessFailureReason(state,sawPhase7);
+    if(failureReason)await failOnMatchReadiness(label,state,failureReason);
     if(state.phase===7){
-      if(state.assetFatal||state.nativeCommandError)
-        await failOnMatchReadiness(label,state,state.assetFatal?'asset-fatal':'native-command-error');
-      if(readiness.observer_error)await failOnMatchReadiness(label,state,'match-observer-error');
+      sawPhase7=true;
       if(readiness.ready&&readiness.missing_players.length===0)return state;
     }
     await page.waitForTimeout(50);
   }
   const state=await diagnostic();
   await checkTimingPause(label,state);
-  if(state.phase===7)await failOnMatchReadiness(label,state,'timeout');
-  throw Error(`${label} timed out after ${timeoutMs} ms: ${JSON.stringify({phase:state.phase,status:state.status,match:state.match})}`);
+  const failureReason=matchReadinessFailureReason(state,sawPhase7)??'timeout';
+  await failOnMatchReadiness(label,state,failureReason);
 }
 async function pad(port,buttons=0,stickX=0,stickY=0,duration=1,label='input'){
   assert(port===0||port===1,'the live diagnostic PAD route supports only P1/P2');
