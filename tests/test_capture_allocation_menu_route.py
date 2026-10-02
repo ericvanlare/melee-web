@@ -56,6 +56,17 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
         rules = {"stock_count": 4, "item_frequency": 3, "item_mask": 0x07}
         changed = {**rules, "item_mask": 0x0F}
         committed = {**changed, "item_frequency": -1}
+        match_players = [
+            {"character_kind": 8, "slot_type": 0, "stocks": 3,
+             "color": 0, "team": 0, "rumble_enabled": 1,
+             "cpu_kind": 4, "cpu_level": 0},
+            {"character_kind": 8, "slot_type": 0, "stocks": 3,
+             "color": 0, "team": 0, "rumble_enabled": 1,
+             "cpu_kind": 4, "cpu_level": 0},
+            *[{"character_kind": 21, "slot_type": 3, "stocks": 0,
+               "color": 0, "team": 0, "rumble_enabled": 0,
+               "cpu_kind": 4, "cpu_level": 0} for _ in range(4)],
+        ]
         expected = [
             ("first_scheduler_return", 0x2A, 0, None, None),
             ("cold_css_ready", 8, 2, None, None),
@@ -91,7 +102,7 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
                  "scene_kind": 2, "game_mode": 2,
                  "match_start_data": {"stage": 0x20, "item_frequency": -1,
                                        "item_mask_hex": "000000000000000f",
-                                       "players": [{"slot_type": 0, "stocks": 3}]},
+                                       "players": match_players},
                  "pad_copy_status_hex": "00", "current_hps_hex": "",
                  "hps_voice_word": "0x0"},
                 {"event": "scheduler_return", "sequence": 2,
@@ -112,7 +123,7 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
                 row["match_start_data"] = {
                     "stage": 0x20, "item_frequency": -1,
                     "item_mask_hex": "000000000000000f",
-                    "players": [{"slot_type": 0, "stocks": 3}]}
+                    "players": match_players}
             if name == "results_no_contest":
                 row["results_outcome"] = 7
             rows.append(row)
@@ -122,6 +133,9 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             result = verify_vs_rules_items_route(path)
             self.assertEqual(result["stock_count_after_results_css_return"], 3)
             self.assertEqual(result["committed_item_mask"], "000000000000000f")
+            self.assertEqual(len(result["live_match_start_players"]), 6)
+            self.assertEqual([p["slot_type"] for p in result["live_match_start_players"]],
+                             [0, 0, 3, 3, 3, 3])
 
             committed_row = next(row for row in rows if row["event"] == "vs_items_back_committed")
             committed_row["rules_state"]["item_frequency"] = 0xFF

@@ -2447,7 +2447,7 @@ int melee_web_native_menu_stock_check(){
  running=true;menu_clock.reset();return 1;
 }
 const char* melee_web_native_menu_source_observe(){
- static char text[1536];
+ static char text[3072];
  MeleeWebMenuSourceObservation observed{};
  StartMeleeData start{};
  int source_valid=0,start_valid=0;
@@ -2457,6 +2457,26 @@ const char* melee_web_native_menu_source_observe(){
  if(host&&!host_entered&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_READY&&
     melee_web_menu_host_raw_selection(host,&start,error,sizeof(error)))start_valid=1;
  if(!source_valid&&!start_valid)return "{}";
+ char start_players[1280]="[]";
+ if(start_valid){
+  size_t used=0;start_players[used++]='[';start_players[used]='\0';
+  for(unsigned i=0;i<GM_MAX_PLAYERS;++i){
+   const auto& player=start.players[i];
+   const int written=std::snprintf(start_players+used,sizeof(start_players)-used,
+    "%s{\"character_kind\":%d,\"slot_type\":%d,\"stocks\":%d,"
+    "\"color\":%d,\"team\":%d,\"rumble_enabled\":%d,"
+    "\"cpu_kind\":%d,\"cpu_level\":%d}",
+    i?",":"",(int)player.ckind,(int)player.slot_type,(int)player.stocks,
+    (int)player.color,(int)player.team,(int)player.rumble_enabled,
+    (int)player.cpu_kind,(int)player.cpu_level);
+   if(written<0||(size_t)written>=sizeof(start_players)-used)
+    return "{\"observer_error\":true,\"observer_error_reason\":\"StartMeleeData roster buffer overflow\"}";
+   used+=(size_t)written;
+  }
+  if(used+2>sizeof(start_players))
+   return "{\"observer_error\":true,\"observer_error_reason\":\"StartMeleeData roster terminator overflow\"}";
+  start_players[used++]=']';start_players[used]='\0';
+ }
  std::snprintf(text,sizeof(text),
   "{\"source\":{\"valid\":%s,\"scene\":%d,\"menu_kind\":%d,"
   "\"previous_menu_kind\":%d,\"hovered_selection\":%d,"
@@ -2467,7 +2487,7 @@ const char* melee_web_native_menu_source_observe(){
   "\"mask_hex\":\"%016llx\"}},"
   "\"start\":{\"valid\":%s,\"match_kind\":%d,\"stage\":%u,"
   "\"item_frequency\":%d,\"item_mask_hex\":\"%016llx\","
-  "\"player_stocks\":[%d,%d]}}",
+  "\"player_stocks\":[%d,%d],\"players\":%s}}",
   source_valid?"true":"false",observed.source_scene,observed.menu_kind,
   observed.previous_menu_kind,observed.hovered_selection,
   observed.confirmed_selection,(unsigned long long) observed.menu_buttons,
@@ -2479,7 +2499,7 @@ const char* melee_web_native_menu_source_observe(){
   start_valid?"true":"false",(int) start.rules.match_kind,
   (unsigned) start.rules.stkind,(int) (int8_t) start.rules.xB,
   (unsigned long long) start.rules.x20,
-  (int) start.players[0].stocks,(int) start.players[1].stocks);
+  (int) start.players[0].stocks,(int) start.players[1].stocks,start_players);
  return text;
 }
 const char* melee_web_native_menu_memory(){

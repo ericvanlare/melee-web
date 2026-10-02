@@ -495,6 +495,14 @@ try {
   assert.equal(sourceStart.start.stage, 0x20,
     'Closed SSS must commit original St_Kind_Last into StartMeleeData');
   assert.deepEqual(sourceStart.start.player_stocks, [3, 3]);
+  assert.equal(sourceStart.start.players.length, 6,
+    'The checked StartMeleeData observer must expose every source player slot');
+  assert.deepEqual(sourceStart.start.players.slice(0, 2).map(player => [
+    player.character_kind, player.slot_type, player.stocks, player.color, player.team,
+  ]), [[8, 0, 3, 0, 0], [8, 0, 3, 0, 0]],
+  'The source CSS route must carry both selected human Mario slots into the match');
+  assert.deepEqual(sourceStart.start.players.slice(2).map(player => player.slot_type),
+    [3, 3, 3, 3], 'Unused source slots must remain Gm_PKind_NA');
   report.sourceObservations.push({label: 'raw SSS StartMeleeData after original OnExit', ...sourceStart});
   await shot('12-live-three-stock-match');
 

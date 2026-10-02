@@ -52,8 +52,10 @@ class RetailAllocationMenuTests(unittest.TestCase):
         self.assertIn("pulse(0,'A',settle=30)", source)
         cold_sss = source.split("def _cold_boot_enter_sss():", 1)[1].split(
             "def cold_boot_to_sss():", 1)[0]
-        self.assertNotIn("set_cpu_mode(", cold_sss)
-        self.assertNotIn("set_cpu_level(", cold_sss)
+        self.assertIn("if player['player_type']:", cold_sss)
+        self.assertIn("set_cpu_mode(door)", cold_sss)
+        self.assertIn("set_cpu_level(door,int(player['cpu_level']))", cold_sss)
+        self.assertIn("roster setup mismatch", cold_sss)
         # The final preparation still uses the existing source CSS/SSS body.
         self.assertIn("set_rules_via_original_menu()", source)
         self.assertIn("select_stage(EXPECTED_STAGE)", source)

@@ -207,21 +207,22 @@ def cold_boot_to_css():
     raise RuntimeError(f'cold boot did not reach original CSS within bound; scenes={{names}}')
 
 def _cold_boot_enter_sss():
-    # The existing rules routine intentionally starts at SSS.  Establish
+    # The existing rules routine intentionally starts at SSS. Establish
     # that source precondition through CSS first; all cursor and costume
-    # changes below use the existing source-driven helpers. Keep every slot
-    # human until the reused preparation body applies CPU modes.
+    # changes below use the original source-driven helpers. Apply any declared
+    # CPU slots through the same CSS controls used by the full preparation.
     _cold_boot_check_character_availability()
-    expected_css=[(p['character_kind'],p['costume'],0) for p in EXPECTED_PLAYERS]
+    expected_css=[(p['character_kind'],p['costume'],p['player_type']) for p in EXPECTED_PLAYERS]
     for port,player in enumerate(EXPECTED_PLAYERS):
         select(port,player['character_kind'])
         set_costume(port,player['costume'])
-    players=[css_player(i) for i in range(len(EXPECTED_PLAYERS))]
-    if [(p['character_kind'],p['costume'],p['slot_type']) for p in players] != [(k,c,0) for k,c,_ in expected_css]:
-        raise RuntimeError(f'cold CSS selection mismatch: expected {{expected_css}}, got {{players}}')
+    for door,player in enumerate(EXPECTED_PLAYERS):
+        if player['player_type']:
+            set_cpu_mode(door)
+            set_cpu_level(door,int(player['cpu_level']))
     players=[css_player(i) for i in range(len(EXPECTED_PLAYERS))]
     if [(p['character_kind'],p['costume'],p['slot_type']) for p in players] != expected_css:
-        raise RuntimeError(f'cold CSS human setup mismatch: expected {{expected_css}}, got {{players}}')
+        raise RuntimeError(f'cold CSS roster setup mismatch: expected {{expected_css}}, got {{players}}')
     if [p['team'] for p in players] != EXPECTED_TEAMS:
         raise RuntimeError(f'cold CSS team setup mismatch: expected {{EXPECTED_TEAMS}}, got {{players}}')
     for _ in range(120):
@@ -485,7 +486,11 @@ def _vs_start_data_state():
         players.append({'character_kind':struct.unpack('b',raw[offset:offset+1])[0],
                         'slot_type':raw[offset+1],
                         'stocks':struct.unpack('b',raw[offset+2:offset+3])[0],
-                        'team':raw[offset+9]})
+                        'color':raw[offset+3],
+                        'team':raw[offset+9],
+                        'rumble_enabled':raw[offset+12]&1,
+                        'cpu_kind':raw[offset+14],
+                        'cpu_level':raw[offset+15]})
     return {'item_frequency':struct.unpack('b',raw[0x15:0x16])[0],
             'stage':struct.unpack('>H',raw[0x18:0x1A])[0],
             'item_mask_hex':f'{int.from_bytes(raw[0x30:0x38],"big"):016x}',
@@ -661,8 +666,12 @@ def _cold_boot_vs_rules_items_round_trip():
     if (start_data['stage']!=EXPECTED_STAGE or
             start_data['item_frequency']!=-1 or
             start_data['item_mask_hex']!=f"{item_toggle['item_mask']:016x}" or
-            start_data['players'][0]['slot_type']!=0 or
-            start_data['players'][0]['stocks']!=3):
+            len(start_data['players'])!=6 or
+            [(p['character_kind'],p['slot_type'],p['stocks'],p['color'],p['team'])
+             for p in start_data['players'][:len(EXPECTED_PLAYERS)]] !=
+            [(int(p['character_kind']),int(p['player_type']),3,int(p['costume']),int(p.get('team',0)))
+             for p in EXPECTED_PLAYERS] or
+            any(p['slot_type']!=3 for p in start_data['players'][len(EXPECTED_PLAYERS):])):
         raise RuntimeError(f'original SSS handoff did not carry source Rules/Items into GM_VS: {start_data}')
     _record_menu_route_marker('vs_match_entered')
     step(180)

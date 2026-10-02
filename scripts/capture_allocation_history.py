@@ -496,10 +496,14 @@ def verify_vs_rules_items_route(path):
     if markers[16].get("selected_stage_kind") != 0x20:
         raise RuntimeError("original SSS route did not retain source St_Kind_Last selection")
     match = markers[17].get("match_start_data", {})
+    players = match.get("players", [])
     if (match.get("stage") != 0x20 or match.get("item_frequency") != -1 or
             match.get("item_mask_hex") != f"{toggled_mask:016x}" or
-            not match.get("players") or match["players"][0].get("slot_type") != 0 or
-            match["players"][0].get("stocks") != 3):
+            len(players) != 6 or
+            [(p.get("character_kind"), p.get("slot_type"), p.get("stocks"),
+              p.get("color"), p.get("team")) for p in players[:2]] !=
+            [(8, 0, 3, 0, 0), (8, 0, 3, 0, 0)] or
+            any(p.get("slot_type") != 3 for p in players[2:])):
         raise RuntimeError("GM_VS StartMeleeData did not contain the selected source Rules/Items values")
     result = markers[20]
     if result.get("results_outcome") != 7:
@@ -530,6 +534,11 @@ def verify_vs_rules_items_route(path):
             "stock_count_after_css_handoff": final_rules["stock_count"],
             "live_match_stage": match["stage"],
             "live_match_player_one_stocks": match["players"][0]["stocks"],
+            "live_match_start_players": [
+                {key: player.get(key) for key in
+                 ("character_kind", "slot_type", "stocks", "color", "team",
+                  "rumble_enabled", "cpu_kind", "cpu_level")}
+                for player in players],
             "results_outcome": result["results_outcome"],
             "stock_count_after_results_css_return": markers[21]["rules_state"]["stock_count"],
             "trace_sha256": retail._sha256(path)}
@@ -859,8 +868,13 @@ def capture(args):
             # This target declares the availability query at first CSS. The
             # route driver never applies it to source game state.
             target = {"expected_setup": {"time_limit_seconds": 60,
-                "players": [{"character_kind": 8, "costume": 0, "player_type": 0,
-                             "stocks": 4, "rumble_enabled": True}],
+                "players": [
+                    {"character_kind": 8, "costume": 0, "player_type": 0,
+                     "cpu_level": 0, "team": 0, "stocks": 4,
+                     "rumble_enabled": True},
+                    {"character_kind": 8, "costume": 0, "player_type": 0,
+                     "cpu_level": 0, "team": 0, "stocks": 4,
+                     "rumble_enabled": True}],
                 "disable_pausing": False, "stage": 32}}
         write_json(evidence / "menu-target.json", target)
         paths["menu_driver"] = evidence / "menu-driver.py"
