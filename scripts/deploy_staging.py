@@ -479,8 +479,9 @@ def main():
                 write_json(config_path, diagnostics_wrangler_config(project))
                 command = [api.wrangler, 'pages', 'deploy', str(upload), '--project-name', PROJECT,
                            '--branch', BRANCH, '--commit-hash', args.sha,
-                           '--commit-message', 'staging ' + args.sha, '--commit-dirty=false', '--no-bundle',
-                           '--config', str(config_path)]
+                           '--commit-message', 'staging ' + args.sha, '--commit-dirty=false', '--no-bundle']
+                # Pages rejects --config, even for its default filename. The
+                # isolated cwd owns the generated wrangler.json discovered here.
                 with (args.report_dir / 'wrangler.log').open('x') as stream:
                     result = subprocess.run(command, cwd=directory, env=api.env, stdout=stream,
                                             stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL)
