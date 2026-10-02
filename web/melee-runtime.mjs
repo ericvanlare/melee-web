@@ -79,6 +79,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let ready = false, fatal = false, destroyed = false, bundle = false, prepared = false, hasLocalData = false;
   let startupCacheReady = false;
   let busy = '', message = '', progress = null, inputDirty = true, lastState = '';
+  // The browser may withhold every native callback between hidden and visible.
+  // Retain that boundary until native can reset its wall clocks and input once.
+  let lifecycleSuspended = false;
   let loading = Object.freeze({phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
   let preparationLabel = '', preparationKeepsAudio = false;
   let discSession = null, assetTransfer = null;
@@ -322,8 +325,14 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     },
     menuSourceReadDiscard(request) { sourceReadResults.delete(request); },
     menuServiceCommands() {
-      if (fatal || destroyed) return;
+      if (fatal || destroyed) return 0;
       for (const c of commands.splice(0)) { try { c.resolve(c.run()); } catch (error) { c.reject(error); } }
+      const suspended = lifecycleSuspended;
+      lifecycleSuspended = false;
+      if (suspended) {
+        Module._melee_web_input_set_activity(0, 0);
+        inputDirty = true;
+      }
       if (inputDirty) {
         inputDirty = false;
         Module._melee_web_input_set_keyboard(keyboard[0] ? 1 : 0);
@@ -331,6 +340,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         Module._melee_web_input_set_activity(document.hasFocus() && document.activeElement === canvas ? 1 : 0,
           document.hidden ? 0 : 1);
       }
+      return suspended ? 1 : 0;
     },
     menuPreparation(label, keepAudio = false) { diagnosticPreparationAt = performance.now(); diagnosticLifecycle('preparation', {timestamp: diagnosticPreparationAt}); preparationLabel = label || 'Preparing original scene'; preparationKeepsAudio = !!keepAudio; message = ''; setLoading('native', 'Preparing game data…', 0, 0); emit('preparation', {label: preparationLabel, keepAudio}); publish(); },
     menuPreparationDone() { const at = performance.now(); diagnosticLifecycle('preparation_done', {timestamp: at, duration_ms: diagnosticPreparationAt === null ? null : at - diagnosticPreparationAt}); diagnosticPreparationAt = null; preparationLabel = ''; message = ''; if (loading?.phase === 'native') { loading = null; refreshCatalogLoading(); } emit('preparationDone'); publish(); },
@@ -359,8 +369,14 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   for (const [name, callback] of Object.entries(callbacks)) window[name] = callback;
   function listen(type, listener) { window.addEventListener(type, listener, true); listeners.push([type, listener]); }
   for (const type of ['focus', 'blur', 'visibilitychange', 'focusin', 'focusout']) listen(type, () => { inputDirty = true; emit('focus'); });
-  listen('visibilitychange', () => diagnosticLifecycle(document.hidden ? 'visibility_hidden' : 'visibility_visible'));
-  for (const type of ['pagehide', 'pageshow', 'freeze', 'resume']) listen(type, () => diagnosticLifecycle(type));
+  listen('visibilitychange', () => {
+    if (document.hidden) lifecycleSuspended = true;
+    diagnosticLifecycle(document.hidden ? 'visibility_hidden' : 'visibility_visible');
+  });
+  for (const type of ['pagehide', 'pageshow', 'freeze', 'resume']) listen(type, () => {
+    if (type === 'pagehide' || type === 'freeze') lifecycleSuspended = true;
+    diagnosticLifecycle(type);
+  });
   listen('error', event => stop(event.error || event.message));
   listen('unhandledrejection', event => stop(event.reason));
   const focus = () => { if (!fatal && !destroyed) { canvas.focus(); inputDirty = true; } };

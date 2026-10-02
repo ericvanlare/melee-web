@@ -1401,7 +1401,12 @@ void service_render_cache_writes(){
         ok,flushed,duration);
 }
 void tick(){
- EM_ASM({window.menuServiceCommands?.();});
+ // A hidden/frozen interval may contain no callback at all. Consume the JS
+ // boundary before polling input or either clock; running/manual pause intent
+ // is unchanged and only inactive wall time is excluded from source debt.
+ if(EM_ASM_INT({return window.menuServiceCommands?.() === 1 ? 1 : 0;})){
+  menu_clock.reset();audio_clock.reset();
+ }
  service_render_cache_writes();
  const double started=emscripten_get_now();
  const bool running_at_callback_start=running;
