@@ -490,6 +490,70 @@ async function testOptOutClearSerializesReenabledWrites() {
   concurrent.dispose();
 }
 
+async function testInitialOptOutClearSerializesReenabledWrites() {
+  const state = {
+    values: [], tombstones: [], clearStarted: false, clearReleased: false,
+    releaseClear: null, saveLog: [],
+  };
+  const adapter = {
+    async load() { return structuredClone(state.values); },
+    async save(values) {
+      const next = structuredClone(values);
+      if (!next.length && !state.clearReleased) {
+        state.clearStarted = true;
+        state.saveLog.push('clear-start');
+        await new Promise(resolve => { state.releaseClear = resolve; });
+        state.clearReleased = true;
+      }
+      state.saveLog.push(next.length ? 'write' : 'clear-complete');
+      state.values = next;
+    },
+    async loadTombstones() { return structuredClone(state.tombstones); },
+    async saveTombstones(values) { state.tombstones = structuredClone(values); },
+  };
+
+  // Seed the adapter with work from the prior visit. Construction opt-out must
+  // remove it even when the user enables reporting again before the deferred
+  // cleanup callback gets a turn.
+  const seed = createDiagnosticsDelivery({
+    globalThis: rootFor(async () => ({status: 201})), origin: 'https://webmelee.gg',
+    storage: adapter, now: () => 10,
+  });
+  assert.equal(seed.enqueue(reportFor({session_id: 'session-initialold'})).accepted, true);
+  await seed.persist();
+  seed.dispose();
+  state.saveLog.length = 0;
+
+  const delivery = createDiagnosticsDelivery({
+    globalThis: rootFor(async () => ({status: 201})), origin: 'https://webmelee.gg',
+    storage: adapter, now: () => 20,
+    optOut: true,
+  });
+  delivery.setOptOut(false);
+  assert.equal(delivery.enqueue(reportFor({session_id: 'session-initialfresh'})).accepted, true);
+  const pendingPersist = delivery.persist();
+  await tick();
+  assert.deepEqual(state.saveLog, ['clear-start'],
+    're-enabling before the constructor cleanup still starts the old-work clear first');
+  state.releaseClear();
+  const result = await pendingPersist;
+  assert.equal(result.persisted, true);
+  assert.deepEqual(state.saveLog, ['clear-start', 'clear-complete', 'write']);
+  assert.deepEqual(state.values.map(value => value.report.session_id), ['session-initialfresh']);
+
+  let requests = 0;
+  const later = createDiagnosticsDelivery({
+    globalThis: rootFor(async () => { requests += 1; return {status: 201}; }),
+    origin: 'https://webmelee.gg', storage: adapter, now: () => 21,
+  });
+  later.setActive(false);
+  const flushed = await later.flushWhenInactive();
+  assert.equal(flushed.sent, 1, 'fresh work survives the initial opt-out cleanup for a later visit');
+  assert.equal(requests, 1);
+  later.dispose();
+  delivery.dispose();
+}
+
 async function testPersistenceSettlementAfterSyncStorageFailure() {
   const failingStorage = {
     load() { return []; },
@@ -683,6 +747,7 @@ await testResumeCancellationAndSessionBudget();
 await testIncidentIdentityStatusAndMultiTabMerge();
 await testAttemptBudgetAndInitialOptOutClear();
 await testOptOutClearSerializesReenabledWrites();
+await testInitialOptOutClearSerializesReenabledWrites();
 await testPersistenceSettlementAfterSyncStorageFailure();
 await testFlushMutationSurvivesPendingWrite();
 console.log('Runtime diagnostics delivery bounds, privacy, scheduling, persistence and environment checks passed');

@@ -455,6 +455,7 @@ export function createDiagnosticsDelivery(options = {}) {
   let persistencePromise = null;
   let activePersistenceGeneration = null;
   let optOutClearPromise = null;
+  let initialOptOutClearTimer = null;
   let flushTimer = null;
   let records = [];
   let tombstones = [];
@@ -1026,6 +1027,14 @@ export function createDiagnosticsDelivery(options = {}) {
 
   function setOptOut(value) {
     optOut = value === true;
+    if (!optOut && initialOptOutClearTimer !== null) {
+      (root.clearTimeout || clearTimeout)(initialOptOutClearTimer);
+      initialOptOutClearTimer = null;
+      // Construction with optOut=true still has to clear the old outbox. If
+      // reporting is re-enabled before the deferred cleanup runs, start that
+      // cleanup now so fresh work waits behind the same clear promise.
+      void clearPersistedOutbox();
+    }
     if (optOut) {
       abortControllers();
       records = [];
@@ -1077,7 +1086,12 @@ export function createDiagnosticsDelivery(options = {}) {
     if (flushTimer !== null) { (root.clearTimeout || clearTimeout)(flushTimer); flushTimer = null; }
   }
 
-  if (optOut) schedule(() => { void clearPersistedOutbox(); }, 0);
+  if (optOut) {
+    initialOptOutClearTimer = schedule(() => {
+      initialOptOutClearTimer = null;
+      void clearPersistedOutbox();
+    }, 0);
+  }
 
   return Object.freeze({
     enqueue,
