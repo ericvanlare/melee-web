@@ -587,7 +587,7 @@ async function runFixturePreflight() {
     'fixture_preflight_operations');
   requireValue(calls.file_name === 'mock.gci', 'fixture_preflight_file');
   requireValue(fixture.load?.state === 'started', 'fixture_preflight_started');
-  requireValue(fixture.start_readiness?.result === 'ready' && fixture.start_readiness.checks >= 1,
+  requireValue(fixture.start_readiness?.result === 'ready' && fixture.start_readiness.checks === 1,
     'fixture_preflight_readiness');
   fixture.owner.Module._melee_web_input_set_activity(1, 1);
   fixture.owner.Module._melee_web_native_menu_unload();
