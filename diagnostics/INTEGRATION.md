@@ -50,8 +50,9 @@ backend:
 7. The current upload command runs from a temporary directory with
    `wrangler pages deploy ... --no-bundle`. Copy the generated function tree
    into that directory before the command. Pass this `wrangler.jsonc`
-   explicitly from the repository (or an equivalent generated config) so the
-   D1 binding and migration directory are not inferred from the temp directory.
+   as an equivalent generated `wrangler.json` in that temporary working
+   directory. Pages discovers this default filename and rejects an explicit
+   `--config` argument. Bind the audited D1 identity and variables in this file.
    Never upload the config or secrets.
 
 Before the first upload, configure the one admin secret in both Pages
