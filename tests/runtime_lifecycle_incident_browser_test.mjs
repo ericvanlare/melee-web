@@ -782,17 +782,20 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
   const startupOnly = mode === 'startup-only';
   const synthetic = mode === 'synthetic';
   const syntheticHold = mode === 'synthetic-hidden-hold';
+  const manualPause = mode === 'manual-pause';
   const syntheticMode = startupOnly || synthetic || syntheticHold;
   const result = {mode, dwell_ms: HIDDEN_DWELL_MS, result: 'fail', cdp: [], failure_kind: null,
     startup_timeout_ms: startupOnly ? STARTUP_ONLY_TIMEOUT_MS : STARTUP_TIMEOUT_MS,
     scope: startupOnly ? 'Bounded startup/readiness probe through CSS with native hook installation; no lifecycle or gameplay claim.' :
       syntheticHold ? 'Controlled Emscripten requestAnimationFrame hold with synthetic document visibility getters; no genuine lifecycle or user-root-cause claim.' :
       synthetic ? 'Synthetic JS/native input handoff and missed-callback checkpoint only; no browser lifecycle or user-root-cause claim.' :
+      manualPause ? 'Explicit manual-pause control with the same bounded synthetic hidden callback hold; no browser lifecycle or user-root-cause claim.' :
       'Real lifecycle mode is entered only after the installed-Chrome capability probe observes genuine lifecycle transitions.',
     experiment: {
       hypothesis: startupOnly ? 'The audited package reaches running CSS within the five-second readiness bound and installs the native input/unload hooks before start.' :
         syntheticHold ? 'Holding the identified native main-loop callback for 350 ms yields no native sample during the hold; the first visible callback observes visible input and records bounded simulation debt.' :
         synthetic ? 'A controlled hidden checkpoint can hand off input ownership and return on an explicit visible checkpoint.' :
+        manualPause ? 'An explicit manual pause remains stopped across the same 350 ms synthetic hidden callback hold and resumes only after an explicit resume.' :
         'Installed Chrome can expose a genuine lifecycle transition through the supported protocol path.',
       pass_criteria: startupOnly ? ['CSS phase 1 is running', 'native activity and unload hooks are installed',
         'no implicit save or unload'] :
@@ -802,6 +805,9 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
         'no automatic resume or implicit save/unload', 'one active 32 kHz audio context remains owned'] :
         synthetic ? ['hidden and visible input activity are both observed', 'native remains running',
           'no unexpected incident, implicit save, or implicit unload', 'one active 32 kHz audio context remains owned'] :
+        manualPause ? ['manual pause remains stopped during the 350 ms synthetic hold',
+          'zero native samples and source steps during the hold', 'no automatic resume or unexpected incident',
+          'one active 32 kHz audio context remains owned'] :
         ['genuine lifecycle events are observed', 'no unexpected incident or implicit save/unload'],
       fail_criteria: ['unexpected incident', 'manual pause resumes without explicit intent', 'bounded report validation fails'],
       stopping_rule: 'Stop at the first unexpected pause, failure, or missing required receipt; retain the structured receipt and screenshot.',
@@ -823,7 +829,8 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
     requireValue(hooksReady === true, 'native_hooks_unavailable');
     const before = await fixtureState(page);
     result.before = {native: before.native, input_activity: before.input_activity.length,
-      audio_contexts: before.audio_owner?.contexts?.length || 0};
+      audio_contexts: before.audio_owner?.contexts?.length || 0,
+      unload_calls: before.unload_calls, cache_save_calls: before.cache_save_calls};
     if (startupOnly) {
       result.startup_readiness = {native_hooks: before.native_hooks, native: before.native,
         input_activity: before.input_activity.length};
@@ -869,6 +876,13 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
       });
       await waitFor(page, () => globalThis.__runtimeLifecycleFixture.player.getState()?.running === false,
         SCENE_TIMEOUT_MS, 'manual_pause_not_stopped');
+      const hold = await page.evaluate(() => globalThis.__runtimeLifecycleFixture.syntheticHiddenHold());
+      result.manual_hidden_hold = hold;
+      requireValue(hold?.available === true, hold?.unrun_reason || 'manual_hidden_hold_unavailable');
+      await waitFor(page, () => {
+        const fixture = globalThis.__runtimeLifecycleFixture;
+        return fixture.native_sample_count > Number(hold.before_native_sample_count || 0);
+      }, SCENE_TIMEOUT_MS, 'manual_visible_native_sample_missing');
     } else {
       const cdp = await page.context().newCDPSession(page);
       await cdp.send('Page.setWebLifecycleState', {state: 'frozen'});
@@ -904,6 +918,10 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
       requireValue(afterLifecycle.native.running === false, 'manual_pause_auto_resumed');
       requireValue(!unexpected.length, 'manual_pause_unexpected_incident');
       requireValue(afterLifecycle.manual_intent.includes('manual_pause'), 'manual_pause_intent_missing');
+      requireValue(result.manual_hidden_hold?.hidden_sample_delta === 0 &&
+        result.manual_hidden_hold?.hidden_source_step_delta === 0,
+        'manual_hidden_native_progress');
+      requireValue(!afterLifecycle.manual_intent.includes('manual_resume'), 'manual_pause_implicit_resume');
       await page.evaluate(() => {
         globalThis.__runtimeLifecycleFixture.manual_intent.push('manual_resume');
         return globalThis.__runtimeLifecycleFixture.player.resume();
@@ -954,7 +972,8 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
       requireValue(afterLifecycle.native.running === true, 'lifecycle_auto_pause');
     }
     const stable = await fixtureState(page);
-    requireValue(stable.unload_calls === 0 && stable.cache_save_calls === 0, 'lifecycle_saved_implicitly');
+    requireValue(stable.unload_calls === before.unload_calls &&
+      stable.cache_save_calls === before.cache_save_calls, 'lifecycle_saved_implicitly');
     requireValue((stable.audio_owner?.contexts || []).length === 1, 'audio_owner_count');
     const activeContexts = (stable.audio_owner?.contexts || []).filter(context => !context.closed);
     requireValue(activeContexts.length === 1 && activeContexts[0].sample_rate === 32000, 'audio_owner_closed');
@@ -964,8 +983,10 @@ async function runLifecycleCase(browser, fixtureUrl, disc, out, mode) {
     if (synthetic) requireValue(result.input_visibility.observed_hidden, 'synthetic_hidden_not_observed');
     await page.evaluate(async () => { await globalThis.__runtimeLifecycleFixture.player.unload(); });
     const afterUnload = await fixtureState(page);
-    requireValue(afterUnload.unload_calls === 1, 'explicit_unload_not_observed');
-    result.explicit_unload = {unload_calls: afterUnload.unload_calls, cache_save_calls: afterUnload.cache_save_calls};
+    requireValue(afterUnload.unload_calls === before.unload_calls + 1, 'explicit_unload_not_observed');
+    result.explicit_unload = {unload_calls: afterUnload.unload_calls, cache_save_calls: afterUnload.cache_save_calls,
+      unload_delta: afterUnload.unload_calls - before.unload_calls,
+      cache_save_delta: afterUnload.cache_save_calls - before.cache_save_calls};
     await page.screenshot({path: path.join(out, 'lifecycle-' + mode + '.png'), fullPage: true});
     result.result = 'pass';
   } catch (error) {
