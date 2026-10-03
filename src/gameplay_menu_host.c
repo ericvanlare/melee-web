@@ -89,6 +89,7 @@ struct MeleeWebMenuHost {
     GameRules saved_rules;
     GameRules selected_rules, route_saved_rules;
     MeleeWebSaveProfilePreferences persisted_preferences;
+    MeleeWebSaveProfilePreferences runtime_preferences;
     struct gmm_x1CB0 saved_preferences;
     struct gmm_x1CB0 selected_preferences, route_saved_preferences;
     int saved_language,saved_saved_language;
@@ -174,6 +175,44 @@ static int runtime_transition(void* data,MeleeWebMenuScene scene,int* request,ch
         h->css_parent_route_requested = 1;
     }
     h->transition=*request;return 1;
+}
+
+/* A few preference fields are normalized while a browser-owned source world
+ * starts. Keep those runtime values as the comparison baseline, then accept
+ * later source menu edits into the persistent preference overlay. */
+static int remember_runtime_preferences(MeleeWebMenuHost* h, char* e, size_t n)
+{
+    return melee_web_save_profile_owner_capture_preferences(
+        h->profile, &h->runtime_preferences, e, n);
+}
+
+static int sync_source_preference_changes(MeleeWebMenuHost* h, char* e, size_t n)
+{
+    MeleeWebSaveProfilePreferences current;
+    if (!melee_web_save_profile_owner_capture_preferences(
+            h->profile, &current, e, n)) {
+        return 0;
+    }
+    if (current.item_frequency != h->runtime_preferences.item_frequency) {
+        h->persisted_preferences.item_frequency = current.item_frequency;
+        h->runtime_preferences.item_frequency = current.item_frequency;
+    }
+    if (current.item_mask != h->runtime_preferences.item_mask) {
+        h->persisted_preferences.item_mask = current.item_mask;
+        h->runtime_preferences.item_mask = current.item_mask;
+    }
+    if (memcmp(current.rumble_enabled, h->runtime_preferences.rumble_enabled,
+               sizeof(current.rumble_enabled)) != 0) {
+        memcpy(h->persisted_preferences.rumble_enabled, current.rumble_enabled,
+               sizeof(current.rumble_enabled));
+        memcpy(h->runtime_preferences.rumble_enabled, current.rumble_enabled,
+               sizeof(current.rumble_enabled));
+    }
+    if (current.saved_language != h->runtime_preferences.saved_language) {
+        h->persisted_preferences.saved_language = current.saved_language;
+        h->runtime_preferences.saved_language = current.saved_language;
+    }
+    return 1;
 }
 
 
@@ -408,7 +447,7 @@ MeleeWebMenuHost* melee_web_menu_host_create(char* e,size_t n){
 }
 
 int melee_web_menu_host_snapshot_card_data(
-    const MeleeWebMenuHost* h,int baseline,uint8_t* output,
+    MeleeWebMenuHost* h,int baseline,uint8_t* output,
     size_t output_size,char* e,size_t n){
     if(!h||h!=owner||!output||output_size!=MELEE_WEB_SAVE_PROFILE_CARD_BYTES||
        (baseline!=0&&baseline!=1))
@@ -422,6 +461,10 @@ int melee_web_menu_host_snapshot_card_data(
     if(h->initial_replay_context)
         return melee_web_save_profile_owner_snapshot_card_data(
             h->profile,output,output_size,e,n);
+    if (h->entered &&
+        !sync_source_preference_changes(h, e, n)) {
+        return 0;
+    }
     return melee_web_save_profile_owner_snapshot_card_data_with_preferences(
         h->profile,&h->persisted_preferences,output,output_size,e,n);
 }
@@ -548,7 +591,7 @@ static int host_prepare_world(MeleeWebMenuHost* h, MeleeWebAudio* audio,
         h->audio_generation=audio_generation;
     }
     HSD_SisLib_803A6048(source_scene||phase==MELEE_WEB_MENU_SSS_READY?0x4800:0x2400);
-    return ok(e,n);
+    return remember_runtime_preferences(h,e,n)&&ok(e,n);
 }
 
 int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,size_t n){
@@ -577,6 +620,7 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
         }
         HSD_SisLib_803A5FBC();restore_context(h);return 0;
     }
+    if(!remember_runtime_preferences(h,e,n))return 0;
     h->source_scene=phase==MELEE_WEB_MENU_SSS_READY?MELEE_WEB_HOST_SCENE_SSS:MELEE_WEB_HOST_SCENE_CSS;
     h->entered=1;lb_8001CF18();return ok(e,n);
 }
@@ -674,6 +718,11 @@ int melee_web_menu_host_enter_title(MeleeWebMenuHost* h, MeleeWebAudio* audio,
         restore_context(h);
         return 0;
     }
+    if (!remember_runtime_preferences(h, e, n)) {
+        HSD_SisLib_803A5FBC();
+        restore_context(h);
+        return 0;
+    }
     h->entered = 1;
     lb_8001CF18();
     return ok(e, n);
@@ -688,6 +737,11 @@ int melee_web_menu_host_enter_main(MeleeWebMenuHost* h, MeleeWebAudio* audio,
         return 0;
     }
     if (!host_enter_main_scene(h, e, n)) {
+        HSD_SisLib_803A5FBC();
+        restore_context(h);
+        return 0;
+    }
+    if (!remember_runtime_preferences(h, e, n)) {
         HSD_SisLib_803A5FBC();
         restore_context(h);
         return 0;
@@ -1227,6 +1281,7 @@ static int host_abort_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
 
 int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t n){
     if(!live(h,e,n)||!h->entered||h->drawing)return fail(e,n,"Native menu leave requires an idle live scene");
+    if (!sync_source_preference_changes(h,e,n)) return 0;
     if (h->source_scene == MELEE_WEB_HOST_SCENE_TITLE ||
         h->source_scene == MELEE_WEB_HOST_SCENE_MAIN ||
         h->source_scene == MELEE_WEB_HOST_SCENE_OPENING ||

@@ -57,7 +57,7 @@ MeleeWebMenuHost* melee_web_menu_host_create_with_profile(
 /* Copy exact card-manifest bytes at a strict source command boundary. Pass
  * baseline=1 to export the immutable mode baseline captured before CSS. */
 int melee_web_menu_host_snapshot_card_data(
-    const MeleeWebMenuHost*, int baseline, uint8_t* output,
+    MeleeWebMenuHost*, int baseline, uint8_t* output,
     size_t output_size, char*, size_t);
 int melee_web_menu_host_enter(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
 /* Source title/main route.  These callbacks retain the host's persistent
