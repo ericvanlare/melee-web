@@ -354,8 +354,8 @@ try {
     await enterSssFromCss();
     await selectFinalDestination();
     await waitForPhase(7);
-    await shot('match');
     await page.waitForTimeout(5000);
+    await shot('match');
     await press('7');
     await page.waitForTimeout(700);
     await driver.pressChord(['q', '9', 'm', '7'], {holdMs: 250, releaseMs: 200});
