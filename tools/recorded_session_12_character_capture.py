@@ -809,7 +809,7 @@ class Driver:
             retained_raw = bytes.fromhex(retained_hex)
             if (retained["is_teams"] is not True or
                     retained["item_frequency"] != -1 or
-                    retained["item_mask_hex"] != "fffffffeffffffff" or
+                    retained["item_mask_hex"] != TEAM_ROUTE_ITEM_MASK or
                     len(retained["players"]) != 2 or
                     [player["player_type"] for player in retained["players"]] != [0, 1] or
                     retained["players"][1].get("cpu_level") != 1 or
