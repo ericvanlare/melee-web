@@ -130,6 +130,7 @@ int main(void)
         check(fresh_preferences.item_frequency == 2 &&
                   fresh_preferences.item_mask == UINT64_MAX &&
                   fresh_preferences.deflicker == 1 &&
+                  fresh_preferences.sound_balance == 0 &&
                   fresh_preferences.saved_language == LANG_US &&
                   !memcmp(fresh_preferences.rumble_enabled,
                           (const uint8_t[4]) { 1, 1, 1, 1 }, 4),
@@ -142,6 +143,7 @@ int main(void)
         save->x1CB0.rumble_enabled[0] = 0;
         save->x1CB0.rumble_enabled[1] = 0;
         save->x1CB0.saved_language = LANG_JP;
+        save->x1CB0.sound_balance = (u8) -5;
         check_error(melee_web_save_profile_owner_snapshot_card_data_with_preferences(
                         profile, &fresh_preferences, card_profile_after,
                         sizeof(card_profile_after), error, sizeof(error)), error);

@@ -627,6 +627,7 @@ int melee_web_save_profile_owner_capture_preferences(
     memcpy(preferences->rumble_enabled, source->rumble_enabled,
            sizeof(preferences->rumble_enabled));
     preferences->deflicker = source->deflicker;
+    preferences->sound_balance = source->sound_balance;
     preferences->saved_language = source->saved_language;
     return aliases_match(candidate, error, error_size) && ok(error, error_size);
 }
@@ -641,6 +642,7 @@ int melee_web_save_profile_owner_snapshot_card_data_with_preferences(
     const size_t mask = base + offsetof(struct gmm_x1CB0, item_mask);
     const size_t rumble = base + offsetof(struct gmm_x1CB0, rumble_enabled);
     const size_t deflicker = base + offsetof(struct gmm_x1CB0, deflicker);
+    const size_t sound_balance = base + offsetof(struct gmm_x1CB0, sound_balance);
     const size_t language = base + offsetof(struct gmm_x1CB0, saved_language);
     if (!preferences || frequency >= MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES ||
         mask + sizeof(preferences->item_mask) >
@@ -648,6 +650,7 @@ int melee_web_save_profile_owner_snapshot_card_data_with_preferences(
         rumble + sizeof(preferences->rumble_enabled) >
             MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES ||
         deflicker >= MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES ||
+        sound_balance >= MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES ||
         language >= MELEE_WEB_SAVE_PROFILE_CARD_SAVE_BYTES)
         return fail(error, error_size,
                     "Source save preference fields exceed the card SaveData extent");
@@ -663,6 +666,7 @@ int melee_web_save_profile_owner_snapshot_card_data_with_preferences(
     memcpy(output + rumble, preferences->rumble_enabled,
            sizeof(preferences->rumble_enabled));
     output[deflicker] = preferences->deflicker;
+    output[sound_balance] = preferences->sound_balance;
     output[language] = preferences->saved_language;
     return ok(error, error_size);
 }

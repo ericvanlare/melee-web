@@ -238,6 +238,10 @@ static int sync_source_preference_changes(MeleeWebMenuHost* h, char* e, size_t n
         h->persisted_preferences.saved_language = current.saved_language;
         h->runtime_preferences.saved_language = current.saved_language;
     }
+    if (current.sound_balance != h->runtime_preferences.sound_balance) {
+        h->persisted_preferences.sound_balance = current.sound_balance;
+        h->runtime_preferences.sound_balance = current.sound_balance;
+    }
     return 1;
 }
 

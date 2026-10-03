@@ -2,6 +2,7 @@
 #include "gameplay_asset_manifest.hpp"
 #include <algorithm>
 #include "gameplay_menu_host.h"
+#include "gameplay_save_profile.h"
 #include "gameplay_match_session.hpp"
 #include "gameplay_results_session.hpp"
 #include "gameplay_prize_session.hpp"
@@ -770,6 +771,11 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
     check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
     check(melee_web_menu_host_route_target_mode(host) == GM_TITLE,
           "Original Main Back lost its GM_TITLE destination");
+    std::vector<uint8_t> sound_card(MELEE_WEB_SAVE_PROFILE_CARD_BYTES);
+    check(melee_web_menu_host_snapshot_card_data(
+              host, 0, sound_card.data(), sound_card.size(), error, sizeof(error)), error);
+    check(sound_card[0x45C] == static_cast<uint8_t>(-5),
+          "Closed Main snapshot lost the source Sound balance");
 
     world->verify_immutable_archives();
     world->close();
@@ -794,6 +800,10 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
     check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
     check(melee_web_menu_host_route_target_mode(host) == GM_MENU,
           "Returned Title Start lost its GM_MENU destination");
+    check(melee_web_menu_host_snapshot_card_data(
+              host, 0, sound_card.data(), sound_card.size(), error, sizeof(error)), error);
+    check(sound_card[0x45C] == static_cast<uint8_t>(-5),
+          "Closed Title snapshot lost the source Sound balance");
     world->close();
     world = std::make_unique<melee_web::GameplayMenuWorld>(
         files, melee_web::GameplayMenuScene::Main);
