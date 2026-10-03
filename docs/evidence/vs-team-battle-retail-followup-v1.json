@@ -1,0 +1,143 @@
+{
+  "schema": "melee-web-vs-team-battle-retail-followup-v1",
+  "status": "source_capture_passed; historical_browser_attempt_07_mask_mismatch; newer_browser_132_receipt_mask_match; fresh_team_browser_rerun_pending",
+  "scope": "Bounded original retail source capture of three CSS -> SSS -> two-player Team Battle -> No Contest Results -> CSS cycles, compared only at declared fields with retained browser receipts. This follow-up does not claim a complete retail/browser Team equivalence pass until a fresh browser Team rerun uses the matching source mask.",
+  "source_capture": {
+    "capture_id": "melee-web-vs-team-battle-20261003-r9",
+    "result": "original_vs_team_results_css_capture_complete",
+    "artifact_root_relative_to_agent_storage": "melee-web/checkouts/team-battle-capture-c631-20261003-20261003-112341-3cc5dafb/work/vs-team-battle-retail-observer-20261003-r9",
+    "report_sha256": "0645d8c289d71a49aa19567c8d99c5d629c91181107f7e70202ab36d1a8c0c4d",
+    "raw_hashes": {
+      "capture_mwro_sha256": "37b01bd4d041e1018ed1a5db156918282dd3970fe01557516f2dc72efbba60cf",
+      "controller_input_mwri_sha256": "c015f4bba57324536e6902d717f18855db4ac153e1f5c469da6db8dcd1634c25",
+      "dolphin_log_sha256": "792f94acac64c4a4c4c876d153f8cfd379e4d6d434ea24a105b9ae65b18fd1ac",
+      "input_intentions_sha256": "83c387411b8e872772f2df8edeb80f7fcffbb8d2bfbc3e2b7b5ff8575ec582ee",
+      "input_status_sha256": "3dd3c78b55c025d58fd5af4d31b65fe0853e21000297ce8c8e54baef4e6d8e51",
+      "observer_status_sha256": "45a9613f3c55db69e042e495f22638884cb0d6922ad1220546ab8d735169ae7e",
+      "source_browser_comparison_receipt_sha256": "2e69a2789a35085f93e2d721cfd69be7f74bfe15eb8d90af8ddc8eaa8a623ada"
+    },
+    "identities": {
+      "game": "GALE01 Rev. 2",
+      "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+      "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+      "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+      "dolphin_executable_sha256": "d60f171412cac13ef5e482ebb8c89aae9c6cbb73ad5a2dc726e330b0cd3acd24",
+      "dolphin_version": "Dolphin 2606a-dirty",
+      "cpu": "JITARM64",
+      "guest_memory_writes": false,
+      "build_manifest_sha256": "225e0e8d9dad20fdec0b0953fe397ac62fc1601b41ab724f6a149fe0011075f5",
+      "profile_fixture_sha256": {
+        "01-GALE-SuperSmashBros0110290334.gci": "39171db67ec4e6b85837107f7cd7e1231402e239ec7f74bfc9efa35d5a2879ce",
+        "GC/SRAM.raw": "49dee06d38cb76aaa8f90bfb2e937face180243d1a170078b4e13226b012f82c"
+      }
+    },
+    "route": "team-battle-results-css-roundtrips",
+    "records": {
+      "setup_records": [
+        {"match_index": 0, "source_sequence": 4171, "stage": 32, "stocks": 3, "teams": [0, 1], "item_frequency": -1, "item_mask_hex": "fffffffffffbffff", "mario_costumes": [0, 3]},
+        {"match_index": 1, "source_sequence": 7780, "stage": 32, "stocks": 3, "teams": [0, 1], "item_frequency": -1, "item_mask_hex": "fffffffffffbffff", "mario_costumes": [0, 3]},
+        {"match_index": 2, "source_sequence": 11432, "stage": 32, "stocks": 3, "teams": [0, 1], "item_frequency": -1, "item_mask_hex": "fffffffffffbffff", "mario_costumes": [0, 3]}
+      ],
+      "results": [
+        {"match_index": 0, "source_sequence": 5389, "outcome": 7, "winners": [0, 1]},
+        {"match_index": 1, "source_sequence": 9037, "outcome": 7, "winners": [0, 1]},
+        {"match_index": 2, "source_sequence": 12685, "outcome": 7, "winners": [0, 1]}
+      ],
+      "css_returns": [
+        {"match_index": 0, "source_sequence": 6847, "is_stock": false, "teams": [0, 1], "item_frequency": -1, "item_mask_hex": "fffffffffffbffff", "mario_costumes": [0, 3]},
+        {"match_index": 1, "source_sequence": 10491, "is_stock": false, "teams": [0, 1], "item_frequency": -1, "item_mask_hex": "fffffffffffbffff", "mario_costumes": [0, 3]},
+        {"match_index": 2, "source_sequence": 14143, "is_stock": false, "teams": [0, 1], "item_frequency": -1, "item_mask_hex": "fffffffffffbffff", "mario_costumes": [0, 3]}
+      ]
+    },
+    "observer": {
+      "boundary_events": 14142,
+      "end_events": 1,
+      "handshake_events": 1,
+      "start_events": 1,
+      "final_event_count": 14145,
+      "source_tick": 469,
+      "completed": true,
+      "process_exit": 0,
+      "input_events": 24006,
+      "input_complete": true
+    },
+    "audio_policy": "host output muted; DSP generation retained",
+    "exclusions": [
+      "Null video; no retail pixel comparison",
+      "No PCM or audible-quality claim",
+      "No physical-input claim",
+      "No performance or timing claim"
+    ]
+  },
+  "source_derived_validation": {
+    "item_mapping": {
+      "item_order_cursor_zero": 5,
+      "source_preference_bit_cleared": 5,
+      "start_melee_data_bit_cleared": 18,
+      "source_mask_hex": "fffffffffffbffff",
+      "pinned_source_refs": [
+        {"file": "melee/src/melee/mn/mnitemsw.c", "lines": "80-84", "reason": "authored row-zero item mapping is 0x05"},
+        {"file": "melee/src/melee/gm/gm_1601.static.h", "lines": "59-63", "reason": "source item table index 5 maps to 0x12"}
+      ]
+    },
+    "retained_css_profile": {
+      "css_data_start_melee_data_offset": 16,
+      "pre_entry_profile_byte_hex": "0x83",
+      "retained_css_is_stock": false,
+      "ordinary_match_is_stock": true,
+      "rationale": "CSSData places VsModeData.start at CSSData +0x10. The retained CSS copy is pre-entry, before gmVsMelee_EnterVs installs the match-entry profile. The ordinary match path remains strict is_stock=true and is_vs=true; only the retained decoder supplies the entry-only is_vs bit after requiring raw profile byte 0x83. Stocks remain checked as 3 in every ordinary setup and retained CSS player record.",
+      "pinned_source_refs": [
+        {"file": "melee/src/melee/mn/types.h", "lines": "264-279", "reason": "VsModeData places StartMeleeData at +0x8; CSSData places VsModeData after its leading 0x8 bytes"},
+        {"file": "melee/src/melee/mn/types.h", "lines": "160-198", "reason": "StartMeleeRules declares is_stock and documents is_vs as set only by gmVsMelee_EnterVs"},
+        {"file": "melee/src/melee/gm/gmvsmelee.c", "lines": "171-184", "reason": "gmVsMelee_EnterVs copies rules, enables stock mode for Stock matches, then sets is_vs"}
+      ]
+    }
+  },
+  "browser_receipts": {
+    "historical_attempt_07": {
+      "report_relative_to_agent_storage": "melee-web/runs/vs-team-battle-browser-route-20261002-130833-576eaf9b/team-battle-attempt-07-full-source/report.json",
+      "report_sha256": "cfaec7fe9916d232d4d5940016edb2c3f22fc7a4854ca2d867abb7bd557021d5",
+      "route_result": "pass",
+      "team_mask_hex": "fffffffeffffffff",
+      "team_mask_cleared_bit": 32,
+      "comparison_result": "mismatch_with_r9_source_mask",
+      "preservation": "Historical attempt and its reduced failure evidence remain unchanged. Its mask is not treated as current source truth."
+    },
+    "newer_browser_132_receipt": {
+      "receipt": "docs/evidence/vs-rules-plus-timer-source-route-v1.json",
+      "receipt_sha256": "ef98a1c5180d81a3dfc47fe881942eedbcb7f4e1977ef1438f1f399eab0711e4",
+      "browser_report_sha256": "19e9b1e221ad43db6140d129149cea2dd90488a3ef02b63bfa2a0d2815076fc1",
+      "line_references": [108, 161, 283],
+      "team_mask_hex": "fffffffffffbffff",
+      "team_mask_cleared_bit": 18,
+      "status": "already_matches_r9_source_mask",
+      "scope_limit": "This newer receipt is a broader Rules Plus/source route receipt, not a fresh matching browser Team Battle rerun. The fresh browser Team rerun remains pending the menus agent."
+    }
+  },
+  "comparison_status": {
+    "source_vs_historical_attempt_07": "source capture passes; old browser receipt mismatches only on item mask, with old browser mask clearing bit 32 and source mask clearing bit 18",
+    "source_vs_newer_browser_132": "declared item-mask field already matches fffffffffffbffff",
+    "full_team_cross_runtime_comparison": "pending fresh browser Team rerun; do not claim complete comparison yet",
+    "comparison_receipt": "The ignored source-browser-comparison-receipt.json is retained beside the r9 report as the historical scoped comparison; this tracked follow-up supersedes its stale browser-mask interpretation with the newer receipt status."
+  },
+  "harness_commits": [
+    "7d2d3124e66ce47e2131e9cb9af4c655c7b3f5d6",
+    "076ecae06d1dc6ca9c6928aa62dd7df7561fcde5",
+    "173efb2f342a799471bb0219ba2c2c104f0ddfda",
+    "1331b2529b0848415224f05dd0dd838b26d8e1a8",
+    "eaf270bcdeae14cbe168d9d34bf9e54e3ee98a52",
+    "36a73dbd8cfdc11b864587b8959caf1ad5d5881d"
+  ],
+  "validation": {
+    "focused_tests": "17 passed",
+    "git_diff_check": "passed",
+    "cleanup": {
+      "observer_completed": true,
+      "input_complete": true,
+      "process_exit": 0,
+      "active_dolphin_or_observer_processes_after_capture": 0,
+      "isolated_profile_input_preserved": true,
+      "output_retained": true
+    }
+  }
+}
