@@ -422,6 +422,16 @@
       "artifact": "nonempty-targeted-final.log",
       "sha256": "451e5a8e9505ce0afef2e5fb2f7a38d3c9f10314ac5d944aab89550a27d315c0",
       "bytes": 1012
+    },
+    {
+      "artifact": "storage-sync-throw-baseline.log",
+      "sha256": "60a5aa1566a29aa98ab37a51ec889126f0df4074815dcc8e2c7709bf72b566e8",
+      "bytes": 526
+    },
+    {
+      "artifact": "storage-sync-throw-fixed.log",
+      "sha256": "a8fe6354c986ba98414d4bb177eee799d52a11332ede80e04bf3e9e2be6b13ae",
+      "bytes": 121
     }
   ],
   "mature_delivery_regression": {
@@ -476,5 +486,12 @@
     "limits": "No waiting on Resume. Current ring and local storage can still evict incidents under their declared bounds; no recovery is promised if no snapshot survives.",
     "authoritative_negative_control": "retained-nonempty-regression-baseline-v3.log",
     "earlier_fixture_limits": "Original fixture used a locally valid but wire-invalid prior session id. Version2 explicitly detected that setup issue. Version3 uses a wire-valid prior record and verifies it was delivered, current young was stored but not delivered, and actual current-ring eviction occurred before the expected collection failure."
+  },
+  "synchronous_storage_failure_followup": {
+    "baseline": "A synchronous optional storage merge exception left a settled persistence promise installed. The next write returned the stale failure; a checkpoint could repeatedly await it.",
+    "fix": "Install the pending promise before invoking the adapter, so failure cleanup runs after assignment.",
+    "source_file_sha256": "8d017456f250efc63e538016c88e34d0bd0853d340a7517000b66106ee54d931",
+    "focused_check": "Full core JavaScript fixture passes, including recovery on the second persist and a subsequent fresh checkpoint.",
+    "limits": "Default IndexedDB merge is asynchronous. This optional adapter exception-isolation regression is not evidence of the phone cause. Prior package/browser and CI results precede this correction."
   }
 }

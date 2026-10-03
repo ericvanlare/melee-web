@@ -36,6 +36,14 @@ control fails and all five affected owner checks pass after the correction.
 The earlier package/browser and CI results above precede this final JavaScript
 correction; its source hash and focused results are bound in the receipt.
 
+An additional storage-adapter negative control found that a synchronous merge
+exception could leave a settled persistence promise installed, preventing later
+writes and starving the checkpoint loop. Deferring the adapter invocation until
+after that promise is installed fixes the error path; the core JavaScript check
+passes, including a fresh write and checkpoint after the exception. The default
+IndexedDB adapter is asynchronous, so this is failure isolation, not a phone
+cause. Earlier package/browser and CI results precede this correction too.
+
 Three bounded probes of the retained PR144 package reproduced a first-CSS
 simulation-debt pause in desktop WebKit; the corresponding Chrome controls
 reached their declared CSS observation windows without a forced pause. A slow

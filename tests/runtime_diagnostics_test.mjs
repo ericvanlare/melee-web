@@ -336,4 +336,25 @@ const nativeRow = (timestamp, sourceFrame = 12) => [
   assert.equal(cancelledMerges, 0, 'cancellation rechecks eligibility before storage');
 }
 
+// A synchronous adapter failure must clear the pending write before a later
+// persist/checkpoint. Otherwise a settled promise can strand every future
+// write and make the checkpoint's pending-write loop starve lifecycle tasks.
+{
+  let merges = 0;
+  const diagnostics = createRuntimeDiagnostics({storage: {
+    merge(records) {
+      if (++merges === 1) throw Object.assign(new Error('storage denied'), {name: 'SecurityError'});
+      return {records, bytes: records.length, evictedCount: 0, malformedCount: 0};
+    },
+  }});
+  diagnostics.trigger(1, 9, 8, -1, 7, 1);
+  assert.equal((await diagnostics.persist()).reason, 'denied');
+  assert.equal((await diagnostics.persist()).persisted, true,
+    'a synchronous storage failure must not strand the next write');
+  assert.equal(merges, 2);
+  assert.equal((await diagnostics.checkpoint()).persisted, true);
+  assert.equal(merges, 3, 'the checkpoint takes a fresh snapshot after recovery');
+  assert.equal(diagnostics.exportReports().flags.storage_denied, true);
+}
+
 console.log('Runtime diagnostics bounds, privacy, host mapping, recovery and storage failure tests passed.');

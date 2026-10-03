@@ -1522,7 +1522,9 @@ export function createRuntimeDiagnostics(options = {}) {
       if (!record) { malformedRecord = true; continue; }
       records.push(record);
     }
-    persistPromise = (async () => {
+    // Install the pending promise before invoking an optional adapter. A
+    // synchronous throw must not clear it before the assignment completes.
+    persistPromise = Promise.resolve().then(async () => {
       try {
         const merged = typeof adapter.merge === 'function'
           ? await promiseResult(adapter.merge(records))
@@ -1545,7 +1547,7 @@ export function createRuntimeDiagnostics(options = {}) {
       } finally {
         persistPromise = null;
       }
-    })();
+    });
     return persistPromise;
   }
 
