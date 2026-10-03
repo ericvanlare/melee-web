@@ -146,3 +146,14 @@ the destination for new captures and logs; omitting it keeps the configured
 support-root behavior. These paired traces narrow RNG consumption boundaries;
 they do not establish pixel, PCM, live-input, performance, or full gameplay
 equivalence.
+
+The selected return may be a `blr` that PPCAnalyst elides as a host branch. The
+reference-capture patch admits only the exact configured, pinned Rand/Randf
+return in that case; it does not enable general callbacks at skipped
+instructions. The bounded window closes at the first target-match source tick
+after `last_tick`, even when that stage makes no later RNG call. Close status
+keeps the selected `rng_return_pc` separate from `close_pc` and reports the
+number of selected-return callbacks separately from records admitted to the
+probe window, plus the last callback's PC, source tick and match. This
+distinguishes a return-delivery failure from a window/scope mismatch; a closed
+window with zero admitted records remains a failed diagnostic.
