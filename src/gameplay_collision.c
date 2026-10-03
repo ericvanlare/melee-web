@@ -24,6 +24,8 @@ struct MeleeWebCollision {
     HSD_GObj* object;
     MapCollData map;
     uint64_t generation;
+    int stage_joint_bindings_ready;
+    int stage_callbacks_ready;
 };
 static MeleeWebCollision* collision_owner;
 
@@ -52,7 +54,8 @@ static int collision_adjacency(int index, size_t count)
 {
     return index == -1 || (index >= 0 && (size_t) index < count);
 }
-static int collision_input(const MeleeWebCollisionInput* in, char* error, size_t size)
+static int collision_input(const MeleeWebCollisionInput* in, int source_loaded,
+                           char* error, size_t size)
 {
     if (!in || !in->vertices || !in->lines || !in->joints ||
         !in->vertex_count || in->vertex_count > groundCollVtx_count ||
@@ -62,7 +65,7 @@ static int collision_input(const MeleeWebCollisionInput* in, char* error, size_t
     if (in->stage_kind < 0 || in->stage_kind >= Gr_Kind_Count ||
         !isfinite(in->stage_scale) || in->stage_scale <= 0.0F)
         return collision_fail(error, size, "Collision requires a source stage kind and positive finite stage scale");
-    if (in->ranges[4].count)
+    if (in->ranges[4].count && !source_loaded)
         return collision_fail(error, size, "Dynamic collision lines require pending stage bindings and callbacks");
     unsigned char categories[1536] = {0};
     for (unsigned category = 0; category < 5; ++category) {
@@ -70,7 +73,8 @@ static int collision_input(const MeleeWebCollisionInput* in, char* error, size_t
         if (!collision_range(range, in->line_count))
             return collision_fail(error, size, "Collision category range is invalid");
         for (int i = range.start; i < range.start + range.count; ++i) {
-            if (categories[i] || (in->lines[i].hi_flags & LINE_FLAG_KIND) != (1U << category))
+            if (categories[i] ||
+                (category < 4 && (in->lines[i].hi_flags & LINE_FLAG_KIND) != (1U << category)))
                 return collision_fail(error, size, "Collision category partition or original line kind is inconsistent");
             categories[i] = 1;
         }
@@ -126,6 +130,50 @@ static int collision_input(const MeleeWebCollisionInput* in, char* error, size_t
             current = kind == CollLine_Floor ? in->lines[current].next0 : in->lines[current].prev0;
         }
     }
+    return 1;
+}
+
+/* Retail Stage_8022524C loads the DAT collision map before StageData::on_init.
+ * Dynamic ranges are usable only after that source callback has bound each
+ * owning joint to its authored JObj. Keep this gate on source adoption alone;
+ * synthetic collision creation runs before any stage callback by design. */
+static int collision_source_dynamic_ready(const MeleeWebCollisionInput* in,
+                                          char* error, size_t size)
+{
+    if (!in->ranges[4].count) return 1;
+    MapCollData* source = stage_info.coll_data;
+    if (!stage_info.on_touch_line)
+        return collision_fail(error, size, "Source dynamic collision has no authored touch-line callback");
+    if (!source || source != mpLib_804D64B4 || !source->lines || !source->joints ||
+        source->vert_count != (int) in->vertex_count ||
+        source->line_count != (int) in->line_count ||
+        source->joint_count != (int) in->joint_count ||
+        source->dynamic_start != in->ranges[4].start ||
+        source->dynamic_count != in->ranges[4].count)
+        return collision_fail(error, size, "Source dynamic collision lost its original loaded map descriptor");
+
+    unsigned char dynamic_line_owners[1536] = {0};
+    for (size_t i = 0; i < in->joint_count; ++i) {
+        const MeleeWebCollisionRange authored = in->joints[i].ranges[4];
+        const MapJoint* loaded = &source->joints[i];
+        if (!authored.count) continue;
+        const CollJoint* bound = &groundCollJoint[i];
+        if (bound->inner != loaded || loaded->dynamic_start != authored.start ||
+            loaded->dynamic_count != authored.count || !bound->x20)
+            return collision_fail(error, size, "Source dynamic collision joint is not bound to its authored stage JObj");
+        for (int line = authored.start; line < authored.start + authored.count; ++line) {
+            if (line < in->ranges[4].start ||
+                line >= in->ranges[4].start + in->ranges[4].count ||
+                groundCollLine[line].x0 != &source->lines[line])
+                return collision_fail(error, size, "Source dynamic collision line has no original joint-owned descriptor");
+            if (dynamic_line_owners[line]++)
+                return collision_fail(error, size, "Source dynamic collision line is owned by overlapping stage joints");
+        }
+    }
+    for (int line = in->ranges[4].start;
+         line < in->ranges[4].start + in->ranges[4].count; ++line)
+        if (dynamic_line_owners[line] != 1)
+            return collision_fail(error, size, "Source dynamic collision ranges do not cover every authored dynamic line");
     return 1;
 }
 
@@ -265,7 +313,7 @@ MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput* in, 
         mpIsland_80458E88.next || mpIsland_80458E88.x4 || HSD_GObj_804D781C) {
         collision_fail(error, size, "Collision creation requires an idle gameplay world and exclusive original storage"); return NULL;
     }
-    if (!collision_input(in, error, size)) return NULL;
+    if (!collision_input(in, 0, error, size)) return NULL;
     /* Original mpLibLoad allocates fixed-capacity arrays even for a tiny map.
      * Include conservative SDK cell headers/rounding, one GObj and its update process, and at most
      * one 0x2c island per floor/ceiling line. This catches undersized worlds;
@@ -321,7 +369,8 @@ MeleeWebCollision* melee_web_collision_adopt_loaded(
         collision_fail(error, size, "Loaded source collision has no exclusive active stage context");
         return NULL;
     }
-    if (!collision_input(in, error, size)) return NULL;
+    if (!collision_input(in, 1, error, size) ||
+        !collision_source_dynamic_ready(in, error, size)) return NULL;
     for (HSD_GObj* candidate = ((HSD_GObj**) HSD_GObj_Entities)[6];
          candidate; candidate = candidate->next) {
         if (candidate->classifier != 1 || !candidate->proc ||
@@ -351,6 +400,10 @@ MeleeWebCollision* melee_web_collision_adopt_loaded(
         owner->map.lines[i] = *groundCollLine[i].x0;
     }
     owner->generation = generation; owner->object = object; collision_owner = owner;
+    if (in->ranges[4].count) {
+        owner->stage_joint_bindings_ready = 1;
+        owner->stage_callbacks_ready = 1;
+    }
     GObj_InitUserData(object, 0, collision_release, owner);
     for (int start = 0; start < owner->map.line_count; ++start)
         for (int direction = 0; direction < 2; ++direction) {
@@ -376,6 +429,8 @@ int melee_web_collision_readiness(MeleeWebCollision* owner, MeleeWebCollisionRea
     MeleeWebCollisionReadiness result = {0};
     result.vertices = owner->map.vert_count; result.lines = owner->map.line_count; result.joints = owner->map.joint_count;
     result.storage_owned = result.original_indices_initialized = 1;
+    result.stage_joint_bindings_ready = owner->stage_joint_bindings_ready;
+    result.stage_callbacks_ready = owner->stage_callbacks_ready;
     for (mp_UnkStruct0* segment = mpIsland_80458E88.next; segment; segment = segment->next) ++result.floor_islands;
     for (mp_UnkStruct0* segment = mpIsland_80458E88.x4; segment; segment = segment->next) ++result.ceiling_islands;
     for (int i = 0; i < owner->map.line_count; ++i) if (owner->map.lines[i].hi_flags & LINE_FLAG_EMPTY) ++result.empty_lines;

@@ -35,6 +35,8 @@ MAX_HISTORY_COLUMNS = 20
 MAX_PRE_EVENTS = 32
 MAX_POST_EVENTS = 24
 NUMBER_LIMIT = 1e12
+# Server envelope epochs use the safe-integer range, separately from measurements.
+MAX_EPOCH_MS = 9007199254740991
 FRAME_LIMIT = 0x7FFFFFFF
 
 ENVIRONMENTS = {"staging", "production"}
@@ -361,8 +363,8 @@ def _sanitize_envelope(value: Any) -> dict[str, Any]:
     envelope = _exact(value, ("report_id", "received_at", "expires_at", "bytes", "report"), "report_envelope")
     return {
         "report_id": _string(envelope["report_id"], REPORT_ID_RE, "report_id"),
-        "received_at": _number(envelope["received_at"], "received_at", integer=True, minimum=0),
-        "expires_at": _number(envelope["expires_at"], "expires_at", integer=True, minimum=0),
+        "received_at": _number(envelope["received_at"], "received_at", integer=True, minimum=0, maximum=MAX_EPOCH_MS),
+        "expires_at": _number(envelope["expires_at"], "expires_at", integer=True, minimum=0, maximum=MAX_EPOCH_MS),
         "bytes": _number(envelope["bytes"], "bytes", integer=True, minimum=1, maximum=65536),
         "report": _sanitize_report(envelope["report"]),
     }

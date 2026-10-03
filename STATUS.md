@@ -66,6 +66,11 @@ remains immutable historical evidence. Quiet-machine and foreground protocols,
 physical input, arranged audible output, uninterrupted audio, pixels/PCM and
 whole-session performance admission remain open. Audio underruns increased
 between retained Results snapshots; their first increase is not located.
+The [bounded audio-counter follow-up](docs/evidence/audio-underrun-triage-v1.json)
+records authenticated staging triage, the admin CLI epoch-bound correction,
+counter semantics and a short instrumented Results return. The historical
+first underrun increase remains unlocated; no audio runtime fix is justified
+by that reduced case.
 The local preparation-wait cause does not classify users' other varied pauses.
 No GitHub merge or hosted deployment is included.
 
