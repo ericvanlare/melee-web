@@ -13,10 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from workspace_resources import operation
 
-# Pinned Aurora plus the reviewed patch preceding the ImGui timestamp fix.
-# Previous patch blob: 0bf4dc0e2e4370d4fbd01198c5851ccf23d0a26e.
+# Pinned Aurora plus the reviewed patch preceding demand-allocated CPU staging.
+# Previous patch blob: 1e936ff823b34bd6b4a6e0926028cdcace72abf4.
 # Recognize this exact source tree, never an arbitrary locally modified checkout.
-AURORA_PREVIOUS_PATCH_TREE = "5c55151760b50ffb99d0f61b665a3cf3fab0efdf"
+AURORA_PREVIOUS_PATCH_TREE = "1f2ebff4c302baded19858a8be4d59919c8d3236"
 
 
 def run(*args, cwd=ROOT):
