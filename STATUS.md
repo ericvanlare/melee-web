@@ -206,6 +206,95 @@ The original title/main-menu receipts above were produced on the PR #96 source
 revision. The current combined runtime also passes the public and audio
 browser lifecycle checks indexed in the PR #86 integration receipt above.
 
+## VS Rules and Items route — bounded Rules Plus timer slice
+
+**Source identified / Native traced / Browser exercised / Compiled** for the
+original Main → VS → Rules → Items → Rules Plus route, one item-row toggle,
+None item frequency, one-minute stock timer, three-stock Final Destination
+browser match, No Contest Results, and retained Rules Plus/CSS navigation. The
+[scoped receipt](docs/evidence/vs-rules-plus-timer-source-route-v1.json) binds
+the retail source prefix, rendered headless Chrome report and screenshots,
+Release package hashes, callbacks, assets, and focused/full-suite checks. The
+retail capture reaches its first match setup, natural Results, scene teardown,
+and CSS return; its enclosing three-match request later failed during another
+match teardown/recreation path. That failure and the reduced prefix are retained
+in the receipt. Retail video used Null rendering, so no retail pixel comparison
+is claimed.
+
+The earlier v2 receipt's item-mask mapping is superseded. Rev. 2 source
+observation and the corrected browser route show that toggling Items cursor 0
+clears in-memory item preference bit 5 and `StartMeleeData` mask bit 18. The
+source menu's authored arrays were assembled into a stable `MnItemSwTable`
+because Emscripten object sections do not preserve the adjacency assumed by
+retail. The browser match receives the edited mask `fffffffffffbffff`, None
+frequency, and enabled 60-second timer, then reaches Results and CSS. Its
+screenshots show real rendered output; the Final Destination frame still has
+magenta outline artifacts, so visual equivalence remains unclaimed.
+
+This route used a fresh isolated Everything-unlocked context and did not exercise
+Personal autosave or source GCI persistence. Item-family spawning, PCM/pixel
+equivalence, physical input, and performance remain outside its evidence. Host
+speaker output was muted while browser audio processing remained enabled.
+
+## VS Teams route — rendered browser slice
+
+**Source identified / Browser exercised / Compiled** for original CSS Teams
+toggle and team-color input, opposing P1/P2 teams, SSS cancellation and re-entry,
+a live two-player Team Battle, No Contest Results, retained Rules/Items on CSS
+return, and Eject/reimport cleanup. The [scoped receipt](docs/evidence/vs-team-battle-route-v1.json)
+binds the rendered browser report, screenshots, runtime package hashes, and
+incomplete retail attempt. Browser source state and navigation passed. The
+retail capture stopped before SSS because the harness used P2's Human/CPU toggle
+bounds instead of the team-color bounds; the reduced [failure packet](docs/evidence/vs-team-battle-retail-boundary-reproducer-v1.json)
+records the exact source samples and corrected geometry decoder. That corrected
+retail interaction has not been rerun, so retail Team match comparison is
+incomplete. Visual/audio equivalence, physical input, performance, source GCI
+persistence, and Personal autosave were not exercised. Host output was muted
+while source DSP/audio processing remained enabled.
+
+## Main Settings > Rumble route
+
+**Source identified / Retail compared / Browser exercised / Compiled** for the
+original Main → Settings → Rumble route and its return to CSS. The retail
+Observer trace records Main/Settings/Rumble/Settings/Main menu IDs
+`0/4/19/4/0`; ordinary A disables Controller 1 rumble and B backs out through
+both original pages. In a fresh isolated Chrome context, the public player
+renders the original Settings and Rumble scenes, changes the source SaveData
+rumble bytes at offset `0x458` from `[1,1,1,1]` to `[0,1,1,1]`, autosaves,
+re-enters the route, returns through VS selection to CSS, exports the same
+preference, and retains it after document reload. The source menu owner unloads
+cleanly. The [scoped route receipt](docs/evidence/main-settings-rumble-route-v1.json)
+indexes the retail trace, browser package identity, input, save bytes, screenshots
+and retained failure runs. The [route capture notes](docs/ORIGINAL_MENU_ROUTE_CAPTURE.md#main-settings-rumble-route)
+separate source state, rendered browser evidence, persistence and lifecycle.
+Retail video/audio were disabled, and the browser package is audio-disabled;
+this does not establish pixel or audio equivalence, physical input, foreground
+timing, performance, or coverage of other Settings pages.
+
+## Main Settings > Display route
+
+**Source identified / Retail compared / Browser exercised / Compiled** for the
+original Main → Settings → Display page and its return through CSS. Retail
+Observer records menu IDs `0/4/21/4/21/4/0`, repeated Display entry and B
+cancellation through Settings/Main. A changes the source SaveData deflicker
+byte at `0x45D` from `1` to `0`. A fresh isolated Chrome context on the
+combined Rumble and trophy-baseline runtime confirms a new Personal profile,
+source toggle/autosave, repeated entry, matching GCI export, and retention
+through a rendered match, No Contest Results and CSS. Native menu teardown
+passes. The [scoped receipt](docs/evidence/main-settings-display-route-v1.json)
+records the exact source and artifact identities, inputs, screenshots, save
+state, lifecycle and exclusions.
+
+The passing combined-state run `browser-route-integrated-01` is real and
+rendered, but stage identity is unobserved. The corrected browser harness sends
+no SSS cursor input, and the route uses `scripts/serve.py` for the required
+cross-origin-isolation headers. Earlier reports that omitted the Playwright
+package path or used a stock Python server are retained as setup failures.
+Retail used Null video and No Audio Output, the browser package is silent, and
+physical input, foreground timing, pixel/PCM
+comparison and performance remain untested. This route does not establish other
+Settings pages or full-game parity.
+
 ## Current acceptance boundaries
 
 The supported CSS → SSS → Mario/Final Destination → Results → CSS route is
@@ -214,6 +303,44 @@ original comparison, live and physical input, visual output, audio fidelity and
 sustained performance. The [roadmap](docs/ROADMAP.md), [accuracy contract](docs/ACCURACY_CONTRACT.md)
 and [performance/accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md) define
 those boundaries; this section adds no new runtime or deployment evidence.
+
+## Original Training CSS/SSS navigation route
+
+The current menu audit confirms the VS rules and item-settings route is still
+partial: `mnmainrule`, `mnruleplus` and `mnitemsw` are in the source build, but
+the browser host does not own their original entry/back path or settings-to-match
+handoff. This Training navigation slice was already underway and is independently
+bounded at the source CSS/SSS states. The next route slice should prioritize the
+original VS rule/item path through a settings change, real match and Results/CSS.
+
+**Source identified / Compiled / Browser exercised** for the bounded original
+1P Training menu route: CSS → Main → the source `SEL_1P_TRAINING` callback →
+`GM_TRAINING` → original Training CSS → original Training SSS; SSS B returns to
+Training CSS, CSS B returns to Main, and repeated entry/exit succeeds. The
+browser selects Mewtwo through CSS geometry and PAD samples, selects Final
+Destination through SSS geometry and PAD samples, then reaches the explicit
+unsupported `GS_TRAINING` state-2 boundary before its one-player simulation is
+entered. Eject and clean reimport recover after that boundary. The
+[scoped receipt](docs/evidence/training-menu-route-v1.json) identifies the
+source states/callbacks, assets, browser screenshots, input and artifact hashes.
+
+Training mode is `GM_TRAINING` (`0x1C`); its authored mode-state ids 0 and 1
+use `GS_CSS` (`0x08`) and `GS_SSS` (`0x09`), while id 2 is `GS_TRAINING`
+(`0x04`). The route uses `mn_8022D7F4` for the 1P Training selection,
+`gm_Mode_Training_OnInit`/`OnLoad`, the source CSS/SSS scene callbacks, and the
+mode callbacks `gm_801B1B74`/`gm_801B1C24`, `gm_801B1EB8`/`gm_801B1EEC`, and
+`gm_801B1F70`/`gm_801B2204`. The host stops before the state-2 OnEnter because
+Training's simulation, HUD/options, item controls, reset and CPU services are
+not integrated. Its error remains explicit.
+
+This is source and real-rendered browser evidence, not retail equivalence. The
+retail Training route capture was unavailable in this host session; only the
+owned Rev. 2 CISO identity was verified. Headless Chrome used a fresh isolated
+Everything-unlocked session and synthetic keyboard/PAD samples. Personal-save
+progression and save writes were not exercised; physical input, audible quality,
+pixel comparison and performance remain unrun. The host audio output was muted
+for capture. The Training row in the [full-game inventory](docs/full-game-inventory.json)
+therefore remains acceptance-unassessed.
 
 ## Repository public; main changes restricted to the owner
 
@@ -1308,14 +1435,6 @@ receipts. Setup and the reproducible acceptance command are in the
 local interoperability result; rollback correctness, browser cross-play,
 public Internet/NAT, rendering/audio accuracy and production readiness remain
 unclaimed.
-
-The [local reporter framing receipt](docs/evidence/local-slippi-reporter-framing-v1.json)
-is a separate **Compiled / Source identified** HTTP boundary check. It binds
-the v4 old/new service hashes and six exact 503 responses per variant; the new
-response is close-delimited with `Connection: close` and no `Content-Length`.
-It preserves the retained reporter-thread failure as a separate, non-
-deterministic inference and makes no native gameplay, browser or official
-service claim.
 
 A separate [headless browser-to-desktop transport receipt](docs/evidence/slippi-browser-desktop-transport-v1.json)
 records one 24-frame raw PAD exchange through the loopback ENet relay and the

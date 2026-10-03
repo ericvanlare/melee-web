@@ -1,0 +1,189 @@
+{
+  "schema": "melee-web-training-menu-route-v1",
+  "status": "partial",
+  "scope": "Original-source 1P Training menu navigation through CSS and SSS, including repeated cancel/entry, stage selection, the explicit unsupported state-2 handoff, Eject and clean reimport. This is not retail equivalence or Training gameplay acceptance.",
+  "source": {
+    "repository": "doldecomp/melee",
+    "commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "runtime_base_commit": "72d37dc719c6f06d569985686c23f8f6d0cfd825",
+    "training_mode": {
+      "id": "GM_TRAINING",
+      "value": "0x1C"
+    },
+    "mode_states": [
+      {
+        "id": 0,
+        "scene": "GS_CSS",
+        "scene_value": "0x08",
+        "source_enter": "gm_801B1B74",
+        "source_exit": "gm_801B1C24"
+      },
+      {
+        "id": 1,
+        "scene": "GS_SSS",
+        "scene_value": "0x09",
+        "source_enter": "gm_801B1EB8",
+        "source_exit": "gm_801B1EEC"
+      },
+      {
+        "id": 2,
+        "scene": "GS_TRAINING",
+        "scene_value": "0x04",
+        "source_enter": "gm_801B1F70",
+        "source_exit": "gm_801B2204",
+        "browser_status": "not_entered; explicit checked unsupported boundary before source simulation OnEnter"
+      }
+    ],
+    "route_callbacks": [
+      "mn_8022D7F4: SEL_1P_TRAINING writes pending_mode=GM_TRAINING",
+      "gm_Mode_Training_OnInit",
+      "gm_Mode_Training_OnLoad",
+      "mnCharSel_Scene_OnEnter",
+      "mnCharSel_Scene_OnFrame",
+      "mnCharSel_Scene_OnExit",
+      "mnCharSel_CursorThink",
+      "fn_80262F44: original CSS Start readiness/trigger callback",
+      "mnStageSel_Scene_OnEnter",
+      "mnStageSel_Scene_OnFrame",
+      "mnStageSel_Scene_OnExit"
+    ],
+    "source_assets": {
+      "non_japanese": [
+        "MnSlChr.usd",
+        "MnExtAll.usd",
+        "SdSlChr.usd:SIS_SelCharData",
+        "MnSlMap.usd"
+      ],
+      "japanese": [
+        "MnSlChr.dat",
+        "MnExtAll.dat",
+        "SdSlChr.dat:SIS_SelCharData",
+        "MnSlMap.dat"
+      ],
+      "asset_note": "Names are read by the original CSS/SSS OnEnter callbacks. The Training route reuses the source archives and does not add replacement menu assets."
+    },
+    "source_save_effects": "gm_Mode_Training_OnInit initializes the in-memory VS mode payload and saved-player defaults. No Personal save or progress path was exercised. The state-2 exit routine gm_801B2204 was not reached."
+  },
+  "retail_reference": {
+    "status": "not_run",
+    "blocker": "No Observer-enabled Dolphin Training route capture/operator was available in this host session. Source and disc identity do not establish retail behavior.",
+    "disc_identity": {
+      "format": "CISO",
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    }
+  },
+  "browser": {
+    "status": "passed",
+    "browser": "headless installed Chrome 154.0.8037.97",
+    "audio_policy": "Host audio output muted by the browser harness; this does not establish audible quality or audio parity.",
+    "fresh_profile": "Isolated browser session, native default Everything-unlocked mode; no Personal profile loaded and no user save changed.",
+    "input": {
+      "keyboard_layout": "B0XX",
+      "menu_keys_used": [
+        "q+9+7: CSS to Main",
+        "m: confirm Main/character/stage selection",
+        "3: move Main 1P menu selection",
+        "7: Start from CSS",
+        "o: B from SSS"
+      ],
+      "source_pad": "Original CSS character and SSS stage source geometry drove browser-injected PAD samples; no selection bytes or stage IDs were written by the helpers.",
+      "physical_input": "not_run"
+    },
+    "observed_route": [
+      "Initial CSS to original Main",
+      "Main SEL_1P_TRAINING to GM_TRAINING and original Training CSS",
+      "Training CSS B to Main; repeated Training entry",
+      "Mewtwo selected with source CSS geometry/PAD edges; 30 neutral source frames consumed; original Start reached SSS",
+      "SSS B returned to Training CSS; CSS B returned to Main",
+      "Repeated Training entry, CSS Start, source SSS cursor to Final Destination (stage kind 32), and stage confirm",
+      "Explicit GM_TRAINING state-2 unsupported error before simulation entry",
+      "Eject and clean CSS reimport succeeded"
+    ],
+    "source_start_observation": {
+      "p1_start_trigger": 4096,
+      "source_start_ready": 1,
+      "source_pending_scene": 1,
+      "resulting_phase": 3,
+      "resulting_message": "Original stage select"
+    },
+    "unsupported_boundary": "Original Training stage selection reached GM_TRAINING state 2. Its one-player simulation, Training HUD/options, item controls, and reset/CPU services are not integrated yet; Eject to recover.",
+    "cleanup": {
+      "status": "Eject and clean reimport passed; the captured unsupported-state snapshot has no live source world objects/processes.",
+      "audio_or_asset_fidelity": "not_evaluated"
+    },
+    "report": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/training-menu-route-20261002-024800/report.json",
+      "sha256": "946cb5179acc0c9ad579b875b4c1097153ed5bf52d6edae663b0f66f39a376a2",
+      "errors": []
+    },
+    "screenshots": {
+      "training_css_selected": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/training-menu-route-20261002-024800/training-mario-selected-6.png",
+        "sha256": "7d34a7633ffa246ce2a67983b5f8d41ff39e2e390239e4746f4c6908457f8760"
+      },
+      "training_sss": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/training-menu-route-20261002-024800/training-sss.png",
+        "sha256": "ea98d149151a7451fe9b103a926389832decda18b086b7da8b1c7c4be6532195"
+      },
+      "training_sss_cancel_css": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/training-menu-route-20261002-024800/training-sss-cancel-css.png",
+        "sha256": "8d506f301fab0b4c14e83b82c6bbb6d8f5ad768261ecca2abd86f52b1c29a305"
+      },
+      "training_css_parent_return": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/training-menu-route-20261002-024800/training-css-parent-return.png",
+        "sha256": "c7ef65716e9c15c7860bae54a261201bd23dac5a7352186f9ddbe0aab0d57886"
+      },
+      "post_reimport_css": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/training-menu-route-20261002-024800/post-failure-clean-css.png",
+        "sha256": "c986f895fafbd455022ab608751b6fd4a3e292de9074ebe69617f6070a62e6a8"
+      },
+      "visual_comparison": "not_run; screenshots are real canvas renders, not pixel-matched to retail."
+    }
+  },
+  "retained_diagnostics": [
+    {
+      "path": "/Volumes/AgentStorage/melee-web/runs/training-css-start-callback-20261002-023100/report.json",
+      "finding": "CSS GObj read Start while ready, but the generic VS CSS validation rejected the Training setup; led to the Training-specific Start validator."
+    },
+    {
+      "path": "/Volumes/AgentStorage/melee-web/runs/training-css-start-callback-20261002-023300/report.json",
+      "finding": "Start reached SSS; the small harness then called its CSS-only driver after the phase change and reported that probe misuse."
+    },
+    {
+      "path": "/Volumes/AgentStorage/melee-web/runs/training-menu-route-20261002-023500/report.json",
+      "finding": "SSS B correctly returned to Training CSS; the harness initially waited for the normal VS CSS message."
+    },
+    {
+      "path": "/Volumes/AgentStorage/melee-web/runs/training-menu-route-20261002-024000/report.json",
+      "finding": "The harness confirmed the repeated route but attempted stage confirm before driving the original SSS cursor to a stage. The final repro uses source SSS geometry and PAD input."
+    }
+  ],
+  "runtime_artifacts": {
+    "configuration": "Release",
+    "build_command": "python3 scripts/build.py --target runtime --configuration Release",
+    "files": {
+      "gameplay_menu_browser.js": "291b7b475b51508fbae9da0ddc2c9ac8b7ad3dd207addc6a49c73153ea61ae9f",
+      "gameplay_menu_browser.wasm": "71ce1702868adbf8686a1f4541fd142e52170b04944e2d19a525eaee2a67373d",
+      "gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    },
+    "patch_sha256": "ce61c72fe3eb7abca96809770c4eeba0ae1749c1b46d120f86908ee042e0ac79"
+  },
+  "checks": {
+    "focused": {
+      "command": "python3 -m unittest discover -s tests -p 'test_gameplay_menu.py' -v",
+      "result": "passed; 2 tests"
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "result": "passed; 1668 tests in 272.147s, 136 skipped",
+      "log": "/Volumes/AgentStorage/melee-web/runs/training-menu-route-20261002-024800/full-suite-final.log",
+      "sha256": "19ce0a71b1b6ada9bf82515214082661de7295dcda7a1c9e042debabf0e91a06"
+    },
+    "release_runtime_build": "passed"
+  },
+  "limits": [
+    "No retail Training navigation comparison was captured.",
+    "No Training match simulation, Training HUD/options, reset, item controls, Training CPU, Results, unlock, or Personal-save progression claim.",
+    "No physical/foreground input, audible output, PCM comparison, pixel comparison, or performance claim."
+  ]
+}

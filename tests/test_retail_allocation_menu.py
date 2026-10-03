@@ -52,8 +52,10 @@ class RetailAllocationMenuTests(unittest.TestCase):
         self.assertIn("pulse(0,'A',settle=30)", source)
         cold_sss = source.split("def _cold_boot_enter_sss():", 1)[1].split(
             "def cold_boot_to_sss():", 1)[0]
-        self.assertNotIn("set_cpu_mode(", cold_sss)
-        self.assertNotIn("set_cpu_level(", cold_sss)
+        self.assertIn("if player['player_type']:", cold_sss)
+        self.assertIn("set_cpu_mode(door)", cold_sss)
+        self.assertIn("set_cpu_level(door,int(player['cpu_level']))", cold_sss)
+        self.assertIn("roster setup mismatch", cold_sss)
         # The final preparation still uses the existing source CSS/SSS body.
         self.assertIn("set_rules_via_original_menu()", source)
         self.assertIn("select_stage(EXPECTED_STAGE)", source)
@@ -176,6 +178,7 @@ class RetailAllocationMenuTests(unittest.TestCase):
                     "event": "pad_command", "port": 1, "command": "PRESS A",
                     "scene_kind": driver.SCENE_MEMCARD, "game_mode": 17,
                     "scene_frame": 17,
+                    "source_sequence": None,
                 })
             finally:
                 if "COMMAND_LOG" in namespace:
@@ -217,6 +220,37 @@ class RetailAllocationMenuTests(unittest.TestCase):
         self.assertNotIn("write_memory(", source)
         self.assertNotIn("put_register", source)
         self.assertNotIn("load_state", source.lower())
+
+    def test_vs_rules_items_driver_uses_only_original_controls_and_source_callbacks(self):
+        source = driver.render_vs_rules_items_round_trip_driver()
+        compile(source, "cold_boot_vs_rules_items_round_trip.py", "exec")
+        self.assertIn("_cold_boot_vs_rules_items_round_trip()", source)
+        self.assertIn("cold-boot-vs-rules-items-route.jsonl", source)
+        self.assertIn("vs_items_one_bit_toggled", source)
+        self.assertIn("vs_items_frequency_none", source)
+        self.assertIn("vs_rules_reentry_retained_items", source)
+        self.assertIn("Rules row 6 opens the authored Rules Plus screen", source)
+        self.assertIn("_vs_rules_wait_menu(15,0)", source)
+        self.assertIn("Rules Plus re-entry did not retain the committed one-minute timer", source)
+        self.assertIn("css_after_rules_start_retained", source)
+        self.assertIn("teams_toggle_before", source)
+        self.assertIn("teams_toggle_after", source)
+        self.assertIn("p2_team_color_before", source)
+        self.assertIn("p2_team_color_after", source)
+        self.assertIn("_cold_boot_configure_teams()", source)
+        self.assertIn("move_cursor(0,-30.0,23.3)", source)
+        self.assertIn("move_cursor(0,(left+right)/2,-3.4)", source)
+        self.assertIn("css_setup", source)
+        self.assertIn("pulse(0,'B',settle=30)", source)
+        self.assertNotIn("write_memory(", source)
+        self.assertNotIn("put_register", source)
+        self.assertNotIn("load_state", source.lower())
+        self.assertNotIn("savestate", source.lower())
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "rules-items.py"
+            driver.write_driver(path, vs_rules_items_round_trip=True)
+            self.assertEqual(path.read_text(), source)
 
 
 if __name__ == "__main__":

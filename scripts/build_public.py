@@ -162,6 +162,7 @@ RUNTIME_FORBIDDEN_EXPORTS = frozenset({
     "_melee_web_native_menu_stock_check", "_melee_web_native_menu_stock_check_ready",
     "_melee_web_native_menu_diagnostics", "_melee_web_native_menu_memory",
     "_melee_web_native_menu_results_pad_trace", "_melee_web_native_menu_results_pause_schedule",
+    "_melee_web_native_menu_source_observe",
     "_melee_web_css_observe", "_melee_web_css_observe_setup", "_melee_web_sss_observe", "_melee_web_input_message",
     "_melee_web_css_observe_port", "_melee_web_native_menu_match_observe",
 })

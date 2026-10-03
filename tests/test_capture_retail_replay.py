@@ -99,10 +99,12 @@ class CaptureRunnerTests(unittest.TestCase):
         command = CAPTURE.dolphin_command(
             Path("/Dolphin"), Path("/owned/user"), Path("/owned/snapshot.sav"),
             Path("/readonly/game.iso"))
-        self.assertEqual(command[0:9], [
-            "/Dolphin", "-u", "/owned/user", "-b", "-d", "-s",
+        self.assertEqual(command[0:7], [
+            "/Dolphin", "-u", "/owned/user", "-s",
             "/owned/snapshot.sav", "-e", "/readonly/game.iso",
         ])
+        self.assertNotIn("-b", command)
+        self.assertNotIn("-d", command)
         for setting in (
             "Dolphin.Input.BackgroundInput=True",
             "Dolphin.Core.CPUCore=0",

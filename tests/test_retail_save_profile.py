@@ -12,6 +12,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import retail_save_profile as PROFILE  # noqa: E402
+sys.path.insert(0, str(ROOT / "scripts"))
+from save_profile_dolphin_interop import deflicker_from_gci  # noqa: E402
 
 
 def encode_block(decoded: bytes) -> bytes:
@@ -51,6 +53,25 @@ def synthetic_recipe(frames: int = 2, version: int = 3) -> bytes:
 
 
 class RetailSaveProfileTests(unittest.TestCase):
+    def test_display_route_capture_reads_source_deflicker_offset(self):
+        for enabled in (0, 1):
+            with self.subTest(enabled=enabled), tempfile.TemporaryDirectory() as directory:
+                gci = bytearray(synthetic_gci())
+                start = PROFILE.GCI_HEADER_BYTES + PROFILE.GAME_DATA_BLOCK * PROFILE.CARD_BLOCK_BYTES
+                decoded = bytearray(PROFILE.decode_block(
+                    gci[start:start + PROFILE.CARD_BLOCK_BYTES]))
+                decoded[PROFILE.SAVE_CHARACTER_OFFSET + 0x45D] = enabled
+                gci[start:start + PROFILE.CARD_BLOCK_BYTES] = encode_block(decoded)
+                path = Path(directory) / "display.gci"
+                path.write_bytes(gci)
+                self.assertEqual(deflicker_from_gci(path), enabled)
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid.gci"
+            path.write_bytes(b"not a GALE01r2 card image")
+            with self.assertRaisesRegex(RuntimeError, "Unsupported GALE01r2 GCI layout"):
+                deflicker_from_gci(path)
+
     def test_v3_binding_inserts_save_masks_and_preserves_inputs(self):
         fixture = synthetic_gci(0x07FF, 0x01C0)
         recipe = synthetic_recipe()

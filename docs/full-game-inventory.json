@@ -2285,9 +2285,72 @@
       "evidence": [
         "docs/ACCURACY_CONTRACT.md",
         "docs/TRANSITION_EQUIVALENCE.md",
-        "docs/REFERENCE_CAPTURE_APP.md"
+        "docs/REFERENCE_CAPTURE_APP.md",
+        "docs/evidence/vs-rules-items-source-route-v1.json",
+        "docs/evidence/vs-rules-items-source-route-v2.json",
+        "docs/evidence/vs-team-battle-route-v1.json",
+        "docs/evidence/vs-team-battle-retail-boundary-reproducer-v1.json",
+        "docs/evidence/vs-rules-plus-timer-source-route-v1.json"
       ],
-      "next_step": "Enumerate rule fields from the source structs and menu mode callers, then add a source/retail/browsing receipt per options family.",
+      "next_step": "The rendered browser route covers original CSS Teams input, opposing two-player Team Battle setup, Rules Plus one-minute timer handoff, No Contest Results, and retained Rules/Items on CSS return. Retail Teams match comparison remains incomplete because the retained capture driver clicked the CSS Human/CPU toggle bounds; the reduced packet preserves that source boundary and corrected geometry decoder. The enclosing Rules Plus retail capture failed later and remains scoped to its retained first-match prefix. Capture bounded retail team-color/match and remaining Rules Plus options, then continue Training, item-family services, and source GCI persistence with independent original/browser evidence.",
+      "issue": null
+    },
+    {
+      "id": "menu-main-settings-rumble",
+      "category": "menus",
+      "title": "Original Main Settings > Rumble route and saved controller preference",
+      "implementation": "integrated",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/mn/mnmain.c",
+        "melee/mn/mnvibration.c",
+        "melee/mn/forward.h",
+        "melee/gm/gmmain_lib.c"
+      ],
+      "depends_on": [
+        "css-sss-and-menu-transitions",
+        "save-and-memory-card"
+      ],
+      "pass_criteria": [
+        "The original Main Settings > Rumble callbacks, authored menu IDs/assets, input gates, and B cancellation return through Settings and Main without replacing source menu state.",
+        "A changes the selected controller rumble value in live source SaveData; Personal autosave, repeated entry, GCI export, document reload, and owner teardown retain/release the correct state.",
+        "Retail source/menu observations and rendered-browser observations are recorded separately; unobserved audio, physical input, pixel, and performance claims remain open."
+      ],
+      "evidence": [
+        "docs/evidence/main-settings-rumble-route-v1.json",
+        "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md",
+        "docs/evidence/save-profile-dolphin-roundtrip-v1.json"
+      ],
+      "next_step": "Keep Rumble animation/audio and physical rumble evidence separate; continue the source-owned Main Settings graph with its next original page.",
+      "issue": null
+    },
+    {
+      "id": "menu-main-settings-display",
+      "category": "menus",
+      "title": "Original Main Settings > Display route and saved deflicker preference",
+      "implementation": "integrated",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/mn/mnmain.c",
+        "melee/mn/mndeflicker.c",
+        "melee/mn/mndeflicker.h",
+        "melee/mn/forward.h",
+        "melee/gm/gmmain_lib.c"
+      ],
+      "depends_on": [
+        "css-sss-and-menu-transitions",
+        "save-and-memory-card"
+      ],
+      "pass_criteria": [
+        "Original Main Settings callbacks, Display menu kind 21, authored assets, input gates and B cancellation preserve source menu selection across repeated entry.",
+        "A changes the source SaveData deflicker byte at offset 0x45D; Personal autosave, CSS return, GCI export and a supported match/Results/CSS return retain the same value.",
+        "Retail source transitions and rendered-browser route are reported separately; stage identity, pixel/audio equivalence, physical input and performance remain independent evidence gates."
+      ],
+      "evidence": [
+        "docs/evidence/main-settings-display-route-v1.json",
+        "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md"
+      ],
+      "next_step": "Extend the next original Main Settings page with its source SaveData fields and menu-owned assets; compare animation/audio and physical input separately.",
       "issue": null
     },
     {
@@ -2317,9 +2380,11 @@
       "evidence": [
         "docs/ACCURACY_CONTRACT.md",
         "docs/TRANSITION_EQUIVALENCE.md",
-        "docs/CONTROLLERS.md"
+        "docs/CONTROLLERS.md",
+        "docs/evidence/vs-rules-items-source-route-v1.json",
+        "docs/evidence/vs-rules-items-source-route-v2.json"
       ],
-      "next_step": "Decompose title, main menu, CSS, SSS, rules and name-entry screens into source mode rows and extend retail transition receipts beyond the current bounded route.",
+      "next_step": "Extend source and rendered-browser transition receipts beyond the bounded VS Rules/Items path to team/Rules Plus selection, name entry, and remaining original mode menus.",
       "issue": null
     },
     {

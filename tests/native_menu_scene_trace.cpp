@@ -24,6 +24,37 @@ static std::vector<uint8_t> read_file(const char* path){
  return {(std::istreambuf_iterator<char>(file)),{}};
 }
 int main(int argc,char** argv){try{
+ if(argc==3 && std::strcmp(argv[1],"--main-display")==0){
+  auto bytes=read_file(argv[2]);
+  auto archive=std::make_shared<melee_web::DatArchive>(bytes);
+  for(unsigned cycle=0;cycle<2;cycle++){
+   char error[256];
+   if(!melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)))throw std::runtime_error(error);
+   if(!melee_web_native_world_enable(error,sizeof(error)))throw std::runtime_error(error);
+   {
+    melee_web::DatNativeMenu menu(archive,melee_web::NativeMenuKind::Main);
+    if(menu.model_count()!=20)throw std::runtime_error("Original Main model count mismatch");
+    const char* names[]={"MenMainConDf_Top_joint","MenMainConDf_Top_animjoint",
+                         "MenMainConDf_Top_matanim_joint","MenMainConDf_Top_shapeanim_joint"};
+    MeleeWebArchiveSymbol symbols[4];
+    for(unsigned i=0;i<4;i++){
+     symbols[i]={"MnMaAll.usd",names[i],menu.export_data(names[i])};
+     if(!symbols[i].native_data)throw std::runtime_error(std::string("Original Display menu export was not hydrated: ")+names[i]);
+    }
+    auto* scope=melee_web_archive_sections_register(symbols,4,error,sizeof(error));
+    if(!scope)throw std::runtime_error(error);
+    auto* handle=melee_web_archive_sections_open("MnMaAll.usd");
+    for(unsigned i=0;i<4;i++)
+     if(melee_web_archive_sections_public(handle,names[i])!=symbols[i].native_data)
+      throw std::runtime_error(std::string("Original Display menu export lookup failed: ")+names[i]);
+    melee_web_archive_sections_release(handle);
+    if(!melee_web_archive_sections_close(scope,error,sizeof(error)))throw std::runtime_error(error);
+   }
+   if(!melee_web_gameplay_shutdown(error,sizeof(error)))throw std::runtime_error(error);
+  }
+  std::cout<<"Original Main Display model, animation, material and shape exports hydrate and release across two worlds\n";
+  return 0;
+ }
  if(argc==1 || (argc==2 && (std::strcmp(argv[1],"--bad-image-index")==0 || std::strcmp(argv[1],"--bad-palette-index")==0))){
   char error[256];
   if(!melee_web_gameplay_startup(4*1024*1024,error,sizeof(error)))throw std::runtime_error(error);
