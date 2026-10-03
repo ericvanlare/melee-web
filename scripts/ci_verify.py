@@ -30,16 +30,33 @@ GROUPS = {
 }
 UNIT_GROUPS = ("unit-0", "unit-1")
 
-# Full discovery runs after configuration, so SDK/source/SDL/fmt-dependent
-# compiler tests execute there. Only tests needing linked artifacts repeat in
-# their owning partition. Proprietary-asset cases keep their normal skips.
+# These trace suites need linked artifacts and have a single owner partition.
+# Keep every case, but run it beside the target instead of compiling the same
+# trace from a unit shard's clean build tree.
+LINKED_BUILD_TARGETS = {
+    "gameplay": ("gameplay_fighter_input_trace",),
+    "fighter": ("gameplay_fighter_asset_trace",),
+}
+REHOMED_TEST_MODULES = {
+    "gameplay": ("test_gameplay_bootstrap", "test_gameplay_collision"),
+    "fighter": ("test_gameplay_fighter_assets",),
+}
+
+# Unit discovery follows configuration, so SDK/source/SDL/fmt-dependent tests
+# run when their requirements are available. Linked consumers with missing
+# outputs may still skip in units and run in their owner; REHOMED_TEST_MODULES
+# instead route complete trace suites to the partition that builds their binary.
+# Proprietary-asset cases keep their normal skips.
 LINKED_TESTS = {
-    "fighter": ("test_pad_state.PadSnapshotTests.test_native_codec_and_source_input_edges",
-                "test_gameplay_save_profile.SaveProfileTests.test_original_initialization_and_restoration"),
     "gameplay": (
         "test_hsd_native.NativeJointRuntimeTests",
         "test_gameplay_common_context",
         "test_source_devcom_startup",
+        *REHOMED_TEST_MODULES["gameplay"],
+    ),
+    "fighter": REHOMED_TEST_MODULES["fighter"] + (
+        "test_pad_state.PadSnapshotTests.test_native_codec_and_source_input_edges",
+        "test_gameplay_save_profile.SaveProfileTests.test_original_initialization_and_restoration",
     ),
     "effects": (
         "test_gameplay_effects", "test_gameplay_bonus_data", "test_gameplay_stage_numeric",
@@ -58,6 +75,16 @@ REQUIRED_TESTS = {
         "test_gameplay_common_context.CommonContextTests.test_original_material_owners_restore_all_common_globals",
         "test_source_devcom_startup.SourceDevComStartupTests.test_source_prefix_and_deferred_devcom_recycling",
         "test_source_devcom_startup.SourceDevComStartupTests.test_fresh_process_rejects_malformed_source_geometry",
+        "test_gameplay_bootstrap.GameplayBootstrapTests.test_original_object_world_and_process_order",
+        "test_gameplay_bootstrap.GameplayBootstrapTests.test_original_fighter_input_consumer_and_lifetime",
+        "test_gameplay_bootstrap.GameplayBootstrapTests.test_generation_accessor_rejects_replaced_heap",
+        "test_gameplay_bootstrap.GameplayBootstrapTests.test_session_arena_retains_original_payload_between_worlds",
+        "test_gameplay_collision.GameplayCollisionTests.test_original_static_collision_load_queries_and_lifetime",
+    ),
+    "fighter": (
+        "test_gameplay_fighter_assets.GameplayFighterAssetsTests.test_scoped_constructor_storage_lifetime",
+        "test_pad_state.PadSnapshotTests.test_native_codec_and_source_input_edges",
+        "test_gameplay_save_profile.SaveProfileTests.test_original_initialization_and_restoration",
     ),
     "effects": (
         "test_gameplay_effects.EffectContextTests.test_authored_bank_bounds_lifetimes_and_restart",
@@ -76,6 +103,13 @@ def check_inventory():
     actual = [target for targets in GROUPS.values() for target in targets]
     if len(actual) != len(set(actual)) or set(actual) != expected:
         raise ValueError("CI partitions must cover every all/fighter target exactly once")
+    supplemental = [target for targets in LINKED_BUILD_TARGETS.values() for target in targets]
+    rehomed = [module for modules in REHOMED_TEST_MODULES.values() for module in modules]
+    if (len(supplemental) != len(set(supplemental)) or set(supplemental) & set(actual) or
+            not set(LINKED_BUILD_TARGETS).issubset(LINKED_TESTS) or
+            not set(REHOMED_TEST_MODULES).issubset(LINKED_TESTS) or
+            len(rehomed) != len(set(rehomed))):
+        raise ValueError("linked targets and rehomed modules must be unique and test-owned")
 
 
 def _test_cases(suite):
@@ -113,6 +147,20 @@ def _filter_suite(suite, shard):
             if child.countTestCases():
                 selected.addTest(child)
         elif unit_shard(_test_module(test)) == shard:
+            selected.addTest(test)
+    return selected
+
+
+def _filter_modules(suite, modules, *, include):
+    """Keep or defer complete test modules without disturbing suite structure."""
+    selected = unittest.TestSuite()
+    modules = set(modules)
+    for test in suite:
+        if isinstance(test, unittest.TestSuite):
+            child = _filter_modules(test, modules, include=include)
+            if child.countTestCases():
+                selected.addTest(child)
+        elif (_test_module(test) in modules) == include:
             selected.addTest(test)
     return selected
 
@@ -171,11 +219,18 @@ def run_tests(group, report):
     loader = unittest.TestLoader()
     if group in UNIT_GROUPS:
         discovered = loader.discover(str(ROOT / "tests"))
-        suite = _filter_suite(discovered, _shard_index(group))
+        shard_suite = _filter_suite(discovered, _shard_index(group))
+        rehomed_modules = tuple(
+            module for modules in REHOMED_TEST_MODULES.values() for module in modules
+        )
+        deferred = _filter_modules(shard_suite, rehomed_modules, include=True)
+        suite = _filter_modules(shard_suite, rehomed_modules, include=False)
         report["discovered"] = _inventory(discovered)
         report["selected"] = _inventory(suite, include_ids=True)
+        report["deferred"] = _inventory(deferred, include_ids=True)
     else:
         suite = loader.loadTestsFromNames(LINKED_TESTS[group])
+        report["selected"] = _inventory(suite, include_ids=True)
     result = unittest.TextTestRunner(verbosity=2, resultclass=RecordingResult).run(suite)
     report["tests"] = result.outcomes
     report["tests_run"] = result.testsRun
@@ -189,12 +244,13 @@ def run_tests(group, report):
 
 def run_group(group, jobs):
     check_inventory()
+    targets = list(GROUPS[group]) + list(LINKED_BUILD_TARGETS.get(group, ()))
     directory = ROOT / "work/ci"
     directory.mkdir(parents=True, exist_ok=True)
     report = {"schema": 1, "group": group, "status": "running", "phases": [],
               "commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
               "machine": {"platform": platform.platform(), "cpus": os.cpu_count(), "jobs": jobs},
-              "targets": list(GROUPS[group])}
+              "targets": targets}
     started = time.monotonic()
 
     def phase(name, operation):
@@ -220,9 +276,9 @@ def run_group(group, jobs):
     try:
         phase("configure", lambda: command(sys.executable, ROOT / "scripts/build.py",
                                            "--configure-only"))
-        if GROUPS[group]:
+        if targets:
             phase("build", lambda: command(ROOT / ".venv/bin/cmake", "--build", ROOT / "build/browser",
-                                            "--target", *GROUPS[group], "-j", jobs))
+                                            "--target", *targets, "-j", jobs))
         if group in UNIT_GROUPS or group in LINKED_TESTS:
             phase("tests", lambda: run_tests(group, report))
         if group == "gameplay":

@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 
-from ci_verify import GROUPS, ninja_timings
+from ci_verify import GROUPS, LINKED_BUILD_TARGETS, ninja_timings
 from workspace_resources import operation
 
 
@@ -40,7 +40,9 @@ def _environment(root):
 
 
 def target_union():
-    return list(dict.fromkeys(target for targets in GROUPS.values() for target in targets))
+    targets = [target for group in (GROUPS, LINKED_BUILD_TARGETS)
+               for group_targets in group.values() for target in group_targets]
+    return list(dict.fromkeys(targets))
 
 
 def _relative_object(output):
