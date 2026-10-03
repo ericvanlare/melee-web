@@ -128,9 +128,11 @@ The source-profile checker and its fixture integration are separately authored d
 The diagnostic Wasm snapshot helper, source-snapshot host driver and rejection
 tests are separately authored project code. They copy opaque runtime bytes and
 compare observations supplied by the native fixture; they contain no recovered
-game/SDK implementation or copied emulator savestate code. This grant does not
-extend to the native gameplay fixture, its game declarations, compiled runtime,
-assets or generated evidence.
+game/SDK implementation or copied emulator savestate code. The listed native
+fixture and its stage-kind bridge are project-authored diagnostic orchestration;
+this grant does not extend to recovered game/SDK declarations or implementations
+that they include or call, nor to the compiled runtime, assets or generated
+evidence.
 
 ## Exclusions and existing terms
 
