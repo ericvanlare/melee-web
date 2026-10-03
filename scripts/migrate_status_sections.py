@@ -22,6 +22,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 STATUS = ROOT / "docs/status"
 KEEP = {"Current status", "Adding or updating evidence", "Current acceptance boundaries"}
+MOVED_DOC_FOLDERS = ("content", "investigations", "history")
 LINK = re.compile(r"(\]\()([^)\s#]+)((?:#[^)\s]*)?\))")
 
 
@@ -39,7 +40,14 @@ def entry_text(section):
         target = match.group(2)
         if re.match(r"^[a-z][a-z0-9+.-]*:", target) or target.startswith("<"):
             return match.group(0)
-        rel = os.path.relpath(os.path.normpath(ROOT / target), STATUS)
+        resolved = Path(os.path.normpath(ROOT / target))
+        if not resolved.exists() and resolved.parent == ROOT / "docs":
+            # The branch predates the docs reorganization; follow the move.
+            moved = [ROOT / "docs" / folder / resolved.name for folder in MOVED_DOC_FOLDERS
+                     if (ROOT / "docs" / folder / resolved.name).exists()]
+            if len(moved) == 1:
+                resolved = moved[0]
+        rel = os.path.relpath(resolved, STATUS)
         return f"{match.group(1)}{Path(rel).as_posix()}{match.group(3)}"
     return LINK.sub(rebase, "# " + section[3:]).rstrip("\n") + "\n"
 

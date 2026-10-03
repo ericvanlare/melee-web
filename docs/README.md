@@ -15,6 +15,8 @@ Observed results live in [STATUS](../STATUS.md) and its dated
 | [Performance and accuracy playbook](PERFORMANCE_AND_ACCURACY.md) | Evidence labels, timing and runtime change rules |
 | [Architecture decisions](ARCHITECTURE.md) | Durable design decisions |
 | [Project direction](PROJECT_DIRECTION.md) | Vanilla port → Slippi compatibility → online strategy |
+| [Architects' log](ARCHITECTS.md) | Coordination between the owner and architects; structural asks |
+| [Player experience metrics](PLAYER_EXPERIENCE_METRICS.md) | What players wait through, tracked release to release (not evidence) |
 | [Build, play and inspect](BUILD_AND_PLAY.md) | Local setup and the player |
 | [Validation](TESTING.md) | Test suites and focused checks |
 | [Local resources](LOCAL_RESOURCES.md) | Disk, scratch and build ownership |

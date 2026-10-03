@@ -156,7 +156,7 @@ trajectory in Interpreter64; its protected dequeue observation resolves the
 retained controller-capture race. All 435 tests pass. This trajectory includes seven stock losses and six respawns but only
 five damage increases and no up-special; broad corpus admission remains open.
 
-Slippi ingestion now normalizes finalized per-frame input/state records, handles
+The separately scoped [source Slippi profile receipt](../evidence/source-slippi-profile-prefix-v1.json) records the optional fixture profile, raw-input comparison through the recorded fourth-stock-loss boundary, default-profile regression, and required validation. The [native-initializer and scheduler-mask follow-up](../evidence/source-slippi-native-initializer-mask-v1.json) separately records default/native initializer diagnostics, ordinary pause/resume, the fresh recorded prefix and scoped source restoration checks. Results/rematch and actual browser multiplayer remain open. Slippi ingestion now normalizes finalized per-frame input/state records, handles
 rollback history without mixing revisions, preserves exact field bits and
 rejects incomplete timelines. The v2 input-only workload transport retains
 source identity and records derived rules explicitly; it never treats UCF

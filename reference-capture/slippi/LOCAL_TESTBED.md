@@ -28,12 +28,63 @@ This is a compiled/source-identified HTTP boundary check. It does not claim
 native gameplay, browser interoperability, official-service behavior, or a
 deterministic cause for the separately retained reporter-thread failure.
 
+## Source Slippi profile prefix diagnostic
+
+The [bounded source-profile prefix receipt](../../docs/evidence/source-slippi-profile-prefix-v1.json) records a source-only check whose finalized raw PAD records are the sole step inputs. It pins the source probe, explicit RNG profile helper, runtime ABI and clean lifecycle boundary. The receipt does not claim a complete replay, pending-state snapshot, browser gameplay, draw/PCM agreement or rollback acceptance. Run the portable checker in `tools/slippi_profile_prefix_check.py` with a local `.slp`, runtime pair, assets and explicit source/profile identities; it fails at the first divergence and retains its failure directory.
+
+Its `queued_transfer_and_default_pair` section records a later root-audited source-only Node pair: a snapshot admitted at quiescent scene 106, raw scene 107 observed pending, scene 108 clear, three restores through scenes 107--110, and a separate old-baseline/candidate scripted/raw byte comparison. The `recorded_match_1342` section separately records the source/native comparison through scene 1341, ending at the fourth P1 stock loss; it does not include Results, rematch, browser, rollback or foreground timing. The portable checker defaults to scenes 0--110 and accepts the explicitly observed full endpoint with `--scene-last 1341`; that full command remains a source/native reproduction gate and does not imply browser/player rollback.
+
+Build `gameplay_snapshot_probe` with `python3 scripts/build.py --trace-target gameplay_snapshot_probe --configuration Release`. With locally owned assets and the pinned desktop replay, run the command below from the repository root. Replace the local input paths and runtime pair, and use their audited SHA-256 identities; `--out` must be absent. The measured identities and fresh full-suite/build/checker results are in the receipt's `required_validation` section. A different replay or build needs its own receipt.
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 tools/slippi_profile_prefix_check.py \
+  --replay /path/to/local.slp --runtime /path/to/gameplay_snapshot_probe.js \
+  --assets /path/to/local-assets \
+  --source-probe tests/gameplay_snapshot_probe.cpp --source-cmake cmake/FighterRuntime.cmake \
+  --profile-helper reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp \
+  --probe-sha256 AUDITED_PROBE_SHA256 --cmake-sha256 AUDITED_CMAKE_SHA256 \
+  --profile-helper-sha256 AUDITED_HELPER_SHA256 \
+  --runtime-sha256 AUDITED_JS_SHA256 --wasm-sha256 AUDITED_WASM_SHA256 \
+  --profile-offset 0x1234 --seed 0x13579bdf --scene-last 1341 \
+  --node /path/to/pinned-node --timeout 30 --cleanup-timeout 6 \
+  --out /path/to/fresh-check-directory
+```
+
+
+### Native initializer and original scheduler masks
+
+The [initializer/mask follow-up receipt](../../docs/evidence/source-slippi-native-initializer-mask-v1.json) binds a separate fresh source build. The opt-in initializer uses source slots 1/2, controllers 0/1, two Mario players with color 0, four stocks and seed 4660. Its 60-byte diagnostic and JSON expose copied selection fields and the actual `stage_info.grkind` through a C-only bridge. The default profile retains slots 0/0, colors 0/1 and seed `0x13579bdf`. The existing bare CPP identity remains unchanged in meaning; the bridge has a separate hash export.
+
+For the native initializer, use the prefix command above with `--seed 4660 --initializer-profile native --stage-kind-bridge tests/gameplay_snapshot_stage_kind_bridge.c --stage-kind-bridge-sha256 AUDITED_BRIDGE_SHA256`. Keep the other source/runtime pins and `--scene-last 1341`. Native profile configuration rejects another seed and any initializer change after init. Neither the prefix nor initializer comparison certifies Results or current network consumption.
+
+The pause checker exercises 124 neutral source ticks and 17 ordinary PAD controls. It checks the source-prepared process mask and callback trace; it never writes pause, scheduler masks or callback state. Early P1/P2 START attempts stay paused, then the original pause timer permits P1 resume. Run it against the same fresh Release probe:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 tools/source_pause_mask_check.py \
+  --runtime build/browser-release/gameplay_snapshot_probe.js \
+  --assets /path/to/local-assets --out /path/to/fresh-pause-check \
+  --source-probe tests/gameplay_snapshot_probe.cpp --source-cmake cmake/FighterRuntime.cmake \
+  --profile-helper reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp \
+  --stage-kind-bridge tests/gameplay_snapshot_stage_kind_bridge.c \
+  --probe-sha256 AUDITED_PROBE_SHA256 --cmake-sha256 AUDITED_CMAKE_SHA256 \
+  --profile-helper-sha256 AUDITED_HELPER_SHA256 \
+  --stage-kind-bridge-sha256 AUDITED_BRIDGE_SHA256 \
+  --runtime-sha256 AUDITED_JS_SHA256 --wasm-sha256 AUDITED_WASM_SHA256 \
+  --worker-sha256 AUDITED_PAUSE_WORKER_SHA256 \
+  --node /path/to/pinned-node --node-sha256 AUDITED_NODE_SHA256 --timeout 30
+```
+
+The launcher reserves five seconds of its whole 30-second cap for owned group cleanup and retains a failure report. Passing requires source close, matching wait/cleanup return codes, released group and absent positive leader PID. A fresh child directory separates worker evidence from the process log. The worker hash is required before spawn, and the launcher records both checker and worker hashes. Supplied symlink inputs are refused before canonicalization. Synthetic controls detect changed callback count and prepared mask; the actual source run checks the full recipe.
+
+An optional MEMFS browser module can be compiled with `python3 scripts/build.py --trace-target gameplay_snapshot_probe_browser --configuration Release`, using the ignored `assets-local/snapshot-mario` fixture. This source-only diagnostic module has no player or draw surface. Its build result is separate from browser execution; it does not enable the multiplayer playing route.
+
 ## Pinned inputs and licensing
 
 [`client.lock.json`](client.lock.json) is the source of truth for the client
 commit, recursive submodule revisions, build profile, Rust extensions, game
 modification and owned disc digest. Do not update one of these components
-independently. Apply the two files in [`patches/`](patches/) only to local
+independently. Apply the ordered files in [`patches/`](patches/) to their
+`patch_targets` from the lock, only in local
 working copies of the matching commits; keep clean upstream checkouts intact.
 The client patches retain their upstream GPL terms. The generated game
 modification retains the pinned ASM repository's GPL-3.0-only terms. The
@@ -58,6 +109,48 @@ headless-platform, Null-video and No Audio Output settings recorded in the
 lock. Use the repository bootstrap and workspace ownership commands before
 preparing or rebuilding these artifacts. Do not copy the disc, generated
 modification, executable, profile or replay into Git.
+
+The transport matrix additionally depends on public PR #133, pinned to commit
+`cdc4b899ee85861cce7f2cebfc9d756a30326ab6` (`origin/codex/local-api-framing-pr`)
+with parent `473e97c41633043562bc5015e1add630d23b70b3`. This branch is based on
+an older project head, so do not merge or cherry-pick the PR commit wholesale.
+For the affected service build, fetch the ref, verify the commit and parent,
+materialize only its two service paths, and apply that checked patch temporarily:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/bootstrap.py
+SERVICE_REF=cdc4b899ee85861cce7f2cebfc9d756a30326ab6
+SERVICE_PARENT=473e97c41633043562bc5015e1add630d23b70b3
+SERVICE_PATCH="$MELEE_RUN_ROOT/pr133-service-paths.patch"
+python3 scripts/agent_workspace.py run -- git fetch --no-tags origin codex/local-api-framing-pr
+test "$(python3 scripts/agent_workspace.py run -- git rev-parse FETCH_HEAD)" = "$SERVICE_REF"
+test "$(python3 scripts/agent_workspace.py run -- git rev-parse "$SERVICE_REF^")" = "$SERVICE_PARENT"
+python3 scripts/agent_workspace.py run -- git diff --binary "$SERVICE_REF^" "$SERVICE_REF" -- \
+  reference-capture/slippi/local_matchmaker/server.cpp \
+  reference-capture/slippi/local_matchmaker/integration_test.cpp > "$SERVICE_PATCH"
+python3 scripts/agent_workspace.py run -- git apply --check "$SERVICE_PATCH"
+test "$(shasum -a 256 reference-capture/slippi/local_matchmaker/server.cpp | cut -d' ' -f1)" \
+  = c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a
+python3 scripts/agent_workspace.py run -- git apply "$SERVICE_PATCH"
+test "$(shasum -a 256 reference-capture/slippi/local_matchmaker/server.cpp | cut -d' ' -f1)" \
+  = 78b680a16ff717e61cbb561281240a9a205a105ac4053634441fb88941fce719
+test "$(shasum -a 256 reference-capture/slippi/local_matchmaker/integration_test.cpp | cut -d' ' -f1)" \
+  = 37f3b2ca979e4012f4a425ce069a91a8a374d299ac87367a1c0891449c58169c
+```
+
+Keep this temporary source state applied for the supported bootstrap/build,
+CTest, normal test suite and the diagnostic runtime. Reverse exactly
+`$SERVICE_PATCH` only in the outermost `finally` path and verify the pre-apply
+`server.cpp` identity. `_verify_build_profile` independently requires
+the matchmaker CMake cache to point at this checkout's `local_matchmaker`, the
+PR #133 `server.cpp` and `integration_test.cpp` identities above, and the staged
+executable to byte-match that cache's `slippi-local-matchmaker` output. It
+therefore refuses a service binary from an unrelated service tree. The
+service-lineage receipt must carry the pinned public ref/commit/parent,
+path-diff SHA and post-apply source-file SHAs, plus the fresh CMake-cache,
+source-inventory and staged-binary SHAs generated from this build. An impaired
+run must use a passed two-cycle `none` baseline from the same client, lock,
+fresh service binary, service lineage and artifact identity set.
 
 ## Prepare the local artifacts
 
@@ -84,6 +177,18 @@ python3 scripts/agent_workspace.py run -- git apply \
 python3 scripts/agent_workspace.py run -- git apply \
   --directory=.deps/slippi-dolphin-local/Externals/SlippiRustExtensions \
   reference-capture/slippi/patches/0002-rust-local-endpoints.patch
+python3 scripts/agent_workspace.py run -- git apply \
+  --directory=.deps/slippi-dolphin-local \
+  reference-capture/slippi/patches/0003-desktop-rollback-diagnostic.patch
+python3 scripts/agent_workspace.py run -- git apply \
+  --directory=.deps/slippi-dolphin-local \
+  reference-capture/slippi/patches/0004-desktop-rollback-duplicate-role2.native.patch
+python3 scripts/agent_workspace.py run -- git apply \
+  --directory=.deps/slippi-dolphin-local \
+  reference-capture/slippi/patches/0005-duplicate-receive-join.native.patch
+python3 scripts/agent_workspace.py run -- git apply \
+  --directory=.deps/slippi-dolphin-local \
+  reference-capture/slippi/patches/0006-jitter-reorder-native.patch
 python3 scripts/agent_workspace.py run -- git clone --no-checkout \
   https://github.com/project-slippi/slippi-ssbm-asm .deps/slippi-ssbm-asm
 python3 scripts/agent_workspace.py run -- git -C .deps/slippi-ssbm-asm checkout --detach \
@@ -94,6 +199,13 @@ The generated `Output/Netplay/GALE01r2.ini` must match the lock hash. Install
 Rust 1.88.0 and use the locked CMake, Ninja and Apple Clang versions. The
 runner rejects mismatched revisions, patch trees, compiler/build settings, or
 generated game modification. Keep the clean Dolphin checkout unchanged.
+The third through sixth patches are opt-in diagnostic controls. They are
+disabled unless an explicit diagnostic config is supplied; the ordinary
+match/rematch command retains its controller script. The sixth patch adds the
+bounded jitter/reorder sender actions, while the fourth and fifth add duplicate
+and receiver-arrival observations.
+See [the bounded rollback diagnostic](ROLLBACK_DIAGNOSTIC.md) for the separate
+frame-indexed fixture and its comparison boundary.
 
 For the client build, configure with the profile recorded in `client.lock.json`
 and build the NoGUI executable:
@@ -149,6 +261,49 @@ ctest = next(line.split("=", 1)[1] for line in cache if line.startswith("CMAKE_C
 os.execv(ctest, [ctest, "--test-dir", str(build), "--output-on-failure"])
 '
 ```
+
+For a clean affected build, run the bootstrap entry point once before the
+temporary PR source apply, then use the client and matchmaker commands above.
+While the two PR paths are applied, the service checks must report the pinned
+server and integration-test SHAs, the CMake cache must name this checkout's
+`local_matchmaker`, and the built `slippi-local-matchmaker` must be the staged
+binary. Keep the paths applied through the matchmaker `ctest`, the normal
+project suite, and the diagnostic baseline/fault runs. Always reverse only in
+the outermost `finally` path and verify both source files return to their
+pre-apply identities (`server.cpp`
+`c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a`,
+`integration_test.cpp`
+`e71b7b895ff7ffe51f7153d510de54eca78931342f6d5d450f7bb1e05d9bad00`). Then
+finish cleanup from the restored source tree:
+
+```sh
+# Keep SERVICE_PATCH applied while these checks and all diagnostic runs execute.
+python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v
+# In the outermost finally block, reverse SERVICE_PATCH and verify both hashes.
+```
+
+Generate the fresh lineage receipt only after the affected build has passed.
+The command calls `_verify_pinned_client_source` and `_verify_build_profile`,
+then records the current build output, CMake cache, service source inventory,
+build manifest and lineage files. It does not use a retained binary or a
+historical receipt as an input:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 \
+  reference-capture/slippi/generate_service_lineage.py \
+  --dolphin-source .deps/slippi-dolphin-local \
+  --enet-source .deps/slippi-dolphin \
+  --dolphin-build work/slippi-local-networking/dolphin-build \
+  --matchmaker-build work/slippi-local-networking/matchmaker-build \
+  --client-binary work/slippi-local-networking/SlippiHeadless.app/Contents/MacOS/dolphin-emu-nogui \
+  --service-binary work/slippi-local-networking/matchmaker-build/slippi-local-matchmaker \
+  --source-patch "$SERVICE_PATCH" \
+  --output "$MELEE_SERVICE_LINEAGE"
+```
+
+The receipt's whole-file SHA is the service identity bound into every baseline
+and fault run; it is computed after writing and is not pre-pinned in
+`client.lock.json`.
 
 The local API listener binds only to `127.0.0.1:43114` and returns HTTP 503 for
 user, GraphQL and reporting requests. The pinned client adaptations point its
@@ -291,3 +446,134 @@ decoding, ordinary Pipe input, loopback socket gates and owned process cleanup.
 The run is accepted only when the generated receipt says `passed`; a client
 boot, connected peer, short replay prefix, successful build or average frame
 rate alone is not the integration result.
+
+## Source-runtime snapshot experiment
+
+The multiplayer workstream's two early questions are controlled desktop
+rollback and restoration of WebMelee's own source simulation. The latter has
+a separate **Compiled / Native traced** feasibility target. It uses the actual
+`GameplayMatchSession`, original raw PAD renewal and scheduler, Mario articles,
+Final Destination collision, and native audio synthesis. It does not draw or
+enter the browser player. Its [hash-bound receipt](../../docs/evidence/source-snapshot-feasibility-v1.json)
+records exact scope, repetitions, coverage, identities, costs and retained
+failed hypotheses. Execution issue
+[#115](https://github.com/ericvanlare/melee-web/issues/115) tracks acceptance.
+
+Prepare the reviewed source target and supply an operator-owned Mario/FD asset
+directory, including the common match, HUD, trophy, rumble and audio files
+required by current source ownership. The runtime reports missing files; it
+does not exempt assets. Use a new ignored output directory for every run:
+
+```sh
+python3 scripts/build.py --configuration Release --trace-target gameplay_snapshot_probe
+python3 scripts/agent_workspace.py run -- \
+  .deps/emsdk/node/24.19.0_64bit/bin/node scripts/check_source_snapshot.mjs \
+  --runtime build/browser-release/gameplay_snapshot_probe.js \
+  --assets assets-local/snapshot-mario \
+  --out work/source-snapshot/fresh-01
+python3 scripts/agent_workspace.py run -- \
+  python3 -m unittest discover -s tests -p test_source_snapshot.py -v
+```
+
+The fixture is one-shot per module and disables Asyncify. Capture occurs after
+a synchronous native
+export returns and the combined source-file/HPS/SSM drive owner reports idle.
+The host copies the entire Wasm memory and records the exported stack pointer.
+Restore requires the same module, full ArrayBuffer identity, capacity and stack
+boundary. Active calls, asynchronous calls, shared memory, changed views,
+growth and closed owners are refused. A failed initialization releases its
+owned files and partially constructed session; it cannot be reused as a fresh
+fixture. Source close releases the match, world and audio owners.
+
+The owned linear state includes native globals, C/C++ allocation metadata,
+pointer identities and source-address shadows; fighters, items, stage and
+collision; HSD objects and process ordering; source RNG and clocks; semantic
+PAD Master/Copy/Game history; match/HUD flow; native AX, SSM/HPS transport and
+PCM buffers. Restoring preserves pointers because it uses the same memory
+instance. No emulator savestate is transplanted. All fixture files are internal
+`RuntimeFiles`, so the asynchronous JavaScript file bridge is unreachable.
+Native audio is rendered into a copied comparison buffer without a host sound
+sink. Replay therefore has no audible commit to duplicate. Source drawing,
+GPU submission, Web Audio and persistent card commits are unreachable in this
+target; their ownership is still an implementation dependency for the player.
+
+For each checkpoint, the driver advances a known sample-indexed PAD stream,
+restores and replays depths 1, 2, 4 and 7 three times. It compares the entire
+native observation and PCM bytes at every replayed sample and all linear
+memory at each depth endpoint. Every forward sample retains full observation
+and PCM hashes. The observation includes both full match-stat
+records, semantic PAD history, source frame/RNG, stock/motion and lifecycle
+fields, article count and scheduler counts. It requires observed Mario fireball
+and both stock-loss coverage. A one-bit source RNG perturbation must diverge,
+then an intact restore must recover agreement. Raw input and forward-state
+logs, baseline observations, first-divergence details and preparation failures
+remain in the ignored run directory.
+
+This is a full-memory correctness baseline, not a production rollback ring.
+Wasm mutable globals beyond the exported stack, function tables, JavaScript
+module/event-loop state, host files/clock, browser input/clock queues, renderer
+resources, externally committed audio and saves are not restored. Endpoint
+memory equality does not claim hidden memory equality at every intermediate
+sample. No retail/Slippi semantic equivalence, full match/rematch, browser
+rollback, visual/audio accuracy, physical input or foreground performance is
+established. The next source experiment must account for actual draw and host
+ownership and reduce snapshot size/cost before enabling player rollback.
+
+### Bounded shared-page follow-up
+
+The [shared-page receipt](../../docs/evidence/source-shared-page-snapshot-v1.json)
+records a Node-only diagnostic owner with at most eight snapshots and a hard
+256 MiB limit on unique owned page payload. Each snapshot covers every byte of
+linear memory. First capture hashes every page; later captures compare each
+page exactly against the most recent retained immutable snapshot. Changed
+pages use SHA-256 buckets followed by exact byte comparison. Released handles
+drop their page references, and failed captures roll back partial ownership.
+No guessed dirty flags or excluded address ranges are used.
+
+Native initialization may grow memory and leave transfers pending. This driver
+records the actual capacity, executes original neutral sample 0, requires
+native quiescence, then binds the owner. Every later capture and restore retains
+the same identity/capacity/stack guards. The complete entry sequence is logged.
+The driver repeats the existing depths and sensitivity control, then restores
+all eight retained states and verifies observation, PCM and full-memory hashes.
+It reports first and subsequent capture costs separately; the payload limit
+does not bound total Node RSS or establish browser performance.
+
+To reproduce the measured 64 MiB initial-capacity candidate, first configure
+the existing Release build through its normal entry point, set the diagnostic
+target's cache value with the checkout's pinned tools, then build it. This value
+does not shrink the authored native arenas or prevent growth:
+
+```sh
+python3 scripts/build.py --configuration Release --configure-only
+python3 scripts/agent_workspace.py run -- env \
+  PATH="$PWD/.venv/bin:$PATH" EMSDK="$PWD/.deps/emsdk" \
+  EM_CONFIG="$PWD/.deps/emsdk/.emscripten" \
+  EM_CACHE="$PWD/.deps/emsdk/upstream/emscripten/cache" \
+  EMSDK_PYTHON="$(command -v python3)" \
+  .venv/bin/cmake -S . -B build/browser-release \
+  -DMELEE_WEB_SNAPSHOT_INITIAL_MEMORY=67108864
+python3 scripts/build.py --configuration Release --trace-target gameplay_snapshot_probe
+python3 scripts/agent_workspace.py run -- \
+  .deps/emsdk/node/24.19.0_64bit/bin/node scripts/check_shared_page_snapshot.mjs \
+  --runtime build/browser-release/gameplay_snapshot_probe.js \
+  --assets assets-local/snapshot-mario \
+  --out work/source-snapshot/shared-pages-fresh-01
+python3 scripts/agent_workspace.py run -- \
+  python3 -m unittest tests.test_shared_page_snapshot -v
+```
+
+Use a second fresh output path for repetition. Initial capacity defaults to
+128 MiB in a new build; this is a persistent CMake cache value. Set it back to
+`134217728` through the same cache command before returning to the full-copy
+driver, which binds memory before initialization. The shared-page driver
+records whichever actual capacity was built. Both drivers
+remain correctness experiments for the declared source-only boundary. Mutable
+Wasm globals/table state outside memory and external browser effects retain
+the exclusions above. A first capture still exceeding one frame, and these
+headless Node costs, do not close player rollback admission.
+
+Controlled desktop rollback remains a separate gate: retain identical
+frame-indexed inputs and initialization, a bounded fault schedule, actual
+prediction/load/resimulation observations and finalized state comparisons.
+Its diagnostic adaptation must remain part of the pinned client bundle.

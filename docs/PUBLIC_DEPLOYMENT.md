@@ -177,6 +177,12 @@ may create its default production deployment. No custom domain should be attache
 until the candidate's returned immutable Pages URL passes verification. Do not
 publish a draft containing missing-operator placeholders.
 
+Before promotion, record the [player experience metrics](PLAYER_EXPERIENCE_METRICS.md)
+for the audited candidate on a local server. Compare them with the previous
+release's report from the same machine, and paste the comparison table into the
+release PR. A flagged regression is investigated or explicitly accepted; it is
+not admission evidence.
+
 ## Hosting constraints and headers
 
 Cloudflare's current [Pages limits](https://developers.cloudflare.com/pages/platform/limits/)
