@@ -8,6 +8,7 @@ from tools.recorded_session_12_character_capture import (
     ROSTER_ICON,
     _capture_exit_code,
     _consume_row,
+    _decode_css_start_data,
     _decode_team_result,
     _validate_team_setup,
 )
@@ -16,7 +17,7 @@ from tools.recorded_session_12_character_capture import (
 class RecordedSession12CharacterCaptureTests(unittest.TestCase):
     @staticmethod
     def team_setup(teams=(0, 1), item_frequency=-1,
-                   item_mask_hex="fffffffeffffffff"):
+                   item_mask_hex="fffffffffffbffff", costumes=(0, 3)):
         raw = bytearray(0x138)
         raw[0] = 0x20  # stock match
         raw[2] = 0x80  # stock mode
@@ -28,7 +29,7 @@ class RecordedSession12CharacterCaptureTests(unittest.TestCase):
         raw[0x2C:0x30] = bytes.fromhex("3f800000")
         for index, team in enumerate(teams):
             base = 0x60 + index * 0x24
-            raw[base:base + 5] = bytes((8, index, 3, index, index + 1))
+            raw[base:base + 5] = bytes((8, index, 3, costumes[index], index + 1))
             raw[base + 9] = team
         raw[0x60 + 0x24 + 14] = 4
         raw[0x60 + 0x24 + 15] = 1
@@ -47,6 +48,12 @@ class RecordedSession12CharacterCaptureTests(unittest.TestCase):
         with self.assertRaisesRegex(CaptureFailure, "opposing authored teams"):
             _validate_team_setup(self.team_setup(teams=(1, 1)), 0)
 
+    def test_team_setup_requires_source_derived_mario_team_colors(self):
+        with self.assertRaisesRegex(CaptureFailure, "source-derived Mario team colors"):
+            _validate_team_setup(self.team_setup(costumes=(0, 1)), 0)
+        with self.assertRaisesRegex(CaptureFailure, "source-derived Mario team colors"):
+            _validate_team_setup(self.team_setup(costumes=(1, 3)), 0)
+
     def test_team_setup_rejects_a_frequency_that_was_not_committed_as_none(self):
         with self.assertRaisesRegex(CaptureFailure, "source team rules differ"):
             _validate_team_setup(self.team_setup(item_frequency=2), 0)
@@ -54,7 +61,7 @@ class RecordedSession12CharacterCaptureTests(unittest.TestCase):
     def test_team_setup_requires_the_original_items_row_zero_mask(self):
         with self.assertRaisesRegex(CaptureFailure, "row-zero item mask"):
             _validate_team_setup(
-                self.team_setup(item_mask_hex="ffffffffffffffff"), 0)
+                self.team_setup(item_mask_hex="fffffffeffffffff"), 0)
 
     def test_team_route_capture_result_is_a_successful_cli_outcome(self):
         self.assertEqual(_capture_exit_code("original_vs_team_results_css_capture_complete"), 0)
@@ -103,6 +110,33 @@ class RecordedSession12CharacterCaptureTests(unittest.TestCase):
             "payload": {"slices": [{"name": "menu_css_live_state", "hex": css_data.hex()}]},
         }, latest, {})
         self.assertEqual(latest["team_state"], {"is_teams": 1, "player_teams": [0, 1]})
+
+    def test_css_context_decodes_pre_entry_retained_start_data(self):
+        start = bytearray.fromhex(self.team_setup())
+        start[2] = 0x06  # CSS pre-entry copy has not enabled stock mode yet.
+        start[4] = 0x83  # source CSSData before gmVsMelee_EnterVs sets is_vs.
+        css_data = bytearray(0x148)
+        css_data[0x10:] = start
+        latest = {}
+        _consume_row({
+            "event": "boundary",
+            "seq": 20,
+            "payload": {
+                "whole_session": True,
+                "boundary": "return_css",
+                "match_index": 0,
+                "slices": [{"name": "menu_css_context", "hex": css_data.hex()}],
+            },
+        }, latest, {})
+        retained = _decode_css_start_data(latest["css_start_data"])
+        self.assertEqual(retained["item_mask_hex"], "fffffffffffbffff")
+        self.assertEqual([player["costume"] for player in retained["players"]], [0, 3])
+        self.assertFalse(retained["is_stock"])
+
+    def test_css_retained_decoder_rejects_match_entry_profile(self):
+        start = bytearray.fromhex(self.team_setup())
+        with self.assertRaisesRegex(CaptureFailure, "pre-entry VS profile byte"):
+            _decode_css_start_data(start.hex())
 
     def test_css_door_decoder_keeps_team_and_human_toggle_bounds_distinct(self):
         doors = bytearray(4 * 36)

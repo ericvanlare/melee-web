@@ -5,11 +5,15 @@ toggle and team-color input, opposing P1/P2 teams, SSS cancellation and re-entry
 a live two-player Team Battle, No Contest Results, retained Rules/Items on CSS
 return, and Eject/reimport cleanup. The [scoped receipt](../evidence/vs-team-battle-route-v1.json)
 binds the rendered browser report, screenshots, runtime package hashes, and
-incomplete retail attempt. Browser source state and navigation passed. The
-retail capture stopped before SSS because the harness used P2's Human/CPU toggle
-bounds instead of the team-color bounds; the reduced [failure packet](../evidence/vs-team-battle-retail-boundary-reproducer-v1.json)
-records the exact source samples and corrected geometry decoder. That corrected
-retail interaction has not been rerun, so retail Team match comparison is
-incomplete. Visual/audio equivalence, physical input, performance, source GCI
-persistence, and Personal autosave were not exercised. Host output was muted
+binds the rendered browser report, screenshots, runtime package hashes, and the
+historical incomplete retail attempt. Browser source state and navigation passed.
+The corrected original retail source route now completes three CSS → SSS → Team
+Battle → No Contest Results → CSS cycles; the [tracked follow-up receipt](../evidence/vs-team-battle-retail-followup-v1.json)
+retains its hashes, exact scope, and cleanup state. The historical browser
+attempt-07 receipt still records the stale mask `fffffffeffffffff`; the newer
+Rules Plus receipt already records the source-derived `fffffffffffbffff` mask
+at its item-route references (lines 108, 161 and 283). That newer receipt is not
+a fresh browser Team rerun, so the complete retail/browser Team comparison
+remains pending. Visual/audio equivalence, physical input, performance, source
+GCI persistence, and Personal autosave were not exercised. Host output was muted
 while source DSP/audio processing remained enabled.
