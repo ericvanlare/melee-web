@@ -28,6 +28,56 @@ This is a compiled/source-identified HTTP boundary check. It does not claim
 native gameplay, browser interoperability, official-service behavior, or a
 deterministic cause for the separately retained reporter-thread failure.
 
+## Source Slippi profile prefix diagnostic
+
+The [bounded source-profile prefix receipt](../../docs/evidence/source-slippi-profile-prefix-v1.json) records a source-only check whose finalized raw PAD records are the sole step inputs. It pins the source probe, explicit RNG profile helper, runtime ABI and clean lifecycle boundary. The receipt does not claim a complete replay, pending-state snapshot, browser gameplay, draw/PCM agreement or rollback acceptance. Run the portable checker in `tools/slippi_profile_prefix_check.py` with a local `.slp`, runtime pair, assets and explicit source/profile identities; it fails at the first divergence and retains its failure directory.
+
+Its `queued_transfer_and_default_pair` section records a later root-audited source-only Node pair: a snapshot admitted at quiescent scene 106, raw scene 107 observed pending, scene 108 clear, three restores through scenes 107--110, and a separate old-baseline/candidate scripted/raw byte comparison. The `recorded_match_1342` section separately records the source/native comparison through scene 1341, ending at the fourth P1 stock loss; it does not include Results, rematch, browser, rollback or foreground timing. The portable checker defaults to scenes 0--110 and accepts the explicitly observed full endpoint with `--scene-last 1341`; that full command remains a source/native reproduction gate and does not imply browser/player rollback.
+
+Build `gameplay_snapshot_probe` with `python3 scripts/build.py --trace-target gameplay_snapshot_probe --configuration Release`. With locally owned assets and the pinned desktop replay, run the command below from the repository root. Replace the local input paths and runtime pair, and use their audited SHA-256 identities; `--out` must be absent. The measured identities and fresh full-suite/build/checker results are in the receipt's `required_validation` section. A different replay or build needs its own receipt.
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 tools/slippi_profile_prefix_check.py \
+  --replay /path/to/local.slp --runtime /path/to/gameplay_snapshot_probe.js \
+  --assets /path/to/local-assets \
+  --source-probe tests/gameplay_snapshot_probe.cpp --source-cmake cmake/FighterRuntime.cmake \
+  --profile-helper reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp \
+  --probe-sha256 AUDITED_PROBE_SHA256 --cmake-sha256 AUDITED_CMAKE_SHA256 \
+  --profile-helper-sha256 AUDITED_HELPER_SHA256 \
+  --runtime-sha256 AUDITED_JS_SHA256 --wasm-sha256 AUDITED_WASM_SHA256 \
+  --profile-offset 0x1234 --seed 0x13579bdf --scene-last 1341 \
+  --node /path/to/pinned-node --timeout 30 --cleanup-timeout 6 \
+  --out /path/to/fresh-check-directory
+```
+
+
+### Native initializer and original scheduler masks
+
+The [initializer/mask follow-up receipt](../../docs/evidence/source-slippi-native-initializer-mask-v1.json) binds a separate fresh source build. The opt-in initializer uses source slots 1/2, controllers 0/1, two Mario players with color 0, four stocks and seed 4660. Its 60-byte diagnostic and JSON expose copied selection fields and the actual `stage_info.grkind` through a C-only bridge. The default profile retains slots 0/0, colors 0/1 and seed `0x13579bdf`. The existing bare CPP identity remains unchanged in meaning; the bridge has a separate hash export.
+
+For the native initializer, use the prefix command above with `--seed 4660 --initializer-profile native --stage-kind-bridge tests/gameplay_snapshot_stage_kind_bridge.c --stage-kind-bridge-sha256 AUDITED_BRIDGE_SHA256`. Keep the other source/runtime pins and `--scene-last 1341`. Native profile configuration rejects another seed and any initializer change after init. Neither the prefix nor initializer comparison certifies Results or current network consumption.
+
+The pause checker exercises 124 neutral source ticks and 17 ordinary PAD controls. It checks the source-prepared process mask and callback trace; it never writes pause, scheduler masks or callback state. Early P1/P2 START attempts stay paused, then the original pause timer permits P1 resume. Run it against the same fresh Release probe:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 tools/source_pause_mask_check.py \
+  --runtime build/browser-release/gameplay_snapshot_probe.js \
+  --assets /path/to/local-assets --out /path/to/fresh-pause-check \
+  --source-probe tests/gameplay_snapshot_probe.cpp --source-cmake cmake/FighterRuntime.cmake \
+  --profile-helper reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp \
+  --stage-kind-bridge tests/gameplay_snapshot_stage_kind_bridge.c \
+  --probe-sha256 AUDITED_PROBE_SHA256 --cmake-sha256 AUDITED_CMAKE_SHA256 \
+  --profile-helper-sha256 AUDITED_HELPER_SHA256 \
+  --stage-kind-bridge-sha256 AUDITED_BRIDGE_SHA256 \
+  --runtime-sha256 AUDITED_JS_SHA256 --wasm-sha256 AUDITED_WASM_SHA256 \
+  --worker-sha256 AUDITED_PAUSE_WORKER_SHA256 \
+  --node /path/to/pinned-node --node-sha256 AUDITED_NODE_SHA256 --timeout 30
+```
+
+The launcher reserves five seconds of its whole 30-second cap for owned group cleanup and retains a failure report. Passing requires source close, matching wait/cleanup return codes, released group and absent positive leader PID. A fresh child directory separates worker evidence from the process log. The worker hash is required before spawn, and the launcher records both checker and worker hashes. Supplied symlink inputs are refused before canonicalization. Synthetic controls detect changed callback count and prepared mask; the actual source run checks the full recipe.
+
+An optional MEMFS browser module can be compiled with `python3 scripts/build.py --trace-target gameplay_snapshot_probe_browser --configuration Release`, using the ignored `assets-local/snapshot-mario` fixture. This source-only diagnostic module has no player or draw surface. Its build result is separate from browser execution; it does not enable the multiplayer playing route.
+
 ## Pinned inputs and licensing
 
 [`client.lock.json`](client.lock.json) is the source of truth for the client
@@ -291,3 +341,134 @@ decoding, ordinary Pipe input, loopback socket gates and owned process cleanup.
 The run is accepted only when the generated receipt says `passed`; a client
 boot, connected peer, short replay prefix, successful build or average frame
 rate alone is not the integration result.
+
+## Source-runtime snapshot experiment
+
+The multiplayer workstream's two early questions are controlled desktop
+rollback and restoration of WebMelee's own source simulation. The latter has
+a separate **Compiled / Native traced** feasibility target. It uses the actual
+`GameplayMatchSession`, original raw PAD renewal and scheduler, Mario articles,
+Final Destination collision, and native audio synthesis. It does not draw or
+enter the browser player. Its [hash-bound receipt](../../docs/evidence/source-snapshot-feasibility-v1.json)
+records exact scope, repetitions, coverage, identities, costs and retained
+failed hypotheses. Execution issue
+[#115](https://github.com/ericvanlare/melee-web/issues/115) tracks acceptance.
+
+Prepare the reviewed source target and supply an operator-owned Mario/FD asset
+directory, including the common match, HUD, trophy, rumble and audio files
+required by current source ownership. The runtime reports missing files; it
+does not exempt assets. Use a new ignored output directory for every run:
+
+```sh
+python3 scripts/build.py --configuration Release --trace-target gameplay_snapshot_probe
+python3 scripts/agent_workspace.py run -- \
+  .deps/emsdk/node/24.19.0_64bit/bin/node scripts/check_source_snapshot.mjs \
+  --runtime build/browser-release/gameplay_snapshot_probe.js \
+  --assets assets-local/snapshot-mario \
+  --out work/source-snapshot/fresh-01
+python3 scripts/agent_workspace.py run -- \
+  python3 -m unittest discover -s tests -p test_source_snapshot.py -v
+```
+
+The fixture is one-shot per module and disables Asyncify. Capture occurs after
+a synchronous native
+export returns and the combined source-file/HPS/SSM drive owner reports idle.
+The host copies the entire Wasm memory and records the exported stack pointer.
+Restore requires the same module, full ArrayBuffer identity, capacity and stack
+boundary. Active calls, asynchronous calls, shared memory, changed views,
+growth and closed owners are refused. A failed initialization releases its
+owned files and partially constructed session; it cannot be reused as a fresh
+fixture. Source close releases the match, world and audio owners.
+
+The owned linear state includes native globals, C/C++ allocation metadata,
+pointer identities and source-address shadows; fighters, items, stage and
+collision; HSD objects and process ordering; source RNG and clocks; semantic
+PAD Master/Copy/Game history; match/HUD flow; native AX, SSM/HPS transport and
+PCM buffers. Restoring preserves pointers because it uses the same memory
+instance. No emulator savestate is transplanted. All fixture files are internal
+`RuntimeFiles`, so the asynchronous JavaScript file bridge is unreachable.
+Native audio is rendered into a copied comparison buffer without a host sound
+sink. Replay therefore has no audible commit to duplicate. Source drawing,
+GPU submission, Web Audio and persistent card commits are unreachable in this
+target; their ownership is still an implementation dependency for the player.
+
+For each checkpoint, the driver advances a known sample-indexed PAD stream,
+restores and replays depths 1, 2, 4 and 7 three times. It compares the entire
+native observation and PCM bytes at every replayed sample and all linear
+memory at each depth endpoint. Every forward sample retains full observation
+and PCM hashes. The observation includes both full match-stat
+records, semantic PAD history, source frame/RNG, stock/motion and lifecycle
+fields, article count and scheduler counts. It requires observed Mario fireball
+and both stock-loss coverage. A one-bit source RNG perturbation must diverge,
+then an intact restore must recover agreement. Raw input and forward-state
+logs, baseline observations, first-divergence details and preparation failures
+remain in the ignored run directory.
+
+This is a full-memory correctness baseline, not a production rollback ring.
+Wasm mutable globals beyond the exported stack, function tables, JavaScript
+module/event-loop state, host files/clock, browser input/clock queues, renderer
+resources, externally committed audio and saves are not restored. Endpoint
+memory equality does not claim hidden memory equality at every intermediate
+sample. No retail/Slippi semantic equivalence, full match/rematch, browser
+rollback, visual/audio accuracy, physical input or foreground performance is
+established. The next source experiment must account for actual draw and host
+ownership and reduce snapshot size/cost before enabling player rollback.
+
+### Bounded shared-page follow-up
+
+The [shared-page receipt](../../docs/evidence/source-shared-page-snapshot-v1.json)
+records a Node-only diagnostic owner with at most eight snapshots and a hard
+256 MiB limit on unique owned page payload. Each snapshot covers every byte of
+linear memory. First capture hashes every page; later captures compare each
+page exactly against the most recent retained immutable snapshot. Changed
+pages use SHA-256 buckets followed by exact byte comparison. Released handles
+drop their page references, and failed captures roll back partial ownership.
+No guessed dirty flags or excluded address ranges are used.
+
+Native initialization may grow memory and leave transfers pending. This driver
+records the actual capacity, executes original neutral sample 0, requires
+native quiescence, then binds the owner. Every later capture and restore retains
+the same identity/capacity/stack guards. The complete entry sequence is logged.
+The driver repeats the existing depths and sensitivity control, then restores
+all eight retained states and verifies observation, PCM and full-memory hashes.
+It reports first and subsequent capture costs separately; the payload limit
+does not bound total Node RSS or establish browser performance.
+
+To reproduce the measured 64 MiB initial-capacity candidate, first configure
+the existing Release build through its normal entry point, set the diagnostic
+target's cache value with the checkout's pinned tools, then build it. This value
+does not shrink the authored native arenas or prevent growth:
+
+```sh
+python3 scripts/build.py --configuration Release --configure-only
+python3 scripts/agent_workspace.py run -- env \
+  PATH="$PWD/.venv/bin:$PATH" EMSDK="$PWD/.deps/emsdk" \
+  EM_CONFIG="$PWD/.deps/emsdk/.emscripten" \
+  EM_CACHE="$PWD/.deps/emsdk/upstream/emscripten/cache" \
+  EMSDK_PYTHON="$(command -v python3)" \
+  .venv/bin/cmake -S . -B build/browser-release \
+  -DMELEE_WEB_SNAPSHOT_INITIAL_MEMORY=67108864
+python3 scripts/build.py --configuration Release --trace-target gameplay_snapshot_probe
+python3 scripts/agent_workspace.py run -- \
+  .deps/emsdk/node/24.19.0_64bit/bin/node scripts/check_shared_page_snapshot.mjs \
+  --runtime build/browser-release/gameplay_snapshot_probe.js \
+  --assets assets-local/snapshot-mario \
+  --out work/source-snapshot/shared-pages-fresh-01
+python3 scripts/agent_workspace.py run -- \
+  python3 -m unittest tests.test_shared_page_snapshot -v
+```
+
+Use a second fresh output path for repetition. Initial capacity defaults to
+128 MiB in a new build; this is a persistent CMake cache value. Set it back to
+`134217728` through the same cache command before returning to the full-copy
+driver, which binds memory before initialization. The shared-page driver
+records whichever actual capacity was built. Both drivers
+remain correctness experiments for the declared source-only boundary. Mutable
+Wasm globals/table state outside memory and external browser effects retain
+the exclusions above. A first capture still exceeding one frame, and these
+headless Node costs, do not close player rollback admission.
+
+Controlled desktop rollback remains a separate gate: retain identical
+frame-indexed inputs and initialization, a bounded fault schedule, actual
+prediction/load/resimulation observations and finalized state comparisons.
+Its diagnostic adaptation must remain part of the pinned client bundle.

@@ -1278,7 +1278,7 @@ trajectory in Interpreter64; its protected dequeue observation resolves the
 retained controller-capture race. All 435 tests pass. This trajectory includes seven stock losses and six respawns but only
 five damage increases and no up-special; broad corpus admission remains open.
 
-Slippi ingestion now normalizes finalized per-frame input/state records, handles
+The separately scoped [source Slippi profile receipt](docs/evidence/source-slippi-profile-prefix-v1.json) records the optional fixture profile, raw-input comparison through the recorded fourth-stock-loss boundary, default-profile regression, and required validation. The [native-initializer and scheduler-mask follow-up](docs/evidence/source-slippi-native-initializer-mask-v1.json) separately records default/native initializer diagnostics, ordinary pause/resume, the fresh recorded prefix and scoped source restoration checks. Results/rematch and actual browser multiplayer remain open. Slippi ingestion now normalizes finalized per-frame input/state records, handles
 rollback history without mixing revisions, preserves exact field bits and
 rejects incomplete timelines. The v2 input-only workload transport retains
 source identity and records derived rules explicitly; it never treats UCF
@@ -1321,6 +1321,31 @@ A separate [headless browser-to-desktop transport receipt](docs/evidence/slippi-
 records one 24-frame raw PAD exchange through the loopback ENet relay and the
 desktop peer's existing input consumer. It does not establish browser gameplay,
 general cross-play, or rollback correctness.
+
+The [source snapshot feasibility receipt](docs/evidence/source-snapshot-feasibility-v1.json)
+adds **Compiled / Native traced** evidence for a synchronous, source-only
+Mario/Final Destination prefix. Two fresh runs pass repeated same-instance
+restore/replay at depths 1, 2, 4 and 7, comparing full native observations and
+PCM each replayed sample and all linear memory at each depth endpoint. The
+script exercises a fireball and stock-loss transitions; a deliberately changed
+RNG bit is detected. Every forward observation/PCM hash repeats between the
+fresh runs. Cross-process raw-memory hashes differ and remain unclassified;
+cross-instance restoration is unsupported. The full-memory resource baseline
+is not practical player rollback admission. Drawing, JS/GPU/audio commits,
+mutable Wasm globals beyond the stack, whole matches, browser multiplayer and
+Slippi compatibility remain separate gates. Reproduction and ownership are in
+the [testbed guide](reference-capture/slippi/LOCAL_TESTBED.md#source-runtime-snapshot-experiment).
+
+The [shared-page follow-up receipt](docs/evidence/source-shared-page-snapshot-v1.json)
+adds **Compiled / Native traced** evidence for bounded immutable page sharing
+in the same source-only profile. Two fresh runs pass repeated exact
+restore/replay, eight retained-state restores, release-to-zero ownership and
+the RNG sensitivity/recovery control. All forward inputs, observations and PCM
+agree with the unoptimized run. Every page is compared exactly before sharing;
+changed pages retain hash-plus-byte comparison. The receipt distinguishes
+first-capture cost, subsequent retained-state cost, owned payload and Node RSS.
+Browser host/draw/audio/save ownership and practical rollback admission remain
+open.
 
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
