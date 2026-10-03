@@ -5,6 +5,11 @@ a second CSS-to-SSS transition, and match entry. It is semantic evidence for thi
 boundary only. Gameplay state, rendered frames, emitted PCM, physical input and
 browser performance retain their separate acceptance gates.
 
+The fixed-profile transition recording below starts with source BGM id `0x34`
+and `menu01.hps`. Normal CSS/SSS can also enter with id `0x36` and
+`menu3.hps`; that original candidate is covered by the shared menu HPS owner
+regression, while this transition fixture remains scoped to its captured BGM.
+
 The JSONL schema is `melee-web-transition-trace` version 1. A run must contain:
 
 1. `capture_begin` in a live CSS with `menu01.hps` active.

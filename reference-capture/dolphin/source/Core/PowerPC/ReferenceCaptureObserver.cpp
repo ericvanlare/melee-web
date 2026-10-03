@@ -547,7 +547,7 @@ struct CpuProbePoint
 // tools/cpu-register-gale01r2.json.  They intentionally remain compiled
 // constants: a probe cannot turn an unverified guest PC into an observer
 // boundary by supplying a different file at runtime.
-constexpr std::array<CpuProbePoint, 36> CPU_PROBE_POINTS = {{
+constexpr std::array<CpuProbePoint, 37> CPU_PROBE_POINTS = {{
     {"after_kind_dispatch", 0x800b3924, 0x7fe3fb78},
     {"state_dispatch_entry", 0x800b2790, 0x7c0802a6},
     {"before_hitlag_sticks", 0x800b2aa8, 0x4bff9af9},
@@ -588,6 +588,7 @@ constexpr std::array<CpuProbePoint, 36> CPU_PROBE_POINTS = {{
     {"samus_effect_bank_load", 0x803984f4, 0x7c0802a6},
     {"gx_init_tlut", 0x8033f024, 0x38000000},
     {"samus_effect_particle_spawn", 0x80398c04, 0x7c0802a6},
+    {"rand_return", 0x80380524, 0x4e800020},
 }};
 
 const CpuProbePoint* FindCpuProbePoint(u32 address)
@@ -627,6 +628,8 @@ struct CpuProbeSettings
   u32 match = 0;
   u32 first_tick = 0;
   u32 last_tick = 0;
+  u32 rng_return_pc = 0;
+  std::string rng_return_site;
 };
 
 const CpuProbeSettings& CpuProbeEnvironment()
@@ -637,8 +640,9 @@ const CpuProbeSettings& CpuProbeEnvironment()
     const std::string match = Env("MWRC_CPU_PROBE_MATCH");
     const std::string first_tick = Env("MWRC_CPU_PROBE_FIRST_TICK");
     const std::string last_tick = Env("MWRC_CPU_PROBE_LAST_TICK");
+    const std::string rng_return_site = Env("MWRC_CPU_PROBE_RNG_RETURN_SITE");
     result.present = !output.empty() || !match.empty() || !first_tick.empty() ||
-                     !last_tick.empty();
+                     !last_tick.empty() || !rng_return_site.empty();
     if (!result.present)
       return result;
     if (output.empty() || output.size() > 4096)
@@ -647,6 +651,16 @@ const CpuProbeSettings& CpuProbeEnvironment()
       return result;
     }
     result.output_path = output;
+    if (!rng_return_site.empty())
+    {
+      if (rng_return_site != "rand_return" && rng_return_site != "randf_return")
+      {
+        result.error = "MWRC_CPU_PROBE_RNG_RETURN_SITE must be rand_return or randf_return";
+        return result;
+      }
+      result.rng_return_site = rng_return_site;
+      result.rng_return_pc = rng_return_site == "rand_return" ? 0x80380524 : 0x8038057c;
+    }
     if (!ParseBoundedDecimal(match, WHOLE_SESSION_MAX_MATCHES - 1, &result.match) ||
         !ParseBoundedDecimal(first_tick, std::numeric_limits<u32>::max(),
                              &result.first_tick) ||
@@ -831,6 +845,8 @@ struct Observer::Impl
       cpu_probe_match = cpu_probe.match;
       cpu_probe_first_tick = cpu_probe.first_tick;
       cpu_probe_last_tick = cpu_probe.last_tick;
+      cpu_probe_rng_return_pc = cpu_probe.rng_return_pc;
+      cpu_probe_rng_return_site = cpu_probe.rng_return_site;
       cpu_probe_records.reset(new (std::nothrow) CpuProbeRecord[CPU_PROBE_MAX_RECORDS]);
       if (!cpu_probe_records)
       {
@@ -1034,10 +1050,25 @@ struct Observer::Impl
     return true;
   }
 
-  void CloseCpuProbe()
+  void RecordSelectedRngCallback(Core::System* system, u32 pc)
+  {
+    if (!cpu_probe_configured || !cpu_probe_valid || cpu_probe_closed ||
+        cpu_probe_rng_return_pc == 0 || pc != cpu_probe_rng_return_pc)
+      return;
+    if (cpu_probe_rng_return_callback_count != std::numeric_limits<u64>::max())
+      ++cpu_probe_rng_return_callback_count;
+    cpu_probe_rng_return_callback_pc = pc;
+    cpu_probe_rng_return_callback_match = match_index;
+    cpu_probe_rng_return_callback_tick_valid =
+        ReadU32(system, 0x80479d58, &cpu_probe_rng_return_callback_tick);
+  }
+
+  void CloseCpuProbe(u32 pc, u32 source_tick)
   {
     if (!cpu_probe_configured || cpu_probe_closed)
       return;
+    cpu_probe_close_pc = pc;
+    cpu_probe_close_tick = source_tick;
     cpu_probe_closed = true;
     // The callback is the sole writer.  Once this release is visible, the
     // writer owns an immutable snapshot and can serialize it without taking a
@@ -1045,9 +1076,59 @@ struct Observer::Impl
     cpu_probe_published.store(true, std::memory_order_release);
   }
 
+  void CloseCpuProbeAtSourceTick(u32 pc, u32 source_tick)
+  {
+    if (!cpu_probe_configured || !cpu_probe_valid || cpu_probe_closed ||
+        source_tick <= cpu_probe_last_tick || match_index != cpu_probe_match)
+      return;
+    const bool rng_match_scope = cpu_probe_rng_return_pc != 0 && whole_session_enabled() &&
+        (whole_phase == 4 || (whole_phase == 5 && match_active));
+    const bool active_match_scope = match_active && setup_ready;
+    if (rng_match_scope || active_match_scope)
+      CloseCpuProbe(pc, source_tick);
+  }
+
+  std::string CpuProbeCloseStatusJson() const
+  {
+    if (!cpu_probe_published.load(std::memory_order_acquire) ||
+        cpu_probe_rng_return_pc == 0)
+      return {};
+    std::string rng_return_pc;
+    std::string close_pc;
+    std::string callback_pc;
+    if (!AppendHex(&rng_return_pc, cpu_probe_rng_return_pc, 8) ||
+        !AppendHex(&close_pc, cpu_probe_close_pc, 8) ||
+        (cpu_probe_rng_return_callback_count != 0 &&
+         !AppendHex(&callback_pc, cpu_probe_rng_return_callback_pc, 8)))
+      return {};
+    const std::string last_callback =
+        cpu_probe_rng_return_callback_count == 0 ? "null" :
+        "{\"pc\":\"0x" + callback_pc + "\",\"source_tick\":" +
+            (cpu_probe_rng_return_callback_tick_valid ?
+                 std::to_string(cpu_probe_rng_return_callback_tick) : "null") +
+            ",\"match\":" +
+            std::to_string(cpu_probe_rng_return_callback_match) + "}";
+    return ",\"cpu_probe_close\":{\"reason\":\"source_tick_after_window\",\"rng_return_pc\":\"0x" +
+           rng_return_pc + "\",\"close_pc\":\"0x" + close_pc +
+           "\",\"configured_match\":" + std::to_string(cpu_probe_match) +
+           ",\"first_tick\":" +
+           std::to_string(cpu_probe_first_tick) + ",\"last_tick\":" +
+           std::to_string(cpu_probe_last_tick) + ",\"selected_return_callback_count\":" +
+           std::to_string(cpu_probe_rng_return_callback_count) +
+           ",\"selected_return_record_count\":" +
+           std::to_string(cpu_probe_record_count) +
+           ",\"selected_return_last_callback\":" + last_callback +
+           ",\"source_tick\":" + std::to_string(cpu_probe_close_tick) + "}";
+  }
+
   void RecordCpuProbe(Core::System* system, u32 pc, const CpuProbePoint& point,
                       PowerPC::PowerPCState* state, u32 source_tick)
   {
+    if (cpu_probe_rng_return_pc != 0 && pc != cpu_probe_rng_return_pc)
+      return;
+    const bool rng_match_construction_scope = cpu_probe_rng_return_pc != 0 &&
+        whole_session_enabled() && match_index == cpu_probe_match &&
+        (whole_phase == 4 || (whole_phase == 5 && match_active && !setup_ready));
     const bool samus_effect_bank_probe = pc == 0x80398614;
     const bool samus_effect_bank_load_probe = pc == 0x803984f4;
     const bool samus_effect_gx_tlut_probe = pc == 0x8033f024;
@@ -1056,7 +1137,8 @@ struct Observer::Impl
         samus_effect_bank_probe || samus_effect_bank_load_probe;
     if (!cpu_probe_configured || !cpu_probe_valid || cpu_probe_closed ||
         (!samus_effect_load_scope &&
-         (!match_active || !setup_ready || match_index != cpu_probe_match)) ||
+         ((!match_active || !setup_ready || match_index != cpu_probe_match) &&
+          !rng_match_construction_scope)) ||
         (samus_effect_bank_probe && cpu_probe_effect_group_found))
       return;
     u32 instruction = 0;
@@ -1070,7 +1152,7 @@ struct Observer::Impl
     }
     if (!samus_effect_load_scope && source_tick > cpu_probe_last_tick)
     {
-      CloseCpuProbe();
+      CloseCpuProbe(pc, source_tick);
       return;
     }
     if (!samus_effect_load_scope &&
@@ -2245,6 +2327,8 @@ struct Observer::Impl
   {
     if (!Start() || invalid.load() || finish_requested.load())
       return;
+    if (pc == cpu_probe_rng_return_pc && cpu_probe_rng_return_pc != 0)
+      RecordSelectedRngCallback(system, pc);
     if (const ItemProbePoint* item_probe = FindItemProbePoint(pc))
     {
       u32 source_tick = 0;
@@ -2301,6 +2385,8 @@ struct Observer::Impl
       SetInvalid("source scene counter is outside the pinned RAM range");
       return;
     }
+    if (boundary == Boundary::SourceTick)
+      CloseCpuProbeAtSourceTick(pc, source_tick);
     raw_size = 0;
     slice_count = 0;
     if (boundary == Boundary::CssEnter || boundary == Boundary::CssCancelEnter ||
@@ -2920,8 +3006,10 @@ struct Observer::Impl
     const auto append_number = [&](u64 value) { return append(std::to_string(value)); };
     const auto append_hex32 = [&](u32 value) { return AppendHex(json, value, 8); };
     const auto append_hex64 = [&](u64 value) { return AppendHex(json, value, 16); };
-    if (!append("{\"schema\":\"melee-web-cpu-register-probe\",\"version\":1,"
-                "\"diagnostic_only\":true,\"window_complete\":true,"
+    if (!append(cpu_probe_rng_return_pc == 0 ?
+                "{\"schema\":\"melee-web-cpu-register-probe\",\"version\":1," :
+                "{\"schema\":\"melee-web-cpu-register-probe\",\"version\":3,") ||
+        !append("\"diagnostic_only\":true,\"window_complete\":true,"
                 "\"source_revision\":\"GALE01r2\",\"dol_sha256\":\""))
       return false;
     if (!append(EXPECTED_DOL_SHA256) || !append("\",\"capture_id\":\"") ||
@@ -2930,7 +3018,13 @@ struct Observer::Impl
       return false;
     if (!append_number(cpu_probe_match) || !append(",\"first_tick\":") ||
         !append_number(cpu_probe_first_tick) || !append(",\"last_tick\":") ||
-        !append_number(cpu_probe_last_tick) || !append(",\"record_count\":") ||
+        !append_number(cpu_probe_last_tick))
+      return false;
+    if (cpu_probe_rng_return_pc != 0 &&
+        (!append(",\"rng_return_pc\":\"0x") ||
+         !append_hex32(cpu_probe_rng_return_pc) || !append("\"")))
+      return false;
+    if (!append(",\"record_count\":") ||
         !append_number(cpu_probe_record_count) || !append(",\"records\":["))
       return false;
     for (size_t record_index = 0; record_index < cpu_probe_record_count; ++record_index)
@@ -3485,14 +3579,16 @@ struct Observer::Impl
     if (!status.IsOpen())
       return false;
     const std::string error_text = JsonEscape(Error());
-    const std::string json =
+    std::string json =
         "{\"state\":\"" + std::string(state) + "\",\"event_count\":" +
         std::to_string(event_count) + ",\"last_seq\":" + std::to_string(last_seq) +
         ",\"source_tick\":" + std::to_string(source_tick) +
         ",\"draw_ordinal\":" + std::to_string(draw) + ",\"completed\":" +
         (completed ? "true" : "false") + ",\"invalid\":" +
         (invalid.load() ? "true" : "false") + ",\"error\":" +
-        (error_text.empty() ? "null" : "\"" + error_text + "\"") + "}\n";
+        (error_text.empty() ? "null" : "\"" + error_text + "\"");
+    json += CpuProbeCloseStatusJson();
+    json += "}\n";
     if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||
         !status.Close())
       return false;
@@ -3562,6 +3658,15 @@ struct Observer::Impl
   u32 cpu_probe_match = 0;
   u32 cpu_probe_first_tick = 0;
   u32 cpu_probe_last_tick = 0;
+  u32 cpu_probe_rng_return_pc = 0;
+  std::string cpu_probe_rng_return_site;
+  u64 cpu_probe_rng_return_callback_count = 0;
+  u32 cpu_probe_rng_return_callback_pc = 0;
+  u32 cpu_probe_rng_return_callback_tick = 0;
+  u32 cpu_probe_rng_return_callback_match = 0;
+  bool cpu_probe_rng_return_callback_tick_valid = false;
+  u32 cpu_probe_close_pc = 0;
+  u32 cpu_probe_close_tick = 0;
   size_t cpu_probe_record_count = 0;
   std::unique_ptr<CpuProbeRecord[]> cpu_probe_records;
   std::string cpu_probe_error;
@@ -3709,9 +3814,17 @@ static bool IsCaptureBoundary(u32 guest_pc)
     // Diagnostic CPU PCs are JIT boundaries only for the fully validated,
     // opt-in companion configuration.  The normal observer boundary set and
     // its disabled path remain unchanged.
-    return (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr) ||
+    return (CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr &&
+            (CpuProbeEnvironment().rng_return_pc == 0 ||
+             CpuProbeEnvironment().rng_return_pc == guest_pc)) ||
            (ItemProbeEnabled() && FindItemProbePoint(guest_pc) != nullptr);
   }
+}
+
+bool Observer::IsRngReturnBoundary(u32 guest_pc)
+{
+  return CpuProbeEnabled() && CpuProbeEnvironment().rng_return_pc == guest_pc &&
+         FindCpuProbePoint(guest_pc) != nullptr;
 }
 
 bool Observer::IsBoundary(u32 guest_pc)

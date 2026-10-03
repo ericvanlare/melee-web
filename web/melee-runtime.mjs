@@ -475,6 +475,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     });
   }
   async function snapshotSaveProfile({baseline = false} = {}) {
+    if (baseline && !prepared && snapshot().phase === 0) throw Error('Select a disc before exporting Everything unlocked.');
     if (!ready || fatal || destroyed) throw Error('The player is unavailable. Reload to recover.');
     const length = 0x1790 + 7 * 0x1F2C;
     const ptr = Module._malloc(length);

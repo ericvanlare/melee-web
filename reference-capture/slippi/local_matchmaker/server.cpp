@@ -210,8 +210,11 @@ private:
       const std::string response =
           "HTTP/1.1 503 Service Unavailable\r\n"
           "Content-Type: application/json\r\n"
-          "Connection: close\r\nContent-Length: " + std::to_string(body.size()) +
-          "\r\n\r\n" + std::string(body);
+          // The pinned ureq 2.12.1 client marks Connection: close streams as
+          // unpoolable, but its buffered length-delimited path still resets
+          // socket timeouts after reading the body. Close-delimited framing
+          // preserves this explicit local rejection without that reset path.
+          "Connection: close\r\n\r\n" + std::string(body);
       (void)send(client, response.data(), response.size(), 0);
       shutdown(client, SHUT_RDWR);
       close(client);

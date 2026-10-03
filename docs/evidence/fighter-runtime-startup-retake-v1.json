@@ -1,0 +1,71 @@
+{
+  "schema": "melee-web-fighter-runtime-startup-retake-v1",
+  "scope": "original-disc import and native menu source preparation only; no match or fighter behavior comparison",
+  "base_commit": "d5fb579ba5bd81ff59407a7a0d7a7e803776cf40",
+  "code_commit": "4a4e4b27c30d7c01739c671abd882b6cdfd72507",
+  "source_change_patch_sha256": "e638d6c1e510ad5554c7794a07986a62a793cc91777fb8b23a79703bd343c18d",
+  "source_game": {
+    "revision": "GALE01 USA revision 2",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "tydatai_usd_sha256": "7e0eaf267000c2734d1ef47e718c923995dfb6cf8ab32ec4e4babc0a84fcca11",
+    "tydatai_dat_sha256": "1bd632a1f50027f8844e008f4d45e9c20987ce4b8c1e5aa1690a83b3f063c0f4"
+  },
+  "failure_before_fix": {
+    "artifact_id": "captain-falcon-current-main-replay-20261003/minimal-import-repro-d5-02",
+    "report_sha256": "263fcf80598a767904b8e07c5297b2a82ac0672406dcc05139915d2d719cebe9",
+    "result": "reproduced-runtime-failure",
+    "boundary": "asset-preparation",
+    "diagnostic": "Aborted(segmentation fault)",
+    "runtime_html_sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d",
+    "runtime_wasm_sha256": "23cfb2ac123529ef0c90ca1addef223cfbc80114ff48c77fe3cadd2934600a3e",
+    "runtime_data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+  },
+  "retake": {
+    "artifact_id": "fighter-runtime-startup-retake-20261003/import-retake-v1",
+    "source_base_commit": "d5fb579ba5bd81ff59407a7a0d7a7e803776cf40",
+    "browser": "installed Google Chrome 154.0.8037.97, headless via scripts/browser_tools.mjs",
+    "runtime_html_sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d",
+    "runtime_js_sha256": "a96f274b3f614859280b10db425dda38b8504cc2a22052efa8f02546e2eda018",
+    "runtime_wasm_sha256": "59f7e55b7f3f4e58cdbd5d27321a4a6a29b6266af59df79652b268fef0a88ab5",
+    "runtime_data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+    "reproducer_sha256": "05dba88fb293c97ca3452d6ccc00fe05df80ab6ec6bab47048c30d529fff4a36",
+    "report_sha256": "57efbbbaf4fbee2cb44d893a2112f09e5d65f5bb35ca26b210b65c86c2368df6",
+    "screenshot_sha256": "eb95ecb5e7c62b50e5a84a9ef2e3370669d7c4cd7a953ff58a2c187363f4779b",
+    "result": "start-control-enabled",
+    "page_errors": [],
+    "limits": [
+      "No match was started; no source gameplay, Results, or CSS return was compared.",
+      "The screenshot is the black gameplay canvas before opening character select.",
+      "Audio output was not initialized; pixels, PCM, live input, and performance equivalence were not tested."
+    ]
+  },
+  "validation": {
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "result": "pass",
+      "tests": 1735,
+      "skipped": 132,
+      "duration_seconds": 286.605,
+      "log_artifact_id": "fighter-runtime-startup-retake-20261003/full-suite-after-manifest.log",
+      "log_sha256": "7982402d54d04137055b4d75ad67ca4c16438b3ad68c18f40eb4e7aff4ce3748"
+    },
+    "focused_trophy_baseline": {
+      "command": "python3 -m unittest discover -s tests -p test_gameplay_native_menus.py -k trophy_baseline -v",
+      "result": "pass",
+      "tests": 1,
+      "log_artifact_id": "fighter-runtime-startup-retake-20261003/trophy-baseline-focused.log",
+      "log_sha256": "7b10daeb937b23f34055d5cce513f245e2d3c1c2438afad0c860c415ab25d639"
+    },
+    "browser_build": {
+      "command": "python3 scripts/build.py --target runtime",
+      "result": "pass",
+      "source_commit": "4a4e4b27c30d7c01739c671abd882b6cdfd72507",
+      "log_artifact_id": "fighter-runtime-startup-retake-20261003/runtime-build.log",
+      "log_sha256": "d471bfa40ccd946a6ae43a73f5789b482cbc6bfce861b7a939dbd87e4eb19665",
+      "runtime_js_sha256": "a96f274b3f614859280b10db425dda38b8504cc2a22052efa8f02546e2eda018",
+      "runtime_wasm_sha256": "59f7e55b7f3f4e58cdbd5d27321a4a6a29b6266af59df79652b268fef0a88ab5",
+      "runtime_data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    }
+  }
+}

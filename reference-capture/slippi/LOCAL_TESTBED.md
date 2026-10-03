@@ -20,6 +20,14 @@ headless Chrome screenshot, WebSocket/relay events, both local PAD streams, and
 the second client's byte-exact remote-PAD observations. The evidence report
 contains hashes for the retained files without recording an operator path.
 
+The [local reporter framing receipt](../../docs/evidence/local-slippi-reporter-framing-v1.json)
+records six direct requests for each of the old and close-delimited local
+service variants. Each request received the exact fail-closed 503 JSON body;
+the new variant omits `Content-Length` while retaining `Connection: close`.
+This is a compiled/source-identified HTTP boundary check. It does not claim
+native gameplay, browser interoperability, official-service behavior, or a
+deterministic cause for the separately retained reporter-thread failure.
+
 ## Pinned inputs and licensing
 
 [`client.lock.json`](client.lock.json) is the source of truth for the client

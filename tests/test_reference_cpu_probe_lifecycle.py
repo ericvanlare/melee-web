@@ -90,6 +90,7 @@ class ReferenceCpuProbeLifecycleTests(unittest.TestCase):
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -178,6 +179,14 @@ struct ProbeHarness {
   u32 cpu_probe_match = 2;
   u32 cpu_probe_first_tick = 100;
   u32 cpu_probe_last_tick = 103;
+  u32 cpu_probe_rng_return_pc = 0;
+  u64 cpu_probe_rng_return_callback_count = 0;
+  u32 cpu_probe_rng_return_callback_pc = 0;
+  u32 cpu_probe_rng_return_callback_tick = 0;
+  u32 cpu_probe_rng_return_callback_match = 0;
+  bool cpu_probe_rng_return_callback_tick_valid = false;
+  u32 cpu_probe_close_pc = 0;
+  u32 cpu_probe_close_tick = 0;
   size_t cpu_probe_record_count = 0;
   std::unique_ptr<CpuProbeRecord[]> cpu_probe_records =
       std::make_unique<CpuProbeRecord[]>(CPU_PROBE_MAX_RECORDS);
@@ -190,6 +199,9 @@ struct ProbeHarness {
   bool match_active = true;
   bool setup_ready = true;
   u32 match_index = 2;
+  u32 whole_session_matches = 0;
+  u32 whole_phase = 0;
+  bool whole_session_enabled() const { return whole_session_matches != 0; }
   std::string capture_id = "capture";
   std::string sequence_id = "sequence";
 
@@ -208,6 +220,10 @@ static void StoreBE32(Core::System* system, u32 address, u32 value) {
 
 static const ReferenceCapture::CpuProbePoint& ProbePoint() {
   return ReferenceCapture::CPU_PROBE_POINTS[0];
+}
+
+static const ReferenceCapture::CpuProbePoint& RngReturnProbePoint() {
+  return ReferenceCapture::CPU_PROBE_POINTS.back();
 }
 
 static const ReferenceCapture::CpuProbePoint& SamusEffectProbePoint() {
@@ -298,18 +314,116 @@ int main() {
     harness.RecordCpuProbe(&system, ProbePoint().address, ProbePoint(), &state, 100);
     assert(harness.cpu_probe_record_count == 1);
     std::string before_close;
-    harness.CloseCpuProbe();
+    harness.CloseCpuProbe(ProbePoint().address, 100);
     assert(harness.cpu_probe_closed);
     assert(harness.cpu_probe_published.load(std::memory_order_acquire));
     assert(harness.BuildCpuProbeJson(&before_close));
-    std::cout << before_close;
+    std::cout << before_close << "\n";
     state.gpr[3] = 0;
     harness.RecordCpuProbe(&system, ProbePoint().address, ProbePoint(), &state, 101);
-    harness.CloseCpuProbe();
+    harness.CloseCpuProbe(ProbePoint().address, 101);
     std::string after_close;
     assert(harness.BuildCpuProbeJson(&after_close));
     assert(before_close == after_close);
     assert(harness.cpu_probe_record_count == 1);
+    assert(harness.cpu_probe_rng_return_callback_count == 0);
+  }
+
+  // The optional RNG selector ignores unrelated PCs and admits only its pinned
+  // return site within the selected whole-session VS construction/match window.
+  {
+    Core::System system;
+    PowerPC::PowerPCState state;
+    ProbeHarness rng_probe;
+    Prepare(&rng_probe, &system, &state);
+    const auto& point = RngReturnProbePoint();
+    assert(point.address == 0x80380524 && point.expected_word == 0x4e800020);
+    StoreBE32(&system, point.address, point.expected_word);
+    rng_probe.cpu_probe_rng_return_pc = point.address;
+    rng_probe.whole_session_matches = 3;
+    rng_probe.match_active = false;
+    rng_probe.setup_ready = false;
+    rng_probe.match_index = rng_probe.cpu_probe_match;
+    rng_probe.whole_phase = 3;
+    StoreBE32(&system, 0x80479d58, 100);
+    rng_probe.RecordSelectedRngCallback(&system, point.address);
+    assert(rng_probe.cpu_probe_rng_return_callback_count == 1);
+    assert(rng_probe.cpu_probe_rng_return_callback_pc == point.address);
+    assert(rng_probe.cpu_probe_rng_return_callback_tick_valid);
+    assert(rng_probe.cpu_probe_rng_return_callback_tick == 100);
+    assert(rng_probe.cpu_probe_rng_return_callback_match == rng_probe.cpu_probe_match);
+    rng_probe.RecordCpuProbe(&system, point.address, point, &state, 100);
+    assert(rng_probe.cpu_probe_record_count == 0);
+    assert(!rng_probe.cpu_probe_closed);
+
+    rng_probe.RecordCpuProbe(&system, ProbePoint().address, ProbePoint(), &state, 104);
+    assert(!rng_probe.cpu_probe_closed);
+    rng_probe.whole_phase = 4;
+    rng_probe.RecordCpuProbe(&system, point.address, point, &state, 100);
+    assert(rng_probe.cpu_probe_record_count == 1);
+    rng_probe.whole_phase = 5;
+    rng_probe.match_active = true;
+    rng_probe.RecordCpuProbe(&system, point.address, point, &state, 101);
+    assert(rng_probe.cpu_probe_record_count == 2);
+    rng_probe.RecordCpuProbe(&system, point.address, point, &state, 104);
+    assert(rng_probe.cpu_probe_closed);
+    assert(rng_probe.cpu_probe_close_pc == point.address);
+    assert(rng_probe.cpu_probe_close_tick == 104);
+    std::string json;
+    assert(rng_probe.BuildCpuProbeJson(&json));
+    assert(json.find("\"version\":3") != std::string::npos);
+    assert(json.find("\"rng_return_pc\":\"0x80380524\"") != std::string::npos);
+    assert(json.find("\"label\":\"rand_return\"") != std::string::npos);
+  }
+
+  // A bounded RNG window must close on the ordinary source-tick boundary
+  // after its selected records. The stage may make no further Rand calls.
+  {
+    Core::System system;
+    PowerPC::PowerPCState state;
+    ProbeHarness rng_probe;
+    Prepare(&rng_probe, &system, &state);
+    const auto& point = RngReturnProbePoint();
+    StoreBE32(&system, point.address, point.expected_word);
+    rng_probe.cpu_probe_rng_return_pc = point.address;
+    rng_probe.cpu_probe_match = 0;
+    rng_probe.whole_session_matches = 3;
+    rng_probe.match_active = true;
+    rng_probe.setup_ready = false;
+    rng_probe.match_index = 0;
+    rng_probe.whole_phase = 5;
+    StoreBE32(&system, 0x80479d58, 100);
+    rng_probe.RecordSelectedRngCallback(&system, point.address);
+    rng_probe.RecordCpuProbe(&system, point.address, point, &state, 100);
+    assert(rng_probe.cpu_probe_record_count == 1);
+
+    const ReferenceCapture::CpuProbePoint source_tick{
+        "source_tick_return", 0x80390eb4, 0x4e800020};
+    StoreBE32(&system, source_tick.address, source_tick.expected_word);
+    rng_probe.CloseCpuProbeAtSourceTick(source_tick.address, 104);
+    assert(rng_probe.cpu_probe_closed);
+    assert(rng_probe.cpu_probe_close_pc == source_tick.address);
+    assert(rng_probe.cpu_probe_close_tick == 104);
+    const std::string close_status = "{\"state\":\"recording\"" +
+                                     rng_probe.CpuProbeCloseStatusJson() + "}";
+    std::cout << close_status << "\n";
+  }
+
+  // A closed window without a delivered callback reports zero callbacks and
+  // zero admitted records, with no fabricated last callback.
+  {
+    Core::System system;
+    PowerPC::PowerPCState state;
+    ProbeHarness missing_callback;
+    Prepare(&missing_callback, &system, &state);
+    missing_callback.cpu_probe_rng_return_pc = RngReturnProbePoint().address;
+    missing_callback.whole_session_matches = 3;
+    missing_callback.match_active = false;
+    missing_callback.match_index = missing_callback.cpu_probe_match;
+    missing_callback.whole_phase = 4;
+    missing_callback.CloseCpuProbeAtSourceTick(0x80390eb4, 104);
+    std::cout << "{\"state\":\"recording\"" +
+                     missing_callback.CpuProbeCloseStatusJson() + "}" << "\n";
   }
 
   // Verified instruction mismatch and all guest ranges outside MEM1 fail the
@@ -396,7 +510,7 @@ int main() {
     assert(record.effect_literal_palette_readable);
     assert(record.effect_literal_palette[0] == 0x6b && record.effect_literal_palette[511] == 0x6b);
     std::string json;
-    effect_probe.CloseCpuProbe();
+    effect_probe.CloseCpuProbe(SamusEffectProbePoint().address, 100);
     assert(effect_probe.BuildCpuProbeJson(&json));
     assert(json.find("\"samus_effect_group\"") != std::string::npos);
     assert(json.find("\"palette_address\":\"0x00aa812a\",\"palette_readable\":true") !=
@@ -499,7 +613,7 @@ int main() {
     assert(consumed.samus_effect_gx_tlut_call);
     assert(consumed.samus_effect_gx_tlut_address == 0x01d3ac8a);
 
-    effect_probe.CloseCpuProbe();
+    effect_probe.CloseCpuProbe(SamusEffectProbePoint().address, 100);
     std::string json;
     assert(effect_probe.BuildCpuProbeJson(&json));
     assert(json.find("\"samus_effect_loaded_group\":{\"bank\":34") !=
@@ -530,11 +644,19 @@ int main() {
             raise RuntimeError(built.stderr)
 
     def test_compiled_probe_window_lifecycle_and_memory_guards(self):
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn(
+            "if (boundary == Boundary::SourceTick)\n      CloseCpuProbeAtSourceTick(pc, source_tick);",
+            source,
+        )
+        self.assertIn("json += CpuProbeCloseStatusJson();", source)
         checked = subprocess.run([str(self.binary)], capture_output=True, text=True)
         self.assertEqual(checked.returncode, 0, checked.stderr)
         # Parse the production serializer's output independently, including raw
         # bits and the binding fields needed by an external run receipt.
-        document = json.loads(checked.stdout)
+        document, status, missing_status = (
+            json.loads(line) for line in checked.stdout.splitlines() if line
+        )
         self.assertEqual(document["schema"], "melee-web-cpu-register-probe")
         self.assertTrue(document["diagnostic_only"])
         self.assertTrue(document["window_complete"])
@@ -550,6 +672,16 @@ int main() {
         self.assertEqual(record["gpr"][3], "0x12345678")
         self.assertEqual(len(record["fpr"]), 7)
         self.assertEqual(record["fpr"][0], "0x0123456789abcdef")
+        self.assertEqual(status["cpu_probe_close"]["rng_return_pc"], "0x80380524")
+        self.assertEqual(status["cpu_probe_close"]["close_pc"], "0x80390eb4")
+        self.assertEqual(status["cpu_probe_close"]["selected_return_callback_count"], 1)
+        self.assertEqual(status["cpu_probe_close"]["selected_return_record_count"], 1)
+        self.assertEqual(status["cpu_probe_close"]["selected_return_last_callback"], {
+            "pc": "0x80380524", "source_tick": 100, "match": 0
+        })
+        self.assertEqual(missing_status["cpu_probe_close"]["selected_return_callback_count"], 0)
+        self.assertEqual(missing_status["cpu_probe_close"]["selected_return_record_count"], 0)
+        self.assertIsNone(missing_status["cpu_probe_close"]["selected_return_last_callback"])
 
 
 if __name__ == "__main__":

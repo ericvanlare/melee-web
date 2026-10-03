@@ -49,6 +49,13 @@ export function mountSaveProfileSettings({onError = () => {}, onBusy = () => {}}
   function updateModeUI() {
     modeSelect.value = activeMode;
     describe();
+    updateExportUI();
+  }
+  function updateExportUI() {
+    // The original trophy tables arrive with the selected disc. Stored Personal
+    // saves remain exportable without a live game.
+    $('export-save').disabled = changing || (activeMode === 'everything' &&
+      (!(hasScene() || state?.state === 'prepared') || state?.busy || state?.requiresReload));
   }
   function isLoaded() { return !!state?.bundle; }
   function hasScene() { return PROFILE_SCENES.has(state?.scene); }
@@ -144,6 +151,7 @@ export function mountSaveProfileSettings({onError = () => {}, onBusy = () => {}}
     changing = value;
     for (const id of ['settings-open', 'save-mode', 'export-save', 'load-save', 'settings-close',
       'save-confirm-cancel', 'save-confirm-accept']) $(id).disabled = value;
+    updateExportUI();
     onBusy();
   }
 
@@ -241,6 +249,7 @@ export function mountSaveProfileSettings({onError = () => {}, onBusy = () => {}}
   }
 
   $('settings-open').addEventListener('click', () => {
+    updateExportUI();
     if (!dialog.open) dialog.showModal();
     modeSelect.focus();
   });
@@ -357,7 +366,7 @@ export function mountSaveProfileSettings({onError = () => {}, onBusy = () => {}}
         onError(error);
       }
     },
-    setState(next) { state = next; reconcileTimer(); },
+    setState(next) { state = next; updateExportUI(); reconcileTimer(); },
     get blocked() { return blocked && activeMode === 'personal'; },
     get busy() { return changing; },
     async flushBeforeTeardown() {

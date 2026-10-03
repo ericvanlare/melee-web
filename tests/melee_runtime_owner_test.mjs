@@ -295,6 +295,8 @@ if (startupCacheDelay) assert.equal(Module._melee_web_native_menu_cache_idle(), 
 Module.onRuntimeInitialized();
 let player = await mounted;
 assert.equal(player.getState().ready, true);
+await assert.rejects(player.snapshotSaveProfile({baseline: true}), /Select a disc/);
+assert.equal(player.getState().requiresReload, false, 'Unavailable baseline export must not enter native code or poison the player');
 assert.equal(player.getState().canSelectDisc, true,
   'Disc selection stays available before the first renderer-cache readiness frame');
 const cacheCallsBeforeMainFrame = cacheIdleCalls;
