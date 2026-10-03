@@ -589,10 +589,9 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
     PADStatus raw[4]{};
     raw[2].err = raw[3].err = -1;
     std::unique_ptr<melee_web::GameplayMenuWorld> world =
-        std::make_unique<melee_web::GameplayMenuWorld>(
-            files, melee_web::GameplayMenuScene::Title);
-    check(melee_web_menu_host_enter_title(host, world->audio(), error,
-                                          sizeof(error)), error);
+        std::make_unique<melee_web::GameplayMenuWorld>(files);
+    check(melee_web_menu_host_enter(host, world->audio(), error,
+                                    sizeof(error)), error);
 
     auto tick = [&]() {
         const int result = melee_web_menu_host_tick(host, raw, error,
@@ -618,15 +617,44 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
     };
 
     neutral(120);
-    raw[0].button = PAD_BUTTON_START;
-    int result = 1;
+    raw[0].button = PAD_BUTTON_START | PAD_TRIGGER_L | PAD_TRIGGER_R;
+    int result = tick();
+    raw[0].button = 0;
+    check(result == 3, "Original CSS did not accept its LR+Start parent route");
+    check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+    check(melee_web_menu_host_route_target_mode(host) == GM_MENU,
+          "Original CSS LR+Start lost its GM_MENU destination");
+    world->close();
+    world = std::make_unique<melee_web::GameplayMenuWorld>(
+        files, melee_web::GameplayMenuScene::Main);
+    check(melee_web_menu_host_enter_main(host, world->audio(), error,
+                                         sizeof(error)), error);
+    neutral(120);
+
+    raw[0].button = PAD_BUTTON_B;
+    result = 1;
     for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
         result = tick();
     raw[0].button = 0;
-    check(result == 3, "Original Title did not accept its Start route");
+    check(result == 3, "Original Main Back did not reach Title before Sound entry");
+    check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+    check(melee_web_menu_host_route_target_mode(host) == GM_TITLE,
+          "Initial Main Back lost its GM_TITLE destination");
+    world->close();
+    world = std::make_unique<melee_web::GameplayMenuWorld>(
+        files, melee_web::GameplayMenuScene::Title);
+    check(melee_web_menu_host_enter_title(host, world->audio(), error,
+                                         sizeof(error)), error);
+    neutral(120);
+    raw[0].button = PAD_BUTTON_START;
+    result = 1;
+    for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
+        result = tick();
+    raw[0].button = 0;
+    check(result == 3, "Original Title Start did not return to Main before Sound entry");
     check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
     check(melee_web_menu_host_route_target_mode(host) == GM_MENU,
-          "Original Title Start lost its GM_MENU destination");
+          "Initial Title Start lost its GM_MENU destination");
     world->close();
     world = std::make_unique<melee_web::GameplayMenuWorld>(
         files, melee_web::GameplayMenuScene::Main);
@@ -670,6 +698,33 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
     check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
     check(melee_web_menu_host_route_target_mode(host) == GM_TITLE,
           "Original Main Back lost its GM_TITLE destination");
+
+    world->verify_immutable_archives();
+    world->close();
+    world = std::make_unique<melee_web::GameplayMenuWorld>(
+        files, melee_web::GameplayMenuScene::Title);
+    check(melee_web_menu_host_enter_title(host, world->audio(), error,
+                                         sizeof(error)), error);
+    check(gmMainLib_8015ED74() == static_cast<u8>(-5),
+          "Original Main-to-Title transition lost the source Sound balance");
+    neutral(120);
+    raw[0].button = PAD_BUTTON_START;
+    result = 1;
+    for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
+        result = tick();
+    raw[0].button = 0;
+    check(result == 3, "Returned Title did not accept its original Start route");
+    check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+    check(melee_web_menu_host_route_target_mode(host) == GM_MENU,
+          "Returned Title Start lost its GM_MENU destination");
+    world->close();
+    world = std::make_unique<melee_web::GameplayMenuWorld>(
+        files, melee_web::GameplayMenuScene::Main);
+    check(melee_web_menu_host_enter_main(host, world->audio(), error,
+                                         sizeof(error)), error);
+    check(gmMainLib_8015ED74() == static_cast<u8>(-5),
+          "Original Title-to-Main transition lost the source Sound balance");
+    check(melee_web_menu_host_leave(host, 1, error, sizeof(error)), error);
     world->verify_immutable_archives();
     world->close();
     world.reset();

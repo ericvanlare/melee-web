@@ -1457,6 +1457,12 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
         melee_web_pad_state_free(next_input);
         return fail(e, n, "Source scene is not title or main");
     }
+    /* Title and Main transitions destroy their temporary world before the
+     * next source scene is prepared. Preserve the complete live preference
+     * block before restore_context restores the caller's copy; otherwise the
+     * next Title/Main/VS scene reapplies the stale selection and loses menu
+     * writes such as Settings > Sound's SaveData balance. */
+    h->selected_preferences = *gmMainLib_8015CC58();
     h->source_scene = MELEE_WEB_HOST_SCENE_NONE;
     h->entered = 0;
     h->transition = 0;
