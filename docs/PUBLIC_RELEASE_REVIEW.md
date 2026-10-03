@@ -72,7 +72,7 @@ NaiadAI, LLC and legal@webmelee.gg, as expressly supplied by the operator. The
 mail route passed actual receipt tests before the nameserver change and after
 DNS migration, before domain activation. The exact alpha is now live at
 [webmelee.gg](https://webmelee.gg/); its scoped artifact, browser, DNS, HTTPS and
-redirect evidence is recorded in [PUBLIC_ALPHA_VALIDATION.md](PUBLIC_ALPHA_VALIDATION.md).
+redirect evidence is recorded in [PUBLIC_ALPHA_VALIDATION.md](history/PUBLIC_ALPHA_VALIDATION.md).
 
 ## Artifact and seed facts
 
@@ -84,7 +84,7 @@ schema has one `aurora_schema` row, one shader row and 627 pipeline rows. The
 PR #47 release preserved all 626 previous records, including the 78 added
 for Link/Young Link, and appended two portable configurations recovered from the
 failed Marth/Battlefield holdout's saved pipeline DB/WAL. The
-[current holdout evidence](CURRENT_RUNTIME_HOLDOUTS_20260919.md) records that
+[current holdout evidence](history/CURRENT_RUNTIME_HOLDOUTS_20260919.md) records that
 failure, exact descriptor identities and preservation checks. The
 [Link descriptor ledger](evidence/link-gpu-compilation-v1.json) and
 [Roy/Doc ledger](evidence/roy-doc-public-preparation-v1.json) remain historical

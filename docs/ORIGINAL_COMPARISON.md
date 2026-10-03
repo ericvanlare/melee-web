@@ -103,7 +103,7 @@ reducer completes. States outside that class still fail explicitly. Generic pose
 validation rejects unpaired LIN/SPL tracks; native fighter-action hydration
 retains structurally bounded streams and fails at the guarded consumer if
 undefined output is reached. See [Donkey's current
-boundary](DONKEY_KONG_PORT_NOTES.md). Parser regressions exercise delayed
+boundary](content/DONKEY_KONG_PORT_NOTES.md). Parser regressions exercise delayed
 zero and one constants, early-callback rejection and invalid-state rejection.
 The two-world 36,000-frame FD probe passes every state and cycle restart.
 

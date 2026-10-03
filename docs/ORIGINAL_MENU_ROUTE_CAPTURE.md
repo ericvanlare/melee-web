@@ -227,6 +227,93 @@ that destination explicitly. Eject then recovers to CSS. A Title timeout is
 also checked to retain a zero payload and no fabricated destination. These
 checks do not enable Challenger Approach or claim full title/demo coverage.
 
+<a id="main-settings-rumble-route"></a>
+
+## Main Settings > Rumble route
+
+The retail Observer capture in
+[`save-profile-dolphin-roundtrip-v1.json`](evidence/save-profile-dolphin-roundtrip-v1.json)
+records the original Main `MenuKind` route `0 → 4 → 19 → 4 → 0` at source
+ticks `95, 130, 141, 186, 197`: Main, Settings, Rumble, Settings, Main. The
+source scene remains `GS_MENU` (`1`) throughout the settings route after Title
+(`GS_TITLE`, `0`). At tick 175, ordinary A changes Controller 1 rumble from on
+to off; B leaves Rumble and then Settings. The source callbacks are
+`mnMain_Scene_OnEnter`, `mnMain_Scene_OnFrame`, `mnVibration_Init`,
+`mnVibration_HandleInput`, and `gmMainLib_SetRumbleEnabled`. The Rumble menu is
+`MENU_KIND_SETTINGS_RUMBLE` (`19`) and uses the `MenMainConVi_Top`,
+`MenMainCtlVi_Top`, `MenMainOnoffVi_Top` and `MenMainCursorVi_Top` exports in
+the Main `MnMaAll.usd` archive. Main also loads its authored `SdMenu.usd`
+(`SIS_MenuData`) and `SdToy.dat` (`SIS_ToyData`) roots. The retail Observer
+receipt has a Null video backend, so its menu IDs/input/save bytes are source
+reference evidence rather than a retail visual capture.
+
+The headless installed-Chrome route in
+[`main-settings-rumble-route-v1.json`](evidence/main-settings-rumble-route-v1.json)
+renders those original Main, Settings and Rumble scenes. From a new isolated
+browser context it keeps the default Everything unlock profile, confirms the
+switch to Personal progress, enters CSS, opens Main with the B0XX L+R+Start
+chord, and reaches Title and Main by their original callbacks. Three D-pad
+Down inputs and A enter Settings then Rumble. After the original intro gate,
+ordinary A disables Controller 1 rumble. The native SaveData snapshot reads
+`[0, 1, 1, 1]` at offset `0x458`; autosave, repeated Settings/Rumble entry,
+exit through original Main/VS selection to CSS, GCI export, and document reload
+retain that value. The production native menu owner unloads successfully after
+the route. The reduced repeated-entry browser run also retains each rendered
+checkpoint and source observer state.
+
+This is source-callback behavior and preference persistence evidence for one
+Settings subroute. The browser screenshots establish rendered original menu
+scenes and input response; they are not pixel comparisons. The retail capture
+uses Null video and no audio output. The browser run uses the audio-disabled
+public player, so audio fidelity, physical-controller behavior, foreground
+timing and performance remain untested. The route does not implement or claim
+the other Settings pages.
+
+## Main Settings > Display route
+
+The retail Observer capture in the scoped [Display route receipt](evidence/main-settings-display-route-v1.json)
+records Main, Settings and Display `MenuKind` IDs `0 → 4 → 21 → 4 → 21 → 4 → 0`
+at source ticks `96, 128, 155, 200, 210, 245, 255`. From the source Title
+scene, three D-pad Down presses and A enter Settings; two Down presses and A
+enter Display. A turns deflicker off; B returns to Settings, A re-enters
+Display with the same row selected, B returns to Settings, and B returns to
+Main. The relevant retail callbacks are
+`mnMain_Scene_OnEnter`, `mnMain_Scene_OnFrame`, `mn_8022DB10`,
+`mn_8022D104`, `mnDeflicker_8024A6C4` and `mnDeflicker_8024A168` from
+`melee/mn/mnmain.c` and `melee/mn/mndeflicker.c`. The Main archive resolves the
+authored `MenMainConDf_Top` model from `MnMaAll.usd`; the settings scene also
+uses `SdMenu.usd` (`SIS_MenuData`) and `SdToy.dat` (`SIS_ToyData`). The source
+SaveData byte at `0x45D` changes from `1` to `0`. Dolphin reports the route
+pass and exact menu sequence; its Observer stream is marked interrupted because
+the capture runner stops its owned Dolphin after the sequence. Retail video and
+audio were disabled.
+
+In a fresh isolated headless-Chrome context, the public player starts with
+Everything unlocked, confirms a new Personal profile, enters original CSS,
+opens the original Title/Main menus, and changes Display deflicker from on to
+off. The browser reads source SaveData at `0x45D`, waits for Personal autosave,
+backs out and re-enters Display, returns through original Main/VS selection to
+CSS, exports the GCI with the same byte, then enters SSS, reaches a supported
+match, opens No Contest Results and returns to CSS. The passing
+`browser-route-integrated-01` run uses the combined Rumble and trophy-baseline
+runtime and sends no SSS cursor input, so stage identity is unobserved and
+excluded. The earlier route used short directional inputs and misidentified its
+stage; that label is superseded. The corrected runner uses
+`scripts/serve.py` for cross-origin-isolation headers; the setup failures are
+retained in the receipt. Personal profile reload and native menu owner teardown
+retain the preference. The SSS back-cancel probe separately confirms B returns
+to CSS after the source input gate. Rendered screenshots and the raw browser
+report are indexed by the receipt.
+
+The receipt separates source state, navigation, rendered visuals, save effects,
+audio, physical input, performance and lifecycle. Browser rendering proves the
+original scenes are displayed and that the option responds; it does not prove
+pixel equivalence. Dolphin used Null video and No Audio Output, and the browser
+package was the silent player profile. Audio quality, physical input,
+foreground timing, performance and the identity of the random/default stage
+remain untested. These results do not establish coverage of other Settings
+pages or full-game parity.
+
 ## Retained local evidence
 
 All captures, screenshots, private inputs, and generated runtime bundles remain

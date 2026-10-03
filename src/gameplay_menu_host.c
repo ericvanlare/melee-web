@@ -19,6 +19,7 @@
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/gmtitle.h>
 #include <melee/gm/gmtitlemode.h>
+#include <melee/gm/gmtrainingmode.h>
 #include <melee/gm/gmvsmelee.h>
 #include <melee/gm/gmvsmode.h>
 #include <melee/gm/gm_unsplit.h>
@@ -39,6 +40,7 @@
 #include <sysdolphin/baselib/video.h>
 #include <sysdolphin/baselib/random.h>
 #include <melee/mn/mnmain.h>
+#include <melee/mn/mnitemsw.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,6 +59,7 @@ extern int melee_web_vs_mode_select_state(int);
 extern int melee_web_vs_mode_next_state(void);
 extern int melee_web_vs_mode_pending_mode(void);
 extern int melee_web_vs_mode_set_route(int current_mode, int previous_mode);
+extern int melee_web_menu_parent_route_pending(const MeleeWebMenuSession*);
 extern GameModeState* melee_web_opening_mode_state(int id);
 extern int melee_web_opening_mode_preload(int id);
 extern int melee_web_opening_mode_next_state(void);
@@ -91,6 +94,7 @@ struct MeleeWebMenuHost {
     GameRules saved_rules;
     GameRules selected_rules, route_saved_rules;
     MeleeWebSaveProfilePreferences persisted_preferences;
+    MeleeWebSaveProfilePreferences runtime_preferences;
     struct gmm_x1CB0 saved_preferences;
     struct gmm_x1CB0 selected_preferences, route_saved_preferences;
     int saved_language,saved_saved_language;
@@ -114,13 +118,17 @@ struct MeleeWebMenuHost {
     GameSceneInfo source_scene_info;
     GameModeState vs_css_state;
     GameModeState vs_sss_state;
+    GameModeState training_css_state;
+    GameModeState training_sss_state;
     MenuEnterData main_enter;
     MenuExitData main_exit;
     int title_exit_payload;
     int source_scene;
     int source_target_mode;
     int source_previous_mode;
+    int source_mode_kind;
     int vs_mode_owned;
+    int training_mode_initialized;
     int opening_active;
     int opening_scene_entered;
     int opening_match_suspended;
@@ -128,12 +136,25 @@ struct MeleeWebMenuHost {
     int opening_state_exit_called;
     int aborted_source_scene;
     int css_parent_route_requested;
+    int training_start_pending;
     int results_active,results_exited,results_committed,prize_active;
     int entered,drawing,transition;
 };
 static MeleeWebMenuHost* owner;
 static int fail(char* e,size_t n,const char* text){if(e&&n)snprintf(e,n,"%s",text);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
+static GameModeState* training_state_for_scene(MeleeWebMenuScene scene)
+{
+    const int state_id = scene == MELEE_WEB_MENU_SCENE_CSS ? 0 :
+                         scene == MELEE_WEB_MENU_SCENE_SSS ? 1 : -1;
+    GameModeState* state;
+
+    if (state_id < 0) return NULL;
+    for (state = gm_Mode_Training_States; state->id != (u8) -1; ++state) {
+        if (state->id == (u8) state_id) return state;
+    }
+    return NULL;
+}
 static void host_reset_preload_scene_aliases(void)
 {
     /* These are the non-heap side effects of gm_1A3F's preloadState. The
@@ -168,7 +189,7 @@ static int runtime_transition(void* data,MeleeWebMenuScene scene,int* request,ch
     if(!live(h,e,n)||!melee_web_menu_clock_request(request))return fail(e,n,"Invalid original menu transition state");
     h->css_parent_route_requested = 0;
     if (scene == MELEE_WEB_MENU_SCENE_CSS && *request != 0 &&
-        gm_GetCurrentGameMode() == GM_VS &&
+        (gm_GetCurrentGameMode() == GM_VS || h->source_mode_kind == GM_TRAINING) &&
         melee_web_vs_mode_pending_mode() == GM_MENU) {
         if (!melee_web_menu_mark_css_parent_route(h->session, e, n)) {
             return 0;
@@ -176,6 +197,48 @@ static int runtime_transition(void* data,MeleeWebMenuScene scene,int* request,ch
         h->css_parent_route_requested = 1;
     }
     h->transition=*request;return 1;
+}
+
+/* A few preference fields are normalized while a browser-owned source world
+ * starts. Keep those runtime values as the comparison baseline, then accept
+ * later source menu edits into the persistent preference overlay. */
+static int remember_runtime_preferences(MeleeWebMenuHost* h, char* e, size_t n)
+{
+    return melee_web_save_profile_owner_capture_preferences(
+        h->profile, &h->runtime_preferences, e, n);
+}
+
+static int sync_source_preference_changes(MeleeWebMenuHost* h, char* e, size_t n)
+{
+    MeleeWebSaveProfilePreferences current;
+    if (!melee_web_save_profile_owner_capture_preferences(
+            h->profile, &current, e, n)) {
+        return 0;
+    }
+    if (current.item_frequency != h->runtime_preferences.item_frequency) {
+        h->persisted_preferences.item_frequency = current.item_frequency;
+        h->runtime_preferences.item_frequency = current.item_frequency;
+    }
+    if (current.item_mask != h->runtime_preferences.item_mask) {
+        h->persisted_preferences.item_mask = current.item_mask;
+        h->runtime_preferences.item_mask = current.item_mask;
+    }
+    if (memcmp(current.rumble_enabled, h->runtime_preferences.rumble_enabled,
+               sizeof(current.rumble_enabled)) != 0) {
+        memcpy(h->persisted_preferences.rumble_enabled, current.rumble_enabled,
+               sizeof(current.rumble_enabled));
+        memcpy(h->runtime_preferences.rumble_enabled, current.rumble_enabled,
+               sizeof(current.rumble_enabled));
+    }
+    if (current.deflicker != h->runtime_preferences.deflicker) {
+        h->persisted_preferences.deflicker = current.deflicker;
+        h->runtime_preferences.deflicker = current.deflicker;
+    }
+    if (current.saved_language != h->runtime_preferences.saved_language) {
+        h->persisted_preferences.saved_language = current.saved_language;
+        h->runtime_preferences.saved_language = current.saved_language;
+    }
+    return 1;
 }
 
 
@@ -196,11 +259,32 @@ static int source_scene_enter(void* data, MeleeWebMenuScene scene,
         if (css == NULL) {
             return fail(e, n, "Original CSS payload is unavailable at mode entry");
         }
-        h->vs_css_state = gm_Mode_Vs_States[gmVsMode_State_Css];
-        h->vs_css_state.info.enter_data = css;
-        h->vs_css_state.info.exit_data = css;
-        *gmVsMelee_GetVsData() = css->vs;
-        state = &h->vs_css_state;
+        if (h->source_mode_kind == GM_TRAINING) {
+            GameModeState* authored = training_state_for_scene(scene);
+            if (authored == NULL) {
+                return fail(e, n,
+                            "Original Training mode has no authored CSS state");
+            }
+            /* Main owns a separate menu selection payload. The Training mode
+             * state owns the saved VS-shaped setup that its original CSS
+             * callback consumes, so don't overwrite that state with the
+             * previous VS CSS payload when entering through GM_MENU. */
+            css->match_type = TRAINING_MODE;
+            css->vs = *gmVsMelee_GetVsData();
+            h->training_css_state = *authored;
+            h->training_css_state.info.enter_data = css;
+            h->training_css_state.info.exit_data = css;
+            state = &h->training_css_state;
+        } else if (h->source_mode_kind == GM_VS) {
+            *gmVsMelee_GetVsData() = css->vs;
+            h->vs_css_state = gm_Mode_Vs_States[gmVsMode_State_Css];
+            h->vs_css_state.info.enter_data = css;
+            h->vs_css_state.info.exit_data = css;
+            state = &h->vs_css_state;
+        } else {
+            return fail(e, n,
+                        "Original CSS route has no checked VS or Training owner");
+        }
         h->source_scene_info.scene_kind = GS_CSS;
         h->source_scene_info.enter_data = css;
         h->source_scene_info.exit_data = css;
@@ -211,11 +295,26 @@ static int source_scene_enter(void* data, MeleeWebMenuScene scene,
         if (sss == NULL) {
             return fail(e, n, "Original SSS payload is unavailable at mode entry");
         }
-        h->vs_sss_state = gm_Mode_Vs_States[gmVsMode_State_Sss];
-        h->vs_sss_state.info.enter_data = sss;
-        h->vs_sss_state.info.exit_data = sss;
         *gmVsMelee_GetVsData() = sss->vs;
-        state = &h->vs_sss_state;
+        if (h->source_mode_kind == GM_TRAINING) {
+            GameModeState* authored = training_state_for_scene(scene);
+            if (authored == NULL) {
+                return fail(e, n,
+                            "Original Training mode has no authored SSS state");
+            }
+            h->training_sss_state = *authored;
+            h->training_sss_state.info.enter_data = sss;
+            h->training_sss_state.info.exit_data = sss;
+            state = &h->training_sss_state;
+        } else if (h->source_mode_kind == GM_VS) {
+            h->vs_sss_state = gm_Mode_Vs_States[gmVsMode_State_Sss];
+            h->vs_sss_state.info.enter_data = sss;
+            h->vs_sss_state.info.exit_data = sss;
+            state = &h->vs_sss_state;
+        } else {
+            return fail(e, n,
+                        "Original SSS route has no checked VS or Training owner");
+        }
         h->source_scene_info.scene_kind = GS_SSS;
         h->source_scene_info.enter_data = sss;
         h->source_scene_info.exit_data = sss;
@@ -244,69 +343,136 @@ static int source_scene_exit(void* data, MeleeWebMenuScene scene,
         if (css == NULL || h->source_scene != MELEE_WEB_HOST_SCENE_CSS) {
             return fail(e, n, "Original CSS payload is unavailable at mode exit");
         }
-        h->vs_css_state.info.exit_data = css;
-        if (parent_route &&
-            (gm_GetCurrentGameMode() != GM_VS ||
-             melee_web_vs_mode_pending_mode() != GM_MENU)) {
-            return fail(e, n,
-                        "Original CSS parent route was no longer pending before OnExit");
-        }
-        gm_Mode_Vs_States[gmVsMode_State_Css].on_exit(&h->vs_css_state);
-        if (parent_route) {
-            if (gm_GetCurrentGameMode() != GM_VS ||
-                melee_web_vs_mode_pending_mode() != GM_MENU) {
+        if (h->source_mode_kind == GM_TRAINING) {
+            const int pending_mode_before = melee_web_vs_mode_pending_mode();
+            if (pending_mode_before >= 0 && pending_mode_before != GM_MENU) {
                 return fail(e, n,
-                            "Original CSS parent route changed before its OnExit completed");
+                            "Original Training CSS requested an unsupported mode route");
             }
-            if (!h->vs_mode_owned) {
-                if (!melee_web_vs_mode_begin()) {
+            h->training_css_state.info.exit_data = css;
+            h->training_css_state.on_exit(&h->training_css_state);
+            if (parent_route ||
+                css->pending_scene_change == CSSPendingSceneChange_2) {
+                if (melee_web_vs_mode_pending_mode() != GM_MENU ||
+                    !h->vs_mode_owned ||
+                    !melee_web_vs_mode_set_route(GM_MENU, GM_TRAINING)) {
                     return fail(e, n,
-                                "Original VS mode lease unavailable for CSS parent return");
+                                "Original Training CSS could not commit its GM_MENU return");
                 }
-                h->vs_mode_owned = 1;
-            }
-            h->source_target_mode = GM_MENU;
-            if (!melee_web_vs_mode_set_route(GM_MENU, GM_VS)) {
-                return fail(e, n,
-                            "Original GM_MENU route owner could not commit the CSS parent return");
-            }
-        } else if (css->pending_scene_change == CSSPendingSceneChange_2) {
-            /* CSS parent return keeps a checked VS lease through GM_MENU. */
-            if (!h->vs_mode_owned) {
-                if (!melee_web_vs_mode_begin()) {
+                h->source_target_mode = GM_MENU;
+                h->source_mode_kind = GM_MENU;
+            } else if (css->pending_scene_change == 1) {
+                if (melee_web_vs_mode_pending_mode() >= 0) {
                     return fail(e, n,
-                                "Original VS mode lease unavailable for CSS parent return");
+                                "Original Training CSS changed mode during its SSS handoff");
                 }
-                h->vs_mode_owned = 1;
-            }
-            if (!melee_web_vs_mode_set_route(GM_MENU, GM_VS)) {
+                h->source_target_mode = -1;
+                h->training_start_pending = 0;
+            } else {
                 return fail(e, n,
-                            "Original GM_MENU route owner could not set GM_VS provenance");
+                            "Original Training CSS exited without a supported source route");
             }
-        } else if (css->pending_scene_change == 1) {
-            /* CSS -> SSS remains inside the same GM_VS owner. */
-            h->source_target_mode = -1;
-        } else if (h->vs_mode_owned) {
-            if (!melee_web_vs_mode_end()) {
-                return fail(e, n, "Original VS mode lease did not release after CSS");
-            }
-            h->vs_mode_owned = 0;
-            h->source_target_mode = -1;
         } else {
-            h->source_target_mode = -1;
+            h->vs_css_state.info.exit_data = css;
+            if (parent_route &&
+                (gm_GetCurrentGameMode() != GM_VS ||
+                 melee_web_vs_mode_pending_mode() != GM_MENU)) {
+                return fail(e, n,
+                            "Original CSS parent route was no longer pending before OnExit");
+            }
+            gm_Mode_Vs_States[gmVsMode_State_Css].on_exit(&h->vs_css_state);
+            if (parent_route) {
+                if (gm_GetCurrentGameMode() != GM_VS ||
+                    melee_web_vs_mode_pending_mode() != GM_MENU) {
+                    return fail(e, n,
+                                "Original CSS parent route changed before its OnExit completed");
+                }
+                if (!h->vs_mode_owned) {
+                    if (!melee_web_vs_mode_begin()) {
+                        return fail(e, n,
+                                    "Original VS mode lease unavailable for CSS parent return");
+                    }
+                    h->vs_mode_owned = 1;
+                }
+                h->source_target_mode = GM_MENU;
+                if (!melee_web_vs_mode_set_route(GM_MENU, GM_VS)) {
+                    return fail(e, n,
+                                "Original GM_MENU route owner could not commit the CSS parent return");
+                }
+            } else if (css->pending_scene_change == CSSPendingSceneChange_2) {
+                /* CSS parent return keeps a checked VS lease through GM_MENU. */
+                if (!h->vs_mode_owned) {
+                    if (!melee_web_vs_mode_begin()) {
+                        return fail(e, n,
+                                    "Original VS mode lease unavailable for CSS parent return");
+                    }
+                    h->vs_mode_owned = 1;
+                }
+                if (!melee_web_vs_mode_set_route(GM_MENU, GM_VS)) {
+                    return fail(e, n,
+                                "Original GM_MENU route owner could not set GM_VS provenance");
+                }
+            } else if (css->pending_scene_change == 1) {
+                /* CSS -> SSS remains inside the same GM_VS owner. */
+                h->source_target_mode = -1;
+            } else if (h->vs_mode_owned) {
+                if (!melee_web_vs_mode_end()) {
+                    return fail(e, n, "Original VS mode lease did not release after CSS");
+                }
+                h->vs_mode_owned = 0;
+                h->source_target_mode = -1;
+            } else {
+                h->source_target_mode = -1;
+            }
         }
     } else if (scene == MELEE_WEB_MENU_SCENE_SSS) {
         sss = (SSSData*) melee_web_menu_sss(h->session);
         if (sss == NULL || h->source_scene != MELEE_WEB_HOST_SCENE_SSS) {
             return fail(e, n, "Original SSS payload is unavailable at mode exit");
         }
-        h->vs_sss_state.info.exit_data = sss;
-        gm_Mode_Vs_States[gmVsMode_State_Sss].on_exit(&h->vs_sss_state);
-        if (sss->start_game && h->vs_mode_owned) {
-            if (!melee_web_vs_mode_end()) {
-                return fail(e, n, "Original VS mode lease did not release before match");
+        if (h->source_mode_kind == GM_TRAINING) {
+            const int pending_mode_before = melee_web_vs_mode_pending_mode();
+            if (pending_mode_before >= 0 && pending_mode_before != GM_MENU) {
+                return fail(e, n,
+                            "Original Training SSS requested an unsupported mode route");
             }
-            h->vs_mode_owned = 0;
+            h->training_sss_state.info.exit_data = sss;
+            h->training_sss_state.on_exit(&h->training_sss_state);
+            if (melee_web_vs_mode_pending_mode() == GM_MENU) {
+                if (!h->vs_mode_owned ||
+                    !melee_web_vs_mode_set_route(GM_MENU, GM_TRAINING)) {
+                    return fail(e, n,
+                                "Original Training SSS could not commit its GM_MENU return");
+                }
+                h->source_target_mode = GM_MENU;
+                h->source_mode_kind = GM_MENU;
+                h->training_start_pending = 0;
+            } else if (melee_web_vs_mode_pending_mode() >= 0) {
+                return fail(e, n,
+                            "Original Training SSS changed to an unsupported mode route");
+            } else if (sss->start_game) {
+                h->training_start_pending = 1;
+                h->source_target_mode = -1;
+                if (h->vs_mode_owned) {
+                    if (!melee_web_vs_mode_end()) {
+                        return fail(e, n,
+                                    "Original Training mode lease did not release at simulation handoff");
+                    }
+                    h->vs_mode_owned = 0;
+                }
+            } else {
+                h->source_target_mode = -1;
+                h->training_start_pending = 0;
+            }
+        } else {
+            h->vs_sss_state.info.exit_data = sss;
+            gm_Mode_Vs_States[gmVsMode_State_Sss].on_exit(&h->vs_sss_state);
+            if (sss->start_game && h->vs_mode_owned) {
+                if (!melee_web_vs_mode_end()) {
+                    return fail(e, n, "Original VS mode lease did not release before match");
+                }
+                h->vs_mode_owned = 0;
+            }
         }
     } else {
         return fail(e, n, "Unsupported menu scene lifecycle callback");
@@ -357,6 +523,7 @@ MeleeWebMenuHost* melee_web_menu_host_create_with_profile(
         h->configured_profile_size=card_data_size;
     }
     h->source_target_mode = -1;
+    h->source_mode_kind = GM_VS;
     h->saved_scene_info = melee_web_current_scene_info();
     MeleeWebMenuRuntime runtime={h,runtime_check,runtime_scheduler,runtime_transition,
                                  source_scene_enter,source_scene_exit};
@@ -430,7 +597,7 @@ MeleeWebMenuHost* melee_web_menu_host_create(char* e,size_t n){
 }
 
 int melee_web_menu_host_snapshot_card_data(
-    const MeleeWebMenuHost* h,int baseline,uint8_t* output,
+    MeleeWebMenuHost* h,int baseline,uint8_t* output,
     size_t output_size,char* e,size_t n){
     if(!h||h!=owner||!output||output_size!=MELEE_WEB_SAVE_PROFILE_CARD_BYTES||
        (baseline!=0&&baseline!=1))
@@ -444,6 +611,10 @@ int melee_web_menu_host_snapshot_card_data(
     if(h->initial_replay_context)
         return melee_web_save_profile_owner_snapshot_card_data(
             h->profile,output,output_size,e,n);
+    if (h->entered &&
+        !sync_source_preference_changes(h, e, n)) {
+        return 0;
+    }
     return melee_web_save_profile_owner_snapshot_card_data_with_preferences(
         h->profile,&h->persisted_preferences,output,output_size,e,n);
 }
@@ -571,7 +742,7 @@ static int host_prepare_world(MeleeWebMenuHost* h, MeleeWebAudio* audio,
         h->audio_generation=audio_generation;
     }
     HSD_SisLib_803A6048(source_scene||phase==MELEE_WEB_MENU_SSS_READY?0x4800:0x2400);
-    return ok(e,n);
+    return remember_runtime_preferences(h,e,n)&&ok(e,n);
 }
 
 int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,size_t n){
@@ -600,6 +771,7 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
         }
         HSD_SisLib_803A5FBC();restore_context(h);return 0;
     }
+    if(!remember_runtime_preferences(h,e,n))return 0;
     h->source_scene=phase==MELEE_WEB_MENU_SSS_READY?MELEE_WEB_HOST_SCENE_SSS:MELEE_WEB_HOST_SCENE_CSS;
     h->entered=1;lb_8001CF18();return ok(e,n);
 }
@@ -629,6 +801,7 @@ static int host_enter_title_scene(MeleeWebMenuHost* h, char* e, size_t n)
         }
         return fail(e, n, "Original title route could not set mode provenance");
     }
+    h->source_mode_kind = GM_TITLE;
     h->source_state = gm_Mode_Title_States[0];
     h->source_state.info.scene_kind = GS_TITLE;
     h->source_state.info.enter_data = NULL;
@@ -659,13 +832,15 @@ static int host_enter_main_scene(MeleeWebMenuHost* h, char* e, size_t n)
                     "Original GM_MENU entry has no retained source mode lease");
     }
     if (h->vs_mode_owned && previous != GM_VS && previous != GM_TITLE &&
-        previous != GM_MENU && previous != GM_OPENING_MV) {
+        previous != GM_MENU && previous != GM_OPENING_MV &&
+        previous != GM_TRAINING) {
         return fail(e, n,
                     "Original GM_MENU entry lacks a supported previous-mode route");
     }
     if (!melee_web_vs_mode_set_route(GM_MENU, previous)) {
         return fail(e, n, "Original GM_MENU route could not set mode provenance");
     }
+    h->source_mode_kind = GM_MENU;
     h->source_state = gm_Mode_Menu_States[0];
     h->source_state.info.scene_kind = GS_MENU;
     h->source_state.info.enter_data = &h->main_enter;
@@ -697,6 +872,11 @@ int melee_web_menu_host_enter_title(MeleeWebMenuHost* h, MeleeWebAudio* audio,
         restore_context(h);
         return 0;
     }
+    if (!remember_runtime_preferences(h, e, n)) {
+        HSD_SisLib_803A5FBC();
+        restore_context(h);
+        return 0;
+    }
     h->entered = 1;
     lb_8001CF18();
     return ok(e, n);
@@ -715,9 +895,68 @@ int melee_web_menu_host_enter_main(MeleeWebMenuHost* h, MeleeWebAudio* audio,
         restore_context(h);
         return 0;
     }
+    if (!remember_runtime_preferences(h, e, n)) {
+        HSD_SisLib_803A5FBC();
+        restore_context(h);
+        return 0;
+    }
     h->entered = 1;
     lb_8001CF18();
     return ok(e, n);
+}
+
+int melee_web_menu_host_enter_training_css(MeleeWebMenuHost* h,
+                                           MeleeWebAudio* audio,
+                                           char* e, size_t n)
+{
+    const MeleeWebMenuPhase phase = melee_web_menu_phase(h ? h->session : NULL);
+
+    if (!h || h != owner || h->source_scene != MELEE_WEB_HOST_SCENE_NONE ||
+        h->entered || h->audio || !h->vs_mode_owned ||
+        h->source_target_mode != GM_TRAINING ||
+        h->source_mode_kind != GM_TRAINING) {
+        return fail(e, n,
+                    "Original Training CSS requires the checked Main -> GM_TRAINING route");
+    }
+    h->training_start_pending = 0;
+    if (phase == MELEE_WEB_MENU_CLOSED) {
+        if (!melee_web_menu_parent_route_pending(h->session)) {
+            return fail(e, n,
+                        "Original Training CSS cannot reopen without a completed GM_MENU parent route");
+        }
+        if (!host_prepare_world(h, audio, MELEE_WEB_MENU_CSS_READY, 0, e, n)) {
+            return 0;
+        }
+        if (!melee_web_menu_reopen_css_after_parent(h->session, e, n)) {
+            HSD_SisLib_803A5FBC();
+            restore_context(h);
+            return 0;
+        }
+        h->source_target_mode = -1;
+        h->source_scene = MELEE_WEB_HOST_SCENE_CSS;
+        h->entered = 1;
+        lb_8001CF18();
+        return ok(e, n);
+    }
+    if (phase != MELEE_WEB_MENU_CREATED && phase != MELEE_WEB_MENU_CSS_READY) {
+        return fail(e, n,
+                    "Original Training CSS route requires a new or CSS-ready menu session");
+    }
+    if (!melee_web_menu_host_enter(h, audio, e, n)) {
+        return 0;
+    }
+    h->source_target_mode = -1;
+    return ok(e, n);
+}
+
+int melee_web_menu_host_mode_kind(const MeleeWebMenuHost* h)
+{
+    return h && h == owner ? h->source_mode_kind : -1;
+}
+
+int melee_web_menu_host_training_start_pending(const MeleeWebMenuHost* h)
+{
+    return h && h == owner ? h->training_start_pending : 0;
 }
 
 int melee_web_menu_host_opening_preview(const MeleeWebMenuHost* h,
@@ -1173,7 +1412,7 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
     } else if (h->source_scene == MELEE_WEB_HOST_SCENE_MAIN) {
         const int requested_mode = h->main_exit.pending_mode;
         if (requested_mode != GM_TITLE && requested_mode != GM_MENU &&
-            requested_mode != GM_VS) {
+            requested_mode != GM_VS && requested_mode != GM_TRAINING) {
             melee_web_pad_state_free(next_input);
             return fail(e, n, "Original main scene requested an unsupported mode");
         }
@@ -1183,12 +1422,37 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
             melee_web_pad_state_free(next_input);
             return fail(e, n, "Original main exit changed its checked destination");
         }
+        if (requested_mode == GM_VS) {
+            /* mnmainrule/mnitemsw commit into the live source globals before
+             * requesting GM_VS. Capture only after the original Main mode
+             * OnExit has consumed that request, so returning through CSS
+             * cannot restore the pre-rules values saved at CSS exit. */
+            h->selected_rules = *gmMainLib_GetGameRules();
+            h->selected_preferences = *gmMainLib_8015CC58();
+            h->selected_characters = *gmMainLib_GetUnlockedCharactersBitmaskPtr();
+            h->selected_stages = *gmMainLib_8015EDA4();
+            if (!melee_web_save_profile_owner_capture_preferences(
+                    h->profile, &h->persisted_preferences, e, n)) {
+                melee_web_pad_state_free(next_input);
+                return 0;
+            }
+        }
         h->source_target_mode = requested_mode;
         h->source_previous_mode = GM_MENU;
         if (!melee_web_vs_mode_set_route(requested_mode, GM_MENU)) {
             melee_web_pad_state_free(next_input);
             return fail(e, n, "Original main exit could not set mode provenance");
         }
+        h->source_mode_kind = requested_mode;
+        if (requested_mode == GM_TRAINING) {
+            if (!h->training_mode_initialized) {
+                gm_Mode_Training_OnInit();
+                h->training_mode_initialized = 1;
+            }
+            gm_Mode_Training_OnLoad();
+            h->training_start_pending = 0;
+        }
+        h->selected_preferences = *gmMainLib_8015CC58();
     } else {
         melee_web_pad_state_free(next_input);
         return fail(e, n, "Source scene is not title or main");
@@ -1250,6 +1514,7 @@ static int host_abort_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
 
 int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t n){
     if(!live(h,e,n)||!h->entered||h->drawing)return fail(e,n,"Native menu leave requires an idle live scene");
+    if (!sync_source_preference_changes(h,e,n)) return 0;
     if (h->source_scene == MELEE_WEB_HOST_SCENE_TITLE ||
         h->source_scene == MELEE_WEB_HOST_SCENE_MAIN ||
         h->source_scene == MELEE_WEB_HOST_SCENE_OPENING ||
@@ -1291,6 +1556,53 @@ int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t
 int melee_web_menu_host_phase(const MeleeWebMenuHost* h){return h&&h==owner?melee_web_menu_phase(h->session):MELEE_WEB_MENU_CLOSED;}
 int melee_web_menu_host_source_scene(const MeleeWebMenuHost* h){
     return h&&h==owner?h->source_scene:MELEE_WEB_HOST_SCENE_NONE;
+}
+int melee_web_menu_host_source_observe(
+    const MeleeWebMenuHost* h, MeleeWebMenuSourceObservation* out,
+    char* e, size_t n)
+{
+    const GameRules* rules;
+    const struct gmm_x1CB0* preferences;
+    if (!h || h != owner || !h->entered || h->audio == NULL || !out ||
+        (h->source_scene != MELEE_WEB_HOST_SCENE_MAIN &&
+         h->source_scene != MELEE_WEB_HOST_SCENE_CSS &&
+         h->source_scene != MELEE_WEB_HOST_SCENE_SSS)) {
+        return fail(e, n,
+                    "Source observation requires an active original menu scene");
+    }
+    memset(out, 0, sizeof(*out));
+    rules = gmMainLib_GetGameRules();
+    preferences = gmMainLib_8015CC58();
+    out->source_scene = h->source_scene;
+    if (h->source_scene == MELEE_WEB_HOST_SCENE_MAIN) {
+        out->menu_kind = mn_804A04F0.cur_menu;
+        out->previous_menu_kind = mn_804A04F0.prev_menu;
+        out->hovered_selection = mn_804A04F0.hovered_selection;
+        out->confirmed_selection = mn_804A04F0.confirmed_selection;
+        out->menu_buttons = mn_804A04F0.buttons;
+        out->item_input_locked = out->menu_kind == 0x10 &&
+                                 mnItemSw_804D6BEC != 0;
+    }
+    out->rule_mode = rules->mode;
+    out->stock_count = rules->stock_count;
+    out->time_limit = rules->time_limit;
+    out->stock_time_limit = rules->stock_time_limit;
+    out->handicap = rules->handicap;
+    out->damage_ratio = rules->damage_ratio;
+    out->friendly_fire = rules->friendly_fire;
+    out->item_frequency = (int) (int8_t) preferences->item_freq;
+    out->item_mask = preferences->item_mask;
+    if (h->source_scene == MELEE_WEB_HOST_SCENE_CSS) {
+        const CSSData* css = melee_web_menu_css(h->session);
+        if (css == NULL) {
+            return fail(e, n, "CSS team observation requires the live original CSS payload");
+        }
+        out->css_setup_valid = 1;
+        out->css_is_teams = css->vs.start.rules.is_teams;
+        out->css_player_teams[0] = css->vs.start.players[0].team;
+        out->css_player_teams[1] = css->vs.start.players[1].team;
+    }
+    return ok(e, n);
 }
 int melee_web_menu_host_route_target_mode(const MeleeWebMenuHost* h){
     return h&&h==owner&&!h->entered&&

@@ -3404,7 +3404,7 @@ index fea468cc6c89d7d4c6c8a1a81e31f99eec07bc63..6d0819f60ef4c12cdf80b1ea29bbd805
  
  void gm_80168C5C(u32 arg0)
 diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
-index cd7e31a0636e4e1a48d6a870e09319e887345ed1..0554c21a737ef40d6f9dfb3f81d361a4c146d082 100644
+index cd7e31a0636e4e1a48d6a870e09319e887345ed1..67376af9be9308608caa38c50987c5b4fd5c6bfb 100644
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
 @@ -1,4 +1,6 @@
@@ -3609,7 +3609,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..0554c21a737ef40d6f9dfb3f81d361a4
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2323,188 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2323,193 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -3633,7 +3633,7 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..0554c21a737ef40d6f9dfb3f81d361a4
 +               data->match_result == OUTCOME_NO_CONTEST;
 +    }
 +    if (gm_GetCurrentGameMode() != GM_VS || !data->x24C8.is_vs ||
-+        data->x24C8.match_kind != MatchKind_Stock || data->x24C8.is_teams ||
++        data->x24C8.match_kind != MatchKind_Stock ||
 +        data->x24C8.x4_4 || data->is_singleplayer ||
 +        data->x24C8.on_frame_start || data->x24C8.on_frame_end ||
 +        data->x24C8.x3_2 || gm_1601_GetUnkData()->unk_10_b1 ||
@@ -3733,17 +3733,17 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..0554c21a737ef40d6f9dfb3f81d361a4
 +        if (rules->match_kind > MatchKind_Bonus || rules->timer_enabled ||
 +            rules->time_limit != 0 || rules->x1_0 || !rules->x1_2 ||
 +            !rules->x1_3 || !rules->disable_pausing || rules->x7 != 0 ||
-+            rules->x20 != (u64) -1 || rules->xB != 2 ||
++            rules->is_teams || rules->x20 != (u64) -1 || rules->xB != 2 ||
 +            rules->game_speed != 1.0F || rules->x54 != NULL ||
 +            rules->on_match_start != gm_80183218 ||
 +            rules->on_frame_start != NULL || rules->on_frame_end != NULL ||
 +            rules->on_match_end != NULL || !melee_web_stage_content(rules->stkind))
 +            return 0;
 +    } else if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
-+               !rules->is_vs || rules->is_teams ||
++               !rules->is_vs || rules->is_teams > 1 ||
 +               !melee_web_match_timer_supported(rules) ||
 +               !melee_web_stage_content(rules->stkind) ||
-+               rules->x20 != (u64) -1 || rules->xB != -1 ||
++               rules->xB != -1 ||
 +               rules->game_speed != 1.0F || rules->x54 != NULL ||
 +               rules->on_match_start != NULL || rules->on_frame_start != NULL ||
 +               rules->on_frame_end != NULL || rules->on_match_end != NULL) return 0;
@@ -3757,12 +3757,17 @@ index cd7e31a0636e4e1a48d6a870e09319e887345ed1..0554c21a737ef40d6f9dfb3f81d361a4
 +        if (content == NULL || !melee_web_match_player_supported(player) ||
 +            player->stocks < 1 || player->stocks > (opening_demo ? 99 : 5) ||
 +            player->color >= content->costumes || player->sub_color > 4 ||
-+            player->team != 0 || player->slot > 4 || player_id != i) return 0;
++            (opening_demo && player->team != 0) ||
++            (!opening_demo && rules->is_teams && player->team > 2) ||
++            player->slot > 4 || player_id != i) return 0;
 +        if (opening_demo &&
 +            (player->slot_type != Gm_PKind_Cpu || player->cpu_kind != 4 ||
 +             player->cpu_level != 9)) return 0;
 +    }
 +    if (opening_demo ? i != 4 : i < 2) return 0;
++    if (!opening_demo && rules->is_teams &&
++        (i != 2 || start->players[0].team == start->players[1].team))
++        return 0;
 +    for (; i < 6; ++i)
 +        if (start->players[i].slot_type != Gm_PKind_NA) return 0;
 +    return 1;
@@ -8004,10 +8009,10 @@ index 5917d53b6f0b12dabfcef9a5fe30109caf75f784..eab242fb0bb95c7538be3ad9cf9d5d2f
  ASSERT_SIZE(union ColorOverlay_x8_t, 0x4);
  
 diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
-index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae436b3674 100644
+index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..850bb56f27b76d2cd4a817e896ada9911ca9fd18 100644
 --- a/src/melee/mn/mncharsel.c
 +++ b/src/melee/mn/mncharsel.c
-@@ -1,3 +1,11 @@
+@@ -1,4 +1,18 @@
 +#if defined(MELEE_WEB_MENU_MARIO_FD)
 +#include "gameplay_platform.h"
 +#include "gameplay_menu.h"
@@ -8017,9 +8022,16 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
 +#define MELEE_WEB_MENU_CHARACTER_AVAILABLE(value) (1)
 +#endif
  #include "mncharsel.h"
++#if defined(MELEE_WEB_GAMEPLAY)
++static u32 melee_web_css_start_callback_count;
++static u32 melee_web_css_last_start_trigger;
++static u32 melee_web_last_start_ready;
++static u32 melee_web_last_start_pending;
++#endif
  
  #include <melee/ft/forward.h>
-@@ -308,17 +316,9 @@ static struct CSSDoorsData2 data2 = {
+ #include <sysdolphin/baselib/forward.h>
+@@ -308,17 +322,9 @@ static struct CSSDoorsData2 data2 = {
      },
  };
  
@@ -8040,7 +8052,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
  
  TextKerning* mnCharSel_8025BC20(TextKerning* arg0, u32 arg1)
  {
-@@ -2032,7 +2032,6 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
+@@ -2032,7 +2038,6 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
  {
      s32 icon_idx;
      s32 icon_offset;
@@ -8048,7 +8060,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
      HSD_JObj* icon_jobj;
  
      do {
-@@ -2058,8 +2057,8 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
+@@ -2058,8 +2063,8 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
      }
  
      mnCharSel_804A0BD0[door]->x5 = 0;
@@ -8059,7 +8071,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
      if (arg1 != 0) {
          mnCharSel_804A0BD0[door]->x10 = mnCharSel_804A0BD0[door]->x8;
          mnCharSel_804A0BD0[door]->x14 = mnCharSel_804A0BD0[door]->xC;
-@@ -2069,20 +2068,20 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
+@@ -2069,20 +2074,20 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
  
      if (mnCharSel_804D6CF5 == 1) {
          lb_80011E24(mnCharSel_804D6CC0, &icon_jobj,
@@ -8084,7 +8096,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
          gm_80168C5C((u32) char_kinds[sel * sizeof(CSSIcon)]);
      }
  }
-@@ -2097,7 +2096,6 @@ s32 mnCharSel_8025FDEC(u8 door)
+@@ -2097,7 +2102,6 @@ s32 mnCharSel_8025FDEC(u8 door)
      int player;
      s8 c_kind;
      int icon_idx;
@@ -8092,7 +8104,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
  
      if (mnCharSel_804D6CF5 == 1) {
          if (door != 0) {
-@@ -2112,15 +2110,19 @@ s32 mnCharSel_8025FDEC(u8 door)
+@@ -2112,15 +2116,19 @@ s32 mnCharSel_8025FDEC(u8 door)
      css = mnCharSel_804D6CB0;
      c_kind = css->vs.start.players[player].ckind;
  
@@ -8114,7 +8126,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
              for (icon_idx = 0; icon_idx < 0x19; icon_idx++) {
                  if (css->vs.start.players[player].ckind ==
                      icon[icon_idx].char_kind)
-@@ -2131,9 +2133,9 @@ s32 mnCharSel_8025FDEC(u8 door)
+@@ -2131,9 +2139,9 @@ s32 mnCharSel_8025FDEC(u8 door)
          }
  
          mnCharSel_804A0BD0[door]->x8 =
@@ -8126,7 +8138,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
  
          mnCharSel_803F0DFC.doors[door].sel_icon_prev = icon_idx;
          mnCharSel_803F0DFC.doors[door].sel_icon = icon_idx;
-@@ -2146,15 +2148,15 @@ s32 mnCharSel_8025FDEC(u8 door)
+@@ -2146,15 +2154,15 @@ s32 mnCharSel_8025FDEC(u8 door)
  
          if (mnCharSel_804D6CF5 == 1) {
              lb_80011E24(mnCharSel_804D6CC0, &sp10,
@@ -8145,7 +8157,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
  
          {
              int door_idx = door;
-@@ -2172,9 +2174,9 @@ s32 mnCharSel_8025FDEC(u8 door)
+@@ -2172,9 +2180,9 @@ s32 mnCharSel_8025FDEC(u8 door)
  
          if (mnCharSel_804D6CF6 != 3 && mnCharSel_804D6CF6 != 4) {
              u8 sel = mnCharSel_803F0DFC.doors[door].sel_icon;
@@ -8157,7 +8169,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
          }
          return 0;
      }
-@@ -2224,7 +2226,6 @@ static inline void updateCursorDisplay(HSD_JObj* jobj,
+@@ -2224,7 +2232,6 @@ static inline void updateCursorDisplay(HSD_JObj* jobj,
                                         HSD_JObj** state_jobj,
                                         HSD_JObj** color_jobj)
  {
@@ -8165,7 +8177,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
  
      if (cursor->x5 != 1) {
          f32 y = cursor->x10;
-@@ -2255,7 +2256,7 @@ static inline void updateCursorDisplay(HSD_JObj* jobj,
+@@ -2255,7 +2262,7 @@ static inline void updateCursorDisplay(HSD_JObj* jobj,
              color_idx = cursor->x4;
          } else {
              color_idx =
@@ -8174,7 +8186,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                         .team];
          }
  
-@@ -2401,7 +2402,6 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2401,7 +2408,6 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
      u32 next_port;
      HSD_JObj* jobj = GET_JOBJ(gobj);
      struct CSSCursorData* cursor = gobj->user_data;
@@ -8182,7 +8194,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
      u32 trigger;
      int n_doors;
      u32 buttons;
-@@ -2457,32 +2457,32 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2457,32 +2463,32 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                              }
                          } else if (door <= 7U) {
                              cpu_door = door - 4;
@@ -8224,7 +8236,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                          .is_hold_handicap_slider = 0;
                  }
                  cursor->x5 = 3;
-@@ -2514,27 +2514,27 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2514,27 +2520,27 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
          cursor->xC = (f32) ((0.0002f * dx) + cursor->xC);
          cursor->x10 = (f32) ((0.0002f * dy) + cursor->x10);
  
@@ -8258,7 +8270,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                          (f32) (cursor->x10 - (-14.8f + sp88.y));
                      cursor->x10 = (f32) (-14.8f + sp88.y);
                  }
-@@ -2562,7 +2562,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2562,7 +2568,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
  
          {
              u8 port = cursor->x4;
@@ -8267,7 +8279,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
              if (tag->state == 0) {
                  if (cursor->x5 == 1) {
                      door = cursor->x6;
-@@ -2574,13 +2574,13 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2574,13 +2580,13 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                          if (cursor->x10 < 0.2f) {
                              if ((s32) port != (s32) door ||
                                  ((s32) port == (s32) door &&
@@ -8283,7 +8295,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                      0x19;
                                  {
                                      s32 player_idx;
-@@ -2650,7 +2650,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2650,7 +2656,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                          m2->xC > icons[i].bound_d &&
                                          icons[i].state >= 1)
                                      {
@@ -8292,7 +8304,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                              .sel_icon = (u8) i;
                                          mnCharSel_8025DB34(door);
                                          if (trigger & HSD_PAD_A) {
-@@ -2666,10 +2666,18 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2666,10 +2672,18 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                              } else {
                                                  player_idx = door;
                                              }
@@ -8312,7 +8324,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                                                 .doors[door]
                                                                 .sel_icon]
                                                      .char_kind;
-@@ -2693,19 +2701,19 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2693,19 +2707,19 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                                  mnCharSel_804A0BC0
                                                      [mnCharSel_804D6CF5 - 1]
                                                          ->gobj);
@@ -8336,7 +8348,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                                          .char_kind);
                                              }
                                              lbAudioAx_800237A8(0xB8, 0x7F,
-@@ -2718,12 +2726,12 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2718,12 +2732,12 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
  
                                  mnCharSel_8025D5AC((s32) door, 0, 1);
                                  {
@@ -8351,7 +8363,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                      .sel_icon_prev = 0x19;
                                  if (trigger & HSD_PAD_A) {
                                      lbAudioAx_80024030(3);
-@@ -2748,7 +2756,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2748,7 +2762,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      case 7: {
                          s32 slider_door = door - 4;
                          updateGrabbedSlider(
@@ -8360,7 +8372,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                              slider_door, trigger, &sp98, &sp88, false);
                      } break;
                      case 8:
-@@ -2757,7 +2765,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2757,7 +2771,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      case 0xB: {
                          s32 hc_door = door - 8;
                          updateGrabbedSlider(
@@ -8369,7 +8381,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                              hc_door, trigger, &sp98, &sp88, true);
                      } break;
                      }
-@@ -2817,24 +2825,24 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2817,24 +2831,24 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      cpu_level_widget:
                          if (mnCharSel_804D6CB0->match_type <= 0xDU) {
                              f32 cy2 = cursor->x10;
@@ -8400,7 +8412,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                              mnCharSel_804D6CB0->vs.start
                                                  .players
                                                      [(s8) (u8)
-@@ -2847,20 +2855,20 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2847,20 +2861,20 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                      } else {
                                          goto door_clicks;
                                      }
@@ -8425,7 +8437,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                              mnCharSel_804D6CB0->vs.start
                                                  .players
                                                      [(s8) (u8)
-@@ -2886,6 +2894,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2886,6 +2900,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      goto update_display;
                  }
  
@@ -8433,7 +8445,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                  if (mnCharSel_804D6CB0->match_type != 2) {
                      f32 cx3 = cursor->xC;
                      if (cx3 > -17.0f && cx3 < 15.0f && cursor->x10 > 22.0f) {
-@@ -2907,6 +2916,8 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2907,6 +2922,8 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                          }
                      }
                  }
@@ -8442,19 +8454,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
  
                  if (cursor->xC < -25.5f && cursor->x10 > 22.0f) {
                      switch ((s32) mnCharSel_804D6CB0->match_type) {
-@@ -2923,6 +2934,11 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
-                     case VS_SLOWMO:
-                         cursor->x8 = 1;
-                         if (trigger & HSD_PAD_A) {
-+#if defined(MELEE_WEB_MENU_MARIO_FD)
-+                            /* Team rules are outside this two-human stock slice. */
-+                            lbAudioAx_80024030(3);
-+                            goto update_display;
-+#endif
-                             sfxMove();
-                             {
-                                 u8* is_teams = &mnCharSel_804D6CB0->vs.start
-@@ -2971,7 +2987,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2971,7 +2988,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      u8 cport2 = cursor->x4;
                      if (mnCharSel_804A0BD0[cport2]->x5 == 0 &&
                          mnCharSel_804D6CB0->vs.start.rules.is_teams == 0 &&
@@ -8463,7 +8463,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                      {
                          mnCharSel_CostumeChange((s32) cport2, trigger);
                      }
-@@ -3183,18 +3199,17 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -3183,18 +3200,17 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                          {
                              if ((cursor->x4 != 3 ||
                                   mnCharSel_804D6CB0->match_type != 1) &&
@@ -8485,7 +8485,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                              .name_jointl,
                                          -1);
                                  }
-@@ -3209,13 +3224,13 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -3209,13 +3225,13 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                              if (mnCharSel_804D6CF5 == 1) {
                                                  lb_80011E24(
                                                      mnCharSel_804D6CC0, &sp74,
@@ -8501,7 +8501,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                                          .list_joint,
                                                      -1);
                                              }
-@@ -3223,7 +3238,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -3223,7 +3239,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                              cursor->xC = sp88.x;
                                              cursor->x10 =
                                                  (f32) (sp88.y - 5.0f);
@@ -8510,7 +8510,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                                  .data->state = 1;
                                          }
                                      }
-@@ -3317,10 +3332,10 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -3317,10 +3333,10 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                              if (cport6 != 3 ||
                                  mnCharSel_804D6CB0->match_type != 1)
                              {
@@ -8523,8 +8523,18 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                                          0;
                                      mnCharSel_804D6CB0->vs.start
                                          .players[cursor->x4]
-@@ -3735,6 +3750,12 @@ void fn_80262F44(HSD_GObj* gobj)
+@@ -3733,9 +3749,26 @@ void fn_80262F44(HSD_GObj* gobj)
+             }
+         }
  
++#if defined(MELEE_WEB_GAMEPLAY)
++        ++melee_web_css_start_callback_count;
++        if (trigger & HSD_PAD_START) {
++            melee_web_css_last_start_trigger = trigger;
++            melee_web_last_start_ready = mnCharSel_804D6CF7;
++            melee_web_last_start_pending = 0;
++        }
++#endif
          if (mnCharSel_804D6CF2 == 0 && (trigger & HSD_PAD_START)) {
              if (mnCharSel_804D6CF7 != 0) {
 +#if defined(MELEE_WEB_MENU_MARIO_FD)
@@ -8534,9 +8544,13 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
 +                }
 +#endif
                  mnCharSel_804D6CF6 = 1;
++#if defined(MELEE_WEB_GAMEPLAY)
++                melee_web_last_start_pending = mnCharSel_804D6CF6;
++#endif
                  mnCharSel_804D6CF2 = 0xFF;
                  if (mnCharSel_804D6CF5 == 1) {
-@@ -4052,6 +4073,7 @@ void fn_802633B0(HSD_GObj* gobj)
+                     if (gm_RumbleEnabledForPlayer(
+@@ -4052,6 +4085,7 @@ void fn_802633B0(HSD_GObj* gobj)
              }
  
              if ((s32) tag->next_tag == row) {
@@ -8544,7 +8558,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                  if (IsNameListFull() == 0) {
                      if (mnCharSel_804D6CF5 == 1) {
                          mnCharSel_804D6CF9 = mnCharSel_804D6CF0;
-@@ -4072,6 +4094,8 @@ void fn_802633B0(HSD_GObj* gobj)
+@@ -4072,6 +4106,8 @@ void fn_802633B0(HSD_GObj* gobj)
                      }
                      return;
                  }
@@ -8553,7 +8567,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
                  goto check_cancel;
              }
  
-@@ -4316,7 +4340,8 @@ s32 mnCharSel_802640A0(void)
+@@ -4316,7 +4352,8 @@ s32 mnCharSel_802640A0(void)
          HSD_Fog* fog = HSD_FogLoadDesc(MODELS->fog);
          HSD_GObjObject_80390A70(gobj, HSD_GObj_FogKind, fog);
      }
@@ -8563,7 +8577,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
  
      gobj = GObj_Create(4, 5, 0x80);
      jobj = HSD_JObjLoadJoint(ANIM[0].joint);
-@@ -5456,14 +5481,22 @@ void mnCharSel_Scene_OnFrame(void)
+@@ -5456,14 +5493,22 @@ void mnCharSel_Scene_OnFrame(void)
      case 3:
          mn_8022F138(1, 8);
          HSD_SisLib_803A5E70();
@@ -8586,7 +8600,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
          mnCharSel_804D6CF6 = 5;
          sfxForward();
          break;
-@@ -5528,3 +5561,94 @@ void mnCharSel_Scene_OnExit(void* unused)
+@@ -5528,3 +5573,104 @@ void mnCharSel_Scene_OnExit(void* unused)
      lbAudioAx_8002702C(4, tmp);
      lbAudioAx_80027168();
  }
@@ -8594,7 +8608,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
 +#if defined(MELEE_WEB_GAMEPLAY)
 +/* Observation only: expose the live cursor/model geometry and the exact
 + * source icon bounds. Tests feed resulting PAD samples through the host. */
-+int melee_web_css_observe_port(unsigned port, int ckind, int ids[4], float geometry[8])
++int melee_web_css_observe_port(unsigned port, int ckind, int ids[14], float geometry[8])
 +{
 +    struct CSSCursorData* cursor;
 +    struct CSSCharModel* model;
@@ -8618,6 +8632,16 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
 +    ids[1] = cursor->x5 == 1 && cursor->x6 < 4 ? cursor->x6 : -1;
 +    ids[2] = selected;
 +    ids[3] = target;
++    ids[4] = mnCharSel_804D6CF0;
++    ids[5] = mnCharSel_804D6CF2;
++    ids[6] = mnCharSel_804D6CF5;
++    ids[7] = mnCharSel_804D6CF6;
++    ids[8] = mnCharSel_804D6CF7;
++    ids[9] = mnCharSel_804A0BD0[0]->x5;
++    ids[10] = (int) melee_web_css_start_callback_count;
++    ids[11] = (int) melee_web_css_last_start_trigger;
++    ids[12] = (int) melee_web_last_start_ready;
++    ids[13] = (int) melee_web_last_start_pending;
 +    geometry[0] = cursor->xC; geometry[1] = cursor->x10;
 +    geometry[2] = model->x8; geometry[3] = model->xC;
 +    geometry[4] = icons[target].bound_l;
@@ -8626,7 +8650,7 @@ index 4a66512d6f7da6dd84668d6bc75eaf7ad680d9b6..91a2330c81610a93442703390d3605ae
 +    geometry[7] = icons[target].bound_d;
 +    return 1;
 +}
-+int melee_web_css_observe(int ckind, int ids[4], float geometry[8])
++int melee_web_css_observe(int ckind, int ids[14], float geometry[8])
 +{
 +    return melee_web_css_observe_port(0, ckind, ids, geometry);
 +}
@@ -8717,6 +8741,42 @@ index a6fabd6a9fa02d64ae6997269460f7546967c690..2017a67f1ef854fe8c687da09342b7f0
  {
      u8* trophy;
      s32 i;
+diff --git a/src/melee/mn/mnitemsw.c b/src/melee/mn/mnitemsw.c
+index bb5440a2b429a338c5a3980cd6b8e046882e2d49..04431cf93f1f80980b3eac63eec08a5618b78951 100644
+--- a/src/melee/mn/mnitemsw.c
++++ b/src/melee/mn/mnitemsw.c
+@@ -88,7 +88,30 @@ static f32 mnItemSw_804D4BA0[2] = { 0.0f, 1.0f };
+ // Some routines address the adjacent data blocks as one table.
+ static inline struct MnItemSwTable* mnItemSw_GetTable(void)
+ {
+-    return (struct MnItemSwTable*) mnItemSw_803ED340;
++    /* The retail image stores these authored globals as one contiguous table.
++     * Browser object sections do not preserve that adjacency, so own a table
++     * assembled from the same source arrays before the menu reads it. */
++    static struct MnItemSwTable table;
++    static u8 initialized;
++    u32 row;
++    u32 column;
++
++    if (initialized == 0) {
++        for (row = 0; row < 4; row++) {
++            for (column = 0; column < 3; column++) {
++                table.x00[row][column] = mnItemSw_803ED340[row][column];
++            }
++        }
++        for (row = 0; row < 18; row++) {
++            table.x30[row] = mnItemSw_AnimTable.x30[row];
++        }
++        for (row = 0; row < 32; row++) {
++            table.items[row] = mnItemSw_AnimTable.items[row];
++            table.item_order[row] = mnItemSw_803ED438[row];
++        }
++        initialized = 1;
++    }
++    return &table;
+ }
+ 
+ #ifdef MUST_MATCH
 diff --git a/src/melee/mn/mnmainrule.c b/src/melee/mn/mnmainrule.c
 index 67c664b238bef265ad585422c4a48e7cd3b57736..196869cfc0a217b52529dc98d96035f92d00937b 100644
 --- a/src/melee/mn/mnmainrule.c
@@ -8891,6 +8951,151 @@ index b110ff19ad600be99ac37edc69f8bf26198ccfac..ec79b9a60698c1352bb617d2c4ebba09
 +    return 1;
 +}
 +#endif
+diff --git a/src/melee/mn/mnvibration.c b/src/melee/mn/mnvibration.c
+index 28ada16d50478a14f872c756c1936dd50191f8d3..0443a9cf98f8d978a4ba69fa1fd0ea16b443f4d8 100644
+--- a/src/melee/mn/mnvibration.c
++++ b/src/melee/mn/mnvibration.c
+@@ -36,29 +36,6 @@ char* GetNameText(u8 slot);
+ int GetNameCount(void);
+ void lbCardGame_UpdatePowerTime(void);
+ 
+-typedef struct MnVibrationDataLayout {
+-    AnimLoopSettings intro_anim;
+-    AnimLoopSettings main_anim;
+-    AnimLoopSettings cursor_anim;
+-    Vec3 name_pos;
+-    char user_data_error[0x18];
+-    char file_name[0x10];
+-    char user_data_name[0xC];
+-    char convi_top_joint[0x18];
+-    char convi_top_animjoint[0x1C];
+-    char convi_top_matanim_joint[0x20];
+-    char convi_top_shapeanim_joint[0x24];
+-    char ctlvi_top_joint[0x18];
+-    char ctlvi_top_animjoint[0x1C];
+-    char ctlvi_top_matanim_joint[0x20];
+-    char ctlvi_top_shapeanim_joint[0x24];
+-    char onoffvi_top_joint[0x1C];
+-    char onoffvi_top_animjoint[0x20];
+-    char onoffvi_top_matanim_joint[0x24];
+-    char onoffvi_top_shapeanim_joint[0x24];
+-    char cursorvi_top_joint[0x20];
+-} MnVibrationDataLayout;
+-
+ // Local inline JObj functions using the weak HSD_JObjSetMtxDirty pattern
+ static inline f32 mnVibration_JObjGetTranslationX(HSD_JObj* jobj)
+ {
+@@ -131,7 +108,7 @@ AnimLoopSettings mnVibration_803EECE0 = { 0.0f, 20.0f, -0.1f };
+ AnimLoopSettings mnVibration_803EECEC = { 50.0f, 70.0f, -0.1f };
+ AnimLoopSettings mnVibration_803EECF8 = { 0.0f, 14.0f, -0.1f };
+ Vec3 mnVibration_803EED04 = { -0.4f, 0.5f, 0.0f };
+-// These strings are accessed through MnVibrationDataLayout.
++// These symbols are passed directly to lbArchive_LoadSections.
+ #ifdef MUST_MATCH
+ #pragma push
+ #pragma force_active on
+@@ -634,24 +611,21 @@ void mnVibration_UpdatePortPanel(HSD_JObj* arg0, u8 arg1, u8 arg2)
+     HSD_JObj* sp14;
+     HSD_JObj* sp10;
+     u8 temp_ret;
+-    MnVibrationDataLayout* floats =
+-        (MnVibrationDataLayout*) &mnVibration_803EECE0;
+-
+     lb_80011E24(arg0, &sp14, 1, -1);
+     if (arg2 != 0) {
+         HSD_JObjReqAnimAll(sp14, (f32) arg1);
+         HSD_JObjAnimAll(sp14);
+         if (GetRumbleSettingOfPort((s32) arg1) != 0) {
+-            HSD_JObjReqAnimAll(sp14, floats->cursor_anim.end_frame);
++            HSD_JObjReqAnimAll(sp14, mnVibration_803EECF8.end_frame);
+         } else {
+-            HSD_JObjReqAnimAll(sp14, floats->cursor_anim.start_frame);
++            HSD_JObjReqAnimAll(sp14, mnVibration_803EECF8.start_frame);
+         }
+         mn_8022F3D8(sp14, 0xFF, MOBJ_MASK);
+         HSD_JObjAnimAll(sp14);
+     } else {
+         HSD_JObjReqAnimAll(sp14, 20.0f);
+         HSD_JObjAnimAll(sp14);
+-        HSD_JObjReqAnimAll(sp14, floats->cursor_anim.end_frame);
++        HSD_JObjReqAnimAll(sp14, mnVibration_803EECF8.end_frame);
+         mn_8022F3D8(sp14, 0xFF, MOBJ_MASK);
+         HSD_JObjAnimAll(sp14);
+     }
+@@ -1081,9 +1055,6 @@ void mnVibration_CreateScreen(s32 arg0)
+     HSD_Text* text;
+     s32 i;
+     MnVibrationData* data;
+-    MnVibrationDataLayout* layout =
+-        (MnVibrationDataLayout*) &mnVibration_803EECE0;
+-
+     (void) arg0;
+     PAD_STACK(24);
+     assets = &mnVibration_804A0898;
+@@ -1097,8 +1068,8 @@ void mnVibration_CreateScreen(s32 arg0)
+     HSD_JObjReqAnimAll(jobj, 0.0f);
+     data = HSD_MemAlloc(sizeof(MnVibrationData));
+     if (data == NULL) {
+-        OSReport(layout->user_data_error);
+-        __assert(layout->file_name, 0x3A7, layout->user_data_name);
++        OSReport(mnVibration_803EED10);
++        __assert(mnVibration_803EED28, 0x3A7, mnVibration_803EED38);
+     }
+     data->x0[0] = 0;
+     data->x0[1] = 0;
+@@ -1145,34 +1116,31 @@ void mnVibration_Init(int arg0)
+     HSD_Archive* archive;
+     HSD_GObj* gobj;
+     HSD_GObjProc* proc;
+-    MnVibrationJointAssets* assets;
+-    MnVibrationDataLayout* strings;
+-
+-    strings = (MnVibrationDataLayout*) &mnVibration_803EECE0;
+-    assets = (&mnVibration_804A0868);
+     mn_804D6BC8.cooldown = 5;
+     mn_804A04F0.prev_menu = mn_804A04F0.cur_menu;
+     mn_804A04F0.cur_menu = 19;
+     mn_804A04F0.hovered_selection = 0;
+     archive = mn_804D6BB8;
+ 
++    /* These are independent C objects; do not derive their addresses through
++     * pointer arithmetic across retail data overlays in the wasm build. */
+     lbArchive_LoadSections(
+-        archive, &assets[3].joint, strings->convi_top_joint,
+-        &assets[3].animjoint, strings->convi_top_animjoint, &assets[3].matanim,
+-        strings->convi_top_matanim_joint, &assets[3].shapeanim,
+-        strings->convi_top_shapeanim_joint,
+-
+-        &assets[1].joint, strings->ctlvi_top_joint, &assets[1].animjoint,
+-        strings->ctlvi_top_animjoint, &assets[1].matanim,
+-        strings->ctlvi_top_matanim_joint, &assets[1].shapeanim,
+-        strings->ctlvi_top_shapeanim_joint,
+-
+-        &assets[2].joint, strings->onoffvi_top_joint, &assets[2].animjoint,
+-        strings->onoffvi_top_animjoint, &assets[2].matanim,
+-        strings->onoffvi_top_matanim_joint, &assets[2].shapeanim,
+-        strings->onoffvi_top_shapeanim_joint,
+-
+-        &assets[0].joint, strings->cursorvi_top_joint,
++        archive, &mnVibration_804A0898.joint, mnVibration_803EED44,
++        &mnVibration_804A0898.animjoint, mnVibration_803EED5C,
++        &mnVibration_804A0898.matanim, mnVibration_803EED78,
++        &mnVibration_804A0898.shapeanim, mnVibration_803EED98,
++
++        &mnVibration_804A0878.joint, mnVibration_803EEDBC,
++        &mnVibration_804A0878.animjoint, mnVibration_803EEDD4,
++        &mnVibration_804A0878.matanim, mnVibration_803EEDF0,
++        &mnVibration_804A0878.shapeanim, mnVibration_803EEE10,
++
++        &mnVibration_804A0888.joint, mnVibration_803EEE34,
++        &mnVibration_804A0888.animjoint, mnVibration_803EEE50,
++        &mnVibration_804A0888.matanim, mnVibration_803EEE70,
++        &mnVibration_804A0888.shapeanim, mnVibration_803EEE94,
++
++        &mnVibration_804A0868.joint, mnVibration_803EEEB8,
+ 
+         NULL);
+ 
 diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
 index ddc3979af7cd75ea2e2333fbf6e661032fc93398..db9a992a336498306e4d905caf4342b5ad625416 100644
 --- a/src/melee/mp/mplib.c

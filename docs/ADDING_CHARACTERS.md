@@ -60,7 +60,7 @@ evidence instead of blindly cherry-picking. Character notes retain chronological
 failures and superseded experiments. Their earlier passing runs are not the
 current acceptance decision.
 
-The Link/Young Link case adds the [source contract and causal repair](LINK_PORT_NOTES.md)
+The Link/Young Link case adds the [source contract and causal repair](content/LINK_PORT_NOTES.md)
 and a [hash-bound receipt](evidence/link-young-link-replay-v1.json). Check that its
 shared fixes exist in your chosen base; a document describing an uncommitted
 candidate is not proof those changes are present on another branch.
@@ -130,7 +130,7 @@ These are routes to evidence, not recipes for applying the previous fix blindly.
 | --- | --- |
 | Zero source frames, DAT external/region error | Read page/native error; identify archive/root/offset. Compare original archive policy, serialized extent and nullable fields. Check real construction before another browser run. |
 | Crash when an effect spawns | Follow original effect calls and child IDs through the complete authored table. Model-only tables may have both particle roots null; a missing entry is not optional. |
-| Neutral costume works but a colored costume crashes | Inspect optional costume parts, archive/cache ownership and every source-selected dynamics row. Purin initially activates one body row but stores five descriptors for its hats; its `x48` root is a custom-part table, not Articles. See [Purin's boundary](JIGGLYPUFF_PORT_NOTES.md). |
+| Neutral costume works but a colored costume crashes | Inspect optional costume parts, archive/cache ownership and every source-selected dynamics row. Purin initially activates one body row but stores five descriptors for its hats; its `x48` root is a custom-part table, not Articles. See [Purin's boundary](content/JIGGLYPUFF_PORT_NOTES.md). |
 | Unsupported command or failing sentinel during a move | Follow the source action into common actions and call/jump targets; distinguish decoded operands from runtime admission and live service readiness. Bombs require opponents' common pickup/throw actions too. |
 | A scripted input misses an expected move without a runtime error | Observe the first source transition, held/pressed input gates and position. Purin's later jumps require held XY through an animation gate, and an aerial charge can land before completion. Correct the input recipe without forcing states or changing source timing. |
 | RNG is the first mismatch | Compare setup/save/music and nullable idle tables, then source consumers in order. Never adjust the seed or add an unexplained RNG call. |
@@ -198,7 +198,7 @@ roots and run explicitly built lifecycle targets with a retained failure report.
 Its match trace runs both orientations, but only the actions in that trace's
 actual branches count as exercised.
 
-The [Link/Young Link verification](LINK_PORT_NOTES.md) adds four reusable checks:
+The [Link/Young Link verification](content/LINK_PORT_NOTES.md) adds four reusable checks:
 serialized article animation rows are not callback-state counts; effect tables
 may be model-only and include child entries beyond directly spawned IDs; a null
 Wait table is semantically different from a nonnull empty table; and matching-C
@@ -206,7 +206,7 @@ stack-placement tricks must be audited before native execution. Original inlined
 arithmetic can also differ from the same helper's out-of-line body. Reduce the
 first divergence to original operands and defined fields before another full run.
 
-The [Dr. Mario/Roy pass](ROY_DR_MARIO_PORT_NOTES.md) separates a playable
+The [Dr. Mario/Roy pass](content/ROY_DR_MARIO_PORT_NOTES.md) separates a playable
 development candidate from content admission. Use this bounded sequence before
 asking for a new original-game capture:
 
@@ -256,7 +256,7 @@ Once a repeatable original capture is available:
    coverage. A passing state comparison does not remove cold/warm performance gates.
 
 Useful existing examples are the
-[clone dependency/lifecycle notes](ROY_DR_MARIO_PORT_NOTES.md),
+[clone dependency/lifecycle notes](content/ROY_DR_MARIO_PORT_NOTES.md),
 [real-asset test](../tests/test_clone_fighters_real_assets.py), and the compact
 [joint-transform](../tests/test_gameplay_srt.py),
 [vector-rotation](../tests/test_gameplay_vector_rotation.py) and
@@ -311,7 +311,7 @@ python3 scripts/generate_fighter_registry.py --melee-root .deps/melee --check
 
 Fox follows the same extraction shape with `PlFx.dat`, `PlFxAJ.dat`,
 `PlFxNr/Or/La/Gr.dat`, `EfFxData.dat` and `audio/us/fox.ssm`. Its exact source
-contract and hashes are recorded in [FOX_PORT_NOTES.md](FOX_PORT_NOTES.md).
+contract and hashes are recorded in [FOX_PORT_NOTES.md](content/FOX_PORT_NOTES.md).
 
 Confirm each costume against its exact source model symbol. Falco's four model
 symbols are `PlyFalco5K_Share_joint`, `PlyFalco5KRe_Share_joint`,

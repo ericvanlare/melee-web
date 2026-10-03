@@ -18,14 +18,25 @@ enum {
     MELEE_WEB_FIGHTER_INPUT_ALREADY_SELECTED = 3,
 };
 
-/* One observation supplied by the read-only CSS source hook.  The
- * original cursor/model positions are in the same coordinate space as the
- * source icon bounds.  held_door is -1 until an original A-button pickup
- * attaches the model and sets cursor->x5. */
+/* One observation supplied by the read-only CSS source hook. The original
+ * cursor/model positions are in the same coordinate space as the source icon
+ * bounds. held_door is -1 until an original A-button pickup attaches the
+ * model and sets cursor->x5. The source_* members expose the authored Start
+ * gate and scene-change state without writing it. */
 typedef struct MeleeWebFighterInputObservation {
     int cursor_port;
     int held_door;
     int selected_character_kind;
+    int source_active_port;
+    int source_start_cooldown;
+    int source_active_cursor_count;
+    int source_pending_scene;
+    int source_start_ready;
+    int source_selected_model_state;
+    int source_confirm_callback_count;
+    int source_last_start_trigger;
+    int source_last_start_ready;
+    int source_last_start_pending;
     float cursor_x;
     float cursor_y;
     float model_x;
@@ -48,7 +59,9 @@ int melee_web_fighter_input_observe_valid(
 
 /* Build one raw source PAD sample.  Observe again after each sample.  Before
  * pickup this drives to the source's A-button attachment point
- * (model.x8 - 3.8, model.xC + 2.6), whose radius is sqrt(9).  While held it
+ * (model.x8 - 3.8, model.xC + 2.6), clamping low y positions to 0.6 to keep
+ * A within the source click region and the strict radius-sqrt(9) pickup test.
+ * While held it
  * drives the cursor to the source model offset (target center - 2.7,
  * target center + 2.0), then returns TARGET_READY once the model lies inside
  * the strict source icon bounds. The caller presses A at PICKUP_READY and

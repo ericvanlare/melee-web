@@ -1,6 +1,6 @@
 # Source allocation identity prerequisite
 
-> Historical component checkpoint. The [runtime integration](CPU_SOURCE_CONTEXT_RUNTIME.md)
+> Historical component checkpoint. The [runtime integration](investigations/CPU_SOURCE_CONTEXT_RUNTIME.md)
 > supersedes the statements below about missing live hooks and Fighter bindings.
 > Its scoped receipt records current evidence and remaining limits.
 
@@ -123,7 +123,7 @@ This is a general model of the supported allocation operations, not a complete
 model of the game's memory system. In particular:
 
 - The heap component receives explicit bounds. The separate
-  [allocation-history experiment](ORIGINAL_ALLOCATION_HISTORY.md) derives original
+  [allocation-history experiment](investigations/ORIGINAL_ALLOCATION_HISTORY.md) derives original
   `OSInitAlloc` placement and replays observed heap selection and replacement.
   `OSAllocFixed` and `OSAddToHeap` remain unsupported and unobserved in its current
   traces. Synthetic component oracles declare their own initial heap bounds.
@@ -228,29 +228,29 @@ source-context and call-site work above.
 
 ## Deferred source ARQ prerequisite
 
-The [original ARQ completion boundary](SOURCE_ARQ_COMPLETION.md) now exercises
+The [original ARQ completion boundary](investigations/SOURCE_ARQ_COMPLETION.md) now exercises
 the pinned SDK queue against checked owned memory spans and deferred transfer
 completion. Its scoped source tests cover priority, cancellation, callback
-reentry and interrupt masking. The [standalone DevCom boundary](SOURCE_DEVCOM_STARTUP.md)
+reentry and interrupt masking. The [standalone DevCom boundary](investigations/SOURCE_DEVCOM_STARTUP.md)
 connects the first direct type-3 request to the validated startup heap. Full
 audio startup and the live browser source context remain open.
 
-The [original ARInit profile](SOURCE_AR_INIT_PROFILE.md) separately executes
+The [original ARInit profile](investigations/SOURCE_AR_INIT_PROFILE.md) separately executes
 the source hardware-size probes and allocator initialization from declared
 owned boot inputs. It has not yet joined the DevCom or live browser providers.
 
-The [DSP startup protocol fixture](SOURCE_DSP_INIT_PROFILE.md) validates original
+The [DSP startup protocol fixture](investigations/SOURCE_DSP_INIT_PROFILE.md) validates original
 SDK task and interrupt handling behind checked synthetic services. It does not
 execute AXOut, DSP firmware or the remaining application allocation history.
 
-The [original AIInit fixture](SOURCE_AI_INIT_PROFILE.md) separately checks the
+The [original AIInit fixture](investigations/SOURCE_AI_INIT_PROFILE.md) separately checks the
 source Audio Interface startup boundary. Its owned synthetic DMA programming
 does not establish live audio buffers, AX/DSP initialization or full-session
 equivalence.
 
 ## Typed CPU carry prerequisite
 
-The [CPU r5 sidecar](CPU_R5_CARRY.md) separates known seed-global words, explicit
+The [CPU r5 sidecar](history/CPU_R5_CARRY.md) separates known seed-global words, explicit
 zero and unavailable values. Its owner token checks world, source allocation
 and sidecar lifetime generations. The [scoped receipt](evidence/cpu-r5-carry-v1.json)
 records an owned seed derivation and an explicitly synthetic fighter identity.

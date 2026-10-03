@@ -9,7 +9,8 @@ Read [README.md](README.md), then [the developer entry](docs/DEVELOPMENT.md).
 That entry routes the task to the authoritative boundary document; do not read
 the entire status and playbook history by default. Consult [current evidence](STATUS.md)
 when a task depends on an existing result, and cite the scoped receipt or report
-that supports any new claim. `STATUS.md` is the current evidence index; do not
+that supports any new claim. `STATUS.md` is the current evidence index; record new evidence as a new
+entry file under `docs/status/` (never a new STATUS section), and do not
 copy its changing measurements into another document. Keep status backed by
 observed evidence and use the playbook's scoped evidence labels.
 

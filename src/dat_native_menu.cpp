@@ -114,12 +114,16 @@ struct DatNativeMenu::Storage {
             values.push_back(item.get());light_lists.push_back(std::move(item));},"Native menu light-list table is invalid");
         require(!values.empty(),"Native menu light-list table is empty");auto** result=make<SceneDesc::LightList*>(values.size()+1);std::copy(values.begin(),values.end(),result);return result;
     }
-    void static_model(std::string_view base){
+    DatNativeJoint* static_joint(std::string_view base){
         auto graph=std::make_unique<DatNativeJoint>(archive,export_offset(std::string(base)+"_joint"));char error[256]{};auto* native=melee_web_native_joint_hydrate(&graph->graph(),error,sizeof(error));require(native,error[0]?error:"Original menu native joint hydration failed");natives.push_back(native);
         auto* joint=static_cast<HSD_Joint*>(melee_web_native_joint_descriptor(native,error,sizeof(error)));require(joint,error[0]?error:"Original menu native joint descriptor is missing");publish(std::string(base)+"_joint",joint);
+        auto* result=graph.get();graphs.push_back(std::move(graph));return result;
+    }
+    void static_model(std::string_view base){
+        auto* graph=static_joint(base);
         const auto animation_name=std::string(base)+"_animjoint";auto animation=std::make_unique<DatNativeAnimation>(archive,export_offset(animation_name),graph->graph());auto* animation_descriptor=static_cast<HSD_AnimJoint*>(animation->descriptor());publish(animation_name,animation_descriptor);animations.push_back(std::move(animation));
         const auto material_name=std::string(base)+"_matanim_joint";auto material=std::make_unique<DatMaterialAnimation>(archive,export_offset(material_name),graph->graph(),TextureIndexValidation::DispatchedValues);auto* material_descriptor=static_cast<HSD_MatAnimJoint*>(material->descriptor());publish(material_name,material_descriptor);materials.push_back(std::move(material));
-        const auto shape_name=std::string(base)+"_shapeanim_joint";auto shape=std::make_unique<DatShapeAnimation>(archive,export_offset(shape_name),graph->graph());publish(shape_name,shape->descriptor());shapes.push_back(std::move(shape));graphs.push_back(std::move(graph));
+        const auto shape_name=std::string(base)+"_shapeanim_joint";auto shape=std::make_unique<DatShapeAnimation>(archive,export_offset(shape_name),graph->graph());publish(shape_name,shape->descriptor());shapes.push_back(std::move(shape));
     }
     void title_mark(){
         const auto root=export_offset("TitleMark_sobjdesc");record(root,8);const auto image_offset=pointer(root,24);const auto palette_offset=archive->pointer(root+4,16);const auto source_image=read_dat_texture_image(*archive,image_offset);
@@ -134,6 +138,13 @@ struct DatNativeMenu::Storage {
         static constexpr std::array<std::string_view,20> main_models={"MenMainBack_Top","MenMainPanel_Top","MenMainConTop_Top","MenMainCursor_Top","MenMainConRl_Top","MenMainCursorRl_Top","MenMainNmRl_Top","MenMainCursorTr01_Top","MenMainCursorTr02_Top","MenMainCursorTr03_Top","MenMainCursorTr04_Top","MenMainCursorRl01_Top","MenMainCursorRl02_Top","MenMainCursorRl03_Top","MenMainCursorRl04_Top","MenMainCursorRl05_Top","MenMainConIs_Top","MenMainCursorIs_Top","MenMainConSs_Top","MenMainCursorSs_Top"};
         static constexpr std::array<std::string_view,2> title_models={"TtlMoji_Top","TtlBg_Top"};
         if(kind==NativeMenuKind::Main){for(const auto name:main_models)static_model(name);count=static_cast<unsigned>(main_models.size());
+            // mnVibration_Init loads these four roots directly from MnMaAll.usd
+            // when the original Settings > Rumble route opens.
+            for(const auto name:{"MenMainConVi_Top","MenMainCtlVi_Top","MenMainOnoffVi_Top"})static_model(name);
+            static_joint("MenMainCursorVi_Top");
+            // mnDeflicker_8024A6C4 loads the authored display setting when
+            // Settings opens the original Display page.
+            static_model("MenMainConDf_Top");
             publish("ScMenMain_cam_int1_camera",camera(export_offset("ScMenMain_cam_int1_camera")));
             publish("ScMenMain_scene_lights",light_list(export_offset("ScMenMain_scene_lights")));
             publish("ScMenMain_fog",fog(export_offset("ScMenMain_fog")));

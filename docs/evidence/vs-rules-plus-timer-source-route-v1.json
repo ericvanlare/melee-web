@@ -1,0 +1,359 @@
+{
+  "schema": "melee-web-vs-rules-plus-timer-source-route-v1",
+  "status": "retail_first_match_prefix_and_rendered_browser_route_passed; enclosing_three_match_capture_failed",
+  "scope": "Original GM_MENU Main -> VS -> Rules -> Items item row 0 off and frequency None -> Rules Plus stock timer set to one minute, B/back and re-entry retention, Start -> CSS -> SSS Final Destination -> live stock match -> No Contest Results -> CSS. The browser route then re-enters Rules Plus to verify timer retention and exits through original menu navigation and Eject/reimport. Retail and browser captures are independent observations; this receipt does not claim cross-runtime equivalence.",
+  "identities": {
+    "retail_game": {
+      "disc_revision": "GALE01 Rev. 2",
+      "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+      "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+      "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+      "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+    },
+    "retail_capture": {
+      "capture_id": "melee-vs-rules-plus-timer-20261002-r2",
+      "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+      "dolphin_version": "2606a-dirty",
+      "cpu": "JITARM64",
+      "dolphin_binary_sha256": "d60f171412cac13ef5e482ebb8c89aae9c6cbb73ad5a2dc726e330b0cd3acd24",
+      "build_manifest_sha256": "225e0e8d9dad20fdec0b0953fe397ac62fc1601b41ab724f6a149fe0011075f5",
+      "capture_driver_sha256": "a786ff1a8134657adc9aab715e3eb99c95b111efdf2554ff2b3215ddec5b2b0f",
+      "capture_wrapper_sha256": "a3562764afeae0bfd82dfaa2aabb75558ae906ae77ca137fbfff842cbb1962d1",
+      "profile": {
+        "mode": "fresh isolated Everything-unlocked copy",
+        "gci_sha256": "39171db67ec4e6b85837107f7cd7e1231402e239ec7f74bfc9efa35d5a2879ce",
+        "sram_sha256": "49dee06d38cb76aaa8f90bfb2e937face180243d1a170078b4e13226b012f82c"
+      }
+    },
+    "implementation": {
+      "origin_main_base": "473e97c41633043562bc5015e1add630d23b70b3",
+      "stack_parent_commit": "37774b26c72550e48748407c56aa61f035ef1cc3",
+      "branch": "codex/vs-rules-plus-timer"
+    }
+  },
+  "source_route": {
+    "scene_ids": {
+      "GM_MENU": 1,
+      "GS_MENU": 1,
+      "MenuKind_Main": 0,
+      "MenuKind_VS": 2,
+      "MenuKind_Rules": 13,
+      "MenuKind_Items": 16,
+      "MenuKind_Rules_Plus": 15,
+      "GM_VS": 2,
+      "GS_CSS": 8,
+      "GS_SSS": 9,
+      "GS_RESULTS": 5
+    },
+    "retail_observation": {
+      "capture_id": "melee-vs-rules-plus-timer-20261002-r2",
+      "observer_relative_path": "vs-rules-plus-timer-retail-source-complete-20261002-203750-f3c8b6a3/work/original-source-route/capture.mwro",
+      "observer_bytes": 320088291,
+      "observer_sha256": "05ad7804d1c41845d04d74df7b90784077574f6f7e13e2d2e2258cf5346071bf",
+      "controller_relative_path": "vs-rules-plus-timer-retail-source-complete-20261002-203750-f3c8b6a3/work/original-source-route/controller-input.mwri",
+      "controller_bytes": 2201736,
+      "controller_sha256": "2f53c0a393699377c0f5f60b32b612e4ef3bbd70ccc70157e45900afb76de17e",
+      "report_relative_path": "vs-rules-plus-timer-retail-source-complete-20261002-203750-f3c8b6a3/work/original-source-route/report.json",
+      "report_sha256": "0c2be51ce80ff6236473480cf28b81c2fab3dd8e1465c40190d517c355c78633",
+      "prefix_reduction_relative_path": "vs-rules-plus-timer-retail-source-complete-20261002-203750-f3c8b6a3/first-match-route-reduction.json",
+      "prefix_reduction_sha256": "105f2c4eb08954859646ea23f22cbab58f7babcebb96b3232d1a5a6e54c18929",
+      "route": "Original source PAD enters Main, VS, Rules, Items, Rules Plus; toggles item cursor 0 off, selects item frequency None and stock count four, sets one minute, presses B to Rules, re-enters Rules Plus and starts through original CSS and SSS.",
+      "rules_plus_route_markers": [
+        {
+          "label": "source-item-cursor-zero-off",
+          "sequence": 1386
+        },
+        {
+          "label": "source-items-none-custom-mask",
+          "sequence": 1570
+        },
+        {
+          "label": "rules-plus-row-selected",
+          "sequence": 1666
+        },
+        {
+          "label": "rules-plus-entry",
+          "sequence": 1708
+        },
+        {
+          "label": "rules-plus-one-minute",
+          "sequence": 1766
+        },
+        {
+          "label": "rules-plus-back-retained-one-minute",
+          "sequence": 1816
+        },
+        {
+          "label": "rules-plus-reentry-retained-one-minute",
+          "sequence": 1862
+        },
+        {
+          "label": "CSS-after-Rules-Plus-Start",
+          "sequence": 2227
+        },
+        {
+          "label": "selected-MARIO-slot-0",
+          "sequence": 2345
+        }
+      ],
+      "first_match_setup": {
+        "cpu_levels": [
+          9,
+          9,
+          9,
+          9
+        ],
+        "is_stock": true,
+        "item_frequency": -1,
+        "item_mask_hex": "fffffffffffbffff",
+        "match_index": 0,
+        "match_kind": 1,
+        "player_kinds": [
+          8,
+          2,
+          20,
+          9
+        ],
+        "source_sequence": 4480,
+        "stage": 32,
+        "stocks": [
+          4,
+          4,
+          4,
+          4
+        ],
+        "time_limit_seconds": 60,
+        "timer_enabled": true
+      },
+      "natural_results_css_return": {
+        "passed": true,
+        "ordered_boundaries": [
+          "css_enter",
+          "css_exit",
+          "sss_enter",
+          "sss_exit",
+          "entry",
+          "setup",
+          "scene_exit",
+          "vs_exit",
+          "vs_exit_return",
+          "vs_mode_exit",
+          "results_enter",
+          "results_exit",
+          "results_mode_exit",
+          "scene_teardown",
+          "return_css"
+        ],
+        "return_css_sequence": 25162,
+        "results_gobj_count": 437
+      },
+      "second_match_setup_retention": {
+        "same_timer_item_frequency_item_mask_and_stage": true,
+        "second_setup": {
+          "cpu_levels": [
+            9,
+            9,
+            9,
+            9
+          ],
+          "is_stock": true,
+          "item_frequency": -1,
+          "item_mask_hex": "fffffffffffbffff",
+          "match_index": 1,
+          "match_kind": 1,
+          "player_kinds": [
+            22,
+            23,
+            6,
+            21
+          ],
+          "source_sequence": 27370,
+          "stage": 32,
+          "stocks": [
+            4,
+            4,
+            4,
+            4
+          ],
+          "time_limit_seconds": 60,
+          "timer_enabled": true
+        }
+      },
+      "enclosing_capture_failure": {
+        "status": "first_source_match_prefix_complete_later_capture_failed",
+        "error": "observer error: {'error': 'whole-session source hook occurred outside an active VS match'}",
+        "observer_state": {
+          "completed": false,
+          "draw_ordinal": 3836,
+          "error": "whole-session source hook occurred outside an active VS match",
+          "event_count": 50030,
+          "invalid": true,
+          "last_seq": 50029,
+          "source_tick": 1688,
+          "state": "invalid"
+        },
+        "last_source_tick": 1688,
+        "triggering_pc_or_boundary": "not serialized in the error event; not inferred",
+        "scope_limit": "The requested three-match capture failed during a later teardown/recreation path. Only the first complete match through Results/CSS and the next match setup retention are claimed."
+      },
+      "rendering_and_input": "Null video; no retail pixel capture. Host audio output muted; PCM comparison not run. Ordinary Dolphin PAD pipe input; no guest-memory writes.",
+      "run_context_sha256": "a40055ce0b52bec8ebacde03736d4b78d8dc0c00a4a088808a7dadd0eeaee836",
+      "input_intentions_sha256": "5a208187d165d7f1031064fac8eb03f9128f5de286db186da728028014017a92",
+      "observer_status": {
+        "file": "status.json",
+        "sha256": "14904e6b9d85359155634d5af7c7da57fa729cb15d09339e613f8a7af19165a7",
+        "completed": false,
+        "invalid": true,
+        "event_count": 50030,
+        "last_seq": 50029,
+        "source_tick": 1688
+      },
+      "input_status": {
+        "file": "input-status.json",
+        "sha256": "ccc96892a4b37b8947293775f67c9fa43fe0a18e3a0cfebe04feaa1f9641d7f3",
+        "complete": false,
+        "invalid": false,
+        "events": 55042
+      },
+      "capture_runner_process_exit": 0,
+      "save_effect_scope": "The source route observes committed in-memory GameRules/item preference state and its StartMeleeData handoff through Results/CSS. Source GCI persistence and Personal-profile autosave were not exercised."
+    },
+    "callbacks": {
+      "main_to_vs": "mn_8022DB10 handles SEL_MAIN_VS and changes MenuKind from Main to VS.",
+      "vs_to_rules": "mn_8022D594 handles SEL_VS_RULES and calls mn_80231714.",
+      "rules_navigation_and_commit": "fn_8022F538 owns Rules input; selection 5 opens Items, selection 6 calls mn_802339FC to enter MenuKind 15 Rules Plus, and Start commits GameRules before mn_80229860(GM_VS).",
+      "rules_plus": "fn_8023201C handles left/right on timer option 0, B commits through mn_8023164C to Rules, and Start commits before GM_VS handoff.",
+      "timer_match_handoff": "gm_80167BC8 converts nonzero stock_time_limit minutes to StartMeleeRules.time_limit seconds and enables the match timer.",
+      "items": "fn_80233E10 owns A/B/Start/directional input; fn_80234C24 owns item menu transition/value update; mnItemSw_CommitItems commits authored item flags and frequency.",
+      "css_main_exit": "mnCharSel_Scene_OnFrame handles the source PAD_LR_START parent route to GM_MENU.",
+      "results": "Source pause and PAD_LR_START + A + Start No Contest input reaches original Results."
+    },
+    "item_table_mapping": {
+      "source_table": "gm_1601.c: lbl_803B7844",
+      "item_menu_table": "mnItemSw_GetTable reads authored mnItemSw_803ED340, mnItemSw_AnimTable and mnItemSw_803ED438 arrays.",
+      "item_order_cursor_zero": 5,
+      "StartMeleeData_mask_bit_cleared": 18,
+      "retail_observed_match_mask_hex": "fffffffffffbffff",
+      "prior_v2_claim_superseded": "The v2 receipt assigned preference bit 16 to match mask bit 32 for cursor 0. Retained Rev. 2 source state and the corrected browser run establish preference bit 5 -> match mask bit 18 instead.",
+      "item_preference_bit_cleared": 5
+    },
+    "assets": [
+      "MnMaAll.usd: Main menu layout and texture tables",
+      "MnSlChr.usd and SdSlChr.usd: non-Japanese CSS character-select data",
+      "MnSlMap.usd: SSS map menu data",
+      "SdMenu.usd: US menu text; SdToy.dat: toy data",
+      "GmEvent.dat: event initialization table loaded through gm_801BA8FC",
+      "LbAd.dat: menu audio load data through lbAudioAx_8002392C"
+    ]
+  },
+  "browser": {
+    "result": "pass",
+    "artifact_root_relative_to_agent_storage_runs": "vs-rules-plus-timer-rendered-browser-20261002-2104-74c0ab",
+    "report_file": "report.json",
+    "report_sha256": "19e9b1e221ad43db6140d129149cea2dd90488a3ef02b63bfa2a0d2815076fc1",
+    "browser": {
+      "executable": "Google Chrome",
+      "version": "154.0.8037.97",
+      "launcher": "scripts/browser_tools.mjs; headless installed Chrome; host speaker output muted"
+    },
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "save_mode": "Everything unlocked (native runtime default, configured_save_mode = MELEE_WEB_SAVE_MODE_EVERYTHING; isolated Playwright context). No Personal profile is loaded; Personal autosave is not exercised by this route.",
+    "route": [
+      "Original CSS -> Main -> VS -> Rules -> Items, with B navigation and transition-lock checks.",
+      "Source Items cursor 0 toggled off; source frequency selector saves the pending row state as None.",
+      "Rules stock count changes to three; Rules selection 6 enters original Rules Plus.",
+      "D-right changes the stock timer from zero to one minute; B returns to Rules and A re-enters to verify retention.",
+      "Start commits through original menu ownership to CSS; source SSS navigation selects Final Destination.",
+      "Live Mario vs Mario Stock match reaches at least 180 gameplay frames with three stocks and an enabled 60-second timer.",
+      "Source pause and No Contest input reaches Results; navigation returns to CSS and Main.",
+      "Rules Plus re-entry after Results retains one minute; Eject/reimport and second Eject complete with no source owners, scoped assets or audio banks remaining."
+    ],
+    "match_values": {
+      "match_kind": "Stock",
+      "stage": 32,
+      "stocks": [
+        3,
+        3
+      ],
+      "timer_enabled": true,
+      "time_limit_seconds": 60,
+      "item_frequency": -1,
+      "item_preference_mask_hex": "ffffffffffffffdf",
+      "item_preference_bit_cleared": 5,
+      "item_mask_hex": "fffffffffffbffff",
+      "item_mask_bit_cleared": 18,
+      "no_contest_outcome": 7
+    },
+    "screenshots": {
+      "08b-rules-plus-one-minute": {
+        "file": "08b-rules-plus-one-minute.png",
+        "sha256": "8e26edfbb3482f51a5473b7af999eb49ceee87335e203001707d44086cfed835"
+      },
+      "12-live-three-stock-match": {
+        "file": "12-live-three-stock-match.png",
+        "sha256": "f1281958f82f913e05a1704a31e1ffb0c3824029f4a0cf08d2ebfc6d513c05cb"
+      },
+      "13-original-results": {
+        "file": "13-original-results.png",
+        "sha256": "edb27074758d6c75bea046deda22cbc5b5a34638cd4e06402eea582b47a2b81b"
+      },
+      "14-css-after-results-settings-retained": {
+        "file": "14-css-after-results-settings-retained.png",
+        "sha256": "6757107411315c45a5317f7f663fb5a660600bb35aad77a7e5d6971a45469a4f"
+      },
+      "16a-rules-plus-retained-after-results": {
+        "file": "16a-rules-plus-retained-after-results.png",
+        "sha256": "6e83de8b942ac2a818f7bd5a7ec5b1b395d1c6187bb57279a442d005b494391c"
+      },
+      "15-clean-reimport-css": {
+        "file": "15-clean-reimport-css.png",
+        "sha256": "adf87c9c1e67af22cbf45e74d2184cbccf5b13cc217e212886cfaede0d31acf9"
+      }
+    },
+    "claims": {
+      "rendered_browser": "passed; source menu and live match frames inspected",
+      "source_state_and_navigation": "passed; original source callbacks and source observations",
+      "retail_source_comparison": "not_run; these are independent captures without cross-runtime comparison",
+      "visual_equivalence": "not_run; browser match shows magenta Final Destination outline artifacts",
+      "audio_equivalence": "not_run; host output muted by policy, browser audio processing remains enabled",
+      "physical_input": "not_run; browser B0XX keyboard PAD and ordinary retail Dolphin PAD pipe only",
+      "performance": "not_run",
+      "Personal_autosave_or_card_persistence": "not_claimed; isolated Everything-unlocked context, no Personal profile or source card diff"
+    }
+  },
+  "implementation_and_validation": {
+    "source_behavior_change": "Patch to mnItemSw_GetTable assembles a stable MnItemSwTable from the authored arrays because retail object data is contiguous while Emscripten sections do not preserve that adjacency.",
+    "changed_file_sha256": {
+      "patches/melee-gameplay.patch": "ea04a9f337096d726e5518ff8899274d599d9012936aacaa8d063660a047d802",
+      "scripts/capture_allocation_history.py": "b40cde9ff62a53b17b05a147adf0c421c543e2c4d5aca552484d239e8a3ae32e",
+      "tools/retail_allocation_menu.py": "399e9e48474c4abbe1085032bf60381712a27d2f03eb70545534be426e25f0ed",
+      "tests/test_capture_allocation_menu_route.py": "26975876ce2c0b8feaada467bef5a99baf9a472f0187a0a9b23be98b0018d290",
+      "tests/test_retail_allocation_menu.py": "c59c7e532c393eae2b5902a2aae9f72c4c93c62ebb5c5c3ce7dc9b1df82cc041",
+      "tests/vs_rules_item_menu_browser_test.mjs": "09a35d59acda448f779c45b3b8aa3fa7eca60a8ebd741932e80bd5fb524542fd"
+    },
+    "release_package_sha256": {
+      "runtime.html": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d",
+      "runtime-development.mjs": "ecf35dd893bedf1ff6d0539f1ebce42aa5a3c9d389b9cee682c0b46b5101e397",
+      "gameplay_menu_browser.js": "6d80184987a3e98698d0e07b290f9740feacc7b56fcf8fc9b59759fa7fa085a2",
+      "gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+      "gameplay_menu_browser.wasm": "fc4e123731504e19ddbc8f36f8f45879a7dbf17e23a07abccf5626161b3cb4fa"
+    },
+    "focused_checks": [
+      "python3 -m unittest tests.test_capture_allocation_menu_route tests.test_retail_allocation_menu -v: 24 passed",
+      "python3 -m py_compile scripts/capture_allocation_history.py tools/retail_allocation_menu.py: passed",
+      "node --check tests/vs_rules_item_menu_browser_test.mjs: passed",
+      "git diff --check: passed"
+    ],
+    "builds": [
+      "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target gameplay: passed",
+      "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime: passed",
+      "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release: passed"
+    ],
+    "full_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "result": "1,733 tests, 133 skipped; exit 0",
+      "log_relative_to_agent_storage_runs": "vs-rules-plus-timer-post-item-table-fix-20261002-203252-b0e6be32/full-suite.log",
+      "log_sha256": "ca9d3f92b2c1f25c178ecf7662036c3c5299352a46378d3cdd6b4357642d421e"
+    }
+  }
+}

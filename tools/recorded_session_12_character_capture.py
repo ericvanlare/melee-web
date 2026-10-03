@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-"""Capture the three-match, twelve-character original-game session.
+"""Capture bounded original-game VS sessions.
 
 The driver launches the pinned passive reference Dolphin, navigates original
 CSS/SSS with ordinary Pipe controllers, and records the source-consumed input
 and observer stream. It does not read or write guest memory. ``--readiness-only``
 drives all three CPU9 lineups through bounded CSS/SSS cancel loops without
 starting a match; that mode is route evidence only and cannot produce a replay
-candidate.
+candidate. ``--team-route`` captures three cycles of the two-player Mario Teams
+route through No Contest Results and the retained CSS settings.
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import math
@@ -29,10 +31,12 @@ from typing import Any, Callable
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 import reference_versus_sequence_capture as capture  # noqa: E402
 import whole_session_replay as replay  # noqa: E402
 from retail_setup_validation import _decode_setup  # noqa: E402
+from dolphin_audio import dolphin_audio_options  # noqa: E402
 
 
 DISC_SHA256 = "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
@@ -81,6 +85,22 @@ LINEUPS: tuple[tuple[str, ...], ...] = (
     ("CAPTAIN_FALCON", "GANONDORF", "LUIGI", "PIKACHU"),
 )
 EXPECTED_ROSTER = tuple(tuple(ROSTER[name][0] for name in lineup) for lineup in LINEUPS)
+# The original team's color for Mario comes from
+# ``gm_801692BC(8) -> lbl_803D51A0[8].x2``.  The pinned table row is
+# ``{ 0x05, 0x00, 0x03, 0x04 }``: team 0 uses x1 (0), and team 1 uses x2
+# (3).  Keep this source mapping explicit so a permissive costume check cannot
+# admit a visually similar but source-invalid team setup.
+MARIO_TEAM_COSTUMES = {0: 0, 1: 3}
+# Source Items cursor 0 is authored preference bit 5
+# (``mnItemSw_803ED438[0]``), which ``lbl_803B7844`` maps to
+# StartMeleeData item-mask bit 18.  Clearing that bit is the committed
+# row-zero mask emitted by the original Team match.
+TEAM_ROUTE_ITEM_MASK = "fffffffffffbffff"
+# CSSData keeps the source ``StartMeleeData`` at +0x10, but it is the
+# pre-entry copy.  ``gmVsMelee_EnterVs`` sets StartMeleeRules.is_vs only when
+# entering the match, so the retained CSS copy has the source byte 0x83 rather
+# than the ordinary match-entry value with that bit set.
+CSS_RETAINED_PROFILE_BYTE = 0x83
 
 
 class CaptureFailure(RuntimeError):
@@ -134,14 +154,115 @@ def _validate_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
     return setup
 
 
+def _validate_team_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
+    if type(match_index) is not int or not 0 <= match_index < len(EXPECTED_ROSTER):
+        raise CaptureFailure(f"unexpected source team-match index {match_index}")
+    try:
+        setup = _decode_setup(raw_hex)
+    except (KeyError, TypeError, ValueError) as error:
+        raise CaptureFailure(f"source team setup is unsupported: {error}") from error
+    if (setup["stage"] != 0x20 or setup["match_kind"] != 1 or
+            setup["timer_enabled"] or setup["time_limit_seconds"] != 0 or
+            not setup["is_stock"] or setup["disable_pausing"] or
+            not setup["is_teams"] or setup["item_frequency"] != -1):
+        raise CaptureFailure(f"source team rules differ from the declared route: {setup}")
+    players = setup["players"]
+    if (len(players) != 2 or [player["port"] for player in players] != [1, 2] or
+            [player["player_type"] for player in players] != [0, 1] or
+            any(player["character_kind"] != ROSTER["MARIO"][0] or
+                player["stocks"] != 3 for player in players) or
+            players[1].get("cpu_kind") != 4 or players[1].get("cpu_level") != 1):
+        raise CaptureFailure(
+            f"source team setup did not contain a three-stock Mario and level-1 CPU: {players}")
+    raw = bytes.fromhex(raw_hex)
+    teams = [raw[0x69], raw[0x8D]]
+    if any(team > 2 for team in teams) or teams[0] == teams[1]:
+        raise CaptureFailure(f"source team setup did not contain opposing authored teams: {teams}")
+    expected_costumes = [MARIO_TEAM_COSTUMES.get(team) for team in teams]
+    actual_costumes = [player["costume"] for player in players]
+    if actual_costumes != expected_costumes:
+        raise CaptureFailure(
+            "source team setup did not contain source-derived Mario team colors: "
+            f"expected {expected_costumes} for teams {teams}, received {actual_costumes}")
+    setup["player_teams"] = teams
+    if setup["item_mask_hex"] != TEAM_ROUTE_ITEM_MASK:
+        raise CaptureFailure(
+            "source Team match did not receive the Rules/Items route's row-zero item mask")
+    return setup
+
+
+def _decode_css_start_data(raw_hex: str) -> dict[str, Any]:
+    """Decode the retained CSSData StartMeleeData with its source profile.
+
+    The ordinary setup decoder intentionally requires ``is_vs`` because that
+    bit is installed by ``gmVsMelee_EnterVs`` at match entry.  CSSData is the
+    source's pre-entry copy, so it must retain the authored pre-entry byte and
+    cannot be checked with that match-entry identity requirement.  All other
+    setup validation remains shared with the ordinary decoder.
+    """
+    if not isinstance(raw_hex, str):
+        raise CaptureFailure("source CSS retained state is not encoded as bytes")
+    try:
+        raw = bytearray.fromhex(raw_hex)
+    except ValueError as error:
+        raise CaptureFailure(f"source CSS retained state is not valid hex: {error}") from error
+    if len(raw) != 0x138:
+        raise CaptureFailure(
+            f"source CSS retained state is not a complete 0x138-byte StartMeleeData: {len(raw)}")
+    if raw[4] != CSS_RETAINED_PROFILE_BYTE:
+        raise CaptureFailure(
+            "source CSS retained state has an unexpected pre-entry VS profile byte: "
+            f"expected {CSS_RETAINED_PROFILE_BYTE:#x}, received {raw[4]:#x}")
+    # Reuse every ordinary setup check and decoder field while locally
+    # supplying the entry-only is_vs bit that the source adds after CSS.
+    raw[4] |= 0x40
+    try:
+        return _decode_setup(raw.hex())
+    except (KeyError, TypeError, ValueError) as error:
+        raise CaptureFailure(f"source CSS retained state is unsupported: {error}") from error
+
+
+def _decode_team_result(raw_hex: str) -> dict[str, Any]:
+    if not isinstance(raw_hex, str) or len(raw_hex) != 0x28 * 2:
+        raise CaptureFailure("original Team Results omitted its complete result slice")
+    try:
+        raw = bytes.fromhex(raw_hex)
+    except ValueError as error:
+        raise CaptureFailure("original Team Results exposed malformed result bytes") from error
+    winner_count = raw[0x0D]
+    if winner_count > 2:
+        raise CaptureFailure(f"original Team Results has invalid winner count {winner_count}")
+    result = {"outcome": raw[4],
+              "winners": list(raw[0x10:0x10 + winner_count])}
+    if (len(set(result["winners"])) != winner_count or
+            any(winner not in (0, 1) for winner in result["winners"])):
+        raise CaptureFailure(f"original Team Results has invalid winner slots: {result}")
+    if result["outcome"] != 7:
+        raise CaptureFailure(
+            f"original Teams pause chord did not publish No Contest outcome 7: {result}")
+    return result
+
+
+SUCCESS_RESULTS = frozenset({
+    "source_css_sss_route_readiness_complete",
+    "three_match_source_capture_complete",
+    "original_vs_team_results_css_capture_complete",
+})
+
+
+def _capture_exit_code(result: Any) -> int:
+    return 0 if result in SUCCESS_RESULTS else 1
+
+
 class Driver:
     def __init__(self, controller: capture.DualPipeController,
                  latest: dict[str, Any], stop: threading.Event,
-                 *, readiness_only: bool) -> None:
+                 *, readiness_only: bool, team_route_only: bool = False) -> None:
         self.controller = controller
         self.latest = latest
         self.stop = stop
         self.readiness_only = readiness_only
+        self.team_route_only = team_route_only
         self.steps: list[dict[str, Any]] = []
 
     def wait(self, predicate: Callable[[], bool], label: str,
@@ -245,7 +366,7 @@ class Driver:
             time.sleep(0.012)
 
     def state(self, label: str) -> None:
-        row = {
+        row = copy.deepcopy({
             "label": label,
             "source_sequence": self.latest.get("consume_seq"),
             "players": self.latest.get("players", [])[:4],
@@ -253,7 +374,8 @@ class Driver:
             "cursors": self.latest.get("cursors", {}),
             "models": self.latest.get("models", {}),
             "sliders": self.latest.get("sliders", {}),
-        }
+            "team_state": self.latest.get("team_state"),
+        })
         self.steps.append(row)
         print(json.dumps(row, sort_keys=True), flush=True)
 
@@ -456,6 +578,10 @@ class Driver:
     def boot_and_drive(self) -> None:
         try:
             self._boot_menus()
+            if self.team_route_only:
+                self.play_team_battle()
+                self.latest["driver_complete"] = True
+                return
             for match_index in range(3):
                 self.configure_lineup(match_index, initial=(match_index == 0))
                 if self.readiness_only:
@@ -517,9 +643,10 @@ class Driver:
         menu_tap("D_DOWN", "stock-count-row")
         self.wait(lambda: self.latest.get("main_selection") == 1, "stock count row")
         if self.latest.get("main_confirmed") != 3:
-            raise CaptureFailure("expected original three stocks before setting four")
-        menu_tap("D_RIGHT", "four-stocks")
-        self.wait(lambda: self.latest.get("main_confirmed") == 4, "four stocks selected")
+            raise CaptureFailure("expected three stocks after selecting Stock mode")
+        if not self.team_route_only:
+            menu_tap("D_RIGHT", "four-stocks")
+            self.wait(lambda: self.latest.get("main_confirmed") == 4, "four stocks selected")
         for wanted in (2, 3, 4, 5):
             menu_tap("D_DOWN", f"Rules-item-switch-{wanted}")
             self.wait(lambda wanted=wanted: self.latest.get("main_selection") == wanted,
@@ -527,6 +654,10 @@ class Driver:
         menu_tap("A", "open-item-switch")
         self.wait(lambda: ready(16) and self.latest.get("main_selection") == 0,
                   "item switch ready")
+        item_entry_poll = self.latest.get("polls", 0)
+        self.wait(lambda: self.latest.get("polls", 0) >= item_entry_poll + 60,
+                  "original Items transition animation")
+        menu_tap("A", "toggle-source-item-row-zero")
         menu_tap("D_UP", "item-frequency-row")
         self.wait(lambda: self.latest.get("main_selection") == 31, "item frequency row")
         if self.latest.get("main_confirmed") != 3:
@@ -573,6 +704,132 @@ class Driver:
             self.wait(lambda: self.latest.get("scene_kind") == "08" and
                       self.latest.get("polls", 0) > base + 240,
                       "returned CSS initialization")
+
+    def configure_team_battle(self) -> None:
+        self.wait(lambda: len(self.latest["models"]) == 4 and
+                  self.latest.get("css_polls", 0) >= 240,
+                  "CSS readiness for original Teams setup")
+        self.select_human(0, "MARIO", initial=True)
+        self.select_cpu(1, "MARIO")
+        self.wait(lambda: [player["kind"] for player in self.latest["players"][:2]] == [0, 1],
+                  "original human and CPU CSS doors")
+        if self.latest["players"][1]["cpu"] != 1:
+            raise CaptureFailure("original Mario CPU did not retain the route's level-one setting")
+        if self.latest.get("team_state") != {"is_teams": 0, "player_teams": [0, 0]}:
+            raise CaptureFailure(
+                f"fresh original CSS team defaults differ from the route: {self.latest.get('team_state')}")
+        self.move(-30.0, 23.3, "CSS-Teams-toggle")
+        self.state("teams-toggle-before")
+        self.tap(0, "A", label="enable-source-Teams")
+        self.wait(lambda: self.latest.get("team_state") ==
+                  {"is_teams": 1, "player_teams": [0, 0]},
+                  "original CSS Teams enabled")
+        door = self.latest["doors"][1]
+        self.move((door["team_left"] + door["team_right"]) / 2, -3.4,
+                  "CSS-P2-team-color")
+        self.state("p2-team-color-before")
+        self.tap(0, "A", label="set-source-P2-team-color")
+        self.wait(lambda: self.latest.get("team_state") ==
+                  {"is_teams": 1, "player_teams": [0, 1]},
+                  "original CSS opposing player teams")
+        self.state("team-battle-configured")
+
+    def play_team_battle(self) -> None:
+        self.configure_team_battle()
+        first_sss = self.latest["boundaries"].get("sss_enter", 0)
+        self.enter_fd(choose_stage=False, before=first_sss)
+        if self.latest.get("team_state") != {"is_teams": 1, "player_teams": [0, 1]}:
+            raise CaptureFailure("original CSS lost Teams or team colors after SSS cancellation")
+        self.state("css-after-team-sss-cancel")
+        for match_index in range(3):
+            before_sss = self.latest["boundaries"].get("sss_enter", 0)
+            setup_boundary_before = self.latest["boundaries"].get("setup", 0)
+            self.enter_fd(choose_stage=True, before=before_sss)
+            self.wait(lambda match_index=match_index:
+                      len(self.latest.get("setup_records", [])) > match_index,
+                      f"source Teams StartMeleeData {match_index}", seconds=30.0)
+            self.wait(lambda setup_boundary_before=setup_boundary_before:
+                      self.latest["boundaries"].get("setup", 0) > setup_boundary_before,
+                      f"source team match setup boundary {match_index}", seconds=30.0)
+            setup = self.latest["setup_records"][match_index]["decoded"]
+            self.latest.setdefault("team_match_setups", []).append(setup)
+            self.state(f"source-team-match-setup-{match_index}")
+
+            before_polls = self.latest.get("polls", 0)
+            self.wait(lambda before_polls=before_polls:
+                      self.latest.get("polls", 0) >= before_polls + 180,
+                      f"source team match {match_index} reaches 180 PAD polls", seconds=45.0)
+            self.tap(0, "START", label=f"team-match-{match_index}-pause")
+            self.wait(lambda before_polls=before_polls:
+                      self.latest.get("polls", 0) >= before_polls + 225,
+                      f"team pause menu {match_index} accepts the No Contest chord",
+                      seconds=10.0)
+            result_before = self.latest["boundaries"].get("results_gobj", 0)
+            chord = capture.raw_pad(buttons=["L", "R", "A", "START"])
+            self.controller.set_both(
+                chord, capture.NEUTRAL_PAD,
+                action=f"team-match-{match_index}-No-Contest-LRAS-Start")
+            expected = (self._expected_button(chord), 0)
+            press_seq = self.latest.get("consume_seq", -1)
+            self.wait(lambda press_seq=press_seq, expected=expected:
+                      any(row["seq"] > press_seq and row["buttons"] == expected
+                          for row in self.latest.get("consumed_history", [])),
+                      f"original source consumed No Contest chord {match_index}", seconds=10.0)
+            self.wait(lambda result_before=result_before:
+                      self.latest["boundaries"].get("results_gobj", 0) > result_before,
+                      f"original Team Results {match_index}", seconds=30.0)
+            self.controller.set_both(capture.NEUTRAL_PAD, capture.NEUTRAL_PAD,
+                                     action=f"team-match-{match_index}-No-Contest-release")
+            self.state(f"original-team-results-{match_index}")
+
+            results_polls = self.latest.get("polls", 0)
+            self.wait(lambda results_polls=results_polls:
+                      self.latest.get("polls", 0) >= results_polls + 270,
+                      f"source Results {match_index} presentation", seconds=20.0)
+            return_before = self.latest["boundaries"].get("return_css", 0)
+            for pulse in range(8):
+                if self.latest["boundaries"].get("return_css", 0) > return_before:
+                    break
+                self.tap(0, "START", label=f"team-results-start-{match_index}-{pulse}")
+                for _ in range(28):
+                    if self.stop.wait(0.05):
+                        raise CaptureFailure("capture stopped in Team Results")
+                    if self.latest["boundaries"].get("return_css", 0) > return_before:
+                        break
+            self.wait(lambda return_before=return_before:
+                      self.latest["boundaries"].get("return_css", 0) > return_before,
+                      f"original Team Results {match_index} return to CSS", seconds=30.0)
+            self.wait(lambda self=self:
+                      self.latest.get("scene_kind") == "08" and
+                      self.latest.get("team_state") ==
+                      {"is_teams": 1, "player_teams": [0, 1]},
+                      f"original CSS retains Teams after Results {match_index}", seconds=30.0)
+            retained_hex = self.latest.get("css_start_data", "")
+            retained = _decode_css_start_data(retained_hex)
+            retained_raw = bytes.fromhex(retained_hex)
+            if (retained["is_teams"] is not True or
+                    retained["item_frequency"] != -1 or
+                    retained["item_mask_hex"] != TEAM_ROUTE_ITEM_MASK or
+                    len(retained["players"]) != 2 or
+                    [player["player_type"] for player in retained["players"]] != [0, 1] or
+                    retained["players"][1].get("cpu_level") != 1 or
+                    any(player["stocks"] != 3 for player in retained["players"]) or
+                    [retained_raw[0x69], retained_raw[0x8D]] != [0, 1]):
+                raise CaptureFailure(
+                    f"original CSS did not retain Team Rules/Items state after match {match_index}: {retained}")
+            self.latest.setdefault("team_css_returns", []).append({
+                "match_index": match_index,
+                "source_sequence": self.latest["boundaries"]["return_css"],
+                "start_data": retained,
+                "team_state": self.latest.get("team_state"),
+            })
+            self.state(f"css-after-team-results-settings-retained-{match_index}")
+            if match_index < 2:
+                css_polls = self.latest.get("css_polls", 0)
+                self.wait(lambda css_polls=css_polls:
+                          self.latest.get("scene_kind") == "08" and
+                          self.latest.get("css_polls", 0) >= css_polls + 240,
+                          "returned CSS initialization")
 
 
 def _consume_row(row: dict[str, Any], latest: dict[str, Any],
@@ -649,16 +906,34 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
                 "kind": raw[index * 36 + 11],
                 "costume": raw[index * 36 + 13],
                 "icon": raw[index * 36 + 14],
+                # CSSDoor stores Human/CPU toggle bounds at 0x14/0x18 and
+                # team-color bounds at 0x1C/0x20. Keep both controls distinct.
                 "left": struct.unpack(">f", raw[index * 36 + 20:index * 36 + 24])[0],
                 "right": struct.unpack(">f", raw[index * 36 + 24:index * 36 + 28])[0],
+                "team_left": struct.unpack(">f", raw[index * 36 + 28:index * 36 + 32])[0],
+                "team_right": struct.unpack(">f", raw[index * 36 + 32:index * 36 + 36])[0],
             } for index in range(4)]
         elif name == "menu_css_live_state":
+            latest["css_start_data"] = raw[0x10:0x148].hex()
+            latest["team_state"] = {
+                "is_teams": raw[0x18],
+                "player_teams": [raw[0x79], raw[0x9D]],
+            }
             latest["players"] = [{
                 "character": raw[112 + index * 36],
                 "kind": raw[113 + index * 36],
                 "stocks": raw[114 + index * 36],
                 "cpu": raw[127 + index * 36],
             } for index in range(6)]
+        elif name == "menu_css_context":
+            # The return_css boundary carries this same source CSSData owner
+            # after Results, while no live-state sample is emitted during the
+            # transition. Use its typed +0x10 StartMeleeData copy so the
+            # retained-settings check observes the returned CSS state.
+            if len(raw) != 0x148:
+                raise CaptureFailure(
+                    f"source CSS context has unexpected size {len(raw)}")
+            latest["css_start_data"] = raw[0x10:0x148].hex()
         elif name == "stage_select_index":
             stage = slices.get("stage_select_kind")
             latest["stage_kind"] = int(stage["hex"], 16) if stage else None
@@ -676,13 +951,37 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
         if type(match_index) is not int or setup_slice is None:
             raise CaptureFailure("source match entry omitted its indexed StartMeleeData")
         setup_hex = setup_slice["hex"]
-        normalized = _validate_setup(setup_hex, match_index)
+        normalized = (_validate_team_setup(setup_hex, match_index)
+                      if latest.get("team_route") else
+                      _validate_setup(setup_hex, match_index))
         latest.setdefault("setup_records", []).append({
             "match_index": match_index,
             "source_sequence": row["seq"],
             "raw_hex": setup_hex,
             "decoded": normalized,
         })
+    if boundary == "results_gobj" and latest.get("team_route"):
+        result_slice = slices.get("result")
+        if result_slice is None:
+            raise CaptureFailure("Team Results GObj omitted the source result slice")
+        match_index = payload.get("match_index")
+        results = latest.setdefault("team_results", [])
+        if type(match_index) is not int or not 0 <= match_index < 3:
+            raise CaptureFailure(
+                f"Team Results GObj has an unexpected source match index: {match_index}")
+        decoded_result = _decode_team_result(result_slice["hex"])
+        if match_index == len(results):
+            results.append({"match_index": match_index,
+                            "source_sequence": row["seq"],
+                            "result": decoded_result})
+        elif (match_index != len(results) - 1 or
+              results[-1]["result"] != decoded_result):
+            raise CaptureFailure(
+                f"Team Results GObj order or published result changed: {match_index}")
+        result_rows = latest.setdefault("team_result_gobj_rows", [])
+        if not any(result_row["payload"].get("match_index") == match_index
+                   for result_row in result_rows):
+            result_rows.append(row)
     if row.get("event") == "error":
         raise CaptureFailure(f"reference observer error: {payload}")
 
@@ -703,11 +1002,15 @@ def _args() -> argparse.Namespace:
                         help="unique MWRO identity using letters, numbers, dot, underscore, hyphen")
     parser.add_argument("--readiness-only", action="store_true",
                         help="cycle three source-confirmed CPU9 lineups through CSS/SSS without matches")
+    parser.add_argument("--team-route", action="store_true",
+                        help="capture three original VS Rules/Items Teams matches through Results/CSS returns")
     return parser.parse_args()
 
 
 def main() -> int:
     args = _args()
+    if args.readiness_only and args.team_route:
+        raise CaptureFailure("--readiness-only and --team-route are separate capture modes")
     out = args.out.expanduser().resolve()
     if ROOT / "work" not in out.parents:
         raise CaptureFailure("--out must be inside this checkout's ignored work/ directory")
@@ -793,6 +1096,7 @@ def main() -> int:
     )
     for setting in settings:
         command.extend(("-C", setting))
+    command.extend(dolphin_audio_options())
     version = subprocess.run([str(dolphin), "--version"], capture_output=True,
                              text=True, check=True).stdout.strip()
     log = log_path.open("w", encoding="utf-8")
@@ -803,14 +1107,19 @@ def main() -> int:
         "cursors": {}, "cursor_revisions": {}, "models": {}, "sliders": {},
         "doors": [], "players": [], "boundaries": {}, "boundary_match_indices": {},
         "expected_match_index": 0, "setup_records": [], "polls": 0,
+        "team_route": args.team_route,
     }
     report: dict[str, Any] = {
         "schema": "melee-web-recorded-session-12-character-capture-v1",
         "capture_id": args.capture_id,
-        "scope": ("three-lineup CSS/SSS route readiness only; no matches started"
+        "scope": ("three original CSS/SSS Team match cycles after the committed row-zero item toggle and None frequency; each is Mario vs level-1 Mario CPU, source No Contest Results and retained CSS; Null video; no pixel, PCM, physical-input, or performance claim"
+                  if args.team_route else
+                  "three-lineup CSS/SSS route readiness only; no matches started"
                   if args.readiness_only else
                   "one continuous three-match original CPU9 session; Null video; no pixels, PCM, or performance claim"),
-        "lineups": [list(lineup) for lineup in LINEUPS],
+        "route": "team-battle-results-css-roundtrips" if args.team_route else "three-lineup-cpu9",
+        "lineups": ([ ["MARIO", "MARIO"] for _ in range(3)] if args.team_route else
+                    [list(lineup) for lineup in LINEUPS]),
         "dolphin_executable_sha256": _sha256(dolphin),
         "build_manifest_sha256": _sha256(manifest_path),
         "disc_sha256": DISC_SHA256,
@@ -821,11 +1130,14 @@ def main() -> int:
         "dolphin_version": version,
         "input_mode": "ordinary-controller-pipe-record",
         "readiness_only": args.readiness_only,
+        "team_route": args.team_route,
+        "audio_policy": "host output muted; DSP generation retained",
     }
-    driver = Driver(controller, latest, stop, readiness_only=args.readiness_only)
+    driver = Driver(controller, latest, stop, readiness_only=args.readiness_only,
+                    team_route_only=args.team_route)
     ended = False
     try:
-        timeout = time.monotonic() + (900 if args.readiness_only else 2400)
+        timeout = time.monotonic() + (900 if args.readiness_only or args.team_route else 2400)
         announcements: list[dict[str, Any]] = []
 
         def retain_announcement(row: dict[str, Any]) -> None:
@@ -858,18 +1170,49 @@ def main() -> int:
                 _consume_row(row, latest, report)
                 if row.get("event") == "end":
                     observer.require_completed_status()
+                    if args.team_route:
+                        # The final return_css boundary and the observer end
+                        # record can arrive before the driver has appended its
+                        # retained-CSS receipt. Let that bounded bookkeeping
+                        # finish before validating the terminal arrays.
+                        thread.join(30)
+                        if thread.is_alive():
+                            raise CaptureFailure(
+                                "ordinary-input driver did not finish after the source end record")
+                        if latest.get("driver_error"):
+                            raise CaptureFailure(latest["driver_error"])
                     status_data = json.loads(status.read_text(encoding="utf-8"))
                     input_data = json.loads(input_status.read_text(encoding="utf-8"))
                     if (not input_data.get("complete") or input_data.get("invalid") or
                             input_data.get("error")):
                         raise CaptureFailure(f"source-consumed input record is incomplete: {input_data}")
-                    if len(latest.get("setup_records", [])) != 3:
-                        raise CaptureFailure("completed source session omitted one or more indexed setups")
-                    replay.validate_milestone_setups(
-                        [entry["raw_hex"] for entry in latest["setup_records"]])
+                    expected_setups = 3
+                    if len(latest.get("setup_records", [])) != expected_setups:
+                        raise CaptureFailure(
+                            f"completed source session omitted setups: expected {expected_setups}")
+                    if not args.team_route:
+                        replay.validate_milestone_setups(
+                            [entry["raw_hex"] for entry in latest["setup_records"]])
+                    else:
+                        result_rows = latest.get("team_result_gobj_rows", [])
+                        team_results = latest.get("team_results", [])
+                        team_setups = latest.get("team_match_setups", [])
+                        css_returns = latest.get("team_css_returns", [])
+                        if any(len(rows) != 3 for rows in
+                               (result_rows, team_results, team_setups, css_returns)):
+                            raise CaptureFailure(
+                                "three-match Team Results/CSS route omitted a source boundary")
+                        report["team_result_gobjs"] = result_rows
+                        report["team_results"] = team_results
+                        report["team_match_setups"] = team_setups
+                        report["team_css_returns"] = css_returns
+                        report["css_team_state_after_results"] = latest.get("team_state")
+                        report["css_rules_after_results"] = css_returns[-1]["start_data"]
                     report["observer_status"] = status_data
                     report["input_status"] = input_data
-                    report["result"] = "three_match_source_capture_complete"
+                    report["result"] = ("original_vs_team_results_css_capture_complete"
+                                         if args.team_route else
+                                         "three_match_source_capture_complete")
                     report["end"] = row
                     ended = True
                     break
@@ -884,7 +1227,8 @@ def main() -> int:
         report["observer_counts"] = observer.counts
         report["latest_state"] = {
             key: latest.get(key) for key in
-            ("scene_kind", "scene_routing", "players", "doors", "setup_records", "boundaries")
+            ("scene_kind", "scene_routing", "players", "doors", "team_state",
+             "setup_records", "boundaries")
         }
         if not args.readiness_only and not ended:
             raise CaptureFailure("full source capture did not reach the observer end record")
@@ -895,7 +1239,8 @@ def main() -> int:
         report["setup_records"] = latest.get("setup_records", [])
         report["latest_state"] = {
             key: latest.get(key) for key in
-            ("scene_kind", "scene_routing", "players", "doors", "setup_records", "boundaries")
+            ("scene_kind", "scene_routing", "players", "doors", "team_state",
+             "setup_records", "boundaries")
         }
         print(f"recorded-session source capture failed: {error}", file=sys.stderr)
     finally:
@@ -920,8 +1265,7 @@ def main() -> int:
         _write_json(report_path, report)
     print(json.dumps({"result": report.get("result"), "error": report.get("error"),
                       "out": str(out)}, sort_keys=True))
-    return 0 if report.get("result") in {
-        "source_css_sss_route_readiness_complete", "three_match_source_capture_complete"} else 1
+    return _capture_exit_code(report.get("result"))
 
 
 if __name__ == "__main__":
