@@ -42,6 +42,34 @@ python3 scripts/agent_workspace.py run -- python3 tools/slippi_profile_prefix_ch
   --out /path/to/fresh-check-directory
 ```
 
+
+### Native initializer and original scheduler masks
+
+The [initializer/mask follow-up receipt](../../docs/evidence/source-slippi-native-initializer-mask-v1.json) binds a separate fresh source build. The opt-in initializer uses source slots 1/2, controllers 0/1, two Mario players with color 0, four stocks and seed 4660. Its 60-byte diagnostic and JSON expose copied selection fields and the actual `stage_info.grkind` through a C-only bridge. The default profile retains slots 0/0, colors 0/1 and seed `0x13579bdf`. The existing bare CPP identity remains unchanged in meaning; the bridge has a separate hash export.
+
+For the native initializer, use the prefix command above with `--seed 4660 --initializer-profile native --stage-kind-bridge tests/gameplay_snapshot_stage_kind_bridge.c --stage-kind-bridge-sha256 AUDITED_BRIDGE_SHA256`. Keep the other source/runtime pins and `--scene-last 1341`. Native profile configuration rejects another seed and any initializer change after init. Neither the prefix nor initializer comparison certifies Results or current network consumption.
+
+The pause checker exercises 124 neutral source ticks and 17 ordinary PAD controls. It checks the source-prepared process mask and callback trace; it never writes pause, scheduler masks or callback state. Early P1/P2 START attempts stay paused, then the original pause timer permits P1 resume. Run it against the same fresh Release probe:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 tools/source_pause_mask_check.py \
+  --runtime build/browser-release/gameplay_snapshot_probe.js \
+  --assets /path/to/local-assets --out /path/to/fresh-pause-check \
+  --source-probe tests/gameplay_snapshot_probe.cpp --source-cmake cmake/FighterRuntime.cmake \
+  --profile-helper reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp \
+  --stage-kind-bridge tests/gameplay_snapshot_stage_kind_bridge.c \
+  --probe-sha256 AUDITED_PROBE_SHA256 --cmake-sha256 AUDITED_CMAKE_SHA256 \
+  --profile-helper-sha256 AUDITED_HELPER_SHA256 \
+  --stage-kind-bridge-sha256 AUDITED_BRIDGE_SHA256 \
+  --runtime-sha256 AUDITED_JS_SHA256 --wasm-sha256 AUDITED_WASM_SHA256 \
+  --worker-sha256 AUDITED_PAUSE_WORKER_SHA256 \
+  --node /path/to/pinned-node --node-sha256 AUDITED_NODE_SHA256 --timeout 30
+```
+
+The launcher reserves five seconds of its whole 30-second cap for owned group cleanup and retains a failure report. Passing requires source close, matching wait/cleanup return codes, released group and absent positive leader PID. A fresh child directory separates worker evidence from the process log. The worker hash is required before spawn, and the launcher records both checker and worker hashes. Supplied symlink inputs are refused before canonicalization. Synthetic controls detect changed callback count and prepared mask; the actual source run checks the full recipe.
+
+An optional MEMFS browser module can be compiled with `python3 scripts/build.py --trace-target gameplay_snapshot_probe_browser --configuration Release`, using the ignored `assets-local/snapshot-mario` fixture. This source-only diagnostic module has no player or draw surface. Its build result is separate from browser execution; it does not enable the multiplayer playing route.
+
 ## Pinned inputs and licensing
 
 [`client.lock.json`](client.lock.json) is the source of truth for the client

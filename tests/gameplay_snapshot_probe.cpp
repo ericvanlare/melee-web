@@ -24,10 +24,14 @@ extern "C" {
 #include <array>
 #include <cstdio>
 #include <cstring>
+#include <cstdint>
+#include <sstream>
 #include <stdexcept>
+#include <string>
 
 extern "C" uint32_t slippi_rng_profile_reset_seed(uint32_t offset);
 extern "C" uint32_t slippi_rng_profile_sync_seed(uint32_t frame, uint32_t offset);
+extern "C" uint32_t melee_web_snapshot_actual_stage_ground_kind(void);
 
 extern "C" {
 #include <melee/gm/forward.h>
@@ -53,7 +57,9 @@ unsigned audio_phase=0;
 std::array<float,1068> pcm{};
 std::array<uint8_t,44> input_bytes{};
 constexpr uint32_t default_source_seed=0x13579bdf;
+constexpr uint32_t native_initializer_seed=4660u;
 uint32_t configured_source_seed=default_source_seed;
+bool native_initializer_enabled=false;
 constexpr uint32_t rng_profile_offset=0x00001234u;
 constexpr uint32_t invalid_profile_frame=0xffffffffu;
 bool rng_profile_enabled=false;
@@ -81,8 +87,59 @@ struct TransferDiagnostic {
     int32_t after_tick_drive, after_tick_source, after_tick_bank;
     int32_t after_audio_drive, after_audio_source, after_audio_bank;
 } transfer_diagnostic{};
+/* Read-only scheduling evidence.  This is separate from every existing ABI:
+ * it records the authored HSD process mask at scheduler entry and the callback
+ * count that the source actually produced for that step. */
+struct InitializerDiagnostic {
+    uint32_t valid, profile, seed, stage_kind, player_count;
+    uint32_t ports[2], controllers[2], fighter_kinds[2], colors[2], stocks[2];
+} initializer_diagnostic{};
+std::string initializer_json;
+uint32_t rng_profile_expected_callback_frame=invalid_profile_frame;
+struct EndingMaskDiagnostic {
+    uint64_t mask_before, scheduler_mask, mask_after;
+    uintptr_t mask_pointer;
+    uint32_t profile_link, expected_callback_delta, callback_delta;
+    uint32_t callback_count_before, callback_count_after;
+    uint32_t source_global_frame_before, source_global_frame_after;
+    uint32_t callback_frame;
+    uint32_t valid;
+} ending_mask_diagnostic{};
+std::string ending_mask_json;
 
 void require(bool value,const char* text){if(!value)throw std::runtime_error(text);}
+void observe_initializer(){
+    require(match!=nullptr,"Initializer diagnostic requires an active match");
+    const auto* start_ptr=match->diagnostic_start_data();
+    require(start_ptr!=nullptr,"Initializer diagnostic requires copied start data");
+    const auto& start=*start_ptr;
+    initializer_diagnostic={};
+    initializer_diagnostic.valid=1;
+    initializer_diagnostic.profile=native_initializer_enabled?1u:0u;
+    initializer_diagnostic.seed=configured_source_seed;
+    initializer_diagnostic.stage_kind=melee_web_snapshot_actual_stage_ground_kind();
+    initializer_diagnostic.player_count=2;
+    std::ostringstream out;
+    out<<"{\"valid\":"<<initializer_diagnostic.valid
+       <<",\"profile\":"<<initializer_diagnostic.profile
+       <<",\"seed\":"<<initializer_diagnostic.seed
+       <<",\"stage_kind\":"<<initializer_diagnostic.stage_kind
+       <<",\"player_count\":"<<initializer_diagnostic.player_count
+       <<",\"players\":[";
+    for(unsigned slot=0;slot<2;slot++){
+        const auto& source=start.players[slot];
+        initializer_diagnostic.ports[slot]=source.slot;
+        initializer_diagnostic.controllers[slot]=source.slot?source.slot-1u:slot;
+        initializer_diagnostic.fighter_kinds[slot]=static_cast<uint32_t>(source.ckind);
+        initializer_diagnostic.colors[slot]=source.color;
+        initializer_diagnostic.stocks[slot]=source.stocks;
+        if(slot)out<<',';
+        out<<"{\"port\":"<<static_cast<uint32_t>(source.slot)<<",\"controller\":"<<initializer_diagnostic.controllers[slot]
+           <<",\"fighter\":"<<static_cast<uint32_t>(source.ckind)
+           <<",\"color\":"<<static_cast<uint32_t>(source.color)<<",\"stocks\":"<<static_cast<uint32_t>(source.stocks)<<'}';
+    }
+    out<<"]}"; initializer_json=out.str();
+}
 template<class F> int checked(F function){
     error[0]='\0';
     try{function();return 1;}
@@ -140,9 +197,8 @@ void rng_profile_proc(HSD_GObj*){
     require(rng_profile_enabled,"RNG profile callback ran while disabled");
     require(seed_ptr!=nullptr,"RNG profile lost the original seed_ptr");
     const uint32_t frame=gm_801A4BB8();
-    if(rng_profile_observation.callback_count &&
-       frame!=rng_profile_observation.callback_frame+1u)
-        throw std::runtime_error("RNG profile callback frame is not monotonic");
+    require(frame==rng_profile_expected_callback_frame,
+            "RNG profile callback frame differs from the source pre-step clock");
     *seed_ptr=slippi_rng_profile_sync_seed(frame,rng_profile_offset);
     rng_profile_observation.callback_count++;
     rng_profile_observation.callback_frame=frame;
@@ -185,16 +241,53 @@ void release_rng_profile_gobj(){
     HSD_GObjPLink_80390228(rng_profile_gobj);
     rng_profile_gobj=nullptr;
 }
+uint64_t scheduler_process_mask(){
+    require(HSD_GObjLibInitData.unk_2!=nullptr,"Source scheduler process-mask pointer is missing");
+    return static_cast<uint64_t>(*HSD_GObjLibInitData.unk_2);
+}
+uint32_t expected_rng_profile_callbacks(uint64_t mask_before){
+    if(!rng_profile_enabled)return 0;
+    require(rng_profile_gobj!=nullptr,"RNG profile GObj ownership was lost before scheduler mask check");
+    require(rng_profile_gobj->proc!=nullptr &&
+            rng_profile_gobj->classifier==HSD_GOBJ_CLASS_FIGHTER &&
+            rng_profile_gobj->p_priority==0,
+            "RNG profile GObj metadata is invalid before scheduler mask check");
+    const unsigned link=rng_profile_gobj->p_link;
+    require(link<64u,"RNG profile process link is outside the authored mask width");
+    /* The authored scheduler invokes a process only when this bit is clear. */
+    return (mask_before&(uint64_t(1)<<link))==0u?1u:0u;
+}
 void step_native(const PADStatus pads[4]){
     transfer_diagnostic.sample=match->source_frames();
     capture_transfer_status(transfer_diagnostic.before_tick_drive,
         transfer_diagnostic.before_tick_source,transfer_diagnostic.before_tick_bank);
     const uint32_t callback_count_before=rng_profile_observation.callback_count;
     const uint32_t source_global_frame_before=rng_profile_enabled?gm_801A4BB8():0;
+    const uint64_t process_mask_before=scheduler_process_mask();
+    ending_mask_diagnostic={process_mask_before,0,0,
+        reinterpret_cast<uintptr_t>(HSD_GObjLibInitData.unk_2),
+        rng_profile_gobj?static_cast<uint32_t>(rng_profile_gobj->p_link):0xffffffffu,
+        0,0,callback_count_before,0,
+        source_global_frame_before,0,invalid_profile_frame,1};
+    rng_profile_expected_callback_frame=source_global_frame_before;
     match->tick(pads);
-    if(rng_profile_enabled){
-        require(rng_profile_observation.callback_count==callback_count_before+1u,
-                "RNG profile callback was skipped or repeated");
+    const uint32_t callback_count_after=rng_profile_observation.callback_count;
+    const uint32_t callback_delta=callback_count_after-callback_count_before;
+    const uint64_t process_mask_after=scheduler_process_mask();
+    /* source_clock_pre publishes the current scheduler mask before HSD
+     * dispatch; use the post-tick value, which is the prepared mask after the
+     * source prelude, rather than treating the prior tick's value as current. */
+    const uint32_t expected_callback_delta=expected_rng_profile_callbacks(process_mask_after);
+    ending_mask_diagnostic.scheduler_mask=process_mask_after;
+    ending_mask_diagnostic.mask_after=process_mask_after;
+    ending_mask_diagnostic.expected_callback_delta=expected_callback_delta;
+    ending_mask_diagnostic.callback_count_after=callback_count_after;
+    ending_mask_diagnostic.callback_delta=callback_delta;
+    ending_mask_diagnostic.source_global_frame_after=rng_profile_enabled?gm_801A4BB8():0;
+    ending_mask_diagnostic.callback_frame=rng_profile_observation.callback_frame;
+    require(callback_delta==expected_callback_delta,
+            "RNG profile callback count differs from the prepared process mask");
+    if(expected_callback_delta){
         require(rng_profile_observation.callback_frame==source_global_frame_before,
                 "RNG profile callback frame differs from the source pre-step clock");
     }
@@ -213,15 +306,23 @@ void step_native(const PADStatus pads[4]){
 
 extern "C" {
 EMSCRIPTEN_KEEPALIVE const char* melee_web_snapshot_error(){return error;}
-EMSCRIPTEN_KEEPALIVE const char* melee_web_snapshot_source_identity(){return MELEE_WEB_SNAPSHOT_PROBE_SHA256;}
+EMSCRIPTEN_KEEPALIVE const char* melee_web_snapshot_source_identity(){
+    return MELEE_WEB_SNAPSHOT_PROBE_SHA256;
+}
+EMSCRIPTEN_KEEPALIVE const char* melee_web_snapshot_stage_kind_bridge_identity(){return MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256;}
 EMSCRIPTEN_KEEPALIVE const char* melee_web_snapshot_rng_profile_identity(){return MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256;}
 EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_configure_rng_profile(uint32_t offset){
     if(attempted){std::snprintf(error,sizeof(error),"RNG profile must be configured before one-shot init");return 0;}
     if(offset!=rng_profile_offset){std::snprintf(error,sizeof(error),"RNG profile offset must be exactly 0x1234");return 0;}
     rng_profile_enabled=true;rng_profile_observation={1,offset,0,invalid_profile_frame,0,0,0,0};error[0]='\0';return 1;
 }
+EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_configure_native_initializer(){
+    if(attempted){std::snprintf(error,sizeof(error),"Initializer profile must be configured before one-shot init");return 0;}
+    native_initializer_enabled=true;configured_source_seed=native_initializer_seed;error[0]='\0';return 1;
+}
 EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_configure_seed(uint32_t seed){
     if(attempted){std::snprintf(error,sizeof(error),"Snapshot seed must be configured before one-shot init");return 0;}
+    if(native_initializer_enabled && seed!=native_initializer_seed){std::snprintf(error,sizeof(error),"Native initializer seed is fixed at 4660");return 0;}
     configured_source_seed=seed;error[0]='\0';return 1;
 }
 EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_init(const char* root){
@@ -259,6 +360,10 @@ EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_init(const char* root){
         player.ckind=CKIND_MARIO;player.color=slot;player.stocks=4;
         player.rumble_enabled=1;
         selection.players[slot]={slot,4,slot,0};
+        if(native_initializer_enabled){
+            player.slot=slot+1;player.color=0;
+            selection.players[slot]={slot,4,0,0};
+        }
     }
     rng_profile_observation.constructor_requested_seed=configured_source_seed;
     if(rng_profile_enabled){
@@ -273,6 +378,7 @@ EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_init(const char* root){
         match=std::make_unique<melee_web::GameplayMatchSession>(files,selection);
     }
     observe();
+    observe_initializer();
     });
     if(!result){
         char init_error[sizeof(error)]{};
@@ -307,7 +413,7 @@ EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_step(unsigned sample){return checked
     canonicalize_input(pads);step_native(pads);
 });}
 EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_step_raw(){return checked([&]{
-    require(match&&!match->complete()&&!match->paused(),"Snapshot fixture is not an active match");
+    require(match&&!match->complete(),"Snapshot fixture is not an active match");
     PADStatus pads[4]{};decode_input(pads);canonicalize_input(pads);step_native(pads);
 });}
 EMSCRIPTEN_KEEPALIVE int melee_web_snapshot_quiescent(){return checked([&]{
@@ -320,6 +426,29 @@ EMSCRIPTEN_KEEPALIVE unsigned melee_web_snapshot_rng_profile_observation_size(){
 EMSCRIPTEN_KEEPALIVE unsigned melee_web_snapshot_observation_size(){return sizeof(observation);}
 EMSCRIPTEN_KEEPALIVE const void* melee_web_snapshot_transfer_diagnostic(){return &transfer_diagnostic;}
 EMSCRIPTEN_KEEPALIVE unsigned melee_web_snapshot_transfer_diagnostic_size(){return sizeof(transfer_diagnostic);}
+EMSCRIPTEN_KEEPALIVE const void* melee_web_snapshot_initializer_diagnostic(){return &initializer_diagnostic;}
+EMSCRIPTEN_KEEPALIVE unsigned melee_web_snapshot_initializer_diagnostic_size(){return sizeof(initializer_diagnostic);}
+EMSCRIPTEN_KEEPALIVE const char* melee_web_snapshot_initializer_json(){return initializer_json.c_str();}
+EMSCRIPTEN_KEEPALIVE const char* melee_web_snapshot_ending_mask_diagnostic(){
+    std::ostringstream out;
+    // uint64_t masks and the pointer are quoted decimal strings so JSON.parse
+    // cannot round them through an IEEE-754 Number before the JS BigInt guard.
+    out<<"{\"valid\":"<<ending_mask_diagnostic.valid
+       <<",\"mask_before\":\""<<ending_mask_diagnostic.mask_before<<"\""
+       <<",\"scheduler_mask\":\""<<ending_mask_diagnostic.scheduler_mask<<"\""
+       <<",\"mask_after\":\""<<ending_mask_diagnostic.mask_after<<"\""
+       <<",\"mask_pointer\":\""<<ending_mask_diagnostic.mask_pointer<<"\""
+       <<",\"profile_link\":"<<ending_mask_diagnostic.profile_link
+       <<",\"expected_callback_delta\":"<<ending_mask_diagnostic.expected_callback_delta
+       <<",\"callback_delta\":"<<ending_mask_diagnostic.callback_delta
+       <<",\"callback_count_before\":"<<ending_mask_diagnostic.callback_count_before
+       <<",\"callback_count_after\":"<<ending_mask_diagnostic.callback_count_after
+       <<",\"source_global_frame_before\":"<<ending_mask_diagnostic.source_global_frame_before
+       <<",\"source_global_frame_after\":"<<ending_mask_diagnostic.source_global_frame_after
+       <<",\"callback_frame\":"<<ending_mask_diagnostic.callback_frame<<"}";
+    ending_mask_json=out.str();
+    return ending_mask_json.c_str();
+}
 EMSCRIPTEN_KEEPALIVE const float* melee_web_snapshot_pcm(){return pcm.data();}
 EMSCRIPTEN_KEEPALIVE unsigned melee_web_snapshot_pcm_size(){return sizeof(pcm);}
 EMSCRIPTEN_KEEPALIVE const uint8_t* melee_web_snapshot_input(){return input_bytes.data();}
