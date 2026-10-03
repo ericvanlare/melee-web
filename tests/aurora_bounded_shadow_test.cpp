@@ -2,6 +2,7 @@
 // ByteBuffer extracted verbatim from the patched internal.hpp.
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <csignal>
 #include <cstdint>
 #include <cstdio>
