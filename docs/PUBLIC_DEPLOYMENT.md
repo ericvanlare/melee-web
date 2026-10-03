@@ -35,7 +35,7 @@ and production at
 The exact audited bytes passed HTTP verification and all ten public browser
 checks on both production origins. The separately frozen audio-enabled
 development Release passes the approved replacement holdout gate; its exact
-[state/timer and performance scope](CURRENT_RUNTIME_HOLDOUTS_20260919.md) does
+[state/timer and performance scope](history/CURRENT_RUNTIME_HOLDOUTS_20260919.md) does
 not establish public full-match, original draw-cadence, live-input, pixel or PCM
 admission. The [September 19 release receipt](evidence/public-marth-pipeline-release-v1.json)
 records identity, rollback and scoped verification. The preceding
@@ -74,7 +74,7 @@ are active with SSL enabled. The two-entry `webmelee_canonical_hosts` list is
 attached to the **enabled** rule `WebMelee canonical hostnames`. The apex,
 redirects, missing routes and unchanged preview hosts passed external checks.
 Always Use HTTPS is enabled and SSL mode remains Full. See the
-[final alpha evidence](PUBLIC_ALPHA_VALIDATION.md) for the exact runtime,
+[final alpha evidence](history/PUBLIC_ALPHA_VALIDATION.md) for the exact runtime,
 manifest, limitations and measured resolver coverage.
 
 ## Build, audit and preview

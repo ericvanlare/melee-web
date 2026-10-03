@@ -167,7 +167,7 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/CAPTAIN_PORT_NOTES.md",
+        "docs/content/CAPTAIN_PORT_NOTES.md",
         "docs/evidence/captain-development-v1.json"
       ],
       "next_step": "Native lifecycles and scoped cold/warm 30-case browser action sweeps pass. Complete independent original comparison and the remaining interaction, item, costume and full-fighter gates.",
@@ -198,7 +198,7 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/DONKEY_KONG_PORT_NOTES.md",
+        "docs/content/DONKEY_KONG_PORT_NOTES.md",
         "docs/evidence/full-game-checkpoint-donkey-v1.json",
         "docs/evidence/production-checkpoint-20260920-v1.json"
       ],
@@ -228,7 +228,7 @@
         "Independent browser and original comparison covers this fighter before acceptance."
       ],
       "evidence": [
-        "docs/FOX_PORT_NOTES.md",
+        "docs/content/FOX_PORT_NOTES.md",
         "docs/REPLAY_CORPUS.md",
         "docs/ADDING_CHARACTERS.md"
       ],
@@ -317,7 +317,7 @@
         "Independent browser and original comparison covers this fighter before acceptance."
       ],
       "evidence": [
-        "docs/BOWSER_PORT_NOTES.md",
+        "docs/content/BOWSER_PORT_NOTES.md",
         "docs/evidence/full-game-checkpoint-koopa-v1.json",
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md"
@@ -348,7 +348,7 @@
         "Independent browser and original comparison covers this fighter before acceptance."
       ],
       "evidence": [
-        "docs/LINK_PORT_NOTES.md",
+        "docs/content/LINK_PORT_NOTES.md",
         "docs/evidence/link-young-link-replay-v1.json",
         "docs/ADDING_CHARACTERS.md"
       ],
@@ -380,7 +380,7 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/LUIGI_PORT_NOTES.md"
+        "docs/content/LUIGI_PORT_NOTES.md"
       ],
       "next_step": "Add independent original comparison and remaining move/interaction/lifecycle coverage. Native costumes and both player orders pass; refreshed 30-case cold/warm browser sweeps after the shared light correction pass 10,400 frames with zero hard failures. Earlier discovery failures remain retained.",
       "issue": null
@@ -438,7 +438,7 @@
         "Independent browser and original comparison covers this fighter before acceptance."
       ],
       "evidence": [
-        "docs/MARTH_PORT_NOTES.md",
+        "docs/content/MARTH_PORT_NOTES.md",
         "docs/REPLAY_CORPUS.md",
         "docs/ADDING_CHARACTERS.md"
       ],
@@ -500,7 +500,7 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/NESS_PORT_NOTES.md"
+        "docs/content/NESS_PORT_NOTES.md"
       ],
       "next_step": "Browser frames (checkpoint 4), CSS/SSS round trip, original comparison, pixels/PCM and performance admission; the PK Flash/Thunder interaction tails and a complete move/costume matrix need their own evidence.",
       "issue": null
@@ -530,7 +530,7 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/PEACH_PORT_NOTES.md"
+        "docs/content/PEACH_PORT_NOTES.md"
       ],
       "next_step": "Browser frames (checkpoint 4), CSS/SSS round trip, original comparison, pixels/PCM and performance admission; the Toad spore counter and float-aerial interactions need their own evidence.",
       "issue": null
@@ -560,7 +560,7 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/PIKACHU_PICHU_PORT_NOTES.md",
+        "docs/content/PIKACHU_PICHU_PORT_NOTES.md",
         "docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json"
       ],
       "next_step": "Add independent original comparison and remaining move/interaction/lifecycle coverage. Both player orders and all costumes pass native construction; forward fixtures drive Pikachu specials. Fresh cold/warm 30-case browser sweeps pass 11,200 frames with zero timing/audio/live-pipeline failures; discovery failures remain retained.",
@@ -625,7 +625,7 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/JIGGLYPUFF_PORT_NOTES.md"
+        "docs/content/JIGGLYPUFF_PORT_NOTES.md"
       ],
       "next_step": "Native five-costume lifetimes, crouch variation, five aerial jumps and ground/air special states pass. Original CSS/SSS reaches 31-case cold/warm action sweeps with 12,800 total source frames and zero hard action-window failures. Broaden authored move/costume and fighter/stage interactions, complete ordinary matches, and perform independent original, pixel, PCM and physical-input comparisons before acceptance.",
       "issue": null
@@ -801,7 +801,7 @@
         "Independent browser and original comparison covers this fighter before acceptance."
       ],
       "evidence": [
-        "docs/LINK_PORT_NOTES.md",
+        "docs/content/LINK_PORT_NOTES.md",
         "docs/evidence/link-young-link-replay-v1.json",
         "docs/ADDING_CHARACTERS.md"
       ],
@@ -831,7 +831,7 @@
         "Independent browser and original comparison covers this fighter before acceptance."
       ],
       "evidence": [
-        "docs/ROY_DR_MARIO_PORT_NOTES.md",
+        "docs/content/ROY_DR_MARIO_PORT_NOTES.md",
         "docs/evidence/roy-dr-mario-integrated-replay-v1.json",
         "docs/ADDING_CHARACTERS.md"
       ],
@@ -861,7 +861,7 @@
         "Independent browser and original comparison covers this fighter before acceptance."
       ],
       "evidence": [
-        "docs/ROY_DR_MARIO_PORT_NOTES.md",
+        "docs/content/ROY_DR_MARIO_PORT_NOTES.md",
         "docs/evidence/roy-dr-mario-integrated-replay-v1.json",
         "docs/ADDING_CHARACTERS.md"
       ],
@@ -894,7 +894,7 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/PIKACHU_PICHU_PORT_NOTES.md",
+        "docs/content/PIKACHU_PICHU_PORT_NOTES.md",
         "docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json"
       ],
       "next_step": "Add independent original comparison and remaining move/interaction/lifecycle coverage. Native forward fixtures observe jolt/Thunder lifetimes and source self-damage; reverse fixtures drive Mario. Fresh cold/warm 30-case browser sweeps pass 11,200 frames with zero timing/audio/live-pipeline failures; discovery failures remain retained.",
@@ -923,7 +923,7 @@
         "Independent browser and original comparison covers this fighter before acceptance."
       ],
       "evidence": [
-        "docs/GANONDORF_PORT_NOTES.md",
+        "docs/content/GANONDORF_PORT_NOTES.md",
         "docs/evidence/ganondorf-development-v1.json",
         "docs/evidence/ganondorf-original-reference-v1.json"
       ],
@@ -984,9 +984,9 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/LINK_PORT_NOTES.md",
-        "docs/MARTH_PORT_NOTES.md",
-        "docs/FOX_PORT_NOTES.md"
+        "docs/content/LINK_PORT_NOTES.md",
+        "docs/content/MARTH_PORT_NOTES.md",
+        "docs/content/FOX_PORT_NOTES.md"
       ],
       "next_step": "Turn the generated source costume registry into per-fighter inventory rows and add missing costume lifecycle and reference receipts.",
       "issue": null
@@ -1180,7 +1180,7 @@
       "evidence": [
         "docs/ADDING_STAGES.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/FOUNTAIN_OF_DREAMS_PORT_NOTES.md"
+        "docs/content/FOUNTAIN_OF_DREAMS_PORT_NOTES.md"
       ],
       "next_step": "Extend the passing cold/warm CSS/SSS, Ready and 30-frame browser entry into the full stage/action matrix and independent original comparison. Two 7,200-tick native stage lifetimes and repeated match lifecycles pass. Cold entry retains two browser long tasks; pixels, PCM, ordinary-input loops and full performance gates remain open.",
       "issue": null
@@ -1359,7 +1359,7 @@
         "Browser and independent original comparison cover this stage before acceptance."
       ],
       "evidence": [
-        "docs/YOSHIS_STORY_PORT_NOTES.md",
+        "docs/content/YOSHIS_STORY_PORT_NOTES.md",
         "docs/evidence/development-timing-20260919-v1.json",
         "docs/ADDING_STAGES.md"
       ],
@@ -1542,7 +1542,7 @@
       "evidence": [
         "docs/ADDING_STAGES.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/HYRULE_TEMPLE_PORT_NOTES.md",
+        "docs/content/HYRULE_TEMPLE_PORT_NOTES.md",
         "docs/evidence/hyrule-temple-development-v1.json"
       ],
       "next_step": "Native stage/match lifetimes and scoped cold/warm browser entry pass. Expand stage interactions, independent original comparison and the complete fighter action matrix; retain the cold startup long task.",
@@ -1962,7 +1962,7 @@
         "Browser and independent original comparison cover this stage before acceptance."
       ],
       "evidence": [
-        "docs/DREAM_LAND_PORT_NOTES.md",
+        "docs/content/DREAM_LAND_PORT_NOTES.md",
         "docs/evidence/development-timing-20260919-v1.json",
         "docs/ADDING_STAGES.md"
       ],
@@ -1995,7 +1995,7 @@
       "evidence": [
         "docs/ADDING_STAGES.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/YOSHIS_ISLAND_64_PORT_NOTES.md",
+        "docs/content/YOSHIS_ISLAND_64_PORT_NOTES.md",
         "docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json"
       ],
       "next_step": "Extend two 5,000-tick native scheduler/cloud/guest lifetimes and five entry-only match lifetimes into full combat and original drawn comparison. Fresh cold/warm CSS/SSS entry passes without resumes/gaps/audio underruns, retaining one 69 ms cold browser long task. Full stage performance, pixels, PCM and ordinary-input loops remain open.",
@@ -2124,8 +2124,8 @@
         "docs/ADDING_STAGES.md",
         "docs/evidence/roy-dr-mario-integrated-replay-v1.json",
         "docs/evidence/development-timing-20260919-v1.json",
-        "docs/YOSHIS_STORY_PORT_NOTES.md",
-        "docs/DREAM_LAND_PORT_NOTES.md"
+        "docs/content/YOSHIS_STORY_PORT_NOTES.md",
+        "docs/content/DREAM_LAND_PORT_NOTES.md"
       ],
       "next_step": "Split the four stage rows into stage-specific data, map, callback, collision, article, visual and acceptance features before expanding the stage roster.",
       "issue": null
@@ -2188,7 +2188,7 @@
       ],
       "evidence": [
         "docs/FIGHTER_RUNTIME.md",
-        "docs/LINK_PORT_NOTES.md",
+        "docs/content/LINK_PORT_NOTES.md",
         "docs/ADDING_STAGES.md",
         "docs/ACCURACY_CONTRACT.md"
       ],
@@ -2285,9 +2285,72 @@
       "evidence": [
         "docs/ACCURACY_CONTRACT.md",
         "docs/TRANSITION_EQUIVALENCE.md",
-        "docs/REFERENCE_CAPTURE_APP.md"
+        "docs/REFERENCE_CAPTURE_APP.md",
+        "docs/evidence/vs-rules-items-source-route-v1.json",
+        "docs/evidence/vs-rules-items-source-route-v2.json",
+        "docs/evidence/vs-team-battle-route-v1.json",
+        "docs/evidence/vs-team-battle-retail-boundary-reproducer-v1.json",
+        "docs/evidence/vs-rules-plus-timer-source-route-v1.json"
       ],
-      "next_step": "Enumerate rule fields from the source structs and menu mode callers, then add a source/retail/browsing receipt per options family.",
+      "next_step": "The rendered browser route covers original CSS Teams input, opposing two-player Team Battle setup, Rules Plus one-minute timer handoff, No Contest Results, and retained Rules/Items on CSS return. Retail Teams match comparison remains incomplete because the retained capture driver clicked the CSS Human/CPU toggle bounds; the reduced packet preserves that source boundary and corrected geometry decoder. The enclosing Rules Plus retail capture failed later and remains scoped to its retained first-match prefix. Capture bounded retail team-color/match and remaining Rules Plus options, then continue Training, item-family services, and source GCI persistence with independent original/browser evidence.",
+      "issue": null
+    },
+    {
+      "id": "menu-main-settings-rumble",
+      "category": "menus",
+      "title": "Original Main Settings > Rumble route and saved controller preference",
+      "implementation": "integrated",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/mn/mnmain.c",
+        "melee/mn/mnvibration.c",
+        "melee/mn/forward.h",
+        "melee/gm/gmmain_lib.c"
+      ],
+      "depends_on": [
+        "css-sss-and-menu-transitions",
+        "save-and-memory-card"
+      ],
+      "pass_criteria": [
+        "The original Main Settings > Rumble callbacks, authored menu IDs/assets, input gates, and B cancellation return through Settings and Main without replacing source menu state.",
+        "A changes the selected controller rumble value in live source SaveData; Personal autosave, repeated entry, GCI export, document reload, and owner teardown retain/release the correct state.",
+        "Retail source/menu observations and rendered-browser observations are recorded separately; unobserved audio, physical input, pixel, and performance claims remain open."
+      ],
+      "evidence": [
+        "docs/evidence/main-settings-rumble-route-v1.json",
+        "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md",
+        "docs/evidence/save-profile-dolphin-roundtrip-v1.json"
+      ],
+      "next_step": "Keep Rumble animation/audio and physical rumble evidence separate; continue the source-owned Main Settings graph with its next original page.",
+      "issue": null
+    },
+    {
+      "id": "menu-main-settings-display",
+      "category": "menus",
+      "title": "Original Main Settings > Display route and saved deflicker preference",
+      "implementation": "integrated",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/mn/mnmain.c",
+        "melee/mn/mndeflicker.c",
+        "melee/mn/mndeflicker.h",
+        "melee/mn/forward.h",
+        "melee/gm/gmmain_lib.c"
+      ],
+      "depends_on": [
+        "css-sss-and-menu-transitions",
+        "save-and-memory-card"
+      ],
+      "pass_criteria": [
+        "Original Main Settings callbacks, Display menu kind 21, authored assets, input gates and B cancellation preserve source menu selection across repeated entry.",
+        "A changes the source SaveData deflicker byte at offset 0x45D; Personal autosave, CSS return, GCI export and a supported match/Results/CSS return retain the same value.",
+        "Retail source transitions and rendered-browser route are reported separately; stage identity, pixel/audio equivalence, physical input and performance remain independent evidence gates."
+      ],
+      "evidence": [
+        "docs/evidence/main-settings-display-route-v1.json",
+        "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md"
+      ],
+      "next_step": "Extend the next original Main Settings page with its source SaveData fields and menu-owned assets; compare animation/audio and physical input separately.",
       "issue": null
     },
     {
@@ -2317,9 +2380,11 @@
       "evidence": [
         "docs/ACCURACY_CONTRACT.md",
         "docs/TRANSITION_EQUIVALENCE.md",
-        "docs/CONTROLLERS.md"
+        "docs/CONTROLLERS.md",
+        "docs/evidence/vs-rules-items-source-route-v1.json",
+        "docs/evidence/vs-rules-items-source-route-v2.json"
       ],
-      "next_step": "Decompose title, main menu, CSS, SSS, rules and name-entry screens into source mode rows and extend retail transition receipts beyond the current bounded route.",
+      "next_step": "Extend source and rendered-browser transition receipts beyond the bounded VS Rules/Items path to team/Rules Plus selection, name entry, and remaining original mode menus.",
       "issue": null
     },
     {
@@ -2632,7 +2697,7 @@
       ],
       "evidence": [
         "docs/ACCURACY_CONTRACT.md",
-        "docs/RENDERER_STARTUP_FIX.md",
+        "docs/history/RENDERER_STARTUP_FIX.md",
         "docs/PERFORMANCE.md"
       ],
       "next_step": "Split renderer acceptance into scene, fighter, stage, interface, effects and presentation rows and attach pixel comparison receipts.",

@@ -1,0 +1,159 @@
+{
+  "schema": "melee-web-vs-rules-items-source-route-v1",
+  "status": "retail_source_route_observed",
+  "scope": "Cold-boot retail Main -> VS -> Rules -> Items -> Rules -> CSS, followed by three original Final Destination CPU9 matches, natural Results, and CSS returns. This is source-state and source-navigation evidence; it is not pixel, PCM, physical-input, performance, or port-equivalence evidence.",
+  "source_capture": {
+    "capture_id": "melee-character-coverage-v10-source-20261002-r3",
+    "artifact_root_relative_to_agent_storage_runs": "vs-rules-items-source-route-20261002-20261002-081531-69c8c10f/original-v10-source",
+    "raw_observer": {
+      "file": "capture.mwro",
+      "bytes": 1786891673,
+      "sha256": "726143a207299e0b7a9d04674c1e5213eed3215a2a109b1c6e108d8d57cdc461",
+      "retained_as_hardlink_to_original": true
+    },
+    "source_consumed_controller_record": {
+      "file": "controller-input.mwri",
+      "bytes": 7489816,
+      "sha256": "692d58e4a3e63641d1073c4e27315bca429349b4cf15a7e09bb1f86710650dd2",
+      "complete": true,
+      "invalid": false,
+      "events": 187244
+    },
+    "input_intentions": {
+      "file": "input-intentions.jsonl",
+      "bytes": 88357,
+      "sha256": "5a9013fc9ba404986793e76c1eb1b7f3aaf52f498c7308d514bd873cb890b806"
+    },
+    "capture_report": {
+      "file": "report.json",
+      "bytes": 405931,
+      "sha256": "45ee9c1262c496f6c42d1464b0a28c71e8a13e24a03ad553b314a776fda93366",
+      "result": "three_match_source_capture_complete",
+      "observer_events": 214822,
+      "observer_completed": true,
+      "observer_invalid": false,
+      "audio_policy": "host output muted with DSP generation retained",
+      "renderer": "Null"
+    },
+    "observer_status": {
+      "file": "status.json",
+      "sha256": "f40dddb98d2cffedc63b8b679a53929a977e4bdc019b205d151b83c11ec606dd",
+      "completed": true,
+      "invalid": false,
+      "event_count": 214822,
+      "last_sequence": 214821
+    },
+    "input_status": {
+      "file": "input-status.json",
+      "sha256": "49ac322f3a7f3d91bcedfd6a2d8e342167cff11e3b2c07c4290d1199b5fd0f85",
+      "complete": true,
+      "invalid": false,
+      "events": 187244
+    },
+    "session_provenance": {
+      "file": "session-provenance.json",
+      "sha256": "a43b5bcd75359c37aabc98e9531e010583b6562273595f83b5385adb44823afb",
+      "source_consumed_workload": "pass",
+      "port_equivalence": "not_evaluated",
+      "pixels": "not_evaluated",
+      "audio_pcm": "not_evaluated",
+      "performance": "not_evaluated"
+    }
+  },
+  "identities": {
+    "disc": {
+      "revision": "GALE01 Rev. 2",
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "dol": {
+      "sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+      "sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+    },
+    "retail_source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "dolphin": {
+      "commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+      "version": "2606a-dirty",
+      "cpu": "JITARM64",
+      "binary_sha256": "938378fa93337d4615721fd1971d0612117d9c0aa1c89963efbaf4ecdf418f2f",
+      "build_manifest_sha256": "1f91a8e3ef4eab4027627293c851cdc8bd70b8c823b137007b177b5f783c0406",
+      "observer_guest_memory_writes": false
+    },
+    "isolated_profile": {
+      "gci_sha256": "39171db67ec4e6b85837107f7cd7e1231402e239ec7f74bfc9efa35d5a2879ce",
+      "sram_sha256": "49dee06d38cb76aaa8f90bfb2e937face180243d1a170078b4e13226b012f82c"
+    }
+  },
+  "observed_menu_route": {
+    "scene_kind": "GS_MENU (1)",
+    "menu_kinds": {
+      "main": 0,
+      "versus": 2,
+      "rules": 13,
+      "items": 16
+    },
+    "input_transport": "Ordinary controller PAD through the isolated Dolphin pipe; no guest-memory or register writes.",
+    "source_menu_flow_samples": [
+      {"sequence": 574, "menu_kind": 0, "hovered": 0, "confirmed": 0},
+      {"sequence": 668, "menu_kind": 0, "hovered": 1, "confirmed": 0},
+      {"sequence": 678, "menu_kind": 2, "hovered": 0, "confirmed": 0},
+      {"sequence": 790, "menu_kind": 2, "hovered": 3, "confirmed": 0},
+      {"sequence": 836, "menu_kind": 13, "hovered": 0, "confirmed": 0},
+      {"sequence": 928, "menu_kind": 13, "hovered": 1, "confirmed": 3},
+      {"sequence": 974, "menu_kind": 13, "hovered": 1, "confirmed": 4},
+      {"sequence": 1166, "menu_kind": 13, "hovered": 5, "confirmed": 0},
+      {"sequence": 1216, "menu_kind": 16, "hovered": 0, "confirmed": 1},
+      {"sequence": 1262, "menu_kind": 16, "hovered": 31, "confirmed": 3},
+      {"sequence": 1312, "menu_kind": 16, "hovered": 31, "confirmed": 2},
+      {"sequence": 1358, "menu_kind": 16, "hovered": 31, "confirmed": 1},
+      {"sequence": 1404, "menu_kind": 16, "hovered": 31, "confirmed": 0},
+      {"sequence": 1452, "menu_kind": 13, "hovered": 5, "confirmed": 0}
+    ],
+    "rules_edits": {
+      "stock_count": "3 -> 4 through original Rules input",
+      "item_frequency": "source Items frequency row confirmed 3 -> 2 -> 1 -> 0 via D-right; source commit stores x21 - 1, and all three StartMeleeData records contain -1 (None).",
+      "item_mask": "ffffffffffffffff for all three matches; this capture does not exercise an item-mask toggle."
+    },
+    "match_setups": [
+      {"match_index": 0, "entry_sequence": 3979, "stage": 32, "stocks": 4, "item_frequency": -1, "item_mask_hex": "ffffffffffffffff", "teams": false},
+      {"match_index": 1, "entry_sequence": 68792, "stage": 32, "stocks": 4, "item_frequency": -1, "item_mask_hex": "ffffffffffffffff", "teams": false},
+      {"match_index": 2, "entry_sequence": 146768, "stage": 32, "stocks": 4, "item_frequency": -1, "item_mask_hex": "ffffffffffffffff", "teams": false}
+    ],
+    "match_end_route": [
+      {"match_index": 0, "natural_results_sequence": 65250, "results_exit_sequence": 66523, "return_css_sequence": 66578},
+      {"match_index": 1, "natural_results_sequence": 143253, "results_exit_sequence": 144529, "return_css_sequence": 144585},
+      {"match_index": 2, "natural_results_sequence": 213500, "results_exit_sequence": 214764, "return_css_sequence": 214820}
+    ],
+    "final_scene_kind": "GS_CSS (8)",
+    "final_scene_routing_hex": "020201000400"
+  },
+  "source_callbacks_and_assets": {
+    "main_versus_entry": "mn_8022DB10 selects SEL_MAIN_VS and opens MenuKind VS (2); mn_8022D594 selects SEL_VS_MELEE and hands off to GM_VS.",
+    "rules_menu": "fn_8022F538 owns Rules input; selection 5 enters Items through mnItemSw_802358C0; Rules Start commits the original GameRules before GM_VS handoff.",
+    "items_menu": "fn_80233E10 owns Items A/B/Start and directional input; mnItemSw_CommitItems stores each authored item flag and item_freq = x21 - 1; B commits and returns to Rules through mn_8023164C.",
+    "input_semantics": "The captured controller pipe used ordinary D-pad, A, B, and Start events. The Items frequency row was reached at source selection 31 and changed only by D-right; no direct menu selection or guest-memory write occurred.",
+    "menu_assets": [
+      "MnMaAll.usd: MenMainConRl_Top, MenMainCursorRl_Top, MenMainNmRl_Top, MenMainConIs_Top, MenMainCursorIs_Top",
+      "MnSlChr.usd and SdSlChr.usd: SIS_SelCharData for non-Japanese language settings",
+      "MnSlMap.usd: source stage-select map menu data",
+      "SdMenu.usd:SIS_MenuData for the captured US language; SdToy.dat:SIS_ToyData"
+    ],
+    "asset_visual_scope": "Retail scene assets were loaded by the source; this capture used Null video and does not establish rendered visual equivalence.",
+    "save_effect_scope": "The source Items route changed GameRules in the session and the resulting StartMeleeData. A source memory-card write or persisted item-preference diff is not claimed by this capture.",
+    "remaining_services": [
+      "Item-mask A toggle and the corresponding single-bit save diff",
+      "Item spawning and all item-family runtime services",
+      "VS teams and the remaining Rules Plus options",
+      "Retail pixel/audio comparison, physical PAD, and performance"
+    ]
+  },
+  "evidence_claims": {
+    "source_state_and_navigation": "observed",
+    "rendered_retail_visuals": "not_observed; the retained Dolphin capture used Null video",
+    "rendered_browser_visuals": "pending separate headless Chrome route capture",
+    "audio_equivalence": "not_run; host output was muted and DSP generation was retained",
+    "physical_input": "not_run; controller pipe only",
+    "performance": "not_run",
+    "source_memory_card_item_preference_persistence": "not_claimed",
+    "item_mask_toggle": "not_exercised"
+  }
+}

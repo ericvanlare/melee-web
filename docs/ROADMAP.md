@@ -84,5 +84,5 @@ The earlier Results-skipping Mario/Final Destination route and silent-alpha chec
 remain historical evidence for their original scopes. Merged Results and
 production-audio work provide implementation and package evidence; they do not
 by themselves establish the full route, general equivalence or full-game
-fidelity. [NEXT_PHASE](NEXT_PHASE.md) preserves the early menu integration notes
+fidelity. [NEXT_PHASE](history/NEXT_PHASE.md) preserves the early menu integration notes
 and is not a second work queue.

@@ -5,6 +5,9 @@ the detailed contracts, not a second status report. `STATUS.md` is the current
 evidence index; follow its links for measurements, retained failures and exact
 receipts instead of copying numbers into this page.
 
+The [documentation map](README.md) lists every document by purpose and says
+where new documents belong.
+
 For the relationship between the vanilla port, accuracy tooling and later
 Slippi/online projects, read [project direction](PROJECT_DIRECTION.md). It records
 strategy; the roadmap and boundary documents still govern implementation order
@@ -144,8 +147,8 @@ experiment, exact pass criteria, exclusions, existing solutions checked and
 stopping rule in the issue. After two experiments at one boundary, reduce the
 reproducer or request a bounded review before another long run. Reference the
 acceptance issue from component PRs without auto-closing it until all its gates
-pass. Keep new evidence in STATUS and scoped reports rather than copying it into
-the roadmap or another status document.
+pass. Keep new evidence in a new `docs/status/` entry and scoped reports rather
+than copying it into the roadmap or another status document.
 
 For code, run focused boundary checks, the full suite, the affected build and a
 diff review. For documentation, validate local links and paths and inspect the

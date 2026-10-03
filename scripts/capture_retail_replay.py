@@ -563,7 +563,10 @@ def dolphin_command(dolphin: Path, user: Path, snapshot: Path, disc: Path,
     if cpu not in CPU_PROFILES:
         raise CaptureRunnerError("Unsupported reference CPU profile")
     return [
-        str(dolphin), "-u", str(user), "-b", "-d", "-s", str(snapshot), "-e", str(disc),
+        # The pinned capture executable is dolphin-emu-nogui. Its CLI omits the
+        # GUI-only --batch and --debugger switches; a nonempty GDBSocket in
+        # the owned Dolphin.ini starts the remote stub directly.
+        str(dolphin), "-u", str(user), "-s", str(snapshot), "-e", str(disc),
         "-C", "Dolphin.Input.BackgroundInput=True",
         "-C", "Dolphin.Display.Fullscreen=False",
         *dolphin_audio_options(audible=audible),

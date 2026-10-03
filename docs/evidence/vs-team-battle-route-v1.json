@@ -1,0 +1,115 @@
+{
+  "schema": "melee-web-vs-team-battle-route-v1",
+  "scope": "Original source CSS Teams selection -> SSS cancellation and re-entry -> two-player Team Battle -> No Contest Results -> original CSS with VS Rules and Items retained. Only two active players with opposing authored team IDs are admitted by this slice.",
+  "identity": {
+    "implementation_base_origin_main": "473e97c41633043562bc5015e1add630d23b70b3",
+    "implementation_branch": "codex/vs-team-battle-route",
+    "game": "GALE01 Rev. 2",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+  },
+  "source_state_and_navigation": {
+    "status": "passed_in_browser; retail_route_incomplete",
+    "source_scenes": "Original GM_MENU=1 / GS_MENU=1 handles Main, VS, Rules and Items (MenuKind 0, 2, 13, 16). GM_VS=2 transitions through GS_CSS=8, GS_SSS=9, GS_RESULTS=5.",
+    "callbacks": [
+      "mn_8022DB10: SEL_MAIN_VS enters the original VS menu.",
+      "mn_8022D594: SEL_VS_RULES calls mn_80231714 for original Rules.",
+      "fn_8022F538: Rules Start commits GameRules and requests GM_VS; Rules selection 5 opens Items.",
+      "fn_80233E10 and fn_80234C24: original Items navigation, row edit, and frequency commit.",
+      "mnCharSel_CursorThink: PAD A toggles StartMeleeData.rules.is_teams at the source Teams control.",
+      "cycleTeam in mncharsel.c: PAD A assigns one of three authored team colors to the selected CSS door.",
+      "mnCharSel_Scene_OnFrame and mnStageSel source input: CSS Start enters SSS, SSS B returns to CSS, and SSS confirmation starts the match.",
+      "Original match pause LR+Start+A creates No Contest; gm_Scene_Results_OnEnter runs fn_801771C0 to select the source team winner representative."
+    ],
+    "runtime_boundary": "VS match preparation accepts exactly two active players when Teams is enabled, each with team ID 0..2 and with different team IDs. Intermediate CSS may show both players on the same team while the original cursor configures the second door; match admission and CSS exit require opposing teams. Three/four-player team rosters, other VS rule families, and item spawning remain unsupported.",
+    "route_menu_assets": [
+      "MnSlChr.usd and SdSlChr.usd:SIS_SelCharData (non-Japanese saved language; Japanese uses .dat)",
+      "MnSlMap.usd (non-Japanese saved language; Japanese uses .dat)",
+      "MnMaAll.usd:MenMainConRl_Top/MenMainCursorRl_Top/MenMainNmRl_Top/MenMainConIs_Top/MenMainCursorIs_Top",
+      "SdMenu.usd:SIS_MenuData for saved US language; SdMenu.dat for other saved languages; SdToy.dat:SIS_ToyData"
+    ],
+    "save_effect": "The route uses an isolated Everything-unlocked browser context. It changes in-memory source Rules/Items and team setup, verifies those settings after Results/CSS return, and verifies Eject/reimport cleanup. It makes no source GCI persistence or Personal-profile autosave claim."
+  },
+  "browser": {
+    "status": "passed",
+    "runner": "Installed Google Chrome 154.0.8037.97 through scripts/browser_tools.mjs and the retained Playwright harness; 1280x960 headless browser, B0XX keyboard PAD routed into original source input, second physical player/controller off.",
+    "runtime_identity": "The browser route ran against this branch's runtime implementation. The later Release build verified the same unchanged runtime C/C++ source; intervening edits were capture harness and evidence files.",
+    "runtime_source_sha256": {
+      "patches/melee-gameplay.patch": "3582e1470f6cd7b02cbfc1cc6aa3120d8bed536e79f645b2b5d10d13602c05aa",
+      "src/gameplay_menu.c": "1cf7848628e69e49cbfa4591bbb3d886271219ef220b193c61f30342fd583eb3",
+      "src/gameplay_match_rules.c": "9b2917e804e1bcaca1e5990b341ad1558f001c532b95af93a35bfb68146bcfa2",
+      "src/gameplay_menu_browser.cpp": "38c0f3218ad666282f9562b31a7e63745bcdda7780d4164a58c7e1b6ddb7930e",
+      "src/gameplay_menu_host.c": "c67d5b02668bc09a3805f4682b548d7554da9f07d9ba6ab166ea52eb7adeb2f0",
+      "src/gameplay_menu_host.h": "681531945a9e495d4eccef5f9dd0b32954d3c95b04dd4386c313d3d61cb48f22",
+      "src/gameplay_results_session.cpp": "4e915890145818c103b3624b639f3ddba148d3762f60046ffbc3fb710f54bc9f"
+    },
+    "save_mode": "Fresh isolated Everything-unlocked browser context; Personal autosave not exercised.",
+    "run_root_relative_to_agent_storage": "melee-web/runs/vs-team-battle-browser-route-20261002-130833-576eaf9b/team-battle-attempt-07-full-source",
+    "report": "report.json",
+    "report_sha256": "cfaec7fe9916d232d4d5940016edb2c3f22fc7a4854ca2d867abb7bd557021d5",
+    "route": "CSS -> original Main/VS/Rules/Items -> CSS -> Teams on and P1/P2 teams 0/1 -> SSS B cancellation -> SSS re-entry and second cancellation -> SSS re-entry -> live 3-stock Final Destination Team Battle -> No Contest -> Results -> CSS with rules/items retained -> Eject/reimport.",
+    "match_source_values": {
+      "players": ["P1 Human Mario", "P2 level-1 CPU Mario"],
+      "team_ids": [0, 1],
+      "stocks": 3,
+      "stage_id": 32,
+      "item_frequency": -1,
+      "item_mask_hex": "fffffffeffffffff",
+      "terminal_outcome": "No Contest",
+      "terminal_winners": [0, 1]
+    },
+    "claims": {
+      "rendered_browser": "passed; retained screenshots show original rendered CSS, live Team match, Results, and CSS return.",
+      "source_state_and_navigation": "passed; read-only source observers and source-routed PAD transitions record menu state, opposing team IDs, match initialization, Results, retained settings, and teardown.",
+      "retail_source_comparison": "not completed; the single retained retail route stopped in CSS before SSS and did not produce a Team match.",
+      "visual_equivalence": "not run; browser screenshots have no matched retail pixel comparison.",
+      "audio_equivalence": "not run; host output was muted while source DSP/audio processing remained enabled.",
+      "physical_input": "not run; browser PAD keyboard route only.",
+      "performance": "not run; this was a functional route capture."
+    },
+    "screenshots": {
+      "11-css-team-battle-configured.png": "3e18686e6adb9ba07f5835cc578c50a0bed1a0a0924e3f562357be3e79c9af2b",
+      "16-live-two-player-team-match.png": "3aac282a6c4489691d7725cd949c2396e17055663042ff1b03b9d0c0e56f36a9",
+      "17-original-team-results.png": "4285c02d909a9c46d29e30b107bef64f5ffa3f44c930ff09037b8ea16fe7d9b8",
+      "18-css-after-team-results-settings-retained.png": "638ec5d9ca3fa1ef1b9f978e0b39e6311c31569c9cb64d4ffbecbd9e30bc2bde"
+    }
+  },
+  "retail_capture": {
+    "status": "incomplete_before_match",
+    "attempt": "melee-web-vs-team-battle-20261002-r2",
+    "artifact_root_relative_to_agent_storage": "melee-web/checkouts/vs-rules-items-route-20261002-005842-59531205/work/vs-team-battle-retail-observer-20261002-r2",
+    "capture_report_sha256": "d483963c559d6da31fc2f8a9cf6a24a6ca9ed623a0ab8d5d67c894f1e61d3c7c",
+    "observer_stream_sha256": "b0373641024a4e08cd06075722bfd1037e100d5de2e953dff5c5324a498e7fe7",
+    "input_stream_sha256": "a35588a3e65084890ed7d999f04aa4693543070f3e47eee52753c7cb8e48cf85",
+    "result": "Cold boot reached Main/VS/Rules/Items and CSS; P1 Human Mario and P2 CPU Mario were selected and Teams was toggled on. The harness activated P2's Human/CPU toggle instead of its team-color control, closing P2. No SSS, match setup, Results, or CSS return was captured.",
+    "reduced_failure_packet": "docs/evidence/vs-team-battle-retail-boundary-reproducer-v1.json",
+    "correction": "The harness now reads CSSDoor team-color bounds at offsets 0x1C/0x20 independently from Human/CPU toggle bounds at 0x14/0x18. Focused tests validate the source geometry decode; the corrected interaction has not been rerun in retail.",
+    "retail_save": "Copied isolated Dolphin profile with SaveDataWritable=False; no user save was modified."
+  },
+  "validation": {
+    "focused_checks": {
+      "command": "python3 -m py_compile tools/recorded_session_12_character_capture.py scripts/capture_allocation_history.py tools/retail_allocation_menu.py; python3 -m unittest tests.test_recorded_session_12_character_capture tests.test_capture_allocation_menu_route tests.test_retail_allocation_menu -v; node --check tests/vs_rules_item_menu_browser_test.mjs; git diff --check",
+      "result": "38 tests passed; Python compile, Node syntax, and diff checks passed.",
+      "log_relative_to_agent_storage": "melee-web/runs/vs-team-battle-browser-route-20261002-130833-576eaf9b/team-battle-attempt-07-full-source/focused-tests-final.log",
+      "log_sha256": "a8452f9ed95e659874db0f3acbe4aa96a0129c7a39d96c103532d71afc1da997"
+    },
+    "full_unit_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "result": "1,742 tests passed, 133 skipped, exit 0; 304.843 seconds.",
+      "log_relative_to_agent_storage": "melee-web/runs/vs-team-battle-browser-route-20261002-130833-576eaf9b/team-battle-attempt-07-full-source/full-suite-final.log",
+      "log_sha256": "4de3033742ed59b3a7efb340eb16fe1da238760a7c1933dfc5a505d2141353c2"
+    },
+    "release_runtime_build": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --configuration Release --target runtime",
+      "result": "passed",
+      "artifacts_sha256": {
+        "build/browser-release/runtime.html": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d",
+        "build/browser-release/runtime-development.mjs": "ecf35dd893bedf1ff6d0539f1ebce42aa5a3c9d389b9cee682c0b46b5101e397",
+        "build/browser-release/gameplay_menu_browser.js": "1afaa837aff7d4cda4bbd56060020f0aaee5ee4f13b8b20401f37e730e28af01",
+        "build/browser-release/gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+        "build/browser-release/gameplay_menu_browser.wasm": "99685564f73b96eba111a8f8ff0d447bd26136a473b35866289468db954ead19"
+      }
+    },
+    "browser_harness": "node --check tests/vs_rules_item_menu_browser_test.mjs passed; full Team Battle browser route passed and is retained in the report above."
+  }
+}

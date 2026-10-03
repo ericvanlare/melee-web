@@ -32,6 +32,27 @@ typedef struct MeleeWebMenuMatchSelection {
      * mode/callback and 99-stock payload separate from ordinary VS rules. */
     uint8_t opening_demo;
 } MeleeWebMenuMatchSelection;
+typedef struct MeleeWebMenuSourceObservation {
+    int source_scene;
+    int menu_kind;
+    int previous_menu_kind;
+    int hovered_selection;
+    int confirmed_selection;
+    uint64_t menu_buttons;
+    int item_input_locked;
+    int rule_mode;
+    int stock_count;
+    int time_limit;
+    int stock_time_limit;
+    int handicap;
+    int damage_ratio;
+    int friendly_fire;
+    int item_frequency;
+    uint64_t item_mask;
+    int css_setup_valid;
+    int css_is_teams;
+    int css_player_teams[2];
+} MeleeWebMenuSourceObservation;
 typedef struct MeleeWebOpeningPreview {
     uint32_t characters[4];
     uint32_t costumes[4];
@@ -61,7 +82,7 @@ int melee_web_menu_host_initialize_profile_baseline(
 /* Copy exact card-manifest bytes at a strict source command boundary. Pass
  * baseline=1 to export the immutable mode baseline captured before CSS. */
 int melee_web_menu_host_snapshot_card_data(
-    const MeleeWebMenuHost*, int baseline, uint8_t* output,
+    MeleeWebMenuHost*, int baseline, uint8_t* output,
     size_t output_size, char*, size_t);
 int melee_web_menu_host_enter(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
 /* Source title/main route.  These callbacks retain the host's persistent
@@ -69,6 +90,14 @@ int melee_web_menu_host_enter(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
  * they do not synthesize a browser menu. */
 int melee_web_menu_host_enter_title(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
 int melee_web_menu_host_enter_main(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
+/* Enter the original Training mode's source CSS after its GM_MENU handoff.
+ * This is the original training CSS/SSS navigation owner; the training
+ * simulation state remains a separate checked runtime boundary. */
+int melee_web_menu_host_enter_training_css(
+    MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
+/* Current original game-mode route selected by the source mode owner. */
+int melee_web_menu_host_mode_kind(const MeleeWebMenuHost*);
+int melee_web_menu_host_training_start_pending(const MeleeWebMenuHost*);
 /* Opening mode uses the original state table. Preview is read-only source
  * selection data used to request the exact assets before preload/OnEnter. */
 int melee_web_menu_host_opening_preview(const MeleeWebMenuHost*,
@@ -104,6 +133,10 @@ int melee_web_menu_host_reenter_css_after_parent(MeleeWebMenuHost*,MeleeWebAudio
 /* Current source scene: 0 when the host is between worlds, 1 CSS, 2 SSS,
  * 3 title, 4 main. */
 int melee_web_menu_host_source_scene(const MeleeWebMenuHost*);
+/* Read the original menu selection and the live VS rule/item values without
+ * advancing source code or transferring any source-owned pointers. */
+int melee_web_menu_host_source_observe(
+    const MeleeWebMenuHost*, MeleeWebMenuSourceObservation*, char*, size_t);
 /* Checked retail destination after leaving a title/main/CSS scene. Known
  * menu routes use the compact values GM_TITLE=0, GM_MENU=1, GM_VS=2; other
  * source modes retain their original mode id. */

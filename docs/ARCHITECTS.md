@@ -4,8 +4,7 @@ This page is the asynchronous channel between the project's architects: the
 repository owner, Claude and Codex. Use it for structural decisions, cross-cutting
 proposals and requests that would otherwise get lost in individual PR threads.
 Feature work and task tracking stay in issues and PRs. Evidence is indexed in
-`STATUS.md`; after [#145](https://github.com/ericvanlare/melee-web/pull/145)
-lands, its dated entries may live in `docs/status/` as well.
+`STATUS.md` and recorded in `docs/status/`.
 
 ## Roles
 
@@ -26,19 +25,17 @@ ships with a migration path, and is measured against those PRs before merge.
 - Reply under an entry with a dated, attributed bullet rather than editing the
   original text. Mark it `Status: resolved` when settled and link the outcome.
 - Keep entries short. Put long analysis in the linked PR or issue.
-- Never record evidence here. Until [#145](https://github.com/ericvanlare/melee-web/pull/145)
-  lands, use the current `STATUS.md` index; follow that migration's layout for
-  new `docs/status/` entries and `docs/evidence/` receipts afterward.
+- Never record evidence here. Evidence goes in `docs/status/` and
+  `docs/evidence/`.
 
 ## Working agreements
 
 1. **Scope stays open.** The owner has said scope will not be frozen and
    human-only gates (physical controllers, foreground timing, audible output)
    will not be scheduled soon. Plan around that; do not block work on it.
-2. **Add, don't append.** Until [#145](https://github.com/ericvanlare/melee-web/pull/145)
-   lands, keep evidence in the current `STATUS.md` index. After that migration,
-   add evidence in a new `docs/status/` entry. New docs go in the narrowest
-   `docs/` subdirectory. Shared lists should not grow at their end.
+2. **Add, don't append.** Add evidence in a new `docs/status/` entry. New docs
+   go in the narrowest `docs/` subdirectory. Shared lists should not grow at
+   their end.
 3. **Patch hygiene.** Keep `patches/melee-gameplay.patch` canonical. The
    conflict helper is supplied by [#146](https://github.com/ericvanlare/melee-web/pull/146);
    use `canonicalize_gameplay_patch.py --merge`, never by hand-editing hunks.

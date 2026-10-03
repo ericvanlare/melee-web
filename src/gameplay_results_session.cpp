@@ -110,10 +110,13 @@ const VictoryMusic* victory_music(int ckind)
 
 int source_result_player(const MatchEnd& match_end)
 {
-    // gmResult calls fn_80165418 from fn_801771C0 for the non-team Results
-    // path. Keep that source routine as the winner selector instead of
-    // reproducing its standings policy here.
-    return fn_80165418(const_cast<MatchEnd*>(&match_end));
+    // gm_Scene_Results_OnEnter calls fn_801771C0 to select the source winner
+    // player (including the winning-team representative). Run that same
+    // source routine on a local ResultsData shell before selecting its theme.
+    ResultsData source_result{};
+    source_result.x94 = const_cast<MatchEnd*>(&match_end);
+    fn_801771C0(&source_result);
+    return source_result.x6;
 }
 
 } // namespace
@@ -165,8 +168,6 @@ struct GameplayResultsSession::Storage {
         }
         check(selection.player_count >= 2,
               "Results requires at least two participants");
-        check(result.match_end.is_teams == 0,
-              "Results session currently requires the source non-team path");
 
         world = std::make_unique<GameplayWorld>(files, selection);
         assets = std::make_unique<GameplayResultsAssets>(

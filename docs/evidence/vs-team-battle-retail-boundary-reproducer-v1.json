@@ -1,0 +1,152 @@
+{
+  "browser": {
+    "audio_equivalence": "not_run; host output muted, DSP processing retained",
+    "performance": "not_run",
+    "physical_input": "not_run",
+    "rendered_browser": "passed",
+    "report_relative_to_agent_storage": "melee-web/runs/vs-team-battle-browser-route-20261002-130833-576eaf9b/team-battle-attempt-07-full-source/report.json",
+    "report_sha256": "cfaec7fe9916d232d4d5940016edb2c3f22fc7a4854ca2d867abb7bd557021d5",
+    "result": "pass",
+    "retail_source_comparison": "not_run; failed capture did not enter a Team match",
+    "route": "Headless installed Chrome: Main/VS/Rules/Items/CSS -> source Teams on and opposing P1/P2 teams -> SSS cancellation/re-entry -> live Team match -> No Contest Results -> CSS with settings retained -> Eject/reimport.",
+    "screenshots_sha256": {
+      "11-css-team-battle-configured": "3e18686e6adb9ba07f5835cc578c50a0bed1a0a0924e3f562357be3e79c9af2b",
+      "16-live-two-player-team-match": "3aac282a6c4489691d7725cd949c2396e17055663042ff1b03b9d0c0e56f36a9",
+      "17-original-team-results": "4285c02d909a9c46d29e30b107bef64f5ffa3f44c930ff09037b8ea16fe7d9b8",
+      "18-css-after-team-results-settings-retained": "638ec5d9ca3fa1ef1b9f978e0b39e6311c31569c9cb64d4ffbecbd9e30bc2bde"
+    },
+    "source_state_and_navigation": "passed",
+    "source_values": {
+      "item_frequency": -1,
+      "item_mask_hex": "fffffffeffffffff",
+      "players": [
+        "P1 Human Mario",
+        "P2 level-1 CPU Mario"
+      ],
+      "stocks": 3,
+      "team_ids": [
+        0,
+        1
+      ]
+    },
+    "visual_equivalence": "not_run"
+  },
+  "identity": {
+    "build_manifest_sha256": "225e0e8d9dad20fdec0b0953fe397ac62fc1601b41ab724f6a149fe0011075f5",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "dolphin_executable_sha256": "d60f171412cac13ef5e482ebb8c89aae9c6cbb73ad5a2dc726e330b0cd3acd24",
+    "game": "GALE01 Rev. 2",
+    "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+  },
+  "retained_failure": {
+    "artifact_root_relative_to_agent_storage": "melee-web/checkouts/vs-rules-items-route-20261002-005842-59531205/work/vs-team-battle-retail-observer-20261002-r2",
+    "capture_id": "melee-web-vs-team-battle-20261002-r2",
+    "failure": "original CSS opposing player teams",
+    "input_status": {
+      "complete": false,
+      "events": 12406,
+      "invalid": false
+    },
+    "input_status_sha256": "c16b934f5d6b45e0e8293c82e7138f0d321b69349539a5afc45bedcf2fe36ad5",
+    "input_stream_sha256": "a35588a3e65084890ed7d999f04aa4693543070f3e47eee52753c7cb8e48cf85",
+    "observer_status": {
+      "completed": false,
+      "event_count": 5633,
+      "invalid": false,
+      "source_tick": 1949,
+      "state": "interrupted"
+    },
+    "observer_stream_sha256": "b0373641024a4e08cd06075722bfd1037e100d5de2e953dff5c5324a498e7fe7",
+    "report_sha256": "d483963c559d6da31fc2f8a9cf6a24a6ca9ed623a0ab8d5d67c894f1e61d3c7c",
+    "route_progress": "Cold boot Main/VS/Rules/Items to CSS; P1 Human Mario and P2 CPU Mario selected; source Teams toggled on; P2 color assignment failed; no SSS, match setup, Results or CSS return occurred.",
+    "status_sha256": "a4f11087d7578692cd3725f9d771d1d1e224b9528ecdeecc4ee4d374b794773f"
+  },
+  "save_effect": "No source GCI persistence or Personal-profile autosave claim. Retail capture used a copied isolated profile with SaveDataWritable=False; browser used a fresh isolated Everything-unlocked context.",
+  "schema": "melee-web-vs-team-battle-retail-boundary-reproducer-v1",
+  "scope": "The headless browser completed the source-backed Team route. The one bounded retail attempt stopped in CSS before SSS because the capture harness clicked P2's Human/CPU toggle bounds instead of its team-color bounds. This packet reduces that failed MWRO stream to the exact input/source rows and source predicate. It does not claim a successful retail Teams match.",
+  "small_reproducer": {
+    "correction_in_worktree": "The driver now decodes CSSDoor team bounds from offsets 0x1C/0x20 and targets their midpoint. Focused tests assert the independent toggle/team bounds and immutable source-state snapshots. Corrected interaction has not been rerun in retail.",
+    "diagnosis": "At source tick 480, P1 cursor x=-16.3065 was outside P2 team-color bounds [-11.4,-6.0] and within P2 Human/CPU toggle bounds [-19.4,-13.4]. The source consumed P1 A (pad slot 0 bytes 0100) at sequence 2694; next CSS sample sequence 2695 shows P2 closed (kind 3) and teams still [0,0]. The capture driver used its existing left/right fields for Human/CPU toggle bounds. The controller route therefore reproduced a harness coordinate error, not a retail team-color defect.",
+    "method": "Decode the retained raw MWRO v1 records around the source-consumed P1 A press; no emulator rerun or source-state mutation.",
+    "records": {
+      "2693": {
+        "boundary": "pad_poll",
+        "p1_cursor": {
+          "x": -16.30649185180664,
+          "y": -3.805621862411499
+        },
+        "p2_door": {
+          "human_cpu_toggle_bounds": [
+            -19.399999618530273,
+            -13.399999618530273
+          ],
+          "kind": 1,
+          "team_color_bounds": [
+            -11.399999618530273,
+            -6.0
+          ]
+        },
+        "sequence": 2693,
+        "source_tick": 480,
+        "teams": {
+          "is_teams": 1,
+          "player_teams": [
+            0,
+            0
+          ]
+        }
+      },
+      "2694": {
+        "boundary": "pad_consume",
+        "p1_buttons_hex": "0100",
+        "sequence": 2694,
+        "source_tick": 480
+      },
+      "2695": {
+        "boundary": "pad_poll",
+        "p1_cursor": {
+          "x": -16.30649185180664,
+          "y": -2.200000047683716
+        },
+        "p2_door": {
+          "human_cpu_toggle_bounds": [
+            -19.399999618530273,
+            -13.399999618530273
+          ],
+          "kind": 3,
+          "team_color_bounds": [
+            -11.399999618530273,
+            -6.0
+          ]
+        },
+        "sequence": 2695,
+        "source_tick": 481,
+        "teams": {
+          "is_teams": 1,
+          "player_teams": [
+            0,
+            0
+          ]
+        }
+      }
+    },
+    "source_rule": {
+      "function": "cycleTeam in melee/mn/mncharsel.c",
+      "predicate": "cursor.xC is strictly between CSSDoor.teambtn_left and teambtn_right; cursor.x10 is strictly between -5.8 and -1.0.",
+      "retail_source_lines": "2370-2382",
+      "source_struct": "CSSDoor in melee/mn/types.h",
+      "struct_offsets": {
+        "teambtn_left": 28,
+        "teambtn_right": 32,
+        "togglebtn_left": 20,
+        "togglebtn_right": 24
+      }
+    }
+  },
+  "status": "reduced_failure_reproducer; browser_route_passed; retail_team_route_incomplete",
+  "validation_after_harness_correction": {
+    "command": "python3 -m py_compile tools/recorded_session_12_character_capture.py; python3 -m unittest tests.test_recorded_session_12_character_capture tests.test_capture_allocation_menu_route tests.test_retail_allocation_menu -v; git diff --check",
+    "result": "38 tests passed; py_compile and diff check passed"
+  }
+}
