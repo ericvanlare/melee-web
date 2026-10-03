@@ -46,6 +46,23 @@ class ComparePlayerMetricsTests(unittest.TestCase):
             self.assertNotEqual(bad.returncode, 0)
             self.assertIn("compare only passing runs", bad.stderr)
 
+    def test_cli_rejects_incomplete_cold_warm_pair(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            good = Path(temporary, "good.json")
+            incomplete = Path(temporary, "incomplete.json")
+            good.write_text(json.dumps({"result": "pass", "player_metrics": metrics()}))
+            missing_warm = metrics()
+            missing_warm["attempts"] = missing_warm["attempts"][:1]
+            incomplete.write_text(json.dumps({"result": "pass", "player_metrics": missing_warm}))
+            script = str(ROOT / "scripts/compare_player_metrics.py")
+            result = subprocess.run(
+                [sys.executable, script, str(good), str(incomplete)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("requires valid cold and warm disc_to_css_ms measurements", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

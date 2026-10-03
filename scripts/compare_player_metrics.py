@@ -8,6 +8,7 @@ accuracy or performance-admission result. See docs/PLAYER_EXPERIENCE_METRICS.md.
 from pathlib import Path
 import argparse
 import json
+import math
 import sys
 
 SCHEMA = "melee-web-player-metrics-v1"
@@ -35,6 +36,19 @@ def _mib(value):
     return None if value is None else round(value / 1048576, 1)
 
 
+def _is_finite_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def _require_paired_disc_to_css(path, metrics):
+    """Reject reports that cannot support the cold/warm comparison below."""
+    values = {cache: _attempt(metrics, cache, "disc_to_css_ms") for cache in ("cold", "warm")}
+    if any(not _is_finite_number(value) or value < 0 for value in values.values()):
+        raise ValueError(
+            f"{path}: player_metrics requires valid cold and warm disc_to_css_ms measurements"
+        )
+
+
 def load(path):
     report = json.loads(Path(path).read_text(encoding="utf-8"))
     metrics = report.get("player_metrics")
@@ -42,6 +56,7 @@ def load(path):
         raise ValueError(f"{path}: no {SCHEMA} player_metrics; rerun browser_smoke.mjs with --disc")
     if report.get("result") != "pass":
         raise ValueError(f"{path}: smoke result is {report.get('result')!r}; compare only passing runs")
+    _require_paired_disc_to_css(path, metrics)
     return report, metrics
 
 

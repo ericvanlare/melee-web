@@ -51,6 +51,10 @@ python3 scripts/compare_player_metrics.py \
   work/player-metrics/<previous>/report.json work/player-metrics/<candidate>/report.json
 ```
 
+The comparator requires one valid cold and one valid warm disc-to-CSS
+measurement in each report. Optional long-task and heap fields may be
+unavailable when the browser does not expose them.
+
 It prints a Markdown table and exits 1 when a metric grows beyond both its
 absolute and relative slack. That is a prompt to investigate before release,
 not an automatic block. Paste the table into the release PR.
