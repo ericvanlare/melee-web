@@ -101,5 +101,12 @@
     "No physical iPhone pause, first-load refresh, crash cause, foreground timing or PCM fidelity claim",
     "No retail-state comparison claimed: source simulation code is unchanged",
     "Earlier overflow failures remain retained; no automatic Resume"
-  ]
+  ],
+  "development_replay": {
+    "prior_overlay_classification": "Gate not exercised: whole-session replay directly invokes native launch without owner.handle.start(). Failure retained; no post-ack timeline was captured.",
+    "prior_overlay_result_sha256": "f55f14745e73589b52c66604638cd7125c71dc9d7775b4b83e55717e6d35da5f",
+    "shared_helper": "waitForAudioRender",
+    "scope": "Await the same owner helper immediately before whole-session replay native launch; single-match replay unchanged.",
+    "tests": "Extracted production handler holds launch while helper is pending and invokes failure finalization on rejection."
+  }
 }

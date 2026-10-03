@@ -31,6 +31,13 @@ commit CI, affected build/package audit and artifact browser validation are
 pending. The separate PR150 persistence work and its retained browser failure
 remain independent.
 
+The development whole-session replay button directly invokes native launch and
+bypasses the public `start()` method. A retained performance overlay that changed
+only `start()` therefore did not exercise the gate. The shared owner now exposes
+`waitForAudioRender` for that replay handler immediately before native launch;
+its extracted-handler test verifies delayed and failed readiness. Legacy
+single-match replay construction remains outside this startup boundary.
+
 Native source clocks, simulation, PCM production, queue capacity and manual
 Resume behavior are unchanged. A single callback cannot promise future audio
 cadence. Physical iPhone, first-load refresh, sustained gameplay, foreground
