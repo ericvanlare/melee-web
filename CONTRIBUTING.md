@@ -67,7 +67,18 @@ Keep upstream checkouts intact and keep dependency revisions pinned in
 `patches/aurora-browser.patch`; gameplay ABI corrections belong in
 `patches/melee-gameplay.patch`. Build preparation materializes generated source
 under ignored `build/gameplay-source/`; do not edit that checkout as the source
-of record. Regenerate a tracked generated declaration only through its existing
+of record. After editing the gameplay patch, run
+`python3 scripts/canonicalize_gameplay_patch.py`; it rewrites the patch as one
+sorted diff per file and verifies the prepared source tree is unchanged. Do not
+append new file diffs at the end of the patch; that collides with every other
+open pull request. When a merge with `main` conflicts in the patch, merge the
+patched source trees instead of the patch text:
+`python3 scripts/canonicalize_gameplay_patch.py --merge $(git merge-base HEAD origin/main) HEAD origin/main`
+writes the combined canonical patch, or names the source files whose edits
+truly overlap. The command requires a clean standalone `.deps/melee` checkout
+at the pinned lockfile commit, holds the checkout mutation guard, rejects
+symlinked patch targets, and refuses to replace a patch changed during the
+operation. Regenerate a tracked generated declaration only through its existing
 generator, review the generated diff, and run its `--check` mode when the
 generator provides one. The [testing guide](docs/TESTING.md) documents the
 fighter-registry example and the [dependency guide](docs/DEPENDENCIES.md)

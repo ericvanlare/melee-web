@@ -7,20 +7,24 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from './browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from './browser_tools.mjs';
+import {PLAYER_METRICS_SCHEMA, installPlayerMetrics, measureDiscToCss, samplePlayerMetrics} from './player_metrics.mjs';
 
 const {values}=parseArgs({options:{
-  ...Object.fromEntries(['url','surface','disc','out','playwright','timeout'].map(name=>[name,{type:'string'}])),
+  ...Object.fromEntries(['url','surface','disc','out','playwright','timeout','repeat'].map(name=>[name,{type:'string'}])),
   headed:{type:'boolean',default:false},
   help:{type:'boolean'},
 }});
 if(values.help){
-  console.log('Usage: node scripts/browser_smoke.mjs --url HTTP_URL --surface development|public --out NEW_DIRECTORY [--disc OWNED_DISC] [--playwright PACKAGE_DIR] [--timeout 90000] [--headed]');
+  console.log('Usage: node scripts/browser_smoke.mjs --url HTTP_URL --surface development|public --out NEW_DIRECTORY [--disc OWNED_DISC] [--playwright PACKAGE_DIR] [--timeout 90000] [--repeat 1..5] [--headed]');
   process.exit(0);
 }
 if(!values.url||!values.out||!['development','public'].includes(values.surface))throw Error('Expected --url, --surface development|public and --out; see --help');
 if(!['http:','https:'].includes(new URL(values.url).protocol))throw Error('Use a real HTTP server');
 const timeout=Number(values.timeout||90000);
 if(!Number.isInteger(timeout)||timeout<1000||timeout>300000)throw Error('Timeout must be 1000..300000 ms');
+const repeat=Number(values.repeat||1);
+if(!Number.isInteger(repeat)||repeat<1||repeat>5)throw Error('Repeat must be 1..5 disc imports');
+if(repeat>1&&!values.disc)throw Error('--repeat requires --disc');
 const {chromium,browser:launchOptions}=await loadBrowserTools(values.playwright);
 await fs.mkdir(path.dirname(path.resolve(values.out)),{recursive:true});
 await fs.mkdir(values.out,{recursive:false});
@@ -33,34 +37,42 @@ try {
   report.browser=browser.version();
   report.browser_mode=values.headed?'headed':'headless';
   const page=await browser.newPage({viewport:{width:1280,height:960}});
-  driver=createBrowserDriver(page,{surface:values.surface,timeoutMs:timeout,deadline:Date.now()+timeout});
+  driver=createBrowserDriver(page,{surface:values.surface,timeoutMs:timeout,deadline:Date.now()+timeout*repeat});
+  await installPlayerMetrics(page);
+  report.player_metrics={schema:PLAYER_METRICS_SCHEMA,scope:'Wall-clock boundaries and page long tasks on this machine and browser. Not accuracy, source timing or performance admission.',attempts:[]};
+  const navigationStarted=Date.now();
   const response=await page.goto(values.url,{timeout});
   if(response?.status()!==200)throw Error('HTTP startup failed: '+response?.status());
   if(!await page.evaluate(()=>crossOriginIsolated&&!!navigator.gpu))throw Error('Cross-origin isolation and WebGPU are required');
   await driver.waitForImport();report.checks.push('import control ready');
-  if(values.disc){
-    await driver.selectDisc(path.resolve(values.disc));
-    if(values.surface==='public'){
-      const entry=await driver.waitForPublicCss();
-      if(entry==='audio-recovery-required'){
-        report.audio_activation_recovery='The public player showed its specific suspended-audio message; the smoke used its one documented Play recovery gesture.';
-        await driver.recoverAudioActivation();
-        report.css_entry='Audio activation recovery';
-      }else {
-        report.audio_activation_recovery='Automatic launch entered CSS without a Play click.';
-        report.css_entry='Automatic public launch';
+  report.player_metrics.page_to_import_ready_ms=Date.now()-navigationStarted;
+  report.player_metrics.page_load=await samplePlayerMetrics(page);
+  for(let attempt=1;values.disc&&attempt<=repeat;attempt++){
+    const measured=await measureDiscToCss(page,async()=>{
+      await driver.selectDisc(path.resolve(values.disc));
+      if(values.surface==='public'){
+        const entry=await driver.waitForPublicCss();
+        if(entry==='audio-recovery-required'){
+          report.audio_activation_recovery='The public player showed its specific suspended-audio message; the smoke used its one documented Play recovery gesture.';
+          await driver.recoverAudioActivation();
+          report.css_entry='Audio activation recovery';
+        }else {
+          report.audio_activation_recovery='Automatic launch entered CSS without a Play click.';
+          report.css_entry='Automatic public launch';
+        }
+      }else{
+        await driver.waitForStart();
+        await driver.launch();
+        report.css_entry='Development surface manual launch';
       }
-    }else{
-      await driver.waitForStart();
-      await driver.launch();
-      report.css_entry='Development surface manual launch';
-    }
+    });
+    report.player_metrics.attempts.push({attempt,cache:attempt===1?'cold':'warm',...measured});
     report.checks.push('owned disc prepared');
     report.checks.push('original CSS running');
     report.launch_state=await driver.diagnostics();
     if(report.launch_state.unavailable||report.launch_state.error||report.launch_state.phase!==1||!report.launch_state.running)
       throw Error(report.launch_state.unavailable||report.launch_state.error||'The selected disc did not remain in running original CSS');
-    await page.screenshot({path:path.join(values.out,'original-css.png'),fullPage:true});
+    if(attempt===1)await page.screenshot({path:path.join(values.out,'original-css.png'),fullPage:true});
     await driver.unload();report.checks.push('teardown and import control ready');
   }
   report.state=await driver.diagnostics();
