@@ -18,11 +18,16 @@ constexpr auto kMenuFiles = std::to_array<std::string_view>({
     "MnSlChr.usd", "MnSlMap.usd", "MnMaAll.usd", "GmTtAll.usd",
     "SdSlChr.usd", "SdMenu.usd", "SdToy.dat", "MnExtAll.usd",
     "LbMcGame.usd", "NtMemAc.usd", "LbMcSnap.usd", "GmEvent.dat", "LbAd.dat", "LbRb.dat",
+    // The source save baseline awards trophies through Toy_SetUnlockState,
+    // whose original initializer resolves these locale-specific tables.
+    "TyDatai.usd", "TyDatai.dat",
     "sislib_font.bin", "smash2.sem",
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
     "dsp_coef.bin",
 #endif
-    "menu01.hps",
+    // Normal CSS/SSS source BGM ids 0x34 and 0x36 select these exact rows in
+    // the pinned lbAudioAx hps_files[] table.
+    "menu01.hps", "menu3.hps",
 });
 
 // This mirrors the pinned GALE01r2 `ssm_files[]` owner table in

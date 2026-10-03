@@ -13,6 +13,10 @@ from check_gameplay import node_runtime
 sys.path.insert(0, str(ROOT / "tools"))
 import compare_transition_trace as transition_compare
 
+def has_menu_trophy_assets(*roots):
+    return all(any((root / name).is_file() for root in roots)
+               for name in ("TyDatai.usd", "TyDatai.dat"))
+
 class NativeMenuSourceTests(unittest.TestCase):
     def test_owned_css_scene_lifecycle(self):
         targets = [ROOT / "build" / name / "native_css_callbacks.js"
@@ -22,7 +26,7 @@ class NativeMenuSourceTests(unittest.TestCase):
         audio = ROOT / "assets-local/next-gate"
         required = [menu / name for name in (
             "MnSlChr.usd", "SdSlChr.usd", "MnExtAll.usd", "LbMcGame.usd",
-            "NtMemAc.usd", "menu01.hps", "nr_select.ssm", "nr_title.ssm",
+            "NtMemAc.usd", "menu01.hps", "menu3.hps", "nr_select.ssm", "nr_title.ssm",
             "nr_name.ssm", "pokemon.ssm", "end.ssm")] + [audio / name for name in (
             "smash2.sem", "main.ssm", "mario.ssm", "dsp_coef.bin", "sislib_font.bin")]
         if not targets or not all(path.is_file() for path in required):
@@ -38,7 +42,8 @@ class NativeMenuSourceTests(unittest.TestCase):
                    for name in ("browser", "browser-release", "browser-audio-preview-release")]
         targets = [path for path in targets if path.is_file()]
         menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
-        if not targets or not (menu / "MnSlChr.usd").is_file() or not (game / "PlMr.dat").is_file():
+        if not has_menu_trophy_assets(menu, game) or not targets or not (menu / "MnSlChr.usd").is_file() or not (game / "PlMr.dat").is_file() or not all(
+                (menu / name).is_file() for name in ("menu01.hps", "menu3.hps")):
             self.skipTest("Build the native menu host and supply owned menu/game fixtures")
         target = max(targets, key=lambda path: path.stat().st_mtime)
         source_revision = subprocess.check_output(
@@ -66,7 +71,8 @@ class NativeMenuSourceTests(unittest.TestCase):
                    for name in ("browser", "browser-release", "browser-audio-preview-release")]
         targets = [path for path in targets if path.is_file()]
         menu = game = ROOT / "assets-local/issue34"
-        if not targets or not (menu / "MnSlChr.usd").is_file() or not all(
+        if not has_menu_trophy_assets(menu, game) or not targets or not (menu / "MnSlChr.usd").is_file() or not all(
+                (menu / name).is_file() for name in ("menu01.hps", "menu3.hps")) or not all(
                 (game / name).is_file() for name in ("link.ssm", "clink.ssm")):
             self.skipTest("Build the native menu host and supply owned Link audio fixtures")
         target = max(targets, key=lambda path: path.stat().st_mtime)
@@ -90,7 +96,8 @@ class NativeMenuSourceTests(unittest.TestCase):
         if not fixture_root.is_absolute():
             fixture_root = ROOT / fixture_root
         menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
-        if not targets or not (menu / "MnSlChr.usd").is_file():
+        if not has_menu_trophy_assets(menu, game) or not targets or not (menu / "MnSlChr.usd").is_file() or not all(
+                (menu / name).is_file() for name in ("menu01.hps", "menu3.hps")):
             self.skipTest("Build the native menu host and supply owned menu fixtures")
         target = max(targets, key=lambda path: path.stat().st_mtime)
         source_revision = subprocess.check_output(
@@ -121,7 +128,8 @@ class NativeMenuSourceTests(unittest.TestCase):
         if not fixture_root.is_absolute():
             fixture_root = ROOT / fixture_root
         menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
-        if not targets or not (menu / "MnSlChr.usd").is_file():
+        if not has_menu_trophy_assets(menu, game) or not targets or not (menu / "MnSlChr.usd").is_file() or not all(
+                (menu / name).is_file() for name in ("menu01.hps", "menu3.hps")):
             self.skipTest("Build the native menu host and supply owned menu fixtures")
         target = max(targets, key=lambda path: path.stat().st_mtime)
         source_revision = subprocess.check_output(
@@ -138,6 +146,27 @@ class NativeMenuSourceTests(unittest.TestCase):
             run.stdout,
         )
         self.assertIn("no movie decode or retail-route claim", run.stdout)
+
+    def test_trophy_baseline_waits_for_original_tydati_owner(self):
+        targets = [ROOT / "build" / name / "native_menu_host_trace.js"
+                   for name in ("browser", "browser-release", "browser-audio-preview-release")]
+        targets = [path for path in targets if path.is_file()]
+        menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
+        if not targets or not (menu / "MnSlChr.usd").is_file() or not has_menu_trophy_assets(menu, game):
+            self.skipTest("Build the native menu host and supply owned TyDatai fixtures")
+        target = max(targets, key=lambda path: path.stat().st_mtime)
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        with tempfile.TemporaryDirectory(prefix="TyDatai profile baseline ") as directory:
+            trace = Path(directory) / "port.jsonl"
+            run = subprocess.run(
+                [str(node_runtime()), str(target), str(menu), str(game), "32",
+                 str(trace), source_revision, "trophy-baseline-v1"],
+                cwd=ROOT, capture_output=True, text=True, timeout=120)
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn(
+            "Original TyDatai-backed save baseline initialized after source-file ownership",
+            run.stdout)
 
     def test_original_sis_layout_and_style_stack(self):
         candidates = [ROOT / "build" / directory / "native_menu_scene_trace.js"

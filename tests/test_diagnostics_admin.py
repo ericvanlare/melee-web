@@ -158,6 +158,36 @@ class DiagnosticsAdminTest(unittest.TestCase):
             self.assertEqual(json.loads(output_path.read_text())["schema"], "melee-web-diagnostics")
             self.assertEqual(stat.S_IMODE(output_path.stat().st_mode), 0o600)
 
+    def test_current_epoch_metadata_preserves_measurement_bounds(self):
+        value = envelope()
+        value.update(received_at=1790979358778, expires_at=1793571358778)
+        cursor = str(value["received_at"]) + "." + REPORT_ID
+        code, output, error, _ = self.run_cli(["query"], {"reports": [value], "next_cursor": cursor})
+        self.assertEqual(code, 0, error)
+        self.assertEqual(json.loads(output)["reports"][0], value)
+        self.assertNotIn(TOKEN, output)
+        code, output, error, _ = self.run_cli(["get", REPORT_ID], value)
+        self.assertEqual(code, 0, error)
+        self.assertEqual(json.loads(output), value)
+        for field in ("received_at", "expires_at"):
+            for valid in (0, admin.MAX_EPOCH_MS):
+                with self.subTest(field=field, valid=valid):
+                    bounded = dict(value, **{field: valid})
+                    code, output, error, _ = self.run_cli(["get", REPORT_ID], bounded)
+                    self.assertEqual(code, 0, error)
+                    self.assertEqual(json.loads(output)[field], valid)
+            for invalid in (-1, 9007199254740992, 1.5, True):
+                with self.subTest(field=field, invalid=invalid):
+                    bad = dict(value, **{field: invalid})
+                    code, output, error, _ = self.run_cli(["get", REPORT_ID], bad)
+                    self.assertEqual(code, 2)
+                    self.assertEqual(output, "")
+                    self.assertIn("invalid_" + field, error)
+        value["report"]["incident"]["value"] = 1e12 + 1
+        code, output, _, _ = self.run_cli(["get", REPORT_ID], value)
+        self.assertEqual(code, 2, 'Unix metadata limits must not widen report measurements')
+        self.assertEqual(output, "")
+
     def test_secret_is_environment_only_and_response_is_revalidated(self):
         with mock.patch.dict(os.environ, {admin.API_ENV: "https://staging.webmelee.gg", admin.TOKEN_ENV: TOKEN}, clear=True):
             with self.assertRaises(SystemExit):

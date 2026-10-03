@@ -341,9 +341,15 @@ void run(const std::string& executable)
           "paired endpoint data must be consistent and loopback-only");
 
     const auto http_response = local_http_request();
-    check(http_response.find("503 Service Unavailable") != std::string::npos &&
-              http_response.find("local-only Slippi API is disabled") != std::string::npos,
-          "local API sink must fail closed instead of simulating a production response");
+    constexpr std::string_view rejection_body =
+        R"({"error":"local-only Slippi API is disabled"})";
+    const auto header_end = http_response.find("\r\n\r\n");
+    check(header_end != std::string::npos &&
+              http_response.find("HTTP/1.1 503 Service Unavailable\r\n") == 0 &&
+              http_response.find("Connection: close\r\n") != std::string::npos &&
+              http_response.find("Content-Length:") == std::string::npos &&
+              http_response.substr(header_end + 4) == rejection_body,
+          "local API sink must fail closed with an exact close-delimited 503 rejection");
 
     EnetClient pending_at_shutdown;
     pending_at_shutdown.send(

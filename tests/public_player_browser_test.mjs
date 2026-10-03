@@ -364,10 +364,11 @@ try {
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await page.locator('#loading-panel').waitFor({state: 'visible', timeout: 30000});
   await check('disc selection during graphics preparation', async () => {
-    // The shell publishes the file control asynchronously after the initial
-    // document is visible. Wait for that readiness boundary before checking
-    // that selection remains available during native graphics preparation.
-    await page.waitForFunction(() => document.querySelector('#choose-disc')?.disabled === false,
+    // Save-profile binding briefly owns the native command boundary at startup.
+    // Wait for that binding as well as the asynchronous file control, then test
+    // selection while graphics preparation is still visible.
+    await page.waitForFunction(() => document.querySelector('#choose-disc')?.disabled === false &&
+      document.querySelector('#settings-open')?.disabled === false,
       null, {timeout: 15000});
     assert(await page.locator('#choose-disc').isEnabled(), 'Selection stays available while startup is busy');
     if (values.disc) {
@@ -461,6 +462,22 @@ try {
     await page.locator('#settings-dialog[open]').waitFor();
     assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
     await shot('settings');
+    assert(await page.locator('#export-save').isDisabled(),
+      'Everything export requires original disc tables; it must not call an unowned native baseline');
+    if (!values.disc) {
+      await page.locator('#save-mode').selectOption('personal');
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      await page.locator('#save-confirm-accept').click();
+      await page.waitForFunction(() => document.querySelector('#save-mode').value === 'personal' &&
+        !document.querySelector('#settings-close').disabled);
+      await page.locator('#settings-close').click();
+      return;
+    }
+    await page.locator('#settings-close').click();
+    await selectDisc(values.disc);
+    await waitForCssOrAudioRecovery();
+    await page.locator('#settings-open').click();
+    assert(await page.locator('#export-save').isEnabled());
     const exported = page.waitForEvent('download');
     await page.locator('#export-save').click();
     const download = await exported;
@@ -470,6 +487,11 @@ try {
     everythingUnlockedGciPath = gciPath;
     everythingUnlockedProfile = new Uint8Array(baseline);
     assert.equal(baseline.byteLength, 0xF1C4);
+    await page.locator('#settings-close').click();
+    await driver.unload();
+    await ready();
+    await page.locator('#settings-open').click();
+    assert(await page.locator('#export-save').isDisabled(), 'Eject releases the original baseline owner');
 
     await page.locator('#save-mode').selectOption('personal');
     await page.locator('#save-confirm-dialog[open]').waitFor();

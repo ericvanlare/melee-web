@@ -83,6 +83,11 @@ remains immutable historical evidence. Quiet-machine and foreground protocols,
 physical input, arranged audible output, uninterrupted audio, pixels/PCM and
 whole-session performance admission remain open. Audio underruns increased
 between retained Results snapshots; their first increase is not located.
+The [bounded audio-counter follow-up](docs/evidence/audio-underrun-triage-v1.json)
+records authenticated staging triage, the admin CLI epoch-bound correction,
+counter semantics and a short instrumented Results return. The historical
+first underrun increase remains unlocated; no audio runtime fix is justified
+by that reduced case.
 The local preparation-wait cause does not classify users' other varied pauses.
 No GitHub merge or hosted deployment is included.
 
@@ -1303,6 +1308,14 @@ receipts. Setup and the reproducible acceptance command are in the
 local interoperability result; rollback correctness, browser cross-play,
 public Internet/NAT, rendering/audio accuracy and production readiness remain
 unclaimed.
+
+The [local reporter framing receipt](docs/evidence/local-slippi-reporter-framing-v1.json)
+is a separate **Compiled / Source identified** HTTP boundary check. It binds
+the v4 old/new service hashes and six exact 503 responses per variant; the new
+response is close-delimited with `Connection: close` and no `Content-Length`.
+It preserves the retained reporter-thread failure as a separate, non-
+deterministic inference and makes no native gameplay, browser or official
+service claim.
 
 A separate [headless browser-to-desktop transport receipt](docs/evidence/slippi-browser-desktop-transport-v1.json)
 records one 24-frame raw PAD exchange through the loopback ENet relay and the

@@ -17,6 +17,16 @@ void melee_web_cpu_observation_tick(size_t index);
 void melee_web_cpu_observation_draw(size_t index);
 void melee_web_cpu_observation_preparation_draw(void);
 void melee_web_cpu_observation_end(size_t frames);
+/* Read-only bounded trace of post-update HSD_Rand/HSD_Randf seed values. */
+enum {
+    MELEE_WEB_RNG_DRAW_RAND = 0,
+    MELEE_WEB_RNG_DRAW_RANDF = 1
+};
+void melee_web_cpu_observation_set_event_cursor(size_t index);
+void melee_web_cpu_observation_set_rng_draw_cursor(size_t index);
+void melee_web_cpu_observation_scheduler_return(void);
+void melee_web_rng_draw_probe_scheduler_return(void);
+void melee_web_cpu_observation_rng_draw(uint32_t updated_seed, unsigned kind);
 
 /* Read-only, one-cursor trace of the Arrow shield-collision arithmetic. */
 enum {

@@ -60,7 +60,11 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/math_data.c")
 target_include_directories(fighter_source_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
   PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
-target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE MELEE_WEB_MENU_MARIO_FD)
+target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE
+  MELEE_WEB_MENU_MARIO_FD)
+if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  target_compile_definitions(fighter_source_runtime PRIVATE MELEE_WEB_RNG_DRAW_OBSERVER=1)
+endif()
 set_source_files_properties(src/gameplay_platform.c PROPERTIES COMPILE_DEFINITIONS "MELEE_WEB_AUDIO;MELEE_WEB_AUDIO_STREAM")
 set_source_files_properties(src/gameplay_audio.c PROPERTIES COMPILE_DEFINITIONS "MELEE_WEB_AUDIO_FX;MELEE_WEB_AUDIO_STREAM")
 set_source_files_properties("${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/thp/THPDec.c"
