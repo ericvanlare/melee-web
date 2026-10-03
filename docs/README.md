@@ -19,6 +19,8 @@ Observed results live in [STATUS](../STATUS.md) and its dated
 | [Validation](TESTING.md) | Test suites and focused checks |
 | [Local resources](LOCAL_RESOURCES.md) | Disk, scratch and build ownership |
 | [Dependencies](DEPENDENCIES.md) | Pins and patch boundaries |
+| [Player experience metrics](PLAYER_EXPERIENCE_METRICS.md) | Release-to-release browser wait and memory observations |
+| [Architects' coordination log](ARCHITECTS.md) | Cross-cutting structural decisions and coordination |
 
 ## Adding content
 
