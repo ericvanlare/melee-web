@@ -22,7 +22,7 @@ class NativeMenuSourceTests(unittest.TestCase):
         audio = ROOT / "assets-local/next-gate"
         required = [menu / name for name in (
             "MnSlChr.usd", "SdSlChr.usd", "MnExtAll.usd", "LbMcGame.usd",
-            "NtMemAc.usd", "menu01.hps", "nr_select.ssm", "nr_title.ssm",
+            "NtMemAc.usd", "menu01.hps", "menu3.hps", "nr_select.ssm", "nr_title.ssm",
             "nr_name.ssm", "pokemon.ssm", "end.ssm")] + [audio / name for name in (
             "smash2.sem", "main.ssm", "mario.ssm", "dsp_coef.bin", "sislib_font.bin")]
         if not targets or not all(path.is_file() for path in required):
@@ -38,7 +38,8 @@ class NativeMenuSourceTests(unittest.TestCase):
                    for name in ("browser", "browser-release", "browser-audio-preview-release")]
         targets = [path for path in targets if path.is_file()]
         menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
-        if not targets or not (menu / "MnSlChr.usd").is_file() or not (game / "PlMr.dat").is_file():
+        if not targets or not (menu / "MnSlChr.usd").is_file() or not (game / "PlMr.dat").is_file() or not all(
+                (menu / name).is_file() for name in ("menu01.hps", "menu3.hps")):
             self.skipTest("Build the native menu host and supply owned menu/game fixtures")
         target = max(targets, key=lambda path: path.stat().st_mtime)
         source_revision = subprocess.check_output(
@@ -67,6 +68,7 @@ class NativeMenuSourceTests(unittest.TestCase):
         targets = [path for path in targets if path.is_file()]
         menu = game = ROOT / "assets-local/issue34"
         if not targets or not (menu / "MnSlChr.usd").is_file() or not all(
+                (menu / name).is_file() for name in ("menu01.hps", "menu3.hps")) or not all(
                 (game / name).is_file() for name in ("link.ssm", "clink.ssm")):
             self.skipTest("Build the native menu host and supply owned Link audio fixtures")
         target = max(targets, key=lambda path: path.stat().st_mtime)
@@ -90,7 +92,8 @@ class NativeMenuSourceTests(unittest.TestCase):
         if not fixture_root.is_absolute():
             fixture_root = ROOT / fixture_root
         menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
-        if not targets or not (menu / "MnSlChr.usd").is_file():
+        if not targets or not (menu / "MnSlChr.usd").is_file() or not all(
+                (menu / name).is_file() for name in ("menu01.hps", "menu3.hps")):
             self.skipTest("Build the native menu host and supply owned menu fixtures")
         target = max(targets, key=lambda path: path.stat().st_mtime)
         source_revision = subprocess.check_output(
@@ -121,7 +124,8 @@ class NativeMenuSourceTests(unittest.TestCase):
         if not fixture_root.is_absolute():
             fixture_root = ROOT / fixture_root
         menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
-        if not targets or not (menu / "MnSlChr.usd").is_file():
+        if not targets or not (menu / "MnSlChr.usd").is_file() or not all(
+                (menu / name).is_file() for name in ("menu01.hps", "menu3.hps")):
             self.skipTest("Build the native menu host and supply owned menu fixtures")
         target = max(targets, key=lambda path: path.stat().st_mtime)
         source_revision = subprocess.check_output(

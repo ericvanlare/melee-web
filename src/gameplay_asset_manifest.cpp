@@ -22,7 +22,9 @@ constexpr auto kMenuFiles = std::to_array<std::string_view>({
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
     "dsp_coef.bin",
 #endif
-    "menu01.hps",
+    // Normal CSS/SSS source BGM ids 0x34 and 0x36 select these exact rows in
+    // the pinned lbAudioAx hps_files[] table.
+    "menu01.hps", "menu3.hps",
 });
 
 // This mirrors the pinned GALE01r2 `ssm_files[]` owner table in

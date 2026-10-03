@@ -24,7 +24,8 @@ export const NATIVE_MENU_DISC_FILES=Object.freeze({
   'GmEvent.dat':'GmEvent.dat',
   'LbAd.dat':'LbAd.dat',
   'LbRb.dat':'LbRb.dat',
-  'menu01.hps':'audio/menu01.hps','smash2.sem':'audio/us/smash2.sem',
+  'menu01.hps':'audio/menu01.hps','menu3.hps':'audio/menu3.hps',
+  'smash2.sem':'audio/us/smash2.sem',
   ...Object.fromEntries([
     'main', 'pokemon', 'nr_title', 'nr_select', 'nr_1p', 'nr_vs', 'captain',
     'clink', 'dk', 'drmario', 'falco', 'fox', 'gkoopa', 'ice',
