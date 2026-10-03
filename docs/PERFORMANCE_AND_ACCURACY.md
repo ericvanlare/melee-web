@@ -377,8 +377,8 @@ Use its focused checks while developing; the gates below govern content admissio
    the source clock must be explained, and growth correlated with a timing failure
    fails the gate.
 8. **Record the result.** Store raw local evidence under ignored `work/` and add
-   the exact passed scope and remaining gaps to `STATUS.md`. Only then update the
-   admitted content claim.
+   the exact passed scope and remaining gaps to a `docs/status/` entry. Only
+   then update the admitted content claim.
 
 The detailed fighter and stage checklists are in
 [ADDING_CHARACTERS.md](ADDING_CHARACTERS.md) and
@@ -516,7 +516,7 @@ Before merging a shared runtime, performance or content change:
       audio, pipeline and error gates.
 - [ ] First-use resources are covered without hidden source simulation.
 - [ ] Raw evidence names its machine, browser, configuration, commit and scope.
-- [ ] `STATUS.md`, the content notes and pipeline-seed inventory describe the
+- [ ] A `docs/status/` entry, the content notes and pipeline-seed inventory describe the
       measured result and every remaining gap.
 
 ## Replay calibration lessons

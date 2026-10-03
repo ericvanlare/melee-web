@@ -144,8 +144,8 @@ experiment, exact pass criteria, exclusions, existing solutions checked and
 stopping rule in the issue. After two experiments at one boundary, reduce the
 reproducer or request a bounded review before another long run. Reference the
 acceptance issue from component PRs without auto-closing it until all its gates
-pass. Keep new evidence in STATUS and scoped reports rather than copying it into
-the roadmap or another status document.
+pass. Keep new evidence in a new `docs/status/` entry and scoped reports rather
+than copying it into the roadmap or another status document.
 
 For code, run focused boundary checks, the full suite, the affected build and a
 diff review. For documentation, validate local links and paths and inspect the
