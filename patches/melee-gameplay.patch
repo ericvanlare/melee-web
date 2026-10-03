@@ -11417,3 +11417,39 @@ index c5da0f9..1d0a988 100644
      if (ip->xCF4_fighterGObjUnk != NULL) {
          if (it_80272D40(ip->xCF4_fighterGObjUnk) == 0) {
              f32 temp_f31;
+
+diff --git a/src/melee/mn/mnitemsw.c b/src/melee/mn/mnitemsw.c
+--- a/src/melee/mn/mnitemsw.c
++++ b/src/melee/mn/mnitemsw.c
+@@ -88,7 +88,30 @@
+ // Some routines address the adjacent data blocks as one table.
+ static inline struct MnItemSwTable* mnItemSw_GetTable(void)
+ {
+-    return (struct MnItemSwTable*) mnItemSw_803ED340;
++    /* The retail image stores these authored globals as one contiguous table.
++     * Browser object sections do not preserve that adjacency, so own a table
++     * assembled from the same source arrays before the menu reads it. */
++    static struct MnItemSwTable table;
++    static u8 initialized;
++    u32 row;
++    u32 column;
++
++    if (initialized == 0) {
++        for (row = 0; row < 4; row++) {
++            for (column = 0; column < 3; column++) {
++                table.x00[row][column] = mnItemSw_803ED340[row][column];
++            }
++        }
++        for (row = 0; row < 18; row++) {
++            table.x30[row] = mnItemSw_AnimTable.x30[row];
++        }
++        for (row = 0; row < 32; row++) {
++            table.items[row] = mnItemSw_AnimTable.items[row];
++            table.item_order[row] = mnItemSw_803ED438[row];
++        }
++        initialized = 1;
++    }
++    return &table;
+ }
+ 
+ #ifdef MUST_MATCH

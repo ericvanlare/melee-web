@@ -2174,7 +2174,8 @@
         "melee/it/itspawn.c",
         "melee/it/itdrop.c",
         "melee/it/itcoll.c",
-        "melee/it/itdraw.c"
+        "melee/it/itdraw.c",
+        "melee/mn/mnitemsw.c"
       ],
       "depends_on": [
         "fighter-roster-and-identities",
@@ -2190,7 +2191,8 @@
         "docs/FIGHTER_RUNTIME.md",
         "docs/LINK_PORT_NOTES.md",
         "docs/ADDING_STAGES.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/evidence/vs-rules-plus-timer-source-route-v1.json"
       ],
       "next_step": "Generate the item-kind census from it/forward.h and map each row to its source implementation, archive data and consuming fighter/stage modes.",
       "issue": null
@@ -2269,6 +2271,7 @@
         "melee/gm/gm_16AE.c",
         "melee/mn/mnmainrule.c",
         "melee/mn/mnruleplus.c",
+        "melee/mn/mnitemsw.c",
         "melee/gm/gmmain_lib.c"
       ],
       "depends_on": [
@@ -2287,9 +2290,10 @@
         "docs/TRANSITION_EQUIVALENCE.md",
         "docs/REFERENCE_CAPTURE_APP.md",
         "docs/evidence/vs-rules-items-source-route-v1.json",
-        "docs/evidence/vs-rules-items-source-route-v2.json"
+        "docs/evidence/vs-rules-items-source-route-v2.json",
+        "docs/evidence/vs-rules-plus-timer-source-route-v1.json"
       ],
-      "next_step": "The original Main/VS/Rules/Items route has separate retail source-route evidence and headless rendered browser evidence for the item row toggle, frequency-selector save ordering, custom item-mask handoff with None frequency, three-stock match, Results/CSS retention, and teardown. The custom-mask comparison is not retail compared; keep that claim scoped. Continue with team rules and Rules Plus, then item-family services and source GCI persistence, each with bounded original/browser evidence.",
+      "next_step": "Rules Plus stock-time-limit editing now has retail first-match-prefix and rendered-browser evidence through a 60-second match, Results/CSS retention and cleanup. The enclosing three-match retail capture failed later and remains scoped to the retained first-match prefix. The earlier v2 item-row bit mapping is superseded by Rev. 2 evidence: preference bit 5 maps to StartMeleeData bit 18. Continue with the remaining Rules Plus options and VS team rules, then item-family services and source GCI persistence, each with bounded original/browser evidence.",
       "issue": null
     },
     {

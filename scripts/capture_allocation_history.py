@@ -275,6 +275,8 @@ def retain_route_screenshots(frames_dir, trace_path, output, *, route="menu"):
         "vs_items_one_bit_toggled", "vs_items_frequency_none", "vs_items_back_committed",
         "vs_rules_back_to_versus", "versus_back_to_main",
         "vs_rules_reentry_retained_items", "vs_rules_stock_three_selected",
+        "vs_rules_plus_entry", "vs_rules_plus_timer_one",
+        "vs_rules_plus_back_retained", "vs_rules_plus_reentry_retained",
         "css_after_rules_start_retained", "sss_after_rules_start",
         "sss_final_destination_selected", "vs_match_entered",
         "vs_match_after_180_ticks", "vs_no_contest_chord_sent",
@@ -425,6 +427,10 @@ def verify_vs_rules_items_route(path):
         ("versus_back_to_main", 1, 1),
         ("vs_rules_reentry_retained_items", 1, 1),
         ("vs_rules_stock_three_selected", 1, 1),
+        ("vs_rules_plus_entry", 1, 1),
+        ("vs_rules_plus_timer_one", 1, 1),
+        ("vs_rules_plus_back_retained", 1, 1),
+        ("vs_rules_plus_reentry_retained", 1, 1),
         ("css_after_rules_start_retained", 8, 2),
         ("sss_after_rules_start", 9, 2),
         ("sss_final_destination_selected", 9, 2),
@@ -458,6 +464,10 @@ def verify_vs_rules_items_route(path):
         "versus_back_to_main": (0, 1),
         "vs_rules_reentry_retained_items": (13, 0),
         "vs_rules_stock_three_selected": (13, 1),
+        "vs_rules_plus_entry": (15, 0),
+        "vs_rules_plus_timer_one": (15, 0),
+        "vs_rules_plus_back_retained": (13, 6),
+        "vs_rules_plus_reentry_retained": (15, 0),
     }
     for row in markers:
         expected_state = expected_menu_states.get(row.get("event"))
@@ -493,9 +503,11 @@ def verify_vs_rules_items_route(path):
             final_rules.get("item_mask") != toggled_mask or
             final_rules.get("item_frequency") != -1):
         raise RuntimeError("Results/CSS return did not retain original source rules and item preferences")
-    if markers[16].get("selected_stage_kind") != 0x20:
+    stage = next(row for row in markers if row["event"] == "sss_final_destination_selected")
+    if stage.get("selected_stage_kind") != 0x20:
         raise RuntimeError("original SSS route did not retain source St_Kind_Last selection")
-    match = markers[17].get("match_start_data", {})
+    match_marker = next(row for row in markers if row["event"] == "vs_match_entered")
+    match = match_marker.get("match_start_data", {})
     players = match.get("players", [])
     if (match.get("stage") != 0x20 or match.get("item_frequency") != -1 or
             match.get("item_mask_hex") != f"{toggled_mask:016x}" or
@@ -505,10 +517,11 @@ def verify_vs_rules_items_route(path):
             [(8, 0, 3, 0, 0), (8, 0, 3, 0, 0)] or
             any(p.get("slot_type") != 3 for p in players[2:])):
         raise RuntimeError("GM_VS StartMeleeData did not contain the selected source Rules/Items values")
-    result = markers[20]
+    result = next(row for row in markers if row["event"] == "results_no_contest")
     if result.get("results_outcome") != 7:
         raise RuntimeError("source Results did not observe OUTCOME_NO_CONTEST")
-    if markers[21].get("scene_kind") != 8:
+    after_results = next(row for row in markers if row["event"] == "css_after_results_retained")
+    if after_results.get("scene_kind") != 8:
         raise RuntimeError("source Results did not return to original CSS")
     frames = [row for row in rows if row.get("event") == "scheduler_return"]
     sequences = [row.get("sequence") for row in frames]
@@ -533,6 +546,8 @@ def verify_vs_rules_items_route(path):
             "committed_item_frequency": final_rules["item_frequency"],
             "stock_count_after_css_handoff": final_rules["stock_count"],
             "live_match_stage": match["stage"],
+            "live_match_timer_enabled": match.get("timer_enabled"),
+            "live_match_time_limit_seconds": match.get("time_limit_seconds"),
             "live_match_player_one_stocks": match["players"][0]["stocks"],
             "live_match_start_players": [
                 {key: player.get(key) for key in
@@ -540,8 +555,118 @@ def verify_vs_rules_items_route(path):
                   "rumble_enabled", "cpu_kind", "cpu_level")}
                 for player in players],
             "results_outcome": result["results_outcome"],
-            "stock_count_after_results_css_return": markers[21]["rules_state"]["stock_count"],
+            "stock_count_after_results_css_return": after_results["rules_state"]["stock_count"],
             "trace_sha256": retail._sha256(path)}
+
+
+def verify_vs_rules_plus_timer_route(path):
+    """Require the retail Rules Plus timer edit, cancel/re-entry, and retention."""
+    base = verify_vs_rules_items_route(path)
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    frames = [row for row in rows if row.get("event") == "scheduler_return"]
+    plus_frames = []
+    plus_groups = []
+    current = None
+    for row in frames:
+        menu = row.get("menu_state", {})
+        is_plus = (row.get("scene_kind") == 1 and row.get("game_mode") == 1 and
+                   menu.get("cur") == 15 and isinstance(row.get("rules_state"), dict))
+        if is_plus:
+            plus_frames.append(row)
+            if current is None:
+                current = []
+                plus_groups.append(current)
+            current.append(row)
+        else:
+            current = None
+    if len(plus_groups) < 2:
+        raise RuntimeError("retail VS route did not enter Rules Plus, B back to Rules, and re-enter")
+    first_group, second_group = plus_groups[:2]
+    initial = first_group[0].get("rules_state", {}).get("stock_time_limit")
+    if type(initial) is not int or not 0 <= initial <= 99:
+        raise RuntimeError("Rules Plus source entry omitted its authored stock timer value")
+    if any(row.get("menu_state", {}).get("hovered") != 0 for row in plus_frames):
+        raise RuntimeError("Rules Plus timer route did not keep its source cursor on option zero")
+    first_values = [row.get("rules_state", {}).get("stock_time_limit")
+                    for row in first_group]
+    if first_values[-1] != 1 or not any(value != initial for value in first_values):
+        raise RuntimeError("Rules Plus PAD input did not change the source timer to one minute")
+    if initial == 1 and 0 not in first_values:
+        raise RuntimeError("one-minute source value was not changed through zero before being reselected")
+    if any(row.get("menu_state", {}).get("confirmed") != 1 or
+           row.get("rules_state", {}).get("stock_time_limit") != 1
+           for row in second_group):
+        raise RuntimeError("Rules Plus re-entry did not retain its committed one-minute value")
+
+    def marker(name):
+        found = next((row for row in rows if row.get("event") == name), None)
+        if found is None:
+            raise RuntimeError(f"retail Rules Plus route omitted source marker {name}")
+        return found
+
+    route_markers = [marker(name) for name in (
+        "vs_rules_plus_entry", "vs_rules_plus_timer_one",
+        "vs_rules_plus_back_retained", "vs_rules_plus_reentry_retained")]
+    if [row.get("event") for row in route_markers] != [
+            "vs_rules_plus_entry", "vs_rules_plus_timer_one",
+            "vs_rules_plus_back_retained", "vs_rules_plus_reentry_retained"]:
+        raise RuntimeError("Rules Plus source markers are out of order")
+    expected_marker_state = (
+        (15, 0, initial), (15, 0, 1), (13, 6, 1), (15, 0, 1))
+    for row, (kind, selection, timer) in zip(route_markers, expected_marker_state):
+        menu = row.get("menu_state", {})
+        if ((row.get("scene_kind"), row.get("game_mode")) != (1, 1) or
+                menu.get("cur") != kind or menu.get("hovered") != selection or
+                row.get("rules_state", {}).get("stock_time_limit") != timer):
+            raise RuntimeError(f"Rules Plus source marker {row.get('event')} has unexpected state: {row}")
+    if (route_markers[1].get("menu_state", {}).get("confirmed") != 1 or
+            route_markers[3].get("menu_state", {}).get("confirmed") != 1):
+        raise RuntimeError("Rules Plus source markers did not record the selected one-minute value")
+
+    rules_after_back = next((row for row in frames
+                             if row.get("scene_kind") == 1 and row.get("game_mode") == 1 and
+                             row.get("menu_state", {}).get("cur") == 13 and
+                             row.get("menu_state", {}).get("hovered") == 6 and
+                             row.get("rules_state", {}).get("stock_time_limit") == 1), None)
+    if rules_after_back is None:
+        raise RuntimeError("Rules Plus B did not retain the one-minute timer in original Rules")
+    css = marker("css_after_rules_start_retained").get("rules_state", {})
+    match = marker("vs_match_entered")
+    live_match = next((row for row in frames
+                       if row.get("scene_kind") == 2 and row.get("game_mode") == 2 and
+                       row.get("rules_state", {}).get("stock_time_limit") == 1 and
+                       isinstance(row.get("match_start_data"), dict)), None)
+    if css.get("stock_time_limit") != 1 or live_match is None:
+        raise RuntimeError("Rules Plus Start did not carry the one-minute rule into CSS and a live match")
+    if match.get("match_start_data", {}).get("stage") != 0x20:
+        raise RuntimeError("Rules Plus route did not enter the source-selected live VS match")
+    start_rules = match.get("match_start_data", {})
+    if (start_rules.get("timer_enabled") is not True or
+            start_rules.get("time_limit_seconds") != 60):
+        raise RuntimeError("Rules Plus timer did not reach live StartMeleeRules as an enabled 60-second timer")
+    after_results = marker("css_after_results_retained").get("rules_state", {})
+    if after_results.get("stock_time_limit") != 1:
+        raise RuntimeError("Results/CSS return did not retain the one-minute Rules Plus timer")
+
+    base["rules_plus_timer"] = {
+        "status": "retail_source_state_and_navigation_observed",
+        "menu_kind": 15,
+        "menu_option": 0,
+        "initial_timer_minutes": initial,
+        "selected_timer_minutes": 1,
+        "timer_minutes_in_css": css["stock_time_limit"],
+        "timer_minutes_during_live_match": live_match["rules_state"]["stock_time_limit"],
+        "timer_minutes_after_results_css": after_results["stock_time_limit"],
+        "rules_plus_entry_count_before_match": len(plus_groups),
+        "source_route_markers": [row["event"] for row in route_markers],
+        "stock_count_after_results_css": after_results.get("stock_count"),
+        "match_stage": match["match_start_data"]["stage"],
+        "live_match_timer_enabled": start_rules["timer_enabled"],
+        "live_match_time_limit_seconds": start_rules["time_limit_seconds"],
+        "results_outcome": marker("results_no_contest").get("results_outcome"),
+        "source_timer_countdown": "not_observed; retail capture records the committed GameRules value and full match route",
+    }
+    return base
 
 
 def parse_melee_gci_profiles(paths):
@@ -667,7 +792,38 @@ def verify_vs_rules_items_route_commands(path):
                               row.get("menu_state", {}).get("cur") == 2), -1)
     rules_confirm_again = index(1, 1, "PRESS A", 2, versus_move_again)
     stock_move = index(1, 1, "PRESS D_DOWN", 13, rules_confirm_again)
-    start_rules = index(1, 1, "PRESS START", 13, stock_move)
+    plus_entry = next((i for i, row in enumerate(commands)
+                       if i > stock_move and row.get("scene_kind") == 1 and
+                       row.get("game_mode") == 1 and row.get("command") == "PRESS A" and
+                       row.get("menu_state", {}).get("cur") == 13 and
+                       row.get("menu_state", {}).get("hovered") == 6), -1)
+    plus_back = next((i for i, row in enumerate(commands)
+                      if i > plus_entry and row.get("scene_kind") == 1 and
+                      row.get("game_mode") == 1 and row.get("command") == "PRESS B" and
+                      row.get("menu_state", {}).get("cur") == 15), -1)
+    plus_reentry = next((i for i, row in enumerate(commands)
+                         if i > plus_back and row.get("scene_kind") == 1 and
+                         row.get("game_mode") == 1 and row.get("command") == "PRESS A" and
+                         row.get("menu_state", {}).get("cur") == 13 and
+                         row.get("menu_state", {}).get("hovered") == 6), -1)
+    plus_start = index(1, 1, "PRESS START", 15, plus_reentry)
+    if plus_entry >= 0 or plus_back >= 0 or plus_reentry >= 0 or plus_start >= 0:
+        edits = [i for i, row in enumerate(commands)
+                 if plus_entry < i < plus_back and row.get("scene_kind") == 1 and
+                 row.get("game_mode") == 1 and row.get("menu_state", {}).get("cur") == 15 and
+                 row.get("menu_state", {}).get("hovered") == 0 and
+                 row.get("command") in ("PRESS D_LEFT", "PRESS D_RIGHT")]
+        if min(plus_entry, plus_back, plus_reentry, plus_start) < 0 or not edits:
+            raise RuntimeError("Rules Plus route lacks original entry, timer edit, B return, re-entry, and Start")
+        if (commands[plus_entry].get("menu_state", {}).get("hovered") != 6 or
+                commands[plus_back].get("menu_state", {}).get("hovered") != 0 or
+                commands[plus_reentry].get("menu_state", {}).get("hovered") != 6):
+            raise RuntimeError("Rules Plus route did not enter and return through the authored source rows")
+        start_rules = plus_start
+    else:
+        # Existing v2 captures end the Rules route directly from row 1. Keep
+        # their command receipt valid while new captures exercise Rules Plus.
+        start_rules = index(1, 1, "PRESS START", 13, stock_move)
     css_start_after_rules = index(8, 2, "PRESS START", after=start_rules)
     sss_start_match = index(9, 2, "PRESS A", after=css_start_after_rules)
     no_contest = [index(2, 2, "PRESS " + button, after=sss_start_match)
@@ -699,8 +855,8 @@ def verify_vs_rules_items_route_commands(path):
         raise RuntimeError("Rules re-entry main menu A was not SEL_MAIN_VS")
     if commands[rules_confirm_again].get("menu_state", {}).get("hovered") != 3:
         raise RuntimeError("Rules re-entry VS menu A was not SEL_VS_RULES")
-    if commands[start_rules].get("menu_state", {}).get("hovered") != 1:
-        raise RuntimeError("Rules Start was not issued with the source stock row selected")
+    if commands[start_rules].get("menu_state", {}).get("hovered") != (0 if plus_start >= 0 else 1):
+        raise RuntimeError("VS Rules/Rules Plus Start was not issued with the expected source row selected")
     no_contest_rows = [commands[i] for i in no_contest]
     if any(row.get("port") != 1 or row.get("source_sequence") is None
            for row in no_contest_rows):
@@ -712,7 +868,8 @@ def verify_vs_rules_items_route_commands(path):
         raise RuntimeError("Results did not exit through an observed original P1 Start input")
     if commands[results_start].get("port") != 1:
         raise RuntimeError("Results confirmation was not routed through original P1 Start")
-    return {"commands": len(commands), "sha256": retail._sha256(path)}
+    return {"commands": len(commands), "sha256": retail._sha256(path),
+            "rules_plus_timer_route": plus_start >= 0}
 
 
 def gdb_script(paths, boot_only=False, menu_round_trip=False,
@@ -956,7 +1113,8 @@ def capture(args):
         metadata["dolphin_pid"] = dolphin.pid
         retail.wait_for_socket(paths["socket"], dolphin, 30)
         gdb_log = (output / "gdb.log").open("x"); streams.append(gdb_log)
-        debugger = subprocess.Popen([str(debugger_path), "--quiet", "--nx", "--batch", "-x", str(commands)],
+        debugger = subprocess.Popen([str(debugger_path), "--quiet", "--nx", "--batch",
+                                     "-x", str(commands)],
                                     stdout=gdb_log, stderr=subprocess.STDOUT, env=environment,
                                     start_new_session=True)
         processes.append((debugger, "GDB"))
@@ -992,7 +1150,7 @@ def capture(args):
                                        str(screenshots.get("reason", screenshots.get("status"))))
         elif args.vs_rules_items_round_trip:
             route_path = evidence / "cold-boot-vs-rules-items-route.jsonl"
-            metadata["menu_route"] = verify_vs_rules_items_route(route_path)
+            metadata["menu_route"] = verify_vs_rules_plus_timer_route(route_path)
             metadata["menu_route"]["input_commands"] = verify_vs_rules_items_route_commands(
                 evidence / "cold-boot-input-commands.jsonl")
             metadata["menu_route"]["save_effect"] = verify_vs_rules_items_save_effect(

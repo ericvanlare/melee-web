@@ -323,7 +323,7 @@ def _menu_route_snapshot(event):
                             'cursor':struct.unpack_from('>ff',cursor,12),
                             'model':struct.unpack_from('>ff',model,8)})
         row['css_cursors']=cursors
-    if kind in (SCENE_CSS,SCENE_SSS):
+    if kind in (SCENE_CSS,SCENE_SSS,SCENE_VS):
         row['rules_state']=rules_state()
     if kind==SCENE_SSS:
         row['selected_stage_kind']=selected_stage_kind()
@@ -477,8 +477,10 @@ def cold_boot_css_menu_round_trip():
 _VS_RULES_ITEMS_ROUTE_HELPERS = r'''
 def _vs_start_data_state():
     # Source identities from mn/types.h: StartMeleeRules is 0x60 bytes,
-    # followed by six 0x24-byte PlayerInitData rows. gmVsMelee_StartData is
-    # pinned in the Rev. 2 symbol map at 0x80480530.
+    # followed by six 0x24-byte PlayerInitData rows. In StartMeleeRules,
+    # timer_enabled is the seventh MSB-first u32 bitfield and time_limit is
+    # the big-endian u32 at 0x10. gmVsMelee_StartData is pinned in the Rev. 2
+    # symbol map at 0x80480530.
     raw=mem(VS_START_DATA_ADDRESS,0x138)
     players=[]
     for index in range(6):
@@ -491,7 +493,9 @@ def _vs_start_data_state():
                         'rumble_enabled':raw[offset+12]&1,
                         'cpu_kind':raw[offset+14],
                         'cpu_level':raw[offset+15]})
-    return {'item_frequency':struct.unpack('b',raw[0x15:0x16])[0],
+    return {'timer_enabled':bool(raw[0]&0x02),
+            'time_limit_seconds':struct.unpack('>I',raw[0x10:0x14])[0],
+            'item_frequency':struct.unpack('b',raw[0x15:0x16])[0],
             'stage':struct.unpack('>H',raw[0x18:0x1A])[0],
             'item_mask_hex':f'{int.from_bytes(raw[0x30:0x38],"big"):016x}',
             'players':players}
@@ -641,12 +645,54 @@ def _cold_boot_vs_rules_items_round_trip():
     else:
         raise RuntimeError(f'original Rules stock selector did not reach three: {menu_state()}')
     _record_menu_route_marker('vs_rules_stock_three_selected')
+
+    # Rules row 6 opens the authored Rules Plus screen (MenuKind 15). Change
+    # the stock timer through its row-zero D-pad controls, back out to Rules,
+    # and re-enter before accepting it so both retention and Start are sourced
+    # from the retail menu callbacks.
+    move_menu_selection(6)
+    if menu_state()['cur']!=13 or menu_state()['hovered']!=6:
+        raise RuntimeError(f'Rules Plus entry did not use original Rules row 6: {menu_state()}')
+    pulse(0,'A',settle=30)
+    rules_plus=_vs_rules_wait_menu(15,0)
+    timer_before=rules_plus['confirmed']
+    if not 0<=timer_before<=99 or rules_state()['stock_time_limit']!=timer_before:
+        raise RuntimeError(f'Rules Plus did not expose its authored stock-timer value: menu={rules_plus} rules={rules_state()}')
+    _record_menu_route_marker('vs_rules_plus_entry')
+    if timer_before==1:
+        pulse(0,'D_LEFT')
+        rules_plus=_vs_rules_wait_menu(15,0)
+        if rules_plus['confirmed']!=0 or rules_state()['stock_time_limit']!=0:
+            raise RuntimeError(f'Rules Plus left input did not change one minute to zero: {rules_plus} {rules_state()}')
+    for _ in range(100):
+        rules_plus=menu_state()
+        if rules_plus['confirmed']==1:
+            break
+        pulse(0,'D_LEFT' if rules_plus['confirmed']>1 else 'D_RIGHT')
+        _vs_rules_wait_menu(15,0)
+    else:
+        raise RuntimeError(f'original Rules Plus timer selector did not reach one minute: {menu_state()}')
+    if rules_state()['stock_time_limit']!=1:
+        raise RuntimeError(f'Rules Plus one-minute value did not reach source GameRules: {rules_state()}')
+    _record_menu_route_marker('vs_rules_plus_timer_one')
+    pulse(0,'B',settle=30)
+    rules_after_plus_back=_vs_rules_wait_menu(13,6)
+    if rules_state()['stock_time_limit']!=1:
+        raise RuntimeError(f'Rules Plus B did not commit one minute before returning to Rules: {rules_after_plus_back} {rules_state()}')
+    _record_menu_route_marker('vs_rules_plus_back_retained')
+    pulse(0,'A',settle=30)
+    rules_plus_reentry=_vs_rules_wait_menu(15,0)
+    if rules_plus_reentry['confirmed']!=1 or rules_state()['stock_time_limit']!=1:
+        raise RuntimeError(f'Rules Plus re-entry did not retain the committed one-minute timer: {rules_plus_reentry} {rules_state()}')
+    _record_menu_route_marker('vs_rules_plus_reentry_retained')
+
     pulse(0,'START',settle=12)
     _cold_boot_wait_css()
     final_rules=rules_state()
-    if (final_rules['stock_count']!=3 or final_rules['item_frequency']!=-1 or
+    if (final_rules['stock_count']!=3 or final_rules['stock_time_limit']!=1 or
+            final_rules['item_frequency']!=-1 or
             final_rules['item_mask']!=item_toggle['item_mask']):
-        raise RuntimeError(f'GM_VS CSS handoff did not retain source Rules/Items values: {final_rules}')
+        raise RuntimeError(f'GM_VS CSS handoff did not retain source Rules/Items/Rules Plus values: {final_rules}')
     _record_menu_route_marker('css_after_rules_start_retained')
 
     # Continue through original CSS and SSS to a real source VS match. The
@@ -707,9 +753,10 @@ def _cold_boot_vs_rules_items_round_trip():
         raise RuntimeError('original Results Start did not return through the source VS route to CSS')
     retained_after_results=rules_state()
     if (retained_after_results['stock_count']!=3 or
+            retained_after_results['stock_time_limit']!=1 or
             retained_after_results['item_frequency']!=-1 or
             retained_after_results['item_mask']!=item_toggle['item_mask']):
-        raise RuntimeError(f'Results/CSS return did not retain source Rules/Items settings: {retained_after_results}')
+        raise RuntimeError(f'Results/CSS return did not retain source Rules/Items/Rules Plus settings: {retained_after_results}')
     _record_menu_route_marker('css_after_results_retained')
 '''
 

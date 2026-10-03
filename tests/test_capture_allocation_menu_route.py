@@ -26,6 +26,7 @@ from capture_allocation_history import (gdb_script, resolve_gdb_executable,
                                         verify_vs_rules_items_route,
                                         verify_vs_rules_items_route_commands,
                                         verify_vs_rules_items_save_effect,
+                                        verify_vs_rules_plus_timer_route,
                                         visual_capture_options)  # noqa: E402
 from tools import retail_allocation_menu  # noqa: E402
 from tools import retail_replay_validation as retail  # noqa: E402
@@ -53,7 +54,8 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
         self.assertNotIn("retail-step", source)
 
     def test_vs_rules_items_verifier_requires_commit_reentry_and_css_retention(self):
-        rules = {"stock_count": 4, "item_frequency": 3, "item_mask": 0x07}
+        rules = {"stock_count": 4, "item_frequency": 3, "item_mask": 0x07,
+                 "stock_time_limit": 0}
         changed = {**rules, "item_mask": 0x0F}
         committed = {**changed, "item_frequency": -1}
         match_players = [
@@ -82,8 +84,12 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             ("versus_back_to_main", 1, 1, (0, 1), committed),
             ("vs_rules_reentry_retained_items", 1, 1, (13, 0), committed),
             ("vs_rules_stock_three_selected", 1, 1, (13, 1), committed),
+            ("vs_rules_plus_entry", 1, 1, (15, 0), rules),
+            ("vs_rules_plus_timer_one", 1, 1, (15, 0), {**committed, "stock_time_limit": 1}),
+            ("vs_rules_plus_back_retained", 1, 1, (13, 6), {**committed, "stock_time_limit": 1}),
+            ("vs_rules_plus_reentry_retained", 1, 1, (15, 0), {**committed, "stock_time_limit": 1}),
             ("css_after_rules_start_retained", 8, 2, None,
-             {**committed, "stock_count": 3}),
+             {**committed, "stock_count": 3, "stock_time_limit": 1}),
             ("sss_after_rules_start", 9, 2, None, committed),
             ("sss_final_destination_selected", 9, 2, None, committed),
             ("vs_match_entered", 2, 2, None, committed),
@@ -91,7 +97,7 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             ("vs_no_contest_chord_sent", 2, 2, None, committed),
             ("results_no_contest", 5, 2, None, committed),
             ("css_after_results_retained", 8, 2, None,
-             {**committed, "stock_count": 3}),
+             {**committed, "stock_count": 3, "stock_time_limit": 1}),
         ]
         rows = [{"event": "scheduler_return", "sequence": 0,
                  "scene_kind": 1, "game_mode": 1,
@@ -100,7 +106,9 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
                  "hps_voice_word": "0x0"},
                 {"event": "scheduler_return", "sequence": 1,
                  "scene_kind": 2, "game_mode": 2,
-                 "match_start_data": {"stage": 0x20, "item_frequency": -1,
+                 "match_start_data": {"stage": 0x20, "timer_enabled": True,
+                                       "time_limit_seconds": 60,
+                                       "item_frequency": -1,
                                        "item_mask_hex": "000000000000000f",
                                        "players": match_players},
                  "pad_copy_status_hex": "00", "current_hps_hex": "",
@@ -113,15 +121,20 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             row = {"event": name, "scene_kind": scene, "game_mode": mode,
                    "sequence": 0, "pad_copy_status_hex": "00"}
             if menu is not None:
+                confirmed = (3 if name == "vs_rules_stock_three_selected" else
+                             1 if name in ("vs_rules_plus_timer_one",
+                                           "vs_rules_plus_back_retained",
+                                           "vs_rules_plus_reentry_retained") else 0)
                 row["menu_state"] = {"cur": menu[0], "hovered": menu[1],
-                                     "confirmed": 3 if name == "vs_rules_stock_three_selected" else 0}
+                                     "confirmed": confirmed}
             if state is not None:
                 row["rules_state"] = state
             if name == "sss_final_destination_selected":
                 row["selected_stage_kind"] = 0x20
             if name == "vs_match_entered":
                 row["match_start_data"] = {
-                    "stage": 0x20, "item_frequency": -1,
+                    "stage": 0x20, "timer_enabled": True,
+                    "time_limit_seconds": 60, "item_frequency": -1,
                     "item_mask_hex": "000000000000000f",
                     "players": match_players}
             if name == "results_no_contest":
@@ -129,6 +142,40 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             rows.append(row)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "route.jsonl"
+            timer_menu = {**committed, "stock_time_limit": 0}
+            one_minute = {**committed, "stock_time_limit": 1}
+            rows.extend([
+                {"event": "scheduler_return", "sequence": 3,
+                 "scene_kind": 1, "game_mode": 1,
+                 "menu_state": {"cur": 15, "hovered": 0, "confirmed": 0},
+                 "rules_state": timer_menu, "pad_copy_status_hex": "00",
+                 "current_hps_hex": "", "hps_voice_word": "0x0"},
+                {"event": "scheduler_return", "sequence": 4,
+                 "scene_kind": 1, "game_mode": 1,
+                 "menu_state": {"cur": 15, "hovered": 0, "confirmed": 1},
+                 "rules_state": one_minute, "pad_copy_status_hex": "00",
+                 "current_hps_hex": "", "hps_voice_word": "0x0"},
+                {"event": "scheduler_return", "sequence": 5,
+                 "scene_kind": 1, "game_mode": 1,
+                 "menu_state": {"cur": 13, "hovered": 6, "confirmed": 1},
+                 "rules_state": one_minute, "pad_copy_status_hex": "00",
+                 "current_hps_hex": "", "hps_voice_word": "0x0"},
+                {"event": "scheduler_return", "sequence": 6,
+                 "scene_kind": 1, "game_mode": 1,
+                 "menu_state": {"cur": 15, "hovered": 0, "confirmed": 1},
+                 "rules_state": one_minute, "pad_copy_status_hex": "00",
+                 "current_hps_hex": "", "hps_voice_word": "0x0"},
+                {"event": "scheduler_return", "sequence": 7,
+                 "scene_kind": 2, "game_mode": 2,
+                 "rules_state": one_minute,
+                 "match_start_data": {"stage": 0x20, "timer_enabled": True,
+                                       "time_limit_seconds": 60,
+                                       "item_frequency": -1,
+                                       "item_mask_hex": "000000000000000f",
+                                       "players": match_players},
+                 "pad_copy_status_hex": "00", "current_hps_hex": "",
+                 "hps_voice_word": "0x0"},
+            ])
             path.write_text("".join(json.dumps(row) + "\n" for row in rows))
             result = verify_vs_rules_items_route(path)
             self.assertEqual(result["stock_count_after_results_css_return"], 3)
@@ -136,6 +183,32 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             self.assertEqual(len(result["live_match_start_players"]), 6)
             self.assertEqual([p["slot_type"] for p in result["live_match_start_players"]],
                              [0, 0, 3, 3, 3, 3])
+            timer = verify_vs_rules_plus_timer_route(path)["rules_plus_timer"]
+            self.assertEqual(timer["initial_timer_minutes"], 0)
+            self.assertEqual(timer["selected_timer_minutes"], 1)
+            self.assertEqual(timer["timer_minutes_during_live_match"], 1)
+            self.assertTrue(timer["live_match_timer_enabled"])
+            self.assertEqual(timer["live_match_time_limit_seconds"], 60)
+            self.assertEqual(timer["timer_minutes_after_results_css"], 1)
+            self.assertEqual(timer["rules_plus_entry_count_before_match"], 2)
+            self.assertEqual(timer["source_route_markers"], [
+                "vs_rules_plus_entry", "vs_rules_plus_timer_one",
+                "vs_rules_plus_back_retained", "vs_rules_plus_reentry_retained"])
+
+            live_match = next(row for row in rows if row.get("event") == "vs_match_entered")
+            live_match["match_start_data"]["time_limit_seconds"] = 0
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            with self.assertRaisesRegex(RuntimeError, "enabled 60-second timer"):
+                verify_vs_rules_plus_timer_route(path)
+            live_match["match_start_data"]["time_limit_seconds"] = 60
+
+            css_after_results = next(row for row in rows
+                                     if row.get("event") == "css_after_results_retained")
+            css_after_results["rules_state"]["stock_time_limit"] = 0
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            with self.assertRaisesRegex(RuntimeError, "Results/CSS return"):
+                verify_vs_rules_plus_timer_route(path)
+            css_after_results["rules_state"]["stock_time_limit"] = 1
 
             committed_row = next(row for row in rows if row["event"] == "vs_items_back_committed")
             committed_row["rules_state"]["item_frequency"] = 0xFF
@@ -144,12 +217,12 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
                 verify_vs_rules_items_route(path)
             committed_row["rules_state"]["item_frequency"] = -1
 
-            rows[-1]["rules_state"]["stock_count"] = 4
+            css_after_results["rules_state"]["stock_count"] = 4
             path.write_text("".join(json.dumps(row) + "\n" for row in rows))
             with self.assertRaisesRegex(RuntimeError, "Results/CSS return"):
                 verify_vs_rules_items_route(path)
 
-            rows[-1]["rules_state"]["stock_count"] = 3
+            css_after_results["rules_state"]["stock_count"] = 3
             match_players[1]["slot_type"] = 1
             path.write_text("".join(json.dumps(row) + "\n" for row in rows))
             with self.assertRaisesRegex(RuntimeError, "StartMeleeData"):
@@ -231,7 +304,11 @@ fs.writeFileSync(path, createMeleeGCI(profile, new Date('2026-01-01T00:00:00Z'))
         add(1, 1, "PRESS D_UP", 2, 0)
         add(1, 1, "PRESS A", 2, 3)
         add(1, 1, "PRESS D_DOWN", 13, 0)
-        add(1, 1, "PRESS START", 13, 1)
+        add(1, 1, "PRESS A", 13, 6)
+        add(1, 1, "PRESS D_RIGHT", 15, 0)
+        add(1, 1, "PRESS B", 15, 0)
+        add(1, 1, "PRESS A", 13, 6)
+        add(1, 1, "PRESS START", 15, 0)
         add(8, 2, "PRESS START")
         add(9, 2, "PRESS A")
         for button in ("L", "R", "A", "START"):
@@ -244,7 +321,9 @@ fs.writeFileSync(path, createMeleeGCI(profile, new Date('2026-01-01T00:00:00Z'))
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "commands.jsonl"
             path.write_text("".join(json.dumps(row) + "\n" for row in commands))
-            self.assertEqual(verify_vs_rules_items_route_commands(path)["commands"], 27)
+            result = verify_vs_rules_items_route_commands(path)
+            self.assertEqual(result["commands"], 31)
+            self.assertTrue(result["rules_plus_timer_route"])
             commands[12]["menu_state"]["confirmed"] = 1
             path.write_text("".join(json.dumps(row) + "\n" for row in commands))
             with self.assertRaisesRegex(RuntimeError, "Items B"):
@@ -534,6 +613,8 @@ fs.writeFileSync(path, createMeleeGCI(profile, new Date('2026-01-01T00:00:00Z'))
             "vs_items_one_bit_toggled", "vs_items_frequency_none", "vs_items_back_committed",
             "vs_rules_back_to_versus", "versus_back_to_main",
             "vs_rules_reentry_retained_items", "vs_rules_stock_three_selected",
+            "vs_rules_plus_entry", "vs_rules_plus_timer_one",
+            "vs_rules_plus_back_retained", "vs_rules_plus_reentry_retained",
             "css_after_rules_start_retained", "sss_after_rules_start",
             "sss_final_destination_selected", "vs_match_entered",
             "vs_match_after_180_ticks", "vs_no_contest_chord_sent",
