@@ -1,0 +1,260 @@
+{
+  "schema": "melee-web-audio-underrun-triage-v1",
+  "result": "bounded-investigation-no-audio-runtime-fix",
+  "evidence_labels": [
+    "Browser exercised"
+  ],
+  "source": {
+    "starting_commit": "473e97c41633043562bc5015e1add630d23b70b3",
+    "runtime_used": "641d40f3ba0601e952d00a604b70acda287978ed",
+    "profile": "audio-player",
+    "runtime_hash": "d850c24101899a19",
+    "unchanged_audio_module_sha256": {
+      "melee-runtime.mjs": "6d62cf1c56ff186f3987a756804734f15fb22dd72f96823b2525b13d72f6b82e",
+      "runtime-audio.mjs": "458f9fe6c42bcbc3785e318c999c9982f13d2ef4b3db167e10222ef8af0fdf24",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f"
+    },
+    "native_package": "Retained deployed artifact served read-only over loopback; frozen producer checkout was not mutated."
+  },
+  "staging_triage": {
+    "query_time_utc": "2026-10-02T23:00:31.904450+00:00",
+    "method": "authenticated read-only CLI query",
+    "complete": true,
+    "report_count": 4,
+    "clusters": [
+      {
+        "identity": "641d40f/d850c241/audio-player",
+        "reason": "simulation_debt",
+        "scene": "css",
+        "clock_owner": "simulation",
+        "count": 4,
+        "debt_ticks": [
+          15,
+          16
+        ],
+        "threshold_ticks": 8
+      }
+    ],
+    "actionable_genuine_incidents": 0,
+    "provenance": "Two direct retained per-session captures; two confirmed by the validation operator.",
+    "provenance_limit": "Original session-bearing exports for the first two controlled probes were not separately retained; operator confirmation identifies deliberate 250ms CSS foreground stalls.",
+    "receipt": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/staging-triage.json",
+      "sha256": "4b7cdeb4cf38dd5676568f1377e74c1e6e8154faacd6bd6d06750f00a8b92cb6"
+    },
+    "query": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/staging-reports-page-1.json",
+      "sha256": "2d0e62f87cb993484ea7231da770dfd9e111ae1f81bbe3e2b53769ecd854a93e"
+    }
+  },
+  "admin_cli_defect": {
+    "observed": "The existing CLI rejected a real authenticated query with invalid_received_at.",
+    "cause": "Server envelope Unix milliseconds were validated against the 1e12 measurement cap. Current epochs exceed that limit.",
+    "fix": "Only received_at/expires_at envelope fields use the existing server/cursor safe-integer range, 0 through 9007199254740991. Report measurement bounds stay unchanged.",
+    "focused_tests": {
+      "result": "pass",
+      "count": 6,
+      "coverage": [
+        "current-date query/get",
+        "cursor",
+        "negative/fractional/boolean/unsafe epoch rejection",
+        "unchanged 1e12 measurement rejection",
+        "environment-only bearer secret",
+        "strict response allowlist",
+        "inclusive zero and safe-integer maximum"
+      ],
+      "log": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/admin-focused-final.log",
+        "sha256": "3dbb3cb8b730744e34a8b1f21ef3cf46fda3aabce80720d5c6f93083338c1358"
+      }
+    },
+    "hosted_verification": "The corrected CLI retrieved all four sanitized reports without exposing the bearer value or changing hosted data."
+  },
+  "historical_audio": {
+    "source_commit": "fe2492be44e77a19ee281053d33fc9bd39f8ac48",
+    "inventory": "Four natural cold/warm two-match attempts plus one separate controlled-contention attempt.",
+    "first_results_underruns": 0,
+    "second_results_underruns": [
+      192,
+      86,
+      86,
+      86,
+      43
+    ],
+    "counter_unit": "Missing stereo output frames in short render quanta after playback priming; cumulative across queue resets.",
+    "intervals": [
+      {
+        "id": "A-final-destination-cold",
+        "condition": "shared-host-uncontrolled",
+        "last_retained_zero_ms": 256492.60500001907,
+        "first_retained_positive_ms": 520676.9249999523,
+        "positive_counter": 192,
+        "original_report": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/A-final-destination-cold/shared-host-uncontrolled/report.json",
+          "sha256": "5b102ec1fd6a636395b2cbf520cef86a1fe772aa83ffcae7f68cd3e8aafa5dca"
+        }
+      },
+      {
+        "id": "A-final-destination-warm",
+        "condition": "shared-host-uncontrolled",
+        "last_retained_zero_ms": 293903.8449997902,
+        "first_retained_positive_ms": 514577.0649998188,
+        "positive_counter": 86,
+        "original_report": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/A-final-destination-warm/shared-host-uncontrolled/report.json",
+          "sha256": "c5fb5068b7566ecbb4ddf0d4d4ae468420dc2781ca47036c82e00aed460d7da7"
+        }
+      },
+      {
+        "id": "B-battlefield-cold",
+        "condition": "shared-host-uncontrolled",
+        "last_retained_zero_ms": 234488.3599998951,
+        "first_retained_positive_ms": 456696.24499988556,
+        "positive_counter": 86,
+        "original_report": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/B-battlefield-cold/shared-host-uncontrolled/report.json",
+          "sha256": "26b31b692d47b0b74a7a07cf043224a0f94f8d1c926b0f6b4720ceb3776af3b2"
+        }
+      },
+      {
+        "id": "B-battlefield-warm",
+        "condition": "shared-host-uncontrolled",
+        "last_retained_zero_ms": 289530.7650001049,
+        "first_retained_positive_ms": 546961.5099999905,
+        "positive_counter": 86,
+        "original_report": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-integrated-validation-20261002-20261002-004703-b6247087/natural/B-battlefield-warm/shared-host-uncontrolled/report.json",
+          "sha256": "a84d4d2cf78cd0dcdb286bb4f0086fc617f0bb90c98b16402844ab0fdd27168f"
+        }
+      },
+      {
+        "id": "A-final-destination-cold",
+        "condition": "controlled-contention",
+        "last_retained_zero_ms": 267364.09999990463,
+        "first_retained_positive_ms": 537128.6300001144,
+        "positive_counter": 43,
+        "original_report": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/diagnostics-controlled-contention-fe2492b-20261002-020249-ed89cb6f/A-final-destination-cold/controlled-contention/report.json",
+          "sha256": "6d617cf6aa9dd5957ef1da918bda658edced58bf0bc4d00a68d199f0793aea18"
+        }
+      }
+    ],
+    "retention_limit": "Only 16 tail queue reports survive at each Results snapshot. The first increment and the scene/PCM at that instant are not recoverable from these files.",
+    "reporting_limit": "The worklet posts queue counters every 128 render quanta; state acknowledgements also carry the cumulative counter. A later frontend scene or enabled flag does not identify the state at the first increment.",
+    "receipt": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/retained-underrun-intervals.json",
+      "sha256": "a69a8a085b4b3b12a8266a0eb2d96399b5d3d76a3f72287f0ba26285243f68a3"
+    }
+  },
+  "reduced_browser": {
+    "result": "pass",
+    "browser": "154.0.8037.97",
+    "browser_mode": "headless installed Chrome",
+    "speaker_output": "muted with shared browserLaunchOptions; AudioContext, worklet and source PCM remain active",
+    "scenario": "Ordinary B0XX input: CSS -> SSS -> Mario/Final Destination -> No Contest -> original Results -> CSS -> SSS -> second match entry.",
+    "wall_cap_seconds": 120,
+    "retained_events": 67,
+    "first_underrun_events": 0,
+    "errors": [],
+    "instrumentation": "Local request interception adds an immediate worklet counter-increment packet; callback wrappers retain scene/running/preparation transitions. No source clock/input mutation, Resume, guard relaxation or production schema change.",
+    "scope_limit": "A No Contest two-human-player route does not reproduce or classify the four-CPU natural Results intervals. Instrumentation does not establish shipping performance or audible/PCM equivalence.",
+    "first_attempt": "Route completed, but Eject reload erased the trace. Retained as an observability failure; no audio finding claimed.",
+    "first_attempt_receipt": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/first-run-observability-failure.json",
+      "sha256": "d6c959bb7399af4b5093cdef39f27f99945764ec4139be845a8829c47234d4dd"
+    },
+    "report": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/run-2/reproducer-report.json",
+      "sha256": "8efb64a6be262e431d946b163a32a2c5c08b7a09fc95e50a30e5040ceb9dac1c"
+    },
+    "screenshot": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/run-2/second-match.png",
+      "sha256": "71f36f72ef37276a0cf9eff41d6b10dfef50a7810fd68499016ea7b2d77e3024"
+    },
+    "worklet": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/run-2/instrumented-audio-worklet.js",
+      "sha256": "b48eeafbde9934765f6518d3e3762da17fe74d341c50d3862ef3b4e2c6abfc2d"
+    },
+    "harness": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/first-underrun-reproducer.mjs",
+      "sha256": "41fb5f3235a27bfe941202941b7ae35d01e24637cb3551980826eec69b7c7353"
+    }
+  },
+  "counter_reducer": {
+    "result": "pass",
+    "existing_tests": [
+      "tests/audio_ring_test.mjs",
+      "tests/audio_worklet_test.mjs"
+    ],
+    "observed": "An enabled, primed ring with 85 queued frames and a 128-frame quantum emits 85 stereo PCM frames, zero-fills 43 and increments the counter by 43. Subsequent 12800 re-prime silence frames add nothing, and reset retains 43.",
+    "scope": "Synthetic FIFO semantics only; it does not reproduce the historical game failure or quantify audible missing sound.",
+    "report": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/counter-boundary.json",
+      "sha256": "2cbb82f87a57f11aa1ab5c6420d08814e375e5247134a1b8d5a255b0e1478b4b"
+    },
+    "harness": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/counter-boundary.mjs",
+      "sha256": "a2d4cbf611145487a2cb744bae0685b0cc92bd5984cb8d11fc601d8fabad7c46"
+    }
+  },
+  "validation": {
+    "python_cli_compilation": "pass",
+    "full_suite": {
+      "result": "pass",
+      "tests": 1721,
+      "skipped": 137,
+      "seconds": 406.209,
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "log": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/full-suite-final.log",
+        "sha256": "b24634f5fb0534b1d7d4d81893654564423720ad28c0023a9bb6f7f942eb89e3"
+      }
+    },
+    "initial_unprepared_suite": {
+      "tests": 1608,
+      "failures": 9,
+      "errors": 48,
+      "skipped": 227,
+      "seconds": 137.818,
+      "classification": "Fresh-checkout setup failures: absent pinned Node/Aurora/source dependencies; retained, then repository bootstrap and configure-only entry points run before rerun.",
+      "log": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/full-suite.log",
+        "sha256": "add4a8ef75e77c051f0ca89953a4c5e4854362aed0ff36ee0f2c63d488bf41e7"
+      }
+    },
+    "bootstrap": "pass",
+    "source_configuration": "pass; standard gameplay Release and RelWithDebInfo configure-only entry points; fixture traces built and exercised by the full suite",
+    "browser_runtime_build": "Unchanged native/audio modules; read-only frozen641d40f package used. This CLI-only code change has no affected native target.",
+    "prepared_release_suite": {
+      "tests": 1701,
+      "failures": 2,
+      "errors": 1,
+      "skipped": 141,
+      "seconds": 278.979,
+      "classification": "Three fixture checks expected build/browser, while the first configure selected build/browser-release. Preserved, then the standard RelWithDebInfo configure-only entry point created the expected directory before the passing rerun.",
+      "log": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/full-suite-prepared.log",
+        "sha256": "0b1b37c15d3c52d773480f94a2903e7c563d3156f5144a4c891de76ead79ab99"
+      }
+    },
+    "test_fixture_configuration": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/forced-pause-audio-first-increase-20261002-155115-d1e36010/configure-test-fixtures.log",
+      "sha256": "05acd412979f4a275ea2ba440eedec777f03b9540869f77bbc0035d9fa161e94"
+    },
+    "evidence_verification": {
+      "result": "pass",
+      "retained_hashes_verified": 20,
+      "unchanged_audio_module_hashes_verified": 4
+    }
+  },
+  "stopping_rule": "After two short browser experiments, reduce/reuse FIFO/worklet tests and produce this bounded review packet. No repeated long soak or speculative audio runtime edit.",
+  "next_action": "If continuing this audio boundary, extend the existing four-CPU harness to retain the first increment immediately with worklet audio time, last PCM/state time, source scene/running and preparation, then stop at that increment or the existing finite campaign cap. Do not infer its cause from a later cumulative snapshot.",
+  "limits": [
+    "No genuine user pause identified in this query snapshot.",
+    "Historical first audio increment remains unlocated; active starvation versus lifecycle/preparation remains uncertain.",
+    "No audible glitch, uninterrupted audio or PCM equivalence claim.",
+    "Quiet-machine and foreground timing, physical controllers and arranged audible-output protocols were not run.",
+    "No new production collection, merge, provisioning, plan change or deployment."
+  ]
+}

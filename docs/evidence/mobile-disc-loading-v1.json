@@ -1,0 +1,180 @@
+{
+  "schema": "melee-web-mobile-disc-loading-evidence-v1",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Browser exercised"
+  ],
+  "result": "Measured pending-payload ownership reduction and bounded functional route; physical mobile crash and whole-session acceptance remain open",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/134",
+  "source": {
+    "base_main": "473e97c41633043562bc5015e1add630d23b70b3",
+    "executable_checkpoint": "ac1f22c75892aa525504fbf986c85583f16418ed",
+    "tested_files_sha256": {
+      "web/disc-session.mjs": "80cf5b766afe66a8e6a35fc33208f9f849f40a61cdfe9eb97b9ba6a587df327d",
+      "web/runtime-assets.mjs": "f93e87c7a63b873a398bc561bd09421004a211db4f761a7c64cae9e5f492064b",
+      "web/runtime-audio-assets.mjs": "5a5f540492304e45367d25f00497d868a6e7ad6370cdef64c5eebe2bf5ae5319",
+      "web/melee-runtime.mjs": "8e163d5ff61bde22956dc05f17a067c3bc5486bfa0c1c5fa60579e098a9da2fc",
+      "tests/disc_session_test.mjs": "efbef925fad3153cb4f143c344bf684241c302e1eac57136f0f34559e777cbc7",
+      "tests/melee_runtime_owner_test.mjs": "9893d938a185e06bc2659a6d2b2ae5571168f8c92832913f5aea0270d9c45d20",
+      "tests/melee_runtime_scope_owner_test.mjs": "ea2f64f0b85a48bfd8f2a6362cba23d6f8b1e140a979cfd4e141ddbbac7a7d44",
+      "tests/test_melee_runtime_scope_owner.py": "f6fb386b2fff7e8d3cbde33b6257b43860326ad5add331e4a4a11ceaf7b70ed9",
+      "tests/public_scene_assets_test.mjs": "6cc60c6854dab70c1441b096383e7fbeaf71b70155d773ba71e48a960b33b57c"
+    }
+  },
+  "source_scope": "Frozen executable checkpoint. Later evidence/index documentation does not change tested code or relabel the packaged bytes. The comparison uses the retained shipped native package with four loader module overlays; its instrumented module hashes stay in the private reports. Final packaging separately validates committed adapter receiver compatibility.",
+  "observation": {
+    "shipped_source_commit": "641d40f3ba0601e952d00a604b70acda287978ed",
+    "shipped_runtime_hash": "d850c24101899a19",
+    "shipped_profile": "audio-player",
+    "incident_query_at_pdt": "2026-10-02 21:27:55.472208 PDT",
+    "incident_query_at_utc": "2026-10-03 04:27:55.472208 UTC",
+    "new_reports": 0,
+    "known_controlled_reports": 4,
+    "crash_completeness": "No report received does not exclude a crash; hard termination can prevent JavaScript capture/persistence/upload. No incident-specific iOS identity or last lifecycle state was received."
+  },
+  "reuse_and_change": {
+    "reused": [
+      "Validated local File and executable identity, immutable FST and full-scope preflight",
+      "Existing eight-file/eight-MiB/eight-ms native handoff",
+      "Existing 64-MiB file and 128-MiB requested FST budgets",
+      "Transactional RuntimeAssetScope copies and complete commit/abort",
+      "Source-authored menu and all original SSM bank names; generated font and verified DSP coefficients"
+    ],
+    "change": "Yield complete caller-owned payloads under consumer backpressure; flush bounded pending batches before reading the entire scene into a Map. Existing readScope remains available for complete-map consumers.",
+    "rejected": "No guessed bank subset, source table exemption, reduced source rate, changed timing guard, forced garbage collection or native arithmetic change."
+  },
+  "ownership_comparison": {
+    "browser": "Google Chrome 154.0.8037.97, headless installed through scripts/browser_tools.mjs, speakers muted with real Web Audio processing",
+    "files": 73,
+    "total_payload_bytes": 32470784,
+    "largest_file_bytes": 3811401,
+    "baseline_pending_payload_bytes": 32470784,
+    "candidate_pending_payload_bytes": 8350812,
+    "reduction_bytes": 24119972,
+    "reduction_percent": 74.28207461821678,
+    "agreement": "Complete transfer name/size/order and endpoint bytes agree; selected complete file, font and DSP bytes checked in owned-disc tests.",
+    "bound": "At most an existing bounded batch plus the next complete file. One valid file may exceed the batch budget. This bound does not include disc-reader transient copies, retained executable, native staging/active data, GPU resources or deferred garbage collection.",
+    "wasm_reserved_bytes_at_css": 334102528,
+    "remaining_startup_long_task_ms": {
+      "baseline": 3505,
+      "candidate": 3467
+    },
+    "timing_scope": "One descriptive run per variant on a shared host with instrumentation and uncontrolled driver/cache state. Not foreground timing or mobile performance admission. Wasm reservation is linear memory capacity, not live allocation or whole-process memory.",
+    "final_code_match": "The final DiscAssetSession and transfer owner bytes exactly match the measured candidate. Adapter streaming behavior is unchanged; a later receiver-independent readScope compatibility repair is covered by the final focused suite and committed package route."
+  },
+  "webkit_reader": {
+    "engine": "Playwright desktop WebKit 26.5",
+    "result": "pass",
+    "checks": [
+      "Real local File/Blob bounded physical slices",
+      "Full preflight before payload reads",
+      "Lazy pull and consumer backpressure",
+      "Complete selected bytes, font and verified DSP order",
+      "Close while yielded preserves caller-owned bytes and rejects the next pull",
+      "Full authored 73-file scope"
+    ],
+    "omissions": "No native runtime, graphics or Web Audio mounted; these are unreachable from the pure reader fixture. This is not physical iOS or full WebKit gameplay validation."
+  },
+  "packaged_route": {
+    "source_commit": "ac1f22c75892aa525504fbf986c85583f16418ed",
+    "runtime_hash": "6213ef57b94f3b78",
+    "profile": "audio-player",
+    "identity_sha256": "703b922f0991a35fb4555fda148e9d1c608d4149bb6596f4846ce0560e75ca1a",
+    "result": "pass",
+    "checks": [
+      "HTTP inventory/byte/header/blocked-route verification",
+      "CSS nonzero PCM",
+      "SSS nonzero PCM",
+      "match nonzero PCM",
+      "Results nonzero PCM",
+      "CSS return nonzero PCM",
+      "warm CSS nonzero PCM",
+      "original routed source scenes and warm menu round trip",
+      "Eject returns to import control"
+    ],
+    "timing_pauses": 0,
+    "resume_actions": 0,
+    "runtime_errors": 0,
+    "scope": "Original CSS/SSS, short four-stock Mario/Final Destination match, deliberate No Contest Results, CSS return, warm CSS/SSS round trip and Eject. Real nonzero PCM transport at each scene. This is a short functional route, not a natural ending, sustained-play acceptance, pixel comparison or uninterrupted audio gate. Screenshots are retained at early scene boundaries.",
+    "http_scope": "Real local manifest-allowlisted server applies actual package _headers and verifies inventory, bytes, aliases and blocked routes. Cloudflare hosted routing and reporting backend are not exercised by this fixture. No hosted deployment."
+  },
+  "validation": {
+    "focused_tests": {
+      "runtime_owner_startup_wrappers": 33,
+      "owned_disc": 3,
+      "result": "pass"
+    },
+    "build": "runtime-audio-preview Release passed; gameplay RelWithDebInfo graph configured for unit fixtures",
+    "initial_full_suite": {
+      "tests": 1723,
+      "skipped": 137,
+      "failures": 2,
+      "cause": "Existing CPU-report mocks classify any absolute path containing browser as browser evidence. External scratch named browser-tmp misclassified retail/native observations. No production code failure inferred. Failed run retained.",
+      "reduction": "All 18 CPU-report tests pass with neutral external scratch; full suite rerun uses that changed environment."
+    },
+    "full_suite_final": {
+      "result": "pass",
+      "tests": 1723,
+      "skipped": 137,
+      "duration_seconds": 324.64,
+      "environment": "Neutral external TMPDIR; pinned bootstrap and configured gameplay unit graph; no production changes between the retained failed run and this environment-corrected rerun."
+    }
+  },
+  "retained_failures": {
+    "browser_probe_preparation": "Two unique-replacement assertion failures reduced with a no-browser overlay preparation check.",
+    "browser_baseline": "Wrong root MIME then an overly strict one-adapter assertion; reports/logs retained, real player uses two successful adapter requests.",
+    "browser_candidate": "A preimport chooser timeout before native API readiness; later run waits for the native API. No payload measurement or user crash reproduction from that failure.",
+    "package_route": "B0XX input without selecting the layout, then an unnecessary confirmation for an already-selected Everything mode. Both reduced with a passing no-disc startup Controls/Settings inventory before another route."
+  },
+  "physical_ios": {
+    "status": "unrun",
+    "reason": "Xcode tools report no available simulator and no connected device. Desktop engine checks and Chrome viewport tests would not establish a physical iOS termination fix."
+  },
+  "limits": [
+    "No root cause identified for the reported iOS tab termination.",
+    "Pending JavaScript payload ownership improved; process/GPU memory peaks and device memory limits remain unmeasured.",
+    "The large Wasm reservation and roughly 3.5-second preparation long task remain next boundaries to reduce.",
+    "No new telemetry, save content changes, native source simulation changes, timing Resume, GitHub merge or hosted deployment.",
+    "Retail state/pixel/PCM comparison, physical input, foreground timing, arranged audible output and whole-session mobile performance remain open."
+  ],
+  "private_evidence": {
+    "root": "/Volumes/AgentStorage/melee-web/runs/mobile-disc-loading-20261002-213117-d487d66a",
+    "sha256": {
+      "scope-ownership-baseline.json": "9efcb5a159db0f678f4f4cb0021200075505772c7f33ee4175781a4fca14d65f",
+      "scope-ownership-streamed.json": "d243b5978283481e7435e61e1e3b1c60f747d7f4905c1496f43f092b57bbcd2e",
+      "browser-baseline-5/report.json": "f2f397ec117232a5e1fb820c745a4f5d48d38690a99178e42a816a82a9797536",
+      "browser-candidate-2/report.json": "d3e2ac87b8176191e40e4119fad1fd811e54b7482dd5b582855f0f047954b765",
+      "browser-comparison.json": "81ed74221beec4ce5cf2dd204d9f06bfdc7f55dac2f5a8f694ec2843ab1a595d",
+      "webkit-reader/report.json": "7f11a03f7c6f2079a4cd646b268a24e3ca2710e8fa6790319c07be2b55b83ba4",
+      "package-manifest.json": "dc3a7e2719a9b7c3c5fcd0f2d3e5f64b612c490c5df78cb17a1e40507057acce",
+      "package-route-3/report.json": "0922114cdb840d15ad2370c94e8a6e6f9af4478a9f954d910963b18a14bde000",
+      "package-route-3/http-report.json": "bdebc4aa79aaa448f3da066802321051b19523007e1b15a861ce0f0ba416c92d",
+      "focused-final.log": "f26d9ce9487d8e2da29bb34047d3300062842710c9a05aa5d035adaafdc57fcd",
+      "disc-focused-final.log": "7eccf53ab837e9e7972c3da077ccc4ef3706d01b6f8326aab09ce83667a8b68c",
+      "build-audio-release.log": "5f24678277edca25b97e9325fcf2aa29b8ac6b3d3c85b157537a4ba00728988a",
+      "configure-gameplay.log": "78d4629034a96d21d50d40e8adc973bd6127a56bc9ea0b17ff3c790ffeadf540",
+      "full-suite.log": "4a982abc74ce4baba11e402df6dbc35682f2cb20ff9015f8b3943098b4cdfc1e",
+      "cpu-report-neutral-scratch.log": "79babc00d7a8f7cf8df301a1f21f71705959c693b1b97b700ca402196a9d397d",
+      "browser-import-probe.mjs": "8c77da6a6d5f1ff351cac87fc63c91f4d2c75715ca00bf08883151956d5a00b6",
+      "webkit-reader-probe.mjs": "4ed1dd1a52f65364d4ba48064d4eb7b655d12097a676e41df8a950cdfbc4158e",
+      "package-route-probe.mjs": "27681c9bceb50ee909324461a6e0cf42312ab0f88d1d02335a1dc39d2cf2605e",
+      "simulators-available.json": "fcb5bb70722101f56e740e0e66b19fda92acae0235f827f11046594634e9593d",
+      "devices-available.log": "9a62266bcb92bcc0cf47f4cd1121133082d095f4af7a7438f377b80f863d7f5c",
+      "full-suite-neutral.log": "db0134933880dad982a214f55c00bb5b5b5f4142aca8b92d7290b3de36579685",
+      "package-route/report.json": "b30e19ba3bda9465f1abf00dbb01f5a602130bd45517c18854469d17942c3295",
+      "package-route-2/report.json": "aa388c1cf38d4ba66fba5250144e145b3df9e8fd77d7b204c9a0033d98d5e4f7",
+      "package-route-inventory/report.json": "6993091e968d3b484923bfee1f0ce03a26637ccc4cc6c3aff131fe2bdf770ec8",
+      "browser-baseline.log": "51c65e695a7c7e9a3fcfaf2dd981a3c375de480332802fe1392eb802f4d61a50",
+      "browser-baseline-2.log": "99dcf4812c03878841298143bb302050c2929e2a730dc6c2574bc4ab6a730a92",
+      "browser-baseline-3/report.json": "1570c774c91376cec095b9f3b7ee71734ee2d1d41b610bf67d233ab39af89d50",
+      "browser-baseline-4/report.json": "1020f4b3f26545eef0fa913949a28e67ee64d8b84b4dfeedbe8482654da4f211",
+      "browser-candidate-1/report.json": "b318511c6be35a14733e786a0d12c6561e9134f425087396210fa60977b1ad2a",
+      "browser-preparation-reducer.log": "2eb9c3cdf6c368cdb7f7d018e4b502d1744f813a70b6f9e16487ba14060bc9bd",
+      "gpu-observation-reducer.json": "f4c55bd01a8436b79385fb0780ee47c080833432671eb62fb22868882e5a36db",
+      "package-audit.log": "75171b06b8f5b471cd2e72fac1cb52a29cf728deee3b3cb239d8f326721573ae",
+      "package-prepare.log": "75171b06b8f5b471cd2e72fac1cb52a29cf728deee3b3cb239d8f326721573ae"
+    }
+  },
+  "cleanup": "Owned Chrome/WebKit browsers and HTTP servers closed; owned probe/profile processes absent. Passing scratch removed by each test owner; failed evidence and current incremental build retained for review."
+}

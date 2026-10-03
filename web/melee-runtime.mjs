@@ -1,6 +1,9 @@
 /** One player owner per document. Native source ticks remain owned by the compiled player. */
 import {loadNativeGameDisc, openNativeGameDiscSession} from './runtime-assets.mjs';
 import {createControllerManager} from './controller-input.mjs';
+import {createRuntimeDiagnostics} from './runtime-diagnostics.mjs';
+import {createDiagnosticsDelivery} from './runtime-diagnostics-delivery.mjs';
+import {DIAGNOSTICS_PREFERENCE_KEY, readDiagnosticsPreference, writeDiagnosticsPreference} from './diagnostics-settings.mjs';
 
 let documentOwner = null;
 function releaseDocumentReservation(reservation) {
@@ -20,6 +23,7 @@ const SOURCE_STREAM_FILES = Object.freeze(['MvOpen.mth', 'MvHowto.mth', 'MvOmake
 export async function mountMeleeRuntime({canvas, onState = () => {}, onError = () => {},
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
   readDisc = loadNativeGameDisc, openDisc = openNativeGameDiscSession, createAudio,
+  diagnosticIdentity = null, recordDiagnostics = true,
   loaderUrl = new URL('./gameplay_public.js', import.meta.url), startupTimeout = 60000} = {}) {
   if (!canvas || canvas.id !== 'canvas') throw Error('The player requires its own #canvas.');
   if (documentOwner) throw Error('Reload the page to start a fresh player.');
@@ -77,6 +81,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let ready = false, fatal = false, destroyed = false, bundle = false, prepared = false, hasLocalData = false;
   let startupCacheReady = false;
   let busy = '', message = '', progress = null, inputDirty = true, lastState = '';
+  // The browser may withhold every native callback between hidden and visible.
+  // Retain that boundary until native can reset its wall clocks and input once.
+  let lifecycleSuspended = false;
   let loading = Object.freeze({phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
   let preparationLabel = '', preparationKeepsAudio = false;
   let discSession = null, assetTransfer = null;
@@ -84,9 +91,93 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   const openedDiscSessions = new WeakSet();
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
+  let diagnostics = null, diagnosticActive = true, longtaskObserver = null, diagnosticPreparationAt = null;
+  let diagnosticDelivery = null, diagnosticDeliveryTimer = null, diagnosticRetainedLoaded = false;
+  let diagnosticGeneration = 0;
+  let automaticDiagnostics = readDiagnosticsPreference();
+  function diagnosticDeliveryBlocked() {
+    // Fatal owners cannot consume another native handoff. Once visible, their
+    // sanitized failure may be delivered despite abandoned preparation state.
+    return document.hidden || destroyed || (!fatal &&
+      (lifecycleSuspended || !!busy || !!preparationLabel || !!loading));
+  }
+  function cancelDiagnosticDelivery() {
+    diagnosticGeneration++;
+    if (diagnosticDeliveryTimer !== null) clearTimeout(diagnosticDeliveryTimer);
+    diagnosticDeliveryTimer = null;
+  }
+  function scheduleDiagnosticDelivery() {
+    if (!diagnostics || !diagnosticDelivery || diagnosticActive || destroyed ||
+        diagnosticDeliveryBlocked() || !automaticDiagnostics || diagnosticDeliveryTimer !== null ||
+        !diagnosticDelivery.getStatus().eligible) return;
+    const generation = diagnosticGeneration;
+    // Complete the bounded post-event window away from the native callback.
+    diagnosticDeliveryTimer = setTimeout(async () => {
+      diagnosticDeliveryTimer = null;
+      const eligible = () => !diagnosticActive && !diagnosticDeliveryBlocked() &&
+        automaticDiagnostics && generation === diagnosticGeneration;
+      if (!eligible()) return;
+      try {
+        if (!diagnosticRetainedLoaded) {
+          const retained = await diagnostics.loadRetained();
+          if (!eligible()) return;
+          diagnosticRetainedLoaded = true;
+          for (const record of retained.records || []) {
+            diagnosticDelivery.enqueue({...record, incidents: [record.incident]});
+          }
+        }
+        if (!eligible()) return;
+        diagnosticDelivery.enqueue(diagnostics.exportReports());
+        await diagnosticDelivery.flushWhenInactive();
+      } catch { /* Delivery is optional and isolated from gameplay and saves. */ }
+    }, 1100);
+  }
+  const diagnosticLifecycle = (type, detail) => { try { diagnostics?.lifecycle(type, detail); } catch {} };
+  const diagnosticActivity = active => {
+    if (active !== diagnosticActive) {
+      diagnosticActive = active;
+      try { void diagnostics?.setActive(active); } catch {}
+    }
+    try {
+      const blocked = diagnosticDeliveryBlocked();
+      diagnosticDelivery?.setActive(active || blocked);
+      if (active || blocked) cancelDiagnosticDelivery();
+      else scheduleDiagnosticDelivery();
+    } catch {}
+  };
+  const diagnosticAudio = data => {
+    try { diagnostics?.audio({timestamp: performance.now(), queue_depth: data.queued,
+      underruns: data.underruns, overflows: data.overflows,
+      clock_seconds: data.audio_clock_seconds, context_state: data.context_state,
+      enabled: data.enabled}); } catch {}
+  };
+  let longtaskAvailable = false;
+  try {
+    if (recordDiagnostics && typeof PerformanceObserver === 'function' &&
+        PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+      longtaskObserver = new PerformanceObserver(list => {
+        for (const entry of list.getEntries()) {
+          try { diagnostics?.longtask({timestamp: entry.startTime, duration_ms: entry.duration}); } catch {}
+        }
+      });
+      longtaskObserver.observe({type: 'longtask'});
+      longtaskAvailable = true;
+    }
+  } catch { longtaskObserver?.disconnect(); longtaskObserver = null; }
+  try {
+    const packaged = diagnosticIdentity || JSON.parse(
+      document.getElementById?.('runtime-diagnostic-identity')?.content || 'null');
+    if (recordDiagnostics) diagnostics = createRuntimeDiagnostics({identity: packaged,
+      audioAvailable: !!createAudio, longtaskAvailable});
+  } catch { /* Optional diagnostics must never stop the player or touch saves. */ }
+  if (!diagnostics) { longtaskObserver?.disconnect(); longtaskObserver = null; }
+  if (diagnostics) {
+    try { diagnosticDelivery = createDiagnosticsDelivery({optOut: !automaticDiagnostics}); }
+    catch { /* Local retention remains useful when delivery is unavailable. */ }
+  }
   const audio = createAudio?.({assetBase, onEvent: data => emit('audio', data),
     onError: error => { message = error.message; onError(error); publish(); }, onFatal: stop});
-  const emit = (name, data) => onEvent(name, data);
+  const emit = (name, data) => { if (name === 'audio') diagnosticAudio(data); onEvent(name, data); };
   let resolveStartup, rejectStartup;
   const startup = new Promise((resolve, reject) => { resolveStartup = resolve; rejectStartup = reject; });
   const Module = {
@@ -195,11 +286,15 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   function publish() {
     const state = snapshot(), key = JSON.stringify(state);
+    diagnosticActivity(!fatal && !destroyed && !document.hidden &&
+      (state.running || state.busy || !!state.loading || !!preparationLabel));
     if (key !== lastState) { lastState = key; onState(state); }
     return state;
   }
   function stop(error) {
     if (fatal || destroyed) return;
+    try { diagnostics?.trigger(4, null, null, null, null, 0); } catch {}
+    diagnosticActivity(false);
     fatal = true; message = String(error?.message || error || 'Player stopped. Reload to recover.');
     clearStartupTimeout();
     discSession?.close(); discSession = null;
@@ -235,6 +330,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     audio?.setEnabled(enabled);
   }
   const callbacks = {
+    menuDiagnosticSample: diagnostics?.observeNative || (() => {}),
+    menuDiagnosticIncident: diagnostics?.trigger || (() => {}),
     menuAudio(pcm) {
       if (!audio) throw Error('Audio output is disabled in this public alpha.');
       audio.write(pcm);
@@ -283,8 +380,14 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     },
     menuSourceReadDiscard(request) { sourceReadResults.delete(request); },
     menuServiceCommands() {
-      if (fatal || destroyed) return;
+      if (fatal || destroyed) return 0;
       for (const c of commands.splice(0)) { try { c.resolve(c.run()); } catch (error) { c.reject(error); } }
+      const suspended = lifecycleSuspended;
+      lifecycleSuspended = false;
+      if (suspended) {
+        Module._melee_web_input_set_activity(0, 0);
+        inputDirty = true;
+      }
       if (inputDirty) {
         inputDirty = false;
         Module._melee_web_input_set_keyboard(keyboard[0] ? 1 : 0);
@@ -292,9 +395,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         Module._melee_web_input_set_activity(document.hasFocus() && document.activeElement === canvas ? 1 : 0,
           document.hidden ? 0 : 1);
       }
+      return suspended ? 1 : 0;
     },
-    menuPreparation(label, keepAudio = false) { preparationLabel = label || 'Preparing original scene'; preparationKeepsAudio = !!keepAudio; message = ''; setLoading('native', 'Preparing game data…', 0, 0); emit('preparation', {label: preparationLabel, keepAudio}); publish(); },
-    menuPreparationDone() { preparationLabel = ''; message = ''; if (loading?.phase === 'native') { loading = null; refreshCatalogLoading(); } emit('preparationDone'); publish(); },
+    menuPreparation(label, keepAudio = false) { diagnosticPreparationAt = performance.now(); diagnosticLifecycle('preparation', {timestamp: diagnosticPreparationAt}); preparationLabel = label || 'Preparing original scene'; preparationKeepsAudio = !!keepAudio; message = ''; setLoading('native', 'Preparing game data…', 0, 0); emit('preparation', {label: preparationLabel, keepAudio}); publish(); },
+    menuPreparationDone() { const at = performance.now(); diagnosticLifecycle('preparation_done', {timestamp: at, duration_ms: diagnosticPreparationAt === null ? null : at - diagnosticPreparationAt}); diagnosticPreparationAt = null; preparationLabel = ''; message = ''; if (loading?.phase === 'native') { loading = null; refreshCatalogLoading(); } emit('preparationDone'); publish(); },
     menuPreparationCanceled() { preparationLabel = ''; preparationKeepsAudio = false; message = ''; if (loading?.phase === 'native') loading = null; emit('preparationCanceled'); publish(); },
     menuPreparationFailed(error) { preparationLabel = ''; preparationKeepsAudio = false; message = error || 'Native preparation failed'; if (loading?.phase === 'native') loading = null; emit('preparationFailed', message); publish(); onError(Error(message)); },
     menuAssetsRequested(generation) {
@@ -319,6 +423,30 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   for (const [name, callback] of Object.entries(callbacks)) window[name] = callback;
   function listen(type, listener) { window.addEventListener(type, listener, true); listeners.push([type, listener]); }
   for (const type of ['focus', 'blur', 'visibilitychange', 'focusin', 'focusout']) listen(type, () => { inputDirty = true; emit('focus'); });
+  listen('visibilitychange', () => {
+    diagnosticLifecycle(document.hidden ? 'visibility_hidden' : 'visibility_visible');
+    if (document.hidden) {
+      lifecycleSuspended = true;
+      // A paused document may already be inactive. Force the delivery adapter
+      // back to its active state until native consumes the sticky handoff.
+      diagnosticActivity(diagnosticActive);
+    } else if (fatal) {
+      diagnosticActivity(false);
+    }
+  });
+  for (const type of ['pagehide', 'pageshow', 'freeze', 'resume']) listen(type, () => {
+    if (type === 'pagehide' || type === 'freeze') {
+      lifecycleSuspended = true;
+      diagnosticActivity(diagnosticActive);
+    }
+    diagnosticLifecycle(type);
+  });
+  listen('offline', () => { try { diagnosticDelivery?.setOnline(false); } catch {} });
+  listen('online', () => { try { diagnosticDelivery?.setOnline(true); } catch {} });
+  listen('storage', event => {
+    if (event.key === DIAGNOSTICS_PREFERENCE_KEY || event.key === null)
+      setAutomaticDiagnostics(readDiagnosticsPreference(), false);
+  });
   listen('error', event => stop(event.error || event.message));
   listen('unhandledrejection', event => stop(event.reason));
   const focus = () => { if (!fatal && !destroyed) { canvas.focus(); inputDirty = true; } };
@@ -347,6 +475,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     });
   }
   async function snapshotSaveProfile({baseline = false} = {}) {
+    if (baseline && !prepared && snapshot().phase === 0) throw Error('Select a disc before exporting Everything unlocked.');
     if (!ready || fatal || destroyed) throw Error('The player is unavailable. Reload to recover.');
     const length = 0x1790 + 7 * 0x1F2C;
     const ptr = Module._malloc(length);
@@ -388,7 +517,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   async function put(name, bytes) {
     await boundary(() => putNow(name, bytes));
   }
-  async function putBatches(entries, generation = 0) {
+  async function putBatches(entries, generation = 0, reportProgress = true) {
     let complete = 0;
     const total = entries.length;
     while (complete < total) {
@@ -410,7 +539,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       complete += processed;
       // Keep this operation visibly active until native preparation starts;
       // the final batch transitions directly so 100% cannot linger.
-      if (complete < total) { setLoading('handoff', 'Preparing game data…', complete, total); publish(); }
+      if (reportProgress && complete < total) { setLoading('handoff', 'Preparing game data…', complete, total); publish(); }
     }
   }
   function reportDiscRead(p) {
@@ -422,6 +551,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   async function transferScope(generation) {
     if (!discSession) throw Error('The local disc session is unavailable.');
+    const diagnosticStarted = performance.now();
     try {
       await pauseAudioForPreparation();
       const names = await boundary(() => {
@@ -429,13 +559,25 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         return Array.from({length: count}, (_, index) =>
           Module.UTF8ToString(check(Module._melee_web_native_asset_name(generation, index))));
       });
-      const files = await discSession.readScope(names, reportDiscRead);
-      const entries = Array.from(files);
-      setLoading('handoff', 'Preparing game data…', 0, entries.length); publish();
-      await putBatches(entries, generation);
+      let batch = [], batchBytes = 0, files = 0, bytes = 0;
+      for await (const [name, data] of discSession.streamScope(names, reportDiscRead)) {
+        // The next file may exceed the existing batch budget on its own. Keep
+        // at most the bounded pending batch plus this one complete file alive.
+        if (batch.length && (batch.length >= IMPORT_BATCH_MAX_FILES ||
+            batchBytes + data.byteLength > IMPORT_BATCH_MAX_BYTES)) {
+          await putBatches(batch, generation, false);
+          batch = []; batchBytes = 0;
+        }
+        batch.push([name, data]); batchBytes += data.byteLength;
+        ++files; bytes += data.byteLength;
+      }
+      setLoading('handoff', 'Preparing game data…', 0, files); publish();
+      await putBatches(batch, generation, false);
+      batch = [];
       await boundary(() => check(Module._melee_web_native_asset_commit(generation)));
-      emit('assetScopeCommitted', {generation, files: entries.length,
-        bytes: entries.reduce((sum, [, data]) => sum + data.byteLength, 0)});
+      diagnosticLifecycle('asset_preparation', {timestamp: performance.now(),
+        duration_ms: performance.now() - diagnosticStarted, files, bytes});
+      emit('assetScopeCommitted', {generation, files, bytes});
       setLoading('native', 'Preparing game data…', 0, 0);
     } catch (error) {
       if (!fatal && !destroyed) await boundary(() => Module._melee_web_native_asset_abort(generation));
@@ -488,12 +630,26 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   const handle = Object.freeze({
     controllers: Module.meleeControllers,
     version: 1, getState: snapshot, focus,
+    getDiagnosticsSettings() {
+      let eligible = false;
+      try { eligible = diagnosticDelivery?.getStatus().eligible === true; } catch {}
+      return Object.freeze({eligible, automatic: eligible && automaticDiagnostics});
+    },
+    setAutomaticDiagnostics,
+    async exportDiagnostics() {
+      // Settings keeps this explicit serialization action off active gameplay.
+      if (diagnosticActive) return null;
+      try {
+        await diagnostics?.persist();
+        return diagnostics ? Object.freeze({current: diagnostics.exportReports(), retained: await diagnostics.exportRetained()}) : null;
+      } catch { return null; }
+    },
     activateAudio() { return prepareAudio(); },
     async openDiscSession(file) {
       if (typeof openDisc !== 'function') throw Error('This player has no local disc session loader.');
       const session = await openDisc(file);
       if (!session || typeof session !== 'object' || typeof session.close !== 'function' ||
-          typeof session.readScope !== 'function') {
+          typeof session.streamScope !== 'function') {
         session?.close?.();
         throw Error('The configured disc loader returned an invalid session.');
       }
@@ -506,7 +662,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     },
     importDisc(file, {preopenedSession = null} = {}) {
       if (preopenedSession && (!openedDiscSessions.has(preopenedSession) ||
-          typeof preopenedSession.close !== 'function' || typeof preopenedSession.readScope !== 'function')) {
+          typeof preopenedSession.close !== 'function' || typeof preopenedSession.streamScope !== 'function')) {
         return Promise.reject(Error('The selected disc session was not opened by this player. Choose the disc again.'));
       }
       let adoptedSession = false;
@@ -583,6 +739,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           catch (error) { onLog(`Source movie catalog cleanup failed: ${error.message}`, true); }
         }
         destroyed = true; syncAudio();
+        diagnosticLifecycle('scene_exit'); diagnosticActivity(false);
+        cancelDiagnosticDelivery(); diagnosticDelivery?.dispose();
+        longtaskObserver?.disconnect();
         discSession?.close(); discSession = null;
         try { await audio?.destroy(); }
         finally {
@@ -594,9 +753,17 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       return Object.freeze({requiresReload: true});
     },
   });
+  function setAutomaticDiagnostics(enabled, persistPreference = true) {
+    automaticDiagnostics = enabled === true;
+    if (persistPreference) writeDiagnosticsPreference(automaticDiagnostics);
+    cancelDiagnosticDelivery();
+    try { diagnosticDelivery?.setOptOut(!automaticDiagnostics); } catch {}
+    try { if (automaticDiagnostics) scheduleDiagnosticDelivery(); } catch {}
+    return automaticDiagnostics;
+  }
   // The development entry may attach tools before loading; these are never part of the public handle.
   onOwner?.({Module, boundary, handle, status, check, put, prepareAudio, pauseAudioForPreparation,
-    syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, stop, callbacks});
+    syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, stop, callbacks, diagnostics});
   configureModule?.(Module);
   // Native seed loading needs this directory even when optional browser
   // persistence is disabled or unavailable. Keep that prerequisite in the

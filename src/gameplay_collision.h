@@ -50,7 +50,9 @@ typedef struct MeleeWebCollisionFloorResult {
 typedef struct MeleeWebCollisionReadiness {
     uint32_t vertices, lines, joints, floor_islands, ceiling_islands, empty_lines;
     int storage_owned, original_indices_initialized;
-    int stage_joint_bindings_ready, stage_callbacks_ready; /* Remain false in this seam. */
+    /* True for an adopted dynamic source map only after its authored JObjs and
+     * source touch-line callback have been checked. Synthetic creation stays false. */
+    int stage_joint_bindings_ready, stage_callbacks_ready;
 } MeleeWebCollisionReadiness;
 
 /* Copies typed arrays, runs original mpLibLoad/pruning/island initialization,
@@ -61,8 +63,10 @@ typedef struct MeleeWebCollisionReadiness {
  * userdata destructor releases storage automatically on world shutdown. */
 MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput*, char* error, size_t error_size);
 /* Adopt collision arrays and the original link-6 updater after retail
- * Stage_8022524C has called mpLibLoad/mpLib_80058820. Does not load or allocate
- * another collision map. */
+ * Stage_8022524C has called mpLibLoad/mpLib_80058820 and the original stage
+ * callbacks have returned. Dynamic ranges require the loaded source map,
+ * authored per-joint JObj bindings, and source touch-line callback. Does not
+ * load or allocate another collision map. */
 MeleeWebCollision* melee_web_collision_adopt_loaded(const MeleeWebCollisionInput*, char* error, size_t error_size);
 /* Results' original dummy-stage entry calls mpLibLoad(NULL) itself. Adopt
  * its default-map arrays and original process so their ordinary GObj destructor

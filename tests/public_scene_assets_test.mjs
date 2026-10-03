@@ -28,6 +28,7 @@ const modulePath = path.join(directory, 'runtime-assets.mjs');
 await fs.writeFile(modulePath, substituted);
 
 let readCalls = 0;
+let payloadReads = 0;
 let metadataCalls = 0;
 let closeCalls = 0;
 let closed = false;
@@ -46,17 +47,17 @@ globalThis.testOpenDiscSession = async file => {
       if (closed) throw Error('DiscAssetSession is closed');
       return new Uint8Array(size).fill((name.length + offset) & 0xff);
     },
-    async readScope(scope, {beforeRead}) {
+    async *streamScope(scope, {beforeRead}) {
       if (closed) throw Error('DiscAssetSession is closed');
       ++readCalls;
       scopeCalls.push(Object.entries(scope));
-      const result = new Map();
-      for (const [name] of Object.entries(scope)) {
-        const index = result.size;
+      for (const [index, [name]] of Object.entries(scope).entries()) {
         beforeRead({name, index});
-        result.set(name, new Uint8Array([index + 1]));
+        if (closed) throw Error('DiscAssetSession is closed');
+        ++payloadReads;
+        yield [name, new Uint8Array([index + 1])];
+        if (closed) throw Error('DiscAssetSession is closed');
       }
-      return result;
     },
     fontBytes() {
       if (closed) throw Error('DiscAssetSession is closed');
@@ -100,7 +101,8 @@ try {
 
   const session = await openNativeGameDiscSession('owned-disc');
   const progress = [];
-  const files = await session.readScope(['PlCo.dat', 'LbRf.dat', 'sislib_font.bin'],
+  const readScope = session.readScope;
+  const files = await readScope(['PlCo.dat', 'LbRf.dat', 'sislib_font.bin'],
     event => progress.push(event));
   assert.deepEqual(scopeCalls, [[['PlCo.dat', 'PlCo.dat'], ['LbRf.dat', 'LbRf.dat']]],
     'logical names map to the exact native FST paths');
@@ -115,12 +117,24 @@ try {
   assert.equal(session.fileInfo('not-present.mth'), null);
   assert.equal((await session.readFile('MvOpen.mth', 32, 32)).byteLength, 32);
 
+  const pulled = session.streamScope(['PlCo.dat', 'LbRf.dat', 'sislib_font.bin']);
+  assert.equal(readCalls, 1, 'stream creation leaves the payload reader idle');
+  const first = await pulled.next();
+  assert.deepEqual(first.value, ['PlCo.dat', files.get('PlCo.dat')]);
+  const readsAfterPull = payloadReads;
+  await Promise.resolve();
+  assert.equal(payloadReads, readsAfterPull, 'paused consumer does not pull another payload');
+  const streamed = new Map([first.value]);
+  for await (const [name, bytes] of pulled) streamed.set(name, bytes);
+  assert.deepEqual(streamed, files, 'streaming retains complete file/font bytes and order');
+  assert.equal(readCalls, 2);
+
   for (const names of [['PlCo.dat', 'PlCo.dat'], ['unknown-native-name'], ['dsp_coef.bin']]) {
-    await assert.rejects(session.readScope(names), names[0] === 'dsp_coef.bin'
+    await assert.rejects(session.streamScope(names).next(), names[0] === 'dsp_coef.bin'
       ? /DSP coefficients/ : names[0] === 'unknown-native-name'
         ? /Unknown native scene asset/ : /duplicate/);
   }
-  assert.equal(readCalls, 1, 'invalid public names fail before any payload read');
+  assert.equal(readCalls, 2, 'invalid public names fail before any payload read');
 
   await assert.rejects(
     session.readScope(['PlCo.dat'], event => {

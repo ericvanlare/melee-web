@@ -450,6 +450,18 @@
       "report_sha256": "e55638d0a879d3751e29c199223ac3384c44268dc7d9680724b4f3ebf8926dde",
       "log_sha256": "2fa9224089247702954744ea0cb2b12fd586eb440f55d9d65b46686fa4ba6a28"
     },
-    "retry_decision": "Unchanged final source fixture passed independently; enlarge the whole-suite budget to720s with45s cleanup reserve. Preserve tests and compiler defaults."
+    "retry_decision": "Unchanged final source fixture passed independently; enlarge the whole-suite budget to720s with45s cleanup reserve. Preserve tests and compiler defaults.",
+    "current_main_refresh": {
+      "base_commit": "caf94659e95fad390a25e49eca79a94678400cbb",
+      "executable_conflicts": false,
+      "validator_and_test_source_unchanged": true,
+      "focused_tests": 73,
+      "focused_skipped": 3,
+      "focused_log_sha256": "87a847624eb9ecb42ff0ab0e4d99f9de9a73707da27ca00ef922efb9afc37d59",
+      "retained_capture_reaudit_sha256": "6c1c8322da54bb40ad2667e594013ed4bd14551b501ef6f3ec4713e602186489",
+      "peer_games": 72,
+      "own_interval_corrections": 8,
+      "scope": "Automatic current-main merge preserved additive reporter-framing documentation and source; unchanged rollback validator rechecked with focused tests and retained captures."
+    }
   }
 }

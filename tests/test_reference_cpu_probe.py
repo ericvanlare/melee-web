@@ -97,6 +97,8 @@ int main(int argc, char** argv) {
   else if (action == "invalid") assert(settings.present && !settings.valid && !CpuProbeEnabled() && !settings.error.empty());
   else if (action == "disabled") assert(settings.valid && !CpuProbeEnabled());
   else if (action == "enabled") assert(settings.valid && CpuProbeEnabled());
+  else if (action == "rand-return") assert(settings.valid && settings.rng_return_site == "rand_return" && settings.rng_return_pc == 0x80380524);
+  else if (action == "randf-return") assert(settings.valid && settings.rng_return_site == "randf_return" && settings.rng_return_pc == 0x8038057c);
   else assert(false);
 }
 '''
@@ -132,10 +134,15 @@ int main(int argc, char** argv) {
                     MWRC_CPU_PROBE_LAST_TICK="163")
         self.run_probe("enabled", **good)
         self.run_probe("disabled", **dict(good, MWRC_ENABLE="0"))
+        self.run_probe("rand-return", **dict(good, MWRC_ENABLE="1",
+                                               MWRC_CPU_PROBE_RNG_RETURN_SITE="rand_return"))
+        self.run_probe("randf-return", **dict(good, MWRC_ENABLE="1",
+                                                MWRC_CPU_PROBE_RNG_RETURN_SITE="randf_return"))
         for patch in ({"MWRC_CPU_PROBE_OUTPUT": ""}, {"MWRC_CPU_PROBE_MATCH": "64"},
                       {"MWRC_CPU_PROBE_FIRST_TICK": "-1"}, {"MWRC_CPU_PROBE_LAST_TICK": "99"},
                       {"MWRC_CPU_PROBE_LAST_TICK": "164"}, {"MWRC_CPU_PROBE_MATCH": ""},
-                      {"MWRC_CPU_PROBE_LAST_TICK": "4294967296"}):
+                      {"MWRC_CPU_PROBE_LAST_TICK": "4294967296"},
+                      {"MWRC_CPU_PROBE_RNG_RETURN_SITE": "0x80380524"}):
             with self.subTest(patch=patch):
                 self.run_probe("invalid", **dict(good, **patch))
 

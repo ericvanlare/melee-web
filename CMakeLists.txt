@@ -104,6 +104,7 @@ if(EMSCRIPTEN)
   # Native class construction retains original virtual callbacks. Link their
   # real SDK providers even when the diagnostic exercises load/free only.
   add_library(hsd_native_runtime STATIC src/hsd_texture_bounds.c src/hsd_native_camera.c src/hsd_native_arrays.c src/hsd_native_pobj.c src/hsd_native_joint.c src/hsd_native_common.c
+    src/gameplay_rng_draw_probe.c
     src/gameplay_stage_context.c src/gameplay_common_context.c "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c")
   foreach(unit class object hash id list jobj dobj mobj tobj texp texpdag tev sobjlib hsd_3924
       displayfunc state aobj fobj robj shadow wobj lobj spline mtx util quatlib
@@ -112,6 +113,9 @@ if(EMSCRIPTEN)
   endforeach()
   target_include_directories(hsd_native_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}")
   target_compile_definitions(hsd_native_runtime PUBLIC TARGET_PC)
+  if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+    target_compile_definitions(hsd_native_runtime PRIVATE MELEE_WEB_RNG_DRAW_OBSERVER=1)
+  endif()
   target_compile_options(hsd_native_runtime PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
     -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
     -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf

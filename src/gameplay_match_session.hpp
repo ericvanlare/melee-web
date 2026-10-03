@@ -39,6 +39,9 @@ public:
     uint32_t random_seed() const;
     int fighter_kind(unsigned index) const;
     const StartMeleeData& start_data() const;
+    // Copied menu selection only; safe during deferred construction and never
+    // traverses live fighters or serializes player/save data.
+    const StartMeleeData* diagnostic_start_data() const noexcept;
     MeleeWebMatchStats player_stats(unsigned index) const;
     MeleeWebAudio* audio() const;
     bool advance_construction();

@@ -14,6 +14,12 @@ int main()
     assert(!state.arm(true));
     assert(!MenuPreparationState::needs_live_render_settle(0));
     assert(MenuPreparationState::needs_live_render_settle(1));
+    assert(MenuPreparationState::needs_live_render_settle(0, 1, true, true));
+    assert(!MenuPreparationState::needs_live_render_settle(0, 1, true, false));
+    assert(!MenuPreparationState::needs_live_render_settle(0, 1, false, true));
+    assert(!MenuPreparationState::needs_live_render_settle(0, 0, true, true));
+    assert(!MenuPreparationState::needs_live_render_settle(0, -1, true, true));
+    assert(MenuPreparationState::needs_live_render_settle(1, -1, false, false));
 
     assert(state.request());
     assert(state.phase() == Phase::WaitingForAudio);

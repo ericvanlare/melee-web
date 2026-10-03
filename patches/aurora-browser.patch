@@ -85,7 +85,7 @@ index f8f9461..dcaaf02 100644
  if (AURORA_ENABLE_RMLUI)
      target_sources(aurora_gx PRIVATE
 diff --git a/extern/CMakeLists.txt b/extern/CMakeLists.txt
-index e1feaca..5051b3e 100644
+index e1feaca..70e4b17 100644
 --- a/extern/CMakeLists.txt
 +++ b/extern/CMakeLists.txt
 @@ -213,11 +213,36 @@ if (AURORA_ENABLE_GX)
@@ -747,7 +747,7 @@ index b3054be..9fe8bd7 100644
    switch (op.type) {
    case FrameOpType::RenderPass:
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83ef..157e619 100644
+index 9fd83ef..1adb5f4 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
 @@ -1,3 +1,6 @@
@@ -795,7 +795,7 @@ index 9fd83ef..157e619 100644
  namespace {
  constexpr Module Log{"aurora::gfx"};
  
-@@ -49,6 +66,46 @@ enum class BufferMapState {
+@@ -49,6 +66,43 @@ enum class BufferMapState {
  
  std::array<wgpu::Buffer, StagingBufferCount> g_stagingBuffers;
  std::array<std::atomic<BufferMapState>, StagingBufferCount> g_mappingStates;
@@ -805,13 +805,10 @@ index 9fd83ef..157e619 100644
 +  size_t previousUsed = 0;
 +
 +  void initialize(size_t capacity) {
-+    bytes = ByteBuffer{capacity};
-+    const bool allocated = bytes.data() != nullptr && bytes.size() == capacity;
-+    AURORA_ASSERT(allocated, "Browser staging shadow allocation failed ({} bytes)", capacity);
-+    if (!allocated) {
-+      std::abort();
-+    }
-+    bytes.clear();
++    // Keep the authoritative per-stream maximum without reserving the full
++    // capacity during renderer startup. The owner moves into FramePacket for
++    // the recording window and returns before that packet is reset.
++    bytes = ByteBuffer::bounded(capacity);
 +    previousUsed = 0;
 +  }
 +
@@ -842,7 +839,7 @@ index 9fd83ef..157e619 100644
  uint32_t g_frameIndex = UINT32_MAX;
  
  std::array<FramePacket, FrameSlotCount> g_framePackets;
-@@ -56,6 +113,99 @@ uint64_t g_nextFrameId = 1;
+@@ -56,6 +110,99 @@ uint64_t g_nextFrameId = 1;
  render_worker::FrameSlotPool g_frameSlots{FrameSlotCount};
  render_worker::FrameSlotPool g_stagingSlots{StagingBufferCount};
  
@@ -942,7 +939,7 @@ index 9fd83ef..157e619 100644
  struct RuntimeDrawType {
    std::string label;
    DrawCallback draw = nullptr;
-@@ -179,7 +329,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
+@@ -179,7 +326,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
    if (render_worker::is_idle()) {
      enqueue_process_events();
    }
@@ -955,7 +952,7 @@ index 9fd83ef..157e619 100644
  }
  
  void pace_frame_start() {
-@@ -239,6 +394,53 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
+@@ -239,6 +391,79 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
          }
        });
  }
@@ -982,6 +979,9 @@ index 9fd83ef..157e619 100644
 +    // that tail deterministic when the persistent shadow's next frame is
 +    // shorter than the previous one.
 +    if (bytes > used) {
++      // A growable owner can have capacity exactly equal to used. Reserve the
++      // aligned tail before touching it, while leaving logical size unchanged.
++      source.reserve_extra(bytes - used);
 +      std::memset(source.data() + used, 0, bytes - used);
 +    }
 +    g_queue.WriteBuffer(g_stagingBuffers[stagingSlot], offset, source.data(), bytes);
@@ -1005,11 +1005,34 @@ index 9fd83ef..157e619 100644
 +    shadows.textureUpload.observe(frame.textureUpload.size());
 +  }
 +}
++
++void return_browser_staging(size_t frameSlot, FramePacket& frame) {
++  auto& shadows = g_browserFrameStaging[frameSlot];
++  AURORA_ASSERT(frame.verts.max_capacity() == static_cast<size_t>(VertexBufferSize),
++                "Browser vertex staging owner lost its capacity bound");
++  AURORA_ASSERT(frame.uniforms.max_capacity() == static_cast<size_t>(UniformBufferSize),
++                "Browser uniform staging owner lost its capacity bound");
++  AURORA_ASSERT(frame.indices.max_capacity() == static_cast<size_t>(IndexBufferSize),
++                "Browser index staging owner lost its capacity bound");
++  AURORA_ASSERT(frame.storage.max_capacity() == static_cast<size_t>(StorageBufferSize),
++                "Browser storage staging owner lost its capacity bound");
++  if constexpr (UseTextureBuffer) {
++    AURORA_ASSERT(frame.textureUpload.max_capacity() == static_cast<size_t>(TextureUploadSize),
++                  "Browser texture staging owner lost its capacity bound");
++  }
++  shadows.verts.bytes = std::move(frame.verts);
++  shadows.uniforms.bytes = std::move(frame.uniforms);
++  shadows.indices.bytes = std::move(frame.indices);
++  shadows.storage.bytes = std::move(frame.storage);
++  if constexpr (UseTextureBuffer) {
++    shadows.textureUpload.bytes = std::move(frame.textureUpload);
++  }
++}
 +#endif
  } // namespace
  
  namespace detail {
-@@ -374,6 +576,9 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
+@@ -374,6 +599,9 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
  }
  
  void initialize() {
@@ -1019,7 +1042,7 @@ index 9fd83ef..157e619 100644
    g_frameIndex = 0;
    g_processEventsQueued.store(false, std::memory_order_release);
    g_lastPresentNs.store(0, std::memory_order_release);
-@@ -385,6 +590,18 @@ void initialize() {
+@@ -385,6 +613,18 @@ void initialize() {
      g_presentTimes.clear();
    }
    render_worker::initialize();
@@ -1038,7 +1061,7 @@ index 9fd83ef..157e619 100644
    // This appears to take a while and blocks the render thread for periods of time
    // render_worker::set_event_pump([] {
    //   if (g_instance) {
-@@ -420,15 +637,22 @@ void initialize() {
+@@ -420,15 +660,22 @@ void initialize() {
                 "Shared Storage Buffer");
    for (size_t i = 0; i < g_stagingBuffers.size(); ++i) {
      const auto label = fmt::format("Staging Buffer {}", i);
@@ -1061,7 +1084,7 @@ index 9fd83ef..157e619 100644
  
    {
      constexpr std::array layoutEntries{
-@@ -519,6 +743,10 @@ void initialize() {
+@@ -519,6 +766,10 @@ void initialize() {
  }
  
  void shutdown() {
@@ -1072,7 +1095,7 @@ index 9fd83ef..157e619 100644
    render_worker::synchronize();
    render_worker::shutdown();
    g_processEventsQueued.store(false, std::memory_order_release);
-@@ -556,12 +784,29 @@ void shutdown() {
+@@ -556,12 +807,29 @@ void shutdown() {
    for (auto& packet : g_framePackets) {
      packet = {};
    }
@@ -1102,7 +1125,7 @@ index 9fd83ef..157e619 100644
    g_frameSlots.reset();
    g_stagingSlots.reset();
    for (auto& state : g_mappingStates) {
-@@ -584,49 +829,116 @@ bool wait_for_staging_buffer(size_t slot) {
+@@ -584,49 +852,109 @@ bool wait_for_staging_buffer(size_t slot) {
    }
  }
  
@@ -1205,25 +1228,18 @@ index 9fd83ef..157e619 100644
 +  shadows.indices.prepare();
 +  shadows.storage.prepare();
 +  shadows.textureUpload.prepare();
-+  frame.verts = ByteBuffer{shadows.verts.bytes.data(), static_cast<size_t>(VertexBufferSize)};
-+  frame.uniforms = ByteBuffer{shadows.uniforms.bytes.data(), static_cast<size_t>(UniformBufferSize)};
-+  frame.indices = ByteBuffer{shadows.indices.bytes.data(), static_cast<size_t>(IndexBufferSize)};
-+  frame.storage = ByteBuffer{shadows.storage.bytes.data(), static_cast<size_t>(StorageBufferSize)};
++  frame.verts = std::move(shadows.verts.bytes);
++  frame.uniforms = std::move(shadows.uniforms.bytes);
++  frame.indices = std::move(shadows.indices.bytes);
++  frame.storage = std::move(shadows.storage.bytes);
 +  if constexpr (UseTextureBuffer) {
-+    frame.textureUpload = ByteBuffer{shadows.textureUpload.bytes.data(), static_cast<size_t>(TextureUploadSize)};
-+  }
-+  frame.verts.clear();
-+  frame.uniforms.clear();
-+  frame.indices.clear();
-+  frame.storage.clear();
-+  if constexpr (UseTextureBuffer) {
-+    frame.textureUpload.clear();
++    frame.textureUpload = std::move(shadows.textureUpload.bytes);
 +  }
 +#else
    size_t bufferOffset = 0;
    const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
    const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
-@@ -643,20 +955,74 @@ bool begin_frame() {
+@@ -643,20 +971,74 @@ bool begin_frame() {
    if constexpr (UseTextureBuffer) {
      mapBuffer(frame.textureUpload, TextureUploadSize);
    }
@@ -1298,7 +1314,7 @@ index 9fd83ef..157e619 100644
    if (g_cpuFrameStart.time_since_epoch().count() != 0) {
      const auto cpuFrameTime = PresentClock::now() - g_cpuFrameStart;
      update_ema(g_cpuFrameTimeNs, duration_ns(cpuFrameTime));
-@@ -669,14 +1035,40 @@ void end_frame(EndFrameCallback callback) {
+@@ -669,14 +1051,44 @@ void end_frame(EndFrameCallback callback) {
    const uint64_t frameId = frame.frameId;
    end_pipeline_frame();
    ++g_frameIndex;
@@ -1325,6 +1341,10 @@ index 9fd83ef..157e619 100644
 +    const double stagingStarted = phase_now_ms();
 +    write_browser_staging_ranges(stagingSlot, packet);
 +    observe_browser_staging(frameSlot, packet);
++    // Queue.WriteBuffer has copied each source prefix before this callback
++    // returns. Return ownership before packet={} so the next frame can grow
++    // the slot buffer without invalidating any pending encoder operation.
++    return_browser_staging(frameSlot, packet);
 +    const double stagingWritesMs = phase_now_ms() - stagingStarted;
 +#else
      g_stagingBuffers[stagingSlot].Unmap();
@@ -1341,7 +1361,7 @@ index 9fd83ef..157e619 100644
      auto afterSubmitCallbacks = std::move(packet.afterSubmitCallbacks);
      packet = {};
      g_resources.stats.drawCallCount = stats.drawCallCount;
-@@ -686,16 +1078,87 @@ void end_frame(EndFrameCallback callback) {
+@@ -686,16 +1098,87 @@ void end_frame(EndFrameCallback callback) {
      g_resources.stats.lastIndexSize = stats.lastIndexSize;
      g_resources.stats.lastStorageSize = stats.lastStorageSize;
      g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
@@ -1430,7 +1450,7 @@ index 9fd83ef..157e619 100644
  uint32_t current_frame() noexcept { return g_frameIndex; }
  
  void after_submit() noexcept { depth_peek::after_submit(); }
-@@ -734,5 +1197,11 @@ float calculate_fps() noexcept {
+@@ -734,5 +1217,11 @@ float calculate_fps() noexcept {
  }
  } // namespace aurora::gfx
  
@@ -4018,6 +4038,200 @@ index 29c9a48..deeb0aa 100644
  constexpr uint32_t ReplacementThumbnailDim = 64;
  constexpr uint64_t ReplacementPublishBudgetBytes = 12ull * 1024ull * 1024ull;
  
+diff --git a/lib/internal.hpp b/lib/internal.hpp
+index d1adb6c..543d1e6 100644
+--- a/lib/internal.hpp
++++ b/lib/internal.hpp
+@@ -4,9 +4,11 @@
+ 
+ #include <aurora/aurora.h>
+ 
++#include <algorithm>
+ #include <array>
+ #include <cassert>
+ #include <cstdint>
++#include <cstdlib>
+ #include <cstring>
+ #include <limits>
+ #include <span>
+@@ -247,16 +249,34 @@ private:
+ class ByteBuffer {
+ public:
+   constexpr ByteBuffer() noexcept = default;
+-  explicit ByteBuffer(size_t size) noexcept
+-  : m_data(static_cast<uint8_t*>(calloc(1, size))), m_length(size), m_capacity(size) {}
+-  explicit ByteBuffer(uint8_t* data, size_t size) noexcept : m_data(data), m_capacity(size), m_owned(false) {}
++  explicit ByteBuffer(size_t size) noexcept {
++    resize(size, true);
++    m_length = size;
++  }
++
++  // A bounded owned buffer starts empty and may grow only through the
++  // supplied authoritative limit.  The limit moves with the owner so a
++  // frame-slot handoff cannot accidentally become unbounded.
++  [[nodiscard]] static ByteBuffer bounded(size_t maxCapacity) noexcept {
++    ByteBuffer result;
++    result.m_maxCapacity = maxCapacity;
++    return result;
++  }
++
++  explicit ByteBuffer(uint8_t* data, size_t size) noexcept
++  : m_data(data), m_capacity(size), m_owned(false) {}
+   ~ByteBuffer() noexcept { release(); }
+ 
+   ByteBuffer(ByteBuffer&& rhs) noexcept
+-  : m_data(rhs.m_data), m_length(rhs.m_length), m_capacity(rhs.m_capacity), m_owned(rhs.m_owned) {
++  : m_data(rhs.m_data),
++    m_length(rhs.m_length),
++    m_capacity(rhs.m_capacity),
++    m_maxCapacity(rhs.m_maxCapacity),
++    m_owned(rhs.m_owned) {
+     rhs.m_data = nullptr;
+     rhs.m_length = 0;
+     rhs.m_capacity = 0;
++    rhs.m_maxCapacity = std::numeric_limits<size_t>::max();
+     rhs.m_owned = true;
+   }
+ 
+@@ -268,10 +288,12 @@ public:
+     m_data = rhs.m_data;
+     m_length = rhs.m_length;
+     m_capacity = rhs.m_capacity;
++    m_maxCapacity = rhs.m_maxCapacity;
+     m_owned = rhs.m_owned;
+     rhs.m_data = nullptr;
+     rhs.m_length = 0;
+     rhs.m_capacity = 0;
++    rhs.m_maxCapacity = std::numeric_limits<size_t>::max();
+     rhs.m_owned = true;
+     return *this;
+   }
+@@ -283,9 +305,15 @@ public:
+   [[nodiscard]] uint8_t* data() noexcept { return m_data; }
+   [[nodiscard]] const uint8_t* data() const noexcept { return m_data; }
+   [[nodiscard]] size_t size() const noexcept { return m_length; }
++  [[nodiscard]] size_t capacity() const noexcept { return m_capacity; }
++  [[nodiscard]] size_t max_capacity() const noexcept { return m_maxCapacity; }
+   [[nodiscard]] bool empty() const noexcept { return m_length == 0; }
+ 
+   void append(const void* data, size_t size) {
++    checked_size_add(size);
++    if (size == 0) {
++      return;
++    }
+     resize(m_length + size, false);
+     memcpy(m_data + m_length, data, size);
+     m_length += size;
+@@ -297,7 +325,14 @@ public:
+   }
+ 
+   void append_zeroes(size_t size) {
+-    resize(m_length + size, true);
++    checked_size_add(size);
++    const size_t begin = m_length;
++    resize(begin + size, true);
++    if (size != 0) {
++      // resize() may already have capacity; explicitly clear the newly
++      // exposed logical range so stale growth slack can never become padding.
++      std::memset(m_data + begin, 0, size);
++    }
+     m_length += size;
+   }
+ 
+@@ -308,45 +343,84 @@ public:
+     m_data = nullptr;
+     m_length = 0;
+     m_capacity = 0;
++    m_maxCapacity = std::numeric_limits<size_t>::max();
+     m_owned = true;
+   }
+ 
+   void clear() { m_length = 0; }
+-  void reserve_extra(size_t size) { resize(m_length + size, true); }
++
++  void reserve_extra(size_t size) {
++    checked_size_add(size);
++    resize(m_length + size, true);
++  }
+ 
+   ByteBuffer clone() const {
+-    ByteBuffer clone{m_length};
+-    std::memcpy(clone.data(), m_data, m_length);
++    ByteBuffer clone = ByteBuffer::bounded(m_maxCapacity);
++    clone.append(m_data, m_length);
+     return clone;
+   }
+ 
+ private:
++  static constexpr size_t Unbounded = std::numeric_limits<size_t>::max();
++
+   uint8_t* m_data = nullptr;
+   size_t m_length = 0;
+   size_t m_capacity = 0;
++  size_t m_maxCapacity = Unbounded;
+   bool m_owned = true;
+ 
++  [[noreturn]] static void fail_capacity() noexcept {
++    // A bounded stream cannot represent this append or allocation; abort
++    // before publishing a partial buffer instead of returning truncated data.
++    abort();
++  }
++
++  void checked_size_add(size_t extra) const noexcept {
++    if (extra > m_maxCapacity - m_length) {
++      fail_capacity();
++    }
++  }
++
+   void resize(size_t size, bool zeroed) {
++    if (size > m_maxCapacity) {
++      fail_capacity();
++    }
+     if (size == 0) {
+       clear();
+     } else if (m_data == nullptr) {
+-      m_data = static_cast<uint8_t*>(zeroed ? calloc(1, size) : malloc(size));
++      const size_t requested = size;
++      m_data = static_cast<uint8_t*>(zeroed ? calloc(1, requested) : malloc(requested));
++      if (m_data == nullptr) {
++        fail_capacity();
++      }
++      m_capacity = requested;
+       m_owned = true;
+     } else if (size > m_capacity) {
+       if (!m_owned) {
+         abort();
+       }
+-      if (size < m_capacity * 2) {
+-        size = m_capacity * 2;
++      size_t requested = size;
++      if (m_capacity != 0) {
++        // Double only after proving the multiplication cannot overflow. Near
++        // the bound, grow directly to the bound so repeated appends do not
++        // realloc one exact request at a time.
++        const size_t doubled = m_capacity > m_maxCapacity / 2
++                                 ? m_maxCapacity
++                                 : m_capacity * 2;
++        requested = std::max(requested, std::min(doubled, m_maxCapacity));
++      }
++      uint8_t* resized = static_cast<uint8_t*>(realloc(m_data, requested));
++      if (resized == nullptr) {
++        fail_capacity();
+       }
+-      m_data = static_cast<uint8_t*>(realloc(m_data, size));
++      m_data = resized;
+       if (zeroed) {
+-        memset(m_data + m_capacity, 0, size - m_capacity);
++        memset(m_data + m_capacity, 0, requested - m_capacity);
+       }
++      m_capacity = requested;
+     } else {
+       return;
+     }
+-    m_capacity = size;
+   }
+ };
+ 
 diff --git a/lib/sqlite_utils.hpp b/lib/sqlite_utils.hpp
 index 38db46b..abd3b23 100644
 --- a/lib/sqlite_utils.hpp
@@ -4148,7 +4362,7 @@ index 592b8ab..ad068b0 100644
    g_instance = {};
    cache_shutdown();
 diff --git a/lib/window.cpp b/lib/window.cpp
-index 2a4aadf..540854e 100644
+index 2a4aadf..58ac741 100644
 --- a/lib/window.cpp
 +++ b/lib/window.cpp
 @@ -33,7 +33,9 @@ extern "C" void Android_UnlockActivityMutex(void);
@@ -4161,6 +4375,39 @@ index 2a4aadf..540854e 100644
  #include "time_internal.hpp"
  #include "dolphin/vi/vi_internal.hpp"
  
+@@ -317,9 +319,19 @@ const AuroraEvent* poll_events() {
+ }
+ 
+ bool create_window(AuroraBackend backend) {
++#if defined(__EMSCRIPTEN__)
++  // Browser CSS owns presentation scaling; keep the configured logical size
++  // as the WebGPU pixel size instead of multiplying it by device DPR.
++  SDL_WindowFlags flags = SDL_WINDOW_HIDDEN;
++#else
+   SDL_WindowFlags flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
++#endif
+ #if TARGET_OS_IOS || TARGET_OS_TV
+   flags |= SDL_WINDOW_FULLSCREEN;
++#elif defined(__EMSCRIPTEN__)
++  if (g_config.startFullscreen) {
++    flags |= SDL_WINDOW_FULLSCREEN;
++  }
+ #else
+   flags |= SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE;
+   if (g_config.startFullscreen) {
+@@ -366,6 +378,12 @@ bool create_window(AuroraBackend backend) {
+     Log.error("Failed to create window: {}", SDL_GetError());
+     return false;
+   }
++#if defined(__EMSCRIPTEN__)
++  // SDL's browser backend may discover the host CSS box during creation;
++  // reset the backing canvas to the configured source size and keep it
++  // independent of later CSS/viewport resize callbacks.
++  TRY(SDL_SetWindowSize(g_window, width, height), "Failed to set browser window size: {}", SDL_GetError());
++#endif
+   SDL_SetWindowMinimumSize(g_window, 640, 480);
+   set_window_icon();
+   return true;
 diff --git a/tests/pipeline_prepare_state_test.cpp b/tests/pipeline_prepare_state_test.cpp
 new file mode 100644
 index 0000000..17fb09e

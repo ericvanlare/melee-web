@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
@@ -56,6 +57,10 @@ PLAYER_RUNTIME_FILES = (
     "controller-settings.css",
     "touch-controls.mjs",
     "touch-controls.css",
+    "runtime-diagnostics.mjs",
+    "runtime-diagnostics-delivery.mjs",
+    "diagnostics-settings.mjs",
+    "diagnostics-schema.mjs",
     "gameplay_public.js",
     "gameplay_public.wasm",
 )
@@ -76,7 +81,14 @@ PLAYER_SOURCE_RUNTIME_FILES = (
     "controller-settings.css",
     "touch-controls.mjs",
     "touch-controls.css",
+    "runtime-diagnostics.mjs",
+    "runtime-diagnostics-delivery.mjs",
+    "diagnostics-settings.mjs",
+    "diagnostics-schema.mjs",
 )
+DIAGNOSTIC_BUILD_SCHEMA_VERSION = 1
+DIAGNOSTIC_BUILD_META_ID = "runtime-diagnostic-identity"
+DIAGNOSTIC_BUILD_PROFILES = frozenset({"player", "audio-preview", "audio-player"})
 RUNTIME_IDENTITY_SCHEMA = "melee-web-runtime-public-build-v2"
 RUNTIME_IDENTITY_NAME = "runtime-public-identity.json"
 RUNTIME_SOURCE_FILES = (
@@ -112,6 +124,9 @@ RUNTIME_SOURCE_FILES = (
     "web/melee-runtime.mjs",
     "web/runtime-assets.mjs",
     "web/runtime-audio-assets.mjs",
+    "web/runtime-diagnostics-delivery.mjs",
+    "web/diagnostics-settings.mjs",
+    "web/diagnostics-schema.mjs",
     "patches/aurora-browser.patch",
     "dependencies.lock.json",
     "tests/native_menu_alarm_unavailable.c",
@@ -164,6 +179,16 @@ RUNTIME_TOOLCHAIN_PATHS = frozenset({
 })
 RUNTIME_ARTIFACT_ROOTS = frozenset({"build/browser-public-release",
                                     "build/browser-public-selective-release"})
+DIAGNOSTICS_BACKEND_SCHEMA = "melee-web-diagnostics-backend-v1"
+DIAGNOSTICS_BACKEND_SOURCE_MAP = (
+    ("diagnostics/pages-function-adapter.mjs", "functions/api/diagnostics.js"),
+    ("diagnostics/pages-function-catchall-adapter.mjs", "functions/api/diagnostics/[[report]].js"),
+    ("diagnostics/worker.mjs", "functions/api/worker.mjs"),
+    ("diagnostics/schema.mjs", "functions/api/schema.mjs"),
+    ("diagnostics/_routes.json", "_routes.json"),
+)
+DIAGNOSTICS_BACKEND_OUTPUTS = frozenset(output for _, output in DIAGNOSTICS_BACKEND_SOURCE_MAP)
+DIAGNOSTICS_BACKEND_ROOT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,95}\.functions$")
 PIPELINE_SEED_PATHS = {
     "source": "web/initial_pipeline_cache.db.gz.b64",
     "materialized": "build/browser-public-release/initial_pipeline_cache.db",
@@ -485,6 +510,116 @@ def _identity_path(runtime_dir: Path) -> Path:
     raise BuildError(
         "runtime-dir must be the producer artifact root and its sibling must contain "
         f"{RUNTIME_IDENTITY_NAME}"
+    )
+
+
+def _source_sha() -> str:
+    """Bind public diagnostics to a clean, actual checkout commit."""
+    try:
+        top = subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"], cwd=ROOT, text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        value = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise BuildError("diagnostic identity requires a committed source checkout") from exc
+    if Path(top).resolve() != ROOT.resolve() or not re.fullmatch(r"[0-9a-f]{40}", value):
+        raise BuildError("diagnostic identity requires this checkout's actual commit")
+    changed = subprocess.run(["git", "diff", "--quiet", "HEAD", "--"], cwd=ROOT)
+    if changed.returncode:
+        raise BuildError("commit source changes before packaging a source-bound diagnostic identity")
+    source_status = subprocess.check_output(
+        ["git", "status", "--porcelain", "--untracked-files=all", "--",
+         "web", "src", "scripts", "cmake", "patches", "CMakeLists.txt", "dependencies.lock.json"],
+        cwd=ROOT, text=True,
+    )
+    if source_status:
+        raise BuildError("uncommitted runtime source cannot carry the current commit identity")
+    return value
+
+
+def _diagnostic_identity(*, source_commit: str, runtime_hash: str,
+                         build_profile: str) -> dict[str, str | int]:
+    """Create the only build identity shape exposed to browser diagnostics."""
+    if (not isinstance(source_commit, str) or
+            not re.fullmatch(r"[0-9a-f]{40}", source_commit)):
+        raise BuildError("diagnostic source_commit must be a 40-character lowercase commit identity")
+    if not isinstance(runtime_hash, str) or not re.fullmatch(r"[0-9a-f]{16}", runtime_hash):
+        raise BuildError("diagnostic runtime_hash must be a 16-character lowercase graph identity")
+    if (not isinstance(build_profile, str) or
+            build_profile not in DIAGNOSTIC_BUILD_PROFILES):
+        raise BuildError("diagnostic build_profile is not an allowed public profile")
+    return {
+        "schema_version": DIAGNOSTIC_BUILD_SCHEMA_VERSION,
+        "source_commit": source_commit,
+        "runtime_hash": runtime_hash,
+        "build_profile": build_profile,
+    }
+
+
+def _diagnostic_meta(identity: dict[str, str | int]) -> str:
+    """Encode a validated identity in a harmless, parseable HTML meta tag."""
+    expected = _diagnostic_identity(
+        source_commit=identity.get("source_commit", ""),
+        runtime_hash=identity.get("runtime_hash", ""),
+        build_profile=identity.get("build_profile", ""),
+    )
+    if identity != expected:
+        raise BuildError("diagnostic identity has unexpected or missing fields")
+    payload = json.dumps(expected, sort_keys=True, separators=(",", ":"))
+    return (f'<meta id="{DIAGNOSTIC_BUILD_META_ID}" '
+            f'content="{html.escape(payload, quote=True)}">')
+
+
+def _read_diagnostic_meta(data: bytes) -> dict[str, str | int]:
+    """Read and validate the packaged identity from player HTML."""
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise BuildError("player HTML is not UTF-8") from exc
+    class _MetaParser(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.matches: list[str | None] = []
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            if tag.lower() != "meta":
+                return
+            ids = [value for name, value in attrs if name.lower() == "id"]
+            contents = [value for name, value in attrs if name.lower() == "content"]
+            if any(value == DIAGNOSTIC_BUILD_META_ID for value in ids):
+                # Preserve malformed duplicate attributes as a failed match;
+                # accepting one value would make a hidden duplicate mutable.
+                self.matches.append(contents[0] if len(ids) == len(contents) == 1 else None)
+
+    parser = _MetaParser()
+    try:
+        parser.feed(text)
+        parser.close()
+    except (TypeError, ValueError) as exc:
+        raise BuildError("player HTML contains malformed metadata") from exc
+    matches = parser.matches
+    if len(matches) != 1:
+        raise BuildError("player HTML must contain exactly one diagnostic build identity")
+    if matches[0] is None:
+        raise BuildError("player diagnostic build identity metadata is malformed")
+    try:
+        value = json.loads(matches[0])
+    except (json.JSONDecodeError, TypeError) as exc:
+        raise BuildError("player diagnostic build identity is not valid JSON") from exc
+    if not isinstance(value, dict):
+        raise BuildError("player diagnostic build identity must be an object")
+    if set(value) != {"schema_version", "source_commit", "runtime_hash", "build_profile"}:
+        raise BuildError("player diagnostic build identity has unexpected or missing fields")
+    if value.get("schema_version") != DIAGNOSTIC_BUILD_SCHEMA_VERSION:
+        raise BuildError("player diagnostic build identity schema version is unsupported")
+    return _diagnostic_identity(
+        source_commit=value.get("source_commit", ""),
+        runtime_hash=value.get("runtime_hash", ""),
+        build_profile=value.get("build_profile", ""),
     )
 
 
@@ -996,6 +1131,8 @@ def _validate_runtime_graph(files: dict[str, bytes], *, audio: bool = False) -> 
     }
     if not audio and forbidden_modules.intersection(files):
         raise BuildError("public runtime graph contains a development audio module")
+    if "runtime-diagnostics.mjs" not in files:
+        raise BuildError("public runtime graph is missing runtime-diagnostics.mjs")
     loader = "gameplay_audio_preview.js" if audio else "gameplay_public.js"
     for rel, data in files.items():
         # Export checks alone cannot detect dormant diagnostics retained by
@@ -1041,6 +1178,7 @@ def _validate_runtime_graph(files: dict[str, bytes], *, audio: bool = False) -> 
         "disc-session.mjs": ("./disc-image.mjs",),
         "controller-settings.mjs": ("./prototype-keyboard-layouts.mjs", "./controller-panel.mjs", "./controller-settings.css", "./touch-controls.mjs"),
         "touch-controls.mjs": ("./touch-controls.css",),
+        "runtime-diagnostics-delivery.mjs": ("./diagnostics-schema.mjs",),
     }
     if audio:
         required_imports.update({
@@ -1200,7 +1338,8 @@ def _robots(mode: str, index_production: bool = False) -> str:
     return "# The apex production host is indexable; Pages preview hosts are blocked by _headers.\nUser-agent: *\nAllow: /\n"
 
 
-def _replace_html(data: bytes, operator: str, contact: str, css_url: str, js_url: str, mode: str) -> bytes:
+def _replace_html(data: bytes, operator: str, contact: str, css_url: str, js_url: str, mode: str,
+                  diagnostic_identity: dict[str, str | int] | None = None) -> bytes:
     text = data.decode("utf-8")
     replacements = {
         STYLE_TOKEN: css_url,
@@ -1210,12 +1349,158 @@ def _replace_html(data: bytes, operator: str, contact: str, css_url: str, js_url
     }
     for token, value in replacements.items():
         text = text.replace(token, value)
+    if diagnostic_identity is not None:
+        marker = _diagnostic_meta(diagnostic_identity)
+        if text.count("<head>") != 1:
+            raise BuildError("player HTML must contain one reviewed <head> boundary")
+        text = text.replace("<head>", f"<head>\n  {marker}", 1)
     text = text.replace('<html lang="en">', f'<html lang="en" data-environment="{mode}">', 1)
     if mode == "preview":
         text = text.replace('<title>', '<title>[staging] ', 1)
     if any(token in text for token in replacements):
         raise BuildError("placeholder substitution failed")
     return text.encode("utf-8")
+
+
+def _diagnostics_backend_source_files() -> dict[str, bytes] | None:
+    """Read the exact public Pages Function graph, excluding config/secrets."""
+    source_files: dict[str, bytes] = {}
+    source_root = ROOT / "diagnostics"
+    if _is_symlink(source_root):
+        raise BuildError("diagnostics backend source directory may not be a symlink")
+    if not source_root.is_dir():
+        return None
+    for source_rel, _ in DIAGNOSTICS_BACKEND_SOURCE_MAP:
+        path = ROOT / source_rel
+        if _is_symlink(path) or not path.is_file():
+            raise BuildError(f"diagnostics backend source is missing: {_display(path)}")
+        try:
+            data = path.read_bytes()
+        except OSError as exc:
+            raise BuildError(f"cannot read diagnostics backend source {_display(path)}: {exc}") from exc
+        if len(data) > MAX_FILE_BYTES:
+            raise BuildError(f"diagnostics backend source exceeds Pages file limit: {source_rel}")
+        if any(marker in data for marker in (b"/Users/", b"/Volumes/", b"/private/var/", b"release-manifest", b"__melee_evidence")):
+            raise BuildError(f"diagnostics backend source contains private deployment material: {source_rel}")
+        source_files[source_rel] = data
+    try:
+        routes = json.loads(source_files["diagnostics/_routes.json"].decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BuildError("diagnostics backend _routes.json is not valid UTF-8 JSON") from exc
+    if routes != {"version": 1, "include": ["/api/diagnostics", "/api/diagnostics/*"], "exclude": []}:
+        raise BuildError("diagnostics backend _routes.json is not the exact API-only route allowlist")
+    browser_schema = ROOT / "web/diagnostics-schema.mjs"
+    if _is_symlink(browser_schema) or not browser_schema.is_file():
+        raise BuildError("diagnostics browser wire schema is missing")
+    if browser_schema.read_bytes() != source_files["diagnostics/schema.mjs"]:
+        raise BuildError("diagnostics browser and backend wire schemas differ")
+    return source_files
+
+
+def _diagnostics_graph_hash(files: dict[str, bytes]) -> str:
+    digest = hashlib.sha256()
+    for name in sorted(files):
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(files[name])
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _diagnostics_backend_descriptor(output: Path, files: dict[str, bytes], source_files: dict[str, bytes]) -> dict[str, object]:
+    output_name = output.name + ".functions"
+    if not DIAGNOSTICS_BACKEND_ROOT_RE.fullmatch(output_name):
+        raise BuildError("static output name cannot form a safe diagnostics Functions sidecar name")
+    records = []
+    for source_rel, output_rel in DIAGNOSTICS_BACKEND_SOURCE_MAP:
+        data = files[output_rel]
+        records.append({
+            "path": output_rel,
+            "source": source_rel,
+            "size": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        })
+    return {
+        "schema": DIAGNOSTICS_BACKEND_SCHEMA,
+        "directory": output_name,
+        "source_sha256": _diagnostics_graph_hash(source_files),
+        "graph_sha256": _diagnostics_graph_hash(files),
+        "routes": {"include": ["/api/diagnostics", "/api/diagnostics/*"], "exclude": []},
+        "files": records,
+    }
+
+
+def stage_diagnostics_backend(output: Path | str) -> dict[str, object] | None:
+    """Materialize the audited Functions sidecar beside a static output."""
+    output = Path(output)
+    source_files = _diagnostics_backend_source_files()
+    if source_files is None:
+        return None
+    sidecar = output.parent / (output.name + ".functions")
+    if _is_symlink(sidecar) or sidecar.exists():
+        raise BuildError(f"diagnostics Functions sidecar must be a fresh path: {_display(sidecar)}")
+    files = {output_rel: source_files[source_rel] for source_rel, output_rel in DIAGNOSTICS_BACKEND_SOURCE_MAP}
+    try:
+        for output_rel, data in files.items():
+            path = sidecar / output_rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            _write_new(path, data)
+    except Exception:
+        if sidecar.exists() and not sidecar.is_symlink():
+            shutil.rmtree(sidecar)
+        raise
+    return _diagnostics_backend_descriptor(output, files, source_files)
+
+
+def audit_diagnostics_backend(output: Path | str, descriptor: dict[str, object] | None) -> dict[str, object] | None:
+    """Audit a Functions sidecar and bind it to current source bytes."""
+    output = Path(output)
+    source_files = _diagnostics_backend_source_files()
+    if source_files is None:
+        if descriptor is not None:
+            raise BuildError("diagnostics backend metadata is present but its source graph is missing")
+        return None
+    if not isinstance(descriptor, dict) or set(descriptor) != {"schema", "directory", "source_sha256", "graph_sha256", "routes", "files"}:
+        raise BuildError("diagnostics backend manifest metadata is incomplete")
+    if descriptor.get("schema") != DIAGNOSTICS_BACKEND_SCHEMA or descriptor.get("directory") != output.name + ".functions":
+        raise BuildError("diagnostics backend manifest identity is invalid")
+    if (not isinstance(descriptor.get("source_sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", descriptor["source_sha256"])
+            or not isinstance(descriptor.get("graph_sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", descriptor["graph_sha256"])
+            or descriptor.get("routes") != {"include": ["/api/diagnostics", "/api/diagnostics/*"], "exclude": []}
+            or not isinstance(descriptor.get("files"), list)):
+        raise BuildError("diagnostics backend manifest metadata has invalid types")
+    sidecar = output.parent / str(descriptor["directory"])
+    if _is_symlink(sidecar) or not sidecar.is_dir():
+        raise BuildError("diagnostics Functions sidecar is missing")
+    expected_source_hash = _diagnostics_graph_hash(source_files)
+    if descriptor.get("source_sha256") != expected_source_hash:
+        raise BuildError("diagnostics backend source identity differs from current source")
+    actual_files: dict[str, bytes] = {}
+    for _, output_rel in DIAGNOSTICS_BACKEND_SOURCE_MAP:
+        path = sidecar / output_rel
+        if _is_symlink(path) or not path.is_file():
+            raise BuildError(f"diagnostics Functions sidecar is missing {output_rel}")
+        actual_files[output_rel] = path.read_bytes()
+    expected_files = {output_rel: source_files[source_rel] for source_rel, output_rel in DIAGNOSTICS_BACKEND_SOURCE_MAP}
+    if actual_files != expected_files:
+        raise BuildError("diagnostics Functions sidecar bytes differ from reviewed source")
+    found = set()
+    for path in sidecar.rglob("*"):
+        if _is_symlink(path):
+            raise BuildError("diagnostics Functions sidecar contains a symlink")
+        if path.is_dir():
+            continue
+        if not path.is_file():
+            raise BuildError("diagnostics Functions sidecar contains a non-file entry")
+        found.add(path.relative_to(sidecar).as_posix())
+    if found != DIAGNOSTICS_BACKEND_OUTPUTS:
+        raise BuildError("diagnostics Functions sidecar contains unauthorized files")
+    expected = _diagnostics_backend_descriptor(output, expected_files, source_files)
+    if descriptor != expected:
+        raise BuildError("diagnostics backend manifest hash or route metadata differs from deployed bytes")
+    return expected
 
 
 def _file_records(output: Path, profile: str = "maintenance") -> list[dict[str, int | str]]:
@@ -1295,6 +1580,10 @@ def build(
             "controller-settings.css": ROOT / "web" / "controller-settings.css",
             "touch-controls.mjs": ROOT / "web" / "touch-controls.mjs",
             "touch-controls.css": ROOT / "web" / "touch-controls.css",
+            "runtime-diagnostics.mjs": ROOT / "web" / "runtime-diagnostics.mjs",
+            "runtime-diagnostics-delivery.mjs": ROOT / "web" / "runtime-diagnostics-delivery.mjs",
+            "diagnostics-settings.mjs": ROOT / "web" / "diagnostics-settings.mjs",
+            "diagnostics-schema.mjs": ROOT / "web" / "diagnostics-schema.mjs",
         }
         for rel, path in source_runtime.items():
             if _is_symlink(path) or not path.is_file():
@@ -1306,10 +1595,17 @@ def build(
             "player/player.css": source_bytes["player.css"],
             "player/player-shell.mjs": source_bytes["player-shell.mjs"],
         })
+        diagnostic_identity = _diagnostic_identity(
+            source_commit=_source_sha(),
+            runtime_hash=runtime_hash,
+            build_profile="player",
+        )
     else:
         source_bytes = _validate_source(source)
         legal_bytes = source_bytes
-        runtime_identity = runtime_files = runtime_hash = identity_bytes = None
+        runtime_identity = runtime_files = runtime_hash = identity_bytes = diagnostic_identity = None
+    backend_descriptor = None
+    backend_sidecar_created = False
     legal_notice = _read_legal_notice()
     operator, contact = _config(mode, operator, contact)
     output.mkdir()
@@ -1346,7 +1642,13 @@ def build(
             page_css_url = css_url if profile == "player" and name == "index.html" else (
                 legal_css_url if profile == "player" else css_url
             )
-            _write_new(output / name, _replace_html(html_source[name], operator, contact, page_css_url, js_url, mode))
+            _write_new(
+                output / name,
+                _replace_html(
+                    html_source[name], operator, contact, page_css_url, js_url, mode,
+                    diagnostic_identity if profile == "player" and name == "index.html" else None,
+                ),
+            )
         (output / "licenses").mkdir()
         _write_new(output / LEGAL_NOTICE_OUTPUT, legal_notice)
         _write_new(output / "_headers", _headers(mode, index_production, profile).encode("utf-8"))
@@ -1354,6 +1656,9 @@ def build(
         if redirects is not None:
             _write_new(output / "_redirects", redirects.encode("utf-8"))
         _write_new(output / "robots.txt", _robots(mode, index_production).encode("utf-8"))
+        if profile == "player":
+            backend_descriptor = stage_diagnostics_backend(output)
+            backend_sidecar_created = backend_descriptor is not None
         records = _file_records(output, profile)
         manifest_value = {
             "schema": SCHEMA,
@@ -1372,6 +1677,8 @@ def build(
                 "identity_sha256": hashlib.sha256(identity_bytes).hexdigest(),
                 "identity": runtime_identity,
             }
+            if backend_descriptor is not None:
+                manifest_value["backend"] = backend_descriptor
         manifest_path.parent.mkdir(parents=True, exist_ok=True)
         _write_new(
             manifest_path,
@@ -1382,6 +1689,9 @@ def build(
         # data.  Remove only this fresh tree so a failed build cannot be used.
         if output.exists() and not output.is_symlink():
             shutil.rmtree(output)
+        sidecar = output.parent / (output.name + ".functions")
+        if backend_sidecar_created and sidecar.exists() and not sidecar.is_symlink():
+            shutil.rmtree(sidecar)
         if manifest_path.exists() and not manifest_path.is_symlink():
             manifest_path.unlink()
         raise

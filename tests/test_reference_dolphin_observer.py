@@ -272,6 +272,26 @@ int main() {
         self.assertIn("if (!Config::Get(Config::SESSION_SAVE_DATA_WRITABLE))", patch)
         self.assertIn("ExpansionInterfaceManager::Shutdown", patch)
 
+    def test_configured_rng_return_is_admitted_when_jit_skips_blr(self) -> None:
+        source = SOURCE.read_text(encoding="utf-8")
+        header = (ROOT / "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.h").read_text(
+            encoding="utf-8"
+        )
+        patch = (ROOT / "reference-capture/dolphin/patches/0004-allocation-followed-returns.patch").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("static bool IsRngReturnBoundary(u32 guest_pc);", header)
+        method_start = source.index("bool Observer::IsRngReturnBoundary(")
+        selected = source[method_start:source.index("bool Observer::IsBoundary(", method_start)]
+        self.assertIn("CpuProbeEnabled()", selected)
+        self.assertIn("CpuProbeEnvironment().rng_return_pc == guest_pc", selected)
+        self.assertIn("FindCpuProbePoint(guest_pc) != nullptr", selected)
+        self.assertIn("ReferenceCapture::Observer::IsRngReturnBoundary(observer_op.address)", patch)
+        self.assertIn("ReferenceCapture::Observer::IsRngReturnBoundary(op.address)", patch)
+        observe_start = source.index("  void Observe(Core::System* system, u32 pc, PowerPC::PowerPCState* state)")
+        before_probe_dispatch = source[observe_start:source.index("FindCpuProbePoint(pc)", observe_start)]
+        self.assertIn("RecordSelectedRngCallback(system, pc)", before_probe_dispatch)
+
     def test_boundary_blocks_retain_complete_guest_register_state(self) -> None:
         patch = PATCH.read_text(encoding="utf-8")
         self.assertIn("const bool observer_enabled", patch)

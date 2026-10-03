@@ -11417,3 +11417,31 @@ index c5da0f9..1d0a988 100644
      if (ip->xCF4_fighterGObjUnk != NULL) {
          if (it_80272D40(ip->xCF4_fighterGObjUnk) == 0) {
              f32 temp_f31;
+
+diff --git a/src/sysdolphin/baselib/random.c b/src/sysdolphin/baselib/random.c
+--- a/src/sysdolphin/baselib/random.c
++++ b/src/sysdolphin/baselib/random.c
+@@ -1,4 +1,7 @@
+ #include "random.h"
++#if defined(MELEE_WEB_RNG_DRAW_OBSERVER)
++extern void melee_web_cpu_observation_rng_draw(u32, unsigned);
++#endif
+ 
+ u32 seed = 1;
+ u32* seed_ptr = &seed;
+@@ -7,4 +10,7 @@ s32 HSD_Rand(void)
+ {
+     *seed_ptr = *seed_ptr * 214013 + 2531011;
++#if defined(MELEE_WEB_RNG_DRAW_OBSERVER)
++    melee_web_cpu_observation_rng_draw(*seed_ptr, 0);
++#endif
+     return *seed_ptr >> 0x10;
+ }
+@@ -13,4 +19,7 @@ f32 HSD_Randf(void)
+ {
+     *seed_ptr = *seed_ptr * 214013 + 2531011;
++#if defined(MELEE_WEB_RNG_DRAW_OBSERVER)
++    melee_web_cpu_observation_rng_draw(*seed_ptr, 1);
++#endif
+     return (f32) (*seed_ptr >> 0x10) / (1 << 16);
+ }

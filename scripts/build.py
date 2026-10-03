@@ -174,8 +174,16 @@ PUBLIC_RUNTIME_SOURCE_FILES = (
     "web/melee-runtime.mjs",
     "web/runtime-assets.mjs",
     "web/runtime-audio-assets.mjs",
+    "web/runtime-diagnostics-delivery.mjs",
+    "web/diagnostics-settings.mjs",
+    "web/diagnostics-schema.mjs",
     "patches/aurora-browser.patch",
     "dependencies.lock.json",
+)
+PUBLIC_RUNTIME_SOURCE_AUXILIARY_FILES = (
+    "tests/native_menu_alarm_unavailable.c",
+    "tests/native_menu_fighter_input.c",
+    "tests/native_menu_stage_input.c",
 )
 
 
@@ -586,11 +594,7 @@ def _source_inputs_record(root, gameplay_source):
     }
     root_files["CMakeLists.txt"] = _sha256(root / "CMakeLists.txt")
     root_files["cmake/FighterRuntime.cmake"] = _sha256(root / "cmake/FighterRuntime.cmake")
-    for path in (
-        "tests/native_menu_alarm_unavailable.c",
-        "tests/native_menu_fighter_input.c",
-        "tests/native_menu_stage_input.c",
-    ):
+    for path in PUBLIC_RUNTIME_SOURCE_AUXILIARY_FILES:
         root_files[path] = _sha256(root / path)
     return {
         "files_sha256": dict(sorted(root_files.items())),

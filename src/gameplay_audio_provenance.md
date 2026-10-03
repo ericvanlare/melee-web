@@ -78,8 +78,19 @@ This does not reproduce optical-disc latency or provide general audio DMA. Origi
 update lists, depop and complete hardware output comparison remain required
 before claiming complete audio fidelity.
 
+The normal CSS/SSS menu owner registers the two source-selected BGM candidates
+from `hps_files[]`: id `0x34` (`menu01.hps`) and id `0x36` (`menu3.hps`). The
+source BGM state selects the id, and the original
+`lbAudioAx_80023F28(gmMainLib_8015ECB0())` call opens that stream; the port
+keeps both exact disc files under one scene-owned HPS
+registry so it does not replace the source choice with a fixed track. The
+focused native HPS trace calls the original owner for both IDs and verifies the
+selected path and streamed PCM. This checks file ownership and scheduling, not
+PCM agreement with retail.
+
 Focused tests: `test_dat_audio.py`, `test_dat_audio_programs.py`,
-`test_gameplay_audio_resample.py`, and optional built `test_gameplay_audio.py`
+`test_gameplay_audio_resample.py`, the source HPS ID/path regression in
+`test_gameplay_audio_stream.py`, and optional built `test_gameplay_audio.py`
 (including the separate original AXFX callback trace).
 The latter takes local main.ssm, mario.ssm, smash2.sem and dsp_coef.bin and checks
 original lbAudioAx→SEM→synth→AX selection, nonzero PCM, callback partition

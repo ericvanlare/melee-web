@@ -408,6 +408,9 @@ const StartMeleeData& GameplayMatchSession::start_data()const{
     check(storage_&&storage_->match,"Match session is closed");
     return storage_->selected.start;
 }
+const StartMeleeData* GameplayMatchSession::diagnostic_start_data()const noexcept{
+    return storage_?&storage_->selected.start:nullptr;
+}
 MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};MeleeWebMatchStats stats{};
     check(melee_web_match_player_stats(storage_->match,index,&stats,error,sizeof(error)),error);return stats;

@@ -178,6 +178,42 @@ class PublicRuntimeBuildTests(unittest.TestCase):
         }
         self.assertTrue(required.issubset(public_build.PUBLIC_RUNTIME_SOURCE_FILES))
 
+    def test_producer_fingerprint_set_matches_public_packager_consumer(self):
+        import build_public
+
+        producer = (set(public_build.PUBLIC_RUNTIME_SOURCE_FILES) |
+                    set(public_build.PUBLIC_RUNTIME_SOURCE_AUXILIARY_FILES))
+        consumer = set(build_public.RUNTIME_SOURCE_FILES)
+        self.assertEqual(producer, consumer)
+        self.assertEqual(
+            {"CMakeLists.txt", "cmake/FighterRuntime.cmake"}.issubset(producer),
+            True,
+        )
+        self.assertEqual(
+            set(public_build.PUBLIC_RUNTIME_SOURCE_AUXILIARY_FILES),
+            {
+                "tests/native_menu_alarm_unavailable.c",
+                "tests/native_menu_fighter_input.c",
+                "tests/native_menu_stage_input.c",
+            },
+        )
+
+    def test_producer_fingerprint_record_contains_every_consumer_source(self):
+        import build_public
+
+        with tempfile.TemporaryDirectory(prefix="public-source-fingerprint-") as directory:
+            root = Path(directory)
+            producer_paths = (set(public_build.PUBLIC_RUNTIME_SOURCE_FILES) |
+                              set(public_build.PUBLIC_RUNTIME_SOURCE_AUXILIARY_FILES))
+            for rel in producer_paths:
+                path = root / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(rel.encode("utf-8"))
+            with patch.object(public_build, "_tree_record", return_value={"path": "stub", "files": 0, "sha256": "0" * 64}), \
+                    patch.object(public_build, "_prepared_source_record", return_value={"path": "stub"}):
+                record = public_build._source_inputs_record(root, root / "build/gameplay-source/src")
+        self.assertEqual(set(record["files_sha256"]), set(build_public.RUNTIME_SOURCE_FILES))
+
     def test_wasm_export_reader_reports_actual_exports(self):
         with tempfile.TemporaryDirectory() as directory:
             wasm = Path(directory) / "runtime.wasm"

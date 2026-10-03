@@ -10,10 +10,12 @@
 #include "gameplay_prize_session.hpp"
 extern "C" const char* melee_web_native_menu_match_observe();
 extern "C" const char* melee_web_native_menu_memory();
+extern "C" int melee_web_native_menu_phase();
 extern "C" void melee_web_cpu_observation_set_event_cursor(size_t index);
 extern "C" void melee_web_cpu_observation_scheduler_return(void);
 extern "C" {
 #include <melee/gm/types.h>
+#include <melee/ty/toy.h>
 #include <sysdolphin/baselib/controller.h>
 extern ResultsData lbl_8046DBE8;
 }
@@ -269,6 +271,34 @@ std::string replay_scene_mismatch(const char* boundary,size_t cursor,
 }
 melee_web::FixedTickClock menu_clock;
 melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::CatchUp};
+bool diagnostic_source_paused=false;
+int diagnostic_source_frame(){
+ return match?static_cast<int>(match->source_frames()):
+        results?static_cast<int>(results->source_frames()):
+        prize?static_cast<int>(prize->source_frames()):-1;
+}
+void diagnostic_incident(int reason,double value=0,double threshold=0,int clock_owner=0){
+ EM_ASM({try{window.menuDiagnosticIncident?.($0,$1,$2,$3,$4,$5);}catch(_){}},
+        reason,value,threshold,diagnostic_source_frame(),melee_web_native_menu_phase(),clock_owner);
+}
+void diagnostic_clock_stall(const melee_web::FixedTickClock::Tick& event,int owner){
+ using Reason=melee_web::FixedTickClock::StallReason;
+ const int reason=event.reason==Reason::Debt?(owner==2?2:1):
+                  event.reason==Reason::ClockRegression?8:3;
+ diagnostic_incident(reason,event.triggering_value,event.threshold,owner);
+}
+template<class... Values>
+void diagnostic_sample(Values... values){
+ static_assert(sizeof...(values)==19);
+ // Pinned Emscripten's EM_ASM signature supports at most 16 arguments. This
+ // fixed stack row crosses once; JavaScript reads only its 19 named scalars.
+ const double data[]={static_cast<double>(values)...};
+ EM_ASM({try{const p=$0>>3;window.menuDiagnosticSample?.(
+  HEAPF64[p],HEAPF64[p+1],HEAPF64[p+2],HEAPF64[p+3],HEAPF64[p+4],
+  HEAPF64[p+5],HEAPF64[p+6],HEAPF64[p+7],HEAPF64[p+8],HEAPF64[p+9],
+  HEAPF64[p+10],HEAPF64[p+11],HEAPF64[p+12],HEAPF64[p+13],HEAPF64[p+14],
+  HEAPF64[p+15],HEAPF64[p+16],HEAPF64[p+17],HEAPF64[p+18]);}catch(_){}},data);
+}
 std::string message="Choose your local Melee disc image.";
 std::string match_message="Original source match";
 bool running=false,pending=false,host_entered=false,world_exposed=false,faulted=false;
@@ -437,7 +467,7 @@ alignas(32) unsigned char fifo[64*1024];
 // Keep the expanded fighter/Kirby archive inventory separate from the
 // original title/main route inventory below. Both are accepted at the native
 // file boundary; neither list substitutes for the other's source assets.
-constexpr std::array<std::string_view,378> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","LbRf.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
+constexpr std::array<std::string_view,379> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","LbRf.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","menu3.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
  "PlDr.dat","PlDrAJ.dat","PlDrNr.dat","PlDrRe.dat","PlDrBu.dat","PlDrGr.dat","PlDrBk.dat","drmario.ssm",
  "PlFe.dat","PlFeAJ.dat","PlFeNr.dat","PlFeRe.dat","PlFeBu.dat","PlFeGr.dat","PlFeYe.dat","EfFeData.dat","emblem.ssm",
  "PlLk.dat","PlLkAJ.dat","PlLkNr.dat","PlLkRe.dat","PlLkBu.dat","PlLkBk.dat","PlLkWh.dat",
@@ -534,7 +564,7 @@ constexpr std::array<std::string_view,18> zelda_sheik_keys={
 };
 // PR #96's route-specific source inventory includes title, main-menu, and all
 // SSM table entries needed before those scenes can select their next route.
-constexpr std::array<std::string_view,277> route_asset_keys={
+constexpr std::array<std::string_view,278> route_asset_keys={
  "LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat",
  "PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","LbAd.dat",
  "LbRf.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat",
@@ -544,7 +574,7 @@ constexpr std::array<std::string_view,277> route_asset_keys={
  "PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm",
  "GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","MnMaAll.usd","GmTtAll.usd",
  "SdMenu.usd","SdToy.dat","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","LbMcSnap.usd",
- "GmEvent.dat","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm",
+ "GmEvent.dat","menu01.hps","menu3.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm",
  "smash2.sem","main.ssm","kongo.ssm","mario.ssm","nr_1p.ssm","nr_vs.ssm","gkoopa.ssm","ice.ssm",
  "kirby.ssm","samus.ssm","zs.ssm","yoshi.ssm","gw.ssm","mhands.ssm","kirbytm.ssm","castle.ssm",
  "corneria.ssm","greatbay.ssm","mutecity.ssm","onett.ssm","zebes.ssm","garden.ssm","klaid.ssm",
@@ -662,7 +692,7 @@ bool prepare_deferred_pipelines(){
  if(!selected.deferred_count)return false;
  // The lookup retained descriptor bytes only. Stop source time before the
  // renderer may construct a pipeline, then settle the unchanged scene.
- running=false;menu_clock.reset();audio_clock.reset();
+ diagnostic_incident(7);running=false;menu_clock.reset();audio_clock.reset();
  if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle){
   check(preparation.request_render_settle(preparation_uses_source_draws()),"Could not pause for pipeline preparation");
   preparation_profile.begin(false,emscripten_get_now());
@@ -1372,7 +1402,12 @@ void service_render_cache_writes(){
         ok,flushed,duration);
 }
 void tick(){
- EM_ASM({window.menuServiceCommands?.();});
+ // A hidden/frozen interval may contain no callback at all. Consume the JS
+ // boundary before polling input or either clock; running/manual pause intent
+ // is unchanged and only inactive wall time is excluded from source debt.
+ if(EM_ASM_INT({return window.menuServiceCommands?.() === 1 ? 1 : 0;})){
+  menu_clock.reset();audio_clock.reset();
+ }
  service_render_cache_writes();
  const double started=emscripten_get_now();
  const bool running_at_callback_start=running;
@@ -1537,7 +1572,8 @@ void tick(){
                                        (!running||preparation.busy());
   MeleeWebAudio* const audio_owner=match?match->audio():results?results->audio():prize?prize->audio():world?world->audio():nullptr;
   const auto audio_elapsed=audio_clock.tick(
-      clock_now,audio_owner&&input->visible&&(running||transition_audio_continues));
+      clock_now,audio_owner&&input->visible&&(running||transition_audio_continues),
+      [](const auto& event) noexcept {diagnostic_clock_stall(event,2);});
   if(audio_elapsed.stalled){
    // Keep the shared timing-pause prefix understood by the development host.
    // Its state capture may resume and records every resume; performance capture
@@ -1598,7 +1634,8 @@ void tick(){
   // first active gameplay interval on the following callback.
   const double simulation_clock_now=emscripten_get_now();
   const auto elapsed=menu_clock.tick(
-      simulation_clock_now,running&&(world||match||results||prize)&&input->visible);
+      simulation_clock_now,running&&(world||match||results||prize)&&input->visible,
+      [](const auto& event) noexcept {diagnostic_clock_stall(event,1);});
   if(elapsed.stalled){running=false;message="Paused after a timing disruption. Resume to continue.";}
   if(elapsed.steps&&transition_audio_continues){
    transition_audio_continues=false;
@@ -1611,6 +1648,7 @@ void tick(){
     if(boundary==melee_web::ResultsSourceFramePauseSchedule::Boundary::missed)
      throw std::runtime_error("Missed scheduled Results source-frame pause; refusing a late boundary");
     if(boundary==melee_web::ResultsSourceFramePauseSchedule::Boundary::due){
+     diagnostic_incident(9);
      running=false;menu_clock.reset();
      message="Paused at scheduled Results source frame "+std::to_string(results_source_frame)+".";
      break;
@@ -1785,7 +1823,7 @@ void tick(){
     message="Whole-session replay complete; final original character select entered.";
    }
   }
- }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
+ }catch(const std::exception& e){diagnostic_incident(4);running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
   if(simulation_done<input_done)simulation_done=failed;
@@ -1824,19 +1862,46 @@ void tick(){
   preparation_profile.pending_staging_at_settle=
       aurora_browser_submission_status().pendingStagingBuffers;
  }
- // A texture upload is complete by the time it is reported here, so pausing
- // source simulation afterward cannot hide its cost. Newly constructed scenes
- // still settle both uploads and pipelines above. During live play, only an
- // outstanding asynchronous pipeline compilation justifies stopping the clock.
+ // A browser pipeline handle may be returned before driver compilation. The
+ // submitted complete draw owns that work even when Aurora's queue is empty.
+ // Stop before the next source callback and retain its image until completion;
+ // uploads and unassociated foreground stalls keep their existing guard.
+ const int created_pipelines=stat_delta(stats_after.createdPipelines,stats_before.createdPipelines);
+ const bool complete_draws=aurora_pipeline_complete_draws_enabled()!=0;
+ const bool created_gpu_pending=created_pipelines>0&&complete_draws&&
+     aurora_browser_submission_status().pendingStagingBuffers!=0;
  if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&running&&actual_source_draw&&
-    melee_web::MenuPreparationState::needs_live_render_settle(stats_after.queuedPipelines)){
-  if(preparation.request_render_settle(preparation_uses_source_draws())){
+    melee_web::MenuPreparationState::needs_live_render_settle(
+        stats_after.queuedPipelines,created_pipelines,complete_draws,created_gpu_pending)){
+  if(preparation.request_render_settle(created_gpu_pending?false:preparation_uses_source_draws())){
    preparation_profile.begin(false,finished);
-   render_only_preparation=true;
-   running=false;menu_clock.reset();message="Preparing first-use rendering...";
+   render_only_preparation=false;
+   diagnostic_incident(7);running=false;menu_clock.reset();audio_clock.reset();
+   message="Preparing first-use rendering...";
+   EM_ASM({window.menuPreparation?.(UTF8ToString($0),false);},message.c_str());
   }
  }
  schedule_startup_pipeline_service();
+ const bool source_paused=match&&match->paused();
+ if(match&&source_paused!=diagnostic_source_paused)diagnostic_incident(source_paused?5:6);
+ diagnostic_source_paused=source_paused;
+ const auto* diagnostic_start=match?match->diagnostic_start_data():nullptr;
+ const auto diagnostic_character=[diagnostic_start](unsigned slot){
+  if(!diagnostic_start||diagnostic_start->players[slot].slot_type==Gm_PKind_NA)return -1;
+  return static_cast<int>(diagnostic_start->players[slot].ckind);
+ };
+ // A compact, read-only feed reuses existing timing/resource counters. Public
+ // builds omit the development JSON profiler and its unrestricted source text.
+ diagnostic_sample(
+        started,diagnostic_source_frame(),melee_web_native_menu_phase(),
+        diagnostic_start?diagnostic_start->rules.stkind:-1,
+        diagnostic_character(0),diagnostic_character(1),
+        diagnostic_character(2),diagnostic_character(3),
+        menu_clock.pending_ticks(),simulation_cpu_ms,render_total_ms,finished-started,preparation_ms,
+        stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines),
+        stat_delta(stats_after.createdPipelines,stats_before.createdPipelines),
+        callback_texture_upload,source_frames.steps(),source_frames.draws(),running);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
  char timing[4096];
  const uint32_t staging_used_bytes=callback_staging_used;
  const int timing_written=std::snprintf(timing,sizeof(timing),
@@ -1923,6 +1988,9 @@ void tick(){
  },timing_written<0?"Native menu timing JSON formatting failed":"Native menu timing JSON exceeded 4096 bytes");
  }
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
+#else
+ ++render_frame;
+#endif
  if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3,$4);},
                                 replay_cursor,replay_match_complete?1:0,
                                 replay_outcome,replay_winner,observed_replay_scene());
@@ -2086,20 +2154,33 @@ int melee_web_native_menu_snapshot_unlocked_baseline(uint8_t* output,unsigned si
  }
  check(!world&&!match&&!results&&!prize&&!source_session_owned,
        "Close source owners before establishing the original save baseline");
+ check(!archive_cache,
+       "Release the native archive cache before establishing an unowned save baseline");
  begin_source_session();
  char error[256]{};
  MeleeWebSaveProfileOwner* profile=melee_web_save_profile_owner_create(error,sizeof(error));
  if(!profile)throw std::runtime_error(error);
  bool active=false;
+ std::unique_ptr<melee_web::GameplayMenuWorld> baseline_world;
  try{
   check(melee_web_save_profile_owner_activate(profile,error,sizeof(error)),error);active=true;
   check(melee_web_save_profile_owner_initialize_default(profile,error,sizeof(error)),error);
+  archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
+  baseline_world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
+  Toy_803124BC();
   check(melee_web_save_profile_owner_initialize_everything(profile,error,sizeof(error)),error);
   check(melee_web_save_profile_owner_snapshot_card_data(profile,output,size,error,sizeof(error)),error);
   check(melee_web_save_profile_owner_deactivate(profile,error,sizeof(error)),error);active=false;
   check(melee_web_save_profile_owner_destroy(profile,error,sizeof(error)),error);profile=nullptr;
+  baseline_world->close_prepared();baseline_world.reset();
+  archive_cache.reset();
   check(melee_web_gameplay_session_end(error,sizeof(error)),error);source_session_owned=false;
  }catch(...){
+  if(baseline_world){
+   try{baseline_world->close_prepared();}catch(...){}
+   baseline_world.reset();
+  }
+  archive_cache.reset();
   if(active&&!melee_web_save_profile_owner_deactivate(profile,nullptr,0))std::abort();
   if(profile&&!melee_web_save_profile_owner_destroy(profile,nullptr,0))std::abort();
   if(source_session_owned){
@@ -2166,10 +2247,12 @@ int melee_web_native_menu_prepare(){try{
  // Repeating it changes allocation history even without entering a source scene.
  if(reference_menu_preparations++)reference_heap_used=true;
  world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
+ check(melee_web_menu_host_initialize_profile_baseline(host,error,sizeof(error)),error);
  const double constructed=emscripten_get_now();
  report_construction("scene-prepare",started,constructed,constructed,before,aurora_stats_snapshot());
  message="Native menu resources prepared.";return 1;
 }catch(const std::exception& e){
+ diagnostic_incident(4);
  if(world&&!host_entered){try{world->close_prepared();}catch(...){}}
  world.reset();
  if(host&&!host_entered){char ignored[256]{};melee_web_menu_host_destroy(host,ignored,sizeof(ignored));host=nullptr;}
@@ -2199,7 +2282,7 @@ int melee_web_native_menu_launch(){try{
  EM_ASM({window.menuPreparation?.(UTF8ToString($0),false);},message.c_str());
 #endif
  return 1;
-}catch(const std::exception& e){message=e.what();running=false;return 0;}}
+}catch(const std::exception& e){diagnostic_incident(4);message=e.what();running=false;return 0;}}
 int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";return 1;}catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){try{
  replay_source_frames=melee_web::SourceFrameSequence{};
@@ -2241,6 +2324,7 @@ unsigned melee_web_native_menu_replay_cursor(){return static_cast<unsigned>(repl
 int melee_web_native_menu_replay_whole_session(){return replay&&replay->whole_session()?1:0;}
 void melee_web_native_menu_pause(int paused){
  if(faulted||replay_final_draw||preparation.busy()||pending||(!host_entered&&!match&&!results&&!prize))return;
+ diagnostic_incident(paused?5:6);
  running=(world||match||results||prize)&&!paused;menu_clock.reset();
  message=running?(match?match_message:results?"Original Results":prize?"Original unlock notification":source_menu_message()):"Paused.";
 }

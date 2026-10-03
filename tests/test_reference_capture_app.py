@@ -18,6 +18,72 @@ SPEC.loader.exec_module(APP)
 
 
 class ReferenceCaptureAppTests(unittest.TestCase):
+    def test_cpu_rng_probe_requires_a_bounded_replay_window_and_pinned_site(self):
+        self.assertEqual(APP.parse_cpu_rng_probe("0:0:0:rand_return"), {
+            "match": 0, "first_tick": 0, "last_tick": 0, "site": "rand_return"})
+        self.assertEqual(APP.parse_cpu_rng_probe("63:4294967290:4294967295:randf_return"), {
+            "match": 63, "first_tick": 4294967290, "last_tick": 4294967295,
+            "site": "randf_return"})
+        for value in ("", "0:0:64:rand_return", "64:0:0:rand_return",
+                      "0:-1:0:rand_return", "0:2:1:rand_return",
+                      "0:0:0:rand", "0:0:0:rand_return:extra"):
+            with self.subTest(value=value), self.assertRaises(APP.EnvironmentError):
+                APP.parse_cpu_rng_probe(value)
+
+    def test_cpu_rng_probe_environment_uses_only_its_bundle_sidecar(self):
+        request = APP.parse_cpu_rng_probe("0:1318:1318:rand_return")
+        self.assertEqual(APP.cpu_rng_probe_environment(request, Path("/owned/run/cpu-register-probe.json")), {
+            "MWRC_CPU_PROBE_OUTPUT": "/owned/run/cpu-register-probe.json",
+            "MWRC_CPU_PROBE_MATCH": "0",
+            "MWRC_CPU_PROBE_FIRST_TICK": "1318",
+            "MWRC_CPU_PROBE_LAST_TICK": "1318",
+            "MWRC_CPU_PROBE_RNG_RETURN_SITE": "rand_return"})
+        self.assertEqual(APP.cpu_rng_probe_environment(None, Path("unused.json")), {})
+
+    def test_cpu_rng_probe_sidecar_is_hash_bound_to_request_and_close(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "cpu-register-probe.json"
+            request = APP.parse_cpu_rng_probe("0:0:0:rand_return")
+            probe = {
+                "schema": "melee-web-cpu-register-probe", "version": 3,
+                "diagnostic_only": True, "window_complete": True,
+                "source_revision": "GALE01r2", "dol_sha256": "a" * 64,
+                "capture_id": "capture-1", "sequence_id": "sequence-1",
+                "match": 0, "first_tick": 0, "last_tick": 0,
+                "rng_return_pc": "0x80380524", "record_count": 1,
+                "records": [{"pc": "0x80380524", "label": "rand_return",
+                             "match": 0, "source_tick": 0}],
+            }
+            path.write_text(json.dumps(probe))
+            status = {"cpu_probe_close": {
+                "reason": "source_tick_after_window", "rng_return_pc": "0x80380524",
+                "configured_match": 0, "first_tick": 0, "last_tick": 0,
+                "source_tick": 1}}
+            result = APP.validate_cpu_rng_probe(path, request, "capture-1", "sequence-1",
+                                                "a" * 64, status)
+            self.assertTrue(result["valid"])
+            self.assertEqual(result["record_count"], 1)
+            probe["records"][0]["label"] = "randf_return"
+            path.write_text(json.dumps(probe))
+            with self.assertRaisesRegex(APP.EnvironmentError, "outside the selected return site"):
+                APP.validate_cpu_rng_probe(path, request, "capture-1", "sequence-1",
+                                           "a" * 64, status)
+
+    def test_cli_root_option_routes_captures_to_explicit_external_storage(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary) / "external-run-root"
+            replay = Path(temporary) / "recorded-bundle"
+            app = mock.Mock(status={"state": "replay_matched"})
+            app.replay.return_value = None
+            argv = ["reference_capture_app.py", "--root", str(root),
+                    "--replay-bundle", str(replay)]
+            with mock.patch.object(APP, "Supervisor", return_value=app) as supervisor, \
+                 mock.patch.object(APP.sys, "argv", argv), \
+                 mock.patch.object(APP.signal, "signal"):
+                self.assertEqual(APP.main(), 0)
+            self.assertEqual(supervisor.call_args.kwargs["root"], root)
+            app.replay.assert_called_once_with(replay)
+
     def test_replay_binds_restored_profile_after_controller_reconfiguration(self):
         from reference_dolphin_replay import read_profile, verify_replay_environment
         import reference_session_comparison as comparison

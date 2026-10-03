@@ -1,5 +1,96 @@
 # Current status
 
+## Fixed browser surface dimensions — issue #134
+
+**Source identified / Compiled / Browser exercised** for keeping the browser
+render surface at its configured pixel dimensions while CSS fits the display.
+The [surface receipt](docs/evidence/mobile-browser-surface-v1.json) binds the
+high-DPI allocation comparison, startup/rotation/fullscreen/input checks,
+audited public package route, full suite and Release builds to their artifacts.
+Source clocks, timing limits, audio and draw order are unchanged.
+
+The new recording shows original character select immediately before Chrome's
+page-error screen. It provides no OS termination reason. The measured graphics
+allocation reduction is a component fix; physical iPhone crash confirmation
+remains open. Desktop WebKit still produces a forced timing pause with the
+smaller surface, retained as a separate failure. Headless functional checks do
+not establish mobile performance, uninterrupted audio or whole-session
+acceptance. No merge or deployment is included.
+
+## Demand-allocated CPU staging — issue #134, PR #141
+
+**Source identified / Compiled / Browser exercised** for removing eager browser
+CPU shadow allocation while retaining the original per-stream limits, GPU
+buffers, source clocks and upload/draw order. The
+[CPU staging receipt](docs/evidence/mobile-cpu-staging-v1.json) binds the measured
+preparation memory reduction, audited public package route, two natural CPU9
+Final Destination matches with Results/CSS reuse and unload, full suite, builds
+and code-head CI. No unexpected pause or browser crash occurred in these runs.
+
+The recording shows a paused UI after reloading from a page-error screen; the
+crash trigger and pause reason are unavailable. Physical iOS crash confirmation
+and foreground/mobile performance remain open. Preparation still blocks the
+main thread, and audio underruns increased between the sustained run's Results
+snapshots. The receipt preserves the outer cleanup assertion failure and the
+subsequent independent process/port closure check. No merge or deployment is
+included.
+
+## Disc-loading payload ownership — issue #134
+
+**Source identified / Compiled / Browser exercised** for streaming complete
+local-disc scene files through the existing bounded native handoff. Full-scope
+preflight and transactional commit/abort remain in place. The
+[disc-loading receipt](docs/evidence/mobile-disc-loading-v1.json) binds the
+pending-payload ownership comparison, desktop WebKit reader check, audited
+committed package, short original CSS/SSS/Mario/Final Destination/No Contest
+Results/CSS route, warm menu round trip and full suite to their artifacts.
+
+This addresses a measured JavaScript payload overlap. The reported iOS
+termination has no incident-specific report, and no physical iOS device or
+simulator was available. Native memory reservation and a large startup
+preparation task remain next boundaries. The short route does not establish a
+natural ending, sustained play, pixel/PCM equivalence, uninterrupted audio or
+foreground/mobile performance admission. The receipt retains failed harness
+attempts and the independently reduced temporary-path fixture collision. No
+hosted deployment is included.
+
+## Bounded runtime pause diagnostics — issue #116
+
+The [local recorder contract](docs/RUNTIME_DIAGNOSTICS.md),
+[packaged recorder receipt](docs/evidence/runtime-recorder-v1.json), and
+[reporting receipt](docs/evidence/runtime-reporting-v1.json) define bounded
+collection, isolated local retention, Settings and same-origin automatic delivery.
+The [integrated owner-fix receipt](docs/evidence/runtime-lifecycle-clock-v1.json)
+is the current evidence index for source `fe2492b`: passing Release builds and
+audited packages, lifecycle/manual-pause and foreground-guard checks, native
+browser-to-local-Pages delivery, paired cold/warm natural CPU9 matches on Final
+Destination and Battlefield, a separate controlled-contention attempt, the
+relevant original-state comparison and the required full suite.
+
+Two owner fixes are demonstrated within that scope. A sticky hidden/page
+handoff resets both native clocks before the next poll. A reduced natural local
+GPU preparation wait now enters existing source-free render settling before it
+can be charged to the next live callback. Existing timing limits, source ticks,
+RNG, float bits, manual Resume, audio and save ownership are preserved.
+**Retail compared** evidence covers the declared recorded match fields;
+nonmatch scalar/PAD state, menu/audio/process state, live timing, pixels and PCM
+remain outside that comparison.
+
+These are **Browser exercised** headless results, with named peer heavy jobs
+parked during timing runs and driver cache uncontrolled. The older
+[natural first-pause receipt](docs/evidence/runtime-natural-first-v1.json)
+remains immutable historical evidence. Quiet-machine and foreground protocols,
+physical input, arranged audible output, uninterrupted audio, pixels/PCM and
+whole-session performance admission remain open. Audio underruns increased
+between retained Results snapshots; their first increase is not located.
+The [bounded audio-counter follow-up](docs/evidence/audio-underrun-triage-v1.json)
+records authenticated staging triage, the admin CLI epoch-bound correction,
+counter semantics and a short instrumented Results return. The historical
+first underrun increase remains unlocated; no audio runtime fix is justified
+by that reduced case.
+The local preparation-wait cause does not classify users' other varied pauses.
+No GitHub merge or hosted deployment is included.
+
 ## Remaining fighter integration — PR #86
 
 Current per-character coverage, original CPU9 references, rendered browser
@@ -1217,6 +1308,14 @@ receipts. Setup and the reproducible acceptance command are in the
 local interoperability result; rollback correctness, browser cross-play,
 public Internet/NAT, rendering/audio accuracy and production readiness remain
 unclaimed.
+
+The [local reporter framing receipt](docs/evidence/local-slippi-reporter-framing-v1.json)
+is a separate **Compiled / Source identified** HTTP boundary check. It binds
+the v4 old/new service hashes and six exact 503 responses per variant; the new
+response is close-delimited with `Connection: close` and no `Content-Length`.
+It preserves the retained reporter-thread failure as a separate, non-
+deterministic inference and makes no native gameplay, browser or official
+service claim.
 
 A separate [headless browser-to-desktop transport receipt](docs/evidence/slippi-browser-desktop-transport-v1.json)
 records one 24-frame raw PAD exchange through the loopback ENet relay and the

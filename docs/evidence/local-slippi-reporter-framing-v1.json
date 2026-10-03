@@ -1,0 +1,64 @@
+{
+  "schema": "melee-web-local-slippi-reporter-framing-evidence-v1",
+  "claim": "The new close-delimited local loopback response keeps its explicit HTTP rejection stable: six pinned ureq requests received status 503, the exact JSON body, Connection: close, and no Content-Length header.",
+  "scope": {
+    "labels": [
+      "Compiled",
+      "Source identified"
+    ],
+    "boundary": "direct HTTP requests to the project-authored local GraphQL sink",
+    "environment": "two worker requests against the pinned local service, three attempts per service variant",
+    "not_established": [
+      "native gameplay or rollback",
+      "browser interoperability",
+      "official Slippi service behavior",
+      "rendering or audio accuracy",
+      "deterministic reproduction of the retained reporter failure"
+    ]
+  },
+  "measured_reducer": {
+    "receipt_id": "m1-v8-reporter-http-reducer-v4",
+    "receipt_sha256": "dc73899307eae89c3f935fd52b3fcedc6d9633648b9633ac86e450c37fcec5e5",
+    "probe_sha256": "c1cbe04e0055c1f6381e70580803efa7eac8001ee4ad7de52d018c01ea617f85",
+    "probe_source_sha256": "abd216151549390b223c81c59c69a4557f0deccbd03078ed9f8a85d7963b1798",
+    "endpoint": "http://127.0.0.1:43114/graphql",
+    "attempts": 3,
+    "workers": 2,
+    "rows_per_variant": 6,
+    "exact_body": "{\"error\":\"local-only Slippi API is disabled\"}",
+    "old_length_delimited": {
+      "service_sha256": "9b894f5e3c8dd2bb2acdd116515fd1dbb9a8f5be41acab113935f02f2c5d9941",
+      "status": 503,
+      "content_length": "45",
+      "connection": "close",
+      "body_exact": true,
+      "probe_returncode": 0,
+      "service_returncode": 0,
+      "panic_marker": false,
+      "process_groups_released": true
+    },
+    "new_close_delimited": {
+      "service_sha256": "d7d7ee8b623114f061da9a52f0c6b7d397596e9275541a57b364272dbafd4a47",
+      "status": 503,
+      "content_length": null,
+      "connection": "close",
+      "body_exact": true,
+      "probe_returncode": 0,
+      "service_returncode": 0,
+      "panic_marker": false,
+      "process_groups_released": true
+    }
+  },
+  "source_identities": {
+    "service_source_sha256": "c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a",
+    "candidate_patch_sha256": "9e409e5768b791781d453bc1bfa09fab830d63657bacd4b4ba70c25ee7e239a7",
+    "dolphin_commit": "41a7a3a110ed52999486ae1901c8fbb9a63d4f13",
+    "rust_commit": "2d29e794de8497582675fb70877851f2cdd2f256",
+    "ureq_version": "2.12.1"
+  },
+  "inference_limits": [
+    "The retained reorder run ended in GameReporterQueueProcessingThread at the pinned ureq response path; its final receipt is c8eacecf21c88b6719d6e6d4c4d8c46c6104bf9e87b287fddd446931ed64530d.",
+    "The six-row old/new reducer did not reproduce that panic, so this change avoids the buffered length-delimited reset path but does not claim that the old framing deterministically caused the retained failure.",
+    "No native client, browser, gameplay, or official service process was run for this receipt."
+  ]
+}

@@ -215,7 +215,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('resultsSourceFrameAtEvent===resultsConfirmFrame+10', harness)
         run_match = harness.index('async function runMatch(matchIndex,expected){')
         pause_schedule = harness.index('scheduleResultsSourceFramePauses,{frames}', run_match)
-        sss = harness.index('await chooseFinalDestination();', run_match)
+        sss = harness.index('await chooseStage();', run_match)
         self.assertLess(pause_schedule, sss,
                         'Exact source pauses must be armed before the original SSS/match route')
 
@@ -313,7 +313,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('scheduleResultsP1StartSequence', harness)
         run_match = harness.index('async function runMatch(matchIndex,expected){')
         schedule = harness.index('scheduleResultsP1StartSequence,{events}', run_match)
-        match_launch = harness.index('await chooseFinalDestination();', run_match)
+        match_launch = harness.index('await chooseStage();', run_match)
         self.assertLess(schedule, match_launch,
                         'Exact Results inputs must be queued before SSS/match source callbacks')
         self.assertNotIn('__meleeWebExactSourceTickScheduler', harness)
@@ -367,7 +367,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('expectedPortErrors:keyboardPortErrors', harness)
         self.assertIn('expectedDisconnectedCpuSlots:keyboardAutoPageSlots', harness)
         self.assertIn("page.on('crash',error=>report.page_crashes.push", harness)
-        self.assertIn("browserCdp.on('Target.targetCrashed'", harness)
+        self.assertIn("browserCdp?.on('Target.targetCrashed'", harness)
         gated_start = harness.index('}else if(keyboardGatedMode){')
         gated_end = harness.index("\n  }else{\n    await writeProgress(`match-${matchIndex}-natural-results`)",
                                   gated_start)

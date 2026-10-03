@@ -39,7 +39,8 @@ export function finalizeSessionCapture(report) {
   if (report.unexpected_requests?.length)
     failures.push('Unexpected non-GET requests were recorded');
   for (const key of ['download_error', 'cpu_download_error', 'owner_trace_error',
-    'source_allocation_trace_error', 'page_dump_error', 'screenshot_error', 'close_error']) {
+    'source_allocation_trace_error', 'rng_draw_probe_error', 'page_dump_error',
+    'screenshot_error', 'close_error']) {
     if (report[key]) failures.push(`${key}: ${report[key]}`);
   }
   for (const name of REQUIRED_SESSION_DOWNLOADS) {

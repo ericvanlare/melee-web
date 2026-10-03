@@ -60,7 +60,11 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/math_data.c")
 target_include_directories(fighter_source_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
   PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
-target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE MELEE_WEB_MENU_MARIO_FD)
+target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE
+  MELEE_WEB_MENU_MARIO_FD)
+if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  target_compile_definitions(fighter_source_runtime PRIVATE MELEE_WEB_RNG_DRAW_OBSERVER=1)
+endif()
 set_source_files_properties(src/gameplay_platform.c PROPERTIES COMPILE_DEFINITIONS "MELEE_WEB_AUDIO;MELEE_WEB_AUDIO_STREAM")
 set_source_files_properties(src/gameplay_audio.c PROPERTIES COMPILE_DEFINITIONS "MELEE_WEB_AUDIO_FX;MELEE_WEB_AUDIO_STREAM")
 set_source_files_properties("${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/thp/THPDec.c"
@@ -193,7 +197,7 @@ else()
 endif()
 configure_file(web/runtime.html runtime.html @ONLY)
 configure_file(web/runtime-cache.js runtime-cache.js COPYONLY)
-foreach(module disc-image disc-session dsp-coefficients runtime-assets runtime-audio runtime-audio-assets match-flow match-menu action-sweep hitch-capture melee-runtime runtime-development controller-input controller-panel controller-settings touch-controls prototype-keyboard-layouts)
+foreach(module disc-image disc-session dsp-coefficients runtime-assets runtime-audio runtime-audio-assets runtime-diagnostics runtime-diagnostics-delivery diagnostics-settings diagnostics-schema match-flow match-menu action-sweep hitch-capture melee-runtime runtime-development controller-input controller-panel controller-settings touch-controls prototype-keyboard-layouts)
   configure_file(web/${module}.mjs ${module}.mjs COPYONLY)
 endforeach()
 configure_file(web/controller-settings.css controller-settings.css COPYONLY)

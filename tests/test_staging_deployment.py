@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import tempfile
 from types import SimpleNamespace
@@ -16,7 +17,31 @@ class StagingDeploymentTests(unittest.TestCase):
         return {'name': 'webmelee-staging', 'production_branch': 'staging',
                 'subdomain': 'webmelee-staging.pages.dev',
                 'domains': ['webmelee-staging.pages.dev', 'staging.webmelee.gg'],
-                'deployment_configs': {'production': {'env_vars': None}, 'preview': {'env_vars': None}}}
+                'uses_functions': True,
+                'deployment_configs': {
+                    'production': self.function_config(),
+                    'preview': self.function_config(),
+                }}
+
+    @staticmethod
+    def function_config():
+        return {
+            'env_vars': {
+                'DIAGNOSTICS_RATE_LIMIT': '60',
+                'DIAGNOSTICS_DAILY_REPORT_CAP': '1000',
+                'DIAGNOSTICS_DAILY_BYTE_CAP': '16777216',
+                'DIAGNOSTICS_ALLOWED_RELEASES': '{"staging":[],"production":[]}',
+                # Pages API metadata intentionally carries the secret type but
+                # not a value.  The deploy config must preserve this project
+                # secret by omitting it from generated vars.
+                'DIAGNOSTICS_ADMIN_TOKEN': {'type': 'secret_text'},
+            },
+            'd1_databases': [{
+                'binding': 'DIAGNOSTICS_DB',
+                'database_id': 'a' * 32,
+                'database_name': 'webmelee-diagnostics',
+            }],
+        }
 
     def test_production_aliases_and_wrong_branch_fail_closed(self):
         staging.validate_project(self.project())
@@ -27,14 +52,107 @@ class StagingDeploymentTests(unittest.TestCase):
                 staging.validate_project({**self.project(), field: value})
 
     def test_service_bindings_functions_and_analytics_are_rejected(self):
-        cases = [dict(uses_functions=True), dict(source={'type': 'github'}),
+        cases = [dict(uses_functions=False), dict(source={'type': 'github'}),
                  dict(build_config={'web_analytics_token': 'token'}),
                  dict(deployment_configs={}),
-                 dict(deployment_configs={'preview': {'env_vars': {'SECRET': 'value'}}, 'production': {}}),
-                 dict(deployment_configs={'production': {'r2_buckets': {'GAME': 'bucket'}}, 'preview': {}})]
+                 dict(deployment_configs={'preview': {'env_vars': {'SECRET': 'value'}},
+                                          'production': self.function_config()}),
+                 dict(deployment_configs={'production': {'r2_buckets': {'GAME': 'bucket'}},
+                                          'preview': self.function_config()}),
+                 dict(deployment_configs={'production': {**self.function_config(),
+                                                         'd1_databases': [{
+                                                             'binding': 'OTHER_DB',
+                                                             'database_id': 'a' * 32,
+                                                             'database_name': 'other',
+                                                         } ]},
+                                          'preview': self.function_config()}),
+                 dict(deployment_configs={'production': {**self.function_config(),
+                                                         'd1_databases': [{
+                                                             **self.function_config()['d1_databases'][0],
+                                                             'migrations_dir': './secret',
+                                                         }]},
+                                          'preview': self.function_config()})]
         for case in cases:
             with self.subTest(case=case), self.assertRaises(ValueError):
                 staging.validate_project({**self.project(), **case})
+
+    def test_generated_wrangler_config_is_narrow_and_uses_project_bindings(self):
+        config = staging.diagnostics_wrangler_config(self.project())
+        self.assertEqual(config['name'], 'webmelee-staging')
+        self.assertEqual(config['pages_build_output_dir'], './public')
+        self.assertEqual(config['d1_databases'], [{
+            'binding': 'DIAGNOSTICS_DB',
+            'database_id': 'a' * 32,
+            'database_name': 'webmelee-diagnostics',
+        }])
+        self.assertEqual(set(config), {
+            '$schema', 'name', 'compatibility_date', 'pages_build_output_dir',
+            'd1_databases', 'vars',
+        })
+        uuid_project = self.project()
+        uuid_project['deployment_configs']['production']['d1_databases'][0]['database_id'] = (
+            '00000000-0000-0000-0000-000000000001'
+        )
+        staging.validate_project(uuid_project)
+
+        api_project = self.project()
+        for config in api_project['deployment_configs'].values():
+            config['env_vars'] = {
+                key: ({'type': 'secret_text'} if key == 'DIAGNOSTICS_ADMIN_TOKEN'
+                      else {'type': 'plain_text', 'value': value})
+                for key, value in config['env_vars'].items()
+            }
+            database = config['d1_databases'][0]
+            config['d1_databases'] = {
+                'DIAGNOSTICS_DB': {
+                    'id': database['database_id'],
+                    'name': database['database_name'],
+                }
+            }
+        staging.validate_project(api_project)
+        self.assertEqual(staging.diagnostics_wrangler_config(api_project)['vars']['DIAGNOSTICS_RATE_LIMIT'], '60')
+        self.assertNotIn('DIAGNOSTICS_ADMIN_TOKEN', staging.diagnostics_wrangler_config(api_project)['vars'])
+
+        secret_project = self.project()
+        secret_project['deployment_configs']['production']['env_vars']['DIAGNOSTICS_RATE_LIMIT'] = {
+            'type': 'secret_text', 'value': '60'
+        }
+        with self.assertRaisesRegex(ValueError, 'non-secret'):
+            staging.validate_project(secret_project)
+
+    def test_admin_secret_metadata_is_required_exact_and_never_uploaded(self):
+        missing = self.project()
+        del missing['deployment_configs']['production']['env_vars']['DIAGNOSTICS_ADMIN_TOKEN']
+        with self.assertRaisesRegex(ValueError, 'missing.*admin secret'):
+            staging.validate_project(missing)
+
+        wrong_type = self.project()
+        wrong_type['deployment_configs']['production']['env_vars']['DIAGNOSTICS_ADMIN_TOKEN'] = {
+            'type': 'plain_text', 'value': 'token'
+        }
+        with self.assertRaisesRegex(ValueError, 'secret_text'):
+            staging.validate_project(wrong_type)
+
+        extra_metadata = self.project()
+        extra_metadata['deployment_configs']['production']['env_vars']['DIAGNOSTICS_ADMIN_TOKEN'] = {
+            'type': 'secret_text', 'value': 'redacted', 'label': 'unexpected'
+        }
+        with self.assertRaisesRegex(ValueError, 'secret_text'):
+            staging.validate_project(extra_metadata)
+
+        project_with_api_secret_value = self.project()
+        project_with_api_secret_value['deployment_configs']['production']['env_vars'][
+            'DIAGNOSTICS_ADMIN_TOKEN'] = {'type': 'secret_text', 'value': 'opaque-test-secret'}
+        staging.validate_project(project_with_api_secret_value)
+        generated = staging.diagnostics_wrangler_config(project_with_api_secret_value)
+        self.assertNotIn('DIAGNOSTICS_ADMIN_TOKEN', generated['vars'])
+        self.assertNotIn('opaque-test-secret', json.dumps(generated, sort_keys=True))
+
+        short_api_secret = self.project()
+        short_api_secret['deployment_configs']['production']['env_vars'][
+            'DIAGNOSTICS_ADMIN_TOKEN'] = {'type': 'secret_text', 'value': 'short'}
+        with self.assertRaisesRegex(ValueError, 'at least 16 characters'):
+            staging.validate_project(short_api_secret)
 
     def test_origin_cannot_escape_staging(self):
         self.assertEqual(staging.immutable_origin('https://1234abcd.webmelee-staging.pages.dev/'),
@@ -102,8 +220,33 @@ class StagingDeploymentTests(unittest.TestCase):
                 get=lambda url: (200, {}, b'wasm accidentally exposed', url),
                 check_destination=lambda *_: None)
             with patch.object(staging, 'load_module', return_value=verifier), \
-                    self.assertRaisesRegex(ValueError, '/gameplay_public.wasm returned 200'):
+                self.assertRaisesRegex(ValueError, '/gameplay_public.wasm returned 200'):
                 staging.verify_http(Path(directory), staging.STABLE, manifest)
+
+    def test_api_verification_requires_private_response_headers(self):
+        headers = {
+            'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff',
+            'Referrer-Policy': 'no-referrer',
+            'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+        }
+        responses = iter((
+            (422, headers, b'{}'),
+            (401, headers, b'{}'),
+            (401, headers, b'{}'),
+            (401, headers, b'{}'),
+            (401, headers, b'{}'),
+        ))
+        with patch.object(staging, '_api_request', side_effect=lambda *args, **kwargs: next(responses)):
+            report = staging._verify_api_routes(staging.STABLE)
+        self.assertEqual([item['status'] for item in report], [422, 401, 401, 401, 401])
+
+        bad = dict(headers)
+        bad.pop('Permissions-Policy')
+        responses = iter(((422, bad, b'{}'),))
+        with patch.object(staging, '_api_request', side_effect=lambda *args, **kwargs: next(responses)), \
+                self.assertRaisesRegex(ValueError, 'permissions policy'):
+            staging._verify_api_routes(staging.STABLE)
 
 
 if __name__ == '__main__':

@@ -24,7 +24,9 @@ export const NATIVE_MENU_DISC_FILES=Object.freeze({
   'GmEvent.dat':'GmEvent.dat',
   'LbAd.dat':'LbAd.dat',
   'LbRb.dat':'LbRb.dat',
-  'menu01.hps':'audio/menu01.hps','smash2.sem':'audio/us/smash2.sem',
+  'TyDatai.usd':'TyDatai.usd','TyDatai.dat':'TyDatai.dat',
+  'menu01.hps':'audio/menu01.hps','menu3.hps':'audio/menu3.hps',
+  'smash2.sem':'audio/us/smash2.sem',
   ...Object.fromEntries([
     'main', 'pokemon', 'nr_title', 'nr_select', 'nr_1p', 'nr_vs', 'captain',
     'clink', 'dk', 'drmario', 'falco', 'fox', 'gkoopa', 'ice',
@@ -197,14 +199,14 @@ export function loadNativeGameDisc(file,report=()=>{}) {
  */
 export async function openNativeGameDiscSession(file) {
   const session = await openDiscSession(file);
-  return Object.freeze({
+  const adapter = {
     close: () => session.close(),
     fileInfo: path => {
       const entry = session.fileInfo(path);
       return entry ? Object.freeze({name: entry.path, size: entry.size}) : null;
     },
     readFile: (path, offset, size) => session.readFile(path, offset, size),
-    async readScope(names, report = () => {}) {
+    async *streamScope(names, report = () => {}) {
       const paths = Object.create(null), seen = new Set();
       for (const name of names) {
         if (typeof name !== 'string' || seen.has(name))
@@ -219,16 +221,21 @@ export async function openNativeGameDiscSession(file) {
       }
       const total = names.length;
       report({phase: 'validate', complete: 0, total});
-      const files = await session.readScope(paths, {
+      yield* session.streamScope(paths, {
         beforeRead: ({name, index}) =>
           report({phase: 'read', file: name, complete: index, total}),
       });
-      if (seen.has('sislib_font.bin')) files.set('sislib_font.bin', session.fontBytes());
+      if (seen.has('sislib_font.bin')) yield ['sislib_font.bin', session.fontBytes()];
       report({phase: 'complete', complete: total, total});
       session.metadata();
+    },
+    async readScope(names, report = () => {}) {
+      const files = new Map();
+      for await (const [name, bytes] of adapter.streamScope(names, report)) files.set(name, bytes);
       return files;
     },
-  });
+  };
+  return Object.freeze(adapter);
 }
 /** Read only the selected source scene's data; no upload or persistence. */
 export function loadRuntimeDisc(file,report=()=>{}) {

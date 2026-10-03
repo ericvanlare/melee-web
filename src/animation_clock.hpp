@@ -11,24 +11,50 @@ class FixedTickClock {
 public:
     enum class OverrunPolicy { Pause, CatchUp };
     explicit FixedTickClock(OverrunPolicy policy = OverrunPolicy::Pause) : policy_(policy) {}
-    struct Tick { unsigned steps = 0; bool stalled = false; unsigned pending_steps = 0; };
+    enum class StallReason { None, Debt, NonFiniteClock, ClockRegression };
+    struct Tick {
+        unsigned steps = 0;
+        bool stalled = false;
+        unsigned pending_steps = 0;
+        StallReason reason = StallReason::None;
+        double triggering_value = 0;
+        double threshold = 0;
+        double interval_ms = 0;
+    };
     void reset() noexcept { previous_.reset(); pending_ = 0; }
+    double pending_ticks() const noexcept { return pending_; }
     Tick tick(double now_ms, bool running) noexcept {
+        return tick(now_ms, running, [](const Tick&) noexcept {});
+    }
+    // The read-only receipt is delivered before reset destroys the clock debt.
+    // Observers must not throw or alter source scheduling.
+    template<class ObserveStall>
+    Tick tick(double now_ms, bool running, ObserveStall observe_stall) noexcept {
         if (!running) { reset(); return {}; }
         if (!std::isfinite(now_ms) || (previous_ && now_ms < *previous_)) {
-            reset(); return {0, true};
+            const Tick failure{0, true, 0,
+                !std::isfinite(now_ms) ? StallReason::NonFiniteClock : StallReason::ClockRegression,
+                now_ms, previous_.value_or(0)};
+            observe_stall(failure);
+            reset(); return failure;
         }
         if (!previous_) { previous_ = now_ms; return {}; }
-        pending_ += (now_ms - *previous_) * (60.0 / 1000.0);
+        const double interval = now_ms - *previous_;
+        pending_ += interval * (60.0 / 1000.0);
         previous_ = now_ms;
         const double whole = std::floor(pending_ + 1e-9);
         // A full second of debt indicates suspension or sustained overload. Keep
         // that explicit rather than trap the browser in endless catch-up.
         const double limit = policy_ == OverrunPolicy::CatchUp ? 60 : 8;
-        if (whole > limit) { reset(); return {0, true}; }
+        if (whole > limit) {
+            const Tick failure{0, true, 0, StallReason::Debt, whole, limit, interval};
+            observe_stall(failure);
+            reset(); return failure;
+        }
         const unsigned steps = static_cast<unsigned>(std::min(whole, 8.0));
         pending_ = std::max(0.0, pending_ - steps);
-        return {steps, false, static_cast<unsigned>(whole) - steps};
+        return {steps, false, static_cast<unsigned>(whole) - steps,
+                StallReason::None, whole, limit, interval};
     }
 private:
     OverrunPolicy policy_;

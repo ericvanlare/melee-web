@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "webmelee-diagnostics-purge",
+  "main": "./purge-worker.mjs",
+  "compatibility_date": "2026-10-01",
+  "triggers": {
+    "crons": ["*/30 * * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DIAGNOSTICS_DB",
+      "database_name": "webmelee-diagnostics-REPLACE",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "./migrations"
+    }
+  ]
+}

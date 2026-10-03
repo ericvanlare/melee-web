@@ -1,0 +1,340 @@
+{
+  "schema": "melee-web-mobile-browser-surface-v1",
+  "date": "2026-10-03",
+  "evidence_labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised"
+  ],
+  "issue": 134,
+  "result": "Configured browser surface preserved across DPR and CSS resize; physical iPhone page-crash cause and a separate desktop WebKit forced pause remain open.",
+  "artifact_convention": "Paths are logical names within the retained mobile-crash-followup-20261003 evidence bundle; recordings, disc inputs and machine paths are not published.",
+  "source": {
+    "base_commit": "6d94d4288b1b17dfea3fdfec236b095bbbbf2da9",
+    "implementation_commit": "1d637ef79850cf2e18b02066cd215c61ef2b61d9",
+    "aurora_previous_tree": "e8ad8b001d963e3bafc48ba2c1d49a2dfdad2a31",
+    "aurora_candidate_tree": "ba1bbed8acbd886ed263468e3d9148163e4afc68"
+  },
+  "user_observation": {
+    "recording_sha256": "7aad8770fd85670f115116e469438d9fbe75bec01fe4c5f0b21586bf6ff18b53",
+    "facts": "Original CSS is visible at 23.8 seconds; Chrome shows Cannot open this page at 23.9 seconds. No Start/SSS transition is visible. The recording starts with Resume visible, but its pause reason is unavailable.",
+    "report": {
+      "artifact": "recording-observation.json",
+      "sha256": "d0ad9c0fd8b9853560fe5e03192a5d0975fd3071e7a89d09c5da5fcc57ecefa1"
+    },
+    "staging_identity": {
+      "artifact": "staging-identity/receipt.json",
+      "sha256": "7f4e20ce91f3bd610b3864ebc1bbb327ae879c5a6e0a00439a9f7553c6847336"
+    },
+    "incident_query": {
+      "artifact": "staging-triage-20261003T1645Z/followup-receipt.json",
+      "sha256": "ad33a2b42fc5543c61a8a398a71ed395883771646f612331679c9153d69994bd"
+    },
+    "limits": "No incident-specific current-release backend report, OS termination reason, device model or iOS version is available. The staging byte verification does not prove the recording loaded those exact bytes."
+  },
+  "owner": {
+    "defect": "Aurora enabled SDL high pixel density and resizable browser surfaces. Pinned SDL multiplied configured 640x480 by DPR and subsequently resized to CSS dimensions times DPR.",
+    "fix": "Only Emscripten omits high-density/resizable flags and explicitly checks SDL_SetWindowSize to the configured dimensions before GPU setup. CSS retains presentation scaling; generic startFullscreen and native flags are preserved.",
+    "preserved": [
+      "Source clocks and 60 Hz simulation",
+      "Timing thresholds and manual Resume",
+      "Input coordinates, source draw order, float arithmetic and RNG",
+      "PCM/AudioWorklet processing and save state",
+      "GPU stream buffer limits and acquired-surface viewport/scissor bounds"
+    ],
+    "reuse": "Uses the existing configured game dimensions and SDL size API. Retains the prior acquired-surface guard; no user-agent exceptions, guessed memory caps or texture-content changes."
+  },
+  "package": {
+    "schema": "melee-web-audio-player-package-v1",
+    "source_sha": "1d637ef79850cf2e18b02066cd215c61ef2b61d9",
+    "runtime_hash": "dd212830c721ebbb",
+    "identity_sha256": "c89451a0de76ccce9877a688801bf4666649df5911e63dcc39cb8f3d8af56c93",
+    "profile": "audio-player",
+    "project": "webmelee"
+  },
+  "validation": {
+    "full_suite": {
+      "result": "pass",
+      "tests": 1724,
+      "skipped": 137,
+      "seconds": 436.648,
+      "report": {
+        "artifact": "full-suite.log",
+        "sha256": "f7781ce1140bc8ba6758f9d0ea765754fbaefd03db2c952317f68fdbde2bd429"
+      }
+    },
+    "bootstrap": {
+      "result": "pass",
+      "tests": 21,
+      "report": {
+        "artifact": "bootstrap-tests.log",
+        "sha256": "b42eadea5bd4f7e40ae2a51d600fcc63bb92f81cad136c1ebd8aaf146d34ebf5"
+      }
+    },
+    "audio_release": {
+      "result": "pass",
+      "report": {
+        "artifact": "build-audio-final.log",
+        "sha256": "75a9c67819f4efcf893f91c67d1098d948cd3da53a6852ea91725735c6f317f4"
+      }
+    },
+    "private_release": {
+      "result": "pass",
+      "report": {
+        "artifact": "build-runtime-final.log",
+        "sha256": "da705ade5d438b003fc8ad8dd0fcea90a602472781d487abf9e91eed23c611ff"
+      }
+    },
+    "package_audit": {
+      "result": "pass",
+      "manifest": {
+        "artifact": "package-final-manifest.json",
+        "sha256": "24145c87e39749da61034ea4f9a10953bce254e5ec03c9b08fb655e0e75c9ee9"
+      },
+      "report": {
+        "artifact": "package-final-audit.log",
+        "sha256": "87beb3ff8efc3c0de00ac7c737cccbd5c6a273da2791bea006462005972abbd0"
+      }
+    },
+    "surface_matrix": {
+      "result": "pass",
+      "cases": 9,
+      "dpr": [
+        1,
+        2,
+        3
+      ],
+      "viewports": [
+        "390x844",
+        "844x390",
+        "1280x960"
+      ],
+      "report": {
+        "artifact": "surface-final/report.json",
+        "sha256": "8148915c043c67f2c78b179633f07f88da78fbf0883760a72afd1d24cb12d1c5"
+      },
+      "baseline_failure": {
+        "artifact": "surface-baseline/report.json",
+        "sha256": "5a5e008474599c74ef3e0be4d942aad432f8b4c24f2643c80ca3514a118df2bd"
+      }
+    },
+    "startup_resize": {
+      "result": "pass",
+      "observations": 15,
+      "scope": "Graphics preparation plus Controls open; fixed backing pixels across real CSS resize.",
+      "report": {
+        "artifact": "resize-final/report.json",
+        "sha256": "bf8d5ebe5b9242017adfbfffe513f8c775382d8f7fb12c711765d86e9e38161f"
+      }
+    },
+    "presentation": {
+      "result": "pass",
+      "dpr": 3,
+      "states": 8,
+      "scope": "Aspect, nonempty game pixels, touch alignment, toolbar clearance, pointer mapping and DOM fullscreen; OS fullscreen/physical input unrun.",
+      "report": {
+        "artifact": "presentation-final/report.json",
+        "sha256": "f5351f96626e43e0271bc7df19bc02121ce586967ebcb53256fda676b45c1552"
+      }
+    },
+    "touch_css": {
+      "result": "pass",
+      "scope": "30 seconds of actual CDP touch input in original CSS, DPR3 390x844. No Start, SSS or Resume. Headless installed Chrome on macOS; not physical iOS.",
+      "baseline": {
+        "artifact": "css-mobile-observation/report.json",
+        "sha256": "39c2c3c12d8284e1311be3d77ff793c269f6cc2fd2896323cf665ae8ead6ae23"
+      },
+      "candidate": {
+        "artifact": "css-mobile-final/report.json",
+        "sha256": "f8ab41c0b1456bb8ef05fb30bae8610800c2168b647ffadfdb544d0f1fd647af"
+      },
+      "backing_pixels": {
+        "baseline": [
+          1920,
+          1440
+        ],
+        "candidate": [
+          640,
+          480
+        ]
+      },
+      "css_pixels": {
+        "baseline": [
+          390,
+          292.5
+        ],
+        "candidate": [
+          390,
+          292.5
+        ]
+      },
+      "known_format_texture_request_bytes": {
+        "baseline": 37012220,
+        "candidate": 5063420,
+        "reduction_percent": 86.31959931071414
+      },
+      "texture_measurement_limit": "Cumulative requested API allocations with known formats; unknown formats excluded. Not resident/live/peak GPU memory. One bounded run per package; driver cache uncontrolled.",
+      "unknown_texture_format_requests": {
+        "baseline": 2,
+        "candidate": 1
+      },
+      "gpu_buffer_request_bytes": {
+        "baseline": 173015136,
+        "candidate": 173015136
+      },
+      "wasm_final_reserved_bytes": {
+        "baseline": 231997440,
+        "candidate": 231997440
+      },
+      "source_audio": "Nonzero original PCM and AudioWorklet processing remained enabled; downstream speaker output muted.",
+      "cleanup": {
+        "process_ids_after_close": {
+          "status": "ok",
+          "observed": [
+            {
+              "pid": 39814,
+              "alive": false,
+              "rss_kb": null
+            },
+            {
+              "pid": 39824,
+              "alive": false,
+              "rss_kb": null
+            },
+            {
+              "pid": 39825,
+              "alive": false,
+              "rss_kb": null
+            },
+            {
+              "pid": 39826,
+              "alive": false,
+              "rss_kb": null
+            },
+            {
+              "pid": 39827,
+              "alive": false,
+              "rss_kb": null
+            },
+            {
+              "pid": 39843,
+              "alive": false,
+              "rss_kb": null
+            },
+            {
+              "pid": 39845,
+              "alive": false,
+              "rss_kb": null
+            },
+            {
+              "pid": 39849,
+              "alive": false,
+              "rss_kb": null
+            },
+            {
+              "pid": 39866,
+              "alive": false,
+              "rss_kb": null
+            }
+          ]
+        },
+        "browser_closed": true,
+        "server_closed": true,
+        "hard_timer_fired": false,
+        "reserved_cleanup_ms": 15000,
+        "elapsed_ms": 38158
+      }
+    },
+    "public_route": {
+      "result": "pass",
+      "scope": "Actual HTTP inventory/bytes/headers and original CSS to SSS to short Mario/Final Destination to No Contest Results to CSS, warm menu round trip and Eject. Nonzero PCM at boundaries; no observed JS errors or unexpected pause. Not a natural four-stock or whole-session acceptance run.",
+      "report": {
+        "artifact": "package-route-final/report.json",
+        "sha256": "c54593d07a0eb3503edcaedd8bc99325bde3166371fffbcffb22ca75377bd6b9"
+      },
+      "http_report": {
+        "artifact": "package-route-final/http-report.json",
+        "sha256": "fdb407df197b108fd25a83c811b75d7cf580dc6af06d29c9932804c938174313"
+      },
+      "cleanup": {
+        "browser_closed": true,
+        "server_closed": true
+      }
+    }
+  },
+  "retained_failures": [
+    {
+      "boundary": "Baseline surface changes to 363x272 at DPR1 landscape instead of configured pixels.",
+      "report": {
+        "artifact": "surface-baseline/report.json",
+        "sha256": "5a5e008474599c74ef3e0be4d942aad432f8b4c24f2643c80ca3514a118df2bd"
+      }
+    },
+    {
+      "boundary": "First packaging correctly refused a stale native producer identity; rebuilt before preparing a fresh immutable package.",
+      "report": {
+        "artifact": "package-dpr-prepare.log",
+        "sha256": "d557ee5211ca34a1ee23aa11066623fc3bdae1ce948b2616a76d55d8c3535813"
+      }
+    },
+    {
+      "boundary": "Early disc selection in desktop WebKit remained in preparation until the bounded deadline; no page crash.",
+      "report": {
+        "artifact": "webkit-css-baseline/report.json",
+        "sha256": "95a6aa226f5cf96c63751f114d6e03bb02ddaea964b13225f8cbfb2f262e822d"
+      }
+    },
+    {
+      "boundary": "Startup-only WebKit reducer reached readiness without GPU errors.",
+      "report": {
+        "artifact": "webkit-startup-only/report.json",
+        "sha256": "54500f0d5cfd77dc8d54d047a88ac732820ef9b0a73304b014c2a01d147d0c11"
+      }
+    },
+    {
+      "boundary": "Ready-gated desktop WebKit CSS produced a forced timing pause on both baseline and the initial fixed-surface candidate. No raw incident owner was captured in these reports.",
+      "baseline": {
+        "artifact": "webkit-css-ready-gated/report.json",
+        "sha256": "3c6d1083784e9b2d1b12082159e324cdc204a5f47c7cef4abdf285820245b446"
+      },
+      "candidate": {
+        "artifact": "webkit-css-dpr-candidate/report.json",
+        "sha256": "f9b9300dcb631e471a37738552dd543b98a560f2656fe682d01aca097f590091"
+      }
+    }
+  ],
+  "open_gates": [
+    "Physical iPhone crash reproduction and termination reason",
+    "Desktop WebKit simulation-backlog stall cause, including observer-effect separation",
+    "Sustained natural session on this surface patch",
+    "Original pixels/PCM comparison, uninterrupted audio, physical controller and foreground/mobile performance"
+  ],
+  "deployment": "No merge or deployment included; staging retest requires explicit authorization.",
+  "resource_handoff": "Owned browser/HTTP jobs closed. Retained recordings, failed reducers and small receipts preserved; incremental builds retained for active mobile follow-up.",
+  "webkit_first_incident_reducer": {
+    "report": {
+      "artifact": "webkit-first-incident-final/report.json",
+      "sha256": "002465bb6c562111735d175a5bad22aca278f4f10d5d18361b01b627bc1303ce"
+    },
+    "scope": "Desktop engine diagnostic only; does not identify the physical iPhone termination.",
+    "observed": {
+      "reason_code": 1,
+      "clock_owner_code": 1,
+      "clock_owner": "simulation",
+      "value_ticks": 16,
+      "threshold_ticks": 8,
+      "scene": 1,
+      "source_frame": -1
+    },
+    "classification_limit": "Runner incorrectly baselined away the already-captured incident at the CSS gate, then labeled pause_without_incident. The raw incident is retained in css_gate_hook and hook_at_stop. No rerun was used to reconstruct it.",
+    "attribution_limit": "Native timing-detail rows are unavailable in this public package. Callback-gap cause, including observation overhead, remains unclassified; this is not physical iPhone crash attribution."
+  },
+  "test_host": {
+    "os": "macOS 26.6 (25G72)",
+    "hardware_model": "Mac16,10",
+    "chrome": "154.0.8037.97, installed, headless",
+    "webkit": "26.5, Playwright headless engine diagnostic only",
+    "audio": "PCM and AudioWorklet enabled, downstream speaker sink silent",
+    "timing_limit": "Functional/resource measurements only; not foreground or mobile performance admission."
+  }
+}

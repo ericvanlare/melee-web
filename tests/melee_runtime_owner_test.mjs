@@ -17,6 +17,23 @@ const adapterRace = process.argv.includes('--adapter-race');
 const adapterRetry = process.argv.includes('--adapter-retry');
 const adapterTimeoutLate = process.argv.includes('--adapter-timeout-late');
 const adapterDeadlineSpan = process.argv.includes('--adapter-deadline-span');
+const lifecycleHandoff = process.argv.includes('--lifecycle-handoff');
+const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host');
+const diagnosticIdentity = {schema_version: 1, source_commit: 'a'.repeat(40), runtime_hash: 'b'.repeat(16), build_profile: 'player'};
+const diagnosticFetches = [];
+let diagnosticPreference = 'on';
+if (diagnosticsKnownHost) {
+  globalThis.location = {origin: 'https://webmelee.gg'};
+  globalThis.fetch = async (url, options) => {
+    diagnosticFetches.push({url, method: options?.method, body: options?.body});
+    return {status: 201};
+  };
+  globalThis.indexedDB = {open() { throw Object.assign(new Error('denied'), {name: 'NotAllowedError'}); }};
+  globalThis.localStorage = {
+    getItem() { return diagnosticPreference; },
+    setItem(_key, value) { diagnosticPreference = value; },
+  };
+}
 if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
 const source = original.replace(
@@ -76,6 +93,9 @@ globalThis.testDiscReader = async (file, report) => {
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'melee-runtime-owner-'));
 const sourcePath = path.join(temporary, 'runtime.mjs');
 await fs.copyFile(new URL('../web/controller-input.mjs', import.meta.url), path.join(temporary, 'controller-input.mjs'));
+for (const module of ['runtime-diagnostics.mjs', 'runtime-diagnostics-delivery.mjs', 'diagnostics-settings.mjs', 'diagnostics-schema.mjs']) {
+  await fs.copyFile(new URL(`../web/${module}`, import.meta.url), path.join(temporary, module));
+}
 await fs.writeFile(sourcePath, source);
 const {mountMeleeRuntime} = await import(pathToFileURL(sourcePath));
 await fs.rm(temporary, {recursive: true});
@@ -188,6 +208,7 @@ let owner;
 const mounted = mountMeleeRuntime({canvas, openDisc: null, createAudio: withAudio ? options => {
   calls.push(['createAudio']); return createRuntimeAudio(options);
 } : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
+  diagnosticIdentity: diagnosticsKnownHost ? diagnosticIdentity : undefined,
   configureModule: cacheUnavailable ? module => {
     module.preRun = () => {
       assert.ok(directories.has('/melee-render-cache'), 'Required setup precedes entry callbacks');
@@ -274,6 +295,8 @@ if (startupCacheDelay) assert.equal(Module._melee_web_native_menu_cache_idle(), 
 Module.onRuntimeInitialized();
 let player = await mounted;
 assert.equal(player.getState().ready, true);
+await assert.rejects(player.snapshotSaveProfile({baseline: true}), /Select a disc/);
+assert.equal(player.getState().requiresReload, false, 'Unavailable baseline export must not enter native code or poison the player');
 assert.equal(player.getState().canSelectDisc, true,
   'Disc selection stays available before the first renderer-cache readiness frame');
 const cacheCallsBeforeMainFrame = cacheIdleCalls;
@@ -322,10 +345,136 @@ if (startupCacheTimeout) {
   process.exit(0);
 }
 assert.equal(player.getState().canImport, true);
+if (diagnosticsKnownHost) {
+  const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
+  async function pumpBoundary(promise) {
+    let settled = false, failure, value;
+    promise.then(result => { value = result; settled = true; }, error => { failure = error; settled = true; });
+    for (let i = 0; !settled && i < 300; i++) {
+      window.menuServiceCommands();
+      await wait(1);
+    }
+    assert.equal(settled, true, 'Owner operation must finish through controlled native boundaries');
+    if (failure) throw failure;
+    return value;
+  }
+  const sample = [100, 12, 1, 2, 3, 4, 5, 6, 9, 1, 2, 3, 4, 5, 6, 7, 8, 1];
+  phase = 1; running = true; window.menuFrame(true);
+  owner.callbacks.menuDiagnosticSample(...sample);
+  const incidentId = owner.callbacks.menuDiagnosticIncident(1, 9, 8, 12, 1, 1);
+  assert.match(incidentId, /^incident-[0-9]+$/);
+  const activeReport = owner.diagnostics.exportReports();
+  assert.deepEqual(activeReport.identity, diagnosticIdentity, 'Known HTTPS host keeps caller-provided safe identity');
+  assert.equal(activeReport.native.callback_count, 1, 'Native scalar callback crosses the owner boundary');
+  assert.equal(activeReport.incidents.length, 1, 'Structured incident trigger crosses the owner boundary');
+  await owner.prepareAudio();
+  assert.ok(calls.some(row => row[0] === 'audioResume'), 'Audio ownership remains on the runtime owner');
+  window.menuPreparation('Controlled preparation', true);
+  await wait(40);
+  assert.equal(diagnosticFetches.length, 0, 'Active and preparing states never POST diagnostics');
+  window.menuPreparationDone();
+  phase = 1; running = false; window.menuFrame(false);
+  await wait(1200);
+  assert.equal(diagnosticFetches.length, 1, 'Inactive integration sends only after the bounded 1,100 ms task');
+  assert.equal(diagnosticFetches[0].method, 'POST');
+  assert.match(JSON.parse(diagnosticFetches[0].body).incident_id, /^session-[a-z0-9]+:incident-[0-9]+$/,
+    'Delivery uses the stable session-bound native incident id');
+
+  if (process.argv.includes('--diagnostics-fatal')) {
+    const beforeFatal = diagnosticFetches.length;
+    phase = 1; running = true; window.menuFrame(true);
+    const dispatch = type => { for (const listener of listeners.get(type) || []) listener(); };
+    document.hidden = true; dispatch('visibilitychange');
+    owner.stop(Error('private-user-path-must-not-be-reported'));
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, beforeFatal, 'Hidden fatal incidents remain local');
+    document.hidden = false; dispatch('visibilitychange');
+    assert.equal(player.getState().requiresReload, true);
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, beforeFatal + 1,
+      'A fatal stopped owner must deliver its sanitized failure without another native frame');
+    const report = JSON.parse(diagnosticFetches.at(-1).body);
+    assert.equal(report.incident.reason, 'runtime_failure');
+    assert.ok(!diagnosticFetches.at(-1).body.includes('private-user-path'));
+    console.log('Shared runtime owner: fatal failure delivers sanitized diagnostics while stopped.');
+    process.exit(0);
+  }
+
+  if (lifecycleHandoff) {
+    const dispatch = type => { for (const listener of listeners.get(type) || []) listener(); };
+    const beforeLifecycleDelivery = diagnosticFetches.length;
+    // Queue a fresh incident while the native scene is paused. The first
+    // inactive frame arms the delivery task, which the hidden edge must cancel
+    // until the native service boundary consumes the sticky handoff.
+    owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+    phase = 1; running = false; window.menuFrame(false);
+    assert.equal(player.getState().paused, true, 'The queued incident leaves manual native pause intent intact');
+    document.hidden = true; dispatch('visibilitychange');
+    document.hidden = false; dispatch('visibilitychange');
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, beforeLifecycleDelivery,
+      'Hidden then visible does not deliver while the native lifecycle handoff is pending');
+    assert.equal(window.menuServiceCommands(), 1,
+      'The first lifecycle service boundary consumes the handoff exactly once');
+    assert.equal(window.menuServiceCommands(), 0,
+      'A lifecycle handoff is not replayed without another hidden edge');
+    assert.equal(player.getState().paused, true, 'Lifecycle delivery gating does not resume the manually paused scene');
+    window.menuFrame(false);
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, beforeLifecycleDelivery + 1,
+      'Deferred delivery becomes eligible only after native handoff and a subsequent frame');
+  }
+
+  const beforeImmediateResume = diagnosticFetches.length;
+  phase = 1; running = true; window.menuFrame(true);
+  owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+  phase = 1; running = false; window.menuFrame(false);
+  await wait(40);
+  phase = 1; running = true; window.menuFrame(true);
+  await wait(1200);
+  const deliveredBeforeOptOut = diagnosticFetches.length;
+  assert.equal(diagnosticFetches.length, beforeImmediateResume, 'Immediate resume cancels deferred delivery');
+
+  owner.callbacks.menuDiagnosticIncident(4, null, null, -1, 1, 0);
+  player.setAutomaticDiagnostics(false);
+  await wait(40);
+  assert.deepEqual(player.getDiagnosticsSettings(), {eligible: true, automatic: false},
+    'Opt-out clears future work while known-host eligibility remains available');
+  phase = 1; running = false; window.menuFrame(false);
+  await wait(1200);
+  assert.equal(diagnosticFetches.length, deliveredBeforeOptOut, 'Opt-out prevents queued diagnostics from posting');
+  diagnosticPreference = 'off';
+  for (const listener of listeners.get('storage') || []) listener({key: 'melee-web-automatic-diagnostics-v1'});
+  assert.deepEqual(player.getDiagnosticsSettings(), {eligible: true, automatic: false},
+    'Cross-tab storage opt-out is honored by the owner');
+
+  const exported = await player.exportDiagnostics();
+  assert.ok(exported && exported.current && exported.retained,
+    'Inactive manual export includes current and retained sections despite denied storage');
+  assert.ok(exported.current.incidents.length <= 4);
+  assert.ok(Array.isArray(exported.retained.records) && exported.retained.records.length <= 4);
+  assert.equal(exported.current.flags.storage_denied, true, 'Denied storage is represented as an explicit flag');
+  const beforeUnload = calls.filter(row => row[0] === 'unload').length;
+  for (let i = 0; !window.menuAudioReadyForPreparation() && i < 20; i++) await wait(10);
+  assert.equal(window.menuAudioReadyForPreparation(), true, 'Audio ownership acknowledges inactive preparation before save/unload');
+  await pumpBoundary(owner.unloadAndSave());
+  assert.equal(calls.filter(row => row[0] === 'unload').length, beforeUnload + 1,
+    'Save/unload ownership remains on the native owner boundary');
+  document.hidden = true;
+  for (const listener of listeners.get('visibilitychange') || []) listener();
+  window.menuServiceCommands();
+  assert.deepEqual(calls.filter(row => row[0] === 'activity').at(-1), ['activity', 1, 0]);
+  document.hidden = false;
+  for (const listener of listeners.get('visibilitychange') || []) listener();
+  window.menuServiceCommands();
+  assert.deepEqual(calls.filter(row => row[0] === 'activity').at(-1), ['activity', 1, 1]);
+  console.log('Shared runtime owner: known-host diagnostics identity, scalar incident wiring, inactive delivery delay/cancel, opt-out storage event, denied persistence, audio/input/save ownership pass.');
+  process.exit(0);
+}
 await assert.rejects(player.openDiscSession({name: 'unsupported.iso'}), /no local disc session loader/,
   'the public shell can request validation only through a configured profile adapter');
 await assert.rejects(player.importDisc({name: 'forged.iso'}, {preopenedSession: {
-  close() {}, readScope: async () => new Map(),
+  close() {}, async *streamScope() {}, readScope: async () => new Map(),
 }}), /not opened by this player/,
   'a structurally plausible session cannot bypass the configured profile loader');
 if (startupCacheError) assert.equal(player.getState().canImport, true, 'Native cache error remains optional for import eligibility');
@@ -360,7 +509,89 @@ async function pump(promise) {
   return value;
 }
 const nativeServiceCommands = window.menuServiceCommands;
-window.menuServiceCommands = () => { ++serviceBatch; nativeServiceCommands(); };
+window.menuServiceCommands = () => { ++serviceBatch; return nativeServiceCommands(); };
+
+if (lifecycleHandoff) {
+  function dispatch(type) {
+    for (const listener of listeners.get(type) || []) listener();
+  }
+  function activityRowsSince(index) {
+    return calls.slice(index).filter(row => row[0] === 'activity').map(row => row.slice(1));
+  }
+  function assertHandoff(events, expectedVisible, label) {
+    const start = calls.length;
+    for (const event of events) dispatch(event);
+    assert.equal(window.menuServiceCommands(), 1, `${label} is consumed exactly at the native command boundary`);
+    assert.deepEqual(activityRowsSince(start).slice(-2), [[0, 0], [1, expectedVisible]],
+      `${label} neutralizes native activity before publishing current input`);
+    const after = calls.length;
+    assert.equal(window.menuServiceCommands(), 0, `${label} handoff is not replayed without another lifecycle event`);
+    assert.deepEqual(activityRowsSince(after), [], `${label} does not emit a second clock handoff`);
+  }
+
+  phase = 1; running = true; window.menuFrame(true);
+  window.menuServiceCommands();
+  let baseline = calls.length;
+  assert.equal(window.menuServiceCommands(), 0, 'ordinary foreground command service has no clock handoff');
+  assert.deepEqual(activityRowsSince(baseline), [], 'ordinary foreground service does not neutralize activity');
+
+  document.hidden = true;
+  assertHandoff(['visibilitychange'], 0, 'visibility hidden');
+
+  // A visible callback is allowed to arrive before the native boundary runs.
+  // The hidden edge remains sticky until that boundary consumes it; observing
+  // the visible edge must not erase the neutralization request.
+  const hiddenVisibleStart = calls.length;
+  document.hidden = true;
+  dispatch('visibilitychange');
+  document.hidden = false;
+  dispatch('visibilitychange');
+  assert.equal(window.menuServiceCommands(), 1,
+    'hidden then visible before service still consumes one clock handoff');
+  assert.deepEqual(activityRowsSince(hiddenVisibleStart).slice(-2), [[0, 0], [1, 1]],
+    'hidden then visible before service neutralizes before current activity');
+  const hiddenVisibleAfter = calls.length;
+  assert.equal(window.menuServiceCommands(), 0,
+    'hidden then visible handoff is consumed only once');
+  assert.deepEqual(activityRowsSince(hiddenVisibleAfter), [],
+    'hidden then visible does not emit another handoff');
+
+  document.hidden = false;
+  assertHandoff(['pagehide', 'pageshow'], 1, 'pagehide/pageshow');
+  assertHandoff(['freeze', 'resume'], 1, 'freeze/resume');
+
+  // Foreground focus changes update input activity but do not reset either
+  // fixed-tick clock. The native handoff return remains zero.
+  document.activeElement = null;
+  baseline = calls.length;
+  dispatch('blur');
+  assert.equal(window.menuServiceCommands(), 0, 'foreground blur does not request a clock handoff');
+  assert.deepEqual(activityRowsSince(baseline), [[0, 1]], 'foreground blur publishes current activity only');
+  player.focus();
+  baseline = calls.length;
+  dispatch('focus');
+  assert.equal(window.menuServiceCommands(), 0, 'foreground focus does not request a clock handoff');
+  assert.deepEqual(activityRowsSince(baseline), [[1, 1]], 'foreground focus publishes current activity only');
+
+  const pauseBoundaryStart = calls.length;
+  const audioResumesBeforePause = calls.filter(row => row[0] === 'audioResume').length;
+  await pump(player.pause());
+  assert.equal(player.getState().paused, true, 'manual pause remains an explicit external state');
+  const pauseBoundaryCalls = calls.slice(pauseBoundaryStart);
+  assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 1), true,
+    'manual pause reaches the native pause boundary in lifecycle mode');
+  assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 0), false,
+    'manual pause does not implicitly resume the native scene in lifecycle mode');
+  assert.equal(pauseBoundaryCalls.some(row => ['unload', 'saveProfile', 'snapshot'].includes(row[0])), false,
+    'manual pause does not unload or save the native owner in lifecycle mode');
+  assert.equal(calls.filter(row => row[0] === 'audioResume').length, audioResumesBeforePause,
+    'manual pause does not resume Web Audio in lifecycle mode');
+  await pump(player.resume());
+  assert.equal(player.getState().running, true, 'manual resume restores running state in lifecycle mode');
+
+  console.log('Shared runtime owner: hidden/page lifecycle handoff neutralizes once before current activity; foreground focus alone does not reset clocks.');
+  process.exit(0);
+}
 const queuedLayout = player.setKeyboardLayout('boxx');
 assert.equal(calls.some(row => row[0] === 'layout'), false);
 window.menuServiceCommands();
@@ -462,7 +693,18 @@ else {
   assert.equal(player.getState().audio, 'disabled');
   assert.throws(() => window.menuAudio(new Float32Array(2)), /Audio output is disabled/);
 }
+const pauseBoundaryStart = calls.length;
+const audioResumesBeforePause = calls.filter(row => row[0] === 'audioResume').length;
 await pump(player.pause()); assert.equal(player.getState().paused, true);
+const pauseBoundaryCalls = calls.slice(pauseBoundaryStart);
+assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 1), true,
+  'Manual pause reaches the native pause boundary');
+assert.equal(pauseBoundaryCalls.some(row => row[0] === 'pause' && row[1] === 0), false,
+  'Manual pause does not implicitly resume the native scene');
+assert.equal(pauseBoundaryCalls.some(row => ['unload', 'saveProfile', 'snapshot'].includes(row[0])), false,
+  'Manual pause does not unload or save the native owner');
+assert.equal(calls.filter(row => row[0] === 'audioResume').length, audioResumesBeforePause,
+  'Manual pause does not resume Web Audio');
 await pump(player.resume()); assert.equal(player.getState().running, true);
 for (const [menuPhase, menuScene] of [[10, 'title'], [11, 'main']]) {
   phase = menuPhase; running = true; window.menuFrame(true);

@@ -1,0 +1,269 @@
+{
+  "schema": "melee-web-diagnostics-reporting-evidence-v1",
+  "status": "bounded_evidence",
+  "source": {
+    "commit": "4e76522b65931e57930ec17eea2ce2c611a120a9",
+    "prior_package_evidence_commit": "b251e7d81d463a898e2dbe338fbe053a62c7fd91",
+    "behavioral_evidence_commit": "4d5bb1ab0b400b0ba5299fe4e11dfa3b1faf27ab",
+    "scope": "runtime reporting backend, current 4e package audits, and prior b251/4d5 bounded behavioral evidence",
+    "claim_boundaries": [
+      "No hosted deployment, provisioning, DNS, or real-user report is claimed",
+      "The induced callback stall demonstrates detection and delivery only; natural pause root cause remains unknown",
+      "Physical deletion, foreground timing, audible output, physical input, and original whole-session acceptance remain outside this receipt",
+      "Cross-tab outbox merge is best effort; storage denial, races, or hard shutdown can lose diagnostic work without affecting saves"
+    ]
+  },
+  "identity": {
+    "source_commit": "4e76522b65931e57930ec17eea2ce2c611a120a9",
+    "packages": {
+      "silent_player": {
+        "profile": "player",
+        "runtime_hash": "9882d551a00e9964",
+        "identity_sha256": "20c7874cc9f04ff18ea7e45fecda713e99b713c9fd66bfc9dce65000b79b0e5a",
+        "manifest_sha256": "d7d94de3c5fa75e91d4ca0fcac96f27380115f10432ada7027cc2b883f840411",
+        "manifest_path": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/silent-manifest-4e.json"
+      },
+      "audio_player": {
+        "profile": "audio-player",
+        "runtime_hash": "40af1053410ff4d8",
+        "identity_sha256": "2e5f0cd935642d65f82a606747cb139b3536019f4e93daf4dd8dab41ee88ad65",
+        "manifest_sha256": "effbdd7d135fad3e7bba17f91736410bc189f875914de22e720dcacb4488a340",
+        "manifest_path": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/audio-manifest-4e.json"
+      }
+    },
+    "prior_b251_packages": {
+      "silent_runtime_hash": "68eab043e35da1c6",
+      "audio_runtime_hash": "3ad51cc70e6646e1",
+      "audio_identity_sha256": "ac86d92a8771468177716b1b1ec97d314db5a60ad8b7628a154b8307e4b4c951"
+    },
+    "prior_4d5_behavioral_identity": {
+      "source_commit": "4d5bb1ab0b400b0ba5299fe4e11dfa3b1faf27ab",
+      "runtime_hash": "cdb580fe8ba25f2c",
+      "build_profile": "audio-player",
+      "manifest_sha256": "9ef009eefd9dd71accffff5cf42253642a84f3c745d8ea7eb8f33da0992d5b95"
+    }
+  },
+  "backend_review": {
+    "status": "pass",
+    "verified": [
+      "Strict v1 allowlist preserves enumerated reason, scene, clock-owner, lifecycle, audio, long-task, nullable capability, and bounded history evidence",
+      "Duplicate-key, nesting, item-count, UTF-8, 64 KiB, and five-second body bounds are enforced",
+      "Known staging/production hosts, exact HTTPS same-origin Origin, independent environment mapping, and configured release identity are enforced",
+      "Only diagnostics API routes reach the Pages sidecar; static fallback, security headers, and blocked-route boundaries remain separate",
+      "D1 deduplication/conflict responses, per-minute and daily intake caps, retained row/byte limits, authenticated CLI query/get/delete, and query-time expiry are bounded"
+    ],
+    "source_hashes": {
+      "diagnostics/worker.mjs": "ab2b6b196b116a69734bd7fe08bfd35f7d4fcd6338e2f59c494c7979ead935fb",
+      "diagnostics/schema.mjs": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5",
+      "diagnostics/_routes.json": "3cb388db22a515039253eda23d7473bae326af9afebfee651461272f18d9203a",
+      "diagnostics/migrations/0001_diagnostics.sql": "e28fe1a69b1f5f2359b0be9e7a5fb6d8b326d1fe4c942af883f4d2914c19ef07",
+      "diagnostics/purge-worker.mjs": "80e1851eb26eb94f9b7d621348c36b4d829d9aeb26ba3d9ee70790c3d2841206"
+    },
+    "source_revision": "4e76522b65931e57930ec17eea2ce2c611a120a9",
+    "backend_bytes_unchanged_from_b251": true
+  },
+  "validation": {
+    "current_4e_package_audits": {
+      "status": "pass",
+      "source_commit": "4e76522b65931e57930ec17eea2ce2c611a120a9",
+      "change_summary": "initial opt-out deferred-clear race fix; b251 public producer source fingerprint parity retained",
+      "silent_player": {
+        "profile": "player",
+        "runtime_hash": "9882d551a00e9964",
+        "build_log": "work/diagnostics/build-reporting-public-4e.log",
+        "package_manifest": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/silent-manifest-4e.json",
+        "manifest_sha256": "d7d94de3c5fa75e91d4ca0fcac96f27380115f10432ada7027cc2b883f840411",
+        "package_log": "work/diagnostics/package-reporting-public-4e.log"
+      },
+      "audio_player": {
+        "profile": "audio-player",
+        "runtime_hash": "40af1053410ff4d8",
+        "build_log": "work/diagnostics/build-reporting-audio-4e.log",
+        "package_manifest": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/audio-manifest-4e.json",
+        "manifest_sha256": "effbdd7d135fad3e7bba17f91736410bc189f875914de22e720dcacb4488a340",
+        "package_log": "work/diagnostics/package-reporting-audio-4e.log"
+      }
+    },
+    "prior_b251_package_audits": {
+      "status": "pass",
+      "source_commit": "b251e7d81d463a898e2dbe338fbe053a62c7fd91",
+      "metadata_change": "public producer source fingerprint parity",
+      "silent_player": {
+        "profile": "player",
+        "runtime_hash": "68eab043e35da1c6",
+        "build_log": "work/diagnostics/build-reporting-public-b251.log",
+        "package_manifest": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/silent-manifest-b251.json",
+        "manifest_sha256": "7f9253f28c6a9c523b8e35934c647fe5c9080ddc0bffba26ab37a3ee96b36169",
+        "package_log": "work/diagnostics/package-reporting-public-b251.log"
+      },
+      "audio_player": {
+        "profile": "audio-player",
+        "runtime_hash": "3ad51cc70e6646e1",
+        "build_log": "work/diagnostics/build-reporting-audio-b251.log",
+        "package_manifest": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/audio-manifest-b251.json",
+        "manifest_sha256": "4a06e8ed31489f545718610e9c01ef90f97df4148c9c53c2652d3a1eb5616a53",
+        "package_log": "work/diagnostics/package-reporting-audio-b251.log"
+      }
+    },
+    "prior_b251_pages_http": {
+      "status": "pass",
+      "reason": "Current Pages six-case HTTP rerun remains active; no hosted service claim",
+      "source_commit": "b251e7d81d463a898e2dbe338fbe053a62c7fd91",
+      "cases": 6,
+      "seconds": 25.448,
+      "log": "work/diagnostics/pages-dev-integration-b251.log",
+      "receipt": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/pages-http-b251/receipt.json",
+      "receipt_sha256": "1cd5956d5cb8182442aed634447e4881b265b4a00be1e608985994932ad2cbe4",
+      "scope": "real local HTTPS Pages/D1 integration; no hosted deployment, Chrome/GPU, native compile, or natural-cause claim"
+    },
+    "prior_4d5_browser_behavior": {
+      "status": "pass",
+      "source_commit": "4d5bb1ab0b400b0ba5299fe4e11dfa3b1faf27ab",
+      "scope": "Headless synthetic delivery plus packaged-native induced callback-stall delivery; no natural-cause claim; not current b251 native validation",
+      "receipts": [
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/browser-synthetic-4d5/receipt.json",
+          "sha256": "3fe25c2229b4690996d60a9bb5ca6354a6ab16392113d21deb1f0a6e4c800288",
+          "checks": [
+            "staging D1 delivery and identity",
+            "inactive suppression, offline queue, disabled preference, and local export",
+            "bounded server rejection/retry",
+            "production origin isolation"
+          ]
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/native-guard-delivery-4d5/receipt.json",
+          "sha256": "3c50b2dc30d36a8f51902f177c3e2fb4b289d50778f823ae0f88ed8dc3295c09",
+          "checks": [
+            "4d5 packaged identity",
+            "Settings default/opt-out/local export",
+            "single native owner and canImport gate",
+            "packaged CSS/audio start",
+            "induced callback stall and source simulation guard",
+            "same-origin sanitized POST and D1 identity",
+            "owner cleanup without automatic resume"
+          ],
+          "observations": {
+            "report_count": 1,
+            "report_bytes": 10575,
+            "report_reason": "simulation_debt",
+            "report_environment": "staging",
+            "guard_value": 13,
+            "guard_threshold": 8,
+            "serialization_total_main_thread_ms": 0.060000061988830566,
+            "fetch_dispatch_main_thread_ms": 0.3500000238418579,
+            "fetch_response_await_ms": 14.454999923706055
+          }
+        }
+      ]
+    },
+    "prior_4d5_full_suite": {
+      "status": "pass",
+      "source_commit": "4d5bb1ab0b400b0ba5299fe4e11dfa3b1faf27ab",
+      "tests": 1693,
+      "skipped": 120,
+      "seconds": 313.177,
+      "log": "work/diagnostics/full-suite-reporting-4d5.log",
+      "current_head_validation": "pending"
+    },
+    "prior_local_pages_backend": {
+      "status": "pass; prior source identity",
+      "source_commit_under_test": "8dd98e35cf0a623addbe584e632d1d2ea4e5ff40",
+      "cases": 6,
+      "receipt": "work/diagnostics/pages-dev-integration-receipt.json",
+      "scope": "local HTTPS Pages/Miniflare D1 route, cap, auth, expiry, purge, and static-isolation checks; not current b251 HTTP validation"
+    },
+    "current_4e_native_delivery": {
+      "status": "pass",
+      "source_commit": "4e76522b65931e57930ec17eea2ce2c611a120a9",
+      "receipt": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/native-guard-delivery-4e/receipt.json",
+      "receipt_sha256": "5426a12f039e26314167c0fcd2ffaa1140c9d6147f3340b295392659fdfc5403",
+      "scope": "Headless packaged-native CSS/audio and induced callback-stall delivery; detection/delivery evidence only, no natural-cause claim",
+      "checks": [
+        "actual Settings default/opt-out/local export",
+        "single owner and canImport gate before chooser",
+        "packaged CSS/audio start with secure GPU, crossOriginIsolated, and requestAdapter evidence",
+        "controlled native callback stall and source simulation guard",
+        "credentialless inactive same-origin POST and strict sanitized wire identity",
+        "D1 report identity and guard values",
+        "owner cleanup without automatic resume"
+      ],
+      "privacy": "induced native callback-stall incident only; no token, cookie, raw request metadata, or hosted endpoint retained",
+      "graphics": {
+        "secure": true,
+        "gpu": true,
+        "crossOriginIsolated": true,
+        "requestAdapter": true,
+        "adapterAvailable": true
+      },
+      "guard": {
+        "reason_code": 1,
+        "value": 13,
+        "threshold": 8,
+        "source_frame": -1,
+        "scene_code": 1,
+        "clock_owner_code": 1,
+        "stall_ms": 200
+      },
+      "report": {
+        "count": 1,
+        "bytes": 9561,
+        "sha256": "f866ade2c68d955228c375bbef5d51a7dbd41fc57c2cad8a4bee7567fab41daa",
+        "reason": "simulation_debt",
+        "environment": "staging",
+        "source_commit": "4e76522b65931e57930ec17eea2ce2c611a120a9",
+        "runtime_hash": "40af1053410ff4d8"
+      },
+      "upload_timing_ms": {
+        "strict_wire_serialization_calls": 2,
+        "strict_wire_serialization_total_main_thread": 0.12500011920928955,
+        "strict_wire_serialization_main_thread": 0.08000004291534424,
+        "fetch_dispatch_main_thread": 0.8299999237060547,
+        "fetch_response_await": 30.97499990463257,
+        "inactive_to_fetch_dispatch": 1107.1299999952316,
+        "strict_wire_serialized_bytes": 9561,
+        "processing_active": false
+      },
+      "artifacts": [
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/native-guard-delivery-4e/native-report.json",
+          "sha256": "54351e7bb72e95eaae8781cde7e9114da8f19e425b189e4abc15c66515b888b5"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/native-guard-delivery-4e/public-settings-export.json",
+          "sha256": "92f4b7973afec83ca0d52b234a3183ef8f02ee792ea730ab5855258300a63df0"
+        },
+        {
+          "path": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/native-guard-delivery-4e/public-settings.png",
+          "sha256": "df672c2a0efde92f75c21a011441f1e2a6080ea51294ddce01f96708413bd0bc"
+        }
+      ],
+      "fixture_cleanup": "removed-successful-disposable"
+    },
+    "current_4e_full_suite": {
+      "status": "pass",
+      "source_commit": "4e76522b65931e57930ec17eea2ce2c611a120a9",
+      "tests": 1695,
+      "skipped": 121,
+      "seconds": 315.801,
+      "log": "work/diagnostics/full-suite-reporting-4e.log",
+      "log_sha256": "1ec360d428ef40f2a97929af6795a12f9167816615f99875b6a31b93596682c0",
+      "receipt": "/Volumes/AgentStorage/melee-web/runs/runtime-diagnostic-reporting-20261001-182028-b3941fdc/full-suite-4e/receipt.json",
+      "receipt_sha256": "750badb0582650ea5385d2081c5b0f1bfb678b552394372f367a24b605d0a33d",
+      "scope": "Required source suite with owned CPU DOL/disc fixtures and external scratch; no browser, performance, or admission claim",
+      "additional_focus": {
+        "status": "pass",
+        "tests": 5,
+        "seconds": 0.855,
+        "scope": "Pinned Wrangler Functions packaging, including the route-compile gate omitted from the full run because WRANGLER_BIN was unavailable there",
+        "log": "work/diagnostics/backend-packaging-final-4e.log",
+        "log_sha256": "7b54eeef7e7868932fd0f7f257d5f53f52b922480adfc31079a527365e5211d7"
+      }
+    }
+  },
+  "retention": {
+    "query_expiry": "30 days",
+    "physical_deletion": "Separate 30-minute scheduled Worker, bounded to 100 rows per run; missed runs, D1 errors, or backlog can extend physical-deletion lag",
+    "deployment_state": "not deployed"
+  }
+}
