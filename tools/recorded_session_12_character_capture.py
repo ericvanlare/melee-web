@@ -96,6 +96,11 @@ MARIO_TEAM_COSTUMES = {0: 0, 1: 3}
 # StartMeleeData item-mask bit 18.  Clearing that bit is the committed
 # row-zero mask emitted by the original Team match.
 TEAM_ROUTE_ITEM_MASK = "fffffffffffbffff"
+# CSSData keeps the source ``StartMeleeData`` at +0x10, but it is the
+# pre-entry copy.  ``gmVsMelee_EnterVs`` sets StartMeleeRules.is_vs only when
+# entering the match, so the retained CSS copy has the source byte 0x83 rather
+# than the ordinary match-entry value with that bit set.
+CSS_RETAINED_PROFILE_BYTE = 0x83
 
 
 class CaptureFailure(RuntimeError):
@@ -184,6 +189,37 @@ def _validate_team_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
         raise CaptureFailure(
             "source Team match did not receive the Rules/Items route's row-zero item mask")
     return setup
+
+
+def _decode_css_start_data(raw_hex: str) -> dict[str, Any]:
+    """Decode the retained CSSData StartMeleeData with its source profile.
+
+    The ordinary setup decoder intentionally requires ``is_vs`` because that
+    bit is installed by ``gmVsMelee_EnterVs`` at match entry.  CSSData is the
+    source's pre-entry copy, so it must retain the authored pre-entry byte and
+    cannot be checked with that match-entry identity requirement.  All other
+    setup validation remains shared with the ordinary decoder.
+    """
+    if not isinstance(raw_hex, str):
+        raise CaptureFailure("source CSS retained state is not encoded as bytes")
+    try:
+        raw = bytearray.fromhex(raw_hex)
+    except ValueError as error:
+        raise CaptureFailure(f"source CSS retained state is not valid hex: {error}") from error
+    if len(raw) != 0x138:
+        raise CaptureFailure(
+            f"source CSS retained state is not a complete 0x138-byte StartMeleeData: {len(raw)}")
+    if raw[4] != CSS_RETAINED_PROFILE_BYTE:
+        raise CaptureFailure(
+            "source CSS retained state has an unexpected pre-entry VS profile byte: "
+            f"expected {CSS_RETAINED_PROFILE_BYTE:#x}, received {raw[4]:#x}")
+    # Reuse every ordinary setup check and decoder field while locally
+    # supplying the entry-only is_vs bit that the source adds after CSS.
+    raw[4] |= 0x40
+    try:
+        return _decode_setup(raw.hex())
+    except (KeyError, TypeError, ValueError) as error:
+        raise CaptureFailure(f"source CSS retained state is unsupported: {error}") from error
 
 
 def _decode_team_result(raw_hex: str) -> dict[str, Any]:
@@ -769,7 +805,7 @@ class Driver:
                       {"is_teams": 1, "player_teams": [0, 1]},
                       f"original CSS retains Teams after Results {match_index}", seconds=30.0)
             retained_hex = self.latest.get("css_start_data", "")
-            retained = _decode_setup(retained_hex)
+            retained = _decode_css_start_data(retained_hex)
             retained_raw = bytes.fromhex(retained_hex)
             if (retained["is_teams"] is not True or
                     retained["item_frequency"] != -1 or
@@ -883,6 +919,15 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
                 "stocks": raw[114 + index * 36],
                 "cpu": raw[127 + index * 36],
             } for index in range(6)]
+        elif name == "menu_css_context":
+            # The return_css boundary carries this same source CSSData owner
+            # after Results, while no live-state sample is emitted during the
+            # transition. Use its typed +0x10 StartMeleeData copy so the
+            # retained-settings check observes the returned CSS state.
+            if len(raw) != 0x148:
+                raise CaptureFailure(
+                    f"source CSS context has unexpected size {len(raw)}")
+            latest["css_start_data"] = raw[0x10:0x148].hex()
         elif name == "stage_select_index":
             stage = slices.get("stage_select_kind")
             latest["stage_kind"] = int(stage["hex"], 16) if stage else None

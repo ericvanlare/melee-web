@@ -8,6 +8,7 @@ from tools.recorded_session_12_character_capture import (
     ROSTER_ICON,
     _capture_exit_code,
     _consume_row,
+    _decode_css_start_data,
     _decode_team_result,
     _validate_team_setup,
 )
@@ -109,6 +110,33 @@ class RecordedSession12CharacterCaptureTests(unittest.TestCase):
             "payload": {"slices": [{"name": "menu_css_live_state", "hex": css_data.hex()}]},
         }, latest, {})
         self.assertEqual(latest["team_state"], {"is_teams": 1, "player_teams": [0, 1]})
+
+    def test_css_context_decodes_pre_entry_retained_start_data(self):
+        start = bytearray.fromhex(self.team_setup())
+        start[2] = 0x06  # CSS pre-entry copy has not enabled stock mode yet.
+        start[4] = 0x83  # source CSSData before gmVsMelee_EnterVs sets is_vs.
+        css_data = bytearray(0x148)
+        css_data[0x10:] = start
+        latest = {}
+        _consume_row({
+            "event": "boundary",
+            "seq": 20,
+            "payload": {
+                "whole_session": True,
+                "boundary": "return_css",
+                "match_index": 0,
+                "slices": [{"name": "menu_css_context", "hex": css_data.hex()}],
+            },
+        }, latest, {})
+        retained = _decode_css_start_data(latest["css_start_data"])
+        self.assertEqual(retained["item_mask_hex"], "fffffffffffbffff")
+        self.assertEqual([player["costume"] for player in retained["players"]], [0, 3])
+        self.assertFalse(retained["is_stock"])
+
+    def test_css_retained_decoder_rejects_match_entry_profile(self):
+        start = bytearray.fromhex(self.team_setup())
+        with self.assertRaisesRegex(CaptureFailure, "pre-entry VS profile byte"):
+            _decode_css_start_data(start.hex())
 
     def test_css_door_decoder_keeps_team_and_human_toggle_bounds_distinct(self):
         doors = bytearray(4 * 36)
