@@ -824,6 +824,12 @@ class Driver:
                 "team_state": self.latest.get("team_state"),
             })
             self.state(f"css-after-team-results-settings-retained-{match_index}")
+            if match_index < 2:
+                css_polls = self.latest.get("css_polls", 0)
+                self.wait(lambda css_polls=css_polls:
+                          self.latest.get("scene_kind") == "08" and
+                          self.latest.get("css_polls", 0) >= css_polls + 240,
+                          "returned CSS initialization")
 
 
 def _consume_row(row: dict[str, Any], latest: dict[str, Any],
