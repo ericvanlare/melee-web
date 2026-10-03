@@ -85,6 +85,12 @@ LINEUPS: tuple[tuple[str, ...], ...] = (
     ("CAPTAIN_FALCON", "GANONDORF", "LUIGI", "PIKACHU"),
 )
 EXPECTED_ROSTER = tuple(tuple(ROSTER[name][0] for name in lineup) for lineup in LINEUPS)
+# The original team's color for Mario comes from
+# ``gm_801692BC(8) -> lbl_803D51A0[8].x2``.  The pinned table row is
+# ``{ 0x05, 0x00, 0x03, 0x04 }``: team 0 uses x1 (0), and team 1 uses x2
+# (3).  Keep this source mapping explicit so a permissive costume check cannot
+# admit a visually similar but source-invalid team setup.
+MARIO_TEAM_COSTUMES = {0: 0, 1: 3}
 
 
 class CaptureFailure(RuntimeError):
@@ -155,14 +161,19 @@ def _validate_team_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
             [player["player_type"] for player in players] != [0, 1] or
             any(player["character_kind"] != ROSTER["MARIO"][0] or
                 player["stocks"] != 3 for player in players) or
-            players[1].get("cpu_kind") != 4 or players[1].get("cpu_level") != 1 or
-            [player["costume"] for player in players] != [0, 1]):
+            players[1].get("cpu_kind") != 4 or players[1].get("cpu_level") != 1):
         raise CaptureFailure(
             f"source team setup did not contain a three-stock Mario and level-1 CPU: {players}")
     raw = bytes.fromhex(raw_hex)
     teams = [raw[0x69], raw[0x8D]]
     if any(team > 2 for team in teams) or teams[0] == teams[1]:
         raise CaptureFailure(f"source team setup did not contain opposing authored teams: {teams}")
+    expected_costumes = [MARIO_TEAM_COSTUMES.get(team) for team in teams]
+    actual_costumes = [player["costume"] for player in players]
+    if actual_costumes != expected_costumes:
+        raise CaptureFailure(
+            "source team setup did not contain source-derived Mario team colors: "
+            f"expected {expected_costumes} for teams {teams}, received {actual_costumes}")
     setup["player_teams"] = teams
     if setup["item_mask_hex"] != "fffffffeffffffff":
         raise CaptureFailure(

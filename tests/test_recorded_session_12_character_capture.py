@@ -16,7 +16,7 @@ from tools.recorded_session_12_character_capture import (
 class RecordedSession12CharacterCaptureTests(unittest.TestCase):
     @staticmethod
     def team_setup(teams=(0, 1), item_frequency=-1,
-                   item_mask_hex="fffffffeffffffff"):
+                   item_mask_hex="fffffffeffffffff", costumes=(0, 3)):
         raw = bytearray(0x138)
         raw[0] = 0x20  # stock match
         raw[2] = 0x80  # stock mode
@@ -28,7 +28,7 @@ class RecordedSession12CharacterCaptureTests(unittest.TestCase):
         raw[0x2C:0x30] = bytes.fromhex("3f800000")
         for index, team in enumerate(teams):
             base = 0x60 + index * 0x24
-            raw[base:base + 5] = bytes((8, index, 3, index, index + 1))
+            raw[base:base + 5] = bytes((8, index, 3, costumes[index], index + 1))
             raw[base + 9] = team
         raw[0x60 + 0x24 + 14] = 4
         raw[0x60 + 0x24 + 15] = 1
@@ -46,6 +46,12 @@ class RecordedSession12CharacterCaptureTests(unittest.TestCase):
         self.assertEqual(setup["players"][1]["cpu_level"], 1)
         with self.assertRaisesRegex(CaptureFailure, "opposing authored teams"):
             _validate_team_setup(self.team_setup(teams=(1, 1)), 0)
+
+    def test_team_setup_requires_source_derived_mario_team_colors(self):
+        with self.assertRaisesRegex(CaptureFailure, "source-derived Mario team colors"):
+            _validate_team_setup(self.team_setup(costumes=(0, 1)), 0)
+        with self.assertRaisesRegex(CaptureFailure, "source-derived Mario team colors"):
+            _validate_team_setup(self.team_setup(costumes=(1, 3)), 0)
 
     def test_team_setup_rejects_a_frequency_that_was_not_committed_as_none(self):
         with self.assertRaisesRegex(CaptureFailure, "source team rules differ"):
