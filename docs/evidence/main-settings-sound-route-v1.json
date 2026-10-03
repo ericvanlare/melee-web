@@ -8,19 +8,19 @@
     "Browser exercised"
   ],
   "port": {
-    "base_commit": "d266492e6453a000defca53ddb92c3463479aede",
-    "route_implementation_commit": "7903d54f80f9285eb46a8844dad36bc26aa0409e",
-    "native_regression_commit": "10dcae25a7edde0af5c5b3300d342d4b98373a5d",
-    "browser_receipt_commit": "6507618",
+    "base_commit": "e7c15a98566fa24be4a7be0adcb96506ed2b4465",
+    "route_implementation_commit": "42b931db5bc4b53475762ab04bb59bd4b8e68cd1",
+    "native_regression_commit": "31ae4f53aea0e9548328a01077812cf34a81428a",
+    "browser_receipt_commit": "7a4ca339d45f72a954beb381ce83018bf617ce35",
     "implementation_file_sha256": {
-      "src/gameplay_menu_host.c": "a499dbec1d399f41a9fc74b95450feb1dc25b2d5fe9bfaf29b82579e3ba7733e",
-      "src/dat_native_menu.cpp": "a1ba5be6bfd991899df0220bba97f249ff3e3d4e3dd62abda5854c522e4d837c",
+      "src/gameplay_menu_host.c": "68284018f81b1898de3efa4b489f791ba7b8c659e094a22cc319de1358dfeea0",
+      "src/dat_native_menu.cpp": "f48e5833149450db0fa1c5c14c5648557517c99560d763333dba279267beb2f4",
       "tests/native_menu_host_trace.cpp": "e7d246bd262d340ee0d4ec89b080741cfa414fe41fde3265fa714bd499d50b1b",
       "tests/test_gameplay_native_menus.py": "6ac3a19a71fa3c9ae21c21e0d5b0ac075e0ab049d4cc72563a43a8b2c5a2d5ae",
       "tests/main_settings_sound_browser_test.mjs": "c6c2982dc56ab0822de80b401121b6c24de5a699f8aff3fe144f04dcf0a7a9b4"
     },
-    "source_commit": "10dcae25a7edde0af5c5b3300d342d4b98373a5d",
-    "browser_receipt_source_commit": "10dcae25a7edde0af5c5b3300d342d4b98373a5d"
+    "source_commit": "7a4ca339d45f72a954beb381ce83018bf617ce35",
+    "browser_receipt_source_commit": "7a4ca339d45f72a954beb381ce83018bf617ce35"
   },
   "source": {
     "repository_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
@@ -89,8 +89,9 @@
       "meaning": "MENU_KIND_MAIN / SEL_MAIN_1P"
     },
     "focused_log": {
-      "path": "native-sound-route-final-v2.log",
-      "sha256": "dfd82f3ed238968bf6e712d9c553428e3c47aee8b53ff02c81a29e3e462b95d2"
+      "path": "main-settings-sound-20261003/focused-native-route.log",
+      "sha256": "36d030d47913f062155603ea8ce16ed81d30cc258b361877bd9bfaf1cac1f2d1",
+      "result": "pass on code-equivalent feature head before documentation-only rebase; the exact current-main standalone retry skipped because the clean validation checkout did not contain the EXCLUDE_FROM_ALL trace target or owned local fixture root"
     },
     "native_target": {
       "path": "build/browser/native_menu_host_trace.js",
@@ -106,12 +107,12 @@
     "mode": "headless installed Chrome; isolated Playwright context; public runtime player profile",
     "browser_version": "154.0.8037.97",
     "public_package_profile": "player",
-    "runtime_hash": "0dda38b0c476834a",
-    "runtime_identity_sha256": "e6e82092f7ddf2188c3f0cd356f089e7121d99e1c741fe3119eb204f6d2a031f",
-    "package_manifest_sha256": "d04a676e6988d4411e23bdf183c1d598932e46992a4941d77f2ef1590435b455",
-    "package_audit": "pass: player preview package, 34 files, 19,223,466 bytes",
-    "run_id": "main-settings-sound-20261003/sound-browser-v4",
-    "report_sha256": "091c7118777ca2054a891ce847d405077727c00d7e7fa9b38ac6534d5322a512",
+    "runtime_hash": "4d50826109429598",
+    "runtime_identity_sha256": "4ee71222f10d9569bb3dd17702d49d880f1916324b3da7d80e4bd2e2dd0c4d30",
+    "package_manifest_sha256": "3c0c14a745fda07af61b358c60a2de01b206c5157dfa2dcaf000f0a6d8c9f9e9",
+    "package_audit": "pass: player preview package, 34 files, 19,237,165 bytes",
+    "run_id": "main-settings-sound-20261003/current-main-browser-v1",
+    "report_sha256": "bec8518f335af031e83ad14ab36b0c0663a23abe594ac2670681df933010314a",
     "checks": [
       "fresh Personal profile and CSS entry",
       "ordinary B0XX input on original title and Main scenes",
@@ -137,9 +138,9 @@
       "sound_balance_before": 0,
       "sound_balance_after": 251,
       "revision_after_sound_save": 5,
-      "revision_after_css_return": 6,
+      "revision_after_css_return": 7,
       "native_css_balance": 251,
-      "exported_gci_sha256": "587ca574d0aa96131b2aa98db1937a823e377974151ab0519e413d14c07b2922",
+      "exported_gci_sha256": "4c87667c494f223864f96a6adda3d1029711e1683f5c18d053c1423b7c8bf93d",
       "exported_gci_balance": 251,
       "serialization_check": "parseMeleeGCI decoded the exported file; byte 0x45C matched live source SaveData. Dolphin import was not repeated in this route; see docs/evidence/save-profile-dolphin-roundtrip-v1.json for independent interop evidence.",
       "source_snapshot_sha256": "04b8d34e20e604cadb04b9db8f6778c35f45a2d2a3335ea517dafe8c9cd9b06e"
@@ -154,7 +155,7 @@
     "screenshots": {
       "css-fresh-personal": {
         "file": "css-fresh-personal.png",
-        "sha256": "c12cb01f2d86ac560f81ffd5280b7a08b6de4af9ea44cb37e554539349eceb11"
+        "sha256": "f8319f54422b237117d6eccb989b56afd606dfb30386183b07e4d1eca55a6182"
       },
       "main-from-css": {
         "file": "main-from-css.png",
@@ -166,54 +167,54 @@
       },
       "main-from-title": {
         "file": "main-from-title.png",
-        "sha256": "0af36ddad53ad87393e15f5c72fa6142de9d327fe08504e12a159cedfcb49521"
+        "sha256": "12eb670d5927dd3faab33e99407639646e530e171a4f21ce6d580386b3bba7cd"
       },
       "settings": {
         "file": "settings.png",
-        "sha256": "e9fafa191ac8036bbd294099ad3d03f3c41df1d0704d4b2c71dc1a7d201ef6f1"
+        "sha256": "468c673761fd9ab597e3d8f4859cd99970eb9abee041c33a5646cad5d0df06d1"
       },
       "settings-sound-selected": {
         "file": "settings-sound-selected.png",
-        "sha256": "4333d01281276fabd5d233c0c9a474f87fa01420cef0920e8f8d15ecbf0035a3"
+        "sha256": "daba0a0d13802b223d06bb62273bb097370a251d99e4557279055a88d02879c3"
       },
       "sound-balance-center": {
         "file": "sound-balance-center.png",
-        "sha256": "53b67450c03935e0aa0ee27e9410be098ea7c414764010556931b7a211c6428b"
+        "sha256": "f2105524775798d1bc3fd9fafef083f53a1f1dac89c876d90dd56a5cc7449a78"
       },
       "settings-after-sound-cancel": {
         "file": "settings-after-sound-cancel.png",
-        "sha256": "7efb0bf2f067b3a1dd5dbaa7336f7e10faeb4eed8cda69ffc86c88cb56bfa95f"
+        "sha256": "7334733226c41c1d88c25fbc8e8ab085c022e09d63acb5ceb40b7d3ff690bcdd"
       },
       "sound-reentered-center": {
         "file": "sound-reentered-center.png",
-        "sha256": "ad6f3e4aff7076f207cbcf3a8669c5fce2ef348545bdde6838199de460899a75"
+        "sha256": "365fa8ab373b6740cebf052129a52bb15a0b5b675e5238d718e89dd4f4fe7eb1"
       },
       "sound-balance-minus-five": {
         "file": "sound-balance-minus-five.png",
-        "sha256": "c245093069486b7e094f0c56dc6ef41da7ff242e6dec687b078ba8d23a0b5dfa"
+        "sha256": "3b3d580a3c0329ec60b04f80a94f26095cdf1e8531f045e232c519427c73af90"
       },
       "sound-reentered-minus-five": {
         "file": "sound-reentered-minus-five.png",
-        "sha256": "51d1d4420c9cc4be16a553ab6b4b6e4a766bd5a5ff7f292412fd9380d5448086"
+        "sha256": "e312d5faaa028986625ac97986c473137045e3fda2a59c1481f364fd8d95b2b3"
       },
       "versus-mode-selection": {
         "file": "versus-mode-selection.png",
-        "sha256": "79e29931c61f29daf9e621543a8e3826a0c5b4c699c54d7a536e9522bfbdfbd5"
+        "sha256": "4257766586671945c68c14af41a694ef6e3dadf8ab19a436cf89f17d4e8813b4"
       },
       "css-returned": {
         "file": "css-returned.png",
-        "sha256": "ec9850e8299fcefb17149a08a0bc2fb9b8b60fb6974c2b202a21b0eb7b00a519"
+        "sha256": "32c872275df37589b0d5794d1fb3ca5d274ceaf12c97170179c153c384e91e3e"
       }
     },
     "visual_claim": "Real rendered original source menus were inspected from headless Chrome screenshots. This is not pixel comparison against a retail capture.",
-    "package_audit_log_sha256": "0dfa7abfb796a8de869fdb6696c1227c7f68e92c2ddccab24ee996e0f11aa212",
-    "source_commit": "10dcae25a7edde0af5c5b3300d342d4b98373a5d",
-    "runtime_build_log_sha256": "3da54f0db957573638553034ed9b12fccdc6f8e3875c9c90983770d9add7377a",
+    "package_audit_log_sha256": "4f561ceb9654b80ac15895213cc2c7f2d1436387e8509934bc313b7009f44c0b",
+    "source_commit": "7a4ca339d45f72a954beb381ce83018bf617ce35",
+    "runtime_build_log_sha256": "e4168206aa55da7e4cb42dc20f842be47cc69ff8dc064b8278aade7b2bbd06c3",
     "audio": "Chrome host output muted through browserLaunchOptions; source audio processing remains enabled. No PCM or audio-fidelity claim.",
     "host_audio": "Muted through scripts/browser_tools.mjs; source Web Audio processing stayed enabled.",
     "physical_input": "Not run; keyboard B0XX only.",
     "foreground_performance": "Not run; browser was headless and no timing gate was attempted.",
-    "browser_run_log_sha256": "0c6007e5514615e9e2519a97f64690b1cc721c5956d8bce78a1b8c17fd0b9d72"
+    "browser_run_log_sha256": "a10065c86fb716fa2c33c5cd7e5a14a6cb0e94d79cf0eef60ffff3e8eb5930bb"
   },
   "retail_reference": {
     "sound_route_captured": false,
@@ -266,7 +267,8 @@
       "run_id": "main-settings-sound-20261003/sound-browser-v2",
       "report_sha256": "7d20dce6c46f28a0043a0428b1debedf5900668dc627c8cbd38fe5dca10623b1",
       "result": "failed before Chrome launch",
-      "cause": "Playwright path was not configured. The rerun supplied the installed package explicitly and passed."
+      "cause": "Playwright path was not configured. The rerun supplied the installed package explicitly and passed.",
+      "note": "Retained alongside the static-server startup failure; both setup causes were corrected before the current-main browser route pass."
     },
     {
       "artifact_id": "main-settings-sound-cold-boot-probes-20261003",
@@ -278,8 +280,16 @@
       "artifact_id": "main-settings-sound-full-suite-missing-development-runtime-v1",
       "run_id": "main-settings-sound-20261003/full-tests-v1",
       "sha256": "f4e3fea0449911b9e0dc1d15c485460379a8598026b991aff0dc57247fd46c9a",
-      "result": "failed: 1,716 tests ran with 2 failures, 1 setup error, 137 skipped",
-      "cause": "The tests that failed require build/browser (RelWithDebInfo); the then-built Release runtime was at build/browser-release. The correct development runtime is being built before a targeted reproduction and full rerun."
+      "result": "failed because two tests failed and one setup errored when build/browser (RelWithDebInfo) was absent; 1811 tests ran, 2 failures, 1 error, 146 skipped",
+      "cause": "Resolved by building the development runtime; six missing-runtime focused tests then passed and the current-main full suite passed 1844 tests with 141 skips."
+    },
+    {
+      "artifact_id": "main-settings-sound-browser-static-server-v1",
+      "run_id": "main-settings-sound-20261003/sound-browser-v1",
+      "failure_packet_sha256": "c5f428f38f00ae926a2d114aa33f85c16d9b13b09f6c524b6c3d12bb05ddbd86",
+      "report_sha256": "dfa28a39eb2987b524fb7864abf5c5195ba39b4063a8ce56dfb708a50623eb16",
+      "result": "failed during player startup before route checks",
+      "cause": "The first reduced reproduction served a packaged player without the required COOP/COEP headers; scripts/serve.py supplied those headers and the subsequent current-main route passed."
     }
   ],
   "validation": {
@@ -287,40 +297,47 @@
       "target": "runtime",
       "configuration": "RelWithDebInfo",
       "result": "pass",
-      "log": "runtime-relwithdebinfo-build-v2.log"
+      "log": "runtime-dev-build.log",
+      "log_sha256": "3e203aaec3896763ed4608987a0c733cf0ad8d69694f9408402734111564f680"
     },
     "public_runtime_build": {
       "target": "runtime-public",
       "configuration": "Release",
       "result": "pass",
-      "log_sha256": "3da54f0db957573638553034ed9b12fccdc6f8e3875c9c90983770d9add7377a"
+      "log": "runtime-public-build.log",
+      "log_sha256": "e4168206aa55da7e4cb42dc20f842be47cc69ff8dc064b8278aade7b2bbd06c3"
     },
     "native_menu_host_trace_build": {
       "result": "pass",
       "log_sha256": "c62fc34325582bf2e7ffa6a0230c8a3263cb191643a61ba7deabd9047cad4cd3"
     },
     "focused_native_route": {
-      "result": "pass",
-      "log_sha256": "dfd82f3ed238968bf6e712d9c553428e3c47aee8b53ff02c81a29e3e462b95d2"
+      "result": "pass on code-equivalent feature head before documentation-only rebase",
+      "log_sha256": "36d030d47913f062155603ea8ce16ed81d30cc258b361877bd9bfaf1cac1f2d1",
+      "log": "focused-native-route.log",
+      "current_main_retry": "skipped: native trace target and owned fixture root were not present in the clean validation checkout; no source divergence was introduced by the rebase"
     },
     "full_unittest_suite": {
       "result": "pass",
-      "tests": 1746,
-      "skipped": 135,
-      "seconds": 415.068,
-      "log_sha256": "c41232fb2dfa9bfbc4e353e818dcf457ef19a3b829b2d77e1274e17c0f0271eb"
+      "tests": 1844,
+      "skipped": 141,
+      "seconds": 316.191,
+      "run_id": "main-settings-sound-20261003/current-main-validation-v1",
+      "log": "full-suite.log",
+      "log_sha256": "6b6b8e5d3520f838561c3777da303f481cb1b8c27f785314d310a629059fb2e3"
     },
     "public_package_audit": {
       "result": "pass",
       "files": 34,
-      "bytes": 19223466,
-      "log_sha256": "0dfa7abfb796a8de869fdb6696c1227c7f68e92c2ddccab24ee996e0f11aa212"
+      "bytes": 19237165,
+      "log": "public-package-audit.log",
+      "log_sha256": "4f561ceb9654b80ac15895213cc2c7f2d1436387e8509934bc313b7009f44c0b"
     },
     "full_game_inventory_report": {
-      "path": "work/full-game-report-sound-route-v2/report.json",
-      "features": 88,
+      "path": "work/main-settings-sound-current-main-inventory-recheck/report.json",
+      "features": 90,
       "source_symbols": 19827,
-      "report_sha256": "29b87decddf460af02245b0300121c880098b9685d781ba56eaf6a10837047d6"
+      "report_sha256": "2f4ad2e4898a0fb8fa93e29e1eb3c3c188f726b4d3f40b77dd6cf7eb0c202e37"
     }
   }
 }

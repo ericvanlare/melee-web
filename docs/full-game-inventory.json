@@ -2182,7 +2182,7 @@
         "runtime-archive-memory-and-ownership"
       ],
       "pass_criteria": [
-        "Every source ItemKind, common item, character article, Pokémon, monster, projectile, effect article and item-related fighter action has an explicit owner and authored table bound.",
+        "Every source ItemKind, common item, character article, Pok\u00e9mon, monster, projectile, effect article and item-related fighter action has an explicit owner and authored table bound.",
         "Spawn/drop rules, collision, pickup/throw, damage, animation, material, effects, audio, persistence, owner changes and teardown match source traces.",
         "Items can be enabled or disabled through original VS rules without silently skipping required item services."
       ],
