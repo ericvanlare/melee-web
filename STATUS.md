@@ -234,10 +234,14 @@ retains its hashes, exact scope, and cleanup state. The historical browser
 attempt-07 receipt still records the stale mask `fffffffeffffffff`; the newer
 Rules Plus receipt already records the source-derived `fffffffffffbffff` mask
 at its item-route references (lines 108, 161 and 283). That newer receipt is not
-a fresh browser Team rerun, so the complete retail/browser Team comparison
-remains pending. Visual/audio equivalence, physical input, performance, source
-GCI persistence, and Personal autosave were not exercised. Host output was muted
-while source DSP/audio processing remained enabled.
+a fresh browser Team rerun, so the [scoped comparison receipt](docs/evidence/vs-team-battle-retail-browser-comparison-v1.json)
+compares the fresh report's selected Team fields against r9 while excluding its
+intentional one-minute timer difference. The browser report contains one match
+with live, pause and terminal observations rather than three cycles; full
+three-cycle route equivalence remains pending. Visual/audio equivalence,
+physical input, performance, source GCI persistence, and Personal autosave were
+not exercised. Host output was muted while source DSP/audio processing remained
+enabled.
 
 ## Main Settings > Rumble route
 
