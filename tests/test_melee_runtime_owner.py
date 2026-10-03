@@ -239,6 +239,10 @@ int main() {{
         self.run_owner(['--diagnostics-mature-delivery-evicted', '--silent'],
                        'evicted same-session retained incident remains deliverable')
 
+    def test_nonempty_retained_read_does_not_orphan_evicted_young_incident(self):
+        self.run_owner(['--diagnostics-mature-delivery-nonempty-evicted', '--silent'],
+                       'nonempty-retained evicted same-session retained incident remains deliverable')
+
     def test_normal_delivery_prefers_fresh_current_post_events(self):
         self.run_owner(['--diagnostics-normal-delivery-freshness', '--silent'],
                        'normal inactive collection prefers the fresh current report')

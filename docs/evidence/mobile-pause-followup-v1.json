@@ -392,6 +392,36 @@
       "artifact": "ci-unit-1.log",
       "sha256": "1cb73f0ea8f439b255a72eff3470aa13f3c68c0a001639a1172c2902f60675db",
       "bytes": 496647
+    },
+    {
+      "artifact": "retained-nonempty-regression-baseline.log",
+      "sha256": "54b609979c7edc4fed0929c9d514fa1a6b2cd2171cdfb288c7b79b6b366ef54a",
+      "bytes": 1805
+    },
+    {
+      "artifact": "retained-nonempty-regression-baseline-v2.log",
+      "sha256": "47ea478f3e234c87b2cb69543a69025d4c10e7f612c0ed0911ba226f8343ea44",
+      "bytes": 466
+    },
+    {
+      "artifact": "retained-nonempty-regression-baseline-v3.log",
+      "sha256": "618bf437ca5819190ca08f28cecbf582033b400799561c42c61b40c7b1165ba8",
+      "bytes": 526
+    },
+    {
+      "artifact": "retained-nonempty-regression-fixed.log",
+      "sha256": "b8ab516d70db63532d6d20396f359c1d87a0de89da0aecf7f9bb0c54714e13e8",
+      "bytes": 100
+    },
+    {
+      "artifact": "owner-nonempty-final.log",
+      "sha256": "754700b1fdd602041a2d202da7e6d11683e59fb2fc247dbe6b93c6daef87a189",
+      "bytes": 7349
+    },
+    {
+      "artifact": "nonempty-targeted-final.log",
+      "sha256": "451e5a8e9505ce0afef2e5fb2f7a38d3c9f10314ac5d944aab89550a27d315c0",
+      "bytes": 1012
     }
   ],
   "mature_delivery_regression": {
@@ -427,5 +457,24 @@
       "sha256": "f81a28a757fa77c164c6fb09a7b7617facf0a8560cd0df79a53cd1682524ac86",
       "size": 14709619
     }
+  },
+  "nonempty_retention_followup": {
+    "baseline": "A nonempty older retained read marked loading complete before a young current incident reached storage. After Resume and current-ring eviction, the stored snapshot was not collected.",
+    "fix": "Keep retained reads eligible while any current incident has an open post-event window.",
+    "source_file_sha256": "d07e1bb9ebae3a6d9de765381270bceb1839642db2bc930c0c1531ae890875f7",
+    "focused_checks": {
+      "result": "pass",
+      "tests": 5,
+      "scope": "Pure JavaScript owner checks: nonempty retention eviction, empty retention eviction, mature delivery, slow read generation retry, current snapshot freshness."
+    },
+    "prior_owner_run": {
+      "result": "failed_wrapper_expectation",
+      "tests": 35,
+      "failures": 1,
+      "scope": "The new Node regression passed, but its Python wrapper expected a different success message. Corrected wrapper and five affected checks then passed; native clock fixture and other owner checks passed in this run."
+    },
+    "limits": "No waiting on Resume. Current ring and local storage can still evict incidents under their declared bounds; no recovery is promised if no snapshot survives.",
+    "authoritative_negative_control": "retained-nonempty-regression-baseline-v3.log",
+    "earlier_fixture_limits": "Original fixture used a locally valid but wire-invalid prior session id. Version2 explicitly detected that setup issue. Version3 uses a wire-valid prior record and verifies it was delivered, current young was stored but not delivered, and actual current-ring eviction occurred before the expected collection failure."
   }
 }

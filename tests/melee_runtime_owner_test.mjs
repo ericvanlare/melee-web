@@ -31,9 +31,10 @@ const diagnosticsRetentionEmptyThenDestroy = process.argv.includes('--diagnostic
 const diagnosticsRetentionFailedThenDestroy = process.argv.includes('--diagnostics-retention-failed-destroy');
 const diagnosticsMatureDeliverySlowLoad = process.argv.includes('--diagnostics-mature-delivery-slow-load');
 const diagnosticsMatureDeliveryEvicted = process.argv.includes('--diagnostics-mature-delivery-evicted');
+const diagnosticsMatureDeliveryNonEmptyEvicted = process.argv.includes('--diagnostics-mature-delivery-nonempty-evicted');
 const diagnosticsNormalDeliveryFreshness = process.argv.includes('--diagnostics-normal-delivery-freshness');
 const diagnosticsMatureDelivery = process.argv.includes('--diagnostics-mature-delivery') || diagnosticsMatureDeliverySlowLoad ||
-  diagnosticsMatureDeliveryEvicted;
+  diagnosticsMatureDeliveryEvicted || diagnosticsMatureDeliveryNonEmptyEvicted;
 const diagnosticsRetentionMode = diagnosticsRetentionCheckpoint || diagnosticsRetentionDestroy ||
   diagnosticsRetentionDenied || diagnosticsRetentionStalled || diagnosticsRetentionQuota ||
   diagnosticsRetentionResumeCancel || diagnosticsRetentionFollowup || diagnosticsRetentionOrdinaryPauseDestroy ||
@@ -662,23 +663,52 @@ if (diagnosticsKnownHost) {
   }
   if (diagnosticsMatureDelivery) {
     const before = diagnosticFetches.length;
-    if (diagnosticsMatureDeliveryEvicted) {
+    if (diagnosticsMatureDeliveryEvicted || diagnosticsMatureDeliveryNonEmptyEvicted) {
+      if (diagnosticsMatureDeliveryNonEmptyEvicted) {
+        // Seed a valid record from a separate session, then leave the real
+        // incident young and absent from storage when the first mature read
+        // runs. This exercises the nonempty-retained edge rather than the
+        // empty-store fallback.
+        await owner.diagnostics.persist();
+        assert.equal(diagnosticStorageRecords.length, 1,
+          'the seed incident reaches the controlled retained store');
+        const unrelated = structuredClone(diagnosticStorageRecords[0]);
+        unrelated.session_id = 'session-prior000000000000';
+        unrelated.incident.id = 'incident-99';
+        unrelated.id = `${unrelated.session_id}:${unrelated.incident.id}`;
+        diagnosticStorageRecords.splice(0, diagnosticStorageRecords.length, unrelated);
+      }
+      const currentIncidentId = owner.diagnostics.exportReports().incidents[0]?.id;
+      assert.equal(currentIncidentId, 'incident-1',
+        'the young current incident has a stable source id before the first pause');
       phase = 1; running = false; window.menuFrame(false);
       await wait(40);
-      assert.equal(diagnosticStorageRecords.length, 1,
-        'the open incident is present in the retained local snapshot');
+      assert.ok(diagnosticStorageLoadCalls > 0,
+        'the first mature collection reads the nonempty retained store');
+      assert.ok(diagnosticStorageRecords.some(record => record.incident.id === currentIncidentId),
+        'the young incident reaches storage after the first mature read');
+      assert.equal(diagnosticFetches.some(fetch => JSON.parse(fetch.body).incident_id?.endsWith(`:${currentIncidentId}`)), false,
+        'the first mature collection does not send the young current incident');
+      if (diagnosticsMatureDeliveryNonEmptyEvicted)
+        assert.ok(diagnosticFetches.some(fetch => JSON.parse(fetch.body).incident_id?.endsWith(':incident-99')),
+          'the unrelated retained record was valid and delivered');
       phase = 1; running = true; window.menuFrame(true);
       for (let i = 0; i < 4; i++) owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
-      assert.equal(owner.diagnostics.exportReports().incidents.some(incident => /:incident-1$/.test(incident.id)), false,
+      assert.equal(owner.diagnostics.exportReports().incidents.some(incident => incident.id === currentIncidentId), false,
         'new incidents actually evicted the first current incident');
       phase = 1; running = false; window.menuFrame(false);
       await wait(100);
-      assert.equal(diagnosticFetches.length, before + 1,
-        'an open retained incident survives current-ring eviction');
-      const payload = JSON.parse(diagnosticFetches.at(-1).body);
-      assert.match(payload.incident_id, /:incident-1$/);
-      assert.equal(payload.incident.reason, 'simulation_debt');
-      console.log('Shared runtime owner: evicted same-session retained incident remains deliverable.');
+      const sentCurrent = diagnosticFetches.some(fetch => {
+        try { return JSON.parse(fetch.body).incident_id?.endsWith(`:${currentIncidentId}`); } catch { return false; }
+      });
+      assert.equal(sentCurrent, true,
+        'an open retained incident survives current-ring eviction after a nonempty retained read');
+      const currentPayload = diagnosticFetches.map(fetch => {
+        try { return JSON.parse(fetch.body); } catch { return null; }
+      }).find(payload => payload?.incident_id?.endsWith(`:${currentIncidentId}`));
+      assert.ok(currentPayload, 'the retained current incident is the delivered report');
+      assert.equal(currentPayload.incident.reason, 'simulation_debt');
+      console.log(`Shared runtime owner: ${diagnosticsMatureDeliveryNonEmptyEvicted ? 'nonempty-retained ' : ''}evicted same-session retained incident remains deliverable.`);
       process.exit(0);
     }
     // The first incident is briefly inactive, then the player resumes before

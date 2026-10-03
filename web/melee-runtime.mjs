@@ -192,19 +192,16 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     if (!eligible()) return null;
     const report = diagnostics.exportReports();
     const current = new Map((report.incidents || []).map(incident => [incident?.id, incident]));
-    let skippedCurrentYoung = false;
     for (const record of retained.records || []) {
       if (!eligible()) return null;
       const currentIncident = record.session_id === report.session_id ? current.get(record.incident?.id) : null;
-      if (currentIncident) {
-        if (!record.incident?.closed && !currentIncident.closed) skippedCurrentYoung = true;
-        continue;
-      }
+      if (currentIncident) continue;
       diagnosticDelivery.enqueue({...record, incidents: [record.incident]});
     }
-    if (!retained.records?.length && (report.incidents || []).some(incident => !incident.closed))
-      skippedCurrentYoung = true;
-    diagnosticRetainedLoaded = !skippedCurrentYoung;
+    // A young current incident may reach storage after this read. Keep the
+    // next inactive read eligible even when older retained records exist, so
+    // ring eviction does not orphan its already persisted snapshot.
+    diagnosticRetainedLoaded = !(report.incidents || []).some(incident => !incident.closed);
     return report;
   }
   function scheduleMatureDiagnosticDelivery() {

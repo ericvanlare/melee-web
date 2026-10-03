@@ -29,6 +29,13 @@ The initial intermittent overflow remains retained and unassigned. Final-code
 CI passed both unit shards and all required checks. These functional results
 do not establish sustained performance or uninterrupted audio.
 
+Final review additionally reproduced a saved-incident loss when a first read
+found older records before a young current incident reached storage. Retained
+reads now remain eligible while any current incident is young. The negative
+control fails and all five affected owner checks pass after the correction.
+The earlier package/browser and CI results above precede this final JavaScript
+correction; its source hash and focused results are bound in the receipt.
+
 Three bounded probes of the retained PR144 package reproduced a first-CSS
 simulation-debt pause in desktop WebKit; the corresponding Chrome controls
 reached their declared CSS observation windows without a forced pause. A slow
