@@ -733,7 +733,7 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
           "Original Sound route did not restore its caller scene owner");
     check(!melee_web_gameplay_world_exists(),
           "Original Sound route retained its native world after teardown");
-    std::cout << "Original Main Settings Sound changed SaveData mix to -5, returned, re-entered, and cleaned up\n";
+    std::cout << "Original Main Settings Sound changed SaveData mix to -5, retained through Title/Main, returned, re-entered, and cleaned up\n";
 }
 
 void run_opening_movie_preload_smoke(melee_web::RuntimeFiles files)

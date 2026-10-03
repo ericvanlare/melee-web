@@ -140,7 +140,7 @@ class NativeMenuSourceTests(unittest.TestCase):
                 cwd=ROOT, capture_output=True, text=True, timeout=120)
         self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
         self.assertIn(
-            "Original Main Settings Sound changed SaveData mix to -5, returned, re-entered, and cleaned up",
+            "Original Main Settings Sound changed SaveData mix to -5, retained through Title/Main, returned, re-entered, and cleaned up",
             run.stdout,
         )
 
