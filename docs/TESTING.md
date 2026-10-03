@@ -104,11 +104,11 @@ evaluates that local clip. Its expected structure is 61 nodes, 111 tracks and a
 10. Reload once and check initialization again. Hide and restore the tab; samples
    should reset and rendering should resume without including the hidden interval.
 11. Record OS, hardware/browser identification available from the runtime, build
-    type, observed duration and any errors in STATUS.md. Do not convert this
+    type, observed duration and any errors in a `docs/status/` entry. Do not convert this
     inspection draw's CPU submission time into a claim about full-game performance.
 
 These steps define acceptance checks, not a record that they have all passed.
-Record actual results and remaining gaps in STATUS.md.
+Record actual results and remaining gaps in a `docs/status/` entry.
 
 The gameplay player has a broader required matrix than this asset-viewer smoke
 test. Run the cold and warm action inventory, hard hitch/audio/pipeline gates and
@@ -136,7 +136,7 @@ establish retail equivalence, content support or replay success. Older files
 marked `processed_only` can supply scoped post-input and browser-performance
 evidence, but cannot receive raw-controller credit. Follow
 [SLIPPI_REPLAY_VALIDATION.md](SLIPPI_REPLAY_VALIDATION.md) and the measured
-[corpus audit](SLIPPI_CORPUS_AUDIT.md) for the downstream gates.
+[corpus audit](history/SLIPPI_CORPUS_AUDIT.md) for the downstream gates.
 
 This currently has no automated GPU screenshot comparison. The CI workflow
 checks tests and compilation, while the smoke test exercises the real browser.

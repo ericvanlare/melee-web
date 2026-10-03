@@ -18,7 +18,7 @@ original elimination exit and final draw. Release/headless and visibly drawn
 port traces match all declared fields and finish teardown. Final visible Release
 cold/warm timing gates pass with zero failures, and the final collector passes
 the full Interpreter64 cross-check against the repeated references. See the
-[complete-game evidence ledger](COMPLETE_REPLAY_CALIBRATION.md) for hashes,
+[complete-game evidence ledger](investigations/COMPLETE_REPLAY_CALIBRATION.md) for hashes,
 shared fixes, retained reds and observed coverage.
 
 The [corpus expansion](REPLAY_CORPUS.md) adds source-driven match-length

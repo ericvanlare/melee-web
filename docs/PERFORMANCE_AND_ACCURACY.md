@@ -377,8 +377,8 @@ Use its focused checks while developing; the gates below govern content admissio
    the source clock must be explained, and growth correlated with a timing failure
    fails the gate.
 8. **Record the result.** Store raw local evidence under ignored `work/` and add
-   the exact passed scope and remaining gaps to `STATUS.md`. Only then update the
-   admitted content claim.
+   the exact passed scope and remaining gaps to a `docs/status/` entry. Only
+   then update the admitted content claim.
 
 The detailed fighter and stage checklists are in
 [ADDING_CHARACTERS.md](ADDING_CHARACTERS.md) and
@@ -516,7 +516,7 @@ Before merging a shared runtime, performance or content change:
       audio, pipeline and error gates.
 - [ ] First-use resources are covered without hidden source simulation.
 - [ ] Raw evidence names its machine, browser, configuration, commit and scope.
-- [ ] `STATUS.md`, the content notes and pipeline-seed inventory describe the
+- [ ] A `docs/status/` entry, the content notes and pipeline-seed inventory describe the
       measured result and every remaining gap.
 
 ## Replay calibration lessons
@@ -584,7 +584,7 @@ The discovery pass found 38 new pipelines and expanded the reviewed seed from
 389 to 427 descriptors. Final visible Release cold/warm runs pass all 3,122 ticks
 with zero hard-gate failures: worst native callbacks 11.330/12.485 ms and worst
 browser intervals 21.365/22.010 ms. This is scoped performance evidence; broad
-content admission remains open. The [complete-game ledger](COMPLETE_REPLAY_CALIBRATION.md)
+content admission remains open. The [complete-game ledger](investigations/COMPLETE_REPLAY_CALIBRATION.md)
 records reference cross-calibration, observed coverage, preparation, memory and
 upload measurements alongside the joined receipt.
 
