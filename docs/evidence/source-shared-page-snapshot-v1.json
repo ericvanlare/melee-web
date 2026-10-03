@@ -1,0 +1,712 @@
+{
+  "schema": "melee-web-source-shared-page-snapshot-v1",
+  "evidence_labels": [
+    "Compiled",
+    "Native traced"
+  ],
+  "milestone": "M2 bounded source snapshot/restore feasibility follow-up",
+  "claim": "Two fresh source-only runs pass repeated exact restore/replay and eight retained snapshots using immutable shared pages. Exact page comparison reduces subsequent retained-state capture cost; first capture remains expensive.",
+  "boundary": "synchronous source-only exported-call return; shared-page owner binds after init and native quiescence",
+  "scenario": "two human Mario players / Final Destination / four stocks",
+  "machine": {
+    "cpu": "Apple M4",
+    "arch": "arm64",
+    "os": "Darwin",
+    "release": "25.6.0",
+    "node": "v24.19.0"
+  },
+  "runtime": {
+    "jsSha256": "baaae9d898b3d4d336876bfb75a8293bddea087267ea19ad380c9a9c4361a9e8",
+    "wasmSha256": "188d6562c273bdccaa161c005aa260f1c58cf9a76b4580923b07dfe3b217ced7"
+  },
+  "assets_sha256": {
+    "EfCoData.dat": "996d78e2c0f4f550f968e2bd8f5e0d18fb8a7525f7e1cb7849a0c836bd7691c0",
+    "EfMrData.dat": "39ccac18137b108b31bb4d832475ba60dc45e381dce9005e14116848e465c669",
+    "GmPause.usd": "3e8490299edf670af0aebb7f27117e0c61297d6b9e2af7ab5c443091e554907f",
+    "GrNLa.dat": "2a295a733414fb65a7061a5c092144fb197570682562b87ba5567ff3f08abb02",
+    "IfAll.usd": "cd957f032b09cf3b80ff725f177525a387efddc264d76cb28581b5da69723929",
+    "IfCoGet.dat": "00f4518c27372eec7a841e20c3adb1ff22041cc5c0257886640954f5c185f599",
+    "ItCo.usd": "5d62efd6437149335b9eef87624ae1253ba7bb260fb08cbae04a3d9215eacd11",
+    "LbBf.dat": "ed0ee6059791bbd7aea4075a039fecdda24698d8baf58052dec91b4d9a364255",
+    "LbRb.dat": "b4d2241deb42f29ffda94dc421641cd58afe290dc49740fcaf5cd7d4c4ce7936",
+    "LbRf.dat": "e8c275128fd0ff3c16f29e672b6df014eefc286c842950e86771175795df5ba8",
+    "MnSlChr.usd": "c9823393ece291429251cb3fc9fd508d59248733ee2667d846d2a5c3434329db",
+    "PdPm.dat": "240fc477461bcc20707be84c9cf82a465ed03cd080c6781cd5de6288102d94ea",
+    "PlCo.dat": "63841336337eb5a7366b06ccc60ea4bd37c3604ab56e19939d78b9aa9cdd234c",
+    "PlMr.dat": "929cdf08c31bc75156ccef05238f2b16dc4d0b187ed1bb4f0a628a2466fb7f7a",
+    "PlMrAJ.dat": "4bd9593e6f0d980b4441891b62ea84a08c099471d695a614974c67223ab5872f",
+    "PlMrBk.dat": "deeb3bc478d720ba432f15c731638629e132269922dd03f05b7f2a9fd07d8c4c",
+    "PlMrBu.dat": "6888f68e434817d336b13d29bbb3d79544941f9748a0aa84355ae22640d9d960",
+    "PlMrGr.dat": "cdb2ea9b7dac639d7aa602e48a4296fdace23ce9c64a4bb35df20fc8a2a019c5",
+    "PlMrNr.dat": "518df5b1d1ce6775a636f4ca8e8e62fb24be65013cd586451c21a181824903ae",
+    "PlMrYe.dat": "c6047de9aaa5f136f72e47cc4e12d2dd606fd1dba36ef773dd3f89007dc669f2",
+    "SdIntro.dat": "21432e0fc6186a67b3522d878846fa46db9171999be93421a88cfc10477a422d",
+    "TyDatai.dat": "1bd632a1f50027f8844e008f4d45e9c20987ce4b8c1e5aa1690a83b3f063c0f4",
+    "TyDatai.usd": "7e0eaf267000c2734d1ef47e718c923995dfb6cf8ab32ec4e4babc0a84fcca11",
+    "dsp_coef.bin": "d7741279c2e8ec5c5fb318f8fbdd6de6bf583520d288e836a5383233a4238179",
+    "end.ssm": "17381aa2d9a04f7c09ac52abf24eee1abc4686cb08f6c9d2733fab0b40b6fd2f",
+    "main.ssm": "949c005709bae3fc72480e76dd1700afa5ec07d0d417fea30cd5524cf55fff20",
+    "mario.ssm": "b9bb209caf8bdc372c077fd877c8bba975f3a8e3ba5062f2c4ec73b7ac1eafa9",
+    "nr_name.ssm": "9190ec1e1aef5e5934151faa6a7b66e44a7ab05de5052048ea60d4bf40dc4bd0",
+    "nr_select.ssm": "94e97f57cd6fbd3ae1b0a7ebc6d9d97648daa16d32386d0f379eebecbbf67a11",
+    "nr_title.ssm": "a055011291f9b7f7f8d30e07ba453d8106735761f1db10d0c789359381326406",
+    "pokemon.ssm": "2f793eee4d05654758bd4a03ec066d9857cb0e549884acf0a72e5fa4be4515de",
+    "sislib_font.bin": "e8d43d10b000e59a64653e8a1b7726bdf95f9102d3ee3307ed56d7c53cde05c1",
+    "smash2.sem": "e844649df8127553f53d2c422375b20f0b814b2f6cc60333028b398dae4854f8",
+    "sp_end.hps": "f0430a9a87ab0c0dae3c4b1644587ff0a92fdb91e21329d429af9f7f0dea6f42"
+  },
+  "native_observation": {
+    "bytes": 1216,
+    "pcmBytes": 4272,
+    "inputBytes": 44,
+    "fields": "source frame/RNG/ready/ending/complete/pause/outcome/winner; stocks/motions/Fireball/object/process counts; PCM; raw PAD sample bytes"
+  },
+  "comparison": "exact observation and PCM bytes at every baseline/replay sample; exact entire-linear-memory Buffer equality at each depth endpoint; full SHA-256 retained for every depth endpoint and retained ring state",
+  "timing_scope": "native-step timings cover only the synchronous checked source step; observation copies, hashes, comparisons, and report writes are outside baseline/replay step timings; capture includes native quiescence and shared-page capture",
+  "algorithm": {
+    "coverage": "Every byte of every full HEAPU8 page; no excluded ranges or guessed dirty flags.",
+    "sharing": "First capture hashes every page. Later captures exactly compare each page against the most recent still-retained immutable snapshot; changed pages use SHA-256 buckets followed by exact byte comparison.",
+    "ownership": "At most eight handles and 256 MiB unique owned payload; failed captures roll back partial references; released handles drop their entries; last release clears payload ownership.",
+    "guards": "Same module/full ArrayBuffer identity/capacity/stack; no shared memory, active or asynchronous source calls, post-binding growth, or closed owners.",
+    "initialization": "Configured 64 MiB grows to 119799808 bytes during native init. Original sample 0 completes pending transfers; native quiescence is then required before owner binding. All entry samples are recorded."
+  },
+  "checkpoints": [
+    300,
+    318,
+    420,
+    438,
+    500,
+    540,
+    558
+  ],
+  "depths": [
+    1,
+    2,
+    4,
+    7
+  ],
+  "repeats_per_depth": 3,
+  "forward_samples": 580,
+  "ring_samples": [
+    572,
+    573,
+    574,
+    575,
+    576,
+    577,
+    578,
+    579
+  ],
+  "fresh_agreement": {
+    "fields": [
+      "sample",
+      "semantic",
+      "observationSha256",
+      "pcmSha256",
+      "inputHex"
+    ],
+    "optimized_runs_exact": true,
+    "pre_optimization_forward_exact": true,
+    "cross_process_raw_memory_agreement_claimed": false
+  },
+  "runs": [
+    {
+      "run": "private-optimized",
+      "result": "passed",
+      "receipt_sha256": "23cb87d763b65fc93b7106c04c5f4bcaf5d0079eecb0d73de7f19bffb4e1510d",
+      "input_trace_sha256": "abdc65f45c53357344bdbbd74a6e96512c2df17a05b683a177bdd564a3504c06",
+      "forward_trace_sha256": "dad4c8b69c9bc340353c1afece7ba72a238903782a9cbe3b41cdc05691f35178",
+      "source_sha256": {
+        "tests/gameplay_snapshot_probe.cpp": "ded6bf73ae92ea634f2898eeb39d2a3a49db733965548438ca57f3221585daa4",
+        "tests/quiescent_wasm_snapshot.mjs": "4a8250b744ac3d00fd4e6b09168829d4adec8a6ebc043e07121e5f3173836570",
+        "scripts/check_source_snapshot.mjs": "7176e19fc8b8afd614994be9e3082270c588538878d461985f4e55fa675fcb09",
+        "scripts/build.py": "4a771b1ed045234e6a3bd69b3ec9c5c788297f5fab3058ef79ef8658173c4c48",
+        "cmake/FighterRuntime.cmake": "48d9d6df279563c593d49a7fc605db144460be65962656ee813a6f1a4feaf675",
+        "dependencies.lock.json": "b49bad1048d13ba05da31e5269bda4bed9fba04ed7a3fe96da8aa97390748d2d"
+      },
+      "helper_sha256": {
+        "runner": "f9e73c43acfc8718e0b65e76743fa9ac9b8524c2b2e1afd17795cec2acc9d131",
+        "prototype": "13de5c707949e836ee5216c6b830e0a3e18a775f0c76b1c80e58a1f4648c7015"
+      },
+      "factory_bytes": 67108864,
+      "post_init_bytes": 119799808,
+      "owner_binding": {
+        "sample": 0,
+        "nativeStepMs": 5.688791999999978,
+        "nativeQuiescence": "passed",
+        "capacityBytes": 119799808,
+        "bufferIdentity": 2
+      },
+      "cycles": 28,
+      "replay_checks": 84,
+      "ring": {
+        "states": 8,
+        "start_sample": 572,
+        "owned_payload_bytes": 80936960,
+        "logical_snapshot_bytes": 958398464,
+        "payload_cap_bytes": 268435456,
+        "page_bytes": 65536,
+        "pages_per_snapshot": 1828,
+        "capture_ms": [
+          39.66954199999964,
+          4.190458000000035,
+          4.320666999999958,
+          4.304791999999907,
+          4.103417000000263,
+          4.132374999999229,
+          4.045917000000372,
+          4.126207999999679
+        ],
+        "capture_counters": [
+          {
+            "hintedSnapshot": false,
+            "pageCount": 1828,
+            "hintComparisons": 0,
+            "hintHits": 0,
+            "hashedPages": 1828
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1801,
+            "hashedPages": 27
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1798,
+            "hashedPages": 30
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1799,
+            "hashedPages": 29
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1801,
+            "hashedPages": 27
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1800,
+            "hashedPages": 28
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1800,
+            "hashedPages": 28
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1800,
+            "hashedPages": 28
+          }
+        ],
+        "all_restores_exact": true,
+        "released_payload_bytes": 0
+      },
+      "timing": {
+        "unhinted_capture_median_ms": 39.63458350000019,
+        "unhinted_capture_max_ms": 48.51999999999998,
+        "retained_hint_capture_median_ms": 4.132374999999229,
+        "retained_hint_capture_max_ms": 4.320666999999958,
+        "restore_median_ms": 2.2975624999999127,
+        "restore_max_ms": 4.295791000000008,
+        "replay_by_depth": [
+          {
+            "depth": 1,
+            "median_ms": 0.30854199999998855,
+            "max_ms": 0.6171659999999974
+          },
+          {
+            "depth": 2,
+            "median_ms": 0.447624999999789,
+            "max_ms": 0.786458000001403
+          },
+          {
+            "depth": 4,
+            "median_ms": 0.9284170000000813,
+            "max_ms": 1.3235839999997552
+          },
+          {
+            "depth": 7,
+            "median_ms": 1.5198329999984708,
+            "max_ms": 1.8768749999990177
+          }
+        ]
+      },
+      "peak_node_rss_bytes": 642056192,
+      "coverage": {
+        "peakFireballs": 1,
+        "minStocks": [
+          3,
+          3
+        ],
+        "motions": [
+          [
+            0,
+            12,
+            14,
+            15,
+            16,
+            17,
+            18,
+            20,
+            21,
+            29,
+            42,
+            178,
+            179,
+            180,
+            322,
+            323,
+            324,
+            343,
+            344
+          ],
+          [
+            0,
+            12,
+            14,
+            15,
+            16,
+            17,
+            18,
+            20,
+            21,
+            29,
+            42,
+            60,
+            67,
+            178,
+            179,
+            180,
+            322,
+            323,
+            324
+          ]
+        ],
+        "objectCounts": [
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "processCounts": [
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          99,
+          100,
+          101,
+          102,
+          103
+        ],
+        "samples": 580
+      },
+      "negative_control": {
+        "result": "detected",
+        "sample": 580,
+        "perturbation": "one restored source RNG bit",
+        "firstDivergence": {
+          "offset": 4,
+          "expected": 14,
+          "actual": 233
+        },
+        "recovery": "passed"
+      },
+      "cleanup": "source match/audio/world closed; shared-page owner closed; all retained pages released"
+    },
+    {
+      "run": "reviewable-optimized",
+      "result": "passed",
+      "receipt_sha256": "4a096e5828d175e910ed736e41005f1c91d548be2b5ebb5929861be63f2fc035",
+      "input_trace_sha256": "abdc65f45c53357344bdbbd74a6e96512c2df17a05b683a177bdd564a3504c06",
+      "forward_trace_sha256": "0c087dc0227370cef434e7bfdb053dec5eedf4c401ff7bb4f6bb1f48d205923b",
+      "source_sha256": {
+        "tests/gameplay_snapshot_probe.cpp": "ded6bf73ae92ea634f2898eeb39d2a3a49db733965548438ca57f3221585daa4",
+        "tests/quiescent_wasm_snapshot.mjs": "4a8250b744ac3d00fd4e6b09168829d4adec8a6ebc043e07121e5f3173836570",
+        "tests/shared_page_wasm_snapshot.mjs": "592694e1af7c250d745242d6f94872c59daf81a58b98cfbdff1a67eaf1d3619f",
+        "scripts/check_shared_page_snapshot.mjs": "e30dfdc79c9dfe6bcbdd073826664bc9ba53189b62e0317f391572b6b2d9d6b5",
+        "scripts/check_source_snapshot.mjs": "7176e19fc8b8afd614994be9e3082270c588538878d461985f4e55fa675fcb09",
+        "scripts/build.py": "4a771b1ed045234e6a3bd69b3ec9c5c788297f5fab3058ef79ef8658173c4c48",
+        "cmake/FighterRuntime.cmake": "48d9d6df279563c593d49a7fc605db144460be65962656ee813a6f1a4feaf675",
+        "dependencies.lock.json": "b49bad1048d13ba05da31e5269bda4bed9fba04ed7a3fe96da8aa97390748d2d"
+      },
+      "helper_sha256": {
+        "runner": "e30dfdc79c9dfe6bcbdd073826664bc9ba53189b62e0317f391572b6b2d9d6b5",
+        "prototype": "592694e1af7c250d745242d6f94872c59daf81a58b98cfbdff1a67eaf1d3619f"
+      },
+      "factory_bytes": 67108864,
+      "post_init_bytes": 119799808,
+      "owner_binding": {
+        "sample": 0,
+        "nativeStepMs": 5.680499999999995,
+        "nativeQuiescence": "passed",
+        "capacityBytes": 119799808,
+        "bufferIdentity": 2
+      },
+      "cycles": 28,
+      "replay_checks": 84,
+      "ring": {
+        "states": 8,
+        "start_sample": 572,
+        "owned_payload_bytes": 80936960,
+        "logical_snapshot_bytes": 958398464,
+        "payload_cap_bytes": 268435456,
+        "page_bytes": 65536,
+        "pages_per_snapshot": 1828,
+        "capture_ms": [
+          39.362458999999944,
+          4.254375000000437,
+          4.347708999999668,
+          4.91083400000025,
+          4.064374999999927,
+          3.9562080000005153,
+          4.057542000000467,
+          4.07891600000039
+        ],
+        "capture_counters": [
+          {
+            "hintedSnapshot": false,
+            "pageCount": 1828,
+            "hintComparisons": 0,
+            "hintHits": 0,
+            "hashedPages": 1828
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1801,
+            "hashedPages": 27
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1798,
+            "hashedPages": 30
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1799,
+            "hashedPages": 29
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1801,
+            "hashedPages": 27
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1800,
+            "hashedPages": 28
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1800,
+            "hashedPages": 28
+          },
+          {
+            "hintedSnapshot": true,
+            "pageCount": 1828,
+            "hintComparisons": 1828,
+            "hintHits": 1800,
+            "hashedPages": 28
+          }
+        ],
+        "all_restores_exact": true,
+        "released_payload_bytes": 0
+      },
+      "timing": {
+        "unhinted_capture_median_ms": 39.59516649999978,
+        "unhinted_capture_max_ms": 44.603875000000016,
+        "retained_hint_capture_median_ms": 4.07891600000039,
+        "retained_hint_capture_max_ms": 4.91083400000025,
+        "restore_median_ms": 2.2868124999999964,
+        "restore_max_ms": 3.089417000000026,
+        "replay_by_depth": [
+          {
+            "depth": 1,
+            "median_ms": 0.2849590000000717,
+            "max_ms": 0.5877920000000358
+          },
+          {
+            "depth": 2,
+            "median_ms": 0.4375,
+            "max_ms": 0.7427919999995538
+          },
+          {
+            "depth": 4,
+            "median_ms": 0.9496250000001965,
+            "max_ms": 1.339584000000059
+          },
+          {
+            "depth": 7,
+            "median_ms": 1.4764600000000883,
+            "max_ms": 1.93920800000069
+          }
+        ]
+      },
+      "peak_node_rss_bytes": 639877120,
+      "coverage": {
+        "peakFireballs": 1,
+        "minStocks": [
+          3,
+          3
+        ],
+        "motions": [
+          [
+            0,
+            12,
+            14,
+            15,
+            16,
+            17,
+            18,
+            20,
+            21,
+            29,
+            42,
+            178,
+            179,
+            180,
+            322,
+            323,
+            324,
+            343,
+            344
+          ],
+          [
+            0,
+            12,
+            14,
+            15,
+            16,
+            17,
+            18,
+            20,
+            21,
+            29,
+            42,
+            60,
+            67,
+            178,
+            179,
+            180,
+            322,
+            323,
+            324
+          ]
+        ],
+        "objectCounts": [
+          59,
+          60,
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "processCounts": [
+          88,
+          89,
+          90,
+          91,
+          92,
+          93,
+          99,
+          100,
+          101,
+          102,
+          103
+        ],
+        "samples": 580
+      },
+      "negative_control": {
+        "result": "detected",
+        "sample": 580,
+        "perturbation": "one restored source RNG bit",
+        "firstDivergence": {
+          "offset": 4,
+          "expected": 14,
+          "actual": 233
+        },
+        "recovery": "passed"
+      },
+      "cleanup": "source match/audio/world closed; shared-page owner closed; all retained pages released"
+    }
+  ],
+  "root_audit_sha256": "c3046b946ef86fe505daa23feec6e6e56d556b772e240dfec6ffa9fd086129c0",
+  "retained_source_manifest_sha256": "dd1ef5731734de8c4390077c1f0075430d1510a171ee80fbf196c976d0ea5a40",
+  "launch_receipt_sha256": "65957422df0dda10bf16719f81a6c5734c05c1d94a48c920deb38657181e4152",
+  "retained_reductions": [
+    {
+      "observation": "initial-capacity owner refused native init growth",
+      "artifacts_sha256": {
+        "evidence.json": "bf5c16a65b102286ccebfea83140478394b4c8fff7044119003b2a9276217d78",
+        "input-samples.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+        "forward-states.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      }
+    },
+    {
+      "observation": "post-init quiescence refused pending native transfers",
+      "artifacts_sha256": {
+        "evidence.json": "7eb33cc128419d37912fc1bed49c55e499e360b8d361dcd5659e8d0004a03050",
+        "input-samples.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+        "failure.json": "7eb33cc128419d37912fc1bed49c55e499e360b8d361dcd5659e8d0004a03050",
+        "forward-states.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+      }
+    },
+    {
+      "observation": "native quiescence located after original sample 0",
+      "artifacts_sha256": {
+        "mario-fd/evidence.json": "9394b1e7b7d58ad27753b4d0a972b21681272e2ff6def191fadc0fefc160c84f"
+      }
+    },
+    {
+      "observation": "unhinted exact-page baseline passed but capture remained expensive",
+      "artifacts_sha256": {
+        "evidence.json": "16543c8ff95ff387d97346a76eff516572e6726ee2f40dbdb441964a1abfab9a",
+        "baseline-500-4.json": "7a8878f11132bcf766ee5263b6b311a70319dfea9ff6ded13da9b7bccb85b509",
+        "baseline-420-2.json": "6de6fde2044ddf04e64202d70de82f8fc6f85f390e6ad207f7b98add0a47015c",
+        "baseline-558-1.json": "df7fc93f3ab17bafefc04175190d716a33fcb5b932aa8ac12ac92834312385fd",
+        "baseline-300-2.json": "7d206f3bc7451bb63f276dcc8a744f05b50f585ec85d3d5dce28a51561a8f5db",
+        "baseline-438-4.json": "34730c6aa4f9fb05ad9449b0e61ee533a1114b756ef1cdadc9268178b710a753",
+        "baseline-318-4.json": "f19e840cb5dccc7b5fea066d19a699a3aa8bdca3b6e9ae7f58fbc2c5144fc32c",
+        "baseline-540-7.json": "bb9d257fab81c5f6446ee1584e8f2cb8c6e8a6b0127c7cc4d5fa66d6bf87b56b",
+        "baseline-500-2.json": "f1a0f52f9f2ae5aaa0a756a9bfaeceb63dadb9fc0754bb1eb66e9fc12491f9be",
+        "input-samples.json": "abdc65f45c53357344bdbbd74a6e96512c2df17a05b683a177bdd564a3504c06",
+        "baseline-420-4.json": "1e81d8784043726c3c5531148f7a22582538c9c3d7ce52aed21ea95fffda4ff8",
+        "baseline-300-4.json": "10b53fe7cf443fd713dec8be00feb4666611dc6d11c066bb5718a9a414a31521",
+        "baseline-558-7.json": "c0b04192814b0750844f3475093f71162121461dd3283d7b6f525d30a849c502",
+        "baseline-438-2.json": "e47d3554f1a9e3b99ae38c4ebd31998553f5989b363244d0e104fb64ea8ead03",
+        "baseline-540-1.json": "4c44a143c6c841e95efc4a005013dca0c363aa6be8251ea777fd33e5ef5d5943",
+        "baseline-318-2.json": "e7a808375795324da31f1827117099847c03e7761bb6a7265776fb4d00b615a5",
+        "baseline-420-7.json": "4f01bf62c9b660742e5c8ddf179a8b14f0f06823b2be9c6bab38376ade989a4e",
+        "baseline-300-7.json": "e91a3aee2595d70dca7c08426bb4c728884dc3febc7928457f2731be3b7b7923",
+        "baseline-558-4.json": "8d1a1f5f45e49726d4b980c6b2a733781e62d36a4c9de7ebe2323801ca44e51e",
+        "baseline-438-1.json": "156cb681bb8b054ea8a2c23e72bb994a667955bce725dac627c180ef8bb9e880",
+        "baseline-540-2.json": "997558bbebee7b05bd3e2fd0fd173f7b447a583952c9daaa2aa8271be3ac94fe",
+        "baseline-318-1.json": "9329ac167f1e69ec850e998bd7d3f421d85700e8c79fcc2bdd6c7880fcb58b15",
+        "baseline-500-1.json": "949090b9d6e054230434e72a53f07f49b6622072503be4e6d85a6f46bf06a31c",
+        "baseline-420-1.json": "007037f70e9790c9cdb2d0d37cbde787cd6bb37da7a14ca828ac6fd614dc4b7b",
+        "baseline-558-2.json": "a7732fd982f4be2477a94af95d88b1acb9a6c0d6521ca43b8ebc37a77eb9fb07",
+        "baseline-300-1.json": "b967496ab07135bceab9671b39a6c29a1df81e8b01e94f21f117ae4a141a8ab8",
+        "baseline-438-7.json": "72bf928cf8bac8db8c980a4cdfbb440c3e51e998627363a5f54da67b4ed03c93",
+        "forward-states.json": "c444ec554eb53982b6042761951a80bc61e112b9541ff954891d068e95332d4b",
+        "baseline-318-7.json": "48d8e410bb243397a70f38697e2731a1deb03884f52c26c566cc8c592a7cdc33",
+        "baseline-540-4.json": "8363393292e68a9ee640336ac63e297ae81504134cbb2f65bdfb26488b8a391b",
+        "baseline-500-7.json": "af4700ebd9bca9749e630c7f5c52170b5525c2cac8ba029894f48839ba6dfc2e"
+      }
+    }
+  ],
+  "decision": {
+    "bounded_correctness": "passed for this synchronous source-only prefix",
+    "practical_player_rollback_admission": false,
+    "reason": "First capture remains about 40 ms and Node peak RSS includes diagnostic full-heap copies and garbage collection. The ring payload is bounded, but browser host/draw/audio/save ownership and foreground timing remain unverified."
+  },
+  "exclusions": [
+    "source draw traversal and hidden draw-dependent simulation",
+    "GPU and JS renderer ownership",
+    "browser input/clock/queue state",
+    "Web Audio and externally committed sound",
+    "persistent saves",
+    "retail or Slippi semantic equivalence",
+    "foreground timing, physical input and Internet connectivity",
+    "Wasm mutable globals and function tables outside linear memory",
+    "imported host state, filesystem state, process state, and external allocator state",
+    "nominal 64 MiB memory or practical rollback performance admission"
+  ],
+  "next_experiment": "Feed strict finalized native raw PAD into fresh source instances and locate the first fighter/processed-input divergence before defining a pinned compatible profile.",
+  "integration_validation": {
+    "focused_tests": {
+      "command": "python3 -m unittest tests.test_shared_page_snapshot -v",
+      "tests": 2,
+      "result": "passed"
+    },
+    "required_full_suite": {
+      "result": "passed",
+      "tests": 1672,
+      "skipped": 136,
+      "unittest_seconds": 290.13,
+      "name": "full-suite",
+      "log": "full-suite.log",
+      "duration_seconds": 290.506,
+      "exit_code": 0,
+      "log_sha256": "a510a41d4689c6d6122306182808dba21cbdb8b8f4ca8d31b897330180cea5d1",
+      "timed_out": false
+    },
+    "affected_build": {
+      "name": "affected-build",
+      "log": "affected-build.log",
+      "duration_seconds": 10.317,
+      "exit_code": 0,
+      "log_sha256": "fc8fbd61e169b61c06dc5163f29c17aa2d68792c26dc52fb89830adffa276002",
+      "timed_out": false
+    },
+    "source_commit": "88fb607c81ac8138a9ab95cbbe435270e5c93698",
+    "source_sha256": {
+      "tests/gameplay_snapshot_probe.cpp": "ded6bf73ae92ea634f2898eeb39d2a3a49db733965548438ca57f3221585daa4",
+      "tests/shared_page_wasm_snapshot.mjs": "592694e1af7c250d745242d6f94872c59daf81a58b98cfbdff1a67eaf1d3619f",
+      "tests/shared_page_snapshot_controls.mjs": "53145b8c5f22e36d2aa9e1ec92bd565f8cfdb11370e9cf6138e5b339d746f24c",
+      "tests/test_shared_page_snapshot.py": "97d371ab041478b5b9d49c2018f47c8672375565c3cb1b134644ebdd044d2a0f",
+      "scripts/check_shared_page_snapshot.mjs": "e30dfdc79c9dfe6bcbdd073826664bc9ba53189b62e0317f391572b6b2d9d6b5",
+      "scripts/check_source_snapshot.mjs": "7176e19fc8b8afd614994be9e3082270c588538878d461985f4e55fa675fcb09",
+      "scripts/build.py": "4a771b1ed045234e6a3bd69b3ec9c5c788297f5fab3058ef79ef8658173c4c48",
+      "cmake/FighterRuntime.cmake": "48d9d6df279563c593d49a7fc605db144460be65962656ee813a6f1a4feaf675",
+      "dependencies.lock.json": "b49bad1048d13ba05da31e5269bda4bed9fba04ed7a3fe96da8aa97390748d2d"
+    },
+    "runtime_rebuilt_bytes_unchanged": true,
+    "default_configure": {
+      "name": "configure",
+      "log": "configure.log",
+      "duration_seconds": 3.156,
+      "exit_code": 0,
+      "log_sha256": "a4d7ea05f921d56a8c84356e5dd5ad78ec798939c76b147eb5780cbf11654454",
+      "timed_out": false
+    },
+    "whole_job_cap_seconds": 600,
+    "validation_receipt_sha256": "0bec3c220b28d57ebc8344bcaf7e11e96ef39f41e327c0f06f3083b4bc457fb3"
+  },
+  "runtime_build": {
+    "source_commit": "746569422830758ec4b90865b3e565d4d147541f",
+    "configuration": "Release",
+    "initial_memory_bytes": 67108864,
+    "stack_bytes": 8388608,
+    "asyncify": false,
+    "memory_growth": true,
+    "emscripten": "6.0.9",
+    "cmake_cache_sha256": "3e0ba0b9a8c51af79b474ee72d4ae6f77d93b27198f7b7e4d43af7f8bcd278f4",
+    "configuration_manifest_sha256": "084ffa187bdcb319f7e4b41dffb2e5f51e684bf5203c87c30c96b4b98b87676d",
+    "source_identity_sha256": "5ad1e5adca498246295ec1b5b40b0573eea2679b2814df61974fbfbc68621190"
+  }
+}

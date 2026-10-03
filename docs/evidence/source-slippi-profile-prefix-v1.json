@@ -1,0 +1,634 @@
+{
+  "schema": "melee-web-source-slippi-profile-prefix-v1",
+  "result": "passed",
+  "evidence_labels": [
+    "Source identified",
+    "Native traced",
+    "recorded-input-prefix"
+  ],
+  "base_commit": "b1c6a22e11b2d1689c43312cc9cef8a978fb4f90",
+  "claim_boundary": "Separate source-only checks: the original 111-step prefix, and recorded-input scenes 0..1341 through the fourth P1 stock loss. Finalized raw 44-byte PAD records are the sole step inputs; native state, callback telemetry and declared fields are observations.",
+  "profile": {
+    "offset": 4660,
+    "offset_hex": "0x1234",
+    "algorithm": "rotl16(global_frame)+offset",
+    "constructor_requested_seed": 324508639,
+    "callback_required_per_step": true
+  },
+  "source": {
+    "probe_sha256": "93b2ce746e634b63bc9a1909e87fdfd32113c088f5c70bde8cb02b5d5e1856ce",
+    "cmake_sha256": "43e16735fa453645f43e64d9e142176c8ea513667c73c0b7095e0cecd964ee35",
+    "profile_helper_sha256": "2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e",
+    "profile_helper_license": "GPL-3.0-only; adapted from the pinned Slippi ASM profile, with upstream authority retained",
+    "probe_and_cmake_license": "Root MIT project-authored fixture diagnostics; no Melee/SDK/game-data rights granted",
+    "profile_provenance": {
+      "repository": "slippi-ssbm-asm",
+      "licensed_commit": "fcf47f10dc244152c2ebaa3a9dec142ea42243b7",
+      "source_path": "Online/Core/InitOnlinePlay.asm",
+      "source_file_sha256": "d0a5df91c9b535b3c711880a4156769c2b3e799e7e72bc9d071be9fd90394067",
+      "license": "GPL-3.0-only",
+      "helper_adaptation_sha256": "2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e",
+      "commit_and_file_hash_are_distinct": "The commit identifies the pinned repository revision; the file SHA identifies the source file read for this helper."
+    }
+  },
+  "runtime": {
+    "js_sha256": "4124982bb1031efb3f699bb0060b0184df91532b3b697d2c0cdfd02d5a89da97",
+    "wasm_sha256": "3f868fa0b583b0a86993c2b792037e1e521a33471f4b3dc9467ffc8093caab34",
+    "abi": {
+      "observation_bytes": 1216,
+      "rng_profile_trace_bytes": 32,
+      "input_bytes": 44,
+      "transfer_diagnostic_bytes": 40
+    }
+  },
+  "native_input": {
+    "schema": "melee-web-native-finalized-input-v2",
+    "frame_count": 111,
+    "scene_range": [
+      0,
+      110
+    ],
+    "inputs_sha256": "f0ad88a06a2e40743153621840ea2c21cd3bf9c5e74c1dd8ff5481acf6b418f8",
+    "receipt_sha256": "31953f3a693a9c8f3cab5173b2d7e5340ec347aff849311782717f5c263fd9f0",
+    "raw_contract": {
+      "bytes": 44,
+      "active_ports": [
+        1,
+        2
+      ],
+      "disabled_ports": {
+        "3": -1,
+        "4": -1
+      },
+      "unobserved_fields": [
+        "analogA",
+        "analogB"
+      ]
+    }
+  },
+  "measurements": {
+    "rows": 111,
+    "callback_count_frame_rng_match": true,
+    "declared_fighter_and_processed_input_match": true,
+    "clean_close": {
+      "result": 1,
+      "success": true
+    },
+    "pending_quiescence_scenes": [
+      107
+    ],
+    "source_capture_sha256": "46a4e4bc1f316dc6704a635a8ac01eea9e843dc46c41c721417c3628111febd7",
+    "root_audit_sha256": "b56c738cfb9965d70d281d5a72c78badffd33964c2244d7ac6a57b91d6ca408d",
+    "declared_comparison_sha256": "8eaf47f93cc82ccd4b289180b15f01a3edfb22fda495aa79db8beaa2fcd6380e",
+    "job_receipt_sha256": "bee49bfec6ac32e315774ec55d8984d1cf72c13bdabe601cc21624c10ad33cea",
+    "runner_report_sha256": "46a4e4bc1f316dc6704a635a8ac01eea9e843dc46c41c721417c3628111febd7",
+    "initial_quiescence": {
+      "result": 0,
+      "pending": true,
+      "snapshot_eligible": false,
+      "interpretation": "Observation-only initialization boundary; no snapshot is taken or restored, and scene 0 is still consumed once."
+    }
+  },
+  "failed_predecessor": {
+    "job": "01",
+    "result": "failed",
+    "source_probe_sha256": "d5d2ed1b095e1dcf094c72d1c6bd0514b3de570da45f4f8475ac6f65dc43a778",
+    "source_cmake_sha256": "43e16735fa453645f43e64d9e142176c8ea513667c73c0b7095e0cecd964ee35",
+    "profile_helper_sha256": "2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e",
+    "runner_sha256": "f72e3835069b5b7a1b4360abb7ee2828171829f8178e0d1ae03243f2929a1620",
+    "failure": "close failed: Remove original fighters before their common context",
+    "cleanup": {
+      "attempted": true,
+      "result": 0,
+      "success": false
+    },
+    "explanation": "The predecessor reached its bounded rows but failed native fixture teardown; job02 retained the corrected source image and clean close separately.",
+    "failure_json_sha256": "7910c47e4bb7777e164ce4a3d50253909d9ac790b592c7c3846fed669dfaadb4",
+    "runtime_js_sha256": "482ef6c8ebb6e88100627dfee89c79a18143b115da59a7bef835fa93b9982159",
+    "runtime_wasm_sha256": "a339904d112bce38e2c8305d938f6ca732ff2d5491d4680ad4f25bd290befd62",
+    "manifest_sha256": "4a93c0fd3a4262695735f7c7276e46b174d64fb12494e5579b4b3d52f6a5a44a",
+    "launcher_sha256": "3acaffec9dc312802414b458f6782f185173c98fecb0cb13dc16bd81dcbd028b",
+    "profile_patch_sha256": "01b6e437cb671ba2eeb85266c5826eb34bd04a7b283be3c73ae27e358d9ecb41",
+    "transfer_patch_sha256": "ec4cf35d9fed449d052e452fdd155f5a266c9810f640c6c518d7fd74bf9dc08a"
+  },
+  "claims_excluded": [
+    "Results, postgame, rematch or complete browser/desktop session",
+    "live networked WebMelee gameplay or browser rollback",
+    "native post-step RNG, full native heap, native PCM or pixels",
+    "foreground timing, physical input, audible quality or performance admission",
+    "GPU, JavaScript, Wasm globals/tables/imports and persistent-save rollback ownership",
+    "retail vanilla compatibility or official Slippi services"
+  ],
+  "scope": {
+    "source_fixture": true,
+    "adapted_desktop_client": false,
+    "recorded_input_prefix": true,
+    "browser_exercised": false,
+    "performance_passed": false,
+    "admitted_vanilla_fixture": false,
+    "retail_vanilla": false,
+    "recorded_match_through_fourth_stock_loss": true,
+    "postgame_results_rematch": false
+  },
+  "measured_prefix": {
+    "row_count": 111,
+    "scene_range": [
+      0,
+      110
+    ],
+    "row_digest_sha256": "25477a58cc0688a6e106f1065d81eb268b397b2c1c3030ef2d6e3028a7bd7878",
+    "native_start_rng_sequence_sha256": "a87135cb91e1bd849f26dfaedb103922cb43037af782a7d7a42c521bcca06a15",
+    "raw_pad_row_hashes_sha256": "24c6bf299d392b91f7daf45259c593d0a33f99befcd7a352c1afabd0455c69f1",
+    "all_callback_count_frame_rng_match": true,
+    "all_declared_fighter_fields_exact": true,
+    "all_processed_input_fields_exact": true,
+    "representative_rows": [
+      {
+        "scene_frame": 0,
+        "recording_frame": -123,
+        "source_step": 1,
+        "start_random_seed": 4660,
+        "raw_pad_bytes": 44,
+        "raw_pad_sha256": "58c907d2f0ae74a09f26bba9c42382ed004a48a3d49543a79453fca4d7d81fe3",
+        "callback_count_before": 0,
+        "callback_count_after": 1,
+        "callback_frame": 0,
+        "callback_seed": 4660,
+        "source_global_frame": 1,
+        "callback_matches_start_rng": true,
+        "declared_fighter_fields_exact": true,
+        "processed_input_fields_exact": true,
+        "declared_differences": [],
+        "processed_differences": [],
+        "native_quiescence": {
+          "result": 1,
+          "pending": false
+        }
+      },
+      {
+        "scene_frame": 92,
+        "recording_frame": -31,
+        "source_step": 93,
+        "start_random_seed": 6033972,
+        "raw_pad_bytes": 44,
+        "raw_pad_sha256": "3d82e54cfb2dd2f702037f521c449cc5adafbf603055c49aa2c9ce8b0acf1a82",
+        "callback_count_before": 92,
+        "callback_count_after": 93,
+        "callback_frame": 92,
+        "callback_seed": 6033972,
+        "source_global_frame": 93,
+        "callback_matches_start_rng": true,
+        "declared_fighter_fields_exact": true,
+        "processed_input_fields_exact": true,
+        "declared_differences": [],
+        "processed_differences": [],
+        "native_quiescence": {
+          "result": 1,
+          "pending": false
+        }
+      },
+      {
+        "scene_frame": 98,
+        "recording_frame": -25,
+        "source_step": 99,
+        "start_random_seed": 6427188,
+        "raw_pad_bytes": 44,
+        "raw_pad_sha256": "4b83c3fce48f685e3e6c15ef4fe3b39f82d66975e3500f8faf81ad051831837d",
+        "callback_count_before": 98,
+        "callback_count_after": 99,
+        "callback_frame": 98,
+        "callback_seed": 6427188,
+        "source_global_frame": 99,
+        "callback_matches_start_rng": true,
+        "declared_fighter_fields_exact": true,
+        "processed_input_fields_exact": true,
+        "declared_differences": [],
+        "processed_differences": [],
+        "native_quiescence": {
+          "result": 1,
+          "pending": false
+        }
+      },
+      {
+        "scene_frame": 106,
+        "recording_frame": -17,
+        "source_step": 107,
+        "start_random_seed": 6951476,
+        "raw_pad_bytes": 44,
+        "raw_pad_sha256": "3d82e54cfb2dd2f702037f521c449cc5adafbf603055c49aa2c9ce8b0acf1a82",
+        "callback_count_before": 106,
+        "callback_count_after": 107,
+        "callback_frame": 106,
+        "callback_seed": 6951476,
+        "source_global_frame": 107,
+        "callback_matches_start_rng": true,
+        "declared_fighter_fields_exact": true,
+        "processed_input_fields_exact": true,
+        "declared_differences": [],
+        "processed_differences": [],
+        "native_quiescence": {
+          "result": 1,
+          "pending": false
+        }
+      },
+      {
+        "scene_frame": 107,
+        "recording_frame": -16,
+        "source_step": 108,
+        "start_random_seed": 7017012,
+        "raw_pad_bytes": 44,
+        "raw_pad_sha256": "3d82e54cfb2dd2f702037f521c449cc5adafbf603055c49aa2c9ce8b0acf1a82",
+        "callback_count_before": 107,
+        "callback_count_after": 108,
+        "callback_frame": 107,
+        "callback_seed": 7017012,
+        "source_global_frame": 108,
+        "callback_matches_start_rng": true,
+        "declared_fighter_fields_exact": true,
+        "processed_input_fields_exact": true,
+        "declared_differences": [],
+        "processed_differences": [],
+        "native_quiescence": {
+          "result": 0,
+          "pending": true
+        }
+      },
+      {
+        "scene_frame": 108,
+        "recording_frame": -15,
+        "source_step": 109,
+        "start_random_seed": 7082548,
+        "raw_pad_bytes": 44,
+        "raw_pad_sha256": "3d82e54cfb2dd2f702037f521c449cc5adafbf603055c49aa2c9ce8b0acf1a82",
+        "callback_count_before": 108,
+        "callback_count_after": 109,
+        "callback_frame": 108,
+        "callback_seed": 7082548,
+        "source_global_frame": 109,
+        "callback_matches_start_rng": true,
+        "declared_fighter_fields_exact": true,
+        "processed_input_fields_exact": true,
+        "declared_differences": [],
+        "processed_differences": [],
+        "native_quiescence": {
+          "result": 1,
+          "pending": false
+        }
+      },
+      {
+        "scene_frame": 110,
+        "recording_frame": -13,
+        "source_step": 111,
+        "start_random_seed": 7213620,
+        "raw_pad_bytes": 44,
+        "raw_pad_sha256": "3d82e54cfb2dd2f702037f521c449cc5adafbf603055c49aa2c9ce8b0acf1a82",
+        "callback_count_before": 110,
+        "callback_count_after": 111,
+        "callback_frame": 110,
+        "callback_seed": 7213620,
+        "source_global_frame": 111,
+        "callback_matches_start_rng": true,
+        "declared_fighter_fields_exact": true,
+        "processed_input_fields_exact": true,
+        "declared_differences": [],
+        "processed_differences": [],
+        "native_quiescence": {
+          "result": 1,
+          "pending": false
+        }
+      }
+    ],
+    "full_rows_retained_in_scoped_capture": true
+  },
+  "queued_transfer_and_default_pair": {
+    "schema": "melee-web-bounded-source-pair-root-audit-v1",
+    "result": "passed",
+    "evidence_labels": [
+      "Source identified",
+      "Native traced",
+      "source-only Node"
+    ],
+    "started_at_utc": "2026-10-02T08:19:29.998Z",
+    "finished_at_utc": "2026-10-02T08:19:33.480Z",
+    "duration_seconds": 3.482,
+    "root_audit_sha256": "a83e4eece479f4089bde23026f18f6cbe90855d4d42c899b232023527edd701b",
+    "whole_report_sha256": "9b76c7cc1cd59222485778e9537ec48a23cdfc96a7662759add3bd1d7990a10d",
+    "hps_receipt_sha256": "0b62a01cf7bbd9146c35f05a0ec9ddb5da184f05953b93e847c2a128c873c2a8",
+    "default_receipt_sha256": "6e9d2c57cdb0de444e93f3a50710b98a99b9ea612ea87e0853e6f2e29b192f01",
+    "identity": {
+      "manifest_sha256": "17839cd18f547b5ee808a6c991ee6d0ac604a3324cd74b52694a0f2e0ad2784e",
+      "source_probe_sha256": "93b2ce746e634b63bc9a1909e87fdfd32113c088f5c70bde8cb02b5d5e1856ce",
+      "source_cmake_sha256": "43e16735fa453645f43e64d9e142176c8ea513667c73c0b7095e0cecd964ee35",
+      "profile_helper_sha256": "2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e",
+      "runtime_js_sha256": "4124982bb1031efb3f699bb0060b0184df91532b3b697d2c0cdfd02d5a89da97",
+      "runtime_wasm_sha256": "3f868fa0b583b0a86993c2b792037e1e521a33471f4b3dc9467ffc8093caab34",
+      "native_inputs_sha256": "f0ad88a06a2e40743153621840ea2c21cd3bf9c5e74c1dd8ff5481acf6b418f8",
+      "native_receipt_sha256": "31953f3a693a9c8f3cab5173b2d7e5340ec347aff849311782717f5c263fd9f0",
+      "page_pool_sha256": "592694e1af7c250d745242d6f94872c59daf81a58b98cfbdff1a67eaf1d3619f",
+      "node_sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+      "assets_manifest_sha256": "29878c6e35f63a8f50348ba4676003181f4437ca161f428504a1396d87ad00a9",
+      "hps_runner_sha256": "de983b2e3e663d834ff6a17d92d8be232b3346a6a24ae5324e739a89006f213c",
+      "default_runner_sha256": "1ffcf01296543c6e575febffb70c3876dd82a1d5871be6f6165e77e1833f4bd8",
+      "default_bounded_checks_sha256": "f590620be2d7913b185b26ad76cf1d34e992b2e3545c55c80d95dc462444ef5c",
+      "default_launcher_sha256": "4f78c122d331bba36901453d93e2f274f42647981d2ca3a2d6834e2abd53dd71",
+      "assets_digest_definition": "SHA-256 of canonical sorted filename-to-SHA-256 JSON map; asset files remain local."
+    },
+    "hps": {
+      "boundary": "Snapshot admitted only after quiescent scene 106; raw scenes 107..110 replayed while scene 107 remains pending.",
+      "admission_scene": 106,
+      "admission_quiescent": true,
+      "pending_scene": 107,
+      "pending_after_step": true,
+      "clear_scene": 108,
+      "restored_pending_state": false,
+      "restore_cycles": 3,
+      "replay_steps": 12,
+      "recovery_steps": 4,
+      "exact_observation_bytes": true,
+      "exact_pcm_bytes": true,
+      "exact_transfer_bytes": true,
+      "exact_full_heap_bytes": true,
+      "heap_bytes": 119799808,
+      "observation_bytes": 1216,
+      "pcm_bytes": 4272,
+      "transfer_bytes": 40,
+      "restore_ms": [
+        5.387292,
+        2.687625,
+        2.707417
+      ],
+      "page_pool": {
+        "scope": "all bytes of every full HEAPU8 page; no excluded ranges",
+        "page_bytes": 65536,
+        "page_count": 1828,
+        "max_snapshots": 8,
+        "max_retained_page_bytes": 268435456,
+        "unique_page_count": 1049,
+        "unique_page_bytes": 68747264,
+        "deduplicated_bytes": 51052544
+      },
+      "negative_control": {
+        "result": "detected",
+        "scope": "Immediate native full-memory corruption only.",
+        "scene": 110,
+        "perturbation": "One idle scene-110 source RNG byte XOR 1",
+        "offset": 83258292,
+        "expected_byte": 162,
+        "actual_byte": 163,
+        "recovery_steps": 4,
+        "recovery_exact": true,
+        "future_rng_sensitivity": "Excluded; the profile callback rewrites RNG on the next raw step."
+      },
+      "cleanup": {
+        "native_close": "passed",
+        "owner_close": "passed",
+        "retained_snapshots": 0,
+        "unique_page_bytes": 0
+      },
+      "scope": "Source-only Node fixture. Native raw-step timing, full-memory copy/hash time and report writes are outside any performance claim."
+    },
+    "default": {
+      "comparison": "Old baseline-scripted -> candidate-scripted -> candidate-raw; Slippi profile disabled.",
+      "rows_including_initialization": 581,
+      "steps": 580,
+      "observation_bytes": 1216,
+      "pad_bytes": 44,
+      "pcm_bytes": 4272,
+      "all_observation_exact": true,
+      "all_pad_exact": true,
+      "all_pcm_exact": true,
+      "first_divergence": null,
+      "baseline_bytes": 3214092,
+      "baseline_sha256": "42554e554246b3a78c96e63e336b22f3137a0f143a56a6dcc6cf2fb2a0e50411",
+      "modes": [
+        {
+          "mode": "baseline-scripted",
+          "source_identity": "ded6bf73ae92ea634f2898eeb39d2a3a49db733965548438ca57f3221585daa4",
+          "runtime_js_sha256": "baaae9d898b3d4d336876bfb75a8293bddea087267ea19ad380c9a9c4361a9e8",
+          "runtime_wasm_sha256": "188d6562c273bdccaa161c005aa260f1c58cf9a76b4580923b07dfe3b217ced7",
+          "cleanup_result": 1
+        },
+        {
+          "mode": "candidate-scripted",
+          "source_identity": "93b2ce746e634b63bc9a1909e87fdfd32113c088f5c70bde8cb02b5d5e1856ce",
+          "runtime_js_sha256": "4124982bb1031efb3f699bb0060b0184df91532b3b697d2c0cdfd02d5a89da97",
+          "runtime_wasm_sha256": "3f868fa0b583b0a86993c2b792037e1e521a33471f4b3dc9467ffc8093caab34",
+          "cleanup_result": 1
+        },
+        {
+          "mode": "candidate-raw",
+          "source_identity": "93b2ce746e634b63bc9a1909e87fdfd32113c088f5c70bde8cb02b5d5e1856ce",
+          "runtime_js_sha256": "4124982bb1031efb3f699bb0060b0184df91532b3b697d2c0cdfd02d5a89da97",
+          "runtime_wasm_sha256": "3f868fa0b583b0a86993c2b792037e1e521a33471f4b3dc9467ffc8093caab34",
+          "cleanup_result": 1
+        }
+      ],
+      "scope": "Source-only Node exact byte comparison, including initialization; no native-game, browser or external-effect comparison."
+    },
+    "claims_excluded": [
+      "Browser gameplay, player rollback, GPU/render state, Web Audio or external audio effects",
+      "Wasm address/layout identity, mutable globals/tables, host allocator/process/filesystem state",
+      "Pending-state snapshot or transfer pumping; the admitted snapshot is scene 106 only",
+      "Foreground timing, nominal memory budget, practical performance or tournament acceptance",
+      "Future RNG sensitivity: the explicit profile callback rewrites RNG on the next raw step",
+      "Complete-match or retail-vanilla equivalence"
+    ]
+  },
+  "recorded_match_1342": {
+    "schema": "melee-web-source-recorded-match-aggregate-v1",
+    "result": "passed",
+    "evidence_labels": [
+      "Source identified",
+      "Native traced",
+      "recorded-input-prefix"
+    ],
+    "claim_boundary": "Source-only Node/native comparison through the recorded adapted-desktop timeline ending at the fourth P1 stock loss. This is a bounded source/native receipt, not postgame, browser, rollback, foreground-timing or retail-vanilla evidence.",
+    "started_at_utc": "2026-10-02T08:44:36.532Z",
+    "finished_at_utc": "2026-10-02T08:44:37.759Z",
+    "duration_seconds": 1.227,
+    "scene_range": [
+      0,
+      1341
+    ],
+    "scene_count": 1342,
+    "source_step_count": 1342,
+    "native_declared_port_rows": 2684,
+    "native_processed_port_rows": 2684,
+    "declared_port_mismatches": 0,
+    "processed_port_mismatches": 0,
+    "callback_count_frame_rng_mismatches": 0,
+    "ready_first_scene": 123,
+    "stock_transitions": [
+      {
+        "scene": 0,
+        "recording_frame": -123,
+        "p1_stocks": 4,
+        "p2_stocks": 4
+      },
+      {
+        "scene": 372,
+        "recording_frame": 249,
+        "p1_stocks": 3,
+        "p2_stocks": 4
+      },
+      {
+        "scene": 695,
+        "recording_frame": 572,
+        "p1_stocks": 2,
+        "p2_stocks": 4
+      },
+      {
+        "scene": 1018,
+        "recording_frame": 895,
+        "p1_stocks": 1,
+        "p2_stocks": 4
+      },
+      {
+        "scene": 1341,
+        "recording_frame": 1218,
+        "p1_stocks": 0,
+        "p2_stocks": 4
+      }
+    ],
+    "terminal_observation": {
+      "recording_frame": 1218,
+      "source_scene": 1341,
+      "source_ready": true,
+      "ending": 0,
+      "complete": 0,
+      "winner": -1,
+      "scope": "Fourth-stock loss boundary only; postgame/Results/rematch are not included."
+    },
+    "identity": {
+      "root_audit_sha256": "0e4eeb4d299fd241dde827a2400b12e10bde4170982d9cd0d3ab6b4cf4c75786",
+      "whole_report_sha256": "b97f8ab553a62271b5ac396c40d33d9414965424ed22bfa876dc653394a47625",
+      "runner_report_sha256": "8afa9f5a9c6a5f97efe992eecefa56dd950a19e441f4df68387c5062e30b2c23",
+      "source_capture_sha256": "49b017f4630a55fdb97dc905e369e908b23879a3da27b9b6cbea5a9d6abd2834",
+      "native_inputs_sha256": "f399296543239274a84e17df02ff2b4ad78ba28c085ea17df0bd0b8b0ae7d6f8",
+      "native_receipt_sha256": "00e89d845768043787526794423c06aac5480c4e5f0ef8694d26bd672d601b46",
+      "source_probe_sha256": "93b2ce746e634b63bc9a1909e87fdfd32113c088f5c70bde8cb02b5d5e1856ce",
+      "runtime_js_sha256": "4124982bb1031efb3f699bb0060b0184df91532b3b697d2c0cdfd02d5a89da97",
+      "runtime_wasm_sha256": "3f868fa0b583b0a86993c2b792037e1e521a33471f4b3dc9467ffc8093caab34",
+      "profile_helper_sha256": "2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e",
+      "match_header_sha256": "daddc4378129ae7f9f9a9fd18270d0c1a892fccea8815b8514a60d1ec1b6f52",
+      "pad_capture_source_sha256": "b106ccac842f1b97db07b1108cf0b8536a498f1d21ea9544200a0daf8f4d6344",
+      "recording_asm_sha256": "88fb17312fa0b02f7294c12c62e58d494bbbd5c270e6a151a3de54cd616eda26",
+      "controller_header_sha256": "59e03120bfe0729fe0ec4b757e305925679f6b418b64695c03aecac663d2e17e",
+      "fighter_types_sha256": "74b7246a0fe4199def6610aa0692378e86a404a0eea815bca5bc422e44b125a8",
+      "assets_manifest_sha256": "cec07ac3a31464c4739da5dfcb931646caa5a1ce0cbe71645cb239413ce9e2ac"
+    },
+    "input_contract": {
+      "native_schema": "melee-web-native-finalized-input-v2",
+      "combined_pad_bytes": 44,
+      "active_ports": [
+        1,
+        2
+      ],
+      "disabled_ports": {
+        "3": -1,
+        "4": -1
+      },
+      "unobserved_fields": [
+        "analogA",
+        "analogB",
+        "four-byte PAD tail/padding"
+      ],
+      "mapping": "Initialization source step 0 is retained separately; source step equals native scene plus 1 for scenes 0..1341. Native finalized PAD bytes are the source-step inputs; no expected-state injection."
+    },
+    "lifecycle": {
+      "native_quiescence_initial_result": 0,
+      "initial_snapshot_eligible": false,
+      "native_close_result": 1,
+      "owned_group_released": true,
+      "scope": "Source/native Node runner; no public checker run is implied by this aggregate."
+    },
+    "scope": {
+      "source_fixture": true,
+      "adapted_desktop_client": true,
+      "browser_exercised": false,
+      "postgame_results_rematch": false,
+      "foreground_timing": false,
+      "rollback": false,
+      "retail_vanilla": false
+    }
+  },
+  "required_validation": {
+    "result": "passed",
+    "base_commit": "b1c6a22e11b2d1689c43312cc9cef8a978fb4f90",
+    "source": {
+      "cmake/FighterRuntime.cmake": "43e16735fa453645f43e64d9e142176c8ea513667c73c0b7095e0cecd964ee35",
+      "reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp": "2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e",
+      "tests/gameplay_snapshot_probe.cpp": "93b2ce746e634b63bc9a1909e87fdfd32113c088f5c70bde8cb02b5d5e1856ce",
+      "tests/test_slippi_profile_prefix.py": "729f17ee9892aee76fa4fb1d491bd7da00bf3789efd9f96b5e8c08b94669659e",
+      "tools/slippi_profile_prefix_check.py": "a49ed3861a972fe2cd234644cc84050a62caa9909f5cf6e10e3368d8b578cce3",
+      "tools/slippi_profile_prefix_runtime.mjs": "d147272d49ba2a6854a3bee086deebb542679be27dac546bdeeb8f008e3a828c"
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "tests": 1680,
+      "skipped": 136,
+      "unittest_seconds": 295.998,
+      "started_at_utc": "2026-10-02T09:33:04.706Z",
+      "finished_at_utc": "2026-10-02T09:38:00.975Z",
+      "exit_code": 0,
+      "owned_group_released": true,
+      "report_sha256": "ea4337247ea272eecd12aceef424bc08bf072f6db392ec8a7a3ec8015d55ad28",
+      "log_sha256": "c973d2143bf1a2234332d72124941f46a7b6309318e34f2ee7088addcdc94eb6"
+    },
+    "affected_build": {
+      "command": "python3 scripts/build.py --trace-target gameplay_snapshot_probe --configuration Release",
+      "started_at_utc": "2026-10-02T09:47:26.487Z",
+      "finished_at_utc": "2026-10-02T09:47:36.974Z",
+      "duration_seconds": 10.486,
+      "exit_code": 0,
+      "owned_group_released": true,
+      "report_sha256": "5d25de37e5e08ffad37f3d2aabc55b24bbad8b627ff0410b75ebc52f1b6034c3",
+      "log_sha256": "86314ac00ebd87e0fa687dd683a047110ce8550597492d210e5be854c3860f07",
+      "runtime_sha256": {
+        "js": "4124982bb1031efb3f699bb0060b0184df91532b3b697d2c0cdfd02d5a89da97",
+        "wasm": "3f868fa0b583b0a86993c2b792037e1e521a33471f4b3dc9467ffc8093caab34"
+      }
+    },
+    "portable_checker": {
+      "started_at_utc": "2026-10-02T09:48:19.001Z",
+      "finished_at_utc": "2026-10-02T09:48:19.784Z",
+      "scene_range": [
+        0,
+        1341
+      ],
+      "rows": 1342,
+      "raw_input_echo_exact": true,
+      "declared_fighter_fields_exact": true,
+      "processed_input_fields_exact": true,
+      "callback_matches_native_frame_start_rng": true,
+      "first_divergence": null,
+      "terminal_observation": {
+        "frame": 1218,
+        "ready": 1,
+        "ending": 0,
+        "complete": 0,
+        "outcome": 2,
+        "winner": -1,
+        "stocks": [
+          0,
+          4
+        ]
+      },
+      "initial_snapshot_eligible": false,
+      "fixture_close_result": 1,
+      "owned_group_released": true,
+      "checker_sha256": "a49ed3861a972fe2cd234644cc84050a62caa9909f5cf6e10e3368d8b578cce3",
+      "worker_sha256": "d147272d49ba2a6854a3bee086deebb542679be27dac546bdeeb8f008e3a828c",
+      "parser_sha256": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956",
+      "replay_sha256": "0e3f417258023269c8d9a9992d8f173596aea1bda659dddd17641939ea5a2c40",
+      "normalized_inputs_sha256": "8c015190b2044daaee78dae71ae94e25df90b17c2adade048a1138db97de0a92",
+      "assets_sha256": "6f92d7d601e9b68f8667400fd14a052c13a032bfbc678bd9ee415daa689b211c",
+      "assets_digest_definition": "Sorted recursive relative file names, each prefixed with its four-byte big-endian length, followed by ASCII SHA-256 file digest.",
+      "report_sha256": "f852347c14c8181e5c21e3703b373fcaefca601e0126bd1604ee282b9c139f25",
+      "worker_report_sha256": "277c7d0e68622cc6618c51a57ea32d84ac7a95b485246f7fcf7d22770a9d2b3d",
+      "rows_jsonl_sha256": "ec1217adbfd13848c16892b7217f1df15d577eeee46630d2024bde81ea9b4541"
+    },
+    "root_audit_sha256": "ff4ac02a725ee599a35d22680a78787da699d4db98d6bdc997f1929252a45542",
+    "documentation_updated_after_executable_validation": true
+  }
+}

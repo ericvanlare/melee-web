@@ -66,6 +66,8 @@ SSS_CURSOR_SWEEP_X_FRAMES = math.ceil(
 SSS_CURSOR_SWEEP_Y_ROWS = math.ceil(
     2 * SSS_CURSOR_Y_BOUND / SSS_CURSOR_MAX_STEP_PER_FRAME
 ) + 1
+SSS_SELECTION_SETTLE_FRAMES = 6
+SSS_SELECTION_SETTLE_ATTEMPTS = 2
 
 
 def _gameplay_controller_port(name: str) -> int:
@@ -145,6 +147,22 @@ def _stage_is_valid_for_game(stage_id: int, game_number: int) -> bool:
     if game_number == 2:
         return stage_id == 32
     return False
+
+
+def _stage_selection_settle(expected: tuple[int, int], observations: list[tuple[int, int] | None]) -> dict:
+    """Return the strict source-state admission for a stage A press.
+
+    The source can still consume one queued stick sample after the host writes
+    neutral. Every observed source frame in the bounded settle window must
+    retain the exact hovered tile; a transient Final Destination observation
+    never authorizes A.
+    """
+    values = list(observations)
+    return {
+        "expected": list(expected),
+        "observed": [None if value is None else list(value) for value in values],
+        "stable": bool(values) and all(value == expected for value in values),
+    }
 
 
 def _slippi_players_are_mario_mario(players: list[dict]) -> bool:
@@ -240,21 +258,21 @@ def _verify_pinned_client_source(lock: dict, source_root: Path | None = None) ->
             or version_match.group(1) != lock["client"]["slippi_semver"]):
         raise RuntimeError("pinned Slippi semantic version differs from client.lock.json")
 
-    def verify_patch_tree(tree: Path, patch_relative: str, allowed_extra: set[str] | None = None):
-        patch = HERE / patch_relative
-        patch_paths = {
-            line.split("a/", 1)[1].split(" b/", 1)[0]
-            for line in patch.read_text(encoding="utf-8").splitlines()
-            if line.startswith("diff --git a/") and " b/" in line
-        }
-        if not patch_paths:
-            raise RuntimeError("pinned client patch has no auditable file list")
-        check = subprocess.run(
-            ["git", "-C", str(tree), "apply", "--reverse", "--check", str(patch)],
-            check=False, capture_output=True, text=True, timeout=15,
-        )
-        if check.returncode:
-            raise RuntimeError("downstream client patch is not applied to its pinned source")
+    def verify_patch_tree(tree: Path, patch_relatives: list[str],
+                          allowed_extra: set[str] | None = None):
+        if not patch_relatives:
+            raise RuntimeError("pinned client patch sequence is empty")
+        patches = [HERE / relative for relative in patch_relatives]
+        patch_paths: set[str] = set()
+        for patch in patches:
+            paths = {
+                line.split("a/", 1)[1].split(" b/", 1)[0]
+                for line in patch.read_text(encoding="utf-8").splitlines()
+                if line.startswith("diff --git a/") and " b/" in line
+            }
+            if not paths:
+                raise RuntimeError(f"pinned client patch has no auditable file list: {patch.name}")
+            patch_paths.update(paths)
         with tempfile.TemporaryDirectory(prefix="slippi-patch-index-") as scratch:
             env = os.environ.copy()
             env["GIT_INDEX_FILE"] = str(Path(scratch) / "index")
@@ -270,12 +288,15 @@ def _verify_pinned_client_source(lock: dict, source_root: Path | None = None) ->
 
             indexed_git("read-tree", "HEAD")
             indexed_git("write-tree")
-            applied = subprocess.run(
-                ["git", "-C", str(tree), "apply", "--cached", str(patch)],
-                check=False, capture_output=True, text=True, timeout=15, env=env,
-            )
-            if applied.returncode:
-                raise RuntimeError("reviewed downstream client patch cannot reproduce its source tree")
+            for patch in patches:
+                applied = subprocess.run(
+                    ["git", "-C", str(tree), "apply", "--cached", str(patch)],
+                    check=False, capture_output=True, text=True, timeout=15, env=env,
+                )
+                if applied.returncode:
+                    raise RuntimeError(
+                        f"reviewed downstream client patch cannot reproduce its source tree: {patch.name}"
+                    )
             expected_tree = indexed_git("write-tree")
             indexed_git("read-tree", "HEAD")
             indexed_git("add", "--all", "--", ".")
@@ -285,9 +306,15 @@ def _verify_pinned_client_source(lock: dict, source_root: Path | None = None) ->
         status = git(tree, "status", "--porcelain", "--untracked-files=all")
         changed = set()
         for line in status.splitlines():
-            if len(line) < 4 or line[0] != " ":
-                raise RuntimeError("pinned client source contains staged or untracked changes")
-            changed.add(line[3:])
+            if len(line) < 4:
+                raise RuntimeError("pinned client source status is malformed")
+            index_status, worktree_status, path = line[0], line[1], line[3:]
+            if index_status == "?":
+                if worktree_status != "?" or path not in patch_paths:
+                    raise RuntimeError("pinned client source contains unrelated untracked changes")
+            elif index_status != " ":
+                raise RuntimeError("pinned client source contains staged changes")
+            changed.add(path)
         if changed != patch_paths | (allowed_extra or set()):
             raise RuntimeError("local source changes extend beyond the reviewed client patch")
         cached = subprocess.run(["git", "-C", str(tree), "diff", "--cached", "--quiet"],
@@ -296,10 +323,19 @@ def _verify_pinned_client_source(lock: dict, source_root: Path | None = None) ->
             raise RuntimeError("pinned client source has staged changes")
         return sorted(patch_paths)
 
+    patch_targets = lock.get("patch_targets")
+    if not isinstance(patch_targets, list) or len(patch_targets) != len(lock["patches"]):
+        raise RuntimeError("client.lock.json patch_targets must match the ordered patch list")
+    if set(patch_targets) != {"dolphin", "rust"}:
+        raise RuntimeError("client.lock.json patch_targets must name dolphin and rust")
+    dolphin_patches = [patch for patch, target in zip(lock["patches"], patch_targets)
+                       if target == "dolphin"]
+    rust_patches = [patch for patch, target in zip(lock["patches"], patch_targets)
+                    if target == "rust"]
     dolphin_paths = verify_patch_tree(
-        source, lock["patches"][0], {"Externals/SlippiRustExtensions"}
+        source, dolphin_patches, {"Externals/SlippiRustExtensions"}
     )
-    rust_paths = verify_patch_tree(rust, lock["patches"][1])
+    rust_paths = verify_patch_tree(rust, rust_patches)
     return {
         "commit": client_pin,
         "slippi_semver": version_match.group(1),
@@ -423,12 +459,29 @@ def _verify_build_profile(
     service_sources = tuple(
         (matchmaker_source / relative).stat().st_mtime_ns
         for relative in (
-            "CMakeLists.txt", "server.cpp", "pairing.cpp", "pairing.hpp",
+            "CMakeLists.txt", "server.cpp", "integration_test.cpp", "pairing.cpp", "pairing.hpp",
             "protocol.cpp", "protocol.hpp", "browser_relay.cpp", "browser_relay.hpp",
         )
     )
     if max(service_sources) > service_binary.stat().st_mtime_ns:
         raise RuntimeError("local matchmaker binary predates service sources; rebuild it")
+    service_prerequisite = lock.get("service_prerequisite")
+    expected_service_source = (service_prerequisite or {}).get("source_sha256")
+    if (not isinstance(expected_service_source, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_service_source)):
+        raise RuntimeError("client.lock.json lacks the reviewed PR #133 service source identity")
+    if _sha256(matchmaker_source / "server.cpp") != expected_service_source:
+        raise RuntimeError("local matchmaker source lacks the reviewed PR #133 framing prerequisite")
+    expected_service_test = (service_prerequisite or {}).get("integration_test_sha256")
+    if (not isinstance(expected_service_test, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_service_test)
+            or _sha256(matchmaker_source / "integration_test.cpp") != expected_service_test):
+        raise RuntimeError("local matchmaker integration source lacks the reviewed PR #133 prerequisite")
+    built_service = matchmaker_build / "slippi-local-matchmaker"
+    if not built_service.is_file():
+        raise FileNotFoundError("local matchmaker build output is missing")
+    if _sha256(built_service) != _sha256(service_binary):
+        raise RuntimeError("staged matchmaker differs from the configured local service build output")
     return {
         "cmake": profile["cmake"],
         "generator": profile["generator"],
@@ -441,8 +494,81 @@ def _verify_build_profile(
         "matchmaker_release_build_verified": True,
         "patched_build_source_verified": True,
         "bundled_client_matches_build_output": True,
+        "bundled_matchmaker_matches_build_output": True,
+        "service_framing_source_verified": True,
+        "service_framing_test_source_verified": True,
         "matchmaker_source_freshness_verified": True,
     }
+
+
+def generate_service_lineage(
+    lock: dict,
+    *,
+    dolphin_source: Path,
+    enet_source: Path,
+    dolphin_build: Path,
+    matchmaker_build: Path,
+    client_binary: Path,
+    service_binary: Path,
+    source_patch: Path,
+    output: Path | None = None,
+) -> dict:
+    """Verify a fresh build and emit its actual service identity set.
+
+    ``source_patch`` is the public path-limited prerequisite diff.  The caller
+    must keep the public source prerequisite applied while invoking this
+    function and while running the resulting service.  The whole receipt SHA
+    is the fresh lineage identity; no historical build receipt is required.
+    """
+    prerequisite = lock.get("service_prerequisite")
+    if not isinstance(prerequisite, dict):
+        raise RuntimeError("client.lock.json lacks the public service prerequisite")
+    source_checkout = _verify_pinned_client_source(lock, dolphin_source)
+    build_profile = _verify_build_profile(
+        lock, source_checkout, dolphin_build=dolphin_build,
+        matchmaker_build=matchmaker_build, dolphin_source=dolphin_source,
+        enet_source=enet_source, client_binary=client_binary,
+        service_binary=service_binary,
+    )
+    matchmaker_source = HERE / "local_matchmaker"
+    cache = matchmaker_build / "CMakeCache.txt"
+    required_files = (source_patch, cache, client_binary, service_binary)
+    if any(not path.is_file() for path in required_files):
+        raise FileNotFoundError("service lineage input is missing")
+    source_diff_sha = _sha256(source_patch)
+    if source_diff_sha != prerequisite.get("public_path_diff_sha256"):
+        raise RuntimeError("service source patch is not the reviewed public path diff")
+    public_source = _sha256(matchmaker_source / "server.cpp")
+    public_test = _sha256(matchmaker_source / "integration_test.cpp")
+    if (public_source != prerequisite.get("source_sha256")
+            or public_test != prerequisite.get("integration_test_sha256")):
+        raise RuntimeError("service source prerequisite changed while generating lineage")
+    head = subprocess.run(["git", "-C", str(ROOT), "rev-parse", "HEAD"],
+                          check=False, capture_output=True, text=True, timeout=15)
+    if head.returncode or not re.fullmatch(r"[0-9a-f]{40}", head.stdout.strip()):
+        raise RuntimeError("service checkout HEAD is not a commit identity")
+    receipt = {
+        "schema": "melee-web-service-lineage-v2",
+        "service_public_ref": prerequisite["public_ref"],
+        "service_public_commit": prerequisite["public_commit"],
+        "service_public_parent_commit": prerequisite["public_parent_commit"],
+        "service_public_path_diff_sha256": prerequisite["public_path_diff_sha256"],
+        "service_base_server_cpp_sha256": prerequisite["base_server_cpp_sha256"],
+        "service_integration_test_sha256": public_test,
+        "service_binary_sha256": _sha256(service_binary),
+        "service_build_cache_sha256": _sha256(cache),
+        "service_source_inventory_sha256": _tree_sha256(matchmaker_source),
+        "service_source_sha256": public_source,
+        "service_source_patch_sha256": source_diff_sha,
+        "service_worktree_head": head.stdout.strip(),
+        "build_profile": build_profile,
+    }
+    if output is not None:
+        output = output.expanduser().resolve()
+        with output.open("x", encoding="utf-8") as stream:
+            json.dump(receipt, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+    return receipt
 
 
 def _assert_no_owned_ports(ports: tuple[int, ...]) -> None:
@@ -472,7 +598,12 @@ class PairRun:
                  matchmaker_build: Path | None = None, dolphin_source: Path | None = None,
                  enet_source: Path | None = None, browser_node: Path | None = None,
                  browser_playwright: Path | None = None,
-                 profile_temp_root: Path | None = None):
+                 profile_temp_root: Path | None = None,
+                 rollback_diagnostic: str | None = None):
+        if rollback_diagnostic not in (None, "none", "hold", "drop", "duplicate", "jitter", "reorder"):
+            raise ValueError("unsupported bounded rollback diagnostic")
+        if rollback_diagnostic is not None and (input_probe_only or browser_transport_probe):
+            raise ValueError("rollback diagnostic requires completed desktop matches")
         self.root = root
         self.disc = disc
         self.cycle = cycle
@@ -489,6 +620,7 @@ class PairRun:
         self.browser_node = browser_node
         self.browser_playwright = browser_playwright
         self.profile_temp_root = profile_temp_root
+        self.rollback_diagnostic = rollback_diagnostic
         self.work = root / f"cycle-{cycle:02d}"
         self.work.mkdir(parents=True, mode=0o700, exist_ok=False)
         self.work.chmod(0o700)
@@ -856,6 +988,32 @@ class PairRun:
         for name in ("p1", "p2"):
             profile = self.profiles[name]
             environment = os.environ.copy()
+            # This harness owns each diagnostic config. Inherited controls
+            # must not contaminate ordinary or separately pinned scenarios.
+            environment.pop("SLIPPI_ROLLBACK_DIAGNOSTIC_CONFIG", None)
+            if self.rollback_diagnostic is not None:
+                from slippi_rollback_diagnostic import parse_config, write_config, SCHEMA, PROFILE_NAME
+                action = self.rollback_diagnostic if name == "p2" else "none"
+                config_path = self.work / f"{name}-rollback-config.json"
+                config = parse_config({
+                    "schema": SCHEMA, "enabled": True, "rng_offset": 0x1234,
+                    "log_path": str(self.work / f"{name}-rollback.jsonl"),
+                    "stage_id": 32,
+                    "input_profile": {"name": PROFILE_NAME, "role": 1 if name == "p1" else 2},
+                    "overlay": None,
+                    # Transport frame 98 carries role 2's delayed input edge.
+                    # HOLD releases at 104; JITTER/REORDER release at 99, and
+                    # the native rows prove the source-frame mapping.
+                    "transport": {"action": action,
+                                  "frame": 98 if action != "none" else None,
+                                  "release_frame": (
+                                      99 if action in {"jitter", "reorder"}
+                                      else 104 if action == "hold" else None
+                                  )},
+                })
+                write_config(config_path, config)
+                environment["SLIPPI_ROLLBACK_DIAGNOSTIC_CONFIG"] = str(config_path)
+                self.evidence["clients"][name]["rollback_config_sha256"] = _sha256(config_path)
             environment["SLIPPI_LOCAL_PAD_OBSERVATION"] = str(self.work / f"{name}-remote-pad.jsonl")
             environment["SLIPPI_LOCAL_SI_OBSERVATION"] = str(self.work / f"{name}-serial-input.jsonl")
             environment["SLIPPI_LOCAL_PAD_SENT_OBSERVATION"] = str(
@@ -1183,11 +1341,26 @@ class PairRun:
                     return selected
             return None
 
-        def commit_final_destination(selected: tuple[int, int]) -> None:
+        def commit_final_destination(selected: tuple[int, int], attempt: int) -> bool:
             pad.neutral()
-            self._wait_frames(picker, 6)
-            if watcher.selected_stage() != selected:
-                raise RuntimeError("Final Destination selection changed while settling")
+            observations = []
+            observation_records = []
+            for _ in range(SSS_SELECTION_SETTLE_FRAMES):
+                self._wait_frames(picker, 1)
+                observed = watcher.selected_stage()
+                source_frame = watcher.values.get("80479d58")
+                observations.append(observed)
+                observation_records.append({
+                    "selected_stage": observed,
+                    "source_frame": source_frame,
+                })
+            settle = _stage_selection_settle(selected, observations)
+            settle["attempt"] = attempt
+            settle["observations"] = observation_records
+            settle["source_frame"] = watcher.values.get("80479d58")
+            trace.setdefault("settle_attempts", []).append(settle)
+            if not settle["stable"]:
+                return False
             trace["steps"].append({
                 "step": step_number,
                 "phase": "selected",
@@ -1207,30 +1380,45 @@ class PairRun:
                 timeout=45,
                 description="both peers starting the Final Destination rematch",
             )
+            return True
 
-        selected = move_and_observe(0.0, 0.0, 10, "position_lower_left")
-        if selected is not None:
-            commit_final_destination(selected)
-            return
-        selected = move_and_observe(0.0, 0.5, 1, "clamp_left_edge")
-        if selected is not None:
-            commit_final_destination(selected)
-            return
-        for row in range(SSS_CURSOR_SWEEP_Y_ROWS):
-            horizontal = 1.0 if row % 2 == 0 else 0.0
-            selected = move_and_observe(
-                horizontal, 0.5, SSS_CURSOR_SWEEP_X_FRAMES, "scan_row", row
-            )
+        def sweep() -> tuple[int, int] | None:
+            selected = move_and_observe(0.0, 0.0, 10, "position_lower_left")
             if selected is not None:
-                commit_final_destination(selected)
-                return
-            if row + 1 < SSS_CURSOR_SWEEP_Y_ROWS:
-                selected = move_and_observe(0.5, 1.0, 1, "advance_row", row)
+                return selected
+            selected = move_and_observe(0.0, 0.5, 1, "clamp_left_edge")
+            if selected is not None:
+                return selected
+            for row in range(SSS_CURSOR_SWEEP_Y_ROWS):
+                horizontal = 1.0 if row % 2 == 0 else 0.0
+                selected = move_and_observe(
+                    horizontal, 0.5, SSS_CURSOR_SWEEP_X_FRAMES, "scan_row", row
+                )
                 if selected is not None:
-                    commit_final_destination(selected)
-                    return
+                    return selected
+                if row + 1 < SSS_CURSOR_SWEEP_Y_ROWS:
+                    selected = move_and_observe(0.5, 1.0, 1, "advance_row", row)
+                    if selected is not None:
+                        return selected
+            return None
+
+        unstable_selection = None
+        for attempt in range(1, SSS_SELECTION_SETTLE_ATTEMPTS + 1):
+            selected = sweep()
+            if selected is None:
+                break
+            if commit_final_destination(selected, attempt):
+                return
+            unstable_selection = selected
         pad.neutral()
         trace["final_destination_reached"] = False
+        if unstable_selection is not None:
+            raise RuntimeError(
+                "Final Destination did not remain selected during the bounded "
+                f"{SSS_SELECTION_SETTLE_FRAMES}-frame settle window after "
+                f"{SSS_SELECTION_SETTLE_ATTEMPTS} attempts; expected={unstable_selection}, "
+                f"last={watcher.selected_stage()}"
+            )
         raise TimeoutError(
             "original SSS cursor sweep did not reach Final Destination; "
             f"last observed stage={watcher.selected_stage()}"
@@ -1258,7 +1446,11 @@ class PairRun:
         start_files = self.replay_baselines.get(game_number)
         if start_files is None:
             raise RuntimeError(f"game {game_number} has no pre-launch replay-file baseline")
-        self.pads["p1"].set_axis("MAIN", 0.0, 0.5)
+        if self.rollback_diagnostic is None:
+            self.pads["p1"].set_axis("MAIN", 0.0, 0.5)
+        else:
+            for pad in self.pads.values():
+                pad.neutral()
         initial_frame = {
             name: self.watchers[name].values.get("80479d58") for name in ("p1", "p2")
         }
@@ -1272,18 +1464,21 @@ class PairRun:
         # The pinned ASM clears pad input until UNFREEZE_INPUTS_FRAME minus
         # Slippi delay. Start after that
         # sync window and hold across normal controller polling.
-        self._wait_game_frames("p2", SCRIPTED_INPUT_START_FRAME)
-        self.evidence["games"][-1]["p2_a_input_source_frame"] = (
-            self.watchers["p2"].values.get("80479d58")
-        )
-        self.pads["p2"].set_button("A", True)
-        self.pads["p2"].set_axis("MAIN", 1.0, 0.5)
-        self._wait_game_frames("p2", 30)
-        self.pads["p2"].set_button("A", False)
-        self.pads["p2"].set_axis("MAIN", 0.5, 0.5)
-        self.evidence["games"][-1]["p2_a_input_end_source_frame"] = (
-            self.watchers["p2"].values.get("80479d58")
-        )
+        if self.rollback_diagnostic is None:
+            self._wait_game_frames("p2", SCRIPTED_INPUT_START_FRAME)
+            self.evidence["games"][-1]["p2_a_input_source_frame"] = (
+                self.watchers["p2"].values.get("80479d58")
+            )
+            self.pads["p2"].set_button("A", True)
+            self.pads["p2"].set_axis("MAIN", 1.0, 0.5)
+            self._wait_game_frames("p2", 30)
+            self.pads["p2"].set_button("A", False)
+            self.pads["p2"].set_axis("MAIN", 0.5, 0.5)
+            self.evidence["games"][-1]["p2_a_input_end_source_frame"] = (
+                self.watchers["p2"].values.get("80479d58")
+            )
+        else:
+            self.evidence["games"][-1]["frame_input_profile"] = "mario-fd-rollback-v1"
         if self.input_probe_only:
             self._wait_game_frames("p1", 60)
             self.evidence["input_probe"] = {
@@ -1333,7 +1528,7 @@ class PairRun:
                 self._verify_browser_remote_consumption()
             return
 
-        left_input_writes = 1
+        left_input_writes = 1 if self.rollback_diagnostic is None else 0
         last_left_input_frame = self.watchers["p1"].values.get("80479d58")
 
         def returned_to_css():
@@ -1344,7 +1539,8 @@ class PairRun:
             if all(code == SCENE_CSS for code in scenes.values()):
                 return True
             frame = self.watchers["p1"].values.get("80479d58")
-            if frame is not None and frame != last_left_input_frame:
+            if (self.rollback_diagnostic is None and frame is not None
+                    and frame != last_left_input_frame):
                 self.pads["p1"].set_axis("MAIN", 0.0, 0.5)
                 left_input_writes += 1
                 last_left_input_frame = frame
@@ -1819,16 +2015,21 @@ def _arguments(argv=None):
     return args
 
 
-def _run_interruption_probe(*, disc: Path, parent_root: Path, timeouts: dict[str, float]) -> dict:
+def _run_interruption_probe(*, disc: Path, parent_root: Path, timeouts: dict[str, float],
+                            artifact_options: dict[str, Path | None] | None = None) -> dict:
     child_root = parent_root / "interruption-child"
     supervisor = ProcessSupervisor(graceful_timeout=timeouts["pair"] + 30, term_timeout=5)
+    artifact_arguments = []
+    for name, path in (artifact_options or {}).items():
+        if path is not None:
+            artifact_arguments.extend(["--" + name.replace("_", "-"), str(path)])
     child = supervisor.start(
         "harness-interruption-probe",
         [sys.executable, str(HERE / "run_local.py"), "--disc", str(disc),
          "--run-root", str(child_root), "--repeat", "1",
          "--boot-timeout", str(timeouts["boot"]), "--pair-timeout", str(timeouts["pair"]),
          "--game-timeout", str(timeouts["game"]), "--rematch-timeout", str(timeouts["rematch"]),
-         "--pause-after-pair"],
+         "--pause-after-pair", *artifact_arguments],
         log_path=parent_root / "interruption-harness.log",
         graceful_signal=signal.SIGINT,
     )
@@ -1915,7 +2116,12 @@ def main(argv=None) -> int:
         print(f"cycle {cycle}/{args.repeat}: passed; private evidence retained", flush=True)
     if args.repeat > 0 and not args.pause_after_pair and not args.input_probe_only:
         print("harness interruption probe: waiting for a fresh paired checkpoint", flush=True)
-        receipt = _run_interruption_probe(disc=disc, parent_root=root, timeouts=timeouts)
+        receipt = _run_interruption_probe(
+            disc=disc, parent_root=root, timeouts=timeouts,
+            artifact_options={name: getattr(args, name) for name in
+                              ("client_binary", "matchmaker_binary", "dolphin_build",
+                               "matchmaker_build", "dolphin_source", "enet_source",
+                               "profile_temp_root")})
         if receipt["result"] != "passed":
             raise RuntimeError("harness interruption probe failed")
         print("harness interruption probe: passed; child processes and ports released", flush=True)

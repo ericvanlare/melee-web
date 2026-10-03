@@ -14,6 +14,10 @@ pinned by [`client.lock.json`](client.lock.json). ENet and nlohmann JSON retain 
 notices from the pinned Dolphin source tree; this repository does not copy
 either dependency into the service directory.
 
+## Source-profile fixture
+
+`tests/gameplay_snapshot_probe.cpp` and its `cmake/FighterRuntime.cmake` integration are project-authored diagnostic code covered by the root MIT license, as enumerated in the root [license scope](../../LICENSE_SCOPE.md). `reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp` is GPL-3.0-only material adapted from the pinned `slippi-ssbm-asm` commit `fcf47f10dc244152c2ebaa3a9dec142ea42243b7`, specifically `Online/Core/InitOnlinePlay.asm` with source-file SHA-256 `d0a5df91c9b535b3c711880a4156769c2b3e799e7e72bc9d071be9fd90394067`. Preserve that upstream license and source authority; the helper, generated runtime and local assets are outside the root MIT grant and this repository grants no Melee, SDK, disc or game-data rights.
+
 ## Downstream client patches
 
 `patches/0001-client-loopback-and-observation.patch` modifies Dolphin files from
@@ -25,7 +29,26 @@ source files declare GPL-2.0-or-later; the patch retains those terms.
 is GPL-2.0; the patch retains those terms. Apply it only to that exact clean
 submodule revision.
 
-The patches are separated from the MIT matchmaking service. Neither patch is
+`patches/0003-desktop-rollback-diagnostic.patch` adds an opt-in diagnostic to
+the same pinned Dolphin source, after patch 0001. Its new client source and
+changes retain GPL-2.0-or-later. The diagnostic's authored Python configuration,
+runner and exact replay comparator have separate root MIT scope; that grant
+does not include the combined native client.
+
+`patches/0004-desktop-rollback-duplicate-role2.native.patch`,
+`patches/0005-duplicate-receive-join.native.patch` and
+`patches/0006-jitter-reorder-native.patch` extend that same opt-in native
+boundary with duplicate, receiver-arrival, jitter and reorder observations.
+Their changed Dolphin files retain GPL-2.0-or-later. The authored
+`transport_fault_recipes.py` validator and its focused tests remain under the
+root MIT project-file scope; they do not grant rights to the combined client.
+
+The project-authored `generate_service_lineage.py` helper and the sanitized
+desktop transport evidence under `docs/evidence/` are also MIT-scoped project
+files. They record identities and bounded observations; they do not relicense
+the adapted client, game data, or retained native binaries.
+
+The patches are separated from the MIT matchmaking service. No client patch is
 an MIT grant for the Dolphin or Rust client source. Build and distribute a
 combined client only under the applicable upstream terms and with their required
 notices and corresponding source.

@@ -1,0 +1,22 @@
+diff --git a/Source/Core/Core/Slippi/SlippiNetplay.cpp b/Source/Core/Core/Slippi/SlippiNetplay.cpp
+--- a/Source/Core/Core/Slippi/SlippiNetplay.cpp
++++ b/Source/Core/Core/Slippi/SlippiNetplay.cpp
+@@ -471,6 +471,18 @@ unsigned int SlippiNetplayClient::OnData(sf::Packet& packet, ENetPeer* peer)
+         break;
+       }
+ 
++      // This event is emitted only after ENet delivered and the PAD packet header/body passed
++      // the receiver's bounds checks. A duplicate packet has inputs_to_copy == 0 after the first
++      // copy, so the receiver log still distinguishes two arrivals with the same wire identity.
++      m_rollback_diagnostic.Record({{"event", "pad_transport_receive"},
++                                    {"packet_frame", frame},
++                                    {"packet_player_port", packet_player_port},
++                                    {"receiver_port", static_cast<int>(m_player_idx) + 1},
++                                    {"payload_hash", PacketHash(packet)},
++                                    {"packet_size", packet.getDataSize()},
++                                    {"inputs_to_copy", inputs_to_copy}},
++                                   SlippiRollbackDiagnostic::ObserverContext::TRANSPORT);
++
+       for (s64 i = inputs_to_copy - 1; i >= 0; i--)
+       {
+         auto pad =

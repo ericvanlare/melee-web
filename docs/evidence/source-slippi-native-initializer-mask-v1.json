@@ -1,0 +1,381 @@
+{
+  "schema": "melee-web-source-slippi-native-initializer-mask-v1",
+  "result": "passed",
+  "evidence_labels": [
+    "Source identified",
+    "Native traced"
+  ],
+  "base_commit": "2c3ff61907e9abdcc24845be8beff6a981eb86c1",
+  "claim_boundary": "Source-only fixture: observed default/native initializer, exact recorded prefix, ordinary source pause/resume and a separately retained ending restore/replay reduction. No live network or draw is exercised by these source checks.",
+  "source": {
+    "probe_sha256": "3836e1419d9a9025903b04cad771975c20d2a2542a8558e0d4b326a476dc5803",
+    "profile_helper_sha256": "2b9f7398e09cb8ca8c2d53474739b313ce565bae77411cd29b4d2f4087a4812e",
+    "stage_kind_bridge_sha256": "1d0ff4c480828886de06f61acf1874625490604bff26e47f528aa3bef844ca41",
+    "cmake_sha256": "2cae52e21d397d18a3363780f694f86432102985248b0e6eaccd8b77bb8db7d9",
+    "checker_sha256": "571de09b5ccbde9651a8e459fc633c8c29fc18d7418c389df58f4a1f3bce87f5",
+    "worker_sha256": "0240d93fd8df80cd94c17af92fb55872cf78d9ed820e07f738d21e906b79f561",
+    "pause_checker_sha256": "c02be5e9431df9f042db071b4ab4b3019143c5e4ad3b3d8912974f318dcb7ed3",
+    "pause_worker_sha256": "977c438109d9295dbe41dab43d9b556aef7594eba694081746afdcae5c3672bf"
+  },
+  "runtime": {
+    "js_sha256": "52404473ae2a9155a155c1883e152eb1a6f31547270e054d3d2b534a074c1f5b",
+    "wasm_sha256": "84d7d42939acbfb4da677c085047e47cafff6a9cc9721288d522dce9d21cd3d8"
+  },
+  "runtime_abi": {
+    "initializer_bytes": 60,
+    "initializer_uint32_fields": 15,
+    "observation_bytes": 1216,
+    "rng_trace_bytes": 32,
+    "raw_pad_bytes": 44,
+    "pcm_bytes": 4272
+  },
+  "reuse": {
+    "copied_start_accessor": "Copied unchanged from main revision 473e97c41633043562bc5015e1add630d23b70b3; observes selected StartMeleeData without traversing live fighters.",
+    "stage_bridge": "C-only getter of actual stage_info.grkind; no guessed StageInfo layout.",
+    "scheduler": "Original HSD/GObj source prelude owns masks, pause timer, callback ordering and source clocks. Raw PAD remains the sole step input.",
+    "rng_helper": "Unchanged GPL-3.0-only helper with pinned ASM provenance in source-slippi-profile-prefix-v1.json.",
+    "snapshot": "Existing quiescent source snapshot and shared-page prototype; no new snapshot engine."
+  },
+  "initializer": {
+    "native": {
+      "binary": {
+        "valid": 1,
+        "profile": 1,
+        "seed": 4660,
+        "stage_kind": 37,
+        "player_count": 2,
+        "players": [
+          {
+            "port": 1,
+            "controller": 0,
+            "fighter": 8,
+            "color": 0,
+            "stocks": 4
+          },
+          {
+            "port": 2,
+            "controller": 1,
+            "fighter": 8,
+            "color": 0,
+            "stocks": 4
+          }
+        ],
+        "bytes_hex": "010000000100000034120000250000000200000001000000020000000000000001000000080000000800000000000000000000000400000004000000"
+      },
+      "json": {
+        "valid": 1,
+        "profile": 1,
+        "seed": 4660,
+        "stage_kind": 37,
+        "player_count": 2,
+        "players": [
+          {
+            "port": 1,
+            "controller": 0,
+            "fighter": 8,
+            "color": 0,
+            "stocks": 4
+          },
+          {
+            "port": 2,
+            "controller": 1,
+            "fighter": 8,
+            "color": 0,
+            "stocks": 4
+          }
+        ]
+      }
+    },
+    "default": {
+      "words": [
+        1,
+        0,
+        324508639,
+        37,
+        2,
+        0,
+        0,
+        0,
+        1,
+        8,
+        8,
+        0,
+        1,
+        4,
+        4
+      ],
+      "json": {
+        "valid": 1,
+        "profile": 0,
+        "seed": 324508639,
+        "stage_kind": 37,
+        "player_count": 2,
+        "players": [
+          {
+            "port": 0,
+            "controller": 0,
+            "fighter": 8,
+            "color": 0,
+            "stocks": 4
+          },
+          {
+            "port": 0,
+            "controller": 1,
+            "fighter": 8,
+            "color": 1,
+            "stocks": 4
+          }
+        ]
+      }
+    },
+    "default_receipt_sha256": "986bea247c41c65e502422c33d39cba7a4b78ca623ced8c9105f9bb63249a948",
+    "default_profile_disabled": true,
+    "source_identity": "Bare CPP SHA remains the existing ABI; the C stage bridge has a separate identity export."
+  },
+  "native_recorded_prefix": {
+    "scene_range": [
+      0,
+      1341
+    ],
+    "rows": 1342,
+    "all_declared_fighter_fields_exact": true,
+    "all_processed_inputs_exact": true,
+    "all_raw_pad_echo_exact": true,
+    "all_callback_frame_rng_exact": true,
+    "last_observation_sha256": "b764b84b34480a0b6a451f9a4b875e0781c32c18eddb16fcf79e7014be914d5d",
+    "row_digest_sha256": "889900eb4807cc7f3e70263d14c2492d4250402a24f5b8a96ffb8ae1058c926b",
+    "replay_sha256": "d56c0b50f7347edc0b06398c8235d0537c7494331ac23c4e57f696af06123df5",
+    "report_sha256": "efc082ec66686e58f66bfbbf596e188ee1be2d652dc73f253e35bf4956655de7",
+    "worker_report_sha256": "16b6d049182e26e6db1192d03ef3960b4932828f59a2d74dcb6b5486d22da3fc",
+    "controls": {
+      "synthetic_decoder_and_comparator": true,
+      "synthetic_initializer_abi_and_json_contract": true,
+      "invalid_offset_rejected": true,
+      "native_seed_mismatch_rejected": true,
+      "invalid_offset_rejected_after_fresh_factory": true,
+      "configuration_after_init_rejected": true,
+      "native_initializer_after_init_rejected": true
+    },
+    "source_close": {
+      "attempted": true,
+      "result": 1,
+      "success": true,
+      "error": null
+    },
+    "asset_root_and_nested_symlinks_refused": true
+  },
+  "pause_mask": {
+    "warmup_steps": 124,
+    "control_steps": 17,
+    "raw_pad_only": true,
+    "controls": {
+      "paused_advances": 13,
+      "early_p1_refused": true,
+      "p2_refused": true,
+      "resume_source_global_frame": 138,
+      "next_tick_source_global_frame": 139
+    },
+    "strict_comparison": "PAD echo, prepared uint64 mask, callback counts/delta/frame and source-global clocks checked against independent trace fields. Paused battle clock and callback stay fixed while source global clock advances.",
+    "report_sha256": "0800665ced01a49602063f411d94d362c4d432a64a5341eac423bf32320563c0",
+    "launcher_report_sha256": "39d71cf310ed5c77964eaff12a3c5b8e45e1ca7e1ae9c99b45ea0a3582b7e2a0",
+    "source_close": {
+      "attempted": true,
+      "result": 1,
+      "success": true,
+      "error": null
+    },
+    "worker_sha256_required_before_spawn": true,
+    "changed_worker_refused_before_child_start": true,
+    "supplied_symlink_input_refused": true
+  },
+  "default_source_snapshot": {
+    "cases": 28,
+    "repeats_per_case": 3,
+    "depths": [
+      1,
+      2,
+      4,
+      7
+    ],
+    "snapshot_bytes": 134217728,
+    "comparison": "exact observation and PCM every replayed sample; entire linear memory at each depth endpoint; observation/PCM hashes for every forward sample",
+    "negative_control": {
+      "result": "detected",
+      "sample": 572,
+      "perturbation": "one restored source RNG bit",
+      "firstDivergence": {
+        "offset": 4,
+        "expected": 198,
+        "actual": 57
+      }
+    },
+    "machine": {
+      "cpu": "Apple M4",
+      "arch": "arm64",
+      "os": "Darwin",
+      "release": "25.6.0",
+      "node": "v24.19.0"
+    },
+    "headless_costs": [
+      {
+        "depth": 1,
+        "cases": 7,
+        "capture_ms_range": [
+          4.677541999999903,
+          12.903624999999977
+        ],
+        "restore_ms_range": [
+          3.1001659999997173,
+          6.59699999999998
+        ],
+        "replay_ms_range": [
+          0.25308399999994435,
+          0.7367920000000368
+        ]
+      },
+      {
+        "depth": 2,
+        "cases": 7,
+        "capture_ms_range": [
+          4.617707999999993,
+          8.046499999999924
+        ],
+        "restore_ms_range": [
+          3.1074579999999514,
+          4.887875000000008
+        ],
+        "replay_ms_range": [
+          0.3769590000001699,
+          0.6828329999998459
+        ]
+      },
+      {
+        "depth": 4,
+        "cases": 7,
+        "capture_ms_range": [
+          4.670082999999977,
+          5.164708000000019
+        ],
+        "restore_ms_range": [
+          3.1032500000001164,
+          3.4355829999999514
+        ],
+        "replay_ms_range": [
+          0.7476249999999709,
+          1.3627089999999953
+        ]
+      },
+      {
+        "depth": 7,
+        "cases": 7,
+        "capture_ms_range": [
+          4.739541999999801,
+          5.292292000000089
+        ],
+        "restore_ms_range": [
+          3.130374999999731,
+          3.466667000000143
+        ],
+        "replay_ms_range": [
+          1.4203750000001492,
+          1.9577919999996993
+        ]
+      }
+    ],
+    "timing_scope": "One synchronous functional run on the named machine; concurrent host work is not controlled. These ranges are diagnostics and do not establish foreground performance admission.",
+    "report_sha256": "ebb2dafb05acd0ea63b9831623db0423c09931ef85d3a14868861811c72dbdb4",
+    "source_close": "source match/audio/world closed"
+  },
+  "ending_reduction": {
+    "private_reducer_sha256": "6364332f92c670fa9d32502aca7f5ccd1a73e5738eee6cc453d7e761c2e47142",
+    "manifest_sha256": "d2621f676e0c0da76b5a31440d5f1258190a026cbe7e49a4d103f9cdedf9cf65",
+    "report_sha256": "d1d883730d2a5bf1a9625449f1bff4cf56be7c244dd74d8ebbe28976420156e0",
+    "scene_frame": 1342,
+    "scheduler_mask": "8392698",
+    "callback_delta": 0,
+    "source_global_frame_after": 1343,
+    "restore_replays": 2,
+    "entire_heap_bytes": 134217728,
+    "all_comparisons_exact": true,
+    "retained_snapshots_after_release": 0,
+    "source_close": {
+      "attempted": true,
+      "result": 1,
+      "success": true,
+      "error": null
+    },
+    "scope": "Private source-only reduction; public prefix and pause tools reproduce their own declared gates. This reduction excludes Results/rematch and external-effect ownership."
+  },
+  "browser_target": {
+    "release_build_passed": true,
+    "browser_runtime_executed": false,
+    "draw_surface": false,
+    "default_enabled": false
+  },
+  "required_validation": {
+    "release_build": {
+      "result": "passed",
+      "targets": [
+        "gameplay_snapshot_probe",
+        "gameplay_snapshot_probe_browser"
+      ],
+      "phase_receipt_sha256": "1879eca04bc41bb6b3df4659745e3b82b213883932186428e656f70850834101"
+    },
+    "full_suite_before_public_pause_tool": {
+      "result": "passed",
+      "tests": 1680,
+      "skipped": 136,
+      "phase_receipt_sha256": "76ce8ec99c0aac5666d191a580ffc031227760477b05735464fb8183689b19a3"
+    },
+    "final_full_suite": {
+      "result": "passed",
+      "tests": 1685,
+      "skipped": 136,
+      "seconds": 267.632,
+      "phase_receipt_sha256": "632684529adcd3706bfc14ea958ccb6fe449094b79907c29a88396c503afa504",
+      "phase_log_sha256": "a21723965a2bd2396ba5907a75864d81fcd0308089fc26d57c38513c734721d4",
+      "source_process_group_reaped": true,
+      "source_process_group_released": true,
+      "positive_leader_pid_absent": true
+    },
+    "full_suite_before_provenance_controls": {
+      "result": "passed",
+      "tests": 1682,
+      "skipped": 136,
+      "seconds": 313.358,
+      "phase_receipt_sha256": "e7d34f2cd8f74f588006c82f91f2e6549ace709a2c06ad9dc4ed322d0e972486",
+      "phase_log_sha256": "54d7904a2c99d44ce50c6d1dc1f2b7a24dd54b4b1489de71541edb3a37492585",
+      "source_process_group_reaped": true,
+      "source_process_group_released": true,
+      "positive_leader_pid_absent": true
+    }
+  },
+  "failed_hypotheses": [
+    {
+      "boundary": "paused raw source step",
+      "cause": "Old fixture rejected an ordinary paused tick before original source code could process resume."
+    },
+    {
+      "boundary": "RNG callback clock",
+      "cause": "Consecutive callback-frame assertion assumed paused source-global ticks invoked the callback."
+    },
+    {
+      "boundary": "new regression checkout",
+      "cause": "First full suite had three errors/failures because build/browser was not configured; configuring the existing regression graph fixed them.",
+      "phase_receipt_sha256": "367cc5a8c5f841a236a9f26546563a8a2e2205809dd2216b8b86455ed3235fb2"
+    },
+    {
+      "boundary": "final provenance review",
+      "cause": "The public pause worker was not pinned before spawn and canonicalizing paths bypassed leaf/root symlink refusal. Required worker SHA and original-path/root/nested-asset controls now pass; v4 suite was deliberately interrupted before applying the final asset correction.",
+      "retained_interrupted_phase_sha256": "dd2961d5ef0de93226fcb6731fdf03cfbaad7bf0568f79dcb1dc9ff5b58a76e3"
+    }
+  ],
+  "claims_excluded": [
+    "complete browser-versus-desktop gameplay, Results and rematch",
+    "current wire input consumption or network-impaired rollback",
+    "GPU/JS renderer ownership and WebAudio committed effects",
+    "mutable Wasm globals/tables beyond declared snapshot boundary",
+    "native post-step RNG, native PCM, pixels and retail vanilla equivalence",
+    "physical-input, audible quality, Internet/NAT and foreground performance admission"
+  ]
+}
