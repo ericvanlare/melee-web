@@ -154,11 +154,12 @@ def main(argv=None):
     parser.add_argument("--repository", type=Path, default=ROOT / ".deps/melee",
                         help="clean standalone Melee checkout at the lockfile commit")
     parser.add_argument("--patch", type=Path, default=ROOT / PATCH)
-    parser.add_argument("--check", action="store_true",
-                        help="exit 1 when the patch is not canonical; do not write")
-    parser.add_argument("--merge", nargs=3, metavar=("BASE", "OURS", "THEIRS"),
-                        help="Git revisions whose patches are merged as source trees into --patch; "
-                             "for a branch behind main: --merge $(git merge-base HEAD origin/main) HEAD origin/main")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check", action="store_true",
+                      help="exit 1 when the patch is not canonical; do not write")
+    mode.add_argument("--merge", nargs=3, metavar=("BASE", "OURS", "THEIRS"),
+                      help="Git revisions whose patches are merged as source trees into --patch; "
+                           "for a branch behind main: --merge $(git merge-base HEAD origin/main) HEAD origin/main")
     args = parser.parse_args(argv)
     try:
         with operation(ROOT, "canonical gameplay patch"):

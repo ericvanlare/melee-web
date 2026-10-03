@@ -138,6 +138,16 @@ class GameplayPatchCanonicalTests(unittest.TestCase):
         self.assertEqual(error.exception.code, 2)
         self.assertEqual(target.read_bytes(), b"edited by another operation")
 
+    def test_cli_rejects_check_and_merge_without_writing(self):
+        target = self.project / "patches/melee-gameplay.patch"
+        target.write_bytes(b"preserve")
+        with redirect_stderr(io.StringIO()) as stderr, self.assertRaises(SystemExit) as error:
+            self._run_cli(["--repository", str(self.repository), "--patch", str(target), "--check",
+                           "--merge", "base", "ours", "theirs"])
+        self.assertEqual(error.exception.code, 2)
+        self.assertIn("not allowed with argument", stderr.getvalue())
+        self.assertEqual(target.read_bytes(), b"preserve")
+
     def test_cli_merge_writes_the_source_tree_merge_atomically(self):
         base = self.patch([("a.c", (1, "base\n"))])
         ours = self.patch([("a.c", (1, "base\n")), ("a.c", (5, "ours\n"))])
