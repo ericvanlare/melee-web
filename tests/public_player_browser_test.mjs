@@ -464,6 +464,11 @@ try {
     assert(await page.locator('#export-save').isDisabled(),
       'Everything export requires original disc tables; it must not call an unowned native baseline');
     if (!values.disc) {
+      await page.locator('#save-mode').selectOption('personal');
+      await page.locator('#save-confirm-dialog[open]').waitFor();
+      await page.locator('#save-confirm-accept').click();
+      await page.waitForFunction(() => document.querySelector('#save-mode').value === 'personal' &&
+        !document.querySelector('#settings-close').disabled);
       await page.locator('#settings-close').click();
       return;
     }
