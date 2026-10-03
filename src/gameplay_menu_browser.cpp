@@ -15,6 +15,7 @@ extern "C" void melee_web_cpu_observation_set_event_cursor(size_t index);
 extern "C" void melee_web_cpu_observation_scheduler_return(void);
 extern "C" {
 #include <melee/gm/types.h>
+#include <melee/ty/toy.h>
 #include <sysdolphin/baselib/controller.h>
 extern ResultsData lbl_8046DBE8;
 }
@@ -2153,20 +2154,33 @@ int melee_web_native_menu_snapshot_unlocked_baseline(uint8_t* output,unsigned si
  }
  check(!world&&!match&&!results&&!prize&&!source_session_owned,
        "Close source owners before establishing the original save baseline");
+ check(!archive_cache,
+       "Release the native archive cache before establishing an unowned save baseline");
  begin_source_session();
  char error[256]{};
  MeleeWebSaveProfileOwner* profile=melee_web_save_profile_owner_create(error,sizeof(error));
  if(!profile)throw std::runtime_error(error);
  bool active=false;
+ std::unique_ptr<melee_web::GameplayMenuWorld> baseline_world;
  try{
   check(melee_web_save_profile_owner_activate(profile,error,sizeof(error)),error);active=true;
   check(melee_web_save_profile_owner_initialize_default(profile,error,sizeof(error)),error);
+  archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
+  baseline_world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
+  Toy_803124BC();
   check(melee_web_save_profile_owner_initialize_everything(profile,error,sizeof(error)),error);
   check(melee_web_save_profile_owner_snapshot_card_data(profile,output,size,error,sizeof(error)),error);
   check(melee_web_save_profile_owner_deactivate(profile,error,sizeof(error)),error);active=false;
   check(melee_web_save_profile_owner_destroy(profile,error,sizeof(error)),error);profile=nullptr;
+  baseline_world->close_prepared();baseline_world.reset();
+  archive_cache.reset();
   check(melee_web_gameplay_session_end(error,sizeof(error)),error);source_session_owned=false;
  }catch(...){
+  if(baseline_world){
+   try{baseline_world->close_prepared();}catch(...){}
+   baseline_world.reset();
+  }
+  archive_cache.reset();
   if(active&&!melee_web_save_profile_owner_deactivate(profile,nullptr,0))std::abort();
   if(profile&&!melee_web_save_profile_owner_destroy(profile,nullptr,0))std::abort();
   if(source_session_owned){
@@ -2233,6 +2247,7 @@ int melee_web_native_menu_prepare(){try{
  // Repeating it changes allocation history even without entering a source scene.
  if(reference_menu_preparations++)reference_heap_used=true;
  world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
+ check(melee_web_menu_host_initialize_profile_baseline(host,error,sizeof(error)),error);
  const double constructed=emscripten_get_now();
  report_construction("scene-prepare",started,constructed,constructed,before,aurora_stats_snapshot());
  message="Native menu resources prepared.";return 1;

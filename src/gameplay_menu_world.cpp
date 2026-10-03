@@ -9,6 +9,7 @@
 #include "dat_menu_support.hpp"
 #include "dat_native_menu.hpp"
 #include "dat_sis.hpp"
+#include "dat_trophy_data.hpp"
 #include "gameplay_archive_sections.h"
 #include "gameplay_audio_bank.hpp"
 #include "gameplay_audio_bank_transport.h"
@@ -18,6 +19,7 @@
 #include "gameplay_source_files_runtime.hpp"
 #include "gameplay_font_atlas.h"
 #include "gameplay_rumble.h"
+#include "gameplay_trophy_roots.hpp"
 #include "hsd_native_joint.h"
 #include "native_dat.hpp"
 
@@ -25,6 +27,7 @@ extern "C" {
 #include <melee/lb/lbcardgame.h>
 #include <melee/lb/lbcardnew.h>
 #include <melee/lb/lbaudio_ax.h>
+#include <melee/ty/toy.h>
 }
 
 #include <algorithm>
@@ -107,6 +110,10 @@ struct GameplayMenuWorld::Storage {
     std::unique_ptr<DatMenuSupport> snapshot_icons;
     std::unique_ptr<DatEventMenuData> event_menu_data;
     std::unique_ptr<DatAudioLoadData> audio_load_data;
+    std::unique_ptr<DatTrophyData> trophy_data_us;
+    std::unique_ptr<DatTrophyData> trophy_data_jp;
+    std::unique_ptr<GameplayTrophyRoots> trophy_roots_us;
+    std::unique_ptr<GameplayTrophyRoots> trophy_roots_jp;
     std::unique_ptr<NativeDatArena> rumble_arena;
     MeleeWebRumble* rumble = nullptr;
     bool rumble_published = false;
@@ -191,6 +198,14 @@ struct GameplayMenuWorld::Storage {
         audio_load_data = std::make_unique<DatAudioLoadData>(archive("LbAd.dat"));
         symbols.push_back({"LbAd.dat", "lbAudioLoadData",
                            audio_load_data->descriptor()});
+        trophy_data_us = std::make_unique<DatTrophyData>(archive("TyDatai.usd"));
+        trophy_data_jp = std::make_unique<DatTrophyData>(archive("TyDatai.dat"));
+        trophy_roots_us =
+            std::make_unique<GameplayTrophyRoots>(*trophy_data_us);
+        trophy_roots_jp =
+            std::make_unique<GameplayTrophyRoots>(*trophy_data_jp);
+        trophy_roots_us->append_symbols("TyDatai.usd", symbols);
+        trophy_roots_jp->append_symbols("TyDatai.dat", symbols);
         if (scene == GameplayMenuScene::Stages) {
             sss = std::make_unique<DatNativeMenu>(archive("MnSlMap.usd"),
                                                   NativeMenuKind::Stages);
@@ -205,12 +220,12 @@ struct GameplayMenuWorld::Storage {
                 archive("LbMcGame.usd"), DatMenuSupportKind::CardIcons);
             card_scene = std::make_unique<DatMenuSupport>(
                 archive("NtMemAc.usd"), DatMenuSupportKind::CardScene);
-            symbols = {
+            symbols.insert(symbols.end(), {
                 {"MnSlChr.usd", "MnSelectChrDataTable", css->descriptor()},
                 {"SdSlChr.usd", "SIS_SelCharData", sis->descriptor()},
                 {"LbMcGame.usd", "MemCardIconData", card_icons->descriptor()},
                 {"NtMemAc.usd", "ScNtcCommon_scene_data", card_scene->descriptor()},
-            };
+            });
             const auto extra = archive("MnExtAll.usd");
             append_public_symbols(symbols, "MnExtAll.usd", extra);
         } else if (scene == GameplayMenuScene::Main) {
@@ -385,6 +400,11 @@ struct GameplayMenuWorld::Storage {
 
     void close_scene(bool discard_card_globals)
     {
+        // gm_1A3F's retail preloadState retires Toy's archive aliases before
+        // the scene heap disappears. The menu host owns that narrow boundary
+        // here, so reset the source Toy aliases before shutting down the SDK
+        // heap that owns lbArchive_LoadSymbols' returned archive.
+        Toy_803127D4();
         if (rumble_published) {
             check(melee_web_rumble_end(rumble, error, sizeof(error)), error,
                   "Native menu rumble close failed");
@@ -421,6 +441,10 @@ struct GameplayMenuWorld::Storage {
         card_scene.reset();
         card_icons.reset();
         audio_load_data.reset();
+        trophy_roots_us.reset();
+        trophy_roots_jp.reset();
+        trophy_data_us.reset();
+        trophy_data_jp.reset();
         event_menu_data.reset();
         title_menu.reset();
         main_menu.reset();

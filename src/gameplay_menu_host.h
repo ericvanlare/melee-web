@@ -54,6 +54,10 @@ MeleeWebMenuHost* melee_web_menu_host_create(char*,size_t);
 MeleeWebMenuHost* melee_web_menu_host_create_with_profile(
     int save_mode, const uint8_t* card_data, size_t card_data_size,
     char*, size_t);
+/* Complete the source-backed save baseline after GameplayMenuWorld has
+ * started its source-file scope and published the original TyDatai roots. */
+int melee_web_menu_host_initialize_profile_baseline(
+    MeleeWebMenuHost*, char*, size_t);
 /* Copy exact card-manifest bytes at a strict source command boundary. Pass
  * baseline=1 to export the immutable mode baseline captured before CSS. */
 int melee_web_menu_host_snapshot_card_data(

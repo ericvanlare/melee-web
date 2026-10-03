@@ -24,6 +24,7 @@ export const NATIVE_MENU_DISC_FILES=Object.freeze({
   'GmEvent.dat':'GmEvent.dat',
   'LbAd.dat':'LbAd.dat',
   'LbRb.dat':'LbRb.dat',
+  'TyDatai.usd':'TyDatai.usd','TyDatai.dat':'TyDatai.dat',
   'menu01.hps':'audio/menu01.hps','menu3.hps':'audio/menu3.hps',
   'smash2.sem':'audio/us/smash2.sem',
   ...Object.fromEntries([

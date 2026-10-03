@@ -134,17 +134,17 @@ void menu_contract()
 {
     const auto names = menu_asset_names();
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
-    check(names.size()==73, "Silent menu descriptor excludes only DSP coefficients");
+    check(names.size()==75, "Silent menu descriptor excludes only DSP coefficients");
     check(!has(names,"dsp_coef.bin"), "Public scope must not request DSP coefficients");
 #else
-    check(names.size()==74, "Menu descriptor must include original title/main resources and the source audio-bank table");
+    check(names.size()==76, "Menu descriptor must include original title/main resources, trophy tables, and the source audio-bank table");
     check(has(names,"dsp_coef.bin"), "Development scope requires DSP coefficients");
 #endif
     for(const auto name:{"MnSlChr.usd","MnSlMap.usd","MnMaAll.usd","GmTtAll.usd",
                          "SdMenu.usd","SdToy.dat","SdSlChr.usd","MnExtAll.usd",
                          "LbMcGame.usd","NtMemAc.usd","LbRb.dat","sislib_font.bin","smash2.sem",
-                         "menu01.hps", "menu3.hps", "LbMcSnap.usd",
-                         "GmEvent.dat", "LbAd.dat"})
+                         "menu01.hps", "menu3.hps", "LbMcSnap.usd", "GmEvent.dat", "LbAd.dat",
+                         "TyDatai.usd", "TyDatai.dat"})
         check(std::find(names.begin(),names.end(),name)!=names.end(),"Missing menu resource");
     const auto banks=menu_audio_bank_names();
     check(banks.size()==55, "Menu audio owner must include every GALE01r2 SSM table row");
