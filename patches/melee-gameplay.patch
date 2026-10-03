@@ -4924,7 +4924,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
 index 4a66512..2e85ce4 100644
 --- a/src/melee/mn/mncharsel.c
 +++ b/src/melee/mn/mncharsel.c
-@@ -1,3 +1,11 @@
+@@ -1,3 +1,17 @@
 +#if defined(MELEE_WEB_MENU_MARIO_FD)
 +#include "gameplay_platform.h"
 +#include "gameplay_menu.h"
@@ -4934,6 +4934,12 @@ index 4a66512..2e85ce4 100644
 +#define MELEE_WEB_MENU_CHARACTER_AVAILABLE(value) (1)
 +#endif
  #include "mncharsel.h"
++#if defined(MELEE_WEB_GAMEPLAY)
++static u32 melee_web_css_start_callback_count;
++static u32 melee_web_css_last_start_trigger;
++static u32 melee_web_last_start_ready;
++static u32 melee_web_last_start_pending;
++#endif
  
  #include <melee/ft/forward.h>
 @@ -308,17 +316,9 @@ static struct CSSDoorsData2 data2 = {
@@ -5435,8 +5441,16 @@ index 4a66512..2e85ce4 100644
                                          0;
                                      mnCharSel_804D6CB0->vs.start
                                          .players[cursor->x4]
-@@ -3735,6 +3751,12 @@ void fn_80262F44(HSD_GObj* gobj)
+@@ -3735,6 +3757,23 @@ void fn_80262F44(HSD_GObj* gobj)
  
++#if defined(MELEE_WEB_GAMEPLAY)
++        ++melee_web_css_start_callback_count;
++        if (trigger & HSD_PAD_START) {
++            melee_web_css_last_start_trigger = trigger;
++            melee_web_last_start_ready = mnCharSel_804D6CF7;
++            melee_web_last_start_pending = 0;
++        }
++#endif
          if (mnCharSel_804D6CF2 == 0 && (trigger & HSD_PAD_START)) {
              if (mnCharSel_804D6CF7 != 0) {
 +#if defined(MELEE_WEB_MENU_MARIO_FD)
@@ -5446,6 +5460,9 @@ index 4a66512..2e85ce4 100644
 +                }
 +#endif
                  mnCharSel_804D6CF6 = 1;
++#if defined(MELEE_WEB_GAMEPLAY)
++                melee_web_last_start_pending = mnCharSel_804D6CF6;
++#endif
                  mnCharSel_804D6CF2 = 0xFF;
                  if (mnCharSel_804D6CF5 == 1) {
 @@ -4052,6 +4074,7 @@ void fn_802633B0(HSD_GObj* gobj)
@@ -5498,7 +5515,7 @@ index 4a66512..2e85ce4 100644
          mnCharSel_804D6CF6 = 5;
          sfxForward();
          break;
-@@ -5528,3 +5562,94 @@ void mnCharSel_Scene_OnExit(void* unused)
+@@ -5528,3 +5579,104 @@ void mnCharSel_Scene_OnExit(void* unused)
      lbAudioAx_8002702C(4, tmp);
      lbAudioAx_80027168();
  }
@@ -5506,7 +5523,7 @@ index 4a66512..2e85ce4 100644
 +#if defined(MELEE_WEB_GAMEPLAY)
 +/* Observation only: expose the live cursor/model geometry and the exact
 + * source icon bounds. Tests feed resulting PAD samples through the host. */
-+int melee_web_css_observe_port(unsigned port, int ckind, int ids[4], float geometry[8])
++int melee_web_css_observe_port(unsigned port, int ckind, int ids[14], float geometry[8])
 +{
 +    struct CSSCursorData* cursor;
 +    struct CSSCharModel* model;
@@ -5530,6 +5547,16 @@ index 4a66512..2e85ce4 100644
 +    ids[1] = cursor->x5 == 1 && cursor->x6 < 4 ? cursor->x6 : -1;
 +    ids[2] = selected;
 +    ids[3] = target;
++    ids[4] = mnCharSel_804D6CF0;
++    ids[5] = mnCharSel_804D6CF2;
++    ids[6] = mnCharSel_804D6CF5;
++    ids[7] = mnCharSel_804D6CF6;
++    ids[8] = mnCharSel_804D6CF7;
++    ids[9] = mnCharSel_804A0BD0[0]->x5;
++    ids[10] = (int) melee_web_css_start_callback_count;
++    ids[11] = (int) melee_web_css_last_start_trigger;
++    ids[12] = (int) melee_web_last_start_ready;
++    ids[13] = (int) melee_web_last_start_pending;
 +    geometry[0] = cursor->xC; geometry[1] = cursor->x10;
 +    geometry[2] = model->x8; geometry[3] = model->xC;
 +    geometry[4] = icons[target].bound_l;
@@ -5538,7 +5565,7 @@ index 4a66512..2e85ce4 100644
 +    geometry[7] = icons[target].bound_d;
 +    return 1;
 +}
-+int melee_web_css_observe(int ckind, int ids[4], float geometry[8])
++int melee_web_css_observe(int ckind, int ids[14], float geometry[8])
 +{
 +    return melee_web_css_observe_port(0, ckind, ids, geometry);
 +}

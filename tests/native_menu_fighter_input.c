@@ -4,7 +4,7 @@
 
 #include <math.h>
 
-extern int melee_web_css_observe(int character_kind, int ids[4],
+extern int melee_web_css_observe(int character_kind, int ids[14],
                                  float geometry[8]);
 
 static int finite_float(float value)
@@ -15,7 +15,7 @@ static int finite_float(float value)
 int melee_web_fighter_input_observe(
     int character_kind, MeleeWebFighterInputObservation* observation)
 {
-    int ids[4];
+    int ids[14];
     float geometry[8];
     if (!observation ||
         !melee_web_css_observe(character_kind, ids, geometry))
@@ -23,6 +23,16 @@ int melee_web_fighter_input_observe(
     observation->cursor_port = ids[0];
     observation->held_door = ids[1];
     observation->selected_character_kind = ids[2];
+    observation->source_active_port = ids[4];
+    observation->source_start_cooldown = ids[5];
+    observation->source_active_cursor_count = ids[6];
+    observation->source_pending_scene = ids[7];
+    observation->source_start_ready = ids[8];
+    observation->source_selected_model_state = ids[9];
+    observation->source_confirm_callback_count = ids[10];
+    observation->source_last_start_trigger = ids[11];
+    observation->source_last_start_ready = ids[12];
+    observation->source_last_start_pending = ids[13];
     observation->cursor_x = geometry[0];
     observation->cursor_y = geometry[1];
     observation->model_x = geometry[2];
@@ -110,6 +120,11 @@ int melee_web_fighter_input_drive(
          * and attaches when dx*dx + dy*dy < 9. */
         target_x = observation->model_x - 3.8f;
         target_y = observation->model_y + 2.6f;
+        /* The source only attaches a fighter on A while the cursor is in
+         * the active CSS area (cursor->x10 >= 0.2). Some low-row Training
+         * models put the geometric pickup point below that hit region. Keep
+         * the adjustment inside the source's strict radius-3 pickup test. */
+        if (target_y < 0.6f) target_y = 0.6f;
         dx = target_x - observation->cursor_x;
         dy = target_y - observation->cursor_y;
         if ((dx * dx + dy * dy) < 9.0f)
