@@ -73,7 +73,7 @@ const report = {
     ? 'Headless rendered original CSS → Main → VS Rules/Items changes → CSS → SSS after the source-authored CSS Start cooldown → SSS B to CSS → CSS L/R/Start to Main and Eject. No match is launched.'
     : menuOnly
     ? 'Headless rendered original Main -> VS -> Rules -> Items re-entry, A item toggle, frequency selector round-trip and save, B return to Rules, then Rules B -> VS -> Main exit. This reduced route validates transient and saved item settings before the longer match capture.'
-    : 'Headless rendered original-source VS Rules and Items route, changed stock/item setup, source-selected match, No Contest Results return to CSS, and clean Eject/reimport. Keyboard PAD delivery only; retail/Dolphin, physical input, and performance equivalence are separate unrun claims.',
+    : 'Headless rendered original-source VS Rules, Items, and Rules Plus route, changed stock/item/timer setup, source-selected match, No Contest Results return to CSS, retained settings on re-entry, and clean Eject/reimport. Keyboard PAD delivery only; retail/Dolphin, physical input, and performance equivalence are separate unrun claims.',
   url: values.url,
   browser: {executable: null, version: null, playwright: null},
   viewport: {width: 1280, height: 960},
@@ -92,6 +92,9 @@ const report = {
     rulesThink: 'fn_8022F538',
     rulesBack: 'fn_8022F538 B in GM_MENU calls mn_80229894(2, 3, 3) to return to VS Rules focus',
     rulesToItems: 'fn_8022F538 selection 5 calls mnItemSw_802358C0',
+    rulesToRulesPlus: 'fn_8022F538 selection 6 calls mn_802339FC; mn_802339FC sets MENU_KIND_RULES_EXTRA=15 and enters the source Rules Plus GObj',
+    rulesPlusInput: 'fn_8023201C uses D-pad left/right on option 0, saves stock_time_limit in minutes, B commits and returns through mn_8023164C, and Start commits before mn_80229860(GM_VS)',
+    rulesPlusMatchHandoff: 'gm_80167BC8 converts nonzero stock_time_limit minutes to StartMeleeRules.time_limit seconds and enables the match timer',
     itemInput: 'fn_80233E10: MenuInput_Back commits the item table and returns to Rules; MenuInput_A toggles the selected item; MenuInput_Start commits and returns to VS',
     itemThink: 'fn_80234C24: animates Items entry/exit, observes cursor/value changes, and commits the source item settings after confirmed changes',
     itemInputGate: 'Observer reads mnItemSw_804D6BEC so the harness waits for the original transition lock before navigation inputs',
@@ -155,6 +158,7 @@ const MAIN_MENU_KIND = 0;
 const VS_MENU_KIND = 2;
 const RULES_MENU_KIND = 13;
 const ITEMS_MENU_KIND = 16;
+const RULES_PLUS_MENU_KIND = 15;
 page.on('pageerror', error => report.errors.push({kind: 'pageerror', message: error.message}));
 page.on('console', message => { if (message.type() === 'error') report.errors.push({kind: 'console', message: message.text()}); });
 page.on('response', response => { if (response.status() >= 400) report.errors.push({kind: 'http', status: response.status(), url: response.url()}); });
@@ -344,6 +348,29 @@ const waitMenu = async (menuKind, hovered, label) => {
     `Timed out waiting for original menu ${menuKind} selection ${hovered}: ${JSON.stringify(observation)}`);
   report.sourceObservations.push({label, ...observation});
   await ensureNoError(label);
+  return observation;
+};
+const waitRulesPlusTimer = async (expected, label) => {
+  const deadline = Date.now() + 15000;
+  let observation;
+  while (Date.now() < deadline) {
+    await resumeTimingPause(label);
+    observation = await observeSource();
+    if (observation.source?.valid && observation.source.scene === 4 &&
+        observation.source.menu_kind === RULES_PLUS_MENU_KIND &&
+        observation.source.hovered_selection === 0 &&
+        observation.source.confirmed_selection === expected &&
+        observation.source.rules.stock_time_limit === expected) break;
+    await ensureNoError(label);
+    await page.waitForTimeout(50);
+  }
+  assert(observation?.source?.valid && observation.source.scene === 4 &&
+    observation.source.menu_kind === RULES_PLUS_MENU_KIND &&
+    observation.source.hovered_selection === 0 &&
+    observation.source.confirmed_selection === expected &&
+    observation.source.rules.stock_time_limit === expected,
+    `Timed out waiting for source Rules Plus stock timer ${expected}: ${JSON.stringify(observation)}`);
+  report.sourceObservations.push({label, ...observation});
   return observation;
 };
 const waitItemInputReady = async label => {
@@ -664,8 +691,8 @@ route: {
       'Original frequency selection must save the pending A-selected item row');
     assert.equal(frequencySavedMaskDelta & (frequencySavedMaskDelta - 1n), 0n,
       'Original frequency selection must save exactly the one A-selected item-mask bit');
-    assert.equal(frequencySavedMaskDelta, 1n << 16n,
-      'Source Items cursor zero maps to saved item preference bit 16');
+    assert.equal(frequencySavedMaskDelta, 1n << 5n,
+      'Source Items cursor zero maps to saved item preference bit 5');
     assert.equal(frequencySaved.source.items.frequency, -1,
       'Original frequency selection must save None as -1');
     report.sourceObservations.push({label: 'source frequency selection saves pending item row', ...frequencySaved});
@@ -727,8 +754,8 @@ route: {
     'Original frequency selection must save the pending A-selected item row');
   assert.equal(frequencySavedMaskDelta & (frequencySavedMaskDelta - 1n), 0n,
     'Original frequency selection must save exactly the one A-selected item-mask bit');
-  assert.equal(frequencySavedMaskDelta, 1n << 16n,
-    'Source Items cursor zero maps to saved item preference bit 16');
+  assert.equal(frequencySavedMaskDelta, 1n << 5n,
+    'Source Items cursor zero maps to saved item preference bit 5');
   assert.equal(frequencySaved.source.items.frequency, -1,
     'Original frequency selection must save None as -1');
   report.sourceObservations.push({label: 'source frequency selection saves pending item row', ...frequencySaved});
@@ -759,13 +786,38 @@ route: {
     'Original left input must change the selected stock setting to three');
   report.sourceObservations.push({label: 'source Rules cursor changed stock value to three', ...stockEdited});
   await shot('08-rules-three-stock');
+  await moveMenuCursor(RULES_MENU_KIND, 7, 6);
+  const rulesPlusChoice = await observeSource();
+  assert.equal(rulesPlusChoice.source.hovered_selection, 6);
+  await press('m');
+  const rulesPlusEntry = await waitRulesPlusTimer(0,
+    'Rules selection 6 opens original Rules Plus at its retained timer value');
+  assert.equal(rulesPlusEntry.source.previous_menu_kind, RULES_MENU_KIND);
+  await shot('08a-rules-plus-timer-entry');
+  await press('4');
+  const timerEdited = await waitRulesPlusTimer(1,
+    'original Rules Plus right input selects a one-minute stock timer');
+  report.checks.push('Original Rules Plus D-right changes the source timer from zero to one minute');
+  await shot('08b-rules-plus-one-minute');
+  await press('o');
+  const rulesAfterTimerBack = await waitMenu(RULES_MENU_KIND, 6,
+    'Rules Plus B commits the timer and returns to Rules');
+  assert.equal(rulesAfterTimerBack.source.rules.stock_time_limit, 1,
+    'Rules Plus B must commit the one-minute timer into source GameRules');
+  report.sourceObservations.push({label: 'Rules after Rules Plus B', ...rulesAfterTimerBack});
+  await press('m');
+  const rulesPlusReentry = await waitRulesPlusTimer(1,
+    'Rules selection 6 re-enters Rules Plus with its committed timer');
+  await shot('08c-rules-plus-reentered-one-minute');
   await press('7');
-  await waitMessage('Original character select', 'Rules Start -> checked GM_VS -> CSS');
+  await waitMessage('Original character select', 'Rules Plus Start -> checked GM_VS -> CSS');
   const cssSetup = await observeSource();
   assert.equal(cssSetup.source.valid, true);
   assert.equal(cssSetup.source.scene, 1);
   assert.equal(cssSetup.source.rules.stock_count, 3,
     'Main -> GM_VS handoff must retain source-committed three-stock rules through CSS');
+  assert.equal(cssSetup.source.rules.stock_time_limit, 1,
+    'Main -> GM_VS handoff must retain the source-committed one-minute timer through CSS');
   assert.equal(cssSetup.source.items.frequency, -1);
   assert.equal(cssSetup.source.items.mask_hex, rules.source.items.mask_hex);
   report.sourceObservations.push({label: 'CSS after original VS rules handoff', ...cssSetup});
@@ -896,6 +948,10 @@ route: {
   }
   assert.equal(matchBeforeNoContest.rules.item_frequency, -1);
   assert.equal(matchBeforeNoContest.rules.match_kind, 1);
+  assert.equal(matchBeforeNoContest.rules.timer_enabled, 1,
+    'Live StartMeleeData must enable the timer selected in original Rules Plus');
+  assert.equal(matchBeforeNoContest.rules.time_limit, 60,
+    'Live StartMeleeData must convert one Rules Plus minute to 60 seconds');
   assert.equal(matchBeforeNoContest.rules.stage, 0x20,
     'Source-selected SSS Final Destination must reach the match as St_Kind_Last');
   const saveMaskDelta = BigInt('0xffffffffffffffff') ^
@@ -908,9 +964,9 @@ route: {
     'The real match must receive the original VS menu item mask');
   assert.equal(matchMaskDelta & (matchMaskDelta - 1n), 0n,
     'The real match item setup must change exactly one authored item bit');
-  assert.equal(matchMaskDelta, 1n << 32n,
-    'Source item preference bit 16 maps to StartMeleeData item-mask bit 32');
-  report.checks.push('live StartMeleeData receives the Rules stock value, None frequency, custom item mask, and source-selected Final Destination');
+  assert.equal(matchMaskDelta, 1n << 18n,
+    'Source item preference bit 5 maps to StartMeleeData item-mask bit 18');
+  report.checks.push('live StartMeleeData receives three-stock Rules, the one-minute Rules Plus timer, None frequency, custom item mask, and source-selected Final Destination');
   await shot(teamBattle ? '16-live-two-player-team-match' : '12-live-three-stock-match');
 
   await press('7');
@@ -949,6 +1005,8 @@ route: {
   const cssAfterResults = await observeSource();
   assert.equal(cssAfterResults.source.rules.stock_count, 3,
     'Results -> CSS must retain the source-committed stock count');
+  assert.equal(cssAfterResults.source.rules.stock_time_limit, 1,
+    'Results -> CSS must retain the source-committed one-minute timer');
   assert.equal(cssAfterResults.source.items.frequency, -1);
   assert.equal(cssAfterResults.source.items.mask_hex, cssSetup.source.items.mask_hex);
   report.sourceObservations.push({label: 'CSS after original Results return', ...cssAfterResults});
@@ -960,10 +1018,22 @@ route: {
   rules = await enterVsRules('15-retained');
   assert.equal(rules.source.rules.stock_count, 3,
     'Results/CSS/Main/VS navigation must retain the committed stock count');
+  assert.equal(rules.source.rules.stock_time_limit, 1,
+    'Results/CSS/Main/VS navigation must retain the committed one-minute timer');
   assert.equal(rules.source.items.frequency, -1);
   assert.equal(rules.source.items.mask_hex, cssSetup.source.items.mask_hex);
   report.checks.push('Original Rules re-entry after Results retains source-committed stock and item settings');
   await shot('16-rules-retained-after-results');
+  await moveMenuCursor(RULES_MENU_KIND, 7, 6);
+  await press('m');
+  const rulesPlusAfterResults = await waitRulesPlusTimer(1,
+    'post-Results Rules re-entry retains the source Rules Plus timer');
+  report.sourceObservations.push({label: 'Rules Plus re-entry after Results', ...rulesPlusAfterResults});
+  await shot('16a-rules-plus-retained-after-results');
+  await press('o');
+  const rulesAfterResultsBack = await waitMenu(RULES_MENU_KIND, 6,
+    'post-Results Rules Plus B returns to original Rules');
+  assert.equal(rulesAfterResultsBack.source.rules.stock_time_limit, 1);
   await press('o');
   await waitMenu(VS_MENU_KIND, 3, 'Rules B returns to VS selection after Results');
   await press('o');

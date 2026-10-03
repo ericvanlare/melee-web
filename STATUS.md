@@ -189,28 +189,35 @@ The original title/main-menu receipts above were produced on the PR #96 source
 revision. The current combined runtime also passes the public and audio
 browser lifecycle checks indexed in the PR #86 integration receipt above.
 
-## VS Rules and Items route — bounded browser slice
+## VS Rules and Items route — bounded Rules Plus timer slice
 
 **Source identified / Native traced / Browser exercised / Compiled** for the
-original Main → VS → Rules → Items path, a source-routed item-row edit and
-frequency save, a three-stock Final Destination match, No Contest Results, and
-retained Rules/CSS navigation. The [scoped receipt](docs/evidence/vs-rules-items-source-route-v2.json)
-binds the retail route observer, rendered headless Chrome report and screenshots,
-Release package hashes, source callbacks, route assets, and focused/full-suite
-checks. The retail route receipt is independent evidence: its capture used Null
-video and did not toggle an item row. A separate cold-boot custom-mask attempt
-did not reach the first scheduler return after 672.6 seconds; the reduced
-JITARM64 boot diagnostic timed out after 600 seconds. The browser custom-mask
-route therefore remains **not retail compared**.
+original Main → VS → Rules → Items → Rules Plus route, one item-row toggle,
+None item frequency, one-minute stock timer, three-stock Final Destination
+browser match, No Contest Results, and retained Rules Plus/CSS navigation. The
+[scoped receipt](docs/evidence/vs-rules-plus-timer-source-route-v1.json) binds
+the retail source prefix, rendered headless Chrome report and screenshots,
+Release package hashes, callbacks, assets, and focused/full-suite checks. The
+retail capture reaches its first match setup, natural Results, scene teardown,
+and CSS return; its enclosing three-match request later failed during another
+match teardown/recreation path. That failure and the reduced prefix are retained
+in the receipt. Retail video used Null rendering, so no retail pixel comparison
+is claimed.
 
-The browser run verifies that changing source Items cursor 0 updates preference
-bit 16 through the original frequency selector, and that the source match setup
-maps it to `StartMeleeData` bit 32. It returns to CSS with the three-stock,
-None-frequency settings retained, then Ejects and cleanly reimports. The fresh
-isolated Everything-unlocked context did not exercise Personal autosave or a
-source GCI write. Item-family spawning, pixel/audio equivalence, physical input,
-and performance remain outside this route's evidence. Host output was muted
-while source DSP/audio processing remained enabled.
+The earlier v2 receipt's item-mask mapping is superseded. Rev. 2 source
+observation and the corrected browser route show that toggling Items cursor 0
+clears in-memory item preference bit 5 and `StartMeleeData` mask bit 18. The
+source menu's authored arrays were assembled into a stable `MnItemSwTable`
+because Emscripten object sections do not preserve the adjacency assumed by
+retail. The browser match receives the edited mask `fffffffffffbffff`, None
+frequency, and enabled 60-second timer, then reaches Results and CSS. Its
+screenshots show real rendered output; the Final Destination frame still has
+magenta outline artifacts, so visual equivalence remains unclaimed.
+
+This route used a fresh isolated Everything-unlocked context and did not exercise
+Personal autosave or source GCI persistence. Item-family spawning, PCM/pixel
+equivalence, physical input, and performance remain outside its evidence. Host
+speaker output was muted while browser audio processing remained enabled.
 
 ## VS Teams route — rendered browser slice
 
