@@ -941,5 +941,57 @@
     "reference-capture/slippi/runtime.py": "1d653673df44b7574ef597c36ecd9ccba9ad2eac4b3c33ed3ce3e1341d1305c1",
     "tools/slippi_format.py": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956",
     "tools/slippi_rollback_diagnostic.py": "25875e5f13781e7fc819d4e7861865f48dd3921655c50f526b50073186a17868"
+  },
+  "occurrence_attribution_validation": {
+    "schema": "melee-web-desktop-rollback-occurrence-review-v1",
+    "result": "passed",
+    "scope": "Post-run recording occurrence attribution and source-only regression validation; no native gameplay rerun.",
+    "source_sha256": {
+      "reference-capture/slippi/run_rollback.py": "5f16a0f3452cf68c70d20fe50c8b8a41e937a4ba361b3e6e31361606c79eed6b",
+      "tests/test_slippi_rollback_runner.py": "76d9957f9c9bf7255bb89bfa99a9837375acca43185ac2aa73cd70c78e5e44d5"
+    },
+    "strict_mapping": [
+      "complete native/replay FrameStart vectors agree on frame, RNG, scene and occurrence order",
+      "each load owns a contiguous post-completion recording interval before the next load",
+      "the last pre-load remote pair differs from finalized input and post-state",
+      "that load has its own later finalized remote pair; repeated loads cannot share occurrences"
+    ],
+    "retained_capture_reaudit": {
+      "report_sha256": "01e8b99a4c56caf77a94ba38682c86d54e0aa9a1963013c77cb7a95ae3afcdab",
+      "captures": [
+        "E06-drop",
+        "E06-duplicate",
+        "E06-hold",
+        "E06-jitter",
+        "E06-none",
+        "E06-reorder",
+        "PR123-drop",
+        "PR123-hold",
+        "PR123-none"
+      ],
+      "peer_games": 72,
+      "prediction_error_loads": 8,
+      "own_interval_corrections": 8
+    },
+    "full_suite": {
+      "tests": 1691,
+      "skipped": 136,
+      "elapsed_seconds": 345.694,
+      "whole_elapsed_seconds": 346.041,
+      "whole_deadline_seconds": 450,
+      "cleanup_reserve_seconds": 45,
+      "report_sha256": "d9413a769f8c22d1ad3ba5d25cf3fb4b4067e09438c4392f6cd0a061313d43be",
+      "log_sha256": "a15fdaa5f0ccbd8559c8e8a38412851abdb62c83f8be6706c58d4440c37aa41c",
+      "owned_runner_pid_and_group_absent": true
+    },
+    "retained_private_directory_name": "rollback-occurrence-review-20261003-104651-a79af8b4",
+    "historical_false_positive_reduction": {
+      "report_sha256": "32af981b7f226d7760e3d316ebb6e77adbe2c90a087c158756c3a0a4da7d9b54",
+      "historical_head": "b50684772ba88c795c09bd03ada3ee7adab0f204",
+      "historical_admitted_loads": 2,
+      "current_refusal": "prediction-error load lacks a wrong-input/state revision corrected to the finalized pair",
+      "validator_source_sha256": "5f16a0f3452cf68c70d20fe50c8b8a41e937a4ba361b3e6e31361606c79eed6b",
+      "scope": "Synthetic replay decoder regression only; no native gameplay execution."
+    }
   }
 }

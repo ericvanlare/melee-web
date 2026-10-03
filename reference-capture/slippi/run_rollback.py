@@ -8,16 +8,16 @@ remain neutral during the match. Raw replays and logs remain private evidence.
 from __future__ import annotations
 
 import argparse
-from collections import Counter
 import json
 from pathlib import Path
 import platform
 import re
+import struct
 import sys
 
 from compare_rollback import compare_timelines, first_difference, validate_complete
 from run_local import PairRun, ROOT, _sha256
-from slippi_format import (PRE_FRAME, POST_FRAME, _raw_stream, _decode_pre_frame,
+from slippi_format import (FRAME_START, PRE_FRAME, POST_FRAME, _raw_stream, _decode_pre_frame,
                            _decode_post_frame, decode_timeline, read_timeline)
 from slippi_rollback_diagnostic import SCHEMA
 
@@ -174,12 +174,31 @@ def verify_prediction_rollbacks(rows, *, game_number):
     by source scene interval, not by their DMA-time rollback flags.
     """
     episode = recording_episode(rows, game_number)
-    scenes = [row["scene_frame"] for row in episode if row.get("event") == "recording_frame_start"]
-    counts = Counter(scenes)
-    rewinds = [(previous, current) for previous, current in zip(scenes, scenes[1:])
-               if current <= previous]
+    recording_starts = []
+    recording_start_indices = {}
+    for index, row in enumerate(episode):
+        if row.get("event") != "recording_frame_start":
+            continue
+        frame = row.get("frame")
+        scene = row.get("scene_frame")
+        rng = row.get("rng")
+        sequence = row.get("event_sequence")
+        if (not isinstance(frame, int) or isinstance(frame, bool) or
+                not isinstance(scene, int) or isinstance(scene, bool) or
+                not isinstance(rng, int) or isinstance(rng, bool) or not 0 <= rng <= 0xFFFFFFFF or
+                not isinstance(sequence, int) or isinstance(sequence, bool)):
+            raise ValueError("recording frame-start occurrence lacks typed frame/scene/rng/event order")
+        if recording_starts and sequence <= recording_starts[-1]["event_sequence"]:
+            raise ValueError("recording frame-start event order is not monotonic")
+        occurrence = len(recording_starts)
+        value = {"frame": frame, "scene_frame": scene, "rng": rng,
+                 "event_sequence": sequence, "occurrence": occurrence}
+        recording_starts.append(value)
+        recording_start_indices[index] = value
     active = {}
     loads = []
+    used_recording_occurrences = set()
+    last_load_complete_event_sequence = None
     for index, row in enumerate(episode):
         event = row.get("event")
         if event == "savestate_capture_complete":
@@ -190,10 +209,20 @@ def verify_prediction_rollbacks(rows, *, game_number):
         elif event == "savestate_load":
             target = row["frame"]
             odb = row["odb"]
+            load_event_sequence = row.get("event_sequence")
+            load_complete_event_sequence = (
+                episode[index + 1].get("event_sequence") if index + 1 < len(episode) else None)
             if (index + 1 == len(episode) or
                     episode[index + 1].get("event") != "savestate_load_complete" or
                     episode[index + 1]["frame"] != target):
                 raise ValueError("native state load did not complete")
+            if (not isinstance(load_event_sequence, int) or isinstance(load_event_sequence, bool) or
+                    not isinstance(load_complete_event_sequence, int) or
+                    isinstance(load_complete_event_sequence, bool) or
+                    load_complete_event_sequence <= load_event_sequence or
+                    (last_load_complete_event_sequence is not None and
+                     load_event_sequence <= last_load_complete_event_sequence)):
+                raise ValueError("native prediction-error load event order is malformed")
             if target not in active or active[target]["odb"]["savestate_is_predicting"] != 1:
                 raise ValueError("native state load lacks a completed predicted-input capture")
             if first_difference(active[target]["preservation"], row["preservation"]):
@@ -208,27 +237,74 @@ def verify_prediction_rollbacks(rows, *, game_number):
             depth = end - target
             if odb["rollback_end_frame"] != end or not 1 <= depth <= 7:
                 raise ValueError("prediction-error load exceeds the pinned rollback interval")
-            if (any(counts[scene] < 2 for scene in range(target, end)) or
-                    not any(current == target and target <= previous < end
-                            for previous, current in rewinds)):
-                raise ValueError("prediction-error load lacks repeated source recording callback coverage")
-            clear = next((later for later in episode[index + 2:]
+            next_load_index = next((later_index for later_index in range(index + 2, len(episode))
+                                    if episode[later_index].get("event") == "savestate_load"),
+                                   len(episode))
+            selected_starts = []
+            search_index = index + 2
+            for scene in range(target, end):
+                selected = next((start_index for start_index in range(search_index, next_load_index)
+                                 if start_index in recording_start_indices and
+                                 recording_start_indices[start_index]["frame"] ==
+                                 scene - RECORDING_FRAME_OFFSET and
+                                 recording_start_indices[start_index]["scene_frame"] == scene),
+                                None)
+                if selected is None:
+                    raise ValueError("prediction-error load lacks its own ordered recording callback interval")
+                selected_value = dict(recording_start_indices[selected])
+                previous_candidates = [start for start_index, start in
+                                      ((candidate_index, recording_start_indices[candidate_index])
+                                       for candidate_index in recording_start_indices)
+                                      if start_index < index and
+                                      start["frame"] == scene - RECORDING_FRAME_OFFSET and
+                                      start["scene_frame"] == scene]
+                if not previous_candidates:
+                    raise ValueError("prediction-error load lacks its pre-rewind recording occurrence")
+                selected_value["pre_rewind_occurrence"] = previous_candidates[-1]["occurrence"]
+                selected_starts.append(selected_value)
+                search_index = selected + 1
+            if not selected_starts or selected_starts[0]["occurrence"] == 0:
+                raise ValueError("prediction-error load lacks a preceding recording rewind occurrence")
+            previous_start = recording_starts[selected_starts[0]["occurrence"] - 1]
+            if not target <= previous_start["scene_frame"] < end:
+                raise ValueError("prediction-error load lacks an ordered recording rewind")
+            post_occurrences = [value["occurrence"] for value in selected_starts]
+            pre_occurrences = [value["pre_rewind_occurrence"] for value in selected_starts]
+            if (post_occurrences != list(range(post_occurrences[0], post_occurrences[0] + depth)) or
+                    pre_occurrences != list(range(pre_occurrences[0], pre_occurrences[0] + depth))):
+                raise ValueError("prediction-error load lacks a contiguous recording occurrence interval")
+            selected_occurrences = {value["occurrence"] for value in selected_starts}
+            if used_recording_occurrences & selected_occurrences:
+                raise ValueError("prediction-error load reuses a recording occurrence")
+            used_recording_occurrences.update(selected_occurrences)
+            clear = next((later for later in episode[index + 2:next_load_index]
                           if later.get("event") == "online_inputs" and later["source_frame"] > end
                           and all(later["odb"][key] == 0 for key in
                                   ("rollback_active", "rollback_should_load_state",
                                    "stable_rollback_active", "stable_rollback_should_load_state"))), None)
             if clear is None:
                 raise ValueError("prediction-error rollback never returned to a normal online-input boundary")
+            if (not isinstance(clear.get("event_sequence"), int) or
+                    isinstance(clear.get("event_sequence"), bool) or
+                    clear["event_sequence"] <= load_complete_event_sequence):
+                raise ValueError("native prediction-error clear event order is malformed")
             loads.append({"state_scene_frame": target, "end_scene_frame": end, "depth": depth,
-                          "load_event_sequence": row["event_sequence"],
-                          "load_complete_event_sequence": episode[index + 1]["event_sequence"],
+                          "load_event_sequence": load_event_sequence,
+                          "load_complete_event_sequence": load_complete_event_sequence,
                           "normal_input_event_sequence": clear["event_sequence"],
-                          "repeated_scene_frames": list(range(target, end))})
+                          "repeated_scene_frames": list(range(target, end)),
+                          # This is an ordinal join between the native DMA
+                          # recording callbacks and the raw replay's Frame
+                          # Start vector. It is deliberately carried per load
+                          # so a later same-scene load cannot satisfy this one.
+                          "recording_frame_start_occurrences": selected_starts})
+            last_load_complete_event_sequence = load_complete_event_sequence
             active.clear()  # Original native B2 releases every active state.
         elif event == "savestate_load_complete":
             if index == 0 or episode[index - 1].get("event") != "savestate_load":
                 raise ValueError("native load completion lacks its preceding load")
     return {"prediction_error_loads": loads, "observed_load_count": len(loads),
+            "recording_frame_starts": recording_starts,
             "depths": [load["depth"] for load in loads],
             "source_resimulation_observation": "repeated recording payloads across each loaded scene interval",
             "resimulation_gate": "full interval coverage; may reject native iterations absent from the recording stream",
@@ -318,7 +394,8 @@ def verify_profile(timeline, rows, *, game_sequence, role):
             "uncovered_pad_fields": ["analogA", "analogB"]}
 
 
-def verify_speculative_corrections(data, timeline, loads, *, remote_port):
+def verify_speculative_corrections(data, timeline, loads, *, remote_port,
+                                   recording_frame_starts=None):
     """Find wrong input and changed post-state, followed by the finalized pair.
 
     Reuse the pinned decoder for individual revisions after its strict timeline
@@ -327,53 +404,209 @@ def verify_speculative_corrections(data, timeline, loads, *, remote_port):
     """
     if len(data) > 256 * 1024 * 1024:
         raise ValueError("revision comparison exceeds the bounded 256 MiB reader")
+    if loads and recording_frame_starts is None:
+        raise ValueError("prediction-error load lacks its native recording occurrence mapping")
     if decode_timeline(data) != timeline:
         raise ValueError("revision bytes differ from the validated finalized timeline")
     raw = _raw_stream(data)
     cursor = 1 + raw[1]
     revisions = {}
+    raw_recording_starts = []
     pending = {}
+    current_recording_start = None
+    raw_event_index = 0
     while cursor < len(raw):
         command = raw[cursor]
         size = timeline.header.event_payload_sizes[command]
         event = raw[cursor:cursor + size + 1]
-        if command in (PRE_FRAME, POST_FRAME):
+        if command == FRAME_START:
+            if len(event) < 13:
+                raise ValueError("raw Frame Start event is truncated")
+            current_recording_start = {
+                "frame": struct.unpack_from(">i", event, 1)[0],
+                "rng": struct.unpack_from(">I", event, 5)[0],
+                "scene_frame": struct.unpack_from(">I", event, 9)[0],
+                "occurrence": len(raw_recording_starts),
+                "raw_event_index": raw_event_index,
+            }
+            raw_recording_starts.append(current_recording_start)
+        elif command in (PRE_FRAME, POST_FRAME):
             value = (_decode_pre_frame if command == PRE_FRAME else _decode_post_frame)(event)
             if value.port == remote_port and not value.is_follower:
+                if (current_recording_start is None or
+                        current_recording_start["frame"] != value.frame):
+                    raise ValueError("remote PRE/POST pair is outside its recording Frame Start occurrence")
                 if command == PRE_FRAME:
-                    pending[value.frame] = value
+                    if value.frame in pending:
+                        raise ValueError("remote PRE frame has no completed POST pair")
+                    pending[value.frame] = (value, current_recording_start)
                 else:
-                    revisions.setdefault(value.frame, []).append((pending.pop(value.frame), value))
+                    if value.frame not in pending:
+                        raise ValueError("remote POST frame has no preceding PRE pair")
+                    pre, pre_start = pending.pop(value.frame)
+                    if pre_start["occurrence"] != current_recording_start["occurrence"]:
+                        raise ValueError("remote PRE/POST pair crosses recording Frame Start occurrences")
+                    revisions.setdefault(value.frame, []).append({
+                        "pre": pre,
+                        "post": value,
+                        "recording_occurrence": current_recording_start["occurrence"],
+                        "raw_event_index": raw_event_index,
+                    })
         cursor += size + 1
+        raw_event_index += 1
+    if pending:
+        raise ValueError("remote PRE frame has no completed POST pair")
+    pairs_per_occurrence = {occurrence: 0 for occurrence in range(len(raw_recording_starts))}
+    for pairs in revisions.values():
+        for pair in pairs:
+            occurrence = pair["recording_occurrence"]
+            pairs_per_occurrence[occurrence] = pairs_per_occurrence.get(occurrence, 0) + 1
+    if any(count != 1 for count in pairs_per_occurrence.values()):
+        raise ValueError("recording Frame Start occurrence lacks exactly one remote PRE/POST pair")
+    if recording_frame_starts is not None:
+        if not isinstance(recording_frame_starts, list):
+            raise ValueError("native recording Frame Start occurrence vector is malformed")
+        for index, value in enumerate(recording_frame_starts):
+            if (not isinstance(value, dict) or
+                    any(not isinstance(value.get(key), int) or isinstance(value.get(key), bool)
+                        for key in ("frame", "rng", "scene_frame", "event_sequence", "occurrence")) or
+                    not 0 <= value.get("rng", -1) <= 0xFFFFFFFF or
+                    value["occurrence"] != index or
+                    (index and value["event_sequence"] <= recording_frame_starts[index - 1]["event_sequence"])):
+                raise ValueError("native recording Frame Start occurrence vector is malformed")
+        expected_starts = [
+            {key: value[key] for key in ("frame", "rng", "scene_frame", "occurrence")}
+            for value in recording_frame_starts
+        ]
+        actual_starts = [
+            {key: value[key] for key in ("frame", "rng", "scene_frame", "occurrence")}
+            for value in raw_recording_starts
+        ]
+        if expected_starts != actual_starts:
+            raise ValueError("native and replay recording Frame Start occurrence ordering differs")
     finalized = {frame.number: frame for frame in timeline.frames}
     observations = []
-    for load in loads:
+    used_recording_occurrences = set()
+    previous_load_complete_event_sequence = None
+    for load_index, load in enumerate(loads):
+        load_event_sequence = load.get("load_event_sequence")
+        load_complete_event_sequence = load.get("load_complete_event_sequence")
+        if (not isinstance(load_event_sequence, int) or isinstance(load_event_sequence, bool) or
+                not isinstance(load_complete_event_sequence, int) or
+                isinstance(load_complete_event_sequence, bool) or
+                load_complete_event_sequence <= load_event_sequence or
+                (previous_load_complete_event_sequence is not None and
+                 load_event_sequence <= previous_load_complete_event_sequence)):
+            raise ValueError("prediction-error load event order is malformed")
+        next_load_event_sequence = None
+        if load_index + 1 < len(loads):
+            next_load_event_sequence = loads[load_index + 1].get("load_event_sequence")
+            if (not isinstance(next_load_event_sequence, int) or
+                    isinstance(next_load_event_sequence, bool) or
+                    next_load_event_sequence <= load_complete_event_sequence):
+                raise ValueError("prediction-error load event order is malformed")
+        selected_starts = load.get("recording_frame_start_occurrences")
+        if not isinstance(selected_starts, list) or not selected_starts:
+            raise ValueError("prediction-error load lacks its native recording occurrence mapping")
+        selected_by_scene = {}
+        for selected in selected_starts:
+            if not isinstance(selected, dict):
+                raise ValueError("prediction-error recording occurrence is malformed")
+            required = ("frame", "rng", "scene_frame", "event_sequence", "occurrence",
+                        "pre_rewind_occurrence")
+            if any(key not in selected for key in required):
+                raise ValueError("prediction-error recording occurrence lacks ordered identity")
+            if (not isinstance(selected["event_sequence"], int) or
+                    isinstance(selected["event_sequence"], bool) or
+                    not isinstance(selected["frame"], int) or
+                    isinstance(selected["frame"], bool) or
+                    not isinstance(selected["rng"], int) or
+                    isinstance(selected["rng"], bool) or
+                    not 0 <= selected["rng"] <= 0xFFFFFFFF or
+                    not isinstance(selected["scene_frame"], int) or
+                    isinstance(selected["scene_frame"], bool)):
+                raise ValueError("prediction-error recording occurrence lacks typed identity")
+            occurrence = selected["occurrence"]
+            if (not isinstance(occurrence, int) or isinstance(occurrence, bool) or
+                    occurrence < 0 or occurrence >= len(raw_recording_starts) or
+                    raw_recording_starts[occurrence]["frame"] != selected["frame"] or
+                    raw_recording_starts[occurrence]["rng"] != selected["rng"] or
+                    raw_recording_starts[occurrence]["scene_frame"] != selected["scene_frame"] or
+                    selected["event_sequence"] != recording_frame_starts[occurrence]["event_sequence"]):
+                raise ValueError("prediction-error recording occurrence does not match raw Frame Start")
+            if occurrence in used_recording_occurrences:
+                raise ValueError("prediction-error load reuses a recording occurrence")
+            pre_occurrence = selected["pre_rewind_occurrence"]
+            if (not isinstance(pre_occurrence, int) or isinstance(pre_occurrence, bool) or
+                    pre_occurrence < 0 or pre_occurrence >= len(raw_recording_starts) or
+                    raw_recording_starts[pre_occurrence]["frame"] != selected["frame"] or
+                    raw_recording_starts[pre_occurrence]["scene_frame"] != selected["scene_frame"] or
+                    pre_occurrence > occurrence):
+                raise ValueError("prediction-error pre-rewind occurrence does not match raw Frame Start")
+            pre_event_sequence = recording_frame_starts[pre_occurrence]["event_sequence"]
+            post_event_sequence = selected["event_sequence"]
+            if (pre_event_sequence >= load_event_sequence or
+                    post_event_sequence <= load_complete_event_sequence or
+                    (next_load_event_sequence is not None and
+                     post_event_sequence >= next_load_event_sequence)):
+                raise ValueError("prediction-error recording occurrence is outside its load interval")
+            if selected["scene_frame"] in selected_by_scene:
+                raise ValueError("prediction-error load reuses a recording occurrence")
+            selected_by_scene[selected["scene_frame"]] = {
+                "pre": pre_occurrence, "post": occurrence}
+            used_recording_occurrences.add(occurrence)
+        expected_scenes = list(range(load["state_scene_frame"], load["end_scene_frame"]))
+        if sorted(selected_by_scene) != expected_scenes:
+            raise ValueError("prediction-error recording occurrence interval is incomplete")
         correction = None
         for scene in range(load["state_scene_frame"], load["end_scene_frame"]):
             frame = scene - RECORDING_FRAME_OFFSET
             final = finalized[frame]
             final_pre = next(value for value in final.inputs if value.port == remote_port)
             final_post = next(value for value in final.expected if value.port == remote_port)
-            pairs = revisions.get(frame, [])
-            for index, (pre, post) in enumerate(pairs):
-                input_difference = first_difference(pre.reconstructed_pad(), final_pre.reconstructed_pad(),
-                                                    "physical_input")
-                state_difference = first_difference(post.record(), final_post.record(), "post_state")
-                if (input_difference and state_difference and
-                        any(later_pre == final_pre and later_post == final_post
-                            for later_pre, later_post in pairs[index + 1:])):
+            occurrences = selected_by_scene[scene]
+            pre_pairs = [pair for pair in revisions.get(frame, [])
+                         if pair["recording_occurrence"] == occurrences["pre"]]
+            post_pairs = [pair for pair in revisions.get(frame, [])
+                          if pair["recording_occurrence"] == occurrences["post"]]
+            if occurrences["pre"] >= occurrences["post"]:
+                raise ValueError("prediction-error load lacks a later recording occurrence after rewind")
+            if pre_pairs and post_pairs:
+                # The last complete pair before this load is the prediction
+                # witness. The finalized pair must be in this load's own
+                # post-rewind occurrence; older/later occurrences are out of
+                # scope even if their bytes happen to match.
+                wrong = pre_pairs[-1]
+                input_difference = first_difference(
+                    wrong["pre"].reconstructed_pad(), final_pre.reconstructed_pad(), "physical_input")
+                state_difference = first_difference(
+                    wrong["post"].record(), final_post.record(), "post_state")
+                # If a malformed or future producer supplies multiple pairs,
+                # use the last complete post pair rather than allowing an
+                # earlier matching revision to satisfy this load. The normal
+                # pinned producer shape is one remote pair per occurrence;
+                # duplicate occurrences are rejected above.
+                finalized_pair = post_pairs[-1]
+                if input_difference and state_difference and finalized_pair is not None:
+                    if (finalized_pair["pre"] != final_pre or
+                            finalized_pair["post"] != final_post):
+                        finalized_pair = None
+                if input_difference and state_difference and finalized_pair is not None:
                     correction = {"scene_frame": scene, "recorded_frame": frame,
                                   "remote_port": remote_port,
                                   "input_difference": input_difference,
                                   "post_state_difference": state_difference,
                                   "corrected_revision_matches_finalized_pair": True,
+                                  "recording_frame_start_occurrence": occurrences["post"],
+                                  "pre_rewind_recording_frame_start_occurrence": occurrences["pre"],
+                                  "revision_pair_index": len(pre_pairs) - 1,
                                   "load_event_sequence": load["load_event_sequence"]}
-                    break
             if correction:
                 break
         if correction is None:
             raise ValueError("prediction-error load lacks a wrong-input/state revision corrected to the finalized pair")
         observations.append(correction)
+        previous_load_complete_event_sequence = load_complete_event_sequence
     return {"observed_corrections": observations, "correction_count": len(observations),
             "scope": "paired remote pre/post revisions within each observed loaded scene interval"}
 
@@ -443,7 +676,9 @@ class RollbackRun(PairRun):
                     rows, game_number=game_number)
                 receipt.setdefault("speculative_corrections", {})[name] = verify_speculative_corrections(
                     replay_data[name], timelines[name],
-                    receipt["rollback_observations"][name]["prediction_error_loads"], remote_port=3 - role)
+                    receipt["rollback_observations"][name]["prediction_error_loads"],
+                    remote_port=3 - role,
+                    recording_frame_starts=receipt["rollback_observations"][name]["recording_frame_starts"])
                 receipt["profile_consumption"][name] = verify_profile(
                     timelines[name], rows, game_sequence=game_number - 1, role=role)
             if self.rollback_diagnostic == "hold" and not any(

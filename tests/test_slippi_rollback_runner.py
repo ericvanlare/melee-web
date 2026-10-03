@@ -48,6 +48,97 @@ def fixture():
     return replace(base, frames=tuple(frames)), rows
 
 
+def recording_frame_starts(*, target_occurrences=1):
+    values = [(-123, 0)] + [(-122, 1)] * target_occurrences
+    values.append((-121, 2))
+    return [{"frame": frame, "rng": (0xB0000000 + frame) & 0xFFFFFFFF,
+             "scene_frame": scene, "event_sequence": index * 10,
+             "occurrence": index}
+            for index, (frame, scene) in enumerate(values)]
+
+
+def repeated_revision_fixture(*, finalized_occurrences):
+    """Make two native rewind occurrences for the same recorded scene.
+
+    Each Frame Start owns the PRE/POST revisions following it.  The first
+    occurrence may intentionally have only the speculative pair; the old
+    global revision scan would incorrectly borrow the later occurrence's final
+    pair for it.
+    """
+    base = timeline_fixture()
+    capture = decode_timeline(base)
+    raw = _raw_stream(base)
+    table_end = 1 + raw[1]
+    events = []
+    cursor = table_end
+    while cursor < len(raw):
+        command = raw[cursor]
+        size = capture.header.event_payload_sizes[command]
+        events.append(raw[cursor:cursor + size + 1])
+        cursor += size + 1
+    prefix = []
+    suffix = []
+    groups = []
+    current = None
+    for event in events:
+        if event[0] == 0x3A:
+            if current is not None:
+                groups.append(current)
+            current = [event]
+        elif event[0] == 0x39:
+            if current is not None:
+                groups.append(current)
+                current = None
+            suffix.append(event)
+        elif current is None:
+            prefix.append(event)
+        else:
+            current.append(event)
+    if current is not None:
+        groups.append(current)
+    target_group = next(group for group in groups
+                        if struct.unpack_from(">i", group[0], 1)[0] == -122)
+
+    def target_occurrence(include_final):
+        if include_final:
+            remote = (_pre_frame(-122, 0), _post_frame(-122, 0, action=14))
+        else:
+            remote = (_pre_frame(-122, 0, buttons=0x200),
+                      _post_frame(-122, 0, action=15))
+        value = [target_group[0], *remote, _pre_frame(-122, 1),
+                 _post_frame(-122, 1)]
+        value.append(target_group[-1])
+        return value
+
+    replacement = []
+    for group in groups:
+        frame = struct.unpack_from(">i", group[0], 1)[0]
+        if frame == -122:
+            for occurrence in range(4):
+                replacement.extend(target_occurrence(occurrence in finalized_occurrences))
+        else:
+            replacement.extend(group)
+    new_raw = raw[:table_end] + b"".join(prefix + replacement + suffix)
+    return RAW_PREFIX + struct.pack(">I", len(new_raw)) + new_raw + b"ignored metadata"
+
+
+def repeated_loads():
+    return [
+        {"state_scene_frame": 1, "end_scene_frame": 2, "load_event_sequence": 15,
+         "load_complete_event_sequence": 16,
+         "recording_frame_start_occurrences": [
+             {"frame": -122, "rng": (0xB0000000 - 122) & 0xFFFFFFFF,
+              "scene_frame": 1, "event_sequence": 20, "occurrence": 2,
+              "pre_rewind_occurrence": 1}]},
+        {"state_scene_frame": 1, "end_scene_frame": 2, "load_event_sequence": 35,
+         "load_complete_event_sequence": 36,
+         "recording_frame_start_occurrences": [
+             {"frame": -122, "rng": (0xB0000000 - 122) & 0xFFFFFFFF,
+              "scene_frame": 1, "event_sequence": 40, "occurrence": 4,
+              "pre_rewind_occurrence": 3}]},
+    ]
+
+
 class RollbackRunnerEvidenceTests(unittest.TestCase):
     def test_failed_incomplete_or_wrong_baseline_game_is_refused(self):
         receipt = {"result": "passed", "scenario": "none", "game": 1,
@@ -62,10 +153,17 @@ class RollbackRunnerEvidenceTests(unittest.TestCase):
                     validate_baseline_game(dict(receipt, **{key: value}), 1)
 
     def test_actual_wrong_input_and_post_state_must_be_corrected_to_finalized_pair(self):
-        data = timeline_fixture()
+        data = repeated_revision_fixture(finalized_occurrences={3})
         capture = decode_timeline(data)
-        loads = [{"state_scene_frame": 1, "end_scene_frame": 2, "load_event_sequence": 20}]
-        report = verify_speculative_corrections(data, capture, loads, remote_port=1)
+        loads = [{"state_scene_frame": 1, "end_scene_frame": 2, "load_event_sequence": 35,
+                  "load_complete_event_sequence": 36,
+                  "recording_frame_start_occurrences": [
+                      {"frame": -122, "rng": (0xB0000000 - 122) & 0xFFFFFFFF,
+                       "scene_frame": 1, "event_sequence": 40,
+                       "occurrence": 4, "pre_rewind_occurrence": 3}]}]
+        starts = recording_frame_starts(target_occurrences=4)
+        report = verify_speculative_corrections(
+            data, capture, loads, remote_port=1, recording_frame_starts=starts)
         correction = report["observed_corrections"][0]
         self.assertEqual(correction["recorded_frame"], -122)
         self.assertEqual(correction["input_difference"]["field"], "physical_input.buttons")
@@ -78,14 +176,60 @@ class RollbackRunnerEvidenceTests(unittest.TestCase):
         )
         for changed_raw in changes:
             changed = RAW_PREFIX + struct.pack(">I", len(changed_raw)) + changed_raw
-            with self.assertRaisesRegex(ValueError, "wrong-input/state revision"):
-                verify_speculative_corrections(changed, decode_timeline(changed), loads, remote_port=1)
-        with self.assertRaisesRegex(ValueError, "wrong-input/state revision"):
-            verify_speculative_corrections(data, capture,
-                                          [dict(loads[0], state_scene_frame=0, end_scene_frame=1)],
-                                          remote_port=1)
+            with self.assertRaises(ValueError):
+                verify_speculative_corrections(
+                    changed, decode_timeline(changed), loads, remote_port=1,
+                    recording_frame_starts=starts)
+        with self.assertRaises(ValueError):
+            verify_speculative_corrections(
+                data, capture,
+                [dict(loads[0], state_scene_frame=0, end_scene_frame=1)],
+                remote_port=1, recording_frame_starts=starts)
         with self.assertRaisesRegex(ValueError, "validated finalized timeline"):
-            verify_speculative_corrections(data, replace(capture, duplicate_updates=99), loads, remote_port=1)
+            verify_speculative_corrections(
+                data, replace(capture, duplicate_updates=99), loads, remote_port=1,
+                recording_frame_starts=starts)
+
+    def test_repeated_load_corrections_are_bound_to_their_frame_start_occurrence(self):
+        starts = recording_frame_starts(target_occurrences=4)
+        loads = repeated_loads()
+        cross_satisfied = repeated_revision_fixture(finalized_occurrences={3})
+        with self.assertRaisesRegex(ValueError, "wrong-input/state revision"):
+            verify_speculative_corrections(
+                cross_satisfied, decode_timeline(cross_satisfied), loads, remote_port=1,
+                recording_frame_starts=starts)
+
+        valid = repeated_revision_fixture(finalized_occurrences={1, 3})
+        report = verify_speculative_corrections(
+            valid, decode_timeline(valid), loads, remote_port=1,
+            recording_frame_starts=starts)
+        self.assertEqual(report["correction_count"], 2)
+        self.assertEqual(
+            [row["recording_frame_start_occurrence"] for row in report["observed_corrections"]],
+            [2, 4])
+
+    def test_repeated_load_pairing_gap_and_occurrence_reuse_are_refused(self):
+        starts = recording_frame_starts(target_occurrences=4)
+        valid = repeated_revision_fixture(finalized_occurrences={1, 3})
+        loads = repeated_loads()
+        swapped = copy.deepcopy(loads)
+        swapped[0]["load_event_sequence"] = 30
+        swapped[0]["load_complete_event_sequence"] = 31
+        with self.assertRaisesRegex(ValueError, "recording occurrence is outside its load interval"):
+            verify_speculative_corrections(
+                valid, decode_timeline(valid), swapped, remote_port=1,
+                recording_frame_starts=starts)
+        gap = repeated_revision_fixture(finalized_occurrences={1, 3})
+        raw = _raw_stream(gap)
+        # Removing the final POST from occurrence 2 leaves no complete final
+        # pair in that occurrence; an older occurrence must not repair it.
+        final_post = _post_frame(-122, 0, action=14)
+        raw = raw.replace(final_post, b"", 1)
+        gap = RAW_PREFIX + struct.pack(">I", len(raw)) + raw
+        with self.assertRaises(ValueError):
+            verify_speculative_corrections(
+                gap, decode_timeline(gap), loads, remote_port=1,
+                recording_frame_starts=starts)
 
     def test_changed_baseline_client_is_refused_before_profile_or_process_creation(self):
         run = RollbackRun.__new__(RollbackRun)
@@ -106,10 +250,14 @@ class RollbackRunnerEvidenceTests(unittest.TestCase):
         rows = [{"event": "recording_game_start"},
                 {"event": "savestate_capture", "frame": 98},
                 {"event": "savestate_capture_complete", "frame": 98, "odb": odb}]
-        rows += [{"event": "recording_frame_start", "scene_frame": scene} for scene in (98, 99, 100)]
+        rows += [{"event": "recording_frame_start", "frame": scene - 123,
+                  "rng": (0xB0000000 + scene - 123) & 0xFFFFFFFF,
+                  "scene_frame": scene} for scene in (98, 99, 100)]
         rows += [{"event": "savestate_load", "frame": 98, "odb": odb},
                  {"event": "savestate_load_complete", "frame": 98}]
-        rows += [{"event": "recording_frame_start", "scene_frame": scene} for scene in (98, 99, 100)]
+        rows += [{"event": "recording_frame_start", "frame": scene - 123,
+                  "rng": (0xB0000000 + scene - 123) & 0xFFFFFFFF,
+                  "scene_frame": scene} for scene in (98, 99, 100)]
         rows += [{"event": "online_inputs", "source_frame": 102,
                   "odb": {key: 0 for key in ("rollback_active", "rollback_should_load_state",
                                             "stable_rollback_active", "stable_rollback_should_load_state")}}]
@@ -121,6 +269,10 @@ class RollbackRunnerEvidenceTests(unittest.TestCase):
         report = verify_prediction_rollbacks(rows, game_number=1)
         self.assertEqual(report["depths"], [3])
         self.assertEqual(report["prediction_error_loads"][0]["repeated_scene_frames"], [98, 99, 100])
+        self.assertEqual(
+            [(value["pre_rewind_occurrence"], value["occurrence"])
+             for value in report["prediction_error_loads"][0]["recording_frame_start_occurrences"]],
+            [(0, 3), (1, 4), (2, 5)])
         for index, key, value in ((2, "savestate_is_predicting", 0),
                                   (6, "stable_rollback_should_load_state", 0),
                                   (6, "stable_rollback_end_frame", 106)):
@@ -135,6 +287,58 @@ class RollbackRunnerEvidenceTests(unittest.TestCase):
         changed[6]["preservation"]["sscb_address"] = 99
         with self.assertRaises(ValueError):
             verify_prediction_rollbacks(changed, game_number=1)
+
+    def test_prediction_loads_cannot_borrow_a_later_same_scene_callback(self):
+        odb = {"frame": 102, "savestate_frame": 98, "stable_savestate_frame": 98,
+               "savestate_is_predicting": 1, "rollback_active": 1,
+               "rollback_should_load_state": 1, "stable_rollback_active": 1,
+               "stable_rollback_should_load_state": 1,
+               "rollback_end_frame": 99, "stable_rollback_end_frame": 99}
+        preservation = {"odb_address": 1, "odb_size": 3311, "rxb_address": 2,
+                        "rxb_size": 297, "sscb_address": 3, "sscb_size": 158}
+
+        def frame_start():
+            return {"event": "recording_frame_start", "frame": -25,
+                    "rng": (0xB0000000 - 25) & 0xFFFFFFFF, "scene_frame": 98}
+
+        def make_rows(*, include_first_post):
+            rows = [
+                {"event": "recording_game_start"},
+                {"event": "savestate_capture", "frame": 98},
+                {"event": "savestate_capture_complete", "frame": 98,
+                 "odb": odb, "preservation": preservation},
+                frame_start(),
+                {"event": "savestate_load", "frame": 98, "odb": odb,
+                 "preservation": preservation},
+                {"event": "savestate_load_complete", "frame": 98},
+            ]
+            if include_first_post:
+                rows.append(frame_start())
+            rows.extend([
+                {"event": "online_inputs", "source_frame": 100,
+                 "odb": {key: 0 for key in ("rollback_active", "rollback_should_load_state",
+                                              "stable_rollback_active", "stable_rollback_should_load_state")}},
+                {"event": "savestate_capture", "frame": 98},
+                {"event": "savestate_capture_complete", "frame": 98,
+                 "odb": odb, "preservation": preservation},
+                {"event": "savestate_load", "frame": 98, "odb": odb,
+                 "preservation": preservation},
+                {"event": "savestate_load_complete", "frame": 98},
+                frame_start(),
+                {"event": "online_inputs", "source_frame": 101,
+                 "odb": {key: 0 for key in ("rollback_active", "rollback_should_load_state",
+                                              "stable_rollback_active", "stable_rollback_should_load_state")}},
+            ])
+            return [dict(row, observer_context="exi", event_sequence=index)
+                    for index, row in enumerate(rows)]
+
+        valid = verify_prediction_rollbacks(make_rows(include_first_post=True), game_number=1)
+        self.assertEqual(valid["observed_load_count"], 2)
+        self.assertEqual(
+            [load["recording_frame_start_occurrences"][0]["occurrence"]
+             for load in valid["prediction_error_loads"]], [1, 2])
+        with self.assertRaisesRegex(ValueError, "ordered recording callback interval"):
+            verify_prediction_rollbacks(make_rows(include_first_post=False), game_number=1)
 
     def test_malformed_or_truncated_diagnostic_rows_are_not_skipped(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -110,10 +110,14 @@ input fields. The raw replay records do not expose analog A/B pressure.
 The run report keeps `rollback_correctness_claimed` false until native
 prediction-error load and source resimulation observations have been checked.
 Each observed load must also have a paired speculative remote input and post-state
-that differ from the finalized pair, followed by the exact finalized pair in the
-same loaded scene interval. The strict decoder validates revision pairing and
-finalization before this read-only revision check. Every loaded scene must have
-repeated recording payload coverage and an observed rewind. This is an explicit
+in the latest pre-load recording occurrence that differ from the finalized pair.
+The corrected pair must occur in that load's own post-completion recording
+interval, before the next load. The complete native and raw replay FrameStart
+vectors must agree on frame, RNG, scene and occurrence order, with exactly one
+remote PRE/POST pair per occurrence. Repeated loads cannot reuse a corrected
+occurrence. The strict decoder validates revision pairing and finalization before
+this read-only revision check. Every loaded scene must have contiguous repeated
+recording payload coverage and an observed rewind. This is an explicit
 coverage gate for the fixture; the recording buffer does not guarantee every
 native simulation iteration will be recorded. Matching finalized replays alone
 cannot satisfy these gates. Delay/jitter,
