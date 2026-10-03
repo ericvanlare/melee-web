@@ -391,7 +391,8 @@
     "javascript_syntax": "node --check tests/main_settings_display_browser_test.mjs passed after the final no-stage-input harness correction.",
     "full_suite": "Ran 1,737 tests; 1,604 passed, 133 optional skips, exit 0 on combined route head 803c5fd5de1c40bca5c5893bd490f256608257fc. Retained log: full-unittest.log under external run main-settings-display-integrated-validation-20261003-055025-85da691f.",
     "affected_builds": "python3 scripts/build.py --target fighter and python3 scripts/build.py --target runtime-public --configuration Release passed on combined route head 803c5fd5de1c40bca5c5893bd490f256608257fc. Public player preview package and audit passed (34 files, 19,210,477 bytes); runtime hash 81c2c297e6bcd4c1, runtime identity SHA256 541d2c1a415caccd475fc3adc8231317eaec84ff572d1e53e2f9fd030a81143c, package manifest SHA256 3c84301ed43f951c0063582373573377599657b7c6ae9e4151b5d92194da0690.",
-    "open_validation": "Combined-state headless browser route passes on runtime hash 81c2c297e6bcd4c1; final diff review and required CI remain pending.",
-    "inventory_report": "work/full-game/main-settings-display-20261003-121500-4d46e0b1; 89 feature rows and pinned-source/evidence-path validation passed; all acceptance fractions remain null."
+    "inventory_report": "work/full-game/main-settings-display-20261003-121500-4d46e0b1; 89 feature rows and pinned-source/evidence-path validation passed; all acceptance fractions remain null.",
+    "final_diff_review": "Passed git diff --check against codex/offline-route-prereqs-20261003; worktree clean. The Display route diff is limited to its source assets/save field, source and browser checks, and scoped inventory/evidence.",
+    "remaining_evidence_gates": "Audio fidelity, physical input, foreground timing, pixels/PCM comparison, performance, and selected SSS stage identity remain unrun as declared under claim_boundaries; this route does not claim full-game acceptance."
   }
 }
