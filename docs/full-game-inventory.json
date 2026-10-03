@@ -2354,6 +2354,38 @@
       "issue": null
     },
     {
+      "id": "main-settings-sound-route",
+      "category": "menus",
+      "title": "Original Main Settings Sound menu, SaveData balance and return navigation",
+      "implementation": "integrated",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/mn/mnmain.c",
+        "melee/mn/mnsound.c",
+        "melee/gm/gmmain_lib.c",
+        "melee/gm/gmtitlemode.c",
+        "melee/gm/gmvsmelee.c"
+      ],
+      "depends_on": [
+        "css-sss-and-menu-transitions",
+        "save-and-memory-card",
+        "input-and-controller-routing"
+      ],
+      "pass_criteria": [
+        "Original GM_MENU Settings > Sound callbacks and authored menu assets run with original cancellation, retained cursor selection, repeat entry and Title/Main/VS/CSS navigation.",
+        "Changing the source Sound/Music balance writes SaveData.sound_balance with original u8 arithmetic and remains live through Title/Main/VS transitions.",
+        "A fresh isolated Personal profile autosaves the live source byte, exports it in the Dolphin-compatible GCI field layout, and unloads all menu/world owners on exit.",
+        "A retail GALE01 Rev. 2 capture records the same input route, source menu kinds, balance byte, return route and teardown before the route is declared retail-compared."
+      ],
+      "evidence": [
+        "docs/evidence/main-settings-sound-route-v1.json",
+        "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md",
+        "docs/evidence/save-profile-dolphin-roundtrip-v1.json"
+      ],
+      "next_step": "Capture this exact Settings > Sound route from the retail Rev. 2 disc after reducing the Dolphin first-scheduler boot stall; compare source input, menu kinds, SaveData balance and exit cleanup.",
+      "issue": null
+    },
+    {
       "id": "css-sss-and-menu-transitions",
       "category": "menus",
       "title": "Original title, character select, stage select and menu transitions",

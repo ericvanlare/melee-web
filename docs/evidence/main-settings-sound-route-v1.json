@@ -1,0 +1,343 @@
+{
+  "schema": "melee-web-main-settings-sound-route-evidence-v1",
+  "scope": "Original Main > Settings > Sound route through Settings > Main > VS > CSS, plus live SaveData persistence and GCI field serialization.",
+  "claim_labels": [
+    "Source identified",
+    "Native traced",
+    "Compiled",
+    "Browser exercised"
+  ],
+  "port": {
+    "base_commit": "e7c15a98566fa24be4a7be0adcb96506ed2b4465",
+    "route_implementation_commit": "42b931db5bc4b53475762ab04bb59bd4b8e68cd1",
+    "native_regression_commit": "31ae4f53aea0e9548328a01077812cf34a81428a",
+    "browser_receipt_commit": "7a4ca339d45f72a954beb381ce83018bf617ce35",
+    "implementation_file_sha256": {
+      "src/gameplay_menu_host.c": "68284018f81b1898de3efa4b489f791ba7b8c659e094a22cc319de1358dfeea0",
+      "src/dat_native_menu.cpp": "f48e5833149450db0fa1c5c14c5648557517c99560d763333dba279267beb2f4",
+      "tests/native_menu_host_trace.cpp": "e7d246bd262d340ee0d4ec89b080741cfa414fe41fde3265fa714bd499d50b1b",
+      "tests/test_gameplay_native_menus.py": "6ac3a19a71fa3c9ae21c21e0d5b0ac075e0ab049d4cc72563a43a8b2c5a2d5ae",
+      "tests/main_settings_sound_browser_test.mjs": "c6c2982dc56ab0822de80b401121b6c24de5a699f8aff3fe144f04dcf0a7a9b4"
+    },
+    "source_commit": "7a4ca339d45f72a954beb381ce83018bf617ce35",
+    "browser_receipt_source_commit": "7a4ca339d45f72a954beb381ce83018bf617ce35"
+  },
+  "source": {
+    "repository_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "disc_revision": "GALE01 Rev. 2",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "main_dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+    "main_dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "scene_ids": [
+      "GM_MENU",
+      "GM_TITLE",
+      "GM_VS"
+    ],
+    "menu_kinds": [
+      0,
+      4,
+      20,
+      4,
+      0
+    ],
+    "callbacks": [
+      "gm_Scene_Title_OnFrame",
+      "mnMain_Scene_OnEnter",
+      "mnMain_Scene_OnFrame",
+      "mn_8022DB10",
+      "mn_8022D104",
+      "mnSound_8024A09C",
+      "mnSound_802492CC",
+      "gmMainLib_8015ED74",
+      "gmMainLib_8015ED80"
+    ],
+    "main_selections": {
+      "versus": 1,
+      "settings": 3,
+      "sound": 1
+    },
+    "assets": [
+      "MnMaAll.usd",
+      "SdMenu.usd",
+      "SdToy.dat",
+      "LbMcGame.usd",
+      "NtMemAc.usd",
+      "LbMcSnap.usd",
+      "GmEvent.dat",
+      "LbAd.dat"
+    ],
+    "save_field": {
+      "structure": "SaveData",
+      "member": "sound_balance",
+      "offset": "0x45C",
+      "type": "u8",
+      "source_default": 0,
+      "left_from_center": 251,
+      "signed_interpretation": -5
+    }
+  },
+  "native": {
+    "result": "pass",
+    "focused_test": "tests.test_gameplay_native_menus.NativeMenuSourceTests.test_original_main_settings_sound_mix_route",
+    "host_trace": "Original callbacks enter the Main 1P root after CSS parent return; Sound cancellation leaves the balance unchanged, repeat entry preserves it, Left writes -5, and Title/Main/VS/CSS navigation retains it through cleanup.",
+    "runtime_preference_fix": "host_leave_source_scene copies the live source preference block before restoring the caller context, so Title/Main re-entry and GM_VS return do not restore the stale balance.",
+    "source_file": "src/gameplay_menu_host.c",
+    "root_observer": {
+      "symbol": "mn_804A04F0",
+      "menu_kind": 0,
+      "hovered_selection": 0,
+      "meaning": "MENU_KIND_MAIN / SEL_MAIN_1P"
+    },
+    "focused_log": {
+      "path": "main-settings-sound-20261003/focused-native-route.log",
+      "sha256": "36d030d47913f062155603ea8ce16ed81d30cc258b361877bd9bfaf1cac1f2d1",
+      "result": "pass on code-equivalent feature head before documentation-only rebase; the exact current-main standalone retry skipped because the clean validation checkout did not contain the EXCLUDE_FROM_ALL trace target or owned local fixture root"
+    },
+    "native_target": {
+      "path": "build/browser/native_menu_host_trace.js",
+      "sha256": "8c0858b70a9d41c8e72e11f095f0a673a6c1094718cd34c59b4b922d5c20bce3"
+    },
+    "compile_log": {
+      "path": "native-menu-build-final-v2.log",
+      "sha256": "c62fc34325582bf2e7ffa6a0230c8a3263cb191643a61ba7deabd9047cad4cd3"
+    }
+  },
+  "browser": {
+    "result": "pass",
+    "mode": "headless installed Chrome; isolated Playwright context; public runtime player profile",
+    "browser_version": "154.0.8037.97",
+    "public_package_profile": "player",
+    "runtime_hash": "4d50826109429598",
+    "runtime_identity_sha256": "4ee71222f10d9569bb3dd17702d49d880f1916324b3da7d80e4bd2e2dd0c4d30",
+    "package_manifest_sha256": "3c0c14a745fda07af61b358c60a2de01b206c5157dfa2dcaf000f0a6d8c9f9e9",
+    "package_audit": "pass: player preview package, 34 files, 19,237,165 bytes",
+    "run_id": "main-settings-sound-20261003/current-main-browser-v1",
+    "report_sha256": "bec8518f335af031e83ad14ab36b0c0663a23abe594ac2670681df933010314a",
+    "checks": [
+      "fresh Personal profile and CSS entry",
+      "ordinary B0XX input on original title and Main scenes",
+      "original Main Settings Sound route changes and autosaves its SaveData balance",
+      "Settings exit returns through original VS selection to CSS"
+    ],
+    "input": [
+      "B0XX L+R+Start from CSS",
+      "B to Title",
+      "Start to Main",
+      "Down x3 to Settings",
+      "A to Settings",
+      "Down once to Sound",
+      "A to Sound",
+      "B cancels back to Settings without changing the source balance",
+      "A re-enters the retained Sound selection; Down selects the Sound/Music balance row",
+      "Left changes source balance from 0 to -5",
+      "B returns to Settings, A re-enters Sound, B returns through Settings to Main",
+      "Up x2 to Versus, A to Versus, A to Melee/CSS"
+    ],
+    "personal_save": {
+      "mode": "Personal, selected after fresh isolated Everything default with restart confirmation",
+      "sound_balance_before": 0,
+      "sound_balance_after": 251,
+      "revision_after_sound_save": 5,
+      "revision_after_css_return": 7,
+      "native_css_balance": 251,
+      "exported_gci_sha256": "4c87667c494f223864f96a6adda3d1029711e1683f5c18d053c1423b7c8bf93d",
+      "exported_gci_balance": 251,
+      "serialization_check": "parseMeleeGCI decoded the exported file; byte 0x45C matched live source SaveData. Dolphin import was not repeated in this route; see docs/evidence/save-profile-dolphin-roundtrip-v1.json for independent interop evidence.",
+      "source_snapshot_sha256": "04b8d34e20e604cadb04b9db8f6778c35f45a2d2a3335ea517dafe8c9cd9b06e"
+    },
+    "cleanup": {
+      "result": 1,
+      "message": "Native menus unloaded.",
+      "phase": 0,
+      "running": 0
+    },
+    "runtime_errors": [],
+    "screenshots": {
+      "css-fresh-personal": {
+        "file": "css-fresh-personal.png",
+        "sha256": "f8319f54422b237117d6eccb989b56afd606dfb30386183b07e4d1eca55a6182"
+      },
+      "main-from-css": {
+        "file": "main-from-css.png",
+        "sha256": "3523ebc952e8fc82f344927777c8c2954f7c8357d694afd9e274bb8c1cbea0c2"
+      },
+      "title": {
+        "file": "title.png",
+        "sha256": "7bef48221a7f872040dde370a95f3b31c7441b6075aaea78b2aee7aa10009380"
+      },
+      "main-from-title": {
+        "file": "main-from-title.png",
+        "sha256": "12eb670d5927dd3faab33e99407639646e530e171a4f21ce6d580386b3bba7cd"
+      },
+      "settings": {
+        "file": "settings.png",
+        "sha256": "468c673761fd9ab597e3d8f4859cd99970eb9abee041c33a5646cad5d0df06d1"
+      },
+      "settings-sound-selected": {
+        "file": "settings-sound-selected.png",
+        "sha256": "daba0a0d13802b223d06bb62273bb097370a251d99e4557279055a88d02879c3"
+      },
+      "sound-balance-center": {
+        "file": "sound-balance-center.png",
+        "sha256": "f2105524775798d1bc3fd9fafef083f53a1f1dac89c876d90dd56a5cc7449a78"
+      },
+      "settings-after-sound-cancel": {
+        "file": "settings-after-sound-cancel.png",
+        "sha256": "7334733226c41c1d88c25fbc8e8ab085c022e09d63acb5ceb40b7d3ff690bcdd"
+      },
+      "sound-reentered-center": {
+        "file": "sound-reentered-center.png",
+        "sha256": "365fa8ab373b6740cebf052129a52bb15a0b5b675e5238d718e89dd4f4fe7eb1"
+      },
+      "sound-balance-minus-five": {
+        "file": "sound-balance-minus-five.png",
+        "sha256": "3b3d580a3c0329ec60b04f80a94f26095cdf1e8531f045e232c519427c73af90"
+      },
+      "sound-reentered-minus-five": {
+        "file": "sound-reentered-minus-five.png",
+        "sha256": "e312d5faaa028986625ac97986c473137045e3fda2a59c1481f364fd8d95b2b3"
+      },
+      "versus-mode-selection": {
+        "file": "versus-mode-selection.png",
+        "sha256": "4257766586671945c68c14af41a694ef6e3dadf8ab19a436cf89f17d4e8813b4"
+      },
+      "css-returned": {
+        "file": "css-returned.png",
+        "sha256": "32c872275df37589b0d5794d1fb3ca5d274ceaf12c97170179c153c384e91e3e"
+      }
+    },
+    "visual_claim": "Real rendered original source menus were inspected from headless Chrome screenshots. This is not pixel comparison against a retail capture.",
+    "package_audit_log_sha256": "4f561ceb9654b80ac15895213cc2c7f2d1436387e8509934bc313b7009f44c0b",
+    "source_commit": "7a4ca339d45f72a954beb381ce83018bf617ce35",
+    "runtime_build_log_sha256": "e4168206aa55da7e4cb42dc20f842be47cc69ff8dc064b8278aade7b2bbd06c3",
+    "audio": "Chrome host output muted through browserLaunchOptions; source audio processing remains enabled. No PCM or audio-fidelity claim.",
+    "host_audio": "Muted through scripts/browser_tools.mjs; source Web Audio processing stayed enabled.",
+    "physical_input": "Not run; keyboard B0XX only.",
+    "foreground_performance": "Not run; browser was headless and no timing gate was attempted.",
+    "browser_run_log_sha256": "a10065c86fb716fa2c33c5cd7e5a14a6cb0e94d79cf0eef60ffff3e8eb5930bb"
+  },
+  "retail_reference": {
+    "sound_route_captured": false,
+    "route_status": "blocked_before_first_scheduler_return",
+    "related_retail_context": "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md covers Title/Main/Versus/CSS retail routes, but does not capture Main > Settings > Sound.",
+    "failure_packet": {
+      "artifact_id": "main-settings-sound-cold-boot-probes-20261003",
+      "run_id": "main-settings-sound-20261003/original-source-probe-packet-v1",
+      "sha256": "95b1ec7d7412e4b834bdac02351c138c2533790c2f80eb229f05a82b69c58287",
+      "result": "blocked_before_first_scheduler_return",
+      "probes": [
+        {
+          "artifact_id": "original-source-boot-only-v2",
+          "cpu": "Interpreter64",
+          "elapsed_seconds": 475,
+          "result": "interrupted",
+          "run_id": "476c4c2e650e434da7ddf759a23ddf2e",
+          "gdb_log_sha256": "ad697a01acd2548bae09fb0c73c8b4da7a6d985d8b5b4520686e6b8811f8a045",
+          "interruption_note_sha256": "cbe4b4cde39408d9ba10c60172f3c55c318b7959191c7ed91614259c6d04c06c"
+        },
+        {
+          "artifact_id": "original-source-boot-only-v3-jitarm64",
+          "cpu": "JITARM64",
+          "elapsed_seconds": 300,
+          "result": "timed_out",
+          "run_id": "97253a5beb594214b070da77c2e12853",
+          "gdb_log_sha256": "ad697a01acd2548bae09fb0c73c8b4da7a6d985d8b5b4520686e6b8811f8a045",
+          "interruption_note_sha256": "72e657b2bc9f0ddbb78e07726beb1ec057c61bd30436808118aa425aba768cd4"
+        }
+      ],
+      "diagnosis": "Changing CPU to match the pinned observer build did not reach the first scheduler; the next source-capture work should inspect the GDB/Dolphin boot boundary before replaying the menu route."
+    },
+    "no_retail_claims": [
+      "Settings/Sound input navigation",
+      "source frame equivalence",
+      "retail visual parity",
+      "retail audio fidelity"
+    ]
+  },
+  "other_boundaries": {
+    "host_audio": "Muted through scripts/browser_tools.mjs; source Web Audio processing stayed enabled.",
+    "audio": "No PCM comparison or audible-output claim.",
+    "physical_input": "Not run; keyboard B0XX only.",
+    "foreground_performance": "Not run; the browser was headless and no timing gate was attempted.",
+    "source_route_capture": "The two cold-boot attempts are retained; no additional full replay was started after the reduced boot-boundary packet."
+  },
+  "retained_failures": [
+    {
+      "artifact_id": "main-settings-sound-browser-playwright-config-v1",
+      "run_id": "main-settings-sound-20261003/sound-browser-v2",
+      "report_sha256": "7d20dce6c46f28a0043a0428b1debedf5900668dc627c8cbd38fe5dca10623b1",
+      "result": "failed before Chrome launch",
+      "cause": "Playwright path was not configured. The rerun supplied the installed package explicitly and passed.",
+      "note": "Retained alongside the static-server startup failure; both setup causes were corrected before the current-main browser route pass."
+    },
+    {
+      "artifact_id": "main-settings-sound-cold-boot-probes-20261003",
+      "run_id": "main-settings-sound-20261003/original-source-probe-packet-v1",
+      "sha256": "95b1ec7d7412e4b834bdac02351c138c2533790c2f80eb229f05a82b69c58287",
+      "result": "blocked_before_first_scheduler_return"
+    },
+    {
+      "artifact_id": "main-settings-sound-full-suite-missing-development-runtime-v1",
+      "run_id": "main-settings-sound-20261003/full-tests-v1",
+      "sha256": "f4e3fea0449911b9e0dc1d15c485460379a8598026b991aff0dc57247fd46c9a",
+      "result": "failed because two tests failed and one setup errored when build/browser (RelWithDebInfo) was absent; 1811 tests ran, 2 failures, 1 error, 146 skipped",
+      "cause": "Resolved by building the development runtime; six missing-runtime focused tests then passed and the current-main full suite passed 1844 tests with 141 skips."
+    },
+    {
+      "artifact_id": "main-settings-sound-browser-static-server-v1",
+      "run_id": "main-settings-sound-20261003/sound-browser-v1",
+      "failure_packet_sha256": "c5f428f38f00ae926a2d114aa33f85c16d9b13b09f6c524b6c3d12bb05ddbd86",
+      "report_sha256": "dfa28a39eb2987b524fb7864abf5c5195ba39b4063a8ce56dfb708a50623eb16",
+      "result": "failed during player startup before route checks",
+      "cause": "The first reduced reproduction served a packaged player without the required COOP/COEP headers; scripts/serve.py supplied those headers and the subsequent current-main route passed."
+    }
+  ],
+  "validation": {
+    "development_runtime_build": {
+      "target": "runtime",
+      "configuration": "RelWithDebInfo",
+      "result": "pass",
+      "log": "runtime-dev-build.log",
+      "log_sha256": "3e203aaec3896763ed4608987a0c733cf0ad8d69694f9408402734111564f680"
+    },
+    "public_runtime_build": {
+      "target": "runtime-public",
+      "configuration": "Release",
+      "result": "pass",
+      "log": "runtime-public-build.log",
+      "log_sha256": "e4168206aa55da7e4cb42dc20f842be47cc69ff8dc064b8278aade7b2bbd06c3"
+    },
+    "native_menu_host_trace_build": {
+      "result": "pass",
+      "log_sha256": "c62fc34325582bf2e7ffa6a0230c8a3263cb191643a61ba7deabd9047cad4cd3"
+    },
+    "focused_native_route": {
+      "result": "pass on code-equivalent feature head before documentation-only rebase",
+      "log_sha256": "36d030d47913f062155603ea8ce16ed81d30cc258b361877bd9bfaf1cac1f2d1",
+      "log": "focused-native-route.log",
+      "current_main_retry": "skipped: native trace target and owned fixture root were not present in the clean validation checkout; no source divergence was introduced by the rebase"
+    },
+    "full_unittest_suite": {
+      "result": "pass",
+      "tests": 1844,
+      "skipped": 141,
+      "seconds": 316.191,
+      "run_id": "main-settings-sound-20261003/current-main-validation-v1",
+      "log": "full-suite.log",
+      "log_sha256": "6b6b8e5d3520f838561c3777da303f481cb1b8c27f785314d310a629059fb2e3"
+    },
+    "public_package_audit": {
+      "result": "pass",
+      "files": 34,
+      "bytes": 19237165,
+      "log": "public-package-audit.log",
+      "log_sha256": "4f561ceb9654b80ac15895213cc2c7f2d1436387e8509934bc313b7009f44c0b"
+    },
+    "full_game_inventory_report": {
+      "path": "work/main-settings-sound-current-main-inventory-recheck/report.json",
+      "features": 90,
+      "source_symbols": 19827,
+      "report_sha256": "2f4ad2e4898a0fb8fa93e29e1eb3c3c188f726b4d3f40b77dd6cf7eb0c202e37"
+    }
+  }
+}
