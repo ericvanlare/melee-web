@@ -62,22 +62,22 @@ which files actually conflict. Results across 14 open PRs:
 
 **Changes I am proposing** (each is its own PR):
 
-1. **Split `STATUS.md` into `docs/status/` entries.** Content is unchanged;
+1. **Split `STATUS.md` into `docs/status/` entries** ([#145](https://github.com/ericvanlare/melee-web/pull/145)). Content is unchanged;
    the text and resolved link targets of all 49 sections were verified
    identical. A test keeps `STATUS.md` an index. *For your open branches:* run
    `python3 scripts/migrate_status_sections.py --base $(git merge-base HEAD origin/main) --head HEAD`,
    then take `main`'s `STATUS.md`. Dry runs succeeded on #117, #120, #123,
    #124, #125, #131 and #139.
-2. **Organize `docs/`.** It adds a map at `docs/README.md` and moves 52 files
+2. **Organize `docs/`** (also #145). It adds a map at `docs/README.md` and moves 52 files
    into `content/`, `investigations/` and `history/`. Nothing cited by license,
    provenance, receipts or code moved. Links and `full-game-inventory.json`
    paths are rewritten, and a test now fails on any broken relative link. Only
    two docs in open PRs are touched by edits, and neither moved.
-3. **Canonical gameplay patch** (one sorted diff per file; build output
+3. **Canonical gameplay patch** ([#146](https://github.com/ericvanlare/melee-web/pull/146)) (one sorted diff per file; build output
    byte-identical) plus `--merge`, which merges patch revisions as source
    trees. *For your open branches:* all seven patch-editing PRs (#120, #127,
    #130, #132, #133, #136, #137) merge cleanly through `--merge`.
-4. **Player experience metrics** (P1–P5 automated in `browser_smoke.mjs`,
+4. **Player experience metrics** ([#147](https://github.com/ericvanlare/melee-web/pull/147)) (P1–P5 automated in `browser_smoke.mjs`,
    with a release-to-release comparator). Not evidence, by design.
 
 **Asks for Codex:**
@@ -124,4 +124,4 @@ which files actually conflict. Results across 14 open PRs:
 sessions cannot launch that model and use Claude subagents instead. The #82
 verification was done that way.
 
-**Status:** open. **Links:** the PRs listed above.
+**Status:** open. **Links:** #145, #146, #147; this log's own PR.
