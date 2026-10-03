@@ -1,0 +1,200 @@
+{
+  "schema": "melee-web-vs-team-battle-retail-browser-comparison-v1",
+  "status": "selected_team_fields_match; timer_excluded; full_route_equivalence_pending",
+  "scope": "Scoped comparison of the r9 original retail source capture with one fresh headless browser Team Battle report. The browser report contains one match with three observations (live, pause, terminal), not three browser cycles. Only fields emitted by both reports are compared. This receipt does not claim exact route equivalence, pixel/audio equivalence, timing equivalence, or a complete three-cycle cross-runtime pass.",
+  "source": {
+    "followup_receipt": "docs/evidence/vs-team-battle-retail-followup-v1.json",
+    "followup_receipt_sha256": "d29e41b9a8b03a31f4fffb0f6b98a8a15bbe426940a55a60b85ad87072a56982",
+    "capture_id": "melee-web-vs-team-battle-20261003-r9",
+    "report_sha256": "0645d8c289d71a49aa19567c8d99c5d629c91181107f7e70202ab36d1a8c0c4d",
+    "artifact_root_relative_to_agent_storage": "melee-web/checkouts/team-battle-capture-c631-20261003-20261003-112341-3cc5dafb/work/vs-team-battle-retail-observer-20261003-r9",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "raw_capture_sha256": "37b01bd4d041e1018ed1a5db156918282dd3970fe01557516f2dc72efbba60cf",
+    "raw_input_sha256": "c015f4bba57324536e6902d717f18855db4ac153e1f5c469da6db8dcd1634c25",
+    "route_scope": "Three original CSS -> SSS -> two-player Team Battle -> No Contest Results -> CSS cycles; Null video; host output muted with DSP generation retained.",
+    "observed_cycles": {
+      "count": 3,
+      "setup_sequences": [4171, 7780, 11432],
+      "result_sequences": [5389, 9037, 12685],
+      "css_return_sequences": [6847, 10491, 14143]
+    },
+    "invariant_setup_fields": {
+      "match_kind": 1,
+      "is_stock": true,
+      "is_teams": true,
+      "teams": [0, 1],
+      "player_stocks": [3, 3],
+      "stage": 32,
+      "item_frequency": -1,
+      "item_mask_hex": "fffffffffffbffff",
+      "mario_costumes": [0, 3]
+    },
+    "results_fields": {
+      "outcome": 7,
+      "winners": [0, 1]
+    },
+    "css_return_fields": {
+      "is_teams": true,
+      "teams": [0, 1],
+      "item_frequency": -1
+    },
+    "cleanup": {
+      "observer_completed": true,
+      "process_exit": 0,
+      "input_complete": true
+    }
+  },
+  "browser": {
+    "report_relative_to_agent_storage": "melee-web/runs/menu-stack-team-c549-browser-retry-20261003-115834-01a64bfd/team-battle/report.json",
+    "report_sha256": "0728542dd910ce238ed9679b97ca585384efb98bb9f3f9f194b3a7e354717553",
+    "result": "pass",
+    "mode": "source-two-player-team-battle-results-route",
+    "browser": "Google Chrome 154.0.8037.97; headless; viewport 1280x960",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "match_observations": {
+      "match_count": 1,
+      "observation_count": 3,
+      "labels": [
+        "live source match after 180 gameplay frames",
+        "original source pause before No Contest",
+        "terminal No Contest payload used by Results"
+      ],
+      "invariant_fields": {
+        "match_kind": 1,
+        "is_teams": 1,
+        "teams": [0, 1],
+        "player_stocks": [3, 3],
+        "stage": 32,
+        "item_frequency": -1,
+        "item_mask_hex": "fffffffffffbffff"
+      },
+      "terminal_results": {
+        "outcome": 7,
+        "winners": [0, 1]
+      }
+    },
+    "css_after_results": {
+      "label": "Team settings retained after Results return",
+      "is_teams": 1,
+      "teams": [0, 1],
+      "item_frequency": -1
+    },
+    "cleanup": [
+      {
+        "label": "Eject after Results/Main",
+        "source_objects": 0,
+        "source_processes": 0,
+        "match_present": false,
+        "results_present": false,
+        "scoped_assets": false,
+        "cached_audio_banks": 0
+      },
+      {
+        "label": "Final Eject after clean reimport",
+        "source_objects": 0,
+        "source_processes": 0,
+        "match_present": false,
+        "results_present": false,
+        "scoped_assets": false,
+        "cached_audio_banks": 0
+      }
+    ],
+    "selected_screenshot_sha256": {
+      "11-css-team-battle-configured.png": "aa054102ba47bdd95eac799e5858cd7a0111d965f533f1e2302f9d184863168a",
+      "16-live-two-player-team-match.png": "74ad1fcd54d6af90cb4ab86b2613862c278a0bbe3641639570a86ac0730f1ca5",
+      "17-original-team-results.png": "628721825861994d7b7f13310584cdcbca0eb0a4e6a2edfbb4cb0a1825b8d2ab",
+      "18-css-after-team-results-settings-retained.png": "3cd2552325930bba916837234a1c520596e020270a7d0d6a9cacd741ba4e42e2",
+      "15-clean-reimport-css.png": "adf87c9c1e67af22cbf45e74d2184cbccf5b13cc217e212886cfaede0d31acf9"
+    }
+  },
+  "comparisons": [
+    {
+      "field": "match_kind",
+      "source_observed": 1,
+      "browser_observed": [1, 1, 1],
+      "status": "match"
+    },
+    {
+      "field": "team_flag_and_team_ids",
+      "source_observed": {"is_teams": true, "teams": [0, 1]},
+      "browser_observed": [{"is_teams": 1, "teams": [0, 1]}, {"is_teams": 1, "teams": [0, 1]}, {"is_teams": 1, "teams": [0, 1]}],
+      "status": "match",
+      "note": "Boolean and integer encodings are semantically equal in their respective reports."
+    },
+    {
+      "field": "player_stocks",
+      "source_observed": [3, 3],
+      "browser_observed": [[3, 3], [3, 3], [3, 3]],
+      "status": "match"
+    },
+    {
+      "field": "stage",
+      "source_observed": 32,
+      "browser_observed": [32, 32, 32],
+      "status": "match"
+    },
+    {
+      "field": "item_frequency",
+      "source_observed": -1,
+      "browser_observed": [-1, -1, -1],
+      "status": "match"
+    },
+    {
+      "field": "start_melee_item_mask",
+      "source_observed": "fffffffffffbffff",
+      "browser_observed": ["fffffffffffbffff", "fffffffffffbffff", "fffffffffffbffff"],
+      "status": "match",
+      "note": "This is the source StartMeleeData mask; browser CSS preference masks use a separate representation and are not substituted here."
+    },
+    {
+      "field": "mario_costumes",
+      "source_observed": [0, 3],
+      "browser_observed": null,
+      "status": "not_compared",
+      "reason": "The fresh browser report emits fighter IDs and team flags but no costume field. No costume mapping is inferred from screenshots or fighter IDs."
+    },
+    {
+      "field": "no_contest_results",
+      "source_observed": {"outcome": 7, "winners": [0, 1]},
+      "browser_observed": {"outcome": 7, "winners": [0, 1]},
+      "status": "match",
+      "note": "The source has three repeated result records; the browser has one terminal result observation."
+    },
+    {
+      "field": "results_to_css_team_retention",
+      "source_observed": {"is_teams": true, "teams": [0, 1], "item_frequency": -1},
+      "browser_observed": {"is_teams": 1, "teams": [0, 1], "item_frequency": -1},
+      "status": "match"
+    },
+    {
+      "field": "cleanup",
+      "source_observed": {"observer_completed": true, "process_exit": 0, "input_complete": true},
+      "browser_observed": {"two_eject_observations_clean": true, "source_objects": 0, "source_processes": 0, "scoped_assets": false, "cached_audio_banks": 0},
+      "status": "both_clean",
+      "note": "The source and browser cleanup reports use different schemas; this records each declared cleanup gate without claiming identical lifecycle traces."
+    }
+  ],
+  "excluded_fields": {
+    "timer": {
+      "source_r9_observed": {"timer_enabled": false, "time_limit_seconds": 0},
+      "browser_observed": {"timer_enabled": true, "time_limit_seconds": 60},
+      "status": "excluded",
+      "reason": "The fresh browser route intentionally retains the one-minute Rules Plus timer; r9 used the zero-timer Team source route. The timer is a route-input difference, not an unexplained Team mismatch.",
+      "separate_reference_receipt": "docs/evidence/vs-rules-plus-timer-source-route-v1.json",
+      "separate_reference_receipt_sha256": "ef98a1c5180d81a3dfc47fe881942eedbcb7f4e1977ef1438f1f399eab0711e4",
+      "reference_lines": [108, 125, 126, 161, 278, 279, 283]
+    },
+    "css_item_mask_representation": {
+      "status": "not_compared",
+      "reason": "The fresh browser CSS observations expose preference mask ffffffffffffffdf, while r9 retained CSS exposes StartMeleeData mask fffffffffffbffff. The match-level StartMeleeData mask is compared above."
+    }
+  },
+  "unexplained_differences": [],
+  "limitations": [
+    "The browser report covers one Team match with live, pause and terminal observations; it does not reproduce r9's three source cycles.",
+    "The browser report omits player costume and player-type fields, so costume and CPU/human identity are not compared.",
+    "The browser timer differs intentionally and is excluded; the separate Rules Plus receipt documents the one-minute timer route.",
+    "No exact route equivalence, pixel equivalence, PCM/audio equivalence, foreground timing, physical-input, performance, or source GCI persistence claim is made."
+  ],
+  "result": "selected_team_fields_match_with_declared_timer_and_schema_exclusions;_fresh_three_cycle_equivalence_pending"
+}
