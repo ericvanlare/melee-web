@@ -2296,6 +2296,35 @@
       "issue": null
     },
     {
+      "id": "menu-main-settings-rumble",
+      "category": "menus",
+      "title": "Original Main Settings > Rumble route and saved controller preference",
+      "implementation": "integrated",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/mn/mnmain.c",
+        "melee/mn/mnvibration.c",
+        "melee/mn/forward.h",
+        "melee/gm/gmmain_lib.c"
+      ],
+      "depends_on": [
+        "css-sss-and-menu-transitions",
+        "save-and-memory-card"
+      ],
+      "pass_criteria": [
+        "The original Main Settings > Rumble callbacks, authored menu IDs/assets, input gates, and B cancellation return through Settings and Main without replacing source menu state.",
+        "A changes the selected controller rumble value in live source SaveData; Personal autosave, repeated entry, GCI export, document reload, and owner teardown retain/release the correct state.",
+        "Retail source/menu observations and rendered-browser observations are recorded separately; unobserved audio, physical input, pixel, and performance claims remain open."
+      ],
+      "evidence": [
+        "docs/evidence/main-settings-rumble-route-v1.json",
+        "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md",
+        "docs/evidence/save-profile-dolphin-roundtrip-v1.json"
+      ],
+      "next_step": "Compare the Rumble intro/panel animation and audio against retail, verify physical rumble output when hardware is available, and add the next authored Settings page with its own route and save receipt.",
+      "issue": null
+    },
+    {
       "id": "css-sss-and-menu-transitions",
       "category": "menus",
       "title": "Original title, character select, stage select and menu transitions",

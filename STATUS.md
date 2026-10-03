@@ -235,6 +235,26 @@ incomplete. Visual/audio equivalence, physical input, performance, source GCI
 persistence, and Personal autosave were not exercised. Host output was muted
 while source DSP/audio processing remained enabled.
 
+## Main Settings > Rumble route
+
+**Source identified / Retail compared / Browser exercised / Compiled** for the
+original Main → Settings → Rumble route and its return to CSS. The retail
+Observer trace records Main/Settings/Rumble/Settings/Main menu IDs
+`0/4/19/4/0`; ordinary A disables Controller 1 rumble and B backs out through
+both original pages. In a fresh isolated Chrome context, the public player
+renders the original Settings and Rumble scenes, changes the source SaveData
+rumble bytes at offset `0x458` from `[1,1,1,1]` to `[0,1,1,1]`, autosaves,
+re-enters the route, returns through VS selection to CSS, exports the same
+preference, and retains it after document reload. The source menu owner unloads
+cleanly. The [scoped route receipt](docs/evidence/main-settings-rumble-route-v1.json)
+indexes the retail trace, browser package identity, input, save bytes, screenshots
+and retained failure runs. The [route capture notes](docs/ORIGINAL_MENU_ROUTE_CAPTURE.md#main-settings-rumble-route)
+separate source state, rendered browser evidence, persistence and lifecycle.
+Retail video/audio were disabled, and the browser package is audio-disabled;
+this does not establish pixel or audio equivalence, physical input, foreground
+timing, performance, or coverage of other Settings pages.
+
+
 ## Current acceptance boundaries
 
 The supported CSS → SSS → Mario/Final Destination → Results → CSS route is
@@ -1375,14 +1395,6 @@ receipts. Setup and the reproducible acceptance command are in the
 local interoperability result; rollback correctness, browser cross-play,
 public Internet/NAT, rendering/audio accuracy and production readiness remain
 unclaimed.
-
-The [local reporter framing receipt](docs/evidence/local-slippi-reporter-framing-v1.json)
-is a separate **Compiled / Source identified** HTTP boundary check. It binds
-the v4 old/new service hashes and six exact 503 responses per variant; the new
-response is close-delimited with `Connection: close` and no `Content-Length`.
-It preserves the retained reporter-thread failure as a separate, non-
-deterministic inference and makes no native gameplay, browser or official
-service claim.
 
 A separate [headless browser-to-desktop transport receipt](docs/evidence/slippi-browser-desktop-transport-v1.json)
 records one 24-frame raw PAD exchange through the loopback ENet relay and the

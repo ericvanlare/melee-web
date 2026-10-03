@@ -227,6 +227,48 @@ that destination explicitly. Eject then recovers to CSS. A Title timeout is
 also checked to retain a zero payload and no fabricated destination. These
 checks do not enable Challenger Approach or claim full title/demo coverage.
 
+<a id="main-settings-rumble-route"></a>
+
+## Main Settings > Rumble route
+
+The retail Observer capture in
+[`save-profile-dolphin-roundtrip-v1.json`](evidence/save-profile-dolphin-roundtrip-v1.json)
+records the original Main `MenuKind` route `0 → 4 → 19 → 4 → 0` at source
+ticks `95, 130, 141, 186, 197`: Main, Settings, Rumble, Settings, Main. The
+source scene remains `GS_MENU` (`1`) throughout the settings route after Title
+(`GS_TITLE`, `0`). At tick 175, ordinary A changes Controller 1 rumble from on
+to off; B leaves Rumble and then Settings. The source callbacks are
+`mnMain_Scene_OnEnter`, `mnMain_Scene_OnFrame`, `mnVibration_Init`,
+`mnVibration_HandleInput`, and `gmMainLib_SetRumbleEnabled`. The Rumble menu is
+`MENU_KIND_SETTINGS_RUMBLE` (`19`) and uses the `MenMainConVi_Top`,
+`MenMainCtlVi_Top`, `MenMainOnoffVi_Top` and `MenMainCursorVi_Top` exports in
+the Main `MnMaAll.usd` archive. Main also loads its authored `SdMenu.usd`
+(`SIS_MenuData`) and `SdToy.dat` (`SIS_ToyData`) roots. The retail Observer
+receipt has a Null video backend, so its menu IDs/input/save bytes are source
+reference evidence rather than a retail visual capture.
+
+The headless installed-Chrome route in
+[`main-settings-rumble-route-v1.json`](evidence/main-settings-rumble-route-v1.json)
+renders those original Main, Settings and Rumble scenes. From a new isolated
+browser context it keeps the default Everything unlock profile, confirms the
+switch to Personal progress, enters CSS, opens Main with the B0XX L+R+Start
+chord, and reaches Title and Main by their original callbacks. Three D-pad
+Down inputs and A enter Settings then Rumble. After the original intro gate,
+ordinary A disables Controller 1 rumble. The native SaveData snapshot reads
+`[0, 1, 1, 1]` at offset `0x458`; autosave, repeated Settings/Rumble entry,
+exit through original Main/VS selection to CSS, GCI export, and document reload
+retain that value. The production native menu owner unloads successfully after
+the route. The reduced repeated-entry browser run also retains each rendered
+checkpoint and source observer state.
+
+This is source-callback behavior and preference persistence evidence for one
+Settings subroute. The browser screenshots establish rendered original menu
+scenes and input response; they are not pixel comparisons. The retail capture
+uses Null video and no audio output. The browser run uses the audio-disabled
+public player, so audio fidelity, physical-controller behavior, foreground
+timing and performance remain untested. The route does not implement or claim
+the other Settings pages.
+
 ## Retained local evidence
 
 All captures, screenshots, private inputs, and generated runtime bundles remain
