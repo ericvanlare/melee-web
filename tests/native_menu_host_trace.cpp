@@ -671,6 +671,35 @@ void run_trophy_baseline_smoke(const melee_web::RuntimeFiles& files)
     check(save->unk_1A8.x4 && save->unk_1A8.x5 && save->unk_1A8.x6,
           "Original source completion flags were not initialized");
 
+    check(!gm_801721EC(),
+          "Everything baseline retained transient new-completion notifications");
+    check((save->x186C & 0x0F) == 0x0F && (save->x186C & 0xF0) == 0,
+          "Everything baseline did not derive only the four source-supported feature bits");
+    for (int selkind = 0; selkind < SELKIND_COUNT; ++selkind) {
+        const auto ckind = static_cast<CharacterKind>(gm_SelKindToCKind((u8) selkind));
+        const u16 clear_ids[] = {
+            gm_80160474(ckind, GM_CLASSIC),
+            gm_80160474(ckind, GM_ADVENTURE),
+            gm_80160474(ckind, GM_ALLSTAR),
+        };
+        for (size_t mode = 0; mode < sizeof(clear_ids) / sizeof(clear_ids[0]); ++mode)
+                check(gmMainLib_8015DA90(clear_ids[mode]) != 0,
+                      "Everything baseline omitted a source-mapped 1P reward from the persisted ledger");
+    }
+    {
+        size_t completed_challenges = 0;
+        for (int challenge = 0; challenge < 0x100; ++challenge) {
+            const int excluded = challenge == 9 || challenge == 0x29 ||
+                challenge == 0x42 || challenge == 0x43 ||
+                challenge == 0xB9 || challenge == 0xC9 || challenge == 0xCA;
+            check((gmMainLib_8015DADC(challenge) != 0) == !excluded,
+                  "Everything baseline challenge flags diverged from the source inventory");
+            completed_challenges += !excluded;
+        }
+        check(completed_challenges == 249 && gmMainLib_8015D8D8(0x123),
+              "Everything baseline omitted the source all-challenges award");
+    }
+
     world->verify_immutable_archives();
     world->close_prepared();
     world.reset();
