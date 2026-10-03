@@ -307,6 +307,8 @@ def _menu_route_snapshot(event):
         if row['menu_state']['cur']==0x10:
             row['item_input_locked']=mem(0x804D6BEC,1)[0]
     elif kind==SCENE_CSS:
+        row['sound_balance']={'save_data_offset':'0x45C',
+                              'value':_menu_route_sound_balance()}
         pointer=u32(0x804D6CB0)
         if not 0x80000000<=pointer<=0x81800000-0x100:
             raise RuntimeError('invalid original CSS data owner during route capture')
@@ -565,12 +567,36 @@ def cold_boot_css_sound_settings_route():
     for _ in range(900):
         if scene_kind()==SCENE_TITLE and mem(0x80479D30,1)[0]==GM_TITLE:
             _record_menu_route_marker('title_after_sound')
-            return
+            break
         if scene_kind()==SCENE_MEMCARD:
             _cold_boot_card_prompt()
             continue
         step(1)
-    raise RuntimeError(f'Main Back did not exit Sound route to Title: scene={_cold_boot_scene_name(scene_kind())} mode={mem(0x80479D30,1)[0]}')
+    else:
+        raise RuntimeError(f'Main Back did not exit Sound route to Title: scene={_cold_boot_scene_name(scene_kind())} mode={mem(0x80479D30,1)[0]}')
+
+    _cold_boot_wait_neutral(24)
+    pulse(0,'START',settle=30)
+    state=_cold_boot_wait_main_menu(0)
+    if state['cur']!=0 or state['hovered']!=0:
+        raise RuntimeError(f'Title Start did not return to the root menu after Sound: {state}')
+    _record_menu_route_marker('root_main_menu_returned_after_sound')
+    move_menu_selection(1)  # SEL_MAIN_VS
+    state=menu_state()
+    if state['cur']!=0 or state['hovered']!=1:
+        raise RuntimeError(f'returned root menu did not select Versus: {state}')
+    pulse(0,'A',settle=24)
+    state=wait_menu(2)  # MENU_KIND_VS
+    if state['cur']!=2 or state['hovered']!=0:
+        raise RuntimeError(f'returned Versus menu did not open at Melee: {state}')
+    _record_menu_route_marker('versus_submenu_ready_after_sound')
+    pulse(0,'A',settle=30)  # SEL_VS_MELEE -> GM_VS
+    _cold_boot_wait_css()
+    retained=_menu_route_sound_balance()
+    if retained!=after:
+        raise RuntimeError(f'Sound SaveData balance changed while returning to CSS: {retained}')
+    _record_menu_route_marker('css_after_sound')
+    return
 '''
 
 

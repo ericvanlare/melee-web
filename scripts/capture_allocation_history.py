@@ -424,6 +424,8 @@ _SOUND_ROUTE_MARKERS = (
     "sound_screen_ready", "settings_after_sound_cancel",
     "sound_screen_reentered", "sound_balance_after_change",
     "settings_after_sound_change", "main_after_settings", "title_after_sound",
+    "root_main_menu_returned_after_sound", "versus_submenu_ready_after_sound",
+    "css_after_sound",
 )
 
 
@@ -449,6 +451,8 @@ def verify_menu_sound_route(path):
         "sound_balance_after_change": (1, 1),
         "settings_after_sound_change": (1, 1),
         "main_after_settings": (1, 1), "title_after_sound": (0, 0),
+        "root_main_menu_returned_after_sound": (1, 1),
+        "versus_submenu_ready_after_sound": (1, 1), "css_after_sound": (8, 2),
     }
     states = {
         "versus_submenu_ready_after_css": (2, 0),
@@ -463,6 +467,8 @@ def verify_menu_sound_route(path):
         "sound_balance_after_change": (20, 0),
         "settings_after_sound_change": (4, 1),
         "main_after_settings": (0, 3),
+        "root_main_menu_returned_after_sound": (0, 0),
+        "versus_submenu_ready_after_sound": (2, 0),
     }
     by_event = {row["event"]: row for row in markers}
     for event, expected in scenes.items():
@@ -480,7 +486,8 @@ def verify_menu_sound_route(path):
                             ("sound_balance_after_change", 251),
                             ("settings_after_sound_change", 251),
                             ("main_after_settings", 251),
-                            ("title_after_sound", 251)):
+                            ("title_after_sound", 251),
+                            ("css_after_sound", 251)):
         balance = by_event[event].get("sound_balance")
         if balance != {"save_data_offset": "0x45C", "value": expected}:
             raise RuntimeError(f"Sound route marker {event} has unexpected SaveData balance: {balance}")
@@ -533,9 +540,13 @@ def verify_menu_sound_route_commands(path):
     sound_back = find(1, 1, "PRESS B", sound_decrement, (20, 0))
     settings_back = find(1, 1, "PRESS B", sound_back, (4, 1))
     main_back = find(1, 1, "PRESS B", settings_back, (0, 3))
+    sound_title_start = find(0, 0, "PRESS START", main_back)
+    sound_vs_confirm = find(1, 1, "PRESS A", sound_title_start, (0, 1))
+    sound_melee_confirm = find(1, 1, "PRESS A", sound_vs_confirm, (2, 0))
     if min(submenu_back, root_back, title_start, settings_confirm, sound_confirm,
            sound_cancel, sound_reenter, sound_select_balance, sound_decrement,
-           sound_back, settings_back, main_back) < 0:
+           sound_back, settings_back, main_back, sound_title_start,
+           sound_vs_confirm, sound_melee_confirm) < 0:
         raise RuntimeError("Sound route lacks its ordered original menu confirmations, edit, and Back inputs")
     return {"commands": len(commands), "sound_edit_command": "PRESS D_LEFT",
             "sha256": retail._sha256(path)}
@@ -1214,6 +1225,11 @@ def capture(args):
                 raise ValueError("owned input-plan copy differs from its frozen source")
             shutil.copy2(args.scenario, evidence / "scenario.json")
             target = scenario_target(scenario)
+        elif args.menu_sound_route:
+            target = {"route": "Title > Main > Settings > Sound > Settings > Main > Title > Main > VS > CSS",
+                "source_menu_kinds": [0, 4, 20, 4, 0, 2],
+                "sound_balance": {"save_data_offset": "0x45C", "before": 0,
+                                  "after": 251, "signed_after": -5}}
         else:
             # This target declares the first CSS roster and eventual stage.
             # The route uses source-driven availability and ordinary PAD
@@ -1268,9 +1284,9 @@ def capture(args):
                     "dolphin_ini_canonical_sha256": retail._canonical_dolphin_ini_sha256(paths["config"], paths["socket"]),
                     "gcpad_ini_sha256": retail._sha256(paths["pad_config"]),
                     "external_save_hashes": external}
-        command = retail.dolphin_command(paths["source_dolphin"], paths["user"], paths["snapshot"], args.disc, cpu=args.cpu)
-        at = command.index("-s")
-        del command[at:at + 2]
+        command = retail.dolphin_command(
+            paths["source_dolphin"], paths["user"], paths["snapshot"], args.disc,
+            cpu=args.cpu, cold_boot=True)
         if args.capture_images:
             command = visual_capture_options(command)
         commands = evidence / "gdb-commands.txt"
@@ -1433,7 +1449,7 @@ def main():
     parser.add_argument("--menu-round-trip", action="store_true",
                         help="Capture a cold-DOL CSS -> original menus -> title -> CSS route; diagnostic only")
     parser.add_argument("--menu-sound-route", action="store_true",
-                        help="Capture cold-DOL Main > Settings > Sound edit and return route; diagnostic only")
+                        help="Capture a cold-DOL original Main > Settings > Sound edit, Back, and return through VS to CSS; diagnostic only")
     parser.add_argument("--vs-rules-items-round-trip", action="store_true",
                         help="Capture cold-DOL VS Rules/Items -> SSS -> live match -> Results -> retained CSS; diagnostic only")
     parser.add_argument("--team-battle", action="store_true",

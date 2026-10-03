@@ -45,6 +45,12 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
         self.assertNotIn("retail-replay-arm", source)
         self.assertNotIn("retail-step", source)
 
+    def test_cold_dol_capture_uses_no_savestate_command_shape(self):
+        source = (Path(__file__).resolve().parents[1] /
+                  "scripts/capture_allocation_history.py").read_text(encoding="utf-8")
+        self.assertIn("cpu=args.cpu, cold_boot=True)", source)
+        self.assertNotIn('command.index("-s")', source)
+
     def test_sound_route_driver_uses_original_source_callbacks_and_inputs(self):
         source = retail_allocation_menu.render_menu_sound_route_driver()
         compile(source, "sound-route-test.py", "exec")
@@ -76,6 +82,9 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             ("settings_after_sound_change", 1, 1, (4, 1), 251),
             ("main_after_settings", 1, 1, (0, 3), 251),
             ("title_after_sound", 0, 0, None, 251),
+            ("root_main_menu_returned_after_sound", 1, 1, (0, 0), 251),
+            ("versus_submenu_ready_after_sound", 1, 1, (2, 0), 251),
+            ("css_after_sound", 8, 2, None, 251),
         ]
         rows = []
         for index, (event, scene, mode, state, balance) in enumerate(markers):
@@ -84,7 +93,7 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             if state is not None:
                 row["menu_state"] = {"cur": state[0], "hovered": state[1]}
             if balance is not None and (scene == 1 or event == "title_ready" or
-                                        event == "title_after_sound"):
+                                        event == "title_after_sound" or event == "css_after_sound"):
                 row["sound_balance"] = {"save_data_offset": "0x45C", "value": balance}
             rows.append(row)
         rows.insert(1, {"event": "scheduler_return", "scene_kind": 1, "game_mode": 1,
@@ -93,7 +102,8 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
                         "sound_balance": {"save_data_offset": "0x45C", "value": 251}})
         rows.insert(2, {"event": "scheduler_return", "scene_kind": 8, "game_mode": 2,
                         "sequence": 1, "pad_copy_status_hex": "00", "current_hps_hex": "",
-                        "hps_voice_word": "0x0", "css_data_hex": "00", "css_cursors": []})
+                        "hps_voice_word": "0x0", "css_data_hex": "00", "css_cursors": [],
+                        "sound_balance": {"save_data_offset": "0x45C", "value": 251}})
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / retail_allocation_menu.MENU_ROUTE_TRACE_NAME
             path.write_text("".join(json.dumps(row) + "\n" for row in rows))
@@ -120,6 +130,8 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             (1, 1, "PRESS D_DOWN", (20, 0)), (1, 1, "PRESS D_LEFT", (20, 0)),
             (1, 1, "PRESS B", (20, 0)), (1, 1, "PRESS B", (4, 1)),
             (1, 1, "PRESS B", (0, 3)),
+            (0, 0, "PRESS START", None), (1, 1, "PRESS A", (0, 1)),
+            (1, 1, "PRESS A", (2, 0)),
         ]
         rows = [{"event": "pad_command", "scene_kind": scene, "game_mode": mode,
                  "command": command,

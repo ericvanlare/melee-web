@@ -559,14 +559,17 @@ def write_gdb_script(path: Path, socket: Path, helper: Path, collector: Path,
 
 
 def dolphin_command(dolphin: Path, user: Path, snapshot: Path, disc: Path,
-                    *, cpu: str = "Interpreter64", audible: bool = False) -> list[str]:
+                    *, cpu: str = "Interpreter64", audible: bool = False,
+                    cold_boot: bool = False) -> list[str]:
     if cpu not in CPU_PROFILES:
         raise CaptureRunnerError("Unsupported reference CPU profile")
-    return [
-        # The pinned capture executable is dolphin-emu-nogui. Its CLI omits the
-        # GUI-only --batch and --debugger switches; a nonempty GDBSocket in
-        # the owned Dolphin.ini starts the remote stub directly.
-        str(dolphin), "-u", str(user), "-s", str(snapshot), "-e", str(disc),
+    # The pinned capture executable is dolphin-emu-nogui. Its CLI omits the
+    # GUI-only --batch and --debugger switches; a nonempty GDBSocket in
+    # the owned Dolphin.ini starts the remote stub directly.
+    command = [str(dolphin), "-u", str(user)]
+    if not cold_boot:
+        command += ["-s", str(snapshot)]
+    command += ["-e", str(disc),
         "-C", "Dolphin.Input.BackgroundInput=True",
         "-C", "Dolphin.Display.Fullscreen=False",
         *dolphin_audio_options(audible=audible),
@@ -576,6 +579,7 @@ def dolphin_command(dolphin: Path, user: Path, snapshot: Path, disc: Path,
         "-C", "Dolphin.Core.EnableCustomRTC=True",
         "-C", f"Dolphin.Core.CustomRTCValue={RTC}",
     ]
+    return command
 
 
 def _write_json(path: Path, value: dict) -> None:

@@ -9,8 +9,9 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {parseMeleeGCI} from '../web/gamecube-save.mjs';
 
-const {values} = parseArgs({options: Object.fromEntries(
-  ['url', 'disc', 'out', 'playwright', 'manifest'].map(name => [name, {type: 'string'}])), strict: true});
+const {values} = parseArgs({options: {...Object.fromEntries(
+  ['url', 'disc', 'out', 'playwright', 'manifest'].map(name => [name, {type: 'string'}])),
+  'probe-export': {type: 'boolean'}}, strict: true});
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url ORIGIN --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const output = path.resolve(values.out);
@@ -42,6 +43,7 @@ const report = {schema: 'melee-web-main-settings-sound-browser-v1', url: values.
     'B returns to Settings, A re-enters Sound, B returns through Settings to Main',
     'Up x2 to Versus, A to Versus, A to Melee/CSS'],
   browserMode: 'headless installed Chrome; isolated Playwright context; public runtime player profile',
+  probeExportOnly: !!values['probe-export'],
   saveMode: 'Everything unlocked default; fresh Personal profile created for this context',
   audio: 'Chrome host output muted through browserLaunchOptions; source audio processing remains enabled. No PCM or audio-fidelity claim.',
   checks: [], screenshots: {}, cleanup: null};
@@ -190,18 +192,20 @@ try {
     await press('m');
     await page.waitForTimeout(700);
     await shot('sound-balance-center');
-    await press('o');
-    await page.waitForTimeout(500);
-    await shot('settings-after-sound-cancel');
-    assert.equal((await nativeSoundSnapshot()).soundBalance, 0,
-      'Backing out of Sound before editing must leave source SaveData unchanged.');
-    await press('m');
-    await page.waitForTimeout(700);
-    await shot('sound-reentered-center');
-    assert.equal((await nativeSoundSnapshot()).soundBalance, 0,
-      'Re-entering the retained Sound selection must preserve the centered source balance.');
+    if (!values['probe-export']) {
+      await press('o');
+      await page.waitForTimeout(500);
+      await shot('settings-after-sound-cancel');
+      assert.equal((await nativeSoundSnapshot()).soundBalance, 0,
+        'Backing out of Sound before editing must leave source SaveData unchanged.');
+      await press('m');
+      await page.waitForTimeout(700);
+      await shot('sound-reentered-center');
+      assert.equal((await nativeSoundSnapshot()).soundBalance, 0,
+        'Re-entering the retained Sound selection must preserve the centered source balance.');
+    }
     await pressDown(1);
-    await press('4');
+    await press('2');
     await page.waitForTimeout(300);
     await shot('sound-balance-minus-five');
     const sourceSnapshot = await nativeSoundSnapshot();
@@ -242,6 +246,8 @@ try {
     assert.deepEqual(css, {message: 'Original character select', phase: 1, running: 1});
     assert.equal((await storeSummary()).soundBalance, 251);
     await shot('css-returned');
+    const nativeAfterCss = await nativeSoundSnapshot();
+    report.nativeAfterCss = {soundBalance: nativeAfterCss.soundBalance, offset: '0x45C'};
 
     await page.locator('#settings-open').click();
     await page.locator('#settings-dialog[open]').waitFor();
@@ -251,6 +257,8 @@ try {
     const exportedPath = path.join(output, 'personal-sound-balance-minus-five.gci');
     await download.saveAs(exportedPath);
     const exported = parseMeleeGCI(new Uint8Array(await fs.readFile(exportedPath)));
+    assert.equal(exported[0x45c], nativeAfterCss.soundBalance,
+      'GCI export must serialize the live source SaveData value after returning to CSS.');
     assert.equal(exported[0x45c], 251,
       'Dolphin-compatible GCI export must preserve source-written sound_balance at 0x45C.');
     report.exportSha256 = await readHash(exportedPath);
@@ -280,6 +288,8 @@ try {
   report.errors = errors;
   if (page && driver) {
     try {
+      if (await page.locator('#settings-dialog[open]').count())
+        await page.locator('#settings-close').click();
       if (!nativeUnloadCaptured) {
         await page.evaluate(() => {
           const unload = Module._melee_web_native_menu_unload.bind(Module);
