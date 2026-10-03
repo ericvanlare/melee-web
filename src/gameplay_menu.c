@@ -635,7 +635,8 @@ static int match_selection_valid(const StartMeleeData* start)
     if (start == NULL || start->rules.match_kind != MatchKind_Stock ||
         !start->rules.is_stock || !start->rules.is_vs ||
         start->rules.is_teams || !melee_web_match_timer_supported(&start->rules) ||
-        start->rules.xB != -1 || start->rules.x20 != UINT64_MAX ||
+        /* The original mask persists while the None frequency disables items. */
+        start->rules.xB != -1 ||
         !melee_web_menu_stage_available(start->rules.stkind))
     {
         return 0;

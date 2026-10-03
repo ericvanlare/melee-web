@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -18,9 +19,13 @@ sys.path.insert(0, str(ROOT))
 from capture_allocation_history import (gdb_script, resolve_gdb_executable,
                                         retain_route_screenshots,
                                         retail as capture_retail,
+                                        tree_hashes,
                                         validate_reference_build_manifest,
                                         validate_setup_receipt,
                                         verify_menu_route, verify_menu_route_commands,
+                                        verify_vs_rules_items_route,
+                                        verify_vs_rules_items_route_commands,
+                                        verify_vs_rules_items_save_effect,
                                         visual_capture_options)  # noqa: E402
 from tools import retail_allocation_menu  # noqa: E402
 from tools import retail_replay_validation as retail  # noqa: E402
@@ -36,6 +41,223 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
         self.assertIn("allocation_finish('captured', 'menu_round_trip_complete')", source)
         self.assertNotIn("retail-replay-arm", source)
         self.assertNotIn("retail-step", source)
+
+    def test_vs_rules_items_gdb_script_stops_at_the_declared_source_route(self):
+        paths = {name: Path("/tmp") / name for name in
+                 ("socket", "allocation_collector", "menu_driver", "helper", "collector")}
+        source = gdb_script(paths, vs_rules_items_round_trip=True)
+        self.assertIn(f"source {paths['menu_driver']}", source)
+        self.assertIn("MENU_ROUTE_TRACE.close()", source)
+        self.assertIn("allocation_finish('captured', 'vs_rules_items_round_trip_complete')", source)
+        self.assertNotIn("retail-replay-arm", source)
+        self.assertNotIn("retail-step", source)
+
+    def test_vs_rules_items_verifier_requires_commit_reentry_and_css_retention(self):
+        rules = {"stock_count": 4, "item_frequency": 3, "item_mask": 0x07}
+        changed = {**rules, "item_mask": 0x0F}
+        committed = {**changed, "item_frequency": -1}
+        match_players = [
+            {"character_kind": 8, "slot_type": 0, "stocks": 3,
+             "color": 0, "team": 0, "rumble_enabled": 1,
+             "cpu_kind": 4, "cpu_level": 0},
+            {"character_kind": 8, "slot_type": 0, "stocks": 3,
+             "color": 0, "team": 0, "rumble_enabled": 1,
+             "cpu_kind": 4, "cpu_level": 0},
+            *[{"character_kind": 21, "slot_type": 3, "stocks": 0,
+               "color": 0, "team": 0, "rumble_enabled": 0,
+               "cpu_kind": 4, "cpu_level": 0} for _ in range(4)],
+        ]
+        expected = [
+            ("first_scheduler_return", 0x2A, 0, None, None),
+            ("cold_css_ready", 8, 2, None, None),
+            ("versus_submenu_after_css_parent", 1, 1, (2, 0), rules),
+            ("root_menu_after_vs_back", 1, 1, (0, 1), rules),
+            ("versus_submenu_for_rules", 1, 1, (2, 0), rules),
+            ("vs_rules_first_entry", 1, 1, (13, 0), rules),
+            ("vs_items_entry", 1, 1, (16, 0), rules),
+            ("vs_items_one_bit_toggled", 1, 1, (16, 0), changed),
+            ("vs_items_frequency_none", 1, 1, (16, 31), changed),
+            ("vs_items_back_committed", 1, 1, (13, 5), committed),
+            ("vs_rules_back_to_versus", 1, 1, (2, 3), committed),
+            ("versus_back_to_main", 1, 1, (0, 1), committed),
+            ("vs_rules_reentry_retained_items", 1, 1, (13, 0), committed),
+            ("vs_rules_stock_three_selected", 1, 1, (13, 1), committed),
+            ("css_after_rules_start_retained", 8, 2, None,
+             {**committed, "stock_count": 3}),
+            ("sss_after_rules_start", 9, 2, None, committed),
+            ("sss_final_destination_selected", 9, 2, None, committed),
+            ("vs_match_entered", 2, 2, None, committed),
+            ("vs_match_after_180_ticks", 2, 2, None, committed),
+            ("vs_no_contest_chord_sent", 2, 2, None, committed),
+            ("results_no_contest", 5, 2, None, committed),
+            ("css_after_results_retained", 8, 2, None,
+             {**committed, "stock_count": 3}),
+        ]
+        rows = [{"event": "scheduler_return", "sequence": 0,
+                 "scene_kind": 1, "game_mode": 1,
+                 "menu_state": {"cur": 16}, "rules_state": committed,
+                 "pad_copy_status_hex": "00", "current_hps_hex": "",
+                 "hps_voice_word": "0x0"},
+                {"event": "scheduler_return", "sequence": 1,
+                 "scene_kind": 2, "game_mode": 2,
+                 "match_start_data": {"stage": 0x20, "item_frequency": -1,
+                                       "item_mask_hex": "000000000000000f",
+                                       "players": match_players},
+                 "pad_copy_status_hex": "00", "current_hps_hex": "",
+                 "hps_voice_word": "0x0"},
+                {"event": "scheduler_return", "sequence": 2,
+                 "scene_kind": 5, "game_mode": 2, "results_outcome": 7,
+                 "pad_copy_status_hex": "00", "current_hps_hex": "",
+                 "hps_voice_word": "0x0"}]
+        for name, scene, mode, menu, state in expected:
+            row = {"event": name, "scene_kind": scene, "game_mode": mode,
+                   "sequence": 0, "pad_copy_status_hex": "00"}
+            if menu is not None:
+                row["menu_state"] = {"cur": menu[0], "hovered": menu[1],
+                                     "confirmed": 3 if name == "vs_rules_stock_three_selected" else 0}
+            if state is not None:
+                row["rules_state"] = state
+            if name == "sss_final_destination_selected":
+                row["selected_stage_kind"] = 0x20
+            if name == "vs_match_entered":
+                row["match_start_data"] = {
+                    "stage": 0x20, "item_frequency": -1,
+                    "item_mask_hex": "000000000000000f",
+                    "players": match_players}
+            if name == "results_no_contest":
+                row["results_outcome"] = 7
+            rows.append(row)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "route.jsonl"
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            result = verify_vs_rules_items_route(path)
+            self.assertEqual(result["stock_count_after_results_css_return"], 3)
+            self.assertEqual(result["committed_item_mask"], "000000000000000f")
+            self.assertEqual(len(result["live_match_start_players"]), 6)
+            self.assertEqual([p["slot_type"] for p in result["live_match_start_players"]],
+                             [0, 0, 3, 3, 3, 3])
+
+            committed_row = next(row for row in rows if row["event"] == "vs_items_back_committed")
+            committed_row["rules_state"]["item_frequency"] = 0xFF
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            with self.assertRaisesRegex(RuntimeError, "Items B"):
+                verify_vs_rules_items_route(path)
+            committed_row["rules_state"]["item_frequency"] = -1
+
+            rows[-1]["rules_state"]["stock_count"] = 4
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            with self.assertRaisesRegex(RuntimeError, "Results/CSS return"):
+                verify_vs_rules_items_route(path)
+
+            rows[-1]["rules_state"]["stock_count"] = 3
+            match_players[1]["slot_type"] = 1
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            with self.assertRaisesRegex(RuntimeError, "StartMeleeData"):
+                verify_vs_rules_items_route(path)
+
+    def test_vs_rules_items_verifier_checks_committed_preferences_in_original_gci(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            initial = root / "everything-unlocked.gci"
+            final_gc = root / "GC"
+            card = final_gc / "USA/Card A"
+            card.mkdir(parents=True)
+            initial_mask = 0xFFFFFFFFFFFFFFFF
+            committed_mask = initial_mask ^ 0x0100000000000000
+            create = """
+import fs from 'node:fs';
+import {createMeleeGCI, parseMeleeGCI} from './web/gamecube-save.mjs';
+const path = process.argv[1];
+const mode = process.argv[2];
+let profile;
+if (mode === 'initial') {
+  profile = new Uint8Array(0xF1C4);
+  profile[0x448] = 2;
+  new DataView(profile.buffer).setBigUint64(0x450, 0xFFFFFFFFFFFFFFFFn, false);
+} else {
+  profile = parseMeleeGCI(new Uint8Array(fs.readFileSync(process.argv[3])));
+  profile[0x448] = mode === 'bad-frequency' ? 2 : 0xFF;
+  new DataView(profile.buffer).setBigUint64(0x450, 0xFEFFFFFFFFFFFFFFn, false);
+}
+fs.writeFileSync(path, createMeleeGCI(profile, new Date('2026-01-01T00:00:00Z')).bytes);
+"""
+            subprocess.run(["node", "--input-type=module", "-e", create,
+                str(initial), "initial"], cwd=ROOT, check=True, capture_output=True, text=True)
+            final = card / initial.name
+            subprocess.run(["node", "--input-type=module", "-e", create,
+                str(final), "final", str(initial)], cwd=ROOT, check=True,
+                capture_output=True, text=True)
+            result = verify_vs_rules_items_save_effect(initial, final_gc, -1, committed_mask)
+            self.assertEqual(result["status"], "verified_source_save_effect")
+            self.assertEqual(result["item_frequency_before"], 2)
+            self.assertEqual(result["item_frequency_after"], 0xFF)
+            self.assertEqual(result["item_frequency_after_menu_value"], -1)
+            self.assertEqual(result["item_mask_before"], f"{initial_mask:016x}")
+            self.assertEqual(result["item_mask_after"], f"{committed_mask:016x}")
+            self.assertEqual(result["other_profile_changed_byte_count"], 0)
+
+            subprocess.run(["node", "--input-type=module", "-e", create,
+                str(final), "bad-frequency", str(initial)], cwd=ROOT, check=True,
+                capture_output=True, text=True)
+            with self.assertRaisesRegex(RuntimeError, "committed source Items values"):
+                verify_vs_rules_items_save_effect(initial, final_gc, -1, committed_mask)
+
+    def test_vs_rules_items_input_verifier_binds_original_menu_choices(self):
+        commands = []
+
+        def add(scene, mode, command, cur=None, hovered=None):
+            row = {"event": "pad_command", "scene_kind": scene,
+                   "game_mode": mode, "command": command}
+            if cur is not None:
+                row["menu_state"] = {"cur": cur, "hovered": hovered}
+            commands.append(row)
+
+        add(8, 2, "PRESS L")
+        add(8, 2, "PRESS R")
+        add(8, 2, "PRESS START")
+        add(1, 1, "PRESS B", 2, 0)
+        add(1, 1, "PRESS A", 0, 1)
+        add(1, 1, "PRESS D_UP", 2, 0)
+        add(1, 1, "PRESS A", 2, 3)
+        add(1, 1, "PRESS D_UP", 13, 0)
+        add(1, 1, "PRESS A", 13, 5)
+        add(1, 1, "PRESS A", 16, 0)
+        add(1, 1, "PRESS D_LEFT", 16, 0)
+        add(1, 1, "PRESS D_UP", 16, 31)
+        add(1, 1, "PRESS B", 16, 31)
+        add(1, 1, "PRESS B", 13, 5)
+        add(1, 1, "PRESS B", 2, 3)
+        add(1, 1, "PRESS A", 0, 1)
+        add(1, 1, "PRESS D_UP", 2, 0)
+        add(1, 1, "PRESS A", 2, 3)
+        add(1, 1, "PRESS D_DOWN", 13, 0)
+        add(1, 1, "PRESS START", 13, 1)
+        add(8, 2, "PRESS START")
+        add(9, 2, "PRESS A")
+        for button in ("L", "R", "A", "START"):
+            add(2, 2, "PRESS " + button)
+            commands[-1]["port"] = 1
+            commands[-1]["source_sequence"] = 42
+        add(5, 2, "PRESS START")
+        commands[-1]["port"] = 1
+        commands[12]["menu_state"]["confirmed"] = 0
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commands.jsonl"
+            path.write_text("".join(json.dumps(row) + "\n" for row in commands))
+            self.assertEqual(verify_vs_rules_items_route_commands(path)["commands"], 27)
+            commands[12]["menu_state"]["confirmed"] = 1
+            path.write_text("".join(json.dumps(row) + "\n" for row in commands))
+            with self.assertRaisesRegex(RuntimeError, "Items B"):
+                verify_vs_rules_items_route_commands(path)
+            commands[12]["menu_state"]["confirmed"] = 0
+            commands[-1]["port"] = 2
+            path.write_text("".join(json.dumps(row) + "\n" for row in commands))
+            with self.assertRaisesRegex(RuntimeError, "original P1 Start"):
+                verify_vs_rules_items_route_commands(path)
+            commands.pop()
+            path.write_text("".join(json.dumps(row) + "\n" for row in commands))
+            with self.assertRaisesRegex(RuntimeError, "did not exit"):
+                verify_vs_rules_items_route_commands(path)
 
     def test_route_verifier_requires_complete_ordered_source_markers_and_ticks(self):
         rows = [
@@ -190,13 +412,75 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             receipt_path = root / "setup-receipt.json"
             receipt_path.write_text(json.dumps(receipt))
             args = SimpleNamespace(disc=disc, dol=dol, dolphin=dolphin,
-                template_user=template, checkpoint_gc=checkpoint)
+                template_user=template, checkpoint_gc=checkpoint, initial_gci=None)
             result = validate_setup_receipt(receipt_path, args,
                 {"sha256": manifest_hash})
             self.assertEqual(result["card_baseline"], "empty GCI folder")
 
             (card / "unexpected.gci").write_bytes(b"not the declared baseline")
             with self.assertRaisesRegex(ValueError, "empty GCI folder baseline"):
+                validate_setup_receipt(receipt_path, args, {"sha256": manifest_hash})
+
+            (card / "unexpected.gci").unlink()
+            source_profile = root / "everything-unlocked.gci"
+            source_profile.write_bytes(b"source-generated Everything unlocked profile")
+            args.initial_gci = source_profile
+            profile_hash = capture_retail._sha256(source_profile)
+            (card / source_profile.name).write_bytes(source_profile.read_bytes())
+            source_report = root / "source-export-report.json"
+            source_manifest = root / "source-export-manifest.json"
+            source_check = "save settings export, import, persistence, compare-and-swap and recovery"
+            source_report.write_text(json.dumps({"schema": "webmelee-public-player-browser-v1",
+                "build_identity": {"schema": "melee-web-public-release-v1", "profile": "player"},
+                "result": "pass", "scope": "isolated save export", "checks": [source_check]}))
+            source_manifest.write_text(json.dumps({"schema": "melee-web-public-release-v1",
+                "profile": "player", "runtime": {"identity_sha256": "bundle-identity"}}))
+            receipt["initial_card"] = {
+                "file_count": 1,
+                "format": "single imported Everything unlocked GCI",
+                "gci_filename": source_profile.name,
+                "gci_sha256": profile_hash,
+                "save_mode": "Everything unlocked",
+            }
+            receipt["source_profile_export"] = {
+                "source_run_report": str(source_report),
+                "source_run_report_sha256": capture_retail._sha256(source_report),
+                "source_run_manifest": str(source_manifest),
+                "source_run_manifest_sha256": capture_retail._sha256(source_manifest),
+                "source_run_result": "pass",
+                "source_run_scope": "isolated save export",
+                "source_run_check": source_check,
+                "exported_gci_sha256": profile_hash,
+                "exported_gci_bytes": source_profile.stat().st_size,
+                "profile_mode": "Everything unlocked",
+            }
+            receipt["external_save_hashes"] = tree_hashes(checkpoint)
+            provenance_path = root / "retail-provenance.json"
+            provenance = {"external_save_hashes": receipt["external_save_hashes"],
+                "source_profile_mode": "Everything unlocked",
+                "source_profile_gci_sha256": profile_hash}
+            provenance_path.write_text(json.dumps(provenance))
+            args.provenance = provenance_path
+            receipt["retail_provenance"] = {
+                "path": str(provenance_path.resolve()),
+                "sha256": capture_retail._sha256(provenance_path),
+                "external_save_hashes": receipt["external_save_hashes"],
+            }
+            receipt_path.write_text(json.dumps(receipt))
+            result = validate_setup_receipt(receipt_path, args,
+                {"sha256": manifest_hash})
+            self.assertEqual(result["card_baseline"],
+                "single imported Everything unlocked GCI")
+            self.assertEqual(result["initial_profile_sha256"], profile_hash)
+
+            (card / source_profile.name).write_bytes(b"changed profile")
+            with self.assertRaisesRegex(ValueError, "declared Everything unlocked profile"):
+                validate_setup_receipt(receipt_path, args, {"sha256": manifest_hash})
+            (card / source_profile.name).write_bytes(source_profile.read_bytes())
+            source_report.write_text(json.dumps({"schema": "webmelee-public-player-browser-v1",
+                "build_identity": {"schema": "melee-web-public-release-v1", "profile": "player"},
+                "result": "fail", "scope": "isolated save export", "checks": [source_check]}))
+            with self.assertRaisesRegex(ValueError, "source profile export report"):
                 validate_setup_receipt(receipt_path, args, {"sha256": manifest_hash})
 
     def test_headless_visual_options_use_the_pinned_image_frame_dumper(self):
@@ -242,6 +526,38 @@ class CaptureAllocationMenuRouteTests(unittest.TestCase):
             mapping = json.loads((root / "screenshots/mapping.json").read_text())
             self.assertEqual(mapping["frame_offset"], 0)
             self.assertIn("not pixel or timing equivalence", mapping["alignment_scope"])
+
+    def test_vs_rules_items_screenshots_map_each_source_route_marker(self):
+        marker_names = (
+            "cold_css_ready", "versus_submenu_after_css_parent", "root_menu_after_vs_back",
+            "versus_submenu_for_rules", "vs_rules_first_entry", "vs_items_entry",
+            "vs_items_one_bit_toggled", "vs_items_frequency_none", "vs_items_back_committed",
+            "vs_rules_back_to_versus", "versus_back_to_main",
+            "vs_rules_reentry_retained_items", "vs_rules_stock_three_selected",
+            "css_after_rules_start_retained", "sss_after_rules_start",
+            "sss_final_destination_selected", "vs_match_entered",
+            "vs_match_after_180_ticks", "vs_no_contest_chord_sent",
+            "results_no_contest", "css_after_results_retained")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            frames = root / "frames"
+            frames.mkdir()
+            rows = []
+            for sequence, name in enumerate(marker_names):
+                rows.append({"event": "scheduler_return", "sequence": sequence})
+                rows.append({"event": name, "sequence": sequence,
+                             "scene_kind": 8, "game_mode": 2})
+                (frames / f"framedump_{sequence + 1}.png").write_bytes(
+                    b"rules items png " + str(sequence).encode())
+            trace = root / "route.jsonl"
+            trace.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            result = retain_route_screenshots(
+                frames, trace, root, route="vs_rules_items")
+            self.assertEqual(result["status"], "retained")
+            self.assertEqual(result["screenshots"], len(marker_names))
+            mapping = json.loads((root / "screenshots/mapping.json").read_text())
+            self.assertEqual(
+                [row["event"] for row in mapping["screenshots"]], list(marker_names))
 
 
 if __name__ == "__main__":

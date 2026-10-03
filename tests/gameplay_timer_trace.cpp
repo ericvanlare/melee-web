@@ -23,6 +23,8 @@ using namespace melee_web;
 
 namespace {
 
+constexpr std::uint64_t kDisabledItemMask = UINT64_MAX ^ UINT64_C(1);
+
 void check(bool condition, const std::string& message)
 {
     if (!condition) throw std::runtime_error(message);
@@ -62,7 +64,10 @@ MeleeWebMenuMatchSelection timed_selection()
     selection.start.rules.time_limit = 60;
     selection.start.rules.x14 = 0;
     selection.start.rules.xB = -1;
-    selection.start.rules.x20 = UINT64_MAX;
+    /* The original Items menu persists its 31 authored flags separately from
+     * frequency. Retail's item service is disabled by xB == -1, so the match
+     * handoff must preserve a changed mask without loading item services. */
+    selection.start.rules.x20 = kDisabledItemMask;
     selection.start.rules.stkind = 0x20; /* St_Kind_Last / Final Destination. */
     selection.hud_layout = 4;
     selection.random_seed = 1;
@@ -139,6 +144,9 @@ void run_timer_lifecycle(const RuntimeFiles& files)
 {
     auto selection = timed_selection();
     auto match = std::make_unique<GameplayMatchSession>(files, selection);
+    check(match->start_data().rules.xB == -1 &&
+              match->start_data().rules.x20 == kDisabledItemMask,
+          "source match did not retain the item-disabled menu mask");
     std::array<PADStatus, 4> neutral{};
     neutral[0].err = PAD_ERR_NONE;
     neutral[1].err = PAD_ERR_NONE;
@@ -228,6 +236,21 @@ void run_timer_lifecycle(const RuntimeFiles& files)
     }
 }
 
+void reject_enabled_items_with_custom_mask(const RuntimeFiles& files)
+{
+    auto selection = timed_selection();
+    selection.start.rules.xB = 0;
+    bool rejected = false;
+    try {
+        GameplayMatchSession match(files, selection);
+    } catch (const std::exception& error) {
+        rejected = std::string(error.what()) ==
+                   "Menu payload does not match the supported stock/stage rules";
+    }
+    check(rejected,
+          "custom item mask with an enabled item frequency crossed the supported match boundary");
+}
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -237,6 +260,7 @@ int main(int argc, char** argv)
         validate_timer_shape();
         validate_selection_consistency();
         RuntimeFiles files = load_files(argv[1], argv[2]);
+        reject_enabled_items_with_custom_mask(files);
         run_timer_lifecycle(files);
         run_timer_lifecycle(files); /* repeat ownership/lifetime teardown */
         std::cout << "Original stock timer countdown, pause/resume, timeout and repeated lifetime passed\n";

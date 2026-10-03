@@ -39,6 +39,7 @@
 #include <sysdolphin/baselib/video.h>
 #include <sysdolphin/baselib/random.h>
 #include <melee/mn/mnmain.h>
+#include <melee/mn/mnitemsw.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1183,6 +1184,21 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
             melee_web_pad_state_free(next_input);
             return fail(e, n, "Original main exit changed its checked destination");
         }
+        if (requested_mode == GM_VS) {
+            /* mnmainrule/mnitemsw commit into the live source globals before
+             * requesting GM_VS. Capture only after the original Main mode
+             * OnExit has consumed that request, so returning through CSS
+             * cannot restore the pre-rules values saved at CSS exit. */
+            h->selected_rules = *gmMainLib_GetGameRules();
+            h->selected_preferences = *gmMainLib_8015CC58();
+            h->selected_characters = *gmMainLib_GetUnlockedCharactersBitmaskPtr();
+            h->selected_stages = *gmMainLib_8015EDA4();
+            if (!melee_web_save_profile_owner_capture_preferences(
+                    h->profile, &h->persisted_preferences, e, n)) {
+                melee_web_pad_state_free(next_input);
+                return 0;
+            }
+        }
         h->source_target_mode = requested_mode;
         h->source_previous_mode = GM_MENU;
         if (!melee_web_vs_mode_set_route(requested_mode, GM_MENU)) {
@@ -1291,6 +1307,43 @@ int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t
 int melee_web_menu_host_phase(const MeleeWebMenuHost* h){return h&&h==owner?melee_web_menu_phase(h->session):MELEE_WEB_MENU_CLOSED;}
 int melee_web_menu_host_source_scene(const MeleeWebMenuHost* h){
     return h&&h==owner?h->source_scene:MELEE_WEB_HOST_SCENE_NONE;
+}
+int melee_web_menu_host_source_observe(
+    const MeleeWebMenuHost* h, MeleeWebMenuSourceObservation* out,
+    char* e, size_t n)
+{
+    const GameRules* rules;
+    const struct gmm_x1CB0* preferences;
+    if (!h || h != owner || !h->entered || h->audio == NULL || !out ||
+        (h->source_scene != MELEE_WEB_HOST_SCENE_MAIN &&
+         h->source_scene != MELEE_WEB_HOST_SCENE_CSS &&
+         h->source_scene != MELEE_WEB_HOST_SCENE_SSS)) {
+        return fail(e, n,
+                    "Source observation requires an active original menu scene");
+    }
+    memset(out, 0, sizeof(*out));
+    rules = gmMainLib_GetGameRules();
+    preferences = gmMainLib_8015CC58();
+    out->source_scene = h->source_scene;
+    if (h->source_scene == MELEE_WEB_HOST_SCENE_MAIN) {
+        out->menu_kind = mn_804A04F0.cur_menu;
+        out->previous_menu_kind = mn_804A04F0.prev_menu;
+        out->hovered_selection = mn_804A04F0.hovered_selection;
+        out->confirmed_selection = mn_804A04F0.confirmed_selection;
+        out->menu_buttons = mn_804A04F0.buttons;
+        out->item_input_locked = out->menu_kind == 0x10 &&
+                                 mnItemSw_804D6BEC != 0;
+    }
+    out->rule_mode = rules->mode;
+    out->stock_count = rules->stock_count;
+    out->time_limit = rules->time_limit;
+    out->stock_time_limit = rules->stock_time_limit;
+    out->handicap = rules->handicap;
+    out->damage_ratio = rules->damage_ratio;
+    out->friendly_fire = rules->friendly_fire;
+    out->item_frequency = (int) (int8_t) preferences->item_freq;
+    out->item_mask = preferences->item_mask;
+    return ok(e, n);
 }
 int melee_web_menu_host_route_target_mode(const MeleeWebMenuHost* h){
     return h&&h==owner&&!h->entered&&

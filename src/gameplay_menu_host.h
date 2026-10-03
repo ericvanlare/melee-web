@@ -32,6 +32,24 @@ typedef struct MeleeWebMenuMatchSelection {
      * mode/callback and 99-stock payload separate from ordinary VS rules. */
     uint8_t opening_demo;
 } MeleeWebMenuMatchSelection;
+typedef struct MeleeWebMenuSourceObservation {
+    int source_scene;
+    int menu_kind;
+    int previous_menu_kind;
+    int hovered_selection;
+    int confirmed_selection;
+    uint64_t menu_buttons;
+    int item_input_locked;
+    int rule_mode;
+    int stock_count;
+    int time_limit;
+    int stock_time_limit;
+    int handicap;
+    int damage_ratio;
+    int friendly_fire;
+    int item_frequency;
+    uint64_t item_mask;
+} MeleeWebMenuSourceObservation;
 typedef struct MeleeWebOpeningPreview {
     uint32_t characters[4];
     uint32_t costumes[4];
@@ -104,6 +122,10 @@ int melee_web_menu_host_reenter_css_after_parent(MeleeWebMenuHost*,MeleeWebAudio
 /* Current source scene: 0 when the host is between worlds, 1 CSS, 2 SSS,
  * 3 title, 4 main. */
 int melee_web_menu_host_source_scene(const MeleeWebMenuHost*);
+/* Read the original menu selection and the live VS rule/item values without
+ * advancing source code or transferring any source-owned pointers. */
+int melee_web_menu_host_source_observe(
+    const MeleeWebMenuHost*, MeleeWebMenuSourceObservation*, char*, size_t);
 /* Checked retail destination after leaving a title/main/CSS scene. Known
  * menu routes use the compact values GM_TITLE=0, GM_MENU=1, GM_VS=2; other
  * source modes retain their original mode id. */

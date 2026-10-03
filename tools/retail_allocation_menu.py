@@ -43,6 +43,7 @@ SCENE_OPENING_MOVIE = 0x1C
 SCHEDULER_RETURN = 0x80390EB4
 COMMAND_LOG_NAME = "cold-boot-input-commands.jsonl"
 MENU_ROUTE_TRACE_NAME = "cold-boot-menu-route.jsonl"
+VS_RULES_ITEMS_TRACE_NAME = "cold-boot-vs-rules-items-route.jsonl"
 
 
 _COLD_BOOT_HELPERS = rf'''
@@ -206,21 +207,22 @@ def cold_boot_to_css():
     raise RuntimeError(f'cold boot did not reach original CSS within bound; scenes={{names}}')
 
 def _cold_boot_enter_sss():
-    # The existing rules routine intentionally starts at SSS.  Establish
+    # The existing rules routine intentionally starts at SSS. Establish
     # that source precondition through CSS first; all cursor and costume
-    # changes below use the existing source-driven helpers. Keep every slot
-    # human until the reused preparation body applies CPU modes.
+    # changes below use the original source-driven helpers. Apply any declared
+    # CPU slots through the same CSS controls used by the full preparation.
     _cold_boot_check_character_availability()
-    expected_css=[(p['character_kind'],p['costume'],0) for p in EXPECTED_PLAYERS]
+    expected_css=[(p['character_kind'],p['costume'],p['player_type']) for p in EXPECTED_PLAYERS]
     for port,player in enumerate(EXPECTED_PLAYERS):
         select(port,player['character_kind'])
         set_costume(port,player['costume'])
-    players=[css_player(i) for i in range(len(EXPECTED_PLAYERS))]
-    if [(p['character_kind'],p['costume'],p['slot_type']) for p in players] != [(k,c,0) for k,c,_ in expected_css]:
-        raise RuntimeError(f'cold CSS selection mismatch: expected {{expected_css}}, got {{players}}')
+    for door,player in enumerate(EXPECTED_PLAYERS):
+        if player['player_type']:
+            set_cpu_mode(door)
+            set_cpu_level(door,int(player['cpu_level']))
     players=[css_player(i) for i in range(len(EXPECTED_PLAYERS))]
     if [(p['character_kind'],p['costume'],p['slot_type']) for p in players] != expected_css:
-        raise RuntimeError(f'cold CSS human setup mismatch: expected {{expected_css}}, got {{players}}')
+        raise RuntimeError(f'cold CSS roster setup mismatch: expected {{expected_css}}, got {{players}}')
     if [p['team'] for p in players] != EXPECTED_TEAMS:
         raise RuntimeError(f'cold CSS team setup mismatch: expected {{EXPECTED_TEAMS}}, got {{players}}')
     for _ in range(120):
@@ -263,6 +265,10 @@ MENU_ROUTE_TRACE_LIMIT=12000
 GM_TITLE=0
 GM_MENU=1
 GM_VS=2
+SCENE_VS=2
+SCENE_RESULTS=5
+VS_START_DATA_ADDRESS=0x80480530
+VS_RESULTS_DATA_ADDRESS=0x8047C020
 
 def _menu_route_snapshot(event):
     kind=scene_kind()
@@ -282,6 +288,9 @@ def _menu_route_snapshot(event):
                            'hovered':struct.unpack_from('>H',menu_flow,2)[0],
                            'confirmed':menu_flow[4],'entering':menu_flow[0x11]}
         row['menu_input_cooldown']=u32(0x804D6BC8)
+        row['rules_state']=rules_state()
+        if row['menu_state']['cur']==0x10:
+            row['item_input_locked']=mem(0x804D6BEC,1)[0]
     elif kind==SCENE_CSS:
         pointer=u32(0x804D6CB0)
         if not 0x80000000<=pointer<=0x81800000-0x100:
@@ -314,6 +323,15 @@ def _menu_route_snapshot(event):
                             'cursor':struct.unpack_from('>ff',cursor,12),
                             'model':struct.unpack_from('>ff',model,8)})
         row['css_cursors']=cursors
+    if kind in (SCENE_CSS,SCENE_SSS):
+        row['rules_state']=rules_state()
+    if kind==SCENE_SSS:
+        row['selected_stage_kind']=selected_stage_kind()
+    elif kind==SCENE_VS:
+        row['match_start_data']=_vs_start_data_state()
+    elif kind==SCENE_RESULTS:
+        row['results_outcome']=mem(VS_RESULTS_DATA_ADDRESS+0x0C,1)[0]
+        row['results_frame_count']=u32(VS_RESULTS_DATA_ADDRESS+0x10)
     hps=mem(0x803BB300,0x40).split(b'\0',1)[0]
     row['current_hps_hex']=hps.hex()
     row['hps_voice_word']=hex(u32(0x804D6038))
@@ -456,6 +474,246 @@ def cold_boot_css_menu_round_trip():
 '''
 
 
+_VS_RULES_ITEMS_ROUTE_HELPERS = r'''
+def _vs_start_data_state():
+    # Source identities from mn/types.h: StartMeleeRules is 0x60 bytes,
+    # followed by six 0x24-byte PlayerInitData rows. gmVsMelee_StartData is
+    # pinned in the Rev. 2 symbol map at 0x80480530.
+    raw=mem(VS_START_DATA_ADDRESS,0x138)
+    players=[]
+    for index in range(6):
+        offset=0x60+index*0x24
+        players.append({'character_kind':struct.unpack('b',raw[offset:offset+1])[0],
+                        'slot_type':raw[offset+1],
+                        'stocks':struct.unpack('b',raw[offset+2:offset+3])[0],
+                        'color':raw[offset+3],
+                        'team':raw[offset+9],
+                        'rumble_enabled':raw[offset+12]&1,
+                        'cpu_kind':raw[offset+14],
+                        'cpu_level':raw[offset+15]})
+    return {'item_frequency':struct.unpack('b',raw[0x15:0x16])[0],
+            'stage':struct.unpack('>H',raw[0x18:0x1A])[0],
+            'item_mask_hex':f'{int.from_bytes(raw[0x30:0x38],"big"):016x}',
+            'players':players}
+
+def _vs_wait_scene(target_scene,target_mode,limit=1800):
+    for _ in range(limit):
+        if (scene_kind()==target_scene and
+                mem(0x80479D30,1)[0]==target_mode):
+            return
+        if scene_kind()==SCENE_MEMCARD:
+            _cold_boot_card_prompt()
+            continue
+        step(1)
+    raise RuntimeError(f'original VS route did not reach scene/mode {target_scene}/{target_mode}: scene={scene_kind()} mode={mem(0x80479D30,1)[0]}')
+
+def _vs_rules_css_to_parent_menu():
+    if scene_kind()!=SCENE_CSS or mem(0x80479D30,1)[0]!=GM_VS:
+        raise RuntimeError('VS Rules route requires live original GM_VS/GS_CSS')
+    for port in range(4): command(port,'SET MAIN .5 .5')
+    step(12)
+    command(0,'PRESS L');command(0,'PRESS R');step(4)
+    command(0,'PRESS START');step(12)
+    command(0,'RELEASE L');command(0,'RELEASE R');command(0,'RELEASE START')
+    state=_cold_boot_wait_main_menu(2)
+    if state['cur']!=2 or state['hovered']!=0:
+        raise RuntimeError(f'CSS parent-menu route did not reach the VS submenu: {state}')
+    _record_menu_route_marker('versus_submenu_after_css_parent')
+
+def _vs_rules_wait_menu(menu_kind,hovered=None,limit=2400):
+    for _ in range(limit):
+        if scene_kind()==SCENE_MENU and mem(0x80479D30,1)[0]==GM_MENU:
+            state=menu_state()
+            if (state['cur']==menu_kind and
+                    (hovered is None or state['hovered']==hovered) and
+                    u32(0x804D6BC8)==0):
+                return state
+        step(1)
+    raise RuntimeError(f'VS Rules route did not reach menu {menu_kind}/{hovered}: {menu_state()}')
+
+def _vs_rules_wait_items(limit=2400):
+    for _ in range(limit):
+        if scene_kind()==SCENE_MENU and mem(0x80479D30,1)[0]==GM_MENU:
+            state=menu_state()
+            if (state['cur']==0x10 and mem(0x804D6BEC,1)[0]==0 and
+                    u32(0x804D6BC8)==0):
+                return state
+        step(1)
+    raise RuntimeError(f'original Items input lock did not clear: {menu_state()} lock={mem(0x804D6BEC,1)[0]}')
+
+def _vs_items_move_cursor(target,limit=64):
+    state=menu_state()
+    if state['cur']!=0x10:
+        raise RuntimeError(f'Items cursor move left the source Items menu: {state}')
+    if state['hovered']==target:
+        return state
+    # mnItemSw_80233B68 maps D-left at item cell 0 directly to frequency row
+    # 31. This route deliberately enters Items at source row zero and uses
+    # that authored wrap edge instead of treating the grid as a linear list.
+    if target!=0x1F or state['hovered']!=0:
+        raise RuntimeError(f'route requires the original item-grid 0 -> frequency-row wrap: {state} -> {target}')
+    pulse(0,'D_LEFT')
+    state=_vs_rules_wait_items()
+    if state['hovered']!=target:
+        raise RuntimeError(f'original Items D-left did not reach frequency row {target}: {state}')
+    return state
+
+def _cold_boot_vs_rules_items_round_trip():
+    """Capture cold-DOL Rules/Items, match, No Contest Results and CSS return."""
+    _record_menu_route_marker('first_scheduler_return')
+    cold_boot_to_css()
+    _record_menu_route_marker('cold_css_ready')
+    _vs_rules_css_to_parent_menu()
+    pulse(0,'B',settle=24)
+    state=_vs_rules_wait_menu(0,1)
+    _record_menu_route_marker('root_menu_after_vs_back')
+
+    move_menu_selection(1)  # SEL_MAIN_VS
+    pulse(0,'A',settle=24)
+    state=_vs_rules_wait_menu(2,0)
+    _record_menu_route_marker('versus_submenu_for_rules')
+    move_menu_selection(3)  # SEL_VS_RULES
+    pulse(0,'A',settle=30)
+    state=_vs_rules_wait_menu(13,0)
+    _record_menu_route_marker('vs_rules_first_entry')
+
+    rules_before=rules_state()
+    move_menu_selection(5,limit=24)
+    pulse(0,'A',settle=30)
+    _vs_rules_wait_items()
+    items_before=rules_state()
+    _record_menu_route_marker('vs_items_entry')
+    if not 0<=menu_state()['confirmed']<=1:
+        raise RuntimeError(f'original Items first-row selection is out of range: {menu_state()}')
+    pulse(0,'A',settle=12)
+    item_toggle=rules_state()
+    changed_bits=items_before['item_mask'] ^ item_toggle['item_mask']
+    if changed_bits==0 or changed_bits & (changed_bits-1):
+        raise RuntimeError(f'original Items A did not change exactly one source mask bit: before={items_before} after={item_toggle}')
+    _record_menu_route_marker('vs_items_one_bit_toggled')
+
+    state=_vs_items_move_cursor(0x1F)
+    if not 0<=state['confirmed']<=5:
+        raise RuntimeError(f'original item frequency selector is out of range: {state}')
+    for _ in range(6):
+        if menu_state()['confirmed']==0:
+            break
+        pulse(0,'D_UP')
+        _vs_rules_wait_items()
+    if menu_state()['confirmed']!=0:
+        raise RuntimeError(f'original item-frequency selector did not reach None: {menu_state()}')
+    _record_menu_route_marker('vs_items_frequency_none')
+
+    pulse(0,'B',settle=30)
+    _vs_rules_wait_menu(13,5)
+    items_committed=rules_state()
+    if (items_committed['item_frequency']!=-1 or
+            items_committed['item_mask']!=item_toggle['item_mask']):
+        raise RuntimeError(f'original Items B did not commit item mask/None frequency: {items_committed}')
+    _record_menu_route_marker('vs_items_back_committed')
+    pulse(0,'B',settle=30)
+    _vs_rules_wait_menu(2,3)
+    _record_menu_route_marker('vs_rules_back_to_versus')
+    pulse(0,'B',settle=30)
+    _vs_rules_wait_menu(0,1)
+    _record_menu_route_marker('versus_back_to_main')
+
+    move_menu_selection(1)
+    pulse(0,'A',settle=24)
+    _vs_rules_wait_menu(2,0)
+    move_menu_selection(3)
+    pulse(0,'A',settle=30)
+    _vs_rules_wait_menu(13,0)
+    retained_before_stock=rules_state()
+    if (retained_before_stock['item_frequency']!=-1 or
+            retained_before_stock['item_mask']!=item_toggle['item_mask']):
+        raise RuntimeError(f'Rules re-entry did not retain original item preferences: {retained_before_stock}')
+    _record_menu_route_marker('vs_rules_reentry_retained_items')
+
+    move_menu_selection(1)
+    for _ in range(100):
+        state=menu_state()
+        if state['hovered']!=1:
+            raise RuntimeError(f'Rules stock edit changed its source row: {state}')
+        if state['confirmed']==3:
+            break
+        pulse(0,'D_LEFT' if state['confirmed']>3 else 'D_RIGHT')
+    else:
+        raise RuntimeError(f'original Rules stock selector did not reach three: {menu_state()}')
+    _record_menu_route_marker('vs_rules_stock_three_selected')
+    pulse(0,'START',settle=12)
+    _cold_boot_wait_css()
+    final_rules=rules_state()
+    if (final_rules['stock_count']!=3 or final_rules['item_frequency']!=-1 or
+            final_rules['item_mask']!=item_toggle['item_mask']):
+        raise RuntimeError(f'GM_VS CSS handoff did not retain source Rules/Items values: {final_rules}')
+    _record_menu_route_marker('css_after_rules_start_retained')
+
+    # Continue through original CSS and SSS to a real source VS match. The
+    # preparation helpers steer CSS/SSS geometry but leave character, stage,
+    # StartMeleeData, and match ownership with their retail callbacks.
+    _cold_boot_enter_sss()
+    if scene_kind()!=SCENE_SSS or mem(0x80479D30,1)[0]!=GM_VS:
+        raise RuntimeError('original Rules route did not enter GM_VS/GS_SSS')
+    _record_menu_route_marker('sss_after_rules_start')
+    select_stage(EXPECTED_STAGE)
+    if selected_stage_kind()!=EXPECTED_STAGE:
+        raise RuntimeError(f'original SSS cursor did not select Final Destination: {selected_stage_kind()}')
+    _record_menu_route_marker('sss_final_destination_selected')
+    pulse(0,'A',settle=30)
+    _vs_wait_scene(SCENE_VS,GM_VS)
+    start_data=_vs_start_data_state()
+    if (start_data['stage']!=EXPECTED_STAGE or
+            start_data['item_frequency']!=-1 or
+            start_data['item_mask_hex']!=f"{item_toggle['item_mask']:016x}" or
+            len(start_data['players'])!=6 or
+            [(p['character_kind'],p['slot_type'],p['stocks'],p['color'],p['team'])
+             for p in start_data['players'][:len(EXPECTED_PLAYERS)]] !=
+            [(int(p['character_kind']),int(p['player_type']),3,int(p['costume']),int(p.get('team',0)))
+             for p in EXPECTED_PLAYERS] or
+            any(p['slot_type']!=3 for p in start_data['players'][len(EXPECTED_PLAYERS):])):
+        raise RuntimeError(f'original SSS handoff did not carry source Rules/Items into GM_VS: {start_data}')
+    _record_menu_route_marker('vs_match_entered')
+    step(180)
+    if scene_kind()!=SCENE_VS or mem(0x80479D30,1)[0]!=GM_VS:
+        raise RuntimeError('original VS match did not remain live for the declared 180 source scheduler ticks')
+    _record_menu_route_marker('vs_match_after_180_ticks')
+
+    # The source no-contest chord is one simultaneous P1 PAD sample. It is
+    # processed by gm_16AE.c and enters the ordinary Results mode route.
+    for button in ('L','R','A','START'):
+        command(0,'PRESS '+button)
+    step(1)
+    for button in ('L','R','A','START'):
+        command(0,'RELEASE '+button)
+    step(1)
+    _record_menu_route_marker('vs_no_contest_chord_sent')
+    _vs_wait_scene(SCENE_RESULTS,GM_VS)
+    result_outcome=mem(VS_RESULTS_DATA_ADDRESS+0x0C,1)[0]
+    if result_outcome!=7:
+        raise RuntimeError(f'original No Contest did not produce OUTCOME_NO_CONTEST=7: {result_outcome}')
+    _record_menu_route_marker('results_no_contest')
+    # Results' source player route accepts P1 Start after its presentation
+    # delay. Retry only after checking the current scene; no result state is
+    # skipped or written.
+    step(270)
+    for _ in range(8):
+        if scene_kind()==SCENE_CSS and mem(0x80479D30,1)[0]==GM_VS:
+            break
+        if scene_kind()!=SCENE_RESULTS or mem(0x80479D30,1)[0]!=GM_VS:
+            raise RuntimeError(f'original Results left its checked owner unexpectedly: scene={scene_kind()} mode={mem(0x80479D30,1)[0]}')
+        pulse(0,'START',settle=90)
+    if scene_kind()!=SCENE_CSS or mem(0x80479D30,1)[0]!=GM_VS:
+        raise RuntimeError('original Results Start did not return through the source VS route to CSS')
+    retained_after_results=rules_state()
+    if (retained_after_results['stock_count']!=3 or
+            retained_after_results['item_frequency']!=-1 or
+            retained_after_results['item_mask']!=item_toggle['item_mask']):
+        raise RuntimeError(f'Results/CSS return did not retain source Rules/Items settings: {retained_after_results}')
+    _record_menu_route_marker('css_after_results_retained')
+'''
+
+
 _COMMAND_LOG_HELPER = rf'''
 # Every controller command is retained as reproducible provenance.  The log
 # records the source scene/frame observed immediately before the pipe write;
@@ -467,7 +725,8 @@ COMMAND_LOG=COMMAND_LOG_PATH.open('x',encoding='utf-8')
 def _record_input_command(port,text):
     row={{'event':'pad_command','port':port+1,'command':text,
          'scene_kind':scene_kind(),'game_mode':mem(0x80479D30,1)[0],
-         'scene_frame':u32(0x80479D58)}}
+         'scene_frame':u32(0x80479D58),
+         'source_sequence':globals().get('MENU_ROUTE_TRACE_SEQUENCE')}}
     if row['scene_kind']==SCENE_MENU:
         menu_flow=mem(0x804A04F0,0x18)
         row['menu_state']={{'cur':menu_flow[0],'prev':menu_flow[1],
@@ -490,8 +749,11 @@ def _check_collector_failure():
 '''
 
 
-def _compose_driver(*, menu_round_trip: bool = False) -> str:
+def _compose_driver(*, menu_round_trip: bool = False,
+                    vs_rules_items_round_trip: bool = False) -> str:
     """Compose a cold route around the existing source-menu body."""
+    if menu_round_trip and vs_rules_items_round_trip:
+        raise ValueError("choose one original menu route capture")
     marker = "\n# Preparation only, before a new checkpoint."
     if _BASE_DRIVER_SOURCE.count(marker) != 1:
         raise ValueError("retail CPU menu driver preparation marker changed")
@@ -512,7 +774,7 @@ def _compose_driver(*, menu_round_trip: bool = False) -> str:
         1,
     )
     route_helpers = _COLD_BOOT_HELPERS
-    if menu_round_trip:
+    if menu_round_trip or vs_rules_items_round_trip:
         if source.count("completed+=1;previous=current") != 1:
             raise ValueError("retail CPU menu source-frame boundary changed")
         source = source.replace(
@@ -520,15 +782,22 @@ def _compose_driver(*, menu_round_trip: bool = False) -> str:
             "completed+=1;previous=current\n        _record_menu_route_frame()",
             1,
         )
-        source = source.replace(marker, _MENU_ROUTE_TRACE_HELPER + marker, 1)
+        trace_helper = _MENU_ROUTE_TRACE_HELPER
         route_helpers += _COLD_BOOT_MENU_ROUTE_HELPERS
+        if vs_rules_items_round_trip:
+            trace_helper = trace_helper.replace(MENU_ROUTE_TRACE_NAME,
+                                                VS_RULES_ITEMS_TRACE_NAME)
+            route_helpers += _VS_RULES_ITEMS_ROUTE_HELPERS
+        source = source.replace(marker, trace_helper + marker, 1)
     source = source.replace(marker, route_helpers + marker, 1)
     route = ("cold_boot_css_menu_round_trip" if menu_round_trip else
+             "_cold_boot_vs_rules_items_round_trip" if vs_rules_items_round_trip else
              "cold_boot_to_sss")
     route_note = (
-        "# This is one continuous fresh-DOL route: cold boot, first CSS, "
-        "retail parent-menu/title return, then a second CSS.\n"
+        "# Fresh-DOL route through the retail parent menus and title, then CSS.\n"
         if menu_round_trip else
+        "# Fresh-DOL VS Rules/Items -> SSS -> source match -> Results -> CSS route.\n"
+        if vs_rules_items_round_trip else
         "# Fresh-DOL entry is complete only when source CSS/SSS is observed.\n"
         "# The existing rules routine starts from SSS; cold_boot_to_sss()\n"
         "# establishes that source boundary through ordinary CSS input.\n"
@@ -538,16 +807,18 @@ def _compose_driver(*, menu_round_trip: bool = False) -> str:
         "\n" + route_note + route + "()\n" + marker,
         1,
     )
-    if menu_round_trip:
+    if menu_round_trip or vs_rules_items_round_trip:
         # This driver is a route capture, not the separate CSS/SSS setup
-        # recipe appended by the base module. Stop after the second source
-        # CSS so the retained route ends at its declared boundary.
+        # recipe appended by the base module. Keep the retained script bounded
+        # at its declared original menu or Results/CSS endpoint.
         source = source.split(marker, 1)[0]
     return source
 
 
 DRIVER_SOURCE = _compose_driver()
 MENU_ROUND_TRIP_DRIVER_SOURCE = _compose_driver(menu_round_trip=True)
+VS_RULES_ITEMS_ROUND_TRIP_DRIVER_SOURCE = _compose_driver(
+    vs_rules_items_round_trip=True)
 
 
 def render_cold_boot_driver() -> str:
@@ -560,15 +831,24 @@ def render_menu_round_trip_driver() -> str:
     return MENU_ROUND_TRIP_DRIVER_SOURCE
 
 
+def render_vs_rules_items_round_trip_driver() -> str:
+    """Return a fresh-DOL Rules/Items -> match -> Results -> CSS route."""
+    return VS_RULES_ITEMS_ROUND_TRIP_DRIVER_SOURCE
+
+
 # Compatibility aliases used by collector/preparation builders.
 render_source_driver = render_cold_boot_driver
 render_driver = render_cold_boot_driver
 
 
-def write_driver(path: str | Path, *, menu_round_trip: bool = False) -> Path:
+def write_driver(path: str | Path, *, menu_round_trip: bool = False,
+                 vs_rules_items_round_trip: bool = False) -> Path:
     """Write one cold-boot driver copy and return its path."""
+    if menu_round_trip and vs_rules_items_round_trip:
+        raise ValueError("choose one original menu route capture")
     destination = Path(path)
     source = (MENU_ROUND_TRIP_DRIVER_SOURCE if menu_round_trip else
+              VS_RULES_ITEMS_ROUND_TRIP_DRIVER_SOURCE if vs_rules_items_round_trip else
               DRIVER_SOURCE)
     destination.write_text(source, encoding="utf-8")
     return destination
@@ -611,6 +891,30 @@ def validate_driver() -> None:
         raise ValueError("menu round-trip driver must use the original root-menu Back input")
     if "PRESS L');command(0,'PRESS R'" not in round_trip:
         raise ValueError("menu round-trip driver lost the CSS parent-menu chord")
+
+    rules_items = VS_RULES_ITEMS_ROUND_TRIP_DRIVER_SOURCE
+    compile(rules_items, "retail_vs_rules_items_round_trip.gdb.py", "exec")
+    if "write_memory(" in rules_items or "put_register" in rules_items:
+        raise ValueError("VS Rules/Items route must not write source state")
+    if "_cold_boot_vs_rules_items_round_trip()" not in rules_items:
+        raise ValueError("VS Rules/Items route lost its cold-DOL entry point")
+    for marker in ("vs_rules_first_entry", "vs_items_entry",
+                   "vs_items_back_committed", "vs_rules_back_to_versus",
+                   "vs_rules_stock_three_selected",
+                   "css_after_rules_start_retained", "sss_final_destination_selected",
+                   "vs_match_after_180_ticks", "vs_no_contest_chord_sent",
+                   "results_no_contest", "css_after_results_retained"):
+        if marker not in rules_items:
+            raise ValueError("VS Rules/Items route lost source marker " + marker)
+    for identity in ("VS_START_DATA_ADDRESS=0x80480530",
+                     "VS_RESULTS_DATA_ADDRESS=0x8047C020",
+                     "_vs_start_data_state()", "_vs_wait_scene(SCENE_RESULTS,GM_VS)"):
+        if identity not in rules_items:
+            raise ValueError("VS Rules/Items route lost its source match boundary " + identity)
+    if VS_RULES_ITEMS_TRACE_NAME not in rules_items:
+        raise ValueError("VS Rules/Items route lost its separate source trace")
+    if "_cold_boot_vs_rules_items_round_trip()" not in rules_items.split("# Preparation only", 1)[0]:
+        raise ValueError("VS Rules/Items source route is not called before setup preparation")
 
 
 validate_driver()
