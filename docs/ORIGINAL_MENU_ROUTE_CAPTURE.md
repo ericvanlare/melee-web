@@ -294,9 +294,11 @@ opens the original Title/Main menus, and changes Display deflicker from on to
 off. The browser reads source SaveData at `0x45D`, waits for Personal autosave,
 backs out and re-enters Display, returns through original Main/VS selection to
 CSS, exports the GCI with the same byte, then enters SSS, reaches a supported
-match, opens No Contest Results and returns to CSS. The passing `full-route-03` run sends no SSS cursor input, so stage identity is
-unobserved and excluded. The earlier route used short directional inputs and
-misidentified its stage; that label is superseded. The corrected runner uses
+match, opens No Contest Results and returns to CSS. The passing
+`browser-route-integrated-01` run uses the combined Rumble and trophy-baseline
+runtime and sends no SSS cursor input, so stage identity is unobserved and
+excluded. The earlier route used short directional inputs and misidentified its
+stage; that label is superseded. The corrected runner uses
 `scripts/serve.py` for cross-origin-isolation headers; the setup failures are
 retained in the receipt. Personal profile reload and native menu owner teardown
 retain the preference. The SSS back-cancel probe separately confirms B returns

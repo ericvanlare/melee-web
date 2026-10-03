@@ -12,7 +12,14 @@
       "complete VS rules/items",
       "full-game parity"
     ],
-    "browser_route": "Main Settings Display > Main/VS > CSS > SSS (no stage input; stage identity unobserved) > supported match > No Contest Results > CSS."
+    "browser_route": "Main Settings Display > Main/VS > CSS > SSS (no stage input; stage identity unobserved) > supported match > No Contest Results > CSS.",
+    "integration_base": {
+      "branch": "codex/offline-route-prereqs-20261003",
+      "included_parent": "codex/offline-route-next-20261003 / PR #137 Main Settings > Rumble at b8663df6d53e7bb0691eaa7208febf43fe61b099",
+      "shared_prerequisite": "PR #140 Initialize trophy tables before source save baseline at 378f8e47021bfc4962f870ebb2e51f58633cf92c",
+      "base_main": "d5fb579ba5bd81ff59407a7a0d7a7e803776cf40",
+      "merge_result": "clean; route-only PR will target this temporary stack base until both parent PRs merge"
+    }
   },
   "source": {
     "repository_head": "9504ef3b207fb8688b7ae95f168b0878cccdd93a",
@@ -103,47 +110,50 @@
     "visual_audio": "No retail visual or audio comparison; Null video and No Audio Output."
   },
   "browser_validation": {
-    "passing_run_id": "main-settings-display-corrected-browser-20261003-120917-4d46e0b1/full-route-03",
-    "report_sha256": "5f92b2a7e9f5ac1e1c689c8a35217f5a77cfba197de36ef812cdc2bd70ea6946",
-    "runner_revision": "9504ef3b207fb8688b7ae95f168b0878cccdd93a",
+    "passing_run_id": "main-settings-display-integrated-validation-20261003-055025-85da691f/browser-route-integrated-01",
+    "report_sha256": "e560115239aaff7faf938bd46a65a506efc4ec667406a538d7fe82033bf8a618",
+    "runner_revision": "803c5fd5de1c40bca5c5893bd490f256608257fc",
     "runner_sha256": "7a05f878885ea14a433427ef10141d88b7008f2de39c8b7a1377f8b93086a869",
     "browser": "Headless installed Chrome 154.0.8037.97 through scripts/browser_tools.mjs; isolated Playwright context.",
     "runtime_package": {
       "profile": "player",
-      "runtime_hash": "2e9f7f2660454ab9",
-      "identity_sha256": "7a724048a33edd659f072670b25b748abff443025e49d0a4c9d3c4293d46587a",
-      "manifest_sha256": "4a2756ef682bc1fe97a95d2127edeccb680b1e5b94b40bdd186b931e1190f8a8"
+      "runtime_hash": "81c2c297e6bcd4c1",
+      "identity_sha256": "541d2c1a415caccd475fc3adc8231317eaec84ff572d1e53e2f9fd030a81143c",
+      "manifest_sha256": "3c84301ed43f951c0063582373573377599657b7c6ae9e4151b5d92194da0690",
+      "package_audit": "pass; preview, 34 files, 19,210,477 bytes"
     },
-    "initial_state": "Everything unlocked is the default. A new isolated Personal profile is created after the original save-mode restart confirmation; no existing user browser save is accessed.",
+    "initial_state": "Everything unlocked is the default. A fresh isolated Personal profile was created only after the original save-mode restart confirmation; no existing browser save was accessed.",
     "checks": [
-      "Fresh Personal profile and CSS entry",
-      "Original Title/Main input and Settings Display route",
-      "Source SaveData byte at 0x45D changes from 1 to 0",
-      "Personal autosave and repeated Display entry",
-      "GCI export contains deflicker 0",
-      "Supported match enters phase 7, No Contest Results phase 8, then CSS phase 1",
-      "Native menu owner unload completes and Personal setting remains saved"
+      "fresh Personal profile and CSS entry",
+      "ordinary B0XX input on original title and Main scenes",
+      "retail Main Settings Display route toggles and autosaves source SaveData",
+      "Settings exit reaches original CSS and exports the source-written setting",
+      "the saved Display preference survives a supported match and Results return to CSS",
+      "source owner unload leaves the Personal Display setting committed"
     ],
     "save_state": {
       "source_snapshot_sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
       "source_length": 61892,
       "source_deflicker": 0,
       "source_offset": "0x45D",
+      "personal_revision_after_toggle": 4,
       "personal_after_results_css": 0,
-      "personal_mode": "personal",
-      "export_gci_sha256": "8f04bc5508aa8e4916b98c5969e9e2cc4d58ee5a51d63987134f577de6208dd4",
+      "personal_after_native_unload": 0,
+      "personal_mode_after_native_unload": "personal",
+      "personal_revision_after_native_unload": 9,
+      "export_gci_sha256": "7e7c0c93e6327b5753e281be5f8a59f9da54124b97680ea4357468bdaa136f82",
       "exported_deflicker": 0
     },
     "screenshots": [
       {
         "checkpoint": "css-fresh-personal",
         "file": "css-fresh-personal.png",
-        "sha256": "f8319f54422b237117d6eccb989b56afd606dfb30386183b07e4d1eca55a6182"
+        "sha256": "c12cb01f2d86ac560f81ffd5280b7a08b6de4af9ea44cb37e554539349eceb11"
       },
       {
         "checkpoint": "main-from-css",
         "file": "main-from-css.png",
-        "sha256": "d2ba09bad230fe7456f5337f61d2101aceeb66e1af90d16ebeeca42f30e8ca20"
+        "sha256": "3523ebc952e8fc82f344927777c8c2954f7c8357d694afd9e274bb8c1cbea0c2"
       },
       {
         "checkpoint": "title",
@@ -153,52 +163,52 @@
       {
         "checkpoint": "main-from-title",
         "file": "main-from-title.png",
-        "sha256": "12eb670d5927dd3faab33e99407639646e530e171a4f21ce6d580386b3bba7cd"
+        "sha256": "0af36ddad53ad87393e15f5c72fa6142de9d327fe08504e12a159cedfcb49521"
       },
       {
         "checkpoint": "settings",
         "file": "settings.png",
-        "sha256": "468c673761fd9ab597e3d8f4859cd99970eb9abee041c33a5646cad5d0df06d1"
+        "sha256": "928abfcb82e3ed9f05cb44d46f01d22b68cd5e6599f52fec7996bc255e43ddde"
       },
       {
         "checkpoint": "settings-display-selected",
         "file": "settings-display-selected.png",
-        "sha256": "460666c824b3491ce189fa9739311f982aaccf85a9cbef446e1b568f63759f8f"
+        "sha256": "ae2198aa353d998a000730fb89dae76b3ad82196c2d547c0fce3d2e974e633c5"
       },
       {
         "checkpoint": "display-deflicker-on-settled",
         "file": "display-deflicker-on-settled.png",
-        "sha256": "d7d3961656ef150d9ff4c9e37a6da5d279e0beacfedacd00777e2329b3fb5d2b"
+        "sha256": "bc32978d09ccfc00dac4ae97e5094f740ee357f991c508098a210bb4c00a0046"
       },
       {
         "checkpoint": "display-deflicker-off",
         "file": "display-deflicker-off.png",
-        "sha256": "ef5cf59b6bbb8aca4bfbaaa3630e7f35f3cb837e6c2213332bf481dd75963fa3"
+        "sha256": "9528c809460f59665d27eee07e68da5e2bb8796ff28c2cf89285c942349c577d"
       },
       {
         "checkpoint": "display-reentered-off",
         "file": "display-reentered-off.png",
-        "sha256": "767cb5696062611719ce8060b97d6fe6d8c9018f373891957dd0e517824854c4"
+        "sha256": "6ae6ebcff5ef5eaa51e60e8fe1ef52b9069ee23f592c8e8a230104862cc4ff42"
       },
       {
         "checkpoint": "versus-mode-selection",
         "file": "versus-mode-selection.png",
-        "sha256": "344397a7414ff9ee54881b164b882291a0fed8c71f2663383f4adb4ea1a1d022"
+        "sha256": "8a11c466ec3fb0f1eaf3454cdbefe6f98b3399ba4a68fa18d024e87d9ed4fdd0"
       },
       {
         "checkpoint": "css-returned",
         "file": "css-returned.png",
-        "sha256": "b12c105ed6b6009f3f194f8cc4f7d93243ccc745c6dc1fa59476ef1b9d1dd4bb"
+        "sha256": "7a64868adacfd96392882370c28cc90b8a64fea7f4472fc3b14499a0312cd1f1"
       },
       {
         "checkpoint": "stage-selection-default",
         "file": "stage-selection-default.png",
-        "sha256": "f30c9bbb1788e3e525bd2f192b8a205b140b20886218fda97001afaa6718701a"
+        "sha256": "d1b6f286627f53909f09435f7772bb0cea0040ee6dbd936efbf15d34ce2778ee"
       },
       {
         "checkpoint": "match",
         "file": "match.png",
-        "sha256": "f8df3dd6cc95af7d4970e8f72441b76b5d2f6f5fde2368e23e64d73abca3f2d7"
+        "sha256": "60bfcd15cb02f2c33a67d1aee90a0c860efbb80ba2da400788dfebee471de007"
       },
       {
         "checkpoint": "results",
@@ -208,12 +218,12 @@
       {
         "checkpoint": "css-after-results",
         "file": "css-after-results.png",
-        "sha256": "4a472a7b4a1d1f850fab149b89849535e815fd4beff277c8f8b64f37d53da60a"
+        "sha256": "d64c46175d44b467b5ad72008b15a60bf5acd1364e47bf1483b89222be6128ca"
       },
       {
         "checkpoint": "personal-save-after-reload",
         "file": "personal-save-after-reload.png",
-        "sha256": "6d0a2b5f6404245505649ac7299c442c5457c87b13006a20f8f004a8a0796691"
+        "sha256": "9bd7fbcd7b8790cf7973a1ce74139235c82f56265cd7934fb2b4ce71850243c7"
       }
     ],
     "cleanup": {
@@ -222,30 +232,117 @@
       "phase": 0,
       "running": 0
     },
-    "audio": "Silent public runtime. Host output remained muted. Audio fidelity is untested.",
-    "stage_identity": "No SSS cursor input was sent. The browser reaches and renders a match, but this route does not read the selected stage kind; stage identity is not claimed.",
-    "rerun_after_harness_correction": "Pass on full-route-03 with no SSS cursor input and scripts/serve.py cross-origin-isolation headers.",
-    "corrected_runner_stage_input": "No SSS cursor input; the corrected full-route-03 capture passed with the selected stage identity unobserved.",
-    "runtime_revision": "9504ef3b207fb8688b7ae95f168b0878cccdd93a",
+    "audio": "Silent public runtime; browserLaunchOptions muted host output. Retail used Null video and No Audio Output. Audio fidelity remains untested.",
+    "stage_identity": "No SSS cursor input was sent. The browser renders a match and Results, but does not read selected stage kind; stage identity is not claimed.",
+    "rerun_after_harness_correction": "Pass on browser-route-integrated-01 against the combined Rumble + trophy-baseline runtime; no SSS cursor input and verified scripts/serve.py isolation headers.",
+    "corrected_runner_stage_input": "No SSS cursor input; combined-state route passed with stage identity unobserved.",
+    "runtime_revision": "803c5fd5de1c40bca5c5893bd490f256608257fc",
     "route_result": "pass",
     "stage_input_attempts": [],
     "browser_errors": [],
-    "superseded_run_stage_input_attempts": [
-      {
-        "keys": [
-          "4"
-        ],
-        "hold_ms": 75,
-        "release_ms": 100
-      },
-      {
-        "keys": [
-          "]"
-        ],
-        "hold_ms": 45,
-        "release_ms": 100
-      }
-    ]
+    "prior_passing_run": {
+      "run_id": "main-settings-display-corrected-browser-20261003-120917-4d46e0b1/full-route-03",
+      "report_sha256": "5f92b2a7e9f5ac1e1c689c8a35217f5a77cfba197de36ef812cdc2bd70ea6946",
+      "runner_revision": "9504ef3b207fb8688b7ae95f168b0878cccdd93a",
+      "runtime_revision": "9504ef3b207fb8688b7ae95f168b0878cccdd93a",
+      "runtime_hash": "2e9f7f2660454ab9",
+      "identity_sha256": "7a724048a33edd659f072670b25b748abff443025e49d0a4c9d3c4293d46587a",
+      "manifest_sha256": "4a2756ef682bc1fe97a95d2127edeccb680b1e5b94b40bdd186b931e1190f8a8",
+      "result": "pass; pre-trophy-baseline integration, superseded by the combined-state route below",
+      "screenshots": [
+        {
+          "checkpoint": "css-fresh-personal",
+          "file": "css-fresh-personal.png",
+          "sha256": "f8319f54422b237117d6eccb989b56afd606dfb30386183b07e4d1eca55a6182"
+        },
+        {
+          "checkpoint": "main-from-css",
+          "file": "main-from-css.png",
+          "sha256": "d2ba09bad230fe7456f5337f61d2101aceeb66e1af90d16ebeeca42f30e8ca20"
+        },
+        {
+          "checkpoint": "title",
+          "file": "title.png",
+          "sha256": "bdcb7e5c3dc0c629bc03c3b6935ab5200eb83cb17325f258f83c17df46bcb474"
+        },
+        {
+          "checkpoint": "main-from-title",
+          "file": "main-from-title.png",
+          "sha256": "12eb670d5927dd3faab33e99407639646e530e171a4f21ce6d580386b3bba7cd"
+        },
+        {
+          "checkpoint": "settings",
+          "file": "settings.png",
+          "sha256": "468c673761fd9ab597e3d8f4859cd99970eb9abee041c33a5646cad5d0df06d1"
+        },
+        {
+          "checkpoint": "settings-display-selected",
+          "file": "settings-display-selected.png",
+          "sha256": "460666c824b3491ce189fa9739311f982aaccf85a9cbef446e1b568f63759f8f"
+        },
+        {
+          "checkpoint": "display-deflicker-on-settled",
+          "file": "display-deflicker-on-settled.png",
+          "sha256": "d7d3961656ef150d9ff4c9e37a6da5d279e0beacfedacd00777e2329b3fb5d2b"
+        },
+        {
+          "checkpoint": "display-deflicker-off",
+          "file": "display-deflicker-off.png",
+          "sha256": "ef5cf59b6bbb8aca4bfbaaa3630e7f35f3cb837e6c2213332bf481dd75963fa3"
+        },
+        {
+          "checkpoint": "display-reentered-off",
+          "file": "display-reentered-off.png",
+          "sha256": "767cb5696062611719ce8060b97d6fe6d8c9018f373891957dd0e517824854c4"
+        },
+        {
+          "checkpoint": "versus-mode-selection",
+          "file": "versus-mode-selection.png",
+          "sha256": "344397a7414ff9ee54881b164b882291a0fed8c71f2663383f4adb4ea1a1d022"
+        },
+        {
+          "checkpoint": "css-returned",
+          "file": "css-returned.png",
+          "sha256": "b12c105ed6b6009f3f194f8cc4f7d93243ccc745c6dc1fa59476ef1b9d1dd4bb"
+        },
+        {
+          "checkpoint": "stage-selection-default",
+          "file": "stage-selection-default.png",
+          "sha256": "f30c9bbb1788e3e525bd2f192b8a205b140b20886218fda97001afaa6718701a"
+        },
+        {
+          "checkpoint": "match",
+          "file": "match.png",
+          "sha256": "f8df3dd6cc95af7d4970e8f72441b76b5d2f6f5fde2368e23e64d73abca3f2d7"
+        },
+        {
+          "checkpoint": "results",
+          "file": "results.png",
+          "sha256": "a7800227a267a5c4055a1c8fa2bddc790c117e194e016fb4cc1b815652de6d4e"
+        },
+        {
+          "checkpoint": "css-after-results",
+          "file": "css-after-results.png",
+          "sha256": "4a472a7b4a1d1f850fab149b89849535e815fd4beff277c8f8b64f37d53da60a"
+        },
+        {
+          "checkpoint": "personal-save-after-reload",
+          "file": "personal-save-after-reload.png",
+          "sha256": "6d0a2b5f6404245505649ac7299c442c5457c87b13006a20f8f004a8a0796691"
+        }
+      ],
+      "checks": [
+        "Fresh Personal profile and CSS entry",
+        "Original Title/Main input and Settings Display route",
+        "Source SaveData byte at 0x45D changes from 1 to 0",
+        "Personal autosave and repeated Display entry",
+        "GCI export contains deflicker 0",
+        "Supported match enters phase 7, No Contest Results phase 8, then CSS phase 1",
+        "Native menu owner unload completes and Personal setting remains saved"
+      ]
+    },
+    "report_path": "/Volumes/AgentStorage/melee-web/runs/main-settings-display-integrated-validation-20261003-055025-85da691f/browser-route-integrated-01/report.json",
+    "server_headers": "scripts/serve.py on 127.0.0.1:8892; verified COOP same-origin and COEP require-corp headers."
   },
   "retained_experiments": [
     {
@@ -290,11 +387,11 @@
     "lifecycle": "Repeated Display entry, CSS/Results path and native menu teardown pass in the retained browser run."
   },
   "validation": {
-    "focused_tests": "test_gameplay_native_menus: 7 run, 2 passed, 5 skipped for unavailable fixtures; test_retail_save_profile: 5 passed; test_gameplay_save_profile: 1 passed.",
-    "javascript_syntax": "node --check tests/main_settings_display_browser_test.mjs passed after the stage-claim correction.",
-    "full_suite": "1736 passed, 132 skipped, exit 0 on commit 9504ef3; rerun required after final edits.",
-    "affected_builds": "python3 scripts/build.py --target fighter and python3 scripts/build.py --target runtime-public --configuration Release passed for runtime commit 9504ef3; public bundle audit passed (34 files, 19,203,527 bytes).",
-    "open_validation": "Re-run full suite, final diff review and CI after integrating the fighter-owned trophy-baseline prerequisite; the corrected headless-browser route passes.",
+    "focused_tests": "Combined-state focused checks: test_gameplay_native_menus 8 run, 2 passed, 6 skipped for missing owned fixtures (including display asset re-entry passed); test_retail_save_profile 5 passed; test_gameplay_save_profile 1 passed; browser route passed with isolated fresh Personal state.",
+    "javascript_syntax": "node --check tests/main_settings_display_browser_test.mjs passed after the final no-stage-input harness correction.",
+    "full_suite": "Ran 1,737 tests; 1,604 passed, 133 optional skips, exit 0 on combined route head 803c5fd5de1c40bca5c5893bd490f256608257fc. Log: /Volumes/AgentStorage/melee-web/runs/main-settings-display-integrated-validation-20261003-055025-85da691f/full-unittest.log.",
+    "affected_builds": "python3 scripts/build.py --target fighter and python3 scripts/build.py --target runtime-public --configuration Release passed on combined route head 803c5fd5de1c40bca5c5893bd490f256608257fc. Public player preview package and audit passed (34 files, 19,210,477 bytes); runtime hash 81c2c297e6bcd4c1, runtime identity SHA256 541d2c1a415caccd475fc3adc8231317eaec84ff572d1e53e2f9fd030a81143c, package manifest SHA256 3c84301ed43f951c0063582373573377599657b7c6ae9e4151b5d92194da0690.",
+    "open_validation": "Combined-state headless browser route passes on runtime hash 81c2c297e6bcd4c1; final diff review and required CI remain pending.",
     "inventory_report": "work/full-game/main-settings-display-20261003-121500-4d46e0b1; 89 feature rows and pinned-source/evidence-path validation passed; all acceptance fractions remain null."
   }
 }
