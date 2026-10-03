@@ -384,5 +384,72 @@
     "sha256": "2f6c462153a989a814f2474130e34712fc737d895d7ead54c88000277342d0dd",
     "started_utc": "2026-10-03T09:13:59.755488+00:00",
     "whole_deadline_seconds": 1500.0
+  },
+  "occurrence_attribution_validation": {
+    "schema": "melee-web-desktop-rollback-occurrence-review-v1",
+    "result": "passed",
+    "scope": "Post-run recording occurrence attribution and source-only regression validation; no native gameplay rerun.",
+    "source_sha256": {
+      "reference-capture/slippi/run_rollback.py": "448fc4d9c80763271d92817960bb0d3c53c4f405b931491534fcd9910c1cbc64",
+      "tests/test_slippi_rollback_runner.py": "927a4947499ec40e68264dc6aebd8e00c9a23eae21455ec2d2eafe4119aef3a8"
+    },
+    "strict_mapping": [
+      "complete native/replay FrameStart vectors agree on frame, RNG, scene and occurrence order",
+      "each load owns a contiguous post-completion recording interval before the next load",
+      "the last pre-load remote pair differs from finalized input and post-state",
+      "that load has its own later finalized remote pair; repeated loads cannot share occurrences"
+    ],
+    "retained_capture_reaudit": {
+      "report_sha256": "18ebe352d80af72273fd1c41134a4e97291f1a1197b0e1e3e9a2df1e5129efbd",
+      "captures": [
+        "E06-drop",
+        "E06-duplicate",
+        "E06-hold",
+        "E06-jitter",
+        "E06-none",
+        "E06-reorder",
+        "PR123-drop",
+        "PR123-hold",
+        "PR123-none"
+      ],
+      "peer_games": 72,
+      "prediction_error_loads": 8,
+      "own_interval_corrections": 8
+    },
+    "full_suite": {
+      "tests": 1718,
+      "skipped": 133,
+      "elapsed_seconds": 401.256,
+      "whole_elapsed_seconds": 401.593,
+      "whole_deadline_seconds": 720.0,
+      "cleanup_reserve_seconds": 45,
+      "report_sha256": "e783c39a4c00cfc9678d6c9a967625a2e05041fe047a179a3dc5ed893438586f",
+      "log_sha256": "ce3dd5b36cbdf2f217f937e554dc7aef220bf87b04edb7cd660f3e8b4a3f4707",
+      "owned_runner_pid_and_group_absent": true
+    },
+    "retained_private_directory_name": "rollback-occurrence-review-20261003-104651-a79af8b4",
+    "historical_false_positive_reduction": {
+      "report_sha256": "32af981b7f226d7760e3d316ebb6e77adbe2c90a087c158756c3a0a4da7d9b54",
+      "historical_head": "b50684772ba88c795c09bd03ada3ee7adab0f204",
+      "historical_admitted_loads": 2,
+      "current_refusal": "prediction-error load lacks a wrong-input/state revision corrected to the finalized pair",
+      "validator_source_sha256": "5f16a0f3452cf68c70d20fe50c8b8a41e937a4ba361b3e6e31361606c79eed6b",
+      "scope": "Synthetic replay decoder regression only; no native gameplay execution."
+    },
+    "retained_timed_out_predecessor": {
+      "report_sha256": "c2d4b1022fb4239b70515716a2ae076694c0b08027a01e43be66052c028eb63e",
+      "elapsed_seconds": 405.009,
+      "work_limit_seconds": 405,
+      "scope": "Full suite stopped at its work deadline without reported test failures; source and tracked status remained unchanged.",
+      "owned_runner_pid_and_group_absent": true
+    },
+    "timeout_boundary_reduction": {
+      "fixture": "test_source_pool_lifetime.py",
+      "result": "passed",
+      "elapsed_seconds": 6.285,
+      "report_sha256": "e55638d0a879d3751e29c199223ac3384c44268dc7d9680724b4f3ebf8926dde",
+      "log_sha256": "2fa9224089247702954744ea0cb2b12fd586eb440f55d9d65b46686fa4ba6a28"
+    },
+    "retry_decision": "Unchanged final source fixture passed independently; enlarge the whole-suite budget to720s with45s cleanup reserve. Preserve tests and compiler defaults."
   }
 }
