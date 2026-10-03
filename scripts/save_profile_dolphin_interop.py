@@ -98,7 +98,8 @@ def main() -> int:
     gci_copy = usa / args.gci.name
     gci_copy.write_bytes(args.gci.read_bytes())
     before_hash = sha256(gci_copy)
-    deflicker_before = deflicker_from_gci(gci_copy)
+    deflicker_before = (deflicker_from_gci(gci_copy)
+                        if args.route == "display" else None)
     if args.route == "display" and deflicker_before != 1:
         raise RuntimeError("The Display route requires deflicker enabled in its starting GCI")
     (config / "Dolphin.ini").write_text("[Core]\nSIDevice0 = 6\n")
@@ -313,7 +314,8 @@ def main() -> int:
                         process.wait()
 
     after_hash = sha256(gci_copy)
-    deflicker_after = deflicker_from_gci(gci_copy)
+    deflicker_after = (deflicker_from_gci(gci_copy)
+                       if args.route == "display" else None)
     if args.route == "rumble":
         required_inputs = {
             "progressive_prompt": sent_progressive,
@@ -360,6 +362,15 @@ def main() -> int:
     if observer_status.get("invalid") or observer_status.get("error"):
         raise RuntimeError(f"Dolphin observer marked the run invalid: {observer_status}")
 
+    save_result = {
+        "input_path": str(args.gci), "input_sha256": before_hash,
+        "dolphin_output_path": str(gci_copy), "output_sha256": after_hash,
+        "output_bytes": gci_copy.stat().st_size,
+    }
+    if args.route == "display":
+        save_result["deflicker"] = {"before": deflicker_before,
+                                    "after": deflicker_after,
+                                    "save_data_offset": "0x45D"}
     summary = {
         "client": {
             "dolphin_version": subprocess.run([str(args.dolphin), "--version"], capture_output=True, text=True,
@@ -370,13 +381,7 @@ def main() -> int:
         "source_revision": args.source_revision,
         "route": args.route,
         "argv": argv,
-        "save": {
-            "input_path": str(args.gci), "input_sha256": before_hash,
-            "dolphin_output_path": str(gci_copy), "output_sha256": after_hash,
-            "output_bytes": gci_copy.stat().st_size,
-            "deflicker": {"before": deflicker_before, "after": deflicker_after,
-                          "save_data_offset": "0x45D"},
-        },
+        "save": save_result,
         "result": "pass",
         "return_code": process.returncode,
         "records_seen": records_seen,
