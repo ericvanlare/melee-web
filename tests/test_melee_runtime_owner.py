@@ -199,6 +199,74 @@ int main() {{
         self.run_owner(['--diagnostics-known-host', '--lifecycle-handoff'],
                        'known-host diagnostics identity, scalar incident wiring, inactive delivery delay/cancel')
 
+    def test_lifecycle_checkpoint_persists_before_deferred_task(self):
+        self.run_owner(['--diagnostics-retention-checkpoint', '--silent'],
+                       'pagehide/freeze checkpoint persists before destroy')
+
+    def test_orderly_destroy_persists_after_native_unload(self):
+        self.run_owner(['--diagnostics-retention-destroy', '--silent'],
+                       'orderly destroy persists before disposing delivery')
+
+    def test_lifecycle_checkpoint_denial_is_isolated(self):
+        self.run_owner(['--diagnostics-retention-denied', '--silent'],
+                       'denied lifecycle checkpoint remains local and isolated')
+
+    def test_lifecycle_checkpoint_cancels_before_visible_resume(self):
+        self.run_owner(['--diagnostics-retention-resume-cancel', '--silent'],
+                       'lifecycle checkpoint cancels before visible gameplay')
+
+    def test_lifecycle_checkpoint_follows_later_incident(self):
+        self.run_owner(['--diagnostics-retention-followup', '--silent'],
+                       'delayed lifecycle checkpoint follows a later incident')
+
+    def test_destroy_refreshes_delayed_ordinary_persist(self):
+        self.run_owner(['--diagnostics-retention-ordinary-pause-destroy', '--silent'],
+                       'destroy refreshes a delayed ordinary inactive snapshot')
+
+    def test_hidden_fatal_incident_reaches_checkpoint(self):
+        self.run_owner(['--diagnostics-retention-hidden-fatal', '--silent'],
+                       'hidden fatal incident is included in the local checkpoint')
+
+    def test_mature_incident_delivery_is_not_starved_by_resume(self):
+        self.run_owner(['--diagnostics-mature-delivery', '--silent'],
+                       'mature inactive diagnostics are delivered before a young incident')
+
+    def test_mature_delivery_retries_latest_inactive_generation(self):
+        self.run_owner(['--diagnostics-mature-delivery-slow-load', '--silent'],
+                       'mature inactive diagnostics are delivered before a young incident')
+
+    def test_evicted_same_session_retained_incident_remains_deliverable(self):
+        self.run_owner(['--diagnostics-mature-delivery-evicted', '--silent'],
+                       'evicted same-session retained incident remains deliverable')
+
+    def test_prior_empty_read_does_not_orphan_later_evicted_incident(self):
+        self.run_owner(['--diagnostics-mature-delivery-prior-read', '--silent'],
+                       'evicted same-session retained incident remains deliverable')
+
+    def test_nonempty_retained_read_does_not_orphan_evicted_young_incident(self):
+        self.run_owner(['--diagnostics-mature-delivery-nonempty-evicted', '--silent'],
+                       'nonempty-retained evicted same-session retained incident remains deliverable')
+
+    def test_normal_delivery_prefers_fresh_current_post_events(self):
+        self.run_owner(['--diagnostics-normal-delivery-freshness', '--silent'],
+                       'normal inactive collection prefers the fresh current report')
+
+    def test_empty_checkpoint_does_not_suppress_destroy(self):
+        self.run_owner(['--diagnostics-retention-empty-destroy', '--silent'],
+                       'empty lifecycle checkpoint does not suppress later destroy persistence')
+
+    def test_failed_checkpoint_does_not_suppress_destroy(self):
+        self.run_owner(['--diagnostics-retention-failed-destroy', '--silent'],
+                       'failed lifecycle checkpoint does not suppress fresh destroy persistence')
+
+    def test_orderly_destroy_times_out_stalled_storage(self):
+        self.run_owner(['--diagnostics-retention-stalled', '--silent'],
+                       'stalled destroy checkpoint times out without trapping teardown')
+
+    def test_orderly_destroy_reports_quota_failure(self):
+        self.run_owner(['--diagnostics-retention-quota', '--silent'],
+                       'quota destroy checkpoint fails explicitly without trapping teardown')
+
     def test_unavailable_persistence_keeps_required_directory(self):
         self.run_owner(['--cache-unavailable'])
 

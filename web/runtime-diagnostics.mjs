@@ -1522,7 +1522,9 @@ export function createRuntimeDiagnostics(options = {}) {
       if (!record) { malformedRecord = true; continue; }
       records.push(record);
     }
-    persistPromise = (async () => {
+    // Install the pending promise before invoking an optional adapter. A
+    // synchronous throw must not clear it before the assignment completes.
+    persistPromise = Promise.resolve().then(async () => {
       try {
         const merged = typeof adapter.merge === 'function'
           ? await promiseResult(adapter.merge(records))
@@ -1545,8 +1547,25 @@ export function createRuntimeDiagnostics(options = {}) {
       } finally {
         persistPromise = null;
       }
-    })();
+    });
     return persistPromise;
+  }
+
+  // A lifecycle owner can already have queued an ordinary inactive persist.
+  // Wait for that write, then take a fresh bounded snapshot only if the owner
+  // is still eligible.  This keeps pagehide/freeze persistence out of the
+  // native callback while preventing a stale snapshot from being reported as
+  // the current incident.
+  async function checkpoint({eligible = () => true} = {}) {
+    try {
+      await Promise.resolve();
+      while (persistPromise) await persistPromise;
+      if (typeof eligible !== 'function' || !eligible())
+        return {persisted: false, reason: 'cancelled', count: 0};
+      return await persist();
+    } catch {
+      return {persisted: false, reason: 'failed', count: 0};
+    }
   }
 
   async function exportRetained() {
@@ -1628,6 +1647,7 @@ export function createRuntimeDiagnostics(options = {}) {
     setActive,
     drain,
     persist,
+    checkpoint,
     exportRetained,
     loadRetained,
     exportReports,
