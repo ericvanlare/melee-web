@@ -23,6 +23,19 @@ class CiSeedTests(unittest.TestCase):
         for left, right in zip(shards, shards[1:]):
             self.assertEqual(left & right, set())
 
+    def test_target_union_includes_linked_trace_targets(self):
+        from ci_verify import GROUPS, LINKED_BUILD_TARGETS
+
+        targets = ci_seed.target_union()
+        expected = {
+            target for group_targets in LINKED_BUILD_TARGETS.values()
+            for target in group_targets
+        }
+        standard = {target for group_targets in GROUPS.values() for target in group_targets}
+        self.assertTrue(expected.issubset(targets))
+        self.assertEqual(len(targets), len(set(targets)))
+        self.assertTrue(expected.isdisjoint(standard))
+
     def test_compdb_filters_unique_relative_objects_only(self):
         rows = [
             {"output": "obj/a.o"},
@@ -56,7 +69,8 @@ class CiSeedTests(unittest.TestCase):
                 "build main.o: cc main.c | generated.h\n"
                 "build other.o: cc other.c\n"
             )
-            with patch.object(ci_seed, "GROUPS", {"tiny": ("main.o", "other.o")}):
+            with patch.object(ci_seed, "GROUPS", {"tiny": ("main.o", "other.o")}), \
+                    patch.object(ci_seed, "LINKED_BUILD_TARGETS", {}):
                 rows = ci_seed._compdb(root, {}, Path(ninja))
             objects = ci_seed.compdb_objects(rows)
             self.assertEqual(objects, ["main.o", "other.o"])

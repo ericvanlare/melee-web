@@ -20,23 +20,28 @@ the 600-second turnaround target. It is not the selected public workflow.
 
 The workflow keeps the existing checked `RelWithDebInfo` compilation
 flags and the exact union of `build.py`'s `all` and `fighter` targets. Two standard
-ARM Ubuntu jobs run the complete test discovery in disjoint module shards. Six
+ARM Ubuntu jobs discover the complete suite and run disjoint module shards.
+Three trace-heavy modules run beside their owning gameplay/fighter partitions
+instead of compiling their trace targets from a unit shard's clean tree. Six
 standard ARM Ubuntu build jobs partition runtime, graphics, gameplay, fighter,
 effects and menu targets, with two Ninja workers per job. On an empty shared
-compiler cache, six preceding Linux jobs compile disjoint object subsets through
+compiler cache, six Linux jobs compile disjoint object subsets through
 the generated Ninja graph and transfer only their ccache entries to those builds.
 Clang PCH consumers are omitted from cache preparation because strict ccache
 settings cannot store them; every consumer builds those objects normally.
-A compatible shared cache skips this preparation; the seed jobs still complete
-and supply empty cache archives. Every consumer configures and builds its full
-target graph; Ninja retains ownership of generated headers, dependencies and links. Linked consumers run in
+A single ARM cache probe now gates seeding. A warm shared cache skips all six
+seed jobs and their empty archive transfers; a miss runs the six cold seed jobs.
+Every consumer configures and builds its full target graph; Ninja retains
+ownership of generated headers, dependencies and links. Linked consumers run in
 the owning partition; the gameplay partition also runs the explicit gameplay
-check. Full discovery runs after
-configuration so generated headers and SDK dependencies are present. SHA-256 of
-each test module selects exactly one unit shard, keeping module fixtures together;
-the reports retain full inventory hashes and selected test IDs. The aggregate
+check. Full discovery runs after configuration so generated headers and SDK
+dependencies are present. SHA-256 of each test module selects exactly one unit
+shard, keeping module fixtures together. Reports retain full inventory hashes,
+unit-selected IDs and IDs deferred to their linked owners. The aggregate
 downloads reports from the current workflow run, verifies their checked commit
-and target lists, and requires the disjoint unit union to match full discovery.
+and target lists, and requires unit-selected plus deferred IDs to match full
+discovery. It also verifies each deferred module ran exactly in its owning
+partition and all rehomed cases passed there.
 Missing reports, empty discovery, stale commits and overlapping shards fail.
 A job rerun replaces its named report, so failed-only reruns can retain passed
 reports from the same workflow and exact checked commit.
@@ -44,6 +49,31 @@ Source census runs once.
 Required asset-free linked consumers cannot silently skip. `browser-build` is
 the aggregate and fails if any partition or the public shell fails, skips or is
 canceled.
+
+### Measured duplicate trace builds
+
+Verify run [37142693006](https://github.com/ericvanlare/melee-web/actions/runs/37142693006)
+shows the unit-shard costs of three modules that each compile an isolated trace:
+
+| Module | Unit-shard test phase | Owner partition build |
+| --- | ---: | --- |
+| `test_gameplay_bootstrap` (four distinct cases) | 80.7s | Scheduler target is already in `gameplay_checks`; fighter-input trace adds about 8.7–12.5s |
+| `test_gameplay_collision` | 23.6s | Target is already in `gameplay_checks` |
+| `test_gameplay_fighter_assets` | 39.5s | Fighter-asset trace adds about 7.5–12s |
+
+The tests and assertions remain unchanged. The unit reports defer these six test
+IDs to gameplay/fighter; the aggregate requires the exact deferred set to run
+and pass in the owner reports. Based on the sampled phase and marginal Ninja
+costs, this shifts about 143.8s out of the unit shards and adds an estimated
+16–25s to owner builds, for about 119–128s less runner compute per workflow.
+Queue scheduling can make the wall-time change smaller; verify completed PR
+runs for actual turnaround.
+
+In the same sampled run all six seed jobs hit a warm compiler cache, but each
+still occupied a rounded ARM runner minute and uploaded an empty archive. The
+single cache probe should reduce that warm-path cost from six rounded runner
+minutes to one, while preserving the six-shard cold path. Cold-path behavior
+still needs a measured cache-epoch run before claiming it is validated.
 
 Automatic verification runs once for each PR revision and once after a push to
 main. Non-main branches without a PR can use `workflow_dispatch`; they do not
