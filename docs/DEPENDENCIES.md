@@ -13,7 +13,9 @@ Build tools: CMake **3.31.6** and Ninja **1.13.0**, installed in the local virtu
 environment. Aurora browser adaptations belong in `patches/aurora-browser.patch`;
 the upstream commit alone does not describe the browser implementation.
 Gameplay ABI corrections belong in `patches/melee-gameplay.patch`, applied only
-to the checked generated `build/gameplay-source` tree. The current patch preserves
+to the checked generated `build/gameplay-source` tree. It is kept in canonical
+form (one sorted diff per file) by `scripts/canonicalize_gameplay_patch.py`, which
+`tests/test_gameplay_patch_canonical.py` checks. The current patch preserves
 canonical fighter animation-flag aliases on little-endian Wasm and corrects the
 Final Destination callback declaration to match its original definition.
 
