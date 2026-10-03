@@ -83,8 +83,8 @@ async function observe(name) {
     assert(Math.abs(c.width - h.width) < 1 || Math.abs(c.height - h.height) < 1, 'Largest fitting image');
     assert(c.bottom <= t.top + 1 && t.bottom <= height + 1, 'Toolbar has reserved space');
     assert(observed.scroll[0] <= w && observed.scroll[1] <= height, 'No document scrolling');
-    for (const [actual, expected] of [[observed.buffer[0], c.width * dpr], [observed.buffer[1], c.height * dpr]])
-      assert(Math.abs(actual - expected) <= 2, 'Backing buffer follows display size and DPR');
+    assert.deepEqual(observed.buffer, [640, 480],
+      'Configured game pixels stay independent of CSS layout and device DPR');
   } catch (error) {report.layoutFailures.push({name, message: error.message});}
   console.log(name, observed.buffer, observed.canvas.width, observed.canvas.height);
 }

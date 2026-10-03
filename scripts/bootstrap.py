@@ -13,10 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from workspace_resources import operation
 
-# Pinned Aurora plus the reviewed patch preceding demand-allocated CPU staging.
-# Previous patch blob: 1e936ff823b34bd6b4a6e0926028cdcace72abf4.
+# Pinned Aurora plus the reviewed #141 demand-allocated CPU staging patch.
+# Previous #141 demand-staging patch blob: 2a5b73c7581aa7683b2f99ae0b28bf771b2b96e7.
 # Recognize this exact source tree, never an arbitrary locally modified checkout.
-AURORA_PREVIOUS_PATCH_TREE = "1f2ebff4c302baded19858a8be4d59919c8d3236"
+AURORA_PREVIOUS_PATCH_TREE = "e8ad8b001d963e3bafc48ba2c1d49a2dfdad2a31"
 
 
 def run(*args, cwd=ROOT):

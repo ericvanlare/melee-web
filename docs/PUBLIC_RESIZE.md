@@ -17,10 +17,16 @@ rectangle. `object-fit` cannot restore 4:3 proportions once the buffer has
 that shape. This is a shell sizing defect; the fix does not change the game
 projection or renderer.
 
-SDL continues to read the canvas CSS dimensions and apply its device pixel
-ratio when resizing the buffer. Its pointer handler scales canvas-relative
-coordinates using those same CSS dimensions. Keeping the bars outside the
-canvas avoids an additional pointer offset or custom backing-buffer owner.
+The browser backing canvas uses the configured 640×480 game pixels. CSS scales
+that image into the available 4:3 rectangle. Aurora's Emscripten window omits
+automatic high-DPI and resizable flags and explicitly restores the configured
+size after SDL discovers the initial CSS box. This avoids multiplying the
+render targets by device pixel ratio or reallocating them for toolbar and
+viewport changes. Native desktop window behavior is unchanged.
+
+SDL's pointer handler still scales canvas-relative coordinates using the CSS
+dimensions. Keeping the bars outside the canvas avoids an additional pointer
+offset. Touch controls use the same fitted rectangle.
 
 Run the owned-disc check against a locally served production package:
 
@@ -31,16 +37,21 @@ node tests/public_presentation_browser_test.mjs \
   --out work/presentation-dpr1
 ```
 
-Repeat with `--dpr 2` and a new output directory. The check uses headless
+Repeat with `--dpr 2` or `--dpr 3` and a new output directory. The check uses headless
 installed Chrome and the actual public shell, imports the disc through its
 normal controls, and retains original character-select screenshots. It asserts
 4:3 geometry, centering, containment, toolbar clearance, absence of scrolling,
 backing dimensions, nonempty game imagery, and canvas-relative pointer offsets
 across tall, wide, desktop, narrow, short, repeated-resize and DOM fullscreen
-states. Screenshots use CSS-pixel resolution at both DPRs to bound capture work;
-the actual game backing buffers still use the selected DPR. The
+states. Screenshots use CSS-pixel resolution to bound capture work;
+the actual game backing buffer remains 640×480. The
 [presentation receipt](evidence/public-presentation-aspect-v1.json) records the
-deployed baseline, corrected production package, retained failures and checks.
+earlier aspect-ratio correction and its historical DPR-sized buffers.
+
+The smaller `tests/browser_surface_resolution_test.mjs` checks the real public
+WebGPU startup at DPR 1, 2 and 3, with portrait, landscape and desktop viewport
+changes, without importing a disc. Pass `--url`, `--out`, `--playwright` and,
+optionally, `--manifest` as above.
 
 This is **Browser exercised** presentation evidence. OS fullscreen/focus,
 foreground timing and original-game pixel equivalence remain separate gates;
