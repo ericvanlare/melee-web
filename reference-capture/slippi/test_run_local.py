@@ -19,10 +19,15 @@ from run_local import (
     SCRIPTED_INPUT_START_FRAME,
     SLIPPI_UNFREEZE_INPUT_FRAME,
     SSS_CURSOR_MAX_STEP_PER_FRAME,
+    SSS_SELECTION_SETTLE_ATTEMPTS,
+    SSS_SELECTION_SETTLE_FRAMES,
     SSS_CURSOR_SWEEP_X_FRAMES,
     SSS_CURSOR_SWEEP_Y_ROWS,
     SSS_CURSOR_X_BOUND,
     SSS_CURSOR_Y_BOUND,
+    _stage_selection_settle,
+    SCENE_GAME,
+    SCENE_SSS,
     _slippi_players_are_mario_mario,
     _stage_is_valid_for_game,
     _ticket_accepted,
@@ -110,6 +115,101 @@ class LocalScenarioGateTests(unittest.TestCase):
         self.assertEqual(SSS_CURSOR_SWEEP_X_FRAMES, 19)
         self.assertEqual(SSS_CURSOR_SWEEP_Y_ROWS, 15)
         self.assertEqual((SSS_CURSOR_X_BOUND, SSS_CURSOR_Y_BOUND), (27.0, 19.0))
+
+    def test_final_destination_settle_requires_exact_tile_for_every_source_frame(self):
+        expected = (25, 32)
+        self.assertEqual(SSS_SELECTION_SETTLE_FRAMES, 6)
+        self.assertEqual(SSS_SELECTION_SETTLE_ATTEMPTS, 2)
+        stable = _stage_selection_settle(expected, [expected] * SSS_SELECTION_SETTLE_FRAMES)
+        self.assertTrue(stable["stable"])
+        drift = _stage_selection_settle(
+            expected, [expected] * (SSS_SELECTION_SETTLE_FRAMES - 1) + [(26, 28)]
+        )
+        self.assertFalse(drift["stable"])
+        self.assertEqual(drift["observed"][-1], [26, 28])
+        self.assertFalse(_stage_selection_settle(expected, [])["stable"])
+
+    def test_final_destination_reacquires_after_transient_settle_drift_without_early_a(self):
+        expected = (25, 32)
+
+        class FakeWatcher:
+            def __init__(self, run):
+                self.run = run
+                self.values = {"80479d58": 0}
+                self.stage = expected
+
+            def selected_stage(self):
+                return self.stage
+
+            def online_scene_code(self):
+                return SCENE_GAME if self.run.pulses else SCENE_SSS
+
+        class FakePad:
+            def set_axis(self, *_args):
+                return None
+
+            def neutral(self):
+                return None
+
+        def advance(run, watcher, count):
+            run.wait_call += 1
+            run.source_frame += count
+            watcher.values["80479d58"] = run.source_frame
+            if run.wait_call == 3:
+                watcher.stage = run.first_settle[0]
+            elif 3 <= run.wait_call <= 8:
+                watcher.stage = run.first_settle[run.wait_call - 3]
+            elif run.wait_call == 10:
+                watcher.stage = run.second_settle[0]
+            elif 10 <= run.wait_call <= 15:
+                watcher.stage = run.second_settle[run.wait_call - 10]
+
+        def make_run(first_settle, second_settle):
+            run = PairRun.__new__(PairRun)
+            run.pulses = 0
+            run.wait_call = 0
+            run.source_frame = 0
+            run.first_settle = first_settle
+            run.second_settle = second_settle
+            watcher = FakeWatcher(run)
+            peer = FakeWatcher(run)
+            pad = FakePad()
+            run.watchers = {"p1": watcher, "p2": peer}
+            run.pads = {"p1": pad}
+            run.evidence = {}
+            run.replay_baselines = {}
+            run._wait_frames = lambda _name, count: advance(run, watcher, count)
+            run._wait_until = lambda predicate, **_kwargs: self.assertTrue(predicate())
+            run._replay_file_snapshot = lambda: {"fresh": True}
+            run._pulse = lambda _name, _button: setattr(run, "pulses", run.pulses + 1)
+            return run
+
+        run = make_run(
+            [expected] * (SSS_SELECTION_SETTLE_FRAMES - 1) + [(26, 28)],
+            [expected] * SSS_SELECTION_SETTLE_FRAMES,
+        )
+        run._select_final_destination(picker="p1")
+        trace = run.evidence["stage_selection_trace"]
+        self.assertEqual(run.pulses, 1)
+        self.assertEqual(len(trace["settle_attempts"]), 2)
+        self.assertFalse(trace["settle_attempts"][0]["stable"])
+        self.assertTrue(trace["settle_attempts"][1]["stable"])
+        self.assertEqual(
+            [row["source_frame"] for row in trace["settle_attempts"][0]["observations"]],
+            list(range(32, 38)),
+        )
+        self.assertEqual(
+            trace["settle_attempts"][0]["observations"][-1]["selected_stage"],
+            (26, 28),
+        )
+
+        run = make_run(
+            [expected] * (SSS_SELECTION_SETTLE_FRAMES - 1) + [(26, 28)],
+            [expected] * (SSS_SELECTION_SETTLE_FRAMES - 1) + [(26, 28)],
+        )
+        with self.assertRaisesRegex(RuntimeError, "did not remain selected"):
+            run._select_final_destination(picker="p1")
+        self.assertEqual(run.pulses, 0)
 
     def test_stage_gate_scopes_random_direct_opening_and_final_destination_rematch(self):
         self.assertTrue(_stage_is_valid_for_game(2, 1))

@@ -1,7 +1,9 @@
 # Desktop rollback diagnostic
 
-The optional downstream client patch `patches/0003-desktop-rollback-diagnostic.patch`
-is enabled only when `SLIPPI_ROLLBACK_DIAGNOSTIC_CONFIG` names a valid JSON file.
+The optional downstream client patches `patches/0003-desktop-rollback-diagnostic.patch`
+through `patches/0006-jitter-reorder-native.patch` are enabled only when
+`SLIPPI_ROLLBACK_DIAGNOSTIC_CONFIG` names a valid JSON file. The ordered patch
+list and target tree are pinned by `client.lock.json`.
 The process writes JSONL observations to the config's `log_path`; both paths are
 operator-owned and must remain outside Git.
 
@@ -29,10 +31,20 @@ outgoing PAD packet with `frame <= packet_frame < release_frame`, then sends the
 held packets in order immediately before the release-frame packet. The bounded
 interval is at most eight frames; diagnostic JSONL records each packet hash and
 the interval begin/release counts. `drop` remains a single packet case and
-retains the ordinary redundant PAD history. Use `action: "none"` with null
-frame fields to disable impairment. Transport `payload_hash` values use
+retains the ordinary redundant PAD history. `duplicate` sends role 2's frame-98
+packet twice and requires two receiver rows with the same packet hash. `jitter`
+holds frame 98 until frame 99 and requires receiver order `[98, 99]`; `reorder`
+sends frame 99 before the held frame 98 and requires receiver order `[99, 98]`.
+Both delayed recipes require the receiver's native `inputs_to_copy` result and a
+sender/receiver hash join. Their interval is one frame, and all transport fault
+recipes are role-2-only where the native patch requires it. Use `action: "none"`
+with null frame fields to disable impairment. Transport `payload_hash` values use
 FNV-1a64 for packet correlation; artifact, config, and replay identities use
 SHA-256.
+
+For the pinned HOLD recipe, only the eight network PAD bytes are changed: wire
+frames 98 through 103 are held and released in order immediately before wire
+frame 104. The trailing four status/padding bytes remain untouched.
 
 The optional `input_profile` must name `mario-fd-rollback-v1` and role `1` or
 `2`. It generates neutral input before frame 90; role 1 holds right on frames
@@ -74,31 +86,55 @@ verified external volume, and `MELEE_SHORT_PROFILE_ROOT` to an existing short
 external directory for the client's Unix sockets.
 
 ```sh
-python3 scripts/agent_workspace.py run -- python3 reference-capture/slippi/run_rollback.py \
+python3 scripts/agent_workspace.py run -- python3 reference-capture/slippi/run_local.py \
   --disc "$MELEE_DISC" --run-root "$MELEE_RUN_ROOT" \
-  --profile-temp-root "$MELEE_SHORT_PROFILE_ROOT" --scenario none
+  --profile-temp-root "$MELEE_SHORT_PROFILE_ROOT"
 ```
 
 The default is two fresh private profile pairs, each playing a match and rematch.
-The last cycle also checks peer disconnect. `none` fixes the source-frame PAD
-profile, opening stage and RNG offset while leaving normal transport enabled.
-The runner checks both finalized peer timelines, generated/consumed PAD bytes,
-native recording payload clocks and RNG, and the fresh repeat against cycle 1.
-Ordinary menu traversal, natural ending, rematch, process and socket checks are
-reused. A mismatch stops before the next long game, retaining its first field
-and frame in the private comparison receipt.
+The last cycle also checks peer disconnect. With no diagnostic environment
+variable, this is the ordinary diagnostic-disabled lifecycle and retains the
+normal controller script and transport.
+The ordinary runner checks its two fresh profile lifecycles, menu traversal,
+natural ending, rematch, disconnect/interruption cleanup, process ownership and
+socket gates. It does not make the diagnostic runner's finalized replay or
+receiver-attributed transport claims. A mismatch stops before the next long
+game, retaining its first field and frame in the private lifecycle receipt.
 
-For an impaired case, choose another absent `MELEE_RUN_ROOT` and point
-`MELEE_BASELINE_ROOT` at the passed `none` run:
+For an impaired case, first create a separate passed diagnostic baseline with
+the same source-profile client and service. This `none` invocation is only the
+comparison fixture consumed by `run_rollback.py`; it is not the ordinary
+diagnostic-disabled lifecycle above. Then choose another absent
+`MELEE_RUN_ROOT` and point `MELEE_BASELINE_ROOT` at that diagnostic baseline:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 reference-capture/slippi/run_rollback.py \
+  --disc "$MELEE_DISC" --run-root "$MELEE_BASELINE_ROOT" \
+  --profile-temp-root "$MELEE_SHORT_PROFILE_ROOT" --scenario none \
+  --service-lineage "$MELEE_SERVICE_LINEAGE"
+```
 
 ```sh
 python3 scripts/agent_workspace.py run -- python3 reference-capture/slippi/run_rollback.py \
   --disc "$MELEE_DISC" --run-root "$MELEE_RUN_ROOT" \
   --profile-temp-root "$MELEE_SHORT_PROFILE_ROOT" \
-  --scenario hold --baseline-root "$MELEE_BASELINE_ROOT"
+  --scenario hold --baseline-root "$MELEE_BASELINE_ROOT" \
+  --service-lineage "$MELEE_SERVICE_LINEAGE"
 ```
 
-`hold` retains role 2's wire frames 98–103 and releases them at 104. The pinned
+`none`, `duplicate`, `jitter`, `reorder`, `hold`, and `drop` are the accepted
+`--scenario` values. `none` is the required two-cycle baseline; every impaired
+run requires that passed baseline root and the same service-lineage receipt.
+The service-lineage receipt is produced only after the public PR #133 ref
+`codex/local-api-framing-pr` at commit
+`cdc4b899ee85861cce7f2cebfc9d756a30326ab6` has been path-applied and built in
+this checkout as described in `LOCAL_TESTBED.md`. The runner verifies the public
+commit/parent, path-diff and source-file identities, configured service build
+output, cache and source inventory fields; it refuses a receipt
+or binary copied from an unrelated service tree. The receipt's build and
+service hashes are generated for the current applied composition and are
+bound identically into the passed baseline and each impaired run.
+The pinned
 input delay is two frames; this interval covers the A-button transition generated
 at source frame 96. The fixture requires the actual held packet identities,
 history, queue counts and release order to match that schedule. `drop` removes
@@ -120,10 +156,11 @@ this read-only revision check. Every loaded scene must have contiguous repeated
 recording payload coverage and an observed rewind. This is an explicit
 coverage gate for the fixture; the recording buffer does not guarantee every
 native simulation iteration will be recorded. Matching finalized replays alone
-cannot satisfy these gates. Delay/jitter,
-duplication and reordering cases, actual browser simulation, cross-machine
+cannot satisfy these gates. Actual browser simulation, cross-machine
 connectivity, pixels, PCM, foreground timing and physical input have separate
-acceptance gates. The [scoped receipt](../../docs/evidence/desktop-rollback-diagnostic-v1.json)
+acceptance gates. The [scoped E06 baseline and transport matrix](../../docs/evidence/desktop-transport-matrix-e06-v1.json)
+records the six desktop scenarios and their receiver-attributed transport rows;
+the [original diagnostic receipt](../../docs/evidence/desktop-rollback-diagnostic-v1.json)
 records two fresh baseline pairs and two fresh held-packet pairs, each playing
 a match and rematch. Two fresh single-packet DROP pairs also pass the same
 finalized comparison through complete matches and rematches, with exact packet

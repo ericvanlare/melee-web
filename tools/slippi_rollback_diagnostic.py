@@ -162,8 +162,10 @@ def parse_config(value: Any) -> DiagnosticConfig:
     action = transport_object["action"]
     if not isinstance(action, str):
         raise DiagnosticConfigError("transport.action must be a string")
-    if action not in {"none", "drop", "hold"}:
-        raise DiagnosticConfigError("transport.action must be one of none, drop, hold")
+    if action not in {"none", "drop", "hold", "duplicate", "jitter", "reorder"}:
+        raise DiagnosticConfigError(
+            "transport.action must be one of none, drop, hold, duplicate, jitter, reorder"
+        )
     frame_value = transport_object["frame"]
     release_value = transport_object["release_frame"]
     if action == "none":
@@ -172,15 +174,27 @@ def parse_config(value: Any) -> DiagnosticConfig:
         frame = release_frame = None
     else:
         frame = _integer(frame_value, "transport.frame", minimum=1, maximum=MAX_FRAME)
-        if action == "drop":
+        if action in {"drop", "duplicate"}:
             if release_value is not None:
-                raise DiagnosticConfigError("transport drop requires null release_frame")
+                raise DiagnosticConfigError(
+                    f"transport {action} requires null release_frame"
+                )
             release_frame = None
+            if action == "duplicate" and (
+                    input_profile is None or input_profile.role != 2):
+                raise DiagnosticConfigError(
+                    "transport duplicate requires the role-2 input profile"
+                )
         else:
             release_frame = _integer(
                 release_value, "transport.release_frame", minimum=frame + 1,
                 maximum=min(MAX_FRAME, frame + MAX_HOLD_FRAMES),
             )
+            if action in {"jitter", "reorder"} and (
+                    input_profile is None or input_profile.role != 2):
+                raise DiagnosticConfigError(
+                    f"transport {action} requires the role-2 input profile"
+                )
 
     if not enabled:
         # Disabled files remain structurally valid but carry no active controls.

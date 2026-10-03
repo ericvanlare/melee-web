@@ -2,11 +2,14 @@
 """Sensitivity and retained-failure checks for the desktop rollback runner."""
 from dataclasses import replace
 import copy
+import hashlib
 import json
+import os
 import struct
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -14,14 +17,18 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "reference-capture/slippi"))
 from run_rollback import (RollbackRun, read_diagnostic_log, verify_log_order, verify_profile,
                           ARTIFACT_IDENTITY_FIELDS, artifact_identities,
+                          _expected_downstream_patch_identities,
                           validate_baseline_game,
+                          validate_baseline_receipts,
+                          validate_service_lineage,
                           verify_prediction_rollbacks, verify_recording_clock, verify_transport,
                           verify_speculative_corrections)
+import run_local as run_local_module
 from test_compare_rollback import timeline
 from test_slippi_format import timeline_fixture, _pre_frame, _post_frame
 from tools.slippi_format import SlippiFrame
 from slippi_format import RAW_PREFIX, _raw_stream, decode_timeline
-from tools.slippi_rollback_diagnostic import SCHEMA
+from tools.slippi_rollback_diagnostic import PROFILE_NAME, SCHEMA
 
 
 def fixture():
@@ -140,6 +147,269 @@ def repeated_loads():
 
 
 class RollbackRunnerEvidenceTests(unittest.TestCase):
+    def _write_baseline_receipt_fixture(self, root):
+        service = {
+            "service_public_ref": "codex/local-api-framing-pr",
+            "service_public_commit": "0" * 40,
+            "service_public_parent_commit": "1" * 40,
+            "service_public_path_diff_sha256": "2" * 64,
+            "service_base_server_cpp_sha256": "3" * 64,
+            "service_integration_test_sha256": "4" * 64,
+            "service_framing_lineage_sha256": "a" * 64,
+            "service_binary_sha256": "b" * 64,
+            "service_build_cache_sha256": "c" * 64,
+            "service_source_inventory_sha256": "d" * 64,
+            "service_source_sha256": "d" * 64,
+            "service_source_patch_sha256": "e" * 64,
+            "service_worktree_head": "f" * 40,
+        }
+        identities = {key: ("1" * 64 if key != "service_framing_lineage_sha256"
+                            else service["service_framing_lineage_sha256"])
+                      for key in ARTIFACT_IDENTITY_FIELDS}
+        identities["downstream_patch_sha256"] = _expected_downstream_patch_identities()
+        identities["matchmaker_sha256"] = service["service_binary_sha256"]
+        for cycle in (1, 2):
+            cycle_root = root / f"cycle-{cycle:02d}"
+            cycle_root.mkdir()
+            for name, role in (("p1", 1), ("p2", 2)):
+                (cycle_root / f"{name}.slp").write_bytes(f"cycle{cycle}-{name}".encode())
+                (cycle_root / f"{name}-rollback-config.json").write_text(json.dumps({
+                    "schema": SCHEMA, "enabled": True, "stage_id": 32,
+                    "rng_offset": 0x1234, "overlay": None,
+                    "transport": {"action": "none", "frame": None,
+                                   "release_frame": None},
+                    "input_profile": {"name": PROFILE_NAME, "role": role},
+                }) + "\n")
+            for game in (1, 2):
+                replays = {name: {"file": f"{name}.slp",
+                                  "sha256": hashlib.sha256(
+                                      (cycle_root / f"{name}.slp").read_bytes()).hexdigest()}
+                           for name in ("p1", "p2")}
+                comparison = {"result": "passed", "game": game, "scenario": "none",
+                              "peer_comparison": {"result": "passed",
+                                                  "compared_frames": 1342,
+                                                  "first_divergence": None},
+                              "replays": replays}
+                (cycle_root / f"game-{game:02d}-comparison.json").write_text(
+                    json.dumps(comparison) + "\n")
+            evidence = {"result": "passed", "service_framing": service, **identities}
+            (cycle_root / "evidence.json").write_text(json.dumps(evidence) + "\n")
+        rollback = {"result": "passed", "scenario": "none",
+                    "fresh_profile_repeatability_verified": True,
+                    "rollback_correctness_claimed": False,
+                    "cycles": [{"cycle": cycle, "result": "passed",
+                                "evidence": f"cycle-{cycle:02d}/evidence.json"}
+                               for cycle in (1, 2)]}
+        (root / "rollback-run.json").write_text(json.dumps(rollback) + "\n")
+        return service
+
+    def test_baseline_admission_binds_both_cycles_comparisons_and_service(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service = self._write_baseline_receipt_fixture(root)
+            binding = validate_baseline_receipts(root, service)
+            self.assertEqual(binding["artifact_identity"]["service_framing_lineage_sha256"],
+                             service["service_framing_lineage_sha256"])
+            changed = json.loads((root / "cycle-02/evidence.json").read_text())
+            changed["matchmaker_sha256"] = "9" * 64
+            (root / "cycle-02/evidence.json").write_text(json.dumps(changed) + "\n")
+            with self.assertRaisesRegex(ValueError, "service binary"):
+                validate_baseline_receipts(root, service)
+
+    def test_actual_retained_job_e04_cycle_identity_map_admits(self):
+        evidence_path = os.environ.get("MELEE_E04_CYCLE_EVIDENCE")
+        if not evidence_path:
+            self.skipTest("MELEE_E04_CYCLE_EVIDENCE is not set")
+        path = Path(evidence_path).expanduser().resolve(strict=True)
+        evidence = json.loads(path.read_text(encoding="utf-8"))
+        identities = artifact_identities(evidence)
+        self.assertEqual(identities["downstream_patch_sha256"],
+                         _expected_downstream_patch_identities())
+
+    def test_downstream_patch_identity_rejects_path_hash_and_type_mutations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service = self._write_baseline_receipt_fixture(root)
+            evidence = json.loads((root / "cycle-01/evidence.json").read_text())
+            expected = dict(evidence["downstream_patch_sha256"])
+            cases = (
+                (dict(expected, **{"patches/unlocked.patch": "1" * 64}),
+                 "path set differs"),
+                ({key: value for key, value in list(expected.items())[:-1]},
+                 "path set differs"),
+                (dict(expected, **{next(iter(expected)): "0" * 64}),
+                 "differs from patch bytes"),
+                (dict(expected, **{next(iter(expected)): True}),
+                 "is not a lowercase SHA-256 identity"),
+                ("1" * 64, "is not a patch identity map"),
+            )
+            for value, message in cases:
+                with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                    artifact_identities(dict(evidence, downstream_patch_sha256=value))
+            binding = validate_baseline_receipts(root, service)
+            self.assertEqual(binding["artifact_identity"]["downstream_patch_sha256"], expected)
+            changed = json.loads((root / "cycle-02/evidence.json").read_text())
+            changed["downstream_patch_sha256"] = dict(expected)
+            changed["downstream_patch_sha256"][next(iter(expected))] = "0" * 64
+            (root / "cycle-02/evidence.json").write_text(json.dumps(changed) + "\n")
+            with self.assertRaisesRegex(ValueError, "differs from patch bytes"):
+                validate_baseline_receipts(root, service)
+
+    def test_service_lineage_requires_public_ref_and_all_source_identities(self):
+        value = {
+            "schema": "melee-web-service-lineage-v2",
+            "build_profile": {"matchmaker_release_build_verified": True},
+            "service_base_server_cpp_sha256": "c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a",
+            "service_binary_sha256": "2" * 64,
+            "service_build_cache_sha256": "3" * 64,
+            "service_source_inventory_sha256": "4" * 64,
+            "service_integration_test_sha256": "37f3b2ca979e4012f4a425ce069a91a8a374d299ac87367a1c0891449c58169c",
+            "service_public_commit": "cdc4b899ee85861cce7f2cebfc9d756a30326ab6",
+            "service_public_parent_commit": "473e97c41633043562bc5015e1add630d23b70b3",
+            "service_public_path_diff_sha256": "cd2fe85202f0315b0e8c216e05447cd9fdfba6b5fb6044f903daeb579eeeb856",
+            "service_public_ref": "codex/local-api-framing-pr",
+            "service_source_patch_sha256": "cd2fe85202f0315b0e8c216e05447cd9fdfba6b5fb6044f903daeb579eeeb856",
+            "service_source_sha256": "78b680a16ff717e61cbb561281240a9a205a105ac4053634441fb88941fce719",
+            "service_worktree_head": "b50684772ba88c795c09bd03ada3ee7adab0f204",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "service-lineage.json"
+            path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
+            identity = validate_service_lineage(path)
+            self.assertEqual(identity["service_public_commit"], value["service_public_commit"])
+            self.assertEqual(identity["service_binary_sha256"], value["service_binary_sha256"])
+            self.assertEqual(identity["service_build_cache_sha256"],
+                             value["service_build_cache_sha256"])
+            changed = dict(value, service_public_parent_commit="0" * 40)
+            path.write_text(json.dumps(changed, indent=2, sort_keys=True) + "\n")
+            with self.assertRaises(ValueError):
+                validate_service_lineage(path)
+
+    def test_service_lineage_generator_binds_fresh_outputs_and_refuses_tamper(self):
+        lock = json.loads((ROOT / "reference-capture/slippi/client.lock.json").read_text())
+        prerequisite = lock["service_prerequisite"]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_patch = root / "service-paths.patch"
+            cache = root / "CMakeCache.txt"
+            client = root / "client"
+            service = root / "service"
+            output = root / "lineage.json"
+            for path in (source_patch, cache, client, service):
+                path.write_bytes(path.name.encode())
+            expected_hashes = {
+                source_patch: prerequisite["public_path_diff_sha256"],
+                cache: "1" * 64,
+                service: "2" * 64,
+                run_local_module.HERE / "local_matchmaker/server.cpp": prerequisite["source_sha256"],
+                run_local_module.HERE / "local_matchmaker/integration_test.cpp":
+                    prerequisite["integration_test_sha256"],
+            }
+
+            def fake_sha(path):
+                path = Path(path)
+                return expected_hashes.get(path, hashlib.sha256(path.read_bytes()).hexdigest())
+
+            def invoke(destination=output):
+                with patch.object(run_local_module, "_verify_pinned_client_source", return_value={}), \
+                     patch.object(run_local_module, "_verify_build_profile", return_value={
+                         "matchmaker_release_build_verified": True}), \
+                     patch.object(run_local_module, "_sha256", side_effect=fake_sha), \
+                     patch.object(run_local_module.subprocess, "run", return_value=SimpleNamespace(
+                         returncode=0, stdout="f" * 40 + "\n")):
+                    return run_local_module.generate_service_lineage(
+                        lock, dolphin_source=root, enet_source=root,
+                        dolphin_build=root, matchmaker_build=root,
+                        client_binary=client, service_binary=service,
+                        source_patch=source_patch, output=destination)
+
+            receipt = invoke()
+            self.assertEqual(receipt["service_binary_sha256"], "2" * 64)
+            self.assertEqual(receipt["service_build_cache_sha256"], "1" * 64)
+            self.assertEqual(receipt["service_source_patch_sha256"],
+                             prerequisite["public_path_diff_sha256"])
+            with self.assertRaises(FileExistsError):
+                invoke()
+
+            original = expected_hashes[source_patch]
+            expected_hashes[source_patch] = "3" * 64
+            with self.assertRaisesRegex(RuntimeError, "reviewed public"):
+                invoke(root / "tampered.json")
+            expected_hashes[source_patch] = original
+            with patch.object(run_local_module, "_verify_pinned_client_source", return_value={}), \
+                 patch.object(run_local_module, "_verify_build_profile",
+                              side_effect=RuntimeError("stale configured service output")):
+                with self.assertRaisesRegex(RuntimeError, "stale configured"):
+                    run_local_module.generate_service_lineage(
+                        lock, dolphin_source=root, enet_source=root,
+                        dolphin_build=root, matchmaker_build=root,
+                        client_binary=client, service_binary=service,
+                        source_patch=source_patch)
+
+    def test_baseline_admission_rejects_stale_cycle_or_comparison(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service = self._write_baseline_receipt_fixture(root)
+            changed = json.loads((root / "cycle-02/game-02-comparison.json").read_text())
+            changed["peer_comparison"]["result"] = "failed"
+            (root / "cycle-02/game-02-comparison.json").write_text(json.dumps(changed) + "\n")
+            with self.assertRaisesRegex(ValueError, "passed no-impairment"):
+                validate_baseline_receipts(root, service)
+
+    def test_baseline_admission_rejects_tampered_service_lineage_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service = self._write_baseline_receipt_fixture(root)
+            changed = json.loads((root / "cycle-02/evidence.json").read_text())
+            changed["service_framing"] = dict(service, service_source_sha256="9" * 64)
+            (root / "cycle-02/evidence.json").write_text(json.dumps(changed) + "\n")
+            with self.assertRaisesRegex(ValueError, "source/build identity"):
+                validate_baseline_receipts(root, service)
+
+    def test_baseline_admission_rejects_boolean_cycle_and_config_fields(self):
+        for relative, mutate in (
+                ("rollback-run.json", lambda value: value["cycles"].__setitem__(1, dict(
+                    value["cycles"][1], cycle=True))),
+                ("cycle-02/p2-rollback-config.json", lambda value: value["input_profile"].__setitem__(
+                    "role", True))):
+            with self.subTest(relative=relative):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    service = self._write_baseline_receipt_fixture(root)
+                    path = root / relative
+                    changed = json.loads(path.read_text())
+                    mutate(changed)
+                    path.write_text(json.dumps(changed) + "\n")
+                    with self.assertRaises(ValueError):
+                        validate_baseline_receipts(root, service)
+
+    def test_baseline_admission_rejects_wrong_cycle_replay_and_profile_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service = self._write_baseline_receipt_fixture(root)
+            cycle_two = root / "cycle-02"
+            replay = cycle_two / "p1.slp"
+            # A symlink to cycle 01 must not satisfy the cycle-02 binding.
+            replay.unlink()
+            replay.symlink_to(root / "cycle-01/p1.slp")
+            with self.assertRaisesRegex(ValueError, "escaped its cycle"):
+                validate_baseline_receipts(root, service)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            service = self._write_baseline_receipt_fixture(root)
+            config_path = root / "cycle-02/p2-rollback-config.json"
+            config = json.loads(config_path.read_text())
+            config["input_profile"]["name"] = "wrong-profile"
+            config_path.write_text(json.dumps(config) + "\n")
+            with self.assertRaisesRegex(ValueError, "pinned none profile"):
+                validate_baseline_receipts(root, service)
+
+            config["input_profile"]["name"] = PROFILE_NAME
+            config["transport"]["frame"] = 98
+            config_path.write_text(json.dumps(config) + "\n")
+            with self.assertRaisesRegex(ValueError, "pinned none profile"):
+                validate_baseline_receipts(root, service)
     def test_failed_incomplete_or_wrong_baseline_game_is_refused(self):
         receipt = {"result": "passed", "scenario": "none", "game": 1,
                    "peer_comparison": {"result": "passed"}}
@@ -233,7 +503,8 @@ class RollbackRunnerEvidenceTests(unittest.TestCase):
 
     def test_changed_baseline_client_is_refused_before_profile_or_process_creation(self):
         run = RollbackRun.__new__(RollbackRun)
-        run.evidence = {key: "unchanged" for key in ARTIFACT_IDENTITY_FIELDS}
+        run.evidence = {key: "1" * 64 for key in ARTIFACT_IDENTITY_FIELDS}
+        run.evidence["downstream_patch_sha256"] = _expected_downstream_patch_identities()
         run.baseline_identities = artifact_identities(run.evidence)
         run.evidence["client_binary_sha256"] = "changed native client"
         with patch("run_local.PairRun._make_profiles") as make_profiles:
@@ -370,6 +641,8 @@ class RollbackRunnerEvidenceTests(unittest.TestCase):
         for changed in (rows[1:], rows[:-1],
                         held + [dict(release, held_payload_hashes=reversed_hashes)],
                         held + [dict(release, release_packet_frame=105)],
+                        [dict(held[0], held_count=True)] + rows[1:],
+                        held[:-1] + [dict(release, release_count=True)],
                         [dict(held[0], history_count=99)] + rows[1:]):
             with self.assertRaises(ValueError):
                 verify_transport(changed, game_sequence=0, scenario="hold", role=2)
@@ -387,6 +660,86 @@ class RollbackRunnerEvidenceTests(unittest.TestCase):
             verify_transport(rows, game_sequence=0, scenario="none", role=2)
         with self.assertRaises(ValueError):
             verify_transport(rows, game_sequence=0, scenario="hold", role=1)
+
+    def test_role2_duplicate_requires_one_frame98_event_and_exact_packet_bytes(self):
+        duplicate = {
+            "event": "pad_transport", "observer_context": "transport", "game_sequence": 0,
+            "action": "duplicate", "role": 2, "packet_frame": 98,
+            "payload_hash": "0123456789abcdef", "duplicate_payload_hash": "0123456789abcdef",
+            "duplicate_count": 1, "history_count": 3,
+            "history_first_frame": 96, "history_last_frame": 98,
+        }
+        report = verify_transport([duplicate], game_sequence=0,
+                                  scenario="duplicate", role=2)
+        self.assertTrue(report["exact_payload_and_history_preserved"])
+        cases = [
+            ([], "missing duplicate"),
+            ([duplicate, dict(duplicate)], "extra duplicate"),
+            ([dict(duplicate, action="drop")], "wrong action"),
+            ([dict(duplicate, packet_frame=97)], "wrong frame"),
+            ([dict(duplicate, role=1)], "wrong role"),
+            ([dict(duplicate, duplicate_count=2)], "wrong count"),
+            ([dict(duplicate, duplicate_count=True)], "boolean count"),
+            ([dict(duplicate, duplicate_payload_hash="fedcba9876543210")], "changed copy"),
+            ([dict(duplicate, history_last_frame=99)], "changed history"),
+        ]
+        for rows, label in cases:
+            with self.subTest(label=label), self.assertRaises(ValueError):
+                verify_transport(rows, game_sequence=0, scenario="duplicate", role=2)
+        with self.assertRaises(ValueError):
+            verify_transport([duplicate], game_sequence=0, scenario="duplicate", role=1)
+
+        receiver = [
+            {"event": "pad_transport_receive", "observer_context": "transport",
+             "game_sequence": 0, "packet_frame": 98, "packet_player_port": 1,
+             "receiver_port": 1, "payload_hash": duplicate["payload_hash"],
+             "inputs_to_copy": 1},
+            {"event": "pad_transport_receive", "observer_context": "transport",
+             "game_sequence": 0, "packet_frame": 98, "packet_player_port": 1,
+             "receiver_port": 1, "payload_hash": duplicate["payload_hash"],
+             "inputs_to_copy": 0},
+        ]
+        self.assertEqual(verify_transport(receiver, game_sequence=0,
+                                          scenario="duplicate", role=1)
+                         ["receiver"]["receiver_event_count"], 2)
+        for changed in (
+                [dict(receiver[0], inputs_to_copy=True), receiver[1]],
+                [dict(receiver[0], inputs_to_copy=0), receiver[1]],
+                [dict(receiver[0], receiver_port=2), receiver[1]],
+                [receiver[0], dict(receiver[1], payload_hash="fedcba9876543210")],
+        ):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                verify_transport(changed, game_sequence=0, scenario="duplicate", role=1)
+
+    def test_jitter_and_reorder_require_authored_native_fields(self):
+        jitter = [
+            {"event": "pad_transport", "observer_context": "transport", "game_sequence": 0,
+             "action": "jitter_hold", "packet_frame": 98, "payload_hash": "0123456789abcdef",
+             "held_count": 1, "history_count": 1, "history_first_frame": 98,
+             "history_last_frame": 98},
+            {"event": "pad_transport", "observer_context": "transport", "game_sequence": 0,
+             "action": "jitter_release", "release_packet_frame": 99, "dispatch_frame": 99,
+             "release_payload_hash": "fedcba9876543210", "release_count": 1,
+             "held_frames": [98], "held_payload_hashes": ["0123456789abcdef"],
+             "dispatch_payload_hashes": [], "history_count": 1,
+             "history_first_frame": 99, "history_last_frame": 99},
+        ]
+        report = verify_transport(jitter, game_sequence=0, scenario="jitter", role=2)
+        self.assertTrue(report["native_history_and_identities_observed"])
+        reorder = [
+            dict(jitter[0], action="reorder_hold"),
+            dict(jitter[1], action="reorder_dispatch",
+                 dispatch_payload_hashes=["fedcba9876543210", "0123456789abcdef"]),
+        ]
+        report = verify_transport(reorder, game_sequence=0, scenario="reorder", role=2)
+        self.assertEqual(report["fault_events"], 2)
+        for changed in ([dict(jitter[0], action="jitter_hold", history_count=True), jitter[1]],
+                        [jitter[0], dict(jitter[1], release_payload_hash="not-hex")],
+                        [dict(reorder[0], action="reorder_hold", history_count=True), reorder[1]]):
+            with self.subTest(changed=changed), self.assertRaises(ValueError):
+                verify_transport(changed, game_sequence=0,
+                                 scenario="reorder" if changed[0]["action"] == "reorder_hold" else "jitter",
+                                 role=2)
 
     def test_recording_delimiter_and_final_rng_clock_are_checked(self):
         capture, _ = fixture()

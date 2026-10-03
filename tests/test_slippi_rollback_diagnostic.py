@@ -47,6 +47,59 @@ class SlippiRollbackDiagnosticConfigTests(unittest.TestCase):
         self.assertEqual(parsed.overlay, InputOverlay(96, "01007f8080802a00"))
         self.assertEqual(parsed.transport, TransportAction("hold", 96, 98))
 
+    def test_role2_duplicate_has_one_packet_frame_and_no_release(self):
+        value = _config()
+        value.update(
+            input_profile={"name": "mario-fd-rollback-v1", "role": 2},
+            overlay=None,
+            transport={"action": "duplicate", "frame": 98, "release_frame": None},
+        )
+        parsed = parse_config(value)
+        self.assertEqual(parsed.transport, TransportAction("duplicate", 98, None))
+        self.assertEqual(parsed.input_profile, InputProfile("mario-fd-rollback-v1", 2))
+
+        for role in (1, None):
+            changed = dict(value)
+            changed["input_profile"] = None if role is None else {
+                "name": "mario-fd-rollback-v1", "role": role,
+            }
+            with self.subTest(role=role), self.assertRaisesRegex(
+                    DiagnosticConfigError, "role-2 input profile"):
+                parse_config(changed)
+        changed = dict(value)
+        changed["transport"] = {"action": "duplicate", "frame": 98, "release_frame": 99}
+        with self.assertRaisesRegex(DiagnosticConfigError, "null release_frame"):
+            parse_config(changed)
+
+    def test_role2_jitter_and_reorder_require_one_frame_release(self):
+        for action in ("jitter", "reorder"):
+            value = _config()
+            value.update(
+                input_profile={"name": "mario-fd-rollback-v1", "role": 2},
+                overlay=None,
+                transport={"action": action, "frame": 98, "release_frame": 99},
+            )
+            parsed = parse_config(value)
+            self.assertEqual(parsed.transport, TransportAction(action, 98, 99))
+            for role in (1, None):
+                changed = copy.deepcopy(value)
+                changed["input_profile"] = None if role is None else {
+                    "name": "mario-fd-rollback-v1", "role": role,
+                }
+                with self.subTest(action=action, role=role), self.assertRaisesRegex(
+                        DiagnosticConfigError, "role-2 input profile"):
+                    parse_config(changed)
+            changed = copy.deepcopy(value)
+            changed["transport"]["release_frame"] = None
+            with self.subTest(action=action, invalid="missing release"), self.assertRaises(
+                    DiagnosticConfigError):
+                parse_config(changed)
+            changed = copy.deepcopy(value)
+            changed["transport"]["release_frame"] = 107
+            with self.subTest(action=action, invalid="wide release"), self.assertRaises(
+                    DiagnosticConfigError):
+                parse_config(changed)
+
     def test_round_trip_writes_canonical_json(self):
         parsed = parse_config(_config())
         with tempfile.TemporaryDirectory() as directory:

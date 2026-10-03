@@ -31,6 +31,19 @@ changes retain GPL-2.0-or-later. The diagnostic's authored Python configuration,
 runner and exact replay comparator have separate root MIT scope; that grant
 does not include the combined native client.
 
+`patches/0004-desktop-rollback-duplicate-role2.native.patch`,
+`patches/0005-duplicate-receive-join.native.patch` and
+`patches/0006-jitter-reorder-native.patch` extend that same opt-in native
+boundary with duplicate, receiver-arrival, jitter and reorder observations.
+Their changed Dolphin files retain GPL-2.0-or-later. The authored
+`transport_fault_recipes.py` validator and its focused tests remain under the
+root MIT project-file scope; they do not grant rights to the combined client.
+
+The project-authored `generate_service_lineage.py` helper and the sanitized
+desktop transport evidence under `docs/evidence/` are also MIT-scoped project
+files. They record identities and bounded observations; they do not relicense
+the adapted client, game data, or retained native binaries.
+
 The patches are separated from the MIT matchmaking service. No client patch is
 an MIT grant for the Dolphin or Rust client source. Build and distribute a
 combined client only under the applicable upstream terms and with their required

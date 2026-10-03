@@ -52,6 +52,48 @@ lock. Use the repository bootstrap and workspace ownership commands before
 preparing or rebuilding these artifacts. Do not copy the disc, generated
 modification, executable, profile or replay into Git.
 
+The transport matrix additionally depends on public PR #133, pinned to commit
+`cdc4b899ee85861cce7f2cebfc9d756a30326ab6` (`origin/codex/local-api-framing-pr`)
+with parent `473e97c41633043562bc5015e1add630d23b70b3`. This branch is based on
+an older project head, so do not merge or cherry-pick the PR commit wholesale.
+For the affected service build, fetch the ref, verify the commit and parent,
+materialize only its two service paths, and apply that checked patch temporarily:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 scripts/bootstrap.py
+SERVICE_REF=cdc4b899ee85861cce7f2cebfc9d756a30326ab6
+SERVICE_PARENT=473e97c41633043562bc5015e1add630d23b70b3
+SERVICE_PATCH="$MELEE_RUN_ROOT/pr133-service-paths.patch"
+python3 scripts/agent_workspace.py run -- git fetch --no-tags origin codex/local-api-framing-pr
+test "$(python3 scripts/agent_workspace.py run -- git rev-parse FETCH_HEAD)" = "$SERVICE_REF"
+test "$(python3 scripts/agent_workspace.py run -- git rev-parse "$SERVICE_REF^")" = "$SERVICE_PARENT"
+python3 scripts/agent_workspace.py run -- git diff --binary "$SERVICE_REF^" "$SERVICE_REF" -- \
+  reference-capture/slippi/local_matchmaker/server.cpp \
+  reference-capture/slippi/local_matchmaker/integration_test.cpp > "$SERVICE_PATCH"
+python3 scripts/agent_workspace.py run -- git apply --check "$SERVICE_PATCH"
+test "$(shasum -a 256 reference-capture/slippi/local_matchmaker/server.cpp | cut -d' ' -f1)" \
+  = c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a
+python3 scripts/agent_workspace.py run -- git apply "$SERVICE_PATCH"
+test "$(shasum -a 256 reference-capture/slippi/local_matchmaker/server.cpp | cut -d' ' -f1)" \
+  = 78b680a16ff717e61cbb561281240a9a205a105ac4053634441fb88941fce719
+test "$(shasum -a 256 reference-capture/slippi/local_matchmaker/integration_test.cpp | cut -d' ' -f1)" \
+  = 37f3b2ca979e4012f4a425ce069a91a8a374d299ac87367a1c0891449c58169c
+```
+
+Keep this temporary source state applied for the supported bootstrap/build,
+CTest, normal test suite and the diagnostic runtime. Reverse exactly
+`$SERVICE_PATCH` only in the outermost `finally` path and verify the pre-apply
+`server.cpp` identity. `_verify_build_profile` independently requires
+the matchmaker CMake cache to point at this checkout's `local_matchmaker`, the
+PR #133 `server.cpp` and `integration_test.cpp` identities above, and the staged
+executable to byte-match that cache's `slippi-local-matchmaker` output. It
+therefore refuses a service binary from an unrelated service tree. The
+service-lineage receipt must carry the pinned public ref/commit/parent,
+path-diff SHA and post-apply source-file SHAs, plus the fresh CMake-cache,
+source-inventory and staged-binary SHAs generated from this build. An impaired
+run must use a passed two-cycle `none` baseline from the same client, lock,
+fresh service binary, service lineage and artifact identity set.
+
 ## Prepare the local artifacts
 
 From a fresh checkout, these commands create the clean pinned sources and an
@@ -80,6 +122,15 @@ python3 scripts/agent_workspace.py run -- git apply \
 python3 scripts/agent_workspace.py run -- git apply \
   --directory=.deps/slippi-dolphin-local \
   reference-capture/slippi/patches/0003-desktop-rollback-diagnostic.patch
+python3 scripts/agent_workspace.py run -- git apply \
+  --directory=.deps/slippi-dolphin-local \
+  reference-capture/slippi/patches/0004-desktop-rollback-duplicate-role2.native.patch
+python3 scripts/agent_workspace.py run -- git apply \
+  --directory=.deps/slippi-dolphin-local \
+  reference-capture/slippi/patches/0005-duplicate-receive-join.native.patch
+python3 scripts/agent_workspace.py run -- git apply \
+  --directory=.deps/slippi-dolphin-local \
+  reference-capture/slippi/patches/0006-jitter-reorder-native.patch
 python3 scripts/agent_workspace.py run -- git clone --no-checkout \
   https://github.com/project-slippi/slippi-ssbm-asm .deps/slippi-ssbm-asm
 python3 scripts/agent_workspace.py run -- git -C .deps/slippi-ssbm-asm checkout --detach \
@@ -90,8 +141,11 @@ The generated `Output/Netplay/GALE01r2.ini` must match the lock hash. Install
 Rust 1.88.0 and use the locked CMake, Ninja and Apple Clang versions. The
 runner rejects mismatched revisions, patch trees, compiler/build settings, or
 generated game modification. Keep the clean Dolphin checkout unchanged.
-The third patch's controls are disabled unless an explicit diagnostic config
-is supplied; the ordinary match/rematch command retains its controller script.
+The third through sixth patches are opt-in diagnostic controls. They are
+disabled unless an explicit diagnostic config is supplied; the ordinary
+match/rematch command retains its controller script. The sixth patch adds the
+bounded jitter/reorder sender actions, while the fourth and fifth add duplicate
+and receiver-arrival observations.
 See [the bounded rollback diagnostic](ROLLBACK_DIAGNOSTIC.md) for the separate
 frame-indexed fixture and its comparison boundary.
 
@@ -149,6 +203,49 @@ ctest = next(line.split("=", 1)[1] for line in cache if line.startswith("CMAKE_C
 os.execv(ctest, [ctest, "--test-dir", str(build), "--output-on-failure"])
 '
 ```
+
+For a clean affected build, run the bootstrap entry point once before the
+temporary PR source apply, then use the client and matchmaker commands above.
+While the two PR paths are applied, the service checks must report the pinned
+server and integration-test SHAs, the CMake cache must name this checkout's
+`local_matchmaker`, and the built `slippi-local-matchmaker` must be the staged
+binary. Keep the paths applied through the matchmaker `ctest`, the normal
+project suite, and the diagnostic baseline/fault runs. Always reverse only in
+the outermost `finally` path and verify both source files return to their
+pre-apply identities (`server.cpp`
+`c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a`,
+`integration_test.cpp`
+`e71b7b895ff7ffe51f7153d510de54eca78931342f6d5d450f7bb1e05d9bad00`). Then
+finish cleanup from the restored source tree:
+
+```sh
+# Keep SERVICE_PATCH applied while these checks and all diagnostic runs execute.
+python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v
+# In the outermost finally block, reverse SERVICE_PATCH and verify both hashes.
+```
+
+Generate the fresh lineage receipt only after the affected build has passed.
+The command calls `_verify_pinned_client_source` and `_verify_build_profile`,
+then records the current build output, CMake cache, service source inventory,
+build manifest and lineage files. It does not use a retained binary or a
+historical receipt as an input:
+
+```sh
+python3 scripts/agent_workspace.py run -- python3 \
+  reference-capture/slippi/generate_service_lineage.py \
+  --dolphin-source .deps/slippi-dolphin-local \
+  --enet-source .deps/slippi-dolphin \
+  --dolphin-build work/slippi-local-networking/dolphin-build \
+  --matchmaker-build work/slippi-local-networking/matchmaker-build \
+  --client-binary work/slippi-local-networking/SlippiHeadless.app/Contents/MacOS/dolphin-emu-nogui \
+  --service-binary work/slippi-local-networking/matchmaker-build/slippi-local-matchmaker \
+  --source-patch "$SERVICE_PATCH" \
+  --output "$MELEE_SERVICE_LINEAGE"
+```
+
+The receipt's whole-file SHA is the service identity bound into every baseline
+and fault run; it is computed after writing and is not pre-pinned in
+`client.lock.json`.
 
 The local API listener binds only to `127.0.0.1:43114` and returns HTTP 503 for
 user, GraphQL and reporting requests. The pinned client adaptations point its

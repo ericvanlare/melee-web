@@ -1,0 +1,388 @@
+{
+  "hold_observations": [
+    {
+      "corrections": 1,
+      "cycle": 1,
+      "depths": [
+        5
+      ],
+      "game": 1
+    },
+    {
+      "corrections": 1,
+      "cycle": 1,
+      "depths": [
+        5
+      ],
+      "game": 2
+    },
+    {
+      "corrections": 1,
+      "cycle": 2,
+      "depths": [
+        4
+      ],
+      "game": 1
+    },
+    {
+      "corrections": 1,
+      "cycle": 2,
+      "depths": [
+        5
+      ],
+      "game": 2
+    }
+  ],
+  "inputs_and_build": {
+    "bundle_sys_sha256": "525d3333b4eed701982ada34942b83cecd9accc6e96b18a27a1b6d863e499946",
+    "client_binary_sha256": "b5697c69fbe6b18359f173c85c5c2cad4fa34cfa307558234af07937211b0c7a",
+    "client_cache_sha256": "bb194e89ddc065dda092fdb67382130d0fd50df582410f120370181df50d7dce",
+    "client_lock_sha256": "e1ef5bbea760b2fc064719330c740db1f6574509478df7f76cab7f0e8cbdc7bc",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "downstream_patch_sha256": {
+      "patches/0001-client-loopback-and-observation.patch": "2e599906c58920f4c5089c9749abee51f94ddccd7909fa39aadf78d5a4fa3150",
+      "patches/0002-rust-local-endpoints.patch": "a2a547fe9334edcc44ddd7686936743160aa5b51f66fd0f47a4af05df5b9a1ca",
+      "patches/0003-desktop-rollback-diagnostic.patch": "9806f2502bdba799c802843b682effea47b2bd70ee63fba7031a75556bcbbadf",
+      "patches/0004-desktop-rollback-duplicate-role2.native.patch": "90b74dc79569d18c250a19203b4bca858d8f8f07c8fbaaad7a6b7302318eb57f",
+      "patches/0005-duplicate-receive-join.native.patch": "2b82547f046ed86c3959108488b0342dcde99bea0d281f071e78c16462eaa443",
+      "patches/0006-jitter-reorder-native.patch": "5c82d7edaa744402c4a04781d6c9727429fa7cae2c7aedad5fde3f0504080ba3"
+    },
+    "game_modification_sha256": "b30b294df5c0d92deb3129afdfbc894a48aabeb1bce0cf92cce8c4e5408a2587",
+    "native_head": "41a7a3a110ed52999486ae1901c8fbb9a63d4f13",
+    "project_head": "b50684772ba88c795c09bd03ada3ee7adab0f204",
+    "service_binary_sha256": "d7d7ee8b623114f061da9a52f0c6b7d397596e9275541a57b364272dbafd4a47",
+    "service_build_cache_sha256": "25852f7388c9a6d2f862220d470a16687c0d77401a14642f487e9651688698c3"
+  },
+  "observed_run_source_sha256": {
+    "all_scenarios_match_common": true,
+    "common": {
+      "reference-capture/slippi/compare_rollback.py": "4d8d5f36ba2ab53c86ed489b168d2340d225bd96e73a8b0ce4eaee53e0963631",
+      "reference-capture/slippi/process.py": "5b769f0b3ed11fc087a3e0af6e83d1a23587103c4d461472886dc1325e8157aa",
+      "reference-capture/slippi/run_local.py": "7583b208e7e3481bcba59f0ce979c403f0dcd570669061594633f2fc6562b951",
+      "reference-capture/slippi/run_rollback.py": "d734fff8605a852348dfce27c3edd5fb6a590cbf641da9d8d7c4dc3320681f7b",
+      "reference-capture/slippi/runtime.py": "1d653673df44b7574ef597c36ecd9ccba9ad2eac4b3c33ed3ce3e1341d1305c1",
+      "reference-capture/slippi/transport_fault_recipes.py": "06788241b0ea193a0568f6192f4ae249d4e7a36d32e75f91fcfca220cf13eb8f",
+      "tools/slippi_format.py": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956",
+      "tools/slippi_rollback_diagnostic.py": "05740a4803b7da8e66c1a89f37093b9fd2503b4e4b6f2c1a4b63ea917903d896"
+    },
+    "description": "source_sha256 map emitted by the E06 pre-correction rollback-run receipts; later validator edits were not rerun against gameplay",
+    "scenario_overrides": {}
+  },
+  "ordinary_lifecycle": {
+    "cycle_evidence_sha256": {
+      "cycle-01": "9175922c0decb2cbd2071df870a97bf659af9e94f5d742ad92a4deb9830fa221",
+      "cycle-02": "85bf84ecd55b83da82658efcd140bb79eb79ed311c9921ac9b51657269436050"
+    },
+    "disconnect_after_rematch": true,
+    "integration_sha256": "b01ef3c2a0ac8893f4124c52a42514e606600f61153bb65ea0d4acb7d24f8319",
+    "interruption_cleanup": true,
+    "interruption_sha256": "606ff5da393d097fbf6a52224cd8a02208ca36d4b8e7799e05fba8ce8961b278",
+    "repeat": 2
+  },
+  "postrun_admission_controls": {
+    "checks": [
+      "exact cycle-root replay containment",
+      "NONE profile/stage/RNG/role/overlay/frame/release configuration",
+      "wrong-cycle symlink and malformed profile/frame negatives"
+    ],
+    "description": "Focused post-run admission hardening; no native or game-state rerun.",
+    "source_only": true
+  },
+  "post_admission_validation": {
+    "schema": "melee-web-desktop-transport-post-admission-v1",
+    "result": "passed",
+    "transaction_sha256": "ad0367c416f6c357a18497d66f990599da54343c541feec8b0a10c921fa8196b",
+    "root_audit_sha256": "b36cbce480a58e66371e5da556ea6327bee777ff1a7541029278d56cfd77cc99",
+    "elapsed_seconds": 268.47629925003275,
+    "service_incremental_build": {
+      "result": "passed",
+      "log_sha256": "94a5ba38c249b9caa266ecee49e173db677e72ed95bda3de97f22df032628ba2"
+    },
+    "service_ctest": {
+      "result": "passed",
+      "tests": 3,
+      "failed": 0,
+      "elapsed_seconds": 2.26,
+      "log_sha256": "1fdca3bb231cfd2b1992bed4a4b70081701406ee35bec7784fdffbdfef898ca6"
+    },
+    "full_suite": {
+      "result": "passed",
+      "tests": 1715,
+      "skipped": 133,
+      "elapsed_seconds": 262.207,
+      "log_sha256": "6393651c956b823b081d669887568e7ce8dae9de2c8a2585de601e70d24121d6"
+    },
+    "service_source": {
+      "before": {
+        "reference-capture/slippi/local_matchmaker/integration_test.cpp": "e71b7b895ff7ffe51f7153d510de54eca78931342f6d5d450f7bb1e05d9bad00",
+        "reference-capture/slippi/local_matchmaker/server.cpp": "c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a"
+      },
+      "after": {
+        "reference-capture/slippi/local_matchmaker/integration_test.cpp": "37f3b2ca979e4012f4a425ce069a91a8a374d299ac87367a1c0891449c58169c",
+        "reference-capture/slippi/local_matchmaker/server.cpp": "78b680a16ff717e61cbb561281240a9a205a105ac4053634441fb88941fce719"
+      },
+      "final": {
+        "reference-capture/slippi/local_matchmaker/integration_test.cpp": "e71b7b895ff7ffe51f7153d510de54eca78931342f6d5d450f7bb1e05d9bad00",
+        "reference-capture/slippi/local_matchmaker/server.cpp": "c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a"
+      },
+      "reversed": true
+    },
+    "cleanup": {
+      "owned_pids_absent": 15,
+      "groups_released": true,
+      "source_inverse": true,
+      "service_reversed": true
+    },
+    "scope": "Post-admission service build, CTest and full-suite validation only; E06 gameplay and transport observations retain their original source identities."
+  },
+  "result": "passed",
+  "retained_failed_predecessor": "E05 duplicate rematch stage-selection failure remains retained separately; it is not relabeled as a pass.",
+  "scenarios": {
+    "drop": {
+      "comparisons": [
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "3588dc218be835705ff82a65516cd9893aee82eff489892bbe5394c5c8705825"
+        },
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "3885775b872562bddc85109903cb843b8be0c68ddc135aa02d4ee53dbfd14a2e"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "c4a24326e561540038aebcd5dc06b0f4817e5a25fe30f6dffbee53e885d3d7a9"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "f0be0f94740aaa5068d6147a18af7a7c29858d116119d43ebb8de9b9f06e1de2"
+        }
+      ],
+      "cycles": 2,
+      "frames_per_game": 1342,
+      "rollback_run_sha256": "646aaeaa9b3987e6df818870577c03c340adccd630dce5d4e67525719f913ec0"
+    },
+    "duplicate": {
+      "comparisons": [
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "ef5ce29c8eccc73c6c9177790a930eb050cf2fcf59d5f9c886c6f6db3df5044d"
+        },
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "7b9f2e3a68d3f9880e488b5308ac46ea2ba8a2f2909e2a55db1526fc90be82e3"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "76d2334814b1caf811c23457df068a7486b4b6d19316912386f6702595a6399e"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "d3fd69d2bb7ee704f1a2a1a8089dd9a590faa17709b09d9aa7b843865760ce45"
+        }
+      ],
+      "cycles": 2,
+      "frames_per_game": 1342,
+      "rollback_run_sha256": "eb2fc4d1c0f4017a6e13ce5c5551cf743ea110773093b946d5de14325a525395"
+    },
+    "hold": {
+      "comparisons": [
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "acb7cc4063e7962ddd4f460c5eeafefa992b73f09d4ae0f76f44996e39c59bb8"
+        },
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "b727465cff61f1313dd7b20a8365dc1a9f852f46cd228069fd35686ba7349430"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "a32f68280d177ad2899bd5d5c000a378d3a002ad0447d79086539ba1279fca92"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "3602e6106fba902af8ce856e7af38a9ed0e5e43a02e3655f8bd828a30228015e"
+        }
+      ],
+      "cycles": 2,
+      "frames_per_game": 1342,
+      "rollback_run_sha256": "e75262cf16da96d72ac4f238477c094e14e8f08c677a609edb8e3ba55eebc98a"
+    },
+    "jitter": {
+      "comparisons": [
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "1f840dbbd15655baeb358851e1f8f0973268298f5c565a1721c9b27305ad07a5"
+        },
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "fd5b231341df8368c1130188e3fcc5bb5ed181a94917569b6303bc0bf788954c"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "267ef9d1a9fc33ad318c161012391e66074768af94709d2ef2e4cdb53d01a3a3"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "ffb110ed70d6109cd8e3f8dd97d077cc5d09214b22504950de989562ac138eab"
+        }
+      ],
+      "cycles": 2,
+      "frames_per_game": 1342,
+      "rollback_run_sha256": "7d9ee85d688f75f94d405008919cd6a73399963eebb1f9e132b268b75c4a1fbc"
+    },
+    "none": {
+      "comparisons": [
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "b8f77e6ed5f3e3d3db2ab9840082f9b763af34bab6642c553c856ac6675ea6c2"
+        },
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "11bc892c40f2c74a8ea43503677055a5927951d1e6c1b761b9b36c5b9649e858"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "99d3b73e117f2b52409d3cb4a081741218a27f956c59d3ae904a99ed640977da"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "0c0d930d8f4a84fdb7ea7324a90cecf66a84e694325cd83c9c03f5ab6661ae93"
+        }
+      ],
+      "cycles": 2,
+      "frames_per_game": 1342,
+      "rollback_run_sha256": "c52ad3549449cb12bc3853d36cc5836d9d3e3c23164bfeea4bc66383fd54af59"
+    },
+    "reorder": {
+      "comparisons": [
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "5b7e5eca0cd9b023bd1fdbcd94e6878a611e4b367986b8a77f624b068b1a026d"
+        },
+        {
+          "cycle": 1,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "24d4625b9dc95a8948ba69551509ccc8e3fdf1fbcce0735a0affb09ce1d123c2"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 1,
+          "sha256": "4e07857db79e593eeca46923a8d36ea7e7af9519b5e8b95ba5b9e524ca23de95"
+        },
+        {
+          "cycle": 2,
+          "frames": 1342,
+          "game": 2,
+          "sha256": "fec1ec77e888cc51e101ee11aee145217f1111b5cc864b0584f1eda875e865b6"
+        }
+      ],
+      "cycles": 2,
+      "frames_per_game": 1342,
+      "rollback_run_sha256": "72e51975cd7bb082ae45e58b142faefb17b96a0dffe8cb86d347cc67159ab047"
+    }
+  },
+  "schema": "melee-web-desktop-transport-matrix-e06-v1",
+  "scope": {
+    "claims": [
+      "ordinary fresh diagnostic-disabled match/rematch cycles with disconnect/interruption cleanup",
+      "none baseline and duplicate/jitter/reorder/drop finalized parsed-field agreement against the paired baseline",
+      "HOLD native prediction-error loads and one corrected wrong-input/post-state pair per game"
+    ],
+    "desktop_only": true,
+    "evidence_label": "Native traced, adapted desktop testbed",
+    "exclusions": [
+      "browser source gameplay",
+      "vanilla equivalence",
+      "rendering/pixels",
+      "PCM/audio output",
+      "physical controllers",
+      "foreground timing/performance",
+      "cross-machine/Internet",
+      "official Slippi services",
+      "unparsed payload fields",
+      "universal rollback invariant"
+    ],
+    "rollback_correctness_claimed": false
+  },
+  "service_lineage": {
+    "public_commit": "cdc4b899ee85861cce7f2cebfc9d756a30326ab6",
+    "public_parent_commit": "473e97c41633043562bc5015e1add630d23b70b3",
+    "public_path_diff_sha256": "cd2fe85202f0315b0e8c216e05447cd9fdfba6b5fb6044f903daeb579eeeb856",
+    "public_ref": "codex/local-api-framing-pr",
+    "receipt_sha256": "f76b1903c19c4052281a3e7db2ac2b648498959b4134f8a658431a8dc421757e",
+    "source_after": {
+      "reference-capture/slippi/local_matchmaker/integration_test.cpp": "37f3b2ca979e4012f4a425ce069a91a8a374d299ac87367a1c0891449c58169c",
+      "reference-capture/slippi/local_matchmaker/server.cpp": "78b680a16ff717e61cbb561281240a9a205a105ac4053634441fb88941fce719"
+    },
+    "source_before": {
+      "reference-capture/slippi/local_matchmaker/integration_test.cpp": "e71b7b895ff7ffe51f7153d510de54eca78931342f6d5d450f7bb1e05d9bad00",
+      "reference-capture/slippi/local_matchmaker/server.cpp": "c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a"
+    },
+    "source_final": {
+      "reference-capture/slippi/local_matchmaker/integration_test.cpp": "e71b7b895ff7ffe51f7153d510de54eca78931342f6d5d450f7bb1e05d9bad00",
+      "reference-capture/slippi/local_matchmaker/server.cpp": "c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a"
+    },
+    "source_inventory_sha256": "49188e8f32fd12226f7f4cab6272970f2df686f37398776f86bc7db4c2806983",
+    "source_sha256": "78b680a16ff717e61cbb561281240a9a205a105ac4053634441fb88941fce719"
+  },
+  "transaction": {
+    "elapsed_seconds": 1241.0345176248811,
+    "finished_utc": "2026-10-03T09:34:40.841326+00:00",
+    "full_suite": {
+      "elapsed_seconds": 256.758,
+      "skipped": 133,
+      "tests": 1714
+    },
+    "owned_processes_absent": 68,
+    "ports_released": true,
+    "root_audit_sha256": "3ae66660f1c3f23d9c6fafff287f9e1a9ce96cfd5e3470e554682381cb4163bf",
+    "service_source_restored": true,
+    "sha256": "2f6c462153a989a814f2474130e34712fc737d895d7ead54c88000277342d0dd",
+    "started_utc": "2026-10-03T09:13:59.755488+00:00",
+    "whole_deadline_seconds": 1500.0
+  }
+}

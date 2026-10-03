@@ -16,26 +16,265 @@ import struct
 import sys
 
 from compare_rollback import compare_timelines, first_difference, validate_complete
-from run_local import PairRun, ROOT, _sha256
+from run_local import LOCK_PATH, PairRun, ROOT, _sha256
 from slippi_format import (FRAME_START, PRE_FRAME, POST_FRAME, _raw_stream, _decode_pre_frame,
                            _decode_post_frame, decode_timeline, read_timeline)
-from slippi_rollback_diagnostic import SCHEMA
+from slippi_rollback_diagnostic import PROFILE_NAME, SCHEMA
+from transport_fault_recipes import validate_transport as validate_transport_delivery
 
 PINNED_INPUT_DELAY = 2  # Config/MainSettings.cpp SLIPPI_ONLINE_DELAY default.
 RECORDING_FRAME_OFFSET = 123  # Recording index starts at -123, scene at 0.
 ARTIFACT_IDENTITY_FIELDS = (
     "client_binary_sha256", "matchmaker_sha256", "dependency_lock_sha256",
-    "downstream_patch_sha256", "game_modification_sha256", "disc_sha256", "bundle_sys_sha256")
+    "downstream_patch_sha256", "game_modification_sha256", "disc_sha256",
+    "bundle_sys_sha256", "service_framing_lineage_sha256")
+EXPECTED_BASELINE_CYCLES = 2
+EXPECTED_BASELINE_GAMES = (1, 2)
+EXPECTED_FINALIZED_FRAMES = 1342
 
 
 def artifact_identities(evidence):
-    return {key: evidence[key] for key in ARTIFACT_IDENTITY_FIELDS}
+    try:
+        values = {key: evidence[key] for key in ARTIFACT_IDENTITY_FIELDS}
+    except KeyError as error:
+        raise ValueError(f"evidence lacks artifact identity {error.args[0]}") from error
+    for key, value in values.items():
+        if key == "downstream_patch_sha256":
+            _validate_downstream_patch_identity(value)
+        else:
+            _strict_sha(value, f"artifact identity {key}")
+    return values
+
+
+def _strict_sha(value, label):
+    if type(value) is not str or not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise ValueError(f"{label} is not a lowercase SHA-256 identity")
+    return value
+
+
+def _expected_downstream_patch_identities():
+    """Return the exact patch map emitted by ``PairRun``.
+
+    The downstream identity is a map because the client is built from every
+    locked patch.  Keeping the path keys in the identity makes an omitted,
+    extra, or substituted patch visible at baseline admission.
+    """
+    lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
+    patches = lock.get("patches")
+    if (type(patches) is not list or not patches
+            or any(type(path) is not str or not path for path in patches)
+            or len(set(patches)) != len(patches)):
+        raise ValueError("client.lock.json patches are not a unique non-empty list")
+    return {path: _sha256(LOCK_PATH.parent / path) for path in patches}
+
+
+def _validate_downstream_patch_identity(value):
+    if type(value) is not dict:
+        raise ValueError("artifact identity downstream_patch_sha256 is not a patch identity map")
+    expected = _expected_downstream_patch_identities()
+    if set(value) != set(expected):
+        raise ValueError("artifact identity downstream_patch_sha256 path set differs from client.lock.json")
+    for path, digest in value.items():
+        _strict_sha(digest, f"artifact identity downstream_patch_sha256[{path}]")
+        if digest != expected[path]:
+            raise ValueError(f"artifact identity downstream_patch_sha256[{path}] differs from patch bytes")
+
+
+def validate_service_lineage(path):
+    """Admit a fresh service build from the public PR #133 composition.
+
+    The public source identity is fixed by ``client.lock.json``.  Build output,
+    cache and source-inventory identities are produced by the current build and
+    are bound by their receipt, baseline and fault runs as one set; old
+    retained binaries and receipts are evidence only.
+    """
+    path = path.expanduser().resolve(strict=True)
+    value = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise ValueError("service lineage receipt is not an object")
+    if value.get("schema") != "melee-web-service-lineage-v2":
+        raise ValueError("service lineage schema is unsupported")
+    lock_path = ROOT / "reference-capture/slippi/client.lock.json"
+    lock = json.loads(lock_path.read_text(encoding="utf-8"))
+    expected = lock.get("service_prerequisite")
+    if not isinstance(expected, dict):
+        raise ValueError("client lock lacks the PR #133 service prerequisite")
+    public_fields = {
+        "service_public_ref": "public_ref",
+        "service_public_commit": "public_commit",
+        "service_public_parent_commit": "public_parent_commit",
+        "service_public_path_diff_sha256": "public_path_diff_sha256",
+        "service_base_server_cpp_sha256": "base_server_cpp_sha256",
+        "service_integration_test_sha256": "integration_test_sha256",
+        "service_source_sha256": "source_sha256",
+    }
+    for actual, locked in public_fields.items():
+        actual_value = value.get(actual)
+        if actual == "service_public_ref":
+            if type(actual_value) is not str or actual_value != expected.get(locked):
+                raise ValueError(f"service lineage {actual} differs from client.lock.json")
+        elif actual in {"service_public_commit", "service_public_parent_commit"}:
+            if type(actual_value) is not str or not re.fullmatch(r"[0-9a-f]{40}", actual_value):
+                raise ValueError(f"service lineage {actual} is not a commit identity")
+        else:
+            _strict_sha(actual_value, f"service lineage {actual}")
+        if actual_value != expected.get(locked):
+            raise ValueError(f"service lineage {actual} differs from client.lock.json")
+    worktree_head = value.get("service_worktree_head")
+    if type(worktree_head) is not str or not re.fullmatch(r"[0-9a-f]{40}", worktree_head):
+        raise ValueError("service lineage service_worktree_head is not a commit identity")
+    for actual in (
+            "service_binary_sha256", "service_build_cache_sha256",
+            "service_source_inventory_sha256"):
+        _strict_sha(value.get(actual), f"service lineage {actual}")
+    if value.get("service_source_patch_sha256") != value["service_public_path_diff_sha256"]:
+        raise ValueError("service lineage source patch is not the public path-limited diff")
+    _strict_sha(value["service_source_patch_sha256"], "service lineage service_source_patch_sha256")
+    profile = value.get("build_profile")
+    if type(profile) is not dict or profile.get("matchmaker_release_build_verified") is not True:
+        raise ValueError("service lineage lacks a verified fresh matchmaker build profile")
+    lineage_sha = _sha256(path)
+    return {
+        "service_framing_lineage_sha256": lineage_sha,
+        "service_public_ref": value["service_public_ref"],
+        "service_public_commit": value["service_public_commit"],
+        "service_public_parent_commit": value["service_public_parent_commit"],
+        "service_public_path_diff_sha256": value["service_public_path_diff_sha256"],
+        "service_base_server_cpp_sha256": value["service_base_server_cpp_sha256"],
+        "service_integration_test_sha256": value["service_integration_test_sha256"],
+        "service_binary_sha256": value["service_binary_sha256"],
+        "service_build_cache_sha256": value["service_build_cache_sha256"],
+        "service_source_inventory_sha256": value["service_source_inventory_sha256"],
+        "service_source_sha256": value["service_source_sha256"],
+        "service_source_patch_sha256": value["service_source_patch_sha256"],
+        "service_worktree_head": value["service_worktree_head"],
+    }
+
+
+def validate_baseline_receipts(root, service_identity):
+    """Bind both fresh baseline cycles, all four games and their inputs.
+
+    Every file identity is recomputed at admission. This prevents a passed
+    cycle-01 report, stale cycle-02/config files, or a changed service receipt
+    from being paired with a new impaired run.
+    """
+    root = root.expanduser().resolve(strict=True)
+    rollback_path = root / "rollback-run.json"
+    if not rollback_path.is_file():
+        raise ValueError("baseline rollback-run.json is missing")
+    rollback = json.loads(rollback_path.read_text(encoding="utf-8"))
+    if type(rollback) is not dict:
+        raise ValueError("baseline rollback-run.json is not an object")
+    if (rollback.get("result") != "passed" or rollback.get("scenario") != "none"
+            or rollback.get("fresh_profile_repeatability_verified") is not True
+            or rollback.get("rollback_correctness_claimed") is not False):
+        raise ValueError("baseline is not a passed diagnostic none run")
+    cycles = rollback.get("cycles")
+    if (type(cycles) is not list or len(cycles) != EXPECTED_BASELINE_CYCLES
+            or any(type(row) is not dict for row in cycles)
+            or [row.get("cycle") for row in cycles] != [1, 2]
+            or any(type(row.get("cycle")) is not int for row in cycles)
+            or any(row.get("result") != "passed" for row in cycles)):
+        raise ValueError("baseline must contain two passed fresh cycles")
+
+    identities = None
+    evidence_hashes = {}
+    comparison_hashes = {}
+    config_hashes = {}
+    baseline_replays = {}
+    for cycle in cycles:
+        cycle_number = cycle["cycle"]
+        cycle_root = (root / f"cycle-{cycle_number:02d}").resolve(strict=True)
+        evidence_path = cycle_root / "evidence.json"
+        if cycle.get("evidence") != f"cycle-{cycle_number:02d}/evidence.json":
+            raise ValueError("baseline cycle evidence path is not canonical")
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        if type(evidence) is not dict:
+            raise ValueError(f"baseline cycle {cycle_number} evidence is not an object")
+        if evidence.get("result") != "passed":
+            raise ValueError(f"baseline cycle {cycle_number} evidence is not passed")
+        current = artifact_identities(evidence)
+        if evidence.get("service_framing_lineage_sha256") != service_identity["service_framing_lineage_sha256"]:
+            raise ValueError("baseline service framing receipt differs from the requested prerequisite")
+        if evidence.get("matchmaker_sha256") != service_identity["service_binary_sha256"]:
+            raise ValueError("baseline service binary differs from the requested prerequisite")
+        if evidence.get("service_framing") != service_identity:
+            raise ValueError("baseline service source/build identity differs from the requested prerequisite")
+        if identities is None:
+            identities = current
+        elif current != identities:
+            raise ValueError("baseline artifact identities differ between fresh cycles")
+        evidence_hashes[f"cycle-{cycle_number:02d}"] = _sha256(evidence_path)
+        for game in EXPECTED_BASELINE_GAMES:
+            comparison_path = cycle_root / f"game-{game:02d}-comparison.json"
+            comparison = json.loads(comparison_path.read_text(encoding="utf-8"))
+            if type(comparison) is not dict:
+                raise ValueError(f"baseline cycle {cycle_number} game {game} comparison is not an object")
+            validate_baseline_game(comparison, game)
+            peer = comparison.get("peer_comparison", {})
+            if (type(peer) is not dict
+                    or type(peer.get("compared_frames")) is not int
+                    or peer.get("compared_frames") != EXPECTED_FINALIZED_FRAMES
+                    or peer.get("first_divergence") is not None):
+                raise ValueError(f"baseline cycle {cycle_number} game {game} comparison is incomplete")
+            comparison_hashes[f"cycle-{cycle_number:02d}/game-{game:02d}"] = _sha256(comparison_path)
+            baseline_replays.setdefault(game, {})
+            replays = comparison.get("replays")
+            for name in ("p1", "p2"):
+                replay = replays.get(name) if type(replays) is dict else None
+                if (type(replays) is not dict
+                        or not isinstance(replay, dict)
+                        or type(replay.get("file")) is not str):
+                    raise ValueError(f"baseline cycle {cycle_number} game {game} lacks {name} replay")
+                replay_path = (cycle_root / replay["file"]).resolve(strict=True)
+                _strict_sha(replay.get("sha256"), f"baseline {cycle_number} {game} {name} replay")
+                try:
+                    replay_path.relative_to(cycle_root)
+                except ValueError as error:
+                    raise ValueError("baseline replay escaped its cycle or changed identity") from error
+                if _sha256(replay_path) != replay.get("sha256"):
+                    raise ValueError("baseline replay escaped its cycle or changed identity")
+                if cycle_number == 1:
+                    baseline_replays[game][name] = replay_path
+            for name, role in (("p1", 1), ("p2", 2)):
+                config_path = cycle_root / f"{name}-rollback-config.json"
+                config = json.loads(config_path.read_text(encoding="utf-8"))
+                if type(config) is not dict:
+                    raise ValueError(f"baseline cycle {cycle_number} {name} config is not an object")
+                transport = config.get("transport")
+                input_profile = config.get("input_profile")
+                if (config.get("schema") != SCHEMA or config.get("enabled") is not True
+                        or config.get("stage_id") != 32
+                        or config.get("rng_offset") != 0x1234
+                        or type(transport) is not dict or transport.get("action") != "none"
+                        or transport.get("frame") is not None
+                        or transport.get("release_frame") is not None
+                        or config.get("overlay") is not None
+                        or type(input_profile) is not dict
+                        or input_profile.get("name") != PROFILE_NAME
+                        or input_profile.get("role") != role
+                        or type(config.get("stage_id")) is not int
+                        or type(config.get("rng_offset")) is not int
+                        or type(input_profile.get("role")) is not int):
+                    raise ValueError("baseline diagnostic config differs from the pinned none profile")
+                config_hashes[f"cycle-{cycle_number:02d}/{name}"] = _sha256(config_path)
+    return {
+        "rollback_run_sha256": _sha256(rollback_path),
+        "cycle_evidence_sha256": evidence_hashes,
+        "comparison_sha256": comparison_hashes,
+        "config_sha256": config_hashes,
+        "artifact_identity": identities,
+        "service_framing": service_identity,
+        "baseline_replays": baseline_replays,
+    }
 
 
 def validate_baseline_game(receipt, game):
-    if (receipt.get("result") != "passed" or receipt.get("game") != game
+    peer = receipt.get("peer_comparison") if type(receipt) is dict else None
+    if (type(receipt) is not dict or receipt.get("result") != "passed"
+            or receipt.get("game") != game
             or receipt.get("scenario") != "none"
-            or receipt.get("peer_comparison", {}).get("result") != "passed"):
+            or type(peer) is not dict or peer.get("result") != "passed"):
         raise ValueError("baseline game lacks passed no-impairment peer comparison")
 
 
@@ -126,39 +365,131 @@ def verify_recording_clock(timeline, rows, *, game_number):
 def verify_transport(rows, *, game_sequence, scenario, role):
     faults = [row for row in rows if row.get("event") == "pad_transport"
               and row.get("game_sequence") == game_sequence]
+    receives = [row for row in rows if row.get("event") == "pad_transport_receive"
+                and row.get("game_sequence") == game_sequence]
+    if any(row.get("observer_context") != "transport" for row in receives):
+        raise ValueError("receiver observations came from the wrong native context")
+    receive_report = None
+    if scenario == "duplicate" and role == 1:
+        # OnData reads the wire player byte from m_player_idx (zero-based);
+        # receiver_port is the diagnostic's one-based local port.
+        for row in receives:
+            wire_port = row.get("packet_player_port")
+            receiver_port = row.get("receiver_port")
+            if (type(wire_port) is not int or not 0 <= wire_port <= 3
+                    or type(receiver_port) is not int or not 1 <= receiver_port <= 4):
+                raise ValueError("native receiver port is outside the authored four-player domain")
+        duplicate_candidates = [row for row in receives
+                                if row.get("packet_frame") == 98
+                                and row.get("packet_player_port") == 1]
+        if (any(row.get("receiver_port") != 1 for row in duplicate_candidates)
+                or len(duplicate_candidates) != 2):
+            raise ValueError("role-2 duplicate receiver rows have the wrong local port or count")
+        duplicate_receives = [row for row in duplicate_candidates
+                              if row.get("receiver_port") == 1]
+        hashes = [row.get("payload_hash") for row in duplicate_receives]
+        if (len(duplicate_receives) != 2
+                or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{16}", value)
+                       for value in hashes)
+                or len(set(hashes)) != 1
+                or [row.get("inputs_to_copy") for row in duplicate_receives] != [1, 0]
+                or any(type(row.get("inputs_to_copy")) is not int for row in duplicate_receives)):
+            raise ValueError("role-2 duplicate did not produce two identical receiver arrivals")
+        receive_report = {"receiver_event_count": 2,
+                          "packet_frame": 98,
+                          "wire_packet_player_port": 1,
+                          "receiver_port": 1,
+                          "payload_hashes": hashes,
+                          "identical_wire_payloads_received": True}
     action = scenario if role == 2 else "none"
     if any(row.get("observer_context") != "transport" for row in faults):
         raise ValueError("fault observations came from the wrong native context")
     if action == "none":
         if faults:
             raise ValueError("no-impairment peer unexpectedly applied a transport fault")
-        return {"action": action, "fault_events": 0}
+        report = {"action": action, "fault_events": 0}
+        if receive_report is not None:
+            report["receiver"] = receive_report
+        return report
     for row in faults:
-        field = "release_payload_hash" if row.get("action") == "hold_release" else "payload_hash"
+        field = ("release_payload_hash" if row.get("action") in {"hold_release", "jitter_release", "reorder_dispatch"}
+                 else "payload_hash")
         if not isinstance(row.get(field), str) or not re.fullmatch(r"[0-9a-f]{16}", row[field]):
             raise ValueError("fault packet lacks its native FNV-1a64 identity")
-        if (row["history_count"] <= 0 or
-                row["history_last_frame"] - row["history_first_frame"] + 1 != row["history_count"]):
+        count = row.get("history_count")
+        first = row.get("history_first_frame")
+        last = row.get("history_last_frame")
+        if (type(count) is not int or type(first) is not int or type(last) is not int
+                or count <= 0 or last - first + 1 != count):
             raise ValueError("fault packet history is not contiguous")
     if action == "drop":
-        if (len(faults) != 1 or faults[0]["action"] != "drop" or
-                faults[0]["packet_frame"] != 98 or faults[0]["drop_count"] != 1 or
-                faults[0]["history_last_frame"] != 98):
+        drop = faults[0] if len(faults) == 1 else {}
+        if (len(faults) != 1 or drop.get("action") != "drop"
+                or type(drop.get("packet_frame")) is not int
+                or drop.get("packet_frame") != 98
+                or type(drop.get("drop_count")) is not int
+                or drop.get("drop_count") != 1
+                or type(drop.get("history_last_frame")) is not int
+                or drop.get("history_last_frame") != 98):
             raise ValueError("single-packet loss schedule was not observed exactly")
         return {"action": action, "fault_events": 1, "packet_frame": 98,
                 "redundant_history_preserved": True}
+    if action == "duplicate":
+        duplicate = faults[0] if len(faults) == 1 else {}
+        if (len(faults) != 1 or duplicate.get("action") != "duplicate"
+                or type(duplicate.get("role")) is not int or duplicate.get("role") != 2
+                or type(duplicate.get("packet_frame")) is not int
+                or duplicate.get("packet_frame") != 98
+                or type(duplicate.get("duplicate_count")) is not int
+                or duplicate.get("duplicate_count") != 1
+                or type(duplicate.get("history_last_frame")) is not int
+                or duplicate.get("history_last_frame") != 98
+                or duplicate.get("duplicate_payload_hash") != duplicate.get("payload_hash")
+                or not isinstance(duplicate.get("duplicate_payload_hash"), str)
+                or not re.fullmatch(r"[0-9a-f]{16}", duplicate["duplicate_payload_hash"])):
+            raise ValueError("single role-2 duplicate schedule or exact payload was not observed")
+        return {"action": action, "fault_events": 1, "packet_frame": 98,
+                "duplicate_count": 1, "role": 2,
+                "payload_hash": duplicate["payload_hash"],
+                "duplicate_payload_hash": duplicate["duplicate_payload_hash"],
+                "exact_payload_and_history_preserved": True}
+    if action in {"jitter", "reorder"}:
+        # The receiver-attributed validator owns the authored hold/dispatch
+        # schedule.  Keeping this per-peer pass limited to native identities
+        # and contiguous history prevents a second, drifting recipe parser.
+        expected_actions = (["jitter_hold", "jitter_release"] if action == "jitter"
+                            else ["reorder_hold", "reorder_dispatch"])
+        if [row.get("action") for row in faults] != expected_actions:
+            raise ValueError(f"{action} requires exactly its authored hold/release event sequence")
+        for row in faults:
+            field = "release_payload_hash" if row["action"] in {"jitter_release", "reorder_dispatch"} else "payload_hash"
+            if not isinstance(row.get(field), str) or not re.fullmatch(r"[0-9a-f]{16}", row[field]):
+                raise ValueError(f"{row['action']} lacks its native FNV-1a64 identity in {field}")
+        return {"action": action, "fault_events": len(faults),
+                "native_history_and_identities_observed": True}
     if action != "hold":
         raise ValueError("unsupported transport observation scenario")
     if ([row["action"] for row in faults] != ["hold_begin", *(["hold"] * 5), "hold_release"]
+            or any(type(row.get("packet_frame")) is not int for row in faults[:-1])
             or [row["packet_frame"] for row in faults[:-1]] != list(range(98, 104))):
         raise ValueError("six-packet hold interval was not observed exactly")
     for count, row in enumerate(faults[:-1], 1):
-        if (row["held_count"] != count or row["begin_count"] != (1 if count == 1 else 0)
+        if (type(row.get("held_count")) is not int
+                or type(row.get("begin_count")) is not int
+                or type(row.get("history_last_frame")) is not int
+                or row["held_count"] != count
+                or row["begin_count"] != (1 if count == 1 else 0)
                 or row["history_last_frame"] != row["packet_frame"]):
             raise ValueError("held packet queue or history differs from the declared schedule")
     release = faults[-1]
-    if (release["release_packet_frame"] != 104 or release["release_count"] != 6 or
-            release["held_frames"] != list(range(98, 104)) or
+    if (type(release.get("release_packet_frame")) is not int
+            or type(release.get("release_count")) is not int
+            or type(release.get("history_last_frame")) is not int
+            or type(release.get("held_frames")) is not list
+            or any(type(value) is not int for value in release["held_frames"])
+            or release["release_packet_frame"] != 104
+            or release["release_count"] != 6
+            or release["held_frames"] != list(range(98, 104)) or
             release["held_payload_hashes"] != [row["payload_hash"] for row in faults[:-1]] or
             release["history_last_frame"] != 104):
         raise ValueError("held packet release did not preserve the original packet identities/order")
@@ -614,14 +945,29 @@ def verify_speculative_corrections(data, timeline, loads, *, remote_port,
 class RollbackRun(PairRun):
     baseline_replays: dict[int, dict[str, Path]] | None = None
     baseline_identities: dict | None = None
+    service_identity: dict | None = None
 
     def _make_profiles(self, *args):
+        if self.baseline_identities is not None:
+            current = {key: self.evidence.get(key) for key in ARTIFACT_IDENTITY_FIELDS
+                       if key in self.evidence and key != "service_framing_lineage_sha256"}
+            expected = {key: value for key, value in self.baseline_identities.items()
+                        if key != "service_framing_lineage_sha256"}
+            difference = first_difference(expected, current, "baseline_artifact_identity")
+            if difference:
+                raise ValueError(json.dumps(difference, sort_keys=True))
+        super()._make_profiles(*args)
+        if self.service_identity is not None:
+            if self.evidence.get("matchmaker_sha256") != self.service_identity["service_binary_sha256"]:
+                raise ValueError("configured matchmaker binary differs from the service prerequisite")
+            self.evidence["service_framing_lineage_sha256"] = (
+                self.service_identity["service_framing_lineage_sha256"])
+            self.evidence["service_framing"] = dict(self.service_identity)
         if self.baseline_identities is not None:
             difference = first_difference(self.baseline_identities, artifact_identities(self.evidence),
                                           "baseline_artifact_identity")
             if difference:
                 raise ValueError(json.dumps(difference, sort_keys=True))
-        super()._make_profiles(*args)
 
     def run(self, **kwargs):
         try:
@@ -665,13 +1011,15 @@ class RollbackRun(PairRun):
             if receipt["peer_comparison"]["result"] != "passed":
                 raise ValueError("finalized peer timelines differ")
             receipt["profile_consumption"] = {}
+            transport_reports = {}
             for name, role in (("p1", 1), ("p2", 2)):
                 rows = read_diagnostic_log(self.work / f"{name}-rollback.jsonl")
                 receipt.setdefault("diagnostic_events", {})[name] = verify_log_order(rows)
                 receipt.setdefault("recording_clock", {})[name] = verify_recording_clock(
                     timelines[name], rows, game_number=game_number)
-                receipt.setdefault("transport", {})[name] = verify_transport(
+                transport_reports[name] = verify_transport(
                     rows, game_sequence=game_number - 1, scenario=self.rollback_diagnostic, role=role)
+                receipt.setdefault("transport", {})[name] = transport_reports[name]
                 receipt.setdefault("rollback_observations", {})[name] = verify_prediction_rollbacks(
                     rows, game_number=game_number)
                 receipt.setdefault("speculative_corrections", {})[name] = verify_speculative_corrections(
@@ -681,6 +1029,17 @@ class RollbackRun(PairRun):
                     recording_frame_starts=receipt["rollback_observations"][name]["recording_frame_starts"])
                 receipt["profile_consumption"][name] = verify_profile(
                     timelines[name], rows, game_sequence=game_number - 1, role=role)
+            if self.rollback_diagnostic in {"jitter", "reorder"}:
+                sender_rows = read_diagnostic_log(self.work / "p2-rollback.jsonl")
+                receiver_rows = read_diagnostic_log(self.work / "p1-rollback.jsonl")
+                receipt["transport_delivery"] = validate_transport_delivery(
+                    sender_rows, receiver_rows, scenario=self.rollback_diagnostic,
+                    game_sequence=game_number - 1)
+            if self.rollback_diagnostic == "duplicate":
+                sender = transport_reports["p2"]
+                receiver = transport_reports["p1"].get("receiver", {})
+                if sender.get("payload_hash") not in receiver.get("payload_hashes", []):
+                    raise ValueError("duplicate sender and receiver packet identities did not join")
             if self.rollback_diagnostic == "hold" and not any(
                     load["state_scene_frame"] <= 98 < load["end_scene_frame"]
                     for load in receipt["rollback_observations"]["p1"]["prediction_error_loads"]):
@@ -710,10 +1069,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--disc", type=Path, required=True)
     parser.add_argument("--run-root", type=Path, required=True, help="absent private output directory")
-    parser.add_argument("--scenario", choices=("none", "hold", "drop"), default="none")
+    parser.add_argument("--scenario", choices=("none", "hold", "drop", "duplicate", "jitter", "reorder"), default="none")
     parser.add_argument("--baseline-root", type=Path, help="a passed prior no-impairment run")
     parser.add_argument("--repeat", type=int, choices=(1, 2), default=2)
     parser.add_argument("--profile-temp-root", type=Path, required=True)
+    parser.add_argument("--service-lineage", type=Path, required=True,
+                        help="PR #133 service framing receipt for the configured matchmaker build")
     for option in ("client-binary", "matchmaker-binary", "dolphin-build", "matchmaker-build",
                    "dolphin-source", "enet-source"):
         parser.add_argument(f"--{option}", type=Path)
@@ -736,33 +1097,24 @@ def main(argv=None):
     try:
         report["source_sha256"] = {name: _sha256(ROOT / name) for name in
                                   ("reference-capture/slippi/run_rollback.py",
+                                   "reference-capture/slippi/transport_fault_recipes.py",
                                    "reference-capture/slippi/compare_rollback.py",
                                    "reference-capture/slippi/run_local.py",
                                    "reference-capture/slippi/process.py", "reference-capture/slippi/runtime.py",
                                    "tools/slippi_format.py", "tools/slippi_rollback_diagnostic.py")}
+        service_identity = validate_service_lineage(args.service_lineage)
+        report["service_framing"] = dict(service_identity)
         baseline_replays = None
         baseline_identities = None
+        baseline_binding = None
         if args.baseline_root is not None:
             baseline_root = args.baseline_root.expanduser().resolve(strict=True)
-            prior = json.loads((baseline_root / "rollback-run.json").read_text())
-            if prior.get("result") != "passed" or prior.get("scenario") != "none":
-                raise ValueError("baseline must be a passed no-impairment fixture")
-            baseline_evidence = json.loads((baseline_root / "cycle-01/evidence.json").read_text())
-            if baseline_evidence.get("result") != "passed":
-                raise ValueError("baseline cycle lacks passed native lifecycle evidence")
-            baseline_identities = artifact_identities(baseline_evidence)
-            baseline_replays = {}
-            for game in (1, 2):
-                receipt = json.loads((baseline_root / "cycle-01" /
-                                      f"game-{game:02d}-comparison.json").read_text())
-                validate_baseline_game(receipt, game)
-                baseline_replays[game] = {}
-                for name in ("p1", "p2"):
-                    replay = receipt["replays"][name]
-                    path = baseline_root / "cycle-01" / replay["file"]
-                    if _sha256(path) != replay["sha256"]:
-                        raise ValueError("baseline replay identity changed")
-                    baseline_replays[game][name] = path
+            baseline_binding = validate_baseline_receipts(baseline_root, service_identity)
+            baseline_identities = baseline_binding["artifact_identity"]
+            baseline_replays = baseline_binding["baseline_replays"]
+            report["baseline_receipt_binding"] = {
+                key: value for key, value in baseline_binding.items() if key != "baseline_replays"
+            }
         for cycle in range(1, args.repeat + 1):
             print(f"{args.scenario} cycle {cycle}/{args.repeat}: fresh profile pair", flush=True)
             run = RollbackRun(
@@ -776,6 +1128,7 @@ def main(argv=None):
                     "dolphin_source", "enet_source")})
             run.baseline_replays = baseline_replays
             run.baseline_identities = baseline_identities
+            run.service_identity = service_identity
             cycle_receipt = {"cycle": cycle, "result": "incomplete",
                              "evidence": f"cycle-{cycle:02d}/evidence.json"}
             report["cycles"].append(cycle_receipt)

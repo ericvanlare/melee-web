@@ -77,6 +77,10 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `reference-capture/slippi/test_run_local.py`
 - `reference-capture/slippi/test_compare_rollback.py`
 - `reference-capture/slippi/test_runtime.py`
+- `reference-capture/slippi/generate_service_lineage.py`
+- `reference-capture/slippi/transport_fault_recipes.py`
+- `tests/test_slippi_transport_fault_recipes.py`
+- `docs/evidence/desktop-transport-matrix-e06-v1.json`
 - `web/gamecube-save.mjs`
 - `web/save-profile-settings.mjs`
 - `web/save-profile-store.mjs`

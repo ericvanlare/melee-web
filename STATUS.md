@@ -1224,16 +1224,19 @@ desktop peer's existing input consumer. It does not establish browser gameplay,
 general cross-play, or rollback correctness.
 
 A [frame-scripted desktop diagnostic receipt](docs/evidence/desktop-rollback-diagnostic-v1.json)
-records separate baseline and six-packet hold fresh repeats using fixed initial conditions
-and native source-frame PAD generation. The hold produced completed prediction-error
-loads and repeated source recording coverage; wrong input and post-state revisions
-were corrected to the finalized pair. Both peers agreed with the corresponding
-baseline games on every parsed declared finalized frame, including neutral startup,
-RNG, input, fighter state, stocks and outcome. Peer disconnect and cleanup passed.
-Both scenarios repeat from fresh profile pairs. Ordinary diagnostic-disabled
-match/rematch, disconnect and interruption cleanup also pass. Combat damage
-and the remaining fault cases are pending; see the
-[diagnostic command and observation boundary](reference-capture/slippi/ROLLBACK_DIAGNOSTIC.md).
+records the original baseline and HOLD boundary. The compact [E06 transport
+matrix receipt](docs/evidence/desktop-transport-matrix-e06-v1.json) records the
+root-audited fresh NONE, DUPLICATE, JITTER, REORDER, HOLD, DROP and ordinary
+scenarios with exact parsed finalized peer/baseline comparisons, receiver
+attribution where applicable, native HOLD correction observations, and cleanup.
+The superseded expanded receipt remains in ignored retained work after SHA
+verification; it is not part of the public evidence payload.
+The E06 validation ran 1,714 tests with 133 skips. DROP remains tolerance
+evidence without a rollback claim; DUPLICATE, JITTER and REORDER remain
+transport evidence without a native rollback claim. These results are local
+adapted-desktop evidence only; see the [diagnostic command and observation
+boundary](reference-capture/slippi/ROLLBACK_DIAGNOSTIC.md) for exclusions and
+reproduction.
 
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
