@@ -21,8 +21,13 @@ retention/reload cases. The full suite passed 1,849 tests before the final
 retained/current snapshot correction; all 34 owner tests passed afterward.
 The broader player check passed 14 checks, then encountered an audio queue
 overflow during the second menu loop. A smaller two-loop route passed without
-overflow after removing the save/Eject/layout prelude. The full failure remains
-retained and unassigned; these results do not constitute a full player pass.
+overflow after removing the save/Eject/layout prelude. The exact deployed
+baseline then passed all 19 checks, and the candidate passed all 19 on a
+follow-up run with earlier error detection. The extra audio
+observer lost its data on final navigation, so no queue-trace claim is made.
+The initial intermittent overflow remains retained and unassigned. Final-code
+CI passed both unit shards and all required checks. These functional results
+do not establish sustained performance or uninterrupted audio.
 
 Three bounded probes of the retained PR144 package reproduced a first-CSS
 simulation-debt pause in desktop WebKit; the corresponding Chrome controls

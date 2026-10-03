@@ -184,6 +184,27 @@
     "reducer_setup_failure": {
       "result": "stopped",
       "reason": "First reducer omitted B0XX keyboard layout and stayed in CSS. Preserved; corrected setup only in version2."
+    },
+    "baseline_public_browser": {
+      "result": "pass",
+      "completed_checks": 19,
+      "source_sha": "3bf2b49184c5aac29075a9ea6b5e7dfe3be6a5b3",
+      "runtime_hash": "a1c6031e0526eff4",
+      "scope": "Exact retained deployed package, all 42 manifest files verified; headless functional protocol only."
+    },
+    "candidate_public_browser_repeat": {
+      "result": "pass",
+      "completed_checks": 19,
+      "timing_pause_recoveries": 0,
+      "scope": "Same audited candidate after reduction and baseline comparison, with early visible-error detection and a scalar audio observer. Observer data was reset by final document navigation, so there is no retained queue trace. The earlier intermittent overflow remains unexplained; no sustained timing or audio-fidelity acceptance."
+    },
+    "ci": {
+      "source_sha": "8508669db9b09c43915d5a173d32e490b0209e4e",
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/37149856747",
+      "result": "pass",
+      "scope": "All required checks green, including both unit shards and browser build; compiler-cache-audit skipped.",
+      "unit_tests": 1851,
+      "unit_skips": 140
     }
   },
   "private_evidence": [
@@ -341,6 +362,36 @@
       "artifact": "pauseOut/native-review/jsc-options/jsc-omg-attribution-receipt-v1.json",
       "sha256": "f707071e31db58473752332b6c511083691e1e6909ecba2443ce287df8ce36ed",
       "bytes": 6103
+    },
+    {
+      "artifact": "baseline-public-browser/report.json",
+      "sha256": "5d52c3ff95bab1fb1aed30c0246337ad9ee90c4e0b52bf2aa53da2f0542c2b82",
+      "bytes": 54331
+    },
+    {
+      "artifact": "candidate-public-audio-boundary/report.json",
+      "sha256": "9ae51c62e7ad85181be054384b31fc30bd4711c84ee9478c8bb5f3469cf4e183",
+      "bytes": 54451
+    },
+    {
+      "artifact": "public-player-audio-boundary-probe.mjs",
+      "sha256": "cd48bca51d908e1f61b7512325ff103c284ac72383aa3227919718518ebdeecb",
+      "bytes": 103227
+    },
+    {
+      "artifact": "public-player-audio-boundary-plan.md",
+      "sha256": "f755b920f9edc07f0bff0dc5d328ca2e03d80c0ca7d6448b05d0d0ae63d0369e",
+      "bytes": 618
+    },
+    {
+      "artifact": "ci-unit-0.log",
+      "sha256": "55cf9f68ade6f41ddd2f723cd38c076b9b55f75158f4f73034db914d29c39b67",
+      "bytes": 554500
+    },
+    {
+      "artifact": "ci-unit-1.log",
+      "sha256": "1cb73f0ea8f439b255a72eff3470aa13f3c68c0a001639a1172c2902f60675db",
+      "bytes": 496647
     }
   ],
   "mature_delivery_regression": {
