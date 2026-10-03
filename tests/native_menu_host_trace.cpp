@@ -19,6 +19,7 @@ extern "C" {
 #include <melee/gm/gmresultplayer.h>
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/types.h>
+#include <melee/mn/mnmain.h>
 #include <melee/ty/forward.h>
 #include <melee/ty/types.h>
 }
@@ -578,6 +579,65 @@ void run_title_main_abort_smoke(const melee_web::RuntimeFiles& files)
     std::cout << "Original all-unlocked CSS roster, P1/P2 Title Start edges, unsupported Challenger, Title timeout to Opening state 1 and recovery passed\n";
 }
 
+struct SoundRouteTick {
+    int result;
+    unsigned audio_phase;
+};
+
+SoundRouteTick sound_route_tick(MeleeWebMenuHost* host,
+                                melee_web::GameplayMenuWorld& world,
+                                PADStatus raw[4], char* error,
+                                float pcm[1068], unsigned audio_phase)
+{
+    const int result = melee_web_menu_host_tick(host, raw, error, 256);
+    check(result == 1 || result == 3, error);
+    audio_phase += 32000;
+    const unsigned count = audio_phase / 60;
+    audio_phase %= 60;
+    if (!melee_web_audio_render(world.audio(), pcm, count, error, 256)) {
+        std::cerr << "sound-route: audio render rejected result=" << result
+                  << " frames=" << count
+                  << " audio_generation=" << melee_web_audio_generation(world.audio())
+                  << " menu_phase=" << melee_web_menu_host_phase(host)
+                  << " source_scene=" << melee_web_menu_host_source_scene(host)
+                  << " error=" << error << "\n";
+        throw std::runtime_error(error);
+    }
+    return {result, audio_phase};
+}
+
+unsigned sound_route_neutral(MeleeWebMenuHost* host,
+                             melee_web::GameplayMenuWorld& world,
+                             PADStatus raw[4], char* error, float pcm[1068],
+                             unsigned audio_phase, unsigned frames)
+{
+    raw[0].button = 0;
+    for (unsigned frame = 0; frame < frames; ++frame) {
+        const auto tick = sound_route_tick(host, world, raw, error, pcm,
+                                           audio_phase);
+        audio_phase = tick.audio_phase;
+        check(tick.result == 1,
+              "Original menu exited during a neutral guard");
+    }
+    return audio_phase;
+}
+
+unsigned sound_route_press(MeleeWebMenuHost* host,
+                           melee_web::GameplayMenuWorld& world,
+                           PADStatus raw[4], char* error, float pcm[1068],
+                           unsigned audio_phase, u16 button)
+{
+    audio_phase = sound_route_neutral(host, world, raw, error, pcm,
+                                      audio_phase, 8);
+    raw[0].button = button;
+    const auto tick = sound_route_tick(host, world, raw, error, pcm,
+                                       audio_phase);
+    audio_phase = tick.audio_phase;
+    check(tick.result == 1,
+          "Original menu exited while sampling an input edge");
+    return sound_route_neutral(host, world, raw, error, pcm, audio_phase, 8);
+}
+
 void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
 {
     char error[256]{};
@@ -593,32 +653,13 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
     check(melee_web_menu_host_enter(host, world->audio(), error,
                                     sizeof(error)), error);
 
-    auto tick = [&]() {
-        const int result = melee_web_menu_host_tick(host, raw, error,
-                                                    sizeof(error));
-        check(result == 1 || result == 3, error);
-        audio_phase += 32000;
-        const unsigned count = audio_phase / 60;
-        audio_phase %= 60;
-        check(melee_web_audio_render(world->audio(), pcm, count, error,
-                                     sizeof(error)), error);
-        return result;
-    };
-    auto neutral = [&](unsigned frames) {
-        raw[0].button = 0;
-        for (unsigned frame = 0; frame < frames; ++frame)
-            check(tick() == 1, "Original menu exited during a neutral guard");
-    };
-    auto press = [&](u16 button) {
-        neutral(8);
-        raw[0].button = button;
-        check(tick() == 1, "Original menu exited while sampling an input edge");
-        neutral(8);
-    };
-
-    neutral(120);
+    audio_phase = sound_route_neutral(host, *world, raw, error, pcm,
+                                      audio_phase, 120);
     raw[0].button = PAD_BUTTON_START | PAD_TRIGGER_L | PAD_TRIGGER_R;
-    int result = tick();
+    auto route_tick = sound_route_tick(host, *world, raw, error, pcm,
+                                       audio_phase);
+    int result = route_tick.result;
+    audio_phase = route_tick.audio_phase;
     raw[0].button = 0;
     check(result == 3, "Original CSS did not accept its LR+Start parent route");
     check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
@@ -629,12 +670,20 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
         files, melee_web::GameplayMenuScene::Main);
     check(melee_web_menu_host_enter_main(host, world->audio(), error,
                                          sizeof(error)), error);
-    neutral(120);
+    check(mn_804A04F0.cur_menu == MENU_KIND_MAIN &&
+              mn_804A04F0.hovered_selection == SEL_MAIN_1P,
+          "CSS parent return did not enter the original Main 1P root");
+    audio_phase = sound_route_neutral(host, *world, raw, error, pcm,
+                                      audio_phase, 120);
 
     raw[0].button = PAD_BUTTON_B;
     result = 1;
-    for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
-        result = tick();
+    for (unsigned frame = 0; frame < 120 && result != 3; ++frame) {
+        route_tick = sound_route_tick(host, *world, raw, error, pcm,
+                                      audio_phase);
+        result = route_tick.result;
+        audio_phase = route_tick.audio_phase;
+    }
     raw[0].button = 0;
     check(result == 3, "Original Main Back did not reach Title before Sound entry");
     check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
@@ -645,11 +694,16 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
         files, melee_web::GameplayMenuScene::Title);
     check(melee_web_menu_host_enter_title(host, world->audio(), error,
                                          sizeof(error)), error);
-    neutral(120);
+    audio_phase = sound_route_neutral(host, *world, raw, error, pcm,
+                                      audio_phase, 120);
     raw[0].button = PAD_BUTTON_START;
     result = 1;
-    for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
-        result = tick();
+    for (unsigned frame = 0; frame < 120 && result != 3; ++frame) {
+        route_tick = sound_route_tick(host, *world, raw, error, pcm,
+                                      audio_phase);
+        result = route_tick.result;
+        audio_phase = route_tick.audio_phase;
+    }
     raw[0].button = 0;
     check(result == 3, "Original Title Start did not return to Main before Sound entry");
     check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
@@ -660,39 +714,57 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
         files, melee_web::GameplayMenuScene::Main);
     check(melee_web_menu_host_enter_main(host, world->audio(), error,
                                          sizeof(error)), error);
-    neutral(120);
+    audio_phase = sound_route_neutral(host, *world, raw, error, pcm,
+                                      audio_phase, 120);
 
     check(gmMainLib_8015ED74() == 0,
           "Fresh source profile did not initialize sound balance to its authored center");
-    press(PAD_BUTTON_DOWN);
-    press(PAD_BUTTON_DOWN);
-    press(PAD_BUTTON_DOWN);
-    press(PAD_BUTTON_A);
-    press(PAD_BUTTON_DOWN);
-    press(PAD_BUTTON_A);
-    press(PAD_BUTTON_DOWN);
-    press(PAD_BUTTON_LEFT);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_DOWN);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_DOWN);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_DOWN);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_A);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_DOWN);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_A);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_DOWN);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_LEFT);
     check(gmMainLib_8015ED74() == static_cast<u8>(-5),
           "Original Sound callback did not decrement the saved mix by five units");
 
-    press(PAD_BUTTON_B);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_B);
     check(melee_web_menu_host_source_scene(host) == 4,
           "Sound Back did not remain in the original Main scene");
     check(gmMainLib_8015ED74() == static_cast<u8>(-5),
           "Sound Back did not retain the source-written saved mix");
-    press(PAD_BUTTON_A);
-    neutral(12);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_A);
+    audio_phase = sound_route_neutral(host, *world, raw, error, pcm,
+                                      audio_phase, 12);
     check(gmMainLib_8015ED74() == static_cast<u8>(-5),
           "Re-entering original Sound changed the saved mix");
-    press(PAD_BUTTON_B);
-    press(PAD_BUTTON_B);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_B);
+    audio_phase = sound_route_press(host, *world, raw, error, pcm,
+                                      audio_phase, PAD_BUTTON_B);
     check(melee_web_menu_host_source_scene(host) == 4,
           "Sound route Back navigation did not return to original Main");
 
     raw[0].button = PAD_BUTTON_B;
     result = 1;
-    for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
-        result = tick();
+    for (unsigned frame = 0; frame < 120 && result != 3; ++frame) {
+        route_tick = sound_route_tick(host, *world, raw, error, pcm,
+                                      audio_phase);
+        result = route_tick.result;
+        audio_phase = route_tick.audio_phase;
+    }
     raw[0].button = 0;
     check(result == 3, "Original Main Back did not return to Title");
     check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
@@ -707,11 +779,16 @@ void run_main_sound_mix_route(const melee_web::RuntimeFiles& files)
                                          sizeof(error)), error);
     check(gmMainLib_8015ED74() == static_cast<u8>(-5),
           "Original Main-to-Title transition lost the source Sound balance");
-    neutral(120);
+    audio_phase = sound_route_neutral(host, *world, raw, error, pcm,
+                                      audio_phase, 120);
     raw[0].button = PAD_BUTTON_START;
     result = 1;
-    for (unsigned frame = 0; frame < 120 && result != 3; ++frame)
-        result = tick();
+    for (unsigned frame = 0; frame < 120 && result != 3; ++frame) {
+        route_tick = sound_route_tick(host, *world, raw, error, pcm,
+                                      audio_phase);
+        result = route_tick.result;
+        audio_phase = route_tick.audio_phase;
+    }
     raw[0].button = 0;
     check(result == 3, "Returned Title did not accept its original Start route");
     check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
