@@ -11509,22 +11509,23 @@ diff --git a/src/melee/mn/mnvibration.c b/src/melee/mn/mnvibration.c
      }
      data->x0[0] = 0;
      data->x0[1] = 0;
-@@ -1146,9 +1117,6 @@
+@@ -1145,34 +1116,31 @@
+     HSD_Archive* archive;
      HSD_GObj* gobj;
      HSD_GObjProc* proc;
-     MnVibrationJointAssets* assets;
+-    MnVibrationJointAssets* assets;
 -    MnVibrationDataLayout* strings;
 -
 -    strings = (MnVibrationDataLayout*) &mnVibration_803EECE0;
-     assets = (&mnVibration_804A0868);
+-    assets = (&mnVibration_804A0868);
      mn_804D6BC8.cooldown = 5;
      mn_804A04F0.prev_menu = mn_804A04F0.cur_menu;
-@@ -1156,23 +1124,25 @@
+     mn_804A04F0.cur_menu = 19;
      mn_804A04F0.hovered_selection = 0;
      archive = mn_804D6BB8;
  
 +    /* These are independent C objects; do not derive their addresses through
-+     * pointer arithmetic across a retail data overlay in the wasm build. */
++     * pointer arithmetic across retail data overlays in the wasm build. */
      lbArchive_LoadSections(
 -        archive, &assets[3].joint, strings->convi_top_joint,
 -        &assets[3].animjoint, strings->convi_top_animjoint, &assets[3].matanim,
@@ -11542,22 +11543,22 @@ diff --git a/src/melee/mn/mnvibration.c b/src/melee/mn/mnvibration.c
 -        strings->onoffvi_top_shapeanim_joint,
 -
 -        &assets[0].joint, strings->cursorvi_top_joint,
-+        archive, &assets[3].joint, mnVibration_803EED44,
-+        &assets[3].animjoint, mnVibration_803EED5C, &assets[3].matanim,
-+        mnVibration_803EED78, &assets[3].shapeanim,
-+        mnVibration_803EED98,
++        archive, &mnVibration_804A0898.joint, mnVibration_803EED44,
++        &mnVibration_804A0898.animjoint, mnVibration_803EED5C,
++        &mnVibration_804A0898.matanim, mnVibration_803EED78,
++        &mnVibration_804A0898.shapeanim, mnVibration_803EED98,
 +
-+        &assets[1].joint, mnVibration_803EEDBC, &assets[1].animjoint,
-+        mnVibration_803EEDD4, &assets[1].matanim,
-+        mnVibration_803EEDF0, &assets[1].shapeanim,
-+        mnVibration_803EEE10,
++        &mnVibration_804A0878.joint, mnVibration_803EEDBC,
++        &mnVibration_804A0878.animjoint, mnVibration_803EEDD4,
++        &mnVibration_804A0878.matanim, mnVibration_803EEDF0,
++        &mnVibration_804A0878.shapeanim, mnVibration_803EEE10,
 +
-+        &assets[2].joint, mnVibration_803EEE34, &assets[2].animjoint,
-+        mnVibration_803EEE50, &assets[2].matanim,
-+        mnVibration_803EEE70, &assets[2].shapeanim,
-+        mnVibration_803EEE94,
++        &mnVibration_804A0888.joint, mnVibration_803EEE34,
++        &mnVibration_804A0888.animjoint, mnVibration_803EEE50,
++        &mnVibration_804A0888.matanim, mnVibration_803EEE70,
++        &mnVibration_804A0888.shapeanim, mnVibration_803EEE94,
 +
-+        &assets[0].joint, mnVibration_803EEEB8,
++        &mnVibration_804A0868.joint, mnVibration_803EEEB8,
  
          NULL);
  
