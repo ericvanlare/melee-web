@@ -21,6 +21,14 @@ local interoperability result; rollback correctness, browser cross-play,
 public Internet/NAT, rendering/audio accuracy and production readiness remain
 unclaimed.
 
+The [local reporter framing receipt](../evidence/local-slippi-reporter-framing-v1.json)
+is a separate **Compiled / Source identified** HTTP boundary check. It binds
+the v4 old/new service hashes and six exact 503 responses per variant; the new
+response is close-delimited with `Connection: close` and no `Content-Length`.
+It preserves the retained reporter-thread failure as a separate, non-
+deterministic inference and makes no native gameplay, browser or official
+service claim.
+
 A separate [headless browser-to-desktop transport receipt](../evidence/slippi-browser-desktop-transport-v1.json)
 records one 24-frame raw PAD exchange through the loopback ENet relay and the
 desktop peer's existing input consumer. It does not establish browser gameplay,
