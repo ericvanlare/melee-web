@@ -20,6 +20,12 @@ class ScopedRuntimeOwnerTests(unittest.TestCase):
     def test_initial_scene_scope_restart_and_file_lifetime(self):
         self.run_mode("--lifecycle", "initial commit")
 
+    def test_source_payload_backpressure_and_complete_native_copy_order(self):
+        self.run_mode("--stream-bound", "bounded source payload")
+
+    def test_source_payload_byte_budget_before_file_count_limit(self):
+        self.run_mode("--stream-byte-bound", "bounded source payload")
+
     def test_duplicate_concurrent_request_fails_closed(self):
         self.run_mode("--duplicate", "duplicate concurrent request")
 
@@ -28,6 +34,9 @@ class ScopedRuntimeOwnerTests(unittest.TestCase):
 
     def test_read_failure_aborts_and_retries(self):
         self.run_mode("--read-fail", "read failure preserves")
+
+    def test_late_read_failure_aborts_staged_payload_and_retries(self):
+        self.run_mode("--read-mid-fail", "read-mid failure preserves")
 
     def test_put_failure_aborts_and_retries(self):
         self.run_mode("--put-fail", "put failure preserves")

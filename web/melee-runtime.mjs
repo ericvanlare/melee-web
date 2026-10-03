@@ -516,7 +516,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   async function put(name, bytes) {
     await boundary(() => putNow(name, bytes));
   }
-  async function putBatches(entries, generation = 0) {
+  async function putBatches(entries, generation = 0, reportProgress = true) {
     let complete = 0;
     const total = entries.length;
     while (complete < total) {
@@ -538,7 +538,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       complete += processed;
       // Keep this operation visibly active until native preparation starts;
       // the final batch transitions directly so 100% cannot linger.
-      if (complete < total) { setLoading('handoff', 'Preparing game data…', complete, total); publish(); }
+      if (reportProgress && complete < total) { setLoading('handoff', 'Preparing game data…', complete, total); publish(); }
     }
   }
   function reportDiscRead(p) {
@@ -558,15 +558,25 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         return Array.from({length: count}, (_, index) =>
           Module.UTF8ToString(check(Module._melee_web_native_asset_name(generation, index))));
       });
-      const files = await discSession.readScope(names, reportDiscRead);
-      const entries = Array.from(files);
-      setLoading('handoff', 'Preparing game data…', 0, entries.length); publish();
-      await putBatches(entries, generation);
+      let batch = [], batchBytes = 0, files = 0, bytes = 0;
+      for await (const [name, data] of discSession.streamScope(names, reportDiscRead)) {
+        // The next file may exceed the existing batch budget on its own. Keep
+        // at most the bounded pending batch plus this one complete file alive.
+        if (batch.length && (batch.length >= IMPORT_BATCH_MAX_FILES ||
+            batchBytes + data.byteLength > IMPORT_BATCH_MAX_BYTES)) {
+          await putBatches(batch, generation, false);
+          batch = []; batchBytes = 0;
+        }
+        batch.push([name, data]); batchBytes += data.byteLength;
+        ++files; bytes += data.byteLength;
+      }
+      setLoading('handoff', 'Preparing game data…', 0, files); publish();
+      await putBatches(batch, generation, false);
+      batch = [];
       await boundary(() => check(Module._melee_web_native_asset_commit(generation)));
-      const bytes = entries.reduce((sum, [, data]) => sum + data.byteLength, 0);
       diagnosticLifecycle('asset_preparation', {timestamp: performance.now(),
-        duration_ms: performance.now() - diagnosticStarted, files: entries.length, bytes});
-      emit('assetScopeCommitted', {generation, files: entries.length, bytes});
+        duration_ms: performance.now() - diagnosticStarted, files, bytes});
+      emit('assetScopeCommitted', {generation, files, bytes});
       setLoading('native', 'Preparing game data…', 0, 0);
     } catch (error) {
       if (!fatal && !destroyed) await boundary(() => Module._melee_web_native_asset_abort(generation));
@@ -638,7 +648,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       if (typeof openDisc !== 'function') throw Error('This player has no local disc session loader.');
       const session = await openDisc(file);
       if (!session || typeof session !== 'object' || typeof session.close !== 'function' ||
-          typeof session.readScope !== 'function') {
+          typeof session.streamScope !== 'function') {
         session?.close?.();
         throw Error('The configured disc loader returned an invalid session.');
       }
@@ -651,7 +661,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     },
     importDisc(file, {preopenedSession = null} = {}) {
       if (preopenedSession && (!openedDiscSessions.has(preopenedSession) ||
-          typeof preopenedSession.close !== 'function' || typeof preopenedSession.readScope !== 'function')) {
+          typeof preopenedSession.close !== 'function' || typeof preopenedSession.streamScope !== 'function')) {
         return Promise.reject(Error('The selected disc session was not opened by this player. Choose the disc again.'));
       }
       let adoptedSession = false;

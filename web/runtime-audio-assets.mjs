@@ -22,17 +22,17 @@ export const loadRuntimeDisc = (file, report) => withAudio(disc.loadRuntimeDisc,
 export const loadNativeMenuDisc = (file, report) => withAudio(disc.loadNativeMenuDisc, file, report);
 export const loadNativeGameDisc = (file, report) => withAudio(disc.loadNativeGameDisc, file, report);
 
-/** One validated local File, with a fresh complete byte map for each native scene. */
+/** One validated local File; native scenes can consume bounded payload batches. */
 export async function openNativeGameSession(file) {
   const session = await openDiscSession(file);
-  return Object.freeze({
+  const adapter = {
     close: () => session.close(),
     fileInfo: path => {
       const entry = session.fileInfo(path);
       return entry ? Object.freeze({name: entry.path, size: entry.size}) : null;
     },
     readFile: (path, offset, size) => session.readFile(path, offset, size),
-    async readScope(names, report = () => {}) {
+    async *streamScope(names, report = () => {}) {
       const paths = Object.create(null), seen = new Set();
       for (const name of names) {
         if (typeof name !== 'string' || seen.has(name)) throw Error('Invalid or duplicate native asset name.');
@@ -43,10 +43,10 @@ export async function openNativeGameSession(file) {
       }
       const total = names.length;
       report({phase: 'validate', complete: 0, total});
-      const files = await session.readScope(paths, {
+      yield* session.streamScope(paths, {
         beforeRead: ({name, index}) => report({phase: 'read', file: name, complete: index, total}),
       });
-      if (seen.has('sislib_font.bin')) files.set('sislib_font.bin', session.fontBytes());
+      if (seen.has('sislib_font.bin')) yield ['sislib_font.bin', session.fontBytes()];
       if (seen.has('dsp_coef.bin')) {
         const coefficients = createAudioFilterTable();
         const hash = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', coefficients)),
@@ -54,11 +54,16 @@ export async function openNativeGameSession(file) {
         if (hash !== AUDIO_FILTER_SHA256) throw Error('Generated audio coefficients failed their integrity check.');
         // Recheck the session after the awaited digest, including concurrent close.
         session.metadata();
-        files.set('dsp_coef.bin', coefficients);
+        yield ['dsp_coef.bin', coefficients];
       }
       report({phase: 'complete', complete: total, total});
       session.metadata();
+    },
+    async readScope(names, report = () => {}) {
+      const files = new Map();
+      for await (const [name, bytes] of adapter.streamScope(names, report)) files.set(name, bytes);
       return files;
     },
-  });
+  };
+  return Object.freeze(adapter);
 }

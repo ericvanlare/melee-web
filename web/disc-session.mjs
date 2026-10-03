@@ -114,16 +114,11 @@ export class DiscAssetSession {
     if (this.#closed) throw new Error("DiscAssetSession is closed");
   }
 
-  /**
-   * Preflight every path first, then read each complete file. A callback is
-   * called only after the whole scope has passed preflight and immediately
-   * before its corresponding payload read.
-   */
-  async readScope(scope, {beforeRead = () => {}} = {}) {
+  /** Preflight the full scope, then yield one owned file per consumer pull. */
+  async *streamScope(scope, {beforeRead = () => {}} = {}) {
     this.#assertOpen();
     const plan = preflightScope(this.#entries, scope);
     this.#assertOpen();
-    const result = new Map();
     for (let index = 0; index < plan.length; ++index) {
       const item = plan[index];
       this.#assertOpen();
@@ -136,8 +131,15 @@ export class DiscAssetSession {
       this.#assertOpen();
       const bytes = await this.#disc.read(item.offset, item.size);
       this.#assertOpen();
-      result.set(item.name, bytes);
+      yield [item.name, bytes];
+      this.#assertOpen();
     }
+  }
+
+  /** Read a complete scope when the caller needs to retain all its payloads. */
+  async readScope(scope, options = {}) {
+    const result = new Map();
+    for await (const [name, bytes] of this.streamScope(scope, options)) result.set(name, bytes);
     return result;
   }
 
