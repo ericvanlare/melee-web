@@ -1,0 +1,169 @@
+diff --git a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
+--- a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
++++ b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
+@@ -29,6 +29,8 @@
+     DROP,
+     HOLD,
+     DUPLICATE,
++    JITTER,
++    REORDER,
+   };
+ 
+   struct Config
+@@ -67,6 +69,9 @@
+   bool IsHoldFrame(s32 packet_frame) const;
+   bool IsDropFrame(s32 packet_frame) const;
+   bool IsDuplicateFrame(s32 packet_frame) const;
++  bool IsJitterFrame(s32 packet_frame) const;
++  bool IsReorderFrame(s32 packet_frame) const;
++  bool IsReorderAction() const;
+   bool ConsumeTransportFrame(s32 packet_frame);
+   s32 ReleaseFrame() const;
+ 
+diff --git a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
+--- a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
++++ b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
+@@ -225,10 +225,27 @@
+     config.transport_frame = ReadFrame(transport, "frame");
+     if (!config.input_profile || config.input_profile->role != 2)
+       Fatal("transport duplicate requires the role-2 input profile");
++  }
++  else if (action == "jitter" || action == "reorder")
++  {
++    config.transport_action = action == "jitter"
++                                  ? SlippiRollbackDiagnostic::TransportAction::JITTER
++                                  : SlippiRollbackDiagnostic::TransportAction::REORDER;
++    if (Member(transport, "frame").is_null() || Member(transport, "release_frame").is_null())
++      Fatal("transport jitter/reorder requires frame and release_frame");
++    config.transport_frame = ReadFrame(transport, "frame");
++    config.transport_release_frame = ReadFrame(transport, "release_frame");
++    if (!config.input_profile || config.input_profile->role != 2)
++      Fatal("transport jitter/reorder requires the role-2 input profile");
++    if (*config.transport_release_frame <= *config.transport_frame ||
++        *config.transport_release_frame - *config.transport_frame > MAX_HOLD_FRAMES)
++    {
++      Fatal("transport jitter/reorder release is outside its bounded range");
++    }
+   }
+   else
+   {
+-    Fatal("transport.action must be none, drop, hold, or duplicate");
++    Fatal("transport.action must be none, drop, hold, duplicate, jitter, or reorder");
+   }
+ 
+   if (!config.enabled &&
+@@ -336,7 +353,8 @@
+ bool SlippiRollbackDiagnostic::IsTransportFrame(s32 packet_frame) const
+ {
+   return IsHoldFrame(packet_frame) || IsDropFrame(packet_frame) ||
+-         IsDuplicateFrame(packet_frame);
++         IsDuplicateFrame(packet_frame) || IsJitterFrame(packet_frame) ||
++         IsReorderFrame(packet_frame);
+ }
+ 
+ bool SlippiRollbackDiagnostic::IsHoldFrame(s32 packet_frame) const
+@@ -361,6 +379,27 @@
+          packet_frame == *m_config.transport_frame;
+ }
+ 
++bool SlippiRollbackDiagnostic::IsJitterFrame(s32 packet_frame) const
++{
++  return Enabled() && m_config.transport_action == TransportAction::JITTER &&
++         m_config.transport_frame && m_config.transport_release_frame &&
++         packet_frame >= *m_config.transport_frame &&
++         packet_frame < *m_config.transport_release_frame;
++}
++
++bool SlippiRollbackDiagnostic::IsReorderFrame(s32 packet_frame) const
++{
++  return Enabled() && m_config.transport_action == TransportAction::REORDER &&
++         m_config.transport_frame && m_config.transport_release_frame &&
++         packet_frame >= *m_config.transport_frame &&
++         packet_frame < *m_config.transport_release_frame;
++}
++
++bool SlippiRollbackDiagnostic::IsReorderAction() const
++{
++  return Enabled() && m_config.transport_action == TransportAction::REORDER;
++}
++
+ bool SlippiRollbackDiagnostic::ConsumeTransportFrame(s32 packet_frame)
+ {
+   if (!IsDropFrame(packet_frame) && !IsDuplicateFrame(packet_frame))
+diff --git a/Source/Core/Core/Slippi/SlippiNetplay.cpp b/Source/Core/Core/Slippi/SlippiNetplay.cpp
+--- a/Source/Core/Core/Slippi/SlippiNetplay.cpp
++++ b/Source/Core/Core/Slippi/SlippiNetplay.cpp
+@@ -1437,7 +1437,9 @@
+   const auto history_first = m_local_pad_queue.back()->frame;
+   const auto history_last = m_local_pad_queue.front()->frame;
+   const auto history_count = m_local_pad_queue.size();
+-  if (m_rollback_diagnostic.IsHoldFrame(frame))
++  if (m_rollback_diagnostic.IsHoldFrame(frame) ||
++      m_rollback_diagnostic.IsJitterFrame(frame) ||
++      m_rollback_diagnostic.IsReorderFrame(frame))
+   {
+     if (m_diagnostic_held_pad_packets.size() >= MAX_DIAGNOSTIC_HELD_PAD_PACKETS)
+       m_rollback_diagnostic.Fail("diagnostic hold packet queue exceeded its eight-packet bound");
+@@ -1445,8 +1447,11 @@
+     const std::string payload_hash = PacketHash(*spac);
+     m_diagnostic_held_pad_packets.push_back(
+         {std::move(spac), frame, payload_hash});
++    const char* action = m_rollback_diagnostic.IsJitterFrame(frame) ? "jitter_hold" :
++                         m_rollback_diagnostic.IsReorderFrame(frame) ? "reorder_hold" :
++                                                                      (is_begin ? "hold_begin" : "hold");
+     m_rollback_diagnostic.Record({{"event", "pad_transport"},
+-                                  {"action", is_begin ? "hold_begin" : "hold"},
++                                  {"action", action},
+                                   {"packet_frame", frame},
+                                   {"payload_hash", payload_hash},
+                                   {"begin_count", is_begin ? 1 : 0},
+@@ -1501,6 +1506,7 @@
+                                   SlippiRollbackDiagnostic::ObserverContext::TRANSPORT);
+   }
+ 
++  bool current_packet_sent = false;
+   if (!m_diagnostic_held_pad_packets.empty() && frame >= m_rollback_diagnostic.ReleaseFrame())
+   {
+     const std::size_t release_count = m_diagnostic_held_pad_packets.size();
+@@ -1512,15 +1518,30 @@
+       held_hashes.push_back(held_packet.payload_hash);
+     }
+     const std::string release_hash = PacketHash(*spac);
++    const bool reorder = m_rollback_diagnostic.IsReorderAction();
++    nlohmann::json dispatch_hashes = nlohmann::json::array();
++    if (reorder)
++    {
++      dispatch_hashes.push_back(release_hash);
++      SendAsync(std::move(spac));
++      current_packet_sent = true;
++    }
+     while (!m_diagnostic_held_pad_packets.empty())
+     {
++      if (reorder)
++        dispatch_hashes.push_back(m_diagnostic_held_pad_packets.front().payload_hash);
+       SendAsync(std::move(m_diagnostic_held_pad_packets.front().packet));
+       m_diagnostic_held_pad_packets.pop_front();
+     }
+     m_rollback_diagnostic.Record({{"event", "pad_transport"},
+-                                  {"action", "hold_release"},
++                                  {"action", reorder ? "reorder_dispatch" :
++                                                               (m_rollback_diagnostic.GetConfig().transport_action ==
++                                                                        SlippiRollbackDiagnostic::TransportAction::JITTER ?
++                                                                    "jitter_release" : "hold_release")},
+                                   {"release_packet_frame", frame},
++                                  {"dispatch_frame", frame},
+                                   {"release_payload_hash", release_hash},
++                                  {"dispatch_payload_hashes", dispatch_hashes},
+                                   {"release_count", release_count},
+                                   {"held_frames", held_frames},
+                                   {"held_payload_hashes", held_hashes},
+@@ -1530,7 +1551,8 @@
+                                   SlippiRollbackDiagnostic::ObserverContext::TRANSPORT);
+   }
+ 
+-  SendAsync(std::move(spac));
++  if (!current_packet_sent)
++    SendAsync(std::move(spac));
+   if (duplicate_packet)
+     SendAsync(std::move(duplicate_packet));
+   u64 time = Common::Timer::NowUs();

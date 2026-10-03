@@ -173,12 +173,38 @@
   },
   "patches": [
     "patches/0001-client-loopback-and-observation.patch",
-    "patches/0002-rust-local-endpoints.patch"
+    "patches/0002-rust-local-endpoints.patch",
+    "patches/0003-desktop-rollback-diagnostic.patch",
+    "patches/0004-desktop-rollback-duplicate-role2.native.patch",
+    "patches/0005-duplicate-receive-join.native.patch",
+    "patches/0006-jitter-reorder-native.patch"
+  ],
+  "patch_targets": [
+    "dolphin",
+    "rust",
+    "dolphin",
+    "dolphin",
+    "dolphin",
+    "dolphin"
   ],
   "rust_extensions": {
     "commit": "2d29e794de8497582675fb70877851f2cdd2f256",
     "repository": "https://github.com/project-slippi/slippi-rust-extensions",
     "toolchain": "1.88.0"
   },
-  "schema": "melee-web-slippi-local-client-pin-v1"
+  "schema": "melee-web-slippi-local-client-pin-m1-overlay-v4",
+  "retained_build_lineage": {
+    "receipt_sha256": "6a465f61b1647054c62a439be5231841075cd6582c6a951feafb21c404ac782e",
+    "bundle_binary_sha256": "e4c8a5fb914baf10f25ccbf1077b9a6880a7abb84619db5a1cf294d866ff673b",
+    "bundle_sys_sha256": "525d3333b4eed701982ada34942b83cecd9accc6e96b18a27a1b6d863e499946"
+  },
+  "service_prerequisite": {
+    "public_ref": "codex/local-api-framing-pr",
+    "public_commit": "cdc4b899ee85861cce7f2cebfc9d756a30326ab6",
+    "public_parent_commit": "473e97c41633043562bc5015e1add630d23b70b3",
+    "public_path_diff_sha256": "cd2fe85202f0315b0e8c216e05447cd9fdfba6b5fb6044f903daeb579eeeb856",
+    "base_server_cpp_sha256": "c952d06734050285d99e52f620f86b23849439f605ed72faff818520ac55c15a",
+    "integration_test_sha256": "37f3b2ca979e4012f4a425ce069a91a8a374d299ac87367a1c0891449c58169c",
+    "source_sha256": "78b680a16ff717e61cbb561281240a9a205a105ac4053634441fb88941fce719"
+  }
 }
