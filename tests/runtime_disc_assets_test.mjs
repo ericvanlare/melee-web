@@ -12,9 +12,10 @@ view.setUint32(0x600,0x100);view.setUint32(0x690,0x10000000);
 await assert.rejects(loadRuntimeDisc(new Blob([bytes])),/Invalid game executable section/);
 console.log('Runtime disc language paths and executable rejection checks passed');
 
-assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,71);
+assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,73);
 assert.equal(NATIVE_MENU_DISC_FILES['LbRb.dat'],'LbRb.dat');
-for (const name of ['MnMaAll.usd','GmTtAll.usd','SdMenu.usd','SdToy.dat','LbMcSnap.usd','GmEvent.dat','LbAd.dat']) {
+for (const name of ['MnMaAll.usd','GmTtAll.usd','SdMenu.usd','SdToy.dat','LbMcSnap.usd','GmEvent.dat','LbAd.dat',
+  'TyDatai.usd','TyDatai.dat']) {
   assert.equal(NATIVE_MENU_DISC_FILES[name],name);
   assert.equal(NATIVE_GAME_DISC_FILES[name],name);
 }

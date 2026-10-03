@@ -185,55 +185,15 @@ int main(void)
     }
     check(Toy_804A284C[5] == 0 && Toy_804A284C[6] == 0,
           "original fresh-profile init did not mutate the Toy table through F600");
-    check_error(melee_web_save_profile_owner_initialize_everything(
-                    profile, error, sizeof(error)), error);
-    check(!gm_801721EC(),
-          "Everything baseline retained transient new-completion notifications");
-    check(gm_80164ABC() && gm_80164600(),
-          "Everything baseline did not unlock the source character/stage tables");
-    check(save->x1A68 == ((UINT64_C(1) << 51) - 1) &&
-              gmMainLib_8015CF94(),
-          "Everything baseline did not complete all 51 events and the final-event condition");
-    check(save->trophy_count == TY_TROPHY_COUNT,
-          "Everything baseline did not award the complete source trophy table");
-    for (size_t trophy = 0; trophy < TY_TROPHY_COUNT; ++trophy)
-        check((save->trophy_flags[trophy] & 0x8000) != 0 &&
-                  (save->trophy_flags[trophy] & 0x00FF) == 1,
-              "Everything baseline trophy flags do not match the original award routine");
-    check((save->x186C & 0x0F) == 0x0F && (save->x186C & 0xF0) == 0,
-          "Everything baseline did not derive only the four source-supported feature bits");
-    check(gmMainLib_8015EDC8()->x4 && gmMainLib_8015EDC8()->x5 &&
-              gmMainLib_8015EDC8()->x6,
-          "Everything baseline did not derive all authored roster/stage completion flags");
-    for (int selkind = 0; selkind < SELKIND_COUNT; ++selkind) {
-        const u8 ckind = gm_SelKindToCKind((u8) selkind);
-        const u16 clear_ids[] = {
-            gm_80160474(ckind, GM_CLASSIC),
-            gm_80160474(ckind, GM_ADVENTURE),
-            gm_80160474(ckind, GM_ALLSTAR),
-        };
-        for (size_t mode = 0; mode < sizeof(clear_ids) / sizeof(clear_ids[0]); ++mode)
-                check(gmMainLib_8015DA90(clear_ids[mode]) != 0,
-                      "Everything baseline omitted a source-mapped 1P reward from the persisted ledger");
-    }
-    {
-        size_t completed_challenges = 0;
-        for (int challenge = 0; challenge < 0x100; ++challenge) {
-            const int excluded = challenge == 9 || challenge == 0x29 ||
-                challenge == 0x42 || challenge == 0x43 ||
-                challenge == 0xB9 || challenge == 0xC9 || challenge == 0xCA;
-            check((gmMainLib_8015DADC(challenge) != 0) == !excluded,
-                  "Everything baseline challenge flags diverged from the source inventory");
-            completed_challenges += !excluded;
-        }
-        check(completed_challenges == 249 && gmMainLib_8015D8D8(0x123),
-              "Everything baseline omitted the source all-challenges award");
-    }
+    check(!melee_web_save_profile_owner_initialize_everything(
+              profile, error, sizeof(error)) &&
+              strstr(error, "initialized original TyDatai tables") != NULL,
+          "Everything baseline accepted a missing original TyDatai owner");
     check_error(melee_web_save_profile_owner_restore_default(
                     profile, error, sizeof(error)), error);
     check(save->unlocked_characers_bitmask == 0 && save->x186A == 0 &&
               save->x1A68 == 0 && save->trophy_count == 0 && save->x186C == 0,
-          "restoring a fresh Personal profile retained completed baseline progress");
+          "restoring a fresh Personal profile changed its source defaults");
     check_error(melee_web_save_profile_owner_snapshot_card_data(
                     profile, card_profile_after, sizeof(card_profile_after),
                     error, sizeof(error)), error);

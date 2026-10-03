@@ -18,6 +18,9 @@ constexpr auto kMenuFiles = std::to_array<std::string_view>({
     "MnSlChr.usd", "MnSlMap.usd", "MnMaAll.usd", "GmTtAll.usd",
     "SdSlChr.usd", "SdMenu.usd", "SdToy.dat", "MnExtAll.usd",
     "LbMcGame.usd", "NtMemAc.usd", "LbMcSnap.usd", "GmEvent.dat", "LbAd.dat", "LbRb.dat",
+    // The source save baseline awards trophies through Toy_SetUnlockState,
+    // whose original initializer resolves these locale-specific tables.
+    "TyDatai.usd", "TyDatai.dat",
     "sislib_font.bin", "smash2.sem",
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
     "dsp_coef.bin",

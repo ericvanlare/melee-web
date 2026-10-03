@@ -19,6 +19,8 @@ extern "C" {
 #include <melee/gm/gmresultplayer.h>
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/types.h>
+#include <melee/ty/forward.h>
+#include <melee/ty/types.h>
 }
 #include <melee/gr/forward.h>
 #include <sysdolphin/baselib/random.h>
@@ -644,6 +646,38 @@ void run_opening_movie_preload_smoke(melee_web::RuntimeFiles files)
           "Opening movie probe retained its source world");
     std::cout << "Original Opening movie route selected state 0 and rejected missing source heap/cache ownership explicitly; no movie decode or retail-route claim\n";
 }
+
+void run_trophy_baseline_smoke(const melee_web::RuntimeFiles& files)
+{
+    char error[256]{};
+    auto* host = melee_web_menu_host_create(error, sizeof(error));
+    check(host != nullptr, error);
+    auto world = std::make_unique<melee_web::GameplayMenuWorld>(
+        files, melee_web::GameplayMenuScene::Title);
+    check(melee_web_menu_host_initialize_profile_baseline(
+              host, error, sizeof(error)), error);
+
+    const auto* save = gmMainLib_GetSaveData();
+    check(save->trophy_count == TY_TROPHY_COUNT,
+          "Original TyDatai-backed Everything baseline omitted trophies");
+    for (size_t trophy = 0; trophy < TY_TROPHY_COUNT; ++trophy)
+        check((save->trophy_flags[trophy] & 0x8000) != 0 &&
+                  (save->trophy_flags[trophy] & 0x00FF) == 1,
+              "Original TyDatai-backed trophy award diverged from Toy_SetUnlockState");
+    check(gm_80164ABC() && gm_80164600() &&
+              save->x1A68 == ((UINT64_C(1) << 51) - 1) &&
+              gmMainLib_8015CF94(),
+          "Original source roster, stage, or event baseline was not initialized");
+    check(save->unk_1A8.x4 && save->unk_1A8.x5 && save->unk_1A8.x6,
+          "Original source completion flags were not initialized");
+
+    world->verify_immutable_archives();
+    world->close_prepared();
+    world.reset();
+    check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+    std::cout << "Original TyDatai-backed save baseline initialized after source-file ownership; "
+                 "trophy and source unlock tables passed\n";
+}
 }
 int main(int argc,char** argv){try{
  if(argc<3||argc>7)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
@@ -656,14 +690,16 @@ int main(int argc,char** argv){try{
  const bool link_css_unload_recipe=input_recipe&&std::string(input_recipe)=="link-css-unload-v1";
  const bool title_main_abort_recipe=input_recipe&&std::string(input_recipe)=="title-main-abort-v1";
  const bool opening_movie_preload_recipe=input_recipe&&std::string(input_recipe)=="opening-movie-preload-v1";
+ const bool trophy_baseline_recipe=input_recipe&&std::string(input_recipe)=="trophy-baseline-v1";
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
-    !title_main_abort_recipe&&!opening_movie_preload_recipe)throw std::runtime_error("Unknown transition input recipe");
+    !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe)
+    throw std::runtime_error("Unknown transition input recipe");
  if((retail_fd_recipe||results_mario_recipe)&&stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(title_main_abort_recipe||opening_movie_preload_recipe)keys=melee_web::menu_asset_names();
+ if(title_main_abort_recipe||opening_movie_preload_recipe||trophy_baseline_recipe)keys=melee_web::menu_asset_names();
  for(const auto& key:melee_web::menu_asset_names())
   if(std::find(keys.begin(),keys.end(),key)==keys.end())keys.push_back(key);
  for(const auto& key:keys){
@@ -691,6 +727,11 @@ int main(int argc,char** argv){try{
   run_opening_movie_preload_smoke(files);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   std::cout<<"Native Opening movie preload ownership probe passed; no movie decode or retail-route claim\n";
+  return 0;
+ }
+ if(trophy_baseline_recipe){
+  run_trophy_baseline_smoke(files);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   return 0;
  }
  const unsigned cycle_count=results_mario_recipe?1:2;

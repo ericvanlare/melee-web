@@ -15,6 +15,9 @@
 extern GameRules gmMainLib_803D4A48;
 extern int melee_web_toy_profile_begin(void);
 extern int melee_web_toy_profile_end(void);
+/* Source cache sentinel set by Toy_803124BC after its locale archive roots
+ * have been loaded. Keep the archive dependency explicit at this boundary. */
+extern void* _Toy_sbss_804D6ED0;
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -741,6 +744,9 @@ int melee_web_save_profile_owner_initialize_everything(
     if (candidate->everything_initialized)
         return fail(error, error_size,
                     "Everything unlocked baseline is already initialized");
+    if (!_Toy_sbss_804D6ED0)
+        return fail(error, error_size,
+                    "Everything unlocked requires initialized original TyDatai tables");
 
     /* These source routines use the authored eleven-entry unlock tables;
      * there is no guessed mask width or asset availability implication. */
