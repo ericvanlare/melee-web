@@ -115,6 +115,75 @@
       "result": "pass",
       "tests": 34,
       "seconds": 23.271
+    },
+    "package": {
+      "prepare": "pass",
+      "audit": "pass",
+      "files": 42
+    },
+    "retention_reload": {
+      "result": "pass",
+      "browser": "154.0.8037.97",
+      "scope": "Headless local HTTP same-origin IndexedDB retention after a controlled pagehide and orderly Eject/reload. The simulation-debt incident is induced; no genuine background-lifecycle, natural-cause, gameplay-timing, performance, audio, pixel or PCM claim.",
+      "cases": [
+        {
+          "mode": "pagehide",
+          "trigger": {
+            "reason": "simulation_debt",
+            "value": 13,
+            "threshold": 8
+          },
+          "before_reload": {
+            "record_count": 1,
+            "incident_id": "incident-1"
+          },
+          "after_reload": {
+            "record_count": 1,
+            "incident_id": "incident-1"
+          }
+        },
+        {
+          "mode": "destroy",
+          "trigger": {
+            "reason": "simulation_debt",
+            "value": 13,
+            "threshold": 8
+          },
+          "after_reload": {
+            "record_count": 1,
+            "incident_id": "incident-1"
+          }
+        }
+      ],
+      "network": {
+        "request_count": 45,
+        "application_uploads": 0
+      }
+    },
+    "public_browser": {
+      "result": "fail",
+      "completed_checks": 14,
+      "boundary": "Second CSS/Main/Title/Main/Versus/CSS loop",
+      "error": "Audio output queue overflow",
+      "native_phase": 11,
+      "native_running": 1,
+      "timing_pause_recoveries": 0,
+      "scope": "Retained application failure; not assigned to diagnostics changes or to the reported phone failure."
+    },
+    "menu_audio_reducer": {
+      "result": "pass",
+      "cycles": 2,
+      "elapsed_ms": 18085,
+      "observer_rows": 49,
+      "observer_overflow": 0,
+      "maximum_observed_queue_frames": 1899,
+      "observed_audio_underruns": 0,
+      "observed_audio_overflows": 0,
+      "scope": "Prelude removed; explicit B0XX keyboard setting. This only excludes the reduced route. The full failure remains open."
+    },
+    "reducer_setup_failure": {
+      "result": "stopped",
+      "reason": "First reducer omitted B0XX keyboard layout and stayed in CSS. Preserved; corrected setup only in version2."
     }
   },
   "private_evidence": [
@@ -204,14 +273,74 @@
       "bytes": 2612
     },
     {
-      "artifact": "pauseOut/native-review/startup-memory-asyncify-review-v1.json",
-      "sha256": "e9f0bde59725e02786c9ff0903eeb3b5960e70ec689aa9e9450f1a02a362e54a",
-      "bytes": 14246
-    },
-    {
       "artifact": "owner-final-review.log",
       "sha256": "7a306ab208611dbaaa03ce467f0ea7a9b7a2a0286189d8adfebea3019f319107",
       "bytes": 5820
+    },
+    {
+      "artifact": "candidate-manifest.json",
+      "sha256": "400a7a89cfe473745299e8624562cf1bf9151a272ac95432ce80cf0123d94598",
+      "bytes": 9091
+    },
+    {
+      "artifact": "package-prepare.log",
+      "sha256": "85bb9abbd52869c18a1696bb7b16e54ce1963f7a2b397221c21382971779912f",
+      "bytes": 1522
+    },
+    {
+      "artifact": "package-audit.log",
+      "sha256": "85bb9abbd52869c18a1696bb7b16e54ce1963f7a2b397221c21382971779912f",
+      "bytes": 1522
+    },
+    {
+      "artifact": "candidate-retention-reload/report.json",
+      "sha256": "980d304209b55e84a2506a28ee7523986e54e7da4edc037512e3905e9d14220f",
+      "bytes": 1843
+    },
+    {
+      "artifact": "candidate-retention-reload/retention-pagehide-paused.png",
+      "sha256": "3dbe4da751b4225e785e7e5d8e363a30358e0bba731b6424e53dc148218902ed",
+      "bytes": 280652
+    },
+    {
+      "artifact": "candidate-retention-reload/retention-destroy-paused.png",
+      "sha256": "5501ea73a9d85b3b35d0ac9c4ca160c12aa37ea346ac06a33d969845890e3c42",
+      "bytes": 280242
+    },
+    {
+      "artifact": "candidate-public-browser/report.json",
+      "sha256": "bf13a1cf6d9c61c7f3ebdc7875b57fa898a6abeff3d442734892d3dc948f6e1a",
+      "bytes": 19716
+    },
+    {
+      "artifact": "candidate-public-browser.log",
+      "sha256": "3b552a9d051515ccd0163b49ad0717cfd377300166d979596f5aee0dbdaf6a61",
+      "bytes": 2010
+    },
+    {
+      "artifact": "candidate-menu-audio-reducer/report.json",
+      "sha256": "ca2793f5b1d7b2981b1c7ac4f077039236e5779133e1e41ba7b722b2f6ffe2f1",
+      "bytes": 15267
+    },
+    {
+      "artifact": "candidate-menu-audio-reducer-v2/report.json",
+      "sha256": "1b8e8ea3ffed6d979f1610a4581dd4a0d9bc9a973aea1217c499bf3041ccc3e2",
+      "bytes": 19058
+    },
+    {
+      "artifact": "menu-audio-reducer-v2.mjs",
+      "sha256": "955f3301669ed61ce8c10d671a60cc575c96e47e79c45f5840647f9005f3bbb0",
+      "bytes": 6644
+    },
+    {
+      "artifact": "pauseOut/native-review/startup-memory-asyncify-review-final.json",
+      "sha256": "7450949cf144a0c9ef394288b8a8a4457b9f88036d1f0d039588a89a675df659",
+      "bytes": 15330
+    },
+    {
+      "artifact": "pauseOut/native-review/jsc-options/jsc-omg-attribution-receipt-v1.json",
+      "sha256": "f707071e31db58473752332b6c511083691e1e6909ecba2443ce287df8ce36ed",
+      "bytes": 6103
     }
   ],
   "mature_delivery_regression": {
@@ -237,5 +366,15 @@
   "upstream_lead": {
     "url": "https://bugs.webkit.org/show_bug.cgi?id=304810",
     "scope": "External report of transient Asyncify/OMG compiler memory growth; matching stack family is a hypothesis only. No causal attribution or source/compiler workaround is claimed."
+  },
+  "candidate": {
+    "source_sha": "7f93f55dcd85cec442149e6bb12a166795f77538",
+    "runtime_hash": "cb717b61778b3b1b",
+    "profile": "audio-player",
+    "identity_sha256": "d95bfdaacdfb29e8b94c05e966e705b333531a4658816186324cb0650e891617",
+    "wasm": {
+      "sha256": "f81a28a757fa77c164c6fb09a7b7617facf0a8560cd0df79a53cd1682524ac86",
+      "size": 14709619
+    }
   }
 }
