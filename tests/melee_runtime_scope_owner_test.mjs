@@ -21,6 +21,7 @@ let pendingNames = [];
 let committed = false;
 let commitFailure = mode === '--commit-fail';
 let readFailure = mode === '--read-fail';
+let readMidFailure = mode === '--read-mid-fail';
 let putFailure = mode === '--put-fail';
 let putError = mode === '--put-fail';
 let unloadCalls = 0;
@@ -32,6 +33,10 @@ let readStarted = false;
 let releaseRead = null;
 let readCount = 0;
 let discClosed = false;
+const payloadSize = mode === '--stream-byte-bound' ? 3 * 1024 * 1024 :
+  mode === '--stream-bound' ? 128 * 1024 : 1;
+const pendingPayloads = new Set();
+let maxPendingPayloads = 0;
 
 Object.defineProperty(globalThis, 'navigator', {
   value: {gpu: {requestAdapter: async () => ({limits: {}})}}, configurable: true,
@@ -81,7 +86,7 @@ async function openDisc(file) {
     async readFile(name, offset, size) {
       return new Uint8Array(size).fill((name.length + offset) & 0xff);
     },
-    async readScope(names) {
+    async *streamScope(names) {
       ++readCount;
       readStarted = true;
       calls.push(['readScope', [...names]]);
@@ -91,7 +96,16 @@ async function openDisc(file) {
         throw Error('source read failed');
       }
       if (holdRead) await new Promise(resolve => { releaseRead = resolve; });
-      return new Map(names.map((name, index) => [name, new Uint8Array([index + 1])]));
+      for (const [index, name] of names.entries()) {
+        if (readMidFailure && index === 12) {
+          readMidFailure = false;
+          throw Error('source read failed');
+        }
+        pendingPayloads.add(name);
+        maxPendingPayloads = Math.max(maxPendingPayloads, pendingPayloads.size);
+        calls.push(['read-payload', name]);
+        yield [name, new Uint8Array(payloadSize).fill(index + 1)];
+      }
     },
     close() {
       if (!discClosed) {
@@ -110,7 +124,7 @@ function nativeName(pointer) {
 
 function installModule(Module) {
   Object.assign(Module, {
-    HEAPU8: new Uint8Array(24 * 1024 * 1024),
+    HEAPU8: new Uint8Array((mode === '--stream-byte-bound' ? 64 : 24) * 1024 * 1024),
     UTF8ToString: value => value,
     _malloc(size) { const pointer = nextPointer; nextPointer += size; return pointer; },
     _free(pointer) { calls.push(['free', pointer]); },
@@ -134,9 +148,10 @@ function installModule(Module) {
       const name = nativeName(namePointer);
       assert.equal(value, generation);
       assert.equal(pendingNames.includes(name), true);
-      assert.equal(size, 1);
+      assert.equal(size, payloadSize);
       calls.push(['asset-file', value, name, serviceBatch,
         Module.HEAPU8[bytesPointer], Module.HEAPU8[bytesPointer + size - 1]]);
+      pendingPayloads.delete(name);
       if (putFailure && name === 'scope-03.dat') {
         putFailure = false;
         return 0;
@@ -156,6 +171,7 @@ function installModule(Module) {
       assert.notEqual(value, 0);
       generation = 0;
       pendingNames = [];
+      pendingPayloads.clear();
       return 1;
     },
     _melee_web_native_source_file_external_set(namePointer, size) {
@@ -333,6 +349,23 @@ async function duplicateRequest() {
   console.log('Scoped runtime owner: duplicate concurrent request fails closed.');
 }
 
+async function streamBound() {
+  await settle(player.importDisc({name: 'bounded-scope.iso'}), 'streamed import did not settle');
+  assert.equal(maxPendingPayloads, mode === '--stream-byte-bound' ? 3 : 9,
+    'file and byte budgets independently bound a pending batch plus the next pull');
+  const copies = assetFilesSince(0);
+  assert.equal(copies.length, 19);
+  assert.deepEqual(copies.map(row => row[2]), scopeNames(), 'streaming preserves native copy order');
+  assert.ok(copies.every((row, index) => row[4] === index + 1 && row[5] === index + 1),
+    'first and last bytes survive every complete native copy');
+  assert.equal(pendingPayloads.size, 0);
+  const firstCopy = calls.findIndex(row => row[0] === 'asset-file');
+  const lastRead = calls.findLastIndex(row => row[0] === 'read-payload');
+  assert.ok(firstCopy < lastRead, 'native consumes bounded batches before the entire scope is read');
+  await settle(player.destroy(), 'streamed owner teardown did not settle');
+  console.log('Scoped runtime owner: bounded source payload and interleaved complete native copies pass.');
+}
+
 async function commitFails() {
   await assert.rejects(settle(player.importDisc({name: 'bad-commit.iso'}), 'failed commit did not settle'),
     /asset commit failed|Ready/);
@@ -346,12 +379,13 @@ async function commitFails() {
 }
 
 async function transferFails(kind) {
-  const label = kind === 'read' ? 'source read failed' : 'asset put failed';
+  const label = kind.startsWith('read') ? 'source read failed' : 'asset put failed';
   const before = calls.length;
   await assert.rejects(settle(player.importDisc({name: `${kind}-failure.iso`}),
     `${kind} failure did not settle`), new RegExp(label));
   const failed = calls.slice(before).map(row => row[0]);
   assert.ok(failed.includes('asset-abort'));
+  if (kind === 'read-mid') assert.ok(failed.includes('asset-file'), 'late read error aborts already staged files');
   assert.equal(failed.includes('asset-commit'), false);
   assert.equal(failed.includes('prepare'), false);
   assert.equal(calls.filter(row => row[0] === 'asset-begin').length, 1);
@@ -422,9 +456,11 @@ async function sourceTransitionFailure() {
 }
 
 if (mode === '--lifecycle') await lifecycle();
+else if (mode === '--stream-bound' || mode === '--stream-byte-bound') await streamBound();
 else if (mode === '--duplicate') await duplicateRequest();
 else if (mode === '--commit-fail') await commitFails();
 else if (mode === '--read-fail') await transferFails('read');
+else if (mode === '--read-mid-fail') await transferFails('read-mid');
 else if (mode === '--put-fail') await transferFails('put');
 else if (mode === '--late-open-stop') await lateOpen('stop');
 else if (mode === '--late-open-destroy') await lateOpen('destroy');

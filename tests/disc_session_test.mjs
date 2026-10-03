@@ -116,10 +116,26 @@ if (discPath) {
   );
   assert.equal(beforeRead, 0, "missing scope must fail before any file payload read");
   assert.equal(source.ranges.length, validatedReads, "missing scope must not read a file payload");
+  const rejectedStream = session.streamScope({common: 'PlCo.dat', missing: '__candidate_missing__.dat'});
+  await assert.rejects(rejectedStream.next(), /Required game data is missing/);
+  assert.equal(source.ranges.length, validatedReads, 'stream preflight rejects before any payload is read');
   const selected = await session.readScope({common: "PlCo.dat"}, {
     beforeRead: ({index}) => assert.equal(index, 0),
   });
   assert(selected.get("common") instanceof Uint8Array);
+  const streamReadsBeforePull = source.ranges.length;
+  const stream = session.streamScope({common: 'PlCo.dat', stage: 'GrNLa.dat'});
+  assert.equal(source.ranges.length, streamReadsBeforePull, 'constructing a stream does not eagerly read payloads');
+  const first = await stream.next();
+  assert.equal(first.value[0], 'common');
+  assert.deepEqual(first.value[1], selected.get('common'));
+  const afterFirstPull = source.ranges.length;
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(source.ranges.length, afterFirstPull, 'a paused consumer prevents reading the next file');
+  const stage = await stream.next();
+  assert.equal(stage.value[0], 'stage');
+  assert.deepEqual(stage.value[1], await session.readFile('GrNLa.dat'));
+  assert.equal((await stream.next()).done, true);
   assert.equal(session.fontBytes().byteLength, metadata.generatedFont.size);
   session.close();
   session.close();
@@ -139,6 +155,13 @@ if (discPath) {
   setTimeout(() => delayedSession.close(), 1);
   await assert.rejects(pendingRead, /Session is closed/);
 
+  const pausedStreamSession = await openDiscSession(new PathFile(discPath));
+  const pausedStream = pausedStreamSession.streamScope({common: 'PlCo.dat', stage: 'GrNLa.dat'});
+  const ownedFirstFile = (await pausedStream.next()).value[1];
+  pausedStreamSession.close();
+  await assert.rejects(pausedStream.next(), /Session is closed/);
+  assert(ownedFirstFile.byteLength > 0, 'closing a stream preserves the caller-owned yielded file');
+
   const progress = [];
   const audioSession = await openNativeGameSession(new PathFile(discPath));
   const audio = await audioSession.readScope(['PlCo.dat', 'sislib_font.bin', 'dsp_coef.bin'], event => progress.push(event));
@@ -148,6 +171,10 @@ if (discPath) {
   await assert.rejects(audioSession.readScope(['PlCo.dat', 'PlCo.dat']), /duplicate/);
   const second = await audioSession.readScope(['GrNLa.dat']);
   assert.deepEqual([...second.keys()], ['GrNLa.dat']);
+  const streamedAudio = new Map();
+  for await (const [name, bytes] of audioSession.streamScope(['PlCo.dat', 'sislib_font.bin', 'dsp_coef.bin']))
+    streamedAudio.set(name, bytes);
+  assert.deepEqual(streamedAudio, audio, 'streamed files/font/verified DSP retain the existing bytes and order');
   audioSession.close();
   await assert.rejects(audioSession.readScope(['PlCo.dat']), /Session is closed/);
   assert(audio.get("sislib_font.bin") instanceof Uint8Array);
@@ -162,6 +189,7 @@ if (discPath) {
   const silentSession = await openNativeGameDiscSession(silentSource);
   const readsBeforeRejectedDsp = silentSource.ranges.length;
   await assert.rejects(silentSession.readScope(['dsp_coef.bin']), /Public native scenes do not accept DSP coefficients/);
+  await assert.rejects(silentSession.streamScope(['PlCo.dat', 'dsp_coef.bin']).next(), /Public native scenes do not accept DSP coefficients/);
   assert.equal(silentSource.ranges.length, readsBeforeRejectedDsp,
     'the silent profile rejects DSP before reading or exempting any asset');
   const silent = await silentSession.readScope(['PlCo.dat']);

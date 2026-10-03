@@ -472,7 +472,7 @@ if (diagnosticsKnownHost) {
 await assert.rejects(player.openDiscSession({name: 'unsupported.iso'}), /no local disc session loader/,
   'the public shell can request validation only through a configured profile adapter');
 await assert.rejects(player.importDisc({name: 'forged.iso'}, {preopenedSession: {
-  close() {}, readScope: async () => new Map(),
+  close() {}, async *streamScope() {}, readScope: async () => new Map(),
 }}), /not opened by this player/,
   'a structurally plausible session cannot bypass the configured profile loader');
 if (startupCacheError) assert.equal(player.getState().canImport, true, 'Native cache error remains optional for import eligibility');
