@@ -364,10 +364,11 @@ try {
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await page.locator('#loading-panel').waitFor({state: 'visible', timeout: 30000});
   await check('disc selection during graphics preparation', async () => {
-    // The shell publishes the file control asynchronously after the initial
-    // document is visible. Wait for that readiness boundary before checking
-    // that selection remains available during native graphics preparation.
-    await page.waitForFunction(() => document.querySelector('#choose-disc')?.disabled === false,
+    // Save-profile binding briefly owns the native command boundary at startup.
+    // Wait for that binding as well as the asynchronous file control, then test
+    // selection while graphics preparation is still visible.
+    await page.waitForFunction(() => document.querySelector('#choose-disc')?.disabled === false &&
+      document.querySelector('#settings-open')?.disabled === false,
       null, {timeout: 15000});
     assert(await page.locator('#choose-disc').isEnabled(), 'Selection stays available while startup is busy');
     if (values.disc) {
