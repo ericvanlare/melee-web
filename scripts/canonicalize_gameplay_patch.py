@@ -8,18 +8,21 @@ lines, and repeated diffs of one file make review harder. The canonical form is
 one diff per file, sorted by path, full blob indexes and fixed diff options.
 
 Canonicalizing never changes the prepared source tree. The command verifies
-that the old and new patches produce the same Git tree before it writes.
-Objects are written to a temporary directory; the pristine checkout is read
-only.
+that the old and new patches produce the same Git tree before it writes. The
+CLI requires the dependency checkout to be standalone, clean, and at the
+lockfile commit. Objects and indexes are written to temporary directories; the
+pristine checkout is read only.
 """
 from pathlib import Path
 import argparse
 import os
+import stat
 import subprocess
 import sys
 import tempfile
 
-from bootstrap import read_lock
+from bootstrap import read_lock, require_clean, verify_repository
+from workspace_resources import operation
 
 ROOT = Path(__file__).resolve().parents[1]
 PATCH = Path("patches/melee-gameplay.patch")
@@ -86,10 +89,70 @@ def merge_patches(repository, commit, base_bytes, ours_bytes, theirs_bytes):
         return canonical, []
 
 
+def _validated_patch_target(path):
+    """Return a regular, non-symlink patch file suitable for replacement."""
+    path = Path(path)
+    absolute = path.absolute()
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"{path}: patch target must be an existing regular file, not a symlink")
+    return absolute
+
+
+def _patch_snapshot(path):
+    """Read a patch and its identity so a concurrent edit cannot be overwritten."""
+    path = _validated_patch_target(path)
+    info = path.stat()
+    return path.read_bytes(), (info.st_dev, info.st_ino, info.st_size,
+                               info.st_mtime_ns, info.st_ctime_ns)
+
+
+def _replace_patch(path, expected, identity, replacement):
+    """Atomically replace an unchanged patch target with regular-file checks."""
+    path = _validated_patch_target(path)
+
+    def unchanged():
+        current = _validated_patch_target(path)
+        info = current.stat()
+        fingerprint = (info.st_dev, info.st_ino, info.st_size,
+                       info.st_mtime_ns, info.st_ctime_ns)
+        return (current == path and fingerprint == identity and
+                current.read_bytes() == expected)
+
+    if not unchanged():
+        raise ValueError(f"{path}: changed while preparing the canonical patch; refusing to overwrite")
+
+    mode = stat.S_IMODE(path.stat().st_mode)
+    temporary_name = None
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.",
+                                                      dir=path.parent)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(replacement)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.chmod(temporary_name, mode)
+        if not unchanged():
+            raise ValueError(f"{path}: changed while writing the canonical patch; refusing to overwrite")
+        os.replace(temporary_name, path)
+        temporary_name = None
+    finally:
+        if temporary_name is not None:
+            Path(temporary_name).unlink(missing_ok=True)
+
+
+def _verify_pinned_repository(repository, commit):
+    """Require the source object database to be the clean, pinned checkout."""
+    try:
+        verify_repository(repository, commit)
+        require_clean(repository)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise ValueError(f"{repository}: unable to verify the pinned checkout") from error
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--repository", type=Path, default=ROOT / ".deps/melee",
-                        help="pristine Melee checkout containing the pinned commit")
+                        help="clean standalone Melee checkout at the lockfile commit")
     parser.add_argument("--patch", type=Path, default=ROOT / PATCH)
     parser.add_argument("--check", action="store_true",
                         help="exit 1 when the patch is not canonical; do not write")
@@ -97,31 +160,36 @@ def main(argv=None):
                         help="Git revisions whose patches are merged as source trees into --patch; "
                              "for a branch behind main: --merge $(git merge-base HEAD origin/main) HEAD origin/main")
     args = parser.parse_args(argv)
-    commit = read_lock(ROOT)["repositories"]["melee"]["commit"]
-    if not (args.repository / ".git").exists():
-        parser.error(f"{args.repository} is not a Git checkout; run scripts/bootstrap.py")
-    if args.merge:
-        versions = [subprocess.check_output(["git", "show", f"{revision}:{PATCH.as_posix()}"], cwd=ROOT)
-                    for revision in args.merge]
-        merged, conflicts = merge_patches(args.repository, commit, *versions)
-        if merged is None:
-            print("Source edits conflict in: " + ", ".join(conflicts), file=sys.stderr)
-            return 1
-        args.patch.write_bytes(merged)
-        print(f"{args.patch}: merged {' + '.join(args.merge[1:])} as source trees")
-        return 0
-    current = args.patch.read_bytes()
-    canonical, tree = canonical_patch(args.repository, commit, current)
-    if canonical == current:
-        print(f"{args.patch}: canonical (tree {tree})")
-        return 0
-    if args.check:
-        print(f"{args.patch}: not canonical; run python3 scripts/canonicalize_gameplay_patch.py",
-              file=sys.stderr)
-        return 1
-    args.patch.write_bytes(canonical)
-    print(f"{args.patch}: rewritten in canonical order (tree {tree} unchanged)")
-    return 0
+    try:
+        with operation(ROOT, "canonical gameplay patch"):
+            commit = read_lock(ROOT)["repositories"]["melee"]["commit"]
+            _verify_pinned_repository(args.repository, commit)
+            target = _validated_patch_target(args.patch)
+            if args.merge:
+                current, identity = _patch_snapshot(target)
+                versions = [subprocess.check_output(["git", "show", f"{revision}:{PATCH.as_posix()}"], cwd=ROOT)
+                            for revision in args.merge]
+                merged, conflicts = merge_patches(args.repository, commit, *versions)
+                if merged is None:
+                    print("Source edits conflict in: " + ", ".join(conflicts), file=sys.stderr)
+                    return 1
+                _replace_patch(target, current, identity, merged)
+                print(f"{target}: merged {' + '.join(args.merge[1:])} as source trees")
+                return 0
+            current, identity = _patch_snapshot(target)
+            canonical, tree = canonical_patch(args.repository, commit, current)
+            if canonical == current:
+                print(f"{target}: canonical (tree {tree})")
+                return 0
+            if args.check:
+                print(f"{target}: not canonical; run python3 scripts/canonicalize_gameplay_patch.py",
+                      file=sys.stderr)
+                return 1
+            _replace_patch(target, current, identity, canonical)
+            print(f"{target}: rewritten in canonical order (tree {tree} unchanged)")
+            return 0
+    except (OSError, ValueError) as error:
+        parser.error(str(error))
 
 
 if __name__ == "__main__":

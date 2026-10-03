@@ -75,7 +75,10 @@ open pull request. When a merge with `main` conflicts in the patch, merge the
 patched source trees instead of the patch text:
 `python3 scripts/canonicalize_gameplay_patch.py --merge $(git merge-base HEAD origin/main) HEAD origin/main`
 writes the combined canonical patch, or names the source files whose edits
-truly overlap. Regenerate a tracked generated declaration only through its existing
+truly overlap. The command requires a clean standalone `.deps/melee` checkout
+at the pinned lockfile commit, holds the checkout mutation guard, rejects
+symlinked patch targets, and refuses to replace a patch changed during the
+operation. Regenerate a tracked generated declaration only through its existing
 generator, review the generated diff, and run its `--check` mode when the
 generator provides one. The [testing guide](docs/TESTING.md) documents the
 fighter-registry example and the [dependency guide](docs/DEPENDENCIES.md)
