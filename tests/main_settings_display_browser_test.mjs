@@ -318,6 +318,8 @@ try {
   } else if (values['stop-after-sss']) {
     await check('retail Start input enters SSS and B cancels back to CSS', async () => {
       await enterSssFromCss();
+      // mnStageSel_Scene_OnEnter sets the original 20-frame input gate.
+      await page.waitForTimeout(700);
       await shot('sss-entered');
       await press('o');
       await waitForPhase(1);
