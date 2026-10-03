@@ -353,6 +353,7 @@ int main(void)
         source_save[0x450] = 0x11; source_save[0x451] = 0x22;
         source_save[0x458] = 0; source_save[0x459] = 1;
         source_save[0x45A] = 0; source_save[0x45B] = 1;
+        source_save[0x45C] = (u8) -5;
         source_save[0x45D] = 0;
         source_save[0x45E] = LANG_JP;
         source_save[0x460] = 0x00; source_save[0x461] = 0x00;
@@ -390,6 +391,7 @@ int main(void)
                       imported_preferences.item_mask ==
                           UINT64_C(0x1122000000000000) &&
                       imported_preferences.deflicker == 0 &&
+                      imported_preferences.sound_balance == (u8) -5 &&
                       imported_preferences.saved_language == LANG_JP &&
                       !memcmp(imported_preferences.rumble_enabled,
                               (const uint8_t[4]) { 0, 1, 0, 1 }, 4),
@@ -404,6 +406,7 @@ int main(void)
             save->x1CB0.rumble_enabled[1] = 1;
             save->x1CB0.deflicker = 1;
             save->x1CB0.saved_language = LANG_US;
+            save->x1CB0.sound_balance = 0;
             save->x1A50 = 0x10203040;
             check_error(melee_web_save_profile_owner_snapshot_card_data_with_preferences(
                             profile, &imported_preferences, card_profile_after,
@@ -414,6 +417,7 @@ int main(void)
                       !memcmp(card_profile_after + 0x458,
                               (const uint8_t[4]) { 0, 1, 0, 1 }, 4) &&
                       card_profile_after[0x45D] == 0 &&
+                      card_profile_after[0x45C] == (u8) -5 &&
                       card_profile_after[0x45E] == LANG_JP,
                   "Runtime overrides replaced imported preferences in the card snapshot");
             check(!memcmp(card_profile_after + 0x1E8,
