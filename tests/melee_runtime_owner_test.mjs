@@ -66,9 +66,15 @@ globalThis.AudioContext = class {
   async resume() { calls.push(['audioResume']); this.state = 'running'; }
   async close() { audioClosed = true; }
 };
+let holdRenderAck = false;
+const pendingRenderAcks = [];
 globalThis.AudioWorkletNode = class {
   port = {postMessage: data => {
-    calls.push(['audioMessage', data.type, data.enabled]);
+    calls.push(['audioMessage', data.type, data.enabled, data.id]);
+    if (data.type === 'render-ready-request') {
+      const ack = () => { calls.push(['audioRenderAck', data.id]); this.port.onmessage({data: {type: 'render-ready', id: data.id}}); };
+      if (holdRenderAck) pendingRenderAcks.push(ack); else queueMicrotask(ack);
+    }
     if (data.type === 'state') queueMicrotask(() => this.port.onmessage({data: {type: 'state-ack', enabled: data.enabled}}));
   }};
   connect() {}
@@ -573,7 +579,8 @@ if (lifecycleHandoff) {
   assert.equal(window.menuServiceCommands(), 0, 'foreground focus does not request a clock handoff');
   assert.deepEqual(activityRowsSince(baseline), [[1, 1]], 'foreground focus publishes current activity only');
 
-  const pauseBoundaryStart = calls.length;
+  const renderRequestsBeforeResume = calls.filter(row => row[0] === 'audioMessage' && row[1] === 'render-ready-request').length;
+const pauseBoundaryStart = calls.length;
   const audioResumesBeforePause = calls.filter(row => row[0] === 'audioResume').length;
   await pump(player.pause());
   assert.equal(player.getState().paused, true, 'manual pause remains an explicit external state');
@@ -670,20 +677,101 @@ assert.equal(calls.slice(failedStart).filter(row => row[0] === 'free').length, f
   'A native transfer error frees the current batch allocations');
 failedFile = null;
 await pump(player.importDisc({name: 'owned.iso'}));
+async function reachPendingRender(startIndex) {
+  for (let i = 0; !pendingRenderAcks.length && i < 100; ++i) {
+    window.menuServiceCommands(); window.menuFrame(running);
+    await new Promise(resolve => setTimeout(resolve, 1));
+  }
+  assert.equal(pendingRenderAcks.length, 1, 'A prepared launch waits for one fresh render acknowledgement');
+  for (let i = 0; i < 3; ++i) { window.menuServiceCommands(); window.menuFrame(running); await Promise.resolve(); }
+  assert.equal(calls.slice(startIndex).some(row => row[0] === 'launch'), false,
+    'Servicing native boundaries cannot launch source time before audio rendering');
+  assert.equal(running, false);
+}
+if (process.argv.includes('--audio-render-timeout') || process.argv.includes('--audio-render-fatal')) {
+  const originalSetTimeout = globalThis.setTimeout, originalClearTimeout = globalThis.clearTimeout;
+  const timers = [];
+  globalThis.setTimeout = (callback, delay, ...args) => {
+    const id = originalSetTimeout(callback, delay, ...args);
+    if (delay === 5000) timers.push({id, callback, cleared: false});
+    return id;
+  };
+  globalThis.clearTimeout = id => {
+    const timer = timers.find(row => row.id === id); if (timer) timer.cleared = true;
+    originalClearTimeout(id);
+  };
+  try {
+    const before = calls.length;
+    holdRenderAck = true;
+    const waiting = player.start();
+    await reachPendingRender(before);
+    const lateAck = pendingRenderAcks.shift();
+    if (process.argv.includes('--audio-render-fatal')) {
+      owner.stop(Error('controlled fatal during renderer wait'));
+      await assert.rejects(pump(waiting), /controlled fatal/);
+      lateAck();
+      window.menuServiceCommands(); await Promise.resolve();
+      assert.equal(calls.slice(before).some(row => row[0] === 'launch'), false);
+      assert.equal(player.getState().requiresReload, true);
+      await player.destroy();
+      console.log('Shared runtime owner: fatal stop cancels pending renderer wait before source launch.');
+    } else {
+      const timer = timers.find(row => !row.cleared);
+      assert.ok(timer, 'The render readiness deadline is active after preparation');
+      clearTimeout(timer.id); timer.callback();
+      await assert.rejects(pump(waiting), /Game audio did not start/);
+      assert.equal(player.getState().canStart, true, 'Prepared disc remains eligible after a bounded audio startup failure');
+      assert.equal(player.getState().requiresReload, false);
+      const retry = player.start();
+      await reachPendingRender(before);
+      lateAck();
+      window.menuServiceCommands(); await Promise.resolve();
+      assert.equal(running, false, 'A timed-out attempt cannot launch the retry');
+      pendingRenderAcks.shift()(); holdRenderAck = false;
+      await pump(retry);
+      assert.equal(running, true);
+      assert.equal(calls.slice(before).filter(row => row[0] === 'launch').length, 1);
+      await pump(player.destroy());
+      console.log('Shared runtime owner: renderer timeout leaves prepared disc retryable; stale ack cannot launch retry.');
+    }
+  } finally {
+    globalThis.setTimeout = originalSetTimeout; globalThis.clearTimeout = originalClearTimeout;
+  }
+  process.exit(0);
+}
 const staleLaunchStart = calls.length;
-await assert.rejects(pump(player.start({isCurrent: () => false})), /Disc selection changed before launch/);
+let selectionCurrent = false;
+if (withAudio) { holdRenderAck = true; selectionCurrent = true; }
+const staleStart = player.start({isCurrent: () => selectionCurrent});
+if (withAudio) {
+  await reachPendingRender(staleLaunchStart);
+  selectionCurrent = false;
+  pendingRenderAcks.shift()(); holdRenderAck = false;
+}
+await assert.rejects(pump(staleStart), /Disc selection changed before launch/);
 assert.equal(calls.slice(staleLaunchStart).some(row => row[0] === 'launch'), false,
   'A stale selection is rejected after preparation and before native launch');
 const startCalls = calls.length;
+holdRenderAck = withAudio;
 const starting = player.start();
 if (withAudio) {
   assert.ok(calls.slice(startCalls).some(row => row[0] === 'audioResume'),
     'Starting must initiate Web Audio resume before yielding to native preparation');
 }
+if (withAudio) {
+  await reachPendingRender(startCalls);
+  pendingRenderAcks.shift()(); holdRenderAck = false;
+}
 await pump(starting);
 if (withAudio) {
   const beforeLaunch = calls.slice(startCalls);
-  assert.ok(beforeLaunch.findIndex(row => row[0] === 'audioResume') < beforeLaunch.findIndex(row => row[0] === 'prepare'));
+  const preparedAt = beforeLaunch.findIndex(row => row[0] === 'prepare');
+  const requestedAt = beforeLaunch.findIndex(row => row[0] === 'audioMessage' && row[1] === 'render-ready-request');
+  const acknowledgedAt = beforeLaunch.findIndex(row => row[0] === 'audioRenderAck');
+  const launchedAt = beforeLaunch.findIndex(row => row[0] === 'launch');
+  assert.ok(beforeLaunch.findIndex(row => row[0] === 'audioResume') < preparedAt);
+  assert.ok(preparedAt < requestedAt && requestedAt < acknowledgedAt && acknowledgedAt < launchedAt,
+    'Fresh rendering after preparation precedes source launch');
 }
 assert.equal(player.getState().scene, 'css');
 assert.equal(player.getState().canPause, true);
@@ -693,6 +781,7 @@ else {
   assert.equal(player.getState().audio, 'disabled');
   assert.throws(() => window.menuAudio(new Float32Array(2)), /Audio output is disabled/);
 }
+const renderRequestsBeforeResume = calls.filter(row => row[0] === 'audioMessage' && row[1] === 'render-ready-request').length;
 const pauseBoundaryStart = calls.length;
 const audioResumesBeforePause = calls.filter(row => row[0] === 'audioResume').length;
 await pump(player.pause()); assert.equal(player.getState().paused, true);
@@ -726,6 +815,8 @@ assert.equal(player.getState().canPause, true, 'Prize remains an active pausable
 assert.equal(player.getState().canStart, false, 'Prize cannot start a second route');
 await pump(player.pause()); assert.equal(player.getState().paused, true);
 await pump(player.resume()); assert.equal(player.getState().running, true);
+assert.equal(calls.filter(row => row[0] === 'audioMessage' && row[1] === 'render-ready-request').length, renderRequestsBeforeResume,
+  'Existing manual Resume behavior does not add startup readiness work');
 phase = 1; running = true; window.menuFrame(true);
 window.menuPreparation('Next source scene', true);
 assert.equal(window.menuAudioReadyForPreparation(), true, 'Same-owner transitions preserve continuous audio');
@@ -736,6 +827,8 @@ await pump(player.unload());
 assert.equal(player.getState().running, false);
 assert.equal(player.getState().canStart, true, 'Normal unload retains the prepared disc for another native launch');
 await pump(player.start());
+if (withAudio) assert.equal(calls.filter(row => row[0] === 'audioMessage' && row[1] === 'render-ready-request').length, renderRequestsBeforeResume + 1,
+  'A subsequent full launch requests fresh renderer progress');
 const destroyed = await pump(player.destroy());
 assert.equal(destroyed.requiresReload, true);
 assert.equal(audioClosed, withAudio);

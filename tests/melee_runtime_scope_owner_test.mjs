@@ -219,6 +219,7 @@ function createTestAudio() {
     async pause() { calls.push(['audio-pause']); },
     readyForPreparation: () => true,
     waitForAck: () => Promise.resolve(),
+    waitForRender: () => Promise.resolve(),
     setEnabled(value) { calls.push(['audio-enabled', !!value]); },
     fail(error) { calls.push(['audio-fail', String(error?.message || error)]); },
     write() {},

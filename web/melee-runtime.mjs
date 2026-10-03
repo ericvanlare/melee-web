@@ -711,6 +711,12 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         // The shell primes audio on Choose file; a recovery Play click supplies
         // its own gesture. Resume before native preparation can yield.
         await prepareAudio(); await prepareNativeResources();
+        // A running AudioContext and a port state acknowledgement can precede
+        // its first output callback. Start source time only after the renderer
+        // processes a quantum following this preparation.
+        if (audio && typeof audio.waitForRender !== 'function')
+          throw Error('The audio output cannot confirm startup readiness. Reload to recover.');
+        await audio?.waitForRender();
         if (!isCurrent()) throw Error('Disc selection changed before launch.');
         await boundary(() => check(Module._melee_web_native_menu_launch())); prepared = false; focus(); syncAudio();
       });

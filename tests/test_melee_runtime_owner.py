@@ -19,6 +19,14 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
     def test_native_command_audio_and_teardown_boundaries(self):
         self.run_owner([])
 
+    def test_render_timeout_preserves_prepared_disc_for_retry(self):
+        self.run_owner(['--audio-render-timeout'],
+                       'renderer timeout leaves prepared disc retryable; stale ack cannot launch retry')
+
+    def test_fatal_stop_cancels_render_wait_before_native_launch(self):
+        self.run_owner(['--audio-render-fatal'],
+                       'fatal stop cancels pending renderer wait before source launch')
+
     def test_missing_webgpu_adapter_stops_before_audio_and_native_module_load(self):
         self.run_owner(['--no-webgpu-adapter'],
                        'missing WebGPU adapter stops before native download or audio setup')
