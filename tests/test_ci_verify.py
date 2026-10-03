@@ -48,6 +48,48 @@ class CiVerifyTests(unittest.TestCase):
             owners = {group for group, shard_ids in selected.items() if ids & shard_ids}
             self.assertEqual(owners, {ci_verify.UNIT_GROUPS[ci_verify.unit_shard(module)]})
 
+    def test_rehomed_repository_modules_are_deferred_exactly_to_linked_owner(self):
+        loader = unittest.TestLoader()
+        discovered = loader.discover(str(ROOT / "tests"))
+        all_cases = list(ci_verify._test_cases(discovered))
+        all_rehomed_modules = {
+            module for modules in ci_verify.REHOMED_TEST_MODULES.values() for module in modules
+        }
+        discovered_rehomed = {
+            test.id() for test in all_cases if ci_verify._test_module(test) in all_rehomed_modules
+        }
+        deferred_by_shard = {}
+        for group in ci_verify.UNIT_GROUPS:
+            shard_suite = ci_verify._filter_suite(discovered, ci_verify._shard_index(group))
+            deferred = ci_verify._filter_modules(
+                shard_suite, all_rehomed_modules, include=True,
+            )
+            selected = ci_verify._filter_modules(
+                shard_suite, all_rehomed_modules, include=False,
+            )
+            deferred_by_shard[group] = {test.id() for test in ci_verify._test_cases(deferred)}
+            self.assertFalse(
+                {test.id() for test in ci_verify._test_cases(selected)} & discovered_rehomed
+            )
+        self.assertEqual(set().union(*deferred_by_shard.values()), discovered_rehomed)
+
+        for owner, modules in ci_verify.REHOMED_TEST_MODULES.items():
+            expected_ids = {
+                test_id for test_id in discovered_rehomed
+                if test_id.split(".", 1)[0] in modules
+            }
+            assigned_shards = {
+                group for group, ids in deferred_by_shard.items() if ids & expected_ids
+            }
+            expected_shard = {
+                ci_verify.UNIT_GROUPS[ci_verify.unit_shard(module)] for module in modules
+                if any(test_id.split(".", 1)[0] == module for test_id in expected_ids)
+            }
+            self.assertEqual(assigned_shards, expected_shard)
+            linked_suite = loader.loadTestsFromNames(ci_verify.LINKED_TESTS[owner])
+            linked_ids = {test.id() for test in ci_verify._test_cases(linked_suite)}
+            self.assertTrue(expected_ids.issubset(linked_ids))
+
     def test_unit_shards_include_new_test_module_without_dropping_cases(self):
         class NewModuleTests(unittest.TestCase):
             __module__ = "test_new_ci_module"
@@ -94,6 +136,37 @@ class CiVerifyTests(unittest.TestCase):
         self.assertEqual(report["selected"]["count"], expected)
         self.assertIn("sha256", report["discovered"])
         self.assertIn("sha256", report["selected"])
+
+    def test_rehomed_module_is_deferred_from_units_and_selected_by_owner(self):
+        class RehomedTests(unittest.TestCase):
+            __module__ = "test_rehomed_module"
+
+            def test_first(self):
+                pass
+
+            def test_second(self):
+                pass
+
+        suite = unittest.TestSuite([
+            RehomedTests("test_first"), RehomedTests("test_second"),
+        ])
+        ids = sorted(test.id() for test in ci_verify._test_cases(suite))
+        owner = ci_verify.UNIT_GROUPS[ci_verify.unit_shard("test_rehomed_module")]
+        report = {}
+        with patch.object(ci_verify, "REHOMED_TEST_MODULES", {"gameplay": ("test_rehomed_module",)}), \
+                patch.object(ci_verify.unittest.TestLoader, "discover", return_value=suite):
+            ci_verify.run_tests(owner, report)
+        self.assertEqual(report["selected"]["ids"], [])
+        self.assertEqual(report["deferred"]["ids"], ids)
+
+        owner_report = {}
+        with patch.object(ci_verify, "REHOMED_TEST_MODULES", {"gameplay": ("test_rehomed_module",)}), \
+                patch.object(ci_verify, "LINKED_TESTS", {"gameplay": ("test_rehomed_module",)}), \
+                patch.object(ci_verify, "REQUIRED_TESTS", {"gameplay": tuple(ids)}), \
+                patch.object(ci_verify.unittest.TestLoader, "loadTestsFromNames", return_value=suite):
+            ci_verify.run_tests("gameplay", owner_report)
+        self.assertEqual(owner_report["selected"]["ids"], ids)
+        self.assertEqual({row["test"] for row in owner_report["tests"]}, set(ids))
 
     def test_inventory_requires_both_unit_shards(self):
         groups = dict(ci_verify.GROUPS)
