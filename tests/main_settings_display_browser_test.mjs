@@ -14,9 +14,11 @@ const {values} = parseArgs({options: {
     .map(name => [name, {type: 'string'}])),
   'stop-after-export': {type: 'boolean', default: false},
   'stop-after-sss': {type: 'boolean', default: false},
+  'stop-after-match': {type: 'boolean', default: false},
 }, strict: true});
-if (values['stop-after-export'] && values['stop-after-sss'])
-  throw Error('--stop-after-export and --stop-after-sss are mutually exclusive');
+if ([values['stop-after-export'], values['stop-after-sss'], values['stop-after-match']]
+  .filter(Boolean).length > 1)
+  throw Error('Probe flags are mutually exclusive');
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url ORIGIN --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const output = path.resolve(values.out);
@@ -28,7 +30,8 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const readHash = async file => hash(await fs.readFile(file));
 const report = {schema: 'melee-web-main-settings-display-browser-v1',
   scope: values['stop-after-export'] ? 'display-export-and-teardown-probe' :
-    values['stop-after-sss'] ? 'display-css-sss-cancel-probe' : 'full-display-route',
+    values['stop-after-sss'] ? 'display-css-sss-cancel-probe' :
+    values['stop-after-match'] ? 'display-css-sss-match-entry-probe' : 'full-display-route',
   url: values.url,
   disc: path.basename(values.disc), discSha256: await readHash(values.disc),
   reference: {sourceCommit: 'b43912cc78606f96c9569f5d6229bc9d7e265ea5',
@@ -36,7 +39,8 @@ const report = {schema: 'melee-web-main-settings-display-browser-v1',
     route: 'Title > Main > Settings > Display > Settings > Main > VS > CSS > SSS > Mario/Final Destination > No Contest Results > CSS',
     sourceCallbacks: ['mnMain_Scene_OnEnter', 'mnMain_Scene_OnFrame',
       'mn_8022DB10', 'mn_8022D104', 'mnDeflicker_8024A6C4',
-      'mnDeflicker_8024A168', 'gmMainLib_8015F588', 'gmMainLib_8015F4F4'],
+      'mnDeflicker_8024A168', 'mnStageSel_Scene_OnFrame',
+      'gmMainLib_8015F588', 'gmMainLib_8015F4F4'],
     mainSelections: {versus: 1, settings: 3}, settingsBackRestoresSelection: 3,
     assets: ['MnMaAll.usd', 'SdMenu.usd', 'SdToy.dat', 'LbMcGame.usd',
       'NtMemAc.usd', 'LbMcSnap.usd', 'GmEvent.dat', 'LbAd.dat'],
@@ -47,7 +51,8 @@ const report = {schema: 'melee-web-main-settings-display-browser-v1',
     'A toggles deflicker off', 'B to Settings', 'A re-enters Display', 'B to Settings',
     'B to Main', 'Up x2 to Versus', 'A to Versus', 'A to Melee/CSS',
     'Start confirms Ready-to-Fight; repeat Start if CSS remains active; Start to SSS',
-    'Right then Up to Final Destination', 'A starts match',
+    'Right then Up to Final Destination; wait for the source 90-frame cursor transition',
+    'Start confirms the stage selection and starts the match',
     'Start then L+R+A+Start enters No Contest Results', 'Start confirmations return to CSS'],
   browserMode: 'headless installed Chrome; isolated Playwright context; public runtime player profile',
   saveMode: 'Everything unlocked default; fresh Personal profile created for this context',
@@ -150,6 +155,17 @@ const enterSssFromCss = async () => {
   // sends Start again only when CSS is still in phase 1.
   if (firstStartPhase === 1) await press('7');
   await waitForPhase(3);
+};
+const selectFinalDestination = async () => {
+  await page.waitForTimeout(1000);
+  await driver.pressChord(['4'], {holdMs: 75, releaseMs: 100});
+  await driver.pressChord([']'], {holdMs: 45, releaseMs: 100});
+  // The retail cursor transition advances for 0x5A frames before Start can
+  // commit a newly selected stage. SSS commits on Start or A+Start; A alone
+  // is ignored by mnStageSel_80259C28.
+  await page.waitForTimeout(1600);
+  await shot('stage-final-destination');
+  await press('7');
 };
 const press = key => driver.pressChord([key]);
 const pressDown = async count => { for (let i = 0; i < count; i++) await press('3'); };
@@ -326,13 +342,17 @@ try {
       await shot('css-after-sss-cancel');
     });
     report.result = 'sss-probe-pass';
+  } else if (values['stop-after-match']) {
+    await check('retail SSS selection transition commits Final Destination and enters the match', async () => {
+      await enterSssFromCss();
+      await selectFinalDestination();
+      await waitForPhase(7);
+      await shot('match');
+    });
+    report.result = 'match-probe-pass';
   } else await check('the saved Display preference survives a supported match and Results return to CSS', async () => {
     await enterSssFromCss();
-    await page.waitForTimeout(1000);
-    await driver.pressChord(['4'], {holdMs: 75, releaseMs: 100});
-    await driver.pressChord([']'], {holdMs: 45, releaseMs: 100});
-    await shot('stage-final-destination');
-    await press('m');
+    await selectFinalDestination();
     await waitForPhase(7);
     await shot('match');
     await page.waitForTimeout(5000);
@@ -399,7 +419,7 @@ try {
   });
 
   assert.deepEqual(errors, [], 'The rendered route must not emit browser errors.');
-  if (!['probe-pass', 'sss-probe-pass'].includes(report.result)) report.result = 'pass';
+  if (!['probe-pass', 'sss-probe-pass', 'match-probe-pass'].includes(report.result)) report.result = 'pass';
 } catch (error) {
   report.result = 'fail';
   report.failure = error?.stack || String(error);
@@ -453,7 +473,7 @@ try {
   await fs.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
 }
 
-if (!['pass', 'probe-pass', 'sss-probe-pass'].includes(report.result))
+if (!['pass', 'probe-pass', 'sss-probe-pass', 'match-probe-pass'].includes(report.result))
   throw Error(`Main Settings Display route failed; see ${path.join(output, 'report.json')}`);
 console.log(JSON.stringify({result: report.result, scope: report.scope, checks: report.checks,
   display: report.displayState, exportSha256: report.exportSha256, cleanup: report.cleanup}, null, 2));
