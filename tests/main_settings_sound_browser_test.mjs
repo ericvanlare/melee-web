@@ -23,7 +23,7 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const readHash = async file => hash(await fs.readFile(file));
 const report = {schema: 'melee-web-main-settings-sound-browser-v1', url: values.url,
   disc: path.basename(values.disc), discSha256: await readHash(values.disc),
-  reference: {sourceReceipt: 'docs/evidence/main-settings-sound-route-v1.json',
+  reference: {routeEvidence: 'docs/evidence/main-settings-sound-route-v1.json',
     sourceCommit: 'b43912cc78606f96c9569f5d6229bc9d7e265ea5',
     mainDolSha256: 'dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646',
     route: 'CSS > parent Main > Title > Main > Settings (MenuKind 4) > Sound (MenuKind 20) > Settings > Main > CSS',
