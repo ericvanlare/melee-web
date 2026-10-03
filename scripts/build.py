@@ -30,6 +30,8 @@ AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
 # surface for the workflow.
 TRACE_TARGETS = (
     "gameplay_content_match_trace",
+    "gameplay_snapshot_probe_browser",
+    "gameplay_snapshot_probe",
     "gameplay_stage_battlefield_trace",
     "gameplay_stage_temple_trace",
     "gameplay_stage_fountain_trace",
@@ -850,6 +852,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         )
         configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
         configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
+        configure.append(
+            f"-DMELEE_WEB_SLIPPI_PROFILE_BROWSER={'ON' if 'gameplay_snapshot_probe_browser' in trace_targets else 'OFF'}"
+        )
         record_build(root, build_dir, False)
         subprocess.run(configure, cwd=root, env=env, check=True)
         if configure_only:
