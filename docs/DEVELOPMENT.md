@@ -5,6 +5,9 @@ the detailed contracts, not a second status report. `STATUS.md` is the current
 evidence index; follow its links for measurements, retained failures and exact
 receipts instead of copying numbers into this page.
 
+The [documentation map](README.md) lists every document by purpose and says
+where new documents belong.
+
 For the relationship between the vanilla port, accuracy tooling and later
 Slippi/online projects, read [project direction](PROJECT_DIRECTION.md). It records
 strategy; the roadmap and boundary documents still govern implementation order

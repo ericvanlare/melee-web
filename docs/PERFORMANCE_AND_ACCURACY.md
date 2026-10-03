@@ -584,7 +584,7 @@ The discovery pass found 38 new pipelines and expanded the reviewed seed from
 389 to 427 descriptors. Final visible Release cold/warm runs pass all 3,122 ticks
 with zero hard-gate failures: worst native callbacks 11.330/12.485 ms and worst
 browser intervals 21.365/22.010 ms. This is scoped performance evidence; broad
-content admission remains open. The [complete-game ledger](COMPLETE_REPLAY_CALIBRATION.md)
+content admission remains open. The [complete-game ledger](investigations/COMPLETE_REPLAY_CALIBRATION.md)
 records reference cross-calibration, observed coverage, preparation, memory and
 upload measurements alongside the joined receipt.
 

@@ -158,7 +158,7 @@ Failures become development regressions and require future replacement holdouts.
 ### Approved current-runtime scope — 2026-09-19
 
 The project owner approved the scoped proposal in
-[the current development evidence](DEVELOPMENT_TIMING_20260919.md#remaining-acceptance-decision).
+[the current development evidence](history/DEVELOPMENT_TIMING_20260919.md#remaining-acceptance-decision).
 For issue #33, the September 12 failure remains measured, failed and causally
 unassigned because its original trace lacks operation/client identity. It is
 retired as a blocker for this explicitly separate current-runtime holdout

@@ -28,10 +28,10 @@ on staging, with cold timing pauses retained under
 [#33](https://github.com/ericvanlare/melee-web/issues/33); this does not broaden
 character or performance admission. See the
 [deployment receipt](../evidence/public-link-release-v1.json),
-[port notes](../LINK_PORT_NOTES.md)
+[port notes](../content/LINK_PORT_NOTES.md)
 and [bounded evidence receipt](../evidence/link-young-link-replay-v1.json).
 
-The new [GPU compilation diagnosis](../LINK_GPU_STALL.md) correlates a
+The new [GPU compilation diagnosis](../history/LINK_GPU_STALL.md) correlates a
 482.785 ms Link staging wait with synchronous Metal compiler work for four
 missing first-draw descriptors. The reviewed seed preserves all existing records
 and adds 78 reviewed descriptors. Its full 7,070-update/7,064-draw state replay

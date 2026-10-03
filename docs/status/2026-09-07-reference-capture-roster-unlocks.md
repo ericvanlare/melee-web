@@ -23,7 +23,7 @@ original probes establish its RNG-seed and fighter-pointer register producers,
 without using captured addresses as inputs or changing CPU integration. The
 1,199-tick 2P and 4,346-tick 3P browser core/CPU regressions remain exact.
 Camera, later subject rounding, draw scheduling and headless completion failures
-remain open. See the [causal audit and scoped evidence](../PHYSICAL_REPLAY_SRT.md).
+remain open. See the [causal audit and scoped evidence](../investigations/PHYSICAL_REPLAY_SRT.md).
 The installed capture app, PR #16, PR #20 and public deployment are unchanged.
 
 Reference Capture 0.2.3 adds startup cancellation and interrupted replay cleanup,

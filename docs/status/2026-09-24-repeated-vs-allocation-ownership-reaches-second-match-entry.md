@@ -7,7 +7,7 @@ Results, CSS/SSS and second VS entry. Two independent original captures are
 byte-identical. Explicit demo-fighter wrappers distinguish Results ownership
 from VS generations, and disk-backed replay retains every compared command and
 result. See the [scoped receipt](../evidence/original-allocation-repeated-ownership-v1.json)
-and [diagnostic controls](../ORIGINAL_ALLOCATION_HISTORY.md#repeated-vs-ownership-diagnostic-controls).
+and [diagnostic controls](../investigations/ORIGINAL_ALLOCATION_HISTORY.md#repeated-vs-ownership-diagnostic-controls).
 The second VS owner remains active at this boundary. Complete three-match
 ownership, a live browser source-address provider, CPU register carry and
 full-session browser equivalence remain open. Pixels, PCM and live performance

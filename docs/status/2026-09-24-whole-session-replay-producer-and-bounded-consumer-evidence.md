@@ -7,4 +7,4 @@ comparison exposes a CPU-input difference consistent with the existing source
 address/register-context limitation; whole-session equivalence remains open.
 Builds, tests, exact comparison scope and retained failures are in the
 [PR59 evidence receipt](../evidence/whole-session-replay-pr59-v1.json) and
-[whole-session section](../VERSUS_RETURN_LOOP.md#pr59-whole-session-producer-and-bounded-replay-evidence-2026-09-24).
+[whole-session section](../history/VERSUS_RETURN_LOOP.md#pr59-whole-session-producer-and-bounded-replay-evidence-2026-09-24).

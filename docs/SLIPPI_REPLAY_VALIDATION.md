@@ -194,7 +194,7 @@ The official `slippi-js` fixture set bootstraps parser compatibility and edge
 cases. The audited public tournament corpus supplies gameplay and performance
 breadth, while an independently captured vanilla corpus supplies the strict
 GALE01 revision-2 oracle. The measured corpus limits and generation plan are in
-[SLIPPI_CORPUS_AUDIT.md](SLIPPI_CORPUS_AUDIT.md). The manifest records
+[SLIPPI_CORPUS_AUDIT.md](history/SLIPPI_CORPUS_AUDIT.md). The manifest records
 provenance without publishing copyrighted assets or personal replay metadata.
 
 Coverage is measured from execution, not filenames. For every replay collect:
@@ -246,7 +246,7 @@ Release cold/warm timing gates pass with zero failures. The final protected-
 dequeue collector also passes the entire Interpreter64 cross-check against the
 repeated reference pair. No broad gold or content admission follows from this
 trajectory. The
-[complete-game evidence ledger](COMPLETE_REPLAY_CALIBRATION.md) records hashes,
+[complete-game evidence ledger](investigations/COMPLETE_REPLAY_CALIBRATION.md) records hashes,
 shared arithmetic/memory fixes and the measured coverage gaps.
 
 The 686-frame movement donor and the 240-tick neutral pair remain scoped

@@ -7,7 +7,7 @@ recovered native kernel evidence encloses the entire failure. The original
 full Chrome trace/report were lost during analysis, with partial observations
 and the recovered kernel recording retained explicitly. The second bounded
 slot did not reproduce the stall and failed focus. This is diagnostic evidence,
-not a fix or acceptance pass. See the [investigation and recovery limits](../BROWSER_RASTER_STALL.md).
+not a fix or acceptance pass. See the [investigation and recovery limits](../history/BROWSER_RASTER_STALL.md).
 The original failure remains causally unassigned. The project owner approved a
 separate [current-runtime holdout gate](../HITCH_CAPTURE.md#approved-current-runtime-scope--2026-09-19)
 on September 19, retaining that historical failure and every hard threshold.
@@ -30,7 +30,7 @@ Marth retains 66,846,720 bytes of live heap growth and Falco zero. Both inputs
 exhaust their frozen cap before original match ending; neither is a complete
 original match. These are `per_tick` measurements, without original draw-cadence,
 live-controller, pixel or PCM admission. See the
-[failed campaign, correction and accepted replacement evidence](../CURRENT_RUNTIME_HOLDOUTS_20260919.md).
+[failed campaign, correction and accepted replacement evidence](../history/CURRENT_RUNTIME_HOLDOUTS_20260919.md).
 
 PR #47 is merged and deployed at [webmelee.gg](https://webmelee.gg). Both
 production origins pass exact HTTP verification and all ten public browser
@@ -45,4 +45,4 @@ zero hard hitch failures and one retained native target miss at 18.300 ms
 initial plan; its contended and incomplete attempts remain recorded, and a
 separately frozen six-slot recovery supplied the affected cache pairs and
 unfinished coverage. No historical failure was reclassified. See the
-[complete timing inventory, memory/preparation evidence and remaining decision](../DEVELOPMENT_TIMING_20260919.md).
+[complete timing inventory, memory/preparation evidence and remaining decision](../history/DEVELOPMENT_TIMING_20260919.md).

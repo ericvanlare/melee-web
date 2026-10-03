@@ -2,7 +2,7 @@
 
 Feature additions are paused at PR #49. The candidate exposes sixteen public
 fighters and seven stages; Donkey Kong's platform shield-drop crash is repaired
-on this branch (see [Donkey Kong's measured scope](../DONKEY_KONG_PORT_NOTES.md)),
+on this branch (see [Donkey Kong's measured scope](../content/DONKEY_KONG_PORT_NOTES.md)),
 re-enabling him in public character selection pending the remaining
 [issue #50](https://github.com/ericvanlare/melee-web/issues/50) verification.
 Both public and development players now load exact scene asset scopes from a
@@ -27,7 +27,7 @@ PR #49 merged as `979fd09` and its exact staging-tested package was deployed to
 webmelee.gg passed exact resource/header/route checks and ten public browser
 checks each. The owner also tested staging and reported multi-CPU loading lag
 as follow-up work. See the [release record on PR #49](https://github.com/ericvanlare/melee-web/pull/49),
-[release checkpoint](../PRODUCTION_CHECKPOINT_20260920.md) and
+[release checkpoint](../history/PRODUCTION_CHECKPOINT_20260920.md) and
 [hash-bound receipt](../evidence/production-checkpoint-20260920-v1.json).
 
 The subsequent PR review's two P3 findings are corrected: reports reject

@@ -5,9 +5,9 @@ The user-approved renderer startup fix is now live at
 the production artifact and apex each passed HTTP verification and ten real
 browser UI checks. The runtime bytes match the accepted preview. This is a
 functional alpha release, without a startup-speedup or expanded gameplay
-acceptance claim. See the [production record](../RENDERER_PRODUCTION_PROMOTION.md).
+acceptance claim. See the [production record](../history/RENDERER_PRODUCTION_PROMOTION.md).
 
-A separate [loading-feedback preview](../PUBLIC_LOADING_FEEDBACK.md) adds
+A separate [loading-feedback preview](../history/PUBLIC_LOADING_FEEDBACK.md) adds
 visible startup phases and bounded file-transfer batches. One local cold/warm
 Mario/FD lifecycle pair passes with zero unexpected pipelines, 7.335/8.960 ms
 native maxima and 24.010/27.305 ms browser gaps. Disc preparation measured
@@ -22,13 +22,13 @@ Falco/Battlefield with zero unexpected pipelines and native/browser maxima of
 9.805/27.350 ms. Required MEMFS setup now belongs to the shared player owner;
 the public alpha still has no IDBFS. Selecting all 508 verified descriptors
 removes the 18 misses in the earlier 280-member selection, whose
-[failure evidence remains preserved](../SELECTIVE_PIPELINE_ALPHA.md).
+[failure evidence remains preserved](../history/SELECTIVE_PIPELINE_ALPHA.md).
 The public build, 758-test suite (31 skips), and ten public UI checks pass.
 An immutable noindex staging preview is available, but the startup-speedup
 release remains **NO-GO**: one hosted cold pair measured 3075.557 ms disc-ready
 against PR15's 3078.824 ms, and two hosted input-selection failures prevent full
 hosted signoff. Production is unchanged. See the
-[scoped fix and fast verification loop](../RENDERER_STARTUP_FIX.md).
+[scoped fix and fast verification loop](../history/RENDERER_STARTUP_FIX.md).
 
 The [source-address prerequisite](../SOURCE_ADDRESS_CONTEXT.md) models ordinary
 original SDK/HSD allocation identity and defined register-byte consumption,
@@ -49,7 +49,7 @@ resampler and coefficient generator; normal development audio remains separate.
 The candidate mounts the player directly with the original minimal prototype
 layout. It still reproduces the opcode-63 CPU-action abort, and the development
 No Contest path can exit with unsupported pending scene 0. These are retained
-failures. See [the alpha validation record](../PUBLIC_ALPHA_VALIDATION.md).
+failures. See [the alpha validation record](../history/PUBLIC_ALPHA_VALIDATION.md).
 The alpha is live at [webmelee.gg](https://webmelee.gg/) after tested legal-contact
 delivery before and after DNS migration and the exact artifact audit. Final apex
 HTTP/browser, HTTPS and canonical redirect checks pass. This does not assert
@@ -62,7 +62,7 @@ local cold/warm Mario/FD captures at DPR 1/2 complete with zero live pipeline
 creation; native interactive maxima are 7.33–8.80 ms. Hosted directory controls
 also remove live discovery, but first startup/disc-ready costs reach 21–24
 seconds and remain a renderer investigation item. The live deployment is
-unchanged. See the [five-way investigation](../PUBLIC_PERFORMANCE_INVESTIGATION.md)
+unchanged. See the [five-way investigation](../history/PUBLIC_PERFORMANCE_INVESTIGATION.md)
 for failed prefixes, transition costs, exact profiles and the frozen candidate.
 
 Ordinary VS CPU levels 1–9 run in the shared compiled runtime used by both
@@ -141,7 +141,7 @@ Battlefield with sparse combat and no up-special; broader gold/content
 admission remain open; the subsequently measured staging fix above closes that
 cohort's observed live heap growth.
 
-The [complete-game replay calibration](../COMPLETE_REPLAY_CALIBRATION.md)
+The [complete-game replay calibration](../investigations/COMPLETE_REPLAY_CALIBRATION.md)
 now covers a derived 3,122-tick Fox/Falco Battlefield elimination match. Two
 independent JITARM64 references repeat exactly; Release/headless and visibly
 drawn port traces match every declared field through the original ending and

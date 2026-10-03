@@ -1,7 +1,7 @@
 # CPU source context integrated; bounded prerequisite evidence
 
 **Compiled / Source identified / Native traced / Retail compared** within the
-[CPU source-context runtime boundary](../CPU_SOURCE_CONTEXT_RUNTIME.md).
+[CPU source-context runtime boundary](../investigations/CPU_SOURCE_CONTEXT_RUNTIME.md).
 The [scoped receipt](../evidence/cpu-source-context-runtime-v2.json) records
 live source Fighter identities and both known register-carry routes in the
 browser. The inactive-TEV descriptor repair restores all four original Fighter
@@ -17,6 +17,6 @@ callback and joint-lookup regressions pass; the full suite ran 1,461 tests with
 evidence; the recorded-session comparison above extends its state coverage. Draw-cadence, pixel, PCM and foreground-timing
 equivalence remain unclaimed. PR #89 was merged at `aecc3e64`; it was not deployed.
 
-The earlier [audio/memory fixture](../SOURCE_LBAUDIO_MEMORY_STARTUP.md) and
+The earlier [audio/memory fixture](../investigations/SOURCE_LBAUDIO_MEMORY_STARTUP.md) and
 [receipt](../evidence/source-lbaudio-memory-startup-v1.json) remain valid for
 their own standalone scope.

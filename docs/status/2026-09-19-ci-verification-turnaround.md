@@ -7,6 +7,6 @@ and reuses only validated compiler-cache entries. All 895 previously passing
 baseline test IDs remain covered; deliberate build/test failures reject the
 aggregate, and a new PR revision cancels obsolete work. Automatic PR and main
 verification remain, with duplicate feature-branch push runs removed.
-See [CI timings, coverage, cache boundaries and cost](../CI_COST.md) for the
+See [CI timings, coverage, cache boundaries and cost](../investigations/CI_COST.md) for the
 measured evidence and retained outliers. This changes verification turnaround;
 gameplay accuracy and runtime performance keep their separate acceptance gates.

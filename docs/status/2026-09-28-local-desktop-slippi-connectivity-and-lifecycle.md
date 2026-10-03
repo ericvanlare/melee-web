@@ -228,8 +228,8 @@ and material animation consumers, collision, lights, shadows, flagged objects,
 and exact bird/tree/wind/blink parameters. The Release browser selects this pair
 through the original CSS/SSS and runs a versioned 46-case inventory covering
 grounded normals, shield/roll/dodge/grab, aerials, twenty wavedashes and all four
-Marth special families. See [Marth's notes](../MARTH_PORT_NOTES.md) and
-[Dream Land's notes](../DREAM_LAND_PORT_NOTES.md).
+Marth special families. See [Marth's notes](../content/MARTH_PORT_NOTES.md) and
+[Dream Land's notes](../content/DREAM_LAND_PORT_NOTES.md).
 
 The active first deliverable is **original in-game CSS → original in-game SSS
 → a playable four-stock Mario-versus-Mario match on Final Destination → original

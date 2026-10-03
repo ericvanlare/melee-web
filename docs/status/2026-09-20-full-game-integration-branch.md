@@ -46,7 +46,7 @@ earlier cold failures remain retained. A following cold/warm pair passes all
 An independently repeated original pair now matches all 603 declared native
 state updates after binding the actual save unlock profile. The legacy unbound
 recipe failure and headless camera mismatch remain retained; drawn comparison,
-complete ending and broader acceptance are open. See [Ganondorf scope and remaining gates](../GANONDORF_PORT_NOTES.md).
+complete ending and broader acceptance are open. See [Ganondorf scope and remaining gates](../content/GANONDORF_PORT_NOTES.md).
 Captain Falcon now passes native source lifecycles in both Captain/Mario player
 orders and all six costumes on Final Destination, including specials, stock
 loss/respawn, pause and repeated teardown. The integration preserves his
@@ -59,7 +59,7 @@ has an exact Falcon-position divergence, and the human-input browser replay
 diverges at Results routing. No page/process crash was reproduced, so the user
 report remains unattributed; device/browser-specific checks are unrun. See the
 [investigation receipt](../evidence/captain-falcon-correctness-investigation-v1.json)
-and [Captain Falcon's measured scope](../CAPTAIN_PORT_NOTES.md).
+and [Captain Falcon's measured scope](../content/CAPTAIN_PORT_NOTES.md).
 Hyrule Temple passes two native stage-owner lifetimes, including scaled geometry,
 original map callbacks, light identity overrides, music candidates and teardown.
 Two original Ready/pause/No Contest match lifetimes also pass. The browser
@@ -67,7 +67,7 @@ reaches advancing Temple gameplay, retaining an entry timing failure; a reviewed
 16-descriptor preload correction clears both cold/warm entry reruns without
 timing resumes. A cold startup long task remains visible, and the full action
 matrix and original comparison remain open; see
-[Temple evidence](../HYRULE_TEMPLE_PORT_NOTES.md).
+[Temple evidence](../content/HYRULE_TEMPLE_PORT_NOTES.md).
 Luigi now passes native source lifecycles in both player orders and all four
 authored costumes. The selected-player fixture observes ground/aerial Fireball
 Articles, special-move entries, pause and repeated teardown. All 30 browser
@@ -75,7 +75,7 @@ action cases pass over 5,200 drawn frames, retaining timing, audio and four
 live-pipeline failures. A reviewed six-descriptor preload update clears both
 5,200-frame cold/warm sweeps with zero hard failures. A fresh pair after the
 shared stage-light lifecycle correction also passes all 10,400 frames with
-zero hard failures; see [Luigi's evidence](../LUIGI_PORT_NOTES.md).
+zero hard failures; see [Luigi's evidence](../content/LUIGI_PORT_NOTES.md).
 Fountain of Dreams now reaches original map, reflection and star construction.
 Its shared changes preserve animated-light storage, exact reflection image
 identity and multiple map objects sharing one camera. Two 7,200-tick native scheduler
@@ -83,7 +83,7 @@ and teardown lifetimes now pass, including moving collision and animated
 lights. Cold/warm browser entry now completes Ready/Go and 30 gameplay frames
 after a reviewed 28-pipeline preload correction. The cold run retains two
 browser long tasks; this is a functional-entry result, not a performance pass. See
-[Fountain's scope](../FOUNTAIN_OF_DREAMS_PORT_NOTES.md).
+[Fountain's scope](../content/FOUNTAIN_OF_DREAMS_PORT_NOTES.md).
 Pikachu and Pichu are now enabled as development candidates, bringing the
 branch to thirteen fighters. Native fixtures pass both player orders and all
 four family costumes, including source jolt/Thunder creation and teardown,
@@ -93,7 +93,7 @@ remain retained. A reviewed preload correction clears all four fresh cold/warm
 sweeps: 22,400 source frames with no hard failures, native target misses or
 heap growth. Shared fixes preserve complete-null effect
 rows and the signed self-damage command. See
-[their measured scope](../PIKACHU_PICHU_PORT_NOTES.md).
+[their measured scope](../content/PIKACHU_PICHU_PORT_NOTES.md).
 Yoshi's Island 64 is the seventh development stage. Its native owner passes two
 5,000-tick source scheduler lifetimes, including cloud collapse/collision
 removal/reappearance, guest selection and teardown. Five Mario/Mario entry,
@@ -103,7 +103,7 @@ resume. Fresh cold/warm entry passes after the preload correction without
 resumes, gaps or audio underruns; one 69 ms cold browser long task remains.
 This is functional entry, not a stage-performance pass.
 The shared material loader now preserves the source base TLUT for
-TIMG-only animation; see [stage evidence](../YOSHIS_ISLAND_64_PORT_NOTES.md).
+TIMG-only animation; see [stage evidence](../content/YOSHIS_ISLAND_64_PORT_NOTES.md).
 Jigglypuff is the fourteenth development fighter. Native checks cover all five
 costume lifetimes, including original hat archives and dynamics, crouch
 animation variation, five aerial jumps and ground/air special states. The
@@ -112,7 +112,7 @@ original browser CSS/SSS route passes 31 action cases in each cold/warm run:
 failures. Shared fixes retain the complete stored dynamics table separately
 from its active body count, the custom-part owner/cache and original crouch
 Wait selection. Earlier loader, blue-hat and input-recipe failures remain
-retained; see [Jigglypuff's measured scope](../JIGGLYPUFF_PORT_NOTES.md).
+retained; see [Jigglypuff's measured scope](../content/JIGGLYPUFF_PORT_NOTES.md).
 The Jigglypuff checkpoint passes both Release builds and the 1,077-test suite
 in 346.034 seconds with 41 explicit skips. Fresh shared headless comparisons
 still match 603 Ganondorf/FD and 240 Mario/FD declared source updates. Its
@@ -133,7 +133,7 @@ shield-drop reducer completes Pass motion 244 on the upper platform for all
 five costumes with pause and repeated teardown. Donkey is re-enabled in public
 character selection. Independent original consumer capture, ceiling lifetimes,
 original comparison and broader acceptance remain open; see
-[Donkey Kong's measured scope](../DONKEY_KONG_PORT_NOTES.md) and
+[Donkey Kong's measured scope](../content/DONKEY_KONG_PORT_NOTES.md) and
 [issue #50](https://github.com/ericvanlare/melee-web/issues/50).
 The Donkey checkpoint passes both Release builds and the full 1,080-test suite
 in 358.963 seconds with 41 explicit skips. Fresh shared headless comparisons
@@ -151,7 +151,7 @@ source visibility cleanup command. Both browser discovery runs finish all
 source frames with zero action-window timing, audio, pipeline or heap-growth
 failures and no entry timing resumes. Independent original Bowser comparison,
 drawn capture interactions and broader acceptance remain open; see
-[Bowser's scope and evidence](../BOWSER_PORT_NOTES.md).
+[Bowser's scope and evidence](../content/BOWSER_PORT_NOTES.md).
 The Bowser checkpoint passes both Release builds and 1,083 tests in 357.995
 seconds with 41 explicit skips. Fresh shared headless comparisons still
 match all 603 Ganondorf/FD and 240 Mario/FD declared source updates. The

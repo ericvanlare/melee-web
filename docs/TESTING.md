@@ -136,7 +136,7 @@ establish retail equivalence, content support or replay success. Older files
 marked `processed_only` can supply scoped post-input and browser-performance
 evidence, but cannot receive raw-controller credit. Follow
 [SLIPPI_REPLAY_VALIDATION.md](SLIPPI_REPLAY_VALIDATION.md) and the measured
-[corpus audit](SLIPPI_CORPUS_AUDIT.md) for the downstream gates.
+[corpus audit](history/SLIPPI_CORPUS_AUDIT.md) for the downstream gates.
 
 This currently has no automated GPU screenshot comparison. The CI workflow
 checks tests and compilation, while the smoke test exercises the real browser.

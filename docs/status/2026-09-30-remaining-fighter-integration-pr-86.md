@@ -2,7 +2,7 @@
 
 Current per-character coverage, original CPU9 references, rendered browser
 match loops, comparison limits, and explicit open gates are recorded in
-[Remaining fighter port notes](../REMAINING_FIGHTERS_PORT_NOTES.md).
+[Remaining fighter port notes](../content/REMAINING_FIGHTERS_PORT_NOTES.md).
 
 Final integration checkpoint (2026-10-01): runtime implementation is `5a9830b`, based on
 `origin/main` `3179aaa`. The copy-dynamics/parameter-endian repair at `3f8657f`,

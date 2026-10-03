@@ -52,7 +52,7 @@ are not admitted. No production deployment was made. Release runtime/native
 builds, the 757-test suite (36 skips) and subsequent focused binding/decoder/report
 checks pass. See [clock replay evidence](../evidence/roy-dr-mario-clock-replay-v1.json),
 [clock format and scope](../RETAIL_DRAW_CLOCK.md), and
-[retained failures](../ROY_DR_MARIO_PORT_NOTES.md).
+[retained failures](../content/ROY_DR_MARIO_PORT_NOTES.md).
 
 **Independent clock validation failed on Doc/Roy at Yoshi’s:** the fresh original
 capture repeats exactly (11,077 updates, 11,067 draws, 58,668 typed semantic

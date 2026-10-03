@@ -18,4 +18,4 @@ unchanged. **Suite**: local 1,129-test run passes with 55 skips (owned fixtures
 for some skipped checks live in other worktrees). Donkey is re-enabled in
 public character selection. The independent original Donkey Pass consumer
 capture remains the open confirmation item; see
-[Donkey Kong's measured scope](../DONKEY_KONG_PORT_NOTES.md).
+[Donkey Kong's measured scope](../content/DONKEY_KONG_PORT_NOTES.md).

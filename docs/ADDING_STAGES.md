@@ -109,7 +109,7 @@ those decoded Articles through `stage_info.itemdata` and `it_804A0F60` before
 the source `on_init`, keep them alive through item teardown, then restore both
 globals. The Yoshi's Story content trace checks that this produces actual
 `It_Kind_Heiho` objects after the source 120-frame timer. Its exact archive
-contract is in [YOSHIS_STORY_PORT_NOTES.md](YOSHIS_STORY_PORT_NOTES.md).
+contract is in [YOSHIS_STORY_PORT_NOTES.md](content/YOSHIS_STORY_PORT_NOTES.md).
 
 Run the focused native/data probes and ask the lead to run the browser and
 central CMake/Ninja targets. Browser SSS selection must use raw PAD input and
