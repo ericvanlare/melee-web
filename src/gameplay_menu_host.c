@@ -210,6 +210,10 @@ static int sync_source_preference_changes(MeleeWebMenuHost* h, char* e, size_t n
         memcpy(h->runtime_preferences.rumble_enabled, current.rumble_enabled,
                sizeof(current.rumble_enabled));
     }
+    if (current.deflicker != h->runtime_preferences.deflicker) {
+        h->persisted_preferences.deflicker = current.deflicker;
+        h->runtime_preferences.deflicker = current.deflicker;
+    }
     if (current.saved_language != h->runtime_preferences.saved_language) {
         h->persisted_preferences.saved_language = current.saved_language;
         h->runtime_preferences.saved_language = current.saved_language;
@@ -1243,6 +1247,7 @@ static int host_leave_source_scene(MeleeWebMenuHost* h, char* e, size_t n)
             melee_web_pad_state_free(next_input);
             return fail(e, n, "Original main exit could not set mode provenance");
         }
+        h->selected_preferences = *gmMainLib_8015CC58();
     } else {
         melee_web_pad_state_free(next_input);
         return fail(e, n, "Source scene is not title or main");

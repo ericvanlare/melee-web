@@ -9,8 +9,11 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {parseMeleeGCI} from '../web/gamecube-save.mjs';
 
-const {values} = parseArgs({options: Object.fromEntries(
-  ['url', 'disc', 'out', 'playwright', 'manifest'].map(name => [name, {type: 'string'}])), strict: true});
+const {values} = parseArgs({options: {
+  ...Object.fromEntries(['url', 'disc', 'out', 'playwright', 'manifest']
+    .map(name => [name, {type: 'string'}])),
+  'stop-after-export': {type: 'boolean', default: false},
+}, strict: true});
 for (const name of ['url', 'disc', 'out'])
   if (!values[name]) throw Error('Use --url ORIGIN --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
 const output = path.resolve(values.out);
@@ -20,7 +23,9 @@ await fs.mkdir(output, {recursive: true});
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const readHash = async file => hash(await fs.readFile(file));
-const report = {schema: 'melee-web-main-settings-display-browser-v1', url: values.url,
+const report = {schema: 'melee-web-main-settings-display-browser-v1',
+  scope: values['stop-after-export'] ? 'display-export-and-teardown-probe' : 'full-display-route',
+  url: values.url,
   disc: path.basename(values.disc), discSha256: await readHash(values.disc),
   reference: {sourceCommit: 'b43912cc78606f96c9569f5d6229bc9d7e265ea5',
     mainDolSha256: 'dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646',
@@ -217,8 +222,11 @@ try {
     await page.waitForTimeout(300);
     await shot('settings-display-selected');
     await press('m');
-    await page.waitForTimeout(700);
-    await shot('display-deflicker-on');
+    // The retail Display root gates input until its initial JObj animation
+    // reaches frame 19. The first capture showed the scene still animating at
+    // 700 ms, so let that source-owned gate settle before sending A.
+    await page.waitForTimeout(1500);
+    await shot('display-deflicker-on-settled');
     await press('m');
     await page.waitForTimeout(300);
     await page.waitForTimeout(400);
@@ -260,27 +268,36 @@ try {
     await driver.waitForPublicCss();
     const css = await readNative();
     assert.deepEqual(css, {message: 'Original character select', phase: 1, running: 1});
-    assert.equal((await storeSummary()).deflicker, 0);
+    report.cssBoundary = {source: await nativeDisplaySnapshot(), personal: await storeSummary()};
+    assert.equal(report.cssBoundary.source.deflicker, 0,
+      'Source SaveData must retain deflicker off after returning to CSS.');
+    assert.equal(report.cssBoundary.personal.deflicker, 0,
+      'Personal progress must retain deflicker off after returning to CSS.');
     await shot('css-returned');
 
     await page.locator('#settings-open').click();
     await page.locator('#settings-dialog[open]').waitFor();
+    report.exportPreflight = {source: await nativeDisplaySnapshot(), personal: await storeSummary()};
     const [download] = await Promise.all([
       page.waitForEvent('download'), page.locator('#export-save').click(),
     ]);
     const exportedPath = path.join(output, 'personal-display-deflicker-off.gci');
     await download.saveAs(exportedPath);
     const exported = parseMeleeGCI(new Uint8Array(await fs.readFile(exportedPath)));
-    assert.equal(exported[0x45D], 0,
-      'The public player exports the source-written Display preference.');
     report.exportSha256 = await readHash(exportedPath);
     report.exportedDeflicker = exported[0x45D];
     report.personalAfterCss = await storeSummary();
+    assert.equal(exported[0x45D], 0,
+      `The public player exports the source-written Display preference; boundary=${JSON.stringify({
+        css: report.cssBoundary, preflight: report.exportPreflight,
+        personalAfterCss: report.personalAfterCss, exported: report.exportedDeflicker})}`);
     await page.locator('#settings-close').click();
     await page.locator('#settings-dialog').waitFor({state: 'hidden'});
   });
 
-  await check('the saved Display preference survives a supported match and Results return to CSS', async () => {
+  if (values['stop-after-export']) {
+    report.result = 'probe-pass';
+  } else await check('the saved Display preference survives a supported match and Results return to CSS', async () => {
     await page.waitForTimeout(1200);
     await press('7');
     await waitForPhase(3);
@@ -355,7 +372,7 @@ try {
   });
 
   assert.deepEqual(errors, [], 'The rendered route must not emit browser errors.');
-  report.result = 'pass';
+  if (report.result !== 'probe-pass') report.result = 'pass';
 } catch (error) {
   report.result = 'fail';
   report.failure = error?.stack || String(error);
@@ -374,6 +391,10 @@ try {
   report.errors = errors;
   if (page && driver && !nativeUnloaded) {
     try {
+      if (await page.locator('#settings-dialog[open]').count()) {
+        await page.locator('#settings-close').click({timeout: 5000});
+        await page.locator('#settings-dialog').waitFor({state: 'hidden', timeout: 5000});
+      }
       if (!nativeUnloadCaptured) {
         await page.evaluate(() => {
           const unload = Module._melee_web_native_menu_unload.bind(Module);
@@ -405,6 +426,7 @@ try {
   await fs.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
 }
 
-if (report.result !== 'pass') throw Error(`Main Settings Display route failed; see ${path.join(output, 'report.json')}`);
-console.log(JSON.stringify({result: report.result, checks: report.checks, display: report.displayState,
-  exportSha256: report.exportSha256, cleanup: report.cleanup}, null, 2));
+if (!['pass', 'probe-pass'].includes(report.result))
+  throw Error(`Main Settings Display route failed; see ${path.join(output, 'report.json')}`);
+console.log(JSON.stringify({result: report.result, scope: report.scope, checks: report.checks,
+  display: report.displayState, exportSha256: report.exportSha256, cleanup: report.cleanup}, null, 2));
