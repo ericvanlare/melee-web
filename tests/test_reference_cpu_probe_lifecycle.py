@@ -178,6 +178,9 @@ struct ProbeHarness {
   u32 cpu_probe_match = 2;
   u32 cpu_probe_first_tick = 100;
   u32 cpu_probe_last_tick = 103;
+  u32 cpu_probe_rng_return_pc = 0;
+  u32 cpu_probe_close_pc = 0;
+  u32 cpu_probe_close_tick = 0;
   size_t cpu_probe_record_count = 0;
   std::unique_ptr<CpuProbeRecord[]> cpu_probe_records =
       std::make_unique<CpuProbeRecord[]>(CPU_PROBE_MAX_RECORDS);
@@ -190,6 +193,9 @@ struct ProbeHarness {
   bool match_active = true;
   bool setup_ready = true;
   u32 match_index = 2;
+  u32 whole_session_matches = 0;
+  u32 whole_phase = 0;
+  bool whole_session_enabled() const { return whole_session_matches != 0; }
   std::string capture_id = "capture";
   std::string sequence_id = "sequence";
 
@@ -208,6 +214,10 @@ static void StoreBE32(Core::System* system, u32 address, u32 value) {
 
 static const ReferenceCapture::CpuProbePoint& ProbePoint() {
   return ReferenceCapture::CPU_PROBE_POINTS[0];
+}
+
+static const ReferenceCapture::CpuProbePoint& RngReturnProbePoint() {
+  return ReferenceCapture::CPU_PROBE_POINTS.back();
 }
 
 static const ReferenceCapture::CpuProbePoint& SamusEffectProbePoint() {
@@ -298,18 +308,58 @@ int main() {
     harness.RecordCpuProbe(&system, ProbePoint().address, ProbePoint(), &state, 100);
     assert(harness.cpu_probe_record_count == 1);
     std::string before_close;
-    harness.CloseCpuProbe();
+    harness.CloseCpuProbe(ProbePoint().address, 100);
     assert(harness.cpu_probe_closed);
     assert(harness.cpu_probe_published.load(std::memory_order_acquire));
     assert(harness.BuildCpuProbeJson(&before_close));
     std::cout << before_close;
     state.gpr[3] = 0;
     harness.RecordCpuProbe(&system, ProbePoint().address, ProbePoint(), &state, 101);
-    harness.CloseCpuProbe();
+    harness.CloseCpuProbe(ProbePoint().address, 101);
     std::string after_close;
     assert(harness.BuildCpuProbeJson(&after_close));
     assert(before_close == after_close);
     assert(harness.cpu_probe_record_count == 1);
+  }
+
+  // The optional RNG selector ignores unrelated PCs and admits only its pinned
+  // return site within the selected whole-session VS construction/match window.
+  {
+    Core::System system;
+    PowerPC::PowerPCState state;
+    ProbeHarness rng_probe;
+    Prepare(&rng_probe, &system, &state);
+    const auto& point = RngReturnProbePoint();
+    assert(point.address == 0x80380524 && point.expected_word == 0x4e800020);
+    StoreBE32(&system, point.address, point.expected_word);
+    rng_probe.cpu_probe_rng_return_pc = point.address;
+    rng_probe.whole_session_matches = 3;
+    rng_probe.match_active = false;
+    rng_probe.setup_ready = false;
+    rng_probe.match_index = rng_probe.cpu_probe_match;
+    rng_probe.whole_phase = 3;
+    rng_probe.RecordCpuProbe(&system, point.address, point, &state, 100);
+    assert(rng_probe.cpu_probe_record_count == 0);
+    assert(!rng_probe.cpu_probe_closed);
+
+    rng_probe.RecordCpuProbe(&system, ProbePoint().address, ProbePoint(), &state, 104);
+    assert(!rng_probe.cpu_probe_closed);
+    rng_probe.whole_phase = 4;
+    rng_probe.RecordCpuProbe(&system, point.address, point, &state, 100);
+    assert(rng_probe.cpu_probe_record_count == 1);
+    rng_probe.whole_phase = 5;
+    rng_probe.match_active = true;
+    rng_probe.RecordCpuProbe(&system, point.address, point, &state, 101);
+    assert(rng_probe.cpu_probe_record_count == 2);
+    rng_probe.RecordCpuProbe(&system, point.address, point, &state, 104);
+    assert(rng_probe.cpu_probe_closed);
+    assert(rng_probe.cpu_probe_close_pc == point.address);
+    assert(rng_probe.cpu_probe_close_tick == 104);
+    std::string json;
+    assert(rng_probe.BuildCpuProbeJson(&json));
+    assert(json.find("\"version\":3") != std::string::npos);
+    assert(json.find("\"rng_return_pc\":\"0x80380524\"") != std::string::npos);
+    assert(json.find("\"label\":\"rand_return\"") != std::string::npos);
   }
 
   // Verified instruction mismatch and all guest ranges outside MEM1 fail the
@@ -396,7 +446,7 @@ int main() {
     assert(record.effect_literal_palette_readable);
     assert(record.effect_literal_palette[0] == 0x6b && record.effect_literal_palette[511] == 0x6b);
     std::string json;
-    effect_probe.CloseCpuProbe();
+    effect_probe.CloseCpuProbe(SamusEffectProbePoint().address, 100);
     assert(effect_probe.BuildCpuProbeJson(&json));
     assert(json.find("\"samus_effect_group\"") != std::string::npos);
     assert(json.find("\"palette_address\":\"0x00aa812a\",\"palette_readable\":true") !=
@@ -499,7 +549,7 @@ int main() {
     assert(consumed.samus_effect_gx_tlut_call);
     assert(consumed.samus_effect_gx_tlut_address == 0x01d3ac8a);
 
-    effect_probe.CloseCpuProbe();
+    effect_probe.CloseCpuProbe(SamusEffectProbePoint().address, 100);
     std::string json;
     assert(effect_probe.BuildCpuProbeJson(&json));
     assert(json.find("\"samus_effect_loaded_group\":{\"bank\":34") !=

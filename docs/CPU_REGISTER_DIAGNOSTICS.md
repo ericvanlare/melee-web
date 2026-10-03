@@ -100,3 +100,49 @@ backchains remain diagnostic errors.
 host/Wasm addresses diagnose the allocation difference. They are not substituted
 for the original pointers, and the ordinary semantic CPU observer remains
 unchanged.
+
+## Bounded retail/port RNG draw tracing
+
+For a fixed recorded-session divergence, the whole-session browser runner can
+retain the exact post-update seeds and call kinds for at most nine selected
+source cursors. Select either an inclusive short range or an ascending cursor
+list:
+
+```sh
+node scripts/capture_whole_session_browser.mjs \
+  --url http://127.0.0.1:PORT/runtime.html --disc "$OWNED_DISC" \
+  --recipe "$RECORDED_SESSION.mwrc" --manifest "$RECORDED_SESSION.json" \
+  --runtime-data build/browser-release/gameplay_menu_browser.data \
+  --out /Volumes/AgentStorage/melee-web/runs/SESSION/rng-port \
+  --rng-draw-probe-cursors 7777,7778,7779
+```
+
+The trace is `rng-draw-probe.jsonl`, hash-bound in `report.json`. Each row gives
+the replay cursor, overflow status, and ordered `HSD_Rand`/`HSD_Randf`
+post-update seeds. An overflow, malformed row, duplicate/unselected cursor, or
+an omitted cursor reached by the run fails the capture report. Deliberately
+stopped prefixes identify selected cursors beyond the stop as missing. This
+observer does not alter the recurrence, consume additional random numbers, or
+establish source-call identity.
+
+The retail capture app can independently select one return site and at most 64
+source ticks while replaying the exact finalized input bundle. Its companion
+probe is checked against the request, pinned GALE01r2 instruction, DOL/capture/
+sequence identities, and a source-tick close after the window:
+
+```sh
+python3 scripts/reference_capture_app.py \
+  --root /Volumes/AgentStorage/melee-web/runs/SESSION/reference \
+  --replay-bundle "$FINALIZED_INPUT_BUNDLE" \
+  --cpu-rng-probe 0:6491:6497:randf_return
+```
+
+The match index is zero based. The return-site selector is restricted to
+`rand_return` and `randf_return`; the observer may include the selected call
+during the VS fighter-construction phase before normal match setup, while
+excluding unrelated menu calls. The validated sidecar and validation receipt
+are retained inside the hash-manifested capture bundle. `--root` changes only
+the destination for new captures and logs; omitting it keeps the configured
+support-root behavior. These paired traces narrow RNG consumption boundaries;
+they do not establish pixel, PCM, live-input, performance, or full gameplay
+equivalence.

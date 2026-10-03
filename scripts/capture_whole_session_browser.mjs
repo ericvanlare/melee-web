@@ -15,6 +15,7 @@ import {parseArgs} from 'node:util';
 import {loadBrowserTools, browserLaunchOptions} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {finalizeSessionCapture, validateRuntimeDataAbort} from './whole_session_capture_result.mjs';
+import {parseRngDrawProbe, validateRngDrawProbeRows} from './rng_draw_probe.mjs';
 
 const {values} = parseArgs({options: {
   url: {type: 'string'},
@@ -31,6 +32,8 @@ const {values} = parseArgs({options: {
   'stop-after-source-frames': {type: 'string'},
   'resume-timing-pauses': {type: 'boolean', default: false},
   'cpu-observations': {type: 'boolean', default: false},
+  'rng-draw-probe-range': {type: 'string'},
+  'rng-draw-probe-cursors': {type: 'string'},
 }});
 
 function integer(name, minimum, maximum) {
@@ -53,6 +56,8 @@ const replayPollMs = values['replay-poll-ms'] === undefined
 const stopAfter = values['stop-after-source-frames'] ? integer('stop-after-source-frames',1,108000) : null;
 const resumeTimingPauses = values['resume-timing-pauses'];
 const captureCpuObservations = values['cpu-observations'];
+const rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
+  cursors: values['rng-draw-probe-cursors']});
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
 const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data']]
@@ -72,6 +77,8 @@ const report = {
   resume_timing_pauses: resumeTimingPauses,
   timing_pause_resumes: [],
   cpu_observations: captureCpuObservations ? 'second_match_only' : 'not_captured',
+  rng_draw_probe: rngDrawProbe ? {request: rngDrawProbe.request,
+    selected_cursors: rngDrawProbe.selected, complete: false} : 'not_captured',
   verified_runtime_data_aborts: [],
   phases: [],
   snapshots: [],
@@ -240,6 +247,8 @@ try {
   if (![8, 9].includes(report.recipe_header.version) ||
       report.recipe_header.frames < 1 || report.recipe_header.frames > 108000)
     throw Error('Whole-session replay requires a valid MWRC v8/v9 frame count');
+  if (rngDrawProbe && rngDrawProbe.selected.some(cursor => cursor >= report.recipe_header.frames))
+    throw Error('RNG draw probe cursor must be inside the source recipe frame count');
   if (captureCpuObservations && report.recipe_header.version !== 9)
     throw Error('--cpu-observations is restricted to MWRC v9 second-match diagnostics');
   const cpuObservationRowLimit = report.recipe_header.frames;
@@ -250,13 +259,20 @@ try {
   browser = await chromium.launch({...browserLaunchOptions(launchOptions, {timeout: phaseTimeoutMs}), headless: true});
   report.browser.version = browser.version();
   page = await browser.newPage({viewport: {width: 900, height: 700}, deviceScaleFactor: 1});
-  await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations}) => {
+  await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations,
+    rngDrawProbeSelection}) => {
     window.__meleeNativeRuntimeReady = false;
     const module = globalThis.Module || {};
     module.onRuntimeInitialized = () => { window.__meleeNativeRuntimeReady = true; };
     globalThis.Module = module;
     window.__cpuPrefixRows = [];
     window.__cpuItemEventRows = [];
+    window.__rngDrawProbeRows = [];
+    window.__rngDrawProbeSelection = rngDrawProbeSelection;
+    window.__meleeRngDrawProbeCursors = rngDrawProbeSelection?.request.kind === 'cursors'
+      ? rngDrawProbeSelection.selected : null;
+    window.__meleeRngDrawProbeRange = rngDrawProbeSelection?.request.kind === 'range'
+      ? [rngDrawProbeSelection.request.first, rngDrawProbeSelection.request.last] : null;
     window.__meleeCaptureWholeSessionCpuObservation = captureCpuObservations;
     window.__meleeSourceOwnerTrace = [];
     window.__meleeSourceAllocationTrace = [];
@@ -269,7 +285,21 @@ try {
       if (window.__cpuItemEventRows.length >= 512) throw Error('CPU item event diagnostic exceeded bound');
       window.__cpuItemEventRows.push(text);
     };
-  }, {cpuObservationRowLimit, captureCpuObservations});
+    window.meleeRngDrawObservation = text => {
+      const selection = window.__rngDrawProbeSelection;
+      if (!selection) throw Error('Unexpected RNG draw observation without a selected probe');
+      if (window.__rngDrawProbeRows.length >= selection.selected.length)
+        throw Error('RNG draw probe exceeded its selected-cursor bound');
+      const row = JSON.parse(text);
+      if (!selection.selected.includes(row.source_cursor))
+        throw Error('RNG draw probe emitted an unselected source cursor');
+      if (window.__rngDrawProbeRows.some(existing =>
+          JSON.parse(existing).source_cursor === row.source_cursor))
+        throw Error('RNG draw probe emitted a duplicate source cursor');
+      window.__rngDrawProbeRows.push(text);
+    };
+  }, {cpuObservationRowLimit, captureCpuObservations,
+    rngDrawProbeSelection: rngDrawProbe});
   page.setDefaultTimeout(phaseTimeoutMs);
   page.setDefaultNavigationTimeout(phaseTimeoutMs);
   page.on('pageerror', error => { const row = {kind: 'pageerror', message: error.stack || error.message}; pageErrors.push(row); firstError(row.kind, row.message); });
@@ -446,6 +476,26 @@ try {
     } catch (error) { report.download_error = String(error?.message || error); }
     try { const rows = await page.evaluate(() => window.__cpuPrefixRows || []); if(rows.length) await write('cpu-prefix.jsonl',rows.join('\n')+'\n'); } catch(error) { report.cpu_download_error = String(error); }
     try { const rows = await page.evaluate(() => window.__cpuItemEventRows || []); await write('cpu-item-events.jsonl',rows.length ? rows.join('\n')+'\n' : ''); report.cpu_item_event_count = rows.length; } catch(error) { report.cpu_item_event_error = String(error); }
+    if (rngDrawProbe) {
+      try {
+        const rows = await page.evaluate(() => window.__rngDrawProbeRows || []);
+        const validation = validateRngDrawProbeRows(rows, rngDrawProbe, {
+          observedCursor: report.final_snapshot?.source_cursor,
+          deliberateStop: report.deliberate_prefix_stop,
+        });
+        const text = validation.rows.length ? validation.rows.join('\n') + '\n' : '';
+        await write('rng-draw-probe.jsonl', text);
+        const artifact = {name: 'rng-draw-probe.jsonl', bytes: Buffer.byteLength(text),
+          sha256: createHash('sha256').update(text).digest('hex')};
+        report.saved_downloads ||= [];
+        report.saved_downloads.push(artifact);
+        report.rng_draw_probe = {...report.rng_draw_probe, complete: validation.complete,
+          captured_cursors: validation.rows.length ? validation.rows.map(row => JSON.parse(row).source_cursor) : [],
+          missing_cursors: validation.missing_cursors, artifact};
+      } catch (error) {
+        report.rng_draw_probe_error = String(error?.message || error);
+      }
+    }
     try { await write('source-owner-trace.json', await page.evaluate(() => window.__meleeSourceOwnerTrace || [])); } catch(error) { report.owner_trace_error = String(error); }
     try { await write('source-main-allocation-trace.json', {total: await page.evaluate(() => window.__meleeSourceAllocationTraceTotal || 0), events: await page.evaluate(() => window.__meleeSourceAllocationTrace || [])}); } catch(error) { report.source_allocation_trace_error = String(error); }
     try { await write('page.txt', await page.locator('body').innerText()); } catch (error) { report.page_dump_error = String(error); }

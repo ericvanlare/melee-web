@@ -11,6 +11,7 @@ from itertools import chain
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import signal
 import subprocess
@@ -107,6 +108,86 @@ def validate_observer_status(status, previous=None):
     return status
 
 
+def parse_cpu_rng_probe(spec):
+    """Validate a bounded HSD RNG return-site probe for an exact replay."""
+    if spec is None:
+        return None
+    if not isinstance(spec, str):
+        raise EnvironmentError("CPU RNG probe must be MATCH:FIRST_TICK:LAST_TICK:SITE")
+    parts = spec.split(":")
+    if len(parts) != 4 or any(re.fullmatch(r"[0-9]+", value) is None for value in parts[:3]):
+        raise EnvironmentError("CPU RNG probe must be MATCH:FIRST_TICK:LAST_TICK:SITE")
+    match, first_tick, last_tick = map(int, parts[:3])
+    site = parts[3]
+    if match > 63 or first_tick > 0xffffffff or last_tick > 0xffffffff:
+        raise EnvironmentError("CPU RNG probe match/ticks exceed their unsigned bounds")
+    if first_tick > last_tick or last_tick - first_tick >= 64:
+        raise EnvironmentError("CPU RNG probe window must contain at most 64 source ticks")
+    if site not in ("rand_return", "randf_return"):
+        raise EnvironmentError("CPU RNG probe site must be rand_return or randf_return")
+    return {"match": match, "first_tick": first_tick, "last_tick": last_tick,
+            "site": site}
+
+
+def cpu_rng_probe_environment(request, output_path):
+    if request is None:
+        return {}
+    return {"MWRC_CPU_PROBE_OUTPUT": str(output_path),
+            "MWRC_CPU_PROBE_MATCH": str(request["match"]),
+            "MWRC_CPU_PROBE_FIRST_TICK": str(request["first_tick"]),
+            "MWRC_CPU_PROBE_LAST_TICK": str(request["last_tick"]),
+            "MWRC_CPU_PROBE_RNG_RETURN_SITE": request["site"]}
+
+
+def validate_cpu_rng_probe(path, request, capture_id, sequence_id, dol_sha256, status):
+    """Verify the selected RNG probe closed on the configured site and identity."""
+    try:
+        probe = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise EnvironmentError("CPU RNG probe sidecar is missing or invalid JSON") from error
+    expected_pc = {"rand_return": "0x80380524", "randf_return": "0x8038057c"}[request["site"]]
+    records = probe.get("records") if isinstance(probe, dict) else None
+    if (not isinstance(records, list) or not records or
+            probe.get("schema") != "melee-web-cpu-register-probe" or
+            probe.get("version") != 3 or probe.get("diagnostic_only") is not True or
+            probe.get("window_complete") is not True or
+            probe.get("source_revision") != "GALE01r2" or
+            probe.get("dol_sha256") != dol_sha256 or
+            probe.get("capture_id") != capture_id or
+            probe.get("sequence_id") != sequence_id or
+            probe.get("match") != request["match"] or
+            probe.get("first_tick") != request["first_tick"] or
+            probe.get("last_tick") != request["last_tick"] or
+            probe.get("rng_return_pc") != expected_pc or
+            probe.get("record_count") != len(records)):
+        raise EnvironmentError("CPU RNG probe sidecar identity or bounded window is invalid")
+    for record in records:
+        if (not isinstance(record, dict) or record.get("pc") != expected_pc or
+                record.get("label") != request["site"] or
+                record.get("match") != request["match"] or
+                isinstance(record.get("source_tick"), bool) or
+                not isinstance(record.get("source_tick"), int) or
+                not request["first_tick"] <= record["source_tick"] <= request["last_tick"]):
+            raise EnvironmentError("CPU RNG probe contains a record outside the selected return site/window")
+    close = status.get("cpu_probe_close") if isinstance(status, dict) else None
+    if (not isinstance(close, dict) or close.get("reason") != "source_tick_after_window" or
+            close.get("rng_return_pc") != expected_pc or
+            close.get("configured_match") != request["match"] or
+            close.get("first_tick") != request["first_tick"] or
+            close.get("last_tick") != request["last_tick"] or
+            isinstance(close.get("source_tick"), bool) or
+            not isinstance(close.get("source_tick"), int) or
+            close["source_tick"] <= request["last_tick"]):
+        raise EnvironmentError("CPU RNG probe did not publish a matching bounded close record")
+    digest = sha256(path)
+    return {"schema": "melee-web-cpu-rng-probe-validation-v1", "valid": True,
+            "capture_id": capture_id, "sequence_id": sequence_id,
+            "dol_sha256": dol_sha256, "output_sha256": digest,
+            "rng_return_pc": expected_pc, "record_count": len(records),
+            "window": {"match": request["match"], "first_tick": request["first_tick"],
+                       "last_tick": request["last_tick"]}}
+
+
 def validate_observer_handshake(records, identity):
     """Bind the first decoded observer record to the verified environment."""
     try:
@@ -152,11 +233,13 @@ class CaptureCancelled(Exception):
 
 
 class Supervisor:
-    def __init__(self, settings_path, *, root=None, emit=None, automated=False):
+    def __init__(self, settings_path, *, root=None, emit=None, automated=False,
+                 cpu_rng_probe=None):
         self.root = root or support_root()
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.settings_path = settings_path
         self.automated = automated
+        self.cpu_rng_probe = parse_cpu_rng_probe(cpu_rng_probe)
         self.replay_source = None
         self.emit_callback = emit or (lambda row: print(json.dumps(row), flush=True))
         self.output_lock = threading.Lock()
@@ -286,6 +369,8 @@ class Supervisor:
         sequence_id = uuid.uuid4().hex
         input_source = ("dolphin_input_replay" if self.replay_source else
                         "automated_human_pipe" if self.automated else "physical_controller")
+        if self.cpu_rng_probe and self.replay_source is None:
+            raise EnvironmentError("CPU RNG probes require an exact recorded-bundle replay")
         replay_binding = self.replay_source["manifest_sha256"] if self.replay_source else None
         # Preflight still binds the current managed profile for drift checks.
         # The recording binds the configuration actually restored for replay.
@@ -295,12 +380,15 @@ class Supervisor:
                 name: hashlib.sha256(data).hexdigest()
                 for name, data in self.replay_source["profile"].items()
             }
+        bundle_metadata = {"environment": capture_identity,
+                           "input_source": input_source,
+                           "replay_source_manifest_sha256": replay_binding,
+                           "private_settings_sha256": settings_hash,
+                           "tooling_sha256": tooling_before}
+        if self.cpu_rng_probe:
+            bundle_metadata["cpu_rng_probe"] = self.cpu_rng_probe
         bundle = ReferenceSessionBundle.begin(self.root / "Captures", identifier, "GALE01r2",
-            uuid.uuid4().hex, metadata={"environment": capture_identity,
-                                      "input_source": input_source,
-                                      "replay_source_manifest_sha256": replay_binding,
-                                      "private_settings_sha256": settings_hash,
-                                      "tooling_sha256": tooling_before}, sequence_start=0)
+            uuid.uuid4().hex, metadata=bundle_metadata, sequence_start=0)
         log = None
         user = None
         try:
@@ -330,6 +418,9 @@ class Supervisor:
                                MWRC_OBSERVER_ID=self.settings["observer_identity"],
                                MWRC_CAPTURE_ID=identifier, MWRC_SEQUENCE_ID=sequence_id,
                                LANG="en_US.UTF-8", LC_ALL="en_US.UTF-8")
+            if self.cpu_rng_probe:
+                environment.update(cpu_rng_probe_environment(
+                    self.cpu_rng_probe, bundle.path / "cpu-register-probe.json"))
             if self.replay_source:
                 environment["MWRC_INPUT_REPLAY"] = str(self.replay_source["input_path"])
                 write_json(bundle.path / "input-source.json", {
@@ -381,6 +472,12 @@ class Supervisor:
             validate_observer_status(final_observer_status, last_observer_status)
             if final_observer_status.get("error") or final_observer_status.get("invalid"):
                 raise EnvironmentError("Observer failure: " + str(final_observer_status.get("error", "invalid stream")))
+            if self.cpu_rng_probe:
+                validation = validate_cpu_rng_probe(
+                    bundle.path / "cpu-register-probe.json", self.cpu_rng_probe,
+                    identifier, sequence_id, self.identity["disc"]["dol_sha256"],
+                    final_observer_status)
+                write_json(bundle.path / "cpu-rng-probe-validation.json", validation)
             completed = completed or final_observer_status.get("completed", False)
             if completed and not terminated_by_supervisor and self.process.returncode != 0:
                 raise EnvironmentError("Dolphin crashed after reporting the original teardown")
@@ -624,10 +721,21 @@ def main():
     parser.add_argument("--automated", action="store_true",
                         help="Developer validation only: ordinary human port 1 Pipe inputs")
     parser.add_argument("--replay-bundle", type=Path, help="Replay one finalized original input recording, then exit")
+    parser.add_argument("--cpu-rng-probe", metavar="MATCH:FIRST_TICK:LAST_TICK:SITE",
+        help="Record one bounded rand_return or randf_return window during --replay-bundle")
+    parser.add_argument("--root", type=Path,
+        help="Store captures and logs under this explicit directory instead of the support root")
     parser.add_argument("--settings", type=Path,
         default=Path(os.environ.get("WEBMELEE_REFERENCE_CAPTURE_SETTINGS", support_root() / "environment.json")))
     args = parser.parse_args()
-    app = Supervisor(args.settings, automated=args.automated)
+    try:
+        probe_request = parse_cpu_rng_probe(args.cpu_rng_probe)
+    except EnvironmentError as error:
+        parser.error(str(error))
+    if probe_request and not args.replay_bundle:
+        parser.error("--cpu-rng-probe requires --replay-bundle")
+    app = Supervisor(args.settings, root=args.root, automated=args.automated,
+                     cpu_rng_probe=args.cpu_rng_probe)
     def interrupted(_signal, _frame):
         app.stop_requested.set()
         raise SystemExit(128 + _signal)
