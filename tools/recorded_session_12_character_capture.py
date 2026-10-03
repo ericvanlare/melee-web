@@ -1170,6 +1170,17 @@ def main() -> int:
                 _consume_row(row, latest, report)
                 if row.get("event") == "end":
                     observer.require_completed_status()
+                    if args.team_route:
+                        # The final return_css boundary and the observer end
+                        # record can arrive before the driver has appended its
+                        # retained-CSS receipt. Let that bounded bookkeeping
+                        # finish before validating the terminal arrays.
+                        thread.join(30)
+                        if thread.is_alive():
+                            raise CaptureFailure(
+                                "ordinary-input driver did not finish after the source end record")
+                        if latest.get("driver_error"):
+                            raise CaptureFailure(latest["driver_error"])
                     status_data = json.loads(status.read_text(encoding="utf-8"))
                     input_data = json.loads(input_status.read_text(encoding="utf-8"))
                     if (not input_data.get("complete") or input_data.get("invalid") or
