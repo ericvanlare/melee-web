@@ -4362,7 +4362,7 @@ index 592b8ab..ad068b0 100644
    g_instance = {};
    cache_shutdown();
 diff --git a/lib/window.cpp b/lib/window.cpp
-index 2a4aadf..540854e 100644
+index 2a4aadf..58ac741 100644
 --- a/lib/window.cpp
 +++ b/lib/window.cpp
 @@ -33,7 +33,9 @@ extern "C" void Android_UnlockActivityMutex(void);
@@ -4375,6 +4375,39 @@ index 2a4aadf..540854e 100644
  #include "time_internal.hpp"
  #include "dolphin/vi/vi_internal.hpp"
  
+@@ -317,9 +319,19 @@ const AuroraEvent* poll_events() {
+ }
+ 
+ bool create_window(AuroraBackend backend) {
++#if defined(__EMSCRIPTEN__)
++  // Browser CSS owns presentation scaling; keep the configured logical size
++  // as the WebGPU pixel size instead of multiplying it by device DPR.
++  SDL_WindowFlags flags = SDL_WINDOW_HIDDEN;
++#else
+   SDL_WindowFlags flags = SDL_WINDOW_HIGH_PIXEL_DENSITY;
++#endif
+ #if TARGET_OS_IOS || TARGET_OS_TV
+   flags |= SDL_WINDOW_FULLSCREEN;
++#elif defined(__EMSCRIPTEN__)
++  if (g_config.startFullscreen) {
++    flags |= SDL_WINDOW_FULLSCREEN;
++  }
+ #else
+   flags |= SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE;
+   if (g_config.startFullscreen) {
+@@ -366,6 +378,12 @@ bool create_window(AuroraBackend backend) {
+     Log.error("Failed to create window: {}", SDL_GetError());
+     return false;
+   }
++#if defined(__EMSCRIPTEN__)
++  // SDL's browser backend may discover the host CSS box during creation;
++  // reset the backing canvas to the configured source size and keep it
++  // independent of later CSS/viewport resize callbacks.
++  TRY(SDL_SetWindowSize(g_window, width, height), "Failed to set browser window size: {}", SDL_GetError());
++#endif
+   SDL_SetWindowMinimumSize(g_window, 640, 480);
+   set_window_icon();
+   return true;
 diff --git a/tests/pipeline_prepare_state_test.cpp b/tests/pipeline_prepare_state_test.cpp
 new file mode 100644
 index 0000000..17fb09e
