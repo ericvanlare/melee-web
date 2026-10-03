@@ -1,0 +1,117 @@
+diff --git a/Source/Core/Core/Slippi/SlippiNetplay.cpp b/Source/Core/Core/Slippi/SlippiNetplay.cpp
+--- a/Source/Core/Core/Slippi/SlippiNetplay.cpp
++++ b/Source/Core/Core/Slippi/SlippiNetplay.cpp
+@@ -1471,6 +1471,34 @@
+                                   {"history_last_frame", history_last}},
+                                   SlippiRollbackDiagnostic::ObserverContext::TRANSPORT);
+     return;
++  }
++
++  std::unique_ptr<sf::Packet> duplicate_packet;
++  if (m_rollback_diagnostic.IsDuplicateFrame(frame))
++  {
++    const auto role = m_rollback_diagnostic.InputProfileRole();
++    if (!role || *role != 2)
++      m_rollback_diagnostic.Fail("duplicate transport action requires role-2 input profile");
++    if (!m_rollback_diagnostic.ConsumeTransportFrame(frame))
++      m_rollback_diagnostic.Fail("duplicate transport frame was consumed more than once");
++
++    duplicate_packet = std::make_unique<sf::Packet>();
++    duplicate_packet->append(spac->getData(), spac->getDataSize());
++    const std::string payload_hash = PacketHash(*spac);
++    const std::string duplicate_payload_hash = PacketHash(*duplicate_packet);
++    if (duplicate_payload_hash != payload_hash)
++      m_rollback_diagnostic.Fail("duplicate transport packet changed its payload");
++    m_rollback_diagnostic.Record({{"event", "pad_transport"},
++                                  {"action", "duplicate"},
++                                  {"packet_frame", frame},
++                                  {"role", *role},
++                                  {"payload_hash", payload_hash},
++                                  {"duplicate_payload_hash", duplicate_payload_hash},
++                                  {"duplicate_count", 1},
++                                  {"history_count", history_count},
++                                  {"history_first_frame", history_first},
++                                  {"history_last_frame", history_last}},
++                                  SlippiRollbackDiagnostic::ObserverContext::TRANSPORT);
+   }
+ 
+   if (!m_diagnostic_held_pad_packets.empty() && frame >= m_rollback_diagnostic.ReleaseFrame())
+@@ -1503,6 +1531,8 @@
+   }
+ 
+   SendAsync(std::move(spac));
++  if (duplicate_packet)
++    SendAsync(std::move(duplicate_packet));
+   u64 time = Common::Timer::NowUs();
+ 
+   has_game_started = true;
+diff --git a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
+--- a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
++++ b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
+@@ -217,9 +217,18 @@
+       Fatal("transport hold release is outside its bounded range");
+     }
+   }
++  else if (action == "duplicate")
++  {
++    config.transport_action = SlippiRollbackDiagnostic::TransportAction::DUPLICATE;
++    if (Member(transport, "frame").is_null() || !Member(transport, "release_frame").is_null())
++      Fatal("transport duplicate requires a frame and null release_frame");
++    config.transport_frame = ReadFrame(transport, "frame");
++    if (!config.input_profile || config.input_profile->role != 2)
++      Fatal("transport duplicate requires the role-2 input profile");
++  }
+   else
+   {
+-    Fatal("transport.action must be none, drop, or hold");
++    Fatal("transport.action must be none, drop, hold, or duplicate");
+   }
+ 
+   if (!config.enabled &&
+@@ -326,7 +335,8 @@
+ 
+ bool SlippiRollbackDiagnostic::IsTransportFrame(s32 packet_frame) const
+ {
+-  return IsHoldFrame(packet_frame) || IsDropFrame(packet_frame);
++  return IsHoldFrame(packet_frame) || IsDropFrame(packet_frame) ||
++         IsDuplicateFrame(packet_frame);
+ }
+ 
+ bool SlippiRollbackDiagnostic::IsHoldFrame(s32 packet_frame) const
+@@ -344,9 +354,16 @@
+          packet_frame == *m_config.transport_frame;
+ }
+ 
++bool SlippiRollbackDiagnostic::IsDuplicateFrame(s32 packet_frame) const
++{
++  return Enabled() && !m_transport_used && m_config.transport_frame &&
++         m_config.transport_action == TransportAction::DUPLICATE &&
++         packet_frame == *m_config.transport_frame;
++}
++
+ bool SlippiRollbackDiagnostic::ConsumeTransportFrame(s32 packet_frame)
+ {
+-  if (!IsDropFrame(packet_frame))
++  if (!IsDropFrame(packet_frame) && !IsDuplicateFrame(packet_frame))
+     return false;
+   m_transport_used = true;
+   return true;
+diff --git a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
+--- a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
++++ b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
+@@ -28,6 +28,7 @@
+     NONE,
+     DROP,
+     HOLD,
++    DUPLICATE,
+   };
+ 
+   struct Config
+@@ -65,6 +66,7 @@
+   bool IsTransportFrame(s32 packet_frame) const;
+   bool IsHoldFrame(s32 packet_frame) const;
+   bool IsDropFrame(s32 packet_frame) const;
++  bool IsDuplicateFrame(s32 packet_frame) const;
+   bool ConsumeTransportFrame(s32 packet_frame);
+   s32 ReleaseFrame() const;
+ 

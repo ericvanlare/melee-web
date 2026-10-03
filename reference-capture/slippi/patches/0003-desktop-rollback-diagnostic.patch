@@ -1,0 +1,1089 @@
+diff --git a/Source/Core/Core/CMakeLists.txt b/Source/Core/Core/CMakeLists.txt
+index 829688e00b..58f90b6498 100644
+--- a/Source/Core/Core/CMakeLists.txt
++++ b/Source/Core/Core/CMakeLists.txt
+@@ -570,6 +570,8 @@ add_library(core
+   Slippi/SlippiPlayback.h
+   Slippi/SlippiReplayComm.cpp
+   Slippi/SlippiReplayComm.h
++  Slippi/SlippiRollbackDiagnostic.cpp
++  Slippi/SlippiRollbackDiagnostic.h
+   Slippi/SlippiSavestate.cpp
+   Slippi/SlippiSavestate.h
+   Slippi/SlippiSpectate.cpp
+diff --git a/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.cpp b/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.cpp
+index 8e6e884957..f391377fe0 100644
+--- a/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.cpp
++++ b/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.cpp
+@@ -5,6 +5,7 @@
+ #include <algorithm>
+ #include <cstdlib>
+ #include <fstream>
++#include <limits>
+ #include <semver/include/semver200.h>
+ #include <utility>  // std::move
+ 
+@@ -64,6 +65,134 @@ namespace ExpansionInterface
+ {
+ namespace
+ {
++// These offsets mirror Online/Online.s in the pinned slippi-ssbm-asm source.
++// They are read-only diagnostic fields; the diagnostic never writes ODB/RXB.
++constexpr u32 ODB_FRAME = 3;
++constexpr u32 ODB_DELAY_FRAMES = 33;
++constexpr u32 ODB_TXB_ADDR = 215;
++constexpr u32 ODB_RXB_ADDR = 219;
++constexpr u32 ODB_ROLLBACK_IS_ACTIVE = 223;
++constexpr u32 ODB_ROLLBACK_SHOULD_LOAD_STATE = 224;
++constexpr u32 ODB_ROLLBACK_END_FRAME = 225;
++constexpr u32 ODB_SAVESTATE_IS_PREDICTING = 908;
++constexpr u32 ODB_SAVESTATE_FRAME = 909;
++constexpr u32 ODB_STABLE_ROLLBACK_IS_ACTIVE = 2751;
++constexpr u32 ODB_STABLE_ROLLBACK_END_FRAME = 2752;
++constexpr u32 ODB_STABLE_ROLLBACK_SHOULD_LOAD_STATE = 2756;
++constexpr u32 ODB_STABLE_SAVESTATE_FRAME = 2757;
++constexpr u32 ODB_STABLE_FINALIZED_FRAME = 2761;
++constexpr u32 ODB_FINALIZED_FRAME = 2778;
++constexpr u32 RXB_OPNT_FRAME_NUMS = 26;
++constexpr u32 RXB_SMALLEST_LATEST_FRAME = 38;
++
++// Exact sizes expanded from the pinned .deps/slippi-ssbm-asm/Online/Online.s at
++// commit fcf47f10dc244152c2ebaa3a9dec142ea42243b7: PAD/input counts at lines 40-56,
++// SSCB_SIZE at lines 147-169, sound storage at lines 174-200, desync storage at lines
++// 214-228, ODB_SIZE at lines 233-285, and RXB_SIZE at lines 295-302.
++// These values are version-bound: a different preservation layout fails below.
++constexpr u32 ASM_ODB_SIZE = 3311;
++constexpr u32 ASM_RXB_SIZE = 297;
++constexpr u32 ASM_SSCB_SIZE = 158;
++
++// CMD_INITIAL_RNG is Recording/Recording.s:19 (0x3A). Its 12-byte payload is
++// authored by Recording/Recording.s:36 and Recording/SendFrameStart.s:52-63.
++constexpr u32 GAME_FRAME_START_PAYLOAD_LENGTH = 12;
++
++struct DiagnosticPreservation
++{
++  u32 odb_address{};
++  u32 odb_size{};
++  u32 rxb_address{};
++  u32 rxb_size{};
++  u32 sscb_address{};
++  u32 sscb_size{};
++};
++
++u32 DiagnosticWord(const u8* payload, u32 offset)
++{
++  return Common::swap32(&payload[offset]);
++}
++
++DiagnosticPreservation ReadDiagnosticPreservation(SlippiRollbackDiagnostic& diagnostic,
++                                                  const u8* payload)
++{
++  DiagnosticPreservation values{DiagnosticWord(payload, 4), DiagnosticWord(payload, 8),
++                                DiagnosticWord(payload, 12), DiagnosticWord(payload, 16),
++                                DiagnosticWord(payload, 20), DiagnosticWord(payload, 24)};
++  if (DiagnosticWord(payload, 28) != 0 || values.odb_address == 0 || values.odb_size == 0 ||
++      values.rxb_address == 0 || values.rxb_size == 0 || values.sscb_address == 0 ||
++      values.sscb_size == 0)
++  {
++    diagnostic.Fail("malformed savestate preservation array");
++  }
++  if (values.odb_size != ASM_ODB_SIZE || values.rxb_size != ASM_RXB_SIZE ||
++      values.sscb_size != ASM_SSCB_SIZE)
++  {
++    diagnostic.Fail("savestate preservation block size does not match pinned ASM");
++  }
++  return values;
++}
++
++u32 DiagnosticAddress(SlippiRollbackDiagnostic& diagnostic, u32 address, u32 size, u32 offset,
++                      u32 width)
++{
++  if (offset > size || width > size - offset ||
++      address > std::numeric_limits<u32>::max() - offset)
++    diagnostic.Fail("rollback observation field exceeds preserved block");
++  return address + offset;
++}
++
++void AddRollbackSnapshot(SlippiRollbackDiagnostic& diagnostic, nlohmann::json& event,
++                         Core::System& system, const DiagnosticPreservation& values)
++{
++  auto& memory = system.GetMemory();
++  if (memory.GetPointerForRange(values.odb_address, values.odb_size) == nullptr ||
++      memory.GetPointerForRange(values.rxb_address, values.rxb_size) == nullptr ||
++      (values.sscb_address != 0 &&
++       memory.GetPointerForRange(values.sscb_address, values.sscb_size) == nullptr))
++  {
++    diagnostic.Fail("rollback preservation block is outside emulated memory");
++  }
++  auto odb_u8 = [&](u32 offset) {
++    return memory.Read_U8(DiagnosticAddress(diagnostic, values.odb_address, values.odb_size,
++                                            offset, 1));
++  };
++  auto odb_u32 = [&](u32 offset) {
++    return memory.Read_U32(DiagnosticAddress(diagnostic, values.odb_address, values.odb_size,
++                                             offset, 4));
++  };
++  auto rxb_u32 = [&](u32 offset) {
++    return memory.Read_U32(DiagnosticAddress(diagnostic, values.rxb_address, values.rxb_size,
++                                             offset, 4));
++  };
++  event["odb"] = {{"frame", odb_u32(ODB_FRAME)},
++                  {"delay_frames", odb_u8(ODB_DELAY_FRAMES)},
++                  {"txb_addr", odb_u32(ODB_TXB_ADDR)},
++                  {"rxb_addr", odb_u32(ODB_RXB_ADDR)},
++                  {"rollback_active", odb_u8(ODB_ROLLBACK_IS_ACTIVE)},
++                  {"rollback_should_load_state", odb_u8(ODB_ROLLBACK_SHOULD_LOAD_STATE)},
++                  {"rollback_end_frame", odb_u32(ODB_ROLLBACK_END_FRAME)},
++                  {"savestate_is_predicting", odb_u8(ODB_SAVESTATE_IS_PREDICTING)},
++                  {"savestate_frame", odb_u32(ODB_SAVESTATE_FRAME)},
++                  {"stable_rollback_active", odb_u8(ODB_STABLE_ROLLBACK_IS_ACTIVE)},
++                  {"stable_rollback_end_frame", odb_u32(ODB_STABLE_ROLLBACK_END_FRAME)},
++                  {"stable_rollback_should_load_state",
++                   odb_u8(ODB_STABLE_ROLLBACK_SHOULD_LOAD_STATE)},
++                  {"stable_savestate_frame", odb_u32(ODB_STABLE_SAVESTATE_FRAME)},
++                  {"stable_finalized_frame", odb_u32(ODB_STABLE_FINALIZED_FRAME)},
++                  {"finalized_frame", odb_u32(ODB_FINALIZED_FRAME)}};
++  event["rxb"] = {{"latest_frame_p0", rxb_u32(RXB_OPNT_FRAME_NUMS)},
++                  {"latest_frame_p1", rxb_u32(RXB_OPNT_FRAME_NUMS + 4)},
++                  {"latest_frame_p2", rxb_u32(RXB_OPNT_FRAME_NUMS + 8)},
++                  {"smallest_latest_frame", rxb_u32(RXB_SMALLEST_LATEST_FRAME)}};
++  event["preservation"] = {{"odb_address", values.odb_address},
++                            {"odb_size", values.odb_size},
++                            {"rxb_address", values.rxb_address},
++                            {"rxb_size", values.rxb_size},
++                            {"sscb_address", values.sscb_address},
++                            {"sscb_size", values.sscb_size}};
++}
++
+ void ObserveLocalOnlinePad(s32 frame, const u8* inputs)
+ {
+   static const char* const path = std::getenv("SLIPPI_LOCAL_PAD_SENT_OBSERVATION");
+@@ -178,7 +307,7 @@ void OSDMessageHandler(const char* message, u32 color, u32 duration_ms)
+ }
+ 
+ CEXISlippi::CEXISlippi(Core::System& system, const std::string current_file_name)
+-    : IEXIDevice(system)
++    : IEXIDevice(system), m_rollback_diagnostic(SlippiRollbackDiagnostic::FromEnvironment())
+ {
+   INFO_LOG_FMT(SLIPPI, "EXI SLIPPI Constructor called.");
+ 
+@@ -1220,6 +1349,11 @@ void CEXISlippi::handleOnlineInputs(u8* payload)
+ 
+   if (frame == 1)
+   {
++    m_rollback_diagnostic.ResetMatch();
++    m_diagnostic_odb_address = 0;
++    m_diagnostic_odb_size = 0;
++    m_diagnostic_rxb_address = 0;
++    m_diagnostic_rxb_size = 0;
+     available_savestates.clear();
+     active_savestates.clear();
+ 
+@@ -1273,6 +1407,32 @@ void CEXISlippi::handleOnlineInputs(u8* payload)
+     return;
+   }
+ 
++  if (frame == 1)
++  {
++    if (const auto profile_role = m_rollback_diagnostic.InputProfileRole())
++    {
++      if (!slippi_netplay || *profile_role != slippi_netplay->LocalPlayerPort() + 1)
++        m_rollback_diagnostic.Fail("configured input profile role does not match local player port");
++      m_rollback_diagnostic.Record({{"event", "input_profile_assignment"},
++                                    {"role", *profile_role},
++                                    {"local_player_port", slippi_netplay->LocalPlayerPort() + 1}},
++                                    SlippiRollbackDiagnostic::ObserverContext::EXI);
++    }
++  }
++
++  if (m_rollback_diagnostic.Enabled() && m_diagnostic_odb_address != 0)
++  {
++    nlohmann::json event = {{"event", "online_inputs"},
++                            {"source_frame", frame},
++                            {"finalized_frame", finalized_frame},
++                            {"delay", delay}};
++    AddRollbackSnapshot(
++        m_rollback_diagnostic, event, Core::System::GetInstance(),
++        {m_diagnostic_odb_address, m_diagnostic_odb_size, m_diagnostic_rxb_address,
++         m_diagnostic_rxb_size, 0, 0});
++    m_rollback_diagnostic.Record(event, SlippiRollbackDiagnostic::ObserverContext::EXI);
++  }
++
+   // Drop inputs that we no longer need (inputs older than the finalized frame passed in)
+   slippi_netplay->DropOldRemoteInputs(finalized_frame);
+ 
+@@ -1628,6 +1788,8 @@ bool CEXISlippi::shouldAdvanceOnlineFrame(s32 frame)
+ 
+ void CEXISlippi::handleSendInputs(s32 frame, u8 delay, s32 checksum_frame, u32 checksum, u8* inputs)
+ {
++  m_rollback_diagnostic.ApplyInputProfile(frame, delay, inputs);
++  m_rollback_diagnostic.ApplyInputOverlay(frame, delay, inputs);
+   ObserveLocalOnlinePad(frame, inputs);
+ 
+   // On the first frame sent, we need to queue up empty dummy pads for as many
+@@ -1839,6 +2001,19 @@ void CEXISlippi::handleCaptureSavestate(u8* payload)
+ 
+   s32 frame = payload[0] << 24 | payload[1] << 16 | payload[2] << 8 | payload[3];
+ 
++  std::optional<DiagnosticPreservation> preservation;
++  if (m_rollback_diagnostic.Enabled())
++  {
++    preservation = ReadDiagnosticPreservation(m_rollback_diagnostic, payload);
++    m_diagnostic_odb_address = preservation->odb_address;
++    m_diagnostic_odb_size = preservation->odb_size;
++    m_diagnostic_rxb_address = preservation->rxb_address;
++    m_diagnostic_rxb_size = preservation->rxb_size;
++    nlohmann::json event = {{"event", "savestate_capture"}, {"frame", frame}};
++    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation);
++    m_rollback_diagnostic.Record(event, SlippiRollbackDiagnostic::ObserverContext::EXI);
++  }
++
+   // u64 startTime = Common::Timer::GetTimeUs();
+ 
+   // Grab an available savestate
+@@ -1866,6 +2041,13 @@ void CEXISlippi::handleCaptureSavestate(u8* payload)
+   ss->Capture();
+   active_savestates[frame] = std::move(ss);
+ 
++  if (preservation)
++  {
++    nlohmann::json event = {{"event", "savestate_capture_complete"}, {"frame", frame}};
++    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation);
++    m_rollback_diagnostic.Record(event, SlippiRollbackDiagnostic::ObserverContext::EXI);
++  }
++
+   // u32 timeDiff = static_cast<u32>(Common::Timer::NowUs() - startTime);
+   // INFO_LOG_FMT(SLIPPI_ONLINE, "SLIPPI ONLINE: Captured savestate for frame {} in: {} ms", frame,
+   //          ((double)timeDiff) / 1000);
+@@ -1876,6 +2058,19 @@ void CEXISlippi::handleLoadSavestate(u8* payload)
+   s32 frame = payload[0] << 24 | payload[1] << 16 | payload[2] << 8 | payload[3];
+   u32* preserve_arr = (u32*)(&payload[4]);
+ 
++  std::optional<DiagnosticPreservation> preservation;
++  if (m_rollback_diagnostic.Enabled())
++  {
++    preservation = ReadDiagnosticPreservation(m_rollback_diagnostic, payload);
++    m_diagnostic_odb_address = preservation->odb_address;
++    m_diagnostic_odb_size = preservation->odb_size;
++    m_diagnostic_rxb_address = preservation->rxb_address;
++    m_diagnostic_rxb_size = preservation->rxb_size;
++    nlohmann::json event = {{"event", "savestate_load"}, {"frame", frame}};
++    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation);
++    m_rollback_diagnostic.Record(event, SlippiRollbackDiagnostic::ObserverContext::EXI);
++  }
++
+   if (!active_savestates.count(frame))
+   {
+     // This savestate does not exist... uhhh? What do we do?
+@@ -1909,6 +2104,13 @@ void CEXISlippi::handleLoadSavestate(u8* payload)
+ 
+   active_savestates.clear();
+ 
++  if (preservation)
++  {
++    nlohmann::json event = {{"event", "savestate_load_complete"}, {"frame", frame}};
++    AddRollbackSnapshot(m_rollback_diagnostic, event, Core::System::GetInstance(), *preservation);
++    m_rollback_diagnostic.Record(event, SlippiRollbackDiagnostic::ObserverContext::EXI);
++  }
++
+   // u32 timeDiff = static_cast<u32>(Common::Timer::NowUs() - startTime);
+   // INFO_LOG_FMT(SLIPPI_ONLINE, "SLIPPI ONLINE: Loaded savestate for frame {} in: %f ms", frame,
+   //          ((double)timeDiff) / 1000);
+@@ -2192,9 +2394,25 @@ void CEXISlippi::prepareOnlineMatchState()
+         };
+       }
+ 
+-      // Clear stage pool so that when we call getRandomStage it will use full list
++      // Clear stage pool so that when we call getRandomStage it will use full list.
+       stage_pool.clear();
+-      local_selections.stage_id = getRandomStage();
++      if (const auto diagnostic_stage = m_rollback_diagnostic.StageOverride())
++      {
++        if (std::find(allowed_stages.begin(), allowed_stages.end(), *diagnostic_stage) ==
++            allowed_stages.end())
++        {
++          m_rollback_diagnostic.Fail("configured stage is not allowed by the active match rules");
++        }
++        local_selections.stage_id = *diagnostic_stage;
++        m_rollback_diagnostic.Record({{"event", "stage_selection_opening"},
++                                      {"selection_option", 3},
++                                      {"stage_id", local_selections.stage_id}},
++                                      SlippiRollbackDiagnostic::ObserverContext::EXI);
++      }
++      else
++      {
++        local_selections.stage_id = getRandomStage();
++      }
+       slippi_netplay->SetMatchSelections(local_selections);
+     }
+ 
+@@ -2784,14 +3002,37 @@ void CEXISlippi::setMatchSelections(u8* payload)
+   if (stage_select_option == 3)
+   {
+     // If stage requested is random, select a random stage
+-    s.stage_id = getRandomStage();
++    if (const auto diagnostic_stage = m_rollback_diagnostic.StageOverride())
++    {
++      if (std::find(allowed_stages.begin(), allowed_stages.end(), *diagnostic_stage) ==
++          allowed_stages.end())
++      {
++        m_rollback_diagnostic.Fail("configured stage is not allowed by the active match rules");
++      }
++      s.stage_id = *diagnostic_stage;
++      m_rollback_diagnostic.Record({{"event", "stage_selection"},
++                                    {"selection_option", stage_select_option},
++                                    {"stage_id", s.stage_id}},
++                                    SlippiRollbackDiagnostic::ObserverContext::EXI);
++    }
++    else
++    {
++      s.stage_id = getRandomStage();
++    }
+   }
+ 
+   INFO_LOG_FMT(SLIPPI, "LPS set char: {}, iSS: {}, {}, stage: {}, alt stage: {}, team: {}",
+                s.is_character_selected, stage_select_option, s.is_stage_selected, s.stage_id,
+                s.alt_stage_mode, s.team_id);
+ 
+-  s.rng_offset = generator() % 0xFFFF;
++  s.rng_offset = m_rollback_diagnostic.Enabled() ? m_rollback_diagnostic.OverrideRngOffset(0) :
++                                                    generator() % 0xFFFF;
++
++  if (m_rollback_diagnostic.Enabled())
++  {
++    m_rollback_diagnostic.Record({{"event", "rng_selection"}, {"rng_offset", s.rng_offset}},
++                                  SlippiRollbackDiagnostic::ObserverContext::EXI);
++  }
+ 
+   // Merge these selections
+   local_selections.Merge(s);
+@@ -3424,6 +3665,41 @@ void CEXISlippi::DMAWrite(u32 _uAddr, u32 _uSize)
+     }
+ 
+     u32 payload_len = payload_sizes[byte];
++    if (byte == CMD_RECEIVE_GAME_INFO && m_rollback_diagnostic.Enabled())
++    {
++      m_diagnostic_odb_address = 0;
++      m_diagnostic_odb_size = 0;
++      m_diagnostic_rxb_address = 0;
++      m_diagnostic_rxb_size = 0;
++      m_rollback_diagnostic.Record({{"event", "recording_game_start"}},
++                                    SlippiRollbackDiagnostic::ObserverContext::EXI);
++    }
++    if (byte == CMD_RECEIVE_INITIAL_RNG && m_rollback_diagnostic.Enabled())
++    {
++      if (payload_len != GAME_FRAME_START_PAYLOAD_LENGTH ||
++          _uSize - buf_loc < GAME_FRAME_START_PAYLOAD_LENGTH + 1)
++      {
++        m_rollback_diagnostic.Fail(
++            "recording frame-start payload length or DMA range disagrees with pinned ASM");
++      }
++
++      const u8* payload = &mem_ptr[buf_loc + 1];
++      nlohmann::json event = {
++          {"event", "recording_frame_start"},
++          {"frame", static_cast<s32>(Common::swap32(&payload[0]))},
++          {"rng", Common::swap32(&payload[4])},
++          {"scene_frame", Common::swap32(&payload[8])},
++      };
++      if (m_diagnostic_odb_address != 0 && m_diagnostic_odb_size != 0 &&
++          m_diagnostic_rxb_address != 0 && m_diagnostic_rxb_size != 0)
++      {
++        AddRollbackSnapshot(
++            m_rollback_diagnostic, event, Core::System::GetInstance(),
++            {m_diagnostic_odb_address, m_diagnostic_odb_size, m_diagnostic_rxb_address,
++             m_diagnostic_rxb_size, 0, 0});
++      }
++      m_rollback_diagnostic.Record(event, SlippiRollbackDiagnostic::ObserverContext::EXI);
++    }
+     switch (byte)
+     {
+     case CMD_RECEIVE_GAME_END:
+diff --git a/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.h b/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.h
+index a5b0afb386..859cefa5da 100644
+--- a/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.h
++++ b/Source/Core/Core/HW/EXI/EXI_DeviceSlippi.h
+@@ -16,6 +16,7 @@
+ #include "Core/Slippi/SlippiNetplay.h"
+ #include "Core/Slippi/SlippiPlayback.h"
+ #include "Core/Slippi/SlippiReplayComm.h"
++#include "Core/Slippi/SlippiRollbackDiagnostic.h"
+ #include "Core/Slippi/SlippiSavestate.h"
+ #include "Core/Slippi/SlippiSpectate.h"
+ #include "Core/Slippi/SlippiUser.h"
+@@ -348,6 +349,12 @@ private:
+   std::map<s32, std::unique_ptr<SlippiSavestate>> active_savestates;
+   std::deque<std::unique_ptr<SlippiSavestate>> available_savestates;
+ 
++  SlippiRollbackDiagnostic m_rollback_diagnostic;
++  u32 m_diagnostic_odb_address = 0;
++  u32 m_diagnostic_odb_size = 0;
++  u32 m_diagnostic_rxb_address = 0;
++  u32 m_diagnostic_rxb_size = 0;
++
+   std::vector<u16> allowed_stages;
+ };
+ }  // namespace ExpansionInterface
+diff --git a/Source/Core/Core/Slippi/SlippiNetplay.cpp b/Source/Core/Core/Slippi/SlippiNetplay.cpp
+index 05b0261427..3a3bc4cb29 100644
+--- a/Source/Core/Core/Slippi/SlippiNetplay.cpp
++++ b/Source/Core/Core/Slippi/SlippiNetplay.cpp
+@@ -8,9 +8,11 @@
+ #include <climits>
+ #include <cstdlib>
+ #include <fstream>
++#include <iomanip>
+ #include <limits>
+ #include <memory>
+ #include <mutex>
++#include <sstream>
+ #include <thread>
+ 
+ #include "Common/CommonTypes.h"
+@@ -37,6 +39,25 @@ SlippiNetplayClient* SLIPPI_NETPLAY = nullptr;
+ 
+ namespace
+ {
++constexpr std::size_t MAX_DIAGNOSTIC_HELD_PAD_PACKETS = 8;
++
++std::string PacketHash(const sf::Packet& packet)
++{
++  constexpr u64 FNV_OFFSET = 14695981039346656037ULL;
++  constexpr u64 FNV_PRIME = 1099511628211ULL;
++  u64 hash = FNV_OFFSET;
++  const auto* bytes = static_cast<const u8*>(packet.getData());
++  for (std::size_t index = 0; index < packet.getDataSize(); ++index)
++  {
++    hash ^= bytes[index];
++    hash *= FNV_PRIME;
++  }
++
++  std::ostringstream stream;
++  stream << std::hex << std::setfill('0') << std::setw(16) << hash;
++  return stream.str();
++}
++
+ void ObserveRemotePadConsumed(int slot, u8 local_player, const SlippiRemotePadOutput& output)
+ {
+   static const char* const path = std::getenv("SLIPPI_LOCAL_PAD_OBSERVATION");
+@@ -138,7 +159,10 @@ SlippiNetplayClient::SlippiNetplayClient(std::vector<std::string> addrs, std::ve
+                                          const u8 remote_player_count, const u16 local_port,
+                                          bool is_decider, u8 player_idx)
+ #ifdef _WIN32
+-    : m_qos_handle(nullptr), m_qos_flow_id(0)
++    : m_qos_handle(nullptr), m_qos_flow_id(0),
++      m_rollback_diagnostic(SlippiRollbackDiagnostic::FromEnvironment())
++#else
++    : m_rollback_diagnostic(SlippiRollbackDiagnostic::FromEnvironment())
+ #endif
+ {
+   WARN_LOG_FMT(SLIPPI_ONLINE, "Initializing Slippi Netplay for port: {}, with host: {}", local_port,
+@@ -248,6 +272,7 @@ SlippiNetplayClient::SlippiNetplayClient(std::vector<std::string> addrs, std::ve
+ 
+ // Make a dummy client
+ SlippiNetplayClient::SlippiNetplayClient(bool is_decider)
++    : m_rollback_diagnostic(SlippiRollbackDiagnostic::FromEnvironment())
+ {
+   this->is_decider = is_decider;
+   SLIPPI_NETPLAY = std::move(this);
+@@ -1307,6 +1332,9 @@ void SlippiNetplayClient::StartSlippiGame()
+   // Reset variables to start a new game
+   has_game_started = false;
+ 
++  m_rollback_diagnostic.ResetMatch();
++  m_diagnostic_held_pad_packets.clear();
++
+   m_local_pad_queue.clear();
+ 
+   for (int i = 0; i < m_remote_player_count; i++)
+@@ -1406,6 +1434,74 @@ void SlippiNetplayClient::SendSlippiPad(std::unique_ptr<SlippiPad> pad)
+   for (auto it = m_local_pad_queue.begin(); it != m_local_pad_queue.end(); ++it)
+     spac->append((*it)->pad_buf, SLIPPI_PAD_DATA_SIZE);  // only transfer 8 bytes per pad
+ 
++  const auto history_first = m_local_pad_queue.back()->frame;
++  const auto history_last = m_local_pad_queue.front()->frame;
++  const auto history_count = m_local_pad_queue.size();
++  if (m_rollback_diagnostic.IsHoldFrame(frame))
++  {
++    if (m_diagnostic_held_pad_packets.size() >= MAX_DIAGNOSTIC_HELD_PAD_PACKETS)
++      m_rollback_diagnostic.Fail("diagnostic hold packet queue exceeded its eight-packet bound");
++    const bool is_begin = m_diagnostic_held_pad_packets.empty();
++    const std::string payload_hash = PacketHash(*spac);
++    m_diagnostic_held_pad_packets.push_back(
++        {std::move(spac), frame, payload_hash});
++    m_rollback_diagnostic.Record({{"event", "pad_transport"},
++                                  {"action", is_begin ? "hold_begin" : "hold"},
++                                  {"packet_frame", frame},
++                                  {"payload_hash", payload_hash},
++                                  {"begin_count", is_begin ? 1 : 0},
++                                  {"held_count", m_diagnostic_held_pad_packets.size()},
++                                  {"history_count", history_count},
++                                  {"history_first_frame", history_first},
++                                  {"history_last_frame", history_last}},
++                                  SlippiRollbackDiagnostic::ObserverContext::TRANSPORT);
++    return;
++  }
++
++  if (m_rollback_diagnostic.IsDropFrame(frame))
++  {
++    m_rollback_diagnostic.ConsumeTransportFrame(frame);
++    m_rollback_diagnostic.Record({{"event", "pad_transport"},
++                                  {"action", "drop"},
++                                  {"packet_frame", frame},
++                                  {"payload_hash", PacketHash(*spac)},
++                                  {"drop_count", 1},
++                                  {"history_count", history_count},
++                                  {"history_first_frame", history_first},
++                                  {"history_last_frame", history_last}},
++                                  SlippiRollbackDiagnostic::ObserverContext::TRANSPORT);
++    return;
++  }
++
++  if (!m_diagnostic_held_pad_packets.empty() && frame >= m_rollback_diagnostic.ReleaseFrame())
++  {
++    const std::size_t release_count = m_diagnostic_held_pad_packets.size();
++    nlohmann::json held_frames = nlohmann::json::array();
++    nlohmann::json held_hashes = nlohmann::json::array();
++    for (const auto& held_packet : m_diagnostic_held_pad_packets)
++    {
++      held_frames.push_back(held_packet.frame);
++      held_hashes.push_back(held_packet.payload_hash);
++    }
++    const std::string release_hash = PacketHash(*spac);
++    while (!m_diagnostic_held_pad_packets.empty())
++    {
++      SendAsync(std::move(m_diagnostic_held_pad_packets.front().packet));
++      m_diagnostic_held_pad_packets.pop_front();
++    }
++    m_rollback_diagnostic.Record({{"event", "pad_transport"},
++                                  {"action", "hold_release"},
++                                  {"release_packet_frame", frame},
++                                  {"release_payload_hash", release_hash},
++                                  {"release_count", release_count},
++                                  {"held_frames", held_frames},
++                                  {"held_payload_hashes", held_hashes},
++                                  {"history_count", history_count},
++                                  {"history_first_frame", history_first},
++                                  {"history_last_frame", history_last}},
++                                  SlippiRollbackDiagnostic::ObserverContext::TRANSPORT);
++  }
++
+   SendAsync(std::move(spac));
+   u64 time = Common::Timer::NowUs();
+ 
+diff --git a/Source/Core/Core/Slippi/SlippiNetplay.h b/Source/Core/Core/Slippi/SlippiNetplay.h
+index e96fdc5c53..17f56d82ec 100644
+--- a/Source/Core/Core/Slippi/SlippiNetplay.h
++++ b/Source/Core/Core/Slippi/SlippiNetplay.h
+@@ -25,6 +25,7 @@
+ #include "Core/NetPlayProto.h"
+ #include "Core/Slippi/SlippiGame.h"
+ #include "Core/Slippi/SlippiPad.h"
++#include "Core/Slippi/SlippiRollbackDiagnostic.h"
+ #include "InputCommon/GCPadStatus.h"
+ 
+ #ifdef _WIN32
+@@ -332,6 +333,13 @@ private:
+   bool AreAllConnectionsDisconnected();
+   bool AreAllPeersDisconnectedForKey(const std::string& key);
+ 
++  struct DiagnosticHeldPadPacket
++  {
++    std::unique_ptr<sf::Packet> packet;
++    s32 frame = 0;
++    std::string payload_hash;
++  };
++
+   bool m_is_connected = false;
+ 
+ #ifdef _WIN32
+@@ -339,6 +347,9 @@ private:
+   QOS_FLOWID m_qos_flow_id;
+ #endif
+ 
++  SlippiRollbackDiagnostic m_rollback_diagnostic;
++  std::deque<DiagnosticHeldPadPacket> m_diagnostic_held_pad_packets;
++
+   u32 m_timebase_frame = 0;
+ };
+ 
+diff --git a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
+new file mode 100644
+index 0000000000..7bc998c77d
+--- /dev/null
++++ b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.cpp
+@@ -0,0 +1,385 @@
++// Copyright 2026 Melee Web contributors
++// Licensed under GPLv2+
++// Refer to the license.txt file included.
++
++#include "Core/Slippi/SlippiRollbackDiagnostic.h"
++
++#include <algorithm>
++#include <cstdint>
++#include <cstdio>
++#include <cstdlib>
++#include <fstream>
++#include <iomanip>
++#include <initializer_list>
++#include <limits>
++#include <mutex>
++#include <sstream>
++#include <utility>
++
++namespace
++{
++constexpr std::string_view SCHEMA = "melee-web-slippi-rollback-diagnostic-v1";
++constexpr s32 MAX_FRAME = 1'000'000;
++constexpr s32 MAX_HOLD_FRAMES = 8;
++constexpr u32 FINAL_DESTINATION_STAGE_ID = 0x20;
++constexpr std::string_view PROFILE_NAME = "mario-fd-rollback-v1";
++
++using json = nlohmann::json;
++
++[[noreturn]] void Fatal(std::string_view reason)
++{
++  std::fputs("[slippi rollback diagnostic] ", stderr);
++  std::fwrite(reason.data(), 1, reason.size(), stderr);
++  std::fputc('\n', stderr);
++  std::fflush(stderr);
++  std::abort();
++}
++
++const json& Member(const json& object, std::string_view key)
++{
++  if (!object.is_object())
++    Fatal("diagnostic config member lookup requires an object");
++  const auto iterator = object.find(std::string(key));
++  if (iterator == object.end())
++    Fatal("diagnostic config is missing a required member");
++  return iterator.value();
++}
++
++void CheckObjectKeys(const json& object, std::initializer_list<std::string_view> required,
++                     std::string_view name)
++{
++  if (!object.is_object())
++    Fatal(std::string(name) + " must be an object");
++
++  for (auto iterator = object.begin(); iterator != object.end(); ++iterator)
++  {
++    const std::string& key = iterator.key();
++    const auto known = std::find_if(required.begin(), required.end(),
++                                    [&key](std::string_view required_key) {
++                                      return required_key == key;
++                                    });
++    if (known == required.end())
++      Fatal(std::string(name) + " has an unknown key");
++  }
++  for (const std::string_view key : required)
++  {
++    if (object.find(std::string(key)) == object.end())
++      Fatal(std::string(name) + " is missing a required key");
++  }
++}
++
++bool ReadBool(const json& object, std::string_view key)
++{
++  const json& value = Member(object, key);
++  if (!value.is_boolean())
++    Fatal(std::string(key) + " must be a boolean");
++  return value.get<bool>();
++}
++
++u32 ReadU32(const json& object, std::string_view key, u32 maximum)
++{
++  const json& value = Member(object, key);
++  if (value.is_number_unsigned())
++  {
++    const std::uint64_t unsigned_value = value.get<std::uint64_t>();
++    if (unsigned_value > maximum)
++      Fatal(std::string(key) + " is outside its bounded range");
++    return static_cast<u32>(unsigned_value);
++  }
++  if (!value.is_number_integer())
++    Fatal(std::string(key) + " must be an integer");
++  const std::int64_t signed_value = value.get<std::int64_t>();
++  if (signed_value < 0 || static_cast<std::uint64_t>(signed_value) > maximum)
++    Fatal(std::string(key) + " is outside its bounded range");
++  return static_cast<u32>(signed_value);
++}
++
++s32 ReadFrame(const json& object, std::string_view key)
++{
++  const u32 frame = ReadU32(object, key, MAX_FRAME);
++  if (frame == 0)
++    Fatal(std::string(key) + " must be at least one");
++  return static_cast<s32>(frame);
++}
++
++u8 HexNibble(char value)
++{
++  if (value >= '0' && value <= '9')
++    return static_cast<u8>(value - '0');
++  if (value >= 'a' && value <= 'f')
++    return static_cast<u8>(value - 'a' + 10);
++  if (value >= 'A' && value <= 'F')
++    return static_cast<u8>(value - 'A' + 10);
++  Fatal("overlay.pad_hex contains a non-hex character");
++}
++
++std::array<u8, 8> ReadPad(const json& object)
++{
++  const json& value = Member(object, "pad_hex");
++  if (!value.is_string())
++    Fatal("overlay.pad_hex must be a string");
++  const std::string text = value.get<std::string>();
++  if (text.size() != 16)
++    Fatal("overlay.pad_hex must contain exactly 16 hex characters");
++
++  std::array<u8, 8> pad{};
++  for (std::size_t index = 0; index < pad.size(); ++index)
++    pad[index] = static_cast<u8>((HexNibble(text[index * 2]) << 4) |
++                                 HexNibble(text[index * 2 + 1]));
++  return pad;
++}
++
++std::string Hex(const u8* bytes, std::size_t size)
++{
++  std::ostringstream stream;
++  stream << std::hex << std::setfill('0');
++  for (std::size_t index = 0; index < size; ++index)
++    stream << std::setw(2) << static_cast<int>(bytes[index]);
++  return stream.str();
++}
++
++SlippiRollbackDiagnostic::Config ParseConfig(const json& root)
++{
++  CheckObjectKeys(root, {"schema", "enabled", "rng_offset", "log_path", "stage_id",
++                         "input_profile", "overlay", "transport"},
++                  "config");
++  const json& schema = Member(root, "schema");
++  if (!schema.is_string() || schema.get<std::string>() != SCHEMA)
++    Fatal("diagnostic config has an unsupported schema");
++
++  SlippiRollbackDiagnostic::Config config;
++  config.enabled = ReadBool(root, "enabled");
++  config.rng_offset = ReadU32(root, "rng_offset", 0xffff);
++  const json& log_path = Member(root, "log_path");
++  if (!log_path.is_string())
++    Fatal("log_path must be a string");
++  config.log_path = log_path.get<std::string>();
++  if (config.log_path.empty() || config.log_path.find('\0') != std::string::npos)
++    Fatal("log_path must be nonempty and contain no NUL");
++  if (!Member(root, "stage_id").is_null())
++  {
++    const u32 stage_id = ReadU32(root, "stage_id", 0xffff);
++    if (stage_id != FINAL_DESTINATION_STAGE_ID)
++      Fatal("stage_id must be Final Destination (0x20)");
++    config.stage_id = static_cast<u16>(stage_id);
++  }
++
++  const json& profile = Member(root, "input_profile");
++  if (!profile.is_null())
++  {
++    CheckObjectKeys(profile, {"name", "role"}, "input_profile");
++    const json& profile_name = Member(profile, "name");
++    if (!profile_name.is_string() || profile_name.get<std::string>() != PROFILE_NAME)
++      Fatal("input_profile.name must be mario-fd-rollback-v1");
++    const u32 role = ReadU32(profile, "role", 2);
++    if (role < 1)
++      Fatal("input_profile.role must be 1 or 2");
++    config.input_profile = SlippiRollbackDiagnostic::Config::InputProfile{
++        std::string(PROFILE_NAME), static_cast<u8>(role)};
++  }
++
++  const json& overlay = Member(root, "overlay");
++  if (!overlay.is_null())
++  {
++    CheckObjectKeys(overlay, {"frame", "pad_hex"}, "overlay");
++    config.overlay_frame = ReadFrame(overlay, "frame");
++    config.overlay_pad = ReadPad(overlay);
++  }
++
++  const json& transport = Member(root, "transport");
++  CheckObjectKeys(transport, {"action", "frame", "release_frame"}, "transport");
++  const json& action_value = Member(transport, "action");
++  if (!action_value.is_string())
++    Fatal("transport.action must be a string");
++  const std::string action = action_value.get<std::string>();
++  if (action == "none")
++  {
++    if (!Member(transport, "frame").is_null() || !Member(transport, "release_frame").is_null())
++      Fatal("transport none requires null frame and release_frame");
++  }
++  else if (action == "drop")
++  {
++    config.transport_action = SlippiRollbackDiagnostic::TransportAction::DROP;
++    if (Member(transport, "frame").is_null() || !Member(transport, "release_frame").is_null())
++      Fatal("transport drop requires a frame and null release_frame");
++    config.transport_frame = ReadFrame(transport, "frame");
++  }
++  else if (action == "hold")
++  {
++    config.transport_action = SlippiRollbackDiagnostic::TransportAction::HOLD;
++    if (Member(transport, "frame").is_null() || Member(transport, "release_frame").is_null())
++      Fatal("transport hold requires frame and release_frame");
++    config.transport_frame = ReadFrame(transport, "frame");
++    config.transport_release_frame = ReadFrame(transport, "release_frame");
++    if (*config.transport_release_frame <= *config.transport_frame ||
++        *config.transport_release_frame - *config.transport_frame > MAX_HOLD_FRAMES)
++    {
++      Fatal("transport hold release is outside its bounded range");
++    }
++  }
++  else
++  {
++    Fatal("transport.action must be none, drop, or hold");
++  }
++
++  if (!config.enabled &&
++      (config.stage_id.has_value() || config.input_profile.has_value() ||
++       config.overlay_frame.has_value() || config.transport_action !=
++                                                 SlippiRollbackDiagnostic::TransportAction::NONE))
++  {
++    Fatal("disabled diagnostic config contains active controls");
++  }
++  return config;
++}
++}  // namespace
++
++SlippiRollbackDiagnostic SlippiRollbackDiagnostic::FromEnvironment()
++{
++  const char* path = std::getenv("SLIPPI_ROLLBACK_DIAGNOSTIC_CONFIG");
++  if (path == nullptr || path[0] == '\0')
++    return SlippiRollbackDiagnostic(Config{});
++
++  std::ifstream stream(path);
++  if (!stream)
++    Fatal("could not open rollback diagnostic config");
++  const json parsed = json::parse(stream, nullptr, false);
++  if (parsed.is_discarded())
++    Fatal("invalid rollback diagnostic config: malformed JSON");
++  if (!parsed.is_object())
++    Fatal("invalid rollback diagnostic config: root must be an object");
++  return SlippiRollbackDiagnostic(ParseConfig(parsed));
++}
++
++void SlippiRollbackDiagnostic::ResetMatch()
++{
++  m_overlay_applied = false;
++  m_transport_used = false;
++  ++m_game_sequence;
++}
++
++void SlippiRollbackDiagnostic::ApplyInputProfile(s32 source_frame, u8 delay, u8* inputs)
++{
++  if (!Enabled() || !m_config.input_profile)
++    return;
++  if (inputs == nullptr)
++    Fail("input profile received a null TXB pad pointer");
++
++  std::array<u8, 8> generated{};
++  const u8 role = m_config.input_profile->role;
++  if (role == 1 && source_frame >= 90 && source_frame <= 139)
++    generated[2] = 0x7f;
++  else if (role == 1 && source_frame >= 150)
++    generated[2] = 0x81;
++  else if (role == 2 && source_frame >= 90 && source_frame <= 126)
++    generated[2] = 0x81;
++  if (role == 2 && source_frame >= 96 && source_frame <= 100)
++    generated[0] = 0x01;
++
++  std::copy(generated.begin(), generated.end(), inputs);
++  Record({{"event", "input_profile"},
++          {"profile", m_config.input_profile->name},
++          {"role", role},
++          {"source_frame", source_frame},
++          {"consumed_frame", source_frame + delay},
++          {"delay", delay},
++          {"generated_pad_hex", Hex(generated.data(), generated.size())},
++          {"pad_after_hex", Hex(inputs, 12)},
++          {"preserved_tail_hex", Hex(inputs + 8, 4)}}, ObserverContext::EXI);
++}
++
++void SlippiRollbackDiagnostic::ApplyInputOverlay(s32 source_frame, u8 delay, u8* inputs)
++{
++  if (!Enabled() || !m_config.overlay_frame || m_overlay_applied ||
++      source_frame != *m_config.overlay_frame)
++  {
++    return;
++  }
++  if (inputs == nullptr)
++    Fail("input overlay received a null TXB pad pointer");
++
++  const std::string before = Hex(inputs, 12);
++  std::copy(m_config.overlay_pad.begin(), m_config.overlay_pad.end(), inputs);
++  m_overlay_applied = true;
++  Record({{"event", "input_overlay"},
++          {"source_frame", source_frame},
++          {"consumed_frame", source_frame + delay},
++          {"pad_before_hex", before},
++          {"pad_after_hex", Hex(inputs, 12)},
++          {"preserved_tail_hex", Hex(inputs + 8, 4)}}, ObserverContext::EXI);
++}
++
++u32 SlippiRollbackDiagnostic::OverrideRngOffset(u32 generated) const
++{
++  return Enabled() ? m_config.rng_offset : generated;
++}
++
++std::optional<u16> SlippiRollbackDiagnostic::StageOverride() const
++{
++  return Enabled() ? m_config.stage_id : std::nullopt;
++}
++
++std::optional<u8> SlippiRollbackDiagnostic::InputProfileRole() const
++{
++  return Enabled() && m_config.input_profile ? std::optional<u8>(m_config.input_profile->role) :
++                                                std::nullopt;
++}
++
++bool SlippiRollbackDiagnostic::IsTransportFrame(s32 packet_frame) const
++{
++  return IsHoldFrame(packet_frame) || IsDropFrame(packet_frame);
++}
++
++bool SlippiRollbackDiagnostic::IsHoldFrame(s32 packet_frame) const
++{
++  return Enabled() && m_config.transport_action == TransportAction::HOLD &&
++         m_config.transport_frame && m_config.transport_release_frame &&
++         packet_frame >= *m_config.transport_frame &&
++         packet_frame < *m_config.transport_release_frame;
++}
++
++bool SlippiRollbackDiagnostic::IsDropFrame(s32 packet_frame) const
++{
++  return Enabled() && !m_transport_used && m_config.transport_frame &&
++         m_config.transport_action == TransportAction::DROP &&
++         packet_frame == *m_config.transport_frame;
++}
++
++bool SlippiRollbackDiagnostic::ConsumeTransportFrame(s32 packet_frame)
++{
++  if (!IsDropFrame(packet_frame))
++    return false;
++  m_transport_used = true;
++  return true;
++}
++
++s32 SlippiRollbackDiagnostic::ReleaseFrame() const
++{
++  return m_config.transport_release_frame.value_or(std::numeric_limits<s32>::max());
++}
++
++void SlippiRollbackDiagnostic::Record(const nlohmann::json& event,
++                                      ObserverContext context) const
++{
++  if (!Enabled())
++    return;
++  static std::mutex mutex;
++  std::lock_guard lock(mutex);
++  std::ofstream stream(m_config.log_path, std::ios::out | std::ios::app);
++  if (!stream)
++    Fail("could not open rollback diagnostic log");
++  auto row = event;
++  row["diagnostic_schema"] = SCHEMA;
++  row["observer_context"] = context == ObserverContext::EXI ? "exi" : "transport";
++  row["game_sequence"] = m_game_sequence;
++  u64& event_sequence = context == ObserverContext::EXI ? m_exi_event_sequence :
++                                                            m_transport_event_sequence;
++  row["event_sequence"] = event_sequence++;
++  stream << row.dump() << '\n';
++  if (!stream)
++    Fail("could not write rollback diagnostic log");
++}
++
++[[noreturn]] void SlippiRollbackDiagnostic::Fail(std::string_view reason) const
++{
++  Fatal(reason);
++}
+diff --git a/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
+new file mode 100644
+index 0000000000..c7deb2926e
+--- /dev/null
++++ b/Source/Core/Core/Slippi/SlippiRollbackDiagnostic.h
+@@ -0,0 +1,83 @@
++// Copyright 2026 Melee Web contributors
++// Licensed under GPLv2+
++// Refer to the license.txt file included.
++
++#pragma once
++
++#include <array>
++#include <optional>
++#include <string>
++#include <string_view>
++#include <utility>
++
++#include <nlohmann/json.hpp>
++
++#include "Common/CommonTypes.h"
++
++class SlippiRollbackDiagnostic
++{
++public:
++  enum class ObserverContext
++  {
++    EXI,
++    TRANSPORT,
++  };
++
++  enum class TransportAction
++  {
++    NONE,
++    DROP,
++    HOLD,
++  };
++
++  struct Config
++  {
++    struct InputProfile
++    {
++      std::string name;
++      u8 role = 0;
++    };
++
++    bool enabled = false;
++    u32 rng_offset = 0;
++    std::string log_path;
++    std::optional<u16> stage_id;
++    std::optional<InputProfile> input_profile;
++    std::optional<s32> overlay_frame;
++    std::array<u8, 8> overlay_pad{};
++    TransportAction transport_action = TransportAction::NONE;
++    std::optional<s32> transport_frame;
++    std::optional<s32> transport_release_frame;
++  };
++
++  static SlippiRollbackDiagnostic FromEnvironment();
++
++  bool Enabled() const { return m_config.enabled; }
++  const Config& GetConfig() const { return m_config; }
++
++  void ResetMatch();
++  void ApplyInputProfile(s32 source_frame, u8 delay, u8* inputs);
++  void ApplyInputOverlay(s32 source_frame, u8 delay, u8* inputs);
++  u32 OverrideRngOffset(u32 generated) const;
++  std::optional<u16> StageOverride() const;
++  std::optional<u8> InputProfileRole() const;
++
++  bool IsTransportFrame(s32 packet_frame) const;
++  bool IsHoldFrame(s32 packet_frame) const;
++  bool IsDropFrame(s32 packet_frame) const;
++  bool ConsumeTransportFrame(s32 packet_frame);
++  s32 ReleaseFrame() const;
++
++  void Record(const nlohmann::json& event, ObserverContext context) const;
++  [[noreturn]] void Fail(std::string_view reason) const;
++
++private:
++  explicit SlippiRollbackDiagnostic(Config config) : m_config(std::move(config)) {}
++
++  Config m_config;
++  bool m_overlay_applied = false;
++  bool m_transport_used = false;
++  s32 m_game_sequence = -1;
++  mutable u64 m_exi_event_sequence = 0;
++  mutable u64 m_transport_event_sequence = 0;
++};

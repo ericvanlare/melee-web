@@ -1346,6 +1346,20 @@ changed pages retain hash-plus-byte comparison. The receipt distinguishes
 first-capture cost, subsequent retained-state cost, owned payload and Node RSS.
 Browser host/draw/audio/save ownership and practical rollback admission remain
 open.
+A [frame-scripted desktop diagnostic receipt](docs/evidence/desktop-rollback-diagnostic-v1.json)
+records the original baseline and HOLD boundary. The compact [E06 transport
+matrix receipt](docs/evidence/desktop-transport-matrix-e06-v1.json) records the
+root-audited fresh NONE, DUPLICATE, JITTER, REORDER, HOLD, DROP and ordinary
+scenarios with exact parsed finalized peer/baseline comparisons, receiver
+attribution where applicable, native HOLD correction observations, and cleanup.
+The superseded expanded receipt remains in ignored retained work after SHA
+verification; it is not part of the public evidence payload.
+The E06 validation ran 1,714 tests with 133 skips. DROP remains tolerance
+evidence without a rollback claim; DUPLICATE, JITTER and REORDER remain
+transport evidence without a native rollback claim. These results are local
+adapted-desktop evidence only; see the [diagnostic command and observation
+boundary](reference-capture/slippi/ROLLBACK_DIAGNOSTIC.md) for exclusions and
+reproduction.
 
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
