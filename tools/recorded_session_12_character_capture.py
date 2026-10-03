@@ -91,6 +91,11 @@ EXPECTED_ROSTER = tuple(tuple(ROSTER[name][0] for name in lineup) for lineup in 
 # (3).  Keep this source mapping explicit so a permissive costume check cannot
 # admit a visually similar but source-invalid team setup.
 MARIO_TEAM_COSTUMES = {0: 0, 1: 3}
+# Source Items cursor 0 is authored preference bit 5
+# (``mnItemSw_803ED438[0]``), which ``lbl_803B7844`` maps to
+# StartMeleeData item-mask bit 18.  Clearing that bit is the committed
+# row-zero mask emitted by the original Team match.
+TEAM_ROUTE_ITEM_MASK = "fffffffffffbffff"
 
 
 class CaptureFailure(RuntimeError):
@@ -175,7 +180,7 @@ def _validate_team_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
             "source team setup did not contain source-derived Mario team colors: "
             f"expected {expected_costumes} for teams {teams}, received {actual_costumes}")
     setup["player_teams"] = teams
-    if setup["item_mask_hex"] != "fffffffeffffffff":
+    if setup["item_mask_hex"] != TEAM_ROUTE_ITEM_MASK:
         raise CaptureFailure(
             "source Team match did not receive the Rules/Items route's row-zero item mask")
     return setup

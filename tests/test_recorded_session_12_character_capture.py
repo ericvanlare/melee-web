@@ -16,7 +16,7 @@ from tools.recorded_session_12_character_capture import (
 class RecordedSession12CharacterCaptureTests(unittest.TestCase):
     @staticmethod
     def team_setup(teams=(0, 1), item_frequency=-1,
-                   item_mask_hex="fffffffeffffffff", costumes=(0, 3)):
+                   item_mask_hex="fffffffffffbffff", costumes=(0, 3)):
         raw = bytearray(0x138)
         raw[0] = 0x20  # stock match
         raw[2] = 0x80  # stock mode
@@ -60,7 +60,7 @@ class RecordedSession12CharacterCaptureTests(unittest.TestCase):
     def test_team_setup_requires_the_original_items_row_zero_mask(self):
         with self.assertRaisesRegex(CaptureFailure, "row-zero item mask"):
             _validate_team_setup(
-                self.team_setup(item_mask_hex="ffffffffffffffff"), 0)
+                self.team_setup(item_mask_hex="fffffffeffffffff"), 0)
 
     def test_team_route_capture_result_is_a_successful_cli_outcome(self):
         self.assertEqual(_capture_exit_code("original_vs_team_results_css_capture_complete"), 0)
