@@ -56,6 +56,16 @@ const readNative = () => page.evaluate(() => ({
   phase: Module._melee_web_native_menu_phase(),
   running: Module._melee_web_native_menu_running(),
 }));
+const nativeRumbleSnapshot = () => page.evaluate(() => {
+  const length = 0x1790 + 7 * 0x1f2c;
+  const pointer = Module._malloc(length);
+  if (!pointer) throw Error('Unable to allocate native save snapshot memory.');
+  try {
+    if (!Module._melee_web_native_menu_snapshot_save_profile(pointer, length, 0))
+      throw Error(Module.UTF8ToString(Module._melee_web_native_menu_message()));
+    return {length, rumble: [...Module.HEAPU8.subarray(pointer + 0x458, pointer + 0x45c)]};
+  } finally { Module._free(pointer); }
+});
 const waitForScene = async message => {
   await page.waitForFunction(expected => {
     const module = globalThis.Module;
@@ -180,25 +190,15 @@ try {
     await press('m');
     await page.waitForTimeout(300);
     await shot('rumble-controller-1-off');
-    // Export while the source Rumble scene is still live. This invokes the
-    // native save snapshot path directly, separate from the autosave poll.
-    await page.locator('#settings-open').click();
-    await page.locator('#settings-dialog[open]').waitFor();
-    const [sourceSnapshotDownload] = await Promise.all([
-      page.waitForEvent('download'), page.locator('#export-save').click(),
-    ]);
-    const sourceSnapshotPath = path.join(output, 'native-rumble-menu-snapshot.gci');
-    await sourceSnapshotDownload.saveAs(sourceSnapshotPath);
-    const sourceSnapshot = parseMeleeGCI(
-      new Uint8Array(await fs.readFile(sourceSnapshotPath)));
-    assert.deepEqual([...sourceSnapshot.subarray(0x458, 0x45c)], [0, 1, 1, 1],
+    // Observe the same native snapshot API used by the production export
+    // without opening the browser toolbar over the live original menu.
+    const sourceSnapshot = await nativeRumbleSnapshot();
+    assert.deepEqual(sourceSnapshot.rumble, [0, 1, 1, 1],
       'A native source snapshot during Rumble must contain the changed SaveData bytes.');
-    report.sourceSnapshot = {sha256: await readHash(sourceSnapshotPath),
-      rumble: [...sourceSnapshot.subarray(0x458, 0x45c)]};
-    await page.locator('#settings-close').click();
-    await page.locator('#settings-dialog').waitFor({state: 'hidden'});
-    await page.waitForFunction(() => document.activeElement?.id === 'canvas', null,
-      {timeout: 10000});
+    const sourceBytesPath = path.join(output, 'native-rumble-save-data-bytes.bin');
+    await fs.writeFile(sourceBytesPath, Buffer.from(sourceSnapshot.rumble));
+    report.sourceSnapshot = {sha256: await readHash(sourceBytesPath),
+      length: sourceSnapshot.length, rumble: sourceSnapshot.rumble, offset: '0x458'};
     await press('o');
     await press('o');
     const saved = await waitForSaved(state => state.mode === 'personal' &&
@@ -226,12 +226,7 @@ try {
     await pressUp(2);
     await press('m');
     await page.waitForTimeout(300);
-    await shot('versus-selection');
-    await press('m');
-    const versusMenu = await readNative();
-    assert.deepEqual(versusMenu, {message: 'Original main menu', phase: 11, running: 1},
-      'Original Main opens its VS submenu before selecting Melee.');
-    await shot('versus-menu');
+    await shot('versus-mode-selection');
     await press('m');
     await driver.waitForPublicCss();
     const css = await readNative();

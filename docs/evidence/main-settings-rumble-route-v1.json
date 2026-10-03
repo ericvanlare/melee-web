@@ -1,0 +1,338 @@
+{
+  "schema": "webmelee-main-settings-rumble-route-v1",
+  "scope": "One original Settings subroute: Main > Settings > Rumble, saved controller preference, return to CSS, repeat entry, persistence, and owner teardown.",
+  "route_audit": {
+    "baseline": "Original Title/Main and Main/VS/CSS callbacks are integrated; the complete Settings subroute was absent from the browser route before this work.",
+    "selected_slice": "Main Settings > Rumble uses the existing original Main menu owner, asset scope, controller input, and Personal-save APIs. VS rules remain a broader partial feature with rule/match dependencies and are tracked separately.",
+    "not_claimed": "This does not complete the original menu graph or all Settings pages."
+  },
+  "source": {
+    "repository_commit": "3fecf9f9ec07bea908765da2a7bb9b030e9fe30f",
+    "upstream": "GALE01 revision 2 source",
+    "upstream_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "source_paths": [
+      "melee/mn/mnmain.c",
+      "melee/mn/mnvibration.c",
+      "melee/mn/forward.h",
+      "melee/gm/forward.h",
+      "melee/gm/gmmain_lib.c"
+    ],
+    "callbacks": [
+      "mnMain_Scene_OnEnter",
+      "mnMain_Scene_OnFrame",
+      "mnVibration_Init",
+      "mnVibration_HandleInput",
+      "gmMainLib_SetRumbleEnabled"
+    ],
+    "scene_kinds": {
+      "GS_TITLE": 0,
+      "GS_MENU": 1,
+      "GS_CSS": 8
+    },
+    "menu_kinds": {
+      "MENU_KIND_MAIN": 0,
+      "MENU_KIND_SETTINGS": 4,
+      "MENU_KIND_SETTINGS_RUMBLE": 19
+    },
+    "assets": {
+      "archive": "MnMaAll.usd",
+      "rumble_exports": [
+        "MenMainConVi_Top",
+        "MenMainCtlVi_Top",
+        "MenMainOnoffVi_Top",
+        "MenMainCursorVi_Top"
+      ],
+      "shared_main_resources": [
+        "SdMenu.usd (SIS_MenuData)",
+        "SdToy.dat (SIS_ToyData)",
+        "LbMcGame.usd",
+        "NtMemAc.usd",
+        "LbMcSnap.usd",
+        "GmEvent.dat",
+        "LbAd.dat"
+      ]
+    }
+  },
+  "retail_reference": {
+    "disc": {
+      "revision": "GALE01 USA Rev. 2",
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+      "main_dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+    },
+    "capture_receipt": "docs/evidence/save-profile-dolphin-roundtrip-v1.json",
+    "dolphin_run_sha256": "087e212bc1537f0bb79c9e9375311f75d773aaa5cb36cf4bb32a864da21c185b",
+    "scene_and_menu_trace": {
+      "scene": "GS_MENU (1) after Title GS_TITLE (0)",
+      "menu_ids": [
+        0,
+        4,
+        19,
+        4,
+        0
+      ],
+      "labels": [
+        "Main",
+        "Settings",
+        "Rumble",
+        "Settings",
+        "Main"
+      ],
+      "source_ticks": [
+        95,
+        130,
+        141,
+        186,
+        197
+      ]
+    },
+    "input_and_effect": [
+      {
+        "tick": 139,
+        "input": "A",
+        "effect": "enter original Rumble page"
+      },
+      {
+        "tick": 175,
+        "input": "A",
+        "effect": "Controller 1 rumble on to off"
+      },
+      {
+        "tick": 184,
+        "input": "B",
+        "effect": "back to Settings"
+      },
+      {
+        "tick": 195,
+        "input": "B",
+        "effect": "back to Main"
+      }
+    ],
+    "video_and_audio": "Dolphin Null video and No Audio Output; retail source/menu IDs, input timing and game-written save fields are observed, retail visuals and audio are not."
+  },
+  "browser_validation": {
+    "runner": "tests/main_settings_rumble_browser_test.mjs",
+    "runner_sha256": "37184cbd47cc9b406dcf339bce118b31e9e69b41a6a2519a117ce16d95c8f4c3",
+    "reentry_runner": "tests/main_rumble_entry_repro.mjs",
+    "reentry_runner_sha256": "451c5b99a1ad22380dec85d926852131f49c0fabe1489131d1df6086445b468d",
+    "browser": "154.0.8037.97",
+    "mode": "Headless installed Chrome via scripts/browser_tools.mjs, isolated Playwright context, audio-disabled public runtime.",
+    "initial_state": "Everything unlocked is the browser default. The isolated context creates a new Personal profile only after the original restart confirmation; no user browser save is read or mutated.",
+    "route_checks": [
+      "fresh Personal profile and CSS entry",
+      "ordinary B0XX input on original title and Main scenes",
+      "retail Main Settings Rumble route toggles and autosaves source SaveData",
+      "Settings exit returns through original VS selection to CSS",
+      "source owner unload completes after the full menu route"
+    ],
+    "screenshots": [
+      {
+        "file": "browser-route-11/css-fresh-personal.png",
+        "sha256": "c12cb01f2d86ac560f81ffd5280b7a08b6de4af9ea44cb37e554539349eceb11"
+      },
+      {
+        "file": "browser-route-11/css-returned.png",
+        "sha256": "9901630275d2439c2d64e27800d5506040f5aeaad3c145d267c9b99f1e335a30"
+      },
+      {
+        "file": "browser-route-11/main-from-css.png",
+        "sha256": "492420e90863ce3aac15060b305ebbc55f5c1bafd7ebdd294837c835c31a2e01"
+      },
+      {
+        "file": "browser-route-11/main-from-title.png",
+        "sha256": "0af36ddad53ad87393e15f5c72fa6142de9d327fe08504e12a159cedfcb49521"
+      },
+      {
+        "file": "browser-route-11/personal-save-after-reload.png",
+        "sha256": "cd0a22a5770866bd5b4fbf76154b11fc33a87316273929b9e57947b54e56076c"
+      },
+      {
+        "file": "browser-route-11/rumble-before.png",
+        "sha256": "d0bde85281dd8e3663412d8bf25b5e15db1f6bad84aa3023bcd9298743374a64"
+      },
+      {
+        "file": "browser-route-11/rumble-controller-1-off.png",
+        "sha256": "2e6405e8e0434a1af042a1d6cba571c65e415faace4a6ccb667e3e4b5e7f69e0"
+      },
+      {
+        "file": "browser-route-11/rumble-reentered-off.png",
+        "sha256": "7e23144a192c184b90b10ea7471ee6f661c2ac135ac2ee9bb46d29c8066e7bad"
+      },
+      {
+        "file": "browser-route-11/settings.png",
+        "sha256": "d1e8fd0cb9595a665a5d8ee6a3c215e3422664293a130a307fa625b762b110c5"
+      },
+      {
+        "file": "browser-route-11/settings-reentered.png",
+        "sha256": "e2e27509f11d2a2a407e788aa81ae78ae14bdd23e1d72d26f0206a07034e327f"
+      },
+      {
+        "file": "browser-route-11/title.png",
+        "sha256": "bdcb7e5c3dc0c629bc03c3b6935ab5200eb83cb17325f258f83c17df46bcb474"
+      },
+      {
+        "file": "browser-route-11/versus-mode-selection.png",
+        "sha256": "5a0c0db0fa17d2dee7c32819f21917b6cc8d18c31ce981826f40e7ea6749941f"
+      }
+    ],
+    "native_source_snapshot": {
+      "sha256": "cbd95ae5ef8810691e3fc7efb7c39ef9ffb661135d858aa0ccc81fc74a0160ae",
+      "length": 61892,
+      "rumble": [
+        0,
+        1,
+        1,
+        1
+      ],
+      "offset": "0x458"
+    },
+    "save_state": {
+      "initial_personal_rumble": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "after_source_toggle": [
+        0,
+        1,
+        1,
+        1
+      ],
+      "save_data_offset": "0x458",
+      "personal_revision_at_toggle": 4,
+      "personal_after_css": {
+        "mode": "personal",
+        "revision": 6,
+        "generation": "fae01933-3051-493d-b7e5-a48671acb4f9",
+        "rumble": [
+          0,
+          1,
+          1,
+          1
+        ]
+      },
+      "after_document_reload": {
+        "mode": "personal",
+        "revision": 6,
+        "generation": "fae01933-3051-493d-b7e5-a48671acb4f9",
+        "rumble": [
+          0,
+          1,
+          1,
+          1
+        ]
+      },
+      "exported_gci_sha256": "0866bcc1dfc616ddcd7882c87bb36f5db2e205458abc7a717622752b6b439b7b",
+      "exported_rumble": [
+        0,
+        1,
+        1,
+        1
+      ]
+    },
+    "native_owner_cleanup": {
+      "result": 1,
+      "message": "Native menus unloaded.",
+      "phase": 0,
+      "running": 0
+    },
+    "browser_errors": [],
+    "repeated_entry": {
+      "report": "reentry-repro-01/report.json",
+      "result": "pass",
+      "checks": [
+        "Rendered public player entered original CSS with an isolated Everything unlocked profile.",
+        "B0XX input reached original Main from CSS."
+      ],
+      "screenshots": [
+        {
+          "file": "reentry-repro-01/rumble-back-to-main.png",
+          "sha256": "1f2835138a8336d9e68f9873984895c6638b4a8fc0697bc820b7d4de418fe607"
+        },
+        {
+          "file": "reentry-repro-01/rumble-back-to-settings.png",
+          "sha256": "6ff3d25caf721bbe6be25d7f78f016d72e9819bbbcba27da3591cef21528bf0a"
+        },
+        {
+          "file": "reentry-repro-01/rumble-controller-1-off.png",
+          "sha256": "1a027800778f658ef9eb4197037c68fb56c1d1cbdb727654646a3588da7e0ebd"
+        },
+        {
+          "file": "reentry-repro-01/rumble-entry-result.png",
+          "sha256": "6db9b5ec9421a591dd59eb899673aa5675df4a4780ef842bde6336c6126f4a14"
+        },
+        {
+          "file": "reentry-repro-01/rumble-reentered.png",
+          "sha256": "983ad794ecdb965669c97dc14cb9967289c7d49d4d9d7c283d0f8fa0be0aa832"
+        },
+        {
+          "file": "reentry-repro-01/settings-before-rumble-entry.png",
+          "sha256": "119f4b23e8ff935c14ab3ec15c22b108f8aa2b934ea7193132ebb6c18f7928e2"
+        },
+        {
+          "file": "reentry-repro-01/settings-reentered.png",
+          "sha256": "fcc0783e982a98b79b24c5e2fbf495f5506f1d208387fdfd159c7b8e1a768408"
+        }
+      ]
+    },
+    "runtime_artifact": {
+      "target": "runtime-public Release",
+      "package_profile": "player",
+      "runtime_hash": "469c3435ffe289b7",
+      "identity_sha256": "f74230779a5292c6eeca2ec06c486cb626a3d2e8d6579db9249faab3cbdfca08",
+      "manifest_sha256": "6469f652133f60c7212ccc3332e1fbbdbaa5d27483e5d5038c3c81277f58f051",
+      "runtime_wasm_sha256": "2493c01dce61772485e5e3ca7c9dcf538caa562c73ff5d55035c38088b08e0aa",
+      "runtime_source_commit": "3fecf9f9ec07bea908765da2a7bb9b030e9fe30f"
+    }
+  },
+  "retained_experiments": [
+    {
+      "path": "browser-route-07/report.json",
+      "result": "Failed before browser launch because the installed Playwright package path was not configured; retained."
+    },
+    {
+      "path": "browser-route-08/report.json",
+      "result": "Source SaveData changed, but a toolbar dialog interrupted canvas focus and the test harness timed out. Its finally path unloaded the native owner successfully; the corrected runner reads native bytes without overlaying the live menu."
+    },
+    {
+      "path": "browser-route-09/interruption.json",
+      "result": "Interrupted capture with endpoint unknown; retained and not classified as route failure."
+    },
+    {
+      "path": "browser-route-10/report.json",
+      "result": "Source preference and autosave passed, but the harness expected Main before a second A. The observed source transition was already in CSS. Finally cleanup unloaded the native owner successfully; the corrected route assertion passed in browser-route-11."
+    },
+    {
+      "path": "browser-route-11/report.json",
+      "result": "Passing full rendered browser route and native owner unload."
+    },
+    {
+      "path": "reentry-repro-01/report.json",
+      "result": "Passing reduced repeated-entry rendered browser run. Browser context closed; native owner unload is verified by the separate full route."
+    }
+  ],
+  "claim_boundaries": {
+    "source_state": "Retail Observer source scene/menu IDs and SaveData effect; source callbacks identified.",
+    "navigation": "Browser uses ordinary B0XX controls through original Title, Main, Settings, Rumble, VS selection and CSS callbacks; repeated Settings/Rumble entry passed.",
+    "visuals": "Rendered browser screenshots show authored scenes, selected controller and OFF state. No retail visual or pixel comparison is claimed.",
+    "audio": "Unrun; headless public build has audio disabled, and retail reference used no audio output.",
+    "physical_input": "Unrun.",
+    "performance": "Unrun.",
+    "save": "Personal autosave, native snapshot, GCI export and post-reload preference retention passed; the existing Dolphin interoperability receipt independently records a game-written Rumble preference.",
+    "lifecycle": "Native source menu owner unload returned success and phase/running zero after the complete route."
+  },
+  "evidence_root": "/Volumes/AgentStorage/melee-web/runs/main-settings-rumble-route-20261003-20261002-215210-c20642af",
+  "validation": {
+    "full_test_command": "python3 -m unittest discover -s tests -v",
+    "full_test_result": "passed; 1734 tests in 345.209 seconds; process exit 0",
+    "full_test_log": "/Volumes/AgentStorage/melee-web/runs/main-settings-rumble-route-20261003-20261002-215210-c20642af/full-suite-pr-final.log",
+    "affected_build_command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime-public --configuration Release",
+    "affected_build_result": "passed; Ninja reported no work; runtime-public identity was regenerated for the recorded artifact hashes.",
+    "javascript_syntax": "node --check passed for tests/main_settings_rumble_browser_test.mjs and tests/main_rumble_entry_repro.mjs",
+    "inventory_validation": {
+      "command": "python3 scripts/full_game_report.py --out work/full-game-rumble-pr-audit-01",
+      "result": "passed; 88 scoped feature entries validated against 19,827 pinned source function symbols",
+      "output": "work/full-game-rumble-pr-audit-01"
+    }
+  }
+}
