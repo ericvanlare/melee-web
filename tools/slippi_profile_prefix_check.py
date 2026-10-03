@@ -56,10 +56,15 @@ def sha256_file(path: Path) -> str:
 
 
 def directory_sha256(path: Path) -> str:
-    if not path.is_dir():
-        fail(f"assets directory is missing: {path}")
+    path = path.expanduser()
+    if path.is_symlink() or not path.is_dir():
+        fail(f"assets directory is missing or symlinked: {path}")
     digest = hashlib.sha256()
-    for child in sorted(item for item in path.rglob("*") if item.is_file()):
+    for child in sorted(path.rglob("*")):
+        if child.is_symlink():
+            fail(f"assets entry is symlinked: {child}")
+        if not child.is_file():
+            continue
         relative = child.relative_to(path).as_posix().encode()
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
@@ -425,7 +430,10 @@ def main(argv: list[str]) -> int:
             "js_sha256": checked_hash(runtime, args.runtime_sha256, "runtime JS"),
             "wasm_sha256": checked_hash(wasm, args.wasm_sha256, "runtime Wasm"),
         }
-        assets_sha256 = directory_sha256(args.assets.resolve())
+        # Keep the lexical root until directory_sha256 has enforced the
+        # non-symlink asset-tree identity policy.  Resolving first would make
+        # a symlinked root indistinguishable from its target.
+        assets_sha256 = directory_sha256(args.assets)
         parser_path = Path(__file__).resolve().parents[1] / "tools/slippi_format.py"
         parser_sha256 = checked_hash(parser_path, sha256_file(parser_path), "Slippi parser")
         frames = normalized_frames(args.replay, args.scene_last)

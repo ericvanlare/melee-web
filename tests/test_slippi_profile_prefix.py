@@ -19,6 +19,37 @@ WORKER = ROOT / "tools/slippi_profile_prefix_runtime.mjs"
 
 
 class SourceProfilePrefixControlsTest(unittest.TestCase):
+    def test_asset_identity_rejects_symlinked_root_and_entries(self):
+        spec = importlib.util.spec_from_file_location("source_profile_asset_test", CHECKER)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            assets = root / "assets"
+            assets.mkdir()
+            owned = assets / "owned.dat"
+            owned.write_bytes(b"owned fixture")
+            self.assertEqual(len(module.directory_sha256(assets)), 64)
+
+            root_link = root / "assets-link"
+            root_link.symlink_to(assets, target_is_directory=True)
+            with self.assertRaisesRegex(module.CheckError, "directory.*symlinked"):
+                module.directory_sha256(root_link)
+
+            file_link = assets / "asset-link.dat"
+            file_link.symlink_to(owned)
+            with self.assertRaisesRegex(module.CheckError, "entry.*symlinked"):
+                module.directory_sha256(assets)
+            file_link.unlink()
+
+            nested_link = assets / "nested-link"
+            nested_link.symlink_to(root, target_is_directory=True)
+            with self.assertRaisesRegex(module.CheckError, "entry.*symlinked"):
+                module.directory_sha256(assets)
+
     def test_python_direct_parser_and_input_controls(self):
         result = subprocess.run(
             [sys.executable, str(CHECKER), "--self-test"],
