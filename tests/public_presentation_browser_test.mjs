@@ -8,11 +8,11 @@ import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.m
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 
 const {values} = parseArgs({options: Object.fromEntries(
-  ['url', 'disc', 'playwright', 'out', 'dpr'].map(name => [name, {type: 'string'}]))});
+  ['url', 'disc', 'playwright', 'out', 'dpr', 'manifest'].map(name => [name, {type: 'string'}]))});
 if (!values.url || !values.disc || !values.out)
-  throw Error('Use --url PUBLIC_ORIGIN --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR] [--dpr 1|2]');
+  throw Error('Use --url PUBLIC_ORIGIN --disc OWNED_DISC --out NEW_DIRECTORY [--playwright PACKAGE_DIR] [--dpr 1|2|3] [--manifest PACKAGE_MANIFEST]');
 const dpr = Number(values.dpr || 1);
-assert([1, 2].includes(dpr), 'Use DPR 1 or 2');
+assert([1, 2, 3].includes(dpr), 'Use DPR 1, 2 or 3');
 await fs.mkdir(path.dirname(values.out), {recursive: true});
 await fs.mkdir(values.out);
 const {chromium, browser: installedBrowser} = await loadBrowserTools(values.playwright);
@@ -22,6 +22,11 @@ const driver = createBrowserDriver(page, {surface: 'public', timeoutMs: 90000});
 const report = {schema: 'webmelee-public-presentation-v1', browser: browser.version(),
   browser_mode: 'headless', dpr, url: values.url, observations: [], errors: [], layoutFailures: [],
   scope: 'Original CSS in the public player with the touch overlay enabled: display geometry, WebGPU pixels, resize, DOM fullscreen and pointer coordinates. No OS fullscreen, timing or retail-equivalence claim.'};
+if (values.manifest) {
+  const manifest = JSON.parse(await fs.readFile(values.manifest, 'utf8'));
+  report.identity = {source_sha: manifest.source_sha, runtime_hash: manifest.runtime_hash,
+    identity_sha256: manifest.identity_sha256, profile: manifest.profile};
+}
 page.on('pageerror', error => report.errors.push(error.message));
 page.on('console', message => {if (message.type() === 'error') report.errors.push(message.text());});
 const frames = () => page.evaluate(() => new Promise(resolve =>

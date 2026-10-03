@@ -4362,7 +4362,7 @@ index 592b8ab..ad068b0 100644
    g_instance = {};
    cache_shutdown();
 diff --git a/lib/window.cpp b/lib/window.cpp
-index 2a4aadf..d237c78 100644
+index 2a4aadf..58ac741 100644
 --- a/lib/window.cpp
 +++ b/lib/window.cpp
 @@ -33,7 +33,9 @@ extern "C" void Android_UnlockActivityMutex(void);
@@ -4375,7 +4375,7 @@ index 2a4aadf..d237c78 100644
  #include "time_internal.hpp"
  #include "dolphin/vi/vi_internal.hpp"
  
-@@ -317,10 +319,16 @@ const AuroraEvent* poll_events() {
+@@ -317,9 +319,19 @@ const AuroraEvent* poll_events() {
  }
  
  bool create_window(AuroraBackend backend) {
@@ -4388,12 +4388,14 @@ index 2a4aadf..d237c78 100644
 +#endif
  #if TARGET_OS_IOS || TARGET_OS_TV
    flags |= SDL_WINDOW_FULLSCREEN;
--#else
-+#elif !defined(__EMSCRIPTEN__)
++#elif defined(__EMSCRIPTEN__)
++  if (g_config.startFullscreen) {
++    flags |= SDL_WINDOW_FULLSCREEN;
++  }
+ #else
    flags |= SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE;
    if (g_config.startFullscreen) {
-     flags |= SDL_WINDOW_FULLSCREEN;
-@@ -366,6 +374,12 @@ bool create_window(AuroraBackend backend) {
+@@ -366,6 +378,12 @@ bool create_window(AuroraBackend backend) {
      Log.error("Failed to create window: {}", SDL_GetError());
      return false;
    }

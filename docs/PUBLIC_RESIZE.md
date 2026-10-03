@@ -69,16 +69,21 @@ This can happen before SDL delivers its corresponding resize event.
 The downstream Aurora patch now queries the acquired texture's dimensions
 inside the presentation callback. It calculates the presentation viewport from
 those dimensions and the captured source texture size, and uses the same
-attachment dimensions for the scissor and ImGui viewport. Ordinary framebuffer
-resizing and aspect-preserving presentation remain enabled. The change does
+attachment dimensions for the scissor and ImGui viewport. This defensive bound
+remains in place with the fixed browser surface policy above. The change does
 not alter game simulation, source EFB drawing, pipeline descriptors, or the
 pinned upstream revision.
 
-`tests/public_resize_browser_test.mjs` exercises actual backing-store changes
-in a visible browser, including startup and an open Controls dialog. The old
-frozen candidate fails on the first narrow resize. The corrected candidate
-passes 14 observations, 13 before graphics preparation finishes. The full
-shared-controller browser test also passes with no browser errors.
+The historical acquired-surface receipt below exercised actual backing-store
+changes, including startup and an open Controls dialog. Its old frozen candidate
+failed on the first narrow resize. The corrected candidate passed 14 observations,
+13 before graphics preparation finished. Those results describe that earlier
+resizable-surface policy.
+
+`tests/public_resize_browser_test.mjs` now checks that CSS resize preserves the
+configured backing pixels during graphics preparation and with Controls open.
+It uses headless installed Chrome by default. The separate surface-resolution
+matrix above covers multiple device pixel ratios.
 
 ```sh
 node tests/public_resize_browser_test.mjs \
