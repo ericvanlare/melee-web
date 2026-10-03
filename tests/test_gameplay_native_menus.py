@@ -183,4 +183,20 @@ class NativeMenuSourceTests(unittest.TestCase):
                 self.assertIn("Native texture animation index exceeds its owned table",
                               rejected.stdout + rejected.stderr)
 
+    def test_original_main_display_assets_reenter_cleanly(self):
+        candidates = [ROOT / "build" / directory / "native_menu_scene_trace.js"
+                      for directory in ("browser", "browser-release")]
+        targets = [path for path in candidates if path.is_file()]
+        archive = ROOT / "assets-local/native-menus/MnMaAll.usd"
+        if not targets or not archive.is_file():
+            self.skipTest("Build the native menu scene trace and provide MnMaAll.usd")
+        target = max(targets, key=lambda path: path.stat().st_mtime)
+        run = subprocess.run([str(node_runtime()), str(target), "--main-display", str(archive)],
+                             cwd=ROOT, capture_output=True, text=True, timeout=60)
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn(
+            "Original Main Display model, animation, material and shape exports hydrate and release across two worlds",
+            run.stdout,
+        )
+
 if __name__ == "__main__": unittest.main()
