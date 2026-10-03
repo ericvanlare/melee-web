@@ -559,9 +559,24 @@ static int stage_selection_valid(int stkind, int allow_unselected)
            melee_web_menu_stage_available(stkind);
 }
 
+static int team_selection_valid(const StartMeleeData* start, int count,
+                                int allow_same_team)
+{
+    if (start == NULL || start->rules.is_teams > 1) return 0;
+    if (!start->rules.is_teams) return 1;
+
+    /* The source CSS exposes three team colours and refuses Start until two
+     * active doors belong to different teams. This route currently owns the
+     * original two-player case; larger team rosters remain unsupported. */
+    return count == 2 && start->players[0].team < 3 &&
+           start->players[1].team < 3 &&
+           (allow_same_team || start->players[0].team != start->players[1].team);
+}
+
 static int css_selection_valid_internal(const CSSData* css,
                                         int allow_unselected_stage,
-                                        int allow_unavailable_progress_character)
+                                        int allow_unavailable_progress_character,
+                                        int allow_same_team)
 {
     int i;
     int count;
@@ -569,7 +584,6 @@ static int css_selection_valid_internal(const CSSData* css,
     if (css == NULL || css->match_type != VS_MELEE ||
         css->vs.start.rules.match_kind != MatchKind_Time ||
         css->vs.start.rules.is_stock || css->vs.start.rules.is_vs ||
-        css->vs.start.rules.is_teams ||
         css->vs.start.rules.timer_enabled || css->vs.start.rules.xB != 2 ||
         css->vs.start.rules.x20 != UINT64_MAX ||
         !stage_selection_valid(css->vs.start.rules.stkind,
@@ -582,6 +596,7 @@ static int css_selection_valid_internal(const CSSData* css,
     {
         return 0;
     }
+    if (!team_selection_valid(&css->vs.start, count, allow_same_team)) return 0;
     for (i = 0; i < count; i++) {
         const PlayerInitData* player=&css->vs.start.players[i];
         const MeleeWebFighterContent* content=melee_web_fighter_content(player->ckind);
@@ -624,7 +639,7 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
     /* fn_80262F44 uses this guard before accepting Start. CSS has selected
      * fighters, but the following SSS still owns the stage selection. Keep
      * the original unset cache value until that scene commits its stage. */
-    return css_selection_valid_internal(css, 1, 0);
+    return css_selection_valid_internal(css, 1, 0, 0);
 }
 
 static int match_selection_valid(const StartMeleeData* start)
@@ -634,7 +649,7 @@ static int match_selection_valid(const StartMeleeData* start)
 
     if (start == NULL || start->rules.match_kind != MatchKind_Stock ||
         !start->rules.is_stock || !start->rules.is_vs ||
-        start->rules.is_teams || !melee_web_match_timer_supported(&start->rules) ||
+        !melee_web_match_timer_supported(&start->rules) ||
         /* The original mask persists while the None frequency disables items. */
         start->rules.xB != -1 ||
         !melee_web_menu_stage_available(start->rules.stkind))
@@ -645,6 +660,7 @@ static int match_selection_valid(const StartMeleeData* start)
     if (count == 0) {
         return 0;
     }
+    if (!team_selection_valid(start, count, 0)) return 0;
     for (i = 0; i < count; ++i) {
         const PlayerInitData* player = &start->players[i];
         const MeleeWebFighterContent* content =
@@ -699,7 +715,11 @@ static int css_progress_valid(const CSSData* css)
             p->ckind = CKIND_MARIO;
         }
     }
-    return css_selection_valid_internal(&view, 1, 1);
+    /* The retail cursor enables Teams before the player chooses an opposing
+     * color. Keep that intermediate CSS state live while still requiring the
+     * two authored team IDs to remain in range. CSS exit and match admission
+     * continue to require opposing teams through the strict validator. */
+    return css_selection_valid_internal(&view, 1, 1, 1);
 }
 
 static int vs_selection_valid(const VsModeData* vs, int allow_unselected_stage)
@@ -711,7 +731,7 @@ static int vs_selection_valid(const VsModeData* vs, int allow_unselected_stage)
     memset(&view, 0, sizeof(view));
     view.match_type = VS_MELEE;
     view.vs = *vs;
-    return css_selection_valid_internal(&view, allow_unselected_stage, 0);
+    return css_selection_valid_internal(&view, allow_unselected_stage, 0, 0);
 }
 
 int melee_web_menu_sss_selection_valid(const SSSData* sss)
@@ -928,7 +948,7 @@ int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
         return 0;
     }
     if (session->phase != MELEE_WEB_MENU_SSS_READY ||
-        !css_selection_valid_internal(&session->css, 1, 0))
+        !css_selection_valid_internal(&session->css, 1, 0, 0))
     {
         return fail(error, error_size,
                     "SSS requires a valid committed Mario CSS selection");
@@ -1085,7 +1105,7 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
                     "CSS has no completed original transition request");
     }
     parent_route = session->css_parent_route_requested;
-    if (!css_selection_valid_internal(&session->css, 1, 0)) {
+    if (!css_selection_valid_internal(&session->css, 1, 0, parent_route)) {
         return fail(error, error_size,
                     "Cannot commit an unavailable character selection");
     }
@@ -1117,7 +1137,7 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
     }
     /* OnExit may publish source-private selection state. Validate that
      * payload before making the next scene available to the host. */
-    if (!css_selection_valid_internal(&session->css, 1, 0)) {
+    if (!css_selection_valid_internal(&session->css, 1, 0, parent_route)) {
         session->phase = MELEE_WEB_MENU_CLOSED;
         return fail(error, error_size, "CSS published an unavailable selection");
     }

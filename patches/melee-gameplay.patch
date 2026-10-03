@@ -1601,7 +1601,7 @@ index cd7e31a..98fa9d4 100644
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2319,188 @@ int fn_8016F160(int arg0, int arg1)
+@@ -2277,3 +2319,193 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -1625,7 +1625,7 @@ index cd7e31a..98fa9d4 100644
 +               data->match_result == OUTCOME_NO_CONTEST;
 +    }
 +    if (gm_GetCurrentGameMode() != GM_VS || !data->x24C8.is_vs ||
-+        data->x24C8.match_kind != MatchKind_Stock || data->x24C8.is_teams ||
++        data->x24C8.match_kind != MatchKind_Stock ||
 +        data->x24C8.x4_4 || data->is_singleplayer ||
 +        data->x24C8.on_frame_start || data->x24C8.on_frame_end ||
 +        data->x24C8.x3_2 || gm_1601_GetUnkData()->unk_10_b1 ||
@@ -1725,14 +1725,14 @@ index cd7e31a..98fa9d4 100644
 +        if (rules->match_kind > MatchKind_Bonus || rules->timer_enabled ||
 +            rules->time_limit != 0 || rules->x1_0 || !rules->x1_2 ||
 +            !rules->x1_3 || !rules->disable_pausing || rules->x7 != 0 ||
-+            rules->x20 != (u64) -1 || rules->xB != 2 ||
++            rules->is_teams || rules->x20 != (u64) -1 || rules->xB != 2 ||
 +            rules->game_speed != 1.0F || rules->x54 != NULL ||
 +            rules->on_match_start != gm_80183218 ||
 +            rules->on_frame_start != NULL || rules->on_frame_end != NULL ||
 +            rules->on_match_end != NULL || !melee_web_stage_content(rules->stkind))
 +            return 0;
 +    } else if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
-+               !rules->is_vs || rules->is_teams ||
++               !rules->is_vs || rules->is_teams > 1 ||
 +               !melee_web_match_timer_supported(rules) ||
 +               !melee_web_stage_content(rules->stkind) ||
 +               rules->xB != -1 ||
@@ -1749,12 +1749,17 @@ index cd7e31a..98fa9d4 100644
 +        if (content == NULL || !melee_web_match_player_supported(player) ||
 +            player->stocks < 1 || player->stocks > (opening_demo ? 99 : 5) ||
 +            player->color >= content->costumes || player->sub_color > 4 ||
-+            player->team != 0 || player->slot > 4 || player_id != i) return 0;
++            (opening_demo && player->team != 0) ||
++            (!opening_demo && rules->is_teams && player->team > 2) ||
++            player->slot > 4 || player_id != i) return 0;
 +        if (opening_demo &&
 +            (player->slot_type != Gm_PKind_Cpu || player->cpu_kind != 4 ||
 +             player->cpu_level != 9)) return 0;
 +    }
 +    if (opening_demo ? i != 4 : i < 2) return 0;
++    if (!opening_demo && rules->is_teams &&
++        (i != 2 || start->players[0].team == start->players[1].team))
++        return 0;
 +    for (; i < 6; ++i)
 +        if (start->players[i].slot_type != Gm_PKind_NA) return 0;
 +    return 1;
@@ -2555,7 +2560,7 @@ diff --git a/src/melee/it/kinds/itlinkhookshot.c b/src/melee/it/kinds/itlinkhook
          link_0 = link_1;
          link_1 = link_1->prev;
      }
-@@ -1780,3 +1785,4 @@
+@@ -1780,4 +1785,5 @@
      return 1;
  }
 +#undef IT_HOOKSHOT_NORMALIZE_678C
@@ -5361,19 +5366,7 @@ index 4a66512..2e85ce4 100644
  
                  if (cursor->xC < -25.5f && cursor->x10 > 22.0f) {
                      switch ((s32) mnCharSel_804D6CB0->match_type) {
-@@ -2923,6 +2935,11 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
-                     case VS_SLOWMO:
-                         cursor->x8 = 1;
-                         if (trigger & HSD_PAD_A) {
-+#if defined(MELEE_WEB_MENU_MARIO_FD)
-+                            /* Team rules are outside this two-human stock slice. */
-+                            lbAudioAx_80024030(3);
-+                            goto update_display;
-+#endif
-                             sfxMove();
-                             {
-                                 u8* is_teams = &mnCharSel_804D6CB0->vs.start
-@@ -2971,7 +2988,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
+@@ -2971,7 +2983,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      u8 cport2 = cursor->x4;
                      if (mnCharSel_804A0BD0[cport2]->x5 == 0 &&
                          mnCharSel_804D6CB0->vs.start.rules.is_teams == 0 &&
@@ -10942,7 +10935,7 @@ diff --git a/src/sysdolphin/baselib/dobj.c b/src/sysdolphin/baselib/dobj.c
 index aa765eb..a12db8a 100644
 --- a/src/sysdolphin/baselib/dobj.c
 +++ b/src/sysdolphin/baselib/dobj.c
-@@ -193,10 +193,29 @@ static int DObjLoad(HSD_DObj* dobj, HSD_DObjDesc* desc)
+@@ -193,11 +193,30 @@ static int DObjLoad(HSD_DObj* dobj, HSD_DObjDesc* desc)
              HSD_DObjModifyFlags(dobj, 4, 0xE);
              break;
          default:

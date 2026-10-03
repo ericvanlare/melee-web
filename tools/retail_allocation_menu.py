@@ -221,6 +221,9 @@ def _cold_boot_enter_sss():
             set_cpu_mode(door)
             set_cpu_level(door,int(player['cpu_level']))
     players=[css_player(i) for i in range(len(EXPECTED_PLAYERS))]
+    if EXPECTED.get('teams_enabled',False):
+        _cold_boot_configure_teams()
+        players=[css_player(i) for i in range(len(EXPECTED_PLAYERS))]
     if [(p['character_kind'],p['costume'],p['slot_type']) for p in players] != expected_css:
         raise RuntimeError(f'cold CSS roster setup mismatch: expected {{expected_css}}, got {{players}}')
     if [p['team'] for p in players] != EXPECTED_TEAMS:
@@ -295,7 +298,10 @@ def _menu_route_snapshot(event):
         pointer=u32(0x804D6CB0)
         if not 0x80000000<=pointer<=0x81800000-0x100:
             raise RuntimeError('invalid original CSS data owner during route capture')
-        row['css_data_hex']=mem(pointer+0x10,0xF0).hex()
+        css_data=mem(pointer+0x10,0xF0)
+        row['css_data_hex']=css_data.hex()
+        row['css_setup']={'is_teams':css_data[8],
+                          'player_teams':[css_data[0x69],css_data[0x8D]]}
         cursors=[]
         for port in range(4):
             cursor_pointer=u32(0x804A0BC0+port*4)
@@ -475,6 +481,42 @@ def cold_boot_css_menu_round_trip():
 
 
 _VS_RULES_ITEMS_ROUTE_HELPERS = r'''
+def _css_team_setup_state():
+    pointer=u32(0x804D6CB0)
+    if not 0x80000000<=pointer<=0x81800000-0x100:
+        raise RuntimeError('invalid original CSSData owner during team setup')
+    raw=mem(pointer+0x10,0xF0)
+    return {'is_teams':raw[8],
+            'player_teams':[raw[0x69],raw[0x8D]]}
+
+def _cold_boot_configure_teams():
+    before=_css_team_setup_state()
+    if before['is_teams']!=0 or before['player_teams']!=[0,0]:
+        raise RuntimeError(f'fresh CSS team defaults differ from the declared source setup: {before}')
+
+    move_cursor(0,-30.0,23.3)
+    _record_menu_route_marker('teams_toggle_before')
+    pulse(0,'A',settle=24)
+    toggled=_css_team_setup_state()
+    if toggled['is_teams']!=1:
+        raise RuntimeError(f'original CSS Teams control did not enable team rules: {toggled}')
+    _record_menu_route_marker('teams_toggle_after')
+
+    door_raw=mem(0x803F0DFC+0x24,0x24)
+    left,right=struct.unpack_from('>ff',door_raw,0x1C)
+    if not left<right:
+        raise RuntimeError(f'original P2 team-color bounds are invalid: {left}/{right}')
+    move_cursor(0,(left+right)/2,-3.4)
+    before_color=_css_team_setup_state()
+    if before_color['player_teams']!=[0,0]:
+        raise RuntimeError(f'CSS Teams toggle unexpectedly changed player colors: {before_color}')
+    _record_menu_route_marker('p2_team_color_before')
+    pulse(0,'A',settle=24)
+    after_color=_css_team_setup_state()
+    if after_color!={'is_teams':1,'player_teams':[0,1]}:
+        raise RuntimeError(f'original P2 team-color control did not select team 1: {after_color}')
+    _record_menu_route_marker('p2_team_color_after')
+
 def _vs_start_data_state():
     # Source identities from mn/types.h: StartMeleeRules is 0x60 bytes,
     # followed by six 0x24-byte PlayerInitData rows. gmVsMelee_StartData is
@@ -491,7 +533,8 @@ def _vs_start_data_state():
                         'rumble_enabled':raw[offset+12]&1,
                         'cpu_kind':raw[offset+14],
                         'cpu_level':raw[offset+15]})
-    return {'item_frequency':struct.unpack('b',raw[0x15:0x16])[0],
+    return {'is_teams':raw[0x08],
+            'item_frequency':struct.unpack('b',raw[0x15:0x16])[0],
             'stage':struct.unpack('>H',raw[0x18:0x1A])[0],
             'item_mask_hex':f'{int.from_bytes(raw[0x30:0x38],"big"):016x}',
             'players':players}
