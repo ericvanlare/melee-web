@@ -50,6 +50,13 @@ rejects malformed records, and enforces four records and 256 KiB across retained
 records. Current triggers take priority over prior visits even if the wall clock
 changes. Storage denial, quota exhaustion, unsupported storage and recorder
 errors are optional diagnostic failures; Personal progress remains independent.
+Hidden, pagehide and freeze events also request a local checkpoint outside the
+native callback, before the ordinary deferred task may be discarded. Returning
+to the visible page cancels a checkpoint that has not begun. Orderly teardown
+waits at most 250 ms for a fresh local snapshot after native unload. It does not
+wait for network delivery or delay Resume. Storage already in flight remains
+best effort; a timeout does not cancel an IndexedDB transaction or prove that
+the report was saved.
 Flags distinguish unavailable storage, failed persistence, malformed retained
 data, eviction and truncation. Successful persistence is best effort; a hard
 browser/process crash can prevent capture or completion.

@@ -1549,6 +1549,23 @@ export function createRuntimeDiagnostics(options = {}) {
     return persistPromise;
   }
 
+  // A lifecycle owner can already have queued an ordinary inactive persist.
+  // Wait for that write, then take a fresh bounded snapshot only if the owner
+  // is still eligible.  This keeps pagehide/freeze persistence out of the
+  // native callback while preventing a stale snapshot from being reported as
+  // the current incident.
+  async function checkpoint({eligible = () => true} = {}) {
+    try {
+      await Promise.resolve();
+      while (persistPromise) await persistPromise;
+      if (typeof eligible !== 'function' || !eligible())
+        return {persisted: false, reason: 'cancelled', count: 0};
+      return await persist();
+    } catch {
+      return {persisted: false, reason: 'failed', count: 0};
+    }
+  }
+
   async function exportRetained() {
     const adapter = storageAdapter();
     if (!adapter) {
@@ -1628,6 +1645,7 @@ export function createRuntimeDiagnostics(options = {}) {
     setActive,
     drain,
     persist,
+    checkpoint,
     exportRetained,
     loadRetained,
     exportReports,

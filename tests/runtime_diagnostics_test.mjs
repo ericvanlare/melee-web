@@ -289,4 +289,51 @@ const nativeRow = (timestamp, sourceFrame = 12) => [
   assert.equal(merges, 1);
 }
 
+// A lifecycle checkpoint waits for an ordinary inactive write and then
+// serializes a fresh report.  The second incident must not be lost in the
+// first write's snapshot, and a quick Resume eligibility change cancels before
+// any storage operation begins.
+{
+  let merges = 0;
+  let retained = [];
+  let releaseFirst;
+  const diagnostics = createRuntimeDiagnostics({storage: {
+    merge(records) {
+      merges++;
+      if (merges === 1) {
+        return new Promise(resolve => {
+          releaseFirst = () => {
+            retained = records;
+            resolve({records, bytes: records.length, evictedCount: 0, malformedCount: 0});
+          };
+        });
+      }
+      retained = records;
+      return {records, bytes: records.length, evictedCount: 0, malformedCount: 0};
+    },
+  }});
+  diagnostics.trigger(1, 1, 8, -1, 7, 1);
+  const ordinary = diagnostics.setActive(false);
+  for (let i = 0; merges === 0 && i < 20; i++)
+    await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(merges, 1, 'the ordinary inactive persist reaches storage first');
+  diagnostics.trigger(2, 61, 60, -1, 7, 2);
+  const fresh = diagnostics.checkpoint({eligible: () => true});
+  releaseFirst();
+  await ordinary;
+  await fresh;
+  assert.equal(merges, 2, 'checkpoint performs a fresh write after the old write settles');
+  assert.equal(retained.length, 2, 'fresh checkpoint includes the later incident');
+
+  let cancelledMerges = 0;
+  let eligible = false;
+  const cancelled = createRuntimeDiagnostics({storage: {
+    merge(records) { cancelledMerges++; return {records, bytes: records.length}; },
+  }});
+  cancelled.trigger(1, 1, 8, -1, 7, 1);
+  const cancelledResult = await cancelled.checkpoint({eligible: () => eligible});
+  assert.equal(cancelledResult.reason, 'cancelled');
+  assert.equal(cancelledMerges, 0, 'cancellation rechecks eligibility before storage');
+}
+
 console.log('Runtime diagnostics bounds, privacy, host mapping, recovery and storage failure tests passed.');

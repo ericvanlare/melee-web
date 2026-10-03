@@ -19,6 +19,7 @@ const IMPORT_BATCH_MAX_FILES = 8;
 const IMPORT_BATCH_MAX_BYTES = 8 * 1024 * 1024;
 const IMPORT_BATCH_MAX_MS = 8;
 const SOURCE_STREAM_FILES = Object.freeze(['MvOpen.mth', 'MvHowto.mth', 'MvOmake15.mth']);
+const DIAGNOSTIC_DESTROY_PERSIST_TIMEOUT_MS = 250;
 
 export async function mountMeleeRuntime({canvas, onState = () => {}, onError = () => {},
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
@@ -94,6 +95,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let diagnostics = null, diagnosticActive = true, longtaskObserver = null, diagnosticPreparationAt = null;
   let diagnosticDelivery = null, diagnosticDeliveryTimer = null, diagnosticRetainedLoaded = false;
   let diagnosticGeneration = 0;
+  let diagnosticCheckpointPromise = null, diagnosticCheckpointSuspended = false;
+  let diagnosticCheckpointRequested = false, diagnosticCheckpointDestroyWindow = false;
+  let diagnosticCheckpointClosed = false;
   let automaticDiagnostics = readDiagnosticsPreference();
   function diagnosticDeliveryBlocked() {
     // Fatal owners cannot consume another native handoff. Once visible, their
@@ -105,6 +109,59 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     diagnosticGeneration++;
     if (diagnosticDeliveryTimer !== null) clearTimeout(diagnosticDeliveryTimer);
     diagnosticDeliveryTimer = null;
+  }
+  function requestDiagnosticCheckpoint() {
+    diagnosticCheckpointRequested = true;
+    if (!diagnostics) {
+      diagnosticCheckpointRequested = false;
+      return Promise.resolve({persisted: false, reason: 'unavailable'});
+    }
+    if (diagnosticCheckpointPromise) return diagnosticCheckpointPromise;
+    const eligible = () => !diagnosticCheckpointClosed &&
+      (diagnosticCheckpointSuspended || diagnosticCheckpointDestroyWindow);
+    // One job owns all lifecycle persistence.  A request received while its
+    // recorder write is pending becomes one fresh iteration after that write;
+    // it never serializes from the native callback or uses a stale snapshot.
+    let promise;
+    promise = Promise.resolve().then(async () => {
+      try {
+        let result = {persisted: false, reason: 'cancelled'};
+        while (diagnosticCheckpointRequested && eligible()) {
+          diagnosticCheckpointRequested = false;
+          try { result = await diagnostics.checkpoint({eligible}); }
+          catch { result = {persisted: false, reason: 'failed'}; }
+        }
+        return result;
+      } catch {
+        return {persisted: false, reason: 'failed'};
+      } finally {
+        if (diagnosticCheckpointPromise === promise) diagnosticCheckpointPromise = null;
+      }
+    });
+    diagnosticCheckpointPromise = promise;
+    return promise;
+  }
+  function beginDiagnosticCheckpoint() {
+    diagnosticCheckpointSuspended = true;
+    try { void requestDiagnosticCheckpoint(); } catch {}
+  }
+  function resetDiagnosticCheckpoint() {
+    diagnosticCheckpointSuspended = false;
+    diagnosticCheckpointRequested = false;
+  }
+  function awaitDiagnosticCheckpoint(timeoutMs = DIAGNOSTIC_DESTROY_PERSIST_TIMEOUT_MS) {
+    diagnosticCheckpointDestroyWindow = true;
+    const job = requestDiagnosticCheckpoint();
+    let timeout;
+    const deadline = new Promise(resolve => {
+      timeout = setTimeout(() => resolve({persisted: false, reason: 'timeout'}), timeoutMs);
+    });
+    return Promise.race([job, deadline]).finally(() => {
+      clearTimeout(timeout);
+      diagnosticCheckpointDestroyWindow = false;
+      diagnosticCheckpointClosed = true;
+      diagnosticCheckpointRequested = false;
+    });
   }
   function scheduleDiagnosticDelivery() {
     if (!diagnostics || !diagnosticDelivery || diagnosticActive || destroyed ||
@@ -293,7 +350,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   function stop(error) {
     if (fatal || destroyed) return;
-    try { diagnostics?.trigger(4, null, null, null, null, 0); } catch {}
+    try { diagnosticIncident(4, null, null, null, null, 0); } catch {}
     diagnosticActivity(false);
     fatal = true; message = String(error?.message || error || 'Player stopped. Reload to recover.');
     clearStartupTimeout();
@@ -329,9 +386,17 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     if (running) preparationKeepsAudio = false;
     audio?.setEnabled(enabled);
   }
+  function diagnosticIncident(...args) {
+    const result = diagnostics?.trigger(...args);
+    const reason = Number(args[0]);
+    if ([1, 2, 3, 4, 8].includes(reason) && diagnosticCheckpointSuspended) {
+      try { void requestDiagnosticCheckpoint(); } catch {}
+    }
+    return result;
+  }
   const callbacks = {
     menuDiagnosticSample: diagnostics?.observeNative || (() => {}),
-    menuDiagnosticIncident: diagnostics?.trigger || (() => {}),
+    menuDiagnosticIncident: diagnosticIncident,
     menuAudio(pcm) {
       if (!audio) throw Error('Audio output is disabled in this public alpha.');
       audio.write(pcm);
@@ -430,14 +495,21 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       // A paused document may already be inactive. Force the delivery adapter
       // back to its active state until native consumes the sticky handoff.
       diagnosticActivity(diagnosticActive);
-    } else if (fatal) {
-      diagnosticActivity(false);
+      beginDiagnosticCheckpoint();
+    } else {
+      resetDiagnosticCheckpoint();
+      if (fatal) {
+        diagnosticActivity(false);
+      }
     }
   });
   for (const type of ['pagehide', 'pageshow', 'freeze', 'resume']) listen(type, () => {
     if (type === 'pagehide' || type === 'freeze') {
       lifecycleSuspended = true;
       diagnosticActivity(diagnosticActive);
+      beginDiagnosticCheckpoint();
+    } else {
+      resetDiagnosticCheckpoint();
     }
     diagnosticLifecycle(type);
   });
@@ -740,6 +812,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         }
         destroyed = true; syncAudio();
         diagnosticLifecycle('scene_exit'); diagnosticActivity(false);
+        try { await awaitDiagnosticCheckpoint(); } catch {}
         cancelDiagnosticDelivery(); diagnosticDelivery?.dispose();
         longtaskObserver?.disconnect();
         discSession?.close(); discSession = null;

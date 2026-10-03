@@ -19,6 +19,7 @@ class RuntimeDiagnosticsTest(unittest.TestCase):
         self.assertIn("function lifecycle(", source)
         self.assertIn("function audio(", source)
         self.assertIn("function setActive(", source)
+        self.assertIn("async function checkpoint(", source)
         self.assertIn("function exportReports(", source)
         self.assertIn("melee-web-runtime-diagnostics", source)
         self.assertIn("objectStoreNames.contains(DIAGNOSTICS_STORE_NAME)", source)

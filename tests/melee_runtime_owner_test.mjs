@@ -18,9 +18,29 @@ const adapterRetry = process.argv.includes('--adapter-retry');
 const adapterTimeoutLate = process.argv.includes('--adapter-timeout-late');
 const adapterDeadlineSpan = process.argv.includes('--adapter-deadline-span');
 const lifecycleHandoff = process.argv.includes('--lifecycle-handoff');
-const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host');
+const diagnosticsRetentionCheckpoint = process.argv.includes('--diagnostics-retention-checkpoint');
+const diagnosticsRetentionDestroy = process.argv.includes('--diagnostics-retention-destroy');
+const diagnosticsRetentionDenied = process.argv.includes('--diagnostics-retention-denied');
+const diagnosticsRetentionStalled = process.argv.includes('--diagnostics-retention-stalled');
+const diagnosticsRetentionQuota = process.argv.includes('--diagnostics-retention-quota');
+const diagnosticsRetentionResumeCancel = process.argv.includes('--diagnostics-retention-resume-cancel');
+const diagnosticsRetentionFollowup = process.argv.includes('--diagnostics-retention-followup');
+const diagnosticsRetentionOrdinaryPauseDestroy = process.argv.includes('--diagnostics-retention-ordinary-pause-destroy');
+const diagnosticsRetentionHiddenFatal = process.argv.includes('--diagnostics-retention-hidden-fatal');
+const diagnosticsRetentionEmptyThenDestroy = process.argv.includes('--diagnostics-retention-empty-destroy');
+const diagnosticsRetentionFailedThenDestroy = process.argv.includes('--diagnostics-retention-failed-destroy');
+const diagnosticsRetentionMode = diagnosticsRetentionCheckpoint || diagnosticsRetentionDestroy ||
+  diagnosticsRetentionDenied || diagnosticsRetentionStalled || diagnosticsRetentionQuota ||
+  diagnosticsRetentionResumeCancel || diagnosticsRetentionFollowup || diagnosticsRetentionOrdinaryPauseDestroy ||
+  diagnosticsRetentionHiddenFatal ||
+  diagnosticsRetentionEmptyThenDestroy ||
+  diagnosticsRetentionFailedThenDestroy;
+const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode;
 const diagnosticIdentity = {schema_version: 1, source_commit: 'a'.repeat(40), runtime_hash: 'b'.repeat(16), build_profile: 'player'};
 const diagnosticFetches = [];
+const diagnosticStorageRecords = [];
+let diagnosticStorageMergeCalls = 0;
+let releaseDiagnosticStorageFirst = null;
 let diagnosticPreference = 'on';
 if (diagnosticsKnownHost) {
   globalThis.location = {origin: 'https://webmelee.gg'};
@@ -29,6 +49,31 @@ if (diagnosticsKnownHost) {
     return {status: 201};
   };
   globalThis.indexedDB = {open() { throw Object.assign(new Error('denied'), {name: 'NotAllowedError'}); }};
+  if (diagnosticsRetentionMode && !diagnosticsRetentionDenied) {
+    globalThis.testDiagnosticsStorage = {
+      load() { return diagnosticStorageRecords.slice(); },
+      merge(records) {
+        ++diagnosticStorageMergeCalls;
+        if (diagnosticsRetentionStalled) return new Promise(() => {});
+        if (diagnosticsRetentionQuota) {
+          return Promise.reject(Object.assign(new Error('quota'), {name: 'QuotaExceededError'}));
+        }
+        if ((diagnosticsRetentionFollowup || diagnosticsRetentionOrdinaryPauseDestroy || diagnosticsRetentionHiddenFatal) &&
+            diagnosticStorageMergeCalls === 1) {
+          return new Promise(resolve => {
+            releaseDiagnosticStorageFirst = () => {
+              diagnosticStorageRecords.splice(0, diagnosticStorageRecords.length, ...records);
+              resolve({records, bytes: records.length, evictedCount: 0, malformedCount: 0});
+            };
+          });
+        }
+        if (diagnosticsRetentionFailedThenDestroy && diagnosticStorageMergeCalls === 1)
+          return Promise.reject(Object.assign(new Error('quota'), {name: 'QuotaExceededError'}));
+        diagnosticStorageRecords.splice(0, diagnosticStorageRecords.length, ...records);
+        return {records, bytes: records.length, evictedCount: 0, malformedCount: 0};
+      },
+    };
+  }
   globalThis.localStorage = {
     getItem() { return diagnosticPreference; },
     setItem(_key, value) { diagnosticPreference = value; },
@@ -36,9 +81,16 @@ if (diagnosticsKnownHost) {
 }
 if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
-const source = original.replace(
+let source = original.replace(
   "import {loadNativeGameDisc, openNativeGameDiscSession} from './runtime-assets.mjs';",
   'const loadNativeGameDisc = globalThis.testDiscReader; const openNativeGameDiscSession = globalThis.testOpenNativeGameDiscSession;');
+if (diagnosticsRetentionMode && !diagnosticsRetentionDenied) {
+  source = source.replace(
+    'createRuntimeDiagnostics({identity:',
+    'createRuntimeDiagnostics({storage: globalThis.testDiagnosticsStorage, identity:');
+  assert.match(source, /createRuntimeDiagnostics\(\{storage: globalThis\.testDiagnosticsStorage,/,
+    'Retention fixture must install the controlled local storage adapter');
+}
 let phase = 0, running = false, nextPointer = 16,
   cacheWaits = startupCacheDelay ? 2 : startupCacheTimeout ? Number.MAX_SAFE_INTEGER : 0, audioClosed = false;
 let rendererStarted = false, cacheIdleCalls = 0;
@@ -361,12 +413,221 @@ if (diagnosticsKnownHost) {
   const sample = [100, 12, 1, 2, 3, 4, 5, 6, 9, 1, 2, 3, 4, 5, 6, 7, 8, 1];
   phase = 1; running = true; window.menuFrame(true);
   owner.callbacks.menuDiagnosticSample(...sample);
-  const incidentId = owner.callbacks.menuDiagnosticIncident(1, 9, 8, 12, 1, 1);
-  assert.match(incidentId, /^incident-[0-9]+$/);
+  let incidentId = null;
+  if (!diagnosticsRetentionEmptyThenDestroy) {
+    incidentId = owner.callbacks.menuDiagnosticIncident(1, 9, 8, 12, 1, 1);
+    assert.match(incidentId, /^incident-[0-9]+$/);
+  }
   const activeReport = owner.diagnostics.exportReports();
   assert.deepEqual(activeReport.identity, diagnosticIdentity, 'Known HTTPS host keeps caller-provided safe identity');
   assert.equal(activeReport.native.callback_count, 1, 'Native scalar callback crosses the owner boundary');
-  assert.equal(activeReport.incidents.length, 1, 'Structured incident trigger crosses the owner boundary');
+  assert.equal(activeReport.incidents.length, diagnosticsRetentionEmptyThenDestroy ? 0 : 1,
+    'Structured incident trigger crosses the owner boundary');
+  if (diagnosticsRetentionMode) {
+    const dispatch = type => { for (const listener of listeners.get(type) || []) listener(); };
+    phase = 1; running = false; window.menuFrame(false);
+    const drainMicrotasks = async count => {
+      for (let i = 0; i < count; i++) await Promise.resolve();
+    };
+    const destroyBeforeDeferredPersistence = async () => {
+      let destroySettled = false, destroyFailure = null, destroyedBeforePersist = null;
+      const destroyStartedAt = Date.now();
+      const destroyPromise = player.destroy().then(value => {
+        destroyedBeforePersist = value;
+        destroySettled = true;
+      }, error => {
+        destroyFailure = error;
+        destroySettled = true;
+      });
+      // Drain only native command/microtask boundaries. Do not wait for a
+      // timer: the regression observes the owner before deferred persistence.
+      for (let i = 0; !destroySettled && i < 64; i++) {
+        window.menuServiceCommands();
+        await Promise.resolve();
+      }
+      await destroyPromise;
+      if (destroyFailure) throw destroyFailure;
+      assert.equal(destroySettled, true, 'Orderly destroy must finish through controlled native boundaries');
+      assert.equal(destroyedBeforePersist.requiresReload, true);
+      return Date.now() - destroyStartedAt;
+    };
+    if (diagnosticsRetentionResumeCancel) {
+      document.hidden = true;
+      dispatch('visibilitychange');
+      document.hidden = false;
+      dispatch('visibilitychange');
+      dispatch('pageshow');
+      dispatch('resume');
+      await drainMicrotasks(8);
+      assert.equal(diagnosticStorageMergeCalls, 0,
+        'Hide followed by visible/resume before the checkpoint microtask must not serialize');
+      phase = 1; running = true; window.menuFrame(true);
+      owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+      await drainMicrotasks(8);
+      assert.equal(diagnosticStorageMergeCalls, 0,
+        'Active gameplay after a cancelled checkpoint must not serialize diagnostics');
+      assert.equal(diagnosticFetches.length, 0, 'Cancelled lifecycle checkpoint never starts delivery');
+      console.log('Shared runtime owner: lifecycle checkpoint cancels before visible gameplay and stays off the active path.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionFollowup) {
+      document.hidden = true;
+      dispatch('visibilitychange');
+      await drainMicrotasks(6);
+      assert.equal(diagnosticStorageMergeCalls, 1, 'The first suspended checkpoint must reach storage once');
+      assert.equal(typeof releaseDiagnosticStorageFirst, 'function');
+      document.hidden = false;
+      dispatch('visibilitychange');
+      dispatch('pageshow');
+      dispatch('resume');
+      phase = 1; running = true; window.menuFrame(true);
+      owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+      phase = 1; running = false; window.menuFrame(false);
+      document.hidden = true;
+      dispatch('visibilitychange');
+      releaseDiagnosticStorageFirst();
+      await drainMicrotasks(24);
+      assert.ok(diagnosticStorageMergeCalls >= 2,
+        'A later incident after Resume/re-hide gets a fresh storage write');
+      assert.equal(diagnosticStorageRecords.length, 2,
+        'The follow-up write contains both bounded incidents');
+      assert.equal(diagnosticFetches.length, 0, 'Suspended follow-up remains local');
+      console.log('Shared runtime owner: delayed lifecycle checkpoint follows a later incident across Resume/re-hide.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionOrdinaryPauseDestroy) {
+      // Let the normal setActive(false) timer begin its older snapshot, then
+      // add an incident and destroy.  Destroy must await that write and force
+      // a fresh checkpoint instead of reusing the old snapshot.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      for (let i = 0; diagnosticStorageMergeCalls === 0 && i < 20; i++)
+        await new Promise(resolve => setTimeout(resolve, 0));
+      assert.equal(diagnosticStorageMergeCalls, 1,
+        'ordinary inactive persistence reaches storage before destroy');
+      assert.equal(typeof releaseDiagnosticStorageFirst, 'function');
+      owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+      let destroySettled = false;
+      const destroyStartedAt = Date.now();
+      const destroyPromise = player.destroy().then(() => { destroySettled = true; });
+      for (let i = 0; !destroySettled && i < 64; i++) {
+        window.menuServiceCommands();
+        await Promise.resolve();
+      }
+      assert.equal(destroySettled, false,
+        'destroy waits for the already pending ordinary persistence');
+      releaseDiagnosticStorageFirst();
+      for (let i = 0; !destroySettled && i < 64; i++) {
+        window.menuServiceCommands();
+        await Promise.resolve();
+      }
+      await destroyPromise;
+      const elapsed = Date.now() - destroyStartedAt;
+      assert.ok(elapsed < 1000);
+      assert.equal(diagnosticStorageMergeCalls, 2,
+        'destroy forces a fresh write after the ordinary persistence settles');
+      assert.equal(diagnosticStorageRecords.length, 2,
+        'fresh destroy snapshot contains the later incident');
+      console.log('Shared runtime owner: destroy refreshes a delayed ordinary inactive snapshot.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionHiddenFatal) {
+      document.hidden = true;
+      dispatch('visibilitychange');
+      owner.stop(Error('private-user-path-must-not-be-reported'));
+      await drainMicrotasks(8);
+      assert.equal(diagnosticStorageMergeCalls, 1,
+        'hidden fatal incident starts one bounded local checkpoint');
+      assert.equal(typeof releaseDiagnosticStorageFirst, 'function');
+      releaseDiagnosticStorageFirst();
+      await drainMicrotasks(24);
+      assert.ok(diagnosticStorageRecords.some(record => record.incident.reason === 'runtime_failure'),
+        'fatal incident reaches the hidden checkpoint through the owner wrapper');
+      assert.equal(diagnosticFetches.length, 0, 'hidden fatal checkpoint remains local');
+      console.log('Shared runtime owner: hidden fatal incident is included in the local checkpoint.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionEmptyThenDestroy) {
+      document.hidden = true;
+      dispatch('visibilitychange');
+      await drainMicrotasks(8);
+      assert.equal(diagnosticStorageMergeCalls, 0, 'Empty checkpoint performs no storage write');
+      document.hidden = false;
+      dispatch('visibilitychange');
+      dispatch('pageshow');
+      dispatch('resume');
+      phase = 1; running = true; window.menuFrame(true);
+      owner.callbacks.menuDiagnosticIncident(1, 9, 8, 12, 1, 1);
+      const elapsed = await destroyBeforeDeferredPersistence();
+      assert.ok(elapsed < 1000);
+      assert.equal(diagnosticStorageRecords.length, 1,
+        'A fresh destroy snapshot is not suppressed by an earlier empty checkpoint');
+      console.log('Shared runtime owner: empty lifecycle checkpoint does not suppress later destroy persistence.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionFailedThenDestroy) {
+      document.hidden = true;
+      dispatch('visibilitychange');
+      await drainMicrotasks(8);
+      const failedReport = owner.diagnostics.exportReports();
+      assert.equal(failedReport.flags.persistence_failed, true,
+        'The first lifecycle checkpoint failure is observable');
+      document.hidden = false;
+      dispatch('visibilitychange');
+      dispatch('pageshow');
+      dispatch('resume');
+      phase = 1; running = true; window.menuFrame(true);
+      owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+      const elapsed = await destroyBeforeDeferredPersistence();
+      assert.ok(elapsed < 1000);
+      assert.equal(diagnosticStorageMergeCalls, 2,
+        'Destroy retries a fresh snapshot after a completed checkpoint failure');
+      assert.equal(diagnosticStorageRecords.length, 2);
+      console.log('Shared runtime owner: failed lifecycle checkpoint does not suppress fresh destroy persistence.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionCheckpoint || diagnosticsRetentionDenied) {
+      // Keep the owner in the same task: the old 0 ms persistence callback has
+      // not run yet. Both lifecycle signals must share one local checkpoint.
+      document.hidden = true;
+      dispatch('visibilitychange');
+      dispatch('pagehide');
+      dispatch('freeze');
+      await drainMicrotasks(8);
+      assert.equal(diagnosticFetches.length, 0,
+        'Lifecycle checkpoints never start network delivery while hidden');
+      if (diagnosticsRetentionDenied) {
+        const deniedReport = owner.diagnostics.exportReports();
+        assert.equal(deniedReport.flags.storage_denied, true,
+          'Denied lifecycle checkpoint is represented without throwing onto the owner');
+        console.log('Shared runtime owner: denied lifecycle checkpoint remains local and isolated.');
+        process.exit(0);
+      }
+      assert.equal(diagnosticStorageRecords.length, 1,
+        'Pagehide/freeze must persist one incident before deferred persistence runs');
+      assert.equal(diagnosticStorageRecords[0].incident.reason, 'simulation_debt');
+      console.log('Shared runtime owner: pagehide/freeze checkpoint persists before destroy.');
+      process.exit(0);
+    }
+    const destroyElapsed = await destroyBeforeDeferredPersistence();
+    assert.ok(destroyElapsed < 1000,
+      'Orderly destroy must remain bounded when local diagnostics storage stalls');
+    if (diagnosticsRetentionStalled) {
+      assert.equal(diagnosticStorageRecords.length, 0, 'A stalled storage adapter cannot fake a completed checkpoint');
+      console.log('Shared runtime owner: stalled destroy checkpoint times out without trapping teardown.');
+    } else if (diagnosticsRetentionQuota) {
+      const quotaReport = owner.diagnostics.exportReports();
+      assert.equal(quotaReport.flags.persistence_failed, true,
+        'Quota persistence failure is represented without trapping teardown');
+      assert.equal(quotaReport.flags.quota_exceeded, true);
+      console.log('Shared runtime owner: quota destroy checkpoint fails explicitly without trapping teardown.');
+    } else {
+      assert.equal(diagnosticStorageRecords.length, 1,
+        'Orderly destroy must persist one incident before disposing delivery');
+      assert.equal(diagnosticStorageRecords[0].incident.reason, 'simulation_debt');
+      console.log('Shared runtime owner: orderly destroy persists before disposing delivery.');
+    }
+    process.exit(0);
+  }
   await owner.prepareAudio();
   assert.ok(calls.some(row => row[0] === 'audioResume'), 'Audio ownership remains on the runtime owner');
   window.menuPreparation('Controlled preparation', true);
