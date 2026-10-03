@@ -1,0 +1,300 @@
+{
+  "schema": "webmelee-main-settings-display-route-v1",
+  "scope": "Original Main > Settings > Display preference toggle, repeated entry, Personal autosave/GCI persistence, supported match, No Contest Results and CSS return.",
+  "route_audit": {
+    "starting_revision": "origin/main d5fb579ba5bd81ff59407a7a0d7a7e803776cf40; implementation branch is stacked on PR #137 (Main Settings > Rumble).",
+    "selected_slice": "The authored Main Settings Display page was missing. Its change is a real SaveData preference, independent of item/rules and stage identity.",
+    "retail_route": "Title > Main > Settings (MenuKind 4) > Display (MenuKind 21) > Settings > Display > Settings > Main (MenuKind 0).",
+    "not_claimed": [
+      "Final Destination selection",
+      "stage identity",
+      "other Settings pages",
+      "complete VS rules/items",
+      "full-game parity"
+    ],
+    "browser_route": "Main Settings Display > Main/VS > CSS > SSS (no stage input; stage identity unobserved) > supported match > No Contest Results > CSS."
+  },
+  "source": {
+    "repository_head": "9504ef3b207fb8688b7ae95f168b0878cccdd93a",
+    "upstream_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "disc_revision": "GALE01 USA Rev. 2",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "main_dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "source_refs": [
+      "melee/mn/mnmain.c",
+      "melee/mn/mndeflicker.c",
+      "melee/mn/mndeflicker.h",
+      "melee/gm/gmmain_lib.c"
+    ],
+    "callbacks": [
+      "mnMain_Scene_OnEnter",
+      "mnMain_Scene_OnFrame",
+      "mn_8022DB10",
+      "mn_8022D104",
+      "mnDeflicker_8024A6C4",
+      "mnDeflicker_8024A168"
+    ],
+    "assets": [
+      "MnMaAll.usd: MenMainConDf_Top",
+      "SdMenu.usd: SIS_MenuData",
+      "SdToy.dat: SIS_ToyData"
+    ],
+    "scene_and_menu_kinds": {
+      "title": "GS_TITLE (0)",
+      "settings": "GS_MENU (1), MenuKind 4",
+      "display": "GS_MENU (1), MenuKind 21"
+    },
+    "source_save_field": {
+      "name": "gmm_x1CB0.deflicker",
+      "offset": "0x45D",
+      "before": 1,
+      "after": 0
+    }
+  },
+  "retail_reference": {
+    "external_run_id": "main-settings-display-reference-20261003-033950-536cdcc6",
+    "receipt": "dolphin-capture-01/roundtrip-receipt.json",
+    "receipt_sha256": "75801e2013b8f111e94b80ce19c8a7b8c681c861feb060cf96c86da1b4953abb",
+    "capture_tool": "Dolphin 2606a-dirty; commit c77bbaa0f372c3f72281602a8b087206706542cb; binary sha256 a197b95a737ad1ad410738fdaab94985c48bdccd5063ce99f4134b849c82d1b1.",
+    "policy": "Pipe input; Null video; No Audio Output; owned Rev. 2 disc and writable temporary Dolphin GCI folder.",
+    "route_observation": {
+      "menu_ids": [
+        0,
+        4,
+        21,
+        4,
+        21,
+        4,
+        0
+      ],
+      "source_ticks": [
+        96,
+        128,
+        155,
+        200,
+        210,
+        245,
+        255
+      ],
+      "input": [
+        "Title progressive-scan prompt acknowledged",
+        "Start enters Main",
+        "D-pad Down x3 and A enter Settings",
+        "D-pad Down x2 and A enter Display",
+        "A changes deflicker 1 to 0",
+        "B returns to Settings",
+        "A re-enters Display at the retained row",
+        "B returns to Settings",
+        "B returns to Main"
+      ],
+      "save_byte": {
+        "offset": "0x45D",
+        "before": 1,
+        "after": 0
+      }
+    },
+    "save_interop": {
+      "input_sha256": "0866bcc1dfc616ddcd7882c87bb36f5db2e205458abc7a717622752b6b439b7b",
+      "output_sha256": "3cbe63f88e67ce4ca4e72eb9845af4c5a032bcb1c9a218e90da788bafdf26152",
+      "bytes": 90176,
+      "result": "pass"
+    },
+    "observer_status": "Runner terminated its owned Dolphin after the complete route, so observer state is interrupted/completed=false with no invalid/error flag. Roundtrip receipt result is pass.",
+    "visual_audio": "No retail visual or audio comparison; Null video and No Audio Output."
+  },
+  "browser_validation": {
+    "passing_run_id": "main-settings-display-corrected-browser-20261003-120917-4d46e0b1/full-route-03",
+    "report_sha256": "5f92b2a7e9f5ac1e1c689c8a35217f5a77cfba197de36ef812cdc2bd70ea6946",
+    "runner_revision": "9504ef3b207fb8688b7ae95f168b0878cccdd93a",
+    "runner_sha256": "7a05f878885ea14a433427ef10141d88b7008f2de39c8b7a1377f8b93086a869",
+    "browser": "Headless installed Chrome 154.0.8037.97 through scripts/browser_tools.mjs; isolated Playwright context.",
+    "runtime_package": {
+      "profile": "player",
+      "runtime_hash": "2e9f7f2660454ab9",
+      "identity_sha256": "7a724048a33edd659f072670b25b748abff443025e49d0a4c9d3c4293d46587a",
+      "manifest_sha256": "4a2756ef682bc1fe97a95d2127edeccb680b1e5b94b40bdd186b931e1190f8a8"
+    },
+    "initial_state": "Everything unlocked is the default. A new isolated Personal profile is created after the original save-mode restart confirmation; no existing user browser save is accessed.",
+    "checks": [
+      "Fresh Personal profile and CSS entry",
+      "Original Title/Main input and Settings Display route",
+      "Source SaveData byte at 0x45D changes from 1 to 0",
+      "Personal autosave and repeated Display entry",
+      "GCI export contains deflicker 0",
+      "Supported match enters phase 7, No Contest Results phase 8, then CSS phase 1",
+      "Native menu owner unload completes and Personal setting remains saved"
+    ],
+    "save_state": {
+      "source_snapshot_sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d",
+      "source_length": 61892,
+      "source_deflicker": 0,
+      "source_offset": "0x45D",
+      "personal_after_results_css": 0,
+      "personal_mode": "personal",
+      "export_gci_sha256": "8f04bc5508aa8e4916b98c5969e9e2cc4d58ee5a51d63987134f577de6208dd4",
+      "exported_deflicker": 0
+    },
+    "screenshots": [
+      {
+        "checkpoint": "css-fresh-personal",
+        "file": "css-fresh-personal.png",
+        "sha256": "f8319f54422b237117d6eccb989b56afd606dfb30386183b07e4d1eca55a6182"
+      },
+      {
+        "checkpoint": "main-from-css",
+        "file": "main-from-css.png",
+        "sha256": "d2ba09bad230fe7456f5337f61d2101aceeb66e1af90d16ebeeca42f30e8ca20"
+      },
+      {
+        "checkpoint": "title",
+        "file": "title.png",
+        "sha256": "bdcb7e5c3dc0c629bc03c3b6935ab5200eb83cb17325f258f83c17df46bcb474"
+      },
+      {
+        "checkpoint": "main-from-title",
+        "file": "main-from-title.png",
+        "sha256": "12eb670d5927dd3faab33e99407639646e530e171a4f21ce6d580386b3bba7cd"
+      },
+      {
+        "checkpoint": "settings",
+        "file": "settings.png",
+        "sha256": "468c673761fd9ab597e3d8f4859cd99970eb9abee041c33a5646cad5d0df06d1"
+      },
+      {
+        "checkpoint": "settings-display-selected",
+        "file": "settings-display-selected.png",
+        "sha256": "460666c824b3491ce189fa9739311f982aaccf85a9cbef446e1b568f63759f8f"
+      },
+      {
+        "checkpoint": "display-deflicker-on-settled",
+        "file": "display-deflicker-on-settled.png",
+        "sha256": "d7d3961656ef150d9ff4c9e37a6da5d279e0beacfedacd00777e2329b3fb5d2b"
+      },
+      {
+        "checkpoint": "display-deflicker-off",
+        "file": "display-deflicker-off.png",
+        "sha256": "ef5cf59b6bbb8aca4bfbaaa3630e7f35f3cb837e6c2213332bf481dd75963fa3"
+      },
+      {
+        "checkpoint": "display-reentered-off",
+        "file": "display-reentered-off.png",
+        "sha256": "767cb5696062611719ce8060b97d6fe6d8c9018f373891957dd0e517824854c4"
+      },
+      {
+        "checkpoint": "versus-mode-selection",
+        "file": "versus-mode-selection.png",
+        "sha256": "344397a7414ff9ee54881b164b882291a0fed8c71f2663383f4adb4ea1a1d022"
+      },
+      {
+        "checkpoint": "css-returned",
+        "file": "css-returned.png",
+        "sha256": "b12c105ed6b6009f3f194f8cc4f7d93243ccc745c6dc1fa59476ef1b9d1dd4bb"
+      },
+      {
+        "checkpoint": "stage-selection-default",
+        "file": "stage-selection-default.png",
+        "sha256": "f30c9bbb1788e3e525bd2f192b8a205b140b20886218fda97001afaa6718701a"
+      },
+      {
+        "checkpoint": "match",
+        "file": "match.png",
+        "sha256": "f8df3dd6cc95af7d4970e8f72441b76b5d2f6f5fde2368e23e64d73abca3f2d7"
+      },
+      {
+        "checkpoint": "results",
+        "file": "results.png",
+        "sha256": "a7800227a267a5c4055a1c8fa2bddc790c117e194e016fb4cc1b815652de6d4e"
+      },
+      {
+        "checkpoint": "css-after-results",
+        "file": "css-after-results.png",
+        "sha256": "4a472a7b4a1d1f850fab149b89849535e815fd4beff277c8f8b64f37d53da60a"
+      },
+      {
+        "checkpoint": "personal-save-after-reload",
+        "file": "personal-save-after-reload.png",
+        "sha256": "6d0a2b5f6404245505649ac7299c442c5457c87b13006a20f8f004a8a0796691"
+      }
+    ],
+    "cleanup": {
+      "result": 1,
+      "message": "Native menus unloaded.",
+      "phase": 0,
+      "running": 0
+    },
+    "audio": "Silent public runtime. Host output remained muted. Audio fidelity is untested.",
+    "stage_identity": "No SSS cursor input was sent. The browser reaches and renders a match, but this route does not read the selected stage kind; stage identity is not claimed.",
+    "rerun_after_harness_correction": "Pass on full-route-03 with no SSS cursor input and scripts/serve.py cross-origin-isolation headers.",
+    "corrected_runner_stage_input": "No SSS cursor input; the corrected full-route-03 capture passed with the selected stage identity unobserved.",
+    "runtime_revision": "9504ef3b207fb8688b7ae95f168b0878cccdd93a",
+    "route_result": "pass",
+    "stage_input_attempts": [],
+    "browser_errors": [],
+    "superseded_run_stage_input_attempts": [
+      {
+        "keys": [
+          "4"
+        ],
+        "hold_ms": 75,
+        "release_ms": 100
+      },
+      {
+        "keys": [
+          "]"
+        ],
+        "hold_ms": 45,
+        "release_ms": 100
+      }
+    ]
+  },
+  "retained_experiments": [
+    {
+      "run_id": "main-settings-display-browser-package-20261003-20261003-041303-0141e18c/sss-probe-01",
+      "result": "fail",
+      "boundary": "SSS B cancellation input arrived before the original 20-frame gate."
+    },
+    {
+      "run_id": "main-settings-display-browser-package-20261003-20261003-041303-0141e18c/sss-probe-02",
+      "result": "pass",
+      "boundary": "After waiting through the source gate, B returned from SSS to CSS and native owner teardown completed."
+    },
+    {
+      "run_id": "main-settings-display-browser-final-20261003-20261003-043340-adf20db5/match-probe-01",
+      "result": "fail",
+      "boundary": "Initial SSS confirmation did not enter a match."
+    },
+    {
+      "run_id": "main-settings-display-browser-final-20261003-20261003-043340-adf20db5/match-probe-02",
+      "result": "pass",
+      "boundary": "Source SSS timing and Start confirmation entered a supported match; stage identity was not proven."
+    },
+    {
+      "run_id": "main-settings-display-corrected-browser-20261003-120917-4d46e0b1/full-route-01",
+      "result": "fail-before-browser",
+      "boundary": "Playwright package path was omitted; no Chrome or game route started."
+    },
+    {
+      "run_id": "main-settings-display-corrected-browser-20261003-120917-4d46e0b1/full-route-02",
+      "result": "fail-before-route",
+      "boundary": "Stock Python HTTP server omitted required cross-origin-isolation headers; failure.png shows the player rejection. Retained; retry used scripts/serve.py."
+    }
+  ],
+  "claim_boundaries": {
+    "source_state": "Retail Observer sees Main/Settings/Display menu IDs and game-written save byte. Browser native snapshot and Personal store agree on deflicker 0.",
+    "navigation": "Retail Display route and browser Results/CSS return are separate observations. The SSS B-cancel probe passes after the input gate.",
+    "visuals": "Real rendered headless-browser source scenes and match/Results/CSS screenshots exist; no pixel comparison. The selected stage kind is not observed.",
+    "audio": "Unrun; retail output and public package were silent.",
+    "physical_input": "Unrun; input was scripted through browser keyboard/controller mapping or Dolphin Pipe.",
+    "performance": "Unrun; no performance claim.",
+    "save": "Dolphin roundtrip and browser Personal autosave/export preserve the changed byte.",
+    "lifecycle": "Repeated Display entry, CSS/Results path and native menu teardown pass in the retained browser run."
+  },
+  "validation": {
+    "focused_tests": "test_gameplay_native_menus: 7 run, 2 passed, 5 skipped for unavailable fixtures; test_retail_save_profile: 5 passed; test_gameplay_save_profile: 1 passed.",
+    "javascript_syntax": "node --check tests/main_settings_display_browser_test.mjs passed after the stage-claim correction.",
+    "full_suite": "1736 passed, 132 skipped, exit 0 on commit 9504ef3; rerun required after final edits.",
+    "affected_builds": "python3 scripts/build.py --target fighter and python3 scripts/build.py --target runtime-public --configuration Release passed for runtime commit 9504ef3; public bundle audit passed (34 files, 19,203,527 bytes).",
+    "open_validation": "Re-run full suite, final diff review and CI after integrating the fighter-owned trophy-baseline prerequisite; the corrected headless-browser route passes.",
+    "inventory_report": "work/full-game/main-settings-display-20261003-121500-4d46e0b1; 89 feature rows and pinned-source/evidence-path validation passed; all acceptance fractions remain null."
+  }
+}

@@ -36,14 +36,14 @@ const report = {schema: 'melee-web-main-settings-display-browser-v1',
   disc: path.basename(values.disc), discSha256: await readHash(values.disc),
   reference: {sourceCommit: 'b43912cc78606f96c9569f5d6229bc9d7e265ea5',
     mainDolSha256: 'dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646',
-    route: 'Title > Main > Settings > Display > Settings > Main > VS > CSS > SSS > Mario/Final Destination > No Contest Results > CSS',
+    retailRoute: 'Title > Main > Settings > Display > Settings > Display > Settings > Main',
+    browserRoute: 'Title > Main > Settings > Display > Settings > Main > VS > CSS > SSS (no stage input; identity unobserved) > match > No Contest Results > CSS',
     sourceCallbacks: ['mnMain_Scene_OnEnter', 'mnMain_Scene_OnFrame',
       'mn_8022DB10', 'mn_8022D104', 'mnDeflicker_8024A6C4',
-      'mnDeflicker_8024A168', 'mnStageSel_Scene_OnFrame',
-      'gmMainLib_8015F588', 'gmMainLib_8015F4F4'],
+      'mnDeflicker_8024A168'],
     mainSelections: {versus: 1, settings: 3}, settingsBackRestoresSelection: 3,
-    assets: ['MnMaAll.usd', 'SdMenu.usd', 'SdToy.dat', 'LbMcGame.usd',
-      'NtMemAc.usd', 'LbMcSnap.usd', 'GmEvent.dat', 'LbAd.dat'],
+    displayAssets: ['MnMaAll.usd: MenMainConDf_Top',
+      'SdMenu.usd: SIS_MenuData', 'SdToy.dat: SIS_ToyData'],
     menuIds: [0, 4, 21, 4, 21, 4, 0],
     deflickerByte: {offset: '0x45D', before: 1, after: 0}},
   input: ['B0XX L+R+Start from CSS', 'B to Title', 'Start to Main',
@@ -51,8 +51,8 @@ const report = {schema: 'melee-web-main-settings-display-browser-v1',
     'A toggles deflicker off', 'B to Settings', 'A re-enters Display', 'B to Settings',
     'B to Main', 'Up x2 to Versus', 'A to Versus', 'A to Melee/CSS',
     'Start confirms Ready-to-Fight; repeat Start if CSS remains active; Start to SSS',
-    'Right then Up to Final Destination; wait for the source 90-frame cursor transition',
-    'Start confirms the stage selection and starts the match',
+    'Send no SSS cursor input; stage identity is not observed by this route',
+    'Start from SSS to enter a supported match',
     'Start then L+R+A+Start enters No Contest Results', 'Start confirmations return to CSS'],
   browserMode: 'headless installed Chrome; isolated Playwright context; public runtime player profile',
   saveMode: 'Everything unlocked default; fresh Personal profile created for this context',
@@ -156,15 +156,9 @@ const enterSssFromCss = async () => {
   if (firstStartPhase === 1) await press('7');
   await waitForPhase(3);
 };
-const selectFinalDestination = async () => {
+const startWithoutStageInput = async () => {
   await page.waitForTimeout(1000);
-  await driver.pressChord(['4'], {holdMs: 75, releaseMs: 100});
-  await driver.pressChord([']'], {holdMs: 45, releaseMs: 100});
-  // The retail cursor transition advances for 0x5A frames before Start can
-  // commit a newly selected stage. SSS commits on Start or A+Start; A alone
-  // is ignored by mnStageSel_80259C28.
-  await page.waitForTimeout(1600);
-  await shot('stage-final-destination');
+  await shot('stage-selection-default');
   await press('7');
 };
 const press = key => driver.pressChord([key]);
@@ -343,16 +337,16 @@ try {
     });
     report.result = 'sss-probe-pass';
   } else if (values['stop-after-match']) {
-    await check('retail SSS selection transition commits Final Destination and enters the match', async () => {
+    await check('original SSS enters a supported match with neutral stage input', async () => {
       await enterSssFromCss();
-      await selectFinalDestination();
+      await startWithoutStageInput();
       await waitForPhase(7);
       await shot('match');
     });
     report.result = 'match-probe-pass';
   } else await check('the saved Display preference survives a supported match and Results return to CSS', async () => {
     await enterSssFromCss();
-    await selectFinalDestination();
+    await startWithoutStageInput();
     await waitForPhase(7);
     await page.waitForTimeout(5000);
     await shot('match');
