@@ -24,6 +24,7 @@ from capture_allocation_history import (gdb_script, resolve_gdb_executable,
                                         validate_reference_build_manifest,
                                         validate_setup_receipt,
                                         verify_menu_route, verify_menu_route_commands,
+                                        verify_menu_sound_route, verify_menu_sound_route_commands,
                                         verify_vs_rules_items_route,
                                         verify_vs_rules_items_route_commands,
                                         verify_vs_rules_items_save_effect,
@@ -34,6 +35,108 @@ from tools import retail_replay_validation as retail  # noqa: E402
 
 
 class CaptureAllocationMenuRouteTests(unittest.TestCase):
+    def test_sound_route_gdb_script_runs_the_route_driver_without_match_replay(self):
+        paths = {name: Path("/tmp") / name for name in
+                 ("socket", "allocation_collector", "menu_driver", "helper", "collector")}
+        source = gdb_script(paths, menu_sound_route=True)
+        self.assertIn(f"source {paths['menu_driver']}", source)
+        self.assertIn("MENU_ROUTE_TRACE.close()", source)
+        self.assertIn("allocation_finish('captured', 'menu_sound_route_complete')", source)
+        self.assertNotIn("retail-replay-arm", source)
+        self.assertNotIn("retail-step", source)
+
+    def test_sound_route_driver_uses_original_source_callbacks_and_inputs(self):
+        source = retail_allocation_menu.render_menu_sound_route_driver()
+        compile(source, "sound-route-test.py", "exec")
+        self.assertIn("cold_boot_css_sound_settings_route()", source)
+        self.assertIn("wait_menu(20)", source)
+        self.assertIn("pulse(0,'B',settle=24)", source)
+        self.assertIn("pulse(0,'D_LEFT')", source)
+        self.assertIn("0x1898+0x45C", source)
+        self.assertNotIn("write_memory(", source)
+        self.assertNotIn("put_register", source)
+
+    def test_sound_route_verifier_binds_menu_graph_cancel_and_save_data_delta(self):
+        markers = [
+            ("first_scheduler_return", 0, 0, None, None),
+            ("cold_css_ready", 8, 2, None, 0),
+            ("css_before_b_back_probe", 8, 2, None, 0),
+            ("css_b_back_probe_remained_css", 8, 2, None, 0),
+            ("versus_submenu_ready_after_css", 1, 1, (2, 0), 0),
+            ("root_main_menu_ready", 1, 1, (0, 1), 0),
+            ("title_ready", 0, 0, None, 0),
+            ("root_main_menu_ready_after_title", 1, 1, (0, 0), 0),
+            ("main_settings_selected", 1, 1, (0, 3), 0),
+            ("settings_ready", 1, 1, (4, 0), 0),
+            ("settings_sound_selected", 1, 1, (4, 1), 0),
+            ("sound_screen_ready", 1, 1, (20, 0), 0),
+            ("settings_after_sound_cancel", 1, 1, (4, 1), 0),
+            ("sound_screen_reentered", 1, 1, (20, 0), 0),
+            ("sound_balance_after_change", 1, 1, (20, 0), 251),
+            ("settings_after_sound_change", 1, 1, (4, 1), 251),
+            ("main_after_settings", 1, 1, (0, 3), 251),
+            ("title_after_sound", 0, 0, None, 251),
+        ]
+        rows = []
+        for index, (event, scene, mode, state, balance) in enumerate(markers):
+            row = {"event": event, "scene_kind": scene, "game_mode": mode,
+                   "sequence": 0, "pad_copy_status_hex": "00"}
+            if state is not None:
+                row["menu_state"] = {"cur": state[0], "hovered": state[1]}
+            if balance is not None and (scene == 1 or event == "title_ready" or
+                                        event == "title_after_sound"):
+                row["sound_balance"] = {"save_data_offset": "0x45C", "value": balance}
+            rows.append(row)
+        rows.insert(1, {"event": "scheduler_return", "scene_kind": 1, "game_mode": 1,
+                        "sequence": 0, "pad_copy_status_hex": "00", "current_hps_hex": "",
+                        "hps_voice_word": "0x0", "menu_state": {"cur": 20, "hovered": 0},
+                        "sound_balance": {"save_data_offset": "0x45C", "value": 251}})
+        rows.insert(2, {"event": "scheduler_return", "scene_kind": 8, "game_mode": 2,
+                        "sequence": 1, "pad_copy_status_hex": "00", "current_hps_hex": "",
+                        "hps_voice_word": "0x0", "css_data_hex": "00", "css_cursors": []})
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / retail_allocation_menu.MENU_ROUTE_TRACE_NAME
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            result = verify_menu_sound_route(path)
+            self.assertEqual(result["initial_balance"], 0)
+            self.assertEqual(result["final_balance"], 251)
+            self.assertEqual(result["source_scheduler_frames"], 2)
+
+            next(row for row in rows if row.get("event") == "sound_balance_after_change")[
+                "sound_balance"]["value"] = 0
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            with self.assertRaisesRegex(RuntimeError, "SaveData balance"):
+                verify_menu_sound_route(path)
+
+    def test_sound_route_command_verifier_requires_ordered_menu_inputs(self):
+        commands = [
+            (8, 2, "PRESS B", None), (8, 2, "PRESS L", None),
+            (8, 2, "PRESS R", None), (8, 2, "PRESS START", None),
+            (1, 1, "PRESS B", (2, 0)), (1, 1, "PRESS B", (0, 1)),
+            (0, 0, "PRESS START", None), (1, 1, "PRESS D_UP", (0, 0)),
+            (1, 1, "PRESS D_UP", (0, 4)), (1, 1, "PRESS A", (0, 3)),
+            (1, 1, "PRESS D_DOWN", (4, 0)), (1, 1, "PRESS A", (4, 1)),
+            (1, 1, "PRESS B", (20, 0)), (1, 1, "PRESS A", (4, 1)),
+            (1, 1, "PRESS D_DOWN", (20, 0)), (1, 1, "PRESS D_LEFT", (20, 0)),
+            (1, 1, "PRESS B", (20, 0)), (1, 1, "PRESS B", (4, 1)),
+            (1, 1, "PRESS B", (0, 3)),
+        ]
+        rows = [{"event": "pad_command", "scene_kind": scene, "game_mode": mode,
+                 "command": command,
+                 **({"menu_state": {"cur": state[0], "hovered": state[1]}}
+                    if state is not None else {})}
+                for scene, mode, command, state in commands]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "commands.jsonl"
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            result = verify_menu_sound_route_commands(path)
+            self.assertEqual(result["commands"], len(commands))
+            rows[15]["command"] = "PRESS D_RIGHT"
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            with self.assertRaisesRegex(RuntimeError, "ordered original menu confirmations"):
+                verify_menu_sound_route_commands(path)
+
+
     def test_route_gdb_script_runs_route_driver_without_match_replay_commands(self):
         paths = {name: Path("/tmp") / name for name in
                  ("socket", "allocation_collector", "menu_driver", "helper", "collector")}
@@ -693,6 +796,31 @@ fs.writeFileSync(path, createMeleeGCI(profile, new Date('2026-01-01T00:00:00Z'))
             mapping = json.loads((root / "screenshots/mapping.json").read_text())
             self.assertEqual(
                 [row["event"] for row in mapping["screenshots"]], list(marker_names))
+
+    def test_sound_route_screenshots_map_each_source_route_marker(self):
+        from capture_allocation_history import _SOUND_ROUTE_MARKERS
+        marker_names = _SOUND_ROUTE_MARKERS[1:]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            frames = root / "frames"
+            frames.mkdir()
+            rows = []
+            for sequence, name in enumerate(marker_names):
+                rows.append({"event": "scheduler_return", "sequence": sequence})
+                rows.append({"event": name, "sequence": sequence,
+                             "scene_kind": 1, "game_mode": 1})
+                (frames / f"framedump_{sequence + 1}.png").write_bytes(
+                    b"sound route png " + str(sequence).encode())
+            trace = root / "route.jsonl"
+            trace.write_text("".join(json.dumps(row) + "\n" for row in rows))
+            result = retain_route_screenshots(
+                frames, trace, root, route="menu_sound")
+            self.assertEqual(result["status"], "retained")
+            self.assertEqual(result["screenshots"], len(marker_names))
+            mapping = json.loads((root / "screenshots/mapping.json").read_text())
+            self.assertEqual(
+                [row["event"] for row in mapping["screenshots"]], list(marker_names))
+
 
 
 if __name__ == "__main__":

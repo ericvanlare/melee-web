@@ -273,6 +273,16 @@ SCENE_RESULTS=5
 VS_START_DATA_ADDRESS=0x80480530
 VS_RESULTS_DATA_ADDRESS=0x8047C020
 
+def _menu_route_sound_balance():
+    # Source layout: gmm_x0.thing begins at 0x1898 and Sound balance is
+    # SaveData byte 0x45C within that object (gmm_x1868.x1CB0.sound_balance).
+    base=u32(0x804D3EE0)
+    offset=0x1898+0x45C
+    if not 0x80000000<=base<=0x81800000-offset-1:
+        raise RuntimeError(f'invalid source gmm_x0 owner for Sound observation: {base:#x}')
+    return mem(base+offset,1)[0]
+
+
 def _menu_route_snapshot(event):
     kind=scene_kind()
     row={'event':event,'scene_kind':kind,
@@ -291,6 +301,8 @@ def _menu_route_snapshot(event):
                            'hovered':struct.unpack_from('>H',menu_flow,2)[0],
                            'confirmed':menu_flow[4],'entering':menu_flow[0x11]}
         row['menu_input_cooldown']=u32(0x804D6BC8)
+        row['sound_balance']={'save_data_offset':'0x45C',
+                              'value':_menu_route_sound_balance()}
         row['rules_state']=rules_state()
         if row['menu_state']['cur']==0x10:
             row['item_input_locked']=mem(0x804D6BEC,1)[0]
@@ -341,6 +353,9 @@ def _menu_route_snapshot(event):
     hps=mem(0x803BB300,0x40).split(b'\0',1)[0]
     row['current_hps_hex']=hps.hex()
     row['hps_voice_word']=hex(u32(0x804D6038))
+    if kind==SCENE_TITLE:
+        row['sound_balance']={'save_data_offset':'0x45C',
+                              'value':_menu_route_sound_balance()}
     return row
 
 def _record_menu_route_frame():
@@ -477,6 +492,85 @@ def cold_boot_css_menu_round_trip():
     _record_menu_route_marker('cold_css_ready')
     _cold_boot_css_to_title()
     _cold_boot_title_to_css()
+
+def cold_boot_css_sound_settings_route():
+    """Capture retail Main > Settings > Sound, edit it, and navigate back."""
+    _record_menu_route_marker('first_scheduler_return')
+    cold_boot_to_css()
+    _record_menu_route_marker('cold_css_ready')
+    _cold_boot_css_to_title()
+
+    if scene_kind()!=SCENE_TITLE or mem(0x80479D30,1)[0]!=GM_TITLE:
+        raise RuntimeError('Sound route requires live original GM_TITLE/GS_TITLE')
+    _cold_boot_wait_neutral(24)
+    pulse(0,'START',settle=30)
+    state=_cold_boot_wait_main_menu(0)
+    if state['cur']!=0 or state['hovered']!=0:
+        raise RuntimeError(f'title Start did not open the root menu: {state}')
+    _record_menu_route_marker('root_main_menu_ready_after_title')
+    move_menu_selection(3)  # SEL_MAIN_SETTINGS in the pinned mnmain.c
+    state=menu_state()
+    if state['cur']!=0 or state['hovered']!=3:
+        raise RuntimeError(f'root menu did not select Settings: {state}')
+    _record_menu_route_marker('main_settings_selected')
+    pulse(0,'A',settle=24)
+    state=wait_menu(4)
+    if state['hovered']!=0:
+        raise RuntimeError(f'Settings did not open at Rumble: {state}')
+    _record_menu_route_marker('settings_ready')
+    move_menu_selection(1)  # SEL_SETTINGS_SOUND
+    state=menu_state()
+    if state['cur']!=4 or state['hovered']!=1:
+        raise RuntimeError(f'Settings did not select Sound: {state}')
+    _record_menu_route_marker('settings_sound_selected')
+    pulse(0,'A',settle=24)
+    state=wait_menu(20)
+    if state['hovered']!=0:
+        raise RuntimeError(f'Sound menu did not open at its default row: {state}')
+    before=_menu_route_sound_balance()
+    if before!=0:
+        raise RuntimeError(f'fresh-card Sound balance was not centered: {before}')
+    _record_menu_route_marker('sound_screen_ready')
+
+    # Back from Sound is a cancellation: the source value remains centered,
+    # and the Settings callback retains its Sound selection on re-entry.
+    pulse(0,'B',settle=24)
+    state=wait_menu(4)
+    if state['hovered']!=1 or _menu_route_sound_balance()!=before:
+        raise RuntimeError(f'Sound Back changed state or selection: {state}')
+    _record_menu_route_marker('settings_after_sound_cancel')
+    pulse(0,'A',settle=24)
+    state=wait_menu(20)
+    if state['hovered']!=0 or _menu_route_sound_balance()!=before:
+        raise RuntimeError(f'Sound re-entry did not preserve the unedited value: {state}')
+    _record_menu_route_marker('sound_screen_reentered')
+    pulse(0,'D_DOWN')
+    pulse(0,'D_LEFT')
+    after=_menu_route_sound_balance()
+    if after!=251:
+        raise RuntimeError(f'Sound Left did not change source balance from 0 to -5: {after}')
+    _record_menu_route_marker('sound_balance_after_change')
+
+    pulse(0,'B',settle=24)
+    state=wait_menu(4)
+    if state['hovered']!=1 or _menu_route_sound_balance()!=after:
+        raise RuntimeError(f'Sound edit did not return to Settings with state retained: {state}')
+    _record_menu_route_marker('settings_after_sound_change')
+    pulse(0,'B',settle=24)
+    state=wait_menu(0)
+    if state['hovered']!=3:
+        raise RuntimeError(f'Settings Back did not retain Main Settings selection: {state}')
+    _record_menu_route_marker('main_after_settings')
+    pulse(0,'B',settle=30)
+    for _ in range(900):
+        if scene_kind()==SCENE_TITLE and mem(0x80479D30,1)[0]==GM_TITLE:
+            _record_menu_route_marker('title_after_sound')
+            return
+        if scene_kind()==SCENE_MEMCARD:
+            _cold_boot_card_prompt()
+            continue
+        step(1)
+    raise RuntimeError(f'Main Back did not exit Sound route to Title: scene={_cold_boot_scene_name(scene_kind())} mode={mem(0x80479D30,1)[0]}')
 '''
 
 
@@ -840,9 +934,10 @@ def _check_collector_failure():
 
 
 def _compose_driver(*, menu_round_trip: bool = False,
-                    vs_rules_items_round_trip: bool = False) -> str:
+                    vs_rules_items_round_trip: bool = False,
+                    menu_sound_route: bool = False) -> str:
     """Compose a cold route around the existing source-menu body."""
-    if menu_round_trip and vs_rules_items_round_trip:
+    if sum((menu_round_trip, vs_rules_items_round_trip, menu_sound_route)) > 1:
         raise ValueError("choose one original menu route capture")
     marker = "\n# Preparation only, before a new checkpoint."
     if _BASE_DRIVER_SOURCE.count(marker) != 1:
@@ -864,7 +959,7 @@ def _compose_driver(*, menu_round_trip: bool = False,
         1,
     )
     route_helpers = _COLD_BOOT_HELPERS
-    if menu_round_trip or vs_rules_items_round_trip:
+    if menu_round_trip or vs_rules_items_round_trip or menu_sound_route:
         if source.count("completed+=1;previous=current") != 1:
             raise ValueError("retail CPU menu source-frame boundary changed")
         source = source.replace(
@@ -882,12 +977,16 @@ def _compose_driver(*, menu_round_trip: bool = False,
     source = source.replace(marker, route_helpers + marker, 1)
     route = ("cold_boot_css_menu_round_trip" if menu_round_trip else
              "_cold_boot_vs_rules_items_round_trip" if vs_rules_items_round_trip else
+             "cold_boot_css_sound_settings_route" if menu_sound_route else
              "cold_boot_to_sss")
     route_note = (
         "# Fresh-DOL route through the retail parent menus and title, then CSS.\n"
         if menu_round_trip else
         "# Fresh-DOL VS Rules/Items -> SSS -> source match -> Results -> CSS route.\n"
         if vs_rules_items_round_trip else
+        "# Cold boot through CSS, return through Main to Title, edit Sound, "
+        "then leave through Main to Title using original menu callbacks.\n"
+        if menu_sound_route else
         "# Fresh-DOL entry is complete only when source CSS/SSS is observed.\n"
         "# The existing rules routine starts from SSS; cold_boot_to_sss()\n"
         "# establishes that source boundary through ordinary CSS input.\n"
@@ -897,7 +996,7 @@ def _compose_driver(*, menu_round_trip: bool = False,
         "\n" + route_note + route + "()\n" + marker,
         1,
     )
-    if menu_round_trip or vs_rules_items_round_trip:
+    if menu_round_trip or vs_rules_items_round_trip or menu_sound_route:
         # This driver is a route capture, not the separate CSS/SSS setup
         # recipe appended by the base module. Keep the retained script bounded
         # at its declared original menu or Results/CSS endpoint.
@@ -909,6 +1008,7 @@ DRIVER_SOURCE = _compose_driver()
 MENU_ROUND_TRIP_DRIVER_SOURCE = _compose_driver(menu_round_trip=True)
 VS_RULES_ITEMS_ROUND_TRIP_DRIVER_SOURCE = _compose_driver(
     vs_rules_items_round_trip=True)
+MENU_SOUND_ROUTE_DRIVER_SOURCE = _compose_driver(menu_sound_route=True)
 
 
 def render_cold_boot_driver() -> str:
@@ -926,19 +1026,26 @@ def render_vs_rules_items_round_trip_driver() -> str:
     return VS_RULES_ITEMS_ROUND_TRIP_DRIVER_SOURCE
 
 
+def render_menu_sound_route_driver() -> str:
+    """Return a fresh-DOL Main > Settings > Sound route driver."""
+    return MENU_SOUND_ROUTE_DRIVER_SOURCE
+
+
 # Compatibility aliases used by collector/preparation builders.
 render_source_driver = render_cold_boot_driver
 render_driver = render_cold_boot_driver
 
 
 def write_driver(path: str | Path, *, menu_round_trip: bool = False,
-                 vs_rules_items_round_trip: bool = False) -> Path:
+                 vs_rules_items_round_trip: bool = False,
+                 menu_sound_route: bool = False) -> Path:
     """Write one cold-boot driver copy and return its path."""
-    if menu_round_trip and vs_rules_items_round_trip:
+    if sum((menu_round_trip, vs_rules_items_round_trip, menu_sound_route)) > 1:
         raise ValueError("choose one original menu route capture")
     destination = Path(path)
     source = (MENU_ROUND_TRIP_DRIVER_SOURCE if menu_round_trip else
               VS_RULES_ITEMS_ROUND_TRIP_DRIVER_SOURCE if vs_rules_items_round_trip else
+              MENU_SOUND_ROUTE_DRIVER_SOURCE if menu_sound_route else
               DRIVER_SOURCE)
     destination.write_text(source, encoding="utf-8")
     return destination
@@ -1005,6 +1112,19 @@ def validate_driver() -> None:
         raise ValueError("VS Rules/Items route lost its separate source trace")
     if "_cold_boot_vs_rules_items_round_trip()" not in rules_items.split("# Preparation only", 1)[0]:
         raise ValueError("VS Rules/Items source route is not called before setup preparation")
+
+    sound_route = MENU_SOUND_ROUTE_DRIVER_SOURCE
+    compile(sound_route, "retail_menu_sound_route.gdb.py", "exec")
+    if "write_memory(" in sound_route or "put_register" in sound_route:
+        raise ValueError("Sound route driver must not write source state")
+    if "load_state" in sound_route.lower() or "savestate" in sound_route.lower():
+        raise ValueError("Sound route driver must not load a saved state")
+    if "cold_boot_css_sound_settings_route()" not in sound_route:
+        raise ValueError("Sound route driver lost its retail route callback")
+    if "pulse(0,'B',settle=24)" not in sound_route or "pulse(0,'D_LEFT')" not in sound_route:
+        raise ValueError("Sound route driver lost ordinary Back/edit controller inputs")
+    if "0x1898+0x45C" not in sound_route:
+        raise ValueError("Sound route observer lost its source SaveData offset derivation")
 
 
 validate_driver()

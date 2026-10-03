@@ -145,6 +145,8 @@ struct DatNativeMenu::Storage {
             // mnDeflicker_8024A6C4 loads the authored display setting when
             // Settings opens the original Display page.
             static_model("MenMainConDf_Top");
+            // mnSound_8024A09C loads this authored overlay for MenuKind 20.
+            static_model("MenMainConSo_Top");
             publish("ScMenMain_cam_int1_camera",camera(export_offset("ScMenMain_cam_int1_camera")));
             publish("ScMenMain_scene_lights",light_list(export_offset("ScMenMain_scene_lights")));
             publish("ScMenMain_fog",fog(export_offset("ScMenMain_fog")));
