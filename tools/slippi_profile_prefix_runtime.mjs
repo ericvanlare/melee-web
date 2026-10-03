@@ -19,19 +19,28 @@ const OBS_PAD_OFFSET = OBS_PLAYERS_OFFSET + 2 * OBS_PLAYER_STRIDE;
 const INPUT_BYTES = 44;
 const PROFILE_OFFSET = 0x1234;
 const DEFAULT_SEED = 0x13579bdf;
+const NATIVE_INITIALIZER_PROFILE = 'native';
+const DEFAULT_INITIALIZER_PROFILE = 'default';
+const NATIVE_INITIALIZER_SEED = 4660;
+const NATIVE_STAGE_KIND = 37;
+const INITIALIZER_DIAGNOSTIC_BYTES = 15 * 4;
 const SUPPORTED_SCENE_LASTS = new Set([110, 1341]);
 
 function fail(message) { throw new Error(message); }
 function requireValue(value, message) { if (!value) fail(message); return value; }
 function sha256(bytes) { return crypto.createHash('sha256').update(bytes).digest('hex'); }
 function sha256File(file) { return sha256(fs.readFileSync(file)); }
+function requireSha(value, label) {
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/i.test(value)) fail(`${label} must be a SHA-256 hex digest`);
+  return value.toLowerCase();
+}
 function asHex(value) { return `0x${value.toString(16).padStart(8, '0')}`; }
 function utcNow() { return new Date().toISOString(); }
 
 function parseArgs(argv) {
   const allowed = new Set(['--runtime', '--wasm', '--assets', '--inputs', '--probe-sha256',
     '--profile-helper-sha256', '--runtime-sha256', '--wasm-sha256', '--profile-offset',
-    '--seed', '--scene-last', '--out']);
+    '--seed', '--initializer-profile', '--stage-kind-bridge-sha256', '--scene-last', '--out']);
   if (argv.length % 2) fail('worker options must be key/value pairs');
   const options = {};
   for (let i = 0; i < argv.length; i += 2) {
@@ -39,7 +48,10 @@ function parseArgs(argv) {
     if (!allowed.has(key) || !value || options[key]) fail('malformed worker options');
     options[key] = value;
   }
-  for (const key of allowed) if (!options[key]) fail(`missing ${key}`);
+  const required = ['--runtime', '--wasm', '--assets', '--inputs', '--probe-sha256',
+    '--profile-helper-sha256', '--runtime-sha256', '--wasm-sha256', '--profile-offset',
+    '--seed', '--scene-last', '--out'];
+  for (const key of required) if (!options[key]) fail(`missing ${key}`);
   return options;
 }
 
@@ -51,12 +63,22 @@ function normalizeOptions(raw) {
     inputs: raw['--inputs'], probeSha: raw['--probe-sha256'],
     helperSha: raw['--profile-helper-sha256'], runtimeSha: raw['--runtime-sha256'],
     wasmSha: raw['--wasm-sha256'], profileOffset: Number(raw['--profile-offset']),
-    seed: Number(raw['--seed']), sceneLast: Number(raw['--scene-last']), out: raw['--out'],
+    seed: Number(raw['--seed']), initializerProfile: raw['--initializer-profile'] ?? DEFAULT_INITIALIZER_PROFILE,
+    stageKindBridgeSha: raw['--stage-kind-bridge-sha256'] || null,
+    sceneLast: Number(raw['--scene-last']), out: raw['--out'],
   };
   for (const name of ['runtime', 'wasm', 'assets', 'inputs', 'out'])
     options[name] = path.resolve(options[name]);
   if (options.profileOffset !== PROFILE_OFFSET) fail('profile offset must be 0x1234');
   if (!SUPPORTED_SCENE_LASTS.has(options.sceneLast)) fail('scene-last must be 110 or 1341');
+  if (options.initializerProfile !== DEFAULT_INITIALIZER_PROFILE && options.initializerProfile !== NATIVE_INITIALIZER_PROFILE)
+    fail('initializer-profile must be default or native');
+  if (options.initializerProfile === NATIVE_INITIALIZER_PROFILE) {
+    if (options.seed !== NATIVE_INITIALIZER_SEED) fail('native initializer requires seed 4660');
+    options.stageKindBridgeSha = requireSha(options.stageKindBridgeSha, 'stage-kind bridge SHA-256');
+  } else if (options.stageKindBridgeSha !== null) {
+    fail('stage-kind bridge identity is only accepted with native initializer');
+  }
   if (!Number.isInteger(options.seed) || options.seed < 0 || options.seed > 0xffffffff)
     fail('seed must be an unsigned 32-bit value');
   if (!fs.existsSync(options.assets) || !fs.statSync(options.assets).isDirectory())
@@ -125,6 +147,83 @@ function decodeObservationBytes(bytes) {
   for (let port = 0; port < 4; port += 1)
     gamePads.push(normalizedPad(view, gameBase + port * PAD_PORT_SIZE));
   return { bytes, sha256: sha256(bytes), players, gamePads };
+}
+
+function decodeInitializerBytes(bytes) {
+  if (bytes.length !== INITIALIZER_DIAGNOSTIC_BYTES) fail(`initializer diagnostic has ${bytes.length} bytes, expected ${INITIALIZER_DIAGNOSTIC_BYTES}`);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const players = [0, 1].map(index => ({
+    port: view.getUint32(20 + index * 4, true),
+    controller: view.getUint32(28 + index * 4, true),
+    fighter: view.getUint32(36 + index * 4, true),
+    color: view.getUint32(44 + index * 4, true),
+    stocks: view.getUint32(52 + index * 4, true),
+  }));
+  return {valid: view.getUint32(0, true), profile: view.getUint32(4, true),
+    seed: view.getUint32(8, true), stage_kind: view.getUint32(12, true),
+    player_count: view.getUint32(16, true), players, bytes_hex: bytes.toString('hex')};
+}
+
+function initializerContract(module, profile, seed = DEFAULT_SEED) {
+  const binary = decodeInitializerBytes(copyBytes(module, module._melee_web_snapshot_initializer_diagnostic(),
+    INITIALIZER_DIAGNOSTIC_BYTES, 'initializer diagnostic'));
+  const json = JSON.parse(module.UTF8ToString(module._melee_web_snapshot_initializer_json()));
+  requireValue(json && json.valid === 1, 'initializer JSON is not valid');
+  requireValue(binary.valid === 1 && binary.player_count === 2, 'initializer binary ABI is invalid');
+  requireValue(json.profile === binary.profile && json.seed === binary.seed &&
+    json.stage_kind === binary.stage_kind && json.player_count === binary.player_count,
+    'initializer JSON disagrees with the 60-byte diagnostic');
+  requireValue(JSON.stringify(json.players) === JSON.stringify(binary.players),
+    'initializer JSON players disagree with the 60-byte diagnostic');
+  if (profile === NATIVE_INITIALIZER_PROFILE) {
+    requireValue(binary.profile === 1 && binary.seed === NATIVE_INITIALIZER_SEED, 'native initializer profile/seed mismatch');
+    requireValue(binary.stage_kind === NATIVE_STAGE_KIND, 'native initializer stage kind differs from actual ground kind 37');
+    requireValue(JSON.stringify(binary.players.map(player => player.port)) === JSON.stringify([1, 2]), 'native initializer ports mismatch');
+    requireValue(JSON.stringify(binary.players.map(player => player.controller)) === JSON.stringify([0, 1]), 'native initializer controllers mismatch');
+    requireValue(binary.players.every(player => player.fighter === 8), 'native initializer fighter kind is not Mario (8)');
+    requireValue(binary.players.every(player => player.color === 0 && player.stocks === 4), 'native initializer color/stocks mismatch');
+  } else {
+    requireValue(binary.profile === 0 && binary.seed === seed, 'default initializer profile/seed mismatch');
+    requireValue(JSON.stringify(binary.players.map(player => player.port)) === JSON.stringify([0, 0]), 'default initializer ports changed');
+    requireValue(JSON.stringify(binary.players.map(player => player.controller)) === JSON.stringify([0, 1]), 'default initializer controllers changed');
+    requireValue(binary.players.every(player => player.fighter === 8), 'default initializer fighter kind is not Mario (8)');
+    requireValue(JSON.stringify(binary.players.map(player => player.color)) === JSON.stringify([0, 1]), 'default initializer colors changed');
+    requireValue(binary.players.every(player => player.stocks === 4), 'default initializer stocks changed');
+  }
+  return {binary, json};
+}
+
+function initializerContractSelfTest() {
+  const bytes = Buffer.alloc(INITIALIZER_DIAGNOSTIC_BYTES);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  [1, 1, NATIVE_INITIALIZER_SEED, NATIVE_STAGE_KIND, 2, 1, 2, 0, 1, 8, 8, 0, 0, 4, 4]
+    .forEach((value, index) => view.setUint32(index * 4, value, true));
+  const heap = Buffer.alloc(128);
+  let json;
+  const module = {HEAPU8: heap, _melee_web_snapshot_initializer_diagnostic: () => 16,
+    _melee_web_snapshot_initializer_json: () => 112, UTF8ToString: () => JSON.stringify(json)};
+  const install = () => {
+    heap.set(bytes, 16);
+    const {bytes_hex, ...record} = decodeInitializerBytes(bytes);
+    json = record;
+  };
+  const rejects = label => {
+    let refused = false;
+    try { initializerContract(module, NATIVE_INITIALIZER_PROFILE); } catch { refused = true; }
+    requireValue(refused, label);
+  };
+  install(); initializerContract(module, NATIVE_INITIALIZER_PROFILE);
+  view.setUint32(12, 32, true); install();
+  rejects('wire stage 32 accepted as source ground kind');
+  view.setUint32(12, NATIVE_STAGE_KIND, true); install();
+  json.players[1].color = 1;
+  rejects('initializer JSON mutation was not detected');
+  view.setUint32(24, 1, true); install();
+  rejects('duplicate native port was accepted');
+  [1, 0, 123, NATIVE_STAGE_KIND, 2, 0, 0, 0, 1, 8, 8, 0, 1, 4, 4]
+    .forEach((value, index) => view.setUint32(index * 4, value, true));
+  install(); initializerContract(module, DEFAULT_INITIALIZER_PROFILE, 123);
+  return true;
 }
 
 function observation(module, pointer) {
@@ -229,7 +328,7 @@ async function main() {
     started_at_utc: utcNow(), claim_boundary:
       'Source-only bounded prefix. Raw 44-byte PAD records are the sole step inputs; callback, native state and declared fields are observations.',
     scene_range: [0, options.sceneLast],
-    profile: { offset: options.profileOffset, seed: options.seed,
+    profile: { offset: options.profileOffset, seed: options.seed, initializer_profile: options.initializerProfile,
       source_algorithm: 'rotl16(global_frame)+offset' },
     rows: [], controls: {}, cleanup: { attempted: false, result: null, success: false, error: null },
   };
@@ -239,6 +338,7 @@ async function main() {
   process.on('SIGTERM', () => { interrupted = true; });
   try {
     report.controls.synthetic_decoder_and_comparator = decoderSelfTest();
+    report.controls.synthetic_initializer_abi_and_json_contract = initializerContractSelfTest();
     requireValue(sha256File(options.runtime) === options.runtimeSha, 'runtime JS SHA-256 differs');
     requireValue(sha256File(options.wasm) === options.wasmSha, 'runtime Wasm SHA-256 differs');
     const input = loadJson(options.inputs, 'normalized inputs');
@@ -256,6 +356,7 @@ async function main() {
     }
     report.runtime = { js_sha256: options.runtimeSha, wasm_sha256: options.wasmSha };
     report.source = { probe_sha256: options.probeSha, profile_helper_sha256: options.helperSha };
+    if (options.initializerProfile === NATIVE_INITIALIZER_PROFILE) report.source.stage_kind_bridge_sha256 = options.stageKindBridgeSha;
     const factory = createRequire(import.meta.url)(options.runtime);
 
     // A fresh uninitialized module is the offset negative control.  It does
@@ -264,6 +365,13 @@ async function main() {
     requireValue(control._melee_web_snapshot_configure_rng_profile(options.profileOffset ^ 1) === 0,
       'invalid profile offset was accepted');
     report.controls.invalid_offset_rejected = true;
+    if (options.initializerProfile === NATIVE_INITIALIZER_PROFILE) {
+      requireValue(control._melee_web_snapshot_configure_native_initializer() === 1,
+        'native initializer control configure failed');
+      requireValue(control._melee_web_snapshot_configure_seed(NATIVE_INITIALIZER_SEED ^ 1) === 0,
+        'native initializer accepted a different seed');
+      report.controls.native_seed_mismatch_rejected = true;
+    }
 
     module = await factory({ print: () => {}, printErr: () => {} });
     const required = [
@@ -276,6 +384,13 @@ async function main() {
       '_melee_web_snapshot_pcm', '_melee_web_snapshot_pcm_size',
       '_melee_web_snapshot_input', '_melee_web_snapshot_quiescent', '_melee_web_snapshot_close',
     ];
+    if (options.initializerProfile === NATIVE_INITIALIZER_PROFILE) {
+      required.push('_melee_web_snapshot_stage_kind_bridge_identity',
+        '_melee_web_snapshot_configure_native_initializer',
+        '_melee_web_snapshot_initializer_diagnostic',
+        '_melee_web_snapshot_initializer_diagnostic_size',
+        '_melee_web_snapshot_initializer_json');
+    }
     for (const name of required) requireValue(typeof module[name] === 'function', `runtime ABI lacks ${name}`);
     requireValue(module._melee_web_snapshot_observation_size() === OBS_SIZE, 'observation ABI is not 1216 bytes');
     requireValue(module._melee_web_snapshot_rng_profile_observation_size() === TRACE_SIZE, 'trace ABI is not 32 bytes');
@@ -285,10 +400,20 @@ async function main() {
       'runtime source probe identity differs');
     requireValue(module.UTF8ToString(module._melee_web_snapshot_rng_profile_identity()) === options.helperSha,
       'runtime profile helper identity differs');
+    if (options.initializerProfile === NATIVE_INITIALIZER_PROFILE) {
+      requireValue(module.UTF8ToString(module._melee_web_snapshot_stage_kind_bridge_identity()) === options.stageKindBridgeSha,
+        'runtime stage-kind bridge identity differs');
+      requireValue(module._melee_web_snapshot_initializer_diagnostic_size() === INITIALIZER_DIAGNOSTIC_BYTES,
+        'initializer diagnostic ABI is not 15 uint32 fields / 60 bytes');
+      requireValue(module._melee_web_snapshot_configure_native_initializer() === 1,
+        `native initializer configure failed: ${readError(module)}`);
+    }
     requireValue(module._melee_web_snapshot_configure_rng_profile(options.profileOffset) === 1,
       `profile configure failed: ${readError(module)}`);
-    requireValue(module._melee_web_snapshot_configure_seed(options.seed) === 1,
-      `seed configure failed: ${readError(module)}`);
+    if (options.initializerProfile === DEFAULT_INITIALIZER_PROFILE) {
+      requireValue(module._melee_web_snapshot_configure_seed(options.seed) === 1,
+        `seed configure failed: ${readError(module)}`);
+    }
     initAttempted = true;
     requireValue(module.ccall('melee_web_snapshot_init', 'number', ['string'], [options.assets]) === 1,
       `init failed: ${readError(module)}`);
@@ -298,6 +423,11 @@ async function main() {
     requireValue(module._melee_web_snapshot_configure_seed(options.seed) === 0,
       'seed reconfiguration after init was accepted');
     report.controls.configuration_after_init_rejected = true;
+    if (options.initializerProfile === NATIVE_INITIALIZER_PROFILE) {
+      requireValue(module._melee_web_snapshot_configure_native_initializer() === 0,
+        'native initializer reconfiguration after init was accepted');
+      report.controls.native_initializer_after_init_rejected = true;
+    }
 
     const tracePointer = module._melee_web_snapshot_rng_profile_observation();
     const observationPointer = module._melee_web_snapshot_observation();
@@ -306,6 +436,9 @@ async function main() {
     requireValue(initialTrace.enabled === 1 && initialTrace.offset === options.profileOffset, 'profile trace is disabled');
     requireValue(initialTrace.callback_count === 0, 'profile callback ran during init');
     requireValue(initialTrace.constructor_requested_seed === options.seed, 'constructor seed trace differs');
+    if (options.initializerProfile === NATIVE_INITIALIZER_PROFILE) {
+      report.initializer = initializerContract(module, options.initializerProfile);
+    }
     const initializationQuiescence = transferQuiescence(module, 'initialization');
     // The measured candidate reports a pending source transfer at init.  This
     // is an observation-only prefix boundary: record it as ineligible for a
@@ -404,9 +537,10 @@ async function main() {
 if (process.argv.length === 3 && process.argv[2] === '--self-test') {
   try {
     decoderSelfTest();
+    initializerContractSelfTest();
     process.stdout.write(JSON.stringify({ result: 'passed', controls: [
       'synthetic-1216-byte-decoder', 'synthetic-state-mutation',
-      'synthetic-processed-mutation'
+      'synthetic-processed-mutation', 'synthetic-60-byte-initializer-mutation'
     ] }) + '\n');
   } catch (error) {
     process.stderr.write(`${error.stack || error}\n`);

@@ -355,24 +355,66 @@ endif()
 unset(_melee_web_snapshot_memory_remainder)
 set(MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE
   "${CMAKE_CURRENT_SOURCE_DIR}/reference-capture/slippi/profiles/slippi_rng_profile_gpl.cpp")
+set(MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SOURCE
+  "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_snapshot_stage_kind_bridge.c")
 add_executable(gameplay_snapshot_probe EXCLUDE_FROM_ALL tests/gameplay_snapshot_probe.cpp
-  ${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE})
+  ${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE}
+  ${MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SOURCE})
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
   "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_snapshot_probe.cpp"
-  "${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE}")
+  "${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE}"
+  "${MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SOURCE}")
 file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_snapshot_probe.cpp" GAMEPLAY_SNAPSHOT_PROBE_SHA256)
 file(SHA256 "${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE}" MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256)
+file(SHA256 "${MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SOURCE}" MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256)
 target_compile_definitions(gameplay_snapshot_probe PRIVATE
   MELEE_WEB_SNAPSHOT_PROBE_SHA256="${GAMEPLAY_SNAPSHOT_PROBE_SHA256}"
-  MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256="${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256}")
+  MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256="${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256}"
+  MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256="${MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256}")
+target_compile_options(gameplay_snapshot_probe PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
 target_link_libraries(gameplay_snapshot_probe PRIVATE fighter_asset_runtime)
 target_link_options(gameplay_snapshot_probe PRIVATE --no-entry --profiling-funcs
   -sASYNCIFY=0
   -sENVIRONMENT=node -sNODERAWFS=1 -sMODULARIZE=1 -sALLOW_MEMORY_GROWTH=1
   -sINITIAL_MEMORY=${MELEE_WEB_SNAPSHOT_INITIAL_MEMORY} -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2
   -sEXPORTED_RUNTIME_METHODS=ccall,HEAPU8,UTF8ToString,stackSave,stackRestore
-  -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_configure_seed,_melee_web_snapshot_configure_rng_profile,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_step_raw,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_rng_profile_observation,_melee_web_snapshot_rng_profile_observation_size,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_transfer_diagnostic,_melee_web_snapshot_transfer_diagnostic_size,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_rng_address,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_close)
+  -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_configure_native_initializer,_melee_web_snapshot_configure_seed,_melee_web_snapshot_configure_rng_profile,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_step_raw,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_initializer_diagnostic,_melee_web_snapshot_initializer_diagnostic_size,_melee_web_snapshot_initializer_json,_melee_web_snapshot_ending_mask_diagnostic,_melee_web_snapshot_rng_profile_observation,_melee_web_snapshot_rng_profile_observation_size,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_transfer_diagnostic,_melee_web_snapshot_transfer_diagnostic_size,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_rng_address,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_stage_kind_bridge_identity,_melee_web_snapshot_close)
 set_target_properties(gameplay_snapshot_probe PROPERTIES SUFFIX ".js")
+
+# Optional real-browser Slippi profile source-only follow-up. The default Node
+# gameplay_snapshot_probe target remains unchanged. This target uses the exact
+# preserved profile source/helper and preloads the ignored local snapshot fixture
+# through MEMFS; it has no player/draw surface.
+option(MELEE_WEB_SLIPPI_PROFILE_BROWSER
+  "Build the optional real-browser Slippi profile probe" OFF)
+set(MELEE_WEB_SLIPPI_PROFILE_BROWSER_ASSET_ROOT
+  "${CMAKE_CURRENT_SOURCE_DIR}/assets-local/snapshot-mario" CACHE PATH
+  "Ignored local source snapshot fixture for the browser Slippi profile probe")
+if(MELEE_WEB_SLIPPI_PROFILE_BROWSER)
+  if(NOT IS_DIRECTORY "${MELEE_WEB_SLIPPI_PROFILE_BROWSER_ASSET_ROOT}")
+    message(FATAL_ERROR
+      "Browser Slippi profile probe requires ${MELEE_WEB_SLIPPI_PROFILE_BROWSER_ASSET_ROOT}")
+  endif()
+  add_executable(gameplay_snapshot_probe_browser EXCLUDE_FROM_ALL
+    tests/gameplay_snapshot_probe.cpp ${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SOURCE}
+    ${MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SOURCE})
+  target_compile_definitions(gameplay_snapshot_probe_browser PRIVATE
+    MELEE_WEB_SNAPSHOT_PROBE_SHA256="${GAMEPLAY_SNAPSHOT_PROBE_SHA256}"
+    MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256="${MELEE_WEB_SNAPSHOT_RNG_PROFILE_SHA256}"
+    MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256="${MELEE_WEB_SNAPSHOT_STAGE_KIND_BRIDGE_SHA256}")
+  target_compile_options(gameplay_snapshot_probe_browser PRIVATE
+    "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+  target_link_libraries(gameplay_snapshot_probe_browser PRIVATE fighter_asset_runtime)
+  target_link_options(gameplay_snapshot_probe_browser PRIVATE --no-entry --profiling-funcs
+    -sASYNCIFY=0 -sENVIRONMENT=web -sMODULARIZE=1 -sEXPORT_ES6=1
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=${MELEE_WEB_SNAPSHOT_INITIAL_MEMORY}
+    -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2
+    -sEXPORTED_RUNTIME_METHODS=ccall,HEAPU8,UTF8ToString,stackSave,stackRestore
+    -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_configure_native_initializer,_melee_web_snapshot_configure_seed,_melee_web_snapshot_configure_rng_profile,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_step_raw,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_initializer_diagnostic,_melee_web_snapshot_initializer_diagnostic_size,_melee_web_snapshot_initializer_json,_melee_web_snapshot_ending_mask_diagnostic,_melee_web_snapshot_rng_profile_observation,_melee_web_snapshot_rng_profile_observation_size,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_transfer_diagnostic,_melee_web_snapshot_transfer_diagnostic_size,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_rng_address,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_stage_kind_bridge_identity,_melee_web_snapshot_close
+    --preload-file "${MELEE_WEB_SLIPPI_PROFILE_BROWSER_ASSET_ROOT}@/assets")
+  set_target_properties(gameplay_snapshot_probe_browser PROPERTIES SUFFIX ".mjs")
+endif()
 
 add_executable(gameplay_music_profile_trace EXCLUDE_FROM_ALL tests/gameplay_music_profile_trace.cpp)
 target_link_libraries(gameplay_music_profile_trace PRIVATE fighter_asset_runtime)

@@ -29,6 +29,10 @@ SCENE_LAST = 110
 SUPPORTED_SCENE_LASTS = (110, 1341)
 PROFILE_OFFSET = 0x1234
 DEFAULT_SEED = 0x13579BDF
+NATIVE_INITIALIZER_PROFILE = "native"
+DEFAULT_INITIALIZER_PROFILE = "default"
+NATIVE_INITIALIZER_SEED = 4660
+NATIVE_STAGE_KIND = 37
 INPUT_PORT_BYTES = 11
 INPUT_BYTES = 44
 NATIVE_SCHEMA = "melee-web-source-slippi-profile-input-v1"
@@ -56,10 +60,15 @@ def sha256_file(path: Path) -> str:
 
 
 def directory_sha256(path: Path) -> str:
-    if not path.is_dir():
-        fail(f"assets directory is missing: {path}")
+    path = path.expanduser()
+    if path.is_symlink() or not path.is_dir():
+        fail(f"assets directory is missing or symlinked: {path}")
     digest = hashlib.sha256()
-    for child in sorted(item for item in path.rglob("*") if item.is_file()):
+    for child in sorted(path.rglob("*")):
+        if child.is_symlink():
+            fail(f"assets entry is symlinked: {child}")
+        if not child.is_file():
+            continue
         relative = child.relative_to(path).as_posix().encode()
         digest.update(len(relative).to_bytes(4, "big"))
         digest.update(relative)
@@ -79,8 +88,9 @@ def parse_hash(value: str, label: str) -> str:
 
 
 def checked_hash(path: Path, expected: str, label: str) -> str:
-    if not path.is_file():
-        fail(f"{label} is not a file: {path}")
+    path = path.expanduser()
+    if path.is_symlink() or not path.is_file():
+        fail(f"{label} is not a regular non-symlink file: {path}")
     actual = sha256_file(path)
     if actual != expected:
         fail(f"{label} SHA-256 differs: expected {expected}, got {actual}")
@@ -344,6 +354,10 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--wasm-sha256")
     result.add_argument("--profile-offset", type=lambda value: int(value, 0))
     result.add_argument("--seed", type=lambda value: int(value, 0))
+    result.add_argument("--initializer-profile", choices=(DEFAULT_INITIALIZER_PROFILE, NATIVE_INITIALIZER_PROFILE),
+                        default=DEFAULT_INITIALIZER_PROFILE)
+    result.add_argument("--stage-kind-bridge", type=Path)
+    result.add_argument("--stage-kind-bridge-sha256")
     result.add_argument("--scene-last", type=int, default=SCENE_LAST,
                         help="inclusive scene endpoint: 110 (default) or measured match endpoint 1341")
     result.add_argument("--node", default="node")
@@ -367,6 +381,13 @@ def require_normal_args(args: argparse.Namespace) -> None:
     validate_scene_last(args.scene_last)
     if not 0 <= args.seed <= 0xFFFFFFFF:
         fail("--seed must be a uint32")
+    if args.initializer_profile == NATIVE_INITIALIZER_PROFILE:
+        if args.seed != NATIVE_INITIALIZER_SEED:
+            fail("native initializer requires --seed 4660")
+        if args.stage_kind_bridge is None or args.stage_kind_bridge_sha256 is None:
+            fail("native initializer requires --stage-kind-bridge and its SHA-256")
+    elif args.stage_kind_bridge is not None or args.stage_kind_bridge_sha256 is not None:
+        fail("stage-kind bridge is only accepted with --initializer-profile native")
     if args.out.exists():
         fail(f"output directory already exists: {args.out}")
     if (
@@ -403,6 +424,8 @@ def main(argv: list[str]) -> int:
         args.probe_sha256 = parse_hash(args.probe_sha256, "--probe-sha256")
         args.cmake_sha256 = parse_hash(args.cmake_sha256, "--cmake-sha256")
         args.profile_helper_sha256 = parse_hash(args.profile_helper_sha256, "--profile-helper-sha256")
+        if args.stage_kind_bridge_sha256 is not None:
+            args.stage_kind_bridge_sha256 = parse_hash(args.stage_kind_bridge_sha256, "--stage-kind-bridge-sha256")
         args.runtime_sha256 = parse_hash(args.runtime_sha256, "--runtime-sha256")
         args.wasm_sha256 = parse_hash(args.wasm_sha256, "--wasm-sha256")
         args.out.mkdir(parents=True)
@@ -419,13 +442,18 @@ def main(argv: list[str]) -> int:
             "cmake_sha256": checked_hash(args.source_cmake, args.cmake_sha256, "source CMake"),
             "profile_helper_sha256": checked_hash(args.profile_helper, args.profile_helper_sha256, "profile helper"),
         }
-        runtime = args.runtime.resolve()
+        if args.initializer_profile == NATIVE_INITIALIZER_PROFILE:
+            source_identities["stage_kind_bridge_sha256"] = checked_hash(
+                args.stage_kind_bridge, args.stage_kind_bridge_sha256, "stage-kind bridge")
+        runtime = args.runtime.expanduser()
         wasm = runtime.with_suffix(".wasm")
         runtime_identities = {
             "js_sha256": checked_hash(runtime, args.runtime_sha256, "runtime JS"),
             "wasm_sha256": checked_hash(wasm, args.wasm_sha256, "runtime Wasm"),
         }
-        assets_sha256 = directory_sha256(args.assets.resolve())
+        runtime = runtime.resolve()
+        wasm = wasm.resolve()
+        assets_sha256 = directory_sha256(args.assets)
         parser_path = Path(__file__).resolve().parents[1] / "tools/slippi_format.py"
         parser_sha256 = checked_hash(parser_path, sha256_file(parser_path), "Slippi parser")
         frames = normalized_frames(args.replay, args.scene_last)
@@ -444,9 +472,12 @@ def main(argv: list[str]) -> int:
             "--profile-helper-sha256", args.profile_helper_sha256,
             "--runtime-sha256", args.runtime_sha256, "--wasm-sha256", args.wasm_sha256,
             "--profile-offset", hex(args.profile_offset), "--seed", hex(args.seed),
+            "--initializer-profile", args.initializer_profile,
             "--scene-last", str(args.scene_last),
             "--out", str(worker_out),
         ]
+        if args.initializer_profile == NATIVE_INITIALIZER_PROFILE:
+            command.extend(["--stage-kind-bridge-sha256", args.stage_kind_bridge_sha256])
         # Reuse the repository's process supervisor: the Node worker receives
         # SIGINT first, then only its own process group is escalated. This
         # leaves cleanup time inside the bounded parent deadline.
@@ -521,7 +552,8 @@ def main(argv: list[str]) -> int:
             "assets": {"path": str(args.assets.resolve()), "sha256": assets_sha256},
             "parser_sha256": parser_sha256,
             "replay": {"path": str(args.replay.resolve()), "scene_range": [SCENE_FIRST, args.scene_last], "frame_count": len(frames)},
-            "profile": {"offset": args.profile_offset, "seed": args.seed},
+            "profile": {"offset": args.profile_offset, "seed": args.seed,
+                        "initializer_profile": args.initializer_profile},
             "worker_returncode": outcome["worker_returncode"],
             "worker_error": outcome["worker_error"],
             "worker_stderr": outcome["worker_stderr"],

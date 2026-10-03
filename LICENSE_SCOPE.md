@@ -44,6 +44,7 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `docs/DEVELOPMENT.md`
 - `docs/evidence/slippi-browser-desktop-transport-v1.json`
 - `docs/evidence/source-slippi-profile-prefix-v1.json`
+- `docs/evidence/source-slippi-native-initializer-mask-v1.json`
 - `docs/BROWSER_FAILURE_TRIAGE.md`
 - `docs/PUBLIC_REPOSITORY_CHECKLIST.md`
 - `docs/PUBLICATION_REVIEW_BRIEF.md`
@@ -57,8 +58,12 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `tools/slippi_format.py`
 - `tools/slippi_profile_prefix_check.py`
 - `tools/slippi_profile_prefix_runtime.mjs`
+- `tools/source_pause_mask_check.py`
+- `tools/source_pause_mask_runtime.mjs`
 - `tests/gameplay_snapshot_probe.cpp`
+- `tests/gameplay_snapshot_stage_kind_bridge.c`
 - `tests/test_slippi_profile_prefix.py`
+- `tests/test_source_pause_mask_check.py`
 - `cmake/FighterRuntime.cmake`
 - `reference-capture/slippi/LICENSES.md`
 - `reference-capture/slippi/LOCAL_TESTBED.md`
