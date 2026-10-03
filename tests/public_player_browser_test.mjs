@@ -461,6 +461,17 @@ try {
     await page.locator('#settings-dialog[open]').waitFor();
     assert.equal(await page.locator('#save-mode').inputValue(), 'everything');
     await shot('settings');
+    assert(await page.locator('#export-save').isDisabled(),
+      'Everything export requires original disc tables; it must not call an unowned native baseline');
+    if (!values.disc) {
+      await page.locator('#settings-close').click();
+      return;
+    }
+    await page.locator('#settings-close').click();
+    await selectDisc(values.disc);
+    await waitForCssOrAudioRecovery();
+    await page.locator('#settings-open').click();
+    assert(await page.locator('#export-save').isEnabled());
     const exported = page.waitForEvent('download');
     await page.locator('#export-save').click();
     const download = await exported;
@@ -470,6 +481,11 @@ try {
     everythingUnlockedGciPath = gciPath;
     everythingUnlockedProfile = new Uint8Array(baseline);
     assert.equal(baseline.byteLength, 0xF1C4);
+    await page.locator('#settings-close').click();
+    await driver.unload();
+    await ready();
+    await page.locator('#settings-open').click();
+    assert(await page.locator('#export-save').isDisabled(), 'Eject releases the original baseline owner');
 
     await page.locator('#save-mode').selectOption('personal');
     await page.locator('#save-confirm-dialog[open]').waitFor();
