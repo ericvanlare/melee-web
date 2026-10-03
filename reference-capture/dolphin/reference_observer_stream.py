@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 import struct
 import zlib
-from typing import Any, Iterator
+from typing import Any, Iterator, Mapping
 
 
 MAGIC = b"MWRO"
@@ -147,7 +147,8 @@ def _json_payload(raw: bytes, context: str) -> dict[str, Any]:
 
 
 def _boundary_payload(raw: bytes, pc: int, source_tick: int,
-                     draw_ordinal: int, context: str) -> dict[str, Any]:
+                      draw_ordinal: int, context: str,
+                      slice_names: Mapping[int, str]) -> dict[str, Any]:
     if len(raw) < BOUNDARY.size:
         raise ObserverStreamError(f"{context}: truncated boundary metadata")
     kind, flags, lr, gpr_count, slice_count, reserved = BOUNDARY.unpack_from(raw)
@@ -200,7 +201,7 @@ def _boundary_payload(raw: bytes, pc: int, source_tick: int,
     for index in range(slice_count):
         offset = gpr_end + index * SLICE.size
         tag, slice_flags, address, size, data_offset = SLICE.unpack_from(raw, offset)
-        if tag not in SLICE_NAMES:
+        if tag not in slice_names:
             raise ObserverStreamError(f"{context}: unknown slice tag {tag}")
         if size == 0 or data_offset < descriptor_end or data_offset + size > payload_end:
             raise ObserverStreamError(f"{context}: invalid slice range")
@@ -212,7 +213,7 @@ def _boundary_payload(raw: bytes, pc: int, source_tick: int,
             raise ObserverStreamError(f"{context}: slice payload has an unexplained gap")
         previous_end = data_offset + size
         slices.append({
-            "name": SLICE_NAMES[tag],
+            "name": slice_names[tag],
             "tag": tag,
             "flags": slice_flags,
             "address": address,
@@ -240,7 +241,8 @@ def _boundary_payload(raw: bytes, pc: int, source_tick: int,
     return decoded
 
 
-def _decode_record(header: tuple[int, ...], payload: bytes, context: str) -> dict[str, Any]:
+def _decode_record(header: tuple[int, ...], payload: bytes, context: str,
+                   slice_names: Mapping[int, str] | None = None) -> dict[str, Any]:
     (magic, version, event_code, sequence, timestamp_ns, pc, source_tick,
      draw_ordinal, payload_size, checksum) = header
     if magic != MAGIC_U32:
@@ -254,8 +256,10 @@ def _decode_record(header: tuple[int, ...], payload: bytes, context: str) -> dic
         raise ObserverStreamError(f"{context}: invalid payload length")
     if zlib.crc32(payload) & 0xFFFFFFFF != checksum:
         raise ObserverStreamError(f"{context}: payload checksum mismatch")
+    names = SLICE_NAMES if slice_names is None else slice_names
     if event == "boundary":
-        decoded = _boundary_payload(payload, pc, source_tick, draw_ordinal, context)
+        decoded = _boundary_payload(payload, pc, source_tick, draw_ordinal,
+                                    context, names)
     elif event in ("handshake", "start", "progress", "error", "end"):
         decoded = _json_payload(payload, context)
     else:  # guarded by EVENT_NAMES above
@@ -270,10 +274,13 @@ def _decode_record(header: tuple[int, ...], payload: bytes, context: str) -> dic
     }
 
 
-def iter_records(path: str | Path) -> Iterator[dict[str, Any]]:
-    """Yield every record, rejecting any malformed or incomplete stream."""
+def iter_records(path: str | Path, *,
+                 slice_names: Mapping[int, str] | None = None
+                 ) -> Iterator[dict[str, Any]]:
+    """Yield every record under the current or an explicitly selected slice schema."""
 
     stream_path = Path(path)
+    names = SLICE_NAMES if slice_names is None else slice_names
     try:
         stream = stream_path.open("rb")
     except OSError as exc:
@@ -302,7 +309,7 @@ def iter_records(path: str | Path) -> Iterator[dict[str, Any]]:
                 raise ObserverStreamError(
                     f"{context}: sequence gap/reorder ({previous_sequence} -> {sequence})")
             previous_sequence = sequence
-            decoded = _decode_record(header, payload, context)
+            decoded = _decode_record(header, payload, context, names)
             if decoded["event"] in {"handshake", "start"}:
                 announcement = decoded["payload"]
                 if announcement.get("whole_session") is True:

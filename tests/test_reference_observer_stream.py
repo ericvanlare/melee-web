@@ -109,6 +109,28 @@ def startup_prize_exit_boundary_payload() -> bytes:
 
 
 class ObserverStreamTests(unittest.TestCase):
+    def test_live_decoder_defaults_to_the_current_slice_schema(self) -> None:
+        record = frame(3, 0, boundary_payload(), pc=0x8034DD8C)
+        header = stream.HEADER.unpack(record[:stream.HEADER.size])
+        payload = record[stream.HEADER.size:]
+
+        decoded = stream._decode_record(header, payload, "live observer record")
+
+        self.assertEqual(decoded["payload"]["slices"][0]["name"], "pad_queue")
+
+    def test_iter_records_accepts_an_explicit_legacy_slice_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "legacy-tags.mwro"
+            path.write_bytes(
+                frame(1, 0, b'{"schema":"test"}')
+                + frame(2, 1, b'{"status":"recording"}')
+                + frame(3, 2, boundary_payload(), pc=0x8034DD8C)
+            )
+            records = list(stream.iter_records(path, slice_names={2: "legacy_pad_queue"}))
+
+        self.assertEqual(records[-1]["payload"]["slices"][0]["name"],
+                         "legacy_pad_queue")
+
     def test_decodes_strict_boundary_and_named_slices(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "capture.mwro"

@@ -29,6 +29,8 @@ class Observer final
 public:
   static bool IsEnabled();
   static bool IsBoundary(u32 guest_pc);
+  // True only for the configured, verified Rand/Randf return used by CPU probes.
+  static bool IsRngReturnBoundary(u32 guest_pc);
   static void OnBoundary(Core::System* system, u32 guest_pc, PowerPC::PowerPCState* state);
   static void Fail(const char* reason);
   // The environment hash is only an activation key.  Boot calls this helper

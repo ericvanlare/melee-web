@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {parseArgs, promisify} from 'node:util';
@@ -15,7 +16,7 @@ await fs.mkdir(output, {recursive: false});
 const {playwrightPath, browserPath} = await loadBrowserTools(values.playwright);
 const cases = ['clean', 'pageerror', 'console', 'http', 'request-failure', 'runtime', 'late-console',
   'export-failure', 'missing-port', 'missing-report', 'empty-exports',
-  'empty-artifact', 'duplicate', 'prefix', 'timing-pause'];
+  'empty-artifact', 'duplicate', 'prefix', 'timing-pause', 'rng-probe', 'rng-probe-invalid'];
 const fixture = mode => String.raw`<!doctype html><html><body>
 <canvas id="canvas"></canvas><div id="status">Synthetic transport fixture</div><div id="log"></div>
 <input type="file" id="disc"><button id="launch" disabled>Play</button><button id="unload">Unload</button>
@@ -46,6 +47,9 @@ function publish(complete=true){
 }
 $('retail-replay-start').onclick=async()=>{
  cursor=1;
+ if(mode==='rng-probe'||mode==='rng-probe-invalid')window.meleeRngDrawObservation(JSON.stringify({
+  schema:'melee-web-rng-draw-probe',version:1,source_cursor:0,overflowed:false,
+  draws:[{kind:'HSD_Randf',seed_after:mode==='rng-probe'?'1234abcd':'1234ABCd'}]}));
  if(mode==='prefix')return;
  if(mode==='timing-pause'){
   $('status').textContent='Paused after a timing disruption. Resume to continue.';
@@ -92,18 +96,29 @@ try {
       '--disc', disc, '--recipe', recipe, '--out', out, '--playwright', playwrightPath,
       '--phase-timeout', '10000', '--replay-timeout', '10000', '--poll-ms', '50'];
     if (mode === 'prefix') args.push('--stop-after-source-frames', '1');
+    if (mode === 'rng-probe'||mode === 'rng-probe-invalid') args.push('--rng-draw-probe-cursors', '0');
     const processResult = await promisify(execFile)(process.execPath, args, {timeout: 30000})
       .then(value => ({...value, code: 0}), error => ({code: error.code, stdout: error.stdout, stderr: error.stderr}));
     const report = JSON.parse(await fs.readFile(path.join(out, 'report.json'), 'utf8'));
     await fs.writeFile(path.join(out, 'process.json'), JSON.stringify(processResult, null, 2) + '\n');
-    assert.equal(processResult.code, mode === 'clean' ? 0 : 1, `${mode}: ${JSON.stringify(processResult)}`);
-    assert.equal(report.result, mode === 'clean' ? 'pass' : mode === 'prefix' ? 'incomplete' : 'fail', mode);
-    assert.equal(/^pass:/m.test(processResult.stdout || ''), mode === 'clean', mode);
+    const passing = mode === 'clean' || mode === 'rng-probe';
+    assert.equal(processResult.code, passing ? 0 : 1, `${mode}: ${JSON.stringify(processResult)}`);
+    assert.equal(report.result, passing ? 'pass' : mode === 'prefix' ? 'incomplete' : 'fail', mode);
+    assert.equal(/^pass:/m.test(processResult.stdout || ''), passing, mode);
     if (mode === 'clean') {
       assert.equal(report.first_error, null);
       assert.deepEqual(report.browser_errors, []);
       assert.deepEqual(report.saved_downloads.map(row => row.name), ['retail-port.jsonl', 'retail-browser-report.json']);
+    } else if (mode === 'rng-probe') {
+      assert.deepEqual(report.saved_downloads.map(row => row.name),
+        ['retail-port.jsonl', 'retail-browser-report.json', 'rng-draw-probe.jsonl']);
+      assert.equal(report.rng_draw_probe.complete, true);
+      assert.deepEqual(report.rng_draw_probe.captured_cursors, [0]);
+      const artifact = await fs.readFile(path.join(out, 'rng-draw-probe.jsonl'));
+      assert.equal(report.rng_draw_probe.artifact.sha256,
+        createHash('sha256').update(artifact).digest('hex'));
     } else assert(report.finalization_failures.length, mode);
+    if (mode === 'rng-probe-invalid') assert.match(report.rng_draw_probe_error, /invalid kind or 32-bit post-update seed/);
     if (['pageerror', 'console', 'http', 'request-failure', 'late-console'].includes(mode)) {
       assert(report.first_error, mode);assert(report.browser_errors.length, mode);
     }

@@ -181,6 +181,11 @@
       "label": "samus_effect_particle_spawn",
       "address": "0x80398c04",
       "expected_word": "0x7c0802a6"
+    },
+    {
+      "label": "rand_return",
+      "address": "0x80380524",
+      "expected_word": "0x4e800020"
     }
   ],
   "extra_memory": [
