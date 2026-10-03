@@ -29,6 +29,14 @@ MENU_ROUTE_SOURCE_FILES = (
     ".deps/melee/src/melee/mn/mnmain.c",
     ".deps/melee/src/melee/mn/mncharsel.c",
 )
+MENU_SOUND_ROUTE_SOURCE_FILES = (
+    *MENU_ROUTE_SOURCE_FILES,
+    ".deps/melee/src/melee/gm/gmmain_lib.c",
+    ".deps/melee/src/melee/mn/mnsound.c",
+    ".deps/melee/src/melee/gm/types.h",
+    "tools/retail_cpu_menu_prepare.py",
+    "tools/retail_allocation_menu.py",
+)
 VS_RULES_ITEMS_ROUTE_SOURCE_FILES = (
     *MENU_ROUTE_SOURCE_FILES,
     ".deps/melee/src/melee/mn/mnmainrule.c",
@@ -245,7 +253,7 @@ def resolve_gdb_executable(path=None):
 
 def retain_route_screenshots(frames_dir, trace_path, output, *, route="menu"):
     """Keep one PNG beside each verified source route marker, with its mapping."""
-    if route not in ("menu", "vs_rules_items"):
+    if route not in ("menu", "vs_rules_items", "menu_sound"):
         raise ValueError("unknown original route screenshot mapping")
     images = sorted(frames_dir.glob("framedump_*.png"),
                     key=lambda path: int(path.stem.rsplit("_", 1)[1]))
@@ -265,22 +273,23 @@ def retain_route_screenshots(frames_dir, trace_path, output, *, route="menu"):
         return {"status": "unmapped", "frame_dump_count": len(images),
                 "scheduler_frame_count": len(scheduler), "frame_offset": offset,
                 "reason": "PNG count differs from source scheduler rows by more than two"}
-    marker_names = ((
-        "cold_css_ready", "css_before_b_back_probe", "css_b_back_probe_remained_css",
-        "versus_submenu_ready_after_css", "root_main_menu_ready", "title_ready",
-        "root_main_menu_ready_after_title", "versus_submenu_ready_after_title",
-        "round_trip_css_ready") if route == "menu" else (
-        "cold_css_ready", "versus_submenu_after_css_parent", "root_menu_after_vs_back",
-        "versus_submenu_for_rules", "vs_rules_first_entry", "vs_items_entry",
-        "vs_items_one_bit_toggled", "vs_items_frequency_none", "vs_items_back_committed",
-        "vs_rules_back_to_versus", "versus_back_to_main",
-        "vs_rules_reentry_retained_items", "vs_rules_stock_three_selected",
-        "vs_rules_plus_entry", "vs_rules_plus_timer_one",
-        "vs_rules_plus_back_retained", "vs_rules_plus_reentry_retained",
-        "css_after_rules_start_retained", "sss_after_rules_start",
-        "sss_final_destination_selected", "vs_match_entered",
-        "vs_match_after_180_ticks", "vs_no_contest_chord_sent",
-        "results_no_contest", "css_after_results_retained"))
+    marker_names = (
+        tuple(_SOUND_ROUTE_MARKERS[1:]) if route == "menu_sound" else
+        ("cold_css_ready", "css_before_b_back_probe", "css_b_back_probe_remained_css",
+         "versus_submenu_ready_after_css", "root_main_menu_ready", "title_ready",
+         "root_main_menu_ready_after_title", "versus_submenu_ready_after_title",
+         "round_trip_css_ready") if route == "menu" else
+        ("cold_css_ready", "versus_submenu_after_css_parent", "root_menu_after_vs_back",
+         "versus_submenu_for_rules", "vs_rules_first_entry", "vs_items_entry",
+         "vs_items_one_bit_toggled", "vs_items_frequency_none", "vs_items_back_committed",
+         "vs_rules_back_to_versus", "versus_back_to_main",
+         "vs_rules_reentry_retained_items", "vs_rules_stock_three_selected",
+         "vs_rules_plus_entry", "vs_rules_plus_timer_one",
+         "vs_rules_plus_back_retained", "vs_rules_plus_reentry_retained",
+         "css_after_rules_start_retained", "sss_after_rules_start",
+         "sss_final_destination_selected", "vs_match_entered",
+         "vs_match_after_180_ticks", "vs_no_contest_chord_sent",
+         "results_no_contest", "css_after_results_retained"))
     markers = [row for row in rows if row.get("event") in marker_names]
     if [row.get("event") for row in markers] != list(marker_names):
         raise RuntimeError("cannot retain route screenshots: expected source markers are missing")
@@ -405,6 +414,143 @@ def verify_menu_route_commands(path):
     if commands[second_confirm].get("menu_state", {}).get("cur") != 2 or commands[second_confirm].get("menu_state", {}).get("hovered") != 0:
         raise RuntimeError("second post-title confirm was not SEL_VS_MELEE in the VS submenu")
     return {"commands": len(commands), "sha256": retail._sha256(path)}
+
+
+_SOUND_ROUTE_MARKERS = (
+    "first_scheduler_return", "cold_css_ready", "css_before_b_back_probe",
+    "css_b_back_probe_remained_css", "versus_submenu_ready_after_css",
+    "root_main_menu_ready", "title_ready", "root_main_menu_ready_after_title",
+    "main_settings_selected", "settings_ready", "settings_sound_selected",
+    "sound_screen_ready", "settings_after_sound_cancel",
+    "sound_screen_reentered", "sound_balance_after_change",
+    "settings_after_sound_change", "main_after_settings", "title_after_sound",
+    "root_main_menu_returned_after_sound", "versus_submenu_ready_after_sound",
+    "css_after_sound",
+)
+
+
+
+def verify_menu_sound_route(path):
+    """Require original scenes, Back retention, and the Sound SaveData delta."""
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    if not rows:
+        raise RuntimeError("Sound route trace is empty")
+    markers = [row for row in rows if row.get("event") != "scheduler_return"]
+    if tuple(row.get("event") for row in markers) != _SOUND_ROUTE_MARKERS:
+        raise RuntimeError("Sound route trace has a missing or unexpected marker")
+    scenes = {
+        "cold_css_ready": (8, 2), "css_before_b_back_probe": (8, 2),
+        "css_b_back_probe_remained_css": (8, 2),
+        "versus_submenu_ready_after_css": (1, 1),
+        "root_main_menu_ready": (1, 1), "title_ready": (0, 0),
+        "root_main_menu_ready_after_title": (1, 1),
+        "main_settings_selected": (1, 1), "settings_ready": (1, 1),
+        "settings_sound_selected": (1, 1), "sound_screen_ready": (1, 1),
+        "settings_after_sound_cancel": (1, 1),
+        "sound_screen_reentered": (1, 1),
+        "sound_balance_after_change": (1, 1),
+        "settings_after_sound_change": (1, 1),
+        "main_after_settings": (1, 1), "title_after_sound": (0, 0),
+        "root_main_menu_returned_after_sound": (1, 1),
+        "versus_submenu_ready_after_sound": (1, 1), "css_after_sound": (8, 2),
+    }
+    states = {
+        "versus_submenu_ready_after_css": (2, 0),
+        "root_main_menu_ready": (0, 1),
+        "root_main_menu_ready_after_title": (0, 0),
+        "main_settings_selected": (0, 3),
+        "settings_ready": (4, 0),
+        "settings_sound_selected": (4, 1),
+        "sound_screen_ready": (20, 0),
+        "settings_after_sound_cancel": (4, 1),
+        "sound_screen_reentered": (20, 0),
+        "sound_balance_after_change": (20, 0),
+        "settings_after_sound_change": (4, 1),
+        "main_after_settings": (0, 3),
+        "root_main_menu_returned_after_sound": (0, 0),
+        "versus_submenu_ready_after_sound": (2, 0),
+    }
+    by_event = {row["event"]: row for row in markers}
+    for event, expected in scenes.items():
+        row = by_event[event]
+        if (row.get("scene_kind"), row.get("game_mode")) != expected:
+            raise RuntimeError(f"Sound route marker {event} reached scene/mode "
+                               f"{row.get('scene_kind')}/{row.get('game_mode')}, expected {expected}")
+    for event, expected in states.items():
+        state = by_event[event].get("menu_state")
+        if not isinstance(state, dict) or (state.get("cur"), state.get("hovered")) != expected:
+            raise RuntimeError(f"Sound route marker {event} has unexpected source menu state: {state}")
+    for event, expected in (("sound_screen_ready", 0),
+                            ("settings_after_sound_cancel", 0),
+                            ("sound_screen_reentered", 0),
+                            ("sound_balance_after_change", 251),
+                            ("settings_after_sound_change", 251),
+                            ("main_after_settings", 251),
+                            ("title_after_sound", 251),
+                            ("css_after_sound", 251)):
+        balance = by_event[event].get("sound_balance")
+        if balance != {"save_data_offset": "0x45C", "value": expected}:
+            raise RuntimeError(f"Sound route marker {event} has unexpected SaveData balance: {balance}")
+    frames = [row for row in rows if row.get("event") == "scheduler_return"]
+    sequences = [row.get("sequence") for row in frames]
+    if not sequences or sequences != list(range(len(sequences))):
+        raise RuntimeError("Sound route source-frame sequence is missing or discontinuous")
+    if not all("pad_copy_status_hex" in row and "current_hps_hex" in row and
+               "hps_voice_word" in row for row in frames):
+        raise RuntimeError("Sound route trace omitted source PAD/audio owner state")
+    if not any(row.get("scene_kind") == 1 and row.get("menu_state", {}).get("cur") == 20 and
+               "sound_balance" in row for row in frames):
+        raise RuntimeError("Sound route source-frame trace omitted MenuKind 20 SaveData state")
+    return {"source_scheduler_frames": len(frames), "markers": list(_SOUND_ROUTE_MARKERS),
+            "initial_balance": 0, "final_balance": 251,
+            "save_data_offset": "0x45C", "trace_sha256": retail._sha256(path)}
+
+
+def verify_menu_sound_route_commands(path):
+    """Bind Sound navigation and edit to ordinary controller commands."""
+    commands = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    if not commands or any(row.get("event") != "pad_command" for row in commands):
+        raise RuntimeError("Sound route input command log is empty or malformed")
+
+    def find(scene, mode, command, after=-1, state=None):
+        for index in range(after + 1, len(commands)):
+            row = commands[index]
+            if (row.get("scene_kind") == scene and row.get("game_mode") == mode and
+                    row.get("command") == command and
+                    (state is None or row.get("menu_state", {}).get("cur") == state[0] and
+                     row.get("menu_state", {}).get("hovered") == state[1])):
+                return index
+        return -1
+
+    css_b = find(8, 2, "PRESS B")
+    css_l = find(8, 2, "PRESS L", css_b)
+    css_r = find(8, 2, "PRESS R", css_l)
+    css_start = find(8, 2, "PRESS START", css_r)
+    if min(css_b, css_l, css_r, css_start) < 0:
+        raise RuntimeError("Sound route lacks the source CSS Back probe and LR+Start parent-menu chord")
+    submenu_back = find(1, 1, "PRESS B", css_start, (2, 0))
+    root_back = find(1, 1, "PRESS B", submenu_back, (0, 1))
+    title_start = find(0, 0, "PRESS START", root_back)
+    settings_confirm = find(1, 1, "PRESS A", title_start, (0, 3))
+    sound_confirm = find(1, 1, "PRESS A", settings_confirm, (4, 1))
+    sound_cancel = find(1, 1, "PRESS B", sound_confirm, (20, 0))
+    sound_reenter = find(1, 1, "PRESS A", sound_cancel, (4, 1))
+    sound_select_balance = find(1, 1, "PRESS D_DOWN", sound_reenter, (20, 0))
+    sound_decrement = find(1, 1, "PRESS D_LEFT", sound_select_balance, (20, 0))
+    sound_back = find(1, 1, "PRESS B", sound_decrement, (20, 0))
+    settings_back = find(1, 1, "PRESS B", sound_back, (4, 1))
+    main_back = find(1, 1, "PRESS B", settings_back, (0, 3))
+    sound_title_start = find(0, 0, "PRESS START", main_back)
+    sound_vs_confirm = find(1, 1, "PRESS A", sound_title_start, (0, 1))
+    sound_melee_confirm = find(1, 1, "PRESS A", sound_vs_confirm, (2, 0))
+    if min(submenu_back, root_back, title_start, settings_confirm, sound_confirm,
+           sound_cancel, sound_reenter, sound_select_balance, sound_decrement,
+           sound_back, settings_back, main_back, sound_title_start,
+           sound_vs_confirm, sound_melee_confirm) < 0:
+        raise RuntimeError("Sound route lacks its ordered original menu confirmations, edit, and Back inputs")
+    return {"commands": len(commands), "sound_edit_command": "PRESS D_LEFT",
+            "sha256": retail._sha256(path)}
+
 
 
 def verify_vs_rules_items_route(path, *, team_battle=False):
@@ -920,7 +1066,7 @@ def verify_vs_rules_items_route_commands(path, *, team_battle=False,
 
 
 def gdb_script(paths, boot_only=False, menu_round_trip=False,
-               vs_rules_items_round_trip=False):
+               vs_rules_items_round_trip=False, menu_sound_route=False):
     q = retail._gdb_quote
     lines = ["set architecture powerpc:common", "set endian big", "set pagination off",
              "set confirm off", "set breakpoint pending on",
@@ -932,7 +1078,7 @@ def gdb_script(paths, boot_only=False, menu_round_trip=False,
              "if _allocation_reg('pc') != 0x80390eb4: raise RuntimeError('boot did not reach first scheduler return')",
              "end"]
     if not boot_only:
-        if menu_round_trip or vs_rules_items_round_trip:
+        if menu_round_trip or vs_rules_items_round_trip or menu_sound_route:
             lines += [f"source {paths['menu_driver']}", "enable 1",
                       "python", "MENU_ROUTE_TRACE.close()", "end"]
         else:
@@ -949,6 +1095,7 @@ def gdb_script(paths, boot_only=False, menu_round_trip=False,
               ("first_scheduler_return" if boot_only else
                "menu_round_trip_complete" if menu_round_trip else
                "vs_rules_items_round_trip_complete" if vs_rules_items_round_trip else
+               "menu_sound_route_complete" if menu_sound_route else
                "requested_match_capture_boundary") + "')",
               "end", "quit", ""]
     return "\n".join(lines)
@@ -964,10 +1111,12 @@ def capture(args):
                 "start": "original_dol_entry", "savestate_loaded": False,
                 "boot_only": args.boot_only, "menu_round_trip": args.menu_round_trip,
                 "vs_rules_items_round_trip": args.vs_rules_items_round_trip,
+                "menu_sound_route": getattr(args, "menu_sound_route", False),
                 "team_battle": getattr(args, "team_battle", False),
                 "route_mode": "cold_boot_css_menu_round_trip" if args.menu_round_trip else
                               "cold_boot_vs_rules_items_team_battle" if getattr(args, "team_battle", False) else
                               "cold_boot_vs_rules_items_route" if args.vs_rules_items_round_trip else
+                              "cold_boot_css_menu_sound_settings" if getattr(args, "menu_sound_route", False) else
                               "first_scheduler_return" if args.boot_only else "fixed_allocation_replay",
                 "candidate_admission": "forbidden",
                 "scope": "original allocation diagnostic; no gameplay or performance admission"}
@@ -978,14 +1127,15 @@ def capture(args):
     try:
         if getattr(args, "team_battle", False) and not args.vs_rules_items_round_trip:
             raise ValueError("--team-battle requires --vs-rules-items-round-trip")
+        menu_sound_route = getattr(args, "menu_sound_route", False)
         route_flags = sum((args.boot_only, args.menu_round_trip,
-                           args.vs_rules_items_round_trip))
+                           args.vs_rules_items_round_trip, menu_sound_route))
         if route_flags > 1:
             raise ValueError("boot-only and original menu routes are separate diagnostic captures")
         if args.vs_rules_items_round_trip and getattr(args, "initial_gci", None) is None:
             raise ValueError("VS Rules/Items retail route requires its declared Everything unlocked GCI baseline")
         plan = scenario = plan_hash = None
-        if not args.boot_only and not args.menu_round_trip and not args.vs_rules_items_round_trip:
+        if not args.boot_only and not args.menu_round_trip and not args.vs_rules_items_round_trip and not menu_sound_route:
             if args.input_plan is None or args.scenario is None:
                 raise ValueError("fixed allocation replay requires --input-plan and --scenario")
             plan, plan_hash = load_plan(args.input_plan)
@@ -1007,9 +1157,11 @@ def capture(args):
             if path is not None:
                 inputs[str(path.resolve())] = retail._sha256(path)
         route_source_identities = {}
-        if args.menu_round_trip or args.vs_rules_items_round_trip:
+        if args.menu_round_trip or args.vs_rules_items_round_trip or menu_sound_route:
             source_files = (VS_RULES_ITEMS_ROUTE_SOURCE_FILES
-                            if args.vs_rules_items_round_trip else MENU_ROUTE_SOURCE_FILES)
+                            if args.vs_rules_items_round_trip else
+                            MENU_SOUND_ROUTE_SOURCE_FILES if menu_sound_route else
+                            MENU_ROUTE_SOURCE_FILES)
             for relative in source_files:
                 source_path = ROOT / relative
                 route_source_identities[relative] = retail._sha256(source_path)
@@ -1057,9 +1209,10 @@ def capture(args):
         boot_context = derive_boot_context(args.dol, args.disc,
             ROOT / ".deps/melee/config/GALE01/symbols.txt", ROOT / ".deps/melee")
         write_json(evidence / "independent-boot-context.json", boot_context)
-        if args.menu_round_trip or args.vs_rules_items_round_trip:
+        if args.menu_round_trip or args.vs_rules_items_round_trip or menu_sound_route:
             route_identity_name = ("vs-rules-items-route-source-identities.json"
                                    if args.vs_rules_items_round_trip else
+                                   "menu-sound-route-source-identities.json" if menu_sound_route else
                                    "route-source-identities.json")
             write_json(evidence / route_identity_name, {
                 "melee_checkout": str((ROOT / ".deps/melee").resolve()),
@@ -1072,6 +1225,11 @@ def capture(args):
                 raise ValueError("owned input-plan copy differs from its frozen source")
             shutil.copy2(args.scenario, evidence / "scenario.json")
             target = scenario_target(scenario)
+        elif args.menu_sound_route:
+            target = {"route": "Title > Main > Settings > Sound > Settings > Main > Title > Main > VS > CSS",
+                "source_menu_kinds": [0, 4, 20, 4, 0, 2],
+                "sound_balance": {"save_data_offset": "0x45C", "before": 0,
+                                  "after": 251, "signed_after": -5}}
         else:
             # This target declares the first CSS roster and eventual stage.
             # The route uses source-driven availability and ordinary PAD
@@ -1095,6 +1253,9 @@ def capture(args):
         elif args.vs_rules_items_round_trip:
             from retail_allocation_menu import render_vs_rules_items_round_trip_driver
             paths["menu_driver"].write_text(render_vs_rules_items_round_trip_driver())
+        elif menu_sound_route:
+            from retail_allocation_menu import render_menu_sound_route_driver
+            paths["menu_driver"].write_text(render_menu_sound_route_driver())
         elif not args.boot_only:
             from retail_allocation_menu import render_driver
             paths["menu_driver"].write_text(render_driver())
@@ -1115,7 +1276,7 @@ def capture(args):
         external = tree_hashes(paths["user"] / "GC")
         if external != paths["provenance"].get("external_save_hashes"):
             raise ValueError("external card context differs from pinned provenance")
-        pipe_count = 4 if (args.menu_round_trip or args.vs_rules_items_round_trip) else (plan["active_player_count"] if plan else 0)
+        pipe_count = 4 if (args.menu_round_trip or args.vs_rules_items_round_trip or menu_sound_route) else (plan["active_player_count"] if plan else 0)
         if pipe_count:
             retail.require_raw_pipe_config(paths["pad_config"], range(1, pipe_count + 1))
         identity = {**paths["identity"], "disc_dol_sha1": retail.verify_disc_dol(args.disc, args.dol),
@@ -1123,14 +1284,14 @@ def capture(args):
                     "dolphin_ini_canonical_sha256": retail._canonical_dolphin_ini_sha256(paths["config"], paths["socket"]),
                     "gcpad_ini_sha256": retail._sha256(paths["pad_config"]),
                     "external_save_hashes": external}
-        command = retail.dolphin_command(paths["source_dolphin"], paths["user"], paths["snapshot"], args.disc, cpu=args.cpu)
-        at = command.index("-s")
-        del command[at:at + 2]
+        command = retail.dolphin_command(
+            paths["source_dolphin"], paths["user"], paths["snapshot"], args.disc,
+            cpu=args.cpu, cold_boot=True)
         if args.capture_images:
             command = visual_capture_options(command)
         commands = evidence / "gdb-commands.txt"
         commands.write_text(gdb_script(paths, args.boot_only, args.menu_round_trip,
-                                       args.vs_rules_items_round_trip))
+                                       args.vs_rules_items_round_trip, menu_sound_route))
         # These owned files are execution inputs even though they live beside
         # the diagnostic outputs. Freeze them before any original process runs.
         for path in evidence.iterdir():
@@ -1221,6 +1382,19 @@ def capture(args):
                 if screenshots.get("status") != "retained":
                     raise RuntimeError("original visual evidence was not mapped to every route marker: " +
                                        str(screenshots.get("reason", screenshots.get("status"))))
+        elif menu_sound_route:
+            route_path = evidence / "cold-boot-menu-route.jsonl"
+            metadata["menu_route"] = verify_menu_sound_route(route_path)
+            metadata["menu_route"]["input_commands"] = verify_menu_sound_route_commands(
+                evidence / "cold-boot-input-commands.jsonl")
+            if args.capture_images:
+                screenshots = retain_route_screenshots(
+                    paths["user"] / "Dump/Frames", route_path, output,
+                    route="menu_sound")
+                metadata["menu_route"]["screenshots"] = screenshots
+                if screenshots.get("status") != "retained":
+                    raise RuntimeError("original visual evidence was not mapped to every route marker: " +
+                                       str(screenshots.get("reason", screenshots.get("status"))))
         if plan is not None:
             trace = load_capture(paths["trace"], cpu=args.cpu)
             verify_capture(plan, trace)
@@ -1274,6 +1448,8 @@ def main():
     parser.add_argument("--boot-only", action="store_true", help="Stop at first scheduler return; diagnostic smoke only")
     parser.add_argument("--menu-round-trip", action="store_true",
                         help="Capture a cold-DOL CSS -> original menus -> title -> CSS route; diagnostic only")
+    parser.add_argument("--menu-sound-route", action="store_true",
+                        help="Capture a cold-DOL original Main > Settings > Sound edit, Back, and return through VS to CSS; diagnostic only")
     parser.add_argument("--vs-rules-items-round-trip", action="store_true",
                         help="Capture cold-DOL VS Rules/Items -> SSS -> live match -> Results -> retained CSS; diagnostic only")
     parser.add_argument("--team-battle", action="store_true",
