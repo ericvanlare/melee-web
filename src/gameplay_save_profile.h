@@ -16,6 +16,7 @@ typedef struct MeleeWebSaveProfilePreferences {
     uint8_t item_frequency;
     uint64_t item_mask;
     uint8_t rumble_enabled[4];
+    uint8_t deflicker;
     uint8_t saved_language;
 } MeleeWebSaveProfilePreferences;
 

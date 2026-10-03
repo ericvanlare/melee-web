@@ -2321,7 +2321,36 @@
         "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md",
         "docs/evidence/save-profile-dolphin-roundtrip-v1.json"
       ],
-      "next_step": "Compare the Rumble intro/panel animation and audio against retail, verify physical rumble output when hardware is available, and add the next authored Settings page with its own route and save receipt.",
+      "next_step": "Keep Rumble animation/audio and physical rumble evidence separate; continue the source-owned Main Settings graph with its next original page.",
+      "issue": null
+    },
+    {
+      "id": "menu-main-settings-display",
+      "category": "menus",
+      "title": "Original Main Settings > Display route and saved deflicker preference",
+      "implementation": "integrated",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/mn/mnmain.c",
+        "melee/mn/mndeflicker.c",
+        "melee/mn/mndeflicker.h",
+        "melee/mn/forward.h",
+        "melee/gm/gmmain_lib.c"
+      ],
+      "depends_on": [
+        "css-sss-and-menu-transitions",
+        "save-and-memory-card"
+      ],
+      "pass_criteria": [
+        "Original Main Settings callbacks, Display menu kind 21, authored assets, input gates and B cancellation preserve source menu selection across repeated entry.",
+        "A changes the source SaveData deflicker byte at offset 0x45D; Personal autosave, CSS return, GCI export and a supported match/Results/CSS return retain the same value.",
+        "Retail source transitions and rendered-browser route are reported separately; stage identity, pixel/audio equivalence, physical input and performance remain independent evidence gates."
+      ],
+      "evidence": [
+        "docs/evidence/main-settings-display-route-v1.json",
+        "docs/ORIGINAL_MENU_ROUTE_CAPTURE.md"
+      ],
+      "next_step": "Extend the next original Main Settings page with its source SaveData fields and menu-owned assets; compare animation/audio and physical input separately.",
       "issue": null
     },
     {

@@ -25,10 +25,33 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "reference-capture/dolphin"))
 from reference_capture_automation import PipeController, prepare_pipe  # noqa: E402
 from reference_observer_stream import HEADER, MAX_PAYLOAD, _decode_record  # noqa: E402
+from reference_capture_save import (  # noqa: E402
+    CARD_BLOCK_BYTES, GCI_HEADER_BYTES, SAVE_OFFSET, decode_block,
+)
 
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def deflicker_from_gci(path: Path) -> int:
+    """Read gmm_x1CB0.deflicker from the primary GALE01r2 GameData block."""
+
+    raw = path.read_bytes()
+    if (len(raw) != GCI_HEADER_BYTES + 11 * CARD_BLOCK_BYTES or
+            raw[:6] != b"GALE01" or
+            raw[8:40].rstrip(b"\0") != b"SuperSmashBros0110290334" or
+            int.from_bytes(raw[56:58], "big") != 11):
+        raise RuntimeError("Unsupported GALE01r2 GCI layout for deflicker observation")
+    start = GCI_HEADER_BYTES + CARD_BLOCK_BYTES
+    decoded = decode_block(raw[start:start + CARD_BLOCK_BYTES])
+    if decoded[16:18] != b"\x00\x01":
+        raise RuntimeError("Primary GameData block has the wrong logical identity")
+    # Source gmm_x1CB0 is at SaveData 0x448, with deflicker at +0x15.
+    value = decoded[SAVE_OFFSET + 0x45D]
+    if value not in (0, 1):
+        raise RuntimeError(f"Saved deflicker value is outside its authored range: {value}")
+    return value
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,6 +63,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dol-sha256", required=True, help="SHA-256 of the selected disc's main.dol")
     parser.add_argument("--source-revision", default="GALE01r2", help="Observer source revision label (default: GALE01r2)")
     parser.add_argument("--capture-id", default="save-profile-interop", help="ASCII observer capture identifier")
+    parser.add_argument("--route", choices=("rumble", "display"), default="rumble",
+                        help="Original Main-menu route to capture (default: rumble)")
     parser.add_argument("--timeout-sec", type=int, default=180, help="Hard source-observation deadline, 30..300 seconds")
     args = parser.parse_args()
     if not re.fullmatch(r"[0-9a-fA-F]{64}", args.dol_sha256):
@@ -73,6 +98,10 @@ def main() -> int:
     gci_copy = usa / args.gci.name
     gci_copy.write_bytes(args.gci.read_bytes())
     before_hash = sha256(gci_copy)
+    deflicker_before = (deflicker_from_gci(gci_copy)
+                        if args.route == "display" else None)
+    if args.route == "display" and deflicker_before != 1:
+        raise RuntimeError("The Display route requires deflicker enabled in its starting GCI")
     (config / "Dolphin.ini").write_text("[Core]\nSIDevice0 = 6\n")
     (config / "GCPadNew.ini").write_text("[GCPad1]\nDevice = Pipe/0/pad1\n")
     fifo = prepare_pipe(user)
@@ -114,6 +143,11 @@ def main() -> int:
     main_down_count = 0
     settings_enter = rumble_enter = rumble_toggle = False
     rumble_exit = settings_exit = False
+    settings_display_downs = 0
+    settings_display_waiting = False
+    settings_display_last_hovered = None
+    display_entered = display_toggle = display_back = False
+    display_reentered = display_verify_back = False
     finished = False
     records_seen = 0
     scene_transitions = []
@@ -213,20 +247,55 @@ def main() -> int:
                     elif flow["cur_menu"] == 0 and main_down_count == 3 and flow["hovered"] == 3 and not settings_enter:
                         pulse("A enters Settings", 0x0100)
                         settings_enter = True
-                    elif flow["cur_menu"] == 4 and settings_enter and not rumble_enter and latest_tick >= menu_transition_tick + 8:
-                        pulse("A enters Settings Rumble", 0x0100)
-                        rumble_enter = True
-                    elif flow["cur_menu"] == 19 and rumble_enter and not rumble_toggle and latest_tick >= menu_transition_tick + 32:
-                        pulse("A turns Controller 1 Rumble off", 0x0100)
-                        rumble_toggle = True
-                    elif flow["cur_menu"] == 19 and rumble_toggle and not rumble_exit and latest_tick >= menu_transition_tick + 40:
-                        pulse("B exits Rumble settings", 0x0200)
-                        rumble_exit = True
-                    elif flow["cur_menu"] == 4 and rumble_exit and not settings_exit and latest_tick >= menu_transition_tick + 8:
-                        pulse("B exits Settings", 0x0200)
-                        settings_exit = True
-                    elif flow["cur_menu"] == 0 and settings_exit and latest_tick >= menu_transition_tick + 30:
-                        finished = True
+                    elif args.route == "rumble":
+                        if flow["cur_menu"] == 4 and settings_enter and not rumble_enter and latest_tick >= menu_transition_tick + 8:
+                            pulse("A enters Settings Rumble", 0x0100)
+                            rumble_enter = True
+                        elif flow["cur_menu"] == 19 and rumble_enter and not rumble_toggle and latest_tick >= menu_transition_tick + 32:
+                            pulse("A turns Controller 1 Rumble off", 0x0100)
+                            rumble_toggle = True
+                        elif flow["cur_menu"] == 19 and rumble_toggle and not rumble_exit and latest_tick >= menu_transition_tick + 40:
+                            pulse("B exits Rumble settings", 0x0200)
+                            rumble_exit = True
+                        elif flow["cur_menu"] == 4 and rumble_exit and not settings_exit and latest_tick >= menu_transition_tick + 8:
+                            pulse("B exits Settings", 0x0200)
+                            settings_exit = True
+                        elif flow["cur_menu"] == 0 and settings_exit and latest_tick >= menu_transition_tick + 30:
+                            finished = True
+                    else:
+                        if (flow["cur_menu"] == 4 and settings_enter and
+                                (not display_entered or (display_back and not display_reentered))):
+                            if latest_tick < menu_transition_tick + 8:
+                                pass
+                            elif settings_display_waiting:
+                                if flow["hovered"] != settings_display_last_hovered:
+                                    settings_display_waiting = False
+                            elif flow["hovered"] < 2 and settings_display_downs < 4:
+                                pulse("D-pad Down selects Settings Display", 0x0004, 0.08)
+                                settings_display_downs += 1
+                                settings_display_last_hovered = flow["hovered"]
+                                settings_display_waiting = True
+                            elif flow["hovered"] == 2:
+                                if not display_entered:
+                                    pulse("A enters Settings Display", 0x0100)
+                                    display_entered = True
+                                else:
+                                    pulse("A re-enters Settings Display", 0x0100)
+                                    display_reentered = True
+                        elif flow["cur_menu"] == 21 and display_entered and not display_toggle and latest_tick >= menu_transition_tick + 32:
+                            pulse("A turns Display deflicker off", 0x0100)
+                            display_toggle = True
+                        elif flow["cur_menu"] == 21 and display_toggle and not display_back and latest_tick >= menu_transition_tick + 40:
+                            pulse("B exits Display after toggling", 0x0200)
+                            display_back = True
+                        elif flow["cur_menu"] == 21 and display_reentered and not display_verify_back and latest_tick >= menu_transition_tick + 32:
+                            pulse("B exits re-entered Display", 0x0200)
+                            display_verify_back = True
+                        elif flow["cur_menu"] == 4 and display_verify_back and not settings_exit and latest_tick >= menu_transition_tick + 8:
+                            pulse("B exits Settings after Display re-entry", 0x0200)
+                            settings_exit = True
+                        elif flow["cur_menu"] == 0 and settings_exit and latest_tick >= menu_transition_tick + 30:
+                            finished = True
                 if process.poll() is not None:
                     break
                 time.sleep(0.025)
@@ -245,28 +314,63 @@ def main() -> int:
                         process.wait()
 
     after_hash = sha256(gci_copy)
-    required_inputs = {
-        "progressive_prompt": sent_progressive,
-        "title_start": sent_start,
-        "main_menu_navigation": main_down_count == 3,
-        "settings_enter": settings_enter,
-        "rumble_settings_enter": rumble_enter,
-        "rumble_change": rumble_toggle,
-        "settings_exit": settings_exit,
-        "completed_controller_sequence": finished,
-    }
+    deflicker_after = (deflicker_from_gci(gci_copy)
+                       if args.route == "display" else None)
+    if args.route == "rumble":
+        required_inputs = {
+            "progressive_prompt": sent_progressive,
+            "title_start": sent_start,
+            "main_menu_navigation": main_down_count == 3,
+            "settings_enter": settings_enter,
+            "rumble_settings_enter": rumble_enter,
+            "rumble_change": rumble_toggle,
+            "settings_exit": settings_exit,
+            "completed_controller_sequence": finished,
+        }
+    else:
+        required_inputs = {
+            "progressive_prompt": sent_progressive,
+            "title_start": sent_start,
+            "main_menu_navigation": main_down_count == 3,
+            "settings_enter": settings_enter,
+            "display_selection": display_entered and settings_display_downs == 2,
+            "display_toggle": display_toggle,
+            "display_exit": display_back,
+            "display_reentered": display_reentered,
+            "display_reentry_exit": display_verify_back,
+            "settings_exit": settings_exit,
+            "completed_controller_sequence": finished,
+        }
     if process.returncode != 0:
         raise RuntimeError(f"Dolphin returned {process.returncode}; see {stdout_path}")
     if not all(required_inputs.values()):
         raise TimeoutError(f"Dolphin did not complete the expected ordinary-input sequence: {required_inputs}")
+    observed_menu_ids = [row["cur_menu"] for row in menu_transitions]
+    expected_menu_ids = ([0, 4, 19, 4, 0] if args.route == "rumble" else
+                         [0, 4, 21, 4, 21, 4, 0])
+    if observed_menu_ids != expected_menu_ids:
+        raise RuntimeError(
+            f"Original {args.route} route menu IDs differ from the captured contract: "
+            f"expected {expected_menu_ids}, got {observed_menu_ids}")
     if before_hash == after_hash:
         raise RuntimeError("Melee left the GCI unchanged; no persistent save was observed")
+    if args.route == "display" and deflicker_after != 0:
+        raise RuntimeError(f"Original Display route did not save deflicker off: {deflicker_after}")
     if not status_path.exists():
         raise RuntimeError("Dolphin did not publish the observer status receipt")
     observer_status = json.loads(status_path.read_text())
     if observer_status.get("invalid") or observer_status.get("error"):
         raise RuntimeError(f"Dolphin observer marked the run invalid: {observer_status}")
 
+    save_result = {
+        "input_path": str(args.gci), "input_sha256": before_hash,
+        "dolphin_output_path": str(gci_copy), "output_sha256": after_hash,
+        "output_bytes": gci_copy.stat().st_size,
+    }
+    if args.route == "display":
+        save_result["deflicker"] = {"before": deflicker_before,
+                                    "after": deflicker_after,
+                                    "save_data_offset": "0x45D"}
     summary = {
         "client": {
             "dolphin_version": subprocess.run([str(args.dolphin), "--version"], capture_output=True, text=True,
@@ -275,18 +379,17 @@ def main() -> int:
         },
         "disc": {"path": str(args.disc), "sha256": sha256(args.disc), "main_dol_sha256": args.dol_sha256.lower()},
         "source_revision": args.source_revision,
+        "route": args.route,
         "argv": argv,
-        "save": {
-            "input_path": str(args.gci), "input_sha256": before_hash,
-            "dolphin_output_path": str(gci_copy), "output_sha256": after_hash,
-            "output_bytes": gci_copy.stat().st_size,
-        },
+        "save": save_result,
         "result": "pass",
         "return_code": process.returncode,
         "records_seen": records_seen,
         "observer_status": observer_status,
         "scene_transitions": scene_transitions,
         "menu_transitions": menu_transitions,
+        "expected_menu_ids": expected_menu_ids,
+        "observed_menu_ids": observed_menu_ids,
         "required_inputs": required_inputs,
         "controller_events": input_events,
         "controller_input_log": input_log_path.read_text(),

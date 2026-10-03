@@ -16,8 +16,8 @@ extern "C" void melee_web_cpu_observation_set_event_cursor(size_t index);
 extern "C" void melee_web_cpu_observation_scheduler_return(void);
 extern "C" {
 #include <melee/gm/types.h>
-#include <melee/ty/toy.h>
 #include <melee/mn/mnitemsw.h>
+#include <melee/ty/toy.h>
 #include <sysdolphin/baselib/controller.h>
 extern ResultsData lbl_8046DBE8;
 }

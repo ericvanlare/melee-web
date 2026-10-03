@@ -269,6 +269,51 @@ public player, so audio fidelity, physical-controller behavior, foreground
 timing and performance remain untested. The route does not implement or claim
 the other Settings pages.
 
+## Main Settings > Display route
+
+The retail Observer capture in the scoped [Display route receipt](evidence/main-settings-display-route-v1.json)
+records Main, Settings and Display `MenuKind` IDs `0 → 4 → 21 → 4 → 21 → 4 → 0`
+at source ticks `96, 128, 155, 200, 210, 245, 255`. From the source Title
+scene, three D-pad Down presses and A enter Settings; two Down presses and A
+enter Display. A turns deflicker off; B returns to Settings, A re-enters
+Display with the same row selected, B returns to Settings, and B returns to
+Main. The relevant retail callbacks are
+`mnMain_Scene_OnEnter`, `mnMain_Scene_OnFrame`, `mn_8022DB10`,
+`mn_8022D104`, `mnDeflicker_8024A6C4` and `mnDeflicker_8024A168` from
+`melee/mn/mnmain.c` and `melee/mn/mndeflicker.c`. The Main archive resolves the
+authored `MenMainConDf_Top` model from `MnMaAll.usd`; the settings scene also
+uses `SdMenu.usd` (`SIS_MenuData`) and `SdToy.dat` (`SIS_ToyData`). The source
+SaveData byte at `0x45D` changes from `1` to `0`. Dolphin reports the route
+pass and exact menu sequence; its Observer stream is marked interrupted because
+the capture runner stops its owned Dolphin after the sequence. Retail video and
+audio were disabled.
+
+In a fresh isolated headless-Chrome context, the public player starts with
+Everything unlocked, confirms a new Personal profile, enters original CSS,
+opens the original Title/Main menus, and changes Display deflicker from on to
+off. The browser reads source SaveData at `0x45D`, waits for Personal autosave,
+backs out and re-enters Display, returns through original Main/VS selection to
+CSS, exports the GCI with the same byte, then enters SSS, reaches a supported
+match, opens No Contest Results and returns to CSS. The passing
+`browser-route-integrated-01` run uses the combined Rumble and trophy-baseline
+runtime and sends no SSS cursor input, so stage identity is unobserved and
+excluded. The earlier route used short directional inputs and misidentified its
+stage; that label is superseded. The corrected runner uses
+`scripts/serve.py` for cross-origin-isolation headers; the setup failures are
+retained in the receipt. Personal profile reload and native menu owner teardown
+retain the preference. The SSS back-cancel probe separately confirms B returns
+to CSS after the source input gate. Rendered screenshots and the raw browser
+report are indexed by the receipt.
+
+The receipt separates source state, navigation, rendered visuals, save effects,
+audio, physical input, performance and lifecycle. Browser rendering proves the
+original scenes are displayed and that the option responds; it does not prove
+pixel equivalence. Dolphin used Null video and No Audio Output, and the browser
+package was the silent player profile. Audio quality, physical input,
+foreground timing, performance and the identity of the random/default stage
+remain untested. These results do not establish coverage of other Settings
+pages or full-game parity.
+
 ## Retained local evidence
 
 All captures, screenshots, private inputs, and generated runtime bundles remain
