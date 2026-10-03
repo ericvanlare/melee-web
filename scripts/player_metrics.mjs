@@ -9,12 +9,16 @@ export const PLAYER_METRICS_SCHEMA='melee-web-player-metrics-v1';
 export async function installPlayerMetrics(page) {
   await page.addInitScript(()=>{
     const tasks=[];
-    Object.defineProperty(globalThis,'__meleePlayerMetrics',{value:{tasks},configurable:false});
+    const state={tasks,longtask_supported:false,longtask_observed:false};
+    Object.defineProperty(globalThis,'__meleePlayerMetrics',{value:state,configurable:false});
     try {
-      if(PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
-        new PerformanceObserver(list=>{
+      const observer=globalThis.PerformanceObserver;
+      state.longtask_supported=!!observer?.supportedEntryTypes?.includes('longtask');
+      if(state.longtask_supported) {
+        new observer(list=>{
           for(const entry of list.getEntries())if(tasks.length<10000)tasks.push([entry.startTime,entry.duration]);
         }).observe({type:'longtask',buffered:true});
+        state.longtask_observed=true;
       }
     } catch {}
   });
@@ -25,6 +29,7 @@ export async function samplePlayerMetrics(page, sinceMs=0) {
   return page.evaluate(sinceMs=>{
     const state=globalThis.__meleePlayerMetrics;
     const tasks=state?(state.tasks.filter(([start])=>start>=sinceMs)):null;
+    const longtaskAvailable=state?.longtask_observed===true;
     let memory=null;
     try {
       const module=globalThis.Module, ptr=module?._melee_web_native_menu_memory?.();
@@ -32,10 +37,11 @@ export async function samplePlayerMetrics(page, sinceMs=0) {
     } catch {}
     return {
       page_now_ms:performance.now(),
-      longtask_supported:!!state&&PerformanceObserver.supportedEntryTypes?.includes('longtask'),
-      longtask_count:tasks?tasks.length:null,
-      longtask_total_ms:tasks?Math.round(tasks.reduce((sum,[,duration])=>sum+duration,0)):null,
-      longest_task_ms:tasks?Math.round(tasks.reduce((max,[,duration])=>Math.max(max,duration),0)):null,
+      longtask_supported:state?.longtask_supported??null,
+      longtask_observed:state?.longtask_observed??null,
+      longtask_count:longtaskAvailable?tasks.length:null,
+      longtask_total_ms:longtaskAvailable?Math.round(tasks.reduce((sum,[,duration])=>sum+duration,0)):null,
+      longest_task_ms:longtaskAvailable?Math.round(tasks.reduce((max,[,duration])=>Math.max(max,duration),0)):null,
       wasm_heap_bytes:memory?.wasm_heap_bytes??null,
       allocator_live_bytes:memory?.allocator_live_bytes??null,
       js_heap_used_bytes:performance.memory?.usedJSHeapSize??null,
