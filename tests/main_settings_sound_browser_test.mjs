@@ -316,6 +316,12 @@ try {
   try { await browser?.close(); }
   catch (error) { report.browserCleanupError = String(error); }
   if (!report.cleanup) report.cleanup = {state: 'not-started'};
+  if (report.result === 'pass' &&
+      (report.cleanup.result !== 1 || report.cleanup.phase !== 0 ||
+       report.cleanup.running !== 0 || report.contextCleanupError || report.browserCleanupError)) {
+    report.result = 'fail';
+    report.failure = 'Sound route did not complete native and browser teardown.';
+  }
   await fs.writeFile(path.join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n');
 }
 
