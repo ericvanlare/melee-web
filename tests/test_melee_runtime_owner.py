@@ -239,6 +239,10 @@ int main() {{
         self.run_owner(['--diagnostics-mature-delivery-evicted', '--silent'],
                        'evicted same-session retained incident remains deliverable')
 
+    def test_prior_empty_read_does_not_orphan_later_evicted_incident(self):
+        self.run_owner(['--diagnostics-mature-delivery-prior-read', '--silent'],
+                       'evicted same-session retained incident remains deliverable')
+
     def test_nonempty_retained_read_does_not_orphan_evicted_young_incident(self):
         self.run_owner(['--diagnostics-mature-delivery-nonempty-evicted', '--silent'],
                        'nonempty-retained evicted same-session retained incident remains deliverable')

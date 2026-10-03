@@ -435,6 +435,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   function diagnosticIncident(...args) {
     const result = diagnostics?.trigger(...args);
+    // An earlier idle read cannot cover an incident created afterward. Its
+    // persisted snapshot may outlive its slot in the bounded current ring.
+    if (result) diagnosticRetainedLoaded = false;
     const reason = Number(args[0]);
     if ([1, 2, 3, 4, 8].includes(reason) && diagnosticCheckpointSuspended) {
       try { void requestDiagnosticCheckpoint(); } catch {}

@@ -30,7 +30,8 @@ const diagnosticsRetentionHiddenFatal = process.argv.includes('--diagnostics-ret
 const diagnosticsRetentionEmptyThenDestroy = process.argv.includes('--diagnostics-retention-empty-destroy');
 const diagnosticsRetentionFailedThenDestroy = process.argv.includes('--diagnostics-retention-failed-destroy');
 const diagnosticsMatureDeliverySlowLoad = process.argv.includes('--diagnostics-mature-delivery-slow-load');
-const diagnosticsMatureDeliveryEvicted = process.argv.includes('--diagnostics-mature-delivery-evicted');
+const diagnosticsMatureDeliveryPriorRead = process.argv.includes('--diagnostics-mature-delivery-prior-read');
+const diagnosticsMatureDeliveryEvicted = process.argv.includes('--diagnostics-mature-delivery-evicted') || diagnosticsMatureDeliveryPriorRead;
 const diagnosticsMatureDeliveryNonEmptyEvicted = process.argv.includes('--diagnostics-mature-delivery-nonempty-evicted');
 const diagnosticsNormalDeliveryFreshness = process.argv.includes('--diagnostics-normal-delivery-freshness');
 const diagnosticsMatureDelivery = process.argv.includes('--diagnostics-mature-delivery') || diagnosticsMatureDeliverySlowLoad ||
@@ -426,6 +427,14 @@ if (diagnosticsKnownHost) {
     assert.equal(settled, true, 'Owner operation must finish through controlled native boundaries');
     if (failure) throw failure;
     return value;
+  }
+  if (diagnosticsMatureDeliveryPriorRead) {
+    // Initial idle collection can complete before the first incident exists.
+    // A later young incident must invalidate that retained-store read even
+    // if it leaves the in-memory ring before its next delivery opportunity.
+    await wait(40);
+    assert.ok(diagnosticStorageLoadCalls > 0, 'initial idle collection reads storage');
+    assert.equal(owner.diagnostics.exportReports().incidents.length, 0);
   }
   const sample = [100, 12, 1, 2, 3, 4, 5, 6, 9, 1, 2, 3, 4, 5, 6, 7, 8, 1];
   phase = 1; running = true; window.menuFrame(true);

@@ -44,6 +44,15 @@ passes, including a fresh write and checkpoint after the exception. The default
 IndexedDB adapter is asynchronous, so this is failure isolation, not a phone
 cause. Earlier package/browser and CI results precede this correction too.
 
+Integration review reproduced the same retained-read loss after an initial
+empty-store read completed before any incident existed. A later incident's
+persisted snapshot became unreachable after its current-ring slot was evicted.
+New incident creation now invalidates the earlier retained read without adding
+storage or serialization to the native callback. The prior-empty-read control
+fails without that invalidation and passes with it; all 36 controlled owner
+checks and the diagnostics core checks pass. Release validation for this
+correction is recorded separately from the earlier receipts.
+
 Three bounded probes of the retained PR144 package reproduced a first-CSS
 simulation-debt pause in desktop WebKit; the corresponding Chrome controls
 reached their declared CSS observation windows without a forced pause. A slow
