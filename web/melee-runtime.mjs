@@ -94,6 +94,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   const commands = [], listeners = [];
   let diagnostics = null, diagnosticActive = true, longtaskObserver = null, diagnosticPreparationAt = null;
   let diagnosticDelivery = null, diagnosticDeliveryTimer = null, diagnosticRetainedLoaded = false;
+  let diagnosticMatureDeliveryPromise = null;
   let diagnosticGeneration = 0;
   let diagnosticCheckpointPromise = null, diagnosticCheckpointSuspended = false;
   let diagnosticCheckpointRequested = false, diagnosticCheckpointDestroyWindow = false;
@@ -180,6 +181,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           if (!eligible()) return;
           diagnosticRetainedLoaded = true;
           for (const record of retained.records || []) {
+            if (!eligible()) return;
             diagnosticDelivery.enqueue({...record, incidents: [record.incident]});
           }
         }
@@ -189,8 +191,46 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       } catch { /* Delivery is optional and isolated from gameplay and saves. */ }
     }, 1100);
   }
+  function scheduleMatureDiagnosticDelivery() {
+    if (!diagnostics || !diagnosticDelivery || diagnosticActive || destroyed ||
+        diagnosticDeliveryBlocked() || !automaticDiagnostics || diagnosticMatureDeliveryPromise !== null ||
+        !diagnosticDelivery.getStatus().eligible) return;
+    const generation = diagnosticGeneration;
+    const eligible = () => !diagnosticActive && !diagnosticDeliveryBlocked() &&
+      automaticDiagnostics && generation === diagnosticGeneration;
+    let promise;
+    promise = Promise.resolve().then(async () => {
+      if (!eligible()) return;
+      const report = diagnostics.exportReports();
+      if (!diagnosticRetainedLoaded) {
+        const retained = await diagnostics.loadRetained();
+        if (!eligible()) return;
+        diagnosticRetainedLoaded = true;
+        for (const record of retained.records || []) {
+          if (!eligible()) return;
+          if (record.session_id === report.session_id && !record.incident?.closed) continue;
+          diagnosticDelivery.enqueue({...record, incidents: [record.incident]});
+        }
+      }
+      if (!eligible()) return;
+      for (const incident of report.incidents || []) {
+        if (!eligible()) return;
+        if (!incident.closed) continue;
+        diagnosticDelivery.enqueue({...report, incidents: [incident], incident});
+      }
+      if (eligible()) await diagnosticDelivery.flushWhenInactive();
+    }).catch(() => {}).finally(() => {
+      if (diagnosticMatureDeliveryPromise === promise) {
+        diagnosticMatureDeliveryPromise = null;
+        if (generation !== diagnosticGeneration && !diagnosticActive && !destroyed &&
+            automaticDiagnostics && !diagnosticDeliveryBlocked()) scheduleMatureDiagnosticDelivery();
+      }
+    });
+    diagnosticMatureDeliveryPromise = promise;
+  }
   const diagnosticLifecycle = (type, detail) => { try { diagnostics?.lifecycle(type, detail); } catch {} };
   const diagnosticActivity = active => {
+    const becameInactive = !active && diagnosticActive;
     if (active !== diagnosticActive) {
       diagnosticActive = active;
       try { void diagnostics?.setActive(active); } catch {}
@@ -199,7 +239,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       const blocked = diagnosticDeliveryBlocked();
       diagnosticDelivery?.setActive(active || blocked);
       if (active || blocked) cancelDiagnosticDelivery();
-      else scheduleDiagnosticDelivery();
+      else {
+        scheduleDiagnosticDelivery();
+        if (becameInactive) scheduleMatureDiagnosticDelivery();
+      }
     } catch {}
   };
   const diagnosticAudio = data => {

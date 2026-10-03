@@ -227,6 +227,14 @@ int main() {{
         self.run_owner(['--diagnostics-retention-hidden-fatal', '--silent'],
                        'hidden fatal incident is included in the local checkpoint')
 
+    def test_mature_incident_delivery_is_not_starved_by_resume(self):
+        self.run_owner(['--diagnostics-mature-delivery', '--silent'],
+                       'mature inactive diagnostics are delivered before a young incident')
+
+    def test_mature_delivery_retries_latest_inactive_generation(self):
+        self.run_owner(['--diagnostics-mature-delivery-slow-load', '--silent'],
+                       'mature inactive diagnostics are delivered before a young incident')
+
     def test_empty_checkpoint_does_not_suppress_destroy(self):
         self.run_owner(['--diagnostics-retention-empty-destroy', '--silent'],
                        'empty lifecycle checkpoint does not suppress later destroy persistence')

@@ -29,18 +29,22 @@ const diagnosticsRetentionOrdinaryPauseDestroy = process.argv.includes('--diagno
 const diagnosticsRetentionHiddenFatal = process.argv.includes('--diagnostics-retention-hidden-fatal');
 const diagnosticsRetentionEmptyThenDestroy = process.argv.includes('--diagnostics-retention-empty-destroy');
 const diagnosticsRetentionFailedThenDestroy = process.argv.includes('--diagnostics-retention-failed-destroy');
+const diagnosticsMatureDeliverySlowLoad = process.argv.includes('--diagnostics-mature-delivery-slow-load');
+const diagnosticsMatureDelivery = process.argv.includes('--diagnostics-mature-delivery') || diagnosticsMatureDeliverySlowLoad;
 const diagnosticsRetentionMode = diagnosticsRetentionCheckpoint || diagnosticsRetentionDestroy ||
   diagnosticsRetentionDenied || diagnosticsRetentionStalled || diagnosticsRetentionQuota ||
   diagnosticsRetentionResumeCancel || diagnosticsRetentionFollowup || diagnosticsRetentionOrdinaryPauseDestroy ||
   diagnosticsRetentionHiddenFatal ||
   diagnosticsRetentionEmptyThenDestroy ||
-  diagnosticsRetentionFailedThenDestroy;
-const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode;
+  diagnosticsRetentionFailedThenDestroy || diagnosticsMatureDelivery;
+const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode || diagnosticsMatureDelivery;
 const diagnosticIdentity = {schema_version: 1, source_commit: 'a'.repeat(40), runtime_hash: 'b'.repeat(16), build_profile: 'player'};
 const diagnosticFetches = [];
 const diagnosticStorageRecords = [];
 let diagnosticStorageMergeCalls = 0;
+let diagnosticStorageLoadCalls = 0;
 let releaseDiagnosticStorageFirst = null;
+let releaseDiagnosticStorageLoad = null;
 let diagnosticPreference = 'on';
 if (diagnosticsKnownHost) {
   globalThis.location = {origin: 'https://webmelee.gg'};
@@ -51,7 +55,15 @@ if (diagnosticsKnownHost) {
   globalThis.indexedDB = {open() { throw Object.assign(new Error('denied'), {name: 'NotAllowedError'}); }};
   if (diagnosticsRetentionMode && !diagnosticsRetentionDenied) {
     globalThis.testDiagnosticsStorage = {
-      load() { return diagnosticStorageRecords.slice(); },
+      load() {
+        ++diagnosticStorageLoadCalls;
+        if (diagnosticsMatureDeliverySlowLoad && diagnosticStorageLoadCalls === 1) {
+          return new Promise(resolve => {
+            releaseDiagnosticStorageLoad = () => resolve(diagnosticStorageRecords.slice());
+          });
+        }
+        return diagnosticStorageRecords.slice();
+      },
       merge(records) {
         ++diagnosticStorageMergeCalls;
         if (diagnosticsRetentionStalled) return new Promise(() => {});
@@ -423,7 +435,7 @@ if (diagnosticsKnownHost) {
   assert.equal(activeReport.native.callback_count, 1, 'Native scalar callback crosses the owner boundary');
   assert.equal(activeReport.incidents.length, diagnosticsRetentionEmptyThenDestroy ? 0 : 1,
     'Structured incident trigger crosses the owner boundary');
-  if (diagnosticsRetentionMode) {
+  if (diagnosticsRetentionMode && !diagnosticsMatureDelivery) {
     const dispatch = type => { for (const listener of listeners.get(type) || []) listener(); };
     phase = 1; running = false; window.menuFrame(false);
     const drainMicrotasks = async count => {
@@ -626,6 +638,41 @@ if (diagnosticsKnownHost) {
       assert.equal(diagnosticStorageRecords[0].incident.reason, 'simulation_debt');
       console.log('Shared runtime owner: orderly destroy persists before disposing delivery.');
     }
+    process.exit(0);
+  }
+  if (diagnosticsMatureDelivery) {
+    const before = diagnosticFetches.length;
+    // The first incident is briefly inactive, then the player resumes before
+    // its postwindow.  It matures while active, so the next inactive edge can
+    // collect it immediately without uploading the newly paused incident.
+    phase = 1; running = false; window.menuFrame(false);
+    await wait(40);
+    for (let i = 0; diagnosticStorageRecords.length === 0 && i < 20; i++) await wait(0);
+    assert.equal(diagnosticStorageRecords.length, 1,
+      'the young same-session incident is present in the retained local snapshot');
+    if (diagnosticsMatureDeliverySlowLoad) {
+      for (let i = 0; typeof releaseDiagnosticStorageLoad !== 'function' && i < 20; i++) await wait(0);
+      assert.equal(typeof releaseDiagnosticStorageLoad, 'function',
+        'the first mature collection is awaiting the controlled retained read');
+    }
+    phase = 1; running = true; window.menuFrame(true);
+    owner.diagnostics.longtask({timestamp: 1500, duration_ms: 4});
+    await wait(1200);
+    owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+    phase = 1; running = false; window.menuFrame(false);
+    if (diagnosticsMatureDeliverySlowLoad) releaseDiagnosticStorageLoad();
+    await wait(100);
+    assert.equal(diagnosticFetches.length, before + 1,
+      'an already mature incident is delivered before the new postwindow expires');
+    assert.equal(JSON.parse(diagnosticFetches.at(-1).body).incident.reason, 'simulation_debt');
+    assert.ok(JSON.parse(diagnosticFetches.at(-1).body).events.post.some(event => event.type === 'longtask'),
+      'same-session young retained data is skipped in favor of the matured current report');
+    assert.equal(diagnosticFetches.some(fetch => JSON.parse(fetch.body).incident.reason === 'audio_debt'), false,
+      'the newly paused incident remains in its postwindow');
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, before + 2,
+      'the newly paused incident still uses the normal bounded postwindow task');
+    console.log('Shared runtime owner: mature inactive diagnostics are delivered before a young incident.');
     process.exit(0);
   }
   await owner.prepareAudio();
