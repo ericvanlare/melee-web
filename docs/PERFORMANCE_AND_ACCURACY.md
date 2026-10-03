@@ -454,12 +454,18 @@ Neither raising the stopped-clock reserve nor forcing a page reload demonstrates
 a lifetime fix. Follow the retained workload through real teardown and reuse;
 measure additional characters/stages as the corpus expands.
 
-Browser staging now has explicit bounded ownership: two frame packets each own
-63 MiB of CPU shadow storage, and two GPU staging buffers remain leased until
-submitted work completes. Upload only the used prefixes, clear the previous
+Browser staging has explicit bounded ownership: each of two frame slots retains
+five CPU shadow buffers that start empty, grow on demand up to the existing
+per-stream limits (63 MiB total per slot), and move into its packet while
+recording. Return those owners after the queue has copied the used prefixes,
+before retiring the packet. Keep capacity for reuse; do not restore per-frame
+allocation or shrink buffers during play. Two GPU staging buffers remain leased
+until submitted work completes. Upload only the used prefixes, clear the previous
 dirty prefixes before reuse, and preserve the original command-buffer copy/draw
 order. Queue completion failure is fatal; callbacks from a retired renderer
 generation cannot release new leases. The native mapping path is unchanged.
+Bound checks, allocation failures and length overflow fail explicitly. Reserve
+the four-byte upload tail before clearing it, without increasing logical length.
 `liveStagingUsedBytes` and `peakStagingUsedBytes` report logical per-frame used
 ranges, not GPU allocation, driver memory, or separately allocated overflow
 texture uploads. Measure those distinctions before adjusting capacities.

@@ -1,0 +1,494 @@
+{
+  "schema": "melee-web-mobile-cpu-staging-v1",
+  "date": "2026-10-03",
+  "evidence_labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised"
+  ],
+  "result": "Demand allocation, public package route and two natural match reuses validated; physical iOS crash cause remains unconfirmed",
+  "issue": 134,
+  "pull_request": 141,
+  "source": {
+    "base_commit": "d5fb579ba5bd81ff59407a7a0d7a7e803776cf40",
+    "implementation_commit": "fba8277f0113cbfb8931a6a0e87f31e86de3412b",
+    "validation_commit": "63467ec112efa0b63d21a0704b301a3dbd200f8a",
+    "aurora_previous_tree": "1f2ebff4c302baded19858a8be4d59919c8d3236",
+    "aurora_candidate_tree": "e8ad8b001d963e3bafc48ba2c1d49a2dfdad2a31"
+  },
+  "observation": {
+    "recording_sha256": "85e89a85533f507764a6534d75682fa36a289c5b9484aea41fe53ee7d84209f8",
+    "facts": "Recording begins on iOS Chrome Cannot open this page; retry reaches original CSS and the toolbar becomes Resume between 22.5 and 23.0 seconds. The page-error transition precedes the clip; the collapsed UI does not distinguish manual and forced pause.",
+    "recording_review": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/recording-observation.json",
+      "sha256": "5dad00d188d52822610611db1355ccb43799b2cf92458656295877b6e201b52d"
+    },
+    "incident_retrieval": "No incident-specific current staging report in narrow/broader received-time queries or unfiltered retained inventory; four older controlled desktop reports are not this incident."
+  },
+  "owner": {
+    "eager_cpu_bytes_removed": 132120576,
+    "frames": 2,
+    "per_slot_max_bytes": 66060288,
+    "stream_max_bytes": {
+      "uniform": 25165824,
+      "vertex": 5242880,
+      "index": 2097152,
+      "storage": 8388608,
+      "texture_upload": 25165824
+    },
+    "implementation": "Empty bounded owned buffers grow geometrically within original maxima. Frame packets borrow ownership by move; return after synchronous queue copy, before packet retirement; reuse capacity and clear prior dirty prefixes. Checked bounds/allocation/overflow abort; aligned upload tail reserved without changing logical length.",
+    "preserved": [
+      "GPU buffer allocation, command-buffer copy/draw order and encoder-task visibility",
+      "frame slot and GPU submission lease lifetime",
+      "complete authored audio bank corpus and original PCM decode",
+      "source simulation/RNG/arithmetic/clocks/manual Resume/save ownership",
+      "native renderer mapping path"
+    ],
+    "alternative_rejected": "Direct writes into final GPU buffers would change the prefix visibility promised to custom encoder tasks; deferred.",
+    "static_review": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/renderer-review/ownership-review-v1.md",
+      "sha256": "f553e22f0be6c7dba125b451826e71cc24c5bebef2f7f92783130b93a5ee0823"
+    },
+    "audio_census": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/native-review/pcm-reducer/receipt.json",
+      "sha256": "acd6929195501556b20ec3787217c89adff066b0984941e144cd7a01819f064f"
+    },
+    "final_review": {
+      "result": "No actionable new regression found in static review",
+      "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/renderer-review/pr141-ownership-review-v2.md",
+      "sha256": "2b56815015f86dd79ba861a82d05ead9a0b28835f45f90f1406b18ab78eed2d6"
+    }
+  },
+  "package": {
+    "schema": "melee-web-audio-player-package-v1",
+    "source_sha": "fba8277f0113cbfb8931a6a0e87f31e86de3412b",
+    "runtime_hash": "0ef18432ae747dcd",
+    "identity_sha256": "b2117903e0a277b56624eb3416b3830c35f05f024de86c7cf8a40af892aad1aa",
+    "profile": "audio-player",
+    "project": "webmelee"
+  },
+  "validation": {
+    "focused_bounds": {
+      "result": "pass",
+      "coverage": [
+        "real patched ByteBuffer extraction",
+        "five authored maxima",
+        "two independent slot owners",
+        "growth/reuse and preserved range data",
+        "moved/cloned bounds",
+        "poisoned padding and aligned tail",
+        "integer overflow",
+        "malloc/calloc/realloc failure"
+      ],
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/bounded-shadow-test.log",
+        "sha256": "6bab94fb358fe0e060f156292c5fd5deef8830d3326a8bd6f7c5a60eadf62f8c"
+      }
+    },
+    "bootstrap": {
+      "result": "pass",
+      "tests": 21,
+      "scope": "exact previous tree upgrade and refusal of unexplained changes"
+    },
+    "full_suite": {
+      "result": "pass",
+      "tests": 1724,
+      "skipped": 137,
+      "seconds": 316.102,
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/full-suite-configured.log",
+        "sha256": "b2ffaa9d02b9f00689e4985433308ee875e65a404881370a40b33b275115ed10"
+      }
+    },
+    "audio_release_build": {
+      "result": "pass",
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/build-audio-release.log",
+        "sha256": "6d29e449fbe446d71965e50ad65dd4e9dfc3f817abb65fc83b4a6b1351de5787"
+      }
+    },
+    "private_release_build": {
+      "result": "pass",
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/build-runtime-release.log",
+        "sha256": "0a2d131e8d3ac028d46314c0d8d2145cb84a0ed7c2acca9be3788254eca39473"
+      },
+      "wasm_sha256": "542ea00623e58fbbc5deb50a24ea44b7db94a79d08aaacc76a5ba0c340e62815"
+    },
+    "package_audit": {
+      "result": "pass",
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/package-audit.log",
+        "sha256": "9821a11162a9655ee260283315270013c0b17bc8fa0955485db8d6eadc0a9387"
+      },
+      "manifest": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/package-manifest.json",
+        "sha256": "04397847be9300479e560dfc269a2b3181d0f380a6a1a7eef7bf4f25fbbf61f2"
+      }
+    },
+    "preparation": {
+      "result": "pass",
+      "scope": "Preparation-only headless installed Chrome. Same observation body, browser/audio helpers, owned corpus, 73 files/32470784 payload bytes, zero launch/source steps/draws. Uncontrolled browser driver cache; one sample per package, not timing admission or physical iOS crash attribution.",
+      "reserved_wasm_bytes": {
+        "baseline": 334102528,
+        "candidate": 193331200,
+        "reduction_bytes": 140771328,
+        "reduction_percent": 42.13417026284817
+      },
+      "gpu_requested_buffer_bytes": {
+        "baseline": 173015136,
+        "candidate": 173015136
+      },
+      "preparation_ms": {
+        "baseline": 3550.574999809265,
+        "candidate": 3340.5549998283386
+      },
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/allocation-comparison.json",
+        "sha256": "b7d7694239a7ca2b2e7e469ba75a8382f21e0ac2749eae3145ac865419635330"
+      },
+      "harness_parity": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/probe-parity-v2.json",
+        "sha256": "28875107d72e70e38faaf99702541ec0918e7e9a601e483571ab31f8e2d96a64"
+      }
+    },
+    "short_route": {
+      "result": "pass",
+      "scope": "Audited audio-player package over a real loopback manifest-allowlisted HTTP fixture applying its actual _headers rules. Original CSS/SSS, short Mario/Final Destination match, No Contest Results return, warm menu round trip and Eject. No native mutation, Resume or gameplay performance admission. HTTP fixture does not establish Cloudflare hosted routing or backend behavior.",
+      "forced_pauses": 0,
+      "browser_errors": [],
+      "heap_capacity": [
+        {
+          "label": "cold CSS",
+          "heap_u8_bytes": 193331200,
+          "heap_buffer_bytes": 193331200
+        },
+        {
+          "label": "SSS",
+          "heap_u8_bytes": 193331200,
+          "heap_buffer_bytes": 193331200
+        },
+        {
+          "label": "match",
+          "heap_u8_bytes": 231997440,
+          "heap_buffer_bytes": 231997440
+        },
+        {
+          "label": "Results",
+          "heap_u8_bytes": 231997440,
+          "heap_buffer_bytes": 231997440
+        },
+        {
+          "label": "CSS return",
+          "heap_u8_bytes": 231997440,
+          "heap_buffer_bytes": 231997440
+        },
+        {
+          "label": "warm SSS",
+          "heap_u8_bytes": 231997440,
+          "heap_buffer_bytes": 231997440
+        },
+        {
+          "label": "warm CSS",
+          "heap_u8_bytes": 231997440,
+          "heap_buffer_bytes": 231997440
+        }
+      ],
+      "audio": "Nonzero PCM at CSS, SSS, match, Results, CSS return and warm CSS; real 32000 Hz context with muted host output.",
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/package-route-candidate/report.json",
+        "sha256": "80a6610dedbf8fff372be976e4b407581e62e52c051cac0fb8c53e4876a79db3"
+      },
+      "http_report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/package-route-candidate/http-report.json",
+        "sha256": "e819c8c1c3151b183ca245dcbe155d11055ef1d849f64e84bea4138dc73156ef"
+      },
+      "comparison": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/route-memory-comparison.json",
+        "sha256": "6c2b993ad88e751cd6fee0a7dc6f0b5884e1fcd28eb4342ecdd219d75b42a065"
+      }
+    },
+    "sustained_reuse": {
+      "result": "browser harness pass; original outer cleanup assertion failed; subsequent cleanup confirmed",
+      "scope": "Private Release runtime in installed headless Chrome with real WebGPU and muted WebAudio. Two natural four-stock CPU9 lineup-A Final Destination matches, original Results/CSS returns and runtime unload. This validates this build and workload; it does not bind the entire campaign to the narrower public package or establish foreground/mobile performance.",
+      "wall_seconds": 516.2384819588624,
+      "harness_cap_seconds": 600,
+      "owned_cap_seconds": 630,
+      "automatic_resume": false,
+      "terminal_match_source_frames": [
+        12519,
+        13707
+      ],
+      "timing_pause_count": 0,
+      "source_timing_disruption_count": 0,
+      "page_errors": [],
+      "page_crashes": [],
+      "target_crashes": [],
+      "native_command_errors": [],
+      "reason_counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        73,
+        0,
+        0
+      ],
+      "dropped_reason_counts": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        49,
+        0,
+        0
+      ],
+      "reason_scope": "Only structured reason 7 render preparation occurred. All cumulative unexpected and unknown reason counts, including evicted records, are zero; preparation validation counters are zero.",
+      "memory_boundaries": [
+        {
+          "label": "initial-css",
+          "wasm_heap_bytes": 231997440,
+          "allocator_live_bytes": 179018632,
+          "menu_present": true,
+          "match_present": false,
+          "results_present": false
+        },
+        {
+          "label": "match-1-natural-results",
+          "wasm_heap_bytes": 231997440,
+          "allocator_live_bytes": 158735656,
+          "menu_present": false,
+          "match_present": false,
+          "results_present": true
+        },
+        {
+          "label": "match-1-returned-css",
+          "wasm_heap_bytes": 278396928,
+          "allocator_live_bytes": 215163528,
+          "menu_present": true,
+          "match_present": false,
+          "results_present": false
+        },
+        {
+          "label": "match-2-natural-results",
+          "wasm_heap_bytes": 278396928,
+          "allocator_live_bytes": 172663632,
+          "menu_present": false,
+          "match_present": false,
+          "results_present": true
+        },
+        {
+          "label": "match-2-returned-css",
+          "wasm_heap_bytes": 278396928,
+          "allocator_live_bytes": 216413584,
+          "menu_present": true,
+          "match_present": false,
+          "results_present": false
+        }
+      ],
+      "memory_after_unload": {
+        "wasm_heap_bytes": 278396928,
+        "allocator_arena_bytes": 231844160,
+        "allocator_live_bytes": 44291048,
+        "allocator_free_bytes": 187553112,
+        "allocator_top_free_bytes": 824,
+        "source_allocation_identity": 0,
+        "source_allocation_generation": 0,
+        "source_allocation_bytes": 0,
+        "source_session_owned": false,
+        "source_world_generation": 0,
+        "source_objects": 0,
+        "source_processes": 0,
+        "source_heap_free_bytes": 0,
+        "cached_archives": 0,
+        "cached_audio_banks": 0,
+        "match_present": false,
+        "menu_present": false,
+        "results_present": false,
+        "prize_present": false,
+        "scoped_assets": true,
+        "asset_files": 0,
+        "asset_bytes": 0,
+        "asset_source_bytes": 0,
+        "staged_asset_files": 0,
+        "staged_asset_bytes": 0,
+        "asset_generation": 0
+      },
+      "memory_scope": "Reserved Wasm reaches 278396928 bytes at the first CSS return and remains there at the second CSS return and unload. Allocator live bytes differ between boundaries; this is bounded reuse evidence, not a leak-free or total-process memory claim.",
+      "audio_results_snapshots": [
+        {
+          "boundary": "match-1-results-entry",
+          "contexts": [
+            {
+              "sample_rate": 32000,
+              "state": "running",
+              "states": [
+                "running",
+                "running"
+              ]
+            }
+          ],
+          "install_errors": [],
+          "worklets": [
+            {
+              "sample_rate": 32000,
+              "connected": true,
+              "destination_connected": true,
+              "pcm_messages": 14315,
+              "pcm_frames": 7634666,
+              "latest_queue_report": {
+                "at_ms": 251263.3450000286,
+                "queued": 0,
+                "underruns": 0,
+                "overflows": 0,
+                "type": null
+              },
+              "errors": []
+            }
+          ]
+        },
+        {
+          "boundary": "match-2-results-entry",
+          "contexts": [
+            {
+              "sample_rate": 32000,
+              "state": "running",
+              "states": [
+                "running",
+                "running"
+              ]
+            }
+          ],
+          "install_errors": [],
+          "worklets": [
+            {
+              "sample_rate": 32000,
+              "connected": true,
+              "destination_connected": true,
+              "pcm_messages": 29098,
+              "pcm_frames": 15518932,
+              "latest_queue_report": {
+                "at_ms": 499619.30500006676,
+                "queued": 0,
+                "underruns": 86,
+                "overflows": 0,
+                "type": "state-ack"
+              },
+              "errors": []
+            }
+          ]
+        }
+      ],
+      "audio_scope": "Both Results snapshots have running 32000 Hz contexts and increasing PCM counters. Underruns rise from 0 to 86 between them, with first increase not located. Uninterrupted audio remains open.",
+      "cache_teardown": {
+        "schema": "melee-web-runtime-cache-teardown-v1",
+        "status": "pass",
+        "owner": "browser_driver.unload \u2192 web/melee-runtime.mjs unloadAndSave",
+        "before": {
+          "phase": 1,
+          "running": 1,
+          "cache": {
+            "state": "dirty",
+            "mounted": true,
+            "populated": true,
+            "saves": 0,
+            "clears": 1,
+            "dirty": true,
+            "file_bytes": 0,
+            "message": "Optional render cache has pending changes; it will persist at unload."
+          }
+        },
+        "after": {
+          "phase": 0,
+          "running": 0,
+          "cache": {
+            "state": "saved",
+            "mounted": true,
+            "populated": true,
+            "saves": 1,
+            "clears": 1,
+            "dirty": false,
+            "file_bytes": 9399984,
+            "message": "Optional render cache persisted."
+          }
+        },
+        "native_cache_idle": 1,
+        "module_save_runtime_cache_owner": "web/melee-runtime.mjs unloadAndSave",
+        "observed_at": "2026-10-03T13:39:07.218Z",
+        "cache_save_count": {
+          "before": 0,
+          "after": 1
+        },
+        "save_observed": true
+      },
+      "visual_review": "Inspected match entry and second CSS return. Final Destination retains magenta/gray artifacts also observed in the baseline public package. No pixel-equivalence claim.",
+      "source_unchanged": true,
+      "artifact_read_failures": [],
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/sustained-reuse/fighter/report.json",
+        "sha256": "5c0f143b81e90ba18f783ecd6cd8275d338aa0c020298cebf41ef0f73fe2b3ea"
+      },
+      "orchestration": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/sustained-reuse/orchestration.json",
+        "sha256": "f634a812d76c3c43b3158579516bbc66c4cd72f997d0f41826c3e945478af02f"
+      },
+      "harness_wrapper": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/run-sustained-reuse.py",
+        "sha256": "1a46c0c2789795c2a47b2552f7a680946bc6d61a630f17fa30a34a4904fe5161"
+      },
+      "cleanup_confirmation": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/sustained-reuse/cleanup-confirmation.json",
+        "sha256": "bccac0f93b93c8a3cee2e04a640fde1d17ff5e9cb26371400aa5f9aa7d66032d"
+      }
+    },
+    "ci_code_head": {
+      "source": "63467ec112efa0b63d21a0704b301a3dbd200f8a",
+      "result": "pass",
+      "successful_checks": 17,
+      "optional_skipped_checks": 1,
+      "run_url": "https://github.com/ericvanlare/melee-web/actions/runs/37124475247",
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/ci-current.json",
+        "sha256": "62689b30d4ffe3f66f8dbf3372c48c7d0912e7eb02612761be48504fc54b2826"
+      }
+    }
+  },
+  "retained_failures": {
+    "local_and_ci": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/validation-attempts.json",
+      "sha256": "1b0cecd5e22c3d210262bd54b90623eac58b0047d88502f8c4ef3167c125e840"
+    },
+    "candidate_harness_setup": {
+      "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/allocation-candidate/report.json",
+      "sha256": "e199bd964b15128ef3ae0cf39da402f0123d74ff87bf4dd3b5ce3cfa1e4ded09"
+    },
+    "harness_setup_scope": "Missing Playwright path; no browser launched; server closed. Explicit existing package path supplied before the sole actual candidate preparation run.",
+    "sustained_wrapper": {
+      "result": "fail",
+      "scope": "The original wrapper sampled group members before later server.poll() reaped the stopped server leader. Its receipt records PID present, group absent, then server_stopped true. All ten recorded owner PIDs and the port were independently confirmed absent/closed afterward. Browser assertions passed, failure receipt and profile retained; no gameplay rerun.",
+      "report": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/sustained-reuse/orchestration.json",
+        "sha256": "f634a812d76c3c43b3158579516bbc66c4cd72f997d0f41826c3e945478af02f"
+      },
+      "cleanup_confirmation": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/mobile-crash-recording-20261003-20261003-050715-2aace976/sustained-reuse/cleanup-confirmation.json",
+        "sha256": "bccac0f93b93c8a3cee2e04a640fde1d17ff5e9cb26371400aa5f9aa7d66032d"
+      }
+    }
+  },
+  "open_gates": [
+    "No physical iOS device or simulator; no reproduced incident-specific mobile crash or confirmed device fix.",
+    "Preparation remains a roughly 3.3-second blocking task in the candidate desktop probe.",
+    "Reserved Wasm and requested GPU buffer bytes are not total browser, driver or physical RAM.",
+    "No foreground timing, physical-controller, audible-output, uninterrupted-audio, pixel/PCM or whole-session performance admission.",
+    "Sustained desktop audio underruns increased from 0 to 86 between Results snapshots; their first increase and cause remain unlocated.",
+    "Threaded Emscripten callback lifetime was reviewed statically; current public build is non-Pthreads. An unchanged shutdown-generation race was noted separately, not attributed to this mobile report."
+  ],
+  "deployment": "No merge, staging or production deployment in this receipt."
+}

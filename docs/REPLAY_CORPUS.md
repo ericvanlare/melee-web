@@ -358,12 +358,17 @@ ranges totaling 63 MiB per frame, regardless of their used lengths. Repeated
 mapping allocations explain the capacity/fragmentation problem without a
 growing retained live allocation in this workload.
 
-The browser path now owns two persistent 63 MiB CPU shadows and uploads their
+The measured fix below owned two persistent 63 MiB CPU shadows and uploaded their
 used prefixes with `Queue.WriteBuffer`. Original command-buffer copies and draw
 order remain intact. Two GPU staging leases enforce completion backpressure;
 retired-generation callbacks cannot release new leases, and completion failure
 fails explicitly. Ordinary per-frame mapping and the temporary 192 MiB match
 reserve are removed. Native rendering and original Melee source are unchanged.
+
+The current [staging ownership contract](PERFORMANCE_AND_ACCURACY.md) grows and
+retains these CPU buffers on demand under the same per-stream maxima. The fixed
+shadow allocation and measurements below describe the historical artifact;
+[current status](../STATUS.md) indexes validation for later changes.
 
 On the same visible Release configuration, three further complete 3,719-tick
 replays in one application passed every hard timing gate. Wasm capacity stayed
