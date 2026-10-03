@@ -235,6 +235,14 @@ int main() {{
         self.run_owner(['--diagnostics-mature-delivery-slow-load', '--silent'],
                        'mature inactive diagnostics are delivered before a young incident')
 
+    def test_evicted_same_session_retained_incident_remains_deliverable(self):
+        self.run_owner(['--diagnostics-mature-delivery-evicted', '--silent'],
+                       'evicted same-session retained incident remains deliverable')
+
+    def test_normal_delivery_prefers_fresh_current_post_events(self):
+        self.run_owner(['--diagnostics-normal-delivery-freshness', '--silent'],
+                       'normal inactive collection prefers the fresh current report')
+
     def test_empty_checkpoint_does_not_suppress_destroy(self):
         self.run_owner(['--diagnostics-retention-empty-destroy', '--silent'],
                        'empty lifecycle checkpoint does not suppress later destroy persistence')

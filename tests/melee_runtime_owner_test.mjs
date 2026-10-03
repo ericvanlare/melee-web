@@ -30,14 +30,18 @@ const diagnosticsRetentionHiddenFatal = process.argv.includes('--diagnostics-ret
 const diagnosticsRetentionEmptyThenDestroy = process.argv.includes('--diagnostics-retention-empty-destroy');
 const diagnosticsRetentionFailedThenDestroy = process.argv.includes('--diagnostics-retention-failed-destroy');
 const diagnosticsMatureDeliverySlowLoad = process.argv.includes('--diagnostics-mature-delivery-slow-load');
-const diagnosticsMatureDelivery = process.argv.includes('--diagnostics-mature-delivery') || diagnosticsMatureDeliverySlowLoad;
+const diagnosticsMatureDeliveryEvicted = process.argv.includes('--diagnostics-mature-delivery-evicted');
+const diagnosticsNormalDeliveryFreshness = process.argv.includes('--diagnostics-normal-delivery-freshness');
+const diagnosticsMatureDelivery = process.argv.includes('--diagnostics-mature-delivery') || diagnosticsMatureDeliverySlowLoad ||
+  diagnosticsMatureDeliveryEvicted;
 const diagnosticsRetentionMode = diagnosticsRetentionCheckpoint || diagnosticsRetentionDestroy ||
   diagnosticsRetentionDenied || diagnosticsRetentionStalled || diagnosticsRetentionQuota ||
   diagnosticsRetentionResumeCancel || diagnosticsRetentionFollowup || diagnosticsRetentionOrdinaryPauseDestroy ||
   diagnosticsRetentionHiddenFatal ||
   diagnosticsRetentionEmptyThenDestroy ||
-  diagnosticsRetentionFailedThenDestroy || diagnosticsMatureDelivery;
-const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode || diagnosticsMatureDelivery;
+  diagnosticsRetentionFailedThenDestroy || diagnosticsMatureDelivery || diagnosticsNormalDeliveryFreshness;
+const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode ||
+  diagnosticsMatureDelivery || diagnosticsNormalDeliveryFreshness;
 const diagnosticIdentity = {schema_version: 1, source_commit: 'a'.repeat(40), runtime_hash: 'b'.repeat(16), build_profile: 'player'};
 const diagnosticFetches = [];
 const diagnosticStorageRecords = [];
@@ -435,7 +439,7 @@ if (diagnosticsKnownHost) {
   assert.equal(activeReport.native.callback_count, 1, 'Native scalar callback crosses the owner boundary');
   assert.equal(activeReport.incidents.length, diagnosticsRetentionEmptyThenDestroy ? 0 : 1,
     'Structured incident trigger crosses the owner boundary');
-  if (diagnosticsRetentionMode && !diagnosticsMatureDelivery) {
+  if (diagnosticsRetentionMode && !diagnosticsMatureDelivery && !diagnosticsNormalDeliveryFreshness) {
     const dispatch = type => { for (const listener of listeners.get(type) || []) listener(); };
     phase = 1; running = false; window.menuFrame(false);
     const drainMicrotasks = async count => {
@@ -640,8 +644,43 @@ if (diagnosticsKnownHost) {
     }
     process.exit(0);
   }
+  if (diagnosticsNormalDeliveryFreshness) {
+    phase = 1; running = false; window.menuFrame(false);
+    await wait(40);
+    assert.equal(diagnosticStorageRecords.length, 1,
+      'the older snapshot is stored before the post-event observation');
+    owner.diagnostics.longtask({timestamp: performance.now(), duration_ms: 4});
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, 1,
+      'normal inactive collection sends one current report after its postwindow');
+    const payload = JSON.parse(diagnosticFetches.at(-1).body);
+    assert.equal(payload.incident.reason, 'simulation_debt');
+    assert.ok(payload.events.post.some(event => event.type === 'longtask'),
+      'normal collection sends the fresh current post-event context');
+    console.log('Shared runtime owner: normal inactive collection prefers the fresh current report.');
+    process.exit(0);
+  }
   if (diagnosticsMatureDelivery) {
     const before = diagnosticFetches.length;
+    if (diagnosticsMatureDeliveryEvicted) {
+      phase = 1; running = false; window.menuFrame(false);
+      await wait(40);
+      assert.equal(diagnosticStorageRecords.length, 1,
+        'the open incident is present in the retained local snapshot');
+      phase = 1; running = true; window.menuFrame(true);
+      for (let i = 0; i < 4; i++) owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+      assert.equal(owner.diagnostics.exportReports().incidents.some(incident => /:incident-1$/.test(incident.id)), false,
+        'new incidents actually evicted the first current incident');
+      phase = 1; running = false; window.menuFrame(false);
+      await wait(100);
+      assert.equal(diagnosticFetches.length, before + 1,
+        'an open retained incident survives current-ring eviction');
+      const payload = JSON.parse(diagnosticFetches.at(-1).body);
+      assert.match(payload.incident_id, /:incident-1$/);
+      assert.equal(payload.incident.reason, 'simulation_debt');
+      console.log('Shared runtime owner: evicted same-session retained incident remains deliverable.');
+      process.exit(0);
+    }
     // The first incident is briefly inactive, then the player resumes before
     // its postwindow.  It matures while active, so the next inactive edge can
     // collect it immediately without uploading the newly paused incident.

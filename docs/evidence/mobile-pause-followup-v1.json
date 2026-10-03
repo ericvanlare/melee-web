@@ -1,0 +1,241 @@
+{
+  "schema": "melee-web-mobile-pause-followup-v1",
+  "date": "2026-10-03",
+  "scope": "Local diagnostics retention and delivery reliability; private desktop WebKit first-CSS investigation. Physical iPhone pause and reload causes remain open.",
+  "reported_device": {
+    "model": "iPhone 15 Pro",
+    "ios_version": "unknown",
+    "browser": "Chrome iOS",
+    "latest_user_observation": "No crash in latest run; repeated forced pauses and a first-load page refresh requiring another disc import."
+  },
+  "starting_release": {
+    "source_commit": "8860e8e9821234c71590caaa6f034e7569abc8f5",
+    "runtime_hash": "0922786ae8768d2a",
+    "profile": "audio-player",
+    "pr": 144
+  },
+  "backend_retrieval": {
+    "environment": "staging",
+    "window_utc": [
+      "2026-10-03T17:45:00Z",
+      "2026-10-03T18:32:00Z"
+    ],
+    "current_release_reports": 0,
+    "unfiltered_window_reports": 0,
+    "all_time_reports": 5,
+    "current_ios_reports": 0,
+    "limitation": "No ingested report does not distinguish failed transmission, opt-out, cancelled collection or rejected intake. No real user report was submitted by this investigation."
+  },
+  "reproduction": {
+    "minimal_webkit": {
+      "outcome": "simulation_debt",
+      "value": 37,
+      "threshold": 8,
+      "callback_gap_ms": 613.56,
+      "incident_max_native_callback_ms": 19.82,
+      "local_incidents_retained": 1,
+      "reloads": 0
+    },
+    "minimal_chrome": {
+      "outcome": "30 seconds CSS without forced pause",
+      "reloads": 0
+    },
+    "gpu_probe_webkit": {
+      "outcome": "forced_pause",
+      "callback_gap_ms": 519.2,
+      "slow_submit_serial": 38,
+      "js_observed_completion_delay_ms": 512.78,
+      "created_pipeline_delta": 0,
+      "queued_pipeline_delta": 0,
+      "overflow": false
+    },
+    "gpu_probe_chrome": {
+      "outcome": "15 seconds CSS without forced pause",
+      "captured_window_max_completion_delay_ms": 6.025,
+      "capture_scope": "First 128 native rows / first 256 GPU events only; later rows explicitly overflowed."
+    },
+    "stack_and_bind_probe": {
+      "outcome": "forced_pause",
+      "callback_gap_ms": 378.58,
+      "slow_submit_serial": 37,
+      "js_observed_completion_delay_ms": 380.44,
+      "pipeline_ids_observed": 32,
+      "first_submission_counts": {
+        "1": 2,
+        "34": 26,
+        "35": 4
+      },
+      "new_pipeline_in_slow_submission": false,
+      "webcontent_footprint": "847.1M",
+      "webcontent_peak_footprint": "1.4G",
+      "webcontent_main_wait_samples": [
+        4888,
+        4986
+      ],
+      "wasm_optimizing_worklist_active_samples": [
+        4986,
+        4986
+      ],
+      "limits": "Six-second aggregate sampled stacks lack individual timestamps. Background Wasm compilation is observed, but CPU contention, GPU hardware execution and the precise callback-gap cause remain unassigned. Desktop WebKit is not physical iOS."
+    }
+  },
+  "retention_regression": {
+    "baseline": "Deferred task had not executed when pagehide/freeze or orderly destroy discarded the owner; controlled storage had 0 records instead of 1.",
+    "fix": "Request a coalesced local checkpoint on suspension; recheck eligibility after existing persistence, cancel pending serialization on Resume, and await a fresh teardown snapshot for at most 250 ms.",
+    "unit_owner_tests": {
+      "count": 30,
+      "result": "pass",
+      "elapsed_seconds": 16.154
+    },
+    "limits": "Already-started storage can complete after timeout. Hard process termination can still prevent capture or storage."
+  },
+  "unchanged_boundaries": [
+    "simulation and audio clocks",
+    "timing guard thresholds",
+    "manual pause/Resume intent",
+    "source ticks/draw order",
+    "input and arithmetic",
+    "Personal progress storage",
+    "network allowlist and opt-out"
+  ],
+  "validation": {
+    "pre_final_full_suite": {
+      "result": "pass",
+      "tests": 1849,
+      "skipped": 140,
+      "seconds": 406.695,
+      "scope": "Before final retained/current snapshot correction; final focused owner validation is recorded separately."
+    },
+    "release_build": {
+      "result": "pass",
+      "target": "runtime-audio-preview",
+      "configuration": "Release"
+    },
+    "final_owner_suite": {
+      "result": "pass",
+      "tests": 34,
+      "seconds": 23.271
+    }
+  },
+  "private_evidence": [
+    {
+      "artifact": "retention-baseline.log",
+      "sha256": "902d92550b7514c66e85e9394250609d504fd9e371f82f847a4cfe99ae41df89",
+      "bytes": 518
+    },
+    {
+      "artifact": "owner-focused-final.log",
+      "sha256": "99bfc3625fd895c4e2156783ff383ae8a43c9dd615d99b8a7b09fc2c67829a2b",
+      "bytes": 5128
+    },
+    {
+      "artifact": "receipt.json",
+      "sha256": "45f12377dd3b5d302d81873e1ed5bc4cc174e5e04350687a0fc5f2b08676d6e1",
+      "bytes": 4731
+    },
+    {
+      "artifact": "webkit-minimal-baseline/report.json",
+      "sha256": "b6da602e713110f20bcacf4f7c856818c59269c039bfe85268e0b8b9ccdfc5a0",
+      "bytes": 1347
+    },
+    {
+      "artifact": "webkit-minimal-baseline/local-diagnostics.json",
+      "sha256": "3e7eaa441318205f73f2063acac9af58e4976d5ec7d537db2adf36200416bff1",
+      "bytes": 23035
+    },
+    {
+      "artifact": "chrome-minimal-control/report.json",
+      "sha256": "13d22bc237b3217be385d07fc80ce385a577215d4858af4c00382edad3c8d946",
+      "bytes": 1200
+    },
+    {
+      "artifact": "webkit-minimal-baseline/staging-mapped/delivery-receipt.json",
+      "sha256": "f6f80b877b5cd1c686cfdf96aaf44f495f00cce6662fa4596d0dda3b18ea3426",
+      "bytes": 2025
+    },
+    {
+      "artifact": "webkit-first-use-probe/report.json",
+      "sha256": "90940967348dd1b373b1d14b718b07e239c87bea07e009591847d1cd4e3fc825",
+      "bytes": 32864
+    },
+    {
+      "artifact": "chrome-first-use-control/report.json",
+      "sha256": "413429e078ef4b16ecb30abe9fb56b2ddd1134847f8dca95710a9be558c409b5",
+      "bytes": 78822
+    },
+    {
+      "artifact": "webkit-first-use-stacks/report.json",
+      "sha256": "f3df7d13b636bd0ea8402493047975d2a05b409bca85c28bbaf179c9be08ad8e",
+      "bytes": 38041
+    },
+    {
+      "artifact": "webkit-first-use-stacks/source-audit-v1.json",
+      "sha256": "fb56a51f4384e43acdc7f630bb48b044d6c0f69446ef3f1e4d6a3f6990e04c57",
+      "bytes": 9064
+    },
+    {
+      "artifact": "webkit-first-use-stacks/WebContent-sample.txt",
+      "sha256": "fe03e5f95494708e0608993e9925b2d23bb71289272d7d56fcce5da07fa46941",
+      "bytes": 337219
+    },
+    {
+      "artifact": "webkit-first-use-stacks/GPU-sample.txt",
+      "sha256": "07500f51effb8e7697b42149a7cc78a755c8e369d402ed333a816952b1fbcfa5",
+      "bytes": 154718
+    },
+    {
+      "artifact": "full-suite.log",
+      "sha256": "8df0a3ff37682e00c3c2150fa9f92d71f5cc80070681589eccc3b06e6c521737",
+      "bytes": 334634
+    },
+    {
+      "artifact": "release-build.log",
+      "sha256": "bd9d634237935b918e0fc96ec99159877bd899342f805a2be13c31dbc6245d4e",
+      "bytes": 200006
+    },
+    {
+      "artifact": "native-review/mature-delivery-baseline/report.log",
+      "sha256": "215c13b84705783006ef7fe9858077f4fc9d024ce7dd017b9a554d5457c41343",
+      "bytes": 489
+    },
+    {
+      "artifact": "pauseOut/backend-refresh/receipt-v2.json",
+      "sha256": "a2c6d981b1606038e61616d6f01d895d0eb811e742e5e5f81f26d03b1e3a0b77",
+      "bytes": 2612
+    },
+    {
+      "artifact": "pauseOut/native-review/startup-memory-asyncify-review-v1.json",
+      "sha256": "e9f0bde59725e02786c9ff0903eeb3b5960e70ec689aa9e9450f1a02a362e54a",
+      "bytes": 14246
+    },
+    {
+      "artifact": "owner-final-review.log",
+      "sha256": "7a306ab208611dbaaa03ce467f0ea7a9b7a2a0286189d8adfebea3019f319107",
+      "bytes": 5820
+    }
+  ],
+  "mature_delivery_regression": {
+    "baseline": "A completed incident remained unsent during the next short pause because the owner restarted the 1.1-second collection delay.",
+    "fix": "An eligible inactive transition collects closed incidents. The ordinary post-event task still collects the new incident. Both collectors prefer the fresh current snapshot over a same-session retained copy and preserve eligibility of skipped young copies.",
+    "limits": "Best effort delivery remains count/byte/retry bounded, inactive-only, host allowlisted and opt-out controlled."
+  },
+  "backend_refresh": {
+    "window_utc": [
+      "2026-10-03T18:32:00Z",
+      "2026-10-03T19:38:42Z"
+    ],
+    "unfiltered_staging_reports": 0,
+    "original_pr144_reports": 0,
+    "latest_staging_reports": 0,
+    "latest_staging_identity": {
+      "source_commit": "3bf2b49184c5aac29075a9ea6b5e7dfe3be6a5b3",
+      "runtime_hash": "a1c6031e0526eff4",
+      "profile": "audio-player"
+    },
+    "receipt": "pauseOut/backend-refresh/receipt-v2.json"
+  },
+  "upstream_lead": {
+    "url": "https://bugs.webkit.org/show_bug.cgi?id=304810",
+    "scope": "External report of transient Asyncify/OMG compiler memory growth; matching stack family is a hypothesis only. No causal attribution or source/compiler workaround is claimed."
+  }
+}

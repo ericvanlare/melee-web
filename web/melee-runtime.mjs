@@ -176,20 +176,36 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         automaticDiagnostics && generation === diagnosticGeneration;
       if (!eligible()) return;
       try {
-        if (!diagnosticRetainedLoaded) {
-          const retained = await diagnostics.loadRetained();
-          if (!eligible()) return;
-          diagnosticRetainedLoaded = true;
-          for (const record of retained.records || []) {
-            if (!eligible()) return;
-            diagnosticDelivery.enqueue({...record, incidents: [record.incident]});
-          }
-        }
-        if (!eligible()) return;
-        diagnosticDelivery.enqueue(diagnostics.exportReports());
+        const report = await loadRetainedForDelivery(eligible);
+        if (!report || !eligible()) return;
+        diagnosticDelivery.enqueue(report);
         await diagnosticDelivery.flushWhenInactive();
       } catch { /* Delivery is optional and isolated from gameplay and saves. */ }
     }, 1100);
+  }
+  async function loadRetainedForDelivery(eligible) {
+    if (diagnosticRetainedLoaded) {
+      if (!eligible()) return null;
+      return diagnostics.exportReports();
+    }
+    const retained = await diagnostics.loadRetained();
+    if (!eligible()) return null;
+    const report = diagnostics.exportReports();
+    const current = new Map((report.incidents || []).map(incident => [incident?.id, incident]));
+    let skippedCurrentYoung = false;
+    for (const record of retained.records || []) {
+      if (!eligible()) return null;
+      const currentIncident = record.session_id === report.session_id ? current.get(record.incident?.id) : null;
+      if (currentIncident) {
+        if (!record.incident?.closed && !currentIncident.closed) skippedCurrentYoung = true;
+        continue;
+      }
+      diagnosticDelivery.enqueue({...record, incidents: [record.incident]});
+    }
+    if (!retained.records?.length && (report.incidents || []).some(incident => !incident.closed))
+      skippedCurrentYoung = true;
+    diagnosticRetainedLoaded = !skippedCurrentYoung;
+    return report;
   }
   function scheduleMatureDiagnosticDelivery() {
     if (!diagnostics || !diagnosticDelivery || diagnosticActive || destroyed ||
@@ -201,17 +217,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     let promise;
     promise = Promise.resolve().then(async () => {
       if (!eligible()) return;
-      const report = diagnostics.exportReports();
-      if (!diagnosticRetainedLoaded) {
-        const retained = await diagnostics.loadRetained();
-        if (!eligible()) return;
-        diagnosticRetainedLoaded = true;
-        for (const record of retained.records || []) {
-          if (!eligible()) return;
-          if (record.session_id === report.session_id && !record.incident?.closed) continue;
-          diagnosticDelivery.enqueue({...record, incidents: [record.incident]});
-        }
-      }
+      const report = await loadRetainedForDelivery(eligible);
+      if (!report) return;
       if (!eligible()) return;
       for (const incident of report.incidents || []) {
         if (!eligible()) return;

@@ -643,10 +643,12 @@ async function runRetentionReload(browser, url, disc, identity, timeout) {
     try {
       const {debt} = await induceSimulationIncident(page, url, disc, identity, timeout,
         `Retention ${mode}`);
+      await page.screenshot({path: path.join(path.resolve(values.out), `retention-${mode}-paused.png`)});
+      const result = {mode, trigger: {reason: debt.reason, value: debt.value, threshold: debt.threshold}};
       if (mode === 'pagehide') {
         await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
-        cases.push({mode, ...await waitForRetained(page, identity, debt.id,
-          'Controlled pagehide checkpoint', 5000)});
+        result.before_reload = await waitForRetained(page, identity, debt.id,
+          'Controlled pagehide checkpoint', 5000);
       } else {
         const destroyed = await page.evaluate(async () => {
           let timer;
@@ -667,9 +669,9 @@ async function runRetentionReload(browser, url, disc, identity, timeout) {
         `${mode} reload changed the fixture origin`);
       const state = await fixtureState(page);
       requireValue(state.errors.length === 0, `Retention ${mode} reload failed: ${state.errors.join('; ')}`);
-      const retainedAfterReload = await waitForRetained(page, identity, debt.id,
+      result.after_reload = await waitForRetained(page, identity, debt.id,
         `${mode} same-origin reload`, 5000);
-      if (mode === 'destroy') cases.push({mode, ...retainedAfterReload});
+      cases.push(result);
     } catch (error) {
       await retainPage(page, `retention-${mode}-failure`);
       throw error;
