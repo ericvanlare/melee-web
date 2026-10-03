@@ -677,7 +677,7 @@ void run_trophy_baseline_smoke(const melee_web::RuntimeFiles& files)
           "Everything baseline did not derive only the four source-supported feature bits");
     for (int selkind = 0; selkind < SELKIND_COUNT; ++selkind) {
         const auto ckind = static_cast<CharacterKind>(gm_SelKindToCKind((u8) selkind));
-        const u16 clear_ids[] = {
+        const int clear_ids[] = {
             gm_80160474(ckind, GM_CLASSIC),
             gm_80160474(ckind, GM_ADVENTURE),
             gm_80160474(ckind, GM_ALLSTAR),
