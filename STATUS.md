@@ -24,6 +24,9 @@ python3 scripts/status_index.py
   fields, source boundary, machine, browser, build and run inventory, and keep
   exclusions explicit.
 - Edit this page only when the acceptance boundaries below change.
+- A branch started before this split can move its STATUS edits into entries
+  with `python3 scripts/migrate_status_sections.py --base $(git merge-base HEAD origin/main) --head HEAD`,
+  then take `main`'s `STATUS.md`.
 
 ## Current acceptance boundaries
 
