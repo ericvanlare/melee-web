@@ -140,7 +140,7 @@ The fighter and VS-stage rows are now decomposed from the pinned source enums,
 but the broad item, mode, single-player, movie and service rows remain
 category-level until their source tables and callers receive the same treatment.
 Ganondorf is a `partial` development candidate with scoped native lifecycle
-and browser-entry evidence in [its port notes](GANONDORF_PORT_NOTES.md). Keep unused, route-only, event-only and boss entities visible rather
+and browser-entry evidence in [its port notes](content/GANONDORF_PORT_NOTES.md). Keep unused, route-only, event-only and boss entities visible rather
 than silently dropping them.
 
 Current development and deployed inventories, fighter-specific limitations and

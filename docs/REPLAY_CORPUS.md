@@ -1,6 +1,6 @@
 # Vanilla replay corpus
 
-This corpus extends the [complete-game calibration](COMPLETE_REPLAY_CALIBRATION.md)
+This corpus extends the [complete-game calibration](investigations/COMPLETE_REPLAY_CALIBRATION.md)
 with independent input workloads. Slippi files supply controller intent under a
 named conversion policy. Newly executed vanilla Melee supplies expected state.
 The original recording's post-frame positions, damage, RNG and outcome are

@@ -321,7 +321,7 @@ command-ownership checks, and malformed streams and unsupported channels
 remain rejected.
 
 The clank repair preserves three original fused operations in `ftcoll.c`;
-see [the instruction and operand audit](FTCOLL_X191C_ROUNDING_AUDIT.md).
+see [the instruction and operand audit](investigations/FTCOLL_X191C_ROUNDING_AUDIT.md).
 The entry-scale repair separately preserves `ftCo_EntryStart_Phys`:
 GALE01r2 `0x800C6788` rounds the subtraction, `0x800C67A8` rounds the entry
 fraction, and `0x800C67AC` fuses the final multiply-add before `0x800C67B0` stores

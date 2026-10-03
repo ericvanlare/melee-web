@@ -14,6 +14,7 @@ Describe the behavior or repository-boundary change and why it is needed.
 - Full suite/build (or why a documentation-only check was sufficient):
 - Browser, native, original-comparison, or performance evidence, if applicable:
 - Known failures, evidence scope, and limitations:
+- New evidence recorded as a `docs/status/` entry (not a new `STATUS.md` section):
 
 ## Repository-content check
 

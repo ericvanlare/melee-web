@@ -44,7 +44,7 @@ changing completion claims belong there and in its scoped receipts.
 The [full-game workflow](FULL_GAME_PORT.md) owns offline feature scope. The
 [accuracy contract](ACCURACY_CONTRACT.md) and
 [performance and accuracy playbook](PERFORMANCE_AND_ACCURACY.md) own runtime
-requirements. The [self-hosting research](SLIPPI_SELF_HOSTING_RESEARCH.md) owns
+requirements. The [self-hosting research](investigations/SLIPPI_SELF_HOSTING_RESEARCH.md) owns
 the inspected Slippi sources, transport findings and infrastructure estimates.
 This document provides the relationship between those authorities.
 
@@ -105,7 +105,7 @@ forward-play timing cannot establish the extra headroom by itself.
 | Browser to Slippi desktop on our service | Cross-play using the Slippi-compatible profile and desktop clients adapted to our service endpoints and identity system. | Browser/ENet bridge or another transport adaptation, compatible session setup and complete reference matches. Creates a separate player pool. |
 | Browser to existing Slippi players through official services | Access to opponents who remain on the official network, subject to that service's support and requirements. | Maintainer coordination, supported authentication/integration, service acceptance, transport and gameplay compatibility. Public source inspection does not prove this route. |
 
-The [source research](SLIPPI_SELF_HOSTING_RESEARCH.md) supports the feasibility
+The [source research](investigations/SLIPPI_SELF_HOSTING_RESEARCH.md) supports the feasibility
 of replacing matchmaking: the production server is private, while the public
 clients expose its contracts and perform gameplay peer to peer. An independent
 backend can use its own accounts and credentials. It would not inherit official
@@ -171,7 +171,7 @@ the relevant prerequisites. Evidence continues to use the playbook labels:
 
 ## Effort, uncertainty and the next experiment
 
-The dated [infrastructure estimates](SLIPPI_SELF_HOSTING_RESEARCH.md#effort-estimate)
+The dated [infrastructure estimates](investigations/SLIPPI_SELF_HOSTING_RESEARCH.md#effort-estimate)
 range from weeks for a controlled desktop pairing proof to months for reliable
 browser cross-play infrastructure, with substantially more work for a mature
 ranked service. They exclude game accuracy and the port's rollback engine.
@@ -180,7 +180,7 @@ state-ownership analysis, reference coverage and restore/re-simulation
 measurements before a useful schedule can be made.
 
 The first online infrastructure milestone is
-[two adapted desktop Slippi clients running headless on the same development machine](SLIPPI_SELF_HOSTING_RESEARCH.md#first-online-infrastructure-milestone-two-local-headless-clients),
+[two adapted desktop Slippi clients running headless on the same development machine](investigations/SLIPPI_SELF_HOSTING_RESEARCH.md#first-online-infrastructure-milestone-two-local-headless-clients),
 connected through our own local matchmaker. One command should launch isolated
 clients, drive a complete match and rematch through ordinary controller input,
 verify bidirectional peer input consumption, retain lifecycle evidence and clean
