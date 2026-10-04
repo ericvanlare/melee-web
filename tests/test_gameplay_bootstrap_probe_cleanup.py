@@ -19,7 +19,7 @@ module.exports = async () => {
   let live = false;
   const heap = new Uint8Array(8192);
   const view = new DataView(heap.buffer);
-  const counts = {init: 0, close: 0};
+  const counts = {init: 0, close: 0, allocations_created: 0, owned_allocations: 0};
   const save = () => fs.writeFileSync(config.counts, JSON.stringify(counts));
   const strings = {1: config.hashes[0], 2: config.hashes[1], 3: config.hashes[2],
                    4: 'injected init or close refusal'};
@@ -48,10 +48,13 @@ module.exports = async () => {
     _melee_web_snapshot_quiescent: () => 1,
     _melee_web_snapshot_error: () => 4,
     ccall: () => {
-      counts.init++; save();
+      counts.init++;
+      counts.allocations_created++;
+      counts.owned_allocations++;
+      live = true;
+      save();
       if (config.mode === 'init_throw') throw new Error('injected init throw');
       if (config.normal_close) {
-        live = true;
         view.setUint32(136, 1, true);
         return 1;
       }
@@ -60,7 +63,11 @@ module.exports = async () => {
     _melee_web_snapshot_close: () => {
       counts.close++; save();
       if (config.mode === 'close_throw') throw new Error('injected close throw');
-      return config.mode === 'close_refused' ? 0 : 1;
+      if (config.mode === 'close_refused') return 0;
+      live = false;
+      counts.owned_allocations--;
+      save();
+      return 1;
     },
   };
 };
@@ -100,7 +107,10 @@ class BootstrapProbeCleanupTests(OwnedWorkspaceTests):
         self.assertEqual(result.returncode, 1, result.stderr)
         report = json.loads((output / "bootstrap-state-report.json").read_text())
         self.assertEqual(report["result"], "failed")
-        self.assertEqual(json.loads(counts.read_text()), {"init": 1, "close": 1})
+        self.assertEqual(json.loads(counts.read_text()), {
+            "init": 1, "close": 1, "allocations_created": 1,
+            "owned_allocations": 0 if success else 1,
+        })
         cleanup = report["cleanup"]
         self.assertTrue(cleanup["required"])
         self.assertTrue(cleanup["attempted"])
