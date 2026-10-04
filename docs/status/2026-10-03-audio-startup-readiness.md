@@ -26,10 +26,15 @@ Audio processing active; added observers exclude performance admission.
 The [scoped receipt](../evidence/audio-startup-readiness-v1.json) pins the audited
 base package, three private override hashes, runner/report hashes, and focused
 negative control. That experiment layers JavaScript over the PR150 candidate;
-this independent production change starts from current main02231e9. Final
-commit CI, affected build/package audit and artifact browser validation are
-pending. The separate PR150 persistence work and its retained browser failure
-remain independent.
+the initial production branch started from main `02231e9`. Its `938a98d`
+checkpoint subsequently passed CI, both affected Release builds, package audit,
+two fresh-context four/eight-second CSS checks, and public import/start/Eject.
+The final package report is SHA256
+`f479cd020e0d148770aedac16c59b076defdb0c0ae522deb735613e0d1965d3d`;
+the public smoke report is SHA256
+`204669a53a7892e88ea627e99f3e390b410e5f394216d328ac6e8d77d6995467`.
+These remain bounded desktop startup observations. PR153's review records the
+subsequent integration with PR150 and its exact validation/deployment identity.
 
 The development whole-session replay button directly invokes native launch and
 bypasses the public `start()` method. A retained performance overlay that changed
@@ -37,6 +42,13 @@ only `start()` therefore did not exercise the gate. The shared owner now exposes
 `waitForAudioRender` for that replay handler immediately before native launch;
 its extracted-handler test verifies delayed and failed readiness. Legacy
 single-match replay construction remains outside this startup boundary.
+
+A later route-correct whole-session replay did receive the process
+acknowledgement, at frame/time zero, and still overflowed in CSS at source cursor
+71 (report SHA256
+`861862109e123eab102a6de84f9c1e7254752fff1b5a4756f0f078289acdda4d`).
+Frame zero is valid under this protocol. The handshake does not resolve that
+failure; producer/consumer clock diagnosis remains open.
 
 Native source clocks, simulation, PCM production, queue capacity and manual
 Resume behavior are unchanged. A single callback cannot promise future audio
