@@ -128,6 +128,18 @@ class RepositoryTests(unittest.TestCase):
                 bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
             self.assertEqual(git(self.repo, "diff", "--binary"), before)
 
+    def test_upgrade_accepts_an_exact_tree_inside_an_iterable(self):
+        previous = self.prepare_patch_upgrade()
+        bootstrap.apply_patch(self.repo, self.patch, previous_tree=("0" * 40, previous))
+        self.assertEqual(bootstrap.patch_state(self.repo, self.patch), "applied")
+
+    def test_upgrade_rejects_an_unknown_iterable_without_changing_files(self):
+        self.prepare_patch_upgrade()
+        before = git(self.repo, "diff", "--binary")
+        with self.assertRaisesRegex(ValueError, "changes differ"):
+            bootstrap.apply_patch(self.repo, self.patch, previous_tree=["0" * 40, "1" * 40])
+        self.assertEqual(git(self.repo, "diff", "--binary"), before)
+
     def test_upgrade_refuses_unrelated_edits_without_changing_any_file(self):
         previous = self.prepare_patch_upgrade()
         (self.repo / "other.txt").write_text("unrelated local work\n")

@@ -21,6 +21,10 @@ from workspace_resources import operation
 AURORA_PREVIOUS_PATCH_TREES = (
     "980aec703ceb03604f7692cb4efd91779f920078",
     "ba1bbed8acbd886ed263468e3d9148163e4afc68",
+    # Current main carries the Future/object patch without the downstream
+    # browser-owner additions. This is the exact tree obtained by applying
+    # that main patch to the pinned pristine Aurora checkout.
+    "ef139550ae1ff9e167cdbf0b8d2b18c4933c3b5a",
 )
 
 
