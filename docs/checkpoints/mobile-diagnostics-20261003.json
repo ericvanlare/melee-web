@@ -1,0 +1,73 @@
+{
+  "schema": "webmelee-fresh-agent-handoff-v1",
+  "date": "2026-10-03",
+  "state": "WIP preservation checkpoint. Stop here until the human resumes work. No merge or deployment authorized by this checkpoint.",
+  "branch": "codex/wip-mobile-diagnostics-checkpoint-20261003",
+  "source_checkpoint_commit": "ac4ecee7a6251ad2462a0a99c2f3162b7f467940",
+  "source_base_commit": "1f3b83176e60e93e4dbd2669e6aa0a450f064407",
+  "source_checkpoint_url": "https://github.com/ericvanlare/melee-web/commit/ac4ecee7a6251ad2462a0a99c2f3162b7f467940",
+  "handoff_ref": "The branch tip adds this handoff to the source checkpoint; resolve the remote branch for its final handoff commit. Both commits are preserved on the pushed branch.",
+  "scope": "No product/runtime changes. Thirteen current first-party diagnostic helpers were copied into archival .template files; only machine-specific path literals were replaced with __LOCAL_*__ placeholders. Do not treat these as newly validated executable tooling.",
+  "source_directory": "experiments/checkpoints/mobile-diagnostics-20261003",
+  "product_work": [
+    {
+      "pr": "https://github.com/ericvanlare/melee-web/pull/154",
+      "head": "1f3b83176e60e93e4dbd2669e6aa0a450f064407",
+      "state_at_checkpoint": "merged and previously staged",
+      "change": "Contain terminal audio failures and preserve their original error."
+    },
+    {
+      "pr": "https://github.com/ericvanlare/melee-web/pull/157",
+      "head": "551938d644b3018583990c82483b949e2e5bb8d3",
+      "state_at_checkpoint": "open, independently reviewed, final CI green; not merged or deployed",
+      "owner": "Separate performance workstream; do not modify its branch as part of this checkpoint.",
+      "change": "Wait for the output-device clock to advance beyond a fresh AudioWorklet process acknowledgement before native playback."
+    }
+  ],
+  "tested": {
+    "checkpoint_only": [
+      "All 13 template files passed JavaScript syntax or Python AST checks.",
+      "All four source manifests parsed and their template hashes matched.",
+      "Diff/content checks found no newly published private paths, captured data, binaries or credential values.",
+      "No browser, profiler, build or runtime validation was started for checkpointing."
+    ],
+    "prior_source_results": [
+      "PR #157 runtime build and 1883-test suite passed, with 141 skips. Public audio-player fresh import and same-context eject/reimport passed seven assertions on code-identical reviewed bytes.",
+      "Desktop WebKit actual candidate audio graph passed readiness/progress and owned cleanup. This was graph-only, without native game/PCM.",
+      "Automatic staging callback-to-POST-to-HTTP201-to-stored-row delivery was observed with a controlled synthetic incident; the browser response-body/lifecycle wait failed separately. The exact synthetic row was deleted."
+    ],
+    "failed_or_unrun": [
+      "Current-main instrumented Chrome replay paused at cursor 1645/source-reported match frame 63. The final page text retained 43.535ms and 84.360 ms two-tick callbacks followed by a 153.365 ms six-tick callback. The 84.360ms callback contained 41.630 ms of staging-slot waiting. No root cause assigned.",
+      "Historical PR #153 desktop WebKit retained a 390.08 ms callback gap. Most ScriptProfiler sample timestamps were zero, so no continuous native/JS coverage claim.",
+      "System Trace native capability probes failed; a TimeProfiler-only comparison was prepared but remains unrun and deprioritized.",
+      "No phone, foreground timing, physical-input, full-match/Results/repeat-match, pixel or PCM acceptance."
+    ]
+  },
+  "unresolved": [
+    "iPhone 15 Pro Chrome iOS first-load refresh cause.",
+    "Phone crashes and sustained play stability.",
+    "Later gameplay timing pauses, including the initiating draw-cost increase and subsequent staging wait.",
+    "No retained staging incident has been identified as the phone session. Abrupt termination can lose an in-memory incident before persistence."
+  ],
+  "private_manifest": {
+    "basename": "mobile-diagnostics-checkpoint-private-20261003.json",
+    "relative_to_verified_runs_root": "mobile-pauses-first-reload-20261003-20261003-113011-cce20970/mobile-diagnostics-checkpoint-private-20261003.json",
+    "contents": "Exact original helper and evidence paths, original/template hashes, placeholder maps, branch/worktree audit, superseded-source inventory and private exceptions.",
+    "location_policy": "Read the host storage instructions and set MELEE_PRIVATE_RUNS to its verified external runs directory. No machine-specific absolute path is published here."
+  },
+  "first_resume_commands": [
+    "git fetch origin codex/wip-mobile-diagnostics-checkpoint-20261003",
+    "git show origin/codex/wip-mobile-diagnostics-checkpoint-20261003:docs/checkpoints/mobile-diagnostics-20261003.json",
+    "python3 -m json.tool \"$MELEE_PRIVATE_RUNS/mobile-pauses-first-reload-20261003-20261003-113011-cce20970/mobile-diagnostics-checkpoint-private-20261003.json\""
+  ],
+  "next_action_after_resume": "First inspect the separate performance workstream handoff for PR #157 and determine whether its prepared Chrome/CDP trace ran before wind-down. Root did not launch that trace. If still unrun, use the existing frozen scenario and maintained native timing/Chrome tracing tools for one bounded capture of the earliest failed callback burst, retaining complete timing rows and trace-loss/clock/process evidence. Reconfirm a concrete quiet window only when the plan is ready. Do not auto Resume or alter timing guards, source ticks or draws. Do not repeat the failed long replay unchanged.",
+  "source_audit": {
+    "current_worktrees": "Current root and child product changes are accounted for; old root worktrees were clean before this checkpoint.",
+    "obsolete_local_commit": "24ddae4586acc0b9b3f9c002d167af1909a0551d is a pre-rebase admin-epoch fix. Its intended script/test/evidence files are byte-identical to already-published 49eb757a07ee7bc648e112d34e6e2be2823c6ab0. No unique unpublished product change requires republishing that obsolete history.",
+    "local_only_exceptions": [
+      "Historical fixed-package probes, negative variants and superseded wrappers remain unchanged in private source inventory. Current useful audio, delivery, timeline and native-profiler families are checkpointed here.",
+      "Generated/pinned upstream C/C++ test fixtures, compiled JS, package copies, captures, private disc inputs and execution receipts remain local. No recovered or unreviewed source is newly published."
+    ]
+  },
+  "remaining_processes": "No root-owned browser/native/server/compiler process. Child agents completed source preservation and are idle. Existing incremental builds and all failed evidence are deliberately retained."
+}
