@@ -23,6 +23,7 @@ AUDIO_PREVIEW_RUNTIME_TARGET = "runtime-audio-preview"
 AUDIO_PREVIEW_RUNTIME_CONFIGURATION = "Release"
 AUDIO_PREVIEW_RUNTIME_BUILD_DIR = "build/browser-audio-preview-release"
 AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
+AURORA_QUIESCENCE_DIAGNOSTIC_TARGET = "aurora-browser-quiescence"
 
 # These are the only lifecycle executables that the content-check workflow may
 # select directly.  Keep this list deliberately small and explicit: adding a
@@ -46,6 +47,10 @@ TRACE_TARGETS = (
 # existing target groups byte-for-byte.
 BUILD_TARGETS = {
     "graphics": ("gx_probe",),
+    # This is a separate build profile, not a production CMake target. It is
+    # the only normal build entry point that enables Aurora's opt-in browser
+    # submission-owner/quiescence instrumentation.
+    AURORA_QUIESCENCE_DIAGNOSTIC_TARGET: ("gx_probe",),
     "gameplay": ("gameplay_checks",),
     "runtime": ("gameplay_menu_browser",),
     PUBLIC_RUNTIME_TARGET: (PUBLIC_RUNTIME_TARGET,),
@@ -87,6 +92,9 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
                        else "build/browser-provenance")
     if target == AUDIO_PREVIEW_RUNTIME_TARGET:
         return root / AUDIO_PREVIEW_RUNTIME_BUILD_DIR
+    if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET:
+        suffix = "-release" if configuration == "Release" else ""
+        return root / f"build/browser-quiescence{suffix}"
     return root / (PUBLIC_RUNTIME_BUILD_DIR if target == PUBLIC_RUNTIME_TARGET else
                    ("build/browser-release" if configuration == "Release" else "build/browser"))
 
@@ -801,6 +809,8 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError("--pipeline-provenance requires the private runtime target")
     if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} and configuration != "Release":
         raise ValueError(f"{target} is Release-only; pass --configuration Release")
+    if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET and configuration != "Release":
+        raise ValueError(f"{target} is Release-only; pass --configuration Release")
     with operation(root, "build " + target):
         lock = read_lock(root)
         verify_sources(root, lock)
@@ -857,6 +867,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             f"-DMELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC={'ON' if 'aurora_future_owner_probe' in trace_targets else 'OFF'}"
         )
         configure.append(
+            f"-DMELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC={'ON' if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET else 'OFF'}"
+        )
+        configure.append(
             f"-DMELEE_WEB_SLIPPI_PROFILE_BROWSER={'ON' if 'gameplay_snapshot_probe_browser' in trace_targets else 'OFF'}"
         )
         record_build(root, build_dir, False)
@@ -887,7 +900,8 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
-    parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "runtime",
+    parser.add_argument("--target", choices=("graphics", AURORA_QUIESCENCE_DIAGNOSTIC_TARGET,
+                                              "gameplay", "fighter", "runtime",
                                               PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET, "all"))
     parser.add_argument("--trace-target", dest="trace_targets", choices=TRACE_TARGETS,
                         action="append",

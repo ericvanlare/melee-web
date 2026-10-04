@@ -1,0 +1,349 @@
+{
+  "browser": {
+    "audible": false,
+    "audit": {
+      "audit_sha256": "2c5db46a37455ce0f2d0a94ac6149d328fa4fe46625a2d57b8cb3f122e6d823d",
+      "chrome_processes_absent": 8,
+      "file_pins_verified": 31,
+      "http_port_refused": true,
+      "node_group_absent": true,
+      "result": "passed",
+      "screenshot_inspected": true,
+      "trees_verified": 5
+    },
+    "browser_tools_sha256": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+    "chrome_path_sha256": "5c336c15b01b400bf971ee4539506692a075292b8dde3e90f3b735815ac97a38",
+    "chrome_version": "154.0.8037.97",
+    "cleanup": {
+      "all_browser_processes_absent": true,
+      "browser_closed": true,
+      "cdp_closed": true,
+      "chrome_processes_absent": true,
+      "close_calls": 1,
+      "http_closed": true,
+      "node_group_released": true,
+      "source_close": true
+    },
+    "console_diagnostics": [
+      {
+        "text": "Failed to load resource: the server responded with a status of 404 (File not found)",
+        "type": "error"
+      },
+      {
+        "text": "[Aurora aurora::gpu] Device lost: Device was destroyed.",
+        "type": "warning"
+      },
+      {
+        "text": "[Aurora aurora::window] Error enabling screensaver: That operation is not supported",
+        "type": "warning"
+      }
+    ],
+    "display_type": "ANGLE_METAL",
+    "duration_seconds": 2.952,
+    "gpu_feature_status": {
+      "gpu_compositing": "enabled",
+      "webgl": "enabled",
+      "webgpu": "enabled"
+    },
+    "gpu_renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Version 26.6 (Build 25G72))",
+    "headless": true,
+    "isolated": true,
+    "page_errors": [],
+    "playwright_module_sha256": "a0f5715ea22354f922791a9c53dc012d5d5c067ff9cc4cd35ffb7cd272071a9f",
+    "result": "passed",
+    "screenshot": {
+      "artifact": "owner-boundary.png",
+      "bytes": 600113,
+      "dimensions": "1280x720",
+      "interpretation": "visual diagnostic only; root observed known magenta geometry; original-pixel agreement unrun",
+      "sha256": "d0d9f1ba4be305c3fbc28c91b0086f7e9e71c64a7ed705526f05857c93f1152c"
+    },
+    "webgpu_enabled": true
+  },
+  "build": {
+    "all_phase_groups_released": true,
+    "artifacts": [
+      {
+        "artifact": "diagnostic-gx-probe.js",
+        "bytes": 362544,
+        "sha256": "c595e9eb9d9dac4b6167cc369aabec836ef83cb38497c0cd2beb3a43b580bad4"
+      },
+      {
+        "artifact": "diagnostic-gx-probe.wasm",
+        "bytes": 6892077,
+        "sha256": "7a3c63f7bf2120da9cfc071da1085be021ac6d45c0cf9b75671d61b8b125eaae"
+      },
+      {
+        "artifact": "ordinary-gx-probe.js",
+        "bytes": 362544,
+        "sha256": "c595e9eb9d9dac4b6167cc369aabec836ef83cb38497c0cd2beb3a43b580bad4"
+      },
+      {
+        "artifact": "ordinary-gx-probe.wasm",
+        "bytes": 6890484,
+        "sha256": "54299f8146beff8d424dbed67df883146092c572c5395679a4e85a97a5aa3ee9"
+      },
+      {
+        "artifact": "rendered-diagnostic.data",
+        "bytes": 20994321,
+        "sha256": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+      },
+      {
+        "artifact": "rendered-diagnostic.mjs",
+        "bytes": 388505,
+        "sha256": "61eab1d67dc5e01cc928e9493e4f038b6588ab8208f05ce972da4efbe4cf350e"
+      },
+      {
+        "artifact": "rendered-diagnostic.wasm",
+        "bytes": 13885643,
+        "sha256": "bb535c2de280ea5a427152dd09b3a43f824cc89ad78ab895f7cc4bac62cda3a1"
+      }
+    ],
+    "cleanup_reserve_seconds": 60,
+    "corrected_browser_manifest": {
+      "artifact": "browser-manifest-v4-corrected.json",
+      "bytes": 41305,
+      "sha256": "a6987382527aa32a44ebabcb12ebfe621eddc0c45236bf5c6e63b673a1457fda"
+    },
+    "diagnostic_profile": "Release aurora-browser-quiescence and rendered source probe, opt-in",
+    "duration_seconds": 55.051,
+    "ordinary_player_profile": "Release graphics, diagnostic owner option OFF",
+    "receipt": {
+      "artifact": "build-receipt.json",
+      "bytes": 40415,
+      "sha256": "f0433bb3f7926c716bbc03f47a5dceca82200aaf06e65a12964c8a7bd8ceea94"
+    },
+    "result": "passed",
+    "whole_seconds": 600
+  },
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Browser exercised"
+  ],
+  "historical_reference": {
+    "artifact": "docs/evidence/aurora-browser-quiescence-v1.json",
+    "aurora_reviewed_tree": "980aec703ceb03604f7692cb4efd91779f920078",
+    "base_commit": "e7c15a98566fa24be4a7be0adcb96506ed2b4465",
+    "label": "historical; not relabeled as current",
+    "sha256": "623b2d20463e48b65d0d4fd3d6932b38823d98c498290f791804a4f3fce273cb",
+    "source_head": "08366be015318f1652fc09099929c57f73cc879d"
+  },
+  "machine": {
+    "browser": "154.0.8037.97",
+    "cpu": "Apple M4",
+    "macos_build": "25G72",
+    "macos_version": "26.6",
+    "memory_bytes": 17179869184,
+    "mode": "headless",
+    "model": "Mac16,10",
+    "speakers": "muted by repository launch options"
+  },
+  "next_boundary": "Provide actual reversible ownership for external Aurora/WebGPU/future/audio effects before considering any renderer or heap restore.",
+  "observed": {
+    "captures_headers": [
+      {
+        "byteSize": 1160,
+        "createdPipelines": 55,
+        "currentFrameIndex": 125,
+        "drawCallCount": 226,
+        "frameDescriptorCount": 2,
+        "frameDescriptorOffset": 120,
+        "frameDescriptorStride": 464,
+        "frameSlotCount": 2,
+        "lastBeginFrameId": "125",
+        "lastCallbackSequence": "125",
+        "lastEndFrameId": "125",
+        "lastRegistrationSequence": "125",
+        "pendingFramePackets": 0,
+        "pendingStagingBuffers": 0,
+        "pipelineCacheStatus": 0,
+        "queuedPipelines": 0,
+        "schemaVersion": 5,
+        "stagingGeneration": "1",
+        "stagingSlotCount": 2,
+        "submissionDescriptorCount": 2,
+        "submissionDescriptorOffset": 1048,
+        "submissionDescriptorStride": 56,
+        "workerBusy": 0
+      },
+      {
+        "byteSize": 1160,
+        "createdPipelines": 55,
+        "currentFrameIndex": 126,
+        "drawCallCount": 235,
+        "frameDescriptorCount": 2,
+        "frameDescriptorOffset": 120,
+        "frameDescriptorStride": 464,
+        "frameSlotCount": 2,
+        "lastBeginFrameId": "126",
+        "lastCallbackSequence": "126",
+        "lastEndFrameId": "126",
+        "lastRegistrationSequence": "126",
+        "pendingFramePackets": 0,
+        "pendingStagingBuffers": 0,
+        "pipelineCacheStatus": 0,
+        "queuedPipelines": 0,
+        "schemaVersion": 5,
+        "stagingGeneration": "1",
+        "stagingSlotCount": 2,
+        "submissionDescriptorCount": 2,
+        "submissionDescriptorOffset": 1048,
+        "submissionDescriptorStride": 56,
+        "workerBusy": 0
+      }
+    ],
+    "descriptor_and_lease_unchanged_at_same_boundary": true,
+    "descriptor_bytes": 1160,
+    "initial_submissions": [
+      {
+        "callbackSequence": "125",
+        "capturedGeneration": "1",
+        "encoder_identity": "opaque-present",
+        "futureId": "128",
+        "queue_identity": "opaque-present",
+        "registrationSequence": "125",
+        "stagingSlot": 0,
+        "state": 2
+      },
+      {
+        "callbackSequence": "124",
+        "capturedGeneration": "1",
+        "encoder_identity": "opaque-present",
+        "futureId": "127",
+        "queue_identity": "opaque-present",
+        "registrationSequence": "124",
+        "stagingSlot": 1,
+        "state": 2
+      }
+    ],
+    "invalid_inputs_refused": true,
+    "lease_bytes": 80,
+    "opaque_identity_scope": "queue, encoder and WebGPU object identities retained as opaque observations; no object reconstruction",
+    "perturbed_descriptor_refused": true,
+    "source_counter_scope": "source frame/ticks/generation moved 1/125/1 to 2/126/1; host metadata remained descriptor-only observations",
+    "source_step": {
+      "after": {
+        "frame": 2,
+        "generation": 1,
+        "ticks": 126
+      },
+      "before": {
+        "frame": 1,
+        "generation": 1,
+        "ticks": 125
+      }
+    },
+    "stale_boundary_refused": true
+  },
+  "receipts": {
+    "browser_ownership": {
+      "artifact": "browser-ownership.json",
+      "bytes": 53833,
+      "sha256": "9bcd21c15e2a942927d9a228d15e9e89c41fdd8cf3bfd8662a9051680ec4fbab"
+    },
+    "browser_report": {
+      "artifact": "browser-report.json",
+      "bytes": 202859,
+      "sha256": "b34ee71380950f4755b58322301e0e2893eb80bb53995d45a9b3df1439a0785c"
+    },
+    "outer_report": {
+      "artifact": "outer-report.json",
+      "bytes": 26962,
+      "sha256": "515bf215ab9a75eb831a0c1acecba6445031c83bf063139cc0be3621454a87be"
+    }
+  },
+  "schema": "melee-web-aurora-browser-quiescence-v2",
+  "scope": {
+    "boundary": "read-only Aurora submission descriptor and diagnostic lease at completed draw boundaries",
+    "claims_excluded": [
+      "original pixels",
+      "PCM agreement",
+      "full match/rematch",
+      "renderer or heap restoration",
+      "performance admission",
+      "physical input",
+      "foreground timing",
+      "audio ownership"
+    ],
+    "full_renderer_restore_safe": false,
+    "restore_or_replay": false,
+    "scenario": "two source Mario players on Final Destination; original Entry/Ready then source frames 1 and 2",
+    "uncaptured_owner_gaps": [
+      "WebGPU object and Promise/finalizer lifetime",
+      "GPU queue/fence and externally committed submissions",
+      "presentation/surface ownership",
+      "pipeline persistence",
+      "audio/PCM ownership",
+      "allocator and buffer contents",
+      "full native host graph"
+    ]
+  },
+  "source": {
+    "asset_tree": {
+      "files": 34,
+      "sha256": "12eab22363cd6653ab3ba393a4067983b0be16a8ac338accb33a7f5a494949e7"
+    },
+    "aurora_commit": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
+    "aurora_patch_sha256": "e3b4b5e720a8cb10135f9054e5b87a3b057f5132ad3651ab08884e693778fc27",
+    "aurora_reviewed_tree": "75678097b50203447dfe1ffc5e642661a66d89ef",
+    "aurora_tree_files": 355,
+    "aurora_tree_sha256": "c3a00d8dee1c4b1cbd3e29d7acdb6795c3790b125b33874d05e5fc2a79118def",
+    "base_commit": "c3ddd39d191abcd59a72cd428a085c0958c922a9",
+    "code_head": "c5a465aed4220ea206887c33e30ab63c408a1c86",
+    "compiler_jobs": 6,
+    "configuration": "Release",
+    "dependency_lock_sha256": "c35316dc3b53d194f36a5fdab73d8d2922962be260465fe1050d49f3576be0ed",
+    "gameplay_source_tree": {
+      "files": 2226,
+      "sha256": "53bd9d7a282c8d3014326c89c96f310da7bdba69e7bd5fb9647c3b9a911a5dfa"
+    },
+    "generated_js_modified": false
+  },
+  "status": "passed",
+  "validation": {
+    "full_unit_suite": {
+      "note": "Required local regression suite at the recorded code head; does not close renderer or session acceptance.",
+      "receipt": {
+        "artifact": "suite/receipt.json",
+        "sha256": "7c1438602d27097a2faaee0f82bb27e5868bc0c55bf6c54923b8468fd9840a61"
+      },
+      "result": "passed",
+      "skipped": 141,
+      "source_head": "c5a465aed4220ea206887c33e30ab63c408a1c86",
+      "test_seconds": 348.523,
+      "tests": 1883,
+      "tracked_source_pins": 1699,
+      "wrapper_seconds": 348.8593607498333
+    },
+    "independent_audit": {
+      "audit": {
+        "artifact": "root-audit-v1.json",
+        "sha256": "2c5db46a37455ce0f2d0a94ac6149d328fa4fe46625a2d57b8cb3f122e6d823d"
+      },
+      "browser_report_sha256": "b34ee71380950f4755b58322301e0e2893eb80bb53995d45a9b3df1439a0785c",
+      "chrome_processes_absent": 8,
+      "file_pins_verified": 31,
+      "node_group_absent": true,
+      "outer_report_sha256": "515bf215ab9a75eb831a0c1acecba6445031c83bf063139cc0be3621454a87be",
+      "port_refused": true,
+      "result": "passed",
+      "screenshot_inspected": true,
+      "trees_verified": 5,
+      "visual_scope": "known magenta geometry; no original pixel comparison or fidelity admission"
+    },
+    "preflight": {
+      "children_started": false,
+      "manifest_sha256": "a6987382527aa32a44ebabcb12ebfe621eddc0c45236bf5c6e63b673a1457fda",
+      "result": "passed"
+    },
+    "private_controls": {
+      "control_count": 8,
+      "report": {
+        "artifact": "controls/report.json",
+        "sha256": "8f0b3a438692fe04f2447faf9bf56188e5835ddaa9090003c0ca3130cd9ee928"
+      },
+      "result": "passed"
+    }
+  }
+}
