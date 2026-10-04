@@ -24,6 +24,8 @@ After normal bootstrap, run the focused controls and affected diagnostic build:
 python3 scripts/agent_workspace.py run -- python3 -m unittest discover \
   -s tests -p 'test_gameplay_bootstrap_state_*.py' -v
 python3 scripts/agent_workspace.py run -- python3 -m unittest discover \
+  -s tests -p test_gameplay_bootstrap_probe_cleanup.py -v
+python3 scripts/agent_workspace.py run -- python3 -m unittest discover \
   -s tests -p test_selected_trace_build.py -v
 python3 scripts/build.py --trace-target gameplay_snapshot_probe \
   --gameplay-bootstrap-state --configuration RelWithDebInfo
@@ -65,6 +67,24 @@ The required full suite passed 1,883 tests with 141 skips in 333.990 seconds.
 The named machine was an arm64 Mac16,10 with 16 GiB, macOS 26.6 build 25G72 and
 Node 22.23.2. Job elapsed times in the receipt describe these checks; they are not
 snapshot/restore costs or foreground performance evidence.
+
+The reviewed runner correction at `9a617d49b54c02a8fa1bfbe4f0b348955892d7a3`
+registers cleanup before entering initialization, attempts source close once,
+and preserves its first structured receipt after a refusal or exception. The
+test-only successor `d57cf8dd57f70d4746917104a496b26e140c4bc2` exercises
+refused/throwing initialization and refused/throwing normal close after two
+successful mock captures. All four lifecycle controls passed. A real Wasm
+fixture again reached Ready at tick 124 and closed once. Deliberately empty
+assets produced a separate **failed** probe at missing `PlCo.dat`; its
+expected-failure control passed with a successful single close.
+
+The post-review full suite passed 1,887 tests with 141 skips in 350.894 seconds
+(351.188 seconds through the owned wrapper). The final normal enabled rebuild
+passed in 17.206 seconds and produced JS/Wasm bytes identical to the original
+enabled artifacts. All 1,700 tracked pins stayed unchanged and each owned
+process group exited. The receipt keeps the original measurements separate
+from these new runner/build/test identities; the compiled producer and wrapper
+did not change.
 
 Arena payloads, SDK heaps and allocator free chains, HSD object/process graphs,
 source-memory ownership, mutable Wasm globals/tables, callback graphs, host

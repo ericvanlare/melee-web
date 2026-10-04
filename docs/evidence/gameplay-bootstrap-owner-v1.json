@@ -174,5 +174,126 @@
     "artifact": "run_phase.py",
     "role": "private process supervisor for the recorded bootstrap/build/Node/suite phases; separate from the compiled producer and probe",
     "sha256": "c0a1d65449130f56dddfccd338ad26e61e414e951bd1038fb9af0232b9920278"
+  },
+  "post_review_validation": {
+    "runner_source_head": "9a617d49b54c02a8fa1bfbe4f0b348955892d7a3",
+    "full_suite_source_head": "d57cf8dd57f70d4746917104a496b26e140c4bc2",
+    "scope": "single-attempt diagnostic cleanup and its receipts; compiled producer/wrapper unchanged",
+    "runner_sha256": "b821e06f51892a94d2ae0969dde6cd86aae2abc9a2b340ac6be448ea0df17cde",
+    "lifecycle_controls": {
+      "tests": 4,
+      "result": "passed",
+      "boundary": "CLI mocks: refused/throwing partial initialization, then rejected/throwing normal close after successful initialization and two captures; every path records exactly one close"
+    },
+    "normal_on_rebuild": {
+      "source_head": "9a617d49b54c02a8fa1bfbe4f0b348955892d7a3",
+      "elapsed_seconds": 16.934451333014295,
+      "receipt_sha256": "84f16a07654085cf0178e8c3738276a0e6cea75e85704090eb86983c0a6ef55b",
+      "process_exit_code": 0,
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1700,
+      "source_unchanged": true
+    },
+    "compiled_artifacts_identical_to_original_enabled_build": true,
+    "real_fixture": {
+      "result": "passed",
+      "ready_steps": 124,
+      "captures": 2,
+      "quiescence": {
+        "stable_bytes": true,
+        "generation": "1",
+        "ticks": "124"
+      },
+      "source_cleanup": {
+        "required": true,
+        "attempted": true,
+        "success": true,
+        "phase": "normal source close",
+        "returncode": 1,
+        "error": null
+      },
+      "report_sha256": "60ee6cce5057cec6abb664ad773f70962bfc543b0418f1a8b89bdc38af62acd2",
+      "phase": {
+        "source_head": "9a617d49b54c02a8fa1bfbe4f0b348955892d7a3",
+        "elapsed_seconds": 0.4981793751940131,
+        "receipt_sha256": "c734dfe94d813c49179ce074212496c8eb040ca1a14df385afb1250b1f940d78",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1700,
+        "source_unchanged": true
+      }
+    },
+    "real_init_refusal_control": {
+      "control_result": "passed",
+      "actual_probe_result": "failed",
+      "reason": "deliberately empty owned assets; source initializer refuses missing PlCo.dat",
+      "probe_exit_code": 1,
+      "source_cleanup": {
+        "required": true,
+        "attempted": true,
+        "success": true,
+        "phase": "after failure",
+        "returncode": 1,
+        "error": null
+      },
+      "failed_report_sha256": "7fa0f5ad21d84a13b79be6dbbfd6481a12c7085db4b1aac876bb0c979691a325",
+      "separate_control_report_sha256": "738fa59b3b088191a763510fe6e637b56800079dcee29077b35e9f4ba8273d54",
+      "phase": {
+        "source_head": "9a617d49b54c02a8fa1bfbe4f0b348955892d7a3",
+        "elapsed_seconds": 0.13717241608537734,
+        "receipt_sha256": "d2cf0cda40d19e3a388b3a8978a9766ca9fc84a839834e21d3725be1d0af4f41",
+        "process_exit_code": 1,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1700,
+        "source_unchanged": true
+      }
+    },
+    "full_suite": {
+      "tests": 1887,
+      "skipped": 141,
+      "seconds": 350.894,
+      "result": "passed",
+      "phase": {
+        "source_head": "d57cf8dd57f70d4746917104a496b26e140c4bc2",
+        "elapsed_seconds": 351.18757437495515,
+        "receipt_sha256": "19aec2caa07417f2214f530762a3720c676fa9e3577f1cc97d2e893996b3a55f",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1700,
+        "source_unchanged": true
+      }
+    },
+    "private_phase_wrappers": [
+      {
+        "artifact": "run_phase.py",
+        "role": "process supervisor for the revised normal ON build and positive Node observation",
+        "sha256": "532f4bfb23bd06b7d3ae565567f5b8479edbc2268f32471270b9cf79497eecfc"
+      },
+      {
+        "artifact": "run_init_refusal.py",
+        "role": "process supervisor expecting exit 1 for the negative init control; raw observation remains failed",
+        "sha256": "f966e65c1b3a092636946716da8dfab39d82dc8f52438cb1ab421b529adf6edc"
+      },
+      {
+        "artifact": "suite_phase.py",
+        "role": "same process supervisor bound to the test-only successor for the full suite",
+        "sha256": "270d49d135d5ba74d5413636b953ae337828a793c266e95e51d5f9c58572a260"
+      },
+      {
+        "artifact": "normal_restore.py",
+        "role": "process supervisor for the final normal ON build; identical wrapper bytes to suite_phase.py, distinct owned output directory",
+        "sha256": "270d49d135d5ba74d5413636b953ae337828a793c266e95e51d5f9c58572a260"
+      }
+    ],
+    "final_normal_on_rebuild": {
+      "source_head": "d57cf8dd57f70d4746917104a496b26e140c4bc2",
+      "elapsed_seconds": 17.206158542074263,
+      "receipt_sha256": "18633dcda966cf5ed094c18e4c02e11a00c1652395acaad903dedfa8fa162ab8",
+      "process_exit_code": 0,
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1700,
+      "source_unchanged": true,
+      "compiled_artifacts_identical_to_original_enabled_build": true
+    }
   }
 }
