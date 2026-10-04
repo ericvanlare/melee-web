@@ -297,6 +297,37 @@ function harness(unload=true,wholeSession=false){
  assert.equal(h.scope.replayLoading,false);
 }
 {
+ // Stopping while the worklet is delayed must not resurrect an unloaded run.
+ for(const phase of ['finishing','finished','queued-launch']){
+  const h=harness(true,true);let resolveRender,finishTeardown;
+  const renderReady=new Promise(resolve=>{resolveRender=resolve;});
+  h.scope.waitForAudioRender=()=>renderReady;
+  h.scope.finishRetailReplay=async()=>{
+   h.scope.retailRun.finishing=true;
+   await new Promise(resolve=>{finishTeardown=resolve;});
+   h.scope.retailRun=null;
+  };
+  const playing=h.play(),bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+  header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+  h.resolveBytes(bytes);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.calls.native,1);
+  let queuedLaunch;
+  if(phase==='queued-launch'){
+   h.scope.boundary=fn=>new Promise(resolve=>{queuedLaunch=()=>resolve(fn());});
+   resolveRender();await new Promise(resolve=>setImmediate(resolve));
+   assert.equal(typeof queuedLaunch,'function');
+  }
+  h.$('pause').onclick(); // Production stop path for a performance replay.
+  assert.equal(h.scope.retailRun.finishing,true);
+  if(phase!=='finishing'){finishTeardown();await new Promise(resolve=>setImmediate(resolve));}
+  if(queuedLaunch)queuedLaunch();else resolveRender();
+  await playing;
+  assert.equal(h.calls.launch,0,`Cancelled ${phase} replay must never launch after readiness`);
+  assert.equal(h.scope.replayLoading,false);
+  if(phase==='finishing'){finishTeardown();await new Promise(resolve=>setImmediate(resolve));}
+ }
+}
+{
  // A failed readiness gate must finish the replay owner and leave source
  // launch untouched; this is a teardown failure, not a successful route.
  const h=harness(true,true);

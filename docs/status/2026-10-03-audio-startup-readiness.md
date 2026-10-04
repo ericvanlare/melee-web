@@ -43,6 +43,13 @@ only `start()` therefore did not exercise the gate. The shared owner now exposes
 its extracted-handler test verifies delayed and failed readiness. Legacy
 single-match replay construction remains outside this startup boundary.
 
+Integration review also reproduced a stop-during-readiness race: a late
+acknowledgement could launch after replay teardown. The continuation now checks
+the captured replay owner both after readiness and at the native command
+boundary. The production-handler fixture fails without the guard and passes
+for pending teardown, completed teardown, and a queued launch cancelled before
+execution.
+
 A later route-correct whole-session replay did receive the process
 acknowledgement, at frame/time zero, and still overflowed in CSS at source cursor
 71 (report SHA256

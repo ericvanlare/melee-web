@@ -232,6 +232,7 @@ $('retail-replay-start').onclick=async()=>{
   if(!wholeSession&&!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
   for(const old of $('retail-replay-downloads').querySelectorAll('a'))URL.revokeObjectURL(old.href);$('retail-replay-downloads').replaceChildren();replayEvidence=[];$('save-replay-evidence').disabled=true;
   retailRun={hash,observe,wholeSession,rows:[],timerRows:[],memory:{before_preparation:replayMemorySnapshot()},frames:0,started:performance.now(),lastProgress:performance.now(),lastCursor:0,focusLost:false,cache:{state:Module.runtimeCacheState?.state||'unknown',bytes:Number(Module.runtimeCacheState?.fileBytes||0),cleared_on_startup:clearRenderCacheOnLoad,driver_cache:'uncontrolled'}};
+  const run=retailRun;
   uiMessage='';$('retail-replay-report').textContent='Preparing reference replay…';$('launch').disabled=true;$('pause').disabled=$('unload').disabled=false;
   retailRun.paintControl=beginReplayPaintControl();
   await boundary(()=>{const ptr=Module._malloc(bytes.length);try{if(!ptr)throw Error('Replay allocation failed');Module.HEAPU8.set(bytes,ptr);check(Module._melee_web_native_menu_replay(ptr,bytes.length,observe?1:0));}finally{Module._free(ptr);}});
@@ -240,7 +241,10 @@ $('retail-replay-start').onclick=async()=>{
   // single-match replay's direct match construction.
   if(Module._melee_web_native_menu_replay_whole_session?.()){
    await waitForAudioRender();
-   await boundary(()=>check(Module._melee_web_native_menu_launch()));
+   if(retailRun!==run||run.finishing)return;
+   // A stop can also arrive after readiness but before this native command.
+   await boundary(()=>{if(retailRun===run&&!run.finishing)check(Module._melee_web_native_menu_launch());});
+   if(retailRun!==run||run.finishing)return;
   }
   $('canvas').focus();inputDirty=true;syncAudio();
  }catch(error){if(retailRun)await finishRetailReplay(error.message);else $('retail-replay-report').textContent=error.message;}
