@@ -1,4 +1,14 @@
-# Aurora Future/object owner accessor preparation
+# Aurora Future/object owner accessor
+
+**Compiled / ABI-only real-WebGPU diagnostic**
+
+The [scoped receipt](../evidence/aurora-future-owner-accessor-v1.json) records
+the normal build, actual Wasm export audit, focused controls, full unit suite
+and real-HTTP headless installed-Chrome runs on an Apple M4 Mac mini with 16 GiB.
+The native bundle was built at `05d0ca8b9be65dd785de3223313d2b6459b46841`;
+the final browser/full-suite harness ran at
+`6b6ae24555ddf030e875d1650e5ec3d0fe13a652`, with every native build input
+verified unchanged. This entry's final update changes documentation only.
 
 This packet adds an opt-in, read-only diagnostic target for the pinned Aurora
 WebGPU runtime. It observes the module-local `WebGPU.Internals.futures` and
@@ -34,7 +44,7 @@ python3 scripts/agent_workspace.py run -- \
   node tests/aurora_future_owner_accessor_vm.mjs
 ```
 
-The later ABI-only build is deliberately separate and uses the repository's
+The ABI-only build is deliberately separate and uses the repository's
 normal `build/browser` private development output under the checkout workspace
 guard; it must not be redirected to an arbitrary new output root:
 
@@ -91,3 +101,29 @@ not establish that no callback can arrive later. Accessor disposal releases
 only its private references and labels, while the host sparse stores remain
 untouched. Buffer arguments follow the Wasm32 unsigned ABI, and writes are
 limited to the fixed record size.
+
+Observed validation: normal bootstrap passed in 24.129s and the affected
+RelWithDebInfo target built with default compiler jobs in 82.635s. Actual Wasm
+parsing found all 24 expected function exports among 84 function exports.
+The focused VM/native/order controls passed 3 tests; the required full suite
+passed 1,871 tests with 141 skips in 374.194s.
+
+The final real-WebGPU fixture passed in 1.008s on installed Chrome 154.0.8037.97.
+It observed adapter/device/work Future IDs 1/2/4 and the queue Promise identity 6
+before and after completion, then closed with no pending/late callback and
+exactly one owned Destroyed callback. The accessor released its private
+references. Ten recorded PIDs and two groups were absent, the HTTP listener
+refused connections, the temporary Chrome profile disappeared, source/bundle
+hashes remained unchanged, and the 800x300 screenshot was inspected. The first
+5.091s run before the publication-order assertion remains retained separately.
+These elapsed times describe the diagnostic job, not foreground performance.
+
+To stage the fixture after the normal build, copy the fresh
+`build/browser/aurora_future_owner_probe.js` and `.wasm`,
+`tests/aurora_future_owner_probe.html`, and
+`tests/aurora_future_owner_probe.mjs` into a new owned site directory, naming
+the latter `wasm_abi_probe.mjs`. The driver itself stays under `tests/` so its
+relative imports resolve. Run the driver under an owned ProcessSupervisor;
+the local receipts additionally track Chrome's separately created process
+group and audit process/profile/listener absence. Retain the driver JSON and
+screenshot on failure; a timeout never authorizes an unchanged retry.
