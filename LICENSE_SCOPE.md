@@ -6,6 +6,13 @@ project-authored subsequent changes. It supplies no rights to their inputs,
 dependencies, generated third-party outputs, quoted material or programs they
 build or serve. Preserve the license and this scope when redistributing them.
 
+- `tools/checkpoints/multiplayer-20261003/hsd-named-metadata/named_objalloc_decode.mjs`
+- `tools/checkpoints/multiplayer-20261003/hsd-named-metadata/test_named_objalloc_decode.mjs`
+- `tools/checkpoints/multiplayer-20261003/source-pad-witness/observer_fragment.inc`
+- `tools/checkpoints/multiplayer-20261003/source-pad-witness/verify_source_pad_witness.py`
+- `tools/checkpoints/multiplayer-20261003/native-scheduler/stage_probe_v94.py`
+- `docs/evidence/multiplayer-wip-checkpoint-20261003.json`
+
 - `scripts/browser_tools.mjs`
 - `scripts/dolphin_audio.py`
 - `scripts/serve.py`
@@ -182,3 +189,5 @@ player. Source availability, permission to reuse individual files and permission
 to distribute a binary are separate questions. Public contributions should
 identify the authority and license for any material they introduce; adding a
 file does not silently extend this allowlist.
+
+The five helpers in `tools/checkpoints/multiplayer-20261003/` and their JSON handoff are separately authored WIP diagnostic orchestration/decoding and synthetic controls, preserved unchanged from ignored prototypes. Their API use and protocol parsing contain no recovered game/SDK implementation or copied debugger implementation. The uncompiled source PAD fragment retains a documented controller-mapping defect and receives no runtime admission. This file-level grant excludes all source APIs, generated targets, private inputs, debugger/client dependencies, captured output and recovered/generated source they consume.

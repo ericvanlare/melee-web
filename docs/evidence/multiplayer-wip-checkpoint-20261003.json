@@ -1,0 +1,86 @@
+{
+  "checkpoint": "WIP preservation only, 2026-10-03 America/Los_Angeles",
+  "branch": "codex/wip-multiplayer-handoff-20261003",
+  "base": "c8eb42f5de4f8c6af846d48d4f2fee2783d31c69",
+  "remote_sha": "See the immutable commit URL in the checkpoint comment on issue115; verify git ls-remote origin refs/heads/codex/wip-multiplayer-handoff-20261003 before continuing.",
+  "workstream": "https://github.com/ericvanlare/melee-web/issues/115",
+  "reviewable_pr": "https://github.com/ericvanlare/melee-web/pull/156",
+  "scope": "No implementation, runtime experiments, merge or deployment during checkpointing. Original executable code is unchanged. Helpers are byte-identical copies of selected ignored prototypes, deliberately outside supported targets.",
+  "published_helpers": [
+    {
+      "path": "tools/checkpoints/multiplayer-20261003/hsd-named-metadata/named_objalloc_decode.mjs",
+      "sha256": "1defcf65de069a9bcefb76fbaab65e6b80d9a5ab987ee37cbcf1155723e37aa3",
+      "bytes": 7584,
+      "publication": "byte-identical first-party helper; no runtime/data/source-fragment inputs copied"
+    },
+    {
+      "path": "tools/checkpoints/multiplayer-20261003/hsd-named-metadata/test_named_objalloc_decode.mjs",
+      "sha256": "a5db08c3db3725afd4d6da1667213d5a15f375ad8d357e43ad866bf128bb4ab6",
+      "bytes": 3074,
+      "publication": "byte-identical first-party helper; no runtime/data/source-fragment inputs copied"
+    },
+    {
+      "path": "tools/checkpoints/multiplayer-20261003/source-pad-witness/observer_fragment.inc",
+      "sha256": "8e15135afcfcfeea7530ae5e26f0b00b991b9add852ea7b64e96adcef85c9ee4",
+      "bytes": 4431,
+      "publication": "byte-identical first-party helper; no runtime/data/source-fragment inputs copied"
+    },
+    {
+      "path": "tools/checkpoints/multiplayer-20261003/source-pad-witness/verify_source_pad_witness.py",
+      "sha256": "b30f002f335d5392b4f7757b99e12a4ef89ce2f4b93964fd5485e96ce9e10763",
+      "bytes": 7878,
+      "publication": "byte-identical first-party helper; no runtime/data/source-fragment inputs copied"
+    },
+    {
+      "path": "tools/checkpoints/multiplayer-20261003/native-scheduler/stage_probe_v94.py",
+      "sha256": "19064c8e9295812d926e58ae6205d6e6d9461a25c5d1fd7590390163fd0a447f",
+      "bytes": 20821,
+      "publication": "byte-identical first-party helper; no runtime/data/source-fragment inputs copied"
+    }
+  ],
+  "provenance": "These five project-authored helpers orchestrate existing APIs or decode diagnostic records with synthetic controls; they contain no recovered game/SDK implementation, captured bytes, disc/assets, binaries, credentials or personal paths. Their license does not extend to source APIs, programs or data they use. Recovered/generated HSD source, owning-TU fragments, upstream debugger/client source and GPL/ASM-derived material stay local with their separate provenance.",
+  "tested_vs_untested": {
+    "pr156": "At executable6b6b55d54d8fe6e763b00a2850cdb65fe049d852/base07bcfdfa6f4531ac464eab44ebecb206daa1f0da:1894 tests/141skips, OFF/ON builds, Ready124/two128-byte captures/refusals/one close passed. Review c8 is docs-only after6b; CI12success/2intentional skips.",
+    "hsd_decoder": "Nine synthetic ABI controls passed before copying. Private actual metadata captured14 exact getter matches/20unmatched registry descriptors. Metadata/pointer identities only; payload and restore admission remain false. This copied code has no new runtime validation.",
+    "native_scheduler": "Private V94 passed actual plain-c/T05 stop at0x80390eb4 with exact breakpoint deletion/disconnect; all owned groups/socket absent. Protocol/scheduler boundary only; no PAD, Fighter, state agreement or rollback claim. Parser is copied without new native run.",
+    "source_pad_witness": "UNAPPLIED AND KNOWN WRONG PORT MAPPING. Static source/mock controls previously passed but did not detect the flaw. It has never compiled or run; do not execute unchanged. Fragment derives stats.player_slot-1 although live stats slot is zero-based; P2 slot1 maps incorrectly to port0. No actual input-application proof."
+  },
+  "unresolved": [
+    "Correct source PAD witness using the validated selection/controller settings and owning MatchContext slot mapping; do not infer controller from live stats.player_slot-1. Independently confirm actual APIs before applying.",
+    "Allocator canonical-v6 is a private partial21candidate accessor/13TU bridge with only static preflight. Transaction/adapter/decoder are not integrated, so it is not runnable.",
+    "Raw V92 parser failure and V90 scheduler failure remain retained; V93 is separate reanalysis and V94 is new scoped success.",
+    "Combined source/host/GPU/audio restore, repeated replay, actual browser-versus-desktop input/state agreement, natural four-stock Results/rematch and impairment correction remain OPEN."
+  ],
+  "exact_next_step": [
+    "Start with `git fetch origin codex/wip-multiplayer-handoff-20261003` and inspect this tree and issue115 checkpoint comment.",
+    "Read the private manifest below on the retained test machine. Inspect the pinned original source/session APIs, correct the observer mapping, and add a reversible opt-in transaction plus bounded typed trace exports. Do not start a long chooser/session replay from this WIP fragment.",
+    "Finish private canonical-v6 transaction/adapter/decoder and strict exact-pointer positive/refusal controls, then schedule the shortest actual owner-mapping capture before payload provenance/restore work.",
+    "For native input, reuse V94 fresh debugger profile/lazy-Z1 handling and V57/A7 observer; join actual raw dequeue to attributable post-step Fighter fields. Preserve source order/arithmetic and never inject expected state."
+  ],
+  "private_manifest": {
+    "basename": "multiplayer-wip-private-manifest-20261003.json",
+    "sha256": "edc4d9260cdbbc84cbb464be7b7c9253be5fd795f119bf4c5fce5ac3386706fb",
+    "lookup": "On the retained host, search the policy-defined external melee-web runs directory for this exact basename. Its full path is also in the task final reply and integration handoff.",
+    "contents": "8951 inventoried ignored source files from five root-owned checkouts, per-file hashes, exact private paths, child provenance audits, original branch identities and published-helper map. Inventory is preservation, not an originality or runnable-admission audit of every legacy file.",
+    "local_only_exceptions": "Frozen historical launch recipes/fixtures, source-bound HSD accessor/control/generated fragments, private input/native observer lineages and retained failed evidence remain local. They depend on private assets/runtime/generated source or have not passed source/license/portability review. Preserve them; publish no broad work-directory copy. The five portable helper selections above are the intended separable source copied in this checkpoint."
+  },
+  "historical_source_checkpoints": [
+    {
+      "branch": "codex/wip-multiplayer-original-profile-20261003",
+      "sha": "2c3ff61907e9abdcc24845be8beff6a981eb86c1",
+      "reason": "six old commits are patch-equivalent to published source-profile history"
+    },
+    {
+      "branch": "codex/wip-multiplayer-original-initializer-20261003",
+      "sha": "e79d8b669d34d9cdd987dbf0ca45ce39ae338021",
+      "reason": "preserve original initializer/profile source; current integration branch has diverged"
+    },
+    {
+      "branch": "codex/wip-multiplayer-bootstrap-before-aurora-20261003",
+      "sha": "43ae163ff99513a101ef95ac8a3cf67984565a8a",
+      "reason": "pre-rebase source/evidence identity; executable work superseded by PR156 c8"
+    }
+  ],
+  "resources": "No owned runtime/browser/native/server process active; all children stopped. Existing incremental builds intentionally retained for future resume; proprietary/private data stays ignored.",
+  "acceptance": "The ambitious browser-versus-desktop match/rematch and rollback objective remains incomplete. This branch is a recoverable checkpoint, not integration-ready implementation."
+}
