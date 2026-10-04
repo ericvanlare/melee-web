@@ -1396,6 +1396,9 @@ bool startup_pipeline_service_allowed(){
 void schedule_startup_pipeline_service();
 void startup_pipeline_service_callback(void*){
  startup_pipeline_service_scheduled=false;
+ // This independent timer can run before tick consumes the terminal signal.
+ // Query owner state without draining commands or changing lifecycle intent.
+ if(EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;}))return;
  if(!startup_pipeline_service_allowed())return;
  const AuroraStats* stats=aurora_get_stats();
  if(!stats||stats->queuedPipelines==0)return;
@@ -1438,10 +1441,20 @@ void service_render_cache_writes(){
         ok,flushed,duration);
 }
 void tick(){
- // A hidden/frozen interval may contain no callback at all. Consume the JS
- // boundary before polling input or either clock; running/manual pause intent
- // is unchanged and only inactive wall time is excluded from source debt.
- if(EM_ASM_INT({return window.menuServiceCommands?.() === 1 ? 1 : 0;})){
+ // Consume owner failure and lifecycle suspension before source or clock work.
+ // A hidden/frozen interval may contain no callback at all; its handoff leaves
+ // running/manual pause intent unchanged and excludes only inactive wall time.
+ const int owner_action=EM_ASM_INT({return window.menuServiceCommands?.() || 0;});
+ if(owner_action<0){
+  // A terminal JS/audio failure is consumed only at this source-free boundary.
+  // Preserve the first owner error and frozen scene for diagnostics; recovery
+  // requires a new document, so no native preparation or source work may follow.
+  running=false;faulted=true;
+  menu_clock.reset();audio_clock.reset();
+  emscripten_cancel_main_loop();
+  return;
+ }
+ if(owner_action==1){
   menu_clock.reset();audio_clock.reset();
  }
  service_render_cache_writes();

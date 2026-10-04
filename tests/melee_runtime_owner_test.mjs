@@ -42,7 +42,9 @@ const diagnosticsRetentionMode = diagnosticsRetentionCheckpoint || diagnosticsRe
   diagnosticsRetentionHiddenFatal ||
   diagnosticsRetentionEmptyThenDestroy ||
   diagnosticsRetentionFailedThenDestroy || diagnosticsMatureDelivery || diagnosticsNormalDeliveryFreshness;
-const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode ||
+const fatalAudioProcessor = process.argv.includes('--fatal-audio-processor');
+const fatalAudioOutput = fatalAudioProcessor || process.argv.includes('--fatal-audio-output');
+const diagnosticsKnownHost = fatalAudioOutput || process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode ||
   diagnosticsMatureDelivery || diagnosticsNormalDeliveryFreshness;
 const diagnosticIdentity = {schema_version: 1, source_commit: 'a'.repeat(40), runtime_hash: 'b'.repeat(16), build_profile: 'player'};
 const diagnosticFetches = [];
@@ -138,7 +140,9 @@ globalThis.AudioContext = class {
 };
 let holdRenderAck = false;
 const pendingRenderAcks = [];
+let lastAudioNode;
 globalThis.AudioWorkletNode = class {
+  constructor() { lastAudioNode = this; }
   port = {postMessage: data => {
     calls.push(['audioMessage', data.type, data.enabled, data.id]);
     if (data.type === 'render-ready-request') {
@@ -421,6 +425,64 @@ if (startupCacheTimeout) {
   process.exit(0);
 }
 assert.equal(player.getState().canImport, true);
+assert.equal(window.menuOwnerStopped(), false);
+if (process.argv.includes('--fatal-native-handoff') || process.argv.includes('--fatal-command-batch')) {
+  phase = 1; running = true; window.menuFrame(true);
+  const firstError = 'Controlled original runtime failure';
+  const pendingCalls = [];
+  const first = owner.boundary(() => {
+    pendingCalls.push('first');
+    if (process.argv.includes('--fatal-command-batch')) owner.stop(Error(firstError));
+    return 1;
+  });
+  const second = owner.boundary(() => { pendingCalls.push('second'); return 2; });
+  const outcomes = Promise.allSettled([first, second]);
+  if (process.argv.includes('--fatal-native-handoff')) owner.stop(Error(firstError));
+  const inputCalls = calls.filter(row => row[0] === 'activity').length;
+  if (process.argv.includes('--fatal-native-handoff')) {
+    assert.equal(window.menuOwnerStopped(), true, 'Independent callbacks can observe terminal state without draining commands');
+    assert.deepEqual(pendingCalls, []);
+  }
+  assert.equal(window.menuServiceCommands(), -1,
+    'Terminal owner requests native cancellation at the next safe callback boundary');
+  assert.equal(window.menuServiceCommands(), -1, 'Terminal cancellation remains sticky');
+  assert.equal(calls.filter(row => row[0] === 'activity').length, inputCalls,
+    'Terminal handoff does not republish input activity');
+  assert.deepEqual(pendingCalls, process.argv.includes('--fatal-command-batch') ? ['first'] : [],
+    'A fault within a detached command batch prevents its remaining commands from running');
+  assert.ok((await outcomes).every(result => result.status === 'rejected'),
+    'All commands interrupted by the terminal failure reject');
+  owner.stop(Error('Later error must not replace the first failure'));
+  assert.equal(player.getState().message, firstError);
+  assert.equal(player.getState().requiresReload, true);
+  console.log('Shared runtime owner: fatal handoff is sticky, rejects queued commands and preserves the first failure.');
+  process.exit(0);
+}
+if (fatalAudioOutput) {
+  await owner.prepareAudio();
+  phase = 1; running = true; window.menuFrame(true);
+  await Promise.resolve();
+  const nativeMutationsBefore = calls.filter(row => ['pause', 'unload', 'launch'].includes(row[0])).length;
+  const firstAudioError = fatalAudioProcessor ? 'Game audio stopped unexpectedly. Reload to recover.' : 'Audio output queue overflow';
+  if (fatalAudioProcessor) lastAudioNode.onprocessorerror();
+  else lastAudioNode.port.onmessage({data: {error: firstAudioError}});
+  assert.equal(player.getState().requiresReload, true,
+    'A worklet failure makes the shared owner terminal');
+  assert.equal(player.getState().message, firstAudioError);
+  assert.equal(calls.filter(row => ['pause', 'unload', 'launch'].includes(row[0])).length, nativeMutationsBefore,
+    'Asynchronous worklet failure must not re-enter a native pause/unload call');
+  assert.equal(window.menuServiceCommands(), -1,
+    'The next native-owned handoff receives the terminal signal');
+  lastAudioNode.port.onmessage({data: {error: 'Later worklet error'}});
+  assert.equal(player.getState().message, firstAudioError, 'Keep the first failure');
+  await new Promise(resolve => setTimeout(resolve, 1200));
+  assert.equal(diagnosticFetches.length, 1, 'The terminal audio incident is delivered once while inactive');
+  const report = JSON.parse(diagnosticFetches[0].body);
+  assert.equal(report.incident.reason, 'runtime_failure');
+  assert.ok(!diagnosticFetches[0].body.includes(firstAudioError), 'Error text stays outside sanitized diagnostics');
+  console.log('Shared runtime owner: worklet failure reaches terminal native handoff and one sanitized incident.');
+  process.exit(0);
+}
 if (diagnosticsKnownHost) {
   const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
   async function pumpBoundary(promise) {
@@ -1219,6 +1281,8 @@ const destroyed = await pump(player.destroy());
 assert.equal(destroyed.requiresReload, true);
 assert.equal(audioClosed, withAudio);
 assert.equal(player.getState().state, 'destroyed');
+assert.equal(window.menuOwnerStopped(), true);
+assert.equal(window.menuServiceCommands(), -1, 'Destroyed owners stop future native callbacks');
 assert.equal(player.getState().canImport, false);
 await assert.rejects(player.start(), /valid local disc/);
 assert.equal(calls.filter(row => row[0] === 'loader').length, 1);
