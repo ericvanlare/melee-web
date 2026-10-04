@@ -86,6 +86,20 @@ process group exited. The receipt keeps the original measurements separate
 from these new runner/build/test identities; the compiled producer and wrapper
 did not change.
 
+The current-main revalidation is based on merged Aurora prerequisite
+`07bcfdfa6f4531ac464eab44ebecb206daa1f0da`. At `6b6b55d54d8fe6e763b00a2850cdb65fe049d852`,
+all four mock controls additionally proved that partial initialization owns a
+live resource and successful close releases it; rejected or throwing close
+retains it and records one attempt. Normal OFF and opt-in ON builds passed in
+31.693 and 19.463 seconds; actual Wasm exports remained
+zero and seven diagnostic functions. The real fixture again reached Ready at
+tick 124, compared two complete records byte for byte, passed all four
+refusal checks, and closed once. The full suite passed 1,894 tests with
+141 skips in 354.949 seconds. All 1,707 tracked source pins remained
+unchanged during each phase and all owned process groups exited. The OFF build
+preceded only the test change; its exact compiled source head and new Wasm
+identities remain separate from historical receipts.
+
 Arena payloads, SDK heaps and allocator free chains, HSD object/process graphs,
 source-memory ownership, mutable Wasm globals/tables, callback graphs, host
 objects, renderer/GPU, browser clocks/input, Web Audio and external effects remain

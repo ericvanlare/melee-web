@@ -295,5 +295,169 @@
       "source_unchanged": true,
       "compiled_artifacts_identical_to_original_enabled_build": true
     }
+  },
+  "merged_main_validation": {
+    "base_main": "07bcfdfa6f4531ac464eab44ebecb206daa1f0da",
+    "source_head": "6b6b55d54d8fe6e763b00a2850cdb65fe049d852",
+    "scope": "current merged Aurora prerequisite; strengthened partial-init mock resource ownership; unchanged compiled bootstrap producer/wrapper and runner",
+    "lifecycle_controls": {
+      "tests": 4,
+      "result": "passed",
+      "boundary": "Every init path creates a live mock allocation before refusal/throw; successful close releases it; refused/thrown normal close retains it; exactly one close on every path",
+      "test_source_sha256": "6e1763720709f3299ca3bf4826a463065633e4bdd79ed6bd9375516b909b6b25"
+    },
+    "builds": {
+      "off": {
+        "source_head": "3ff7e109ab007513a2b0db0a0fb5067c709d99f5",
+        "elapsed_seconds": 31.692904541036114,
+        "receipt_sha256": "439e8eadbbca35f122500e24d85a915f1feb4723add6ed30967983e66b745046",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1707,
+        "source_unchanged": true
+      },
+      "on": {
+        "source_head": "6b6b55d54d8fe6e763b00a2850cdb65fe049d852",
+        "elapsed_seconds": 19.463042000075802,
+        "receipt_sha256": "9ae50e1d0f22180efce180761ae6c3f64d263c6405ac55e340f8a9fc6027cd26",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1707,
+        "source_unchanged": true
+      }
+    },
+    "off_build_test_only_successor": {
+      "source_head": "6b6b55d54d8fe6e763b00a2850cdb65fe049d852",
+      "compiled_source_head": "3ff7e109ab007513a2b0db0a0fb5067c709d99f5",
+      "only_intervening_change": "tests/test_gameplay_bootstrap_probe_cleanup.py"
+    },
+    "artifacts": {
+      "off": [
+        {
+          "name": "gameplay_snapshot_probe.js",
+          "bytes": 338938,
+          "sha256": "cda1f5ac859d01f3dff5c59f39968c4536b8f3c061cb27fc43dce9b0540c7076"
+        },
+        {
+          "name": "gameplay_snapshot_probe.wasm",
+          "bytes": 104900091,
+          "sha256": "18641191d8176739312a40f39bd8fd553a00b6d305cda8a8545af176d5b2b8d5"
+        }
+      ],
+      "on": [
+        {
+          "name": "gameplay_snapshot_probe.js",
+          "bytes": 343193,
+          "sha256": "4359170cda094f659b0b844f2e6c8e073d859f2c06a3771582426022051fd16d"
+        },
+        {
+          "name": "gameplay_snapshot_probe.wasm",
+          "bytes": 104906140,
+          "sha256": "8e07c039a3bf455e710703c477476a21c697ba7c24051ab1cdfc10f01a6108f4"
+        }
+      ]
+    },
+    "actual_exports": {
+      "off": {
+        "functions": 98,
+        "diagnostic_functions": [],
+        "audit_sha256": "3e0d8c5afd731190b98152c282256be82d79d316964c20ce2f313bdbd68933f2"
+      },
+      "on": {
+        "functions": 105,
+        "diagnostic_functions": [
+          "melee_web_gameplay_bootstrap_state_abi_size",
+          "melee_web_gameplay_bootstrap_state_abi_version",
+          "melee_web_gameplay_bootstrap_state_capture",
+          "melee_web_gameplay_bootstrap_state_probe_identity",
+          "melee_web_gameplay_bootstrap_state_schema",
+          "melee_web_gameplay_bootstrap_state_source_c_identity",
+          "melee_web_gameplay_bootstrap_state_source_h_identity"
+        ],
+        "audit_sha256": "bf0c7057e2f63b51c6e2b6e330a882a6832564786193a3b7026b9672c436ceeb"
+      }
+    },
+    "real_fixture": {
+      "result": "passed",
+      "ready_steps": 124,
+      "captures": 2,
+      "quiescence": {
+        "stable_bytes": true,
+        "generation": "1",
+        "ticks": "124"
+      },
+      "refusals": [
+        {
+          "label": "before world initialization",
+          "returned_zero": true,
+          "output_unchanged": true
+        },
+        {
+          "label": "wrong output size",
+          "returned_zero": true,
+          "output_unchanged": true
+        },
+        {
+          "label": "null output",
+          "returned_zero": true,
+          "output_unchanged": true
+        },
+        {
+          "label": "after world close",
+          "returned_zero": true,
+          "output_unchanged": true
+        }
+      ],
+      "source_cleanup": {
+        "required": true,
+        "attempted": true,
+        "success": true,
+        "phase": "normal source close",
+        "returncode": 1,
+        "error": null
+      },
+      "runner_sha256": "b821e06f51892a94d2ae0969dde6cd86aae2abc9a2b340ac6be448ea0df17cde",
+      "report_sha256": "903df0e14b3dafae398549fcbb501e2416dfa2ea1b2222457c6cc10762640d60",
+      "root_audit_sha256": "0d0f53dee7b15df136abc387717ee238e4faa57287388006dbff756a76d5cf01",
+      "assets_after_observation_match_frozen_original_baseline": true,
+      "asset_files": 34,
+      "phase": {
+        "source_head": "6b6b55d54d8fe6e763b00a2850cdb65fe049d852",
+        "elapsed_seconds": 0.5684768750797957,
+        "receipt_sha256": "2e9f5214c2fa230ba68a9ef1b8249f6f7080689cc632999e3b4ba8890e34fb73",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1707,
+        "source_unchanged": true
+      }
+    },
+    "full_suite": {
+      "tests": 1894,
+      "skipped": 141,
+      "seconds": 354.949,
+      "result": "passed",
+      "phase": {
+        "source_head": "6b6b55d54d8fe6e763b00a2850cdb65fe049d852",
+        "elapsed_seconds": 355.2302888748236,
+        "receipt_sha256": "63b534cbb8ca57260416ba1494097e283ba970e7d96965ecb8975b6d6f61d893",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1707,
+        "source_unchanged": true
+      }
+    },
+    "private_phase_wrappers": [
+      {
+        "artifact": "run_phase.py",
+        "role": "current-main OFF build at the rebased pre-test source head",
+        "sha256": "436517bb837faa8055de72a4db8645bf630aa3ead0cc6d605ec60ad8220bebc3"
+      },
+      {
+        "artifact": "run_phase_post_mock.py",
+        "role": "current-head ON build, source observation and full suite",
+        "sha256": "773cce318168ff4d77c3a8696a14174705c4ac0c819bfdf3edd519a5c515c3d7"
+      }
+    ],
+    "runtime_admission": false
   }
 }
