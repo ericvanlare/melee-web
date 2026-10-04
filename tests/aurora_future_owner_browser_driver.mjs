@@ -7,6 +7,7 @@ import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {assertNativeFutureOrder} from './aurora_future_owner_probe.mjs';
 
 function parseArgs(argv) {
   const values = {};
@@ -110,6 +111,7 @@ function strictProbeResult(result) {
   if (!result || result.evidence !== 'ABI-only-real-webgpu-populated-future-observation')
     throw new Error('populated WebGPU evidence label mismatch');
   if (result.result !== 'passed') throw new Error(`source probe failed: ${result.failure ?? 'unknown failure'}`);
+  assertNativeFutureOrder(result);
   if (result.host_setup !== 'none' || result.webgpu_path !== 'native-emdawn-c-api' ||
       result.settlement !== 'observed-before-and-after-queue-future' ||
       result.graph_restore !== 'unsupported')

@@ -46,13 +46,13 @@ python3 scripts/agent_workspace.py run -- \
 The HTML fixture is a subsequent real-HTTP headless-browser boundary. It keeps
 speaker output silent, reports console/page errors and cleanup, and carries a
 data-URL favicon so an automatic request cannot create an unrelated 404. The
-driver's `--timeout-ms` is a whole-process deadline; it reserves ten seconds
-for bounded CDP, screenshot, detach, context, browser, and HTTP-server close
-operations. A close timeout is retained as failure and requires the outer
-ProcessSupervisor to kill/reap the exact owned process group; the driver never
-signals unrelated Chrome processes. No compiled artifact, browser run, WebGPU
-result, gameplay result, or restore claim is included in this preparation
-packet.
+driver's `--timeout-ms` is a wall-clock budget for the phases it explicitly
+times and for bounded cleanup. It reserves ten seconds for CDP, screenshot,
+detach, context, browser, and HTTP-server close operations; it does not guarantee
+process termination or cancel the underlying operation after a timeout. Run it
+under the repository's ProcessSupervisor, which owns its exact process group.
+The outer owner must also track and verify Chrome descendants that create their
+own groups. This preparation description makes no gameplay or restore claim.
 
 Once the opt-in target has produced a fresh bundle and the page/driver files
 have been staged beside its `.js`/`.wasm` output, the corresponding bounded
@@ -84,3 +84,10 @@ refusal without invoking a getter, identity replacement, invalid output and
 ordinal zero-write refusal, disposal/re-capture, independent module state,
 and the explicit retained-reference/tracked-entry budgets. Those budgets are
 diagnostic resource limits, not authored WebGPU table bounds.
+
+The native callback-before-Future-publication bit is rejected at every recorded
+checkpoint. Cleanup observes one event-loop turn after destruction; it does
+not establish that no callback can arrive later. Accessor disposal releases
+only its private references and labels, while the host sparse stores remain
+untouched. Buffer arguments follow the Wasm32 unsigned ABI, and writes are
+limited to the fixed record size.

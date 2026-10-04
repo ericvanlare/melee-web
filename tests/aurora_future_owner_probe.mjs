@@ -181,6 +181,18 @@ function readObserverDiagnostics(module) {
   }
 }
 
+// Native state is cumulative, so any early publication-order failure must
+// remain fatal at all later checkpoints, including the bounded close turn.
+export function assertNativeFutureOrder(result) {
+  for (const name of ['before_adapter_state', 'before_work_state', 'after_work_state', 'cleanup_state']) {
+    const state = result[name];
+    if (!Number.isInteger(state) || state < 0 || state > 0xffffffff)
+      throw new Error(`invalid native state checkpoint: ${name}`);
+    if ((state & STATE.CALLBACK_BEFORE_FUTURE) !== 0)
+      throw new Error(`native callback preceded Future publication: ${name}`);
+  }
+}
+
 export async function collect(moduleURL) {
   const imported = await import(moduleURL);
   const factory = factoryFromModule(imported);
@@ -310,6 +322,13 @@ export async function collect(moduleURL) {
       (result.cleanup_state & (1 << 18)) === 0) {
     result.result = 'failed';
     result.failure = 'native device-lost Destroyed callback was not the exact owned close event';
+    return result;
+  }
+  try {
+    assertNativeFutureOrder(result);
+  } catch (error) {
+    result.result = 'failed';
+    result.failure = String(error?.stack ?? error);
     return result;
   }
   result.result = 'passed';

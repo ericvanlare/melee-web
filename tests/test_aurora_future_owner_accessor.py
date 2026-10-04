@@ -59,6 +59,16 @@ class AuroraFutureOwnerAccessorTests(OwnedWorkspaceTests):
         self.assertFalse(result.get("webgpuDevice"))
         self.assertEqual(len(result.get("cases", [])), 6)
 
+    def test_native_future_order_perturbation(self):
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("Node.js unavailable")
+        result = subprocess.run(
+            [node, str(ROOT / "tests" / "aurora_future_owner_order_controls.mjs")],
+            cwd=ROOT, text=True, capture_output=True, timeout=10,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_native_refuses_without_writing_output(self):
         compiler = shutil.which("c++")
         if compiler is None:
