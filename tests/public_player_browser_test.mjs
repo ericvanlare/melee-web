@@ -204,7 +204,8 @@ async function readNativeMenuState() {
     running: typeof Module?._melee_web_native_menu_running === 'function'
       ? Module._melee_web_native_menu_running() : 0,
     status: document.querySelector('#status')?.textContent || '',
-    runtimeError: document.querySelector('#status')?.dataset.runtimeError || null,
+    runtimeError: document.querySelector('#status')?.dataset.runtimeError ||
+      (document.querySelector('#error-dialog[open]') ? document.querySelector('#error')?.textContent || 'Application error' : null),
   }));
 }
 const isTimingPaused = state =>

@@ -18,9 +18,39 @@ const adapterRetry = process.argv.includes('--adapter-retry');
 const adapterTimeoutLate = process.argv.includes('--adapter-timeout-late');
 const adapterDeadlineSpan = process.argv.includes('--adapter-deadline-span');
 const lifecycleHandoff = process.argv.includes('--lifecycle-handoff');
-const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host');
+const diagnosticsRetentionCheckpoint = process.argv.includes('--diagnostics-retention-checkpoint');
+const diagnosticsRetentionDestroy = process.argv.includes('--diagnostics-retention-destroy');
+const diagnosticsRetentionDenied = process.argv.includes('--diagnostics-retention-denied');
+const diagnosticsRetentionStalled = process.argv.includes('--diagnostics-retention-stalled');
+const diagnosticsRetentionQuota = process.argv.includes('--diagnostics-retention-quota');
+const diagnosticsRetentionResumeCancel = process.argv.includes('--diagnostics-retention-resume-cancel');
+const diagnosticsRetentionFollowup = process.argv.includes('--diagnostics-retention-followup');
+const diagnosticsRetentionOrdinaryPauseDestroy = process.argv.includes('--diagnostics-retention-ordinary-pause-destroy');
+const diagnosticsRetentionHiddenFatal = process.argv.includes('--diagnostics-retention-hidden-fatal');
+const diagnosticsRetentionEmptyThenDestroy = process.argv.includes('--diagnostics-retention-empty-destroy');
+const diagnosticsRetentionFailedThenDestroy = process.argv.includes('--diagnostics-retention-failed-destroy');
+const diagnosticsMatureDeliverySlowLoad = process.argv.includes('--diagnostics-mature-delivery-slow-load');
+const diagnosticsMatureDeliveryPriorRead = process.argv.includes('--diagnostics-mature-delivery-prior-read');
+const diagnosticsMatureDeliveryEvicted = process.argv.includes('--diagnostics-mature-delivery-evicted') || diagnosticsMatureDeliveryPriorRead;
+const diagnosticsMatureDeliveryNonEmptyEvicted = process.argv.includes('--diagnostics-mature-delivery-nonempty-evicted');
+const diagnosticsNormalDeliveryFreshness = process.argv.includes('--diagnostics-normal-delivery-freshness');
+const diagnosticsMatureDelivery = process.argv.includes('--diagnostics-mature-delivery') || diagnosticsMatureDeliverySlowLoad ||
+  diagnosticsMatureDeliveryEvicted || diagnosticsMatureDeliveryNonEmptyEvicted;
+const diagnosticsRetentionMode = diagnosticsRetentionCheckpoint || diagnosticsRetentionDestroy ||
+  diagnosticsRetentionDenied || diagnosticsRetentionStalled || diagnosticsRetentionQuota ||
+  diagnosticsRetentionResumeCancel || diagnosticsRetentionFollowup || diagnosticsRetentionOrdinaryPauseDestroy ||
+  diagnosticsRetentionHiddenFatal ||
+  diagnosticsRetentionEmptyThenDestroy ||
+  diagnosticsRetentionFailedThenDestroy || diagnosticsMatureDelivery || diagnosticsNormalDeliveryFreshness;
+const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode ||
+  diagnosticsMatureDelivery || diagnosticsNormalDeliveryFreshness;
 const diagnosticIdentity = {schema_version: 1, source_commit: 'a'.repeat(40), runtime_hash: 'b'.repeat(16), build_profile: 'player'};
 const diagnosticFetches = [];
+const diagnosticStorageRecords = [];
+let diagnosticStorageMergeCalls = 0;
+let diagnosticStorageLoadCalls = 0;
+let releaseDiagnosticStorageFirst = null;
+let releaseDiagnosticStorageLoad = null;
 let diagnosticPreference = 'on';
 if (diagnosticsKnownHost) {
   globalThis.location = {origin: 'https://webmelee.gg'};
@@ -29,6 +59,39 @@ if (diagnosticsKnownHost) {
     return {status: 201};
   };
   globalThis.indexedDB = {open() { throw Object.assign(new Error('denied'), {name: 'NotAllowedError'}); }};
+  if (diagnosticsRetentionMode && !diagnosticsRetentionDenied) {
+    globalThis.testDiagnosticsStorage = {
+      load() {
+        ++diagnosticStorageLoadCalls;
+        if (diagnosticsMatureDeliverySlowLoad && diagnosticStorageLoadCalls === 1) {
+          return new Promise(resolve => {
+            releaseDiagnosticStorageLoad = () => resolve(diagnosticStorageRecords.slice());
+          });
+        }
+        return diagnosticStorageRecords.slice();
+      },
+      merge(records) {
+        ++diagnosticStorageMergeCalls;
+        if (diagnosticsRetentionStalled) return new Promise(() => {});
+        if (diagnosticsRetentionQuota) {
+          return Promise.reject(Object.assign(new Error('quota'), {name: 'QuotaExceededError'}));
+        }
+        if ((diagnosticsRetentionFollowup || diagnosticsRetentionOrdinaryPauseDestroy || diagnosticsRetentionHiddenFatal) &&
+            diagnosticStorageMergeCalls === 1) {
+          return new Promise(resolve => {
+            releaseDiagnosticStorageFirst = () => {
+              diagnosticStorageRecords.splice(0, diagnosticStorageRecords.length, ...records);
+              resolve({records, bytes: records.length, evictedCount: 0, malformedCount: 0});
+            };
+          });
+        }
+        if (diagnosticsRetentionFailedThenDestroy && diagnosticStorageMergeCalls === 1)
+          return Promise.reject(Object.assign(new Error('quota'), {name: 'QuotaExceededError'}));
+        diagnosticStorageRecords.splice(0, diagnosticStorageRecords.length, ...records);
+        return {records, bytes: records.length, evictedCount: 0, malformedCount: 0};
+      },
+    };
+  }
   globalThis.localStorage = {
     getItem() { return diagnosticPreference; },
     setItem(_key, value) { diagnosticPreference = value; },
@@ -36,9 +99,16 @@ if (diagnosticsKnownHost) {
 }
 if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
-const source = original.replace(
+let source = original.replace(
   "import {loadNativeGameDisc, openNativeGameDiscSession} from './runtime-assets.mjs';",
   'const loadNativeGameDisc = globalThis.testDiscReader; const openNativeGameDiscSession = globalThis.testOpenNativeGameDiscSession;');
+if (diagnosticsRetentionMode && !diagnosticsRetentionDenied) {
+  source = source.replace(
+    'createRuntimeDiagnostics({identity:',
+    'createRuntimeDiagnostics({storage: globalThis.testDiagnosticsStorage, identity:');
+  assert.match(source, /createRuntimeDiagnostics\(\{storage: globalThis\.testDiagnosticsStorage,/,
+    'Retention fixture must install the controlled local storage adapter');
+}
 let phase = 0, running = false, nextPointer = 16,
   cacheWaits = startupCacheDelay ? 2 : startupCacheTimeout ? Number.MAX_SAFE_INTEGER : 0, audioClosed = false;
 let rendererStarted = false, cacheIdleCalls = 0;
@@ -364,15 +434,331 @@ if (diagnosticsKnownHost) {
     if (failure) throw failure;
     return value;
   }
+  if (diagnosticsMatureDeliveryPriorRead) {
+    // Initial idle collection can complete before the first incident exists.
+    // A later young incident must invalidate that retained-store read even
+    // if it leaves the in-memory ring before its next delivery opportunity.
+    await wait(40);
+    assert.ok(diagnosticStorageLoadCalls > 0, 'initial idle collection reads storage');
+    assert.equal(owner.diagnostics.exportReports().incidents.length, 0);
+  }
   const sample = [100, 12, 1, 2, 3, 4, 5, 6, 9, 1, 2, 3, 4, 5, 6, 7, 8, 1];
   phase = 1; running = true; window.menuFrame(true);
   owner.callbacks.menuDiagnosticSample(...sample);
-  const incidentId = owner.callbacks.menuDiagnosticIncident(1, 9, 8, 12, 1, 1);
-  assert.match(incidentId, /^incident-[0-9]+$/);
+  let incidentId = null;
+  if (!diagnosticsRetentionEmptyThenDestroy) {
+    incidentId = owner.callbacks.menuDiagnosticIncident(1, 9, 8, 12, 1, 1);
+    assert.match(incidentId, /^incident-[0-9]+$/);
+  }
   const activeReport = owner.diagnostics.exportReports();
   assert.deepEqual(activeReport.identity, diagnosticIdentity, 'Known HTTPS host keeps caller-provided safe identity');
   assert.equal(activeReport.native.callback_count, 1, 'Native scalar callback crosses the owner boundary');
-  assert.equal(activeReport.incidents.length, 1, 'Structured incident trigger crosses the owner boundary');
+  assert.equal(activeReport.incidents.length, diagnosticsRetentionEmptyThenDestroy ? 0 : 1,
+    'Structured incident trigger crosses the owner boundary');
+  if (diagnosticsRetentionMode && !diagnosticsMatureDelivery && !diagnosticsNormalDeliveryFreshness) {
+    const dispatch = type => { for (const listener of listeners.get(type) || []) listener(); };
+    phase = 1; running = false; window.menuFrame(false);
+    const drainMicrotasks = async count => {
+      for (let i = 0; i < count; i++) await Promise.resolve();
+    };
+    const destroyBeforeDeferredPersistence = async () => {
+      let destroySettled = false, destroyFailure = null, destroyedBeforePersist = null;
+      const destroyStartedAt = Date.now();
+      const destroyPromise = player.destroy().then(value => {
+        destroyedBeforePersist = value;
+        destroySettled = true;
+      }, error => {
+        destroyFailure = error;
+        destroySettled = true;
+      });
+      // Drain only native command/microtask boundaries. Do not wait for a
+      // timer: the regression observes the owner before deferred persistence.
+      for (let i = 0; !destroySettled && i < 64; i++) {
+        window.menuServiceCommands();
+        await Promise.resolve();
+      }
+      await destroyPromise;
+      if (destroyFailure) throw destroyFailure;
+      assert.equal(destroySettled, true, 'Orderly destroy must finish through controlled native boundaries');
+      assert.equal(destroyedBeforePersist.requiresReload, true);
+      return Date.now() - destroyStartedAt;
+    };
+    if (diagnosticsRetentionResumeCancel) {
+      document.hidden = true;
+      dispatch('visibilitychange');
+      document.hidden = false;
+      dispatch('visibilitychange');
+      dispatch('pageshow');
+      dispatch('resume');
+      await drainMicrotasks(8);
+      assert.equal(diagnosticStorageMergeCalls, 0,
+        'Hide followed by visible/resume before the checkpoint microtask must not serialize');
+      phase = 1; running = true; window.menuFrame(true);
+      owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+      await drainMicrotasks(8);
+      assert.equal(diagnosticStorageMergeCalls, 0,
+        'Active gameplay after a cancelled checkpoint must not serialize diagnostics');
+      assert.equal(diagnosticFetches.length, 0, 'Cancelled lifecycle checkpoint never starts delivery');
+      console.log('Shared runtime owner: lifecycle checkpoint cancels before visible gameplay and stays off the active path.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionFollowup) {
+      document.hidden = true;
+      dispatch('visibilitychange');
+      await drainMicrotasks(6);
+      assert.equal(diagnosticStorageMergeCalls, 1, 'The first suspended checkpoint must reach storage once');
+      assert.equal(typeof releaseDiagnosticStorageFirst, 'function');
+      document.hidden = false;
+      dispatch('visibilitychange');
+      dispatch('pageshow');
+      dispatch('resume');
+      phase = 1; running = true; window.menuFrame(true);
+      owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+      phase = 1; running = false; window.menuFrame(false);
+      document.hidden = true;
+      dispatch('visibilitychange');
+      releaseDiagnosticStorageFirst();
+      await drainMicrotasks(24);
+      assert.ok(diagnosticStorageMergeCalls >= 2,
+        'A later incident after Resume/re-hide gets a fresh storage write');
+      assert.equal(diagnosticStorageRecords.length, 2,
+        'The follow-up write contains both bounded incidents');
+      assert.equal(diagnosticFetches.length, 0, 'Suspended follow-up remains local');
+      console.log('Shared runtime owner: delayed lifecycle checkpoint follows a later incident across Resume/re-hide.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionOrdinaryPauseDestroy) {
+      // Let the normal setActive(false) timer begin its older snapshot, then
+      // add an incident and destroy.  Destroy must await that write and force
+      // a fresh checkpoint instead of reusing the old snapshot.
+      await new Promise(resolve => setTimeout(resolve, 0));
+      for (let i = 0; diagnosticStorageMergeCalls === 0 && i < 20; i++)
+        await new Promise(resolve => setTimeout(resolve, 0));
+      assert.equal(diagnosticStorageMergeCalls, 1,
+        'ordinary inactive persistence reaches storage before destroy');
+      assert.equal(typeof releaseDiagnosticStorageFirst, 'function');
+      owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+      let destroySettled = false;
+      const destroyStartedAt = Date.now();
+      const destroyPromise = player.destroy().then(() => { destroySettled = true; });
+      for (let i = 0; !destroySettled && i < 64; i++) {
+        window.menuServiceCommands();
+        await Promise.resolve();
+      }
+      assert.equal(destroySettled, false,
+        'destroy waits for the already pending ordinary persistence');
+      releaseDiagnosticStorageFirst();
+      for (let i = 0; !destroySettled && i < 64; i++) {
+        window.menuServiceCommands();
+        await Promise.resolve();
+      }
+      await destroyPromise;
+      const elapsed = Date.now() - destroyStartedAt;
+      assert.ok(elapsed < 1000);
+      assert.equal(diagnosticStorageMergeCalls, 2,
+        'destroy forces a fresh write after the ordinary persistence settles');
+      assert.equal(diagnosticStorageRecords.length, 2,
+        'fresh destroy snapshot contains the later incident');
+      console.log('Shared runtime owner: destroy refreshes a delayed ordinary inactive snapshot.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionHiddenFatal) {
+      document.hidden = true;
+      dispatch('visibilitychange');
+      owner.stop(Error('private-user-path-must-not-be-reported'));
+      await drainMicrotasks(8);
+      assert.equal(diagnosticStorageMergeCalls, 1,
+        'hidden fatal incident starts one bounded local checkpoint');
+      assert.equal(typeof releaseDiagnosticStorageFirst, 'function');
+      releaseDiagnosticStorageFirst();
+      await drainMicrotasks(24);
+      assert.ok(diagnosticStorageRecords.some(record => record.incident.reason === 'runtime_failure'),
+        'fatal incident reaches the hidden checkpoint through the owner wrapper');
+      assert.equal(diagnosticFetches.length, 0, 'hidden fatal checkpoint remains local');
+      console.log('Shared runtime owner: hidden fatal incident is included in the local checkpoint.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionEmptyThenDestroy) {
+      document.hidden = true;
+      dispatch('visibilitychange');
+      await drainMicrotasks(8);
+      assert.equal(diagnosticStorageMergeCalls, 0, 'Empty checkpoint performs no storage write');
+      document.hidden = false;
+      dispatch('visibilitychange');
+      dispatch('pageshow');
+      dispatch('resume');
+      phase = 1; running = true; window.menuFrame(true);
+      owner.callbacks.menuDiagnosticIncident(1, 9, 8, 12, 1, 1);
+      const elapsed = await destroyBeforeDeferredPersistence();
+      assert.ok(elapsed < 1000);
+      assert.equal(diagnosticStorageRecords.length, 1,
+        'A fresh destroy snapshot is not suppressed by an earlier empty checkpoint');
+      console.log('Shared runtime owner: empty lifecycle checkpoint does not suppress later destroy persistence.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionFailedThenDestroy) {
+      document.hidden = true;
+      dispatch('visibilitychange');
+      await drainMicrotasks(8);
+      const failedReport = owner.diagnostics.exportReports();
+      assert.equal(failedReport.flags.persistence_failed, true,
+        'The first lifecycle checkpoint failure is observable');
+      document.hidden = false;
+      dispatch('visibilitychange');
+      dispatch('pageshow');
+      dispatch('resume');
+      phase = 1; running = true; window.menuFrame(true);
+      owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+      const elapsed = await destroyBeforeDeferredPersistence();
+      assert.ok(elapsed < 1000);
+      assert.equal(diagnosticStorageMergeCalls, 2,
+        'Destroy retries a fresh snapshot after a completed checkpoint failure');
+      assert.equal(diagnosticStorageRecords.length, 2);
+      console.log('Shared runtime owner: failed lifecycle checkpoint does not suppress fresh destroy persistence.');
+      process.exit(0);
+    }
+    if (diagnosticsRetentionCheckpoint || diagnosticsRetentionDenied) {
+      // Keep the owner in the same task: the old 0 ms persistence callback has
+      // not run yet. Both lifecycle signals must share one local checkpoint.
+      document.hidden = true;
+      dispatch('visibilitychange');
+      dispatch('pagehide');
+      dispatch('freeze');
+      await drainMicrotasks(8);
+      assert.equal(diagnosticFetches.length, 0,
+        'Lifecycle checkpoints never start network delivery while hidden');
+      if (diagnosticsRetentionDenied) {
+        const deniedReport = owner.diagnostics.exportReports();
+        assert.equal(deniedReport.flags.storage_denied, true,
+          'Denied lifecycle checkpoint is represented without throwing onto the owner');
+        console.log('Shared runtime owner: denied lifecycle checkpoint remains local and isolated.');
+        process.exit(0);
+      }
+      assert.equal(diagnosticStorageRecords.length, 1,
+        'Pagehide/freeze must persist one incident before deferred persistence runs');
+      assert.equal(diagnosticStorageRecords[0].incident.reason, 'simulation_debt');
+      console.log('Shared runtime owner: pagehide/freeze checkpoint persists before destroy.');
+      process.exit(0);
+    }
+    const destroyElapsed = await destroyBeforeDeferredPersistence();
+    assert.ok(destroyElapsed < 1000,
+      'Orderly destroy must remain bounded when local diagnostics storage stalls');
+    if (diagnosticsRetentionStalled) {
+      assert.equal(diagnosticStorageRecords.length, 0, 'A stalled storage adapter cannot fake a completed checkpoint');
+      console.log('Shared runtime owner: stalled destroy checkpoint times out without trapping teardown.');
+    } else if (diagnosticsRetentionQuota) {
+      const quotaReport = owner.diagnostics.exportReports();
+      assert.equal(quotaReport.flags.persistence_failed, true,
+        'Quota persistence failure is represented without trapping teardown');
+      assert.equal(quotaReport.flags.quota_exceeded, true);
+      console.log('Shared runtime owner: quota destroy checkpoint fails explicitly without trapping teardown.');
+    } else {
+      assert.equal(diagnosticStorageRecords.length, 1,
+        'Orderly destroy must persist one incident before disposing delivery');
+      assert.equal(diagnosticStorageRecords[0].incident.reason, 'simulation_debt');
+      console.log('Shared runtime owner: orderly destroy persists before disposing delivery.');
+    }
+    process.exit(0);
+  }
+  if (diagnosticsNormalDeliveryFreshness) {
+    phase = 1; running = false; window.menuFrame(false);
+    await wait(40);
+    assert.equal(diagnosticStorageRecords.length, 1,
+      'the older snapshot is stored before the post-event observation');
+    owner.diagnostics.longtask({timestamp: performance.now(), duration_ms: 4});
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, 1,
+      'normal inactive collection sends one current report after its postwindow');
+    const payload = JSON.parse(diagnosticFetches.at(-1).body);
+    assert.equal(payload.incident.reason, 'simulation_debt');
+    assert.ok(payload.events.post.some(event => event.type === 'longtask'),
+      'normal collection sends the fresh current post-event context');
+    console.log('Shared runtime owner: normal inactive collection prefers the fresh current report.');
+    process.exit(0);
+  }
+  if (diagnosticsMatureDelivery) {
+    const before = diagnosticFetches.length;
+    if (diagnosticsMatureDeliveryEvicted || diagnosticsMatureDeliveryNonEmptyEvicted) {
+      if (diagnosticsMatureDeliveryNonEmptyEvicted) {
+        // Seed a valid record from a separate session, then leave the real
+        // incident young and absent from storage when the first mature read
+        // runs. This exercises the nonempty-retained edge rather than the
+        // empty-store fallback.
+        await owner.diagnostics.persist();
+        assert.equal(diagnosticStorageRecords.length, 1,
+          'the seed incident reaches the controlled retained store');
+        const unrelated = structuredClone(diagnosticStorageRecords[0]);
+        unrelated.session_id = 'session-prior000000000000';
+        unrelated.incident.id = 'incident-99';
+        unrelated.id = `${unrelated.session_id}:${unrelated.incident.id}`;
+        diagnosticStorageRecords.splice(0, diagnosticStorageRecords.length, unrelated);
+      }
+      const currentIncidentId = owner.diagnostics.exportReports().incidents[0]?.id;
+      assert.equal(currentIncidentId, 'incident-1',
+        'the young current incident has a stable source id before the first pause');
+      phase = 1; running = false; window.menuFrame(false);
+      await wait(40);
+      assert.ok(diagnosticStorageLoadCalls > 0,
+        'the first mature collection reads the nonempty retained store');
+      assert.ok(diagnosticStorageRecords.some(record => record.incident.id === currentIncidentId),
+        'the young incident reaches storage after the first mature read');
+      assert.equal(diagnosticFetches.some(fetch => JSON.parse(fetch.body).incident_id?.endsWith(`:${currentIncidentId}`)), false,
+        'the first mature collection does not send the young current incident');
+      if (diagnosticsMatureDeliveryNonEmptyEvicted)
+        assert.ok(diagnosticFetches.some(fetch => JSON.parse(fetch.body).incident_id?.endsWith(':incident-99')),
+          'the unrelated retained record was valid and delivered');
+      phase = 1; running = true; window.menuFrame(true);
+      for (let i = 0; i < 4; i++) owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+      assert.equal(owner.diagnostics.exportReports().incidents.some(incident => incident.id === currentIncidentId), false,
+        'new incidents actually evicted the first current incident');
+      phase = 1; running = false; window.menuFrame(false);
+      await wait(100);
+      const sentCurrent = diagnosticFetches.some(fetch => {
+        try { return JSON.parse(fetch.body).incident_id?.endsWith(`:${currentIncidentId}`); } catch { return false; }
+      });
+      assert.equal(sentCurrent, true,
+        'an open retained incident survives current-ring eviction after a nonempty retained read');
+      const currentPayload = diagnosticFetches.map(fetch => {
+        try { return JSON.parse(fetch.body); } catch { return null; }
+      }).find(payload => payload?.incident_id?.endsWith(`:${currentIncidentId}`));
+      assert.ok(currentPayload, 'the retained current incident is the delivered report');
+      assert.equal(currentPayload.incident.reason, 'simulation_debt');
+      console.log(`Shared runtime owner: ${diagnosticsMatureDeliveryNonEmptyEvicted ? 'nonempty-retained ' : ''}evicted same-session retained incident remains deliverable.`);
+      process.exit(0);
+    }
+    // The first incident is briefly inactive, then the player resumes before
+    // its postwindow.  It matures while active, so the next inactive edge can
+    // collect it immediately without uploading the newly paused incident.
+    phase = 1; running = false; window.menuFrame(false);
+    await wait(40);
+    for (let i = 0; diagnosticStorageRecords.length === 0 && i < 20; i++) await wait(0);
+    assert.equal(diagnosticStorageRecords.length, 1,
+      'the young same-session incident is present in the retained local snapshot');
+    if (diagnosticsMatureDeliverySlowLoad) {
+      for (let i = 0; typeof releaseDiagnosticStorageLoad !== 'function' && i < 20; i++) await wait(0);
+      assert.equal(typeof releaseDiagnosticStorageLoad, 'function',
+        'the first mature collection is awaiting the controlled retained read');
+    }
+    phase = 1; running = true; window.menuFrame(true);
+    owner.diagnostics.longtask({timestamp: 1500, duration_ms: 4});
+    await wait(1200);
+    owner.callbacks.menuDiagnosticIncident(2, 61, 60, 13, 1, 2);
+    phase = 1; running = false; window.menuFrame(false);
+    if (diagnosticsMatureDeliverySlowLoad) releaseDiagnosticStorageLoad();
+    await wait(100);
+    assert.equal(diagnosticFetches.length, before + 1,
+      'an already mature incident is delivered before the new postwindow expires');
+    assert.equal(JSON.parse(diagnosticFetches.at(-1).body).incident.reason, 'simulation_debt');
+    assert.ok(JSON.parse(diagnosticFetches.at(-1).body).events.post.some(event => event.type === 'longtask'),
+      'same-session young retained data is skipped in favor of the matured current report');
+    assert.equal(diagnosticFetches.some(fetch => JSON.parse(fetch.body).incident.reason === 'audio_debt'), false,
+      'the newly paused incident remains in its postwindow');
+    await wait(1200);
+    assert.equal(diagnosticFetches.length, before + 2,
+      'the newly paused incident still uses the normal bounded postwindow task');
+    console.log('Shared runtime owner: mature inactive diagnostics are delivered before a young incident.');
+    process.exit(0);
+  }
   await owner.prepareAudio();
   assert.ok(calls.some(row => row[0] === 'audioResume'), 'Audio ownership remains on the runtime owner');
   window.menuPreparation('Controlled preparation', true);

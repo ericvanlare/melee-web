@@ -177,6 +177,7 @@ const fixture = globalThis.__runtimeDiagnosticsFixture = {
 const sample = globalThis.menuDiagnosticSample;
 let previousSampleAt = null;
 fixture.resetSamples = () => { fixture.samples.length = 0; previousSampleAt = null; };
+fixture.readRetained = async () => fixture.owner?.diagnostics?.loadRetained?.() || null;
 function recordSample(args, duration) {
   const at = performance.now();
   const sourceFrame = Number.isFinite(Number(args[1])) ? Number(args[1]) : null;
@@ -513,6 +514,29 @@ async function retainPage(page, label) {
   try { await fs.writeFile(path.join(out, `${label}.json`), JSON.stringify(await fixtureState(page), null, 2), {flag: 'wx'}); } catch {}
 }
 
+function assertRetained(retained, identity, incidentId, label) {
+  requireValue(retained && retained.schema === 'melee-web-runtime-diagnostics' && retained.version === 1,
+    `${label} retained report has an unexpected schema`);
+  requireValue(JSON.stringify(retained.identity) === JSON.stringify(identity),
+    `${label} retained report identity changed`);
+  requireValue(Array.isArray(retained.records) && retained.records.length === 1,
+    `${label} retained record count is not exactly one`);
+  const record = retained.records[0];
+  requireValue(record && JSON.stringify(record.identity) === JSON.stringify(identity),
+    `${label} retained record identity changed`);
+  requireValue(record.incident?.id === incidentId && record.incident?.reason === SIMULATION_DEBT_REASON,
+    `${label} retained incident did not survive with its trigger identity`);
+  return {record_count: retained.records.length, incident_id: incidentId};
+}
+
+async function waitForRetained(page, identity, incidentId, label, timeout = 5000) {
+  await page.waitForFunction(expected => Promise.resolve(globalThis.__runtimeDiagnosticsFixture?.readRetained?.())
+    .then(value => value?.records?.some(record => record?.incident?.id === expected) === true)
+    .catch(() => false), incidentId, {timeout, polling: 50});
+  const retained = await page.evaluate(() => globalThis.__runtimeDiagnosticsFixture.readRetained());
+  return assertRetained(retained, identity, incidentId, label);
+}
+
 async function runCollection(browser, url, disc, identity, enabled, timeout, label) {
   const page = await browser.newPage({viewport: {width: 1280, height: 960}});
   try {
@@ -560,30 +584,36 @@ async function runCollection(browser, url, disc, identity, enabled, timeout, lab
   }
 }
 
+async function induceSimulationIncident(page, url, disc, identity, timeout, label) {
+  await page.goto(`${url}?enabled=1`, {timeout});
+  await page.waitForFunction(() => globalThis.__runtimeDiagnosticsFixture?.ready === true, null, {timeout});
+  await selectDiscAndStart(page, disc, timeout);
+  await assertStillCss(page, `${label} precondition`);
+  await page.waitForFunction(() => {
+    const fixture = globalThis.__runtimeDiagnosticsFixture;
+    return fixture.owner.diagnostics.exportReports().native.callback_count >= 800 || fixture.errors.length;
+  }, null, {timeout: 20000, polling: 500});
+  await assertStillCss(page, `${label} full-history precondition`);
+  await page.evaluate(() => { const until = performance.now() + 200; while (performance.now() < until) {} });
+  await page.waitForFunction(() => {
+    const report = globalThis.__runtimeDiagnosticsFixture?.owner?.diagnostics?.exportReports?.();
+    return report?.incidents?.some(item => item.reason === 'simulation_debt' &&
+      item.value > 8 && item.threshold === 8);
+  }, null, {timeout: STALL_TIMEOUT_MS});
+  const before = await readReport(page, identity, `${label} incident`);
+  const debt = before.report.incidents.find(item => item.reason === SIMULATION_DEBT_REASON);
+  requireValue(debt && debt.value > SIMULATION_DEBT_THRESHOLD && debt.threshold === SIMULATION_DEBT_THRESHOLD,
+    `${label} did not retain the native value and threshold`);
+  const state = await page.evaluate(() => globalThis.__runtimeDiagnosticsFixture.player.getState());
+  requireValue(state.running === false, `${label} guard did not pause the native CSS owner`);
+  requireValue(typeof debt.id === 'string' && debt.id.length > 0, `${label} incident has no stable identifier`);
+  return {before, debt};
+}
+
 async function runSimulationStall(browser, url, disc, identity, timeout) {
   const page = await browser.newPage({viewport: {width: 1280, height: 960}});
   try {
-    await page.goto(`${url}?enabled=1`, {timeout});
-    await page.waitForFunction(() => globalThis.__runtimeDiagnosticsFixture?.ready === true, null, {timeout});
-    await selectDiscAndStart(page, disc, timeout);
-    await assertStillCss(page, 'Simulation stall precondition');
-    await page.waitForFunction(() => {
-      const fixture = globalThis.__runtimeDiagnosticsFixture;
-      return fixture.owner.diagnostics.exportReports().native.callback_count >= 800 || fixture.errors.length;
-    }, null, {timeout: 20000, polling: 500});
-    await assertStillCss(page, 'Full-history simulation stall precondition');
-    await page.evaluate(() => { const until = performance.now() + 200; while (performance.now() < until) {} });
-    await page.waitForFunction(() => {
-      const report = globalThis.__runtimeDiagnosticsFixture?.owner?.diagnostics?.exportReports?.();
-      return report?.incidents?.some(item => item.reason === 'simulation_debt' &&
-        item.value > 8 && item.threshold === 8);
-    }, null, {timeout: STALL_TIMEOUT_MS});
-    const before = await readReport(page, identity, 'Simulation debt');
-    const debt = before.report.incidents.find(item => item.reason === SIMULATION_DEBT_REASON);
-    requireValue(debt && debt.value > SIMULATION_DEBT_THRESHOLD && debt.threshold === SIMULATION_DEBT_THRESHOLD,
-      'Simulation debt incident did not retain the native value and threshold');
-    const beforeRecovery = await page.evaluate(() => globalThis.__runtimeDiagnosticsFixture.player.getState());
-    requireValue(beforeRecovery.running === false, 'Simulation guard did not pause the native CSS owner');
+    const {before, debt} = await induceSimulationIncident(page, url, disc, identity, timeout, 'Simulation stall');
     await page.evaluate(() => globalThis.__runtimeDiagnosticsFixture.player.resume());
     await page.waitForFunction(() => {
       const fixture = globalThis.__runtimeDiagnosticsFixture;
@@ -602,6 +632,55 @@ async function runSimulationStall(browser, url, disc, identity, timeout) {
   } finally {
     await page.close();
   }
+}
+
+async function runRetentionReload(browser, url, disc, identity, timeout) {
+  const cases = [];
+  const expectedOrigin = new URL(url).origin;
+  for (const mode of ['pagehide', 'destroy']) {
+    const caseContext = await browser.newContext({viewport: {width: 1280, height: 960}});
+    const page = await caseContext.newPage();
+    try {
+      const {debt} = await induceSimulationIncident(page, url, disc, identity, timeout,
+        `Retention ${mode}`);
+      await page.screenshot({path: path.join(path.resolve(values.out), `retention-${mode}-paused.png`)});
+      const result = {mode, trigger: {reason: debt.reason, value: debt.value, threshold: debt.threshold}};
+      if (mode === 'pagehide') {
+        await page.evaluate(() => window.dispatchEvent(new Event('pagehide')));
+        result.before_reload = await waitForRetained(page, identity, debt.id,
+          'Controlled pagehide checkpoint', 5000);
+      } else {
+        const destroyed = await page.evaluate(async () => {
+          let timer;
+          try {
+            return await Promise.race([
+              globalThis.__runtimeDiagnosticsFixture.player.destroy(),
+              new Promise((_, reject) => { timer = setTimeout(() => reject(Error('destroy timeout')), 5000); }),
+            ]);
+          } finally { if (timer !== undefined) clearTimeout(timer); }
+        });
+        requireValue(destroyed?.requiresReload === true,
+          'Orderly diagnostics Eject did not require a reload');
+      }
+      await page.reload({waitUntil: 'domcontentloaded', timeout});
+      await page.waitForFunction(() => globalThis.__runtimeDiagnosticsFixture?.ready === true ||
+        globalThis.__runtimeDiagnosticsFixture?.load?.state === 'error', null, {timeout});
+      requireValue(new URL(page.url()).origin === expectedOrigin,
+        `${mode} reload changed the fixture origin`);
+      const state = await fixtureState(page);
+      requireValue(state.errors.length === 0, `Retention ${mode} reload failed: ${state.errors.join('; ')}`);
+      result.after_reload = await waitForRetained(page, identity, debt.id,
+        `${mode} same-origin reload`, 5000);
+      cases.push(result);
+    } catch (error) {
+      await retainPage(page, `retention-${mode}-failure`);
+      throw error;
+    } finally {
+      await page.close();
+      await caseContext.close();
+    }
+  }
+  return cases;
 }
 
 async function runAudioStall(browser, url, disc, identity, timeout) {
@@ -667,9 +746,10 @@ const {values} = parseArgs({options: {
   playwright: {type: 'string'}, out: {type: 'string'}, help: {type: 'boolean'},
   'startup-only': {type: 'boolean'},
   'incidents-only': {type: 'boolean'},
+  'retention-reload': {type: 'boolean'},
 }});
 if (values.help) {
-  console.log('Usage: node tests/runtime_diagnostics_browser_test.mjs --site AUDITED_AUDIO_PLAYER --manifest MANIFEST --disc OWNED_ISO --out FRESH_REPORT_DIR [--playwright PLAYWRIGHT_DIR]');
+  console.log('Usage: node tests/runtime_diagnostics_browser_test.mjs --site AUDITED_AUDIO_PLAYER --manifest MANIFEST --disc OWNED_ISO --out FRESH_REPORT_DIR [--playwright PLAYWRIGHT_DIR] [--retention-reload]');
   process.exit(0);
 }
 for (const name of ['site', 'manifest', 'disc', 'out']) requireValue(values[name], `--${name} is required`);
@@ -712,7 +792,21 @@ try {
   context = await browser.newContext();
   const fixtureUrl = `${localServer.origin}/__runtime-diagnostics-fixture/`;
   report.collection = [];
-  if (values['startup-only']) {
+  if (values['retention-reload']) {
+    report.scope = 'Headless local HTTP same-origin IndexedDB retention after a controlled pagehide and orderly Eject/reload. The simulation-debt incident is induced; no genuine background-lifecycle, natural-cause, gameplay-timing, performance, audio, pixel or PCM claim.';
+    await context.close(); context = null;
+    const deadline = setTimeout(() => { void browser.close().catch(() => {}); }, 100000);
+    try {
+      report.retention_reload = await runRetentionReload(browser, fixtureUrl, disc, expectedIdentity, 30000);
+    } finally { clearTimeout(deadline); }
+    report.checks.push('controlled pagehide and orderly Eject retained one bounded incident across same-origin reloads');
+    const forbiddenRequests = localServer.requests.filter(request => request.method !== 'GET' && request.method !== 'HEAD' ||
+      /(?:api\/diagnostics|upload|evidence|manifest|__melee_evidence)/i.test(request.path));
+    requireValue(forbiddenRequests.length === 0,
+      `Retention mode issued forbidden network requests: ${JSON.stringify(forbiddenRequests)}`);
+    report.network = {request_count: localServer.requests.length, application_uploads: 0};
+    report.result = 'pass';
+  } else if (values['startup-only']) {
     const page = await context.newPage({viewport: {width: 1280, height: 960}});
     try {
       await page.goto(`${fixtureUrl}?enabled=1`, {timeout: 120000});

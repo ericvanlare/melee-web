@@ -50,6 +50,15 @@ rejects malformed records, and enforces four records and 256 KiB across retained
 records. Current triggers take priority over prior visits even if the wall clock
 changes. Storage denial, quota exhaustion, unsupported storage and recorder
 errors are optional diagnostic failures; Personal progress remains independent.
+Hidden, pagehide and freeze events also request a local checkpoint outside the
+native callback, before the ordinary deferred task may be discarded. The
+[lifecycle retention receipt](evidence/mobile-pause-followup-v1.json) keeps the
+controlled loss regression separate from the unresolved mobile pause reports. Returning
+to the visible page cancels a checkpoint that has not begun. Orderly teardown
+waits at most 250 ms for a fresh local snapshot after native unload. It does not
+wait for network delivery or delay Resume. Storage already in flight remains
+best effort; a timeout does not cancel an IndexedDB transaction or prove that
+the report was saved.
 Flags distinguish unavailable storage, failed persistence, malformed retained
 data, eviction and truncation. Successful persistence is best effort; a hard
 browser/process crash can prevent capture or completion.
@@ -133,8 +142,11 @@ off preference to other open tabs. Off clears unsent work and aborts in-flight
 requests; a request already received by the server cannot be retracted.
 
 The runtime schedules collection for delivery after the one-second post-event
-window. Entering gameplay, preparation or another busy operation cancels that
-task. Existing pending work is retried only while inactive, with a five-second
+window. An inactive transition also collects incidents whose post-event window
+has already closed, so repeated quick Resume actions do not restart their wait.
+The current report takes precedence over an older retained copy of the same
+incident. Entering gameplay, preparation or another busy operation cancels the
+collection task. Existing pending work is retried only while inactive, with a five-second
 request deadline, bounded exponential backoff, three attempts per queued
 record, and four total upload attempts per visit. Each request is an exact
 same-origin JSON POST to `/api/diagnostics`, at most 64 KiB, with credentials
@@ -194,5 +206,9 @@ reason/value/threshold, recovery context, persistence bounds and zero uploads.
 Induced stalls validate detection/recovery only. Headless CSS evidence does not
 establish sustained gameplay, original state agreement, quiet-machine or
 foreground performance, physical input, uninterrupted audio or pixels/PCM.
+Pass `--retention-reload` for the smaller local-storage check: two fresh contexts
+induce a native simulation-debt pause, then exercise controlled pagehide or
+orderly teardown followed by an actual same-origin reload. It verifies the
+incident identity survives in IndexedDB; it does not simulate a process kill.
 Use [hitch capture](HITCH_CAPTURE.md) to reduce a natural failure and
 [the accuracy contract](ACCURACY_CONTRACT.md) for separate acceptance gates.

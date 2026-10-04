@@ -19,6 +19,7 @@ const IMPORT_BATCH_MAX_FILES = 8;
 const IMPORT_BATCH_MAX_BYTES = 8 * 1024 * 1024;
 const IMPORT_BATCH_MAX_MS = 8;
 const SOURCE_STREAM_FILES = Object.freeze(['MvOpen.mth', 'MvHowto.mth', 'MvOmake15.mth']);
+const DIAGNOSTIC_DESTROY_PERSIST_TIMEOUT_MS = 250;
 
 export async function mountMeleeRuntime({canvas, onState = () => {}, onError = () => {},
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
@@ -93,7 +94,11 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   const commands = [], listeners = [];
   let diagnostics = null, diagnosticActive = true, longtaskObserver = null, diagnosticPreparationAt = null;
   let diagnosticDelivery = null, diagnosticDeliveryTimer = null, diagnosticRetainedLoaded = false;
+  let diagnosticMatureDeliveryPromise = null;
   let diagnosticGeneration = 0;
+  let diagnosticCheckpointPromise = null, diagnosticCheckpointSuspended = false;
+  let diagnosticCheckpointRequested = false, diagnosticCheckpointDestroyWindow = false;
+  let diagnosticCheckpointClosed = false;
   let automaticDiagnostics = readDiagnosticsPreference();
   function diagnosticDeliveryBlocked() {
     // Fatal owners cannot consume another native handoff. Once visible, their
@@ -105,6 +110,59 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     diagnosticGeneration++;
     if (diagnosticDeliveryTimer !== null) clearTimeout(diagnosticDeliveryTimer);
     diagnosticDeliveryTimer = null;
+  }
+  function requestDiagnosticCheckpoint() {
+    diagnosticCheckpointRequested = true;
+    if (!diagnostics) {
+      diagnosticCheckpointRequested = false;
+      return Promise.resolve({persisted: false, reason: 'unavailable'});
+    }
+    if (diagnosticCheckpointPromise) return diagnosticCheckpointPromise;
+    const eligible = () => !diagnosticCheckpointClosed &&
+      (diagnosticCheckpointSuspended || diagnosticCheckpointDestroyWindow);
+    // One job owns all lifecycle persistence.  A request received while its
+    // recorder write is pending becomes one fresh iteration after that write;
+    // it never serializes from the native callback or uses a stale snapshot.
+    let promise;
+    promise = Promise.resolve().then(async () => {
+      try {
+        let result = {persisted: false, reason: 'cancelled'};
+        while (diagnosticCheckpointRequested && eligible()) {
+          diagnosticCheckpointRequested = false;
+          try { result = await diagnostics.checkpoint({eligible}); }
+          catch { result = {persisted: false, reason: 'failed'}; }
+        }
+        return result;
+      } catch {
+        return {persisted: false, reason: 'failed'};
+      } finally {
+        if (diagnosticCheckpointPromise === promise) diagnosticCheckpointPromise = null;
+      }
+    });
+    diagnosticCheckpointPromise = promise;
+    return promise;
+  }
+  function beginDiagnosticCheckpoint() {
+    diagnosticCheckpointSuspended = true;
+    try { void requestDiagnosticCheckpoint(); } catch {}
+  }
+  function resetDiagnosticCheckpoint() {
+    diagnosticCheckpointSuspended = false;
+    diagnosticCheckpointRequested = false;
+  }
+  function awaitDiagnosticCheckpoint(timeoutMs = DIAGNOSTIC_DESTROY_PERSIST_TIMEOUT_MS) {
+    diagnosticCheckpointDestroyWindow = true;
+    const job = requestDiagnosticCheckpoint();
+    let timeout;
+    const deadline = new Promise(resolve => {
+      timeout = setTimeout(() => resolve({persisted: false, reason: 'timeout'}), timeoutMs);
+    });
+    return Promise.race([job, deadline]).finally(() => {
+      clearTimeout(timeout);
+      diagnosticCheckpointDestroyWindow = false;
+      diagnosticCheckpointClosed = true;
+      diagnosticCheckpointRequested = false;
+    });
   }
   function scheduleDiagnosticDelivery() {
     if (!diagnostics || !diagnosticDelivery || diagnosticActive || destroyed ||
@@ -118,22 +176,65 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         automaticDiagnostics && generation === diagnosticGeneration;
       if (!eligible()) return;
       try {
-        if (!diagnosticRetainedLoaded) {
-          const retained = await diagnostics.loadRetained();
-          if (!eligible()) return;
-          diagnosticRetainedLoaded = true;
-          for (const record of retained.records || []) {
-            diagnosticDelivery.enqueue({...record, incidents: [record.incident]});
-          }
-        }
-        if (!eligible()) return;
-        diagnosticDelivery.enqueue(diagnostics.exportReports());
+        const report = await loadRetainedForDelivery(eligible);
+        if (!report || !eligible()) return;
+        diagnosticDelivery.enqueue(report);
         await diagnosticDelivery.flushWhenInactive();
       } catch { /* Delivery is optional and isolated from gameplay and saves. */ }
     }, 1100);
   }
+  async function loadRetainedForDelivery(eligible) {
+    if (diagnosticRetainedLoaded) {
+      if (!eligible()) return null;
+      return diagnostics.exportReports();
+    }
+    const retained = await diagnostics.loadRetained();
+    if (!eligible()) return null;
+    const report = diagnostics.exportReports();
+    const current = new Map((report.incidents || []).map(incident => [incident?.id, incident]));
+    for (const record of retained.records || []) {
+      if (!eligible()) return null;
+      const currentIncident = record.session_id === report.session_id ? current.get(record.incident?.id) : null;
+      if (currentIncident) continue;
+      diagnosticDelivery.enqueue({...record, incidents: [record.incident]});
+    }
+    // A young current incident may reach storage after this read. Keep the
+    // next inactive read eligible even when older retained records exist, so
+    // ring eviction does not orphan its already persisted snapshot.
+    diagnosticRetainedLoaded = !(report.incidents || []).some(incident => !incident.closed);
+    return report;
+  }
+  function scheduleMatureDiagnosticDelivery() {
+    if (!diagnostics || !diagnosticDelivery || diagnosticActive || destroyed ||
+        diagnosticDeliveryBlocked() || !automaticDiagnostics || diagnosticMatureDeliveryPromise !== null ||
+        !diagnosticDelivery.getStatus().eligible) return;
+    const generation = diagnosticGeneration;
+    const eligible = () => !diagnosticActive && !diagnosticDeliveryBlocked() &&
+      automaticDiagnostics && generation === diagnosticGeneration;
+    let promise;
+    promise = Promise.resolve().then(async () => {
+      if (!eligible()) return;
+      const report = await loadRetainedForDelivery(eligible);
+      if (!report) return;
+      if (!eligible()) return;
+      for (const incident of report.incidents || []) {
+        if (!eligible()) return;
+        if (!incident.closed) continue;
+        diagnosticDelivery.enqueue({...report, incidents: [incident], incident});
+      }
+      if (eligible()) await diagnosticDelivery.flushWhenInactive();
+    }).catch(() => {}).finally(() => {
+      if (diagnosticMatureDeliveryPromise === promise) {
+        diagnosticMatureDeliveryPromise = null;
+        if (generation !== diagnosticGeneration && !diagnosticActive && !destroyed &&
+            automaticDiagnostics && !diagnosticDeliveryBlocked()) scheduleMatureDiagnosticDelivery();
+      }
+    });
+    diagnosticMatureDeliveryPromise = promise;
+  }
   const diagnosticLifecycle = (type, detail) => { try { diagnostics?.lifecycle(type, detail); } catch {} };
   const diagnosticActivity = active => {
+    const becameInactive = !active && diagnosticActive;
     if (active !== diagnosticActive) {
       diagnosticActive = active;
       try { void diagnostics?.setActive(active); } catch {}
@@ -142,7 +243,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       const blocked = diagnosticDeliveryBlocked();
       diagnosticDelivery?.setActive(active || blocked);
       if (active || blocked) cancelDiagnosticDelivery();
-      else scheduleDiagnosticDelivery();
+      else {
+        scheduleDiagnosticDelivery();
+        if (becameInactive) scheduleMatureDiagnosticDelivery();
+      }
     } catch {}
   };
   const diagnosticAudio = data => {
@@ -293,7 +397,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   function stop(error) {
     if (fatal || destroyed) return;
-    try { diagnostics?.trigger(4, null, null, null, null, 0); } catch {}
+    try { diagnosticIncident(4, null, null, null, null, 0); } catch {}
     diagnosticActivity(false);
     fatal = true; message = String(error?.message || error || 'Player stopped. Reload to recover.');
     clearStartupTimeout();
@@ -334,9 +438,20 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     if (running) preparationKeepsAudio = false;
     audio?.setEnabled(enabled);
   }
+  function diagnosticIncident(...args) {
+    const result = diagnostics?.trigger(...args);
+    // An earlier idle read cannot cover an incident created afterward. Its
+    // persisted snapshot may outlive its slot in the bounded current ring.
+    if (result) diagnosticRetainedLoaded = false;
+    const reason = Number(args[0]);
+    if ([1, 2, 3, 4, 8].includes(reason) && diagnosticCheckpointSuspended) {
+      try { void requestDiagnosticCheckpoint(); } catch {}
+    }
+    return result;
+  }
   const callbacks = {
     menuDiagnosticSample: diagnostics?.observeNative || (() => {}),
-    menuDiagnosticIncident: diagnostics?.trigger || (() => {}),
+    menuDiagnosticIncident: diagnosticIncident,
     menuAudio(pcm) {
       if (!audio) throw Error('Audio output is disabled in this public alpha.');
       audio.write(pcm);
@@ -435,14 +550,21 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       // A paused document may already be inactive. Force the delivery adapter
       // back to its active state until native consumes the sticky handoff.
       diagnosticActivity(diagnosticActive);
-    } else if (fatal) {
-      diagnosticActivity(false);
+      beginDiagnosticCheckpoint();
+    } else {
+      resetDiagnosticCheckpoint();
+      if (fatal) {
+        diagnosticActivity(false);
+      }
     }
   });
   for (const type of ['pagehide', 'pageshow', 'freeze', 'resume']) listen(type, () => {
     if (type === 'pagehide' || type === 'freeze') {
       lifecycleSuspended = true;
       diagnosticActivity(diagnosticActive);
+      beginDiagnosticCheckpoint();
+    } else {
+      resetDiagnosticCheckpoint();
     }
     diagnosticLifecycle(type);
   });
@@ -749,6 +871,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         }
         destroyed = true; syncAudio();
         diagnosticLifecycle('scene_exit'); diagnosticActivity(false);
+        try { await awaitDiagnosticCheckpoint(); } catch {}
         cancelDiagnosticDelivery(); diagnosticDelivery?.dispose();
         longtaskObserver?.disconnect();
         discSession?.close(); discSession = null;
