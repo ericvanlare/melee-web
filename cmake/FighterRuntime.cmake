@@ -386,6 +386,42 @@ target_link_options(gameplay_snapshot_probe PRIVATE --no-entry --profiling-funcs
   -sEXPORTED_FUNCTIONS=_malloc,_free,_melee_web_snapshot_configure_native_initializer,_melee_web_snapshot_configure_seed,_melee_web_snapshot_configure_rng_profile,_melee_web_snapshot_init,_melee_web_snapshot_step,_melee_web_snapshot_step_raw,_melee_web_snapshot_error,_melee_web_snapshot_observation,_melee_web_snapshot_observation_size,_melee_web_snapshot_initializer_diagnostic,_melee_web_snapshot_initializer_diagnostic_size,_melee_web_snapshot_initializer_json,_melee_web_snapshot_ending_mask_diagnostic,_melee_web_snapshot_rng_profile_observation,_melee_web_snapshot_rng_profile_observation_size,_melee_web_snapshot_rng_profile_identity,_melee_web_snapshot_transfer_diagnostic,_melee_web_snapshot_transfer_diagnostic_size,_melee_web_snapshot_pcm,_melee_web_snapshot_pcm_size,_melee_web_snapshot_input,_melee_web_snapshot_rng_address,_melee_web_snapshot_quiescent,_melee_web_snapshot_source_identity,_melee_web_snapshot_stage_kind_bridge_identity,_melee_web_snapshot_close)
 set_target_properties(gameplay_snapshot_probe PROPERTIES SUFFIX ".js")
 
+option(MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE
+  "Compile the typed read-only gameplay-bootstrap diagnostic into gameplay_snapshot_probe" OFF)
+set(MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_PROBE
+  "${CMAKE_CURRENT_SOURCE_DIR}/tests/gameplay_bootstrap_state_probe.c")
+if(MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE)
+  if(NOT TARGET gameplay_snapshot_probe)
+    message(FATAL_ERROR "typed gameplay-bootstrap diagnostic requires gameplay_snapshot_probe")
+  endif()
+  foreach(_melee_web_bootstrap_identity IN ITEMS
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_bootstrap.c"
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_bootstrap.h"
+      "${MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_PROBE}")
+    if(NOT EXISTS "${_melee_web_bootstrap_identity}" OR
+       IS_SYMLINK "${_melee_web_bootstrap_identity}")
+      message(FATAL_ERROR "typed gameplay-bootstrap identity input must be a regular file: ${_melee_web_bootstrap_identity}")
+    endif()
+  endforeach()
+  file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_bootstrap.c"
+       MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_SOURCE_C_SHA256)
+  file(SHA256 "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_bootstrap.h"
+       MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_SOURCE_H_SHA256)
+  file(SHA256 "${MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_PROBE}"
+       MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_PROBE_SHA256)
+  target_sources(gameplay_snapshot_probe PRIVATE
+    "${MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_PROBE}")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_bootstrap.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_bootstrap.h"
+    "${MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_PROBE}")
+  target_compile_definitions(gameplay_snapshot_probe PRIVATE
+    MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_SOURCE_C_SHA256="${MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_SOURCE_C_SHA256}"
+    MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_SOURCE_H_SHA256="${MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_SOURCE_H_SHA256}"
+    MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_PROBE_SHA256="${MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_PROBE_SHA256}")
+  message(STATUS "typed gameplay-bootstrap diagnostic enabled for gameplay_snapshot_probe")
+endif()
+
 # Optional real-browser Slippi profile source-only follow-up. The default Node
 # gameplay_snapshot_probe target remains unchanged. This target uses the exact
 # preserved profile source/helper and preloads the ignored local snapshot fixture

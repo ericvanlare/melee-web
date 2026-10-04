@@ -780,8 +780,11 @@ def _write_audio_preview_identity(root, build_dir, version, cmake, ninja,
 
 def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
           pipeline_provenance=False, selective_pipelines=False, configure_only=False,
-          trace_targets=None):
+          trace_targets=None, gameplay_bootstrap_state=False):
     trace_targets = tuple(trace_targets or ())
+    if gameplay_bootstrap_state and (
+        tuple(trace_targets or ()) != ("gameplay_snapshot_probe",)):
+        raise ValueError("--gameplay-bootstrap-state requires --trace-target gameplay_snapshot_probe")
     if trace_targets:
         if target != "all":
             raise ValueError("--target and --trace-target are mutually exclusive")
@@ -851,6 +854,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         configure.append(
             f"-DMELEE_WEB_AUDIO_PREVIEW_RUNTIME={'ON' if target == AUDIO_PREVIEW_RUNTIME_TARGET else 'OFF'}"
         )
+        configure.append(
+            f"-DMELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE={'ON' if gameplay_bootstrap_state else 'OFF'}"
+        )
         configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
         configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
         configure.append(
@@ -899,6 +905,8 @@ def main():
                         help="Prepare certified upcoming pipeline unions in a separate runtime build")
     parser.add_argument("--configure-only", action="store_true",
                         help="Configure the selected build directory without compiling targets")
+    parser.add_argument("--gameplay-bootstrap-state", action="store_true",
+                        help="Enable the typed bootstrap-state diagnostic on gameplay_snapshot_probe")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
@@ -907,7 +915,8 @@ def main():
     try:
         build(args.jobs, target=args.target or "all", configuration=args.configuration,
               pipeline_provenance=args.pipeline_provenance, selective_pipelines=args.selective_pipelines,
-              configure_only=args.configure_only, trace_targets=args.trace_targets)
+              configure_only=args.configure_only, trace_targets=args.trace_targets,
+              gameplay_bootstrap_state=args.gameplay_bootstrap_state)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 
