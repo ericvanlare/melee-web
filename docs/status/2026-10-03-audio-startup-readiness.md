@@ -19,9 +19,9 @@ continued past that failure boundary without queue overflow. These earlier
 comparisons are retained in the [v1 receipt](../evidence/audio-output-clock-startup-v1.json).
 
 On current main, a bounded instrumented four-player Mario/Final Destination
-replay passed startup and reached gameplay without an audio queue overflow. It
-then paused after a timing disruption at replay cursor `1645` (source-reported
-frame `63`); no runtime error or browser error was recorded. The capture posted
+replay passed startup and reached live match source frame `63` without an audio
+queue overflow. It then paused after a timing disruption at replay cursor
+`1645`; no runtime error or browser error was recorded. The capture posted
 1,656 PCM packets / 883,199 frames. After pause, the final Worklet snapshot
 reported 64 underrun frames (2 ms) and zero overflows. The run did not reach
 Results or return-to-CSS and does not establish uninterrupted audio or

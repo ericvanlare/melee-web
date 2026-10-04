@@ -84,6 +84,7 @@
       "status": "Paused after a timing disruption. Resume to continue.",
       "replay_cursor": 1645,
       "source_reported_frame": 63,
+      "source_frame_semantics": "The native diagnostic emits this field only after match construction is complete; it is the live match source-frame counter. The separate 'ticks: 0' text is the stock-check diagnostic counter.",
       "runtime_error": null,
       "browser_errors": [],
       "failure_kind": "timing_disruption",
@@ -156,7 +157,7 @@
     }
   },
   "limitations": [
-    "The current-main replay stopped before the first live match source tick and did not reach Results, return-to-CSS or repeat-match.",
+    "The current-main replay advanced to live match source frame 63, then stopped before completing the four-stock match, Results, return-to-CSS or repeat-match.",
     "The timing disruption and 64 underrun frames remain open; no zero-underrun or sustained-performance claim.",
     "The render diagnostic is instrumented and cannot causally assign the pause.",
     "No PCM fidelity, original-state, pixel, physical-input, foreground-timing or mobile gameplay acceptance is claimed.",
