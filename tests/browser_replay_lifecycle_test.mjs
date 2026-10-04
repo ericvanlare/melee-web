@@ -210,7 +210,7 @@ function harness(unload=true,wholeSession=false){
  const elements=new Map();
  const $=id=>{if(!elements.has(id))elements.set(id,{disabled:false,textContent:'',files:[],value:'performance',querySelectorAll:()=>[],replaceChildren(){},focus(){}});return elements.get(id);};
  $('retail-replay-file').files=[{size:1194,arrayBuffer:()=>pending}];
- const calls={native:0,unload:0,audio:0,paused:0,timingResets:0,failed:[],launch:0};
+ const calls={native:0,unload:0,audio:0,paused:0,timingResets:0,failed:[],launch:0,renderWaits:0};
  const scope={$,retailRun:null,replayLoading:false,ready:true,fatal:false,bundle:true,importing:false,
   replayEvidence:[],uiMessage:'',inputDirty:false,clearRenderCacheOnLoad:false,
   window:{},setTimeout:fn=>fn(),
@@ -221,6 +221,7 @@ function harness(unload=true,wholeSession=false){
   resetTiming:()=>{calls.timingResets++;},prepareAudio:async()=>{calls.audio++;},pauseAudioForPreparation:async()=>{},
   beginReplayPaintControl:()=>({evidence:{mode:'normal'},restore(){}}),
   boundary:async fn=>fn(),check:value=>assert.equal(value,1),syncAudio(){},
+  waitForAudioRender:async()=>{calls.renderWaits++;},
   finishRetailReplay:async reason=>{calls.failed.push(reason);calls.completedRun=scope.retailRun;scope.retailRun=null;},
   Module:{HEAPU8:new Uint8Array(2048),_malloc:()=>1,_free(){},
    _melee_web_native_menu_replay:()=>{calls.native++;return 1;},
@@ -272,6 +273,77 @@ function harness(unload=true,wholeSession=false){
  assert.equal(h.calls.unload,0,'Whole-session replay retains the canonical prepared CSS assets');
  assert.equal(h.calls.native,1);
  assert.equal(h.calls.launch,1,'A whole-session recipe enters CSS through the ordinary launch');
+ assert.equal(h.calls.renderWaits,1,'Whole-session launch waits for owner audio rendering');
+}
+{
+ // Whole-session launch must hold after native replay construction until the
+ // owner reports a fresh render quantum. This is deliberately independent of
+ // the ordinary single-match path below.
+ const h=harness(true,true);let resolveRender;
+ const renderReady=new Promise(resolve=>{resolveRender=resolve;});
+ h.scope.waitForAudioRender=()=>{h.calls.renderWaits++;return renderReady;};
+ const playing=h.play(),bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+ header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+ h.resolveBytes(bytes);
+ await new Promise(resolve=>setImmediate(resolve));
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.calls.native,1,'Whole-session replay is constructed before the readiness gate');
+ assert.equal(h.calls.renderWaits,1);
+ assert.equal(h.calls.launch,0,'Native launch waits while owner render readiness is pending');
+ assert.equal(h.scope.replayLoading,true,'Replay remains owned while readiness is pending');
+ resolveRender();
+ await playing;
+ assert.equal(h.calls.launch,1,'Native launch follows the owner render acknowledgement');
+ assert.equal(h.scope.replayLoading,false);
+}
+{
+ // Stopping while the worklet is delayed must not resurrect an unloaded run.
+ for(const phase of ['finishing','finished','queued-launch']){
+  const h=harness(true,true);let resolveRender,finishTeardown;
+  const renderReady=new Promise(resolve=>{resolveRender=resolve;});
+  h.scope.waitForAudioRender=()=>renderReady;
+  h.scope.finishRetailReplay=async()=>{
+   h.scope.retailRun.finishing=true;
+   await new Promise(resolve=>{finishTeardown=resolve;});
+   h.scope.retailRun=null;
+  };
+  const playing=h.play(),bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+  header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+  h.resolveBytes(bytes);await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(h.calls.native,1);
+  let queuedLaunch;
+  if(phase==='queued-launch'){
+   h.scope.boundary=fn=>new Promise(resolve=>{queuedLaunch=()=>resolve(fn());});
+   resolveRender();await new Promise(resolve=>setImmediate(resolve));
+   assert.equal(typeof queuedLaunch,'function');
+  }
+  h.$('pause').onclick(); // Production stop path for a performance replay.
+  assert.equal(h.scope.retailRun.finishing,true);
+  if(phase!=='finishing'){finishTeardown();await new Promise(resolve=>setImmediate(resolve));}
+  if(queuedLaunch)queuedLaunch();else resolveRender();
+  await playing;
+  assert.equal(h.calls.launch,0,`Cancelled ${phase} replay must never launch after readiness`);
+  assert.equal(h.scope.replayLoading,false);
+  if(phase==='finishing'){finishTeardown();await new Promise(resolve=>setImmediate(resolve));}
+ }
+}
+{
+ // A failed readiness gate must finish the replay owner and leave source
+ // launch untouched; this is a teardown failure, not a successful route.
+ const h=harness(true,true);
+ h.scope.waitForAudioRender=async()=>{
+  h.calls.renderWaits++;
+  throw Error('Game audio did not start. Close this message, then choose Play to try again.');
+ };
+ const playing=h.play(),bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+ header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+ h.resolveBytes(bytes);await playing;
+ assert.equal(h.calls.native,1,'Readiness failure occurs after bounded replay construction');
+ assert.equal(h.calls.renderWaits,1);
+ assert.equal(h.calls.launch,0,'Failed readiness must prevent native launch');
+ assert.deepEqual(h.calls.failed,['Game audio did not start. Close this message, then choose Play to try again.']);
+ assert.equal(h.scope.retailRun,null,'Failed readiness releases the replay owner');
+ assert.equal(h.scope.replayLoading,false);
 }
 {
  const h=harness(true,true);
@@ -288,6 +360,7 @@ function harness(unload=true,wholeSession=false){
  const h=harness();const playing=h.play();h.resolveBytes(new ArrayBuffer(1194));await playing;
  assert.equal(h.calls.native,1);
  assert.equal(h.calls.launch,0,'A single-match recipe keeps its direct match construction');
+ assert.equal(h.calls.renderWaits,0,'Single-match replay does not add whole-session render gating');
 }
 {
  const h=harness();h.scope.retailRun={observe:false};await h.$('pause').onclick();

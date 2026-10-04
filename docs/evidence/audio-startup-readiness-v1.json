@@ -1,0 +1,112 @@
+{
+  "schema": "melee-web-audio-startup-readiness-v1",
+  "date": "2026-10-03",
+  "production_base": "02231e9",
+  "evidence_level": [
+    "Source identified",
+    "Browser checked: bounded layered original CSS startup",
+    "Not sustained performance admission"
+  ],
+  "observed_failure": "The initial source PCM producer can start while the AudioContext reports running but its currentTime observations remain fixed. A port state acknowledgement does not prove process() progress.",
+  "quiet_baseline": {
+    "source": "b8f5782ee1cdee9177c0ed5e094aeb88e5b8e2a8",
+    "runtime": "52b26a1cf16070f9",
+    "report_sha256": "9201a553017bb99dad55abee1789588bee1822286c86d2647a71acc42d64241c",
+    "runner_sha256": "fdc1a845b3441757e53fa635eac18ba097afa7b8dcb34894daf7009c3ca1f2e5",
+    "browser": "Chrome154.0.8037.97",
+    "condition": "Declared build/capture owners parked; headless, muted output with Web Audio active; passive scalar observers",
+    "case2": {
+      "window_seconds": 8,
+      "initial_constant_clock_pcm_packets": 30,
+      "initial_constant_clock_pcm_frames": 16000,
+      "max_queue_frames": 15936,
+      "overflows": 0,
+      "underruns": 0
+    }
+  },
+  "layered_probe": {
+    "report_sha256": "f4eb48766c8b3a0c13097d6de43bbc49e27ebf61f91813a4e56ae2453f1ced0d",
+    "runner_sha256": "b824a82147a89701599eb5d0f8f67d738fc9e28aae40aef2fb410a9d54cbe473",
+    "base_identity": {
+      "schema_version": 1,
+      "source_commit": "b8f5782ee1cdee9177c0ed5e094aeb88e5b8e2a8",
+      "runtime_hash": "52b26a1cf16070f9",
+      "build_profile": "audio-player"
+    },
+    "experimental_files": [
+      {
+        "path": "runtime-audio.mjs",
+        "base_sha256": "458f9fe6c42bcbc3785e318c999c9982f13d2ef4b3db167e10222ef8af0fdf24",
+        "experimental_sha256": "76986109eb774c343cdc8384dae91c77b84d76b327f20963d1217d64910fc729",
+        "bytes": 5157
+      },
+      {
+        "path": "audio-worklet.js",
+        "base_sha256": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+        "experimental_sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea",
+        "bytes": 1517
+      },
+      {
+        "path": "melee-runtime.mjs",
+        "base_sha256": "d07e1bb9ebae3a6d9de765381270bceb1839642db2bc930c0c1531ae890875f7",
+        "experimental_sha256": "8e2a65588681c3228d3b14927a2d9dff7fab16527bb2f6e151f48b19df90a816",
+        "bytes": 47366
+      }
+    ],
+    "result": "bounded_css_windows_complete",
+    "duration_seconds": 24.1,
+    "cases": [
+      {
+        "index": 1,
+        "window_ms": 4000,
+        "result": "css_window_complete",
+        "request_to_process_ack_ms": 29.225000143051147,
+        "pcm_frames_before_ack": 0,
+        "max_queue_frames": 1770,
+        "underruns": 0,
+        "overflows": 0,
+        "trace_rows": 260,
+        "dropped_rows": 0
+      },
+      {
+        "index": 2,
+        "window_ms": 8000,
+        "result": "css_window_complete",
+        "request_to_process_ack_ms": 529.1699998378754,
+        "pcm_frames_before_ack": 0,
+        "max_queue_frames": 1685,
+        "underruns": 0,
+        "overflows": 0,
+        "trace_rows": 510,
+        "dropped_rows": 0
+      }
+    ]
+  },
+  "production_scope": "Await one fresh worklet process acknowledgement after native preparation, before initial/full-relaunch source clocks begin. Nonce matches request; five-second timeout; fail/destroy reject pending request. Native clocks, frame production, PCM contents, queue size, manual Resume and native preparation policy remain unchanged.",
+  "focused_tests": {
+    "baseline_owner_source": "02231e9",
+    "negative_log_sha256": "5b649f584b37e285ddde2e29bef8f9acdd249eb14727b7b7be545847aa7b1fcc",
+    "corrected_log_sha256": "e4c0868ea14cf1efaf80cc6330c0c6cfdcb3d97b844bba652ddea79085b156eb",
+    "results": [
+      "Prior owner fails delayed-render gate regression; corrected owner passes",
+      "Protocol fake-timer tests cover state-ack distinction, nonce matching, late ack after timeout, duplicate requests, sync send failure, teardown and unavailable output",
+      "Real shipped worklet in VM confirms ack emitted only from process; not a browser rendering claim",
+      "Controlled owner verifies delayed rendering cannot launch source time, stale selection cancels, relaunch requests fresh progress, manual Resume remains unchanged"
+    ]
+  },
+  "release_validation": "Pending final commit CI, affected build/package audit and real-browser verification of final artifact.",
+  "exclusions": [
+    "The layered probe is not an unchanged release package pass",
+    "One callback does not guarantee future uninterrupted output or solve later interruption",
+    "No physical iPhone pause, first-load refresh, crash cause, foreground timing or PCM fidelity claim",
+    "No retail-state comparison claimed: source simulation code is unchanged",
+    "Earlier overflow failures remain retained; no automatic Resume"
+  ],
+  "development_replay": {
+    "prior_overlay_classification": "Gate not exercised: whole-session replay directly invokes native launch without owner.handle.start(). Failure retained; no post-ack timeline was captured.",
+    "prior_overlay_result_sha256": "f55f14745e73589b52c66604638cd7125c71dc9d7775b4b83e55717e6d35da5f",
+    "shared_helper": "waitForAudioRender",
+    "scope": "Await the same owner helper immediately before whole-session replay native launch; single-match replay unchanged.",
+    "tests": "Extracted production handler holds launch while helper is pending and invokes failure finalization on rejection."
+  }
+}

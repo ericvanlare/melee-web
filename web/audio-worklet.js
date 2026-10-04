@@ -1,8 +1,9 @@
 import { AudioRing } from './audio-ring.mjs';
 class MeleeAudioOutput extends AudioWorkletProcessor {
   constructor() {
-    super(); this.queue = new AudioRing(); this.enabled = false; this.blocks = 0;
+    super(); this.queue = new AudioRing(); this.enabled = false; this.blocks = 0; this.renderReadyRequest = null;
     this.port.onmessage = ({ data }) => {
+      if (data.type === 'render-ready-request' && Number.isSafeInteger(data.id) && data.id > 0) this.renderReadyRequest = data.id;
       if (data.type === 'state') { this.enabled = data.enabled; this.queue.reset(); this.port.postMessage({type: 'state-ack', enabled: this.enabled, queued: this.queue.available, underruns: this.queue.underruns, overflows: this.queue.overflows}); }
       if (data.type === 'pcm' && this.enabled) {
         try { if (!this.queue.push(data.pcm)) this.port.postMessage({ error: 'Audio output queue overflow' }); }
@@ -11,6 +12,10 @@ class MeleeAudioOutput extends AudioWorkletProcessor {
     };
   }
   process(_inputs, outputs) {
+    if (this.renderReadyRequest !== null) {
+      this.port.postMessage({type: 'render-ready', id: this.renderReadyRequest, process_time: currentTime, process_frame: currentFrame});
+      this.renderReadyRequest = null;
+    }
     const [left, right] = outputs[0];
     if (this.enabled && left && right) this.queue.consume(left, right);
     if (++this.blocks % 128 === 0) this.port.postMessage({ queued: this.queue.available, underruns: this.queue.underruns, overflows: this.queue.overflows });

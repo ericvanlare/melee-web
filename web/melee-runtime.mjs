@@ -426,6 +426,11 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   const waitForAudioAck = () => audio?.waitForAck() || Promise.resolve();
   const prepareAudio = async () => { await audio?.prepare(); };
+  const waitForAudioRender = async () => {
+    if (audio && typeof audio.waitForRender !== 'function')
+      throw Error('The audio output cannot confirm startup readiness. Reload to recover.');
+    await audio?.waitForRender();
+  };
   const pauseAudioForPreparation = async () => { await audio?.pause(); };
   function syncAudio() {
     const running = ready && !fatal && !destroyed && !!Module._melee_web_native_menu_running();
@@ -833,6 +838,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         // The shell primes audio on Choose file; a recovery Play click supplies
         // its own gesture. Resume before native preparation can yield.
         await prepareAudio(); await prepareNativeResources();
+        // A running AudioContext and a port state acknowledgement can precede
+        // its first output callback. Start source time only after the renderer
+        // processes a quantum following this preparation.
+        await waitForAudioRender();
         if (!isCurrent()) throw Error('Disc selection changed before launch.');
         await boundary(() => check(Module._melee_web_native_menu_launch())); prepared = false; focus(); syncAudio();
       });
@@ -886,7 +895,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   // The development entry may attach tools before loading; these are never part of the public handle.
   onOwner?.({Module, boundary, handle, status, check, put, prepareAudio, pauseAudioForPreparation,
-    syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, stop, callbacks, diagnostics});
+    syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, waitForAudioRender, stop, callbacks, diagnostics});
   configureModule?.(Module);
   // Native seed loading needs this directory even when optional browser
   // persistence is disabled or unavailable. Keep that prerequisite in the

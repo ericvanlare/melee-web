@@ -20,7 +20,7 @@ function retailReplayWallTimeMs(wholeSession) {
 const RETAIL_REPLAY_MAX_BYTES = 16 + 4 + 8 + (0x18 + 0x55E8 + 0x148 + 6) +
   4 + 3 * 0x138 + 822 + RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES * 44 + 2 + 32 * 12;
 let owner, controllerSettings, Module, boundary, status, check, put, prepareAudio, pauseAudioForPreparation;
-let syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck;
+let syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, waitForAudioRender;
 let preparationKeepsAudio = false;
 const stop = error => owner.stop(error);
 const $=id=>document.getElementById(id);const startupUrl=new URL(location.href),clearRenderCacheOnLoad=startupUrl.searchParams.get('render-cache')==='clear',hitchCaptureFromUrl=startupUrl.searchParams.get('hitch-capture')==='1',hitchCausalFromUrl=startupUrl.searchParams.get('hitch-causal')==='1',hitchUserTimingFromUrl=startupUrl.searchParams.get('hitch-marks')==='1';if(clearRenderCacheOnLoad){startupUrl.searchParams.delete('render-cache');history.replaceState(null,'',startupUrl);}let ready=false,fatal=false,bundle=false,inputDirty=true,importing=false,uiMessage="";let frameLast=0,perfLastReport=0,activeFrames=0,worstFrame=0,worstBrowserCallback=null,longFrames=0,browserLongTasks=0,browserLongTaskWorst=0;let nativeTimingFrames=0,nativeTimingWorst=0,nativeLongFrames=0,nativeOverBudgetFrames=0,nativeSourceSteps=0,nativeSourceDraws=0,nativeWorstTiming=null,nativeFirstUse=0,nativeFirstUseWorst=0,nativePreviousTiming=null,nativeLastTiming=null,livePipelineQueued=0,livePipelineCreated=0,liveTextureUploads=0,liveStagingUsedBytes=0,peakStagingUsedBytes=0;let constructionCounts={},constructionWorst=0,constructionFirstUseWorst=0,preparationSince=0,preparationLabel="",preparationSequence=0,activePreparation=null,pendingEntryProfile=null,settlingEntryProfile=null,entryProfiles=[],latestNativePreparation=null;let preparationCount=0,preparationWorst=0;let diagnosticCaptureInvalid=false,audioStateAcknowledged=true,audioAckWaiters=[],stockCheckActive=false,latestAudio={queued:0,underruns:0,overflows:0},actionSweepActive=false,actionSweepFocusLost=false,selectionDriveActive=false,sweepAutomaticResumes=0;
@@ -232,13 +232,20 @@ $('retail-replay-start').onclick=async()=>{
   if(!wholeSession&&!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
   for(const old of $('retail-replay-downloads').querySelectorAll('a'))URL.revokeObjectURL(old.href);$('retail-replay-downloads').replaceChildren();replayEvidence=[];$('save-replay-evidence').disabled=true;
   retailRun={hash,observe,wholeSession,rows:[],timerRows:[],memory:{before_preparation:replayMemorySnapshot()},frames:0,started:performance.now(),lastProgress:performance.now(),lastCursor:0,focusLost:false,cache:{state:Module.runtimeCacheState?.state||'unknown',bytes:Number(Module.runtimeCacheState?.fileBytes||0),cleared_on_startup:clearRenderCacheOnLoad,driver_cache:'uncontrolled'}};
+  const run=retailRun;
   uiMessage='';$('retail-replay-report').textContent='Preparing reference replay…';$('launch').disabled=true;$('pause').disabled=$('unload').disabled=false;
   retailRun.paintControl=beginReplayPaintControl();
   await boundary(()=>{const ptr=Module._malloc(bytes.length);try{if(!ptr)throw Error('Replay allocation failed');Module.HEAPU8.set(bytes,ptr);check(Module._melee_web_native_menu_replay(ptr,bytes.length,observe?1:0));}finally{Module._free(ptr);}});
   // A whole-session recipe keeps one source arena and cursors through the real
   // scene chain, so it enters CSS through the ordinary launch instead of the
   // single-match replay's direct match construction.
-  if(Module._melee_web_native_menu_replay_whole_session?.())await boundary(()=>check(Module._melee_web_native_menu_launch()));
+  if(Module._melee_web_native_menu_replay_whole_session?.()){
+   await waitForAudioRender();
+   if(retailRun!==run||run.finishing)return;
+   // A stop can also arrive after readiness but before this native command.
+   await boundary(()=>{if(retailRun===run&&!run.finishing)check(Module._melee_web_native_menu_launch());});
+   if(retailRun!==run||run.finishing)return;
+  }
   $('canvas').focus();inputDirty=true;syncAudio();
  }catch(error){if(retailRun)await finishRetailReplay(error.message);else $('retail-replay-report').textContent=error.message;}
  finally{replayLoading=false;if(!retailRun){$('disc').disabled=fatal||importing;$('launch').disabled=fatal||!bundle;}}
@@ -280,7 +287,7 @@ controllerSettings = mountControllerSettings({
 try {
   await mountMeleeRuntime({canvas:$('canvas'),createAudio:createRuntimeAudio,readDisc:loadNativeGameDisc,openDisc:openNativeGameSession,loaderUrl:new URL('./gameplay_menu_browser.js',import.meta.url),
     onOwner(context){owner=context;({Module,boundary,status,check,put,prepareAudio,pauseAudioForPreparation,
-      syncAudio,unloadAndSave,prepareNativeResources,waitForAudioAck}=context);},
+      syncAudio,unloadAndSave,prepareNativeResources,waitForAudioAck,waitForAudioRender}=context);},
     configureModule(module){
       installRuntimeCache(module,report=>{const size=report.fileBytes?` · ${report.fileBytes} persisted bytes`:'';
         $('cache-status').textContent=report.message+size;runtimeCacheSyncCapability=report.sync_diagnostics||null;window.meleeHitchCapture?.setCacheSyncCapability?.(runtimeCacheSyncCapability||{});$('export-render-cache').disabled=!report.mounted||!report.populated;

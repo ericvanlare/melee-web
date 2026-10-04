@@ -2,6 +2,12 @@
 export function createRuntimeAudio({assetBase, onEvent, onError, onFatal}) {
   let context = null, node = null, nodePreparation = null, enabled = false, acknowledged = true;
   const waiters = [];
+  let renderSequence = 0;
+  const renderWaiters = new Map();
+  const clearRenderWaiters = error => {
+    for (const waiter of renderWaiters.values()) { clearTimeout(waiter.timer); waiter.reject(error); }
+    renderWaiters.clear();
+  };
   const waitForAck = () => acknowledged ? Promise.resolve() : new Promise((resolve, reject) => {
     const waiter = {resolve, reject, timer: setTimeout(() =>
       onFatal(Error('Audio did not acknowledge preparation. Reload to recover.')), 10000)};
@@ -50,6 +56,11 @@ export function createRuntimeAudio({assetBase, onEvent, onError, onFatal}) {
             });
             acknowledged = false;
             node.port.onmessage = ({data}) => {
+              if (data.type === 'render-ready') {
+                const waiter = renderWaiters.get(data.id);
+                if (waiter) { renderWaiters.delete(data.id); clearTimeout(waiter.timer); waiter.resolve(); }
+                return;
+              }
               if (data.type === 'state-ack' && data.enabled === enabled) {
                 acknowledged = true;
                 for (const waiter of waiters.splice(0)) { clearTimeout(waiter.timer); waiter.resolve(); }
@@ -67,14 +78,32 @@ export function createRuntimeAudio({assetBase, onEvent, onError, onFatal}) {
         await ensureRunning(resumed);
       }
     },
+    // Port messages can be handled before output rendering starts. Keep source
+    // playback stopped until one output quantum acknowledges this fresh request.
+    waitForRender() {
+      if (!context || !node || context.state !== 'running')
+        return Promise.reject(Error('Game audio is unavailable. Close this message, then choose Play to try again.'));
+      if (renderWaiters.size) return Promise.reject(Error('Audio readiness is already pending.'));
+      const id = ++renderSequence;
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+          renderWaiters.delete(id);
+          reject(Error('Game audio did not start. Close this message, then choose Play to try again.'));
+        }, 5000);
+        renderWaiters.set(id, {resolve, reject, timer});
+        try { node.port.postMessage({type: 'render-ready-request', id}); }
+        catch (error) { renderWaiters.delete(id); clearTimeout(timer); reject(error); }
+      });
+    },
     setEnabled,
     async pause() { setEnabled(false); await waitForAck(); },
     waitForAck,
     readyForPreparation: () => !node || (!enabled && acknowledged),
     write(pcm) { if (enabled) node?.port.postMessage({type: 'pcm', pcm}, [pcm.buffer]); },
     fail(error) {
+      clearRenderWaiters(error);
       for (const waiter of waiters.splice(0)) { clearTimeout(waiter.timer); waiter.reject(error); }
     },
-    async destroy() { node?.disconnect(); if (context) await context.close(); },
+    async destroy() { clearRenderWaiters(Error('Audio output closed.')); node?.disconnect(); if (context) await context.close(); },
   });
 }
