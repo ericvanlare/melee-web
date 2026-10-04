@@ -1,5 +1,5 @@
 {
-  "build_command": "python3 scripts/build.py --target graphics --configuration Release",
+  "build_command": "python3 scripts/build.py --target aurora-browser-quiescence --configuration Release",
   "evidence_labels": [
     "Compiled",
     "Source identified",

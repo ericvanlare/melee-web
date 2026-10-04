@@ -40,8 +40,8 @@ complete host graph were not compared.
 After normal bootstrap, run the host regression and affected build:
 
 ```sh
-python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_aurora_browser_submission_owner.py -v
-python3 scripts/build.py --target graphics --configuration Release
+python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p 'test_aurora_browser_*' -v
+python3 scripts/build.py --target aurora-browser-quiescence --configuration Release
 ```
 
 The required local checks passed at code head `08366be`: 1,837 tests with 140
@@ -55,7 +55,9 @@ have not been run; the two-frame diagnostic does not satisfy that gate.
 
 The real browser receipt uses the retained private GameplayMatchSession fixture
 and locally owned assets; this change adds no public browser reproduction target.
-Its temporary diagnostic CMake target was reversed after the fresh build.
+The diagnostic build profile is opt-in and writes a separate
+`build/browser-quiescence-release` directory; ordinary player builds keep the
+owner book, mutex and descriptor/lease producer disabled.
 Bootstrap recognizes only the exact preceding reviewed Aurora tree when upgrading
 an existing dependency checkout.
 
