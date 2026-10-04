@@ -499,9 +499,20 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       return pointer;
     },
     menuSourceReadDiscard(request) { sourceReadResults.delete(request); },
+    menuOwnerStopped() { return fatal || destroyed; },
     menuServiceCommands() {
-      if (fatal || destroyed) return 0;
-      for (const c of commands.splice(0)) { try { c.resolve(c.run()); } catch (error) { c.reject(error); } }
+      // Native consumes this terminal signal before input, clocks, preparation
+      // or source work. Never re-enter native teardown from an audio/error event.
+      if (fatal || destroyed) return -1;
+      for (const c of commands.splice(0)) {
+        if (fatal || destroyed) { c.reject(Error(message || 'Player stopped.')); continue; }
+        try {
+          const result = c.run();
+          if (fatal || destroyed) c.reject(Error(message || 'Player stopped.'));
+          else c.resolve(result);
+        } catch (error) { c.reject(error); }
+      }
+      if (fatal || destroyed) return -1;
       const suspended = lifecycleSuspended;
       lifecycleSuspended = false;
       if (suspended) {
@@ -881,7 +892,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           publish();
         }
       }
-      // The global Emscripten heap and main loop live until this document retires.
+      // Native consumes the terminal owner state at its next safe boundary.
+      // The global Emscripten heap remains until this document retires.
       return Object.freeze({requiresReload: true});
     },
   });
