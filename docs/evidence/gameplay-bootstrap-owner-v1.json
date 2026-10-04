@@ -1,0 +1,174 @@
+{
+  "schema": "gameplay-bootstrap-owner-v1",
+  "source_head": "4d9b972fe6161a9e024419529b7599df654fd247",
+  "base_main": "c3ddd39d191abcd59a72cd428a085c0958c922a9",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified"
+  ],
+  "scope": "Synchronous existing source Mario/Final Destination Wasm fixture, original Entry/Ready, read-only private bootstrap owner; no restore or original trace comparison",
+  "runtime_admission": false,
+  "build": {
+    "target": "gameplay_snapshot_probe",
+    "configuration": "RelWithDebInfo",
+    "emscripten": "6.0.9",
+    "compiler_jobs": "normal build.py default",
+    "option": "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE",
+    "default": "OFF",
+    "enabled_only_for_exact_probe_selection": true
+  },
+  "machine": {
+    "model": "Mac16,10",
+    "architecture": "arm64",
+    "memory_bytes": 17179869184,
+    "macos": "26.6",
+    "macos_build": "25G72",
+    "node": "22.23.2"
+  },
+  "abi": {
+    "version": 1,
+    "schema": "GPBS",
+    "bytes": 128,
+    "private_state_groups": 13,
+    "private_variables": 21,
+    "pointer_and_callback_fields": "numeric identities only; never dereferenced or restored"
+  },
+  "identities": {
+    "probe_source_sha256": "b865199583487ae5dbf716ab89e68813103aa2ae5214cfcda0130ff81cf91c94",
+    "source_c_sha256": "a284e9beb7c2163f546bbbc4000c1b6f2cb059d7700e9cc1ea118aab61097e61",
+    "source_h_sha256": "9cd1bf45066f037c5c23e5ea4307440361c288876f9304183d32cb69bf8ebfa4"
+  },
+  "artifacts": {
+    "off": [
+      {
+        "name": "gameplay_snapshot_probe.js",
+        "bytes": 338938,
+        "sha256": "cda1f5ac859d01f3dff5c59f39968c4536b8f3c061cb27fc43dce9b0540c7076"
+      },
+      {
+        "name": "gameplay_snapshot_probe.wasm",
+        "bytes": 104898150,
+        "sha256": "e44ca2b3e3beaf3a26423f859d7604ba8863f0aeb82b8ce4ab25796505ef16bc"
+      }
+    ],
+    "on": [
+      {
+        "name": "gameplay_snapshot_probe.js",
+        "bytes": 343193,
+        "sha256": "4359170cda094f659b0b844f2e6c8e073d859f2c06a3771582426022051fd16d"
+      },
+      {
+        "name": "gameplay_snapshot_probe.wasm",
+        "bytes": 104904199,
+        "sha256": "a9c4479a9e4c4f143798ed95ddfcb96b2cda1245652f9f72f8ef77db32dc2f62"
+      }
+    ]
+  },
+  "observed": {
+    "result": "passed",
+    "ready_steps": 124,
+    "captures": 2,
+    "byte_identical": true,
+    "generation": "1",
+    "ticks": "124",
+    "refusals": [
+      {
+        "label": "before world initialization",
+        "returned_zero": true,
+        "output_unchanged": true
+      },
+      {
+        "label": "wrong output size",
+        "returned_zero": true,
+        "output_unchanged": true
+      },
+      {
+        "label": "null output",
+        "returned_zero": true,
+        "output_unchanged": true
+      },
+      {
+        "label": "after world close",
+        "returned_zero": true,
+        "output_unchanged": true
+      }
+    ],
+    "source_close": "source match/audio/world closed",
+    "runtime_log_bytes": 0,
+    "owned_asset_files": 34,
+    "asset_hashes_unchanged": true,
+    "report_sha256": "7e975ed4776d40e04d1a7318ca0c7d762c0e07f974c8833227fefadc0c27d985",
+    "root_audit_sha256": "02223c23eda6d7c76a8d79f3fb282db3bcfb9e65d0953ff4118e138816a2af60"
+  },
+  "focused_controls": {
+    "host64_producer": {
+      "tests": 1,
+      "result": "passed",
+      "boundary": "exact extracted producer with applied header; pointer-width/argument zero-write refusal"
+    },
+    "wrapper": {
+      "tests": 1,
+      "result": "passed",
+      "boundary": "exact wrapper and header with explicit mocked owner APIs; staged failure write, lifecycle/allocation/stats refusals and valid publication"
+    },
+    "build_selection": {
+      "tests": 10,
+      "result": "passed",
+      "boundary": "real build function with mocked subprocesses; OFF/ON selection and pre-mutation refusals"
+    }
+  },
+  "full_suite": {
+    "tests": 1883,
+    "skipped": 141,
+    "seconds": 333.99,
+    "result": "passed"
+  },
+  "phases": {
+    "build-off": {
+      "passed": true,
+      "elapsed_seconds": 19.600551582872868,
+      "receipt_sha256": "ccf0a3925c58f359fcfc78b7f0359dc175696bf54e275abb86e14778fedd94b9",
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1697
+    },
+    "build-on": {
+      "passed": true,
+      "elapsed_seconds": 16.30863220896572,
+      "receipt_sha256": "dff26362733a9621d43a1d71fec6955b781ad8f2a15faeab526f5af12a2885c6",
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1697
+    },
+    "observe": {
+      "passed": true,
+      "elapsed_seconds": 0.3829788330476731,
+      "receipt_sha256": "960baabd28fbfabee3fe7af2d48efcaa7f39c90f6cf693a663b3e065bbfb242b",
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1697
+    },
+    "suite": {
+      "passed": true,
+      "elapsed_seconds": 334.2437989159953,
+      "receipt_sha256": "0e19865bf2258583fbfd405acfe3704f3bbb16ed43d4117bf42f9b6a59b93a68",
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1697
+    }
+  },
+  "phase_wrapper_sha256": "c0a1d65449130f56dddfccd338ad26e61e414e951bd1038fb9af0232b9920278",
+  "exclusions": [
+    "arena/session payloads and allocation provenance",
+    "SDK heap descriptors and HSD object allocator registry/free chains",
+    "HSD GObj/process/fighter/item/render/animation graphs",
+    "source-memory and Wasm mutable globals/function tables",
+    "callback-owned graphs and JavaScript/host objects",
+    "renderer/GPU, browser input/clocks, Web Audio and external effects",
+    "snapshot restoration, replay correctness, original/Slippi state agreement",
+    "whole match/rematch, impaired rollback, foreground performance, physical input and Internet"
+  ],
+  "actual_export_audit": {
+    "passed": true,
+    "required_diagnostic_functions": 7,
+    "off_diagnostic_functions": 0,
+    "on_diagnostic_functions": 7,
+    "report_sha256": "5d9a35ac99d602f2412a56c4c12e3cdc2d7060cc35bf88b693997be7dd50ab6b"
+  }
+}
