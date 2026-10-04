@@ -156,10 +156,23 @@ index 56c7aae..4a1c018 100644
  void aurora_set_log_level(AuroraLogLevel level);
  void aurora_set_pause_on_focus_lost(bool value);
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
-index 94504b1..ae5908f 100644
+index 94504b1..b834676 100644
 --- a/include/aurora/gfx.h
 +++ b/include/aurora/gfx.h
-@@ -26,8 +26,64 @@ typedef struct {
+@@ -3,10 +3,12 @@
+ 
+ #ifdef __cplusplus
+ #include <cstdint>
++#include <cstddef>
+ 
+ extern "C" {
+ #else
+ #include "stdint.h"
++#include "stddef.h"
+ #endif
+ 
+ #if !defined(NDEBUG) && !defined(AURORA_GFX_DEBUG_GROUPS)
+@@ -26,8 +28,161 @@ typedef struct {
    uint32_t lastIndexSize;
    uint32_t lastStorageSize;
    uint32_t lastTextureUploadSize;
@@ -219,6 +232,103 @@ index 94504b1..ae5908f 100644
 +  uint32_t workerBusy;
 +} AuroraBrowserSubmissionStatus;
 +AuroraBrowserSubmissionStatus aurora_browser_submission_status();
++
++/* Diagnostic-only browser ownership view. The five stream fields mirror the
++ * authored BrowserFrameStaging members; no restore operation consumes them. */
++enum {
++  AURORA_BROWSER_QUIESCENCE_SCHEMA_VERSION = 5,
++  AURORA_BROWSER_STAGING_STREAM_COUNT = 5,
++};
++typedef struct {
++  uint64_t dataAddress;
++  uint64_t length;
++  uint64_t capacity;
++  uint64_t maxCapacity;
++  uint32_t owned;
++  uint32_t reserved;
++} AuroraBrowserByteBufferDescriptor;
++typedef struct {
++  uint32_t frameSlot;
++  uint32_t packetActive;
++  uint32_t packetStagingBuffer;
++  uint32_t reserved;
++  uint64_t packetFrameId;
++  uint64_t shadowPreviousUsed[AURORA_BROWSER_STAGING_STREAM_COUNT];
++  AuroraBrowserByteBufferDescriptor packetBuffers[AURORA_BROWSER_STAGING_STREAM_COUNT];
++  AuroraBrowserByteBufferDescriptor shadowBuffers[AURORA_BROWSER_STAGING_STREAM_COUNT];
++} AuroraBrowserFrameStagingDescriptor;
++typedef enum {
++  AURORA_BROWSER_SUBMISSION_IDLE = 0,
++  AURORA_BROWSER_SUBMISSION_REGISTERED = 1,
++  AURORA_BROWSER_SUBMISSION_COMPLETED = 2,
++  AURORA_BROWSER_SUBMISSION_GENERATION_STALE = 3,
++  AURORA_BROWSER_SUBMISSION_FAILED = 4,
++  AURORA_BROWSER_SUBMISSION_IMMEDIATE_RELEASE = 5,
++} AuroraBrowserSubmissionState;
++typedef struct {
++  uint32_t stagingSlot;
++  uint32_t state;
++  uint64_t futureId;
++  uint64_t registrationSequence;
++  uint64_t callbackSequence;
++  uint64_t capturedGeneration;
++  uint64_t queueHandle;
++  uint64_t encoderHandle;
++} AuroraBrowserSubmissionDescriptor;
++/* The frame and submission rows immediately follow this header at their
++ * authored offsets. The size query supplies both counts; callers never guess
++ * a slot bound. */
++typedef struct {
++  uint32_t schemaVersion;
++  uint32_t byteSize;
++  uint32_t frameSlotCount;
++  uint32_t stagingSlotCount;
++  uint32_t frameDescriptorOffset;
++  uint32_t frameDescriptorStride;
++  uint32_t frameDescriptorCount;
++  uint32_t submissionDescriptorOffset;
++  uint32_t submissionDescriptorStride;
++  uint32_t submissionDescriptorCount;
++  uint32_t pendingFramePackets;
++  uint32_t pendingStagingBuffers;
++  uint32_t workerBusy;
++  uint32_t pipelineCacheStatus;
++  uint32_t queuedPipelines;
++  uint32_t createdPipelines;
++  uint32_t drawCallCount;
++  uint32_t currentFrameIndex;
++  uint64_t stagingGeneration;
++  uint64_t lastBeginFrameId;
++  uint64_t lastEndFrameId;
++  uint64_t lastRegistrationSequence;
++  uint64_t lastCallbackSequence;
++  uint64_t staleCallbackCount;
++} AuroraBrowserQuiescenceDescriptor;
++/* This is a diagnostic unchanged-boundary check, never a restore token.
++ * Descriptor and lease capture are supported only on inline, non-pthread
++ * Emscripten; threaded callers receive an explicit refusal. */
++typedef struct {
++  uint64_t stagingGeneration;
++  uint64_t lastBeginFrameId;
++  uint64_t lastEndFrameId;
++  uint32_t currentFrameIndex;
++  uint32_t queuedPipelines;
++  uint32_t createdPipelines;
++  uint32_t drawCallCount;
++  uint32_t pipelineCacheStatus;
++  uint32_t pendingFramePackets;
++  uint32_t pendingStagingBuffers;
++  uint32_t workerBusy;
++  uint64_t lastRegistrationSequence;
++  uint64_t lastCallbackSequence;
++  uint64_t staleCallbackCount;
++} AuroraBrowserQuiescenceLease;
++size_t aurora_browser_quiescence_descriptor_bytes();
++size_t aurora_browser_quiescence_lease_bytes();
++int aurora_browser_quiescence_descriptor(void* out, size_t bytes);
++int aurora_browser_quiescence_validate_descriptor(const void* captured, size_t bytes);
++int aurora_browser_quiescence_capture_lease(AuroraBrowserQuiescenceLease* out);
++int aurora_browser_quiescence_validate_lease(const AuroraBrowserQuiescenceLease* lease);
 +#endif
 +
  const AuroraStats* aurora_get_stats();
@@ -722,6 +832,125 @@ index 0a35990..11a6faf 100644
    const auto controller = aurora::input::get_controller_for_player(chan);
    if (should_use_device_rumble(chan, controller)) {
      u16 low = 0;
+diff --git a/lib/gfx/browser_submission_owner.hpp b/lib/gfx/browser_submission_owner.hpp
+new file mode 100644
+index 0000000..f0634a7
+--- /dev/null
++++ b/lib/gfx/browser_submission_owner.hpp
+@@ -0,0 +1,113 @@
++#pragma once
++
++#include <array>
++#include <atomic>
++#include <cstddef>
++#include <cstdint>
++#include <mutex>
++
++namespace aurora::gfx::detail {
++
++struct BrowserSubmissionOwner {
++  uint64_t futureId = 0;
++  uint64_t registrationSequence = 0;
++  uint64_t callbackSequence = 0;
++  uint64_t capturedGeneration = 0;
++  uint64_t queueHandle = 0;
++  uint64_t encoderHandle = 0;
++  uint32_t state = 0;
++};
++
++enum class BrowserOwnerCallbackOutcome : uint32_t {
++  Stale = 0,
++  OwnershipMismatch = 1,
++  Completed = 2,
++  Failed = 3,
++};
++
++/* This book is the narrow synchronization seam for the real owner records.
++ * Registration is published before the WebGPU call; a spontaneous callback can
++ * therefore complete before Future returns, and publish_future_if_current can
++ * attach the returned Future id afterward without replacing a reused slot. */
++template <size_t SlotCount>
++class BrowserSubmissionOwnerBook {
++ public:
++  BrowserSubmissionOwnerBook(uint32_t registeredState, uint32_t completedState,
++                             uint32_t failedState, uint32_t immediateState)
++      : m_registeredState(registeredState),
++        m_completedState(completedState),
++        m_failedState(failedState),
++        m_immediateState(immediateState) {}
++
++  void publish_registration(size_t slot, uint64_t registrationSequence,
++                           uint64_t generation, uint64_t queueHandle,
++                           uint64_t encoderHandle) {
++    std::lock_guard lock{m_mutex};
++    auto& owner = m_records[slot];
++    owner = {};
++    owner.registrationSequence = registrationSequence;
++    owner.capturedGeneration = generation;
++    owner.queueHandle = queueHandle;
++    owner.encoderHandle = encoderHandle;
++    owner.state = m_registeredState;
++  }
++
++  void publish_future_if_current(size_t slot, uint64_t registrationSequence,
++                                 uint64_t generation,
++                                 const std::atomic_uint64_t& currentGeneration,
++                                 uint64_t futureId) {
++    std::lock_guard lock{m_mutex};
++    auto& owner = m_records[slot];
++    if (owner.registrationSequence == registrationSequence &&
++        owner.capturedGeneration == generation &&
++        currentGeneration.load(std::memory_order_acquire) == generation) {
++      owner.futureId = futureId;
++    }
++  }
++
++  BrowserOwnerCallbackOutcome complete_callback(size_t slot,
++                                                 uint64_t registrationSequence,
++                                                 uint64_t generation,
++                                                 const std::atomic_uint64_t& currentGeneration,
++                                                 uint64_t callbackSequence,
++                                                 bool success) {
++    std::lock_guard lock{m_mutex};
++    auto& owner = m_records[slot];
++    // A callback from an older captured generation is stale and must not touch
++    // the slot. A current-generation registration/state mismatch is different:
++    // it indicates duplicate completion or owner reuse and must fail closed.
++    if (currentGeneration.load(std::memory_order_acquire) != generation) {
++      return BrowserOwnerCallbackOutcome::Stale;
++    }
++    if (owner.registrationSequence != registrationSequence ||
++        owner.capturedGeneration != generation || owner.state != m_registeredState) {
++      return BrowserOwnerCallbackOutcome::OwnershipMismatch;
++    }
++    owner.callbackSequence = callbackSequence;
++    owner.state = success ? m_completedState : m_failedState;
++    return success ? BrowserOwnerCallbackOutcome::Completed : BrowserOwnerCallbackOutcome::Failed;
++  }
++
++  void mark_immediate(size_t slot, uint64_t generation) {
++    std::lock_guard lock{m_mutex};
++    auto& owner = m_records[slot];
++    owner = {};
++    owner.capturedGeneration = generation;
++    owner.state = m_immediateState;
++  }
++
++  BrowserSubmissionOwner snapshot(size_t slot) const {
++    std::lock_guard lock{m_mutex};
++    return m_records[slot];
++  }
++
++ private:
++  mutable std::mutex m_mutex;
++  std::array<BrowserSubmissionOwner, SlotCount> m_records{};
++  uint32_t m_registeredState;
++  uint32_t m_completedState;
++  uint32_t m_failedState;
++  uint32_t m_immediateState;
++};
++
++}  // namespace aurora::gfx::detail
 diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
 index b3054be..9fe8bd7 100644
 --- a/lib/gfx/encoding.cpp
@@ -747,17 +976,19 @@ index b3054be..9fe8bd7 100644
    switch (op.type) {
    case FrameOpType::RenderPass:
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83ef..1adb5f4 100644
+index 9fd83ef..adde61b 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
-@@ -1,3 +1,6 @@
+@@ -1,4 +1,8 @@
 +#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 +#include "pipeline_provenance_runtime.h"
 +#endif
  #include "frame.hpp"
++#include "browser_submission_owner.hpp"
  
  #include "depth_peek.hpp"
-@@ -16,9 +19,12 @@
+ #include "pipeline_cache.hpp"
+@@ -16,9 +20,12 @@
  #include "../webgpu/gpu_prof.hpp"
  
  #include <array>
@@ -770,7 +1001,7 @@ index 9fd83ef..1adb5f4 100644
  #include <deque>
  #include <mutex>
  #include <optional>
-@@ -27,6 +33,9 @@
+@@ -27,6 +34,9 @@
  #include <utility>
  #include <vector>
  
@@ -780,7 +1011,7 @@ index 9fd83ef..1adb5f4 100644
  #include <tracy/Tracy.hpp>
  #include <magic_enum.hpp>
  
-@@ -36,6 +45,14 @@ using webgpu::g_device;
+@@ -36,6 +46,14 @@ using webgpu::g_device;
  using webgpu::g_instance;
  using webgpu::g_queue;
  
@@ -795,7 +1026,7 @@ index 9fd83ef..1adb5f4 100644
  namespace {
  constexpr Module Log{"aurora::gfx"};
  
-@@ -49,6 +66,43 @@ enum class BufferMapState {
+@@ -49,6 +67,67 @@ enum class BufferMapState {
  
  std::array<wgpu::Buffer, StagingBufferCount> g_stagingBuffers;
  std::array<std::atomic<BufferMapState>, StagingBufferCount> g_mappingStates;
@@ -823,6 +1054,17 @@ index 9fd83ef..1adb5f4 100644
 +  }
 +
 +  void observe(size_t used) { previousUsed = used; }
++
++  AuroraBrowserByteBufferDescriptor descriptor() const noexcept {
++    return {
++        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(bytes.data())),
++        static_cast<uint64_t>(bytes.size()),
++        static_cast<uint64_t>(bytes.capacity()),
++        static_cast<uint64_t>(bytes.max_capacity()),
++        bytes.owned() ? 1U : 0U,
++        0U,
++    };
++  }
 +};
 +
 +struct BrowserFrameStaging {
@@ -835,11 +1077,24 @@ index 9fd83ef..1adb5f4 100644
 +
 +std::array<BrowserFrameStaging, FrameSlotCount> g_browserFrameStaging;
 +std::atomic_uint64_t g_browserStagingGeneration{0};
++
++/* One record per authored staging slot. The book serializes publication and
++ * callback completion, including AllowSpontaneous callbacks before Future.id is
++ * returned; stale callbacks never mutate a reused slot. */
++BrowserSubmissionOwnerBook<StagingBufferCount> g_browserSubmissionOwners{
++    AURORA_BROWSER_SUBMISSION_REGISTERED,
++    AURORA_BROWSER_SUBMISSION_COMPLETED,
++    AURORA_BROWSER_SUBMISSION_FAILED,
++    AURORA_BROWSER_SUBMISSION_IMMEDIATE_RELEASE,
++};
++std::atomic_uint64_t g_browserSubmissionSequence{0};
++std::atomic_uint64_t g_browserCallbackSequence{0};
++std::atomic_uint64_t g_browserStaleCallbackCount{0};
 +#endif
  uint32_t g_frameIndex = UINT32_MAX;
  
  std::array<FramePacket, FrameSlotCount> g_framePackets;
-@@ -56,6 +110,99 @@ uint64_t g_nextFrameId = 1;
+@@ -56,6 +135,99 @@ uint64_t g_nextFrameId = 1;
  render_worker::FrameSlotPool g_frameSlots{FrameSlotCount};
  render_worker::FrameSlotPool g_stagingSlots{StagingBufferCount};
  
@@ -939,7 +1194,7 @@ index 9fd83ef..1adb5f4 100644
  struct RuntimeDrawType {
    std::string label;
    DrawCallback draw = nullptr;
-@@ -179,7 +326,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
+@@ -179,7 +351,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
    if (render_worker::is_idle()) {
      enqueue_process_events();
    }
@@ -952,7 +1207,7 @@ index 9fd83ef..1adb5f4 100644
  }
  
  void pace_frame_start() {
-@@ -239,6 +391,79 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
+@@ -239,6 +416,79 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
          }
        });
  }
@@ -1032,7 +1287,7 @@ index 9fd83ef..1adb5f4 100644
  } // namespace
  
  namespace detail {
-@@ -374,6 +599,9 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
+@@ -374,6 +624,9 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
  }
  
  void initialize() {
@@ -1042,7 +1297,7 @@ index 9fd83ef..1adb5f4 100644
    g_frameIndex = 0;
    g_processEventsQueued.store(false, std::memory_order_release);
    g_lastPresentNs.store(0, std::memory_order_release);
-@@ -385,6 +613,18 @@ void initialize() {
+@@ -385,6 +638,18 @@ void initialize() {
      g_presentTimes.clear();
    }
    render_worker::initialize();
@@ -1061,7 +1316,7 @@ index 9fd83ef..1adb5f4 100644
    // This appears to take a while and blocks the render thread for periods of time
    // render_worker::set_event_pump([] {
    //   if (g_instance) {
-@@ -420,15 +660,22 @@ void initialize() {
+@@ -420,15 +685,22 @@ void initialize() {
                 "Shared Storage Buffer");
    for (size_t i = 0; i < g_stagingBuffers.size(); ++i) {
      const auto label = fmt::format("Staging Buffer {}", i);
@@ -1084,7 +1339,7 @@ index 9fd83ef..1adb5f4 100644
  
    {
      constexpr std::array layoutEntries{
-@@ -519,6 +766,10 @@ void initialize() {
+@@ -519,6 +791,10 @@ void initialize() {
  }
  
  void shutdown() {
@@ -1095,7 +1350,7 @@ index 9fd83ef..1adb5f4 100644
    render_worker::synchronize();
    render_worker::shutdown();
    g_processEventsQueued.store(false, std::memory_order_release);
-@@ -556,12 +807,29 @@ void shutdown() {
+@@ -556,12 +832,29 @@ void shutdown() {
    for (auto& packet : g_framePackets) {
      packet = {};
    }
@@ -1125,7 +1380,7 @@ index 9fd83ef..1adb5f4 100644
    g_frameSlots.reset();
    g_stagingSlots.reset();
    for (auto& state : g_mappingStates) {
-@@ -584,49 +852,109 @@ bool wait_for_staging_buffer(size_t slot) {
+@@ -584,49 +877,109 @@ bool wait_for_staging_buffer(size_t slot) {
    }
  }
  
@@ -1239,7 +1494,7 @@ index 9fd83ef..1adb5f4 100644
    size_t bufferOffset = 0;
    const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
    const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
-@@ -643,20 +971,74 @@ bool begin_frame() {
+@@ -643,20 +996,74 @@ bool begin_frame() {
    if constexpr (UseTextureBuffer) {
      mapBuffer(frame.textureUpload, TextureUploadSize);
    }
@@ -1314,7 +1569,7 @@ index 9fd83ef..1adb5f4 100644
    if (g_cpuFrameStart.time_since_epoch().count() != 0) {
      const auto cpuFrameTime = PresentClock::now() - g_cpuFrameStart;
      update_ema(g_cpuFrameTimeNs, duration_ns(cpuFrameTime));
-@@ -669,14 +1051,44 @@ void end_frame(EndFrameCallback callback) {
+@@ -669,14 +1076,48 @@ void end_frame(EndFrameCallback callback) {
    const uint64_t frameId = frame.frameId;
    end_pipeline_frame();
    ++g_frameIndex;
@@ -1353,6 +1608,10 @@ index 9fd83ef..1adb5f4 100644
 +    const double packetStarted = phase_now_ms();
      auto encoder = std::move(packet.encoder);
 -    const auto stats = packet.stats;
++#ifdef __EMSCRIPTEN__
++    const uint64_t frameEncoderHandle =
++        static_cast<uint64_t>(reinterpret_cast<uintptr_t>(encoder.Get()));
++#endif
 +    auto stats = packet.stats;
 +    stats.lastEndFrameId = frameId;
 +#ifdef __EMSCRIPTEN__
@@ -1361,7 +1620,7 @@ index 9fd83ef..1adb5f4 100644
      auto afterSubmitCallbacks = std::move(packet.afterSubmitCallbacks);
      packet = {};
      g_resources.stats.drawCallCount = stats.drawCallCount;
-@@ -686,16 +1098,87 @@ void end_frame(EndFrameCallback callback) {
+@@ -686,16 +1127,355 @@ void end_frame(EndFrameCallback callback) {
      g_resources.stats.lastIndexSize = stats.lastIndexSize;
      g_resources.stats.lastStorageSize = stats.lastStorageSize;
      g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
@@ -1375,23 +1634,53 @@ index 9fd83ef..1adb5f4 100644
      if (callback) {
 -      callback(encoder, std::move(afterSubmitCallbacks));
 +      // The caller's callback finishes and submits the command buffer before
-+      // this completion observer is registered. Guard the slot pool against
-+      // a later Aurora shutdown/reinitialization resetting its ownership.
++      // this completion observer is registered. Publish a registration record
++      // before the API call: AllowSpontaneous may invoke the callback before
++      // OnSubmittedWorkDone returns its Future.
 +      const double observerStarted = phase_now_ms();
 +      const auto generation = g_browserStagingGeneration.load(std::memory_order_acquire);
-+      g_queue.OnSubmittedWorkDone(
++      const uint64_t registrationSequence =
++          g_browserSubmissionSequence.fetch_add(1, std::memory_order_acq_rel) + 1;
++      const uint64_t queueHandle = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(g_queue.Get()));
++      const uint64_t encoderHandle = frameEncoderHandle;
++      g_browserSubmissionOwners.publish_registration(
++          stagingSlot, registrationSequence, generation, queueHandle, encoderHandle);
++      const wgpu::Future future = g_queue.OnSubmittedWorkDone(
 +          wgpu::CallbackMode::AllowSpontaneous,
-+          [stagingSlot, generation](wgpu::QueueWorkDoneStatus status, wgpu::StringView message) {
-+            if (generation != g_browserStagingGeneration.load(std::memory_order_acquire)) {
++          [stagingSlot, generation, registrationSequence](wgpu::QueueWorkDoneStatus status,
++                                                            wgpu::StringView message) {
++            const uint64_t callbackSequence =
++                g_browserCallbackSequence.fetch_add(1, std::memory_order_acq_rel) + 1;
++            const auto outcome = g_browserSubmissionOwners.complete_callback(
++                stagingSlot,
++                registrationSequence,
++                generation,
++                g_browserStagingGeneration,
++                callbackSequence,
++                status == wgpu::QueueWorkDoneStatus::Success);
++            if (outcome == BrowserOwnerCallbackOutcome::Stale) {
++              g_browserStaleCallbackCount.fetch_add(1, std::memory_order_acq_rel);
 +              return;
 +            }
-+            if (status != wgpu::QueueWorkDoneStatus::Success) {
++            if (outcome == BrowserOwnerCallbackOutcome::OwnershipMismatch) {
++              Log.fatal("Browser staging owner mismatch: slot {} registration {}",
++                        stagingSlot, registrationSequence);
++            } else if (outcome == BrowserOwnerCallbackOutcome::Failed) {
++              // Preserve the existing fatal-then-release ordering.
 +              Log.fatal("Browser staging submission failed: {}", message);
 +            }
 +            g_stagingSlots.release(stagingSlot);
 +          });
++      g_browserSubmissionOwners.publish_future_if_current(
++          stagingSlot,
++          registrationSequence,
++          generation,
++          g_browserStagingGeneration,
++          future.id);
 +      stats.lastEndFrameObserverMs = phase_now_ms() - observerStarted;
 +    } else {
++      g_browserSubmissionOwners.mark_immediate(
++          stagingSlot, g_browserStagingGeneration.load(std::memory_order_acquire));
 +      g_stagingSlots.release(stagingSlot);
      }
 +#endif
@@ -1434,8 +1723,8 @@ index 9fd83ef..1adb5f4 100644
 +                  g_resources.stats.lastEndFrameCallbackMs + g_resources.stats.lastEndFrameObserverMs +
 +                  g_resources.stats.lastEndFrameTailMs);
 +#endif
- }
- 
++}
++
 +#ifdef __EMSCRIPTEN__
 +AuroraBrowserSubmissionStatus browser_submission_status() {
 +  enqueue_process_events();
@@ -1445,18 +1734,274 @@ index 9fd83ef..1adb5f4 100644
 +      render_worker::is_idle() ? 0U : 1U,
 +  };
 +}
++
++namespace {
++uint32_t browser_pipeline_cache_status() noexcept {
++  switch (pipeline_cache_status()) {
++  case PipelineCacheStatus::Ready:
++    return 0U;
++  case PipelineCacheStatus::Pending:
++    return 1U;
++  case PipelineCacheStatus::Error:
++    return 2U;
++  }
++  return 2U;
++}
++
++void fill_quiescence_header(AuroraBrowserQuiescenceDescriptor& out,
++                            const AuroraBrowserSubmissionStatus& submission) noexcept {
++  const auto& stats = g_resources.stats;
++  std::memset(&out, 0, sizeof(out));
++  out.schemaVersion = AURORA_BROWSER_QUIESCENCE_SCHEMA_VERSION;
++  out.frameSlotCount = static_cast<uint32_t>(FrameSlotCount);
++  out.stagingSlotCount = static_cast<uint32_t>(StagingBufferCount);
++  out.frameDescriptorOffset = static_cast<uint32_t>(sizeof(AuroraBrowserQuiescenceDescriptor));
++  out.frameDescriptorStride = static_cast<uint32_t>(sizeof(AuroraBrowserFrameStagingDescriptor));
++  out.frameDescriptorCount = static_cast<uint32_t>(FrameSlotCount);
++  out.submissionDescriptorOffset = static_cast<uint32_t>(
++      sizeof(AuroraBrowserQuiescenceDescriptor) +
++      FrameSlotCount * sizeof(AuroraBrowserFrameStagingDescriptor));
++  out.submissionDescriptorStride = static_cast<uint32_t>(sizeof(AuroraBrowserSubmissionDescriptor));
++  out.submissionDescriptorCount = static_cast<uint32_t>(StagingBufferCount);
++  out.pendingFramePackets = submission.pendingFramePackets;
++  out.pendingStagingBuffers = submission.pendingStagingBuffers;
++  out.workerBusy = submission.workerBusy;
++  out.pipelineCacheStatus = browser_pipeline_cache_status();
++  out.queuedPipelines = stats.queuedPipelines;
++  out.createdPipelines = stats.createdPipelines;
++  out.drawCallCount = stats.drawCallCount;
++  out.currentFrameIndex = g_frameIndex;
++  out.stagingGeneration = g_browserStagingGeneration.load(std::memory_order_acquire);
++  out.lastBeginFrameId = stats.lastBeginFrameId;
++  out.lastEndFrameId = stats.lastEndFrameId;
++  out.lastRegistrationSequence = g_browserSubmissionSequence.load(std::memory_order_acquire);
++  out.lastCallbackSequence = g_browserCallbackSequence.load(std::memory_order_acquire);
++  out.staleCallbackCount = g_browserStaleCallbackCount.load(std::memory_order_acquire);
++  out.byteSize = static_cast<uint32_t>(
++      out.submissionDescriptorOffset + StagingBufferCount * sizeof(AuroraBrowserSubmissionDescriptor));
++}
++
++AuroraBrowserQuiescenceLease quiescence_lease(const AuroraBrowserSubmissionStatus& submission) noexcept {
++  const auto& stats = g_resources.stats;
++  AuroraBrowserQuiescenceLease out;
++  std::memset(&out, 0, sizeof(out));
++  out.stagingGeneration = g_browserStagingGeneration.load(std::memory_order_acquire);
++  out.lastBeginFrameId = stats.lastBeginFrameId;
++  out.lastEndFrameId = stats.lastEndFrameId;
++  out.currentFrameIndex = g_frameIndex;
++  out.queuedPipelines = stats.queuedPipelines;
++  out.createdPipelines = stats.createdPipelines;
++  out.drawCallCount = stats.drawCallCount;
++  out.pipelineCacheStatus = browser_pipeline_cache_status();
++  out.pendingFramePackets = submission.pendingFramePackets;
++  out.pendingStagingBuffers = submission.pendingStagingBuffers;
++  out.workerBusy = submission.workerBusy;
++  out.lastRegistrationSequence = g_browserSubmissionSequence.load(std::memory_order_acquire);
++  out.lastCallbackSequence = g_browserCallbackSequence.load(std::memory_order_acquire);
++  out.staleCallbackCount = g_browserStaleCallbackCount.load(std::memory_order_acquire);
++  return out;
++}
++
++bool quiescence_lease_is_idle(const AuroraBrowserQuiescenceLease& lease) noexcept {
++  return lease.pendingFramePackets == 0 && lease.pendingStagingBuffers == 0 && lease.workerBusy == 0 &&
++         lease.pipelineCacheStatus == 0 && lease.queuedPipelines == 0;
++}
++
++bool quiescence_lease_equal(const AuroraBrowserQuiescenceLease& left,
++                            const AuroraBrowserQuiescenceLease& right) noexcept {
++  return left.stagingGeneration == right.stagingGeneration &&
++         left.lastBeginFrameId == right.lastBeginFrameId && left.lastEndFrameId == right.lastEndFrameId &&
++         left.currentFrameIndex == right.currentFrameIndex && left.queuedPipelines == right.queuedPipelines &&
++         left.createdPipelines == right.createdPipelines && left.drawCallCount == right.drawCallCount &&
++         left.pipelineCacheStatus == right.pipelineCacheStatus &&
++         left.pendingFramePackets == right.pendingFramePackets &&
++         left.pendingStagingBuffers == right.pendingStagingBuffers && left.workerBusy == right.workerBusy &&
++         left.lastRegistrationSequence == right.lastRegistrationSequence &&
++         left.lastCallbackSequence == right.lastCallbackSequence &&
++         left.staleCallbackCount == right.staleCallbackCount;
++}
++
++AuroraBrowserByteBufferDescriptor describe_buffer(const ByteBuffer& buffer) noexcept {
++  return {
++      static_cast<uint64_t>(reinterpret_cast<uintptr_t>(buffer.data())),
++      static_cast<uint64_t>(buffer.size()),
++      static_cast<uint64_t>(buffer.capacity()),
++      static_cast<uint64_t>(buffer.max_capacity()),
++      buffer.owned() ? 1U : 0U,
++      0U,
++  };
++}
++
++void fill_staging_descriptor(AuroraBrowserFrameStagingDescriptor& out, size_t frameSlot) noexcept {
++  const auto& shadows = g_browserFrameStaging[frameSlot];
++  const auto& packet = g_framePackets[frameSlot];
++  const bool active = packet.frameId != 0;
++  std::memset(&out, 0, sizeof(out));
++  out.frameSlot = static_cast<uint32_t>(frameSlot);
++  out.packetActive = active ? 1U : 0U;
++  out.packetStagingBuffer = active ? static_cast<uint32_t>(packet.stagingBuffer) : UINT32_MAX;
++  out.packetFrameId = packet.frameId;
++  out.shadowPreviousUsed[0] = static_cast<uint64_t>(shadows.verts.previousUsed);
++  out.shadowPreviousUsed[1] = static_cast<uint64_t>(shadows.uniforms.previousUsed);
++  out.shadowPreviousUsed[2] = static_cast<uint64_t>(shadows.indices.previousUsed);
++  out.shadowPreviousUsed[3] = static_cast<uint64_t>(shadows.storage.previousUsed);
++  out.shadowPreviousUsed[4] = static_cast<uint64_t>(shadows.textureUpload.previousUsed);
++  out.shadowBuffers[0] = shadows.verts.descriptor();
++  out.shadowBuffers[1] = shadows.uniforms.descriptor();
++  out.shadowBuffers[2] = shadows.indices.descriptor();
++  out.shadowBuffers[3] = shadows.storage.descriptor();
++  out.shadowBuffers[4] = shadows.textureUpload.descriptor();
++  // Inactive FramePacket ByteBuffers still have authored default ownership and
++  // capacity metadata; packetActive distinguishes liveness without hiding it.
++  out.packetBuffers[0] = describe_buffer(packet.verts);
++  out.packetBuffers[1] = describe_buffer(packet.uniforms);
++  out.packetBuffers[2] = describe_buffer(packet.indices);
++  out.packetBuffers[3] = describe_buffer(packet.storage);
++  out.packetBuffers[4] = describe_buffer(packet.textureUpload);
++}
++
++void fill_submission_descriptor(AuroraBrowserSubmissionDescriptor& out, size_t stagingSlot) noexcept {
++  const auto owner = g_browserSubmissionOwners.snapshot(stagingSlot);
++  std::memset(&out, 0, sizeof(out));
++  out.stagingSlot = static_cast<uint32_t>(stagingSlot);
++  out.state = owner.state;
++  out.futureId = owner.futureId;
++  out.registrationSequence = owner.registrationSequence;
++  out.callbackSequence = owner.callbackSequence;
++  out.capturedGeneration = owner.capturedGeneration;
++  out.queueHandle = owner.queueHandle;
++  out.encoderHandle = owner.encoderHandle;
++}
++
++AuroraBrowserQuiescenceDescriptor make_quiescence_descriptor(
++    const AuroraBrowserSubmissionStatus& submission) noexcept {
++  AuroraBrowserQuiescenceDescriptor out{};
++  fill_quiescence_header(out, submission);
++  return out;
++}
++} // namespace
++
++bool browser_quiescence_supported() noexcept {
++#if defined(__EMSCRIPTEN_PTHREADS__)
++  return false;
++#else
++  return true;
++#endif
++}
++
++size_t browser_quiescence_descriptor_bytes() noexcept {
++  if (!browser_quiescence_supported()) {
++    return 0;
++  }
++  return sizeof(AuroraBrowserQuiescenceDescriptor) +
++         FrameSlotCount * sizeof(AuroraBrowserFrameStagingDescriptor) +
++         StagingBufferCount * sizeof(AuroraBrowserSubmissionDescriptor);
++}
++
++size_t browser_quiescence_lease_bytes() noexcept {
++  return browser_quiescence_supported() ? sizeof(AuroraBrowserQuiescenceLease) : 0;
++}
++
++int browser_quiescence_descriptor(void* out, size_t bytes) noexcept {
++  if (!browser_quiescence_supported()) {
++    return 0;
++  }
++  const size_t required = browser_quiescence_descriptor_bytes();
++  if (out == nullptr || bytes < required) {
++    return 0;
++  }
++  const auto submission = browser_submission_status();
++  const auto header = make_quiescence_descriptor(submission);
++  std::array<AuroraBrowserFrameStagingDescriptor, FrameSlotCount> frameRows;
++  std::array<AuroraBrowserSubmissionDescriptor, StagingBufferCount> submissionRows;
++  std::memset(frameRows.data(), 0, sizeof(frameRows));
++  std::memset(submissionRows.data(), 0, sizeof(submissionRows));
++  for (size_t slot = 0; slot < FrameSlotCount; ++slot) {
++    fill_staging_descriptor(frameRows[slot], slot);
++  }
++  for (size_t slot = 0; slot < StagingBufferCount; ++slot) {
++    fill_submission_descriptor(submissionRows[slot], slot);
++  }
++  std::memcpy(out, &header, sizeof(header));
++  auto* bytesOut = static_cast<uint8_t*>(out) + sizeof(header);
++  std::memcpy(bytesOut, frameRows.data(), sizeof(frameRows));
++  std::memcpy(bytesOut + sizeof(frameRows), submissionRows.data(), sizeof(submissionRows));
++  return 1;
++}
++
++int browser_quiescence_validate_descriptor(const void* captured, size_t bytes) noexcept {
++  if (!browser_quiescence_supported()) {
++    return 0;
++  }
++  const size_t required = browser_quiescence_descriptor_bytes();
++  if (captured == nullptr || bytes < required) {
++    return 0;
++  }
++  std::array<uint8_t, sizeof(AuroraBrowserQuiescenceDescriptor) +
++                         FrameSlotCount * sizeof(AuroraBrowserFrameStagingDescriptor) +
++                         StagingBufferCount * sizeof(AuroraBrowserSubmissionDescriptor)> current{};
++  if (!browser_quiescence_descriptor(current.data(), current.size())) {
++    return 0;
++  }
++  return std::memcmp(captured, current.data(), required) == 0 ? 1 : 0;
+ }
+ 
++int browser_quiescence_capture_lease(AuroraBrowserQuiescenceLease* out) noexcept {
++  if (!browser_quiescence_supported()) {
++    return 0;
++  }
++  if (out == nullptr) {
++    return 0;
++  }
++  const auto submission = browser_submission_status();
++  *out = quiescence_lease(submission);
++  return quiescence_lease_is_idle(*out) ? 1 : 0;
++}
++
++int browser_quiescence_validate_lease(const AuroraBrowserQuiescenceLease* lease) noexcept {
++  if (!browser_quiescence_supported()) {
++    return 0;
++  }
++  if (lease == nullptr) {
++    return 0;
++  }
++  const auto submission = browser_submission_status();
++  const auto current = quiescence_lease(submission);
++  if (!quiescence_lease_is_idle(current)) {
++    return 0;
++  }
++  return quiescence_lease_equal(*lease, current) ? 1 : 0;
++}
 +#endif
 +
  uint32_t current_frame() noexcept { return g_frameIndex; }
  
  void after_submit() noexcept { depth_peek::after_submit(); }
-@@ -734,5 +1217,11 @@ float calculate_fps() noexcept {
+@@ -734,5 +1514,29 @@ float calculate_fps() noexcept {
  }
  } // namespace aurora::gfx
  
 +#ifdef __EMSCRIPTEN__
 +AuroraBrowserSubmissionStatus aurora_browser_submission_status() {
 +  return aurora::gfx::browser_submission_status();
++}
++size_t aurora_browser_quiescence_descriptor_bytes() {
++  return aurora::gfx::browser_quiescence_descriptor_bytes();
++}
++size_t aurora_browser_quiescence_lease_bytes() {
++  return aurora::gfx::browser_quiescence_lease_bytes();
++}
++int aurora_browser_quiescence_descriptor(void* out, size_t bytes) {
++  return aurora::gfx::browser_quiescence_descriptor(out, bytes);
++}
++int aurora_browser_quiescence_validate_descriptor(const void* captured, size_t bytes) {
++  return aurora::gfx::browser_quiescence_validate_descriptor(captured, bytes);
++}
++int aurora_browser_quiescence_capture_lease(AuroraBrowserQuiescenceLease* out) {
++  return aurora::gfx::browser_quiescence_capture_lease(out);
++}
++int aurora_browser_quiescence_validate_lease(const AuroraBrowserQuiescenceLease* lease) {
++  return aurora::gfx::browser_quiescence_validate_lease(lease);
 +}
 +#endif
 +
@@ -4039,7 +4584,7 @@ index 29c9a48..deeb0aa 100644
  constexpr uint64_t ReplacementPublishBudgetBytes = 12ull * 1024ull * 1024ull;
  
 diff --git a/lib/internal.hpp b/lib/internal.hpp
-index d1adb6c..543d1e6 100644
+index d1adb6c..eb5cbe9 100644
 --- a/lib/internal.hpp
 +++ b/lib/internal.hpp
 @@ -4,9 +4,11 @@
@@ -4106,12 +4651,13 @@ index d1adb6c..543d1e6 100644
      rhs.m_owned = true;
      return *this;
    }
-@@ -283,9 +305,15 @@ public:
+@@ -283,9 +305,16 @@ public:
    [[nodiscard]] uint8_t* data() noexcept { return m_data; }
    [[nodiscard]] const uint8_t* data() const noexcept { return m_data; }
    [[nodiscard]] size_t size() const noexcept { return m_length; }
 +  [[nodiscard]] size_t capacity() const noexcept { return m_capacity; }
 +  [[nodiscard]] size_t max_capacity() const noexcept { return m_maxCapacity; }
++  [[nodiscard]] bool owned() const noexcept { return m_owned; }
    [[nodiscard]] bool empty() const noexcept { return m_length == 0; }
  
    void append(const void* data, size_t size) {
@@ -4122,7 +4668,7 @@ index d1adb6c..543d1e6 100644
      resize(m_length + size, false);
      memcpy(m_data + m_length, data, size);
      m_length += size;
-@@ -297,7 +325,14 @@ public:
+@@ -297,7 +326,14 @@ public:
    }
  
    void append_zeroes(size_t size) {
@@ -4138,7 +4684,7 @@ index d1adb6c..543d1e6 100644
      m_length += size;
    }
  
-@@ -308,45 +343,84 @@ public:
+@@ -308,45 +344,84 @@ public:
      m_data = nullptr;
      m_length = 0;
      m_capacity = 0;

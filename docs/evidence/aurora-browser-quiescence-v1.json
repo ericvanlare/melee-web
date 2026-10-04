@@ -1,0 +1,331 @@
+{
+  "build_command": "python3 scripts/build.py --target graphics --configuration Release",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Browser exercised"
+  ],
+  "limitations": [
+    "diagnostic descriptor and unchanged-boundary lease only; no restore operation consumes them",
+    "monotonic counters are Wasm-resident and must not be treated as independent host restore authority",
+    "descriptor/lease explicitly refuse Emscripten pthread builds; owner bookkeeping remains synchronized",
+    "no WebGPU fence/queue/encoder/Promise reconstruction, heap restore, or combined renderer/audio restore",
+    "private retained GameplayMatchSession fixture and locally owned assets; no public browser reproduction target added",
+    "no original pixel/PCM agreement, full match/rematch, impairment, Internet, physical input, or foreground performance admission"
+  ],
+  "machine": {
+    "browser": "Google Chrome 154.0.8037.97",
+    "cpu": "Apple M4",
+    "gpu_renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Version 26.6 (Build 25G72))",
+    "mode": "headless",
+    "os": "macOS 26.6 (25G72)",
+    "speakers": "muted through repository launch options"
+  },
+  "next_boundary": "compose separate host-owned restore authorization and actual effect ownership before any full renderer heap restoration",
+  "observed": {
+    "capture_headers": [
+      {
+        "byteSize": 1160,
+        "createdPipelines": 55,
+        "currentFrameIndex": 125,
+        "drawCallCount": 226,
+        "frameDescriptorCount": 2,
+        "frameDescriptorOffset": 120,
+        "frameDescriptorStride": 464,
+        "frameSlotCount": 2,
+        "lastBeginFrameId": "125",
+        "lastCallbackSequence": "125",
+        "lastEndFrameId": "125",
+        "lastRegistrationSequence": "125",
+        "pendingFramePackets": 0,
+        "pendingStagingBuffers": 0,
+        "pipelineCacheStatus": 0,
+        "queuedPipelines": 0,
+        "schemaVersion": 5,
+        "stagingGeneration": "1",
+        "stagingSlotCount": 2,
+        "staleCallbackCount": "0",
+        "submissionDescriptorCount": 2,
+        "submissionDescriptorOffset": 1048,
+        "submissionDescriptorStride": 56,
+        "workerBusy": 0
+      },
+      {
+        "byteSize": 1160,
+        "createdPipelines": 55,
+        "currentFrameIndex": 126,
+        "drawCallCount": 235,
+        "frameDescriptorCount": 2,
+        "frameDescriptorOffset": 120,
+        "frameDescriptorStride": 464,
+        "frameSlotCount": 2,
+        "lastBeginFrameId": "126",
+        "lastCallbackSequence": "126",
+        "lastEndFrameId": "126",
+        "lastRegistrationSequence": "126",
+        "pendingFramePackets": 0,
+        "pendingStagingBuffers": 0,
+        "pipelineCacheStatus": 0,
+        "queuedPipelines": 0,
+        "schemaVersion": 5,
+        "stagingGeneration": "1",
+        "stagingSlotCount": 2,
+        "staleCallbackCount": "0",
+        "submissionDescriptorCount": 2,
+        "submissionDescriptorOffset": 1048,
+        "submissionDescriptorStride": 56,
+        "workerBusy": 0
+      }
+    ],
+    "chrome_processes_absent": 8,
+    "descriptor_bytes": 1160,
+    "descriptor_delta": {
+      "buffer_address_capacity_and_ownership_unchanged": true,
+      "changed_fields": 16,
+      "changed_owner_fields": [
+        "shadow high-water lengths",
+        "shadow ByteBuffer lengths",
+        "Future ID",
+        "encoder handle",
+        "registration/callback sequences",
+        "frame/draw counters"
+      ],
+      "scope": "one source step only; no allocator, buffer contents or host graph agreement"
+    },
+    "driver_process_group_absent": true,
+    "http_listener_closed": true,
+    "initial_submission_rows": [
+      {
+        "callbackSequence": "124",
+        "capturedGeneration": "1",
+        "encoderHandle": "112567304",
+        "futureId": "127",
+        "queueHandle": "9744160",
+        "registrationSequence": "124",
+        "stagingSlot": 0,
+        "state": 2
+      },
+      {
+        "callbackSequence": "125",
+        "capturedGeneration": "1",
+        "encoderHandle": "112567304",
+        "futureId": "128",
+        "queueHandle": "9744160",
+        "registrationSequence": "125",
+        "stagingSlot": 1,
+        "state": 2
+      }
+    ],
+    "invalid_inputs_refused": true,
+    "lease_bytes": 80,
+    "perturbed_descriptor_refused": true,
+    "progression_calls": 125,
+    "source_close_calls": 1,
+    "source_file_pins_verified": 1739,
+    "source_step": {
+      "after": {
+        "frame": 2,
+        "generation": 1,
+        "ticks": 126
+      },
+      "before": {
+        "frame": 1,
+        "generation": 1,
+        "ticks": 125
+      }
+    },
+    "stale_descriptor_and_lease_refused": true,
+    "unchanged_descriptor_exact": true
+  },
+  "private_artifacts": [
+    {
+      "artifact": "build-receipt.json",
+      "bytes": 5724,
+      "sha256": "cf2416d165bb7950acfe0f668c6bafaea5be19ea60f78a209c4db848bddd2113"
+    },
+    {
+      "artifact": "build-manifest-v1.json",
+      "bytes": 360659,
+      "sha256": "01c8f6a58a1695ecae0ec5f8bf5388dc621685e046ad8464541cde9b85b59648"
+    },
+    {
+      "artifact": "install-receipt.json",
+      "bytes": 1012,
+      "sha256": "6e6df9652f27dc279d48d0bd03d273971164d8864a65af20e9bb852496e8269c"
+    },
+    {
+      "artifact": "browser-manifest-v1.json",
+      "bytes": 361987,
+      "sha256": "0d5119dca61b46765be0766112246c86bf2ca4369fead1623401805bc34bada4"
+    },
+    {
+      "artifact": "outer-report.json",
+      "bytes": 1391,
+      "sha256": "64978da3b57054945c3dcc700842d415e697b3a423eca2417ea7099beb850e5e"
+    },
+    {
+      "artifact": "browser-report.json",
+      "bytes": 190094,
+      "sha256": "9943dda70688b9ec2a8bb2ed80d546ca181d09a7ad49c3da394c6617b0ce832a"
+    },
+    {
+      "artifact": "root-audit.json",
+      "bytes": 3164,
+      "sha256": "da36713d1ed914d9c5175fe2b8312b47b8778cb091daa1efe964f8e032749685"
+    },
+    {
+      "artifact": "owner-boundary.png",
+      "bytes": 600113,
+      "sha256": "d0d9f1ba4be305c3fbc28c91b0086f7e9e71c64a7ed705526f05857c93f1152c"
+    },
+    {
+      "artifact": "rendered_snapshot_probe.cpp",
+      "bytes": 33731,
+      "sha256": "9c7292840c7039ce886d7176d18b8085c7d8613ea26e794fa7fbadef1512d987"
+    },
+    {
+      "artifact": "page.mjs",
+      "bytes": 11959,
+      "sha256": "01bb96502e7368a0eb6b1d8a3673013fa529951ee6cb1fb8e488a19d8b714ab8"
+    },
+    {
+      "artifact": "run_browser.py",
+      "bytes": 5935,
+      "sha256": "d2918f7ef3827df001e6930d1474e15887160461cc7a44a88ffa11dc68f3fd76"
+    },
+    {
+      "artifact": "browser.mjs",
+      "bytes": 4508,
+      "sha256": "c0b04eef25c948fca8f472ca909478e96cbb2012aeda0357e4daef1dc1563fa2"
+    },
+    {
+      "artifact": "build.py",
+      "bytes": 8313,
+      "sha256": "76be2e3a4bd5c7499668a4e61ff285837677d9f54d423db39f659dde66c01235"
+    },
+    {
+      "artifact": "probe-target.patch",
+      "bytes": 4040,
+      "sha256": "2d44b59447cb8407ac9069cda8aa7024fe089130c9ff2ebfb5273ef7d332c538"
+    },
+    {
+      "artifact": "descriptor-delta.json",
+      "bytes": 2312,
+      "sha256": "e90efdda5425db85710f2516d1f9e5e3f6c4818c09b1752a1b30b90755f839e8"
+    }
+  ],
+  "result": "passed",
+  "review_validation": {
+    "full_unit_suite": {
+      "cleanup_audit": {
+        "artifact": "local-review/suite-02/root-cleanup-audit-v1.json",
+        "bytes": 371,
+        "sha256": "37c91c5e0fb28a07bbe8831a10b2f924c62d2a00213be96eab741d006d61cc05"
+      },
+      "guarded_seconds": 295.534,
+      "receipt": {
+        "artifact": "local-review/suite-02/validation-receipt.json",
+        "bytes": 1348,
+        "sha256": "eaaff4f340bef2713b80d1e3ea39727846a17ef261b556216ac00d2a8c875014"
+      },
+      "reproduction_command": [
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "result": "passed",
+      "skipped": 140,
+      "source_head": "08366be015318f1652fc09099929c57f73cc879d",
+      "source_tool_pins_verified": 1744,
+      "test_seconds": 294.92,
+      "tests": 1837
+    },
+    "scope": "Required local review checks at the pinned code head; no additional browser, GPU, renderer restoration or full-session admission.",
+    "standard_graphics_release": {
+      "artifacts": {
+        "js": {
+          "artifact": "gx_probe.js",
+          "bytes": 362544,
+          "sha256": "c595e9eb9d9dac4b6167cc369aabec836ef83cb38497c0cd2beb3a43b580bad4"
+        },
+        "wasm": {
+          "artifact": "gx_probe.wasm",
+          "bytes": 6892077,
+          "sha256": "ad0bec3ad697199c0a1cd4b6725c357bdde8153b8c886cd92ae2094ed3da43a0"
+        }
+      },
+      "cleanup_audit": {
+        "artifact": "local-review/graphics-02/root-cleanup-audit-v1.json",
+        "bytes": 964,
+        "sha256": "475418d9bcf5f0229b43e3368088cc243c3c04ddc2d16a9bfde86a3a9b476e4f"
+      },
+      "guarded_seconds": 13.345,
+      "receipt": {
+        "artifact": "local-review/graphics-02/validation-receipt.json",
+        "bytes": 1814,
+        "sha256": "e995a9621ec2db64cdc3a3fa8f3aac70d358a9df6ea0a2fa08623025e6c7bc3f"
+      },
+      "reproduction_command": [
+        "python3",
+        "scripts/build.py",
+        "--target",
+        "graphics",
+        "--configuration",
+        "Release"
+      ],
+      "result": "passed",
+      "source_head": "08366be015318f1652fc09099929c57f73cc879d",
+      "source_tool_pins_verified": 1744
+    },
+    "three_complete_retained_workloads": "unrun"
+  },
+  "runtime": {
+    "data": {
+      "bytes": 20994321,
+      "sha256": "c27ebe868a2c3db61fdf4b7ac543eea5e0822c057d1518b8a5f02e505b69bd8c"
+    },
+    "mjs": {
+      "bytes": 388505,
+      "sha256": "61eab1d67dc5e01cc928e9493e4f038b6588ab8208f05ce972da4efbe4cf350e"
+    },
+    "wasm": {
+      "bytes": 13885643,
+      "sha256": "c79744fe4500e31107016f25607d520045827b20e3223b62818a56b28e1cfd28"
+    }
+  },
+  "scenario": "two source Mario players on Final Destination; original Entry/Ready then source frames 1 and 2",
+  "schema": "melee-web-aurora-browser-quiescence-v1",
+  "source": {
+    "aurora_commit": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
+    "aurora_patch_sha256": "c54cef9c1d16fd9be6b89148968e82fd0e40322def29776e47fe37d1c8ed5806",
+    "aurora_reviewed_tree": "980aec703ceb03604f7692cb4efd91779f920078",
+    "base_commit": "e7c15a98566fa24be4a7be0adcb96506ed2b4465",
+    "compiler_jobs": 6,
+    "configuration": "Release",
+    "dependency_lock_sha256": "c35316dc3b53d194f36a5fdab73d8d2922962be260465fe1050d49f3576be0ed",
+    "emscripten": "6.0.9",
+    "generated_js_modified": false
+  },
+  "unit_regression": {
+    "command": "python3 -m unittest discover -s tests -p test_aurora_browser_submission_owner.py -v",
+    "coverage": [
+      "old-generation callback after slot reuse",
+      "current-generation wrong registration",
+      "spontaneous callback before future publication",
+      "duplicate completion",
+      "failed completion",
+      "immediate owner",
+      "stale future publication",
+      "current owner remains usable after stale events"
+    ],
+    "passed": true
+  }
+}
