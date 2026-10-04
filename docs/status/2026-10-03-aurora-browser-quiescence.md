@@ -1,76 +1,62 @@
 # Aurora browser ownership descriptor
 
-## Scope and evidence
+**Compiled / Source identified / Browser exercised**
 
-`Compiled`, `Source identified`, and `Browser exercised` apply to the
-[bound receipt](../evidence/aurora-browser-quiescence-v1.json), using a fresh
-Release build from the recorded current-main base and the pinned Aurora source.
-The actual source Mario/Final Destination fixture follows original Entry/Ready,
-then renders source frames 1 and 2. The generated JavaScript is unmodified.
+The [current receipt](../evidence/aurora-browser-quiescence-v2.json) covers code
+head `c5a465a` on main base `c3ddd39`, on the Apple M4 Mac mini with Chrome
+154.0.8037.97 in headless mode. The diagnostic owner book, mutex, descriptor
+producer and boundary lease are OFF in ordinary builds. The opt-in Release
+profile uses a separate `build/browser-quiescence-release` directory.
 
-The new schema records every authored frame/staging slot, all five packet and
-retained shadow ByteBuffer owners, shadow high-water lengths, staging generation,
-and the actual returned WebGPU Future ID plus queue/encoder identities.
-Registration and callback sequences distinguish completion activity from scalar
-frame state. Counts and row extents come from the native descriptor; callers
-must query its byte size. These identities are observations, not reconstructed
-WebGPU objects.
+The schema records all authored frame/staging slots, packet and shadow
+ByteBuffer metadata, staging generation, submission/callback sequences and
+returned WebGPU Future, queue and encoder identities. Row counts, byte sizes,
+offsets and strides come from the native descriptor. These opaque identities
+are observations; they do not reconstruct host objects.
 
-The production owner book publishes registration before `OnSubmittedWorkDone`,
-so spontaneous completion before the call returns still joins the real Future
-ID. Old-generation callbacks cannot mutate a reused slot. A current-generation
-registration mismatch or duplicate completion fails explicitly before release.
-The focused compiled regression exercises this actual header.
+The actual source Mario/Final Destination fixture followed original Entry/Ready
+and drew source frames 1 and 2. Two idle captures matched byte for byte.
+Invalid inputs, a deliberate descriptor perturbation, and descriptors/leases
+from the previous source boundary were refused. Host polling kept source
+counters unchanged; one ordinary source step moved frame/ticks/generation from
+`1/125/1` to `2/126/1`. The descriptor was 1160 bytes and the lease 80 bytes.
 
-Two captures at an idle boundary agree byte for byte and validate unchanged.
-Invalid inputs and a deliberately perturbed descriptor are refused; an ordinary
-subsequent source step invalidates the prior descriptor and diagnostic lease.
-Host polling preserves source counters. The receipt retains GPU diagnostics,
-the inspected screenshot, exact build/run hashes, and independent source,
-browser-process, process-group and HTTP-listener cleanup checks.
+Ordinary and diagnostic Release builds passed. The retained rendered build
+transaction took 55.051 seconds, reversed its temporary CMake change exactly,
+and preserved input hashes. The browser transaction passed in 2.952 seconds;
+the independent audit verified 31 file pins, five trees, eight Chrome process
+absences, the Node process group and the closed HTTP listener. The screenshot
+was inspected: both fighters and the stage render, with known magenta geometry.
+No original pixel comparison was performed. The receipt retains the favicon
+404 and expected Aurora shutdown diagnostics separately from page errors.
 
-The retained field comparison locates actual changes in shadow lengths,
-submission/Future/encoder identities and counters across that source step.
-Buffer addresses, capacities and ownership flags remain stable in this interval.
-That stability covers metadata only; allocator state, buffer contents and the
-complete host graph were not compared.
+The required suite passed: 1883 tests, 141 skipped, 348.523 seconds in unittest
+(348.859 seconds through the owned wrapper). All 1699 tracked source pins
+remained unchanged. Eight private transaction/cleanup controls also passed.
+The receipt binds artifact and report hashes. Generated JavaScript was unmodified.
 
-## Reproduction and limits
-
-After normal bootstrap, run the host regression and affected build:
+After normal bootstrap, reproduce the public focused checks and build:
 
 ```sh
 python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p 'test_aurora_browser_*' -v
 python3 scripts/build.py --target aurora-browser-quiescence --configuration Release
 ```
 
-The required local checks passed at code head `08366be`: 1,837 tests with 140
-skipped (294.920 seconds), followed by the standard graphics Release build
-(13.345 seconds). The [receipt](../evidence/aurora-browser-quiescence-v1.json)
-binds both guarded runs, their artifacts and independent cleanup audits; each
-verified 1,744 source/tool pins. The earlier missing-build preparation failure
-remains retained. This documentation update changes no executable behavior.
-The three complete retained workloads required for renderer/lifetime admission
-have not been run; the two-frame diagnostic does not satisfy that gate.
+The rendered receipt uses a retained private source fixture and locally owned
+assets; this PR adds no public browser reproduction target. The
+[historical receipt](../evidence/aurora-browser-quiescence-v1.json) remains bound
+to old code head `08366be` and base `e7c15a`; it is not validation of this revision.
 
-The real browser receipt uses the retained private GameplayMatchSession fixture
-and locally owned assets; this change adds no public browser reproduction target.
-The diagnostic build profile is opt-in and writes a separate
-`build/browser-quiescence-release` directory; ordinary player builds keep the
-owner book, mutex and descriptor/lease producer disabled.
-Bootstrap recognizes only the exact preceding reviewed Aurora tree when upgrading
-an existing dependency checkout.
+Descriptor/lease polling can process queued completions and submits no new draw.
+It refuses pthread builds because packet/shadow reads lack a synchronized
+threaded boundary. The owner book rejects mismatched and duplicate completions;
+old-generation callbacks cannot mutate reused slots.
 
-Descriptor/lease calls use the existing submission-status polling path, which
-can process queued completions and submits no new draw. They explicitly refuse
-Emscripten pthread builds because packet and shadow fields lack a synchronized
-threaded read boundary. Owner bookkeeping itself is synchronized.
-
-These APIs authorize no heap or renderer restoration. Their counters live in
-Wasm memory, so they cannot establish independent host authority after a heap
-restore. WebGPU objects, pending Promise/finalizer identities, presentation,
-pipeline persistence, full audio and externally committed effects still need
-their own ownership gates. Original pixels/PCM, complete gameplay/rematch,
-impaired rollback, Internet, physical input and foreground performance remain
-unrun here. The multiplayer acceptance task remains
-[open](https://github.com/ericvanlare/melee-web/issues/115).
+No restore consumes these records. Wasm-resident counters cannot provide
+independent host authority after heap restoration. WebGPU/Promise/finalizer,
+queue/fence/submission, presentation, pipeline, audio, allocator/buffer-content
+and complete native host ownership still need reversible contracts.
+`full_renderer_restore_safe` remains false. Complete gameplay/rematch, impaired
+rollback, original pixels/PCM, physical input, Internet and foreground
+performance remain unrun here; [multiplayer acceptance](https://github.com/ericvanlare/melee-web/issues/115)
+is open.
