@@ -22,6 +22,10 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
     def test_worklet_processor_exception_stops_owner_without_a_port_message(self):
         self.run_owner(['--fatal-audio-processor'], 'worklet failure reaches terminal native handoff')
 
+    def test_fatal_audio_during_disc_operation_preserves_first_failure(self):
+        self.run_owner(['--fatal-audio-disc-operation'],
+                       'fatal audio during deferred disc preparation preserves the first error')
+
     def test_fatal_owner_cancels_native_at_the_safe_boundary(self):
         self.run_owner(['--fatal-native-handoff'], 'fatal handoff is sticky')
 
