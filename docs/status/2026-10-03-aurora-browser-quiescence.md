@@ -44,7 +44,12 @@ python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests 
 python3 scripts/build.py --target graphics --configuration Release
 ```
 
-The required local full-suite and standard graphics review checks are pending.
+The required local checks passed at code head `08366be`: 1,837 tests with 140
+skipped (294.920 seconds), followed by the standard graphics Release build
+(13.345 seconds). The [receipt](../evidence/aurora-browser-quiescence-v1.json)
+binds both guarded runs, their artifacts and independent cleanup audits; each
+verified 1,744 source/tool pins. The earlier missing-build preparation failure
+remains retained. This documentation update changes no executable behavior.
 The three complete retained workloads required for renderer/lifetime admission
 have not been run; the two-frame diagnostic does not satisfy that gate.
 
