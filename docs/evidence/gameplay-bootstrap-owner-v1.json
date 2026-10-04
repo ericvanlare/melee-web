@@ -153,7 +153,6 @@
       "tracked_source_pins": 1697
     }
   },
-  "phase_wrapper_sha256": "c0a1d65449130f56dddfccd338ad26e61e414e951bd1038fb9af0232b9920278",
   "exclusions": [
     "arena/session payloads and allocation provenance",
     "SDK heap descriptors and HSD object allocator registry/free chains",
@@ -170,5 +169,10 @@
     "off_diagnostic_functions": 0,
     "on_diagnostic_functions": 7,
     "report_sha256": "5d9a35ac99d602f2412a56c4c12e3cdc2d7060cc35bf88b693997be7dd50ab6b"
+  },
+  "phase_wrapper": {
+    "artifact": "run_phase.py",
+    "role": "private process supervisor for the recorded bootstrap/build/Node/suite phases; separate from the compiled producer and probe",
+    "sha256": "c0a1d65449130f56dddfccd338ad26e61e414e951bd1038fb9af0232b9920278"
   }
 }

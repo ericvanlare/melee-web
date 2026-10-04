@@ -34,18 +34,33 @@ fs.mkdirSync(options['--out']);
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const fileSha256 = file => sha256(fs.readFileSync(file));
 const report = {
-  schema: 'source-gameplay-bootstrap-state-observation-v2', result: 'incomplete',
+  schema: 'source-gameplay-bootstrap-state-observation-v3', result: 'incomplete',
   evidence_label: 'Source identified', runtime_admission: false,
   execution_scope: 'compiled Wasm diagnostic fixture; no original native/Dolphin trace',
   source_drawing: false, browser_gameplay: false,
   runtime: null, identities: null, ready_steps: null,
-  captures: [], refusals: [], quiescence: null, cleanup: null,
+  captures: [], refusals: [], quiescence: null,
+  cleanup: {required: false, attempted: false, success: null, phase: null,
+    returncode: null, error: null},
   runtime_log: [], runtime_log_bytes: 0,
 };
 const write = () => fs.writeFileSync(path.join(options['--out'], 'bootstrap-state-report.json'), JSON.stringify(report, null, 2) + '\n');
 write();
 let module = null;
-let opened = false;
+const closeSource = phase => {
+  if (!report.cleanup.required || report.cleanup.attempted) return report.cleanup.success;
+  report.cleanup.attempted = true;
+  report.cleanup.phase = phase;
+  try {
+    report.cleanup.returncode = module._melee_web_snapshot_close();
+    report.cleanup.success = report.cleanup.returncode === 1;
+    if (!report.cleanup.success) report.cleanup.error = module.UTF8ToString(module._melee_web_snapshot_error());
+  } catch (error) {
+    report.cleanup.success = false;
+    report.cleanup.error = String(error.stack || error);
+  }
+  return report.cleanup.success;
+};
 const readState = (bytes) => {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   const u32 = offset => view.getUint32(offset, true);
@@ -101,6 +116,7 @@ try {
   regular(wasmPath, 'runtime Wasm');
   report.runtime = {js_sha256: fileSha256(options['--runtime']), wasm_sha256: fileSha256(wasmPath)};
   report.identities = {
+    runner_sha256: fileSha256(path.resolve(process.argv[1])),
     probe_source_sha256: fileSha256(options['--probe-source']),
     source_c_sha256: fileSha256(options['--source-c']),
     source_h_sha256: fileSha256(options['--source-h']),
@@ -115,8 +131,10 @@ try {
       sourceHIdentity !== report.identities.source_h_sha256) throw new Error('compiled probe/source identity mismatch');
   if (module._melee_web_gameplay_bootstrap_state_abi_size() !== 128 || module._melee_web_gameplay_bootstrap_state_abi_version() !== 1 || module._melee_web_gameplay_bootstrap_state_schema() !== 0x47504253) throw new Error('compiled bootstrap ABI exports mismatch');
   requireRefusal('before world initialization', ptr => module._melee_web_gameplay_bootstrap_state_capture(ptr, 128));
+  // Initialization can allocate before returning a refusal or throwing.
+  // Record cleanup ownership before entering it, and attempt close only once.
+  report.cleanup.required = true;
   checked(() => module.ccall('melee_web_snapshot_init', 'number', ['string'], [options['--assets']]), 'source fixture init');
-  opened = true;
   const ready = () => new DataView(module.HEAPU8.buffer).getUint32(module._melee_web_snapshot_observation() + 8, true);
   let steps = 0;
   while (!ready() && steps < 600) { checked(() => module._melee_web_snapshot_step(steps), 'ordinary source step'); steps += 1; }
@@ -140,11 +158,11 @@ try {
     report.captures = captures.map(item => item.state);
     report.quiescence = {stable_bytes: true, generation: captures[0].state.generation, ticks: captures[0].state.ticks};
   } finally { module._free(ptr); }
-  checked(() => module._melee_web_snapshot_close(), 'source close'); opened = false;
+  if (!closeSource('normal source close')) throw new Error(`source close failed: ${report.cleanup.error}`);
   requireRefusal('after world close', ptr => module._melee_web_gameplay_bootstrap_state_capture(ptr, 128));
-  report.cleanup = 'source match/audio/world closed'; report.result = 'passed';
+  report.result = 'passed';
 } catch (error) {
   report.result = 'failed'; report.failure = String(error.stack || error);
-  if (module && opened) { try { report.cleanup = module._melee_web_snapshot_close() === 1 ? 'source match/audio/world closed after failure' : module.UTF8ToString(module._melee_web_snapshot_error()); } catch (cleanupError) { report.cleanup = String(cleanupError.stack || cleanupError); } }
+  closeSource('after failure');
   process.exitCode = 1;
 } finally { write(); console.log(JSON.stringify({result: report.result, output: options['--out'], failure: report.failure})); }
