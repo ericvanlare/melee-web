@@ -472,112 +472,6 @@ index 94504b1..b834676 100644
  const AuroraStats* aurora_get_stats();
  float aurora_get_fps();
  
-diff --git a/include/aurora/pipeline_prepare.h b/include/aurora/pipeline_prepare.h
-new file mode 100644
-index 0000000..df9fd74
---- /dev/null
-+++ b/include/aurora/pipeline_prepare.h
-@@ -0,0 +1,100 @@
-+#pragma once
-+
-+/*
-+ * This header exposes common pipeline preparation controls and the optional
-+ * selective pipeline descriptor API. It is intentionally independent of
-+ * MELEE_WEB_PIPELINE_PROVENANCE so a shipping build can use reviewed controls
-+ * without enabling capture.
-+ */
-+#include <stddef.h>
-+#include <stdint.h>
-+
-+#ifdef __cplusplus
-+extern "C" {
-+#endif
-+
-+/* Enable complete draw resolution for non-selective development rendering. */
-+int aurora_pipeline_set_complete_draws(int enabled);
-+
-+/* Return whether complete draw resolution is currently enabled. */
-+int aurora_pipeline_complete_draws_enabled(void);
-+
-+/* Drain queued pipeline work without starting or clearing a render frame. */
-+int aurora_pipeline_service_preparation(void);
-+
-+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
-+
-+/* Values are the current aurora::gfx::ShaderType values. */
-+enum {
-+  AURORA_PIPELINE_SHADER_CLEAR = 0,
-+  AURORA_PIPELINE_SHADER_GX = 1,
-+  AURORA_PIPELINE_SHADER_RML = 2,
-+};
-+
-+typedef struct AuroraPipelineDescriptor {
-+  uint32_t type;
-+  uint64_t pipeline_ref;
-+  uint32_t config_version;
-+  uint32_t config_size;
-+  uint8_t sha256[32];
-+} AuroraPipelineDescriptor;
-+
-+typedef enum AuroraPipelinePrepareState {
-+  AURORA_PIPELINE_PREPARE_UNCONFIGURED = 0,
-+  /* Selective mode is active but the first post-init union is not supplied. */
-+  AURORA_PIPELINE_PREPARE_ENABLED_NO_REQUEST = 1,
-+  AURORA_PIPELINE_PREPARE_VALIDATING = 2,
-+  AURORA_PIPELINE_PREPARE_PENDING = 3,
-+  AURORA_PIPELINE_PREPARE_READY = 4,
-+  AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP = 5,
-+  AURORA_PIPELINE_PREPARE_ERROR = 6,
-+} AuroraPipelinePrepareState;
-+
-+typedef struct AuroraPipelinePrepareStatus {
-+  uint32_t state;
-+  uint8_t configured;
-+  uint8_t valid;
-+  uint8_t ready;
-+  uint8_t reserved;
-+  uint32_t requested_count;
-+  uint32_t unique_count;
-+  uint32_t accepted_count;
-+  uint32_t ready_count;
-+  uint32_t pending_count;
-+  uint32_t unknown_count;
-+  uint32_t error_count;
-+  uint32_t invalid_index;
-+  uint64_t retained_config_bytes;
-+  uint32_t unexpected_count;
-+  uint32_t deferred_count;
-+} AuroraPipelinePrepareStatus;
-+
-+/* Arm selective mode. Call while the Aurora pipeline cache is stopped. */
-+int aurora_pipeline_prepare_enable(void);
-+
-+/* Disable selective mode. Call while the Aurora pipeline cache is stopped. */
-+int aurora_pipeline_prepare_disable(void);
-+
-+/*
-+ * Replace the active allowed union. Call after cache initialization and before
-+ * the next source/render operation. The array is copied before return.
-+ */
-+int aurora_prepare_pipeline_union(const AuroraPipelineDescriptor *entries,
-+                                  size_t count);
-+
-+/* Prepare all descriptors in the verified, already imported catalog. This
-+ * uses the same membership checks, queue and deduplication as an explicit union. */
-+int aurora_prepare_pipeline_catalog(void);
-+
-+/* Read a synchronized status snapshot. Returns zero only for a null output. */
-+int aurora_pipeline_prepare_status(AuroraPipelinePrepareStatus *out);
-+
-+/* Public alpha only: service deferred descriptors after the owner has paused
-+ * its source clock. Lookup never constructs an undeclared pipeline. */
-+int aurora_pipeline_prepare_deferred(void);
-+
-+#endif /* defined(MELEE_WEB_SELECTIVE_PIPELINES) */
-+
-+#ifdef __cplusplus
-+}
-+#endif
 diff --git a/include/dolphin/pad.h b/include/dolphin/pad.h
 index 252fca7..3e36937 100644
 --- a/include/dolphin/pad.h
@@ -4025,459 +3919,6 @@ index 7eb4723..de393fd 100644
  
  template <typename Config>
  PipelineRef find_pipeline(ShaderType type, const Config& config, NewPipelineCallback&& cb);
-diff --git a/lib/gfx/pipeline_cache_queue.hpp b/lib/gfx/pipeline_cache_queue.hpp
-new file mode 100644
-index 0000000..a1b71e6
---- /dev/null
-+++ b/lib/gfx/pipeline_cache_queue.hpp
-@@ -0,0 +1,76 @@
-+#pragma once
-+
-+#include <cstddef>
-+#include <iterator>
-+#include <list>
-+#include <unordered_map>
-+#include <utility>
-+
-+namespace aurora::gfx::detail {
-+
-+// The browser cache writer may be deferred across many live matches. Keep one
-+// row per SQLite key, preserve its first enqueue position, and never evict a
-+// row when the optional persistence budget is exhausted.
-+template <typename Write, typename Traits, size_t MaxRows = 16384, size_t MaxBytes = 64 * 1024 * 1024>
-+class CoalescingWriteQueue {
-+ public:
-+  enum class EnqueueResult {
-+    Added,
-+    Coalesced,
-+    Overflow,
-+  };
-+
-+  EnqueueResult enqueue(Write write) {
-+    const auto key = Traits::key(write);
-+    const auto incomingBytes = Traits::bytes(write);
-+    const auto found = index_.find(key);
-+    if (found != index_.end()) {
-+      auto& existing = *found->second;
-+      const auto existingBytes = Traits::bytes(existing);
-+      if (incomingBytes > MaxBytes - (bytes_ - existingBytes)) {
-+        overflowed_ = true;
-+        return EnqueueResult::Overflow;
-+      }
-+      Traits::merge(existing, std::move(write));
-+      bytes_ = bytes_ - existingBytes + Traits::bytes(existing);
-+      return EnqueueResult::Coalesced;
-+    }
-+
-+    if (queue_.size() >= MaxRows || incomingBytes > MaxBytes - bytes_) {
-+      overflowed_ = true;
-+      return EnqueueResult::Overflow;
-+    }
-+
-+    queue_.emplace_back(std::move(write));
-+    auto iterator = std::prev(queue_.end());
-+    index_.emplace(Traits::key(*iterator), iterator);
-+    bytes_ += Traits::bytes(*iterator);
-+    return EnqueueResult::Added;
-+  }
-+
-+  void take(std::list<Write>& batch) {
-+    batch.splice(batch.end(), queue_);
-+    index_.clear();
-+    bytes_ = 0;
-+  }
-+
-+  void clear() {
-+    queue_.clear();
-+    index_.clear();
-+    bytes_ = 0;
-+    overflowed_ = false;
-+  }
-+
-+  bool pending() const { return !queue_.empty(); }
-+  bool overflowed() const { return overflowed_; }
-+  size_t size() const { return queue_.size(); }
-+  size_t bytes() const { return bytes_; }
-+
-+ private:
-+  std::list<Write> queue_;
-+  std::unordered_map<typename Traits::Key, typename std::list<Write>::iterator, typename Traits::Hash> index_;
-+  size_t bytes_ = 0;
-+  bool overflowed_ = false;
-+};
-+
-+} // namespace aurora::gfx::detail
-diff --git a/lib/gfx/pipeline_prepare_state.hpp b/lib/gfx/pipeline_prepare_state.hpp
-new file mode 100644
-index 0000000..b629d3b
---- /dev/null
-+++ b/lib/gfx/pipeline_prepare_state.hpp
-@@ -0,0 +1,365 @@
-+#pragma once
-+
-+/*
-+ * GPU- and SQLite-free bounded state used by the selective pipeline cache.
-+ * The cache owns seed configuration bytes internally; callers provide only
-+ * typed descriptor identities.
-+ */
-+
-+#include <aurora/pipeline_prepare.h>
-+
-+#include <algorithm>
-+#include <array>
-+#include <cstddef>
-+#include <cstdint>
-+#include <cstring>
-+#include <iterator>
-+#include <limits>
-+#include <utility>
-+#include <vector>
-+
-+namespace aurora::gfx::selective {
-+
-+constexpr size_t MaxSeedDescriptors = 1024;
-+constexpr size_t MaxRetainedConfigBytes = 16u * 1024u * 1024u;
-+
-+using Sha256Digest = std::array<uint8_t, 32>;
-+
-+struct DescriptorKey {
-+  uint32_t type = 0;
-+  uint64_t pipelineRef = 0;
-+  uint32_t configVersion = 0;
-+
-+  bool operator==(const DescriptorKey&) const = default;
-+};
-+
-+struct DescriptorIdentity {
-+  DescriptorKey key;
-+  uint32_t configSize = 0;
-+  Sha256Digest sha256{};
-+
-+  bool operator==(const DescriptorIdentity&) const = default;
-+};
-+
-+struct SeedDescriptor {
-+  DescriptorIdentity identity;
-+  uint32_t firstFrameUsed = UINT32_MAX;
-+  std::vector<uint8_t> config;
-+};
-+
-+enum class RegistryInsertResult {
-+  Inserted,
-+  Duplicate,
-+  Conflict,
-+  Invalid,
-+  Overflow,
-+};
-+
-+enum class RequestResult {
-+  Accepted,
-+  Duplicate,
-+  Unknown,
-+  Conflict,
-+  Invalid,
-+  Overflow,
-+};
-+
-+enum class GateResult {
-+  Allowed,
-+  Unknown,
-+  ByteMismatch,
-+};
-+
-+namespace detail {
-+
-+constexpr std::array<uint32_t, 64> Sha256RoundConstants{
-+    0x428a2f98u, 0x71374491u, 0xb5c0fbcfu, 0xe9b5dba5u, 0x3956c25bu, 0x59f111f1u, 0x923f82a4u,
-+    0xab1c5ed5u, 0xd807aa98u, 0x12835b01u, 0x243185beu, 0x550c7dc3u, 0x72be5d74u, 0x80deb1feu,
-+    0x9bdc06a7u, 0xc19bf174u, 0xe49b69c1u, 0xefbe4786u, 0x0fc19dc6u, 0x240ca1ccu, 0x2de92c6fu,
-+    0x4a7484aau, 0x5cb0a9dcu, 0x76f988dau, 0x983e5152u, 0xa831c66du, 0xb00327c8u, 0xbf597fc7u,
-+    0xc6e00bf3u, 0xd5a79147u, 0x06ca6351u, 0x14292967u, 0x27b70a85u, 0x2e1b2138u, 0x4d2c6dfcu,
-+    0x53380d13u, 0x650a7354u, 0x766a0abbu, 0x81c2c92eu, 0x92722c85u, 0xa2bfe8a1u, 0xa81a664bu,
-+    0xc24b8b70u, 0xc76c51a3u, 0xd192e819u, 0xd6990624u, 0xf40e3585u, 0x106aa070u, 0x19a4c116u,
-+    0x1e376c08u, 0x2748774cu, 0x34b0bcb5u, 0x391c0cb3u, 0x4ed8aa4au, 0x5b9cca4fu, 0x682e6ff3u,
-+    0x748f82eeu, 0x78a5636fu, 0x84c87814u, 0x8cc70208u, 0x90befffau, 0xa4506cebu, 0xbef9a3f7u,
-+    0xc67178f2u,
-+};
-+
-+constexpr uint32_t rotate_right(uint32_t value, uint32_t amount) noexcept {
-+  return (value >> amount) | (value << (32u - amount));
-+}
-+
-+inline void sha256_block(const uint8_t* block, uint32_t (&state)[8]) noexcept {
-+  uint32_t words[64]{};
-+  for (size_t i = 0; i < 16; ++i) {
-+    words[i] = (static_cast<uint32_t>(block[i * 4]) << 24) |
-+              (static_cast<uint32_t>(block[i * 4 + 1]) << 16) |
-+              (static_cast<uint32_t>(block[i * 4 + 2]) << 8) |
-+              static_cast<uint32_t>(block[i * 4 + 3]);
-+  }
-+  for (size_t i = 16; i < 64; ++i) {
-+    const uint32_t s0 = rotate_right(words[i - 15], 7) ^ rotate_right(words[i - 15], 18) ^ (words[i - 15] >> 3);
-+    const uint32_t s1 = rotate_right(words[i - 2], 17) ^ rotate_right(words[i - 2], 19) ^ (words[i - 2] >> 10);
-+    words[i] = words[i - 16] + s0 + words[i - 7] + s1;
-+  }
-+
-+  uint32_t a = state[0];
-+  uint32_t b = state[1];
-+  uint32_t c = state[2];
-+  uint32_t d = state[3];
-+  uint32_t e = state[4];
-+  uint32_t f = state[5];
-+  uint32_t g = state[6];
-+  uint32_t h = state[7];
-+  for (size_t i = 0; i < 64; ++i) {
-+    const uint32_t s1 = rotate_right(e, 6) ^ rotate_right(e, 11) ^ rotate_right(e, 25);
-+    const uint32_t choose = (e & f) ^ ((~e) & g);
-+    const uint32_t temp1 = h + s1 + choose + Sha256RoundConstants[i] + words[i];
-+    const uint32_t s0 = rotate_right(a, 2) ^ rotate_right(a, 13) ^ rotate_right(a, 22);
-+    const uint32_t majority = (a & b) ^ (a & c) ^ (b & c);
-+    const uint32_t temp2 = s0 + majority;
-+    h = g;
-+    g = f;
-+    f = e;
-+    e = d + temp1;
-+    d = c;
-+    c = b;
-+    b = a;
-+    a = temp1 + temp2;
-+  }
-+  state[0] += a;
-+  state[1] += b;
-+  state[2] += c;
-+  state[3] += d;
-+  state[4] += e;
-+  state[5] += f;
-+  state[6] += g;
-+  state[7] += h;
-+}
-+
-+} // namespace detail
-+
-+inline Sha256Digest sha256(const uint8_t* data, size_t size) noexcept {
-+  Sha256Digest digest{};
-+  if ((data == nullptr && size != 0) || size > std::numeric_limits<uint64_t>::max() / 8u) {
-+    return digest;
-+  }
-+
-+  const uint64_t bitLength = static_cast<uint64_t>(size) * 8u;
-+  uint32_t state[8]{0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
-+                    0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u};
-+  const size_t fullSize = size - (size % 64);
-+  for (size_t offset = 0; offset < fullSize; offset += 64) {
-+    detail::sha256_block(data + offset, state);
-+  }
-+
-+  const size_t remainder = size - fullSize;
-+  std::array<uint8_t, 128> tail{};
-+  if (remainder != 0) {
-+    std::memcpy(tail.data(), data + fullSize, remainder);
-+  }
-+  tail[remainder] = 0x80;
-+  const size_t tailSize = remainder < 56 ? 64 : 128;
-+  for (size_t i = 0; i < 8; ++i) {
-+    tail[tailSize - 1 - i] = static_cast<uint8_t>(bitLength >> (i * 8));
-+  }
-+  for (size_t offset = 0; offset < tailSize; offset += 64) {
-+    detail::sha256_block(tail.data() + offset, state);
-+  }
-+  for (size_t i = 0; i < 8; ++i) {
-+    digest[i * 4] = static_cast<uint8_t>(state[i] >> 24);
-+    digest[i * 4 + 1] = static_cast<uint8_t>(state[i] >> 16);
-+    digest[i * 4 + 2] = static_cast<uint8_t>(state[i] >> 8);
-+    digest[i * 4 + 3] = static_cast<uint8_t>(state[i]);
-+  }
-+  return digest;
-+}
-+
-+class SeedDescriptorRegistry {
-+public:
-+  RegistryInsertResult add_seed(uint32_t type, uint64_t pipelineRef, uint32_t configVersion,
-+                                uint32_t firstFrameUsed, const uint8_t* config, size_t configSize) {
-+    if (type > AURORA_PIPELINE_SHADER_RML || config == nullptr || configSize == 0 ||
-+        configSize > std::numeric_limits<uint32_t>::max() || configSize > MaxRetainedConfigBytes) {
-+      return RegistryInsertResult::Invalid;
-+    }
-+    DescriptorIdentity identity{
-+        .key = {.type = type, .pipelineRef = pipelineRef, .configVersion = configVersion},
-+        .configSize = static_cast<uint32_t>(configSize),
-+        .sha256 = sha256(config, configSize),
-+    };
-+    for (const auto& entry : entries_) {
-+      if (!(entry.identity.key == identity.key)) {
-+        continue;
-+      }
-+      if (entry.identity == identity && entry.config.size() == configSize &&
-+          std::memcmp(entry.config.data(), config, configSize) == 0) {
-+        return RegistryInsertResult::Duplicate;
-+      }
-+      return RegistryInsertResult::Conflict;
-+    }
-+
-+    if (entries_.size() >= MaxSeedDescriptors || totalConfigBytes_ > MaxRetainedConfigBytes - configSize) {
-+      return RegistryInsertResult::Overflow;
-+    }
-+
-+    SeedDescriptor entry{
-+        .identity = identity,
-+        .firstFrameUsed = firstFrameUsed,
-+        .config = std::vector<uint8_t>(config, config + configSize),
-+    };
-+    totalConfigBytes_ += configSize;
-+    entries_.push_back(std::move(entry));
-+    return RegistryInsertResult::Inserted;
-+  }
-+
-+  void clear() noexcept {
-+    entries_.clear();
-+    totalConfigBytes_ = 0;
-+  }
-+
-+  [[nodiscard]] size_t size() const noexcept { return entries_.size(); }
-+  [[nodiscard]] size_t total_config_bytes() const noexcept { return totalConfigBytes_; }
-+  [[nodiscard]] const std::vector<SeedDescriptor>& entries() const noexcept { return entries_; }
-+
-+  [[nodiscard]] bool contains(const DescriptorKey& key) const noexcept { return find(key) != nullptr; }
-+
-+  /* The GPU cache is keyed only by pipelineRef.  Keep the generic typed
-+   * registry permissive, but let the cache reject an ambiguous seed set
-+   * before it can queue any GPU work. */
-+  [[nodiscard]] bool global_refs_unique() const noexcept {
-+    for (size_t i = 0; i < entries_.size(); ++i) {
-+      for (size_t j = i + 1; j < entries_.size(); ++j) {
-+        if (entries_[i].identity.key.pipelineRef == entries_[j].identity.key.pipelineRef &&
-+            !(entries_[i].identity == entries_[j].identity)) {
-+          return false;
-+        }
-+      }
-+    }
-+    return true;
-+  }
-+
-+  [[nodiscard]] const SeedDescriptor* find(const DescriptorKey& key) const noexcept {
-+    const auto it = std::find_if(entries_.begin(), entries_.end(), [&](const SeedDescriptor& entry) {
-+      return entry.identity.key == key;
-+    });
-+    return it == entries_.end() ? nullptr : &*it;
-+  }
-+
-+  [[nodiscard]] const SeedDescriptor* find(const DescriptorIdentity& identity) const noexcept {
-+    const auto* entry = find(identity.key);
-+    return entry != nullptr && entry->identity == identity ? entry : nullptr;
-+  }
-+
-+  [[nodiscard]] GateResult gate(const DescriptorIdentity& identity, const uint8_t* config, size_t configSize) const
-+      noexcept {
-+    const auto* entry = find(identity.key);
-+    if (entry == nullptr) {
-+      return GateResult::Unknown;
-+    }
-+    if (!(entry->identity == identity) || config == nullptr || configSize != entry->config.size() ||
-+        std::memcmp(entry->config.data(), config, configSize) != 0) {
-+      return GateResult::ByteMismatch;
-+    }
-+    return GateResult::Allowed;
-+  }
-+
-+private:
-+  std::vector<SeedDescriptor> entries_;
-+  size_t totalConfigBytes_ = 0;
-+};
-+
-+class PipelineSelection {
-+public:
-+  RequestResult build(const AuroraPipelineDescriptor* descriptors, size_t count,
-+                      const SeedDescriptorRegistry& registry, size_t* invalidIndex = nullptr) const {
-+    if (invalidIndex != nullptr) {
-+      *invalidIndex = std::numeric_limits<size_t>::max();
-+    }
-+    if (descriptors == nullptr && count != 0) {
-+      return RequestResult::Invalid;
-+    }
-+    if (count == 0) {
-+      return RequestResult::Invalid;
-+    }
-+    if (count > MaxSeedDescriptors) {
-+      return RequestResult::Overflow;
-+    }
-+
-+    std::vector<DescriptorIdentity> candidate;
-+    candidate.reserve(count);
-+    for (size_t i = 0; i < count; ++i) {
-+      const AuroraPipelineDescriptor& descriptor = descriptors[i];
-+      if (descriptor.type > AURORA_PIPELINE_SHADER_RML || descriptor.config_size == 0 ||
-+          descriptor.config_size > MaxRetainedConfigBytes) {
-+        if (invalidIndex != nullptr) {
-+          *invalidIndex = i;
-+        }
-+        return RequestResult::Invalid;
-+      }
-+      DescriptorIdentity identity{
-+          .key = {.type = descriptor.type, .pipelineRef = descriptor.pipeline_ref,
-+                  .configVersion = descriptor.config_version},
-+          .configSize = descriptor.config_size,
-+      };
-+      std::copy(std::begin(descriptor.sha256), std::end(descriptor.sha256), identity.sha256.begin());
-+
-+      if (std::find(candidate.begin(), candidate.end(), identity) != candidate.end()) {
-+        continue;
-+      }
-+      if (std::find_if(candidate.begin(), candidate.end(), [&](const DescriptorIdentity& prior) {
-+            return prior.key == identity.key;
-+          }) != candidate.end()) {
-+        if (invalidIndex != nullptr) {
-+          *invalidIndex = i;
-+        }
-+        return RequestResult::Conflict;
-+      }
-+      if (registry.find(identity) == nullptr) {
-+        if (invalidIndex != nullptr) {
-+          *invalidIndex = i;
-+        }
-+        return RequestResult::Unknown;
-+      }
-+      candidate.push_back(identity);
-+    }
-+    return RequestResult::Accepted;
-+  }
-+
-+  RequestResult replace(const AuroraPipelineDescriptor* descriptors, size_t count,
-+                        const SeedDescriptorRegistry& registry, size_t* invalidIndex = nullptr) {
-+    const auto result = build(descriptors, count, registry, invalidIndex);
-+    if (result != RequestResult::Accepted) {
-+      return result;
-+    }
-+
-+    std::vector<DescriptorIdentity> candidate;
-+    candidate.reserve(count);
-+    for (size_t i = 0; i < count; ++i) {
-+      DescriptorIdentity identity{
-+          .key = {.type = descriptors[i].type, .pipelineRef = descriptors[i].pipeline_ref,
-+                  .configVersion = descriptors[i].config_version},
-+          .configSize = descriptors[i].config_size,
-+      };
-+      std::copy(std::begin(descriptors[i].sha256), std::end(descriptors[i].sha256), identity.sha256.begin());
-+      if (std::find(candidate.begin(), candidate.end(), identity) == candidate.end()) {
-+        candidate.push_back(identity);
-+      }
-+    }
-+    members_ = std::move(candidate);
-+    return RequestResult::Accepted;
-+  }
-+
-+  void clear() noexcept { members_.clear(); }
-+  [[nodiscard]] size_t size() const noexcept { return members_.size(); }
-+  [[nodiscard]] const std::vector<DescriptorIdentity>& members() const noexcept { return members_; }
-+  [[nodiscard]] bool contains(const DescriptorKey& key) const noexcept {
-+    return std::any_of(members_.begin(), members_.end(),
-+                       [&](const DescriptorIdentity& identity) { return identity.key == key; });
-+  }
-+
-+private:
-+  std::vector<DescriptorIdentity> members_;
-+};
-+
-+} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
 index d04db0f..9c583fd 100644
 --- a/lib/gfx/recording.cpp
@@ -5006,7 +4447,7 @@ index b12b327..0fbfa77 100644
      sPipelineLayout = g_device.CreatePipelineLayout(&desc);
    }
 diff --git a/lib/gx/pipeline.cpp b/lib/gx/pipeline.cpp
-index 0c3631c..3cf50c4 100644
+index 0c3631c..9124154 100644
 --- a/lib/gx/pipeline.cpp
 +++ b/lib/gx/pipeline.cpp
 @@ -1,3 +1,6 @@
@@ -5016,7 +4457,19 @@ index 0c3631c..3cf50c4 100644
  #include "pipeline.hpp"
  
  #include "../gfx/encoding.hpp"
-@@ -22,12 +25,21 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+@@ -8,6 +11,11 @@
+ #include "gx_fmt.hpp"
+ #include "shader_info.hpp"
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#include <cstdio>
++#endif
++
+ #include <tracy/Tracy.hpp>
+ 
+ namespace aurora::gx {
+@@ -22,17 +30,27 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
  }
  
  void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
@@ -5037,7 +4490,34 @@ index 0c3631c..3cf50c4 100644
 +#endif
    const std::array offsets{data.uniformRange.offset};
    pass.SetBindGroup(1, resources.uniformBindGroup, offsets.size(), offsets.data());
-   if (data.bindGroups.textureBindGroup) {
+-  if (data.bindGroups.textureBindGroup) {
+-    pass.SetBindGroup(2, gfx::find_bind_group(data.bindGroups.textureBindGroup));
+-  }
++  const auto textureBindGroup = data.bindGroups.textureBindGroup
++                                    ? gfx::find_bind_group(data.bindGroups.textureBindGroup)
++                                    : g_emptyTextureBindGroup;
++  pass.SetBindGroup(2, textureBindGroup);
+   pass.SetIndexBuffer(resources.indexBuffer, wgpu::IndexFormat::Uint16, data.idxRange.offset, data.idxRange.size);
+   if (data.dstAlpha != UINT32_MAX) {
+     const wgpu::Color color{0.f, 0.f, 0.f, data.dstAlpha / 255.f};
+@@ -41,6 +59,17 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+   if (data.indexCount == 0) {
+     pass.Draw(data.vtxCount, data.instanceCount);
+   } else {
++#ifdef __EMSCRIPTEN__
++    if (data.indexCount == 6) {
++      char trace[192];
++      std::snprintf(trace, sizeof(trace),
++                    "{\"call_site\":\"gx\",\"pipeline_ref\":\"%016llx\",\"group2_ref\":\"%016llx\",\"group2_handle_valid\":%s,\"group2_set_for_draw\":true}",
++                    static_cast<unsigned long long>(data.pipeline),
++                    static_cast<unsigned long long>(data.bindGroups.textureBindGroup),
++                    static_cast<bool>(textureBindGroup) ? "true" : "false");
++      EM_ASM({ const rows = window.__meleeRendererIndexedDrawTrace; if (rows && rows.length < 512) rows.push(UTF8ToString($0)); }, trace);
++    }
++#endif
+     pass.DrawIndexed(data.indexCount, data.instanceCount);
+   }
+ }
 diff --git a/lib/gx/pipeline.hpp b/lib/gx/pipeline.hpp
 index 1abcbd5..c5fe2fa 100644
 --- a/lib/gx/pipeline.hpp
@@ -5328,6 +4808,53 @@ index d1adb6c..eb5cbe9 100644
    }
  };
  
+diff --git a/lib/rmlui/pipeline.cpp b/lib/rmlui/pipeline.cpp
+index e630f17..fcfe3a0 100644
+--- a/lib/rmlui/pipeline.cpp
++++ b/lib/rmlui/pipeline.cpp
+@@ -1,5 +1,10 @@
+ #include "pipeline.hpp"
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#include <cstdio>
++#endif
++
+ #include "../gfx/encoding.hpp"
+ #include "../gfx/resources.hpp"
+ #include "../gfx/resource_cache.hpp"
+@@ -978,8 +983,11 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+     }
+   }
+ 
+-  if (data.bindGroup2 != 0) {
++  bool group2HandleValid = false;
++  const bool group2SetForDraw = data.bindGroup2 != 0;
++  if (group2SetForDraw) {
+     const auto bindGroup = gfx::find_bind_group(data.bindGroup2);
++    group2HandleValid = static_cast<bool>(bindGroup);
+     if ((data.dynamicBindGroupMask & DynamicGroup2) != 0) {
+       const std::array offsets{data.bindGroup2DynamicOffset};
+       pass.SetBindGroup(2, bindGroup, offsets.size(), offsets.data());
+@@ -998,6 +1006,18 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+     auto& resources = gfx::detail::resources();
+     pass.SetVertexBuffer(0, resources.vertexBuffer, data.vertexRange.offset, data.vertexRange.size);
+     pass.SetIndexBuffer(resources.indexBuffer, wgpu::IndexFormat::Uint32, data.indexRange.offset, data.indexRange.size);
++#ifdef __EMSCRIPTEN__
++    if (data.indexCount == 6) {
++      char trace[192];
++      std::snprintf(trace, sizeof(trace),
++                    "{\"call_site\":\"rmlui\",\"pipeline_ref\":\"%016llx\",\"group2_ref\":\"%016llx\",\"group2_handle_valid\":%s,\"group2_set_for_draw\":%s}",
++                    static_cast<unsigned long long>(data.pipeline),
++                    static_cast<unsigned long long>(data.bindGroup2),
++                    group2HandleValid ? "true" : "false",
++                    group2SetForDraw ? "true" : "false");
++      EM_ASM({ const rows = window.__meleeRendererIndexedDrawTrace; if (rows && rows.length < 512) rows.push(UTF8ToString($0)); }, trace);
++    }
++#endif
+     pass.DrawIndexed(data.indexCount);
+   } else {
+     pass.Draw(data.vertexCount);
 diff --git a/lib/sqlite_utils.hpp b/lib/sqlite_utils.hpp
 index 38db46b..abd3b23 100644
 --- a/lib/sqlite_utils.hpp
@@ -5504,6 +5031,565 @@ index 2a4aadf..58ac741 100644
    SDL_SetWindowMinimumSize(g_window, 640, 480);
    set_window_icon();
    return true;
+diff --git a/include/aurora/pipeline_prepare.h b/include/aurora/pipeline_prepare.h
+new file mode 100644
+index 0000000..df9fd74
+--- /dev/null
++++ b/include/aurora/pipeline_prepare.h
+@@ -0,0 +1,100 @@
++#pragma once
++
++/*
++ * This header exposes common pipeline preparation controls and the optional
++ * selective pipeline descriptor API. It is intentionally independent of
++ * MELEE_WEB_PIPELINE_PROVENANCE so a shipping build can use reviewed controls
++ * without enabling capture.
++ */
++#include <stddef.h>
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/* Enable complete draw resolution for non-selective development rendering. */
++int aurora_pipeline_set_complete_draws(int enabled);
++
++/* Return whether complete draw resolution is currently enabled. */
++int aurora_pipeline_complete_draws_enabled(void);
++
++/* Drain queued pipeline work without starting or clearing a render frame. */
++int aurora_pipeline_service_preparation(void);
++
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++
++/* Values are the current aurora::gfx::ShaderType values. */
++enum {
++  AURORA_PIPELINE_SHADER_CLEAR = 0,
++  AURORA_PIPELINE_SHADER_GX = 1,
++  AURORA_PIPELINE_SHADER_RML = 2,
++};
++
++typedef struct AuroraPipelineDescriptor {
++  uint32_t type;
++  uint64_t pipeline_ref;
++  uint32_t config_version;
++  uint32_t config_size;
++  uint8_t sha256[32];
++} AuroraPipelineDescriptor;
++
++typedef enum AuroraPipelinePrepareState {
++  AURORA_PIPELINE_PREPARE_UNCONFIGURED = 0,
++  /* Selective mode is active but the first post-init union is not supplied. */
++  AURORA_PIPELINE_PREPARE_ENABLED_NO_REQUEST = 1,
++  AURORA_PIPELINE_PREPARE_VALIDATING = 2,
++  AURORA_PIPELINE_PREPARE_PENDING = 3,
++  AURORA_PIPELINE_PREPARE_READY = 4,
++  AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP = 5,
++  AURORA_PIPELINE_PREPARE_ERROR = 6,
++} AuroraPipelinePrepareState;
++
++typedef struct AuroraPipelinePrepareStatus {
++  uint32_t state;
++  uint8_t configured;
++  uint8_t valid;
++  uint8_t ready;
++  uint8_t reserved;
++  uint32_t requested_count;
++  uint32_t unique_count;
++  uint32_t accepted_count;
++  uint32_t ready_count;
++  uint32_t pending_count;
++  uint32_t unknown_count;
++  uint32_t error_count;
++  uint32_t invalid_index;
++  uint64_t retained_config_bytes;
++  uint32_t unexpected_count;
++  uint32_t deferred_count;
++} AuroraPipelinePrepareStatus;
++
++/* Arm selective mode. Call while the Aurora pipeline cache is stopped. */
++int aurora_pipeline_prepare_enable(void);
++
++/* Disable selective mode. Call while the Aurora pipeline cache is stopped. */
++int aurora_pipeline_prepare_disable(void);
++
++/*
++ * Replace the active allowed union. Call after cache initialization and before
++ * the next source/render operation. The array is copied before return.
++ */
++int aurora_prepare_pipeline_union(const AuroraPipelineDescriptor *entries,
++                                  size_t count);
++
++/* Prepare all descriptors in the verified, already imported catalog. This
++ * uses the same membership checks, queue and deduplication as an explicit union. */
++int aurora_prepare_pipeline_catalog(void);
++
++/* Read a synchronized status snapshot. Returns zero only for a null output. */
++int aurora_pipeline_prepare_status(AuroraPipelinePrepareStatus *out);
++
++/* Public alpha only: service deferred descriptors after the owner has paused
++ * its source clock. Lookup never constructs an undeclared pipeline. */
++int aurora_pipeline_prepare_deferred(void);
++
++#endif /* defined(MELEE_WEB_SELECTIVE_PIPELINES) */
++
++#ifdef __cplusplus
++}
++#endif
+diff --git a/lib/gfx/pipeline_cache_queue.hpp b/lib/gfx/pipeline_cache_queue.hpp
+new file mode 100644
+index 0000000..a1b71e6
+--- /dev/null
++++ b/lib/gfx/pipeline_cache_queue.hpp
+@@ -0,0 +1,76 @@
++#pragma once
++
++#include <cstddef>
++#include <iterator>
++#include <list>
++#include <unordered_map>
++#include <utility>
++
++namespace aurora::gfx::detail {
++
++// The browser cache writer may be deferred across many live matches. Keep one
++// row per SQLite key, preserve its first enqueue position, and never evict a
++// row when the optional persistence budget is exhausted.
++template <typename Write, typename Traits, size_t MaxRows = 16384, size_t MaxBytes = 64 * 1024 * 1024>
++class CoalescingWriteQueue {
++ public:
++  enum class EnqueueResult {
++    Added,
++    Coalesced,
++    Overflow,
++  };
++
++  EnqueueResult enqueue(Write write) {
++    const auto key = Traits::key(write);
++    const auto incomingBytes = Traits::bytes(write);
++    const auto found = index_.find(key);
++    if (found != index_.end()) {
++      auto& existing = *found->second;
++      const auto existingBytes = Traits::bytes(existing);
++      if (incomingBytes > MaxBytes - (bytes_ - existingBytes)) {
++        overflowed_ = true;
++        return EnqueueResult::Overflow;
++      }
++      Traits::merge(existing, std::move(write));
++      bytes_ = bytes_ - existingBytes + Traits::bytes(existing);
++      return EnqueueResult::Coalesced;
++    }
++
++    if (queue_.size() >= MaxRows || incomingBytes > MaxBytes - bytes_) {
++      overflowed_ = true;
++      return EnqueueResult::Overflow;
++    }
++
++    queue_.emplace_back(std::move(write));
++    auto iterator = std::prev(queue_.end());
++    index_.emplace(Traits::key(*iterator), iterator);
++    bytes_ += Traits::bytes(*iterator);
++    return EnqueueResult::Added;
++  }
++
++  void take(std::list<Write>& batch) {
++    batch.splice(batch.end(), queue_);
++    index_.clear();
++    bytes_ = 0;
++  }
++
++  void clear() {
++    queue_.clear();
++    index_.clear();
++    bytes_ = 0;
++    overflowed_ = false;
++  }
++
++  bool pending() const { return !queue_.empty(); }
++  bool overflowed() const { return overflowed_; }
++  size_t size() const { return queue_.size(); }
++  size_t bytes() const { return bytes_; }
++
++ private:
++  std::list<Write> queue_;
++  std::unordered_map<typename Traits::Key, typename std::list<Write>::iterator, typename Traits::Hash> index_;
++  size_t bytes_ = 0;
++  bool overflowed_ = false;
++};
++
++} // namespace aurora::gfx::detail
+diff --git a/lib/gfx/pipeline_prepare_state.hpp b/lib/gfx/pipeline_prepare_state.hpp
+new file mode 100644
+index 0000000..b629d3b
+--- /dev/null
++++ b/lib/gfx/pipeline_prepare_state.hpp
+@@ -0,0 +1,365 @@
++#pragma once
++
++/*
++ * GPU- and SQLite-free bounded state used by the selective pipeline cache.
++ * The cache owns seed configuration bytes internally; callers provide only
++ * typed descriptor identities.
++ */
++
++#include <aurora/pipeline_prepare.h>
++
++#include <algorithm>
++#include <array>
++#include <cstddef>
++#include <cstdint>
++#include <cstring>
++#include <iterator>
++#include <limits>
++#include <utility>
++#include <vector>
++
++namespace aurora::gfx::selective {
++
++constexpr size_t MaxSeedDescriptors = 1024;
++constexpr size_t MaxRetainedConfigBytes = 16u * 1024u * 1024u;
++
++using Sha256Digest = std::array<uint8_t, 32>;
++
++struct DescriptorKey {
++  uint32_t type = 0;
++  uint64_t pipelineRef = 0;
++  uint32_t configVersion = 0;
++
++  bool operator==(const DescriptorKey&) const = default;
++};
++
++struct DescriptorIdentity {
++  DescriptorKey key;
++  uint32_t configSize = 0;
++  Sha256Digest sha256{};
++
++  bool operator==(const DescriptorIdentity&) const = default;
++};
++
++struct SeedDescriptor {
++  DescriptorIdentity identity;
++  uint32_t firstFrameUsed = UINT32_MAX;
++  std::vector<uint8_t> config;
++};
++
++enum class RegistryInsertResult {
++  Inserted,
++  Duplicate,
++  Conflict,
++  Invalid,
++  Overflow,
++};
++
++enum class RequestResult {
++  Accepted,
++  Duplicate,
++  Unknown,
++  Conflict,
++  Invalid,
++  Overflow,
++};
++
++enum class GateResult {
++  Allowed,
++  Unknown,
++  ByteMismatch,
++};
++
++namespace detail {
++
++constexpr std::array<uint32_t, 64> Sha256RoundConstants{
++    0x428a2f98u, 0x71374491u, 0xb5c0fbcfu, 0xe9b5dba5u, 0x3956c25bu, 0x59f111f1u, 0x923f82a4u,
++    0xab1c5ed5u, 0xd807aa98u, 0x12835b01u, 0x243185beu, 0x550c7dc3u, 0x72be5d74u, 0x80deb1feu,
++    0x9bdc06a7u, 0xc19bf174u, 0xe49b69c1u, 0xefbe4786u, 0x0fc19dc6u, 0x240ca1ccu, 0x2de92c6fu,
++    0x4a7484aau, 0x5cb0a9dcu, 0x76f988dau, 0x983e5152u, 0xa831c66du, 0xb00327c8u, 0xbf597fc7u,
++    0xc6e00bf3u, 0xd5a79147u, 0x06ca6351u, 0x14292967u, 0x27b70a85u, 0x2e1b2138u, 0x4d2c6dfcu,
++    0x53380d13u, 0x650a7354u, 0x766a0abbu, 0x81c2c92eu, 0x92722c85u, 0xa2bfe8a1u, 0xa81a664bu,
++    0xc24b8b70u, 0xc76c51a3u, 0xd192e819u, 0xd6990624u, 0xf40e3585u, 0x106aa070u, 0x19a4c116u,
++    0x1e376c08u, 0x2748774cu, 0x34b0bcb5u, 0x391c0cb3u, 0x4ed8aa4au, 0x5b9cca4fu, 0x682e6ff3u,
++    0x748f82eeu, 0x78a5636fu, 0x84c87814u, 0x8cc70208u, 0x90befffau, 0xa4506cebu, 0xbef9a3f7u,
++    0xc67178f2u,
++};
++
++constexpr uint32_t rotate_right(uint32_t value, uint32_t amount) noexcept {
++  return (value >> amount) | (value << (32u - amount));
++}
++
++inline void sha256_block(const uint8_t* block, uint32_t (&state)[8]) noexcept {
++  uint32_t words[64]{};
++  for (size_t i = 0; i < 16; ++i) {
++    words[i] = (static_cast<uint32_t>(block[i * 4]) << 24) |
++              (static_cast<uint32_t>(block[i * 4 + 1]) << 16) |
++              (static_cast<uint32_t>(block[i * 4 + 2]) << 8) |
++              static_cast<uint32_t>(block[i * 4 + 3]);
++  }
++  for (size_t i = 16; i < 64; ++i) {
++    const uint32_t s0 = rotate_right(words[i - 15], 7) ^ rotate_right(words[i - 15], 18) ^ (words[i - 15] >> 3);
++    const uint32_t s1 = rotate_right(words[i - 2], 17) ^ rotate_right(words[i - 2], 19) ^ (words[i - 2] >> 10);
++    words[i] = words[i - 16] + s0 + words[i - 7] + s1;
++  }
++
++  uint32_t a = state[0];
++  uint32_t b = state[1];
++  uint32_t c = state[2];
++  uint32_t d = state[3];
++  uint32_t e = state[4];
++  uint32_t f = state[5];
++  uint32_t g = state[6];
++  uint32_t h = state[7];
++  for (size_t i = 0; i < 64; ++i) {
++    const uint32_t s1 = rotate_right(e, 6) ^ rotate_right(e, 11) ^ rotate_right(e, 25);
++    const uint32_t choose = (e & f) ^ ((~e) & g);
++    const uint32_t temp1 = h + s1 + choose + Sha256RoundConstants[i] + words[i];
++    const uint32_t s0 = rotate_right(a, 2) ^ rotate_right(a, 13) ^ rotate_right(a, 22);
++    const uint32_t majority = (a & b) ^ (a & c) ^ (b & c);
++    const uint32_t temp2 = s0 + majority;
++    h = g;
++    g = f;
++    f = e;
++    e = d + temp1;
++    d = c;
++    c = b;
++    b = a;
++    a = temp1 + temp2;
++  }
++  state[0] += a;
++  state[1] += b;
++  state[2] += c;
++  state[3] += d;
++  state[4] += e;
++  state[5] += f;
++  state[6] += g;
++  state[7] += h;
++}
++
++} // namespace detail
++
++inline Sha256Digest sha256(const uint8_t* data, size_t size) noexcept {
++  Sha256Digest digest{};
++  if ((data == nullptr && size != 0) || size > std::numeric_limits<uint64_t>::max() / 8u) {
++    return digest;
++  }
++
++  const uint64_t bitLength = static_cast<uint64_t>(size) * 8u;
++  uint32_t state[8]{0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
++                    0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u};
++  const size_t fullSize = size - (size % 64);
++  for (size_t offset = 0; offset < fullSize; offset += 64) {
++    detail::sha256_block(data + offset, state);
++  }
++
++  const size_t remainder = size - fullSize;
++  std::array<uint8_t, 128> tail{};
++  if (remainder != 0) {
++    std::memcpy(tail.data(), data + fullSize, remainder);
++  }
++  tail[remainder] = 0x80;
++  const size_t tailSize = remainder < 56 ? 64 : 128;
++  for (size_t i = 0; i < 8; ++i) {
++    tail[tailSize - 1 - i] = static_cast<uint8_t>(bitLength >> (i * 8));
++  }
++  for (size_t offset = 0; offset < tailSize; offset += 64) {
++    detail::sha256_block(tail.data() + offset, state);
++  }
++  for (size_t i = 0; i < 8; ++i) {
++    digest[i * 4] = static_cast<uint8_t>(state[i] >> 24);
++    digest[i * 4 + 1] = static_cast<uint8_t>(state[i] >> 16);
++    digest[i * 4 + 2] = static_cast<uint8_t>(state[i] >> 8);
++    digest[i * 4 + 3] = static_cast<uint8_t>(state[i]);
++  }
++  return digest;
++}
++
++class SeedDescriptorRegistry {
++public:
++  RegistryInsertResult add_seed(uint32_t type, uint64_t pipelineRef, uint32_t configVersion,
++                                uint32_t firstFrameUsed, const uint8_t* config, size_t configSize) {
++    if (type > AURORA_PIPELINE_SHADER_RML || config == nullptr || configSize == 0 ||
++        configSize > std::numeric_limits<uint32_t>::max() || configSize > MaxRetainedConfigBytes) {
++      return RegistryInsertResult::Invalid;
++    }
++    DescriptorIdentity identity{
++        .key = {.type = type, .pipelineRef = pipelineRef, .configVersion = configVersion},
++        .configSize = static_cast<uint32_t>(configSize),
++        .sha256 = sha256(config, configSize),
++    };
++    for (const auto& entry : entries_) {
++      if (!(entry.identity.key == identity.key)) {
++        continue;
++      }
++      if (entry.identity == identity && entry.config.size() == configSize &&
++          std::memcmp(entry.config.data(), config, configSize) == 0) {
++        return RegistryInsertResult::Duplicate;
++      }
++      return RegistryInsertResult::Conflict;
++    }
++
++    if (entries_.size() >= MaxSeedDescriptors || totalConfigBytes_ > MaxRetainedConfigBytes - configSize) {
++      return RegistryInsertResult::Overflow;
++    }
++
++    SeedDescriptor entry{
++        .identity = identity,
++        .firstFrameUsed = firstFrameUsed,
++        .config = std::vector<uint8_t>(config, config + configSize),
++    };
++    totalConfigBytes_ += configSize;
++    entries_.push_back(std::move(entry));
++    return RegistryInsertResult::Inserted;
++  }
++
++  void clear() noexcept {
++    entries_.clear();
++    totalConfigBytes_ = 0;
++  }
++
++  [[nodiscard]] size_t size() const noexcept { return entries_.size(); }
++  [[nodiscard]] size_t total_config_bytes() const noexcept { return totalConfigBytes_; }
++  [[nodiscard]] const std::vector<SeedDescriptor>& entries() const noexcept { return entries_; }
++
++  [[nodiscard]] bool contains(const DescriptorKey& key) const noexcept { return find(key) != nullptr; }
++
++  /* The GPU cache is keyed only by pipelineRef.  Keep the generic typed
++   * registry permissive, but let the cache reject an ambiguous seed set
++   * before it can queue any GPU work. */
++  [[nodiscard]] bool global_refs_unique() const noexcept {
++    for (size_t i = 0; i < entries_.size(); ++i) {
++      for (size_t j = i + 1; j < entries_.size(); ++j) {
++        if (entries_[i].identity.key.pipelineRef == entries_[j].identity.key.pipelineRef &&
++            !(entries_[i].identity == entries_[j].identity)) {
++          return false;
++        }
++      }
++    }
++    return true;
++  }
++
++  [[nodiscard]] const SeedDescriptor* find(const DescriptorKey& key) const noexcept {
++    const auto it = std::find_if(entries_.begin(), entries_.end(), [&](const SeedDescriptor& entry) {
++      return entry.identity.key == key;
++    });
++    return it == entries_.end() ? nullptr : &*it;
++  }
++
++  [[nodiscard]] const SeedDescriptor* find(const DescriptorIdentity& identity) const noexcept {
++    const auto* entry = find(identity.key);
++    return entry != nullptr && entry->identity == identity ? entry : nullptr;
++  }
++
++  [[nodiscard]] GateResult gate(const DescriptorIdentity& identity, const uint8_t* config, size_t configSize) const
++      noexcept {
++    const auto* entry = find(identity.key);
++    if (entry == nullptr) {
++      return GateResult::Unknown;
++    }
++    if (!(entry->identity == identity) || config == nullptr || configSize != entry->config.size() ||
++        std::memcmp(entry->config.data(), config, configSize) != 0) {
++      return GateResult::ByteMismatch;
++    }
++    return GateResult::Allowed;
++  }
++
++private:
++  std::vector<SeedDescriptor> entries_;
++  size_t totalConfigBytes_ = 0;
++};
++
++class PipelineSelection {
++public:
++  RequestResult build(const AuroraPipelineDescriptor* descriptors, size_t count,
++                      const SeedDescriptorRegistry& registry, size_t* invalidIndex = nullptr) const {
++    if (invalidIndex != nullptr) {
++      *invalidIndex = std::numeric_limits<size_t>::max();
++    }
++    if (descriptors == nullptr && count != 0) {
++      return RequestResult::Invalid;
++    }
++    if (count == 0) {
++      return RequestResult::Invalid;
++    }
++    if (count > MaxSeedDescriptors) {
++      return RequestResult::Overflow;
++    }
++
++    std::vector<DescriptorIdentity> candidate;
++    candidate.reserve(count);
++    for (size_t i = 0; i < count; ++i) {
++      const AuroraPipelineDescriptor& descriptor = descriptors[i];
++      if (descriptor.type > AURORA_PIPELINE_SHADER_RML || descriptor.config_size == 0 ||
++          descriptor.config_size > MaxRetainedConfigBytes) {
++        if (invalidIndex != nullptr) {
++          *invalidIndex = i;
++        }
++        return RequestResult::Invalid;
++      }
++      DescriptorIdentity identity{
++          .key = {.type = descriptor.type, .pipelineRef = descriptor.pipeline_ref,
++                  .configVersion = descriptor.config_version},
++          .configSize = descriptor.config_size,
++      };
++      std::copy(std::begin(descriptor.sha256), std::end(descriptor.sha256), identity.sha256.begin());
++
++      if (std::find(candidate.begin(), candidate.end(), identity) != candidate.end()) {
++        continue;
++      }
++      if (std::find_if(candidate.begin(), candidate.end(), [&](const DescriptorIdentity& prior) {
++            return prior.key == identity.key;
++          }) != candidate.end()) {
++        if (invalidIndex != nullptr) {
++          *invalidIndex = i;
++        }
++        return RequestResult::Conflict;
++      }
++      if (registry.find(identity) == nullptr) {
++        if (invalidIndex != nullptr) {
++          *invalidIndex = i;
++        }
++        return RequestResult::Unknown;
++      }
++      candidate.push_back(identity);
++    }
++    return RequestResult::Accepted;
++  }
++
++  RequestResult replace(const AuroraPipelineDescriptor* descriptors, size_t count,
++                        const SeedDescriptorRegistry& registry, size_t* invalidIndex = nullptr) {
++    const auto result = build(descriptors, count, registry, invalidIndex);
++    if (result != RequestResult::Accepted) {
++      return result;
++    }
++
++    std::vector<DescriptorIdentity> candidate;
++    candidate.reserve(count);
++    for (size_t i = 0; i < count; ++i) {
++      DescriptorIdentity identity{
++          .key = {.type = descriptors[i].type, .pipelineRef = descriptors[i].pipeline_ref,
++                  .configVersion = descriptors[i].config_version},
++          .configSize = descriptors[i].config_size,
++      };
++      std::copy(std::begin(descriptors[i].sha256), std::end(descriptors[i].sha256), identity.sha256.begin());
++      if (std::find(candidate.begin(), candidate.end(), identity) == candidate.end()) {
++        candidate.push_back(identity);
++      }
++    }
++    members_ = std::move(candidate);
++    return RequestResult::Accepted;
++  }
++
++  void clear() noexcept { members_.clear(); }
++  [[nodiscard]] size_t size() const noexcept { return members_.size(); }
++  [[nodiscard]] const std::vector<DescriptorIdentity>& members() const noexcept { return members_; }
++  [[nodiscard]] bool contains(const DescriptorKey& key) const noexcept {
++    return std::any_of(members_.begin(), members_.end(),
++                       [&](const DescriptorIdentity& identity) { return identity.key == key; });
++  }
++
++private:
++  std::vector<DescriptorIdentity> members_;
++};
++
++} // namespace aurora::gfx::selective
 diff --git a/tests/pipeline_prepare_state_test.cpp b/tests/pipeline_prepare_state_test.cpp
 new file mode 100644
 index 0000000..17fb09e

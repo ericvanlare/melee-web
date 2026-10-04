@@ -25,6 +25,8 @@ AURORA_PREVIOUS_PATCH_TREES = (
     # browser-owner additions. This is the exact tree obtained by applying
     # that main patch to the pinned pristine Aurora checkout.
     "ef139550ae1ff9e167cdbf0b8d2b18c4933c3b5a",
+    # Exact renderer diagnostic tree from this fighter checkout's c3ddd39 build.
+    "734ea922f3e6c1ff53ebf356714f30682f7a7abe",
 )
 
 

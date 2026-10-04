@@ -120,6 +120,13 @@ class RepositoryTests(unittest.TestCase):
         bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
         self.assertEqual((self.repo / "alpha.txt").stat().st_mtime_ns, changed_mtime)
 
+    def test_upgrade_accepts_member_of_exact_recognized_previous_trees(self):
+        previous = self.prepare_patch_upgrade()
+        bootstrap.apply_patch(self.repo, self.patch,
+                              previous_tree=frozenset((previous, "0" * 40)))
+        self.assertEqual((self.repo / "alpha.txt").read_text(), "updated reviewed patch\n")
+        self.assertEqual(bootstrap.patch_state(self.repo, self.patch), "applied")
+
     def test_upgrade_requires_the_exact_recognized_previous_tree(self):
         self.prepare_patch_upgrade()
         before = git(self.repo, "diff", "--binary")

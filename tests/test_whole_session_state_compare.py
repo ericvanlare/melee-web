@@ -11,11 +11,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "reference-capture" / "dolphin"), str(ROOT / "tests")]
 
 from reference_capture_semantics import pad_snapshot_bytes  # noqa: E402
-from test_whole_session_replay import _pad_consume, _raw_pad_snapshot, _whole_setup  # noqa: E402
+from test_whole_session_replay import (  # noqa: E402
+    _candidate, _pad_consume, _raw_pad_snapshot, _whole_setup,
+)
+import whole_session_replay as session_replay  # noqa: E402
 from whole_session_replay import SCENES, _consumed_ports  # noqa: E402
 from whole_session_state_compare import (  # noqa: E402
-    BrowserReader, Comparator, SourceCollector, _browser_completion_ok, _is_match_field,
-    _fighter_entities, _snapshot_values, _state_from_payload, _validate_browser_report,
+    BrowserReader, Comparator, ComparisonError, Recipe, SourceCollector,
+    _browser_completion_ok, _is_match_field,
+    _browser_entities_v10, _fighter_entities, _fighter_entities_v10,
+    _snapshot_values, _state_from_payload, _validate_browser_report,
 )
 
 
@@ -150,16 +155,18 @@ def _source_rows(fighter_count=4):
 
 def _browser_trace(path, pads, state, *, declared_setup=None, alter=None, rows_alter=None):
     setup = {"record": "session_match_enter_complete", "rng": state["rng"],
-             "match_frame": state["match_frame"], "pad_state_hex": state["pad_state_hex"],
-             "fighters": copy.deepcopy(state["fighters"])}
+             "match_frame": state["match_frame"], "pad_state_hex": state["pad_state_hex"]}
+    if "fighters" in state:
+        setup["fighters"] = copy.deepcopy(state["fighters"])
     if declared_setup is not None:
         setup["declared_setup"] = copy.deepcopy(declared_setup)
     if "fighter_entities" in state:
         setup["fighter_entities"] = copy.deepcopy(state["fighter_entities"])
     frame = {"record": "session_frame", "scene": SCENES["match"], "index": 0,
              "supplied_inputs": list(pads), "rng": state["rng"],
-             "match_frame": state["match_frame"], "pad_state_hex": state["pad_state_hex"],
-             "fighters": copy.deepcopy(state["fighters"])}
+             "match_frame": state["match_frame"], "pad_state_hex": state["pad_state_hex"]}
+    if "fighters" in state:
+        frame["fighters"] = copy.deepcopy(state["fighters"])
     if "fighter_entities" in state:
         frame["fighter_entities"] = copy.deepcopy(state["fighter_entities"])
     if alter:
@@ -182,6 +189,69 @@ def _v9_state(payload):
     state = _state_from_payload(payload, "v9 fixture")
     state.update(_snapshot_values(payload, "v9 fixture"))
     state["fighter_entities"] = _fighter_entities(payload, "v9 fixture", 0, {})
+    return state
+
+
+def _v10_entity_slices(slices, *, secondary_pointer=0x80681000,
+                       secondary_head=0x805A0000):
+    """Project the semantic fixture into the v10 source pair slice schema."""
+    result = []
+    primary_heads = {}
+    for item in slices:
+        if item["name"] == "fighter_head":
+            raw = bytes.fromhex(item["hex"])
+            primary_heads[item["flags"]] = (item["address"], raw)
+            item = dict(item, size=0x100, hex=raw[:0x100].hex())
+        elif item["name"] == "fighter_tail":
+            continue
+        result.append(copy.deepcopy(item))
+    for slot, (pointer, raw) in primary_heads.items():
+        result.append({"name": "fighter_input_anim", "flags": slot,
+                       "address": pointer + 0x620, "size": 0x280,
+                       "hex": raw[0x620:0x8A0].hex()})
+        tail = next(item for item in slices if item.get("name") == "fighter_tail" and
+                    item.get("flags") == slot)
+        tail_raw = bytes.fromhex(tail["hex"])
+        result.append({"name": "fighter_damage_shield", "flags": slot,
+                       "address": pointer + 0x1830, "size": 0x16C,
+                       "hex": tail_raw[0x830:0x99C].hex()})
+    pair = next(item for item in result if item["name"] == "player_entities" and
+                item["flags"] == 1)
+    pair["hex"] = pair["hex"][:8] + secondary_pointer.to_bytes(4, "big").hex()
+    result.append({"name": "player_entity_user_data", "flags": 0x0101,
+                   "address": secondary_pointer + 0x2C, "size": 4,
+                   "hex": secondary_head.to_bytes(4, "big").hex()})
+    head = bytearray(0x100)
+    _word(head, 0, secondary_pointer)
+    head[0x0C] = 1
+    _word(head, 4, 11)
+    result.append({"name": "fighter_head", "flags": 0x0101,
+                   "address": secondary_head, "size": len(head), "hex": head.hex()})
+    result.append({"name": "fighter_input_anim", "flags": 0x0101,
+                   "address": secondary_head + 0x620, "size": 0x280,
+                   "hex": bytes(0x280).hex()})
+    result.append({"name": "fighter_damage_shield", "flags": 0x0101,
+                   "address": secondary_head + 0x1830, "size": 0x16C,
+                   "hex": bytes(0x16C).hex()})
+    links = sorted((item for item in result
+                    if item["name"] == "player_entity_user_data"),
+                   key=lambda item: (item["flags"] & 0xFF, item["flags"] >> 8))
+    link_index = iter(links)
+    for index, item in enumerate(result):
+        if item["name"] == "player_entity_user_data":
+            result[index] = next(link_index)
+    return result
+
+
+def _v10_state(payload, match_index=0, previous=None, *, require_primaries=True):
+    previous = {} if previous is None else previous
+    slices = payload["slices"]
+    memory = __import__("reference_capture_semantics").SliceMemory(slices)
+    state = _snapshot_values(payload, "v10 fixture")
+    state["match_frame"] = memory.word(0x8046B6C4)
+    state["fighter_entities"] = _fighter_entities_v10(
+        payload, "v10 fixture", match_index, previous,
+        require_primaries=require_primaries)
     return state
 
 
@@ -392,6 +462,100 @@ class WholeSessionStateCompareTests(unittest.TestCase):
         self.assertEqual(comparison_fields(9),
                          ("rng", "match_frame", "pad_state_hex", "fighters",
                           "fighter_entities"))
+
+    def test_v10_compares_live_secondary_fighter_state_and_identity(self):
+        source, pads, state_slices, _ = _source_rows()
+        for index in (7, 9):
+            source[index]["payload"]["slices"] = _v10_entity_slices(
+                source[index]["payload"]["slices"])
+        state = _v10_state(source[9]["payload"])
+        self.assertEqual([(row["slot"], row["entity_index"])
+                          for row in state["fighter_entities"]],
+                         [(0, 0), (1, 0), (1, 1), (2, 0), (3, 0)])
+        self.assertNotEqual(state["fighter_entities"][1]["kind"],
+                            state["fighter_entities"][2]["kind"])
+        setup_payload = source[7]["payload"]
+        setup_raw = next(item["hex"] for item in setup_payload["slices"]
+                         if item["name"] == "match_setup")
+        from whole_session_replay import _decode_setup
+        declared = _decode_setup(setup_raw)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.jsonl"
+            _browser_trace(path, pads, state, declared_setup=declared)
+            comparator, _ = _run_source(path, source, pads, version=10, finish=False)
+            self.assertEqual(comparator.setup_count, 1)
+            self.assertEqual(comparator.match_compared, 1)
+
+            def change_secondary(setup, frame):
+                setup["fighter_entities"][2]["damage_bits"] = "3f800000"
+            _browser_trace(path, pads, state, declared_setup=declared,
+                           alter=change_secondary)
+            with self.assertRaisesRegex(ValueError,
+                                        "fighter_entities\\[2\\]\\.damage_bits"):
+                _run_source(path, source, pads, version=10, finish=False)
+
+    def test_v10_tracks_secondary_loss_and_rejoin_generations(self):
+        _, _, state_slices, _ = _source_rows()
+        previous = {}
+        first_payload = {"slices": _v10_entity_slices(state_slices)}
+        first = _fighter_entities_v10(first_payload, "v10 fixture", 0, previous,
+                                      require_primaries=True)
+        self.assertEqual(next(row for row in first
+                              if row["slot"] == 1 and row["entity_index"] == 1)
+                         ["generation"], 0)
+
+        absent_slices = _v10_entity_slices(state_slices)
+        pair = next(item for item in absent_slices if item["name"] == "player_entities" and
+                    item["flags"] == 1)
+        pair["hex"] = pair["hex"][:8] + "00000000"
+        absent_slices = [item for item in absent_slices
+                         if item.get("flags") != 0x0101]
+        absent = _fighter_entities_v10({"slices": absent_slices}, "v10 fixture", 0,
+                                       previous, require_primaries=False)
+        self.assertFalse(any(row["slot"] == 1 and row["entity_index"] == 1
+                             for row in absent))
+
+        rejoined_slices = _v10_entity_slices(
+            state_slices, secondary_pointer=0x80681100, secondary_head=0x805B0000)
+        rejoined = _fighter_entities_v10({"slices": rejoined_slices}, "v10 fixture", 0,
+                                         previous, require_primaries=False)
+        partner = next(row for row in rejoined
+                       if row["slot"] == 1 and row["entity_index"] == 1)
+        self.assertEqual(partner["generation"], 2)
+        self.assertEqual(_browser_entities_v10(rejoined, "v10 browser", 0,
+                                               require_primaries=True), rejoined)
+
+    def test_v10_browser_state_rejects_boolean_entity_identity(self):
+        _, _, state_slices, _ = _source_rows()
+        source = {"slices": _v10_entity_slices(state_slices)}
+        entities = _fighter_entities_v10(source, "v10 fixture", 0, {},
+                                         require_primaries=True)
+        changed = copy.deepcopy(entities)
+        changed[1]["fighter_player_id"] = True
+        with self.assertRaisesRegex(ComparisonError, "fighter_player_id.*expected integer"):
+            _browser_entities_v10(changed, "v10 browser", 0, require_primaries=True)
+
+    def test_v10_field_manifest_keeps_primary_and_secondary_state_explicit(self):
+        from whole_session_state_compare import comparison_fields
+        self.assertEqual(comparison_fields(9),
+                         ("rng", "match_frame", "pad_state_hex", "fighters",
+                          "fighter_entities"))
+        self.assertEqual(comparison_fields(10),
+                         ("rng", "match_frame", "pad_state_hex", "fighter_entities"))
+
+    def test_v10_recipe_reader_binds_the_fixed_coverage_setups(self):
+        capture = session_replay.capture_from_records(_candidate(fighter_v10=True))
+        payload, _ = session_replay.encode_v10(capture)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fighter-v10.mwrc"
+            path.write_bytes(payload)
+            recipe = Recipe(path, payload)
+        self.assertEqual(recipe.version, 10)
+        self.assertEqual(len(recipe.match_setups), 3)
+        self.assertEqual(len({player["character_kind"]
+                              for setup in recipe.match_setups
+                              for player in session_replay._decode_setup(setup.hex())["players"]}),
+                         12)
 
     def test_real_comparator_rejects_reordered_input_cursor(self):
         source, pads, _, _ = _source_rows()

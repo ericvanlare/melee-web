@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Derive a checked MWRC v9 recipe from raw whole-session observer streams.
+"""Derive a checked MWRC v8/v9/v10 recipe from raw whole-session observer streams.
 
 The only replay inputs admitted here are bytes from the source PAD queue at the
 observer's pad_consume boundary.  Lifecycle boundaries assign each consumed
@@ -38,10 +38,16 @@ from retail_setup_validation import _decode_setup  # noqa: E402
 MAGIC = b"MWRC"
 MWRC_V8_VERSION = 8
 MWRC_VERSION = 9
+MWRC_FIGHTER_VERSION = 10
 V9_MILESTONE_ROSTER = (
     (8, 2, 20, 9),       # Mario, Fox, Falco, Marth
     (22, 23, 6, 21),     # Dr. Mario, Roy, Link, Young Link
     (0, 25, 7, 13),      # Captain Falcon, Ganondorf, Luigi, Pikachu
+)
+V10_FIGHTER_ROSTER = (
+    (1, 5, 11, 12),       # Donkey Kong, Bowser, Ness, Peach
+    (15, 10, 24, 18),     # Jigglypuff, Mewtwo, Pichu, Zelda/Sheik icon
+    (4, 14, 16, 17),      # Kirby, Ice Climbers, Samus, Yoshi
 )
 V9_MILESTONE_RULES = {
     # Copied from the accepted four-Mario MWRC v8 setup in
@@ -67,7 +73,7 @@ PAD_SEMANTIC_SIZE = 11
 PORT_COUNT = 4
 FRAME_INPUT_SIZE = PORT_COUNT * PAD_SEMANTIC_SIZE
 # Legacy MWRC readers and producers remain capped at one ten-minute source
-# budget.  Whole-session v8/v9 carries three such budgets in one bounded
+# budget.  Whole-session v8/v9/v10 carries three such budgets in one bounded
 # workload, while keeping its cap explicit so callers cannot accidentally
 # widen an older format.
 LEGACY_MAX_FRAMES = 36000
@@ -91,13 +97,15 @@ EXPECTED_OBSERVER_SCHEMA = "melee-web-passive-dolphin-observer"
 SCHEMA = "melee-web-whole-session-replay-candidate"
 SCHEMA_VERSION = 1
 SCOPE = (
-    "original source-consumed PAD and scoped MWRC v8/v9 whole-session "
-    "workload; no CPU-decision input, port-equivalence, performance, pixel, PCM, "
+    "original source-consumed PAD and scoped MWRC v8/v9/v10 whole-session workload; "
+    "v10 requires a fixed twelve-character CPU9 profile and live fighter entity state; "
+    "no CPU-decision input, full-roster equivalence, performance, pixel, PCM, "
     "or tournament-admission claim"
 )
 RUNTIME_CONTEXT_STATUS = (
-    "v8/v9 carry source first-CSS PAD/RNG/GameRules/SaveData/CSSData/KO context "
-    "for the typed consumer; end-to-end runtime equivalence remains unevaluated"
+    "v8/v9 carry source first-CSS PAD/RNG/GameRules/SaveData/CSSData/KO context; "
+    "v10 compares live fighter entities in its fixed three-match profile; "
+    "end-to-end full-roster equivalence remains unevaluated"
 )
 
 SCENES = {"css": 1, "sss": 2, "match": 3, "results": 4, "prize": 5}
@@ -106,7 +114,7 @@ IDENTITY = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
 
 
 class WholeSessionReplayError(ValueError):
-    """The raw streams cannot be admitted as a complete MWRC v8 workload."""
+    """The raw streams cannot be admitted as a complete MWRC workload."""
 
 
 def _fail(message: str) -> None:
@@ -376,8 +384,18 @@ def _match_setups(records: list[Mapping[str, Any]], match_count: int) -> tuple[l
 
 def validate_milestone_setups(setup_hexes: list[str]) -> list[dict[str, Any]]:
     """Require the assigned three-match, twelve-character CPU9 workload."""
+    return _validate_cpu9_setups(setup_hexes, V9_MILESTONE_ROSTER, "MWRC v9")
+
+
+def validate_fighter_v10_setups(setup_hexes: list[str]) -> list[dict[str, Any]]:
+    """Require the distinct three-match fighter-coverage CPU9 workload."""
+    return _validate_cpu9_setups(setup_hexes, V10_FIGHTER_ROSTER, "MWRC v10")
+
+
+def _validate_cpu9_setups(setup_hexes: list[str], expected_roster: tuple[tuple[int, ...], ...],
+                          profile: str) -> list[dict[str, Any]]:
     if len(setup_hexes) != 3:
-        _fail("MWRC v9 milestone requires exactly three match setups")
+        _fail(f"{profile} profile requires exactly three match setups")
     declared: list[dict[str, Any]] = []
     for match_index, setup_hex in enumerate(setup_hexes):
         try:
@@ -395,7 +413,7 @@ def validate_milestone_setups(setup_hexes: list[str]) -> list[dict[str, Any]]:
                     player.get("cpu_level") != 9 or player["stocks"] != 4 or
                     player["costume"] != slot or player["rumble_enabled"]):
                 _fail(f"match {match_index} port {slot + 1} is not the declared four-stock CPU9 profile")
-        expected = V9_MILESTONE_ROSTER[match_index]
+        expected = expected_roster[match_index]
         actual = tuple(player["character_kind"] for player in players)
         if actual != expected:
             _fail(f"match {match_index} character lineup differs from the selected milestone roster")
@@ -403,12 +421,15 @@ def validate_milestone_setups(setup_hexes: list[str]) -> list[dict[str, Any]]:
     rules = [{key: value for key, value in setup.items() if key != "players"}
              for setup in declared]
     if rules[1:] != rules[:-1]:
-        _fail("MWRC v9 match rules changed between the three match setups")
+        _fail(f"{profile} match rules changed between the three match setups")
     if rules[0] != V9_MILESTONE_RULES:
-        _fail("MWRC v9 rules differ from the accepted four-Mario stock-match profile")
+        accepted_profile = ("accepted four-Mario stock-match profile"
+                            if profile == "MWRC v9" else
+                            "accepted four-stock CPU9 Final Destination profile")
+        _fail(f"{profile} rules differ from the {accepted_profile}")
     distinct = {player["character_kind"] for setup in declared for player in setup["players"]}
     if len(distinct) != 12:
-        _fail("MWRC v9 setup table does not select twelve distinct characters")
+        _fail(f"{profile} setup table does not select twelve distinct characters")
     return declared
 
 
@@ -687,12 +708,14 @@ def _encode_whole_session(capture: Mapping[str, Any], version: int) -> tuple[byt
         _fail("source setup table is missing")
     if version == MWRC_V8_VERSION and any(value != setup_hexes[0] for value in setup_hexes):
         _fail("MWRC v8 requires identical StartMeleeData for every match")
-    if version == MWRC_VERSION and len(setup_hexes) != 3:
-        _fail("MWRC v9 milestone requires exactly three match setups")
+    if version in (MWRC_VERSION, MWRC_FIGHTER_VERSION) and len(setup_hexes) != 3:
+        _fail(f"MWRC v{version} profile requires exactly three match setups")
     setups = [_hex_bytes(value, GAME_INFO_SIZE, f"source setup {index}")
               for index, value in enumerate(setup_hexes)]
     if version == MWRC_VERSION:
         validate_milestone_setups([value.hex() for value in setups])
+    elif version == MWRC_FIGHTER_VERSION:
+        validate_fighter_v10_setups([value.hex() for value in setups])
     setup = setups[0]
     initial_pad = _hex_bytes(capture["first_css"]["pad_state_hex"], PAD_STATE_BYTES,
                               "first CSS semantic PAD state")
@@ -765,6 +788,11 @@ def encode_v9(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
     return _encode_whole_session(capture, MWRC_VERSION)
 
 
+def encode_v10(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
+    """Encode the strict three-match fighter-coverage session profile."""
+    return _encode_whole_session(capture, MWRC_FIGHTER_VERSION)
+
+
 def encode_v7(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
     """Reject the provisional whole-session format explicitly.
 
@@ -776,11 +804,18 @@ def encode_v7(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
 
 
 def _encode_current(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
-    """Keep the v8 exporter path for repeated setups; use v9 for the milestone."""
+    """Select only the fixed v8, v9, or fighter-v10 recipe profiles."""
     setup_hexes = capture.get("setup_hexes", [capture.get("setup_hex")])
     if isinstance(setup_hexes, list) and setup_hexes and all(
             value == setup_hexes[0] for value in setup_hexes):
         return encode_v8(capture)
+    if isinstance(setup_hexes, list) and len(setup_hexes) == 3:
+        try:
+            validate_fighter_v10_setups(setup_hexes)
+        except WholeSessionReplayError:
+            pass
+        else:
+            return encode_v10(capture)
     return encode_v9(capture)
 
 
@@ -841,7 +876,7 @@ def _capture_report(capture: Mapping[str, Any],
 def export_single(capture_path: str | Path, output_path: str | Path,
                   sidecar_path: str | Path | None = None,
                   status_path: str | Path | None = None) -> dict[str, Any]:
-    """Write a valid v8/v9 workload from one complete source capture.
+    """Write a valid v8/v9/v10 workload from one complete source capture.
 
     This mode proves transport completeness and source ownership only. It
     intentionally does not claim independent execution or repeatability.
@@ -877,7 +912,7 @@ def export_pair(first_path: str | Path, second_path: str | Path, output_path: st
                 sidecar_path: str | Path | None = None,
                 status_a: str | Path | None = None,
                 status_b: str | Path | None = None) -> dict[str, Any]:
-    """Validate two independent streams and write a v8/v9 recipe plus provenance."""
+    """Validate two independent streams and write a v8/v9/v10 recipe plus provenance."""
     first = Path(first_path).expanduser().resolve()
     second = Path(second_path).expanduser().resolve()
     if first == second:
@@ -927,7 +962,7 @@ def _main(argv: list[str]) -> int:
     parser.add_argument("--single", action="store_true",
                         help="export one complete stream without a repeatability claim")
     parser.add_argument("--output", required=True, type=Path,
-                        help="new checked MWRC output (v8 for repeated setups; v9 for the 12-character milestone)")
+                        help="new checked MWRC output (v8 repeated setup; v9 12-character milestone; v10 fighter coverage)")
     parser.add_argument("--sidecar", type=Path, help="new JSON provenance sidecar path")
     parser.add_argument("--status-a", type=Path, help="observer status for capture A")
     parser.add_argument("--status-b", type=Path, help="observer status for capture B")

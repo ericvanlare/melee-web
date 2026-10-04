@@ -43,9 +43,12 @@ DISC_SHA256 = "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
 DOL_SHA256 = "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
 DOL_SHA1 = "08e0bf20134dfcb260699671004527b2d6bb1a45"
 DOLPHIN_COMMIT = "c77bbaa0f372c3f72281602a8b087206706542cb"
+CSS_HITBOX_MAP_SHA256 = "7bfbc83d833fe0a22b70a8258e01de79e89295d7aefd3cd6c87d5220686df419"
+CSS_HITBOX_MAP_PATH = ROOT / "docs" / "evidence" / "source-css-hitbox-map-v1.json"
 PROFILE_GCI = "01-GALE-SuperSmashBros0110290334.gci"
 PROFILE_GCI_SHA256 = "39171db67ec4e6b85837107f7cd7e1231402e239ec7f74bfc9efa35d5a2879ce"
 PROFILE_SRAM_SHA256 = "49dee06d38cb76aaa8f90bfb2e937face180243d1a170078b4e13226b012f82c"
+FIGHTER_ENTITY_PROFILE = "v10-live-static-player-pair"
 CAPTURE_ID_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
 
 # Target points stay inside the authored icon hitboxes and account for source
@@ -54,16 +57,29 @@ CAPTURE_ID_PATTERN = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
 ROSTER: dict[str, tuple[int, tuple[float, float]]] = {
     "MARIO": (8, (-20.9, 16.5)),
     "FOX": (2, (-20.9, 9.5)),
-    "FALCO": (20, (-32.2, 9.5)),
+    "FALCO": (20, (-27.2, 9.5)),
     "MARTH": (9, (14.1, 2.5)),
     "DR_MARIO": (22, (-27.2, 16.5)),
     "ROY": (23, (20.6, 2.5)),
     "LINK": (6, (21.0, 9.5)),
-    "YOUNG_LINK": (21, (26.0, 9.5)),
+    "YOUNG_LINK": (21, (27.3, 9.5)),
     "CAPTAIN_FALCON": (0, (21.0, 16.5)),
-    "GANONDORF": (25, (26.0, 16.5)),
+    "GANONDORF": (25, (27.3, 16.5)),
     "LUIGI": (7, (-13.9, 16.5)),
     "PIKACHU": (13, (-13.9, 2.5)),
+    "DONKEY_KONG": (1, (14.1, 16.5)),
+    "BOWSER": (5, (-6.9, 16.5)),
+    "NESS": (11, (-13.9, 9.5)),
+    "PEACH": (12, (0.1, 16.5)),
+    "JIGGLYPUFF": (15, (-6.9, 2.5)),
+    "MEWTWO": (10, (0.1, 2.5)),
+    "PICHU": (24, (-20.4, 2.5)),
+    "ZELDA": (18, (14.1, 9.5)),
+    "KIRBY": (4, (0.1, 9.5)),
+    "ICE_CLIMBERS": (14, (-6.9, 9.5)),
+    "SAMUS": (16, (7.1, 9.5)),
+    "YOSHI": (17, (7.1, 16.5)),
+    "GAME_AND_WATCH": (3, (7.1, 2.5)),
 }
 ROSTER_ICON: dict[str, int] = {
     "MARIO": 1,
@@ -78,6 +94,19 @@ ROSTER_ICON: dict[str, int] = {
     "GANONDORF": 8,
     "LUIGI": 2,
     "PIKACHU": 19,
+    "DONKEY_KONG": 6,
+    "BOWSER": 3,
+    "NESS": 11,
+    "PEACH": 4,
+    "JIGGLYPUFF": 20,
+    "MEWTWO": 21,
+    "PICHU": 18,
+    "ZELDA": 15,
+    "KIRBY": 13,
+    "ICE_CLIMBERS": 12,
+    "SAMUS": 14,
+    "YOSHI": 5,
+    "GAME_AND_WATCH": 22,
 }
 LINEUPS: tuple[tuple[str, ...], ...] = (
     ("MARIO", "FOX", "FALCO", "MARTH"),
@@ -101,6 +130,18 @@ TEAM_ROUTE_ITEM_MASK = "fffffffffffbffff"
 # entering the match, so the retained CSS copy has the source byte 0x83 rather
 # than the ordinary match-entry value with that bit set.
 CSS_RETAINED_PROFILE_BYTE = 0x83
+FIGHTER_V10_LINEUPS: tuple[tuple[str, ...], ...] = (
+    ("DONKEY_KONG", "BOWSER", "NESS", "PEACH"),
+    ("JIGGLYPUFF", "MEWTWO", "PICHU", "ZELDA"),
+    ("KIRBY", "ICE_CLIMBERS", "SAMUS", "YOSHI"),
+)
+FIGHTER_V10_EXPECTED_ROSTER = tuple(
+    tuple(ROSTER[name][0] for name in lineup) for lineup in FIGHTER_V10_LINEUPS
+)
+LINEUP_PROFILES = {
+    "v9-milestone": (LINEUPS, EXPECTED_ROSTER),
+    "v10-fighter-coverage": (FIGHTER_V10_LINEUPS, FIGHTER_V10_EXPECTED_ROSTER),
+}
 
 
 class CaptureFailure(RuntimeError):
@@ -119,12 +160,71 @@ def _write_json(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _validate_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
+def validate_source_css_hitbox_map() -> None:
+    if _sha256(CSS_HITBOX_MAP_PATH) != CSS_HITBOX_MAP_SHA256:
+        raise CaptureFailure("tracked source CSS hitbox map has the wrong SHA-256")
+    try:
+        source_map = json.loads(CSS_HITBOX_MAP_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise CaptureFailure(f"cannot read tracked source CSS hitbox map: {error}") from error
+    original = source_map.get("original_game", {})
+    source = source_map.get("source", {})
+    if (source_map.get("schema") != "melee-web-source-css-hitbox-map-v1" or
+            original.get("revision") != "GALE01 USA revision 2" or
+            original.get("dol_sha256") != DOL_SHA256 or
+            source.get("revision") != "b43912cc78606f96c9569f5d6229bc9d7e265ea5"):
+        raise CaptureFailure("source CSS hitbox map is not bound to the pinned GALE01r2 source")
+    icons = source_map.get("css_icons")
+    if not isinstance(icons, list) or len(icons) != 25:
+        raise CaptureFailure("source CSS hitbox map must describe all 25 selectable icons")
+    by_identity: dict[str, dict[str, Any]] = {}
+    seen_indices: set[int] = set()
+    for row in icons:
+        if not isinstance(row, dict):
+            raise CaptureFailure("source CSS hitbox map contains a malformed icon row")
+        identity = row.get("selectable_identity")
+        index = row.get("css_icon_index")
+        if (not isinstance(identity, str) or identity in by_identity or type(index) is not int or
+                index in seen_indices or not 0 <= index < 25):
+            raise CaptureFailure("source CSS hitbox map has duplicate or invalid selector identities")
+        by_identity[identity] = row
+        seen_indices.add(index)
+    if seen_indices != set(range(25)):
+        raise CaptureFailure("source CSS hitbox map does not cover every selector index")
+    identity_alias = {"ZELDA": "ZELDA_SHEIK_SHARED"}
+    for name, (kind, point) in ROSTER.items():
+        identity = identity_alias.get(name, name)
+        row = by_identity.get(identity)
+        if (row is None or row.get("source_character_kind") != kind or
+                row.get("css_icon_index") != ROSTER_ICON[name] or
+                row.get("point_is_strictly_inside_hitbox") is not True):
+            raise CaptureFailure(f"source CSS hitbox map identity disagrees for {name}")
+        target = row.get("selection_point", {})
+        hitbox = row.get("hitbox", {})
+        try:
+            x, y = float(target["x"]), float(target["y"])
+            left, right = float(hitbox["left"]), float(hitbox["right"])
+            lower, upper = float(hitbox["lower"]), float(hitbox["upper"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise CaptureFailure(f"source CSS hitbox map has invalid bounds for {name}") from error
+        if (not all(math.isfinite(value) for value in (x, y, left, right, lower, upper)) or
+                not left < x < right or not lower < y < upper or
+                not math.isclose(x, point[0], rel_tol=0.0, abs_tol=1e-12) or
+                not math.isclose(y, point[1], rel_tol=0.0, abs_tol=1e-12)):
+            raise CaptureFailure(f"capture target for {name} disagrees with its source hitbox row")
+    expected_lineups = [["ZELDA_SHEIK_SHARED" if name == "ZELDA" else name
+                         for name in lineup] for lineup in FIGHTER_V10_LINEUPS]
+    if source_map.get("proposed_cpu9_final_destination_lineups") != expected_lineups:
+        raise CaptureFailure("source CSS hitbox map and v10 lineup profile disagree")
+
+
+def _validate_setup(raw_hex: str, match_index: int,
+                    expected_roster=EXPECTED_ROSTER) -> dict[str, Any]:
     try:
         setup = _decode_setup(raw_hex)
     except (KeyError, TypeError, ValueError) as error:
         raise CaptureFailure(f"match {match_index} source setup is unsupported: {error}") from error
-    if not 0 <= match_index < len(EXPECTED_ROSTER):
+    if not 0 <= match_index < len(expected_roster):
         raise CaptureFailure(f"unexpected source match index {match_index}")
     if {key: value for key, value in setup.items() if key != "players"} != replay.V9_MILESTONE_RULES:
         raise CaptureFailure(f"match {match_index} rules differ from the accepted stock-match profile")
@@ -135,7 +235,7 @@ def _validate_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
     for slot, player in enumerate(players):
         expected = {
             "port": slot + 1,
-            "character_kind": EXPECTED_ROSTER[match_index][slot],
+            "character_kind": expected_roster[match_index][slot],
             "costume": slot,
             "stocks": 4,
             "player_type": 1,
@@ -149,7 +249,7 @@ def _validate_setup(raw_hex: str, match_index: int) -> dict[str, Any]:
                 f"expected {expected}, received {player}"
             )
         actual.append(player["character_kind"])
-    if tuple(actual) != EXPECTED_ROSTER[match_index]:
+    if tuple(actual) != expected_roster[match_index]:
         raise CaptureFailure(f"match {match_index} source roster mismatch")
     return setup
 
@@ -257,12 +357,15 @@ def _capture_exit_code(result: Any) -> int:
 class Driver:
     def __init__(self, controller: capture.DualPipeController,
                  latest: dict[str, Any], stop: threading.Event,
-                 *, readiness_only: bool, team_route_only: bool = False) -> None:
+                 *, readiness_only: bool, team_route_only: bool = False,
+                 lineups=LINEUPS, expected_roster=EXPECTED_ROSTER) -> None:
         self.controller = controller
         self.latest = latest
         self.stop = stop
         self.readiness_only = readiness_only
         self.team_route_only = team_route_only
+        self.lineups = lineups
+        self.expected_roster = expected_roster
         self.steps: list[dict[str, Any]] = []
 
     def wait(self, predicate: Callable[[], bool], label: str,
@@ -513,7 +616,7 @@ class Driver:
                   f"CPU slider {slot} released")
 
     def configure_lineup(self, match_index: int, *, initial: bool) -> None:
-        lineup = LINEUPS[match_index]
+        lineup = self.lineups[match_index]
         self.latest["expected_match_index"] = 0 if self.readiness_only else match_index
         self.wait(lambda: len(self.latest["models"]) == 4 and
                   self.latest.get("css_polls", 0) >= 240,
@@ -532,7 +635,7 @@ class Driver:
             self.select_cpu(3, lineup[3])
         for slot in range(4):
             self.set_cpu9(slot)
-        expected = EXPECTED_ROSTER[match_index]
+        expected = self.expected_roster[match_index]
         current = self.latest["players"][:4]
         if any(row["kind"] != 1 or row["cpu"] != 9 or row["character"] != expected[index]
                for index, row in enumerate(current)):
@@ -582,7 +685,7 @@ class Driver:
                 self.play_team_battle()
                 self.latest["driver_complete"] = True
                 return
-            for match_index in range(3):
+            for match_index in range(len(self.lineups)):
                 self.configure_lineup(match_index, initial=(match_index == 0))
                 if self.readiness_only:
                     self.enter_fd(choose_stage=False,
@@ -854,7 +957,7 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
         latest.setdefault("boundaries", {})[boundary] = row["seq"]
         if boundary == "return_css":
             latest["expected_match_index"] = min(
-                match_index + 1, len(EXPECTED_ROSTER) - 1
+                match_index + 1, latest.get("expected_roster_count", len(EXPECTED_ROSTER)) - 1
             )
     if boundary == "sss_enter":
         latest["stage_kind"] = None
@@ -953,7 +1056,9 @@ def _consume_row(row: dict[str, Any], latest: dict[str, Any],
         setup_hex = setup_slice["hex"]
         normalized = (_validate_team_setup(setup_hex, match_index)
                       if latest.get("team_route") else
-                      _validate_setup(setup_hex, match_index))
+                      _validate_setup(
+                          setup_hex, match_index,
+                          latest.get("expected_roster", EXPECTED_ROSTER)))
         latest.setdefault("setup_records", []).append({
             "match_index": match_index,
             "source_sequence": row["seq"],
@@ -1000,6 +1105,9 @@ def _args() -> argparse.Namespace:
                         help="new evidence directory beneath this checkout's ignored work/")
     parser.add_argument("--capture-id", required=True,
                         help="unique MWRO identity using letters, numbers, dot, underscore, hyphen")
+    parser.add_argument("--lineup-profile", choices=tuple(LINEUP_PROFILES),
+                        default="v9-milestone",
+                        help="fixed CPU9 roster profile; v10 avoids repeating the existing lineup")
     parser.add_argument("--readiness-only", action="store_true",
                         help="cycle three source-confirmed CPU9 lineups through CSS/SSS without matches")
     parser.add_argument("--team-route", action="store_true",
@@ -1011,6 +1119,8 @@ def main() -> int:
     args = _args()
     if args.readiness_only and args.team_route:
         raise CaptureFailure("--readiness-only and --team-route are separate capture modes")
+    lineups, expected_roster = LINEUP_PROFILES[args.lineup_profile]
+    validate_source_css_hitbox_map()
     out = args.out.expanduser().resolve()
     if ROOT / "work" not in out.parents:
         raise CaptureFailure("--out must be inside this checkout's ignored work/ directory")
@@ -1081,6 +1191,8 @@ def main() -> int:
         "MWRC_INPUT_STATUS": str(input_status),
         "LANG": "en_US.UTF-8",
     })
+    if args.lineup_profile == "v10-fighter-coverage":
+        env["MWRC_FIGHTER_ENTITY_PROFILE"] = FIGHTER_ENTITY_PROFILE
     command = [str(dolphin), "-p", "headless", "-v", "Null", "-u", str(user), "-e", str(disc)]
     settings = (
         "Dolphin.Interface.ConfirmStop=False",
@@ -1108,9 +1220,11 @@ def main() -> int:
         "doors": [], "players": [], "boundaries": {}, "boundary_match_indices": {},
         "expected_match_index": 0, "setup_records": [], "polls": 0,
         "team_route": args.team_route,
+        "expected_roster": expected_roster, "expected_roster_count": len(expected_roster),
     }
     report: dict[str, Any] = {
         "schema": "melee-web-recorded-session-12-character-capture-v1",
+        "lineup_profile": args.lineup_profile,
         "capture_id": args.capture_id,
         "scope": ("three original CSS/SSS Team match cycles after the committed row-zero item toggle and None frequency; each is Mario vs level-1 Mario CPU, source No Contest Results and retained CSS; Null video; no pixel, PCM, physical-input, or performance claim"
                   if args.team_route else
@@ -1118,8 +1232,13 @@ def main() -> int:
                   if args.readiness_only else
                   "one continuous three-match original CPU9 session; Null video; no pixels, PCM, or performance claim"),
         "route": "team-battle-results-css-roundtrips" if args.team_route else "three-lineup-cpu9",
-        "lineups": ([ ["MARIO", "MARIO"] for _ in range(3)] if args.team_route else
-                    [list(lineup) for lineup in LINEUPS]),
+        "lineups": ([["MARIO", "MARIO"] for _ in range(3)] if args.team_route else
+                    [list(lineup) for lineup in lineups]),
+        "source_css_hitbox_map": {
+            "schema": "melee-web-source-css-hitbox-map-v1",
+            "sha256": CSS_HITBOX_MAP_SHA256,
+            "dol_sha256": DOL_SHA256,
+        },
         "dolphin_executable_sha256": _sha256(dolphin),
         "build_manifest_sha256": _sha256(manifest_path),
         "disc_sha256": DISC_SHA256,
@@ -1134,6 +1253,7 @@ def main() -> int:
         "audio_policy": "host output muted; DSP generation retained",
     }
     driver = Driver(controller, latest, stop, readiness_only=args.readiness_only,
+                    lineups=lineups, expected_roster=expected_roster,
                     team_route_only=args.team_route)
     ended = False
     try:
@@ -1149,6 +1269,7 @@ def main() -> int:
                                             sequence_id=args.capture_id)
             identity = observer.identity or {}
             handshake = announcements[0]["payload"] if announcements else {}
+            start_record = announcements[1]["payload"] if len(announcements) > 1 else {}
             if (identity.get("capture_id") != args.capture_id or
                     identity.get("sequence_id") != args.capture_id or
                     handshake.get("schema") != "melee-web-passive-dolphin-observer" or
@@ -1156,6 +1277,10 @@ def main() -> int:
                     handshake.get("dol_sha256") != DOL_SHA256 or
                     handshake.get("writes_guest_memory") is not False):
                 raise CaptureFailure("observer handshake does not match requested capture identity")
+            if (args.lineup_profile == "v10-fighter-coverage" and
+                    (handshake.get("fighter_entity_profile") != FIGHTER_ENTITY_PROFILE or
+                     start_record.get("fighter_entity_profile") != FIGHTER_ENTITY_PROFILE)):
+                raise CaptureFailure("observer did not acknowledge the v10 live entity capture profile")
             report["observer_identity"] = identity
             report["observer_handshake"] = handshake
             thread = threading.Thread(target=driver.boot_and_drive, name="original-css-driver")
@@ -1191,8 +1316,11 @@ def main() -> int:
                         raise CaptureFailure(
                             f"completed source session omitted setups: expected {expected_setups}")
                     if not args.team_route:
-                        replay.validate_milestone_setups(
-                            [entry["raw_hex"] for entry in latest["setup_records"]])
+                        setup_hexes = [entry["raw_hex"] for entry in latest["setup_records"]]
+                        if args.lineup_profile == "v10-fighter-coverage":
+                            replay.validate_fighter_v10_setups(setup_hexes)
+                        else:
+                            replay.validate_milestone_setups(setup_hexes)
                     else:
                         result_rows = latest.get("team_result_gobj_rows", [])
                         team_results = latest.get("team_results", [])

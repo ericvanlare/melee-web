@@ -31,9 +31,9 @@ def _raw_pad_snapshot() -> bytes:
     return bytes(raw)
 
 
-def _whole_session_cpu_setup(match_index: int) -> bytes:
-    """Four ordinary CPU9 players with the selected per-match roster."""
-    lineups = replay.V9_MILESTONE_ROSTER
+def _whole_session_cpu_setup(match_index: int, *, fighter_v10: bool = False) -> bytes:
+    """Four ordinary CPU9 players with the selected strict per-match roster."""
+    lineups = replay.V10_FIGHTER_ROSTER if fighter_v10 else replay.V9_MILESTONE_ROSTER
     raw = bytearray.fromhex(_whole_setup()["start_melee_hex"])
     raw[0] = (raw[0] & 0x1F) | 0x20  # accepted four-Mario MatchKind
     raw[2] |= 0x80  # stock rules
@@ -84,7 +84,7 @@ def _pad_consume(match_index: int, value: int, source_tick: int) -> dict:
 
 
 def _candidate(capture_id: str = "capture-a", sequence_id: str = "sequence-a",
-               *, v9_milestone: bool = False):
+               *, v9_milestone: bool = False, fighter_v10: bool = False):
     rows = copy.deepcopy(_decoded_observer_rows())
     # Keep the fixture's published masks consistent with its typed SaveData,
     # as the v8 reader checks both source ranges at the transport boundary.
@@ -130,8 +130,9 @@ def _candidate(capture_id: str = "capture-a", sequence_id: str = "sequence-a",
                  "hex": "12345678"},
             ])
         if boundary == "entry":
-            setup_hex = (_whole_session_cpu_setup(payload.get("match_index", 0)).hex()
-                         if v9_milestone else setup)
+            setup_hex = (_whole_session_cpu_setup(
+                payload.get("match_index", 0), fighter_v10=fighter_v10).hex()
+                         if v9_milestone or fighter_v10 else setup)
             payload["gprs"][3] = 0x80520000
             payload["slices"].append(
                 {"name": "match_setup", "address": 0x80520000, "size": 0x138,
@@ -506,6 +507,38 @@ class WholeSessionReplayTests(unittest.TestCase):
         changed["setup_hexes"] = capture["setup_hexes"][:2]
         with self.assertRaisesRegex(replay.WholeSessionReplayError, "exactly three"):
             replay.encode_v9(changed)
+
+    def test_v10_uses_distinct_fixed_fighter_roster_and_rejects_v9_lineup(self):
+        capture = replay.capture_from_records(_candidate(fighter_v10=True))
+        expected = [_whole_session_cpu_setup(index, fighter_v10=True).hex()
+                    for index in range(3)]
+        payload, transport = replay.encode_v10(capture)
+        self.assertEqual(transport["version"], 10)
+        self.assertEqual(replay.HEADER.unpack_from(payload)[1], 10)
+        self.assertEqual(capture["setup_hexes"], expected)
+        self.assertEqual([tuple(player["character_kind"] for player in setup["players"])
+                          for setup in capture["declared_setups"]],
+                         list(replay.V10_FIGHTER_ROSTER))
+        self.assertEqual(len({kind for lineup in replay.V10_FIGHTER_ROSTER
+                              for kind in lineup}), 12)
+        with self.assertRaisesRegex(replay.WholeSessionReplayError, "character lineup"):
+            replay.encode_v9(capture)
+
+        changed = dict(capture)
+        changed["setup_hexes"] = list(capture["setup_hexes"])
+        for index, setup_hex in enumerate(changed["setup_hexes"]):
+            raw = bytearray.fromhex(setup_hex)
+            raw[0x0B] = 0
+            changed["setup_hexes"][index] = raw.hex()
+        with self.assertRaisesRegex(replay.WholeSessionReplayError,
+                                    "accepted four-stock CPU9 Final Destination profile"):
+            replay.encode_v10(changed)
+
+    def test_current_export_selects_v10_only_for_its_fixed_fighter_roster(self):
+        capture = replay.capture_from_records(_candidate(fighter_v10=True))
+        payload, transport = replay._encode_current(capture)
+        self.assertEqual(transport["version"], 10)
+        self.assertEqual(replay.HEADER.unpack_from(payload)[1], 10)
 
     def test_independent_pair_rejects_match_setup_change(self):
         rows_a = _candidate(v9_milestone=True)

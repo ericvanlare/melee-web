@@ -16,6 +16,10 @@ static void vec(const Vec3* v){printf("[\"%08x\",\"%08x\",\"%08x\"]",bits(v->x),
 static HSD_GObj* observed_entities[4];
 static uint32_t entity_generations[4];
 static uint32_t observed_match = UINT_MAX;
+static HSD_GObj* observed_entities_v10[4][2];
+static uint32_t entity_generations_v10[4][2];
+static uint8_t entity_seen_v10[4][2];
+static uint32_t observed_match_v10 = UINT_MAX;
 uint32_t melee_web_retail_rng(void){
     if(!seed_ptr)abort();
     return *seed_ptr;
@@ -95,5 +99,69 @@ void melee_web_retail_entities_index(uint32_t match_index){
     }
     if(Player_GetPlayerSlotType(4)!=Gm_PKind_NA||
        Player_GetPlayerSlotType(5)!=Gm_PKind_NA)abort();
+    printf("]");
+}
+
+void melee_web_retail_state_v10(void){
+    if(!seed_ptr)abort();
+    printf("\"rng\":%u,\"match_frame\":%u",*seed_ptr,gm_GetFrameCount());
+}
+
+void melee_web_retail_entities_reset_v10(void){
+    memset(observed_entities_v10,0,sizeof(observed_entities_v10));
+    memset(entity_generations_v10,0,sizeof(entity_generations_v10));
+    memset(entity_seen_v10,0,sizeof(entity_seen_v10));
+    observed_match_v10=UINT_MAX;
+}
+
+void melee_web_retail_entities_index_v10(uint32_t match_index,int require_primaries){
+    if(match_index>=3)abort();
+    if(observed_match_v10==UINT_MAX||match_index!=observed_match_v10){
+        if(observed_match_v10!=UINT_MAX&&match_index!=observed_match_v10+1)abort();
+        memset(observed_entities_v10,0,sizeof(observed_entities_v10));
+        memset(entity_generations_v10,0,sizeof(entity_generations_v10));
+        memset(entity_seen_v10,0,sizeof(entity_seen_v10));
+        observed_match_v10=match_index;
+    }
+    HSD_GObj* seen_gobjs[8]={0};
+    unsigned seen_count=0;
+    uint8_t has_primary[4]={0,0,0,0};
+    printf(",\"fighter_entities\":[");
+    unsigned emitted=0;
+    for(unsigned slot=0;slot<4;slot++){
+        StaticPlayer* player=Player_GetPtrForSlot(slot);
+        if(!player||Player_GetPlayerSlotType(slot)!=Gm_PKind_Cpu)abort();
+        for(unsigned entity_index=0;entity_index<2;entity_index++){
+            HSD_GObj* entity=player->player_entity[entity_index];
+            if(entity_seen_v10[slot][entity_index]&&
+               observed_entities_v10[slot][entity_index]!=entity){
+                if(entity_generations_v10[slot][entity_index]==UINT_MAX)abort();
+                entity_generations_v10[slot][entity_index]++;
+            }
+            entity_seen_v10[slot][entity_index]=1;
+            observed_entities_v10[slot][entity_index]=entity;
+            if(!entity)continue;
+            Fighter* fighter=entity->user_data;
+            if(!fighter||fighter->gobj!=entity||fighter->player_id!=slot)abort();
+            for(unsigned earlier=0;earlier<seen_count;earlier++)
+                if(seen_gobjs[earlier]==entity)abort();
+            if(seen_count>=sizeof(seen_gobjs)/sizeof(seen_gobjs[0]))abort();
+            seen_gobjs[seen_count++]=entity;
+            if(entity_index==0)has_primary[slot]=1;
+            if(emitted++)printf(",");
+            printf("{\"match_index\":%u,\"entity_index\":%u,\"generation\":%u,"
+                   "\"fighter_player_id\":%u,\"fighter_gobj_linked\":true,",
+                   match_index,entity_index,entity_generations_v10[slot][entity_index],
+                   fighter->player_id);
+            fighter_fields(slot,fighter);
+            printf("}");
+        }
+    }
+    if(Player_GetPlayerSlotType(4)!=Gm_PKind_NA||
+       Player_GetPlayerSlotType(5)!=Gm_PKind_NA)abort();
+    if(require_primaries){
+        for(unsigned slot=0;slot<4;slot++)if(!has_primary[slot])abort();
+    }
+    if(!emitted)abort();
     printf("]");
 }

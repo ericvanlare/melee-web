@@ -32,6 +32,7 @@ const {values} = parseArgs({options: {
   'stop-after-source-frames': {type: 'string'},
   'resume-timing-pauses': {type: 'boolean', default: false},
   'cpu-observations': {type: 'boolean', default: false},
+  'capture-renderer-indexed-draws': {type: 'boolean', default: false},
   'rng-draw-probe-range': {type: 'string'},
   'rng-draw-probe-cursors': {type: 'string'},
 }});
@@ -56,6 +57,7 @@ const replayPollMs = values['replay-poll-ms'] === undefined
 const stopAfter = values['stop-after-source-frames'] ? integer('stop-after-source-frames',1,108000) : null;
 const resumeTimingPauses = values['resume-timing-pauses'];
 const captureCpuObservations = values['cpu-observations'];
+const captureRendererIndexedDraws = values['capture-renderer-indexed-draws'];
 const rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
   cursors: values['rng-draw-probe-cursors']});
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
@@ -66,7 +68,7 @@ const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime
 await fs.mkdir(output, {recursive: false});
 const report = {
   schema: 'melee-web-headless-whole-session-replay-v1',
-  scope: 'Single headless browser MWRC v8/v9 diagnostic; no pixel, PCM, performance, or admission claim',
+  scope: 'Single headless browser MWRC v8/v9/v10 diagnostic; no pixel, PCM, performance, or admission claim',
   result: 'fail',
   url: values.url,
   mode: 'state',
@@ -77,6 +79,7 @@ const report = {
   resume_timing_pauses: resumeTimingPauses,
   timing_pause_resumes: [],
   cpu_observations: captureCpuObservations ? 'second_match_only' : 'not_captured',
+  renderer_indexed_draw_trace: captureRendererIndexedDraws ? {status: 'requested_not_collected'} : 'not_requested',
   rng_draw_probe: rngDrawProbe ? {request: rngDrawProbe.request,
     selected_cursors: rngDrawProbe.selected, complete: false} : 'not_captured',
   verified_runtime_data_aborts: [],
@@ -244,9 +247,9 @@ try {
     version: recipeBytes.readUInt32BE(4), seed: recipeBytes.readUInt32BE(8),
     frames: recipeBytes.readUInt32BE(12), bytes: recipeBytes.length,
   };
-  if (![8, 9].includes(report.recipe_header.version) ||
+  if (![8, 9, 10].includes(report.recipe_header.version) ||
       report.recipe_header.frames < 1 || report.recipe_header.frames > 108000)
-    throw Error('Whole-session replay requires a valid MWRC v8/v9 frame count');
+    throw Error('Whole-session replay requires a valid MWRC v8/v9/v10 frame count');
   if (rngDrawProbe && rngDrawProbe.selected.some(cursor => cursor >= report.recipe_header.frames))
     throw Error('RNG draw probe cursor must be inside the source recipe frame count');
   if (captureCpuObservations && report.recipe_header.version !== 9)
@@ -260,6 +263,7 @@ try {
   report.browser.version = browser.version();
   page = await browser.newPage({viewport: {width: 900, height: 700}, deviceScaleFactor: 1});
   await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations,
+    captureRendererIndexedDraws,
     rngDrawProbeSelection}) => {
     window.__meleeNativeRuntimeReady = false;
     const module = globalThis.Module || {};
@@ -277,6 +281,7 @@ try {
     window.__meleeSourceOwnerTrace = [];
     window.__meleeSourceAllocationTrace = [];
     window.__meleeSourceAllocationTraceTotal = 0;
+    if (captureRendererIndexedDraws) window.__meleeRendererIndexedDrawTrace = [];
     window.meleeCpuObservation = text => {
       if (window.__cpuPrefixRows.length >= cpuObservationRowLimit) throw Error('CPU prefix diagnostic exceeded source recipe frame bound');
       window.__cpuPrefixRows.push(text);
@@ -298,7 +303,7 @@ try {
         throw Error('RNG draw probe emitted a duplicate source cursor');
       window.__rngDrawProbeRows.push(text);
     };
-  }, {cpuObservationRowLimit, captureCpuObservations,
+  }, {cpuObservationRowLimit, captureCpuObservations, captureRendererIndexedDraws,
     rngDrawProbeSelection: rngDrawProbe});
   page.setDefaultTimeout(phaseTimeoutMs);
   page.setDefaultNavigationTimeout(phaseTimeoutMs);
@@ -494,6 +499,19 @@ try {
           missing_cursors: validation.missing_cursors, artifact};
       } catch (error) {
         report.rng_draw_probe_error = String(error?.message || error);
+      }
+    }
+    if (captureRendererIndexedDraws) {
+      try {
+        const rows = await page.evaluate(() => window.__meleeRendererIndexedDrawTrace || []);
+        if (!Array.isArray(rows) || rows.length > 512 || rows.some(row => typeof row !== 'string'))
+          throw Error('Renderer indexed-draw trace has invalid shape or exceeds 512 rows');
+        const text = rows.length ? rows.join('\n') + '\n' : '';
+        await write('renderer-indexed-draws.jsonl', text);
+        report.renderer_indexed_draw_trace = {status: 'captured', rows: rows.length,
+          bytes: Buffer.byteLength(text), sha256: createHash('sha256').update(text).digest('hex')};
+      } catch (error) {
+        report.renderer_indexed_draw_trace_error = String(error?.message || error);
       }
     }
     try { await write('source-owner-trace.json', await page.evaluate(() => window.__meleeSourceOwnerTrace || [])); } catch(error) { report.owner_trace_error = String(error); }

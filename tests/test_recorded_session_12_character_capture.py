@@ -5,12 +5,17 @@ import unittest
 from tools.recorded_session_12_character_capture import (
     CaptureFailure,
     Driver,
+    FIGHTER_ENTITY_PROFILE,
+    FIGHTER_V10_EXPECTED_ROSTER,
+    FIGHTER_V10_LINEUPS,
+    LINEUP_PROFILES,
     ROSTER_ICON,
     _capture_exit_code,
     _consume_row,
     _decode_css_start_data,
     _decode_team_result,
     _validate_team_setup,
+    validate_source_css_hitbox_map,
 )
 
 
@@ -169,6 +174,28 @@ class RecordedSession12CharacterCaptureTests(unittest.TestCase):
         self.assertEqual(driver.steps[0]["doors"][0]["kind"], 0)
         self.assertEqual(driver.steps[0]["cursors"][0]["x"], 1.0)
         self.assertEqual(driver.steps[0]["team_state"]["player_teams"], [0, 0])
+    def test_v10_profile_names_the_observed_live_player_entity_domain(self):
+        self.assertEqual(FIGHTER_ENTITY_PROFILE, "v10-live-static-player-pair")
+
+    def test_tracked_source_css_hitbox_map_binds_all_selectable_targets(self):
+        validate_source_css_hitbox_map()
+        self.assertEqual(len(ROSTER_ICON), 25)
+
+    def test_fighter_v10_profile_is_distinct_and_uses_source_hitbox_rows(self):
+        lineups, expected = LINEUP_PROFILES["v10-fighter-coverage"]
+        self.assertEqual(lineups, FIGHTER_V10_LINEUPS)
+        self.assertEqual(expected, FIGHTER_V10_EXPECTED_ROSTER)
+        self.assertEqual(len({kind for lineup in expected for kind in lineup}), 12)
+        self.assertFalse(set(kind for lineup in expected for kind in lineup) &
+                         set(kind for lineup in LINEUP_PROFILES["v9-milestone"][1]
+                             for kind in lineup))
+        for character, icon in {
+            "DONKEY_KONG": 6, "BOWSER": 3, "NESS": 11, "PEACH": 4,
+            "JIGGLYPUFF": 20, "MEWTWO": 21, "PICHU": 18, "ZELDA": 15,
+            "KIRBY": 13, "ICE_CLIMBERS": 12, "SAMUS": 14, "YOSHI": 5,
+        }.items():
+            with self.subTest(character=character):
+                self.assertEqual(ROSTER_ICON[character], icon)
 
     def test_boundary_requires_whole_session_marker(self):
         with self.assertRaisesRegex(CaptureFailure, "unmarked boundary"):

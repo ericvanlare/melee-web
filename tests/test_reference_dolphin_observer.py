@@ -111,6 +111,110 @@ int main() {
             checked = subprocess.run([str(path / "slot")], capture_output=True, text=True)
             self.assertEqual(checked.returncode, 0, checked.stderr)
 
+    def test_v10_live_entity_reader_validates_both_source_links(self) -> None:
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        if compiler is None:
+            self.skipTest("A native C++ compiler is not installed")
+        source = SOURCE.read_text(encoding="utf-8")
+        reader = source[source.index("  bool ReadLivePlayerEntities("):
+                        source.index("  bool AddLivePlayerEntitySlices(")]
+        match_slices = source[source.index("  bool AddMatchSlices("):
+                              source.index("  bool ReadProfileRoot(")]
+        self.assertIn('Env("MWRC_FIGHTER_ENTITY_PROFILE")', source)
+        self.assertIn('fighter_entity_profile != "v10-live-static-player-pair"', source)
+        self.assertIn("fighter_entity_profile", source)
+        self.assertIn("v10-live-static-player-pair", source)
+        self.assertIn("whole_session_fighter_entities_v10", match_slices)
+        self.assertIn("AddLivePlayerEntitySlices(system, slot", match_slices)
+        self.assertIn("AddSlice(system, SliceTag::PlayerEntityUserData, gobj + 0x2c, 4, flags)", source)
+        self.assertIn("constexpr size_t MAX_SLICES = 80;", source)
+        harness = r"""
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <unordered_map>
+using u8 = uint8_t;
+using u32 = uint32_t;
+struct Core { struct System {}; };
+struct Reader {
+  std::unordered_map<u32, u8> memory;
+  bool IsMem1Range(u32 address, size_t size) const {
+    return address >= 0x80000000U &&
+           static_cast<uint64_t>(address) + size <= 0x81800000ULL;
+  }
+  bool ReadBytes(Core::System*, u32 address, size_t size, u8* output) const {
+    if (!IsMem1Range(address, size)) return false;
+    for (size_t i = 0; i < size; ++i) {
+      const auto found = memory.find(address + static_cast<u32>(i));
+      if (found == memory.end()) return false;
+      output[i] = found->second;
+    }
+    return true;
+  }
+  static u32 ReadBE32(const u8* bytes) {
+    return (static_cast<u32>(bytes[0]) << 24) |
+           (static_cast<u32>(bytes[1]) << 16) |
+           (static_cast<u32>(bytes[2]) << 8) | bytes[3];
+  }
+  bool ReadU32(Core::System* system, u32 address, u32* value) const {
+    std::array<u8, 4> bytes{};
+    if (!ReadBytes(system, address, bytes.size(), bytes.data())) return false;
+    *value = ReadBE32(bytes.data());
+    return true;
+  }
+  bool ReadFighterSourceSlot(Core::System* system, u32 fighter, u8* slot) const {
+    return IsMem1Range(fighter, 0xD) && ReadBytes(system, fighter + 0xC, 1, slot);
+  }
+  void Put8(u32 address, u8 value) { memory[address] = value; }
+  void Put32(u32 address, u32 value) {
+    for (unsigned i = 0; i < 4; ++i)
+      memory[address + i] = static_cast<u8>(value >> (24 - 8 * i));
+  }
+""" + reader + r"""
+};
+int main() {
+  Reader reader;
+  Core::System system;
+  constexpr u32 slot = 2;
+  constexpr u32 pair = 0x80453080 + slot * 0xe90 + 0xb0;
+  constexpr u32 primary = 0x80500000, secondary = 0x80500100;
+  constexpr u32 primary_fighter = 0x80600000, secondary_fighter = 0x80600100;
+  reader.Put32(pair, primary);
+  reader.Put32(pair + 4, secondary);
+  reader.Put32(primary + 0x2c, primary_fighter);
+  reader.Put32(secondary + 0x2c, secondary_fighter);
+  reader.Put32(primary_fighter, primary);
+  reader.Put32(secondary_fighter, secondary);
+  reader.Put8(primary_fighter + 0x0c, slot);
+  reader.Put8(secondary_fighter + 0x0c, slot);
+  std::array<u32, 2> gobjs{}, fighters{};
+  assert(reader.ReadLivePlayerEntities(&system, slot, &gobjs, &fighters));
+  assert(gobjs[0] == primary && gobjs[1] == secondary);
+  assert(fighters[0] == primary_fighter && fighters[1] == secondary_fighter);
+  reader.Put32(secondary_fighter, primary);
+  assert(!reader.ReadLivePlayerEntities(&system, slot, &gobjs, &fighters));
+  reader.Put32(secondary_fighter, secondary);
+  reader.Put8(secondary_fighter + 0x0c, 3);
+  assert(!reader.ReadLivePlayerEntities(&system, slot, &gobjs, &fighters));
+  reader.Put8(secondary_fighter + 0x0c, slot);
+  reader.Put32(pair + 4, primary);
+  assert(!reader.ReadLivePlayerEntities(&system, slot, &gobjs, &fighters));
+  assert(!reader.ReadLivePlayerEntities(&system, 4, &gobjs, &fighters));
+}
+"""
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)
+            (path / "live_entities.cpp").write_text(harness)
+            built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Werror",
+                                    str(path / "live_entities.cpp"), "-o",
+                                    str(path / "live_entities")],
+                                   capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            checked = subprocess.run([str(path / "live_entities")], capture_output=True,
+                                     text=True)
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
     def test_scene_reset_classifier_distinguishes_menu_match_results_and_prize(self) -> None:
         compiler = shutil.which("clang++") or shutil.which("g++")
         if compiler is None:

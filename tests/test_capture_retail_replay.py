@@ -100,8 +100,8 @@ class CaptureRunnerTests(unittest.TestCase):
             Path("/Dolphin"), Path("/owned/user"), Path("/owned/snapshot.sav"),
             Path("/readonly/game.iso"))
         self.assertEqual(command[0:7], [
-            "/Dolphin", "-u", "/owned/user", "-s",
-            "/owned/snapshot.sav", "-e", "/readonly/game.iso",
+            "/Dolphin", "-u", "/owned/user", "-s", "/owned/snapshot.sav",
+            "-e", "/readonly/game.iso",
         ])
         self.assertNotIn("-b", command)
         self.assertNotIn("-d", command)
@@ -117,9 +117,9 @@ class CaptureRunnerTests(unittest.TestCase):
         ):
             self.assertIn(setting, command)
 
-    def test_cold_boot_command_omits_save_state_and_unsupported_nogui_flags(self):
+    def test_dolphin_command_cold_boot_omits_snapshot(self):
         command = CAPTURE.dolphin_command(
-            Path("/Dolphin"), Path("/owned/user"), Path("/unused/snapshot.sav"),
+            Path("/Dolphin"), Path("/owned/user"), Path("/owned/snapshot.sav"),
             Path("/readonly/game.iso"), cold_boot=True)
         self.assertEqual(command[0:5], [
             "/Dolphin", "-u", "/owned/user", "-e", "/readonly/game.iso",

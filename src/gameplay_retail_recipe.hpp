@@ -60,11 +60,11 @@ struct RetailReplayRecipe {
     std::vector<std::array<uint8_t, 0x138>> match_setups;
     std::vector<MeleeWebMenuMatchSelection> match_selections;
     std::unique_ptr<RetailReplayInitialCssContext> initial_css;
-    // Versions 8 and 9 are opt-in whole-session forms: one continuous pad history
+    // Versions 8, 9, and 10 are opt-in whole-session forms: one continuous pad history
     // with a declared scene span table and copied first-CSS source context. It
     // starts from the fresh prepared CSS owner and retains one source arena
     // across the menu chain and matches. A used source heap is rejected.
-    bool whole_session() const { return version == 8 || version == 9; }
+    bool whole_session() const { return version == 8 || version == 9 || version == 10; }
     unsigned scheduling_mode() const { return version == 6 ? 2 : version == 5 ? 1 : 0; }
     std::size_t expected_draws() const {
         if (draw_boundaries.empty()) return frames.size();
@@ -87,10 +87,13 @@ struct RetailReplayRecipe {
  * flags=0, u32 context_bytes), the source GameRules, SaveData, complete
  * CSSData entry object and six-byte KO array, and finally the whole-session
  * span table. V9 replaces the one setup payload with a bounded, ordered setup
- * table so each match selection is independently bound. Schema 1 is rejected
+ * table so each match selection is independently bound. V10 retains that
+ * transport while selecting the distinct fighter-coverage roster and comparing
+ * full source-owned state for both live StaticPlayer entity slots. Schema 1 is rejected
  * because it cannot initialize CSS. */
 constexpr uint32_t kRetailReplayVersion = 9;
 constexpr uint32_t kRetailReplayV8Version = 8;
+constexpr uint32_t kRetailReplayFighterVersion = 10;
 constexpr uint16_t kRetailReplayContextVersion = 2;
 constexpr size_t kRetailReplayGameRulesBytes = 0x18;
 constexpr size_t kRetailReplaySaveDataBytes = 0x55E8;

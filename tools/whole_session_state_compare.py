@@ -6,7 +6,7 @@ bind one-for-one to MWRC frames; no scene or input search is performed.  Menu
 rows validate browser field shape and exact scene/input order; their scalar
 state is explicitly outside this comparator's source-to-browser join. VS
 ``setup`` and ``source_tick`` rows additionally carry exact state for the two
-to four active fighters in the match.
+to four active fighters in v8/v9, or every live source entity in v10.
 
 This module is intentionally separate from the older indexed-prefix
 comparator.  It checks the complete source-consumed timeline and reports the
@@ -32,6 +32,7 @@ sys.path[:0] = [str(ROOT / "reference-capture" / "dolphin"), str(ROOT / "tools")
 from reference_observer_stream import iter_records  # noqa: E402
 import reference_capture_semantics as semantics  # noqa: E402
 from reference_capture_semantics import SliceMemory, pad_snapshot_bytes, state_snapshot  # noqa: E402
+from retail_replay_validation import _validate_fighter  # noqa: E402
 from whole_session_replay import (  # noqa: E402
     CONTEXT_BYTES,
     CONTEXT_HEADER,
@@ -44,6 +45,7 @@ from whole_session_replay import (  # noqa: E402
     SPAN,
     _consumed_ports,
     _decode_setup,
+    validate_fighter_v10_setups,
     validate_milestone_setups,
 )
 
@@ -55,6 +57,7 @@ MWRC_HEADER = struct.Struct(">4sIIIHH")
 MWRC_CONTEXT_VERSION = 2
 MWRC_V8_VERSION = 8
 MWRC_VERSION = 9
+MWRC_FIGHTER_VERSION = 10
 FRAME_BYTES = 44
 PORT_BYTES = 11
 PORT_COUNT = 4
@@ -62,6 +65,7 @@ MAX_UINT32 = 0xFFFFFFFF
 SCENE_NAMES = {value: key for key, value in SCENES.items()}
 COMPARE_FIELDS = ("rng", "match_frame", "pad_state_hex", "fighters")
 V9_COMPARE_FIELDS = COMPARE_FIELDS + ("fighter_entities",)
+V10_COMPARE_FIELDS = ("rng", "match_frame", "pad_state_hex", "fighter_entities")
 NONMATCH_FIELDS: tuple[str, ...] = ()
 FIGHTER_KEYS = {
     "slot", "kind", "motion", "animation", "ground_air", "facing_bits",
@@ -78,6 +82,8 @@ class ComparisonError(ValueError):
 def comparison_fields(version: int) -> tuple[str, ...]:
     if version == MWRC_VERSION:
         return V9_COMPARE_FIELDS
+    if version == MWRC_FIGHTER_VERSION:
+        return V10_COMPARE_FIELDS
     if version == MWRC_V8_VERSION:
         return COMPARE_FIELDS
     raise ComparisonError(f"unsupported whole-session comparison version {version}")
@@ -374,8 +380,154 @@ def _fighter_entities(payload: Mapping[str, Any], context: str, match_index: int
     return result
 
 
+V10_ENTITY_IDENTITY_KEYS = {
+    "match_index", "entity_index", "generation", "fighter_player_id",
+    "fighter_gobj_linked",
+}
+V10_ENTITY_KEYS = V10_ENTITY_IDENTITY_KEYS | FIGHTER_KEYS
+
+
+def _browser_entities_v10(value: Any, context: str, match_index: int,
+                          *, require_primaries: bool) -> list[dict[str, Any]]:
+    if not isinstance(value, list) or not 1 <= len(value) <= 8:
+        raise ComparisonError(f"{context}: expected one to eight live fighter entities")
+    result: list[dict[str, Any]] = []
+    seen: set[tuple[int, int]] = set()
+    last_identity = (-1, -1)
+    for item in value:
+        if not isinstance(item, dict) or set(item) != V10_ENTITY_KEYS:
+            raise ComparisonError(f"{context}: malformed fighter entity state")
+        slot = _int(item.get("slot"), f"{context}.fighter_entities.slot", 0, 3)
+        entity_index = _int(item.get("entity_index"),
+                             f"{context}.fighter_entities.entity_index", 0, 1)
+        identity = (slot, entity_index)
+        if identity in seen or identity <= last_identity:
+            raise ComparisonError(f"{context}: fighter entities are duplicate, missing, or reordered")
+        seen.add(identity)
+        last_identity = identity
+        observed_match = _int(item.get("match_index"),
+                              f"{context}.fighter_entities.match_index", 0, 2)
+        observed_player = _int(item.get("fighter_player_id"),
+                               f"{context}.fighter_entities.fighter_player_id", 0, 3)
+        if (observed_match != match_index or
+                observed_player != slot or
+                item.get("fighter_gobj_linked") is not True):
+            raise ComparisonError(f"{context}: fighter entity owner or GObj backlink is invalid")
+        _int(item.get("generation"), f"{context}.fighter_entities.generation")
+        fighter = {key: item[key] for key in FIGHTER_KEYS}
+        _validate_fighter(fighter, slot, f"{context}.fighter_entities[{slot},{entity_index}]")
+        result.append(item)
+    if require_primaries and {slot for slot, index in seen if index == 0} != set(range(4)):
+        raise ComparisonError(f"{context}: match setup must expose all four primary source entities")
+    return result
+
+
+def _fighter_entities_v10(payload: Mapping[str, Any], context: str, match_index: int,
+                          previous: dict[tuple[int, int], tuple[int, int]],
+                          *, require_primaries: bool) -> list[dict[str, Any]]:
+    """Compare each live source StaticPlayer entity with its full fighter state."""
+    slices = payload.get("slices")
+    if not isinstance(slices, list):
+        raise ComparisonError(f"{context}: missing typed entity slices")
+    _validate_fighter_slice_flags(slices, context)
+    pairs = [item for item in slices
+             if isinstance(item, dict) and item.get("name") == "player_entities"]
+    links = [item for item in slices
+             if isinstance(item, dict) and item.get("name") == "player_entity_user_data"]
+    if len(pairs) != 4:
+        raise ComparisonError(f"{context}: expected four ordered StaticPlayer entity pairs")
+    if [(item.get("flags"), item.get("address"), item.get("size")) for item in pairs] != [
+            (slot, 0x80453080 + slot * 0xE90 + 0xB0, 8) for slot in range(4)]:
+        raise ComparisonError(f"{context}: StaticPlayer entity-pair records are missing or reordered")
+
+    pair_pointers: dict[tuple[int, int], int] = {}
+    seen_gobjs: set[int] = set()
+    for slot, pair in enumerate(pairs):
+        raw = _hex(pair.get("hex"), 8, f"{context}.player_entities[{slot}]")
+        pair_raw = bytes.fromhex(raw)
+        for entity_index in range(2):
+            pointer = int.from_bytes(pair_raw[entity_index * 4:entity_index * 4 + 4], "big")
+            pair_pointers[(slot, entity_index)] = pointer
+            if pointer:
+                if not 0x80000000 <= pointer < 0x81800000:
+                    raise ComparisonError(f"{context}: entity {slot}/{entity_index} is outside source MEM1")
+                if pointer in seen_gobjs:
+                    raise ComparisonError(f"{context}: duplicate live GObj across source entity slots")
+                seen_gobjs.add(pointer)
+
+    live = {identity for identity, pointer in pair_pointers.items() if pointer}
+    link_by_identity: dict[tuple[int, int], Mapping[str, Any]] = {}
+    for link in links:
+        flags = link.get("flags")
+        if type(flags) is not int or not 0 <= flags <= 0xFFFF:
+            raise ComparisonError(f"{context}: invalid player entity user_data flags")
+        identity = (flags & 0xFF, flags >> 8)
+        if identity not in live or identity in link_by_identity:
+            raise ComparisonError(f"{context}: extra or duplicate player entity user_data link")
+        link_by_identity[identity] = link
+    if set(link_by_identity) != live:
+        raise ComparisonError(f"{context}: live source entity is missing its user_data link")
+    link_order = []
+    for link in links:
+        flags = link["flags"]
+        link_order.append((flags & 0xFF, flags >> 8))
+    if link_order != sorted(live):
+        raise ComparisonError(f"{context}: player entity user_data links are missing or reordered")
+
+    heads: dict[tuple[int, int], Mapping[str, Any]] = {}
+    for item in slices:
+        if isinstance(item, dict) and item.get("name") == "fighter_head":
+            flags = item.get("flags")
+            if type(flags) is not int:
+                raise ComparisonError(f"{context}: Fighter head has invalid identity flags")
+            identity = (flags & 0xFF, flags >> 8)
+            if identity in heads:
+                raise ComparisonError(f"{context}: duplicate Fighter head for live entity")
+            heads[identity] = item
+    if set(heads) != live:
+        raise ComparisonError(f"{context}: Fighter heads do not match live StaticPlayer entities")
+
+    memory = SliceMemory(slices)
+    result: list[dict[str, Any]] = []
+    for slot in range(4):
+        for entity_index in range(2):
+            identity = (slot, entity_index)
+            pointer = pair_pointers[identity]
+            old = previous.get(identity)
+            generation = (0 if old is None else old[1] + (old[0] != pointer))
+            previous[identity] = (pointer, generation)
+            if not pointer:
+                continue
+            link = link_by_identity[identity]
+            gobj = pointer
+            if link.get("size") != 4 or link.get("address") != gobj + 0x2C:
+                raise ComparisonError(f"{context}: source GObj user_data address is detached")
+            user_data = int.from_bytes(bytes.fromhex(_hex(
+                link.get("hex"), 4, f"{context}.entity[{slot},{entity_index}].user_data")), "big")
+            head = heads[identity]
+            if head.get("address") != user_data or head.get("size") != 0x100:
+                raise ComparisonError(f"{context}: source GObj user_data does not name its Fighter head")
+            raw_head = bytes.fromhex(_hex(
+                head.get("hex"), 0x100, f"{context}.entity[{slot},{entity_index}].fighter_head"))
+            if (int.from_bytes(raw_head[:4], "big") != gobj or raw_head[0x0C] != slot):
+                raise ComparisonError(f"{context}: Fighter GObj backlink or player_id is detached")
+            fighter = semantics.fighter_state(memory, slot, user_data)
+            result.append({
+                "match_index": match_index,
+                "entity_index": entity_index,
+                "generation": generation,
+                "fighter_player_id": slot,
+                "fighter_gobj_linked": True,
+                **fighter,
+            })
+    if not result:
+        raise ComparisonError(f"{context}: source match has no live fighter entities")
+    return _browser_entities_v10(result, context, match_index,
+                                 require_primaries=require_primaries)
+
+
 class Recipe:
-    """Decoded, checked MWRC v8/v9 transport."""
+    """Decoded, checked MWRC v8/v9/v10 transport."""
 
     def __init__(self, path: Path, raw: bytes) -> None:
         self.path = path
@@ -383,8 +535,9 @@ class Recipe:
         if len(raw) < MWRC_HEADER.size + CONTEXT_HEADER.size:
             raise ComparisonError("MWRC recipe is truncated")
         magic, version, self.seed, count, self.characters, self.stages = MWRC_HEADER.unpack_from(raw)
-        if magic != b"MWRC" or version not in (MWRC_V8_VERSION, MWRC_VERSION):
-            raise ComparisonError("whole-session comparison requires MWRC v8 or v9")
+        if magic != b"MWRC" or version not in (
+                MWRC_V8_VERSION, MWRC_VERSION, MWRC_FIGHTER_VERSION):
+            raise ComparisonError("whole-session comparison requires MWRC v8, v9, or v10")
         self.version = version
         self.frame_count = count
         if not 1 <= count <= 108000:
@@ -411,14 +564,14 @@ class Recipe:
             cursor += GAME_INFO_SIZE
         else:
             if cursor + 4 > len(raw):
-                raise ComparisonError("MWRC v9 setup table header is truncated")
+                raise ComparisonError(f"MWRC v{version} setup table header is truncated")
             setup_count, setup_flags = struct.unpack_from(">HH", raw, cursor)
             cursor += 4
             if setup_flags != 0 or not 3 <= setup_count <= 64:
-                raise ComparisonError("MWRC v9 setup table count or flags are invalid")
+                raise ComparisonError(f"MWRC v{version} setup table count or flags are invalid")
             setup_end = cursor + setup_count * GAME_INFO_SIZE
             if setup_end + PAD_STATE_BYTES > len(raw):
-                raise ComparisonError("MWRC v9 setup table is truncated")
+                raise ComparisonError(f"MWRC v{version} setup table is truncated")
             self.match_setups = [raw[cursor + index * GAME_INFO_SIZE:
                                       cursor + (index + 1) * GAME_INFO_SIZE]
                                  for index in range(setup_count)]
@@ -459,12 +612,14 @@ class Recipe:
             raise ComparisonError("MWRC spans do not cover the admitted whole-session timeline")
         if self.spans[-1]["scene"] not in (SCENES["results"], SCENES["prize"]):
             raise ComparisonError("MWRC timeline does not end in Results or Prize")
-        if version == MWRC_VERSION:
+        if version in (MWRC_VERSION, MWRC_FIGHTER_VERSION):
             match_spans = sum(span["scene"] == SCENES["match"] for span in self.spans)
             if len(self.match_setups) != 3 or match_spans != 3:
-                raise ComparisonError("MWRC v9 requires exactly three match setups and match spans")
+                raise ComparisonError(f"MWRC v{version} requires exactly three match setups and match spans")
             try:
-                validate_milestone_setups([setup.hex() for setup in self.match_setups])
+                validator = (validate_milestone_setups if version == MWRC_VERSION
+                             else validate_fighter_v10_setups)
+                validator([setup.hex() for setup in self.match_setups])
             except ValueError as error:
                 raise ComparisonError(str(error)) from error
         if cursor != len(raw):
@@ -587,7 +742,11 @@ class Comparator:
                       actual=str(error))
         expected_keys = {"record", "scene", "index", "supplied_inputs", "rng", "pad_state_hex"}
         if expected_scene == SCENES["match"]:
-            expected_keys |= {"match_frame", "fighters"}
+            expected_keys.add("match_frame")
+            if self.recipe.version == MWRC_FIGHTER_VERSION:
+                expected_keys.add("fighter_entities")
+            else:
+                expected_keys.add("fighters")
             if self.recipe.version == MWRC_VERSION:
                 expected_keys.add("fighter_entities")
         BrowserReader._require(row, expected_keys,
@@ -614,10 +773,16 @@ class Comparator:
         _hex(row["pad_state_hex"], PAD_STATE_BYTES, f"browser frame {index}.pad_state_hex")
         if expected_scene == SCENES["match"]:
             _int(row["match_frame"], f"browser frame {index}.match_frame")
-            _validate_browser_fighters(row["fighters"], f"browser frame {index}")
             if self.recipe.version == MWRC_VERSION:
+                _validate_browser_fighters(row["fighters"], f"browser frame {index}")
                 row["fighter_entities"] = _browser_entities(
                     row["fighter_entities"], f"browser frame {index}", self.current_match)
+            elif self.recipe.version == MWRC_FIGHTER_VERSION:
+                row["fighter_entities"] = _browser_entities_v10(
+                    row["fighter_entities"], f"browser frame {index}", self.current_match,
+                    require_primaries=False)
+            else:
+                _validate_browser_fighters(row["fighters"], f"browser frame {index}")
         return row
 
     def on_setup(self, match_index: int, state: dict[str, Any], source_seq: int) -> None:
@@ -629,13 +794,18 @@ class Comparator:
             self.fail("browser trace is missing the expected match setup record",
                       record="session_match_enter_complete", index=match_index,
                       expected="session_match_enter_complete", actual=str(error))
-        expected_keys = {"record", "rng", "match_frame", "pad_state_hex", "fighters"}
-        if self.recipe.version == MWRC_VERSION:
+        expected_keys = {"record", "rng", "match_frame", "pad_state_hex"}
+        if self.recipe.version == MWRC_FIGHTER_VERSION:
+            expected_keys.add("fighter_entities")
+        else:
+            expected_keys.add("fighters")
+        if self.recipe.version in (MWRC_VERSION, MWRC_FIGHTER_VERSION):
             expected_keys |= {"declared_setup", "fighter_entities"}
         BrowserReader._require(row, expected_keys,
                                f"browser match_enter_complete before match {match_index}")
         _int(row["match_frame"], f"browser match setup {match_index}.match_frame")
-        _validate_browser_fighters(row["fighters"], f"browser match setup {match_index}")
+        if self.recipe.version != MWRC_FIGHTER_VERSION:
+            _validate_browser_fighters(row["fighters"], f"browser match setup {match_index}")
         if row.get("record") != "session_match_enter_complete":
             self.fail("browser match setup record is missing or reordered", record=row.get("record"),
                       index=self.frame_index, expected="session_match_enter_complete",
@@ -643,9 +813,17 @@ class Comparator:
         if self.recipe.version == MWRC_VERSION:
             row["fighter_entities"] = _browser_entities(
                 row["fighter_entities"], f"browser match {match_index} setup", match_index)
+        elif self.recipe.version == MWRC_FIGHTER_VERSION:
+            row["fighter_entities"] = _browser_entities_v10(
+                row["fighter_entities"], f"browser match {match_index} setup", match_index,
+                require_primaries=True)
+            if match_index == 2 and not any(
+                    entity["slot"] == 1 and entity["entity_index"] == 1
+                    for entity in row["fighter_entities"]):
+                raise ComparisonError("MWRC v10 Ice Climbers setup omitted Nana entity slot 1")
         self._compare(state, row, self.compare_fields, record="match_enter_complete",
                       index=match_index, context=f"match {match_index} setup")
-        if self.recipe.version == MWRC_VERSION:
+        if self.recipe.version in (MWRC_VERSION, MWRC_FIGHTER_VERSION):
             self._compare({"declared_setup": state["declared_setup"]}, row,
                           ("declared_setup",), record="match_enter_complete",
                           index=match_index, context=f"match {match_index} declared setup")
@@ -700,7 +878,9 @@ class Comparator:
             raise ComparisonError("source frame count does not cover the MWRC recipe")
         if self.source_spans != self.recipe.spans:
             raise ComparisonError("source scene spans disagree with the MWRC recipe")
-        if self.setup_count == 0 or (self.recipe.version == MWRC_VERSION and self.setup_count != 3):
+        if self.setup_count == 0 or (self.recipe.version in
+                                     (MWRC_VERSION, MWRC_FIGHTER_VERSION) and
+                                     self.setup_count != 3):
             raise ComparisonError("source session has the wrong number of match setups")
         row = self.browser.next()
         if row.get("record") != "end":
@@ -837,7 +1017,7 @@ class SourceCollector:
         _, raw = _slice(row["payload"], "match_setup", GAME_INFO_SIZE, "source setup")
         self.setup_bytes.append(raw)
         state = self._match_state(row["payload"], "source setup")
-        if self.recipe.version == MWRC_VERSION:
+        if self.recipe.version in (MWRC_VERSION, MWRC_FIGHTER_VERSION):
             state["declared_setup"] = _decode_setup(raw.hex())
         self.callback.on_setup(self.match_index, state, row["seq"])
 
@@ -861,6 +1041,23 @@ class SourceCollector:
         self.last_source_tick[self.match_index] = row["source_tick"]
 
     def _match_state(self, payload: Mapping[str, Any], context: str) -> dict[str, Any]:
+        if self.recipe.version == MWRC_FIGHTER_VERSION:
+            slices = payload.get("slices")
+            if not isinstance(slices, list):
+                raise ComparisonError(f"{context}: missing typed match slices")
+            memory = SliceMemory(slices)
+            state = _snapshot_values(payload, context)
+            state["scene_frame"] = memory.word(0x80479D58)
+            state["match_frame"] = memory.word(0x8046B6C4)
+            previous = self.entity_previous.setdefault(self.match_index, {})
+            state["fighter_entities"] = _fighter_entities_v10(
+                payload, context, self.match_index, previous,
+                require_primaries=(context == "source setup"))
+            if (context == "source setup" and self.match_index == 2 and
+                    not any(entity["slot"] == 1 and entity["entity_index"] == 1
+                            for entity in state["fighter_entities"])):
+                raise ComparisonError("MWRC v10 source setup omitted Nana entity slot 1")
+            return state
         state = _state_from_payload(payload, context)
         state.update(_snapshot_values(payload, context))
         if self.recipe.version == MWRC_VERSION:

@@ -215,7 +215,7 @@ $('retail-replay-start').onclick=async()=>{
  replayLoading=true;$('retail-replay-start').disabled=$('disc').disabled=$('launch').disabled=true;
  try{
   if(window.meleeHitchCaptureLoading)await window.meleeHitchCaptureLoading;if(window.meleeHitchCaptureLoadError&&hitchCaptureFromUrl)throw Error(`Hitch capture unavailable: ${window.meleeHitchCaptureLoadError}`);
-  // Native parsing applies the legacy 36,000-frame limit and the v8
+  // Native parsing applies the legacy 36,000-frame limit and the v8/v9/v10
   // whole-session 108,000-frame limit after reading the version. This upload
   // bound admits the largest checked v8 envelope without widening legacy
   // formats or allowing an unbounded allocation.
@@ -227,7 +227,7 @@ $('retail-replay-start').onclick=async()=>{
   // rejects an already used source heap before accepting it.
   const header=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
   const wholeVersion=bytes.length>=8&&header.getUint32(0,false)===0x4d575243?header.getUint32(4,false):0;
-  const wholeSession=wholeVersion===8||wholeVersion===9;
+  const wholeSession=wholeVersion===8||wholeVersion===9||wholeVersion===10;
   if(wholeSession&&owner.handle.getState().state!=='prepared')throw Error('Whole-session replay requires a freshly imported disc before opening character select.');
   if(!wholeSession&&!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
   for(const old of $('retail-replay-downloads').querySelectorAll('a'))URL.revokeObjectURL(old.href);$('retail-replay-downloads').replaceChildren();replayEvidence=[];$('save-replay-evidence').disabled=true;

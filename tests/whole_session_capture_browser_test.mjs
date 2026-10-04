@@ -14,7 +14,7 @@ assert(values.out, 'Use --out NEW_DIRECTORY to retain the browser contract repor
 const output = path.resolve(values.out);
 await fs.mkdir(output, {recursive: false});
 const {playwrightPath, browserPath} = await loadBrowserTools(values.playwright);
-const cases = ['clean', 'pageerror', 'console', 'http', 'request-failure', 'runtime', 'late-console',
+const cases = ['clean', 'clean-v10', 'renderer-draw-trace', 'pageerror', 'console', 'http', 'request-failure', 'runtime', 'late-console',
   'export-failure', 'missing-port', 'missing-report', 'empty-exports',
   'empty-artifact', 'duplicate', 'prefix', 'timing-pause', 'rng-probe', 'rng-probe-invalid'];
 const fixture = mode => String.raw`<!doctype html><html><body>
@@ -46,7 +46,8 @@ function publish(complete=true){
  if(mode==='duplicate')link('retail-port.jsonl','duplicate synthetic trace\n');
 }
 $('retail-replay-start').onclick=async()=>{
- cursor=1;
+  cursor=1;
+  if(mode==='renderer-draw-trace')window.__meleeRendererIndexedDrawTrace.push('{"call_site":"gx","pipeline_ref":"0000000000000001","group2_set_for_draw":true}');
  if(mode==='rng-probe'||mode==='rng-probe-invalid')window.meleeRngDrawObservation(JSON.stringify({
   schema:'melee-web-rng-draw-probe',version:1,source_cursor:0,overflowed:false,
   draws:[{kind:'HSD_Randf',seed_after:mode==='rng-probe'?'1234abcd':'1234ABCd'}]}));
@@ -88,8 +89,9 @@ try {
   await fs.writeFile(disc, 'Synthetic harness input; no game content');
   const header = Buffer.alloc(20);
   header.write('MWRC');header.writeUInt32BE(8, 4);header.writeUInt32BE(1, 12);
-  await fs.writeFile(recipe, header);
   for (const mode of cases) {
+    header.writeUInt32BE(mode === 'clean-v10' ? 10 : 8, 4);
+    await fs.writeFile(recipe, header);
     const out = path.join(output, mode);
     const args = [fileURLToPath(new URL('../scripts/capture_whole_session_browser.mjs', import.meta.url)),
       '--url', `http://127.0.0.1:${server.address().port}/runtime.html?case=${mode}`,
@@ -97,18 +99,28 @@ try {
       '--phase-timeout', '10000', '--replay-timeout', '10000', '--poll-ms', '50'];
     if (mode === 'prefix') args.push('--stop-after-source-frames', '1');
     if (mode === 'rng-probe'||mode === 'rng-probe-invalid') args.push('--rng-draw-probe-cursors', '0');
+    if (mode === 'renderer-draw-trace') args.push('--capture-renderer-indexed-draws');
     const processResult = await promisify(execFile)(process.execPath, args, {timeout: 30000})
       .then(value => ({...value, code: 0}), error => ({code: error.code, stdout: error.stdout, stderr: error.stderr}));
     const report = JSON.parse(await fs.readFile(path.join(out, 'report.json'), 'utf8'));
     await fs.writeFile(path.join(out, 'process.json'), JSON.stringify(processResult, null, 2) + '\n');
-    const passing = mode === 'clean' || mode === 'rng-probe';
+    const passing = mode === 'clean' || mode === 'clean-v10' || mode === 'renderer-draw-trace' || mode === 'rng-probe';
     assert.equal(processResult.code, passing ? 0 : 1, `${mode}: ${JSON.stringify(processResult)}`);
     assert.equal(report.result, passing ? 'pass' : mode === 'prefix' ? 'incomplete' : 'fail', mode);
     assert.equal(/^pass:/m.test(processResult.stdout || ''), passing, mode);
-    if (mode === 'clean') {
+    if (mode === 'clean' || mode === 'clean-v10' || mode === 'renderer-draw-trace') {
       assert.equal(report.first_error, null);
       assert.deepEqual(report.browser_errors, []);
+      assert.equal(report.recipe_header.version, mode === 'clean-v10' ? 10 : 8);
       assert.deepEqual(report.saved_downloads.map(row => row.name), ['retail-port.jsonl', 'retail-browser-report.json']);
+      if (mode === 'renderer-draw-trace') {
+        const trace = await fs.readFile(path.join(out, 'renderer-indexed-draws.jsonl'), 'utf8');
+        assert.equal(report.renderer_indexed_draw_trace.status, 'captured');
+        assert.equal(report.renderer_indexed_draw_trace.rows, 1);
+        assert.equal(report.renderer_indexed_draw_trace.sha256,
+          createHash('sha256').update(trace).digest('hex'));
+        assert.deepEqual(JSON.parse(trace), {call_site:'gx',pipeline_ref:'0000000000000001',group2_set_for_draw:true});
+      }
     } else if (mode === 'rng-probe') {
       assert.deepEqual(report.saved_downloads.map(row => row.name),
         ['retail-port.jsonl', 'retail-browser-report.json', 'rng-draw-probe.jsonl']);

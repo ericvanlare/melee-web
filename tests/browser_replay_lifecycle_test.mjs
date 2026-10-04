@@ -266,14 +266,16 @@ function harness(unload=true,wholeSession=false){
  assert.equal(h.scope.replayLoading,false);assert.equal(h.$('disc').disabled,false);
 }
 {
- const h=harness(true,true);const playing=h.play();
- const bytes=new ArrayBuffer(1194),header=new DataView(bytes);
- header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
- h.resolveBytes(bytes);await playing;
- assert.equal(h.calls.unload,0,'Whole-session replay retains the canonical prepared CSS assets');
- assert.equal(h.calls.native,1);
- assert.equal(h.calls.launch,1,'A whole-session recipe enters CSS through the ordinary launch');
- assert.equal(h.calls.renderWaits,1,'Whole-session launch waits for owner audio rendering');
+ for(const version of [8,9,10]) {
+  const h=harness(true,true);const playing=h.play();
+  const bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+  header.setUint32(0,0x4d575243,false);header.setUint32(4,version,false);
+  h.resolveBytes(bytes);await playing;
+  assert.equal(h.calls.unload,0,`MWRC v${version} whole-session replay retains the canonical prepared CSS assets`);
+  assert.equal(h.calls.native,1);
+  assert.equal(h.calls.launch,1,`MWRC v${version} whole-session replay enters CSS through the ordinary launch`);
+  assert.equal(h.calls.renderWaits,1,`MWRC v${version} launch waits for owner audio rendering`);
+ }
 }
 {
  // Whole-session launch must hold after native replay construction until the
@@ -345,6 +347,7 @@ function harness(unload=true,wholeSession=false){
  assert.equal(h.scope.retailRun,null,'Failed readiness releases the replay owner');
  assert.equal(h.scope.replayLoading,false);
 }
+
 {
  const h=harness(true,true);
  h.scope.owner.handle.getState=()=>({state:'match'});

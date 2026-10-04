@@ -568,8 +568,8 @@ def dolphin_command(dolphin: Path, user: Path, snapshot: Path, disc: Path,
     # the owned Dolphin.ini starts the remote stub directly.
     command = [str(dolphin), "-u", str(user)]
     if not cold_boot:
-        command += ["-s", str(snapshot)]
-    command += ["-e", str(disc),
+        command.extend(["-s", str(snapshot)])
+    command.extend(["-e", str(disc),
         "-C", "Dolphin.Input.BackgroundInput=True",
         "-C", "Dolphin.Display.Fullscreen=False",
         *dolphin_audio_options(audible=audible),
@@ -578,7 +578,7 @@ def dolphin_command(dolphin: Path, user: Path, snapshot: Path, disc: Path,
         "-C", "Dolphin.Core.EnableCheats=False",
         "-C", "Dolphin.Core.EnableCustomRTC=True",
         "-C", f"Dolphin.Core.CustomRTCValue={RTC}",
-    ]
+    ])
     return command
 
 

@@ -3028,6 +3028,50 @@ index 5c5cf8c34a68839698e4c24f4d8336b5d6a7d69d..e39c7cd170b1a03a261c0b88082e18c2
      }
  }
  
+diff --git a/src/melee/ft/kinds/ftKoopa/ftkoopa.c b/src/melee/ft/kinds/ftKoopa/ftkoopa.c
+index 6de8bbf095bc2a45777d2350377a64f0057f3dac..975fe219b26430f680756013da6a5ce4c6a7f6b0 100644
+--- a/src/melee/ft/kinds/ftKoopa/ftkoopa.c
++++ b/src/melee/ft/kinds/ftKoopa/ftkoopa.c
+@@ -348,7 +348,10 @@ void ftKp_Init_OnLoad(HSD_GObj* gobj)
+     fp->x2226_b1 = true;
+ }
+ 
+-void ftKp_Init_80132B38(void) {}
++void ftKp_Init_80132B38(HSD_GObj* gobj)
++{
++    (void) gobj;
++}
+ 
+ void ftKp_Init_OnItemPickup(HSD_GObj* gobj, bool flag)
+ {
+diff --git a/src/melee/ft/kinds/ftKoopa/ftkoopa.h b/src/melee/ft/kinds/ftKoopa/ftkoopa.h
+index 419981ae944f1463d6df2389a7ca2bb697bf0c8e..bc0f18e53454e573a77d3c3e6756ef7ba6cb52b5 100644
+--- a/src/melee/ft/kinds/ftKoopa/ftkoopa.h
++++ b/src/melee/ft/kinds/ftKoopa/ftkoopa.h
+@@ -11,7 +11,7 @@
+ /* 132A64 */ void ftKp_Init_UnkMotionStates3(Fighter_GObj* gobj);
+ /* 132A84 */ void ftKp_Init_OnLoadForGKoopa(Fighter* fp);
+ /* 132ABC */ void ftKp_Init_OnLoad(Fighter_GObj* gobj);
+-/* 132B38 */ void ftKp_Init_80132B38(void);
++/* 132B38 */ void ftKp_Init_80132B38(HSD_GObj* gobj);
+ /* 132B3C */ void ftKp_Init_OnItemPickup(Fighter_GObj* gobj, bool flag);
+ /* 132C1C */ void ftKp_Init_OnItemInvisible(Fighter_GObj* gobj);
+ /* 132C64 */ void ftKp_Init_OnItemVisible(Fighter_GObj* gobj);
+diff --git a/src/melee/ft/kinds/ftKoopa/ftkoopaspecialhi.c b/src/melee/ft/kinds/ftKoopa/ftkoopaspecialhi.c
+index 490c23f44482e003f2408138c3cdb2d90da8e9c3..071ea546a38f47ad141c384f5b02b3c209c15877 100644
+--- a/src/melee/ft/kinds/ftKoopa/ftkoopaspecialhi.c
++++ b/src/melee/ft/kinds/ftKoopa/ftkoopaspecialhi.c
+@@ -20,8 +20,8 @@
+ static inline void ftKp_SpecialHi_Enter_inline(Fighter_GObj* gobj)
+ {
+     Fighter* fp = GET_FIGHTER(gobj);
+-    fp->take_dmg_cb = (void (*)(HSD_GObj*)) ftKp_Init_80132B38;
+-    fp->death2_cb = (void (*)(HSD_GObj*)) ftKp_Init_80132B38;
++    fp->take_dmg_cb = ftKp_Init_80132B38;
++    fp->death2_cb = ftKp_Init_80132B38;
+ }
+ 
+ void ftKp_SpecialHi_Enter(Fighter_GObj* gobj)
 diff --git a/src/melee/ft/kinds/ftPurin/ftpurin.c b/src/melee/ft/kinds/ftPurin/ftpurin.c
 index 5781099cc506a586f861010d06b4cac9417dc449..50a25eaf3e5f8112d836adfbc124f68183fc2be0 100644
 --- a/src/melee/ft/kinds/ftPurin/ftpurin.c

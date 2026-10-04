@@ -48,7 +48,7 @@ constexpr u32 MAGIC = 0x4f52574d; // little-endian "MWRO"
 // headroom for those bursts; overflow remains a hard capture failure.
 constexpr size_t RING_SIZE = 1024;
 constexpr size_t RING_PAYLOAD = 256 * 1024;
-constexpr size_t MAX_SLICES = 64;
+constexpr size_t MAX_SLICES = 80;
 constexpr size_t MAX_RAW = 192 * 1024;
 constexpr u32 PAD_READ_HSD_CALLER = 0x80376A28;
 constexpr u32 CSS_ENTER_RETURN = 0x802669F0;
@@ -834,6 +834,14 @@ struct Observer::Impl
       return false;
     }
     whole_session_matches = WholeSessionMatchCount();
+    const std::string fighter_entity_profile = Env("MWRC_FIGHTER_ENTITY_PROFILE");
+    if (!fighter_entity_profile.empty() &&
+        fighter_entity_profile != "v10-live-static-player-pair")
+      SetInvalid("MWRC_FIGHTER_ENTITY_PROFILE has an unsupported value");
+    whole_session_fighter_entities_v10 =
+        fighter_entity_profile == "v10-live-static-player-pair";
+    if (whole_session_fighter_entities_v10 && whole_session_matches == 0)
+      SetInvalid("MWRC_FIGHTER_ENTITY_PROFILE requires a whole-session capture");
     capture_id = Env("MWRC_CAPTURE_ID");
     sequence_id = Env("MWRC_SEQUENCE_ID");
     const CpuProbeSettings& cpu_probe = CpuProbeEnvironment();
@@ -946,6 +954,8 @@ struct Observer::Impl
                    std::to_string(whole_session_matches) + ",\"capture_id\":\"" +
                    JsonEscape(capture_id) + "\",\"sequence_id\":\"" +
                    JsonEscape(sequence_id) + "\"";
+    if (whole_session_fighter_entities_v10)
+      handshake += ",\"fighter_entity_profile\":\"v10-live-static-player-pair\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -958,6 +968,8 @@ struct Observer::Impl
                JsonEscape(sequence_id) + "\"";
     else
       start += "\"";
+    if (whole_session_fighter_entities_v10)
+      start += ",\"fighter_entity_profile\":\"v10-live-static-player-pair\"";
     start += "}";
     PushJson(Event::Start, start);
     return !invalid.load();
@@ -1858,6 +1870,74 @@ struct Observer::Impl
     return true;
   }
 
+  bool ReadLivePlayerEntities(Core::System* system, u32 slot,
+                              std::array<u32, 2>* gobjs,
+                              std::array<u32, 2>* fighters) const
+  {
+    if (slot >= 4 || !gobjs || !fighters)
+      return false;
+    const u32 entities = 0x80453080 + slot * 0xe90 + 0xb0;
+    std::array<u8, 8> bytes{};
+    if (!ReadBytes(system, entities, bytes.size(), bytes.data()))
+      return false;
+    for (u32 entity_index = 0; entity_index < 2; ++entity_index)
+    {
+      const u32 gobj = ReadBE32(bytes.data() + entity_index * 4);
+      (*gobjs)[entity_index] = gobj;
+      (*fighters)[entity_index] = 0;
+      if (!gobj)
+        continue;
+      u32 fighter = 0;
+      u32 backlink = 0;
+      u8 owner_slot = 0xff;
+      if (!IsMem1Range(gobj, 0x30) || !ReadU32(system, gobj + 0x2c, &fighter) ||
+          !IsMem1Range(fighter, 0x100) || !ReadFighterSourceSlot(system, fighter, &owner_slot) ||
+          owner_slot != slot || !ReadU32(system, fighter, &backlink) || backlink != gobj)
+        return false;
+      if (entity_index != 0 && (*gobjs)[entity_index] == (*gobjs)[0])
+        return false;
+      (*fighters)[entity_index] = fighter;
+    }
+    return true;
+  }
+
+  bool AddLivePlayerEntitySlices(Core::System* system, u32 slot,
+                                 std::array<u32, 8>* seen_gobjs, u32* seen_count)
+  {
+    if (!seen_gobjs || !seen_count)
+      return SetInvalid("whole-session live entity identity tracker is invalid"), false;
+    const u32 entities = 0x80453080 + slot * 0xe90 + 0xb0;
+    std::array<u32, 2> gobjs{};
+    std::array<u32, 2> fighters{};
+    if (!ReadLivePlayerEntities(system, slot, &gobjs, &fighters))
+      return SetInvalid("StaticPlayer entity pair has an invalid live GObj/Fighter owner"), false;
+    if (!AddSlice(system, SliceTag::PlayerEntities, entities, 8,
+                  static_cast<u16>(slot)))
+      return SetInvalid("StaticPlayer entity pair escaped the pinned source range"), false;
+    for (u32 entity_index = 0; entity_index < 2; ++entity_index)
+    {
+      const u32 gobj = gobjs[entity_index];
+      if (!gobj)
+        continue;
+      for (u32 earlier = 0; earlier < *seen_count; ++earlier)
+      {
+        if ((*seen_gobjs)[earlier] == gobj)
+          return SetInvalid("live StaticPlayer entity GObj is duplicated across source slots"),
+                 false;
+      }
+      if (*seen_count >= 8)
+        return SetInvalid("live StaticPlayer entity count exceeds the bounded source roster"),
+               false;
+      (*seen_gobjs)[(*seen_count)++] = gobj;
+      const u16 flags = FighterEntitySliceFlags(slot, entity_index);
+      if (!AddSlice(system, SliceTag::PlayerEntityUserData, gobj + 0x2c, 4, flags) ||
+          !AddFighterSlices(system, slot, entity_index, fighters[entity_index]))
+        return SetInvalid("live StaticPlayer GObj/Fighter slices escaped the pinned ranges"),
+               false;
+    }
+    return true;
+  }
+
   bool AddMatchSlices(Core::System* system)
   {
     if (!AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e) ||
@@ -1869,17 +1949,27 @@ struct Observer::Impl
         !ReadU32(system, 0x804d5f94, &rng_pointer) || !rng_pointer ||
         !AddSlice(system, SliceTag::RngValue, rng_pointer, 4))
       return false;
+    std::array<u32, 8> seen_gobjs{};
+    u32 seen_gobj_count = 0;
     for (u32 slot = 0; slot < 4; ++slot)
     {
       if (!fighter_present[slot])
         continue;
-      if (!AddPlayerEntitySlices(system, slot))
-        return false;
-      for (u32 entity_index = 0; entity_index < fighter_entity_count[slot]; ++entity_index)
+      if (whole_session_fighter_entities_v10)
       {
-        if (!AddFighterSlices(system, slot, entity_index,
-                              fighter_entity_pointers[slot][entity_index]))
+        if (!AddLivePlayerEntitySlices(system, slot, &seen_gobjs, &seen_gobj_count))
           return false;
+      }
+      else
+      {
+        if (!AddPlayerEntitySlices(system, slot))
+          return false;
+        for (u32 entity_index = 0; entity_index < fighter_entity_count[slot]; ++entity_index)
+        {
+          if (!AddFighterSlices(system, slot, entity_index,
+                                fighter_entity_pointers[slot][entity_index]))
+            return false;
+        }
       }
       if (!AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1,
                     static_cast<u16>(slot)) ||
@@ -3690,6 +3780,7 @@ struct Observer::Impl
   std::array<bool, 16> item_probe_pair_active{};
   std::array<u32, 16> item_probe_pair_lr{};
   u32 whole_session_matches = 0;
+  bool whole_session_fighter_entities_v10 = false;
   u32 audio_owner_epoch = 0;
   u32 match_index = 0;
   bool css_steering_ready = false;

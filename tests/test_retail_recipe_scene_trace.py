@@ -86,6 +86,19 @@ extern "C" void melee_web_retail_entities(void) {
 }
 extern "C" void melee_web_retail_entities_index(uint32_t) {}
 extern "C" void melee_web_retail_entities_reset(void) {}
+extern "C" void melee_web_retail_state_v10(void) {
+    if (!fake::state_allowed) {
+        std::cerr << "fighter-state observer called outside VS\n";
+        std::exit(91);
+    }
+    ++fake::state;
+    std::cout << "\"rng\":7,\"match_frame\":0";
+}
+extern "C" void melee_web_retail_entities_reset_v10(void) {}
+extern "C" void melee_web_retail_entities_index_v10(uint32_t, int) {
+    if (!fake::state_allowed) std::abort();
+    std::cout << ",\"fighter_entities\":[]";
+}
 extern "C" uint32_t melee_web_retail_rng(void) { ++fake::rng; return 123; }
 extern "C" uint32_t gm_GetFrameCount(void) { return 0; }
 extern "C" uint32_t gm_8016AEEC(void) { return 0; }
