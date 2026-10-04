@@ -29,6 +29,7 @@ AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
 # trace requires reviewing its source contract before it becomes a build
 # surface for the workflow.
 TRACE_TARGETS = (
+    "aurora_future_owner_probe",
     "gameplay_content_match_trace",
     "gameplay_snapshot_probe_browser",
     "gameplay_snapshot_probe",
@@ -852,6 +853,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         )
         configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
         configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
+        configure.append(
+            f"-DMELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC={'ON' if 'aurora_future_owner_probe' in trace_targets else 'OFF'}"
+        )
         configure.append(
             f"-DMELEE_WEB_SLIPPI_PROFILE_BROWSER={'ON' if 'gameplay_snapshot_probe_browser' in trace_targets else 'OFF'}"
         )
