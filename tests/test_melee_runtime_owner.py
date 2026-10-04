@@ -16,6 +16,22 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
         self.run_owner(['--diagnostics-known-host', '--diagnostics-fatal'],
                        'fatal failure delivers sanitized diagnostics while stopped')
 
+    def test_worklet_failure_stops_owner_and_reports_one_sanitized_incident(self):
+        self.run_owner(['--fatal-audio-output'], 'worklet failure reaches terminal native handoff')
+
+    def test_worklet_processor_exception_stops_owner_without_a_port_message(self):
+        self.run_owner(['--fatal-audio-processor'], 'worklet failure reaches terminal native handoff')
+
+    def test_fatal_audio_during_disc_operation_preserves_first_failure(self):
+        self.run_owner(['--fatal-audio-disc-operation'],
+                       'fatal audio during deferred disc preparation preserves the first error')
+
+    def test_fatal_owner_cancels_native_at_the_safe_boundary(self):
+        self.run_owner(['--fatal-native-handoff'], 'fatal handoff is sticky')
+
+    def test_fault_inside_command_batch_rejects_remaining_commands(self):
+        self.run_owner(['--fatal-command-batch'], 'fatal handoff is sticky')
+
     def test_native_command_audio_and_teardown_boundaries(self):
         self.run_owner([])
 
@@ -56,12 +72,18 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
         tick = source.index("void tick(){")
         cache_call = source.index("service_render_cache_writes();", tick)
         prefix = source[tick:cache_call + len("service_render_cache_writes();")]
-        handoff = "EM_ASM_INT({return window.menuServiceCommands?.() === 1 ? 1 : 0;})"
+        handoff = "EM_ASM_INT({return window.menuServiceCommands?.() || 0;})"
         self.assertEqual(prefix.count(handoff), 1,
                          "the fixture must exercise the production lifecycle boundary")
         self.assertIn("menu_clock.reset();audio_clock.reset();", prefix)
         self.assertTrue(prefix.endswith("service_render_cache_writes();"))
         prefix = prefix.replace(handoff, "SIMULATED_HANDOFF()")
+        startup_begin = source.index("void startup_pipeline_service_callback(void*){")
+        startup_end = source.index("void schedule_startup_pipeline_service(){", startup_begin)
+        startup_callback = source[startup_begin:startup_end]
+        terminal_query = "EM_ASM_INT({return window.menuOwnerStopped?.()?1:0;})"
+        self.assertEqual(startup_callback.count(terminal_query), 1)
+        startup_callback = startup_callback.replace(terminal_query, "owner_stopped")
 
         compiler_name = os.environ.get("CXX", "clang++")
         compiler_words = shlex.split(compiler_name)
@@ -80,6 +102,9 @@ using melee_web::FixedTickClock;
 FixedTickClock menu_clock;
 FixedTickClock audio_clock{{FixedTickClock::OverrunPolicy::CatchUp}};
 bool running = true;
+bool faulted = false;
+unsigned cancellations = 0;
+void emscripten_cancel_main_loop() {{ ++cancellations; }}
 bool visible = true;
 int pending_handoff = 0;
 unsigned source_frames = 0;
@@ -93,6 +118,16 @@ int simulated_consumable_handoff() noexcept {{
 }}
 #define SIMULATED_HANDOFF() simulated_consumable_handoff()
 void service_render_cache_writes() {{ ++cache_services; }}
+bool owner_stopped = false;
+bool startup_pipeline_service_scheduled = true;
+bool startup_pipeline_service_failed = false;
+unsigned startup_batches = 0;
+struct AuroraStats {{ unsigned queuedPipelines; }};
+const AuroraStats* aurora_get_stats() {{ static AuroraStats stats{{1}}; return &stats; }}
+bool startup_pipeline_service_allowed() {{ return !faulted; }}
+bool aurora_pipeline_service_preparation() {{ ++startup_batches; return true; }}
+
+{startup_callback}
 
 {prefix}
 }}
@@ -176,6 +211,27 @@ int main() {{
     const auto after_double_service = menu_clock.tick(700.0, true);
     assert(after_double_service.stalled);
     assert(after_double_service.threshold == 8);
+    // A delayed ownerless preparation callback must observe JS terminal state
+    // before the main-loop handoff has set native faulted.
+    startup_pipeline_service_callback(nullptr);
+    assert(startup_batches == 1 && !startup_pipeline_service_scheduled);
+    owner_stopped = true;
+    startup_pipeline_service_scheduled = true;
+    startup_pipeline_service_callback(nullptr);
+    assert(!faulted && startup_batches == 1 && !startup_pipeline_service_scheduled);
+    // The actual production prefix consumes a terminal owner failure before
+    // cache/preparation/input/source work, independent of manual-pause gates.
+    running = true;
+    const auto services_before_fault = cache_services;
+    const auto source_before_fault = source_frames;
+    const auto audio_before_fault = audio_ticks;
+    pending_handoff = -1;
+    tick();
+    assert(!running && faulted && cancellations == 1);
+    assert(cache_services == services_before_fault);
+    const Pair after_fault = advance(2000.0);
+    assert(after_fault.menu.steps == 0 && after_fault.audio.steps == 0);
+    assert(source_frames == source_before_fault && audio_ticks == audio_before_fault);
     std::cout << "native lifecycle handoff fixture passed\\n";
 }}
 '''

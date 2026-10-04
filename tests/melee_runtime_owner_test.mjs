@@ -42,7 +42,10 @@ const diagnosticsRetentionMode = diagnosticsRetentionCheckpoint || diagnosticsRe
   diagnosticsRetentionHiddenFatal ||
   diagnosticsRetentionEmptyThenDestroy ||
   diagnosticsRetentionFailedThenDestroy || diagnosticsMatureDelivery || diagnosticsNormalDeliveryFreshness;
-const diagnosticsKnownHost = process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode ||
+const fatalAudioProcessor = process.argv.includes('--fatal-audio-processor');
+const fatalAudioDiscOperation = process.argv.includes('--fatal-audio-disc-operation');
+const fatalAudioOutput = fatalAudioProcessor || process.argv.includes('--fatal-audio-output') || fatalAudioDiscOperation;
+const diagnosticsKnownHost = fatalAudioOutput || process.argv.includes('--diagnostics-known-host') || diagnosticsRetentionMode ||
   diagnosticsMatureDelivery || diagnosticsNormalDeliveryFreshness;
 const diagnosticIdentity = {schema_version: 1, source_commit: 'a'.repeat(40), runtime_hash: 'b'.repeat(16), build_profile: 'player'};
 const diagnosticFetches = [];
@@ -113,7 +116,8 @@ let phase = 0, running = false, nextPointer = 16,
   cacheWaits = startupCacheDelay ? 2 : startupCacheTimeout ? Number.MAX_SAFE_INTEGER : 0, audioClosed = false;
 let rendererStarted = false, cacheIdleCalls = 0;
 let failedFile = null, serviceBatch = 0;
-const calls = [], states = [], listeners = new Map();
+const calls = [], states = [], ownerErrors = [], listeners = new Map();
+let controlledDiscSession = null, releaseDiscScope = null, reportDiscProgress = null;
 let adapterRequests = 0, adapterImplementation = () => process.argv.includes('--no-webgpu-adapter') ? null : ({limits: {}});
 let resolveDeferredAdapter;
 const deferredAdapter = new Promise(resolve => { resolveDeferredAdapter = resolve; });
@@ -138,7 +142,9 @@ globalThis.AudioContext = class {
 };
 let holdRenderAck = false;
 const pendingRenderAcks = [];
+let lastAudioNode;
 globalThis.AudioWorkletNode = class {
+  constructor() { lastAudioNode = this; }
   port = {postMessage: data => {
     calls.push(['audioMessage', data.type, data.enabled, data.id]);
     if (data.type === 'render-ready-request') {
@@ -165,6 +171,33 @@ globalThis.testDiscReader = async (file, report) => {
   for (let index = 0; index < entries.length; index++) report({phase: 'read', file: entries[index][0], complete: index, total});
   report({phase: 'complete', complete: total, total});
   return new Map(entries);
+};
+globalThis.testOpenNativeGameDiscSession = async file => {
+  assert.equal(fatalAudioDiscOperation, true,
+    'The controlled session is only used by the fatal disc-operation case');
+  calls.push(['openDisc', file.name]);
+  let release;
+  const released = new Promise(resolve => { release = resolve; });
+  const session = {
+    closed: false,
+    close() { this.closed = true; calls.push(['discClose']); },
+    fileInfo(name) { return {name, size: 1}; },
+    async readFile(_name, _offset, size) {
+      if (this.closed) throw Error('DiscAssetSession is closed');
+      return new Uint8Array(size);
+    },
+    async *streamScope(names, report) {
+      calls.push(['streamScope', names.length]);
+      reportDiscProgress = report;
+      report({phase: 'read', complete: 0, total: names.length});
+      await released;
+      if (this.closed) throw Error('DiscAssetSession is closed');
+      yield ['asset.dat', new Uint8Array([1])];
+    },
+  };
+  controlledDiscSession = session;
+  releaseDiscScope = release;
+  return session;
 };
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'melee-runtime-owner-'));
 const sourcePath = path.join(temporary, 'runtime.mjs');
@@ -281,7 +314,9 @@ if (adapterRace || adapterRetry || adapterTimeoutLate || adapterDeadlineSpan) {
   process.exit(0);
 }
 let owner;
-const mounted = mountMeleeRuntime({canvas, openDisc: null, createAudio: withAudio ? options => {
+const mounted = mountMeleeRuntime({canvas,
+  openDisc: fatalAudioDiscOperation ? globalThis.testOpenNativeGameDiscSession : null,
+  createAudio: withAudio ? options => {
   calls.push(['createAudio']); return createRuntimeAudio(options);
 } : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
   diagnosticIdentity: diagnosticsKnownHost ? diagnosticIdentity : undefined,
@@ -292,7 +327,8 @@ const mounted = mountMeleeRuntime({canvas, openDisc: null, createAudio: withAudi
     };
     globalThis.installRuntimeCache(module, event => calls.push(['cacheReport', event]));
   } : undefined,
-  onState: state => states.push(state), onOwner: context => { owner = context; },
+  onState: state => states.push(state), onError: error => ownerErrors.push(error?.message || String(error)),
+  onOwner: context => { owner = context; },
   startupTimeout: startupCacheTimeout ? 10 : undefined});
 if (process.argv.includes('--no-webgpu-adapter')) {
   await assert.rejects(mounted, /No WebGPU adapter is available/);
@@ -365,6 +401,17 @@ Object.assign(Module, {
   _melee_web_input_set_activity(focused, visible) { calls.push(['activity', focused, visible]); },
   _melee_web_input_set_keyboard_layout(value) { calls.push(['layout', value]); return 1; },
 });
+if (fatalAudioDiscOperation) Object.assign(Module, {
+  _melee_web_native_source_file_external_set(_pointer, size) {
+    calls.push(['sourceRegister', size]); return 1;
+  },
+  _melee_web_native_asset_begin() { calls.push(['assetBegin']); return 1; },
+  _melee_web_native_asset_count() { calls.push(['assetCount']); return 1; },
+  _melee_web_native_asset_name() { calls.push(['assetName']); return 'asset.dat'; },
+  _melee_web_native_asset_file() { calls.push(['assetFile']); return 1; },
+  _melee_web_native_asset_commit() { calls.push(['assetCommit']); return 1; },
+  _melee_web_native_asset_abort() { calls.push(['assetAbort']); return 1; },
+});
 if (missingCacheService) delete Module._melee_web_native_menu_cache_idle;
 if (startupCacheDelay) assert.equal(Module._melee_web_native_menu_cache_idle(), 1,
   'The pre-main cache status is not used as startup readiness');
@@ -421,6 +468,137 @@ if (startupCacheTimeout) {
   process.exit(0);
 }
 assert.equal(player.getState().canImport, true);
+assert.equal(window.menuOwnerStopped(), false);
+if (process.argv.includes('--fatal-native-handoff') || process.argv.includes('--fatal-command-batch')) {
+  phase = 1; running = true; window.menuFrame(true);
+  const firstError = 'Controlled original runtime failure';
+  const pendingCalls = [];
+  const first = owner.boundary(() => {
+    pendingCalls.push('first');
+    if (process.argv.includes('--fatal-command-batch')) owner.stop(Error(firstError));
+    return 1;
+  });
+  const second = owner.boundary(() => { pendingCalls.push('second'); return 2; });
+  const outcomes = Promise.allSettled([first, second]);
+  if (process.argv.includes('--fatal-native-handoff')) owner.stop(Error(firstError));
+  const inputCalls = calls.filter(row => row[0] === 'activity').length;
+  if (process.argv.includes('--fatal-native-handoff')) {
+    assert.equal(window.menuOwnerStopped(), true, 'Independent callbacks can observe terminal state without draining commands');
+    assert.deepEqual(pendingCalls, []);
+  }
+  assert.equal(window.menuServiceCommands(), -1,
+    'Terminal owner requests native cancellation at the next safe callback boundary');
+  assert.equal(window.menuServiceCommands(), -1, 'Terminal cancellation remains sticky');
+  assert.equal(calls.filter(row => row[0] === 'activity').length, inputCalls,
+    'Terminal handoff does not republish input activity');
+  assert.deepEqual(pendingCalls, process.argv.includes('--fatal-command-batch') ? ['first'] : [],
+    'A fault within a detached command batch prevents its remaining commands from running');
+  assert.ok((await outcomes).every(result => result.status === 'rejected'),
+    'All commands interrupted by the terminal failure reject');
+  owner.stop(Error('Later error must not replace the first failure'));
+  assert.equal(player.getState().message, firstError);
+  assert.equal(player.getState().requiresReload, true);
+  console.log('Shared runtime owner: fatal handoff is sticky, rejects queued commands and preserves the first failure.');
+  process.exit(0);
+}
+if (fatalAudioDiscOperation) {
+  await owner.prepareAudio();
+  assert.equal(releaseDiscScope, null,
+    'The controlled disc scope is installed only after the operation enters its stream boundary');
+  const reading = player.importDisc({name: 'fatal-audio-deferred.iso'});
+  for (let i = 0; !calls.some(row => row[0] === 'streamScope') && i < 80; ++i) {
+    window.menuServiceCommands();
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  assert.equal(typeof releaseDiscScope, 'function',
+    'Disc preparation must remain suspended at the controlled streamScope boundary');
+  assert.equal(calls.some(row => row[0] === 'readDisc'), false,
+    'The public operation must use the controlled openDisc session route');
+  assert.ok(calls.some(row => row[0] === 'streamScope'),
+    'The native asset transfer must be waiting on streamScope');
+  const beforeTerminalNative = calls.filter(row => ['prepare', 'launch', 'assetCommit'].includes(row[0])).length;
+  const firstAudioError = 'Audio output queue overflow';
+  lastAudioNode.port.onmessage({data: {error: firstAudioError}});
+  assert.equal(player.getState().requiresReload, true,
+    'A worklet failure makes the in-flight disc operation terminal');
+  assert.equal(player.getState().message, firstAudioError,
+    'The first audio failure is visible before the deferred disc read closes');
+  assert.equal(controlledDiscSession.closed, true,
+    'The terminal audio failure closes the active disc session');
+  assert.equal(calls.filter(row => row[0] === 'discClose').length, 1,
+    'The active disc session is closed exactly once at the terminal boundary');
+  releaseDiscScope();
+  await assert.rejects(reading, /DiscAssetSession is closed/,
+    'The original import operation still rejects when its disc scope closes');
+  assert.equal(player.getState().message, firstAudioError,
+    'A later closed-disc rejection must not replace the first audio failure');
+  assert.equal(typeof reportDiscProgress, 'function');
+  reportDiscProgress({phase: 'read', complete: 1, total: 1});
+  assert.equal(player.getState().message, firstAudioError,
+    'A delayed progress notification must not replace the first audio failure');
+  assert.equal(player.getState().loading, null,
+    'A rejected preparation leaves no stale loading state after the terminal failure');
+  assert.equal(ownerErrors.length, 1, 'Only the terminal audio failure reaches the public error callback');
+  assert.equal(ownerErrors[0], firstAudioError);
+  assert.equal(calls.filter(row => ['prepare', 'launch', 'assetCommit'].includes(row[0])).length, beforeTerminalNative,
+    'A terminal in-flight operation cannot begin another native preparation, asset commit, or launch');
+
+  // Native can still deliver a late preparation callback while its rejected
+  // read is unwinding. Every callback must preserve the terminal state and
+  // remain silent to the public error channel.
+  for (const [name, args] of [
+    ['menuPreparation', ['late preparation', true]],
+    ['menuPreparationDone', []],
+    ['menuPreparationCanceled', []],
+    ['menuPreparationFailed', ['late closed-disc failure']],
+  ]) {
+    window[name](...args);
+    assert.equal(player.getState().message, firstAudioError,
+      `${name} cannot replace a terminal audio failure`);
+    assert.equal(player.getState().loading, null,
+      `${name} cannot resurrect preparation loading after a terminal failure`);
+    assert.equal(ownerErrors.length, 1,
+      `${name} cannot emit a second public error after a terminal audio failure`);
+  }
+  const destroyed = await player.destroy();
+  assert.equal(destroyed.requiresReload, true);
+  assert.equal(player.getState().state, 'destroyed');
+  assert.equal(player.getState().message, firstAudioError,
+    'Destroy preserves the first terminal failure');
+  for (const [name, args] of [['menuPreparation', ['after destroy', false]], ['menuPreparationFailed', ['after destroy']]]) {
+    window[name](...args);
+    assert.equal(player.getState().message, firstAudioError,
+      `${name} remains ignored after destroy`);
+    assert.equal(ownerErrors.length, 1, `${name} remains silent after destroy`);
+  }
+  console.log('Shared runtime owner: fatal audio during deferred disc preparation preserves the first error and rejects late work safely.');
+  process.exit(0);
+}
+if (fatalAudioOutput) {
+  await owner.prepareAudio();
+  phase = 1; running = true; window.menuFrame(true);
+  await Promise.resolve();
+  const nativeMutationsBefore = calls.filter(row => ['pause', 'unload', 'launch'].includes(row[0])).length;
+  const firstAudioError = fatalAudioProcessor ? 'Game audio stopped unexpectedly. Reload to recover.' : 'Audio output queue overflow';
+  if (fatalAudioProcessor) lastAudioNode.onprocessorerror();
+  else lastAudioNode.port.onmessage({data: {error: firstAudioError}});
+  assert.equal(player.getState().requiresReload, true,
+    'A worklet failure makes the shared owner terminal');
+  assert.equal(player.getState().message, firstAudioError);
+  assert.equal(calls.filter(row => ['pause', 'unload', 'launch'].includes(row[0])).length, nativeMutationsBefore,
+    'Asynchronous worklet failure must not re-enter a native pause/unload call');
+  assert.equal(window.menuServiceCommands(), -1,
+    'The next native-owned handoff receives the terminal signal');
+  lastAudioNode.port.onmessage({data: {error: 'Later worklet error'}});
+  assert.equal(player.getState().message, firstAudioError, 'Keep the first failure');
+  await new Promise(resolve => setTimeout(resolve, 1200));
+  assert.equal(diagnosticFetches.length, 1, 'The terminal audio incident is delivered once while inactive');
+  const report = JSON.parse(diagnosticFetches[0].body);
+  assert.equal(report.incident.reason, 'runtime_failure');
+  assert.ok(!diagnosticFetches[0].body.includes(firstAudioError), 'Error text stays outside sanitized diagnostics');
+  console.log('Shared runtime owner: worklet failure reaches terminal native handoff and one sanitized incident.');
+  process.exit(0);
+}
 if (diagnosticsKnownHost) {
   const wait = delay => new Promise(resolve => setTimeout(resolve, delay));
   async function pumpBoundary(promise) {
@@ -1219,6 +1397,8 @@ const destroyed = await pump(player.destroy());
 assert.equal(destroyed.requiresReload, true);
 assert.equal(audioClosed, withAudio);
 assert.equal(player.getState().state, 'destroyed');
+assert.equal(window.menuOwnerStopped(), true);
+assert.equal(window.menuServiceCommands(), -1, 'Destroyed owners stop future native callbacks');
 assert.equal(player.getState().canImport, false);
 await assert.rejects(player.start(), /valid local disc/);
 assert.equal(calls.filter(row => row[0] === 'loader').length, 1);

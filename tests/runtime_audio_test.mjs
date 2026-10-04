@@ -85,7 +85,7 @@ const flush = async () => {
   await Promise.resolve();
 };
 
-async function withAudio(test) {
+async function withAudio(test, hooks = {}) {
   const original = {
     AudioContext: globalThis.AudioContext,
     AudioWorkletNode: globalThis.AudioWorkletNode,
@@ -101,11 +101,12 @@ async function withAudio(test) {
   globalThis.clearTimeout = timers.clearTimeout.bind(timers);
   try {
     const events = [];
-    const audio = createRuntimeAudio({
+    let audio;
+    audio = createRuntimeAudio({
       assetBase: 'https://example.test/runtime/',
       onEvent: event => events.push(event),
-      onError: error => events.push({error: error.message}),
-      onFatal: error => events.push({fatal: error.message}),
+      onError: error => { events.push({error: error.message}); hooks.onError?.(error, audio); },
+      onFatal: error => { events.push({fatal: error.message}); hooks.onFatal?.(error, audio); },
     });
     await audio.prepare();
     await flush();
@@ -182,6 +183,29 @@ await withAudio(async ({audio, node, context}) => {
   assert.equal(node.disconnected, true, 'destroy must disconnect the worklet node');
   assert.equal(context.closed, true, 'destroy must close the audio context');
 });
+
+// A worklet transport error is terminal. The owner's fatal callback rejects
+// any pending render wait through the transport fail hook, preserving the
+// original worklet error for the sanitized runtime_failure path.
+await withAudio(async ({audio, node, events}) => {
+  const pending = audio.waitForRender();
+  node.port.emit({type: 'audio-error', error: 'Audio output queue overflow'});
+  assert.deepEqual(events.filter(event => event.fatal), [
+    {fatal: 'Audio output queue overflow'},
+  ], 'worklet errors must route only through the fatal callback');
+  assert.equal(events.some(event => event.error === 'Audio output queue overflow' && !event.type), false,
+    'worklet errors must not route through recoverable onError');
+  await assert.rejects(pending, /Audio output queue overflow/);
+}, {onFatal: (error, audio) => audio.fail(error)});
+
+await withAudio(async ({audio, node, events}) => {
+  const pending = audio.waitForRender();
+  node.onprocessorerror();
+  assert.deepEqual(events.filter(event => event.fatal), [
+    {fatal: 'Game audio stopped unexpectedly. Reload to recover.'},
+  ], 'processor exceptions must use the terminal owner path even without a port message');
+  await assert.rejects(pending, /Game audio stopped unexpectedly/);
+}, {onFatal: (error, audio) => audio.fail(error)});
 
 // Unavailable and suspended contexts reject without creating an unbounded wait.
 {

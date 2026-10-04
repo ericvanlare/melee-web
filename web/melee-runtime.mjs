@@ -421,7 +421,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       return await Promise.race([run(), new Promise((_, reject) => {
         timeout = setTimeout(() => { const error = Error('The player stopped responding. Reload to recover.'); stop(error); reject(error); }, 60000);
       })]);
-    } catch (error) { callbacks.menuPreparationFailed(error.message || String(error)); throw error; }
+    } catch (error) {
+      if (!fatal && !destroyed) callbacks.menuPreparationFailed(error.message || String(error));
+      throw error;
+    }
     finally { clearTimeout(timeout); busy = ''; progress = null; publish(); }
   }
   const waitForAudioAck = () => audio?.waitForAck() || Promise.resolve();
@@ -499,9 +502,20 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       return pointer;
     },
     menuSourceReadDiscard(request) { sourceReadResults.delete(request); },
+    menuOwnerStopped() { return fatal || destroyed; },
     menuServiceCommands() {
-      if (fatal || destroyed) return 0;
-      for (const c of commands.splice(0)) { try { c.resolve(c.run()); } catch (error) { c.reject(error); } }
+      // Native consumes this terminal signal before input, clocks, preparation
+      // or source work. Never re-enter native teardown from an audio/error event.
+      if (fatal || destroyed) return -1;
+      for (const c of commands.splice(0)) {
+        if (fatal || destroyed) { c.reject(Error(message || 'Player stopped.')); continue; }
+        try {
+          const result = c.run();
+          if (fatal || destroyed) c.reject(Error(message || 'Player stopped.'));
+          else c.resolve(result);
+        } catch (error) { c.reject(error); }
+      }
+      if (fatal || destroyed) return -1;
       const suspended = lifecycleSuspended;
       lifecycleSuspended = false;
       if (suspended) {
@@ -517,10 +531,12 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       }
       return suspended ? 1 : 0;
     },
-    menuPreparation(label, keepAudio = false) { diagnosticPreparationAt = performance.now(); diagnosticLifecycle('preparation', {timestamp: diagnosticPreparationAt}); preparationLabel = label || 'Preparing original scene'; preparationKeepsAudio = !!keepAudio; message = ''; setLoading('native', 'Preparing game data…', 0, 0); emit('preparation', {label: preparationLabel, keepAudio}); publish(); },
-    menuPreparationDone() { const at = performance.now(); diagnosticLifecycle('preparation_done', {timestamp: at, duration_ms: diagnosticPreparationAt === null ? null : at - diagnosticPreparationAt}); diagnosticPreparationAt = null; preparationLabel = ''; message = ''; if (loading?.phase === 'native') { loading = null; refreshCatalogLoading(); } emit('preparationDone'); publish(); },
-    menuPreparationCanceled() { preparationLabel = ''; preparationKeepsAudio = false; message = ''; if (loading?.phase === 'native') loading = null; emit('preparationCanceled'); publish(); },
-    menuPreparationFailed(error) { preparationLabel = ''; preparationKeepsAudio = false; message = error || 'Native preparation failed'; if (loading?.phase === 'native') loading = null; emit('preparationFailed', message); publish(); onError(Error(message)); },
+    // An in-flight native transaction may finish after a terminal audio error.
+    // Its late preparation notifications must preserve that original failure.
+    menuPreparation(label, keepAudio = false) { if (fatal || destroyed) return; diagnosticPreparationAt = performance.now(); diagnosticLifecycle('preparation', {timestamp: diagnosticPreparationAt}); preparationLabel = label || 'Preparing original scene'; preparationKeepsAudio = !!keepAudio; message = ''; setLoading('native', 'Preparing game data…', 0, 0); emit('preparation', {label: preparationLabel, keepAudio}); publish(); },
+    menuPreparationDone() { if (fatal || destroyed) return; const at = performance.now(); diagnosticLifecycle('preparation_done', {timestamp: at, duration_ms: diagnosticPreparationAt === null ? null : at - diagnosticPreparationAt}); diagnosticPreparationAt = null; preparationLabel = ''; message = ''; if (loading?.phase === 'native') { loading = null; refreshCatalogLoading(); } emit('preparationDone'); publish(); },
+    menuPreparationCanceled() { if (fatal || destroyed) return; preparationLabel = ''; preparationKeepsAudio = false; message = ''; if (loading?.phase === 'native') loading = null; emit('preparationCanceled'); publish(); },
+    menuPreparationFailed(error) { if (fatal || destroyed) return; preparationLabel = ''; preparationKeepsAudio = false; message = error || 'Native preparation failed'; if (loading?.phase === 'native') loading = null; emit('preparationFailed', message); publish(); onError(Error(message)); },
     menuAssetsRequested(generation) {
       // Native only requests after closing the outgoing owners. Keep its
       // Constructing gate stopped until the complete scope commits.
@@ -670,6 +686,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     }
   }
   function reportDiscRead(p) {
+    if (fatal || destroyed) return;
     progress = p.phase === 'complete' ? null : Object.freeze({complete: p.complete, total: p.total});
     message = `Reading local data ${p.complete}/${p.total}`;
     if (p.phase === 'complete') setLoading('handoff', 'Preparing game data…', 0, p.total);
@@ -881,7 +898,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           publish();
         }
       }
-      // The global Emscripten heap and main loop live until this document retires.
+      // Native consumes the terminal owner state at its next safe boundary.
+      // The global Emscripten heap remains until this document retires.
       return Object.freeze({requiresReload: true});
     },
   });
