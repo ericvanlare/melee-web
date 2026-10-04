@@ -1,0 +1,144 @@
+{
+  "schema": "webmelee-mobile-diagnostics-source-manifest-v1",
+  "checkpoint": "mobile-diagnostics-20261003",
+  "bundle": "webkit-timeline-game-probe-v1",
+  "evidence_label": "historical private PR153 desktop WebKit timeline diagnostic source; archival template only",
+  "files": [
+    {
+      "original_basename": "webkit-timeline-game-probe-v1.mjs",
+      "template_filename": "webkit-timeline-game-probe-v1.mjs.template",
+      "original_sha256": "5a8ccf83e006776b6384ecfa39c7bb9c994f28865a4b6152502f7b80e84392ec",
+      "template_sha256": "d48cd5a6f1bc56411e19099bdb0d12ad5cd9912e320b72eefb65f661d3e644d9",
+      "original_bytes": 43149,
+      "template_bytes": 42836,
+      "placeholder_keys": [
+        "__LOCAL_CHECKOUT_ROOT__",
+        "__LOCAL_PLAYWRIGHT_CORE__",
+        "__LOCAL_WEBKIT_RUNTIME_ROOT__"
+      ],
+      "transform": "exact machine-path string substitution only; executable logic and source order preserved"
+    },
+    {
+      "original_basename": "timeline-probe-helper.mjs",
+      "template_filename": "timeline-probe-helper.mjs.template",
+      "original_sha256": "b0a6690f72ea8887edbd0b9637e567c05c134ee8038aefb6cab6a7bd61e903c5",
+      "template_sha256": "b0a6690f72ea8887edbd0b9637e567c05c134ee8038aefb6cab6a7bd61e903c5",
+      "original_bytes": 14882,
+      "template_bytes": 14882,
+      "placeholder_keys": [],
+      "transform": "exact machine-path string substitution only; executable logic and source order preserved"
+    },
+    {
+      "original_basename": "timeline-probe-self-check.mjs",
+      "template_filename": "timeline-probe-self-check.mjs.template",
+      "original_sha256": "b85dc264297b666acf383c2706aaab190cc17b9451642cc7cac82a1d1fbf3b26",
+      "template_sha256": "b85dc264297b666acf383c2706aaab190cc17b9451642cc7cac82a1d1fbf3b26",
+      "original_bytes": 3917,
+      "template_bytes": 3917,
+      "placeholder_keys": [],
+      "transform": "exact machine-path string substitution only; executable logic and source order preserved"
+    },
+    {
+      "original_basename": "analyze-timeline.py",
+      "template_filename": "analyze-timeline.py.template",
+      "original_sha256": "5ba0801b270029ceaeafe829322a102ff827dc3cc1101b68fa9eaa9f018407e7",
+      "template_sha256": "5ba0801b270029ceaeafe829322a102ff827dc3cc1101b68fa9eaa9f018407e7",
+      "original_bytes": 4773,
+      "template_bytes": 4773,
+      "placeholder_keys": [],
+      "transform": "exact machine-path string substitution only; executable logic and source order preserved"
+    },
+    {
+      "original_basename": "run-webkit-timeline-game-probe-v1.py",
+      "template_filename": "run-webkit-timeline-game-probe-v1.py.template",
+      "original_sha256": "b8c61db87687bd40c8a96c9d87bb4586b3642f3ee9bf0631f73832b589ea13b4",
+      "template_sha256": "59eadd4973cea4c27ac0045555bf353aa8cff5902d21fd6d6cdb5596203db760",
+      "original_bytes": 6139,
+      "template_bytes": 5743,
+      "placeholder_keys": [
+        "__LOCAL_CHECKOUT_ROOT__",
+        "__LOCAL_DISC_IMAGE__",
+        "__LOCAL_EVIDENCE_ROOT__",
+        "__LOCAL_PACKAGE_ROOT__",
+        "__LOCAL_PLAYWRIGHT_MODULE__",
+        "__LOCAL_WEBKIT_RUNTIME_ROOT__"
+      ],
+      "transform": "exact machine-path string substitution only; executable logic and source order preserved"
+    }
+  ],
+  "public_path_policy": {
+    "absolute_machine_paths_in_templates": false,
+    "credentials_or_secrets_in_templates": false,
+    "placeholder_policy": "Local machine-dependent paths are represented only by explicit __LOCAL_*__ placeholders and must be supplied by an operator before use.",
+    "placeholder_keys": [
+      "__LOCAL_CHECKOUT_ROOT__",
+      "__LOCAL_DISC_IMAGE__",
+      "__LOCAL_EVIDENCE_ROOT__",
+      "__LOCAL_PACKAGE_ROOT__",
+      "__LOCAL_PLAYWRIGHT_CORE__",
+      "__LOCAL_PLAYWRIGHT_MODULE__",
+      "__LOCAL_WEBKIT_RUNTIME_ROOT__"
+    ]
+  },
+  "static_checks": {
+    "node_syntax": "pass (node --check on all .mjs.template copies)",
+    "python_syntax": "pass (python3 -m py_compile on all .py.template copies)",
+    "template_path_scan": "pass (no /Volumes, /Users, /private, or operator-home literals in templates)",
+    "credential_keyword_scan": "pass (no credential-bearing literals in templates)",
+    "source_hash_capture": "pass",
+    "template_hash_capture": "pass"
+  },
+  "provenance": {
+    "historical_report": {
+      "original_basename": "report.json",
+      "sha256": "2e551921c82232e261530e946267288356624d79af48f2f2e7e83beb1b305881"
+    },
+    "historical_receipt": {
+      "original_basename": "timeline-webkit-pr153-v1-receipt.json",
+      "sha256": "700ba2100e5bdb555a505c1c47017ae52f169fdb853da7ae458328a1bd4e04f2"
+    },
+    "source_scope": "One bounded CSS observation in the exact PR153 audio-player package; no Resume, source/runtime edits, fences, clock changes, recovery policy, uploads, or public export."
+  },
+  "excluded_private_artifacts": [
+    {
+      "original_basename": "timeline-webkit-pr153-v1/",
+      "reason": "retained private result directory; captures/results are excluded from the public checkpoint"
+    },
+    {
+      "original_basename": "timeline-webkit-pr153-v1-receipt.json",
+      "reason": "private execution receipt; exact source/evidence paths remain in the private map"
+    },
+    {
+      "original_basename": "timeline-webkit-pr153-v1.log",
+      "reason": "private execution log"
+    },
+    {
+      "original_basename": "webkit-timeline-game-probe-v1-plan.json",
+      "reason": "private execution plan; not required for the source template bundle"
+    }
+  ],
+  "limitations": [
+    "Historical PR153 desktop WebKit diagnostic source; not a current staging or production artifact.",
+    "Retained evidence records a 390.08 ms frame-exit to next-service gap.",
+    "The retained profiler sample set contains 609 of 618 samples with zero timestamps; timestamped samples are incomplete.",
+    "The source bundle does not establish a cause for the gap, an iPhone or other phone result, physical-input behavior, audible output, pixels, PCM, or phone acceptance.",
+    "Templates are archival and require explicit local path substitution; no browser, profiler, native workload, or analysis rerun is part of this checkpoint."
+  ],
+  "audit": {
+    "bundle_directory_review": "The retained bundle directory was enumerated before copying; five source files are represented as templates and no additional source files were found.",
+    "retained_source_basenames": [
+      "webkit-timeline-game-probe-v1.mjs",
+      "timeline-probe-helper.mjs",
+      "timeline-probe-self-check.mjs",
+      "analyze-timeline.py",
+      "run-webkit-timeline-game-probe-v1.py"
+    ],
+    "excluded_private_or_superseded_basenames": [
+      "timeline-webkit-pr153-v1/",
+      "timeline-webkit-pr153-v1-receipt.json",
+      "timeline-webkit-pr153-v1.log",
+      "webkit-timeline-game-probe-v1-plan.json"
+    ],
+    "excluded_content_policy": "Private reports, receipts, logs, screenshots, run plans, and captured traces remain outside this public checkpoint."
+  }
+}

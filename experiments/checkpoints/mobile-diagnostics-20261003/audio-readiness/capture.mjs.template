@@ -1,0 +1,201 @@
+import fs from 'node:fs/promises';
+import http from 'node:http';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+
+
+const source = path.resolve(process.argv[2]);
+const out = path.resolve(process.argv[3]);
+await fs.mkdir(out, {recursive: false});
+const assets = new Map([
+  ['/runtime-audio.mjs', ['runtime-audio.mjs', 'text/javascript; charset=utf-8']],
+  ['/audio-worklet.js', ['audio-worklet.js', 'text/javascript; charset=utf-8']],
+  ['/audio-ring.mjs', ['audio-ring.mjs', 'text/javascript; charset=utf-8']],
+]);
+const html = `<!doctype html><meta charset="utf-8"><title>Runtime audio output clock probe</title>
+<button id="start">Start production audio graph probe</button>
+<script type="module">
+import {createRuntimeAudio} from '/runtime-audio.mjs';
+const trace = window.__probe = {
+  events: [], contexts: [], worklets: [], pcmMessages: 0, outputApiAvailable: false,
+  phase: 'idle', complete: false, result: null,
+};
+const now = () => performance.now();
+const event = (kind, detail = {}) => trace.events.push({kind, at_ms: now(), ...detail});
+const NativeAudioContext = window.AudioContext;
+const timestampMethod = NativeAudioContext?.prototype?.getOutputTimestamp;
+trace.outputApiAvailable = typeof timestampMethod === 'function';
+if (timestampMethod) {
+  NativeAudioContext.prototype.getOutputTimestamp = function() {
+    const timestamp = timestampMethod.call(this);
+    const record = trace.contexts.find(item => item.context === this);
+    if (record) record.samples.push({phase: trace.phase, at_ms: now(), current_time: this.currentTime,
+      context_time: timestamp.contextTime, performance_time: timestamp.performanceTime});
+    return timestamp;
+  };
+}
+const AudioContextProxy = function(...args) {
+  const context = new NativeAudioContext(...args);
+  trace.contexts.push({context, created_at_ms: now(), sample_rate: context.sampleRate, initial_state: context.state, samples: []});
+  event('context-created', {sample_rate: context.sampleRate, state: context.state});
+  return context;
+};
+AudioContextProxy.prototype = NativeAudioContext.prototype;
+Object.defineProperty(window, 'AudioContext', {value: AudioContextProxy, configurable: true, writable: true});
+const ports = new WeakMap();
+const NativeMessagePort = window.MessagePort;
+const nativePostMessage = NativeMessagePort.prototype.postMessage;
+NativeMessagePort.prototype.postMessage = function(data, ...args) {
+  const record = ports.get(this);
+  if (record) {
+    record.messages.push({direction: 'out', type: data?.type || null, at_ms: now()});
+    if (data?.type === 'render-ready-request') event('render-ready-request', {id: data.id});
+    if (data?.type === 'pcm') trace.pcmMessages++;
+  }
+  return nativePostMessage.call(this, data, ...args);
+};
+const NativeWorkletNode = window.AudioWorkletNode;
+const AudioWorkletNodeProxy = function(context, name, options) {
+  const node = new NativeWorkletNode(context, name, options);
+  const record = {name, connected: false, messages: []};
+  trace.worklets.push(record);
+  ports.set(node.port, record);
+  node.port.addEventListener('message', ({data}) => {
+    record.messages.push({direction: 'in', type: data?.type || null, at_ms: now(), process_time: data?.process_time ?? null, process_frame: data?.process_frame ?? null});
+    if (data?.type === 'render-ready') event('worklet-render-ack', {id: data.id, process_time: data.process_time, process_frame: data.process_frame});
+  });
+  const connect = node.connect.bind(node);
+  const silentDestination = context.createGain();
+  silentDestination.gain.value = 0;
+  silentDestination.connect(context.destination);
+  node.connect = (...args) => { record.connected = true; if (args[0] === context.destination) args[0] = silentDestination; return connect(...args); };
+  return node;
+};
+AudioWorkletNodeProxy.prototype = NativeWorkletNode.prototype;
+Object.defineProperty(window, 'AudioWorkletNode', {value: AudioWorkletNodeProxy, configurable: true, writable: true});
+document.querySelector('#start').addEventListener('click', async () => {
+  trace.phase = 'prepare';
+  event('trusted-click');
+  const audio = createRuntimeAudio({assetBase: new URL('./', location.href), onEvent: detail => event('runtime-event', {detail}), onError: error => event('runtime-error', {message: error.message}), onFatal: error => event('runtime-fatal', {message: error.message})});
+  try {
+    await audio.prepare();
+    event('prepare-resolved', {state: trace.contexts[0]?.context.state, current_time: trace.contexts[0]?.context.currentTime});
+    trace.phase = 'wait-for-render';
+    await audio.waitForRender();
+    trace.phase = 'post-ready';
+    event('wait-for-render-resolved', {state: trace.contexts[0]?.context.state, current_time: trace.contexts[0]?.context.currentTime});
+    const sampler = setInterval(() => {
+      const context = trace.contexts[0]?.context;
+      if (context && timestampMethod) context.getOutputTimestamp();
+    }, 25);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    clearInterval(sampler);
+    const context = trace.contexts[0]?.context;
+    trace.result = {ok: true, state_after_observation: context?.state, current_time_after_observation: context?.currentTime};
+    event('post-ready-observation-complete', trace.result);
+    await audio.destroy();
+    event('audio-destroy-resolved');
+  } catch (error) {
+    trace.result = {ok: false, error: String(error?.stack || error)};
+    event('probe-error', {message: String(error?.message || error)});
+    try { await audio.destroy(); event('audio-destroy-resolved'); }
+    catch (cleanupError) { event('audio-destroy-error', {message: String(cleanupError?.message || cleanupError)}); }
+  } finally {
+    trace.contexts = trace.contexts.map(record => ({created_at_ms: record.created_at_ms,
+      sample_rate: record.sample_rate, initial_state: record.initial_state,
+      final_state: record.context.state, current_time_final: record.context.currentTime,
+      samples: record.samples}));
+    trace.complete = true;
+  }
+});
+</script>`;
+const server = http.createServer(async (request, response) => {
+  try {
+    const pathname = new URL(request.url, 'http://127.0.0.1').pathname;
+    if (pathname === '/favicon.ico') { response.writeHead(204); response.end(); return; }
+    if (pathname === '/' || pathname === '/index.html') {
+      response.writeHead(200, {'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store'});
+      response.end(html);
+      return;
+    }
+    const item = assets.get(pathname);
+    if (!item) { response.writeHead(404); response.end('not found'); return; }
+    const bytes = await fs.readFile(path.join(source, item[0]));
+    response.writeHead(200, {'content-type': item[1], 'cache-control': 'no-store'});
+    response.end(bytes);
+  } catch (error) { response.writeHead(500); response.end(String(error)); }
+});
+let browser = null, context = null, page = null;
+let serverClosed = false;
+const report = {schema: 'melee-web-webkit-runtime-output-timestamp-probe-v1',
+  source_root: source, output_dir: out, started_at: new Date().toISOString(),
+  attempt_limit: {browser_launch_ms: 5000, wall_ms: 20000, post_ready_observation_ms: 1500},
+  scope: 'Production createRuntimeAudio + shipped AudioWorklet graph only; source audio disabled; no game, native module, PCM, visual or gameplay claim.',
+  browser: null, origin: null, result: null, trace: null, cleanup: {page_closed: false, context_closed: false, browser_closed: false, server_closed: false},
+};
+try {
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  const address = server.address();
+  report.origin = `http://127.0.0.1:${address.port}`;
+  process.env.PLAYWRIGHT_BROWSERS_PATH = '__LOCAL_WEBKIT_RUNTIME__';
+  const {webkit} = await import(pathToFileURL(path.join(process.argv[4], 'index.mjs')).href);
+  browser = await webkit.launch({headless: true, timeout: 5000});
+  report.browser = {name: 'WebKit', version: browser.version(), mode: 'headless', audio_muted: true, mute_method: 'zero-gain destination; Worklet and Web Audio processing stay enabled', playwright_path: process.argv[4], browsers_path: process.env.PLAYWRIGHT_BROWSERS_PATH};
+  context = await browser.newContext({viewport: {width: 800, height: 600}});
+  page = await context.newPage();
+  page.setDefaultTimeout(2500);
+  page.on('pageerror', error => { report.page_error = error.message; });
+  page.on('console', message => { if (message.type() === 'error') report.console_error ||= message.text(); });
+  page.on('response', response => { if (response.status() >= 400) report.http_error ||= `${response.status()} ${response.url()}`; });
+  await page.goto(report.origin, {waitUntil: 'load', timeout: 3000});
+  await page.locator('#start').click();
+  await page.waitForFunction(() => window.__probe?.complete === true, null, {timeout: 9500});
+  report.trace = await page.evaluate(() => {
+    const value = window.__probe;
+    return {...value, contexts: value.contexts.map(record => ({...record})), worklets: value.worklets.map(record => ({...record}))};
+  });
+  report.result = report.trace.result;
+  if (report.page_error || report.console_error || report.http_error) throw Error(`Browser diagnostics reported an error: ${report.page_error || report.console_error || report.http_error}`);
+  if (!report.trace.outputApiAvailable) throw Error('Browser did not expose AudioContext.getOutputTimestamp.');
+  if (!report.result?.ok) throw Error(report.result?.error || 'Production runtime audio graph did not reach readiness.');
+  if (report.trace.pcmMessages !== 0) throw Error(`Probe unexpectedly posted ${report.trace.pcmMessages} PCM messages.`);
+  const ack = report.trace.events.find(item => item.kind === 'worklet-render-ack');
+  const ready = report.trace.events.find(item => item.kind === 'wait-for-render-resolved');
+  if (!ack || !ready || !Number.isFinite(ack.process_time) || !Number.isInteger(ack.process_frame)) throw Error('Probe omitted a finite Worklet process acknowledgement.');
+  const samples = report.trace.contexts[0].samples;
+  const productSamples = samples.filter(item => item.phase === 'wait-for-render');
+  const crossing = productSamples.find(item => item.context_time > ack.process_time);
+  if (!crossing || crossing.at_ms > ready.at_ms) throw Error('Production readiness did not follow an output timestamp beyond the acknowledged process time.');
+  const postSamples = samples.filter(item => item.phase === 'post-ready');
+  if (postSamples.length < 2 || postSamples.at(-1).context_time <= postSamples[0].context_time ||
+      postSamples.at(-1).current_time <= postSamples[0].current_time) {
+    throw Error('Audio device or AudioContext clock stopped advancing during the post-readiness observation.');
+  }
+  report.screenshot = path.join(out, 'probe.png');
+  await page.screenshot({path: report.screenshot});
+  report.summary = {ack_ms: ack.at_ms, process_time: ack.process_time, process_frame: ack.process_frame,
+    readiness_ms: ready.at_ms, ack_to_ready_ms: ready.at_ms - ack.at_ms, crossing_timestamp_ms: crossing.at_ms,
+    product_output_samples: productSamples.length, post_ready_output_samples: postSamples.length,
+    product_context_time_at_ready: crossing.context_time,
+    post_ready_output_context_time_first: postSamples[0].context_time,
+    post_ready_output_context_time_last: postSamples.at(-1).context_time,
+    post_ready_audio_context_time_first: postSamples[0].current_time,
+    post_ready_audio_context_time_last: postSamples.at(-1).current_time,
+    pcm_messages: report.trace.pcmMessages,
+  };
+} catch (error) {
+  report.result = {ok: false, error: String(error?.stack || error)};
+  report.error = String(error?.message || error);
+} finally {
+  try { if (page) { await page.close(); report.cleanup.page_closed = true; } } catch (error) { report.cleanup.page_error = String(error); }
+  try { if (context) { await context.close(); report.cleanup.context_closed = true; } } catch (error) { report.cleanup.context_error = String(error); }
+  try { if (browser) { await browser.close(); report.cleanup.browser_closed = true; } } catch (error) { report.cleanup.browser_error = String(error); }
+  try { await new Promise(resolve => server.close(() => { serverClosed = true; resolve(); })); } catch (error) { report.cleanup.server_error = String(error); }
+  report.cleanup.server_closed = serverClosed;
+  report.finished_at = new Date().toISOString();
+  await fs.writeFile(path.join(out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+}
+if (!report.result?.ok || !Object.values(report.cleanup).every(value => value === true)) {
+  process.stderr.write(`${report.error || report.result?.error || 'probe or cleanup incomplete'}\n`);
+  process.exitCode = 1;
+} else process.stdout.write(`${JSON.stringify({result: report.result, summary: report.summary, cleanup: report.cleanup})}\n`);

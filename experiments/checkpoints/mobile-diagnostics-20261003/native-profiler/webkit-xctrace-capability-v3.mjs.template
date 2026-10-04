@@ -1,0 +1,348 @@
+#!/usr/bin/env node
+'use strict';
+
+/*
+ * UNEXECUTED private capability probe.  It attaches xctrace to one pinned
+ * WebKit WebContent process hosting an inert loopback page.  The page-side
+ * CPU pulse selects the process; RSS, process order, and the first WebContent
+ * PID are deliberately not used as identity.  This file never opens the game.
+ */
+import { createHash } from 'node:crypto';
+import { execFile, spawn } from 'node:child_process';
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import http from 'node:http';
+import path from 'node:path';
+import { performance } from 'node:perf_hooks';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+const DEFAULT_XCTRACE = '__LOCAL_XCTRACE__';
+const DEFAULT_CORE = '__LOCAL_PLAYWRIGHT_CORE_BUNDLE__';
+const DEFAULT_PROTOCOL = '__LOCAL_WEBKIT_PROTOCOL__';
+const DEFAULT_BROWSERS = '__LOCAL_WEBKIT_RUNTIME_ROOT__';
+const DEFAULT_WEBKIT = `${DEFAULT_BROWSERS}/webkit-2336`;
+const EXPECTED_CORE_SHA256 = '9393fa79e1c67c74edc26b610d65a4f7ed73d345a762465cc88340a33a2454ac';
+const EXPECTED_PROTOCOL_SHA256 = '448bdfe4851c841182a686d85cf3080672adbebf5dfc54d516eb3e3cd967e5fe';
+const MAX_REPORT_TEXT = 16 * 1024;
+const MAX_PROCESS_ROWS = 4096;
+const MAX_PROBE_SAMPLES = 128;
+const MAX_TABLES = 16;
+const MAX_TABLE_BYTES = 16 * 1024 * 1024;
+const STARTUP_MS = 10_000;
+const RECORD_MS = 8_000;
+const CLEANUP_MS = 5_000;
+
+function parseArgs(argv) {
+  const a = { out: null, playwright: null, protocol: DEFAULT_PROTOCOL, core: DEFAULT_CORE,
+    browsersPath: DEFAULT_BROWSERS, webkitRoot: DEFAULT_WEBKIT, xctrace: DEFAULT_XCTRACE,
+    window: `${RECORD_MS}ms`, timeLimit: `${RECORD_MS}ms` };
+  for (let i = 0; i < argv.length; i += 1) {
+    const k = argv[i];
+    if (k === '--out') a.out = argv[++i];
+    else if (k === '--playwright-core') a.core = argv[++i];
+    else if (k === '--protocol') a.protocol = argv[++i];
+    else if (k === '--browsers-path') a.browsersPath = argv[++i];
+    else if (k === '--webkit-root') a.webkitRoot = argv[++i];
+    else if (k === '--playwright') a.playwright = argv[++i];
+    else if (k === '--xctrace') a.xctrace = argv[++i];
+    else if (k === '--window') a.window = argv[++i];
+    else if (k === '--time-limit') a.timeLimit = argv[++i];
+    else if (k === '--help') {
+      console.log('usage: node webkit-xctrace-capability-v1.mjs --out <absent-dir> --playwright <playwright-dir> [--playwright-core <coreBundle.js>] [--protocol <protocol.json>] [--browsers-path <dir>] [--webkit-root <dir>] [--xctrace <xctrace>] [--window 8s] [--time-limit 8s]');
+      process.exit(0);
+    } else throw new Error(`unknown argument: ${k}`);
+  }
+  for (const [name, value] of Object.entries(a)) {
+    if (['out', 'playwright', 'core', 'protocol', 'browsersPath', 'webkitRoot', 'xctrace'].includes(name) && !value) throw new Error(`--${name} is required`);
+  }
+  return a;
+}
+
+function sha256(file) {
+  return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+function capText(value, cap = MAX_REPORT_TEXT) {
+  const text = String(value ?? '');
+  return text.length <= cap ? text : `${text.slice(0, cap)}…`;
+}
+
+function finite(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function withTimeout(promise, ms, label) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms); }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
+
+async function processRows() {
+  const [identity, usage, command] = await Promise.all([
+    execFileAsync('/bin/ps', ['-axo', 'pid=,ppid=,pcpu=,comm='], { timeout: 3000, maxBuffer: 512 * 1024 }),
+    execFileAsync('/bin/ps', ['-axo', 'pid=,time='], { timeout: 3000, maxBuffer: 512 * 1024 }),
+    execFileAsync('/bin/ps', ['-axo', 'pid=,command='], { timeout: 3000, maxBuffer: 512 * 1024 }),
+  ]);
+  const parseTwo = text => new Map(text.stdout.split('\n').flatMap(line => {
+    const match = line.match(/^\s*(\d+)\s+(.+?)\s*$/);
+    return match ? [[Number(match[1]), match[2]]] : [];
+  }));
+  const commands = parseTwo(command);
+  const times = parseTwo(usage);
+  const cpuSeconds = value => {
+    const parts = String(value).trim().split(/[:-]/).map(Number);
+    if (!parts.length || parts.some(part => !Number.isFinite(part))) return null;
+    let seconds = 0;
+    for (const part of parts) seconds = seconds * 60 + part;
+    return seconds;
+  };
+  const rows = [];
+  const identityLines = identity.stdout.split('\n');
+  for (const line of identityLines) {
+    const m = line.match(/^\s*(\d+)\s+(\d+)\s+([0-9.]+)\s+(.+?)\s*$/);
+    if (m) {
+      const pid = Number(m[1]);
+      rows.push({ pid, ppid: Number(m[2]), pcpu: Number(m[3]), comm: m[4], command: commands.get(pid) || m[4], cpu_seconds: cpuSeconds(times.get(pid)) });
+    }
+  }
+  if (rows.length > MAX_PROCESS_ROWS) throw new Error(`ps process row cap exceeded: ${rows.length} > ${MAX_PROCESS_ROWS}`);
+  return rows;
+}
+
+function webContentRows(rows, webkitRoot) {
+  const prefix = `${path.resolve(webkitRoot)}/com.apple.WebKit.WebContent.xpc/Contents/MacOS/`;
+  return rows.flatMap(row => {
+    const index = row.comm.indexOf(prefix);
+    if (index < 0) return [];
+    const executable = row.comm.slice(index).split(/\s+/)[0];
+    return [{ ...row, executable }];
+  });
+}
+
+function rowMap(rows) { return new Map(rows.map(row => [row.pid, row])); }
+
+function summarizeProbe(before, during, after) {
+  const b = rowMap(before);
+  const candidates = new Map();
+  for (const row of webContentRows([...before, ...during.flat(), ...after], currentWebKitRoot)) {
+    if (!candidates.has(row.pid)) candidates.set(row.pid, { pid: row.pid, ppid: row.ppid, executable: row.executable, baseline: b.get(row.pid)?.cpu_seconds ?? null, during: [], after: [] });
+  }
+  for (const row of webContentRows(during.flat(), currentWebKitRoot)) candidates.get(row.pid)?.during.push(row.cpu_seconds);
+  for (const row of webContentRows(after, currentWebKitRoot)) candidates.get(row.pid)?.after.push(row.cpu_seconds);
+  const result = [...candidates.values()].map(item => {
+    const baseline = item.baseline ?? 0;
+    const maxDuringCpu = item.during.filter(Number.isFinite).length ? Math.max(...item.during.filter(Number.isFinite)) : null;
+    const maxAfterCpu = item.after.filter(Number.isFinite).length ? Math.max(...item.after.filter(Number.isFinite)) : null;
+    return { ...item, samples_during: item.during.length, max_during_cpu_seconds: maxDuringCpu, max_after_cpu_seconds: maxAfterCpu, delta_cpu_seconds: maxDuringCpu === null ? null : maxDuringCpu - baseline };
+  }).sort((x, y) => (y.delta_cpu_seconds ?? -Infinity) - (x.delta_cpu_seconds ?? -Infinity));
+  return result.map(({ during: _during, after: _after, ...item }) => item);
+}
+
+let currentWebKitRoot = DEFAULT_WEBKIT;
+
+async function cpuPulse(page, durationMs, webkitRoot) {
+  currentWebKitRoot = path.resolve(webkitRoot);
+  const before = await processRows();
+  const during = [];
+  const pulseDeadline = performance.now() + Math.max(1_000, durationMs + 1_500);
+  let done = false;
+  const probe = page.evaluate((duration) => {
+    const started = performance.now();
+    performance.mark('native-stack-capability-pulse-start');
+    let state = 0;
+    while (performance.now() - started < duration) {
+      for (let i = 0; i < 4000; i += 1) state = (state + Math.sin(i + state)) % 104729;
+    }
+    performance.mark('native-stack-capability-pulse-end');
+    return { started, ended: performance.now(), state };
+  }, durationMs).finally(() => { done = true; });
+  probe.catch(() => {});
+  while (!done && during.length < MAX_PROBE_SAMPLES) {
+    if (performance.now() >= pulseDeadline) throw new Error('inert CPU probe exceeded its sample deadline');
+    during.push(await processRows());
+    await sleep(24);
+  }
+  if (!done) throw new Error('inert CPU probe sample cap exceeded before page pulse completed');
+  const pulse = await probe;
+  const after = await processRows();
+  return { pulse, before, during, after, candidates: summarizeProbe(before, during, after) };
+}
+
+function choosePid(first, second, baselinePids, webkitRoot) {
+  const old = new Set(baselinePids);
+  const candidates = second.candidates.filter(item => !old.has(item.pid) && item.samples_during > 0 && (item.delta_cpu_seconds ?? -Infinity) >= 0.05);
+  if (candidates.length !== 1) throw new Error(`inert CPU probe did not select one WebContent PID (${candidates.length} candidates)`);
+  const winner = candidates[0];
+  const firstWinner = first.candidates.find(item => item.pid === winner.pid);
+  if (!firstWinner || (firstWinner.delta_cpu_seconds ?? -Infinity) < 0.05) throw new Error(`WebContent PID ${winner.pid} was not the stable winner across two inert CPU probes`);
+  const other = second.candidates.filter(item => item.pid !== winner.pid && !old.has(item.pid));
+  if (other.some(item => (item.delta_cpu_seconds ?? -Infinity) >= (winner.delta_cpu_seconds ?? 0) - 0.02)) throw new Error('inert CPU probe winner was not unique');
+  const current = webContentRows(second.after, webkitRoot).find(item => item.pid === winner.pid) || webContentRows(second.before, webkitRoot).find(item => item.pid === winner.pid);
+  if (!current || current.executable !== winner.executable) throw new Error('selected PID no longer has the pinned WebContent executable');
+  return { pid: winner.pid, ppid: winner.ppid, executable: winner.executable, selection: 'stable_unique_inert_cpu_delta', first_probe: firstWinner, second_probe: winner };
+}
+
+function inertHtml() {
+  return '<!doctype html><meta charset="utf-8"><link rel="icon" href="data:,"><title>inert native stack capability</title><main id="state">inert</main>';
+}
+
+async function pageClockAnchor(page) {
+  const hostBefore = performance.now();
+  const epochBefore = Date.now();
+  const pageValue = await page.evaluate(() => ({ time_origin: Number.isFinite(performance.timeOrigin) ? performance.timeOrigin : null, now: Number.isFinite(performance.now()) ? performance.now() : null, hidden: document.hidden, visibility_state: document.visibilityState }));
+  const epochAfter = Date.now();
+  const hostAfter = performance.now();
+  return { host_before_monotonic_ms: hostBefore, host_after_monotonic_ms: hostAfter, host_before_epoch_ms: epochBefore, host_after_epoch_ms: epochAfter, ...pageValue };
+}
+
+async function startServer() {
+  const requests = [];
+  const server = http.createServer((request, response) => {
+    requests.push({ method: request.method, url: request.url, at_ms: Date.now() });
+    if (request.url !== '/') { response.writeHead(404); response.end('not found'); return; }
+    response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+    response.end(inertHtml());
+  });
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+  const address = server.address();
+  return { server, requests, url: `http://127.0.0.1:${address.port}/` };
+}
+
+function spawnCapture(args, target, tracePath, notificationName) {
+  const command = ['record', '--template', 'System Trace', '--instrument', 'Time Profiler', '--attach', String(target.pid), '--output', tracePath, '--time-limit', args.timeLimit, '--window', args.window, '--notify-tracing-started', notificationName, '--no-prompt'];
+  const listener = spawn('__LOCAL_NOTIFYUTIL__', ['-v', '-1', notificationName], { stdio: ['ignore', 'pipe', 'pipe'] });
+  const child = spawn(args.xctrace, command, { stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = ''; let stderr = ''; let notifyOutput = ''; let notified = false; let listenerError = null; let childError = null;
+  const collect = (which, chunk) => { const text = String(chunk); if (which === 'stdout') stdout = capText(`${stdout}${text}`, MAX_REPORT_TEXT); else stderr = capText(`${stderr}${text}`, MAX_REPORT_TEXT); };
+  const collectNotify = chunk => { notifyOutput = capText(`${notifyOutput}${String(chunk)}`, MAX_REPORT_TEXT); };
+  listener.stdout.on('data', collectNotify); listener.stderr.on('data', collectNotify);
+  listener.once('error', error => { listenerError = error.message; });
+  child.once('error', error => { childError = error.message; });
+  const listenerExited = new Promise(resolve => listener.once('close', (code, signal) => { notified = code === 0 && !listenerError; resolve({ code, signal }); }));
+  child.stdout.on('data', chunk => collect('stdout', chunk));
+  child.stderr.on('data', chunk => collect('stderr', chunk));
+  const exited = new Promise(resolve => child.once('close', (code, signal) => resolve({ code, signal })));
+  return { child, listener, command, notificationName, exited, listenerExited, output: () => ({ stdout, stderr, notify_output: notifyOutput, notified, listener_error: listenerError, child_error: childError }) };
+}
+
+async function terminateOwned(child, exited, label, cleanupDeadline) {
+  if (!child) return null;
+  if (child.exitCode !== null || child.signalCode !== null) return await withTimeout(exited, 500, label + ' close');
+  const remaining = () => Math.max(1, cleanupDeadline - performance.now());
+  for (const [signal, waitMs] of [['SIGINT', 3_000], ['SIGTERM', 1_000], ['SIGKILL', 1_000]]) {
+    if (child.exitCode !== null || child.signalCode !== null) return await withTimeout(exited, Math.min(500, remaining()), label + ' close');
+    child.kill(signal);
+    try { return await withTimeout(exited, Math.min(waitMs, remaining()), `${label} ${signal}`); } catch { /* escalate within the shared deadline */ }
+  }
+  throw new Error(`${label} remained alive after bounded SIGKILL cleanup`);
+}
+
+async function stopCapture(capture, cleanupDeadline) {
+  if (!capture) return null;
+  const result = await terminateOwned(capture.child, capture.exited, 'xctrace recording', cleanupDeadline);
+  if (capture.listener?.exitCode === null && capture.listener?.signalCode === null) await terminateOwned(capture.listener, capture.listenerExited, 'notifyutil', cleanupDeadline);
+  return result;
+}
+
+function tableSchemas(toc) {
+  const schemas = [];
+  for (const match of toc.matchAll(/<table\b[^>]*\bschema="([^"]+)"[^>]*>/gi)) {
+    if (!schemas.includes(match[1])) schemas.push(match[1]);
+  }
+  const preferred = schemas.filter(value => /thread|thread-state|sample|cpu|time-profile|time/i.test(value));
+  return preferred.slice(0, MAX_TABLES);
+}
+
+async function exportTrace(xctrace, tracePath, exportDir, targetPid, deadline) {
+  const tocPath = path.join(exportDir, 'trace-toc.xml');
+  const remaining = Math.min(15_000, deadline - performance.now());
+  if (remaining <= 0) throw new Error('global deadline reached before trace TOC export');
+  await execFileAsync(xctrace, ['export', '--input', tracePath, '--toc', '--output', tocPath], { timeout: remaining, maxBuffer: 1024 * 1024 });
+  const toc = await fsp.readFile(tocPath, 'utf8');
+  if (toc.length > 1024 * 1024) throw new Error('trace TOC exceeds bound');
+  return { toc_path: tocPath, schemas: tableSchemas(toc), timestamp_coverage: { status: 'raw_capture_pending_review', target_pid: targetPid, requirement: 'Root must inspect TOC, export actual typed time/thread/stack tables and validate target PID plus pulse interval coverage. No text match is accepted as coverage.' } };
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const out = path.resolve(args.out);
+  if (fs.existsSync(out)) throw new Error(`output must be absent: ${out}`);
+  fs.mkdirSync(out, { recursive: true });
+  currentWebKitRoot = path.resolve(args.webkitRoot);
+  const started = performance.now();
+  const outerDeadline = started + 55_000;
+  const withinOuter = (promise, ms, label) => withTimeout(promise, Math.max(1, Math.min(ms, outerDeadline - performance.now())), label);
+  const report = { schema: 'webkit-native-stack-capability/v2', status: 'running', scope: 'Inert loopback WebKit page only; no game import, native workload, source input, audio, or product hook.', identities: {}, timing: { started_monotonic_ms: started, outer_budget_ms: 55_000, startup_budget_ms: STARTUP_MS, record_budget_ms: RECORD_MS, cleanup_budget_ms: CLEANUP_MS }, process_binding: { method: 'stable unique cumulative CPU-time delta from two page-side inert pulses; exact pinned WebContent executable; no RSS or process-order selection' }, page: { url: null, requests: [], anchors: [], probes: [] }, recording: { xctrace: args.xctrace, command: null, notification_name: null, trace_path: path.join(out, 'webkit-system-trace.trace'), started_signal: false, exit: null }, export: null, cleanup: { errors: [] }, errors: [] };
+  let browser; let context; let page; let serverInfo; let capture; let cleanupDeadline = null;
+  try {
+    const core = { path: path.resolve(args.core), bytes: fs.statSync(args.core).size, sha256: sha256(args.core) };
+    const protocol = { path: path.resolve(args.protocol), bytes: fs.statSync(args.protocol).size, sha256: sha256(args.protocol) };
+    if (core.sha256 !== EXPECTED_CORE_SHA256) throw new Error(`Playwright core hash mismatch: ${core.sha256}`);
+    if (protocol.sha256 !== EXPECTED_PROTOCOL_SHA256) throw new Error(`WebKit protocol hash mismatch: ${protocol.sha256}`);
+    if (!fs.existsSync(args.xctrace)) throw new Error(`xctrace missing: ${args.xctrace}`);
+    report.identities = { playwright_core: core, webkit_protocol: protocol, webkit_root: path.resolve(args.webkitRoot), xctrace: { path: path.resolve(args.xctrace) } };
+    const beforePids = (await processRows()).map(row => row.pid);
+    serverInfo = await startServer(); report.page.url = serverInfo.url;
+    process.env.PLAYWRIGHT_BROWSERS_PATH = path.resolve(args.browsersPath);
+    const { webkit } = await import(path.join(args.playwright, 'index.mjs'));
+    browser = await withinOuter(webkit.launch({ headless: true, timeout: STARTUP_MS }), STARTUP_MS, 'WebKit launch');
+    context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: false, hasTouch: false });
+    page = await context.newPage();
+    page.on('pageerror', error => report.errors.push({ kind: 'pageerror', message: capText(error.message) }));
+    page.on('console', message => { if (message.type() === 'error') report.errors.push({ kind: 'console', message: capText(message.text()) }); });
+    await withinOuter(page.goto(serverInfo.url, { waitUntil: 'domcontentloaded', timeout: STARTUP_MS }), STARTUP_MS, 'inert page load');
+    report.page.anchors.push(await pageClockAnchor(page));
+    const first = await withinOuter(cpuPulse(page, 240, args.webkitRoot), STARTUP_MS, 'first inert CPU probe');
+    const second = await withinOuter(cpuPulse(page, 240, args.webkitRoot), STARTUP_MS, 'second inert CPU probe');
+    report.page.probes.push({ first: { pulse: first.pulse, candidates: first.candidates }, second: { pulse: second.pulse, candidates: second.candidates } });
+    const target = choosePid(first, second, beforePids, args.webkitRoot);
+    report.process_binding.target = target;
+    const notification = `com.webmelee.xctrace.native-stack.${target.pid}.${Date.now()}`;
+    capture = spawnCapture(args, target, report.recording.trace_path, notification);
+    report.recording.command = [args.xctrace, ...capture.command]; report.recording.notification_name = notification;
+    const startNotificationDeadline = performance.now() + 15_000;
+    await withinOuter((async () => { while (!capture.output().notified) { if (performance.now() >= startNotificationDeadline) throw new Error('Darwin notification deadline elapsed'); const state = capture.output(); if (state.child_error) throw new Error(`xctrace spawn failed: ${state.child_error}`); if (state.listener_error) throw new Error(`notifyutil spawn failed: ${state.listener_error}`); if ((capture.child.exitCode !== null || capture.child.signalCode !== null)) throw new Error('xctrace exited before Darwin recording-start notification'); if ((capture.listener.exitCode !== null || capture.listener.signalCode !== null)) throw new Error('notifyutil exited before Darwin recording-start notification'); await sleep(25); } })(), 15_000, 'xctrace Darwin recording start');
+    report.recording.started_signal = true;
+    report.recording.notification_received_monotonic_ms = performance.now();
+    for (let i = 0; i < 3; i += 1) { const pulse = await withinOuter(cpuPulse(page, 220, args.webkitRoot), 5_000, `capture CPU probe ${i}`); report.page.probes.push({ capture_index: i, pulse: pulse.pulse, candidates: pulse.candidates }); await sleep(100); }
+    report.page.anchors.push(await pageClockAnchor(page));
+    cleanupDeadline = performance.now() + CLEANUP_MS;
+    report.recording.exit = await stopCapture(capture, cleanupDeadline);
+    if (report.recording.exit?.code !== 0) throw new Error('xctrace did not exit successfully');
+    report.recording.stdout = capture.output().stdout; report.recording.stderr = capture.output().stderr; report.recording.notify_output = capture.output().notify_output;
+    report.cleanup.xctrace_exit_observed = (capture.child.exitCode !== null || capture.child.signalCode !== null);
+    report.cleanup.notifyutil_exit_observed = (capture.listener.exitCode !== null || capture.listener.signalCode !== null);
+    if (!report.cleanup.xctrace_exit_observed || !report.cleanup.notifyutil_exit_observed) throw new Error('owned tracing children did not close after bounded stop');
+    if (!fs.existsSync(report.recording.trace_path)) throw new Error('xctrace did not produce a trace file');
+    const afterCaptureTarget = webContentRows(await processRows(), args.webkitRoot).find(row => row.pid === target.pid);
+    report.process_binding.after_capture = afterCaptureTarget ? { pid: afterCaptureTarget.pid, ppid: afterCaptureTarget.ppid, executable: afterCaptureTarget.executable } : null;
+    if (!afterCaptureTarget || afterCaptureTarget.executable !== target.executable) throw new Error('selected WebContent PID/executable was not present after capture');
+    report.export = await exportTrace(args.xctrace, report.recording.trace_path, out, target.pid, outerDeadline);
+    report.status = 'captured_pending_review';
+  } catch (error) {
+    report.status = 'failure'; report.errors.push({ kind: 'runner', message: capText(error.message) });
+    if (capture) { report.recording.stdout = capture.output().stdout; report.recording.stderr = capture.output().stderr; report.recording.notify_output = capture.output().notify_output; try { cleanupDeadline = performance.now() + CLEANUP_MS; report.recording.exit = await stopCapture(capture, cleanupDeadline); report.cleanup.xctrace_exit_observed = (capture.child.exitCode !== null || capture.child.signalCode !== null); report.cleanup.notifyutil_exit_observed = (capture.listener.exitCode !== null || capture.listener.signalCode !== null); if (!report.cleanup.xctrace_exit_observed || !report.cleanup.notifyutil_exit_observed) report.cleanup.errors.push('owned tracing child remained alive after cleanup'); } catch (stopError) { report.cleanup.errors.push(capText(stopError.message)); } }
+  } finally {
+    cleanupDeadline = performance.now() + CLEANUP_MS;
+    const close = async (label, value) => { if (!value) return; try { await withTimeout(value.close(), Math.max(1, cleanupDeadline - performance.now()), `${label} close`); } catch (error) { report.cleanup.errors.push(`${label}: ${capText(error.message)}`); } };
+    await close('context', context); await close('browser', browser);
+    if (serverInfo?.server) { try { await withTimeout(new Promise(resolve => serverInfo.server.close(resolve)), Math.max(1, cleanupDeadline - performance.now()), 'server close'); } catch (error) { report.cleanup.errors.push(`server: ${capText(error.message)}`); } }
+    report.page.requests = serverInfo?.requests?.slice(0, 32) || [];
+    report.cleanup.elapsed_ms = performance.now() - started;
+    if (report.cleanup.errors.length || report.errors.length) report.status = 'failure';
+    await fsp.writeFile(path.join(out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+  }
+  console.log(JSON.stringify({ status: report.status, target: report.process_binding.target?.pid ?? null, timestamp_coverage: report.export?.timestamp_coverage?.status ?? 'unavailable', cleanup_errors: report.cleanup.errors.length }));
+  if (report.status === 'failure') process.exitCode = 1;
+}
+
+function finiteNumber(value) { return typeof value === 'number' && Number.isFinite(value) ? value : null; }
+
+await main();

@@ -1,0 +1,371 @@
+#!/usr/bin/env python3
+"""Unexecuted CLI-only xctrace Time Profiler comparison reducer.
+
+It attaches the Time Profiler template to one owned inert Python worker,
+waits for the natural eight-second xctrace stop, and exports only the trace
+TOC.  There is no browser, game, WebKit, source, input, audio, or product
+workload in this reducer.  A manual signal is used only after a failed
+natural-stop/cleanup deadline.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import math
+import os
+from pathlib import Path
+import re
+import signal
+import subprocess
+import sys
+import time
+
+
+XCTRACE = Path('__LOCAL_XCTRACE__')
+NOTIFYUTIL = Path('__LOCAL_NOTIFYUTIL__')
+TEMPLATE = 'Time Profiler'
+INSTRUMENT = None
+TIME_LIMIT = '8s'
+WINDOW = '8s'
+READY_SECONDS = 15.0
+NATURAL_SECONDS = 20.0
+EXPORT_SECONDS = 10.0
+CLEANUP_SECONDS = 5.0
+TOTAL_SECONDS = 60.0
+MAX_EVENT_BYTES = 64 * 1024
+MAX_EVENTS = 64
+MAX_TOC_BYTES = 2 * 1024 * 1024
+
+
+WORKER_SOURCE = r'''
+import json
+import math
+import os
+from pathlib import Path
+import signal
+import sys
+import time
+
+events = Path(sys.argv[1])
+go_file = Path(sys.argv[2])
+stop = False
+
+def now():
+    return time.time_ns(), time.monotonic_ns()
+
+def emit(kind, **fields):
+    epoch, mono = now()
+    record = {'kind': kind, 'epoch_ns': epoch, 'monotonic_ns': mono}
+    record.update(fields)
+    with events.open('a', encoding='utf-8') as stream:
+        stream.write(json.dumps(record, separators=(',', ':')) + '\n')
+        stream.flush()
+
+def stopped(_signum, _frame):
+    global stop
+    stop = True
+
+signal.signal(signal.SIGTERM, stopped)
+signal.signal(signal.SIGINT, stopped)
+emit('worker_ready', pid=os.getpid())
+wait_started = time.monotonic()
+while not go_file.exists() and not stop and time.monotonic() - wait_started < 30:
+    time.sleep(0.02)
+if stop or not go_file.exists():
+    emit('worker_stopped_before_go')
+    raise SystemExit(2)
+emit('capture_go_seen', pid=os.getpid())
+for index in range(3):
+    if stop:
+        break
+    start_epoch, start_mono = now()
+    emit('pulse_start', label='inert-pulse-%d' % index, index=index,
+         interval_start_epoch_ns=start_epoch,
+         interval_start_monotonic_ns=start_mono)
+    deadline = time.perf_counter() + 0.22
+    accumulator = 0.0
+    while time.perf_counter() < deadline:
+        for value in range(5000):
+            accumulator = math.sin(accumulator + value) + accumulator * 0.000001
+    end_epoch, end_mono = now()
+    emit('pulse_end', label='inert-pulse-%d' % index, index=index,
+         interval_end_epoch_ns=end_epoch,
+         interval_end_monotonic_ns=end_mono,
+         accumulator=accumulator)
+    if stop:
+        break
+    idle_start_epoch, idle_start_mono = now()
+    time.sleep(0.50)
+    idle_end_epoch, idle_end_mono = now()
+    emit('idle_interval', label='inert-idle-%d' % index, index=index,
+         interval_start_epoch_ns=idle_start_epoch,
+         interval_start_monotonic_ns=idle_start_mono,
+         interval_end_epoch_ns=idle_end_epoch,
+         interval_end_monotonic_ns=idle_end_mono)
+emit('worker_idle_after_pulses', pid=os.getpid())
+while not stop:
+    time.sleep(0.10)
+emit('worker_stopped', pid=os.getpid())
+'''
+
+
+def digest(path: Path) -> str:
+    hasher = hashlib.sha256()
+    with path.open('rb') as stream:
+        for block in iter(lambda: stream.read(1024 * 1024), b''):
+            hasher.update(block)
+    return hasher.hexdigest()
+
+
+def bounded_text(value: object, limit: int = 16_384) -> str:
+    text = str(value)
+    return text if len(text) <= limit else text[:limit] + '…'
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--out', required=True)
+    parser.add_argument('--xctrace', default=str(XCTRACE))
+    parser.add_argument('--notifyutil', default=str(NOTIFYUTIL))
+    return parser.parse_args()
+
+
+def monotonic_epoch() -> dict[str, int]:
+    return {'epoch_ns': time.time_ns(), 'monotonic_ns': time.monotonic_ns()}
+
+
+def process_identity(pid: int) -> dict[str, object] | None:
+    result = subprocess.run(['/bin/ps', '-p', str(pid), '-o', 'pid=,ppid=,pgid=,comm='], capture_output=True, text=True, timeout=3, check=False)
+    fields = result.stdout.strip().split(None, 3)
+    if result.returncode != 0 or len(fields) != 4:
+        return None
+    args = subprocess.run(['/bin/ps', '-p', str(pid), '-o', 'args='], capture_output=True, text=True, timeout=3, check=False).stdout.strip()
+    return {'pid': int(fields[0]), 'ppid': int(fields[1]), 'pgid': int(fields[2]), 'comm': fields[3], 'args': args}
+
+
+def write_event(path: Path, kind: str, **fields: object) -> None:
+    record = {'kind': kind, **monotonic_epoch(), **fields}
+    with path.open('a', encoding='utf-8') as stream:
+        stream.write(json.dumps(record, separators=(',', ':')) + '\n')
+
+
+def read_events(path: Path) -> list[dict[str, object]]:
+    raw = path.read_bytes()
+    if len(raw) > MAX_EVENT_BYTES:
+        raise RuntimeError(f'worker event log exceeds {MAX_EVENT_BYTES} bytes')
+    events: list[dict[str, object]] = []
+    for line in raw.splitlines():
+        if not line:
+            continue
+        if len(events) >= MAX_EVENTS:
+            raise RuntimeError(f'worker event count exceeds {MAX_EVENTS}')
+        value = json.loads(line.decode('utf-8'))
+        if not isinstance(value, dict) or not isinstance(value.get('kind'), str):
+            raise RuntimeError('malformed worker event')
+        events.append(value)
+    return events
+
+
+def terminate_bounded(process: subprocess.Popen[bytes] | None, label: str, deadline: float, manual_cleanup: list[str]) -> None:
+    if process is None or process.poll() is not None:
+        return
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        manual_cleanup.append(f'{label}:{sig.name}')
+        try:
+            process.send_signal(sig)
+        except ProcessLookupError:
+            return
+        try:
+            process.wait(timeout=max(0.1, min(2.0, deadline - time.monotonic())))
+            return
+        except subprocess.TimeoutExpired:
+            continue
+    raise RuntimeError(f'{label} remained alive after bounded cleanup')
+
+
+def export_toc(xctrace: Path, trace: Path, toc: Path, deadline: float) -> dict[str, object]:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise RuntimeError('global deadline reached before TOC export')
+    result = subprocess.run(
+        [str(xctrace), 'export', '--input', str(trace), '--toc', '--output', str(toc)],
+        capture_output=True, text=True, timeout=min(EXPORT_SECONDS, remaining), check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f'xctrace TOC export failed with code {result.returncode}: {bounded_text(result.stderr)}')
+    raw = toc.read_bytes()
+    if len(raw) > MAX_TOC_BYTES:
+        raise RuntimeError(f'xctrace TOC exceeds {MAX_TOC_BYTES} bytes')
+    text = raw.decode('utf-8', errors='strict')
+    schemas = sorted(set(re.findall(r'<table\b[^>]*\bschema="([^"]+)"', text)))
+    typed = [schema for schema in schemas if re.search(r'thread|sample|cpu|time|state', schema, re.I)]
+    if not schemas or not typed:
+        raise RuntimeError('completed Time Profiler trace TOC did not expose a typed schema')
+    return {
+        'path': str(toc),
+        'bytes': len(raw),
+        'schemas': schemas,
+        'typed_schemas': typed,
+        'coverage': 'TOC schema presence only; no PID regex or text match is treated as interval coverage',
+        'xctrace_stdout': bounded_text(result.stdout),
+        'xctrace_stderr': bounded_text(result.stderr),
+    }
+
+
+def main() -> int:
+    args = parse_args()
+    out = Path(args.out).resolve()
+    if out.exists():
+        raise RuntimeError(f'output must be absent: {out}')
+    out.mkdir(parents=True)
+    events_path = out / 'worker-events.jsonl'
+    go_path = out / 'capture-go'
+    trace_path = out / 'inert-worker-system-trace.trace'
+    toc_path = out / 'trace-toc.xml'
+    started = time.monotonic()
+    total_deadline = started + TOTAL_SECONDS
+    report: dict[str, object] = {
+        'schema': 'webkit-cli-native-capability/v2',
+        'status': 'running',
+        'scope': 'One inert Python worker only; Time Profiler template comparison. No browser, WebKit, game, source input, audio, or product workload.',
+        'identity': {
+            'runner': str(Path(__file__).resolve()),
+            'runner_sha256': digest(Path(__file__).resolve()),
+            'worker_source_sha256': hashlib.sha256(WORKER_SOURCE.encode()).hexdigest(),
+            'python': sys.executable,
+            'xctrace': str(Path(args.xctrace).resolve()),
+            'template': TEMPLATE,
+            'instrument': INSTRUMENT,
+        },
+        'bounds': {
+            'ready_seconds': READY_SECONDS,
+            'natural_record_seconds': 8,
+            'natural_completion_seconds': NATURAL_SECONDS,
+            'export_seconds': EXPORT_SECONDS,
+            'cleanup_seconds': CLEANUP_SECONDS,
+            'total_seconds': TOTAL_SECONDS,
+        },
+        'anchors': {'runner_start': monotonic_epoch()},
+        'worker': {},
+        'recording': {'trace_path': str(trace_path), 'command': None, 'notification_name': None},
+        'events': None,
+        'toc': None,
+        'cleanup': {'manual_signals': [], 'errors': []},
+        'errors': [],
+    }
+    worker: subprocess.Popen[bytes] | None = None
+    listener: subprocess.Popen[bytes] | None = None
+    recorder: subprocess.Popen[bytes] | None = None
+    try:
+        if not Path(args.xctrace).is_file() or not Path(args.notifyutil).is_file():
+            raise RuntimeError('xctrace or notifyutil is unavailable')
+        worker = subprocess.Popen(
+            [sys.executable, '-c', WORKER_SOURCE, str(events_path), str(go_path)],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            start_new_session=True,
+        )
+        worker_id = process_identity(worker.pid)
+        if worker_id is None:
+            raise RuntimeError('inert worker PID was not observable after spawn')
+        report['worker'] = {'pid': worker.pid, 'identity_before': worker_id}
+        ready_deadline = min(total_deadline, time.monotonic() + READY_SECONDS)
+        while not events_path.exists() or b'worker_ready' not in events_path.read_bytes():
+            if worker.poll() is not None:
+                raise RuntimeError(f'inert worker exited before ready: {worker.returncode}')
+            if time.monotonic() >= ready_deadline:
+                raise RuntimeError('inert worker ready deadline elapsed')
+            time.sleep(0.02)
+        report['anchors']['worker_ready'] = monotonic_epoch()
+        notification = f'com.webmelee.xctrace.cli-native.{worker.pid}.{time.time_ns()}'
+        command = [str(Path(args.xctrace).resolve()), 'record', '--template', TEMPLATE, '--attach', str(worker.pid), '--output', str(trace_path), '--time-limit', TIME_LIMIT, '--window', WINDOW, '--notify-tracing-started', notification, '--no-prompt']
+        report['recording']['command'] = command
+        report['recording']['notification_name'] = notification
+        listener = subprocess.Popen([str(Path(args.notifyutil).resolve()), '-v', '-1', notification], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        recorder = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=True)
+        report['anchors']['xctrace_spawn'] = monotonic_epoch()
+        notify_deadline = min(total_deadline, time.monotonic() + READY_SECONDS)
+        while listener.poll() is None:
+            if recorder.poll() is not None:
+                raise RuntimeError(f'xctrace exited before notification: {recorder.returncode}')
+            if time.monotonic() >= notify_deadline:
+                raise RuntimeError('xctrace Darwin notification deadline elapsed')
+            time.sleep(0.02)
+        notify_stdout, notify_stderr = listener.communicate(timeout=1)
+        report['recording']['notify_stdout'] = bounded_text(notify_stdout)
+        report['recording']['notify_stderr'] = bounded_text(notify_stderr)
+        if listener.returncode != 0:
+            raise RuntimeError(f'notifyutil did not observe one notification: {listener.returncode}')
+        report['recording']['started_signal'] = True
+        report['anchors']['notification_received'] = monotonic_epoch()
+        go_path.write_text('go\n', encoding='ascii')
+        write_event(events_path, 'runner_go_written', pid=worker.pid)
+        natural_deadline = min(total_deadline, time.monotonic() + NATURAL_SECONDS)
+        while recorder.poll() is None:
+            if time.monotonic() >= natural_deadline:
+                raise RuntimeError('xctrace natural completion deadline elapsed; manual cleanup only')
+            time.sleep(0.05)
+        stdout, stderr = recorder.communicate(timeout=2)
+        report['recording']['stdout'] = bounded_text(stdout)
+        report['recording']['stderr'] = bounded_text(stderr)
+        report['recording']['exit_code'] = recorder.returncode
+        report['anchors']['xctrace_natural_exit'] = monotonic_epoch()
+        if recorder.returncode != 0:
+            raise RuntimeError(f'xctrace natural recording exited with code {recorder.returncode}')
+        after = process_identity(worker.pid)
+        report['worker']['identity_after_capture'] = after
+        report['worker']['alive_after_capture'] = worker.poll() is None and after is not None
+        if not report['worker']['alive_after_capture']:
+            raise RuntimeError('inert worker was not alive after natural xctrace capture')
+        if not trace_path.exists() or not trace_path.is_dir():
+            raise RuntimeError('natural xctrace completion did not produce a trace directory')
+        report['toc'] = export_toc(Path(args.xctrace), trace_path, toc_path, total_deadline)
+        report['events'] = read_events(events_path)
+        pulses = [event for event in report['events'] if event.get('kind') == 'pulse_start']
+        if len(pulses) != 3:
+            raise RuntimeError(f'expected three named worker pulses, found {len(pulses)}')
+        report['status'] = 'captured_pending_native_table_review'
+    except BaseException as error:
+        report['status'] = 'failure'
+        report['errors'].append({'type': type(error).__name__, 'message': bounded_text(error)})
+    finally:
+        cleanup_deadline = min(total_deadline + CLEANUP_SECONDS, time.monotonic() + CLEANUP_SECONDS)
+        for process, label in ((recorder, 'xctrace'), (listener, 'notifyutil'), (worker, 'worker')):
+            if process is None or process.poll() is not None:
+                continue
+            try:
+                process.terminate()
+                report['cleanup']['manual_signals'].append(f'{label}:SIGTERM')
+                process.wait(timeout=max(0.1, min(2.0, cleanup_deadline - time.monotonic())))
+            except (subprocess.TimeoutExpired, ProcessLookupError):
+                try:
+                    process.kill()
+                    report['cleanup']['manual_signals'].append(f'{label}:SIGKILL')
+                    process.wait(timeout=max(0.1, min(2.0, cleanup_deadline - time.monotonic())))
+                except BaseException as error:
+                    report['cleanup']['errors'].append(f'{label}: {bounded_text(error)}')
+        if recorder is not None and recorder.poll() is not None:
+            try:
+                recorder_stdout, recorder_stderr = recorder.communicate(timeout=1)
+                report['recording']['stdout'] = bounded_text(recorder_stdout)
+                report['recording']['stderr'] = bounded_text(recorder_stderr)
+                report['recording']['exit_code'] = recorder.returncode
+            except BaseException as error:
+                report['cleanup']['errors'].append('recorder output: ' + bounded_text(error))
+        report['anchors']['runner_end'] = monotonic_epoch()
+        try:
+            if events_path.exists():
+                report['events'] = read_events(events_path)
+        except BaseException as error:
+            report['cleanup']['errors'].append(f'events: {bounded_text(error)}')
+        if report['cleanup']['errors']:
+            report['status'] = 'failure'
+        report['elapsed_seconds'] = time.monotonic() - started
+        (out / 'report.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+    print(json.dumps({'status': report['status'], 'worker_pid': report['worker'].get('pid'), 'xctrace_exit': report['recording'].get('exit_code'), 'cleanup_errors': len(report['cleanup']['errors'])}))
+    return 0 if report['status'] == 'captured_pending_native_table_review' else 1
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -1,0 +1,70 @@
+{
+  "execution_status": {
+    "cli_time_profiler_v2": "unrun",
+    "cli_time_profiler_v2_supervisor": "unrun",
+    "webkit_xctrace_attempt2_supervisor": "ran; failed; retained evidence is referenced only in the private manifest",
+    "webkit_xctrace_v3": "ran via attempt-02 supervisor; failed with retained partial RunIssues-only trace and exit 1"
+  },
+  "files": [
+    {
+      "original_basename": "webkit-xctrace-capability-v3.mjs",
+      "original_sha256": "da2c5070fbca84f8e0b157bc12241036c25371541d9a8ab7877aceef3e945d6d",
+      "path_substitution_count": 5,
+      "placeholders": [
+        "__LOCAL_NOTIFYUTIL__",
+        "__LOCAL_PLAYWRIGHT_CORE_BUNDLE__",
+        "__LOCAL_WEBKIT_PROTOCOL__",
+        "__LOCAL_WEBKIT_RUNTIME_ROOT__",
+        "__LOCAL_XCTRACE__"
+      ],
+      "template": "webkit-xctrace-capability-v3.mjs.template",
+      "template_sha256": "ecc9405c01c5315ec81b7406520004ff288685417b0b21ce85db4cdd538b7582"
+    },
+    {
+      "original_basename": "run-native-capability-attempt2.py",
+      "original_sha256": "64f99f772a601492a2f978fbfd4e3e445f3a2028167120e4928e22da15815d59",
+      "path_substitution_count": 3,
+      "placeholders": [
+        "__LOCAL_CHECKOUT__",
+        "__LOCAL_PLAYWRIGHT_ROOT__",
+        "__LOCAL_WEBKIT_RUNTIME_ROOT__"
+      ],
+      "template": "run-native-capability-attempt2.py.template",
+      "template_sha256": "3e528e97d006f5995a638976f3d27031c8db0f95b8f2fa4186436508bf395ffe"
+    },
+    {
+      "original_basename": "run-xctrace-inert-worker-v2.py",
+      "original_sha256": "3300aec873e1a27033adc23925af4c79c14af075df54cac778c4856b7dce39c3",
+      "path_substitution_count": 2,
+      "placeholders": [
+        "__LOCAL_NOTIFYUTIL__",
+        "__LOCAL_XCTRACE__"
+      ],
+      "template": "run-xctrace-inert-worker-v2.py.template",
+      "template_sha256": "82eaf68bad81048542e95110e32de01bed1afd3105729de63a3718f4b1e23b88"
+    },
+    {
+      "original_basename": "run-owned-cli-capability-v2.py",
+      "original_sha256": "42c13aa9dd86727d0714f266e8de54d11799ef92b36500c92cfdf4f4b583f051",
+      "path_substitution_count": 2,
+      "placeholders": [
+        "__LOCAL_CHECKOUT__",
+        "__LOCAL_WEBKIT_RUNTIME_ROOT__"
+      ],
+      "template": "run-owned-cli-capability-v2.py.template",
+      "template_sha256": "5a0e6215f2b16ad2548653d6426e1952c62a0251311ddce82423845f01534c33"
+    }
+  ],
+  "schema": "webmelee-mobile-diagnostics-checkpoint/native-profiler/v1",
+  "scope": "Source-only private diagnostic templates; no game data, captured output, binaries, credentials, or executable entrypoints.",
+  "source_exceptions": [
+    "The WebKit v3 source was previously exercised by the retained attempt-02 supervisor, which failed; this archive does not reinterpret that result.",
+    "The CLI Time Profiler comparison was prepared but never executed."
+  ],
+  "state": "archival_templates",
+  "template_rules": {
+    "logic": "Control flow and measurement logic were preserved; only machine-specific path literals were replaced with explicit __LOCAL_*__ placeholders.",
+    "suffix": "All archived files use .mjs.template or .py.template and are not executable entrypoints.",
+    "validation": "Python AST and JSON manifest validation performed; no capture, build, browser, or profiler execution performed."
+  }
+}

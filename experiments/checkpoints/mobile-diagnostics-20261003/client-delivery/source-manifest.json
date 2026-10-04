@@ -1,0 +1,66 @@
+{
+  "schema": "webmelee-mobile-diagnostics-checkpoint-v1",
+  "scope": "Source-only archival templates for the latest first-party client delivery harness.",
+  "source_commit": "1f3b83176e60e93e4dbd2669e6aa0a450f064407",
+  "files": [
+    {
+      "template": "client-auto-delivery-pr152-v3.mjs.template",
+      "original_basename": "client-auto-delivery-pr152-v3.mjs",
+      "original_sha256": "9502742106c4fee19be0fe99cc9ce69a8d7dbcb883e7bb8b027b1e1bbf6cd141",
+      "template_sha256": "30fc57a2df403dd01719331d2bfd190dfd2eb9e0c3ec70f9077b47dc93e05ad5",
+      "placeholder_keys": [
+        "__LOCAL_DEFAULT_OUT__",
+        "__LOCAL_ADMIN_SCRIPT__",
+        "__LOCAL_BROWSER_TOOLS__",
+        "__LOCAL_TOKEN_FILE__"
+      ],
+      "status": {
+        "overall": "failed",
+        "callback_post_201_stored": "pass",
+        "response_body_lifecycle_wait": "failed",
+        "synthetic_row_deleted": "pass"
+      }
+    },
+    {
+      "template": "run-client-delivery.py.template",
+      "original_basename": "run-client-delivery.py",
+      "original_sha256": "df2d35fab3f199d033d1944f534ac50a9f3bb90be2c389210e0a356ea5f3d587",
+      "template_sha256": "9ad3cfd8573755c67c740dd67b04765f07f3707dd1a99c9ba3ddb3113bea9aa1",
+      "placeholder_keys": [
+        "__LOCAL_CHECKOUT__",
+        "__LOCAL_PLAYWRIGHT_DIR__"
+      ],
+      "status": {
+        "overall": "failed",
+        "callback_post_201_stored": "pass",
+        "response_body_lifecycle_wait": "failed",
+        "synthetic_row_deleted": "pass"
+      }
+    }
+  ],
+  "prior_versions_superseded": [
+    "browser-pr152-client-delivery-v3 is the preserved latest first-party version; prior prepared variants remain external evidence only and are not copied.",
+    "client-auto-delivery-pr154-v2.mjs and its plan remain private external evidence; not copied because they are superseded by PR152-v3."
+  ],
+  "validation": {
+    "static_checks": [
+      "node --check after placeholder substitution",
+      "python3 -m py_compile after placeholder substitution"
+    ],
+    "browser_or_network_rerun": false,
+    "observed_attempt": {
+      "callback_post_201_stored": "pass",
+      "response_body_lifecycle_wait": "failed",
+      "synthetic_row_deleted": "pass",
+      "overall_harness": "failed"
+    },
+    "template_materialization": "Copy each .mjs.template to the .mjs filename expected by the preserved wrapper before execution; no browser or network rerun was performed."
+  },
+  "privacy": {
+    "credentials": false,
+    "reports": false,
+    "captures": false,
+    "binaries": false,
+    "absolute_personal_paths": false
+  }
+}

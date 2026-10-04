@@ -1,0 +1,84 @@
+import subprocess,os,signal,time,json,sys,threading,importlib.util,hashlib
+from pathlib import Path
+ROOT=Path('__LOCAL_CHECKOUT_ROOT__')
+OUT=Path('__LOCAL_EVIDENCE_ROOT__')
+PACKAGE=Path('__LOCAL_PACKAGE_ROOT__')
+WEBKIT_PREFIX='__LOCAL_WEBKIT_RUNTIME_ROOT__/'
+engine=sys.argv[1];assert engine == 'webkit', 'This profiler plan is WebKit-only'
+name='timeline-'+engine+'-pr153-v1'; BASE=OUT/'pauseOut/webkit-timeline-game-probe-v1';receipt_path=BASE/(name+'-receipt.json')
+assert not receipt_path.exists() and not (BASE/name).exists(),'Preserve prior output; no overwrite'
+start=time.monotonic();owned={};before={};proc=None;server=None;servethread=None;monitor=None;done=threading.Event()
+receipt={'schema':'webmelee-timeline-slot-v1','engine':engine,'started_at':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),'limit_seconds':30,'result':'pending'}
+def processes():
+    raw=subprocess.check_output(['/bin/ps','-axo','pid=,ppid=,comm='],text=True)
+    argv=subprocess.check_output(['/bin/ps','-axo','pid=,args='],text=True)
+    args={int(x[0]):x[1] for line in argv.splitlines() if len(x:=line.strip().split(None,1))==2}
+    return {int(a):{'parent':int(b),'command':c,'args':args.get(int(a))} for line in raw.splitlines() if len(z:=line.strip().split(None,2))==3 for a,b,c in [z]}
+def collect():
+    current=processes();tree={proc.pid}
+    while True:
+        more={p for p,r in current.items() if r['parent'] in tree}
+        if more.issubset(tree):break
+        tree.update(more)
+    for p,r in current.items():
+        if p in tree or (p not in before and r['command'].startswith(WEBKIT_PREFIX)):
+            owned[p]=r
+def watch():
+    while not done.wait(.25):
+        try:collect()
+        except Exception as e:receipt.setdefault('monitor_errors',[]).append(str(e))
+def alive():
+    current=processes();return {p:c for p,c in owned.items() if current.get(p,{}).get('command')==c['command'] and current.get(p,{}).get('args')==c['args']}
+try:
+    before=processes()
+    assert not any(r['command'].startswith(WEBKIT_PREFIX) for r in before.values()),'Prior WebKit child still uses owned runtime'
+    spec=importlib.util.spec_from_file_location('owned_serve',ROOT/'scripts/serve.py');mod=importlib.util.module_from_spec(spec);spec.loader.exec_module(mod)
+    server=mod.create_server(PACKAGE/'final-package',port=0);servethread=threading.Thread(target=server.serve_forever,daemon=True);servethread.start()
+    receipt['origin']=f'http://127.0.0.1:{server.server_port}'
+    cmd=['python3','scripts/agent_workspace.py','run','--',str(ROOT/'.deps/emsdk/node/24.19.0_64bit/bin/node'),str(BASE/'webkit-timeline-game-probe-v1.mjs'),'--url',receipt['origin'],'--site',str(PACKAGE/'final-package'),'--manifest',str(PACKAGE/'final-manifest.json'),'--out',str(BASE/name),'--engine',engine,'--disc','__LOCAL_DISC_IMAGE__','--playwright','__LOCAL_PLAYWRIGHT_MODULE__']
+    receipt['runner_sha256']=hashlib.sha256((BASE/'webkit-timeline-game-probe-v1.mjs').read_bytes()).hexdigest()
+    with (BASE/(name+'.log')).open('x') as log:
+        proc=subprocess.Popen(cmd,cwd=ROOT,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+        receipt['leader_pid']=proc.pid;collect();monitor=threading.Thread(target=watch,daemon=True);monitor.start()
+        receipt['exit_code']=proc.wait(timeout=max(1,30-(time.monotonic()-start)))
+    receipt['result']='completed' if receipt['exit_code']==0 else 'failed'
+except BaseException as e:
+    receipt['result']='failed';receipt['failure']=str(e)
+finally:
+    if proc:
+        collect();done.set()
+        if monitor:monitor.join(timeout=2)
+        remaining=alive();receipt['cleanup_before']=[{'pid':p,**c} for p,c in remaining.items()]
+        for p in remaining:
+            try:os.kill(p,signal.SIGTERM)
+            except ProcessLookupError:pass
+        if proc.poll() is None:
+            try:proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:proc.kill();proc.wait()
+        deadline=time.monotonic()+2
+        while alive() and time.monotonic()<deadline:time.sleep(.05)
+        for p in alive():
+            try:os.kill(p,signal.SIGKILL)
+            except ProcessLookupError:pass
+        now=processes()
+        receipt['external_new_chrome_processes']=[{'pid':p,**r} for p,r in now.items() if p not in before and p not in owned and r['command'].startswith('/Applications/Google Chrome.app/')]
+        receipt['unattributed_new_webkit_processes']=[{'pid':p,**r} for p,r in now.items() if p not in before and p not in owned and r['command'].startswith(WEBKIT_PREFIX)]
+        if receipt['unattributed_new_webkit_processes']:receipt['result']='failed'
+        receipt['owned_pids']=[{'pid':p,**c} for p,c in owned.items()]
+        receipt['cleanup_remaining']=[{'pid':p,**c} for p,c in alive().items()]
+        if receipt['cleanup_remaining'] or receipt.get('monitor_errors'):receipt['result']='failed'
+    if server:
+        server.shutdown();server.server_close();servethread.join(timeout=2)
+        receipt['server_closed']=not servethread.is_alive()
+        import socket
+        with socket.socket() as probe:
+            probe.settimeout(.2);receipt['port_connect_ex']=probe.connect_ex(('127.0.0.1',server.server_port))
+        if not receipt['port_connect_ex']:receipt['result']='failed'
+        if not receipt['server_closed']:receipt['result']='failed'
+    report_path=BASE/name/'report.json'
+    if report_path.exists():
+        receipt['report_sha256']=hashlib.sha256(report_path.read_bytes()).hexdigest()
+    receipt['finished_at']=time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime());receipt['elapsed_seconds']=time.monotonic()-start
+    receipt_path.write_text(json.dumps(receipt,indent=2)+'\n')
+    print(json.dumps(receipt))
+if receipt['result']!='completed':sys.exit(1)

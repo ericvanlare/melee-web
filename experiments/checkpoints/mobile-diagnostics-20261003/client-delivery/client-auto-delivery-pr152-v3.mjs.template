@@ -1,0 +1,459 @@
+#!/usr/bin/env node
+/**
+ * Prepared PR152 public-client delivery check v3.
+ *
+ * This external harness exercises only the deployed public callbacks. It
+ * separates request, response headers/status, response-body parsing, and
+ * request-finished/request-failed events so a body delay cannot be reported as
+ * a missing POST. It is prepared for a bounded run; this turn does not launch
+ * Chrome or send a new report.
+ */
+import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {promisify} from 'node:util';
+import {execFile as execFileCallback} from 'node:child_process';
+import {pathToFileURL} from 'node:url';
+
+const execFile = promisify(execFileCallback);
+const ORIGIN = 'https://webmelee-staging.pages.dev';
+const EXPECTED_IDENTITY = Object.freeze({
+  schema_version: 1,
+  source_commit: '07bcfdfa6f4531ac464eab44ebecb206daa1f0da',
+  runtime_hash: '9c81b55e5bc2366d',
+  build_profile: 'audio-player',
+});
+const DEFAULT_OUT = '__LOCAL_DEFAULT_OUT__';
+const ADMIN = '__LOCAL_ADMIN_SCRIPT__';
+const BROWSER_TOOLS = '__LOCAL_BROWSER_TOOLS__';
+const TOKEN_FILE = process.env.MELEE_DIAGNOSTICS_ADMIN_TOKEN_FILE ||
+  '__LOCAL_TOKEN_FILE__';
+const REPORT_ID_RE = /^[0-9a-f]{64}$/;
+const SESSION_ID_RE = /^session-[a-z0-9]{1,64}$/;
+const INCIDENT_ID_RE = /^incident-[0-9]+$/;
+const CANONICAL_INCIDENT_ID_RE = /^session-[a-z0-9]{1,64}:incident-[0-9]+$/;
+const TOTAL_DEADLINE_MS = 20000;
+const GOTO_TIMEOUT_MS = 7000;
+const IDLE_TIMEOUT_MS = 7000;
+// The product keeps its 5 s abort. The harness waits for that product window
+// plus the inactive checkpoint, rather than starting its deadline at callback.
+const DELIVERY_TIMEOUT_MS = 7500;
+const RESPONSE_META_TIMEOUT_MS = 5500;
+const RESPONSE_BODY_TIMEOUT_MS = 2000;
+const REQUEST_LIFECYCLE_TIMEOUT_MS = 3000;
+const ADMIN_TIMEOUT_MS = 5000;
+
+function fail(code) { const error = new Error(code); error.code = code; throw error; }
+function assertValue(condition, code) { if (!condition) fail(code); }
+function digest(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
+function safeError(error) {
+  return typeof error?.code === 'string' && /^[a-z0-9_]+$/.test(error.code) ? error.code : 'harness_error';
+}
+function outputPath() {
+  const index = process.argv.indexOf('--out');
+  return path.resolve(index >= 0 && process.argv[index + 1] ? process.argv[index + 1] : DEFAULT_OUT);
+}
+function raceDeadline(promise, milliseconds, code) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error(code), {code})), milliseconds);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+function normalizeFailureCategory(value) {
+  const text = String(value || '').toLowerCase();
+  if (text.includes('abort')) return 'aborted';
+  if (text.includes('timeout') || text.includes('timed out')) return 'timeout';
+  if (text.includes('cors') || text.includes('cross origin')) return 'cors';
+  if (text.includes('dns') || text.includes('name_not_resolved')) return 'dns';
+  if (text.includes('refused') || text.includes('reset') || text.includes('network')) return 'network';
+  return 'request_failed';
+}
+function consoleCategory(message) {
+  const type = String(message?.type?.() || '').toLowerCase();
+  const text = String(message?.text?.() || '').toLowerCase();
+  if (type === 'error' && /failed to fetch|network|net::|cors|refused|reset/.test(text)) {
+    return /cors/.test(text) ? 'cors' : /failed to fetch|network|net::/.test(text) ? 'network' : 'request_error';
+  }
+  if (/content security policy|\bcsp\b/.test(text)) return 'csp';
+  return null;
+}
+function canonicalIncident(sessionId, sourceIncidentId) {
+  return `${sessionId}:${sourceIncidentId}`;
+}
+function compareIdentity(value) {
+  const actual = value && typeof value === 'object' ? value : {};
+  const expectedKeys = Object.keys(EXPECTED_IDENTITY).sort();
+  const actualKeys = Object.keys(actual).sort();
+  return actualKeys.length === expectedKeys.length && actualKeys.every((key, index) => key === expectedKeys[index]) &&
+    expectedKeys.every(key => actual[key] === EXPECTED_IDENTITY[key]);
+}
+async function readIdentity(page) {
+  const value = await page.evaluate(() => {
+    const meta = document.getElementById('runtime-diagnostic-identity');
+    let identity = null;
+    try { identity = JSON.parse(meta?.content || 'null'); } catch {}
+    return {
+      identity,
+      secure: globalThis.isSecureContext === true,
+      cross_origin_isolated: globalThis.crossOriginIsolated === true,
+      webgpu: !!navigator.gpu,
+      request_adapter: typeof navigator.gpu?.requestAdapter === 'function',
+      idle_hint_hidden: document.getElementById('idle-hint')?.hidden ?? true,
+      selected_disc_count: document.getElementById('disc-file')?.files?.length ?? -1,
+      diagnostic_incident: typeof globalThis.menuDiagnosticIncident === 'function',
+      menu_frame: typeof globalThis.menuFrame === 'function',
+    };
+  });
+  assertValue(compareIdentity(value.identity), 'identity_mismatch');
+  assertValue(value.secure && value.cross_origin_isolated && value.webgpu && value.request_adapter,
+    'required_browser_capability_missing');
+  return value;
+}
+async function captureDeliveryState(page, state) {
+  if (!page) return {available: false, reason: 'page_unavailable'};
+  try {
+    return await raceDeadline(page.evaluate(async () => {
+      let preference = 'missing';
+      try {
+        const value = localStorage.getItem('melee-web-automatic-diagnostics-v1');
+        preference = value === 'off' ? 'off' : value === 'on' ? 'on' : 'missing';
+      } catch { preference = 'unreadable'; }
+      let indexeddbDeliveryDb = null;
+      try {
+        const databases = await indexedDB.databases();
+        indexeddbDeliveryDb = databases.some(value => value?.name === 'melee-web-diagnostics-delivery');
+      } catch { indexeddbDeliveryDb = null; }
+      const hint = document.getElementById('idle-hint');
+      return {
+        available: true,
+        automatic_preference: preference,
+        indexeddb_delivery_db: indexeddbDeliveryDb,
+        idle_hint_hidden: hint?.hidden ?? null,
+        incident_callback_present: typeof globalThis.menuDiagnosticIncident === 'function',
+        frame_callback_present: typeof globalThis.menuFrame === 'function',
+      };
+    }), 1200, 'delivery_state_timeout');
+  } catch (error) {
+    return {available: false, reason: safeError(error)};
+  }
+}
+async function runAdmin(args) {
+  let token;
+  try { token = (await fs.readFile(TOKEN_FILE, 'utf8')).trim(); } catch { fail('admin_token_unreadable'); }
+  assertValue(token.length >= 16 && token.length <= 512, 'admin_token_invalid');
+  try {
+    const result = await execFile('python3', [ADMIN, '--url', ORIGIN, ...args], {
+      env: {...process.env, MELEE_DIAGNOSTICS_ADMIN_TOKEN: token},
+      timeout: ADMIN_TIMEOUT_MS, maxBuffer: 2 * 1024 * 1024,
+    });
+    try { return JSON.parse(result.stdout); } catch { fail('admin_invalid_json'); }
+  } catch (error) {
+    if (error?.code === 'admin_invalid_json') throw error;
+    fail('admin_request_failed');
+  }
+}
+async function closeBounded(value, label, cleanup) {
+  if (!value) { cleanup[label] = true; return; }
+  try {
+    await raceDeadline(Promise.resolve(value.close()), 1500, `cleanup_${label}_timeout`);
+    cleanup[label] = true;
+  } catch {
+    cleanup[label] = false;
+    cleanup.ok = false;
+  }
+}
+async function runBrowser(state, deadlineAt) {
+  const {browserLaunchOptions, loadBrowserTools} = await import(pathToFileURL(BROWSER_TOOLS).href);
+  let browser, context, page;
+  const requestTasks = [];
+  const posts = [];
+  const apiOrigins = new Set();
+  const pageErrors = [];
+  const cspViolations = [];
+  const networkCategories = new Set();
+  let requestResolve;
+  let responseResolve;
+  let responseBodyResolve;
+  let lifecycleResolve;
+  const requestSeen = new Promise(resolve => { requestResolve = resolve; });
+  const responseMeta = new Promise(resolve => { responseResolve = resolve; });
+  const responseBody = new Promise(resolve => { responseBodyResolve = resolve; });
+  const requestLifecycle = new Promise(resolve => { lifecycleResolve = resolve; });
+  const closeDeadline = setTimeout(() => { void browser?.close().catch(() => {}); }, Math.max(1, deadlineAt - Date.now()));
+  try {
+    const loaded = await raceDeadline(loadBrowserTools(process.env.MELEE_PLAYWRIGHT_DIR), 4000, 'browser_tools_timeout');
+    browser = await raceDeadline(loaded.chromium.launch(browserLaunchOptions(loaded.browser, {
+      headed: false, audible: false, timeout: 4000,
+    })), 5000, 'browser_launch_timeout');
+    state.browser_version = browser.version();
+    context = await browser.newContext({viewport: {width: 640, height: 480}});
+    page = await context.newPage();
+    page.on('pageerror', error => { pageErrors.push(error?.name === 'Error' ? 'Error' : 'page_error'); });
+    page.on('console', message => {
+      const category = consoleCategory(message);
+      if (!category) return;
+      if (category === 'csp') cspViolations.push(category);
+      else networkCategories.add(category);
+    });
+    let targetRequest = null;
+    page.on('request', request => {
+      let url;
+      try { url = new URL(request.url()); } catch { return; }
+      if (url.pathname !== '/api/diagnostics') return;
+      apiOrigins.add(url.origin);
+      if (request.method() !== 'POST') return;
+      targetRequest = request;
+      state.request_seen = true;
+      state.request_at_ms = Date.now();
+      requestResolve(true);
+      const task = (async () => {
+        try {
+          const headers = await request.allHeaders();
+          let body = null;
+          try { body = JSON.parse(request.postData() || 'null'); } catch { fail('post_body_invalid_json'); }
+          assertValue(body && typeof body === 'object' && !Array.isArray(body), 'post_body_missing');
+          if (SESSION_ID_RE.test(body.session_id || '')) state.generated_session_id = body.session_id;
+          if (INCIDENT_ID_RE.test(body.incident_id || '') || CANONICAL_INCIDENT_ID_RE.test(body.incident_id || ''))
+            state.wire_incident_id = body.incident_id;
+          posts.push({
+            session_id: body.session_id,
+            incident_id: body.incident_id,
+            reason: body.incident?.reason,
+            value: body.incident?.value,
+            threshold: body.incident?.threshold,
+            environment: body.environment?.env,
+            origin: body.environment?.origin,
+            source_commit: body.identity?.source_commit,
+            runtime_hash: body.identity?.runtime_hash,
+            build_profile: body.identity?.build_profile,
+            headers: {
+              content_type: headers['content-type'] || null,
+              origin: headers.origin || null,
+              cookie: Object.hasOwn(headers, 'cookie'),
+              authorization: Object.hasOwn(headers, 'authorization'),
+              referer: Object.hasOwn(headers, 'referer'),
+            },
+          });
+        } catch (error) {
+          state.request_capture_failure = safeError(error);
+        }
+      })();
+      requestTasks.push(task);
+    });
+    page.on('response', response => {
+      const request = response.request();
+      if (request !== targetRequest) return;
+      let url;
+      try { url = new URL(response.url()); } catch { return; }
+      if (url.origin !== ORIGIN || url.pathname !== '/api/diagnostics' || request.method() !== 'POST') return;
+      state.response_seen = true;
+      state.response_at_ms = Date.now();
+      const status = response.status();
+      state.response_status = status;
+      responseResolve({status, content_type: response.headers()['content-type'] || null});
+      void (async () => {
+        try {
+          const text = await raceDeadline(response.text(), RESPONSE_BODY_TIMEOUT_MS, 'post_response_body_timeout');
+          let body;
+          try { body = JSON.parse(text); } catch { fail('post_response_invalid_json'); }
+          const reportId = typeof body?.report_id === 'string' && REPORT_ID_RE.test(body.report_id) ? body.report_id : null;
+          if (reportId) state.report_id = reportId;
+          state.response_body = {accepted: body?.accepted === true, duplicate: body?.duplicate === true, report_id: reportId};
+          responseBodyResolve(state.response_body);
+        } catch (error) {
+          state.response_body_failure = safeError(error);
+          responseBodyResolve({failure: state.response_body_failure});
+        }
+      })();
+    });
+    page.on('requestfinished', request => {
+      if (request !== targetRequest) return;
+      state.request_lifecycle = 'finished';
+      state.request_lifecycle_at_ms = Date.now();
+      lifecycleResolve({state: 'finished'});
+    });
+    page.on('requestfailed', request => {
+      if (request !== targetRequest) return;
+      const category = normalizeFailureCategory(request.failure()?.errorText);
+      state.request_lifecycle = 'failed';
+      state.request_lifecycle_at_ms = Date.now();
+      state.request_failure_category = category;
+      networkCategories.add(category);
+      lifecycleResolve({state: 'failed', category});
+    });
+    const loadedResponse = await page.goto(ORIGIN + '/', {waitUntil: 'domcontentloaded', timeout: GOTO_TIMEOUT_MS});
+    assertValue(loadedResponse?.status() === 200, 'public_index_http_status');
+    await raceDeadline(page.waitForFunction(() => {
+      const hint = document.getElementById('idle-hint');
+      return hint?.hidden === false && typeof globalThis.menuDiagnosticIncident === 'function' &&
+        typeof globalThis.menuFrame === 'function';
+    }, null, {timeout: IDLE_TIMEOUT_MS, polling: 50}), IDLE_TIMEOUT_MS + 250, 'runtime_idle_timeout');
+    state.page = await readIdentity(page);
+    assertValue(state.page.idle_hint_hidden === false && state.page.selected_disc_count === 0,
+      'no_disc_idle_contract_failed');
+    state.trigger_at_ms = Date.now();
+    const callbackResult = await page.evaluate(() => {
+      const incident_id = globalThis.menuDiagnosticIncident(1, 13, 8, -1, 1, 1);
+      if (!incident_id) throw Error('incident_callback_rejected');
+      globalThis.menuFrame(false);
+      return {incident_id};
+    });
+    assertValue(INCIDENT_ID_RE.test(callbackResult.incident_id), 'incident_id_invalid');
+    state.generated_incident_id = callbackResult.incident_id;
+    await raceDeadline(requestSeen, DELIVERY_TIMEOUT_MS, 'diagnostics_post_not_observed');
+    await Promise.all(requestTasks);
+    const response = await raceDeadline(responseMeta, RESPONSE_META_TIMEOUT_MS, 'diagnostics_response_not_observed');
+    const body = await raceDeadline(responseBody, RESPONSE_BODY_TIMEOUT_MS + 250, 'diagnostics_response_body_not_observed');
+    const lifecycle = await raceDeadline(requestLifecycle, REQUEST_LIFECYCLE_TIMEOUT_MS, 'diagnostics_request_lifecycle_timeout');
+    state.timing = {response_status_observed: true, request_lifecycle: lifecycle.state};
+    assertValue(apiOrigins.size === 1 && apiOrigins.has(ORIGIN), 'diagnostics_origin_mismatch');
+    assertValue(posts.length === 1, 'diagnostics_post_count');
+    const post = posts[0];
+    assertValue(SESSION_ID_RE.test(post.session_id), 'session_id_invalid');
+    const expectedWireIncident = canonicalIncident(post.session_id, callbackResult.incident_id);
+    assertValue(post.incident_id === expectedWireIncident, 'wire_incident_id_mismatch');
+    assertValue(post.reason === 'simulation_debt' && post.value === 13 && post.threshold === 8 &&
+      post.environment === 'staging' && post.origin === ORIGIN, 'wire_report_semantics_mismatch');
+    assertValue(post.source_commit === EXPECTED_IDENTITY.source_commit && post.runtime_hash === EXPECTED_IDENTITY.runtime_hash &&
+      post.build_profile === EXPECTED_IDENTITY.build_profile, 'wire_identity_mismatch');
+    assertValue(post.headers.content_type === 'application/json' && post.headers.origin === ORIGIN &&
+      !post.headers.cookie && !post.headers.authorization && !post.headers.referer, 'wire_privacy_headers');
+    assertValue(response.status === 201, 'diagnostics_post_status');
+    assertValue(body.accepted && !body.duplicate && REPORT_ID_RE.test(body.report_id || ''), 'diagnostics_post_not_accepted');
+    assertValue(lifecycle.state === 'finished', 'diagnostics_request_failed');
+    state.generated_session_id = post.session_id;
+    state.wire_incident_id = post.incident_id;
+    state.post_status = response.status;
+    state.post = {count: posts.length, headers: post.headers, wire_incident_id: post.incident_id};
+    state.response = {status: response.status, content_type: response.content_type, body};
+    state.lifecycle = lifecycle;
+  } finally {
+    state.delivery_local = await captureDeliveryState(page, state);
+    const cleanup = {ok: true, page: false, context: false, browser: false};
+    await closeBounded(page, 'page', cleanup);
+    await closeBounded(context, 'context', cleanup);
+    await closeBounded(browser, 'browser', cleanup);
+    clearTimeout(closeDeadline);
+    state.cleanup = cleanup;
+    state.page_errors = pageErrors.length;
+    state.csp_violations = cspViolations.length;
+    state.network_categories = [...networkCategories].sort();
+    if (!cleanup.ok) fail('browser_cleanup_failed');
+    if (pageErrors.length) fail('public_page_error');
+    if (cspViolations.length) fail('public_csp_violation');
+  }
+}
+async function cleanupSynthetic(state) {
+  const result = {attempted: false, mode: null, candidate_count: 0, deleted: false};
+  if (state.report_id) {
+    result.attempted = true; result.mode = 'response_report_id';
+    try {
+      const envelope = await runAdmin(['get', state.report_id]);
+      const report = envelope?.report;
+      const expectedIncident = state.generated_session_id && state.generated_incident_id ?
+        canonicalIncident(state.generated_session_id, state.generated_incident_id) : null;
+      const exact = envelope?.report_id === state.report_id && report?.session_id === state.generated_session_id &&
+        (report?.incident_id === expectedIncident || report?.incident_id === state.generated_incident_id) &&
+        report?.environment?.env === 'staging' && report?.environment?.origin === ORIGIN &&
+        report?.identity?.source_commit === EXPECTED_IDENTITY.source_commit && report?.identity?.runtime_hash === EXPECTED_IDENTITY.runtime_hash;
+      if (!exact) return {...result, reason: 'identity_mismatch_preserved'};
+      const deletion = await runAdmin(['delete', state.report_id]);
+      return {...result, deleted: deletion?.deleted === true};
+    } catch { return {...result, reason: 'admin_cleanup_failed'}; }
+  }
+  if (!state.generated_session_id || !state.generated_incident_id) return {...result, reason: 'synthetic_identity_unavailable'};
+  result.attempted = true; result.mode = 'bounded_query_fallback';
+  try {
+    const query = await runAdmin(['query', '--environment', 'staging', '--source-commit', EXPECTED_IDENTITY.source_commit,
+      '--runtime-hash', EXPECTED_IDENTITY.runtime_hash, '--limit', '100']);
+    const expectedIncident = canonicalIncident(state.generated_session_id, state.generated_incident_id);
+    const candidates = (query?.reports || []).filter(item => {
+      const report = item?.report;
+      return report?.session_id === state.generated_session_id &&
+        (report?.incident_id === expectedIncident || report?.incident_id === state.generated_incident_id) &&
+        report?.environment?.env === 'staging' && report?.environment?.origin === ORIGIN &&
+        report?.identity?.source_commit === EXPECTED_IDENTITY.source_commit && report?.identity?.runtime_hash === EXPECTED_IDENTITY.runtime_hash &&
+        report?.incident?.reason === 'simulation_debt' && report?.incident?.value === 13 && report?.incident?.threshold === 8;
+    });
+    result.candidate_count = candidates.length;
+    if (candidates.length !== 1 || !REPORT_ID_RE.test(candidates[0]?.report_id || ''))
+      return {...result, reason: candidates.length === 0 ? 'no_exact_candidate_preserved' : 'non_unique_candidates_preserved'};
+    const reportId = candidates[0].report_id;
+    const envelope = await runAdmin(['get', reportId]);
+    const report = envelope?.report;
+    assertValue(envelope?.report_id === reportId && report?.session_id === state.generated_session_id &&
+      (report?.incident_id === expectedIncident || report?.incident_id === state.generated_incident_id), 'fallback_identity_mismatch');
+    const deletion = await runAdmin(['delete', reportId]);
+    return {...result, report_id: reportId, deleted: deletion?.deleted === true};
+  } catch { return {...result, reason: 'admin_cleanup_failed'}; }
+}
+
+const startedAt = new Date().toISOString();
+const out = outputPath();
+const receipt = {
+  schema: 'webmelee-public-client-delivery-check-v3',
+  scope: 'One synthetic simulation-debt incident through the deployed PR152 staging public package. No disc, user data, production request, native gameplay or natural-cause claim.',
+  result: 'fail', started_at: startedAt, finished_at: null, origin: ORIGIN, identity: EXPECTED_IDENTITY,
+  bounds: {total_ms: TOTAL_DEADLINE_MS, goto_ms: GOTO_TIMEOUT_MS, idle_ms: IDLE_TIMEOUT_MS,
+    delivery_ms: DELIVERY_TIMEOUT_MS, response_meta_ms: RESPONSE_META_TIMEOUT_MS,
+    response_body_ms: RESPONSE_BODY_TIMEOUT_MS, request_lifecycle_ms: REQUEST_LIFECYCLE_TIMEOUT_MS, admin_ms: ADMIN_TIMEOUT_MS},
+  browser_mode: 'headless', audio_output: 'muted_by_shared_browser_policy', checks: [],
+  changed_hypothesis: 'v1 observed a POST request and the backend accepted it, but v1 waited for response.json() before recording status and timed out at five seconds. v2 records headers/status immediately, separately bounds body parsing, captures requestfinished/requestfailed and network categories, and accepts the runtime canonical session:incident-N wire ID.',
+};
+const state = {};
+const deadlineAt = Date.now() + TOTAL_DEADLINE_MS;
+try {
+  await runBrowser(state, deadlineAt);
+  receipt.browser = {version: state.browser_version, mode: 'headless'};
+  receipt.capabilities = {secure: state.page.secure, cross_origin_isolated: state.page.cross_origin_isolated,
+    webgpu: state.page.webgpu, request_adapter: state.page.request_adapter};
+  receipt.network = {api_origin_count: 1, post_count: state.post.count, post_status: state.post_status,
+    wire_incident_id: state.post.wire_incident_id, headers: state.post.headers,
+    response: state.response, lifecycle: state.lifecycle};
+  receipt.generated = {session_id: state.generated_session_id, source_incident_id: state.generated_incident_id,
+    wire_incident_id: state.wire_incident_id, report_id: state.response.body.report_id};
+  receipt.checks.push('current stable package identity and no-disc idle state');
+  receipt.checks.push('real public menuDiagnosticIncident -> menuFrame(false) callback path');
+  receipt.checks.push('one same-origin inactive JSON POST with no browser credential headers');
+  receipt.checks.push('response status captured before body parsing plus request lifecycle event');
+  receipt.checks.push('wire incident ID matches runtime session:incident-N mapping');
+  const envelope = await runAdmin(['get', state.response.body.report_id]);
+  const report = envelope?.report;
+  assertValue(envelope?.report_id === state.response.body.report_id && report?.session_id === state.generated_session_id &&
+    (report?.incident_id === state.wire_incident_id || report?.incident_id === state.generated_incident_id), 'admin_identity_mismatch');
+  assertValue(report?.environment?.env === 'staging' && report?.environment?.origin === ORIGIN &&
+    report?.identity?.source_commit === EXPECTED_IDENTITY.source_commit && report?.identity?.runtime_hash === EXPECTED_IDENTITY.runtime_hash, 'admin_current_identity_mismatch');
+  assertValue(report?.incident?.reason === 'simulation_debt' && report?.incident?.value === 13 && report?.incident?.threshold === 8, 'admin_reason_mismatch');
+  receipt.admin = {retrieved: true, identity_match: true};
+  const deletion = await runAdmin(['delete', state.response.body.report_id]);
+  assertValue(deletion?.deleted === true, 'admin_delete_failed');
+  receipt.admin.deleted = true;
+  receipt.result = 'pass';
+} catch (error) {
+  receipt.failure = safeError(error);
+  receipt.cleanup_synthetic = await cleanupSynthetic(state);
+  if (state.browser_version) receipt.browser = {version: state.browser_version, mode: 'headless'};
+  if (state.page) receipt.capabilities = {secure: state.page.secure, cross_origin_isolated: state.page.cross_origin_isolated,
+    webgpu: state.page.webgpu, request_adapter: state.page.request_adapter};
+}
+if (state.generated_session_id || state.generated_incident_id || state.report_id || state.wire_incident_id) {
+  receipt.generated = {session_id: state.generated_session_id || null, source_incident_id: state.generated_incident_id || null,
+    wire_incident_id: state.wire_incident_id || null, report_id: state.report_id || null};
+}
+if (state.cleanup) receipt.cleanup = state.cleanup;
+if (state.delivery_local) receipt.delivery_local = state.delivery_local;
+if (state.page_errors !== undefined || state.csp_violations !== undefined)
+  receipt.page_observations = {page_errors: state.page_errors || 0, csp_violations: state.csp_violations || 0,
+    network_categories: state.network_categories || [], request_seen: state.request_seen === true,
+    response_seen: state.response_seen === true, response_status: state.response_status || null,
+    request_lifecycle: state.request_lifecycle || 'unknown', request_failure_category: state.request_failure_category || null,
+    response_body_failure: state.response_body_failure || null, request_capture_failure: state.request_capture_failure || null};
+receipt.observation_times_ms = {trigger: state.trigger_at_ms ?? null, request: state.request_at_ms ?? null, response: state.response_at_ms ?? null, request_lifecycle: state.request_lifecycle_at_ms ?? null};
+receipt.finished_at = new Date().toISOString();
+await fs.mkdir(path.dirname(out), {recursive: true});
+await fs.mkdir(out, {recursive: false});
+const encoded = JSON.stringify(receipt, null, 2) + '\n';
+await fs.writeFile(path.join(out, 'receipt.json'), encoded, {flag: 'wx', mode: 0o600});
+console.log(JSON.stringify({result: receipt.result, failure: receipt.failure || null, receipt: path.join(out, 'receipt.json'), receipt_sha256: digest(encoded)}));
+if (receipt.result !== 'pass') process.exitCode = 1;

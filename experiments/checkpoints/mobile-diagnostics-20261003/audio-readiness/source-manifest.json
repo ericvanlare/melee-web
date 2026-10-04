@@ -1,0 +1,38 @@
+{
+  "schema": "webmelee-source-checkpoint-v1",
+  "scope": "Archival first-party source templates; no runtime logic change. Machine-specific path literals only were replaced. Not executable or newly validated capture tooling.",
+  "files": [
+    {
+      "original_basename": "capture.mjs",
+      "original_sha256": "be4b2758ddacfb23a896e642ca0e5e890830f41f308127e66d2157dbeac927f9",
+      "template": "capture.mjs.template",
+      "template_sha256": "7e5cdafd2c82ffe69497d3b52e6da7c082c1e3ad6c1fa52db02022a8c1e17ea9",
+      "placeholders": [
+        "__LOCAL_WEBKIT_RUNTIME__"
+      ]
+    },
+    {
+      "original_basename": "run-owned-webkit-audio.py",
+      "original_sha256": "00af547b8c7d2ac35f49b44f980a453db37dc54e600b15bfdbe0cd21af93302d",
+      "template": "run-owned-webkit-audio.py.template",
+      "template_sha256": "c4dd71461ba0a1bcbcae1b918b2a91b6fe3d7035d44126f1f35021f90b1e5d7b",
+      "placeholders": [
+        "__LOCAL_CHECKOUT__",
+        "__LOCAL_WEBKIT_RUNTIME__",
+        "__LOCAL_PLAYWRIGHT__"
+      ]
+    }
+  ],
+  "historical_validation": "Original pinned desktop WebKit graph-only candidate check passed output-clock readiness/progress and cleanup. No native game or PCM was run; no phone or gameplay acceptance.",
+  "checkpoint_validation": [
+    "Python AST parsed",
+    "JavaScript syntax checked separately",
+    "Public literals reviewed for game data, credentials and personal paths"
+  ],
+  "materialization": "Copy .template files to their original basenames in a new private directory, substitute placeholders from the private manifest and bind candidate-source files to the reviewed hashes. Do not overwrite retained attempts. Run only after human resumes diagnostic work.",
+  "limitations": [
+    "Historical candidate was based on source07bcfdf with audio module later published in PR157.",
+    "Supervisor schema/docstring inherited native-capability naming; actual scope is Web Audio graph only.",
+    "Public templates are archival; only original local source bytes have execution evidence."
+  ]
+}

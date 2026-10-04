@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Private diagnostic: align Inspector seconds with bracketed page clocks."""
+import collections
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+p = Path(sys.argv[1])
+d = json.loads(p.read_text())
+anchors = d['protocol']['clock_anchors']
+a, b = anchors['start'], anchors['stop']
+mid = lambda x: (x['page_before_ms'] + x['page_after_ms']) / 2
+scale = (mid(b) - mid(a)) / (b['protocol_seconds'] - a['protocol_seconds'])
+offset = mid(a) - a['protocol_seconds'] * scale
+page_ms = lambda t: None if t is None else offset + t * scale
+flat = []
+def flatten(rows, depth=0):
+    for r in rows:
+        flat.append({
+            'type': r.get('type'), 'start_ms': page_ms(r.get('start_time')),
+            'end_ms': page_ms(r.get('end_time')), 'data': r.get('data'),
+            'depth': depth,
+        })
+        flatten(r.get('children', []), depth + 1)
+flatten(d['protocol']['timeline'])
+scalar = d['scalar_probe']
+native = scalar['native']['rows']
+css = next((r['timestamp'] for r in native if r['phase'] == 1 and r['running'] == 1), None)
+boundary = scalar['boundary']['rows']
+gaps = []
+last_frame = None
+for r in boundary:
+    if r['kind'] == 'frame_exit':
+        last_frame = r
+    if r['kind'] == 'service_entry' and last_frame and css is not None and last_frame['timestamp'] >= css:
+        delta = r['timestamp'] - last_frame['timestamp']
+        if delta > 100:
+            gaps.append({'start_ms': last_frame['timestamp'], 'end_ms': r['timestamp'], 'duration_ms': delta})
+        last_frame = None
+def overlap(r, gap):
+    start, end = r.get('start_ms'), r.get('end_ms')
+    if start is None:
+        return False
+    if end is None:
+        end = start
+    return end >= gap['start_ms'] and start <= gap['end_ms']
+scripts, samples = [], []
+for r in d['protocol']['script']:
+    if r.get('kind') == 'trackingUpdate':
+        scripts.append({'type': r.get('type'), 'start_ms': page_ms(r.get('start_time')), 'end_ms': page_ms(r.get('end_time'))})
+    for sample in r.get('samples', []):
+        samples.append({'at_ms': page_ms(sample.get('timestamp')), 'frames': sample.get('frames', [])})
+for gap in gaps:
+    matched = [r for r in flat if overlap(r, gap)]
+    gap['timeline_overlap'] = matched
+    gap['script_overlap'] = [r for r in scripts if overlap(r, gap)]
+    gap['samples'] = [r for r in samples if r['at_ms'] is not None and gap['start_ms'] <= r['at_ms'] <= gap['end_ms']]
+    gap['sample_top_frames'] = collections.Counter((r['frames'][0].get('name') or '<unnamed>') for r in gap['samples'] if r['frames'])
+    gap['gpu_events'] = [r for r in scalar['gpu']['rows'] if gap['start_ms'] - 20 <= r['timestamp'] <= gap['end_ms'] + 20]
+    gap['boundary_neighbors'] = [r for r in boundary if gap['start_ms'] - 25 <= r['timestamp'] <= gap['end_ms'] + 25]
+    gap['heartbeat_neighbors'] = [t for t in scalar['clocks']['heartbeat']['timestamps'] if gap['start_ms'] - 25 <= t <= gap['end_ms'] + 25]
+    gap['raf_neighbors'] = [t for t in scalar['clocks']['raf']['timestamps'] if gap['start_ms'] - 25 <= t <= gap['end_ms'] + 25]
+result = {
+    'schema': 'webmelee-private-inspector-gap-analysis-v1',
+    'report_path': str(p), 'report_sha256': hashlib.sha256(p.read_bytes()).hexdigest(),
+    'status': d['status'], 'result': d['result'],
+    'alignment': {'scale_ms_per_protocol_second': scale, 'offset_ms': offset, 'anchors': anchors},
+    'first_native_running_css_ms': css,
+    'observation': d['page']['observation'],
+    'timeline_types': collections.Counter(r['type'] for r in flat),
+    'script_types': collections.Counter(r['type'] for r in scripts),
+    'sample_count': len(samples), 'gaps_over_100ms': gaps,
+    'limitations': [
+        'Private profiler-instrumented desktop WebKit, historical exact PR153 bytes; no iPhone or current staging acceptance.',
+        'Page and Inspector clocks are mapped using measured bracket midpoints; uncertainty remains within anchor brackets.',
+        'Overlapping event intervals and sampled stacks show recorded work, not exclusive CPU time or automatic causation.',
+        'An uncovered gap does not prove an OS, JIT, GPU, GC, or scheduler cause.',
+        'GPU promise resolution times measure notification arrival, not GPU execution duration.',
+    ],
+}
+out = p.parent / 'timeline-gap-analysis.json'
+assert not out.exists(), 'Preserve prior analysis'
+out.write_text(json.dumps(result, indent=2) + '\n')
+print(json.dumps({'path': str(out), 'sha256': hashlib.sha256(out.read_bytes()).hexdigest(), 'status': result['status'], 'result': result['result'], 'first_css_ms': css, 'scale': scale, 'gaps': [{k: g[k] for k in ('start_ms', 'end_ms', 'duration_ms', 'sample_top_frames')} for g in gaps], 'timeline_types': result['timeline_types'], 'sample_count': len(samples)}, indent=2))

@@ -1,0 +1,383 @@
+// Private, unexecuted diagnostic helper for the exact PR153 package.
+// It writes only fixed-capacity scalar rings while the game is active. Objects
+// are created only when the runner asks for a stopped snapshot.
+
+export const PROBE_CAPS = Object.freeze({
+  native: 2048,
+  gpu: 8192,
+  boundary: 16384,
+  heartbeat: 4096,
+  raf: 2048,
+});
+
+export const PROBE_INIT = () => {
+  const NC = 2048;
+  const GC = 8192;
+  const BC = 16384;
+  const HC = 4096;
+  const RC = 2048;
+  const state = {
+    active: false,
+    armed: false,
+    stopped: false,
+    nativeCount: 0,
+    nativeDropped: 0,
+    gpuCount: 0,
+    gpuDropped: 0,
+    boundaryCount: 0,
+    boundaryDropped: 0,
+    wrapperErrors: 0,
+    armedAt: NaN,
+    stoppedAt: NaN,
+    hasRunningProgress: false,
+    runningSampleCount: 0,
+    sourceStepTotal: 0,
+    sourceDrawTotal: 0,
+    nativeTimestamp: new Float64Array(NC),
+    nativePhase: new Float64Array(NC),
+    nativeRunning: new Float64Array(NC),
+    nativeQueued: new Float64Array(NC),
+    nativeCreated: new Float64Array(NC),
+    nativeSteps: new Float64Array(NC),
+    nativeDraws: new Float64Array(NC),
+    gpuKind: new Uint8Array(GC),
+    gpuTimestamp: new Float64Array(GC),
+    gpuPending: new Uint32Array(GC),
+    gpuQueue: new Uint32Array(GC),
+    gpuSerial: new Float64Array(GC),
+    gpuStatus: new Int8Array(GC),
+    completionRejected: 0,
+    boundaryKind: new Uint8Array(BC),
+    boundaryTimestamp: new Float64Array(BC),
+    boundaryStarted: new Float64Array(BC),
+    boundaryTotal: new Float64Array(BC),
+    boundarySteps: new Float64Array(BC),
+    boundaryDraws: new Float64Array(BC),
+    boundaryArgument: new Float64Array(BC),
+    callbackCalls: new Uint32Array(8),
+    heartbeats: new Float64Array(HC),
+    rafs: new Float64Array(RC),
+    heartbeatCount: 0,
+    heartbeatDropped: 0,
+    rafCount: 0,
+    rafDropped: 0,
+    interval: null,
+    rafHandle: null,
+    queueNextId: 0,
+    queues: new WeakMap(),
+    queueStates: [],
+    restores: [],
+    nativeWrapped: false,
+    submitHooked: false,
+    completionHooked: false,
+  };
+
+  const number = value => Number.isFinite(Number(value)) ? Number(value) : NaN;
+  const pendingTotal = () => state.queueStates.reduce((sum, queue) => sum + Math.max(0, queue.submitted - queue.completed), 0);
+  const heartbeat = () => {
+    if (!state.active) return;
+    if (state.heartbeatCount < HC) state.heartbeats[state.heartbeatCount++] = performance.now();
+    else state.heartbeatDropped += 1;
+  };
+  const raf = () => {
+    if (!state.active) return;
+    if (state.rafCount < RC) state.rafs[state.rafCount++] = performance.now();
+    else state.rafDropped += 1;
+    state.rafHandle = requestAnimationFrame(raf);
+  };
+  const startClocks = () => {
+    heartbeat();
+    state.interval = setInterval(heartbeat, 10);
+    state.rafHandle = requestAnimationFrame(raf);
+  };
+  const putNative = args => {
+    if (!state.active) return;
+    if (state.nativeCount >= NC) {
+      state.nativeDropped += 1;
+      return;
+    }
+    const index = state.nativeCount++;
+    const sourceSteps = number(args[16]);
+    const sourceDraws = number(args[17]);
+    state.nativeTimestamp[index] = number(args[0]);
+    state.nativePhase[index] = number(args[2]);
+    state.nativeRunning[index] = number(args[18]);
+    state.nativeQueued[index] = number(args[13]);
+    state.nativeCreated[index] = number(args[14]);
+    state.nativeSteps[index] = sourceSteps;
+    state.nativeDraws[index] = sourceDraws;
+    if (state.nativeRunning[index] === 1) {
+      state.runningSampleCount += 1;
+      if (Number.isFinite(sourceSteps)) state.sourceStepTotal += sourceSteps;
+      if (Number.isFinite(sourceDraws)) state.sourceDrawTotal += sourceDraws;
+      if (sourceSteps > 0 && sourceDraws > 0) state.hasRunningProgress = true;
+    }
+  };
+  const putGpu = (kind, timestamp, pending, queueId = 0, serial = 0, status = -1) => {
+    if (!state.active) return;
+    if (state.gpuCount >= GC) {
+      state.gpuDropped += 1;
+      return;
+    }
+    const index = state.gpuCount++;
+    state.gpuKind[index] = kind;
+    state.gpuTimestamp[index] = number(timestamp);
+    state.gpuPending[index] = Math.max(0, Math.min(0xffffffff, pending | 0));
+    state.gpuQueue[index] = queueId;
+    state.gpuSerial[index] = serial;
+    state.gpuStatus[index] = status;
+  };
+  const putBoundary = (kind, args) => {
+    if (!state.active) return;
+    if (state.boundaryCount >= BC) {
+      state.boundaryDropped += 1;
+      return;
+    }
+    const index = state.boundaryCount++;
+    state.boundaryKind[index] = kind;
+    state.boundaryTimestamp[index] = performance.now();
+    if (kind === 3 || kind === 4) {
+      state.boundaryStarted[index] = number(args?.[0]);
+      state.boundaryTotal[index] = number(args?.[11]);
+      state.boundarySteps[index] = number(args?.[16]);
+      state.boundaryDraws[index] = number(args?.[17]);
+      state.boundaryArgument[index] = number(args?.[18]);
+    } else if (kind === 5 || kind === 6) {
+      const timing = args?.[0];
+      state.boundaryStarted[index] = number(timing?.started);
+      state.boundaryTotal[index] = number(timing?.total_ms);
+    } else if (kind === 7 || kind === 8) {
+      state.boundaryArgument[index] = number(args?.[0]);
+    }
+  };
+  const wrap = (name, enter, exit, callIndex) => {
+    const original = globalThis[name];
+    if (typeof original !== 'function' || original.__meleeTimelineProbeWrapped) return false;
+    const wrapped = function wrappedCallback(...args) {
+      putBoundary(enter, args);
+      state.callbackCalls[callIndex] += 1;
+      try {
+        return original.apply(this, args);
+      } catch (error) {
+        state.wrapperErrors += 1;
+        throw error;
+      } finally {
+        putBoundary(exit, args);
+      }
+    };
+    wrapped.__meleeTimelineProbeWrapped = true;
+    try {
+      globalThis[name] = wrapped;
+    } catch {
+      return false;
+    }
+    if (globalThis[name] !== wrapped) return false;
+    state.restores.push(() => {
+      if (globalThis[name] !== wrapped) {
+        state.wrapperErrors += 1;
+        return;
+      }
+      globalThis[name] = original;
+    });
+    return true;
+  };
+  const installNative = () => {
+    if (state.nativeWrapped) return true;
+    const original = globalThis.menuDiagnosticSample;
+    if (typeof original !== 'function') return false;
+    const wrapped = function wrappedNativeSample(...args) {
+      putBoundary(3, args);
+      state.callbackCalls[2] += 1;
+      try {
+        return original.apply(this, args);
+      } catch (error) {
+        state.wrapperErrors += 1;
+        throw error;
+      } finally {
+        putNative(args);
+        putBoundary(4, args);
+      }
+    };
+    wrapped.__meleeTimelineProbeWrapped = true;
+    try {
+      globalThis.menuDiagnosticSample = wrapped;
+    } catch {
+      return false;
+    }
+    state.restores.push(() => {
+      if (globalThis.menuDiagnosticSample !== wrapped) {
+        state.wrapperErrors += 1;
+        return;
+      }
+      globalThis.menuDiagnosticSample = original;
+    });
+    state.nativeWrapped = globalThis.menuDiagnosticSample === wrapped;
+    return state.nativeWrapped;
+  };
+  const queueState = queue => {
+    let value = state.queues.get(queue);
+    if (!value) {
+      value = { id: ++state.queueNextId, submitted: 0, completed: 0 };
+      state.queues.set(queue, value);
+      state.queueStates.push(value);
+    }
+    return value;
+  };
+  const installGpu = () => {
+    const prototype = globalThis.GPUQueue?.prototype;
+    if (!prototype) return false;
+    let submitHooked = state.submitHooked;
+    let completionHooked = state.completionHooked;
+    const originalSubmit = prototype.submit;
+    if (typeof originalSubmit === 'function' && !originalSubmit.__meleeTimelineProbeWrapped) {
+      const wrappedSubmit = function wrappedSubmit(...args) {
+        const result = originalSubmit.apply(this, args);
+        if (state.active) {
+          const queue = queueState(this);
+          const serial = ++queue.submitted;
+          putGpu(1, performance.now(), pendingTotal(), queue.id, serial);
+        }
+        return result;
+      };
+      wrappedSubmit.__meleeTimelineProbeWrapped = true;
+      try {
+        prototype.submit = wrappedSubmit;
+        submitHooked = prototype.submit === wrappedSubmit;
+        if (submitHooked) state.restores.push(() => {
+          if (prototype.submit !== wrappedSubmit) {
+            state.wrapperErrors += 1;
+            return;
+          }
+          prototype.submit = originalSubmit;
+        });
+      } catch {
+        submitHooked = false;
+      }
+    } else if (originalSubmit?.__meleeTimelineProbeWrapped) submitHooked = true;
+    const originalDone = prototype.onSubmittedWorkDone;
+    if (typeof originalDone === 'function' && !originalDone.__meleeTimelineProbeWrapped) {
+      const wrappedDone = function wrappedDone(...args) {
+        const promise = originalDone.apply(this, args);
+        if (state.active && promise && typeof promise.then === 'function') {
+          const queue = queueState(this);
+          const target = queue.submitted;
+          putGpu(2, performance.now(), pendingTotal(), queue.id, target);
+          promise.then(() => {
+            if (!state.active) return;
+            queue.completed = Math.max(queue.completed, target);
+            putGpu(3, performance.now(), pendingTotal(), queue.id, target, 0);
+          }, () => {
+            if (!state.active) return;
+            state.completionRejected += 1;
+            putGpu(4, performance.now(), pendingTotal(), queue.id, target, 1);
+          });
+        }
+        return promise;
+      };
+      wrappedDone.__meleeTimelineProbeWrapped = true;
+      try {
+        prototype.onSubmittedWorkDone = wrappedDone;
+        completionHooked = prototype.onSubmittedWorkDone === wrappedDone;
+        if (completionHooked) state.restores.push(() => {
+          if (prototype.onSubmittedWorkDone !== wrappedDone) {
+            state.wrapperErrors += 1;
+            return;
+          }
+          prototype.onSubmittedWorkDone = originalDone;
+        });
+      } catch {
+        completionHooked = false;
+      }
+    } else if (originalDone?.__meleeTimelineProbeWrapped) completionHooked = true;
+    state.submitHooked = submitHooked;
+    state.completionHooked = completionHooked;
+    return submitHooked && completionHooked;
+  };
+  const install = () => {
+    if (state.armed) return { armed: true, duplicate: true };
+    try {
+      if (!installNative()) throw new Error('menuDiagnosticSample unavailable at timeline arm');
+      const service = wrap('menuServiceCommands', 1, 2, 0);
+      const timing = wrap('menuRuntimeTiming', 5, 6, 1);
+      const frame = wrap('menuFrame', 7, 8, 3);
+      if (!service || !frame) throw new Error('required menu callback unavailable at timeline arm');
+      installGpu();
+      if (!state.submitHooked || !state.completionHooked) throw new Error('required GPU callback unavailable at timeline arm');
+      state.active = true;
+      state.armed = true;
+      state.armedAt = performance.now();
+      startClocks();
+      return {
+        armed: true,
+        native: state.nativeWrapped,
+        service_hooked: service,
+        timing_hooked: timing,
+        frame_hooked: frame,
+        submit_hooked: state.submitHooked,
+        completion_hooked: state.completionHooked,
+        armed_at_ms: state.armedAt,
+      };
+    } catch (error) {
+      for (const restore of state.restores.splice(0)) {
+        try { restore(); } catch { state.wrapperErrors += 1; }
+      }
+      throw error;
+    }
+  };
+  const stop = () => {
+    if (state.stopped) return state.snapshot || null;
+    state.active = false;
+    if (state.interval !== null) clearInterval(state.interval);
+    if (state.rafHandle !== null) cancelAnimationFrame(state.rafHandle);
+    for (const restore of state.restores.splice(0)) {
+      try { restore(); } catch { state.wrapperErrors += 1; }
+    }
+    state.stopped = true;
+    state.stoppedAt = performance.now();
+    const native = [];
+    for (let i = 0; i < state.nativeCount; i += 1) native.push({
+      timestamp: state.nativeTimestamp[i],
+      phase: state.nativePhase[i],
+      running: state.nativeRunning[i],
+      queued_delta: state.nativeQueued[i],
+      created_delta: state.nativeCreated[i],
+      source_steps: state.nativeSteps[i],
+      source_draws: state.nativeDraws[i],
+    });
+    const gpu = [];
+    for (let i = 0; i < state.gpuCount; i += 1) gpu.push({
+      kind: state.gpuKind[i],
+      timestamp: state.gpuTimestamp[i],
+      pending: state.gpuPending[i],
+      queue_id: state.gpuQueue[i],
+      target_serial: state.gpuSerial[i],
+      status: state.gpuStatus[i],
+    });
+    const boundaryNames = ['', 'service_entry', 'service_exit', 'sample_entry', 'sample_exit', 'timing_entry', 'timing_exit', 'frame_entry', 'frame_exit'];
+    const boundary = [];
+    for (let i = 0; i < state.boundaryCount; i += 1) boundary.push({
+      type: state.boundaryKind[i],
+      kind: boundaryNames[state.boundaryKind[i]] || 'unknown',
+      timestamp: state.boundaryTimestamp[i],
+      native_started: state.boundaryStarted[i],
+      native_total_ms: state.boundaryTotal[i],
+      source_steps: state.boundarySteps[i],
+      source_draws: state.boundaryDraws[i],
+      argument: state.boundaryArgument[i],
+    });
+    state.snapshot = {
+      schema: 'webmelee-timeline-game-scalar-probe-v1',
+      armed: state.armed,
+      armed_at_ms: state.armedAt,
+      stopped_at_ms: state.stoppedAt,
+      boundary: { capacity: BC, size: state.boundaryCount, dropped: state.boundaryDropped, wrapper_errors: state.wrapperErrors, rows: boundary, callback_calls: Array.from(state.callbackCalls) },
+      native: { capacity: NC, size: state.nativeCount, dropped: state.nativeDropped, rows: native, running_sample_count: state.runningSampleCount, source_step_total: state.sourceStepTotal, source_draw_total: state.sourceDrawTotal, has_running_progress: state.hasRunningProgress },
+      gpu: { capacity: GC, size: state.gpuCount, dropped: state.gpuDropped, pending_at_stop: pendingTotal(), completion_rejected: state.completionRejected, submit_hooked: state.submitHooked, completion_hooked: state.completionHooked, rows: gpu },
+      clocks: { heartbeat: { capacity: HC, size: state.heartbeatCount, dropped: state.heartbeatDropped, timestamps: Array.from(state.heartbeats.subarray(0, state.heartbeatCount)) }, raf: { capacity: RC, size: state.rafCount, dropped: state.rafDropped, timestamps: Array.from(state.rafs.subarray(0, state.rafCount)) } },
+    };
+    return state.snapshot;
+  };
+  globalThis.__meleeTimelineProbeArm = install;
+  globalThis.__meleeTimelineProbeStop = stop;
+  globalThis.__meleeTimelineProbeStatus = () => ({ armed: state.armed, active: state.active, stopped: state.stopped, has_running_progress: state.hasRunningProgress, running_sample_count: state.runningSampleCount, source_step_total: state.sourceStepTotal, source_draw_total: state.sourceDrawTotal });
+};

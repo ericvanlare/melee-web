@@ -1,0 +1,121 @@
+#!/usr/bin/env node
+'use strict';
+
+import assert from 'node:assert/strict';
+import { PROBE_INIT } from './timeline-probe-helper.mjs';
+
+const names = [
+  'menuDiagnosticSample',
+  'menuServiceCommands',
+  'menuRuntimeTiming',
+  'menuFrame',
+  'GPUQueue',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'setInterval',
+  'clearInterval',
+];
+const original = new Map(names.map(name => [name, globalThis[name]]));
+
+class FakeGPUQueue {
+  constructor(reject = false) {
+    this.reject = reject;
+  }
+
+  submit() {}
+
+  onSubmittedWorkDone() {
+    return this.reject ? Promise.reject(new Error('synthetic completion rejection')) : Promise.resolve();
+  }
+}
+
+let rafId = 0;
+globalThis.menuDiagnosticSample = () => undefined;
+globalThis.menuServiceCommands = () => 0;
+globalThis.menuRuntimeTiming = () => 0;
+globalThis.menuFrame = () => undefined;
+globalThis.GPUQueue = FakeGPUQueue;
+globalThis.requestAnimationFrame = () => ++rafId;
+globalThis.cancelAnimationFrame = () => undefined;
+globalThis.setInterval = () => 1;
+globalThis.clearInterval = () => undefined;
+const expectedAfterSetup = new Map(names.map(name => [name, globalThis[name]]));
+
+try {
+  PROBE_INIT();
+  const arm = globalThis.__meleeTimelineProbeArm();
+  assert.equal(arm.armed, true);
+  assert.equal(arm.native, true);
+  assert.equal(arm.service_hooked, true);
+  assert.equal(arm.frame_hooked, true);
+  assert.equal(arm.submit_hooked, true);
+  assert.equal(arm.completion_hooked, true);
+  assert(Number.isFinite(arm.armed_at_ms));
+
+  globalThis.menuServiceCommands();
+  globalThis.menuFrame();
+  const sample = Array(19).fill(0);
+  sample[0] = 1;
+  sample[2] = 1;
+  sample[11] = 0.25;
+  sample[16] = 1;
+  sample[17] = 1;
+  sample[18] = 1;
+  globalThis.menuDiagnosticSample(...sample);
+
+  const completedQueue = new FakeGPUQueue();
+  completedQueue.submit([]);
+  await completedQueue.onSubmittedWorkDone();
+  const rejectedQueue = new FakeGPUQueue(true);
+  rejectedQueue.submit([]);
+  await rejectedQueue.onSubmittedWorkDone().catch(() => undefined);
+  await Promise.resolve();
+
+  // Exercise the fixed-capacity event path. The stopped snapshot must report
+  // the overflow rather than growing an unbounded array or throwing.
+  for (let index = 0; index < 8200; index += 1) globalThis.menuFrame();
+
+  const snapshot = globalThis.__meleeTimelineProbeStop();
+  assert.equal(snapshot.armed, true);
+  assert.equal(snapshot.native.size, 1);
+  assert.equal(snapshot.native.dropped, 0);
+  assert.equal(snapshot.native.has_running_progress, true);
+  assert.equal(snapshot.boundary.capacity, 16384);
+  assert.equal(snapshot.boundary.size, snapshot.boundary.capacity);
+  assert(snapshot.boundary.dropped > 0);
+  assert.equal(snapshot.boundary.wrapper_errors, 0);
+  assert.equal(snapshot.gpu.completion_rejected, 1);
+  assert.equal(snapshot.gpu.dropped, 0);
+  assert(snapshot.clocks.heartbeat.size >= 1);
+  assert.equal(snapshot.clocks.heartbeat.dropped, 0);
+  assert.equal(snapshot.clocks.raf.dropped, 0);
+  assert(Number.isFinite(snapshot.stopped_at_ms));
+
+  for (const [name, value] of expectedAfterSetup) {
+    assert.equal(globalThis[name], value, `${name} was not restored`);
+  }
+  console.log(JSON.stringify({
+    status: 'pass',
+    arm: {
+      native: arm.native,
+      service_hooked: arm.service_hooked,
+      frame_hooked: arm.frame_hooked,
+      submit_hooked: arm.submit_hooked,
+      completion_hooked: arm.completion_hooked,
+    },
+    snapshot: {
+      native_size: snapshot.native.size,
+      boundary_size: snapshot.boundary.size,
+      boundary_dropped: snapshot.boundary.dropped,
+      completion_rejected: snapshot.gpu.completion_rejected,
+    },
+  }));
+} finally {
+  for (const [name, value] of original) {
+    if (value === undefined) delete globalThis[name];
+    else globalThis[name] = value;
+  }
+  delete globalThis.__meleeTimelineProbeArm;
+  delete globalThis.__meleeTimelineProbeStop;
+  delete globalThis.__meleeTimelineProbeStatus;
+}

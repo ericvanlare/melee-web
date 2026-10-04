@@ -1,0 +1,795 @@
+#!/usr/bin/env node
+'use strict';
+
+import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
+import http from 'node:http';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
+import { parseArgs } from 'node:util';
+import { fileURLToPath } from 'node:url';
+import { createBrowserDriver } from '__LOCAL_CHECKOUT_ROOT__/scripts/browser_driver.mjs';
+import { PROBE_INIT } from './timeline-probe-helper.mjs';
+
+const EXPECTED_MANIFEST_SHA256 = 'c37ebf8b9142ed17c539cda596ed68b22c3e650382c12264b84307605e355a08';
+const EXPECTED_SOURCE = 'cbe64a71d9ca1a7e3816840ab66234502856042a';
+const EXPECTED_RUNTIME = '56cb0a2092358272';
+const DEFAULT_CORE = '__LOCAL_PLAYWRIGHT_CORE__';
+const DEFAULT_PROTOCOL = '__LOCAL_WEBKIT_RUNTIME_ROOT__/webkit-2336/protocol.json';
+const EXPECTED_CORE_SHA256 = '9393fa79e1c67c74edc26b610d65a4f7ed73d345a762465cc88340a33a2454ac';
+const EXPECTED_PROTOCOL_SHA256 = '448bdfe4851c841182a686d85cf3080672adbebf5dfc54d516eb3e3cd967e5fe';
+const DEFAULT_BROWSERS_PATH = '__LOCAL_WEBKIT_RUNTIME_ROOT__';
+const MAX_TIMELINE_EVENTS = 8192;
+const MAX_SCRIPT_EVENTS = 8192;
+const MAX_NESTED_NODES = 32768;
+const MAX_SAMPLE_TRACES = 16384;
+const MAX_STACK_FRAMES = 65536;
+const MAX_STRING_LENGTH = 4096;
+const MAX_SERIALIZED_TRACE_BYTES = 32 * 1024 * 1024;
+const MAX_REQUESTS = 1024;
+const MAX_FAILURE_CODES = 128;
+const MAX_BROWSER_EVENTS = 64;
+const MAX_DATA_DEPTH = 16;
+const WORKLOAD_BUDGET_MS = 27000;
+const CLEANUP_BUDGET_MS = 2500;
+
+function parseCli(argv) {
+  const { values } = parseArgs({
+    args: argv,
+    options: {
+      site: { type: 'string' },
+      manifest: { type: 'string' },
+      disc: { type: 'string' },
+      out: { type: 'string' },
+      playwright: { type: 'string' },
+      core: { type: 'string', default: DEFAULT_CORE },
+      protocol: { type: 'string', default: DEFAULT_PROTOCOL },
+      url: { type: 'string' },
+      engine: { type: 'string', default: 'webkit' },
+      'browsers-path': { type: 'string', default: DEFAULT_BROWSERS_PATH },
+      expect: { type: 'string', default: 'either' },
+    },
+    strict: true,
+    allowPositionals: false,
+  });
+  for (const key of ['site', 'manifest', 'disc', 'out', 'playwright']) {
+    if (!values[key]) throw new Error(`--${key} is required`);
+  }
+  if (!['either', 'pause', 'healthy'].includes(values.expect)) throw new Error('--expect must be either, pause, or healthy');
+  if (values.engine !== 'webkit') throw new Error('this profiler runner is WebKit-only');
+  return {
+    site: path.resolve(values.site),
+    manifest: path.resolve(values.manifest),
+    disc: path.resolve(values.disc),
+    out: path.resolve(values.out),
+    playwright: path.resolve(values.playwright),
+    core: path.resolve(values.core),
+    protocol: path.resolve(values.protocol),
+    url: values.url || null,
+    engine: values.engine,
+    browsersPath: path.resolve(values['browsers-path']),
+    expect: values.expect,
+  };
+}
+
+function sha256(bytes) {
+  return createHash('sha256').update(bytes).digest('hex');
+}
+
+async function fileIdentity(file) {
+  const stat = await fs.stat(file);
+  const hash = createHash('sha256');
+  let bytes = 0;
+  const stream = fsSync.createReadStream(file, { highWaterMark: 1024 * 1024 });
+  for await (const chunk of stream) {
+    hash.update(chunk);
+    bytes += chunk.byteLength;
+  }
+  if (bytes !== stat.size) throw new Error(`file changed while hashing: ${file}`);
+  return { path: path.resolve(file), bytes, sha256: hash.digest('hex') };
+}
+
+function finite(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function boundedError(error) {
+  const message = error && typeof error.message === 'string' ? error.message : String(error ?? 'unknown error');
+  return message.length <= 1024 ? message : `${message.slice(0, 1024)}…`;
+}
+
+function withDeadline(promise, deadline, label) {
+  let timer;
+  const remaining = Math.max(1, deadline - performance.now());
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} exceeded deadline`)), remaining);
+  });
+  return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+}
+
+function responseType(file) {
+  const ext = path.extname(file).toLowerCase();
+  return ({
+    '.html': 'text/html; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.mjs': 'text/javascript; charset=utf-8',
+    '.json': 'application/json; charset=utf-8',
+    '.wasm': 'application/wasm',
+    '.data': 'application/octet-stream',
+    '.gci': 'application/octet-stream',
+    '.png': 'image/png',
+    '.svg': 'image/svg+xml',
+    '.txt': 'text/plain; charset=utf-8',
+  })[ext] || 'application/octet-stream';
+}
+
+function recordRequest(report, request) {
+  if (report.server.requests.length < MAX_REQUESTS) report.server.requests.push(request);
+  else report.server.request_drops += 1;
+}
+
+function createStaticServer(site, report) {
+  return http.createServer(async (request, response) => {
+    const rawUrl = request.url || '/';
+    let pathname;
+    try {
+      pathname = decodeURIComponent(new URL(rawUrl, 'http://127.0.0.1').pathname);
+    } catch {
+      recordRequest(report, { method: request.method, path: rawUrl, status: 400 });
+      response.writeHead(400, { 'cache-control': 'no-store' });
+      response.end('bad request');
+      return;
+    }
+    const relative = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+    const candidate = path.resolve(site, relative);
+    if (!candidate.startsWith(`${path.resolve(site)}${path.sep}`) || request.method !== 'GET') {
+      recordRequest(report, { method: request.method, path: pathname, status: 404 });
+      response.writeHead(404, { 'cache-control': 'no-store' });
+      response.end('not found');
+      return;
+    }
+    try {
+      const body = await fs.readFile(candidate);
+      recordRequest(report, { method: request.method, path: pathname, status: 200, bytes: body.byteLength });
+      response.writeHead(200, {
+        'cache-control': 'no-store',
+        'content-type': responseType(candidate),
+        'content-length': body.byteLength,
+        'referrer-policy': 'no-referrer',
+      });
+      response.end(body);
+    } catch {
+      recordRequest(report, { method: request.method, path: pathname, status: 404 });
+      response.writeHead(404, { 'cache-control': 'no-store' });
+      response.end('not found');
+    }
+  });
+}
+
+async function verifyPackage(site, manifestPath) {
+  const manifestBytes = await fs.readFile(manifestPath);
+  if (sha256(manifestBytes) !== EXPECTED_MANIFEST_SHA256) throw new Error('PR153 package manifest hash mismatch');
+  const manifest = JSON.parse(manifestBytes);
+  if (manifest.source_sha !== EXPECTED_SOURCE || manifest.runtime_hash !== EXPECTED_RUNTIME || manifest.profile !== 'audio-player') throw new Error('PR153 package identity mismatch');
+  const inventory = [];
+  const walk = async (directory, prefix = '') => {
+    for (const entry of await fs.readdir(directory, { withFileTypes: true })) {
+      const name = `${prefix}${entry.name}`;
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) await walk(full, `${name}/`);
+      else if (entry.isFile()) inventory.push(name);
+      else throw new Error(`nonregular package entry: ${name}`);
+    }
+  };
+  await walk(site);
+  const expected = manifest.files.map(file => file.path).sort();
+  if (JSON.stringify(inventory.sort()) !== JSON.stringify(expected)) throw new Error('package inventory differs from manifest');
+  for (const file of manifest.files) {
+    const full = path.join(site, file.path);
+    const bytes = await fs.readFile(full);
+    if (bytes.byteLength !== file.size || sha256(bytes) !== file.sha256) throw new Error(`package file hash mismatch: ${file.path}`);
+  }
+  return { manifest, manifestBytes };
+}
+
+function createTimelineCapture(report) {
+  const capture = {
+    timeline: [],
+    script: [],
+    timelineSeen: 0,
+    scriptSeen: 0,
+    nestedNodes: 0,
+    sampleTraces: 0,
+    stackFrames: 0,
+    serializedTraceBytes: null,
+    failureCodes: [],
+    drops: { timeline: 0, script: 0, nested_nodes: 0, samples: 0, stack_frames: 0, strings: 0, data: 0 },
+  };
+  const fail = code => {
+    if (capture.failureCodes.length < MAX_FAILURE_CODES) capture.failureCodes.push(code);
+    else capture.drops.data += 1;
+  };
+  const safeString = (value, code) => {
+    if (value == null) return null;
+    if (typeof value !== 'string') {
+      fail(`${code}_not_string`);
+      return null;
+    }
+    if (value.length > MAX_STRING_LENGTH) {
+      capture.drops.strings += 1;
+      fail(`${code}_string_cap`);
+      return null;
+    }
+    return value;
+  };
+  const cloneData = (value, code, depth = 0) => {
+    if (value == null || typeof value === 'boolean') return value ?? null;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string') return safeString(value, code);
+    if (depth >= MAX_DATA_DEPTH) {
+      capture.drops.data += 1;
+      fail(`${code}_depth_cap`);
+      return null;
+    }
+    if (Array.isArray(value)) {
+      const result = [];
+      for (let index = 0; index < value.length; index += 1) {
+        if (capture.nestedNodes >= MAX_NESTED_NODES) {
+          capture.drops.nested_nodes += 1;
+          fail(`${code}_nodes_cap`);
+          break;
+        }
+        capture.nestedNodes += 1;
+        result.push(cloneData(value[index], `${code}[${index}]`, depth + 1));
+      }
+      if (result.length !== value.length) capture.drops.data += value.length - result.length;
+      return result;
+    }
+    if (typeof value === 'object') {
+      const result = {};
+      for (const key of Object.keys(value)) {
+        const safeKey = safeString(key, `${code}.key`);
+        if (safeKey === null) continue;
+        if (capture.nestedNodes >= MAX_NESTED_NODES) {
+          capture.drops.nested_nodes += 1;
+          fail(`${code}_nodes_cap`);
+          break;
+        }
+        capture.nestedNodes += 1;
+        result[safeKey] = cloneData(value[key], `${code}.${safeKey}`, depth + 1);
+      }
+      if (Object.keys(result).length !== Object.keys(value).length) capture.drops.data += 1;
+      return result;
+    }
+    capture.drops.data += 1;
+    fail(`${code}_unsupported_value`);
+    return null;
+  };
+  const compactTimeline = (record, receiveMonotonicMs, depth = 0) => {
+    if (!record || typeof record !== 'object') {
+      capture.drops.timeline += 1;
+      fail('timeline_record_invalid');
+      return null;
+    }
+    if (capture.nestedNodes >= MAX_NESTED_NODES) {
+      capture.drops.nested_nodes += 1;
+      fail('timeline_nodes_cap');
+      return null;
+    }
+    capture.nestedNodes += 1;
+    const children = Array.isArray(record.children) ? record.children : [];
+    const result = {
+      receive_monotonic_ms: receiveMonotonicMs,
+      type: safeString(record.type, 'timeline.type'),
+      start_time: finite(record.startTime ?? record.data?.startTime),
+      end_time: finite(record.endTime ?? record.data?.endTime),
+      data: cloneData(record.data ?? null, 'timeline.data'),
+      stack_trace: record.stackTrace === undefined ? null : compactStackTrace(record.stackTrace, 'timeline.stack_trace'),
+      children: [],
+    };
+    if (children.length > 1024) {
+      capture.drops.data += children.length - 1024;
+      fail('timeline_children_cap');
+    }
+    const childLimit = Math.min(children.length, 1024);
+    if (depth >= 16 && childLimit > 0) {
+      capture.drops.nested_nodes += childLimit;
+      fail('timeline_depth_cap');
+    } else {
+      for (let index = 0; index < childLimit; index += 1) {
+        const child = compactTimeline(children[index], receiveMonotonicMs, depth + 1);
+        if (child) result.children.push(child);
+      }
+    }
+    return result;
+  };
+  const compactSamples = samples => {
+    const traces = samples && Array.isArray(samples.stackTraces) ? samples.stackTraces : [];
+    if (traces.length > MAX_SAMPLE_TRACES) {
+      capture.drops.samples += traces.length - MAX_SAMPLE_TRACES;
+      fail('script_samples_cap');
+    }
+    const result = [];
+    for (let index = 0; index < Math.min(traces.length, MAX_SAMPLE_TRACES); index += 1) {
+      const trace = traces[index];
+      capture.sampleTraces += 1;
+      const sourceFrames = trace && Array.isArray(trace.stackFrames) ? trace.stackFrames : [];
+      const frames = [];
+      for (let frameIndex = 0; frameIndex < sourceFrames.length; frameIndex += 1) {
+        if (capture.stackFrames >= MAX_STACK_FRAMES) {
+          capture.drops.stack_frames += sourceFrames.length - frameIndex;
+          fail('script_stack_frames_cap');
+          break;
+        }
+        const frame = sourceFrames[frameIndex] || {};
+        capture.stackFrames += 1;
+        const location = frame.expressionLocation && typeof frame.expressionLocation === 'object' ? frame.expressionLocation : null;
+        frames.push({
+          name: safeString(frame.name, 'script.frame.name'),
+          url: safeString(frame.url, 'script.frame.url'),
+          line: finite(frame.line),
+          column: finite(frame.column),
+          source_id: finite(frame.sourceID),
+          expression_location: location ? { line: finite(location.line), column: finite(location.column) } : null,
+        });
+      }
+      result.push({ timestamp: finite(trace && trace.timestamp), frames });
+    }
+    return result;
+  };
+  const compactStackTrace = (trace, code) => {
+    if (!trace || typeof trace !== 'object') {
+      fail(`${code}_invalid`);
+      return null;
+    }
+    const sourceFrames = Array.isArray(trace.callFrames) ? trace.callFrames : (Array.isArray(trace.frames) ? trace.frames : []);
+    const frames = [];
+    for (let index = 0; index < sourceFrames.length; index += 1) {
+      if (capture.stackFrames >= MAX_STACK_FRAMES) {
+        capture.drops.stack_frames += sourceFrames.length - index;
+        fail(`${code}_frames_cap`);
+        break;
+      }
+      const frame = sourceFrames[index] || {};
+      capture.stackFrames += 1;
+      const location = frame.expressionLocation && typeof frame.expressionLocation === 'object' ? frame.expressionLocation : null;
+      frames.push({
+        name: safeString(frame.functionName ?? frame.name, `${code}.name`),
+        url: safeString(frame.url, `${code}.url`),
+        line: finite(frame.lineNumber ?? frame.line),
+        column: finite(frame.columnNumber ?? frame.column),
+        source_id: finite(frame.sourceID ?? frame.sourceId),
+        expression_location: location ? { line: finite(location.line), column: finite(location.column) } : null,
+      });
+    }
+    return { description: safeString(trace.description, `${code}.description`), frames };
+  };
+  const scriptInterval = (start, end, code) => {
+    const startTime = finite(start);
+    const endTime = finite(end);
+    const supplied = (start !== undefined && start !== null) || (end !== undefined && end !== null);
+    if (supplied && (startTime === null || endTime === null || endTime < startTime)) fail(`${code}_invalid`);
+    return { start_time: startTime, end_time: endTime };
+  };
+  const receive = () => performance.now();
+  const addTimeline = record => {
+    capture.timelineSeen += 1;
+    if (capture.timeline.length >= MAX_TIMELINE_EVENTS) {
+      capture.drops.timeline += 1;
+      fail('timeline_events_cap');
+      return;
+    }
+    const compact = compactTimeline(record, receive());
+    if (compact) capture.timeline.push(compact);
+  };
+  const addScript = record => {
+    capture.scriptSeen += 1;
+    if ((record.start_time !== null || record.end_time !== null) &&
+        (record.start_time === null || record.end_time === null || record.end_time < record.start_time)) fail('script_interval_invalid');
+    if (capture.script.length >= MAX_SCRIPT_EVENTS) {
+      capture.drops.script += 1;
+      fail('script_events_cap');
+      return;
+    }
+    capture.script.push(record);
+  };
+  const listeners = [];
+  const attach = session => {
+    const on = (event, listener) => { session.on(event, listener); listeners.push([event, listener]); };
+    on('Timeline.recordingStarted', event => {
+      report.protocol.notifications.timeline_started = true;
+      addTimeline({ type: 'RecordingStarted', startTime: event && event.startTime, endTime: null, data: event && event.data });
+    });
+    on('Timeline.recordingStopped', event => {
+      report.protocol.notifications.timeline_stopped = true;
+      addTimeline({ type: 'RecordingStopped', startTime: null, endTime: event && event.endTime, data: event && event.data });
+    });
+    on('Timeline.eventRecorded', event => addTimeline(event && event.record ? event.record : event));
+    on('ScriptProfiler.trackingStart', event => {
+      report.protocol.notifications.script_started = true;
+      addScript({ kind: 'trackingStart', receive_monotonic_ms: receive(), timestamp: finite(event && event.timestamp), start_time: finite(event && event.timestamp), end_time: finite(event && event.timestamp), samples: [] });
+    });
+    on('ScriptProfiler.trackingUpdate', event => {
+      const detail = event && event.event ? event.event : event;
+      const interval = scriptInterval(detail && detail.startTime, detail && detail.endTime, 'script.interval');
+      addScript({ kind: 'trackingUpdate', receive_monotonic_ms: receive(), type: safeString(detail && detail.type, 'script.event.type'), start_time: interval.start_time, end_time: interval.end_time, samples: [] });
+    });
+    on('ScriptProfiler.trackingComplete', event => {
+      report.protocol.notifications.script_completed = true;
+      addScript({ kind: 'trackingComplete', receive_monotonic_ms: receive(), timestamp: finite(event && event.timestamp), start_time: finite(event && event.timestamp), end_time: finite(event && event.timestamp), samples: compactSamples(event && event.samples) });
+    });
+    on('error', error => { fail(`protocol_error:${boundedError(error)}`); });
+  };
+  const detach = session => {
+    for (const [event, listener] of listeners.splice(0)) {
+      try { session.removeListener(event, listener); } catch { fail(`remove_listener:${event}`); }
+    }
+  };
+  const finalize = () => {
+    let serialized;
+    try {
+      serialized = JSON.stringify({ timeline: capture.timeline, script: capture.script });
+      capture.serializedTraceBytes = Buffer.byteLength(serialized, 'utf8');
+    } catch {
+      capture.serializedTraceBytes = null;
+      fail('trace_serialization_failed');
+    }
+    if (capture.serializedTraceBytes !== null && capture.serializedTraceBytes > MAX_SERIALIZED_TRACE_BYTES) fail('serialized_trace_bytes_cap');
+    return capture;
+  };
+  return { capture, attach, detach, finalize };
+}
+
+function flattenTimeline(records, output = []) {
+  for (const record of records) {
+    output.push(record);
+    if (Array.isArray(record.children)) flattenTimeline(record.children, output);
+  }
+  return output;
+}
+
+function findTimestamp(records, label) {
+  return flattenTimeline(records).find(record => record.type === 'TimeStamp' && record.data && record.data.message === label);
+}
+
+function validateClockAnchors(report) {
+  const start = findTimestamp(report.protocol.timeline, 'melee-timeline-game-start');
+  const stop = findTimestamp(report.protocol.timeline, 'melee-timeline-game-stop');
+  const pageStart = report.page.anchors && report.page.anchors.start;
+  const pageStop = report.page.anchors && report.page.anchors.stop;
+  if (!start || !stop || finite(start.start_time) === null || finite(stop.start_time) === null) throw new Error('timeline clock anchors missing');
+  if (!pageStart || !pageStop || ![pageStart.before_ms, pageStart.after_ms, pageStop.before_ms, pageStop.after_ms].every(Number.isFinite)) throw new Error('page clock anchors missing');
+  if (pageStart.after_ms < pageStart.before_ms || pageStop.after_ms < pageStop.before_ms || pageStop.before_ms <= pageStart.after_ms) throw new Error('page clock anchor order invalid');
+  if (stop.start_time <= start.start_time) throw new Error('protocol clock anchor order invalid');
+  const pageDuration = pageStop.before_ms - pageStart.before_ms;
+  const protocolDurationSeconds = stop.start_time - start.start_time;
+  if (!(pageDuration > 0) || !(protocolDurationSeconds > 0)) throw new Error('clock anchor durations invalid');
+  report.protocol.clock_anchors = {
+    start: { protocol_seconds: start.start_time, page_before_ms: pageStart.before_ms, page_after_ms: pageStart.after_ms },
+    stop: { protocol_seconds: stop.start_time, page_before_ms: pageStop.before_ms, page_after_ms: pageStop.after_ms },
+    protocol_time_unit: 'seconds',
+    observed_protocol_seconds_per_page_ms: protocolDurationSeconds / pageDuration,
+    observed_page_ms_per_protocol_second: pageDuration / protocolDurationSeconds,
+    limitation: 'Two-anchor empirical correspondence only; no OS-clock offset or causal timing claim.',
+  };
+}
+
+async function boundedClose(target, deadline, label) {
+  if (!target) return;
+  await withDeadline(target.close(), deadline, label);
+}
+
+async function main() {
+  const args = parseCli(process.argv.slice(2));
+  if (fsSync.existsSync(args.out)) throw new Error(`output must be absent: ${args.out}`);
+  await fs.mkdir(args.out, { recursive: false });
+  const started = performance.now();
+  const deadline = started + WORKLOAD_BUDGET_MS;
+  const report = {
+    schema: 'webmelee-timeline-game-probe-v1',
+    status: 'running',
+    result: null,
+    scope: 'Private exact PR153 audio-player package; one bounded CSS observation; no Resume, source/runtime edits, fences, clock changes, recovery policy, uploads, or public export.',
+    identities: {},
+    timing: { started_monotonic_ms: started, workload_budget_ms: WORKLOAD_BUDGET_MS, cleanup_budget_ms: CLEANUP_BUDGET_MS },
+    package: { site: args.site, manifest: args.manifest, expected_manifest_sha256: EXPECTED_MANIFEST_SHA256, expected_source: EXPECTED_SOURCE, expected_runtime: EXPECTED_RUNTIME },
+    protocol: { session_id_before: null, session_id_after: null, commands: [], notifications: { timeline_started: false, timeline_stopped: false, script_started: false, script_completed: false }, timeline: [], script: [], drops: {} },
+    browser: { version: null, page_errors: [], console_errors: [], request_failures: [], http_errors: [], unexpected_navigations: [], crashed: false, event_drops: {} },
+    server: { host: '127.0.0.1', port: null, external: Boolean(args.url), requests: [], request_drops: 0 },
+    probe_arm: null,
+    page: { anchors: { start: null, stop: null }, observation: null },
+    scalar_probe: null,
+    cleanup: { errors: [], page_closed: false, context_closed: false, browser_closed: false, server_closed: false },
+    failure_codes: [],
+  };
+  let server = null;
+  let browser = null;
+  let context = null;
+  let page = null;
+  let driver = null;
+  let session = null;
+  let capture = null;
+  let captureTools = null;
+  let timelineEnabled = false;
+  let timelineStarted = false;
+  let scriptStarted = false;
+  let probeStopped = false;
+  let cleanupDeadline = null;
+  let responseOrigin = null;
+  const listeners = [];
+  const failCode = code => {
+    if (report.failure_codes.length < MAX_FAILURE_CODES) report.failure_codes.push(code);
+    else report.failure_code_drops = (report.failure_code_drops || 0) + 1;
+  };
+  const recordBrowser = (key, value, failureCode) => {
+    const rows = report.browser[key];
+    if (rows.length < MAX_BROWSER_EVENTS) rows.push(value);
+    else {
+      report.browser.event_drops[key] = (report.browser.event_drops[key] || 0) + 1;
+      failCode(`${failureCode}_cap`);
+    }
+  };
+  const addListener = (target, event, listener) => { target.on(event, listener); listeners.push([target, event, listener]); };
+  const removeListeners = () => {
+    for (const [target, event, listener] of listeners.splice(0)) {
+      try { target.removeListener(event, listener); } catch { failCode(`remove_listener:${event}`); }
+    }
+  };
+  const send = async (method, params = {}) => {
+    const command = { method, sent_monotonic_ms: performance.now(), ok: false };
+    report.protocol.commands.push(command);
+    try {
+      const result = await withDeadline(session.send(method, params), deadline, method);
+      command.ok = true;
+      return result;
+    } catch (error) {
+      command.error_code = boundedError(error);
+      failCode(`protocol_command:${method}`);
+      throw error;
+    }
+  };
+  const markPageAnchor = async label => {
+    return page.evaluate(anchorLabel => {
+      const before = performance.now();
+      performance.mark(`${anchorLabel}-before`);
+      if (typeof console.timeStamp === 'function') console.timeStamp(anchorLabel);
+      const after = performance.now();
+      performance.mark(`${anchorLabel}-after`);
+      return { before_ms: before, after_ms: after, time_origin_ms: performance.timeOrigin };
+    }, label);
+  };
+  const stopProbe = async (stopDeadline = cleanupDeadline || deadline) => {
+    if (probeStopped || !page) return report.scalar_probe;
+    try {
+      report.scalar_probe = await withDeadline(page.evaluate(() => globalThis.__meleeTimelineProbeStop?.() || null), stopDeadline, 'scalar probe stop');
+      probeStopped = true;
+    } catch (error) {
+      failCode('scalar_probe_stop');
+      report.scalar_probe_error = boundedError(error);
+    }
+    return report.scalar_probe;
+  };
+  const stopInspector = async () => {
+    if (!session) return;
+    const stopDeadline = cleanupDeadline || (performance.now() + CLEANUP_BUDGET_MS);
+    if (timelineStarted) {
+      try { await withDeadline(session.send('Timeline.stop', {}), stopDeadline, 'Timeline.stop'); } catch { failCode('timeline_stop'); }
+      timelineStarted = false;
+    }
+    if (scriptStarted) {
+      try { await withDeadline(session.send('ScriptProfiler.stopTracking', {}), stopDeadline, 'ScriptProfiler.stopTracking'); } catch { failCode('script_stop'); }
+      scriptStarted = false;
+    }
+    if (timelineEnabled) {
+      try { await withDeadline(session.send('Timeline.disable', {}), stopDeadline, 'Timeline.disable'); } catch { failCode('timeline_disable'); }
+      timelineEnabled = false;
+    }
+  };
+  try {
+    const { manifest, manifestBytes } = await verifyPackage(args.site, args.manifest);
+    report.identities.manifest = { path: args.manifest, bytes: manifestBytes.byteLength, sha256: sha256(manifestBytes) };
+    report.identities.runner = await fileIdentity(fileURLToPath(import.meta.url));
+    report.identities.helper = await fileIdentity(fileURLToPath(new URL('./timeline-probe-helper.mjs', import.meta.url)));
+    report.identities.core = await fileIdentity(args.core);
+    report.identities.protocol = await fileIdentity(args.protocol);
+    if (report.identities.core.sha256 !== EXPECTED_CORE_SHA256) throw new Error('pinned Playwright core hash mismatch');
+    if (report.identities.protocol.sha256 !== EXPECTED_PROTOCOL_SHA256) throw new Error('pinned WebKit protocol hash mismatch');
+    report.identities.disc = await fileIdentity(args.disc);
+    if (!fsSync.existsSync(path.join(args.browsersPath, 'webkit-2336', 'INSTALLATION_COMPLETE'))) throw new Error('pinned WebKit installation marker missing');
+    process.env.PLAYWRIGHT_BROWSERS_PATH = args.browsersPath;
+    const playwrightIndex = path.join(args.playwright, 'index.mjs');
+    if (!fsSync.existsSync(playwrightIndex)) throw new Error(`Playwright WebKit index missing: ${playwrightIndex}`);
+    const { webkit } = await import(playwrightIndex);
+
+    let url = args.url;
+    if (url) {
+      const parsed = new URL(url);
+      if (parsed.protocol !== 'http:' || parsed.hostname !== '127.0.0.1') throw new Error('external URL must be loopback HTTP');
+      report.server.port = Number(parsed.port) || 80;
+      report.server.external_origin = parsed.origin;
+    } else {
+      server = createStaticServer(args.site, report);
+      await withDeadline(new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); }), deadline, 'package server start');
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('package server address unavailable');
+      report.server.port = address.port;
+      url = `http://127.0.0.1:${address.port}/`;
+    }
+    responseOrigin = new URL(url).origin;
+
+    browser = await withDeadline(webkit.launch({ headless: true, timeout: 15000 }), deadline, 'WebKit launch');
+    report.browser.version = browser.version();
+    context = await withDeadline(browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, reducedMotion: 'reduce' }), deadline, 'context creation');
+    page = await withDeadline(context.newPage(), deadline, 'page creation');
+    await page.addInitScript(PROBE_INIT);
+    await page.addInitScript(() => {
+      const originalConnect = AudioNode.prototype.connect;
+      const gains = new WeakMap();
+      AudioNode.prototype.connect = function muteDestination(destination, ...args) {
+        if (destination instanceof AudioDestinationNode) {
+          let gain = gains.get(destination);
+          if (!gain) {
+            gain = this.context.createGain();
+            gain.gain.value = 0;
+            originalConnect.call(gain, destination);
+            gains.set(destination, gain);
+          }
+          return originalConnect.call(this, gain, ...args);
+        }
+        return originalConnect.call(this, destination, ...args);
+      };
+    });
+    addListener(page, 'pageerror', error => { recordBrowser('page_errors', { name: error?.name || null, message: boundedError(error) }, 'pageerror'); failCode('pageerror'); void page.evaluate(() => { globalThis.__meleeTimelineProbeStopRequested = true; }).catch(() => {}); });
+    addListener(page, 'console', message => { if (message.type() === 'error') { recordBrowser('console_errors', { text: boundedError(message.text()) }, 'console_error'); failCode('console_error'); void page.evaluate(() => { globalThis.__meleeTimelineProbeStopRequested = true; }).catch(() => {}); } });
+    addListener(page, 'requestfailed', request => { recordBrowser('request_failures', { url: boundedError(request.url()), failure: boundedError(request.failure()?.errorText || 'request failed') }, 'request_failed'); failCode('request_failed'); void page.evaluate(() => { globalThis.__meleeTimelineProbeStopRequested = true; }).catch(() => {}); });
+    addListener(page, 'response', response => {
+      let sameOrigin = false;
+      try { sameOrigin = new URL(response.url()).origin === responseOrigin; } catch { sameOrigin = false; }
+      if (sameOrigin && response.status() !== 200) {
+        recordBrowser('http_errors', { url: boundedError(response.url()), status: response.status() }, 'http_status');
+        failCode('http_status');
+        void page.evaluate(() => { globalThis.__meleeTimelineProbeStopRequested = true; }).catch(() => {});
+      }
+    });
+    addListener(page, 'crash', () => { report.browser.crashed = true; failCode('page_crash'); });
+    addListener(page, 'framenavigated', frame => { if (frame === page.mainFrame() && report.server.navigation_seen) { recordBrowser('unexpected_navigations', frame.url(), 'unexpected_navigation'); failCode('unexpected_navigation'); } report.server.navigation_seen = true; });
+
+    await withDeadline(page.goto(url, { waitUntil: 'domcontentloaded', timeout: 15000 }), deadline, 'package navigation');
+    await withDeadline(page.waitForFunction(() => document.querySelector('#loading-panel')?.hidden === true && globalThis.Module?._melee_web_native_menu_cache_idle?.() === 1, null, { timeout: Math.max(1000, Math.min(15000, deadline - performance.now())) }), deadline, 'graphics/cache readiness');
+    report.page.startup = await page.evaluate(() => ({ cross_origin_isolated: crossOriginIsolated, webgpu: Boolean(navigator.gpu), canvas: [Module.canvas.width, Module.canvas.height], navigation_type: performance.getEntriesByType('navigation')[0]?.type || null }));
+
+    const serverPage = page._connection?.toImpl?.(page);
+    session = serverPage?.delegate?._session;
+    if (!session || typeof session.send !== 'function' || typeof session.on !== 'function') throw new Error('WKSession bridge unavailable');
+    report.protocol.session_id_before = session.sessionId || null;
+    if (!report.protocol.session_id_before) throw new Error('WKSession identity unavailable');
+    captureTools = createTimelineCapture(report);
+    capture = captureTools.capture;
+    captureTools.attach(session);
+    report.probe_arm = await page.evaluate(() => globalThis.__meleeTimelineProbeArm?.() || null);
+    if (!report.probe_arm?.armed || !report.probe_arm.service_hooked || !report.probe_arm.frame_hooked || !report.probe_arm.submit_hooked || !report.probe_arm.completion_hooked) throw new Error('scalar callback/GPU probe arm incomplete');
+
+    await send('Timeline.enable');
+    timelineEnabled = true;
+    await send('Timeline.setInstruments', { instruments: ['Timeline'] });
+    await send('ScriptProfiler.startTracking', { includeSamples: true });
+    scriptStarted = true;
+    await send('Timeline.start', { maxCallStackDepth: 8 });
+    timelineStarted = true;
+    await withDeadline(new Promise(resolve => setTimeout(resolve, 25)), deadline, 'profiler start notification drain');
+    const currentSession = page._connection.toImpl(page).delegate._session;
+    if (currentSession !== session || currentSession.sessionId !== report.protocol.session_id_before) throw new Error('WKSession changed before disc import');
+    report.page.anchors.start = await markPageAnchor('melee-timeline-game-start');
+
+    driver = createBrowserDriver(page, { surface: 'public', timeoutMs: 15000,
+      deadline: Date.now() + Math.max(1, deadline - performance.now()) });
+    await withDeadline(driver.selectDisc(args.disc), deadline, 'disc selection');
+    report.page.observation = await withDeadline(page.evaluate(() => new Promise(resolve => {
+      const startedAt = performance.now();
+      let firstCss = null;
+      let polls = 0;
+      const interval = setInterval(() => {
+        polls += 1;
+        const now = performance.now();
+        const module = globalThis.Module;
+        const phase = module?._melee_web_native_menu_phase?.();
+        const running = module?._melee_web_native_menu_running?.();
+        let message = null;
+        try { message = module?.UTF8ToString?.(module?._melee_web_native_menu_message?.()); } catch { message = null; }
+        const status = globalThis.__meleeTimelineProbeStatus?.() || {};
+        if (phase === 1 && running && status.has_running_progress && firstCss === null) firstCss = now;
+        let outcome = null;
+        if (globalThis.__meleeTimelineProbeStopRequested) outcome = 'browser_error';
+        else if (message?.startsWith('Paused after a timing disruption')) outcome = 'forced_pause';
+        else if (firstCss !== null && now - firstCss >= 8000) outcome = 'css_observation_complete';
+        else if (now - startedAt >= 16000) outcome = 'css_deadline';
+        if (outcome) {
+          clearInterval(interval);
+          resolve({ outcome, phase: phase ?? null, running: running ?? null, message, first_css_ms: firstCss, at_ms: now, polls, hidden: document.hidden, visibility_state: document.visibilityState, canvas: module?.canvas ? [module.canvas.width, module.canvas.height] : null, status });
+        }
+      }, 100);
+    })), deadline, 'CSS observation');
+    report.page.anchors.stop = await markPageAnchor('melee-timeline-game-stop');
+    await stopProbe();
+    await stopInspector();
+    await withDeadline(new Promise(resolve => setTimeout(resolve, 100)), deadline, 'profiler event drain');
+    report.protocol.session_id_after = page._connection.toImpl(page).delegate._session?.sessionId || null;
+    if (report.protocol.session_id_after !== report.protocol.session_id_before) throw new Error('WKSession changed while stopping profiler');
+    captureTools.finalize();
+    report.protocol.timeline = capture.timeline;
+    report.protocol.script = capture.script;
+    report.protocol.drops = capture.drops;
+    report.protocol.capture_counts = { timeline_seen: capture.timelineSeen, script_seen: capture.scriptSeen, nested_nodes: capture.nestedNodes, sample_traces: capture.sampleTraces, stack_frames: capture.stackFrames, serialized_trace_bytes: capture.serializedTraceBytes };
+    report.protocol.failure_codes = capture.failureCodes;
+    validateClockAnchors(report);
+    if (!report.protocol.notifications.timeline_started || !report.protocol.notifications.timeline_stopped || !report.protocol.notifications.script_started || !report.protocol.notifications.script_completed) throw new Error('required profiler notification missing');
+    if (capture.timelineSeen === 0 || capture.scriptSeen === 0 || capture.sampleTraces === 0) throw new Error('profiler trace/sample payload missing');
+    if (capture.failureCodes.length || Object.values(capture.drops).some(value => value !== 0)) throw new Error('profiler capture truncation/drop/error');
+    if (capture.serializedTraceBytes === null || capture.serializedTraceBytes > MAX_SERIALIZED_TRACE_BYTES) throw new Error('serialized trace size invalid');
+    if (!report.server.external && (report.server.request_drops || report.server.requests.some(request => request.status !== 200))) throw new Error('package request failed');
+    if (report.browser.http_errors.length || report.browser.page_errors.length || report.browser.console_errors.length || report.browser.request_failures.length || report.browser.crashed || report.browser.unexpected_navigations.length) throw new Error('browser error captured');
+    if (Object.values(report.browser.event_drops).some(value => value !== 0) || report.failure_code_drops) throw new Error('browser/failure event capacity exceeded');
+    if (report.scalar_probe?.boundary?.dropped || report.scalar_probe?.boundary?.wrapper_errors || report.scalar_probe?.native?.dropped || report.scalar_probe?.gpu?.dropped || report.scalar_probe?.gpu?.completion_rejected || report.scalar_probe?.clocks?.heartbeat?.dropped || report.scalar_probe?.clocks?.raf?.dropped) throw new Error('scalar probe capacity exceeded, GPU completion rejected, or wrapper failed');
+    if (!['forced_pause', 'css_observation_complete'].includes(report.page.observation?.outcome)) throw new Error('observation did not reach bounded endpoint');
+    if (args.expect === 'pause' && report.page.observation.outcome !== 'forced_pause') throw new Error('expected forced pause was not observed');
+    if (args.expect === 'healthy' && report.page.observation.outcome !== 'css_observation_complete') throw new Error('expected healthy CSS endpoint was not observed');
+    // The measured window and Inspector have ended. Preserve the structured
+    // incident using the existing local export, without automatic delivery.
+    if (report.page.observation.outcome === 'css_observation_complete') {
+      await withDeadline(page.locator('#pause-game').click(), deadline, 'manual pause after observation');
+      report.page.manual_pause_after_observation = true;
+      await withDeadline(page.waitForFunction(() => Module._melee_web_native_menu_running() === 0,
+        null, { timeout: 2000 }), deadline, 'manual pause completion');
+    }
+    await withDeadline(new Promise(resolve => setTimeout(resolve, 1200)), deadline, 'local recorder settle');
+    await withDeadline(page.locator('#settings-open').click(), deadline, 'diagnostics settings');
+    const download = page.waitForEvent('download', { timeout: 2000 });
+    const exported = download.then(item => item.saveAs(path.join(args.out, 'local-diagnostics.json')));
+    await withDeadline(Promise.all([exported, page.locator('#export-diagnostics').click()]), deadline, 'local diagnostics export');
+    report.identities.local_diagnostics = await fileIdentity(path.join(args.out, 'local-diagnostics.json'));
+    await withDeadline(page.screenshot({ path: path.join(args.out, 'stopped.png'), timeout: 2000 }), deadline, 'stopped screenshot');
+    report.result = report.page.observation.outcome;
+    report.status = 'pass';
+  } catch (error) {
+    report.status = 'fail';
+    report.result = 'failure';
+    report.failure = { message: boundedError(error) };
+    failCode('runner_failure');
+    cleanupDeadline = performance.now() + CLEANUP_BUDGET_MS;
+    await stopProbe(cleanupDeadline);
+    await stopInspector();
+    if (captureTools) {
+      captureTools.finalize();
+      report.protocol.timeline = capture.timeline;
+      report.protocol.script = capture.script;
+      report.protocol.drops = capture.drops;
+      report.protocol.capture_counts = { timeline_seen: capture.timelineSeen, script_seen: capture.scriptSeen, nested_nodes: capture.nestedNodes, sample_traces: capture.sampleTraces, stack_frames: capture.stackFrames, serialized_trace_bytes: capture.serializedTraceBytes };
+      report.protocol.failure_codes = capture.failureCodes;
+    }
+  } finally {
+    cleanupDeadline ??= performance.now() + CLEANUP_BUDGET_MS;
+    if (captureTools && session) captureTools.detach(session);
+    removeListeners();
+    if (driver) { try { driver.dispose(); } catch { failCode('driver_dispose'); } }
+    if (page) { try { await boundedClose(page, cleanupDeadline, 'page close'); report.cleanup.page_closed = true; } catch (error) { report.cleanup.errors.push(`page_close:${boundedError(error)}`); } }
+    if (context) { try { await boundedClose(context, cleanupDeadline, 'context close'); report.cleanup.context_closed = true; } catch (error) { report.cleanup.errors.push(`context_close:${boundedError(error)}`); } }
+    if (browser) { try { await boundedClose(browser, cleanupDeadline, 'browser close'); report.cleanup.browser_closed = true; } catch (error) { report.cleanup.errors.push(`browser_close:${boundedError(error)}`); } }
+    if (server) { try { await withDeadline(new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())), cleanupDeadline, 'server close'); report.cleanup.server_closed = true; } catch (error) { report.cleanup.errors.push(`server_close:${boundedError(error)}`); } }
+    if (report.cleanup.errors.length) {
+      report.status = 'fail';
+      report.result = 'failure';
+      failCode('cleanup_error');
+    }
+    report.timing.finished_monotonic_ms = performance.now();
+    report.timing.elapsed_ms = report.timing.finished_monotonic_ms - started;
+    report.failure_codes = Array.from(new Set(report.failure_codes));
+    report.browser.event_drops_total = Object.values(report.browser.event_drops).reduce((sum, value) => sum + value, 0);
+    if (report.failure_code_drops) report.status = 'fail';
+    await fs.writeFile(path.join(args.out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' });
+  }
+  if (report.status !== 'pass') process.exitCode = 1;
+}
+
+main().catch(error => { console.error(boundedError(error)); process.exitCode = 1; });

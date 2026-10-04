@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""One owned headless public-client check; no timing/performance admission."""
+import hashlib
+import json
+import os
+import signal
+import subprocess
+import threading
+import time
+from pathlib import Path
+
+BASE = Path(__file__).resolve().parent
+ROOT = Path('__LOCAL_CHECKOUT__')
+OUT = BASE / 'attempt-01'
+RECEIPT = BASE / 'attempt-01-owner-receipt.json'
+assert not OUT.exists() and not RECEIPT.exists(), 'Preserve prior attempts'
+receipt = {'schema': 'webmelee-owned-public-client-check-v1', 'started_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()), 'process_cap_seconds': 40, 'result': 'running'}
+started = time.monotonic()
+owned = {}
+process = None
+stopped = threading.Event()
+
+def inventory():
+    comm = subprocess.check_output(['/bin/ps', '-axo', 'pid=,ppid=,pgid=,comm='], text=True)
+    raw_args = subprocess.check_output(['/bin/ps', '-axo', 'pid=,args='], text=True)
+    args = {int(a[0]): a[1] for line in raw_args.splitlines() if len(a := line.strip().split(None, 1)) == 2}
+    return {int(a[0]): {'parent': int(a[1]), 'pgid': int(a[2]), 'command': a[3], 'args': args.get(int(a[0]))}
+            for line in comm.splitlines() if len(a := line.strip().split(None, 3)) == 4}
+
+def collect():
+    current = inventory()
+    family = {process.pid}
+    while True:
+        children = {pid for pid, row in current.items() if row['parent'] in family}
+        if children <= family:
+            break
+        family.update(children)
+    for pid in family:
+        if pid in current:
+            owned[pid] = current[pid]
+
+def live_owned():
+    current = inventory()
+    return {pid: row for pid, row in owned.items() if current.get(pid, {}).get('command') == row['command'] and current.get(pid, {}).get('args') == row['args']}
+
+def monitor():
+    while not stopped.wait(.2):
+        try:
+            collect()
+        except Exception as error:
+            receipt.setdefault('monitor_errors', []).append(type(error).__name__)
+
+try:
+    env = dict(os.environ)
+    env['MELEE_PLAYWRIGHT_DIR'] = '__LOCAL_PLAYWRIGHT_DIR__'
+    runner = BASE / 'client-auto-delivery-pr152-v3.mjs'
+    receipt['runner_sha256'] = hashlib.sha256(runner.read_bytes()).hexdigest()
+    command = ['python3', 'scripts/agent_workspace.py', 'run', '--', str(ROOT / '.deps/emsdk/node/24.19.0_64bit/bin/node'), str(runner), '--out', str(OUT)]
+    with (BASE / 'attempt-01.log').open('x') as log:
+        process = subprocess.Popen(command, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        receipt['leader_pid'] = process.pid
+        collect()
+        watcher = threading.Thread(target=monitor, daemon=True)
+        watcher.start()
+        receipt['exit_code'] = process.wait(timeout=max(1, 40 - (time.monotonic() - started)))
+    receipt['result'] = 'completed' if receipt['exit_code'] == 0 else 'failed'
+except BaseException as error:
+    receipt['result'] = 'failed'
+    receipt['failure_type'] = type(error).__name__
+finally:
+    if process is not None:
+        collect()
+        stopped.set()
+        if 'watcher' in globals():
+            watcher.join(timeout=1)
+        receipt['cleanup_before'] = [{'pid': pid, **row} for pid, row in live_owned().items()]
+        for pid in live_owned():
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        until = time.monotonic() + 3
+        while live_owned() and time.monotonic() < until:
+            time.sleep(.05)
+        for pid in live_owned():
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        if process.poll() is None:
+            process.wait(timeout=1)
+        receipt['owned_processes'] = [{'pid': pid, **row} for pid, row in owned.items()]
+        receipt['cleanup_remaining'] = [{'pid': pid, **row} for pid, row in live_owned().items()]
+        if receipt['cleanup_remaining'] or receipt.get('monitor_errors'):
+            receipt['result'] = 'failed'
+    report = OUT / 'receipt.json'
+    if report.exists():
+        receipt['client_receipt_sha256'] = hashlib.sha256(report.read_bytes()).hexdigest()
+    receipt['elapsed_seconds'] = time.monotonic() - started
+    receipt['finished_at'] = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+    RECEIPT.write_text(json.dumps(receipt, indent=2) + '\n')
+    print(json.dumps({k: v for k, v in receipt.items() if k != 'owned_processes'}))
+if receipt['result'] != 'completed':
+    raise SystemExit(1)
