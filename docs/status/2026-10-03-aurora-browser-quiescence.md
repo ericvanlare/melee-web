@@ -27,8 +27,9 @@ and preserved input hashes. The browser transaction passed in 2.952 seconds;
 the independent audit verified 31 file pins, five trees, eight Chrome process
 absences, the Node process group and the closed HTTP listener. The screenshot
 was inspected: both fighters and the stage render, with known magenta geometry.
-No original pixel comparison was performed. The receipt retains the favicon
-404 and expected Aurora shutdown diagnostics separately from page errors.
+No original pixel comparison was performed. The receipt retains a resource
+404 without a request URL and the Aurora shutdown diagnostics separately from
+page errors; the failed resource cannot be identified from this capture.
 
 The required suite passed: 1883 tests, 141 skipped, 348.523 seconds in unittest
 (348.859 seconds through the owned wrapper). All 1699 tracked source pins
