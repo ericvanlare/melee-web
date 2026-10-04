@@ -216,9 +216,75 @@
   ],
   "result": "passed",
   "review_validation": {
-    "full_unit_suite": "pending",
-    "scope": "The passed result covers only the declared diagnostic; these broader review/admission checks remain separate.",
-    "standard_graphics_release": "pending",
+    "full_unit_suite": {
+      "cleanup_audit": {
+        "artifact": "local-review/suite-02/root-cleanup-audit-v1.json",
+        "bytes": 371,
+        "sha256": "37c91c5e0fb28a07bbe8831a10b2f924c62d2a00213be96eab741d006d61cc05"
+      },
+      "guarded_seconds": 295.534,
+      "receipt": {
+        "artifact": "local-review/suite-02/validation-receipt.json",
+        "bytes": 1348,
+        "sha256": "eaaff4f340bef2713b80d1e3ea39727846a17ef261b556216ac00d2a8c875014"
+      },
+      "reproduction_command": [
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "result": "passed",
+      "skipped": 140,
+      "source_head": "08366be015318f1652fc09099929c57f73cc879d",
+      "source_tool_pins_verified": 1744,
+      "test_seconds": 294.92,
+      "tests": 1837
+    },
+    "scope": "Required local review checks at the pinned code head; no additional browser, GPU, renderer restoration or full-session admission.",
+    "standard_graphics_release": {
+      "artifacts": {
+        "js": {
+          "artifact": "gx_probe.js",
+          "bytes": 362544,
+          "sha256": "c595e9eb9d9dac4b6167cc369aabec836ef83cb38497c0cd2beb3a43b580bad4"
+        },
+        "wasm": {
+          "artifact": "gx_probe.wasm",
+          "bytes": 6892077,
+          "sha256": "ad0bec3ad697199c0a1cd4b6725c357bdde8153b8c886cd92ae2094ed3da43a0"
+        }
+      },
+      "cleanup_audit": {
+        "artifact": "local-review/graphics-02/root-cleanup-audit-v1.json",
+        "bytes": 964,
+        "sha256": "475418d9bcf5f0229b43e3368088cc243c3c04ddc2d16a9bfde86a3a9b476e4f"
+      },
+      "guarded_seconds": 13.345,
+      "receipt": {
+        "artifact": "local-review/graphics-02/validation-receipt.json",
+        "bytes": 1814,
+        "sha256": "e995a9621ec2db64cdc3a3fa8f3aac70d358a9df6ea0a2fa08623025e6c7bc3f"
+      },
+      "reproduction_command": [
+        "python3",
+        "scripts/build.py",
+        "--target",
+        "graphics",
+        "--configuration",
+        "Release"
+      ],
+      "result": "passed",
+      "source_head": "08366be015318f1652fc09099929c57f73cc879d",
+      "source_tool_pins_verified": 1744
+    },
     "three_complete_retained_workloads": "unrun"
   },
   "runtime": {
