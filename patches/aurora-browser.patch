@@ -155,6 +155,144 @@ index 56c7aae..4a1c018 100644
  
  void aurora_set_log_level(AuroraLogLevel level);
  void aurora_set_pause_on_focus_lost(bool value);
+diff --git a/include/aurora/aurora_browser_future_owner_accessor.h b/include/aurora/aurora_browser_future_owner_accessor.h
+new file mode 100644
+index 0000000..2ecd22a
+--- /dev/null
++++ b/include/aurora/aurora_browser_future_owner_accessor.h
+@@ -0,0 +1,132 @@
++#pragma once
++
++#include <stddef.h>
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/* Read-only metadata returned by the Emscripten JS-library bridge. The bridge
++ * writes all bytes, including padding, before returning. Promise settlement and
++ * WebGPU graph reconstruction are deliberately represented as unsupported
++ * diagnostics rather than inferred from synchronous JS observations. */
++typedef struct {
++  uint32_t schemaVersion;
++  uint32_t statusFlags;
++  uint32_t errorCode;
++  uint32_t reserved;
++  uint64_t futuresArrayLabel;
++  uint64_t futuresLength;
++  uint64_t futuresOwnCount;
++  uint64_t futuresMaxIndex;
++  uint64_t jsObjectsArrayLabel;
++  uint64_t jsObjectsLength;
++  uint64_t jsObjectsOwnCount;
++  uint64_t jsObjectsMaxIndex;
++  uint64_t futureRowCount;
++  uint64_t jsObjectRowCount;
++} AuroraBrowserFutureOwnerSummary;
++
++/* One row is either a sparse WebGPU.Internals.futures entry or a sparse
++ * WebGPU.Internals.jsObjects entry. identityLabel is an accessor-private opaque
++ * identity, never a JS pointer and never a restorable handle. */
++typedef struct {
++  uint32_t kind;
++  uint32_t rowFlags;
++  uint32_t valueKind;
++  uint32_t reserved;
++  uint64_t index;
++  uint64_t identityLabel;
++} AuroraBrowserFutureOwnerRow;
++
++/* Return values: 1 = summary/row written; 0 = no prior summary for rows;
++ * negative values are fail-closed integrity errors. Invalid output pointers,
++ * byte counts, alignments, and ordinals are rejected before any heap write. Unsupported settlement and
++ * graph state are positive statusFlags, because they are observations rather
++ * than an authorization to restore. */
++enum {
++  AURORA_BROWSER_FUTURE_OWNER_SCHEMA_VERSION = 2,
++  AURORA_BROWSER_FUTURE_OWNER_STATUS_SETTLEMENT_UNKNOWN = 1u << 0,
++  AURORA_BROWSER_FUTURE_OWNER_STATUS_GRAPH_UNSUPPORTED = 1u << 1,
++  AURORA_BROWSER_FUTURE_OWNER_STATUS_DELETED_TRACKED_ENTRY = 1u << 2,
++  AURORA_BROWSER_FUTURE_OWNER_STATUS_NONINDEX_PROPERTY = 1u << 3,
++  AURORA_BROWSER_FUTURE_OWNER_ERROR_NO_INTERNALS = -1,
++  AURORA_BROWSER_FUTURE_OWNER_ERROR_OUTPUT = -2,
++  AURORA_BROWSER_FUTURE_OWNER_ERROR_ARRAY_REPLACED = -3,
++  AURORA_BROWSER_FUTURE_OWNER_ERROR_ENTRY_REPLACED = -4,
++  AURORA_BROWSER_FUTURE_OWNER_ERROR_DESCRIPTOR = -5,
++  AURORA_BROWSER_FUTURE_OWNER_ERROR_SHAPE = -6,
++  AURORA_BROWSER_FUTURE_OWNER_ERROR_ORDINAL = -7,
++  AURORA_BROWSER_FUTURE_OWNER_ERROR_UNSUPPORTED = -8,
++};
++
++enum {
++  AURORA_BROWSER_FUTURE_OWNER_ROW_F_PRESENT = 1u << 0,
++  AURORA_BROWSER_FUTURE_OWNER_ROW_F_SETTLEMENT_UNKNOWN = 1u << 1,
++  AURORA_BROWSER_FUTURE_OWNER_ROW_F_OPAQUE_GRAPH = 1u << 2,
++  AURORA_BROWSER_FUTURE_OWNER_VALUE_UNDEFINED = 1,
++  AURORA_BROWSER_FUTURE_OWNER_VALUE_OBJECT = 2,
++  AURORA_BROWSER_FUTURE_OWNER_VALUE_NULL = 3,
++  AURORA_BROWSER_FUTURE_OWNER_VALUE_PRIMITIVE = 4,
++};
++
++size_t aurora_browser_future_owner_summary_bytes(void);
++size_t aurora_browser_future_owner_row_bytes(void);
++size_t aurora_browser_future_owner_row_count(void);
++/* 1 = single-threaded Emscripten accessor available; negative = explicit unsupported. */
++int aurora_browser_future_owner_capability(void);
++int aurora_browser_future_owner_summary(void* out, size_t bytes);
++int aurora_browser_future_owner_row(void* out, size_t bytes, int32_t ordinal);
++int aurora_browser_future_owner_dispose(void);
++
++#ifdef __cplusplus
++}
++#endif
++
++#ifdef __cplusplus
++static_assert(sizeof(AuroraBrowserFutureOwnerSummary) == 96,
++              "future owner summary ABI changed");
++static_assert(sizeof(AuroraBrowserFutureOwnerRow) == 32,
++              "future owner row ABI changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, schemaVersion) == 0,
++              "future owner summary schema offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, statusFlags) == 4,
++              "future owner summary status offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, errorCode) == 8,
++              "future owner summary error offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, reserved) == 12,
++              "future owner summary reserved offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, futuresArrayLabel) == 16,
++              "future owner summary futures label offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, futuresLength) == 24,
++              "future owner summary futures length offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, futuresOwnCount) == 32,
++              "future owner summary futures count offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, futuresMaxIndex) == 40,
++              "future owner summary futures max offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, jsObjectsArrayLabel) == 48,
++              "future owner summary objects label offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, jsObjectsLength) == 56,
++              "future owner summary objects length offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, jsObjectsOwnCount) == 64,
++              "future owner summary objects count offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, jsObjectsMaxIndex) == 72,
++              "future owner summary objects max offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, futureRowCount) == 80,
++              "future owner summary future rows offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerSummary, jsObjectRowCount) == 88,
++              "future owner summary object rows offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerRow, kind) == 0,
++              "future owner row kind offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerRow, rowFlags) == 4,
++              "future owner row flags offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerRow, valueKind) == 8,
++              "future owner row value kind offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerRow, reserved) == 12,
++              "future owner row reserved offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerRow, index) == 16,
++              "future owner row index offset changed");
++static_assert(offsetof(AuroraBrowserFutureOwnerRow, identityLabel) == 24,
++              "future owner row identity offset changed");
++#endif
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
 index 94504b1..ae5908f 100644
 --- a/include/aurora/gfx.h
@@ -722,6 +860,378 @@ index 0a35990..11a6faf 100644
    const auto controller = aurora::input::get_controller_for_player(chan);
    if (should_use_device_rumble(chan, controller)) {
      u16 low = 0;
+diff --git a/lib/gfx/aurora_browser_future_owner_accessor.cpp b/lib/gfx/aurora_browser_future_owner_accessor.cpp
+new file mode 100644
+index 0000000..f4cd633
+--- /dev/null
++++ b/lib/gfx/aurora_browser_future_owner_accessor.cpp
+@@ -0,0 +1,57 @@
++#include "aurora/aurora_browser_future_owner_accessor.h"
++
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++#include <emscripten/em_js.h>
++
++/* The $ symbol and its postset are module-local Emscripten library state. The
++ * exact Emdawn $WebGPU library object is observed; no producer is replaced. */
++EM_JS_DEPS(aurora_browser_future_owner_accessor_v5,
++           "$WebGPU,$AuroraBrowserFutureOwnerV5");
++
++EM_JS(int, aurora_browser_future_owner_summary, (void* out, size_t bytes), {
++  const normalizedOut = Number(out) >>> 0;
++  const normalizedBytes = Number(bytes) >>> 0;
++  return AuroraBrowserFutureOwnerV5.summary(normalizedOut, normalizedBytes);
++});
++
++EM_JS(size_t, aurora_browser_future_owner_row_count, (), {
++  return AuroraBrowserFutureOwnerV5.rowCount();
++});
++
++EM_JS(int, aurora_browser_future_owner_row,
++      (void* out, size_t bytes, int32_t ordinal), {
++  const normalizedOut = Number(out) >>> 0;
++  const normalizedBytes = Number(bytes) >>> 0;
++  return AuroraBrowserFutureOwnerV5.row(normalizedOut, normalizedBytes, ordinal);
++});
++
++EM_JS(int, aurora_browser_future_owner_dispose, (), {
++  return AuroraBrowserFutureOwnerV5.dispose();
++});
++
++#else
++int aurora_browser_future_owner_capability(void) {
++  return AURORA_BROWSER_FUTURE_OWNER_ERROR_UNSUPPORTED;
++}
++size_t aurora_browser_future_owner_row_count(void) { return 0; }
++int aurora_browser_future_owner_summary(void*, size_t) {
++  return AURORA_BROWSER_FUTURE_OWNER_ERROR_UNSUPPORTED;
++}
++int aurora_browser_future_owner_row(void*, size_t, int32_t) {
++  return AURORA_BROWSER_FUTURE_OWNER_ERROR_UNSUPPORTED;
++}
++int aurora_browser_future_owner_dispose(void) {
++  return AURORA_BROWSER_FUTURE_OWNER_ERROR_UNSUPPORTED;
++}
++#endif
++
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++int aurora_browser_future_owner_capability(void) { return 1; }
++#endif
++
++size_t aurora_browser_future_owner_summary_bytes(void) {
++  return sizeof(AuroraBrowserFutureOwnerSummary);
++}
++size_t aurora_browser_future_owner_row_bytes(void) {
++  return sizeof(AuroraBrowserFutureOwnerRow);
++}
+diff --git a/lib/gfx/aurora_browser_future_owner_accessor_library.js b/lib/gfx/aurora_browser_future_owner_accessor_library.js
+new file mode 100644
+index 0000000..69d2ea3
+--- /dev/null
++++ b/lib/gfx/aurora_browser_future_owner_accessor_library.js
+@@ -0,0 +1,303 @@
++/* Pinned Emscripten JS-library bridge for the v5 read-only accessor.
++ * The postset creates a closure in the generated module. It intentionally
++ * does not publish state on globalThis or replace an Emdawn producer. */
++addToLibrary({
++  $AuroraBrowserFutureOwnerV5__deps: ['$WebGPU'],
++  $AuroraBrowserFutureOwnerV5: {},
++  $AuroraBrowserFutureOwnerV5__postset: `
++    AuroraBrowserFutureOwnerV5 = /* Canonical module-private accessor implementation. The generator places this
++ * expression inside the Emscripten $AuroraBrowserFutureOwnerV5 postset. It
++ * never calls Promise methods, enrolls callbacks, waits, or writes WebGPU
++ * Internals. Its closure is owned by one generated module instance. */
++(() => {
++  let moduleState = null;
++  const SUMMARY_BYTES = 96;
++  const ROW_BYTES = 32;
++  const MAX_RETAINED_REFS = 4096;
++  const MAX_TRACKED_ENTRIES = 65536;
++  const ERROR = Object.freeze({
++    NO_INTERNALS: -1,
++    OUTPUT: -2,
++    ARRAY_REPLACED: -3,
++    ENTRY_REPLACED: -4,
++    DESCRIPTOR: -5,
++    SHAPE: -6,
++    ORDINAL: -7,
++  });
++
++  function makeState() {
++    return {
++      arrays: { futures: null, jsObjects: null },
++      arrayLabels: { futures: 0, jsObjects: 0 },
++      labels: new WeakMap(),
++      refs: new Map(),
++      nextLabel: 1,
++      entries: { futures: new Map(), jsObjects: new Map() },
++      last: null,
++    };
++  }
++
++  function state() {
++    if (moduleState === null) moduleState = makeState();
++    return moduleState;
++  }
++
++  function isObjectLike(value) {
++    return (typeof value === "object" && value !== null) || typeof value === "function";
++  }
++
++  function cloneLabelMap(source) {
++    const labels = new Map();
++    for (const [label, value] of source.refs) labels.set(value, label);
++    return labels;
++  }
++
++  function beginStage(source) {
++    return {
++      arrays: { futures: source.arrays.futures, jsObjects: source.arrays.jsObjects },
++      arrayLabels: { futures: source.arrayLabels.futures, jsObjects: source.arrayLabels.jsObjects },
++      labels: cloneLabelMap(source),
++      refs: new Map(source.refs),
++      nextLabel: source.nextLabel,
++      entries: { futures: new Map(source.entries.futures), jsObjects: new Map(source.entries.jsObjects) },
++    };
++  }
++
++  function stageLabel(stage, value) {
++    if (!isObjectLike(value)) return 0;
++    let label = stage.labels.get(value);
++    if (label === undefined) {
++      if (stage.refs.size >= MAX_RETAINED_REFS) throw ERROR.SHAPE;
++      label = stage.nextLabel++;
++      stage.labels.set(value, label);
++      stage.refs.set(label, value);
++    }
++    return label;
++  }
++
++  function isIndex(key) {
++    if (key === "0") return true;
++    if (typeof key !== "string" || !/^[1-9][0-9]*$/.test(key)) return false;
++    const value = Number(key);
++    return Number.isSafeInteger(value) && value >= 0 && value < 0xffffffff && String(value) === key;
++  }
++
++  function fieldValue(owner, name) {
++    if ((typeof owner !== "object" && typeof owner !== "function") || owner === null) throw ERROR.NO_INTERNALS;
++    const descriptor = Object.getOwnPropertyDescriptor(owner, name);
++    if (!descriptor || !Object.prototype.hasOwnProperty.call(descriptor, "value")) throw ERROR.DESCRIPTOR;
++    return descriptor.value;
++  }
++
++  function inspectArray(stage, internals, name, kind, status) {
++    const array = fieldValue(internals, name);
++    if (!Array.isArray(array)) throw ERROR.SHAPE;
++    if (stage.arrays[name] !== null && stage.arrays[name] !== array) throw ERROR.ARRAY_REPLACED;
++    if (stage.arrays[name] === null) {
++      stage.arrays[name] = array;
++      stage.arrayLabels[name] = stageLabel(stage, array);
++    }
++    const lengthDescriptor = Object.getOwnPropertyDescriptor(array, "length");
++    if (!lengthDescriptor || !Object.prototype.hasOwnProperty.call(lengthDescriptor, "value") ||
++        !lengthDescriptor.writable || lengthDescriptor.enumerable || lengthDescriptor.configurable) {
++      throw ERROR.DESCRIPTOR;
++    }
++    if (!Number.isSafeInteger(array.length) || array.length < 0 || array.length > 0xffffffff) throw ERROR.SHAPE;
++
++    const rows = [];
++    const present = new Set();
++    const pending = new Map();
++    let ownCount = 0;
++    let maxIndex = 0;
++    const keys = Reflect.ownKeys(array);
++    for (const key of keys) {
++      if (key === "length") continue;
++      const descriptor = Object.getOwnPropertyDescriptor(array, key);
++      if (!descriptor) throw ERROR.DESCRIPTOR;
++      if (typeof key === "symbol") {
++        status.value |= 1 << 3;
++        if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) throw ERROR.DESCRIPTOR;
++        continue;
++      }
++      if (!isIndex(key)) {
++        status.value |= 1 << 3;
++        if (!Object.prototype.hasOwnProperty.call(descriptor, "value")) throw ERROR.DESCRIPTOR;
++        continue;
++      }
++      if (!Object.prototype.hasOwnProperty.call(descriptor, "value") ||
++          !descriptor.writable || !descriptor.enumerable || !descriptor.configurable) {
++        throw ERROR.DESCRIPTOR;
++      }
++      const index = Number(key);
++      const value = descriptor.value;
++      present.add(key);
++      pending.set(key, value);
++      const previousPresent = stage.entries[name].has(key);
++      const previous = stage.entries[name].get(key);
++      if (previousPresent && previous !== value) throw ERROR.ENTRY_REPLACED;
++      const objectLike = isObjectLike(value);
++      const valueKind = value === undefined ? 1 : value === null ? 3 : objectLike ? 2 : 4;
++      const identityLabel = objectLike ? stageLabel(stage, value) : 0;
++      const rowFlags = (kind === 1 ? 1 << 1 : 0) | (1 << 2) | 1;
++      rows.push({ kind, rowFlags, valueKind, index, identityLabel });
++      ownCount += 1;
++      if (index > maxIndex) maxIndex = index;
++    }
++    if (ownCount > MAX_TRACKED_ENTRIES) throw ERROR.SHAPE;
++    for (const key of stage.entries[name].keys()) {
++      if (!present.has(key)) {
++        const descriptor = Object.getOwnPropertyDescriptor(array, key);
++        if (descriptor) throw ERROR.DESCRIPTOR;
++        status.value |= 1 << 2;
++      }
++    }
++    for (const [key, value] of pending) stage.entries[name].set(key, value);
++    if (stage.entries[name].size > MAX_TRACKED_ENTRIES) throw ERROR.SHAPE;
++    return {
++      arrayLabel: stage.arrayLabels[name],
++      length: array.length,
++      ownCount,
++      maxIndex,
++      rows,
++    };
++  }
++
++  function internalsFromWebGPU() {
++    if (typeof WebGPU === "undefined" || WebGPU === null) throw ERROR.NO_INTERNALS;
++    const internals = fieldValue(WebGPU, "Internals");
++    if (!internals || (typeof internals !== "object" && typeof internals !== "function")) throw ERROR.NO_INTERNALS;
++    return internals;
++  }
++
++  function capture(source) {
++    const internals = internalsFromWebGPU();
++    const stage = beginStage(source);
++    const status = { value: 0 };
++    const futures = inspectArray(stage, internals, "futures", 1, status);
++    const jsObjects = inspectArray(stage, internals, "jsObjects", 2, status);
++    if (futures.rows.length) status.value |= 1 << 0;
++    status.value |= 1 << 1;
++    const rows = futures.rows.concat(jsObjects.rows);
++    const result = {
++      schemaVersion: 2,
++      statusFlags: status.value,
++      errorCode: 0,
++      futuresArrayLabel: futures.arrayLabel,
++      futuresLength: futures.length,
++      futuresOwnCount: futures.ownCount,
++      futuresMaxIndex: futures.maxIndex,
++      jsObjectsArrayLabel: jsObjects.arrayLabel,
++      jsObjectsLength: jsObjects.length,
++      jsObjectsOwnCount: jsObjects.ownCount,
++      jsObjectsMaxIndex: jsObjects.maxIndex,
++      futureRowCount: futures.rows.length,
++      jsObjectRowCount: jsObjects.rows.length,
++      rows,
++    };
++    if (rows.length > MAX_TRACKED_ENTRIES) throw ERROR.SHAPE;
++    return { result, stage };
++  }
++
++  function commit(source, captureResult) {
++    const { result, stage } = captureResult;
++    source.arrays = stage.arrays;
++    source.arrayLabels = stage.arrayLabels;
++    source.refs = stage.refs;
++    source.nextLabel = stage.nextLabel;
++    source.entries = stage.entries;
++    source.labels = new WeakMap();
++    for (const [label, value] of source.refs) source.labels.set(value, label);
++    source.last = result;
++  }
++
++  function validOutput(out, bytes, required, alignment) {
++    return Number.isSafeInteger(out) && out > 0 && (out % alignment) === 0 &&
++      Number.isSafeInteger(bytes) && bytes >= required && out <= HEAPU8.length - required;
++  }
++
++  function writeU32(out, offset, value) {
++    HEAPU32[(out + offset) / 4] = value >>> 0;
++  }
++
++  function writeU64(out, offset, value) {
++    const number = BigInt(value);
++    writeU32(out, offset, Number(number & 0xffffffffn));
++    writeU32(out, offset + 4, Number((number >> 32n) & 0xffffffffn));
++  }
++
++  function writeSummary(out, result) {
++    writeU32(out, 0, result.schemaVersion);
++    writeU32(out, 4, result.statusFlags);
++    writeU32(out, 8, result.errorCode);
++    writeU32(out, 12, 0);
++    writeU64(out, 16, result.futuresArrayLabel);
++    writeU64(out, 24, result.futuresLength);
++    writeU64(out, 32, result.futuresOwnCount);
++    writeU64(out, 40, result.futuresMaxIndex);
++    writeU64(out, 48, result.jsObjectsArrayLabel);
++    writeU64(out, 56, result.jsObjectsLength);
++    writeU64(out, 64, result.jsObjectsOwnCount);
++    writeU64(out, 72, result.jsObjectsMaxIndex);
++    writeU64(out, 80, result.futureRowCount);
++    writeU64(out, 88, result.jsObjectRowCount);
++  }
++
++  function writeRow(out, row) {
++    writeU32(out, 0, row.kind);
++    writeU32(out, 4, row.rowFlags);
++    writeU32(out, 8, row.valueKind);
++    writeU32(out, 12, 0);
++    writeU64(out, 16, row.index);
++    writeU64(out, 24, row.identityLabel);
++  }
++
++  return {
++    summary(out, bytes) {
++      const source = state();
++      source.last = null;
++      if (!validOutput(out, bytes, SUMMARY_BYTES, 8)) return ERROR.OUTPUT;
++      try {
++        const captured = capture(source);
++        HEAPU8.fill(0, out, out + SUMMARY_BYTES);
++        writeSummary(out, captured.result);
++        commit(source, captured);
++        return 1;
++      } catch (error) {
++        source.last = null;
++        return typeof error === "number" ? error : ERROR.SHAPE;
++      }
++    },
++    rowCount() {
++      const source = moduleState;
++      return source && source.last ? source.last.rows.length : 0;
++    },
++    row(out, bytes, ordinal) {
++      if (!validOutput(out, bytes, ROW_BYTES, 8)) return ERROR.OUTPUT;
++      if (!Number.isSafeInteger(ordinal) || ordinal < 0) return ERROR.ORDINAL;
++      const source = moduleState;
++      if (!source || !source.last || ordinal >= source.last.rows.length) return 0;
++      try {
++        HEAPU8.fill(0, out, out + ROW_BYTES);
++        writeRow(out, source.last.rows[ordinal]);
++        return 1;
++      } catch (_) {
++        return ERROR.SHAPE;
++      }
++    },
++    dispose() {
++      if (moduleState) {
++        moduleState.last = null;
++        moduleState.arrays = { futures: null, jsObjects: null };
++        moduleState.arrayLabels = { futures: 0, jsObjects: 0 };
++        moduleState.refs.clear();
++        moduleState.entries.futures.clear();
++        moduleState.entries.jsObjects.clear();
++        moduleState = null;
++      }
++      return 1;
++    },
++  };
++})()
++;
++  `,
++});
 diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
 index b3054be..9fe8bd7 100644
 --- a/lib/gfx/encoding.cpp

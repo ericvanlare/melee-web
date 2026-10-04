@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="icon" href="data:,">
+<title>Future owner populated WebGPU probe</title>
+<style>body { font: 14px monospace; margin: 16px; white-space: pre-wrap; }</style>
+<pre id="status">loading</pre>
+<script type="module">
+import {collect} from './wasm_abi_probe.mjs';
+const status = document.querySelector('#status');
+try {
+  const result = await collect('./aurora_future_owner_probe.js');
+  window.__abiProbeResult = result;
+  status.textContent = JSON.stringify({
+    result: result.result, failure: result.failure ?? null,
+    evidence: result.evidence, emdawn_link_anchor: result.emdawn_link_anchor,
+    webgpu_path: result.webgpu_path, before_work_state: result.before_work_state,
+    after_work_state: result.after_work_state,
+    future_ids: result.future_ids,
+    summary_bytes: result.summary_bytes,
+    row_bytes: result.row_bytes, row_count: result.row_count,
+    summary_result: result.summary_result, disposed: result.disposed,
+    real_cleanup: result.real_cleanup,
+    cleanup_state: result.cleanup_state,
+    cleanup_lifecycle: result.cleanup_lifecycle,
+    cleanup_pending_callbacks: result.cleanup_pending_callbacks,
+    cleanup_late_callback: result.cleanup_late_callback,
+    cleanup_observer: result.cleanup_observer ?? null,
+  }, null, 2);
+} catch (error) {
+  window.__abiProbeError = String(error && error.stack ? error.stack : error);
+  status.textContent = window.__abiProbeError;
+} finally {
+  window.__abiProbeDone = true;
+}
+</script>

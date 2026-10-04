@@ -1,0 +1,183 @@
+{
+  "schema": "melee-web-aurora-future-owner-accessor-v1",
+  "evidence_labels": [
+    "Compiled",
+    "ABI-only real-WebGPU diagnostic"
+  ],
+  "source": {
+    "main_base": "73c66e925634b6be1f9de924c59df83d3cbe40f9",
+    "native_build_commit": "05d0ca8b9be65dd785de3223313d2b6459b46841",
+    "harness_commit": "6b6ae24555ddf030e875d1650e5ec3d0fe13a652",
+    "native_inputs_unchanged_at_harness_commit": true,
+    "aurora_commit": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
+    "patch_sha256": "f4af73e2e1d2fb625461984a24e1fac599d0e0708fdbb89f2bc6f2635e54edbb"
+  },
+  "environment": {
+    "machine": "Mac mini Mac16,10",
+    "cpu": "Apple M4",
+    "memory_bytes": 17179869184,
+    "browser": "Installed Google Chrome 154.0.8037.97, headless, silent host output",
+    "configuration": "RelWithDebInfo",
+    "emscripten": "6.0.9",
+    "compiler_jobs": "scripts/build.py default"
+  },
+  "abi": {
+    "summary_bytes": 96,
+    "row_bytes": 32,
+    "supported": "single-threaded Emscripten Wasm32",
+    "unsupported_native_and_pthreads": -8,
+    "retained_reference_budget": 4096,
+    "tracked_entry_budget": 65536,
+    "budget_scope": "diagnostic caps, not authored WebGPU bounds",
+    "schema_version": 2
+  },
+  "validation": {
+    "bootstrap": {
+      "passed": true,
+      "elapsed_seconds": 24.128788833040744,
+      "receipt_sha256": "7c792e2190bbe85f75c5e291e6475b402256d1f49329428b3afc888ac9b65b26"
+    },
+    "affected_build": {
+      "passed": true,
+      "elapsed_seconds": 82.63536916696467,
+      "receipt_sha256": "2a522de83677bf8616c1e526e36d94130b4a12e74a64b4bfb40b5ed1d8075b86"
+    },
+    "actual_wasm_exports": {
+      "expected_functions": 24,
+      "actual_functions": 84,
+      "missing": [],
+      "receipt_sha256": "6c10333d200dcd488700ca16ac97bbc24fb66ea3e716e1b00bca3dff0efb2477"
+    },
+    "focused_controls": {
+      "passed": true,
+      "tests": 3,
+      "elapsed_seconds": 0.335,
+      "scope": "VM sparse-store/identity/output controls; native unsupported zero-write; publication-order flag perturbation"
+    },
+    "full_suite": {
+      "passed": true,
+      "tests": 1871,
+      "skipped": 141,
+      "test_elapsed_seconds": 374.194,
+      "owner_elapsed_seconds": 374.91322095901705,
+      "receipt_sha256": "433686293b3aae822fee7727f402db349facee673069599a42d963169cf147e8",
+      "source_head": "6b6ae24555ddf030e875d1650e5ec3d0fe13a652",
+      "source_pins_verified": 1692,
+      "source_unchanged": true,
+      "pid_and_group_absent": true
+    },
+    "browser": {
+      "passed": true,
+      "elapsed_seconds": 1.008083375170827,
+      "receipt_sha256": "7f20455ce2331adb662587397b5f6d01be47378bb0e5ba49eb8309588d4fde15",
+      "driver_sha256": "0b9cd0063c324f7fa0033d69d151cb23d476c32efb756f0f251dfbe8f5515d1f",
+      "cleanup_audit_sha256": "ee361775f3ac3b97cabade90ddd375cf8c0de44f59fd1aa46ce86e2b9551356a",
+      "console_errors": 0,
+      "page_errors": 0,
+      "owned_pids_verified_absent": 10,
+      "owned_groups_verified_absent": 2,
+      "listener_refused": true,
+      "temporary_profile_absent": true,
+      "source_and_bundle_unchanged": true,
+      "native_state_checkpoints": {
+        "before_adapter_state": 3,
+        "before_work_state": 255,
+        "after_work_state": 2559,
+        "cleanup_state": 322047
+      },
+      "future_ids": {
+        "adapter": "1",
+        "device": "2",
+        "work": "4"
+      },
+      "work_promise_identity": "6",
+      "real_cleanup": true,
+      "accessor_disposed": true,
+      "native_lifecycle": 3,
+      "pending_callbacks": 0,
+      "late_callback": 0,
+      "observer": {
+        "device_lost_reason": 2,
+        "device_lost_callbacks": 1,
+        "uncaptured_error_callbacks": 0,
+        "unexpected_callbacks": 0
+      },
+      "post_close_observation": "one event-loop turn"
+    }
+  },
+  "artifacts": {
+    "aurora_future_owner_probe.js": {
+      "sha256": "776832898d25faa2a891559dd2d997e1a3099c6b4b28449b592b98fd5874eb0a",
+      "bytes": 105472
+    },
+    "aurora_future_owner_probe.wasm": {
+      "sha256": "5f44f819d62ab368692bf9c8475aac6d8e845cb19793032e14ec30f41f17fd82",
+      "bytes": 1853264
+    },
+    "wasm_abi_probe.mjs": {
+      "sha256": "4feecccf967ffd846a82817bcb06d42bc77a0d6ced098442bb067f726cefd0d3",
+      "bytes": 14551
+    },
+    "aurora_future_owner_probe.html": {
+      "sha256": "c32f24f4abc771010eba052d44dd9cecc585269c0aa601f21adb0fe5d101de9d",
+      "bytes": 1499
+    }
+  },
+  "retained_evidence": {
+    "location": "private external run inventory; no binaries/profiles committed",
+    "first_browser_receipt_sha256": "6829725c2a154aea01343a2839d8d9c18ccf106bc4f49eb5bf2484a11c523cc6",
+    "first_browser_head": "05d0ca8b9be65dd785de3223313d2b6459b46841",
+    "first_browser_scope": "before publication-order guard was added; same compiled native inputs"
+  },
+  "restoration": "unsupported",
+  "exclusions": [
+    "gameplay",
+    "original native comparison",
+    "Promise or GPU graph restoration",
+    "heap snapshot/restore",
+    "eventual callback absence beyond observed close turn",
+    "SDK-store disposal or garbage collection",
+    "general memory leak claim",
+    "audio fidelity",
+    "physical input",
+    "foreground timing",
+    "performance admission",
+    "Slippi match/rematch or rollback acceptance"
+  ],
+  "reproduction": {
+    "bootstrap": [
+      "python3",
+      "scripts/bootstrap.py"
+    ],
+    "affected_build": [
+      "python3",
+      "scripts/build.py",
+      "--trace-target",
+      "aurora_future_owner_probe",
+      "--configuration",
+      "RelWithDebInfo"
+    ],
+    "focused": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-p",
+      "test_aurora_future_owner_accessor.py",
+      "-v"
+    ],
+    "full_suite": [
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-v"
+    ],
+    "browser_driver": "tests/aurora_future_owner_browser_driver.mjs; stage four files as described in the status entry and run under an owned ProcessSupervisor",
+    "workspace_ownership": "Use scripts/agent_workspace.py run for tools/tests and the normal build/bootstrap entry points"
+  }
+}

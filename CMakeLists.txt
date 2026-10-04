@@ -17,6 +17,11 @@ option(MELEE_WEB_PUBLIC_RUNTIME "Redact local paths from public artifacts" OFF)
 option(MELEE_WEB_AUDIO_PREVIEW_RUNTIME "Build the Release audio-enabled staging runtime" OFF)
 option(MELEE_WEB_PIPELINE_PROVENANCE "Private pipeline-use coverage recorder" OFF)
 option(MELEE_WEB_SELECTIVE_PIPELINES "Prepare certified descriptor unions before source interaction" OFF)
+option(MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC
+  "Build the opt-in read-only Emscripten Future/object ownership diagnostic" OFF)
+if(MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC AND NOT EMSCRIPTEN)
+  message(FATAL_ERROR "Aurora Future/object ownership diagnostic requires Emscripten")
+endif()
 if(MELEE_WEB_AUDIO_PREVIEW_RUNTIME AND NOT MELEE_WEB_PUBLIC_RUNTIME)
   message(FATAL_ERROR "Audio preview runtime must use the redacted public source boundary")
 endif()
@@ -280,6 +285,24 @@ if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/CMakeLists.txt")
 endif()
 include(cmake/PinnedArchives.cmake)
 add_subdirectory(.deps/aurora)
+
+# This target is deliberately opt-in and separate from the normal player.
+# The accessor only reads Emdawn's sparse Future/object stores; it does not
+# enroll callbacks, submit work, install handles, or authorize restoration.
+if(EMSCRIPTEN AND MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC)
+  add_executable(aurora_future_owner_probe EXCLUDE_FROM_ALL
+    tests/aurora_future_owner_probe.cpp
+    .deps/aurora/lib/gfx/aurora_browser_future_owner_accessor.cpp)
+  target_include_directories(aurora_future_owner_probe PRIVATE .deps/aurora/include)
+  target_link_libraries(aurora_future_owner_probe PRIVATE aurora::gx)
+  target_link_options(aurora_future_owner_probe PRIVATE
+    -sENVIRONMENT=web -sEXIT_RUNTIME=0 -sALLOW_MEMORY_GROWTH=1
+    -sMODULARIZE=1 -sEXPORT_ES6=1 -sEXPORT_NAME=FutureOwnerAbiFixture
+    -sEXPORTED_RUNTIME_METHODS=HEAPU8
+    "-sEXPORTED_FUNCTIONS=_main,_malloc,_free,_future_owner_abi_fixture,_future_owner_emdawn_link_anchor,_future_owner_capability,_future_owner_summary_bytes,_future_owner_summary,_future_owner_row_bytes,_future_owner_row_count,_future_owner_row,_future_owner_dispose,_future_owner_real_start,_future_owner_real_poll,_future_owner_real_submit,_future_owner_real_state,_future_owner_real_ids_bytes,_future_owner_real_ids,_future_owner_real_pending_callbacks,_future_owner_real_lifecycle,_future_owner_real_late_callback,_future_owner_real_observer_bytes,_future_owner_real_observer,_future_owner_real_cleanup"
+    "SHELL:--js-library=${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/lib/gfx/aurora_browser_future_owner_accessor_library.js")
+  set_target_properties(aurora_future_owner_probe PROPERTIES SUFFIX ".js")
+endif()
 if(MELEE_WEB_SELECTIVE_PIPELINES AND MELEE_WEB_PUBLIC_RUNTIME)
   target_compile_definitions(aurora_gx PRIVATE MELEE_WEB_ALPHA_PIPELINE_FALLBACK=1)
 endif()
