@@ -21,6 +21,8 @@ _Static_assert(sizeof(HSD_GObj) == 0x38 && offsetof(HSD_GObj, proc) == 0x18 &&
 _Static_assert(sizeof(HSD_GObjProc) == 0x18 && offsetof(HSD_GObjProc, gobj) == 0x10,
                "Original HSD process layout");
 _Static_assert(sizeof(HSD_ObjAllocData) == 0x2c, "Original object allocator layout");
+_Static_assert(sizeof(MeleeWebGameplayBootstrapState) == 128,
+               "Bootstrap state ABI requires Wasm32 layout");
 
 extern HSD_ObjAllocData gobj_alloc_data, gobjproc_alloc_data;
 
@@ -97,6 +99,59 @@ MeleeWebGameplayAllocation melee_web_gameplay_allocation(void)
     result.generation = allocation_generation;
     result.bytes = (uint64_t) (arena ? arena_bytes : session_bytes);
     return result;
+}
+
+static uint32_t bootstrap_pointer_identity(const void* pointer)
+{
+    return (uint32_t)(uintptr_t)pointer;
+}
+
+static uint32_t bootstrap_startup_identity(MeleeWebGameplayVSStartup callback)
+{
+    return (uint32_t)(uintptr_t)callback;
+}
+
+static uint32_t bootstrap_shutdown_identity(MeleeWebGameplayVSShutdown callback)
+{
+    return (uint32_t)(uintptr_t)callback;
+}
+
+static uint32_t bootstrap_finish_identity(void (*callback)(void))
+{
+    return (uint32_t)(uintptr_t)callback;
+}
+
+int melee_web_gameplay_bootstrap_state(MeleeWebGameplayBootstrapState* out,
+                                       uint32_t out_size)
+{
+    if (!out || out_size != sizeof(*out) || sizeof(void*) != sizeof(uint32_t))
+        return 0;
+    memset(out, 0, sizeof(*out));
+    out->abi_version = MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_ABI_VERSION;
+    out->abi_size = (uint32_t)sizeof(*out);
+    out->schema = MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_SCHEMA;
+    out->ticks = ticks;
+    out->disabled_links = disabled_links;
+    out->generation = generation;
+    out->allocation_generation = allocation_generation;
+    out->arena_bytes = (uint64_t)arena_bytes;
+    out->session_bytes = (uint64_t)session_bytes;
+    out->arena_identity = bootstrap_pointer_identity(arena);
+    out->session_identity = bootstrap_pointer_identity(session_arena);
+    out->heap_handle = (int32_t)heap;
+    out->object_kind_count = (uint32_t)object_kind_count;
+    out->stepping = (uint32_t)stepping;
+    out->shutting_down = (uint32_t)shutting_down;
+    out->tables_live = (uint32_t)tables_live;
+    out->vs_startup_pending = (uint32_t)vs_startup_pending;
+    out->startup_in_progress = (uint32_t)startup_in_progress;
+    out->vs_sis_live = (uint32_t)vs_sis_live;
+    out->vs_dynamics_ready = (uint32_t)vs_dynamics_ready;
+    out->vs_manager_ready = (uint32_t)vs_manager_ready;
+    out->vs_startup_callback = bootstrap_startup_identity(vs_startup_callback);
+    out->vs_shutdown_callback = bootstrap_shutdown_identity(vs_shutdown_callback);
+    out->finish_hsd_objects = bootstrap_finish_identity(finish_hsd_objects);
+    return 1;
 }
 
 int melee_web_gameplay_session_begin(size_t bytes, char* error, size_t error_size)

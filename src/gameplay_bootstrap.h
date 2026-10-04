@@ -24,6 +24,67 @@ typedef struct MeleeWebGameplayAllocation {
     uint64_t bytes;
 } MeleeWebGameplayAllocation;
 
+/* Read-only identity of every private scalar/pointer/callback owned by
+ * gameplay_bootstrap.c. Pointer and function fields are numeric identities;
+ * this record never grants a caller permission to dereference or restore
+ * them. The fixed layout is Wasm32-only and is diagnostic, not a snapshot
+ * admission or restore format. */
+typedef struct MeleeWebGameplayBootstrapState {
+    uint32_t abi_version;
+    uint32_t abi_size;
+    uint32_t schema;
+    uint32_t reserved0;
+    uint64_t ticks;
+    uint64_t disabled_links;
+    uint64_t generation;
+    uint64_t allocation_generation;
+    uint64_t arena_bytes;
+    uint64_t session_bytes;
+    uint32_t arena_identity;
+    uint32_t session_identity;
+    int32_t heap_handle;
+    uint32_t object_kind_count;
+    uint32_t stepping;
+    uint32_t shutting_down;
+    uint32_t tables_live;
+    uint32_t vs_startup_pending;
+    uint32_t startup_in_progress;
+    uint32_t vs_sis_live;
+    uint32_t vs_dynamics_ready;
+    uint32_t vs_manager_ready;
+    uint32_t vs_startup_callback;
+    uint32_t vs_shutdown_callback;
+    uint32_t finish_hsd_objects;
+    uint32_t reserved1;
+} MeleeWebGameplayBootstrapState;
+
+enum {
+    MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_ABI_VERSION = 1,
+    MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_SCHEMA = 0x47504253u /* GPBS */,
+};
+
+#if defined(__cplusplus)
+static_assert(sizeof(MeleeWebGameplayBootstrapState) == 128,
+              "Bootstrap state ABI must remain 128 bytes");
+static_assert(offsetof(MeleeWebGameplayBootstrapState, ticks) == 16 &&
+              offsetof(MeleeWebGameplayBootstrapState, arena_identity) == 64 &&
+              offsetof(MeleeWebGameplayBootstrapState, heap_handle) == 72 &&
+              offsetof(MeleeWebGameplayBootstrapState, stepping) == 80 &&
+              offsetof(MeleeWebGameplayBootstrapState, vs_startup_callback) == 112 &&
+              offsetof(MeleeWebGameplayBootstrapState, reserved1) == 124,
+              "Bootstrap state ABI offsets changed");
+#else
+_Static_assert(sizeof(MeleeWebGameplayBootstrapState) == 128,
+               "Bootstrap state ABI must remain 128 bytes");
+_Static_assert(offsetof(MeleeWebGameplayBootstrapState, ticks) == 16 &&
+               offsetof(MeleeWebGameplayBootstrapState, arena_identity) == 64 &&
+               offsetof(MeleeWebGameplayBootstrapState, heap_handle) == 72 &&
+               offsetof(MeleeWebGameplayBootstrapState, stepping) == 80 &&
+               offsetof(MeleeWebGameplayBootstrapState, vs_startup_callback) == 112 &&
+               offsetof(MeleeWebGameplayBootstrapState, reserved1) == 124,
+               "Bootstrap state ABI offsets changed");
+#endif
+
 /* Reserve one backing arena for an application session. The arena is not
  * initialized as an SDK heap until the first world starts. A session keeps the
  * allocation and its payload bytes across world shutdown/startup; ordinary
@@ -32,6 +93,9 @@ int melee_web_gameplay_session_begin(size_t heap_bytes, char* error, size_t erro
 int melee_web_gameplay_session_end(char* error, size_t error_size);
 int melee_web_gameplay_session_active(void);
 MeleeWebGameplayAllocation melee_web_gameplay_allocation(void);
+/* Public prototype for the typed read-only owner producer. */
+int melee_web_gameplay_bootstrap_state(MeleeWebGameplayBootstrapState* out,
+                                       uint32_t out_size);
 
 /* Owns a single isolated SDK heap and the HSD process tables. This nonrendering
  * bootstrap executes original allocation, object lifecycle and scheduling;

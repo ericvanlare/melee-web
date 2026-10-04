@@ -87,6 +87,90 @@ class SelectedTraceBuildTests(unittest.TestCase):
         self.assertIn("-DMELEE_WEB_PIPELINE_PROVENANCE=OFF", configure)
         self.assertIn("-DMELEE_WEB_SELECTIVE_PIPELINES=OFF", configure)
 
+    def test_bootstrap_diagnostic_is_off_for_an_existing_trace_by_default(self):
+        root = self._configured_root()
+        lock = {"repositories": {}, "emscripten": "6.0.9"}
+        generated = root / "build/gameplay-source/src"
+        with patch.object(BUILD, "read_lock", return_value=lock), \
+                patch.object(BUILD, "verify_sources"), \
+                patch.object(BUILD, "prepare_sources", return_value=generated), \
+                patch.object(BUILD.subprocess, "run") as run:
+            BUILD.build(1, root=root, trace_targets=("gameplay_snapshot_probe",))
+        configure_calls = [call for call in run.call_args_list if "-S" in call.args[0]]
+        self.assertEqual(len(configure_calls), 1)
+        configure = configure_calls[0].args[0]
+        self.assertIn("-DMELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE=OFF", configure)
+        self.assertNotIn("-DMELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE=ON", configure)
+
+    def test_bootstrap_diagnostic_requires_the_exact_snapshot_trace_and_forwards_on(self):
+        root = self._configured_root()
+        lock = {"repositories": {}, "emscripten": "6.0.9"}
+        generated = root / "build/gameplay-source/src"
+        with patch.object(BUILD, "read_lock", return_value=lock), \
+                patch.object(BUILD, "verify_sources"), \
+                patch.object(BUILD, "prepare_sources", return_value=generated), \
+                patch.object(BUILD.subprocess, "run") as run:
+            BUILD.build(1, root=root, trace_targets=("gameplay_snapshot_probe",),
+                        gameplay_bootstrap_state=True)
+        configure_calls = [call for call in run.call_args_list if "-S" in call.args[0]]
+        self.assertEqual(len(configure_calls), 1)
+        self.assertIn("-DMELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE=ON", configure_calls[0].args[0])
+        build_calls = [call for call in run.call_args_list if "--build" in call.args[0]]
+        self.assertEqual(build_calls[0].args[0][build_calls[0].args[0].index("--target") + 1:
+                                                 build_calls[0].args[0].index("-j")],
+                         ["gameplay_snapshot_probe"])
+
+    def test_bootstrap_diagnostic_configure_only_forwards_option_without_building(self):
+        root = self._configured_root()
+        lock = {"repositories": {}, "emscripten": "6.0.9"}
+        generated = root / "build/gameplay-source/src"
+        with patch.object(BUILD, "read_lock", return_value=lock), \
+                patch.object(BUILD, "verify_sources"), \
+                patch.object(BUILD, "prepare_sources", return_value=generated), \
+                patch.object(BUILD.subprocess, "run") as run:
+            BUILD.build(1, root=root, trace_targets=("gameplay_snapshot_probe",),
+                        gameplay_bootstrap_state=True, configure_only=True)
+        configure_calls = [call for call in run.call_args_list if "-S" in call.args[0]]
+        self.assertEqual(len(configure_calls), 1)
+        self.assertIn("-DMELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE=ON", configure_calls[0].args[0])
+        self.assertFalse([call for call in run.call_args_list if "--build" in call.args[0]])
+
+    def test_bootstrap_diagnostic_rejects_missing_wrong_multiple_and_other_target_before_subprocess(self):
+        cases = (
+            {"gameplay_bootstrap_state": True},
+            {"gameplay_bootstrap_state": True,
+             "trace_targets": ("gameplay_content_match_trace",)},
+            {"gameplay_bootstrap_state": True,
+             "trace_targets": ("gameplay_snapshot_probe", "gameplay_content_match_trace")},
+            {"gameplay_bootstrap_state": True, "target": "fighter"},
+            {"gameplay_bootstrap_state": True, "target": "fighter",
+             "trace_targets": ("gameplay_snapshot_probe",)},
+        )
+        for case in cases:
+            with self.subTest(case=case), \
+                    patch.object(BUILD, "read_lock") as read_lock, \
+                    patch.object(BUILD.subprocess, "run") as run:
+                with self.assertRaises(ValueError):
+                    BUILD.build(1, root=Path("/missing/repo"), **case)
+                read_lock.assert_not_called()
+                run.assert_not_called()
+
+    def test_normal_player_target_keeps_diagnostic_off_and_adds_no_export_setting(self):
+        root = self._configured_root()
+        lock = {"repositories": {}, "emscripten": "6.0.9"}
+        generated = root / "build/gameplay-source/src"
+        with patch.object(BUILD, "read_lock", return_value=lock), \
+                patch.object(BUILD, "verify_sources"), \
+                patch.object(BUILD, "prepare_sources", return_value=generated), \
+                patch.object(BUILD.subprocess, "run") as run:
+            BUILD.build(1, root=root, target="runtime")
+        configure_calls = [call for call in run.call_args_list if "-S" in call.args[0]]
+        self.assertEqual(len(configure_calls), 1)
+        configure = configure_calls[0].args[0]
+        self.assertIn("-DMELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE=OFF", configure)
+        self.assertNotIn("-DMELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE=ON", configure)
+        self.assertFalse(any("EXPORTED_FUNCTIONS" in argument for argument in configure))
+
     def test_trace_selection_rejects_other_target_graphs_before_source_work(self):
         for kwargs in (
             {"target": "fighter"},
