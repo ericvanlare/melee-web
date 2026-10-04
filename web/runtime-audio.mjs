@@ -54,6 +54,7 @@ export function createRuntimeAudio({assetBase, onEvent, onError, onFatal}) {
             node = new AudioWorkletNode(context, 'melee-audio-output', {
               numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
             });
+            node.onprocessorerror = () => onFatal(Error('Game audio stopped unexpectedly. Reload to recover.'));
             acknowledged = false;
             node.port.onmessage = ({data}) => {
               if (data.type === 'render-ready') {
@@ -65,7 +66,7 @@ export function createRuntimeAudio({assetBase, onEvent, onError, onFatal}) {
                 acknowledged = true;
                 for (const waiter of waiters.splice(0)) { clearTimeout(waiter.timer); waiter.resolve(); }
               }
-              if (data.error) onError(Error(data.error));
+              if (data.error) onFatal(Error(data.error));
               onEvent({...data, context_state: context.state,
                 audio_clock_seconds: context.currentTime, enabled});
             };
