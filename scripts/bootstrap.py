@@ -13,13 +13,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from workspace_resources import operation
 
-# Tree produced by the currently reviewed Aurora patch before the read-only
-# Future/object accessor additions below.  Bootstrap uses this exact tree as
-# its predecessor so it cannot overwrite an unrelated Aurora working tree.
-# The predecessor also contains the already-reviewed staging changes (source
-# blob 2a5b73c7581aa7683b2f99ae0b28bf771b2b96e7); recognize this exact tree,
-# never an arbitrary locally modified checkout.
-AURORA_PREVIOUS_PATCH_TREE = "ba1bbed8acbd886ed263468e3d9148163e4afc68"
+# Recognized predecessors for the combined Future/object and browser-owner
+# patch. The first is the installed earlier owner diagnostic tree observed in
+# this checkout; the second is the clean-main predecessor retained by the
+# Future/object bootstrap path. Both are exact isolated-index trees, never an
+# arbitrary locally modified checkout.
+AURORA_PREVIOUS_PATCH_TREES = (
+    "980aec703ceb03604f7692cb4efd91779f920078",
+    "ba1bbed8acbd886ed263468e3d9148163e4afc68",
+)
 
 
 def run(*args, cwd=ROOT):
@@ -148,7 +150,13 @@ def apply_patch(path, patch, *, previous_tree=None):
     pristine, expected, actual = _patch_trees(path, patch)
     if actual == expected:
         return
-    if actual != pristine and actual != previous_tree:
+    if previous_tree is None:
+        recognized_predecessors = set()
+    elif isinstance(previous_tree, str):
+        recognized_predecessors = {previous_tree}
+    else:
+        recognized_predecessors = set(previous_tree)
+    if actual != pristine and actual not in recognized_predecessors:
         raise ValueError(f"{path.name}: changes differ from {patch.name}; refusing to overwrite or build")
     # Apply only the delta from an explicitly recognized tree. Reversing the
     # whole old patch would touch unchanged sources and invalidate build caches.
@@ -186,7 +194,7 @@ def _bootstrap(root=ROOT):
         path = ensure_repository(deps, name, spec)
         if name != "aurora":
             require_clean(path)
-    apply_patch(deps / "aurora", patch, previous_tree=AURORA_PREVIOUS_PATCH_TREE)
+    apply_patch(deps / "aurora", patch, previous_tree=AURORA_PREVIOUS_PATCH_TREES)
 
     env_dir = root / ".venv"
     if env_dir.is_symlink():
