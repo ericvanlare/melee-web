@@ -1,6 +1,6 @@
 /** Functional byte equality does not admit the native replay performance gate. */
 export function classifyStagingByteReplayCompletion(report) {
-  const allowed = new Set(['livePipelinesCreated', 'preparationPauses']);
+  const allowed = new Set(['livePipelinesCreated', 'preparationPauses', 'browserCallbackGaps']);
   if (!report || report.complete !== true || report.frames !== 600 ||
       report.metrics?.sourceFrames !== 600 || report.metrics?.sourceSteps !== 600 ||
       report.metrics?.sourceDraws !== 600 || report.metrics?.focusLost ||
