@@ -13,7 +13,7 @@ function capture(slot, {rendererOffset = 0, mismatchAt = null, cursorMismatchAt 
   const frames = Array.from({length: STAGING_RING_BYTE_HASH_FRAME_CAP}, (_, index) => ({
     gameplay_ordinal: index + 1,
     source_cursor: index,
-    source_frame: index + 1,
+    source_frame: Math.max(0, index - 120),
     source_draw_ordinal: index + 1,
     renderer_frame_id: index + rendererOffset,
     renderer_frame_index: index + rendererOffset,
@@ -35,7 +35,7 @@ function installMockCapture() {
     capture: () => window.__meleeWebStagingByteCapture}));
 }
 
-function fakeFrame(sourceFrame = 1, sourceCursor = 0, slot = 0, marker = 'a') {
+function fakeFrame(sourceFrame = 0, sourceCursor = 0, slot = 0, marker = 'a') {
   return {frame_id: 100, frame_index: 99, staging_slot: slot,
     source_frame: sourceFrame, source_cursor: sourceCursor,
     writes: [{destination_role: 0, destination_offset: 0, byte_length: 16, sha256: marker.repeat(64)}]};
@@ -96,16 +96,16 @@ test('mock installer fails duplicate, missing, or reordered tagged draws', async
   const {page, capture: current} = await installMockCapture();
   await armStagingRingByteCapture(page);
   const installed = current();
-  assert.equal(installed.setSourceDrawTag(1, 0), true);
-  installed.recordFrame(fakeFrame(1, 0));
+  assert.equal(installed.setSourceDrawTag(0, 0), true);
+  installed.recordFrame(fakeFrame(0, 0));
   assert.equal(installed.frames.length, 1);
   assert.equal(installed.setSourceDrawTag(3, 2), false);
   assert.deepEqual(installed.errors, ['missing_duplicate_or_reordered_source_cursor']);
 
   const duplicateCapture = await installMockCapture();
   await armStagingRingByteCapture(duplicateCapture.page);
-  assert.equal(duplicateCapture.capture().setSourceDrawTag(1, 0), true);
-  duplicateCapture.capture().recordFrame(fakeFrame(1, 0));
+  assert.equal(duplicateCapture.capture().setSourceDrawTag(0, 0), true);
+  duplicateCapture.capture().recordFrame(fakeFrame(0, 0));
   assert.equal(duplicateCapture.capture().setSourceDrawTag(2, 0), false);
   assert.deepEqual(duplicateCapture.capture().errors, ['missing_duplicate_or_reordered_source_cursor']);
 });
@@ -115,8 +115,8 @@ test('capture stops at cursor 599, and later catch-up draws do not overflow the 
   await armStagingRingByteCapture(page);
   const installed = current();
   for (let cursor = 0; cursor < 600; cursor++) {
-    assert.equal(installed.setSourceDrawTag(cursor + 1, cursor), true);
-    installed.recordFrame(fakeFrame(cursor + 1, cursor, cursor % 4));
+    assert.equal(installed.setSourceDrawTag(Math.max(0, cursor - 120), cursor), true);
+    installed.recordFrame(fakeFrame(Math.max(0, cursor - 120), cursor, cursor % 4));
   }
   assert.equal(installed.status, 'complete');
   assert.equal(installed.expected_cursor, 600);
@@ -127,4 +127,15 @@ test('capture stops at cursor 599, and later catch-up draws do not overflow the 
   assert.equal(installed.overflow, false);
   const snapshot = await readStagingRingByteCapture(page);
   assert.equal(snapshot.frames.length, 600);
+});
+
+test('raw original match counter may hold during entry, but its origin and cross-ring identity remain checked', async () => {
+  const {page, capture: current} = await installMockCapture();
+  await armStagingRingByteCapture(page);
+  assert.equal(current().setSourceDrawTag(1, 0), false);
+  assert.deepEqual(current().rejected_source_tag,
+    {source_frame: 1, source_cursor: 0, expected_cursor: 0});
+  const other = capture(3);
+  other.frames[150].source_frame++;
+  assert.throws(() => compareStagingRingByteCaptures(capture(0), other), /mismatch at gameplay ordinal 151/);
 });

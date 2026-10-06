@@ -17,6 +17,7 @@ const {values} = parseArgs({options: {
   'build-dir': {type: 'string'}, slots: {type: 'string'}, playwright: {type: 'string'},
   'phase-timeout-ms': {type: 'string', default: '180000'},
   'capture-timeout-ms': {type: 'string', default: '300000'},
+  'capture-prefix': {type: 'string', default: '600'},
 }});
 
 function integer(name, min, max) {
@@ -29,6 +30,7 @@ if (!values.url || !values.disc || !values.recipe || !values.out || !values['bui
 }
 const slots = Number(values.slots);
 if (![2, 4].includes(slots)) throw Error('--slots must be 2 or 4');
+const prefixFrames = integer('capture-prefix', 1, 600);
 const phaseTimeoutMs = integer('phase-timeout-ms', 1000, 600000);
 const captureTimeoutMs = integer('capture-timeout-ms', 1000, 1200000);
 const url = new URL(values.url);
@@ -261,6 +263,7 @@ try {
     if (replayReport?.pass === true && status.status !== 'complete') {
       throw Error(`Native replay completed before the byte capture reached 600 rows: ${JSON.stringify(status)}`);
     }
+    if (prefixFrames < 600 && status.frame_count >= prefixFrames) break;
     if (status.status === 'complete' && replayReport?.pass === true) break;
     await page.waitForTimeout(100);
   }
@@ -275,14 +278,14 @@ try {
   if (report.ring_status_after?.frame_slots !== slots || report.ring_status_after?.staging_buffers !== slots) {
     throw Error('Active staging ring identity changed during capture');
   }
-  if (Date.now() >= deadline && status.status !== 'complete') throw Error('600-frame capture exceeded its wall-time bound');
-  if (report.capture.status !== 'complete' || report.capture.frame_count !== 600 ||
-      report.capture.pending_frame_count !== 0 || report.capture.errors?.length || report.capture.overflow) {
+  if (Date.now() >= deadline && status.status !== 'complete' && status.frame_count < prefixFrames) throw Error('600-frame capture exceeded its wall-time bound');
+  if (prefixFrames === 600 && (report.capture.status !== 'complete' || report.capture.frame_count !== 600 ||
+      report.capture.pending_frame_count !== 0 || report.capture.errors?.length || report.capture.overflow)) {
     throw Error(`600-frame capture failed: ${JSON.stringify(status)}`);
   }
-  if (replayReport?.pass !== true || replayReport?.complete !== true || replayReport?.frames !== 600 ||
+  if (prefixFrames === 600 && (replayReport?.pass !== true || replayReport?.complete !== true || replayReport?.frames !== 600 ||
       replayReport?.metrics?.sourceFrames !== 600 || replayReport?.metrics?.sourceSteps !== 600 ||
-      replayReport?.metrics?.sourceDraws !== 600) {
+      replayReport?.metrics?.sourceDraws !== 600)) {
     throw Error(`600-frame native replay did not complete cleanly: ${JSON.stringify(replayReport)}`);
   }
   report.build_artifacts_after = await buildArtifacts(buildDirectory);
@@ -291,7 +294,10 @@ try {
   }
   if (report.browser_errors.length) throw Error('Browser errors were retained during byte capture');
   report.screenshots.success = await takeScreenshot(page, output, 'capture-success');
-  report.result = 'captured';
+  report.result = prefixFrames === 600 ? 'captured' : 'prefix_captured';
+  report.requested_prefix_frames = prefixFrames;
+  report.fixture_gameplay_progression = report.capture.entry_progress;
+  report.fixture_active_gameplay_observed = report.capture.entry_progress.some(row => row.match?.ready === true && row.source_frame > 0);
 } catch (error) {
   report.failure = String(error?.stack || error);
   if (liveCapture && page && !page.isClosed()) {

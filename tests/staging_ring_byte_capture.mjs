@@ -17,6 +17,7 @@ export async function installStagingRingByteCapture(page, frameCap = STAGING_RIN
       active: false,
       status: 'installed',
       frames: [],
+      entry_progress: [],
       errors: [],
       overflow: false,
       expected_cursor: 0,
@@ -38,7 +39,7 @@ export async function installStagingRingByteCapture(page, frameCap = STAGING_RIN
         capture.active = true;
         capture.status = 'capturing';
         capture.started_at_ms = performance.now();
-        return {status: capture.status, cap: capture.cap, start_cursor: 0, source_frame: 1};
+        return {status: capture.status, cap: capture.cap, start_cursor: 0, source_frame: 0};
       },
       setSourceDrawTag(sourceFrame, sourceCursor) {
         if (!capture.active) return false;
@@ -47,12 +48,19 @@ export async function installStagingRingByteCapture(page, frameCap = STAGING_RIN
           return false;
         }
         if (!Number.isInteger(sourceCursor) || !Number.isInteger(sourceFrame) ||
-            sourceCursor !== capture.expected_cursor || sourceFrame !== sourceCursor + 1) {
+            sourceCursor !== capture.expected_cursor || sourceFrame < 0 ||
+            (sourceCursor === 0 && sourceFrame !== 0)) {
           capture.rejected_source_tag = {source_frame: sourceFrame, source_cursor: sourceCursor,
             expected_cursor: capture.expected_cursor};
           capture.fail(capture.expected_cursor === 0 ? 'first_source_cursor_or_frame_mismatch' :
             'missing_duplicate_or_reordered_source_cursor');
           return false;
+        }
+        if ([0, 119, 239, 599].includes(sourceCursor)) {
+          let match = null;
+          try { match = JSON.parse(window.Module.UTF8ToString(window.Module._melee_web_native_menu_match_observe())); }
+          catch {}
+          capture.entry_progress.push({source_cursor: sourceCursor, source_frame: sourceFrame, match});
         }
         capture.current_source_tag = {source_cursor: sourceCursor, source_frame: sourceFrame,
           gameplay_ordinal: sourceCursor + 1, source_draw_ordinal: sourceCursor + 1};
@@ -74,7 +82,7 @@ export async function installStagingRingByteCapture(page, frameCap = STAGING_RIN
           capture.fail('source_tag_frame_mismatch');
           return;
         }
-        if (tag.source_cursor !== capture.expected_cursor || tag.source_frame !== tag.source_cursor + 1) {
+        if (tag.source_cursor !== capture.expected_cursor) {
           capture.fail('missing_duplicate_or_reordered_source_cursor');
           return;
         }
@@ -124,6 +132,7 @@ export async function installStagingRingByteCapture(page, frameCap = STAGING_RIN
           started_at_ms: capture.started_at_ms,
           completed_at_ms: capture.completed_at_ms,
           frames: capture.frames.slice(),
+          entry_progress: capture.entry_progress.slice(),
         };
       },
     };
@@ -166,7 +175,8 @@ function validateCapture(label, capture, expectedSlots) {
   for (let index = 0; index < required; index++) {
     const row = capture.frames[index];
     if (!row || row.gameplay_ordinal !== index + 1 || row.source_cursor !== index ||
-        row.source_frame !== index + 1 || row.source_draw_ordinal !== index + 1 ||
+        !Number.isInteger(row.source_frame) || row.source_frame < 0 ||
+        (index === 0 && row.source_frame !== 0) || row.source_draw_ordinal !== index + 1 ||
         !Array.isArray(row.writes) || row.writes.length > 5) {
       throw new Error(`${label} capture has a missing, duplicate, or reordered source cursor at gameplay ordinal ${index + 1}`);
     }
@@ -194,7 +204,7 @@ export function compareStagingRingByteCaptures(twoSlot, fourSlot) {
   return {
     status: 'equal',
     comparison: 'SHA-256 plus exact byte length/role/offset for every submitted Queue.WriteBuffer range',
-    compared_identity: 'gameplay ordinal, MWRCv4 input cursor, source frame, and exact submitted ranges; renderer-global IDs and staging-slot IDs are retained as provenance only',
+    compared_identity: 'gameplay ordinal, MWRCv4 input cursor, actual original match counter (which can hold during entry), and exact submitted ranges; renderer-global IDs and staging-slot IDs are retained as provenance only',
     normalized_field: 'staging_slot only',
     frames: required,
     fingerprinted_write_count: twoSlot.frames.reduce((sum, frame) => sum + frame.writes.length, 0),
