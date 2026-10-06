@@ -19,6 +19,25 @@ spikes visible without recording every source frame.
 The native bridge uses one fixed 152-byte stack row to stay within the pinned
 Emscripten argument limit; it reads only these named numeric fields.
 
+The optional staging snapshot is enabled only on loopback with
+`?melee-web-staging-diagnostics=1`. It samples at most once per 100 ms into a
+100-row numeric ring (5,600 bytes) and takes one fresh sample at an unexpected
+incident. Peaks observed between retained rows are carried into the next row,
+so JS rate limiting does not discard a destructive native snapshot's maximum.
+The local incident contains the active slot count, peak sampled occupied
+slots in the preceding ten seconds, queue completion registrations and
+callbacks observed in that window, peak queue-completion callback latency, and
+the source frame associated with the latest observed queue callback. It stores no draw payload,
+GPU address, player input, or device identifier. The delivery adapter omits
+these local-only fields from the shared wire report.
+
+Queue-completion callback latency is elapsed time from registering
+`Queue.OnSubmittedWorkDone` until its callback is observed. It includes GPU
+queue work and browser callback delivery, so CPU contention or event-loop delay
+can increase it. It is not a hardware GPU execution duration; timestamp-query
+profiling is not enabled by this recorder. The staging snapshot is incident
+context and cannot by itself classify a pause cause.
+
 The first [packaged browser receipt](evidence/runtime-recorder-v1.json) measures
 collection, a full 100-row capture, serialization and awaited isolated storage.
 It justifies these bounded defaults for the observed CSS diagnostic workload;

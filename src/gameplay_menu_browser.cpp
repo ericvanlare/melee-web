@@ -121,7 +121,19 @@ int diagnostic_source_frame(){
         results?static_cast<int>(results->source_frames()):
         prize?static_cast<int>(prize->source_frames()):-1;
 }
-void diagnostic_incident(int reason,double value,double threshold,int clock_owner){
+void diagnostic_staging_sample(bool force=false){
+ if(!aurora_browser_staging_diagnostics_enabled())return;
+ const auto staging=aurora_browser_staging_diagnostic_snapshot();
+ EM_ASM({try{window.menuDiagnosticStagingSample?.(
+  $0,$1,$2,$3,$4,$5,$6,$7);
+ }catch(_){}},emscripten_get_now(),static_cast<int>(staging.activeSlots),
+    static_cast<int>(staging.occupiedSlots),
+    static_cast<double>(staging.queueCompletionRegistrations),
+    static_cast<double>(staging.queueCompletionCallbacks),
+    staging.peakQueueCompletionCallbackMs,staging.lastQueueCallbackSourceFrame,force?1:0);
+}
+void diagnostic_incident(int reason,double value=0,double threshold=0,int clock_owner=0){
+ diagnostic_staging_sample(true);
  EM_ASM({try{window.menuDiagnosticIncident?.($0,$1,$2,$3,$4,$5);}catch(_){}},
         reason,value,threshold,diagnostic_source_frame(),melee_web_native_menu_phase(),clock_owner);
 }
@@ -1164,7 +1176,21 @@ void tick(){
     }
    }
    draw_done=emscripten_get_now();
-   aurora_end_frame();end_done=emscripten_get_now();check(drawn,error);
+   const bool completed_input_draw=match&&drew_source&&source_frames.pending();
+   const bool tag_staging_byte_draw=aurora_browser_staging_byte_hash_enabled()&&
+       completed_input_draw&&replay&&replay->version==4&&replay_cursor>0&&!replay_final_draw;
+   const bool collect_staging_diagnostics=aurora_browser_staging_diagnostics_enabled();
+   if(tag_staging_byte_draw){
+    EM_ASM({window.__meleeWebStagingByteCapture?.setSourceDrawTag($0,$1);},
+           static_cast<int>(match->source_frames()),static_cast<int>(replay_cursor-1));
+   }
+   if(collect_staging_diagnostics)
+    aurora_browser_staging_set_diagnostic_source_frame(
+      drew_source?static_cast<int32_t>(diagnostic_source_frame()):-1);
+   aurora_end_frame();
+   if(tag_staging_byte_draw)EM_ASM({window.__meleeWebStagingByteCapture?.clearSourceDrawTag();});
+   if(collect_staging_diagnostics)aurora_browser_staging_set_diagnostic_source_frame(-1);
+   end_done=emscripten_get_now();check(drawn,error);
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
    melee_web_provenance_frame(0);
    if(drew_source)provenance_return_draw=false;
@@ -1594,6 +1620,7 @@ void tick(){
         stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines),
         stat_delta(stats_after.createdPipelines,stats_before.createdPipelines),
         callback_texture_upload,source_frames.steps(),source_frames.draws(),running);
+ diagnostic_staging_sample();
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
  publish_runtime_timing({
   .started=started,

@@ -129,8 +129,8 @@ if(values['incident-capture-preflight']){
   console.log(JSON.stringify(await runIncidentCapturePreflight()));
   process.exit(0);
 }
-if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--stage-setup-only] [--stage-kind final-destination|battlefield] [--wall-bound-seconds SECONDS] [--stop-on-timing-pause] [--controlled-contention] [--user-data-dir EXTERNAL_PROFILE] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK] [--readiness-preflight] [--stage-map-preflight]');
+if(!values.url||!values.disc||!values.out||!['A','B','M'].includes(values.lineup))
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B|M [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--stage-setup-only] [--stage-kind final-destination|battlefield] [--wall-bound-seconds SECONDS] [--stop-on-timing-pause] [--controlled-contention] [--user-data-dir EXTERNAL_PROFILE] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK] [--readiness-preflight] [--stage-map-preflight]');
 const stageKind=values['stage-kind']||'final-destination';
 if(!Object.hasOwn(stages,stageKind))
   throw Error('--stage-kind must be final-destination or battlefield');
@@ -219,7 +219,8 @@ function sourceProvenance(){
     tracked_diff_sha256:createHash('sha256').update(
       execFileSync('git',['diff','--binary','HEAD'],{cwd:repository})).digest('hex')};
 }
-const lineup=values.lineup==='A'?
+const lineup=values.lineup==='M'?
+  Array.from({length:4},()=>({name:'Mario',kind:8,position:null})):values.lineup==='A'?
   [{name:'Game & Watch',kind:3,position:[7.1,2.5]},
    {name:'Kirby',kind:4,position:[0.1,9.5]},
    {name:'Ice Climbers',kind:14,position:[-6.9,9.5]},

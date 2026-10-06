@@ -71,6 +71,55 @@ const nativeRow = (timestamp, sourceFrame = 12) => [
   assert.deepEqual(incidentIds.slice(-4), report.incidents.map(incident => incident.id));
 }
 
+// Staging measurements are collected only after explicit enablement and are
+// reduced to a ten-second scalar summary on the local incident boundary.
+{
+  let timestamp = 0;
+  const diagnostics = createRuntimeDiagnostics({now: () => timestamp, stagingDiagnosticsEnabled: true});
+  diagnostics.observeStaging(0, 2, 1, 1, 0, -1, -1);
+  timestamp = 100;
+  diagnostics.observeStaging(100, 2, 2, 2, 1, 4.25, 3);
+  timestamp = 200;
+  diagnostics.observeStaging(200, 2, 1, 3, 2, 9.5, 4);
+  diagnostics.trigger(1, 61, 60, 4, 7, 1);
+  const staging = diagnostics.exportReports().incidents[0].staging;
+  assert.deepEqual(staging, {
+    window_ms: 10000,
+    sample_count: 3,
+    active_slots: 2,
+    peak_occupied_slots: 2,
+    queue_completion_registrations: 2,
+    queue_completion_callbacks: 2,
+    peak_queue_completion_callback_ms: 9.5,
+    last_queue_callback_source_frame: 4,
+  });
+
+  const disabled = createRuntimeDiagnostics({now: () => timestamp});
+  assert.equal(disabled.observeStaging(100, 2, 1, 1, 1, 5, 1), false);
+  disabled.trigger(1, 61, 60, 4, 7, 1);
+  assert.equal(disabled.exportReports().incidents[0].staging, null);
+}
+
+// A destructive native snapshot can arrive between accepted JS rows. Preserve
+// its peaks until the next retained row so rate limiting cannot erase them.
+{
+  let timestamp = 0;
+  const diagnostics = createRuntimeDiagnostics({now: () => timestamp, stagingDiagnosticsEnabled: true});
+  diagnostics.observeStaging(0, 2, 1, 0, 0, -1, -1);
+  timestamp = 50;
+  assert.equal(diagnostics.observeStaging(50, 2, 2, 1, 1, 20, 4), false,
+    'the 50ms native snapshot is throttled from the 100ms JS ring');
+  timestamp = 100;
+  assert.equal(diagnostics.observeStaging(100, 2, 1, 2, 2, 5, 5), true);
+  diagnostics.trigger(1, 61, 60, 5, 7, 1);
+  const staging = diagnostics.exportReports().incidents[0].staging;
+  assert.equal(staging.sample_count, 2);
+  assert.equal(staging.peak_occupied_slots, 2,
+    'occupied slots report the peak observed across snapshots');
+  assert.equal(staging.peak_queue_completion_callback_ms, 20,
+    'the dropped snapshot peak survives until an accepted row');
+}
+
 // Trigger and recovery context are bounded structured records.  Unknown
 // reason/detail strings do not cross the export boundary.
 {
@@ -249,10 +298,13 @@ const nativeRow = (timestamp, sourceFrame = 12) => [
 // storage bytes, and reject unknown keys or oversized numeric payloads.
 {
   let retained = [];
-  const writer = createRuntimeDiagnostics({storage: {load: () => retained, save: records => { retained = records; }}, wallNow: () => 100});
+  const writer = createRuntimeDiagnostics({storage: {load: () => retained, save: records => { retained = records; }},
+    wallNow: () => 100, stagingDiagnosticsEnabled: true});
+  writer.observeStaging(0, 2, 1, 1, 1, 3.5, 8, true);
   writer.trigger(1, 4, 8, -1, 7, 1);
   await writer.setActive(false);
   const valid = retained[0];
+  assert.equal(valid.incident.staging.peak_occupied_slots, 1);
   const tampered = structuredClone(valid);
   tampered.incident.reason = 'private arbitrary text';
   const oversized = structuredClone(valid);

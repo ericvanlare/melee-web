@@ -294,7 +294,7 @@ index 0000000000000000000000000000000000000000..2ecd22a6c10e9caf99ce33d9c0a465a0
 +              "future owner row identity offset changed");
 +#endif
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
-index 94504b177d6733244a9de40a8dfb49f5964363ae..b83467626ca164d25409393f95b22daf9e6de01b 100644
+index 94504b177d6733244a9de40a8dfb49f5964363ae..a703b3b42b4245f56d8199544416b3f836de4fce 100644
 --- a/include/aurora/gfx.h
 +++ b/include/aurora/gfx.h
 @@ -3,10 +3,12 @@
@@ -310,7 +310,7 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..b83467626ca164d25409393f95b22daf
  #endif
  
  #if !defined(NDEBUG) && !defined(AURORA_GFX_DEBUG_GROUPS)
-@@ -26,8 +28,161 @@ typedef struct {
+@@ -26,8 +28,176 @@ typedef struct {
    uint32_t lastIndexSize;
    uint32_t lastStorageSize;
    uint32_t lastTextureUploadSize;
@@ -370,6 +370,21 @@ index 94504b177d6733244a9de40a8dfb49f5964363ae..b83467626ca164d25409393f95b22daf
 +  uint32_t workerBusy;
 +} AuroraBrowserSubmissionStatus;
 +AuroraBrowserSubmissionStatus aurora_browser_submission_status();
++
++/** Explicit local-only staging diagnostics. This snapshot does not pump browser
++ * callbacks or wait; queue-completion latency includes callback delivery time. */
++typedef struct {
++  uint32_t activeSlots;
++  uint32_t occupiedSlots;
++  uint64_t queueCompletionRegistrations;
++  uint64_t queueCompletionCallbacks;
++  double peakQueueCompletionCallbackMs;
++  int32_t lastQueueCallbackSourceFrame;
++} AuroraBrowserStagingDiagnosticSnapshot;
++int aurora_browser_staging_diagnostics_enabled();
++AuroraBrowserStagingDiagnosticSnapshot aurora_browser_staging_diagnostic_snapshot();
++void aurora_browser_staging_set_diagnostic_source_frame(int32_t sourceFrame);
++int aurora_browser_staging_byte_hash_enabled();
 +
 +/* Diagnostic-only browser ownership view. The five stream fields mirror the
 + * authored BrowserFrameStaging members; no restore operation consumes them. */
@@ -1486,10 +1501,10 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..9fe8bd7426cee8680344ad5c719debc4
    switch (op.type) {
    case FrameOpType::RenderPass:
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9106da735 100644
+index 9fd83efc28ad8a19c3e902a6efc1096126982583..69165bf66d60d95bf2c20ac5e2fb37b124e2060b 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
-@@ -1,4 +1,10 @@
+@@ -1,7 +1,16 @@
 +#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 +#include "pipeline_provenance_runtime.h"
 +#endif
@@ -1500,7 +1515,13 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
  
  #include "depth_peek.hpp"
  #include "pipeline_cache.hpp"
-@@ -16,9 +22,12 @@
++#ifdef __EMSCRIPTEN__
++#include "pipeline_prepare_state.hpp"
++#endif
+ #include "recording.hpp"
+ #include "render_worker.hpp"
+ #include "resource_cache.hpp"
+@@ -16,9 +25,12 @@
  #include "../webgpu/gpu_prof.hpp"
  
  #include <array>
@@ -1513,7 +1534,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
  #include <deque>
  #include <mutex>
  #include <optional>
-@@ -27,6 +36,9 @@
+@@ -27,6 +39,9 @@
  #include <utility>
  #include <vector>
  
@@ -1523,7 +1544,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
  #include <tracy/Tracy.hpp>
  #include <magic_enum.hpp>
  
-@@ -36,6 +48,14 @@ using webgpu::g_device;
+@@ -36,6 +51,14 @@ using webgpu::g_device;
  using webgpu::g_instance;
  using webgpu::g_queue;
  
@@ -1538,10 +1559,166 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
  namespace {
  constexpr Module Log{"aurora::gfx"};
  
-@@ -49,6 +69,69 @@ enum class BufferMapState {
+@@ -49,12 +72,336 @@ enum class BufferMapState {
  
  std::array<wgpu::Buffer, StagingBufferCount> g_stagingBuffers;
  std::array<std::atomic<BufferMapState>, StagingBufferCount> g_mappingStates;
++#ifdef __EMSCRIPTEN__
++size_t g_activeBrowserFrameSlotCount = 2;
++bool g_browserStagingByteHashEnabled = false;
++bool g_browserStagingDiagnosticsEnabled = false;
++std::atomic_uint64_t g_browserQueueCompletionRegistrations{0};
++std::atomic_uint64_t g_browserQueueCompletionCallbacks{0};
++std::atomic<double> g_browserPeakQueueCompletionCallbackMs{-1.0};
++std::atomic<int32_t> g_browserLastCompletedSourceFrame{-1};
++std::atomic<int32_t> g_browserDiagnosticSourceFrame{-1};
++
++size_t resolve_browser_frame_slot_count() noexcept {
++  return static_cast<size_t>(EM_ASM_INT({
++    try {
++      const host = window.location.hostname;
++      const localHost = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
++      const nav = window.navigator;
++      const userAgent = nav.userAgent || '';
++      const mobileUserAgent = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
++      const touchMac = /Macintosh/i.test(userAgent) && nav.maxTouchPoints > 1;
++      const mobile = nav.userAgentData ? nav.userAgentData.mobile : mobileUserAgent || touchMac;
++      const requested = new URLSearchParams(window.location.search).get('melee-web-staging-slots');
++      if (!localHost) {
++        window.__meleeWebStagingRingSelection = {
++          requested_frame_slots: requested,
++          selected_frame_slots: 2,
++          reason: 'non_loopback_fixed_two',
++          selector_scope: 'loopback desktop browser experiment',
++        };
++        return 2;
++      }
++      if (mobile || mobileUserAgent || touchMac) {
++        window.__meleeWebStagingRingSelection = {
++          requested_frame_slots: requested,
++          selected_frame_slots: 2,
++          reason: 'mobile_fixed_two',
++          selector_scope: 'loopback desktop browser experiment',
++        };
++        return 2;
++      }
++      const desktop = /Windows NT|Macintosh|X11|Linux x86_64|CrOS/i.test(userAgent);
++      if (!desktop) {
++        window.__meleeWebStagingRingSelection = {
++          requested_frame_slots: requested,
++          selected_frame_slots: 2,
++          reason: 'unsupported_user_agent_fixed_two',
++          selector_scope: 'loopback desktop browser experiment',
++        };
++        return 2;
++      }
++      const selected = requested === '4' ? 4 : 2;
++      window.__meleeWebStagingRingSelection = {
++        requested_frame_slots: requested,
++        selected_frame_slots: selected,
++        reason: requested === '4' ? 'explicit_local_desktop_opt_in' :
++          requested !== null && requested !== '2' ? 'invalid_request_fixed_two' : 'default_two',
++        selector_scope: 'loopback desktop browser experiment',
++      };
++      return selected;
++    } catch (_) {
++      return 2;
++    }
++  }));
++}
++
++bool resolve_browser_staging_byte_hash_enabled() noexcept {
++#if defined(__EMSCRIPTEN_PTHREADS__)
++  EM_ASM({
++    const selection = window.__meleeWebStagingRingSelection;
++    if (!selection) return;
++    const requested = new URLSearchParams(window.location.search)
++      .get('melee-web-staging-byte-hash') === '1';
++    selection.byte_hash_requested = requested;
++    selection.byte_hash_enabled = false;
++    selection.byte_hash_reason = requested ? 'threaded_renderer_capture_unsupported' : 'not_requested';
++  });
++  return false;
++#else
++  return EM_ASM_INT({
++    try {
++      const selection = window.__meleeWebStagingRingSelection;
++      const localHost = window.location.hostname === 'localhost' ||
++        window.location.hostname === '127.0.0.1' || window.location.hostname === '::1' ||
++        window.location.hostname === '[::1]';
++      const mobile = selection?.reason === 'mobile_fixed_two' ||
++        selection?.reason === 'unsupported_user_agent_fixed_two';
++      const requested = new URLSearchParams(window.location.search)
++        .get('melee-web-staging-byte-hash') === '1';
++      const enabled = localHost && !mobile && requested;
++      if (selection) {
++        selection.byte_hash_requested = requested;
++        selection.byte_hash_enabled = enabled;
++        selection.byte_hash_reason = !requested ? 'not_requested' :
++          enabled ? 'explicit_local_desktop_opt_in' : 'unsupported_environment';
++      }
++      return enabled ? 1 : 0;
++    } catch (_) {
++      return 0;
++    }
++  }) != 0;
++#endif
++}
++
++bool resolve_browser_staging_diagnostics_enabled() noexcept {
++  return EM_ASM_INT({
++    try {
++      const selection = window.__meleeWebStagingRingSelection;
++      const host = window.location.hostname;
++      const localHost = host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]';
++      const requested = new URLSearchParams(window.location.search)
++        .get('melee-web-staging-diagnostics') === '1';
++      const recorderEnabled = window.menuStagingDiagnosticsEnabled?.() === true;
++      const enabled = localHost && requested && recorderEnabled;
++      if (selection) {
++        selection.staging_diagnostics_requested = requested;
++        selection.staging_diagnostics_enabled = enabled;
++        selection.staging_diagnostics_reason = !requested ? 'not_requested' :
++          enabled ? 'explicit_loopback_opt_in' : localHost ? 'recorder_unavailable' : 'unsupported_environment';
++      }
++      return enabled ? 1 : 0;
++    } catch (_) {
++      return 0;
++    }
++  }) != 0;
++}
++
++void observe_browser_queue_completion(double registrationMs, int32_t sourceFrame) noexcept {
++  if (!g_browserStagingDiagnosticsEnabled) {
++    return;
++  }
++  const double latencyMs = std::max(0.0, phase_now_ms() - registrationMs);
++  auto peak = g_browserPeakQueueCompletionCallbackMs.load(std::memory_order_acquire);
++  while ((peak < 0.0 || latencyMs > peak) &&
++         !g_browserPeakQueueCompletionCallbackMs.compare_exchange_weak(
++             peak, latencyMs, std::memory_order_acq_rel, std::memory_order_acquire)) {
++  }
++  g_browserLastCompletedSourceFrame.store(sourceFrame, std::memory_order_release);
++  g_browserQueueCompletionCallbacks.fetch_add(1, std::memory_order_acq_rel);
++}
++#endif
++
++size_t active_frame_slot_count() noexcept {
++#ifdef __EMSCRIPTEN__
++  return g_activeBrowserFrameSlotCount;
++#else
++  return FrameSlotCount;
++#endif
++}
++
++size_t active_staging_buffer_count() noexcept {
++#ifdef __EMSCRIPTEN__
++  return g_activeBrowserFrameSlotCount;
++#else
++  return StagingBufferCount;
++#endif
++}
++
 +#ifdef __EMSCRIPTEN__
 +struct BrowserStagingShadow {
 +  ByteBuffer bytes;
@@ -1608,10 +1785,24 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
  uint32_t g_frameIndex = UINT32_MAX;
  
  std::array<FramePacket, FrameSlotCount> g_framePackets;
-@@ -56,6 +139,99 @@ uint64_t g_nextFrameId = 1;
- render_worker::FrameSlotPool g_frameSlots{FrameSlotCount};
- render_worker::FrameSlotPool g_stagingSlots{StagingBufferCount};
- 
+ uint64_t g_nextFrameId = 1;
+-render_worker::FrameSlotPool g_frameSlots{FrameSlotCount};
+-render_worker::FrameSlotPool g_stagingSlots{StagingBufferCount};
++render_worker::FrameSlotPool g_frameSlots{
++#ifdef __EMSCRIPTEN__
++    2
++#else
++    FrameSlotCount
++#endif
++};
++render_worker::FrameSlotPool g_stagingSlots{
++#ifdef __EMSCRIPTEN__
++    2
++#else
++    StagingBufferCount
++#endif
++};
++
 +struct BeginFrameTiming {
 +  uint64_t frameId = 0;
 +  double frameSlotMs = 0.0;
@@ -1704,11 +1895,10 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +  (void)timing;
 +#endif
 +}
-+
+ 
  struct RuntimeDrawType {
    std::string label;
-   DrawCallback draw = nullptr;
-@@ -179,7 +355,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
+@@ -179,12 +526,17 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
    if (render_worker::is_idle()) {
      enqueue_process_events();
    }
@@ -1721,7 +1911,13 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
  }
  
  void pace_frame_start() {
-@@ -239,6 +420,79 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
+   ZoneScopedN("Frame start pacing");
+-  if (g_frameSlots.free_count() == FrameSlotCount) {
++  if (g_frameSlots.free_count() == active_frame_slot_count()) {
+     return;
+   }
+ 
+@@ -239,6 +591,130 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
          }
        });
  }
@@ -1733,8 +1929,23 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +constexpr uint64_t BrowserStorageStagingOffset = BrowserIndexStagingOffset + IndexBufferSize;
 +constexpr uint64_t BrowserTextureUploadStagingOffset = BrowserStorageStagingOffset + StorageBufferSize;
 +
++struct BrowserStagingWriteFingerprint {
++  uint32_t role = 0;
++  uint32_t offset = 0;
++  uint32_t byteLength = 0;
++  std::array<uint8_t, 32> sha256{};
++};
++static_assert(sizeof(BrowserStagingWriteFingerprint) == 44);
++
 +void write_browser_staging_ranges(size_t stagingSlot, FramePacket& frame) {
-+  const auto write = [&](ByteBuffer& source, uint64_t offset, size_t capacity) {
++  std::array<BrowserStagingWriteFingerprint, 5> fingerprints{};
++  size_t fingerprintCount = 0;
++  const bool captureFingerprints = g_browserStagingByteHashEnabled &&
++      EM_ASM_INT({
++        const capture = window.__meleeWebStagingByteCapture;
++        return capture?.active === true && capture.current_source_tag !== null ? 1 : 0;
++      }) != 0;
++  const auto write = [&](ByteBuffer& source, uint64_t offset, size_t capacity, uint32_t role) {
 +    const auto used = source.size();
 +    const auto bytes = static_cast<size_t>(AURORA_ALIGN(used, 4));
 +    if (bytes == 0) {
@@ -1753,14 +1964,50 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +      source.reserve_extra(bytes - used);
 +      std::memset(source.data() + used, 0, bytes - used);
 +    }
++    if (captureFingerprints) {
++      AURORA_ASSERT(fingerprintCount < fingerprints.size(), "Browser staging fingerprint row overflow");
++      auto& fingerprint = fingerprints[fingerprintCount++];
++      fingerprint.role = role;
++      fingerprint.offset = static_cast<uint32_t>(offset);
++      fingerprint.byteLength = static_cast<uint32_t>(bytes);
++      fingerprint.sha256 = aurora::gfx::selective::sha256(source.data(), bytes);
++    }
 +    g_queue.WriteBuffer(g_stagingBuffers[stagingSlot], offset, source.data(), bytes);
 +  };
-+  write(frame.verts, BrowserVertexStagingOffset, static_cast<size_t>(VertexBufferSize));
-+  write(frame.uniforms, BrowserUniformStagingOffset, static_cast<size_t>(UniformBufferSize));
-+  write(frame.indices, BrowserIndexStagingOffset, static_cast<size_t>(IndexBufferSize));
-+  write(frame.storage, BrowserStorageStagingOffset, static_cast<size_t>(StorageBufferSize));
++  write(frame.verts, BrowserVertexStagingOffset, static_cast<size_t>(VertexBufferSize), 0);
++  write(frame.uniforms, BrowserUniformStagingOffset, static_cast<size_t>(UniformBufferSize), 1);
++  write(frame.indices, BrowserIndexStagingOffset, static_cast<size_t>(IndexBufferSize), 2);
++  write(frame.storage, BrowserStorageStagingOffset, static_cast<size_t>(StorageBufferSize), 3);
 +  if constexpr (UseTextureBuffer) {
-+    write(frame.textureUpload, BrowserTextureUploadStagingOffset, static_cast<size_t>(TextureUploadSize));
++    write(frame.textureUpload, BrowserTextureUploadStagingOffset, static_cast<size_t>(TextureUploadSize), 4);
++  }
++  if (captureFingerprints) {
++    EM_ASM({
++        const capture = window.__meleeWebStagingByteCapture;
++      if (capture?.active === true && capture.current_source_tag !== null) {
++        const base = $4 >>> 0;
++        const rows = [];
++        for (let index = 0; index < $3; index++) {
++          const row = base + index * 44;
++          rows.push({
++            destination_role: HEAPU32[row >>> 2],
++            destination_offset: HEAPU32[(row + 4) >>> 2],
++            byte_length: HEAPU32[(row + 8) >>> 2],
++            sha256: Array.from(HEAPU8.subarray(row + 12, row + 44),
++              byte => byte.toString(16).padStart(2, '0')).join(''),
++          });
++        }
++        capture.recordFrame({
++          frame_id: $0 >>> 0,
++          frame_index: $1 >>> 0,
++          staging_slot: $2 >>> 0,
++          source_frame: capture.current_source_tag.source_frame,
++          source_cursor: capture.current_source_tag.source_cursor,
++          writes: rows,
++        });
++      }
++    }, static_cast<uint32_t>(frame.frameId), frame.frameIndex, static_cast<uint32_t>(stagingSlot),
++       static_cast<uint32_t>(fingerprintCount), fingerprints.data());
 +  }
 +}
 +
@@ -1801,7 +2048,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
  } // namespace
  
  namespace detail {
-@@ -374,6 +628,9 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
+@@ -374,6 +850,9 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
  }
  
  void initialize() {
@@ -1811,13 +2058,39 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
    g_frameIndex = 0;
    g_processEventsQueued.store(false, std::memory_order_release);
    g_lastPresentNs.store(0, std::memory_order_release);
-@@ -385,6 +642,18 @@ void initialize() {
+@@ -384,7 +863,44 @@ void initialize() {
+     std::lock_guard lock{g_presentStatsMutex};
      g_presentTimes.clear();
    }
++#ifdef __EMSCRIPTEN__
++  g_activeBrowserFrameSlotCount = resolve_browser_frame_slot_count();
++  g_browserStagingByteHashEnabled = resolve_browser_staging_byte_hash_enabled();
++  g_browserStagingDiagnosticsEnabled = resolve_browser_staging_diagnostics_enabled();
++  g_browserQueueCompletionRegistrations.store(0, std::memory_order_release);
++  g_browserQueueCompletionCallbacks.store(0, std::memory_order_release);
++  g_browserPeakQueueCompletionCallbackMs.store(-1.0, std::memory_order_release);
++  g_browserLastCompletedSourceFrame.store(-1, std::memory_order_release);
++  g_browserDiagnosticSourceFrame.store(-1, std::memory_order_release);
++  g_frameSlots.reset(g_activeBrowserFrameSlotCount);
++  g_stagingSlots.reset(g_activeBrowserFrameSlotCount);
++  EM_ASM({
++    window.__meleeWebStagingRingStatus = {
++      frame_slots: $0,
++      staging_buffers: $1,
++      reserved_gpu_buffer_bytes: $1 * $2,
++      selection: window.__meleeWebStagingRingSelection || null,
++    };
++  }, static_cast<int>(g_activeBrowserFrameSlotCount),
++     static_cast<int>(g_activeBrowserFrameSlotCount), static_cast<int>(StagingBufferSize));
++#else
++  g_frameSlots.reset(FrameSlotCount);
++  g_stagingSlots.reset(StagingBufferCount);
++#endif
    render_worker::initialize();
 +#ifdef __EMSCRIPTEN__
 +  g_browserStagingGeneration.fetch_add(1, std::memory_order_acq_rel);
-+  for (auto& shadows : g_browserFrameStaging) {
++  for (size_t slot = 0; slot < active_frame_slot_count(); ++slot) {
++    auto& shadows = g_browserFrameStaging[slot];
 +    shadows.verts.initialize(static_cast<size_t>(VertexBufferSize));
 +    shadows.uniforms.initialize(static_cast<size_t>(UniformBufferSize));
 +    shadows.indices.initialize(static_cast<size_t>(IndexBufferSize));
@@ -1830,9 +2103,12 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
    // This appears to take a while and blocks the render thread for periods of time
    // render_worker::set_event_pump([] {
    //   if (g_instance) {
-@@ -420,15 +689,22 @@ void initialize() {
+@@ -418,17 +934,24 @@ void initialize() {
+                "Shared Index Buffer");
+   createBuffer(g_resources.storageBuffer, wgpu::BufferUsage::Storage | wgpu::BufferUsage::CopyDst, StorageBufferSize,
                 "Shared Storage Buffer");
-   for (size_t i = 0; i < g_stagingBuffers.size(); ++i) {
+-  for (size_t i = 0; i < g_stagingBuffers.size(); ++i) {
++  for (size_t i = 0; i < active_staging_buffer_count(); ++i) {
      const auto label = fmt::format("Staging Buffer {}", i);
 +#ifdef __EMSCRIPTEN__
 +    createBuffer(g_stagingBuffers[i], wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc, StagingBufferSize,
@@ -1853,7 +2129,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
  
    {
      constexpr std::array layoutEntries{
-@@ -519,6 +795,10 @@ void initialize() {
+@@ -519,6 +1042,10 @@ void initialize() {
  }
  
  void shutdown() {
@@ -1864,7 +2140,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
    render_worker::synchronize();
    render_worker::shutdown();
    g_processEventsQueued.store(false, std::memory_order_release);
-@@ -556,12 +836,29 @@ void shutdown() {
+@@ -556,12 +1083,29 @@ void shutdown() {
    for (auto& packet : g_framePackets) {
      packet = {};
    }
@@ -1894,7 +2170,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
    g_frameSlots.reset();
    g_stagingSlots.reset();
    for (auto& state : g_mappingStates) {
-@@ -584,49 +881,109 @@ bool wait_for_staging_buffer(size_t slot) {
+@@ -584,49 +1128,109 @@ bool wait_for_staging_buffer(size_t slot) {
    }
  }
  
@@ -2008,7 +2284,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
    size_t bufferOffset = 0;
    const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
    const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
-@@ -643,20 +1000,74 @@ bool begin_frame() {
+@@ -643,20 +1247,74 @@ bool begin_frame() {
    if constexpr (UseTextureBuffer) {
      mapBuffer(frame.textureUpload, TextureUploadSize);
    }
@@ -2083,7 +2359,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
    if (g_cpuFrameStart.time_since_epoch().count() != 0) {
      const auto cpuFrameTime = PresentClock::now() - g_cpuFrameStart;
      update_ema(g_cpuFrameTimeNs, duration_ns(cpuFrameTime));
-@@ -669,14 +1080,48 @@ void end_frame(EndFrameCallback callback) {
+@@ -669,14 +1327,48 @@ void end_frame(EndFrameCallback callback) {
    const uint64_t frameId = frame.frameId;
    end_pipeline_frame();
    ++g_frameIndex;
@@ -2134,20 +2410,20 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
      auto afterSubmitCallbacks = std::move(packet.afterSubmitCallbacks);
      packet = {};
      g_resources.stats.drawCallCount = stats.drawCallCount;
-@@ -686,16 +1131,391 @@ void end_frame(EndFrameCallback callback) {
+@@ -686,16 +1378,441 @@ void end_frame(EndFrameCallback callback) {
      g_resources.stats.lastIndexSize = stats.lastIndexSize;
      g_resources.stats.lastStorageSize = stats.lastStorageSize;
      g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
 +    stats.lastEndFramePacketMs = phase_now_ms() - packetStarted;
 +    const double callbackStarted = phase_now_ms();
-     if (callback) {
--      callback(encoder, std::move(afterSubmitCallbacks));
++    if (callback) {
 +      callback(encoder, std::move(afterSubmitCallbacks), stats);
-     }
++    }
 +    stats.lastEndFrameCallbackMs = phase_now_ms() - callbackStarted;
 +#ifdef __EMSCRIPTEN__
 +#if defined(AURORA_BROWSER_QUIESCENCE_DIAGNOSTIC)
-+    if (callback) {
+     if (callback) {
+-      callback(encoder, std::move(afterSubmitCallbacks));
 +      // The caller's callback finishes and submits the command buffer before
 +      // this completion observer is registered. Publish a registration record
 +      // before the API call: AllowSpontaneous may invoke the callback before
@@ -2158,12 +2434,19 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +          g_browserSubmissionSequence.fetch_add(1, std::memory_order_acq_rel) + 1;
 +      const uint64_t queueHandle = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(g_queue.Get()));
 +      const uint64_t encoderHandle = frameEncoderHandle;
++      const double completionRegistrationMs =
++          g_browserStagingDiagnosticsEnabled ? phase_now_ms() : 0.0;
++      const int32_t diagnosticSourceFrame =
++          g_browserDiagnosticSourceFrame.load(std::memory_order_acquire);
++      if (g_browserStagingDiagnosticsEnabled) {
++        g_browserQueueCompletionRegistrations.fetch_add(1, std::memory_order_acq_rel);
++      }
 +      g_browserSubmissionOwners.publish_registration(
 +          stagingSlot, registrationSequence, generation, queueHandle, encoderHandle);
 +      const wgpu::Future future = g_queue.OnSubmittedWorkDone(
 +          wgpu::CallbackMode::AllowSpontaneous,
-+          [stagingSlot, generation, registrationSequence](wgpu::QueueWorkDoneStatus status,
-+                                                            wgpu::StringView message) {
++          [stagingSlot, generation, registrationSequence, completionRegistrationMs,
++           diagnosticSourceFrame](wgpu::QueueWorkDoneStatus status, wgpu::StringView message) {
 +            const uint64_t callbackSequence =
 +                g_browserCallbackSequence.fetch_add(1, std::memory_order_acq_rel) + 1;
 +            const auto outcome = g_browserSubmissionOwners.complete_callback(
@@ -2177,6 +2460,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +              g_browserStaleCallbackCount.fetch_add(1, std::memory_order_acq_rel);
 +              return;
 +            }
++            observe_browser_queue_completion(completionRegistrationMs, diagnosticSourceFrame);
 +            if (outcome == BrowserOwnerCallbackOutcome::OwnershipMismatch) {
 +              Log.fatal("Browser staging owner mismatch: slot {} registration {}",
 +                        stagingSlot, registrationSequence);
@@ -2197,7 +2481,7 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +      g_browserSubmissionOwners.mark_immediate(
 +          stagingSlot, g_browserStagingGeneration.load(std::memory_order_acquire));
 +      g_stagingSlots.release(stagingSlot);
-+    }
+     }
 +#else
 +    if (callback) {
 +      // The caller's callback finishes and submits the command buffer before
@@ -2205,12 +2489,21 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +      // a later Aurora shutdown/reinitialization resetting its ownership.
 +      const double observerStarted = phase_now_ms();
 +      const auto generation = g_browserStagingGeneration.load(std::memory_order_acquire);
++      const double completionRegistrationMs =
++          g_browserStagingDiagnosticsEnabled ? phase_now_ms() : 0.0;
++      const int32_t diagnosticSourceFrame =
++          g_browserDiagnosticSourceFrame.load(std::memory_order_acquire);
++      if (g_browserStagingDiagnosticsEnabled) {
++        g_browserQueueCompletionRegistrations.fetch_add(1, std::memory_order_acq_rel);
++      }
 +      g_queue.OnSubmittedWorkDone(
 +          wgpu::CallbackMode::AllowSpontaneous,
-+          [stagingSlot, generation](wgpu::QueueWorkDoneStatus status, wgpu::StringView message) {
++          [stagingSlot, generation, completionRegistrationMs,
++           diagnosticSourceFrame](wgpu::QueueWorkDoneStatus status, wgpu::StringView message) {
 +            if (generation != g_browserStagingGeneration.load(std::memory_order_acquire)) {
 +              return;
 +            }
++            observe_browser_queue_completion(completionRegistrationMs, diagnosticSourceFrame);
 +            if (status != wgpu::QueueWorkDoneStatus::Success) {
 +              Log.fatal("Browser staging submission failed: {}", message);
 +            }
@@ -2261,18 +2554,48 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +                  g_resources.stats.lastEndFrameCallbackMs + g_resources.stats.lastEndFrameObserverMs +
 +                  g_resources.stats.lastEndFrameTailMs);
 +#endif
- }
- 
++}
++
 +#ifdef __EMSCRIPTEN__
 +AuroraBrowserSubmissionStatus browser_submission_status() {
 +  // This status poll is part of the ordinary browser preparation path. Keep it
 +  // independent of the opt-in owner book and descriptor/lease diagnostics.
 +  enqueue_process_events();
 +  return {
-+      static_cast<uint32_t>(FrameSlotCount - g_frameSlots.free_count()),
-+      static_cast<uint32_t>(StagingBufferCount - g_stagingSlots.free_count()),
++      static_cast<uint32_t>(active_frame_slot_count() - g_frameSlots.free_count()),
++      static_cast<uint32_t>(active_staging_buffer_count() - g_stagingSlots.free_count()),
 +      render_worker::is_idle() ? 0U : 1U,
 +  };
++}
++
++int browser_staging_diagnostics_enabled() noexcept {
++  return g_browserStagingDiagnosticsEnabled ? 1 : 0;
++}
++
++AuroraBrowserStagingDiagnosticSnapshot browser_staging_diagnostic_snapshot() noexcept {
++  AuroraBrowserStagingDiagnosticSnapshot out{};
++  out.lastQueueCallbackSourceFrame = -1;
++  if (!g_browserStagingDiagnosticsEnabled) {
++    return out;
++  }
++  out.activeSlots = static_cast<uint32_t>(active_staging_buffer_count());
++  out.occupiedSlots = out.activeSlots - static_cast<uint32_t>(g_stagingSlots.free_count());
++  out.queueCompletionRegistrations = g_browserQueueCompletionRegistrations.load(std::memory_order_acquire);
++  out.queueCompletionCallbacks = g_browserQueueCompletionCallbacks.load(std::memory_order_acquire);
++  out.peakQueueCompletionCallbackMs =
++      g_browserPeakQueueCompletionCallbackMs.exchange(-1.0, std::memory_order_acq_rel);
++  out.lastQueueCallbackSourceFrame = g_browserLastCompletedSourceFrame.load(std::memory_order_acquire);
++  return out;
++}
++
++void browser_staging_set_diagnostic_source_frame(int32_t sourceFrame) noexcept {
++  if (g_browserStagingDiagnosticsEnabled) {
++    g_browserDiagnosticSourceFrame.store(sourceFrame, std::memory_order_release);
++  }
+ }
+ 
++int browser_staging_byte_hash_enabled() noexcept {
++  return g_browserStagingByteHashEnabled ? 1 : 0;
 +}
 +
 +#if defined(AURORA_BROWSER_QUIESCENCE_DIAGNOSTIC)
@@ -2294,16 +2617,16 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +  const auto& stats = g_resources.stats;
 +  std::memset(&out, 0, sizeof(out));
 +  out.schemaVersion = AURORA_BROWSER_QUIESCENCE_SCHEMA_VERSION;
-+  out.frameSlotCount = static_cast<uint32_t>(FrameSlotCount);
-+  out.stagingSlotCount = static_cast<uint32_t>(StagingBufferCount);
++  out.frameSlotCount = static_cast<uint32_t>(active_frame_slot_count());
++  out.stagingSlotCount = static_cast<uint32_t>(active_staging_buffer_count());
 +  out.frameDescriptorOffset = static_cast<uint32_t>(sizeof(AuroraBrowserQuiescenceDescriptor));
 +  out.frameDescriptorStride = static_cast<uint32_t>(sizeof(AuroraBrowserFrameStagingDescriptor));
-+  out.frameDescriptorCount = static_cast<uint32_t>(FrameSlotCount);
++  out.frameDescriptorCount = static_cast<uint32_t>(active_frame_slot_count());
 +  out.submissionDescriptorOffset = static_cast<uint32_t>(
 +      sizeof(AuroraBrowserQuiescenceDescriptor) +
-+      FrameSlotCount * sizeof(AuroraBrowserFrameStagingDescriptor));
++      active_frame_slot_count() * sizeof(AuroraBrowserFrameStagingDescriptor));
 +  out.submissionDescriptorStride = static_cast<uint32_t>(sizeof(AuroraBrowserSubmissionDescriptor));
-+  out.submissionDescriptorCount = static_cast<uint32_t>(StagingBufferCount);
++  out.submissionDescriptorCount = static_cast<uint32_t>(active_staging_buffer_count());
 +  out.pendingFramePackets = submission.pendingFramePackets;
 +  out.pendingStagingBuffers = submission.pendingStagingBuffers;
 +  out.workerBusy = submission.workerBusy;
@@ -2319,7 +2642,8 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +  out.lastCallbackSequence = g_browserCallbackSequence.load(std::memory_order_acquire);
 +  out.staleCallbackCount = g_browserStaleCallbackCount.load(std::memory_order_acquire);
 +  out.byteSize = static_cast<uint32_t>(
-+      out.submissionDescriptorOffset + StagingBufferCount * sizeof(AuroraBrowserSubmissionDescriptor));
++      out.submissionDescriptorOffset +
++      active_staging_buffer_count() * sizeof(AuroraBrowserSubmissionDescriptor));
 +}
 +
 +AuroraBrowserQuiescenceLease quiescence_lease(const AuroraBrowserSubmissionStatus& submission) noexcept {
@@ -2435,8 +2759,8 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +    return 0;
 +  }
 +  return sizeof(AuroraBrowserQuiescenceDescriptor) +
-+         FrameSlotCount * sizeof(AuroraBrowserFrameStagingDescriptor) +
-+         StagingBufferCount * sizeof(AuroraBrowserSubmissionDescriptor);
++         active_frame_slot_count() * sizeof(AuroraBrowserFrameStagingDescriptor) +
++         active_staging_buffer_count() * sizeof(AuroraBrowserSubmissionDescriptor);
 +}
 +
 +size_t browser_quiescence_lease_bytes() noexcept {
@@ -2457,16 +2781,18 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
 +  std::array<AuroraBrowserSubmissionDescriptor, StagingBufferCount> submissionRows;
 +  std::memset(frameRows.data(), 0, sizeof(frameRows));
 +  std::memset(submissionRows.data(), 0, sizeof(submissionRows));
-+  for (size_t slot = 0; slot < FrameSlotCount; ++slot) {
++  for (size_t slot = 0; slot < active_frame_slot_count(); ++slot) {
 +    fill_staging_descriptor(frameRows[slot], slot);
 +  }
-+  for (size_t slot = 0; slot < StagingBufferCount; ++slot) {
++  for (size_t slot = 0; slot < active_staging_buffer_count(); ++slot) {
 +    fill_submission_descriptor(submissionRows[slot], slot);
 +  }
 +  std::memcpy(out, &header, sizeof(header));
 +  auto* bytesOut = static_cast<uint8_t*>(out) + sizeof(header);
-+  std::memcpy(bytesOut, frameRows.data(), sizeof(frameRows));
-+  std::memcpy(bytesOut + sizeof(frameRows), submissionRows.data(), sizeof(submissionRows));
++  const size_t frameRowsBytes = active_frame_slot_count() * sizeof(frameRows[0]);
++  const size_t submissionRowsBytes = active_staging_buffer_count() * sizeof(submissionRows[0]);
++  std::memcpy(bytesOut, frameRows.data(), frameRowsBytes);
++  std::memcpy(bytesOut + frameRowsBytes, submissionRows.data(), submissionRowsBytes);
 +  return 1;
 +}
 +
@@ -2527,13 +2853,25 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
  uint32_t current_frame() noexcept { return g_frameIndex; }
  
  void after_submit() noexcept { depth_peek::after_submit(); }
-@@ -734,5 +1554,29 @@ float calculate_fps() noexcept {
+@@ -734,5 +1851,41 @@ float calculate_fps() noexcept {
  }
  } // namespace aurora::gfx
  
 +#ifdef __EMSCRIPTEN__
 +AuroraBrowserSubmissionStatus aurora_browser_submission_status() {
 +  return aurora::gfx::browser_submission_status();
++}
++int aurora_browser_staging_diagnostics_enabled() {
++  return aurora::gfx::browser_staging_diagnostics_enabled();
++}
++AuroraBrowserStagingDiagnosticSnapshot aurora_browser_staging_diagnostic_snapshot() {
++  return aurora::gfx::browser_staging_diagnostic_snapshot();
++}
++void aurora_browser_staging_set_diagnostic_source_frame(int32_t sourceFrame) {
++  aurora::gfx::browser_staging_set_diagnostic_source_frame(sourceFrame);
++}
++int aurora_browser_staging_byte_hash_enabled() {
++  return aurora::gfx::browser_staging_byte_hash_enabled();
 +}
 +size_t aurora_browser_quiescence_descriptor_bytes() {
 +  return aurora::gfx::browser_quiescence_descriptor_bytes();
@@ -2558,19 +2896,20 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9
  const AuroraStats* aurora_get_stats() { return &aurora::gfx::detail::resources().stats; }
  float aurora_get_fps() { return aurora::gfx::calculate_fps(); }
 diff --git a/lib/gfx/frame.hpp b/lib/gfx/frame.hpp
-index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..8bcfe547ddacc12b4f2c57d068feed473f5c2dbc 100644
+index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..bfe1df5be258d2354aef04d05da9baf2dbe5ac42 100644
 --- a/lib/gfx/frame.hpp
 +++ b/lib/gfx/frame.hpp
-@@ -8,7 +8,14 @@
+@@ -7,8 +7,15 @@
+ 
  namespace aurora::gfx::detail {
  
- inline constexpr size_t FrameSlotCount = 2;
 +#ifdef __EMSCRIPTEN__
-+// Queue.WriteBuffer does not need the native map-ahead ring. Keep one GPU
-+// staging buffer per frame packet so a submitted frame cannot overwrite data
-+// still consumed by the queue.
++// Browser experiments can use up to four active frame slots. The renderer
++// keeps two active by default and allocates only the selected slots.
++inline constexpr size_t FrameSlotCount = 4;
 +inline constexpr size_t StagingBufferCount = FrameSlotCount;
 +#else
+ inline constexpr size_t FrameSlotCount = 2;
  inline constexpr size_t StagingBufferCount = FrameSlotCount + 3;
 +#endif
  inline constexpr uint64_t StagingBufferSize = UniformBufferSize + VertexBufferSize + IndexBufferSize +
@@ -4609,10 +4948,24 @@ index cd2b794159d0daeca9dc0092300e0e808d2f5de4..551fd6ea49b0c1783eef09b41288ad96
  
  namespace testing {
 diff --git a/lib/gfx/render_worker.cpp b/lib/gfx/render_worker.cpp
-index 85783b60ec1a569ac7fba6dd153e8bc588cffee5..2698e9692a6d27e9fd9ea62176f1965bd22f41fd 100644
+index 85783b60ec1a569ac7fba6dd153e8bc588cffee5..2a84f8361987a84da1af99fdbe631038d52c84cf 100644
 --- a/lib/gfx/render_worker.cpp
 +++ b/lib/gfx/render_worker.cpp
-@@ -191,6 +191,13 @@ size_t FrameSlotPool::free_count() const {
+@@ -185,12 +185,27 @@ void FrameSlotPool::reset() {
+   m_cv.notify_all();
+ }
+ 
++void FrameSlotPool::reset(size_t slotCount) {
++  {
++    std::lock_guard lock{m_mutex};
++    m_freeSlots.assign(slotCount, true);
++  }
++  m_cv.notify_all();
++}
++
+ size_t FrameSlotPool::free_count() const {
+   std::lock_guard lock{m_mutex};
+   return static_cast<size_t>(std::ranges::count(m_freeSlots, true));
  }
  
  void initialize() {
@@ -4626,7 +4979,7 @@ index 85783b60ec1a569ac7fba6dd153e8bc588cffee5..2698e9692a6d27e9fd9ea62176f1965b
    if (g_running.exchange(true, std::memory_order_acq_rel)) {
      return;
    }
-@@ -204,6 +211,10 @@ void initialize() {
+@@ -204,6 +219,10 @@ void initialize() {
  }
  
  void shutdown() {
@@ -4637,6 +4990,18 @@ index 85783b60ec1a569ac7fba6dd153e8bc588cffee5..2698e9692a6d27e9fd9ea62176f1965b
    if (!g_running.load(std::memory_order_acquire)) {
      return;
    }
+diff --git a/lib/gfx/render_worker.hpp b/lib/gfx/render_worker.hpp
+index 7d652cafbb8eed78f5baea55ff73426cb681c3e5..ad0a325784e60d0999c0364e66289bfc25e7a784 100644
+--- a/lib/gfx/render_worker.hpp
++++ b/lib/gfx/render_worker.hpp
+@@ -65,6 +65,7 @@ public:
+   std::optional<size_t> try_acquire();
+   void release(size_t slot);
+   void reset();
++  void reset(size_t slotCount);
+   [[nodiscard]] size_t free_count() const;
+ 
+ private:
 diff --git a/lib/gfx/texture.cpp b/lib/gfx/texture.cpp
 index 029a3d047c357a5e1aed999af63a3dee8ea09f03..6ad1ff1e468194773386d4a6b3c1f098407133c5 100644
 --- a/lib/gfx/texture.cpp

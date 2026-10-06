@@ -100,6 +100,13 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let diagnosticCheckpointRequested = false, diagnosticCheckpointDestroyWindow = false;
   let diagnosticCheckpointClosed = false;
   let automaticDiagnostics = readDiagnosticsPreference();
+  let stagingDiagnosticsEnabled = false;
+  try {
+    const url = new URL(globalThis.location.href);
+    const localHost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(url.hostname);
+    stagingDiagnosticsEnabled = recordDiagnostics && localHost &&
+      url.searchParams.get('melee-web-staging-diagnostics') === '1';
+  } catch { /* Staging diagnostics remain disabled unless explicitly selected. */ }
   function diagnosticDeliveryBlocked() {
     // Fatal owners cannot consume another native handoff. Once visible, their
     // sanitized failure may be delivered despite abandoned preparation state.
@@ -272,7 +279,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     const packaged = diagnosticIdentity || JSON.parse(
       document.getElementById?.('runtime-diagnostic-identity')?.content || 'null');
     if (recordDiagnostics) diagnostics = createRuntimeDiagnostics({identity: packaged,
-      audioAvailable: !!createAudio, longtaskAvailable});
+      audioAvailable: !!createAudio, longtaskAvailable, stagingDiagnosticsEnabled});
   } catch { /* Optional diagnostics must never stop the player or touch saves. */ }
   if (!diagnostics) { longtaskObserver?.disconnect(); longtaskObserver = null; }
   if (diagnostics) {
@@ -455,6 +462,13 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   const callbacks = {
     menuDiagnosticSample: diagnostics?.observeNative || (() => {}),
     menuDiagnosticIncident: diagnosticIncident,
+    menuStagingDiagnosticsEnabled() { return stagingDiagnosticsEnabled; },
+    menuDiagnosticStagingSample(timestamp, activeSlots, occupiedSlots, registrations,
+      callbacks, peakQueueCompletionCallbackMs, lastCompletedSourceFrame, force) {
+      if (!stagingDiagnosticsEnabled) return false;
+      return diagnostics?.observeStaging(timestamp, activeSlots, occupiedSlots, registrations,
+        callbacks, peakQueueCompletionCallbackMs, lastCompletedSourceFrame, force === true || force === 1) || false;
+    },
     menuAudio(pcm) {
       if (!audio) throw Error('Audio output is disabled in this public alpha.');
       audio.write(pcm);
