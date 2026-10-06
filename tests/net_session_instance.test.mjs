@@ -3,7 +3,7 @@ import {mkdtemp, rm} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import {openNetInstance} from '../scripts/net_session_instance.mjs';
+import {firstFatalBrowserError, openNetInstance} from '../scripts/net_session_instance.mjs';
 
 function fakeChrome(goto) {
   let closeCalls = 0;
@@ -48,6 +48,13 @@ const common = {
   label: 'failure-test',
   timeoutMs: 1000,
 };
+
+test('retains request failures as diagnostics while keeping HTTP and page errors fatal', () => {
+  const abortedData = {kind: 'requestfailed', method: 'GET', url: '/gameplay_menu_browser.data', failure: 'net::ERR_ABORTED'};
+  assert.equal(firstFatalBrowserError([abortedData]), null);
+  assert.equal(firstFatalBrowserError([abortedData, {kind: 'http', status: 404}]).kind, 'http');
+  assert.equal(firstFatalBrowserError([abortedData, {kind: 'pageerror', message: 'module failed'}]).kind, 'pageerror');
+});
 
 test('closes Chrome and removes driver listeners when runtime navigation fails', async () => {
   await withProfile(async profile => {

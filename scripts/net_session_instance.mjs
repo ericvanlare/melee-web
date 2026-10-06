@@ -14,6 +14,10 @@ import {createBrowserDriver} from './browser_driver.mjs';
 export const NET_FRAME_BYTES = 44;
 export const NET_RECORD_BYTES = 64;
 
+export function firstFatalBrowserError(errors) {
+  return errors.find(error => error.kind !== 'requestfailed') ?? null;
+}
+
 // Installed once per page. Every call reads Module.HEAPU8 fresh because the
 // heap can grow between callbacks.
 const PAGE_HELPERS = () => {

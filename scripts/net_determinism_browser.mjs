@@ -19,7 +19,7 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {loadBrowserTools} from './browser_tools.mjs';
 import {classifyRoute, expectedFullSceneOrder, validateFullRoute} from './net_determinism_contract.mjs';
-import {NET_FRAME_BYTES, NET_RECORD_BYTES, openNetInstance} from './net_session_instance.mjs';
+import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstance} from './net_session_instance.mjs';
 
 const SCRIPT_HEADER_BYTES = 16;
 const {values} = parseArgs({options: {
@@ -158,7 +158,8 @@ async function runInstance(spec) {
       if (status.cursor !== lastCursor) { lastCursor = status.cursor; lastProgress = Date.now(); }
       const native = await instance.native();
       if (native.error) throw Error(`Runtime error: ${native.error}`);
-      if (instance.errors.length) throw Error(`Page error: ${JSON.stringify(instance.errors[0])}`);
+      const fatalBrowserError = firstFatalBrowserError(instance.errors);
+      if (fatalBrowserError) throw Error(`Page error: ${JSON.stringify(fatalBrowserError)}`);
       if (await instance.maybeResume(status.cursor)) lastProgress = Date.now();
       if (status.cursor >= total && result.records >= total) {
         result.final_status = status;
@@ -192,7 +193,7 @@ async function runInstance(spec) {
     result.outcome = 'complete';
   } catch (error) {
     result.first_error = String(error.stack || error.message || error);
-    if (Array.isArray(error.browserErrors)) result.page_errors = error.browserErrors;
+    if (Array.isArray(error.browserErrors)) result.browser_diagnostics = error.browserErrors;
     if (error.startupDiagnostics) result.failure_startup = error.startupDiagnostics;
     if (typeof error.browserClosed === 'boolean') result.browser_closed = error.browserClosed;
     try { if (instance) { result.failure_status = await instance.status(); result.failure_native = await instance.native(); } } catch {}
@@ -206,7 +207,10 @@ async function runInstance(spec) {
     } catch (captureError) { result.failure_capture_error = String(captureError.message || captureError); }
   } finally {
     result.finished_at = new Date().toISOString();
-    result.page_errors = instance?.errors ?? result.page_errors ?? [];
+    result.browser_diagnostics = instance?.errors ?? result.browser_diagnostics ?? [];
+    result.page_errors = result.browser_diagnostics.filter(row => row.kind === 'pageerror' || row.kind === 'console');
+    result.request_diagnostics = result.browser_diagnostics.filter(row =>
+      row.kind === 'http' || row.kind === 'requestfailed' || row.kind === 'unexpected-request');
     if (instance) result.timing_resumes = instance.timingResumes;
     await checksums.close();
     if (instance) result.start_record = (result.final_status ?? result.failure_status)?.start ?? null;
