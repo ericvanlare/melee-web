@@ -261,7 +261,9 @@ async function pollRun() {
       await peers[role].setNativeProgress(status.cursor);
       if (status.wait_episodes > instanceRows[role].last_wait_episodes) {
         instanceRows[role].last_wait_episodes = status.wait_episodes;
-        waitObservations.push({role, wait_episodes: status.wait_episodes,
+        waitObservations.push({role, scope: probe && status.wait_start_tick < LOCKSTEP_DELAY + 1
+          ? 'startup-publication' : probe && role === 'alpha' && status.wait_start_tick === LOCKSTEP_DELAY + 1
+          ? 'withheld-input1' : 'network-wait', wait_episodes: status.wait_episodes,
           wait_start_tick: status.wait_start_tick, wait_last_tick: status.wait_last_tick,
           cursor: status.cursor, pushed: status.pushed, blocker: status.blocker,
           wait_callbacks: status.wait_callbacks, wait_resume_count: status.wait_resume_count,
@@ -275,17 +277,29 @@ async function pollRun() {
       instanceRows.injected_disconnect = {role: 'beta', source_tick: disconnectAt, at_ms: Date.now()};
       relay.beta.close();
     }
-    if (probe && !instanceRows.probe_released &&
-        waitObservations.some(row => row.role === 'alpha' && row.blocker === 'network_wait')) {
-      const wait = waitObservations.find(row => row.role === 'alpha' && row.blocker === 'network_wait');
-      const delayedSourceTick = LOCKSTEP_DELAY + 1;
+    // The start handshake confirms source time before asynchronous input0
+    // delivery. Preserve those startup wait counters; select the actual
+    // withheld-input1 boundary from the current native state.
+    const delayedSourceTick = LOCKSTEP_DELAY + 1;
+    if (probe && !instanceRows.probe_released && rows.alpha.cursor === delayedSourceTick &&
+        rows.alpha.blocker === 'network_wait') {
+      const wait = {...rows.alpha};
       if (wait.cursor !== delayedSourceTick || wait.pushed !== delayedSourceTick ||
           wait.wait_start_tick !== delayedSourceTick || wait.wait_last_tick !== delayedSourceTick)
         throw Error(`CSS input wait was not held at one unconsumed source tick: ${JSON.stringify(wait)}`);
+      if (!wait.network_wait.active || wait.wait_episodes !== wait.wait_resume_count + 1)
+        throw Error(`CSS input wait counters do not describe one active episode: ${JSON.stringify(wait)}`);
+      instanceRows.alpha.target_wait = wait;
+      instanceRows.alpha.startup_waits = {episodes: wait.wait_episodes - 1,
+        resumes: wait.wait_resume_count, observed: waitObservations.filter(row =>
+          row.role === 'alpha' && row.wait_start_tick < delayedSourceTick)};
       const before = rows.alpha.cursor;
       await sleep(120);
       const held = await instances.alpha.status();
-      if (held.cursor !== before || held.blocker !== 'network_wait' || !held.network_wait.active)
+      if (held.cursor !== before || held.pushed !== before || held.blocker !== 'network_wait' ||
+          !held.network_wait.active || held.wait_episodes !== wait.wait_episodes ||
+          held.wait_resume_count !== wait.wait_resume_count ||
+          held.wait_start_tick !== delayedSourceTick || held.wait_last_tick !== delayedSourceTick)
         throw Error(`Network wait consumed a source tick or changed blocker while remote input was held: ${JSON.stringify(held)}`);
       instanceRows.alpha.wait_hold = {before_cursor: before, after_cursor: held.cursor,
         wait_callbacks_before: wait.wait_callbacks, wait_callbacks_after: held.wait_callbacks,
@@ -425,7 +439,7 @@ async function run() {
     };
   });
   if (probe) {
-    const alphaWait = waitObservations.find(row => row.role === 'alpha' && row.blocker === 'network_wait');
+    const alphaWait = instanceRows.alpha.target_wait;
     if (!alphaWait || !instanceRows.alpha.wait_hold || !instanceRows.probe_released)
       throw Error('Reduced probe did not observe and release the missing remote CSS input tick');
     for (const role of ['alpha', 'beta']) {
@@ -437,8 +451,10 @@ async function run() {
     if (instanceRows.alpha.wait_hold.before_cursor !== instanceRows.alpha.wait_hold.after_cursor)
       throw Error('Held remote input advanced the source cursor');
     const alphaFinal = await instances.alpha.status();
-    if (alphaFinal.wait_episodes !== 1 || alphaFinal.wait_resume_count !== 1 || alphaFinal.cursor !== sourceTicks)
-      throw Error(`Remote-input wait did not resume exactly once without source-tick debt: ${JSON.stringify(alphaFinal)}`);
+    if (alphaFinal.wait_episodes !== alphaWait.wait_episodes ||
+        alphaFinal.wait_resume_count !== alphaWait.wait_resume_count + 1 || alphaFinal.cursor !== sourceTicks)
+      throw Error(`Remote-input wait did not finish with exactly one additional resume and no extra wait episodes or source ticks: ${JSON.stringify(alphaFinal)}`);
+    instanceRows.alpha.final_status = alphaFinal;
     const bytesA = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
     const bytesB = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
     if (!bytesA.equals(bytesB)) throw Error('CSS probe per-consumed-tick checksum streams differ');

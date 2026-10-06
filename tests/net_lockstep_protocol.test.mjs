@@ -79,6 +79,63 @@ test('duplicate contributions are idempotent and out-of-order input stays inside
   assert.equal(h.terminals.beta.length, 0);
 });
 
+test('deferred input survives real TCP ACK sends until an idempotent explicit release', async () => {
+  const errors = [], frames = {alpha: [], beta: []}, sent = {alpha: [], beta: []};
+  const relay = await openLoopbackPeerPair({onEndpointError: (role, error) => errors.push({role, error})});
+  const make = role => new LockstepPeer({role, sourceTicks: 6, inputTicks: 4,
+    pushFrame: async (first, bytes) => {
+      for (let offset = 0; offset < bytes.length; offset += 44)
+        frames[role].push({tick: first + offset / 44, bytes: Buffer.from(bytes.subarray(offset, offset + 44))});
+    }});
+  const alpha = make('alpha'), beta = make('beta');
+  const until = async predicate => {
+    const deadline = Date.now() + 2000;
+    while (!predicate() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 2));
+    assert.equal(errors.length, 0, 'TCP peer callbacks must succeed');
+    assert(predicate(), 'real TCP peer progress must meet the bound');
+  };
+  try {
+    for (const peer of [alpha, beta]) {
+      relay[peer.role].onMessage(raw => peer.receive(raw));
+      peer.attach(async raw => { sent[peer.role].push(JSON.parse(raw)); await relay[peer.role].send(raw); });
+    }
+    await alpha.start({build: 'same'}); await beta.start({build: 'same'});
+    await until(() => alpha.ready && beta.ready);
+    await beta.addLocalInput(0, sample(2));
+    await beta.addLocalInput(2, sample(4));
+    await beta.addLocalInput(1, sample(3), {deferSend: true});
+    const sendsBeforeAck = sent.beta.length;
+    await alpha.addLocalInputs([[0, sample(10)], [1, sample(11)], [2, sample(12)], [3, sample(13)]]);
+    await until(() => beta.remoteContiguousInput === 3 && alpha.remoteAckInput === 3 && alpha.remote.has(2));
+    assert(sent.beta.length > sendsBeforeAck, 'incoming PAD traffic forced a real ACK state send');
+    assert.equal(beta.local.has(1), true, 'held input remains locally available');
+    assert.equal(alpha.remote.has(1), false, 'ACK retransmission must not leak held input1');
+    assert.equal(alpha.remoteContiguousInput, 0);
+    assert.equal(alpha.nextSourceFrame, 3, 'missing input1 holds the delayed source cursor3');
+    assert.equal(sent.beta.some(packet => packet.unacknowledged?.some(row => row.tick === 1)), false);
+    assert.deepEqual(beta.summary().deferred_input_ticks, [1]);
+
+    // Delayed-checksum traffic also calls the same retransmission path.
+    await beta.addChecksum(record(0, 9));
+    await beta.setNativeProgress(3);
+    await until(() => alpha.remoteChecksums.has(0));
+    assert.equal(alpha.remote.has(1), false);
+    assert.equal(alpha.nextSourceFrame, 3);
+
+    await beta.addLocalInput(1, sample(3), {repeat: true});
+    await until(() => alpha.remoteContiguousInput === 2 && alpha.nextSourceFrame === 5);
+    assert.deepEqual(beta.summary().deferred_input_ticks, []);
+    assert(alpha.inputDuplicates > 0);
+    const before = frames.alpha.map(row => ({tick: row.tick, bytes: row.bytes.toString('hex')}));
+    await beta.addLocalInput(1, sample(3), {repeat: true});
+    await until(() => beta.remoteAckInput === 2);
+    await relay.alpha.flush(); await relay.beta.flush();
+    assert.deepEqual(frames.alpha.map(row => ({tick: row.tick, bytes: row.bytes.toString('hex')})), before,
+      'releasing identical input again cannot push duplicate source frames');
+    assert.equal(alpha.terminal, null); assert.equal(beta.terminal, null);
+  } finally { await relay.close(); }
+});
+
 test('packet reordering holds state by sequence then acknowledges contiguous inputs and delayed checksums', async () => {
   const h = harness();
   await h.alpha.start(h.agreement); await h.beta.start(h.agreement); await h.flush();

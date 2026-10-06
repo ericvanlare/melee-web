@@ -76,6 +76,7 @@ export class LockstepPeer {
     this.terminal = null;
     this.local = new Map();
     this.nativeLocal = new Map();
+    this.deferredInputs = new Set();
     this.remote = new Map();
     this.localChecksums = new Map();
     this.remoteChecksums = new Map();
@@ -179,6 +180,11 @@ export class LockstepPeer {
       const previous = this.local.get(tick);
       if (previous && !previous.equals(value))
         return this.fail('protocol', {reason: 'local input changed after publication', tick});
+      // A deferred contribution remains native-local but cannot escape through
+      // ACK/checksum retransmissions. Republishing it without deferSend releases
+      // the hold; identical subsequent releases remain idempotent.
+      if (deferSend && !previous) this.deferredInputs.add(tick);
+      else if (!deferSend) this.deferredInputs.delete(tick);
       this.local.set(tick, value);
       const native = overrides.has(tick) ? Buffer.from(overrides.get(tick)) : value;
       if (native.length !== PAD_BYTES) throw Error('Native PAD contribution must contain 11 bytes');
@@ -222,7 +228,7 @@ export class LockstepPeer {
   async #sendState() {
     if (!this.ready || this.terminal) return;
     const unacknowledged = [...this.local.entries()]
-      .filter(([tick]) => tick > this.remoteAckInput)
+      .filter(([tick]) => tick > this.remoteAckInput && !this.deferredInputs.has(tick))
       .slice(0, LOCKSTEP_MAX_BATCH)
       .map(([tick, sample]) => ({tick, pad: sample.toString('base64')}));
     const checksums = [...this.localChecksums.entries()]
@@ -404,7 +410,9 @@ export class LockstepPeer {
     return {
       role: this.role, local_port: this.localPort, remote_port: this.remotePort,
       ready: this.ready, terminal: this.terminal,
-      local_input_ticks: this.local.size, remote_input_ticks: this.remote.size,
+      local_input_ticks: this.local.size,
+      deferred_input_ticks: [...this.deferredInputs].sort((a, b) => a - b),
+      remote_input_ticks: this.remote.size,
       native_local_divergences: [...this.local.entries()].filter(([tick, sample]) =>
         this.nativeLocal.get(tick) && !this.nativeLocal.get(tick).equals(sample)).length,
       remote_contiguous_input: this.remoteContiguousInput,
