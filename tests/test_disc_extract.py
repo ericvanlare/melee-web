@@ -80,6 +80,13 @@ class DiscExtractTests(unittest.TestCase):
     def test_raw_image_exact_selection_and_source_preserved(self):
         data = raw_image()
         source = self.image(data)
+        with disc_extract.DiscImage(source) as disc:
+            indexed = disc.indexed_files()
+            self.assertEqual(
+                indexed["models/target.dat"],
+                (2, disc_extract.DiscFile("models/target.dat", PAYLOAD_OFFSET, len(PAYLOAD))),
+            )
+            self.assertEqual(disc.files(), {path: entry for path, (_index, entry) in indexed.items()})
         selected = self.extract(source)
         self.assertEqual(selected, disc_extract.DiscFile("models/target.dat", PAYLOAD_OFFSET, len(PAYLOAD)))
         self.assertEqual(self.output.read_bytes(), PAYLOAD)

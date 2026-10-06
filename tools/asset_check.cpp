@@ -24,7 +24,27 @@ void json_string(std::string_view value)
     std::cout << '"';
 }
 
-std::shared_ptr<const melee_web::DatArchive> load(const char* path)
+void external_links(const melee_web::DatArchive& archive)
+{
+    std::cout << '[';
+    bool first_symbol = true;
+    for (const auto& symbol : archive.external_symbols()) {
+        if (!first_symbol) std::cout << ',';
+        first_symbol = false;
+        std::cout << "{\"name\":";
+        json_string(symbol.name);
+        std::cout << ",\"slots\":[";
+        for (std::size_t i = 0; i < symbol.slots.size(); ++i) {
+            if (i) std::cout << ',';
+            std::cout << symbol.slots[i];
+        }
+        std::cout << "]}";
+    }
+    std::cout << ']';
+}
+
+std::shared_ptr<const melee_web::DatArchive> load(const char* path,
+    melee_web::DatExternalPolicy external_policy)
 {
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file) throw melee_web::DatError("Cannot open local DAT file");
@@ -35,7 +55,7 @@ std::shared_ptr<const melee_web::DatArchive> load(const char* path)
     file.seekg(0);
     if (!file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())))
         throw melee_web::DatError("Could not read the complete local DAT file");
-    return std::make_shared<melee_web::DatArchive>(bytes);
+    return std::make_shared<melee_web::DatArchive>(bytes, external_policy);
 }
 
 void model_counts(const melee_web::RigidModel& model)
@@ -77,6 +97,7 @@ struct Options {
     std::optional<std::string> symbol;
     std::optional<std::uint32_t> stage_entry;
     bool opaque = false;
+    bool resolve_null_externals = false;
 };
 
 Options options(int argc, char** argv)
@@ -87,6 +108,10 @@ Options options(int argc, char** argv)
         if (arg == "--opaque") {
             if (result.opaque) throw std::runtime_error("Duplicate --opaque");
             result.opaque = true;
+        } else if (arg == "--resolve-null-externals") {
+            if (result.resolve_null_externals)
+                throw std::runtime_error("Duplicate --resolve-null-externals");
+            result.resolve_null_externals = true;
         } else if (arg == "--symbol") {
             if (result.symbol || ++i == argc) throw std::runtime_error("--symbol requires one unique value");
             result.symbol = argv[i];
@@ -117,16 +142,24 @@ int main(int argc, char** argv)
     try { args = options(argc, argv); }
     catch (const std::exception& error) {
         std::cerr << error.what() << "\nUsage: asset_check <local DAT> [--symbol exact-root] "
-                     "[--stage-entry N [--opaque]]\n";
+                     "[--stage-entry N [--opaque]] [--resolve-null-externals]\n";
         return 2;
     }
     try {
-        const auto archive = load(args.path);
+        const auto external_policy = args.resolve_null_externals
+            ? melee_web::DatExternalPolicy::ResolveNull
+            : melee_web::DatExternalPolicy::Reject;
+        const auto archive = load(args.path, external_policy);
         if (args.stage_entry) {
             const auto symbol = args.symbol.value_or("map_head");
             std::cout << "{\"scope\":\"stage_model\",\"target_type\":\"stage_entry\",\"root\":";
             json_string(symbol);
-            std::cout << ",\"source_entry\":" << *args.stage_entry << ",\"render_pass\":";
+            std::cout << ",\"source_entry\":" << *args.stage_entry
+                      << ",\"external_policy\":\""
+                      << (args.resolve_null_externals ? "resolve_null" : "reject")
+                      << "\",\"externals\":";
+            external_links(*archive);
+            std::cout << ",\"render_pass\":";
             json_string(args.opaque ? "opaque" : "all");
             bool rejected = false;
             try {
@@ -158,7 +191,11 @@ int main(int argc, char** argv)
         for (const auto& root : archive->public_symbols()) {
             if (args.symbol && root.name != *args.symbol) continue;
             found = true;
-            std::cout << "{\"scope\":\"rigid_model\",\"target_type\":\"joint_root\",\"render_pass\":\"all\",\"root\":";
+            std::cout << "{\"scope\":\"rigid_model\",\"target_type\":\"joint_root\",\"external_policy\":\""
+                      << (args.resolve_null_externals ? "resolve_null" : "reject")
+                      << "\",\"externals\":";
+            external_links(*archive);
+            std::cout << ",\"render_pass\":\"all\",\"root\":";
             json_string(root.name);
             std::cout << ",\"offset\":" << root.data_offset;
             try { model_counts(melee_web::RigidModel(archive, root.name)); }

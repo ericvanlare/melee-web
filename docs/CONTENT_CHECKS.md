@@ -26,6 +26,10 @@ For lifecycle-only work, explicitly set `"checks": []`; the report lists asset
 parser checks as unverified and no parser is compiled or run. A nonempty `checks`
 array still runs first, and any selected parser failure stops the combined run.
 Use the standalone batch command below when only the parser boundary is changing.
+DAT rows remain strict by default. Set `resolve_null_externals: true` only
+when the source loader validates external chains and resolves those links to
+null; the report retains their names and source slots, and null resolution does
+not make an otherwise missing model or service succeed.
 
 For example, `work/content-check.json` can contain the following **bounded sample**
 for Dr. Mario/Roy on Final Destination and the separate Battlefield trace:
@@ -116,7 +120,9 @@ PCM fidelity and cold/warm live timing remain separate checks. See the
 
 `scripts/check_assets.py --manifest work/asset-checks.json` accepts the same
 `checks` array in an object containing only that field. Each row requires `path`
-and may supply `symbol`, unsigned `stage_entry`, and boolean `opaque`.
+and may supply `symbol`, unsigned `stage_entry`, boolean `opaque`, and boolean
+`resolve_null_externals`. The last option explicitly mirrors source null
+resolution semantics; it is not external-symbol binding.
 `opaque: true` requires a stage entry and retains the existing explicit partial
 render-pass scope. All rows are validated before the checker is compiled once.
 Parser rejections are retained while the rest of the batch is checked.

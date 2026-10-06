@@ -156,7 +156,7 @@ Other public roots of GrPs.usd (data offset, span to next root):
   `quake_model_set` `0x161388` (model plus four authored animations and a
   terminator, which satisfies the existing world check at
   `src/gameplay_world.cpp:515-523`).
-- `yakumono_param` `0x3db68` (0x70; layout under Data bounds).
+- `yakumono_param` `0x3db68` (public-symbol interval `0x70`; the next referenced target begins at `+0x54`, as detailed under Data bounds).
 - `GrdPStadiumBG_OVDummy_mat6962_GrdPStadiumDummy_0_image_desc` `0x89cc`: a 16×16
   I4 dummy descriptor referenced exactly once, from `0x8a30`.
 - `SIS_GrPStadiumData` `0x13ca80`: a 22-entry `u8*` string table.
@@ -501,10 +501,13 @@ rules flag `x5_3` is set and mode 8 is focused on Jigglypuff, Sing gains
 
 `yakumono_param` is the source struct at `grpstadium.c:41-65`: seven `int`s,
 `u8 r, g, b`, one padding byte, ten `u32`s and five `s16`s. It consumes 0x52
-bytes (`sizeof` 0x54) of a 0x70-byte root. The 0x52-0x6F tail is non-zero and
-opaque; copy only the consumed prefix, as the Fountain decoder does
-(`src/gameplay_stage_fountain.c`). There are no relocations in the root, and
-the values are identical in all six archives:
+bytes; the source ABI size is 0x54, including two trailing padding bytes. In
+GrPs.usd the next referenced target begins at `+0x54`, and the relocation at
+`ALDYakuAll + 4` points to it. The next public symbol is at `+0x70`, which
+defines a public-symbol interval rather than object ownership. Thus bytes
+`+0x52..+0x53` are ABI padding and `+0x54..+0x6f` is a separate referenced
+region, not an opaque yakumono tail. The source struct contains no relocations.
+The values are identical in all six archives:
 
 | Field | Value | Use |
 | --- | --- | --- |

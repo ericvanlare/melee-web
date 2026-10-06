@@ -52,6 +52,11 @@ class SelectedTraceBuildTests(unittest.TestCase):
                                   configuration="Release"),
             root / "build/browser-release",
         )
+        self.assertEqual(
+            BUILD.build_directory(root, target="pokemon_stadium_c0_trace",
+                                  configuration="RelWithDebInfo"),
+            root / "build/browser",
+        )
 
     def test_repeated_trace_targets_build_only_reviewed_targets_with_pinned_environment(self):
         root = self._configured_root()
@@ -59,7 +64,7 @@ class SelectedTraceBuildTests(unittest.TestCase):
         generated = root / "build/gameplay-source/src"
         traces = ("gameplay_content_match_trace", "gameplay_stage_battlefield_trace",
                   "gameplay_stage_temple_trace", "gameplay_stage_fountain_trace",
-                  "gameplay_stage_old_yoshi_trace")
+                  "gameplay_stage_old_yoshi_trace", "pokemon_stadium_c0_trace")
         with patch.object(BUILD, "read_lock", return_value=lock), \
                 patch.object(BUILD, "verify_sources"), \
                 patch.object(BUILD, "prepare_sources", return_value=generated), \
