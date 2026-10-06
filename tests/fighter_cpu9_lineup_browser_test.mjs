@@ -26,6 +26,7 @@ import {Worker} from 'node:worker_threads';
 import {parseArgs} from 'node:util';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
+import {installSizedCssObservers} from './pause_trace_capture.mjs';
 import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
 import {queueResultsP1StartAtCurrentSource,scheduleResultsP1StartSequence,
   scheduleResultsSourceFramePauses}
@@ -2413,6 +2414,7 @@ try{
   assert(report.gpu.cross_origin_isolated&&report.gpu.adapter_available,
     'Rendered validation requires an isolated page and a WebGPU adapter');
   await driver.waitForImport();
+  report.css_observer_storage = await installSizedCssObservers(page);
   await installRuntimeDiagnosticsCapture(report.runtime_diagnostics.identity,
     report.runtime_diagnostics.identity_scope);
   await installResultsInputObserver();
