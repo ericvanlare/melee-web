@@ -16,6 +16,13 @@ import {openLoopbackPeerPair} from './net_lockstep_relay.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
 
 const HEADER_BYTES = 16;
+const POSITIVE_ROUTE_BOUNDARIES = Object.freeze([
+  Object.freeze({name: 'css-start', phase: 1, label: 'original CSS before input publication'}),
+  Object.freeze({name: 'sss', phase: 3, label: 'original SSS'}),
+  Object.freeze({name: 'match', phase: 7, label: 'original match'}),
+  Object.freeze({name: 'results', phase: 8, label: 'original Results'}),
+  Object.freeze({name: 'css-return', phase: 1, label: 'original CSS after Results'}),
+]);
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, script: {type: 'string'}, out: {type: 'string'},
   playwright: {type: 'string'}, seed: {type: 'string'}, scenario: {type: 'string', default: 'probe'},
@@ -110,6 +117,7 @@ let instances = null, relay = null, peers = null, disconnectHandled = false, int
 const peerSummaries = {alpha: null, beta: null};
 const checksumFiles = {};
 const instanceRows = {};
+const routeBoundaryState = {alpha: {sawMatch: false}, beta: {sawMatch: false}};
 const waitObservations = [];
 const scheduled = new Map();
 const closeNotes = [];
@@ -152,6 +160,107 @@ function nativeSample(role, tick) {
   const port = role === 'alpha' ? 0 : 1;
   if (flip && flip.port === port && flip.tick === tick) sample[flip.byte] ^= 1 << flip.bit;
   return sample;
+}
+
+function routeBoundaryPath(role, boundary) {
+  const filename = boundary.name === 'css-return' ? 'final.png' : `route-${boundary.name}.png`;
+  return path.join(childDirectory(role), filename);
+}
+
+function recordMissedBoundary(role, boundary, reason, {phase = null, cursor = null} = {}) {
+  const row = instanceRows[role];
+  if (!row.route_boundary_misses.some(item => item.name === boundary.name)) {
+    row.route_boundary_misses.push({name: boundary.name, label: boundary.label,
+      expected_phase: boundary.phase, reason, observed_phase: phase, observed_cursor: cursor,
+      observed_at: new Date().toISOString()});
+  }
+}
+
+async function captureRouteBoundary(role, boundary, cursor) {
+  const row = instanceRows[role];
+  if (row.route_boundary_captures.some(item => item.name === boundary.name) ||
+      row.route_boundary_misses.some(item => item.name === boundary.name)) return;
+  const nativeBefore = await instances[role].native();
+  if (nativeBefore.phase !== boundary.phase) {
+    recordMissedBoundary(role, boundary, 'native phase changed before the route-boundary snapshot',
+      {phase: nativeBefore.phase, cursor});
+    return;
+  }
+  const driverDiagnostics = await instances[role].driver.diagnostics();
+  if (driverDiagnostics.unavailable || driverDiagnostics.phase !== boundary.phase) {
+    recordMissedBoundary(role, boundary, driverDiagnostics.unavailable ||
+      'browser-driver phase did not confirm the route boundary', {phase: driverDiagnostics.phase ?? null, cursor});
+    return;
+  }
+  const screenshotPath = routeBoundaryPath(role, boundary);
+  await instances[role].screenshot(screenshotPath);
+  const screenshot = await fs.readFile(screenshotPath);
+  if (screenshot.length < 8 || !screenshot.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])))
+    throw Error(`${role} ${boundary.name} route-boundary screenshot is not a PNG`);
+  const nativeAfter = await instances[role].native();
+  const statusAfter = await instances[role].status();
+  const graphics = await instances[role].graphics();
+  row.route_boundary_captures.push({name: boundary.name, label: boundary.label,
+    phase: boundary.phase, source_cursor_sampled_before_screenshot: cursor,
+    last_consumed_tick: cursor > 0 ? cursor - 1 : null,
+    source_cursor_after_screenshot: statusAfter.cursor,
+    source_cursor_stable_during_screenshot: statusAfter.cursor === cursor,
+    screenshot: path.relative(output, screenshotPath),
+    screenshot_bytes: screenshot.length, screenshot_sha256: sha256(screenshot),
+    screenshot_phase_stable: nativeAfter.phase === boundary.phase,
+    phase_after_screenshot: nativeAfter.phase,
+    browser_driver: driverDiagnostics,
+    gpu: graphics,
+    gpu_observed: graphics.cross_origin_isolated === true && graphics.webgpu_api === true &&
+      graphics.webgpu_adapter === true,
+    captured_at: new Date().toISOString()});
+}
+
+async function captureObservedRouteBoundary(role, phase, cursor) {
+  const state = routeBoundaryState[role];
+  if (phase === 7 || phase === 8) state.sawMatch = true;
+  const boundary = phase === 3 ? POSITIVE_ROUTE_BOUNDARIES[1] :
+    phase === 7 ? POSITIVE_ROUTE_BOUNDARIES[2] :
+    phase === 8 ? POSITIVE_ROUTE_BOUNDARIES[3] :
+    phase === 1 && state.sawMatch ? POSITIVE_ROUTE_BOUNDARIES[4] : null;
+  if (boundary) await captureRouteBoundary(role, boundary, cursor);
+}
+
+async function finishRouteBoundaryEvidence(role, phase, cursor) {
+  const row = instanceRows[role];
+  for (const boundary of POSITIVE_ROUTE_BOUNDARIES) {
+    if (row.route_boundary_captures.some(item => item.name === boundary.name) ||
+        row.route_boundary_misses.some(item => item.name === boundary.name)) continue;
+    if (boundary.name === 'css-return' && phase === boundary.phase) {
+      await captureRouteBoundary(role, boundary, cursor);
+      continue;
+    }
+    recordMissedBoundary(role, boundary, `route ended before phase ${boundary.phase} was sampled`,
+      {phase, cursor});
+  }
+  const captured = new Set(row.route_boundary_captures.map(item => item.name));
+  const missed = new Set(row.route_boundary_misses.map(item => item.name));
+  const capturesComplete = captured.size === POSITIVE_ROUTE_BOUNDARIES.length && missed.size === 0;
+  const gpuComplete = capturesComplete && row.route_boundary_captures.every(item => item.gpu_observed);
+  const phaseStable = capturesComplete && row.route_boundary_captures.every(item => item.screenshot_phase_stable);
+  row.route_boundary_report = {
+    expected: POSITIVE_ROUTE_BOUNDARIES.map(({name, phase: expectedPhase, label}) =>
+      ({name, phase: expectedPhase, label})),
+    captured: row.route_boundary_captures.map(({name, phase: capturedPhase,
+      source_cursor_sampled_before_screenshot, last_consumed_tick,
+      source_cursor_after_screenshot, source_cursor_stable_during_screenshot, screenshot,
+      screenshot_bytes, screenshot_sha256, screenshot_phase_stable, gpu_observed}) =>
+      ({name, phase: capturedPhase, source_cursor_sampled_before_screenshot, last_consumed_tick,
+        source_cursor_after_screenshot, source_cursor_stable_during_screenshot, screenshot,
+        screenshot_bytes, screenshot_sha256,
+        screenshot_phase_stable, gpu_observed})),
+    missed: row.route_boundary_misses,
+    captures_complete: capturesComplete,
+    gpu_diagnostics_complete: gpuComplete,
+    phase_stable_through_screenshots: phaseStable,
+    complete: capturesComplete && gpuComplete && phaseStable,
+    pixel_equivalence_claim: false,
+  };
 }
 
 async function drainChecksums(role, peer) {
@@ -255,8 +364,9 @@ async function pollRun() {
     if (peers.alpha.terminal || peers.beta.terminal) break;
     const rows = {};
     for (const role of ['alpha', 'beta']) {
-      const {status} = await checkedHealth(role);
+      const {status, native} = await checkedHealth(role);
       rows[role] = status;
+      if (scenario === 'positive') await captureObservedRouteBoundary(role, native.phase, status.cursor);
       await drainChecksums(role, peers[role]);
       await peers[role].setNativeProgress(status.cursor);
       if (status.wait_episodes > instanceRows[role].last_wait_episodes) {
@@ -357,8 +467,10 @@ async function run() {
   }});
   pairResults.transport = {host: '127.0.0.1', port: null, framing: 'opaque length-prefixed JSON'};
   instances = {};
-  instanceRows.alpha = {role: 'alpha', local_port: 0, remote_port: 1, records: 0, timing_resumes: [], scene_runs: [], last_wait_episodes: 0};
-  instanceRows.beta = {role: 'beta', local_port: 1, remote_port: 0, records: 0, timing_resumes: [], scene_runs: [], last_wait_episodes: 0};
+  instanceRows.alpha = {role: 'alpha', local_port: 0, remote_port: 1, records: 0, timing_resumes: [], scene_runs: [], last_wait_episodes: 0,
+    route_boundary_captures: [], route_boundary_misses: []};
+  instanceRows.beta = {role: 'beta', local_port: 1, remote_port: 0, records: 0, timing_resumes: [], scene_runs: [], last_wait_episodes: 0,
+    route_boundary_captures: [], route_boundary_misses: []};
   const openTimeout = Math.min(180000, deadline - Date.now());
   if (openTimeout <= 0) throw Error('No run deadline remains for browser startup');
   const opened = await Promise.allSettled(['alpha', 'beta'].map(role => openNetInstance({
@@ -418,6 +530,20 @@ async function run() {
   pairResults.identity.handshake_confirmed_before_tick0 = true;
   pairResults.identity.peer_agreement_sha256 = peers.alpha.agreementHash;
   pairResults.transport.port = relay.port ?? null;
+  if (scenario === 'positive') {
+    const initial = await Promise.all(['alpha', 'beta'].map(async role => ({
+      role, status: await instances[role].status(), native: await instances[role].native(),
+    })));
+    await Promise.all(initial.map(async ({role, status, native}) => {
+      if (native.phase === POSITIVE_ROUTE_BOUNDARIES[0].phase) {
+        await captureRouteBoundary(role, POSITIVE_ROUTE_BOUNDARIES[0], status.cursor);
+      } else {
+        recordMissedBoundary(role, POSITIVE_ROUTE_BOUNDARIES[0],
+          'original CSS start was not current before input publication',
+          {phase: native.phase, cursor: status.cursor});
+      }
+    }));
+  }
   if (scenario === 'probe') {
     await publishProbeInputs(peers.alpha, peers.beta);
   } else if (scenario === 'disconnect') {
@@ -473,11 +599,17 @@ async function run() {
       const scenes = instanceRows[role].scene_runs.map(row => row.scene);
       instanceRows[role].route = validateFullRoute(scenes, observed.match);
       instanceRows[role].match_observation = observed.match;
-      instanceRows[role].graphics = await instances[role].graphics();
-      await instances[role].screenshot(path.join(childDirectory(role), 'final.png'));
+      await finishRouteBoundaryEvidence(role, instanceRows[role].final_native.phase,
+        instanceRows[role].final_status.cursor);
+      instanceRows[role].graphics = instanceRows[role].route_boundary_captures
+        .find(item => item.name === 'css-return')?.gpu ?? null;
     }
     pairResults.route = {scope: classifyRoute(sourceTicks, sourceTicks), expected_full_scene_order: expectedFullSceneOrder(),
-      alpha: instanceRows.alpha.route, beta: instanceRows.beta.route};
+      alpha: instanceRows.alpha.route, beta: instanceRows.beta.route,
+      boundary_capture_contract: {expected: POSITIVE_ROUTE_BOUNDARIES.map(({name, phase, label}) => ({name, phase, label})),
+        source: 'existing browser-driver diagnostics, net-session WebGPU diagnostics, and headless Chrome viewport screenshots',
+        pixel_equivalence_claim: false,
+        alpha: instanceRows.alpha.route_boundary_report, beta: instanceRows.beta.route_boundary_report}};
     const bytesA = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
     const bytesB = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
     if (!bytesA.equals(bytesB)) throw Error('Two native per-consumed-tick checksum streams differ');
