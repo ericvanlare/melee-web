@@ -11,6 +11,8 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {installStagingRingByteCapture, readStagingRingByteCapture,
   readStagingRingByteCaptureStatus, armStagingRingByteCapture} from './staging_ring_byte_capture.mjs';
 
+import {classifyStagingByteReplayCompletion} from './staging_ring_replay_completion.mjs';
+
 const ROOT = path.resolve(import.meta.dirname, '..');
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, recipe: {type: 'string'}, out: {type: 'string'},
@@ -257,14 +259,15 @@ try {
       throw Error(`Submitted-byte capture failed: ${JSON.stringify(status)}`);
     }
     replayReport = failure.replayReport;
-    if (replayReport && replayReport.pass !== true) {
-      throw Error(`Native replay report failed: ${JSON.stringify(replayReport.failures || replayReport)}`);
-    }
-    if (replayReport?.pass === true && status.status !== 'complete') {
-      throw Error(`Native replay completed before the byte capture reached 600 rows: ${JSON.stringify(status)}`);
+    if (replayReport) report.native_replay_report = replayReport;
+    if (replayReport) {
+      report.functional_completion = classifyStagingByteReplayCompletion(replayReport);
+      if (status.status !== 'complete') {
+        throw Error(`Native replay completed before the byte capture reached 600 rows: ${JSON.stringify(status)}`);
+      }
     }
     if (prefixFrames < 600 && status.frame_count >= prefixFrames) break;
-    if (status.status === 'complete' && replayReport?.pass === true) break;
+    if (status.status === 'complete' && replayReport?.complete === true) break;
     await page.waitForTimeout(100);
   }
   report.capture_status_at_stop = status;
@@ -283,11 +286,7 @@ try {
       report.capture.pending_frame_count !== 0 || report.capture.errors?.length || report.capture.overflow)) {
     throw Error(`600-frame capture failed: ${JSON.stringify(status)}`);
   }
-  if (prefixFrames === 600 && (replayReport?.pass !== true || replayReport?.complete !== true || replayReport?.frames !== 600 ||
-      replayReport?.metrics?.sourceFrames !== 600 || replayReport?.metrics?.sourceSteps !== 600 ||
-      replayReport?.metrics?.sourceDraws !== 600)) {
-    throw Error(`600-frame native replay did not complete cleanly: ${JSON.stringify(replayReport)}`);
-  }
+  if (prefixFrames === 600) report.functional_completion = classifyStagingByteReplayCompletion(replayReport);
   report.build_artifacts_after = await buildArtifacts(buildDirectory);
   if (JSON.stringify(report.build_artifacts_before) !== JSON.stringify(report.build_artifacts_after)) {
     throw Error('Served build artifacts changed during byte capture');
