@@ -6,6 +6,8 @@ import subprocess
 import sys
 import unittest
 
+from menu_browser_source import menu_browser_source
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -48,7 +50,7 @@ class WebLaunchTests(unittest.TestCase):
         self.assertIn("melee_web_asset_open", viewer)
 
     def test_native_game_manifest_matches_browser_allowlist(self):
-        browser = (ROOT / "src" / "gameplay_menu_browser.cpp").read_text(encoding="utf-8")
+        browser = menu_browser_source()
         manifest = subprocess.run(
             ["node", "--input-type=module", "-e",
              "import {NATIVE_GAME_DISC_FILES} from './web/runtime-assets.mjs';"
