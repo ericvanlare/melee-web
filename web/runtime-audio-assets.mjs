@@ -27,6 +27,7 @@ export async function openNativeGameSession(file) {
   const session = await openDiscSession(file);
   const adapter = {
     close: () => session.close(),
+    identity: () => session.identity(),
     fileInfo: path => {
       const entry = session.fileInfo(path);
       return entry ? Object.freeze({name: entry.path, size: entry.size}) : null;

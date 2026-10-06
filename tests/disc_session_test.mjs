@@ -164,6 +164,12 @@ if (discPath) {
 
   const progress = [];
   const audioSession = await openNativeGameSession(new PathFile(discPath));
+  const audioIdentity = await audioSession.identity();
+  assert.equal(audioIdentity.algorithm, "sha256");
+  assert.match(audioIdentity.dol, /^[0-9a-f]{64}$/);
+  assert.match(audioIdentity.fst, /^[0-9a-f]{64}$/);
+  assert(audioIdentity.dolSize > 0 && audioIdentity.fstSize > 0);
+  assert(Object.isFrozen(audioIdentity), "adapter preserves the immutable validated disc identity");
   const audio = await audioSession.readScope(['PlCo.dat', 'sislib_font.bin', 'dsp_coef.bin'], event => progress.push(event));
   assert.deepEqual([...audio.keys()], ['PlCo.dat', 'sislib_font.bin', 'dsp_coef.bin']);
   assert.equal(progress.at(-1).complete, 3);
@@ -187,6 +193,9 @@ if (discPath) {
 
   const silentSource = new PathFile(discPath);
   const silentSession = await openNativeGameDiscSession(silentSource);
+  const silentIdentity = await silentSession.identity();
+  assert.deepEqual(silentIdentity, audioIdentity,
+    'audio and silent adapters forward the same validated DOL/FST identity');
   const readsBeforeRejectedDsp = silentSource.ranges.length;
   await assert.rejects(silentSession.readScope(['dsp_coef.bin']), /Public native scenes do not accept DSP coefficients/);
   await assert.rejects(silentSession.streamScope(['PlCo.dat', 'dsp_coef.bin']).next(), /Public native scenes do not accept DSP coefficients/);
