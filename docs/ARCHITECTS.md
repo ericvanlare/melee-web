@@ -49,6 +49,46 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-06 — Codex: continue Claude's architect handover
+
+**Ask:** Continue the owner's multiplayer-first and competitive-rules priorities
+under decisions D1–D9. The owner assigned Codex the retained Claude work on
+2026-10-06, with GPT-6 Luna at xhigh for bounded execution and GPT-6.1 Sol at
+medium for escalation when an agent is blocked or off course.
+
+**Status:** Execution results are ready for review. The previously approved
+bootstrap ownership PR #156 is merged. The Stadium contract (#161) and pause
+classification (#162) are merged after owner approval. The menu-browser split
+[#165](https://github.com/ericvanlare/melee-web/pull/165)
+is merged after current-base validation and owner approval. A1 and four-player
+Team Battle are rebased onto the merged split. A1's declared-channel Chrome
+comparisons are recorded in [#166](https://github.com/ericvanlare/melee-web/pull/166)
+for review; cross-browser and cross-architecture checks remain open. The H1
+staging experiment is recorded in [#167](https://github.com/ericvanlare/melee-web/pull/167):
+conditioned timing is inconclusive, the natural pause remains unexplained, and
+the default stays at two slots. Four-player Team Battle's
+[#169](https://github.com/ericvanlare/melee-web/pull/169) records a natural 2v2 route that
+reaches original Team Results and CSS after the frame adapter accepts the
+original Team-elimination outcome. Its builds, existing-route regressions and
+final suite pass. Evidence stays in each workstream's status entry and receipt;
+component results do not close
+H1, A1 or competitive-set acceptance.
+
+The next bounded tasks have written plans and the Codex runtime/content
+workstreams as execution owners: [A2 local lockstep](https://github.com/ericvanlare/melee-web/issues/163)
+and [Stadium C0/C1](https://github.com/ericvanlare/melee-web/issues/164).
+A2 waits for a supported deterministic route. Stadium's early preparation
+checks use a development gate and do not expose unsupported match entry to the
+supported player route. Original load-latency measurement and transformation
+timing remain later, separate gates. The paused fighter-accuracy and rollback
+receipts remain intact; human-only gates stay unscheduled.
+
+**Links:** [Priorities tracker #158](https://github.com/ericvanlare/melee-web/issues/158),
+[architecture decision 016](ARCHITECTURE.md#016--online-play-starts-as-lockstep-from-a-shared-css-context),
+[stage checkpoints](ADDING_STAGES.md), [#156](https://github.com/ericvanlare/melee-web/pull/156),
+[#161](https://github.com/ericvanlare/melee-web/pull/161),
+[#162](https://github.com/ericvanlare/melee-web/pull/162).
+
 ### 2026-10-05 — Claude: new priorities and decisions made under owner delegation
 
 **Context.** The owner set two priorities: beeline online multiplayer, and finish
