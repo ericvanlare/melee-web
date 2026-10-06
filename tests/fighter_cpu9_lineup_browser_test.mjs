@@ -1045,6 +1045,12 @@ async function enableFriendlyFire(){
     });
   await page.waitForTimeout(800);
   await fullPad(padButtonL|padButtonR|buttonStart,255,255,4,'CSS L+R+Start to original Main');
+  const mainReady=await waitFor('active original Main owner before neutral PAD release',state=>
+    state.phase===11&&state.running===1&&state.status.startsWith('Original main menu')&&
+    state.diagnostics.includes('raw PAD: none'),60000);
+  report.source_progress.push({label:'original Main active and queued CSS PAD drained before neutral release',
+    phase:mainReady.phase,running:mainReady.running,status:mainReady.status,
+    diagnostics:mainReady.diagnostics});
   await fullPad(0,0,0,2,'CSS L+R+Start release');
   await waitForSource('original Main root',source=>source.scene===MAIN_SCENE&&
     source.menu_kind===MAIN_MENU_KIND,60000);
