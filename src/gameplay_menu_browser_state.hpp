@@ -30,6 +30,7 @@ extern ResultsData lbl_8046DBE8;
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_retail_recipe.hpp"
+#include "gameplay_net_input.h"
 #include "gameplay_replay_completion_policy.hpp"
 #include "../tests/native_menu_fighter_input.h"
 #include "../tests/native_menu_stage_input.h"

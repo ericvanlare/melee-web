@@ -210,6 +210,19 @@ window.menuReplayPoll=()=>{
  }}
  if(now-run.started>retailReplayWallTimeMs(run.wholeSession))finishRetailReplay('Replay exceeded bounded wall time');
 };
+// Development-only networked-session entry (Track A1). It mirrors the
+// whole-session replay entry: the canonical freshly prepared CSS owner receives
+// one agreed seed, then the ordinary native launch enters it. Per-tick PAD
+// frames and checksum records cross only the _melee_web_net_* exports.
+window.meleeNetBegin=async(seed,maxFrames)=>{
+ if(retailRun||replayLoading||!ready||fatal||!bundle||typeof Module._melee_web_native_menu_net_begin!=='function')throw Error('Networked session is unavailable');
+ if(owner.handle.getState().state!=='prepared')throw Error('A networked session requires a freshly imported disc before opening character select.');
+ resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
+ await boundary(()=>check(Module._melee_web_native_menu_net_begin(seed>>>0,maxFrames>>>0)));
+ await waitForAudioRender();
+ await boundary(()=>check(Module._melee_web_native_menu_launch()));
+ $('canvas').focus();inputDirty=true;syncAudio();
+};
 $('retail-replay-start').onclick=async()=>{
  if(replayLoading||retailRun||!ready||fatal||!bundle)return;
  replayLoading=true;$('retail-replay-start').disabled=$('disc').disabled=$('launch').disabled=true;

@@ -30,6 +30,8 @@ static void* arena;
 static size_t arena_bytes;
 static void* session_arena;
 static size_t session_bytes;
+/* Diagnostic-only initial arena pattern; -1 keeps the allocator's bytes. */
+static int session_arena_fill = -1;
 static OSHeapHandle heap = -1;
 static uint64_t ticks, disabled_links, generation, allocation_generation;
 static int stepping, shutting_down, tables_live;
@@ -163,10 +165,26 @@ int melee_web_gameplay_session_begin(size_t bytes, char* error, size_t error_siz
         return fail(error, error_size, "Gameplay session arena must be between 64 KiB and 64 MiB");
     void* candidate = malloc(bytes);
     if (!candidate) return fail(error, error_size, "Unable to allocate gameplay session arena");
+    if (session_arena_fill >= 0) memset(candidate, session_arena_fill, bytes);
     session_arena = candidate;
     session_bytes = bytes;
     next_allocation_generation();
     return success(error, error_size);
+}
+
+int melee_web_gameplay_session_arena_fill(int pattern)
+{
+    if (session_arena || pattern < -1 || pattern > 255) return 0;
+    session_arena_fill = pattern;
+    return 1;
+}
+
+int melee_web_gameplay_session_arena(const void** base, size_t* bytes)
+{
+    if (!session_arena || !base || !bytes) return 0;
+    *base = session_arena;
+    *bytes = session_bytes;
+    return 1;
 }
 
 int melee_web_gameplay_session_end(char* error, size_t error_size)
