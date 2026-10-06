@@ -103,10 +103,10 @@
   },
   "coverage": "The patched validator text is extracted from the canonical patch and compared, with the shared rule, against a literal transcription of fn_80262F44 for every team flag, roster size 0-5 and 4^4 colour assignment; named 2v2, 3v1 and 2v1v1 cases and each refusal are asserted. Reintroducing the former two-player bound into the extracted validator fails the 2v2 case.",
   "full_suite": {
-   "status": "passed",
+   "status": "failed",
    "tests": 1885,
    "skipped": 141,
-   "note": "Skips are owned-asset or toolchain-dependent tests absent on the build machine; the three build/browser-dependent tests ran after the default-configuration runtime build."
+   "note": "Historical run failed test_status_entries.test_entry_links_resolve because this receipt did not yet exist. The receipt now exists; rerun the suite before claiming a current result."
   }
  },
  "source_files_sha256": {
