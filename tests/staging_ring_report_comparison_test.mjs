@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import test from 'node:test';
 import {compareStagingRingReports as compare} from './staging_ring_report_comparison.mjs';
 const artifactNames = JSON.parse(fs.readFileSync(new URL('../tools/browser_build_artifacts.json', import.meta.url)));
-function fixtures() {
+function fixtures(names = artifactNames) {
   const source = {commit: 'a'.repeat(40), tree: 'b'.repeat(40),
     tracked_diff_sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     aurora_patch_sha256: 'c'.repeat(64)};
-  const map = Object.fromEntries(artifactNames.map(name => [name, {bytes: 16, sha256: 'd'.repeat(64)}]));
+  const map = Object.fromEntries(names.map(name => [name, {bytes: 16, sha256: 'd'.repeat(64)}]));
   const report = slots => {
     const ring = {frame_slots: slots, staging_buffers: slots, selection: {byte_hash_enabled: true}};
     return {result: 'captured', requested_frame_slots: slots, ring_status: ring, browser_errors: [], source: structuredClone(source),
@@ -22,7 +23,9 @@ function fixtures() {
         frames: Array.from({length: 600}, (_, index) => ({gameplay_ordinal: index + 1, source_cursor: index,
           source_frame: Math.max(0, index - 120), source_draw_ordinal: index + 1, writes: []}))}};
   };
-  return {two: report(2), four: report(4), options: {artifactNames, sourceDifference: {verified: true,
+  return {two: report(2), four: report(4), options: {artifactNames: names, sourceDifference: {verified: true,
+    artifact_inventory: {path: 'tools/browser_build_artifacts.json', names: names.slice(),
+      sha256: crypto.createHash('sha256').update(JSON.stringify(names)).digest('hex')},
     ring2_commit: source.commit, ring4_commit: source.commit, ring2_tree: source.tree, ring4_tree: source.tree,
     changed_paths: []}}};
 }
@@ -32,6 +35,19 @@ test('missing post-map rejects by default; explicit recovery binds subsequent co
   const result = compare(two, four, {...options, recoverMissingRing2PostMap: true});
   assert.equal(result.missing_ring2_post_map, true);
   assert.match(result.artifact_binding, /conditional artifact binding/);
+});
+test('capture-source inventory supports historical modules and rejects unverified substitutions', () => {
+  const historical = fixtures(artifactNames.filter(name => name !== 'net-timing-pause.mjs'));
+  assert.equal(compare(historical.two, historical.four, historical.options).result, 'equal');
+  for (const change of [
+    f => delete f.options.sourceDifference.artifact_inventory,
+    f => f.options.artifactNames.pop(),
+    f => f.options.artifactNames.push(f.options.artifactNames[0]),
+    f => f.options.sourceDifference.artifact_inventory.names.reverse(),
+  ]) {
+    const f = fixtures(artifactNames.slice()); change(f);
+    assert.throws(() => compare(f.two, f.four, f.options), /artifact inventory/);
+  }
 });
 test('rejects absent completion, wrong rings, mutation, structural failure and cleanup errors', () => {
   for (const change of [

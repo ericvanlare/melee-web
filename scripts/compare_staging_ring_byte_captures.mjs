@@ -25,10 +25,18 @@ for (const report of [two, four]) {
 }
 const diff = execFileSync('git', ['diff', '--binary', two.source.commit, four.source.commit], {cwd: ROOT});
 const names = git('diff', '--name-only', two.source.commit, four.source.commit);
+// Historical captures keep their own executable inventory as main adds modules.
+// Both source identities are resolved above; do not substitute today's manifest.
+const inventoryPath = 'tools/browser_build_artifacts.json';
+const inventories = [two, four].map(report => execFileSync('git',
+  ['show', `${report.source.commit}:${inventoryPath}`], {cwd: ROOT}));
+if (!inventories[0].equals(inventories[1]))
+  throw Error('Capture source commits declare different runtime artifact inventories');
+const artifactNames = JSON.parse(inventories[0]);
 const sourceDifference = {verified: true, ring2_commit: two.source.commit, ring4_commit: four.source.commit,
   ring2_tree: two.source.tree, ring4_tree: four.source.tree, changed_paths: names ? names.split('\n') : [],
+  artifact_inventory: {path: inventoryPath, sha256: sha(inventories[0]), names: artifactNames},
   diff_sha256: sha(diff), policy: 'Only unserved tests/*.mjs harness code may differ; full served/local executable maps remain checked'};
-const artifactNames = JSON.parse(await fs.readFile(path.join(ROOT, 'tools/browser_build_artifacts.json'), 'utf8'));
 const result = compareStagingRingReports(two, four, {artifactNames, sourceDifference,
   recoverMissingRing2PostMap: values['recover-missing-ring2-post-map'] === true});
 result.report_inputs = Object.fromEntries(['ring2', 'ring4'].map((label, index) =>

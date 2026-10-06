@@ -5,8 +5,13 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 function require(condition, message) { if (!condition) throw Error(message); }
 export function compareStagingRingReports(two, four, {artifactNames, sourceDifference,
   recoverMissingRing2PostMap = false} = {}) {
-  require(Array.isArray(artifactNames) && artifactNames.length === 31,
-    'Comparison requires the complete 31-file runtime artifact inventory');
+  require(Array.isArray(artifactNames) && artifactNames.length > 0 &&
+    artifactNames.every(name => typeof name === 'string' && /^[a-zA-Z0-9_.-]+$/.test(name)) &&
+    new Set(artifactNames).size === artifactNames.length &&
+    sourceDifference?.artifact_inventory?.path === 'tools/browser_build_artifacts.json' &&
+    /^[0-9a-f]{64}$/.test(sourceDifference.artifact_inventory.sha256 ?? '') &&
+    same(artifactNames, sourceDifference.artifact_inventory.names),
+    'Comparison requires the complete artifact inventory verified from both capture source commits');
   const completion = {};
   for (const [label, report, slots] of [['ring2', two, 2], ['ring4', four, 4]]) {
     completion[label] = classifyStagingByteReplayCompletion(report?.native_replay_report);
