@@ -36,6 +36,8 @@ typedef struct NetSession {
     MeleeWebNetArenaRecord arena[MELEE_WEB_NET_ARENA_RECORDS];
     uint32_t arena_count;
     uint32_t arena_overflow;
+    /* Diagnostic initialization requested before import, then consumed once
+     * by net_session_begin at the backing arena allocation boundary. */
     int arena_fill;
     int arena_fill_pending;
 } NetSession;
@@ -70,7 +72,9 @@ int melee_web_net_session_begin(size_t bytes, char* error, size_t error_size)
         net.arena_fill_pending = 0;
         return 1;
     }
-    return melee_web_gameplay_session_begin(bytes, error, error_size);
+    if (!melee_web_gameplay_session_begin(bytes, error, error_size)) return 0;
+    net.arena_fill = -1;
+    return 1;
 }
 
 int melee_web_net_begin(uint32_t seed, uint32_t max_frames, char* e, size_t n)
