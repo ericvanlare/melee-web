@@ -123,6 +123,17 @@ class NetChecksumComparatorTests(unittest.TestCase):
             self.assertTrue(report["identical"])
             self.assertTrue(report["start_record_equal"])
 
+    def test_auxiliary_arena_report_labels_size_separately_from_hash(self):
+        report = comparator.compare_arena(
+            [{"tick": 0, "scene": 1, "base": 100, "bytes": 4096, "hash": "a"}],
+            [{"tick": 0, "scene": 1, "base": 100, "bytes": 4096, "hash": "b"}],
+        )
+        row = report["entries"][0]
+        self.assertTrue(row["base_equal"])
+        self.assertTrue(row["size_equal"])
+        self.assertFalse(row["hash_equal"])
+        self.assertNotIn("bytes_equal", row)
+
 
 if __name__ == "__main__":
     unittest.main()

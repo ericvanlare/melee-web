@@ -20,6 +20,10 @@ Channels, in the order a first divergence is named:
   scene_state  fighter fields in the match, CSS/SSS selection data in menus
   total        FNV-1a64 over header + input + master_pad + scene_state
   objects      supplementary: GObj link identity and root transforms
+
+The separate arena record is an auxiliary raw-region digest, not one of the
+declared source-state channels. It covers the complete session allocation,
+including allocator, unused and padding bytes.
 """
 
 from __future__ import annotations
@@ -152,7 +156,7 @@ def scene_runs(rows: list[dict]) -> list[dict]:
 
 
 def compare_arena(first, second) -> dict:
-    """Compare the optional per-scene-entry arena hashes of two instances."""
+    """Compare optional raw session-arena metadata, separately from channels."""
     if first is None or second is None:
         return {"available": False}
     rows = []
@@ -163,7 +167,7 @@ def compare_arena(first, second) -> dict:
             "tick_a": a and a["tick"], "tick_b": b and b["tick"],
             "scene_a": a and a["scene"], "scene_b": b and b["scene"],
             "base_equal": bool(a and b and a["base"] == b["base"]),
-            "bytes_equal": bool(a and b and a["bytes"] == b["bytes"]),
+            "size_equal": bool(a and b and a["bytes"] == b["bytes"]),
             "hash_equal": bool(a and b and a["hash"] == b["hash"]),
         })
     return {"available": True, "entries": rows,
