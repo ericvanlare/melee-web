@@ -277,7 +277,9 @@ async function pollRun() {
     }
     if (probe && waitObservations.some(row => row.role === 'alpha' && row.blocker === 'remote_input')) {
       const wait = waitObservations.find(row => row.role === 'alpha' && row.blocker === 'remote_input');
-      if (wait.cursor !== wait.pushed || wait.wait_start_tick !== wait.cursor)
+      const delayedSourceTick = LOCKSTEP_DELAY + 1;
+      if (wait.cursor !== delayedSourceTick || wait.pushed !== delayedSourceTick ||
+          wait.wait_start_tick !== delayedSourceTick || wait.wait_last_tick !== delayedSourceTick)
         throw Error(`CSS input wait was not held at one unconsumed source tick: ${JSON.stringify(wait)}`);
       const before = rows.alpha.cursor;
       await sleep(120);
@@ -286,7 +288,7 @@ async function pollRun() {
         throw Error(`Network wait consumed a source tick or changed blocker while remote input was held: ${JSON.stringify(held)}`);
       instanceRows.alpha.wait_hold = {before_cursor: before, after_cursor: held.cursor,
         wait_callbacks_before: wait.wait_callbacks, wait_callbacks_after: held.wait_callbacks,
-        blocker: held.blocker, held_ms: 120};
+        wait_resume_count_before: held.wait_resume_count, blocker: held.blocker, held_ms: 120};
       await peers.beta.addLocalInputs([[1, localSample('beta', 1)],
         [3, localSample('beta', 3)], [4, localSample('beta', 4)], [5, localSample('beta', 5)]], {repeat: true});
       instanceRows.probe_released = true;
@@ -433,6 +435,13 @@ async function run() {
     }
     if (instanceRows.alpha.wait_hold.before_cursor !== instanceRows.alpha.wait_hold.after_cursor)
       throw Error('Held remote input advanced the source cursor');
+    const alphaFinal = await instances.alpha.status();
+    if (alphaFinal.wait_episodes !== 1 || alphaFinal.wait_resume_count !== 1 || alphaFinal.cursor !== sourceTicks)
+      throw Error(`Remote-input wait did not resume exactly once without source-tick debt: ${JSON.stringify(alphaFinal)}`);
+    const bytesA = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
+    const bytesB = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
+    if (!bytesA.equals(bytesB)) throw Error('CSS probe per-consumed-tick checksum streams differ');
+    pairResults.checksums = {records_each: sourceTicks, streams_identical: true, sha256: sha256(bytesA)};
     if (peers.alpha.inputDuplicates < 1 || peers.alpha.outOfOrderInputs < 1)
       throw Error('Reduced probe did not exercise duplicate and out-of-order remote input');
     pairResults.route = {scope: 'CSS-only prefix', status: 'not-full-route', scene: 'CSS'};
