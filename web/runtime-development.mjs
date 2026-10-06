@@ -3,6 +3,7 @@ import {mountMeleeRuntime} from './melee-runtime.mjs';
 import {mountControllerSettings} from './controller-settings.mjs';
 import {createRuntimeAudio} from './runtime-audio.mjs';
 import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.mjs';
+import {attemptNetworkTimingPauseResume, canResumeNetworkTimingPause} from './net-timing-pause.mjs';
 const developmentHooks = {};
 const RETAIL_REPLAY_LEGACY_MAX_FRAMES = 36000;
 const RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES = 108000;
@@ -214,6 +215,18 @@ window.menuReplayPoll=()=>{
 // whole-session replay entry: the canonical freshly prepared CSS owner receives
 // one agreed seed, then the ordinary native launch enters it. Per-tick PAD
 // frames and checksum records cross only the _melee_web_net_* exports.
+window.meleeNetCanResumeTimingPause=()=>{
+ if(!owner?.handle||typeof Module._melee_web_net_status!=='function')return false;
+ const network=JSON.parse(Module.UTF8ToString(Module._melee_web_net_status()));
+ const running=Module._melee_web_native_menu_running();
+ const message=Module.UTF8ToString(Module._melee_web_native_menu_message());
+ return canResumeNetworkTimingPause({networkActive:network.active===true,nativeRunning:running===1,
+  message,ownerState:owner.handle.getState()});
+};
+window.meleeNetResumeTimingPause=async()=>{
+ return attemptNetworkTimingPauseResume({canResume:()=>window.meleeNetCanResumeTimingPause(),
+  resume:()=>owner.handle.resume(),isRunning:()=>Module._melee_web_native_menu_running()===1});
+};
 window.meleeNetBegin=async(seed,maxFrames)=>{
  if(retailRun||replayLoading||!ready||fatal||!bundle||typeof Module._melee_web_native_menu_net_begin!=='function')throw Error('Networked session is unavailable');
  if(owner.handle.getState().state!=='prepared')throw Error('A networked session requires a freshly imported disc before opening character select.');

@@ -77,10 +77,9 @@ const PAGE_HELPERS = () => {
       return out;
     },
     resumeTimingPause() {
-      const status = document.querySelector('#status')?.textContent || '';
-      if (!status.startsWith('Paused after a timing disruption') || Module._melee_web_native_menu_running()) return false;
-      Module._melee_web_native_menu_pause(0);
-      return Module._melee_web_native_menu_running() === 1;
+      if (typeof window.meleeNetCanResumeTimingPause !== 'function' ||
+          !window.meleeNetCanResumeTimingPause()) return false;
+      return window.meleeNetResumeTimingPause();
     },
   };
 };
