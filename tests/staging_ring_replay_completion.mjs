@@ -3,7 +3,7 @@ export function classifyStagingByteReplayCompletion(report) {
   const allowed = new Set(['livePipelinesCreated', 'preparationPauses', 'browserCallbackGaps']);
   if (!report || report.complete !== true || report.frames !== 600 ||
       report.metrics?.sourceFrames !== 600 || report.metrics?.sourceSteps !== 600 ||
-      report.metrics?.sourceDraws !== 600 || report.metrics?.focusLost ||
+      report.metrics?.sourceDraws !== 600 || report.metrics?.focusLost !== false ||
       report.instrumented_timing_resumes !== 0 || !Array.isArray(report.failures)) {
     throw Error('Native replay did not complete the exact 600-input functional timeline');
   }
