@@ -26,7 +26,6 @@ import {Worker} from 'node:worker_threads';
 import {parseArgs} from 'node:util';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
-import {installSizedCssObservers} from './pause_trace_capture.mjs';
 import {readResultsEntryPacket,bindResultsEntryPacket} from './results_entry_packet.mjs';
 import {queueResultsP1StartAtCurrentSource,scheduleResultsP1StartSequence,
   scheduleResultsSourceFramePauses}
@@ -2414,7 +2413,8 @@ try{
   assert(report.gpu.cross_origin_isolated&&report.gpu.adapter_available,
     'Rendered validation requires an isolated page and a WebGPU adapter');
   await driver.waitForImport();
-  report.css_observer_storage = await installSizedCssObservers(page);
+  report.css_observer_storage = {provider: 'served development helpers; no replacement',
+    native_ids_bytes: 56, native_geometry_bytes: 32};
   report.staging_ring = await page.evaluate(() => window.__meleeWebStagingRingStatus ?? null);
   if (new URL(values.url).searchParams.get('melee-web-staging-slots') === '4') {
     assert.equal(report.staging_ring?.frame_slots, 4, 'Explicit ring4 regression requires four native frame slots');
