@@ -852,6 +852,68 @@ int inspect_yakumono_target(const std::filesystem::path& path)
 
 int run_probe(std::string_view probe, const std::filesystem::path& path)
 {
+    if (probe == "animation-slots") {
+        constexpr std::array<const char*, 6> names{
+            "GrPs.usd", "GrPs.dat", "GrPs1.dat", "GrPs2.dat",
+            "GrPs3.dat", "GrPs4.dat"};
+        const auto report_slot = [](const DatArchive& archive, std::uint32_t slot) {
+            std::cout << "{\"slot\":" << slot;
+            const DatExternalSymbol* external = nullptr;
+            for (const auto& symbol : archive.external_symbols()) {
+                if (std::find(symbol.slots.begin(), symbol.slots.end(), slot) !=
+                    symbol.slots.end()) {
+                    external = &symbol;
+                    break;
+                }
+            }
+            if (external) {
+                std::cout << ",\"kind\":\"external\",\"identity\":";
+                print_json_string(external->name);
+                std::cout << ",\"external_slot\":" << slot;
+            } else if (archive.has_relocation(slot)) {
+                const auto target = archive.pointer(slot, 1);
+                check(target.has_value(), "local animation reference resolved to null");
+                std::cout << ",\"kind\":\"local\",\"target\":" << *target;
+            } else {
+                const auto raw = archive.be32(slot);
+                check(raw == 0, "animation slot has a nonzero unrelocated word");
+                std::cout << ",\"kind\":\"absent\",\"raw_word\":0";
+            }
+            std::cout << '}';
+        };
+
+        std::cout << "{\"probe\":\"animation-slots\",\"scope\":\"metadata-only local/external/absent reference classification\",\"archives\":[";
+        for (std::size_t file_index = 0; file_index < names.size(); ++file_index) {
+            if (file_index) std::cout << ',';
+            const auto bytes = read_file(path / names[file_index]);
+            const auto archive = std::make_shared<const DatArchive>(
+                bytes, DatExternalPolicy::ResolveNull);
+            const DatStage stage(*archive);
+            check(stage.entries.size() == 10,
+                  std::string(names[file_index]) + " map_head does not have 10 entries");
+            std::cout << "{\"name\":";
+            print_json_string(names[file_index]);
+            std::cout << ",\"entry_slots\":[";
+            for (std::size_t i = 0; i < stage.entries.size(); ++i) {
+                if (i) std::cout << ',';
+                const auto& entry = stage.entries[i];
+                const auto descriptor = entry.descriptor_offset;
+                std::cout << "{\"entry\":" << i << ",\"joint\":";
+                report_slot(*archive, descriptor);
+                std::cout << ",\"joint_animation\":";
+                report_slot(*archive, descriptor + 4);
+                std::cout << ",\"material_animation\":";
+                report_slot(*archive, descriptor + 8);
+                std::cout << ",\"shape_animation\":";
+                report_slot(*archive, descriptor + 12);
+                std::cout << '}';
+            }
+            std::cout << "]}";
+        }
+        std::cout << "]}\n";
+        return 0;
+    }
+
     const auto bytes = read_file(path);
     const auto archive = std::make_shared<const DatArchive>(
         bytes, DatExternalPolicy::ResolveNull);
