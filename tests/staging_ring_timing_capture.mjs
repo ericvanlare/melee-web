@@ -165,7 +165,8 @@ const report = {
   result: 'fail',
   requested_frame_slots: slots,
   stall_ms: stallMs,
-  target_source_frame: 600,
+  target_replay_cursor: 600,
+  original_match_counter: 'retained at actual insertion; not an input ordinal',
   instrumentation: 'pause timing table and staging diagnostics enabled uniformly in every cell; overhead not isolated',
   gpu_windows: [],
   browser_mode: 'headless installed Chrome, muted host output; no submitted-byte hashing and no automatic timing resume',
@@ -238,7 +239,7 @@ try {
   report.gpu_config = heavy.config;
   report.gpu_ready = heavy.ready;
   report.capture_start = await installPauseTraceCapture(page,
-    {sourceFrame: 600, replayCursor: 600, durationMs: stallMs});
+    {sourceFrame: null, replayCursor: 600, durationMs: stallMs});
   if (!report.capture_start.timing_hook_present || !report.capture_start.sample_hook_present)
     throw Error('Source timing observation hooks are unavailable');
   traceInstalled = true;
@@ -265,6 +266,9 @@ try {
       running: Module._melee_web_native_menu_running(), at_ms: performance.now(),
       epoch_ms: performance.timeOrigin + performance.now()}));
     if (!gpuOn && native.cursor >= 400) {
+      report.match_before_gpu_load = await page.evaluate(() => window.menuObservePlayer?.() ?? null);
+      if (report.match_before_gpu_load?.ready !== true || !(native.frame > 0))
+        throw Error('Conditioned fixture did not enter active gameplay before GPU-load treatment');
       const load = await setHeavyGpu(heavy, true);
       report.gpu_windows.push({event: 'on', native, load,
         boundary: 'harness command after observed source cursor; actual command time retained'});

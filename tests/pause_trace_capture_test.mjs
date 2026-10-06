@@ -54,6 +54,20 @@ try {
   assert.equal(state.stall_schedule.error, 'target_source_frame_skipped');
   assert.equal(state.errors, 0);
 
+  cursor = 600;
+  globalThis.window = {
+    menuRuntimeTiming() {}, menuDiagnosticSample() {}, menuDiagnosticIncident() {},
+    Module: {_melee_web_native_menu_replay_cursor: () => cursor},
+  };
+  await installPauseTraceCapture(page, {sourceFrame: null, replayCursor: 600, durationMs: 2});
+  sample[1] = 476;
+  globalThis.window.menuDiagnosticSample(...sample);
+  globalThis.window.menuRuntimeTiming({frame: 600, total_ms: 2});
+  state = globalThis.window.__meleePauseTrace.state;
+  assert.equal(state.stall_schedule.status, 'complete');
+  assert.equal(state.stall_schedule.observed_source_frame, 476);
+  assert.equal(state.stall_schedule.observed_replay_cursor, 600);
+
   await assert.rejects(() => installPauseTraceCapture(page,
     {sourceFrame: 600, replayCursor: 600, durationMs: 251}), /1\.\.250ms/);
 } finally {

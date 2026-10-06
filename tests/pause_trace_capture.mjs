@@ -27,10 +27,10 @@ export function pauseTraceConfig(baseTrace){
 }
 
 export async function installPauseTraceCapture(page,stallSchedule=null){
-  if(stallSchedule!==null&&(!Number.isSafeInteger(stallSchedule.sourceFrame)||stallSchedule.sourceFrame<1||
+  if(stallSchedule!==null&&((stallSchedule.sourceFrame!==null&&(!Number.isSafeInteger(stallSchedule.sourceFrame)||stallSchedule.sourceFrame<0))||
     !Number.isSafeInteger(stallSchedule.replayCursor)||stallSchedule.replayCursor<0||
     !Number.isSafeInteger(stallSchedule.durationMs)||stallSchedule.durationMs<1||stallSchedule.durationMs>250))
-    throw Error('Pause-trace stall schedule must name a positive source frame, nonnegative replay cursor and 1..250ms duration');
+    throw Error('Pause-trace stall schedule must name a optional nonnegative original match counter, exact nonnegative replay cursor and 1..250ms duration');
   return page.evaluate(({columns,stallSchedule})=>{
     if(window.__meleePauseTrace)return {status:'already-installed'};
     const COLS=columns.length,CAP=72000,RING=1800;
@@ -58,11 +58,13 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
     const maybeRunStall=sourceFrame=>{
       const schedule=state.stall_schedule;
       if(!schedule||schedule.status!=='armed'||!Number.isInteger(sourceFrame))return;
-      if(sourceFrame<schedule.sourceFrame)return;
+      const cursorOnly=schedule.sourceFrame===null;
+      if(!cursorOnly&&sourceFrame<schedule.sourceFrame)return;
       const cursor=window.Module?._melee_web_native_menu_replay_cursor?.()??null;
-      if(sourceFrame!==schedule.sourceFrame||cursor!==schedule.replayCursor){
+      if(cursorOnly&&cursor<schedule.replayCursor)return;
+      if((!cursorOnly&&sourceFrame!==schedule.sourceFrame)||cursor!==schedule.replayCursor){
         schedule.status='failed';
-        schedule.error=sourceFrame!==schedule.sourceFrame?'target_source_frame_skipped':'target_replay_cursor_mismatch';
+        schedule.error=!cursorOnly&&sourceFrame!==schedule.sourceFrame?'target_source_frame_skipped':'target_replay_cursor_mismatch';
         schedule.observed_source_frame=sourceFrame;
         schedule.observed_replay_cursor=cursor;
         return;
