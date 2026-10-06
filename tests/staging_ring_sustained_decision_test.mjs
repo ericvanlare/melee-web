@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {assessSustainedWindow, classifySustainedAttempt, resolveSustainedAttempt,
-  summarizeObservedBatchDurations} from './staging_ring_sustained_decision.mjs';
+  summarizeObservedBatchDurations, artifactMapDigest, compareArtifactMaps,
+  validateProspectiveBuildManifest} from './staging_ring_sustained_decision.mjs';
 
 function rowsForWindow(start, end, pending = [0, 1, 2], stagingMs = 12, totalMs = 20) {
   const count = pending.length;
@@ -121,5 +122,37 @@ assert.equal(teardownFailure.reason, 'capture_or_cleanup_integrity_failed');
 assert.deepEqual(teardownFailure.integrity_errors, ['artifact_postcheck_error']);
 assert.equal(resolveSustainedAttempt({integrityErrors: [], control, treatment: positiveTreatment,
   terminal: {outcome: 'timing_pause', pause_reason: 1}, recorder, gpuLoad}).result, 'positive_control');
+
+const localArtifacts = Object.fromEntries(Array.from({length: 31}, (_, index) => {
+  const name = `browser-artifact-${String(index).padStart(2, '0')}`;
+  return [name, {bytes: index + 1, sha256: String(index + 1).padStart(64, '0')}];
+}));
+const source = {commit: 'a'.repeat(40), tree: 'b'.repeat(40)};
+assert.equal(artifactMapDigest(localArtifacts), artifactMapDigest(Object.fromEntries(
+  Object.entries(localArtifacts).reverse())));
+const prospectiveManifest = {schema: 'melee-web-h1-prospective-build-manifest-v1',
+  binding_type: 'prospective_local_build_inventory', source,
+  build_directory: '/frozen/release', inventory: {artifact_count: 31,
+    artifact_map_sha256: artifactMapDigest(localArtifacts), artifacts: localArtifacts}};
+assert.equal(validateProspectiveBuildManifest(prospectiveManifest, {source,
+  buildDirectory: '/frozen/release', localArtifacts}).valid, true);
+const changedArtifacts = {...localArtifacts, 'browser-artifact-03':
+  {bytes: 999, sha256: 'c'.repeat(64)}};
+const changed = compareArtifactMaps(localArtifacts, changedArtifacts);
+assert.equal(changed.matches, false);
+assert.deepEqual(changed.differences.map(item => item.name), ['browser-artifact-03']);
+assert.deepEqual(validateProspectiveBuildManifest(prospectiveManifest, {source,
+  buildDirectory: '/frozen/release', localArtifacts: changedArtifacts}).problems,
+['local_artifact_map_mismatch']);
+assert.ok(validateProspectiveBuildManifest(prospectiveManifest, {source: {...source, tree: 'd'.repeat(40)},
+  buildDirectory: '/frozen/release', localArtifacts}).problems.includes('source_identity_mismatch'));
+assert.ok(validateProspectiveBuildManifest({...prospectiveManifest,
+  inventory: {...prospectiveManifest.inventory, artifact_map_sha256: 'e'.repeat(64)}}, {source,
+  buildDirectory: '/frozen/release', localArtifacts}).problems.includes('manifest_artifact_digest_invalid'));
+const oldHistoricalMap = {...localArtifacts,
+  'browser-artifact-02': {bytes: 3, sha256: 'f'.repeat(64)},
+  'browser-artifact-08': {bytes: 9, sha256: 'e'.repeat(64)}};
+assert.deepEqual(compareArtifactMaps(oldHistoricalMap, localArtifacts).differences.map(item => item.name),
+['browser-artifact-02', 'browser-artifact-08']);
 
 console.log('Sustained staging-ring window qualification and frozen decision rules passed.');

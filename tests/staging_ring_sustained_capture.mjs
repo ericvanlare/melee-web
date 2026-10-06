@@ -13,12 +13,13 @@ import {installPauseTraceCapture, readPauseTraceCapture, readPauseTraceStatus,
 import {createHeavyGpuPage, setHeavyGpu, readHeavyGpu} from './pause_trace_perturb.mjs';
 import {assessSustainedWindow, SUSTAINED_WINDOW_MS,
   MAX_OBSERVED_GPU_WINDOW_MS, PREPARATION_REASON, summarizeObservedBatchDurations,
-  resolveSustainedAttempt} from './staging_ring_sustained_decision.mjs';
+  resolveSustainedAttempt, artifactMapDigest, compareArtifactMaps,
+  validateProspectiveBuildManifest} from './staging_ring_sustained_decision.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, recipe: {type: 'string'},
-  'baseline-report': {type: 'string'}, out: {type: 'string'},
+  'baseline-report': {type: 'string'}, 'prospective-build-manifest': {type: 'string'}, out: {type: 'string'},
   'build-dir': {type: 'string'}, playwright: {type: 'string'},
   'phase-timeout-ms': {type: 'string', default: '180000'},
   'preparation-timeout-ms': {type: 'string', default: '180000'},
@@ -31,7 +32,7 @@ function integer(name, min, max) {
     throw Error(`--${name} must be ${min}..${max}`);
   return value;
 }
-for (const name of ['url', 'disc', 'recipe', 'baseline-report', 'out', 'build-dir']) {
+for (const name of ['url', 'disc', 'recipe', 'baseline-report', 'prospective-build-manifest', 'out', 'build-dir']) {
   if (!values[name]) throw Error(`Missing --${name}`);
 }
 const phaseTimeoutMs = integer('phase-timeout-ms', 1000, 600000);
@@ -48,6 +49,7 @@ baseUrl.searchParams.set('melee-web-staging-diagnostics', '1');
 const output = path.resolve(values.out);
 await fs.mkdir(output, {recursive: false});
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+const browserArtifactNames = JSON.parse(await fs.readFile(path.join(ROOT, 'tools/browser_build_artifacts.json'), 'utf8'));
 async function shaFile(filename) {
   const hash = crypto.createHash('sha256');
   const stream = (await import('node:fs')).createReadStream(filename);
@@ -60,9 +62,8 @@ async function inputIdentity(filename) {
   return {bytes: stat.size, sha256: await shaFile(filename)};
 }
 async function artifactMap(buildDirectory) {
-  const names = JSON.parse(await fs.readFile(path.join(ROOT, 'tools/browser_build_artifacts.json'), 'utf8'));
   const artifacts = {};
-  for (const name of names) {
+  for (const name of browserArtifactNames) {
     const local = path.join(buildDirectory, name);
     const stat = await fs.stat(local);
     if (!stat.isFile()) throw Error(`Release artifact is not a file: ${name}`);
@@ -83,6 +84,16 @@ async function artifactMap(buildDirectory) {
     if (servedSha !== localSha || bytes !== stat.size)
       throw Error(`Served Release artifact differs from frozen build: ${name}`);
     artifacts[name] = {bytes, sha256: servedSha};
+  }
+  return artifacts;
+}
+async function localArtifactMap(buildDirectory) {
+  const artifacts = {};
+  for (const name of browserArtifactNames) {
+    const filename = path.join(buildDirectory, name);
+    const stat = await fs.stat(filename);
+    if (!stat.isFile()) throw Error(`Release artifact is not a file: ${name}`);
+    artifacts[name] = {bytes: stat.size, sha256: await shaFile(filename)};
   }
   return artifacts;
 }
@@ -223,7 +234,8 @@ const report = {
   maximum_observed_gpu_window_ms: MAX_OBSERVED_GPU_WINDOW_MS,
   observer_slack_ms: MAX_OBSERVED_GPU_WINDOW_MS - SUSTAINED_WINDOW_MS,
   capture_start: null, calibration: [], control_window: null, treatment_window: null,
-  source: null, baseline_binding: null, build_artifacts_before: null, build_artifacts_after: null,
+  source: null, baseline_binding: null, prospective_build_binding: null,
+  build_artifacts_before: null, build_artifacts_after: null,
   inputs: null, recipe_header: null, browser_errors: [], failure: null,
 };
 const pageError = error => report.browser_errors.push({kind: 'pageerror', message: String(error?.message || error)});
@@ -457,18 +469,41 @@ try {
     throw Error('Disc or fixture identity differs from the authorized prior H1 timing report');
   report.inputs = {disc: discIdentity, recipe: recipeIdentity, recipe_sidecar_sha256: sidecarSha};
   report.source = await sourceIdentity();
+  const buildDirectory = path.resolve(values['build-dir']);
+  const prospectiveBytes = await fs.readFile(values['prospective-build-manifest']);
+  const prospectiveManifest = JSON.parse(prospectiveBytes);
+  const localArtifacts = await localArtifactMap(buildDirectory);
+  const prospectiveValidation = validateProspectiveBuildManifest(prospectiveManifest, {
+    source: report.source, buildDirectory, localArtifacts});
+  report.prospective_build_binding = {manifest_path: path.resolve(values['prospective-build-manifest']),
+    manifest_sha256: sha(prospectiveBytes), schema: prospectiveManifest.schema ?? null,
+    binding_type: prospectiveManifest.binding_type ?? null,
+    inventory_artifact_count: prospectiveManifest.inventory?.artifact_count ?? null,
+    inventory_artifact_map_sha256: prospectiveManifest.inventory?.artifact_map_sha256 ?? null,
+    references: prospectiveManifest.references ?? null,
+    limitations: prospectiveManifest.limitations ?? null,
+    validation: prospectiveValidation};
+  if (!prospectiveValidation.valid)
+    throw Error(`Prospective build manifest rejected: ${prospectiveValidation.problems.join(', ')}`);
+  const priorArtifacts = baseline.build_artifacts_before ?? {};
+  const historicalComparison = compareArtifactMaps(priorArtifacts, prospectiveManifest.inventory.artifacts);
   report.baseline_binding = {report_sha256: sha(baselineBytes),
     captured_source_commit: baseline.source?.commit ?? null,
-    artifact_count: Object.keys(baseline.build_artifacts_before ?? {}).length};
+    historical_artifact_count: Object.keys(priorArtifacts).length,
+    historical_artifact_map_sha256: artifactMapDigest(priorArtifacts),
+    current_vs_historical_artifact_map_matches: historicalComparison.matches,
+    historical_artifact_map_differences: historicalComparison.differences,
+    scope: 'prior H1 report binds disc and fixture identity only; its artifact map is historical and is not the prospective build gate'};
   report.baseline_recipe_sha256 = baseline.inputs?.recipe?.sha256 ?? null;
   report.protocol_bounds = {phase_timeout_ms: phaseTimeoutMs,
     preparation_timeout_ms: preparationTimeoutMs, load_window_timeout_ms: windowTimeoutMs,
     calibration_window_ms_each: 500, observation_poll_interval_ms: 15};
-  const buildDirectory = path.resolve(values['build-dir']);
   report.build_artifacts_before = await artifactMap(buildDirectory);
-  report.build_artifact_map_sha256 = sha(Buffer.from(JSON.stringify(report.build_artifacts_before)));
-  if (JSON.stringify(report.build_artifacts_before) !== JSON.stringify(baseline.build_artifacts_before))
-    throw Error('Served Release artifact map differs from the frozen prior H1 report; inspect, do not rebaseline');
+  report.build_artifact_map_sha256 = artifactMapDigest(report.build_artifacts_before);
+  const beforeManifestComparison = compareArtifactMaps(prospectiveManifest.inventory.artifacts,
+    report.build_artifacts_before);
+  if (!beforeManifestComparison.matches)
+    throw Error(`Fresh pre-capture HTTP artifact map differs from prospective manifest: ${JSON.stringify(beforeManifestComparison.differences)}`);
 
   const {chromium, browser: launchOptions, browserPath, playwrightPath} = await loadBrowserTools(values.playwright);
   browser = await chromium.launch({...browserLaunchOptions(launchOptions, {timeout: phaseTimeoutMs}), headless: true});
@@ -602,9 +637,26 @@ try {
     const buildDirectory = path.resolve(values['build-dir']);
     if (browser && report.build_artifacts_before) {
       report.build_artifacts_after = await artifactMap(buildDirectory);
-      if (JSON.stringify(report.build_artifacts_before) !== JSON.stringify(report.build_artifacts_after)) {
+      report.build_artifact_map_after_sha256 = artifactMapDigest(report.build_artifacts_after);
+      if (!compareArtifactMaps(report.build_artifacts_before, report.build_artifacts_after).matches) {
         report.build_changed_during_capture = true;
         report.failure ||= 'Served Release artifact map changed during the capture';
+        process.exitCode = 1;
+      }
+      const postManifestBytes = await fs.readFile(values['prospective-build-manifest']);
+      if (sha(postManifestBytes) !== report.prospective_build_binding?.manifest_sha256) {
+        report.failure ||= 'Prospective build manifest changed during the capture';
+        process.exitCode = 1;
+      }
+      const postManifest = JSON.parse(postManifestBytes);
+      const afterManifestComparison = compareArtifactMaps(postManifest.inventory?.artifacts,
+        report.build_artifacts_after);
+      report.prospective_build_binding.after_http_artifact_map = {
+        matches_manifest: afterManifestComparison.matches,
+        differences: afterManifestComparison.differences,
+        artifact_map_sha256: report.build_artifact_map_after_sha256};
+      if (!afterManifestComparison.matches) {
+        report.failure ||= 'Fresh post-capture HTTP artifact map differs from prospective manifest';
         process.exitCode = 1;
       }
     }

@@ -1,3 +1,6 @@
+import crypto from 'node:crypto';
+import path from 'node:path';
+
 export const SUSTAINED_WINDOW_MS = 2000;
 export const PREPARATION_REASON = 7;
 export const SIMULATION_DEBT_REASON = 1;
@@ -6,6 +9,62 @@ export const SIMULATION_DEBT_REASON = 1;
 export const MAX_OBSERVED_GPU_WINDOW_MS = SUSTAINED_WINDOW_MS + 100;
 
 const finite = value => typeof value === 'number' && Number.isFinite(value);
+
+/** Stable digest for a named browser-artifact inventory, independent of JSON
+ * object insertion order. Each value is the captured {bytes, sha256} pair. */
+export function artifactMapDigest(artifacts) {
+  if (!artifacts || typeof artifacts !== 'object' || Array.isArray(artifacts)) return null;
+  const entries = Object.entries(artifacts).sort(([left], [right]) => left.localeCompare(right));
+  if (!entries.length || entries.some(([name, value]) => !name ||
+      !Number.isSafeInteger(value?.bytes) || value.bytes < 0 ||
+      typeof value?.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(value.sha256))) return null;
+  return crypto.createHash('sha256').update(JSON.stringify(Object.fromEntries(entries))).digest('hex');
+}
+
+/** Compare two named inventories and retain exact identities on changed files. */
+export function compareArtifactMaps(expected, actual) {
+  const expectedMap = expected && typeof expected === 'object' && !Array.isArray(expected) ? expected : {};
+  const actualMap = actual && typeof actual === 'object' && !Array.isArray(actual) ? actual : {};
+  const differences = [];
+  for (const name of [...new Set([...Object.keys(expectedMap), ...Object.keys(actualMap)])].sort()) {
+    const before = expectedMap[name] ?? null;
+    const after = actualMap[name] ?? null;
+    if (JSON.stringify(before) !== JSON.stringify(after)) differences.push({name, expected: before, actual: after});
+  }
+  return {matches: differences.length === 0, differences};
+}
+
+/** Verify an authorized prospective source/build identity before the runner
+ * accepts any served bytes. This does not assert historical equivalence. */
+export function validateProspectiveBuildManifest(manifest, {source, buildDirectory,
+  localArtifacts} = {}) {
+  const problems = [];
+  if (manifest?.schema !== 'melee-web-h1-prospective-build-manifest-v1' ||
+      manifest?.binding_type !== 'prospective_local_build_inventory')
+    problems.push('manifest_schema_invalid');
+  if (!source || manifest?.source?.commit !== source.commit || manifest?.source?.tree !== source.tree)
+    problems.push('source_identity_mismatch');
+  if (buildDirectory && pathResolve(manifest?.build_directory) !== pathResolve(buildDirectory))
+    problems.push('build_directory_mismatch');
+  const inventory = manifest?.inventory;
+  const actualCount = inventory?.artifacts && typeof inventory.artifacts === 'object' &&
+    !Array.isArray(inventory.artifacts) ? Object.keys(inventory.artifacts).length : 0;
+  if (!inventory || inventory.artifact_count !== actualCount || actualCount !== 31)
+    problems.push('manifest_artifact_count_invalid');
+  const declaredDigest = artifactMapDigest(inventory?.artifacts);
+  if (!declaredDigest || inventory?.artifact_map_sha256 !== declaredDigest)
+    problems.push('manifest_artifact_digest_invalid');
+  const localComparison = compareArtifactMaps(inventory?.artifacts, localArtifacts);
+  if (!localComparison.matches) problems.push('local_artifact_map_mismatch');
+  return {valid: problems.length === 0, problems,
+    manifest_artifact_map_sha256: inventory?.artifact_map_sha256 ?? null,
+    local_artifact_map_sha256: artifactMapDigest(localArtifacts),
+    local_artifact_differences: localComparison.differences};
+}
+
+function pathResolve(value) {
+  return typeof value === 'string' && value.length ? path.resolve(value) : null;
+}
 
 /** Summarize the actual registration-to-delivery batch samples retained by
  * pause_trace_perturb.mjs. This is wall duration, not pure GPU execution time. */
