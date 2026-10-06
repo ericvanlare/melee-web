@@ -1,0 +1,463 @@
+{
+  "schema": "gameplay-bootstrap-owner-v1",
+  "source_head": "4d9b972fe6161a9e024419529b7599df654fd247",
+  "base_main": "c3ddd39d191abcd59a72cd428a085c0958c922a9",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified"
+  ],
+  "scope": "Synchronous existing source Mario/Final Destination Wasm fixture, original Entry/Ready, read-only private bootstrap owner; no restore or original trace comparison",
+  "runtime_admission": false,
+  "build": {
+    "target": "gameplay_snapshot_probe",
+    "configuration": "RelWithDebInfo",
+    "emscripten": "6.0.9",
+    "compiler_jobs": "normal build.py default",
+    "option": "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE",
+    "default": "OFF",
+    "enabled_only_for_exact_probe_selection": true
+  },
+  "machine": {
+    "model": "Mac16,10",
+    "architecture": "arm64",
+    "memory_bytes": 17179869184,
+    "macos": "26.6",
+    "macos_build": "25G72",
+    "node": "22.23.2"
+  },
+  "abi": {
+    "version": 1,
+    "schema": "GPBS",
+    "bytes": 128,
+    "private_state_groups": 13,
+    "private_variables": 21,
+    "pointer_and_callback_fields": "numeric identities only; never dereferenced or restored"
+  },
+  "identities": {
+    "probe_source_sha256": "b865199583487ae5dbf716ab89e68813103aa2ae5214cfcda0130ff81cf91c94",
+    "source_c_sha256": "a284e9beb7c2163f546bbbc4000c1b6f2cb059d7700e9cc1ea118aab61097e61",
+    "source_h_sha256": "9cd1bf45066f037c5c23e5ea4307440361c288876f9304183d32cb69bf8ebfa4"
+  },
+  "artifacts": {
+    "off": [
+      {
+        "name": "gameplay_snapshot_probe.js",
+        "bytes": 338938,
+        "sha256": "cda1f5ac859d01f3dff5c59f39968c4536b8f3c061cb27fc43dce9b0540c7076"
+      },
+      {
+        "name": "gameplay_snapshot_probe.wasm",
+        "bytes": 104898150,
+        "sha256": "e44ca2b3e3beaf3a26423f859d7604ba8863f0aeb82b8ce4ab25796505ef16bc"
+      }
+    ],
+    "on": [
+      {
+        "name": "gameplay_snapshot_probe.js",
+        "bytes": 343193,
+        "sha256": "4359170cda094f659b0b844f2e6c8e073d859f2c06a3771582426022051fd16d"
+      },
+      {
+        "name": "gameplay_snapshot_probe.wasm",
+        "bytes": 104904199,
+        "sha256": "a9c4479a9e4c4f143798ed95ddfcb96b2cda1245652f9f72f8ef77db32dc2f62"
+      }
+    ]
+  },
+  "observed": {
+    "result": "passed",
+    "ready_steps": 124,
+    "captures": 2,
+    "byte_identical": true,
+    "generation": "1",
+    "ticks": "124",
+    "refusals": [
+      {
+        "label": "before world initialization",
+        "returned_zero": true,
+        "output_unchanged": true
+      },
+      {
+        "label": "wrong output size",
+        "returned_zero": true,
+        "output_unchanged": true
+      },
+      {
+        "label": "null output",
+        "returned_zero": true,
+        "output_unchanged": true
+      },
+      {
+        "label": "after world close",
+        "returned_zero": true,
+        "output_unchanged": true
+      }
+    ],
+    "source_close": "source match/audio/world closed",
+    "runtime_log_bytes": 0,
+    "owned_asset_files": 34,
+    "asset_hashes_unchanged": true,
+    "report_sha256": "7e975ed4776d40e04d1a7318ca0c7d762c0e07f974c8833227fefadc0c27d985",
+    "root_audit_sha256": "02223c23eda6d7c76a8d79f3fb282db3bcfb9e65d0953ff4118e138816a2af60"
+  },
+  "focused_controls": {
+    "host64_producer": {
+      "tests": 1,
+      "result": "passed",
+      "boundary": "exact extracted producer with applied header; pointer-width/argument zero-write refusal"
+    },
+    "wrapper": {
+      "tests": 1,
+      "result": "passed",
+      "boundary": "exact wrapper and header with explicit mocked owner APIs; staged failure write, lifecycle/allocation/stats refusals and valid publication"
+    },
+    "build_selection": {
+      "tests": 10,
+      "result": "passed",
+      "boundary": "real build function with mocked subprocesses; OFF/ON selection and pre-mutation refusals"
+    }
+  },
+  "full_suite": {
+    "tests": 1883,
+    "skipped": 141,
+    "seconds": 333.99,
+    "result": "passed"
+  },
+  "phases": {
+    "build-off": {
+      "passed": true,
+      "elapsed_seconds": 19.600551582872868,
+      "receipt_sha256": "ccf0a3925c58f359fcfc78b7f0359dc175696bf54e275abb86e14778fedd94b9",
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1697
+    },
+    "build-on": {
+      "passed": true,
+      "elapsed_seconds": 16.30863220896572,
+      "receipt_sha256": "dff26362733a9621d43a1d71fec6955b781ad8f2a15faeab526f5af12a2885c6",
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1697
+    },
+    "observe": {
+      "passed": true,
+      "elapsed_seconds": 0.3829788330476731,
+      "receipt_sha256": "960baabd28fbfabee3fe7af2d48efcaa7f39c90f6cf693a663b3e065bbfb242b",
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1697
+    },
+    "suite": {
+      "passed": true,
+      "elapsed_seconds": 334.2437989159953,
+      "receipt_sha256": "0e19865bf2258583fbfd405acfe3704f3bbb16ed43d4117bf42f9b6a59b93a68",
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1697
+    }
+  },
+  "exclusions": [
+    "arena/session payloads and allocation provenance",
+    "SDK heap descriptors and HSD object allocator registry/free chains",
+    "HSD GObj/process/fighter/item/render/animation graphs",
+    "source-memory and Wasm mutable globals/function tables",
+    "callback-owned graphs and JavaScript/host objects",
+    "renderer/GPU, browser input/clocks, Web Audio and external effects",
+    "snapshot restoration, replay correctness, original/Slippi state agreement",
+    "whole match/rematch, impaired rollback, foreground performance, physical input and Internet"
+  ],
+  "actual_export_audit": {
+    "passed": true,
+    "required_diagnostic_functions": 7,
+    "off_diagnostic_functions": 0,
+    "on_diagnostic_functions": 7,
+    "report_sha256": "5d9a35ac99d602f2412a56c4c12e3cdc2d7060cc35bf88b693997be7dd50ab6b"
+  },
+  "phase_wrapper": {
+    "artifact": "run_phase.py",
+    "role": "private process supervisor for the recorded bootstrap/build/Node/suite phases; separate from the compiled producer and probe",
+    "sha256": "c0a1d65449130f56dddfccd338ad26e61e414e951bd1038fb9af0232b9920278"
+  },
+  "post_review_validation": {
+    "runner_source_head": "9a617d49b54c02a8fa1bfbe4f0b348955892d7a3",
+    "full_suite_source_head": "d57cf8dd57f70d4746917104a496b26e140c4bc2",
+    "scope": "single-attempt diagnostic cleanup and its receipts; compiled producer/wrapper unchanged",
+    "runner_sha256": "b821e06f51892a94d2ae0969dde6cd86aae2abc9a2b340ac6be448ea0df17cde",
+    "lifecycle_controls": {
+      "tests": 4,
+      "result": "passed",
+      "boundary": "CLI mocks: refused/throwing partial initialization, then rejected/throwing normal close after successful initialization and two captures; every path records exactly one close"
+    },
+    "normal_on_rebuild": {
+      "source_head": "9a617d49b54c02a8fa1bfbe4f0b348955892d7a3",
+      "elapsed_seconds": 16.934451333014295,
+      "receipt_sha256": "84f16a07654085cf0178e8c3738276a0e6cea75e85704090eb86983c0a6ef55b",
+      "process_exit_code": 0,
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1700,
+      "source_unchanged": true
+    },
+    "compiled_artifacts_identical_to_original_enabled_build": true,
+    "real_fixture": {
+      "result": "passed",
+      "ready_steps": 124,
+      "captures": 2,
+      "quiescence": {
+        "stable_bytes": true,
+        "generation": "1",
+        "ticks": "124"
+      },
+      "source_cleanup": {
+        "required": true,
+        "attempted": true,
+        "success": true,
+        "phase": "normal source close",
+        "returncode": 1,
+        "error": null
+      },
+      "report_sha256": "60ee6cce5057cec6abb664ad773f70962bfc543b0418f1a8b89bdc38af62acd2",
+      "phase": {
+        "source_head": "9a617d49b54c02a8fa1bfbe4f0b348955892d7a3",
+        "elapsed_seconds": 0.4981793751940131,
+        "receipt_sha256": "c734dfe94d813c49179ce074212496c8eb040ca1a14df385afb1250b1f940d78",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1700,
+        "source_unchanged": true
+      }
+    },
+    "real_init_refusal_control": {
+      "control_result": "passed",
+      "actual_probe_result": "failed",
+      "reason": "deliberately empty owned assets; source initializer refuses missing PlCo.dat",
+      "probe_exit_code": 1,
+      "source_cleanup": {
+        "required": true,
+        "attempted": true,
+        "success": true,
+        "phase": "after failure",
+        "returncode": 1,
+        "error": null
+      },
+      "failed_report_sha256": "7fa0f5ad21d84a13b79be6dbbfd6481a12c7085db4b1aac876bb0c979691a325",
+      "separate_control_report_sha256": "738fa59b3b088191a763510fe6e637b56800079dcee29077b35e9f4ba8273d54",
+      "phase": {
+        "source_head": "9a617d49b54c02a8fa1bfbe4f0b348955892d7a3",
+        "elapsed_seconds": 0.13717241608537734,
+        "receipt_sha256": "d2cf0cda40d19e3a388b3a8978a9766ca9fc84a839834e21d3725be1d0af4f41",
+        "process_exit_code": 1,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1700,
+        "source_unchanged": true
+      }
+    },
+    "full_suite": {
+      "tests": 1887,
+      "skipped": 141,
+      "seconds": 350.894,
+      "result": "passed",
+      "phase": {
+        "source_head": "d57cf8dd57f70d4746917104a496b26e140c4bc2",
+        "elapsed_seconds": 351.18757437495515,
+        "receipt_sha256": "19aec2caa07417f2214f530762a3720c676fa9e3577f1cc97d2e893996b3a55f",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1700,
+        "source_unchanged": true
+      }
+    },
+    "private_phase_wrappers": [
+      {
+        "artifact": "run_phase.py",
+        "role": "process supervisor for the revised normal ON build and positive Node observation",
+        "sha256": "532f4bfb23bd06b7d3ae565567f5b8479edbc2268f32471270b9cf79497eecfc"
+      },
+      {
+        "artifact": "run_init_refusal.py",
+        "role": "process supervisor expecting exit 1 for the negative init control; raw observation remains failed",
+        "sha256": "f966e65c1b3a092636946716da8dfab39d82dc8f52438cb1ab421b529adf6edc"
+      },
+      {
+        "artifact": "suite_phase.py",
+        "role": "same process supervisor bound to the test-only successor for the full suite",
+        "sha256": "270d49d135d5ba74d5413636b953ae337828a793c266e95e51d5f9c58572a260"
+      },
+      {
+        "artifact": "normal_restore.py",
+        "role": "process supervisor for the final normal ON build; identical wrapper bytes to suite_phase.py, distinct owned output directory",
+        "sha256": "270d49d135d5ba74d5413636b953ae337828a793c266e95e51d5f9c58572a260"
+      }
+    ],
+    "final_normal_on_rebuild": {
+      "source_head": "d57cf8dd57f70d4746917104a496b26e140c4bc2",
+      "elapsed_seconds": 17.206158542074263,
+      "receipt_sha256": "18633dcda966cf5ed094c18e4c02e11a00c1652395acaad903dedfa8fa162ab8",
+      "process_exit_code": 0,
+      "pid_and_process_group_absent": true,
+      "tracked_source_pins": 1700,
+      "source_unchanged": true,
+      "compiled_artifacts_identical_to_original_enabled_build": true
+    }
+  },
+  "merged_main_validation": {
+    "base_main": "07bcfdfa6f4531ac464eab44ebecb206daa1f0da",
+    "source_head": "6b6b55d54d8fe6e763b00a2850cdb65fe049d852",
+    "scope": "current merged Aurora prerequisite; strengthened partial-init mock resource ownership; unchanged compiled bootstrap producer/wrapper and runner",
+    "lifecycle_controls": {
+      "tests": 4,
+      "result": "passed",
+      "boundary": "Every init path creates a live mock allocation before refusal/throw; successful close releases it; refused/thrown normal close retains it; exactly one close on every path",
+      "test_source_sha256": "6e1763720709f3299ca3bf4826a463065633e4bdd79ed6bd9375516b909b6b25"
+    },
+    "builds": {
+      "off": {
+        "source_head": "3ff7e109ab007513a2b0db0a0fb5067c709d99f5",
+        "elapsed_seconds": 31.692904541036114,
+        "receipt_sha256": "439e8eadbbca35f122500e24d85a915f1feb4723add6ed30967983e66b745046",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1707,
+        "source_unchanged": true
+      },
+      "on": {
+        "source_head": "6b6b55d54d8fe6e763b00a2850cdb65fe049d852",
+        "elapsed_seconds": 19.463042000075802,
+        "receipt_sha256": "9ae50e1d0f22180efce180761ae6c3f64d263c6405ac55e340f8a9fc6027cd26",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1707,
+        "source_unchanged": true
+      }
+    },
+    "off_build_test_only_successor": {
+      "source_head": "6b6b55d54d8fe6e763b00a2850cdb65fe049d852",
+      "compiled_source_head": "3ff7e109ab007513a2b0db0a0fb5067c709d99f5",
+      "only_intervening_change": "tests/test_gameplay_bootstrap_probe_cleanup.py"
+    },
+    "artifacts": {
+      "off": [
+        {
+          "name": "gameplay_snapshot_probe.js",
+          "bytes": 338938,
+          "sha256": "cda1f5ac859d01f3dff5c59f39968c4536b8f3c061cb27fc43dce9b0540c7076"
+        },
+        {
+          "name": "gameplay_snapshot_probe.wasm",
+          "bytes": 104900091,
+          "sha256": "18641191d8176739312a40f39bd8fd553a00b6d305cda8a8545af176d5b2b8d5"
+        }
+      ],
+      "on": [
+        {
+          "name": "gameplay_snapshot_probe.js",
+          "bytes": 343193,
+          "sha256": "4359170cda094f659b0b844f2e6c8e073d859f2c06a3771582426022051fd16d"
+        },
+        {
+          "name": "gameplay_snapshot_probe.wasm",
+          "bytes": 104906140,
+          "sha256": "8e07c039a3bf455e710703c477476a21c697ba7c24051ab1cdfc10f01a6108f4"
+        }
+      ]
+    },
+    "actual_exports": {
+      "off": {
+        "functions": 98,
+        "diagnostic_functions": [],
+        "audit_sha256": "3e0d8c5afd731190b98152c282256be82d79d316964c20ce2f313bdbd68933f2"
+      },
+      "on": {
+        "functions": 105,
+        "diagnostic_functions": [
+          "melee_web_gameplay_bootstrap_state_abi_size",
+          "melee_web_gameplay_bootstrap_state_abi_version",
+          "melee_web_gameplay_bootstrap_state_capture",
+          "melee_web_gameplay_bootstrap_state_probe_identity",
+          "melee_web_gameplay_bootstrap_state_schema",
+          "melee_web_gameplay_bootstrap_state_source_c_identity",
+          "melee_web_gameplay_bootstrap_state_source_h_identity"
+        ],
+        "audit_sha256": "bf0c7057e2f63b51c6e2b6e330a882a6832564786193a3b7026b9672c436ceeb"
+      }
+    },
+    "real_fixture": {
+      "result": "passed",
+      "ready_steps": 124,
+      "captures": 2,
+      "quiescence": {
+        "stable_bytes": true,
+        "generation": "1",
+        "ticks": "124"
+      },
+      "refusals": [
+        {
+          "label": "before world initialization",
+          "returned_zero": true,
+          "output_unchanged": true
+        },
+        {
+          "label": "wrong output size",
+          "returned_zero": true,
+          "output_unchanged": true
+        },
+        {
+          "label": "null output",
+          "returned_zero": true,
+          "output_unchanged": true
+        },
+        {
+          "label": "after world close",
+          "returned_zero": true,
+          "output_unchanged": true
+        }
+      ],
+      "source_cleanup": {
+        "required": true,
+        "attempted": true,
+        "success": true,
+        "phase": "normal source close",
+        "returncode": 1,
+        "error": null
+      },
+      "runner_sha256": "b821e06f51892a94d2ae0969dde6cd86aae2abc9a2b340ac6be448ea0df17cde",
+      "report_sha256": "903df0e14b3dafae398549fcbb501e2416dfa2ea1b2222457c6cc10762640d60",
+      "root_audit_sha256": "0d0f53dee7b15df136abc387717ee238e4faa57287388006dbff756a76d5cf01",
+      "assets_after_observation_match_frozen_original_baseline": true,
+      "asset_files": 34,
+      "phase": {
+        "source_head": "6b6b55d54d8fe6e763b00a2850cdb65fe049d852",
+        "elapsed_seconds": 0.5684768750797957,
+        "receipt_sha256": "2e9f5214c2fa230ba68a9ef1b8249f6f7080689cc632999e3b4ba8890e34fb73",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1707,
+        "source_unchanged": true
+      }
+    },
+    "full_suite": {
+      "tests": 1894,
+      "skipped": 141,
+      "seconds": 354.949,
+      "result": "passed",
+      "phase": {
+        "source_head": "6b6b55d54d8fe6e763b00a2850cdb65fe049d852",
+        "elapsed_seconds": 355.2302888748236,
+        "receipt_sha256": "63b534cbb8ca57260416ba1494097e283ba970e7d96965ecb8975b6d6f61d893",
+        "process_exit_code": 0,
+        "pid_and_process_group_absent": true,
+        "tracked_source_pins": 1707,
+        "source_unchanged": true
+      }
+    },
+    "private_phase_wrappers": [
+      {
+        "artifact": "run_phase.py",
+        "role": "current-main OFF build at the rebased pre-test source head",
+        "sha256": "436517bb837faa8055de72a4db8645bf630aa3ead0cc6d605ec60ad8220bebc3"
+      },
+      {
+        "artifact": "run_phase_post_mock.py",
+        "role": "current-head ON build, source observation and full suite",
+        "sha256": "773cce318168ff4d77c3a8696a14174705c4ac0c819bfdf3edd519a5c515c3d7"
+      }
+    ],
+    "runtime_admission": false
+  }
+}
