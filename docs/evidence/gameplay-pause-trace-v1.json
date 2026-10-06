@@ -1,0 +1,654 @@
+{
+ "schema": "melee-web-gameplay-pause-trace-v1",
+ "date": "2026-10-06",
+ "issues": {
+  "tracker": 158,
+  "item": "H1",
+  "related": [
+   116,
+   134
+  ],
+  "related_pr": 157,
+  "closes": []
+ },
+ "evidence_level": [
+  "Compiled (Release runtime at the PR 157 head)",
+  "Browser exercised: one natural four-Mario CPU9 Final Destination match, 10,657 source frames, no live-match timing pause (experiment 1)",
+  "Browser exercised, induced: a second headless page occupying the GPU-process main thread produced a forced timing pause 1.12 s after the load was raised (experiment 2, one run)",
+  "Not performance admitted; not foreground, physical-input or audible; the natural cursor-1645 pause is not reproduced and its trigger remains unidentified"
+ ],
+ "classification": {
+  "natural_cursor_1645_pause": "not reproduced; cause unexplained",
+  "mechanism_demonstrated_under_induced_load": "sustained GPU-process occupancy lengthens GPU completion latency; the two-slot browser staging ring then makes each catch-up draw wait for completion; callback duration feeds back into clock debt; the eight-tick guard fires",
+  "natural_trigger_identified": false,
+  "host_cpu_contention": "not tested (the induced schedule ended at its first pause, before the CPU-spinner window)",
+  "observer_induced_pause_found": "experiment 1 Results pause at source frame 532 coincides with the harness capture read, not live play"
+ },
+ "source": {
+  "build_commit": "551938d644b3018583990c82483b949e2e5bb8d3",
+  "build_pr": 157,
+  "build_pr_state_when_run": "open",
+  "main_when_build_branched": "07bcfdfa6f4531ac464eab44ebecb206daa1f0da",
+  "build_command": "python3 scripts/build.py --target runtime --configuration Release",
+  "wasm_sha256": "e17f89d0e26258ad41daf9e4296bdcd5c90e4a646d63173ac1738448d1436a20",
+  "wasm_bytes": 15643943,
+  "served_manifest_sha256": "8f90bab93a715def9588639aa3813c62c5d276ac41c9ad0fcb9305f0b28245aa",
+  "same_build_both_experiments": true,
+  "runtime_code_changed": false,
+  "thresholds_frame_rate_ticks_draws_arithmetic_changed": false
+ },
+ "environment": {
+  "browser": "Installed headless Google Chrome 154.0.8037.98 via scripts/browser_tools.mjs; Playwright 1.62.1; Web Audio processing active; host speakers muted",
+  "gpu": "ANGLE Metal, Apple M4",
+  "owned_disc": {
+   "format": "CISO",
+   "bytes": 1449165376,
+   "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+  },
+  "url_query": "hitch-capture=1&hitch-marks=1",
+  "browser_context": "temporary, fresh origin storage, empty render cache; driver cache uncontrolled",
+  "host_load": {
+   "experiment_1_start": "18.65 12.51 6.92 (after another job finished; 85% CPU idle)",
+   "experiment_1_end": "2.69 7.07 5.81",
+   "experiment_2_start": "3.30 4.08 3.55",
+   "experiment_2_end": "4.21 4.15 3.62"
+  },
+  "lane": "browser-timing lane marker held for each capture; no heavy compiler job and no other headless Chrome at experiment 2 start"
+ },
+ "experiment_1_natural": {
+  "scenario": "Original CSS -> SSS -> Final Destination, four-stock, four Mario CPU9, natural play to the natural end; Results; tracing and per-callback table retained",
+  "harness": "tests/fighter_cpu9_lineup_browser_test.mjs --lineup M --pause-trace --stop-on-timing-pause (local diagnostic edits, not committed)",
+  "live_match": {
+   "source_frame_range": [
+    0,
+    10657
+   ],
+   "callbacks": 10782,
+   "source_steps_and_draws": [
+    10895,
+    10895
+   ],
+   "natural_end": true,
+   "terminal_outcome_code": 2,
+   "winner_slot_index": 2,
+   "winner": "P3",
+   "timing_pauses_in_live_match": 0,
+   "steps_per_callback": {
+    "1": 10669,
+    "2": 113
+   },
+   "callback_total_ms": {
+    "p50": 5.1,
+    "p95": 5.7,
+    "p99": 8.629000000000051,
+    "max": 12.255
+   },
+   "callbacks_over_16_67_ms": 0,
+   "max_pending_debt_ticks": 0.9996,
+   "staging_slot_waits_in_live_callbacks": 0,
+   "max_callback_gap_ms_between_consecutive_callbacks": 33.5,
+   "callback_gaps_over_33_3_ms": 1,
+   "render_preparation_holds": {
+    "at_match_start": 5,
+    "during_match_source_frames": [
+     609,
+     1763,
+     2247,
+     4268,
+     6772,
+     8840
+    ],
+    "effect": "clock held for three to four callbacks (about 50-66 ms) with draws suppressed; pending debt reset to 0; GPU return latency about 71 ms"
+   },
+   "pipelines_created_in_live_callbacks": 32.0,
+   "per_step_ms_max": {
+    "simulation_audio": 5.88,
+    "simulation_audio_first_step_only": true,
+    "draw": 5.38,
+    "begin": 0.17,
+    "end": 2.23
+   },
+   "max_six_step_simulation_audio_sum_ms": 11.97
+  },
+  "trace_window_page_s_140_to_206": {
+   "renderer_main_task_max_ms": 11.21,
+   "renderer_main_busy_fraction": 0.286,
+   "renderer_gc_event_max_ms": 1.294,
+   "gpu_main_task_max_ms": 8.098,
+   "gpu_main_busy_fraction": 0.047,
+   "audio_worklet_task_max_ms": 0.428,
+   "queue_submit_to_renderer_return_ms": {
+    "n": 8586,
+    "p50": 0.291,
+    "p95": 0.864,
+    "p99": 1.282,
+    "max": 70.786
+   },
+   "trace_ring_wrapped": true,
+   "trace_does_not_cover_match_start": true
+  },
+  "audio": {
+   "underrun_frames_in_live_match": 86,
+   "events": 1,
+   "coincident_with": "the single 33.5 ms live callback gap at source frame 6031",
+   "queued_frames_range_in_live_match": [
+    0,
+    2219
+   ],
+   "worklet_overflows": 0
+  },
+  "results_pause": {
+   "label": "Results 1",
+   "scene": "results",
+   "source_frame": 532,
+   "reason": "simulation_debt",
+   "value_ticks": 19,
+   "threshold_ticks": 8,
+   "trigger_page_ms": 215790.3450000286,
+   "last_callback_start_page_ms": 215473.05,
+   "gap_ms": 317.3,
+   "harness_capture_read_page_ms": 215520.2,
+   "harness_action": "the experiment 1 harness stopped the trace and read a 7.3 MB capture while the Results clock ran",
+   "attribution": "observer-induced by timing correspondence; no negative control; not a live-gameplay pause",
+   "results_max_callback_interval_ms_otherwise": 25.02
+  }
+ },
+ "experiment_2_induced": {
+  "scenario": "Same build and lineup; natural match with labelled induced perturbations; stop at first forced pause; capture read only after the clock stopped",
+  "frozen_before_run": true,
+  "one_run_only": true,
+  "perturbation_schedule": "tests/pause_trace_perturb.mjs PERTURB_SCHEDULE (stall ladder, GPU load 18 ms then 35 ms batches, CPU spinners, GPU load plus stalls)",
+  "gpu_load_definition": "a second headless page issuing synchronous WebGL2 batches (readPixels) of 18 ms (300 iterations) or 35 ms (600 iterations) when measured alone; the longest WebGL task on the GPU-process main thread (which also decodes the game WebGPU commands) was 40.2 ms in the 18 ms window and 49.4 ms in the 35 ms window",
+  "baseline_6s_before_first_perturbation": {
+   "callbacks": 360,
+   "steps_per_callback": {
+    "0": 2,
+    "1": 355,
+    "2": 3
+   },
+   "total_ms": {
+    "p50": 5.672499999999999,
+    "p99": 6.22865,
+    "max": 11.22
+   },
+   "staging_slot_waits": 0,
+   "max_pending_ticks": 0.989
+  },
+  "stall_ladder_idle_host": [
+   {
+    "stall_ms": 25,
+    "catch_up_steps": 2,
+    "catch_up_callback_ms": 11.3,
+    "catch_up_staging_wait_ms": 0.14,
+    "callbacks_to_recover": 1,
+    "paused": false
+   },
+   {
+    "stall_ms": 50,
+    "catch_up_steps": 4,
+    "catch_up_callback_ms": 22.8,
+    "catch_up_staging_wait_ms": 0.42,
+    "callbacks_to_recover": 1,
+    "paused": false
+   },
+   {
+    "stall_ms": 75,
+    "catch_up_steps": 5,
+    "catch_up_callback_ms": 29.4,
+    "catch_up_staging_wait_ms": 1.27,
+    "callbacks_to_recover": 2,
+    "paused": false
+   },
+   {
+    "stall_ms": 100,
+    "catch_up_steps": 7,
+    "catch_up_callback_ms": 45.4,
+    "catch_up_staging_wait_ms": 4.59,
+    "callbacks_to_recover": 2,
+    "paused": false
+   }
+  ],
+  "gpu_load_18ms_window": {
+   "source_frames": [
+    1500,
+    1900
+   ],
+   "duration_s": 6.6,
+   "callbacks": 398,
+   "steps_per_callback": {
+    "0": 24,
+    "1": 357,
+    "2": 17
+   },
+   "staging_waits": {
+    "callbacks": 16,
+    "sum_ms": 56.56,
+    "max_ms": 8.395,
+    "count_sum": 81
+   },
+   "max_callback_ms": 16.585,
+   "max_pending_ticks": 1.0,
+   "paused": false,
+   "measured_load_batch_ms": {
+    "p50": 18.0,
+    "p95": 18.6,
+    "max": 41.9
+   }
+  },
+  "gpu_load_35ms_window": {
+   "start_page_ms": 61784.0,
+   "source_frames_at_start": 2100,
+   "paused": true,
+   "trigger": {
+    "at_ms": 62905.50500011444,
+    "row": 3529,
+    "reason": 1,
+    "value": 9,
+    "threshold": 8,
+    "source_frame": 2156,
+    "scene": 7,
+    "clock_owner": 1
+   },
+   "seconds_from_load_on_to_trigger": 1.12,
+   "first_staging_wait_ge_4_ms": {
+    "row": 3513,
+    "page_ms": 61983.7,
+    "steps": 1,
+    "total_ms": 22.16,
+    "staging_wait_ms": 16.47,
+    "staging_wait_count": 10,
+    "other_ms_per_step": 5.7
+   },
+   "callbacks_before_trigger": 23,
+   "staging_wait_ms_sum": 568.0,
+   "source_steps_in_window": 51,
+   "callback_ramp_steps_total_wait_ms": [
+    [
+     0,
+     0.01,
+     0.0
+    ],
+    [
+     2,
+     11.57,
+     0.0
+    ],
+    [
+     1,
+     22.16,
+     16.47
+    ],
+    [
+     1,
+     6.17,
+     0.0
+    ],
+    [
+     1,
+     10.1,
+     4.17
+    ],
+    [
+     1,
+     5.99,
+     0.0
+    ],
+    [
+     1,
+     14.28,
+     8.36
+    ],
+    [
+     2,
+     36.74,
+     24.8
+    ],
+    [
+     2,
+     40.81,
+     28.91
+    ],
+    [
+     2,
+     32.25,
+     20.7
+    ],
+    [
+     2,
+     40.27,
+     28.96
+    ],
+    [
+     3,
+     33.31,
+     16.44
+    ],
+    [
+     3,
+     72.12,
+     54.63
+    ],
+    [
+     4,
+     65.52,
+     41.62
+    ],
+    [
+     5,
+     86.26,
+     57.59
+    ],
+    [
+     5,
+     108.23,
+     78.23
+    ],
+    [
+     7,
+     119.85,
+     78.89
+    ],
+    [
+     7,
+     149.47,
+     108.25
+    ]
+   ],
+   "final_callback_interval_ms": 150.39,
+   "staging_wait_per_step_ms_last_8_callbacks": [
+    14.48,
+    5.48,
+    18.21,
+    10.4,
+    11.52,
+    15.65,
+    11.27,
+    15.46
+   ],
+   "non_wait_ms_per_step_in_window": "about 5.7 to 5.9 (baseline p50 5.67); simulation_audio per step at most 0.64",
+   "trace": {
+    "submit_to_renderer_return_p99_ms": {
+     "in_35ms_window": 40.022040000000004,
+     "in_18ms_window": 18.53368,
+     "n": [
+      115,
+      853
+     ],
+     "note": "pooled submit to next renderer return; coarse"
+    },
+    "renderer_main_task_max_ms": 13.2,
+    "renderer_gc_event_max_ms": 0.34,
+    "audio_worklet_task_max_ms": 0.42,
+    "gpu_main_longest_tasks_ms": [
+     49.4
+    ],
+    "gpu_main_longest_task_kind": "WebGL (second page)",
+    "baseline_gpu_main_longest_task_ms": 1.6
+   },
+   "natural_pipeline_holds_before_cascade": "two render_preparation holds at 61.77 s and 61.85 s, within 0.2 s of the load being raised; the 18 ms window contained six holds without a cascade",
+   "audio": "queue drained (171 to 0 frames) at 62.71 s before the pause; 661 underrun frames by the end"
+  },
+  "not_run": [
+   "CPU-spinner window (frames 2800-3400)",
+   "GPU load plus 50/100/100 ms stalls (frames 3700-4420)"
+  ],
+  "heavy_page_in_run_stats_for_35ms_window": "not retained (cleanup overwrote the final read); in-run 18 ms stats matched calibration"
+ },
+ "mechanism_source": {
+  "clock": {
+   "file": "src/animation_clock.hpp",
+   "fact": "FixedTickClock (menu clock, Pause policy) adds elapsed wall time between callback starts as debt; more than 8 whole ticks forces a pause; a callback runs at most 8 ticks. A long callback is therefore debt for the next."
+  },
+  "staging_ring": {
+   "file": "aurora lib/gfx/frame.hpp via patches/aurora-browser.patch",
+   "fact": "Emscripten StagingBufferCount equals FrameSlotCount, which is 2; begin_frame waits for a slot released by OnSubmittedWorkDone, yielding with emscripten_sleep(0). One draw per source tick, so ticks beyond the second in a callback wait for GPU completion."
+  },
+  "stability_condition": "derived from the ring size, not measured directly: sustained 60 Hz needs completion latency L no greater than about 2 x 16.67 ms = 33 ms with two slots; above that catch-up cost per tick exceeds one tick and the loop diverges"
+ },
+ "hypotheses": [
+  {
+   "hypothesis": "draw cost rises (CPU draw/encode work)",
+   "verdict": "not supported",
+   "evidence": "draw ms per step unchanged in the induced cascade (about 3.5); natural maximum 5.38"
+  },
+  {
+   "hypothesis": "GPU completion lag -> staging-slot wait -> debt -> forced pause",
+   "verdict": "sufficient under induced load; natural occurrence unobserved",
+   "evidence": "experiment 2 cascade; zero staging waits in natural experiment 1"
+  },
+  {
+   "hypothesis": "JS/GC or observer overhead in live play",
+   "verdict": "not supported for live play; observer shown sufficient for the Results pause",
+   "evidence": "renderer GC max 1.29 ms, main task max 11.2 ms (natural), 0.34 / 13.2 ms (induced cascade); capture read coincides with the 317 ms Results gap"
+  },
+  {
+   "hypothesis": "live preparation / pipeline compilation",
+   "verdict": "not supported in the natural run; confound noted in the induced run",
+   "evidence": "six live holds absorbed with no debt; GPU return latency 71 ms during holds"
+  },
+  {
+   "hypothesis": "audio worklet starvation",
+   "verdict": "not a cause; underruns are consequences",
+   "evidence": "worklet task max 0.43 ms; underruns follow callback gaps and stalls"
+  },
+  {
+   "hypothesis": "host CPU contention",
+   "verdict": "untested",
+   "evidence": "schedule ended at first pause; PR 157 per-step costs were inflated in every phase, including simulation_audio, which cannot wait on the GPU"
+  }
+ ],
+ "pr_157_diagnostic_comparison": {
+  "pr157_final_callback_ms": {
+   "total": 153.365,
+   "simulation_audio": 30.08,
+   "begin": 28.53,
+   "draw": 66.35,
+   "end": 28.35,
+   "staging_slot_wait": 11.205,
+   "steps": 6
+  },
+  "per_step_ratio_to_experiment_1_median": {
+   "simulation_audio": "about 10x (5.0 vs 0.5 ms)",
+   "draw": "about 3.8x (11.1 vs 2.9 ms)",
+   "begin": "about 48x (4.8 vs 0.1 ms, includes the wait)",
+   "end": "about 3.4x (4.7 vs 1.4 ms)"
+  },
+  "reading": "PR 157 staging wait was 7% of its final callback; the induced cascade was 72%. The PR 157 pause therefore mixes GPU wait with a process-wide slowdown; GPU-process occupancy alone does not reproduce its composition."
+ },
+ "proposed_fix": {
+  "status": "not implemented",
+  "change": "Give the Emscripten renderer more frames in flight on desktop (FrameSlotCount and StagingBufferCount from 2 to 4) in the downstream patch to Aurora lib/gfx/frame.hpp, so a bounded catch-up burst does not serialize on GPU completion; tolerance rises from about 33 ms to about 67 ms completion latency",
+  "cost": "each staging buffer is 63 MiB (24+5+2+8+24 MiB): about 126 MiB more GPU allocation, plus per-slot CPU shadows; keep 2 on mobile until #134 memory work lands, or right-size slots to used bytes",
+  "keeps_source_semantics": "source ticks, one draw per tick, order, arithmetic, clock threshold, audio and GPU commands are unchanged; only the number of buffers in flight changes",
+  "validation": [
+   "Release build and full suite",
+   "identical per-frame submitted-byte hashes for 600 frames, ring 2 versus 4",
+   "repeat the experiment 2 35 ms load window and the 100 ms stall under load: no pause for 20 s, max pending debt below 8 ticks",
+   "natural four-Mario match to its end with no staging waits",
+   "GPU and Wasm memory before and after at CSS and match"
+  ]
+ },
+ "artifacts": {
+  "root": "Paths are relative to the runs/ directory on the verified external AgentStorage mount. Run directories stay outside Git.",
+  "files": [
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-m4-fd-cpu9/report.json",
+    "bytes": 2030002,
+    "sha256": "1168b5057a5335fbd248e6eda22de30567c370e9b9ac2951445b74a1f6e7a749"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-m4-fd-cpu9/pause-trace-capture.json",
+    "bytes": 7307649,
+    "sha256": "9853939620d52b3deb498caac316ff3dc9069f91a6ada1b82b52db456f81c0f5"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-m4-fd-cpu9/chrome-trace/chrome-trace.json.gz",
+    "bytes": 25928016,
+    "sha256": "d09a9d6bcb68bd52d16434ff676ccead59db63ed017f6a813b693418a2a7e15e"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-m4-fd-cpu9/chrome-trace/trace-metadata.json",
+    "bytes": 894,
+    "sha256": "718dd81c565c3f50441e27ecd3620e846e49129c1f5d8f74c98d574b2d2da30a"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-m4-fd-cpu9/timing-pause-1.json",
+    "bytes": 74683,
+    "sha256": "98d1cb9679fc83730d5b26ecb436f0f2c9065f7ae94b99d41e5fbae13dba4da9"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-m4-fd-cpu9/results-entry-1-f6bf1c734e0c6d9be72add9f3606c7484f9786714f18e75126eec0e1fd5c2fd7.json",
+    "bytes": 40574,
+    "sha256": "f6bf1c734e0c6d9be72add9f3606c7484f9786714f18e75126eec0e1fd5c2fd7"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-host/start.txt",
+    "bytes": 2575,
+    "sha256": "68a30bc6a44a736f46c452cd9b05cb552c6737c5bd6865406dcddac0e970289c"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-host/end.txt",
+    "bytes": 2912,
+    "sha256": "07d462fccb2e3e14043b85f84222bab0aa827950f78cb89468e76e257a293d03"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-host/harness.log",
+    "bytes": 462,
+    "sha256": "d0431742189d006a0bfea72294d914b15f8e0946cb9c9869f8effde4396377dc"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/frozen-scenario-exp1.json",
+    "bytes": 6674,
+    "sha256": "7c82c6f4502b4d7ea76419c388fa3b258bdb8431982a3b3759b741b1d514114c"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/harness-local.diff",
+    "bytes": 10685,
+    "sha256": "bb9c201ae378683393d466e78a4215aaa8ee3f1861db4cd3797b7b42e633f77a"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-analysis-v2.json",
+    "bytes": 4441,
+    "sha256": "4c80f43d6d39fa9b201f1c110c6ef99450a6c7238b8acc7180dfef68833c8291"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-trace-window-analysis.json",
+    "bytes": 4588,
+    "sha256": "7a172843bfed451744f5dc62421b2c6eb742e289343e7c134d93f1ce727466ca"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp1-results-pause-analysis.json",
+    "bytes": 1084,
+    "sha256": "0d2e151bd6d0e5cbdec67c00f8a2683c987db3c82bdfa8037e4b4491b3918b61"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/analyze_pause_trace.py",
+    "bytes": 16250,
+    "sha256": "44107fbc0b76d98dc02093d1ebf4757602def99cb18318d4a2f97967c4b903b9"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-m4-fd-cpu9-perturb/report.json",
+    "bytes": 336669,
+    "sha256": "3b1281074a9141d5c1c49003918e353505fec93a1e3ee805af9856124b529da7"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-m4-fd-cpu9-perturb/pause-trace-capture.json",
+    "bytes": 3919186,
+    "sha256": "d592f4cac9009f6e470d2d5eb6e5d564e5de839982004aa750fb73a19016e918"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-m4-fd-cpu9-perturb/perturbation-events.json",
+    "bytes": 2732,
+    "sha256": "ebe4f3ee10a9fa241d78ba15e2194825204c46532b242ddb8ab8ab5f7fb542e3"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-m4-fd-cpu9-perturb/chrome-trace/chrome-trace.json.gz",
+    "bytes": 23037883,
+    "sha256": "6b9933374e4c6492238dffafeb3a6f66f3ec14bc30357d4e2bc3ba4664ea3977"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-m4-fd-cpu9-perturb/chrome-trace/trace-metadata.json",
+    "bytes": 894,
+    "sha256": "00344f895b23bd4c740c3432f4d73a704e521174fa893a11a0b6057861425d40"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-m4-fd-cpu9-perturb/timing-pause-1.json",
+    "bytes": 70827,
+    "sha256": "fd7f09f25877fe1362a5215720f9167b0b62ae756e34adb4989ff32ac69d2d56"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-host/start.txt",
+    "bytes": 3114,
+    "sha256": "03dbdfa095c6afbda7e8b08cc4ea892c437268407900d66ae9b27d732ca8b455"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-host/end.txt",
+    "bytes": 3026,
+    "sha256": "5539eeae98882d41d2e570ec884d8cef7346c4a30728fa4bcb2b31a9e305b4ed"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-host/harness.log",
+    "bytes": 461,
+    "sha256": "c0411038a1d3269334a2179134cfdcbc5fe19ffc85620fbd81263808686cd689"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-lane-wait.log",
+    "bytes": 355,
+    "sha256": "14d179d3bc836759696ff582d312364c9182faa46e3b80965acd8daa9ac70fb6"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/frozen-scenario-exp2.json",
+    "bytes": 4204,
+    "sha256": "f57a4f68a85d6369eefb21ca159f8d884a599997808f7eeee7338ccbd0ab2ffd"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/harness-local-exp2-perturb.diff",
+    "bytes": 19602,
+    "sha256": "000ef25f8ce51e821ce73055d45044c1d761c803670be558fd9971b41f700192"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/exp2-analysis-v3.json",
+    "bytes": 46372,
+    "sha256": "dbe6b4365a6663c5ece8d2b550fe2f82e60d11493cb71219b6a5ff54aea1d958"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/analyze_exp2.py",
+    "bytes": 16332,
+    "sha256": "24a8438c15982026dc25dc113d498eed5c5e6ba582dd25be807263d7e7c6a200"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/calib-gpu-uniform-bound.json",
+    "bytes": 603,
+    "sha256": "be3a7a728138c9c7bc5f736245896f1c99541ed261b1b4808011d1bc8742288b"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/calibrate-gpu-load.mjs",
+    "bytes": 1385,
+    "sha256": "9f8590f3cba38bda8216bc383f2e14d289d7654260765f866b30918555a7c8d2"
+   },
+   {
+    "path": "claude-pause-trace-20261005-181014-23d65077/selfcheck4-setup-only/report.json",
+    "bytes": 181662,
+    "sha256": "e3a0307ba5ba2ac1366dab773c40afe248c4bf5fad06c1249827e458b6858510"
+   }
+  ]
+ },
+ "local_harness_not_committed": {
+  "reason": "diagnostic edits to a maintained harness; reproduction needs them; they are retained with these hashes and can be committed separately",
+  "tests/pause_trace_capture.mjs": "23b8120043221ddbcac798dc86ee150f71eccdc0e7db96ac37502e70feaf5805",
+  "tests/pause_trace_perturb.mjs": "b27cc8b2c6caac8768e91347fa4988bc5a89893734f2cb010dcc1d88d921d589",
+  "tests/fighter_cpu9_lineup_browser_test.mjs_experiment_2_working_tree": "83d3553e8b58750a8ba7a5977904ca941b003a94c165542265a698bb59431d67",
+  "experiment_1_diff_sha256": "bb9c201ae378683393d466e78a4215aaa8ee3f1861db4cd3797b7b42e633f77a",
+  "experiment_2_diff_sha256": "000ef25f8ce51e821ce73055d45044c1d761c803670be558fd9971b41f700192",
+  "experiment_1_to_2_observer_change": "experiment 1 stopped the trace and read the capture at Results entry while the clock ran; experiment 2 reads only after a pause"
+ },
+ "limits": [
+  "One natural run and one induced run; no distribution, no repetition.",
+  "The natural cursor-1645 four-player replay (recorded input) was not available to this checkout and was not reproduced; experiment 1 used natural CPU9 play with the same lineup, stage and build.",
+  "The trace ring wrapped; the natural match start (source frame 63) has table data but no trace.",
+  "The induced pause proves a sufficient mechanism, not that it caused the PR 157 pause; the PR 157 composition differs.",
+  "Host CPU contention, thermal state and other GPU clients were not isolated.",
+  "Headless only: no foreground timing, physical input, audible output, mobile or performance admission.",
+  "Experiment budget at this boundary (two) is spent."
+ ]
+}
