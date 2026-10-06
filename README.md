@@ -66,6 +66,13 @@ original-game comparisons separately from the browser player.
 
 ## Accuracy and contribution priorities
 
+Current priorities are **online multiplayer** and **everything a
+competitive-rules set needs** (full roster, legal stages, tournament rules,
+doubles). Whole-game breadth follows them. The [roadmap](docs/ROADMAP.md#current-priorities)
+explains the order, and the pinned
+[priorities tracker](https://github.com/ericvanlare/melee-web/issues/158)
+shows live progress.
+
 The original GameCube build is the behavioral reference. The supported player
 route is original character select → original stage select → a four-stock
 Mario-versus-Mario Final Destination match → original Results → original

@@ -244,3 +244,61 @@ bounds, and total decoded budget, but leaves compressed payloads in immutable
 disc storage. The original three-slot stream transport decodes a block with the
 same DSP rounding and saturation when its source transfer completes. This keeps
 full-track decoding out of scene entry while preserving exact PCM evidence.
+
+## 016 — Online play starts as lockstep from a shared CSS context
+
+Online play is staged as delay-based lockstep, then rollback, then Slippi
+cross-play ([roadmap](ROADMAP.md#current-priorities), Track A). Lockstep needs no
+snapshot or restore. Each peer runs the same Wasm and consumes the same agreed
+per-tick PAD for all four ports.
+
+**Shared start.** Peers do not start in lockstep at boot. Each starts from a fresh
+page and a fresh, unentered CSS owner, then applies one agreed start context
+through a guarded pre-entry setter, as whole-session replay already does. The
+context holds the RNG seed, PAD library state, rules, CSS data and canonical save
+bytes, using the Everything save mode with canonical preferences. Personal save
+preferences such as item settings change gameplay, so they never enter a
+networked session. Before the first tick, peers exchange and compare these:
+
+- the Wasm hash
+- the DOL hash and a file-table hash
+- a native start-state hash
+- the port assignment
+
+**Input seam.** Network input replaces the per-step `PADStatus` sample at the same
+point where replay injects recorded frames. JavaScript buffers incoming packets.
+Native code pulls them at the existing callback boundary and never takes them
+from a socket handler mid-tick. Each tick runs exactly once, with its agreed
+input. Local-only injectors (scheduled Results input, confirm and stock helpers)
+refuse to run in a networked session. The fixed input delay and the neutral input
+for the first ticks are properties of the networked mode identity under #9, and
+are never retail evidence.
+
+**Waiting for a peer.** When remote input for the next tick has not arrived, the
+step loop stops, and the fixed-tick clock moves its baseline forward without
+accruing simulation debt. The wait is recorded as its own `network_wait` event,
+never as a timing pause or as performance evidence. Waiting only stretches wall
+time. It never skips, inserts or bursts source ticks. A real timing pause on
+either peer stalls both, so gameplay headroom (H1) gates Internet play, but not
+the functional determinism and loopback steps.
+
+**Determinism boundary.** Simulation arithmetic is deterministic: the build uses
+`-ffp-contract=off`, the original MSL trig and no JavaScript math, threads or
+random sources in game code. Four host channels can still reach game state and
+must be proven or tied to source ticks before lockstep is trusted:
+
+- **Draw count.** Scene-preparation draw counts depend on the GPU and the
+  pipeline cache, and some draws write game state.
+- **Audio clock.** The separate audio clock runs the synth callback and the
+  bank-transfer pump, and the game can observe that pump's busy status.
+- **Uninitialized memory.** Arena and stack bytes are not cleared between scenes.
+- **Host clocks.** `OSGetTime`/`OSGetTick` read the host clock.
+
+NaN bit patterns can differ across engines and CPUs. Each peer publishes a
+per-tick checksum over the shared state, and the first mismatch stops the
+session as a desync. Recorded state is never injected to hide one.
+
+**Transport.** Every packet carries the unacknowledged inputs, an acknowledgement
+and a delayed checksum. The same protocol runs first over a loopback relay, then
+over a Cloudflare Worker that relays WebSocket traffic for each room, and later
+over a WebRTC data channel with that relay as fallback.
