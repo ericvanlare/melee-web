@@ -196,6 +196,9 @@ const PADStatus* melee_web_net_before_step(uint32_t scene)
             ++net.start_barrier_callbacks;
             return NULL;
         }
+        /* The declared lockstep timeline is finite. Reaching its end is not a
+         * missing remote contribution and must not grow network-wait counters. */
+        if (net.cursor >= net.max_frames) return NULL;
     }
     if (net.cursor >= net.pushed) {
         ++net.wait_callbacks;
@@ -382,7 +385,8 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_net_status(void)
     const char* blocker = net.terminal_kind ? "terminal" :
         net.start_capture_failed ? "start_identity_error" :
         (!net.start_recorded || !net.start_confirmed) ? "start_identity" :
-        (net.cursor >= net.pushed) ? "remote_input" :
+        (net.start_required && net.cursor >= net.max_frames) ? "complete" :
+        (net.cursor >= net.pushed) ? (net.start_required ? "network_wait" : "remote_input") :
         (ring_used() >= MELEE_WEB_NET_CHECKSUM_RING) ? "checksum_backpressure" : "none";
     int written = snprintf(status_text, sizeof(status_text),
         "{\"active\":%d,\"context_applied\":%d,\"seed\":%u,\"max_frames\":%u,"
@@ -392,6 +396,8 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_net_status(void)
         "\"backpressure_callbacks\":%llu,\"ring_pending\":%u,\"arena_fill\":%d,"
         "\"indexed\":{\"duplicates\":%u,\"conflicts\":%u,\"gaps\":%u,\"invalid\":%u},"
         "\"terminal\":{\"kind\":%u,\"tick\":%u,\"channel\":%u},"
+        "\"network_wait\":{\"active\":%d,\"callbacks\":%llu,\"episodes\":%u,"
+        "\"start_tick\":%u,\"last_tick\":%u,\"resume_count\":%u},"
         "\"start\":{\"required\":%d,\"recorded\":%d,\"scene\":%u,\"seed\":%u,\"frame\":%u,"
         "\"confirmed\":%d,\"capture_failed\":%d,\"card\":\"%016llx\","
         "\"pad_history\":\"%016llx\",\"native_context\":\"%016llx\","
@@ -405,6 +411,9 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_net_status(void)
         (unsigned long long) net.backpressure_callbacks, ring_used(), net.arena_fill,
         net.indexed_duplicates, net.indexed_conflicts, net.indexed_gaps,
         net.indexed_invalid, net.terminal_kind, net.terminal_tick, net.terminal_channel,
+        net.start_required && net.waiting,
+        (unsigned long long) net.wait_callbacks, net.wait_episodes,
+        net.wait_start_tick, net.wait_last_tick, net.wait_resume_count,
         net.start_required, net.start_recorded, net.start.scene, net.start.seed, net.start.frame,
         net.start_confirmed, net.start_capture_failed,
         (unsigned long long) net.start_card_hash,

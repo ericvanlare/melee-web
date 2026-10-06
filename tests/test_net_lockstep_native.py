@@ -105,6 +105,9 @@ int main(void) {{
      !strstr(status,"\\\"native_context\\\":\\\""))return 3;
   if(!melee_web_net_confirm_start())return 4;
   if(melee_web_net_before_step(1)!=NULL||net.wait_episodes!=1||net.wait_start_tick!=0)return 5;
+  status=(char*)melee_web_net_status();
+  if(!strstr(status,"\\\"blocker\\\":\\\"network_wait\\\"")||
+     !strstr(status,"\\\"network_wait\\\":{{\\\"active\\\":1"))return 26;
   if(!melee_web_net_push_indexed(0,frame,1)||!melee_web_net_push_indexed(0,frame,1)||
      net.indexed_duplicates!=1||net.pushed!=1)return 6;
   if(melee_web_net_before_step(1)==NULL)return 7;
@@ -139,6 +142,18 @@ int main(void) {{
   melee_web_net_terminate(MELEE_WEB_NET_TERMINAL_DISCONNECT,1,0);
   if(melee_web_net_before_step(1)!=NULL||net.cursor!=1||!melee_web_net_active()||
      melee_web_net_push_indexed(1,frame,1))return 22;
+
+  /* Exhausting a finite A2 input timeline is completion, not another wait. */
+  melee_web_net_reset();
+  if(!melee_web_net_begin_lockstep(7,1,NULL,0))return 27;
+  net.context_applied=1;net.host=(MeleeWebMenuHost*)1;
+  if(melee_web_net_before_step(1)!=NULL||!melee_web_net_confirm_start()||
+     !melee_web_net_push_indexed(0,frame,1)||melee_web_net_before_step(1)==NULL)return 28;
+  melee_web_net_after_step();
+  if(melee_web_net_before_step(1)!=NULL||net.cursor!=1||net.wait_callbacks||net.wait_episodes)return 29;
+  status=(char*)melee_web_net_status();
+  if(!strstr(status,"\\\"blocker\\\":\\\"complete\\\"")||
+     !strstr(status,"\\\"network_wait\\\":{{\\\"active\\\":0"))return 30;
 
   /* Existing A1 sequential entry keeps its established first consumable tick. */
   melee_web_net_reset();

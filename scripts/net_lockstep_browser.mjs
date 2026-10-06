@@ -275,8 +275,9 @@ async function pollRun() {
       instanceRows.injected_disconnect = {role: 'beta', source_tick: disconnectAt, at_ms: Date.now()};
       relay.beta.close();
     }
-    if (probe && waitObservations.some(row => row.role === 'alpha' && row.blocker === 'remote_input')) {
-      const wait = waitObservations.find(row => row.role === 'alpha' && row.blocker === 'remote_input');
+    if (probe && !instanceRows.probe_released &&
+        waitObservations.some(row => row.role === 'alpha' && row.blocker === 'network_wait')) {
+      const wait = waitObservations.find(row => row.role === 'alpha' && row.blocker === 'network_wait');
       const delayedSourceTick = LOCKSTEP_DELAY + 1;
       if (wait.cursor !== delayedSourceTick || wait.pushed !== delayedSourceTick ||
           wait.wait_start_tick !== delayedSourceTick || wait.wait_last_tick !== delayedSourceTick)
@@ -284,7 +285,7 @@ async function pollRun() {
       const before = rows.alpha.cursor;
       await sleep(120);
       const held = await instances.alpha.status();
-      if (held.cursor !== before || held.blocker !== 'remote_input')
+      if (held.cursor !== before || held.blocker !== 'network_wait' || !held.network_wait.active)
         throw Error(`Network wait consumed a source tick or changed blocker while remote input was held: ${JSON.stringify(held)}`);
       instanceRows.alpha.wait_hold = {before_cursor: before, after_cursor: held.cursor,
         wait_callbacks_before: wait.wait_callbacks, wait_callbacks_after: held.wait_callbacks,
@@ -424,7 +425,7 @@ async function run() {
     };
   });
   if (probe) {
-    const alphaWait = waitObservations.find(row => row.role === 'alpha' && row.blocker === 'remote_input');
+    const alphaWait = waitObservations.find(row => row.role === 'alpha' && row.blocker === 'network_wait');
     if (!alphaWait || !instanceRows.alpha.wait_hold || !instanceRows.probe_released)
       throw Error('Reduced probe did not observe and release the missing remote CSS input tick');
     for (const role of ['alpha', 'beta']) {
