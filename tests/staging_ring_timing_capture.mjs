@@ -302,6 +302,8 @@ try {
   const frameColumn = columns.indexOf('sample_source_frame');
   const preparationColumn = columns.indexOf('preparation_ms');
   const timeColumn = columns.indexOf('hook_at_ms');
+  report.post_entry_preparation_incidents = report.capture.incidents.filter(event =>
+    event.reason === 7 && event.source_frame > 0);
   report.post_entry_preparation_rows = [];
   for (let index = 0; index < report.capture.rows; index++) {
     const base = index * width;
@@ -331,8 +333,8 @@ try {
   }
   if (report.browser_errors.length) throw Error('Browser errors were retained during byte capture');
   report.screenshots.success = await takeScreenshot(page, output, 'capture-success');
-  report.result = report.post_entry_preparation_rows.length ? 'inconclusive' : 'observed';
-  if (report.post_entry_preparation_rows.length) report.confound = 'Native preparation occurred after the original match counter began advancing; the conditioned pause comparison is inconclusive';
+  report.result = report.post_entry_preparation_rows.length || report.post_entry_preparation_incidents.length ? 'inconclusive' : 'observed';
+  if (report.post_entry_preparation_rows.length || report.post_entry_preparation_incidents.length) report.confound = 'Native preparation occurred after the original match counter began advancing; the conditioned pause comparison is inconclusive';
 } catch (error) {
   report.failure = String(error?.stack || error);
   if (traceInstalled && page && !page.isClosed()) {

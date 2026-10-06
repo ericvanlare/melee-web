@@ -155,11 +155,15 @@ export async function readRetainedPauseDiagnostics(page,waitForIncident=false){
       if(retained.records.length||performance.now()>=deadline)break;
       await new Promise(resolve=>setTimeout(resolve,50));
     }while(true);
-    const observed=window.__meleePauseTrace?.state.incidents.length??null;
+    const nativeIncidents=window.__meleePauseTrace?.state.incidents??null;
+    const observed=nativeIncidents?.length??null;
+    // Match the existing producer: these are lifecycle events, not retained incidents.
+    const qualifying=nativeIncidents?.filter(event=>![5,6,7,9].includes(event.reason)).length??null;
     return {read_api:'createRuntimeDiagnostics().exportRetained()',
       scope:'actual locally persisted runtime recorder incidents; reader metadata is not the producer session',
-      status:retained.records.length?'retained_incidents':observed===0?'no_incident_generated':'incident_not_retained',
+      status:retained.records.length?'retained_incidents':qualifying===0?'no_qualifying_incident_generated':'incident_not_retained',
       native_trace_incident_count:observed,
+      qualifying_native_incident_count:qualifying,
       retained_records:retained.records,
       reader_flags:retained.flags};
   },waitForIncident);
