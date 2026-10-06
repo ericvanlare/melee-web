@@ -1,0 +1,403 @@
+{
+  "schema": "melee-web-menu-browser-split-v1",
+  "date": "2026-10-06",
+  "scope": "Behavior-preserving split of src/gameplay_menu_browser.cpp by scene with one-field-per-line JSON observers. Compiled, source identified and headless Chrome exercised at original CSS only. No timing, performance, pixel, PCM, physical-input or retail-comparison claim.",
+  "verified_source_tree": "c3598d4a8970297f3494cd226d27dcce14fb1c80",
+  "machine": {
+    "platform": "macOS 26.6 arm64, 10 CPUs",
+    "browser": "installed Google Chrome 154.0.8037.98, headless, host speakers silent",
+    "playwright": "1.62.1"
+  },
+  "builds": [
+    {
+      "target": "runtime",
+      "configuration": "RelWithDebInfo",
+      "baseline_wasm_sha256_16": "15839703988e7f99",
+      "split_wasm_sha256_16": "be135a2a0c19944c",
+      "baseline_bytes": 124903853,
+      "split_bytes": 125214887
+    },
+    {
+      "target": "runtime",
+      "configuration": "Release",
+      "baseline_wasm_sha256_16": "d15245b0eb1587cb",
+      "split_wasm_sha256_16": "870780b593a1e69e",
+      "baseline_bytes": 15645371,
+      "split_bytes": 15652738
+    },
+    {
+      "target": "runtime-public",
+      "configuration": "Release",
+      "baseline_wasm_sha256_16": "d2be5b58af668b85",
+      "split_wasm_sha256_16": "7dd45bd2e78541d0",
+      "baseline_bytes": 14685699,
+      "split_bytes": 14680887
+    },
+    {
+      "target": "runtime-audio-preview",
+      "configuration": "Release",
+      "baseline_wasm_sha256_16": "4f4270c9ab8fc0ed",
+      "split_wasm_sha256_16": "26c257008e29d89e",
+      "baseline_bytes": 14707263,
+      "split_bytes": 14704557
+    }
+  ],
+  "wasm_interface": {
+    "method": "Parse the Wasm import and export sections. RelWithDebInfo keeps names and compares them directly. Release builds minify names, so each export and import is compared by the JS name the Emscripten glue binds, with kind and Wasm signature.",
+    "runtime_relwithdebinfo": {
+      "exports": [
+        239,
+        239
+      ],
+      "imports": [
+        398,
+        398
+      ],
+      "identical": true,
+      "sorted_export_sha256_16": "f9649b5582bfe529",
+      "section_order_identical": false
+    },
+    "runtime_release": {
+      "exports": [
+        225,
+        225
+      ],
+      "imports": [
+        392,
+        392
+      ],
+      "identical_except": [
+        "dynCall_vidddiii -> dynCall_vidddii",
+        "invoke_vidddiii -> invoke_vidddii"
+      ],
+      "classification": "Native API entries matched; only the listed generated Emscripten helper names differ."
+    },
+    "runtime_public_release": {
+      "exports": [
+        201,
+        201
+      ],
+      "imports": [
+        391,
+        391
+      ],
+      "identical_except": [
+        "dynCall_vidddiii -> dynCall_vidddii",
+        "invoke_vidddiii -> invoke_vidddii"
+      ],
+      "classification": "Native API entries matched; only the listed generated Emscripten helper names differ."
+    },
+    "runtime_audio_preview_release": {
+      "exports": [
+        201,
+        201
+      ],
+      "imports": [
+        391,
+        391
+      ],
+      "identical_except": [
+        "dynCall_vidddiii -> dynCall_vidddii",
+        "invoke_vidddiii -> invoke_vidddii"
+      ],
+      "classification": "Native API entries matched; only the listed generated Emscripten helper names differ."
+    },
+    "difference_cause": {
+      "function": "report_construction(char const*, double, double, double, AuroraStats const&, AuroraStats const&)",
+      "baseline": "internal linkage; argument promotion turned the 'before' reference into two scalar arguments, so the Wasm function took 7 parameters (i32,f64,f64,f64,i32,i32,i32)",
+      "split": "external linkage (shared with the menu unit); keeps the 6 declared parameters (i32,f64,f64,f64,i32,i32)",
+      "emscripten_helper": "exception-invoke trampoline pair generated from that signature",
+      "classification": "Generated helper ABI difference caused by linkage; native API contract did not change."
+    }
+  },
+  "function_inventory_release_runtime": {
+    "functions": [
+      15490,
+      15476
+    ],
+    "names_only_before": 29,
+    "names_only_after": 15,
+    "normalization": "anonymous namespace mapped to melee_web_menu_browser; trailing numeric uniquifiers removed",
+    "classes": [
+      "helpers now external and kept out of line",
+      "accessors and templates now inlined",
+      "renumbered lambda and global-destructor stubs",
+      "trampoline pair"
+    ]
+  },
+  "em_asm_bodies": {
+    "runtime_relwithdebinfo": {
+      "counts": [
+        120,
+        120
+      ],
+      "identical": true
+    },
+    "runtime_release": {
+      "counts": [
+        120,
+        120
+      ],
+      "identical": true
+    },
+    "runtime_public_release": {
+      "counts": [
+        112,
+        111
+      ],
+      "only_before": "window.menuPreparation?.(UTF8ToString($0)) from the replay export that the public player forbids; no Wasm code in the baseline references its address"
+    },
+    "runtime_audio_preview_release": {
+      "counts": [
+        115,
+        114
+      ],
+      "only_before": "same dead string as the public build"
+    }
+  },
+  "observer_format_proof": {
+    "method": "For each converted snprintf call: same destination buffer and size, concatenated add() fragments equal the original format string, and ordered arguments equal the original, with TARGET_PC defined and undefined. Combined with tests/test_fixed_format_writer.py (writer equals one snprintf at every buffer size, including truncation).",
+    "converted_calls": 11,
+    "passes": 22,
+    "unchanged_fallback_snprintf_calls_checked": 2,
+    "failures": 0
+  },
+  "observer_capture": {
+    "scenario": "Import the owned disc, reach original CSS, wait 3 seconds, read observers, unload, read observers again. Two runs per build.",
+    "builds_compared": [
+      "RelWithDebInfo development",
+      "Release development"
+    ],
+    "exact_text_equal": [
+      "source_observe (618 bytes)",
+      "match_observe",
+      "results_pad_trace",
+      "results_entry_packet",
+      "diagnostics",
+      "phase"
+    ],
+    "memory_differences": "allocator_* fields only; live and free values also differ between two runs of one build, arena and top-free differ between builds with cause not isolated; wasm_heap_bytes and all source_* fields equal",
+    "hooks": {
+      "menuRuntimeTiming": {
+        "payloads_per_run": "213 to 218",
+        "distinct_key_orders": 1,
+        "key_orders_identical": true,
+        "values_compared": false
+      },
+      "menuConstructionTiming": {
+        "payloads": 3,
+        "kinds": [
+          "scene-prepare",
+          "scene-enter",
+          "lifecycle-close"
+        ],
+        "identical_sequence": true
+      },
+      "menuPreparationProfile": {
+        "payloads": 0,
+        "note": "not emitted on this route; PreparationProfile::report is covered by the format proof only"
+      }
+    },
+    "not_covered_at_runtime": "populated match_observe, results_pad_trace samples and results_entry_packet need a match and Results route; their format and arguments are covered by the static proof"
+  },
+  "tests": {
+    "full_suite": {
+      "ran": 1884,
+      "result": "OK",
+      "skipped": 139,
+      "skip_reasons": "owned DOL, fighter archives, built traces and other local inputs absent in this checkout"
+    },
+    "verify_menus_partition": {
+      "tests_run": 2,
+      "result": "passed"
+    },
+    "fixed_format_writer": "passes"
+  },
+  "smoke": {
+    "command": "scripts/browser_smoke.mjs --surface development with the owned disc on the RelWithDebInfo development build",
+    "checks": [
+      "import control ready",
+      "owned disc prepared",
+      "original CSS running",
+      "teardown and import control ready"
+    ],
+    "result": "pass"
+  },
+  "not_built": [
+    "MELEE_WEB_PIPELINE_PROVENANCE variant",
+    "MELEE_WEB_SELECTIVE_PIPELINES variants"
+  ],
+  "indicative_cost": {
+    "method": "host-native clang -O2, about 55 doubles and 8 integers, best of 5 runs of 200000 calls",
+    "packed_snprintf_ns": 5048,
+    "per_field_add_ns": 5233,
+    "claim": "indicative only; not a Wasm measurement"
+  },
+  "historical_evidence_scope": "Root-level build, interface, function, serializer, observer, smoke, and indicative-cost fields retain the earlier comparison against historical baseline 07bcfdf. Current-base revalidation is recorded separately below.",
+  "historical_baseline": {
+    "commit": "07bcfdfa6f4531ac464eab44ebecb206daa1f0da",
+    "description": "main before the split; same toolchain and flags as the split builds"
+  },
+  "current_revalidation": {
+    "base_commit": "bf8c4898e54647bc6a27da607db82e4c14711e04",
+    "split_commit": "18b8010ac3be2396fa7e77f9ed8ad997f93577c6",
+    "paired_targets": [
+      {
+        "target": "runtime",
+        "configuration": "RelWithDebInfo",
+        "base_wasm_bytes": 124904507,
+        "base_wasm_sha256": "1d187c99769c66f47f403f503ec95985ed6e9b60e90c9f8245458fb93cf58afe",
+        "split_wasm_bytes": 125215559,
+        "split_wasm_sha256": "b484d9bb4873d794f7b9d98bdc5d922e4f71263b6244659a03cb38d93605234f"
+      },
+      {
+        "target": "runtime",
+        "configuration": "Release",
+        "base_wasm_bytes": 15645371,
+        "base_wasm_sha256": "cb1fdf347af90ffba49000215e855b7f63ef309b49568b32c50d9f37fd49a23a",
+        "split_wasm_bytes": 15652738,
+        "split_wasm_sha256": "ad46ff13f90d26b867d9a357c868a61dfa57bf7c7306149c8d5b35e28189c06c"
+      }
+    ],
+    "shared_data_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+    "native_wasm_api": {
+      "RelWithDebInfo_runtime": {
+        "exports": 239,
+        "imports": 398,
+        "comparison": "identical by name, kind, and signature"
+      },
+      "Release_runtime": {
+        "native_api_function_keys_and_signatures_compared": 51,
+        "result": "equal after mapping minified Wasm symbols through JS glue bindings"
+      },
+      "generated_emscripten_helper": {
+        "base": [
+          "dynCall_vidddiii",
+          "invoke_vidddiii"
+        ],
+        "split": [
+          "dynCall_vidddii",
+          "invoke_vidddii"
+        ],
+        "classification": "generated exception-invoke helper pair; separate from the native API export set"
+      }
+    },
+    "headless_css_captures": {
+      "browser": {
+        "product": "Google Chrome",
+        "version": "154.0.8037.98",
+        "mode": "headless",
+        "playwright": "1.62"
+      },
+      "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+      "checks": [
+        "import control ready",
+        "owned disc prepared",
+        "original CSS running",
+        "teardown and import control ready"
+      ],
+      "browser_errors": [],
+      "reports": {
+        "base_RelWithDebInfo": {
+          "report_sha256": "666a898e58a607521af3c63f03d257cf5c36013be185e62202f802333def92eb",
+          "screenshot_sha256": "1f01b0f0538926d70977ef7b80a2485d3384a25595cfda633909dbf44d86d9f9"
+        },
+        "base_Release": {
+          "report_sha256": "b3374d1e5f011ae37115319da907a1970e257c244904f69c74ca7b4a0d47927d",
+          "screenshot_sha256": "642ad1b79bdfc99441b1d62bcbedb540291066c5fac72e7b62c39f9c051d82c0"
+        },
+        "split_RelWithDebInfo_after_restore": {
+          "report_sha256": "d667077944ba23409f6b0127a0abe7dc1b37bdf9e02ae31d9460e78a7342f39d",
+          "screenshot_sha256": "47920808780e7d895b4b6fdd80fbb30f32aa09a2b5498dc1d704b145fe4db356"
+        },
+        "split_Release_after_restore": {
+          "report_sha256": "0a630fa47d0b497b220ec6325dfaf6ba365e6b503ec9634221259aca2ead74d3",
+          "screenshot_sha256": "ce1e15337961eeeb3da6d8eb3e01b8e1924a0f0313a3b643edb870c445c6b3c4"
+        }
+      },
+      "observers": {
+        "comparison": "Exact observer text across base and split in both profiles, before and after unload",
+        "before_unload": {
+          "source_observe": {
+            "bytes": 618,
+            "sha256": "aa1cd5f46e404a090018836d30a728e6b4df544d94867511beda6dc7555dcb43"
+          },
+          "match_observe": {
+            "bytes": 2,
+            "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "results_pad_trace": {
+            "bytes": 992,
+            "sha256": "dd7ada26cee7b29506e32ef8eccdb303647699d9e2067a2041dd5dbad61f892a"
+          },
+          "results_entry_packet": {
+            "bytes": 4,
+            "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "diagnostics": {
+            "bytes": 134,
+            "sha256": "6605ea153bdde1a7f0e429a0b5df9e42b33b6397b9852f0cbe63954389f07676"
+          }
+        },
+        "after_unload": {
+          "source_observe": {
+            "bytes": 2,
+            "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "match_observe": {
+            "bytes": 2,
+            "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          },
+          "results_pad_trace": {
+            "bytes": 992,
+            "sha256": "dd7ada26cee7b29506e32ef8eccdb303647699d9e2067a2041dd5dbad61f892a"
+          },
+          "results_entry_packet": {
+            "bytes": 4,
+            "sha256": "74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"
+          },
+          "diagnostics": {
+            "bytes": 95,
+            "sha256": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12"
+          }
+        },
+        "memory": "Removing allocator_* fields makes the captured memory observer equal; wasm_heap_bytes and source fields match. Allocator values are excluded.",
+        "hook_shape": "Runtime and construction hook key/type orders match. Values and timings were not compared; callback counts vary. Two construction events were observed per current capture."
+      },
+      "scope_limits": [
+        "No timing/performance, pixel equality, PCM/audio, physical-input, or retail-comparison claim.",
+        "The populated match, Results, and entry-packet outputs are not asserted; this CSS capture checks byte identity for the observer payloads emitted on the route."
+      ]
+    },
+    "tests_and_builds": {
+      "menu_ci_shard": {
+        "command": "python3 scripts/ci_verify.py --group menus",
+        "targets": [
+          "native_menu_scene_trace",
+          "dat_menu_support_trace"
+        ],
+        "tests": 2,
+        "result": "passed"
+      },
+      "full_suite": {
+        "command": "python3 -m unittest discover -s tests -v",
+        "tests_run": 1900,
+        "skipped": 139,
+        "result": "OK"
+      },
+      "built_targets": [
+        "runtime RelWithDebInfo",
+        "runtime Release",
+        "runtime-public Release",
+        "runtime-audio-preview Release"
+      ],
+      "new_split_unit_warnings": 0,
+      "warning_note": "Release build output warnings were from pinned upstream SDK headers; none originated in the new split units."
+    },
+    "restored_checkout": {
+      "head": "18b8010ac3be2396fa7e77f9ed8ad997f93577c6",
+      "source_swap": "Base worktree use was journaled. The split branch was restored and both runtime profiles rebuilt.",
+      "artifact_comparison": "Wasm/data and Release JS, public/audio-preview outputs, and identity sidecars equal saved split checkpoint. RelWithDebInfo generated JS differs only in ephemeral temporary include paths; normalized bytes match the checkpoint."
+    }
+  }
+}

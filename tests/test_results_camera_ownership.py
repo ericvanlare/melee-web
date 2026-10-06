@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from check_gameplay import node_runtime
 
+from menu_browser_source import menu_browser_source
+
 
 class ResultsCameraOwnershipTests(unittest.TestCase):
     def test_camera_subject_lists_and_free_boundary_are_observed(self):
@@ -37,7 +39,7 @@ class ResultsCameraOwnershipTests(unittest.TestCase):
                       "Camera_800290D4 after free-push"):
             self.assertIn(phase, patch)
 
-        browser = (ROOT / "src/gameplay_menu_browser.cpp").read_text(encoding="utf-8")
+        browser = menu_browser_source()
         serializer = browser[browser.index("void append_camera_entry_json("):]
         for field in ("source_camera_subject_events", "subject_prev_in_pool",
                       "subject_next_in_pool", "source_camera_subject_event_overflow"):
@@ -66,7 +68,7 @@ class ResultsCameraOwnershipTests(unittest.TestCase):
         self.assertLess(before, root_write)
         self.assertLess(root_write, after)
 
-        browser = (ROOT / "src/gameplay_menu_browser.cpp").read_text(encoding="utf-8")
+        browser = menu_browser_source()
         serializer = browser[browser.index("void append_camera_entry_json("):]
         for field in ("source_camera_pool_events", "source_tick", "scene_entered",
                       "source_free", "source_pool", "owner_pool", "allocation_generation"):
