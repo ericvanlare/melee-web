@@ -21,6 +21,7 @@ export async function installStagingRingByteCapture(page, frameCap = STAGING_RIN
       overflow: false,
       expected_cursor: 0,
       current_source_tag: null,
+      rejected_source_tag: null,
       started_at_ms: null,
       completed_at_ms: null,
       fail(reason) {
@@ -47,6 +48,8 @@ export async function installStagingRingByteCapture(page, frameCap = STAGING_RIN
         }
         if (!Number.isInteger(sourceCursor) || !Number.isInteger(sourceFrame) ||
             sourceCursor !== capture.expected_cursor || sourceFrame !== sourceCursor + 1) {
+          capture.rejected_source_tag = {source_frame: sourceFrame, source_cursor: sourceCursor,
+            expected_cursor: capture.expected_cursor};
           capture.fail(capture.expected_cursor === 0 ? 'first_source_cursor_or_frame_mismatch' :
             'missing_duplicate_or_reordered_source_cursor');
           return false;
@@ -117,6 +120,7 @@ export async function installStagingRingByteCapture(page, frameCap = STAGING_RIN
           errors: capture.errors.slice(),
           expected_cursor: capture.expected_cursor,
           current_source_tag: capture.current_source_tag,
+          rejected_source_tag: capture.rejected_source_tag,
           started_at_ms: capture.started_at_ms,
           completed_at_ms: capture.completed_at_ms,
           frames: capture.frames.slice(),
