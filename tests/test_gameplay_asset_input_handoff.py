@@ -13,12 +13,14 @@ import tempfile
 import textwrap
 import unittest
 
+from menu_browser_source import menu_browser_source
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def _handoff_tail() -> str:
-    source = (ROOT / "src" / "gameplay_menu_browser.cpp").read_text(encoding="utf-8")
+    source = menu_browser_source()
     function_start = source.index("bool finish_asset_handoff(){")
     tail_start = source.index(
         " check(destination==AssetDestination::Match||destination==AssetDestination::Replay,",

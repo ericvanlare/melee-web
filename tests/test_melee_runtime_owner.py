@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from check_gameplay import node_runtime
 
+from menu_browser_source import menu_browser_source
+
 class SharedRuntimeOwnerTests(unittest.TestCase):
     def test_fatal_failure_delivers_sanitized_diagnostics(self):
         self.run_owner(['--diagnostics-known-host', '--diagnostics-fatal'],
@@ -68,7 +70,7 @@ class SharedRuntimeOwnerTests(unittest.TestCase):
                        'hidden/page lifecycle handoff neutralizes once before current activity')
 
     def test_native_tick_consumes_lifecycle_handoff_before_clock_work(self):
-        source = (ROOT / "src" / "gameplay_menu_browser.cpp").read_text()
+        source = menu_browser_source()
         tick = source.index("void tick(){")
         cache_call = source.index("service_render_cache_writes();", tick)
         prefix = source[tick:cache_call + len("service_render_cache_writes();")]
