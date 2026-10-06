@@ -42,6 +42,7 @@ const zeroIncidentReasonCounts=()=>Array(INCIDENT_REASON_SLOTS).fill(0);
 const incidentReasonBucket=value=>Number.isInteger(value)&&value>=0&&value<INCIDENT_REASON_SLOTS?value:null;
 const {values}=parseArgs({options:{...Object.fromEntries(
   ['url','disc','out','lineup','playwright','build-dir','results-input','cpu-levels'].map(name=>[name,{type:'string'}])),
+  teams:{type:'string'},'friendly-fire':{type:'boolean'},
   'results-confirm-frame':{type:'string'},
   'results-observe-after-confirmation':{type:'boolean'},
   matches:{type:'string'},'setup-only':{type:'boolean'},'stage-setup-only':{type:'boolean'},
@@ -129,8 +130,8 @@ if(values['incident-capture-preflight']){
   console.log(JSON.stringify(await runIncidentCapturePreflight()));
   process.exit(0);
 }
-if(!values.url||!values.disc||!values.out||!['A','B'].includes(values.lineup))
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B [--cpu-levels L0,L1,L2,L3] [--matches 1|2|3|4] [--setup-only] [--stage-setup-only] [--stage-kind final-destination|battlefield] [--wall-bound-seconds SECONDS] [--stop-on-timing-pause] [--controlled-contention] [--user-data-dir EXTERNAL_PROFILE] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK] [--readiness-preflight] [--stage-map-preflight]');
+if(!values.url||!values.disc||!values.out||!['A','B','M'].includes(values.lineup))
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out NEW_DIRECTORY --lineup A|B|M [--cpu-levels L0,L1,L2,L3] [--teams T0,T1,T2,T3 [--friendly-fire]] [--matches 1|2|3|4] [--setup-only] [--stage-setup-only] [--stage-kind final-destination|battlefield] [--wall-bound-seconds SECONDS] [--stop-on-timing-pause] [--controlled-contention] [--user-data-dir EXTERNAL_PROFILE] [--playwright PACKAGE_DIR] [--build-dir BUILT_RUNTIME_DIR] [--results-input keyboard|keyboard-three-prefix|keyboard-gated|keyboard-gated-p1-enter|keyboard-gated-two-prefix|keyboard-gated-two-prefix-source-tick|source-tick|source-tick-three-pulse] [--results-confirm-frame SOURCE_TICK] [--readiness-preflight] [--stage-map-preflight]');
 const stageKind=values['stage-kind']||'final-destination';
 if(!Object.hasOwn(stages,stageKind))
   throw Error('--stage-kind must be final-destination or battlefield');
@@ -158,6 +159,16 @@ if(cpuLevels.length!==4||cpuLevels.some(level=>!Number.isInteger(level)||level<1
   throw Error('--cpu-levels must contain exactly four comma-separated integer levels from 1 through 9');
 const cpuProfileDescription=cpuLevels.every(level=>level===9)?'four CPU9 players':
   `four CPU players at source-confirmed levels ${cpuLevels.join(',')}`;
+// Original VS Team Battle: mnCharSel cycleTeam advances a door through
+// (team + 1) % 3, and fn_80262F44 keeps CSS Start hidden until two active
+// doors belong to different teams. Request only setups the source can start.
+const teams=values.teams===undefined?null:values.teams.split(',').map(Number);
+if(teams&&(teams.length!==4||teams.some(team=>!Number.isInteger(team)||team<0||team>2)||
+   new Set(teams).size<2))
+  throw Error('--teams must contain four source team IDs from 0 through 2 with at least two different teams');
+const friendlyFire=values['friendly-fire']===true;
+if(friendlyFire&&!teams)throw Error('--friendly-fire applies only to a --teams Team Battle');
+const teamDescription=teams?`; Team Battle teams ${teams.join(',')}${friendlyFire?' with Rules Plus friendly fire on':''}`:'';
 const resultsInputMode=values['results-input']||'keyboard';
 if(!['keyboard','keyboard-three-prefix','keyboard-gated','keyboard-gated-p1-enter',
   'keyboard-gated-two-prefix','keyboard-gated-two-prefix-source-tick','source-tick',
@@ -219,7 +230,8 @@ function sourceProvenance(){
     tracked_diff_sha256:createHash('sha256').update(
       execFileSync('git',['diff','--binary','HEAD'],{cwd:repository})).digest('hex')};
 }
-const lineup=values.lineup==='A'?
+const lineup=values.lineup==='M'?
+  Array.from({length:4},()=>({name:'Mario',kind:8})):values.lineup==='A'?
   [{name:'Game & Watch',kind:3,position:[7.1,2.5]},
    {name:'Kirby',kind:4,position:[0.1,9.5]},
    {name:'Ice Climbers',kind:14,position:[-6.9,9.5]},
@@ -245,7 +257,7 @@ const resultsInputScope=resultsInputMode==='keyboard-three-prefix'?
   sourceTickThreePulse?
   `P1-only ten-source-tick Start holds queued at Results ticks 180/360/${resultsConfirmFrame}; disconnected CPU page transitions must precede the tick-${resultsConfirmFrame} confirmation; connectedness and consumed edges retained; controlled PAD path, not literal keyboard-event replay`:null;
 const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
-  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, ${cpuProfileDescription}, four stocks, ${stage.name}; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
+  scope:`Headless Chrome rendered gameplay; live source CSS/SSS controller input, ${cpuProfileDescription}${teamDescription}, four stocks, ${stage.name}; Results continuation input=${resultsInputMode}; ${continuationScope}. No retail comparison, pixels, PCM, foreground timing, physical-controller or performance claim.`,
   campaign:campaignRequested?{kind:'natural-incident',wall_bound_seconds:wallBoundSeconds,
     stage_kind:stage.id,stage_source_id:stage.sourceId,stop_on_timing_pause:stopOnTimingPause,
     contention:campaignCondition,condition:campaignCondition,audio:'enabled',
@@ -255,7 +267,13 @@ const report={schema:'melee-web-cpu9-lineup-browser-v1',result:'fail',
   results_input_scope:resultsInputScope,
   stage_setup_only:stageSetupOnly,
   controller_profile:null,
-  lineup:values.lineup,players:lineup.map(({name,kind},door)=>({name,kind,cpu:cpuLevels[door],stocks:4})),
+  lineup:values.lineup,players:lineup.map(({name,kind},door)=>({name,kind,cpu:cpuLevels[door],stocks:4,
+    team:teams?teams[door]:null})),
+  team_battle:teams?{teams,friendly_fire:friendlyFire,source_rules:[
+    'mnCharSel_CursorThink toggles StartMeleeData.rules.is_teams at the original CSS Teams control',
+    'cycleTeam advances one door through the three authored team colours ((team + 1) % 3)',
+    'fn_80262F44 keeps CSS Start hidden until two active doors belong to different teams',
+    'fn_8023201C Rules Plus row 1 saves GameRules.friendly_fire; gm_1601 copies it into StartMeleeRules']}:null,
   matches:[],screenshots:[],source_progress:[],pad_sample_count:0,page_errors:[],phases:[],controller_inputs:[],
   results_input_events:[],
   browser_context:{kind:userDataDirectory?'persistent':'temporary',
@@ -652,6 +670,7 @@ async function failOnTimingPause(label,state){
   const receipt={schema:'melee-web-timing-pause-receipt-v1',label,
     match:activeMatchIndex,phase:state?.phase??null,running:state?.running??null,
     status:isTimingPause(state)?state.status:null,source_frame:timingPauseSourceFrame(state),
+    native_message:state?.native_message??null,dom_status:state?.dom_status??state?.status??null,
     runtime_diagnostics:report.runtime_diagnostics,
     diagnostics:typeof state?.diagnostics==='string'?state.diagnostics:null,
     observed_at:new Date().toISOString()};
@@ -981,6 +1000,200 @@ async function configureRoster(expected){
   for(let door=0;door<4;door++)await setCpuLevel(door,cpuLevels[door]);
   return verifyRoster(expected,`${cpuProfileDescription} ${stage.name} roster before SSS`);
 }
+const padButtonRight=0x0002,padButtonDown=0x0004,padButtonR=0x0020,padButtonL=0x0040;
+const MAIN_SCENE=4,MAIN_MENU_KIND=0,VS_MENU_KIND=2,RULES_MENU_KIND=13,RULES_PLUS_MENU_KIND=15;
+const sourceObserve=()=>page.evaluate(()=>JSON.parse(
+  Module.UTF8ToString(Module._melee_web_native_menu_source_observe())));
+async function waitForSourcePadReady(label,expectedPhases=[11]){
+  const deadline=Date.now()+20000;
+  let state=null,ownerCanPause=false,nativeMessage='';
+  while(Date.now()<deadline){
+    state=await diagnostic();
+    if(state.error)throw Error(`${label}: ${state.error}`);
+    if(state.nativeCommandError)throw Error(`${label}: ${state.nativeCommandError}`);
+    nativeMessage=await page.evaluate(()=>
+      Module.UTF8ToString(Module._melee_web_native_menu_message()));
+    if(isTimingPause({status:nativeMessage}))
+      await failOnTimingPause(label,{...state,status:nativeMessage,
+        native_message:nativeMessage,dom_status:state.status});
+    ownerCanPause=await page.evaluate(()=>{
+      const button=document.querySelector('#pause');
+      return Boolean(button&&!button.disabled);
+    });
+    if(state.running===1&&expectedPhases.includes(state.phase)&&ownerCanPause&&
+       state.diagnostics.includes('raw PAD: none')){
+      report.source_progress.push({label,phase:state.phase,running:state.running,
+        status:state.status,native_message:nativeMessage,diagnostics:state.diagnostics,
+        owner_can_pause:ownerCanPause});
+      return state;
+    }
+    await page.waitForTimeout(20);
+  }
+  throw Error(`${label} timed out waiting for an active source PAD owner: ${JSON.stringify({
+    phase:state?.phase,running:state?.running,status:state?.status,
+    native_message:nativeMessage,diagnostics:state?.diagnostics,
+    owner_can_pause:ownerCanPause,error:state?.error})}`);
+}
+async function waitForSource(label,predicate,timeoutMs=15000){
+  const deadline=Date.now()+timeoutMs;
+  let observation=null;
+  while(Date.now()<deadline){
+    const state=await diagnostic();
+    await checkTimingPause(label,state);
+    if(state.error)throw Error(`${label}: ${state.error}`);
+    observation=await sourceObserve();
+    if(observation?.source?.valid&&predicate(observation.source))return observation;
+    await page.waitForTimeout(50);
+  }
+  throw Error(`${label} timed out: ${JSON.stringify(observation?.source??observation)}`);
+}
+// Original menus consume trigger edges; one source tick down and two neutral
+// ticks give each navigation input one edge without auto-repeat.
+async function sourceMenuTap(buttons,label){
+  const releasePhase=buttons===buttonStart?[1]:[11];
+  await waitForSourcePadReady(`${label}: owner ready before press`,[11]);
+  await pad(0,buttons,0,0,1,label);
+  await waitForSourcePadReady(`${label}: owner ready before release`,releasePhase);
+  await pad(0,0,0,0,2,`${label}:release`);
+  await waitForSourcePadReady(`${label}: owner ready after release`,releasePhase);
+}
+async function moveSourceMenu(menuKind,total,target,label){
+  for(let step=0;step<total*2;step++){
+    const observed=await waitForSource(`${label} cursor`,source=>source.scene===MAIN_SCENE&&
+      source.menu_kind===menuKind);
+    if(observed.source.hovered_selection===target)return observed;
+    await sourceMenuTap(padButtonDown,`${label} down`);
+  }
+  throw Error(`${label}: original menu ${menuKind} cursor did not reach ${target}`);
+}
+async function enableFriendlyFire(){
+  // CSS L+R+Start follows the original mnCharSel_Scene_OnFrame parent route
+  // to Main. Rules Plus row 1 is GameRules.friendly_fire (fn_8023201C), and
+  // Rules Plus Start commits before mn_80229860(GM_VS) returns to CSS.
+  const fullPad=(buttons,triggerLeft,triggerRight,duration,label)=>page.evaluate(args=>
+    Module._melee_web_native_menu_pad_sample_full(...args),
+    [0,buttons,0,0,0,0,triggerLeft,triggerRight,duration]).then(async accepted=>{
+      assert.equal(accepted,1,`${label}: source PAD sample rejected`);
+      report.pad_sample_count++;
+      report.controller_inputs.push({port:0,buttons,triggerLeft,triggerRight,duration,label});
+      await page.waitForTimeout(Math.max(40,duration*18));
+    });
+  await page.waitForTimeout(800);
+  await fullPad(padButtonL|padButtonR|buttonStart,255,255,4,'CSS L+R+Start to original Main');
+  const mainReady=await waitFor('active original Main owner before neutral PAD release',state=>
+    state.phase===11&&state.running===1&&state.status.startsWith('Original main menu')&&
+    state.diagnostics.includes('raw PAD: none'),60000);
+  report.source_progress.push({label:'original Main active and queued CSS PAD drained before neutral release',
+    phase:mainReady.phase,running:mainReady.running,status:mainReady.status,
+    diagnostics:mainReady.diagnostics});
+  await fullPad(0,0,0,2,'CSS L+R+Start release');
+  await waitForSource('original Main root',source=>source.scene===MAIN_SCENE&&
+    source.menu_kind===MAIN_MENU_KIND,60000);
+  await screenshot('friendly-fire-main');
+  await moveSourceMenu(MAIN_MENU_KIND,5,1,'Main VS');
+  await sourceMenuTap(buttonA,'Main VS A');
+  await waitForSource('original VS menu',source=>source.menu_kind===VS_MENU_KIND);
+  await moveSourceMenu(VS_MENU_KIND,5,3,'VS Rules');
+  await sourceMenuTap(buttonA,'VS Rules A');
+  await waitForSource('original Rules',source=>source.menu_kind===RULES_MENU_KIND);
+  await moveSourceMenu(RULES_MENU_KIND,7,6,'Rules Plus row');
+  await sourceMenuTap(buttonA,'Rules Plus A');
+  await waitForSource('original Rules Plus',source=>source.menu_kind===RULES_PLUS_MENU_KIND&&
+    source.hovered_selection===0);
+  await moveSourceMenu(RULES_PLUS_MENU_KIND,5,1,'Rules Plus friendly fire row');
+  const before=await sourceObserve();
+  assert.equal(before.source.rules.friendly_fire,0,'Fresh Everything profile starts with friendly fire off');
+  await sourceMenuTap(padButtonRight,'Rules Plus friendly fire right');
+  const edited=await waitForSource('Rules Plus friendly fire on',source=>
+    source.menu_kind===RULES_PLUS_MENU_KIND&&source.hovered_selection===1&&
+    source.confirmed_selection===1);
+  report.phases.push({label:'source Rules Plus friendly fire row set on',source:edited.source});
+  await screenshot('friendly-fire-rules-plus-on');
+  await sourceMenuTap(buttonStart,'Rules Plus Start commits to GM_VS');
+  await waitFor('original CSS after Rules Plus Start',s=>s.phase===1&&s.css,60000);
+  const css=await waitForSource('CSS retains committed friendly fire',source=>
+    source.scene===1&&source.rules.friendly_fire===1);
+  report.phases.push({label:'CSS after source Rules Plus friendly fire commit',source:css.source});
+}
+async function cssTeams(label){
+  const observed=await waitForSource(label,source=>source.scene===1&&source.css_setup?.valid);
+  const setup=observed.source.css_setup;
+  assert(Array.isArray(setup.door_teams)&&setup.door_teams.length===4,
+    `${label}: four-door CSS team observation unavailable`);
+  return setup;
+}
+async function enableCssTeams(){
+  const isTeams=async label=>(await waitForSource(label,source=>source.scene===1&&
+    source.css_setup?.valid)).source.css_setup.is_teams;
+  if(await isTeams('CSS Teams before toggle')===1)return;
+  await page.waitForTimeout(800);
+  // mnCharSel_CursorThink: PAD A toggles is_teams while the cursor is at
+  // x < -25.5 and y > 22 (the original Teams control).
+  await move(0,-28,23.3,'CSS-Teams-control');
+  await tap(0,buttonA,'CSS Teams toggle');
+  const enabled=await waitForSource('CSS Teams enabled',source=>source.scene===1&&
+    source.css_setup?.valid&&source.css_setup.is_teams===1,4000);
+  report.phases.push({label:'original CSS Teams control enabled',css_setup:enabled.source.css_setup});
+  await screenshot('css-teams-enabled');
+}
+async function assignCssTeams(targets){
+  for(let door=0;door<4;door++){
+    for(let attempt=0;attempt<4;attempt++){
+      const setup=await cssTeams(`door ${door} team before cycle`);
+      if(setup.door_teams[door]===targets[door])break;
+      const before=setup.door_teams[door];
+      const g=row((await css()).geometry,door,12);
+      assert(Number.isFinite(g[6])&&Number.isFinite(g[7])&&g[7]>g[6],
+        `Original door ${door} team-box bounds are invalid: ${JSON.stringify(g)}`);
+      // cycleTeam accepts -5.8 < y < -1.0 inside the door's authored box.
+      await move(0,(g[6]+g[7])/2,-3.4,`team-box-door-${door}`);
+      await tap(0,buttonA,`cycle-team-door-${door}`);
+      await waitForSource(`door ${door} team advanced`,source=>source.scene===1&&
+        source.css_setup?.door_teams?.[door]===(before+1)%3,4000);
+    }
+  }
+  const setup=await cssTeams('CSS teams configured');
+  assert.equal(setup.is_teams,1,'Teams must remain enabled after team colour input');
+  assert.deepEqual(setup.door_teams,targets,'Original CSS door teams must match the requested setup');
+  report.phases.push({label:'original CSS team colours configured',css_setup:setup});
+  await screenshot('css-teams-configured');
+  return setup;
+}
+function assertTeamMatchEntry(entry,matchIndex){
+  const rules=entry.match?.rules;
+  assert(rules,`Team match ${matchIndex} entry observation is unavailable`);
+  assert.equal(rules.is_teams,1,'The live source StartMeleeData must keep the CSS Teams flag');
+  assert.deepEqual(rules.door_teams,teams,
+    'The live source StartMeleeData must keep every original CSS door team');
+  assert.equal(rules.friendly_fire,friendlyFire?1:0,
+    'The live source StartMeleeData must keep the Rules Plus friendly-fire choice');
+  report.phases.push({label:`match ${matchIndex} source Team Battle entry`,rules});
+}
+function assertTeamTerminal(match,matchIndex){
+  const terminal=match?.terminal;
+  assert(terminal&&Array.isArray(terminal.winners),
+    `Team match ${matchIndex} terminal source MatchEnd is unavailable`);
+  // gm_GetTeamBattleOutcome returns OUTCOME_TEAM_ELIMINATION (3) once at most
+  // one team retains stocks; MatchEnd ranks the remaining team as winners.
+  assert.equal(terminal.outcome,3,'A natural Team Battle must end with source OUTCOME_TEAM_ELIMINATION');
+  assert(terminal.winners.length>=1&&terminal.winners.every(winner=>
+    Number.isInteger(winner)&&winner>=0&&winner<4),
+    `Team match ${matchIndex} winners are outside the four doors: ${JSON.stringify(terminal.winners)}`);
+  const winnerTeams=[...new Set(terminal.winners.map(winner=>teams[winner]))];
+  assert.equal(winnerTeams.length,1,'Every source Team Battle winner must belong to one team');
+  return {outcome:terminal.outcome,winners:terminal.winners,winning_team:winnerTeams[0],
+    winning_team_doors:teams.flatMap((team,door)=>team===winnerTeams[0]?[door]:[])};
+}
+async function assertTeamCssReturn(matchIndex){
+  const setup=await cssTeams(`CSS team setup after match ${matchIndex} Results`);
+  assert.equal(setup.is_teams,1,'Results return must keep the original CSS Teams flag');
+  assert.deepEqual(setup.door_teams,teams,'Results return must keep every original CSS door team');
+  const observed=await sourceObserve();
+  assert.equal(observed.source.rules.friendly_fire,friendlyFire?1:0,
+    'Results return must keep the Rules Plus friendly-fire choice');
+  report.phases.push({label:`CSS after match ${matchIndex} Team Battle Results`,css_setup:setup,
+    friendly_fire:observed.source.rules.friendly_fire});
+}
 async function chooseStage(){
   await tap(0,buttonStart,'CSS-to-SSS Start',8);
   const rawStart=await waitFor('original SSS entry after raw PAD Start',s=>s.phase===3,2000)
@@ -1048,6 +1261,7 @@ async function runMatch(matchIndex,expected){
   await chooseStage();
   startControlledContention();
   const entry=await writeProgress(`match-${matchIndex}-entry`);
+  if(teams)assertTeamMatchEntry(entry,matchIndex);
   await screenshot(`match-${matchIndex}-entry`);
   const checkpoints=[600,2400,6000,10000,14000,18000,24000];
   let next=0,deadline=Date.now()+12*60*1000,stalledSince=0,terminalTransitionRecorded=false;
@@ -1118,6 +1332,7 @@ async function runMatch(matchIndex,expected){
   const result={match:matchIndex,entered_results_phase:state.phase,
     source_diagnostics:state.diagnostics,terminal_match:state.match,
     memory_at_results:state.memory,players:expected.map(({name,kind})=>({name,kind,cpu:9,stocks:4}))};
+  if(teams)result.team_battle=assertTeamTerminal(state.match,matchIndex);
   report.matches.push(result);
   report.phases.push({label:`match ${matchIndex} naturally reached Results/Prize`,phase:state.phase,match:state.match});
   // Ordinary Start input advances authored Results/Prize routing. Stop only
@@ -1942,6 +2157,7 @@ async function runMatch(matchIndex,expected){
   assert(!returned.memory.match_present&&!returned.memory.results_present,
     'Prior match and Results owners must be torn down at CSS return');
   await screenshot(`match-${matchIndex}-returned-css`);
+  if(teams)await assertTeamCssReturn(matchIndex);
   const sourcePadTraceRecord=await retainResultsSourcePadTrace(matchIndex,'natural-results-to-css');
   const cameraEntry=sourcePadTraceRecord?.trace?.camera_entry;
   assert(cameraEntry,
@@ -2446,7 +2662,15 @@ try{
   await waitFor('original VS CSS initial entry',s=>s.phase===1&&s.css,60000);
   await screenshot('initial-css');
   report.initial_css=await writeProgress('initial-css');
+  if(friendlyFire)await enableFriendlyFire();
+  // Enable Teams before doors 3/4 join so the CSS progress boundary sees a
+  // third and fourth door entering an active Team Battle setup.
+  if(teams)await enableCssTeams();
   await configureRoster(lineup);
+  if(teams){
+    await assignCssTeams(teams);
+    await verifyRoster(lineup,`${cpuProfileDescription} ${stage.name} Team Battle roster before SSS`);
+  }
   if(values['setup-only']){report.result='setup-only-pass';}
   else if(stageSetupOnly){
     await chooseStage();

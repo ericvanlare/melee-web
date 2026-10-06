@@ -327,6 +327,49 @@ int main(void)
     css.vs.start.players[3].slot = 0;
     if (melee_web_menu_active_player_count(&css.vs.start) != 4 ||
         !melee_web_menu_css_selection_valid(&css)) return 67;
+    {
+        /* Original CSS Team Battle (fn_80262F44 and cycleTeam): Start is
+         * accepted for any two-to-four door roster once two active doors
+         * use different team colours, and each colour stays in 0..2. */
+        static const u8 admitted[][4] = {
+            {0, 0, 1, 1}, {2, 2, 2, 0}, {1, 0, 1, 2}, {0, 1, 2, 2}};
+        static const u8 refused[][4] = {{1, 1, 1, 1}, {0, 0, 1, 3}};
+        CSSData team_css = css;
+        SSSData team_sss;
+        team_css.vs.start.rules.is_teams = 1;
+        for (size_t row = 0; row < sizeof(admitted) / sizeof(admitted[0]); ++row) {
+            for (int i = 0; i < 4; ++i)
+                team_css.vs.start.players[i].team = admitted[row][i];
+            memset(&team_sss, 0, sizeof(team_sss));
+            team_sss.force_stage_id = -1;
+            team_sss.vs = team_css.vs;
+            if (!melee_web_menu_css_selection_valid(&team_css) ||
+                !melee_web_menu_sss_selection_valid(&team_sss)) return 123;
+        }
+        for (size_t row = 0; row < sizeof(refused) / sizeof(refused[0]); ++row) {
+            for (int i = 0; i < 4; ++i)
+                team_css.vs.start.players[i].team = refused[row][i];
+            memset(&team_sss, 0, sizeof(team_sss));
+            team_sss.force_stage_id = -1;
+            team_sss.vs = team_css.vs;
+            if (melee_web_menu_css_selection_valid(&team_css) ||
+                melee_web_menu_sss_selection_valid(&team_sss)) return 124;
+        }
+        /* Three doors: 1v1v1 and 2v1 start; three on one team do not. */
+        team_css.vs.start.players[3].slot_type = Gm_PKind_NA;
+        team_css.vs.start.players[0].team = 0;
+        team_css.vs.start.players[1].team = 1;
+        team_css.vs.start.players[2].team = 2;
+        team_css.vs.start.players[3].team = 0;
+        if (!melee_web_menu_css_selection_valid(&team_css)) return 125;
+        team_css.vs.start.players[2].team = 0;
+        if (!melee_web_menu_css_selection_valid(&team_css)) return 126;
+        team_css.vs.start.players[1].team = 0;
+        if (melee_web_menu_css_selection_valid(&team_css)) return 127;
+        team_css.vs.start.players[1].team = 1;
+        team_css.vs.start.rules.is_teams = 2;
+        if (melee_web_menu_css_selection_valid(&team_css)) return 128;
+    }
     css.vs.start.players[4].slot_type = Gm_PKind_Cpu;
     if (melee_web_menu_active_player_count(&css.vs.start) != 0) return 68;
     css.vs.start.players[4].slot_type = Gm_PKind_NA;
@@ -635,6 +678,74 @@ int main(void)
             !melee_web_menu_abort(session, error, sizeof(error)) ||
             !melee_web_menu_session_destroy(session, error, sizeof(error)))
             return 74;
+    }
+    {
+        /* Teams may be enabled before P3/P4 join (the former two-player gate
+         * rejected the third door here), and every door may share one colour
+         * until the cursor changes one. CSS exit and the match handoff still
+         * require two active doors on different teams. */
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
+        char error[128];
+        MeleeWebMenuSession* session =
+            melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
+        if (session == NULL || !melee_web_menu_enter_css(session, error,
+                                                          sizeof(error)))
+            return 130;
+        transition_request = 0;
+        active_css->vs.start.rules.is_teams = 1;
+        for (int i = 0; i < 4; ++i) active_css->vs.start.players[i].team = 0;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TICKED)
+            return 131;
+        for (int door = 2; door < 4; ++door) {
+            active_css->vs.start.players[door].slot_type = Gm_PKind_Cpu;
+            active_css->vs.start.players[door].cpu_kind = CpuKind_4;
+            active_css->vs.start.players[door].cpu_level = 9;
+            active_css->vs.start.players[door].ckind = CHKIND_NONE;
+            active_css->vs.start.players[door].slot = 0;
+            if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                    MELEE_WEB_MENU_RESULT_TICKED)
+                return 132;
+        }
+        active_css->vs.start.players[2].ckind = CKIND_MARIO;
+        active_css->vs.start.players[3].ckind = CKIND_MARIO;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TICKED ||
+            melee_web_menu_css_selection_valid(active_css))
+            return 133;
+        transition_request = 1;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+            melee_web_menu_leave_css(session, error, sizeof(error)) ||
+            melee_web_menu_phase(session) != MELEE_WEB_MENU_CSS)
+            return 134;
+        active_css->vs.start.players[2].team = 1;
+        active_css->vs.start.players[3].team = 1;
+        if (!melee_web_menu_css_selection_valid(active_css) ||
+            !melee_web_menu_leave_css(session, error, sizeof(error)) ||
+            melee_web_menu_phase(session) != MELEE_WEB_MENU_SSS_READY ||
+            !melee_web_menu_abort(session, error, sizeof(error)) ||
+            !melee_web_menu_session_destroy(session, error, sizeof(error)))
+            return 135;
+    }
+    {
+        /* cycleTeam never produces a fourth colour; keep it fail-closed. */
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
+        char error[128];
+        MeleeWebMenuSession* session =
+            melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
+        if (session == NULL || !melee_web_menu_enter_css(session, error,
+                                                          sizeof(error)))
+            return 136;
+        transition_request = 0;
+        active_css->vs.start.rules.is_teams = 1;
+        active_css->vs.start.players[0].team = 0;
+        active_css->vs.start.players[1].team = 3;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_SELECTION_REJECTED ||
+            !melee_web_menu_abort(session, error, sizeof(error)) ||
+            !melee_web_menu_session_destroy(session, error, sizeof(error)))
+            return 137;
     }
     {
         MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};

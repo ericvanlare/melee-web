@@ -1650,8 +1650,8 @@ int melee_web_menu_host_source_observe(
         }
         out->css_setup_valid = 1;
         out->css_is_teams = css->vs.start.rules.is_teams;
-        out->css_player_teams[0] = css->vs.start.players[0].team;
-        out->css_player_teams[1] = css->vs.start.players[1].team;
+        for (int i = 0; i < 4; ++i)
+            out->css_player_teams[i] = css->vs.start.players[i].team;
     }
     return ok(e, n);
 }

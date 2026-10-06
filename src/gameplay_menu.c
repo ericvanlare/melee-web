@@ -563,15 +563,9 @@ static int stage_selection_valid(int stkind, int allow_unselected)
 static int team_selection_valid(const StartMeleeData* start, int count,
                                 int allow_same_team)
 {
-    if (start == NULL || start->rules.is_teams > 1) return 0;
-    if (!start->rules.is_teams) return 1;
-
     /* The source CSS exposes three team colours and refuses Start until two
-     * active doors belong to different teams. This route currently owns the
-     * original two-player case; larger team rosters remain unsupported. */
-    return count == 2 && start->players[0].team < 3 &&
-           start->players[1].team < 3 &&
-           (allow_same_team || start->players[0].team != start->players[1].team);
+     * active doors belong to different teams; see the shared rule. */
+    return melee_web_team_setup_supported(start, count, !allow_same_team);
 }
 
 static int css_selection_valid_internal(const CSSData* css,
@@ -779,9 +773,10 @@ static int css_progress_valid(const CSSData* css)
         }
     }
     /* The retail cursor enables Teams before the player chooses an opposing
-     * color. Keep that intermediate CSS state live while still requiring the
-     * two authored team IDs to remain in range. CSS exit and match admission
-     * continue to require opposing teams through the strict validator. */
+     * color, and doors may join or leave while Teams is on. Keep that
+     * intermediate CSS state live while still requiring every authored team
+     * ID to remain in range. CSS exit and match admission continue to
+     * require opposing teams through the strict validator. */
     return css_selection_valid_internal(&view, 1, 1, 1);
 }
 
