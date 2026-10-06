@@ -127,6 +127,7 @@ const localArtifacts = Object.fromEntries(Array.from({length: 31}, (_, index) =>
   const name = `browser-artifact-${String(index).padStart(2, '0')}`;
   return [name, {bytes: index + 1, sha256: String(index + 1).padStart(64, '0')}];
 }));
+const currentNames = Object.keys(localArtifacts);
 const source = {commit: 'a'.repeat(40), tree: 'b'.repeat(40)};
 assert.equal(artifactMapDigest(localArtifacts), artifactMapDigest(Object.fromEntries(
   Object.entries(localArtifacts).reverse())));
@@ -135,20 +136,36 @@ const prospectiveManifest = {schema: 'melee-web-h1-prospective-build-manifest-v1
   build_directory: '/frozen/release', inventory: {artifact_count: 31,
     artifact_map_sha256: artifactMapDigest(localArtifacts), artifacts: localArtifacts}};
 assert.equal(validateProspectiveBuildManifest(prospectiveManifest, {source,
-  buildDirectory: '/frozen/release', localArtifacts}).valid, true);
+  buildDirectory: '/frozen/release', localArtifacts, expectedNames: currentNames}).valid, true);
 const changedArtifacts = {...localArtifacts, 'browser-artifact-03':
   {bytes: 999, sha256: 'c'.repeat(64)}};
 const changed = compareArtifactMaps(localArtifacts, changedArtifacts);
 assert.equal(changed.matches, false);
 assert.deepEqual(changed.differences.map(item => item.name), ['browser-artifact-03']);
 assert.deepEqual(validateProspectiveBuildManifest(prospectiveManifest, {source,
-  buildDirectory: '/frozen/release', localArtifacts: changedArtifacts}).problems,
+  buildDirectory: '/frozen/release', localArtifacts: changedArtifacts, expectedNames: currentNames}).problems,
 ['local_artifact_map_mismatch']);
 assert.ok(validateProspectiveBuildManifest(prospectiveManifest, {source: {...source, tree: 'd'.repeat(40)},
-  buildDirectory: '/frozen/release', localArtifacts}).problems.includes('source_identity_mismatch'));
+  buildDirectory: '/frozen/release', localArtifacts, expectedNames: currentNames}).problems.includes('source_identity_mismatch'));
 assert.ok(validateProspectiveBuildManifest({...prospectiveManifest,
   inventory: {...prospectiveManifest.inventory, artifact_map_sha256: 'e'.repeat(64)}}, {source,
-  buildDirectory: '/frozen/release', localArtifacts}).problems.includes('manifest_artifact_digest_invalid'));
+  buildDirectory: '/frozen/release', localArtifacts, expectedNames: currentNames}).problems.includes('manifest_artifact_digest_invalid'));
+const artifact32 = {...localArtifacts, 'browser-artifact-31': {bytes: 32, sha256: '2'.repeat(64)}};
+const names32 = [...currentNames, 'browser-artifact-31'];
+const manifest32 = {...prospectiveManifest, inventory: {artifact_count: 32,
+  artifact_map_sha256: artifactMapDigest(artifact32), artifacts: artifact32}};
+assert.equal(validateProspectiveBuildManifest(manifest32, {source, buildDirectory: '/frozen/release',
+  localArtifacts: artifact32, expectedNames: names32}).valid, true);
+const missingOne = validateProspectiveBuildManifest(prospectiveManifest, {source,
+  buildDirectory: '/frozen/release', localArtifacts: artifact32, expectedNames: names32});
+assert.ok(missingOne.problems.includes('manifest_artifact_count_invalid'));
+assert.ok(missingOne.problems.includes('manifest_artifact_names_mismatch'));
+const unexpected = {...artifact32, 'browser-artifact-32': {bytes: 33, sha256: '3'.repeat(64)}};
+const unexpectedManifest = {...prospectiveManifest, inventory: {artifact_count: 32,
+  artifact_map_sha256: artifactMapDigest(unexpected), artifacts: unexpected}};
+assert.ok(validateProspectiveBuildManifest(unexpectedManifest, {source,
+  buildDirectory: '/frozen/release', localArtifacts: localArtifacts, expectedNames: currentNames})
+  .problems.includes('manifest_artifact_names_mismatch'));
 const oldHistoricalMap = {...localArtifacts,
   'browser-artifact-02': {bytes: 3, sha256: 'f'.repeat(64)},
   'browser-artifact-08': {bytes: 9, sha256: 'e'.repeat(64)}};

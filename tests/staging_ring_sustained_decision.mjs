@@ -37,7 +37,7 @@ export function compareArtifactMaps(expected, actual) {
 /** Verify an authorized prospective source/build identity before the runner
  * accepts any served bytes. This does not assert historical equivalence. */
 export function validateProspectiveBuildManifest(manifest, {source, buildDirectory,
-  localArtifacts} = {}) {
+  localArtifacts, expectedNames} = {}) {
   const problems = [];
   if (manifest?.schema !== 'melee-web-h1-prospective-build-manifest-v1' ||
       manifest?.binding_type !== 'prospective_local_build_inventory')
@@ -46,17 +46,33 @@ export function validateProspectiveBuildManifest(manifest, {source, buildDirecto
     problems.push('source_identity_mismatch');
   if (buildDirectory && pathResolve(manifest?.build_directory) !== pathResolve(buildDirectory))
     problems.push('build_directory_mismatch');
+  const requiredNames = Array.isArray(expectedNames) ? expectedNames :
+    (localArtifacts && typeof localArtifacts === 'object' ? Object.keys(localArtifacts) : []);
+  const requiredNameSet = new Set(requiredNames);
+  if (!requiredNames.length || requiredNames.some(name => typeof name !== 'string' || !name) ||
+      requiredNameSet.size !== requiredNames.length)
+    problems.push('expected_artifact_names_invalid');
   const inventory = manifest?.inventory;
   const actualCount = inventory?.artifacts && typeof inventory.artifacts === 'object' &&
     !Array.isArray(inventory.artifacts) ? Object.keys(inventory.artifacts).length : 0;
-  if (!inventory || inventory.artifact_count !== actualCount || actualCount !== 31)
+  if (!inventory || inventory.artifact_count !== actualCount || actualCount !== requiredNames.length)
     problems.push('manifest_artifact_count_invalid');
+  const actualNames = inventory?.artifacts && typeof inventory.artifacts === 'object' &&
+    !Array.isArray(inventory.artifacts) ? Object.keys(inventory.artifacts) : [];
+  if (requiredNameSet.size === requiredNames.length &&
+      (actualNames.length !== requiredNames.length ||
+       [...requiredNameSet].some(name => !Object.hasOwn(inventory?.artifacts ?? {}, name))))
+    problems.push('manifest_artifact_names_mismatch');
+  if (localArtifacts && (Object.keys(localArtifacts).length !== requiredNames.length ||
+      [...requiredNameSet].some(name => !Object.hasOwn(localArtifacts, name))))
+    problems.push('local_artifact_names_mismatch');
   const declaredDigest = artifactMapDigest(inventory?.artifacts);
   if (!declaredDigest || inventory?.artifact_map_sha256 !== declaredDigest)
     problems.push('manifest_artifact_digest_invalid');
   const localComparison = compareArtifactMaps(inventory?.artifacts, localArtifacts);
   if (!localComparison.matches) problems.push('local_artifact_map_mismatch');
   return {valid: problems.length === 0, problems,
+    expected_artifact_count: requiredNames.length,
     manifest_artifact_map_sha256: inventory?.artifact_map_sha256 ?? null,
     local_artifact_map_sha256: artifactMapDigest(localArtifacts),
     local_artifact_differences: localComparison.differences};

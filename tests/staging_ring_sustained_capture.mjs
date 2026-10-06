@@ -474,7 +474,7 @@ try {
   const prospectiveManifest = JSON.parse(prospectiveBytes);
   const localArtifacts = await localArtifactMap(buildDirectory);
   const prospectiveValidation = validateProspectiveBuildManifest(prospectiveManifest, {
-    source: report.source, buildDirectory, localArtifacts});
+    source: report.source, buildDirectory, localArtifacts, expectedNames: browserArtifactNames});
   report.prospective_build_binding = {manifest_path: path.resolve(values['prospective-build-manifest']),
     manifest_sha256: sha(prospectiveBytes), schema: prospectiveManifest.schema ?? null,
     binding_type: prospectiveManifest.binding_type ?? null,
