@@ -18,7 +18,12 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
         melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,
         "Whole-session replay requires the fresh prepared character-select owner");
  reference_heap_used=true;
- if(!candidate->whole_session())close();
+ if(!candidate->whole_session()){
+  close();
+  // Modern disc import releases its active CSS assets at unload. Reuse the
+  // existing bounded Replay scope rather than the eager-file legacy path.
+  scoped_assets=scoped_disc_import;
+ }
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  replay=std::move(candidate);replay_trace=observe;replay_pending=!replay->whole_session();
  replay_completion={};replay_completion.whole_session=replay->whole_session();

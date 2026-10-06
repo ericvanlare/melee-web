@@ -87,6 +87,7 @@ enum class AssetDestination {
  OpeningScene, OpeningMatch, TitleReturn
 };
 extern AssetDestination asset_destination;
+extern bool scoped_disc_import;
 extern bool scoped_assets,asset_committed;
 extern uint32_t asset_generation;
 extern std::vector<std::string> requested_assets;

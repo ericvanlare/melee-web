@@ -3,6 +3,8 @@ namespace melee_web_menu_browser {
 melee_web::RuntimeFiles files;
 melee_web::RuntimeAssetScope asset_scope(files);
 AssetDestination asset_destination=AssetDestination::None;
+// Disc import mode survives scene unload; active asset transactions do not.
+bool scoped_disc_import=false;
 bool scoped_assets=false,asset_committed=false;
 uint32_t asset_generation=0;
 std::vector<std::string> requested_assets;
