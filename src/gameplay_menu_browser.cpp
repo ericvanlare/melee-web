@@ -263,7 +263,11 @@ alignas(32) unsigned char fifo[64*1024];
 void begin_source_session(){
  if(source_session_owned)return;
  char error[256]{};
+#if defined(MELEE_WEB_NET_SESSION)
+ check(melee_web_net_session_begin(32U*1024U*1024U,error,sizeof(error)),error);
+#else
  check(melee_web_gameplay_session_begin(32U*1024U*1024U,error,sizeof(error)),error);
+#endif
  source_session_owned=true;
 }
 void clear_diagnostic_pad(){diagnostic_pad={};diagnostic_pad_port=0;diagnostic_pad_remaining=0;}

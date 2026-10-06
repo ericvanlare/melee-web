@@ -39,6 +39,9 @@ const PADStatus* melee_web_net_before_step(uint32_t scene);
 /* Record the checksum of the tick that consumed the frame. */
 void melee_web_net_after_step(void);
 void melee_web_net_reset(void);
+/* Begin the reserved arena. An optional diagnostic fill is applied only while
+ * that allocation is created, and the request is consumed once. */
+int melee_web_net_session_begin(size_t heap_bytes, char* error, size_t error_size);
 #else
 /* Player builds compile the hooks away; no networked state exists. */
 static inline int melee_web_net_active(void) { return 0; }

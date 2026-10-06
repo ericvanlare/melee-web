@@ -82,73 +82,103 @@ const PAGE_HELPERS = () => {
 };
 
 export async function openNetInstance({chromium, launchOptions, url, disc, userDataDir, label,
-  throttle = 1, arenaFill = -1, timeoutMs = 120000}) {
+  throttle = 1, arenaFill = -1, timeoutMs = 120000, deadline = Infinity}) {
   await fs.mkdir(path.resolve(userDataDir), {recursive: true});
   const context = await chromium.launchPersistentContext(path.resolve(userDataDir), {
     ...browserLaunchOptions(launchOptions, {timeout: timeoutMs}),
     viewport: {width: 900, height: 700}, deviceScaleFactor: 1,
   });
-  const page = context.pages()[0] || await context.newPage();
-  const errors = [];
-  page.on('pageerror', error => errors.push({kind: 'pageerror', message: String(error.stack || error.message)}));
-  page.on('console', message => { if (message.type() === 'error') errors.push({kind: 'console', message: message.text()}); });
-  page.on('response', response => { if (response.status() >= 400) errors.push({kind: 'http', status: response.status(), url: response.url()}); });
-  page.on('request', request => { if (request.method() !== 'GET') errors.push({kind: 'unexpected-request', method: request.method(), url: request.url()}); });
-  await page.addInitScript(() => {
-    window.__meleeNativeRuntimeReady = false;
-    const module = globalThis.Module || {};
-    module.onRuntimeInitialized = () => { window.__meleeNativeRuntimeReady = true; };
-    globalThis.Module = module;
-  });
-  page.setDefaultTimeout(timeoutMs);
-  page.setDefaultNavigationTimeout(timeoutMs);
-  const instance = {label, page, context, errors, timingResumes: [], throttle, arenaFill, closed: false};
-  const driver = createBrowserDriver(page, {surface: 'development', timeoutMs});
-  instance.driver = driver;
-  const response = await page.goto(url, {waitUntil: 'domcontentloaded'});
-  if (response?.status() !== 200) throw Error(`runtime.html returned HTTP ${response?.status()}`);
-  const headers = response.headers();
-  if (headers['cross-origin-opener-policy'] !== 'same-origin' || headers['cross-origin-embedder-policy'] !== 'require-corp')
-    throw Error('Runtime did not load over COOP/COEP HTTP isolation');
-  if (!await page.evaluate(() => crossOriginIsolated)) throw Error('Browser page is not cross-origin isolated');
-  await driver.waitForImport();
-  await page.evaluate(PAGE_HELPERS);
-  if (throttle !== 1) {
-    instance.cdp = await context.newCDPSession(page);
-    await instance.cdp.send('Emulation.setCPUThrottlingRate', {rate: throttle});
+  let page, driver, instance, closed = false, closeComplete = false;
+  const close = async () => {
+    if (closed) return closeComplete;
+    closed = true;
+    try { driver?.dispose(); } catch {}
+    let browser;
+    try { browser = context.browser(); } catch {}
+    try { await context.close(); closeComplete = true; }
+    catch { try { if (browser) { await browser.close(); closeComplete = true; } } catch {} }
+    if (instance) instance.closed = closeComplete;
+    return closeComplete;
+  };
+  const remaining = () => {
+    const ms = Math.min(timeoutMs, deadline - Date.now());
+    if (ms <= 0) throw Error('Network determinism wall-time bound exhausted');
+    return Math.max(1, Math.floor(ms));
+  };
+  const bounded = async operation => {
+    const ms = remaining();
+    if (page) {
+      page.setDefaultTimeout(ms);
+      page.setDefaultNavigationTimeout(ms);
+    }
+    let timer;
+    try {
+      return await Promise.race([
+        Promise.resolve().then(operation),
+        new Promise((_, reject) => { timer = setTimeout(() => reject(Error('Network determinism wall-time bound exhausted')), ms); }),
+      ]);
+    } finally { clearTimeout(timer); }
+  };
+
+  try {
+    page = context.pages()[0] || await bounded(() => context.newPage());
+    const errors = [];
+    page.on('pageerror', error => errors.push({kind: 'pageerror', message: String(error.stack || error.message)}));
+    page.on('console', message => { if (message.type() === 'error') errors.push({kind: 'console', message: message.text()}); });
+    page.on('response', response => { if (response.status() >= 400) errors.push({kind: 'http', status: response.status(), url: response.url()}); });
+    page.on('request', request => { if (request.method() !== 'GET') errors.push({kind: 'unexpected-request', method: request.method(), url: request.url()}); });
+    await bounded(() => page.addInitScript(() => {
+      window.__meleeNativeRuntimeReady = false;
+      const module = globalThis.Module || {};
+      module.onRuntimeInitialized = () => { window.__meleeNativeRuntimeReady = true; };
+      globalThis.Module = module;
+    }));
+    instance = {label, page, context, errors, timingResumes: [], throttle, arenaFill, closed: false, close};
+    driver = createBrowserDriver(page, {surface: 'development', timeoutMs, deadline});
+    instance.driver = driver;
+    const response = await bounded(() => page.goto(url, {waitUntil: 'domcontentloaded'}));
+    if (response?.status() !== 200) throw Error(`runtime.html returned HTTP ${response?.status()}`);
+    const headers = response.headers();
+    if (headers['cross-origin-opener-policy'] !== 'same-origin' || headers['cross-origin-embedder-policy'] !== 'require-corp')
+      throw Error('Runtime did not load over COOP/COEP HTTP isolation');
+    if (!await bounded(() => page.evaluate(() => crossOriginIsolated))) throw Error('Browser page is not cross-origin isolated');
+    await driver.waitForImport();
+    await bounded(() => page.evaluate(PAGE_HELPERS));
+    if (throttle !== 1) {
+      instance.cdp = await bounded(() => context.newCDPSession(page));
+      await bounded(() => instance.cdp.send('Emulation.setCPUThrottlingRate', {rate: throttle}));
+    }
+    // The arena pattern is a pre-session diagnostic; it must precede disc import.
+    if (arenaFill >= 0) {
+      const accepted = await bounded(() => page.evaluate(pattern => Module._melee_web_net_arena_fill(pattern), arenaFill));
+      if (!accepted) throw Error('The session arena pattern was rejected');
+    }
+    instance.userAgent = await bounded(() => page.evaluate(() => navigator.userAgent));
+    instance.browserVersion = context.browser()?.version() ?? null;
+    instance.importDisc = async () => { await driver.selectDisc(disc); await driver.waitForStart(); };
+    instance.begin = (seed, maxFrames) => bounded(() => page.evaluate(([s, m]) => window.meleeNetBegin(s, m), [seed >>> 0, maxFrames]));
+    instance.push = async frames => {
+      if (frames.length % NET_FRAME_BYTES) throw Error('Networked frames must be 44-byte multiples');
+      const ok = await bounded(() => page.evaluate(base64 => window.__net.push(base64), Buffer.from(frames).toString('base64')));
+      if (!ok) throw Error('The native queue rejected an agreed frame chunk');
+    };
+    instance.drain = async (max = 1024) => {
+      const result = await bounded(() => page.evaluate(count => window.__net.drain(count), max));
+      return {count: result.count, bytes: Buffer.from(result.data, 'base64')};
+    };
+    instance.status = () => bounded(() => page.evaluate(() => window.__net.status()));
+    instance.native = () => bounded(() => page.evaluate(() => window.__net.native()));
+    instance.observe = () => bounded(() => page.evaluate(() => window.__net.observe()));
+    instance.maybeResume = async cursor => {
+      const resumed = await bounded(() => page.evaluate(() => window.__net.resumeTimingPause()));
+      if (resumed) instance.timingResumes.push({cursor, at_ms: Date.now()});
+      return resumed;
+    };
+    instance.unload = () => driver.unload();
+    return instance;
+  } catch (error) {
+    const browserClosed = await close();
+    if (error && typeof error === 'object') error.browserClosed = browserClosed;
+    throw error;
   }
-  // The arena pattern is a pre-session diagnostic; it must precede disc import.
-  if (arenaFill >= 0) {
-    const accepted = await page.evaluate(pattern => Module._melee_web_net_arena_fill(pattern), arenaFill);
-    if (!accepted) throw Error('The session arena pattern was rejected');
-  }
-  instance.userAgent = await page.evaluate(() => navigator.userAgent);
-  instance.browserVersion = context.browser()?.version() ?? null;
-  instance.importDisc = async () => { await driver.selectDisc(disc); await driver.waitForStart(); };
-  instance.begin = (seed, maxFrames) => page.evaluate(([s, m]) => window.meleeNetBegin(s, m), [seed >>> 0, maxFrames]);
-  instance.push = async frames => {
-    if (frames.length % NET_FRAME_BYTES) throw Error('Networked frames must be 44-byte multiples');
-    const ok = await page.evaluate(base64 => window.__net.push(base64), Buffer.from(frames).toString('base64'));
-    if (!ok) throw Error('The native queue rejected an agreed frame chunk');
-  };
-  instance.drain = async (max = 1024) => {
-    const result = await page.evaluate(count => window.__net.drain(count), max);
-    return {count: result.count, bytes: Buffer.from(result.data, 'base64')};
-  };
-  instance.status = () => page.evaluate(() => window.__net.status());
-  instance.native = () => page.evaluate(() => window.__net.native());
-  instance.observe = () => page.evaluate(() => window.__net.observe());
-  instance.maybeResume = async cursor => {
-    const resumed = await page.evaluate(() => window.__net.resumeTimingPause());
-    if (resumed) instance.timingResumes.push({cursor, at_ms: Date.now()});
-    return resumed;
-  };
-  instance.unload = () => driver.unload();
-  instance.close = async () => {
-    if (instance.closed) return;
-    instance.closed = true;
-    try { driver.dispose(); } catch {}
-    try { await context.close(); } catch {}
-  };
-  return instance;
 }

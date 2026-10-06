@@ -90,10 +90,12 @@ _Static_assert(offsetof(MeleeWebGameplayBootstrapState, ticks) == 16 &&
  * allocation and its payload bytes across world shutdown/startup; ordinary
  * startup/shutdown retains its existing malloc/free behavior. */
 int melee_web_gameplay_session_begin(size_t heap_bytes, char* error, size_t error_size);
+/* Opt-in diagnostic allocation path. Fills only the newly allocated session
+ * arena before publishing it; -1 preserves malloc's bytes. Other live SDK
+ * owners or allocator state cause refusal. */
+int melee_web_gameplay_session_begin_with_pattern(size_t heap_bytes, int pattern,
+                                                  char* error, size_t error_size);
 int melee_web_gameplay_session_end(char* error, size_t error_size);
-/* Diagnostic arena initialization for determinism experiments. Before a
- * session begins, select a byte pattern (0-255) or -1 for allocator bytes. */
-int melee_web_gameplay_session_arena_fill(int pattern);
 /* Read-only view of the current session arena; 0 when no session is owned. */
 int melee_web_gameplay_session_arena(const void** base, size_t* bytes);
 int melee_web_gameplay_session_active(void);

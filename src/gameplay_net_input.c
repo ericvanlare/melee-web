@@ -37,6 +37,7 @@ typedef struct NetSession {
     uint32_t arena_count;
     uint32_t arena_overflow;
     int arena_fill;
+    int arena_fill_pending;
 } NetSession;
 
 static NetSession net = {.arena_fill = -1};
@@ -53,14 +54,30 @@ int melee_web_net_active(void) { return net.active; }
 void melee_web_net_reset(void)
 {
     const int fill = net.arena_fill;
+    const int fill_pending = net.arena_fill_pending;
     free(net.frames);
     memset(&net, 0, sizeof(net));
     net.arena_fill = fill;
+    net.arena_fill_pending = fill_pending;
+}
+
+int melee_web_net_session_begin(size_t bytes, char* error, size_t error_size)
+{
+    if (net.arena_fill_pending) {
+        if (!melee_web_gameplay_session_begin_with_pattern(bytes, net.arena_fill,
+                                                           error, error_size))
+            return 0;
+        net.arena_fill_pending = 0;
+        return 1;
+    }
+    return melee_web_gameplay_session_begin(bytes, error, error_size);
 }
 
 int melee_web_net_begin(uint32_t seed, uint32_t max_frames, char* e, size_t n)
 {
     if (net.active) return fail(e, n, "A networked session is already active");
+    if (net.arena_fill_pending)
+        return fail(e, n, "Diagnostic arena pattern missed the session allocation boundary");
     if (!max_frames || max_frames > MELEE_WEB_NET_MAX_FRAMES)
         return fail(e, n, "Networked session frame bound is outside 1-216000");
     melee_web_net_reset();
@@ -194,8 +211,9 @@ EMSCRIPTEN_KEEPALIVE unsigned melee_web_net_checksum_drain(uint8_t* out, unsigne
 /* Diagnostic arena pattern for channel experiments; before disc import. */
 EMSCRIPTEN_KEEPALIVE int melee_web_net_arena_fill(int pattern)
 {
-    if (!melee_web_gameplay_session_arena_fill(pattern)) return 0;
+    if (melee_web_gameplay_session_active() || pattern < -1 || pattern > 255) return 0;
     net.arena_fill = pattern;
+    net.arena_fill_pending = pattern >= 0;
     return 1;
 }
 

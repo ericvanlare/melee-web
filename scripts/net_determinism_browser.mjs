@@ -109,9 +109,11 @@ async function runInstance(spec) {
   const deadline = Date.now() + timeoutMs;
   try {
     result.profile_kind = (await fs.readdir(spec.profile).catch(() => [])).length ? 'warm-existing' : 'cold-empty';
+    const openTimeoutMs = Math.min(180000, deadline - Date.now());
+    if (openTimeoutMs <= 0) throw Error(`Instance exceeded ${timeoutMs} ms during browser startup`);
     instance = await openNetInstance({chromium, launchOptions, url: values.url, disc: values.disc,
       userDataDir: spec.profile, label: spec.label, throttle: spec.throttle, arenaFill: spec.arenaFill,
-      timeoutMs: 180000});
+      timeoutMs: openTimeoutMs, deadline});
     result.browser_version = instance.browserVersion;
     result.user_agent = instance.userAgent;
     result.browser_executable = path.basename(browserPath);
@@ -163,6 +165,7 @@ async function runInstance(spec) {
     result.outcome = 'complete';
   } catch (error) {
     result.first_error = String(error.stack || error.message || error);
+    if (typeof error.browserClosed === 'boolean') result.browser_closed = error.browserClosed;
     try { if (instance) { result.failure_status = await instance.status(); result.failure_native = await instance.native(); } } catch {}
   } finally {
     result.finished_at = new Date().toISOString();
@@ -170,8 +173,10 @@ async function runInstance(spec) {
     await checksums.close();
     if (instance) result.start_record = (result.final_status ?? result.failure_status)?.start ?? null;
     if (instance) result.arena = (result.final_status ?? result.failure_status)?.arena ?? null;
-    await fs.writeFile(path.join(directory, 'instance.json'), JSON.stringify(result, null, 2) + '\n');
     await instance?.close();
+    if (instance) result.browser_closed = instance.closed;
+    else if (result.browser_closed === undefined) result.browser_closed = null;
+    await fs.writeFile(path.join(directory, 'instance.json'), JSON.stringify(result, null, 2) + '\n');
   }
   return result;
 }

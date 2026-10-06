@@ -6,7 +6,12 @@ Input is the 64-byte little-endian record stream exported by
 passes only when it has the same length as its peer and every tick agrees in
 every channel; there is no tolerance. The comparator never edits or
 re-synchronizes either stream, and agreement on the declared channels does not
-establish pixels, PCM, timing or retail equivalence.
+establish pixels, PCM, timing or retail equivalence. Instance directories must
+contain a complete instance report whose record count matches a nonempty stream.
+When both reports are present, their pre-first-tick `start_record` values must
+also match for the pair to pass. That record covers the declared start-state
+fields; it does not identify the build or disc, which the evidence receipt binds
+separately.
 
 Channels, in the order a first divergence is named:
   header       tick, scene, RNG seed, match frame count
@@ -47,6 +52,8 @@ class StreamError(ValueError):
 
 
 def read_records(data: bytes) -> list[dict]:
+    if not data:
+        raise StreamError("stream is empty; zero records cannot establish agreement")
     if len(data) % RECORD_BYTES:
         raise StreamError(f"stream length {len(data)} is not a multiple of {RECORD_BYTES}")
     rows = []
@@ -72,6 +79,8 @@ def _render(row: dict) -> dict:
 
 def compare(first: list[dict], second: list[dict]) -> dict:
     """Return per-channel first divergence and mismatch counts."""
+    if not first or not second:
+        raise StreamError("both streams must contain at least one checksum record")
     shared = min(len(first), len(second))
     mismatched = {name: [] for name, _ in CHANNEL_FIELDS}
     for index in range(shared):
@@ -92,30 +101,39 @@ def compare(first: list[dict], second: list[dict]) -> dict:
             "mismatched_ticks": len(ticks),
             "first_mismatched_tick": ticks[0] if ticks else None,
         }
-    # The first divergence is the earliest mismatching tick in the gating
-    # channels; name every gating channel that differs there.
     gating = [name for name, _ in CHANNEL_FIELDS if name != "objects"]
-    firsts = [(mismatched[name][0], name) for name in gating if mismatched[name]]
-    report["identical"] = not firsts and report["length_equal"] and not mismatched["objects"]
-    report["gating_identical"] = not firsts and report["length_equal"]
-    if firsts:
-        tick = min(first_tick for first_tick, _ in firsts)
-        differing = [name for name in gating if mismatched[name] and mismatched[name][0] == tick]
-        report["first_divergence"] = {
+    gating_firsts = [(mismatched[name][0], name) for name in gating if mismatched[name]]
+    all_firsts = [(ticks[0], name) for name, ticks in mismatched.items() if ticks]
+    if not report["length_equal"]:
+        all_firsts.append((shared, "stream_length"))
+        gating_firsts.append((shared, "stream_length"))
+        report["channels"]["stream_length"] = {
+            "mismatched_ticks": 1,
+            "first_mismatched_tick": shared,
+        }
+
+    def divergence_at(first_ticks):
+        if not first_ticks:
+            return None
+        tick = min(first_tick for first_tick, _ in first_ticks)
+        differing = [name for first_tick, name in first_ticks if first_tick == tick]
+        row_a = first[tick] if tick < len(first) else None
+        row_b = second[tick] if tick < len(second) else None
+        scene_row = row_a or row_b
+        return {
             "tick": tick,
-            "scene": SCENE_NAMES.get(first[tick]["scene"], str(first[tick]["scene"])),
+            "scene": SCENE_NAMES.get(scene_row["scene"], str(scene_row["scene"])) if scene_row else "end",
             "channels": differing,
             "objects_also_differs": bool(mismatched["objects"] and mismatched["objects"][0] <= tick),
-            "a": _render(first[tick]),
-            "b": _render(second[tick]),
+            "a": _render(row_a) if row_a else None,
+            "b": _render(row_b) if row_b else None,
         }
-    elif mismatched["objects"]:
-        tick = mismatched["objects"][0]
-        report["first_divergence"] = {
-            "tick": tick, "scene": SCENE_NAMES.get(first[tick]["scene"], str(first[tick]["scene"])),
-            "channels": ["objects"], "objects_also_differs": True,
-            "a": _render(first[tick]), "b": _render(second[tick]),
-        }
+
+    report["first_divergence"] = divergence_at(all_firsts)
+    report["first_gating_divergence"] = divergence_at(gating_firsts)
+    report["stream_identical"] = report["first_divergence"] is None
+    report["identical"] = report["stream_identical"]
+    report["gating_identical"] = report["first_gating_divergence"] is None
     if not report["length_equal"]:
         report["length_note"] = (
             f"stream A has {len(first)} ticks and stream B has {len(second)}; "
@@ -158,10 +176,37 @@ def load(path: Path):
     meta = None
     if path.is_dir():
         meta_path = path / "instance.json"
-        if meta_path.exists():
+        if not meta_path.is_file():
+            raise StreamError(f"instance directory is missing {meta_path.name}: {path}")
+        try:
             meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            raise StreamError(f"invalid instance metadata in {meta_path}: {error}") from error
+        if not isinstance(meta, dict) or meta.get("outcome") != "complete":
+            outcome = meta.get("outcome") if isinstance(meta, dict) else None
+            raise StreamError(f"instance metadata is not complete at {path} (outcome: {outcome})")
         path = path / "checksums.bin"
-    return read_records(path.read_bytes()), meta
+    rows = read_records(path.read_bytes())
+    if meta is not None:
+        records = meta.get("records")
+        total_ticks = meta.get("total_ticks")
+        if type(records) is not int or records != len(rows):
+            raise StreamError(f"instance metadata record count disagrees with checksum stream at {path.parent}")
+        if type(total_ticks) is not int or total_ticks != len(rows):
+            raise StreamError(f"instance metadata is incomplete at {path.parent}: total_ticks does not match the stream")
+        if meta.get("first_error") is not None:
+            raise StreamError(f"instance metadata records an error at {path.parent}: {meta['first_error']}")
+        if meta.get("browser_closed") is not True:
+            raise StreamError(f"instance metadata does not confirm browser cleanup at {path.parent}")
+        start = meta.get("start_record")
+        required_start_fields = {
+            "recorded", "scene", "seed", "frame", "total", "pad",
+            "scene_state", "object_state", "objects", "flags",
+        }
+        if (not isinstance(start, dict) or not required_start_fields.issubset(start) or
+                type(start.get("recorded")) is not int or start["recorded"] != 1):
+            raise StreamError(f"instance metadata is missing its recorded agreed start context at {path.parent}")
+    return rows, meta
 
 
 def compare_paths(a: Path, b: Path) -> dict:
@@ -173,7 +218,11 @@ def compare_paths(a: Path, b: Path) -> dict:
     report["scene_runs_equal"] = report["scene_runs_a"] == report["scene_runs_b"]
     start_a = meta_a and meta_a.get("start_record")
     start_b = meta_b and meta_b.get("start_record")
-    report["start_record_equal"] = None if not (start_a and start_b) else start_a == start_b
+    report["start_record_equal"] = None if start_a is None or start_b is None else start_a == start_b
+    if report["start_record_equal"] is False:
+        report["identical"] = False
+        report["gating_identical"] = False
+        report["start_context_mismatch"] = {"a": start_a, "b": start_b}
     report["arena"] = compare_arena(meta_a and meta_a.get("arena"), meta_b and meta_b.get("arena"))
     return report
 
@@ -200,6 +249,12 @@ def main(argv=None) -> int:
     if divergence:
         print(f"DIVERGED at tick {divergence['tick']} ({divergence['scene']}): "
               f"channels {', '.join(divergence['channels'])}")
+        gating = report.get("first_gating_divergence")
+        if gating and gating["tick"] != divergence["tick"]:
+            print(f"first gating divergence at tick {gating['tick']} ({gating['scene']}): "
+                  f"channels {', '.join(gating['channels'])}")
+    elif report.get("start_record_equal") is False:
+        print("streams agree per tick, but the agreed start contexts differ")
     else:
         print("streams differ only in length")
     print(text if not args.json else f"report: {args.json}")
