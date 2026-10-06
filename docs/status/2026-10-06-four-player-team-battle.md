@@ -44,9 +44,10 @@ preconditions.
 
 The development CSS observer also now allocates the full native write shape:
 14 int32 IDs and 8 float geometry values. Its focused test checks the actual
-helper and cleanup cases. The lineup harness waits for the source Main owner
-to be ready before releasing each CSS PAD edge; no runtime input guard or
-clock threshold was weakened.
+helper and cleanup cases. The lineup harness waits for source menu owner readiness before and after
+source-menu PAD press/release edges across Main, VS, Rules, and Rules Plus. It
+requires native running state, the expected source phase, drained raw PAD, and
+pause-owner readiness; no runtime input guard or clock threshold was weakened.
 
 The route reuses the existing CPU9 lineup harness for door setup, natural-match
 detection, and Results return; the existing two-player Teams harness provides
@@ -90,11 +91,15 @@ manifest.
 
 ## Retained failures
 
-The pre-fix natural 2v2 failure and the first public smoke attempt are retained
-with their reports. The public attempt used `scripts/serve.py`, which does not
-apply the package’s CSP headers; the changed hypothesis used pinned Wrangler
-Pages dev and passed the preview smoke. The local Wrangler HTTP report retains
-its known `_headers` 502 behavior; hosted 404 behavior was not tested.
+The scoped receipt links the retained menu-readiness attempts: the initial CSS
+neutral release was rejected; the next setup probe hit the active-scene raw-PAD
+guard during Main/VS/Rules navigation; a changed readiness-gated setup-only
+probe then passed the menu setup. That probe did not enter a match. The first
+natural 2v2 failure and the first public smoke attempt are also retained. The
+public attempt used `scripts/serve.py`, which does not apply the package’s CSP
+headers; the changed hypothesis used pinned Wrangler Pages dev and passed the
+preview smoke. The local Wrangler HTTP report retains its known `_headers` 502
+behavior; hosted 404 behavior was not tested.
 
 ## Open gates and exclusions
 

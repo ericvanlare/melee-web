@@ -4,12 +4,13 @@
   "source_run_id": "four-player-team-battle-20261006-134211-fd628f84",
   "identity": {
     "base_commit": "e92c5764f4392269e32e061d94ca6537e9bf7079",
-    "head_commit": "11ad9701d964f231793160b8ff267869614b86cb",
     "branch": "claude/four-player-team-battle",
     "game": "GALE01 Rev. 2",
     "source_repository": "doldecomp/melee",
     "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
-    "tracker": "#158 item B3"
+    "tracker": "#158 item B3",
+    "tested_source_commit": "11ad9701d964f231793160b8ff267869614b86cb",
+    "tested_source_commit_scope": "Browser builds, runtime scenarios, and source tests were bound to this source commit. The evidence documentation is committed after it; that documentation-only commit does not alter the tested source."
   },
   "implementation": {
     "setup_rule": "melee_web_team_setup_supported in src/gameplay_player_selection.h; used by CSS/SSS/match handoff, match-rules preparation, and patched fn_8016DCC0 boundary",
@@ -160,7 +161,14 @@
       "tests.test_gameplay_team_setup",
       "tests.test_match_flow"
     ],
-    "setup_rule_coverage": "tests/test_gameplay_team_setup.py extracts the patched source-start validator and compares it with the shared rule and an independent literal transcription of fn_80262F44 across both Teams flags, roster sizes 0–5, and 4^4 colour assignments. It checks 2v2, interleaved 2v2, 3v1, 2v1v1, 1v1v1, 2v1, 1v1, free-for-all and refusals; match-rules prepare/init and menu traces check their respective boundaries."
+    "setup_rule_coverage": "tests/test_gameplay_team_setup.py extracts the patched source-start validator and compares it with the shared rule and an independent literal transcription of fn_80262F44 across both Teams flags, roster sizes 0–5, and 4^4 colour assignments. It checks 2v2, interleaved 2v2, 3v1, 2v1v1, 1v1v1, 2v1, 1v1, free-for-all and refusals; match-rules prepare/init and menu traces check their respective boundaries.",
+    "historical_suite_failure": {
+      "status": "historical failure, superseded by the current passing suite",
+      "tests": 1885,
+      "skipped": 141,
+      "reason": "The historical test_status_entries.test_entry_links_resolve check failed while this status entry/receipt link was absent. Commit f679194 corrected the historical receipt record; the final current suite passes with the entry present.",
+      "recorded_at_commit": "f679194"
+    }
   },
   "builds": {
     "current_source_commit": "11ad9701d964f231793160b8ff267869614b86cb",
@@ -421,6 +429,73 @@
           "path": "logs/public-http-check-public-smoke-pages-v2.log",
           "sha256": "bf7688697153736049c8e4e3dcd0a2c1bc7c18d852ba4da3e7fcc65faa348573"
         }
+      }
+    },
+    "setup_probe_history": {
+      "scope": "Harness readiness debugging only; these captures did not play or accept a match. The successful setup-only probe predates the outcome-adapter fix and is not the natural-route acceptance evidence.",
+      "initial_css_neutral_release_rejected": {
+        "report": {
+          "path": "scenario-team-2v2/report.json",
+          "sha256": "b7f67eebdb5d8b4564ae33367fa5612ee57066e51460ea63b29cf5340cc87292"
+        },
+        "stdout": {
+          "path": "logs/team-2v2-browser.log",
+          "sha256": "f1654f9ef270c1422013ff41a48c8173298f4a4bf3c0fceda8170df03173fef6"
+        },
+        "observation": "CSS L+R+Start release was rejected by source PAD readiness while the source Main path was still preparing.",
+        "screenshots": [
+          {
+            "path": "scenario-team-2v2/initial-css.png",
+            "sha256": "c843bd26f91b38440812afc846b8be075e8ae7c103c0516283953b3df341687f"
+          },
+          {
+            "path": "scenario-team-2v2/failure.png",
+            "sha256": "5ec803d5f29e9991fd2bb101d09942504a4518507b9b60b7ab83cba8a30f260b"
+          }
+        ]
+      },
+      "menu_release_guard_rejected": {
+        "report": {
+          "path": "scenario-team-setup-probe/report.json",
+          "sha256": "d6b93535c094b9343b790573d2c362dfa579dc6fbc5a465a0b1154cf08b1f287"
+        },
+        "stdout": {
+          "path": "logs/team-setup-probe-browser-v2.log",
+          "sha256": "7e5ea064bd10db8f7252243d6a5c465526ef9255f643b0c7233d9f8e9686a2be"
+        },
+        "screenshots": [
+          "scenario-team-setup-probe/friendly-fire-main.png",
+          "scenario-team-setup-probe/failure.png"
+        ],
+        "observation": "Existing raw PAD API refused the release because the native scene was not active; the guard was retained."
+      },
+      "setup_only_pass": {
+        "result": "setup-only-pass",
+        "report": {
+          "path": "scenario-team-setup-probe-v3/report.json",
+          "sha256": "3eef49356a8780a755edbc1d3ff13cdb31b17ae020206385db5ce9a20d8c8811"
+        },
+        "stdout": {
+          "path": "logs/team-setup-probe-browser-v3.log",
+          "sha256": "969b21bf34ef05d76dcbe845fecce9dd9eae47af6f000604fe47789238bd8d7b"
+        },
+        "screenshots": [
+          {
+            "path": "scenario-team-setup-probe-v3/css-teams-configured.png",
+            "sha256": "1a763216665ae4c38827fdcd770b3fd113fb5b2a38fcc5f09e161da5d2504072"
+          },
+          {
+            "path": "scenario-team-setup-probe-v3/friendly-fire-rules-plus-on.png",
+            "sha256": "ef6dbc14c7f3804b33010efd1f66b8aee70fbd81d0b830903044d4886d09be0a"
+          }
+        ]
+      },
+      "initial_cli_parse_error": {
+        "stdout": {
+          "path": "logs/team-setup-probe-browser.log",
+          "sha256": "b3a9334c2eb11af4e25c483e95964d14a0acc455cec96484b2e18e8c35a146f6"
+        },
+        "observation": "Node CLI rejected an unexpected positional argument before browser launch; this was a command-construction error, not a runtime result."
       }
     }
   },
