@@ -31,7 +31,7 @@ int observer_fragments(char* buffer, size_t size, unsigned frame, int delta, dou
     out.add(",\"x\":%.9g", position);
     out.add(",\"mask_hex\":\"%016llx\"", mask);
     out.add(",\"bytes\":%zu", bytes);
-    out.add(",\"pair\":[%d,%d]", delta, -delta);
+    out.add(",\"pair\":[%d,%lld]", delta, -static_cast<long long>(delta));
     out.add(",\"ready\":%s", flag);
     out.add(",\"phases\":{");
     out.add("\"empty\":%s", "");
@@ -44,8 +44,8 @@ int observer_single(char* buffer, size_t size, unsigned frame, int delta, double
                     float position, unsigned long long mask, size_t bytes, const char* flag) {
     return std::snprintf(buffer, size,
         "{\"frame\":%u,\"delta\":%d,\"ms\":%.3f,\"x\":%.9g,\"mask_hex\":\"%016llx\","
-        "\"bytes\":%zu,\"pair\":[%d,%d],\"ready\":%s,\"phases\":{\"empty\":%s}}",
-        frame, delta, ms, position, mask, bytes, delta, -delta, flag, "");
+        "\"bytes\":%zu,\"pair\":[%d,%lld],\"ready\":%s,\"phases\":{\"empty\":%s}}",
+        frame, delta, ms, position, mask, bytes, delta, -static_cast<long long>(delta), flag, "");
 }
 
 void compare_all_sizes(unsigned frame, int delta, double ms, float position,
