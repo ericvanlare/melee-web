@@ -13,14 +13,16 @@ class FakeTimers {
 
   clearTimeout(id) { this.pending.delete(id); }
 
+  runNext() {
+    const [id, timer] = [...this.pending.entries()]
+      .sort((left, right) => left[1].at - right[1].at)[0];
+    this.pending.delete(id);
+    this.now = timer.at;
+    timer.callback();
+  }
+
   runAll() {
-    while (this.pending.size) {
-      const [id, timer] = [...this.pending.entries()]
-        .sort((left, right) => left[1].at - right[1].at)[0];
-      this.pending.delete(id);
-      this.now = timer.at;
-      timer.callback();
-    }
+    while (this.pending.size) this.runNext();
   }
 }
 
@@ -51,6 +53,7 @@ class FakeAudioContext {
   constructor() {
     this.state = 'running';
     this.currentTime = 0;
+    this.outputTimestamp = {contextTime: 0, performanceTime: 0};
     this.sampleRate = 32000;
     this.audioWorklet = {addModule: async () => {}};
     this.destination = {};
@@ -59,6 +62,7 @@ class FakeAudioContext {
   }
 
   resume() { return Promise.resolve(); }
+  getOutputTimestamp() { return {...this.outputTimestamp}; }
 
   close() {
     this.closed = true;
@@ -84,6 +88,12 @@ const flush = async () => {
   await Promise.resolve();
   await Promise.resolve();
 };
+
+async function advanceOutputTimestamp({context, timers}, contextTime) {
+  context.outputTimestamp.contextTime = contextTime;
+  timers.runNext();
+  await flush();
+}
 
 async function withAudio(test, hooks = {}) {
   const original = {
@@ -123,8 +133,8 @@ async function withAudio(test, hooks = {}) {
   }
 }
 
-// A state acknowledgement is not a render-process acknowledgement.
-await withAudio(async ({audio, node}) => {
+// State and Worklet acknowledgements do not prove output-device progress.
+await withAudio(async ({audio, node, context, timers}) => {
   const pending = audio.waitForRender();
   let settled = false;
   pending.then(() => { settled = true; }, () => { settled = true; });
@@ -136,11 +146,18 @@ await withAudio(async ({audio, node}) => {
   await flush();
   assert.equal(settled, false, 'state-ack must not resolve render wait');
   node.port.emit({type: 'render-ready', id: request.id, process_time: 1.25, process_frame: 2048});
+  await flush();
+  assert.equal(settled, false, 'Worklet acknowledgement must wait for the output device to pass its process time');
+  context.outputTimestamp.contextTime = 1.25;
+  timers.runNext();
+  await flush();
+  assert.equal(settled, false, 'an output timestamp equal to the Worklet process time is not past it');
+  await advanceOutputTimestamp({context, timers}, 1.254);
   await pending;
 });
 
 // Only the matching nonce resolves; unrelated and late acknowledgements do not.
-await withAudio(async ({audio, node, timers}) => {
+await withAudio(async ({audio, node, context, timers}) => {
   const first = audio.waitForRender();
   const firstId = node.port.messages.at(-1).data.id;
   node.port.emit({type: 'render-ready', id: firstId + 1, process_time: 1, process_frame: 1});
@@ -149,13 +166,25 @@ await withAudio(async ({audio, node, timers}) => {
   await flush();
   assert.equal(firstSettled, false, 'wrong render nonce must be ignored');
   node.port.emit({type: 'render-ready', id: firstId, process_time: 1.5, process_frame: 512});
+  await advanceOutputTimestamp({context, timers}, 1.504);
   await first;
+
+  const delayedAck = audio.waitForRender();
+  const delayedAckId = node.port.messages.at(-1).data.id;
+  const beforeDelayedDeadline = timers.now;
+  timers.now = beforeDelayedDeadline + 4800;
+  node.port.emit({type: 'render-ready', id: delayedAckId, process_time: 10, process_frame: 3200});
+  timers.runAll();
+  assert.equal(timers.now - beforeDelayedDeadline, 5000,
+    'the original five-second deadline covers both Worklet acknowledgement and device progress');
+  await assert.rejects(delayedAck, /Game audio did not start/);
 
   const timedOut = audio.waitForRender();
   const timedOutId = node.port.messages.at(-1).data.id;
   const beforeTimeout = timers.now;
+  node.port.emit({type: 'render-ready', id: timedOutId, process_time: 2, process_frame: 1024});
   timers.runAll();
-  assert.equal(timers.now - beforeTimeout, 5000, 'Render readiness has a five-second deadline');
+  assert.equal(timers.now - beforeTimeout, 5000, 'Output-device readiness has a five-second deadline');
   await assert.rejects(timedOut, /Game audio did not start/);
 
   const retry = audio.waitForRender();
@@ -167,21 +196,34 @@ await withAudio(async ({audio, node, timers}) => {
   await flush();
   assert.equal(retrySettled, false, 'late timeout acknowledgement must not resolve a retry');
   node.port.emit({type: 'render-ready', id: retryId, process_time: 2.5, process_frame: 1536});
+  await advanceOutputTimestamp({context, timers}, 2.504);
   await retry;
 });
 
 // Pending waits are rejected by explicit failure and destroy cleanup.
 await withAudio(async ({audio, node, context}) => {
   const failed = audio.waitForRender();
+  const failedId = node.port.messages.at(-1).data.id;
+  node.port.emit({type: 'render-ready', id: failedId, process_time: 1});
   audio.fail(Error('synthetic failure'));
   await assert.rejects(failed, /synthetic failure/);
 
   const closed = audio.waitForRender();
+  const closedId = node.port.messages.at(-1).data.id;
+  node.port.emit({type: 'render-ready', id: closedId, process_time: 1});
   const destroyed = audio.destroy();
   await assert.rejects(closed, /closed|destroy/i);
   await destroyed;
   assert.equal(node.disconnected, true, 'destroy must disconnect the worklet node');
   assert.equal(context.closed, true, 'destroy must close the audio context');
+});
+await withAudio(async ({audio, node, context, timers}) => {
+  const suspended = audio.waitForRender();
+  const id = node.port.messages.at(-1).data.id;
+  node.port.emit({type: 'render-ready', id, process_time: 1});
+  context.state = 'suspended';
+  timers.runNext();
+  await assert.rejects(suspended, /stopped before output became ready/i);
 });
 
 // A worklet transport error is terminal. The owner's fatal callback rejects
@@ -216,14 +258,52 @@ await withAudio(async ({audio, context}) => {
   context.state = 'suspended';
   await assert.rejects(audio.waitForRender(), /unavailable|before launch/i);
 });
+await withAudio(async ({audio, context}) => {
+  Object.defineProperty(context, 'getOutputTimestamp', {value: undefined});
+  await assert.rejects(audio.waitForRender(), /output timing is unavailable/i);
+});
+await withAudio(async ({audio, node, context}) => {
+  context.outputTimestamp.performanceTime = -1;
+  const pending = audio.waitForRender();
+  const id = node.port.messages.at(-1).data.id;
+  node.port.emit({type: 'render-ready', id, process_time: 0.004});
+  await assert.rejects(pending, /output timing could not be read/i);
+});
+await withAudio(async ({audio, node, context}) => {
+  context.outputTimestamp.contextTime = Number.NaN;
+  const pending = audio.waitForRender();
+  const id = node.port.messages.at(-1).data.id;
+  node.port.emit({type: 'render-ready', id, process_time: 0.004});
+  await assert.rejects(pending, /output timing could not be read/i);
+});
+await withAudio(async ({audio, node, context}) => {
+  Object.defineProperty(context, 'getOutputTimestamp', {value() { throw Error('synthetic timestamp failure'); }});
+  const pending = audio.waitForRender();
+  const id = node.port.messages.at(-1).data.id;
+  node.port.emit({type: 'render-ready', id, process_time: 0.004});
+  await assert.rejects(pending, /output timing could not be read/i);
+});
+await withAudio(async ({audio, node}) => {
+  const pending = audio.waitForRender();
+  const id = node.port.messages.at(-1).data.id;
+  node.port.emit({type: 'render-ready', id, process_time: Number.NaN});
+  await assert.rejects(pending, /did not report its process time/i);
+});
 
 // Duplicate pending requests are rejected, while a synchronous post failure
 // clears the failed request so the next request can proceed.
-await withAudio(async ({audio, node}) => {
+await withAudio(async ({audio, node, context, timers}) => {
   const pending = audio.waitForRender();
   await assert.rejects(audio.waitForRender(), /already pending|pending/i);
   const firstId = node.port.messages.at(-1).data.id;
   node.port.emit({type: 'render-ready', id: firstId, process_time: 3, process_frame: 2048});
+  await flush();
+  const timersAfterAck = timers.pending.size;
+  node.port.emit({type: 'render-ready', id: firstId, process_time: 3.25, process_frame: 2176});
+  await flush();
+  assert.equal(timers.pending.size, timersAfterAck,
+    'duplicate render acknowledgements do not create parallel output polls');
+  await advanceOutputTimestamp({context, timers}, 3.004);
   await pending;
 
   node.port.failNextRender = true;
@@ -231,6 +311,7 @@ await withAudio(async ({audio, node}) => {
   const retry = audio.waitForRender();
   const retryId = node.port.messages.at(-1).data.id;
   node.port.emit({type: 'render-ready', id: retryId, process_time: 3.5, process_frame: 2560});
+  await advanceOutputTimestamp({context, timers}, 3.504);
   await retry;
 });
 

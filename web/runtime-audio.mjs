@@ -4,9 +4,42 @@ export function createRuntimeAudio({assetBase, onEvent, onError, onFatal}) {
   const waiters = [];
   let renderSequence = 0;
   const renderWaiters = new Map();
+  const clearRenderWaiter = waiter => {
+    clearTimeout(waiter.timer);
+    clearTimeout(waiter.pollTimer);
+  };
+  const outputTimingError = cause => {
+    const error = Error('Game audio output timing could not be read. Close this message, then choose Play to try again.');
+    if (cause !== undefined) error.cause = cause;
+    return error;
+  };
   const clearRenderWaiters = error => {
-    for (const waiter of renderWaiters.values()) { clearTimeout(waiter.timer); waiter.reject(error); }
+    for (const waiter of renderWaiters.values()) { clearRenderWaiter(waiter); waiter.reject(error); }
     renderWaiters.clear();
+  };
+  const waitForOutputAfter = waiter => {
+    const poll = () => {
+      if (renderWaiters.get(waiter.id) !== waiter) return;
+      if (context.state !== 'running') {
+        renderWaiters.delete(waiter.id); clearRenderWaiter(waiter);
+        waiter.reject(Error('Game audio stopped before output became ready.'));
+        return;
+      }
+      let timestamp;
+      try { timestamp = context.getOutputTimestamp(); }
+      catch (error) {
+        renderWaiters.delete(waiter.id); clearRenderWaiter(waiter); waiter.reject(outputTimingError(error));
+        return;
+      }
+      if (!Number.isFinite(timestamp?.contextTime) || timestamp.contextTime < 0 ||
+          !Number.isFinite(timestamp?.performanceTime) || timestamp.performanceTime < 0) {
+        renderWaiters.delete(waiter.id); clearRenderWaiter(waiter);
+        waiter.reject(outputTimingError(Error('AudioContext returned an invalid output timestamp.')));
+      } else if (timestamp.contextTime > waiter.processTime) {
+        renderWaiters.delete(waiter.id); clearRenderWaiter(waiter); waiter.resolve();
+      } else waiter.pollTimer = setTimeout(poll, 16);
+    };
+    poll();
   };
   const waitForAck = () => acknowledged ? Promise.resolve() : new Promise((resolve, reject) => {
     const waiter = {resolve, reject, timer: setTimeout(() =>
@@ -59,7 +92,15 @@ export function createRuntimeAudio({assetBase, onEvent, onError, onFatal}) {
             node.port.onmessage = ({data}) => {
               if (data.type === 'render-ready') {
                 const waiter = renderWaiters.get(data.id);
-                if (waiter) { renderWaiters.delete(data.id); clearTimeout(waiter.timer); waiter.resolve(); }
+                if (waiter && waiter.processTime === null) {
+                  if (!Number.isFinite(data.process_time) || data.process_time < 0) {
+                    renderWaiters.delete(data.id); clearRenderWaiter(waiter);
+                    waiter.reject(Error('Audio renderer did not report its process time.'));
+                  } else {
+                    waiter.processTime = data.process_time;
+                    waitForOutputAfter(waiter);
+                  }
+                }
                 return;
               }
               if (data.type === 'state-ack' && data.enabled === enabled) {
@@ -79,21 +120,24 @@ export function createRuntimeAudio({assetBase, onEvent, onError, onFatal}) {
         await ensureRunning(resumed);
       }
     },
-    // Port messages can be handled before output rendering starts. Keep source
-    // playback stopped until one output quantum acknowledges this fresh request.
+    // Port messages and Worklet callbacks can precede output-device progress.
+    // Keep source playback stopped until the device timestamp passes that callback.
     waitForRender() {
       if (!context || !node || context.state !== 'running')
         return Promise.reject(Error('Game audio is unavailable. Close this message, then choose Play to try again.'));
+      if (typeof context.getOutputTimestamp !== 'function')
+        return Promise.reject(Error('Game audio output timing is unavailable. Close this message, then choose Play to try again.'));
       if (renderWaiters.size) return Promise.reject(Error('Audio readiness is already pending.'));
       const id = ++renderSequence;
       return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => {
-          renderWaiters.delete(id);
+        const waiter = {id, resolve, reject, timer: null, pollTimer: null, processTime: null};
+        waiter.timer = setTimeout(() => {
+          renderWaiters.delete(id); clearRenderWaiter(waiter);
           reject(Error('Game audio did not start. Close this message, then choose Play to try again.'));
         }, 5000);
-        renderWaiters.set(id, {resolve, reject, timer});
+        renderWaiters.set(id, waiter);
         try { node.port.postMessage({type: 'render-ready-request', id}); }
-        catch (error) { renderWaiters.delete(id); clearTimeout(timer); reject(error); }
+        catch (error) { renderWaiters.delete(id); clearRenderWaiter(waiter); reject(error); }
       });
     },
     setEnabled,
