@@ -267,7 +267,7 @@ try {
       epoch_ms: performance.timeOrigin + performance.now()}));
     if (!gpuOn && native.cursor >= 400) {
       report.match_before_gpu_load = await page.evaluate(() => window.menuObservePlayer?.() ?? null);
-      if (report.match_before_gpu_load?.ready !== true || !(native.frame > 0))
+      if (report.match_before_gpu_load?.ready !== true || !(native.frame > 0) || !native.running)
         throw Error('Conditioned fixture did not enter active gameplay before GPU-load treatment');
       const load = await setHeavyGpu(heavy, true);
       report.gpu_windows.push({event: 'on', native, load,
@@ -297,6 +297,20 @@ try {
   report.capture = await readPauseTraceCapture(page, terminal.outcome);
   report.runtime_incident_recorder = await readRetainedPauseDiagnostics(page,
     terminal.outcome === 'timing_pause');
+  const columns = report.capture.columns, width = columns.length;
+  const frameColumn = columns.indexOf('sample_source_frame');
+  const preparationColumn = columns.indexOf('preparation_ms');
+  const timeColumn = columns.indexOf('hook_at_ms');
+  report.post_entry_preparation_rows = [];
+  for (let index = 0; index < report.capture.rows; index++) {
+    const base = index * width;
+    if (report.capture.table[base + frameColumn] > 0 && report.capture.table[base + preparationColumn] > 0)
+      report.post_entry_preparation_rows.push({row: index,
+        hook_at_ms: report.capture.table[base + timeColumn],
+        original_match_counter: report.capture.table[base + frameColumn],
+        preparation_ms: report.capture.table[base + preparationColumn]});
+  }
+
   if (terminal.outcome === 'timing_pause' && !report.runtime_incident_recorder.retained_records.some(
     record => record.incident?.staging !== null && record.incident?.staging !== undefined))
     throw Error('Timing pause occurred but its runtime recorder staging incident was not retained');
@@ -316,7 +330,8 @@ try {
   }
   if (report.browser_errors.length) throw Error('Browser errors were retained during byte capture');
   report.screenshots.success = await takeScreenshot(page, output, 'capture-success');
-  report.result = 'observed';
+  report.result = report.post_entry_preparation_rows.length ? 'inconclusive' : 'observed';
+  if (report.post_entry_preparation_rows.length) report.confound = 'Native preparation occurred after the original match counter began advancing; the conditioned pause comparison is inconclusive';
 } catch (error) {
   report.failure = String(error?.stack || error);
   if (traceInstalled && page && !page.isClosed()) {
