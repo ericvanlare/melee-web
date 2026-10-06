@@ -58,7 +58,7 @@ medium for escalation when an agent is blocked or off course.
 
 **Status:** Execution results are ready for review. The previously approved
 bootstrap ownership PR #156 is merged. The Stadium contract (#161) and pause
-classification (#162) are updated and await owner approval. The menu-browser split
+classification (#162) are merged after owner approval. The menu-browser split
 [#165](https://github.com/ericvanlare/melee-web/pull/165)
 is merged after current-base validation and owner approval. A1 and four-player
 Team Battle are rebased onto the merged split. A1's declared-channel Chrome
@@ -66,7 +66,8 @@ comparisons are recorded in [#166](https://github.com/ericvanlare/melee-web/pull
 for review; cross-browser and cross-architecture checks remain open. The H1
 staging experiment is recorded in [#167](https://github.com/ericvanlare/melee-web/pull/167):
 conditioned timing is inconclusive, the natural pause remains unexplained, and
-the default stays at two slots. Four-player Team Battle's natural 2v2 route
+the default stays at two slots. Four-player Team Battle's
+[#169](https://github.com/ericvanlare/melee-web/pull/169) records a natural 2v2 route that
 reaches original Team Results and CSS after the frame adapter accepts the
 original Team-elimination outcome. Its builds, existing-route regressions and
 final suite pass. Evidence stays in each workstream's status entry and receipt;
