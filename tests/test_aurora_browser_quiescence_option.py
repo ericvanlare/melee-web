@@ -212,7 +212,42 @@ class AuroraBrowserQuiescenceOptionTests(OwnedWorkspaceTests):
             )
             self.assertNotIn("std::mutex", header_off)
             self.assertIn("std::mutex", header_on)
-            self.assertEqual(off.strip(), BASELINE.read_text(encoding="utf-8").split("\n", 2)[2].strip())
+            # Keep the historical fixture. Project out only the reviewed staging
+            # telemetry; every other ordinary-path delta still fails comparison.
+            registration = (
+                "      const double completionRegistrationMs =\n"
+                "          g_browserStagingDiagnosticsEnabled ? phase_now_ms() : 0.0;\n"
+                "      const int32_t diagnosticSourceFrame =\n"
+                "          g_browserDiagnosticSourceFrame.load(std::memory_order_acquire);\n"
+                "      if (g_browserStagingDiagnosticsEnabled) {\n"
+                "        g_browserQueueCompletionRegistrations.fetch_add(1, std::memory_order_acq_rel);\n"
+                "      }\n"
+            )
+            capture = "[stagingSlot, generation, completionRegistrationMs,\n           diagnosticSourceFrame]"
+            completion = "            observe_browser_queue_completion(completionRegistrationMs, diagnosticSourceFrame);\n"
+            for addition in (registration, capture, completion):
+                self.assertEqual(off.count(addition), 1)
+            projected = off.replace(registration, "").replace(
+                capture, "[stagingSlot, generation]"
+            ).replace(completion, "")
+            self.assertEqual(projected.strip(), BASELINE.read_text(encoding="utf-8").split("\n", 2)[2].strip())
+            guard = "if (!g_browserStagingDiagnosticsEnabled) {\n    return;\n  }"
+            observer_start = source.index("void observe_browser_queue_completion(")
+            observer_end = source.index("\n}\n", observer_start)
+            observer = source[observer_start:observer_end]
+            self.assertEqual(observer.count(guard), 1)
+            self.assertLess(observer.index(guard), observer.index("phase_now_ms()"))
+            positions = [off.index(token) for token in (
+                "if (generation != g_browserStagingGeneration.load",
+                "return;",
+                "observe_browser_queue_completion(",
+                "if (status != wgpu::QueueWorkDoneStatus::Success)",
+                'Log.fatal("Browser staging submission failed:',
+                "g_stagingSlots.release(stagingSlot)",
+            )]
+            self.assertEqual(positions, sorted(positions))
+            # This is a bounded source projection, not binary/default-path
+            # equivalence: disabled diagnostics still capture an atomic frame read.
 
             off_preprocessed = self._preprocess(function, diagnostic=False)
             on_preprocessed = self._preprocess(function, diagnostic=True)
