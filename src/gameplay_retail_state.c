@@ -50,16 +50,20 @@ void melee_web_fighter_fields_visit(unsigned slot,const Fighter* fp,
         visitor->input_field(context,"input_hex",words,timers);
 }
 // JSON printer: byte-identical to the historical v8/v9 retail stream.
-static int json_first_field=1;
-static void json_name(const char* name){printf(json_first_field?"\"%s\":":",\"%s\":",name);json_first_field=0;}
-static void json_unsigned(void* context,const char* name,uint32_t value){(void)context;json_name(name);printf("%u",value);}
-static void json_signed(void* context,const char* name,int32_t value){(void)context;json_name(name);printf("%d",(int)value);}
-static void json_bits(void* context,const char* name,uint32_t value){(void)context;json_name(name);printf("\"%08x\"",value);}
+typedef struct JsonFieldContext { int first_field; } JsonFieldContext;
+static void json_name(void* context,const char* name){
+        JsonFieldContext* writer=(JsonFieldContext*)context;
+        printf(writer->first_field?"\"%s\":":",\"%s\":",name);
+        writer->first_field=0;
+}
+static void json_unsigned(void* context,const char* name,uint32_t value){json_name(context,name);printf("%u",value);}
+static void json_signed(void* context,const char* name,int32_t value){json_name(context,name);printf("%d",(int)value);}
+static void json_bits(void* context,const char* name,uint32_t value){json_name(context,name);printf("\"%08x\"",value);}
 static void json_vector(void* context,const char* name,const uint32_t value[3]){
-        (void)context;json_name(name);printf("[\"%08x\",\"%08x\",\"%08x\"]",value[0],value[1],value[2]);
+        json_name(context,name);printf("[\"%08x\",\"%08x\",\"%08x\"]",value[0],value[1],value[2]);
 }
 static void json_input(void* context,const char* name,const uint32_t words[20],const uint8_t timers[28]){
-        (void)context;json_name(name);printf("\"");
+        json_name(context,name);printf("\"");
         for(unsigned i=0;i<20;i++)printf("%08x",words[i]);
         for(unsigned i=0;i<28;i++)printf("%02x",timers[i]);
         printf("\"");
@@ -67,8 +71,8 @@ static void json_input(void* context,const char* name,const uint32_t words[20],c
 static const MeleeWebFighterFieldVisitor json_fields={
         json_unsigned,json_signed,json_bits,json_vector,json_input};
 static void fighter_fields(unsigned slot,const Fighter* fp){
-        json_first_field=1;
-        melee_web_fighter_fields_visit(slot,fp,&json_fields,NULL);
+        JsonFieldContext context={1};
+        melee_web_fighter_fields_visit(slot,fp,&json_fields,&context);
 }
 void melee_web_retail_state(void){
     if(!seed_ptr)abort();
