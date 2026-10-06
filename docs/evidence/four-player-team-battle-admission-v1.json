@@ -1,0 +1,560 @@
+{
+  "schema": "melee-web-four-player-team-battle-admission-v1",
+  "scope": "Four-player Team Battle admission and bounded headless functional routes on the original development runtime, plus a packaged-public audio-disabled No Contest/menu smoke. Not full supported-session or retail-accuracy acceptance.",
+  "source_run_id": "four-player-team-battle-20261006-134211-fd628f84",
+  "identity": {
+    "base_commit": "e92c5764f4392269e32e061d94ca6537e9bf7079",
+    "branch": "claude/four-player-team-battle",
+    "game": "GALE01 Rev. 2",
+    "source_repository": "doldecomp/melee",
+    "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "tracker": "#158 item B3",
+    "tested_source_commit": "11ad9701d964f231793160b8ff267869614b86cb",
+    "tested_source_commit_scope": "Browser builds, runtime scenarios, and source tests were bound to this source commit. The evidence documentation is committed after it; that documentation-only commit does not alter the tested source."
+  },
+  "implementation": {
+    "setup_rule": "melee_web_team_setup_supported in src/gameplay_player_selection.h; used by CSS/SSS/match handoff, match-rules preparation, and patched fn_8016DCC0 boundary",
+    "outcome_fix": "ordinary source-frame adapter accepts OUTCOME_TEAM_ELIMINATION only when StartMeleeData.rules.is_teams is true; existing callback, ordinary outcomes, opening-demo policy, and preconditions remain intact",
+    "development_observer_fix": "web/runtime-development.mjs allocates 14 int32 CSS observer IDs and 8 float geometry values for native writes",
+    "harness_only_readiness": "The lineup harness waits for source menu owner readiness before and after source-menu PAD press/release edges across Main, VS, Rules, and Rules Plus. It requires native running state, the expected source phase, drained raw PAD, and pause-owner readiness; no runtime input guard or clock threshold was weakened.",
+    "source_files_sha256": {
+      "patches/melee-gameplay.patch": "77c9beea02a2313b22087a966221546a7d944958ded320ffcef6d561502c6e74",
+      "src/gameplay_player_selection.h": "30e4b1ca68c2fa09f43fd0ed6cfc259dc4a6af2c36a3ff552b0c19bf27c532fe",
+      "src/gameplay_menu.c": "b1a391daf65ff54d024a9c518cfeae3bf0303da335fdd3de84e3d37ab3b16e28",
+      "src/gameplay_match_rules.c": "df3b01db57f134c3bb78968f4141bb5eecb73f32355d6eb7d30984b0149a47ae",
+      "web/runtime-development.mjs": "41927b6466d8417ba3cc3fe0a9f65fe6c953841110b9ae5766e37b94eb7b612a",
+      "tests/test_gameplay_match_source_outcome.py": "6bd2b109a98ccff4a459c9f13d5f4a7e9e7784dcc344eb05094013606c8b6999",
+      "tests/development_css_observer_storage_test.mjs": "50c68dafade8092c99e570aaef4d4393c415fb6f27be2dea914ffe72d7bfa760",
+      "tests/fighter_cpu9_lineup_browser_test.mjs": "d6e8b9a766c7d246aab4a716331c51be2b927f3837e3f9decd386091cc3f63be",
+      "tests/test_gameplay_team_setup.py": "4f7e71014a98da38ce014fc4de45ff45dd161083c5d9817d520f3e3a0f384648",
+      "tests/gameplay_team_setup_trace.c": "aa8c8f45e27045db501a6369e0c5b5e357c0f930a8a410570e182e0bb3ba4c80",
+      "tests/vs_rules_item_menu_browser_test.mjs": "cc3b9e8426d594c5350dcd9f388ce3fc443d96b810d3352e4848c30406c75f74"
+    },
+    "reused_harnesses": [
+      "tests/fighter_cpu9_lineup_browser_test.mjs for CPU9 door setup, natural-match detection, and Results return",
+      "tests/vs_rules_item_menu_browser_test.mjs for the two-player Teams CSS/team-colour input recipe",
+      "scripts/browser_driver.mjs for route readiness helpers"
+    ]
+  },
+  "source_derivation": {
+    "files": [
+      "src/melee/mn/mncharsel.c",
+      "src/melee/gm/gm_1601.c",
+      "src/melee/gm/forward.h",
+      "src/melee/gm/gm_16AE.c"
+    ],
+    "rules": [
+      "cycleTeam advances one door through three authored team colours (0..2)",
+      "fn_80262F44 enables CSS Start at two active doors and requires opposing team colours in Teams",
+      "the original VS CSS owns four doors",
+      "vanilla Team Battle aggregates team stocks and produces OUTCOME_TEAM_ELIMINATION"
+    ]
+  },
+  "admission": {
+    "accepted": "2–4 contiguous players, team colours 0..2; Teams requires at least two different teams; non-Teams remains free-for-all",
+    "refused": [
+      "one active player",
+      "all active players on one team",
+      "team colour above 2",
+      "invalid is_teams value",
+      "non-contiguous doors",
+      "unsupported CPU kind or stock/timer/item profile"
+    ],
+    "explicit_team_refusal": "Team Battle payload is outside the supported setups: two to four contiguous players, team colours 0-2, and at least two players on different teams",
+    "canonical_patch_tree": "df37a6ac1c1176fd224b9a0e7a843a254995b525",
+    "source_reachable_examples": {
+      "2v2": [
+        [
+          0,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          0,
+          1
+        ]
+      ],
+      "3v1": [
+        [
+          2,
+          2,
+          2,
+          0
+        ]
+      ],
+      "2v1v1": [
+        [
+          1,
+          0,
+          1,
+          2
+        ]
+      ],
+      "1v1v1": [
+        [
+          0,
+          1,
+          2
+        ]
+      ],
+      "2v1": [
+        [
+          1,
+          0,
+          1
+        ]
+      ],
+      "1v1": [
+        [
+          0,
+          1
+        ]
+      ],
+      "non_teams": "free-for-all with two to four contiguous players"
+    }
+  },
+  "tests": {
+    "focused_status": "passed",
+    "focused_log": {
+      "path": "logs/focused-boundary-tests-11ad970.log",
+      "sha256": "8db9dd7a37eefb188896330b34ff284b73a3e2964bcb75a664dc425f8409b1f0"
+    },
+    "canonical_patch_check": {
+      "status": "passed",
+      "command": "python3 scripts/canonicalize_gameplay_patch.py --check",
+      "tree": "df37a6ac1c1176fd224b9a0e7a843a254995b525",
+      "path": "logs/canonical-patch-check-11ad970.log",
+      "sha256": "b8f9cbf7adbce5a268c8136977a0eefe6681e60c4dba04994c757528ebd432be"
+    },
+    "css_observer_test": {
+      "status": "passed",
+      "command": "node --test tests/development_css_observer_storage_test.mjs",
+      "source": "actual development CSS observer helper; native write shape and OOM/unavailable cleanup controls",
+      "log": {
+        "path": "logs/development-css-observer-focused-11ad970.log",
+        "sha256": "4881bfd8d518294e0bd3473a40c15527dd7c42870810780029ea12afe80cca4e"
+      }
+    },
+    "coverage": "Extracted adapter test accepts outcome 3 for Teams only; rejects outcome 3 outside Teams and other unsupported values; preserves outcomes 0/1/2/7, opening-demo behavior, callback and ten preconditions. Existing setup tests cover shared CSS/source admission and refusal boundaries.",
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "status": "passed",
+      "tests": 1903,
+      "skipped": 141,
+      "elapsed_seconds": 342.218,
+      "exit_code": 0,
+      "path": "logs/full-suite-11ad970.log",
+      "sha256": "4955cafd3fef0e4d30850e4158c48af1249e000b8bc89c3a9cf6404ce3b63967"
+    },
+    "standard_graph": {
+      "status": "configured",
+      "command": "python3 scripts/build.py --target gameplay --configuration RelWithDebInfo --configure-only",
+      "path": "logs/configure-standard-11ad970.log",
+      "sha256": "7c2584ddfd4bf7d7a2bb500d7002ba5f141e8ddd129af4c5d4c6803aa75d4c4c"
+    },
+    "focused_cases": [
+      "tests.test_gameplay_match_source_outcome",
+      "tests.test_gameplay_replay_completion_policy",
+      "tests.test_gameplay_team_setup",
+      "tests.test_match_flow"
+    ],
+    "setup_rule_coverage": "tests/test_gameplay_team_setup.py extracts the patched source-start validator and compares it with the shared rule and an independent literal transcription of fn_80262F44 across both Teams flags, roster sizes 0–5, and 4^4 colour assignments. It checks 2v2, interleaved 2v2, 3v1, 2v1v1, 1v1v1, 2v1, 1v1, free-for-all and refusals; match-rules prepare/init and menu traces check their respective boundaries.",
+    "historical_suite_failure": {
+      "status": "historical failure, superseded by the current passing suite",
+      "tests": 1885,
+      "skipped": 141,
+      "reason": "The historical test_status_entries.test_entry_links_resolve check failed while this status entry/receipt link was absent. Commit f679194 corrected the historical receipt record; the final current suite passes with the entry present.",
+      "recorded_at_commit": "f679194"
+    }
+  },
+  "builds": {
+    "current_source_commit": "11ad9701d964f231793160b8ff267869614b86cb",
+    "current_incremental_release": {
+      "status": "passed",
+      "exit_code": 0,
+      "stdout_scope": "The 11ad970 incremental dev and public Release commands completed successfully; complete stdout was not retained as files. The build tool transcript showed the final link/identity lines. Browser reports below bind the actually served current artifacts by hash."
+    },
+    "current_dev_artifacts": {
+      "profile": "runtime Release, development profile with audio processing enabled",
+      "js": {
+        "path": "build/browser-release/gameplay_menu_browser.js",
+        "bytes": 293892,
+        "sha256": "1d0994a0f0bb3814bbf4251b55fc6652aeae7be120d7d00b39515f585a2aed62"
+      },
+      "wasm": {
+        "path": "build/browser-release/gameplay_menu_browser.wasm",
+        "bytes": 15653414,
+        "sha256": "c2191c6a8c128e7687e2f20b0b4fa712b6a374fd2b0ade7bc9aa3bfc0d964bbe"
+      },
+      "data": {
+        "path": "build/browser-release/gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      }
+    },
+    "current_public_artifacts": {
+      "profile": "runtime-public Release; audio disabled",
+      "identity": {
+        "path": "build/runtime-public-identity.json",
+        "sha256": "a46664d316845e2b8414e59534e48bd0b0cea7399cb4efe5c198854e8ad4c7ea"
+      },
+      "js": {
+        "path": "public-preview-outcome-v1/runtime/1501cda4efd21565/gameplay_public.js",
+        "bytes": 289425,
+        "sha256": "a15a3e955d7e03c04a2cb59a4949e5bd98b1ea4ed2736ea2788c1aba91203d1a"
+      },
+      "wasm": {
+        "path": "public-preview-outcome-v1/runtime/1501cda4efd21565/gameplay_public.wasm",
+        "bytes": 14681583,
+        "sha256": "5dcdfcf7d29023b5b388683554411abb47350af9a1d40d96c168855e588962b8"
+      },
+      "data": {
+        "path": "public-preview-outcome-v1/runtime/1501cda4efd21565/gameplay_public.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      }
+    },
+    "complete_earlier_build_logs": {
+      "source_commit": "3ec18a8",
+      "note": "These are full stdout from the earlier Release build before the outcome adapter change; they are not logs for the current 11ad970 build.",
+      "development": {
+        "path": "dev-runtime-release-build.log",
+        "lines": 11128,
+        "sha256": "bea02db1123cb9f1cb62977447e5ea8299c530dffbe6f8a99279809739d98428"
+      },
+      "public": {
+        "path": "runtime-public-release-build.log",
+        "lines": 11129,
+        "sha256": "f0a98853b6f901b1462f395bdfa2f6a424898ea3004cad9416878742410595c3"
+      }
+    },
+    "public_preview_package": {
+      "directory": "public-preview-outcome-v1",
+      "manifest": "public-preview-outcome-v1.manifest.json",
+      "manifest_sha256": "f0328c14610716b0860faea13826e6af3fe6345e20b64879639590c920734420",
+      "files": 34,
+      "bytes": 19238654,
+      "package_log": {
+        "path": "logs/public-package-outcome-v1.log",
+        "sha256": "f7270775cf07d25d57624b31d6c1b6babdd72a576841bd055088f18247e8cbbc"
+      },
+      "audit_log": {
+        "path": "logs/public-audit-outcome-v1.log",
+        "sha256": "c313041f627dc096463e1a79292f7b859a51d3bf1569c87f44b3c86fe592f2ee"
+      }
+    },
+    "provenance_note": {
+      "path": "logs/source-outcome-fix-validation-11ad970.md",
+      "sha256": "beb627c22bf2eaa3a2b696071ce81f03734da7369b4140a1a30f20ca610713c7"
+    }
+  },
+  "browser_environment": {
+    "browser": "headless installed Chrome via scripts/browser_tools.mjs and the pinned local Playwright installation",
+    "host_audio": "muted through browserLaunchOptions; development DSP/PCM/WebAudio processing remained enabled",
+    "dev_source_identity": "commit 11ad970, clean and unchanged across each scenario",
+    "dev_artifact_identity": "27 artifact hashes equal before and after each dev scenario",
+    "public_artifact_identity": "34 packaged files and package manifest equal before and after public smoke"
+  },
+  "browser_scenarios": {
+    "natural_team_2v2": {
+      "result": "pass",
+      "scope": "natural original CSS→SSS→four Mario CPU9, teams 0,0,1,1, friendly fire on, four stocks, Final Destination→source Results→CSS",
+      "terminal": {
+        "source_frame": 12030,
+        "outcome": 3,
+        "complete": true,
+        "published_source_winner_slots": [
+          1
+        ],
+        "source_start_team_door_order": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "friendly_fire": true,
+        "team_winning_slot": 0,
+        "visually_observed_first_place_players": [
+          0,
+          1
+        ]
+      },
+      "diagnostics": {
+        "timing_pause_receipts": 0,
+        "source_timing_disruptions": 0,
+        "page_errors": 0,
+        "page_crashes": 0,
+        "native_command_errors": 0
+      },
+      "evidence": {
+        "report": {
+          "path": "scenario-team-2v2-outcome-v1/report.json",
+          "sha256": "96940e05656729019bff254b15417b1c485953b08222249cd494a283f4be97cc"
+        },
+        "stdout": {
+          "path": "logs/team-2v2-browser-outcome-v1.log",
+          "sha256": "dde9661cea42c61494412195f83a4b4079bd652d1c3d710e1984c404b8537daa"
+        },
+        "identity_before": {
+          "path": "identity/dev-team-2v2-outcome-v1-before.json",
+          "sha256": "54adac9e5666f5197e43c32aa1e2091275ec5d7acca8e4cd779caf7b46d9e5dc"
+        },
+        "identity_after": {
+          "path": "identity/dev-team-2v2-outcome-v1-after.json",
+          "sha256": "54adac9e5666f5197e43c32aa1e2091275ec5d7acca8e4cd779caf7b46d9e5dc"
+        },
+        "screenshots": [
+          "scenario-team-2v2-outcome-v1/initial-css.png",
+          "scenario-team-2v2-outcome-v1/css-teams-configured.png",
+          "scenario-team-2v2-outcome-v1/friendly-fire-rules-plus-on.png",
+          "scenario-team-2v2-outcome-v1/match-1-sss.png",
+          "scenario-team-2v2-outcome-v1/match-1-fd-highlighted.png",
+          "scenario-team-2v2-outcome-v1/match-1-entry.png",
+          "scenario-team-2v2-outcome-v1/match-1-auto-pages-before-confirmation.png",
+          "scenario-team-2v2-outcome-v1/match-1-returned-css.png"
+        ]
+      }
+    },
+    "ordinary_four_mario": {
+      "result": "pass",
+      "scope": "natural non-Teams original CSS→SSS→four Mario CPU9, four stocks, Final Destination→ordinary Results→CSS",
+      "terminal": {
+        "source_frame": 14387,
+        "outcome": 2,
+        "complete": true,
+        "published_source_winner_slots": [
+          3
+        ],
+        "teams_flag": false
+      },
+      "diagnostics": {
+        "timing_pause_receipts": 0,
+        "source_timing_disruptions": 0,
+        "page_errors": 0,
+        "page_crashes": 0,
+        "native_command_errors": 0
+      },
+      "evidence": {
+        "report": {
+          "path": "scenario-mario-four-player-outcome-v1/report.json",
+          "sha256": "6f4e4aa65fbbbc882139f0c0e7350ff9fdcb2321c4a41b9b740e2305d8d536e9"
+        },
+        "stdout": {
+          "path": "logs/mario-four-player-browser-outcome-v1.log",
+          "sha256": "a1635abb2d734b3f762c47170a231f468284ac4765b303b9bd1ca0500264ac05"
+        },
+        "identity_before": {
+          "path": "identity/dev-mario-four-player-outcome-v1-before.json",
+          "sha256": "54adac9e5666f5197e43c32aa1e2091275ec5d7acca8e4cd779caf7b46d9e5dc"
+        },
+        "identity_after": {
+          "path": "identity/dev-mario-four-player-outcome-v1-after.json",
+          "sha256": "54adac9e5666f5197e43c32aa1e2091275ec5d7acca8e4cd779caf7b46d9e5dc"
+        },
+        "screenshots": [
+          "scenario-mario-four-player-outcome-v1/initial-css.png",
+          "scenario-mario-four-player-outcome-v1/match-1-sss.png",
+          "scenario-mario-four-player-outcome-v1/match-1-fd-highlighted.png",
+          "scenario-mario-four-player-outcome-v1/match-1-entry.png",
+          "scenario-mario-four-player-outcome-v1/match-1-returned-css.png"
+        ]
+      }
+    },
+    "existing_two_player_teams_route": {
+      "result": "pass",
+      "check_count": 17,
+      "scope": "original CSS/VS/Rules/Items, two-player Teams setup, three-stock match configuration and original Results/menu route. Existing harness No Contest route reaches Results; this is not a natural-match win.",
+      "evidence": {
+        "report": {
+          "path": "scenario-team-two-player-outcome-v1/report.json",
+          "sha256": "28813f0e4d518e83a3b0a5999c534a69d1b3156480eafd3ce83a0c677b215d2a"
+        },
+        "stdout": {
+          "path": "logs/team-two-player-browser-outcome-v1.log",
+          "sha256": "887a7c55b67adb3cc6e450c89c7e1cec3714bf911c0114987b5d9f7102ddb133"
+        },
+        "identity_before": {
+          "path": "identity/dev-team-two-player-outcome-v1-before.json",
+          "sha256": "54adac9e5666f5197e43c32aa1e2091275ec5d7acca8e4cd779caf7b46d9e5dc"
+        },
+        "identity_after": {
+          "path": "identity/dev-team-two-player-outcome-v1-after.json",
+          "sha256": "54adac9e5666f5197e43c32aa1e2091275ec5d7acca8e4cd779caf7b46d9e5dc"
+        }
+      }
+    },
+    "packaged_public_smoke": {
+      "result": "pass",
+      "checks": 19,
+      "scope": "packaged-public production-entry, ordinary keyboard UI/lifecycle and network smoke; the route uses a harness-induced No Contest, not a natural four-stock win",
+      "runtime_profile": "runtime-public Release with audio disabled; not audio validation",
+      "evidence": {
+        "report": {
+          "path": "scenario-public-smoke-pages-v2/report.json",
+          "sha256": "72719c4cfca3d12741e3bc68469e14e1ade9be0f02981c44d8dff225cda2f240"
+        },
+        "stdout": {
+          "path": "logs/public-smoke-browser-pages-v2.log",
+          "sha256": "eb399de3e8a7a4fa9abdb66314da9fd08df185a6f328a2633c0dcd15ce4409cd"
+        },
+        "identity_before": {
+          "path": "identity/public-smoke-pages-v2-before.json",
+          "sha256": "a7826dea30a3b70cb35e0827266d10af270596f0ad9d304131cea2ffd39d344a"
+        },
+        "identity_after": {
+          "path": "identity/public-smoke-pages-v2-after.json",
+          "sha256": "a7826dea30a3b70cb35e0827266d10af270596f0ad9d304131cea2ffd39d344a"
+        },
+        "screenshots": [
+          "scenario-public-smoke-pages-v2/routed-css-after-results.png",
+          "scenario-public-smoke-pages-v2/routed-results.png",
+          "scenario-public-smoke-pages-v2/routed-match.png",
+          "scenario-public-smoke-pages-v2/routed-sss.png",
+          "scenario-public-smoke-pages-v2/routed-final-destination.png"
+        ]
+      },
+      "http_audit": {
+        "status": "passed",
+        "exact_resources": 33,
+        "expected_missing_routes": 32,
+        "known_local_limitation": "Wrangler Pages dev returned 502 for the package _headers route; hosted 404 behavior was not tested.",
+        "report": {
+          "path": "public-http-check-public-smoke-pages-v2.json",
+          "sha256": "f549c040be8bb1542d303b5782e583eb1ccec4d60bbaf02812c8c342f1a4c629"
+        },
+        "stdout": {
+          "path": "logs/public-http-check-public-smoke-pages-v2.log",
+          "sha256": "bf7688697153736049c8e4e3dcd0a2c1bc7c18d852ba4da3e7fcc65faa348573"
+        }
+      }
+    },
+    "setup_probe_history": {
+      "scope": "Harness readiness debugging only; these captures did not play or accept a match. The successful setup-only probe predates the outcome-adapter fix and is not the natural-route acceptance evidence.",
+      "initial_css_neutral_release_rejected": {
+        "report": {
+          "path": "scenario-team-2v2/report.json",
+          "sha256": "b7f67eebdb5d8b4564ae33367fa5612ee57066e51460ea63b29cf5340cc87292"
+        },
+        "stdout": {
+          "path": "logs/team-2v2-browser.log",
+          "sha256": "f1654f9ef270c1422013ff41a48c8173298f4a4bf3c0fceda8170df03173fef6"
+        },
+        "observation": "CSS L+R+Start release was rejected by source PAD readiness while the source Main path was still preparing.",
+        "screenshots": [
+          {
+            "path": "scenario-team-2v2/initial-css.png",
+            "sha256": "c843bd26f91b38440812afc846b8be075e8ae7c103c0516283953b3df341687f"
+          },
+          {
+            "path": "scenario-team-2v2/failure.png",
+            "sha256": "5ec803d5f29e9991fd2bb101d09942504a4518507b9b60b7ab83cba8a30f260b"
+          }
+        ]
+      },
+      "menu_release_guard_rejected": {
+        "report": {
+          "path": "scenario-team-setup-probe/report.json",
+          "sha256": "d6b93535c094b9343b790573d2c362dfa579dc6fbc5a465a0b1154cf08b1f287"
+        },
+        "stdout": {
+          "path": "logs/team-setup-probe-browser-v2.log",
+          "sha256": "7e5ea064bd10db8f7252243d6a5c465526ef9255f643b0c7233d9f8e9686a2be"
+        },
+        "screenshots": [
+          "scenario-team-setup-probe/friendly-fire-main.png",
+          "scenario-team-setup-probe/failure.png"
+        ],
+        "observation": "Existing raw PAD API refused the release because the native scene was not active; the guard was retained."
+      },
+      "setup_only_pass": {
+        "result": "setup-only-pass",
+        "report": {
+          "path": "scenario-team-setup-probe-v3/report.json",
+          "sha256": "3eef49356a8780a755edbc1d3ff13cdb31b17ae020206385db5ce9a20d8c8811"
+        },
+        "stdout": {
+          "path": "logs/team-setup-probe-browser-v3.log",
+          "sha256": "969b21bf34ef05d76dcbe845fecce9dd9eae47af6f000604fe47789238bd8d7b"
+        },
+        "screenshots": [
+          {
+            "path": "scenario-team-setup-probe-v3/css-teams-configured.png",
+            "sha256": "1a763216665ae4c38827fdcd770b3fd113fb5b2a38fcc5f09e161da5d2504072"
+          },
+          {
+            "path": "scenario-team-setup-probe-v3/friendly-fire-rules-plus-on.png",
+            "sha256": "ef6dbc14c7f3804b33010efd1f66b8aee70fbd81d0b830903044d4886d09be0a"
+          }
+        ]
+      },
+      "initial_cli_parse_error": {
+        "stdout": {
+          "path": "logs/team-setup-probe-browser.log",
+          "sha256": "b3a9334c2eb11af4e25c483e95964d14a0acc455cec96484b2e18e8c35a146f6"
+        },
+        "observation": "Node CLI rejected an unexpected positional argument before browser launch; this was a command-construction error, not a runtime result."
+      }
+    }
+  },
+  "retained_failures": [
+    {
+      "scenario": "pre-fix natural 2v2 Team Battle",
+      "result": "failed, retained",
+      "observation": "At frame 13888 the source reached ending=true, complete=false, outcome=3; the prior source adapter rejected this vanilla Team Elimination outcome as unsupported. No timing pause was reported.",
+      "report": {
+        "path": "scenario-team-2v2-v4/report.json",
+        "sha256": "019bff6a731477e18062db45828f7f90b8f1966abdc210893fb2d8da54ec3c70"
+      },
+      "stdout": {
+        "path": "logs/team-2v2-browser-v4.log",
+        "sha256": "0053da5dfd2b374a4c9177e727a587e8415842ba61d2076cea71902852994a45"
+      },
+      "screenshots": [
+        {
+          "path": "scenario-team-2v2-v4/failure.png",
+          "sha256": "a150673b4d412c4eac5d93e7932f7e5fefa7a4746027c87ad47613ad951cc0ca"
+        },
+        {
+          "path": "scenario-team-2v2-v4/failure-canvas.png",
+          "sha256": "c9fce04f4e085e43c32c2bb3ec3a54f80518b9586bd57319a36107cb3530df70"
+        }
+      ]
+    },
+    {
+      "scenario": "first public preview smoke",
+      "result": "failed, retained",
+      "observation": "The ad hoc scripts/serve.py host did not apply the packaged CSP header rules; failure occurred at a header assertion before the public route. The changed hypothesis used pinned Wrangler Pages dev.",
+      "report": {
+        "path": "scenario-public-smoke-outcome-v1/report.json",
+        "sha256": "c4fc2c9da70d755fcdd4f83d745d2b3116d2f09355500e1cafe42bb52b5453fe"
+      },
+      "stdout": {
+        "path": "logs/public-smoke-browser-outcome-v1.log",
+        "sha256": "dd37e3ef7d27408fc8e07ba04d07fe56febe285bfcf07c3764af79cf4523e716"
+      },
+      "screenshots": [
+        {
+          "path": "scenario-public-smoke-outcome-v1/failure.png",
+          "sha256": "b3522529be06a3a1d3810426d1ff7e54263182514e51d5a9434e3909d1cda8e9"
+        }
+      ]
+    }
+  ],
+  "exclusions": [
+    "natural 3v1 and 2v1v1 browser matches",
+    "public-player ports 3/4",
+    "retail comparison",
+    "physical controllers",
+    "foreground timing",
+    "uninterrupted audio or PCM fidelity",
+    "pixel equivalence",
+    "performance",
+    "Sudden Death",
+    "sparse or non-contiguous door layouts",
+    "full supported-session or whole-game accuracy acceptance",
+    "deployment and merge"
+  ]
+}

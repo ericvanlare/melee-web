@@ -5,7 +5,7 @@ extern "C" {
 int melee_web_native_menu_results_pad_schedule(unsigned source_frame,unsigned port,
                                                 unsigned buttons,unsigned duration){try{
  const int phase=host&&host_entered?melee_web_menu_host_phase(host):-1;
- if(replay||faulted||preparation.busy()||pending||!running||!host_entered||match||
+ if(replay||melee_web_net_active()||faulted||preparation.busy()||pending||!running||!host_entered||match||
     results||prize||(phase!=MELEE_WEB_MENU_CSS&&phase!=MELEE_WEB_MENU_CSS_READY&&
                      phase!=MELEE_WEB_MENU_SSS&&phase!=MELEE_WEB_MENU_SSS_READY)||
     diagnostic_pad_remaining||diagnostic_start_ticks||stock_check==-1)
@@ -21,7 +21,7 @@ int melee_web_native_menu_results_pad_schedule(unsigned source_frame,unsigned po
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_results_pause_schedule(unsigned source_frame){try{
  const int phase=host&&host_entered?melee_web_menu_host_phase(host):-1;
- if(replay||faulted||preparation.busy()||pending||!running||!host_entered||match||
+ if(replay||melee_web_net_active()||faulted||preparation.busy()||pending||!running||!host_entered||match||
     results||prize||(phase!=MELEE_WEB_MENU_CSS&&phase!=MELEE_WEB_MENU_CSS_READY&&
                      phase!=MELEE_WEB_MENU_SSS&&phase!=MELEE_WEB_MENU_SSS_READY)||
     diagnostic_pad_remaining||diagnostic_start_ticks||stock_check==-1)

@@ -356,10 +356,13 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",\"is_teams\":%u",(unsigned) start.rules.is_teams);
  out.add(",\"player_teams\":[%d,%d]",(int) start.players[0].team,(int) start.players[1].team);
  out.add(",\"player_stocks\":[%d,%d]",(int) start.players[0].stocks,(int) start.players[1].stocks);
+ out.add(",\"door_teams\":[%d,%d,%d,%d]",(int) start.players[0].team,(int) start.players[1].team,(int) start.players[2].team,(int) start.players[3].team);
+ out.add(",\"friendly_fire\":%u",(unsigned) start.rules.friendly_fire);
  out.add("}");
  out.add(",\"players\":[");
  out.add("{");
  out.add("\"fighter\":%d",p0.fighter_kind);
+ out.add(",\"human\":%s",start.players[0].slot_type==Gm_PKind_Human?"true":"false");
  out.add(",\"stocks\":%d",p0.stocks);
  out.add(",\"motion\":%d",p0.motion_id);
  out.add(",\"groundAir\":%d",p0.ground_or_air);
@@ -368,6 +371,7 @@ const char* melee_web_native_menu_match_observe(){
  out.add("}");
  out.add(",{");
  out.add("\"fighter\":%d",p1.fighter_kind);
+ out.add(",\"human\":%s",start.players[1].slot_type==Gm_PKind_Human?"true":"false");
  out.add(",\"stocks\":%d",p1.stocks);
  out.add(",\"motion\":%d",p1.motion_id);
  out.add(",\"groundAir\":%d",p1.ground_or_air);
@@ -464,6 +468,7 @@ const char* melee_web_native_menu_source_observe(){
  out.add("\"valid\":%s",observed.css_setup_valid ? "true" : "false");
  out.add(",\"is_teams\":%d",observed.css_is_teams);
  out.add(",\"player_teams\":[%d,%d]",observed.css_player_teams[0],observed.css_player_teams[1]);
+ out.add(",\"door_teams\":[%d,%d,%d,%d]",observed.css_player_teams[0],observed.css_player_teams[1],observed.css_player_teams[2],observed.css_player_teams[3]);
  out.add("}");
  out.add("}");
  out.add(",\"items_menu\":{");

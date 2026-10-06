@@ -43,6 +43,15 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
  EM_ASM({window.menuPreparation?.(UTF8ToString($0));},message.c_str());
  return 1;
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}
+#if defined(MELEE_WEB_NET_SESSION)
+int melee_web_native_menu_net_begin(unsigned seed,unsigned max_frames){try{
+ check(!replay&&!reference_heap_used&&world&&host&&!host_entered&&!world_exposed&&!match&&
+       !results&&!prize&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,
+       "Networked session requires the fresh prepared character-select owner");
+ char error[256]{};check(melee_web_net_begin(seed,max_frames,error,sizeof(error)),error);
+ reference_heap_used=true;message="Networked session ready; launch to enter character select.";return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+#endif
 unsigned melee_web_native_menu_replay_cursor(){return static_cast<unsigned>(replay_cursor);}
 int melee_web_native_menu_replay_whole_session(){return replay&&replay->whole_session()?1:0;}
 int melee_web_native_menu_player_state(unsigned player,int* fighter_kind,int* motion_id,
@@ -56,7 +65,7 @@ int melee_web_native_menu_player_state(unsigned player,int* fighter_kind,int* mo
  *position_x=stats.position[0];*position_y=stats.position[1];return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_stock_check_ready(){
- return !replay&&match&&!faulted&&running&&match->ready()&&!match->paused()&&
+ return !replay&&!melee_web_net_active()&&match&&!faulted&&running&&match->ready()&&!match->paused()&&
         !match->ending()&&stock_check!=-1&&diagnostic_start_ticks==0&&diagnostic_pad_remaining==0;
 }
 int melee_web_native_menu_stock_check(){

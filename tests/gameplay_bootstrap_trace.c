@@ -118,12 +118,27 @@ static int retained_session_case(void)
 {
     const size_t bytes = 1024 * 1024;
     check(!melee_web_gameplay_session_active(), "fresh process has no gameplay session");
-    check(melee_web_gameplay_session_begin(bytes, error, sizeof(error)),
-          "session backing arena begins");
+    check(!melee_web_gameplay_session_begin_with_pattern(bytes, 256, error, sizeof(error)) &&
+              !melee_web_gameplay_session_active() &&
+              melee_web_gameplay_allocation().identity == 0,
+          "session arena pattern rejects values outside one byte before allocation");
+    check(melee_web_gameplay_session_begin_with_pattern(bytes, 0xA5, error, sizeof(error)),
+          "diagnostic session arena is patterned at allocation");
+    const void* backing = NULL;
+    size_t backing_bytes = 0;
+    check(melee_web_gameplay_session_arena(&backing, &backing_bytes) &&
+              backing != NULL && backing_bytes == bytes,
+          "pattern diagnostic publishes only its new session arena");
+    const unsigned char* pattern = (const unsigned char*) backing;
+    for (size_t i = 0; i < bytes; ++i)
+        check(pattern[i] == 0xA5, "pattern diagnostic fills exactly the new session arena");
     MeleeWebGameplayAllocation allocation = melee_web_gameplay_allocation();
     check(melee_web_gameplay_session_active() && allocation.identity != 0 &&
               allocation.generation != 0 && allocation.bytes == bytes,
           "session exposes its backing allocation identity and size");
+    check(!melee_web_gameplay_session_begin_with_pattern(bytes, 0, error, sizeof(error)) &&
+              melee_web_gameplay_allocation().identity == allocation.identity,
+          "pattern refusal leaves an existing session allocation unchanged");
     check(!melee_web_gameplay_startup(bytes + 32, error, sizeof(error)),
           "session rejects a world with a different arena size");
     check(melee_web_gameplay_startup(bytes, error, sizeof(error)),

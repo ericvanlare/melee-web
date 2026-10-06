@@ -156,17 +156,34 @@ int melee_web_gameplay_bootstrap_state(MeleeWebGameplayBootstrapState* out,
 
 int melee_web_gameplay_session_begin(size_t bytes, char* error, size_t error_size)
 {
+    return melee_web_gameplay_session_begin_with_pattern(bytes, -1, error, error_size);
+}
+
+int melee_web_gameplay_session_begin_with_pattern(size_t bytes, int pattern,
+                                                  char* error, size_t error_size)
+{
     if (session_arena || arena || HSD_GObj_Entities || HSD_GetHeap() != -1 ||
         !melee_web_gameplay_heap_available())
         return fail(error, error_size, "An idle process with no SDK allocator is required for a gameplay session");
     if (bytes < 65536 || bytes > 64U * 1024U * 1024U)
         return fail(error, error_size, "Gameplay session arena must be between 64 KiB and 64 MiB");
+    if (pattern < -1 || pattern > 255)
+        return fail(error, error_size, "Gameplay session arena pattern must be -1 or a byte value");
     void* candidate = malloc(bytes);
     if (!candidate) return fail(error, error_size, "Unable to allocate gameplay session arena");
+    if (pattern >= 0) memset(candidate, pattern, bytes);
     session_arena = candidate;
     session_bytes = bytes;
     next_allocation_generation();
     return success(error, error_size);
+}
+
+int melee_web_gameplay_session_arena(const void** base, size_t* bytes)
+{
+    if (!session_arena || !base || !bytes) return 0;
+    *base = session_arena;
+    *bytes = session_bytes;
+    return 1;
 }
 
 int melee_web_gameplay_session_end(char* error, size_t error_size)
