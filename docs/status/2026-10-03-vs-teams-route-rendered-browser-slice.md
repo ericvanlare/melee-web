@@ -21,3 +21,6 @@ three-cycle route equivalence remains pending. Visual/audio equivalence,
 physical input, performance, source GCI persistence, and Personal autosave were
 not exercised. Host output was muted while source DSP/audio processing remained
 enabled.
+
+Later: the two-player limit recorded here was widened to two through four
+players; see [four-player Team Battle admission](2026-10-06-four-player-team-battle.md).

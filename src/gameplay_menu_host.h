@@ -51,7 +51,7 @@ typedef struct MeleeWebMenuSourceObservation {
     uint64_t item_mask;
     int css_setup_valid;
     int css_is_teams;
-    int css_player_teams[2];
+    int css_player_teams[4];
 } MeleeWebMenuSourceObservation;
 typedef struct MeleeWebOpeningPreview {
     uint32_t characters[4];

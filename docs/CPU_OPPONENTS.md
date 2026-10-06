@@ -11,7 +11,10 @@ simulation loop or prototype-only CPU setting.
 ordinary VS CPU (`cpu_kind == 4`, difficulty 1–9). Both the menu gates and the
 patched original match-entry boundary use it. The shared owner accepts two
 through four contiguous players, 1–5 stocks, and the supported fighters/stages.
-Teams, event and training AI modes are not admitted. These implementation gates
+Team Battle uses the source CSS rule in that header: the three authored team
+colours and two active doors on different teams (see
+[four-player Team Battle](status/2026-10-06-four-player-team-battle.md)).
+Event and training AI modes are not admitted. These implementation gates
 are broader than the current accuracy evidence; see the
 [complete-match development corpus](CPU_MATCH_CORPUS.md).
 CPU rumble stays disabled by the original `gm_LoadRumbleEnabled` routine.

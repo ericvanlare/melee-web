@@ -29,9 +29,11 @@ compiled implementation. No CPU decisions are implemented in the shell.
 
 The source match owner now accepts two through four contiguous players using
 the supported fighters and stages, human or ordinary VS CPU kind 4. Its stock
-range is 1–5, matching the original CSS control. Teams, extra active slots,
-other CPU kinds, unsupported content and unsupported rule profiles remain
-rejected. This admission check is an implementation limit, not accuracy
+range is 1–5, matching the original CSS control. Team Battle is admitted for
+the source CSS setups (three team colours, two active players on different
+teams; see [four-player Team Battle](status/2026-10-06-four-player-team-battle.md)).
+Extra active slots, other CPU kinds, unsupported content and unsupported rule
+profiles remain rejected. This admission check is an implementation limit, not accuracy
 acceptance for all configurations within it.
 
 At exit, shared code uses the original `gm_80166378` ranking operation on an
@@ -369,8 +371,9 @@ Future CPU holdouts must be independently authored after the shared fixes.
 They should include unseen two-/three-/four-player fights, the currently
 uncovered difficulties 2, 4 and 7, Falco as human, Battlefield, zero-knockback
 hitlag, taunts, recovery, stock loss/respawn and consecutive-match teardown.
-Teams, other CPU kinds and Sudden Death remain outside the current admitted
-implementation boundary. All three current workloads remain development cases.
+Other CPU kinds and Sudden Death remain outside the current admitted
+implementation boundary, and Team Battle has no CPU development workload or
+retail comparison. All three current workloads remain development cases.
 
 Integration may touch `src/gameplay_menu_browser.cpp`, shared match ownership,
 `CMakeLists.txt`, `cmake/FighterRuntime.cmake`, and

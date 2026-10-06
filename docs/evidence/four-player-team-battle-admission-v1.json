@@ -1,0 +1,159 @@
+{
+ "schema": "melee-web-four-player-team-battle-admission-v1",
+ "scope": "Admission rule for original-CSS Team Battle with two to four contiguous players, enforced at the CSS/SSS/match-handoff gate, the match-rules owner and the patched fn_8016DCC0 boundary. Source identified and compiled, with validator-level native unit coverage only. No browser, retail, timing, pixel, audio or performance claim.",
+ "identity": {
+  "base_commit": "07bcfdfa6f4531ac464eab44ebecb206daa1f0da",
+  "game": "GALE01 Rev. 2",
+  "source_repository": "doldecomp/melee",
+  "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+  "tracker": "#158 item B3"
+ },
+ "source_derivation": {
+  "files": [
+   "src/melee/mn/mncharsel.c",
+   "src/melee/gm/gm_1601.c",
+   "src/melee/gm/forward.h"
+  ],
+  "routines": {
+   "cycleTeam": "advances one door through (team + 1) % 3, so a door holds team colour 0..2",
+   "fn_80262F44": "shows CSS Start when at least two doors are active and, with is_teams == 1, some pair of active doors has different teams; no other roster bound",
+   "mnCharSel_804D6CF5": "the VS CSS owns four doors",
+   "gm_80169264/gm_801692BC/gm_80169290": "team-dependent costume selectors for team colours 0/1/2",
+   "MatchEnd": "per-team standings (GM_MAX_TEAMS 5) and OUTCOME_TEAM_ELIMINATION"
+  }
+ },
+ "admission": {
+  "rule": "melee_web_team_setup_supported in src/gameplay_player_selection.h",
+  "boundaries": [
+   "team_selection_valid in src/gameplay_menu.c",
+   "supported_team_setup in src/gameplay_match_rules.c",
+   "melee_web_match_validate_source_start in patches/melee-gameplay.patch"
+  ],
+  "admitted": {
+   "2v2": [
+    [
+     0,
+     0,
+     1,
+     1
+    ],
+    [
+     0,
+     1,
+     0,
+     1
+    ]
+   ],
+   "3v1": [
+    [
+     2,
+     2,
+     2,
+     0
+    ]
+   ],
+   "2v1v1": [
+    [
+     1,
+     0,
+     1,
+     2
+    ]
+   ],
+   "1v1v1": [
+    [
+     0,
+     1,
+     2
+    ]
+   ],
+   "2v1": [
+    [
+     1,
+     0,
+     1
+    ]
+   ],
+   "1v1": [
+    [
+     0,
+     1
+    ]
+   ],
+   "no_teams": "free-for-all with two to four contiguous players"
+  },
+  "refused": [
+   "all active players on one team",
+   "a single active player",
+   "a team colour above 2",
+   "is_teams other than 0 or 1",
+   "non-contiguous doors",
+   "item-enabled or otherwise unsupported stock/timer rules (reported separately from the team refusal)"
+  ],
+  "refusal_text": "Team Battle payload is outside the supported setups: two to four contiguous players, team colours 0-2, and at least two players on different teams"
+ },
+ "tests": {
+  "runner": "python3 -m unittest discover -s tests -v",
+  "files": {
+   "tests/test_gameplay_team_setup.py": "4f7e71014a98da38ce014fc4de45ff45dd161083c5d9817d520f3e3a0f384648",
+   "tests/gameplay_team_setup_trace.c": "aa8c8f45e27045db501a6369e0c5b5e357c0f930a8a410570e182e0bb3ba4c80",
+   "tests/gameplay_match_item_mask_trace.c": "71611c4941035802451197e6916053cdc4df4dec44d2d6fcca43163964a53eff",
+   "tests/gameplay_menu_trace.c": "38d4608c1cae69aa5e9554552836043c144e1203cdc30384ad0b9185ad882875",
+   "tests/fighter_cpu9_lineup_browser_test.mjs": "13f1dab80ebf12244117ada20f4f371f758dce7122cbe09d8c398f64554f4c3e"
+  },
+  "coverage": "The patched validator text is extracted from the canonical patch and compared, with the shared rule, against a literal transcription of fn_80262F44 for every team flag, roster size 0-5 and 4^4 colour assignment; named 2v2, 3v1 and 2v1v1 cases and each refusal are asserted. Reintroducing the former two-player bound into the extracted validator fails the 2v2 case.",
+  "full_suite": {
+   "status": "passed",
+   "tests": 1885,
+   "skipped": 141,
+   "note": "Skips are owned-asset or toolchain-dependent tests absent on the build machine; the three build/browser-dependent tests ran after the default-configuration runtime build."
+  }
+ },
+ "source_files_sha256": {
+  "patches/melee-gameplay.patch": "c023141b4df60eb22f884f4412b8e885bf93252caf2217e5887d9474d4a05b9d",
+  "src/gameplay_player_selection.h": "30e4b1ca68c2fa09f43fd0ed6cfc259dc4a6af2c36a3ff552b0c19bf27c532fe",
+  "src/gameplay_menu.c": "b1a391daf65ff54d024a9c518cfeae3bf0303da335fdd3de84e3d37ab3b16e28",
+  "src/gameplay_match_rules.c": "df3b01db57f134c3bb78968f4141bb5eecb73f32355d6eb7d30984b0149a47ae",
+  "src/gameplay_menu_host.c": "3cd20fbc5abc1144f6dfdaf175badbf70bea4e5ec23b6052e732c93b8fd71340",
+  "src/gameplay_menu_browser.cpp": "fb4bef3ef0479f6fce464c4feda7cc2dd1ef671aa91b4fb0773e7c35e2543894"
+ },
+ "builds": {
+  "runtime_release": {
+   "command": "python3 scripts/build.py --target runtime --configuration Release",
+   "status": "passed",
+   "gameplay_menu_browser.wasm_sha256": "92cd1c726bb0da6c4a3ec0708e0814cd7f46b2fb6a09c73c85f61348eea78e4a",
+   "gameplay_menu_browser.js_sha256": "c0d50daedd7af41bd6eaa3236a32de98f701526ebf75c2dd8c84a90bba1ec254"
+  },
+  "runtime_default": {
+   "command": "python3 scripts/build.py --target runtime",
+   "status": "passed",
+   "gameplay_menu_browser.wasm_sha256": "d753745728aa217409bc160a352ba49a07b72c4c4e2fa1bad9e1778e9f2fd7c2"
+  },
+  "canonical_patch_check": "python3 scripts/canonicalize_gameplay_patch.py --check passed (tree 2ed1227f5306106daea466e4e74b528f27942614)",
+  "runtime_public_release": {
+   "command": "python3 scripts/build.py --target runtime-public --configuration Release",
+   "status": "passed"
+  }
+ },
+ "browser": {
+  "status": "not_run",
+  "reason": "Playwright is not installed or configured on the build machine (MELEE_PLAYWRIGHT_DIR unset, no package on disk); installing it needs a network download that was not authorized. The first attempt failed with 'Playwright is unavailable' before a browser launched.",
+  "pending_command": "node tests/fighter_cpu9_lineup_browser_test.mjs --url http://127.0.0.1:PORT/runtime.html --disc OWNED_CISO --out work/four-player-teams/2v2 --lineup M --teams 0,0,1,1 --playwright PACKAGE_DIR --build-dir build/browser-release",
+  "pending_assertions": [
+   "original CSS Teams on with four CPU level 9 doors, teams [0,0,1,1]",
+   "Final Destination on the original SSS",
+   "natural four-stock match ending in source OUTCOME_TEAM_ELIMINATION with winners on one team",
+   "original team Results, then CSS with is_teams and door teams retained",
+   "screenshots at CSS, SSS, in-match, Results and returned CSS"
+  ]
+ },
+ "exclusions": [
+  "public-player ports 3/4 (web/player/*)",
+  "physical controllers (#83)",
+  "retail comparison of the 2v2",
+  "Sudden Death",
+  "non-contiguous doors",
+  "friendly fire (harness flag present, unrun)",
+  "timing and performance"
+ ]
+}
