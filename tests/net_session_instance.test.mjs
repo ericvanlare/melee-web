@@ -8,13 +8,19 @@ import {openNetInstance} from '../scripts/net_session_instance.mjs';
 function fakeChrome(goto) {
   let closeCalls = 0;
   let removeCalls = 0;
+  const listeners = new Map();
+  const emit = (kind, value) => { for (const listener of listeners.get(kind) || []) listener(value); };
   const page = {
-    on() {},
+    on(kind, listener) {
+      const entries = listeners.get(kind) || [];
+      entries.push(listener);
+      listeners.set(kind, entries);
+    },
     off() { ++removeCalls; },
     async addInitScript() {},
     setDefaultTimeout() {},
     setDefaultNavigationTimeout() {},
-    goto,
+    goto: (...args) => goto(emit, ...args),
   };
   const context = {
     pages: () => [page],
@@ -53,6 +59,29 @@ test('closes Chrome and removes driver listeners when runtime navigation fails',
     assert.equal(failure.browserClosed, true);
     assert.equal(chrome.closeCalls, 1);
     assert.equal(chrome.removeCalls, 2);
+  });
+});
+
+test('preserves HTTP, request and page errors when runtime startup fails before returning an instance', async () => {
+  await withProfile(async profile => {
+    const chrome = fakeChrome(async (emit) => {
+      emit('response', {status: () => 404, url: () => 'http://127.0.0.1/net-timing-pause.mjs'});
+      emit('requestfailed', {method: () => 'GET', url: () => 'http://127.0.0.1/net-timing-pause.mjs',
+        failure: () => ({errorText: 'net::ERR_ABORTED'})});
+      emit('pageerror', Error('Failed to load net-timing-pause.mjs'));
+      const error = Error('startup did not reach runtime');
+      error.diagnostics = {errors: [{kind: 'http', message: 'HTTP 404 module request'}]};
+      throw error;
+    });
+    let failure;
+    try { await openNetInstance({...common, chromium: chrome.chromium, userDataDir: profile}); }
+    catch (error) { failure = error; }
+    assert.equal(failure.browserClosed, true);
+    assert.deepEqual(failure.browserErrors.map(row => row.kind), ['http', 'requestfailed', 'pageerror']);
+    assert.equal(failure.browserErrors[0].status, 404);
+    assert.equal(failure.browserErrors[1].failure, 'net::ERR_ABORTED');
+    assert.match(failure.startupDiagnostics.errors[0].message, /404/);
+    assert.equal(chrome.closeCalls, 1);
   });
 });
 

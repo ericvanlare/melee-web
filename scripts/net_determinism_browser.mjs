@@ -181,7 +181,6 @@ async function runInstance(spec) {
     result.graphics = await instance.graphics();
     result.screenshot = path.join(spec.label, 'final.png');
     await instance.screenshot(path.join(directory, 'final.png'));
-    result.timing_resumes = instance.timingResumes;
     result.wait_episodes = result.final_status.wait_episodes;
     if (!values['skip-unload']) {
       // Unload also persists the optional render cache into the profile, which is
@@ -192,6 +191,8 @@ async function runInstance(spec) {
     result.outcome = 'complete';
   } catch (error) {
     result.first_error = String(error.stack || error.message || error);
+    if (Array.isArray(error.browserErrors)) result.page_errors = error.browserErrors;
+    if (error.startupDiagnostics) result.failure_startup = error.startupDiagnostics;
     if (typeof error.browserClosed === 'boolean') result.browser_closed = error.browserClosed;
     try { if (instance) { result.failure_status = await instance.status(); result.failure_native = await instance.native(); } } catch {}
     try {
@@ -203,7 +204,8 @@ async function runInstance(spec) {
     } catch (captureError) { result.failure_capture_error = String(captureError.message || captureError); }
   } finally {
     result.finished_at = new Date().toISOString();
-    result.page_errors = instance?.errors ?? [];
+    result.page_errors = instance?.errors ?? result.page_errors ?? [];
+    if (instance) result.timing_resumes = instance.timingResumes;
     await checksums.close();
     if (instance) result.start_record = (result.final_status ?? result.failure_status)?.start ?? null;
     if (instance) result.arena = (result.final_status ?? result.failure_status)?.arena ?? null;

@@ -126,10 +126,13 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
   try {
     page = context.pages()[0] || await bounded(() => context.newPage());
     const errors = [];
-    page.on('pageerror', error => errors.push({kind: 'pageerror', message: String(error.stack || error.message)}));
-    page.on('console', message => { if (message.type() === 'error') errors.push({kind: 'console', message: message.text()}); });
-    page.on('response', response => { if (response.status() >= 400) errors.push({kind: 'http', status: response.status(), url: response.url()}); });
-    page.on('request', request => { if (request.method() !== 'GET') errors.push({kind: 'unexpected-request', method: request.method(), url: request.url()}); });
+    const noteError = error => { if (errors.length < 32) errors.push(error); };
+    page.on('pageerror', error => noteError({kind: 'pageerror', message: String(error.stack || error.message)}));
+    page.on('console', message => { if (message.type() === 'error') noteError({kind: 'console', message: message.text()}); });
+    page.on('response', response => { if (response.status() >= 400) noteError({kind: 'http', status: response.status(), url: response.url()}); });
+    page.on('requestfailed', request => noteError({kind: 'requestfailed', method: request.method(),
+      url: request.url(), failure: request.failure()?.errorText || null}));
+    page.on('request', request => { if (request.method() !== 'GET') noteError({kind: 'unexpected-request', method: request.method(), url: request.url()}); });
     await bounded(() => page.addInitScript(() => {
       window.__meleeNativeRuntimeReady = false;
       const module = globalThis.Module || {};
@@ -197,6 +200,10 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     instance.unload = () => driver.unload();
     return instance;
   } catch (error) {
+    if (error && typeof error === 'object') {
+      error.browserErrors = instance?.errors ? [...instance.errors] : [];
+      error.startupDiagnostics = error.diagnostics ?? null;
+    }
     const browserClosed = await close();
     if (error && typeof error === 'object') error.browserClosed = browserClosed;
     throw error;
