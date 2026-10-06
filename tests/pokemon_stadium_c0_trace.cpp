@@ -15,6 +15,13 @@
 #include "native_dat.hpp"
 #include "pokemon_stadium_ground_snapshot.h"
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wwrite-strings"
+extern "C" {
+#include <melee/sc/types.h>
+}
+#pragma GCC diagnostic pop
+
 #include <algorithm>
 #include <array>
 #include <bit>
