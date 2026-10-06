@@ -13,15 +13,24 @@ Build tools: CMake **3.31.6** and Ninja **1.13.0**, installed in the local virtu
 environment. Aurora browser adaptations belong in `patches/aurora-browser.patch`;
 the upstream commit alone does not describe the browser implementation.
 Gameplay ABI corrections belong in `patches/melee-gameplay.patch`, applied only
-to the checked generated `build/gameplay-source` tree. It is kept in canonical
-form (one sorted diff per file) by `scripts/canonicalize_gameplay_patch.py`, which
-`tests/test_gameplay_patch_canonical.py` checks. The canonicalizer reads the
-clean standalone checkout at the exact lockfile commit through an isolated
-temporary index; it does not mutate the dependency worktree. Its CLI also
-serializes repository mutations and atomically replaces only an unchanged,
-regular patch file. The current patch preserves
-canonical fighter animation-flag aliases on little-endian Wasm and corrects the
-Final Destination callback declaration to match its original definition.
+to the checked generated `build/gameplay-source` tree. The current gameplay patch
+preserves canonical fighter animation-flag aliases on little-endian Wasm and
+corrects the Final Destination callback declaration to match its original
+definition.
+
+Both reviewed patches are kept in canonical form (one sorted diff per file, full
+blob indexes and fixed diff options) by `scripts/canonicalize_gameplay_patch.py`,
+which `tests/test_gameplay_patch_canonical.py` checks. The default
+`--target gameplay` reads the clean standalone `.deps/melee` checkout.
+`--target aurora` reads `.deps/aurora`, whose working tree normally carries the
+applied browser patch, so only its HEAD must equal the lockfile commit. In both
+cases the canonicalizer reads the pinned commit's objects through an isolated
+temporary index and object directory; it does not mutate the dependency
+worktree. Its CLI also serializes repository mutations and atomically replaces
+only an unchanged, regular patch file. The smaller `patches/source-*.patch`,
+`melee-source-ar-init-cxx.patch` and `reference-dolphin-*.patch` files are not
+canonicalized: their tests apply them to individual copied files or to the
+Dolphin reference tree, and retained profiles bind their exact bytes.
 
 ## Reproducibility and provenance
 

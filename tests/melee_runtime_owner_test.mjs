@@ -135,8 +135,10 @@ globalThis.document = {hidden: false, activeElement: canvas, hasFocus: () => tru
 globalThis.AudioContext = class {
   sampleRate = 32000;
   state = 'suspended';
+  outputTimestamp = {contextTime: 0, performanceTime: 0};
   audioWorklet = {addModule: async url => { calls.push(['worklet', url]); }};
   destination = {};
+  getOutputTimestamp() { return {...this.outputTimestamp}; }
   async resume() { calls.push(['audioResume']); this.state = 'running'; }
   async close() { audioClosed = true; }
 };
@@ -144,11 +146,15 @@ let holdRenderAck = false;
 const pendingRenderAcks = [];
 let lastAudioNode;
 globalThis.AudioWorkletNode = class {
-  constructor() { lastAudioNode = this; }
+  constructor(context) { lastAudioNode = this; this.context = context; }
   port = {postMessage: data => {
     calls.push(['audioMessage', data.type, data.enabled, data.id]);
     if (data.type === 'render-ready-request') {
-      const ack = () => { calls.push(['audioRenderAck', data.id]); this.port.onmessage({data: {type: 'render-ready', id: data.id}}); };
+      const ack = () => {
+        calls.push(['audioRenderAck', data.id]);
+        this.context.outputTimestamp.contextTime = 0.004;
+        this.port.onmessage({data: {type: 'render-ready', id: data.id, process_time: 0}});
+      };
       if (holdRenderAck) pendingRenderAcks.push(ack); else queueMicrotask(ack);
     }
     if (data.type === 'state') queueMicrotask(() => this.port.onmessage({data: {type: 'state-ack', enabled: data.enabled}}));

@@ -10,7 +10,7 @@ Observed results live in [STATUS](../STATUS.md) and its dated
 | Document | Use it for |
 | --- | --- |
 | [Developer entry](DEVELOPMENT.md) | Command routing by change boundary |
-| [Roadmap](ROADMAP.md) | Work order and acceptance boundaries |
+| [Roadmap](ROADMAP.md) | Current priorities, work order and acceptance boundaries (live state: pinned [priorities tracker](https://github.com/ericvanlare/melee-web/issues/158)) |
 | [Accuracy contract](ACCURACY_CONTRACT.md) | What counts as correct, and how it is proven |
 | [Performance and accuracy playbook](PERFORMANCE_AND_ACCURACY.md) | Evidence labels, timing and runtime change rules |
 | [Architecture decisions](ARCHITECTURE.md) | Durable design decisions |
@@ -99,6 +99,7 @@ receipts or code. Do not move them without updating every citation.
 | [`content/`](content/) | Fighter and stage development notes |
 | [`investigations/`](investigations/) | Bounded boundary investigations and research records still cited by current work |
 | [`history/`](history/) | Superseded checkpoints, dated campaigns and resolved incidents, kept for provenance |
+| `handoffs/` | Work-in-progress handoffs, one `YYYY-MM-DD-<slug>.md` per paused workstream. They live on the WIP branch they describe and are not merged to `main`. |
 
 New documents go in the narrowest matching directory. A one-off investigation
 belongs in `investigations/`, not at the top level. When its conclusion lands

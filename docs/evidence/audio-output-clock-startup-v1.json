@@ -1,0 +1,174 @@
+{
+  "schema": "melee-web-audio-output-clock-startup-v1",
+  "date": "2026-10-03",
+  "evidence_level": [
+    "Source identified",
+    "Browser checked: bounded original CSS startup and match-initialization prefixes",
+    "Not sustained performance admission"
+  ],
+  "source": {
+    "base_commit": "c3ddd39d191abcd59a72cd428a085c0958c922a9",
+    "candidate_patch_sha256": "ae874afcbe3f19020ac8cbb8410e62a1533121b8978325553ae329e35755d657",
+    "touched_paths": [
+      "web/runtime-audio.mjs",
+      "tests/runtime_audio_test.mjs",
+      "tests/melee_runtime_owner_test.mjs"
+    ],
+    "native_simulation_or_pcm_producer_changed": false
+  },
+  "diagnosis": {
+    "boundary": "Web Audio output readiness before the initial native playback launch",
+    "cause": "AudioWorklet process acknowledgement at process time zero preceded progress at the output-device stream position. Starting native PCM production on that acknowledgement filled the 16,384-frame queue before output began.",
+    "fix": "After the matching Worklet acknowledgement, keep native launch pending until AudioContext.getOutputTimestamp().contextTime is strictly greater than the acknowledged process_time. The existing five-second readiness deadline covers both waits; invalid or unavailable timestamps fail explicitly.",
+    "api_semantics": "The W3C Web Audio specification defines AudioTimestamp.contextTime as the context time of the sample frame currently rendered by the output device: https://www.w3.org/TR/webaudio-1.0/#dom-audiocontext-getoutputtimestamp"
+  },
+  "environment": {
+    "configuration": "Release runtime build",
+    "browser": "Installed headless Google Chrome 154.0.8037.97 via scripts/browser_tools.mjs",
+    "playwright_version": "1.62.1",
+    "playwright_tree_sha256": "7db22b55af7bba95353d3edb4f50a9bd28c82e0c556a04722fddd4a4421cd211",
+    "browser_tools_sha256": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+    "gpu": "ANGLE Metal on Apple M4, driver 26.6",
+    "host_speaker_output": "muted",
+    "web_audio_processing": "active",
+    "scenario": "Existing four-player Mario/Final Destination MWRC replay, 42,127 declared frames, v8",
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "mwrc_sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e",
+    "release_build_receipt_sha256": "8699c8943004c58f4cfcec98af565ad2891cb8a8a9110a8beca1f38860d679d3",
+    "served_file_manifest_sha256": "64fd2e2f9ed7bf8aee39ef98fd0193db443b6ebe70f3d63c827b47d3b96863d0"
+  },
+  "staging_base": {
+    "project": "webmelee-staging",
+    "branch": "staging",
+    "deployment_id": "c629d0fb-6b61-4b6c-8589-225d74723fd4",
+    "environment": "staging",
+    "source_commit": "c3ddd39d191abcd59a72cd428a085c0958c922a9",
+    "profile": "audio-player",
+    "runtime_hash": "c372effad3c88d6f",
+    "manifest_sha256": "8443bc488ceff9dbd3eaadb068ef759d22388f2d286afec6039831582169e20a",
+    "deployment_receipt_sha256": "cea257bbc0edf2f46364300e7090e25371e11e6dbc40e15fd89aac2a8a7e7a99",
+    "immutable_url": "https://c629d0fb.webmelee-staging.pages.dev",
+    "stable_url": "https://webmelee-staging.pages.dev",
+    "live_root_get": {
+      "status": 200,
+      "stable_and_immutable_html_sha256": "e74b7c100807998bfa9907fc9f9147cdc869d51f09ce810acc272a561575df96",
+      "served_runtime_hash": "c372effad3c88d6f"
+    },
+    "production_changed": false
+  },
+  "current_main_control": {
+    "source_commit": "c3ddd39d191abcd59a72cd428a085c0958c922a9",
+    "gate": "Disabled with unmodified HEAD:web/runtime-audio.mjs; private passive observers retained",
+    "baseline_runtime_audio_sha256": "38fcfa2016d44e7dad7476f2aef84392c2ac556f647c0d161edb6d283fe2300d",
+    "report_sha256": "87b85d54c09d1abf99e2e2871d5f356e9a934b15f6f34b845b5628a5bf626535",
+    "supervisor_sha256": "ec49731daa19fefb3f0fc0b39c22816eaad173ce0f3f6c93647829e41471f6031",
+    "cleanup_sha256": "4a8de83d490e8ca6bbf9b2fe9d7dda22f7d479d109f1b717ff6ce262181f45a5",
+    "durable_receipt_sha256": "9be4e19a66c4444d3c7da59002c9127f5eeffe67bbf2ec243a0f39c7f5c62194",
+    "readiness": {
+      "worklet_ack_ms": 3633.21,
+      "process_time_seconds": 0,
+      "context_current_time_seconds": 0.008,
+      "native_launch_requested_ms": 3633.225
+    },
+    "failure": {
+      "time_ms": 4175.315,
+      "source_cursor": 31,
+      "accepted_packets": 30,
+      "accepted_frames": 16000,
+      "rejected_packet_frames": 533,
+      "error": "Audio output queue overflow",
+      "context_current_time_seconds": 0.008
+    },
+    "result_classification": "Expected reproduction of the current-main startup failure; runner exit 1 records the runtime error."
+  },
+  "candidate_startup_prefix": {
+    "report_sha256": "4a0831a151110d2d39282defad716e4d1631968f6feafcaf2560c71855d3e4a0",
+    "supervisor_sha256": "7c2c8eb50d45866c410b845b3dd81e6f10b8d75d51b00a678b1f26c293d8951a",
+    "cleanup_sha256": "42e995a94bf9d0bc615244ad9b51df25c6ed33be4123fa458eed7caf4239bb2d",
+    "durable_receipt_sha256": "46054bcc6f5ac1ac6112af8ef23ea008850a4baef08df2af1fbb01de6c08f8bd",
+    "readiness": {
+      "worklet_ack_ms": 3697.845,
+      "process_time_seconds": 0,
+      "context_current_time_seconds": 0.008,
+      "output_timestamp_ms": 4273.585,
+      "output_timestamp_context_time_seconds": 0.010118,
+      "wait_from_ack_ms": 575.74,
+      "native_launch_requested_ms": 4273.62
+    },
+    "bounded_result": {
+      "requested_stop_cursor": 121,
+      "prefix_snapshot_cursor": 122,
+      "final_cursor": 124,
+      "runtime_error": null,
+      "first_overflow": null,
+      "prefix_posted_packets": 122,
+      "prefix_posted_frames": 65066,
+      "post_failures": 0,
+      "worklet_samples": [
+        {"audio_time_seconds": 0.516, "queued_frames": 1749, "underruns": 0, "overflows": 0},
+        {"audio_time_seconds": 1.024, "queued_frames": 1365, "underruns": 0, "overflows": 0},
+        {"audio_time_seconds": 1.536, "queued_frames": 1514, "underruns": 0, "overflows": 0},
+        {"audio_time_seconds": 2.048, "queued_frames": 1664, "underruns": 0, "overflows": 0}
+      ]
+    },
+    "result_classification": "Deliberate bounded prefix stop, not a runtime failure or completed gameplay replay."
+  },
+  "candidate_match_initialization_prefix": {
+    "report_sha256": "f1d5f510e9e98aadf88cf26bacddc18343b743f6fab0e85b7560ded07be3c2d0",
+    "supervisor_sha256": "312bf55b089afa5746bf9be5eb815aecffe2b2d19bc41ab453ce764c101daf53",
+    "cleanup_sha256": "cc934226124a544ea8054710de89d2b9d2f03c1922a213cd76a5328c7883a905",
+    "durable_receipt_sha256": "9e91953ed536fea4a40d8737a64078a63e573ea9d9f95c3f60fa58063c31090b",
+    "readiness": {
+      "worklet_ack_ms": 3678.385,
+      "output_timestamp_ms": 4235.015,
+      "output_timestamp_context_time_seconds": 0.010151,
+      "wait_from_ack_ms": 556.63,
+      "native_launch_requested_ms": 4235.095
+    },
+    "bounded_result": {
+      "requested_stop_cursor": 1543,
+      "final_cursor": 1546,
+      "phase": 7,
+      "status": "Original Mario vs Mario vs Mario vs Mario match on Final Destination",
+      "live_source_frame_at_last_snapshot": 0,
+      "runtime_error": null,
+      "first_overflow": null,
+      "post_attempts": 1543,
+      "posted_frames": 822933,
+      "post_failures": 0,
+      "worklet_samples_retained_through_audio_time_seconds": 3.584,
+      "dropped_event_rows": 1362
+    },
+    "result_classification": "The audio startup overflow stayed absent through match initialization; no live match tick or full-route claim."
+  },
+  "validation": {
+    "focused_commands_passed": [
+      "python3 scripts/agent_workspace.py run -- node tests/runtime_audio_test.mjs",
+      "python3 scripts/agent_workspace.py run -- node tests/melee_runtime_owner_test.mjs",
+      "python3 scripts/agent_workspace.py run -- node tests/audio_worklet_test.mjs",
+      "git diff --check"
+    ],
+    "release_build": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "result": "passed",
+      "receipt_sha256": "8699c8943004c58f4cfcec98af565ad2891cb8a8a9110a8beca1f38860d679d3"
+    },
+    "full_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "result": "passed after configuring the normal CMake graph with scripts/build.py --configure-only",
+      "tests_run": 1876,
+      "skipped": 141,
+      "duration_seconds": 404.397,
+      "log_sha256": "28626dfc018f16c98060482c0008503bba1c2113b19a358a18a813a536728374",
+      "initial_setup_failure_log_sha256": "44c2120cf6c914a59ab9a78da61971267916b7c5671089d32df162af72af9d31"
+    }
+  },
+  "exclusions": [
+    "The captures stop at a startup prefix and match initialization; sustained live-match timing, the complete Results/return/repeat-match cycle, P1-P5 release-to-release metrics, PCM fidelity and pixel comparison are not established.",
+    "The extended capture retained only 256 event rows; cumulative producer counters and first overflow survived the row cap, but periodic Worklet samples after 3.584 seconds were not retained.",
+    "No original-state comparison was repeated because native simulation code and PCM production were unchanged.",
+    "No physical controller, foreground timing, iPhone or device-interruption acceptance is claimed."
+  ],
+  "retained_run_id": "current-main-output-clock-gameplay-candidate-20261003-210127-0d24d9e3",
+  "raw_reports_retained_outside_repository": true
+}
