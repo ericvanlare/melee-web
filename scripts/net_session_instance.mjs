@@ -197,6 +197,8 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       if (resumed) instance.timingResumes.push({cursor, at_ms: Date.now()});
       return resumed;
     };
+    instance.timingPauseDiagnostics = () => bounded(() => page.evaluate(() =>
+      window.meleeNetTimingPauseDiagnostics?.() ?? null));
     instance.unload = () => driver.unload();
     return instance;
   } catch (error) {

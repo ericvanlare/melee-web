@@ -179,6 +179,7 @@ async function runInstance(spec) {
         observed_scenes: result.scene_runs.map(row => row.scene)};
     }
     result.graphics = await instance.graphics();
+    result.timing_pause_diagnostics = await instance.timingPauseDiagnostics();
     result.screenshot = path.join(spec.label, 'final.png');
     await instance.screenshot(path.join(directory, 'final.png'));
     result.wait_episodes = result.final_status.wait_episodes;
@@ -195,6 +196,7 @@ async function runInstance(spec) {
     if (error.startupDiagnostics) result.failure_startup = error.startupDiagnostics;
     if (typeof error.browserClosed === 'boolean') result.browser_closed = error.browserClosed;
     try { if (instance) { result.failure_status = await instance.status(); result.failure_native = await instance.native(); } } catch {}
+    try { if (instance) result.failure_timing_pause = await instance.timingPauseDiagnostics(); } catch {}
     try {
       if (instance) {
         result.failure_graphics = await instance.graphics();

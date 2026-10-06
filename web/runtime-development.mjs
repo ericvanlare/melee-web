@@ -3,7 +3,7 @@ import {mountMeleeRuntime} from './melee-runtime.mjs';
 import {mountControllerSettings} from './controller-settings.mjs';
 import {createRuntimeAudio} from './runtime-audio.mjs';
 import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.mjs';
-import {attemptNetworkTimingPauseResume, canResumeNetworkTimingPause} from './net-timing-pause.mjs';
+import {attemptNetworkTimingPauseResume, evaluateNetworkTimingPause} from './net-timing-pause.mjs';
 const developmentHooks = {};
 const RETAIL_REPLAY_LEGACY_MAX_FRAMES = 36000;
 const RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES = 108000;
@@ -215,14 +215,25 @@ window.menuReplayPoll=()=>{
 // whole-session replay entry: the canonical freshly prepared CSS owner receives
 // one agreed seed, then the ordinary native launch enters it. Per-tick PAD
 // frames and checksum records cross only the _melee_web_net_* exports.
-window.meleeNetCanResumeTimingPause=()=>{
- if(!owner?.handle||typeof Module._melee_web_net_status!=='function')return false;
+window.meleeNetTimingPauseEligibilitySnapshot=()=>{
+ if(!owner?.handle||typeof Module._melee_web_net_status!=='function')
+  return {eligible:false,reasons:['owner-unavailable'],network_status:null,native_running:null,native_message:null,owner_state:null};
  const network=JSON.parse(Module.UTF8ToString(Module._melee_web_net_status()));
  const running=Module._melee_web_native_menu_running();
  const message=Module.UTF8ToString(Module._melee_web_native_menu_message());
- return canResumeNetworkTimingPause({networkActive:network.active===true,nativeRunning:running===1,
-  message,ownerState:owner.handle.getState()});
+ const ownerState=owner.handle.getState();
+ return {network_status:network,native_running:running,native_message:message,owner_state:ownerState,
+  ...evaluateNetworkTimingPause({networkStatus:network,nativeRunning:running,message,ownerState})};
 };
+window.meleeNetCanResumeTimingPause=()=>{
+ const snapshot=window.meleeNetTimingPauseEligibilitySnapshot();
+ const checks=window.__meleeNetTimingPauseChecks||(window.__meleeNetTimingPauseChecks=[]);
+ if(checks.length>=32)checks.shift();
+ checks.push(snapshot);
+ return snapshot.eligible;
+};
+window.meleeNetTimingPauseDiagnostics=()=>({checks:window.__meleeNetTimingPauseChecks||[],
+ current:window.meleeNetTimingPauseEligibilitySnapshot()});
 window.meleeNetResumeTimingPause=async()=>{
  return attemptNetworkTimingPauseResume({canResume:()=>window.meleeNetCanResumeTimingPause(),
   resume:()=>owner.handle.resume(),isRunning:()=>Module._melee_web_native_menu_running()===1});
