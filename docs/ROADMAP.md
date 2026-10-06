@@ -27,7 +27,8 @@ prefer Track A.
 profile, a natural four-stock match through the original menus completes without
 a timing-guard pause. Both tracks depend on this. Lockstep stalls both players
 on any host stall, rollback must re-simulate several ticks inside one tick's
-budget, and competitive play cannot tolerate pauses. Work starts from the open
+budget, and competitive play cannot tolerate pauses. H1 gates A3 and B5. The
+functional steps A1 and A2 can proceed without it. Work starts from the open
 pause classification in [#116](https://github.com/ericvanlare/melee-web/issues/116).
 The fix must come from the runtime, never from a threshold, frame-rate,
 skipped-tick or auto-Resume change.
@@ -39,24 +40,22 @@ other in the browser under competitive rules, through the original menus.
 
 The path reuses what the project already proved. The browser runtime replays
 recorded per-tick controller input to exact recorded-session agreement with the
-original game. Two runtimes that receive the same inputs should therefore stay
-in step without any snapshot or restore. That makes delay-based lockstep the
-shortest route to real play. Rollback, and then Slippi desktop cross-play, build
-on it later.
+original game. Two runtimes that start from the same CSS context and receive the
+same inputs should therefore stay in step without any snapshot or restore. That
+makes delay-based lockstep the shortest route to real play. Rollback, and then
+Slippi desktop cross-play, build on it later. The design, including the host
+channels that A1 must rule out, is [architecture decision 016](ARCHITECTURE.md#016--online-play-starts-as-lockstep-from-a-shared-css-context).
 
 | Step | Outcome |
 | --- | --- |
-| **A1. Determinism** | Two browser instances given the same build, disc, save and per-tick input produce identical per-tick state checksums: first in the same browser, then across Chrome and WebKit. |
+| **A1. Determinism** | Two fresh browser instances given the same build, disc, CSS start context and per-tick input produce identical per-tick state checksums from CSS through Results and back to CSS. Their pacing, caches and memory initialization deliberately differ. First run in Chrome, then across Chrome and WebKit, and across x86 and arm64. |
 | **A2. Local lockstep** | Two tabs on one machine play through original CSS → SSS → match → Results → CSS with a fixed input delay over loopback, with matching checksums on every tick. |
 | **A3. Internet lockstep** | Two machines connect through a small signaling service and a WebRTC data channel (with relay fallback). They play a complete set with desync detection and a clean disconnect. |
 | **A4. Rollback** | Snapshot, restore and re-simulate replace the fixed delay with prediction. This continues the state-ownership work in [#115](https://github.com/ericvanlare/melee-web/issues/115). |
 | **A5. Slippi desktop cross-play** | A pinned Slippi compatibility profile and a transport bridge let a browser player face a desktop Slippi player ([project direction](PROJECT_DIRECTION.md), [#9](https://github.com/ericvanlare/melee-web/issues/9)). |
 
-The online design and its risks (input seam, cross-browser determinism, waiting
-for a peer without charging simulation debt, transport) are recorded as an
-[architecture decision](ARCHITECTURE.md) before A2 begins. Every online mode
-carries an explicit mode identity under #9, so a networked session is never
-reported as retail-equivalent evidence.
+Every online mode carries an explicit mode identity under #9, so a networked
+session is never reported as retail-equivalent evidence.
 
 ### Track B: competitive-rules Melee before the whole game
 
