@@ -70,6 +70,10 @@ const PAGE_HELPERS = () => {
         } finally { Module._free(ids); Module._free(geometry); }
         out.setup = window.menuObserveCssSetup?.() ?? null;
       }
+      if (Module._melee_web_native_menu_match_observe) {
+        const match = Module.UTF8ToString(Module._melee_web_native_menu_match_observe());
+        out.match = JSON.parse(match);
+      }
       return out;
     },
     resumeTimingPause() {
@@ -169,6 +173,23 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     instance.status = () => bounded(() => page.evaluate(() => window.__net.status()));
     instance.native = () => bounded(() => page.evaluate(() => window.__net.native()));
     instance.observe = () => bounded(() => page.evaluate(() => window.__net.observe()));
+    instance.graphics = () => bounded(() => page.evaluate(async () => {
+      const canvas = document.querySelector('canvas');
+      const adapter = globalThis.navigator.gpu ? await navigator.gpu.requestAdapter().catch(() => null) : null;
+      let webgl = null;
+      const context = canvas?.getContext('webgl2') || canvas?.getContext('webgl');
+      if (context) {
+        const debug = context.getExtension('WEBGL_debug_renderer_info');
+        webgl = {
+          version: context.getParameter(context.VERSION),
+          renderer: context.getParameter(debug ? debug.UNMASKED_RENDERER_WEBGL : context.RENDERER),
+        };
+      }
+      return {cross_origin_isolated: crossOriginIsolated, webgpu_api: !!navigator.gpu,
+        webgpu_adapter: !!adapter,
+        canvas: canvas ? {width: canvas.width, height: canvas.height} : null, webgl};
+    }));
+    instance.screenshot = file => bounded(() => page.screenshot({path: file, fullPage: false}));
     instance.maybeResume = async cursor => {
       const resumed = await bounded(() => page.evaluate(() => window.__net.resumeTimingPause()));
       if (resumed) instance.timingResumes.push({cursor, at_ms: Date.now()});

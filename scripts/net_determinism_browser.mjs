@@ -18,6 +18,7 @@ import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {loadBrowserTools} from './browser_tools.mjs';
+import {classifyRoute, expectedFullSceneOrder, validateFullRoute} from './net_determinism_contract.mjs';
 import {NET_FRAME_BYTES, NET_RECORD_BYTES, openNetInstance} from './net_session_instance.mjs';
 
 const SCRIPT_HEADER_BYTES = 16;
@@ -39,6 +40,14 @@ const integer = (name, minimum, maximum) => {
     throw Error(`--${name} must be an integer between ${minimum} and ${maximum}`);
   return value;
 };
+const uint32 = (text, name) => {
+  if (typeof text !== 'string' || !/^(?:0[xX][0-9a-fA-F]+|[0-9]+)$/.test(text))
+    throw Error(`${name} must be an unsigned 32-bit integer`);
+  const value = Number(text);
+  if (!Number.isSafeInteger(value) || value < 0 || value > 0xffffffff)
+    throw Error(`${name} must be an unsigned 32-bit integer`);
+  return value;
+};
 if (!values.url || !values.disc || !values.script || !values.out || !values.seed || !values.instance?.length)
   throw Error('Use --url runtime.html --disc PATH --script NAME.mwni --seed U32 --out NEW_DIR --instance "label=a,profile=DIR[,throttle=4][,flip=TICK:BYTE:BIT][,seed=U32][,arena-fill=0..255]" (repeatable)');
 const url = new URL(values.url);
@@ -48,7 +57,7 @@ const lookahead = integer('lookahead', 1, 20000);
 const timeoutMs = integer('timeout-ms', 1000, 21600000);
 const stallMs = integer('stall-ms', 1000, 3600000);
 const pollMs = integer('poll-ms', 10, 2000);
-const seed = Number(values.seed) >>> 0;
+const seed = uint32(values.seed, '--seed');
 const stopAfter = values['stop-after-ticks'] ? integer('stop-after-ticks', 1, 216000) : null;
 
 function parseInstance(text) {
@@ -60,11 +69,12 @@ function parseInstance(text) {
     if (key === 'label') spec.label = value;
     else if (key === 'profile') spec.profile = path.resolve(value);
     else if (key === 'throttle') spec.throttle = Number(value);
-    else if (key === 'seed') spec.seed = Number(value) >>> 0;
+    else if (key === 'seed') spec.seed = uint32(value, '--instance seed');
     else if (key === 'arena-fill') spec.arenaFill = Number(value);
     else if (key === 'flip') {
-      const [tick, byte, bit] = value.split(':').map(Number);
-      if (![tick, byte, bit].every(Number.isInteger) || tick < 0 || byte < 0 || byte >= NET_FRAME_BYTES || bit < 0 || bit > 7)
+      const fields = value.split(':');
+      const [tick, byte, bit] = fields.map(Number);
+      if (fields.length !== 3 || ![tick, byte, bit].every(Number.isInteger) || tick < 0 || byte < 0 || byte >= NET_FRAME_BYTES || bit < 0 || bit > 7)
         throw Error('flip must be TICK:BYTE:BIT with BYTE below 44 and BIT below 8');
       spec.flip = {tick, byte, bit};
     } else throw Error(`Unknown --instance field: ${key}`);
@@ -85,6 +95,11 @@ const frameCount = scriptBytes.readUInt32BE(8);
 if (scriptBytes.length !== SCRIPT_HEADER_BYTES + frameCount * NET_FRAME_BYTES) throw Error('Script length disagrees with its frame count');
 const baseFrames = scriptBytes.subarray(SCRIPT_HEADER_BYTES);
 const total = stopAfter ? Math.min(stopAfter, frameCount) : frameCount;
+for (const spec of specs)
+  if (spec.flip && spec.flip.tick >= total)
+    throw Error(`flip tick ${spec.flip.tick} is outside the ${total}-tick workload`);
+const routeScope = classifyRoute(total, frameCount);
+const fullRoute = routeScope === 'full';
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
 const output = path.resolve(values.out);
@@ -154,6 +169,18 @@ async function runInstance(spec) {
         throw Error(`No source progress for ${stallMs} ms at cursor ${status.cursor}: ${JSON.stringify(native)}`);
       await sleep(pollMs);
     }
+    if (fullRoute) {
+      const observed = await instance.observe();
+      const scenes = result.scene_runs.map(row => row.scene);
+      result.route = validateFullRoute(scenes, observed.match);
+      result.match_observation = observed.match;
+    } else {
+      result.route = {scope: 'prefix-only', status: 'not-checked',
+        observed_scenes: result.scene_runs.map(row => row.scene)};
+    }
+    result.graphics = await instance.graphics();
+    result.screenshot = path.join(spec.label, 'final.png');
+    await instance.screenshot(path.join(directory, 'final.png'));
     result.timing_resumes = instance.timingResumes;
     result.wait_episodes = result.final_status.wait_episodes;
     if (!values['skip-unload']) {
@@ -167,6 +194,13 @@ async function runInstance(spec) {
     result.first_error = String(error.stack || error.message || error);
     if (typeof error.browserClosed === 'boolean') result.browser_closed = error.browserClosed;
     try { if (instance) { result.failure_status = await instance.status(); result.failure_native = await instance.native(); } } catch {}
+    try {
+      if (instance) {
+        result.failure_graphics = await instance.graphics();
+        result.failure_screenshot = path.join(spec.label, 'failure.png');
+        await instance.screenshot(path.join(directory, 'failure.png'));
+      }
+    } catch (captureError) { result.failure_capture_error = String(captureError.message || captureError); }
   } finally {
     result.finished_at = new Date().toISOString();
     result.page_errors = instance?.errors ?? [];
@@ -187,9 +221,13 @@ const report = {
   scope: 'Functional two-instance determinism workload; no timing, performance, pixels, PCM, transport or retail-equivalence claim.',
   url: values.url, browser: path.basename(browserPath), playwright: playwrightPath,
   script: {path: path.basename(values.script), sha256: sha256(scriptBytes), frames: frameCount, ticks_pushed: total},
+  route: {scope: routeScope,
+    expected_full_scene_order: fullRoute ? expectedFullSceneOrder() : null,
+    full_route_selection_checked: fullRoute},
   seed, lookahead, poll_ms: pollMs, timing_pauses_auto_resumed: true,
   instances: results.map(row => ({label: row.label, outcome: row.outcome, records: row.records, throttle: row.throttle,
-    profile_kind: row.profile_kind, timing_resumes: row.timing_resumes.length, first_error: row.first_error})),
+    profile_kind: row.profile_kind, route: row.route ?? {scope: fullRoute ? 'full' : 'prefix-only', status: 'failed'},
+    timing_resumes: row.timing_resumes.length, first_error: row.first_error})),
 };
 await fs.writeFile(path.join(output, 'run.json'), JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify(report.instances));
