@@ -2415,6 +2415,12 @@ try{
     'Rendered validation requires an isolated page and a WebGPU adapter');
   await driver.waitForImport();
   report.css_observer_storage = await installSizedCssObservers(page);
+  report.staging_ring = await page.evaluate(() => window.__meleeWebStagingRingStatus ?? null);
+  if (new URL(values.url).searchParams.get('melee-web-staging-slots') === '4') {
+    assert.equal(report.staging_ring?.frame_slots, 4, 'Explicit ring4 regression requires four native frame slots');
+    assert.equal(report.staging_ring?.staging_buffers, 4, 'Explicit ring4 regression requires four native staging buffers');
+  }
+
   await installRuntimeDiagnosticsCapture(report.runtime_diagnostics.identity,
     report.runtime_diagnostics.identity_scope);
   await installResultsInputObserver();
