@@ -137,13 +137,19 @@ for maps 3 and 4; GrPs4.dat provides map 6's joint plus one joint-animation
 table; and GrPs3.dat provides maps 7 and 8's joints and their one-element joint
 and material-animation tables, plus map 9's joint and one material-animation
 table. No map has a shape-animation table. Non-owner archives retain the exact
-named external identity and descriptor slot; the corresponding provider row is
-checked against its public symbol and local table length. `ResolveNull` makes
-those external optional pointers null while preserving external metadata, so a
-null local optional does not mean the authored slot is absent. These ownership
-facts do not establish runtime external linking. Map 0's joint slot is local in
-each of the five English archives and is checked as a bounded 64-byte target;
-the trace does not require a public symbol name for that slot. Map 1 also calls
+named external identity and descriptor slot. The provider is identified by the
+exact hashed archive and its `map_head` row's local relocated slot and target
+bounds; each present local animation list has one entry. None of the 32 local
+descriptor targets in these six DATs has a public symbol at the exact target
+offset. In particular, the imported symbol name is not treated as a provider
+public symbol. `lbArchive_InitializeDAT` calls `HSD_ArchiveLocateExtern` with a
+null address, which clears each imported slot; `grDatFiles_801C6330` selects the
+resident archive whose `map_head` row has a local joint. The C0 trace records
+these source and archive facts without executing runtime owner selection.
+`ResolveNull` makes external optional pointers null while preserving external
+metadata, so a null local optional does not mean the authored slot is absent.
+Map 0's joint slot is local in each of the five English archives and is checked
+as a bounded 64-byte target. Map 1 also calls
 `grAnime_801C77FC(gobj, 0, 7)`. Case 4 freezes the outgoing map with
 `grAnime_801C7A04(xE4, 0, 7, 0.0f)`. The per-entry `animation_flags` (`x28`)
 slots exist in every archive, including for externally owned entries.

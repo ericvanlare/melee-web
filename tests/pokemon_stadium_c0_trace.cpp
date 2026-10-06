@@ -245,12 +245,12 @@ struct AnimationSlotExpectation {
     // -1 means absent in every archive; -2 means local in every archive.
     // Otherwise the value is the ordinal of the archive that owns the root.
     int owner;
-    const char* symbol;
+    const char* external_identity;
     std::size_t target_bytes;
     bool pointer_list;
 };
 
-constexpr std::array<const char*, 10> joint_symbols{
+constexpr std::array<const char*, 10> joint_external_identities{
     nullptr,
     "GrdPStadiumBG_TopN_joint",
     "GrdPStadiumField_TopN_joint",
@@ -263,7 +263,7 @@ constexpr std::array<const char*, 10> joint_symbols{
     "GrdPStadiumWater_TopN_joint",
 };
 constexpr std::array<int, 10> joint_owners{-2, 0, 0, 1, 2, 0, 4, 3, 3, 3};
-constexpr std::array<const char*, 10> joint_animation_symbols{
+constexpr std::array<const char*, 10> joint_animation_external_identities{
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
     "GrdPStadiumRock_TopN_animjoint_list",
     "GrdPStadiumWaterFunsuiA_TopN_animjoint_list",
@@ -272,7 +272,7 @@ constexpr std::array<const char*, 10> joint_animation_symbols{
 };
 constexpr std::array<int, 10> joint_animation_owners{
     -1, -1, -1, -1, -1, -1, 4, 3, 3, -1};
-constexpr std::array<const char*, 10> material_animation_symbols{
+constexpr std::array<const char*, 10> material_animation_external_identities{
     nullptr,
     "GrdPStadiumBG_TopN_matanim_joint_list",
     "GrdPStadiumField_TopN_matanim_joint_list",
@@ -291,13 +291,13 @@ AnimationSlotExpectation animation_expectation(std::size_t entry,
                                                std::uint32_t field_offset)
 {
     if (field_offset == 0)
-        return {joint_owners[entry], joint_symbols[entry], 64, false};
+        return {joint_owners[entry], joint_external_identities[entry], 64, false};
     if (field_offset == 4)
-        return {joint_animation_owners[entry], joint_animation_symbols[entry],
+        return {joint_animation_owners[entry], joint_animation_external_identities[entry],
                 4, true};
     if (field_offset == 8)
         return {material_animation_owners[entry],
-                material_animation_symbols[entry], 4, true};
+                material_animation_external_identities[entry], 4, true};
     check(field_offset == 12, "unknown Stadium animation slot offset");
     return {-1, nullptr, 0, false};
 }
@@ -325,11 +325,11 @@ void validate_animation_slot(const ArchiveRecord& record,
     const bool local = expectation.owner == -2 ||
                        static_cast<std::size_t>(expectation.owner) == archive_ordinal;
     if (!local) {
-        check(expectation.symbol != nullptr && external != nullptr &&
-                  external->name == expectation.symbol &&
+        check(expectation.external_identity != nullptr && external != nullptr &&
+                  external->name == expectation.external_identity &&
                   std::count(external->slots.begin(), external->slots.end(), slot) == 1 &&
                   !archive.has_relocation(slot) && archive.be32(slot) == 0,
-              label + " external identity or exact slot differs from the authored provider");
+              label + " external identity or exact slot differs from the authored import");
         return;
     }
 
@@ -337,9 +337,8 @@ void validate_animation_slot(const ArchiveRecord& record,
           label + " is not a local relocated reference in its authored provider");
     const auto target = archive.pointer(slot, expectation.target_bytes);
     check(target.has_value(), label + " local reference has no bounded target");
-    if (expectation.symbol)
-        check(symbol_offset(archive, expectation.symbol) == *target,
-              label + " target differs from its expected provider public symbol");
+    check(public_symbols_at(archive, *target).empty(),
+          label + " local target no longer matches the pinned anonymous-row inventory");
     if (expectation.pointer_list)
         check(pointer_list_count(archive, *target) == 1,
               label + " local animation table length differs from one authored slot");
