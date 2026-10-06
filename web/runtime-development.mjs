@@ -247,6 +247,24 @@ window.meleeNetBegin=async(seed,maxFrames)=>{
  await boundary(()=>check(Module._melee_web_native_menu_launch()));
  $('canvas').focus();inputDirty=true;syncAudio();
 };
+window.meleeNetBeginLockstep=async(seed,maxFrames)=>{
+ if(retailRun||replayLoading||!ready||fatal||!bundle||typeof Module._melee_web_native_menu_net_begin_lockstep!=='function')throw Error('Lockstep session is unavailable');
+ if(owner.handle.getState().state!=='prepared')throw Error('A lockstep session requires a freshly imported disc before opening character select.');
+ resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
+ await boundary(()=>check(Module._melee_web_native_menu_net_begin_lockstep(seed>>>0,maxFrames>>>0)));
+ await waitForAudioRender();
+ await boundary(()=>check(Module._melee_web_native_menu_launch()));
+ $('canvas').focus();inputDirty=true;syncAudio();
+};
+window.meleeNetPeerIdentity=async()=>{
+ if(!owner?.handle?.discIdentity)throw Error('Lockstep disc identity is unavailable');
+ const response=await fetch(new URL('./gameplay_menu_browser.wasm',import.meta.url),{cache:'no-store'});
+ if(!response.ok)throw Error(`Could not read lockstep Wasm identity (${response.status})`);
+ const bytes=await response.arrayBuffer();
+ const digest=await crypto.subtle.digest('SHA-256',bytes);
+ const wasm=Array.from(new Uint8Array(digest),value=>value.toString(16).padStart(2,'0')).join('');
+ return {algorithm:'sha256',wasm,disc:await owner.handle.discIdentity()};
+};
 $('retail-replay-start').onclick=async()=>{
  if(replayLoading||retailRun||!ready||fatal||!bundle)return;
  replayLoading=true;$('retail-replay-start').disabled=$('disc').disabled=$('launch').disabled=true;

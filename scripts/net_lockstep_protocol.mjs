@@ -1,0 +1,471 @@
+import {createHash} from 'node:crypto';
+
+export const LOCKSTEP_VERSION = 1;
+export const LOCKSTEP_DELAY = 2;
+export const LOCKSTEP_WINDOW = 32;
+export const LOCKSTEP_MAX_BATCH = 32;
+export const NET_RECORD_BYTES = 64;
+export const PAD_BYTES = 11;
+export const NET_FRAME_BYTES = 44;
+export const TERMINAL = Object.freeze({desync: 1, disconnect: 2, protocol: 3, startIdentity: 4});
+
+const opposite = Object.freeze({alpha: 'beta', beta: 'alpha'});
+const portFor = Object.freeze({alpha: 0, beta: 1});
+const zeroPad = Buffer.alloc(PAD_BYTES);
+const noControllerPad = Buffer.from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xff]);
+const digest = value => createHash('sha256').update(value).digest('hex');
+const clone = value => JSON.parse(JSON.stringify(value));
+
+function integer(value, max, label) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > max)
+    throw Error(`Invalid lockstep ${label}`);
+  return value;
+}
+
+function decodeSample(text) {
+  if (typeof text !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(text))
+    throw Error('Invalid lockstep PAD sample encoding');
+  const value = Buffer.from(text, 'base64');
+  if (value.length !== PAD_BYTES || value.toString('base64') !== text)
+    throw Error('Lockstep PAD sample must contain exactly 11 canonical bytes');
+  return value;
+}
+
+function recordTick(record) {
+  if (!Buffer.isBuffer(record) || record.length !== NET_RECORD_BYTES)
+    throw Error('Lockstep checksum must be one 64-byte native record');
+  return record.readUInt32LE(0);
+}
+
+function mismatchChannel(a, b) {
+  const fields = [
+    [0, 16, 0], // header
+    [24, 8, 1], // four PAD records
+    [32, 8, 2], // HSD master PAD
+    [16, 4, 3], // checksum component flags
+    [40, 8, 3], // scene state and flags
+    [56, 8, 4], // total
+    [20, 4, 5], // object count
+    [48, 8, 5], // object state
+  ];
+  for (const [offset, size, channel] of fields)
+    if (!a.subarray(offset, offset + size).equals(b.subarray(offset, offset + size))) return channel;
+  return 0;
+}
+
+/** One side of the bounded A2 peer protocol. The transport is an opaque
+ * send(string) callback; it never assembles PAD frames or edits checksums. */
+export class LockstepPeer {
+  constructor({role, sourceTicks, inputTicks, pushFrame, onTerminal = () => {}, onReady = () => {}}) {
+    if (!(role in opposite)) throw Error('Lockstep role must be alpha or beta');
+    this.role = role;
+    this.remoteRole = opposite[role];
+    this.localPort = portFor[role];
+    this.remotePort = portFor[this.remoteRole];
+    this.sourceTicks = integer(sourceTicks, 216000, 'source tick bound');
+    this.inputTicks = integer(inputTicks, 216000, 'input tick bound');
+    if (this.sourceTicks < LOCKSTEP_DELAY || this.inputTicks + LOCKSTEP_DELAY !== this.sourceTicks)
+      throw Error('Lockstep input and source tick bounds must differ by the fixed two-tick delay');
+    this.pushFrame = pushFrame;
+    this.onTerminal = onTerminal;
+    this.onReady = onReady;
+    this.sendRaw = null;
+    this.localHello = null;
+    this.remoteHello = null;
+    this.ready = false;
+    this.terminal = null;
+    this.local = new Map();
+    this.nativeLocal = new Map();
+    this.remote = new Map();
+    this.localChecksums = new Map();
+    this.remoteChecksums = new Map();
+    this.remoteAckInput = -1;
+    this.remoteAckChecksum = -1;
+    this.remoteContiguousInput = -1;
+    this.localContiguousInput = -1;
+    this.remoteContiguousChecksum = -1;
+    this.localContiguousChecksum = -1;
+    this.nextChecksumCompare = 0;
+    this.nextSequence = 0;
+    this.expectedSequence = 0;
+    this.lastAccepted = new Map();
+    this.pendingSequence = new Map();
+    this.nextSourceFrame = 0;
+    this.delayedChecksumThrough = -1;
+    this.inputDuplicates = 0;
+    this.checksumDuplicates = 0;
+    this.outOfOrderInputs = 0;
+    this.acknowledgedInputs = 0;
+    this.acknowledgedChecksums = 0;
+    this.checksumMismatches = [];
+    this.pump = Promise.resolve();
+  }
+
+  attach(sendRaw) { this.sendRaw = sendRaw; }
+
+  async sendObject(object) {
+    if (!this.sendRaw || this.terminal) return;
+    await this.sendRaw(JSON.stringify(object));
+  }
+
+  async start(agreement) {
+    if (this.localHello) throw Error('Lockstep start identity was already sent');
+    this.localHello = {
+      type: 'hello', version: LOCKSTEP_VERSION, role: this.role,
+      local_port: this.localPort, remote_port: this.remotePort,
+      agreement: clone(agreement),
+    };
+    this.agreementHash = digest(JSON.stringify(this.localHello.agreement));
+    await this.sendObject(this.localHello);
+  }
+
+  async receive(text) {
+    if (this.terminal) return;
+    let packet;
+    try { packet = JSON.parse(text); }
+    catch (error) {
+      await this.fail('protocol', {reason: 'invalid JSON'});
+      throw error;
+    }
+    try {
+      if (packet?.type === 'hello') return await this.#receiveHello(packet);
+      if (packet?.type === 'terminal' && packet.version === LOCKSTEP_VERSION &&
+          packet.role === this.remoteRole &&
+          ['desync', 'disconnect', 'protocol', 'startIdentity'].includes(packet.kind))
+        return await this.fail(packet.kind, packet.details ?? {}, {notify: false});
+      if (!this.ready) throw Error('state arrived before peer identity agreement');
+      if (packet?.type !== 'state' || packet.version !== LOCKSTEP_VERSION ||
+          packet.role !== this.remoteRole) throw Error('invalid state packet identity');
+      await this.#receiveState(packet, text);
+    } catch (error) {
+      await this.fail('protocol', {reason: String(error.message || error)});
+      throw error;
+    }
+  }
+
+  async #receiveHello(packet) {
+    if (!this.localHello || packet.version !== LOCKSTEP_VERSION ||
+        packet.role !== this.remoteRole || packet.local_port !== this.remotePort ||
+        packet.remote_port !== this.localPort || !packet.agreement ||
+        JSON.stringify(packet.agreement) !== JSON.stringify(this.localHello.agreement))
+      throw Error('peer start identity or complementary PAD-port ownership differs');
+    if (this.remoteHello && JSON.stringify(this.remoteHello) !== JSON.stringify(packet))
+      throw Error('conflicting peer start identity retransmission');
+    this.remoteHello = clone(packet);
+    if (!this.ready) {
+      this.ready = true;
+      await this.onReady(this);
+      await this.#pumpFrames();
+    }
+  }
+
+  async addLocalInput(tick, sample, {repeat = false, deferSend = false, nativeSample = sample} = {}) {
+    return this.addLocalInputs([[tick, sample]], {repeat, deferSend,
+      nativeOverrides: nativeSample === sample ? [] : [[tick, nativeSample]]});
+  }
+
+  async addLocalInputs(entries, {repeat = false, deferSend = false, nativeOverrides = []} = {}) {
+    this.#assertReady();
+    if (!Array.isArray(entries) || !entries.length || entries.length > LOCKSTEP_MAX_BATCH)
+      throw Error(`Lockstep local input batches must contain 1..${LOCKSTEP_MAX_BATCH} contributions`);
+    const seen = new Set();
+    const overrides = new Map(nativeOverrides);
+    for (const [tick, sample] of entries) {
+      integer(tick, this.inputTicks - 1, 'input tick');
+      if (seen.has(tick)) throw Error('Local input batch repeats an input tick');
+      seen.add(tick);
+      const value = Buffer.from(sample);
+      if (value.length !== PAD_BYTES) throw Error('Local PAD contribution must contain 11 bytes');
+      const previous = this.local.get(tick);
+      if (previous && !previous.equals(value))
+        return this.fail('protocol', {reason: 'local input changed after publication', tick});
+      this.local.set(tick, value);
+      const native = overrides.has(tick) ? Buffer.from(overrides.get(tick)) : value;
+      if (native.length !== PAD_BYTES) throw Error('Native PAD contribution must contain 11 bytes');
+      const oldNative = this.nativeLocal.get(tick);
+      if (oldNative && !oldNative.equals(native))
+        return this.fail('protocol', {reason: 'native local input changed after publication', tick});
+      this.nativeLocal.set(tick, native);
+    }
+    while (this.local.has(this.localContiguousInput + 1)) ++this.localContiguousInput;
+    await this.#pumpFrames();
+    if (!deferSend) await this.#sendState();
+    if (repeat) await this.#sendState();
+  }
+
+  async addChecksum(record) {
+    this.#assertReady();
+    const value = Buffer.from(record);
+    const tick = recordTick(value);
+    if (tick >= this.sourceTicks) throw Error('Native checksum is beyond the source tick bound');
+    const previous = this.localChecksums.get(tick);
+    if (previous && !previous.equals(value)) return this.fail('protocol', {reason: 'native emitted conflicting checksums', tick});
+    this.localChecksums.set(tick, value);
+    while (this.localChecksums.has(this.localContiguousChecksum + 1)) ++this.localContiguousChecksum;
+    await this.#compareReadyChecksums();
+  }
+
+  async setNativeProgress(cursor, {flushFinal = false} = {}) {
+    this.#assertReady();
+    integer(cursor, this.sourceTicks, 'native cursor');
+    const through = flushFinal ? this.sourceTicks - 1 : cursor - LOCKSTEP_DELAY - 1;
+    if (through > this.delayedChecksumThrough) {
+      this.delayedChecksumThrough = through;
+      await this.#sendState();
+    }
+  }
+
+  #assertReady() {
+    if (!this.ready || this.terminal) throw Error(`Lockstep peer ${this.role} is not active`);
+  }
+
+  async #sendState() {
+    if (!this.ready || this.terminal) return;
+    const unacknowledged = [...this.local.entries()]
+      .filter(([tick]) => tick > this.remoteAckInput)
+      .slice(0, LOCKSTEP_MAX_BATCH)
+      .map(([tick, sample]) => ({tick, pad: sample.toString('base64')}));
+    const checksums = [...this.localChecksums.entries()]
+      .filter(([tick]) => tick > this.remoteAckChecksum && tick <= this.delayedChecksumThrough)
+      .slice(0, LOCKSTEP_MAX_BATCH)
+      .map(([tick, record]) => ({tick, record: record.toString('base64')}));
+    await this.sendObject({
+      type: 'state', version: LOCKSTEP_VERSION, role: this.role,
+      sequence: this.nextSequence++,
+      ack_sequence: this.expectedSequence ? this.expectedSequence - 1 : null,
+      ack_input: this.remoteContiguousInput >= 0 ? this.remoteContiguousInput : null,
+      ack_checksum: this.remoteContiguousChecksum >= 0 ? this.remoteContiguousChecksum : null,
+      unacknowledged, delayed_checksums: checksums,
+    });
+  }
+
+  async #receiveState(packet, raw) {
+    integer(packet.sequence, 0xffffffff, 'packet sequence');
+    const rawHash = digest(raw);
+    if (packet.sequence < this.expectedSequence) {
+      const accepted = this.lastAccepted.get(packet.sequence);
+      if (!accepted || accepted !== rawHash) throw Error('conflicting or expired duplicate state packet');
+      return;
+    }
+    if (packet.sequence - this.expectedSequence > LOCKSTEP_WINDOW)
+      throw Error('state packet is outside the bounded reorder window');
+    const pending = this.pendingSequence.get(packet.sequence);
+    if (pending && pending.rawHash !== rawHash) throw Error('conflicting state packet sequence');
+    this.pendingSequence.set(packet.sequence, {packet, rawHash});
+    let changed = false;
+    while (this.pendingSequence.has(this.expectedSequence)) {
+      const next = this.pendingSequence.get(this.expectedSequence);
+      this.pendingSequence.delete(this.expectedSequence);
+      this.lastAccepted.set(this.expectedSequence, next.rawHash);
+      while (this.lastAccepted.size > LOCKSTEP_WINDOW) this.lastAccepted.delete(this.lastAccepted.keys().next().value);
+      ++this.expectedSequence;
+      changed = (await this.#applyState(next.packet)) || changed;
+    }
+    await this.#pumpFrames();
+    if (changed) await this.#sendState();
+  }
+
+  async #applyState(packet) {
+    let changed = false;
+    const ackSequence = packet.ack_sequence;
+    if (ackSequence !== null) {
+      integer(ackSequence, 0xffffffff, 'sequence acknowledgement');
+      if (ackSequence >= this.nextSequence) throw Error('peer acknowledged an unsent state packet');
+    }
+    for (const [field, current, countName] of [
+      ['ack_input', this.remoteAckInput, 'acknowledgedInputs'],
+      ['ack_checksum', this.remoteAckChecksum, 'acknowledgedChecksums'],
+    ]) {
+      const value = packet[field];
+      if (value !== null) {
+        integer(value, 0xffffffff, `${field} value`);
+        const maximum = field === 'ack_input' ? this.localContiguousInput : this.localContiguousChecksum;
+        if (value > maximum) throw Error(`peer ${field} exceeds published local data`);
+        if (value > current) {
+          this[field === 'ack_input' ? 'remoteAckInput' : 'remoteAckChecksum'] = value;
+          this[countName] += value - current;
+          changed = true;
+        }
+      }
+    }
+    if (!Array.isArray(packet.unacknowledged) || packet.unacknowledged.length > LOCKSTEP_MAX_BATCH ||
+        !Array.isArray(packet.delayed_checksums) || packet.delayed_checksums.length > LOCKSTEP_MAX_BATCH)
+      throw Error('state packet exceeded its bounded payload');
+    const seenInputs = new Set();
+    for (const entry of packet.unacknowledged) {
+      const tick = integer(entry?.tick, this.inputTicks - 1, 'remote input tick');
+      if (seenInputs.has(tick)) throw Error('state packet repeats an input tick');
+      seenInputs.add(tick);
+      if (tick > this.remoteContiguousInput + LOCKSTEP_WINDOW + 1)
+        throw Error('remote input is outside the bounded reorder window');
+      const sample = decodeSample(entry.pad);
+      const old = this.remote.get(tick);
+      if (old && !old.equals(sample)) throw Error(`conflicting remote PAD contribution at tick ${tick}`);
+      if (old) ++this.inputDuplicates;
+      else { this.remote.set(tick, sample); changed = true; }
+      if (tick > this.remoteContiguousInput + 1) ++this.outOfOrderInputs;
+    }
+    while (this.remote.has(this.remoteContiguousInput + 1)) ++this.remoteContiguousInput;
+
+    const seenChecksums = new Set();
+    for (const entry of packet.delayed_checksums) {
+      const tick = integer(entry?.tick, this.sourceTicks - 1, 'remote checksum tick');
+      if (seenChecksums.has(tick)) throw Error('state packet repeats a checksum tick');
+      seenChecksums.add(tick);
+      const record = Buffer.from(entry.record || '', 'base64');
+      if (record.length !== NET_RECORD_BYTES || record.toString('base64') !== entry.record || recordTick(record) !== tick)
+        throw Error('invalid delayed checksum record');
+      const old = this.remoteChecksums.get(tick);
+      if (old && !old.equals(record)) throw Error(`conflicting remote checksum at tick ${tick}`);
+      if (old) ++this.checksumDuplicates;
+      else { this.remoteChecksums.set(tick, record); changed = true; }
+      if (tick > this.remoteContiguousChecksum + LOCKSTEP_WINDOW + 1)
+        throw Error('remote checksum is outside the bounded reorder window');
+    }
+    while (this.remoteChecksums.has(this.remoteContiguousChecksum + 1)) ++this.remoteContiguousChecksum;
+    await this.#compareReadyChecksums();
+    return changed;
+  }
+
+  async #compareReadyChecksums() {
+    // A checksum may arrive out of order. Never report a later mismatch until
+    // every preceding checksum from both peers has arrived and matched.
+    const through = Math.min(this.localContiguousChecksum, this.remoteContiguousChecksum);
+    while (this.nextChecksumCompare <= through && !this.terminal) {
+      const tick = this.nextChecksumCompare;
+      const local = this.localChecksums.get(tick), remote = this.remoteChecksums.get(tick);
+      if (!local || !remote) throw Error(`contiguous checksum ${tick} is missing a peer record`);
+      if (!local.equals(remote)) {
+        const channel = mismatchChannel(local, remote);
+        this.checksumMismatches.push({tick, channel});
+        await this.fail('desync', {tick, channel});
+        return;
+      }
+      ++this.nextChecksumCompare;
+    }
+  }
+
+  async #pumpFrames() {
+    if (!this.ready || this.terminal) return;
+    this.pump = this.pump.then(async () => {
+      while (this.nextSourceFrame < this.sourceTicks && !this.terminal) {
+        const firstTick = this.nextSourceFrame;
+        const frames = [];
+        while (frames.length < LOCKSTEP_MAX_BATCH && this.nextSourceFrame < this.sourceTicks) {
+          const sourceTick = this.nextSourceFrame;
+          let local = zeroPad, remote = zeroPad;
+          if (sourceTick >= LOCKSTEP_DELAY) {
+            const inputTick = sourceTick - LOCKSTEP_DELAY;
+          local = this.nativeLocal.get(inputTick);
+            remote = this.remote.get(inputTick);
+            if (!local || !remote) break;
+          }
+          const frame = Buffer.alloc(NET_FRAME_BYTES);
+          frame.set(noControllerPad, 22);
+          frame.set(noControllerPad, 33);
+          frame.set(local, this.localPort * PAD_BYTES);
+          frame.set(remote, this.remotePort * PAD_BYTES);
+          frames.push(frame);
+        ++this.nextSourceFrame;
+        }
+        if (!frames.length) break;
+        try {
+          await this.pushFrame(firstTick, Buffer.concat(frames));
+        } catch (error) {
+          const reason = `indexed native frame push failed at source tick ${firstTick}: ${String(error.message || error)}`;
+          await this.fail('protocol', {reason, tick: firstTick});
+          throw Error(reason, {cause: error});
+        }
+      }
+    });
+    await this.pump;
+  }
+
+  async fail(kind, details = {}, {notify = true} = {}) {
+    if (this.terminal) return;
+    this.terminal = {kind, ...details};
+    let callbackError = null;
+    try { await this.onTerminal(this.terminal, this); }
+    catch (error) { callbackError = error; }
+    if (notify && this.sendRaw) {
+      const packet = {type: 'terminal', version: LOCKSTEP_VERSION,
+        role: this.role, kind, details: clone(details)};
+      try { await this.sendRaw(JSON.stringify(packet)); }
+      catch (error) { callbackError ??= error; }
+    }
+    if (callbackError) throw callbackError;
+  }
+
+  async disconnect(reason = 'loopback transport closed') {
+    await this.fail('disconnect', {reason});
+  }
+
+  summary() {
+    return {
+      role: this.role, local_port: this.localPort, remote_port: this.remotePort,
+      ready: this.ready, terminal: this.terminal,
+      local_input_ticks: this.local.size, remote_input_ticks: this.remote.size,
+      native_local_divergences: [...this.local.entries()].filter(([tick, sample]) =>
+        this.nativeLocal.get(tick) && !this.nativeLocal.get(tick).equals(sample)).length,
+      remote_contiguous_input: this.remoteContiguousInput,
+      remote_ack_input: this.remoteAckInput,
+      local_checksum_ticks: this.localChecksums.size,
+      remote_checksum_ticks: this.remoteChecksums.size,
+      remote_contiguous_checksum: this.remoteContiguousChecksum,
+      next_checksum_compare: this.nextChecksumCompare,
+      remote_ack_checksum: this.remoteAckChecksum,
+      local_contiguous_input: this.localContiguousInput,
+      local_contiguous_checksum: this.localContiguousChecksum,
+      next_source_frame: this.nextSourceFrame,
+      input_duplicates: this.inputDuplicates,
+      checksum_duplicates: this.checksumDuplicates,
+      out_of_order_inputs: this.outOfOrderInputs,
+      acknowledged_inputs: this.acknowledgedInputs,
+      acknowledged_checksums: this.acknowledgedChecksums,
+      checksum_mismatches: this.checksumMismatches,
+      start_identity_hash: this.agreementHash ?? null,
+    };
+  }
+}
+
+export function relayFrame(text) {
+  const payload = Buffer.from(text, 'utf8');
+  if (!payload.length || payload.length > 1024 * 1024) throw Error('Loopback packet exceeds its 1 MiB bound');
+  const header = Buffer.alloc(4);
+  header.writeUInt32BE(payload.length);
+  return Buffer.concat([header, payload]);
+}
+
+export class RelayDecoder {
+  constructor() { this.buffer = Buffer.alloc(0); }
+  push(chunk) {
+    this.buffer = Buffer.concat([this.buffer, chunk]);
+    const rows = [];
+    while (this.buffer.length >= 4) {
+      const length = this.buffer.readUInt32BE(0);
+      if (!length || length > 1024 * 1024) throw Error('Invalid loopback packet length');
+      if (this.buffer.length < length + 4) break;
+      rows.push(this.buffer.subarray(4, length + 4).toString('utf8'));
+      this.buffer = this.buffer.subarray(length + 4);
+    }
+    return rows;
+  }
+}
+
+export function parseNetChecksum(record) {
+  const tick = recordTick(record);
+  return {
+    tick, scene: record.readUInt32LE(4), seed: record.readUInt32LE(8), frame: record.readUInt32LE(12),
+    flags: record.readUInt32LE(16), objects: record.readUInt32LE(20),
+    input: record.readBigUInt64LE(24).toString(16).padStart(16, '0'),
+    pad: record.readBigUInt64LE(32).toString(16).padStart(16, '0'),
+    scene_state: record.readBigUInt64LE(40).toString(16).padStart(16, '0'),
+    object_state: record.readBigUInt64LE(48).toString(16).padStart(16, '0'),
+    total: record.readBigUInt64LE(56).toString(16).padStart(16, '0'),
+  };
+}
+
+export const lockstepConstants = Object.freeze({
+  delay: LOCKSTEP_DELAY, window: LOCKSTEP_WINDOW, maxBatch: LOCKSTEP_MAX_BATCH,
+  neutralPad: zeroPad.toString('hex'), noControllerPad: noControllerPad.toString('hex'),
+});

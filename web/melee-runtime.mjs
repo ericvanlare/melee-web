@@ -818,6 +818,11 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       openedDiscSessions.add(session);
       return session;
     },
+    async discIdentity() {
+      if (!discSession || typeof discSession.identity !== 'function')
+        throw Error('A validated local disc identity is unavailable.');
+      return discSession.identity();
+    },
     importDisc(file, {preopenedSession = null} = {}) {
       if (preopenedSession && (!openedDiscSessions.has(preopenedSession) ||
           typeof preopenedSession.close !== 'function' || typeof preopenedSession.streamScope !== 'function')) {

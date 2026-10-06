@@ -20,6 +20,13 @@ async function sha1(bytes) {
   ).join("");
 }
 
+async function sha256(bytes) {
+  return Array.from(
+    new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)),
+    value => value.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
 function requireLocalFile(file) {
   const FileConstructor = globalThis.File;
   if (typeof FileConstructor !== "function" || !(file instanceof FileConstructor)) {
@@ -180,6 +187,20 @@ export class DiscAssetSession {
         source: "validated DOL fixed font range",
         size: this.#executable.font.size,
       }),
+    });
+  }
+
+  /** Identity of the exact validated executable and raw parsed file table. */
+  async identity() {
+    this.#assertOpen();
+    const fst = await this.#disc.read(this.#disc._fstOffset, this.#disc._fstSize);
+    this.#assertOpen();
+    return Object.freeze({
+      algorithm: "sha256",
+      dol: await sha256(this.#executable.dol),
+      fst: await sha256(fst),
+      dolSize: this.#executable.dol.byteLength,
+      fstSize: fst.byteLength,
     });
   }
 

@@ -45,6 +45,17 @@ const PAGE_HELPERS = () => {
       for (let i = 0; i < text.length; ++i) heap[ptr + i] = text.charCodeAt(i);
       return Module._melee_web_net_push(ptr, text.length / 44);
     },
+    pushIndexed(firstTick, base64) {
+      const text = atob(base64);
+      const ptr = buffer(text.length);
+      const heap = Module.HEAPU8;
+      for (let i = 0; i < text.length; ++i) heap[ptr + i] = text.charCodeAt(i);
+      return Module._melee_web_net_push_indexed(firstTick >>> 0, ptr, text.length / 44);
+    },
+    confirmStart() { return Module._melee_web_net_confirm_start(); },
+    terminate(kind, tick, channel) {
+      Module._melee_web_net_terminate(kind >>> 0, tick >>> 0, channel >>> 0);
+    },
     drain(max) {
       const ptr = buffer(max * 64);
       const count = Module._melee_web_net_checksum_drain(ptr, max);
@@ -167,11 +178,23 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     instance.browserVersion = context.browser()?.version() ?? null;
     instance.importDisc = async () => { await driver.selectDisc(disc); await driver.waitForStart(); };
     instance.begin = (seed, maxFrames) => bounded(() => page.evaluate(([s, m]) => window.meleeNetBegin(s, m), [seed >>> 0, maxFrames]));
+    instance.beginLockstep = (seed, maxFrames) => bounded(() => page.evaluate(([s, m]) => window.meleeNetBeginLockstep(s, m), [seed >>> 0, maxFrames]));
+    instance.peerIdentity = () => bounded(() => page.evaluate(() => window.meleeNetPeerIdentity()));
     instance.push = async frames => {
       if (frames.length % NET_FRAME_BYTES) throw Error('Networked frames must be 44-byte multiples');
       const ok = await bounded(() => page.evaluate(base64 => window.__net.push(base64), Buffer.from(frames).toString('base64')));
       if (!ok) throw Error('The native queue rejected an agreed frame chunk');
     };
+    instance.pushIndexed = async (firstTick, frames) => {
+      if (frames.length % NET_FRAME_BYTES) throw Error('Lockstep frames must be 44-byte multiples');
+      const ok = await bounded(() => page.evaluate(([tick, base64]) => window.__net.pushIndexed(tick, base64),
+        [firstTick, Buffer.from(frames).toString('base64')]));
+      if (!ok) throw Error(`The native queue rejected indexed frames beginning at ${firstTick}`);
+    };
+    instance.confirmStart = () => bounded(() => page.evaluate(() => window.__net.confirmStart()));
+    instance.terminate = (kind, tick, channel = 0) => bounded(() => page.evaluate(([k, t, c]) => {
+      window.__net.terminate(k, t, c); return window.__net.status();
+    }, [kind, tick, channel]));
     instance.drain = async (max = 1024) => {
       const result = await bounded(() => page.evaluate(count => window.__net.drain(count), max));
       return {count: result.count, bytes: Buffer.from(result.data, 'base64')};

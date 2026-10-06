@@ -6,6 +6,8 @@
 #include "gameplay_net_checksum.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_menu_host.h"
+#include "gameplay_pad_state.h"
+#include "gameplay_save_profile.h"
 #include <emscripten.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,9 +30,26 @@ typedef struct NetSession {
     uint64_t wait_callbacks;
     uint32_t wait_episodes;
     int waiting;
+    uint32_t wait_start_tick;
+    uint32_t wait_last_tick;
+    uint32_t wait_resume_count;
+    uint64_t start_barrier_callbacks;
     uint64_t backpressure_callbacks;
     int start_recorded;
+    int start_required;
+    int start_confirmed;
+    int start_capture_failed;
+    uint64_t start_card_hash;
+    uint64_t start_pad_history_hash;
+    uint64_t start_native_context;
     MeleeWebNetChecksumRecord start;
+    unsigned terminal_kind;
+    uint32_t terminal_tick;
+    unsigned terminal_channel;
+    unsigned indexed_duplicates;
+    unsigned indexed_conflicts;
+    unsigned indexed_gaps;
+    unsigned indexed_invalid;
     MeleeWebNetChecksumRecord ring[MELEE_WEB_NET_CHECKSUM_RING];
     uint32_t ring_read, ring_write;
     MeleeWebNetArenaRecord arena[MELEE_WEB_NET_ARENA_RECORDS];
@@ -43,7 +62,7 @@ typedef struct NetSession {
 } NetSession;
 
 static NetSession net = {.arena_fill = -1};
-static char status_text[8192];
+static char status_text[16384];
 
 static int fail(char* e, size_t n, const char* message)
 {
@@ -77,7 +96,8 @@ int melee_web_net_session_begin(size_t bytes, char* error, size_t error_size)
     return 1;
 }
 
-int melee_web_net_begin(uint32_t seed, uint32_t max_frames, char* e, size_t n)
+static int net_begin(uint32_t seed, uint32_t max_frames, int require_identity,
+                     char* e, size_t n)
 {
     if (net.active) return fail(e, n, "A networked session is already active");
     if (net.arena_fill_pending)
@@ -90,9 +110,22 @@ int melee_web_net_begin(uint32_t seed, uint32_t max_frames, char* e, size_t n)
     net.active = 1;
     net.seed = seed;
     net.max_frames = max_frames;
+    net.start_required = require_identity;
+    net.start_confirmed = !require_identity;
     net.last_scene = UINT32_MAX;
     if (e && n) *e = 0;
     return 1;
+}
+
+int melee_web_net_begin(uint32_t seed, uint32_t max_frames, char* e, size_t n)
+{
+    return net_begin(seed, max_frames, 0, e, n);
+}
+
+int melee_web_net_begin_lockstep(uint32_t seed, uint32_t max_frames,
+                                 char* e, size_t n)
+{
+    return net_begin(seed, max_frames, 1, e, n);
 }
 
 int melee_web_net_apply_start_context(MeleeWebMenuHost* host, char* e, size_t n)
@@ -107,6 +140,37 @@ int melee_web_net_apply_start_context(MeleeWebMenuHost* host, char* e, size_t n)
 
 static uint32_t ring_used(void) { return net.ring_write - net.ring_read; }
 
+static void capture_start_identity(uint32_t scene)
+{
+    static const uint8_t tag[] = "MeleeWeb native start identity v1";
+    static const PADStatus neutral[4];
+    uint8_t pad_state[MELEE_WEB_PAD_STATE_BYTES];
+    uint8_t* card = malloc(MELEE_WEB_SAVE_PROFILE_CARD_BYTES);
+    char error[256] = {0};
+    if (!card || !melee_web_menu_host_snapshot_card_data(
+            net.host, 0, card, MELEE_WEB_SAVE_PROFILE_CARD_BYTES,
+            error, sizeof(error))) {
+        free(card);
+        net.start_capture_failed = 1;
+        net.terminal_kind = MELEE_WEB_NET_TERMINAL_START_IDENTITY;
+        return;
+    }
+    melee_web_pad_state_capture(pad_state);
+    melee_web_net_checksum_compute(UINT32_MAX, scene, neutral, net.host, &net.start);
+    net.start_card_hash = melee_web_net_fnv1a64(
+        0xcbf29ce484222325ull, card, MELEE_WEB_SAVE_PROFILE_CARD_BYTES);
+    net.start_pad_history_hash = melee_web_net_fnv1a64(
+        0xcbf29ce484222325ull, pad_state, sizeof(pad_state));
+    uint64_t identity = melee_web_net_fnv1a64(
+        0xcbf29ce484222325ull, tag, sizeof(tag));
+    identity = melee_web_net_fnv1a64(identity, &net.start, sizeof(net.start));
+    identity = melee_web_net_fnv1a64(identity, card, MELEE_WEB_SAVE_PROFILE_CARD_BYTES);
+    identity = melee_web_net_fnv1a64(identity, pad_state, sizeof(pad_state));
+    net.start_native_context = identity;
+    net.start_recorded = 1;
+    free(card);
+}
+
 static void record_arena(uint32_t scene)
 {
     MeleeWebNetArenaRecord row = {net.cursor, scene, 0, 0, 0};
@@ -120,19 +184,41 @@ static void record_arena(uint32_t scene)
 const PADStatus* melee_web_net_before_step(uint32_t scene)
 {
     if (!net.active || !net.context_applied || net.step_pending) abort();
+    if (net.terminal_kind) return NULL;
+    if (net.start_required) {
+        /* A2's first callback is a prepared-state barrier. Its identity is
+         * exchanged before tick0; the source loop cannot consume until both
+         * peers explicitly confirm the same Wasm/DOL/FST/native identity. */
+        if (!net.start_recorded && !net.start_capture_failed)
+            capture_start_identity(scene);
+        if (net.start_capture_failed) return NULL;
+        if (!net.start_confirmed) {
+            ++net.start_barrier_callbacks;
+            return NULL;
+        }
+    }
     if (net.cursor >= net.pushed) {
         ++net.wait_callbacks;
-        if (!net.waiting) ++net.wait_episodes;
+        if (!net.waiting) {
+            ++net.wait_episodes;
+            net.wait_start_tick = net.cursor;
+        }
         net.waiting = 1;
+        net.wait_last_tick = net.cursor;
         return NULL;
+    }
+    if (net.waiting) {
+        net.waiting = 0;
+        ++net.wait_resume_count;
     }
     /* Never drop a checksum: a full ring stops source time like a wait. */
     if (ring_used() >= MELEE_WEB_NET_CHECKSUM_RING) {
         ++net.backpressure_callbacks;
         return NULL;
     }
-    net.waiting = 0;
-    if (!net.start_recorded) {
+    /* Preserve A1's original checksum capture point: immediately before its
+     * first available sequential frame is consumed. */
+    if (!net.start_required && !net.start_recorded) {
         static const PADStatus neutral[4];
         melee_web_net_checksum_compute(UINT32_MAX, scene, neutral, net.host, &net.start);
         net.start_recorded = 1;
@@ -185,13 +271,82 @@ static int decode_frame(const uint8_t* p, PADStatus out[4])
 
 EMSCRIPTEN_KEEPALIVE int melee_web_net_push(const uint8_t* bytes, unsigned count)
 {
-    if (!net.active || !bytes || !count || count > net.max_frames - net.pushed) return 0;
+    if (!net.active || net.terminal_kind || !bytes || !count ||
+        count > net.max_frames - net.pushed) return 0;
     for (unsigned i = 0; i < count; ++i)
         if (!decode_frame(bytes + (size_t) i * MELEE_WEB_NET_FRAME_BYTES,
                           net.frames[net.pushed + i]))
             return 0;
     net.pushed += count;
     return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int melee_web_net_push_indexed(uint32_t first_tick,
+                                                    const uint8_t* bytes,
+                                                    unsigned count)
+{
+    PADStatus parsed[4];
+    if (!net.active || net.terminal_kind || !bytes || !count ||
+        first_tick > net.max_frames ||
+        count > net.max_frames - first_tick) {
+        ++net.indexed_invalid;
+        return 0;
+    }
+    if (first_tick > net.pushed) {
+        ++net.indexed_gaps;
+        net.terminal_kind = MELEE_WEB_NET_TERMINAL_PROTOCOL;
+        net.terminal_tick = net.pushed;
+        return 0;
+    }
+    /* Decode and validate the entire envelope before changing the native
+     * contiguous frontier. Only byte-identical game values may be retried. */
+    for (unsigned i = 0; i < count; ++i) {
+        if (!decode_frame(bytes + (size_t) i * MELEE_WEB_NET_FRAME_BYTES, parsed)) {
+            ++net.indexed_invalid;
+            net.terminal_kind = MELEE_WEB_NET_TERMINAL_PROTOCOL;
+            net.terminal_tick = first_tick + i;
+            return 0;
+        }
+        uint32_t tick = first_tick + i;
+        if (tick < net.pushed &&
+            memcmp(parsed, net.frames[tick], sizeof(parsed)) != 0) {
+            ++net.indexed_conflicts;
+            net.terminal_kind = MELEE_WEB_NET_TERMINAL_PROTOCOL;
+            net.terminal_tick = tick;
+            return 0;
+        }
+    }
+    uint32_t overlap = net.pushed - first_tick;
+    if (overlap > count) overlap = count;
+    if (overlap) net.indexed_duplicates += overlap;
+    for (unsigned i = overlap; i < count; ++i) {
+        if (!decode_frame(bytes + (size_t) i * MELEE_WEB_NET_FRAME_BYTES, parsed))
+            abort(); /* The full packet was decoded in the validation pass. */
+        memcpy(net.frames[net.pushed], parsed, sizeof(parsed));
+        ++net.pushed;
+    }
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE int melee_web_net_confirm_start(void)
+{
+    if (!net.active || !net.start_recorded || net.start_capture_failed ||
+        net.terminal_kind) return 0;
+    net.start_confirmed = 1;
+    return 1;
+}
+
+EMSCRIPTEN_KEEPALIVE void melee_web_net_terminate(unsigned kind,
+                                                  uint32_t tick,
+                                                  unsigned channel)
+{
+    if (!net.active || net.terminal_kind) return;
+    if (kind < MELEE_WEB_NET_TERMINAL_DESYNC ||
+        kind > MELEE_WEB_NET_TERMINAL_START_IDENTITY)
+        kind = MELEE_WEB_NET_TERMINAL_PROTOCOL;
+    net.terminal_kind = kind;
+    net.terminal_tick = tick;
+    net.terminal_channel = channel;
 }
 
 EMSCRIPTEN_KEEPALIVE unsigned melee_web_net_cursor(void) { return net.cursor; }
@@ -224,18 +379,37 @@ EMSCRIPTEN_KEEPALIVE int melee_web_net_arena_fill(int pattern)
 EMSCRIPTEN_KEEPALIVE const char* melee_web_net_status(void)
 {
     size_t used = 0;
+    const char* blocker = net.terminal_kind ? "terminal" :
+        net.start_capture_failed ? "start_identity_error" :
+        (!net.start_recorded || !net.start_confirmed) ? "start_identity" :
+        (net.cursor >= net.pushed) ? "remote_input" :
+        (ring_used() >= MELEE_WEB_NET_CHECKSUM_RING) ? "checksum_backpressure" : "none";
     int written = snprintf(status_text, sizeof(status_text),
         "{\"active\":%d,\"context_applied\":%d,\"seed\":%u,\"max_frames\":%u,"
-        "\"pushed\":%u,\"cursor\":%u,\"wait_callbacks\":%llu,\"wait_episodes\":%u,"
+        "\"pushed\":%u,\"cursor\":%u,\"blocker\":\"%s\","
+        "\"start_barrier_callbacks\":%llu,\"wait_callbacks\":%llu,\"wait_episodes\":%u,"
+        "\"wait_start_tick\":%u,\"wait_last_tick\":%u,\"wait_resume_count\":%u,"
         "\"backpressure_callbacks\":%llu,\"ring_pending\":%u,\"arena_fill\":%d,"
-        "\"start\":{\"recorded\":%d,\"scene\":%u,\"seed\":%u,\"frame\":%u,"
+        "\"indexed\":{\"duplicates\":%u,\"conflicts\":%u,\"gaps\":%u,\"invalid\":%u},"
+        "\"terminal\":{\"kind\":%u,\"tick\":%u,\"channel\":%u},"
+        "\"start\":{\"required\":%d,\"recorded\":%d,\"scene\":%u,\"seed\":%u,\"frame\":%u,"
+        "\"confirmed\":%d,\"capture_failed\":%d,\"card\":\"%016llx\","
+        "\"pad_history\":\"%016llx\",\"native_context\":\"%016llx\","
         "\"total\":\"%016llx\",\"pad\":\"%016llx\",\"scene_state\":\"%016llx\","
         "\"object_state\":\"%016llx\",\"objects\":%u,\"flags\":%u},"
         "\"arena_overflow\":%u,\"arena\":[",
         net.active, net.context_applied, net.seed, net.max_frames, net.pushed,
-        net.cursor, (unsigned long long) net.wait_callbacks, net.wait_episodes,
+        net.cursor, blocker, (unsigned long long) net.start_barrier_callbacks,
+        (unsigned long long) net.wait_callbacks, net.wait_episodes,
+        net.wait_start_tick, net.wait_last_tick, net.wait_resume_count,
         (unsigned long long) net.backpressure_callbacks, ring_used(), net.arena_fill,
-        net.start_recorded, net.start.scene, net.start.seed, net.start.frame,
+        net.indexed_duplicates, net.indexed_conflicts, net.indexed_gaps,
+        net.indexed_invalid, net.terminal_kind, net.terminal_tick, net.terminal_channel,
+        net.start_required, net.start_recorded, net.start.scene, net.start.seed, net.start.frame,
+        net.start_confirmed, net.start_capture_failed,
+        (unsigned long long) net.start_card_hash,
+        (unsigned long long) net.start_pad_history_hash,
+        (unsigned long long) net.start_native_context,
         (unsigned long long) net.start.total, (unsigned long long) net.start.pad,
         (unsigned long long) net.start.scene_state,
         (unsigned long long) net.start.object_state, net.start.objects,
