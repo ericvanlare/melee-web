@@ -20,10 +20,10 @@ class AuroraPipelinePreparationTests(unittest.TestCase):
         self.assertTrue((AURORA / "include/aurora/pipeline_prepare.h").is_file(),
                         "Apply the pinned Aurora patch before running tests")
 
-    def compile(self, source, binary, *flags):
+    def compile(self, source, binary, *flags, selective=True):
         result = subprocess.run([
             self.compiler, "-std=c++20", "-O2", "-Wall", "-Wextra", "-Werror",
-            "-DMELEE_WEB_SELECTIVE_PIPELINES", "-I", str(AURORA / "include"),
+            *(["-DMELEE_WEB_SELECTIVE_PIPELINES"] if selective else []), "-I", str(AURORA / "include"),
             "-I", str(AURORA / "lib/gfx"), *flags, str(source), "-o", str(binary),
         ], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -41,7 +41,7 @@ class AuroraPipelinePreparationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="pipeline-prepare-sha-") as directory:
             source = Path(directory) / "hash.cpp"
             source.write_text('''
-#include "pipeline_prepare_state.hpp"
+#include "sha256.hpp"
 #include <cstdio>
 #include <vector>
 int main() {
@@ -55,7 +55,7 @@ int main() {
 }
 ''')
             binary = Path(directory) / "hash-test"
-            self.compile(source, binary)
+            self.compile(source, binary, selective=False)
             output = subprocess.check_output([str(binary)], text=True).splitlines()
             expected = [hashlib.sha256(bytes((i * 17 + 3) & 255 for i in range(size))).hexdigest()
                         for size in (0, 55, 56, 64, 4176)]
