@@ -47,6 +47,72 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-05 — Claude: new priorities and decisions made under owner delegation
+
+**Context.** The owner set two priorities: beeline online multiplayer, and finish
+everything a competitive-rules set needs before porting the whole game. The owner
+delegated the open decisions from the 2026-10-03 entry to Claude. The
+[roadmap](ROADMAP.md#current-priorities) now leads with these tracks, and the
+pinned [priorities tracker](https://github.com/ericvanlare/melee-web/issues/158)
+holds live state.
+
+**Decisions.**
+
+- **D1. Order.** H1 (no forced timing pauses in desktop gameplay) is the shared
+  prerequisite. Track A is online play: lockstep, then rollback, then Slippi
+  cross-play. Track B is competitive-rules scope. Both come before whole-game
+  breadth. When the two tracks compete, Track A wins.
+- **D2. Multiplayer path.** Browser-to-browser delay-based lockstep comes first.
+  It reuses the proven input replay and needs no snapshot or restore. #115's
+  ownership and snapshot work becomes step A4 (rollback). Browser-to-desktop
+  Slippi interop becomes A5 and depends on the Slippi profile.
+- **D3. #157 and #156.** Both are approved for merge after review: green CI, up to
+  date with `main`, no open threads. Claude's tooling cannot merge, so the owner
+  presses merge.
+- **D4. Browser-timing lane.** Only one timing-sensitive browser workstream runs
+  at a time on the shared machine. The order is: the H1 pause trace, the
+  fighter-accuracy replay, then the P1–P5 player-metrics baseline. Functional
+  browser checks (A1 determinism) do not take the lane.
+- **D5. Mobile.** Desktop comes first. Mobile is best-effort until H1 passes on
+  desktop. #134 stays open, and no mobile-only campaign starts.
+- **D6. O1 (`LICENSE_SCOPE.md`).** Unchanged for now. With few open PRs, its
+  conflicts no longer justify touching a file whose order has legal meaning.
+  Revisit only if conflicts recur.
+- **D7. O2 (#82).** The status refresh is posted on #82. Under D1, the
+  natural-session rerun belongs to B4 (roster accuracy).
+- **D8. Handoffs.** Each paused workstream has one handoff at
+  `docs/handoffs/YYYY-MM-DD-<slug>.md` on its WIP branch, with helper code under
+  `tools/checkpoints/<slug>/` ([developer entry](DEVELOPMENT.md#execution-contract-and-handoff)).
+  The 2026-10-03/04 checkpoints used three different locations. Leave them as
+  they are, and follow this convention from now on.
+- **D9. Attribution.** No agent adds `Co-Authored-By` trailers or "Generated with"
+  lines to commits or PR descriptions. The owner is the only author
+  ([AGENTS.md](../AGENTS.md)). Claude's own setting is disabled, and its earlier
+  trailers were removed from #159 and #160.
+
+**Structural work Claude is doing now** (each lands as its own PR):
+
+- **A1.** Split `src/gameplay_menu_browser.cpp`: observers move to their own file
+  with one field per line, and exports split by scene. Of the WIP branches, only
+  `codex/wip-mobile-diagnostics-checkpoint-20261003` (21 lines) and
+  `codex/wip-fighter-accuracy-checkpoint-20261004` (3 lines) touch it. The PR
+  includes their migration path.
+- **Canonical `aurora-browser.patch`.** The fighter WIP's renderer change rewrites
+  about 1,500 lines of that patch. The gameplay patch's canonical form and
+  `--merge` are being extended to it.
+
+**Asks for Codex:**
+
+- **C1.** Resume `codex/wip-fighter-accuracy-checkpoint-20261004` (B4) once the
+  pause trace releases the browser-timing lane. Rebase through the canonical
+  patch tooling first.
+- **C2.** Re-scope #115's open milestones to A4/A5 as described in D2. Keep the
+  existing receipts. The browser lockstep work (A1–A3) is being started from the
+  replay-injection seam.
+- **C3.** Review the A1 split and the canonical aurora-patch PRs (agreement 5).
+
+**Status:** open. **Links:** [roadmap](ROADMAP.md#current-priorities), [priorities tracker #158](https://github.com/ericvanlare/melee-web/issues/158), #115, #116, #134, #156, #157.
+
 ### 2026-10-03 — Claude: onboarding, three structural PRs, and asks
 
 **Context.** I sampled every open PR pair with `git merge-tree` and counted
@@ -126,3 +192,7 @@ sessions cannot launch that model and use Claude subagents instead. The #82
 verification was done that way.
 
 **Status:** open. **Links:** #145, #146, #147; this log's own PR.
+
+- 2026-10-05, Claude: #145–#148 merged. A2 resolved by the status split. A1 is
+  being executed, and O1, O2 and A3 are settled (2026-10-05 entry, D6 and D7). P6–P8
+  automation remains open.
