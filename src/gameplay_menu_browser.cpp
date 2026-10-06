@@ -132,7 +132,7 @@ void diagnostic_staging_sample(bool force=false){
     static_cast<double>(staging.queueCompletionCallbacks),
     staging.peakQueueCompletionCallbackMs,staging.lastQueueCallbackSourceFrame,force?1:0);
 }
-void diagnostic_incident(int reason,double value=0,double threshold=0,int clock_owner=0){
+void diagnostic_incident(int reason,double value,double threshold,int clock_owner){
  diagnostic_staging_sample(true);
  EM_ASM({try{window.menuDiagnosticIncident?.($0,$1,$2,$3,$4,$5);}catch(_){}},
         reason,value,threshold,diagnostic_source_frame(),melee_web_native_menu_phase(),clock_owner);
