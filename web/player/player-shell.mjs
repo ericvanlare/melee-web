@@ -310,7 +310,7 @@ if (audioInfo && audioDetails) {
 
 settings = mountControllerSettings({
   container: $('controls-dialog'),
-  disableExtraPorts: true,
+  initialSources: ['auto', 'auto', 'off', 'off'],
   openButton: $('controls-open'),
   focus: () => player?.focus(),
   onError: error => showError(error),

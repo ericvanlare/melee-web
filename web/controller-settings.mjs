@@ -5,19 +5,21 @@ import {mountTouchControls} from './touch-controls.mjs';
 export const SOURCE_MODES = Object.freeze(['auto', 'keyboard', 'controller', 'touch', 'off']);
 export const SETTINGS_KEY = 'melee-prototype-keyboard-v1';
 
-const validSource = (mode, port = 0) => SOURCE_MODES.includes(mode) && !(mode === 'touch' && port !== 0) ? mode : 'auto';
+const PORT_NAMES = Object.freeze(['one', 'two', 'three', 'four']);
+const validSource = (mode, port = 0, fallback = 'auto') => SOURCE_MODES.includes(mode) &&
+  !(mode === 'touch' && port !== 0) && !(mode === 'keyboard' && port > 1) ? mode : fallback;
 const validLayout = layout => ['two', 'boxx'].includes(layout) ? layout : 'two';
 const validTouchOpacity = opacity => Number.isFinite(opacity) ? Math.max(0.25, Math.min(0.75, opacity)) : 0.55;
-const sourceSelect = port => `player-${port ? 'two' : 'one'}-source`;
-const sourceStatus = port => `player-${port ? 'two' : 'one'}-source-status`;
+const sourceSelect = port => `player-${PORT_NAMES[port]}-source`;
+const sourceStatus = port => `player-${PORT_NAMES[port]}-source-status`;
 
 function safeStorage(storage) {
   if (storage !== undefined) return storage;
   try { return globalThis.localStorage; } catch { return null; }
 }
 
-function readSettings(storage, key, initialSources = ['auto', 'auto']) {
-  const fallback = {layout: 'two', sources: initialSources.map((mode, port) => validSource(mode, port)), touchOpacity: 0.55};
+function readSettings(storage, key, initialSources) {
+  const fallback = {layout: 'two', sources: PORT_NAMES.map((_, port) => validSource(initialSources[port], port)), touchOpacity: 0.55};
   if (!storage || !key) return fallback;
   try {
     const saved = JSON.parse(storage.getItem(key) || 'null');
@@ -25,7 +27,9 @@ function readSettings(storage, key, initialSources = ['auto', 'auto']) {
     const result = {layout: validLayout(saved.layout), sources: fallback.sources.slice(),
       touchOpacity: validTouchOpacity(saved.touchOpacity)};
     if (Array.isArray(saved.sources)) {
-      for (let port = 0; port < 2; port++) result.sources[port] = validSource(saved.sources[port], port);
+      for (let port = 0; port < PORT_NAMES.length; port++) {
+        result.sources[port] = validSource(saved.sources[port], port, fallback.sources[port]);
+      }
     } else {
       // Older public preferences stored whether each keyboard was enabled.
       // Preserve their effective source: enabled means Auto, disabled means
@@ -39,7 +43,7 @@ function readSettings(storage, key, initialSources = ['auto', 'auto']) {
 
 function saveSettings(storage, key, layout, sources, touchOpacity) {
   if (!storage || !key) return;
-  try { storage.setItem(key, JSON.stringify({layout, sources: sources.slice(0, 2), touchOpacity})); }
+  try { storage.setItem(key, JSON.stringify({layout, sources: sources.slice(0, PORT_NAMES.length), touchOpacity})); }
   catch { /* Session-only controls when storage is unavailable. */ }
 }
 
@@ -77,6 +81,7 @@ function describeSource(mode, row, port, layout) {
     return row ? `Controller only · ${controllerName(row)}` : 'Controller only · waiting for a ready controller';
   }
   if (!row && port === 1 && layout === 'boxx') return 'No controller · B0XX keyboard is Player 1 only';
+  if (!row && port > 1) return 'No ready controller connected';
   return row ? `Controller · ${controllerName(row)}` : 'Keyboard · no ready controller connected';
 }
 
@@ -85,13 +90,13 @@ function renderMarkup(container) {
     element('div', {className: 'controls-heading'},
       element('div', {},
         element('h2', {textContent: 'Controls'}),
-        element('p', {textContent: 'Choose where each player gets input. Auto uses a connected controller when one is ready and falls back to the keyboard.'}),
+        element('p', {textContent: 'Choose where each player gets input. Auto uses a ready controller. Keyboard fallback is available for Players 1 and 2.'}),
       ),
       element('button', {id: 'controls-close', type: 'button', textContent: 'Done'}),
     ),
     element('section', {className: 'source-settings', 'aria-labelledby': 'source-settings-title'},
       element('h3', {id: 'source-settings-title', textContent: 'Player input'}),
-      sourceRow(0), sourceRow(1),
+      ...PORT_NAMES.map((_, port) => sourceRow(port)),
       element('p', {id: 'boxx-source-note', className: 'source-note', hidden: true,
         textContent: 'B0XX provides keyboard controls for Player 1 only; Player 2 keyboard input is unavailable.'}),
     ),
@@ -124,14 +129,15 @@ function renderMarkup(container) {
       element('label', {for: sourceSelect(port), textContent: `Player ${port + 1}`}),
       element('select', {'id': sourceSelect(port), 'data-source-port': port,
         'aria-label': `Player ${port + 1} input source`, disabled: true},
-        element('option', {value: 'auto', textContent: 'Auto (controller if connected, keyboard otherwise)'}),
-        element('option', {value: 'keyboard', textContent: 'Keyboard'}),
+        element('option', {value: 'auto', textContent: port < 2 ?
+          'Auto (controller if connected, keyboard otherwise)' : 'Auto (connected controller)'}),
+        ...(port < 2 ? [element('option', {value: 'keyboard', textContent: 'Keyboard'})] : []),
         element('option', {value: 'controller', textContent: 'Controller only'}),
         ...(port === 0 ? [element('option', {value: 'touch', textContent: 'Touch controls'})] : []),
         element('option', {value: 'off', textContent: 'Off'}),
       ),
       element('p', {id: sourceStatus(port), className: 'source-status', role: 'status', 'aria-live': 'polite',
-        textContent: 'Auto · Keyboard until a ready controller connects'}),
+        textContent: port < 2 ? 'Auto · Keyboard until a ready controller connects' : 'No ready controller connected'}),
     );
   }
 }
@@ -144,7 +150,7 @@ function renderMarkup(container) {
  * schedule frames, or touch the low-level controller mapper.
  */
 export function mountControllerSettings({container, storage,
-  preferenceKey = SETTINGS_KEY, initialSources = ['auto', 'auto'], disableExtraPorts = false,
+  preferenceKey = SETTINGS_KEY, initialSources = ['auto', 'auto', 'auto', 'auto'],
   legacyKeyboard = [], onError = () => {}, focus = () => {}, openButton = null,
   expose = false} = {}) {
   if (!container || typeof container.replaceChildren !== 'function') throw Error('A controller settings container is required.');
@@ -162,7 +168,7 @@ export function mountControllerSettings({container, storage,
   let controllerPanel = null, lastRows = [], lastInspection = 0;
   const $ = id => container.querySelector(`#${id}`) || document.getElementById(id);
   const dialog = container.matches?.('dialog') ? container : container.closest?.('dialog');
-  const sourceElements = [$(sourceSelect(0)), $(sourceSelect(1))];
+  const sourceElements = PORT_NAMES.map((_, port) => $(sourceSelect(port)));
   const layoutElement = $('keyboard-layout');
   const touchOpacityElement = $('touch-opacity');
   const closeElement = $('controls-close');
@@ -216,7 +222,7 @@ export function mountControllerSettings({container, storage,
     table.replaceChildren(head, body);
   }
   function renderSources(rows = lastRows) {
-    for (let port = 0; port < 2; port++) {
+    for (let port = 0; port < PORT_NAMES.length; port++) {
       const select = sourceElements[port], statusElement = $(sourceStatus(port));
       if (!select || !statusElement) continue;
       const mode = validSource(sources[port], port);
@@ -243,13 +249,12 @@ export function mountControllerSettings({container, storage,
   function applySources(ticket = applySequence) {
     const current = player, currentManager = current?.controllers;
     if (!current || ticket !== applySequence) return Promise.resolve();
-    for (let port = 0; port < 2; port++) {
+    for (let port = 0; port < PORT_NAMES.length; port++) {
       const mode = validSource(sources[port], port);
       sources[port] = mode;
       currentManager?.setPortSource?.(port, mode);
-      current.setKeyboard?.(port, mode === 'auto' || mode === 'keyboard');
+      if (port < 2) current.setKeyboard?.(port, mode === 'auto' || mode === 'keyboard');
     }
-    if (disableExtraPorts) for (let port = 2; port < 4; port++) currentManager?.setPortSource?.(port, 'off');
     touchControls?.setController(currentManager);
     updateTouchSource();
     renderNotice(true);
@@ -273,7 +278,7 @@ export function mountControllerSettings({container, storage,
     return applyPromise;
   }
   function setSource(port, mode, {persist = true} = {}) {
-    if (![0, 1].includes(port)) throw Error('Unknown player port.');
+    if (!Number.isInteger(port) || port < 0 || port >= PORT_NAMES.length) throw Error('Unknown player port.');
     let next = validSource(mode, port);
     if (port === 1 && layout === 'boxx' && next === 'keyboard') next = 'auto';
     sources[port] = next;
