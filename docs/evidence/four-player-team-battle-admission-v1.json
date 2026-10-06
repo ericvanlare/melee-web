@@ -16,7 +16,7 @@
     "setup_rule": "melee_web_team_setup_supported in src/gameplay_player_selection.h; used by CSS/SSS/match handoff, match-rules preparation, and patched fn_8016DCC0 boundary",
     "outcome_fix": "ordinary source-frame adapter accepts OUTCOME_TEAM_ELIMINATION only when StartMeleeData.rules.is_teams is true; existing callback, ordinary outcomes, opening-demo policy, and preconditions remain intact",
     "development_observer_fix": "web/runtime-development.mjs allocates 14 int32 CSS observer IDs and 8 float geometry values for native writes",
-    "harness_only_readiness": "lineup test waits for actual source Main owner readiness before releasing guarded CSS PAD input; no runtime clock or guard changes",
+    "harness_only_readiness": "The lineup harness waits for source menu owner readiness before and after source-menu PAD press/release edges across Main, VS, Rules, and Rules Plus. It requires native running state, the expected source phase, drained raw PAD, and pause-owner readiness; no runtime input guard or clock threshold was weakened.",
     "source_files_sha256": {
       "patches/melee-gameplay.patch": "77c9beea02a2313b22087a966221546a7d944958ded320ffcef6d561502c6e74",
       "src/gameplay_player_selection.h": "30e4b1ca68c2fa09f43fd0ed6cfc259dc4a6af2c36a3ff552b0c19bf27c532fe",
