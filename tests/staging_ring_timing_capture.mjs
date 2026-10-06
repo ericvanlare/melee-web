@@ -266,7 +266,8 @@ try {
       running: Module._melee_web_native_menu_running(), at_ms: performance.now(),
       epoch_ms: performance.timeOrigin + performance.now()}));
     if (!gpuOn && native.cursor >= 400) {
-      report.match_before_gpu_load = await page.evaluate(() => window.menuObservePlayer?.() ?? null);
+      report.match_before_gpu_load = await page.evaluate(() =>
+        JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_match_observe())));
       if (report.match_before_gpu_load?.ready !== true || !(native.frame > 0) || !native.running)
         throw Error('Conditioned fixture did not enter active gameplay before GPU-load treatment');
       const load = await setHeavyGpu(heavy, true);
