@@ -137,6 +137,32 @@ export async function readPauseTraceStatus(page){
   });
 }
 
+/** Read the existing recorder's persisted incidents after the measured window.
+ * The development owner is module-local; exportRetained is the existing public
+ * recorder read API. This reader never triggers, persists or synthesizes an
+ * incident. A native timing pause makes the original owner inactive and queues
+ * its own persistence before this bounded read. */
+export async function readRetainedPauseDiagnostics(page,waitForIncident=false){
+  return page.evaluate(async wait=>{
+    const {createRuntimeDiagnostics}=await import('./runtime-diagnostics.mjs');
+    const reader=createRuntimeDiagnostics();
+    const deadline=performance.now()+(wait?2000:0);
+    let retained;
+    do{
+      retained=await reader.exportRetained();
+      if(retained.records.length||performance.now()>=deadline)break;
+      await new Promise(resolve=>setTimeout(resolve,50));
+    }while(true);
+    const observed=window.__meleePauseTrace?.state.incidents.length??null;
+    return {read_api:'createRuntimeDiagnostics().exportRetained()',
+      scope:'actual locally persisted runtime recorder incidents; reader metadata is not the producer session',
+      status:retained.records.length?'retained_incidents':observed===0?'no_incident_generated':'incident_not_retained',
+      native_trace_incident_count:observed,
+      retained_records:retained.records,
+      reader_flags:retained.flags};
+  },waitForIncident);
+}
+
 export async function readPauseTraceCapture(page,reason){
   const captured=await page.evaluate(()=>{
     const capture=window.__meleePauseTrace;

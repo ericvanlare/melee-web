@@ -8,7 +8,8 @@ import {execFileSync} from 'node:child_process';
 import {parseArgs} from 'node:util';
 import {loadBrowserTools, browserLaunchOptions} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
-import {installPauseTraceCapture, readPauseTraceCapture, readPauseTraceStatus} from './pause_trace_capture.mjs';
+import {installPauseTraceCapture, readPauseTraceCapture, readPauseTraceStatus,
+  readRetainedPauseDiagnostics} from './pause_trace_capture.mjs';
 import {createHeavyGpuPage, setHeavyGpu, readHeavyGpu} from './pause_trace_perturb.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
@@ -290,6 +291,11 @@ try {
   }
   report.gpu_observation = await readHeavyGpu(heavy);
   report.capture = await readPauseTraceCapture(page, terminal.outcome);
+  report.runtime_incident_recorder = await readRetainedPauseDiagnostics(page,
+    terminal.outcome === 'timing_pause');
+  if (terminal.outcome === 'timing_pause' && !report.runtime_incident_recorder.retained_records.some(
+    record => record.incident?.staging !== null && record.incident?.staging !== undefined))
+    throw Error('Timing pause occurred but its runtime recorder staging incident was not retained');
   report.memory_after = await memorySnapshot(page);
   report.ring_status_after = await page.evaluate(() => window.__meleeWebStagingRingStatus);
   if (report.ring_status_after?.frame_slots !== slots || report.ring_status_after?.staging_buffers !== slots)
@@ -314,6 +320,8 @@ try {
       report.capture_read_error = String(readError?.message || readError);
     }
     try { report.capture_status_at_stop = await readPauseTraceStatus(page); } catch {}
+    try { report.runtime_incident_recorder = await readRetainedPauseDiagnostics(page, true); }
+    catch (readError) { report.recorder_read_error = String(readError); }
     try { report.memory_after = await memorySnapshot(page); } catch {}
   }
   if (page && !page.isClosed()) {
@@ -325,6 +333,11 @@ try {
   if (heavy) {
     try { report.gpu_final = await readHeavyGpu(heavy); await setHeavyGpu(heavy, false); }
     catch (error) { report.gpu_cleanup_error = String(error); }
+  }
+  if (traceInstalled && page && !page.isClosed()) {
+    try {
+      report.runtime_incident_recorder_final = await readRetainedPauseDiagnostics(page, true);
+    } catch (error) { report.recorder_final_read_error = String(error); }
   }
   try { driver?.dispose(); } catch {}
   try { await browser?.close(); } catch (error) {
