@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {assessSustainedWindow, classifySustainedAttempt, resolveSustainedAttempt,
   summarizeObservedBatchDurations, artifactMapDigest, compareArtifactMaps,
-  validateProspectiveBuildManifest} from './staging_ring_sustained_decision.mjs';
+  validateProspectiveBuildManifest, validateSelectedRingStatus} from './staging_ring_sustained_decision.mjs';
 
 function rowsForWindow(start, end, pending = [0, 1, 2], stagingMs = 12, totalMs = 20) {
   const count = pending.length;
@@ -173,3 +173,20 @@ assert.deepEqual(compareArtifactMaps(oldHistoricalMap, localArtifacts).differenc
 ['browser-artifact-02', 'browser-artifact-08']);
 
 console.log('Sustained staging-ring window qualification and frozen decision rules passed.');
+
+for (const slots of [2, 4]) {
+  const status = {frame_slots: slots, staging_buffers: slots,
+    reserved_gpu_buffer_bytes: slots * 63 * 1024 * 1024,
+    selection: {requested_frame_slots: String(slots), selected_frame_slots: slots,
+      reason: slots === 4 ? 'explicit_local_desktop_opt_in' : 'default_two',
+      byte_hash_enabled: false, staging_diagnostics_enabled: true}};
+  assert.equal(validateSelectedRingStatus(status, slots).valid, true);
+  for (const patch of [{frame_slots: slots === 2 ? 4 : 2},
+    {reserved_gpu_buffer_bytes: status.reserved_gpu_buffer_bytes - 1},
+    {selection: {...status.selection, reason: 'non_loopback_fixed_two'}},
+    {selection: {...status.selection, byte_hash_enabled: true}},
+    {selection: {...status.selection, staging_diagnostics_enabled: false}}])
+    assert.equal(validateSelectedRingStatus({...status, ...patch}, slots).valid, false);
+}
+assert.equal(validateSelectedRingStatus({}, 3).valid, false);
+console.log('Explicit selected ring, diagnostic flags and reservation identities passed.');

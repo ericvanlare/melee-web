@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** One bounded ring-two sustained-load reducer; no stalls, hashes or retries. */
+/** One bounded opt-in staging-ring sustained-load reducer; no stalls, hashes or retries. */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
@@ -14,13 +14,14 @@ import {createHeavyGpuPage, setHeavyGpu, readHeavyGpu} from './pause_trace_pertu
 import {assessSustainedWindow, SUSTAINED_WINDOW_MS,
   MAX_OBSERVED_GPU_WINDOW_MS, PREPARATION_REASON, summarizeObservedBatchDurations,
   resolveSustainedAttempt, artifactMapDigest, compareArtifactMaps,
-  validateProspectiveBuildManifest} from './staging_ring_sustained_decision.mjs';
+  validateProspectiveBuildManifest, validateSelectedRingStatus} from './staging_ring_sustained_decision.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, recipe: {type: 'string'},
   'baseline-report': {type: 'string'}, 'prospective-build-manifest': {type: 'string'}, out: {type: 'string'},
   'build-dir': {type: 'string'}, playwright: {type: 'string'},
+  slots: {type: 'string', default: '2'},
   'phase-timeout-ms': {type: 'string', default: '180000'},
   'preparation-timeout-ms': {type: 'string', default: '180000'},
   'window-timeout-ms': {type: 'string', default: '15000'},
@@ -35,6 +36,8 @@ function integer(name, min, max) {
 for (const name of ['url', 'disc', 'recipe', 'baseline-report', 'prospective-build-manifest', 'out', 'build-dir']) {
   if (!values[name]) throw Error(`Missing --${name}`);
 }
+const slots = Number(values.slots);
+if (![2, 4].includes(slots)) throw Error('--slots must be 2 or 4');
 const phaseTimeoutMs = integer('phase-timeout-ms', 1000, 600000);
 const preparationTimeoutMs = integer('preparation-timeout-ms', 1000, 600000);
 const windowTimeoutMs = integer('window-timeout-ms', 3000, 300000);
@@ -42,7 +45,7 @@ const baseUrl = new URL(values.url);
 if (!['http:', 'https:'].includes(baseUrl.protocol) || !baseUrl.pathname.endsWith('/runtime.html') ||
     !['localhost', '127.0.0.1', '::1', '[::1]'].includes(baseUrl.hostname))
   throw Error('A real loopback HTTP runtime.html URL is required');
-baseUrl.searchParams.set('melee-web-staging-slots', '2');
+baseUrl.searchParams.set('melee-web-staging-slots', String(slots));
 baseUrl.searchParams.delete('melee-web-staging-byte-hash');
 baseUrl.searchParams.set('melee-web-staging-diagnostics', '1');
 
@@ -223,10 +226,12 @@ let traceInstalled = false, runtimeReady = false, gpuOn = false, unloaded = fals
 const report = {
   schema: 'melee-web-staging-ring-sustained-v1',
   captured_at: new Date().toISOString(),
-  scope: 'one synthetic 1800-input fixture; requested 2s ring-two 300-work callback control then one requested 2s 600-work treatment; actual enabled intervals retained, <=100ms observer slack only; headless mechanism diagnostic only',
+  scope: `one synthetic 1800-input fixture; requested 2s ring-${slots} 300-work callback control then one requested 2s 600-work treatment; actual enabled intervals retained, <=100ms observer slack only; headless mechanism diagnostic only`,
   result: 'fail', decision: 'inspect_immediately',
   browser_mode: 'headless installed Chrome; host speakers muted; Web Audio and PCM processing remain enabled',
-  treatment: 'ring_two', hash_capture: false, staging_diagnostics: true,
+  treatment: slots === 4 ? 'ring_four' : 'ring_two', requested_frame_slots: slots,
+  decision_assessment_semantics: 'legacy frozen fractional-remainder classifier; comparison interpretation is separate; pause_callback fields may refer to preceding active callback rather than actual guard callback',
+  hash_capture: false, staging_diagnostics: true,
   host_stall: 'none', adaptive_tuning: false,
   batch_duration_semantics: 'observed WebGL draw plus synchronous readback registration-to-delivery wall duration; not pure GPU execution time',
   requested_control_callback_window_ms: SUSTAINED_WINDOW_MS,
@@ -524,10 +529,9 @@ try {
   runtimeReady = true;
   await page.waitForFunction(() => !!window.__meleeWebStagingRingStatus, null, {timeout: phaseTimeoutMs});
   report.ring_status = await page.evaluate(() => window.__meleeWebStagingRingStatus);
-  if (report.ring_status?.frame_slots !== 2 || report.ring_status?.staging_buffers !== 2 ||
-      report.ring_status?.selection?.byte_hash_enabled !== false ||
-      report.ring_status?.selection?.staging_diagnostics_enabled !== true)
-    throw Error('Runtime did not select ring two with hashing off and staging diagnostics on');
+  report.ring_status_validation = validateSelectedRingStatus(report.ring_status, slots);
+  if (!report.ring_status_validation.valid)
+    throw Error(`Requested ring-${slots} identity rejected: ${report.ring_status_validation.problems.join(', ')}`);
   report.memory_before = await memorySnapshot(page);
   heavy = await createHeavyGpuPage(browser);
   report.gpu_config = heavy.config;
@@ -610,6 +614,9 @@ try {
     try {
       report.native_before_unload = await nativeSnapshot(page);
       report.ring_status_before_unload = await page.evaluate(() => window.__meleeWebStagingRingStatus ?? null);
+      report.ring_status_before_unload_validation = validateSelectedRingStatus(report.ring_status_before_unload, slots);
+      if (!report.ring_status_before_unload_validation.valid)
+        throw Error(`Pre-unload ring identity rejected: ${report.ring_status_before_unload_validation.problems.join(', ')}`);
       report.memory_before_unload = await memorySnapshot(page);
     } catch (error) {report.pre_unload_snapshot_error = String(error?.message || error);}
     try {await driver?.unload(); unloaded = true; report.unload = {attempted: true, completed: true};}

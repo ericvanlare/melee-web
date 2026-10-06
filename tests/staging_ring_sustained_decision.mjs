@@ -10,6 +10,28 @@ export const MAX_OBSERVED_GPU_WINDOW_MS = SUSTAINED_WINDOW_MS + 100;
 
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 
+/** Pinned Aurora resources.hpp: 24+5+2+8+24 MiB per staging buffer.
+ * This is a reservation identity, not measured resident GPU memory. */
+export function validateSelectedRingStatus(status, slots) {
+  const problems = [];
+  if (![2, 4].includes(slots)) problems.push('requested_slots_invalid');
+  if (status?.frame_slots !== slots || status?.staging_buffers !== slots)
+    problems.push('selected_slots_mismatch');
+  const selection = status?.selection;
+  if (selection?.requested_frame_slots !== String(slots) ||
+      selection?.selected_frame_slots !== slots ||
+      selection?.reason !== (slots === 4 ? 'explicit_local_desktop_opt_in' : 'default_two'))
+    problems.push('selection_identity_mismatch');
+  if (selection?.byte_hash_enabled !== false || selection?.staging_diagnostics_enabled !== true)
+    problems.push('diagnostic_flags_mismatch');
+  const expectedReservation = slots * 63 * 1024 * 1024;
+  if (status?.reserved_gpu_buffer_bytes !== expectedReservation)
+    problems.push('staging_reservation_mismatch');
+  return {valid: problems.length === 0, problems, requested_slots: slots,
+    expected_reserved_gpu_buffer_bytes: expectedReservation,
+    memory_semantics: 'declared buffer reservation; resident physical GPU memory unavailable'};
+}
+
 /** Stable digest for a named browser-artifact inventory, independent of JSON
  * object insertion order. Each value is the captured {bytes, sha256} pair. */
 export function artifactMapDigest(artifacts) {
