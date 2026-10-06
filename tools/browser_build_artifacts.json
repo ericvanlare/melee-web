@@ -4,6 +4,7 @@
   "gameplay_menu_browser.data",
   "runtime.html",
   "runtime-development.mjs",
+  "net-timing-pause.mjs",
   "melee-runtime.mjs",
   "controller-input.mjs",
   "controller-panel.mjs",

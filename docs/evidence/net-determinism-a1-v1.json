@@ -1,0 +1,152 @@
+{
+  "schema": "melee-web-net-determinism-a1-v1",
+  "date": "2026-10-06",
+  "issue": 158,
+  "scope": "Functional determinism evidence for the six declared per-tick streams and agreed start context on the supported browser route. This is not whole-world memory equivalence, retail equivalence, timing, performance, pixel, PCM, physical-input, or transport evidence.",
+  "implementation_revision": "baa9ff5d64ac4f919c46edcce2f87dc5b6374537",
+  "runtime_build": {
+    "source_revision": "7eb5d89b1e4310cf2d33ec23ae3d780dc87dace5",
+    "configuration": "development runtime, RelWithDebInfo",
+    "runtime_files": [
+      {"path": "runtime.html", "bytes": 5205, "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"},
+      {"path": "runtime-development.mjs", "bytes": 55265, "sha256": "79bf6c496ae79c7cf3ea95c105daa2c99f2650865d12c9a8dda5d60f01836f70"},
+      {"path": "net-timing-pause.mjs", "bytes": 1043, "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"},
+      {"path": "gameplay_menu_browser.js", "bytes": 597356, "sha256": "60a88c1ec2cbd6e6b46964d9b3fc8fb556a938a7f40fde90ec62cc2f7ad125cb"},
+      {"path": "gameplay_menu_browser.wasm", "bytes": 125390136, "sha256": "956064cfe1bd74abb73563fc28ef32744bbfeb685218b3f46d4a370b749c0531"},
+      {"path": "gameplay_menu_browser.data", "bytes": 3674112, "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"}
+    ],
+    "pre_capture_http_manifest": {
+      "artifact_count": 28,
+      "sha256": "ece8d5dcc9811c1f6aebdb09e8b54cddebc6e3a6f1b4c6f24c42823056545ab9"
+    },
+    "post_capture_http_manifest": {
+      "artifact_count": 32,
+      "sha256": "536a1b910b6de48254aad834e75f6719e8487340e219de331eac4a730788fd5a",
+      "all_http_200": true,
+      "all_served_bytes_equal_local_build": true,
+      "original_28_hashes_unchanged": true,
+      "additional_imports_verified_only_after_capture": [
+        "runtime-diagnostics.mjs",
+        "runtime-diagnostics-delivery.mjs",
+        "diagnostics-settings.mjs",
+        "diagnostics-schema.mjs"
+      ]
+    },
+    "manifest_scope": {
+      "applies_to_scenarios": [
+        "Cold normal versus cold CPU x4",
+        "Cold session arena fill 0 versus 165"
+      ],
+      "earlier_scenarios_without_retained_manifest": [
+        "Unperturbed repeat, warm-existing profiles",
+        "1200-tick input-flip negative control",
+        "1200-tick preflight and arena-fill prefix"
+      ],
+      "earlier_scenario_note": "These earlier captures used a prior frozen development build. Its served artifact manifest was not retained, so no 7eb5d89 artifact identity is claimed for them."
+    },
+    "identity_note": "Per-instance JSON does not embed a runtime build identity. For the cold normal, CPU x4, and full arena-fill captures, run-to-build binding uses the frozen served artifact manifest and post-capture HTTP verification; the four additional diagnostic imports were not hashed before capture."
+  },
+  "workload": {
+    "input_sha256": "007fafb2bfc1c34b81509b8ee073b6250b32ab6d227502be6d4b986ddd8cbb4c",
+    "seed": 305419896,
+    "frames": 5082,
+    "full_route": ["CSS", "SSS", "Match", "Results", "CSS"],
+    "match_selection": {"stage_id": 32, "players": 2, "human_players": 2, "stocks_each": 4},
+    "declared_channels": ["header", "input", "master_pad", "scene_state", "total", "objects"],
+    "comparison_rules": "Nonempty complete streams and complete instance metadata are required. Start-record agreement gates success separately. First object divergence and first gating-channel divergence are both reported. Results are covered only by the declared channels, not by a claim over all Results internals."
+  },
+  "results": [
+    {
+      "scenario": "Unperturbed repeat, warm-existing profiles",
+      "harness_revision": "c0f13a4",
+      "runtime_build_manifest_retained": false,
+      "runs": 2,
+      "profile_kind": "warm-existing",
+      "ticks_each": 5082,
+      "full_route_passed": true,
+      "start_record_equal": true,
+      "scene_runs_equal": true,
+      "all_six_channels_identical": true,
+      "notes": "This is a within-run repeated baseline using warm existing Chrome profiles; it is not the cold-profile result."
+    },
+    {
+      "scenario": "Cold normal versus cold CPU x4",
+      "normal_harness_revision": "baa9ff5d64ac4f919c46edcce2f87dc5b6374537",
+      "cpu_x4_harness_revision": "7eb5d89b1e4310cf2d33ec23ae3d780dc87dace5",
+      "runtime_build_revision": "7eb5d89b1e4310cf2d33ec23ae3d780dc87dace5",
+      "orchestration": "Separate sequential scenario runs and browser processes; not simultaneous playback.",
+      "profile_kind": "cold-empty for both compared instances",
+      "ticks_each": 5082,
+      "full_route_passed": true,
+      "start_record_equal": true,
+      "scene_runs_equal": true,
+      "all_six_channels_identical": true,
+      "cpu_x4_timing_pause_resumes": 352,
+      "raw_arena": "At all five scene boundaries, base and size matched; the whole-region hash differed. The raw digest is auxiliary and differences were not localized."
+    },
+    {
+      "scenario": "Cold session arena fill 0 versus 165",
+      "harness_revision": "baa9ff5d64ac4f919c46edcce2f87dc5b6374537",
+      "runtime_build_revision": "7eb5d89b1e4310cf2d33ec23ae3d780dc87dace5",
+      "profile_kind": "cold-empty for both instances",
+      "ticks_each": 5082,
+      "full_route_passed": true,
+      "fill_values": [0, 165],
+      "start_record_equal": true,
+      "scene_runs_equal": true,
+      "all_six_channels_identical": true,
+      "raw_arena": "At all five scene boundaries, base and size matched; the 32 MiB whole-region hash differed, establishing that the raw regions differ. The digest includes unclassified region contents; differences were not localized and establish no whole-memory equivalence or localized gameplay-state divergence claim."
+    }
+  ],
+  "negative_control": {
+    "scenario": "1200-tick prefix with one input byte flipped at tick 1000",
+    "harness_revision": "c0f13a4",
+    "runtime_build_manifest_retained": false,
+    "first_divergence_tick": 1000,
+    "first_divergence_scene": "Match",
+    "mismatched_channels": ["input", "master_pad", "scene_state", "total"],
+    "objects_also_differ_at_first_tick": false,
+    "start_record_equal": true
+  },
+  "comparator_controls": [
+    "Empty streams refuse comparison rather than passing as identical.",
+    "Failed or incomplete instance metadata refuses a positive comparison.",
+    "A mismatched agreed start context prevents success even when stream bytes match.",
+    "An earlier object mismatch remains the first divergence while a later input/gating mismatch is separately reported.",
+    "The flipped-input control reports its first mismatch tick."
+  ],
+  "lifecycle_and_diagnostics": {
+    "timing_pause_recovery": "The development-only harness checks native pause status, network active status as emitted by the native integer field, and owner paused/canPause state; recovery uses the owner resume lifecycle. The cold CPU x4 run recorded 352 successful resumes.",
+    "arena_fill_boundary": "The one-shot fill is restricted to the pre-publication session arena boundary and refuses after session allocation/ownership has begun; it does not fill stack or unrelated memory.",
+    "browser_errors": "A GET requestfailed event for gameplay_menu_browser.data with net::ERR_ABORTED is retained in request diagnostics. It did not prevent module/runtime readiness, native CSS startup, progress, or full-route completion. The abort origin is unproven; no path-specific exemption is asserted.",
+    "cache_scope": "Profiles were cold-empty where stated. OS, GPU-driver and other host caches were not cleared or controlled."
+  },
+  "build_and_tests": {
+    "affected_target": "runtime development build passed at runtime_build.source_revision",
+    "full_suite_command": "python3 -m unittest discover -s tests -v",
+    "full_suite_tests": 1910,
+    "full_suite_skipped": 141,
+    "full_suite_duration_seconds": 339.533,
+    "full_suite_result": "OK",
+    "full_suite_log_sha256": "f9635ebe76e33c57af35cc6734334ee45392f5ef86cc15ac1060406d4a3961bd",
+    "retail_visitor_check": "The fixed four-row Fighter fixture compares exact pre-change and post-change JSON bytes; this does not claim broader retail-state coverage."
+  },
+  "retained_evidence": {
+    "run_id": "claude-net-determinism-a1-20261006-20261006-115937-e9eec3b0",
+    "bindings_manifest": "a1-evidence-bindings-v2.json",
+    "bindings_sha256": "de0a2ee10a3509cc0d153025997298dc9e61f1276d1566b6c652d79361694453",
+    "pre_capture_build_manifest_sha256": "ece8d5dcc9811c1f6aebdb09e8b54cddebc6e3a6f1b4c6f24c42823056545ab9",
+    "post_capture_build_manifest_sha256": "536a1b910b6de48254aad834e75f6719e8487340e219de331eac4a730788fd5a",
+    "initial_e1": "Retained separately as a startup failure with zero records after connection refused; it is not a comparison result."
+  },
+  "not_claimed": [
+    "Whole-world or whole-arena byte equality",
+    "Retail-game equivalence",
+    "FPS, wall-clock timing, latency, performance or foreground timing",
+    "Pixel or image equality",
+    "PCM/audio fidelity or audible behavior",
+    "Physical controller input",
+    "Network transport or multiplayer acceptance",
+    "Cross-browser or cross-architecture determinism"
+  ]
+}

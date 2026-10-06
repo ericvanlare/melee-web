@@ -158,6 +158,55 @@ def _run_bounded(directory: Path, label: str, command: list[str], timeout: int):
 
 
 class OwnedWorkspaceTests(unittest.TestCase):
+    def test_snapshot_inventories_every_private_bootstrap_global(self):
+        source = SOURCE.read_text(encoding="utf-8")
+        declarations = source.split("static void* arena;", 1)[1].split("static int fail(", 1)[0]
+        declarations = "static void* arena;" + declarations
+        globals_seen = set()
+        for line in declarations.splitlines():
+            line = line.strip()
+            if not line.startswith("static ") or not line.endswith(";"):
+                continue
+            function_pointer = re.search(r"\(\s*\*\s*(\w+)\s*\)", line)
+            if function_pointer:
+                globals_seen.add(function_pointer.group(1))
+                continue
+            declarators = line.removeprefix("static ").removesuffix(";").split(",")
+            for declarator in declarators:
+                match = re.search(r"(?:\*\s*)?(\w+)\s*(?:=[^,]*)?$", declarator.strip())
+                self.assertIsNotNone(match, f"unparsed bootstrap global: {line}")
+                globals_seen.add(match.group(1))
+
+        expected = {
+            "arena", "arena_bytes", "session_arena", "session_bytes", "heap",
+            "ticks", "disabled_links", "generation", "allocation_generation",
+            "stepping", "shutting_down", "tables_live", "vs_startup_pending",
+            "startup_in_progress", "vs_sis_live", "vs_dynamics_ready",
+            "vs_manager_ready", "vs_startup_callback", "vs_shutdown_callback",
+            "object_kind_count", "finish_hsd_objects",
+        }
+        self.assertEqual(globals_seen, expected, "private bootstrap owner inventory changed")
+        snapshot = _function(source, "melee_web_gameplay_bootstrap_state")
+        captured = set(re.findall(r"\bout->(\w+)\s*=", snapshot))
+        report_fields = {
+            "arena": "arena_identity", "arena_bytes": "arena_bytes",
+            "session_arena": "session_identity", "session_bytes": "session_bytes",
+            "heap": "heap_handle", "ticks": "ticks",
+            "disabled_links": "disabled_links", "generation": "generation",
+            "allocation_generation": "allocation_generation", "stepping": "stepping",
+            "shutting_down": "shutting_down", "tables_live": "tables_live",
+            "vs_startup_pending": "vs_startup_pending",
+            "startup_in_progress": "startup_in_progress", "vs_sis_live": "vs_sis_live",
+            "vs_dynamics_ready": "vs_dynamics_ready", "vs_manager_ready": "vs_manager_ready",
+            "vs_startup_callback": "vs_startup_callback",
+            "vs_shutdown_callback": "vs_shutdown_callback",
+            "object_kind_count": "object_kind_count",
+            "finish_hsd_objects": "finish_hsd_objects",
+        }
+        self.assertEqual({name: field for name, field in report_fields.items() if field in captured},
+                         report_fields,
+                         "bootstrap snapshot must report every private owner field")
+
     def test_exact_producer_host64_refuses_without_writing(self):
         if struct.calcsize("P") != 8:
             self.skipTest("host-64 refusal control requires an 8-byte host pointer")

@@ -362,6 +362,7 @@ const char* melee_web_native_menu_match_observe(){
  out.add(",\"players\":[");
  out.add("{");
  out.add("\"fighter\":%d",p0.fighter_kind);
+ out.add(",\"human\":%s",start.players[0].slot_type==Gm_PKind_Human?"true":"false");
  out.add(",\"stocks\":%d",p0.stocks);
  out.add(",\"motion\":%d",p0.motion_id);
  out.add(",\"groundAir\":%d",p0.ground_or_air);
@@ -370,6 +371,7 @@ const char* melee_web_native_menu_match_observe(){
  out.add("}");
  out.add(",{");
  out.add("\"fighter\":%d",p1.fighter_kind);
+ out.add(",\"human\":%s",start.players[1].slot_type==Gm_PKind_Human?"true":"false");
  out.add(",\"stocks\":%d",p1.stocks);
  out.add(",\"motion\":%d",p1.motion_id);
  out.add(",\"groundAir\":%d",p1.ground_or_air);

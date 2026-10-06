@@ -104,6 +104,7 @@ struct MeleeWebMenuHost {
     uint8_t initial_game_rules[0x18];
     uint8_t initial_save_data[0x55E8];
     int initial_replay_context;
+    int net_start_context;
     VsModeData route_saved_vs;
     MatchExitInfo route_saved_exit;
     ResultsMatchInfo route_saved_result;
@@ -657,6 +658,46 @@ int melee_web_menu_host_apply_replay_context(
     melee_web_pad_state_free(h->input);h->input=input;
     h->seed=random_seed;h->initial_replay_context=1;
     return ok(e,n);
+}
+/* Networked sessions use the canonical Everything mode and the fresh host's
+ * default rules, preferences and PAD history; only the agreed seed is
+ * installed. Personal save preferences change gameplay and are rejected. */
+int melee_web_menu_host_apply_net_context(
+    MeleeWebMenuHost* h, uint32_t random_seed, char* e, size_t n)
+{
+    if(!h||h!=owner||h->entered||h->audio||h->initial_replay_context||
+       h->net_start_context||h->input||
+       melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_CREATED||
+       seed_ptr!=&h->seed)
+        return fail(e,n,"Networked start context requires a fresh unentered menu host");
+    if(h->save_mode!=MELEE_WEB_SAVE_MODE_EVERYTHING||h->configured_profile_size!=0)
+        return fail(e,n,"Networked start context requires the canonical Everything save mode without a personal profile");
+    h->seed=random_seed;h->net_start_context=1;
+    return ok(e,n);
+}
+int melee_web_menu_host_selection_state(const MeleeWebMenuHost* h,
+                                        StartMeleeData* start,uint8_t header[6]){
+    MeleeWebMenuPhase phase;
+    if(!h||h!=owner||!h->entered||!start||!header)return 0;
+    phase=melee_web_menu_phase(h->session);
+    memset(header,0,6);
+    if(phase==MELEE_WEB_MENU_CSS||phase==MELEE_WEB_MENU_CSS_READY){
+        const CSSData* css=melee_web_menu_css(h->session);
+        if(!css)return 0;
+        header[0]=(uint8_t)(css->unk_0x0>>8);header[1]=(uint8_t)css->unk_0x0;
+        header[2]=css->match_type;header[3]=css->pending_scene_change;
+        *start=css->vs.start;
+        return 1;
+    }
+    if(phase==MELEE_WEB_MENU_SSS||phase==MELEE_WEB_MENU_SSS_READY){
+        const SSSData* sss=melee_web_menu_sss(h->session);
+        if(!sss)return 0;
+        header[0]=sss->unk_stage;header[1]=sss->x1;header[2]=sss->no_lras;
+        header[3]=(uint8_t)sss->force_stage_id;header[4]=sss->start_game;
+        *start=sss->vs.start;
+        return 2;
+    }
+    return 0;
 }
 static void restore_context(MeleeWebMenuHost* h){
     HSD_PadLibData=h->saved_library;

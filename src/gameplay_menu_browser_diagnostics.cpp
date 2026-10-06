@@ -8,13 +8,13 @@ constexpr unsigned kDiagnosticPadButtons=PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT|PAD_BU
 }
 extern "C" {
 void melee_web_native_menu_confirm_check(){
- if(!replay&&(host_entered||match)&&!faulted&&!preparation.busy()&&!pending&&stock_check!=-1&&diagnostic_pad_remaining==0)
+ if(!replay&&!melee_web_net_active()&&(host_entered||match)&&!faulted&&!preparation.busy()&&!pending&&stock_check!=-1&&diagnostic_pad_remaining==0)
   diagnostic_start_ticks=3;
 }
 int melee_web_native_menu_pad_sample_full(unsigned port,unsigned buttons,int stick_x,int stick_y,
                                           int cstick_x,int cstick_y,unsigned trigger_l,
                                           unsigned trigger_r,unsigned duration){try{
- if(replay||faulted||preparation.busy()||pending||stock_check==-1||diagnostic_start_ticks!=0||!running||(!host_entered&&!match&&!results&&!prize))
+ if(replay||melee_web_net_active()||faulted||preparation.busy()||pending||stock_check==-1||diagnostic_start_ticks!=0||!running||(!host_entered&&!match&&!results&&!prize))
   throw std::runtime_error("Raw PAD samples require an active, non-diagnostic scene");
  if(port>1||buttons>0xffffU||(buttons&~kDiagnosticPadButtons)||stick_x<-80||stick_x>80||stick_y<-80||stick_y>80||
     cstick_x<-80||cstick_x>80||cstick_y<-80||cstick_y>80||trigger_l>255||trigger_r>255||duration<1||duration>120)

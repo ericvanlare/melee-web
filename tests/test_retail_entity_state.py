@@ -7,6 +7,8 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
+# Exact four-row output captured from the pre-visitor formatter at 07bcfdf.
+FIXTURE = ROOT / "tests" / "fixtures" / "retail-entity-state-before-shared-visitor.jsonl"
 
 HARNESS = r'''
 #include <melee/ft/types.h>
@@ -77,6 +79,8 @@ class RetailEntityStateTests(unittest.TestCase):
             self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
             ran = subprocess.run([str(executable)], capture_output=True, text=True, timeout=10)
             self.assertEqual(ran.returncode, 0, ran.stdout + ran.stderr)
+        self.assertEqual(ran.stdout.encode(), FIXTURE.read_bytes(),
+                         "shared Fighter visitor changed the retail JSON byte stream")
         rows = [json.loads(line) for line in ran.stdout.splitlines()]
         self.assertEqual(len(rows), 4)
         for row in rows:
