@@ -1501,7 +1501,7 @@ index b3054be5ad2dc2a45c3de4ecb3e944114421526c..9fe8bd7426cee8680344ad5c719debc4
    switch (op.type) {
    case FrameOpType::RenderPass:
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83efc28ad8a19c3e902a6efc1096126982583..2426f37dd32f771f2897a295ac689e58e8833547 100644
+index 9fd83efc28ad8a19c3e902a6efc1096126982583..f0bbbfe2699431617088da259f018976dbc15333 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
 @@ -1,7 +1,16 @@
@@ -1585,41 +1585,41 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..2426f37dd32f771f2897a295ac689e58
 +      const mobile = nav.userAgentData ? nav.userAgentData.mobile : mobileUserAgent || touchMac;
 +      const requested = new URLSearchParams(window.location.search).get('melee-web-staging-slots');
 +      if (!localHost) {
-+        window.__meleeWebStagingRingSelection = {
++        window.__meleeWebStagingRingSelection = ({
 +          requested_frame_slots: requested,
 +          selected_frame_slots: 2,
 +          reason: 'non_loopback_fixed_two',
 +          selector_scope: 'loopback desktop browser experiment',
-+        };
++        });
 +        return 2;
 +      }
 +      if (mobile || mobileUserAgent || touchMac) {
-+        window.__meleeWebStagingRingSelection = {
++        window.__meleeWebStagingRingSelection = ({
 +          requested_frame_slots: requested,
 +          selected_frame_slots: 2,
 +          reason: 'mobile_fixed_two',
 +          selector_scope: 'loopback desktop browser experiment',
-+        };
++        });
 +        return 2;
 +      }
 +      const desktop = /Windows NT|Macintosh|X11|Linux x86_64|CrOS/i.test(userAgent);
 +      if (!desktop) {
-+        window.__meleeWebStagingRingSelection = {
++        window.__meleeWebStagingRingSelection = ({
 +          requested_frame_slots: requested,
 +          selected_frame_slots: 2,
 +          reason: 'unsupported_user_agent_fixed_two',
 +          selector_scope: 'loopback desktop browser experiment',
-+        };
++        });
 +        return 2;
 +      }
 +      const selected = requested === '4' ? 4 : 2;
-+      window.__meleeWebStagingRingSelection = {
++      window.__meleeWebStagingRingSelection = ({
 +        requested_frame_slots: requested,
 +        selected_frame_slots: selected,
 +        reason: requested === '4' ? 'explicit_local_desktop_opt_in' :
 +          requested !== null && requested !== '2' ? 'invalid_request_fixed_two' : 'default_two',
 +        selector_scope: 'loopback desktop browser experiment',
-+      };
++      });
 +      return selected;
 +    } catch (_) {
 +      return 2;
@@ -2074,12 +2074,12 @@ index 9fd83efc28ad8a19c3e902a6efc1096126982583..2426f37dd32f771f2897a295ac689e58
 +  g_frameSlots.reset(g_activeBrowserFrameSlotCount);
 +  g_stagingSlots.reset(g_activeBrowserFrameSlotCount);
 +  EM_ASM({
-+    window.__meleeWebStagingRingStatus = {
++    window.__meleeWebStagingRingStatus = ({
 +      frame_slots: $0,
 +      staging_buffers: $1,
 +      reserved_gpu_buffer_bytes: $1 * $2,
 +      selection: window.__meleeWebStagingRingSelection || null,
-+    };
++    });
 +  }, static_cast<int>(g_activeBrowserFrameSlotCount),
 +     static_cast<int>(g_activeBrowserFrameSlotCount), static_cast<int>(StagingBufferSize));
 +#else
