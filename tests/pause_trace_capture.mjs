@@ -15,7 +15,7 @@ export const PAUSE_TRACE_COLUMNS=Object.freeze([
   'source_steps','source_draws','draw_calls','queued_delta','created_delta',
   'texture_upload_bytes','staging_used_bytes','wasm_heap_bytes','began','drawn','draw_suppressed',
   'sample_pending_ticks','sample_running','sample_source_frame','sample_scene',
-  'sample_update_ms','sample_render_ms','sample_callback_ms']);
+  'sample_update_ms','sample_render_ms','sample_callback_ms','sample_replay_cursor']);
 
 export function pauseTraceConfig(baseTrace){
   const trace=structuredClone(baseTrace);
@@ -93,13 +93,17 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
           const s=state.sample||[];
           if(state.rows<CAP){
             const b=data?.begin_phases||{},e=data?.end_phases||{};
+            // Record the replay input cursor at this observed timing callback
+            // boundary. The compact source sample above contains the original
+            // match frame; these are distinct source identities.
+            const replayCursor=window.Module?._melee_web_native_menu_replay_cursor?.()??null;
             const v=[hookAt,data?.started,data?.frame,data?.total_ms,data?.preparation_ms,data?.input_ms,
               data?.simulation_audio_ms,data?.begin_ms,data?.draw_ms,data?.end_ms,
               b.staging_slot_wait_ms,b.staging_slot_wait_count,b.frame_slot_wait_ms,b.frame_slot_wait_count,
               b.max_wait_ms,b.record_ms,e.gfx_finish_ms,e.queue_submit_ms,e.surface_encode_ms,e.observer_ms,
               data?.source_steps,data?.source_draws,data?.draw_calls,data?.queued_delta,data?.created_delta,
               data?.texture_upload_bytes,data?.staging_used_bytes,data?.wasm_heap_bytes,data?.began,
-              data?.drawn,data?.draw_suppressed,s[0],s[1],s[2],s[3],s[4],s[5],s[6]];
+              data?.drawn,data?.draw_suppressed,s[0],s[1],s[2],s[3],s[4],s[5],s[6],replayCursor];
             const base=state.rows*COLS;
             for(let index=0;index<COLS;index++){
               const value=Number(v[index]);table[base+index]=Number.isFinite(value)?value:NaN;
@@ -121,7 +125,7 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
   },{columns:PAUSE_TRACE_COLUMNS,stallSchedule});
 }
 
-export async function readPauseTraceStatus(page){
+export async function readPauseTraceStatus(page,{readNative=true}={}){
   return page.evaluate(()=>{
     const capture=window.__meleePauseTrace;
     if(!capture)return {status:'not-installed'};
@@ -129,14 +133,57 @@ export async function readPauseTraceStatus(page){
     const call=name=>{try{return typeof module?.[name]==='function'?module[name]():null;}catch(error){return {error:String(error?.message||error)};}};
     const status=document.querySelector('#status');
     const dialog=document.querySelector('#error-dialog[open]');
+    let nativeMessage=null;
+    if(readNative)try{const pointer=module?._melee_web_native_menu_message?.();
+      if(pointer)nativeMessage=module.UTF8ToString(pointer);}catch(error){nativeMessage={error:String(error?.message||error)};}
     return {status:'installed',rows:capture.state.rows,dropped:capture.state.dropped,
       capture_errors:capture.state.errors,stall_schedule:capture.state.stall_schedule,
       incidents:capture.state.incidents.slice(),incident_overflow:capture.state.incident_overflow,
       replay_cursor:call('_melee_web_native_menu_replay_cursor'),source_running:call('_melee_web_native_menu_running'),
-      phase:call('_melee_web_native_menu_phase'),runtime_error:status?.dataset.runtimeError||null,
+      phase:call('_melee_web_native_menu_phase'),native_message:nativeMessage,
+      runtime_error:status?.dataset.runtimeError||null,
       dialog_error:dialog?document.querySelector('#error')?.textContent?.trim()||'Application error':null,
       replay_report:window.lastRetailReplayReport??null,status_text:status?.textContent||null};
   });
+}
+
+/** Atomically mark a timing-table row cursor and page-clock boundary. */
+export async function markPauseTraceBoundary(page){
+  return page.evaluate(()=>{
+    const capture=window.__meleePauseTrace;
+    if(!capture)return {status:'not-installed'};
+    return {status:'marked',at_ms:performance.now(),time_origin:performance.timeOrigin,
+      row_count:capture.state.rows};
+  });
+}
+
+/** Read only rows needed to supervise a bounded active window. The large
+ * retained table stays in the page until the measured load is off and the game
+ * owner has been unloaded. */
+export async function readPauseTraceRows(page,fromRow=0){
+  if(!Number.isSafeInteger(fromRow)||fromRow<0)throw Error('Pause-trace row cursor must be a nonnegative safe integer');
+  return page.evaluate(start=>{
+    const capture=window.__meleePauseTrace;
+    if(!capture)return {status:'not-installed'};
+    const names=['hook_at_ms','total_ms','preparation_ms','staging_slot_wait_ms',
+      'simulation_audio_ms','sample_pending_ticks','sample_running','sample_source_frame',
+      'sample_replay_cursor'];
+    const indexes=names.map(name=>capture.state.columns.indexOf(name));
+    if(indexes.some(index=>index<0))return {status:'missing-columns',names,columns:capture.state.columns};
+    const end=capture.state.rows,begin=Math.min(start,end),width=capture.state.columns.length;
+    const rows=[];
+    for(let row=begin;row<end;row++){
+      const base=row*width,item={row};
+      for(let column=0;column<names.length;column++){
+        const value=capture.table[base+indexes[column]];
+        item[names[column]]=Number.isFinite(value)?value:null;
+      }
+      rows.push(item);
+    }
+    return {status:'read',from_row:begin,to_row:end,rows,
+      incidents:capture.state.incidents.slice(),incident_overflow:capture.state.incident_overflow,
+      capture_errors:capture.state.errors,dropped:capture.state.dropped};
+  },fromRow);
 }
 
 /** Read the existing recorder's persisted incidents after the measured window.

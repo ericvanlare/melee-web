@@ -1,0 +1,125 @@
+import assert from 'node:assert/strict';
+import {assessSustainedWindow, classifySustainedAttempt, resolveSustainedAttempt,
+  summarizeObservedBatchDurations} from './staging_ring_sustained_decision.mjs';
+
+function rowsForWindow(start, end, pending = [0, 1, 2], stagingMs = 12, totalMs = 20) {
+  const count = pending.length;
+  return pending.map((debt, index) => {
+    const at = count === 1 ? start : start + (end - start) * index / (count - 1);
+    return {row: index, hook_at_ms: at, total_ms: totalMs, preparation_ms: 0,
+      staging_slot_wait_ms: stagingMs, simulation_audio_ms: 0.5,
+      sample_pending_ticks: debt, sample_running: 1, sample_source_frame: 100 + index,
+      sample_replay_cursor: 500 + index};
+  });
+}
+
+const control = assessSustainedWindow({rows: rowsForWindow(0, 2000), incidents: [], startMs: 0, endMs: 2000});
+assert.equal(control.status, 'clean');
+assert.equal(control.first_input_cursor, 500);
+assert.equal(control.last_original_frame, 102);
+
+const preparation = assessSustainedWindow({rows: rowsForWindow(0, 2000).map((row, index) =>
+  index === 1 ? {...row, preparation_ms: 0.25} : row),
+incidents: [{reason: 7, source_frame: 101, at_ms: 1000}], startMs: 0, endMs: 2000});
+assert.equal(preparation.status, 'inconclusive');
+assert.ok(preparation.problems.includes('preparation_duration_observed'));
+assert.ok(preparation.problems.includes('preparation_event_observed'));
+
+const missingCursor = assessSustainedWindow({rows: rowsForWindow(0, 2000).map(row =>
+  ({...row, sample_replay_cursor: null})), incidents: [], startMs: 0, endMs: 2000});
+assert.ok(missingCursor.problems.includes('missing_callback_telemetry'));
+const shortControl = assessSustainedWindow({rows: rowsForWindow(0, 1999), incidents: [], startMs: 0, endMs: 1999});
+assert.ok(shortControl.problems.includes('window_shorter_than_required'));
+const errorWindow = assessSustainedWindow({rows: rowsForWindow(0, 2000), incidents: [], startMs: 0, endMs: 2000,
+  browserErrors: ['console error']});
+assert.ok(errorWindow.problems.includes('browser_error'));
+
+const recorder = {retained_records: [{incident: {reason: 'simulation_debt', staging: {wait_ms: 18}}}]};
+const pauseRows = rowsForWindow(100, 300, [1, 3, 5], 12, 20);
+pauseRows.push({...pauseRows.at(-1), row: 3, sample_running: 0, sample_replay_cursor: 503});
+const positiveTreatment = assessSustainedWindow({rows: pauseRows,
+  incidents: [], startMs: 100, endMs: 300, durationMs: 0, pauseTerminal: true});
+assert.equal(positiveTreatment.status, 'clean');
+assert.equal(positiveTreatment.callback_rows, 3);
+assert.equal(positiveTreatment.pause_callback_row.sample_running, 0);
+const gpuLoad = {requested_iterations: 600, requested_gpu_load_window_ms: 2000,
+  actual_gpu_load_window_ms: 2001,
+  batch_durations_ms: [2.1, 2.3],
+  gpu_observation: {window_batches: 2, errors: [], on: false}};
+const positive = classifySustainedAttempt({control, treatment: positiveTreatment,
+  terminal: {outcome: 'timing_pause', pause_reason: 1}, recorder, gpuLoad});
+assert.equal(positive.result, 'positive_control');
+assert.equal(positive.decision, 'propose_one_equivalent_ring_four_comparison');
+assert.equal(positive.staging_wait_dominant, true);
+assert.equal(positive.rising_callback_debt, true);
+assert.deepEqual(positive.observed_batch_duration_stats_ms,
+  {count: 2, min_ms: 2.1, mean_ms: 2.2, p50_ms: 2.3, p95_ms: 2.3, max_ms: 2.3});
+assert.equal(positive.gpu_load_actual_minus_requested_ms, 1);
+assert.equal(positive.gpu_load_observer_overshoot_ms, 1);
+
+const cpuTreatment = assessSustainedWindow({rows: rowsForWindow(100, 300, [1, 3, 5], 4, 20),
+  incidents: [], startMs: 100, endMs: 300, durationMs: 0});
+const cpuPause = classifySustainedAttempt({control, treatment: cpuTreatment,
+  terminal: {outcome: 'timing_pause', pause_reason: 1}, recorder, gpuLoad});
+assert.equal(cpuPause.result, 'classified_pause');
+assert.equal(cpuPause.classification, 'cpu_or_callback_gap_dominated');
+assert.equal(cpuPause.decision, 'park_ring_four');
+
+const nonmonotonicPause = assessSustainedWindow({rows: rowsForWindow(100, 300, [1, 5, 2], 12, 20),
+  incidents: [], startMs: 100, endMs: 300, durationMs: 0});
+assert.equal(classifySustainedAttempt({control, treatment: nonmonotonicPause,
+  terminal: {outcome: 'timing_pause', pause_reason: 1}, recorder, gpuLoad}).classification,
+'staging_wait_without_rising_callback_debt');
+const invalidWait = assessSustainedWindow({rows: rowsForWindow(100, 300, [1, 3, 5], 25, 20),
+  incidents: [], startMs: 100, endMs: 300, durationMs: 0});
+assert.equal(classifySustainedAttempt({control, treatment: invalidWait,
+  terminal: {outcome: 'timing_pause', pause_reason: 1}, recorder, gpuLoad}).staging_wait_dominant, false);
+
+const cleanTreatment = assessSustainedWindow({rows: rowsForWindow(100, 2100, [0, 1, 2], 2, 10),
+  incidents: [], startMs: 100, endMs: 2100});
+assert.deepEqual(classifySustainedAttempt({control, treatment: cleanTreatment,
+  terminal: {outcome: 'window_complete'}, recorder: {retained_records: []}, gpuLoad}),
+{result: 'clean_nonreproduction', decision: 'park_ring_four',
+  observed_batch_duration_stats_ms: {count: 2, min_ms: 2.1, mean_ms: 2.2, p50_ms: 2.3, p95_ms: 2.3, max_ms: 2.3},
+  requested_gpu_load_window_ms: 2000, actual_gpu_load_window_ms: 2001,
+  gpu_load_actual_minus_requested_ms: 1, gpu_load_observer_overshoot_ms: 1,
+  gpu_load_early_stop_ms: 0});
+assert.equal(classifySustainedAttempt({control, treatment: positiveTreatment,
+  terminal: {outcome: 'timing_pause', pause_reason: 1}, recorder: {retained_records: []}, gpuLoad}).reason,
+'genuine_staging_incident_not_exported');
+assert.equal(classifySustainedAttempt({control, treatment: positiveTreatment,
+  terminal: {outcome: 'timing_pause', pause_reason: 4}, recorder, gpuLoad}).reason,
+'pause_reason_not_simulation_debt');
+assert.equal(classifySustainedAttempt({control: preparation, treatment: positiveTreatment,
+  terminal: {outcome: 'timing_pause', pause_reason: 1}, recorder, gpuLoad}).decision,
+'inspect_immediately');
+assert.equal(classifySustainedAttempt({control, treatment: cleanTreatment,
+  terminal: {outcome: 'window_complete'}, stimulusValid: false, gpuLoad}).reason,
+'invalid_stimulus');
+assert.equal(classifySustainedAttempt({control, treatment: cleanTreatment,
+  terminal: {outcome: 'window_complete'}, gpuLoad: {...gpuLoad,
+    gpu_observation: {...gpuLoad.gpu_observation, window_batches: 1}}}).reason,
+'measured_600_gpu_window_invalid');
+assert.equal(classifySustainedAttempt({control, treatment: cleanTreatment,
+  terminal: {outcome: 'window_complete'}, gpuLoad: {...gpuLoad,
+    actual_gpu_load_window_ms: 2100}}).result, 'clean_nonreproduction');
+assert.equal(classifySustainedAttempt({control, treatment: cleanTreatment,
+  terminal: {outcome: 'window_complete'}, gpuLoad: {...gpuLoad,
+    actual_gpu_load_window_ms: 2101}}).reason, 'measured_600_gpu_window_invalid');
+assert.equal(classifySustainedAttempt({control, treatment: cleanTreatment,
+  terminal: {outcome: 'window_complete'}, gpuLoad: {...gpuLoad,
+    batch_durations_ms: [2.1, 0]}}).reason, 'measured_600_gpu_window_invalid');
+assert.equal(summarizeObservedBatchDurations([3, 1, 2]).mean_ms, 2);
+assert.equal(summarizeObservedBatchDurations([]), null);
+
+const teardownFailure = resolveSustainedAttempt({integrityErrors: ['artifact_postcheck_error'],
+  control, treatment: positiveTreatment, terminal: {outcome: 'timing_pause', pause_reason: 1},
+  recorder, gpuLoad});
+assert.equal(teardownFailure.result, 'inconclusive');
+assert.equal(teardownFailure.decision, 'inspect_immediately');
+assert.equal(teardownFailure.reason, 'capture_or_cleanup_integrity_failed');
+assert.deepEqual(teardownFailure.integrity_errors, ['artifact_postcheck_error']);
+assert.equal(resolveSustainedAttempt({integrityErrors: [], control, treatment: positiveTreatment,
+  terminal: {outcome: 'timing_pause', pause_reason: 1}, recorder, gpuLoad}).result, 'positive_control');
+
+console.log('Sustained staging-ring window qualification and frozen decision rules passed.');

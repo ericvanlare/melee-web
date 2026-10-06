@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import {installPauseTraceCapture} from './pause_trace_capture.mjs';
+import {installPauseTraceCapture, readPauseTraceRows, readPauseTraceStatus} from './pause_trace_capture.mjs';
 
 const originalWindow = globalThis.window;
+const originalDocument = globalThis.document;
 try {
   let cursor = 600;
   globalThis.window = {
@@ -68,11 +69,42 @@ try {
   assert.equal(state.stall_schedule.observed_source_frame, 476);
   assert.equal(state.stall_schedule.observed_replay_cursor, 600);
 
+  cursor = 600;
+  globalThis.window = {
+    menuRuntimeTiming() {}, menuDiagnosticSample() {}, menuDiagnosticIncident() {},
+    Module: {_melee_web_native_menu_replay_cursor: () => cursor},
+  };
+  await installPauseTraceCapture(page, null);
+  sample[1] = 476;
+  globalThis.window.menuDiagnosticSample(...sample);
+  cursor = 601;
+  globalThis.window.menuRuntimeTiming({frame: 476, total_ms: 2, preparation_ms: 0});
+  state = globalThis.window.__meleePauseTrace.state;
+  const cursorColumn = state.columns.indexOf('sample_replay_cursor');
+  assert.ok(cursorColumn >= 0);
+  assert.equal(state.columns.indexOf('sample_source_frame') < cursorColumn, true);
+  assert.equal(globalThis.window.__meleePauseTrace.table[cursorColumn], 601,
+    'input cursor is sampled at the timing callback boundary, separately from source frame 476');
+  const rows = await readPauseTraceRows(page, 0);
+  assert.equal(rows.status, 'read');
+  assert.equal(rows.rows[0].sample_source_frame, 476);
+  assert.equal(rows.rows[0].sample_replay_cursor, 601);
+  assert.equal(rows.rows[0].preparation_ms, 0);
+  let staleNativeMessageReads = 0;
+  globalThis.window.Module._melee_web_native_menu_message = () => {staleNativeMessageReads++; throw Error('freed module');};
+  globalThis.document = {querySelector: selector => selector === '#status'
+    ? {dataset: {}, textContent: 'unloaded'} : null};
+  const afterUnload = await readPauseTraceStatus(page, {readNative: false});
+  assert.equal(afterUnload.status, 'installed');
+  assert.equal(staleNativeMessageReads, 0, 'post-unload status must not dereference native memory');
+
   await assert.rejects(() => installPauseTraceCapture(page,
     {sourceFrame: 600, replayCursor: 600, durationMs: 251}), /1\.\.250ms/);
 } finally {
   if (originalWindow === undefined) delete globalThis.window;
   else globalThis.window = originalWindow;
+  if (originalDocument === undefined) delete globalThis.document;
+  else globalThis.document = originalDocument;
 }
 
 console.log('Pause trace capture scheduling and exact source-cursor stall checks passed.');
