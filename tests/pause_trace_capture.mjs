@@ -1,9 +1,11 @@
-/** Opt-in, observation-only pause-trace capture for the CPU9 lineup harness.
+/** Opt-in pause-trace capture for the CPU9 lineup and bounded timing harnesses.
  * Local diagnostic helper for the 2026-10-05 gameplay pause trace. It wraps the
  * development runtime's existing per-callback timing hook (window.menuRuntimeTiming),
- * the compact sample hook and the incident hook. Each wrapper calls the original
- * first and stores already-published scalars in a preallocated Float64Array; it
- * never changes source scheduling, clocks, input, audio or GPU work. */
+ * the compact sample hook and the incident hook. Without a scheduled stall it
+ * calls originals and stores published scalars in a preallocated Float64Array.
+ * The optional fixed timing-matrix stall is an explicit host-side busy interval
+ * inside the callback timing-observation hook, after source draws/submissions and
+ * the original timing observer, before the native callback returns. */
 
 export const PAUSE_TRACE_COLUMNS=Object.freeze([
   'hook_at_ms','started_ms','frame','total_ms','preparation_ms','input_ms','simulation_audio_ms',
@@ -24,14 +26,19 @@ export function pauseTraceConfig(baseTrace){
   return trace;
 }
 
-export async function installPauseTraceCapture(page){
-  return page.evaluate(columns=>{
+export async function installPauseTraceCapture(page,stallSchedule=null){
+  if(stallSchedule!==null&&(!Number.isSafeInteger(stallSchedule.sourceFrame)||stallSchedule.sourceFrame<1||
+    !Number.isSafeInteger(stallSchedule.replayCursor)||stallSchedule.replayCursor<0||
+    !Number.isSafeInteger(stallSchedule.durationMs)||stallSchedule.durationMs<1||stallSchedule.durationMs>250))
+    throw Error('Pause-trace stall schedule must name a positive source frame, nonnegative replay cursor and 1..250ms duration');
+  return page.evaluate(({columns,stallSchedule})=>{
     if(window.__meleePauseTrace)return {status:'already-installed'};
     const COLS=columns.length,CAP=72000,RING=1800;
     const table=new Float64Array(CAP*COLS);
     const ring=new Array(RING);
     const state={columns,cap:CAP,rows:0,dropped:0,ring_size:RING,incidents:[],incident_overflow:0,
-      sample:null,errors:0,installed_at_ms:performance.now(),time_origin:performance.timeOrigin};
+      sample:null,errors:0,installed_at_ms:performance.now(),time_origin:performance.timeOrigin,
+      stall_schedule:stallSchedule?{...stallSchedule,status:'armed',actual:null,error:null}:null};
     const originalTiming=window.menuRuntimeTiming;
     const originalSample=window.menuDiagnosticSample;
     const originalIncident=window.menuDiagnosticIncident;
@@ -48,13 +55,42 @@ export async function installPauseTraceCapture(page){
         else state.incident_overflow++;
       }
     };
+    const maybeRunStall=sourceFrame=>{
+      const schedule=state.stall_schedule;
+      if(!schedule||schedule.status!=='armed'||!Number.isInteger(sourceFrame))return;
+      if(sourceFrame<schedule.sourceFrame)return;
+      const cursor=window.Module?._melee_web_native_menu_replay_cursor?.()??null;
+      if(sourceFrame!==schedule.sourceFrame||cursor!==schedule.replayCursor){
+        schedule.status='failed';
+        schedule.error=sourceFrame!==schedule.sourceFrame?'target_source_frame_skipped':'target_replay_cursor_mismatch';
+        schedule.observed_source_frame=sourceFrame;
+        schedule.observed_replay_cursor=cursor;
+        return;
+      }
+      const startedAt=performance.now();
+      schedule.status='running';
+      schedule.started_at_ms=startedAt;
+      schedule.started_epoch_ms=performance.timeOrigin+startedAt;
+      schedule.observed_source_frame=sourceFrame;
+      schedule.observed_replay_cursor=cursor;
+      schedule.insertion_boundary='menuRuntimeTiming observer after original observer and source submission, before native callback return';
+      const deadline=startedAt+schedule.durationMs;
+      while(performance.now()<deadline){/* declared host-stall treatment */}
+      const endedAt=performance.now();
+      schedule.status='complete';
+      schedule.ended_at_ms=endedAt;
+      schedule.ended_epoch_ms=performance.timeOrigin+endedAt;
+      schedule.actual_ms=endedAt-startedAt;
+      schedule.replay_cursor_after=window.Module?._melee_web_native_menu_replay_cursor?.()??null;
+    };
     window.menuRuntimeTiming=function(data){
       const hookAt=performance.now();
       try{return originalTiming?.apply(this,arguments);}
       finally{
         try{
+          const s=state.sample||[];
           if(state.rows<CAP){
-            const b=data?.begin_phases||{},e=data?.end_phases||{},s=state.sample||[];
+            const b=data?.begin_phases||{},e=data?.end_phases||{};
             const v=[hookAt,data?.started,data?.frame,data?.total_ms,data?.preparation_ms,data?.input_ms,
               data?.simulation_audio_ms,data?.begin_ms,data?.draw_ms,data?.end_ms,
               b.staging_slot_wait_ms,b.staging_slot_wait_count,b.frame_slot_wait_ms,b.frame_slot_wait_count,
@@ -69,6 +105,7 @@ export async function installPauseTraceCapture(page){
             ring[state.rows%RING]=data;
             state.rows++;
           }else state.dropped++;
+          maybeRunStall(s[2]);
           state.sample=null;
         }catch(_){state.errors++;}
       }
@@ -77,8 +114,27 @@ export async function installPauseTraceCapture(page){
     return {status:'installed',columns:COLS,capacity:CAP,ring:RING,
       timing_hook_present:typeof originalTiming==='function',
       sample_hook_present:typeof originalSample==='function',
-      incident_hook_present:typeof originalIncident==='function'};
-  },PAUSE_TRACE_COLUMNS);
+      incident_hook_present:typeof originalIncident==='function',
+      stall_schedule_supported:!!state.stall_schedule};
+  },{columns:PAUSE_TRACE_COLUMNS,stallSchedule});
+}
+
+export async function readPauseTraceStatus(page){
+  return page.evaluate(()=>{
+    const capture=window.__meleePauseTrace;
+    if(!capture)return {status:'not-installed'};
+    const module=window.Module;
+    const call=name=>{try{return typeof module?.[name]==='function'?module[name]():null;}catch(error){return {error:String(error?.message||error)};}};
+    const status=document.querySelector('#status');
+    const dialog=document.querySelector('#error-dialog[open]');
+    return {status:'installed',rows:capture.state.rows,dropped:capture.state.dropped,
+      capture_errors:capture.state.errors,stall_schedule:capture.state.stall_schedule,
+      incidents:capture.state.incidents.slice(),incident_overflow:capture.state.incident_overflow,
+      replay_cursor:call('_melee_web_native_menu_replay_cursor'),source_running:call('_melee_web_native_menu_running'),
+      phase:call('_melee_web_native_menu_phase'),runtime_error:status?.dataset.runtimeError||null,
+      dialog_error:dialog?document.querySelector('#error')?.textContent?.trim()||'Application error':null,
+      replay_report:window.lastRetailReplayReport??null,status_text:status?.textContent||null};
+  });
 }
 
 export async function readPauseTraceCapture(page,reason){
@@ -98,6 +154,7 @@ export async function readPauseTraceCapture(page,reason){
     return {status:'captured',read_at_ms:performance.now(),time_origin:performance.timeOrigin,
       columns:state.columns,rows,dropped:state.dropped,errors:state.errors,cap:state.cap,
       installed_at_ms:state.installed_at_ms,incidents:state.incidents,
+      stall_schedule:state.stall_schedule,
       incident_overflow:state.incident_overflow,table:flat,ring:ringRows,audio_snapshot:audio,
       audio_queue_history:audioHistory,hitch_capture:hitch,marks,
       status_text:document.querySelector('#status')?.textContent||null,
