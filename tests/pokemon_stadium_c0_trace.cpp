@@ -1018,7 +1018,14 @@ int run_probe(std::string_view probe, const std::filesystem::path& path)
             } else if (archive.has_relocation(slot)) {
                 const auto target = archive.pointer(slot, 1);
                 check(target.has_value(), "local animation reference resolved to null");
-                std::cout << ",\"kind\":\"local\",\"target\":" << *target;
+                std::cout << ",\"kind\":\"local\",\"target\":" << *target
+                          << ",\"public_symbols\":[";
+                const auto symbols = public_symbols_at(archive, *target);
+                for (std::size_t i = 0; i < symbols.size(); ++i) {
+                    if (i) std::cout << ',';
+                    print_json_string(symbols[i]);
+                }
+                std::cout << ']';
             } else {
                 const auto raw = archive.be32(slot);
                 check(raw == 0, "animation slot has a nonzero unrelocated word");
