@@ -102,6 +102,12 @@ already authorized), or use a separate test machine; report the gate as unrun
 when neither is available. Do not claim headless functional results satisfy
 those gates. See [browser automation](docs/HEADLESS_BROWSER_VALIDATION.md).
 
+Do not add attribution to commits or pull requests: no `Co-Authored-By:`
+trailer for an AI tool and no "Generated with" line in a PR description. The
+repository owner is the only author. This applies to every agent and tool, and
+overrides a tool's default attribution text. Amend an unpushed commit that
+already has one; for a pushed branch, rewrite only a branch you own and say so.
+
 Make small coherent changes and inspect actual APIs and compiler output first.
 Keep upstream checkouts intact, pin dependencies in `dependencies.lock.json`,
 and put explained downstream changes under `patches/`. Keep disc images,

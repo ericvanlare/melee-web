@@ -85,6 +85,10 @@ holds live state.
   `tools/checkpoints/<slug>/` ([developer entry](DEVELOPMENT.md#execution-contract-and-handoff)).
   The 2026-10-03/04 checkpoints used three different locations. Leave them as
   they are, and follow this convention from now on.
+- **D9. Attribution.** No agent adds `Co-Authored-By` trailers or "Generated with"
+  lines to commits or PR descriptions. The owner is the only author
+  ([AGENTS.md](../AGENTS.md)). Claude's own setting is disabled, and its earlier
+  trailers were removed from #159 and #160.
 
 **Structural work Claude is doing now** (each lands as its own PR):
 
