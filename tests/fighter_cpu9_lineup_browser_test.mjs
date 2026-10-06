@@ -670,6 +670,7 @@ async function failOnTimingPause(label,state){
   const receipt={schema:'melee-web-timing-pause-receipt-v1',label,
     match:activeMatchIndex,phase:state?.phase??null,running:state?.running??null,
     status:isTimingPause(state)?state.status:null,source_frame:timingPauseSourceFrame(state),
+    native_message:state?.native_message??null,dom_status:state?.dom_status??state?.status??null,
     runtime_diagnostics:report.runtime_diagnostics,
     diagnostics:typeof state?.diagnostics==='string'?state.diagnostics:null,
     observed_at:new Date().toISOString()};
@@ -1003,6 +1004,36 @@ const padButtonRight=0x0002,padButtonDown=0x0004,padButtonR=0x0020,padButtonL=0x
 const MAIN_SCENE=4,MAIN_MENU_KIND=0,VS_MENU_KIND=2,RULES_MENU_KIND=13,RULES_PLUS_MENU_KIND=15;
 const sourceObserve=()=>page.evaluate(()=>JSON.parse(
   Module.UTF8ToString(Module._melee_web_native_menu_source_observe())));
+async function waitForSourcePadReady(label,expectedPhases=[11]){
+  const deadline=Date.now()+20000;
+  let state=null,ownerCanPause=false,nativeMessage='';
+  while(Date.now()<deadline){
+    state=await diagnostic();
+    if(state.error)throw Error(`${label}: ${state.error}`);
+    if(state.nativeCommandError)throw Error(`${label}: ${state.nativeCommandError}`);
+    nativeMessage=await page.evaluate(()=>
+      Module.UTF8ToString(Module._melee_web_native_menu_message()));
+    if(isTimingPause({status:nativeMessage}))
+      await failOnTimingPause(label,{...state,status:nativeMessage,
+        native_message:nativeMessage,dom_status:state.status});
+    ownerCanPause=await page.evaluate(()=>{
+      const button=document.querySelector('#pause');
+      return Boolean(button&&!button.disabled);
+    });
+    if(state.running===1&&expectedPhases.includes(state.phase)&&ownerCanPause&&
+       state.diagnostics.includes('raw PAD: none')){
+      report.source_progress.push({label,phase:state.phase,running:state.running,
+        status:state.status,native_message:nativeMessage,diagnostics:state.diagnostics,
+        owner_can_pause:ownerCanPause});
+      return state;
+    }
+    await page.waitForTimeout(20);
+  }
+  throw Error(`${label} timed out waiting for an active source PAD owner: ${JSON.stringify({
+    phase:state?.phase,running:state?.running,status:state?.status,
+    native_message:nativeMessage,diagnostics:state?.diagnostics,
+    owner_can_pause:ownerCanPause,error:state?.error})}`);
+}
 async function waitForSource(label,predicate,timeoutMs=15000){
   const deadline=Date.now()+timeoutMs;
   let observation=null;
@@ -1019,8 +1050,12 @@ async function waitForSource(label,predicate,timeoutMs=15000){
 // Original menus consume trigger edges; one source tick down and two neutral
 // ticks give each navigation input one edge without auto-repeat.
 async function sourceMenuTap(buttons,label){
+  const releasePhase=buttons===buttonStart?[1]:[11];
+  await waitForSourcePadReady(`${label}: owner ready before press`,[11]);
   await pad(0,buttons,0,0,1,label);
+  await waitForSourcePadReady(`${label}: owner ready before release`,releasePhase);
   await pad(0,0,0,0,2,`${label}:release`);
+  await waitForSourcePadReady(`${label}: owner ready after release`,releasePhase);
 }
 async function moveSourceMenu(menuKind,total,target,label){
   for(let step=0;step<total*2;step++){
