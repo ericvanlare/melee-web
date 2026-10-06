@@ -68,17 +68,29 @@ Keep upstream checkouts intact and keep dependency revisions pinned in
 `patches/melee-gameplay.patch`. Build preparation materializes generated source
 under ignored `build/gameplay-source/`; do not edit that checkout as the source
 of record. After editing the gameplay patch, run
-`python3 scripts/canonicalize_gameplay_patch.py`; it rewrites the patch as one
-sorted diff per file and verifies the prepared source tree is unchanged. Do not
-append new file diffs at the end of the patch; that collides with every other
-open pull request. When a merge with `main` conflicts in the patch, merge the
-patched source trees instead of the patch text:
-`python3 scripts/canonicalize_gameplay_patch.py --merge $(git merge-base HEAD origin/main) HEAD origin/main`
-writes the combined canonical patch, or names the source files whose edits
-truly overlap. The command requires a clean standalone `.deps/melee` checkout
-at the pinned lockfile commit, holds the checkout mutation guard, rejects
-symlinked patch targets, and refuses to replace a patch changed during the
-operation. Regenerate a tracked generated declaration only through its existing
+`python3 scripts/canonicalize_gameplay_patch.py`; after editing the Aurora
+patch, run `python3 scripts/canonicalize_gameplay_patch.py --target aurora`.
+Each rewrites its patch as one sorted diff per file and verifies the patched
+source tree is unchanged. Do not append new file diffs at the end of a patch or
+regenerate it with ad hoc diff options; either collides with every other open
+pull request. When a merge with `main` conflicts in a patch, merge the patched
+source trees instead of the patch text:
+
+```sh
+python3 scripts/canonicalize_gameplay_patch.py --merge $(git merge-base HEAD origin/main) HEAD origin/main
+python3 scripts/canonicalize_gameplay_patch.py --target aurora --merge $(git merge-base HEAD origin/main) HEAD origin/main
+```
+
+Each writes the combined canonical patch, or names the source files whose edits
+truly overlap. The gameplay target requires a clean standalone `.deps/melee`
+checkout at the pinned lockfile commit. The Aurora target requires
+`.deps/aurora` at the pinned commit but reads only its Git objects, so the
+applied browser patch in its working tree does not matter; a merged Aurora
+patch reaches that checkout through bootstrap like any other Aurora patch
+change. Both hold the checkout mutation guard, reject symlinked patch targets,
+and refuse to replace a patch changed during the operation.
+
+Regenerate a tracked generated declaration only through its existing
 generator, review the generated diff, and run its `--check` mode when the
 generator provides one. The [testing guide](docs/TESTING.md) documents the
 fighter-registry example and the [dependency guide](docs/DEPENDENCIES.md)

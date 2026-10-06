@@ -36,9 +36,11 @@ ships with a migration path, and is measured against those PRs before merge.
 2. **Add, don't append.** Add evidence in a new `docs/status/` entry. New docs
    go in the narrowest `docs/` subdirectory. Shared lists should not grow at
    their end.
-3. **Patch hygiene.** Keep `patches/melee-gameplay.patch` canonical. The
-   conflict helper is supplied by [#146](https://github.com/ericvanlare/melee-web/pull/146);
-   use `canonicalize_gameplay_patch.py --merge`, never by hand-editing hunks.
+3. **Patch hygiene.** Keep `patches/melee-gameplay.patch` and
+   `patches/aurora-browser.patch` canonical. The conflict helper is supplied by
+   [#146](https://github.com/ericvanlare/melee-web/pull/146) (add
+   `--target aurora` for the Aurora patch); use
+   `canonicalize_gameplay_patch.py --merge`, never by hand-editing hunks.
 4. **Measure player experience.** Each release candidate records the
    player experience metrics comparison (`docs/PLAYER_EXPERIENCE_METRICS.md`).
 5. **Structural PRs get a cross-review.** Each architect reviews the other's

@@ -1,5 +1,5 @@
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 8bc473c..a7f111b 100644
+index 8bc473c3b04cf0728c161ebec142008fcc57d8b3..a7f111ba53ff3ff59a57d6a8c7881b390d92fad9 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -5,7 +5,14 @@ if (APPLE)
@@ -28,7 +28,7 @@ index 8bc473c..a7f111b 100644
  set_property(CACHE AURORA_DAWN_LINKAGE PROPERTY STRINGS shared static)
  
 diff --git a/cmake/AuroraDawnProvider.cmake b/cmake/AuroraDawnProvider.cmake
-index 184d0ee..abc9c5e 100644
+index 184d0eedc67e95b34c528e423b1cf141674ef6b5..abc9c5e7d07fca29b6b1142950d0d771ce08af6e 100644
 --- a/cmake/AuroraDawnProvider.cmake
 +++ b/cmake/AuroraDawnProvider.cmake
 @@ -104,7 +104,20 @@ if (_aurora_dawn_provider STREQUAL "auto")
@@ -54,7 +54,7 @@ index 184d0ee..abc9c5e 100644
    if (NOT TARGET webgpu_dawn)
      message(STATUS "aurora: Fetching Dawn (provider=vendor, linkage=${AURORA_DAWN_LINKAGE})")
 diff --git a/cmake/aurora_core.cmake b/cmake/aurora_core.cmake
-index 5ef636d..1e6f619 100644
+index 5ef636d1e3f3ce2cef3f83d414ae32bf7dec7e24..1e6f619f37d43bb4ccd71528101ad780526c4d26 100644
 --- a/cmake/aurora_core.cmake
 +++ b/cmake/aurora_core.cmake
 @@ -63,7 +63,10 @@ if(AURORA_ENABLE_RMLUI)
@@ -70,7 +70,7 @@ index 5ef636d..1e6f619 100644
              lib/webgpu/gpu.cpp
              lib/webgpu/gpu_cache.cpp
 diff --git a/cmake/aurora_gx.cmake b/cmake/aurora_gx.cmake
-index f8f9461..dcaaf02 100644
+index f8f9461c4b3adcec716546cb293e5642c9790370..dcaaf02321decd349e88d14ce91380caa15cfc77 100644
 --- a/cmake/aurora_gx.cmake
 +++ b/cmake/aurora_gx.cmake
 @@ -51,7 +51,9 @@ set_target_properties(aurora_gx PROPERTIES FOLDER "aurora")
@@ -85,7 +85,7 @@ index f8f9461..dcaaf02 100644
  if (AURORA_ENABLE_RMLUI)
      target_sources(aurora_gx PRIVATE
 diff --git a/extern/CMakeLists.txt b/extern/CMakeLists.txt
-index e1feaca..70e4b17 100644
+index e1feaca15b1b92273960fe50e2a258be3f42c069..70e4b17cbdfe24d6687a4f6b1d662c6a86f89886 100644
 --- a/extern/CMakeLists.txt
 +++ b/extern/CMakeLists.txt
 @@ -213,11 +213,36 @@ if (AURORA_ENABLE_GX)
@@ -127,7 +127,7 @@ index e1feaca..70e4b17 100644
      target_link_libraries(imgui_backends PRIVATE imgui ${AURORA_SDL3_TARGET} dawn::webgpu_dawn)
      target_link_libraries(imgui PUBLIC imgui_backends)
 diff --git a/include/aurora/aurora.h b/include/aurora/aurora.h
-index 56c7aae..4a1c018 100644
+index 56c7aaef3bfcdba5340d7ccd7bd752ed05c72803..4a1c01843e4201eef41e2803a07b9733930362dc 100644
 --- a/include/aurora/aurora.h
 +++ b/include/aurora/aurora.h
 @@ -37,6 +37,12 @@ typedef enum {
@@ -157,7 +157,7 @@ index 56c7aae..4a1c018 100644
  void aurora_set_pause_on_focus_lost(bool value);
 diff --git a/include/aurora/aurora_browser_future_owner_accessor.h b/include/aurora/aurora_browser_future_owner_accessor.h
 new file mode 100644
-index 0000000..2ecd22a
+index 0000000000000000000000000000000000000000..2ecd22a6c10e9caf99ce33d9c0a465a076965c7f
 --- /dev/null
 +++ b/include/aurora/aurora_browser_future_owner_accessor.h
 @@ -0,0 +1,132 @@
@@ -294,7 +294,7 @@ index 0000000..2ecd22a
 +              "future owner row identity offset changed");
 +#endif
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
-index 94504b1..b834676 100644
+index 94504b177d6733244a9de40a8dfb49f5964363ae..b83467626ca164d25409393f95b22daf9e6de01b 100644
 --- a/include/aurora/gfx.h
 +++ b/include/aurora/gfx.h
 @@ -3,10 +3,12 @@
@@ -474,7 +474,7 @@ index 94504b1..b834676 100644
  
 diff --git a/include/aurora/pipeline_prepare.h b/include/aurora/pipeline_prepare.h
 new file mode 100644
-index 0000000..df9fd74
+index 0000000000000000000000000000000000000000..df9fd7448e3f016235ee7e808f48bcf090c1da25
 --- /dev/null
 +++ b/include/aurora/pipeline_prepare.h
 @@ -0,0 +1,100 @@
@@ -579,7 +579,7 @@ index 0000000..df9fd74
 +}
 +#endif
 diff --git a/include/dolphin/pad.h b/include/dolphin/pad.h
-index 252fca7..3e36937 100644
+index 252fca7d9a4056d9e19f31d0777ba153a30fcc65..3e36937e92a0c391d80194b7527fa4f8f9be25cd 100644
 --- a/include/dolphin/pad.h
 +++ b/include/dolphin/pad.h
 @@ -221,6 +221,11 @@ s32 PADGetNativeButtonPressed(u32 port);
@@ -595,7 +595,7 @@ index 252fca7..3e36937 100644
  void PADSetVirtualStatus(u32 port, const PADStatus* status);
  void PADClearVirtualStatus(u32 port);
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842..7d9b3a1 100644
+index 9430842976e01edc8d43d2182e56a61f7def6ec8..7d9b3a1be57cbad75844268c3268937519c8e2f4 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
 @@ -1,6 +1,10 @@
@@ -892,7 +892,7 @@ index 9430842..7d9b3a1 100644
  const AuroraBackend* aurora_get_available_backends(size_t* count) {
    if (count != nullptr) {
 diff --git a/lib/dawn/BackendBinding.cpp b/lib/dawn/BackendBinding.cpp
-index 447ead8..8514c86 100644
+index 447ead855b709494be9403184ff22d644a6dd626..8514c868265b3d55fa999c98511c749ad95adb46 100644
 --- a/lib/dawn/BackendBinding.cpp
 +++ b/lib/dawn/BackendBinding.cpp
 @@ -23,6 +23,10 @@ std::shared_ptr<wgpu::ChainedStruct> SetupWindowAndGetSurfaceDescriptor(SDL_Wind
@@ -907,7 +907,7 @@ index 447ead8..8514c86 100644
    std::shared_ptr<wgpu::SurfaceSourceWindowsHWND> desc = std::make_shared<wgpu::SurfaceSourceWindowsHWND>();
    desc->hwnd = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
 diff --git a/lib/dolphin/pad/pad.cpp b/lib/dolphin/pad/pad.cpp
-index 0a35990..11a6faf 100644
+index 0a35990e83cf1c0f1a6e33c97230bd596c080749..11a6fafcfb05d827434e58c8d05eaa8d320bf6fc 100644
 --- a/lib/dolphin/pad/pad.cpp
 +++ b/lib/dolphin/pad/pad.cpp
 @@ -292,6 +292,7 @@ constexpr PADCLampRegion ClampRegion{
@@ -972,7 +972,7 @@ index 0a35990..11a6faf 100644
      u16 low = 0;
 diff --git a/lib/gfx/aurora_browser_future_owner_accessor.cpp b/lib/gfx/aurora_browser_future_owner_accessor.cpp
 new file mode 100644
-index 0000000..f4cd633
+index 0000000000000000000000000000000000000000..f4cd6334e7638592f7c660e5681e4a703d74482e
 --- /dev/null
 +++ b/lib/gfx/aurora_browser_future_owner_accessor.cpp
 @@ -0,0 +1,57 @@
@@ -1035,7 +1035,7 @@ index 0000000..f4cd633
 +}
 diff --git a/lib/gfx/aurora_browser_future_owner_accessor_library.js b/lib/gfx/aurora_browser_future_owner_accessor_library.js
 new file mode 100644
-index 0000000..69d2ea3
+index 0000000000000000000000000000000000000000..69d2ea3a2418c7640cba5791d638d9e2d10c171e
 --- /dev/null
 +++ b/lib/gfx/aurora_browser_future_owner_accessor_library.js
 @@ -0,0 +1,303 @@
@@ -1344,7 +1344,7 @@ index 0000000..69d2ea3
 +});
 diff --git a/lib/gfx/browser_submission_owner.hpp b/lib/gfx/browser_submission_owner.hpp
 new file mode 100644
-index 0000000..f0634a7
+index 0000000000000000000000000000000000000000..f0634a77889589f06a380984f6d69319299b76a4
 --- /dev/null
 +++ b/lib/gfx/browser_submission_owner.hpp
 @@ -0,0 +1,113 @@
@@ -1462,7 +1462,7 @@ index 0000000..f0634a7
 +
 +}  // namespace aurora::gfx::detail
 diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
-index b3054be..9fe8bd7 100644
+index b3054be5ad2dc2a45c3de4ecb3e944114421526c..9fe8bd7426cee8680344ad5c719debc441d966c0 100644
 --- a/lib/gfx/encoding.cpp
 +++ b/lib/gfx/encoding.cpp
 @@ -154,6 +154,9 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
@@ -1486,7 +1486,7 @@ index b3054be..9fe8bd7 100644
    switch (op.type) {
    case FrameOpType::RenderPass:
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83ef..4781ea9 100644
+index 9fd83efc28ad8a19c3e902a6efc1096126982583..4781ea96d7e2c05083a72f76b28582a9106da735 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
 @@ -1,4 +1,10 @@
@@ -2558,7 +2558,7 @@ index 9fd83ef..4781ea9 100644
  const AuroraStats* aurora_get_stats() { return &aurora::gfx::detail::resources().stats; }
  float aurora_get_fps() { return aurora::gfx::calculate_fps(); }
 diff --git a/lib/gfx/frame.hpp b/lib/gfx/frame.hpp
-index 0b86ffe..8bcfe54 100644
+index 0b86ffead6e8f6153d2acf52cf9daecf4f07ccfa..8bcfe547ddacc12b4f2c57d068feed473f5c2dbc 100644
 --- a/lib/gfx/frame.hpp
 +++ b/lib/gfx/frame.hpp
 @@ -8,7 +8,14 @@
@@ -2586,7 +2586,7 @@ index 0b86ffe..8bcfe54 100644
  uint32_t current_frame() noexcept;
  void after_submit() noexcept;
 diff --git a/lib/gfx/frame_packet.hpp b/lib/gfx/frame_packet.hpp
-index d50ce6a..8f7ded5 100644
+index d50ce6a43a8af6071dc9e810e96e63eccc5c7640..8f7ded5ccb5c5b9d8b845c0b7780b5997e4d67e6 100644
 --- a/lib/gfx/frame_packet.hpp
 +++ b/lib/gfx/frame_packet.hpp
 @@ -1,3 +1,6 @@
@@ -2639,7 +2639,7 @@ index d50ce6a..8f7ded5 100644
    std::deque<TextureCopy> textureCopies;
    std::deque<EncoderTask> encoderTasks;
 diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
-index bff9b47..52b5ffe 100644
+index bff9b4781bd4c7f0e78b4f47b886c6ef6d63b079..52b5ffef6583d22d2d3db7583d0d6ef77b8479ab 100644
 --- a/lib/gfx/pipeline_cache.cpp
 +++ b/lib/gfx/pipeline_cache.cpp
 @@ -1,10 +1,20 @@
@@ -3990,7 +3990,7 @@ index bff9b47..52b5ffe 100644
    if (it == g_pipelines.end()) {
      return false;
 diff --git a/lib/gfx/pipeline_cache.hpp b/lib/gfx/pipeline_cache.hpp
-index 7eb4723..de393fd 100644
+index 7eb4723889679df6de87d11535c190cf4fdee06d..de393fd45034561847088120271875cc0031578e 100644
 --- a/lib/gfx/pipeline_cache.hpp
 +++ b/lib/gfx/pipeline_cache.hpp
 @@ -2,6 +2,11 @@
@@ -4027,7 +4027,7 @@ index 7eb4723..de393fd 100644
  PipelineRef find_pipeline(ShaderType type, const Config& config, NewPipelineCallback&& cb);
 diff --git a/lib/gfx/pipeline_cache_queue.hpp b/lib/gfx/pipeline_cache_queue.hpp
 new file mode 100644
-index 0000000..a1b71e6
+index 0000000000000000000000000000000000000000..a1b71e665d90d7bf6513621bd35fc518bc904275
 --- /dev/null
 +++ b/lib/gfx/pipeline_cache_queue.hpp
 @@ -0,0 +1,76 @@
@@ -4109,7 +4109,7 @@ index 0000000..a1b71e6
 +} // namespace aurora::gfx::detail
 diff --git a/lib/gfx/pipeline_prepare_state.hpp b/lib/gfx/pipeline_prepare_state.hpp
 new file mode 100644
-index 0000000..b629d3b
+index 0000000000000000000000000000000000000000..b629d3bf2c5ea5f9a084724ed514ca9977ac3bbf
 --- /dev/null
 +++ b/lib/gfx/pipeline_prepare_state.hpp
 @@ -0,0 +1,365 @@
@@ -4479,7 +4479,7 @@ index 0000000..b629d3b
 +
 +} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
-index d04db0f..9c583fd 100644
+index d04db0f34210fb56995de0793200c457aaf61233..9c583fde7f8cd802712f92f15da827ade7aeb382 100644
 --- a/lib/gfx/recording.cpp
 +++ b/lib/gfx/recording.cpp
 @@ -19,6 +19,7 @@
@@ -4597,7 +4597,7 @@ index d04db0f..9c583fd 100644
    const wgpu::TexelCopyBufferLayout layout{
        .offset = 0,
 diff --git a/lib/gfx/recording.hpp b/lib/gfx/recording.hpp
-index cd2b794..551fd6e 100644
+index cd2b794159d0daeca9dc0092300e0e808d2f5de4..551fd6ea49b0c1783eef09b41288ad96e45fe14e 100644
 --- a/lib/gfx/recording.hpp
 +++ b/lib/gfx/recording.hpp
 @@ -17,6 +17,7 @@ struct RecordedFrame {
@@ -4609,7 +4609,7 @@ index cd2b794..551fd6e 100644
  
  namespace testing {
 diff --git a/lib/gfx/render_worker.cpp b/lib/gfx/render_worker.cpp
-index 85783b6..2698e96 100644
+index 85783b60ec1a569ac7fba6dd153e8bc588cffee5..2698e9692a6d27e9fd9ea62176f1965bd22f41fd 100644
 --- a/lib/gfx/render_worker.cpp
 +++ b/lib/gfx/render_worker.cpp
 @@ -191,6 +191,13 @@ size_t FrameSlotPool::free_count() const {
@@ -4638,7 +4638,7 @@ index 85783b6..2698e96 100644
      return;
    }
 diff --git a/lib/gfx/texture.cpp b/lib/gfx/texture.cpp
-index 029a3d0..6ad1ff1 100644
+index 029a3d047c357a5e1aed999af63a3dee8ea09f03..6ad1ff1e468194773386d4a6b3c1f098407133c5 100644
 --- a/lib/gfx/texture.cpp
 +++ b/lib/gfx/texture.cpp
 @@ -30,6 +30,7 @@ wgpu::Extent3D physical_size(wgpu::Extent3D size, TextureFormatInfo info) {
@@ -4672,7 +4672,7 @@ index 029a3d0..6ad1ff1 100644
    return std::make_shared<TextureRef>(std::move(texture), std::move(textureView), wgpu::TextureView{}, size, wgpuFormat,
                                        mips, gxFormat);
 diff --git a/lib/gfx/texture_replacement.cpp b/lib/gfx/texture_replacement.cpp
-index 03dda46..c810993 100644
+index 03dda4678ec0b5c9e6ca6d124d8519c90d093700..c810993364c2060b0b1fd346245294cef117fad4 100644
 --- a/lib/gfx/texture_replacement.cpp
 +++ b/lib/gfx/texture_replacement.cpp
 @@ -462,7 +462,8 @@ bool remove_mipmaps(gfx::ConvertedTexture& texture) noexcept {
@@ -4700,7 +4700,7 @@ index 03dda46..c810993 100644
    uint64_t o = 0;
    const auto append = [&](const ByteBuffer& d) noexcept -> bool {
 diff --git a/lib/gfx/types.hpp b/lib/gfx/types.hpp
-index 940d599..4b30013 100644
+index 940d599b8bf31ff792c991f5b0319e25848fa217..4b3001346b8790d6c36ab004544bb49f004136b9 100644
 --- a/lib/gfx/types.hpp
 +++ b/lib/gfx/types.hpp
 @@ -37,5 +37,5 @@ using webgpu::Viewport;
@@ -4711,7 +4711,7 @@ index 940d599..4b30013 100644
 +using EndFrameCallback = std::function<void(wgpu::CommandEncoder&, std::vector<AfterSubmitCallback>, AuroraStats&)>;
  } // namespace aurora::gfx
 diff --git a/lib/gx/command_processor.cpp b/lib/gx/command_processor.cpp
-index b0dce17..65c1407 100644
+index b0dce17ad0b01846863e846d994671be8ac367af..65c1407bb2e0cb2b18d806975487110d3b3c4cd0 100644
 --- a/lib/gx/command_processor.cpp
 +++ b/lib/gx/command_processor.cpp
 @@ -1,3 +1,9 @@
@@ -4821,7 +4821,7 @@ index b0dce17..65c1407 100644
      gfx::Range idxRange;
      static ByteBuffer idxBuf;
 diff --git a/lib/gx/fifo.cpp b/lib/gx/fifo.cpp
-index bcaba60..388117d 100644
+index bcaba60c56ef18ddbda9c40e39c35d3e95b9db47..388117d3ab9a2093819d3db4ed308671e9c800aa 100644
 --- a/lib/gx/fifo.cpp
 +++ b/lib/gx/fifo.cpp
 @@ -1,3 +1,6 @@
@@ -4941,7 +4941,7 @@ index bcaba60..388117d 100644
  
  } // namespace aurora::gx::fifo
 diff --git a/lib/gx/fifo.hpp b/lib/gx/fifo.hpp
-index 0d6a5d8..510e6e7 100644
+index 0d6a5d8ab36c7992ab98418458bb21beb178faaf..510e6e7c675bad50276fb46ced412a4584ae4db5 100644
 --- a/lib/gx/fifo.hpp
 +++ b/lib/gx/fifo.hpp
 @@ -1,3 +1,6 @@
@@ -4984,7 +4984,7 @@ index 0d6a5d8..510e6e7 100644
      LIKELY {
        if (detail::sBufferSize < detail::sBufferCapacity)
 diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
-index b12b327..0fbfa77 100644
+index b12b327fe4d3276c13b23e93baca64824ed50806..0fbfa7733ee223e6ff9802c662c633065747b975 100644
 --- a/lib/gx/gx.cpp
 +++ b/lib/gx/gx.cpp
 @@ -567,12 +567,17 @@ void initialize() noexcept {
@@ -5006,7 +5006,7 @@ index b12b327..0fbfa77 100644
      sPipelineLayout = g_device.CreatePipelineLayout(&desc);
    }
 diff --git a/lib/gx/pipeline.cpp b/lib/gx/pipeline.cpp
-index 0c3631c..3cf50c4 100644
+index 0c3631c9b7b0638f7a60d057a44a9f37de6d9024..3cf50c489cd1644682fe4fe38052707765308180 100644
 --- a/lib/gx/pipeline.cpp
 +++ b/lib/gx/pipeline.cpp
 @@ -1,3 +1,6 @@
@@ -5039,7 +5039,7 @@ index 0c3631c..3cf50c4 100644
    pass.SetBindGroup(1, resources.uniformBindGroup, offsets.size(), offsets.data());
    if (data.bindGroups.textureBindGroup) {
 diff --git a/lib/gx/pipeline.hpp b/lib/gx/pipeline.hpp
-index 1abcbd5..c5fe2fa 100644
+index 1abcbd518965b15fb9de612eee2f1811402975c2..c5fe2fa3f883a092fd5590758e90c35d44f90a96 100644
 --- a/lib/gx/pipeline.hpp
 +++ b/lib/gx/pipeline.hpp
 @@ -1,3 +1,6 @@
@@ -5084,7 +5084,7 @@ index 1abcbd5..c5fe2fa 100644
    uint32_t version = GXPipelineConfigVersion;
    uint32_t msaaSamples = 1;
 diff --git a/lib/gx/shader.cpp b/lib/gx/shader.cpp
-index 92f358b..c6683db 100644
+index 92f358b4642a7d439e66ef548deea230bb3c3539..c6683dbcd881c55b3bf20d9e12eb074afc97a775 100644
 --- a/lib/gx/shader.cpp
 +++ b/lib/gx/shader.cpp
 @@ -1628,6 +1628,11 @@ std::string build_shader_source(const ShaderConfig& config) noexcept {
@@ -5118,7 +5118,7 @@ index 92f358b..c6683db 100644
      Log.info("Generated shader (hash {:x}): {}", hash, shaderSource);
    }
 diff --git a/lib/gx/texture.hpp b/lib/gx/texture.hpp
-index 29c9a48..deeb0aa 100644
+index 29c9a48bfa21fe4da1f30933125ca1907393dac3..deeb0aa9b5501271e241e98bfcdb9ed5c3c0cb12 100644
 --- a/lib/gx/texture.hpp
 +++ b/lib/gx/texture.hpp
 @@ -26,7 +26,11 @@ const TextureStats& texture_stats() noexcept;
@@ -5134,7 +5134,7 @@ index 29c9a48..deeb0aa 100644
  constexpr uint64_t ReplacementPublishBudgetBytes = 12ull * 1024ull * 1024ull;
  
 diff --git a/lib/internal.hpp b/lib/internal.hpp
-index d1adb6c..eb5cbe9 100644
+index d1adb6ce2e124816790f4c86e0ccc69d981ac406..eb5cbe925ba64b7b8aac8e188136a2d5f5712866 100644
 --- a/lib/internal.hpp
 +++ b/lib/internal.hpp
 @@ -4,9 +4,11 @@
@@ -5329,7 +5329,7 @@ index d1adb6c..eb5cbe9 100644
  };
  
 diff --git a/lib/sqlite_utils.hpp b/lib/sqlite_utils.hpp
-index 38db46b..abd3b23 100644
+index 38db46bbfcfbc76c8a7fbc062e8fb1086638e738..abd3b23debd1e1a6496f28d93d51bbe0695802b4 100644
 --- a/lib/sqlite_utils.hpp
 +++ b/lib/sqlite_utils.hpp
 @@ -52,18 +52,19 @@ public:
@@ -5356,7 +5356,7 @@ index 38db46b..abd3b23 100644
  
    explicit operator bool() const { return m_active; }
 diff --git a/lib/webgpu/gpu.cpp b/lib/webgpu/gpu.cpp
-index 592b8ab..ad068b0 100644
+index 592b8ab440f52253a8e1eaa76236bfe3a7ec466a..ad068b05e86c14973fcb6e0d2173135d0ec4e568 100644
 --- a/lib/webgpu/gpu.cpp
 +++ b/lib/webgpu/gpu.cpp
 @@ -1,3 +1,6 @@
@@ -5458,7 +5458,7 @@ index 592b8ab..ad068b0 100644
    g_instance = {};
    cache_shutdown();
 diff --git a/lib/window.cpp b/lib/window.cpp
-index 2a4aadf..58ac741 100644
+index 2a4aadf6913443d286bc309ca6fe3e73f7630e52..58ac7417baf95ea90c3b72290d07f6882d904296 100644
 --- a/lib/window.cpp
 +++ b/lib/window.cpp
 @@ -33,7 +33,9 @@ extern "C" void Android_UnlockActivityMutex(void);
@@ -5506,7 +5506,7 @@ index 2a4aadf..58ac741 100644
    return true;
 diff --git a/tests/pipeline_prepare_state_test.cpp b/tests/pipeline_prepare_state_test.cpp
 new file mode 100644
-index 0000000..17fb09e
+index 0000000000000000000000000000000000000000..17fb09eca1b46fad73f97f6f3a8d24c76ac08eed
 --- /dev/null
 +++ b/tests/pipeline_prepare_state_test.cpp
 @@ -0,0 +1,111 @@
