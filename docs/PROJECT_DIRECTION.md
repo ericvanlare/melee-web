@@ -136,9 +136,18 @@ cannot compensate for an incorrect input or acknowledgement protocol.
 
 ## Sequencing and decision gates
 
-The roadmap continues to order delivery: establish reliable local play, expand
-and validate the vanilla game, then admit later compatibility and online scope.
-Within that direction, these are the useful decision gates:
+The [roadmap](ROADMAP.md#current-priorities) orders delivery. Since 2026-10-05,
+the order has been:
+
+1. Gameplay headroom.
+2. In parallel: browser-to-browser online play (delay-based lockstep first, then
+   rollback) and competitive-rules scope.
+3. Whole-game breadth.
+4. The Slippi compatibility profile and desktop cross-play.
+
+Browser-to-browser play between two copies of this port does not need the Slippi
+profile. Gates 4 and 5 below apply to it directly, and gate 3 applies only to
+cross-play. These are the decision gates:
 
 1. **Local acceptance.** Complete the original CSS → SSS → four-stock Mario/Final
    Destination → CSS boundary and the roadmap's required repeated-session,

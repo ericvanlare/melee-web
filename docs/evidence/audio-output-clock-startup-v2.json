@@ -1,0 +1,167 @@
+{
+  "schema": "melee-web-audio-output-clock-startup-v2",
+  "date": "2026-10-04",
+  "evidence_level": [
+    "Source identified",
+    "Browser exercised: bounded current-main four-player replay interrupted by timing pause",
+    "Startup queue overflow removed in scoped comparison; not performance admitted"
+  ],
+  "artifact_paths": {
+    "root": "Paths below are relative to the runs/ directory on the verified external AgentStorage mount.",
+    "candidate_run": "current-main-output-clock-gameplay-candidate-20261003-210127-0d24d9e3/merged-main-07bcfdf-v1",
+    "webkit_run": "mobile-pauses-first-reload-20261003-20261003-113011-cce20970/pauseOut/webkit-audio-output-readiness-07bcfdf-v1"
+  },
+  "source": {
+    "base_commit": "07bcfdfa6f4531ac464eab44ebecb206daa1f0da",
+    "origin_main_commit": "07bcfdfa6f4531ac464eab44ebecb206daa1f0da",
+    "candidate_source_diff_sha256": "ae874afcbe3f19020ac8cbb8410e62a1533121b8978325553ae329e35755d657",
+    "changed_paths": [
+      "web/runtime-audio.mjs",
+      "tests/runtime_audio_test.mjs",
+      "tests/melee_runtime_owner_test.mjs"
+    ],
+    "native_simulation_or_pcm_producer_changed": false,
+    "implementation": "After the matching AudioWorklet process acknowledgement, wait until AudioContext.getOutputTimestamp().contextTime is strictly greater than its process_time before native source playback. The existing five-second deadline covers both waits; invalid or unavailable timestamps fail explicitly."
+  },
+  "staging_baseline": {
+    "candidate_change_deployed": false,
+    "source_commit": "07bcfdfa6f4531ac464eab44ebecb206daa1f0da",
+    "deployment_id": "19a6ec7e-b035-4361-ad6e-43f275e4d3f5",
+    "profile": "audio-player",
+    "runtime_hash": "9c81b55e5bc2366d",
+    "manifest_sha256": "edb5722a41fa895ddabb69f814f09e183e70e5e3ad8551a26eec235118a5d30e",
+    "receipt_path": "pr152-staging-20261003-221952-5730ef71/deployment-receipt.json",
+    "receipt_sha256": "9327ff1b3e37e6aa5476bf900f7b94e6984c1fbb1cb5d466bdb2f3cee2f8a70c",
+    "production_changed": false
+  },
+  "prior_same_commit_startup_comparison": {
+    "evidence_path": "docs/evidence/audio-output-clock-startup-v1.json",
+    "base_commit": "c3ddd39d191abcd59a72cd428a085c0958c922a9",
+    "control": {
+      "worklet_process_time_seconds": 0,
+      "context_current_time_seconds": 0.008,
+      "accepted_packets": 30,
+      "accepted_frames": 16000,
+      "overflow_packet": 31,
+      "source_cursor": 31,
+      "error": "Audio output queue overflow",
+      "report_sha256": "87b85d54c09d1abf99e2e2871d5f356e9a934b15f6f34b845b5628a5bf626535",
+      "durable_receipt_sha256": "9be4e19a66c4444d3c7da59002c9127f5eeffe67bbf2ec243a0f39c7f5c62194"
+    },
+    "candidate": {
+      "output_clock_wait_ms": [
+        556.63,
+        575.74
+      ],
+      "result": "Both bounded captures passed the cursor-31 overflow boundary; one reached match initialization. They did not establish sustained live-match timing.",
+      "startup_prefix_report_sha256": "4a0831a151110d2d39282defad716e4d1631968f6feafcaf2560c71855d3e4a0",
+      "match_initialization_report_sha256": "f1d5f510e9e98aadf88cf26bacddc18343b743f6fab0e85b7560ded07be3c2d0"
+    }
+  },
+  "current_main_gameplay_capture": {
+    "scenario": "Original four-player Mario versus Mario versus Mario versus Mario on Final Destination; MWRC v8; 3,000 replay-cursor cap; one attempt",
+    "browser": "Installed headless Google Chrome 154.0.8037.97 via scripts/browser_tools.mjs; Playwright 1.62.1",
+    "gpu": "ANGLE Metal, Apple M4, driver 26.6",
+    "host_speaker_output": "muted",
+    "web_audio_processing": "active",
+    "report_path": "current-main-output-clock-gameplay-candidate-20261003-210127-0d24d9e3/merged-main-07bcfdf-v1/candidate-v2/gameplay-prefix-v2/attempt-01/report.json",
+    "report_sha256": "a2ec279ed781001f089224a94d422ac6b7dc89ffbd09ae958a45e13d77768ad8",
+    "supervisor_sha256": "97b5df17e475722a0406d556eed2fd3c35816f8f99390e116c3d4d447fc51b61",
+    "cleanup_sha256": "96386ce697b366ba3f067989522d3f3f5b7cfe281bc487968221a4fd85602bea",
+    "capture_receipt_path": "current-main-output-clock-gameplay-candidate-20261003-210127-0d24d9e3/merged-main-07bcfdf-v1/candidate-v2/gameplay-prefix-v2/candidate-capture-receipt-v2.json",
+    "capture_receipt_sha256": "10e9eabd0ce8c83eec12dd60d6442b267ec7ce7a6d92946d4cc85605601e3c19",
+    "start_utc": "2026-10-04T05:45:34.964Z",
+    "elapsed_seconds": 39.947,
+    "readiness": {
+      "worklet_ack_ms": 3680.635,
+      "worklet_process_time_seconds": 0,
+      "native_launch_requested_ms": 3750.725,
+      "ack_to_launch_ms": 70.09,
+      "note": "The production gate awaited output timestamp progress; this instrumented capture did not retain the crossing timestamp itself."
+    },
+    "result": {
+      "phase": 7,
+      "status": "Paused after a timing disruption. Resume to continue.",
+      "replay_cursor": 1645,
+      "source_reported_frame": 63,
+      "source_frame_semantics": "The native diagnostic emits this field only after match construction is complete; it is the live match source-frame counter. The separate 'ticks: 0' text is the stock-check diagnostic counter.",
+      "runtime_error": null,
+      "browser_errors": [],
+      "failure_kind": "timing_disruption",
+      "first_queue_overflow": null,
+      "post_attempts": 1656,
+      "posted_packets": 1656,
+      "posted_frames": 883199,
+      "post_failures": 0,
+      "max_active_queued_frames": 1578,
+      "last_periodic_underrun_frames": 64,
+      "last_periodic_overflows": 0
+    },
+    "timing_diagnostic": {
+      "browser_long_task_ms": 50,
+      "live_render_total_ms": 153.365,
+      "simulation_audio_ms": 30.08,
+      "begin_ms": 28.53,
+      "draw_ms": 66.35,
+      "end_ms": 28.35,
+      "pipeline_queued_delta": 0,
+      "staging_slot_wait_ms": 11.205,
+      "worker_ms": 15.6,
+      "observer_ms": 2.82,
+      "source_steps": 6,
+      "source_draws": 6,
+      "interpretation": "Timestamp-correlated instrumented diagnostic only. It does not identify the pause threshold or establish that the render interval caused the disruption."
+    },
+    "cleanup": {
+      "node_and_chrome_process_groups_absent": true,
+      "server_closed": true,
+      "server_thread_joined": true,
+      "listener_absent": true
+    },
+    "classification": "Startup queue overflow absent in this bounded candidate capture; gameplay timing disruption remains unresolved. Not full-session or performance acceptance."
+  },
+  "webkit_graph_probe": {
+    "scope": "Production createRuntimeAudio and shipped AudioWorklet graph only; audio source disabled; no native module, PCM or gameplay.",
+    "browser": "Headless WebKit 26.5",
+    "report_path": "mobile-pauses-first-reload-20261003-20261003-113011-cce20970/pauseOut/webkit-audio-output-readiness-07bcfdf-v1/attempt-01/report.json",
+    "report_sha256": "21f4ba94c7664cfb005e076e9598429546836741c6e0e8d733b7f14317292ab2",
+    "owner_receipt_path": "mobile-pauses-first-reload-20261003-20261003-113011-cce20970/pauseOut/webkit-audio-output-readiness-07bcfdf-v1/attempt-01-owner-receipt.json",
+    "owner_receipt_sha256": "be40df069dc1afbe1cd617d472c705e99058f8d7cdb058bf1f680caedf8c63cd",
+    "worklet_ack_ms": 170,
+    "output_timestamp_crossing_ms": 188,
+    "output_timestamp_context_time_seconds": 0.018666666666666668,
+    "observed_current_time_seconds": 1.524,
+    "result": "Output clock advanced while context stayed running; teardown completed. Graph-readiness compatibility only, not gameplay or iPhone validation."
+  },
+  "validation": {
+    "focused_checks": [
+      "python3 scripts/agent_workspace.py run -- node tests/runtime_audio_test.mjs",
+      "python3 scripts/agent_workspace.py run -- node tests/melee_runtime_owner_test.mjs",
+      "python3 scripts/agent_workspace.py run -- node tests/audio_worklet_test.mjs",
+      "git diff --check"
+    ],
+    "release_build": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "result": "pass",
+      "build_log_sha256": "218615614f9b697fd1b1e5fb98684d7fd8af57f420062e583e1774be8fb6ff1e",
+      "build_receipt_sha256": "a72b5604a021371d6a15281c4da486f9246da87912a4cbc3284e2402a6cdd3c4",
+      "build_receipt_path": "current-main-output-clock-gameplay-candidate-20261003-210127-0d24d9e3/merged-main-07bcfdf-v1/candidate-v2/release-build-receipt.json",
+      "served_file_manifest_sha256": "103d25160ba343490dbb1d75857a8aa07940af4be2b4a8591ddd7da2fc78a203"
+    },
+    "full_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "result": "pass",
+      "tests": 1883,
+      "skipped": 141,
+      "log_sha256": "2d54e30d370e77186dc2838284e42486d2e49a0888248b75870858b1bbd23927"
+    }
+  },
+  "limitations": [
+    "The current-main replay advanced to live match source frame 63, then stopped before completing the four-stock match, Results, return-to-CSS or repeat-match.",
+    "The timing disruption and 64 underrun frames remain open; no zero-underrun or sustained-performance claim.",
+    "The render diagnostic is instrumented and cannot causally assign the pause.",
+    "No PCM fidelity, original-state, pixel, physical-input, foreground-timing or mobile gameplay acceptance is claimed.",
+    "No candidate deployment was made; staging and production remain unchanged."
+  ],
+  "raw_reports_retained_outside_repository": true
+}

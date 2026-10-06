@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
-"""Rewrite the reviewed gameplay patch in canonical Git order.
+"""Rewrite a reviewed dependency patch in canonical Git order.
 
-The reviewed patch is an input to source preparation, not a log. Appending new
+A reviewed patch is an input to source preparation, not a log. Appending new
 file diffs at its end makes unrelated pull requests conflict on the same final
 lines, and repeated diffs of one file make review harder. The canonical form is
-`git diff` of the pinned Melee tree against that tree with the patch applied:
-one diff per file, sorted by path, full blob indexes and fixed diff options.
+`git diff` of the pinned dependency tree against that tree with the patch
+applied: one diff per file, sorted by path, full blob indexes and fixed diff
+options.
+
+`--target gameplay` (the default) selects patches/melee-gameplay.patch and the
+pinned Melee checkout; `--target aurora` selects patches/aurora-browser.patch
+and the pinned Aurora checkout.
 
 Canonicalizing never changes the prepared source tree. The command verifies
 that the old and new patches produce the same Git tree before it writes. The
-CLI requires the dependency checkout to be standalone, clean, and at the
-lockfile commit. Objects and indexes are written to temporary directories; the
-pristine checkout is read only.
+CLI requires the dependency checkout to be standalone and at the lockfile
+commit; the Melee checkout must also be clean. Objects and indexes are written
+to temporary directories; the dependency checkout is read only.
 """
 from pathlib import Path
+from typing import NamedTuple
 import argparse
 import os
 import stat
@@ -25,11 +31,31 @@ from bootstrap import read_lock, require_clean, verify_repository
 from workspace_resources import operation
 
 ROOT = Path(__file__).resolve().parents[1]
-PATCH = Path("patches/melee-gameplay.patch")
+
+
+class PatchTarget(NamedTuple):
+    patch: Path        # repository-relative reviewed patch
+    dependency: str    # dependencies.lock.json repository and .deps/ directory
+    clean: bool        # require a clean dependency working tree
+
+
+TARGETS = {
+    "gameplay": PatchTarget(Path("patches/melee-gameplay.patch"), "melee", True),
+    # Bootstrap applies the Aurora patch to the working tree of .deps/aurora,
+    # so that checkout is normally dirty. Only the pinned commit's objects are
+    # read, through a temporary index and object directory, so its working tree
+    # does not affect the result.
+    "aurora": PatchTarget(Path("patches/aurora-browser.patch"), "aurora", False),
+}
+# Every option that changes `git diff` output is fixed, so a contributor's Git
+# configuration (context, order file, prefixes, renames) cannot change the bytes.
 DIFF = ["-c", "core.quotePath=false", "-c", "diff.noprefix=false",
         "-c", "diff.mnemonicPrefix=false", "-c", "diff.renames=false",
+        "-c", "diff.suppressBlankEmpty=false",
         "diff", "--no-ext-diff", "--no-color", "--binary", "--full-index",
-        "--no-renames", "--diff-algorithm=myers", "--src-prefix=a/", "--dst-prefix=b/"]
+        "--no-renames", "--diff-algorithm=myers", "--indent-heuristic",
+        "--unified=3", "--inter-hunk-context=0", "--no-relative", "-O/dev/null",
+        "--src-prefix=a/", "--dst-prefix=b/"]
 
 
 def _environment(repository, temporary):
@@ -140,20 +166,25 @@ def _replace_patch(path, expected, identity, replacement):
             Path(temporary_name).unlink(missing_ok=True)
 
 
-def _verify_pinned_repository(repository, commit):
-    """Require the source object database to be the clean, pinned checkout."""
+def _verify_pinned_repository(repository, commit, *, clean=True):
+    """Require the source object database to be the pinned (and clean) checkout."""
     try:
         verify_repository(repository, commit)
-        require_clean(repository)
+        if clean:
+            require_clean(repository)
     except (OSError, subprocess.SubprocessError) as error:
         raise ValueError(f"{repository}: unable to verify the pinned checkout") from error
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--repository", type=Path, default=ROOT / ".deps/melee",
-                        help="clean standalone Melee checkout at the lockfile commit")
-    parser.add_argument("--patch", type=Path, default=ROOT / PATCH)
+    parser.add_argument("--target", choices=tuple(TARGETS), default="gameplay",
+                        help="reviewed patch: gameplay (patches/melee-gameplay.patch, the default) "
+                             "or aurora (patches/aurora-browser.patch)")
+    parser.add_argument("--repository", type=Path,
+                        help="standalone dependency checkout at the lockfile commit "
+                             "(default: .deps/melee, clean; or .deps/aurora for --target aurora)")
+    parser.add_argument("--patch", type=Path, help="patch file to rewrite (default: the target's reviewed patch)")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--check", action="store_true",
                       help="exit 1 when the patch is not canonical; do not write")
@@ -161,16 +192,22 @@ def main(argv=None):
                       help="Git revisions whose patches are merged as source trees into --patch; "
                            "for a branch behind main: --merge $(git merge-base HEAD origin/main) HEAD origin/main")
     args = parser.parse_args(argv)
+    selected = TARGETS[args.target]
+    repository = args.repository if args.repository is not None else ROOT / ".deps" / selected.dependency
+    patch_path = args.patch if args.patch is not None else ROOT / selected.patch
+    rerun = "python3 scripts/canonicalize_gameplay_patch.py" + (
+        "" if args.target == "gameplay" else f" --target {args.target}")
     try:
-        with operation(ROOT, "canonical gameplay patch"):
-            commit = read_lock(ROOT)["repositories"]["melee"]["commit"]
-            _verify_pinned_repository(args.repository, commit)
-            target = _validated_patch_target(args.patch)
+        with operation(ROOT, f"canonical {args.target} patch"):
+            commit = read_lock(ROOT)["repositories"][selected.dependency]["commit"]
+            _verify_pinned_repository(repository, commit, clean=selected.clean)
+            target = _validated_patch_target(patch_path)
             if args.merge:
                 current, identity = _patch_snapshot(target)
-                versions = [subprocess.check_output(["git", "show", f"{revision}:{PATCH.as_posix()}"], cwd=ROOT)
+                versions = [subprocess.check_output(["git", "show", f"{revision}:{selected.patch.as_posix()}"],
+                                                    cwd=ROOT)
                             for revision in args.merge]
-                merged, conflicts = merge_patches(args.repository, commit, *versions)
+                merged, conflicts = merge_patches(repository, commit, *versions)
                 if merged is None:
                     print("Source edits conflict in: " + ", ".join(conflicts), file=sys.stderr)
                     return 1
@@ -178,13 +215,12 @@ def main(argv=None):
                 print(f"{target}: merged {' + '.join(args.merge[1:])} as source trees")
                 return 0
             current, identity = _patch_snapshot(target)
-            canonical, tree = canonical_patch(args.repository, commit, current)
+            canonical, tree = canonical_patch(repository, commit, current)
             if canonical == current:
                 print(f"{target}: canonical (tree {tree})")
                 return 0
             if args.check:
-                print(f"{target}: not canonical; run python3 scripts/canonicalize_gameplay_patch.py",
-                      file=sys.stderr)
+                print(f"{target}: not canonical; run {rerun}", file=sys.stderr)
                 return 1
             _replace_patch(target, current, identity, canonical)
             print(f"{target}: rewritten in canonical order (tree {tree} unchanged)")
