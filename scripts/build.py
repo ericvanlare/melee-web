@@ -151,6 +151,13 @@ PUBLIC_RUNTIME_FORBIDDEN_EXPORTS = frozenset(
         "_melee_web_css_observe_setup",
         "_melee_web_sss_observe",
         "_melee_web_input_message",
+        "_melee_web_native_menu_net_begin",
+        "_melee_web_net_push",
+        "_melee_web_net_cursor",
+        "_melee_web_net_pushed",
+        "_melee_web_net_checksum_drain",
+        "_melee_web_net_status",
+        "_melee_web_net_arena_fill",
     }
 )
 PUBLIC_RUNTIME_SOURCE_FILES = (

@@ -263,7 +263,11 @@ alignas(32) unsigned char fifo[64*1024];
 void begin_source_session(){
  if(source_session_owned)return;
  char error[256]{};
+#if defined(MELEE_WEB_NET_SESSION)
+ check(melee_web_net_session_begin(32U*1024U*1024U,error,sizeof(error)),error);
+#else
  check(melee_web_gameplay_session_begin(32U*1024U*1024U,error,sizeof(error)),error);
+#endif
  source_session_owned=true;
 }
 void clear_diagnostic_pad(){diagnostic_pad={};diagnostic_pad_port=0;diagnostic_pad_remaining=0;}
@@ -436,7 +440,7 @@ if(scoped_assets){
  }
  if(replay&&replay_trace&&replay_final_draw&&!faulted)
   melee_web::retail_replay_end(replay->frames.size(),replay->whole_session());
- replay.reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
+ replay.reset();melee_web_net_reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
  css_fighter_release_port=-1;last_css_fighter_observation_valid=false;
@@ -516,6 +520,8 @@ void enter_world(){
       replay->initial_css->game_rules.data(),replay->initial_css->save_data.data(),
       error,sizeof(error)),error);
  }
+ if(melee_web_net_active()&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED)
+  check(melee_web_net_apply_start_context(host,error,sizeof(error)),error);
  check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);host_entered=true;world_exposed=true;
  const double entered=emscripten_get_now();
  report_construction("scene-enter",started,constructed,entered,before,aurora_stats_snapshot());
@@ -1373,6 +1379,13 @@ void tick(){
     sample=checked_input;
     --diagnostic_pad_remaining;
    }
+   if(melee_web_net_active()){
+    // Agreed network input replaces the sample at the replay seam. Without
+    // the next frame this is a network wait: no tick and no clock debt.
+    const PADStatus* agreed=melee_web_net_before_step(static_cast<uint32_t>(observed_replay_scene()));
+    if(!agreed){menu_clock.reset();break;}
+    sample=agreed;
+   }
    int result=1;
    const bool replay_whole=replay&&replay->whole_session();
    if(replay_whole){
@@ -1457,6 +1470,7 @@ void tick(){
    }
    else if(prize){prize->tick(sample);source_frames.did_step();if(prize->requested())result=3;}
    else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);source_frames.did_step();}
+   if(melee_web_net_active())melee_web_net_after_step();
    if(replay_whole){
     // One continuous timeline: the cursor advances once per simulation step,
     // whichever owner consumed that step, and the owner must be the scene the

@@ -121,6 +121,14 @@ int melee_web_menu_host_apply_replay_context(
     const uint8_t css_data[0x148], const uint8_t ko_counts[GM_MAX_PLAYERS],
     const uint8_t game_rules[0x18], const uint8_t save_data[0x55E8],
     char*, size_t);
+/* Install only the agreed networked seed on a fresh unentered host. Requires
+ * the canonical Everything mode, no personal profile and default PAD history. */
+int melee_web_menu_host_apply_net_context(MeleeWebMenuHost*, uint32_t random_seed,
+                                          char*, size_t);
+/* Read-only copy of the session-owned CSS (returns 1) or SSS (returns 2)
+ * selection payload and its small scalar header; 0 outside those scenes. */
+int melee_web_menu_host_selection_state(const MeleeWebMenuHost*, StartMeleeData*,
+                                        uint8_t header[6]);
 /* Original raw PAD processing, scene callback, audio control and scheduler.
  * Returns 1 while active, 3 on an original transition request, 0 on failure. */
 int melee_web_menu_host_tick(MeleeWebMenuHost*,const PADStatus[4],char*,size_t);
