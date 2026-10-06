@@ -628,7 +628,9 @@ add_custom_command(
   DEPENDS scripts/materialize_pipeline_cache.py web/initial_pipeline_cache.db.gz.b64
   VERBATIM)
 add_custom_target(gameplay_menu_pipeline_seed DEPENDS "${initial_pipeline_cache}" "${initial_pipeline_identity}")
-add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
+add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/gameplay_menu_browser_menu.cpp src/gameplay_menu_browser_match.cpp
+  src/gameplay_menu_browser_results.cpp src/gameplay_menu_browser_diagnostics.cpp
+  src/gameplay_menu_browser_observers.cpp src/browser_input.cpp src/browser_controllers.cpp
   tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
 add_dependencies(gameplay_menu_browser gameplay_menu_pipeline_seed)
 target_include_directories(gameplay_menu_browser PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
@@ -667,7 +669,9 @@ configure_file(web/native-menu.html native-menu.html @ONLY)
 # Keep the development target above intact so replay and source-observation
 # checks retain their full instrumentation.
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
-  add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
+  add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/gameplay_menu_browser_menu.cpp src/gameplay_menu_browser_match.cpp
+    src/gameplay_menu_browser_results.cpp src/gameplay_menu_browser_diagnostics.cpp
+    src/gameplay_menu_browser_observers.cpp src/browser_input.cpp src/browser_controllers.cpp
     tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
   add_dependencies(gameplay_public gameplay_menu_pipeline_seed)
   target_include_directories(gameplay_public PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
@@ -695,7 +699,9 @@ endif()
 # gameplay_menu_browser.cpp. The save/profile exports are shared with the
 # public player so its local-only settings use the same checked source owner.
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
-  add_executable(gameplay_audio_preview EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
+  add_executable(gameplay_audio_preview EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/gameplay_menu_browser_menu.cpp src/gameplay_menu_browser_match.cpp
+    src/gameplay_menu_browser_results.cpp src/gameplay_menu_browser_diagnostics.cpp
+    src/gameplay_menu_browser_observers.cpp src/browser_input.cpp src/browser_controllers.cpp
     tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
   add_dependencies(gameplay_audio_preview gameplay_menu_pipeline_seed)
   target_include_directories(gameplay_audio_preview PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")

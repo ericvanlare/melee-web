@@ -14,12 +14,14 @@ import tempfile
 import textwrap
 import unittest
 
+from menu_browser_source import menu_browser_source
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def _results_branch() -> str:
-    source = (ROOT / "src" / "gameplay_menu_browser.cpp").read_text(encoding="utf-8")
+    source = menu_browser_source()
     advance_start = source.index("void advance(){")
     start = source.index("\n if(results){", advance_start) + 1
     opening = source.index("{", start)

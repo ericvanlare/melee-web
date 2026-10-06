@@ -11,6 +11,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from check_gameplay import node_runtime
 
+from menu_browser_source import menu_browser_source
+
 
 class ResultsEntryPacketTests(unittest.TestCase):
     def test_wasm_copy_retains_pre_teardown_pad_and_full_typed_payload(self):
@@ -64,7 +66,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertEqual(bytes.fromhex(second['pad']['hex']), bytes(822))
 
     def test_capture_site_uses_existing_buffer_before_deferred_assets_return(self):
-        source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text()
+        source = menu_browser_source()
         # Opening VS demos use a separate MatchEnd path. Anchor this contract
         # at the ordinary results-producing branch so its deferred asset
         # handoff is checked without depending on the surrounding branch
@@ -241,7 +243,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn("'results-observation-pass'", harness)
 
     def test_exact_results_pause_scheduler_is_a_dev_only_pre_step_control(self):
-        runtime = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
+        runtime = menu_browser_source()
         pause = runtime.index('int melee_web_native_menu_results_pause_schedule(')
         loop = runtime.index('for(unsigned step=0;step<elapsed.steps;step++){')
         boundary = runtime.index('scheduled_results_pauses.before_tick(results_source_frame)', loop)
@@ -275,7 +277,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
                         gate.index('if(diagnosticFrame>=targetFrame)'))
 
     def test_results_pad_trace_is_bounded_and_development_only(self):
-        source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
+        source = menu_browser_source()
         self.assertIn('kResultsPadTraceCapacity=8192', source)
         self.assertIn('results->source_frames(),sample', source)
         self.assertIn('extern ResultsData lbl_8046DBE8', source)
@@ -329,7 +331,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
                         'Both CPU auto-pages must be observed before the final P1 Start is queued')
         self.assertIn("row.status==='queued-awaiting-consumed-trace'", harness)
         self.assertIn("pageCheck.status='pass';", harness)
-        runtime = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
+        runtime = menu_browser_source()
         scheduler = runtime.index('int melee_web_native_menu_results_pad_schedule(')
         source_step = runtime.index('activate_scheduled_results_pad(results->source_frames(),input->raw)')
         pad_override = runtime.index('if(diagnostic_pad_remaining){')
@@ -416,7 +418,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
                         input_helper.index('Module._melee_web_native_menu_pad_sample'))
 
     def test_results_trace_resets_before_scoped_asset_early_return(self):
-        source = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
+        source = menu_browser_source()
         # Keep the assertion scoped to the ordinary Results entry. The
         # Opening-demo branch now precedes it and intentionally bypasses this
         # Results trace lifecycle.
@@ -475,7 +477,7 @@ class ResultsEntryPacketTests(unittest.TestCase):
         self.assertIn('melee_web_camera_pool_last_subject_count = n_subjects;', camera_patch)
         self.assertIn('++melee_web_camera_pool_allocation_generation;', camera_patch)
 
-        browser = (ROOT / 'src/gameplay_menu_browser.cpp').read_text(encoding='utf-8')
+        browser = menu_browser_source()
         reset = browser.index('results_camera_entry_snapshot={};')
         construct = browser.index('results=std::make_unique<melee_web::GameplayResultsSession>')
         capture = browser.index('results_camera_entry_snapshot=results->camera_entry_snapshot();',
