@@ -7,14 +7,17 @@ east → B, west → X, north → Y. Right shoulder → Z; triggers → L/R.
 Controls allows an explicit custom mapping when that convention is unwanted.
 
 The public player and development `runtime.html` use the same compact **Controls**
-component to select the source separately for Player 1 and Player 2. Player 1 also
-has an optional **Touch controls** source. Available choices are **Auto**,
-**Keyboard**, **Controller only**, **Touch controls** (Player 1 only), or **Off**.
-Auto prefers a recognized controller and otherwise enables that player's keyboard.
-Keyboard overrides physical input for that slot; automatically assigned controllers
-move to another eligible slot. Both public slots can use the keyboard at once.
-The public player disables automatic ports 3/4, while the shared manager and probe
-retain four-port support. B0XX keyboard input remains Player 1 only.
+component to select the source separately for Players 1–4. Players 1 and 2 offer
+**Auto**, **Keyboard**, **Controller only**, or **Off**; Player 1 also offers
+**Touch controls**. Auto prefers a recognized controller and otherwise enables
+that player's keyboard. Players 3 and 4 offer **Auto**, **Controller only**, or
+**Off**, with no keyboard fallback. Keyboard overrides physical input for that
+slot; automatically assigned controllers move to another eligible slot. Players 1 and 2 can both use the keyboard at once. B0XX keyboard input remains
+Player 1 only.
+
+Public defaults are Auto for Players 1/2 and Off for Players 3/4. Choose Auto or
+Controller only to enable an extra public port. Development defaults all four
+ports to Auto. The shared manager keeps each controller assigned to one port.
 Source choices survive reload with the existing keyboard preferences. Detailed
 controller testing/remapping and keyboard bindings are collapsed settings sections,
 not a required step before play. Choose **Disc** during graphics startup or
@@ -114,8 +117,9 @@ never creates a runtime or changes simulation sampling. New pages can mount this
 component rather than importing a page shell.
 
 Both standalone entries share preferences at the same origin. The public page
-sets `disableExtraPorts: true`; development preserves ports 3/4 for its existing
-diagnostics. The older prototype keeps its hidden keyboard-checkbox adapter,
+supplies `initialSources: ['auto', 'auto', 'off', 'off']`; development uses
+four Auto defaults. Four saved source choices are restored on both surfaces,
+while older two-player preferences preserve the extra ports’ entry defaults. The older prototype keeps its hidden keyboard-checkbox adapter,
 but layout changes now go through this settings owner. Iframe overrides remain
 session-only. Development audio, replay and rendering diagnostics stay in the
 development entry and remain absent from the public artifact.

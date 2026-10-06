@@ -1,0 +1,180 @@
+{
+  "schema": "melee-web-public-four-port-controls-v1",
+  "evidence_labels": [
+    "Compiled",
+    "Browser exercised"
+  ],
+  "scope": "Shared public/development Controls routing for four authored Gamepad API devices; public audio-disabled menu/lifecycle regression. No physical input, four-human gameplay, performance or retail equivalence claim.",
+  "source_run_id": "public-four-port-controls-20261006-155156-be98e0ec",
+  "identity": {
+    "tested_source_commit": "3825ed28842ce836a7cf047ea74d40c2f211cfc2",
+    "tested_source_tree": "8633b3f3768c16fac08a44d9e209e5c717ffcb18",
+    "base_commit": "c212e99aec20685b893a6ba90c3517c388b43908",
+    "build_and_suite_source_commit": "861200e2137bf2cf53fa234c2d0e5192f2c7f533",
+    "rebase_tree_equal": true,
+    "native_inputs_unchanged_by_rebase": true,
+    "browser": "Chrome 154.0.8037.98",
+    "browser_mode": "headless",
+    "public_profile": "player (audio disabled)"
+  },
+  "implementation": {
+    "source_files": [
+      "web/controller-settings.mjs",
+      "web/player/player-shell.mjs"
+    ],
+    "public_default_sources": [
+      "auto",
+      "auto",
+      "off",
+      "off"
+    ],
+    "development_default_sources": [
+      "auto",
+      "auto",
+      "auto",
+      "auto"
+    ],
+    "extra_port_choices": [
+      "auto",
+      "controller",
+      "off"
+    ],
+    "reuse": "Existing four-port controller manager, PAD sampling, unique assignment, neutral disconnect/reconnect, preference store and browser harness."
+  },
+  "validation": {
+    "suite": {
+      "tests": 1919,
+      "skipped": 141,
+      "seconds": 367.965,
+      "exit_code": 0
+    },
+    "release_targets": [
+      "runtime",
+      "runtime-public"
+    ],
+    "controller_surfaces": [
+      "development runtime.html",
+      "packaged public player"
+    ],
+    "controller_assertions": [
+      "four unique assignments and four distinct PAD button samples",
+      "P3 Off removes assignment and explicit Controller restores it",
+      "P4 disconnect/reconnect restores one unique assignment",
+      "four source choices survive reload",
+      "legacy two-player choices retain extra-port defaults",
+      "invalid stored P3/P4 keyboard/touch choices fall back to their defaults",
+      "storage-unavailable and narrow-viewport controls work"
+    ],
+    "public_lifecycle_checks": 19,
+    "public_lifecycle_scope": "Owned-disc CSS, menu routes, B0XX CSS/SSS, supported Mario/FD match with harness-induced No Contest Results/CSS, settings/eject/reimport, headers/network policy. Not a natural match result.",
+    "screenshots": "Four-row public and development screenshots inspected; all rows readable and unclipped.",
+    "artifacts_unchanged": true,
+    "development_http_files": 32,
+    "public_package_files": 34,
+    "public_runtime_hash": "a1ac67adcc7ce1e4",
+    "public_identity_sha256": "ade003805457571a525f39b121fe52a2560c31dfb677cabfcaef4485cd3f7207",
+    "owned_servers_stopped": true
+  },
+  "retained_failures": [
+    {
+      "file": "full-suite.log",
+      "scope": "Before exact predecessor Aurora migration and current inventory-comparator fix; 1916 tests, 2 failures, 25 errors, 141 skips. Failed reproducers retained. No UI-specific failure observed."
+    }
+  ],
+  "evidence": [
+    {
+      "file": "current-validation.json",
+      "bytes": 1245,
+      "sha256": "bee37dec34adfebf5e907fa9f85040c1f1f15b1234d19f3b5ab0282491f7b00e"
+    },
+    {
+      "file": "full-suite-current.log",
+      "bytes": 347414,
+      "sha256": "278c3b2bb7b52de0bf7f71a781e5e0ee6e88d5d64fd5a9b4a29da03259e8a893"
+    },
+    {
+      "file": "build-runtime-current.log",
+      "bytes": 1421242,
+      "sha256": "3d0b019c446da4787170ffef2b7fea559b4470f30db4af192a47b9cf35f809ef"
+    },
+    {
+      "file": "build-public-current.log",
+      "bytes": 1379946,
+      "sha256": "9f576fe0189d0238bccf142bf0e7c99cee32c1215568920a06515d3c7c623f22"
+    },
+    {
+      "file": "bootstrap.log",
+      "bytes": 1715,
+      "sha256": "6e083d5a29d83136ba84263852e20b72b1f61721feac7f4e0be64003de9d9ad7"
+    },
+    {
+      "file": "aurora-before-bootstrap.json",
+      "bytes": 267,
+      "sha256": "7c82a6484ff0ddda44dd1f308e0e1592124542a61b2cd3c3c9232e4ec1e0f251"
+    },
+    {
+      "file": "aurora-after-bootstrap.json",
+      "bytes": 194,
+      "sha256": "f99df81305b5c9982aaf506aa6a0c8cf2c4df6f86dfc8e0e6dc4143c9033949d"
+    },
+    {
+      "file": "merged-base-rebase.json",
+      "bytes": 311,
+      "sha256": "10a26f2f0ae18a2a17d36fde0109db2ffabcb172d2d43d8d1e25a72475bb579f"
+    },
+    {
+      "file": "browser-validation.json",
+      "bytes": 24593,
+      "sha256": "5c83b5e4b743d73b1a3f20fb6d1d09ba5f6d0e52d06e1d0ddc3f651c224abf7e"
+    },
+    {
+      "file": "public-output.manifest.json",
+      "bytes": 168722,
+      "sha256": "ae4fb456685a3893db0e66d48780589c2ecfe5984fbdf297827fdaa320dd3d74"
+    },
+    {
+      "file": "package.log",
+      "bytes": 132,
+      "sha256": "3837b2a569e82eebc1a9bfd02d1172e4c81a474748dbe9cac1dc0de6949a6a73"
+    },
+    {
+      "file": "audit.log",
+      "bytes": 56,
+      "sha256": "c5519bd6e3168fce7f5f996fd112e0700edff41186b663dda637736879ca144c"
+    },
+    {
+      "file": "browser-controls-development/report.json",
+      "bytes": 374,
+      "sha256": "b2d14e2409d97c0a14dc715cddd5763da50969fc1060e97e146eeec30db35b46"
+    },
+    {
+      "file": "browser-controls-public/report.json",
+      "bytes": 369,
+      "sha256": "bee3c3421d19f33ce404ef44f980bb85a804ba5995232e5af1e577c6b592e16e"
+    },
+    {
+      "file": "browser-public-lifecycle/report.json",
+      "bytes": 31104,
+      "sha256": "81f8b4b4312df08a912e1c9c620997aa9a6eb68cd456cb943d0666b2c6191e68"
+    },
+    {
+      "file": "browser-controls-development/four-player-controller-routing.png",
+      "bytes": 129485,
+      "sha256": "f57d5588f6f038ecee6cb0fdf2b2a18a47f13673d91b1a5de67373aee3adbfaf"
+    },
+    {
+      "file": "browser-controls-public/four-player-controller-routing.png",
+      "bytes": 75920,
+      "sha256": "caacb80889dd95fdaa2dad784218a600bfb9c32255c6cbf3cd09d96688f1b36b"
+    }
+  ],
+  "exclusions": [
+    "Physical controllers and USB adapters",
+    "Four-human match acceptance",
+    "Sparse active-port layouts",
+    "Retail pixels and PCM",
+    "Foreground or uninterrupted-audio performance",
+    "Internet play",
+    "Production deployment"
+  ]
+}
