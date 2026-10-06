@@ -13,8 +13,9 @@ Slippi/online projects, read [project direction](PROJECT_DIRECTION.md). It recor
 strategy; the roadmap and boundary documents still govern implementation order
 and acceptance.
 
-Choose work from the [roadmap](ROADMAP.md) and current evidence in
-`STATUS.md`. GitHub issues own bounded tasks and completion criteria; this entry
+Choose work from the [roadmap's current priorities](ROADMAP.md#current-priorities),
+its pinned [priorities tracker](https://github.com/ericvanlare/melee-web/issues/158)
+and current evidence in `STATUS.md`. GitHub issues own bounded tasks and completion criteria; this entry
 owns command routing. Do not infer an accuracy pass from a closed implementation
 issue, a short replay or a successful build.
 
@@ -149,6 +150,15 @@ reproducer or request a bounded review before another long run. Reference the
 acceptance issue from component PRs without auto-closing it until all its gates
 pass. Keep new evidence in a new `docs/status/` entry and scoped reports rather
 than copying it into the roadmap or another status document.
+
+To pause unfinished work, push a WIP branch with one handoff at
+`docs/handoffs/YYYY-MM-DD-<slug>.md`. It states the branch, base and source
+commit; what was tested and what was not; open failures; and the exact next
+step. Keep machine-local paths and hashes in a private manifest outside Git, and
+name only how to find it. Preserved helper code goes under
+`tools/checkpoints/<slug>/` on the same branch. Do not create other handoff
+locations. Link the handoff from the tracking issue and from the
+[priorities tracker](https://github.com/ericvanlare/melee-web/issues/158).
 
 For code, run focused boundary checks, the full suite, the affected build and a
 diff review. For documentation, validate local links and paths and inspect the

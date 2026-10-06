@@ -34,9 +34,11 @@ started when they are no longer needed.
 Never blanket-delete `work/`, ignored files, another task's output, source,
 recordings, local changes, or evidence that has not been safely archived.
 
-Choose work from the [roadmap](docs/ROADMAP.md) and current evidence in
-`STATUS.md`. Complete and verify the supported playing experience before
-expanding scope. Each execution issue needs an observable failure or outcome,
+Choose work from the [roadmap's current priorities](docs/ROADMAP.md#current-priorities),
+its pinned [priorities tracker](https://github.com/ericvanlare/melee-web/issues/158)
+and current evidence in `STATUS.md`. Online multiplayer and competitive-rules
+scope come before whole-game breadth; the supported route stays the regression
+baseline. Each execution issue needs an observable failure or outcome,
 smallest next experiment, pass criteria, exclusions and a stopping rule. Check
 existing implementations for relevant solutions and record reuse or rejection.
 Component fixes do not close whole-session acceptance.
