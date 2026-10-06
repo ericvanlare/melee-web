@@ -160,7 +160,7 @@ set_target_properties(fighter_runtime_probe PROPERTIES SUFFIX ".js")
 # Real-data Stadium checkpoint 0 structural trace. It owns fresh checked DAT
 # parsers but does not register or enable a runtime stage profile.
 add_executable(pokemon_stadium_c0_trace EXCLUDE_FROM_ALL
-  tests/pokemon_stadium_c0_trace.cpp)
+  tests/pokemon_stadium_c0_trace.cpp tests/pokemon_stadium_ground_snapshot.c)
 target_link_libraries(pokemon_stadium_c0_trace PRIVATE fighter_asset_runtime)
 target_compile_options(pokemon_stadium_c0_trace PRIVATE -ffp-contract=off)
 target_link_options(pokemon_stadium_c0_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1

@@ -13,14 +13,7 @@
 #include "gameplay_effect_banks.h"
 #include "gameplay_ground_data.h"
 #include "native_dat.hpp"
-
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wwrite-strings"
-extern "C" {
-#include <melee/gr/types.h>
-#include <melee/sc/types.h>
-}
-#pragma GCC diagnostic pop
+#include "pokemon_stadium_ground_snapshot.h"
 
 #include <algorithm>
 #include <array>
@@ -488,20 +481,20 @@ void report_archive(const ArchiveRecord& record)
 
     const auto ground_root = symbol_offset(archive, "grGroundParam");
     NativeDatArena ground_arena(record.archive);
-    auto* ground = static_cast<GroundParam*>(melee_web_ground_data_decode(
-        ground_arena.reader(), ground_root));
-    check(ground && ground->stage_param_count == 18 && ground->stage_params,
+    void* decoded_ground = melee_web_ground_data_decode(ground_arena.reader(), ground_root);
+    StadiumGroundSnapshot ground{};
+    check(stadium_ground_snapshot(decoded_ground, &ground) &&
+              ground.stage_param_count == 18,
           "checked GroundParam decode did not produce 18 StageParam rows");
-    check(ground->y == scale && ground->stage_params[0].stkind == 3 &&
-              ground->stage_params[0].x14 == 6,
+    check(ground.y == scale && ground.row0_stkind == 3 && ground.row0_x14 == 6,
           "GrPs.usd GroundParam/row-zero Stadium source facts differ");
     const auto stage_rows = archive.pointer(ground_root + 0xb0,
-                                             std::size_t(ground->stage_param_count) * 0x64);
+                                             std::size_t(ground.stage_param_count) * 0x64);
     check(stage_rows && *stage_rows == 0x3d380,
           "GrPs.usd StageParam source row location differs from the contract");
     std::vector<std::uint32_t> stage_ids;
-    for (int i = 0; i < ground->stage_param_count; ++i)
-        stage_ids.push_back(static_cast<std::uint32_t>(ground->stage_params[i].stkind));
+    for (int i = 0; i < ground.stage_param_count; ++i)
+        stage_ids.push_back(ground.stage_ids[i]);
 
     const auto itemdata = symbol_offset(archive, "itemdata");
     const auto itemdata_null = !archive.pointer(itemdata, 4) && !archive.has_relocation(itemdata);
@@ -598,13 +591,13 @@ void report_archive(const ArchiveRecord& record)
               << ",\"entry_animations\":";
     print_entry_animations(record);
     std::cout << ",\"stage_scale\":" << std::setprecision(9) << scale
-              << ",\"stage_param_count\":" << ground->stage_param_count
+              << ",\"stage_param_count\":" << ground.stage_param_count
               << ",\"stage_param_rows_offset\":" << *stage_rows
               << ",\"stage_param_ids\":";
     print_u32_array(stage_ids);
     std::cout << ",\"stadium_stage_param\":{\"stkind\":"
-              << static_cast<unsigned>(ground->stage_params[0].stkind)
-              << ",\"x14\":" << ground->stage_params[0].x14 << "}"
+              << ground.row0_stkind
+              << ",\"x14\":" << ground.row0_x14 << "}"
               << ",\"itemdata_is_null\":true"
               << ",\"collision\":{\"root\":" << collision.root_offset
               << ",\"vertices\":" << collision.vertices.size()
@@ -876,16 +869,16 @@ int run_probe(std::string_view probe, const std::filesystem::path& path)
     if (probe == "ground") {
         const auto root = symbol_offset(*archive, "grGroundParam");
         NativeDatArena arena(archive);
-        auto* ground = static_cast<GroundParam*>(
-            melee_web_ground_data_decode(arena.reader(), root));
-        check(ground && ground->stage_param_count == 18 && ground->stage_params &&
-                  ground->stage_params[0].stkind == 3 &&
-                  ground->stage_params[0].x14 == 6,
+        void* decoded_ground = melee_web_ground_data_decode(arena.reader(), root);
+        StadiumGroundSnapshot ground{};
+        check(stadium_ground_snapshot(decoded_ground, &ground) &&
+                  ground.stage_param_count == 18 && ground.row0_stkind == 3 &&
+                  ground.row0_x14 == 6,
               "Stadium checked GroundParam source probe failed");
         std::cout << "{\"probe\":\"ground\",\"scope\":\"typed GroundParam/StageParam structural decode\",\"rows\":"
-                  << ground->stage_param_count << ",\"row0_stkind\":"
-                  << static_cast<unsigned>(ground->stage_params[0].stkind)
-                  << ",\"row0_x14\":" << ground->stage_params[0].x14 << "}\n";
+                  << ground.stage_param_count << ",\"row0_stkind\":"
+                  << ground.row0_stkind
+                  << ",\"row0_x14\":" << ground.row0_x14 << "}\n";
         return 0;
     }
     if (probe == "quake") {
