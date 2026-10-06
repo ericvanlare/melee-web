@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import {installPauseTraceCapture, readPauseTraceRows, readPauseTraceStatus} from './pause_trace_capture.mjs';
 
 const originalWindow = globalThis.window;
@@ -11,7 +12,11 @@ try {
     menuDiagnosticIncident() {},
     Module: {_melee_web_native_menu_replay_cursor: () => cursor},
   };
-  const page = {evaluate: async (callback, value) => callback(value)};
+  // Reconstruct the function in a separate realm as Playwright does. Calling
+  // callback(value) directly would retain Node lexical bindings and hide leaks.
+  const page = {evaluate: async (callback, value) => vm.runInNewContext(
+    `(${callback.toString()})(argument)`, {window: globalThis.window,
+      document: globalThis.document, performance, argument: structuredClone(value)})};
   const installed = await installPauseTraceCapture(page,
     {sourceFrame: 600, replayCursor: 600, durationMs: 2});
   assert.equal(installed.status, 'installed');
@@ -90,13 +95,30 @@ try {
   assert.equal(rows.rows[0].sample_source_frame, 476);
   assert.equal(rows.rows[0].sample_replay_cursor, 601);
   assert.equal(rows.rows[0].preparation_ms, 0);
-  let staleNativeMessageReads = 0;
-  globalThis.window.Module._melee_web_native_menu_message = () => {staleNativeMessageReads++; throw Error('freed module');};
+  let nativeReads = 0;
+  globalThis.window.Module = {
+    _melee_web_native_menu_message: () => {nativeReads++; return 123;},
+    UTF8ToString: pointer => {assert.equal(pointer, 123); return 'ready';},
+    _melee_web_native_menu_replay_cursor: () => {nativeReads++; return 601;},
+    _melee_web_native_menu_running: () => {nativeReads++; return 1;},
+    _melee_web_native_menu_phase: () => {nativeReads++; return 2;},
+  };
   globalThis.document = {querySelector: selector => selector === '#status'
     ? {dataset: {}, textContent: 'unloaded'} : null};
+  const ready = await readPauseTraceStatus(page);
+  assert.equal(ready.native_message, 'ready');
+  assert.equal(ready.replay_cursor, 601);
+  assert.equal(ready.source_running, 1);
+  assert.equal(ready.phase, 2);
+  assert.equal(nativeReads, 4, 'default status reads native APIs across serialized boundary');
+  nativeReads = 0;
+  for (const name of Object.keys(globalThis.window.Module))
+    globalThis.window.Module[name] = () => {nativeReads++; throw Error('freed module');};
   const afterUnload = await readPauseTraceStatus(page, {readNative: false});
   assert.equal(afterUnload.status, 'installed');
-  assert.equal(staleNativeMessageReads, 0, 'post-unload status must not dereference native memory');
+  assert.equal(nativeReads, 0, 'post-unload status must not call any native API');
+  for (const name of ['native_message', 'replay_cursor', 'source_running', 'phase'])
+    assert.equal(afterUnload[name], null);
 
   await assert.rejects(() => installPauseTraceCapture(page,
     {sourceFrame: 600, replayCursor: 600, durationMs: 251}), /1\.\.250ms/);

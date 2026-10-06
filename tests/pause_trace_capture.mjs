@@ -126,11 +126,12 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
 }
 
 export async function readPauseTraceStatus(page,{readNative=true}={}){
-  return page.evaluate(()=>{
+  // Playwright serializes this callback; Node closure bindings do not cross.
+  return page.evaluate(readNative=>{
     const capture=window.__meleePauseTrace;
     if(!capture)return {status:'not-installed'};
     const module=window.Module;
-    const call=name=>{try{return typeof module?.[name]==='function'?module[name]():null;}catch(error){return {error:String(error?.message||error)};}};
+    const call=name=>{if(!readNative)return null;try{return typeof module?.[name]==='function'?module[name]():null;}catch(error){return {error:String(error?.message||error)};}};
     const status=document.querySelector('#status');
     const dialog=document.querySelector('#error-dialog[open]');
     let nativeMessage=null;
@@ -144,7 +145,7 @@ export async function readPauseTraceStatus(page,{readNative=true}={}){
       runtime_error:status?.dataset.runtimeError||null,
       dialog_error:dialog?document.querySelector('#error')?.textContent?.trim()||'Application error':null,
       replay_report:window.lastRetailReplayReport??null,status_text:status?.textContent||null};
-  });
+  },readNative);
 }
 
 /** Atomically mark a timing-table row cursor and page-clock boundary. */
