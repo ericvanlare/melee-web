@@ -10,7 +10,7 @@ import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {loadBrowserTools} from './browser_tools.mjs';
-import {classifyRoute, expectedFullSceneOrder, validateFullRoute} from './net_determinism_contract.mjs';
+import {classifyRoute, collapseConsecutiveScenes, expectedFullSceneOrder, validateFullRoute} from './net_determinism_contract.mjs';
 import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstance} from './net_session_instance.mjs';
 import {openLoopbackPeerPair} from './net_lockstep_relay.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
@@ -596,9 +596,9 @@ async function run() {
       instanceRows[role].final_status = await instances[role].status();
       instanceRows[role].final_native = await instances[role].native();
       const observed = await instances[role].observe();
-      const scenes = instanceRows[role].scene_runs.map(row => row.scene);
-      instanceRows[role].route = validateFullRoute(scenes, observed.match);
       instanceRows[role].match_observation = observed.match;
+      const scenes = collapseConsecutiveScenes(instanceRows[role].scene_runs.map(row => row.scene));
+      instanceRows[role].route = validateFullRoute(scenes, observed.match);
       await finishRouteBoundaryEvidence(role, instanceRows[role].final_native.phase,
         instanceRows[role].final_status.cursor);
       instanceRows[role].graphics = instanceRows[role].route_boundary_captures

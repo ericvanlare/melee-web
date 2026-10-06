@@ -4,6 +4,14 @@ export function classifyRoute(ticks, frameCount) {
   return ticks === frameCount ? 'full' : 'prefix-only';
 }
 
+export function collapseConsecutiveScenes(perTickScenes) {
+  const transitions = [];
+  for (const scene of perTickScenes) {
+    if (transitions.at(-1) !== scene) transitions.push(scene);
+  }
+  return transitions;
+}
+
 export function validateFullRoute(scenes, match) {
   if (JSON.stringify(scenes) !== JSON.stringify(FULL_SCENE_ORDER))
     throw Error(`Full route scene order mismatch: ${JSON.stringify(scenes)}`);

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
-import {classifyRoute, validateFullRoute} from '../scripts/net_determinism_contract.mjs';
+import {classifyRoute, collapseConsecutiveScenes, validateFullRoute} from '../scripts/net_determinism_contract.mjs';
 
 const scriptPath = fileURLToPath(new URL('../scripts/net_determinism_browser.mjs', import.meta.url));
 const validMatch = {complete: true, rules: {stage: 0x20, player_stocks: [4, 4]},
@@ -45,6 +45,34 @@ test('prefix workloads are classified without asserting full-route acceptance', 
   assert.throws(() => validateFullRoute([1, 2], validMatch), /scene order mismatch/);
   assert.throws(() => validateFullRoute([1, 2, 3, 4, 1], {...validMatch, players: [{human: true}, {human: false}]}), /two-human/);
   assert.throws(() => validateFullRoute([1, 2, 3, 4, 1], {...validMatch, rules: {...validMatch.rules, stage: 0}}), /Final Destination/);
+});
+
+test('A2 per-tick checksum scenes collapse only consecutive repeats before route validation', () => {
+  const perTickScenes = [
+    ...Array(154).fill(1),
+    ...Array(152).fill(2),
+    ...Array(3986).fill(3),
+    ...Array(612).fill(4),
+    ...Array(180).fill(1),
+  ];
+  assert.equal(perTickScenes.length, 5084);
+  assert.deepEqual(collapseConsecutiveScenes(perTickScenes), [1, 2, 3, 4, 1]);
+  assert.equal(perTickScenes.length, 5084, 'scene compression must not remove per-tick samples');
+  assert.deepEqual(validateFullRoute(collapseConsecutiveScenes(perTickScenes), validMatch).observed_scenes,
+    [1, 2, 3, 4, 1]);
+
+  const repeatedScene = [...perTickScenes];
+  repeatedScene.splice(155, 0, 1);
+  assert.deepEqual(collapseConsecutiveScenes(repeatedScene), [1, 2, 1, 2, 3, 4, 1],
+    'a later return to a scene remains visible');
+  assert.throws(() => validateFullRoute(collapseConsecutiveScenes(repeatedScene), validMatch),
+    /scene order mismatch/);
+
+  const outOfOrder = [...perTickScenes];
+  outOfOrder[200] = 3;
+  assert.deepEqual(collapseConsecutiveScenes(outOfOrder), [1, 2, 3, 2, 3, 4, 1]);
+  assert.throws(() => validateFullRoute(collapseConsecutiveScenes(outOfOrder), validMatch),
+    /scene order mismatch/);
 });
 
 test('invalid global and per-instance seeds fail before browser startup', async () => {
