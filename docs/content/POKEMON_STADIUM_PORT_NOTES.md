@@ -129,10 +129,21 @@ registration order is map 1, map 5, then map 2 (`grpstadium.c:163-184,
 202-228, 302-340`). Profile values: `required_map_ids = {0, 1, 2, 5}`,
 `entry_count = 10`. Every `on_init` consumes animation slot 0 only, through
 `grAnime_801C8138(gobj, map_id, 0)`, so the animation consumer counts are ten
-explicit ones. Authored table lengths, as counted by the decode tool up to the first
-unrelocated word (the profile uses the consumer count above, not these):
-entries 1, 2, 3, 4, 5 and 9 have one material-animation slot; entry 6 has one joint slot; entries 7 and 8 have one
-joint and one material slot; no entry has shape animation. Map 1 also calls
+explicit ones. The structural archive trace records local, external, and absent
+states per descriptor slot. Its authored ownership matrix is cross-provider:
+GrPs.usd locally provides one material-animation table for maps 1, 2, and 5;
+GrPs1.dat and GrPs2.dat provide the fire and grass material-animation tables
+for maps 3 and 4; GrPs4.dat provides map 6's joint plus one joint-animation
+table; and GrPs3.dat provides maps 7 and 8's joints and their one-element joint
+and material-animation tables, plus map 9's joint and one material-animation
+table. No map has a shape-animation table. Non-owner archives retain the exact
+named external identity and descriptor slot; the corresponding provider row is
+checked against its public symbol and local table length. `ResolveNull` makes
+those external optional pointers null while preserving external metadata, so a
+null local optional does not mean the authored slot is absent. These ownership
+facts do not establish runtime external linking. Map 0's joint slot is local in
+each of the five English archives and is checked as a bounded 64-byte target;
+the trace does not require a public symbol name for that slot. Map 1 also calls
 `grAnime_801C77FC(gobj, 0, 7)`. Case 4 freezes the outgoing map with
 `grAnime_801C7A04(xE4, 0, 7, 0.0f)`. The per-entry `animation_flags` (`x28`)
 slots exist in every archive, including for externally owned entries.

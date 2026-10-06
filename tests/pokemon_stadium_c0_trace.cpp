@@ -219,6 +219,164 @@ void print_external_metadata(const DatArchive& archive)
     std::cout << ']';
 }
 
+const DatExternalSymbol* external_at_slot(const DatArchive& archive,
+                                          std::uint32_t slot)
+{
+    const DatExternalSymbol* result = nullptr;
+    for (const auto& external : archive.external_symbols()) {
+        if (std::find(external.slots.begin(), external.slots.end(), slot) ==
+            external.slots.end()) continue;
+        check(result == nullptr, "animation slot has duplicate external identities");
+        result = &external;
+    }
+    return result;
+}
+
+std::vector<std::string> public_symbols_at(const DatArchive& archive,
+                                           std::uint32_t target)
+{
+    std::vector<std::string> result;
+    for (const auto& symbol : archive.public_symbols())
+        if (symbol.data_offset == target) result.push_back(symbol.name);
+    return result;
+}
+
+struct AnimationSlotExpectation {
+    // -1 means absent in every archive; -2 means local in every archive.
+    // Otherwise the value is the ordinal of the archive that owns the root.
+    int owner;
+    const char* symbol;
+    std::size_t target_bytes;
+    bool pointer_list;
+};
+
+constexpr std::array<const char*, 10> joint_symbols{
+    nullptr,
+    "GrdPStadiumBG_TopN_joint",
+    "GrdPStadiumField_TopN_joint",
+    "GrdPStadiumFire_TopN_joint",
+    "GrdPStadiumGrass_TopN_joint",
+    "GrdPStadiumNormal_TopN_joint",
+    "GrdPStadiumRock_TopN_joint",
+    "GrdPStadiumWaterFunsuiA_TopN_joint",
+    "GrdPStadiumWaterFunsuiB_TopN_joint",
+    "GrdPStadiumWater_TopN_joint",
+};
+constexpr std::array<int, 10> joint_owners{-2, 0, 0, 1, 2, 0, 4, 3, 3, 3};
+constexpr std::array<const char*, 10> joint_animation_symbols{
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    "GrdPStadiumRock_TopN_animjoint_list",
+    "GrdPStadiumWaterFunsuiA_TopN_animjoint_list",
+    "GrdPStadiumWaterFunsuiB_TopN_animjoint_list",
+    nullptr,
+};
+constexpr std::array<int, 10> joint_animation_owners{
+    -1, -1, -1, -1, -1, -1, 4, 3, 3, -1};
+constexpr std::array<const char*, 10> material_animation_symbols{
+    nullptr,
+    "GrdPStadiumBG_TopN_matanim_joint_list",
+    "GrdPStadiumField_TopN_matanim_joint_list",
+    "GrdPStadiumFire_TopN_matanim_joint_list",
+    "GrdPStadiumGrass_TopN_matanim_joint_list",
+    "GrdPStadiumNormal_TopN_matanim_joint_list",
+    nullptr,
+    "GrdPStadiumWaterFunsuiA_TopN_matanim_joint_list",
+    "GrdPStadiumWaterFunsuiB_TopN_matanim_joint_list",
+    "GrdPStadiumWater_TopN_matanim_joint_list",
+};
+constexpr std::array<int, 10> material_animation_owners{
+    -1, 0, 0, 1, 2, 0, -1, 3, 3, 3};
+
+AnimationSlotExpectation animation_expectation(std::size_t entry,
+                                               std::uint32_t field_offset)
+{
+    if (field_offset == 0)
+        return {joint_owners[entry], joint_symbols[entry], 64, false};
+    if (field_offset == 4)
+        return {joint_animation_owners[entry], joint_animation_symbols[entry],
+                4, true};
+    if (field_offset == 8)
+        return {material_animation_owners[entry],
+                material_animation_symbols[entry], 4, true};
+    check(field_offset == 12, "unknown Stadium animation slot offset");
+    return {-1, nullptr, 0, false};
+}
+
+void validate_animation_slot(const ArchiveRecord& record,
+                             std::size_t archive_ordinal,
+                             std::size_t entry_index,
+                             std::uint32_t field_offset,
+                             const char* field_name)
+{
+    const auto& archive = *record.archive;
+    const auto slot = record.stage->entries[entry_index].descriptor_offset + field_offset;
+    const auto expectation = animation_expectation(entry_index, field_offset);
+    const auto* external = external_at_slot(archive, slot);
+    const auto label = record.name + " map " + std::to_string(entry_index) + " " +
+                       field_name;
+
+    if (expectation.owner == -1) {
+        check(external == nullptr && !archive.has_relocation(slot) &&
+                  archive.be32(slot) == 0,
+              label + " is not the authored absent slot");
+        return;
+    }
+
+    const bool local = expectation.owner == -2 ||
+                       static_cast<std::size_t>(expectation.owner) == archive_ordinal;
+    if (!local) {
+        check(expectation.symbol != nullptr && external != nullptr &&
+                  external->name == expectation.symbol &&
+                  std::count(external->slots.begin(), external->slots.end(), slot) == 1 &&
+                  !archive.has_relocation(slot) && archive.be32(slot) == 0,
+              label + " external identity or exact slot differs from the authored provider");
+        return;
+    }
+
+    check(external == nullptr && archive.has_relocation(slot),
+          label + " is not a local relocated reference in its authored provider");
+    const auto target = archive.pointer(slot, expectation.target_bytes);
+    check(target.has_value(), label + " local reference has no bounded target");
+    if (expectation.symbol)
+        check(symbol_offset(archive, expectation.symbol) == *target,
+              label + " target differs from its expected provider public symbol");
+    if (expectation.pointer_list)
+        check(pointer_list_count(archive, *target) == 1,
+              label + " local animation table length differs from one authored slot");
+}
+
+void print_animation_slot(const DatArchive& archive, std::uint32_t slot,
+                          std::size_t target_bytes, bool pointer_list)
+{
+    const auto* external = external_at_slot(archive, slot);
+    std::cout << "{\"slot\":" << slot;
+    if (external) {
+        std::cout << ",\"kind\":\"external\",\"identity\":";
+        print_json_string(external->name);
+        std::cout << ",\"external_slot\":" << slot << '}';
+        return;
+    }
+    if (archive.has_relocation(slot)) {
+        const auto target = archive.pointer(slot, target_bytes);
+        check(target.has_value(), "local animation reference resolved to null while reporting");
+        std::cout << ",\"kind\":\"local\",\"target\":" << *target
+                  << ",\"public_symbols\":[";
+        const auto symbols = public_symbols_at(archive, *target);
+        for (std::size_t i = 0; i < symbols.size(); ++i) {
+            if (i) std::cout << ',';
+            print_json_string(symbols[i]);
+        }
+        std::cout << ']';
+        if (pointer_list)
+            std::cout << ",\"table_count\":" << pointer_list_count(archive, *target);
+        std::cout << '}';
+        return;
+    }
+    const auto raw = archive.be32(slot);
+    check(raw == 0, "absent animation reference has nonzero raw data");
+    std::cout << ",\"kind\":\"absent\",\"raw_word\":0}";
+}
+
 void print_entry_animations(const ArchiveRecord& record)
 {
     const auto& archive = *record.archive;
@@ -227,11 +385,9 @@ void print_entry_animations(const ArchiveRecord& record)
     for (std::size_t i = 0; i < entries.size(); ++i) {
         if (i) std::cout << ',';
         const auto& entry = entries[i];
-        const auto count = [&](const std::optional<std::uint32_t>& table) {
-            return table ? pointer_list_count(archive, *table) : 0U;
-        };
+        const auto descriptor = entry.descriptor_offset;
         std::cout << "{\"joint\":";
-        print_bool(entry.joint_offset.has_value());
+        print_animation_slot(archive, descriptor, 64, false);
         std::cout << ",\"camera\":";
         print_bool(entry.camera_offset.has_value());
         std::cout << ",\"light\":";
@@ -240,10 +396,13 @@ void print_entry_animations(const ArchiveRecord& record)
         print_bool(entry.fog_offset.has_value());
         std::cout << ",\"animation_flags\":";
         print_bool(entry.animation_flags_offset.has_value());
-        std::cout << ",\"joint_anim\":" << count(entry.joint_animation_table)
-                  << ",\"material_anim\":" << count(entry.material_animation_table)
-                  << ",\"shape_anim\":" << count(entry.shape_animation_table)
-                  << ",\"unknown_14\":";
+        std::cout << ",\"joint_anim\":";
+        print_animation_slot(archive, descriptor + 4, 4, true);
+        std::cout << ",\"material_anim\":";
+        print_animation_slot(archive, descriptor + 8, 4, true);
+        std::cout << ",\"shape_anim\":";
+        print_animation_slot(archive, descriptor + 12, 4, false);
+        std::cout << ",\"unknown_14\":";
         print_bool(entry.unknown_14_offset.has_value());
         std::cout << ",\"collision_bindings\":" << entry.collision_bindings.count
                   << ",\"joint_indices\":" << entry.joint_indices.count << '}';
@@ -375,25 +534,11 @@ void validate_archive_contract(const ArchiveRecord& record, std::size_t ordinal)
     check(light_end >= light_start && light_end - light_start == 24 * 8,
           record.name + " bounded light identity interval is not exactly 24 rows");
 
-    const std::array<bool, 10> expected_joint{false, false, false, false, false,
-                                               false, true, true, true, false};
-    const std::array<bool, 10> expected_material{false, true, true, true, true,
-                                                  true, false, true, true, true};
     for (std::size_t i = 0; i < stage.entries.size(); ++i) {
-        const auto& entry = stage.entries[i];
-        check(bool(entry.joint_animation_table) == expected_joint[i] &&
-                  bool(entry.material_animation_table) == expected_material[i] &&
-                  !entry.shape_animation_table,
-              record.name + " authored animation root presence differs at map " +
-                  std::to_string(i));
-        if (entry.joint_animation_table)
-            check(pointer_list_count(archive, *entry.joint_animation_table) == 1,
-                  record.name + " joint animation table length differs at map " +
-                      std::to_string(i));
-        if (entry.material_animation_table)
-            check(pointer_list_count(archive, *entry.material_animation_table) == 1,
-                  record.name + " material animation table length differs at map " +
-                      std::to_string(i));
+        (void)validate_animation_slot(record, ordinal, i, 0, "joint");
+        (void)validate_animation_slot(record, ordinal, i, 4, "joint animation");
+        (void)validate_animation_slot(record, ordinal, i, 8, "material animation");
+        (void)validate_animation_slot(record, ordinal, i, 12, "shape animation");
     }
 }
 
