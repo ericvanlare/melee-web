@@ -57,6 +57,9 @@ function reportFor({origin = 'https://webmelee.gg', kind = null, incidents = nul
   const incident = {
     id: 'incident-1', reason: 'simulation_debt', value: 9, threshold: 8, clock_owner: 'simulation',
     source_frame: 12, scene,
+    staging: {window_ms: 10000, sample_count: 100, active_slots: 4, peak_occupied_slots: 3,
+      queue_completion_registrations: 120, queue_completion_callbacks: 118,
+      peak_queue_completion_callback_ms: 22.5, last_queue_callback_source_frame: 12},
     history: {rows: [[1, undefined, 3], [4, 5, 6]]},
     pre_events: [{type: 'lifecycle', kind: 'active', timestamp: 10}],
     post_events: [{type: 'longtask', timestamp: 20, duration_ms: 5}],
@@ -119,6 +122,8 @@ async function testKnownHostsAndAllowlist() {
   assert.deepEqual(Object.keys(body).sort(), ['capabilities', 'client', 'environment', 'events', 'flags', 'history', 'identity', 'incident', 'incident_id', 'schema', 'session_id', 'version']);
   assert.equal(body.identity.source_commit, 'a'.repeat(40));
   assert.equal(body.incident.source_frame, 12);
+  assert.equal(Object.hasOwn(body.incident, 'staging'), false,
+    'opt-in staging diagnostics remain in local incident records only');
   assert.equal(body.incident.reason, REASONS.includes('simulation_debt') ? 'simulation_debt' : 'native_callback_over_budget');
   assert.equal(body.history.rows[0].includes(0), false, 'missing values are never invented as zero');
   assert.equal(body.history.rows[0][1], null);

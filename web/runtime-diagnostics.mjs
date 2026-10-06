@@ -19,6 +19,8 @@ export const DEFAULT_MAX_STORAGE_BYTES = 256 * 1024;
 export const DEFAULT_POST_EVENT_CAP = 24;
 export const DEFAULT_RECENT_EVENT_CAP = 32;
 export const DEFAULT_POST_WINDOW_MS = 1000;
+export const DEFAULT_STAGING_DIAGNOSTIC_WINDOW_MS = 10000;
+export const DEFAULT_STAGING_DIAGNOSTIC_SAMPLES = 100;
 export const DIAGNOSTICS_DB_NAME = 'melee-web-runtime-diagnostics';
 export const DIAGNOSTICS_STORE_NAME = 'incidents';
 
@@ -342,6 +344,22 @@ function strictStoredNative(native) {
       .every(value => Number.isSafeInteger(value) && value >= 0);
 }
 
+function strictStoredStaging(staging) {
+  if (staging === null) return true;
+  return strictStoredKeys(staging, ['window_ms', 'sample_count', 'active_slots', 'peak_occupied_slots',
+    'queue_completion_registrations', 'queue_completion_callbacks',
+    'peak_queue_completion_callback_ms', 'last_queue_callback_source_frame']) &&
+    staging.window_ms === DEFAULT_STAGING_DIAGNOSTIC_WINDOW_MS &&
+    Number.isSafeInteger(staging.sample_count) && staging.sample_count >= 0 &&
+    staging.sample_count <= DEFAULT_STAGING_DIAGNOSTIC_SAMPLES &&
+    (staging.active_slots === null || (Number.isSafeInteger(staging.active_slots) && staging.active_slots >= 1 && staging.active_slots <= 4)) &&
+    Number.isSafeInteger(staging.peak_occupied_slots) && staging.peak_occupied_slots >= 0 && staging.peak_occupied_slots <= 4 &&
+    Number.isSafeInteger(staging.queue_completion_registrations) && staging.queue_completion_registrations >= 0 &&
+    Number.isSafeInteger(staging.queue_completion_callbacks) && staging.queue_completion_callbacks >= 0 &&
+    isNullableNonNegative(staging.peak_queue_completion_callback_ms) &&
+    isNullableNonNegativeInteger(staging.last_queue_callback_source_frame);
+}
+
 function strictStoredHistory(history) {
   if (!strictStoredKeys(history,
     ['seconds', 'hz', 'sample_interval_ms', 'columns', 'rows', 'evicted', 'evicted_count', 'truncated'])) return false;
@@ -441,10 +459,15 @@ function normalizeStoredIncident(value) {
         !strictStoredClient(value.client) || !strictStoredCapabilities(value.capabilities) ||
         !strictStoredAudio(value.audio) || !strictStoredFlags(value.flags) || !strictStoredLimits(value.limits) ||
         !incident || typeof incident !== 'object' ||
-        !strictStoredKeys(incident, ['id', 'timestamp', 'captured_at_ms', 'reason', 'reason_code', 'value', 'threshold',
-          'source_frame', 'scene', 'scene_code', 'clock_owner', 'clock_owner_code', 'native', 'history',
+        !strictStoredKeys(incident, Object.prototype.hasOwnProperty.call(incident, 'staging') ?
+          ['id', 'timestamp', 'captured_at_ms', 'reason', 'reason_code', 'value', 'threshold',
+            'source_frame', 'scene', 'scene_code', 'clock_owner', 'clock_owner_code', 'native', 'staging', 'history',
+            'pre_events', 'post_events', 'post_truncated', 'post_truncated_count', 'closed', 'recovery',
+            'recovery_timed_out'] :
+          ['id', 'timestamp', 'captured_at_ms', 'reason', 'reason_code', 'value', 'threshold',
+            'source_frame', 'scene', 'scene_code', 'clock_owner', 'clock_owner_code', 'native', 'history',
           'pre_events', 'post_events', 'post_truncated', 'post_truncated_count', 'closed', 'recovery',
-          'recovery_timed_out']) || !/^incident-[0-9]+$/.test(incident.id) ||
+            'recovery_timed_out']) || !/^incident-[0-9]+$/.test(incident.id) ||
         !isNullableFinite(incident.timestamp) || !Number.isSafeInteger(incident.captured_at_ms) || incident.captured_at_ms < 0 ||
         !['simulation_debt', 'audio_debt', 'nonfinite_clock', 'runtime_failure', 'clock_regression', 'unknown'].includes(incident.reason) ||
         !Number.isSafeInteger(incident.reason_code) || incident.reason_code < 0 ||
@@ -454,7 +477,9 @@ function normalizeStoredIncident(value) {
         !Number.isSafeInteger(incident.scene_code) || incident.scene_code < 0 || incident.scene_code > 255 ||
         !['other', 'simulation', 'audio'].includes(incident.clock_owner) ||
         !Number.isSafeInteger(incident.clock_owner_code) || incident.clock_owner_code < 0 || incident.clock_owner_code > 2 ||
-        !strictStoredNative(incident.native) || !strictStoredHistory(incident.history) ||
+        !strictStoredNative(incident.native) ||
+        (Object.prototype.hasOwnProperty.call(incident, 'staging') && !strictStoredStaging(incident.staging)) ||
+        !strictStoredHistory(incident.history) ||
         !strictStoredEvents(incident.pre_events) || !strictStoredEvents(incident.post_events) ||
         incident.pre_events.length > 32 || incident.post_events.length > 128 ||
         !isBoolean(incident.post_truncated) || !Number.isSafeInteger(incident.post_truncated_count) || incident.post_truncated_count < 0 ||
@@ -589,6 +614,15 @@ export function createRuntimeDiagnostics(options = {}) {
 
   const history = new Float64Array(historyCapacity * HISTORY_COLUMN_COUNT);
   const nativeScratch = new Float64Array(HISTORY_COLUMN_COUNT);
+  const stagingDiagnosticsEnabled = options.stagingDiagnosticsEnabled === true;
+  const stagingSampleColumns = 7;
+  const stagingSamples = stagingDiagnosticsEnabled ?
+    new Float64Array(DEFAULT_STAGING_DIAGNOSTIC_SAMPLES * stagingSampleColumns) : null;
+  let stagingSampleHead = 0;
+  let stagingSampleCount = 0;
+  let lastStagingSampleTimestamp = null;
+  let pendingStagingPeakOccupiedSlots = 0;
+  let pendingStagingPeakQueueCompletionCallbackMs = null;
   let historyHead = 0;
   let historyCount = 0;
   let historyEvicted = false;
@@ -701,6 +735,103 @@ export function createRuntimeDiagnostics(options = {}) {
     return rows;
   }
 
+  function observeStaging(
+    timestamp, activeSlots, occupiedSlots, registrations, callbacks,
+    peakQueueCompletionCallbackMs, lastCompletedSourceFrame, force = false,
+  ) {
+    if (!stagingDiagnosticsEnabled) return false;
+    const at = finite(timestamp);
+    const activeValue = integer(activeSlots);
+    const occupiedValue = integer(occupiedSlots);
+    const registrationValue = integer(registrations);
+    const callbackValue = integer(callbacks);
+    const latencyValue = peakQueueCompletionCallbackMs === -1 ? null : finite(peakQueueCompletionCallbackMs);
+    const sourceValue = integer(lastCompletedSourceFrame);
+    if (at === null || activeValue === null || activeValue < 1 || activeValue > 4 ||
+        occupiedValue === null || occupiedValue < 0 || occupiedValue > activeValue ||
+        registrationValue === null || registrationValue < 0 || callbackValue === null ||
+        callbackValue < 0 || callbackValue > registrationValue ||
+        (peakQueueCompletionCallbackMs !== -1 && (latencyValue === null || latencyValue < 0)) ||
+        (lastCompletedSourceFrame !== -1 && (sourceValue === null || sourceValue < 0))) {
+      markMalformed();
+      return false;
+    }
+    if (lastStagingSampleTimestamp !== null && at < lastStagingSampleTimestamp) {
+      markMalformed();
+      return false;
+    }
+    pendingStagingPeakOccupiedSlots = Math.max(pendingStagingPeakOccupiedSlots, occupiedValue);
+    if (latencyValue !== null) {
+      pendingStagingPeakQueueCompletionCallbackMs = maxNullable(
+        pendingStagingPeakQueueCompletionCallbackMs, latencyValue);
+    }
+    if (!force && lastStagingSampleTimestamp !== null &&
+        at - lastStagingSampleTimestamp < sampleIntervalMs) return false;
+    lastStagingSampleTimestamp = at;
+    const offset = stagingSampleHead * stagingSampleColumns;
+    stagingSamples[offset] = at;
+    stagingSamples[offset + 1] = activeValue;
+    stagingSamples[offset + 2] = pendingStagingPeakOccupiedSlots;
+    stagingSamples[offset + 3] = registrationValue;
+    stagingSamples[offset + 4] = callbackValue;
+    stagingSamples[offset + 5] = pendingStagingPeakQueueCompletionCallbackMs === null ? NaN :
+      pendingStagingPeakQueueCompletionCallbackMs;
+    stagingSamples[offset + 6] = sourceValue === null || sourceValue === -1 ? NaN : sourceValue;
+    stagingSampleHead = (stagingSampleHead + 1) % DEFAULT_STAGING_DIAGNOSTIC_SAMPLES;
+    if (stagingSampleCount < DEFAULT_STAGING_DIAGNOSTIC_SAMPLES) stagingSampleCount++;
+    pendingStagingPeakOccupiedSlots = 0;
+    pendingStagingPeakQueueCompletionCallbackMs = null;
+    return true;
+  }
+
+  function stagingSummary(at) {
+    if (!stagingDiagnosticsEnabled) return null;
+    const rows = [];
+    let baseline = null;
+    const start = (stagingSampleHead - stagingSampleCount + DEFAULT_STAGING_DIAGNOSTIC_SAMPLES) %
+      DEFAULT_STAGING_DIAGNOSTIC_SAMPLES;
+    for (let n = 0; n < stagingSampleCount; n++) {
+      const row = (start + n) % DEFAULT_STAGING_DIAGNOSTIC_SAMPLES;
+      const offset = row * stagingSampleColumns;
+      const timestamp = stagingSamples[offset];
+      if (timestamp > at) continue;
+      const sample = Array.from(stagingSamples.subarray(offset, offset + stagingSampleColumns));
+      if (timestamp < at - DEFAULT_STAGING_DIAGNOSTIC_WINDOW_MS) baseline = sample;
+      else rows.push(sample);
+    }
+    let peakOccupiedSlots = 0;
+    let peakQueueCompletionCallbackMs = null;
+    let registrations = 0;
+    let callbacks = 0;
+    let lastQueueCallbackSourceFrame = null;
+    let previous = baseline;
+    for (const row of rows) {
+      peakOccupiedSlots = Math.max(peakOccupiedSlots, row[2]);
+      if (Number.isFinite(row[5])) {
+        peakQueueCompletionCallbackMs = maxNullable(peakQueueCompletionCallbackMs, row[5]);
+      }
+      if (previous) {
+        registrations += Math.max(0, row[3] - previous[3]);
+        callbacks += Math.max(0, row[4] - previous[4]);
+        if (row[4] > previous[4]) {
+          lastQueueCallbackSourceFrame = Number.isFinite(row[6]) ? row[6] : null;
+        }
+      }
+      previous = row;
+    }
+    const last = rows.at(-1);
+    return {
+      window_ms: DEFAULT_STAGING_DIAGNOSTIC_WINDOW_MS,
+      sample_count: rows.length,
+      active_slots: last ? last[1] : null,
+      peak_occupied_slots: peakOccupiedSlots,
+      queue_completion_registrations: registrations,
+      queue_completion_callbacks: callbacks,
+      peak_queue_completion_callback_ms: peakQueueCompletionCallbackMs,
+      last_queue_callback_source_frame: lastQueueCallbackSourceFrame,
+    };
+  }
+
   function nativeSummary() {
     return {
       callback_count: callbackCount,
@@ -810,6 +941,7 @@ export function createRuntimeDiagnostics(options = {}) {
       clock_owner: ownerInfo.name,
       clock_owner_code: ownerInfo.code,
       native: nativeSummary(),
+      staging: stagingSummary(nowValue),
       history: currentHistory(),
       pre_events: recentEvents.slice(),
       post_events: [],
@@ -1191,6 +1323,7 @@ export function createRuntimeDiagnostics(options = {}) {
       clock_owner: incident.clock_owner,
       clock_owner_code: incident.clock_owner_code,
       native: incident.native,
+      staging: incident.staging,
       history: incident.history,
       pre_events: incident.pre_events,
       post_events: incident.post_events,
@@ -1266,6 +1399,7 @@ export function createRuntimeDiagnostics(options = {}) {
         source_frame: incident.source_frame, scene: incident.scene, scene_code: incident.scene_code,
         clock_owner: incident.clock_owner, clock_owner_code: incident.clock_owner_code,
         native: incident.native,
+        staging: incident.staging,
         history: {
           seconds: historySeconds, hz: historyHz, sample_interval_ms: sampleIntervalMs,
           columns: [], rows: [], evicted: incident.history.evicted,
@@ -1640,6 +1774,7 @@ export function createRuntimeDiagnostics(options = {}) {
 
   return Object.freeze({
     observeNative,
+    observeStaging,
     trigger,
     lifecycle,
     longtask,

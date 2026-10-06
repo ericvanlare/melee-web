@@ -149,7 +149,7 @@ constexpr std::array<std::string_view,278> route_asset_keys={
 }
 extern "C" {
 unsigned melee_web_native_asset_begin(){try{
- close();scoped_assets=true;
+ close();scoped_disc_import=true;scoped_assets=true;
  request_assets(AssetDestination::InitialMenu);
  return asset_generation;
 }catch(const std::exception& e){message=e.what();return 0;}}
@@ -253,7 +253,7 @@ if(scoped_assets)throw std::runtime_error("Scoped disc imports require an asset 
  for(auto key:zelda_sheik_keys)known|=key==name;
  if(!known)throw std::runtime_error("Unknown native menu file: "+std::string(name));
  archive_cache.reset();
- files[name]={data,data+size};return 1;
+ files[name]={data,data+size};scoped_disc_import=false;return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_source_file_external_set(const char* name,unsigned size){try{
  if(world||match||results||prize||host_entered)
@@ -269,6 +269,7 @@ int melee_web_native_source_files_external_clear(){try{
  char error[256]{};
  check(melee_web_source_files_external_clear(error,sizeof(error)),
        error[0]?error:"Native streamed disc file catalog release failed");
+ scoped_disc_import=false;
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_prepare(){try{

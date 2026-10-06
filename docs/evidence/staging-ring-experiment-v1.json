@@ -1,0 +1,326 @@
+{
+  "schema": "melee-web-staging-ring-experiment-v1",
+  "date": "2026-10-06",
+  "evidence_root_run_id": "claude-h1-staging-ring-20261006-102458-eb61e3c0",
+  "labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised"
+  ],
+  "result": "bounded functional byte equality; conditioned timing inconclusive and natural pause not reproduced",
+  "acceptance": {
+    "H1_timing_fix": false,
+    "whole_session_accuracy": false,
+    "foreground_performance": false,
+    "retail_pixels_or_PCM": false,
+    "real_staging_incident_persistence": false
+  },
+  "policy": {
+    "default_slots": 2,
+    "mobile_slots": 2,
+    "four_slots": "explicit loopback desktop opt-in only",
+    "byte_hash": "explicit functional diagnostic, non-pthread only",
+    "timing_diagnostics": "enabled uniformly in all four conditioned cells",
+    "natural_diagnostics": false,
+    "automatic_resume": false
+  },
+  "fixture": {
+    "scope": "synthetic conditioned MWRCv4 match component, not retail/menu identity",
+    "seed_hex": "12345678",
+    "source_setup": "tracked test_retail_recipe_runtime._v9_setup((8,8,8,8)) + PAD_SNAPSHOT",
+    "profiles_hex": [
+      "07ff",
+      "01c0"
+    ],
+    "input": "neutral",
+    "byte_capture_inputs": 600,
+    "timing_inputs": 1800,
+    "source_draw_contract": "exact completed-input cursor0..599, independent drawordinal1..600; original match counter retained, first0 last476",
+    "entry": "early draws include authored entry; ready gameplay observed by cursor239/raw116"
+  },
+  "byte_proof": {
+    "rows": 600,
+    "fingerprints": 2463,
+    "comparison": "actual submitted Queue.WriteBuffer role/offset/length/order/SHA-256 equality",
+    "original_native_results": "performance failed, complete true,600 inputs/steps/draws; original reports retained",
+    "performance_only_allowlist": [
+      "browserCallbackGaps",
+      "livePipelinesCreated",
+      "preparationPauses"
+    ],
+    "strict_gates": "complete input/draw sequence, native completion, no structural/runtime/focus/teardown failures, zero resumes, requested and observed rings2/4",
+    "binding": "conditional artifact binding: ring2 post-map missing; matching later ring4 before/after31-file maps are subsequent unchanged-build witnesses; explicit recovery required",
+    "harness_identity": "different source commits retained and unserved harness-only diff proved; same actual executable maps and Aurora patch"
+  },
+  "timing": {
+    "matrix_assessment": "timing-matrix-assessment.json",
+    "insertion_boundary": "menuRuntimeTiming observer after original observer and source submission, before native callback return",
+    "target_cursor": 600,
+    "raw_counter": 476,
+    "delivered": [
+      "ring2/35ms",
+      "ring4/35ms",
+      "ring2/100ms"
+    ],
+    "not_delivered": [
+      "ring4/100ms: cursor skipped600\u2192601; refused stimulus"
+    ],
+    "all_classification": "inconclusive; delivered cells had post-entry preparation; no timing pause reproduced",
+    "recorder": "no qualifying timing/fault incident generated; preparation lifecycle events excluded by existing policy; no fabricated records",
+    "latency_scope": "Queue.OnSubmittedWorkDone registration\u2192callback delivery, not pure GPU duration",
+    "occupancy_scope": "sampled staging occupancy/peak, not physical GPU memory"
+  },
+  "natural": {
+    "result": "pass",
+    "slots": 4,
+    "route": "original CSS\u2192original SSS\u2192four Mario CPU9 four-stock Final Destination\u2192original Results\u2192original CSS",
+    "terminal_frame": 12541,
+    "terminal_outcome": 2,
+    "winning_port": 3,
+    "timing_pause": false,
+    "automatic_resume": false,
+    "runtime_page_crash_native_errors": 0,
+    "provenance": "source_unchanged=false retained; exact tracked end diff is unserved comparison harness only;24 actual response identities and original local WASM retained; no31-file pre/post claim",
+    "previous_natural_pause": "unexplained"
+  },
+  "memory": {
+    "ring2_reserved_GPU_buffer_bytes": 132120576,
+    "ring4_reserved_GPU_buffer_bytes": 264241152,
+    "difference_bytes": 132120576,
+    "claim": "renderer reservation, not physical GPU allocation or residency; native allocator and JS snapshots retained separately without causal attribution",
+    "observed_snapshots": {
+      "ring2": {
+        "before": {
+          "lifecycle": "imported CSS owner before replay",
+          "wasm_heap_bytes": 193331200,
+          "allocator_live_bytes": 172515944,
+          "js_used_heap_bytes": 26713102
+        },
+        "after": {
+          "lifecycle": "after replay unload",
+          "wasm_heap_bytes": 193331200,
+          "allocator_live_bytes": 24575352,
+          "js_used_heap_bytes": 26396456
+        }
+      },
+      "ring4": {
+        "before": {
+          "lifecycle": "imported CSS owner before replay",
+          "wasm_heap_bytes": 193331200,
+          "allocator_live_bytes": 172515800,
+          "js_used_heap_bytes": 24519866
+        },
+        "after": {
+          "lifecycle": "after replay unload",
+          "wasm_heap_bytes": 193331200,
+          "allocator_live_bytes": 24575232,
+          "js_used_heap_bytes": 23206099
+        }
+      }
+    },
+    "snapshot_scope": "Different scene lifecycle and JS collection states; no ring-size causal attribution"
+  },
+  "integration_fixes": [
+    "scoped disc import mode survives ordinary owner unload; actual disc/import clearing resets it; v4 requests existing bounded Replay scope",
+    "development CSS observer allocates authored14 int32 outputs (56bytes), preserves returned4 IDs/eight geometry and cleanup; OOM tested",
+    "narrow shared SHA extraction, EM_ASM object expression correction, duplicate default-argument removal"
+  ],
+  "validation": {
+    "Release_runtime_build": "pass",
+    "focused_contracts": "pass, including previously blocked native traces and historical observer projection",
+    "initial_full_suite": {
+      "tests": 1886,
+      "seconds": 289.642,
+      "failures": 3,
+      "errors": 1,
+      "skips": 145,
+      "causes": [
+        "historical OFF observer fixture needed exact reviewed telemetry projection",
+        "ordinary build/browser graph absent for scheduler/fighter input/collision/fighter asset trace tests"
+      ],
+      "retained": "full-suite.log"
+    },
+    "final_full_suite": {
+      "result": "pass",
+      "tests": 1906,
+      "seconds": 311.911,
+      "skips": 141,
+      "source_commit": "c3ddafd23636d5f72baa9179915eebd713552725",
+      "source_tree": "1c1b338d258383de4e8c43572fb069e95f6240b3",
+      "log": "full-suite-prerequisites-corrected.log",
+      "prerequisites": "supported gameplay RelWithDebInfo configure-only graph, then native traces compiled by their tests"
+    }
+  },
+  "retained_failures": [
+    "release-build.log",
+    "release-build-sha-extracted.log",
+    "release-build-macro-fixed.log",
+    "byte-ring2-v1",
+    "byte-ring2-v2",
+    "byte-ring2-v3",
+    "first-draw-probe",
+    "timing-ring2-stall35-v1",
+    "timing-ring4-stall100-v1",
+    "natural-ring4-v1",
+    "full-suite.log"
+  ],
+  "artifacts": [
+    {
+      "path": "diagnostic-v4-600.mwrc",
+      "bytes": 27554,
+      "sha256": "6ee71fccef197766753f47f3179ad0a4d3ceb266dcfd32aeed84def3fb4065ee"
+    },
+    {
+      "path": "diagnostic-v4-timing-1800.mwrc",
+      "bytes": 80354,
+      "sha256": "bfb5ead0432704e3088d8ab5b9dcec248ae550c413db990df1851bafea31b0eb"
+    },
+    {
+      "path": "byte-ring2-v4/report.json",
+      "bytes": 875153,
+      "sha256": "acc2637ab25f434bcff53fe21ce5b11812211d7336f5d4d2b1285ee57a3604f8"
+    },
+    {
+      "path": "byte-ring4-v1/report.json",
+      "bytes": 884562,
+      "sha256": "c0d6b72c183934fa0d768c114975d37cc6f5272a05eae0e61f7b9a5e13f59714"
+    },
+    {
+      "path": "byte-comparison-v2.json",
+      "bytes": 29619,
+      "sha256": "3440dcd0a6148185d34ada1566506b54319bcf070ae7f5745895c5d1b12ba28f"
+    },
+    {
+      "path": "byte-ring2-v4-functional-assessment.json",
+      "bytes": 466,
+      "sha256": "46c7d5afb81ca50e556e983ed14be5f8a979f66aee74a323a72a8690f32ead94"
+    },
+    {
+      "path": "timing-matrix-assessment.json",
+      "bytes": 11776,
+      "sha256": "515f885bc6767556aacb76367597948455edcb50a9837c4e48e9c741b281c7ce"
+    },
+    {
+      "path": "natural-ring4-v2/report.json",
+      "bytes": 1800426,
+      "sha256": "9fae590acea23f8f349eb8a29cab940a354b3a198643023eb0401e80ad17a980"
+    },
+    {
+      "path": "natural-ring4-v2-provenance-assessment.json",
+      "bytes": 7171,
+      "sha256": "dec44b7fc8a70fc14c84990157cec9e1e739cdb3a252b6336f9b31eabb332f6f"
+    },
+    {
+      "path": "release-build-css-observer.log",
+      "bytes": 12213,
+      "sha256": "f2f1cb89efe2a9be4ae29cb75e6354b77d8aca89e1b4b6510c92760507500cb6"
+    },
+    {
+      "path": "full-suite.log",
+      "bytes": 345907,
+      "sha256": "4809abaf2d704913686853b9a9521fd880332ad658717622cd3de3e35b3cf3f4"
+    },
+    {
+      "path": "full-suite-configure.log",
+      "bytes": 14857,
+      "sha256": "433bd4e17058f1933f870f5b7f5d03d4364780bf28fe36105d11b7779d98ee65"
+    },
+    {
+      "path": "release-build.log",
+      "bytes": 508829,
+      "sha256": "283de264639aba97bf9a5b3ca25e94d39674b63475477dc4f0b17bd57a977df5"
+    },
+    {
+      "path": "release-build-sha-extracted.log",
+      "bytes": 42656,
+      "sha256": "578df70988bf20b63cba53e80819fa02a65b98feefeffe301c5eba39b93efcd7"
+    },
+    {
+      "path": "release-build-macro-fixed.log",
+      "bytes": 1398354,
+      "sha256": "4ff20521f306ebd6a83070d38b88d00b2f48ecc87ad529627c98a5ed2a4d439f"
+    },
+    {
+      "path": "release-build-defaults-fixed.log",
+      "bytes": 408286,
+      "sha256": "2e6ffb4b7463b678129571108fc35693ae4af8ee78140813c83f311f4e882381"
+    },
+    {
+      "path": "release-build-scoped-import.log",
+      "bytes": 1199203,
+      "sha256": "29db2a1d7d23874dedab278cf68d6ce94301ce5c05b1033eb72782d36db3ae71"
+    },
+    {
+      "path": "focused-bootstrap.log",
+      "bytes": 725,
+      "sha256": "17d16450290ed4d7284e9e36b4c0f57e5ea11597e061173d6ffbe25675b37f93"
+    },
+    {
+      "path": "focused-collision-fighter-assets.log",
+      "bytes": 416,
+      "sha256": "b7ba40382f49383b292c9c0f4a249b43cf4b225247420f17907c9a3d752d7bdd"
+    },
+    {
+      "path": "byte-ring2-v1/report.json",
+      "bytes": 13260,
+      "sha256": "02b3b66a95802e3dcf936b5bdd55394cbdc38ba06a14b2131321a5d4aa0c3cfb"
+    },
+    {
+      "path": "byte-ring2-v2/report.json",
+      "bytes": 13466,
+      "sha256": "8063dbc94a966e61cdf504d32c188b321deab335989e91f46aec8e5143a28f78"
+    },
+    {
+      "path": "byte-ring2-v3/report.json",
+      "bytes": 854640,
+      "sha256": "2cf6e0e75b14676d484cbf9019901db20c718bfdc1e46d7423389605a5b95c6a"
+    },
+    {
+      "path": "timing-ring2-stall35-v1/report.json",
+      "bytes": 1298736,
+      "sha256": "94197943dacd5e3f8d5d726cb912d5e6645234ab93fb2514ee70303d6448e21b"
+    },
+    {
+      "path": "timing-ring2-stall35-v2/report.json",
+      "bytes": 2781838,
+      "sha256": "faeafa1776d9d84129f59570fec8638ee79f5c65ac70f29c976d15c0aa55a68f"
+    },
+    {
+      "path": "timing-ring4-stall35-v1/report.json",
+      "bytes": 2780721,
+      "sha256": "e2a7d26f4171b4d3ad2becde5a730c17847b8ea36b398e813ec15a274966e2f0"
+    },
+    {
+      "path": "timing-ring2-stall100-v1/report.json",
+      "bytes": 2740890,
+      "sha256": "82f8f34edd727ce2827078cae0c864cba05ae376fd98bed877c81c498e5f5e21"
+    },
+    {
+      "path": "timing-ring4-stall100-v1/report.json",
+      "bytes": 1892395,
+      "sha256": "a8432b6fe218f8d52968a5c51b635304e7e6014b7ee88c441603857eb91831dd"
+    },
+    {
+      "path": "full-suite-prerequisites-corrected.log",
+      "bytes": 345127,
+      "sha256": "ba9730ea57e1605ab9e9c035a248c5a0f00bb75dffb07735df9142e774fb6f93"
+    }
+  ],
+  "limitations": [
+    "functional hash instrumentation and preparation interruptions prevent timing inference from byte captures",
+    "no demonstrated35ms benefit or100ms pause gate",
+    "real staging incident persistence remains unproven",
+    "no accepted H1 fix or natural-pause explanation",
+    "headless rendering does not establish foreground/physical-controller/audio/pixel/retail equivalence"
+  ],
+  "aurora_patch_sha256": "97d8af9c8474b692d049d243eda2ad9913a67025e88cfd6f4d3be7a63676db4a",
+  "cleanup": {
+    "owned_browsers": "closed",
+    "owned_HTTP_server": "closed",
+    "port8787_listener": false,
+    "timing_marker": "removed",
+    "heavy_lane": "released after final suite",
+    "incremental_builds": "retained for review/reuse",
+    "external_free_GB_at_handoff": 1590.299
+  }
+}

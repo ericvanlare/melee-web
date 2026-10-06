@@ -25,6 +25,9 @@ AURORA_PREVIOUS_PATCH_TREES = (
     # browser-owner additions. This is the exact tree obtained by applying
     # that main patch to the pinned pristine Aurora checkout.
     "ef139550ae1ff9e167cdbf0b8d2b18c4933c3b5a",
+    # Reviewed canonical patch on main before the staging-ring experiment.
+    # Exact pinned-Aurora tree; unrelated dependency edits still refuse.
+    "75678097b50203447dfe1ffc5e642661a66d89ef",
 )
 
 
