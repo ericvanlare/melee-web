@@ -22,10 +22,11 @@ acknowledged four inputs and compared identical six-record checksum streams.
 
 The source producer is `5b805d7`; the reused ordinary Release runtime was
 built at `0d8556e`. The source changes did not alter runtime target inputs, so
-the captured artifact was reused by hash rather than rebuilt. The current-main
-Python suite passed 2,024 tests total, with 151 skipped; focused signaling,
-Worker HTTP/WebSocket, and contract checks also passed. These identities and
-logs are recorded in the portable receipt.
+the historical 36-file inventory was reused in the 37-file capture staging;
+the 32 native runtime files remained unchanged. No fresh runtime build was
+needed. The current-main Python suite passed 2,024 tests total, with 151
+skipped; focused signaling, Worker HTTP/WebSocket, and contract checks also
+passed. These identities and logs are recorded in the portable receipt.
 
 The receipt includes 900×700 screenshot hashes, WebGPU/isolation checks, and
 source draw counts. The canvases were 640×480. Root's review saw elongated red

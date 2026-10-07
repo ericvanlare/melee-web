@@ -40,7 +40,9 @@
     "configuration": "Release",
     "build_log_sha256": "d733b02e90e6b2b7ccbb3b85e3f2cbf8869220cf1d222552cb78eb42e46d5fd4",
     "runtime_target_input_delta_to_source_producer": [],
-    "staged_runtime_file_count": 36,
+    "historical_staged_file_count": 36,
+    "captured_staged_file_count": 37,
+    "native_runtime_file_count": 32,
     "fresh_build_for_issue231": false,
     "reason": "The issue231 changes were browser JavaScript, tests, and documentation. The ordinary Release artifacts and staged runtime inputs were verified unchanged and reused. This build identity is distinct from the page-source producer above."
   },
