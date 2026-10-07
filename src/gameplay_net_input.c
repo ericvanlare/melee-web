@@ -13,6 +13,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+enum LocalCaptureFailureReason {
+    LOCAL_CAPTURE_FAILURE_NONE = 0,
+    LOCAL_CAPTURE_FAILURE_INVALID_RAW,
+    LOCAL_CAPTURE_FAILURE_CURSOR_COUNT,
+    LOCAL_CAPTURE_FAILURE_POLL_SERIAL,
+    LOCAL_CAPTURE_FAILURE_PAD_ERROR,
+    LOCAL_CAPTURE_FAILURE_PUBLISH_REJECTED,
+};
+
 typedef struct NetSession {
     int active;
     int context_applied;
@@ -46,6 +55,13 @@ typedef struct NetSession {
     uint32_t local_capture_last_cursor;
     uint64_t local_capture_last_poll_serial;
     uint8_t local_capture_last_bytes[MELEE_WEB_NET_PAD_BYTES];
+    unsigned local_capture_failure_reason;
+    uint32_t local_capture_failure_cursor;
+    uint32_t local_capture_failure_count;
+    uint64_t local_capture_failure_poll_serial;
+    uint64_t local_capture_failure_last_poll_serial;
+    unsigned local_capture_failure_port;
+    int local_capture_failure_pad_error;
     uint64_t start_card_hash;
     uint64_t start_pad_history_hash;
     uint64_t start_native_context;
@@ -70,6 +86,31 @@ typedef struct NetSession {
 
 static NetSession net = {.arena_fill = -1};
 static char status_text[16384];
+
+static const char* local_capture_failure_name(unsigned reason)
+{
+    switch (reason) {
+    case LOCAL_CAPTURE_FAILURE_INVALID_RAW: return "invalid_raw";
+    case LOCAL_CAPTURE_FAILURE_CURSOR_COUNT: return "cursor_count";
+    case LOCAL_CAPTURE_FAILURE_POLL_SERIAL: return "poll_serial";
+    case LOCAL_CAPTURE_FAILURE_PAD_ERROR: return "pad_error";
+    case LOCAL_CAPTURE_FAILURE_PUBLISH_REJECTED: return "publish_rejected";
+    default: return "none";
+    }
+}
+
+static void record_local_capture_failure(unsigned reason, uint64_t poll_serial,
+                                         int pad_error)
+{
+    if (net.local_capture_failure_reason) return;
+    net.local_capture_failure_reason = reason;
+    net.local_capture_failure_cursor = net.cursor;
+    net.local_capture_failure_count = net.local_capture_count;
+    net.local_capture_failure_poll_serial = poll_serial;
+    net.local_capture_failure_last_poll_serial = net.local_capture_last_poll_serial;
+    net.local_capture_failure_port = net.local_capture_port;
+    net.local_capture_failure_pad_error = pad_error;
+}
 
 static int fail(char* e, size_t n, const char* message)
 {
@@ -177,6 +218,8 @@ int melee_web_net_capture_local_input(uint64_t poll_serial,
     if (!net.start_confirmed) return 1;
     if (net.cursor >= net.local_capture_input_ticks) {
         if (net.local_capture_count != net.local_capture_input_ticks) {
+            record_local_capture_failure(LOCAL_CAPTURE_FAILURE_CURSOR_COUNT,
+                                         poll_serial, 0);
             melee_web_net_terminate(MELEE_WEB_NET_TERMINAL_PROTOCOL,
                                     net.cursor, net.local_capture_port);
             return 0;
@@ -187,18 +230,42 @@ int melee_web_net_capture_local_input(uint64_t poll_serial,
      * already-published contribution is immutable; never sample the new PAD. */
     if (net.local_capture_count && net.cursor == net.local_capture_last_cursor)
         return 1;
-    if (!raw || net.cursor != net.local_capture_count ||
-        net.local_capture_count >= net.local_capture_input_ticks ||
-        (net.local_capture_count && poll_serial <= net.local_capture_last_poll_serial)) {
+    if (!raw) {
+        record_local_capture_failure(LOCAL_CAPTURE_FAILURE_INVALID_RAW,
+                                     poll_serial, 0);
+        melee_web_net_terminate(MELEE_WEB_NET_TERMINAL_PROTOCOL,
+                                net.cursor, net.local_capture_port);
+        return 0;
+    }
+    if (net.cursor != net.local_capture_count ||
+        net.local_capture_count >= net.local_capture_input_ticks) {
+        record_local_capture_failure(LOCAL_CAPTURE_FAILURE_CURSOR_COUNT,
+                                     poll_serial, 0);
+        melee_web_net_terminate(MELEE_WEB_NET_TERMINAL_PROTOCOL,
+                                net.cursor, net.local_capture_port);
+        return 0;
+    }
+    if (net.local_capture_count &&
+        poll_serial <= net.local_capture_last_poll_serial) {
+        record_local_capture_failure(LOCAL_CAPTURE_FAILURE_POLL_SERIAL,
+                                     poll_serial, 0);
         melee_web_net_terminate(MELEE_WEB_NET_TERMINAL_PROTOCOL,
                                 net.cursor, net.local_capture_port);
         return 0;
     }
 
     uint8_t bytes[MELEE_WEB_NET_PAD_BYTES];
-    if (!encode_local_pad(&raw[net.local_capture_port], bytes) ||
-        !melee_web_net_publish_local_input(net.cursor, net.local_capture_port,
+    if (!encode_local_pad(&raw[net.local_capture_port], bytes)) {
+        record_local_capture_failure(LOCAL_CAPTURE_FAILURE_PAD_ERROR,
+                                     poll_serial, raw[net.local_capture_port].err);
+        melee_web_net_terminate(MELEE_WEB_NET_TERMINAL_PROTOCOL,
+                                net.cursor, net.local_capture_port);
+        return 0;
+    }
+    if (!melee_web_net_publish_local_input(net.cursor, net.local_capture_port,
                                            poll_serial, bytes)) {
+        record_local_capture_failure(LOCAL_CAPTURE_FAILURE_PUBLISH_REJECTED,
+                                     poll_serial, 0);
         melee_web_net_terminate(MELEE_WEB_NET_TERMINAL_PROTOCOL,
                                 net.cursor, net.local_capture_port);
         return 0;
@@ -464,6 +531,25 @@ EMSCRIPTEN_KEEPALIVE int melee_web_net_arena_fill(int pattern)
 EMSCRIPTEN_KEEPALIVE const char* melee_web_net_status(void)
 {
     size_t used = 0;
+    char local_capture_failure[320];
+    if (!net.local_capture_failure_reason) {
+        snprintf(local_capture_failure, sizeof(local_capture_failure), "null");
+    } else {
+        char pad_error[24];
+        if (net.local_capture_failure_reason == LOCAL_CAPTURE_FAILURE_PAD_ERROR)
+            snprintf(pad_error, sizeof(pad_error), "%d", net.local_capture_failure_pad_error);
+        else
+            snprintf(pad_error, sizeof(pad_error), "null");
+        snprintf(local_capture_failure, sizeof(local_capture_failure),
+            "{\"reason\":\"%s\",\"cursor\":%u,\"count\":%u,"
+            "\"poll_serial\":\"%llu\",\"last_poll_serial\":\"%llu\","
+            "\"port\":%u,\"pad_error\":%s}",
+            local_capture_failure_name(net.local_capture_failure_reason),
+            net.local_capture_failure_cursor, net.local_capture_failure_count,
+            (unsigned long long) net.local_capture_failure_poll_serial,
+            (unsigned long long) net.local_capture_failure_last_poll_serial,
+            net.local_capture_failure_port, pad_error);
+    }
     const char* blocker = net.terminal_kind ? "terminal" :
         net.start_capture_failed ? "start_identity_error" :
         (!net.start_recorded || !net.start_confirmed) ? "start_identity" :
@@ -478,6 +564,7 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_net_status(void)
         "\"backpressure_callbacks\":%llu,\"ring_pending\":%u,\"arena_fill\":%d,"
         "\"indexed\":{\"duplicates\":%u,\"conflicts\":%u,\"gaps\":%u,\"invalid\":%u},"
         "\"terminal\":{\"kind\":%u,\"tick\":%u,\"channel\":%u},"
+        "\"local_capture_failure\":%s,"
         "\"network_wait\":{\"active\":%d,\"callbacks\":%llu,\"episodes\":%u,"
         "\"start_tick\":%u,\"last_tick\":%u,\"resume_count\":%u},"
         "\"start\":{\"required\":%d,\"recorded\":%d,\"scene\":%u,\"seed\":%u,\"frame\":%u,"
@@ -493,6 +580,7 @@ EMSCRIPTEN_KEEPALIVE const char* melee_web_net_status(void)
         (unsigned long long) net.backpressure_callbacks, ring_used(), net.arena_fill,
         net.indexed_duplicates, net.indexed_conflicts, net.indexed_gaps,
         net.indexed_invalid, net.terminal_kind, net.terminal_tick, net.terminal_channel,
+        local_capture_failure,
         net.start_required && net.waiting,
         (unsigned long long) net.wait_callbacks, net.wait_episodes,
         net.wait_start_tick, net.wait_last_tick, net.wait_resume_count,
