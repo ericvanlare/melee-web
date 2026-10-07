@@ -492,6 +492,16 @@ test('WebSocket transport metadata leaves unavailable TCP byte counters absent',
   assert.equal(Object.hasOwn(summary, 'beta_to_alpha_bytes'), false);
 });
 
+test('WebRTC DataChannel metadata is retained only for reliable ordered transport', () => {
+  const metadata = {type: 'webrtc-datachannel', peer_limit: 2, ordered: true, reliable: true,
+    packet_limit_bytes: 1024 * 1024};
+  assert.deepEqual(describeLockstepTransport({transport: metadata}), metadata);
+  assert.throws(() => describeLockstepTransport({transport: {...metadata, ordered: false}}),
+    /reliable and ordered/);
+  assert.throws(() => describeLockstepTransport({transport: {...metadata, reliable: false}}),
+    /reliable and ordered/);
+});
+
 test('tracked terminal callbacks return their rejection and drain waits for settlement', async () => {
   const callbackFailures = [];
   const queue = createTransportCallbackQueue(failure => callbackFailures.push(failure));

@@ -103,6 +103,27 @@ const PAGE_HELPERS = () => {
       return window.meleeNetResumeTimingPause();
     },
   };
+  window.__meleeWebNetNativePeerApi = () => {
+    const encode = bytes => {
+      let text = '';
+      for (const byte of bytes) text += String.fromCharCode(byte);
+      return btoa(text);
+    };
+    return {
+      pushIndexed: (tick, bytes) => window.__net.pushIndexed(tick, encode(bytes)),
+      configureLocalInputCapture: (port, ticks) => window.__net.configureLocalInputCapture(port, ticks),
+      confirmStart: () => window.__net.confirmStart(),
+      terminate: (...args) => window.__net.terminate(...args),
+      status: () => window.__net.status(),
+      drain: max => {
+        const result = window.__net.drain(max), text = atob(result.data), records = [];
+        if (text.length !== result.count * 64) throw Error('Native checksum byte count differs');
+        for (let offset = 0; offset < text.length; offset += 64)
+          records.push(Array.from(text.slice(offset, offset + 64), byte => byte.charCodeAt(0)));
+        return records;
+      },
+    };
+  };
 };
 
 export async function openNetInstance({chromium, launchOptions, url, disc, userDataDir, label,
@@ -198,28 +219,157 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       return bounded(() => page.evaluate(async options => {
         if (window.__netPeer) throw Error('Browser native peer already allocated');
         const {createBrowserNativePeer} = await import('./net_lockstep_browser_peer.mjs');
-        const encode = bytes => {
-          let text = '';
-          for (const byte of bytes) text += String.fromCharCode(byte);
-          return btoa(text);
-        };
-        window.__netPeer = createBrowserNativePeer({...options, native: {
-          pushIndexed: (tick, bytes) => window.__net.pushIndexed(tick, encode(bytes)),
-          configureLocalInputCapture: (port, ticks) => window.__net.configureLocalInputCapture(port, ticks),
-          confirmStart: () => window.__net.confirmStart(),
-          terminate: (...args) => window.__net.terminate(...args),
-          status: () => window.__net.status(),
-          drain: max => {
-            const result = window.__net.drain(max), text = atob(result.data), records = [];
-            if (text.length !== result.count * 64) throw Error('Native checksum byte count differs');
-            for (let offset = 0; offset < text.length; offset += 64)
-              records.push(Array.from(text.slice(offset, offset + 64), byte => byte.charCodeAt(0)));
-            return records;
-          },
-        }});
+        window.__netPeer = createBrowserNativePeer({...options, native: window.__meleeWebNetNativePeerApi()});
         return window.__netPeer.snapshot();
       }, options));
     };
+    instance.installLocalWebRtcPeerFactory = options => {
+      if (!peerModules) throw Error('Browser peer requires expected module hashes');
+      if (browserPeerAllocated) throw Error('Browser native peer factory was already installed');
+      browserPeerAllocated = true;
+      return bounded(() => page.evaluate(async options => {
+        if (window.__meleeCreateBrowserNativePeerForChannel)
+          throw Error('Local WebRTC native peer factory was already installed');
+        const [{createBrowserNativePeer}, {createDataChannelEndpoint}] = await Promise.all([
+          import('./net_lockstep_browser_peer.mjs'), import('./net_lockstep_webrtc.mjs'),
+        ]);
+        const native = window.__meleeWebNetNativePeerApi();
+        if (!native || typeof native.pushIndexed !== 'function' ||
+            typeof native.configureLocalInputCapture !== 'function' ||
+            typeof native.confirmStart !== 'function' || typeof native.terminate !== 'function' ||
+            typeof native.status !== 'function' || typeof native.drain !== 'function')
+          throw Error('Local WebRTC browser native adapter is incomplete');
+        window.__meleeCreateBrowserNativePeerForChannel = channel => {
+          if (window.__netPeer) throw Error('Browser native peer already allocated');
+          if (!channel || channel.readyState === 'closed')
+            throw Error('Local WebRTC data channel is unavailable for native peer attachment');
+          window.__netPeer = createBrowserNativePeer({...options,
+            native}, {createEndpoint: endpointOptions =>
+            createDataChannelEndpoint({...endpointOptions, channel})});
+          window.__meleeLocalWebRtcAttach = {ready_state: channel.readyState,
+            ordered: channel.ordered, max_retransmits: channel.maxRetransmits,
+            max_packet_lifetime: channel.maxPacketLifeTime};
+          return window.__netPeer.snapshot();
+        };
+        return true;
+      }, options));
+    };
+    instance.prepareLocalWebRtcReceiver = () => bounded(() => page.evaluate(() => {
+      if (window.__meleeLocalWebRtc) throw Error('Local WebRTC peer connection was already created');
+      const pc = new RTCPeerConnection({iceServers: []});
+      let resolvePeer, rejectPeer;
+      const peerCreated = new Promise((resolve, reject) => { resolvePeer = resolve; rejectPeer = reject; });
+      peerCreated.catch(() => {});
+      const state = window.__meleeLocalWebRtc = {role: 'beta', pc, channel: null,
+        attach_source: null, ready_state_at_attach: null, attach_error: null, peerCreated};
+      pc.addEventListener('datachannel', event => {
+        try {
+          if (state.channel) throw Error('Remote WebRTC data channel was announced more than once');
+          state.channel = event.channel;
+          state.attach_source = 'datachannel';
+          state.ready_state_at_attach = event.channel.readyState;
+          const snapshot = window.__meleeCreateBrowserNativePeerForChannel(event.channel);
+          resolvePeer(snapshot);
+        } catch (error) {
+          state.attach_error = String(error?.stack || error?.message || error);
+          rejectPeer(error);
+        }
+      }, {once: true});
+      return {role: state.role, receiver_registered: true};
+    }));
+    instance.createLocalWebRtcOffer = () => bounded(() => page.evaluate(async timeoutMs => {
+      if (window.__meleeLocalWebRtc) throw Error('Local WebRTC peer connection was already created');
+      const pc = new RTCPeerConnection({iceServers: []});
+      const channel = pc.createDataChannel('a3-native-input', {ordered: true});
+      const state = window.__meleeLocalWebRtc = {role: 'alpha', pc, channel,
+        attach_source: 'createDataChannel', ready_state_at_attach: channel.readyState,
+        attach_error: null, peerCreated: null};
+      const peer = window.__meleeCreateBrowserNativePeerForChannel(channel);
+      const waitForIce = async () => {
+        if (pc.iceGatheringState === 'complete') return;
+        await new Promise((resolve, reject) => {
+          const done = error => {
+            clearTimeout(timer);
+            pc.removeEventListener('icegatheringstatechange', changed);
+            if (error) reject(error); else resolve();
+          };
+          const changed = () => { if (pc.iceGatheringState === 'complete') done(); };
+          const timer = setTimeout(() => done(Error('Local WebRTC ICE gathering timed out')), timeoutMs);
+          pc.addEventListener('icegatheringstatechange', changed);
+          changed();
+        });
+      };
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await waitForIce();
+      const candidates = pc.localDescription.sdp.split(/\r?\n/)
+        .filter(line => line.startsWith('a=candidate:')).map(line => line.trim().split(/\s+/)[7]);
+      return {peer, description: {type: pc.localDescription.type, sdp: pc.localDescription.sdp},
+        candidate_types: candidates};
+    }, Math.max(1, Math.floor(remaining()))));
+    instance.acceptLocalWebRtcOffer = offer => bounded(() => page.evaluate(async ({offer, timeoutMs}) => {
+      const state = window.__meleeLocalWebRtc;
+      if (state?.role !== 'beta' || !state.pc) throw Error('Local WebRTC beta receiver is not prepared');
+      await state.pc.setRemoteDescription(offer);
+      const answer = await state.pc.createAnswer();
+      await state.pc.setLocalDescription(answer);
+      if (state.pc.iceGatheringState !== 'complete') {
+        await new Promise((resolve, reject) => {
+          const done = error => {
+            clearTimeout(timer);
+            state.pc.removeEventListener('icegatheringstatechange', changed);
+            if (error) reject(error); else resolve();
+          };
+          const changed = () => { if (state.pc.iceGatheringState === 'complete') done(); };
+          const timer = setTimeout(() => done(Error('Local WebRTC ICE gathering timed out')), timeoutMs);
+          state.pc.addEventListener('icegatheringstatechange', changed);
+          changed();
+        });
+      }
+      const candidates = state.pc.localDescription.sdp.split(/\r?\n/)
+        .filter(line => line.startsWith('a=candidate:')).map(line => line.trim().split(/\s+/)[7]);
+      return {description: {type: state.pc.localDescription.type, sdp: state.pc.localDescription.sdp},
+        candidate_types: candidates};
+    }, {offer, timeoutMs: Math.max(1, Math.floor(remaining()))}));
+    instance.acceptLocalWebRtcAnswer = answer => bounded(() => page.evaluate(async answer => {
+      const state = window.__meleeLocalWebRtc;
+      if (state?.role !== 'alpha' || !state.pc) throw Error('Local WebRTC alpha peer is not prepared');
+      await state.pc.setRemoteDescription(answer);
+      return true;
+    }, answer));
+    instance.waitForLocalWebRtcPeer = () => bounded(() => page.evaluate(async timeoutMs => {
+      const state = window.__meleeLocalWebRtc;
+      if (!state) throw Error('Local WebRTC peer connection was not prepared');
+      if (state.role === 'alpha') return window.__netPeer?.snapshot() ?? null;
+      let timer;
+      try {
+        return await Promise.race([state.peerCreated, new Promise((_, reject) => {
+          timer = setTimeout(() => reject(Error('Local WebRTC datachannel event did not create the beta peer')), timeoutMs);
+        })]);
+      } finally { clearTimeout(timer); }
+    }, Math.max(1, Math.floor(remaining()))));
+    instance.localWebRtcState = () => bounded(() => page.evaluate(() => {
+      const state = window.__meleeLocalWebRtc;
+      if (!state) return null;
+      const {pc, channel} = state;
+      const candidateTypes = description => description?.sdp?.split(/\r?\n/)
+        .filter(line => line.startsWith('a=candidate:')).map(line => line.trim().split(/\s+/)[7]) ?? [];
+      return {role: state.role, attach_source: state.attach_source,
+        ready_state_at_attach: state.ready_state_at_attach, attach_error: state.attach_error,
+        ready_state: channel?.readyState ?? null, ordered: channel?.ordered ?? null,
+        max_retransmits: channel?.maxRetransmits ?? null,
+        max_packet_lifetime: channel?.maxPacketLifeTime ?? null,
+        connection_state: pc.connectionState, ice_connection_state: pc.iceConnectionState,
+        local_candidate_types: candidateTypes(pc.localDescription),
+        remote_candidate_types: candidateTypes(pc.remoteDescription)};
+    }));
+    instance.closeLocalWebRtc = () => bounded(() => page.evaluate(() => {
+      const state = window.__meleeLocalWebRtc;
+      if (!state) return null;
+      if (state.pc.connectionState !== 'closed') state.pc.close();
+      return {role: state.role, connection_state: state.pc.connectionState,
+        channel_state: state.channel?.readyState ?? null};
+    }));
     instance.peerRpc = (name, args = []) => bounded(() => page.evaluate(([name, args]) =>
       window.__netPeer.rpc(name, args), [name, args]));
     instance.armPeerClose = () => bounded(() => page.evaluate(() => window.__netPeer?.armClose()));
@@ -373,10 +523,14 @@ export function browserPeerFacade(instance, initial) {
 }
 
 export function createPeerModuleResponseObserver({url, peerModuleHashes, runtimeArtifactNames, onFailure = () => {}}) {
-  const names = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs'];
-  if (Object.keys(peerModuleHashes).sort().join() !== [...names].sort().join() ||
+  const relayModules = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs'];
+  const webrtcModules = [...relayModules, 'net_lockstep_webrtc.mjs'];
+  const provided = Object.keys(peerModuleHashes).sort().join();
+  const names = provided === [...relayModules].sort().join() ? relayModules :
+    provided === [...webrtcModules].sort().join() ? webrtcModules : null;
+  if (!names ||
       Object.values(peerModuleHashes).some(hash => !/^[0-9a-f]{64}$/.test(hash)))
-    throw Error('Browser peer requires exact three module SHA-256 identities');
+    throw Error('Browser peer requires an exact relay or WebRTC module SHA-256 inventory');
   const expected = new Map(names.map(name => [new URL(name, url).href, peerModuleHashes[name]]));
   const allowed = new Set([...runtimeArtifactNames, ...names].map(name => new URL(name, url).href));
   const responses = [], tasks = new Set();

@@ -23,6 +23,11 @@ export function describeLockstepTransportAttempt(relayUrl) {
 }
 
 export function describeLockstepTransport(pair, {relayUrl} = {}) {
+  if (pair?.transport?.type === 'webrtc-datachannel') {
+    if (pair.transport.ordered !== true || pair.transport.reliable !== true)
+      throw Error('WebRTC lockstep transport must be reliable and ordered');
+    return {...pair.transport};
+  }
   if (pair?.transport?.type === 'room-websocket') {
     if (typeof relayUrl !== 'string') throw Error('Room WebSocket transport metadata requires its relay URL');
     const url = new URL(relayUrl);

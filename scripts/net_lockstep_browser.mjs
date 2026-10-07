@@ -40,6 +40,7 @@ const {values} = parseArgs({options: {
   playwright: {type: 'string'}, seed: {type: 'string'}, scenario: {type: 'string', default: 'probe'},
   'relay-url': {type: 'string'},
   'peer-owner': {type: 'string', default: 'node'},
+  'peer-transport': {type: 'string'},
   'source-ticks': {type: 'string', default: '8'}, 'timeout-ms': {type: 'string', default: '3600000'},
   'stall-ms': {type: 'string', default: '120000'}, 'poll-ms': {type: 'string', default: '50'},
   'delay-ms': {type: 'string', default: '250'}, 'flip': {type: 'string'},
@@ -69,7 +70,16 @@ if (!['probe', 'positive', 'flip', 'disconnect', 'input-sampling'].includes(valu
 const scenario = values.scenario;
 if (!['node', 'browser'].includes(values['peer-owner'])) throw Error('--peer-owner must be node or browser');
 const browserOwned = values['peer-owner'] === 'browser';
-if (browserOwned && !values['relay-url']) throw Error('Browser-owned peers require --relay-url');
+const peerTransport = values['peer-transport'] ??
+  (browserOwned || values['relay-url'] ? 'relay' : 'tcp-loopback');
+if (values['peer-transport'] !== undefined && !['relay', 'webrtc'].includes(peerTransport))
+  throw Error('--peer-transport must be relay or webrtc');
+if (!browserOwned && values['peer-transport'] !== undefined)
+  throw Error('--peer-transport applies only to browser-owned peers');
+const localWebRtc = peerTransport === 'webrtc';
+if (browserOwned && !localWebRtc && !values['relay-url']) throw Error('Browser-owned relay peers require --relay-url');
+if (localWebRtc && (!browserOwned || !inputSampling))
+  throw Error('The local WebRTC endpoint is scoped to browser-owned input-sampling');
 if (inputSampling && !browserOwned)
   throw Error('The input-sampling scenario requires --peer-owner browser');
 const url = new URL(values.url);
@@ -150,10 +160,11 @@ const pairResults = {
     probe ? 'CSS network-wait and duplicate-contribution probe' :
     scenario === 'positive' ? 'full original-route functional lockstep' : `bounded ${scenario} control`,
   exclusions: inputSampling ? ['physical controllers', 'keyboard sampling', 'wall-clock latency',
-    'foreground timing', 'uninterrupted/audio-output acceptance', 'Internet/two-machine/WebRTC play',
+    'foreground timing', 'uninterrupted/audio-output acceptance', 'Internet/two-machine play',
+    ...(!localWebRtc ? ['WebRTC'] : []),
     'pixels/PCM', 'full-route or whole-session accuracy', 'performance'] :
     ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'two-machine Internet acceptance'],
-  peer_owner: values['peer-owner'],
+  peer_owner: values['peer-owner'], peer_transport: peerTransport,
   input_delay: LOCKSTEP_DELAY,
   neutral_prefix: {source_ticks: LOCKSTEP_DELAY, player_ports: 'neutral PADStatus', unowned_ports: 'no-controller'},
   script: scriptBytes ? {name: path.basename(values.script), sha256: scriptHash, frame_count: inputCount,
@@ -161,7 +172,8 @@ const pairResults = {
   input_capture: inputSampling ? {source: 'browser-local native PADStatus', input_ticks: usedInputs,
     source_ticks: sourceTicks, pattern: ['neutral', 'A', 'release', 'neutral'],
     beta_deferred_input_tick: 0} : null,
-  transport_attempt: describeLockstepTransportAttempt(values['relay-url']),
+  transport_attempt: localWebRtc ? {type: 'webrtc-datachannel', local_only: true, ice_servers: []} :
+    describeLockstepTransportAttempt(values['relay-url']),
   peers: [], outcome: 'fail', first_error: null, relay_closed: false, started_at: new Date().toISOString(),
 };
 let instances = null, relay = null, peers = null, disconnectHandled = false, intentionalRelayClose = false;
@@ -643,9 +655,10 @@ async function run() {
     route_boundary_captures: [], route_boundary_misses: []};
   const openTimeout = Math.min(180000, deadline - Date.now());
   if (openTimeout <= 0) throw Error('No run deadline remains for browser startup');
-  const peerModuleHashes = browserOwned ? Object.fromEntries(await Promise.all([
-    'net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs',
-  ].map(async name => [name, sha256(await fs.readFile(new URL(name, import.meta.url)))]))) : null;
+  const peerModuleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs',
+    ...(localWebRtc ? ['net_lockstep_webrtc.mjs'] : [])];
+  const peerModuleHashes = browserOwned ? Object.fromEntries(await Promise.all(peerModuleNames.map(async name =>
+    [name, sha256(await fs.readFile(new URL(name, import.meta.url)))]))) : null;
   const opened = await Promise.allSettled(['alpha', 'beta'].map(role => openNetInstance({
     chromium, launchOptions, url: values.url, disc: values.disc,
     userDataDir: path.join(childDirectory(role), 'profile'), label: role,
@@ -704,14 +717,37 @@ async function run() {
   };
   peers = {};
   if (browserOwned) {
-    const roomId = createRoomId();
-    await Promise.all(['alpha', 'beta'].map(async role => {
-      const initial = await instances[role].createBrowserPeer({role, sourceTicks, inputTicks: usedInputs,
-        relayUrl: values['relay-url'], roomId, agreement: agreements[role], timeoutMs: Math.min(stallMs, deadline - Date.now()),
-        ...(inputSampling ? {inputCapture: {deferSendTicks: role === 'beta' ? [0] : [],
-          pattern: role === 'alpha' ? ['neutral', 'A', 'release', 'neutral'] : Array(usedInputs).fill('neutral')}} : {})});
-      peers[role] = browserPeerFacade(instances[role], initial);
-    }));
+    const roomId = localWebRtc ? undefined : createRoomId();
+    const peerOptions = role => ({role, sourceTicks, inputTicks: usedInputs,
+      ...(localWebRtc ? {} : {relayUrl: values['relay-url'], roomId}),
+      agreement: agreements[role], timeoutMs: Math.min(stallMs, deadline - Date.now()),
+      ...(inputSampling ? {inputCapture: {deferSendTicks: role === 'beta' ? [0] : [],
+        pattern: role === 'alpha' ? ['neutral', 'A', 'release', 'neutral'] : Array(usedInputs).fill('neutral')}} : {})});
+    if (localWebRtc) {
+      await Promise.all(['alpha', 'beta'].map(role =>
+        instances[role].installLocalWebRtcPeerFactory(peerOptions(role))));
+      await instances.beta.prepareLocalWebRtcReceiver();
+      const offer = await instances.alpha.createLocalWebRtcOffer();
+      if (offer.candidate_types.length === 0 || offer.candidate_types.some(type => type !== 'host'))
+        throw Error('Local WebRTC offer did not contain only host ICE candidates');
+      const answer = await instances.beta.acceptLocalWebRtcOffer(offer.description);
+      if (answer.candidate_types.length === 0 || answer.candidate_types.some(type => type !== 'host'))
+        throw Error('Local WebRTC answer did not contain only host ICE candidates');
+      await instances.alpha.acceptLocalWebRtcAnswer(answer.description);
+      const betaInitial = await instances.beta.waitForLocalWebRtcPeer();
+      peers.alpha = browserPeerFacade(instances.alpha, offer.peer);
+      peers.beta = browserPeerFacade(instances.beta, betaInitial);
+      pairResults.local_webrtc_signaling = {ice_servers: [],
+        signaling: 'in-memory offer/answer after host candidate gathering',
+        offer_candidate_types: offer.candidate_types, answer_candidate_types: answer.candidate_types,
+        receiver_handler_registered_before_offer: true,
+        beta_peer_created_in_datachannel_handler: true};
+    } else {
+      await Promise.all(['alpha', 'beta'].map(async role => {
+        const initial = await instances[role].createBrowserPeer(peerOptions(role));
+        peers[role] = browserPeerFacade(instances[role], initial);
+      }));
+    }
     pairResults.browser_peer_modules = {expected: peerModuleHashes, responses: {
       alpha: await instances.alpha.freezePeerModuleIdentity(), beta: await instances.beta.freezePeerModuleIdentity(),
     }};
@@ -720,9 +756,19 @@ async function run() {
         await Promise.all(['alpha', 'beta'].map(role => peers[role].armClose()));
         const rows = await Promise.allSettled(['alpha', 'beta'].map(role => peers[role].close(true)));
         const errors = rows.filter(row => row.status === 'rejected').map(row => row.reason);
+        if (localWebRtc) {
+          const rtcRows = await Promise.allSettled(['alpha', 'beta'].map(role => instances[role].closeLocalWebRtc()));
+          for (const row of rtcRows) {
+            if (row.status === 'rejected') errors.push(row.reason);
+            else if (row.value) {
+              pairResults.local_webrtc_cleanup ??= {};
+              pairResults.local_webrtc_cleanup[row.value.role] = row.value;
+            }
+          }
+        }
         if (errors.length) throw new AggregateError(errors, 'Browser peer pair close failed');
       }};
-    pairResults.transport = describeLockstepTransport(relay, {relayUrl: values['relay-url']});
+    pairResults.transport = describeLockstepTransport(relay, localWebRtc ? {} : {relayUrl: values['relay-url']});
   }
   if (!browserOwned) for (const role of ['alpha', 'beta']) {
     peers[role] = new LockstepPeer({role, sourceTicks, inputTicks: usedInputs,
@@ -757,6 +803,24 @@ async function run() {
   if (!peers.alpha.ready || !peers.beta.ready) throw Error('A2 start identity handshake timed out');
   pairResults.identity.handshake_confirmed_before_tick0 = true;
   pairResults.identity.peer_agreement_sha256 = peers.alpha.agreementHash;
+  if (localWebRtc) {
+    const states = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role =>
+      [role, await instances[role].localWebRtcState()])));
+    if (states.alpha.attach_source !== 'createDataChannel' ||
+        states.alpha.ready_state_at_attach !== 'connecting' ||
+        states.beta.attach_source !== 'datachannel' || states.beta.ready_state_at_attach !== 'open' ||
+        ['alpha', 'beta'].some(role => states[role].ordered !== true ||
+          states[role].max_retransmits !== null || states[role].max_packet_lifetime !== null ||
+          states[role].connection_state !== 'connected' ||
+          !['connected', 'completed'].includes(states[role].ice_connection_state) ||
+          states[role].local_candidate_types.length === 0 ||
+          states[role].local_candidate_types.some(type => type !== 'host') ||
+          states[role].remote_candidate_types.length === 0 ||
+          states[role].remote_candidate_types.some(type => type !== 'host')))
+      throw Error(`Local WebRTC endpoint did not complete the reviewed reliable host-only attachment: ${JSON.stringify(states)}`);
+    pairResults.local_webrtc = {ice_servers: [], peers: states,
+      attachment_states_match_contract: true, both_connections_connected: true};
+  }
   if (scenario === 'positive') {
     const initial = await Promise.all(['alpha', 'beta'].map(async role => ({
       role, status: await instances[role].status(), native: await instances[role].native(),
@@ -1015,6 +1079,12 @@ try {
     if (!instances?.[role]) continue;
     try { instanceRows[role].failure_status = await instances[role].status(); } catch {}
     try { instanceRows[role].failure_native = await instances[role].native(); } catch {}
+    if (localWebRtc) {
+      try { instanceRows[role].local_webrtc_failure_state = await instances[role].localWebRtcState(); }
+      catch (captureError) {
+        instanceRows[role].local_webrtc_failure_state_error = String(captureError.message || captureError);
+      }
+    }
     try { await instances[role].screenshot(path.join(childDirectory(role), 'failure.png')); } catch (captureError) {
       instanceRows[role].failure_capture_error = String(captureError.message || captureError);
     }
@@ -1036,6 +1106,19 @@ try {
     for (const instance of Object.values(instances)) {
       try { await instance.closePeer(true); }
       catch (error) { closeNotes.push(`partial browser peer close: ${String(error.message || error)}`); }
+    }
+    if (localWebRtc) {
+      await Promise.all(Object.entries(instances).map(async ([role, instance]) => {
+        try {
+          const result = await instance.closeLocalWebRtc();
+          if (result) {
+            pairResults.local_webrtc_cleanup ??= {};
+            pairResults.local_webrtc_cleanup[role] = result;
+          }
+        } catch (error) {
+          closeNotes.push(`partial ${role} WebRTC close: ${String(error.message || error)}`);
+        }
+      }));
     }
   }
   await transportCallbackQueue.drain();
