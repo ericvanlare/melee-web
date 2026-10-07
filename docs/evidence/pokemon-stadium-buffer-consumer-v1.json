@@ -1,0 +1,321 @@
+{
+  "schema": "melee-web-pokemon-stadium-buffer-consumer-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/233",
+  "related_issues": [
+    164,
+    227,
+    232
+  ],
+  "result": "passed_scoped_original_auxiliary_image_buffer_ownership",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "boundary": "Original grStadium_801D2D78 auxiliary IMAGE/GObj constructor and exact wrapper/image teardown; the registered GX callback is observed but never dispatched.",
+  "source_producers": {
+    "phase1_observers": {
+      "commit": "ea42449caa5f0abb1751df7388a85a2c5637ebf1",
+      "review_run_id": "stadium-buffer-observer-phase1-20261007-20261007-140617-f31ffb2e",
+      "review_receipt_artifact": "root-phase1-review-v1.json",
+      "review_receipt_sha256": "f789851108cf5173757f042bd1e26376cde7dea6e1504c1809458f5d5163faa7",
+      "compiler_producer_note": "Actual-TU IR was first emitted at HEAD ac695e063eaad274ad98f3999f6ac3743cd395e5 with four tracked dirty files; the immutable identity supplement preserves that producer. The four files were committed byte-for-byte as ea42449 after review."
+    },
+    "phase2_constructor_freeze": {
+      "commit": "cf4a167475690e3115f237a3c631a00792be8089",
+      "tree": "4f095759b7d91b3779e8d8ecb5ec8a245c75fce8",
+      "source_freeze_run_id": "stadium-buffer-constructor-sourcefreeze-20261007-20261007-144025-553f9cd3",
+      "source_freeze_artifact": "phase2-source-freeze-v1.json",
+      "source_freeze_sha256": "bad3b382960b750ea7d8ff89a43fdf9760b287d769a10e914549deb6d136013d",
+      "first_run_review_artifact": "root-first-constructor-result-review-v1.json",
+      "first_run_review_sha256": "58a70d541a0e8b90999cee0d1ad557734fde433fae14cd2b2a173ec78f0e1bb8"
+    },
+    "integration_validation": {
+      "branch": "codex/stadium-buffer-integration-20261007",
+      "commit": "69e44ffc9b11179373c1699eba3c2893b54d49c2",
+      "tree": "100a9baa59eda71b152a516bf8249f9bb5d49359",
+      "base_at_validation": "e3220aa2e2da7b17b99dce0999811bd1e66a0814",
+      "working_tree_clean_at_validation": true,
+      "current_main_note": "The full suite and ordinary Release builds were produced on 69e44ffc based on e3220aa. A final refresh onto d8f76001fc93ca593228fe740f70aec6b8f9ee4b is queued and not yet validated.",
+      "queued_refresh_target": "d8f76001fc93ca593228fe740f70aec6b8f9ee4b"
+    }
+  },
+  "observers_and_abi": {
+    "source_memory": "Const context and exact-payload allocation observers report explicit status, heap/world identity, requested bytes, liveness and allocation generation. Rejected queries do not call fail(), advance next_id(), or change owner health or watermarks. Address reuse is separated by generation.",
+    "actual_preload_tu": "The actual lbdvd.c TU observer checks authored preload-cache entry 0x7D3 using the source lookup predicate and reported absence before and after construction. It does not mutate the cache.",
+    "private_layout": {
+      "execution_pointer_bytes": 4,
+      "hsd_image_desc_bytes": 24,
+      "private_wrapper_bytes": 32,
+      "flag_container_candidate_offset": 24,
+      "flag_container_candidate_bytes": 2,
+      "compiler_observed_flag_access_offset": 24,
+      "compiler_observed_flag_access_width": 1,
+      "x1a_offset": 26,
+      "x1c_offset": 28,
+      "original_constructor_allocation_bytes": 28,
+      "actual_constructor_writes": "Descriptor bytes [0,24), plus one compiler-lowered flag byte at +24. The pinned Emscripten 6.0.9 Release -O3 actual-TU IR shows the descriptor memzero is 24 bytes and flag access is i8 at +24; it does not access x1A or x1C.",
+      "declaration_layout_limit": "The 26-byte layout prefix bound is declaration-derived from HSD_ImageDesc and the candidate u16 bitfield container. It is not the actual write span; the compiler proof establishes actual flag width 1.",
+      "allocation_limit": "The source allocation remains exactly 0x1C. The private wrapper is 32 bytes and x1C begins at offset 28, beyond that allocation. No allocation enlargement, private-wrapper copy, x1A/x1C read, or full-size equality assertion is used. Host64 is rejected before the source constructor call."
+    },
+    "release_ir_proof": {
+      "run_id": "stadium-buffer-retained98-c1-prep-20261007-215542-cf4a",
+      "receipt_artifact": "native-release-ir-proof-v1.json",
+      "receipt_sha256": "03dc0467f33d079100801d68ed3ccd3f02d16acb44a3dfe60fec695c0bd2c2a4",
+      "ir_sha256": "79c5e823cad609f01b40a8601ddd207371d677ccb8f0abc39dc094a0476e919c",
+      "excerpt_sha256": "9f86a5352e435fe793bee610c3228befc55198026ee89a6dce2736ebc7133c04",
+      "actual_compile_command_sha256": "b35c8f99b18c4d27ae0fb88fe8355eb06eec62705b4ce7c69c64c8c3fff15ca6",
+      "generated_source_sha256": "dfd603804f36a8d53fa39a17be444b59df9d6586f887083c6ed40e44fcbeb23d",
+      "compiler": "Emscripten 6.0.9; exact native C1 Release -O3 grpstadium.c translation-unit flags"
+    }
+  },
+  "constructor_lifetimes": {
+    "asset_free": {
+      "source_producer": "cf4a167475690e3115f237a3c631a00792be8089",
+      "run_id": "stadium-buffer-constructor-sourcefreeze-20261007-20261007-144025-553f9cd3",
+      "authorization_artifact": "root-first-constructor-run-authorization-v1.json",
+      "authorization_sha256": "c9d2c9028eb3e86e75db2b901d750f73ab8de898b228ab919800cf65cf0f93e8",
+      "result_artifact": "root-first-constructor-run-result-v1.json",
+      "result_sha256": "d59189db8f37fbb05fbf20ba860a5ce9c190cfda3559c5fe83120fd530371a19",
+      "independent_review_sha256": "58a70d541a0e8b90999cee0d1ad557734fde433fae14cd2b2a173ec78f0e1bb8",
+      "launches": 1,
+      "positive_lifetimes": 2,
+      "observed": "The original constructor made a fresh wrapper request of 28 bytes and the original descriptor helper allocated its exact rounded image request. Exact payload leases and generations were checked before and after original HSD_Free and immediate original GObj removal; tracked source pools/lists and context guards restored. The callback remained registered and was not dispatched."
+    },
+    "retained_98_file_fixture": {
+      "source_producer": "cf4a167475690e3115f237a3c631a00792be8089",
+      "run_id": "stadium-buffer-retained98-c1-prep-20261007-215542-cf4a",
+      "packet_artifact": "retained98-c1-native-preparation-v4.json",
+      "packet_sha256": "2dc40eefc1b1dfba18bfc65f51bd72eccb29a07672829ceeac28be872dce25fb",
+      "authorization_artifact": "root-native-authorization-v1.json",
+      "authorization_sha256": "3a84669ceb5e50fb78ce1c49cf1ecfb2fc5127b0cf203d8d4c3714fec16a8826",
+      "result_artifact": "retained98-run-result-v4.json",
+      "result_sha256": "e497a1eb45d0423340fd09521378451757623816e0c8d376a783cb016016b51d",
+      "root_review_artifact": "root-native-result-review-v1.json",
+      "root_review_sha256": "7991132b675a729f5182727a56e21c6c6635924e593c0bf4792344a0e0e429ea",
+      "launches": 1,
+      "tests_passed": 1,
+      "positive_lifetimes": 2,
+      "seconds": 1.06,
+      "fixture_files": 98,
+      "fixture_union_manifest_sha256": "258233cd7ad22041a65aca34329157272f2248a9985729e7f47b52a21a662ea6",
+      "fixture_union_run_id": "stadium-c1-lifecycle-packet-v2-be7d780f-20261007",
+      "fixture_union_manifest_artifact": "fixture-union-v2.json",
+      "pre_run_inventory_artifact": "retained98-current-inventory-v4.json",
+      "pre_run_inventory_sha256": "38eaf41f2e0be01b12ee2e07a6dec9d447947f7a79a211240a3ac67550451da6",
+      "post_run_inventory_recorded": false,
+      "fixture_identity_limit": "The pre-run inventory is recorded, and the native test passed. The result supplement contains post-run source/artifact identities but no post-run fixture inventory, so no file-by-file unchanged-after-run claim is made.",
+      "trace": "One header-only trace line; there are no match ticks or expected-state records.",
+      "profile": "Release with MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=ON; the trace's generic browser-release label is not the build-profile identity.",
+      "observed": "The existing screen-roots preflight and original 2D78 constructor/remove lifetimes passed twice. No callback dispatch or stage entry occurred. Numeric allocation generations were asserted internally but were not printed."
+    },
+    "generation_bound": "At most five tracked IDs across two lifetimes: first GObj_Create may lazily add one GObj-pool backing block; removal returns the pool slot for reuse; each constructor adds exactly one wrapper and one image payload. This is a generation bound, not a free-byte or heap-capacity claim."
+  },
+  "integration_validation": {
+    "suite": {
+      "command": "python3 -m unittest discover -s tests -v, through scripts/agent_workspace.py run",
+      "producer": "69e44ffc9b11179373c1699eba3c2893b54d49c2",
+      "run_id": "stadium-buffer-integration-e322-20261007-2206-cf4a",
+      "log_artifact": "full-unittest-v2.log",
+      "log_sha256": "9aef09deffc4bf24540c419d00034fe845bf4346cb12ed238b9a55475c51e989",
+      "result": "2031 tests, 132 skipped, passed"
+    },
+    "canonical_patch_repair": {
+      "run_id": "stadium-buffer-integration-e322-20261007-2206-cf4a",
+      "v1_failed_log_artifact": "full-unittest-v1.log",
+      "v1_failed_log_sha256": "ede57b4aada3afd1cfdd23275a765fd5399b0899913d36dd861a92cfb6d2fd0d",
+      "failure": "The only failure was test_reviewed_patch_is_canonical. The documented canonicalizer reordered the appended grpstadium hunk and patch index metadata; generated/applied source bytes and the pinned .deps/melee checkout stayed unchanged.",
+      "historical_tree_field_correction": "The frozen preview JSON key applied_source_tree_sha256 contains the 40-hex Git tree 793f13dedd03d1da62ac547c5dc93355f4447c32, not a SHA-256. This receipt names it applied_source_git_tree. The byte/source-tree equality result remains valid; the frozen receipt was not edited.",
+      "canonical_patch_sha256": "5abfcfb67504d95cc57cc3ddfed6cd56c0e55bda552a6d037d19d0c00739db82",
+      "generated_source_sha256_unchanged": "dfd603804f36a8d53fa39a17be444b59df9d6586f887083c6ed40e44fcbeb23d",
+      "focused_logs": {
+        "canonicalizer": "b3c5eb6dd212fe1418fb6e22be65e62050c38562facd7837e050f4e2e4931d13",
+        "patch_canonical_tests": "a3ed7c81ce4ca55a2aae4bb88ca88612d5b6d8c9f889d867f1dbe367edf25e7c",
+        "source_ownership_tests": "03e0f04df0936cf14a01d513425833cc720c713d9ffeba601be4f330885badf3",
+        "heap_ownership_tests": "5017b4a0f794a21fa33b60c8f9787099f23d282a35524b63dd851a9be27b161d"
+      }
+    },
+    "ordinary_release": {
+      "build_directory": "build/browser-release",
+      "configuration": "Release",
+      "boolean_cache_options_off": [
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME",
+        "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC",
+        "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC",
+        "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE",
+        "MELEE_WEB_PIPELINE_PROVENANCE",
+        "MELEE_WEB_PUBLIC_RUNTIME",
+        "MELEE_WEB_RESULTS_RENDERED_TRACE",
+        "MELEE_WEB_SELECTIVE_PIPELINES",
+        "MELEE_WEB_SLIPPI_PROFILE_BROWSER",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC"
+      ],
+      "cmake_cache_manifest": {
+        "configuration": "Release",
+        "CMakeCache.txt_sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc",
+        "build.ninja_sha256": "3066b10d098da57343b358a10405f91c8e8f6afd8be4e5d5b3295c55d0bf635f",
+        "all_10_boolean_options_off": true
+      },
+      "targets": [
+        {
+          "target": "native_menu_host_trace",
+          "command": "python3 scripts/build.py --trace-target native_menu_host_trace --configuration Release",
+          "log_run_id": "stadium-buffer-integration-e322-20261007-2206-cf4a",
+          "log_artifact": "ordinary-release-native-menu-build-v1.log",
+          "log_sha256": "ad4b798f14718ef6d9eeaf3644fce7c116cffa182392411576531cf2a44e27b1",
+          "js_sha256": "a38469b0da5e97b03f9a1d7d6d5b6c9d0dd9a7b697777c26350064430fa0a3f9",
+          "wasm_sha256": "e15e58419b95b80817e3341c2988323b9bfd61d822626f5790a0f56b58659299"
+        },
+        {
+          "target": "gameplay_menu_browser",
+          "build_entrypoint_target": "runtime",
+          "command": "python3 scripts/build.py --target runtime --configuration Release",
+          "log_run_id": "stadium-buffer-integration-e322-20261007-2206-cf4a",
+          "log_artifact": "ordinary-release-gameplay-menu-browser-build-v1.log",
+          "log_sha256": "19e5cf4a631ac36ea6438d2144f6871cd3b0918e7daae79a0c16d088b40a8022",
+          "js_sha256": "4e751ebb2467c3a8ee74583b37aa1753f1233c89e496b61458594c16eb262e61",
+          "wasm_sha256": "5a7e61e998cd2727f31fa45cdfe55d8ac86f2e2c9ebed40229de684414e57cc7"
+        }
+      ],
+      "affected_objects": {
+        "build/browser-release/CMakeFiles/gameplay_runtime.dir/src/gameplay_source_memory_runtime.cpp.o": "21da5736cdeabd4188845ffe4caf1140ba8a6a7fb40ab85d7ab584fe48c95811",
+        "build/browser-release/CMakeFiles/fighter_source_runtime.dir/build/gameplay-source/src/melee/gr/grpstadium.c.o": "c40ab6d44f014d7a3264dedeb402d06a45b6b438b0cada82f2db3de7609d61f8",
+        "build/browser-release/CMakeFiles/gameplay_menu_browser.dir/src/gameplay_menu_browser.cpp.o": "387726e5727785ee552ec296dfbeedab42c7c2e53190d9519499a8795f7cbc00"
+      },
+      "warning_note": "Builds passed with existing dependency writable-string warnings (160 warnings on the runtime build)."
+    },
+    "diagnostic_native_producer": {
+      "profile": "Release; MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=ON",
+      "artifact_identity": "The retained fixture run uses separate build/browser-stadium-c1a-release output, not ordinary browser-release output.",
+      "js_sha256": "96bd0647d3528867909f519756412520c22da383f398fe1586334c5ce3e82a79",
+      "wasm_sha256": "1899fa1c39cd6edfd059502315a9effd5f36f68662d4cc0db31ee3a00c61e570",
+      "grpstadium_object_sha256": "c40ab6d44f014d7a3264dedeb402d06a45b6b438b0cada82f2db3de7609d61f8",
+      "generated_source_sha256": "dfd603804f36a8d53fa39a17be444b59df9d6586f887083c6ed40e44fcbeb23d"
+    }
+  },
+  "tracked_source_hashes": {
+    "patches/melee-gameplay.patch": "5abfcfb67504d95cc57cc3ddfed6cd56c0e55bda552a6d037d19d0c00739db82",
+    "src/gameplay_source_memory_runtime.cpp": "8416b981cf93f3793db11508bbefcd94bc7e9a0a6919bb8e74f3dcbe56bdac71",
+    "src/gameplay_source_memory_runtime.h": "f21beec813c8a3eeb488441083afff70640dbb0d28f86d156df8ccba7ceab5a2",
+    "src/gameplay_source_preload.h": "cb1ee49f0a624d0a06aece29e520ddb13f4e7fa608157874c8e79e9a8846d11c",
+    "tests/gameplay_heap_trace.cpp": "25e350604310ad7b5980b460871ac7364716ddd1a253cc6507ef0175072fa997",
+    "tests/stadium_buffer_consumer.hpp": "f83916a12f80ced15e83d39c85ea954f2fb8633d4d4ca3c80a5e38026d98b86a",
+    "tests/stadium_screen_roots_trace.cpp": "e36e043f918f7eaabb178536158a2b409bb394ac5e0c812963ec4ace6068011f",
+    "tests/native_menu_host_trace.cpp": "8e016a509f4b24e7bee4b4c576c9efd1e77bc2e191cfa674f47785e76ce0f996"
+  },
+  "integration_patch": {
+    "canonical_patch_sha256": "5abfcfb67504d95cc57cc3ddfed6cd56c0e55bda552a6d037d19d0c00739db82",
+    "pinned_upstream_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "generated_grpstadium_source_sha256": "dfd603804f36a8d53fa39a17be444b59df9d6586f887083c6ed40e44fcbeb23d",
+    "applied_source_git_tree": "793f13dedd03d1da62ac547c5dc93355f4447c32",
+    "pinned_upstream_checkout_modified": false
+  },
+  "next_boundary_proposal": {
+    "status": "source-only service contract; no callback, Ground owner, or stage entry was created or run",
+    "service": "One original 0x7D3 EFB-to-image copy through grStadium_801D2FD0 -> lb_800122C8 -> HSD_ImageDescCopyFromEFB.",
+    "actual_stage_owner_chain": "PsType_Display is map 1. grStadium_OnInit takes the original stage Ground GObj and invokes grStadium_801D1290, which resolves the map-1 display material, calls grStadium_801D2278, and creates the 0x7D3 image GObj. After source state 7 clears its flag, grStadium_801D2FD0 calls lb_800122C8(&desc, 0, 36, 0), sets the flag, then marks Ground_GetMapGObj(PsType_Display)->u.display.xF8_0. The helper forwards those exact coordinates and clear value to HSD_ImageDescCopyFromEFB with sync=true.",
+    "actual_service_chain": "The EFB texture-copy service is present in the ordinary browser Wasm. Generated tobj.c uses GX declarations resolved by the actual Emscripten preprocessor to .deps/aurora/include/dolphin/gx/GXFrameBuffer.h. Its compiled object has undefined GXSetTexCopySrc, GXSetTexCopyDst, GXCopyTex, GXPixModeSync, and GXInvalidateTexAll; the gameplay_menu_browser link edge includes .deps/aurora/libaurora_gx.a, whose GXFrameBuffer.cpp, GXManage.cpp, and GXTexture.cpp objects provide those APIs. The resulting Wasm contains lb_800122C8, HSD_ImageDescCopyFromEFB, GXSetTexCopySrc, GXSetTexCopyDst, GXCopyTex, and GXPixModeSync. The old Dolphin GXFrameBuf.c direct GXWGFifo implementation is not compiled into this target. Aurora GXFrameBuffer.cpp writes its custom source, destination, pointer, and BP 0x52 commands into aurora::gx::fifo; the command processor decodes source/destination state and routes the BP 0x52 texture-copy trigger to aurora::gx::copy_tex. That implementation resolves the current render pass into an Aurora texture associated with the exact destination pointer, then exposes that handle by the same pointer during texture binding. On the non-pthreads Emscripten path FIFO processing is inline at publish(), but publish requires an active Aurora frame. GXPixModeSync emits PE state and is not a GPU drain; Aurora GXInvalidateTexAll is empty. No EFB copy was executed or validated here, and these facts do not prove source-pixel output or synchronization correctness.",
+    "smallest_next_experiment": "No new GX bridge is proposed: the linked Aurora EFB texture-copy service already consumes the original HSD_ImageDescCopyFromEFB calls. Keep the next step source-only: trace the supported browser draw owner from a successful aurora_begin_frame through the original display Ground/GObj callback site, and prove the active Aurora frame/render-pass precondition and genuine display-Ground ownership before requesting one original callback invocation. If that ownership path is unavailable, split the missing stage/render owner rather than calling the callback directly. A later authorized one-call check must preserve the original (left=0, top=36, clear=0, sync=true) arguments and observe the same 0x7D3 destination identity; it must not claim pixels or GPU completion from source/link evidence.",
+    "stop_if": "Stop if the browser source draw cannot demonstrate a live Aurora frame/render pass and genuine PsType_Display Ground owner without fabricating state or broad stage admission. Treat Aurora's empty GXInvalidateTexAll and lack of a GXPixModeSync GPU drain as explicit unverified service semantics if the later acceptance needs cache invalidation or completion. Do not add a replacement bridge based on the old Dolphin direct-FIFO implementation.",
+    "exclusions": [
+      "callback execution",
+      "Ground owner creation",
+      "stage OnInit/entry/admission",
+      "grStadium_801D2E24 second buffer",
+      "camera/text/SIS",
+      "ticks or gameplay draw",
+      "browser run",
+      "retail comparison",
+      "pixels/audio/performance acceptance"
+    ],
+    "browser_gx_service_audit": {
+      "target": "gameplay_menu_browser",
+      "profile": "ordinary Release, C1 and all other ten MELEE_WEB boolean options OFF; Emscripten 6.0.9; O3; non-pthreads; WebGPU port",
+      "pinned_aurora_commit": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
+      "downstream_aurora_patch": "patches/aurora-browser.patch",
+      "downstream_aurora_patch_sha256": "97d8af9c8474b692d049d243eda2ad9913a67025e88cfd6f4d3be7a63676db4a",
+      "compile_database": "build/browser-release/compile_commands.json",
+      "compile_database_sha256": "0ca748c07e2b46000bd99c9bf976b366794ca81909c765eb97dfa1372c415ab2",
+      "link_graph": "build/browser-release/build.ninja",
+      "link_graph_sha256": "3066b10d098da57343b358a10405f91c8e8f6afd8be4e5d5b3295c55d0bf635f",
+      "wasm_sha256": "5a7e61e998cd2727f31fa45cdfe55d8ac86f2e2c9ebed40229de684414e57cc7",
+      "generated_tobj_tu": {
+        "path": "build/gameplay-source/src/sysdolphin/baselib/tobj.c",
+        "source_sha256": "c8675531bbac68882a7d2002e83e689e29e6a20465c7fb154b9e326167d49c23",
+        "compile_command_sha256": "03a8af9a9b78a68c668f26d873e2bd27a24ba3789d414ccaa05daba53347f125",
+        "preprocessed_sha256": "81917843babe331e95994dfc7517e3aa98c426f40e439cc5b2aa15bf5b8ac19e",
+        "preprocessed_bytes": 291190,
+        "preprocessed_resolved_copy_header": ".deps/aurora/include/dolphin/gx/GXFrameBuffer.h",
+        "defines": [
+          "AURORA",
+          "AURORA_ENABLE_GX",
+          "ENABLE_BACKEND_WEBGPU"
+        ],
+        "flags": [
+          "-O3",
+          "-DNDEBUG",
+          "-std=gnu11",
+          "--use-port=emdawnwebgpu"
+        ],
+        "include_order_prefix": [
+          "src",
+          "build/gameplay-source/src",
+          ".deps/aurora/include",
+          "build/browser-release/_deps/fmt-src/include"
+        ],
+        "object_sha256": "bcb3b75698fc8ff77a0b6d140d5527736791cec4f63d201ad9f6fe0dca0d6a0d"
+      },
+      "aurora_providers": {
+        "link_edge_libraries": [
+          "libhsd_native_runtime.a",
+          ".deps/aurora/libaurora_gx.a"
+        ],
+        "archive_sha256": "329b65af8024652e9635f64e709eb2b684c3c29f1ae48b5d6207efe4dcc9a83b",
+        "gx_framebuffer_source_sha256": "832b5be6ff7afbda9fdc5bc019a6058da12ed42a885655dcdcd853d84c13505a",
+        "gx_framebuffer_object_sha256": "fce9516f1823fa2b25ce3e1ebca2e2791937dae5846af9daa702c86fc305c8f1",
+        "gx_manage_object_sha256": "8eec8e95c76af2eaac3d3b18fcd143f2bfc9ca4e4163c50945b8327f2927ce9e",
+        "gx_texture_object_sha256": "03450af20245f6e764d8a5e698bf9e91aff8d684299c45a5b51d68875a007c32",
+        "actual_wasm_symbols": [
+          "lb_800122C8",
+          "HSD_ImageDescCopyFromEFB",
+          "GXSetTexCopySrc",
+          "GXSetTexCopyDst",
+          "GXCopyTex",
+          "GXPixModeSync"
+        ],
+        "old_direct_dolphin_producer": "No GXFrameBuf.c compile command or build object exists in this target."
+      },
+      "frame_and_sync_limits": {
+        "publish_requires_active_frame": true,
+        "active_frame_owner": "aurora::begin_frame calls gx::fifo::begin_frame after gfx::begin_frame succeeds; aurora::end_frame drains FIFO then finishes the graphics packet.",
+        "gx_pix_mode_sync": "Writes the PE control register to FIFO and marks BP state sent; it does not drain the Aurora FIFO or prove GPU completion.",
+        "gx_invalidate_tex_all": "Aurora implementation is empty; its symbol is optimized out of the observed Wasm.",
+        "runtime_claim": "Source/link identity only. No callback, Ground owner, stage entry, EFB operation, texture output, or GPU-completion check ran."
+      },
+      "source_producer_commit": "69e44ffc9b11179373c1699eba3c2893b54d49c2",
+      "base_at_validation": "e3220aa2e2da7b17b99dce0999811bd1e66a0814",
+      "aurora_service_sources_sha256": {
+        "GXFrameBuffer.cpp": "832b5be6ff7afbda9fdc5bc019a6058da12ed42a885655dcdcd853d84c13505a",
+        "lib/gx/command_processor.cpp": "8ca295978f3c294532bf0c16421fb547ba111592b7630492bcf3d7451eb688e4",
+        "lib/gx/regs.cpp": "59656a8e6c75566c22a8b34251230c7ced5daf8bc89245c4df690ed37f54f768",
+        "lib/gx/fifo.cpp": "8a1aa9b4e9953d9264f87c96926330dc771dde4d68774771ac4003eb8a4cf9ee",
+        "lib/gx/texture.cpp": "441dcd01ad0bbfd9b1f63db1596a0264aa0acce0546cbbd79baedf46b97c6ca5",
+        "lib/dolphin/gx/GXManage.cpp": "df5e1b449d473afb7e628acb06fc1faf75b55b3b037a9bbd4acaa8d641108ef8",
+        "lib/dolphin/gx/GXTexture.cpp": "7f9c49ef7e37ad3be35cc0d53ff84f43fa89e0f90b1e891f661819ca6b2df0f9"
+      },
+      "gx_framebuffer_compile_command_sha256": "9f00f823945e65287dd0485a44151069dfa0a86b2e46a581c86bc8115c25796c"
+    }
+  },
+  "not_established": [
+    "No callback dispatch, Ground OnInit, stage entry/publication/admission, or gameplay tick/draw",
+    "No 0x7D4 second buffer, camera/text, or global SIS consumer",
+    "No browser, screenshot, retail comparison, timing, pixels, audio fidelity, or whole-session acceptance",
+    "The successful suite and ordinary Release builds are on 69e44ffc based on e3220aa, not the queued d8f76001 final base."
+  ],
+  "private_evidence_run_ids": [
+    "stadium-buffer-observer-phase1-20261007-20261007-140617-f31ffb2e",
+    "stadium-buffer-constructor-sourcefreeze-20261007-20261007-144025-553f9cd3",
+    "stadium-buffer-retained98-c1-prep-20261007-215542-cf4a",
+    "stadium-buffer-integration-e322-20261007-2206-cf4a"
+  ]
+}
