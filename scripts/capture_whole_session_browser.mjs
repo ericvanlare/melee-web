@@ -11,19 +11,30 @@ import fs from 'node:fs/promises';
 import {createReadStream} from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
 import {parseArgs} from 'node:util';
 import {loadBrowserTools, browserLaunchOptions} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {finalizeSessionCapture, validateRuntimeDataAbort} from './whole_session_capture_result.mjs';
 import {parseRngDrawProbe, validateRngDrawProbeRows} from './rng_draw_probe.mjs';
+import {NATURAL_PAUSE_PROTOCOL, resolveCaptureMode, validateNaturalPauseManifest,
+  naturalPauseRuntimeUrl, validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
+  stopSourceBeforeNaturalPauseExport} from './natural_pause_diagnostic.mjs';
+import {installPauseTraceCapture, readPauseTraceCapture, readPauseTraceStatus,
+  readRetainedPauseDiagnostics} from '../tests/pause_trace_capture.mjs';
+import {traceSettings, finalizeTrace} from './run_hitch_matrix.mjs';
 
-const {values} = parseArgs({options: {
+const {values, tokens} = parseArgs({tokens: true, options: {
   url: {type: 'string'},
   disc: {type: 'string'},
   recipe: {type: 'string'},
   manifest: {type: 'string'},
   'runtime-data': {type: 'string'},
   out: {type: 'string'},
+  mode: {type: 'string', default: 'state'},
+  'diagnostic-manifest': {type: 'string'},
+  'build-dir': {type: 'string'},
+  'browser-profile': {type: 'string'},
   playwright: {type: 'string'},
   'phase-timeout': {type: 'string', default: '120000'},
   'replay-timeout': {type: 'string', default: '900000'},
@@ -48,16 +59,58 @@ if (!values.url || !values.disc || !values.recipe || !values.out)
 const url = new URL(values.url);
 if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
-const phaseTimeoutMs = integer('phase-timeout', 1000, 300000);
-const replayTimeoutMs = integer('replay-timeout', 1000, 1800000);
-const pollMs = integer('poll-ms', 50, 2000);
-const replayPollMs = values['replay-poll-ms'] === undefined
-  ? pollMs : integer('replay-poll-ms', 1, 2000);
-const stopAfter = values['stop-after-source-frames'] ? integer('stop-after-source-frames',1,108000) : null;
-const resumeTimingPauses = values['resume-timing-pauses'];
-const captureCpuObservations = values['cpu-observations'];
+const captureMode = resolveCaptureMode(values.mode, values['diagnostic-manifest']);
+const diagnostic = captureMode.diagnostic;
+const diagnosticUrl = diagnostic ? naturalPauseRuntimeUrl(url.href) : url;
+const diagnosticManifestPath = diagnostic ? path.resolve(values['diagnostic-manifest']) : null;
+let diagnosticManifest = null;
+let diagnosticManifestSha256 = null;
+let diagnosticArtifactNames = [];
+if (diagnostic) {
+  if (!values['build-dir'] || !values['browser-profile'])
+    throw Error('Performance capture requires --build-dir and --browser-profile');
+  const mutableBounds = new Set(['phase-timeout', 'replay-timeout', 'poll-ms', 'replay-poll-ms']);
+  if (tokens.some(token => mutableBounds.has(token.name)))
+    throw Error('Performance capture uses the frozen manifest timeouts and polling intervals');
+  if (values['runtime-data'])
+    throw Error('Performance capture does not read or hash runtime-data');
+  const manifestBytes = await fs.readFile(diagnosticManifestPath);
+  diagnosticManifestSha256 = createHash('sha256').update(manifestBytes).digest('hex');
+  try { diagnosticManifest = JSON.parse(manifestBytes); }
+  catch (error) { throw Error(`Diagnostic manifest is not JSON: ${error.message}`); }
+  diagnosticArtifactNames = JSON.parse(await fs.readFile(new URL('../tools/browser_build_artifacts.json', import.meta.url)));
+  validateNaturalPauseManifest(diagnosticManifest, diagnosticArtifactNames);
+  if (new URL(diagnosticManifest.runtime_url).href !== url.href ||
+      path.resolve(diagnosticManifest.inputs.disc.path) !== path.resolve(values.disc) ||
+      path.resolve(diagnosticManifest.inputs.recipe.path) !== path.resolve(values.recipe) ||
+      path.resolve(diagnosticManifest.build.directory) !== path.resolve(values['build-dir']) ||
+      path.resolve(diagnosticManifest.browser.profile_path) !== path.resolve(values['browser-profile']))
+    throw Error('Diagnostic manifest disagrees with URL, input paths, Release build directory, or fresh profile');
+  try {
+    await fs.lstat(path.resolve(values['browser-profile']));
+    throw Error('Performance capture requires a profile path that does not already exist');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  if (diagnosticManifest.protocol.mode !== values.mode)
+    throw Error('Diagnostic manifest mode disagrees with --mode');
+}
+const phaseTimeoutMs = diagnostic ? NATURAL_PAUSE_PROTOCOL.phase_timeout_ms : integer('phase-timeout', 1000, 300000);
+const replayTimeoutMs = diagnostic ? NATURAL_PAUSE_PROTOCOL.replay_timeout_ms : integer('replay-timeout', 1000, 1800000);
+const pollMs = diagnostic ? NATURAL_PAUSE_PROTOCOL.phase_observation_interval_ms : integer('poll-ms', 50, 2000);
+const replayPollMs = diagnostic ? NATURAL_PAUSE_PROTOCOL.replay_poll_interval_ms :
+  values['replay-poll-ms'] === undefined ? pollMs : integer('replay-poll-ms', 1, 2000);
+const requestedStopAfter = values['stop-after-source-frames'] ? integer('stop-after-source-frames',1,108000) : null;
+const stopAfter = diagnostic ? NATURAL_PAUSE_PROTOCOL.source_cursor_limit : requestedStopAfter;
+if (diagnostic && requestedStopAfter !== null && requestedStopAfter !== stopAfter)
+  throw Error('Performance capture cursor bound is frozen by the diagnostic manifest');
+const resumeTimingPauses = diagnostic ? false : values['resume-timing-pauses'];
+if (diagnostic && values['resume-timing-pauses']) throw Error('Performance diagnosis cannot resume a timing pause');
+const captureCpuObservations = diagnostic ? false : values['cpu-observations'];
 const rngDrawProbe = parseRngDrawProbe({range: values['rng-draw-probe-range'],
   cursors: values['rng-draw-probe-cursors']});
+if (diagnostic && (values['cpu-observations'] || rngDrawProbe))
+  throw Error('Performance diagnosis does not enable CPU-prefix or RNG observers');
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
 const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data']]
@@ -66,10 +119,12 @@ const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime
 await fs.mkdir(output, {recursive: false});
 const report = {
   schema: 'melee-web-headless-whole-session-replay-v1',
-  scope: 'Single headless browser MWRC v8/v9 diagnostic; no pixel, PCM, performance, or admission claim',
+  scope: diagnostic ? 'One bounded headless natural-pause performance diagnosis; no admission, pixel, PCM, foreground, or physical-input claim' :
+    'Single headless browser MWRC v8/v9 diagnostic; no pixel, PCM, performance, or admission claim',
   result: 'fail',
   url: values.url,
-  mode: 'state',
+  mode: captureMode.mode,
+  ...(diagnostic ? {diagnostic_manifest: {path: diagnosticManifestPath, sha256: diagnosticManifestSha256}} : {}),
   phase_timeout_ms: phaseTimeoutMs,
   replay_timeout_ms: replayTimeoutMs,
   poll_ms: pollMs,
@@ -104,6 +159,12 @@ const runtimeDataNetwork = {
   contentLength: null,
 };
 const runtimeDataAbortCandidates = [];
+let browserContext;
+let diagnosticCdp;
+let traceStarted = false;
+let naturalPauseTraceSettings = null;
+let diagnosticPreflightValid = false;
+let browserTools = null;
 
 const write = async (name, value) => {
   await fs.writeFile(path.join(output, name), typeof value === 'string' ? value : JSON.stringify(value, null, 2) + '\n');
@@ -118,16 +179,57 @@ const statInput = async filename => {
   if (!stat.isFile()) throw Error(`Input is not a regular file: ${filename}`);
   return {path: filename, bytes: stat.size, sha256: await digest(filename)};
 };
+function git(...args) {
+  return execFileSync('git', args, {cwd: path.resolve(import.meta.dirname, '..'), encoding: 'utf8'}).trim();
+}
+function compareIdentityMaps(expected, actual) {
+  const differences = [];
+  if (!expected || typeof expected !== 'object' || Array.isArray(expected) ||
+      !actual || typeof actual !== 'object' || Array.isArray(actual) ||
+      Object.keys(expected).length !== Object.keys(actual).length) return {matches: false, differences: ['inventory']};
+  for (const [name, identity] of Object.entries(expected)) {
+    if (!Object.hasOwn(actual, name) || actual[name]?.bytes !== identity?.bytes ||
+        actual[name]?.sha256 !== identity?.sha256) differences.push(name);
+  }
+  return {matches: differences.length === 0, differences};
+}
+async function sourceIdentity() {
+  if (git('status', '--porcelain')) throw Error('Freeze the diagnostic harness commit and leave the checkout clean');
+  return {commit: git('rev-parse', 'HEAD'), tree: git('rev-parse', 'HEAD^{tree}')};
+}
+async function releaseArtifactMap(buildDirectory, baseUrl) {
+  const map = {};
+  for (const name of diagnosticArtifactNames) {
+    const filename = path.join(buildDirectory, name);
+    const localStat = await fs.stat(filename);
+    if (!localStat.isFile()) throw Error(`Release artifact is not a regular file: ${name}`);
+    const localSha256 = await digest(filename);
+    const response = await fetch(new URL(name, baseUrl), {cache: 'no-store', signal: AbortSignal.timeout(30000)});
+    if (!response.ok) throw Error(`Served Release artifact ${name}: HTTP ${response.status}`);
+    const hash = createHash('sha256');
+    let bytes = 0;
+    for await (const chunk of response.body) {
+      bytes += chunk.byteLength;
+      if (bytes > 1024 * 1024 * 1024) throw Error(`Served Release artifact exceeds the 1 GiB identity bound: ${name}`);
+      hash.update(chunk);
+    }
+    const sha256 = hash.digest('hex');
+    if (bytes !== localStat.size || sha256 !== localSha256)
+      throw Error(`Served Release artifact differs from local build: ${name}`);
+    map[name] = {bytes, sha256};
+  }
+  return map;
+}
 
 function firstError(kind, message, details = null) {
   if (!report.first_error) report.first_error = {kind, message: String(message), phase: currentPhase, details};
 }
 
-async function snapshot(reason = 'poll') {
+async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
   if (!page || page.isClosed()) return null;
   let value;
   try {
-    value = await page.evaluate(reason => {
+    value = await page.evaluate(({reason, captureCss}) => {
       const module = globalThis.Module;
       const ready = globalThis.__meleeNativeRuntimeReady === true;
       const call = name => {
@@ -142,7 +244,7 @@ async function snapshot(reason = 'poll') {
       try { replayReport = reportText.trim().startsWith('{') ? JSON.parse(reportText) : null; } catch {}
       const phase = call('_melee_web_native_menu_phase');
       let css = null;
-      if (phase === 1 && module?._melee_web_css_observe_port) {
+      if (captureCss && phase === 1 && module?._melee_web_css_observe_port) {
         const ids = module._malloc(16), geometry = module._malloc(32);
         if (!ids || !geometry) throw Error('CSS observation allocation failed');
         try {
@@ -169,7 +271,7 @@ async function snapshot(reason = 'poll') {
         replay_report: replayReport,
         replay_downloads: [...document.querySelectorAll('#retail-replay-downloads a')].map(link => link.download),
       };
-    }, reason);
+    }, {reason, captureCss});
   } catch (error) {
     firstError('snapshot', error.message || error);
     return {reason, snapshot_error: String(error.message || error)};
@@ -179,7 +281,7 @@ async function snapshot(reason = 'poll') {
     report_pass: value.replay_report?.pass ?? null});
   // Keep a state transition that occurs between source-cursor increments too,
   // while excluding animated geometry so focused CSS traces remain bounded.
-  const cssStateKey = value.phase === 1 ? JSON.stringify({
+  const cssStateKey = captureCss && value.phase === 1 ? JSON.stringify({
     cursor: value.source_cursor,
     css_ids: value.css?.map(row => row?.ids ?? null) ?? null,
     cursors: value.css_setup?.cursors ?? null,
@@ -196,18 +298,18 @@ async function snapshot(reason = 'poll') {
   return value;
 }
 
-async function phase(name, task, timeoutMs = phaseTimeoutMs) {
+async function phase(name, task, timeoutMs = phaseTimeoutMs, observationIntervalMs = pollMs) {
   currentPhase = name;
   const started = Date.now();
   const row = {name, started_at: new Date(started).toISOString(), timeout_ms: timeoutMs, result: 'fail'};
   report.phases.push(row);
   await snapshot('phase-start:' + name);
   const pendingPolls = new Set();
-  const timer = setInterval(() => {
+  const timer = observationIntervalMs > 0 ? setInterval(() => {
     const pending = snapshot('phase-poll:' + name);
     pendingPolls.add(pending);
     void pending.finally(() => pendingPolls.delete(pending));
-  }, pollMs);
+  }, observationIntervalMs) : null;
   let timeout;
   try {
     await Promise.race([
@@ -219,7 +321,7 @@ async function phase(name, task, timeoutMs = phaseTimeoutMs) {
     firstError(name, error.message || error, await snapshot('phase-error:' + name));
     throw error;
   } finally {
-    clearInterval(timer);
+    if (timer) clearInterval(timer);
     clearTimeout(timeout);
     await Promise.all(pendingPolls);
     row.elapsed_ms = Date.now() - started;
@@ -228,7 +330,29 @@ async function phase(name, task, timeoutMs = phaseTimeoutMs) {
 }
 
 try {
-  report.inputs = {disc: await statInput(values.disc), recipe: await statInput(values.recipe)};
+  report.inputs = {disc: await statInput(diagnostic ? path.resolve(values.disc) : values.disc),
+    recipe: await statInput(diagnostic ? path.resolve(values.recipe) : values.recipe)};
+  if (diagnostic) {
+    const source = await sourceIdentity();
+    if (source.commit !== diagnosticManifest.source.commit || source.tree !== diagnosticManifest.source.tree)
+      throw Error('Current source commit/tree differs from the frozen diagnostic manifest');
+    report.source_identity = source;
+    for (const name of ['disc', 'recipe']) {
+      const expected = diagnosticManifest.inputs[name], actual = report.inputs[name];
+      if (actual.path !== expected.path || actual.bytes !== expected.bytes || actual.sha256 !== expected.sha256)
+        throw Error(`Current ${name} input differs from the frozen diagnostic manifest`);
+    }
+    report.producer = {configuration: diagnosticManifest.build.configuration,
+      target: diagnosticManifest.build.target, directory: diagnosticManifest.build.directory,
+      source_commit: source.commit, source_tree: source.tree,
+      expected_artifacts: diagnosticManifest.build.artifacts};
+    report.build_artifacts_before = await releaseArtifactMap(diagnosticManifest.build.directory, url);
+    const beforeComparison = compareIdentityMaps(diagnosticManifest.build.artifacts, report.build_artifacts_before);
+    report.build_artifact_preflight = {matches_manifest: beforeComparison.matches,
+      differences: beforeComparison.differences};
+    if (!beforeComparison.matches)
+      throw Error(`Fresh local/served Release artifact map differs from manifest: ${JSON.stringify(beforeComparison.differences)}`);
+  }
   if (values['runtime-data'])
     report.inputs.runtime_data = await statInput(values['runtime-data']);
   if (values.manifest) {
@@ -247,18 +371,66 @@ try {
   if (![8, 9].includes(report.recipe_header.version) ||
       report.recipe_header.frames < 1 || report.recipe_header.frames > 108000)
     throw Error('Whole-session replay requires a valid MWRC v8/v9 frame count');
+  if (diagnostic && (report.recipe_header.version !== diagnosticManifest.inputs.recipe.header.version ||
+      report.recipe_header.seed !== diagnosticManifest.inputs.recipe.header.seed ||
+      report.recipe_header.frames !== diagnosticManifest.inputs.recipe.header.frames ||
+      report.recipe_header.bytes !== report.inputs.recipe.bytes))
+    throw Error('MWRC header differs from the frozen diagnostic recipe identity');
   if (rngDrawProbe && rngDrawProbe.selected.some(cursor => cursor >= report.recipe_header.frames))
     throw Error('RNG draw probe cursor must be inside the source recipe frame count');
   if (captureCpuObservations && report.recipe_header.version !== 9)
     throw Error('--cpu-observations is restricted to MWRC v9 second-match diagnostics');
   const cpuObservationRowLimit = report.recipe_header.frames;
   report.cpu_observation_row_limit = cpuObservationRowLimit;
-  const {chromium, browser: launchOptions, browserPath, playwrightPath} =
-    await loadBrowserTools(values.playwright);
-  report.browser = {executable: path.basename(browserPath), playwright: playwrightPath};
-  browser = await chromium.launch({...browserLaunchOptions(launchOptions, {timeout: phaseTimeoutMs}), headless: true});
+  browserTools ||= await loadBrowserTools(values.playwright);
+  const {chromium, browser: launchOptions, browserPath, playwrightPath} = browserTools;
+  report.browser = {executable: diagnostic ? path.resolve(browserPath) : path.basename(browserPath),
+    playwright: playwrightPath};
+  const browserOptions = {...browserLaunchOptions(launchOptions, {timeout: phaseTimeoutMs}), headless: true,
+    ...(diagnostic ? {viewport: {width: NATURAL_PAUSE_PROTOCOL.viewport_width,
+      height: NATURAL_PAUSE_PROTOCOL.viewport_height},
+      deviceScaleFactor: NATURAL_PAUSE_PROTOCOL.device_scale_factor} : {})};
+  if (diagnostic) {
+    const chromeVersionOutput = execFileSync(browserPath, ['--version'], {encoding: 'utf8'}).trim();
+    const chromeVersion = chromeVersionOutput.match(/\d+(?:\.\d+){2,3}/)?.[0] ?? null;
+    const identity = {executable_path: path.resolve(browserPath), version: chromeVersion,
+      profile_path: path.resolve(values['browser-profile']), profile_existed_before_launch: false};
+    report.browser_identity_preflight = validateNaturalPauseBrowserIdentity(diagnosticManifest.browser, identity);
+    if (!report.browser_identity_preflight.valid)
+      throw Error(`Installed Chrome or fresh profile differs from manifest: ${JSON.stringify(report.browser_identity_preflight)}`);
+    diagnosticPreflightValid = true;
+    report.browser.installed_version_output = chromeVersionOutput;
+    const profile = path.resolve(values['browser-profile']);
+    browserContext = await chromium.launchPersistentContext(profile, browserOptions);
+    browser = browserContext.browser();
+    if (!browser) throw Error('Persistent Chrome context did not expose its owned browser process');
+    report.browser.profile = profile;
+  } else {
+    browser = await chromium.launch(browserOptions);
+  }
   report.browser.version = browser.version();
-  page = await browser.newPage({viewport: {width: 900, height: 700}, deviceScaleFactor: 1});
+  page = diagnostic ? (browserContext.pages()[0] || await browserContext.newPage()) :
+    await browser.newPage({viewport: {width: 900, height: 700}, deviceScaleFactor: 1});
+  if (diagnostic) {
+    const identity = {executable_path: path.resolve(browserPath), version: report.browser.version,
+      profile_path: path.resolve(values['browser-profile']), profile_existed_before_launch: false};
+    report.browser_identity_postlaunch = validateNaturalPauseBrowserIdentity(diagnosticManifest.browser, identity);
+    if (!report.browser_identity_postlaunch.valid)
+      throw Error(`Launched Chrome identity differs from manifest: ${JSON.stringify(report.browser_identity_postlaunch)}`);
+    const browserCdp = await browser.newBrowserCDPSession();
+    try {
+      report.browser.command_line = await browserCdp.send('Browser.getBrowserCommandLine');
+      report.browser_process_info = (await browserCdp.send('SystemInfo.getProcessInfo')).processInfo;
+      if (!Array.isArray(report.browser_process_info) || !report.browser_process_info.length)
+        throw Error('Owned Chrome CDP process inventory is unavailable');
+      const expectedProfile = path.resolve(values['browser-profile']);
+      const arguments_ = report.browser.command_line.arguments || [];
+      const profileIndex = arguments_.indexOf('--user-data-dir');
+      if (!arguments_.some(argument => argument === `--user-data-dir=${expectedProfile}`) &&
+          !(profileIndex >= 0 && arguments_[profileIndex + 1] === expectedProfile))
+        throw Error('Chrome command line does not bind the exact diagnostic profile path');
+    } finally { await browserCdp.detach(); }
+  }
   await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations,
     rngDrawProbeSelection}) => {
     window.__meleeNativeRuntimeReady = false;
@@ -339,7 +511,7 @@ try {
     pageErrors.push(row); firstError(row.kind, `${row.message} ${row.url}`);
   });
   await phase('http-load', async () => {
-    const response = await page.goto(values.url, {waitUntil: 'domcontentloaded'});
+    const response = await page.goto(diagnosticUrl.href, {waitUntil: 'domcontentloaded'});
     if (response?.status() !== 200) throw Error(`runtime.html returned HTTP ${response?.status()}`);
     const headers = response.headers();
     if (headers['cross-origin-opener-policy'] !== 'same-origin' || headers['cross-origin-embedder-policy'] !== 'require-corp')
@@ -348,6 +520,14 @@ try {
   });
   driver = createBrowserDriver(page, {surface: 'development', timeoutMs: phaseTimeoutMs});
   await phase('runtime-ready', () => driver.waitForImport());
+  if (diagnostic) {
+    report.pause_trace_installation = await installPauseTraceCapture(page, null);
+    if (!report.pause_trace_installation.timing_hook_present ||
+        !report.pause_trace_installation.sample_hook_present ||
+        !report.pause_trace_installation.incident_hook_present ||
+        report.pause_trace_installation.stall_schedule_supported)
+      throw Error('Natural-pause capture hooks are missing or unexpectedly support an injected stall');
+  }
   if (values['runtime-data']) {
     report.runtime_data_load = await page.evaluate(async expectedUrl => {
       const module = globalThis.Module;
@@ -371,6 +551,12 @@ try {
   await page.evaluate(() => { window.__meleeNativeRuntimeReady = true; });
   await phase('disc-import', () => driver.selectDisc(values.disc));
   await phase('asset-preparation', () => driver.waitForStart());
+  if (diagnostic) {
+    report.ring_status = await page.evaluate(() => window.__meleeWebStagingRingStatus ?? null);
+    report.ring_status_validation = validateDefaultTwoRingStatus(report.ring_status);
+    if (!report.ring_status_validation.valid)
+      throw Error(`Default two-slot staging identity rejected: ${report.ring_status_validation.problems.join(', ')}`);
+  }
   // The development UI import is deliberately separate from the disc import.
   // It is the only replay input supplied after the fresh runtime is prepared.
   const uiTimeout = Math.min(phaseTimeoutMs, 10000);
@@ -378,7 +564,7 @@ try {
     await page.locator('summary').filter({hasText: 'Diagnostics'}).click();
   }, uiTimeout);
   await phase('replay-mode-import', async () => {
-    await page.locator('#retail-replay-mode').selectOption('state');
+    await page.locator('#retail-replay-mode').selectOption(diagnostic ? 'performance' : 'state');
   }, uiTimeout);
   await phase('replay-file-import', async () => {
     await page.locator('#retail-replay-file').setInputFiles(values.recipe);
@@ -389,18 +575,57 @@ try {
       return button && !button.disabled;
     }, null, {timeout: uiTimeout});
   }, uiTimeout);
+  if (diagnostic) {
+    diagnosticCdp = await browserContext.newCDPSession(page);
+    naturalPauseTraceSettings = traceSettings();
+    await diagnosticCdp.send('Tracing.start', naturalPauseTraceSettings.trace);
+    traceStarted = true;
+    report.trace_configuration = naturalPauseTraceSettings.trace;
+    report.trace_started_at_utc = new Date().toISOString();
+  }
   await phase('whole-session-replay', async () => {
+    const replayStartedAt = Date.now();
+    let lastProgressWriteAt = 0;
     await page.locator('#retail-replay-start').click();
-    const deadline = Date.now() + replayTimeoutMs;
+    const deadline = replayStartedAt + replayTimeoutMs;
     let last = null;
     while (Date.now() < deadline) {
-      last = await snapshot('replay-poll');
+      last = await snapshot('replay-poll', {captureCss: !diagnostic});
       if (!last) throw Error('Browser page closed before the recorded-session replay completed');
-      await write('progress.json', {harness_phase:currentPhase,phase:last?.phase,cursor:last?.source_cursor,
-        status:last?.status,error:last?.runtime_error,log:last?.log?.slice(-1600),
-        browser_report:last?.replay_report,at_ms:last?.at_ms});
+      if (Date.now() - lastProgressWriteAt >= NATURAL_PAUSE_PROTOCOL.progress_write_interval_ms) {
+        await write('progress.json', {harness_phase:currentPhase,phase:last?.phase,cursor:last?.source_cursor,
+          status:last?.status,error:last?.runtime_error,log:last?.log?.slice(-1600),
+          browser_report:last?.replay_report,at_ms:last?.at_ms});
+        lastProgressWriteAt = Date.now();
+      }
+      if (diagnostic) {
+        const observed = await readPauseTraceStatus(page);
+        const stop = firstNaturalPauseStop({source_running: observed.source_running,
+          source_cursor: observed.replay_cursor, runtime_error: observed.runtime_error,
+          dialog_error: observed.dialog_error, native_message: observed.native_message,
+          status_text: observed.status_text, incidents: observed.incidents}, Date.now() - replayStartedAt);
+        if (stop) {
+          report.natural_pause_terminal = {...stop, observed_at_ms: observed.at_ms,
+            elapsed_ms: Date.now() - replayStartedAt, source_cursor: observed.replay_cursor,
+            source_running: observed.source_running, phase: observed.phase};
+          return;
+        }
+        if (pageErrors.length) {
+          report.natural_pause_terminal = {outcome: 'browser_error', error: pageErrors[0],
+            elapsed_ms: Date.now() - replayStartedAt, source_cursor: observed.replay_cursor,
+            source_running: observed.source_running, phase: observed.phase};
+          return;
+        }
+        if ((last?.replay_downloads || []).includes('retail-browser-report.json')) {
+          report.browser_report = last.replay_report;
+          report.natural_pause_terminal = {outcome: 'replay_completed', complete: last.replay_report?.complete === true,
+            pass: last.replay_report?.pass === true, elapsed_ms: Date.now() - replayStartedAt,
+            source_cursor: observed.replay_cursor, source_running: observed.source_running};
+          return;
+        }
+      }
       if (!resumeTimingPauses && last.status?.startsWith('Paused after a timing disruption'))
-        throw Error(`Recorded-session replay paused after a timing disruption at cursor ${last.source_cursor}`);
+        if (!diagnostic) throw Error(`Recorded-session replay paused after a timing disruption at cursor ${last.source_cursor}`);
       if (resumeTimingPauses && last?.status?.startsWith('Paused after a timing disruption') &&
           (last?.running === 0 || last?.running === false)) {
         const cursor = last.source_cursor;
@@ -440,19 +665,127 @@ try {
         }
         throw Error(runtimeError);
       }
-      if (stopAfter && !report.deliberate_prefix_stop && last?.source_cursor >= stopAfter) {
+      if (!diagnostic && stopAfter && !report.deliberate_prefix_stop && last?.source_cursor >= stopAfter) {
         report.deliberate_prefix_stop = {requested_cursor: stopAfter, observed_cursor: last.source_cursor, reason: 'Bounded first-divergence diagnostic; incomplete replay expected'};
         await page.locator('#unload').click();
       }
       await new Promise(resolve => setTimeout(resolve, replayPollMs));
     }
+    if (diagnostic) {
+      report.natural_pause_terminal = {outcome: 'replay_timeout', elapsed_ms: Date.now() - replayStartedAt,
+        source_cursor: last?.source_cursor ?? null, source_running: last?.running ?? null};
+      return;
+    }
     throw Error(`whole-session replay exceeded ${replayTimeoutMs} ms; last snapshot ${JSON.stringify(last)}`);
-  }, replayTimeoutMs);
+  }, diagnostic ? NATURAL_PAUSE_PROTOCOL.replay_phase_timeout_ms : replayTimeoutMs,
+  diagnostic ? 0 : pollMs);
 } catch (error) {
   firstError(currentPhase, error.message || error, await snapshot('fatal'));
   report.failure = String(error.stack || error);
 } finally {
-  if (page && !page.isClosed()) {
+  if (diagnostic) {
+    if (page && !page.isClosed() && report.pause_trace_installation) {
+      try {
+        const stopped = await stopSourceBeforeNaturalPauseExport({
+          readStatus: () => readPauseTraceStatus(page),
+          stopPlayback: async () => {
+            const pause = await page.evaluate(() => {
+              const module = globalThis.Module;
+              if (typeof module?._melee_web_native_menu_pause !== 'function' ||
+                  typeof module?._melee_web_native_menu_running !== 'function')
+                throw Error('Native pause and running exports are unavailable');
+              const before = module._melee_web_native_menu_running();
+              if (before === 1) module._melee_web_native_menu_pause(1);
+              return {before, after: module._melee_web_native_menu_running()};
+            });
+            report.source_pause = pause;
+            if (pause.after !== 0) throw Error('Native pause did not stop source playback');
+          },
+          finalizeTrace: async () => {
+            if (!traceStarted || !diagnosticCdp || !naturalPauseTraceSettings)
+              return {paths: [], complete: false, reusable: false, error: 'Trace was not started'};
+            const value = await finalizeTrace(diagnosticCdp, output, naturalPauseTraceSettings);
+            traceStarted = false;
+            report.trace = value;
+            if (!value.complete) process.exitCode = 1;
+            return value;
+          },
+          readEvidence: async () => {
+            const stoppedVisual = await page.evaluate(async () => {
+              const canvas = document.querySelector('#canvas');
+              const rect = canvas?.getBoundingClientRect();
+              let adapterAvailable = false;
+              if (navigator.gpu && typeof navigator.gpu.requestAdapter === 'function') {
+                try { adapterAvailable = (await navigator.gpu.requestAdapter()) !== null; } catch {}
+              }
+              let contextAvailable = false;
+              try { contextAvailable = canvas?.getContext('webgpu') !== null; } catch {}
+              return {viewport: {inner_width: innerWidth, inner_height: innerHeight,
+                  visual_width: visualViewport?.width ?? null, visual_height: visualViewport?.height ?? null,
+                  device_pixel_ratio: devicePixelRatio},
+                canvas: canvas ? {buffer_width: canvas.width, buffer_height: canvas.height,
+                  css_width: rect.width, css_height: rect.height} : null,
+                gpu_status: {secure_context: isSecureContext, cross_origin_isolated: crossOriginIsolated,
+                  adapter_available: adapterAvailable,
+                  preferred_canvas_format: navigator.gpu?.getPreferredCanvasFormat?.() ?? null,
+                  webgpu_context_available: contextAvailable}};
+            });
+            const screenshotPath = path.join(output, 'stopped-scene.png');
+            await page.screenshot({path: screenshotPath, fullPage: false});
+            const screenshotStat = await fs.stat(screenshotPath);
+            report.stopped_scene = {...stoppedVisual, screenshot: {path: screenshotPath,
+              bytes: screenshotStat.size, sha256: await digest(screenshotPath)}};
+            report.runtime_incident_recorder = await readRetainedPauseDiagnostics(page,
+              ['timing_pause', 'runtime_error', 'preparation_error'].includes(report.natural_pause_terminal?.outcome));
+            report.staging_incident_summaries = (report.runtime_incident_recorder.retained_records || [])
+              .map(record => ({id: record.id, reason: record.reason, timestamp: record.timestamp,
+                staging: record.staging ?? null}));
+            report.capture_status_after_stop = await readPauseTraceStatus(page, {readNative: false});
+            report.capture = await readPauseTraceCapture(page,
+              report.natural_pause_terminal?.outcome ?? 'capture_failure');
+            return {runtime_incident_recorder: report.runtime_incident_recorder,
+              capture_rows: report.capture.rows, capture_errors: report.capture.errors,
+              capture_dropped: report.capture.dropped};
+          },
+          cleanupAfterEvidence: async () => {
+            const unloaded = await page.evaluate(() => {
+              const module = globalThis.Module;
+              if (typeof module?._melee_web_native_menu_unload !== 'function')
+                throw Error('Native unload export is unavailable after evidence export');
+              const result = module._melee_web_native_menu_unload();
+              return {result, phase: module._melee_web_native_menu_phase?.() ?? null,
+                source_running: module._melee_web_native_menu_running?.() ?? null};
+            });
+            if (unloaded.result !== 1 || unloaded.phase !== 0 || unloaded.source_running !== 0)
+              throw Error(`Native unload did not verify cleanly: ${JSON.stringify(unloaded)}`);
+            if (diagnosticCdp) {
+              await diagnosticCdp.detach();
+              diagnosticCdp = null;
+            }
+            report.cleanup = {native_unload: unloaded, cdp_detached: true};
+            return unloaded;
+          },
+        });
+        report.source_stop = {before: stopped.before, after: stopped.stopped,
+          source_stopped_before_trace_stream_and_capture_export: true,
+          cleanup_after_export: stopped.cleanup};
+        report.natural_pause_observation_limits = {
+          source_guard_value: 'integer triggering_value and threshold from the actual source incident hook',
+          fractional_pre_guard_demand: 'not retained by the source hook; not inferred across reset or early-break boundaries',
+          staging: 'aggregate occupancy and registration/callback counters plus peak callback wall duration; no one-to-one completion IDs',
+          callback_history: 'full preceding callback rows from the bounded capture table',
+        };
+        report.final_snapshot = await snapshot('finally-after-source-stop');
+      } catch (error) {
+        report.source_stop_error = String(error?.stack || error);
+        process.exitCode = 1;
+      }
+    } else if (traceStarted) {
+      // Without a readable stopped page there is no safe large trace export.
+      report.trace_finalization_skipped = 'Source-stop state could not be verified; trace bytes were not streamed.';
+      process.exitCode = 1;
+    }
+  } else if (page && !page.isClosed()) {
     const final = await snapshot('finally');
     report.final_snapshot = final;
     try {
@@ -503,7 +836,15 @@ try {
   }
   try { driver?.dispose(); } catch (error) { report.close_error = String(error); }
   // Quiesce browser callbacks before deciding whether diagnostics permit success.
-  try { if (browser) await browser.close(); } catch (error) { report.close_error = String(error); }
+  try {
+    if (diagnostic && browserContext) {
+      await browserContext.close();
+      report.cleanup ||= {};
+      report.cleanup.browser_context_closed = true;
+    }
+    else if (browser) await browser.close();
+  } catch (error) { report.close_error = String(error); }
+  try { await diagnosticCdp?.detach(); } catch (error) { report.cdp_close_error = String(error); }
   for (const candidate of runtimeDataAbortCandidates) {
     const expected = report.inputs?.runtime_data;
     const actual = report.runtime_data_load;
@@ -535,10 +876,64 @@ try {
     }
   }
   report.browser_errors = pageErrors.slice(0, 256);
-  finalizeSessionCapture(report);
+  if (diagnostic) {
+    if (diagnosticManifest) {
+      try {
+        const afterSource = await sourceIdentity();
+        const afterArtifacts = await releaseArtifactMap(diagnosticManifest.build.directory, url);
+        const artifactComparison = compareIdentityMaps(diagnosticManifest.build.artifacts, afterArtifacts);
+        const manifestAfter = await fs.readFile(diagnosticManifestPath);
+        report.producer_postflight = {source_unchanged: JSON.stringify(afterSource) === JSON.stringify(report.source_identity),
+          build_artifacts_match_manifest: artifactComparison.matches,
+          build_artifact_differences: artifactComparison.differences,
+          manifest_unchanged: createHash('sha256').update(manifestAfter).digest('hex') === diagnosticManifestSha256,
+          build_artifacts_after: afterArtifacts};
+        if (!report.producer_postflight.source_unchanged || !artifactComparison.matches ||
+            !report.producer_postflight.manifest_unchanged) process.exitCode = 1;
+      } catch (error) {
+          report.producer_postflight_error = String(error?.stack || error);
+          process.exitCode = 1;
+      }
+    }
+    const terminal = report.natural_pause_terminal;
+    const validTerminalOutcomes = new Set(['timing_pause', 'runtime_error', 'cursor_limit',
+      'replay_timeout', 'replay_completed']);
+    const preflightValid = diagnosticPreflightValid &&
+      report.browser_identity_preflight?.valid === true && report.browser_identity_postlaunch?.valid === true &&
+      report.ring_status_validation?.valid === true;
+    const postflightValid = report.producer_postflight?.source_unchanged === true &&
+      report.producer_postflight?.build_artifacts_match_manifest === true &&
+      report.producer_postflight?.manifest_unchanged === true;
+    const cleanupValid = report.cleanup?.native_unload?.result === 1 &&
+      report.cleanup.native_unload.phase === 0 && report.cleanup.native_unload.source_running === 0 &&
+      report.cleanup.cdp_detached === true && report.cleanup.browser_context_closed === true &&
+      report.source_stop?.source_stopped_before_trace_stream_and_capture_export === true &&
+      !report.source_stop_error && !report.close_error && !report.cdp_close_error;
+    const visualValid = Number.isSafeInteger(report.stopped_scene?.screenshot?.bytes) &&
+      report.stopped_scene.screenshot.bytes > 0 &&
+      Number.isFinite(report.stopped_scene?.viewport?.device_pixel_ratio) &&
+      !!report.stopped_scene?.gpu_status;
+    const captureValid = preflightValid && postflightValid && cleanupValid && visualValid &&
+      validTerminalOutcomes.has(terminal?.outcome) && report.trace?.complete === true &&
+      report.capture?.status === 'captured' && report.capture.rows > 0 &&
+      report.capture.errors === 0 && report.capture.dropped === 0 && report.capture.incident_overflow === 0;
+    report.diagnostic_capture_valid = captureValid;
+    report.diagnostic_validity = {preflight: preflightValid, ring_default_two: report.ring_status_validation?.valid === true,
+      explicit_terminal_outcome: validTerminalOutcomes.has(terminal?.outcome), trace_complete: report.trace?.complete === true,
+      callback_capture_complete: report.capture?.status === 'captured' && report.capture?.rows > 0 &&
+        report.capture?.errors === 0 && report.capture?.dropped === 0 && report.capture?.incident_overflow === 0,
+      stopped_scene_visual: visualValid,
+      producer_postflight: postflightValid, cleanup: cleanupValid,
+      clean_prefix: captureValid && ['cursor_limit', 'replay_timeout'].includes(terminal?.outcome),
+      terminal_failure: terminal?.outcome === 'runtime_error'};
+    report.result = captureValid ? 'captured' : 'incomplete';
+  } else finalizeSessionCapture(report);
   await write('report.json', report);
   if (report.failure) await write('failure.txt', report.failure + '\n');
 }
 
-if (report.result !== 'pass') process.exitCode = 1;
+if (diagnostic) {
+  if (report.result !== 'captured' || process.exitCode) process.exitCode = 1;
+  else console.log(`captured: ${report.natural_pause_terminal?.outcome || 'unknown'}; diagnosis only`);
+} else if (report.result !== 'pass') process.exitCode = 1;
 else console.log(`pass: ${report.recipe_header.frames} frames; source cursor and phase diagnostics retained`);

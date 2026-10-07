@@ -49,10 +49,14 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
     window.menuDiagnosticIncident=function(...args){
       try{return originalIncident?.apply(this,args);}
       finally{
-        if(state.incidents.length<256)state.incidents.push({at_ms:performance.now(),row:state.rows,
-          reason:args[0],value:args[1],threshold:args[2],source_frame:args[3],scene:args[4],
-          clock_owner:args[5]});
-        else state.incident_overflow++;
+        const at=performance.now();
+        if(state.incidents.length<256){
+          const incident={at_ms:at,row:state.rows,reason:args[0],value:args[1],
+            threshold:args[2],source_frame:args[3],scene:args[4],clock_owner:args[5]};
+          state.incidents.push(incident);
+          try{performance.mark(`pause-trace-incident-${state.incidents.length}`,{detail:incident});}
+          catch(_){state.errors++;}
+        }else state.incident_overflow++;
       }
     };
     const maybeRunStall=sourceFrame=>{
@@ -137,7 +141,8 @@ export async function readPauseTraceStatus(page,{readNative=true}={}){
     let nativeMessage=null;
     if(readNative)try{const pointer=module?._melee_web_native_menu_message?.();
       if(pointer)nativeMessage=module.UTF8ToString(pointer);}catch(error){nativeMessage={error:String(error?.message||error)};}
-    return {status:'installed',rows:capture.state.rows,dropped:capture.state.dropped,
+    return {status:'installed',at_ms:performance.now(),time_origin:performance.timeOrigin,
+      rows:capture.state.rows,dropped:capture.state.dropped,
       capture_errors:capture.state.errors,stall_schedule:capture.state.stall_schedule,
       incidents:capture.state.incidents.slice(),incident_overflow:capture.state.incident_overflow,
       replay_cursor:call('_melee_web_native_menu_replay_cursor'),source_running:call('_melee_web_native_menu_running'),
@@ -229,7 +234,7 @@ export async function readPauseTraceCapture(page,reason){
     const audio=window.__meleeWebAudioDiagnostics?.snapshot?.()||null;
     const audioHistory=window.__meleePauseTraceAudioHistory?.slice?.()||null;
     const hitch=window.meleeHitchCapture?.report?.()||null;
-    const marks=performance.getEntriesByType('mark').filter(mark=>mark.name.startsWith('pause-trace-'))
+    const marks=performance.getEntriesByType('mark').filter(mark=>mark.name.startsWith('pause-trace-')||mark.name.startsWith('melee-hitch-'))
       .map(mark=>({name:mark.name,start_time:mark.startTime}));
     return {status:'captured',read_at_ms:performance.now(),time_origin:performance.timeOrigin,
       columns:state.columns,rows,dropped:state.dropped,errors:state.errors,cap:state.cap,

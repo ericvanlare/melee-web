@@ -6,10 +6,11 @@ const originalWindow = globalThis.window;
 const originalDocument = globalThis.document;
 try {
   let cursor = 600;
+  const observerOrder = [];
   globalThis.window = {
-    menuRuntimeTiming() {},
+    menuRuntimeTiming() { observerOrder.push('timing-original'); },
     menuDiagnosticSample() {},
-    menuDiagnosticIncident() {},
+    menuDiagnosticIncident() { observerOrder.push('incident-original'); },
     Module: {_melee_web_native_menu_replay_cursor: () => cursor},
   };
   // Reconstruct the function in a separate realm as Playwright does. Calling
@@ -32,7 +33,16 @@ try {
   assert.ok(state.stall_schedule.actual_ms >= 2);
   assert.equal(state.stall_schedule.replay_cursor_after, 600);
   assert.equal(state.errors, 0);
+  assert.equal(observerOrder[0], 'timing-original', 'the existing timing observer runs before capture');
   assert.match(state.stall_schedule.insertion_boundary, /before native callback return/);
+
+  globalThis.window.menuDiagnosticIncident(1, 9, 8, 600, 7, 1);
+  assert.equal(observerOrder.at(-1), 'incident-original', 'the existing incident recorder runs before capture');
+  const markedIncident = state.incidents.at(-1);
+  assert.deepEqual({row: markedIncident.row, value: markedIncident.value, threshold: markedIncident.threshold},
+    {row: 1, value: 9, threshold: 8});
+  assert.equal(globalThis.performance.getEntriesByName('pause-trace-incident-1').at(-1).detail.value, 9,
+    'the User Timing mark retains the original integer guard trigger and threshold');
 
   cursor = 601;
   globalThis.window = {
