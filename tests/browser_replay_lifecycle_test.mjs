@@ -35,7 +35,10 @@ assert(start&&pause&&completion);
  // Its exact error must finish the replay on the next callback, not after
  // the 15-minute watchdog, and teardown must not run reentrantly in Wasm.
  const failed=page.split('\n').find(line=>line.startsWith('developmentHooks.preparationFailed='));
- const poll=page.slice(page.indexOf('window.menuReplayPoll='),page.indexOf("\n$('retail-replay-start').onclick="));
+ const pollStart=page.indexOf('window.menuReplayPoll=');
+ const pollEnd=page.indexOf('\n};',pollStart);
+ assert(pollStart>=0&&pollEnd>pollStart,'The replay poll handler must have a bounded source body');
+ const poll=page.slice(pollStart,pollEnd+3);
  const ended=[],display={files:[{}],dataset:{}};
  const scope={developmentHooks:{},window:{},retailRun:{},ready:true,fatal:false,bundle:true,
   replayLoading:false,$:()=>display,finishRetailReplay:reason=>ended.push(reason)};
