@@ -262,6 +262,67 @@
     "root_result_review_sha256": "4cfd7bcb2380da5369f57bec5377acb0d73277c8070d9ff5fbee8312489c347a"
   },
   "integration_validation": {
+    "current_main": "5041d6b761ad128217fbb6fafb54f87b3223bf62",
+    "tested_head": "8b3bbad9bd1699391b39375fa570c7b89adca5bb",
+    "tested_tree": "0ddeb4c60be494fd17e528e9b34ebffbd8d10e8b",
+    "implementation_commit": "5e046f9c83a4c44681a72962ea472d033abc547b",
+    "implementation_tree": "889b1063fdcb7271500addf7783ea35a43b71e74",
+    "scope": "Comparator/test implementation unchanged after current-main rebase; documentation commit followed.",
+    "focused_comparator_suite": {
+      "command": "python3 -m unittest discover -s tests -p test_whole_session_state_compare.py -v",
+      "workspace_wrapper": "python3 scripts/agent_workspace.py run --",
+      "tests_run": 80,
+      "status": "pass",
+      "elapsed_seconds": 18.546,
+      "log_artifact": "focused-comparator-tests-v1.log",
+      "log_sha256": "acd178cc4d4abfda89eaf9bf2b01b4455ee86091ff720807a8f4051f3da48b6d"
+    },
+    "full_python_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "workspace_wrapper": "python3 scripts/agent_workspace.py run --",
+      "tests_run": 2029,
+      "skipped": 151,
+      "status": "pass",
+      "elapsed_seconds": 405.948,
+      "footer": "Ran 2029 tests in 405.948s; OK (skipped=151)",
+      "log_artifact": "full-python-suite-v1.log",
+      "log_sha256": "03ad83802555f5e3f75d045197756af6f8ac9f0680c3cda93fbfaa5acf4a317a"
+    },
+    "release_build_reuse": {
+      "runtime_rebuild_performed": false,
+      "reason": "Comparator-only Python change; no runtime source changed.",
+      "runtime_source_inputs_verified": 60,
+      "source_inputs_match_capture": 60,
+      "release_artifacts_verified": 32,
+      "artifacts_match_capture": 32,
+      "source_inputs_changed": 0,
+      "artifacts_changed": 0,
+      "verification_artifact": "retained-build-reuse-v1.json",
+      "verification_sha256": "599d13ccbbfdefb0a2359f6e6e2d9aa83702eda92a7d7b6e6a80e05a8187aec9"
+    }
+  },
+  "retained_preparation_failures": [
+    {
+      "attempt": "packet-preparation-v1",
+      "failure": "The first-positive audit does not include source_tick_seq; that sequence is bound by the runner checkpoint and authenticated source-prefix observation. The initial packet projection did not preserve that mapping, so the packet was not accepted. No source content was opened and no comparison ran."
+    },
+    {
+      "attempt": "metadata-preflight-v2",
+      "failure": "The preflight expected the validator's total record count to equal session_frame rows. The actual export contained 2,314 validated JSONL records and 2,312 session_frame rows. Source opening was blocked; no comparison ran."
+    },
+    {
+      "attempt": "result-review-metadata-projection-v1",
+      "failure": "An initial review projection looked up last_source_sequence in a checkpoint tuple that uses source_sequence. The source was not read again and the comparison was not repeated; corrected review accepted the retained result."
+    }
+  ],
+  "limitations": [
+    "CSS/SSS frames provide recipe input-order evidence only; no nonmatch state fields were compared.",
+    "Exported rows after the target received shape and order validation only; their state was not compared.",
+    "The capture and comparison are incomplete bounded-prefix evidence, not whole-session acceptance.",
+    "No claim follows about later match frames, later matches, Results, return to CSS, pixels, PCM, live timing, performance, physical input or competitive readiness."
+  ],
+  "whole_session_acceptance": false,
+  "historical_integration_validation": {
     "current_main": "e3220aa2e2da7b17b99dce0999811bd1e66a0814",
     "producer": {
       "commit": "e29cb5af7f46097aec4d2d3ecd2187d2bab29400",
@@ -295,26 +356,5 @@
       "artifacts_changed": 0,
       "post_suite_reuse_review_sha256": "5c451d49a3c82c1d7f4a044e75f3f6f3ba697d00a6cb8e0d197965108720dc1b"
     }
-  },
-  "retained_preparation_failures": [
-    {
-      "attempt": "packet-preparation-v1",
-      "failure": "The first-positive audit does not include source_tick_seq; that sequence is bound by the runner checkpoint and authenticated source-prefix observation. The initial packet projection did not preserve that mapping, so the packet was not accepted. No source content was opened and no comparison ran."
-    },
-    {
-      "attempt": "metadata-preflight-v2",
-      "failure": "The preflight expected the validator's total record count to equal session_frame rows. The actual export contained 2,314 validated JSONL records and 2,312 session_frame rows. Source opening was blocked; no comparison ran."
-    },
-    {
-      "attempt": "result-review-metadata-projection-v1",
-      "failure": "An initial review projection looked up last_source_sequence in a checkpoint tuple that uses source_sequence. The source was not read again and the comparison was not repeated; corrected review accepted the retained result."
-    }
-  ],
-  "limitations": [
-    "CSS/SSS frames provide recipe input-order evidence only; no nonmatch state fields were compared.",
-    "Exported rows after the target received shape and order validation only; their state was not compared.",
-    "The capture and comparison are incomplete bounded-prefix evidence, not whole-session acceptance.",
-    "No claim follows about later match frames, later matches, Results, return to CSS, pixels, PCM, live timing, performance, physical input or competitive readiness."
-  ],
-  "whole_session_acceptance": false
+  }
 }
