@@ -1,0 +1,272 @@
+{
+  "schema": "melee-web-pokemon-stadium-c1-e8-request-v1",
+  "result": "passed_with_explicit_scope_exclusions",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "issue": "https://github.com/ericvanlare/melee-web/issues/203",
+  "boundary": "One original E8 typed request for Pokémon Stadium StKind 3, followed by checked typed teardown. The trace stopped before stage-object construction and admission.",
+  "build_producer": {
+    "branch": "codex/stadium-c1-context-preflight-20261007",
+    "commit": "0a668403b75be645f2226599c8927b42b32fee3d",
+    "tree": "f3928e2884722f1aecf754342e489fa8f00a7434",
+    "built_before_test_only_followups": true,
+    "build_command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --trace-target native_menu_host_trace --configuration Release --stadium-c1a-diagnostic",
+    "build_exit_code": 0,
+    "default_compiler_job_policy": "unchanged",
+    "source_files": {
+      "cmake/FighterRuntime.cmake": "6443f7c16f84f8d107390c5167e961d49f70d3e702f7422fc30a275dc67e3b3d",
+      "tests/native_menu_host_trace.cpp": "e1a8ad811578daaadcbffc721bdca4053451f68c510ad4817403e04ab8f00918",
+      "tests/stadium_c1_e8_call_observer.c": "7d47c8ef7b2811f7d10d3d2b570569feb15d85c72dec0381f4b505f901ec7def",
+      "tests/stadium_c1_e8_call_observer.h": "66b9c06102cdf56996ca257bd57bd031715731d005c6e266d4485c827de37544",
+      "tests/stadium_c1_e8_call_observer_test.c": "e59ac8578a24f950f7d7743975876cb62b30285b7e597e4e76996b6afdc18fdd",
+      "tests/stadium_c1_stage_state_probe.c": "92d5643f03961bffc4048c105061eac326c9bb5d66dd825e24de65c3ad9e9fcc",
+      "tests/stadium_c1_stage_state_probe.h": "d6e355a0b8b0ac9376034c23764b32f3ac1305f0c169a3a5fc1ef2d6166dc373"
+    },
+    "toolchain": {
+      "emscripten": "6.0.9 (4e4223852a0835923411059a3929907d7df1232e)",
+      "configuration": "Release"
+    },
+    "targets": {
+      "native_menu_host_trace.js": {
+        "bytes": 232567,
+        "sha256": "76d63008d538b57e6ef97933d21c67d17637bcf7d53195ca943fb32f559143a9"
+      },
+      "native_menu_host_trace.wasm": {
+        "bytes": 13678850,
+        "sha256": "c6f7d95380400d05e2c9fdc167a84c35ad7147aaec0643ace22c188fe8766586"
+      }
+    },
+    "build_logs": {
+      "stdout": {
+        "bytes": 15462,
+        "sha256": "8d8a959f0198e1a6b23e8d88242814ed3b3d6ef1adb3b284dee8d84b6b244fd0"
+      },
+      "stderr": {
+        "bytes": 1530,
+        "sha256": "67426491e8fdf614f25168afaa2344710c0cfd1819e7c3f2c37fd97ae9f981ca"
+      }
+    }
+  },
+  "test_launch": {
+    "branch": "codex/stadium-c1-context-preflight-20261007",
+    "commit": "21aa898cd0f4a9977743cd2445413deb33e9a8cb",
+    "tree": "ce3cf192d42b84f65f94fabbe03ec0f9c5c2909c",
+    "relationship_to_build": "The trace implementation and build inputs match build producer 0a668403. Two later commits changed Python test/preflight code only; they are included in the launch identity and did not rebuild or alter the executable inputs.",
+    "test_source_files": {
+      "tests/test_gameplay_native_menus.py": "a475250de39dd089f769bda741d8293c6a25048e99fce0ed648e328639ca7d0a",
+      "tests/test_stadium_c1_e8_observer.py": "172542502453abb1da212a1981b59f72c35113676348c55d686344ec3e552340"
+    }
+  },
+  "fixture": {
+    "selected_kind": 3,
+    "authored_menu_file_names": 76,
+    "selected_manifest_file_names": 36,
+    "unique_union_file_names": 98,
+    "missing_file_names": 0,
+    "fixture_manifest_sha256": "258233cd7ad22041a65aca34329157272f2248a9985729e7f47b52a21a662ea6",
+    "root_fixture_recheck_sha256": "234e75d29492889c14ac443e4ca1b3f5a4f03f99c0d1f5d9b4efa0c00e9a7c2f",
+    "provenance": "The reviewed fixture union used retained source/menu files and the exact selected manifest; the independently rechecked fixture contained all 98 names with no missing or extra files."
+  },
+  "execution": {
+    "wrapped_test_command": "python3 scripts/agent_workspace.py run -- env MELEE_KEEP_TEST_ARTIFACTS=1 MELEE_REQUIRE_STADIUM_E8_FIXTURES=1 MELEE_MENU_FIXTURE_ROOT=<reviewed-98-file-fixture-root> python3 -m unittest discover -s tests -p test_gameplay_native_menus.py -k stadium_e8_one_request_and_checked_teardown -v",
+    "timeout_seconds": 120,
+    "test_count": 1,
+    "skipped": 0,
+    "unittest_exit_code": 0,
+    "native_process_exit_code": 0,
+    "runtime": "Emscripten-bundled Node.js v24.19.0; binary SHA-256 27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+    "trace_header_source_revision": "21aa898cd0f4a9977743cd2445413deb33e9a8cb",
+    "trace_header_build_configuration": "browser-release",
+    "trace_input_recipe": "stadium-e8-request-v1",
+    "trace_event_count": 1,
+    "trace_event": "stadium_e8_request_returned",
+    "trace_stage_kind": 3,
+    "result": "passed"
+  },
+  "observations": {
+    "source_archive_lookup": {
+      "source_size_name": "/GrPs.usd",
+      "typed_open_name": "/GrPs.usd",
+      "source_size_bytes": 1461024,
+      "source_size_call_count": 1,
+      "typed_open_call_count": 1,
+      "delegated_to_real_functions": true
+    },
+    "typed_public_lookup_call_counts": {
+      "map_head": 1,
+      "coll_data": 1,
+      "ALDYakuAll": 1,
+      "map_ptcl": 1,
+      "map_texg": 1,
+      "yakumono_param": 1,
+      "quake_model_set": 1,
+      "grGroundParam": 0,
+      "itemdata": 0,
+      "map_plit": 0,
+      "other_names": 0
+    },
+    "resolved_typed_roots": [
+      "map_head",
+      "coll_data",
+      "grGroundParam",
+      "ALDYakuAll",
+      "map_ptcl",
+      "map_texg",
+      "yakumono_param",
+      "quake_model_set"
+    ],
+    "authored_empty_roots": {
+      "itemdata": true,
+      "map_plit": true
+    },
+    "stage_info_x6E4": {
+      "after": [-1, 0],
+      "source_effect_checked": true
+    },
+    "stage_info_xA0": {
+      "value_observed": 160,
+      "assertion": "observed_only; no expected-value check"
+    },
+    "source_seed_unchanged": true,
+    "save_owner_unchanged": true,
+    "stage_objects_started": false,
+    "checked_teardown": true,
+    "ordinary_admission_closed": true,
+    "source_time_or_performance_claim": false
+  },
+  "prior_reopened_context_lifecycle": {
+    "first_run": {
+      "producer_commit": "be7d780f457c7ac78f1ccd57e3275b40f0ce4522",
+      "producer_tree": "bcb3c03c4dd787c0a0f7e551cb103cde31ece690",
+      "result": "failed_before_lifecycle_observations",
+      "failure": "Initial combined source-file/Toy-alias/category-bit guard failed; the run did not identify the failed conjunct and retained a header-only trace.",
+      "result_sha256": "2871c0444bd9248d843a551b0ca75fd1fbcb9ad34c40f44d540472ef98020bc2"
+    },
+    "corrected_run": {
+      "producer_commit": "767258ee4879cb2ac2a0b3a6a2427e570850ab2a",
+      "producer_tree": "f40c6de93b37604c5aaa99838e7847694c34e83e",
+      "result": "passed_lifecycle_only_without_E8",
+      "unittest_exit_code": 0,
+      "result_sha256": "9b361c93424cdf4025eb3d5135b9fdf08ee8b6a71999c0be6edda6a70c5c1ac1",
+      "root_result_review_sha256": "8899e5e38db022efd4440b4a526bd80064036966c08f657f2f9a49ef96123569",
+      "trace_sha256": "c3676279845510a92100849ff53a65b0f678b24abebb7d51dd87f9c281ecb735",
+      "scope": "Reopened-context lifetime only; no E8 request, publication, stage callback, gameplay, or admission."
+    }
+  },
+  "retained_external_run": {
+    "bundle_id": "stadium-e8-diagnostic-source-20261007T144748Z-0a66840/E8run",
+    "contents_manifest_sha256": "0e3d7c28d4212a77edb912853b4ebefd63226c825f26d06647c1eb7750b95c49",
+    "run_manifest_sha256": "9faf56c1c3043ed0c6f5f1522531a23d0e5ce1e5b7d8ef9e9fdbf13f26721588",
+    "observations_sha256": "8219dc847bfac9d98522c5308f72cf5c302a6312eb97df55e7be4bc17be9702a",
+    "trace_sha256": "29a41ffba4148964aa849c72454f1877f43b0135ef3c23d5f984969d09f125e6",
+    "stdout_sha256": "032fbab5e5769b14f9d5797a2c21c90102ffd222a560687199e1754c8e6453db",
+    "stderr_sha256": "2df9e5b02b691143b62b8e8fefe325105502ce1b8c4cb36a814e8f59405b4aed",
+    "unittest_output_sha256": "204143bc9f3563c3795f530835902cb86026850aadc5a42e747b7a37ef0e9742",
+    "root_launch_review_sha256": "eaafc6a6c6b1bfe7026ef56aa1d25c533f94aca2d59d636c3ae929537e5d4935",
+    "fixture_recheck_sha256": "234e75d29492889c14ac443e4ca1b3f5a4f03f99c0d1f5d9b4efa0c00e9a7c2f",
+    "root_result_review_sha256": "ae5d68854d0701221008bcd615b7710e643df8152834e44b0d517df7dd27131b"
+  },
+  "integration_validation": {
+    "external_receipt": {
+      "bundle_id": "stadium-c1-main-integration-v2-20261007T1521Z-704571d/integration-results-v1.json",
+      "sha256": "27785ea37f7216a667e812ec340d5bf2c088b9d12a187cb1f4427ad1621d25db"
+    },
+    "rebase": {
+      "old_base_commit": "789de9b2945b976fff665813bfc3e8a72ad0703f",
+      "integration_base_commit": "2bb56a5f1707f2723f51d1a23e65e73f8658da28",
+      "integration_base_tree": "6fba4d2f2b1fa57db7e50c38b9a52bea13c2393d",
+      "five_existing_commits_range_diff_equal": true,
+      "range_diff_sha256": "2fadbc12ec5451127ff4dbb5955874a026198646f0ea9623d40ebdcfa38fce2f",
+      "additional_test_only_commit": {
+        "commit": "704571dfe08f6a08e13e70e67e3685eb0b6d843b",
+        "tree": "615b073675ad20e9c6ebc60a3837f3dea60167d5",
+        "file": "tests/test_gameplay_native_menus.py",
+        "sha256": "f74074d9a88a2588119a827a78451565108577127b857d890ecfe144ae91d824"
+      }
+    },
+    "first_full_suite_attempt": {
+      "run_bundle_id": "stadium-c1-main-integration-20261007T1511Z-b4540c7",
+      "head": "b4540c79e64536f1030a6aa4ae3596ba09d2f2ad",
+      "tree": "5e68e06b98b6bb4ba487be0181d54f0c6ed4c1cd",
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "result": "failed_once_before_preflight_guard_fix",
+      "tests_run": 1997,
+      "skipped": 133,
+      "failures": 1,
+      "elapsed_seconds": 369.816,
+      "failure": "test_stadium_c1_reopened_context_lifecycle_preflight launched with the default partial fixture and native observation failed because selected RuntimeFiles entry PlCo.dat was missing.",
+      "interpretation": "The lifecycle harness checked the 76 menu names but not the full 98-name menu/selected union before launching. The failed run is retained; no E8 trace was selected.",
+      "stdout_sha256": "01e11dc8f13381fd480904a9ee905c6c28bf041abe7f9408c9c6c369eead89fb",
+      "stderr_sha256": "144985857fc7fc68164313e2afca6b1ad41298f4301e5538062cdaa215f04725"
+    },
+    "fixture_preflight_guard": {
+      "change": "Lifecycle preflight now checks every authored menu and selected name across both fixture roots before native launch. A partial default fixture skips with missing names; an explicitly selected campaign fails when files are missing.",
+      "synthetic_regression": {
+        "case": "All 98 synthetic names present except selected PlCo.dat",
+        "result": "passed",
+        "tests_run": 1,
+        "elapsed_seconds": 0.094,
+        "stderr_sha256": "085718deeb03cc11afec0838bee201438002213df674b8b7e0bdcf430353904b"
+      },
+      "default_fixture_preflight": {
+        "result": "skipped_before_native_launch",
+        "tests_run": 1,
+        "skipped": 1,
+        "stderr_sha256": "acd2e945308331bacc438eb057c8a2dd6ab60d512c08c2f9726cee425f7c4aac"
+      },
+      "no_lifecycle_or_E8_trace_after_guard_fix": true
+    },
+    "full_suite_after_guard_fix": {
+      "run_bundle_id": "stadium-c1-main-integration-v2-20261007T1521Z-704571d",
+      "head": "704571dfe08f6a08e13e70e67e3685eb0b6d843b",
+      "tree": "615b073675ad20e9c6ebc60a3837f3dea60167d5",
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "tests_run": 1998,
+      "skipped": 134,
+      "failures": 0,
+      "elapsed_seconds": 358.279,
+      "stadium_boundary_results": {
+        "synthetic_missing_selected_file_preflight": "passed",
+        "default_lifecycle_preflight": "skipped_before_native_launch_for_incomplete_98-file-union",
+        "E8_request_and_teardown": "skipped; no fixture root was selected",
+        "C1a_raw_PAD_selection": "passed as part of full discovery"
+      },
+      "stdout_bytes": 4449,
+      "stdout_sha256": "b0dc4c28ae1221db4404c457f6641c2584f001cd2450b2890d3ec4a996c82f0e",
+      "stderr_bytes": 359083,
+      "stderr_sha256": "e954bbe9c86a12adcd70deaf2fd5173af0ac01781787298578808ca2140704ad"
+    },
+    "diagnostic_release_build_after_guard_fix": {
+      "run_bundle_id": "stadium-c1-main-integration-v2-20261007T1521Z-704571d",
+      "producer_commit": "704571dfe08f6a08e13e70e67e3685eb0b6d843b",
+      "producer_tree": "615b073675ad20e9c6ebc60a3837f3dea60167d5",
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --trace-target native_menu_host_trace --configuration Release --stadium-c1a-diagnostic",
+      "exit_code": 0,
+      "default_compiler_job_policy": "unchanged",
+      "stdout_sha256": "6c6da4084176e4cc2a6a5e6c39c8df4d05caf8d0c050efa26f2154c4650fb6b8",
+      "stderr_sha256": "67426491e8fdf614f25168afaa2344710c0cfd1819e7c3f2c37fd97ae9f981ca",
+      "targets": {
+        "native_menu_host_trace.js": {
+          "bytes": 232567,
+          "sha256": "76d63008d538b57e6ef97933d21c67d17637bcf7d53195ca943fb32f559143a9"
+        },
+        "native_menu_host_trace.wasm": {
+          "bytes": 13678850,
+          "sha256": "c6f7d95380400d05e2c9fdc167a84c35ad7147aaec0643ace22c188fe8766586"
+        }
+      },
+      "artifact_hashes_match_the_pre-rebase_E8_build": true
+    }
+  },
+  "exclusions": [
+    "No Ground storage/device snapshot or stage-object construction.",
+    "No StageItems sentinel or empty-list publication.",
+    "No Stage_8022524C, on_init, stage callback, fighter, renderer, browser capture, ordinary match admission, or gameplay entry.",
+    "No source-time or performance measurement.",
+    "This diagnostic does not enable Pokémon Stadium or establish playable-stage readiness."
+  ]
+}
