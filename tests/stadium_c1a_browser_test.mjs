@@ -13,6 +13,7 @@ import {parseArgs} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {cssReadinessEvidence, cssSssOutcome, hasCssMenuReadiness} from './stadium_c1a_css_sss_reducer.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LIMITS = Object.freeze({
@@ -32,7 +33,9 @@ const LIMITS = Object.freeze({
 
 const {values} = parseArgs({options: Object.fromEntries(
   ['build', 'disc', 'disc-sha256', 'out', 'playwright', 'preflight', 'source-revision']
-    .map(name => [name, {type: 'string'}])), strict: true});
+    .map(name => [name, {type: 'string'}]).concat([
+      ['css-sss-reducer', {type: 'boolean', default: false}],
+    ])), strict: true});
 for (const name of ['build', 'disc', 'disc-sha256', 'out', 'playwright', 'preflight', 'source-revision'])
   if (!values[name]) throw Error(`Missing --${name}`);
 
@@ -85,6 +88,7 @@ const report = {
   browser: null,
   local_http_artifacts: {count: 0, before: null, after: null, unchanged: false},
   scenario: {
+    route_mode: values['css-sss-reducer'] ? 'css-sss-reducer' : 'full-c1a',
     armed_before_css_entry: false,
     controls: null,
     input_recipe: null,
@@ -92,6 +96,24 @@ const report = {
     original_sss_phase: null,
     raw_pad_stage_drive_frames: 0,
     source_selection: null,
+    css_sss_reducer: values['css-sss-reducer'] ? {
+      scope: 'Original CSS -> original SSS only; one ordinary B0XX Start chord after observed source and input readiness. No SSS selection, stage, match, or source archive request.',
+      max_readiness_frames: 180,
+      max_post_start_frames: Math.ceil(LIMITS.sourceTransitionMs * 144 / 1000),
+      post_start_sample_cap_hz: 144,
+      post_start_transition_deadline_ms: LIMITS.sourceTransitionMs,
+      observer_contract: {css_ids_length: 14, cooldown_index: 5, pending_scene_index: 7,
+        start_ready_index: 8, callback_count_index: 10, last_start_trigger_index: 11,
+        last_start_ready_index: 12, last_start_pending_index: 13},
+      canvas_focused_before_observation: false,
+      samples: [],
+      readiness: null,
+      input_before_start: null,
+      input_after_start: null,
+      last_source_start: null,
+      transition: null,
+      outcome: null,
+    } : null,
     requested_committed_manifest: null,
     native_observation: null,
     final_phase: null,
@@ -236,6 +258,207 @@ async function sourceSnapshot(label) {
   return timeout(nativeSnapshot(), Math.min(5000, remaining()), label);
 }
 
+async function observeCssInputFrame(label, operationDeadline = deadline) {
+  const operationTimeout = Math.min(5000, remaining(), operationDeadline - Date.now());
+  if (operationTimeout <= 0) throw Error(`${label} deadline exhausted`);
+  return timeout(page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => {
+    const module = globalThis.Module;
+    const phase = module?._melee_web_native_menu_phase?.() ?? null;
+    const pointer = module?._melee_web_native_menu_message?.();
+    const diagnosticsPointer = module?._melee_web_native_menu_diagnostics?.();
+    let css = null, observerError = null;
+    if (phase === 1) {
+      if (typeof module?._melee_web_css_observe_port !== 'function') {
+        observerError = 'CSS source observer export is absent';
+      } else {
+        const ids = module._malloc(14 * 4), geometry = module._malloc(8 * 4);
+        if (!ids || !geometry) {
+          if (ids) module._free(ids);
+          if (geometry) module._free(geometry);
+          observerError = 'CSS source observer allocation failed';
+        } else {
+          try {
+            if (module._melee_web_css_observe_port(0, 8, ids, geometry)) {
+              css = {ids: Array.from(module.HEAP32.subarray(ids >> 2, (ids >> 2) + 14)),
+                geometry: Array.from(module.HEAPF32.subarray(geometry >> 2, (geometry >> 2) + 8))};
+            }
+          } catch (error) { observerError = String(error?.message || error); }
+          finally { module._free(ids); module._free(geometry); }
+        }
+      }
+    }
+    let input = null;
+    try {
+      if (typeof module?._melee_web_input_message === 'function')
+        input = JSON.parse(module.UTF8ToString(module._melee_web_input_message()));
+      else observerError ||= 'Input state export is absent';
+    } catch (error) { observerError ||= `Input snapshot failed: ${String(error?.message || error)}`; }
+    resolve({at_ms: performance.now(), phase,
+      running: module?._melee_web_native_menu_running?.() ?? null,
+      message: pointer ? module.UTF8ToString(pointer) : null,
+      diagnostics: diagnosticsPointer ? module.UTF8ToString(diagnosticsPointer) : null,
+      runtime_error: document.querySelector('#status')?.dataset.runtimeError || null,
+      hidden: document.hidden, focused: document.hasFocus(), css, input, observer_error: observerError});
+  }))), operationTimeout, label);
+}
+
+async function runCssSssReducer({startKey, baseUrl, artifacts, before}) {
+  const reducer = report.scenario.css_sss_reducer;
+  const samples = reducer.samples;
+  await timeout(page.locator('#canvas').focus({timeout: Math.min(5000, remaining())}),
+    Math.min(5000, remaining()), 'Focus source canvas before CSS readiness observation');
+  reducer.canvas_focused_before_observation = true;
+  for (let frame = 0; frame < reducer.max_readiness_frames; frame++) {
+    const sample = await observeCssInputFrame(`CSS readiness RAF sample ${frame}`);
+    samples.push(sample);
+    if (sample.observer_error || sample.runtime_error) {
+      reducer.outcome = {accepted: false, failure_boundary: sample.runtime_error
+        ? 'native-runtime-error' : 'css-or-input-observer-error', sample_index: frame,
+        detail: sample.runtime_error || sample.observer_error};
+      await persistReport();
+      throw Error(`${reducer.outcome.failure_boundary}: ${reducer.outcome.detail}`);
+    }
+    const progress = cssReadinessEvidence(samples);
+    if (hasCssMenuReadiness(sample) && progress.input_progressed && progress.source_callback_progressed) {
+      reducer.readiness = {...progress, ready_sample: frame,
+        source_start_cooldown: sample.css.ids[5], source_pending_scene: sample.css.ids[7],
+        source_start_ready: sample.css.ids[8], source_callback_count: sample.css.ids[10],
+        input_sample_count: sample.input.samples, p1: sample.input.pads[0]};
+      break;
+    }
+    if (frame % 10 === 9) await persistReport();
+  }
+  const lastReadySample = samples.at(-1);
+  const readiness = cssReadinessEvidence(samples);
+  reducer.readiness ||= {...readiness, source_start_cooldown: lastReadySample?.css?.ids?.[5] ?? null,
+    source_pending_scene: lastReadySample?.css?.ids?.[7] ?? null,
+    source_start_ready: lastReadySample?.css?.ids?.[8] ?? null,
+    source_callback_count: lastReadySample?.css?.ids?.[10] ?? null,
+    input_sample_count: lastReadySample?.input?.samples ?? null,
+    p1: lastReadySample?.input?.pads?.[0] ?? null};
+  if (!readiness.readiness_observed || !readiness.input_progressed || !readiness.source_callback_progressed ||
+      !hasCssMenuReadiness(lastReadySample)) {
+    reducer.outcome = {accepted: false, failure_boundary: !readiness.readiness_observed
+      ? 'css-readiness-not-observed' : !readiness.input_progressed || !readiness.source_callback_progressed
+      ? 'css-source-or-input-progress-not-observed' : 'css-readiness-not-current-at-start-gate'};
+    await persistReport();
+    throw Error(`CSS-to-SSS reducer stopped before sending Start: ${reducer.outcome.failure_boundary}`);
+  }
+
+  const baselineSamples = lastReadySample.input.samples;
+  if (lastReadySample.input.pads[0].buttons !== 0) {
+    reducer.outcome = {accepted: false, failure_boundary: 'p1-not-neutral-before-start',
+      buttons: lastReadySample.input.pads[0].buttons};
+    await persistReport();
+    throw Error('P1 raw PAD is not neutral before the reducer Start chord');
+  }
+  reducer.input_before_start = lastReadySample.input;
+  reducer.start_key = startKey;
+  const postStartSampleStart = samples.length;
+  await persistReport();
+  const transitionStartedAt = Date.now();
+  const transitionDeadline = Math.min(deadline, transitionStartedAt + LIMITS.sourceTransitionMs);
+  try {
+    await timeout(driver.pressChord([startKey], {holdMs: 120, releaseMs: 150}),
+      Math.min(transitionDeadline - Date.now(), remaining()), 'Single ordinary B0XX CSS-to-SSS Start chord');
+  } catch (error) {
+    reducer.transition = {started_at_epoch_ms: transitionStartedAt,
+      elapsed_ms: Date.now() - transitionStartedAt, sample_count: 0,
+      sample_cap: reducer.max_post_start_frames, sample_cap_hz: reducer.post_start_sample_cap_hz,
+      deadline_ms: LIMITS.sourceTransitionMs,
+      stop: 'start-chord-error', observation_error: errorText(error)};
+    reducer.outcome = {accepted: false, failure_boundary: 'start-chord-delivery-error',
+      detail: errorText(error)};
+    await persistReport();
+    throw error;
+  }
+  let finalSample = null;
+  let transitionStop = 'sample-cap';
+  let transitionError = null;
+  for (let frame = 0; frame < reducer.max_post_start_frames; frame++) {
+    if (Date.now() >= transitionDeadline) { transitionStop = 'source-transition-deadline'; break; }
+    try {
+      finalSample = await observeCssInputFrame(`CSS-to-SSS post-Start RAF sample ${frame}`,
+        transitionDeadline);
+    } catch (error) {
+      transitionStop = Date.now() >= transitionDeadline ? 'source-transition-deadline' : 'observation-error';
+      transitionError = errorText(error);
+      break;
+    }
+    samples.push(finalSample);
+    if (finalSample.observer_error || finalSample.runtime_error) {
+      reducer.outcome = {accepted: false, failure_boundary: finalSample.runtime_error
+        ? 'native-runtime-error' : 'css-or-input-observer-error', sample_index: samples.length - 1,
+        detail: finalSample.runtime_error || finalSample.observer_error};
+      await persistReport();
+      throw Error(`${reducer.outcome.failure_boundary}: ${reducer.outcome.detail}`);
+    }
+    if (frame % 60 === 59) await persistReport();
+    if (finalSample.phase === 3 && finalSample.running === 1) {
+      transitionStop = 'sss-phase-3-running';
+      break;
+    }
+  }
+  reducer.transition = {started_at_epoch_ms: transitionStartedAt,
+    elapsed_ms: Date.now() - transitionStartedAt,
+    sample_count: samples.length - postStartSampleStart,
+    sample_cap: reducer.max_post_start_frames, sample_cap_hz: reducer.post_start_sample_cap_hz,
+    deadline_ms: LIMITS.sourceTransitionMs,
+    stop: transitionStop, observation_error: transitionError};
+  reducer.input_after_start = finalSample?.input ?? null;
+  const lastSourceSample = [...samples].reverse().find(sample => sample.css?.ids?.length === 14);
+  reducer.last_source_start = lastSourceSample ? {
+    trigger: lastSourceSample.css.ids[11], ready_at_trigger: lastSourceSample.css.ids[12],
+    pending_at_trigger: lastSourceSample.css.ids[13], callback_count: lastSourceSample.css.ids[10],
+    phase: lastSourceSample.phase, running: lastSourceSample.running,
+  } : null;
+  reducer.outcome = cssSssOutcome(samples, finalSample, baselineSamples);
+  if (transitionError)
+    reducer.outcome.failure_boundary = 'css-to-sss-observation-error';
+  report.scenario.final_phase = finalSample?.phase ?? null;
+  report.scenario.final_running = finalSample?.running ?? null;
+  report.scenario.native_message = finalSample?.message ?? null;
+  report.scenario.native_diagnostics = finalSample?.diagnostics ?? null;
+  await saveScreenshot(finalSample?.phase === 3 ? 'stadium-c1a-sss-after-start' : 'stadium-c1a-css-after-start');
+  if (!reducer.outcome.accepted)
+    throw Error(`CSS-to-SSS reducer failed at ${reducer.outcome.failure_boundary}`);
+
+  report.scenario.page_errors = pageErrors;
+  report.scenario.console_errors = consoleErrors;
+  report.scenario.http_requests = [...requestRows, ...responseRows];
+  report.scenario.external_http_requests = externalRequests;
+  assert.deepEqual(pageErrors, [], 'Browser page raised JavaScript errors during CSS-to-SSS');
+  assert.deepEqual(externalRequests, [], 'CSS-to-SSS reducer attempted a non-loopback HTTP request');
+
+  report.cleanup.unload_attempted = true;
+  unloadAttempted = true;
+  await timeout(driver.unload(), LIMITS.unloadMs, 'Recoverable CSS-to-SSS reducer unload');
+  report.cleanup.unload_completed = true;
+  const afterUnload = await timeout(page.evaluate(() => ({
+    phase: Module._melee_web_native_menu_phase(), running: Module._melee_web_native_menu_running(),
+    error: document.querySelector('#status')?.dataset.runtimeError || null,
+    import_enabled: !!document.querySelector('#disc') && !document.querySelector('#disc').disabled,
+  })), Math.min(5000, remaining()), 'CSS-to-SSS reducer post-unload snapshot');
+  assert.equal(afterUnload.phase, 0);
+  assert.equal(afterUnload.running, 0);
+  assert.equal(afterUnload.error, null);
+  assert.equal(afterUnload.import_enabled, true);
+  report.cleanup.native_after_unload = afterUnload;
+  report.cleanup.observation_cleared = true;
+  await saveScreenshot('stadium-c1a-css-sss-after-unload');
+  report.profile.after = summarizeStorage(await timeout(context.storageState(),
+    Math.min(5000, remaining()), 'Post-reducer browser profile snapshot'));
+  const after = await buildArtifactInventory(baseUrl, artifacts);
+  assertProducerArtifacts(after, artifacts, 'Reducer after-run');
+  report.local_http_artifacts.after = after;
+  report.local_http_artifacts.unchanged = JSON.stringify(before) === JSON.stringify(after);
+  assert.equal(report.local_http_artifacts.unchanged, true,
+    'One or more of the 32 served artifacts changed during the CSS-to-SSS reducer');
+  report.scenario.http_requests = [...requestRows, ...responseRows];
+  report.scenario.external_http_requests = externalRequests;
+  report.result = 'pass';
+}
+
 async function cleanupServer() {
   if (!serverProcess) return;
   const child = serverProcess;
@@ -267,6 +490,10 @@ async function cleanupServer() {
 async function main() {
   assert.equal(build, expectedBuild, 'Only the isolated C1a diagnostic runtime may be served');
   assert.equal(preflight.schema, 'melee-web-stadium-c1a-browser-preflight-v1');
+  if (values['css-sss-reducer'])
+    assert.equal(preflight.route_mode, 'css-sss-reducer', 'Reducer command requires a frozen CSS-to-SSS preflight');
+  else if (preflight.route_mode)
+    assert.equal(preflight.route_mode, 'full-c1a', 'Full C1a command differs from its frozen preflight route');
   assert.equal(preflight.source_revision, values['source-revision'],
     'Command source revision differs from the frozen preflight');
   assert.equal(path.resolve(preflight.build.path), build, 'Served build differs from frozen preflight');
@@ -283,6 +510,13 @@ async function main() {
     'Browser runner path differs from frozen preflight');
   assert.equal(await hashFile(runnerPath), preflight.test_script.sha256,
     'Browser runner bytes differ from frozen preflight');
+  if (values['css-sss-reducer']) {
+    const helperPath = path.join(ROOT, 'tests/stadium_c1a_css_sss_reducer.mjs');
+    assert.equal(path.resolve(preflight.reducer_helper?.path || ''), helperPath,
+      'Reducer command omitted or changed its acceptance helper path');
+    assert.equal(await hashFile(helperPath), preflight.reducer_helper.sha256,
+      'Reducer acceptance helper bytes differ from the frozen preflight');
+  }
   assert.deepEqual(preflight.limits_ms, LIMITS, 'Runtime bounds differ from frozen preflight');
   assert.equal(LIMITS.captureWorkMs,
     preflight.owner_deadline.overall_timeout_ms - preflight.owner_deadline.cleanup_reserve_ms,
@@ -470,7 +704,10 @@ async function main() {
   report.scenario.original_css_phase = await sourceSnapshot('Original CSS native snapshot');
   assert.equal(report.scenario.original_css_phase.phase, 1, 'Original CSS phase did not start');
   assert.equal(report.scenario.original_css_phase.running, 1, 'Original CSS source time did not run');
-  await saveScreenshot('stadium-c1a-original-css');
+  if (values['css-sss-reducer']) {
+    await runCssSssReducer({startKey, baseUrl, artifacts, before});
+    return;
+  }
 
   await timeout(driver.pressChord([startKey], {holdMs: 120, releaseMs: 150}),
     Math.min(LIMITS.sourceTransitionMs, remaining()), 'Raw-PAD B0XX CSS-to-SSS Start');
