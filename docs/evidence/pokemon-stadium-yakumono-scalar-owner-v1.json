@@ -1,0 +1,215 @@
+{
+  "schema": "melee-web-pokemon-stadium-yakumono-scalar-owner-v1",
+  "result": "passed_with_explicit_scope_exclusions",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "boundary": "One exact arena-owned Stadium yakumono scalar prefix decoded from the retained English GrPs.usd input. No stage construction or gameplay claim.",
+  "producer": {
+    "branch": "codex/stadium-yakumono-scalar-20261007",
+    "commit": "210ae4aca48970cad09e6e52921bdd39e3972c82",
+    "tree": "82778c7e9cc977d26d2180d4d288cfee2ed79da3",
+    "base": "6c0ccecd6c88d50670668a032a6882463639e809",
+    "tracked_and_untracked_worktree_clean_before_and_after_validation": true,
+    "source_files": [
+      "src/gameplay_stage_stadium.h",
+      "src/gameplay_stage_stadium.c",
+      "cmake/FighterRuntime.cmake",
+      "tests/gameplay_stage_stadium_yakumono_trace.cpp",
+      "tests/test_stadium_yakumono.py"
+    ]
+  },
+  "source": {
+    "archive": "GrPs.usd",
+    "retained_input": "assets-local/stadium-c0-20261006/GrPs.usd",
+    "bytes": 1461024,
+    "sha256": "aa740cfbbeced294f058449caca8ac0380532521dde06ca4a6dcc03080cf6a6d",
+    "root_public_symbol": "yakumono_param",
+    "root_data_offset": 252776,
+    "next_authored_target_extent_bytes": 84,
+    "c0_source_facts": "docs/evidence/pokemon-stadium-c0-structural-v1.json",
+    "expected_fields_in_source_order": [
+      3600,
+      3800,
+      1200,
+      1800,
+      300,
+      120,
+      60,
+      600,
+      240,
+      600,
+      300,
+      600,
+      1200,
+      600,
+      1200,
+      600,
+      800,
+      5,
+      2,
+      2,
+      0,
+      7
+    ],
+    "expected_rgb": [150, 180, 160],
+    "provenance": "Reuses the exact already retained C0 input; no archive inventory or asset extraction was repeated."
+  },
+  "native_contract": {
+    "api": "MeleeWebNativeDat and melee_web_stadium_yakumono_decode(reader, root)",
+    "native_owner": "NativeDatArena",
+    "source_size_bytes": 84,
+    "source_fields": {
+      "signed_32": 7,
+      "rgb_bytes": 3,
+      "unsigned_32": 10,
+      "signed_16": 5
+    },
+    "padding": "RGB and trailing native padding are explicit, compile-time offset-checked, set to zero, and not read from source bytes.",
+    "extent": "DatArchive public interval remains distinct from the source object's next-target extent. The decoder requests exactly 0x54 bytes through reader.region before allocation.",
+    "scalar_policy": "Preserve all source scalar bits; no Stadium-specific production value limits."
+  },
+  "focused_probe": {
+    "command": "MELEE_WEB_RUN_STADIUM_RETAINED_PROBE=1 MELEE_WEB_STADIUM_TRACE_BINARY=<retained native target> python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_stadium_yakumono.py -k retained_grps_yakumono -v",
+    "test": "test_retained_grps_yakumono_decodes_through_two_native_owners",
+    "run_count": 1,
+    "exit_code": 0,
+    "summary": "Ran 1 test in 0.359s; OK.",
+    "host_compiler": "Apple clang 21.0.0 (clang-2100.1.1.101), C and C++",
+    "native_target": {
+      "object_bytes": 1816,
+      "object_sha256": "377a1deb927ac82cb5472d93ca7e8d52065f37a176b61c31891a0aa1eda10720",
+      "binary_bytes": 88224,
+      "binary_sha256": "da10a5c955275e030c9bf75a136ec6d601a7df1ad2ebe45ec155e73b6dbc6d49"
+    },
+    "assertions": [
+      "Two sequential independent NativeDatArena owners decoded the same retained source root.",
+      "All 7 s32, 10 u32, 5 s16 fields and RGB matched the retained C0 source facts.",
+      "The checked region request was exactly 0x54 bytes; the expected source-field read sequence contains no padding or root+0x54 access.",
+      "The raw file bytes and resolved DAT data-section bytes independently matched their baselines after both owners were destroyed.",
+      "The same executable passed synthetic exact-layout, short-target-before-allocation, injected allocation-failure and independent-arena recovery checks."
+    ],
+    "stdout_sha256": "eab01f8f633ed0364019a77a030affd47af4952616627455c338e95b0dac2ba6",
+    "stderr_sha256": "9e61bebd10f6db1b9244045a092c479ac8d101d55969961c23e92022d3e8d6b9",
+    "private_run_inventory_id": "stadium-yakumono-scalar-20261007-20261007-005954-e42fd96d/retained-grps-native-probe-210ae4a"
+  },
+  "integration_validation": {
+    "full_python_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "total": 1964,
+      "passed": 1828,
+      "skipped": 136,
+      "elapsed_seconds": 351.279,
+      "exit_code": 0,
+      "retained_input_test": "Explicitly skipped because MELEE_WEB_RUN_STADIUM_RETAINED_PROBE was unset; the retained probe was not repeated.",
+      "stdout": {
+        "bytes": 4449,
+        "sha256": "a78e3057a9dc2896d8da27a2245809b4611ed23f0acb7c7614cb5d6d7bb16870"
+      },
+      "stderr": {
+        "bytes": 352703,
+        "sha256": "a3d7aec7290824b6d735c92376d479b95d67b043f0e4517e31f5272b17a8660b"
+      }
+    },
+    "release_runtime_build": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "target": "gameplay_menu_browser",
+      "configuration": "Release",
+      "platform": "Emscripten wasm32",
+      "cmake": "3.31.6",
+      "emscripten": "6.0.9 (4e4223852a0835923411059a3929907d7df1232e)",
+      "exit_code": 0,
+      "compiled_affected_source": "src/gameplay_stage_stadium.c",
+      "cmake_flags": {
+        "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+        "MELEE_WEB_SELECTIVE_PIPELINES": "OFF"
+      },
+      "pre_build_runtime_artifacts": {
+        "gameplay_menu_browser.js": {
+          "bytes": 299682,
+          "sha256": "64f70283f7aedd5bb0ee89e4375326c40fd9c26ae7ee0e84db02b58aab0bc839"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15737625,
+          "sha256": "68454fd43ce9e819a7efe8730ee60e52d6bf0c795c3a50c8148e130a82c9cd07"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        }
+      },
+      "post_build_runtime_artifacts": {
+        "gameplay_menu_browser.js": {
+          "bytes": 299682,
+          "sha256": "64f70283f7aedd5bb0ee89e4375326c40fd9c26ae7ee0e84db02b58aab0bc839"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15737625,
+          "sha256": "e0b875574e8d82398255149298c701efbf1a60940d44e3addace2ecfe39d3ba1"
+        },
+        "gameplay_menu_browser.data": {
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        }
+      },
+      "affected_object": {
+        "path": "build/browser-release/CMakeFiles/fighter_source_runtime.dir/src/gameplay_stage_stadium.c.o",
+        "bytes": 1558,
+        "sha256": "6207cf9bebef44af5563270ec0159cfbefaec8a4f1787e59781f745314d0c584"
+      },
+      "stdout": {
+        "bytes": 10920,
+        "sha256": "379608ace6bb72e06d49df29b6771b67753c0bfdbd4c3ecb315465359a2ea961"
+      },
+      "stderr": {
+        "bytes": 1519,
+        "sha256": "21c6fec15fe4097868f5576455de36b5f8bdc50c0683c3849e8c4ec9eb6ec8fa"
+      },
+      "runtime_executed": false
+    },
+    "pre_build_served_artifact_sets": {
+      "normal_release_files_preserved": 38,
+      "stadium_c1a_diagnostic_files_preserved": 40,
+      "copies_verified_byte_identical": true,
+      "normal_release_and_c1a_sets_unchanged_after_suite_before_build": true,
+      "manifest_sha256": "986169d8fd42a82ae20e005cbb887ea3ec50431b0cfcd60fc237e8487fef8067",
+      "private_run_inventory_id": "stadium-yakumono-scalar-20261007-20261007-005954-e42fd96d/previous-served-artifacts-before-release-build"
+    },
+    "log_inventory_id": "stadium-yakumono-scalar-20261007-20261007-005954-e42fd96d/integration-validation"
+  },
+  "documentation_checks": {
+    "status_index": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/status_index.py",
+      "exit_code": 0,
+      "new_entry_listed": true,
+      "stdout_sha256": "1cfe90ea287aa978fc73022da5801875d6ef5778ad88daa91c4ae4aad502c37f"
+    },
+    "status_entries": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_status_entries.py -v",
+      "tests": 4,
+      "exit_code": 0,
+      "stderr_sha256": "9eab8bd5d492e94886d26d364f01be0b45793da6785bb091b57d8f9ff125af06"
+    },
+    "markdown_links": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_markdown_links.py -v",
+      "tests": 1,
+      "exit_code": 0,
+      "stderr_sha256": "0c9f2b467e9c160ebe087d32cbcc012f33d6b053ec1c88ddd6eee98e45ad7862"
+    },
+    "json_parse": "passed",
+    "diff_check": "git diff --check passed"
+  },
+  "exclusions": [
+    "No original CSS/SSS archive request or C1 source lookup.",
+    "No stage callback, profile, stage admission, StageInfo publication or gameplay-stage construction.",
+    "No source-file service, archive registration, heap bootstrap, E8/publication or public content row.",
+    "No collision, rendering, stage lifecycle, browser or playable Stadium evidence.",
+    "No Release runtime execution."
+  ],
+  "next_boundary": "A separate reviewed source-owned dependency is required before any stage publication or source lookup work."
+}
