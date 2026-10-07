@@ -699,6 +699,21 @@ async function run() {
     pairResults.checksums = {records_each: sourceTicks, streams_identical: true, sha256: sha256(bytesA)};
     if (peers.alpha.inputDuplicates < 1 || peers.alpha.outOfOrderInputs < 1)
       throw Error('Reduced probe did not exercise duplicate and out-of-order remote input');
+    for (const role of ['alpha', 'beta']) {
+      const filename = path.join(childDirectory(role), 'accounted-css.png');
+      await instances[role].screenshot(filename);
+      const bytes = await fs.readFile(filename);
+      const graphics = await instances[role].graphics();
+      const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
+      if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
+          graphics.cross_origin_isolated !== true || graphics.webgpu_adapter !== true ||
+          native.phase !== 1 || status.cursor !== sourceTicks || status.blocker !== 'complete')
+        throw Error(`${role} reduced accounting probe did not retain its final rendered CSS boundary`);
+      instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
+        screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
+        gpu: graphics, source_steps_and_draws: instanceRows[role].source_accounting,
+        scope: 'CSS at the completed prefix; source counters exclude preparation-only draws'};
+    }
     pairResults.route = {scope: 'CSS-only prefix', status: 'not-full-route', scene: 'CSS'};
     pairResults.outcome = 'complete';
   } else if (scenario === 'positive') {
