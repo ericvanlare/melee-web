@@ -2492,9 +2492,10 @@ def _validate_clock300_checkpoint_lineage(audit: Mapping[str, Any],
             prior_expectations.get("scope") != V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE or
             prior_expectations.get("version") != 1):
         raise ComparisonError("prior clock-300 expectations schema or scope is unsupported")
+    if not all(isinstance(prior_expectations.get(section), dict)
+               for section in ("source", "recipe", "browser")):
+        raise ComparisonError("prior clock-300 expectations sections are malformed")
     prior_source = prior_expectations.get("source")
-    if not isinstance(prior_source, dict):
-        raise ComparisonError("prior clock-300 expectations lack source identity")
     for field in ("capture_id", "sequence_id", "trace", "manifest", "report", "audit",
                   "positive_boundary_audit", "first_positive_boundary",
                   "clock60_boundary_audit", "clock60_boundary"):
@@ -2506,7 +2507,10 @@ def _validate_clock300_checkpoint_lineage(audit: Mapping[str, Any],
             prior_source.get("match_clock_boundary_audit") != prior_audit_identity):
         raise ComparisonError("prior clock-300 expectations differ from the frozen boundary/audit")
 
-    prior_files = _expectation_files(prior_expectations)
+    try:
+        prior_files = _expectation_files(prior_expectations)
+    except (KeyError, TypeError, AttributeError) as error:
+        raise ComparisonError("prior clock-300 expectations file identities are malformed") from error
     prior_files.update({
         "clock60_boundary_audit": prior_source.get("clock60_boundary_audit"),
         "match_clock_boundary_audit": prior_source.get("match_clock_boundary_audit"),
@@ -2555,12 +2559,18 @@ def _validate_clock300_checkpoint_lineage(audit: Mapping[str, Any],
     launch_trace = launch_source.get("trace")
     if not isinstance(launch_trace, dict):
         raise ComparisonError("match-clock runner packet trace identity is malformed")
+    launch_trace_path = launch_trace.get("path")
+    if (not isinstance(launch_trace_path, str) or
+            Path(launch_trace_path).resolve() != Path(expected_source["trace"]["path"]).resolve()):
+        raise ComparisonError("match-clock runner packet nested trace path differs from source identity")
     if (launch_source.get("capture_id") != expected_source["capture_id"] or
             launch_source.get("sequence_id") != expected_source["sequence_id"] or
             launch_source.get("path") != expected_source["trace"]["path"] or
             launch_trace.get("bytes") != expected_source["trace"]["bytes"] or
             launch_trace.get("recorded_full_sha256") !=
             expected_source["trace"]["recorded_full_sha256"] or
+            launch_source.get("first_positive_boundary") != expected_source["first_positive_boundary"] or
+            launch_source.get("clock60_boundary") != expected_source["clock60_boundary"] or
             launch_source.get("clock300_audit") != prior_audit_identity or
             launch_source.get("match_clock_boundary") != prior_boundary):
         raise ComparisonError("match-clock runner packet differs from its frozen source lineage")

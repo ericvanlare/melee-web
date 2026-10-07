@@ -29,7 +29,8 @@ from whole_session_state_compare import (  # noqa: E402
     V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE, V10_FIRST_POSITIVE_RECORD_CAP,
     V10_FIRST_MATCH_CLOCK_GE60_SCOPE, V10_MATCH_CLOCK_RECORD_CAP,
     V10_MATCH_CLOCK_REJOIN_FRAME,
-    V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE, MATCH_CLOCK_EXPECTATION_SCHEMA,
+    V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE, CLOCK60_EXPECTATION_SCHEMA,
+    MATCH_CLOCK_EXPECTATION_SCHEMA,
     V10_BROWSER_PRODUCER_SCHEMA, V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA,
     V10_PREFIX_RECORD_CAP, V10_RULES_BYTES, WHOLE_SESSION_SCOPE,
     _file_stat_identity, _first_match_required_cursor, _first_match_tick_join_complete,
@@ -928,12 +929,24 @@ def _attach_clock300_lineage(fixture):
     })
 
     prior_audit = copy.deepcopy(current_audit)
+    prior_clock60_packet = copy.deepcopy(packet)
+    prior_clock60_packet["schema"] = CLOCK60_EXPECTATION_SCHEMA
+    prior_clock60_packet["scope"] = V10_FIRST_MATCH_CLOCK_GE60_SCOPE
+    prior_clock60_packet["source"].pop("match_clock_boundary", None)
+    prior_clock60_packet["source"].pop("match_clock_boundary_audit", None)
+    prior_clock60_path = fixture["packet_path"].with_name("prior-clock60-expectations.json")
+    prior_clock60_path.write_text(json.dumps(prior_clock60_packet), encoding="utf-8")
+    prior_clock60_identity = {
+        "path": str(prior_clock60_path), "bytes": prior_clock60_path.stat().st_size,
+        "sha256": hashlib.sha256(prior_clock60_path.read_bytes()).hexdigest(),
+    }
     prior_audit.update({
         "schema": "melee-web-b4-source-clock-ge300-audit-v3",
         "scope": "source-only-clock-ge300",
         "status": "first_match_clock_ge300_found",
         "target_match_frame_at_least": V10_MATCH_CLOCK_REJOIN_FRAME,
         "checkpoints": {"first_positive_clock1": "pass", "first_clock60": "pass"},
+        "expectations": prior_clock60_identity,
     })
     prior_audit["source"]["content_bytes_read"] = len(prior_prefix_bytes)
     prior_audit["observed"].pop(f"target_clock_ge{target['target_match_frame_at_least']}_observed")
@@ -1073,6 +1086,27 @@ def _refresh_clock500_packet_chain(fixture, *, audit=None, launch_packet=None):
     fixture["packet"]["source"]["match_clock_boundary_audit"] = audit_identity
     fixture["packet_path"].write_text(json.dumps(fixture["packet"]), encoding="utf-8")
     return audit, launch_packet
+
+
+def _refresh_clock500_prior_lineage(fixture, prior_packet):
+    prior_path = fixture["prior_packet_path"]
+    prior_path.write_text(json.dumps(prior_packet), encoding="utf-8")
+    prior_identity = {
+        "path": str(prior_path), "bytes": prior_path.stat().st_size,
+        "sha256": hashlib.sha256(prior_path.read_bytes()).hexdigest(),
+    }
+    audit = fixture["match_clock_audit"]
+    audit["expectations"] = prior_identity
+    audit_path = fixture["match_clock_path"]
+    audit_path.write_text(json.dumps(audit), encoding="utf-8")
+    audit_identity = {
+        "path": str(audit_path), "bytes": audit_path.stat().st_size,
+        "sha256": hashlib.sha256(audit_path.read_bytes()).hexdigest(),
+    }
+    source = fixture["packet"]["source"]
+    source["prior_match_clock_expectations"] = prior_identity
+    source["match_clock_boundary_audit"] = audit_identity
+    fixture["packet_path"].write_text(json.dumps(fixture["packet"]), encoding="utf-8")
 
 
 def _run_clock60_comparison(fixture, *, raw_overrides=None,
@@ -3027,6 +3061,9 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             ("missing-audit-identity", "expectations"),
             ("wrong-prefix", "runner"),
             ("malformed-runner-trace", "runner"),
+            ("wrong-nested-trace-path", "runner"),
+            ("wrong-positive-boundary-declaration", "runner"),
+            ("wrong-clock60-boundary-declaration", "runner"),
             ("wrong-audit-identity", "runner"),
         )
         for name, subject in cases:
@@ -3053,6 +3090,12 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                         "fresh_prefix"]["sha256"] = "0" * 64
                 elif name == "malformed-runner-trace":
                     launch["source"]["trace"] = []
+                elif name == "wrong-nested-trace-path":
+                    launch["source"]["trace"]["path"] = "/tmp/other-capture.mwro"
+                elif name == "wrong-positive-boundary-declaration":
+                    launch["source"]["first_positive_boundary"]["source_sequence"] += 1
+                elif name == "wrong-clock60-boundary-declaration":
+                    launch["source"]["clock60_boundary"]["browser_cursor"] += 1
                 else:
                     launch["source"]["clock300_audit"]["sha256"] = "0" * 64
                 _refresh_clock500_packet_chain(fixture, audit=audit, launch_packet=launch)
@@ -3070,9 +3113,44 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                     else "exact clock-300 observation" if name in {"missing-rejoin-flag", "false-rejoin-flag"}
                     else "frozen clock-300 lineage identities" if name == "missing-audit-identity"
                     else "runner packet trace identity is malformed" if name == "malformed-runner-trace"
+                    else "nested trace path differs" if name == "wrong-nested-trace-path"
+                    else "frozen source lineage" if name in {
+                        "wrong-positive-boundary-declaration",
+                        "wrong-clock60-boundary-declaration",
+                    }
                     else "frozen source lineage" if name == "wrong-audit-identity"
                     else "clock-300 prefix differs")
                 with self.assertRaisesRegex(ComparisonError, expected_message):
+                    _validate_match_clock_boundary_audit(
+                        selected["match_clock_boundary_audit"], loaded, fixture["recipe"])
+
+    def test_later_match_clock_audit_rejects_malformed_prior_expectation_sections(self):
+        cases = (
+            ("missing-browser", lambda packet: packet.pop("browser"),
+             "expectations sections are malformed"),
+            ("nonobject-browser", lambda packet: packet.__setitem__("browser", []),
+             "expectations sections are malformed"),
+            ("missing-browser-report", lambda packet: packet["browser"].pop("report"),
+             "file identities are malformed"),
+        )
+        for name, mutate, expected in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as directory:
+                fixture = _clock60_comparison_fixture(
+                    Path(directory), terminal_match_frame=500)
+                _attach_clock300_lineage(fixture)
+                prior = json.loads(fixture["prior_packet_path"].read_text())
+                mutate(prior)
+                _refresh_clock500_prior_lineage(fixture, prior)
+                selected = fixture["selected"]
+                loaded, _ = _load_expectations(
+                    fixture["packet_path"],
+                    {key: selected[key] for key in (
+                        "reference", "source_manifest", "source_report", "source_audit", "recipe",
+                        "browser_capture_report", "browser_producer_manifest", "browser_report",
+                        "port_trace", "positive_boundary_audit", "clock60_boundary_audit",
+                        "match_clock_boundary_audit")},
+                    scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)
+                with self.assertRaisesRegex(ComparisonError, expected):
                     _validate_match_clock_boundary_audit(
                         selected["match_clock_boundary_audit"], loaded, fixture["recipe"])
 
