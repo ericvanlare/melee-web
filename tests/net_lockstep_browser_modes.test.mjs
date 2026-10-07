@@ -23,9 +23,9 @@ test('positive WebRTC cannot pass SDP through the Node memory coordinator', () =
 });
 
 test('unsupported WebRTC scenarios and owners fail before acquisition', () => {
-  for (const scenario of ['probe', 'flip', 'disconnect'])
+  for (const scenario of ['probe', 'flip'])
     assert.throws(() => validateLockstepBrowserMode(options({scenario})),
-      /browser-owned input-sampling or positive mode/);
+      /browser-owned input-sampling, positive, or disconnect mode/);
   assert.throws(() => validateLockstepBrowserMode(options({'peer-owner': 'node'})),
     /applies only to browser-owned peers/);
 });
@@ -54,4 +54,10 @@ test('unknown mode values and Node input-sampling remain rejected', () => {
   assert.throws(() => validateLockstepBrowserMode(options({scenario: 'input-sampling',
     'peer-owner': 'node', 'peer-transport': undefined, 'webrtc-signaling': 'memory'})),
     /input-sampling scenario requires --peer-owner browser/);
+});
+
+test('disconnect WebRTC requires page-owned room signaling', () => {
+  assert.equal(validateLockstepBrowserMode(options({scenario: 'disconnect'})).roomWorkerSignaling, true);
+  assert.throws(() => validateLockstepBrowserMode(options({scenario: 'disconnect',
+    'webrtc-signaling': 'memory'})), /Disconnect WebRTC mode requires/);
 });

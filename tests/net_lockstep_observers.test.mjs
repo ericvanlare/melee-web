@@ -6,7 +6,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
-  verifyTerminalHold, verifyPositivePeerCompletion, verifyReliableHostWebRtc, WasmResponseIdentityObserver, attachWasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
+  verifyTerminalHold, verifyDisconnectBoundary, verifyPositivePeerCompletion, verifyReliableHostWebRtc, WasmResponseIdentityObserver, attachWasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
 import {createTransportCallbackQueue} from '../scripts/net_lockstep_transport.mjs';
 
 function callback(data, kind = 'Native callback') {
@@ -395,4 +395,18 @@ test('final WebRTC observation rejects closed, unreliable or non-host endpoints'
     {attach_error: 'error'}, {local_candidate_types: []}, {remote_candidate_types: ['srflx']},
     {remote_candidate_types: undefined}])
     assert.throws(() => verifyReliableHostWebRtc(connectedRtc(change)), /connected, reliable, ordered and host-only/);
+});
+
+test('disconnect pre-close observation rejects missing ACK or native boundary', () => {
+  const status = {cursor: 6, pushed: 6, blocker: 'network_wait', network_wait: {active: 1}};
+  const summary = {remote_ack_input: 3, local_input_ticks: 4, remote_input_ticks: 4,
+    checksum_mismatches: [], terminal: null, next_checksum_compare: 2};
+  assert.equal(verifyDisconnectBoundary(status, summary, 6, 4).remote_ack_input, 3);
+  for (const changed of [{remote_ack_input: 2}, {remote_ack_input: undefined},
+    {local_input_ticks: 5}, {remote_input_ticks: 3}, {terminal: {kind: 'disconnect'}},
+    {checksum_mismatches: [{}]}])
+    assert.throws(() => verifyDisconnectBoundary(status, {...summary, ...changed}, 6, 4));
+  for (const changed of [{cursor: 7}, {pushed: 5}, {blocker: 'terminal'},
+    {network_wait: {active: 0}}])
+    assert.throws(() => verifyDisconnectBoundary({...status, ...changed}, summary, 6, 4));
 });

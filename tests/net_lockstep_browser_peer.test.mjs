@@ -364,3 +364,27 @@ test('closed-browser inventory joins pending observations and rejects without a 
   assert.equal(bodyReads, 0);
   await assert.rejects(observer.freeze(), /closed before peer module response body/);
 });
+
+test('unarmed endpoint close calls native disconnect without sending on the closed channel', async () => {
+  const run = harness();
+  await run.ready();
+  const before = run.sent.length;
+  run.endpoint.send = async () => { throw Error('send after endpoint close'); };
+  const row = await run.controller.close({intentional: false});
+  assert.equal(row.protocol.terminal.kind, 'disconnect');
+  assert.equal(run.terminals.length, 1);
+  assert.equal(run.sent.length, before);
+  run.nativeRecords.push(run.record(0));
+  const drained = await run.controller.rpc('drain');
+  assert.deepEqual(drained.records, [run.record(0)]);
+  assert.equal(drained.checksumOwnership.post_terminal_native_evidence_records, 1);
+  assert.equal(drained.protocol.local_checksum_ticks, 0);
+});
+
+test('unarmed endpoint close retains rejected native terminal callback', async () => {
+  const run = harness({terminalFailure: true});
+  await run.ready();
+  await assert.rejects(run.controller.close({intentional: false}), /Browser native peer close failed/);
+  assert.match(run.controller.snapshot().failure, /terminal callback failure/);
+  assert.equal(run.terminals.length, 1);
+});

@@ -20,7 +20,7 @@ import {createTransportCallbackQueue, describeLockstepTransport, describeLockste
   openLockstepPeerPair, recordAvailableTransportMetrics} from './net_lockstep_transport.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
-  verifyTerminalHold, verifyPositivePeerCompletion, verifyReliableHostWebRtc} from './net_lockstep_observers.mjs';
+  verifyTerminalHold, verifyPositivePeerCompletion, verifyReliableHostWebRtc, verifyDisconnectBoundary} from './net_lockstep_observers.mjs';
 import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
 import {BUTTONS} from '../web/controller-input.mjs';
 import {lockstepConstants} from './net_lockstep_core.mjs';
@@ -120,7 +120,7 @@ const scriptHash = scriptBytes ? sha256(scriptBytes) : null;
 const deadline = Date.now() + timeoutMs;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const childDirectory = role => path.join(output, role);
-async function captureAccountedCss(role, expectedCursor) {
+async function captureAccountedCss(role, expectedCursor, expectedBlocker = 'complete') {
   const filename = path.join(childDirectory(role), 'accounted-css.png');
   await instances[role].screenshot(filename);
   const bytes = await fs.readFile(filename);
@@ -128,12 +128,14 @@ async function captureAccountedCss(role, expectedCursor) {
   const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
   if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
       graphics.cross_origin_isolated !== true || graphics.webgpu_adapter !== true ||
-      native.phase !== 1 || status.cursor !== expectedCursor || status.blocker !== 'complete')
+      native.phase !== 1 || status.cursor !== expectedCursor || status.blocker !== expectedBlocker ||
+      (expectedBlocker === 'terminal' && status.terminal.kind !== TERMINAL.disconnect))
     throw Error(`${role} CSS accounting capture did not retain its rendered final cursor ${expectedCursor}`);
   instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
     screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
     gpu: graphics, source_steps_and_draws: instanceRows[role].source_accounting,
-    scope: 'CSS at the completed prefix; source counters exclude preparation-only draws'};
+    blocker: status.blocker,
+    scope: 'CSS at the held source prefix; source counters exclude preparation-only draws'};
 }
 // Match melee_web_net_fnv1a64 over already-native PADStatus bytes; this does not
 // convert JavaScript Gamepad state into the protocol's PAD record layout.
@@ -531,8 +533,13 @@ async function pollRun() {
     }
     if (!probe && scenario === 'disconnect' && !disconnectInjected &&
         Math.min(rows.alpha.cursor, rows.beta.cursor) >= disconnectAt) {
+      if (localWebRtc) {
+        const publishedInputs = pairResults.disconnect_missing_input_tick;
+        pairResults.disconnect_before_close = Object.fromEntries(['alpha', 'beta'].map(role =>
+          [role, verifyDisconnectBoundary(rows[role], peers[role].summary(), disconnectAt, publishedInputs)]));
+      }
       disconnectInjected = true;
-      instanceRows.injected_disconnect = {role: 'beta', source_tick: disconnectAt, at_ms: Date.now()};
+      pairResults.injected_disconnect = {role: 'beta', source_tick: disconnectAt, at_ms: Date.now()};
       if (browserOwned) await relay.beta.close(false);
       else relay.beta.close();
     }
@@ -918,7 +925,8 @@ async function run() {
     instanceRows[role].source_accounting_artifact = {name: 'source-accounting.json',
       bytes: bytes.length, sha256: sha256(bytes)};
     instanceRows[role].source_accounting = verifyNetSourceAccounting(capture,
-      scenario === 'positive' || scenario === 'probe' || inputSampling ? sourceTicks : capture.final.cursor);
+      scenario === 'positive' || scenario === 'probe' || inputSampling ? sourceTicks :
+        localWebRtc && scenario === 'disconnect' ? disconnectAt : capture.final.cursor);
   }
   pairResults.wait_observations = waitObservations;
   pairResults.transport_errors = transportErrors;
@@ -1107,6 +1115,32 @@ async function run() {
   } else {
     if (!disconnectHandled || peers.alpha.terminal?.kind !== 'disconnect' || peers.beta.terminal?.kind !== 'disconnect')
       throw Error('Transport disconnect did not produce an explicit bounded terminal');
+    if (localWebRtc) {
+      for (const role of ['alpha', 'beta']) {
+        const row = instanceRows[role], ownership = peers[role].checksumOwnership;
+        row.final_status = await instances[role].status();
+        row.final_native = await instances[role].native();
+        if (row.records !== disconnectAt || row.scene_runs.some(frame => frame.scene !== 1) ||
+            pairResults.terminal_hold.peers[role].cursor_after !== disconnectAt ||
+            pairResults.terminal_hold.peers[role].pushed_after !== disconnectAt ||
+            !Number.isSafeInteger(ownership?.active_native_records_submitted_before_export) ||
+            ownership.active_native_records_submitted_before_export < 0 ||
+            !Number.isSafeInteger(ownership?.post_terminal_native_evidence_records) ||
+            ownership.post_terminal_native_evidence_records < 0 ||
+            ownership.active_native_records_submitted_before_export +
+              ownership.post_terminal_native_evidence_records !== row.records)
+          throw Error(`${role} WebRTC disconnect native evidence is incomplete`);
+        await captureAccountedCss(role, disconnectAt, 'terminal');
+      }
+      const left = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
+      const right = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
+      if (left.length !== disconnectAt * NET_RECORD_BYTES || !left.equals(right))
+        throw Error('WebRTC disconnect raw native checksum prefix differs');
+      pairResults.disconnect_native_evidence = {records_each: disconnectAt, streams_identical: true,
+        sha256: sha256(left), protocol_comparisons: Object.fromEntries(['alpha', 'beta'].map(role =>
+          [role, peers[role].summary().next_checksum_compare])),
+        scope: 'Raw consumed native prefix; post-close protocol comparison totals are reported separately'};
+    }
     pairResults.negative_control = {disconnect_at_source_tick: disconnectAt,
       terminals: {alpha: peers.alpha.terminal, beta: peers.beta.terminal}, explicit: true};
     pairResults.outcome = 'expected-disconnect';

@@ -20,10 +20,10 @@ export function validateLockstepBrowserMode(values) {
     throw Error('--webrtc-signaling applies only to the local WebRTC transport');
   if (browserOwned && !localWebRtc && !values['relay-url'])
     throw Error('Browser-owned relay peers require --relay-url');
-  if (localWebRtc && (!browserOwned || !['input-sampling', 'positive'].includes(scenario)))
-    throw Error('The local WebRTC endpoint requires browser-owned input-sampling or positive mode');
-  if (localWebRtc && scenario === 'positive' && !roomWorkerSignaling)
-    throw Error('Positive WebRTC mode requires --webrtc-signaling room-worker');
+  if (localWebRtc && (!browserOwned || !['input-sampling', 'positive', 'disconnect'].includes(scenario)))
+    throw Error('The local WebRTC endpoint requires browser-owned input-sampling, positive, or disconnect mode');
+  if (localWebRtc && ['positive', 'disconnect'].includes(scenario) && !roomWorkerSignaling)
+    throw Error(`${scenario === 'positive' ? 'Positive' : 'Disconnect'} WebRTC mode requires --webrtc-signaling room-worker`);
   if (scenario === 'input-sampling' && !browserOwned)
     throw Error('The input-sampling scenario requires --peer-owner browser');
   return {browserOwned, peerTransport, localWebRtc, roomWorkerSignaling};

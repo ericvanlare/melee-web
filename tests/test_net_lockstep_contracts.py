@@ -15,6 +15,7 @@ class NetLockstepContractTests(unittest.TestCase):
             str(node_runtime()), '--test',
             str(ROOT / 'tests/net_lockstep_observers.test.mjs'),
             str(ROOT / 'tests/net_lockstep_browser_modes.test.mjs'),
+            str(ROOT / 'tests/net_lockstep_browser_disconnect_report.test.mjs'),
             str(ROOT / 'tests/net_source_accounting.test.mjs'),
             str(ROOT / 'tests/net_lockstep_core.test.mjs'),
             str(ROOT / 'tests/net_lockstep_browser_peer.test.mjs'),
