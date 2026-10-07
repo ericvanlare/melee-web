@@ -47,6 +47,9 @@ public:
     DatNativeMap(const DatNativeMap&)=delete;
     DatNativeMap& operator=(const DatNativeMap&)=delete;
     void* map_head()const noexcept;
+    // Borrows the canonical IMAGE already present in this map's texture graph.
+    // Missing graph membership throws; validity ends with this owner's lifetime.
+    void* image_descriptor(uint32_t source_offset)const;
     /* Return a borrowed checked native MapCollData view owned by this
      * DatNativeMap. Decoded lazily because marker-only maps need no collision
      * archive; the pointer is valid only through this owner's lifetime. */

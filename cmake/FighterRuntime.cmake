@@ -249,6 +249,15 @@ target_link_options(gameplay_stage_map_trace PRIVATE -sENVIRONMENT=node -sALLOW_
   -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1)
 set_target_properties(gameplay_stage_map_trace PROPERTIES SUFFIX ".js")
 
+add_executable(stadium_screen_roots_trace EXCLUDE_FROM_ALL
+  tests/stadium_screen_roots_trace.cpp tests/stadium_screen_roots_probe.c)
+target_link_libraries(stadium_screen_roots_trace PRIVATE fighter_asset_runtime)
+target_compile_options(stadium_screen_roots_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(stadium_screen_roots_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=8388608)
+set_target_properties(stadium_screen_roots_trace PROPERTIES SUFFIX ".js")
+
 add_executable(dat_native_stage_map_trace EXCLUDE_FROM_ALL
   tests/dat_native_stage_map_trace.cpp tests/dat_native_stage_map_trace.c)
 target_link_libraries(dat_native_stage_map_trace PRIVATE fighter_asset_runtime)
@@ -633,6 +642,7 @@ add_executable(native_menu_host_trace EXCLUDE_FROM_ALL tests/native_menu_host_tr
   tests/native_menu_fighter_input.c tests/native_menu_stage_input.c tests/native_menu_alarm_unavailable.c)
 if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   target_sources(native_menu_host_trace PRIVATE
+    tests/stadium_screen_roots_probe.c
     tests/stadium_c1_stage_state_probe.c
     tests/stadium_c1_e8_call_observer.c
     tests/gameplay_random_article_fields.c

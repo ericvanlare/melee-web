@@ -38,6 +38,8 @@
 #include "stadium_c1_e8_call_observer.h"
 #include "stadium_c1_item_owner_negative_cases.hpp"
 #include "stadium_c1_item_owner_preflight.hpp"
+#include "stadium_screen_roots_synthetic.hpp"
+#include "stadium_c0_native_map_contract.hpp"
 #endif
 #include <melee/ft/forward.h>
 #include <melee/gm/forward.h>
@@ -1845,6 +1847,72 @@ void run_stadium_c1_item_state_preflight(
     check_stadium_preflight_stage_empty();
 }
 
+void run_stadium_screen_roots_preflight(
+    const melee_web::RuntimeFiles& files, MeleeWebMenuHost* host,
+    const MeleeWebMenuMatchSelection& selected,
+    const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& baseline,
+    const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>& save_before)
+{
+    using namespace melee_web;
+    namespace screen = melee_web::test::stadium_screen;
+    const auto& raw = files.at("GrPs.usd");
+    const auto raw_before = raw;
+    auto archive = std::make_shared<const DatArchive>(raw, DatExternalPolicy::ResolveNull);
+    const auto image_offset = screen::root(*archive, screen::image_name);
+    const auto sis_offset = screen::root(*archive, screen::sis_name);
+    check(image_offset == 35276 && archive->be16(image_offset+4) == 16 &&
+              archive->be16(image_offset+6) == 16 && archive->be32(image_offset+8) == 0 &&
+              sis_offset == 0x13ca80 &&
+              archive->next_target_offset(sis_offset)-sis_offset == 88,
+          "Screen roots differ from the retained C0 source contract");
+    const auto globals_before = stadium_item_runtime_globals();
+    const auto stats_before = melee_web_gameplay_stats();
+    const auto* seed_owner = seed_ptr;
+    check(seed_owner != nullptr, "Screen preflight lacks a retained RNG owner");
+    const auto seed_before = *seed_owner;
+    check(((HSD_GObj**)HSD_GObj_Entities)[9] == nullptr,
+          "Screen preflight found an existing item object");
+    auto invariants = [&] {
+        check_stadium_item_runtime_globals(globals_before);
+        const auto stats = melee_web_gameplay_stats();
+        check(stats.ticks == stats_before.ticks && stats.generation == stats_before.generation,
+              "Screen descriptor checks changed source ticks/generation");
+        check(seed_ptr == seed_owner && *seed_owner == seed_before,
+              "Screen descriptor checks changed RNG owner/value");
+        check(((HSD_GObj**)HSD_GObj_Entities)[9] == nullptr,
+              "Screen descriptor checks created an item object");
+        check(raw == raw_before && std::equal(archive->data().begin(), archive->data().end(), raw_before.begin()+32),
+              "Screen descriptor checks changed raw GrPs bytes");
+        std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> save_after{};
+        char error[256]{};
+        check(melee_web_menu_host_snapshot_card_data(host, 0, save_after.data(), save_after.size(), error, sizeof(error)), error);
+        check(save_after == save_before, "Screen descriptor checks changed retained save");
+        check_stadium_selection_preserved(host, selected, baseline);
+        check_stadium_preflight_stage_empty();
+    };
+    invariants();
+    screen::synthetic_checks(invariants);
+    invariants();
+    for (unsigned lifetime=0; lifetime<2; ++lifetime) {
+        {
+            DatNativeMap map(archive, melee_web::test::stadium_contract);
+            DatSis sis(archive, screen::sis_name);
+            check(sis.entry_count() == 22, "Screen SIS changed authored 22-slot count");
+            {
+                DatNativeMap foreign(archive, melee_web::test::stadium_contract);
+                screen::synthetic::rejects([&] {
+                    screen::identity(map, 1, foreign.image_descriptor(image_offset));
+                }, "unique map descriptor");
+            }
+            invariants();
+            screen::catalog_checks(*archive, map, sis, 1, image_offset);
+            invariants();
+        }
+        invariants();
+    }
+    std::cout << "C1 screen-root preflight preserved canonical IMAGE, writable SIS and two owner/catalog lifetimes; no stage entry or ticks\n";
+}
+
 void run_stadium_c1_context_preflight(
     const melee_web::RuntimeFiles& menu_files,
     MeleeWebMenuHost*& host,
@@ -1855,6 +1923,7 @@ void run_stadium_c1_context_preflight(
     const std::filesystem::path& game_dir,
     bool perform_e8_request,
     bool perform_item_state_preflight,
+    bool perform_screen_roots_preflight,
     TransitionTrace& trace)
 {
     char error[256]{};
@@ -1995,6 +2064,9 @@ void run_stadium_c1_context_preflight(
             run_stadium_c1_item_state_preflight(
                 reopened_files, host, selected, baseline, save_before);
         }
+        if (perform_screen_roots_preflight) {
+            run_stadium_screen_roots_preflight(reopened_files, host, selected, baseline, save_before);
+        }
         world->verify_immutable_archives();
         check_stadium_preflight_stage_empty();
 
@@ -2049,6 +2121,7 @@ void run_stadium_c1a_selection_smoke(
     bool reopened_context_preflight,
     bool e8_request_trace,
     bool item_state_preflight,
+    bool screen_roots_preflight,
     const std::filesystem::path& menu_dir,
     const std::filesystem::path& game_dir,
     TransitionTrace& trace)
@@ -2171,7 +2244,7 @@ void run_stadium_c1a_selection_smoke(
     if (reopened_context_preflight) {
         run_stadium_c1_context_preflight(
             files, host, world, selected, names, menu_dir, game_dir,
-            e8_request_trace, item_state_preflight, trace);
+            e8_request_trace, item_state_preflight, screen_roots_preflight, trace);
     } else {
         world->verify_immutable_archives();
         world->close();
@@ -2213,19 +2286,22 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="stadium-c1-context-preflight-v1";
  const bool stadium_c1_item_state_preflight_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-c1-item-state-preflight-v1";
+ const bool stadium_screen_roots_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-screen-roots-preflight-v1";
  const bool stadium_e8_request_recipe=input_recipe&&
      std::string(input_recipe)=="stadium-e8-request-v1";
 #else
  const bool stadium_c1a_recipe=false;
  const bool stadium_c1_context_preflight_recipe=false;
  const bool stadium_c1_item_state_preflight_recipe=false;
+ const bool stadium_screen_roots_recipe=false;
  const bool stadium_e8_request_recipe=false;
 #endif
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
     !sound_settings_recipe&&!stadium_c1a_recipe&&
     !stadium_c1_context_preflight_recipe&&
-    !stadium_c1_item_state_preflight_recipe&&!stadium_e8_request_recipe&&
+    !stadium_c1_item_state_preflight_recipe&&!stadium_screen_roots_recipe&&!stadium_e8_request_recipe&&
     !v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if(v10_css_replay_start_recipe&&
@@ -2237,14 +2313,14 @@ int main(int argc,char** argv){try{
     stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
  if((stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
-     stadium_c1_item_state_preflight_recipe||stadium_e8_request_recipe)&&
+     stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||stadium_e8_request_recipe)&&
     stage_kind!=St_Kind_PStadium)
    throw std::runtime_error("C1a recipes require source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
  if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
-    stadium_c1_item_state_preflight_recipe||stadium_e8_request_recipe||
+    stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||stadium_e8_request_recipe||
     v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
@@ -2274,11 +2350,11 @@ int main(int argc,char** argv){try{
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
-    stadium_c1_item_state_preflight_recipe||stadium_e8_request_recipe){
+    stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||stadium_e8_request_recipe){
   run_stadium_c1a_selection_smoke(
       files, stadium_c1_context_preflight_recipe||
-          stadium_c1_item_state_preflight_recipe||stadium_e8_request_recipe,
-      stadium_e8_request_recipe, stadium_c1_item_state_preflight_recipe,
+          stadium_c1_item_state_preflight_recipe||stadium_screen_roots_recipe||stadium_e8_request_recipe,
+      stadium_e8_request_recipe, stadium_c1_item_state_preflight_recipe, stadium_screen_roots_recipe,
       argv[1], argv[2], trace);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   return 0;
