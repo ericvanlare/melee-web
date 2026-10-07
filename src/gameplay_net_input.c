@@ -196,10 +196,10 @@ int melee_web_net_local_capture_pending(void)
         !net.start_confirmed ||
         net.local_capture_count >= net.local_capture_input_ticks)
         return 0;
-    /* A remote wait may revisit the cursor whose local bytes were already
-     * published. Keep that immutable contribution and use ordinary pacing. */
-    return !net.local_capture_count ||
-           net.cursor != net.local_capture_last_cursor;
+    /* Keep the budget restricted even when this cursor was sampled before a
+     * remote wait. Resuming it can expose later cursors in the same callback;
+     * those still need distinct polls. The capture guard keeps the old bytes. */
+    return 1;
 }
 
 static int encode_local_pad(const PADStatus* pad,

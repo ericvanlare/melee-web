@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <limits>
 #include <optional>
 #include <stdexcept>
@@ -32,6 +33,7 @@ unsigned a3_test_capture_failure_port(void);
 std::uint32_t a3_test_ring_write(void);
 std::uint32_t a3_test_wait_callbacks(void);
 std::uint32_t a3_test_pushed(void);
+int a3_test_push_remaining_neutral(void);
 
 int melee_web_net_local_capture_pending(void);
 int melee_web_net_capture_local_input(std::uint64_t poll_serial,
@@ -303,7 +305,7 @@ bool budgeted_native_sampling_and_draws() {
                 source_frames.before_step(present);
                 if (!melee_web_net_local_capture_pending() || selected_budget() != 1 ||
                     !melee_web_net_capture_local_input(serial++, raw) ||
-                    melee_web_net_local_capture_pending() ||
+                    (melee_web_net_local_capture_pending() != (callback < 3)) ||
                     !melee_web_net_before_step(1)) return false;
                 melee_web_net_after_step();
                 source_frames.did_step();
@@ -355,6 +357,49 @@ bool budgeted_native_sampling_and_draws() {
     return true;
 }
 
+bool remote_wait_resume_keeps_capture_budget(unsigned port) {
+    if (!a3_test_prepare_local_capture(port, 1)) return false;
+    PADStatus raw[4]{};
+    if (!melee_web_net_capture_local_input(500, raw) ||
+        !melee_web_net_before_step(1)) return false;
+    melee_web_net_after_step();
+    if (!melee_web_net_capture_local_input(501, raw) ||
+        melee_web_net_before_step(1) != nullptr || a3_test_cursor() != 1 ||
+        a3_test_capture_count() != 2 || a3_test_wait_callbacks() != 1) return false;
+
+    // The resumed cursor already has its immutable contribution, but later
+    // cursors still need samples. Three due steps must not select budget eight.
+    Clock clock;
+    clock.reset(); // Same reset as the caller's remote wait.
+    clock.tick_with_budget(1000, true, selected_budget());
+    if (!a3_test_push_remaining_neutral()) return false;
+    raw[port].button = 0x100;
+    const auto resumed = clock.tick_with_budget(1050, true, selected_budget());
+    SourceFrames source_frames;
+    source_frames.begin_callback();
+    unsigned draws = 0;
+    const auto present = [&]() { ++draws; return true; };
+    for (unsigned step = 0; step < resumed.steps; ++step) {
+        source_frames.before_step(present);
+        if (!melee_web_net_capture_local_input(502, raw) ||
+            !melee_web_net_before_step(1)) break;
+        melee_web_net_after_step();
+        source_frames.did_step();
+    }
+    source_frames.finish(present);
+    const bool passed = resumed.steps == 1 && resumed.pending_steps == 2 &&
+        close_to(clock.pending_ticks(), 2) && a3_test_cursor() == 2 &&
+        a3_test_capture_count() == 2 && a3_test_publications() == 2 &&
+        a3_test_terminal_kind() == 0 && selected_budget() == 1 &&
+        source_frames.steps() == 1 && source_frames.draws() == 1 && draws == 1;
+    if (!passed) std::fprintf(stderr,
+        "remote resume port=%u returned=%u cursor=%u captures=%u terminal=%u\n",
+        port, resumed.steps, a3_test_cursor(), a3_test_capture_count(),
+        a3_test_terminal_kind());
+    melee_web_net_reset();
+    return passed;
+}
+
 bool remote_wait_and_exception_resets() {
     if (!a3_test_prepare_local_capture(0, 1) || selected_budget() != 1) return false;
     Clock clock;
@@ -385,7 +430,7 @@ bool remote_wait_and_exception_resets() {
     waiting_callback.before_step(waiting_present);
     if (!melee_web_net_local_capture_pending() ||
         !melee_web_net_capture_local_input(501, raw) ||
-        melee_web_net_local_capture_pending()) return false;
+        !melee_web_net_local_capture_pending()) return false;
     if (melee_web_net_before_step(1) != nullptr || a3_test_cursor() != 1 ||
         a3_test_wait_callbacks() != 1) return false;
     waiting_callback.finish(waiting_present);
@@ -393,7 +438,7 @@ bool remote_wait_and_exception_resets() {
         return false;
     raw[0].button = 0x100;
     if (!melee_web_net_capture_local_input(502, raw) || a3_test_publications() != 2 ||
-        a3_test_capture_count() != 2 || melee_web_net_local_capture_pending()) return false;
+        a3_test_capture_count() != 2 || !melee_web_net_local_capture_pending()) return false;
     clock.reset(); // Existing network-wait reset intentionally discards this debt.
     if (clock.pending_ticks() != 0 || clock.tick_with_budget(1000, true, 8).steps != 0 ||
         clock.tick_with_budget(1017, true, 8).steps != 1) return false;
@@ -419,6 +464,8 @@ extern "C" int a3_run_clock_native_reproducer(void) {
 }
 
 extern "C" int a3_run_budgeted_clock_tests(void) {
-    return budget_api_controls() && budgeted_native_sampling_and_draws() &&
+    return remote_wait_resume_keeps_capture_budget(0) &&
+        remote_wait_resume_keeps_capture_budget(1) &&
+        budget_api_controls() && budgeted_native_sampling_and_draws() &&
         remote_wait_and_exception_resets() ? 0 : 1;
 }

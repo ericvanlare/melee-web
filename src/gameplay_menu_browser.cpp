@@ -1738,19 +1738,6 @@ void tick(){
 #endif
   source_frames.finish(present_source);
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
-  if(local_capture_clock){
-   const double due_steps=elapsed.stalled?elapsed.triggering_value:
-       static_cast<double>(elapsed.steps+elapsed.pending_steps);
-   EM_ASM({try{globalThis.menuDiagnosticInputClockSample?.({
-     callback_ms:$0,interval_ms:$1,due_steps:$2,budget_steps:1,
-     returned_steps:$3,unconsumed_whole_steps:$4,pending_ticks_after:$5,
-     completed_source_steps:$6,source_draws:$7,stalled:!!$8});}catch(_){}},
-     simulation_clock_now,elapsed.interval_ms,due_steps,elapsed.steps,
-     elapsed.pending_steps,menu_clock.pending_ticks(),source_frames.steps(),
-     source_frames.draws(),elapsed.stalled?1:0);
-  }
-#endif
-#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
   replay_boundary_mark("source_frames_finish_returned",static_cast<int>(source_frames.steps()),
                        static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
 #endif

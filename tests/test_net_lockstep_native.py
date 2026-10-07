@@ -90,6 +90,10 @@ unsigned a3_test_capture_failure_port(void){return net.local_capture_failure_por
 uint32_t a3_test_ring_write(void){return net.ring_write;}
 uint32_t a3_test_wait_callbacks(void){return net.wait_callbacks;}
 uint32_t a3_test_pushed(void){return net.pushed;}
+int a3_test_push_remaining_neutral(void) {
+  uint8_t frames[MELEE_WEB_NET_FRAME_BYTES*5] = {0};
+  return melee_web_net_push_indexed(1,frames,5);
+}
 """ if include_clock_composition else ""
     clock_finish = """
   if(a3_run_clock_native_reproducer()!=0)return 74;
@@ -255,15 +259,15 @@ int main(void) {{
      memcmp(local_capture_bytes,(uint8_t[11]){{0x12,0x34,0x80,0x7f,0xff,0x01,
        0x22,0x33,0x44,0x55,0x00}},11)||
      memcmp(net.local_capture_last_bytes,local_capture_bytes,11)||
-     melee_web_net_local_capture_pending())return 34;
+     !melee_web_net_local_capture_pending())return 34;
   if(melee_web_net_before_step(1)!=NULL||net.wait_episodes!=1||
-     melee_web_net_local_capture_pending())return 35;
+     !melee_web_net_local_capture_pending())return 35;
   raw[0].button=0;
   if(!melee_web_net_capture_local_input(21,raw)||local_capture_publications!=1||
      memcmp(net.local_capture_last_bytes,local_capture_bytes,11))return 35;
   uint8_t source_frames[MELEE_WEB_NET_FRAME_BYTES*6]={{0}};
   if(!melee_web_net_push_indexed(0,source_frames,6))return 36;
-  if(melee_web_net_before_step(1)==NULL||melee_web_net_local_capture_pending())return 37;
+  if(melee_web_net_before_step(1)==NULL||!melee_web_net_local_capture_pending())return 37;
   melee_web_net_after_step();
   if(!melee_web_net_local_capture_pending())return 37;
   raw[0].button=0x80;
