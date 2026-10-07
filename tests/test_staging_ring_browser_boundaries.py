@@ -29,3 +29,6 @@ class StagingRingBrowserBoundaryTests(unittest.TestCase):
 
     def test_actual_development_observer_storage(self):
         self.run_boundary('development_css_observer_storage_test.mjs')
+
+    def test_sustained_window_and_inventory(self):
+        self.run_boundary('staging_ring_sustained_decision_test.mjs')
