@@ -46,6 +46,9 @@ class GameplayBootstrapTests(unittest.TestCase):
     def test_borrowed_sis_descriptor_retires_after_source_text(self):
         self.run_trace("borrowed_sis")
 
+    def test_unknown_sis_drain_retains_blocked_world_without_retry(self):
+        self.run_trace("sis_drain_refusal")
+
     def run_trace(self, kind):
         executable = "gameplay_fighter_input_trace" if kind == "fighter" else "gameplay_scheduler_trace"
         arguments = []
@@ -59,6 +62,9 @@ class GameplayBootstrapTests(unittest.TestCase):
         elif kind == "borrowed_sis":
             arguments = ["borrowed_sis"]
             expected = "Checked borrowed SIS source text lifetime trace: passed"
+        elif kind == "sis_drain_refusal":
+            arguments = ["sis_drain_refusal"]
+            expected = "Unknown SIS drain failure-control world retained: passed"
         elif kind == "bootstrap":
             expected = "Original HSD gameplay-bootstrap scheduler trace: passed"
         asset = ROOT / "assets-local/next-gate/PlCo.dat"

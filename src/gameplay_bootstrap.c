@@ -542,6 +542,9 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
                                   error, error_size)) {
             /* Drain completion is unknown. Keep active shutdown latched and
              * forbid any retry rather than rerunning destructive source work. */
+            if (error && error_size && !error[0])
+                snprintf(error, error_size,
+                         "Original VS SIS shutdown did not confirm complete source drain");
             return 0;
         }
         vs_sis_live = 0;

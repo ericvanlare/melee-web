@@ -36,6 +36,7 @@ static HSD_GObj* borrowed_sis_text_gobj;
 static int borrowed_sis_drain_seen;
 static int borrowed_sis_sweep_seen;
 static int borrowed_sis_replace_after_drain;
+static int borrowed_sis_refuse_drain;
 static unsigned borrowed_sis_shutdown_calls;
 static SIS borrowed_sis_foreign_after_drain;
 typedef struct TestObject { unsigned id, delete_self, remove_proc, reorder; } TestObject;
@@ -73,6 +74,11 @@ static int vs_borrowed_sis_shutdown(MeleeWebGameplayVSSisOperation operation,
                                    int slot, void* expected,
                                    char* failure, size_t size)
 {
+    if (operation == MELEE_WEB_VS_SIS_DRAIN && borrowed_sis_refuse_drain) {
+        ++borrowed_sis_shutdown_calls;
+        if (failure && size) failure[0] = '\0';
+        return 0;
+    }
     if (!melee_web_gameplay_vs_sis(operation, slot, expected, failure, size)) return 0;
     if (operation != MELEE_WEB_VS_SIS_DRAIN) return 1;
     check(borrowed_sis_owner && borrowed_sis_owner->canary == 0x51A51A51,
@@ -204,6 +210,7 @@ static int borrowed_sis_lifetime(unsigned generation, int publish_descriptor,
     borrowed_sis_sweep_seen = 0;
     borrowed_sis_shutdown_calls = 0;
     borrowed_sis_replace_after_drain = generation == 4;
+    borrowed_sis_refuse_drain = generation == 5;
 
     static SIS* prior_foreign_table[1];
     if (generation == 2) {
@@ -253,6 +260,33 @@ static int borrowed_sis_lifetime(unsigned generation, int publish_descriptor,
         HSD_SisLib_804D1124[1] = borrowed_sis_descriptor;
     }
 
+    if (borrowed_sis_refuse_drain) {
+        check(!melee_web_gameplay_shutdown(error, sizeof(error)) &&
+                  strstr(error, "did not confirm complete source drain") != NULL,
+              "returned source-drain refusal supplies an explicit failure");
+        MeleeWebGameplayBootstrapState state;
+        check(melee_web_gameplay_bootstrap_state(&state, sizeof(state)) &&
+                  state.shutting_down == 1 && state.vs_sis_live == 1 &&
+                  state.tables_live == 1 && borrowed_sis_shutdown_calls == 1 &&
+                  !borrowed_sis_drain_seen && !borrowed_sis_sweep_seen &&
+                  HSD_SisLib_804D7978 == text &&
+                  HSD_SisLib_804D1124[1] == borrowed_sis_descriptor &&
+                  !HSD_SisLib_FontSlotBorrowable(2) && owner.canary == 0x51A51A51,
+              "unknown source drain retains the live owner, archive, text and generic objects");
+        check(!melee_web_gameplay_step(error, sizeof(error)) &&
+                  !melee_web_gameplay_vs_startup_active() &&
+                  melee_web_gameplay_generation() == 0 &&
+                  melee_web_gameplay_stats().generation == 0,
+              "unknown source drain cannot step or publish a live world");
+        check(!melee_web_gameplay_shutdown(error, sizeof(error)) &&
+                  borrowed_sis_shutdown_calls == 1 && !borrowed_sis_sweep_seen,
+              "unknown source drain cannot be retried or swept");
+        /* Exit this separate fixture process with the failed source world and
+         * all stack-backed owners still live. This is failure-control retention,
+         * not a normal teardown or an accepted leak. */
+        puts("Unknown SIS drain failure-control world retained: passed");
+        exit(0);
+    }
     if (borrowed_sis_replace_after_drain) {
         check(!melee_web_gameplay_shutdown(error, sizeof(error)),
               "foreign replacement after original drain retains a blocked world");
@@ -519,6 +553,8 @@ int main(int argc, char** argv)
 {
     if (argc == 2 && !strcmp(argv[1], "replaced_heap")) return replaced_heap_case();
     if (argc == 2 && !strcmp(argv[1], "retained_session")) return retained_session_case();
+    if (argc == 2 && !strcmp(argv[1], "sis_drain_refusal"))
+        return !borrowed_sis_lifetime(5, 1, 0);
     if (argc == 2 && !strcmp(argv[1], "source_owned_sis")) {
         check(borrowed_sis_lifetime(0, 0, 0), "reduced source-owned SIS loader lifetime");
         puts("Original source-owned SIS loader trace: passed");
