@@ -1,0 +1,229 @@
+{
+  "schema": "melee-web-borrowed-sis-retirement-v1",
+  "result": "passed_with_explicit_scope_exclusions",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "boundary": "Single checked port-owned borrowed SIS binding across original source text drain, checked clear, and generic GObj sweep. Synthetic fixtures only; no Stadium stage construction.",
+  "producer": {
+    "branch": "codex/stadium-sis-borrowed-retirement-20261007",
+    "executable_commit": "2dcda64048cff9c19545510ee0e0b78c710348c9",
+    "base": "52f735dbd9198d0aa570f7f52ed625f47ba90332",
+    "tree": "d68980dc6ebfe71ed9ad418d111dc76f3f942e3e",
+    "diff_sha256": "7966755d2bf6f47d8f44ce1ec73431556c52b04d3b08b8ca632d5b91cd8e5033",
+    "source_files": [
+      "cmake/FighterRuntime.cmake",
+      "patches/melee-gameplay.patch",
+      "src/gameplay_bootstrap.c",
+      "src/gameplay_bootstrap.h",
+      "src/gameplay_vs_sis.c",
+      "src/gameplay_vs_sis.h",
+      "src/gameplay_world.cpp",
+      "tests/gameplay_bootstrap_state_probe.mjs",
+      "tests/gameplay_bootstrap_trace.c",
+      "tests/gameplay_common_context_trace.c",
+      "tests/test_gameplay_bootstrap.py",
+      "tests/test_gameplay_bootstrap_probe_cleanup.py",
+      "tests/test_gameplay_bootstrap_state_host64.py",
+      "tests/test_gameplay_bootstrap_state_wrapper.py"
+    ],
+    "upstream_melee": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "pristine_upstream_before_and_after_validation": true,
+    "private_source_manifest_sha256": "0e61f9d4e391027336c4b6fa4b71467fb30f9b6ee8bc8948865134c184fe17d8"
+  },
+  "machine": {
+    "architecture": "arm64",
+    "os": "macOS 26.6 build25G72",
+    "fixture_node": "24.19.0",
+    "browser": "not run"
+  },
+  "contract": {
+    "source_accessor": "HSD_SisLib_FontSlotBorrowable in canonical patches/melee-gameplay.patch; private archive owner read only, authored array extent",
+    "binding": "Bootstrap owns one font slot and expected descriptor; configured VS owner validates empty prior slot/no source archive; original publisher remains separate",
+    "vs_owner_operations": [
+      "validate borrowed registration",
+      "preflight borrowed binding",
+      "complete-or-fatal original SIS drain",
+      "checked borrowed retirement"
+    ],
+    "provider": "Stateless src/gameplay_vs_sis.c is in fighter_source_runtime; lower gameplay_runtime has no direct SIS symbols/includes or new linkage dependency",
+    "order": [
+      "preflight before destruction",
+      "original HSD_SisLib_803A5FBC drains text/context and source archives",
+      "checked borrowed slot clear",
+      "generic GObj sweep while descriptor owner remains live",
+      "allocation owner release by caller"
+    ],
+    "shutdown_phase": {
+      "0": "idle",
+      "1": "active; unknown returned drain failure remains blocked without retry",
+      "2": "retained after known completed drain; checked shutdown-only retry skips original drain"
+    },
+    "diagnostics": {
+      "abi_version": 1,
+      "bytes": 128,
+      "schema": "GPB2",
+      "reused_fields": {
+        "offset12": "borrowed font slot or UINT32_MAX",
+        "offset124": "expected descriptor identity"
+      },
+      "historical_GPBS_receipt": "docs/evidence/gameplay-bootstrap-owner-v1.json remains historical",
+      "added_diagnostic_bytes": 0,
+      "tracked_owner_values": [
+        "vs_borrowed_sis_slot",
+        "vs_borrowed_sis_descriptor"
+      ]
+    },
+    "normal_world_owner_retirement": "No stage/profile/content/admission route is enabled by this seam"
+  },
+  "fixtures": {
+    "borrowed_lifetimes": 4,
+    "controls": [
+      "two complete published generations",
+      "nonempty prior-slot refusal without change",
+      "foreign pre-drain replacement refusal without change",
+      "unpublished registered descriptor",
+      "real source-owned SIS archive-slot refusal",
+      "foreign replacement after real drain: blocked phase2, unrepaired refusal, repaired retry with one original callback",
+      "returned DRAIN0 with empty diagnostic: explicit fallback error, activephase1, retained real archive/text/owner, no sweep/step/live generation, no second callback"
+    ],
+    "text": "Original SIS context/text creation and text GObj/list destruction; no glyph drawing or bytecode equivalence",
+    "archive": "Valid big-endian synthetic DAT bytes, checked by actual DatArchive parser; existing typed native public symbol owner, genuine original SIS archive allocation/copied data/original free",
+    "bytes": "Both fixture vectors remain immutable across successful original loading and teardown",
+    "failure_control": "Separate process exits with deliberately retained failed world and stack-backed owners still live; not normal teardown or leak acceptance"
+  },
+  "validation": {
+    "focused_bootstrap": {
+      "exit_code": 0,
+      "seconds": 20.27084517478943,
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_gameplay_bootstrap.py -v",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "ea5433eae619d465dff11809792c3d2fb1f0f0e0ef35360a770e1888309dd1ee",
+      "executable_producer": "5520bde180b584f9fee8d4558597bcdd6f5ee594",
+      "run_label": "stadium-sis-final-validation-20261007-023818-b5562877"
+    },
+    "focused_collision": {
+      "exit_code": 0,
+      "seconds": 3.0372490882873535,
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_gameplay_collision.py -v",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "fb61acdc121174aea1db0a411bccd66f28c9b71a73f485f5211c4c1a3b675622",
+      "executable_producer": "5520bde180b584f9fee8d4558597bcdd6f5ee594",
+      "run_label": "stadium-sis-final-validation-20261007-023818-b5562877"
+    },
+    "focused_common_context": {
+      "exit_code": 0,
+      "seconds": 0.11780118942260742,
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_gameplay_common_context.py -v",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "55dfed056100880c6b1c2ed55e6886129ee111283167f640196dc6aa314f5272",
+      "executable_producer": "5520bde180b584f9fee8d4558597bcdd6f5ee594",
+      "run_label": "stadium-sis-final-validation-20261007-023818-b5562877"
+    },
+    "fresh_narrow_gameplay_closure": {
+      "exit_code": 0,
+      "seconds": 30.161045789718628,
+      "command": "python3 scripts/build.py --target gameplay",
+      "stdout_sha256": "dff8c565bffd38a746945d5118403bec0e2a9af7fbae4290ae823c9334f306cf",
+      "stderr_sha256": "778010fb0fa7590bfe79cd4d0e4a4df963e18bdd2ad4d2fd2b19988c0e23df84",
+      "executable_producer": "5520bde180b584f9fee8d4558597bcdd6f5ee594",
+      "run_label": "stadium-sis-final-validation-20261007-023818-b5562877"
+    },
+    "current_main_abi": {
+      "exit_code": 0,
+      "seconds": 0.6402122974395752,
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p 'test_gameplay_bootstrap_state_*.py' -v",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "7ddbde5e64f0faa1e4644edfa79ea2174fec848574a9e1ba8a9f5370fd9f8ca2",
+      "executable_producer": "2dcda64048cff9c19545510ee0e0b78c710348c9",
+      "run_label": "stadium-sis-current-main-validation-20261007-024622-6b1fd974"
+    },
+    "current_main_full_suite": {
+      "exit_code": 0,
+      "seconds": 369.73499298095703,
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "stdout_sha256": "638c0b9057e846e3028e36d96407fd43fe56335e7eaed31dd54d0fe5927e5cae",
+      "stderr_sha256": "c8942ecc31b51d42f27c0d09218b580d58061a69c92be8d311a98ecf9c3d7d91",
+      "tests": 1972,
+      "skipped": 132,
+      "unittest_seconds": 369.376,
+      "executable_producer": "2dcda64048cff9c19545510ee0e0b78c710348c9",
+      "run_label": "stadium-sis-current-main-validation-20261007-024622-6b1fd974"
+    },
+    "current_main_release": {
+      "exit_code": 0,
+      "seconds": 22.47585892677307,
+      "command": "python3 scripts/build.py --target runtime --configuration Release",
+      "stdout_sha256": "159791d135a07b5e0a7a692ad1735191844622829f66dbb5e4f587e724b19354",
+      "stderr_sha256": "21c6fec15fe4097868f5576455de36b5f8bdc50c0683c3849e8c4ec9eb6ec8fa",
+      "executable_producer": "2dcda64048cff9c19545510ee0e0b78c710348c9",
+      "run_label": "stadium-sis-current-main-validation-20261007-024622-6b1fd974"
+    },
+    "release_executed": false,
+    "retained_artifacts": {
+      "build/browser-release/gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "build/browser-release/gameplay_menu_browser.js": {
+        "bytes": 299682,
+        "sha256": "e848edeb48d2b3712113b81543019d8df7bd3e0001aa726e8b98b407e41ab328"
+      },
+      "build/browser-release/gameplay_menu_browser.wasm": {
+        "bytes": 15739269,
+        "sha256": "429181c83b1a1e1cf02762c7d379ae01acb15599991867af437b480dbde788a5"
+      }
+    }
+  },
+  "base_refresh": {
+    "previous_executable": "5520bde180b584f9fee8d4558597bcdd6f5ee594",
+    "range_diff": "Three source commits unchanged (=) on current main; exact range-diff retained privately",
+    "previous_suite": "Passed; superseded by current-main validation",
+    "previous_queued_release": "Completed in flight and retained; superseded by current-main validation"
+  },
+  "retained_experiments": [
+    {
+      "failure": "Manager LbRb.dat RuntimeFiles ownership missing",
+      "retained": true
+    },
+    {
+      "failure": "Original SIS load lacked typed native public symbol ownership",
+      "retained": true
+    },
+    {
+      "failure": "Direct lower bootstrap SIS references broke narrow collision link closure at4131df1",
+      "retained": true
+    }
+  ],
+  "source_only_reuse_review": {
+    "manager_rumble": "Reuse typed LbRb.dat/lbRumbleData rows plus exact RuntimeFiles ownership required by current lbDvd source loader; HPS module location did not establish an HPS requirement",
+    "dormant_vs_preload": "No discovered unittest/run-script consumer; missing newer RuntimeFiles prerequisite is source inspection only, not an observed baseline failure",
+    "sis_loader": "Existing native public symbol hydration and genuine original archive owner; no generic parser/registry or fake archive pointer",
+    "link_failure_correction": "Typed existing VS callback/stateless upper helper; no proliferation of full fighter linkage into narrow probes"
+  },
+  "exclusions": [
+    "Stadium callback/profile/content/admission",
+    "actual C1/E8 source archive lookup",
+    "stage-only screen retirement",
+    "real asset read or probe",
+    "SIS drawing/bytecode equivalence",
+    "transformation scheduler",
+    "natural browser/menu transition",
+    "retail state/pixels/PCM comparison",
+    "foreground timing/physical input/audible output/performance",
+    "issue164 whole-session acceptance"
+  ],
+  "cleanup": {
+    "successful_test_scratch": "Owned test cleanup retained existing safeguards",
+    "incremental_builds": "Kept for current-head review/CI followup; no retirement applied",
+    "retained_evidence": "All failed/reduced/successful experiment receipts and compiled artifacts preserved",
+    "browsers_servers_started": 0
+  },
+  "retained_runs": {
+    "final": "stadium-sis-current-main-validation-20261007-024622-6b1fd974",
+    "private_manifest_and_full_logs_retained": true,
+    "earlier_failures_reduced_loader_parser_check_and_superseded_passes_retained": true
+  }
+}
