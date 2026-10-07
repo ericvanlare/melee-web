@@ -1,0 +1,263 @@
+{
+  "schema": "melee-web-a3-webrtc-input-sampling-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/225",
+  "scope": "One same-host, headless, two-browser-peer synthetic Gamepad input-sampling and fixed two-tick consumption check over a direct local WebRTC DataChannel. Component evidence only.",
+  "evidence_labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised"
+  ],
+  "capture_producer": {
+    "repository": "melee-web",
+    "branch": "codex/a3-native-input-webrtc-20261007",
+    "commit": "0d8556e44bf65ca9db4f93fabb44a35b07ca2350",
+    "tree": "8ff5460dcecef41acd25375cbca62e32dbaf9af5",
+    "base_main_commit": "4135b202d60a48e089c002d7417059dac23c7e6c",
+    "tracked_worktree_clean_before_and_after_capture": true,
+    "patch_equivalent_rebase_commit": "ee2e86512a1b54156a3feaf79b8250ca95420f58",
+    "current_main_commit": "10dd466c3ac4103fc11f56b1943ba4930c477959",
+    "current_main_tree": "0252f801026110001ae1d7a7f5ef40fa146da481",
+    "rebased_issue225_patch_equivalent": true,
+    "runtime_build_inputs_changed_since_capture": false,
+    "current_main_delta": {
+      "from": "4135b202d60a48e089c002d7417059dac23c7e6c",
+      "to": "10dd466c3ac4103fc11f56b1943ba4930c477959",
+      "changed_files": [
+        "docs/RECORDED_SESSION_STATE.md",
+        "docs/evidence/b4-v10-first-match-clock1000-source-only-v1.json",
+        "docs/evidence/b4-v10-ordered-clock-lineage-comparator-v1.json",
+        "docs/status/2026-10-07-b4-v10-first-match-clock1000-source-only.md",
+        "docs/status/2026-10-07-b4-v10-ordered-clock-lineage-comparator.md",
+        "scripts/compare_whole_session_state.py",
+        "tests/test_compare_whole_session_state_cli.py",
+        "tests/test_whole_session_state_compare.py",
+        "tools/whole_session_state_compare.py"
+      ],
+      "runtime_build_inputs_changed": false,
+      "captured_release_artifact_hashes_unchanged": true
+    }
+  },
+  "implementation": {
+    "reuse": "Pass the existing endpoint factory through createBrowserNativePeer and use the existing direct WebRTC DataChannel endpoint. Native PAD processing, 11-byte serialization, poll serial, fixed S+2 mapping, checksum format, and lockstep protocol were unchanged.",
+    "signaling": "In-memory offer/answer after host candidate gathering; alpha attaches at createDataChannel while connecting, and beta attaches synchronously in the datachannel event while open.",
+    "input_source": "Synthetic Gamepad injection inside each page. No physical or keyboard input was sampled.",
+    "changed_file_sha256": {
+      "scripts/net_lockstep_browser.mjs": "e059f67b69fbfeb606395de9d7e541c118d1c1ea26503c4869811063cfe82f09",
+      "scripts/net_lockstep_transport.mjs": "e08ad69bdb4f590848ee86d9dbfcc5bf7f0af0c63ec1a20046cc3aa4a77dfbb7",
+      "scripts/net_session_instance.mjs": "786bee12598a28018d0cc46d474f4546e812ace9a7de73970d6d739695f650d0",
+      "tests/net_lockstep_browser_peer.test.mjs": "5621f6dd8a11b17f8fb984031dee53d0c74aac22730562541beeb70f473f6ab8",
+      "tests/net_lockstep_transport.test.mjs": "1d73650b26acffb1dc60428e9763ae3c7af0ae6d43c447ed2f2f10d2823e9b30",
+      "tests/test_net_lockstep_contracts.py": "1b625263ed456997c4e251173129e3ecfd7c8cc16f4a4d0a948fb0917bbafa55"
+    }
+  },
+  "runtime_build": {
+    "producer_commit": "0d8556e44bf65ca9db4f93fabb44a35b07ca2350",
+    "producer_tree": "8ff5460dcecef41acd25375cbca62e32dbaf9af5",
+    "configuration": "Release",
+    "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+    "compiler_jobs": "default",
+    "build_log_sha256": "d733b02e90e6b2b7ccbb3b85e3f2cbf8869220cf1d222552cb78eb42e46d5fd4",
+    "artifacts": {
+      "gameplay_menu_browser.js": {
+        "bytes": 300352,
+        "sha256": "05e19b0c1e508ef44bacc45b1ed513e4dd450eb25e88fa9e40150f100ca42ab3"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15741510,
+        "sha256": "34b08e2755f0237804d41ab7c27d6eec114a461186a27e8736e5c3a916d3fc22"
+      },
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      }
+    },
+    "staged_runtime_manifest_sha256": "357a5da57d3311e53c4347825fb1f826ae8f220d30b1453c034e6711384d4105",
+    "staged_runtime_file_count": 36,
+    "staged_runtime_bytes": 20303433,
+    "staged_runtime_files_match_manifest": true
+  },
+  "browser_probe": {
+    "run_id": "issue225-webrtc-input-capture-20261007-123554-f44fcaa1",
+    "packet_sha256": "709248b78fd1eb8bd3b2429d7131aef6a1f5cd2bba6fb4c232bd141f5ab5c739",
+    "coordinator_sha256": "c71b7201a5b712ca1748d87ebe73a62a9e1bccbbc279d2381b83fdd1f8c91960",
+    "runner_report_sha256": "1d6dd7e949c103b29dfed8ef5c56e2734c52f59021b6535f23fb771c1dba6e1b",
+    "root_result_review_sha256": "d1dc32f5701ea8d5698825264fee35cffb83da6032a02f3881462c0888db4f8d",
+    "result": "pass",
+    "failed_browser_runs": 0,
+    "machine": "Mac mini",
+    "browser": {
+      "name": "Google Chrome",
+      "version": "154.0.8037.98",
+      "mode": "headless",
+      "speaker_muted": true,
+      "audio_processing_disabled": false,
+      "playwright": "1.62.1"
+    },
+    "transport": {
+      "type": "webrtc-datachannel",
+      "local_only": true,
+      "ice_servers": [],
+      "candidate_types": {
+        "offer": ["host", "host"],
+        "answer": ["host", "host"]
+      },
+      "ordered": true,
+      "reliable": true,
+      "connection_states": {"alpha": "connected", "beta": "connected"},
+      "attachment": {
+        "alpha": {"event": "createDataChannel", "ready_state": "connecting"},
+        "beta": {"event": "datachannel", "ready_state": "open"}
+      },
+      "signaling": "In-memory offer/answer after host candidate gathering; no external signaling service."
+    },
+    "input_capture": {
+      "source_ticks": 6,
+      "input_ticks": 4,
+      "delay": "Capture at source cursor S is consumed at native source S+2; source ticks 0 and 1 use neutral bootstrap input.",
+      "alpha": {
+        "gamepad_index": 0,
+        "local_port": 0,
+        "states": ["neutral", "A", "release", "neutral"],
+        "poll_serials": [212, 213, 214, 226],
+        "pad_status_bytes": [
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ]
+      },
+      "beta": {
+        "gamepad_index": 1,
+        "local_port": 1,
+        "states": ["neutral", "neutral", "neutral", "neutral"],
+        "poll_serials": [210, 211, 212, 213],
+        "pad_status_bytes": [
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        ]
+      },
+      "native_input_component_fnv1a64_by_source_tick": [
+        "908c9d77152a1213",
+        "908c9d77152a1213",
+        "908c9d77152a1213",
+        "66930180ccd3f0e2",
+        "908c9d77152a1213",
+        "908c9d77152a1213"
+      ],
+      "native_input_component_matches_expected_on_both_peers": true,
+      "checksum_records_per_peer": 6,
+      "input_ack_through_tick": 3,
+      "remote_wait": {
+        "source_cursor": 2,
+        "blocker": "network_wait",
+        "held_ms": 120,
+        "capture_count_before": 3,
+        "capture_count_after": 3,
+        "bytes_and_serial_unchanged": true,
+        "released_role": "beta",
+        "released_input_tick": 0
+      }
+    },
+    "css_boundary": {
+      "scene": "CSS on both peers for all six source ticks",
+      "source_steps_each": 6,
+      "source_draws_each": 6,
+      "checksum_streams_identical": true,
+      "checksum_mismatches": 0,
+      "canvas_dimensions_each": [640, 480],
+      "screenshots": [
+        {"role": "alpha", "name": "accounted-css.png", "png_dimensions": [900, 700], "bytes": 469933, "sha256": "0cf36c8a94a28eb0306a34c892b56030403923f526cc66ed2708227bf5ae061f"},
+        {"role": "beta", "name": "accounted-css.png", "png_dimensions": [900, 700], "bytes": 470759, "sha256": "7eb3b218044cdf4396027e5a281178b9c567d0d613a9a1d740e42ec9c35bc263"}
+      ],
+      "cross_origin_isolated_each": true,
+      "webgpu_api_and_adapter_each": true,
+      "visual_review": "Root visually observed red elongated shapes/cropped presentation. Screenshot presence and GPU diagnostics only; no visual-fidelity or pixel-equivalence acceptance."
+    },
+    "audio": {
+      "runtime_processing_enabled": true,
+      "speaker_muted": true,
+      "acceptance": false,
+      "note": "No uninterrupted-audio or audible-output acceptance is claimed. Retained audio underrun diagnostics, if present, are diagnostic evidence only."
+    },
+    "cleanup": {
+      "capture_owner_passed": true,
+      "owned_process_pids_absent": 25,
+      "owned_process_groups_absent": 5,
+      "browser_profiles_removed": 2,
+      "chrome_tmp_empty": true,
+      "http_server_stopped": true,
+      "port_8787_free": true,
+      "lane_marker_released_by_root": true
+    },
+    "raw_artifact_hashes": {
+      "browser_owner_sha256": "99b99aead83d6a472944c9f9b98e4abee0fc043a53093a33cd49fc569de2e13e",
+      "process_trace_sha256": "5290aac2bacb4b318c5612263fb107d641e39d890732a9d0fb71f7ab949e5f6a",
+      "capture_log_sha256": "6700a2ebc865236a7752de2f5052534e96a06048927b1490fc99a28e99d58107",
+      "checksums_bin_sha256": "b10250cba1c5cc1c71e61dc27c3be068efa44904e516b44c41eeb8be0f5fe426"
+    }
+  },
+  "validation": {
+    "full_python_suite_before_latest_main_merge": {
+      "producer_commit": "0d8556e44bf65ca9db4f93fabb44a35b07ca2350",
+      "base_main_commit": "4135b202d60a48e089c002d7417059dac23c7e6c",
+      "total_including_skips": 2015,
+      "passed": 1864,
+      "skipped": 151,
+      "failed": 0,
+      "log_sha256": "918894f9b958b164bdf3ae7ba472424531e282d78887af50172a5082d23a2ee4"
+    },
+    "full_python_suite_current_main": {
+      "producer_commit": "ee2e86512a1b54156a3feaf79b8250ca95420f58",
+      "producer_tree": "331acac6d135d731b1c10318eac67bc33c251c1c",
+      "base_main_commit": "10dd466c3ac4103fc11f56b1943ba4930c477959",
+      "total_including_skips": 2024,
+      "passed": 1873,
+      "skipped": 151,
+      "failed": 0,
+      "duration_seconds": 376.722,
+      "log_sha256": "2dc706c2d746d1c03281bf07590d98a5f3b2ff30e13cd5d25d60c27d976ead3b"
+    },
+    "runtime_build_reuse_after_main_refresh": "The intervening main commit changed documentation, a comparator, and comparator tests only. The six issue225 JS/test file hashes, 36 staged artifacts, and Release JS/WASM/data hashes match the capture producer; no rebuild was required."
+  },
+  "historical_validation": {
+    "full_suite_on_dirty_precommit_tree": {
+      "head_commit": "15fd2199abee8cb32c0fa11606521cbfcf823105",
+      "head_tree": "9e6168f4dad5cbd27f0918e5ec43aa3c0e59c6f0",
+      "working_tree_patch_sha256": "45962d5fa98617094061341476a9f153b7d80d8e7bca1d933f69da7156571f72",
+      "working_tree_patch_bytes": 31054,
+      "patch_unchanged_before_and_after_suite": true,
+      "files": [
+        {"path": "scripts/net_lockstep_browser.mjs", "sha256": "e059f67b69fbfeb606395de9d7e541c118d1c1ea26503c4869811063cfe82f09"},
+        {"path": "scripts/net_lockstep_transport.mjs", "sha256": "e08ad69bdb4f590848ee86d9dbfcc5bf7f0af0c63ec1a20046cc3aa4a77dfbb7"},
+        {"path": "scripts/net_session_instance.mjs", "sha256": "786bee12598a28018d0cc46d474f4546e812ace9a7de73970d6d739695f650d0"},
+        {"path": "tests/net_lockstep_browser_peer.test.mjs", "sha256": "5621f6dd8a11b17f8fb984031dee53d0c74aac22730562541beeb70f473f6ab8"},
+        {"path": "tests/net_lockstep_transport.test.mjs", "sha256": "1d73650b26acffb1dc60428e9763ae3c7af0ae6d43c447ed2f2f10d2823e9b30"},
+        {"path": "tests/test_net_lockstep_contracts.py", "sha256": "1b625263ed456997c4e251173129e3ecfd7c8cc16f4a4d0a948fb0917bbafa55"}
+      ],
+      "result": "Ran 2013 tests; OK (skipped=149)",
+      "log_sha256": "04ceeef1264083ef9567cae2412709a041fad5195800ae5c75d053a6d82ae517"
+    },
+    "initial_focused_syntax_failure": {
+      "reported": true,
+      "raw_log_retained": false,
+      "note": "The first focused syntax failure was reported during implementation; its exact error cannot be verified from retained evidence. Later syntax checks and focused tests passed."
+    },
+    "packet_generation_failure": {
+      "reported_error": "A one-off Python packet-summary snippet raised NameError because it omitted import json after writing the coordinator.",
+      "raw_note_sha256": "fb7a0a32d1d9431079c25be2341f40a664597b6baefe174eb2a1c47f22ddd01d",
+      "effect": "No repository source changed and no browser/server started; the coordinator was inspected, corrected, and syntax-checked before launch."
+    }
+  },
+  "exclusions": [
+    "physical or keyboard input",
+    "Internet, hosted signaling, STUN/TURN, relay fallback, or two-machine play",
+    "foreground timing, latency, or sustained performance",
+    "visual/pixel equivalence or game-render fidelity",
+    "uninterrupted audio or audible-output acceptance",
+    "full supported route, full-match, or whole-session accuracy",
+    "tournament or rollback acceptance"
+  ],
+  "acceptance": "The bounded #225 synthetic browser-local native input and fixed-delay component criteria passed on the captured producer. Current-main tests pass after rebase; final integration remains subject to pull-request CI and merge. Broader A3 acceptance remains open."
+}
