@@ -413,7 +413,18 @@ function createAgreement(identity, start) {
 }
 
 async function publishAllInputs(alpha, beta) {
+  const publicationTerminated = () => {
+    const terminals = [alpha.terminal, beta.terminal].filter(Boolean);
+    if (!terminals.length) return false;
+    if (scenario !== 'flip' || terminals.some(terminal => terminal.kind !== 'desync'))
+      throw Error(`Unexpected terminal during input publication: ${JSON.stringify(terminals)}`);
+    // The existing terminal-pair, native hold and raw first-mismatch checks
+    // validate the expected desync after publication returns.
+    return true;
+  };
   for (let first = 0; first < usedInputs; first += 32) {
+    await refreshBrowserPeers();
+    if (publicationTerminated()) return;
     const end = Math.min(first + 32, usedInputs);
     const left = [], right = [];
     for (let tick = first; tick < end; ++tick) {
@@ -425,11 +436,16 @@ async function publishAllInputs(alpha, beta) {
     const rightOverrides = right.filter(([tick]) => flip?.port === 1 && flip.tick === tick)
       .map(([tick]) => [tick, nativeSample('beta', tick)]);
     await alpha.addLocalInputs(left, {nativeOverrides: leftOverrides});
+    await refreshBrowserPeers();
+    if (publicationTerminated()) return;
     await beta.addLocalInputs(right, {nativeOverrides: rightOverrides});
+    await refreshBrowserPeers();
+    if (publicationTerminated()) return;
     const ackEnd = end - 1;
     const started = Date.now();
     for (;;) {
       await refreshBrowserPeers();
+      if (publicationTerminated()) return;
       if (alpha.remoteAckInput >= ackEnd && beta.remoteAckInput >= ackEnd) break;
       if (Date.now() > deadline || Date.now() - started > stallMs)
         throw Error(`Loopback input acknowledgement stalled before tick ${ackEnd}`);
