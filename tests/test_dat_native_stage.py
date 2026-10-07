@@ -1,5 +1,6 @@
 """Optional real stage descriptor boundary; does not claim complete stage execution."""
 from pathlib import Path
+import hashlib
 import shutil
 import subprocess
 import tempfile
@@ -62,13 +63,13 @@ class NativeStageOriginalRuntime(unittest.TestCase):
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertIn("Original native map publication/lookup/lifetime/restart passed",result.stdout)
 
-    def run_trace(self,name,argument):
+    def run_trace(self,name,*arguments):
         target=ROOT/"build/browser"/(name+".js")
         if not target.is_file():self.skipTest("Original stage trace target unavailable")
         import sys
         sys.path.insert(0,str(ROOT/"scripts"))
         from check_gameplay import node_runtime
-        result=subprocess.run([str(node_runtime()),str(target),str(argument)],cwd=ROOT,capture_output=True,text=True,timeout=180)
+        result=subprocess.run([str(node_runtime()),str(target),*(str(argument) for argument in arguments)],cwd=ROOT,capture_output=True,text=True,timeout=180)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         return result.stdout
 
@@ -77,6 +78,14 @@ class NativeStageOriginalRuntime(unittest.TestCase):
         if not asset.is_file():self.skipTest("Optional local stage asset unavailable")
         output=self.run_trace("dat_native_stage_map_trace",asset)
         self.assertIn("Complete FD native map",output)
+
+    def test_stadium_map_only_owner_preserves_exact_imports_and_nulls(self):
+        asset=ROOT/"assets-local/stadium-c0-20261006/GrPs.usd"
+        if not asset.is_file():self.skipTest("Retained C0 English GrPs.usd input unavailable")
+        digest=hashlib.sha256(asset.read_bytes()).hexdigest()
+        self.assertEqual(digest,"aa740cfbbeced294f058449caca8ac0380532521dde06ca4a6dcc03080cf6a6d")
+        output=self.run_trace("dat_native_stage_map_trace","--stadium-map",asset)
+        self.assertIn("C0 Stadium map-only owner",output)
 
     def test_original_oninit_scheduler_and_teardown(self):
         assets=ROOT/"assets-local/next-gate"

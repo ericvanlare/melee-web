@@ -7,7 +7,7 @@
 #include <math.h>
 int melee_web_test_native_stage_map(void* pointer,void* yaku){
  UnkStageDat* map=pointer;u32** programs=yaku;
- if(!map||map->unkC!=10||map->unk4!=1||map->unk14!=2||map->unk24!=3||map->unk2C!=1||map->unk18!=NULL||map->unk1C!=32||!programs)return 0;
+ if(!map||map->unkC!=10||map->unk4!=1||map->unk14!=2||map->unk24!=3||map->unk2C!=1||map->unk18!=NULL||map->unk1C!=32||!programs||map->unk8[0].x28)return 0;
  for(int i=0;i<10;i++){
   struct UnkStageDat_x8_t* entry=&map->unk8[i];
   if(!entry->unk0||!entry->x10||!entry->x18||!entry->x18[0]->desc)return 0;
@@ -33,4 +33,34 @@ int melee_web_test_native_stage_map(void* pointer,void* yaku){
   if(i==0&&(first->r||first->a||second->r!=200||second->a!=255))return 0;
  }
  return 1;
+}
+
+int melee_web_test_native_stadium_map(void* pointer){
+ UnkStageDat* map=pointer;
+ static const u8 resident[10]={1,1,1,0,0,1,0,0,0,0};
+ if(!map||map->unkC!=10||map->unk4!=1||map->unk14!=0||map->unk24!=0||
+    map->unk2C!=44||map->unk18!=NULL||map->unk1C!=48||!map->unk28)return 0;
+ for(int i=0;i<10;i++){
+  struct UnkStageDat_x8_t* entry=&map->unk8[i];
+  if((entry->unk0!=NULL)!=resident[i])return 0;
+  if(resident[i]){
+   if(!entry->x10||!entry->x18||!entry->x18[0]||!entry->x18[0]->desc)return 0;
+   if(i&&(!entry->unk4||!entry->unk8))return 0;
+  }else{
+   if(entry->x10||entry->x18||entry->x1C)return 0;
+   if(i!=9&&(entry->unk24||entry->unk20))return 0;
+  }
+  if(i==0){if(entry->x28)return 0;}
+  else if(!entry->x28)return 0;
+  if(i==9&&(entry->unk24!=1||!entry->unk20))return 0;
+ }
+ return 1;
+}
+const u8* melee_web_test_native_stadium_flags(void* pointer,int index){
+ UnkStageDat* map=pointer;
+ return map&&index>=0&&index<map->unkC?map->unk8[index].x28:NULL;
+}
+void* melee_web_test_native_stadium_flag(void* pointer,int index){
+ UnkStageDat* map=pointer;
+ return map&&index>=0&&index<map->unk2C?map->unk28[index]:NULL;
 }
