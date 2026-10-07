@@ -1,0 +1,19 @@
+# MWRC v10 first match clock-60 comparison
+
+**Compiled / Source identified / Retail compared / Browser exercised**
+
+One bounded GALE01 revision-2 MWRC v10 comparison joined the retained source capture to a separately captured ordinary browser replay. It compared the match setup and all 184 contiguous match-0 ticks from tick 0 through the first `match_frame` 60. The exact terminal source boundary was tick 183, source sequence 5030 after PAD consume 5029, at recipe timeline index 1367 and browser cursor 1368. No declared field differed.
+
+The comparison first rejoined the accepted clock-1 boundary at tick 124, source sequence 4735 after PAD consume 4734. Its fresh consumed-prefix digest matched the accepted audit; the comparator then continued and matched the fresh clock-60 digest. The full MWRO kept its recorded SHA-256 and was not rehashed; its file stat remained stable during the bounded read.
+
+The browser capture requested cursor 1368, observed 1378 and exported 1381 frames (indices 0–1380). Its 937 CSS and 247 SSS frames established recipe input order only. Match frames 1184–1367 were compared through clock 60; the 13 exported match frames after that boundary received shape and order validation only. The setup compared RNG, match clock, PAD state, fighters, primary fighter entities and declared setup. Each of the 184 match ticks compared RNG, match clock, PAD state, fighters and primary fighter entities. The strict fighter schema covers 14 float-bit scalars per fighter; across four fighters and 185 compared state samples, that is 10,360 bit values derived from the declared fields. The comparator report records the field-level result, not a separate float counter.
+
+The capture intentionally stopped at the bounded prefix. The capture child exited 1 and the browser report remained incomplete; no browser error occurred before the stop. Both 32-artifact inventories passed, and independent CDP/OS cleanup verification passed. The comparison CLI also exited 1, as expected for `boundary_result: equivalent` with `result: incomplete`, `complete: false`, and `whole_session_equivalent: false`.
+
+The browser capture, comparison, and full validation each bind to producer commit `90289a2` and tree `feb7ed9`; their run identities and outputs are recorded separately in the [portable receipt](../evidence/b4-v10-first-match-clock60-comparison-v1.json). The Python suite completed 1,988 tests, with 145 skipped, and the affected default-off Release runtime build succeeded. The earlier source-only clock-60 audit remains a separate artifact from the browser comparison.
+
+Three preparation failures remain retained: an earlier source-audit packet was rejected before any MWRO stat or stream access due to four mistyped sidecar path tokens; the capture-packet final display raised a `TypeError` after packet files were written; and the first comparison-packet finalizer raised a summary-print `KeyError` after successful preflight. None of these preparation failures executed a comparison. The capture preparation failure started no server or browser. The corrected packets were reviewed; the capture and comparison each ran once.
+
+A possible next boundary is the first match-0 clock value at least 300, covering a multi-second continuation beyond this result. The first step would be a separate bounded source-only audit that rejoins the accepted clock-60 tuple and fresh prefix digest, then checks continuous recipe/PAD/tick/entity lineage through the target under the same 32 MiB and 8,192-record caps. The target tuple must come from that audit; a projected cursor is not an identity. This proposal is not authorized or executed.
+
+This result does not establish state agreement after clock 60, later matches, whole-session accuracy, pixels, PCM, live timing, performance or competitive readiness.
