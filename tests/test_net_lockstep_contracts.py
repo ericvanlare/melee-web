@@ -14,6 +14,7 @@ class NetLockstepContractTests(unittest.TestCase):
         result = subprocess.run([
             str(node_runtime()), '--test',
             str(ROOT / 'tests/net_lockstep_observers.test.mjs'),
+            str(ROOT / 'tests/net_source_accounting.test.mjs'),
             str(ROOT / 'tests/net_lockstep_protocol.test.mjs'),
             str(ROOT / 'tests/net_determinism_browser.test.mjs'),
         ], cwd=ROOT, capture_output=True, text=True, timeout=60)

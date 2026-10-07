@@ -11,6 +11,7 @@ import path from 'node:path';
 import {browserLaunchOptions} from './browser_tools.mjs';
 import {createBrowserDriver} from './browser_driver.mjs';
 import {attachWasmResponseIdentityObserver} from './net_lockstep_observers.mjs';
+import {installNetSourceAccounting, readNetSourceAccounting} from './net_source_accounting.mjs';
 
 export const NET_FRAME_BYTES = 44;
 export const NET_RECORD_BYTES = 64;
@@ -209,6 +210,8 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       return {count: result.count, bytes: Buffer.from(result.data, 'base64')};
     };
     instance.status = () => bounded(() => page.evaluate(() => window.__net.status()));
+    instance.installSourceAccounting = () => bounded(() => installNetSourceAccounting(page));
+    instance.readSourceAccounting = options => bounded(() => readNetSourceAccounting(page, options));
     instance.native = () => bounded(() => page.evaluate(() => window.__net.native()));
     instance.observe = () => bounded(() => page.evaluate(() => window.__net.observe()));
     instance.graphics = () => bounded(() => page.evaluate(async () => {

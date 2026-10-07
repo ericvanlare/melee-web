@@ -16,6 +16,7 @@ import {openLoopbackPeerPair} from './net_lockstep_relay.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
   verifyTerminalHold} from './net_lockstep_observers.mjs';
+import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
 
 const HEADER_BYTES = 16;
 const POSITIVE_ROUTE_BOUNDARIES = Object.freeze([
@@ -548,6 +549,9 @@ async function run() {
   await Promise.all(['alpha', 'beta'].map(role => instances[role].importDisc()));
   await Promise.all(['alpha', 'beta'].map(role => instances[role].beginLockstep(seed, sourceTicks)));
   const startRows = await waitForStart();
+  for (const role of ['alpha', 'beta']) {
+    instanceRows[role].source_accounting_start = await instances[role].installSourceAccounting();
+  }
   // Freeze the initial browser load-response set before peerIdentity performs
   // its separate cache-bypassing fetch of the served Wasm artifact.
   const loadedWasm = await Promise.all(['alpha', 'beta'].map(role => instances[role].freezeLoadedWasmIdentity()));
@@ -653,6 +657,15 @@ async function run() {
   }
   stopRouteCaptureWatchers = true;
   await settleRouteBoundaryWatchers();
+  for (const role of ['alpha', 'beta']) {
+    const capture = await instances[role].readSourceAccounting({freeze: true});
+    const bytes = Buffer.from(JSON.stringify(capture, null, 2) + '\n');
+    await fs.writeFile(path.join(childDirectory(role), 'source-accounting.json'), bytes);
+    instanceRows[role].source_accounting_artifact = {name: 'source-accounting.json',
+      bytes: bytes.length, sha256: sha256(bytes)};
+    instanceRows[role].source_accounting = verifyNetSourceAccounting(capture,
+      scenario === 'positive' || scenario === 'probe' ? sourceTicks : capture.final.cursor);
+  }
   pairResults.wait_observations = waitObservations;
   pairResults.transport_errors = transportErrors;
   pairResults.endpoint_errors = {alpha: relay.alpha.errors, beta: relay.beta.errors};
@@ -759,6 +772,15 @@ try {
   for (const role of ['alpha', 'beta']) {
     const instance = instances?.[role];
     if (instance) {
+      if (instanceRows[role].source_accounting_start && !instanceRows[role].source_accounting_artifact) {
+        try {
+          const capture = await instance.readSourceAccounting({freeze: true});
+          const bytes = Buffer.from(JSON.stringify(capture, null, 2) + '\n');
+          await fs.writeFile(path.join(childDirectory(role), 'source-accounting.json'), bytes);
+          instanceRows[role].source_accounting_artifact = {name: 'source-accounting.json',
+            bytes: bytes.length, sha256: sha256(bytes), incomplete: true};
+        } catch (error) { instanceRows[role].source_accounting_error = String(error.message || error); }
+      }
       try { instanceRows[role].timing_pause_diagnostics = await instance.timingPauseDiagnostics(); } catch {}
       try { await instance.unload(); instanceRows[role].unloaded = true; }
       catch (error) { instanceRows[role].unloaded = false; instanceRows[role].unload_error = String(error.message || error); }
