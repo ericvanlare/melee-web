@@ -25,10 +25,11 @@ export function readyRenderEvent(diagnostics, expectedPhase, priorSignatures = n
   const rows = renderEvents(diagnostics.log);
   for (let index = rows.length - 1; index >= 0; --index) {
     const row = rows[index], data = row.data;
-    if (priorSignatures.has(row.signature) || data.drawn !== 1 || data.draw_suppressed !== 0 ||
-        !(data.draw_calls > 0) || !(data.source_draws > 0) || data.preparation === true ||
+    if (priorSignatures.has(row.signature) || data.began !== 1 || data.drawn !== 1 ||
+        data.draw_suppressed !== 0 || data.preparation_ms !== 0 ||
+        !(data.draw_calls > 0) || !(data.source_draws > 0) ||
         /preparing|ready:\s*0/i.test(data.source || '')) continue;
-    return {phase: expectedPhase, kind: row.kind, last_frame: data.last_frame ?? null,
+    return {phase: expectedPhase, kind: row.kind, frame: data.frame ?? null,
       draw_calls: data.draw_calls, source_draws: data.source_draws,
       draw_suppressed: data.draw_suppressed, source: data.source ?? null,
       signature: row.signature};

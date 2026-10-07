@@ -8,17 +8,17 @@ function callback(data, kind = 'Native callback') {
   return `${kind} ${JSON.stringify(data)}`;
 }
 
-const readyDraw = extra => ({began: 1, drawn: 1, last_frame: 17, draw_calls: 90,
-  source_draws: 1, draw_suppressed: 0, source: 'Original stage select', ...extra});
+const readyDraw = extra => ({began: 1, drawn: 1, frame: 17, preparation_ms: 0,
+  draw_calls: 90, source_draws: 1, draw_suppressed: 0, source: 'Original stage select', ...extra});
 
 test('route readiness requires a new same-phase positive source draw with no preparation', () => {
-  const oldDraw = callback(readyDraw({last_frame: 16}));
-  const newDraw = callback(readyDraw({last_frame: 17}));
+  const oldDraw = callback(readyDraw({frame: 16}));
+  const newDraw = callback(readyDraw({frame: 17}));
   const prior = renderEventSignatures(oldDraw);
   const diagnostics = {phase: 3, running: 1, status: 'Original stage select',
     log: `${oldDraw}\n${newDraw}`};
   assert.deepEqual(readyRenderEvent(diagnostics, 3, prior), {
-    phase: 3, kind: 'Native callback', last_frame: 17, draw_calls: 90,
+    phase: 3, kind: 'Native callback', frame: 17, draw_calls: 90,
     source_draws: 1, draw_suppressed: 0, source: 'Original stage select', signature: newDraw,
   });
   assert.equal(readyRenderEvent({...diagnostics, log: oldDraw}, 3, prior), null,
@@ -29,6 +29,8 @@ test('route readiness requires a new same-phase positive source draw with no pre
   for (const data of [
     readyDraw({draw_suppressed: 1}), readyDraw({draw_calls: 0}),
     readyDraw({source_draws: 0}), readyDraw({source: 'match preparing · ready: 0'}),
+    readyDraw({preparation_ms: 0.005}), readyDraw({preparation_ms: undefined}),
+    readyDraw({began: 0}),
   ]) assert.equal(readyRenderEvent({...diagnostics, log: callback(data)}, 3, new Set()), null);
 });
 
