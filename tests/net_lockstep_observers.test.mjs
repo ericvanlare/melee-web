@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import test from 'node:test';
+import {EventEmitter} from 'node:events';
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
-  verifyTerminalHold, WasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
+  verifyTerminalHold, WasmResponseIdentityObserver, attachWasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
 
 function callback(data, kind = 'Native callback') {
   return `${kind} ${JSON.stringify(data)}`;
@@ -117,4 +118,87 @@ test('loaded Wasm response set freezes before the later handshake fresh fetch', 
   assert.equal(identity.response_count, 1);
   assert.equal(identity.response_set_frozen_before_handshake_fetch, true);
   assert.equal(identity.response_hashes.length, 1);
+});
+
+
+const wasmUrl = 'http://127.0.0.1:18943/gameplay_menu_browser.wasm';
+class Cdp extends EventEmitter {
+  calls = [];
+  bodies = new Map();
+  detached = false;
+  async send(method, params) {
+    this.calls.push({method, params});
+    if (method === 'Network.getResponseBody') {
+      const body = this.bodies.get(params.requestId);
+      if (body instanceof Error) throw body;
+      return {body: body.toString('base64'), base64Encoded: true};
+    }
+    return {};
+  }
+  async detach() { this.detached = true; }
+}
+function load(cdp, requestId, body, {url = wasmUrl, method = 'GET', status = 200,
+  type = 'Fetch', headers = {}, finish = true, request = true} = {}) {
+  cdp.bodies.set(requestId, body);
+  if (request) cdp.emit('Network.requestWillBeSent', {requestId, request: {url, method}});
+  cdp.emit('Network.responseReceived', {requestId, type, response: {url, status, headers}});
+  if (finish) cdp.emit('Network.loadingFinished', {requestId});
+}
+
+test('dedicated observer reads its exact load request and freezes before a changed fresh request', async () => {
+  const cdp = new Cdp();
+  const observer = await attachWasmResponseIdentityObserver(cdp, {expectedUrl: wasmUrl});
+  assert.deepEqual(cdp.calls, [{method: 'Network.enable', params: {
+    maxResourceBufferSize: 64 * 1024 * 1024, maxTotalBufferSize: 128 * 1024 * 1024}}]);
+  load(cdp, 'unrelated', Buffer.from('other host'), {url: wasmUrl.replace('127.0.0.1', 'localhost')});
+  load(cdp, 'load-1', Buffer.from('actual load'));
+  const frozen = observer.freeze();
+  load(cdp, 'fresh-2', Buffer.from('fresh changed'));
+  const receipt = await frozen;
+  assert.equal(receipt.sha256, createHash('sha256').update('actual load').digest('hex'));
+  assert.equal(receipt.response_count, 1);
+  assert.equal(receipt.response_hashes[0].request_id, 'load-1');
+  assert.equal(receipt.response_hashes[0].method, 'GET');
+  assert.deepEqual(cdp.calls.map(row => row.method), ['Network.enable', 'Network.getResponseBody']);
+  assert.equal(cdp.calls[1].params.requestId, 'load-1');
+  await observer.detach();
+  assert.equal(cdp.detached, true);
+  assert.equal(cdp.eventNames().length, 0);
+});
+
+test('dedicated observer retains request, status, read, and size failures without a new fetch', async () => {
+  for (const [options, body, match] of [
+    [{request: false}, Buffer.from('load'), /no matching observed request/],
+    [{method: 'POST'}, Buffer.from('load'), /not usable/],
+    [{status: 503}, Buffer.from('load'), /not usable/],
+    [{type: 'Document'}, Buffer.from('load'), /not usable/],
+    [{}, Error('evicted sentinel'), /evicted sentinel/],
+    [{}, Buffer.alloc(9), /byte bound/],
+    [{}, Buffer.alloc(12), /encoded byte bound/],
+    [{headers: {'Content-Length': '9'}}, Buffer.from('load'), /Content-Length exceeded/],
+    [{headers: {'Content-Length': 'invalid'}}, Buffer.from('load'), /Content-Length exceeded/],
+  ]) {
+    const cdp = new Cdp();
+    const observer = await attachWasmResponseIdentityObserver(cdp, {expectedUrl: wasmUrl, maxBodyBytes: 8});
+    load(cdp, 'bad', body, options);
+    await assert.rejects(observer.freeze(), match);
+    await observer.detach();
+    assert.ok(cdp.calls.every(row => ['Network.enable', 'Network.getResponseBody'].includes(row.method)));
+  }
+});
+
+test('dedicated observer rejects load failure, incomplete teardown, conflicts and absence', async () => {
+  for (const mode of ['failed', 'detach', 'conflict', 'missing']) {
+    const cdp = new Cdp();
+    const observer = await attachWasmResponseIdentityObserver(cdp, {expectedUrl: wasmUrl});
+    if (mode === 'conflict') {
+      load(cdp, 'one', Buffer.from('one')); load(cdp, 'two', Buffer.from('two'));
+    } else if (mode !== 'missing') {
+      load(cdp, 'one', Buffer.from('one'), {finish: false});
+      if (mode === 'failed') cdp.emit('Network.loadingFailed', {requestId: 'one', errorText: 'load failed sentinel'});
+      else await observer.detach();
+    }
+    await assert.rejects(observer.freeze(), /failed sentinel|detached before|conflicting|No runtime/);
+    await observer.detach();
+  }
 });
