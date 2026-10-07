@@ -21,6 +21,13 @@ namespace melee_web {
 [[nodiscard]] std::vector<std::string>
 match_asset_names(const MeleeWebMenuMatchSelection& selection);
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+// Private diagnostic preparation only. This descriptor does not admit
+// Stadium to the ordinary match registry or construct a match owner.
+[[nodiscard]] std::vector<std::string>
+stadium_c1a_asset_names(const MeleeWebMenuMatchSelection& selection);
+#endif
+
 // Complete menu plus selected-fighter/stage assets needed to enter one
 // source-selected Opening VS state. The preview is read-only source data; it
 // is not a synthetic StartMeleeData payload.

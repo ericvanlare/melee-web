@@ -6,6 +6,11 @@ AssetDestination asset_destination=AssetDestination::None;
 // Disc import mode survives scene unload; active asset transactions do not.
 bool scoped_disc_import=false;
 bool scoped_assets=false,asset_committed=false;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+bool stadium_c1a_armed=false;
+std::string stadium_c1a_observation;
+int stadium_c1a_raw_stkind=-1;
+#endif
 uint32_t asset_generation=0;
 std::vector<std::string> requested_assets;
 MeleeWebMenuMatchSelection asset_selection{};
@@ -456,6 +461,9 @@ if(scoped_assets){
   melee_web::retail_replay_end(replay->frames.size(),replay->whole_session());
  replay.reset();melee_web_net_reset();replay_completion={};replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ stadium_c1a_armed=false;stadium_c1a_observation.clear();stadium_c1a_raw_stkind=-1;
+#endif
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;pending_menu_source_scene=0;pending_opening_state=-1;audio_clock.reset();clear_diagnostic_pad();clear_scheduled_results_pad();clear_scheduled_results_pauses();
  css_fighter_release_port=-1;last_css_fighter_observation_valid=false;
  match_message="Original source match";
@@ -479,6 +487,12 @@ void request_assets(AssetDestination destination,
  case AssetDestination::Replay:
   check(selection!=nullptr,"This asset scope requires an original source selection");
   names=melee_web::match_asset_names(*selection);break;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ case AssetDestination::StadiumC1a:
+  check(stadium_c1a_armed&&selection!=nullptr,
+        "Stadium C1a preparation requires its armed source selection");
+  names=melee_web::stadium_c1a_asset_names(*selection);break;
+#endif
  case AssetDestination::Results:
   check(asset_selection_valid,"Results assets require the completed match selection");
   names=melee_web::results_asset_names(asset_selection);break;
@@ -867,6 +881,24 @@ void advance(){
  world->close();world.reset();world_exposed=false;pending=false;menu_clock.reset();audio_phase=0;
  report_owner_lifetime("menu-after-teardown");
  if(phase==5){
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  if(stadium_c1a_armed){
+   StartMeleeData raw_sss{};
+   check(melee_web_menu_host_stadium_c1a_raw_selection(
+       host,&raw_sss,error,sizeof(error)),error);
+   check(raw_sss.rules.stkind==St_Kind_PStadium,
+         "Stadium C1a raw SSS payload did not retain source StKind 3");
+   stadium_c1a_raw_stkind=raw_sss.rules.stkind;
+   MeleeWebMenuMatchSelection selection{};
+   check(melee_web_menu_host_stadium_c1a_selection(
+       host,&selection,error,sizeof(error)),error);
+   check(selection.start.rules.stkind==St_Kind_PStadium,
+         "Stadium C1a selection did not retain source StKind 3");
+   if(scoped_assets){request_assets(AssetDestination::StadiumC1a,&selection);return;}
+   throw std::runtime_error(
+       "Stadium C1a requires the checked local-disc asset-scope boundary; Eject to recover.");
+  }
+#endif
   if(melee_web_menu_host_mode_kind(host)==GM_TRAINING){
    check(melee_web_menu_host_training_start_pending(host),
          "Original Training SSS reached its simulation state without a checked start handoff");
@@ -898,9 +930,44 @@ bool finish_asset_handoff(){
  if(asset_destination==AssetDestination::None)return true;
  if(!asset_committed)return false;
  check(!world&&!match&&!archive_cache,"Asset handoff found a live source owner");
- archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  const auto destination=asset_destination;
  asset_destination=AssetDestination::None;asset_committed=false;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(destination==AssetDestination::StadiumC1a){
+  check(stadium_c1a_armed&&stadium_c1a_raw_stkind==St_Kind_PStadium&&
+        asset_selection_valid&&host&&!host_entered,
+        "Stadium C1a handoff lost its armed closed source owner");
+  const auto names=melee_web::stadium_c1a_asset_names(asset_selection);
+  check(names==requested_assets,
+        "Stadium C1a imported scope differs from its source manifest");
+  check(files.size()==names.size()&&asset_scope.active_file_count()==names.size(),
+        "Stadium C1a import did not publish the complete exact manifest");
+  for(const auto& name:names){
+   const auto found=files.find(name);
+   check(found!=files.end()&&!found->second.empty(),
+         "Stadium C1a import is missing a manifest file");
+  }
+  stadium_c1a_observation="{\"checkpoint\":\"C1a\",\"raw_sss_stkind\":"+
+      std::to_string(stadium_c1a_raw_stkind)+",\"prepared_stkind\":"+
+      std::to_string(asset_selection.start.rules.stkind)+
+      ",\"manifest_files\":[";
+  for(size_t i=0;i<names.size();++i){
+   if(i)stadium_c1a_observation+=",";
+   stadium_c1a_observation+="\""+names[i]+"\"";
+  }
+  stadium_c1a_observation+=
+      "],\"manifest_committed\":true,\"resolvedname\":null,"
+      "\"runtime_source_file_service_request_observed\":false,"
+      "\"match_constructed\":false,\"stage_constructed\":false,"
+      "\"recoverable_stop\":\"before source archive request and match admission\"}";
+  message="Pokémon Stadium C1a preparation complete. Source archive request and match/stage lifecycle remain deferred; unload to recover.";
+  running=false;
+  EM_ASM({window.menuStadiumC1aPrepared?.(UTF8ToString($0));},
+         stadium_c1a_observation.c_str());
+  return true;
+ }
+#endif
+ archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  if(destination==AssetDestination::ReturnMenu){enter_world();return true;}
  if(destination==AssetDestination::TitleReturn){enter_title_after_opening();return true;}
  if(destination==AssetDestination::OpeningScene||

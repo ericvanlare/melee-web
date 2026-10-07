@@ -8793,24 +8793,27 @@ index 67c664b238bef265ad585422c4a48e7cd3b57736..196869cfc0a217b52529dc98d96035f9
  static inline u8 mn_8022F538_GetHoveredSelection(void)
  {
 diff --git a/src/melee/mn/mnstagesel.c b/src/melee/mn/mnstagesel.c
-index b110ff19ad600be99ac37edc69f8bf26198ccfac..ec79b9a60698c1352bb617d2c4ebba09c0b21b8a 100644
+index b110ff19ad600be99ac37edc69f8bf26198ccfac..4531f5d3680a0d2e3b2ce035b974bc83fe55fef9 100644
 --- a/src/melee/mn/mnstagesel.c
 +++ b/src/melee/mn/mnstagesel.c
-@@ -1,5 +1,13 @@
+@@ -1,5 +1,16 @@
  #include "mnstagesel.h"
  
 +#if defined(MELEE_WEB_MENU_MARIO_FD)
 +#include "gameplay_menu.h"
 +#define MELEE_WEB_MENU_STAGE_AVAILABLE(value) \
 +    melee_web_menu_stage_available(value)
++#define MELEE_WEB_MENU_STAGE_EXPLICIT_CONFIRM_AVAILABLE(value) \
++    melee_web_menu_stage_explicit_confirm_available(value)
 +#else
 +#define MELEE_WEB_MENU_STAGE_AVAILABLE(value) (1)
++#define MELEE_WEB_MENU_STAGE_EXPLICIT_CONFIRM_AVAILABLE(value) (1)
 +#endif
 +
  #include <placeholder.h>
  
  #include "inlines.h"
-@@ -47,7 +55,8 @@ int mnStageSel_802599EC(void)
+@@ -47,7 +58,8 @@ int mnStageSel_802599EC(void)
  
      for (i = 0; i < NUM_STAGES; i++) {
          if (mnStageSel_803F06D0[i].x4 >= 0 &&
@@ -8820,7 +8823,7 @@ index b110ff19ad600be99ac37edc69f8bf26198ccfac..ec79b9a60698c1352bb617d2c4ebba09
          {
              break;
          }
-@@ -56,6 +65,18 @@ int mnStageSel_802599EC(void)
+@@ -56,6 +68,18 @@ int mnStageSel_802599EC(void)
          for (i = 0; i < NUM_STAGES; i++) {
              mnStageSel_803F06D0[i].x4 = 0;
          }
@@ -8839,7 +8842,7 @@ index b110ff19ad600be99ac37edc69f8bf26198ccfac..ec79b9a60698c1352bb617d2c4ebba09
      }
      while (var_r29) {
          for (i = 0; i < NUM_STAGES; i++) {
-@@ -65,7 +86,8 @@ int mnStageSel_802599EC(void)
+@@ -65,7 +89,8 @@ int mnStageSel_802599EC(void)
          }
          for (i = 0; i < NUM_STAGES; i++) {
              if (mnStageSel_803F06D0[i].x4 == 0 &&
@@ -8849,7 +8852,7 @@ index b110ff19ad600be99ac37edc69f8bf26198ccfac..ec79b9a60698c1352bb617d2c4ebba09
              {
                  var_r29 = false;
              }
-@@ -74,14 +96,19 @@ int mnStageSel_802599EC(void)
+@@ -74,14 +99,19 @@ int mnStageSel_802599EC(void)
      for (iter = 0; iter < MAX_ITER; iter++) {
          int tmp = HSD_Randi(NUM_STAGES);
          i = tmp;
@@ -8870,11 +8873,11 @@ index b110ff19ad600be99ac37edc69f8bf26198ccfac..ec79b9a60698c1352bb617d2c4ebba09
      }
      mnStageSel_803F06D0[i].x4 = -1;
      if (i < 22) {
-@@ -124,12 +151,24 @@ void mnStageSel_80259C28(void)
+@@ -124,12 +154,24 @@ void mnStageSel_80259C28(void)
          if (mnStageSel_804D6CAE < 0x1E &&
              mnStageSel_803F06D0[mnStageSel_804D6CAE].x8 >= 2)
          {
-+            if (!MELEE_WEB_MENU_STAGE_AVAILABLE(
++            if (!MELEE_WEB_MENU_STAGE_EXPLICIT_CONFIRM_AVAILABLE(
 +                    mnStageSel_803F06D0[mnStageSel_804D6CAE].xB)) {
 +                lbAudioAx_80024030(3);
 +                return;
@@ -8896,7 +8899,7 @@ index b110ff19ad600be99ac37edc69f8bf26198ccfac..ec79b9a60698c1352bb617d2c4ebba09
  skip_randomize:
  
      gobj = GObj_Create(HSD_GOBJ_CLASS_FIGHTER, 5, 0x80);
-@@ -851,10 +890,55 @@ void mnStageSel_Scene_OnExit(UNUSED void* exit_data)
+@@ -851,10 +893,55 @@ void mnStageSel_Scene_OnExit(UNUSED void* exit_data)
  
  int mnStageSel_8025BBD4(void)
  {

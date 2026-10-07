@@ -155,6 +155,15 @@ int melee_web_menu_host_route_target_state(const MeleeWebMenuHost*);
 /* Reads the separate configuration produced by the original VS-entry rules
  * and player preparation after CSS/SSS OnExit. */
 int melee_web_menu_host_selection(const MeleeWebMenuHost*,MeleeWebMenuMatchSelection*,char*,size_t);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Private development checkpoint: arms one fresh VS menu owner and reads its
+ * source-selected Stadium payload for manifest preparation only. */
+int melee_web_menu_host_enable_stadium_c1a(MeleeWebMenuHost*,char*,size_t);
+int melee_web_menu_host_stadium_c1a_raw_selection(
+    const MeleeWebMenuHost*,StartMeleeData*,char*,size_t);
+int melee_web_menu_host_stadium_c1a_selection(const MeleeWebMenuHost*,
+    MeleeWebMenuMatchSelection*,char*,size_t);
+#endif
 /* Reads the raw SSS-owned payload after OnExit and before VS-entry
  * normalization. This is a read-only retail-equivalence observation. */
 int melee_web_menu_host_raw_selection(const MeleeWebMenuHost*,StartMeleeData*,char*,size_t);

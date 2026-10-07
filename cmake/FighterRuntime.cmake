@@ -62,6 +62,13 @@ target_include_directories(fighter_source_runtime PUBLIC src "${MELEE_WEB_GAMEPL
   PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
 target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE
   MELEE_WEB_MENU_MARIO_FD)
+if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  # This development-only predicate/API is compiled into the private source
+  # library. The public source variant below is built from its own target and
+  # never inherits this definition.
+  target_compile_definitions(fighter_source_runtime PRIVATE
+    MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+endif()
 if(NOT MELEE_WEB_PUBLIC_RUNTIME AND NOT MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
   target_compile_definitions(fighter_source_runtime PRIVATE MELEE_WEB_RNG_DRAW_OBSERVER=1)
 endif()
@@ -97,6 +104,10 @@ add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
   src/dat_effect_banks.cpp src/dat_effect_entries.cpp src/dat_native_animation.cpp)
 target_link_libraries(fighter_asset_runtime PUBLIC fighter_source_runtime)
 target_compile_options(fighter_asset_runtime PRIVATE -ffp-contract=off)
+if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  target_compile_definitions(fighter_asset_runtime PRIVATE
+    MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+endif()
 
 # The public alpha has an explicitly silent audio policy.  Keep its source
 # graph separate from the development graph so the development resampler is
@@ -619,6 +630,10 @@ target_compile_options(native_audio_banks PRIVATE
 
 add_executable(native_menu_host_trace EXCLUDE_FROM_ALL tests/native_menu_host_trace.cpp
   tests/native_menu_fighter_input.c tests/native_menu_stage_input.c tests/native_menu_alarm_unavailable.c)
+if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  target_compile_definitions(native_menu_host_trace PRIVATE
+    MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+endif()
 target_compile_options(native_menu_host_trace PRIVATE
   "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
 target_link_libraries(native_menu_host_trace PRIVATE fighter_asset_runtime)
@@ -648,6 +663,10 @@ add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.
 # Development builds only; the public and audio-preview players define no
 # MELEE_WEB_NET_SESSION, compile its hooks away and export none of it.
 target_compile_definitions(gameplay_menu_browser PRIVATE MELEE_WEB_NET_SESSION)
+if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  target_compile_definitions(gameplay_menu_browser PRIVATE
+    MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+endif()
 add_dependencies(gameplay_menu_browser gameplay_menu_pipeline_seed)
 target_include_directories(gameplay_menu_browser PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 set_property(TARGET gameplay_menu_browser APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
@@ -656,6 +675,10 @@ target_link_libraries(gameplay_menu_browser PRIVATE fighter_asset_runtime aurora
 target_include_directories(gameplay_menu_browser SYSTEM PRIVATE "${EMSCRIPTEN_SYSROOT}/include/compat")
 target_compile_options(gameplay_menu_browser PRIVATE -ffp-contract=off)
 set(gameplay_menu_browser_exports "_main,_malloc,_free,_melee_web_native_asset_begin,_melee_web_native_asset_count,_melee_web_native_asset_name,_melee_web_native_asset_file,_melee_web_native_asset_commit,_melee_web_native_asset_abort,_melee_web_native_menu_file,_melee_web_native_source_file_external_set,_melee_web_native_source_files_external_clear,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_replay_whole_session,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_set_save_profile,_melee_web_native_menu_snapshot_save_profile,_melee_web_native_menu_snapshot_unlocked_baseline,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_results_pad_schedule,_melee_web_native_menu_results_pause_schedule,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_native_menu_memory,_melee_web_native_menu_results_entry_packet,_melee_web_native_menu_results_pad_trace,_melee_web_css_observe,_melee_web_css_observe_setup,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message,_melee_web_native_menu_match_observe,_melee_web_native_menu_source_observe,_melee_web_css_observe_port,_melee_web_native_menu_net_begin,_melee_web_native_menu_net_begin_lockstep,_melee_web_net_push,_melee_web_net_push_indexed,_melee_web_net_confirm_start,_melee_web_net_terminate,_melee_web_net_cursor,_melee_web_net_pushed,_melee_web_net_checksum_drain,_melee_web_net_status,_melee_web_net_arena_fill")
+if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  string(APPEND gameplay_menu_browser_exports
+    ",_melee_web_native_menu_stadium_c1a_arm,_melee_web_native_menu_stadium_c1a_observe")
+endif()
 if(MELEE_WEB_PIPELINE_PROVENANCE)
   # Emscripten consumes one complete export list. Keep every existing root
   # and add the private collector commands only in this configuration.

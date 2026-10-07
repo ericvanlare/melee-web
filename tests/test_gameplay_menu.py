@@ -18,7 +18,18 @@ class GameplayMenuContractTests(unittest.TestCase):
     def test_public_donkey_selection_at_css_and_final_match_handoff(self):
         self.run_contract(public=True)
 
-    def run_contract(self, *, public):
+    def test_stadium_diagnostic_explicit_confirm_owner_lifetime(self):
+        self.run_contract(public=False, stadium=True)
+        # The reduced trace checks content-only availability even while armed.
+        # Bind that rejection to the actual prepared random-stage function,
+        # which must never call the explicit-tile diagnostic permission.
+        source = (ROOT / "build/gameplay-source/src/melee/mn/mnstagesel.c").read_text()
+        random_selection = source.split("int mnStageSel_802599EC(void)", 1)[1].split(
+            "void mnStageSel_80259C28(void)", 1)[0]
+        self.assertIn("MELEE_WEB_MENU_STAGE_AVAILABLE", random_selection)
+        self.assertNotIn("MELEE_WEB_MENU_STAGE_EXPLICIT_CONFIRM_AVAILABLE", random_selection)
+
+    def run_contract(self, *, public, stadium=False):
         sdk = ROOT / ".deps/emsdk"
         compiler = sdk / "upstream/emscripten/emcc"
         config = sdk / ".emscripten"
@@ -36,6 +47,7 @@ class GameplayMenuContractTests(unittest.TestCase):
                     str(compiler), "-Wall", "-Wextra", "-Werror",
                     "-Wno-unused-variable", "-DAURORA",
                     *(["-DMELEE_WEB_PUBLIC_RUNTIME"] if public else []),
+                    *(["-DMELEE_WEB_STADIUM_C1A_DIAGNOSTIC"] if stadium else []),
                     "-DTARGET_PC", "-I", str(ROOT / "src"), "-I",
                     str(ROOT / "build/gameplay-source/src"), "-I",
                     str(ROOT / ".deps/aurora/include"), "-I",

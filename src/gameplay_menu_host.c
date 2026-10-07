@@ -138,6 +138,9 @@ struct MeleeWebMenuHost {
     int aborted_source_scene;
     int css_parent_route_requested;
     int training_start_pending;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    int stadium_c1a_enabled;
+#endif
     int results_active,results_exited,results_committed,prize_active;
     int entered,drawing,transition;
 };
@@ -1730,12 +1733,10 @@ int melee_web_menu_host_provenance(const MeleeWebMenuHost* h,MeleeWebPipelineSou
     return 1;
 }
 #endif
-int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSelection* out,char* e,size_t n){
-    if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed)
-        return fail(e,n,"Selection requires a closed menu scene with owned RNG");
-    const VsModeData* vs=melee_web_menu_ready_vs(h->session);
-    if(!vs||!melee_web_menu_sss_selection_valid(melee_web_menu_sss(h->session)))
-        return fail(e,n,"Original menus have not committed a supported selection");
+static int host_selection_from_vs(const MeleeWebMenuHost* h,
+                                  const VsModeData* vs,
+                                  MeleeWebMenuMatchSelection* out,
+                                  char* e,size_t n){
     out->start=vs->start;
     const int count=melee_web_menu_active_player_count(&vs->start);
     if(count<MELEE_WEB_MENU_MIN_PLAYERS||count>MELEE_WEB_MENU_MAX_PLAYERS)
@@ -1760,6 +1761,54 @@ int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSel
     out->save_profile_present=1;
     return ok(e,n);
 }
+int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSelection* out,char* e,size_t n){
+    if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed)
+        return fail(e,n,"Selection requires a closed menu scene with owned RNG");
+    const VsModeData* vs=melee_web_menu_ready_vs(h->session);
+    if(!vs||!melee_web_menu_sss_selection_valid(melee_web_menu_sss(h->session)))
+        return fail(e,n,"Original menus have not committed a supported selection");
+    return host_selection_from_vs(h,vs,out,e,n);
+}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_menu_host_enable_stadium_c1a(MeleeWebMenuHost* h,
+                                            char* e,size_t n){
+    if(!h||h!=owner||h->entered||h->source_scene!=MELEE_WEB_HOST_SCENE_NONE||
+       h->audio||h->source_target_mode!=-1||h->source_mode_kind!=GM_VS||
+       h->vs_mode_owned||h->opening_active||
+       melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_CREATED||
+       h->stadium_c1a_enabled)
+        return fail(e,n,"Stadium C1a requires a fresh, unentered VS menu host");
+    if(!melee_web_menu_enable_stadium_c1a(h->session,e,n))return 0;
+    h->stadium_c1a_enabled=1;
+    return ok(e,n);
+}
+
+int melee_web_menu_host_stadium_c1a_raw_selection(
+    const MeleeWebMenuHost* h,StartMeleeData* out,char* e,size_t n){
+    if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed||
+       !h->stadium_c1a_enabled||
+       !melee_web_menu_stadium_c1a_ready_selection_valid(h->session))
+        return fail(e,n,"Stadium C1a raw selection requires its committed source SSS payload");
+    const SSSData* sss=melee_web_menu_sss(h->session);
+    if(!sss||!sss->start_game||sss->vs.start.rules.stkind!=St_Kind_PStadium)
+        return fail(e,n,"Stadium C1a raw selection lost source StKind 3");
+    *out=sss->vs.start;
+    return ok(e,n);
+}
+
+int melee_web_menu_host_stadium_c1a_selection(
+    const MeleeWebMenuHost* h,MeleeWebMenuMatchSelection* out,
+    char* e,size_t n){
+    if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed||
+       !h->stadium_c1a_enabled||
+       !melee_web_menu_stadium_c1a_ready_selection_valid(h->session))
+        return fail(e,n,"Stadium C1a requires its source-selected prepared SSS payload");
+    const VsModeData* vs=melee_web_menu_ready_vs(h->session);
+    if(!vs||vs->start.rules.stkind!=St_Kind_PStadium)
+        return fail(e,n,"Stadium C1a selection lost its original StKind");
+    return host_selection_from_vs(h,vs,out,e,n);
+}
+#endif
 int melee_web_menu_host_raw_selection(const MeleeWebMenuHost* h,StartMeleeData* out,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed||
        melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)

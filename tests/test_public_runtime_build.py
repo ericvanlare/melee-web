@@ -142,6 +142,32 @@ class PublicRuntimeBuildTests(unittest.TestCase):
         for forbidden in public_build.PUBLIC_RUNTIME_FORBIDDEN_EXPORTS:
             self.assertNotIn(forbidden, public)
 
+    def test_stadium_c1a_compile_and_export_surface_is_development_only(self):
+        top_level = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text(encoding="utf-8")
+        self.assertIn(
+            'option(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC', top_level)
+        self.assertIn(
+            '"Enable the development-only Pokémon Stadium selection/preparation checkpoint" OFF',
+            top_level,
+        )
+        self.assertIn(
+            "\n".join([
+                "if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC AND",
+                "   (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME))",
+            ]),
+            top_level,
+        )
+        browser = cmake.split("add_executable(gameplay_menu_browser", 1)[1].split(
+            "# The public player", 1)[0]
+        self.assertIn("target_compile_definitions(gameplay_menu_browser PRIVATE", browser)
+        self.assertIn("_melee_web_native_menu_stadium_c1a_arm", browser)
+        public_player = cmake.split("# The public player", 1)[1].split(
+            "# Shared typed scene/model tables", 1)[0]
+        self.assertNotIn("MELEE_WEB_STADIUM_C1A_DIAGNOSTIC", public_player)
+        self.assertNotIn("_melee_web_native_menu_stadium_c1a_arm", public_player)
+        self.assertNotIn("_melee_web_native_menu_stadium_c1a_observe", public_player)
+
     def test_development_target_keeps_instrumentation(self):
         cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text(encoding="utf-8")
         development = cmake.split("add_executable(gameplay_menu_browser", 1)[1].split(
