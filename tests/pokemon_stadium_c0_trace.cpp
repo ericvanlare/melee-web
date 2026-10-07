@@ -1300,10 +1300,21 @@ int run_probe(std::string_view probe, const std::filesystem::path& path)
                       yakumono->g == 180 && yakumono->b == 160,
                   "catalog Stadium yakumono owner differs from the typed source ABI");
 
+            melee_web::DatStage map_metadata(*archive);
             melee_web::DatNativeMap map_owner(
                 archive, melee_web::test::stadium_contract);
             check(map_owner.map_head() && map_owner.collision(),
                   "catalog map_head/coll_data owners are incomplete");
+            const auto source_light_counts =
+                melee_web::test::ground_authored_light_pointer_counts(
+                    *archive, map_metadata);
+            const auto native_light_counts = map_owner.source_light_counts();
+            check(native_light_counts.size() == map_metadata.entries.size(),
+                  "catalog native Ground light-count rows differ from source entries");
+            for (const auto& entry : map_metadata.entries)
+                check(native_light_counts[entry.index] ==
+                          source_light_counts.at(entry.index),
+                      "catalog native Ground light count differs from bounded source table");
             melee_web::DatStageYaku random_yaku(
                 archive, symbol_offset(*archive, "ALDYakuAll"));
             check(random_yaku.native_data(),
@@ -1337,15 +1348,23 @@ int run_probe(std::string_view probe, const std::filesystem::path& path)
                              archive->data().begin(), archive->data().end()),
                   "typed catalog changed the immutable GrPs.usd data section");
 
-            std::size_t map_light_descriptors = 0;
-            for (const auto count : map_owner.source_light_counts())
-                map_light_descriptors += count;
+            std::size_t ground_light_pointer_count_sum = 0;
+            for (const auto count : source_light_counts)
+                ground_light_pointer_count_sum += count;
             std::cout << "{\"probe\":\"catalog\",\"scope\":\"typed C0 preparation only; no publication or E8\","
                          "\"map_head\":true,\"coll_data\":true,\"grGroundParam\":true,"
                          "\"ALDYakuAll\":true,\"map_ptcl\":true,\"map_texg\":true,"
                          "\"yakumono_param\":true,\"quake_model_set\":true,"
-                         "\"map_light_descriptors\":" << map_light_descriptors
-                      << ",\"map_plit\":\"not separately owned on the native-map route\","
+                         "\"ground_light_source_counts_match_native\":true,"
+                         "\"ground_light_table_pointer_counts\":[";
+            for (std::size_t i = 0; i < source_light_counts.size(); ++i) {
+                if (i) std::cout << ',';
+                std::cout << source_light_counts[i];
+            }
+            std::cout << "],\"ground_light_table_pointer_count_sum\":"
+                      << ground_light_pointer_count_sum
+                      << ",\"ground_light_count_semantics\":\"per-entry pointer slots; aliases count per slot\",";
+            std::cout << "\"map_plit\":\"not separately owned on the native-map route\","
                          "\"itemdata\":{\"symbol_present\":true,\"root_word\":0,"
                          "\"relocated\":false,\"decoded_items\":0},"
                          "\"particle_bank_published\":false,\"native_map_published\":false,"

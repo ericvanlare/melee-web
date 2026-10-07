@@ -165,18 +165,11 @@ void stadium_map_trace(const char* path){
    check(melee_web_test_native_stadium_map(map),"C0 resident map owner and imported-null rows");
    check(owner.collision(),"C0 map owner exposes its checked native coll_data view");
    const auto light_counts=owner.source_light_counts();
+   const auto source_light_counts=ground_authored_light_pointer_counts(*archive,metadata);
    check(light_counts.size()==metadata.entries.size(),"C0 map source-light row count");
    for(const auto& entry:metadata.entries){
-    uint32_t expected=0;
-    if(entry.light_table_offset){
-     const auto end=archive->next_target_offset(*entry.light_table_offset);
-     for(;*entry.light_table_offset+expected*4<end;expected++)
-      if(!archive->pointer(*entry.light_table_offset+expected*4,4))break;
-     check(*entry.light_table_offset+expected*4<end&&
-               !archive->pointer(*entry.light_table_offset+expected*4,4),
-           "C0 authored Ground light list has a bounded null terminator");
-    }
-    check(light_counts[entry.index]==expected,"C0 map light row matches source table");
+    check(light_counts[entry.index]==source_light_counts.at(entry.index),
+          "C0 map light row matches source table");
     if(entry.animation_flags_offset){
      const auto* flags=melee_web_test_native_stadium_flags(map,int(entry.index));
      const auto source=archive->range(*entry.animation_flags_offset,stadium_animation_counts[entry.index]);
@@ -305,21 +298,12 @@ int main(int argc,char** argv){try{
    melee_web::DatNativeStage stage(archive);
    const auto light_counts=stage.source_light_counts();
    melee_web::DatStage stage_metadata(*archive);
+   const auto source_light_counts=ground_authored_light_pointer_counts(*archive,stage_metadata);
    check(light_counts.size()==stage_metadata.entries.size(),
          "Native stage source-light bounds differ from the authored entry table");
-   for(const auto& entry:stage_metadata.entries){
-    uint32_t expected=0;
-    if(entry.light_table_offset){
-     const auto end=archive->next_target_offset(*entry.light_table_offset);
-     for(;*entry.light_table_offset+expected*4<end;expected++)
-      if(!archive->pointer(*entry.light_table_offset+expected*4,4))break;
-     check(*entry.light_table_offset+expected*4<end&&
-               !archive->pointer(*entry.light_table_offset+expected*4,4),
-           "Authored Ground light list lacks a bounded null terminator");
-    }
-    check(light_counts[entry.index]==expected,
+   for(const auto& entry:stage_metadata.entries)
+    check(light_counts[entry.index]==source_light_counts.at(entry.index),
           "Native Ground light bound differs from its null-terminated DAT table");
-   }
    check(!stage.particle_events().empty(),"actual stage particle events retained");
    for(const auto& event:stage.particle_events())check(event.bank==30,"actual stage generator bank selector");
    check(melee_web_test_native_stage_map(stage.map_head(),stage.yakumono()),"original native map descriptors invalid");

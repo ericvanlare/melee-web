@@ -1,9 +1,11 @@
 #pragma once
 
 #include "dat_native_stage.hpp"
+#include "dat_stage.hpp"
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 namespace melee_web::test {
 constexpr std::array<uint8_t,10> stadium_animation_counts={1,1,1,1,1,1,1,1,1,1};
@@ -37,6 +39,29 @@ constexpr std::array<melee_web::DatNativeMapExternalReference,26> stadium_extern
  {9,16,"GrdPStadium_Water_SEDUNIQUEwater_cam_int1_camera"},
  {9,24,"GrdPStadium_Water_SEDUNIQUEwater_scene_lights"},
 }};
+/* Count authored per-entry Ground light-table pointer slots, including aliases.
+ * Each present table is bounded at the next authored target and must contain a
+ * null pointer terminator before that boundary. This is distinct from the
+ * map-level light-override table and from unique descriptor identities.
+ */
+inline std::vector<uint32_t> ground_authored_light_pointer_counts(
+    const melee_web::DatArchive& archive, const melee_web::DatStage& metadata)
+{
+ std::vector<uint32_t> counts(metadata.entries.size(),0);
+ for(const auto& entry:metadata.entries){
+  if(!entry.light_table_offset)continue;
+  const uint32_t root=*entry.light_table_offset;
+  const uint32_t end=archive.next_target_offset(root);
+  uint32_t count=0;
+  for(;root+count*4<end;count++)
+   if(!archive.pointer(root+count*4,4))break;
+  if(root+count*4>=end||archive.pointer(root+count*4,4))
+   throw melee_web::DatError("Ground authored light-pointer table lacks a bounded null terminator");
+  counts.at(entry.index)=count;
+ }
+ return counts;
+}
+
 constexpr auto local_flag=melee_web::DatNativeMapFlagKind::LocalMaterial;
 constexpr auto external_flag=melee_web::DatNativeMapFlagKind::ExternalNull;
 constexpr std::array<melee_web::DatNativeMapFlagExpectation,44> stadium_flag_expectations={{
