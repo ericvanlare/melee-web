@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import vm from 'node:vm';
+import {installPauseTraceCapture, readPauseTraceStatus} from './pause_trace_capture.mjs';
 import {NATURAL_PAUSE_PROTOCOL, STOPPED_SCENE_PAIR_PROTOCOL, resolveCaptureMode, validateNaturalPauseManifest,
   validateStoppedScenePairManifest, firstNaturalPauseIncident, firstStoppedScenePairStop,
   validateStoppedScenePairBoundary, summarizeStoppedSourceInterval,
@@ -164,6 +166,82 @@ assert.equal(firstStoppedScenePairStop({...preparedPair, source_running: 1, sour
 assert.equal(progressedPairState.started, true);
 assert.equal(firstStoppedScenePairStop({...preparedPair, source_phase: 1}, 30, {started: false}).outcome,
   'source_stopped_before_screenshot_target', 'an unexplained stopped phase is not ignored');
+const transitioningPairState = {started: true};
+const preparingMatch = {source_phase: 7, source_running: 0, source_cursor: 1458,
+  preparation: {active: true, source: 'menuPreparation', error: null}};
+assert.equal(firstStoppedScenePairStop(preparingMatch, 24819, transitioningPairState), null,
+  'source-owned inter-scene preparation is not an unexplained source stop');
+assert.equal(firstStoppedScenePairStop({...preparingMatch, source_running: 1,
+  preparation: {active: false}, source_cursor: 1500}, 25000, transitioningPairState), null,
+  'preparation can arm the live source again within the fixed deadline');
+assert.equal(firstStoppedScenePairStop({...preparingMatch, preparation: {active: false}}, 25000,
+  transitioningPairState).outcome, 'source_stopped_before_screenshot_target');
+assert.equal(firstStoppedScenePairStop({...preparingMatch, runtime_error: 'construction failed'}, 25000,
+  transitioningPairState).outcome, 'runtime_error');
+assert.equal(firstStoppedScenePairStop({...preparingMatch, incidents: [{reason: 1}]}, 25000,
+  transitioningPairState).outcome, 'timing_pause', 'an actual incident still wins during preparation');
+assert.equal(firstStoppedScenePairStop({...preparingMatch,
+  preparation: {active: false, error: 'source preparation failed'}}, 25000,
+  transitioningPairState).outcome, 'runtime_error');
+assert.equal(firstStoppedScenePairStop(preparingMatch, 35000, transitioningPairState).outcome,
+  'pair_replay_timeout', 'preparation cannot widen the fixed replay deadline');
+assert.equal(firstStoppedScenePairStop({...preparingMatch, source_cursor: 1600, source_running: 1,
+  latest_callback: {sample_replay_cursor: 1600, sample_source_frame: 1}}, 25000,
+  transitioningPairState), null, 'an active preparation owner cannot qualify an image target');
+
+// Exercise the actual browser observer without launching Chrome: evaluate has
+// no Node closures and chains every original source hook with its receiver.
+const previousWindow = globalThis.window, previousDocument = globalThis.document;
+const chainedPreparationHooks = [];
+const observerWindow = {};
+for (const name of ['menuRuntimeTiming', 'menuDiagnosticSample', 'menuDiagnosticIncident',
+  'menuPreparation', 'menuPreparationDone', 'menuPreparationCanceled',
+  'menuPreparationFailed', 'menuPreparationProfile']) {
+  observerWindow[name] = function(...args) {
+    assert.equal(this, observerWindow);
+    chainedPreparationHooks.push({name, args});
+    return name;
+  };
+}
+try {
+  globalThis.window = observerWindow;
+  globalThis.document = {querySelector: () => null};
+  const fakeObserverPage = {evaluate: async (fn, args) => vm.runInNewContext(
+    `(${fn.toString()})(argument)`, {window: observerWindow, document: globalThis.document,
+      performance, argument: structuredClone(args)})};
+  const installation = await installPauseTraceCapture(fakeObserverPage);
+  assert.equal(installation.preparation_hooks_present, true);
+  const preparationStatus = async () => (await readPauseTraceStatus(fakeObserverPage,
+    {readNative: false})).preparation;
+  assert.equal(observerWindow.menuPreparation('next scene', false), 'menuPreparation');
+  assert.equal((await preparationStatus()).active, true);
+  assert.equal(observerWindow.menuPreparationDone(), 'menuPreparationDone');
+  assert.equal((await preparationStatus()).active, false);
+  assert.equal(observerWindow.menuDiagnosticIncident(7), 'menuDiagnosticIncident');
+  assert.equal((await preparationStatus()).active, true, 'reason7 covers render-only preparation');
+  assert.equal(observerWindow.menuPreparationProfile({gpu_completion_ready: true}), 'menuPreparationProfile');
+  assert.equal((await preparationStatus()).active, false, 'native arm profile closes render-only preparation');
+  observerWindow.menuPreparation('next scene');
+  observerWindow.menuPreparationCanceled();
+  assert.equal((await preparationStatus()).active, false);
+  observerWindow.menuPreparation('next scene');
+  observerWindow.menuPreparationFailed('construction failed');
+  assert.equal((await preparationStatus()).error, 'construction failed');
+  const beforePauseEvents = observerWindow.__meleePauseTrace.state.manual_pause_events;
+  observerWindow.menuDiagnosticIncident(5);
+  assert.equal(observerWindow.__meleePauseTrace.state.manual_pause_events, beforePauseEvents + 1);
+  assert.deepEqual(chainedPreparationHooks.map(row => row.name), ['menuPreparation', 'menuPreparationDone',
+    'menuDiagnosticIncident', 'menuPreparationProfile', 'menuPreparation', 'menuPreparationCanceled',
+    'menuPreparation', 'menuPreparationFailed', 'menuDiagnosticIncident']);
+  assert.deepEqual(chainedPreparationHooks[0].args, ['next scene', false]);
+  observerWindow.menuPreparationProfile({gpu_completion_ready: false});
+  assert.equal((await preparationStatus()).active, true);
+  assert.match((await preparationStatus()).error, /lacks GPU completion/,
+    'an incomplete profile cannot release preparation ownership');
+} finally {
+  if (previousWindow === undefined) delete globalThis.window; else globalThis.window = previousWindow;
+  if (previousDocument === undefined) delete globalThis.document; else globalThis.document = previousDocument;
+}
 assert.equal(firstStoppedScenePairStop({source_running: 1, source_cursor: 1599,
   latest_callback: {sample_source_frame: 100, sample_replay_cursor: 1599}}, 5000), null,
   'a positive match frame before the fixed cursor target is insufficient');
@@ -265,6 +343,45 @@ await assert.rejects(() => stopSourceBeforeDiagnosticExport({
 }), /Refusing large diagnostic exports/);
 assert.deepEqual(unsafeOrder, ['status', 'stop', 'status'],
   'trace stream and capture reads are skipped unless source_running is confirmed zero');
+for (const stoppedPreparation of [true, false]) {
+  const refusedPauseOrder = [];
+  await assert.rejects(() => stopSourceBeforeDiagnosticExport({
+    requirePauseAcknowledgement: true,
+    readStatus: async () => {refusedPauseOrder.push('status'); return {source_running: 0,
+      preparation: {active: stoppedPreparation}};},
+    stopPlayback: async () => {refusedPauseOrder.push('pause'); return {acknowledged: false};},
+    captureImmediate: async () => {refusedPauseOrder.push('image');},
+    finalizeTrace: async () => {refusedPauseOrder.push('trace');},
+    readEvidence: async () => {refusedPauseOrder.push('export');},
+  }), /fresh native pause acknowledgement/);
+  assert.deepEqual(refusedPauseOrder, ['status', 'pause'],
+    'running0 cannot authorize exports when busy/pending preparation refuses the manual pause');
+}
+for (const resumedStatus of [{source_running: 1, preparation: {active: false}},
+  {source_running: 0, preparation: {active: true}}]) {
+  const autoResumeOrder = [];
+  await assert.rejects(() => stopSourceBeforeDiagnosticExport({
+    requirePauseAcknowledgement: true,
+    readStatus: async () => {autoResumeOrder.push('status'); return autoResumeOrder.length === 1
+      ? {source_running: 0, preparation: {active: true}} : resumedStatus;},
+    stopPlayback: async () => {autoResumeOrder.push('pause'); return {acknowledged: true};},
+    finalizeTrace: async () => {autoResumeOrder.push('trace');},
+    readEvidence: async () => {autoResumeOrder.push('export');},
+  }), /Refusing large diagnostic exports/);
+  assert.deepEqual(autoResumeOrder, ['status', 'pause', 'status'],
+    'auto-resume or renewed preparation observed before export rejects even an earlier acknowledgement');
+}
+const acknowledgedPauseOrder = [];
+await stopSourceBeforeDiagnosticExport({
+  requirePauseAcknowledgement: true,
+  readStatus: async () => {acknowledgedPauseOrder.push('status'); return {source_running: 0,
+    preparation: {active: false}};},
+  stopPlayback: async () => {acknowledgedPauseOrder.push('pause'); return {acknowledged: true};},
+  finalizeTrace: async () => {acknowledgedPauseOrder.push('trace');},
+  readEvidence: async () => {acknowledgedPauseOrder.push('export');},
+});
+assert.deepEqual(acknowledgedPauseOrder, ['status', 'pause', 'status', 'trace', 'export'],
+  'an already stopped pair still requires fresh source acknowledgement before export');
 const timedOutStatusOrder = [];
 await assert.rejects(() => stopSourceBeforeDiagnosticExport({
   readStatus: async () => {timedOutStatusOrder.push('status'); throw Error('renderer observation timed out');},

@@ -37,11 +37,33 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
     const table=new Float64Array(CAP*COLS);
     const ring=new Array(RING);
     const state={columns,cap:CAP,rows:0,dropped:0,ring_size:RING,incidents:[],incident_overflow:0,
+      preparation:{active:false,error:null,sequence:0,source:null},manual_pause_events:0,
       sample:null,errors:0,installed_at_ms:performance.now(),time_origin:performance.timeOrigin,
       stall_schedule:stallSchedule?{...stallSchedule,status:'armed',actual:null,error:null}:null};
     const originalTiming=window.menuRuntimeTiming;
     const originalSample=window.menuDiagnosticSample;
     const originalIncident=window.menuDiagnosticIncident;
+    // Source-emitted lifecycle hooks cover scene construction/arming. A
+    // first-use reason-7 incident covers render-only preparation, whose arm
+    // publishes a profile but may omit menuPreparation/Done.
+    const preparationHooks=['menuPreparation','menuPreparationDone','menuPreparationCanceled',
+      'menuPreparationFailed','menuPreparationProfile'];
+    const preparationHooksPresent=preparationHooks.every(name=>typeof window[name]==='function');
+    for(const name of preparationHooks){
+      const original=window[name];
+      window[name]=function(...args){
+        try{return original?.apply(this,args);}
+        finally{
+          const preparation=state.preparation;
+          preparation.sequence++;preparation.source=name;
+          preparation.active=name==='menuPreparation';
+          preparation.error=name==='menuPreparationFailed'?String(args[0]||'Native preparation failed'):null;
+          if(name==='menuPreparationProfile'&&args[0]?.gpu_completion_ready!==true){
+            preparation.active=true;preparation.error='Native preparation profile lacks GPU completion';
+          }
+        }
+      };
+    }
     window.menuDiagnosticSample=function(...args){
       try{return originalSample?.apply(this,args);}
       finally{state.sample=[args[8],args[18]?1:0,args[1],args[2],args[9],args[10],args[11]];}
@@ -49,6 +71,9 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
     window.menuDiagnosticIncident=function(...args){
       try{return originalIncident?.apply(this,args);}
       finally{
+        if(args[0]===7){state.preparation.active=true;state.preparation.source='incident_7';
+          state.preparation.error=null;state.preparation.sequence++;}
+        if(args[0]===5)state.manual_pause_events++;
         const at=performance.now();
         if(state.incidents.length<256){
           const incident={at_ms:at,row:state.rows,reason:args[0],value:args[1],
@@ -125,6 +150,7 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
       timing_hook_present:typeof originalTiming==='function',
       sample_hook_present:typeof originalSample==='function',
       incident_hook_present:typeof originalIncident==='function',
+      preparation_hooks_present:preparationHooksPresent,
       stall_schedule_supported:!!state.stall_schedule};
   },{columns:PAUSE_TRACE_COLUMNS,stallSchedule});
 }
@@ -156,6 +182,7 @@ export async function readPauseTraceStatus(page,{readNative=true,includeLatestCa
       rows:capture.state.rows,dropped:capture.state.dropped,
       capture_errors:capture.state.errors,stall_schedule:capture.state.stall_schedule,
       incidents:capture.state.incidents.slice(),incident_overflow:capture.state.incident_overflow,
+      preparation:{...capture.state.preparation},manual_pause_events:capture.state.manual_pause_events,
       replay_cursor:call('_melee_web_native_menu_replay_cursor'),source_running:call('_melee_web_native_menu_running'),
       ...(includeLatestCallback?{latest_callback:latestCallback}:{}),
       phase:call('_melee_web_native_menu_phase'),native_message:nativeMessage,

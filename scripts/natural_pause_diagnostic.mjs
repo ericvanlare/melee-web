@@ -206,6 +206,9 @@ export function firstNaturalPauseIncident(snapshot) {
 export function firstStoppedScenePairStop(snapshot, elapsedMs, replayState = {}) {
   const incident = firstNaturalPauseIncident(snapshot);
   if (incident) return incident;
+  if (snapshot?.preparation?.error)
+    return {outcome: 'runtime_error', error: snapshot.preparation.error};
+  const preparing = snapshot?.preparation?.active === true;
   const cursor = snapshot?.source_cursor;
   const callback = snapshot?.latest_callback;
   // The async UI handler reads/hashes the recipe and prepares audio before
@@ -218,11 +221,11 @@ export function firstStoppedScenePairStop(snapshot, elapsedMs, replayState = {})
   const awaitingStart = !replayState.started && snapshot?.source_phase === 0 && cursor === 0 &&
     (!callback || (callback.sample_replay_cursor === 0 && callback.sample_source_frame === -1 &&
       callback.source_steps === 0 && callback.source_draws === 0));
-  if (snapshot?.source_running === 0 && !awaitingStart)
+  if (snapshot?.source_running === 0 && !awaitingStart && !preparing)
     return {outcome: 'source_stopped_before_screenshot_target', observed_cursor: cursor ?? null,
       latest_callback: callback ?? null};
   if (Number.isSafeInteger(cursor) && cursor >= STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_target &&
-      snapshot?.source_running === 1 &&
+      snapshot?.source_running === 1 && !preparing &&
       Number.isSafeInteger(callback?.sample_replay_cursor) &&
       callback.sample_replay_cursor >= STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_target &&
       Number.isFinite(callback?.sample_source_frame) && callback.sample_source_frame > 0)
@@ -295,11 +298,17 @@ export function summarizeStoppedSourceInterval(capture, firstRow, endRow) {
 
 /** Stop source playback before finalizing/streaming or reading diagnostic evidence. */
 export async function stopSourceBeforeDiagnosticExport({readStatus, stopPlayback,
-  captureImmediate, finalizeTrace, readEvidence, cleanupAfterEvidence}) {
+  captureImmediate, finalizeTrace, readEvidence, cleanupAfterEvidence, requirePauseAcknowledgement = false}) {
   const before = await readStatus();
-  if (before?.source_running !== 0) await stopPlayback();
+  // running=0 is also temporary construction/arming. Never export a pair
+  // until the exact pause command proves the native pending/busy guard passed.
+  let pause = null;
+  if (requirePauseAcknowledgement || before?.source_running !== 0) pause = await stopPlayback();
+  if (requirePauseAcknowledgement && pause?.acknowledged !== true)
+    throw Error('Refusing large diagnostic exports without a fresh native pause acknowledgement');
   const stopped = await readStatus();
-  if (stopped?.source_running !== 0)
+  if (stopped?.source_running !== 0 ||
+      (requirePauseAcknowledgement && stopped?.preparation?.active === true))
     throw Error('Refusing large diagnostic exports while native source playback is active');
   const immediate = captureImmediate ? await captureImmediate(stopped) : null;
   const trace = await finalizeTrace();

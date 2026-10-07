@@ -615,6 +615,7 @@ try {
     if (!report.pause_trace_installation.timing_hook_present ||
         !report.pause_trace_installation.sample_hook_present ||
         !report.pause_trace_installation.incident_hook_present ||
+        (stoppedScenePair && !report.pause_trace_installation.preparation_hooks_present) ||
         report.pause_trace_installation.stall_schedule_supported)
       throw Error('Natural-pause capture hooks are missing or unexpectedly support an injected stall');
   }
@@ -697,7 +698,7 @@ try {
           source_cursor: observed.replay_cursor, runtime_error: observed.runtime_error,
           dialog_error: observed.dialog_error, native_message: observed.native_message,
           status_text: observed.status_text, incidents: observed.incidents,
-          latest_callback: observed.latest_callback};
+          latest_callback: observed.latest_callback, preparation: observed.preparation};
         const elapsedMs = Date.now() - replayStartedAt;
         const stop = stoppedScenePair
           ? firstStoppedScenePairStop(observedTerminal, elapsedMs, pairReplayState)
@@ -797,6 +798,7 @@ try {
       try {
         const stopped = await stopSourceBeforeDiagnosticExport({
           readStatus: () => pauseTraceStatus({includeLatestCallback: stoppedScenePair}),
+          requirePauseAcknowledgement: stoppedScenePair,
           stopPlayback: async () => {
             const pause = await observePageOperation('native source pause', page.evaluate(() => {
               const module = globalThis.Module;
@@ -804,11 +806,23 @@ try {
                   typeof module?._melee_web_native_menu_running !== 'function')
                 throw Error('Native pause and running exports are unavailable');
               const before = module._melee_web_native_menu_running();
-              if (before === 1) module._melee_web_native_menu_pause(1);
-              return {before, after: module._melee_web_native_menu_running()};
+              const capture = window.__meleePauseTrace;
+              const pauseEventsBefore = capture?.state.manual_pause_events;
+              // Native emits reason 5 only after rejecting busy preparation,
+              // pending transitions, faults and missing owners. The exact
+              // synchronous call must acknowledge; running=0 alone is unsafe.
+              module._melee_web_native_menu_pause(1);
+              const after = module._melee_web_native_menu_running();
+              const pauseEventsAfter = capture?.state.manual_pause_events;
+              return {before, after, pause_events_before: pauseEventsBefore,
+                pause_events_after: pauseEventsAfter,
+                acknowledged: Number.isSafeInteger(pauseEventsBefore) &&
+                  pauseEventsAfter === pauseEventsBefore + 1 && after === 0 &&
+                  capture?.state.preparation.active === false};
             }));
             report.source_pause = pause;
             if (pause.after !== 0) throw Error('Native pause did not stop source playback');
+            return pause;
           },
           captureImmediate: stoppedScenePair &&
             report.natural_pause_terminal?.outcome === 'paired_screenshot_target'
@@ -966,6 +980,8 @@ try {
         report.final_snapshot = await snapshot('finally-after-source-stop');
       } catch (error) {
         report.source_stop_error = String(error?.stack || error);
+        if (stoppedScenePair) report.trace_finalization_skipped ||=
+          'Pair source stop was not acknowledged or stable; large exports were skipped and owned browser cleanup follows.';
         process.exitCode = 1;
       }
       if (pageObservationTimedOut) {
