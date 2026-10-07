@@ -7,7 +7,7 @@ import {createRoomRelayPeerEndpoint} from './net_lockstep_websocket_relay.mjs';
 export const BROWSER_CHECKSUM_EXPORT_LIMIT = 512;
 
 export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl, roomId,
-  timeoutMs = 5000, agreement, native, inputCapture = null},
+  timeoutMs = 5000, agreement, native, inputCapture = null, autonomousPump = false},
 {createEndpoint = createRoomRelayPeerEndpoint} = {}) {
   if (!agreement || typeof agreement !== 'object') throw Error('Browser peer requires its frozen start agreement');
   if (inputCapture !== null && (!inputCapture || typeof inputCapture !== 'object' ||
@@ -21,7 +21,21 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   if (inputCapture && (localPort < 0 || typeof native.configureLocalInputCapture !== 'function' ||
       !native.configureLocalInputCapture(localPort, inputTicks)))
     throw Error('Native local input capture configuration was rejected');
-  let failure = null, intentionalClose = false, closed = false;
+  if (typeof autonomousPump !== 'boolean' || (autonomousPump && typeof native.subscribeProgress !== 'function'))
+    throw Error('Autonomous native pump requires a progress subscription');
+  let failure = null, intentionalClose = false, closed = false, closing = false;
+  let wakeRequested = false, wakeQueued = false, wakeRuns = 0, unsubscribeProgress = null;
+  let closeOperation = null, drainFailure = null;
+  let nativeChain = Promise.resolve();
+  const callNative = (name, ...args) => {
+    if (!autonomousPump) return native[name](...args);
+    const operation = nativeChain.then(() => {
+      if (closed) throw Error('Native access after autonomous peer close');
+      return native[name](...args);
+    });
+    nativeChain = operation.catch(remember);
+    return operation;
+  };
   let rpcChain = Promise.resolve(), activeNativeRecords = 0, postTerminalNativeRecords = 0;
   const exports = [], pending = new Set(), capturedLocalInputs = [];
   let localInputQueue = Promise.resolve(), lastCapturePollSerial = null, peer = null;
@@ -35,12 +49,12 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
   };
   peer = new LockstepPeer({role, sourceTicks, inputTicks,
     pushFrame: async (tick, bytes) => {
-      if (!await native.pushIndexed(tick, bytes)) throw Error('Native indexed input queue rejected agreed frames');
+      if (!await callNative('pushIndexed', tick, bytes)) throw Error('Native indexed input queue rejected agreed frames');
     },
     onReady: async () => {
-      if (!await native.confirmStart()) throw Error('Native rejected peer start identity confirmation');
+      if (!await callNative('confirmStart')) throw Error('Native rejected peer start identity confirmation');
     },
-    onTerminal: terminal => native.terminate(TERMINAL[terminal.kind] ?? TERMINAL.protocol,
+    onTerminal: terminal => callNative('terminate', TERMINAL[terminal.kind] ?? TERMINAL.protocol,
       Number.isInteger(terminal.tick) ? terminal.tick : 0,
       Number.isInteger(terminal.channel) ? terminal.channel : 0),
   });
@@ -116,11 +130,19 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     await settle();
     // One extra record detects capacity exhaustion; do not silently truncate or
     // stop draining and describe the remaining native records as exported.
-    const records = await native.drain(BROWSER_CHECKSUM_EXPORT_LIMIT - exports.length + 1);
-    if (!Array.isArray(records) || records.some(record => record.length !== NET_RECORD_BYTES))
+    const records = await callNative('drain', BROWSER_CHECKSUM_EXPORT_LIMIT - exports.length + 1);
+    if (!Array.isArray(records) || records.some(record =>
+        (!Array.isArray(record) && !(record instanceof Uint8Array)) || record.length !== NET_RECORD_BYTES ||
+        Array.from(record).some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255))) {
+      drainFailure = {kind: 'malformed_drain', returned_records: Array.isArray(records) ? records.length : null,
+        retained_records: Array.isArray(records) ? records.slice(0, BROWSER_CHECKSUM_EXPORT_LIMIT + 1)
+          .map(record => Array.isArray(record) || record instanceof Uint8Array ? Array.from(record).slice(0, NET_RECORD_BYTES + 1) : null) : []};
       throw Error('Native checksum drain returned malformed records');
+    }
     if (records.length + exports.length > BROWSER_CHECKSUM_EXPORT_LIMIT) {
       const error = remember(Error('Browser native checksum export queue exceeded its 512-record bound'));
+      drainFailure = {kind: 'export_overflow', returned_records: records.length,
+        retained_records: records.slice(0, BROWSER_CHECKSUM_EXPORT_LIMIT + 1).map(record => Array.from(record))};
       await peer.fail('protocol', {reason: error.message});
       throw error;
     }
@@ -130,7 +152,12 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       else ++postTerminalNativeRecords;
       exports.push(Array.from(bytes));
     }
-    if (peer.ready && !peer.terminal) await peer.setNativeProgress((await native.status()).cursor);
+    if (peer.ready && !peer.terminal) {
+      const status = await callNative('status');
+      const flushFinal = autonomousPump && status.active === 1 && status.blocker === 'complete' &&
+        status.cursor === sourceTicks && status.terminal?.kind === 0;
+      await peer.setNativeProgress(status.cursor, {flushFinal});
+    }
     await settle();
   }
   const snapshot = () => ({protocol: peer.summary(), endpointErrors: endpoint.errors,
@@ -140,11 +167,50 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
     checksumOwnership: {owner: 'browser-page', export_limit_records: BROWSER_CHECKSUM_EXPORT_LIMIT,
       active_native_records_submitted_before_export: activeNativeRecords,
       post_terminal_native_evidence_records: postTerminalNativeRecords},
+    nativePump: {enabled: autonomousPump, closing, wake_requested: wakeRequested,
+      wake_queued: wakeQueued, completed_wakeups: wakeRuns, drain_failure: drainFailure},
     failure: failure ? String(failure?.stack || failure) : null, transport: endpoint.transport});
+
+  // Native observations and RPCs join one owner; notifications never step source time.
+  function serialize(operation) {
+    const result = rpcChain.then(operation);
+    rpcChain = result.catch(remember);
+    return result;
+  }
+  function requestWakeup() {
+    if (closing || closed || failure) return;
+    wakeRequested = true;
+    if (wakeQueued) return;
+    wakeQueued = true;
+    const operation = serialize(async () => {
+      wakeRequested = false;
+      try { check(); await pump(); ++wakeRuns; }
+      catch (error) {
+        remember(error);
+        if (!peer.terminal) {
+          try { await peer.fail('protocol', {reason: String(error?.message || error)}); }
+          catch (terminalError) { remember(terminalError); }
+        }
+        throw error;
+      } finally {
+        wakeQueued = false;
+        if (wakeRequested && !closing && !failure) requestWakeup();
+      }
+    });
+    // A background error is sticky evidence, never an unhandled rejection.
+    operation.catch(remember);
+  }
+  if (autonomousPump) {
+    unsubscribeProgress = native.subscribeProgress(requestWakeup);
+    if (typeof unsubscribeProgress !== 'function')
+      throw Error('Native progress subscription requires an unsubscribe owner');
+  }
 
   // Serialize RPCs so native scratch and evidence exports have one owner.
   function rpc(name, args = []) {
-    const operation = rpcChain.then(async () => {
+    if (autonomousPump && closing && !closed)
+      return Promise.reject(Error('Browser native peer is closing'));
+    const operation = serialize(async () => {
       check();
       if (closed && !['snapshot', 'drain'].includes(name)) throw Error('Browser native peer is closed');
       if (name === 'start') { await Promise.all([startup, endpoint.ready]); await settle(); }
@@ -176,18 +242,46 @@ export function createBrowserNativePeer({role, sourceTicks, inputTicks, relayUrl
       else if (name === 'disconnect') await peer.disconnect(...args);
       else if (name === 'fail') await peer.fail(...args);
       else if (name !== 'snapshot' && name !== 'drain') throw Error(`Unknown browser peer RPC: ${name}`);
-      await pump();
+      if (!autonomousPump || !closed) await pump();
       const result = snapshot();
       if (name === 'drain') result.records = exports.splice(0);
       return result;
     });
-    rpcChain = operation.catch(remember);
     return operation;
   }
-  async function close({intentional = true} = {}) {
+  function close(options = {}) {
+    closeOperation ??= finishClose(options);
+    return closeOperation;
+  }
+  async function finishClose({intentional = true} = {}) {
+    closing = true;
+    wakeRequested = false;
     intentionalClose = intentional;
     const failures = [];
-    for (const operation of [() => rpcChain, () => endpoint.close(), () => startup, () => settle()]) {
+    if (unsubscribeProgress) {
+      try { unsubscribeProgress(); } catch (error) { failures.push(remember(error)); }
+      unsubscribeProgress = null;
+    }
+    const finalNativeDrain = async () => {
+      if (!autonomousPump) return;
+      await settle();
+      const before = await callNative('status');
+      const quiescent = status => status?.active === 1 &&
+        Number.isSafeInteger(status.cursor) && status.cursor >= 0 && status.cursor <= sourceTicks &&
+        ((status.blocker === 'complete' && status.cursor === sourceTicks && status.terminal?.kind === 0) ||
+         (status.blocker === 'terminal' && Number.isInteger(status.terminal?.kind) &&
+          status.terminal.kind >= 1 && status.terminal.kind <= 4 &&
+          Number.isSafeInteger(status.terminal.tick) && status.terminal.tick >= 0 &&
+          status.terminal.tick < sourceTicks && Number.isSafeInteger(status.terminal.channel) &&
+          status.terminal.channel >= 0 && status.terminal.channel <= 0xffffffff));
+      if (!quiescent(before)) throw Error('Autonomous native pump close requires complete or terminal native quiescence');
+      await pump();
+      const after = await callNative('status');
+      if (!quiescent(after) || after.cursor !== before.cursor ||
+          JSON.stringify(after.terminal) !== JSON.stringify(before.terminal) || after.ring_pending !== 0)
+        throw Error('Autonomous native pump close boundary changed or retained native records');
+    };
+    for (const operation of [() => rpcChain, finalNativeDrain, () => endpoint.close(), () => startup, () => settle()]) {
       try { await operation(); } catch (error) { failures.push(remember(error)); }
     }
     closed = endpoint.closed;
