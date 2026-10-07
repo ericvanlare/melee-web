@@ -1,0 +1,19 @@
+{
+  "schema": "melee-web-net-lockstep-pre-portable-checksum-fixture-v1",
+  "note": "Captured from the unchanged pre-portable Node parser; do not regenerate expected values from the portable core.",
+  "record_bytes": 64,
+  "record_hex": "04030201080706050c0b0a09100f0e0d141312111817161508070605040302011817161514131211282726252423222138373635343332314847464544434241",
+  "parsed": {
+    "tick": 16909060,
+    "scene": 84281096,
+    "seed": 151653132,
+    "frame": 219025168,
+    "flags": 286397204,
+    "objects": 353769240,
+    "input": "0102030405060708",
+    "pad": "1112131415161718",
+    "scene_state": "2122232425262728",
+    "object_state": "3132333435363738",
+    "total": "4142434445464748"
+  }
+}

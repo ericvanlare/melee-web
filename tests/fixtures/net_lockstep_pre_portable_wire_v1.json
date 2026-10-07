@@ -1,0 +1,30 @@
+{
+  "schema": "melee-web-net-lockstep-pre-portable-core-fixtures-v1",
+  "note": "Captured from the current Node protocol implementation before portable-core edits; not expected values regenerated from a new core.",
+  "agreement_json_utf8": "{\"build\":\"same\"}",
+  "agreement_sha256_hex": "617117b98fe7726a1aa3f6fd96e707c937bf97cd426eeb4cda03cbd3f0a2f8f6",
+  "peers": {
+    "alpha": {
+      "hello_json_utf8": "{\"type\":\"hello\",\"version\":1,\"role\":\"alpha\",\"local_port\":0,\"remote_port\":1,\"agreement\":{\"build\":\"same\"}}",
+      "hello_utf8_bytes": 103,
+      "hello_sha256_hex": "9bb6fd9313ccda68c2f716a8d7cccef963d2ea51a85d6ca2157b653e8dfae28c",
+      "first_state_json_utf8": "{\"type\":\"state\",\"version\":1,\"role\":\"alpha\",\"sequence\":0,\"ack_sequence\":null,\"ack_input\":null,\"ack_checksum\":null,\"unacknowledged\":[{\"tick\":0,\"pad\":\"AAEBAAAAAAAAAAA=\"}],\"delayed_checksums\":[]}",
+      "first_state_utf8_bytes": 191,
+      "first_state_raw_sha256_hex": "351a1eb5b78441c7349cbf48bba3256e5ee006663ee43b03a30b617f61fbeaa6",
+      "ready_callback_agreement_hash_hex": "617117b98fe7726a1aa3f6fd96e707c937bf97cd426eeb4cda03cbd3f0a2f8f6",
+      "source_frames_before_input": 2,
+      "source_frame_tick2_hex": "0001010000000000000000000202000000000000000000000000000000000000ff00000000000000000000ff"
+    },
+    "beta": {
+      "hello_json_utf8": "{\"type\":\"hello\",\"version\":1,\"role\":\"beta\",\"local_port\":1,\"remote_port\":0,\"agreement\":{\"build\":\"same\"}}",
+      "hello_utf8_bytes": 102,
+      "hello_sha256_hex": "a19bd19a12546b2036e4ae974b7df93395c9dac30da6394089b03ec8aebfa31a",
+      "first_state_json_utf8": "{\"type\":\"state\",\"version\":1,\"role\":\"beta\",\"sequence\":0,\"ack_sequence\":null,\"ack_input\":null,\"ack_checksum\":null,\"unacknowledged\":[{\"tick\":0,\"pad\":\"AAICAAAAAAAAAAA=\"}],\"delayed_checksums\":[]}",
+      "first_state_utf8_bytes": 190,
+      "first_state_raw_sha256_hex": "286bfed6560db92db2334347721c66245d73875ed6d7a5c09a36436d049d6493",
+      "ready_callback_agreement_hash_hex": "617117b98fe7726a1aa3f6fd96e707c937bf97cd426eeb4cda03cbd3f0a2f8f6",
+      "source_frames_before_input": 2,
+      "source_frame_tick2_hex": "0001010000000000000000000202000000000000000000000000000000000000ff00000000000000000000ff"
+    }
+  }
+}

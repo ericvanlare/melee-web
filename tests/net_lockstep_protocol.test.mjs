@@ -308,3 +308,17 @@ test('transport-close disconnect preserves native terminal callback rejection', 
   assert.equal(peer.terminal.kind, 'disconnect');
   assert.equal(sendAttempts, 0);
 });
+
+test('Node facade and portable core own copies of Buffer inputs and retain Buffer frame callbacks', async () => {
+  const h = harness();
+  await h.alpha.start(h.agreement); await h.beta.start(h.agreement); await h.flush();
+  const local = sample(3), native = sample(7), checksum = record(0, 0x1234);
+  await h.alpha.addLocalInputs([[0, local]], {nativeOverrides: [[0, native]]});
+  await h.alpha.addChecksum(checksum);
+  local.fill(0xee); native.fill(0xdd); checksum.fill(0xcc);
+  assert.deepEqual(Buffer.from(h.alpha.local.get(0)), sample(3));
+  assert.deepEqual(Buffer.from(h.alpha.nativeLocal.get(0)), sample(7));
+  assert.equal(Buffer.from(h.alpha.localChecksums.get(0)).readUInt32LE(0), 0);
+  assert.equal(Buffer.from(h.alpha.localChecksums.get(0)).readBigUInt64LE(24), 0x1234n);
+  assert(Buffer.isBuffer(h.frames.alpha[0].bytes), 'the Node facade keeps Buffer-compatible frame callbacks');
+});
