@@ -55,9 +55,8 @@
     "retail_browser_report_sha256": "873b0efd41f2eb680fa6ee2833359da98ff47b3bc5337f677de36f7308f3d571",
     "runtime_data": {
       "bytes": 3674112,
-      "content_opened": false,
-      "freshly_rehashed": false,
-      "recorded_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      "capture_load_verified": true,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
     }
   },
   "comparison": {
@@ -167,7 +166,11 @@
     "source_prefix_fresh_hash": true,
     "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "stdout_sha256": "4913639c41f65e6f1bbb69aed2f5dae6bbd943e0f36f27ba8192399e9e460749",
-    "whole_session_equivalent": false
+    "whole_session_equivalent": false,
+    "runtime_data": {
+      "content_opened": false,
+      "freshly_rehashed": false
+    }
   },
   "date": "2026-10-07",
   "full_validation": {
@@ -223,6 +226,12 @@
       "failure": "four browser-sidecar path date tokens were wrong; rejected before MWRO stat or stream open; no retry",
       "receipt_sha256": "33d0cb413707c75d0f3702172a776e33edcd6a62ff5bc8c16a2e8bf75bfa117f",
       "stage": "Earlier source-only clock60 audit packet v2"
+    },
+    {
+      "failure": "final packet display raised TypeError because the reporting step passed write_json metadata to sha_file instead of the packet path; packet and companion files had already been written and independently verified; no server or browser was started",
+      "receipt_path": "/Volumes/AgentStorage/melee-web/runs/b4-clock60-browser-capture-prep-20261007-90289a2/packet-preparation-note-v1.json",
+      "receipt_sha256": "cab892b973e12111575aa7c4dddb4c4521a815e3b8f01301b29d64a82cf2a84e",
+      "stage": "Clock60 browser capture packet v1 preparation"
     },
     {
       "failure": "final summary print raised KeyError capture_report_sha256 after preflight and preliminary files were written; no comparison output was created",
