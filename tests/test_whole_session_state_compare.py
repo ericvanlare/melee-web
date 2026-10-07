@@ -33,7 +33,8 @@ from whole_session_state_compare import (  # noqa: E402
     _load_expectations, _require_stable_mwro_stat,
     _first_difference, _source_prefix_identity, _validate_browser_producer_source,
     _validate_source_capture_report, _validate_source_manifest_capture,
-    _validate_v10_browser_provenance, _validate_first_positive_audit,
+    _validate_v10_browser_provenance, _validate_v10_browser_export,
+    _validate_first_positive_audit,
     _browser_entities, compare_paths,
 )
 
@@ -274,6 +275,57 @@ def _v10_recipe_bytes(*, corrupt_later_roster=False, trailing=b""):
         SPAN.pack(scene, 0, 0, index, index) for index, scene in enumerate(route))
     return (header + context + setup_table + bytes(PAD_STATE_BYTES) +
             bytes(frame_count * 44) + spans + trailing)
+
+
+def _browser_export_rows(recipe, exported_cursor):
+    header = {
+        "record": "header", "schema": "melee-web-port-session-diagnostic",
+        "version": 1, "frames_requested": recipe.frame_count,
+        "comparison": "not_run", "cpu_observations": "not_captured",
+        "draw_state": "not_captured",
+    }
+    rows = [header]
+    match_spans = [span for span in recipe.spans if span["scene"] == SCENES["match"]]
+    match_starts = {span["first_frame"]: match_index
+                    for match_index, span in enumerate(match_spans)}
+    for index in range(exported_cursor):
+        match_index = match_starts.get(index)
+        if match_index is not None:
+            state = _v9_state({"slices": _state_slices(tick=0, match_frame=0)})
+            for entity in state["fighter_entities"]:
+                entity["match_index"] = match_index
+            rows.append({
+                "record": "session_match_enter_complete",
+                "rng": state["rng"], "match_frame": state["match_frame"],
+                "pad_state_hex": state["pad_state_hex"],
+                "fighters": copy.deepcopy(state["fighters"]),
+                "fighter_entities": copy.deepcopy(state["fighter_entities"]),
+                "declared_setup": recipe.declared_match_setups[match_index],
+            })
+        scene = recipe.frames[index]["scene"]
+        row = {
+            "record": "session_frame", "scene": scene, "index": index,
+            "supplied_inputs": recipe.frames[index]["pads"],
+            "rng": recipe.seed, "pad_state_hex": "00" * PAD_STATE_BYTES,
+        }
+        if scene == SCENES["match"]:
+            state = _v9_state({"slices": _state_slices(tick=index, match_frame=0)})
+            for entity in state["fighter_entities"]:
+                entity["match_index"] = match_index
+            row.update({
+                "match_frame": state["match_frame"],
+                "fighters": copy.deepcopy(state["fighters"]),
+                "fighter_entities": copy.deepcopy(state["fighter_entities"]),
+            })
+        rows.append(row)
+    return rows
+
+
+def _write_browser_export(path: Path, recipe, exported_cursor):
+    rows = _browser_export_rows(recipe, exported_cursor)
+    path.write_text("\n".join(json.dumps(row, separators=(",", ":"))
+                              for row in rows) + "\n", encoding="utf-8")
+    return rows
 
 
 def _v10_positive_recipe_bytes(first_css, consumed_pads):
@@ -589,6 +641,195 @@ class WholeSessionStateCompareTests(unittest.TestCase):
         self.assertEqual(recipe.entity_profile, PRIMARY_STATIC_ENTITY_PROFILE)
         self.assertEqual(V10_PREFIX_RECORD_CAP, 4200)
         self.assertEqual(V10_FIRST_POSITIVE_RECORD_CAP, 8192)
+
+    def test_v10_browser_export_validates_all_rows_setup_entities_and_exact_eof(self):
+        recipe_raw = _v10_recipe_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            recipe_path = root / "recipe.mwrc"
+            recipe_path.write_bytes(recipe_raw)
+            recipe = Recipe(recipe_path, recipe_raw,
+                            scope=V10_FIRST_SETUP_TICK0_SCOPE)
+            trace_path = root / "port.jsonl"
+            good_rows = _browser_export_rows(recipe, 5)
+
+            def write(rows):
+                trace_path.write_text("\n".join(
+                    json.dumps(row, separators=(",", ":")) for row in rows) + "\n",
+                    encoding="utf-8")
+
+            write(good_rows)
+            packet = {"source": {}}
+            self.assertEqual(_validate_v10_browser_export(
+                trace_path, recipe, 5, packet), 7)
+
+            def assert_bad(rows, message):
+                write(rows)
+                with self.assertRaisesRegex(ComparisonError, message):
+                    _validate_v10_browser_export(trace_path, recipe, 5, packet)
+
+            missing_setup = copy.deepcopy(good_rows)
+            del missing_setup[next(i for i, row in enumerate(missing_setup)
+                                   if row.get("record") == "session_match_enter_complete")]
+            assert_bad(missing_setup, "fields differ|record order")
+
+            duplicate_setup = copy.deepcopy(good_rows)
+            setup_index = next(i for i, row in enumerate(duplicate_setup)
+                               if row.get("record") == "session_match_enter_complete")
+            duplicate_setup.insert(setup_index + 1, copy.deepcopy(duplicate_setup[setup_index]))
+            assert_bad(duplicate_setup, "fields differ|record order")
+
+            reordered = copy.deepcopy(good_rows)
+            reordered[1], reordered[2] = reordered[2], reordered[1]
+            assert_bad(reordered, "missing, extra, or reordered")
+
+            wrong_scene = copy.deepcopy(good_rows)
+            wrong_scene[2]["scene"] = SCENES["css"]
+            assert_bad(wrong_scene, "missing, extra, or reordered")
+
+            bool_scene = copy.deepcopy(good_rows)
+            bool_scene[1]["scene"] = True
+            assert_bad(bool_scene, "exact integers")
+
+            bool_index = copy.deepcopy(good_rows)
+            bool_index[2]["index"] = True
+            assert_bad(bool_index, "exact integers")
+
+            wrong_pad = copy.deepcopy(good_rows)
+            wrong_pad[1]["supplied_inputs"][0] = "01" + "00" * 10
+            assert_bad(wrong_pad, "disagree with the MWRC input cursor")
+
+            wrong_setup = copy.deepcopy(good_rows)
+            setup = next(row for row in wrong_setup
+                         if row.get("record") == "session_match_enter_complete")
+            setup["declared_setup"]["players"][0]["character_kind"] ^= 1
+            assert_bad(wrong_setup, "declared_setup differs")
+
+            wrong_entity = copy.deepcopy(good_rows)
+            setup = next(row for row in wrong_entity
+                         if row.get("record") == "session_match_enter_complete")
+            setup["fighter_entities"][2]["entity_index"] = 1
+            assert_bad(wrong_entity, "missing, extra, or reordered")
+
+            wrong_generation = copy.deepcopy(good_rows)
+            frame = next(row for row in wrong_generation
+                         if row.get("record") == "session_frame" and row.get("scene") == SCENES["match"])
+            frame["fighter_entities"][0]["generation"] = True
+            assert_bad(wrong_generation, "expected integer")
+
+            too_few_match_fighters = copy.deepcopy(good_rows)
+            frame = next(row for row in too_few_match_fighters
+                         if row.get("record") == "session_frame" and
+                         row.get("scene") == SCENES["match"])
+            frame["fighters"].pop()
+            assert_bad(too_few_match_fighters, "requires four primary fighters")
+
+            extra = copy.deepcopy(good_rows)
+            extra.append({"record": "end", "frames": 5, "status": "captured"})
+            assert_bad(extra, "records after the exported prefix")
+
+            write(good_rows)
+            trace_path.write_text(trace_path.read_text(encoding="utf-8") + "{\"record\":\n",
+                                  encoding="utf-8")
+            with self.assertRaisesRegex(ComparisonError, "invalid JSON"):
+                _validate_v10_browser_export(trace_path, recipe, 5, packet)
+
+            write(good_rows)
+            with mock.patch("whole_session_state_compare.V10_BROWSER_EXPORT_RECORD_CAP", 6):
+                with self.assertRaisesRegex(ComparisonError, "bounded record count"):
+                    _validate_v10_browser_export(trace_path, recipe, 5, packet)
+
+    def test_v10_export_tail_checks_typed_shape_without_comparing_tail_state(self):
+        recipe_raw = _v10_recipe_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            recipe_path = root / "recipe.mwrc"
+            recipe_path.write_bytes(recipe_raw)
+            recipe = Recipe(recipe_path, recipe_raw,
+                            scope=V10_FIRST_SETUP_TICK0_SCOPE)
+            trace_path = root / "port.jsonl"
+            rows = _browser_export_rows(recipe, 11)
+            tail_match = next(row for row in rows
+                              if row.get("record") == "session_frame" and
+                              row.get("index") == 10)
+            # This is a later, un-compared match row. A valid but different state
+            # value remains a shape check, not a source-equivalence assertion.
+            tail_match["fighters"][0]["kind"] ^= 1
+            trace_path.write_text("\n".join(json.dumps(row, separators=(",", ":"))
+                                        for row in rows) + "\n", encoding="utf-8")
+            self.assertEqual(_validate_v10_browser_export(
+                trace_path, recipe, 11, {"source": {}}), 15)
+
+            tail_match["fighters"][0]["kind"] = True
+            trace_path.write_text("\n".join(json.dumps(row, separators=(",", ":"))
+                                        for row in rows) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ComparisonError, "expected integer"):
+                _validate_v10_browser_export(trace_path, recipe, 11, {"source": {}})
+
+            tail_match["fighters"][0]["kind"] = 1
+            tail_match["fighter_entities"][0]["generation"] = True
+            trace_path.write_text("\n".join(json.dumps(row, separators=(",", ":"))
+                                        for row in rows) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(ComparisonError, "expected integer"):
+                _validate_v10_browser_export(trace_path, recipe, 11, {"source": {}})
+
+    def test_invalid_browser_provenance_never_opens_the_original_stream(self):
+        recipe_raw = _v10_recipe_bytes()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            recipe_path = root / "recipe.mwrc"
+            recipe_path.write_bytes(recipe_raw)
+            recipe_sha = hashlib.sha256(recipe_raw).hexdigest()
+            reference_path = root / "reference.mwro"
+            reference_path.write_bytes(b"reference input remains unopened")
+            source_identity = {
+                "trace_bytes": reference_path.stat().st_size,
+                "recorded_full_trace_sha256": "b" * 64,
+                "full_trace_rehashed": False,
+                "audit_records_decoded": 1, "audit_bytes_read": 1,
+                "manifest_sha256": "c" * 64, "source_report_sha256": "d" * 64,
+                "audit_sha256": "e" * 64,
+            }
+            paths = {
+                name: root / f"{name}.json"
+                for name in ("source_manifest", "source_report", "source_audit",
+                             "browser_capture_report", "browser_producer_manifest",
+                             "browser_report", "port_trace")
+            }
+            packet = {
+                "source": {
+                    "trace": {"bytes": reference_path.stat().st_size,
+                              "recorded_full_sha256": "b" * 64},
+                    "capture_id": "capture", "sequence_id": "sequence",
+                },
+                "recipe": {
+                    "path": str(recipe_path), "bytes": len(recipe_raw),
+                    "sha256": recipe_sha, "version": 10,
+                    "frame_count": 12, "seed": 0x12345678,
+                },
+                "browser": {},
+            }
+            with (mock.patch("whole_session_state_compare._load_expectations",
+                             return_value=(packet, "f" * 64)),
+                  mock.patch("whole_session_state_compare._validate_v10_source_provenance",
+                             return_value=({}, {}, {}, source_identity)),
+                  mock.patch("whole_session_state_compare._validate_v10_browser_provenance",
+                             side_effect=ComparisonError("bad browser export")),
+                  mock.patch("whole_session_state_compare.iter_records") as read_source):
+                result = compare_paths(
+                    reference_path, recipe_path, paths["port_trace"],
+                    scope=V10_FIRST_SETUP_TICK0_SCOPE,
+                    expectations=root / "frozen-expectations.json",
+                    source_manifest=paths["source_manifest"],
+                    source_report=paths["source_report"],
+                    source_audit=paths["source_audit"],
+                    browser_capture_report=paths["browser_capture_report"],
+                    browser_producer_manifest=paths["browser_producer_manifest"],
+                    browser_report=paths["browser_report"],
+                )
+            self.assertEqual(result["result"], "invalid")
+            self.assertIn("bad browser export", result["error"])
+            read_source.assert_not_called()
 
     def test_positive_scope_passes_caps_to_reader_and_cannot_pass_on_cap_stop(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1010,14 +1251,24 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             recipe_sha = hashlib.sha256(recipe_raw).hexdigest()
 
             trace_path = root / "port.jsonl"
-            trace_path.write_bytes(b"bounded browser trace")
+            exported_cursor = 5
+            _write_browser_export(trace_path, recipe, exported_cursor)
             trace_sha = hashlib.sha256(trace_path.read_bytes()).hexdigest()
+            failures = [
+                "whole-session final CSS was not entered",
+                "Manual unload stopped the replay",
+                "incomplete input timeline",
+                "source tick/draw count mismatch",
+            ]
             report = {
                 "schema": "melee-web-browser-retail-replay", "version": 1,
                 "recipe_sha256": recipe_sha, "frames": recipe.frame_count,
                 "mode": "state_capture", "complete": False, "pass": False,
-                "final_scene": None,
-                "metrics": {"sourceFrames": 4, "sourceSteps": 4, "sourceDraws": 4},
+                "final_scene": None, "instrumented_timing_resumes": 0,
+                "failures": failures,
+                "metrics": {"sourceFrames": exported_cursor,
+                            "sourceSteps": exported_cursor,
+                            "sourceDraws": exported_cursor},
                 "trace_sha256": trace_sha,
             }
             browser_report_path = root / "retail-report.json"
@@ -1043,9 +1294,22 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             producer_sha = hashlib.sha256(producer_path.read_bytes()).hexdigest()
 
             capture_path = root / "capture.json"
+            expected_download_names = ["retail-port.jsonl", "retail-browser-report.json"]
+            report_bytes = browser_report_path.stat().st_size
+            report_sha = hashlib.sha256(browser_report_path.read_bytes()).hexdigest()
+            error_message = "Browser replay report failed: " + json.dumps(
+                failures, separators=(",", ":"))
+            unloaded_snapshot = {
+                "source_cursor": 0, "phase": 0, "running": 0,
+                "at_ms": 101, "runtime_error": None,
+                "replay_report": report,
+                "replay_downloads": expected_download_names,
+            }
             wrapper = {
                 "schema": "melee-web-headless-whole-session-replay-v1",
                 "mode": "state", "result": "incomplete",
+                "resume_timing_pauses": False, "timing_pause_resumes": [],
+                "probe": None, "verified_runtime_data_aborts": [],
                 "inputs": {
                     "recipe": {"path": str(recipe_path), "bytes": recipe_path.stat().st_size,
                                "sha256": recipe_sha},
@@ -1056,19 +1320,44 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                              "bytes": 1_449_165_376,
                              "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"},
                     "runtime_data": {"path": str(runtime_path), "bytes": 3,
-                                     "sha256": "c" * 64},
+                             "sha256": "c" * 64},
                 },
-                "deliberate_prefix_stop": {"requested_cursor": 4,
+                "deliberate_prefix_stop": {"requested_cursor": 3,
                                             "observed_cursor": 4},
                 "snapshots": [
                     {"source_cursor": None, "phase": None, "running": None,
                      "replay_report": None, "replay_downloads": [],
                      "runtime_error": None, "at_ms": 1.25,
                      "status": "startup text can vary", "reason": "unclassified"},
-                    {"source_cursor": 4, "at_ms": 100, "runtime_error": None},
-                    {"source_cursor": 0, "at_ms": 101, "runtime_error": None},
+                    {"source_cursor": 0, "phase": 7, "running": 1,
+                     "at_ms": 10, "runtime_error": None,
+                     "replay_report": None, "replay_downloads": []},
+                    {"source_cursor": 4, "phase": 7, "running": 1,
+                     "at_ms": 100, "runtime_error": None,
+                     "replay_report": None, "replay_downloads": []},
+                    unloaded_snapshot,
                 ],
-                "browser_errors": [], "first_error": None,
+                "final_snapshot": unloaded_snapshot,
+                "first_mismatch": {
+                    "phase": "whole-session-replay",
+                    "failure": failures[0], "snapshot": unloaded_snapshot,
+                },
+                "first_error": {
+                    "kind": "whole-session-replay", "phase": "whole-session-replay",
+                    "message": error_message,
+                    "details": {"at_ms": 102, "phase": 0, "running": 0,
+                                "source_cursor": 0, "runtime_error": None,
+                                "replay_report": report,
+                                "replay_downloads": expected_download_names},
+                },
+                "failure": f"Error: {error_message}\n    at fixture",
+                "browser_errors": [], "unexpected_requests": [],
+                "saved_downloads": [
+                    {"name": "retail-port.jsonl", "bytes": trace_path.stat().st_size,
+                     "sha256": trace_sha},
+                    {"name": "retail-browser-report.json", "bytes": report_bytes,
+                     "sha256": report_sha},
+                ],
                 "browser_report": report,
             }
             capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
@@ -1100,8 +1389,12 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                 recipe_path, recipe_sha, recipe, packet)
             self.assertEqual(identity["required_cursor"], 3)
             self.assertEqual(identity["target_cursor"], 4)
+            self.assertEqual(identity["requested_cursor"], 3)
+            self.assertEqual(identity["observed_cursor"], 4)
+            self.assertEqual(identity["exported_cursor"], 5)
+            self.assertEqual(identity["browser_records_validated"], 7)
             self.assertFalse(identity["runtime_data_recorded_identity"]["freshly_rehashed"])
-            with self.assertRaisesRegex(ComparisonError, "stopped before the first-match state boundary"):
+            with self.assertRaisesRegex(ComparisonError, "requested/observed cursors"):
                 _validate_v10_browser_provenance(
                     capture_path, producer_path, browser_report_path, trace_path,
                     recipe_path, recipe_sha, recipe, packet, required_cursor=5)
@@ -1134,11 +1427,27 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             assert_bad_snapshots([
                 good_rows[0], {"source_cursor": 2.5, "at_ms": 99,
                                "runtime_error": None}, *good_rows[2:]],
-                "invalid source cursor")
+                "expected integer")
             assert_bad_snapshots([
                 {**good_rows[0], "at_ms": float("inf")}, *good_rows[1:]],
-                "finite numeric observation time")
+                "finite ordered observation times")
             wrapper["snapshots"] = good_rows
+            capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
+            expected_files["capture_report"]["bytes"] = capture_path.stat().st_size
+            expected_files["capture_report"]["sha256"] = hashlib.sha256(
+                capture_path.read_bytes()).hexdigest()
+
+            valid_failure = wrapper["failure"]
+            wrapper["failure"] = ""
+            capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
+            expected_files["capture_report"]["bytes"] = capture_path.stat().st_size
+            expected_files["capture_report"]["sha256"] = hashlib.sha256(
+                capture_path.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(ComparisonError, "failure text"):
+                _validate_v10_browser_provenance(
+                    capture_path, producer_path, browser_report_path, trace_path,
+                    recipe_path, recipe_sha, recipe, packet)
+            wrapper["failure"] = valid_failure
             capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
             expected_files["capture_report"]["bytes"] = capture_path.stat().st_size
             expected_files["capture_report"]["sha256"] = hashlib.sha256(
@@ -1162,7 +1471,7 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             expected_files["capture_report"]["bytes"] = capture_path.stat().st_size
             expected_files["capture_report"]["sha256"] = hashlib.sha256(
                 capture_path.read_bytes()).hexdigest()
-            with self.assertRaisesRegex(ComparisonError, "pre-stop browser error"):
+            with self.assertRaisesRegex(ComparisonError, "unrelated browser or request failure"):
                 _validate_v10_browser_provenance(
                     capture_path, producer_path, browser_report_path, trace_path,
                     recipe_path, recipe_sha, recipe, packet)
@@ -1545,6 +1854,11 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                 "fighters": state["fighters"],
                 "fighter_entities": state["fighter_entities"],
             })
+        browser_rows.append({
+            "record": "session_frame", "scene": recipe.frames[5]["scene"],
+            "index": 5, "supplied_inputs": recipe.frames[5]["pads"],
+            "rng": recipe.seed, "pad_state_hex": recipe.initial_pad.hex(),
+        })
 
         with tempfile.TemporaryDirectory() as directory:
             browser_path = Path(directory) / "positive-prefix.jsonl"
@@ -1575,6 +1889,7 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                 self.assertEqual(comparator.nonmatch_compared, 2)
                 self.assertEqual(comparator.match_compared, 3)
                 self.assertIsNone(comparator.first_difference)
+                self.assertEqual(browser.line, 7)
             finally:
                 browser.close()
 

@@ -59,6 +59,10 @@ from whole_session_replay import (  # noqa: E402
     _gpr,
     validate_milestone_setups,
 )
+from retail_replay_validation import (  # noqa: E402
+    CaptureError as RetailCaptureError,
+    _validate_fighter as _validate_retail_fighter,
+)
 
 
 SCHEMA = "melee-web-whole-session-state-comparison-v1"
@@ -98,6 +102,13 @@ V10_BROWSER_PRODUCER_SCHEMA = "melee-web-b4-match-entry-producer-source-v1"
 V10_PREFIX_BYTE_CAP = 32 * 1024 * 1024
 V10_PREFIX_RECORD_CAP = 4200
 V10_FIRST_POSITIVE_RECORD_CAP = 8192
+V10_BROWSER_EXPORT_RECORD_CAP = 8192
+V10_MANUAL_UNLOAD_FAILURES = (
+    "whole-session final CSS was not entered",
+    "Manual unload stopped the replay",
+    "incomplete input timeline",
+    "source tick/draw count mismatch",
+)
 V10_DEFAULT_OFF_GATES = {
     "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
     "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
@@ -701,6 +712,18 @@ class BrowserReader:
         except StopIteration as error:
             raise ComparisonError("browser trace ended before the expected record") from error
         return row
+
+    def expect_eof(self, *, max_records: int) -> None:
+        """Require no records after the bounded export without reading past its cap."""
+        if self.line >= max_records:
+            if self.stream.read(1):
+                raise ComparisonError("browser trace exceeds its bounded record count")
+            return
+        try:
+            self._read()
+        except StopIteration:
+            return
+        raise ComparisonError("browser trace contains records after the exported prefix")
 
     def close(self) -> None:
         self.stream.close()
@@ -1957,6 +1980,265 @@ def _require_stable_mwro_stat(before: Mapping[str, int], after: Mapping[str, int
         raise ComparisonError("source MWRO stat identity changed during bounded prefix read")
 
 
+def _validate_v10_browser_setup_row(browser: BrowserReader, recipe: Recipe,
+                                    match_index: int) -> None:
+    if browser.line >= V10_BROWSER_EXPORT_RECORD_CAP:
+        raise ComparisonError("browser trace reached its bounded record count before match setup")
+    row = browser.next()
+    expected_keys = {"record", "rng", "match_frame", "pad_state_hex", "fighters",
+                     "declared_setup", "fighter_entities"}
+    BrowserReader._require(row, expected_keys,
+                           f"browser match setup {match_index} line {browser.line}")
+    if row.get("record") != "session_match_enter_complete":
+        raise ComparisonError("browser match setup record is missing or reordered")
+    _int(row["rng"], f"browser match setup {match_index}.rng")
+    _int(row["match_frame"], f"browser match setup {match_index}.match_frame")
+    _hex(row["pad_state_hex"], PAD_STATE_BYTES,
+         f"browser match setup {match_index}.pad_state_hex")
+    _validate_v10_browser_fighters(row["fighters"],
+                                   f"browser match setup {match_index}")
+    _validate_v10_browser_entities(row["fighter_entities"],
+                                   f"browser match {match_index} setup", match_index)
+    difference = _first_difference(recipe.declared_match_setups[match_index],
+                                   row["declared_setup"])
+    if difference:
+        field, expected, actual = difference
+        raise ComparisonError(
+            f"browser match setup {match_index} declared_setup differs at {field}: "
+            f"expected {expected!r}, got {actual!r}")
+
+
+def _validate_v10_browser_fighters(fighters: Any, context: str) -> None:
+    """Check the full v10 fighter shape without assigning state equivalence."""
+    _validate_browser_fighters(fighters, context)
+    if len(fighters) != 4:
+        raise ComparisonError(f"{context}: v10 requires four primary fighters")
+    for slot, fighter in enumerate(fighters):
+        try:
+            _validate_retail_fighter(fighter, slot, f"{context}.fighters[{slot}]")
+        except RetailCaptureError as error:
+            raise ComparisonError(str(error)) from error
+
+
+def _validate_v10_browser_entities(value: Any, context: str,
+                                   match_index: int) -> list[dict[str, int]]:
+    if not isinstance(value, list) or len(value) != 4:
+        raise ComparisonError(f"{context}: expected four ordered v10 fighter entities")
+    for slot, item in enumerate(value):
+        if not isinstance(item, dict):
+            raise ComparisonError(f"{context}: malformed fighter entity at slot {slot}")
+        for field in ("match_index", "slot", "entity_index"):
+            _int(item.get(field), f"{context}.fighter_entities[{slot}].{field}")
+    return _browser_entities(value, context, match_index)
+
+
+def _validate_v10_browser_export(port_trace_path: Path, recipe: Recipe,
+                                 exported_cursor: int, packet: Mapping[str, Any]) -> int:
+    """Validate the bounded, possibly overshot browser export without source state."""
+    exported_cursor = _int(exported_cursor, "browser exported cursor", 1,
+                           min(recipe.frame_count, V10_BROWSER_EXPORT_RECORD_CAP - 1))
+    browser = BrowserReader(port_trace_path)
+    try:
+        if (type(browser.header.get("frames_requested")) is not int or
+                browser.header["frames_requested"] != recipe.frame_count):
+            raise ComparisonError("browser trace header frames_requested disagrees with MWRC recipe")
+        first_positive = packet["source"].get("first_positive_boundary")
+        positive_boundary = (first_positive if recipe.scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
+                             else None)
+        frame_validator = Comparator(recipe, browser, positive_boundary=positive_boundary)
+        match_starts = {
+            span["first_frame"]: match_index
+            for match_index, span in enumerate(
+                span for span in recipe.spans if span["scene"] == SCENES["match"])
+        }
+        if _first_match_timeline_index(recipe) >= exported_cursor:
+            raise ComparisonError("browser export ends before its first match setup boundary")
+        for index in range(exported_cursor):
+            match_index = match_starts.get(index)
+            if match_index is not None:
+                _validate_v10_browser_setup_row(browser, recipe, match_index)
+                frame_validator.current_match = match_index
+            if browser.line >= V10_BROWSER_EXPORT_RECORD_CAP:
+                raise ComparisonError("browser trace reached its bounded record count before EOF")
+            row = frame_validator._expect_frame_row(recipe.frames[index]["scene"], index)
+            if type(row["scene"]) is not int or type(row["index"]) is not int:
+                raise ComparisonError(
+                    f"browser frame {index}: scene and index must be exact integers")
+            if recipe.frames[index]["scene"] == SCENES["match"]:
+                _validate_v10_browser_fighters(
+                    row["fighters"], f"browser frame {index}")
+                _validate_v10_browser_entities(row["fighter_entities"],
+                                               f"browser frame {index}",
+                                               frame_validator.current_match)
+        browser.expect_eof(max_records=V10_BROWSER_EXPORT_RECORD_CAP)
+        if browser.line > V10_BROWSER_EXPORT_RECORD_CAP:
+            raise ComparisonError("browser trace exceeds its bounded record count")
+        return browser.line
+    finally:
+        browser.close()
+
+
+def _validate_v10_manual_unload(wrapper: Mapping[str, Any],
+                                browser_report: Mapping[str, Any], *,
+                                required_cursor: int, requested_cursor: int,
+                                observed_cursor: int, recipe: Recipe,
+                                download_identities: Mapping[str, Mapping[str, Any]]) -> float:
+    expected_download_names = ["retail-port.jsonl", "retail-browser-report.json"]
+    if (wrapper.get("mode") != "state" or wrapper.get("result") != "incomplete" or
+            wrapper.get("resume_timing_pauses") is not False or
+            wrapper.get("timing_pause_resumes") != [] or wrapper.get("probe") is not None):
+        raise ComparisonError("browser capture is not an ordinary deliberate state-prefix stop")
+    for name, value in wrapper.items():
+        if name != "first_error" and name.endswith("_error") and value not in (None, "", [], {}):
+            raise ComparisonError(f"browser capture recorded an unrelated {name}")
+    if (wrapper.get("browser_errors") != [] or wrapper.get("unexpected_requests") != []):
+        raise ComparisonError("browser capture has an unrelated browser or request failure")
+    if wrapper.get("verified_runtime_data_aborts") != []:
+        raise ComparisonError("browser capture has a runtime-data abort")
+    if (browser_report.get("instrumented_timing_resumes") != 0 or
+            browser_report.get("errors") not in (None, [])):
+        raise ComparisonError("retail browser report has unrelated instrumentation or errors")
+    if browser_report.get("failures") != list(V10_MANUAL_UNLOAD_FAILURES):
+        raise ComparisonError("retail browser report failures are not the documented manual-unload set")
+
+    saved_downloads = wrapper.get("saved_downloads")
+    if not isinstance(saved_downloads, list) or len(saved_downloads) != len(expected_download_names):
+        raise ComparisonError("browser capture did not save exactly the bounded trace and report")
+    observed_downloads: dict[str, dict[str, Any]] = {}
+    for item in saved_downloads:
+        if not isinstance(item, dict) or set(item) != {"name", "bytes", "sha256"}:
+            raise ComparisonError("browser capture saved-download identity is malformed")
+        name = item["name"]
+        if not isinstance(name, str) or name in observed_downloads:
+            raise ComparisonError("browser capture has a duplicate or unknown saved download")
+        size = _int(item["bytes"], f"saved download {name} bytes")
+        digest = item["sha256"]
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise ComparisonError(f"saved download {name} hash is malformed")
+        observed_downloads[name] = {"bytes": size, "sha256": digest}
+    if observed_downloads != {name: dict(download_identities[name])
+                             for name in expected_download_names}:
+        raise ComparisonError("saved browser downloads disagree with the validated trace/report files")
+
+    snapshots = wrapper.get("snapshots")
+    if not isinstance(snapshots, list):
+        raise ComparisonError("browser capture report lacks replay snapshots")
+    target_rows: list[dict[str, Any]] = []
+    last_time = -math.inf
+    cursor_available = False
+    previous_cursor = 0
+    target_time: float | None = None
+    unload_time: float | None = None
+    unload_started = False
+    for row in snapshots:
+        if not isinstance(row, dict):
+            raise ComparisonError("browser capture snapshot list contains a malformed row")
+        if "source_cursor" not in row or "runtime_error" not in row:
+            raise ComparisonError("browser capture snapshot lacks its cursor or runtime-error field")
+        at_ms = row.get("at_ms")
+        if (type(at_ms) not in (int, float) or not math.isfinite(at_ms) or at_ms < last_time):
+            raise ComparisonError("browser capture snapshots lack finite ordered observation times")
+        last_time = at_ms
+        cursor = row["source_cursor"]
+        if cursor is None:
+            if cursor_available:
+                raise ComparisonError("browser capture has a null cursor after replay observation began")
+            if (row.get("phase", object()) is not None or
+                    row.get("running", object()) is not None or
+                    row.get("replay_report", object()) is not None or
+                    row.get("replay_downloads") != [] or row["runtime_error"] is not None):
+                raise ComparisonError("browser pre-replay snapshot has inconsistent unavailable fields")
+            continue
+        if row["runtime_error"] is not None:
+            raise ComparisonError("browser capture recorded a runtime error during manual unload")
+        cursor = _int(cursor, "browser snapshot source cursor", 0, recipe.frame_count)
+        cursor_available = True
+        running = row.get("running")
+        phase = row.get("phase")
+        if type(running) is not int or running not in (0, 1) or type(phase) is not int:
+            raise ComparisonError("browser replay snapshot lacks integer phase/running state")
+        downloads = row.get("replay_downloads")
+        replay_report = row.get("replay_report")
+        if downloads not in ([], expected_download_names):
+            raise ComparisonError("browser snapshot contains unexpected replay downloads")
+        if replay_report is not None and replay_report != browser_report:
+            raise ComparisonError("browser snapshot carries an unrelated replay report")
+        has_export = downloads == expected_download_names or replay_report is not None
+        if has_export:
+            if (cursor != 0 or running != 0 or phase != 0 or
+                    downloads != expected_download_names or replay_report != browser_report):
+                raise ComparisonError("browser export is not bound to the unloaded native snapshot")
+            unload_started = True
+            if unload_time is None:
+                unload_time = float(at_ms)
+        elif unload_started:
+            raise ComparisonError("browser snapshot followed unload without the validated report")
+        elif target_time is not None and at_ms > target_time:
+            if cursor != 0 or running != 0 or phase != 0:
+                raise ComparisonError("browser replay continued running after the observed stop")
+            unload_started = True
+        else:
+            if cursor < previous_cursor or cursor > observed_cursor:
+                raise ComparisonError("browser live snapshot cursor is nonmonotonic or exceeds stop observation")
+            previous_cursor = cursor
+            if cursor == observed_cursor and running == 1:
+                target_rows.append(row)
+                target_time = max(float(at_ms), target_time or -math.inf)
+    if (requested_cursor < required_cursor or observed_cursor < requested_cursor or
+            not target_rows or target_time is None or unload_time is None or
+            unload_time <= target_time):
+        raise ComparisonError("browser capture chronology does not reach the requested manual-unload stop")
+    if target_rows[-1].get("runtime_error") is not None:
+        raise ComparisonError("browser observed stop snapshot contains a runtime error")
+
+    final_snapshot = wrapper.get("final_snapshot")
+    def is_export_snapshot(row: Any) -> bool:
+        return (isinstance(row, dict) and type(row.get("source_cursor")) is int and
+                row.get("source_cursor") == 0 and
+                type(row.get("phase")) is int and
+                row.get("phase") == 0 and row.get("running") == 0 and
+                type(row.get("running")) is int and
+                row.get("runtime_error") is None and
+                row.get("replay_downloads") == expected_download_names and
+                row.get("replay_report") == browser_report)
+
+    if not is_export_snapshot(final_snapshot):
+        raise ComparisonError("browser final snapshot does not show the unloaded exported prefix")
+    first_mismatch = wrapper.get("first_mismatch")
+    if (not isinstance(first_mismatch, dict) or
+            first_mismatch.get("phase") != "whole-session-replay" or
+            first_mismatch.get("failure") != V10_MANUAL_UNLOAD_FAILURES[0] or
+            not is_export_snapshot(first_mismatch.get("snapshot"))):
+        raise ComparisonError("browser first mismatch is not bound to the unloaded manual-stop report")
+    message = "Browser replay report failed: " + json.dumps(
+        list(V10_MANUAL_UNLOAD_FAILURES), separators=(",", ":"))
+    first_error = wrapper.get("first_error")
+    if not isinstance(first_error, dict) or not isinstance(first_error.get("details"), dict):
+        raise ComparisonError("browser capture lacks the expected post-unload replay failure")
+    details = first_error["details"]
+    first_error_time = details.get("at_ms")
+    details_cursor = details.get("source_cursor")
+    details_phase = details.get("phase")
+    details_running = details.get("running")
+    if (first_error.get("kind") != "whole-session-replay" or
+            first_error.get("phase") != "whole-session-replay" or
+            first_error.get("message") != message or
+            type(first_error_time) not in (int, float) or
+            not math.isfinite(first_error_time) or first_error_time <= unload_time or
+            type(details_cursor) is not int or details_cursor != 0 or
+            type(details_phase) is not int or details_phase != 0 or
+            type(details_running) is not int or details_running != 0 or
+            details.get("runtime_error") is not None or
+            details.get("replay_downloads") != expected_download_names or
+            details.get("replay_report") != browser_report):
+        raise ComparisonError("browser capture first error is not the expected post-unload report failure")
+    failure = wrapper.get("failure")
+    if (not isinstance(failure, str) or not failure.splitlines() or
+            failure.splitlines()[0] != f"Error: {message}"):
+        raise ComparisonError("browser capture failure text does not bind to the manual-unload report")
+    return target_time
+
+
 def _validate_v10_browser_provenance(capture_report_path: Path,
                                      producer_manifest_path: Path,
                                      browser_report_path: Path,
@@ -2062,59 +2344,8 @@ def _validate_v10_browser_provenance(capture_report_path: Path,
                              recipe.frame_count)
     observed_cursor = _int(stop.get("observed_cursor"), "browser observed stop cursor", 1,
                            recipe.frame_count)
-    if requested_cursor < required_cursor or observed_cursor < required_cursor:
-        raise ComparisonError("browser capture stopped before the first-match state boundary")
-    snapshots = wrapper.get("snapshots")
-    if not isinstance(snapshots, list):
-        raise ComparisonError("browser capture report lacks replay snapshots")
-    target_rows = []
-    cursor_available = False
-    for row in snapshots:
-        if not isinstance(row, dict):
-            raise ComparisonError("browser capture snapshot list contains a malformed row")
-        if "source_cursor" not in row or "runtime_error" not in row:
-            raise ComparisonError("browser capture snapshot lacks its cursor or runtime-error field")
-        cursor = row["source_cursor"]
-        at_ms = row.get("at_ms")
-        if (type(at_ms) is not int and
-                (type(at_ms) is not float or not math.isfinite(at_ms))):
-            raise ComparisonError("browser capture snapshot lacks a finite numeric observation time")
-        if cursor is None:
-            if cursor_available:
-                raise ComparisonError("browser capture has a null cursor after replay observation began")
-            if (row.get("phase", object()) is not None or
-                    row.get("running", object()) is not None or
-                    row.get("replay_report", object()) is not None or
-                    row.get("replay_downloads") != [] or row["runtime_error"] is not None):
-                raise ComparisonError("browser pre-replay snapshot has inconsistent unavailable fields")
-            continue
-        if type(cursor) is not int or not 0 <= cursor <= recipe.frame_count:
-            raise ComparisonError("browser capture snapshot has an invalid source cursor")
-        cursor_available = True
-        if cursor == observed_cursor and row.get("runtime_error") is None:
-            target_rows.append(row)
-    if not target_rows:
-        raise ComparisonError("browser capture has no clean snapshot at its observed stop cursor")
-    target_time = max(row["at_ms"] for row in target_rows)
-    for row in snapshots:
-        at_ms = row.get("at_ms")
-        if type(at_ms) in (int, float) and at_ms <= target_time:
-            if row.get("runtime_error") is not None:
-                raise ComparisonError("browser capture has a runtime error before the deliberate stop")
-            cursor = row.get("source_cursor")
-            if type(cursor) is int and cursor > observed_cursor:
-                raise ComparisonError("browser capture advanced past its reported stop cursor")
-    browser_errors = wrapper.get("browser_errors")
-    if not isinstance(browser_errors, list) or browser_errors:
-        raise ComparisonError("browser capture has a pre-stop browser error")
-    first_error = wrapper.get("first_error")
-    if first_error is not None:
-        if not isinstance(first_error, dict) or not isinstance(first_error.get("details"), dict):
-            raise ComparisonError("browser capture first error lacks structured details")
-        details = first_error["details"]
-        if (type(details.get("at_ms")) not in (int, float) or
-                details["at_ms"] <= target_time or details.get("runtime_error") is not None):
-            raise ComparisonError("browser capture first error was not observed after its deliberate stop")
+    if requested_cursor < required_cursor or observed_cursor < requested_cursor:
+        raise ComparisonError("browser requested/observed cursors do not reach the frozen stop boundary")
 
     if wrapper.get("browser_report") != browser_report:
         raise ComparisonError("embedded and sidecar retail browser reports disagree")
@@ -2128,13 +2359,22 @@ def _validate_v10_browser_provenance(capture_report_path: Path,
             browser_report.get("final_scene") is not None):
         raise ComparisonError("retail browser report is not the incomplete v10 state capture")
     metrics = browser_report.get("metrics")
-    if (not isinstance(metrics, dict) or
-            any(metrics.get(name) != observed_cursor
-                for name in ("sourceFrames", "sourceSteps", "sourceDraws"))):
-        raise ComparisonError("retail browser report source cursors disagree with stop provenance")
+    if not isinstance(metrics, dict):
+        raise ComparisonError("retail browser report is missing exported source metrics")
+    exported_values = [
+        _int(metrics.get(name), f"retail browser report metrics.{name}", 1,
+             recipe.frame_count)
+        for name in ("sourceFrames", "sourceSteps", "sourceDraws")
+    ]
+    if len(set(exported_values)) != 1:
+        raise ComparisonError("retail browser report source export metrics disagree")
+    exported_cursor = exported_values[0]
+    if not required_cursor <= requested_cursor <= observed_cursor <= exported_cursor:
+        raise ComparisonError("browser requested, observed, and exported cursors are inconsistent")
     trace_size = port_trace_path.stat().st_size
     if trace_size > V10_PREFIX_BYTE_CAP:
         raise ComparisonError("browser trace exceeds its bounded diagnostic size")
+    trace_stat_before = _file_stat_identity(port_trace_path)
     trace_sha = _sha256(port_trace_path)
     trace_bytes = port_trace_path.stat().st_size
     _verify_expected_file(expected_files["port_trace"], port_trace_path,
@@ -2142,14 +2382,34 @@ def _validate_v10_browser_provenance(capture_report_path: Path,
     if (browser_report.get("trace_sha256") != trace_sha or
             inputs.get("recipe", {}).get("sha256") != browser_report.get("recipe_sha256")):
         raise ComparisonError("retail browser report hashes disagree with selected trace/recipe")
+    target_time = _validate_v10_manual_unload(
+        wrapper, browser_report, required_cursor=required_cursor,
+        requested_cursor=requested_cursor, observed_cursor=observed_cursor,
+        recipe=recipe,
+        download_identities={
+            "retail-port.jsonl": {"bytes": trace_bytes, "sha256": trace_sha},
+            "retail-browser-report.json": {
+                "bytes": browser_report_path.stat().st_size, "sha256": report_sha,
+            },
+        })
+    browser_records = _validate_v10_browser_export(
+        port_trace_path, recipe, exported_cursor, packet)
+    trace_stat_after = _file_stat_identity(port_trace_path)
+    if trace_stat_before != trace_stat_after:
+        raise ComparisonError("browser trace stat identity changed during bounded export validation")
     return producer, wrapper, browser_report, {
         "capture_report_sha256": capture_sha,
         "producer_manifest_sha256": producer_sha,
         "browser_report_sha256": report_sha,
         "port_trace_sha256": trace_sha,
         "port_trace_bytes": trace_bytes,
+        "port_trace_stat_before": trace_stat_before,
+        "port_trace_stat_after": trace_stat_after,
+        "browser_records_validated": browser_records,
         "target_cursor": observed_cursor,
+        "observed_cursor": observed_cursor,
         "requested_cursor": requested_cursor,
+        "exported_cursor": exported_cursor,
         "required_cursor": required_cursor,
         "target_snapshot_ms": target_time,
         "browser_errors_before_stop": 0,
@@ -2221,6 +2481,7 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                          if positive_scope else
                          "Checks CSS/SSS consumed-input order and compares first match setup plus source tick 0 state only; no later match frame is read by the comparator."),
             "nonmatch_state": "CSS/SSS consumed-input ordering is not scalar state equivalence; nonmatch_fields_compared is empty.",
+            "browser_export_tail": "All exported rows are checked for schema, typed shape, recipe input/order and exact EOF. Match rows beyond the semantic comparison boundary receive shape checks only; their state is not compared with the original.",
             "whole_session": "This is incomplete prefix evidence and never establishes whole-session equivalence.",
             "timing_rendering_audio": "No timing, draw cadence, pixels, PCM, performance, or tournament-admission claim.",
         },
@@ -2391,7 +2652,7 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             "frames_requested": recipe_obj.frame_count,
             "timeline_frames_consumed": comparator.compared,
             "nonmatch_frames_input_ordered": comparator.nonmatch_compared,
-            "browser_frames_captured": browser_identity["target_cursor"],
+            "browser_frames_captured": browser_identity["exported_cursor"],
             "match_state_frames_compared": comparator.match_compared,
             "source_prefix": {
                 "records_read": stats.records_read,
@@ -2438,6 +2699,7 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 **target,
                 "setup_source_sequence": source.first_setup_seq,
                 "browser_observed_cursor": browser_identity["target_cursor"],
+                "browser_exported_cursor": browser_identity["exported_cursor"],
                 "source_prefix_sha256": stats.prefix_sha256,
                 "source_prefix_records": stats.records_read,
                 "source_prefix_bytes": stats.bytes_read,
