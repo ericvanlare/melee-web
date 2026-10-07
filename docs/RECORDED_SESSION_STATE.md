@@ -319,6 +319,43 @@ existing v8/v9 and v10 prefix scopes remain unchanged.
 The measured result and its capture, comparator, and validation identities are
 recorded in the [B4 clock-60 comparison entry](status/2026-10-07-b4-v10-first-match-clock60-comparison.md).
 
+## Bounded MWRC v10 post-clock-60 boundary comparison
+
+Use `--scope v10-first-match-clock-boundary` with a frozen packet that binds a
+terminal first-match clock threshold and its source-only audit, in addition to
+the accepted clock-1 and clock-60 audits. Pass that third audit separately with
+`--match-clock-boundary-audit`. This scope compares every contiguous match-0
+tick from setup through the packet's terminal tuple, rejoining the fresh source
+prefix hashes at clock 1, clock 60, and the terminal boundary before continuing.
+The terminal clock value must be the first one at or above the packet's
+threshold; clock regression, jumps, early threshold, incorrect tuples, PAD/tick
+misjoins, entity failures, or declared-state differences stop the comparison.
+
+```sh
+python3 scripts/compare_whole_session_state.py \
+  --reference "$SESSION_REFERENCE" --recipe "$SESSION_RECIPE" \
+  --port-trace "$SESSION_BROWSER_TRACE" \
+  --browser-report "$SESSION_BROWSER_REPORT" \
+  --scope v10-first-match-clock-boundary \
+  --expectations "$SESSION_EXPECTATIONS" \
+  --source-manifest "$SESSION_SOURCE_MANIFEST" \
+  --source-report "$SESSION_SOURCE_REPORT" \
+  --source-audit "$SESSION_SOURCE_AUDIT" \
+  --positive-boundary-audit "$SESSION_POSITIVE_AUDIT" \
+  --clock60-boundary-audit "$SESSION_CLOCK60_AUDIT" \
+  --match-clock-boundary-audit "$SESSION_MATCH_CLOCK_AUDIT" \
+  --browser-capture-report "$SESSION_BROWSER_CAPTURE_REPORT" \
+  --browser-producer-manifest "$SESSION_BROWSER_PRODUCER_MANIFEST" \
+  --out "$SESSION_COMPARISON_OUT"
+```
+
+The source reader remains capped at 32 MiB and 8,192 records. CSS/SSS rows
+establish input order only, and exported rows beyond the terminal cursor receive
+shape checks without source-state comparison. A matching terminal boundary is
+still incomplete evidence (`boundary_result: equivalent`, `result: incomplete`,
+`complete: false`, `whole_session_equivalent: false`; CLI exit 1). Whole-session
+default behavior and the existing v8/v9 scopes remain unchanged.
+
 ## Capture command failure gates
 
 The capture command reports success only after the replay completes, browser
