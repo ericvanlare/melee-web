@@ -38,7 +38,7 @@
 #include "stadium_c1_e8_call_observer.h"
 #include "stadium_c1_item_owner_negative_cases.hpp"
 #include "stadium_c1_item_owner_preflight.hpp"
-#include "stadium_screen_roots_synthetic.hpp"
+#include "stadium_live_image_consumer.hpp"
 #include "stadium_c0_native_map_contract.hpp"
 #endif
 #include <melee/ft/forward.h>
@@ -1912,10 +1912,27 @@ void run_stadium_screen_roots_preflight(
             invariants();
             screen::catalog_checks(*archive, map, sis, 1, image_offset);
             invariants();
+            auto* image = static_cast<HSD_ImageDesc*>(map.image_descriptor(image_offset));
+            screen::identity(map, 1, image);
+            const MeleeWebArchiveSymbol symbols[] = {
+                {"GrPs.usd", screen::image_name, image},
+                {"GrPs.usd", screen::sis_name, sis.descriptor()},
+            };
+            screen::Catalog catalog("GrPs.usd", symbols, 2);
+            check(stadium_screen_source_public(catalog.handle, screen::image_name) == image &&
+                      stadium_screen_source_public(catalog.handle, screen::sis_name) == sis.descriptor(),
+                  "Live consumer catalog lost canonical IMAGE/SIS owners");
+            DatNativeMap foreign(archive, melee_web::test::stadium_contract);
+            auto* foreign_image = static_cast<HSD_ImageDesc*>(foreign.image_descriptor(image_offset));
+            auto* descriptor = static_cast<HSD_Joint*>(
+                stadium_screen_map_entry_joint(map.map_head(), 1));
+            screen::live_source_consumer_lifetime(descriptor, image, foreign_image, invariants);
+            invariants();
         }
         invariants();
     }
     std::cout << "C1 screen-root preflight preserved canonical IMAGE, writable SIS and two owner/catalog lifetimes; no stage entry or ticks\n";
+    std::cout << "C1 live Stadium IMAGE source hit/miss/remove passed twice; no stage entry or ticks\n";
 }
 
 void run_stadium_c1_context_preflight(

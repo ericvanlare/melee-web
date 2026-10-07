@@ -1,5 +1,7 @@
 #include "gameplay_compat.h"
 #include "stadium_screen_roots_probe.h"
+#include <melee/gr/ground.h>
+#include <melee/gr/grpstadium.h>
 #include <melee/gr/types.h>
 #include <sysdolphin/baselib/archive.h>
 #include <sysdolphin/baselib/jobj.h>
@@ -49,4 +51,47 @@ int stadium_screen_image_view(void* pointer, uint32_t entry, void* image,
 void* stadium_screen_source_public(void* handle, const char* name)
 {
     return HSD_ArchiveGetPublicAddress((HSD_Archive*)handle, name);
+}
+
+void* stadium_screen_map_entry_joint(void* pointer, uint32_t entry)
+{
+    UnkStageDat* map = pointer;
+    if (!map || entry >= (uint32_t) map->unkC || !map->unk8)
+        return NULL;
+    return map->unk8[entry].unk0;
+}
+
+size_t stadium_screen_stage_info_size(void)
+{
+    return sizeof(stage_info);
+}
+
+int stadium_screen_stage_info_snapshot(void* output, size_t size)
+{
+    if (!output || size != sizeof(stage_info))
+        return 0;
+    memcpy(output, &stage_info, sizeof(stage_info));
+    return 1;
+}
+
+int stadium_screen_stage_is_empty(void)
+{
+    size_t i;
+    if (stage_info.param || stage_info.itemdata || stage_info.coll_data ||
+        stage_info.map_ptcl || stage_info.map_texg || stage_info.map_plit)
+        return 0;
+    for (i = 0; i < sizeof(stage_info.map_gobjs) /
+                        sizeof(stage_info.map_gobjs[0]); ++i)
+        if (stage_info.map_gobjs[i])
+            return 0;
+    return 1;
+}
+
+StadiumLiveImageQuery stadium_screen_live_image_query(void* view, void* image,
+                                                     void* material_sentinel)
+{
+    HSD_MObj* material = material_sentinel;
+    HSD_TObj* texture = grStadium_801D3138(view, image, &material);
+    const StadiumLiveImageQuery result = { texture, material };
+    return result;
 }

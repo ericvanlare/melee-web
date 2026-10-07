@@ -1,0 +1,484 @@
+{
+  "schema": "melee-web-pokemon-stadium-live-map1-image-consumer-v1",
+  "result": "passed_scoped_live_source_constructor_query_ownership",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "issue": "https://github.com/ericvanlare/melee-web/issues/227",
+  "related_issues": [
+    164,
+    223
+  ],
+  "boundary": "Original HSD_JObjLoadJoint/grStadium_801D3138/HSD_JObjRemoveAll on checked map1 descriptors in a retained diagnostic context; no stage entry/admission.",
+  "reuse": {
+    "owner": "Existing DatNativeMap canonical borrowed IMAGE accessor and DatSis; exactly two native public roots through typed catalog/source HSD lookup.",
+    "query": "Zero-initialized local HSD_GObj.hsd_obj view, not registered or destroyed as a source GObj; clear before original immediate-root RemoveAll.",
+    "rejected": "gameplay_stage_visual_begin/stage publication introduce Ground, camera, animation and GX-link lifetimes outside this prerequisite."
+  },
+  "native_source": {
+    "producer_commit": "2ded3d4f465d82cea1a3323343ef300a1ab8b6d6",
+    "producer_tree": "4dc4898496807db19329a1d20df7cce9527ab78c",
+    "working_tree": "clean",
+    "files_sha256": {
+      "tests/stadium_live_image_consumer.hpp": "cb81fb10eab01aa424b69a8aa82e59abfdd7c73ac259e64d6e48163a880c3a3e",
+      "tests/stadium_screen_roots_probe.c": "0318dd83d2446f85c7b6c226a6d0ae28d589fe425a5165a87c16b823730df18f",
+      "tests/stadium_screen_roots_probe.h": "00daac59b3b72768f114428778c1a4be231027a4d0504ce78fb27070a0bad2cd",
+      "tests/stadium_screen_roots_trace.cpp": "5c3c6ff0896d8ab1ed5a07c4170d4601bb569296bfc47660e35c77539ade4ad7",
+      "tests/native_menu_host_trace.cpp": "01aed8f89779cd4f5ffb6dc090bdb6d8989a1ac4080fd11d45b1eef84690d35c",
+      "tests/stadium_screen_roots_synthetic.hpp": "0a396fda44b743e179408a1ca1d9d7c1f0088aad8b8a0f1801917da452464e37",
+      "tests/stadium_screen_roots_checks.hpp": "c2b7d6c4e72d25fb5ee3f1afc139b1f3394595c10fff552d5bd2a65dca9fab23",
+      "tests/stadium_c0_native_map_contract.hpp": "6c7d9a6de710f3e006960d87155a6d1f9a9ef5b2e24fb78a0feb25bd59d25143",
+      "CMakeLists.txt": "8e7b7e766ca4c7c3ba1d38fbb0c66fe156d9654746c79b2fb231bd27255046c7",
+      "cmake/FighterRuntime.cmake": "9aa5b509d1ea3cda74ae33bc878ae9c4b17fa6bef3da8a4752ea348fe66c1c42",
+      "src/dat_native_stage.cpp": "3cbd102048f86d925b46f59c2d644b0f67a2353a220caa7ba56af1ea4cdc6393",
+      "src/dat_native_stage.hpp": "6f5758f56894a394c16ca13d071356316bfeedc94584830716c98bd8a376c781",
+      "src/dat_sis.cpp": "4759d19d6b02d3f6859d792e851828c0596e35cffa8f4e8939cd1993adda6672",
+      "tests/test_dat_native_stage.py": "712a84687313a8060de185f6f74ec519ee3beaa448d84e8ae05a3f1a812ba10f",
+      "tests/test_gameplay_native_menus.py": "5fb14a4770655e1685fed5c75c328d6303b8384bf833747ec60d77fac834544f",
+      "dependencies.lock.json": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385"
+    }
+  },
+  "native_build": {
+    "command": [
+      "python3",
+      "scripts/build.py",
+      "--trace-target",
+      "native_menu_host_trace",
+      "--configuration",
+      "Release",
+      "--stadium-c1a-diagnostic"
+    ],
+    "exit_code": 0,
+    "profile": "Release diagnostic ON",
+    "diagnostic": true,
+    "log_sha256": "20c577d15e1f5498ceb212abf41db3916edb0467a1b9bd10bb91fff21613bbc6",
+    "artifacts": {
+      "native_menu_host_trace.js": {
+        "bytes": 233327,
+        "sha256": "c07cad55714aaf18bc430d82ce17f8ca1276259ce40f2398e258e05c44159b2b"
+      },
+      "native_menu_host_trace.wasm": {
+        "bytes": 13846952,
+        "sha256": "c4623d195add10562b35ae91c2d3377569a9e7259e029c4b8ffab006d2f4a8ed"
+      },
+      "CMakeCache.txt": {
+        "bytes": 61252,
+        "sha256": "59b26ab9d7f1414fd337c83e8dc3f009655dad37c38dbd6e7434268b69e7d9e6"
+      },
+      "build.ninja": {
+        "bytes": 5787871,
+        "sha256": "26d81feed6aea8ddd8ad3fb7a9ec3f0607b3df75877b2b93fe0e7346707ef436"
+      }
+    }
+  },
+  "native_execution": {
+    "command": [
+      "python3",
+      "scripts/agent_workspace.py",
+      "run",
+      "--",
+      "python3",
+      "tests/test_gameplay_native_menus.py",
+      "NativeMenuSourceTests.test_stadium_screen_roots_owner_preflight",
+      "-v"
+    ],
+    "environment": {
+      "MELEE_MENU_FIXTURE_ROOT": "Exact previously retained 98-file C1 fixture",
+      "MELEE_KEEP_TEST_ARTIFACTS": "1"
+    },
+    "launches": 1,
+    "positive_lifetimes": 2,
+    "passed_tests": 1,
+    "seconds": 0.982,
+    "exit_code": 0,
+    "success_line": "C1 live Stadium IMAGE source hit/miss/remove passed twice; no stage entry or ticks",
+    "trace": {
+      "lines": 1,
+      "header": {
+        "record": "header",
+        "schema": "melee-web-transition-trace",
+        "version": 1,
+        "producer": "port",
+        "game_revision": "GALE01r2",
+        "source_revision": "2ded3d4f465d82cea1a3323343ef300a1ab8b6d6",
+        "build_configuration": "browser-release",
+        "input_recipe": "stadium-screen-roots-preflight-v1"
+      },
+      "sha256": "c9d23ea07aa5145709e069c349feda507deaff7e003b44d4e4f6f5b3c26671ec"
+    },
+    "artifacts": {
+      "screen-roots-preflight-command.txt": {
+        "bytes": 836,
+        "sha256": "f67699d4548408d1658ab83ee92a01b1502d6cfa01e7b1e60d4d4bd7a5035f54"
+      },
+      "screen-roots-preflight.jsonl": {
+        "bytes": 267,
+        "sha256": "c9d23ea07aa5145709e069c349feda507deaff7e003b44d4e4f6f5b3c26671ec"
+      },
+      "screen-roots-preflight.stderr": {
+        "bytes": 1082,
+        "sha256": "c22f27c592161514bf25a73c5a1790526795eeb450694206e4be02d18d1f05fb"
+      },
+      "screen-roots-preflight.stdout": {
+        "bytes": 449,
+        "sha256": "154328bedc39cee5a66eb848fd67cafcb3b9a14bfbfe0312244d9b71a408d57e"
+      }
+    },
+    "profile_limit": "Generic browser-release trace header is not diagnostic profile identity; actual frozen cache is Release diagnostic ON.",
+    "node": {
+      "version": "v24.19.0",
+      "sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1"
+    }
+  },
+  "observed_native": {
+    "map_entry": 1,
+    "image_source_offset": 35276,
+    "canonical_live_reference_count": 1,
+    "hit": "Returned TObj image is accessor/catalog pointer; independent live JObj/DObj/MObj/TObj traversal confirms returned MObj ownership and exactly one IMAGE reference.",
+    "misses": "Live foreign-owner IMAGE and empty view return NULL and preserve actual material sentinel.",
+    "borrowed_preload_gate": "No participating global toon IMAGE or shadow chain before candidate load; no globals disabled or authored flags changed.",
+    "borrowed_snapshots": [
+      "object/root/next/image",
+      "id/mtxid/coord"
+    ],
+    "restored": [
+      "source descriptor ID bindings/ID allocator usage",
+      "live class nb_exist including derived classes",
+      "AObj/RObj/Rvalue/Vec/Mtx/render/TEV-register/channel used pool entries",
+      "texture-bound live count",
+      "borrowed toon/shadow state",
+      "entity/process/GX lists and full StageInfo",
+      "raw GrPs input and post-ResolveNull decoded archive",
+      "save card/selection/RNG owner and value/item globals/empty link",
+      "generation/ticks/empty stage state"
+    ],
+    "cache_policy": "Lazy class registration and source allocator caches may remain; live instances and used pool entries restore. No pool reset or heap-free-byte equality requirement.",
+    "lifetime_order": "Loaded root and stack query view end before caller-owned canonical/foreign map, SIS, catalog and handle teardown. Two lifetimes do not require distinct addresses.",
+    "construction_plan": "Reject repeated construction descriptors or instance targets outside the loaded descriptor graph before source loading; no per-asset bypass."
+  },
+  "fixture": {
+    "logical_files": 98,
+    "original_union_manifest_sha256": "258233cd7ad22041a65aca34329157272f2248a9985729e7f47b52a21a662ea6",
+    "before_inventory_sha256": "59a9d2711a7565cc4a6760578af1959cd1faff9b1a6e2936b810a4faff151e2a",
+    "after_inventory_sha256": "d6d7adb1c156013023be797dc57af02e3efd10aa9a88fce2f86181ed636610a6",
+    "all98_after_unchanged": true,
+    "same98_as_historical_bc": true,
+    "extraction_or_new_C0_scan": false
+  },
+  "synthetic_validation": {
+    "execution_producer": "b4641a14bb534fa1d9f1fd9e7f6e71940f7a759e",
+    "execution_tree": "683dc74579a9476d10b2d1a2f848cbdca5a23c73",
+    "committed_before_build_run": true,
+    "profile": "RelWithDebInfo",
+    "lifetimes": 2,
+    "source_load_query_remove_passed": true,
+    "artifact_hashes": {
+      "reuse.patch": "fe7349f315e297beee418d43e88cb7be07bf618bf0fdd241d29168b3687772a4",
+      "synthetic-build-v1.log": "e1bbfc126b7d79ba8a725fae21b9837789d96bcc7bb87b6f9c495613190b8ee2",
+      "diagnostic-compile-v1.log": "96dcf4c919ad3dbced11bf180b06085ec027ad022f22a309a79f66b3fa815da8",
+      "synthetic-v1-command.json": "b05a54641bfee2d0c48664d3ba53222668602d70efc57ee270a7af67246633da",
+      "synthetic-v1.stdout": "2e043905aeea8b33a9fd1d4fa8af5b53bdd58282ad711576ebc3a299d5b326df",
+      "synthetic-v1.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "synthetic-v1-exit.txt": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "handoff-workspace-status.json": "cfbd94eca9db16b105430fbb1b82444896d3024edeecd5f6c1c56bc2e97762c5",
+      "commands.txt": "62805586bb98f28b7e671829a99bf140f22aec719e4d1ab3736eafe46375ee3b",
+      "source-review.md": "64e7cec92dd69ccec93aaa5d9e10a7768e53bf32ab2611a924039decbcf5dd55"
+    },
+    "earlier_dirty_execution": {
+      "actual_head": "4135b202d60a48e089c002d7417059dac23c7e6c",
+      "equivalent_content_commit_after_execution": "4e7476f8430b12cb196ba9cce8e7a9f71d637906",
+      "original_freeze_preserved": true,
+      "producer_correction_sha256": "2f66c3e2db47627df7d075d5e112b7747b307b9e7cded63a966aa488c65ce3bb"
+    }
+  },
+  "failures": [
+    {
+      "boundary": "Incoming C++ source header/map access and source C linkage",
+      "raw_logs": "Two original-owner failures retained only in parent tool transcripts; separate raw logs/source snapshots for those failed versions were not retained.",
+      "gap_explicit": true,
+      "incoming_source_freeze_sha256": "41bfb7158ef02accb2c35beeca3c36f73c899de8887da00073845df11907181d",
+      "correction": "Move StageInfo/map/query behind actual C probe/source declarations; use C linkage for source HSD headers."
+    },
+    {
+      "boundary": "Added ownership-counter compile",
+      "cause": "Missing mtx.h declaration for source Vec/Mtx allocator accessors; inspected before one corrected compile retry.",
+      "raw_log_sha256": "2ec750627e23c49fe3bc8c6acb5d25aa8ed881d8780a400a34c50ccc6e71da44",
+      "failed_header_sha256": "6ed9f76edaa9464a49b7865305fa095bb99734ee37a4b8d744f591d04d9bf176",
+      "corrected_build_log_sha256": "6c9d1e5496fba5aa998a7022eb4a42f6cb81ab7ab4d4b0ce21fb7d5f16799f0c"
+    },
+    {
+      "boundary": "Input-packet preparation only; no native attempt",
+      "cause": "Incorrectly selected the 76-menu-copy inventory instead of authoritative 98-file union; direct schema reduction used unchanged original union and freshly verified all98.",
+      "failure_note_sha256": "028dcb47f7353a226054b79727020a229a29587fe747403ba293bb1496a0c2eb",
+      "reduction_sha256": "b00d83f772a101a2e69c5d908224bb1301886654c4df253307317cacbf69c477"
+    }
+  ],
+  "independent_reviews": {
+    "source_sha256": "4470c272024e489248e5e7ab9a69d9b926be36f172b66b35d39aa3ff9415a256",
+    "one_native_packet_authorization_sha256": "05ce23244f21161b105d3611bdddb12425de674fd5d6ba25f0d5b5dff1ba1241",
+    "native_result_sha256": "ef5f8f702695b8a1595ea877fb9908e8f25e0cbfd72efcc36ca1e32da6af469c"
+  },
+  "private_evidence": "Retained external NVMe runs discoverable by stadium-live-image-escalation, stadium-live-image-reuse, stadium-live-image-native-packet and stadium-live-image-integration prefixes; raw logs, binaries, failed reproducers, original fixture and owned native scratch preserved.",
+  "unrun": [
+    "E8",
+    "Stage2524C",
+    "OnInit/Ground",
+    "registered stage GObj or stage publication/profile/admission",
+    "source animation/gameplay ticks/draw",
+    "global SIS/camera/text/copy-buffer consumers",
+    "browser",
+    "retail comparison",
+    "performance/pixels/audio acceptance",
+    "deployment"
+  ],
+  "whole_stage_admission": false,
+  "historical_integration_validation": {
+    "producer": "4544b8d1e0754af6fd37a05007a24e87e72839ac",
+    "tree": "2de5caa5bae7b4fdd2d711b9926253f6f089e013",
+    "base": "10dd466c3ac4103fc11f56b1943ba4930c477959",
+    "clean": true,
+    "native_producer": "2ded3d4f465d82cea1a3323343ef300a1ab8b6d6",
+    "source_hashes": {
+      "tests/stadium_live_image_consumer.hpp": "cb81fb10eab01aa424b69a8aa82e59abfdd7c73ac259e64d6e48163a880c3a3e",
+      "tests/stadium_screen_roots_probe.c": "0318dd83d2446f85c7b6c226a6d0ae28d589fe425a5165a87c16b823730df18f",
+      "tests/stadium_screen_roots_probe.h": "00daac59b3b72768f114428778c1a4be231027a4d0504ce78fb27070a0bad2cd",
+      "tests/stadium_screen_roots_trace.cpp": "5c3c6ff0896d8ab1ed5a07c4170d4601bb569296bfc47660e35c77539ade4ad7",
+      "tests/native_menu_host_trace.cpp": "01aed8f89779cd4f5ffb6dc090bdb6d8989a1ac4080fd11d45b1eef84690d35c",
+      "tests/stadium_screen_roots_synthetic.hpp": "0a396fda44b743e179408a1ca1d9d7c1f0088aad8b8a0f1801917da452464e37",
+      "tests/stadium_screen_roots_checks.hpp": "c2b7d6c4e72d25fb5ee3f1afc139b1f3394595c10fff552d5bd2a65dca9fab23",
+      "tests/stadium_c0_native_map_contract.hpp": "6c7d9a6de710f3e006960d87155a6d1f9a9ef5b2e24fb78a0feb25bd59d25143",
+      "CMakeLists.txt": "8e7b7e766ca4c7c3ba1d38fbb0c66fe156d9654746c79b2fb231bd27255046c7",
+      "cmake/FighterRuntime.cmake": "9aa5b509d1ea3cda74ae33bc878ae9c4b17fa6bef3da8a4752ea348fe66c1c42",
+      "src/dat_native_stage.cpp": "3cbd102048f86d925b46f59c2d644b0f67a2353a220caa7ba56af1ea4cdc6393",
+      "src/dat_native_stage.hpp": "6f5758f56894a394c16ca13d071356316bfeedc94584830716c98bd8a376c781",
+      "src/dat_sis.cpp": "4759d19d6b02d3f6859d792e851828c0596e35cffa8f4e8939cd1993adda6672",
+      "tests/test_dat_native_stage.py": "712a84687313a8060de185f6f74ec519ee3beaa448d84e8ae05a3f1a812ba10f",
+      "tests/test_gameplay_native_menus.py": "f657940ee0d5c4fb67d51504b556c745aaede452ade5833a377cf1f42f205382",
+      "dependencies.lock.json": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385"
+    },
+    "source_delta": "Only a four-line persistent Python assertion for the observed new live-consumer completion line; executable C/C++ source unchanged. Native run not repeated.",
+    "ordinary_release_native_target": {
+      "producer": "4544b8d1e0754af6fd37a05007a24e87e72839ac",
+      "tree": "2de5caa5bae7b4fdd2d711b9926253f6f089e013",
+      "command": [
+        "python3",
+        "scripts/build.py",
+        "--trace-target",
+        "native_menu_host_trace",
+        "--configuration",
+        "Release"
+      ],
+      "target": "native_menu_host_trace",
+      "configuration": "Release",
+      "diagnostic": false,
+      "exit_code": 0,
+      "log_sha256": "b842bb6b9f4a5dbdc83f039ebc1f1b2429f73972ccf3047dcd71164e93e2d69c",
+      "artifacts": {
+        "native_menu_host_trace.js": {
+          "bytes": 232567,
+          "sha256": "a38469b0da5e97b03f9a1d7d6d5b6c9d0dd9a7b697777c26350064430fa0a3f9"
+        },
+        "native_menu_host_trace.wasm": {
+          "bytes": 13584106,
+          "sha256": "4e55e2a6efec320088debb6a6857c46218d970be0a2c6d5788365029a0baf6c4"
+        },
+        "CMakeCache.txt": {
+          "bytes": 60977,
+          "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+        },
+        "build.ninja": {
+          "bytes": 5617594,
+          "sha256": "d11466440968997a8275b2e64408da815c773cd386affbf2529b446291f1494e"
+        }
+      }
+    },
+    "full_suite": {
+      "producer": "4544b8d1e0754af6fd37a05007a24e87e72839ac",
+      "tree": "2de5caa5bae7b4fdd2d711b9926253f6f089e013",
+      "command": [
+        "env",
+        "-u",
+        "MELEE_MENU_FIXTURE_ROOT",
+        "-u",
+        "MELEE_KEEP_TEST_ARTIFACTS",
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 2030,
+      "seconds": 375.706,
+      "skipped": 136,
+      "retained_fixture_environment": "UNSET",
+      "keep_test_artifacts_environment": "UNSET",
+      "retained_screen_roots_and_E8_skipped_before_native_launch": true,
+      "stdout_sha256": "df84b19db1130fe83dc10a91b68f1aeb5738ef9e3c6da0be7121ead46bb95ac3",
+      "stderr_sha256": "d680e19bdc77348854798123ae25e975ccbb5570f1a4cd5d0423cc3358f88b8e"
+    },
+    "retained_native_run_repeated": false,
+    "documentation": {
+      "tests": 4,
+      "result": "pass",
+      "repository_content_tracked_entries": 1925,
+      "repository_content_findings": 0,
+      "diff_check": "pass",
+      "docs_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "docs_stderr_sha256": "f8f4cd42c8cf346581e19b2280feef071b2fc8aabb115bac7dc4c3b374814e78",
+      "content_stdout_sha256": "41abaef06faa1f5c7987a127a6ba5916455c2f94913d1185ce3a199036dc4bba",
+      "content_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "current_integration_validation": {
+    "producer": "adee01b9b35fdebf4a3d4377880fb68a5dec7f4e",
+    "tree": "35cf095af5b22169fa377712d69b83e6589b60ad",
+    "base": "2fd79a51afb84e3a260b8553d568cb6360f91171",
+    "clean": true,
+    "source_hashes": {
+      "tests/stadium_live_image_consumer.hpp": "cb81fb10eab01aa424b69a8aa82e59abfdd7c73ac259e64d6e48163a880c3a3e",
+      "tests/stadium_screen_roots_probe.c": "0318dd83d2446f85c7b6c226a6d0ae28d589fe425a5165a87c16b823730df18f",
+      "tests/stadium_screen_roots_probe.h": "00daac59b3b72768f114428778c1a4be231027a4d0504ce78fb27070a0bad2cd",
+      "tests/stadium_screen_roots_trace.cpp": "5c3c6ff0896d8ab1ed5a07c4170d4601bb569296bfc47660e35c77539ade4ad7",
+      "tests/native_menu_host_trace.cpp": "01aed8f89779cd4f5ffb6dc090bdb6d8989a1ac4080fd11d45b1eef84690d35c",
+      "tests/stadium_screen_roots_synthetic.hpp": "0a396fda44b743e179408a1ca1d9d7c1f0088aad8b8a0f1801917da452464e37",
+      "tests/stadium_screen_roots_checks.hpp": "c2b7d6c4e72d25fb5ee3f1afc139b1f3394595c10fff552d5bd2a65dca9fab23",
+      "tests/stadium_c0_native_map_contract.hpp": "6c7d9a6de710f3e006960d87155a6d1f9a9ef5b2e24fb78a0feb25bd59d25143",
+      "CMakeLists.txt": "8e7b7e766ca4c7c3ba1d38fbb0c66fe156d9654746c79b2fb231bd27255046c7",
+      "cmake/FighterRuntime.cmake": "9aa5b509d1ea3cda74ae33bc878ae9c4b17fa6bef3da8a4752ea348fe66c1c42",
+      "src/dat_native_stage.cpp": "3cbd102048f86d925b46f59c2d644b0f67a2353a220caa7ba56af1ea4cdc6393",
+      "src/dat_native_stage.hpp": "6f5758f56894a394c16ca13d071356316bfeedc94584830716c98bd8a376c781",
+      "src/dat_sis.cpp": "4759d19d6b02d3f6859d792e851828c0596e35cffa8f4e8939cd1993adda6672",
+      "tests/test_dat_native_stage.py": "712a84687313a8060de185f6f74ec519ee3beaa448d84e8ae05a3f1a812ba10f",
+      "tests/test_gameplay_native_menus.py": "f657940ee0d5c4fb67d51504b556c745aaede452ade5833a377cf1f42f205382",
+      "dependencies.lock.json": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385"
+    },
+    "all16_boundary_source_hashes_unchanged": true,
+    "source_delta": "Rebase onto current main; no boundary C/C++/Python changes. Final receipt/status refresh is documentation only.",
+    "native_producer": "2ded3d4f465d82cea1a3323343ef300a1ab8b6d6",
+    "ordinary_release_native_target": {
+      "producer": "4544b8d1e0754af6fd37a05007a24e87e72839ac",
+      "tree": "2de5caa5bae7b4fdd2d711b9926253f6f089e013",
+      "command": [
+        "python3",
+        "scripts/build.py",
+        "--trace-target",
+        "native_menu_host_trace",
+        "--configuration",
+        "Release"
+      ],
+      "target": "native_menu_host_trace",
+      "configuration": "Release",
+      "diagnostic": false,
+      "exit_code": 0,
+      "log_sha256": "b842bb6b9f4a5dbdc83f039ebc1f1b2429f73972ccf3047dcd71164e93e2d69c",
+      "artifacts": {
+        "native_menu_host_trace.js": {
+          "bytes": 232567,
+          "sha256": "a38469b0da5e97b03f9a1d7d6d5b6c9d0dd9a7b697777c26350064430fa0a3f9"
+        },
+        "native_menu_host_trace.wasm": {
+          "bytes": 13584106,
+          "sha256": "4e55e2a6efec320088debb6a6857c46218d970be0a2c6d5788365029a0baf6c4"
+        },
+        "CMakeCache.txt": {
+          "bytes": 60977,
+          "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+        },
+        "build.ninja": {
+          "bytes": 5617594,
+          "sha256": "d11466440968997a8275b2e64408da815c773cd386affbf2529b446291f1494e"
+        }
+      }
+    },
+    "full_suite": {
+      "producer": "adee01b9b35fdebf4a3d4377880fb68a5dec7f4e",
+      "tree": "35cf095af5b22169fa377712d69b83e6589b60ad",
+      "command": [
+        "env",
+        "-u",
+        "MELEE_MENU_FIXTURE_ROOT",
+        "-u",
+        "MELEE_KEEP_TEST_ARTIFACTS",
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 2030,
+      "seconds": 387.434,
+      "skipped": 132,
+      "retained_fixture_environment": "UNSET",
+      "keep_test_artifacts_environment": "UNSET",
+      "retained_screen_roots_and_E8_skipped_before_native_launch": true,
+      "stdout_sha256": "7360b91367dbf59fce9914658675eebd645109230e9261b0204e903f88ed100e",
+      "stderr_sha256": "b55b438a93bde38f3d768223e6a9cb56c8073afd27403f364c0fa5cb9faf498b"
+    },
+    "retained_native_run_repeated": false,
+    "build_reuse": {
+      "producer": "4544b8d1e0754af6fd37a05007a24e87e72839ac",
+      "all4_artifacts_identical": true,
+      "artifacts": {
+        "native_menu_host_trace.js": {
+          "bytes": 232567,
+          "sha256": "a38469b0da5e97b03f9a1d7d6d5b6c9d0dd9a7b697777c26350064430fa0a3f9"
+        },
+        "native_menu_host_trace.wasm": {
+          "bytes": 13584106,
+          "sha256": "4e55e2a6efec320088debb6a6857c46218d970be0a2c6d5788365029a0baf6c4"
+        },
+        "CMakeCache.txt": {
+          "bytes": 60977,
+          "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+        },
+        "build.ninja": {
+          "bytes": 5617594,
+          "sha256": "d11466440968997a8275b2e64408da815c773cd386affbf2529b446291f1494e"
+        }
+      },
+      "profile": "Release diagnostic OFF",
+      "actual_ninja_input_listing": "ordinary-target-inputs.txt",
+      "main_delta_intersection_with_explicit_target_inputs": [],
+      "source_and_build_configuration_inputs": "C/C++/CMake/pinned dependency files unchanged; main delta consists only of unrelated lockstep JS/Python test and2docs files. Existing target/toolchain retained; no replacement."
+    },
+    "skip_difference": {
+      "previous_skips": 136,
+      "current_skips": 132,
+      "previous_skips_now_executed": [
+        "test_opening_movie_entry_requires_source_heap_owner (test_gameplay_native_menus.NativeMenuSourceTests.test_opening_movie_entry_requires_source_heap_owner)",
+        "test_original_main_settings_sound_mix_route (test_gameplay_native_menus.NativeMenuSourceTests.test_original_main_settings_sound_mix_route)",
+        "test_title_and_main_checked_abort_teardown (test_gameplay_native_menus.NativeMenuSourceTests.test_title_and_main_checked_abort_teardown)",
+        "test_trophy_baseline_waits_for_original_tydati_owner (test_gameplay_native_menus.NativeMenuSourceTests.test_trophy_baseline_waits_for_original_tydati_owner)"
+      ],
+      "retained_stadium_and_E8_skip_lines": [
+        "test_stadium_e8_one_request_and_checked_teardown (test_gameplay_native_menus.NativeMenuSourceTests.test_stadium_e8_one_request_and_checked_teardown) ... skipped 'The reviewed C1 fixture root is required for the E8 trace'",
+        "test_stadium_screen_roots_owner_preflight (test_gameplay_native_menus.NativeMenuSourceTests.test_stadium_screen_roots_owner_preflight) ... skipped 'Stadium owner preflight requires the retained 98-file union; missing EfCoData.dat, EfMrData.dat, GmPause.usd, GrPs.usd, GrPs1.dat'"
+      ]
+    },
+    "documentation": {
+      "tests": 4,
+      "result": "pass",
+      "repository_content_tracked_entries": 1927,
+      "repository_content_findings": 0,
+      "diff_check": "pass",
+      "docs_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "docs_stderr_sha256": "d3376c6071835912396d579a144de83a24d65f75134d8eb636df4304ac050246"
+    }
+  }
+}
