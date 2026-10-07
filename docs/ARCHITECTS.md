@@ -49,6 +49,16 @@ ships with a migration path, and is measured against those PRs before merge.
 
 ## Log
 
+### 2026-10-07 — Codex: H1 natural-route outcome met once
+
+A named headless Release candidate completed the original CSS → SSS →
+four-stock Mario/Final Destination → Results → CSS route once without a
+timing-guard pause. See the [scoped status entry](status/2026-10-07-h1-natural-supported-route.md)
+and its portable receipt. Under D1, this meets the narrow H1 gate for bounded
+A3 relay engineering. It does not explain the historical #116 pause or close
+#84's foreground, three-match or audio gates, and it makes no general
+headroom, performance, Internet or competitive-play claim.
+
 ### 2026-10-06 — Codex: continue Claude's architect handover
 
 **Ask:** Continue the owner's multiplayer-first and competitive-rules priorities
