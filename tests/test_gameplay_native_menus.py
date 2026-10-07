@@ -241,6 +241,10 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         )
 
         if recipe == "stadium-screen-roots-preflight-v1":
+            self.assertIn(
+                "C1 live Stadium IMAGE source hit/miss/remove passed twice; no stage entry or ticks",
+                run.stdout,
+            )
             self.assertEqual(len(trace.read_text(encoding="utf-8").splitlines()), 1,
                              "Screen root probe must retain a header-only trace")
 
