@@ -437,7 +437,14 @@ try {
     if (!beforeComparison.matches)
       throw Error(`Fresh local/served Release artifact map differs from manifest: ${JSON.stringify(beforeComparison.differences)}`);
   }
-  if (values['runtime-data'])
+  if (stoppedScenePair) {
+    // Reuse the independently checked frozen package identity, before replay
+    // timing starts. An aborted transport still requires loaded bytes/hash.
+    const name = 'gameplay_menu_browser.data';
+    const identity = diagnosticManifest.build.artifacts[name];
+    if (!identity) throw Error('Stopped-scene pair requires a frozen runtime data artifact');
+    report.inputs.runtime_data = {path: path.join(diagnosticManifest.build.directory, name), ...identity};
+  } else if (values['runtime-data'])
     report.inputs.runtime_data = await statInput(values['runtime-data']);
   if (values.manifest) {
     report.inputs.manifest = await statInput(values.manifest);
@@ -611,7 +618,7 @@ try {
         report.pause_trace_installation.stall_schedule_supported)
       throw Error('Natural-pause capture hooks are missing or unexpectedly support an injected stall');
   }
-  if (values['runtime-data']) {
+  if (report.inputs.runtime_data) {
     report.runtime_data_load = await page.evaluate(async expectedUrl => {
       const module = globalThis.Module;
       const bytes = module.FS.readFile('/initial_pipeline_cache.db');
@@ -672,6 +679,7 @@ try {
     await page.locator('#retail-replay-start').click();
     const deadline = replayStartedAt + replayTimeoutMs;
     let last = null;
+    const pairReplayState = {started: false};
     while (Date.now() < deadline) {
       last = await snapshot('replay-poll', {captureCss: !diagnostic});
       if (!last) throw Error('Browser page closed before the recorded-session replay completed');
@@ -684,14 +692,14 @@ try {
       }
       if (diagnostic) {
         const observed = await pauseTraceStatus({includeLatestCallback: stoppedScenePair});
-        const observedTerminal = {source_running: observed.source_running,
+        const observedTerminal = {source_running: observed.source_running, source_phase: observed.phase,
           source_cursor: observed.replay_cursor, runtime_error: observed.runtime_error,
           dialog_error: observed.dialog_error, native_message: observed.native_message,
           status_text: observed.status_text, incidents: observed.incidents,
           latest_callback: observed.latest_callback};
         const elapsedMs = Date.now() - replayStartedAt;
         const stop = stoppedScenePair
-          ? firstStoppedScenePairStop(observedTerminal, elapsedMs)
+          ? firstStoppedScenePairStop(observedTerminal, elapsedMs, pairReplayState)
           : firstNaturalPauseStop(observedTerminal, elapsedMs);
         if (stop) {
           report.natural_pause_terminal = {...stop, observed_at_ms: observed.at_ms,

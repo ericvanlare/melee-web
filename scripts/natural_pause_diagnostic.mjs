@@ -203,12 +203,22 @@ export function firstNaturalPauseIncident(snapshot) {
   return null;
 }
 
-export function firstStoppedScenePairStop(snapshot, elapsedMs) {
+export function firstStoppedScenePairStop(snapshot, elapsedMs, replayState = {}) {
   const incident = firstNaturalPauseIncident(snapshot);
   if (incident) return incident;
   const cursor = snapshot?.source_cursor;
   const callback = snapshot?.latest_callback;
-  if (snapshot?.source_running === 0)
+  // The async UI handler reads/hashes the recipe and prepares audio before
+  // native launch. Only this untouched prepared state may wait for startup.
+  // Retain observed activity even if a later stop resets its native cursor.
+  replayState.started ||= snapshot?.source_running === 1 ||
+    (Number.isSafeInteger(cursor) && cursor > 0) ||
+    callback?.source_steps > 0 || callback?.source_draws > 0 ||
+    callback?.sample_replay_cursor > 0;
+  const awaitingStart = !replayState.started && snapshot?.source_phase === 0 && cursor === 0 &&
+    (!callback || (callback.sample_replay_cursor === 0 && callback.sample_source_frame === -1 &&
+      callback.source_steps === 0 && callback.source_draws === 0));
+  if (snapshot?.source_running === 0 && !awaitingStart)
     return {outcome: 'source_stopped_before_screenshot_target', observed_cursor: cursor ?? null,
       latest_callback: callback ?? null};
   if (Number.isSafeInteger(cursor) && cursor >= STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_target &&

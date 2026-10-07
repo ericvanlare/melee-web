@@ -131,6 +131,39 @@ assert.equal(firstNaturalPauseStop({source_running: 1, source_cursor: 3000, runt
 assert.equal(firstNaturalPauseIncident({source_running: 1, source_cursor: 3000,
   incidents: [{reason: 7, value: 0, threshold: 0}]}), null,
   'ordinary preparation settling does not end the short visual prefix');
+const pairStartupState = {started: false};
+const preparedPair = {source_phase: 0, source_running: 0, source_cursor: 0,
+  latest_callback: {row: 27, source_steps: 0, source_draws: 0,
+    sample_source_frame: -1, sample_replay_cursor: 0}};
+assert.equal(firstStoppedScenePairStop(preparedPair, 30, pairStartupState), null,
+  'async recipe/audio preparation has not yet launched source simulation');
+assert.equal(pairStartupState.started, false);
+assert.equal(firstStoppedScenePairStop({...preparedPair, incidents: [{reason: 7}]}, 30, pairStartupState), null,
+  'preparation settling retains its existing nonterminal classification');
+assert.equal(firstStoppedScenePairStop({...preparedPair, dialog_error: 'audio preparation failed'}, 30,
+  pairStartupState).outcome, 'runtime_error');
+assert.equal(firstStoppedScenePairStop({...preparedPair, latest_callback: null}, 100, pairStartupState), null);
+assert.equal(firstStoppedScenePairStop(preparedPair, 35000, pairStartupState).outcome, 'pair_replay_timeout',
+  'waiting for launch consumes the original replay deadline');
+assert.equal(firstStoppedScenePairStop({...preparedPair, runtime_error: 'preparation failed'}, 30,
+  pairStartupState).outcome, 'runtime_error');
+assert.equal(firstStoppedScenePairStop({...preparedPair, incidents: [{reason: 4}]}, 30,
+  pairStartupState).outcome, 'runtime_error');
+assert.equal(firstStoppedScenePairStop({...preparedPair, incidents: [{reason: 1}]}, 30,
+  pairStartupState).outcome, 'timing_pause');
+assert.equal(firstStoppedScenePairStop({...preparedPair, source_running: 1}, 250, pairStartupState), null);
+assert.equal(pairStartupState.started, true, 'native running state is sufficient even before the first tick');
+assert.equal(firstStoppedScenePairStop(preparedPair, 500, pairStartupState).outcome,
+  'source_stopped_before_screenshot_target', 'a later zero-cursor stop cannot look like startup');
+assert.equal(firstStoppedScenePairStop({...preparedPair, source_cursor: 1}, 250, {started: false}).outcome,
+  'source_stopped_before_screenshot_target', 'a first observation after progress still detects an unexplained stop');
+const progressedPairState = {started: false};
+assert.equal(firstStoppedScenePairStop({...preparedPair, source_running: 1, source_cursor: 1,
+  latest_callback: {...preparedPair.latest_callback, source_steps: 1, sample_replay_cursor: 1}},
+  250, progressedPairState), null);
+assert.equal(progressedPairState.started, true);
+assert.equal(firstStoppedScenePairStop({...preparedPair, source_phase: 1}, 30, {started: false}).outcome,
+  'source_stopped_before_screenshot_target', 'an unexplained stopped phase is not ignored');
 assert.equal(firstStoppedScenePairStop({source_running: 1, source_cursor: 1599,
   latest_callback: {sample_source_frame: 100, sample_replay_cursor: 1599}}, 5000), null,
   'a positive match frame before the fixed cursor target is insufficient');

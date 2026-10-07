@@ -33,6 +33,9 @@ const validRuntimeDataAbort = {
   expectedSha256: 'a'.repeat(64), actualSha256: 'a'.repeat(64), fromCache: false,
 };
 assert.equal(validateRuntimeDataAbort(validRuntimeDataAbort), true);
+assert.equal(validateRuntimeDataAbort({...validRuntimeDataAbort, loadedBytes: null, totalBytes: null,
+  fileBytes: null, expectedBytes: null, expectedSha256: null, actualSha256: null, fromCache: null}), false,
+  'the H1 startup report abort without loaded package bytes/hash remains an error');
 for (const [key, value] of [
   ['requestCount', 2], ['responseCount', 0], ['failureCount', 2], ['finishedCount', 1],
   ['url', 'http://127.0.0.1:8813/other.data'], ['method', 'POST'], ['resourceType', 'xhr'],
