@@ -415,13 +415,13 @@ async function main() {
   await timeout(page.goto(`${baseUrl}/runtime.html`, {waitUntil: 'commit', timeout: remaining(30000)}),
     remaining(30000), 'Runtime page navigation');
   await driver.waitForImport();
-  const readControls = () => page.evaluate(() => ({
+  const readControls = () => timeout(page.evaluate(() => ({
     layout: document.querySelector('#keyboard-layout')?.value ?? null,
     sources: ['#player-one-source', '#player-two-source'].map(selector =>
       document.querySelector(selector)?.value ?? null),
     key_bindings: [...document.querySelectorAll('#keyboard-bindings tbody tr')].map(row =>
       [...row.cells].map(cell => cell.textContent.trim())),
-  }));
+  })), Math.min(5000, remaining()), 'Runtime Controls snapshot');
   await page.locator('#controls-open').click();
   const controlsBefore = await readControls();
   await page.locator('#keyboard-layout').selectOption('boxx');
