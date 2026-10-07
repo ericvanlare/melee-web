@@ -172,7 +172,12 @@
   "integration_validation": {
     "external_receipt": {
       "bundle_id": "stadium-c1-main-integration-v2-20261007T1521Z-704571d/integration-results-v1.json",
-      "sha256": "27785ea37f7216a667e812ec340d5bf2c088b9d12a187cb1f4427ad1621d25db"
+      "sha256": "e006e70ff0cd03e9943441761eb51baef51c0ebd073f047baaa257d78efc5175"
+    },
+    "issue_203_update": {
+      "url": "https://github.com/ericvanlare/melee-web/issues/203",
+      "state": "OPEN",
+      "remote_body_sha256": "583dcc09774063eb91bb322ddcef1461d3407bb9877ad47949ddf7371761c53a"
     },
     "rebase": {
       "old_base_commit": "789de9b2945b976fff665813bfc3e8a72ad0703f",
