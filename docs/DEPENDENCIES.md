@@ -54,6 +54,14 @@ integration baseline, not a hermetic or bit-for-bit reproducible release build.
 Tool downloads, host tooling and release artifact reproducibility remain future
 hardening work.
 
+The A3 room-relay boundary test uses the pinned Wrangler config reader and
+direct Miniflare HTTP/WebSocket listener rather than Wrangler's local proxy.
+`dependencies.lock.json` records Miniflare **5.20260911.0-alpha** and workerd
+**1.20260911.1**, the exact runtime dependencies declared by Wrangler **4.131.1**.
+The test verifies those package relationships before starting the actual Worker
+module with its parsed `wrangler.jsonc` bindings. These are local validation
+tools; they do not imply a production deployment or account configuration.
+
 The browser patch disables position-independent code for this static Wasm build.
 The original configuration triggered an invalid LLVM relocation in zlib's
 `adler32_stub`, also reported in [Emscripten issue 27525](https://github.com/emscripten-core/emscripten/issues/27525).

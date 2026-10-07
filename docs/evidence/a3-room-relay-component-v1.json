@@ -1,0 +1,177 @@
+{
+  "schema": "melee-web-a3-room-relay-component-evidence-v1",
+  "scope": "Local room-relay HTTP/WebSocket and existing A2 protocol component only. No public deployment, Internet session, browser, two-machine complete set, rollback, or production acceptance.",
+  "evidence_labels": [
+    "Source identified"
+  ],
+  "source": {
+    "repository": "melee-web",
+    "base_main": "b7e3afa0fed35fcd7d470ed3db88ef06959a15a0",
+    "producer_commit": "7abab468a1e242a12fd27f09fff4e8a134f8b9fd",
+    "producer_tree": "6c77fb1d456a853a30bb3011a134368c2694125e",
+    "validation_worktree_clean_at_start": true,
+    "validation_worktree_clean_after_tests": true,
+    "protocol_source_changed": false,
+    "paths": [
+      "online/relay/worker.mjs",
+      "online/relay/wrangler.jsonc",
+      "scripts/net_lockstep_websocket_relay.mjs",
+      "scripts/net_room_relay_direct_runtime.mjs",
+      "tests/net_room_relay_worker.test.mjs",
+      "tests/test_net_lockstep_contracts.py",
+      "dependencies.lock.json"
+    ],
+    "sha256": {
+      "worker_module": "850b0f1dbb5f8c48c997a9d46405644ef2a36b6795e6b7fac5bbacd2005cb709",
+      "wrangler_config": "bb6478a7d663ce4b54349e631baa02c85eaf35d6daf32ba5188e89f531595846",
+      "client_adapter": "8c47c626999977ac2b30bbc0a6d151f5f66d1b137e788bf7cfeec4ef17272f68",
+      "a2_protocol": "d21dd7a5f81aa31a4b6a821bb3f6fa2b1f0b1b8a6c314b5c22af21bc1bc62aea",
+      "direct_runtime_harness": "df17229fbc1d05adf1fdf8c0e7251f8d58da70e20ee445070307182b819c1d72",
+      "dependencies_lock": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385",
+      "room_relay_test_harness": "6ccc3499de70043998da5ea76b50f03bb83ccdbc8f6219538c8e08256056c3e1",
+      "unittest_contract_wrapper": "6c1ee2e4cc694b53a24be7b5043d4a165dfef7d2df4ab379abb278f8526d4913",
+      "wrangler_package_json": "f8c0028333405b155b088117dda5181e7b2927d74e558ac9baae0fcdda05dfa8",
+      "miniflare_package_json": "2c26f1ea6dfda3c29f80ae2cb78f96d1ca38dfdf530b0e51f6f66dac1823b765",
+      "workerd_package_json": "065d0b712ed53706c846b553029a0384c017a60b64eee33772b02c2272b959fa"
+    }
+  },
+  "component": {
+    "room_peer_limit": 2,
+    "room_id": "22..64 base64url characters",
+    "a2_packet_limit_bytes": 1048576,
+    "client_send_queue_limit_bytes": 1048576,
+    "client_inbound_queue_limit_bytes": 1048576,
+    "client_inbound_queue_limit_messages": 256,
+    "readiness": "ready is sent to both peers only after the second socket is accepted; no pre-ready packet buffering or replay",
+    "packet_behavior": "opaque A2 text forwarding; binary and oversized text close with explicit relay codes",
+    "callback_contract": "inbound callbacks are serialized and awaited; inbound drain is separate from local send-buffer flush and neither implies peer acknowledgement",
+    "durable_object_api": "standard WebSocket API with explicit socket ownership",
+    "deployment": "not performed"
+  },
+  "runtime": {
+    "wrangler": "4.131.1",
+    "miniflare": "5.20260911.0-alpha",
+    "workerd": "1.20260911.1",
+    "node_versions_observed": [
+      "v24.19.0",
+      "v22.23.2"
+    ],
+    "actual_worker_transport": "The actual Wrangler JSONC config and Worker module ran over a direct local Miniflare HTTP/WebSocket listener. Wrangler's local proxy path was excluded because retained proxy startup/close failures remain unresolved."
+  },
+  "checks": [
+    {
+      "name": "full Python unittest discovery",
+      "command": "python3 -m unittest discover -s tests -v",
+      "result": "passed",
+      "passed": 1942,
+      "skipped": 142,
+      "duration_seconds": 348.018,
+      "private_log": {
+        "path": "work/a3-room-relay-validation-7abab46/full-python-suite.log",
+        "bytes": 353913,
+        "sha256": "d856d7557c357049d13e0adce494ae4fd57d636548fd2b95ac394dcf5f58709a"
+      }
+    },
+    {
+      "name": "actual Worker room contract and A2 boundary",
+      "command": "node --test tests/net_room_relay_worker.test.mjs",
+      "result": "passed",
+      "passed": 4,
+      "skipped": 0,
+      "duration_seconds": 2.184334,
+      "private_log": {
+        "path": "work/a3-room-relay-validation-7abab46/node-room-relay-tests.log",
+        "bytes": 1711,
+        "sha256": "4dc068b57c3331ab4bc49a4f2693e632143fd434f465a9b1811983962eee7ff2"
+      }
+    },
+    {
+      "name": "existing A2 protocol tests",
+      "command": "node --test tests/net_lockstep_protocol.test.mjs",
+      "result": "passed",
+      "passed": 12,
+      "skipped": 0,
+      "duration_seconds": 1.070208,
+      "private_log": {
+        "path": "work/a3-room-relay-validation-7abab46/node-lockstep-protocol-tests.log",
+        "bytes": 2907,
+        "sha256": "9bac1818ab9e318c6c4ceb99ca7945bce7da9be189eeeda3c7b8a96c28f64fb5"
+      }
+    },
+    {
+      "name": "Node syntax and JSON parsing",
+      "result": "passed",
+      "paths": [
+        "online/relay/worker.mjs",
+        "scripts/net_lockstep_websocket_relay.mjs",
+        "scripts/net_room_relay_direct_runtime.mjs",
+        "tests/net_room_relay_worker.test.mjs",
+        "dependencies.lock.json",
+        "online/relay/wrangler.jsonc"
+      ]
+    },
+    {
+      "name": "repository content guard",
+      "result": "passed",
+      "tracked_entries_checked": 1831,
+      "findings": 0
+    }
+  ],
+  "fixture_reduction": {
+    "classification": "Two earlier inbound-overflow fixture attempts timed out waiting for disconnect callbacks because the raw TCP peer exchanged WebSocket Close frames but omitted TCP FIN. The production adapter was unchanged; the corrected fixture validates both masked client Close frames and ends TCP after both sides exchange Close.",
+    "private_reducer": {
+      "path": "work/a3-raw-close-fin-2eykKV/diagnostic.json",
+      "diagnostic_sha256": "af02bc22d9837ea9c2bbf9c94940eb2d417894929f74b2eeef95fbc5f33b2958",
+      "review_path": "work/a3-raw-close-fin-2eykKV/review.md",
+      "review_sha256": "773bfb65b204334d96a4afa85f4733143f4cee3f06a8a1c5c9255d8b97ec3a5e",
+      "hash_manifest_path": "work/a3-raw-close-fin-2eykKV/hashes.json",
+      "hash_manifest_sha256": "21e2c3ea8a86c1aa433eeb6c4c3fa7b48f8327f67dac8a0482460d295c0a1cba"
+    },
+    "observation": "With Node v22.23.2, client state remained CLOSING with no close event after 100 ms while TCP was held open; after server.end(), a clean 4003 close event arrived in 0.897375 ms."
+  },
+  "direct_runtime_runs": [
+    {
+      "source": "full Python suite contract wrapper",
+      "runtime_node": "v24.19.0",
+      "receipt_paths": [
+        "work/a3-room-relay-validation-7abab46/direct-miniflare-01.receipt.json",
+        "work/a3-room-relay-validation-7abab46/direct-miniflare-02.receipt.json"
+      ],
+      "receipt_sha256": [
+        "818ddaf76924f769cfdb2679e804b1bb56cc863528fc0e008d579704069006fa",
+        "d32d13e5e5334f4583f009f0c7dfaf5a78dea7e253f9df161b08da7707ddf31f"
+      ]
+    },
+    {
+      "source": "explicit Node Worker test",
+      "runtime_node": "v22.23.2",
+      "receipt_paths": [
+        "work/a3-room-relay-validation-7abab46/node-run/direct-miniflare-01.receipt.json",
+        "work/a3-room-relay-validation-7abab46/node-run/direct-miniflare-02.receipt.json"
+      ],
+      "receipt_sha256": [
+        "e9434d0f58840ca93b0a2bdf6d3bb8d65907087e06e4e5c8a3317a82d912b482",
+        "3cf649e8a1618bdf9ed4a77712fce954c2c50b2f0b0a0ffe9d048e681b93bbba"
+      ]
+    }
+  ],
+  "cleanup": {
+    "direct_runtime_receipts": 4,
+    "ready_and_disposed": true,
+    "exit_code": 0,
+    "process_group_absent": true,
+    "fallback_signal_or_kill": false,
+    "runtime_errors": 0,
+    "structured_errors": 0,
+    "stderr_errors": false,
+    "disposable_scratch_removed_after_pass": true
+  },
+  "limitations": [
+    "No production deployment, account, DNS, secret, or paid provisioning change was made.",
+    "No Internet transport, browser integration, two-machine complete set, WebRTC fallback, rollback, or competitive acceptance was tested.",
+    "The A2 protocol implementation and input semantics were not changed; this is transport-component evidence only.",
+    "The local Worker runtime integration bypasses Wrangler's local proxy; its retained startup/close failures remain unresolved.",
+    "Standard Durable Object WebSockets retain the object while active and may accrue duration charges; no usage, cost, or performance was measured.",
+    "H1/#116 pause diagnosis and #84 foreground/sustained acceptance remain open."
+  ]
+}
