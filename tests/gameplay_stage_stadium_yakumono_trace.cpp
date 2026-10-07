@@ -8,6 +8,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
@@ -43,6 +45,21 @@ void put_u16(std::vector<std::uint8_t>& bytes, std::size_t offset,
           "synthetic halfword write escaped fixture");
     bytes[offset] = static_cast<std::uint8_t>(value >> 8);
     bytes[offset + 1] = static_cast<std::uint8_t>(value);
+}
+
+std::vector<std::uint8_t> read_file(const std::filesystem::path& path)
+{
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    check(bool(file), "cannot open retained GrPs.usd input");
+    const auto size = file.tellg();
+    check(size >= 0 && std::uint64_t(size) <= DatArchive::max_archive_bytes,
+          "retained GrPs.usd exceeds the DAT reader budget");
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(size));
+    file.seekg(0);
+    check(bool(file.read(reinterpret_cast<char*>(bytes.data()),
+                         static_cast<std::streamsize>(bytes.size()))),
+          "cannot read the complete retained GrPs.usd input");
+    return bytes;
 }
 
 std::shared_ptr<const DatArchive>
@@ -324,9 +341,97 @@ void allocation_failure_and_independent_recovery()
           "independent arena did not recover after allocation failure");
 }
 
+void retained_grps_yakumono_decodes_twice(const std::filesystem::path& path)
+{
+    const auto raw_file = read_file(path);
+    auto archive = std::make_shared<DatArchive>(
+        raw_file, DatExternalPolicy::ResolveNull);
+    const std::vector<std::uint8_t> resolved_data(
+        archive->data().begin(), archive->data().end());
+
+    const auto found = std::find_if(archive->public_symbols().begin(),
+        archive->public_symbols().end(), [](const auto& symbol) {
+            return symbol.name == "yakumono_param";
+        });
+    check(found != archive->public_symbols().end(),
+          "retained GrPs.usd has no yakumono_param public root");
+    const std::uint32_t root = found->data_offset;
+    check(archive->next_target_offset(root) - root == 0x54,
+          "retained GrPs.usd yakumono target is not exactly 0x54 bytes");
+
+    constexpr std::array<std::int32_t, 7> expected_s32 = {
+        3600, 3800, 1200, 1800, 300, 120, 60,
+    };
+    constexpr std::array<std::uint32_t, 10> expected_u32 = {
+        600, 240, 600, 300, 600, 1200, 600, 1200, 600, 800,
+    };
+    constexpr std::array<std::int16_t, 5> expected_s16 = {5, 2, 2, 0, 7};
+    constexpr std::array<std::uint8_t, 3> expected_rgb = {150, 180, 160};
+
+    const auto check_archive_bytes = [&] {
+        check(read_file(path) == raw_file,
+              "typed Stadium decode modified the raw retained file");
+        check(std::vector<std::uint8_t>(archive->data().begin(),
+                                        archive->data().end()) == resolved_data,
+              "typed Stadium decode modified the resolved DAT data section");
+    };
+
+    for (unsigned lifetime = 0; lifetime < 2; ++lifetime) {
+        {
+            NativeDatArena arena(archive);
+            GuardedReader guarded(arena.reader(), root);
+            auto* decoded = static_cast<MeleeWebStadiumYakumono*>(
+                melee_web_stadium_yakumono_decode(&guarded.api, root));
+            check(decoded != nullptr,
+                  "retained GrPs.usd Stadium decoder returned no owner");
+            check(guarded.region_calls == 1 && guarded.region_root == root &&
+                      guarded.region_size == 0x54,
+                  "retained GrPs.usd decode did not claim its exact 0x54-byte root");
+
+            const std::array<std::int32_t, 7> actual_s32 = {
+                decoded->x0, decoded->x4, decoded->x8, decoded->xC,
+                decoded->x10, decoded->x14, decoded->x18,
+            };
+            const std::array<std::uint32_t, 10> actual_u32 = {
+                decoded->x20, decoded->x24, decoded->x28, decoded->x2C,
+                decoded->x30, decoded->x34, decoded->x38, decoded->x3C,
+                decoded->x40, decoded->x44,
+            };
+            const std::array<std::int16_t, 5> actual_s16 = {
+                decoded->x48, decoded->x4A, decoded->x4C, decoded->x4E,
+                decoded->x50,
+            };
+            check(actual_s32 == expected_s32 && actual_u32 == expected_u32 &&
+                      actual_s16 == expected_s16,
+                  "retained GrPs.usd Stadium scalar fields differ from C0 source facts");
+            check(std::array<std::uint8_t, 3>{decoded->r, decoded->g, decoded->b} ==
+                      expected_rgb,
+                  "retained GrPs.usd Stadium RGB differs from C0 source facts");
+            check(decoded->_rgb_padding == 0 && decoded->_final_padding == 0,
+                  "retained GrPs.usd decode did not normalize owner padding");
+
+            std::vector<std::pair<char, std::uint32_t>> expected_reads;
+            for (std::uint32_t offset = 0; offset <= 0x18; offset += 4)
+                expected_reads.emplace_back('w', root + offset);
+            for (std::uint32_t offset = 0x1C; offset <= 0x1E; ++offset)
+                expected_reads.emplace_back('b', root + offset);
+            for (std::uint32_t offset = 0x20; offset <= 0x44; offset += 4)
+                expected_reads.emplace_back('w', root + offset);
+            for (std::uint32_t offset = 0x48; offset <= 0x50; offset += 2)
+                expected_reads.emplace_back('h', root + offset);
+            check(guarded.reads == expected_reads,
+                  "retained GrPs.usd decode read padding or the +0x54 neighbor");
+        }
+        check_archive_bytes();
+    }
+
+    std::cout << "Retained GrPs.usd yakumono typed scalar decode passed twice "
+                 "at data offset " << root << " with separate raw/data immutability\n";
+}
+
 } // namespace
 
-int main()
+int main(int argc, char** argv)
 {
     try {
         static_assert(sizeof(MeleeWebStadiumYakumono) == 0x54,
@@ -336,6 +441,10 @@ int main()
         allocation_failure_and_independent_recovery();
         check(melee_web_stadium_yakumono_decode(nullptr, 0) == nullptr,
               "null reader was not rejected safely");
+        if (argc == 3 && std::string(argv[1]) == "--real-grps")
+            retained_grps_yakumono_decodes_twice(argv[2]);
+        else
+            check(argc == 1, "usage: trace [--real-grps GrPs.usd]");
         std::cout << "Pokémon Stadium yakumono exact 0x54-byte source ABI, "
                      "signed fields, RGB, bounded reads, short extent and "
                      "independent arena recovery passed\n";

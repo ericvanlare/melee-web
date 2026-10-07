@@ -1,4 +1,6 @@
-"""Check the exact Stadium yakumono scalar ABI with synthetic DAT bytes only."""
+"""Check Stadium yakumono ABI bounds with synthetic and retained source bytes."""
+import hashlib
+import os
 from pathlib import Path
 import re
 import shutil
@@ -44,6 +46,71 @@ class StadiumYakumonoDecoderTests(unittest.TestCase):
                                     text=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("exact 0x54-byte source ABI", result.stdout)
+
+    def test_retained_grps_yakumono_decodes_through_two_native_owners(self):
+        if os.environ.get("MELEE_WEB_RUN_STADIUM_RETAINED_PROBE") != "1":
+            self.skipTest(
+                "Set MELEE_WEB_RUN_STADIUM_RETAINED_PROBE=1 for the one-shot probe")
+        asset = ROOT / "assets-local/stadium-c0-20261006/GrPs.usd"
+        if not asset.is_file():
+            self.skipTest("Retained C0 English GrPs.usd input unavailable")
+        expected_hash = "aa740cfbbeced294f058449caca8ac0380532521dde06ca4a6dcc03080cf6a6d"
+        raw_before = asset.read_bytes()
+        digest_before = hashlib.sha256(raw_before).hexdigest()
+        self.assertEqual(digest_before, expected_hash)
+        self.assertEqual(len(raw_before), 1_461_024)
+
+        cc, cxx = self._compilers()
+        includes = ["-I", str(ROOT / "src")]
+        with tempfile.TemporaryDirectory(prefix="melee retained Stadium yakumono ") as directory:
+            directory = Path(directory)
+            prepared_binary = os.environ.get("MELEE_WEB_STADIUM_TRACE_BINARY")
+            if prepared_binary:
+                binary = Path(prepared_binary).resolve()
+                self.assertTrue(binary.is_file(), "prepared native probe binary is missing")
+            else:
+                decoder_object = directory / "gameplay_stage_stadium.o"
+                result = subprocess.run(
+                    [cc, "-std=c11", "-Wall", "-Wextra", "-Werror", *includes,
+                     "-c", str(ROOT / "src/gameplay_stage_stadium.c"),
+                     "-o", str(decoder_object)],
+                    capture_output=True, text=True, timeout=120)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+                binary = directory / "stadium_yakumono_retained_trace"
+                sources = [ROOT / "src" / (name + ".cpp") for name in
+                           ("dat_archive", "native_dat")]
+                result = subprocess.run(
+                    [cxx, "-std=c++20", "-DTARGET_PC", "-Wall", "-Wextra", "-Werror",
+                     "-O1", *includes, *map(str, sources),
+                     str(ROOT / "tests/gameplay_stage_stadium_yakumono_trace.cpp"),
+                     str(decoder_object), "-o", str(binary)],
+                    capture_output=True, text=True, timeout=120)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            binary_hash = hashlib.sha256(binary.read_bytes()).hexdigest()
+            cc_version = subprocess.run([cc, "--version"], capture_output=True,
+                                        text=True, timeout=30)
+            cxx_version = subprocess.run([cxx, "--version"], capture_output=True,
+                                         text=True, timeout=30)
+            print(
+                "PROBE_PREFLIGHT "
+                f"asset={asset} bytes={len(raw_before)} sha256={digest_before} "
+                f"binary={binary} sha256={binary_hash} "
+                f"cc={cc} version={cc_version.stdout.splitlines()[0]} "
+                f"cxx={cxx} version={cxx_version.stdout.splitlines()[0]}",
+                flush=True)
+            result = subprocess.run(
+                [str(binary), "--real-grps", str(asset)],
+                capture_output=True, text=True, timeout=60)
+            print(result.stdout, end="", flush=True)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("typed scalar decode passed twice", result.stdout)
+
+        raw_after = asset.read_bytes()
+        self.assertEqual(raw_after, raw_before,
+                         "the retained raw GrPs.usd input changed during the probe")
+        self.assertEqual(hashlib.sha256(raw_after).hexdigest(), expected_hash)
 
     def test_pinned_source_layout_matches_portable_header(self):
         cc = shutil.which("clang") or shutil.which("cc")
