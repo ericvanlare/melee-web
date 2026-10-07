@@ -277,6 +277,140 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       }, {once: true});
       return {role: state.role, receiver_registered: true};
     }));
+    instance.startRoomSignaledLocalWebRtc = options => {
+      const pageOptions = {...options,
+        timeoutMs: Math.min(options.timeoutMs, Math.max(1, Math.floor(remaining())))};
+      return bounded(() => page.evaluate(async options => {
+      if (window.__meleeLocalWebRtc) throw Error('Local WebRTC peer connection was already created');
+      if (typeof window.__meleeCreateBrowserNativePeerForChannel !== 'function')
+        throw Error('Local WebRTC native peer factory was not installed');
+      const {createRoomWebRtcSignaler} = await import('./net_lockstep_webrtc_signaling.mjs');
+      const pc = new RTCPeerConnection({iceServers: []});
+      let resolvePeer, rejectPeer;
+      const peerCreated = new Promise((resolve, reject) => { resolvePeer = resolve; rejectPeer = reject; });
+      peerCreated.catch(() => {});
+      const state = window.__meleeLocalWebRtc = {role: options.role, pc, channel: null,
+        attach_source: null, ready_state_at_attach: null, attach_error: null, peerCreated,
+        signaler: null, local_candidate_types: [], remote_candidate_types: []};
+      const attach = (channel, source) => {
+        try {
+          if (state.channel) throw Error('duplicate-channel');
+          state.channel = channel;
+          state.attach_source = source;
+          state.ready_state_at_attach = channel.readyState;
+          resolvePeer(window.__meleeCreateBrowserNativePeerForChannel(channel));
+        } catch {
+          state.attach_error = 'datachannel-attachment-failed';
+          rejectPeer(Error('datachannel-attachment-failed'));
+        }
+      };
+      if (options.role === 'alpha') {
+        const channel = pc.createDataChannel('a3-native-input', {ordered: true});
+        attach(channel, 'createDataChannel');
+      } else {
+        // Register before constructing the signaling endpoint or awaiting its
+        // READY barrier. The channel can be announced as open in this event.
+        pc.addEventListener('datachannel', event => attach(event.channel, 'datachannel'), {once: true});
+      }
+
+      const waitForIce = async () => {
+        if (pc.iceGatheringState === 'complete') return;
+        await new Promise((resolve, reject) => {
+          const finish = error => {
+            clearTimeout(timer);
+            pc.removeEventListener('icegatheringstatechange', changed);
+            if (error) reject(error); else resolve();
+          };
+          const changed = () => { if (pc.iceGatheringState === 'complete') finish(); };
+          const timer = setTimeout(() => finish(Error('ice-gathering-timeout')), options.timeoutMs);
+          pc.addEventListener('icegatheringstatechange', changed);
+          changed();
+        });
+      };
+      const candidateTypes = description => description?.sdp?.split(/\r?\n/)
+        .filter(line => line.startsWith('a=candidate:')).map(line => line.trim().split(/\s+/)[7]) ?? [];
+      const checkHostCandidates = (description, destination) => {
+        const types = candidateTypes(description);
+        if (!types.length || types.some(type => type !== 'host')) throw Error('host-candidate-contract-failed');
+        state[destination] = types;
+      };
+      const waitForConnected = async () => {
+        let peerTimer;
+        try {
+          await Promise.race([peerCreated, new Promise((_, reject) =>
+            { peerTimer = setTimeout(() => reject(Error('datachannel-attachment-timeout')), options.timeoutMs); })]);
+        } finally { clearTimeout(peerTimer); }
+        const channel = state.channel;
+        if (!channel) throw Error('datachannel-attachment-failed');
+        await new Promise((resolve, reject) => {
+          let timer;
+          const cleanup = () => {
+            clearTimeout(timer);
+            pc.removeEventListener('connectionstatechange', changed);
+            pc.removeEventListener('iceconnectionstatechange', changed);
+            channel.removeEventListener('open', changed);
+            channel.removeEventListener('close', changed);
+            channel.removeEventListener('error', failed);
+          };
+          const failed = () => { cleanup(); reject(Error('datachannel-connection-failed')); };
+          const changed = () => {
+            if (pc.connectionState === 'connected' &&
+                ['connected', 'completed'].includes(pc.iceConnectionState) && channel.readyState === 'open') {
+              cleanup(); resolve();
+            } else if (pc.connectionState === 'failed' || pc.connectionState === 'closed' ||
+                pc.iceConnectionState === 'failed' || channel.readyState === 'closed') failed();
+          };
+          timer = setTimeout(() => { cleanup(); reject(Error('datachannel-connection-timeout')); }, options.timeoutMs);
+          pc.addEventListener('connectionstatechange', changed);
+          pc.addEventListener('iceconnectionstatechange', changed);
+          channel.addEventListener('open', changed);
+          channel.addEventListener('close', changed);
+          channel.addEventListener('error', failed);
+          changed();
+        });
+      };
+      const signaler = createRoomWebRtcSignaler({url: options.url, roomId: options.roomId,
+        role: options.role, timeoutMs: options.timeoutMs,
+        createOffer: async () => {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          await waitForIce();
+          checkHostCandidates(pc.localDescription, 'local_candidate_types');
+          return {type: pc.localDescription.type, sdp: pc.localDescription.sdp};
+        },
+        acceptOffer: async offer => {
+          await pc.setRemoteDescription(offer);
+          checkHostCandidates(pc.remoteDescription, 'remote_candidate_types');
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          await waitForIce();
+          checkHostCandidates(pc.localDescription, 'local_candidate_types');
+          return {type: pc.localDescription.type, sdp: pc.localDescription.sdp};
+        },
+        acceptAnswer: async answer => {
+          await pc.setRemoteDescription(answer);
+          checkHostCandidates(pc.remoteDescription, 'remote_candidate_types');
+        }});
+      state.signaler = signaler;
+      await signaler.negotiated;
+      await waitForConnected();
+      signaler.assertHealthy();
+      return {peer: window.__netPeer.snapshot(), signaling: signaler.snapshot(),
+        local_webrtc: {role: state.role, attach_source: state.attach_source,
+          ready_state_at_attach: state.ready_state_at_attach, ordered: state.channel?.ordered ?? null,
+          max_retransmits: state.channel?.maxRetransmits ?? null,
+          max_packet_lifetime: state.channel?.maxPacketLifeTime ?? null,
+          connection_state: pc.connectionState, ice_connection_state: pc.iceConnectionState,
+          local_candidate_types: state.local_candidate_types,
+          remote_candidate_types: state.remote_candidate_types}};
+      }, pageOptions));
+    };
+    instance.assertRoomSignalingHealthy = () => bounded(() => page.evaluate(() => {
+      const signaler = window.__meleeLocalWebRtc?.signaler;
+      if (!signaler) throw Error('Room WebRTC signaling is unavailable');
+      signaler.assertHealthy();
+      return signaler.snapshot();
+    }));
     instance.createLocalWebRtcOffer = () => bounded(() => page.evaluate(async timeoutMs => {
       if (window.__meleeLocalWebRtc) throw Error('Local WebRTC peer connection was already created');
       const pc = new RTCPeerConnection({iceServers: []});
@@ -361,18 +495,33 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
         max_packet_lifetime: channel?.maxPacketLifeTime ?? null,
         connection_state: pc.connectionState, ice_connection_state: pc.iceConnectionState,
         local_candidate_types: candidateTypes(pc.localDescription),
-        remote_candidate_types: candidateTypes(pc.remoteDescription)};
+        remote_candidate_types: candidateTypes(pc.remoteDescription),
+        room_signaling: state.signaler?.snapshot() ?? null,
+        room_signaling_error: state.signaler?.snapshot().failure_code ?? null};
     }));
-    instance.closeLocalWebRtc = () => bounded(() => page.evaluate(() => {
+    instance.closeLocalWebRtc = () => bounded(() => page.evaluate(async () => {
       const state = window.__meleeLocalWebRtc;
       if (!state) return null;
-      if (state.pc.connectionState !== 'closed') state.pc.close();
+      state.signaler?.armClose();
+      const results = await Promise.allSettled([
+        state.signaler ? state.signaler.close() : Promise.resolve(null),
+        Promise.resolve().then(() => {
+          if (state.pc.connectionState !== 'closed') state.pc.close();
+        }),
+      ]);
+      const failures = results.filter(result => result.status === 'rejected').map(result => result.reason);
+      if (failures.length) throw new AggregateError(failures, 'Local WebRTC cleanup failed');
       return {role: state.role, connection_state: state.pc.connectionState,
-        channel_state: state.channel?.readyState ?? null};
+        channel_state: state.channel?.readyState ?? null,
+        room_signaling: state.signaler?.snapshot() ?? null};
     }));
     instance.peerRpc = (name, args = []) => bounded(() => page.evaluate(([name, args]) =>
       window.__netPeer.rpc(name, args), [name, args]));
-    instance.armPeerClose = () => bounded(() => page.evaluate(() => window.__netPeer?.armClose()));
+    instance.armPeerClose = () => bounded(() => page.evaluate(() => {
+      window.__netPeer?.armClose();
+      window.__meleeLocalWebRtc?.signaler?.armClose();
+      return true;
+    }));
     instance.closePeer = intentional => bounded(() => page.evaluate(intentional =>
       window.__netPeer?.close({intentional}), intentional));
     instance.freezeLoadedWasmIdentity = () => bounded(() => wasmResponses.freeze());
@@ -525,12 +674,13 @@ export function browserPeerFacade(instance, initial) {
 export function createPeerModuleResponseObserver({url, peerModuleHashes, runtimeArtifactNames, onFailure = () => {}}) {
   const relayModules = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs'];
   const webrtcModules = [...relayModules, 'net_lockstep_webrtc.mjs'];
+  const roomSignaledWebRtcModules = [...webrtcModules, 'net_lockstep_webrtc_signaling.mjs'];
   const provided = Object.keys(peerModuleHashes).sort().join();
-  const names = provided === [...relayModules].sort().join() ? relayModules :
-    provided === [...webrtcModules].sort().join() ? webrtcModules : null;
+  const names = [relayModules, webrtcModules, roomSignaledWebRtcModules]
+    .find(modules => provided === [...modules].sort().join());
   if (!names ||
       Object.values(peerModuleHashes).some(hash => !/^[0-9a-f]{64}$/.test(hash)))
-    throw Error('Browser peer requires an exact relay or WebRTC module SHA-256 inventory');
+    throw Error('Browser peer requires an exact relay or WebRTC module SHA-256 inventory, optionally including room signaling');
   const expected = new Map(names.map(name => [new URL(name, url).href, peerModuleHashes[name]]));
   const allowed = new Set([...runtimeArtifactNames, ...names].map(name => new URL(name, url).href));
   const responses = [], tasks = new Set();

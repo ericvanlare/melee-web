@@ -1,0 +1,191 @@
+{
+  "schema": "melee-web-a3-room-worker-webrtc-input-sampling-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/231",
+  "scope": "One same-host headless Chrome run of page-owned WebRTC offer/answer through the local RoomRelay Worker, carrying the existing six-source/four-input native CSS probe. Component evidence only.",
+  "evidence_labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised"
+  ],
+  "source_producer": {
+    "commit": "5b805d71a0732404d0a1b5b13e1e214a3ef8e1fb",
+    "tree": "f21c5f986e68cada92378fd2e90da80bfbd78546",
+    "base_main_commit": "41495f1894ec624c5aabb87bd8c2a4ce7b34d1cf",
+    "tracked_clean_at_capture_start_and_finish": true,
+    "reviewed_source_test_files_unchanged_after_rebase": true
+  },
+  "validation": {
+    "focused_signaling_and_session_tests": {
+      "result": "passed; 28 tests, 0 failures",
+      "log_sha256": "58533e3c130cac6414a75de4a6e52ba4f49ade092ddf51818c2da87ded580ecd"
+    },
+    "focused_contract_wrapper": {
+      "result": "passed",
+      "log_sha256": "b6eb51be435fc4352688374f49a2c5a1ee3634d17d5c34e8a957abf9ade3136f"
+    },
+    "real_worker_http_websocket_tests": {
+      "result": "passed; 6 tests, 0 failures",
+      "log_sha256": "d09f31561a85010ed05d0d7057eefd37558ea118c32e1b98c40320d520cd6aab"
+    },
+    "python_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "result": "passed; 2024 tests total, 151 skipped",
+      "log_sha256": "f477c659ca5dc7d5fc02d91f13006b174b1371e8cb76fc32ed64dee92aa47c7f"
+    },
+    "root_source_review_sha256": "5c03a9f0ec35e7244d8da09ef7d20e32a0bed4d1765ede5d0680fc6bf42e4e17"
+  },
+  "runtime_build": {
+    "producer_commit": "0d8556e44bf65ca9db4f93fabb44a35b07ca2350",
+    "producer_tree": "8ff5460dcecef41acd25375cbca62e32dbaf9af5",
+    "configuration": "Release",
+    "build_log_sha256": "d733b02e90e6b2b7ccbb3b85e3f2cbf8869220cf1d222552cb78eb42e46d5fd4",
+    "runtime_target_input_delta_to_source_producer": [],
+    "historical_staged_file_count": 36,
+    "captured_staged_file_count": 37,
+    "native_runtime_file_count": 32,
+    "fresh_build_for_issue231": false,
+    "reason": "The issue231 changes were browser JavaScript, tests, and documentation. The ordinary Release artifacts and staged runtime inputs were verified unchanged and reused. This build identity is distinct from the page-source producer above."
+  },
+  "signaling_and_transport": {
+    "result": "pass",
+    "peer_pages": 2,
+    "browser": "Google Chrome 154.0.8037.98, headless, Playwright 1.62.1",
+    "speaker_muted": true,
+    "audio_processing_disabled": false,
+    "signaling": "Page-owned versioned offer/answer over the existing local RoomRelay Worker; raw SDP was not exposed to Node-visible reports or logs.",
+    "worker_runtime": "Wrangler 4.131.1, Miniflare 5.20260911.0-alpha, workerd 1.20260911.1",
+    "data_channel": {
+      "type": "WebRTC DataChannel",
+      "ordered": true,
+      "reliable": true,
+      "ice_servers": [],
+      "candidate_types": ["host"],
+      "alpha_attached_at": "createDataChannel, readyState connecting",
+      "beta_attached_at": "datachannel event, readyState open",
+      "both_connected": true
+    },
+    "room_worker_source_sha256": "850b0f1dbb5f8c48c997a9d46405644ef2a36b6795e6b7fac5bbacd2005cb709",
+    "browser_modules": {
+      "net_lockstep_webrtc.mjs": "f7bdc789211d097bae000fa7b966f157a5db72b185fbfea6f1179a140ee3e1fe",
+      "net_lockstep_browser_peer.mjs": "10dc682c5834ec66859d53553813f3789b1b0a185cf5528f2995859c2b517262",
+      "net_lockstep_core.mjs": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+      "net_lockstep_websocket_relay.mjs": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+      "net_lockstep_webrtc_signaling.mjs": "4e54cb6b2286c6133efbd9477336553f876d17ae3425794328748580f4157326"
+    }
+  },
+  "native_input_sampling": {
+    "source_ticks": 6,
+    "input_ticks": 4,
+    "capture_and_consumption": "A sample captured at source cursor S is consumed at source S+2. Source ticks 0 and 1 use neutral bootstrap input.",
+    "sample_source": "Native input->raw selected local PADStatus; no second poll or JavaScript serializer.",
+    "alpha": {
+      "local_port": 0,
+      "synthetic_gamepad_index": 0,
+      "states": ["neutral", "A", "release", "neutral"],
+      "poll_serials": [250, 251, 252, 270],
+      "pad_status_bytes": [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      ]
+    },
+    "beta": {
+      "local_port": 1,
+      "synthetic_gamepad_index": 1,
+      "states": ["neutral", "neutral", "neutral", "neutral"],
+      "poll_serials": [248, 249, 250, 251],
+      "pad_status_bytes": [
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      ]
+    },
+    "remote_wait": {
+      "source_cursor": 2,
+      "held_ms": 120,
+      "capture_count_before_and_after": 3,
+      "captured_bytes_and_poll_serial_unchanged": true,
+      "released_role": "beta",
+      "released_input_tick": 0
+    },
+    "native_input_component_fnv1a64_by_source_tick": [
+      "908c9d77152a1213",
+      "908c9d77152a1213",
+      "908c9d77152a1213",
+      "66930180ccd3f0e2",
+      "908c9d77152a1213",
+      "908c9d77152a1213"
+    ],
+    "matches_expected_input_on_every_native_checksum_record_for_both_peers": true,
+    "checksum_records_per_peer": 6,
+    "input_acknowledged_through_tick": 3,
+    "checksum_streams_identical": true,
+    "checksum_stream_bytes_per_peer": 384,
+    "checksum_stream_sha256": "b10250cba1c5cc1c71e61dc27c3be068efa44904e516b44c41eeb8be0f5fe426"
+  },
+  "css_and_visual_diagnostics": {
+    "scene": "CSS on both peers for all six source ticks",
+    "source_steps_and_draws_each": 6,
+    "canvas_dimensions_each": [640, 480],
+    "screenshots": [
+      {
+        "role": "alpha",
+        "png_dimensions": [900, 700],
+        "bytes": 470089,
+        "sha256": "3119f8f88ce171cc25326954469b7ce78790c77cd78368924461c376fee65dda"
+      },
+      {
+        "role": "beta",
+        "png_dimensions": [900, 700],
+        "bytes": 470070,
+        "sha256": "32c6e576bfac641a08006e4b057e22c5a1aee3eda01dca771f51fb55c9f286ea"
+      }
+    ],
+    "cross_origin_isolated_and_webgpu_adapter_each": true,
+    "visual_review": "Root viewed both images and noted elongated red geometry and lower clipping. Screenshot and GPU/isolation diagnostics only; no pixel or visual-fidelity pass."
+  },
+  "audio_diagnostics": {
+    "processing_enabled": true,
+    "speaker_muted": true,
+    "underrun_frames": {
+      "alpha": 107,
+      "beta": 86
+    },
+    "interpretation": "Underruns are retained diagnostics. No continuous-audio or audible-output acceptance."
+  },
+  "cleanup": {
+    "independent_root_review_sha256": "813d72c4d345cdde5d5c179dd3fee9706ab8bf5331781f4cae6c230a6a9b283a",
+    "independently_checked_pids_absent": 26,
+    "independently_checked_process_groups_absent": 6,
+    "owned_processes_and_groups_absent": true,
+    "worker_and_inspector_ports_free": true,
+    "profiles_removed": true,
+    "worker_owned_paths_absent": true,
+    "chrome_temporary_directory_empty": true,
+    "worker_clean_exit_no_fallback": true
+  },
+  "capture_identity": {
+    "packet_sha256": "ccd31465a157bafa5063ce143319aee9a712e21c2a3326962db70598786e2ae9",
+    "run_report_sha256": "1c0cc6cc4860441a8d1dc7387c49fd0b10f564a0801767f02debf95b33bf0a97",
+    "coordinator_sha256": "46e6787948d0716b3553f05ae46d0356c0ba49be2ae6b51e31a2b2275f0c4077",
+    "worker_receipt_sha256": "f6f405ec294a4beaab752576b4b2dc61078864096e25ba429a3a08db15c2371b",
+    "result": "pass for local page-owned signaling and the six-source/four-input native CSS component check"
+  },
+  "evidence_retention_note": {
+    "initial_frozen_source_manifest_sha256": "1fe0580da3afa0a2358cc0407c31f42175c4ce85b07d1ef0ad9c5d1d5d03745b",
+    "initial_manifest_review_receipt_sha256": "5c03a9f0ec35e7244d8da09ef7d20e32a0bed4d1765ede5d0680fc6bf42e4e17",
+    "original_manifest_bytes_recovered": false,
+    "original_manifest_reconstructed": false,
+    "integration_supplement_sha256": "bcee9b5b1d807ac388d52d3be41d79c1c5042bb3bf5c0ab26e3c7e564439aa36",
+    "overwrite_correction_sha256": "a24b0f9de73d0bb9bf44ed488859ed1482ccca62e4e45913ebef3e41ef38fe1d",
+    "note": "The original manifest bytes referenced by the initial source review were overwritten while integration validation was added and could not be recovered. The v2 supplement records later validation and is not represented as the original."
+  },
+  "limitations": [
+    "Same-host synthetic Gamepad input only; physical and keyboard input were not tested.",
+    "Local Worker and host-only ICE only; Internet, STUN/TURN, and two-machine behavior were not tested.",
+    "CSS component only; full supported route, whole-session accuracy, foreground timing, and performance were not tested.",
+    "Visual fidelity, uninterrupted audio, and audible-output acceptance were not established."
+  ]
+}
