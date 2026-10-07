@@ -43,6 +43,9 @@ class GameplayBootstrapTests(unittest.TestCase):
     def test_session_arena_retains_original_payload_between_worlds(self):
         self.run_trace("retained_session")
 
+    def test_borrowed_sis_descriptor_retires_after_source_text(self):
+        self.run_trace("borrowed_sis")
+
     def run_trace(self, kind):
         executable = "gameplay_fighter_input_trace" if kind == "fighter" else "gameplay_scheduler_trace"
         arguments = []
@@ -53,6 +56,9 @@ class GameplayBootstrapTests(unittest.TestCase):
         elif kind == "retained_session":
             arguments = ["retained_session"]
             expected = "Original gameplay session arena retention trace: passed"
+        elif kind == "borrowed_sis":
+            arguments = ["borrowed_sis"]
+            expected = "Checked borrowed SIS source text lifetime trace: passed"
         elif kind == "bootstrap":
             expected = "Original HSD gameplay-bootstrap scheduler trace: passed"
         asset = ROOT / "assets-local/next-gate/PlCo.dat"

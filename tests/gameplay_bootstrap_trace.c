@@ -2,6 +2,7 @@
 #include "gameplay_archive_sections.h"
 #include "gameplay_rumble.h"
 #include "gameplay_render.h"
+#include "gameplay_source_files.h"
 #include "hsd_native_joint.h"
 #include <melee/lb/types.h>
 #include <sysdolphin/baselib/gobj.h>
@@ -15,6 +16,7 @@
 #include <dolphin/os/OSAlloc.h>
 #include <melee/cm/camera.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,7 +24,22 @@ static char error[256];
 static unsigned trace[128], trace_size, removals;
 static struct Fighter_804D653C_t vs_rumble_rows[40];
 static MeleeWebArchiveSections* vs_archive_scope;
+typedef struct BorrowedSisOwner {
+    uint32_t canary;
+    SIS sis;
+    SIS* table[1];
+} BorrowedSisOwner;
+static BorrowedSisOwner* borrowed_sis_owner;
+static SIS* borrowed_sis_descriptor;
+static HSD_GObj* borrowed_sis_text_gobj;
+static int borrowed_sis_drain_seen;
+static int borrowed_sis_sweep_seen;
+static int borrowed_sis_replace_after_drain;
+static unsigned borrowed_sis_shutdown_calls;
+static SIS borrowed_sis_foreign_after_drain;
 typedef struct TestObject { unsigned id, delete_self, remove_proc, reorder; } TestObject;
+
+static void check(int condition, const char* message);
 
 extern void gm_801A4BD4(void);
 extern HSD_GObj* DevText_GetGObj(void);
@@ -36,6 +53,259 @@ static int vs_manager_startup(char* error, size_t size)
     return 1;
 }
 static void vs_sis_shutdown(void) { HSD_SisLib_803A5FBC(); }
+
+static void borrowed_sis_parent_removed(void* data)
+{
+    BorrowedSisOwner* owner = data;
+    check(owner == borrowed_sis_owner && owner->canary == 0x51A51A51,
+          "borrowed SIS descriptor owner remains alive through the generic GObj sweep");
+    check(borrowed_sis_drain_seen && HSD_SisLib_804D1124[1] == NULL,
+          "checked borrowed SIS slot retires after source text drain and before generic sweep");
+    borrowed_sis_sweep_seen = 1;
+}
+
+static void vs_borrowed_sis_shutdown(void)
+{
+    HSD_SisLib_803A5FBC();
+    check(borrowed_sis_owner && borrowed_sis_owner->canary == 0x51A51A51,
+          "borrowed SIS owner remains alive during original text teardown");
+    check(HSD_SisLib_804D7978 == NULL && HSD_SisLib_804D797C == NULL,
+          "original SIS shutdown drains source text and context lists");
+    if (borrowed_sis_text_gobj) {
+        int linked = 0;
+        for (unsigned link = 0; link <= HSD_GObjLibInitData.p_link_max; ++link)
+            for (HSD_GObj* object = ((HSD_GObj**)HSD_GObj_Entities)[link];
+                 object; object = object->next)
+                if (object == borrowed_sis_text_gobj) linked = 1;
+        check(!linked, "original SIS shutdown removes its text GObj before the generic sweep");
+    }
+    check(HSD_SisLib_804D1124[1] == borrowed_sis_descriptor ||
+              HSD_SisLib_804D1124[1] == NULL,
+          "source shutdown preserves only the expected or unpublished borrowed descriptor");
+    borrowed_sis_drain_seen = 1;
+    ++borrowed_sis_shutdown_calls;
+    if (borrowed_sis_replace_after_drain)
+        HSD_SisLib_804D1124[1] = &borrowed_sis_foreign_after_drain;
+}
+
+static void put_be32(uint8_t* bytes, size_t offset, uint32_t value)
+{
+    bytes[offset] = (uint8_t)(value >> 24);
+    bytes[offset + 1] = (uint8_t)(value >> 16);
+    bytes[offset + 2] = (uint8_t)(value >> 8);
+    bytes[offset + 3] = (uint8_t)value;
+}
+
+static void make_borrowed_sis_archive(uint8_t* bytes, size_t size)
+{
+    const char symbol[] = "BorrowedSIS";
+    check(size == 0x20 + 4 + 8 + sizeof(symbol),
+          "synthetic SIS archive has its exact header, data, public row and name extent");
+    memset(bytes, 0, size);
+    put_be32(bytes, 0, (uint32_t)size);
+    put_be32(bytes, 4, 4);
+    put_be32(bytes, 12, 1);
+    put_be32(bytes, 0x20 + 4, 0);
+    put_be32(bytes, 0x20 + 8, 0);
+    memcpy(bytes + 0x20 + 4 + 8, symbol, sizeof(symbol));
+}
+
+static int borrowed_sis_lifetime(unsigned generation, int publish_descriptor,
+                                 int exercise_foreign_replacement)
+{
+    static uint8_t archive_bytes[0x20 + 4 + 8 + sizeof("BorrowedSIS")];
+    make_borrowed_sis_archive(archive_bytes, sizeof(archive_bytes));
+    /* Real synthetic DAT bytes establish the manager's exact RuntimeFiles
+     * name; the existing typed preload owns its native rumble rows. */
+    uint8_t rumble_bytes[0x20 + sizeof(vs_rumble_rows) + 8 + sizeof("lbRumbleData")];
+    memset(rumble_bytes, 0, sizeof(rumble_bytes));
+    put_be32(rumble_bytes, 0, sizeof(rumble_bytes));
+    put_be32(rumble_bytes, 4, sizeof(vs_rumble_rows));
+    put_be32(rumble_bytes, 12, 1);
+    memcpy(rumble_bytes + 0x20 + sizeof(vs_rumble_rows) + 8,
+           "lbRumbleData", sizeof("lbRumbleData"));
+    uint8_t original_archive[sizeof(archive_bytes)], original_rumble[sizeof(rumble_bytes)];
+    memcpy(original_archive, archive_bytes, sizeof(original_archive));
+    memcpy(original_rumble, rumble_bytes, sizeof(original_rumble));
+    const MeleeWebSourceFileInput source_files[] = {
+        {"BorrowedSIS.usd", archive_bytes, sizeof(archive_bytes)},
+        {"LbRb.dat", rumble_bytes, sizeof(rumble_bytes)}};
+    static SIS* source_owned_table[1];
+    const MeleeWebArchiveSymbol source_symbols[] = {
+        {"LbRb.dat", "lbRumbleData", vs_rumble_rows},
+        {"BorrowedSIS.usd", "BorrowedSIS", source_owned_table}};
+    vs_archive_scope = melee_web_archive_sections_register(
+        source_symbols, 2, error, sizeof(error));
+    check(vs_archive_scope != NULL, "VS manager has its typed rumble source");
+    MeleeWebSourceFileScope* source_scope = melee_web_source_files_begin(
+        source_files, 2, error, sizeof(error));
+    check(source_scope != NULL, "synthetic source archive file scope opens");
+
+    check(melee_web_gameplay_prepare_vs_startup(vs_manager_startup,
+                                                generation ? vs_borrowed_sis_shutdown : vs_sis_shutdown,
+                                                error, sizeof(error)),
+          "VS scene configures source SIS startup and checked teardown");
+    check(melee_web_gameplay_startup(4U * 1024U * 1024U, error, sizeof(error)),
+          "source manager and original SIS heap start for a borrowed lifetime");
+    check(melee_web_native_world_enable(error, sizeof(error)),
+          "source manager's original HSD GObj cleanup owner initializes");
+    check(HSD_SisLib_FontSlotBorrowable(-1) == 0 &&
+              HSD_SisLib_FontSlotBorrowable(5) == 0,
+          "source archive-owner accessor rejects indices outside its authored array");
+
+    HSD_SisLib_803A62A0(2, "BorrowedSIS.usd", "BorrowedSIS");
+    SIS* source_owned_descriptor = HSD_SisLib_804D1124[2];
+    check(source_owned_descriptor != NULL &&
+              !HSD_SisLib_FontSlotBorrowable(2),
+          "original SIS loader installs a real source-owned archive in font slot 2");
+    check(!melee_web_gameplay_vs_register_borrowed_sis(
+              2, source_owned_descriptor, error, sizeof(error)),
+          "checked borrowed registration rejects a live source-owned archive slot");
+    check(HSD_SisLib_804D1124[2] == source_owned_descriptor &&
+              !HSD_SisLib_FontSlotBorrowable(2),
+          "source-owned archive refusal leaves its original descriptor and archive untouched");
+
+    if (generation == 0) {
+        check(source_owned_descriptor == (SIS*)source_owned_table,
+              "original SIS loader resolves the hydrated synthetic public table");
+        check(melee_web_gameplay_shutdown(error, sizeof(error)),
+              "reduced source-owned loader fixture drains original SIS and world");
+        check(HSD_SisLib_804D1124[2] == NULL && HSD_SisLib_FontSlotBorrowable(2),
+              "original SIS shutdown releases its actual archive owner");
+        check(melee_web_rumble_clear_source_rows(vs_rumble_rows, error, sizeof(error)),
+              "reduced loader clears source rumble borrow after shutdown");
+        check(melee_web_archive_sections_close(vs_archive_scope, error, sizeof(error)),
+              "reduced loader closes native symbols after original archive release");
+        vs_archive_scope = NULL;
+        check(melee_web_source_files_end(source_scope, error, sizeof(error)),
+              "reduced loader closes its owned RuntimeFiles scope");
+        check(!memcmp(original_archive, archive_bytes, sizeof(original_archive)) &&
+                  !memcmp(original_rumble, rumble_bytes, sizeof(original_rumble)),
+              "reduced loader preserves immutable original fixture bytes");
+        return 1;
+    }
+
+    BorrowedSisOwner owner = {0};
+    owner.canary = 0x51A51A51;
+    owner.table[0] = &owner.sis;
+    borrowed_sis_owner = &owner;
+    borrowed_sis_descriptor = (SIS*)owner.table;
+    borrowed_sis_text_gobj = NULL;
+    borrowed_sis_drain_seen = 0;
+    borrowed_sis_sweep_seen = 0;
+    borrowed_sis_shutdown_calls = 0;
+    borrowed_sis_replace_after_drain = generation == 4;
+
+    static SIS* prior_foreign_table[1];
+    if (generation == 2) {
+        prior_foreign_table[0] = &owner.sis;
+        HSD_SisLib_804D1124[1] = (SIS*)prior_foreign_table;
+        check(!melee_web_gameplay_vs_register_borrowed_sis(
+                  1, borrowed_sis_descriptor, error, sizeof(error)),
+              "borrowed registration rejects a nonempty prior descriptor slot");
+        check(HSD_SisLib_804D1124[1] == (SIS*)prior_foreign_table,
+              "nonempty prior slot refusal preserves its existing descriptor");
+        HSD_SisLib_804D1124[1] = NULL;
+    }
+
+    check(melee_web_gameplay_vs_register_borrowed_sis(
+              1, borrowed_sis_descriptor, error, sizeof(error)),
+          "one borrowed descriptor registers against an empty source slot");
+    if (publish_descriptor) {
+        /* This harness publication mirrors the original Stadium assignment;
+         * it does not claim a natural browser or stage transition. */
+        HSD_SisLib_804D1124[1] = borrowed_sis_descriptor;
+    }
+
+    HSD_GObj* parent = GObj_Create(0, 0x20, 0);
+    check(parent != NULL, "borrowed SIS fixture creates an owner parent GObj");
+    GObj_InitUserData(parent, 0, borrowed_sis_parent_removed, &owner);
+    check(HSD_SisLib_803A611C(1, parent, 9, 0x0d, 0, 1, 0, 0) == 0,
+          "original SIS context binds font 1 to the parent GObj");
+    HSD_Text* text = HSD_SisLib_803A5ACC(1, 0, 1.0F, 2.0F, 0.0F, 0.0F, 0.0F);
+    check(text != NULL, "original SIS text object is created");
+    if (publish_descriptor) {
+        HSD_SisLib_803A6368(text, 0);
+        check(text->sis_buffer == &owner.sis,
+              "original SIS text resolves its buffer through the borrowed descriptor table");
+    }
+    borrowed_sis_text_gobj = text->entity;
+    check(borrowed_sis_text_gobj != NULL && HSD_SisLib_804D7978 == text,
+          "original SIS text has a source GObj and remains on the SIS text list");
+
+    if (exercise_foreign_replacement) {
+        static SIS foreign_descriptor;
+        HSD_SisLib_804D1124[1] = &foreign_descriptor;
+        check(!melee_web_gameplay_shutdown(error, sizeof(error)),
+              "shutdown preflight rejects a foreign SIS descriptor replacement");
+        check(HSD_SisLib_804D1124[1] == &foreign_descriptor &&
+                  HSD_SisLib_804D7978 == text && !borrowed_sis_drain_seen,
+              "foreign replacement refusal leaves the descriptor and source text untouched");
+        HSD_SisLib_804D1124[1] = borrowed_sis_descriptor;
+    }
+
+    if (borrowed_sis_replace_after_drain) {
+        check(!melee_web_gameplay_shutdown(error, sizeof(error)),
+              "foreign replacement after original drain retains a blocked world");
+        MeleeWebGameplayBootstrapState state;
+        check(melee_web_gameplay_bootstrap_state(&state, sizeof(state)) &&
+                  state.shutting_down == 2 && state.vs_sis_live == 0 &&
+                  state.tables_live == 1 && borrowed_sis_shutdown_calls == 1 &&
+                  borrowed_sis_drain_seen && !borrowed_sis_sweep_seen &&
+                  HSD_SisLib_804D1124[1] == &borrowed_sis_foreign_after_drain &&
+                  owner.canary == 0x51A51A51,
+              "post-drain refusal retains descriptor owner and generic objects");
+        check(!melee_web_gameplay_step(error, sizeof(error)) &&
+                  !melee_web_gameplay_vs_startup_active() &&
+                  melee_web_gameplay_generation() == 0 &&
+                  melee_web_gameplay_stats().generation == 0,
+              "retained partial teardown cannot step or publish a live world");
+        check(!melee_web_gameplay_shutdown(error, sizeof(error)) &&
+                  borrowed_sis_shutdown_calls == 1 && !borrowed_sis_sweep_seen,
+              "unrepaired retry fails without repeating source drain or sweeping");
+        HSD_SisLib_804D1124[1] = borrowed_sis_descriptor;
+    }
+    check(melee_web_gameplay_shutdown(error, sizeof(error)),
+          "original SIS drain retires the checked borrowed slot before GObj sweep");
+    check(borrowed_sis_shutdown_calls == 1,
+          "original SIS callback executes exactly once including a retained retry");
+    check(borrowed_sis_drain_seen && borrowed_sis_sweep_seen,
+          "borrowed descriptor owner spans source text drain and generic object sweep");
+    check(HSD_SisLib_804D1124[1] == NULL &&
+              HSD_SisLib_FontSlotBorrowable(1) &&
+              HSD_SisLib_804D1124[2] == NULL &&
+              HSD_SisLib_FontSlotBorrowable(2),
+          "borrowed slot is retired and source-owned archive is released by original shutdown");
+    check(owner.canary == 0x51A51A51,
+          "descriptor allocation owner remains live through completed teardown");
+    check(melee_web_rumble_clear_source_rows(vs_rumble_rows, error, sizeof(error)),
+          "borrowed rumble rows release after world shutdown");
+    check(melee_web_archive_sections_close(vs_archive_scope, error, sizeof(error)),
+          "typed rumble archive scope closes after source manager teardown");
+    vs_archive_scope = NULL;
+    check(melee_web_source_files_end(source_scope, error, sizeof(error)),
+          "synthetic source archive scope closes after original shutdown");
+    check(!memcmp(original_archive, archive_bytes, sizeof(original_archive)) &&
+              !memcmp(original_rumble, rumble_bytes, sizeof(original_rumble)),
+          "original source loading leaves both fixture byte vectors immutable");
+    borrowed_sis_owner = NULL;
+    borrowed_sis_descriptor = NULL;
+    return 1;
+}
+
+static int borrowed_sis_case(void)
+{
+    check(borrowed_sis_lifetime(1, 1, 1),
+          "first published borrowed SIS lifetime completes");
+    check(borrowed_sis_lifetime(2, 1, 0),
+          "second published borrowed SIS lifetime completes without stale binding");
+    check(borrowed_sis_lifetime(3, 0, 0),
+          "incomplete borrowed SIS publication completes without a stale descriptor");
+    check(borrowed_sis_lifetime(4, 1, 0),
+          "post-drain foreign replacement blocks gameplay until checked retry");
+    puts("Checked borrowed SIS source text lifetime trace: passed");
+    return 0;
+}
 
 static void check(int condition, const char* message)
 {
@@ -240,6 +510,12 @@ int main(int argc, char** argv)
 {
     if (argc == 2 && !strcmp(argv[1], "replaced_heap")) return replaced_heap_case();
     if (argc == 2 && !strcmp(argv[1], "retained_session")) return retained_session_case();
+    if (argc == 2 && !strcmp(argv[1], "source_owned_sis")) {
+        check(borrowed_sis_lifetime(0, 0, 0), "reduced source-owned SIS loader lifetime");
+        puts("Original source-owned SIS loader trace: passed");
+        return 0;
+    }
+    if (argc == 2 && !strcmp(argv[1], "borrowed_sis")) return borrowed_sis_case();
     if (argc == 2 && !strcmp(argv[1], "vs_preload")) return vs_preload_case();
     check(argc == 1, "unexpected bootstrap trace arguments");
     check(!melee_web_gameplay_step(error, sizeof(error)), "uninitialized ticks reject");

@@ -33,13 +33,13 @@ module.exports = async () => {
     _melee_web_gameplay_bootstrap_state_source_h_identity: () => 3,
     _melee_web_gameplay_bootstrap_state_abi_size: () => 128,
     _melee_web_gameplay_bootstrap_state_abi_version: () => 1,
-    _melee_web_gameplay_bootstrap_state_schema: () => 0x47504253,
+    _melee_web_gameplay_bootstrap_state_schema: () => 0x47504232,
     _melee_web_gameplay_bootstrap_state_capture: (ptr, size) => {
       if (!live || !ptr || size !== 128) return 0;
       heap.fill(0, ptr, ptr + size);
       const u32 = (offset, value) => view.setUint32(ptr + offset, value, true);
       const u64 = (offset, value) => view.setBigUint64(ptr + offset, value, true);
-      u32(0, 1); u32(4, 128); u32(8, 0x47504253);
+      u32(0, 1); u32(4, 128); u32(8, 0x47504232); u32(12, 0xffffffff);
       u64(32, 1n); u64(40, 1n); u64(48, 65536n);
       u32(64, 4096); u32(88, 1);
       return 1;

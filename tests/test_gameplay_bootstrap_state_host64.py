@@ -97,6 +97,8 @@ static int vs_startup_pending, startup_in_progress, vs_sis_live;
 static int vs_dynamics_ready, vs_manager_ready;
 static MeleeWebGameplayVSStartup vs_startup_callback;
 static MeleeWebGameplayVSShutdown vs_shutdown_callback;
+static uint32_t vs_borrowed_sis_slot = UINT32_MAX;
+static void* vs_borrowed_sis_descriptor;
 static unsigned object_kind_count;
 static void (*finish_hsd_objects)(void);
 
@@ -183,6 +185,7 @@ class OwnedWorkspaceTests(unittest.TestCase):
             "stepping", "shutting_down", "tables_live", "vs_startup_pending",
             "startup_in_progress", "vs_sis_live", "vs_dynamics_ready",
             "vs_manager_ready", "vs_startup_callback", "vs_shutdown_callback",
+            "vs_borrowed_sis_slot", "vs_borrowed_sis_descriptor",
             "object_kind_count", "finish_hsd_objects",
         }
         self.assertEqual(globals_seen, expected, "private bootstrap owner inventory changed")
@@ -200,6 +203,8 @@ class OwnedWorkspaceTests(unittest.TestCase):
             "vs_dynamics_ready": "vs_dynamics_ready", "vs_manager_ready": "vs_manager_ready",
             "vs_startup_callback": "vs_startup_callback",
             "vs_shutdown_callback": "vs_shutdown_callback",
+            "vs_borrowed_sis_slot": "vs_borrowed_sis_slot",
+            "vs_borrowed_sis_descriptor": "vs_borrowed_sis_descriptor",
             "object_kind_count": "object_kind_count",
             "finish_hsd_objects": "finish_hsd_objects",
         }
