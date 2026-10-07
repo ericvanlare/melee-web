@@ -10,6 +10,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {browserLaunchOptions} from './browser_tools.mjs';
 import {createBrowserDriver} from './browser_driver.mjs';
+import {WasmResponseIdentityObserver} from './net_lockstep_observers.mjs';
 
 export const NET_FRAME_BYTES = 44;
 export const NET_RECORD_BYTES = 64;
@@ -142,9 +143,13 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     page = context.pages()[0] || await bounded(() => context.newPage());
     const errors = [];
     const noteError = error => { if (errors.length < 32) errors.push(error); };
+    const wasmResponses = new WasmResponseIdentityObserver();
     page.on('pageerror', error => noteError({kind: 'pageerror', message: String(error.stack || error.message)}));
     page.on('console', message => { if (message.type() === 'error') noteError({kind: 'console', message: message.text()}); });
-    page.on('response', response => { if (response.status() >= 400) noteError({kind: 'http', status: response.status(), url: response.url()}); });
+    page.on('response', response => {
+      wasmResponses.observe(response);
+      if (response.status() >= 400) noteError({kind: 'http', status: response.status(), url: response.url()});
+    });
     page.on('requestfailed', request => noteError({kind: 'requestfailed', method: request.method(),
       url: request.url(), failure: request.failure()?.errorText || null}));
     page.on('request', request => { if (request.method() !== 'GET') noteError({kind: 'unexpected-request', method: request.method(), url: request.url()}); });
@@ -157,6 +162,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     instance = {label, page, context, errors, timingResumes: [], throttle, arenaFill, closed: false, close};
     driver = createBrowserDriver(page, {surface: 'development', timeoutMs, deadline});
     instance.driver = driver;
+    instance.freezeLoadedWasmIdentity = () => bounded(() => wasmResponses.freeze());
     const response = await bounded(() => page.goto(url, {waitUntil: 'domcontentloaded'}));
     if (response?.status() !== 200) throw Error(`runtime.html returned HTTP ${response?.status()}`);
     const headers = response.headers();

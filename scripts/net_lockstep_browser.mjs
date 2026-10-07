@@ -14,6 +14,8 @@ import {classifyRoute, collapseConsecutiveScenes, expectedFullSceneOrder, valida
 import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstance} from './net_session_instance.mjs';
 import {openLoopbackPeerPair} from './net_lockstep_relay.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
+import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
+  verifyTerminalHold} from './net_lockstep_observers.mjs';
 
 const HEADER_BYTES = 16;
 const POSITIVE_ROUTE_BOUNDARIES = Object.freeze([
@@ -122,6 +124,9 @@ const waitObservations = [];
 const scheduled = new Map();
 const closeNotes = [];
 const transportErrors = [];
+const routeCaptureTasks = new Map();
+const routeCaptureErrors = [];
+let stopRouteCaptureWatchers = false;
 
 async function checkedHealth(role) {
   const instance = instances[role];
@@ -176,22 +181,16 @@ function recordMissedBoundary(role, boundary, reason, {phase = null, cursor = nu
   }
 }
 
-async function captureRouteBoundary(role, boundary, cursor) {
+async function captureRouteBoundary(role, boundary, priorSignatures) {
   const row = instanceRows[role];
   if (row.route_boundary_captures.some(item => item.name === boundary.name) ||
       row.route_boundary_misses.some(item => item.name === boundary.name)) return;
-  const nativeBefore = await instances[role].native();
-  if (nativeBefore.phase !== boundary.phase) {
-    recordMissedBoundary(role, boundary, 'native phase changed before the route-boundary snapshot',
-      {phase: nativeBefore.phase, cursor});
-    return;
-  }
   const driverDiagnostics = await instances[role].driver.diagnostics();
-  if (driverDiagnostics.unavailable || driverDiagnostics.phase !== boundary.phase) {
-    recordMissedBoundary(role, boundary, driverDiagnostics.unavailable ||
-      'browser-driver phase did not confirm the route boundary', {phase: driverDiagnostics.phase ?? null, cursor});
-    return;
-  }
+  const readiness = readyRenderEvent(driverDiagnostics, boundary.phase, priorSignatures);
+  const nativeBefore = await instances[role].native();
+  const statusBefore = await instances[role].status();
+  if (!readiness || nativeBefore.phase !== boundary.phase || statusBefore.blocker === 'terminal') return false;
+  const cursor = statusBefore.cursor;
   const screenshotPath = routeBoundaryPath(role, boundary);
   await instances[role].screenshot(screenshotPath);
   const screenshot = await fs.readFile(screenshotPath);
@@ -209,21 +208,67 @@ async function captureRouteBoundary(role, boundary, cursor) {
     screenshot_bytes: screenshot.length, screenshot_sha256: sha256(screenshot),
     screenshot_phase_stable: nativeAfter.phase === boundary.phase,
     phase_after_screenshot: nativeAfter.phase,
+    render_readiness: readiness,
     browser_driver: driverDiagnostics,
     gpu: graphics,
     gpu_observed: graphics.cross_origin_isolated === true && graphics.webgpu_api === true &&
       graphics.webgpu_adapter === true,
     captured_at: new Date().toISOString()});
+  return true;
 }
 
-async function captureObservedRouteBoundary(role, phase, cursor) {
+async function watchRouteBoundary(role, boundary, {includeCurrentRender = false} = {}) {
+  let priorSignatures = new Set();
+  if (!includeCurrentRender) {
+    const initial = await instances[role].driver.diagnostics();
+    priorSignatures = renderEventSignatures(initial.log);
+  }
+  for (;;) {
+    const [status, native, diagnostics] = await Promise.all([
+      instances[role].status(), instances[role].native(), instances[role].driver.diagnostics(),
+    ]);
+    if (native.phase !== boundary.phase) {
+      recordMissedBoundary(role, boundary, 'route left the observed phase before a ready draw was captured',
+        {phase: native.phase, cursor: status.cursor});
+      return;
+    }
+    const readiness = readyRenderEvent(diagnostics, boundary.phase, priorSignatures);
+    if (readiness) {
+      if (await captureRouteBoundary(role, boundary, priorSignatures)) return;
+    }
+    if (stopRouteCaptureWatchers || status.cursor >= sourceTicks) {
+      recordMissedBoundary(role, boundary, 'route ended before a ready current-phase draw was captured',
+        {phase: native.phase, cursor: status.cursor});
+      return;
+    }
+    await sleep(Math.min(pollMs, 50));
+  }
+}
+
+function scheduleRouteBoundary(role, boundary, options = {}) {
+  const row = instanceRows[role], key = `${role}:${boundary.name}`;
+  if (row.route_boundary_captures.some(item => item.name === boundary.name) ||
+      row.route_boundary_misses.some(item => item.name === boundary.name) || routeCaptureTasks.has(key)) return;
+  const task = watchRouteBoundary(role, boundary, options).catch(error => {
+    routeCaptureErrors.push({role, boundary: boundary.name, message: String(error?.stack || error?.message || error)});
+  });
+  routeCaptureTasks.set(key, task);
+}
+
+async function settleRouteBoundaryWatchers() {
+  await Promise.all([...routeCaptureTasks.values()]);
+  if (routeCaptureErrors.length)
+    throw Error(`Route-boundary readiness observer failed: ${JSON.stringify(routeCaptureErrors[0])}`);
+}
+
+function captureObservedRouteBoundary(role, phase) {
   const state = routeBoundaryState[role];
   if (phase === 7 || phase === 8) state.sawMatch = true;
   const boundary = phase === 3 ? POSITIVE_ROUTE_BOUNDARIES[1] :
     phase === 7 ? POSITIVE_ROUTE_BOUNDARIES[2] :
     phase === 8 ? POSITIVE_ROUTE_BOUNDARIES[3] :
     phase === 1 && state.sawMatch ? POSITIVE_ROUTE_BOUNDARIES[4] : null;
-  if (boundary) await captureRouteBoundary(role, boundary, cursor);
+  if (boundary) scheduleRouteBoundary(role, boundary);
 }
 
 async function finishRouteBoundaryEvidence(role, phase, cursor) {
@@ -231,16 +276,15 @@ async function finishRouteBoundaryEvidence(role, phase, cursor) {
   for (const boundary of POSITIVE_ROUTE_BOUNDARIES) {
     if (row.route_boundary_captures.some(item => item.name === boundary.name) ||
         row.route_boundary_misses.some(item => item.name === boundary.name)) continue;
-    if (boundary.name === 'css-return' && phase === boundary.phase) {
-      await captureRouteBoundary(role, boundary, cursor);
-      continue;
-    }
-    recordMissedBoundary(role, boundary, `route ended before phase ${boundary.phase} was sampled`,
+    recordMissedBoundary(role, boundary, `route ended before a ready draw in phase ${boundary.phase} was captured`,
       {phase, cursor});
   }
   const captured = new Set(row.route_boundary_captures.map(item => item.name));
   const missed = new Set(row.route_boundary_misses.map(item => item.name));
   const capturesComplete = captured.size === POSITIVE_ROUTE_BOUNDARIES.length && missed.size === 0;
+  const renderReady = capturesComplete && row.route_boundary_captures.every(item =>
+    item.render_readiness?.draw_calls > 0 && item.render_readiness?.source_draws > 0 &&
+    item.render_readiness?.draw_suppressed === 0);
   const gpuComplete = capturesComplete && row.route_boundary_captures.every(item => item.gpu_observed);
   const phaseStable = capturesComplete && row.route_boundary_captures.every(item => item.screenshot_phase_stable);
   row.route_boundary_report = {
@@ -248,17 +292,18 @@ async function finishRouteBoundaryEvidence(role, phase, cursor) {
       ({name, phase: expectedPhase, label})),
     captured: row.route_boundary_captures.map(({name, phase: capturedPhase,
       source_cursor_sampled_before_screenshot, last_consumed_tick,
-      source_cursor_after_screenshot, source_cursor_stable_during_screenshot, screenshot,
+      source_cursor_after_screenshot, source_cursor_stable_during_screenshot, screenshot, render_readiness,
       screenshot_bytes, screenshot_sha256, screenshot_phase_stable, gpu_observed}) =>
       ({name, phase: capturedPhase, source_cursor_sampled_before_screenshot, last_consumed_tick,
         source_cursor_after_screenshot, source_cursor_stable_during_screenshot, screenshot,
-        screenshot_bytes, screenshot_sha256,
+        render_readiness, screenshot_bytes, screenshot_sha256,
         screenshot_phase_stable, gpu_observed})),
     missed: row.route_boundary_misses,
     captures_complete: capturesComplete,
+    ready_draw_complete: renderReady,
     gpu_diagnostics_complete: gpuComplete,
     phase_stable_through_screenshots: phaseStable,
-    complete: capturesComplete && gpuComplete && phaseStable,
+    complete: capturesComplete && renderReady && gpuComplete && phaseStable,
     pixel_equivalence_claim: false,
   };
 }
@@ -366,7 +411,7 @@ async function pollRun() {
     for (const role of ['alpha', 'beta']) {
       const {status, native} = await checkedHealth(role);
       rows[role] = status;
-      if (scenario === 'positive') await captureObservedRouteBoundary(role, native.phase, status.cursor);
+      if (scenario === 'positive') captureObservedRouteBoundary(role, native.phase);
       await drainChecksums(role, peers[role]);
       await peers[role].setNativeProgress(status.cursor);
       if (status.wait_episodes > instanceRows[role].last_wait_episodes) {
@@ -446,6 +491,19 @@ async function pollRun() {
   if (Date.now() > deadline) throw Error('Lockstep run exceeded its wall-time bound');
 }
 
+async function waitForTerminalPair(kind) {
+  const terminalDeadline = Math.min(deadline, Date.now() + stallMs);
+  while (Date.now() <= terminalDeadline) {
+    const [alpha, beta] = await Promise.all(['alpha', 'beta'].map(role => instances[role].status()));
+    if (peers.alpha.terminal?.kind === (kind === TERMINAL.desync ? 'desync' : 'disconnect') &&
+        peers.beta.terminal?.kind === (kind === TERMINAL.desync ? 'desync' : 'disconnect') &&
+        alpha.terminal.kind === kind && beta.terminal.kind === kind)
+      return {alpha, beta};
+    await sleep(pollMs);
+  }
+  throw Error(`Both native peers did not reach terminal kind ${kind} within the bounded notification window`);
+}
+
 async function run() {
   const {chromium, browser: launchOptions, browserPath, playwrightPath} = await loadBrowserTools(values.playwright);
   pairResults.browser = path.basename(browserPath);
@@ -488,17 +546,32 @@ async function run() {
   await Promise.all(['alpha', 'beta'].map(role => instances[role].importDisc()));
   await Promise.all(['alpha', 'beta'].map(role => instances[role].beginLockstep(seed, sourceTicks)));
   const startRows = await waitForStart();
+  // Freeze the initial browser load-response set before peerIdentity performs
+  // its separate cache-bypassing fetch of the served Wasm artifact.
+  const loadedWasm = await Promise.all(['alpha', 'beta'].map(role => instances[role].freezeLoadedWasmIdentity()));
   const identities = await Promise.all(['alpha', 'beta'].map(role => instances[role].peerIdentity()));
+  for (const [index, role] of ['alpha', 'beta'].entries()) {
+    if (loadedWasm[index].sha256 !== identities[index].wasm)
+      throw Error(`${role} browser-loaded Wasm response differs from the start-handshake fresh-fetch identity`);
+  }
   const agreements = {
     alpha: createAgreement(identities[0], startRows[0]),
     beta: createAgreement(identities[1], startRows[1]),
   };
   pairResults.identity = {
     wasm_sha256_equal: identities[0].wasm === identities[1].wasm,
+    loaded_wasm_response_sha256_equal: loadedWasm[0].sha256 === loadedWasm[1].sha256,
+    wasm_sha256_source: 'peerIdentity fresh fetch compared with frozen initial browser load-response body SHA-256',
     disc_identity_equal: JSON.stringify(identities[0].disc) === JSON.stringify(identities[1].disc),
     native_start_equal: JSON.stringify(startRows[0]) === JSON.stringify(startRows[1]),
     alpha: {wasm_sha256: identities[0].wasm, disc: identities[0].disc, native_start: startRows[0]},
     beta: {wasm_sha256: identities[1].wasm, disc: identities[1].disc, native_start: startRows[1]},
+    browser_loaded_wasm_response: {
+      source: 'response body observed before navigation and frozen before peerIdentity fresh fetch',
+      alpha: loadedWasm[0], beta: loadedWasm[1],
+      compared_to_handshake_fresh_fetch: true,
+      fresh_fetch_byte_length: 'not exposed by peerIdentity',
+    },
   };
   peers = {};
   for (const role of ['alpha', 'beta']) {
@@ -536,7 +609,7 @@ async function run() {
     })));
     await Promise.all(initial.map(async ({role, status, native}) => {
       if (native.phase === POSITIVE_ROUTE_BOUNDARIES[0].phase) {
-        await captureRouteBoundary(role, POSITIVE_ROUTE_BOUNDARIES[0], status.cursor);
+        scheduleRouteBoundary(role, POSITIVE_ROUTE_BOUNDARIES[0], {includeCurrentRender: true});
       } else {
         recordMissedBoundary(role, POSITIVE_ROUTE_BOUNDARIES[0],
           'original CSS start was not current before input publication',
@@ -554,6 +627,30 @@ async function run() {
   pairResults.transport.alpha_to_beta_bytes = relay.traffic.alpha_to_beta_bytes;
   pairResults.transport.beta_to_alpha_bytes = relay.traffic.beta_to_alpha_bytes;
   await pollRun();
+  if (scenario === 'flip' || scenario === 'disconnect') {
+    const expectedKind = scenario === 'flip' ? TERMINAL.desync : TERMINAL.disconnect;
+    const before = await waitForTerminalPair(expectedKind);
+    const holdStarted = Date.now();
+    await sleep(120);
+    const after = {
+      alpha: await instances.alpha.status(), beta: await instances.beta.status(),
+    };
+    const expectedTick = scenario === 'flip' ? flip.tick + LOCKSTEP_DELAY : undefined;
+    const expectedChannel = scenario === 'flip' ? 1 : undefined;
+    pairResults.terminal_hold = verifyTerminalHold(before, after, expectedKind,
+      {expectedTick, expectedChannel});
+    pairResults.terminal_hold.window_observed_ms = Date.now() - holdStarted;
+    await drainChecksums('alpha', peers.alpha); await drainChecksums('beta', peers.beta);
+  }
+  if (scenario === 'positive') {
+    for (const role of ['alpha', 'beta']) {
+      const [status, native] = await Promise.all([instances[role].status(), instances[role].native()]);
+      captureObservedRouteBoundary(role, native.phase);
+      instanceRows[role].route_completion_sample = {phase: native.phase, cursor: status.cursor};
+    }
+  }
+  stopRouteCaptureWatchers = true;
+  await settleRouteBoundaryWatchers();
   pairResults.wait_observations = waitObservations;
   pairResults.transport_errors = transportErrors;
   pairResults.endpoint_errors = {alpha: relay.alpha.errors, beta: relay.beta.errors};
@@ -618,14 +715,19 @@ async function run() {
   } else if (scenario === 'flip') {
     const mismatch = peers.alpha.checksumMismatches[0] || peers.beta.checksumMismatches[0];
     const expectedTick = flip.tick + LOCKSTEP_DELAY;
-    if (!mismatch || mismatch.tick !== expectedTick)
+    if (!mismatch || mismatch.tick !== expectedTick || mismatch.channel !== 1 ||
+        peers.alpha.terminal.kind !== 'desync' || peers.beta.terminal.kind !== 'desync')
       throw Error(`Changed input did not stop at its first delayed checksum tick ${expectedTick}: ${JSON.stringify(mismatch)}`);
+    const rawPrefix = verifyFirstChecksumMismatch(
+      await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin')),
+      await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin')),
+      expectedTick, 1);
     pairResults.negative_control = {changed_local_port: flip.port, input_tick: flip.tick,
       source_tick: expectedTick, byte: flip.byte, bit: flip.bit, detected_at_first_mismatch: true,
-      channel: mismatch.channel};
+      channel: mismatch.channel, native_checksum_prefix: rawPrefix};
     pairResults.outcome = 'expected-desync';
   } else {
-    if (!disconnectHandled || !['alpha', 'beta'].some(role => peers[role].terminal?.kind === 'disconnect'))
+    if (!disconnectHandled || peers.alpha.terminal?.kind !== 'disconnect' || peers.beta.terminal?.kind !== 'disconnect')
       throw Error('Loopback disconnect did not produce an explicit bounded terminal');
     pairResults.negative_control = {disconnect_at_source_tick: disconnectAt,
       terminals: {alpha: peers.alpha.terminal, beta: peers.beta.terminal}, explicit: true};
@@ -636,6 +738,8 @@ async function run() {
 try {
   await run();
 } catch (error) {
+  stopRouteCaptureWatchers = true;
+  await Promise.allSettled([...routeCaptureTasks.values()]);
   pairResults.first_error = String(error.stack || error.message || error);
   pairResults.outcome = 'fail';
   if (peers) pairResults.peers = ['alpha', 'beta'].map(role => peers[role]?.summary() ?? null);
