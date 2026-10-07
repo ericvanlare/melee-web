@@ -1,0 +1,208 @@
+{
+  "schema": "melee-web-pokemon-stadium-item-owner-negatives-v1",
+  "result": "passed_scoped_preparation_negatives",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "issue": "https://github.com/ericvanlare/melee-web/issues/216",
+  "related_issues": [
+    214,
+    164
+  ],
+  "boundary": "Synthetic rejection guards in a retained C1 context before item runtime preparation, followed by the existing two prepare_source/end lifetimes. No Stadium admission or gameplay claim.",
+  "source": {
+    "branch": "codex/stadium-item-owner-negatives-20261007",
+    "producer_commit": "4852d072a3777070f778ecc893f34fa72fefb31a",
+    "producer_tree": "df2bf866d428d23afded46e1a5c4db551e788dc2",
+    "working_tree_at_build": "clean",
+    "reviewed_source_sha256": "836a650c8157491b49ad3b9261571699999c50bc0c39d35a5e5f4e1dcb065d60",
+    "files_sha256": {
+      "cmake/FighterRuntime.cmake": "55f0f8f51b5daf228093797f6fc89034b4293dd11c9af16447242d41c2bd7fb4",
+      "src/gameplay_item_runtime.c": "2e8776b17448b0a18f8094f218a3b79694b88c993b9ff25eaaa37eaa9f455eca",
+      "tests/gameplay_random_article_fields.c": "f1427224f2b7a510d45ae84e91bd94b54c61e062bcbbe9d30a98b2416d96a8f5",
+      "tests/gameplay_random_article_layout.h": "cf5f9f4bf57de0b3b18e80476b4c7493d2e5d44a85715de446da253ed3c1d26a",
+      "tests/gameplay_random_article_trace.cpp": "2de85ef38bf6ea2321c7d3c7b806e6a507322b612b35483100f183eae894bd71",
+      "tests/native_menu_host_trace.cpp": "e58c38aa838b0bc6ef3fb6fc9d9e03b2a890969a05b176c38ed2228405d93951",
+      "tests/stadium_c1_item_owner_negative_cases.cpp": "b788f64524bdcaadddaaef188ca7ac246bbbd882beae7d6c912aa157acefe54f",
+      "tests/stadium_c1_item_owner_negative_cases.hpp": "b3f0e838093190329d978b47df61ee084c73443a694306628d7210d8fd121e42",
+      "tests/stadium_c1_item_owner_preflight.hpp": "420cd75f2227a18f5b11e236cf5473904498b8f73363cdbac80e793799fc4a4b",
+      "tests/test_gameplay_random_article.py": "ba4f76682fea52cc463bc413221f7e93b0d0f1ae624b68df1644588904ec6f9f"
+    }
+  },
+  "builds": {
+    "ordinary_runtime": {
+      "command": "python3 scripts/build.py --target runtime --configuration Release",
+      "configuration": "Release",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": false,
+      "target": "gameplay_menu_browser",
+      "exit_code": 0
+    },
+    "diagnostic_trace": {
+      "command": "python3 scripts/build.py --trace-target native_menu_host_trace --configuration Release --stadium-c1a-diagnostic",
+      "configuration": "Release",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": true,
+      "target": "native_menu_host_trace",
+      "exit_code": 0
+    },
+    "compiler_job_policy": "Unchanged build.py default; no --jobs override",
+    "trace_header_profile_limit": "The header uses the generic browser-release label. Actual producer profile is the diagnostic ON cache; it is not an ordinary or production diagnostic runtime result."
+  },
+  "fixture": {
+    "logical_union_count": 98,
+    "identity_inventory_sha256": "258233cd7ad22041a65aca34329157272f2248a9985729e7f47b52a21a662ea6",
+    "all_98_sizes_and_sha256_verified_before": true,
+    "all_98_unchanged_after": true,
+    "ItCo.usd_sha256": "5d62efd6437149335b9eef87624ae1253ba7bb260fb08cbae04a3d9215eacd11",
+    "GrPs.usd_sha256": "aa740cfbbeced294f058449caca8ac0380532521dde06ca4a6dcc03080cf6a6d"
+  },
+  "focused_execution": {
+    "command": "MELEE_MENU_FIXTURE_ROOT=<exact-retained-98-file-fixture-root> MELEE_KEEP_TEST_ARTIFACTS=1 python3 scripts/agent_workspace.py run -- python3 tests/test_gameplay_native_menus.py NativeMenuSourceTests.test_stadium_c1_item_state_owner_preflight",
+    "attempt_count": 1,
+    "test_count": 1,
+    "skipped": 0,
+    "exit_code": 0,
+    "elapsed_seconds": 1.01,
+    "trace_record_count": 1,
+    "trace_event_count": 0,
+    "positive_prepare_end_lifetimes": 2,
+    "negative_cases": [
+      "Missing retained ItCo and/or GrPs names",
+      "Missing itPublicData public symbol",
+      "Absent Random source root and native registration",
+      "Present Random source root with null native registration",
+      "Capacity one rejects actual parsed non-null script row one; synthetic capacity only",
+      "All six missing public-data links",
+      "Referenced four-byte extents for x0, x4, x8, xC and x10 rejected by production decoder",
+      "Character table four-byte extent rejected even with adjacent archive-readable words",
+      "x14 four-byte color extent: public decoder accepts readable pointer, color count guard and DatColorAnimation reject extent",
+      "Twelve-byte color extent rejected by color count guard and DatColorAnimation"
+    ],
+    "retained_invariants": [
+      "Seven captured item global pointer values",
+      "Public-data pointers and source color pointer",
+      "Random state-table and script links",
+      "Empty item entity link 9",
+      "Gameplay generation and tick count",
+      "Source RNG pointer owner and value",
+      "Save card bytes and CSS/SSS selection",
+      "Raw retained ItCo.usd and GrPs.usd bytes",
+      "Empty stage preparation/publication state"
+    ],
+    "all_assertions_passed": true
+  },
+  "synthetic_check": {
+    "focused_build": "gameplay_random_article_trace Wasm target passed after C layout accessor include fix",
+    "focused_unittest": "1 test passed",
+    "direct_stdout_retained": true,
+    "full_discovery_test_passed": true
+  },
+  "full_suite": {
+    "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+    "exit_code": 0,
+    "tests": 2013,
+    "skipped": 135,
+    "elapsed_seconds": 368.663,
+    "fixture_settings": "Default; no explicit retained fixture campaign. Retained item-owner/lifecycle and E8 fixture gates skipped before native launch."
+  },
+  "artifacts": {
+    "artifacts/browser-release/gameplay_menu_browser.js": {
+      "bytes": 299682,
+      "sha256": "e848edeb48d2b3712113b81543019d8df7bd3e0001aa726e8b98b407e41ab328"
+    },
+    "artifacts/browser-release/gameplay_menu_browser.wasm": {
+      "bytes": 15739291,
+      "sha256": "95ccec9b475d6799bf65fb33f4bb2497c70d1ae48342bbd7e2c07b4a52db0678"
+    },
+    "artifacts/browser-release/CMakeCache.txt": {
+      "bytes": 60977,
+      "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+    },
+    "artifacts/browser-release/build.ninja": {
+      "bytes": 5600028,
+      "sha256": "265e87781570a998133947da0842bb57fed4e1aee4f8433096ffa62cdc3918e9"
+    },
+    "artifacts/browser-stadium-c1a-release/native_menu_host_trace.js": {
+      "bytes": 232759,
+      "sha256": "810e1827b4eb2c1d9802371be757f55a9bb7e0b1bbdd8ec9f56412d70c13f1ac"
+    },
+    "artifacts/browser-stadium-c1a-release/native_menu_host_trace.wasm": {
+      "bytes": 13733826,
+      "sha256": "471c610860cb3c3276296b13289410fe3e916feae98e8c1d762d7e0b7a81f3b0"
+    },
+    "artifacts/browser-stadium-c1a-release/CMakeCache.txt": {
+      "bytes": 61252,
+      "sha256": "59b26ab9d7f1414fd337c83e8dc3f009655dad37c38dbd6e7434268b69e7d9e6"
+    },
+    "artifacts/browser-stadium-c1a-release/build.ninja": {
+      "bytes": 5768077,
+      "sha256": "9f24d0ffbdc6368163cc97b444d69355e7c877c0fe8ee3b113e70609c9347427"
+    },
+    "focused-evidence/c1-item-state-preflight.stderr": {
+      "bytes": 1078,
+      "sha256": "760db92c9edb5c5f7a92153c5b93998e94172befbe043809d881594eb7dc74a3"
+    },
+    "focused-evidence/c1-item-state-preflight.jsonl": {
+      "bytes": 268,
+      "sha256": "f2b8fea851656f26290cc09a8a6d96998af8a68394357b3367fadda4cae51814"
+    },
+    "focused-evidence/c1-item-state-preflight-command.txt": {
+      "bytes": 838,
+      "sha256": "e27c49437d8b06046fbc6c1dc7b4170fbd358a7a23731dedfd6dc5c8d7344546"
+    },
+    "focused-evidence/c1-item-state-preflight.stdout": {
+      "bytes": 601,
+      "sha256": "1147a4836eb961bb40a5488f7fb0baabf18922613b9b932ec8b2001697ff0878"
+    }
+  },
+  "raw_runner_logs": {
+    "diagnostic-release-build.log": {
+      "bytes": 17160,
+      "sha256": "1df540064ac9d26d05cd185a01aea005a84d1522f548544203ca7c24044ca2d8"
+    },
+    "fixture-verification-before.log": {
+      "bytes": 44,
+      "sha256": "6f86e0cc0e1ac2c394c7ec1d825f083765995f4234b174557d2d00eca344982e"
+    },
+    "fullsuite.stderr.log": {
+      "bytes": 362182,
+      "sha256": "3f988ab240d35be2d81e0f443e5d96196cc0b4bdbdebc1b66a3bf167590d0600"
+    },
+    "fullsuite.stdout.log": {
+      "bytes": 4449,
+      "sha256": "4e4ac2d1581cb1e317dfd3ce12a71465d3e7c660a270abeb010b1274eb1a0c91"
+    },
+    "ordinary-release-build.log": {
+      "bytes": 18281,
+      "sha256": "0042371bb26347e2149720f0f81463603e6d8a6c708bf3fa8bc781605ab9b783"
+    },
+    "retained-preflight.stderr.log": {
+      "bytes": 253,
+      "sha256": "0225fbf943ad4264e82b212222037dd9ffde32d9ba615be8711d319c4525e33e"
+    },
+    "retained-preflight.stdout.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "retention": {
+    "private_run_locator": "stadium-item-owner-integration-20261007-105137-8d032728 on the verified external evidence volume",
+    "prior_215_and_E8_artifacts": "Preserved; not overwritten or rerun",
+    "original_pre_fix_baseline_gap": "Earlier worker overwrote the baseline raw binaries/compiler logs; only narrative and hashes remain. No claim that those raw baseline artifacts are retained.",
+    "preparation_only_failures": "Unsupported focused build.py trace target and unavailable ambient CMake are retained in escalation raw logs. Initial fixture verifier wrongly treated the 76-file copy list as the 98-file union; this console assertion is transcribed in preparation-only-failure-notes.json, not claimed as a raw retained log. It stopped before native launch and was corrected using the packet full union inventory."
+  },
+  "exclusions": [
+    "E8 request",
+    "Stage_8022524C",
+    "OnInit",
+    "Ground_801C0800",
+    "Item startup",
+    "Stage process/draw/tick",
+    "Browser launch",
+    "Disc extraction",
+    "Production deployment",
+    "Retail comparison",
+    "Performance or whole-session acceptance"
+  ]
+}
