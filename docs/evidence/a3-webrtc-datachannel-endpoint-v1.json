@@ -1,0 +1,273 @@
+{
+  "schema": "melee-web-a3-webrtc-datachannel-endpoint-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/222",
+  "scope": "Two local headless Chrome pages attach the portable A2 peer to a direct reliable ordered RTCDataChannel and exchange the existing start-identity hello. The portable peer sends its two neutral bootstrap records to an explicit test sink. No native runtime or gameplay rendering is loaded.",
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised"
+  ],
+  "source": {
+    "captured_producer_commit": "c9281323dc17f8c6052aa229b29b20fe61ceb654",
+    "captured_producer_tree": "c3b21a6df84a89beff2928093fed59d44ae16c39",
+    "captured_base_main_commit": "af13467f09ee0245bceeb7c80fb4ede698ec5f69",
+    "current_main_commit": "718d19093a581271676bb1b0a32750c46c440fcf",
+    "current_main_tree": "eea17efc243a453917e905a5212eecea87cf255b",
+    "rebased_endpoint_commits": [
+      {
+        "old": "4c86704",
+        "new": "46c3e0e",
+        "patch_equivalent": true
+      },
+      {
+        "old": "c928132",
+        "new": "f14588f",
+        "patch_equivalent": true
+      }
+    ],
+    "integration_test_commit": "405155bcf5c7e988b2685ea771ed7ecb0416b9d5",
+    "integration_test_tree": "1e5b79df458264162354918738789306b8512389",
+    "integration_files": [
+      {
+        "path": "scripts/net_lockstep_webrtc.mjs",
+        "bytes": 13621,
+        "sha256": "f7bdc789211d097bae000fa7b966f157a5db72b185fbfea6f1179a140ee3e1fe"
+      },
+      {
+        "path": "tests/net_lockstep_webrtc.test.mjs",
+        "bytes": 15367,
+        "sha256": "eca58bd312000de73c041043ed86ab13b527e3570d64a5514b8a5ec8683cd255"
+      },
+      {
+        "path": "tests/test_net_lockstep_contracts.py",
+        "bytes": 1318,
+        "sha256": "0eec3c05962685bb9b5e08b4e47eb762fb1216cdc5f46bfca8fb8e1550b1e5ce"
+      }
+    ],
+    "captured_source_identity": {
+      "portable_core_sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+      "webrtc_endpoint_sha256": "f7bdc789211d097bae000fa7b966f157a5db72b185fbfea6f1179a140ee3e1fe",
+      "current_integrated_source_matches_capture": true,
+      "basis": "The staged bytes, captured producer bytes, and current rebased integration bytes have the same SHA-256 for both portable modules."
+    },
+    "test_integration_change": {
+      "file": "tests/test_net_lockstep_contracts.py",
+      "change": "Add tests/net_lockstep_webrtc.test.mjs to the existing Node test list used by Python unittest discovery.",
+      "commit": "405155bcf5c7e988b2685ea771ed7ecb0416b9d5"
+    }
+  },
+  "implementation_contract": {
+    "endpoint": "createDataChannelEndpoint adapts an already-created RTCDataChannel. It requires ordered delivery and unset retransmission limits, installs receive/error/close listeners synchronously, bounds inbound/outbound queues, and retains terminal/close errors.",
+    "protocol": "The existing portable LockstepPeer hello/state protocol is reused unchanged; send-buffer drain is not treated as a remote acknowledgement.",
+    "attachment": {
+      "alpha": "Endpoint attaches immediately after createDataChannel; readyState is connecting at attachment.",
+      "beta": "The datachannel listener is registered before setRemoteDescription and attaches the endpoint synchronously in that event; readyState is open before the event fires.",
+      "spec": "https://www.w3.org/TR/webrtc/#announcing-a-data-channel-instance"
+    },
+    "signaling": "The beta page creates and returns its answer after applying the offer. Alpha applies the answer before the coordinator waits for beta attachment, avoiding an attachment-before-answer wait."
+  },
+  "browser_probe": {
+    "run_inventory_id": "issue222-webrtc-local-probe-capture-20261007-02",
+    "result": "pass",
+    "checks_passed": 5,
+    "failed_browser_runs": 0,
+    "capture_source_commit": "c9281323dc17f8c6052aa229b29b20fe61ceb654",
+    "launch_packet_v2_sha256": "2d05ba6353e1ce6f989e1e16096be20fd350047d623ed52f1767d91b5a9b91c4",
+    "root_result_review_sha256": "62816799a721e3184e4ee64638f19472d18003c9a01dec43f9c4df0b965d26a3",
+    "runtime": {
+      "browser": "Google Chrome 154.0.8037.98",
+      "mode": "headless",
+      "audio_muted": true,
+      "pages": 2,
+      "playwright": "1.62.1",
+      "cross_origin_isolated": {
+        "alpha": true,
+        "beta": true
+      }
+    },
+    "transport": {
+      "ice_servers": [],
+      "candidate_types": {
+        "offer": [
+          "host",
+          "host"
+        ],
+        "answer": [
+          "host",
+          "host"
+        ]
+      },
+      "signaling": "In-memory offer/answer descriptions after host candidate gathering.",
+      "ordered": true,
+      "max_retransmits": null,
+      "max_packet_lifetime": null,
+      "connection_states": {
+        "alpha": "connected",
+        "beta": "connected"
+      },
+      "attachment_ready_states": {
+        "alpha": "connecting",
+        "beta": "open"
+      },
+      "local_role_ports": {
+        "alpha": 0,
+        "beta": 1
+      },
+      "agreement_hash_equal": true,
+      "hello_received_once_each": true
+    },
+    "sink": {
+      "native_runtime_loaded": false,
+      "wasm_loaded": false,
+      "native_api_call_claim": "Not applicable: the probe did not load native runtime JavaScript or WebAssembly.",
+      "frames_per_peer": 2,
+      "first_tick": 0,
+      "bytes_per_frame": 44,
+      "records": "Exact neutral bootstrap records observed at the portable test sink; no native frame was submitted."
+    },
+    "resource_inventory": {
+      "resource_paths": [
+        "/",
+        "/probe.mjs",
+        "/scripts/net_lockstep_core.mjs",
+        "/scripts/net_lockstep_webrtc.mjs"
+      ],
+      "requests": 8,
+      "responses": 8,
+      "unexpected_resources": 0,
+      "probe_module_sha256": "77bdb8ad73096b43af08bec4d30dd9df6a159e9c241e3a6bd11089a5d3f39e38",
+      "portable_core_sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+      "webrtc_endpoint_sha256": "f7bdc789211d097bae000fa7b966f157a5db72b185fbfea6f1179a140ee3e1fe"
+    },
+    "close": {
+      "alpha_disconnects": 1,
+      "beta_disconnects": 1,
+      "endpoint_errors": [],
+      "cleanup_errors": []
+    },
+    "webgpu_metadata": {
+      "available": true,
+      "vendor": "apple",
+      "architecture": "metal-3",
+      "scope_note": "Metadata was recorded from the CSS fixture; no game rendering or GPU correctness assertion was made."
+    },
+    "screenshots": [
+      {
+        "name": "alpha-ready.png",
+        "width": 960,
+        "height": 700,
+        "bytes": 59022,
+        "sha256": "f0b08a7b15908ce04621d1a80b97a3b68755bb01272e8596e4fbdae8b2018252"
+      },
+      {
+        "name": "beta-ready.png",
+        "width": 960,
+        "height": 700,
+        "bytes": 58993,
+        "sha256": "377737f34e7cb1e775cb636697c5c3e091ee8e01c8575eebf4418b6420e3c8dc"
+      },
+      {
+        "name": "alpha-closed.png",
+        "width": 960,
+        "height": 700,
+        "bytes": 58032,
+        "sha256": "a4a0f84a22fc32eac494c7b99258bedb4245a77461c1538e941dc29f6ec54b2c"
+      },
+      {
+        "name": "beta-closed.png",
+        "width": 960,
+        "height": 700,
+        "bytes": 58002,
+        "sha256": "3ce15ab3fccebc6a0cd977a9a8e4739648ac0b08bc711aa97a50fdde1731bfdc"
+      }
+    ],
+    "cleanup": {
+      "owner_and_runner_passed": true,
+      "chrome_process_group_absent": true,
+      "capture_and_server_groups_absent": true,
+      "temporary_profile_empty": true,
+      "local_server_closed": true,
+      "process_cleanup_errors": 0
+    },
+    "raw_artifact_hashes": {
+      "runner_report_sha256": "66a469ff7e03c7caf85266b2f941875c32c317a2a987f51b880cd0f06b5e60c9",
+      "owner_receipt_sha256": "ff31c987e922ccd2ddc96b93541b70945f420f4d4a3e2449d9a7872c81c048df",
+      "process_trace_sha256": "24c28d27f9d7645a4f45a6b9373ae47385f8945c80da5d29bcf11f93ffd5be44",
+      "capture_log_sha256": "aa9621b0f3b63e99267a9b2fb4c64e64470acb278fddae97e898b22eab4e291c",
+      "server_log_sha256": "5edfb2bdc760b9c122dce28cae457142f63bd618ad40cc0a28293b541ac0f9d0"
+    }
+  },
+  "prelaunch_packet_history": {
+    "v1": {
+      "launch_packet_sha256": "1a18b8a907eced8d34378ef507fa104d86210c83b21b21e9342e8f9ab46e93a6",
+      "self_review_sha256": "8376430657cfcca9b694ecdb58f990a42279d16c5c362858b454b28b1f2cc8fe",
+      "manifest_sha256": "bbe63c511ec879f9a8473bf6bf989bae27867177be768a09219e35cad95a5841",
+      "outcome": "Stopped in root review before launch. Review found that beta waited for datachannel attachment before creating its answer and that the readyState assertion incorrectly expected beta to be connecting.",
+      "browser_run": false,
+      "raw_runner_and_probe_bytes_retained": false,
+      "retention_note": "The v1 packet, manifest, and self-review metadata remain; the staged v1 runner and page probe files were overwritten for v2. No reconstructed v1 source bytes are represented as retained."
+    },
+    "v2": {
+      "launch_packet_sha256": "2d05ba6353e1ce6f989e1e16096be20fd350047d623ed52f1767d91b5a9b91c4",
+      "root_packet_review_sha256": "217aede5ae257840a87fc7b9840f6d628ea226f6df9210e74000cd1768c0ce9a",
+      "launch_authorization_sha256": "85c59bee534c05f0f7c166c105b37c3c29d379cee86521ab1972a37aadff82bf",
+      "root_result_review_sha256": "62816799a721e3184e4ee64638f19472d18003c9a01dec43f9c4df0b965d26a3",
+      "outcome": "One authorized local headless browser run passed; no failed browser run occurred."
+    }
+  },
+  "current_main_validation": {
+    "run_inventory_id": "issue222-current-main-validation-20261007T184340Z",
+    "execution_head_before_test_commit": "f14588f7fbdce6f5ca1ad532d9a0e4c6b5b5441b",
+    "execution_tree_before_uncommitted_test_patch": "d58914192db6129f3d3386cf222df27b2cce7e69",
+    "dirty_test_patch": {
+      "path": "tests/test_net_lockstep_contracts.py",
+      "file_sha256": "0eec3c05962685bb9b5e08b4e47eb762fb1216cdc5f46bfca8fb8e1550b1e5ce",
+      "diff_sha256": "7c7b54ec7ce36accf0347373e8db380d25a5003e65907c123eea58c85224e43e",
+      "change": "One line adds tests/net_lockstep_webrtc.test.mjs to the SDK Node test invocation."
+    },
+    "committed_as": "405155bcf5c7e988b2685ea771ed7ecb0416b9d5",
+    "execution_bytes_match_committed_test_file": true,
+    "focused_node_command": "python3 scripts/agent_workspace.py run -- .deps/emsdk/node/24.19.0_64bit/bin/node --test tests/net_lockstep_webrtc.test.mjs tests/net_lockstep_core.test.mjs tests/net_lockstep_browser_peer.test.mjs tests/net_lockstep_transport.test.mjs",
+    "focused_node_tests": {
+      "total": 50,
+      "passed": 50,
+      "failed": 0,
+      "log": "focused-node24.log",
+      "sha256": "508259ac9473c5f753962941a701dbe46820ddf932fc3027b67a0f94f3e3ad0c"
+    },
+    "focused_python_wrapper": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_net_lockstep_contracts.py -v",
+      "tests": 1,
+      "passed": 1,
+      "nested_webrtc_suite_included": true,
+      "log": "focused-contract-wrapper.log",
+      "sha256": "6c54ab85cde6f7f07aa11be08e2702901c5c79a5819a97486298a02e3c0354c2"
+    },
+    "full_python_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "total": 2013,
+      "passed": 1864,
+      "skipped": 149,
+      "failed": 0,
+      "duration_seconds": 369.172,
+      "log": "full-python-suite.log",
+      "sha256": "91964994f437917903e786d11b446c293ef16d3afee6eec9185bf592a62f8c78"
+    },
+    "native_build": "Not required; the component and test integration changes are JavaScript/Python test dispatch and documentation only. No C/C++ runtime file changed."
+  },
+  "evidence_boundary": {
+    "claims": [
+      "The existing A2 portable core works with the reviewed browser WebRTC endpoint in two local headless Chrome pages.",
+      "The browser-owned endpoint exchanges the existing A2 identity hello over a reliable ordered local DataChannel.",
+      "The v2 CSS-only probe reaches the explicit portable test sink with two exact neutral bootstrap records per peer.",
+      "Current-main rebase preserves the captured portable core and WebRTC endpoint bytes; the full suite now executes the new WebRTC unit file through unittest discovery."
+    ],
+    "exclusions": [
+      "native runtime execution, native frame submission, or gameplay input sampling",
+      "keyboard or physical controller input",
+      "Internet, hosted signaling, TURN, relay fallback, or two-machine acceptance",
+      "foreground timing, latency, performance, or sustained behavior",
+      "game rendering, pixel accuracy, PCM/audio-output acceptance, or full supported route",
+      "complete A3, rollback, tournament, or whole-session acceptance"
+    ]
+  }
+}
