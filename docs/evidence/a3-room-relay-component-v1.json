@@ -11,6 +11,16 @@
     "producer_tree": "6c77fb1d456a853a30bb3011a134368c2694125e",
     "validation_worktree_clean_at_start": true,
     "validation_worktree_clean_after_tests": true,
+    "preexisting_documentation_wip": {
+      "paths": [
+        "docs/DEPENDENCIES.md",
+        "online/relay/README.md"
+      ],
+      "stashed_before_validation": true,
+      "stash_commit": "fc9b9da56c2c1993299ccd6eba7b5df5d999de92",
+      "restored_after_validation": true,
+      "recorded_in_documentation_commit": "848db43893e23364226eb3aa6f326726c3969e17"
+    },
     "protocol_source_changed": false,
     "paths": [
       "online/relay/worker.mjs",
@@ -63,7 +73,8 @@
       "name": "full Python unittest discovery",
       "command": "python3 -m unittest discover -s tests -v",
       "result": "passed",
-      "passed": 1942,
+      "tests_total": 1942,
+      "passed": 1800,
       "skipped": 142,
       "duration_seconds": 348.018,
       "private_log": {

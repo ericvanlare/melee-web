@@ -16,7 +16,8 @@ The [portable receipt](../evidence/a3-room-relay-component-v1.json) binds the
 producer commit and source/config/runtime hashes, focused test outcomes, and
 cleanup receipts. Against producer `7abab468a1e242a12fd27f09fff4e8a134f8b9fd`
 (tree `6c77fb1d456a853a30bb3011a134368c2694125e`), the full Python suite passed
-1,942 tests with 142 skips. The relay HTTP/WebSocket test passed four cases,
+with 1,942 total tests: 1,800 passed and 142 skipped. The relay
+HTTP/WebSocket test passed four cases,
 the existing A2 protocol suite passed 12 cases, and the repository content
 guard reported zero findings. The actual Worker tests used Wrangler 4.131.1,
 Miniflare 5.20260911.0-alpha and workerd 1.20260911.1. Four direct-runtime
