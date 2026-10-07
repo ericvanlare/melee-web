@@ -1,0 +1,92 @@
+{
+  "schema": "melee-web-a2-portable-core-receipt-v1",
+  "scope": "Offline A2 protocol portability and exact pre-change wire compatibility only.",
+  "source": {
+    "base_main_commit": "95175a9d34a2e23e4bc0a08ac5aac55f0ede969c",
+    "implementation_commit": "a9157d0f46650964684475bd22f4707be00af452",
+    "implementation_tree": "e4ca6a92e8039dcd8043fecd9f9b9a29ae7122f9",
+    "core_file": "scripts/net_lockstep_core.mjs",
+    "core_sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+    "node_facade_file": "scripts/net_lockstep_protocol.mjs",
+    "node_facade_sha256": "9a6886adc3cca97ab8433bd1a3662abc7418ba640b4bf435ef212f613fc52e5f"
+  },
+  "pre_change_fixtures": {
+    "producer_commit": "da1f3eaf9836f757380cfdfc7e9d2cafa97eeab1",
+    "producer_tree": "70dea560ac45adf8a60e7ce4acd91e0303c70dac",
+    "protocol_module_sha256": "d21dd7a5f81aa31a4b6a821bb3f6fa2b1f0b1b8a6c314b5c22af21bc1bc62aea",
+    "wire_fixture": "tests/fixtures/net_lockstep_pre_portable_wire_v1.json",
+    "wire_fixture_sha256": "fe94ab2e0e3d92a28a48f030b35ff840d7734c851296398b1c07fc310f7ea5dd",
+    "checksum_fixture": "tests/fixtures/net_lockstep_pre_portable_checksum_v1.json",
+    "checksum_fixture_sha256": "d1f9d1aef7b8e3f5310e282941b23537f30a8d5579e418731403ca2e45f05657",
+    "capture_method": "Captured from the unchanged Node module before implementation, then copied byte-for-byte into the repository fixture files. Expected wire bytes and hashes are not regenerated from the new core.",
+    "fixture_run_inventory_id": "a3-portable-core-golden-fixtures-20261007-20261007-020423-489bdd10"
+  },
+  "runtime": {
+    "sdk_node_version": "v24.19.0",
+    "sdk_node_executable": ".deps/emsdk/node/24.19.0_64bit/bin/node",
+    "sdk_node_sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+    "dependencies_lock_sha256": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385"
+  },
+  "focused_validation": {
+    "command": "python3 scripts/agent_workspace.py run -- .deps/emsdk/node/24.19.0_64bit/bin/node --test tests/net_lockstep_core.test.mjs tests/net_lockstep_protocol.test.mjs",
+    "outcome": "pass",
+    "tests_total": 21,
+    "tests_passed": 21,
+    "tests_failed": 0,
+    "run_inventory_id": "a3-portable-core-golden-fixtures-20261007-20261007-020423-489bdd10",
+    "log": "focused-node24-reviewed.log",
+    "log_sha256": "2ceac885bce4464dc9d675db25d74fa58c8c7be2dfe7d53aaa6e07328b1a87b7"
+  },
+  "discovery_validation": {
+    "command": "python3 -m unittest tests.test_net_lockstep_contracts -v",
+    "outcome": "pass",
+    "tests_total": 1,
+    "tests_passed": 1,
+    "run_inventory_id": "a3-portable-core-golden-fixtures-20261007-20261007-020423-489bdd10",
+    "log": "focused-unittest-contract-wrapper.log",
+    "log_sha256": "f3bbbec8718de5f0783e297f1eb6ce896fa6a6aaab5d83e07cf84e2a959d455b",
+    "note": "The unittest wrapper runs the discovered Node observer, source-accounting, portable-core, protocol, transport, real Worker, and browser-harness contract tests."
+  },
+  "full_python_suite": {
+    "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+    "outcome": "pass",
+    "tests_total": 1964,
+    "tests_passed": 1819,
+    "tests_skipped": 145,
+    "duration_seconds": 358.733,
+    "log": "full-python-suite.log",
+    "log_sha256": "e148303789592af0e6b930404f01a4305b6ccd63d40a5110ae40394734d3a78b"
+  },
+  "release_runtime_build": {
+    "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+    "outcome": "pass",
+    "exit_code": 0,
+    "log": "release-runtime-build.log",
+    "log_sha256": "5f281eccf6ff60edd1dbe9f8b44dd04704c9963e95911e17dbf3ae4618a979f4",
+    "artifacts": [
+      {"file": "build/browser-release/gameplay_menu_browser.js", "sha256": "63766185f1cccef75d3c07bd4088061c39056ae5328e60d2812ad84cf8509229"},
+      {"file": "build/browser-release/gameplay_menu_browser.wasm", "sha256": "db6444fe2da48369b01ecd18d3d2ce90e398754f455aaa6a2096525a2ed56069"},
+      {"file": "build/browser-release/runtime.html", "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"}
+    ],
+    "scope_note": "This repository runtime build is build validation only; the portable A2 module was not loaded into a browser or asserted to be part of these runtime artifacts."
+  },
+  "retained_initial_assertion_failures": [
+    {
+      "log": "focused-node24-first.log",
+      "run_inventory_id": "a3-portable-core-golden-fixtures-20261007-20261007-020423-489bdd10",
+      "sha256": "4dbdfc0d1e23a84d4f97e5d05bdad8430f6c9ea1c1c2147e847d6ec4e5c49345",
+      "note": "Three test assertions were corrected: neutral-PAD expected-string length, explicit terminal on digest failure, and Buffer/Uint8Array byte normalization."
+    },
+    {
+      "log": "focused-node24-corrected.log",
+      "run_inventory_id": "a3-portable-core-golden-fixtures-20261007-20261007-020423-489bdd10",
+      "sha256": "6738d5985eed5394a45cf69d2178db664d5d4d3161c5e929c98830c4a1fc6118",
+      "note": "One remaining test assertion used Buffer-only read methods on the core-owned Uint8Array checksum; the assertion was normalized through Buffer.from. No protocol mismatch was observed."
+    }
+  ],
+  "evidence_boundary": {
+    "claims": ["Node SDK import without Buffer global", "native WebCrypto hashing", "exact unchanged hello/state wire bytes and hashes", "exact 44-byte PAD frames", "checksum parse fields", "serialized state hashing", "startup atomicity", "bounded receive queue", "explicit digest failures", "Node TCP facade compatibility"],
+    "exclusions": ["actual browser import or execution", "browser-owned peer endpoints", "WebSocket endpoint extraction", "Internet or two-machine acceptance", "live input", "WebRTC", "rollback", "deployment", "gameplay accuracy or performance"]
+  },
+  "external_run_inventory_id": "a3-portable-core-validation-20261007-022201-ca5e13ac"
+}
