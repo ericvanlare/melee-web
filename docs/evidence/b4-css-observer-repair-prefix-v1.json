@@ -1,0 +1,376 @@
+{
+  "schema": "melee-web-b4-css-observer-repair-prefix-evidence-v1",
+  "scope": "Source identified / Browser exercised: one ordinary exact MWRC v10 CSS prefix. No retail comparison, causal finding, complete session, pixels, PCM, live timing, GPU cause, performance or admission claim.",
+  "private_locations_omitted": true,
+  "source": {
+    "capture_commit": "7cb680dfb5cc20cfd0ba43c64e4813fd76c98a54",
+    "capture_tree": "c3fff20d238db46b7a26be17d34c951ffa0d5256",
+    "capture_baseline": "3c26104663afdbc8a8e3bc5f175f80d9750b1b78",
+    "abi_original_commit": "5b6e2f05889309ce490ac55c48fd8a6fd62dc613",
+    "native_web_producer_commit": "190d150fd2148ccdfcb10d834538e91eb6f2c92b",
+    "native_web_sources_unchanged": true,
+    "rebuilt": false,
+    "source_delta_from_producer_paths": [
+      "docs/evidence/b4-add492-to-190d-review-v1.md",
+      "docs/evidence/b4-first-replay-callback-v1.json",
+      "docs/status/2026-10-06-b4-first-replay-callback.md",
+      "scripts/capture_whole_session_browser.mjs",
+      "tests/character_reference_browser_test.mjs",
+      "tests/development_css_observer_storage_test.mjs"
+    ]
+  },
+  "input": {
+    "recipe_format_version": 10,
+    "recipe_sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+    "seed": 3336171383,
+    "source_frame_count": 50394,
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "raw_game_assets_included": false
+  },
+  "protocol": {
+    "mode": "state",
+    "first_callback_probe": false,
+    "resume_timing_pauses": false,
+    "requested_cursor": 10,
+    "phase_timeout_ms": 18000,
+    "replay_timeout_ms": 90000,
+    "poll_ms": 250,
+    "observation_timeout_ms": 5000,
+    "owner_overall_timeout_ms": 300000,
+    "owner_cleanup_reserve_ms": 45000,
+    "http_request_bound_ms": 5000,
+    "one_run_only": true
+  },
+  "producer_artifacts": {
+    "inventory_count": 32,
+    "local_and_served_equal_to_frozen_before_and_after": true,
+    "artifacts": [
+      {
+        "name": "gameplay_menu_browser.js",
+        "bytes": 299681,
+        "sha256": "fd0faf2d6bb5630abc218ac7b27136578d69822973f12f0ccca47b49667e051f"
+      },
+      {
+        "name": "gameplay_menu_browser.wasm",
+        "bytes": 15722515,
+        "sha256": "930adb1228f41f055c2b07f374c7ae0e9308e2beee1875de79b471bf55c99975"
+      },
+      {
+        "name": "gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "name": "runtime.html",
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      {
+        "name": "runtime-development.mjs",
+        "bytes": 58285,
+        "sha256": "b41d0e2ff2fcce8695a8e2ce99bf0d5053ec43020d5fa4cd246f493bb9d4ac28"
+      },
+      {
+        "name": "net-timing-pause.mjs",
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      {
+        "name": "melee-runtime.mjs",
+        "bytes": 50136,
+        "sha256": "6d330656905e52820f56af5bf10bd6dfe741e6a2adb5a24c6f708720d45941f8"
+      },
+      {
+        "name": "runtime-diagnostics.mjs",
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      {
+        "name": "runtime-diagnostics-delivery.mjs",
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      {
+        "name": "diagnostics-settings.mjs",
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      {
+        "name": "diagnostics-schema.mjs",
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      {
+        "name": "controller-input.mjs",
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "name": "controller-panel.mjs",
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      {
+        "name": "controller-panel.css",
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      {
+        "name": "controller-settings.mjs",
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      {
+        "name": "controller-settings.css",
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      {
+        "name": "touch-controls.mjs",
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      {
+        "name": "touch-controls.css",
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      {
+        "name": "prototype-keyboard-layouts.mjs",
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      {
+        "name": "runtime-cache.js",
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      {
+        "name": "audio-worklet.js",
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      {
+        "name": "audio-ring.mjs",
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      {
+        "name": "disc-image.mjs",
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      {
+        "name": "disc-session.mjs",
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      {
+        "name": "dsp-coefficients.mjs",
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      {
+        "name": "runtime-assets.mjs",
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      {
+        "name": "runtime-audio-assets.mjs",
+        "bytes": 3685,
+        "sha256": "2201d9156f3c4902a81a39d4520fc0f684eaeac4c9d4c8c46cb010010697ed3b"
+      },
+      {
+        "name": "runtime-audio.mjs",
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      {
+        "name": "match-flow.mjs",
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      {
+        "name": "match-menu.mjs",
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      {
+        "name": "action-sweep.mjs",
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      {
+        "name": "hitch-capture.mjs",
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      }
+    ]
+  },
+  "observations": {
+    "requested_cursor": 10,
+    "observed_cursor_at_stop": 17,
+    "phase_at_stop": 1,
+    "running_at_stop": 1,
+    "runtime_error_at_stop": null,
+    "snapshot_source_cursors_before_unload": [
+      0,
+      1,
+      14,
+      17
+    ],
+    "retained_session_frame_count": 19,
+    "retained_session_frame_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18
+    ],
+    "all_retained_session_frames_css": true,
+    "last_successful_and_final_snapshot": {
+      "phase": 0,
+      "running": 0,
+      "source_cursor": 0,
+      "status": "Native menus unloaded."
+    },
+    "terminal_interpretation": "Cursor17 was the polling stop observation. Retained records continue through index18 before unload. Cursor0 is post-unload reset; no terminal pre-unload getter value is claimed.",
+    "runner_result": "incomplete",
+    "runner_exit_code": 1,
+    "wrapper_exit_code": 1,
+    "owner_exit_code": 1,
+    "owner_result": "fail",
+    "owner_elapsed_ms": 11812,
+    "replay_phase_elapsed_ms": 855,
+    "first_error_after_deliberate_unload": "Browser replay report failed: [\"whole-session final CSS was not entered\",\"Manual unload stopped the replay\",\"incomplete input timeline\",\"source tick/draw count mismatch\"]",
+    "pre_stop_runtime_or_browser_error_retained": false,
+    "observation_timeout": false,
+    "timing_pause_resumes": 0,
+    "screenshot_inspected": true,
+    "screenshot_scope": "Unloaded UI and black canvas; teardown evidence only."
+  },
+  "ownership": {
+    "cleanup_passed": true,
+    "process_observation_passed": true,
+    "browser_root_observed": true,
+    "cdp_attribution_complete": true,
+    "capture_process_group_absent": true,
+    "server_process_group_absent": true,
+    "all_owned_browser_identities_absent": true,
+    "owned_lane_released": true,
+    "port_free_after_cleanup": true
+  },
+  "validation": {
+    "actual_css_callsite_tests": {
+      "passed": 12,
+      "failed": 0
+    },
+    "replay_lifecycle": "pass",
+    "capture_result_marker_protocol": "pass",
+    "diff_check": "pass",
+    "full_suite_after_abi_repair": "not run in this task",
+    "original_comparison": {
+      "result": "invalid",
+      "exit_code": 2,
+      "error": "whole-session comparison requires MWRC v8 or v9",
+      "report": {
+        "bytes": 1240,
+        "sha256": "f55046e1fdfaaa0d2bc9d43eb4cd0634ce55cde0687cc55765939a90453b9ac4"
+      },
+      "comparator_script": {
+        "bytes": 1777,
+        "sha256": "dbc17677b8dba3eec954018dd0b2c069dd12c248d575e1743145e64d2b43a53a"
+      },
+      "comparator_tool": {
+        "bytes": 60193,
+        "sha256": "79c1d709965a41b835c8aa8f5e256787d387f5a5465fa9a52bdef15c2d025448"
+      },
+      "fields_compared": [],
+      "first_state_mismatch": null,
+      "interpretation": "Rejected transport version before comparison; no original-state agreement or divergence established."
+    }
+  },
+  "runtime_data_load": {
+    "file_bytes": 3674112,
+    "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+    "loaded_bytes": 3674112,
+    "total_bytes": 3674112,
+    "from_cache": false
+  },
+  "retained_reports": {
+    "review-packet-v2.json": {
+      "bytes": 24541,
+      "sha256": "b5706bb2f0a7c2851686d8ed8a48484b8f2d6e8deef27a6f2bdcd755540962d9"
+    },
+    "root-launch-review-v2.json": {
+      "bytes": 12119,
+      "sha256": "1b77c2b02d84a4cfa8c5eeaec08de1de81513bc48e5a8d7419b81a94d33814bd"
+    },
+    "run-result-v1.json": {
+      "bytes": 12152,
+      "sha256": "2f0016a22131b5bb282f6a767ea30b0992e6a654e18ed9a9464eafe34e6bda7d"
+    },
+    "owner-report.json": {
+      "bytes": 109708,
+      "sha256": "65d6a0c164586848c3b5818a09a2a4971a410762892fbb45898bf742ace72269"
+    },
+    "wrapper-report.json": {
+      "bytes": 292,
+      "sha256": "51151967135e328c2d69dd654c82c50b44adc9a61c13f271a5ab07273767cdc0"
+    },
+    "http-local-inventory-pre.json": {
+      "bytes": 14862,
+      "sha256": "dd582e9fdd935b859e28aaff810b305b41634cf140753c555d67354637a496ae"
+    },
+    "http-local-inventory-post.json": {
+      "bytes": 14863,
+      "sha256": "de27367ea2661a875aad216ca8b93e5814999e683fb12ba737a6259dbc7abb09"
+    },
+    "launch-result.json": {
+      "bytes": 550,
+      "sha256": "3fe1b8aa4860c878de86e1eab9d6500599aae7123e636d2393ed75b033d31038"
+    },
+    "prefix-output/report.json": {
+      "bytes": 378196,
+      "sha256": "d98524442a69f8bc8ea0f642c41252546bdc9943492c464cd09e6285a03f0557"
+    },
+    "prefix-output/retail-browser-report.json": {
+      "bytes": 18399,
+      "sha256": "9db947d818539c281907c5ddb2b8cff3678fb5754f867e14b63b5788835069af"
+    },
+    "prefix-output/retail-port.jsonl": {
+      "bytes": 35289,
+      "sha256": "4bd5c32ff06c96ec0a828ddd7641695d3f6bb157bb49df6ed883b226df7f9cbd"
+    },
+    "prefix-output/final.png": {
+      "bytes": 88545,
+      "sha256": "5051ece6704852fe9166cfb0e8c70665bff91e5101464e9bc1526d7685961568"
+    },
+    "handoff-v1.json": {
+      "bytes": 1968,
+      "sha256": "c327026d5cab530891e9a58a3380516162c8f3ba06df12f5511d99c56a28b539"
+    }
+  },
+  "causal_caution": "Progress on this producer and repaired polling path does not prove the observer overflow caused the old timeout; old add492 and current producer, Node and observation machinery differ.",
+  "next_boundary": {
+    "ordinary_prefix_requested_cursor": 1200,
+    "first_match_source_index": 1184,
+    "authorization": "Recommendation only; not run.",
+    "scope": "Observe ordinary CSS\u2192SSS\u2192first-match progress, actual overshoot and first failure; no full-session acceptance.",
+    "prerequisite": "Integrate current shared H1 fixes and bind fresh source/runtime identities before next reviewed run."
+  }
+}
