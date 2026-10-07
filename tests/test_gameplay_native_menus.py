@@ -19,6 +19,38 @@ def has_menu_trophy_assets(*roots):
     return all(any((root / name).is_file() for root in roots)
                for name in ("TyDatai.usd", "TyDatai.dat"))
 
+def find_stadium_c1_manifest_names(value):
+    if isinstance(value, dict):
+        if isinstance(value.get("manifest_names"), list):
+            return value["manifest_names"]
+        for child in value.values():
+            found = find_stadium_c1_manifest_names(child)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = find_stadium_c1_manifest_names(child)
+            if found is not None:
+                return found
+    return None
+
+def stadium_c1_selected_file_names():
+    preparation = json.loads(
+        (ROOT / "docs/evidence/pokemon-stadium-c1a-css-sss-preparation-v1.json")
+        .read_text(encoding="utf-8"))
+    names = find_stadium_c1_manifest_names(preparation)
+    if not isinstance(names, list):
+        raise AssertionError("C1 evidence has no selected-file manifest")
+    return names
+
+def missing_stadium_fixture_names(menu, game, required_names):
+    return sorted(name for name in set(required_names)
+                  if not (menu / name).is_file() and not (game / name).is_file())
+
+def stadium_fixture_campaign_is_explicit():
+    return (bool(os.environ.get("MELEE_MENU_FIXTURE_ROOT"))
+            or os.environ.get("MELEE_REQUIRE_STADIUM_E8_FIXTURES") == "1")
+
 class NativeMenuSourceTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
@@ -83,11 +115,25 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         required = json.loads(subprocess.check_output(
             [str(node_runtime()), "--input-type=module", "-e", script],
             cwd=ROOT, text=True))
-        missing = [str(menu / name) for name in required if not (menu / name).is_file()]
-        if not target.is_file() or missing:
+        selected = stadium_c1_selected_file_names()
+        self.assertEqual(len(required), 76)
+        self.assertEqual(len(set(required)), 76)
+        self.assertEqual(len(selected), 36)
+        self.assertEqual(len(set(selected)), 36)
+        required_union = sorted(set(required) | set(selected))
+        self.assertEqual(len(required_union), 98)
+        missing = missing_stadium_fixture_names(menu, game, required_union)
+        if missing:
             detail = ", ".join(missing[:5])
-            self.skipTest("C1 context preflight requires its built host trace and exact owned menu closure" +
-                          (f"; missing {detail}" if detail else ""))
+            message = (
+                "C1 context preflight requires the exact 98-file menu/selected union"
+                f"; missing {detail}"
+            )
+            if stadium_fixture_campaign_is_explicit():
+                self.fail(message)
+            self.skipTest(message)
+        if not target.is_file():
+            self.skipTest("C1 context preflight requires its built host trace")
         source_revision = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         trace = self.scratch / "c1-context-preflight.jsonl"
@@ -118,6 +164,35 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         self.assertIn(
             "stage publication, or source menu entry",
             run.stdout,
+        )
+
+    def test_stadium_c1_fixture_preflight_detects_missing_selected_file(self):
+        target = self.scratch / "synthetic-c1-fixture-preflight"
+        menu, game = target / "native-menus", target / "next-gate"
+        menu.mkdir(parents=True)
+        game.mkdir()
+        script = "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; " \
+                 "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), " \
+                 "'dsp_coef.bin', 'sislib_font.bin']))"
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        selected_names = stadium_c1_selected_file_names()
+        self.assertIn("PlCo.dat", selected_names)
+        required_union = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual(len(menu_names), 76)
+        self.assertEqual(len(selected_names), 36)
+        self.assertEqual(len(required_union), 98)
+        for name in required_union:
+            if name == "PlCo.dat":
+                continue
+            root = menu if name in menu_names else game
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+        self.assertEqual(
+            missing_stadium_fixture_names(menu, game, required_union),
+            ["PlCo.dat"],
         )
 
     def test_stadium_e8_one_request_and_checked_teardown(self):
@@ -153,22 +228,7 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             "melee-web-pokemon-stadium-c1a-css-sss-preparation-v1",
         )
 
-        def find_manifest(value):
-            if isinstance(value, dict):
-                if isinstance(value.get("manifest_names"), list):
-                    return value["manifest_names"]
-                for child in value.values():
-                    found = find_manifest(child)
-                    if found is not None:
-                        return found
-            elif isinstance(value, list):
-                for child in value:
-                    found = find_manifest(child)
-                    if found is not None:
-                        return found
-            return None
-
-        selected_names = find_manifest(preparation)
+        selected_names = stadium_c1_selected_file_names()
         self.assertIsNotNone(selected_names, "C1 evidence has no selected-file manifest")
         self.assertEqual(len(selected_names), 36)
         self.assertEqual(len(set(selected_names)), len(selected_names))
