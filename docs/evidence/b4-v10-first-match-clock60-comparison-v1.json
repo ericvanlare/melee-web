@@ -316,5 +316,35 @@
     },
     "revision": "GALE01r2",
     "sequence_id": "melee-fighter-v10-origin-main-20261003-r1"
+  },
+  "current_main_integration": {
+    "private_run_id": "b4-clock60-current-main-integration-20261007-20261007-054009-ae1f2135",
+    "validation_manifest_sha256": "9c4e074437cc1b3d239b76c33a011261d71a6453a62874313774d3958ca11c6b",
+    "validation_source_commit": "9e987e1997a53ccb5c4ca5595b455c22cf2edfe1",
+    "validation_source_tree": "60e63832d81add0ab5787eca9c4470fdc21e26b7",
+    "main_base_commit": "ab643840602e61f23253d5e31ba8dff6515c7d1a",
+    "main_base_tree": "21c14d3866c0c99f22764edd49fd44793c0426a8",
+    "historical_capture_and_comparison_producer_commit": "90289a29b57a8008ee8fd801754100867c718536",
+    "historical_capture_and_comparison_producer_tree": "feb7ed9a3a013e64ff4027f9009ff88d09878914",
+    "rebase_range_diff": "all five commits matched exactly against the prior reviewed range",
+    "post_validation_changes": "portable receipt documentation only; no executable source content changed",
+    "python_suite": {
+      "status": "passed",
+      "tests_completed": 1988,
+      "skipped": 145,
+      "exit_code": 0,
+      "log_sha256": "f0b62a03e0dd572463211edee297a5c76700ae05f3435f65c1b1f4cf449f8062"
+    },
+    "release_build": {
+      "status": "success",
+      "target": "runtime",
+      "configuration": "Release",
+      "compiler_jobs": "default; --jobs not specified",
+      "optional_diagnostic_profile_flags": [],
+      "exit_code": 0,
+      "log_sha256": "5472c316407001a26ace5706e8adcdfc99b57bff33723dd7c7973b82dd701c51",
+      "runtime_artifact_count": 32,
+      "runtime_artifact_manifest_sha256": "70fe0c43b7ea44acdc4278822e4f7cff801545e511420fd483524e492c54ee35"
+    }
   }
 }
