@@ -102,6 +102,9 @@ V10_SOURCE_LINEUP_PROFILE = "v10-fighter-coverage"
 V10_SOURCE_INPUT_MODE = "ordinary-controller-pipe-record"
 V10_BROWSER_CAPTURE_SCHEMA = "melee-web-headless-whole-session-replay-v1"
 V10_BROWSER_PRODUCER_SCHEMA = "melee-web-b4-match-entry-producer-source-v1"
+# Retained historical producer format: the shared source/build/input contract
+# is unchanged. New producers must use V10_BROWSER_PRODUCER_SCHEMA.
+V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA = "melee-web-b4-first-match-clock300-browser-producer-v1"
 V10_PREFIX_BYTE_CAP = 32 * 1024 * 1024
 V10_PREFIX_RECORD_CAP = 4200
 V10_FIRST_POSITIVE_RECORD_CAP = 8192
@@ -2422,8 +2425,13 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
 
 
 def _validate_browser_producer_source(producer: Mapping[str, Any],
-                                      expected_browser: Mapping[str, Any]) -> Mapping[str, Any]:
-    if producer.get("schema") != V10_BROWSER_PRODUCER_SCHEMA:
+                                      expected_browser: Mapping[str, Any], *,
+                                      scope: str | None = None) -> Mapping[str, Any]:
+    schema = producer.get("schema")
+    if schema == V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA:
+        if scope != V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE:
+            raise ComparisonError("historical clock300 producer requires the post-clock60 boundary scope")
+    elif schema != V10_BROWSER_PRODUCER_SCHEMA:
         raise ComparisonError("browser producer manifest schema is unsupported")
     source = producer.get("source")
     expected = expected_browser.get("producer")
@@ -2849,7 +2857,7 @@ def _validate_v10_browser_provenance(capture_report_path: Path,
     expected_producer = expected_browser.get("producer")
     if not isinstance(expected_producer, dict):
         raise ComparisonError("expectations lack browser producer identity")
-    _validate_browser_producer_source(producer, expected_browser)
+    _validate_browser_producer_source(producer, expected_browser, scope=recipe.scope)
 
     disc = inputs.get("disc")
     expected_disc = expected_browser["disc"]
@@ -2959,6 +2967,7 @@ def _validate_v10_browser_provenance(capture_report_path: Path,
     return producer, wrapper, browser_report, {
         "capture_report_sha256": capture_sha,
         "producer_manifest_sha256": producer_sha,
+        "producer_manifest_schema": producer["schema"],
         "browser_report_sha256": report_sha,
         "port_trace_sha256": trace_sha,
         "port_trace_bytes": trace_bytes,

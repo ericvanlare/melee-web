@@ -331,6 +331,15 @@ The terminal clock value must be the first one at or above the packet's
 threshold; clock regression, jumps, early threshold, incorrect tuples, PAD/tick
 misjoins, entity failures, or declared-state differences stop the comparison.
 
+New browser producer manifests use the canonical
+`melee-web-b4-match-entry-producer-source-v1` schema for every boundary. This
+post-clock-60 scope also reads the retained historical
+`melee-web-b4-first-match-clock300-browser-producer-v1` format, whose shared
+source, Release-runtime build, artifact and input identity contract is unchanged.
+The historical format is rejected in other scopes. Its actual schema and exact
+manifest hash remain in the comparison provenance; compatibility does not
+rewrite capture evidence or bypass any frozen identity or transport check.
+
 ```sh
 python3 scripts/compare_whole_session_state.py \
   --reference "$SESSION_REFERENCE" --recipe "$SESSION_RECIPE" \

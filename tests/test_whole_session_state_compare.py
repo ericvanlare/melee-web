@@ -29,6 +29,7 @@ from whole_session_state_compare import (  # noqa: E402
     V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE, V10_FIRST_POSITIVE_RECORD_CAP,
     V10_FIRST_MATCH_CLOCK_GE60_SCOPE, V10_MATCH_CLOCK_RECORD_CAP,
     V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE, MATCH_CLOCK_EXPECTATION_SCHEMA,
+    V10_BROWSER_PRODUCER_SCHEMA, V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA,
     V10_PREFIX_RECORD_CAP, V10_RULES_BYTES, WHOLE_SESSION_SCOPE,
     _file_stat_identity, _first_match_required_cursor, _first_match_tick_join_complete,
     _first_match_timeline_index, _first_positive_match_join_complete,
@@ -1731,6 +1732,39 @@ class WholeSessionStateCompareTests(unittest.TestCase):
         with self.assertRaisesRegex(ComparisonError, "head"):
             _validate_browser_producer_source(producer, expected)
 
+    def test_historical_producer_keeps_shared_identity_contract_and_explicit_scope(self):
+        expected = {"producer": {
+            "branch": "codex/frozen", "head": "1" * 40,
+            "tree": "2" * 40, "base_main": "3" * 40,
+        }}
+        for schema in (V10_BROWSER_PRODUCER_SCHEMA,
+                       V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA):
+            producer = {"schema": schema,
+                        "source": {**expected["producer"], "clean": True}}
+            self.assertTrue(_validate_browser_producer_source(
+                producer, expected, scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)["clean"])
+            for field in ("branch", "head", "tree", "base_main", "clean"):
+                wrong = copy.deepcopy(producer)
+                wrong["source"][field] = False if field == "clean" else "different"
+                with self.subTest(schema=schema, field=field), self.assertRaises(ComparisonError):
+                    _validate_browser_producer_source(
+                        wrong, expected, scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)
+            for malformed in (None, [], {}):
+                with self.subTest(schema=schema, malformed=malformed), self.assertRaises(ComparisonError):
+                    _validate_browser_producer_source(
+                        {"schema": schema, "source": malformed}, expected,
+                        scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)
+        producer = {"schema": V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA,
+                    "source": {**expected["producer"], "clean": True}}
+        for scope in (None, WHOLE_SESSION_SCOPE, V10_FIRST_SETUP_TICK0_SCOPE,
+                      V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE, V10_FIRST_MATCH_CLOCK_GE60_SCOPE):
+            with self.subTest(scope=scope), self.assertRaisesRegex(ComparisonError, "post-clock60"):
+                _validate_browser_producer_source(producer, expected, scope=scope)
+        producer["schema"] = "unrecognized-producer-v1"
+        with self.assertRaisesRegex(ComparisonError, "schema is unsupported"):
+            _validate_browser_producer_source(
+                producer, expected, scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)
+
     def test_browser_capture_provenance_rejects_pre_stop_errors_without_rehashing_runtime(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -1884,6 +1918,60 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertEqual(identity["exported_cursor"], 5)
             self.assertEqual(identity["browser_records_validated"], 7)
             self.assertFalse(identity["runtime_data_recorded_identity"]["freshly_rehashed"])
+
+            # Read the historical format through the real provenance gates.
+            # Export shape has its own tests; this fixture uses tick-0 rows.
+            canonical_producer = copy.deepcopy(producer)
+            producer["schema"] = V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA
+            def write_producer(*, bind=True):
+                producer_path.write_text(json.dumps(producer), encoding="utf-8")
+                if bind:
+                    entry = {"path": str(producer_path),
+                             "bytes": producer_path.stat().st_size,
+                             "sha256": hashlib.sha256(producer_path.read_bytes()).hexdigest()}
+                    packet["browser"]["producer_manifest"] = entry
+                    wrapper["inputs"]["manifest"] = dict(entry)
+                capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
+                packet["browser"]["capture_report"].update(
+                    bytes=capture_path.stat().st_size,
+                    sha256=hashlib.sha256(capture_path.read_bytes()).hexdigest())
+            write_producer()
+            recipe.scope = V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE
+            with mock.patch("whole_session_state_compare._validate_v10_browser_export", return_value=7):
+                _, _, _, historical_identity = _validate_v10_browser_provenance(
+                    capture_path, producer_path, browser_report_path, trace_path,
+                    recipe_path, recipe_sha, recipe, packet, required_cursor=3)
+            self.assertEqual(historical_identity["producer_manifest_schema"],
+                             V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA)
+            self.assertEqual(historical_identity["producer_manifest_sha256"],
+                             hashlib.sha256(producer_path.read_bytes()).hexdigest())
+            historical_producer = copy.deepcopy(producer)
+            for field, value, message in (
+                    ("configuration", "Debug", "Release runtime"),
+                    ("target", "different", "Release runtime"),
+                    ("artifact_count", 2, "Release runtime"),
+                    ("default_off_gates", {}, "non-default gate"),
+                    ("directory", str(root / "different-build"), "artifact inventory"),
+                    ("artifacts", {"gameplay_menu_browser.data": {"bytes": 3, "sha256": "bad"}},
+                     "inventory is malformed")):
+                producer = copy.deepcopy(historical_producer)
+                producer["build"][field] = value
+                write_producer()
+                with self.subTest(historical_build=field), self.assertRaisesRegex(ComparisonError, message):
+                    _validate_v10_browser_provenance(
+                        capture_path, producer_path, browser_report_path, trace_path,
+                        recipe_path, recipe_sha, recipe, packet, required_cursor=3)
+            producer = copy.deepcopy(historical_producer)
+            write_producer()
+            producer["source"]["head"] = "9" * 40
+            write_producer(bind=False)
+            with self.assertRaisesRegex(ComparisonError, "manifest hash differs"):
+                _validate_v10_browser_provenance(
+                    capture_path, producer_path, browser_report_path, trace_path,
+                    recipe_path, recipe_sha, recipe, packet, required_cursor=3)
+            producer = canonical_producer
+            recipe.scope = V10_FIRST_SETUP_TICK0_SCOPE
+            write_producer()
 
             # Rebind the sidecar hash after every mutation so the transport gate,
             # rather than stale fixture identity, rejects the altered evidence.
@@ -2052,7 +2140,36 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertEqual(result["result"], "invalid")
             self.assertIn("runtime-data abort", result["error"])
             read_source.assert_not_called()
+            # Actual schema/source failures also precede opening the source.
+            for schema, changed_head, message in (
+                    (V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA, False, "post-clock60"),
+                    ("unknown-producer", False, "schema is unsupported"),
+                    (V10_BROWSER_PRODUCER_SCHEMA, True, "head differs")):
+                producer = copy.deepcopy(canonical_producer)
+                producer["schema"] = schema
+                if changed_head:
+                    producer["source"]["head"] = "9" * 40
+                wrapper = copy.deepcopy(good_wrapper)
+                write_producer()
+                with (mock.patch("whole_session_state_compare._load_expectations",
+                                 return_value=(packet, "f" * 64)),
+                      mock.patch("whole_session_state_compare._validate_v10_source_provenance",
+                                 return_value=({}, {}, {}, {})),
+                      mock.patch("whole_session_state_compare.iter_records") as read_source):
+                    result = compare_paths(
+                        reference_path, recipe_path, trace_path,
+                        scope=V10_FIRST_SETUP_TICK0_SCOPE, expectations=root / "packet.json",
+                        source_manifest=root / "source-manifest.json",
+                        source_report=root / "source-report.json", source_audit=root / "audit.json",
+                        browser_capture_report=capture_path, browser_producer_manifest=producer_path,
+                        browser_report=browser_report_path)
+                with self.subTest(unopened_schema=schema):
+                    self.assertEqual(result["result"], "invalid")
+                    self.assertIn(message, result["error"])
+                    read_source.assert_not_called()
+            producer = copy.deepcopy(canonical_producer)
             wrapper = copy.deepcopy(good_wrapper)
+            write_producer()
             write_capture()
             with self.assertRaisesRegex(ComparisonError, "requested/observed cursors"):
                 _validate_v10_browser_provenance(
