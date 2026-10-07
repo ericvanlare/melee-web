@@ -1,0 +1,307 @@
+{
+  "audit_execution": {
+    "execution_count": 1,
+    "execution_handoff_sha256": "95e46c7b217cd404ae73e99eba7bd6674e72b9b777e9b6e01fc1e2392f417653",
+    "exit_code": 0,
+    "launch_authorization_sha256": "2914103ded98c0434d3fd5693d93dad9ca25ae7cae8929706676b00971714bbd",
+    "launch_packet_sha256": "4441269eb101c5e59114e959db492bb588344b1fee428f4c684366dcfcf07fa7",
+    "launch_receipt_sha256": "aa58f5df3db01b01dca0153b1462f0917d2ed9cc9405148196f9e6efb8573c71",
+    "preparation_review_sha256": "0887c6e63ac507f05bb37d7485b5dcb7d7655553b3c0d15aa7045b2fbe5386fd",
+    "private_run_id": "b4-source-first-clock60-proposal-20261007-20261007-030328-7133ec91",
+    "producer": {
+      "authored_clock_source_sha256": "3012de58a3c6f3d2d4b8e60ca58211127a24413feadf5164e2d75c7d8c98df16",
+      "commit": "9095073629a1cc4bdd1a46d7b71902e933e87db7",
+      "comparator_sha256": "cde54a5513a6cb07dc43b33c026143920116c27e7be260d7a7038398ef340502",
+      "other_source_hashes": {
+        "src/gameplay_hud.c": "6cfcd0711b10ce7050334e980a5d0942c1aa35f2623661453b12d0fbd1651ffa",
+        "src/gameplay_match_session.cpp": "1d4850c4ae935fc291bbbff3c400fd0e74b1e93c66a2f3df9119d872f14e5cc5",
+        "src/gameplay_replay_session.cpp": "2b30dcfbc706661c823982cc796f30ab51d691942f66a61bb88f9d934f3b997f"
+      },
+      "reader_sha256": "51df479caf303791c981c020161557671dbc901d02e192964af10be7baff063f",
+      "script_sha256": "5eeea0255c349fe4b3b0fc4e2566df26cbc089d6e4570c16ac470caea8cdd930",
+      "tree": "93e1e38aff1f00d61a82800380e17331590cb484"
+    },
+    "report_bytes": 24785,
+    "report_sha256": "c4f2bd73157f36c80c7ad5b11275c205d484608813241d3af94b9462bf3187b1",
+    "root_result_review_sha256": "aeb4d0f126587941869c64071c99caab1fd5305385574f9c5ffb088760ee5e39",
+    "root_verified_execution_artifacts": 9,
+    "schema": "melee-web-b4-first-match-clock-ge60-source-audit-v2",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_sha256": "688b352eb2e4a93956d2fecc277fc456b6315118ad96bc541e16fbb0af56fb9b"
+  },
+  "browser_context_only": {
+    "clock60_state_compared_with_browser": false,
+    "export_sufficient_for_clock60_target": false,
+    "previous_browser_report_sha256": "d3e734025b62dfd35fb9da9a785c503ad4fe3345d40c0ad0c6800c9d951bf393",
+    "previous_capture_base_main": "6c0ccecd6c88d50670668a032a6882463639e809",
+    "previous_capture_producer_commit": "940411fa13a17de796217b1dba5b4c338dd02b8f",
+    "previous_capture_producer_tree": "1a952c3537b98ae6777ddd6b166c24525d3994b9",
+    "previous_capture_report_sha256": "85a4fd196f1d6efb25fdb43fd287684c9d91d68207b0b94792da77aa722ebcf0",
+    "previous_comparison_report_sha256": "0ec654b52392f40fa5ba89e7cbbf04e070781e6afab40f400aaf824b104f6ff9",
+    "previous_comparison_target_match_frame": 1,
+    "previous_exported_cursor": 1314,
+    "previous_observed_cursor": 1311,
+    "previous_port_trace_sha256": "50ea4d53af90aaeb390f0096352782c38fafd0c069556e8ce6f2b725b5f776c2",
+    "previous_producer_manifest_sha256": "1d8c790ad4577648753ebed1ce39917c2292987364aef2c14a48f6a379ef8108",
+    "previous_requested_cursor": 1309,
+    "runtime_data_freshly_rehashed": false,
+    "validated_as_provenance_only": true
+  },
+  "clock60_observation": {
+    "checks": {
+      "existing_browser_sidecar_provenance": "pass",
+      "rejoined_accepted_first_positive_boundary": "pass",
+      "source_css_setup_binding": "pass",
+      "source_pad_tick_entity_join": "pass",
+      "source_provenance": "pass",
+      "source_recipe_input_order": "pass"
+    },
+    "css_sss_input_ordered_frames": 1184,
+    "match_ticks_observed": 184,
+    "observed_rng": 485756123,
+    "prefix": {
+      "bytes": 12780628,
+      "fresh_hash_scope": "exact raw MWRO bytes consumed through joined clock-60 source tick",
+      "fresh_sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77",
+      "last_sequence": 5030,
+      "records": 5031
+    },
+    "primary_entities": [
+      {
+        "entity_index": 0,
+        "fighter_gobj_linked": true,
+        "fighter_player_id": 0,
+        "generation": 0,
+        "match_index": 0,
+        "slot": 0
+      },
+      {
+        "entity_index": 0,
+        "fighter_gobj_linked": true,
+        "fighter_player_id": 1,
+        "generation": 0,
+        "match_index": 0,
+        "slot": 1
+      },
+      {
+        "entity_index": 0,
+        "fighter_gobj_linked": true,
+        "fighter_player_id": 2,
+        "generation": 0,
+        "match_index": 0,
+        "slot": 2
+      },
+      {
+        "entity_index": 0,
+        "fighter_gobj_linked": true,
+        "fighter_player_id": 3,
+        "generation": 0,
+        "match_index": 0,
+        "slot": 3
+      }
+    ],
+    "scene_spans": [
+      {
+        "first_frame": 0,
+        "last_frame": 936,
+        "scene": 1
+      },
+      {
+        "first_frame": 937,
+        "last_frame": 1183,
+        "scene": 2
+      },
+      {
+        "first_frame": 1184,
+        "last_frame": 1367,
+        "scene": 3
+      }
+    ],
+    "state_fields_observed": [
+      "fighter_entities",
+      "fighters",
+      "match_frame",
+      "pad_state_hex",
+      "rng",
+      "scene_frame"
+    ],
+    "tuple": {
+      "cursor_after_frame": 1368,
+      "match_frame": 60,
+      "match_index": 0,
+      "pad_consume_source_sequence": 5029,
+      "source_tick": 183,
+      "source_tick_seq": 5030,
+      "timeline_frame_index": 1367
+    }
+  },
+  "date": "2026-10-07",
+  "failed_v2_launch": {
+    "actual_path_component": "202607",
+    "error": "expectations browser_producer_manifest path does not bind to the selected input",
+    "exit_code": 2,
+    "expected_path_component": "20261007",
+    "failure_report_sha256": "1dd2ea586f5e222c27d1fd0df890f11f5abe863f14675baeb050e3122db64b21",
+    "mismatched_sidecar_path_tokens": 4,
+    "mwro_stat_or_stream_open_reached": false,
+    "note": "Corrected v3 received separate root authorization and ran once.",
+    "receipt_sha256": "33d0cb413707c75d0f3702172a776e33edcd6a62ff5bc8c16a2e8bf75bfa117f",
+    "v2_was_retried": false
+  },
+  "follow_on_proposal": {
+    "capture_requirements": {
+      "base": "Clean current main c3e9112ce2112a12920531b56637d886b9ae5e9c (or root-reviewed candidate over it). Do not reuse older browser producer as clock60 evidence.",
+      "browser": "Ordinary supported route with headless installed Chrome; preserve rendering/WebAudio processing while host output is muted; default5s observation timeout; separate requested/observed/exported cursor metrics and ensure exported data contains target index1367.",
+      "build": "Official Release runtime from a frozen clean candidate based on current main, including current shared fixes; use the agent_workspace owner wrapper/default compiler jobs on verified external NVMe. Hash source/tool/runtime/32-artifact manifests and reuse no older capture producer as clock60 evidence.",
+      "ownership": "Fresh external temp/output roots; existing 300s owner/45s cleanup and external32-file pre/post inventory; independent CDP/OS attribution and strict cleanup. Root reviews complete packet before launch.",
+      "scenario": "Same exact GALE01r2 source/disc and v10 recipe/setup/input/state; ordinary supported route; request recipe cursor1368 with no resume and stop on first error. The trace must contain the completed target row at timeline index1367; keep requested, observed and exported cursors as separate metrics and do not require them to be equal.",
+      "stopping": "Exactly one capture then one comparison after packet reviews; first invalid/divergence/unsupported/cap is retained; no retries, original recapture or full session."
+    },
+    "cli_invocation_shape": [
+      "scripts/compare_whole_session_state.py --scope v10-first-match-clock-ge60",
+      "--positive-boundary-audit <accepted first-positive source audit>",
+      "--clock60-boundary-audit <v3 clock60 source audit>",
+      "--expectations <frozen clock60 expectations packet>",
+      "--browser-capture-report <fresh wrapper report> --browser-producer-manifest <fresh producer manifest>",
+      "--browser-report <fresh browser report> --port-trace <fresh port trace>",
+      "--reference <retained MWRO> --recipe <bound MWRC> --source-manifest <bound manifest> --source-report <bound report> --source-audit <identity audit> --out <fresh report>"
+    ],
+    "comparison_claim": "Declared fields only through clock60; CSS/SSS scalar fields remain unclaimed and nonmatch_fields_compared=[]; later gameplay/whole-session remains unaccepted.",
+    "existing_browser_export_sufficient": false,
+    "expectations_packet": {
+      "required_bound_sidecars": [
+        "first_positive_boundary_audit",
+        "clock60_boundary_audit",
+        "source_manifest",
+        "source_report",
+        "first_setup_identity_audit",
+        "recipe",
+        "fresh_browser_capture_report",
+        "fresh_browser_producer_manifest",
+        "fresh_browser_report",
+        "fresh_port_trace"
+      ],
+      "required_source_targets": {
+        "accepted_first_positive": {
+          "cursor_after_frame": 1309,
+          "match_frame": 1,
+          "match_index": 0,
+          "pad_consume_source_sequence": 4734,
+          "prefix_bytes": 10389712,
+          "prefix_records": 4736,
+          "prefix_sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a",
+          "source_tick": 124,
+          "source_tick_seq": 4735,
+          "timeline_frame_index": 1308
+        },
+        "terminal_clock60": {
+          "cursor_after_frame": 1368,
+          "match_frame": 60,
+          "match_index": 0,
+          "pad_consume_source_sequence": 5029,
+          "prefix_bytes": 12780628,
+          "prefix_records": 5031,
+          "prefix_sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77",
+          "source_tick": 183,
+          "source_tick_seq": 5030,
+          "timeline_frame_index": 1367
+        }
+      },
+      "schema": "melee-web-v10-first-match-clock-ge60-expectations",
+      "source_full_hash": "Previously recorded provenance only; no full MWRO rehash."
+    },
+    "focused_tests": [
+      "Synthetic collector+browser comparator path through setup, ticks0..183, prior clock1 rejoin and exact clock60 boundary.",
+      "First-divergence controls for RNG, PAD, declared Fighter fields/float bits and entity identity/backlink/generation.",
+      "Reject early positive, clock regression/jump, wrong terminal tuple/PAD sequence, duplicate/reordered setup or source ticks, missing/reordered PAD join, secondary/detached entities and incomplete browser prefix.",
+      "Bounded reader cap/no-read-past-target; malformed v3 audit/provenance; preserve v8/v9 defaults and existing first-positive tests; reject v10 default whole-session.",
+      "CLI scope and target-audit requirements with unchanged default whole-session exit behavior.",
+      "At both frozen checkpoints, verify fresh source prefix bytes/records/SHA, exact PAD/tick/source sequence and timeline cursor; reject mismatch before reading past first-positive and terminal boundaries respectively."
+    ],
+    "goal": "Bounded source/browser comparison through joined match-0 tick183, match_frame60, timeline1367, cursor1368.",
+    "issue_number": 202,
+    "keep_issue_open": true,
+    "scope": "v10-first-match-clock-ge60",
+    "smallest_interface": [
+      "Add one explicit scope constant `v10-first-match-clock-ge60` to `tools/whole_session_state_compare.py`; register it with the existing v10 prefix-scope/Recipe/field-selection path while leaving the whole-session default and first-positive scope unchanged.",
+      "Add `--clock60-boundary-audit` to `scripts/compare_whole_session_state.py` and `compare_paths(..., clock60_boundary_audit_path=...)`; new-scope expectations bind both the already accepted `--positive-boundary-audit` and the clock60 v3 source audit plus fresh browser capture sidecars.",
+      "Extend the existing Comparator boundary handling with an explicit first-positive checkpoint and terminal clock60 tuple. It must rejoin the first-positive tuple and fresh consumed prefix before continuing, then compare contiguous match-0 ticks through the exact terminal tuple; retain existing declared field and entity validators.",
+      "Reuse Recipe, SourceCollector, BrowserReader, Comparator, v10 provenance validators, PAD/tick join, entity/lifetime checks and the bounded reader; do not create another comparator or relax float/RNG/PAD/whole-session checks.",
+      "Stop after source tick183 is joined and compared at timeline index1367. Return the existing bounded semantics: boundary_result equivalent/diverged, overall incomplete, complete=false, whole_session_equivalent=false, CLI exit1 for an equivalent prefix."
+    ]
+  },
+  "issue": {
+    "number": 202,
+    "url": "https://github.com/ericvanlare/melee-web/issues/202"
+  },
+  "limits": [
+    "Source-only evidence through first clock>=60; no browser state comparison at that boundary.",
+    "CSS/SSS rows only validate source-consumed input order.",
+    "No later match, whole-roster, pixels, PCM, timing, performance or competitive acceptance.",
+    "The full MWRO hash remains previously recorded; only the consumed prefix was freshly hashed."
+  ],
+  "reused_prior_boundary": {
+    "fresh_prefix": {
+      "bytes": 10389712,
+      "last_sequence": 4735,
+      "records": 4736,
+      "scope": "through prior first-positive match frame only",
+      "sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a"
+    },
+    "prior_source_audit_sha256": "9e74c7018001369295e569ef071427633db53e2a0e6dc1db182c8aa3604d096d",
+    "rejoined_before_continuing": true,
+    "tuple": {
+      "cursor_after_frame": 1309,
+      "match_frame": 1,
+      "match_index": 0,
+      "pad_consume_source_sequence": 4734,
+      "source_tick": 124,
+      "source_tick_seq": 4735,
+      "timeline_frame_index": 1308
+    }
+  },
+  "schema": "melee-web-b4-v10-first-match-clock60-source-only-v1",
+  "scope": {
+    "audit_completed": true,
+    "browser_state_after_match_frame_1_compared": false,
+    "evidence_label": "Source-only observation; no clock-60 Retail comparison.",
+    "result": "source-only bounded observation through first match-0 match_frame >= 60",
+    "status": "first_match_clock_ge60_found",
+    "whole_session_equivalent": false
+  },
+  "source_identity": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "dol_sha1": "08e0bf20134dfcb2606996710047b2d6bb1a45",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "first_setup_identity_audit_sha256": "742a9a6b7317651c654620c1f69c87cff4177a8c9e7eea8c34d596e817af43e8",
+    "recipe": {
+      "bytes": 2241622,
+      "frame_count": 50394,
+      "seed": 3336171383,
+      "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+      "version": 10
+    },
+    "recorded_full_mwro": {
+      "bytes": 2137257881,
+      "fresh_full_sha256_computed": false,
+      "recorded_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "stat_after": {
+        "bytes": 2137257881,
+        "device": 16777242,
+        "inode": 6599739,
+        "mtime_ns": 1791051579441504716
+      },
+      "stat_before": {
+        "bytes": 2137257881,
+        "device": 16777242,
+        "inode": 6599739,
+        "mtime_ns": 1791051579441504716
+      },
+      "stat_stable_during_audit": true
+    },
+    "revision": "GALE01 revision 2",
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "source_capture_report_sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913",
+    "source_manifest_sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7"
+  }
+}
