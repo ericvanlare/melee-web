@@ -212,6 +212,39 @@
       "first_rejection": "Both peers rejected a new sample at source cursor 1 because its poll_serial repeated the previous sample (alpha port 0: 204; beta port 1: 203)."
     }
   ],
+  "integration_validation": {
+    "validated_code_head_commit": "0bb60f8cfeb4a996a9f2f949decddeb11ef1d79f",
+    "current_base_main_commit": "74451fcc61d77b7441b4e447badc5fc7c7ff2052",
+    "range_diff": "All nine original PR commits are patch-equivalent after rebasing onto current main.",
+    "focused_clock_native": {
+      "commands": [
+        "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_net_lockstep_native.py -v",
+        "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_animation_clock.py -v"
+      ],
+      "tests_total": 3,
+      "failed": 0,
+      "log_sha256": [
+        "a94741d7d097d38b5e67d0bdcb986bc5bfd95cdd8b18cd86fb5e429e30753257",
+        "235aeab7f1f26375070a9b281d48eb4f17fcc35bfb4056409dc039df54fce55e"
+      ]
+    },
+    "full_python_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "tests_total_including_skips": 2012,
+      "skipped": 148,
+      "failed": 0,
+      "log_sha256": "abb836d7136c49084b312f1a7f58cc85de69542fa0dcaec7ed469373998a9306"
+    },
+    "runtime_source_equivalence": {
+      "capture_and_release_build_producer_commit": "e1bbfa93e9babe2a5327f07adcef226bbf6096f8",
+      "producer_tree": "40f5afaf21427114834435ad70b18208aba1b2cf",
+      "recorded_runtime_source_hashes_match": true,
+      "release_build_reused": true,
+      "new_runtime_build_performed": false,
+      "current_main_merge_runtime_sources_changed": false,
+      "historical_capture_identity_changed": false
+    }
+  },
   "reducer_review": {
     "reviewed_pre_rebase_commit": "4321cde5453a2a8c9c4435be85f3a87a79a5e83b",
     "patch_equivalent_capture_producer": "e1bbfa93e9babe2a5327f07adcef226bbf6096f8",
