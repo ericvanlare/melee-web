@@ -51,6 +51,65 @@ void source_observer_preflight()
     require(melee_web_stadium_buffer_layout_read(&layout),
             "Actual Stadium source translation unit did not report private layout facts");
     pure_gate_checks(layout);
+    const auto constructor_facts = actual_pre_call_facts(layout);
+    require(original_constructor_pre_call_supported(constructor_facts),
+            "Actual original-constructor pre-call facts did not pass the pure gate");
+    auto rejected_facts = constructor_facts;
+    rejected_facts.memory_status = MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Inactive source-memory owner passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.source_memory_healthy = false;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Unhealthy source-memory owner passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.os_current_heap += 1;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Mismatched OS heap passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.hsd_heap += 1;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Mismatched HSD heap passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    ++rejected_facts.world_generation;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Mismatched source-world generation passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.preload_status = MELEE_WEB_SOURCE_PRELOAD_PRESENT;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Present 0x7d3 preload match passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.execution_pointer_bytes = 8;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Unsupported host64 ABI passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.compiler_flag_access.matches_reviewed_actual_tu = false;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Unproven compiler flag access passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.compiler_flag_access.byte_width = 2;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Incorrect compiler flag access width passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.p_link_max = 0x11;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Invalid authored p_link bound passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.gx_link_max = UINT8_MAX;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "GX max-link sentinel overflow passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.gobj_tables_ready = false;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Unavailable GObj tables passed the pure constructor gate");
+    rejected_facts = constructor_facts;
+    rejected_facts.immediate_removal_context = false;
+    require(!original_constructor_pre_call_supported(rejected_facts),
+            "Deferred-removal/callback context passed the pure constructor gate");
+    auto exhausted_pair = constructor_facts.memory_context;
+    exhausted_pair.allocation_generation_watermark = UINT64_MAX - 4;
+    require(!pair_generation_headroom_supported(exhausted_pair),
+            "Insufficient source-generation headroom passed the two-lifetime gate");
     std::cout << "Stadium actual-TU layout: ptr=" << layout.pointer_bytes
               << " HSD_ImageDesc=" << layout.image_desc_bytes
               << " ImageDescWrapper=" << layout.wrapper_bytes
@@ -61,7 +120,7 @@ void source_observer_preflight()
               << " x1C@" << layout.x1c_offset
               << " allocation=" << layout.constructor_allocation_bytes
               << " layout-prefix-bound=" << layout.layout_prefix_bound_bytes
-              << "; ABI layout gate passed, constructor not called\n";
+              << "; actual-layout and pure pre-call controls passed\n";
 }
 }
 int main(){try{
@@ -69,10 +128,11 @@ int main(){try{
     require(melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)),error);
     require(melee_web_native_world_enable(error,sizeof(error)),error);
     source_observer_preflight();
+    melee_web::test::stadium_buffer::run_original_constructor_lifetimes([] {});
     synthetic_checks();
     live_source_consumer_checks();
     require(melee_web_gameplay_shutdown(error,sizeof(error)),error);
     std::cout<<"Screen roots synthetic canonical IMAGE, writable SIS, catalog negatives and two lifetimes passed\n";
     std::cout<<"Live Stadium IMAGE source hit/miss/remove passed twice\n";
-    std::cout<<"Pure source-memory, preload predicate and Stadium ABI gate controls passed; no 2D78 constructor call\n";
+    std::cout<<"Original Stadium auxiliary IMAGE constructor/remove passed twice without callback dispatch or stage entry\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

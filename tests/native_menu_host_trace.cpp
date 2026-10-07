@@ -39,6 +39,7 @@
 #include "stadium_c1_item_owner_negative_cases.hpp"
 #include "stadium_c1_item_owner_preflight.hpp"
 #include "stadium_live_image_consumer.hpp"
+#include "stadium_buffer_consumer.hpp"
 #include "stadium_c0_native_map_contract.hpp"
 #endif
 #include <melee/ft/forward.h>
@@ -1896,6 +1897,9 @@ void run_stadium_screen_roots_preflight(
         check_stadium_preflight_stage_empty();
     };
     invariants();
+    melee_web::test::stadium_buffer::run_original_constructor_lifetimes(
+        invariants);
+    invariants();
     screen::synthetic_checks(invariants);
     invariants();
     for (unsigned lifetime=0; lifetime<2; ++lifetime) {
@@ -1933,6 +1937,7 @@ void run_stadium_screen_roots_preflight(
     }
     std::cout << "C1 screen-root preflight preserved canonical IMAGE, writable SIS and two owner/catalog lifetimes; no stage entry or ticks\n";
     std::cout << "C1 live Stadium IMAGE source hit/miss/remove passed twice; no stage entry or ticks\n";
+    std::cout << "C1 original Stadium auxiliary IMAGE constructor/remove passed twice without callback dispatch or stage entry\n";
 }
 
 void run_stadium_c1_context_preflight(
