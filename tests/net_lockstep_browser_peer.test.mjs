@@ -239,11 +239,12 @@ test('settled snapshot and close join a receive blocked inside native confirmati
 });
 
 const moduleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs'];
+const webrtcModuleNames = [...moduleNames, 'net_lockstep_webrtc.mjs'];
 const moduleBody = Buffer.from('module bytes');
 const moduleHash = createHash('sha256').update(moduleBody).digest('hex');
-function moduleObserver() {
+function moduleObserver(names = moduleNames) {
   return createPeerModuleResponseObserver({url: 'http://127.0.0.1:8787/runtime.html',
-    peerModuleHashes: Object.fromEntries(moduleNames.map(name => [name, moduleHash])),
+    peerModuleHashes: Object.fromEntries(names.map(name => [name, moduleHash])),
     runtimeArtifactNames: ['runtime-development.mjs']});
 }
 function response(name, {body = moduleBody, coop = 'same-origin', status = 200} = {}) {
@@ -259,6 +260,17 @@ test('peer module observer records exact loaded bytes while admitting catalog ru
   const rows = await observer.freeze();
   assert.equal(rows.length, 3);
   assert.ok(rows.every(row => row.sha256 === moduleHash && row.bytes === moduleBody.length));
+});
+
+test('peer module observer binds the optional local WebRTC endpoint module', async () => {
+  const observer = moduleObserver(webrtcModuleNames);
+  for (const name of webrtcModuleNames) observer.observe(response(name));
+  const rows = await observer.freeze();
+  assert.deepEqual(rows.map(row => new URL(row.url).pathname.split('/').at(-1)).sort(),
+    [...webrtcModuleNames].sort());
+  assert.throws(() => createPeerModuleResponseObserver({url: 'http://127.0.0.1:8787/runtime.html',
+    peerModuleHashes: {'net_lockstep_webrtc.mjs': moduleHash}, runtimeArtifactNames: []}),
+  /exact relay or WebRTC module SHA-256 inventory/);
 });
 
 test('peer module observer rejects unexpected paths, changed bytes, headers and duplicate/missing responses', async () => {
