@@ -16,6 +16,7 @@ class NetLockstepContractTests(unittest.TestCase):
             str(ROOT / 'tests/net_lockstep_observers.test.mjs'),
             str(ROOT / 'tests/net_source_accounting.test.mjs'),
             str(ROOT / 'tests/net_lockstep_protocol.test.mjs'),
+            str(ROOT / 'tests/net_room_relay_worker.test.mjs'),
             str(ROOT / 'tests/net_determinism_browser.test.mjs'),
         ], cwd=ROOT, capture_output=True, text=True, timeout=60)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

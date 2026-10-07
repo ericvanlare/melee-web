@@ -1,0 +1,19 @@
+{
+  "name": "melee-web-room-relay",
+  "main": "./worker.mjs",
+  "compatibility_date": "2026-09-18",
+  "durable_objects": {
+    "bindings": [
+      {"name": "ROOMS", "class_name": "RoomRelay"}
+    ]
+  },
+  "exports": {
+    "RoomRelay": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+  "vars": {
+    "RELAY_ALLOWED_ORIGINS": "https://webmelee.gg,https://www.webmelee.gg,http://localhost:8787,http://127.0.0.1:8787"
+  }
+}
