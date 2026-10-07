@@ -16,6 +16,12 @@ import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.m
 import {cssReadinessEvidence, cssSssOutcome, hasCssMenuReadiness} from './stadium_c1a_css_sss_reducer.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const {values} = parseArgs({options: Object.fromEntries(
+  ['build', 'disc', 'disc-sha256', 'out', 'playwright', 'preflight', 'source-revision']
+    .map(name => [name, {type: 'string'}]).concat([
+      ['css-sss-reducer', {type: 'boolean', default: false}],
+    ])), strict: true});
+const cssSssReducer = values['css-sss-reducer'];
 const LIMITS = Object.freeze({
   serverStartMs: 10000,
   browserLaunchMs: 30000,
@@ -26,16 +32,10 @@ const LIMITS = Object.freeze({
   manifestHandoffMs: 20000,
   unloadMs: 15000,
   cleanupMs: 5000,
-  cleanupTotalMs: 15000,
-  captureWorkMs: 150000,
+  cleanupTotalMs: cssSssReducer ? 5000 : 15000,
+  captureWorkMs: cssSssReducer ? 95000 : 150000,
   stageDriveFrames: 180,
 });
-
-const {values} = parseArgs({options: Object.fromEntries(
-  ['build', 'disc', 'disc-sha256', 'out', 'playwright', 'preflight', 'source-revision']
-    .map(name => [name, {type: 'string'}]).concat([
-      ['css-sss-reducer', {type: 'boolean', default: false}],
-    ])), strict: true});
 for (const name of ['build', 'disc', 'disc-sha256', 'out', 'playwright', 'preflight', 'source-revision'])
   if (!values[name]) throw Error(`Missing --${name}`);
 
