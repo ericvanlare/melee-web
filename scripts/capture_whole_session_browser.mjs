@@ -795,31 +795,42 @@ try {
       report.trace_finalization_skipped = 'Renderer observation timed out; terminal cursor unknown and no pause, trace, screenshot, or capture export was attempted.';
       process.exitCode = 1;
     } else if (page && !page.isClosed() && report.pause_trace_installation) {
+      let sourceStopStage = 'source pause and ownership acquisition';
       try {
         const stopped = await stopSourceBeforeDiagnosticExport({
           readStatus: () => pauseTraceStatus({includeLatestCallback: stoppedScenePair}),
           requirePauseAcknowledgement: stoppedScenePair,
+          cleanupOnFailure: stoppedScenePair,
           stopPlayback: async () => {
-            const pause = await observePageOperation('native source pause', page.evaluate(() => {
+            const pause = await observePageOperation('native source pause', page.evaluate(({holdEvidence}) => {
               const module = globalThis.Module;
               if (typeof module?._melee_web_native_menu_pause !== 'function' ||
                   typeof module?._melee_web_native_menu_running !== 'function')
                 throw Error('Native pause and running exports are unavailable');
-              const before = module._melee_web_native_menu_running();
-              const capture = window.__meleePauseTrace;
-              const pauseEventsBefore = capture?.state.manual_pause_events;
-              // Native emits reason 5 only after rejecting busy preparation,
-              // pending transitions, faults and missing owners. The exact
-              // synchronous call must acknowledge; running=0 alone is unsafe.
-              module._melee_web_native_menu_pause(1);
-              const after = module._melee_web_native_menu_running();
-              const pauseEventsAfter = capture?.state.manual_pause_events;
-              return {before, after, pause_events_before: pauseEventsBefore,
-                pause_events_after: pauseEventsAfter,
-                acknowledged: Number.isSafeInteger(pauseEventsBefore) &&
-                  pauseEventsAfter === pauseEventsBefore + 1 && after === 0 &&
-                  capture?.state.preparation.active === false};
-            }));
+              const pauseAndAcknowledge = () => {
+                const before = module._melee_web_native_menu_running();
+                const capture = window.__meleePauseTrace;
+                const pauseEventsBefore = capture?.state.manual_pause_events;
+                // Native emits reason 5 only after rejecting busy preparation,
+                // pending transitions, faults and missing owners. The exact
+                // synchronous call must acknowledge; running=0 alone is unsafe.
+                module._melee_web_native_menu_pause(1);
+                const after = module._melee_web_native_menu_running();
+                const pauseEventsAfter = capture?.state.manual_pause_events;
+                return {before, after, pause_events_before: pauseEventsBefore,
+                  pause_events_after: pauseEventsAfter,
+                  acknowledged: Number.isSafeInteger(pauseEventsBefore) &&
+                    pauseEventsAfter === pauseEventsBefore + 1 && after === 0 &&
+                    capture?.state.preparation.active === false};
+              };
+              if (!holdEvidence) return pauseAndAcknowledge();
+              if (typeof window.menuReplayAcquireStoppedEvidence !== 'function')
+                throw Error('Development stopped-evidence ownership API is unavailable');
+              const lease = window.menuReplayAcquireStoppedEvidence(
+                module._melee_web_native_menu_replay_cursor(), pauseAndAcknowledge);
+              return {...lease.pause, lease};
+            }, {holdEvidence: stoppedScenePair}));
+            if (pause.lease) report.stopped_evidence_lease = pause.lease;
             report.source_pause = pause;
             if (pause.after !== 0) throw Error('Native pause did not stop source playback');
             return pause;
@@ -827,6 +838,7 @@ try {
           captureImmediate: stoppedScenePair &&
             report.natural_pause_terminal?.outcome === 'paired_screenshot_target'
             ? async status => {
+              sourceStopStage = 'immediate stopped-scene screenshot';
               report.stopped_scene_pair ||= {images: [], source_counters: {}, render_environment: null,
                 visible_gameplay_observed: 'not_assessed', capture_order: []};
               const boundary = validateStoppedScenePairBoundary(report.natural_pause_terminal, status);
@@ -848,6 +860,7 @@ try {
               return {valid: true, boundary, image: immediate};
             } : undefined,
           finalizeTrace: async () => {
+            sourceStopStage = 'trace finalization';
             if (!traceStarted || !diagnosticCdp || !naturalPauseTraceSettings)
               return {paths: [], complete: false, reusable: false, error: 'Trace was not started'};
             const value = await boundedCaptureOperation(
@@ -861,6 +874,7 @@ try {
             return value;
           },
           readEvidence: async () => {
+            sourceStopStage = 'stopped scene and GPU status';
             const pairEligible = stoppedScenePair &&
               report.natural_pause_terminal?.outcome === 'paired_screenshot_target' &&
               report.stopped_scene_pair?.stop_boundary?.valid === true &&
@@ -888,6 +902,7 @@ try {
               }));
               if (stoppedScenePair) {
                 report.stopped_scene_pair.capture_order.push('gpu_status_queried');
+                sourceStopStage = 'delayed stopped-scene screenshot';
                 const delayed = await captureStoppedSceneImage('stopped-scene-after-export',
                   report.stopped_scene_pair.stop_boundary.stopped_cursor);
                 report.stopped_scene_pair.images.push(delayed.image);
@@ -918,6 +933,7 @@ try {
                 staging: record.staging ?? null}));
             report.capture_status_after_stop = await pauseTraceStatus({readNative: false,
               includeLatestCallback: stoppedScenePair});
+            sourceStopStage = 'callback capture export';
             report.capture = await observePageOperation('callback capture export',
               readPauseTraceCapture(page, report.natural_pause_terminal?.outcome ?? 'capture_failure'));
             if (stoppedScenePair && pairEligible) {
@@ -949,15 +965,25 @@ try {
               capture_rows: report.capture.rows, capture_errors: report.capture.errors,
               capture_dropped: report.capture.dropped};
           },
-          cleanupAfterEvidence: async () => {
-            const unloaded = await observePageOperation('native session unload', page.evaluate(() => {
+          cleanupAfterEvidence: async failure => {
+            if (!failure) sourceStopStage = 'replay owner finish';
+            if (stoppedScenePair && !report.stopped_evidence_lease)
+              return {skipped: 'No stopped evidence lease acquired; owned browser cleanup follows'};
+            const reason = failure ? `Stopped evidence export failed: ${failure.message || failure}` :
+              'Diagnostic stopped-prefix evidence complete';
+            const unloaded = await observePageOperation('native session unload', page.evaluate(async ({leaseToken, reason}) => {
               const module = globalThis.Module;
               if (typeof module?._melee_web_native_menu_unload !== 'function')
                 throw Error('Native unload export is unavailable after evidence export');
-              const result = module._melee_web_native_menu_unload();
-              return {result, phase: module._melee_web_native_menu_phase?.() ?? null,
+              let result, lease = null;
+              if (leaseToken !== null) {
+                lease = await window.menuReplayFinishStoppedEvidence(leaseToken, reason);
+                result = module._melee_web_native_menu_phase?.() === 0 ? 1 : 0;
+              } else result = module._melee_web_native_menu_unload();
+              return {result, lease, phase: module._melee_web_native_menu_phase?.() ?? null,
                 source_running: module._melee_web_native_menu_running?.() ?? null};
-            }));
+            }, {leaseToken: report.stopped_evidence_lease?.token ?? null, reason}));
+            if (unloaded.lease) report.stopped_evidence_lease = unloaded.lease;
             if (unloaded.result !== 1 || unloaded.phase !== 0 || unloaded.source_running !== 0)
               throw Error(`Native unload did not verify cleanly: ${JSON.stringify(unloaded)}`);
             if (diagnosticCdp) {
@@ -980,14 +1006,18 @@ try {
         report.final_snapshot = await snapshot('finally-after-source-stop');
       } catch (error) {
         report.source_stop_error = String(error?.stack || error);
-        if (stoppedScenePair) report.trace_finalization_skipped ||=
-          'Pair source stop was not acknowledged or stable; large exports were skipped and owned browser cleanup follows.';
+        if (error?.cleanup_error) report.source_stop_cleanup_error = error.cleanup_error;
+        report.source_stop_failed_stage = sourceStopStage;
+        if (stoppedScenePair && !report.trace?.complete) report.trace_finalization_skipped ||=
+          `Trace finalization did not complete; stopped evidence failed at ${sourceStopStage}. Owned browser cleanup follows.`;
         process.exitCode = 1;
       }
       if (pageObservationTimedOut) {
         report.natural_pause_terminal ||= {outcome: 'observation_timeout', source_cursor: null,
           source_running: null, phase: currentPhase};
-        report.trace_finalization_skipped ||= 'Renderer observation timed out; remaining diagnostic exports were skipped.';
+        report.diagnostic_exports_skipped = 'Renderer observation timed out; remaining diagnostic exports were skipped.';
+        if (!report.trace?.complete) report.trace_finalization_skipped ||=
+          'Renderer observation timed out before trace finalization completed.';
         process.exitCode = 1;
       }
     } else if (traceStarted) {

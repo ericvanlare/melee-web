@@ -298,23 +298,35 @@ export function summarizeStoppedSourceInterval(capture, firstRow, endRow) {
 
 /** Stop source playback before finalizing/streaming or reading diagnostic evidence. */
 export async function stopSourceBeforeDiagnosticExport({readStatus, stopPlayback,
-  captureImmediate, finalizeTrace, readEvidence, cleanupAfterEvidence, requirePauseAcknowledgement = false}) {
-  const before = await readStatus();
-  // running=0 is also temporary construction/arming. Never export a pair
-  // until the exact pause command proves the native pending/busy guard passed.
-  let pause = null;
-  if (requirePauseAcknowledgement || before?.source_running !== 0) pause = await stopPlayback();
-  if (requirePauseAcknowledgement && pause?.acknowledged !== true)
-    throw Error('Refusing large diagnostic exports without a fresh native pause acknowledgement');
-  const stopped = await readStatus();
-  if (stopped?.source_running !== 0 ||
-      (requirePauseAcknowledgement && stopped?.preparation?.active === true))
-    throw Error('Refusing large diagnostic exports while native source playback is active');
-  const immediate = captureImmediate ? await captureImmediate(stopped) : null;
-  const trace = await finalizeTrace();
-  const evidence = await readEvidence();
-  const cleanup = cleanupAfterEvidence ? await cleanupAfterEvidence() : null;
-  return {before, stopped, immediate, trace, evidence, cleanup};
+  captureImmediate, finalizeTrace, readEvidence, cleanupAfterEvidence, requirePauseAcknowledgement = false, cleanupOnFailure = false}) {
+  let cleanup, failure, cleanupAttempted = false;
+  try {
+    const before = await readStatus();
+    // running=0 is also temporary construction/arming. Never export a pair
+    // until the exact pause command proves the native pending/busy guard passed.
+    let pause = null;
+    if (requirePauseAcknowledgement || before?.source_running !== 0) pause = await stopPlayback();
+    if (requirePauseAcknowledgement && pause?.acknowledged !== true)
+      throw Error('Refusing large diagnostic exports without a fresh native pause acknowledgement');
+    const stopped = await readStatus();
+    if (stopped?.source_running !== 0 ||
+        (requirePauseAcknowledgement && stopped?.preparation?.active === true))
+      throw Error('Refusing large diagnostic exports while native source playback is active');
+    const immediate = captureImmediate ? await captureImmediate(stopped) : null;
+    const trace = await finalizeTrace();
+    const evidence = await readEvidence();
+    cleanupAttempted = true;
+    cleanup = cleanupAfterEvidence ? await cleanupAfterEvidence() : null;
+    return {before, stopped, immediate, trace, evidence, cleanup};
+  } catch (error) {
+    failure = error;
+    throw error;
+  } finally {
+    if (failure && cleanupOnFailure && !cleanupAttempted && cleanupAfterEvidence) {
+      try { await cleanupAfterEvidence(failure); }
+      catch (cleanupError) { failure.cleanup_error = String(cleanupError?.stack || cleanupError); }
+    }
+  }
 }
 
 /** Persist safe process attribution before querying command-line capability. */

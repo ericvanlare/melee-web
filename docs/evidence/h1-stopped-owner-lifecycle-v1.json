@@ -1,0 +1,89 @@
+{
+  "schema": "melee-web-h1-stopped-owner-lifecycle-receipt-v1",
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised"
+  ],
+  "scope": "Read-only retained callback-table lifecycle reduction and source ownership diagnosis; no new browser run or pixel-cause proof.",
+  "prior_run_locator": "Private external run h1-natural-pause-diagnostic-repair-20261006-20261006-185549-7bed3de9",
+  "prior_report_sha256": "8aa7c922867a00bab62d08e20fc5a5112ad60e67ab9422bc6e1b09ea8ebb8ba1",
+  "prior_stop": {
+    "at_ms": 54484.97499990463,
+    "reason": 5,
+    "cursor": 3001,
+    "source_frame": 1419
+  },
+  "prior_retained_rows": [
+    {
+      "row": 3079,
+      "hook_at_ms": 54481.59500002861,
+      "source_steps": 1,
+      "source_draws": 1,
+      "sample_running": 1,
+      "sample_source_frame": 1419,
+      "sample_replay_cursor": 3001
+    },
+    {
+      "row": 3080,
+      "hook_at_ms": 54494.01999998093,
+      "source_steps": 0,
+      "source_draws": 0,
+      "sample_running": 0,
+      "sample_source_frame": 1419,
+      "sample_replay_cursor": 3001
+    },
+    {
+      "row": 3122,
+      "hook_at_ms": 55193.78999996185,
+      "source_steps": 0,
+      "source_draws": 0,
+      "sample_running": 0,
+      "sample_source_frame": 1419,
+      "sample_replay_cursor": 3001
+    },
+    {
+      "row": 3123,
+      "hook_at_ms": 55220.56999993324,
+      "source_steps": 0,
+      "source_draws": 0,
+      "sample_running": 0,
+      "sample_source_frame": -1,
+      "sample_replay_cursor": 0
+    },
+    {
+      "row": 3323,
+      "hook_at_ms": 58543.170000076294,
+      "source_steps": 0,
+      "source_draws": 0,
+      "sample_running": 0,
+      "sample_source_frame": -1,
+      "sample_replay_cursor": 0
+    }
+  ],
+  "capture_read_at_ms": 58547.125,
+  "ordering": "The callback capture was read before cleanupAfterEvidence invoked its native unload.",
+  "latest_pair_run_locator": "Private external run h1-stable-pause-pair-20261007-20261006-194542-672d8e85",
+  "latest_pair": {
+    "native_reason_5_acknowledged": true,
+    "immediate_cursor_before_after": 1608,
+    "immediate_latest_callback_after_source_steps": 0,
+    "immediate_latest_callback_after_source_draws": 0,
+    "trace_finalized": true,
+    "delayed_image_refused": "cursor 0 != expected 1608",
+    "immediate_image_sha256": "0506650a9311c9fd64377ef8f47908137208207b50477defbc954f01147a691c",
+    "harness_source_commit": "5def99bf61157a071816ed09c9fc36de4b7159fa"
+  },
+  "source_path": [
+    "web/runtime-development.mjs menuReplayPoll: stopped replay watchdog after 700ms",
+    "web/runtime-development.mjs finishRetailReplay -> unloadAndSave",
+    "web/melee-runtime.mjs unloadAndSave -> native menu unload",
+    "src/gameplay_menu_browser.cpp close -> replay_cursor=0; source ownership released"
+  ],
+  "interpretation": "The older retained callback table proves scene/cursor ownership reset during export. Production replay polling deterministically finishes stopped performance replays after 700ms. Teardown is strongly supported; exact canvas blanking and historical pixel cause are not proved.",
+  "unproven": [
+    "No lease browser execution yet",
+    "No H1 natural-pause explanation or performance acceptance",
+    "No pixel equivalence, full supported route, foreground, physical input or PCM acceptance"
+  ],
+  "latest_pair_report_sha256": "fcda400825ecf293faa4498a0260832259ea8b95b4f87d4af6b03ffccc8a9cb8"
+}

@@ -334,6 +334,25 @@ await assert.rejects(() => stopSourceBeforeDiagnosticExport({
 }), /image boundary failed/);
 assert.deepEqual(failedImageOrder, ['status', 'stop', 'status', 'immediate-image'],
   'an incomplete immediate image prevents later trace/export work from masking the first boundary');
+const failedLeaseOrder = [];
+await assert.rejects(() => stopSourceBeforeDiagnosticExport({
+  readStatus: async () => ({source_running: 0}),
+  stopPlayback: async () => ({acknowledged: true}),
+  requirePauseAcknowledgement: true,
+  cleanupOnFailure: true,
+  captureImmediate: async () => {failedLeaseOrder.push('immediate');},
+  finalizeTrace: async () => {failedLeaseOrder.push('trace'); throw Error('stream failed');},
+  readEvidence: async () => {failedLeaseOrder.push('export');},
+  cleanupAfterEvidence: async failure => {assert.equal(failure.message, 'stream failed'); failedLeaseOrder.push('owner-finish');},
+}), /stream failed/);
+assert.deepEqual(failedLeaseOrder, ['immediate', 'trace', 'owner-finish']);
+let cleanupAttempts = 0;
+await assert.rejects(() => stopSourceBeforeDiagnosticExport({
+  readStatus: async () => ({source_running: 0}), finalizeTrace: async () => ({}),
+  readEvidence: async () => ({}), cleanupOnFailure: true,
+  cleanupAfterEvidence: async () => {cleanupAttempts++; throw Error('owner finish failed');},
+}), /owner finish failed/);
+assert.equal(cleanupAttempts, 1, 'A failed owner finish is never retried');
 const unsafeOrder = [];
 await assert.rejects(() => stopSourceBeforeDiagnosticExport({
   readStatus: async () => {unsafeOrder.push('status'); return {source_running: 1};},
@@ -403,6 +422,23 @@ assert.ok(runner.includes("snapshot('replay-poll', {captureCss: !diagnostic})"),
   'state mode preserves CSS observations while performance polling avoids allocations');
 assert.ok(runner.includes("readNaturalPauseBrowserCommandLine("),
   'strict owner cleanup receives a CDP process inventory before measurement');
+// Exercise the actual runner catch reporting: a later image failure must not
+// retrospectively claim that its already completed trace was skipped.
+{
+ const at=runner.indexOf('        report.source_stop_error = String(error?.stack || error);');
+ const end=runner.indexOf('        process.exitCode = 1;',at);
+ assert.ok(at>=0&&end>at);
+ const handler=runner.slice(at,end+'        process.exitCode = 1;'.length);
+ for(const complete of [true,false]){
+  const scope={report:{trace:{complete}},error:new Error('cursor changed'),
+   sourceStopStage:'delayed stopped-scene screenshot',stoppedScenePair:true,process:{}};
+  vm.createContext(scope);vm.runInContext(handler,scope);
+  assert.equal(scope.report.source_stop_failed_stage,'delayed stopped-scene screenshot');
+  assert.ok(scope.report.source_stop_error.includes('cursor changed'));
+  assert.equal(typeof scope.report.trace_finalization_skipped,complete?'undefined':'string');
+  assert.equal(scope.process.exitCode,1);
+ }
+}
 const processInfoAt = runner.indexOf("report.browser.command_line = await readNaturalPauseBrowserCommandLine(");
 const durableInventoryAt = runner.indexOf("await write('report.json', report);", processInfoAt);
 const pageCreateAt = runner.indexOf('page = diagnostic ?');
