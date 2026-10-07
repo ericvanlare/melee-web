@@ -65,8 +65,9 @@ All ten screenshots were inspected by the execution agent and lead. Match images
 show conspicuous magenta Final Destination geometry. The same visible symptom
 exists in hash-bound A1 screenshots, whose native builds differ from this one.
 That establishes a prior observation, not a rendering cause or pixel equivalence.
-The rendering defect remains open. Earlier full-route screenshots taken during
-preparation are preserved and do not count as ready-draw evidence.
+The rendering defect remains open in
+[#175](https://github.com/ericvanlare/melee-web/issues/175). Earlier full-route
+screenshots taken during preparation are preserved and do not count as ready-draw evidence.
 
 ## Negative controls and reduced failures
 
@@ -98,10 +99,17 @@ Integration removes those placeholders; historical reports remain unchanged.
 
 Focused protocol, observer and native-input tests cover real TCP delivery and
 failure propagation, response identity, wait recovery, indexed input and terminal
-holds. Current-main integration build and full-suite results are recorded in the
-portable receipt when complete. Browser evidence above keeps its original source
-identities. Both successful controls and the full route closed their owned
-browsers, relay and HTTP server; failures and active incremental builds remain
+holds. The current-main integration suite passed 1,928 tests with 141 skipped
+at `db65a95`. A later review found that one failed browser launch could leave its
+successful sibling outside cleanup ownership. The actual runner/finalizer failed
+a reduced injected-startup test before repair; all 25 focused checks passed after
+`6537e35` registered every successful launch before rethrowing a sibling error.
+The official Release runtime build passed on that clean source, with all 32
+packaged artifact identities retained. Final PR-head CI remains the merge gate.
+The receipt also preserves the earlier lifecycle-fixture failure and an invalid
+build CLI invocation that stopped before compilation. Browser evidence above
+keeps its original source identities. Both successful controls and the full route
+closed their owned browsers, relay and HTTP server; failures and active incremental builds remain
 retained. Unrelated processes were left alone.
 
 Cross-browser and cross-architecture determinism, retail state and PCM comparison,

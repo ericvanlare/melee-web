@@ -622,7 +622,223 @@
     "historical_loopback_transport_zero_fields": "Initial loopback_transport byte placeholders were never updated. Actual counters are in transport; integration removes the unused placeholders without altering transport behavior."
   },
   "integration_validation": {
-    "state": "pending full suite and current-main Release build; historical browser evidence remains bound to original sources"
+    "state": "Local validation passed; final PR-head CI remains the merge gate.",
+    "base_commit": "73d3c4c35731faf1a36ee909bfd7e3e764c02e49",
+    "full_suite": {
+      "source_commit": "db65a95f19e154f49e737cd67c334515ddb866d9",
+      "tests": 1928,
+      "skipped": 141,
+      "exit_code": 0,
+      "log": "integration-full-suite-v2.log",
+      "receipt": "integration-validation-v2.json"
+    },
+    "post_suite_change": {
+      "source_commit": "6537e35ef6964782184cf4dd931f270cb20fef88",
+      "scope": "Runner startup ownership and its failure-injection regression only; no native or lockstep protocol change. Every fulfilled browser is registered before a sibling launch error is rethrown so the existing finalizer unloads and closes it.",
+      "focused_tests": 25,
+      "failures": 0,
+      "log": "startup-cleanup-focused-after.log",
+      "before_fix_log": "startup-cleanup-before.log"
+    },
+    "release_build": {
+      "source_commit": "6537e35ef6964782184cf4dd931f270cb20fef88",
+      "source_tree": "3de2e3294b4d91578a9ebc6741cb16a348bee86f",
+      "clean_before": true,
+      "configuration": "Release",
+      "target": "runtime",
+      "started_at": "2026-10-07T00:56:49.397970+00:00",
+      "command": [
+        "python3",
+        "scripts/build.py",
+        "--configuration",
+        "Release",
+        "--target",
+        "runtime"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 21.944,
+      "log": {
+        "path": "integration-release-build-v2.log",
+        "bytes": 1199293,
+        "sha256": "fc7ecd2edb67d7c0de748e3a5bad2754da373bef8d6e94f12f806cd3174f6a89"
+      },
+      "source_unchanged_after": true,
+      "clean_after": true,
+      "artifacts": [
+        {
+          "path": "build/browser-release/gameplay_menu_browser.js",
+          "bytes": 299506,
+          "sha256": "0f3f8bfec2976b33911a6a0e097dd67d2e5967ed6fbe88164565319fd28c3873"
+        },
+        {
+          "path": "build/browser-release/gameplay_menu_browser.wasm",
+          "bytes": 15716100,
+          "sha256": "0c32baded113db4172403ae3ed0fbe5f71b172677fb9ece7b3a30870d40b5e66"
+        },
+        {
+          "path": "build/browser-release/gameplay_menu_browser.data",
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        },
+        {
+          "path": "build/browser-release/runtime.html",
+          "bytes": 5205,
+          "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+        },
+        {
+          "path": "build/browser-release/runtime-development.mjs",
+          "bytes": 56665,
+          "sha256": "7faecdf82fa101d9c256e4cf9335d780fd1da1c99a58d6c7429bfcfe36d74c7d"
+        },
+        {
+          "path": "build/browser-release/net-timing-pause.mjs",
+          "bytes": 1043,
+          "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+        },
+        {
+          "path": "build/browser-release/melee-runtime.mjs",
+          "bytes": 50136,
+          "sha256": "6d330656905e52820f56af5bf10bd6dfe741e6a2adb5a24c6f708720d45941f8"
+        },
+        {
+          "path": "build/browser-release/runtime-diagnostics.mjs",
+          "bytes": 85702,
+          "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+        },
+        {
+          "path": "build/browser-release/runtime-diagnostics-delivery.mjs",
+          "bytes": 51514,
+          "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+        },
+        {
+          "path": "build/browser-release/diagnostics-settings.mjs",
+          "bytes": 2876,
+          "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+        },
+        {
+          "path": "build/browser-release/diagnostics-schema.mjs",
+          "bytes": 18780,
+          "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+        },
+        {
+          "path": "build/browser-release/controller-input.mjs",
+          "bytes": 19263,
+          "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+        },
+        {
+          "path": "build/browser-release/controller-panel.mjs",
+          "bytes": 36847,
+          "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+        },
+        {
+          "path": "build/browser-release/controller-panel.css",
+          "bytes": 5240,
+          "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+        },
+        {
+          "path": "build/browser-release/controller-settings.mjs",
+          "bytes": 18680,
+          "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+        },
+        {
+          "path": "build/browser-release/controller-settings.css",
+          "bytes": 3482,
+          "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+        },
+        {
+          "path": "build/browser-release/touch-controls.mjs",
+          "bytes": 13954,
+          "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+        },
+        {
+          "path": "build/browser-release/touch-controls.css",
+          "bytes": 6381,
+          "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+        },
+        {
+          "path": "build/browser-release/prototype-keyboard-layouts.mjs",
+          "bytes": 935,
+          "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+        },
+        {
+          "path": "build/browser-release/runtime-cache.js",
+          "bytes": 16143,
+          "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+        },
+        {
+          "path": "build/browser-release/audio-worklet.js",
+          "bytes": 1517,
+          "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+        },
+        {
+          "path": "build/browser-release/audio-ring.mjs",
+          "bytes": 2040,
+          "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+        },
+        {
+          "path": "build/browser-release/disc-image.mjs",
+          "bytes": 15255,
+          "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+        },
+        {
+          "path": "build/browser-release/disc-session.mjs",
+          "bytes": 7552,
+          "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+        },
+        {
+          "path": "build/browser-release/dsp-coefficients.mjs",
+          "bytes": 4043,
+          "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+        },
+        {
+          "path": "build/browser-release/runtime-assets.mjs",
+          "bytes": 17029,
+          "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+        },
+        {
+          "path": "build/browser-release/runtime-audio-assets.mjs",
+          "bytes": 3685,
+          "sha256": "2201d9156f3c4902a81a39d4520fc0f684eaeac4c9d4c8c46cb010010697ed3b"
+        },
+        {
+          "path": "build/browser-release/runtime-audio.mjs",
+          "bytes": 7660,
+          "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+        },
+        {
+          "path": "build/browser-release/match-flow.mjs",
+          "bytes": 10679,
+          "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+        },
+        {
+          "path": "build/browser-release/match-menu.mjs",
+          "bytes": 8566,
+          "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+        },
+        {
+          "path": "build/browser-release/action-sweep.mjs",
+          "bytes": 18698,
+          "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+        },
+        {
+          "path": "build/browser-release/hitch-capture.mjs",
+          "bytes": 21958,
+          "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+        }
+      ],
+      "scope": "Current-main integration compile and packaged artifact identity only; retained browser runs keep their historical native and runner sources."
+    },
+    "retained_integration_failures": [
+      {
+        "receipt": "integration-validation.json",
+        "boundary": "Replay lifecycle VM fixture included the subsequent module function containing import.meta; slice now ends at the actual callback terminator. Focused lifecycle check and full-suite rerun passed."
+      },
+      {
+        "receipt": "integration-validation-v2.json",
+        "boundary": "Initial queued build invocation used unsupported CLI target/options and exited before compilation. Correct official --configuration Release --target runtime invocation is separately bound above."
+      }
+    ],
+    "browser_scope": "Historical browser evidence remains bound to original native and runner sources; the current-main integration build is compile/artifact evidence only."
   },
   "limitations": [
     "Node-controlled real TCP loopback with two fresh Chrome instances; not a public browser networking UI or Internet transport.",
@@ -870,6 +1086,78 @@
       "path": "disconnect-fix-receipt.json",
       "bytes": 1721,
       "sha256": "2a79c3b22f182843df3b4aaded91076416e46fbda4cf611dd81b10646336c374"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "integration-validation.json",
+      "bytes": 547,
+      "sha256": "8f8b9667a817bc0875ed06106c26b2ebc3e076bd00afdbcd3ff0637743fef595"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "integration-full-suite.log",
+      "bytes": 350628,
+      "sha256": "62a379604f06d52d87e3d7ba67168c7f9874160b6a824cf743485d424e6fbac1"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "integration-validation-v2.json",
+      "bytes": 1103,
+      "sha256": "bc968355a4bd6337bfbbafbb3da9a2117116aff11767d7406802e19179ed1886"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "integration-full-suite-v2.log",
+      "bytes": 350255,
+      "sha256": "9e9b508503295a1b697c505e2ca19ecdd0b219373da381bbd93ac2c741762991"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "integration-release-build.log",
+      "bytes": 875,
+      "sha256": "46467cba9c73ecf259d35f2092bcce47da8642f36ee041adc66ec2ffa82c8c32"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "startup-ownership-probe.mjs",
+      "bytes": 1165,
+      "sha256": "a870d02475333ce1c9b9aa2fd8d36c3c0918492fca685cf9689e2ef2e95fd51e"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "startup-ownership-probe.before.log",
+      "bytes": 539,
+      "sha256": "af49b6028abcb9d63eb5218872c1f9141f505c75227b1c672c63481b42256da5"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "startup-cleanup-test-draft.mjs",
+      "bytes": 2526,
+      "sha256": "e72e0596e1ccd1dce518d2742504b420f51561e27384b0e89a1ee7b4b11d2da5"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "startup-cleanup-before.log",
+      "bytes": 994,
+      "sha256": "719c82f1ed5f48a348daefd4138ab94de352c67bb4078bc4031bb34d351edf91"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "startup-cleanup-focused-after.log",
+      "bytes": 5896,
+      "sha256": "bae733c4eaabc4a74d08ae9b7203915d319be0ade7d481262efed033fd35a743"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "integration-release-build-v2.json",
+      "bytes": 6514,
+      "sha256": "470835af90625ec3eb8235fa8b2b7e6d1b2b49c930be20ee42ba05ab16f3c6fd"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "integration-release-build-v2.log",
+      "bytes": 1199293,
+      "sha256": "fc7ecd2edb67d7c0de748e3a5bad2754da373bef8d6e94f12f806cd3174f6a89"
     }
   ]
 }
