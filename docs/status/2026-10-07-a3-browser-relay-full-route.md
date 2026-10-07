@@ -2,8 +2,10 @@
 
 **Source identified / Compiled / Browser exercised: local Worker relay**. The
 [portable receipt](../evidence/a3-browser-relay-full-route-controls-v1.json)
-binds the current producer, served Release artifacts, the actual local Worker
-runtime, scenario reports, and cleanup evidence.
+binds the historical browser capture producer, served Release artifacts, the
+actual local Worker runtime, scenario reports, and cleanup evidence. It records
+a separate fresh build and suite validation after an identical-patch rebase onto
+current main; the browser route was not repeated.
 
 The Node harness owns both A2 `LockstepPeer` protocol instances and WebSocket
 endpoints; two independent headless Chrome runtimes load and execute the game
@@ -27,12 +29,23 @@ pushed count 16 unchanged for 124 ms. In all three runs, the identity handshake
 completed before tick 0, callback/source accounting passed, and the coordinator
 recorded no endpoint, transport, callback, or cleanup errors.
 
-The focused batch used headless installed Chrome 154.0.8037.98 and the pinned
-SDK Node 24.19.0, Wrangler 4.131.1, Miniflare 5.20260911.0-alpha and workerd
-1.20260911.1. The Release artifacts were built from this producer; the 32-file
-local and HTTP inventories matched before and after every scenario. Browser
-audio output was muted while normal audio processing remained enabled. The
-full Python suite passed with 1,961 tests total: 1,817 passed and 144 skipped.
+The historical browser batch used headless installed Chrome 154.0.8037.98 and
+the pinned SDK Node 24.19.0, Wrangler 4.131.1, Miniflare 5.20260911.0-alpha
+and workerd 1.20260911.1. Its Release artifacts were built from capture producer
+`4b58eaeb6a1821f7ff7bbe12f5f060408261f71a`; the 32-file local and HTTP
+inventories matched before and after every scenario. Browser audio output was
+muted while normal audio processing remained enabled. The capture-producer full
+Python suite passed with 1,961 total tests: 1,817 passed and 144 skipped.
+
+After preserving those 32 historical served files, the implementation was
+rebased onto main `84fe5c4b64a3fc83459b00bba9730e5b38825613`. The range-diff
+confirmed both implementation patches were identical. A fresh Release `runtime`
+build and full Python suite passed on executable producer
+`51d7d76e450981d4e33ad7abbea0af17f43066b5` (tree
+`a22d9fcb8ddac3f2b68752cfe7e42e848fa1691c`): 1,964 tests total, 1,819 passed,
+and 145 skipped. The build produced a new 32-file served inventory; only
+`gameplay_menu_browser.wasm` differed from the preserved pre-build inventory.
+This was build/suite validation only; it did not repeat the browser capture.
 
 The positive run recorded the startup network wait at source tick 2 for both
 peers. The flip run recorded the same initial wait; the disconnect run recorded

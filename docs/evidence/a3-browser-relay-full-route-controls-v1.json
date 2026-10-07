@@ -1,20 +1,4 @@
 {
-  "build_and_suite": {
-    "python_suite_passed": 1817,
-    "python_suite_receipt": {
-      "file": "full-python-suite-receipt-v1.json",
-      "run_id": "a3-main-current-validation-20261007-004625-b5270c53"
-    },
-    "python_suite_receipt_sha256": "be7f5efe7aa3e6377b58cd4f256c9356fc922e7ee63ff64fcdfec5de699f57a4",
-    "python_suite_skipped": 144,
-    "python_suite_total": 1961,
-    "release_build_log_sha256": "7bd6117ace33a9f531f7d72bb02535c7318e9af6d205aa634e622c42e86d5996",
-    "release_build_receipt": {
-      "file": "release-build-receipt-v1.json",
-      "run_id": "a3-main-current-validation-20261007-004625-b5270c53"
-    },
-    "release_build_receipt_sha256": "90c909efd6db9a576a1921835c17e80d06689547c381c5092ea73b251a769adf"
-  },
   "cleanup": {
     "browser_identity_rows_absent_without_intervention": 65,
     "browser_process_groups_absent": 6,
@@ -84,7 +68,6 @@
   },
   "private_run_inventory": {
     "batch_run_id": "a3-full-route-controls-batch-20261007T082510Z-981bbd42",
-    "current_main_validation_run_id": "a3-main-current-validation-20261007-004625-b5270c53",
     "historical_css_probe_run_ids": {
       "v3_failure": "a3-browser-relay-8tick-css-probe-20261007-20261007-002817-a9c7a940",
       "v4_css_only_pass": "a3-browser-relay-8tick-css-probe-20261007-003833-4acb6f75"
@@ -94,7 +77,10 @@
       "flip": "a3-full-route-controls-flip-20261007-010430-24485fe7",
       "positive": "a3-full-route-controls-positive-20261007-010427-284489d6"
     },
-    "storage": "verified external NVMe; absolute mount path is kept only in the external run manifest, not this repository receipt"
+    "storage": "verified external NVMe; absolute mount path is kept only in the external run manifest, not this repository receipt",
+    "capture_producer_validation_run_id": "a3-main-current-validation-20261007-004625-b5270c53",
+    "current_main_validation_run_id": "a3-current-main-validation-20261007-20261007-014733-8c4cb817",
+    "implementation_range_diff_run_id": "a3-current-main-validation-20261007-20261007-014733-8c4cb817"
   },
   "remaining_scope": [
     "Two-machine and Internet play",
@@ -215,7 +201,7 @@
     "wrangler": "4.131.1"
   },
   "schema": "melee-web-a3-browser-relay-full-route-controls-evidence-v1",
-  "scope": "Single-host headless browser functional route and A2 terminal controls through the actual local Worker/Durable Object relay. No two-machine/Internet, WebRTC, rollback, deployment, performance, pixel/PCM, foreground, or audible-output acceptance.",
+  "scope": "Full-route/control browser evidence remains from the recorded capture producer; a separate post-rebase current-main Release build and full Python suite are recorded here. No current-main browser capture was run. This is single-host headless functional evidence through the local Worker relay, not two-machine/Internet, WebRTC, rollback, deployment, performance, pixel/PCM, foreground or audible-output acceptance.",
   "source": {
     "a2_protocol_source_changed": false,
     "base_main": "6c0ccecd6c88d50670668a032a6882463639e809",
@@ -228,5 +214,64 @@
     "served_manifest_sha256": "84b4d9050f89666407deb4cc50e5327fa859ce076f032b303a337e4a55bfa0e6",
     "tracked_clean_at_capture_start_and_finish": true,
     "transport_ownership": "Node owns both LockstepPeer protocol instances and WebSocket endpoints; two independent headless browser runtimes execute the game source and receive their own input. The actual local Worker relay connects the Node-owned endpoints."
+  },
+  "capture_producer_validation": {
+    "python_suite_passed": 1817,
+    "python_suite_receipt": {
+      "file": "full-python-suite-receipt-v1.json",
+      "run_id": "a3-main-current-validation-20261007-004625-b5270c53"
+    },
+    "python_suite_receipt_sha256": "be7f5efe7aa3e6377b58cd4f256c9356fc922e7ee63ff64fcdfec5de699f57a4",
+    "python_suite_skipped": 144,
+    "python_suite_total": 1961,
+    "release_build_log_sha256": "7bd6117ace33a9f531f7d72bb02535c7318e9af6d205aa634e622c42e86d5996",
+    "release_build_receipt": {
+      "file": "release-build-receipt-v1.json",
+      "run_id": "a3-main-current-validation-20261007-004625-b5270c53"
+    },
+    "release_build_receipt_sha256": "90c909efd6db9a576a1921835c17e80d06689547c381c5092ea73b251a769adf"
+  },
+  "current_main_validation": {
+    "base_main": "84fe5c4b64a3fc83459b00bba9730e5b38825613",
+    "validation_head_commit": "679a013a9f1e2024c475e7d32bcc452d08c71350",
+    "validation_head_tree": "ed0e4d17c3e3fb29dd81739dcbda2c6bd3dfac8c",
+    "executable_producer_commit": "51d7d76e450981d4e33ad7abbea0af17f43066b5",
+    "executable_producer_tree": "a22d9fcb8ddac3f2b68752cfe7e42e848fa1691c",
+    "implementation_range_diff": {
+      "file": "implementation-range-diff.txt",
+      "run_id": "a3-current-main-validation-20261007-20261007-014733-8c4cb817",
+      "sha256": "fd169ca54285da00c5deea99637bcd275640a9a3024920afa717f427ec901b0b",
+      "identical_implementation_patches": true
+    },
+    "python_suite": {
+      "file": "full-python-suite-receipt-v2.json",
+      "run_id": "a3-current-main-validation-20261007-20261007-014733-8c4cb817",
+      "sha256": "95cc57dcaef533962a2580093dbaf7e25baaff41b5deda6a299c6cc2e64e7606",
+      "tests_total": 1964,
+      "passed": 1819,
+      "skipped": 145
+    },
+    "release_build": {
+      "file": "release-build-receipt-v2.json",
+      "run_id": "a3-current-main-validation-20261007-20261007-014733-8c4cb817",
+      "sha256": "350d74192cd28df102ba5d8f89c9a1134f0ee885d6cf5059fc7708658ccd917b",
+      "target": "runtime",
+      "configuration": "Release",
+      "served_artifacts_file": "current-main-served-runtime-artifacts-v2.json",
+      "served_artifacts_sha256": "753b0ac71b8ca39d6ea9c133e6efee4d026957c2fcbb6b6e02ef34cf10cb67aa",
+      "served_artifact_count": 32,
+      "served_artifact_bytes": 20228679,
+      "changed_from_preserved_prebuild": [
+        "gameplay_menu_browser.wasm"
+      ]
+    },
+    "preserved_prebuild_artifacts": {
+      "file": "pre-build-served-runtime-manifest.json",
+      "run_id": "a3-current-main-validation-20261007-20261007-014733-8c4cb817",
+      "sha256": "531efe3ea46086fe5bb7a486f566634691125cc1533524761c6c8799a53573e2",
+      "file_count": 32,
+      "total_bytes": 20228679
+    },
+    "browser_capture_repeated": false
   }
 }
