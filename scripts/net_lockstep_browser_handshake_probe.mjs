@@ -751,7 +751,8 @@ async function run() {
     await termination.wait(page.goto(`${origin}/${fixtureUrl}`, {waitUntil: 'load', timeout: 15000}),
       15000, 'browser fixture load');
     termination.throwIfRequested();
-    await Promise.all(browserResponseTasks);
+    await termination.wait(Promise.all(browserResponseTasks), 3000,
+      'initial browser resource response capture');
     if (browserResponseErrors.length)
       throw Error(`Browser fixture response capture failed: ${JSON.stringify(browserResponseErrors)}`);
     verifyBrowserResponseSet(browserResponseRows, manifest);
@@ -760,9 +761,11 @@ async function run() {
     recordEvent('worker-start-begin');
     await awaitOwnedAcquisition(startRoomRelayRuntime({evidenceDir: path.join(output, 'worker-evidence'),
       producer: manifest.producer, diagnostic: message => recordEvent(`worker:${message}`)}),
-    value => { runtime = value; }, termination);
-    report.runtime = {base: runtime.base, port: runtime.port, ownerProcess: runtime.ownerProcess,
-      identity: runtime.runtimeIdentity, hashes: runtime.hashes};
+    value => {
+      runtime = value;
+      report.runtime = {base: runtime.base, port: runtime.port, ownerProcess: runtime.ownerProcess,
+        identity: runtime.runtimeIdentity, hashes: runtime.hashes};
+    }, termination);
     recordEvent('worker-started');
 
     const roomId = createRoomId();
@@ -826,7 +829,8 @@ async function run() {
       5000, 'browser readiness screenshot');
     const beforeClose = await capturePreCloseObservation({
       screenshot,
-      readBrowserSnapshot: () => page.evaluate(() => window.browserAlphaSnapshot()),
+      readBrowserSnapshot: () => termination.wait(
+        page.evaluate(() => window.browserAlphaSnapshot()), 3000, 'browser alpha post-screenshot snapshot'),
       readNodeSnapshot: async () => snapshotNode(),
       pageErrors, expectedFrames: expectedNeutralFrames});
     report.browserScreenshot = {path: path.basename(screenshotPath), sha256: sha256(await fs.readFile(screenshotPath))};
