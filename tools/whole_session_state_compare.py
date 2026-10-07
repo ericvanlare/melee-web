@@ -1656,6 +1656,9 @@ ORDERED_CLOCK_TUPLE_FIELDS = frozenset({
 ORDERED_CLOCK_PREFIX_FIELDS = frozenset({
     "bytes_read", "records_read", "last_source_sequence", "sha256",
 })
+MAX_ORDERED_CLOCK_LINEAGE_CHECKPOINTS = 16
+MAX_ORDERED_CLOCK_LINEAGE_DEPTH = 8
+MAX_ORDERED_CLOCK_LINEAGE_AUDIT_VALIDATIONS = 32
 
 
 def _ordered_audit_checkpoint_status_key(checkpoint: Mapping[str, Any],
@@ -1701,8 +1704,9 @@ def _validate_ordered_clock_lineage_expectations(source: Mapping[str, Any],
                              "supporting_expectations"}):
         raise ComparisonError("ordered clock-lineage expectations schema is malformed")
     checkpoints = lineage.get("checkpoints")
-    if not isinstance(checkpoints, list) or len(checkpoints) < 3:
-        raise ComparisonError("ordered clock-lineage needs two anchors and a terminal checkpoint")
+    if (not isinstance(checkpoints, list) or len(checkpoints) < 3 or
+            len(checkpoints) > MAX_ORDERED_CLOCK_LINEAGE_CHECKPOINTS):
+        raise ComparisonError("ordered clock-lineage checkpoint count is outside its bounded range")
     normalized: list[dict[str, Any]] = []
     seen_labels: set[str] = set()
     for index, item in enumerate(checkpoints):
@@ -2536,7 +2540,10 @@ def _validate_clock60_audit(path: Path, packet: Mapping[str, Any], recipe: Recip
 def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
                                          recipe: Recipe, *, ordered_lineage: bool = False,
                                          positive_audit: Mapping[str, Any] | None = None,
-                                         clock60_audit: Mapping[str, Any] | None = None
+                                         clock60_audit: Mapping[str, Any] | None = None,
+                                         _ordered_depth: int = 0,
+                                         _ordered_ancestors: tuple[tuple[str, int, str], ...] = (),
+                                         _ordered_validation_count: list[int] | None = None
                                          ) -> tuple[dict[str, Any], str]:
     """Validate the packet-bound terminal audit produced by the bounded clock runner."""
     if ordered_lineage and (not isinstance(positive_audit, Mapping) or
@@ -2727,7 +2734,11 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
                 limits.get("max_records") != prefix_record_cap):
             raise ComparisonError("later match-clock audit caps differ from the frozen bounded reader")
         if ordered_lineage:
-            _validate_ordered_clock_audit_lineage(audit, packet, recipe)
+            _validate_ordered_clock_audit_lineage(
+                audit, packet, recipe, positive_audit=positive_audit,
+                clock60_audit=clock60_audit, depth=_ordered_depth,
+                ancestors=_ordered_ancestors,
+                validation_count=_ordered_validation_count)
         else:
             _validate_clock300_checkpoint_lineage(audit, packet, recipe)
     return audit, digest
@@ -2867,16 +2878,22 @@ def _load_prior_clock_expectations(identity: Mapping[str, Any],
     prior, digest, size = _read_json_sidecar(
         path, f"ordered {label} expectations", max_bytes=1024 * 1024)
     _verify_expected_file(identity, path, digest, size, f"ordered {label} expectations")
-    if (prior.get("schema") != MATCH_CLOCK_EXPECTATION_SCHEMA or
-            prior.get("scope") != V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE or
-            prior.get("version") != 1):
+    prior_scope = prior.get("scope")
+    prior_schema = (MATCH_CLOCK_EXPECTATION_SCHEMA
+                    if prior_scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE else
+                    ORDERED_CLOCK_LINEAGE_EXPECTATION_SCHEMA
+                    if prior_scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else None)
+    if (prior_schema is None or prior.get("schema") != prior_schema or
+            type(prior.get("version")) is not int or prior.get("version") != 1):
         raise ComparisonError(f"ordered {label} expectations schema or scope is unsupported")
     prior_source = prior.get("source")
-    current_source = current_packet["source"]
+    current_source = current_packet.get("source")
+    if not isinstance(prior_source, dict) or not isinstance(current_source, dict):
+        raise ComparisonError(f"ordered {label} expectations source section is malformed")
     for field in ("capture_id", "sequence_id", "trace", "manifest", "report", "audit",
                   "positive_boundary_audit", "first_positive_boundary",
                   "clock60_boundary_audit", "clock60_boundary"):
-        if not isinstance(prior_source, dict) or prior_source.get(field) != current_source.get(field):
+        if prior_source.get(field) != current_source.get(field):
             raise ComparisonError(f"ordered {label} source expectations differ at {field}")
     if prior.get("recipe") != current_packet.get("recipe"):
         raise ComparisonError(f"ordered {label} expectations bind a different MWRC recipe")
@@ -2884,12 +2901,21 @@ def _load_prior_clock_expectations(identity: Mapping[str, Any],
         raise ComparisonError(f"ordered {label} expectations bind a different audit")
     expected_target = prior_source.get("match_clock_boundary")
     checkpoint_tuple = checkpoint["tuple"]
+    current_target = current_source.get("match_clock_boundary")
     if (not isinstance(expected_target, dict) or
+            not isinstance(current_target, dict) or
+            type(expected_target.get("target_match_frame_at_least")) is not int or
+            type(current_target.get("target_match_frame_at_least")) is not int or
+            expected_target["target_match_frame_at_least"] >=
+            current_target["target_match_frame_at_least"] or
             expected_target.get("target_match_frame_at_least") != checkpoint_tuple["match_frame"] or
             _first_difference({key: value for key, value in expected_target.items()
                                if key != "target_match_frame_at_least"}, checkpoint_tuple)):
         raise ComparisonError(f"ordered {label} expectations differ from the frozen checkpoint")
-    files = _expectation_files(prior)
+    try:
+        files = _expectation_files(prior)
+    except (KeyError, TypeError, AttributeError) as error:
+        raise ComparisonError(f"ordered {label} expectations file identities are malformed") from error
     files["clock60_boundary_audit"] = prior_source.get("clock60_boundary_audit")
     files["match_clock_boundary_audit"] = prior_source.get("match_clock_boundary_audit")
     selected: dict[str, Path] = {}
@@ -2899,15 +2925,38 @@ def _load_prior_clock_expectations(identity: Mapping[str, Any],
             raise ComparisonError(f"ordered {label} expectations contain a malformed {name} identity")
         selected[name] = Path(expected_file["path"])
     loaded, _ = _load_expectations(path, selected,
-                                   scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)
+                                   scope=prior_scope)
     return loaded, prior_source
 
 
 def _validate_ordered_clock_audit_lineage(audit: Mapping[str, Any],
                                           packet: Mapping[str, Any],
-                                          recipe: Recipe) -> None:
+                                          recipe: Recipe, *,
+                                          positive_audit: Mapping[str, Any] | None = None,
+                                          clock60_audit: Mapping[str, Any] | None = None,
+                                          depth: int = 0,
+                                          ancestors: tuple[tuple[str, int, str], ...] = (),
+                                          validation_count: list[int] | None = None) -> None:
     """Validate every checkpoint in the frozen ordered audit chain."""
     expected_source = packet["source"]
+    if depth > MAX_ORDERED_CLOCK_LINEAGE_DEPTH:
+        raise ComparisonError("ordered clock-lineage nesting exceeds its bounded depth")
+    if validation_count is None:
+        validation_count = [0]
+    validation_count[0] += 1
+    if validation_count[0] > MAX_ORDERED_CLOCK_LINEAGE_AUDIT_VALIDATIONS:
+        raise ComparisonError("ordered clock-lineage validation exceeds its bounded work limit")
+    current_identity = expected_source.get("match_clock_boundary_audit")
+    if (not isinstance(current_identity, Mapping) or
+            not isinstance(current_identity.get("path"), str) or
+            type(current_identity.get("bytes")) is not int or
+            not isinstance(current_identity.get("sha256"), str)):
+        raise ComparisonError("ordered clock-lineage terminal audit identity is malformed")
+    identity_key = (str(Path(current_identity["path"]).resolve()),
+                    current_identity["bytes"], current_identity["sha256"])
+    if identity_key in ancestors:
+        raise ComparisonError("ordered clock-lineage contains a recursive audit cycle")
+    ancestors = (*ancestors, identity_key)
     lineage = expected_source["ordered_clock_lineage"]
     runner_identity = lineage["runner_packet"]
     threshold = expected_source["match_clock_boundary"]["target_match_frame_at_least"]
@@ -3059,8 +3108,22 @@ def _validate_ordered_clock_audit_lineage(audit: Mapping[str, Any],
             raise ComparisonError(f"ordered clock runner packet {label} audit identity differs")
         nested_packet, nested_source = _load_prior_clock_expectations(
             expected_exp, audit_identity, packet, recipe, checkpoint)
+        nested_scope = nested_packet.get("scope")
+        nested_ordered = nested_scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE
+        if nested_scope not in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                                V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
+            raise ComparisonError(f"ordered {label} expectations use an unsupported scope")
+        if nested_ordered and (not isinstance(positive_audit, Mapping) or
+                               not isinstance(clock60_audit, Mapping)):
+            raise ComparisonError(f"ordered {label} validation lacks its validated anchor audits")
         nested_audit, _ = _validate_match_clock_boundary_audit(
-            Path(audit_identity["path"]), nested_packet, recipe)
+            Path(audit_identity["path"]), nested_packet, recipe,
+            ordered_lineage=nested_ordered,
+            positive_audit=positive_audit if nested_ordered else None,
+            clock60_audit=clock60_audit if nested_ordered else None,
+            _ordered_depth=depth + 1,
+            _ordered_ancestors=ancestors,
+            _ordered_validation_count=validation_count)
         nested_observed = nested_audit["observed"].get(
             f"target_clock_ge{nested_source['match_clock_boundary']['target_match_frame_at_least']}_observed")
         if not isinstance(nested_observed, dict):
