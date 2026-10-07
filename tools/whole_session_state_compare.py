@@ -2199,8 +2199,6 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
     positive_scope = scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
     if not _is_v10_prefix_scope(scope):
         raise ComparisonError(f"unsupported bounded v10 prefix scope {scope!r}")
-    if positive_scope != (positive_boundary_audit_path is not None):
-        raise ComparisonError("bounded prefix scope and positive-boundary audit selection disagree")
     result: dict[str, Any] = {
         "schema": SCHEMA,
         "scope": scope,
@@ -2240,6 +2238,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
     source_stat_before: dict[str, int] | None = None
     last_source_sequence: int | None = None
     try:
+        if positive_scope != (positive_boundary_audit_path is not None):
+            raise ComparisonError(
+                "bounded prefix scope and positive-boundary audit selection disagree")
         selected = {
             "reference": reference_path,
             "source_manifest": source_manifest_path,

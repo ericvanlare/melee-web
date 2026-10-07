@@ -13,10 +13,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "reference-capture" / "dolphin"), str(ROOT / "tests")]
 
 from reference_capture_semantics import pad_snapshot_bytes  # noqa: E402
-from test_whole_session_replay import _pad_consume, _raw_pad_snapshot, _whole_setup  # noqa: E402
+from test_whole_session_replay import (  # noqa: E402
+    _candidate, _pad_consume, _raw_pad_snapshot, _whole_setup)
 from whole_session_replay import (  # noqa: E402
     EXPECTED_DOLPHIN_COMMIT, EXPECTED_DOL_SHA1, EXPECTED_DOL_SHA256,
-    EXPECTED_OBSERVER_SCHEMA, SCENES, _consumed_ports,
+    EXPECTED_OBSERVER_SCHEMA, SCENES, _consumed_ports, _first_css_context,
 )
 from whole_session_state_compare import (  # noqa: E402
     BrowserReader, Comparator, SourceCollector, _browser_completion_ok, _is_match_field,
@@ -275,6 +276,38 @@ def _v10_recipe_bytes(*, corrupt_later_roster=False, trailing=b""):
             bytes(frame_count * 44) + spans + trailing)
 
 
+def _v10_positive_recipe_bytes(first_css, consumed_pads):
+    route = [
+        (SCENES["css"], 0, 0), (SCENES["sss"], 1, 1),
+        (SCENES["match"], 2, 4), (SCENES["results"], 5, 5),
+        (SCENES["css"], 6, 6), (SCENES["sss"], 7, 7),
+        (SCENES["match"], 8, 8), (SCENES["results"], 9, 9),
+        (SCENES["css"], 10, 10), (SCENES["sss"], 11, 11),
+        (SCENES["match"], 12, 12), (SCENES["results"], 13, 13),
+    ]
+    frame_count = 14
+    frame_pads = list(consumed_pads) + [
+        [bytes(11).hex()] * 4 for _ in range(frame_count - len(consumed_pads))]
+    if len(frame_pads) != frame_count or any(len(frame) != 4 for frame in frame_pads):
+        raise AssertionError("synthetic v10 recipe needs one four-port PAD row per frame")
+    context = b"".join(bytes.fromhex(first_css[name]) for name in (
+        "game_rules_hex", "save_data_hex", "css_data_hex", "ko_counts_hex"))
+    if len(context) != CONTEXT_BYTES:
+        raise AssertionError("synthetic first-CSS context does not match MWRC v10 size")
+    initial_pad = bytes.fromhex(first_css["pad_state_hex"])
+    setups = _v10_setup_bytes()
+    header = MWRC_HEADER.pack(
+        b"MWRC", MWRC_V10_VERSION, first_css["rng"], frame_count,
+        first_css["profile_masks"]["characters"],
+        first_css["profile_masks"]["stages"])
+    setup_table = struct.pack(">HH", len(setups), 0) + b"".join(setups)
+    frames = b"".join(bytes.fromhex(port) for frame in frame_pads for port in frame)
+    spans = struct.pack(">H", len(route)) + b"".join(
+        SPAN.pack(scene, 0, 0, first, last) for scene, first, last in route)
+    return (header + CONTEXT_HEADER.pack(2, 0, CONTEXT_BYTES) + context +
+            setup_table + initial_pad + frames + spans)
+
+
 def _expectation_packet(directory: Path, *, capture_id: str, sequence_id: str,
                         producer_head: str):
     directory.mkdir(parents=True, exist_ok=True)
@@ -409,6 +442,25 @@ def _positive_expectation_packet(directory: Path, *, capture_id="capture-positiv
 
 
 class WholeSessionStateCompareTests(unittest.TestCase):
+    def test_v10_scope_audit_selection_mismatch_returns_structured_invalid_result(self):
+        result = compare_paths(
+            "unused.mwro", "unused.mwrc", "unused.jsonl",
+            scope=V10_FIRST_SETUP_TICK0_SCOPE,
+            expectations="unused-expectations.json",
+            source_manifest="unused-manifest.json",
+            source_report="unused-report.json",
+            source_audit="unused-audit.json",
+            browser_capture_report="unused-capture.json",
+            browser_producer_manifest="unused-producer.json",
+            browser_report="unused-browser-report.json",
+            positive_boundary_audit="unused-positive-audit.json")
+
+        self.assertEqual(result["result"], "invalid")
+        self.assertFalse(result["complete"])
+        self.assertFalse(result["whole_session_equivalent"])
+        self.assertIn("scope and positive-boundary audit selection disagree",
+                      result["error"])
+
     def test_bounded_source_trace_stat_identity_must_remain_stable(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "trace.mwro"
@@ -1369,6 +1421,162 @@ class WholeSessionStateCompareTests(unittest.TestCase):
         with self.assertRaisesRegex(ComparisonError, "PAD consume"):
             collector._tick(_boundary("source_tick", 12, 2,
                                       slices=_state_slices(tick=2, match_frame=0)))
+
+    def test_first_positive_scope_compares_real_collector_path_through_clock_one(self):
+        candidate = _candidate()
+        boundary = lambda name, match=0: next(  # noqa: E731
+            row for row in candidate
+            if row.get("event") == "boundary" and
+            row.get("payload", {}).get("boundary") == name and
+            row.get("payload", {}).get("match_index") == match)
+        rows = [copy.deepcopy(candidate[0]), copy.deepcopy(candidate[1]),
+                copy.deepcopy(boundary("css_enter")),
+                copy.deepcopy(candidate[3]),
+                copy.deepcopy(boundary("css_exit")),
+                copy.deepcopy(boundary("sss_enter")),
+                copy.deepcopy(candidate[6]),
+                copy.deepcopy(boundary("sss_exit")),
+                copy.deepcopy(boundary("entry"))]
+
+        setups = _v10_setup_bytes()
+        raw_setup = setups[0]
+        entry = rows[-1]
+        entry_setup = next(item for item in entry["payload"]["slices"]
+                           if item["name"] == "match_setup")
+        entry_setup.update({"size": len(raw_setup), "hex": raw_setup.hex()})
+
+        setup = copy.deepcopy(boundary("setup"))
+        setup["source_tick"] = 0
+        setup["payload"]["gprs"] = [0] * 32
+        setup["payload"]["gprs"][3] = 0x80600000
+        setup["payload"]["slices"] = _state_slices(tick=0, match_frame=0) + [{
+            "name": "match_setup", "address": 0x80600000,
+            "size": len(raw_setup), "hex": raw_setup.hex(),
+        }]
+        rows.append(setup)
+
+        for tick, value in enumerate((0x30, 0x40, 0x50)):
+            pad = _pad_consume(0, value, tick)
+            rows.append(pad)
+            rows.append(_boundary(
+                "source_tick", 0, tick,
+                slices=_state_slices(tick=tick, match_frame=0 if tick < 2 else 1)))
+
+        for seq, row in enumerate(rows):
+            row["seq"] = seq
+            row["draw_ordinal"] = seq
+        rows[0]["payload"]["fighter_entity_profile"] = "v10-live-static-player-pair"
+        css_row = rows[2]
+        first_css = _first_css_context([css_row])
+        source_identity = _source_prefix_identity(rows[0]["payload"], rows[1]["payload"])
+
+        menu_pads = [_consumed_ports(rows[3], 0), _consumed_ports(rows[6], 0)]
+        match_pads = [_consumed_ports(rows[index], 0) for index in (10, 12, 14)]
+        recipe_raw = _v10_positive_recipe_bytes(first_css, [*menu_pads, *match_pads])
+        recipe = Recipe(Path("synthetic-positive.mwrc"), recipe_raw,
+                        scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE)
+        self.assertEqual(_first_match_timeline_index(recipe), 2)
+
+        source_manifest = {"input": {
+            "capture": source_identity,
+            "first_css": first_css,
+            "profile_context": first_css["profile_context"],
+            "match_setups": [
+                {"match_index": index, "start_melee_hex": raw.hex(),
+                 "declared_setup": recipe.declared_match_setups[index]}
+                for index, raw in enumerate(recipe.match_setups)],
+            "setup_hex": recipe.setup.hex(),
+            "declared_setup": recipe.declared_match_setups[0],
+        }}
+        source_audit = {
+            "first_entry_verified_seq": 8,
+            "first_setup": {"seq": 9, "source_tick": 0, "match_index": 0},
+            "first_source_tick": {"seq": 11, "source_tick": 0, "match_index": 0},
+        }
+        source_expectations = {
+            "capture_id": source_identity["capture_id"],
+            "sequence_id": source_identity["sequence_id"],
+        }
+        target = {
+            "match_index": 0, "source_tick": 2,
+            "source_sequence": 15, "pad_consume_sequence": 14,
+            "timeline_frame_index": 4, "browser_cursor": 5, "match_frame": 1,
+        }
+
+        def source_state(payload, context, previous):
+            state = _state_from_payload(payload, context)
+            state.update(_snapshot_values(payload, context))
+            state["fighter_entities"] = _fighter_entities(
+                payload, context, 0, previous)
+            return state
+
+        setup_state = source_state(setup["payload"], "browser setup", {})
+        setup_state["declared_setup"] = recipe.declared_match_setups[0]
+        browser_rows = [{
+            "record": "header", "schema": "melee-web-port-session-diagnostic",
+            "version": 1, "frames_requested": recipe.frame_count,
+            "comparison": "not_run", "cpu_observations": "not_captured",
+            "draw_state": "not_captured",
+        }]
+        for index in (0, 1):
+            browser_rows.append({
+                "record": "session_frame", "scene": recipe.frames[index]["scene"],
+                "index": index, "supplied_inputs": recipe.frames[index]["pads"],
+                "rng": recipe.seed, "pad_state_hex": recipe.initial_pad.hex(),
+            })
+        browser_rows.append({
+            "record": "session_match_enter_complete",
+            "rng": setup_state["rng"], "match_frame": setup_state["match_frame"],
+            "pad_state_hex": setup_state["pad_state_hex"],
+            "fighters": setup_state["fighters"],
+            "fighter_entities": setup_state["fighter_entities"],
+            "declared_setup": setup_state["declared_setup"],
+        })
+        browser_entity_history = {}
+        for tick, index in enumerate((2, 3, 4)):
+            tick_slices = _state_slices(tick=tick, match_frame=0 if tick < 2 else 1)
+            state = source_state({"slices": tick_slices}, f"browser tick {tick}",
+                                 browser_entity_history)
+            browser_rows.append({
+                "record": "session_frame", "scene": SCENES["match"],
+                "index": index, "supplied_inputs": recipe.frames[index]["pads"],
+                "rng": state["rng"], "match_frame": state["match_frame"],
+                "pad_state_hex": state["pad_state_hex"],
+                "fighters": state["fighters"],
+                "fighter_entities": state["fighter_entities"],
+            })
+
+        with tempfile.TemporaryDirectory() as directory:
+            browser_path = Path(directory) / "positive-prefix.jsonl"
+            browser_path.write_text(
+                "\n".join(json.dumps(row, separators=(",", ":"))
+                          for row in browser_rows) + "\n", encoding="utf-8")
+            browser = BrowserReader(browser_path)
+            try:
+                comparator = Comparator(recipe, browser, positive_boundary=target)
+                collector = SourceCollector(
+                    comparator, recipe, source_manifest, source_audit,
+                    source_expectations)
+                joined = False
+                for row in rows:
+                    collector.consume(row)
+                    joined = _first_positive_match_join_complete(
+                        row, collector, comparator, target)
+                    if joined:
+                        break
+                self.assertTrue(joined)
+                self.assertEqual(collector.record_count, 16)
+                self.assertEqual(collector.first_setup_seq, 9)
+                self.assertEqual(collector.first_source_tick_seq, 11)
+                self.assertEqual(collector.last_source_tick_seq, 15)
+                self.assertIsNone(collector.pending)
+                self.assertEqual(comparator.setup_count, 1)
+                self.assertEqual(comparator.compared, target["browser_cursor"])
+                self.assertEqual(comparator.nonmatch_compared, 2)
+                self.assertEqual(comparator.match_compared, 3)
+                self.assertIsNone(comparator.first_difference)
+            finally:
+                browser.close()
 
     def test_source_collector_and_comparator_match_setup_and_tick(self):
         source, pads, _, _ = _source_rows()
