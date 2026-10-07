@@ -5546,6 +5546,60 @@ index 6c26c029432e5a07f6c0a34343d87f9fd3364367..137d9c8d76dfe57c96ef79159de59e24
 +    Ground_801C466C();
 +}
 +#endif
+diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..ce50a4c7d10f71cac57e4295d6b134842ff00650 100644
+--- a/src/melee/gr/grpstadium.c
++++ b/src/melee/gr/grpstadium.c
+@@ -1,5 +1,10 @@
+ #include "grpstadium.h"
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#include <stddef.h>
++#include "gameplay_source_preload.h"
++#endif
++
+ #include <sysdolphin/baselib/forward.h>
+ 
+ #include "granime.h"
+@@ -652,6 +657,38 @@ typedef struct ImageDescWrapper {
+     u16 x1A, x1C;
+ } ImageDescWrapper;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++int melee_web_stadium_buffer_layout_read(MeleeWebStadiumBufferLayout* out)
++{
++    size_t desc_end;
++    size_t candidate_end;
++    size_t x1a_offset;
++    if (out == NULL) return 0;
++    x1a_offset = offsetof(ImageDescWrapper, x1A);
++    if (x1a_offset < sizeof(u16)) return 0;
++    out->pointer_bytes = sizeof(void*);
++    out->image_desc_bytes = sizeof(HSD_ImageDesc);
++    out->wrapper_bytes = sizeof(ImageDescWrapper);
++    out->desc_offset = offsetof(ImageDescWrapper, desc);
++    out->flag_container_candidate_bytes = sizeof(u16);
++    /* flag is declared u16 before x1A. This candidate follows the actual
++     * member layout; it does not report the lowered bitfield access span. */
++    out->flag_container_candidate_offset = x1a_offset - sizeof(u16);
++    out->x1a_offset = x1a_offset;
++    out->x1c_offset = offsetof(ImageDescWrapper, x1C);
++    out->constructor_allocation_bytes = 0x1C;
++    desc_end = out->desc_offset + out->image_desc_bytes;
++    candidate_end = out->flag_container_candidate_offset +
++                    out->flag_container_candidate_bytes;
++    out->layout_prefix_bound_bytes =
++        desc_end > candidate_end ? desc_end : candidate_end;
++    return out->desc_offset == 0 &&
++           out->image_desc_bytes == 0x18 &&
++           out->flag_container_candidate_offset == desc_end &&
++           out->x1a_offset == candidate_end;
++}
++#endif
++
+ #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
+ 
+ void grStadium_801D1EF8(Ground_GObj* gobj)
 diff --git a/src/melee/gr/grshrine.c b/src/melee/gr/grshrine.c
 index 9851d18921226b2adc5917698fd8662c1dd1eb4e..02ccf3daeab7602ae44037257c788d1f0aaac216 100644
 --- a/src/melee/gr/grshrine.c
@@ -7564,61 +7618,8 @@ index 5ea9c63cc9ac017b5ae38ed9ccd57495d03e9747..b943ec8e6145317f0ba08987dd1ed446
  }
  
  /// Execute Loop
-diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
-index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..546cd2ddc741ddc4de9fac9bd4e547534089286d 100644
---- a/src/melee/gr/grpstadium.c
-+++ b/src/melee/gr/grpstadium.c
-@@ -1,4 +1,9 @@
- #include "grpstadium.h"
-+
-+#if defined(MELEE_WEB_GAMEPLAY)
-+#include <stddef.h>
-+#include "gameplay_source_preload.h"
-+#endif
- 
- #include <sysdolphin/baselib/forward.h>
- 
-@@ -652,6 +657,38 @@
-     u16 x1A, x1C;
- } ImageDescWrapper;
- 
-+#if defined(MELEE_WEB_GAMEPLAY)
-+int melee_web_stadium_buffer_layout_read(MeleeWebStadiumBufferLayout* out)
-+{
-+    size_t desc_end;
-+    size_t candidate_end;
-+    size_t x1a_offset;
-+    if (out == NULL) return 0;
-+    x1a_offset = offsetof(ImageDescWrapper, x1A);
-+    if (x1a_offset < sizeof(u16)) return 0;
-+    out->pointer_bytes = sizeof(void*);
-+    out->image_desc_bytes = sizeof(HSD_ImageDesc);
-+    out->wrapper_bytes = sizeof(ImageDescWrapper);
-+    out->desc_offset = offsetof(ImageDescWrapper, desc);
-+    out->flag_container_candidate_bytes = sizeof(u16);
-+    /* flag is declared u16 before x1A. This candidate follows the actual
-+     * member layout; it does not report the lowered bitfield access span. */
-+    out->flag_container_candidate_offset = x1a_offset - sizeof(u16);
-+    out->x1a_offset = x1a_offset;
-+    out->x1c_offset = offsetof(ImageDescWrapper, x1C);
-+    out->constructor_allocation_bytes = 0x1C;
-+    desc_end = out->desc_offset + out->image_desc_bytes;
-+    candidate_end = out->flag_container_candidate_offset +
-+                    out->flag_container_candidate_bytes;
-+    out->layout_prefix_bound_bytes =
-+        desc_end > candidate_end ? desc_end : candidate_end;
-+    return out->desc_offset == 0 &&
-+           out->image_desc_bytes == 0x18 &&
-+           out->flag_container_candidate_offset == desc_end &&
-+           out->x1a_offset == candidate_end;
-+}
-+#endif
-+
- #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
- 
- void grStadium_801D1EF8(Ground_GObj* gobj)
 diff --git a/src/melee/lb/lbdvd.c b/src/melee/lb/lbdvd.c
-index d5b38ac5c92ce0e82ca005de8a205cb338790bb4..1e811f97a6fd8a6e65adc1472edf0a7c8640beeb 100644
+index d5b38ac5c92ce0e82ca005de8a205cb338790bb4..f2f2784310c8ccd0426e527a0d282f7a1a49f063 100644
 --- a/src/melee/lb/lbdvd.c
 +++ b/src/melee/lb/lbdvd.c
 @@ -1,5 +1,11 @@
@@ -7633,7 +7634,7 @@ index d5b38ac5c92ce0e82ca005de8a205cb338790bb4..1e811f97a6fd8a6e65adc1472edf0a7c
  #include "lb_0195.h"
  #include "lbarchive.h"
  #include "lbdvd.static.h"
-@@ -343,6 +349,29 @@
+@@ -343,6 +349,29 @@ void lbDvd_80017E64(int key, int index, void* value, bool cancelflag)
      lbDvd_80017CC4();
  }
  
