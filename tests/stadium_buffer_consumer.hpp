@@ -28,16 +28,18 @@ inline bool actual_layout_supported(
 {
     const uint64_t descriptor_end =
         uint64_t(layout.desc_offset) + layout.image_desc_bytes;
-    const uint64_t flag_end =
-        uint64_t(layout.flag_storage_offset) + layout.flag_storage_bytes;
+    const uint64_t candidate_end =
+        uint64_t(layout.flag_container_candidate_offset) +
+        layout.flag_container_candidate_bytes;
     return execution_pointer_bytes == 4 && layout.pointer_bytes == 4 &&
            layout.image_desc_bytes == 0x18 && layout.wrapper_bytes > 0x1c &&
-           layout.desc_offset == 0 && layout.flag_storage_offset == 0x18 &&
-           layout.flag_storage_bytes == sizeof(uint16_t) &&
+           layout.desc_offset == 0 &&
+           layout.flag_container_candidate_offset == 0x18 &&
+           layout.flag_container_candidate_bytes == sizeof(uint16_t) &&
            layout.x1a_offset == 0x1a && layout.x1c_offset == 0x1c &&
            layout.constructor_allocation_bytes == 0x1c &&
-           layout.written_prefix_bytes == flag_end &&
-           descriptor_end <= flag_end && flag_end <= 0x1c &&
+           layout.layout_prefix_bound_bytes == candidate_end &&
+           descriptor_end <= candidate_end && candidate_end <= 0x1c &&
            uint64_t(layout.x1c_offset) + sizeof(uint16_t) <=
                layout.wrapper_bytes;
 }
@@ -51,7 +53,7 @@ inline void pure_gate_checks(const MeleeWebStadiumBufferLayout& actual_layout)
         throw std::runtime_error(
             "Unsupported host64 ABI passed the pure Stadium buffer gate");
     auto invalid_layout = actual_layout;
-    invalid_layout.flag_storage_offset = 0x1c;
+    invalid_layout.flag_container_candidate_offset = 0x1c;
     if (actual_layout_supported(4, invalid_layout))
         throw std::runtime_error(
             "Flag storage outside the original 0x1c allocation passed the pure gate");

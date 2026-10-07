@@ -7578,7 +7578,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..546cd2ddc741ddc4de9fac9bd4e54753
  
  #include <sysdolphin/baselib/forward.h>
  
-@@ -652,6 +657,36 @@
+@@ -652,6 +657,38 @@
      u16 x1A, x1C;
  } ImageDescWrapper;
  
@@ -7586,7 +7586,7 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..546cd2ddc741ddc4de9fac9bd4e54753
 +int melee_web_stadium_buffer_layout_read(MeleeWebStadiumBufferLayout* out)
 +{
 +    size_t desc_end;
-+    size_t flag_end;
++    size_t candidate_end;
 +    size_t x1a_offset;
 +    if (out == NULL) return 0;
 +    x1a_offset = offsetof(ImageDescWrapper, x1A);
@@ -7595,20 +7595,22 @@ index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..546cd2ddc741ddc4de9fac9bd4e54753
 +    out->image_desc_bytes = sizeof(HSD_ImageDesc);
 +    out->wrapper_bytes = sizeof(ImageDescWrapper);
 +    out->desc_offset = offsetof(ImageDescWrapper, desc);
-+    out->flag_storage_bytes = sizeof(u16);
-+    /* flag is the u16 bitfield immediately before the authored x1A member.
-+     * Derive its storage from this TU's private type; do not copy its ABI. */
-+    out->flag_storage_offset = x1a_offset - sizeof(u16);
++    out->flag_container_candidate_bytes = sizeof(u16);
++    /* flag is declared u16 before x1A. This candidate follows the actual
++     * member layout; it does not report the lowered bitfield access span. */
++    out->flag_container_candidate_offset = x1a_offset - sizeof(u16);
 +    out->x1a_offset = x1a_offset;
 +    out->x1c_offset = offsetof(ImageDescWrapper, x1C);
 +    out->constructor_allocation_bytes = 0x1C;
 +    desc_end = out->desc_offset + out->image_desc_bytes;
-+    flag_end = out->flag_storage_offset + out->flag_storage_bytes;
-+    out->written_prefix_bytes = desc_end > flag_end ? desc_end : flag_end;
++    candidate_end = out->flag_container_candidate_offset +
++                    out->flag_container_candidate_bytes;
++    out->layout_prefix_bound_bytes =
++        desc_end > candidate_end ? desc_end : candidate_end;
 +    return out->desc_offset == 0 &&
 +           out->image_desc_bytes == 0x18 &&
-+           out->flag_storage_offset == desc_end &&
-+           out->x1a_offset == flag_end;
++           out->flag_container_candidate_offset == desc_end &&
++           out->x1a_offset == candidate_end;
 +}
 +#endif
 +
@@ -7631,10 +7633,11 @@ index d5b38ac5c92ce0e82ca005de8a205cb338790bb4..1e811f97a6fd8a6e65adc1472edf0a7c
  #include "lb_0195.h"
  #include "lbarchive.h"
  #include "lbdvd.static.h"
-@@ -343,6 +349,27 @@
+@@ -343,6 +349,29 @@
      lbDvd_80017CC4();
  }
  
++#if defined(MELEE_WEB_GAMEPLAY)
 +int melee_web_source_preload_predicate(int state, int load_score,
 +                                       int entry_num, int requested_entry)
 +{
@@ -7655,11 +7658,12 @@ index d5b38ac5c92ce0e82ca005de8a205cb338790bb4..1e811f97a6fd8a6e65adc1472edf0a7c
 +    }
 +    return MELEE_WEB_SOURCE_PRELOAD_ABSENT;
 +}
++#endif
 +
  void* lbDvd_GetPreloadedArchive(ssize_t entry_num)
  {
      s8 type;
-@@ -463,6 +490,19 @@ HSD_Archive* lbDvd_8001819C(const char* basename)
+@@ -463,6 +492,19 @@ HSD_Archive* lbDvd_8001819C(const char* basename)
  {
      HSD_Archive* archive;
      char* filename = lbFileGetFullName(basename);

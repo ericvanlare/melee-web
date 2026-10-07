@@ -55,12 +55,13 @@ void source_observer_preflight()
               << " HSD_ImageDesc=" << layout.image_desc_bytes
               << " ImageDescWrapper=" << layout.wrapper_bytes
               << " desc@" << layout.desc_offset
-              << " flag-storage@" << layout.flag_storage_offset << "+"
-              << layout.flag_storage_bytes << " x1A@" << layout.x1a_offset
+              << " flag-container-candidate@"
+              << layout.flag_container_candidate_offset << "+"
+              << layout.flag_container_candidate_bytes << " x1A@" << layout.x1a_offset
               << " x1C@" << layout.x1c_offset
               << " allocation=" << layout.constructor_allocation_bytes
-              << " written-prefix=" << layout.written_prefix_bytes
-              << "; ABI gate passed, constructor not called\n";
+              << " layout-prefix-bound=" << layout.layout_prefix_bound_bytes
+              << "; ABI layout gate passed, constructor not called\n";
 }
 }
 int main(){try{
