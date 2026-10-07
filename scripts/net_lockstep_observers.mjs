@@ -251,3 +251,19 @@ export function verifyReliableHostWebRtc(state) {
     throw Error(`WebRTC is not connected, reliable, ordered and host-only: ${JSON.stringify(state)}`);
   return state;
 }
+
+// Record an observed boundary before transport loss; final protocol receipts may
+// be incomplete after close and are not a replacement for this observation.
+export function verifyDisconnectBoundary(status, summary, sourceCursor, publishedInputs) {
+  if (!Number.isSafeInteger(sourceCursor) || sourceCursor < 1 ||
+      !Number.isSafeInteger(publishedInputs) || publishedInputs < 1 ||
+      status?.cursor !== sourceCursor || status?.pushed !== sourceCursor ||
+      status?.blocker !== 'network_wait' || status?.network_wait?.active !== 1 ||
+      summary?.terminal || summary?.remote_ack_input !== publishedInputs - 1 ||
+      summary?.local_input_ticks !== publishedInputs || summary?.remote_input_ticks !== publishedInputs ||
+      !Array.isArray(summary?.checksum_mismatches) || summary.checksum_mismatches.length)
+    throw Error(`Disconnect pre-close boundary is incomplete: ${JSON.stringify({status, summary})}`);
+  return {source_cursor: status.cursor, pushed: status.pushed, blocker: status.blocker,
+    published_inputs: publishedInputs, remote_ack_input: summary.remote_ack_input,
+    next_checksum_compare: summary.next_checksum_compare, observed_before_close: true};
+}
