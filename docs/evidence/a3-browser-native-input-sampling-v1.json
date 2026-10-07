@@ -172,10 +172,36 @@
   "historical_experiments": [
     {
       "private_run_id": "issue210-browser-local-input-sampling-20261007-152348",
-      "producer_commit": "574a9d0d44719ae123b9974c7c8fe2c0c7fc7ad9",
+      "launch_packet_sha256": "3e87e6d36da8259b3176eb9eeaa596459141f6ec82bb7e727dbb84f420998c26",
+      "coordinator_sha256": "51f8c0168f9b704c6a3b9c6a8a9d42adcbda0f607afe8792e45ec90b063b4206",
+      "coordinator_adaptation_diff_sha256": "7aa869a3052e322ac296cf670fa3820abd5190cef0720a00409d628a7432ef45",
+      "runner_source_head": {
+        "commit": "574a9d0d44719ae123b9974c7c8fe2c0c7fc7ad9",
+        "tree": "146b18789f20a565fc043d86f802a96447fe44cc",
+        "runner_overlay_from_staged_source_sha256": "3e659003c878daed3e78555fc9ee4fc55cbb80f6cff9a5ee3673b8a6c293dadd",
+        "overlay_path": "scripts/net_lockstep_browser.mjs"
+      },
+      "staged_runtime_source": {
+        "commit": "934e79ef8086ebceed37acc65359592e650d7955",
+        "tree": "110789e667d1debd8ee2bc13624a1952a574a86b",
+        "manifest_sha256": "c721c3cfb9d1f153c0e52c3ca6b12a204efc9c64f3753a971185dd93a2b5b1b2"
+      },
+      "runtime_build_producer": {
+        "commit": "420c740435a5b3a9e4f71a4ce0c8766e8ffa6e3d",
+        "tree": "2c33339b692fda0a80ae279de113de498fc6e6ad",
+        "configuration": "Release",
+        "test_only_dirty_delta_sha256": "83ed8eca2e9dc769c0faeb56d34a71f880d2f6b55c96077fda0a9992736b9136",
+        "test_only_dirty_delta": "One define in tests/test_net_arena_fill_lifetime.py matching the existing 11-byte PADStatus contract; no native runtime source changed.",
+        "build_log_sha256": "2508d85acfd0d5fe9581d7c81411c567d1e54612865000a8a86add22317f8a34",
+        "runtime_artifacts": {
+          "gameplay_menu_browser.js": "9c17e5f1dcd06f9d5667e1e57bd0c5f77adfd51a9e0074481a973847f5d7e9db",
+          "gameplay_menu_browser.wasm": "2abc10ade1c082e7b4bb213ca2c5b57cafde95e69d1295fcf3fed4f76f75ab66"
+        }
+      },
+      "runner_overlay_changed_native_runtime_or_staged_site": false,
       "result": "failed before acceptance; runner reported an indexed native frame push error at source tick 2",
       "root_failure_review_sha256": "d6830c33866eef31eac1f43a79aac9b5c1fb93703e4f0a077f229e7ff90092da",
-      "cause_limit": "That producer had no local-capture failure reason in status; its stale peer snapshot does not identify the first native cause."
+      "cause_limit": "The captured status had no local-capture failure reason, and the stale peer snapshot does not identify the first native cause. The later diagnostic run identified a repeated poll serial at cursor 1; that finding is not evidence of this first run's cause."
     },
     {
       "private_run_id": "issue210-diagnostics-input-sampling-capture-20261007-091855-c52102bc",
