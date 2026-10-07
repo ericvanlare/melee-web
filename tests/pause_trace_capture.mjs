@@ -129,9 +129,9 @@ export async function installPauseTraceCapture(page,stallSchedule=null){
   },{columns:PAUSE_TRACE_COLUMNS,stallSchedule});
 }
 
-export async function readPauseTraceStatus(page,{readNative=true}={}){
+export async function readPauseTraceStatus(page,{readNative=true,includeLatestCallback=false}={}){
   // Playwright serializes this callback; Node closure bindings do not cross.
-  return page.evaluate(readNative=>{
+  return page.evaluate(({readNative,includeLatestCallback})=>{
     const capture=window.__meleePauseTrace;
     if(!capture)return {status:'not-installed'};
     const module=window.Module;
@@ -141,16 +141,28 @@ export async function readPauseTraceStatus(page,{readNative=true}={}){
     let nativeMessage=null;
     if(readNative)try{const pointer=module?._melee_web_native_menu_message?.();
       if(pointer)nativeMessage=module.UTF8ToString(pointer);}catch(error){nativeMessage={error:String(error?.message||error)};}
+    let latestCallback=null;
+    if(includeLatestCallback&&capture.state.rows>0){
+      const names=['source_steps','source_draws','draw_calls','sample_source_frame','sample_replay_cursor'];
+      const width=capture.state.columns.length,row=capture.state.rows-1,base=row*width;
+      const values=Object.fromEntries(names.map(name=>{
+        const column=capture.state.columns.indexOf(name);
+        const value=column<0?NaN:capture.table[base+column];
+        return [name,Number.isFinite(value)?value:null];
+      }));
+      latestCallback={row,...values};
+    }
     return {status:'installed',at_ms:performance.now(),time_origin:performance.timeOrigin,
       rows:capture.state.rows,dropped:capture.state.dropped,
       capture_errors:capture.state.errors,stall_schedule:capture.state.stall_schedule,
       incidents:capture.state.incidents.slice(),incident_overflow:capture.state.incident_overflow,
       replay_cursor:call('_melee_web_native_menu_replay_cursor'),source_running:call('_melee_web_native_menu_running'),
+      ...(includeLatestCallback?{latest_callback:latestCallback}:{}),
       phase:call('_melee_web_native_menu_phase'),native_message:nativeMessage,
       runtime_error:status?.dataset.runtimeError||null,
       dialog_error:dialog?document.querySelector('#error')?.textContent?.trim()||'Application error':null,
       replay_report:window.lastRetailReplayReport??null,status_text:status?.textContent||null};
-  },readNative);
+  },{readNative,includeLatestCallback});
 }
 
 /** Atomically mark a timing-table row cursor and page-clock boundary. */

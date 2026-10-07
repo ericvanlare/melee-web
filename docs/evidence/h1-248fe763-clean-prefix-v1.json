@@ -1,0 +1,89 @@
+{
+  "schema": "melee-web-h1-natural-prefix-receipt-v1",
+  "evidence_label": "Source identified / Compiled / Browser exercised",
+  "result": "clean_prefix_no_pause_reproduced",
+  "scope": "One bounded headless performance diagnosis on the H1 harness source; not whole-session acceptance, root-cause evidence, or a performance pass.",
+  "run_locator": "Private retained external run h1-natural-pause-diagnostic-repair-20261006-20261006-185549-7bed3de9; source report, trace and independent review remain there.",
+  "source": {
+    "commit": "248fe763a79f96f42a223612d1379574e484cc1f",
+    "tree": "bb2b2470cabac4dcc0882a9df64e058115c5d12b"
+  },
+  "producer_binding": {
+    "release_runtime": true,
+    "local_artifact_files": 32,
+    "local_artifacts_bound_pre_and_post": true,
+    "independent_http_response_files": 32,
+    "http_responses_bound_pre_and_post": true,
+    "browser_loaded_response_bytes_verified": false,
+    "wasm_filesystem_data_bytes_verified": false
+  },
+  "input": {
+    "recipe_format": "MWRC",
+    "recipe_version": 8,
+    "seed": 3980218793,
+    "frames": 42127,
+    "recipe_sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e",
+    "disc": "Super Smash Bros. Melee USA Rev 2 CISO; private identity bound in retained manifest"
+  },
+  "environment": {
+    "browser": "Installed Google Chrome 154.0.8037.98",
+    "headless": true,
+    "host_audio_muted_with_processing_retained": true,
+    "frame_slots": 2,
+    "selection": "default_two",
+    "automatic_timing_pause_resume": false,
+    "injected_load_or_stall": false,
+    "trace_buffer_mib": 128,
+    "trace_stream_cap_mib": 256
+  },
+  "terminal": {
+    "outcome": "cursor_limit",
+    "replay_cursor": 3001,
+    "live_match_source_frame": 1419,
+    "prior_pause_identity_crossed": {
+      "replay_cursor": 1645,
+      "live_match_source_frame": 63,
+      "timing_or_runtime_incident_observed": false
+    },
+    "native_source_stopped_before_trace_and_capture_export": true,
+    "owner_deadline_and_owned_process_cleanup": "pass"
+  },
+  "callback_evidence": {
+    "rows_before_stop": 3080,
+    "source_steps_before_stop": 3001,
+    "source_draws_before_stop": 3001,
+    "maximum_native_callback_ms": 50.755,
+    "maximum_explicit_preparation_ms": 50.73,
+    "maximum_native_callback_ms_after_match_counter_positive": 11.37,
+    "maximum_recorded_frame_or_staging_slot_wait_ms": 0,
+    "post_stop_rows": 244,
+    "post_stop_rows_with_zero_steps_draws_and_draw_calls": 244
+  },
+  "trace": {
+    "complete": true,
+    "data_loss": false,
+    "stream_bytes": 8490917,
+    "categories_include_renderer_scheduler_and_v8_cpu_profiler": true
+  },
+  "staging": {
+    "queue_completion_aggregate_records_retained": false,
+    "one_to_one_completion_ids_available": false,
+    "staging_cause_classified": false
+  },
+  "visual": {
+    "stopped_screenshot_artifact_present": true,
+    "canvas_observed_black": true,
+    "visible_gameplay_confirmed": false,
+    "legacy_stopped_scene_visual_flag_meant_artifact_and_viewport_gpu_presence_only": true,
+    "cause": "unknown"
+  },
+  "interpretation": "The run crossed the previously reported pause identity and reached the cursor bound without a timing/runtime incident or automatic resume. It is a clean prefix only. Zero sampled waits and the available trace do not classify staging completion or explain the old pause.",
+  "unrun_or_unproven": [
+    "Natural timing-pause reproduction and root cause",
+    "Browser-loaded response and Wasm filesystem .data byte identity",
+    "Staging occupancy/completion correlation for a generated incident",
+    "Image-visible gameplay and pixel equivalence",
+    "Original full-route H1 acceptance",
+    "Foreground timing, physical input, audible output, and PCM comparison"
+  ]
+}

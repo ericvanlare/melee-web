@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {NATURAL_PAUSE_PROTOCOL, resolveCaptureMode, validateNaturalPauseManifest,
+import {NATURAL_PAUSE_PROTOCOL, STOPPED_SCENE_PAIR_PROTOCOL, resolveCaptureMode, validateNaturalPauseManifest,
+  validateStoppedScenePairManifest, firstNaturalPauseIncident, firstStoppedScenePairStop,
+  summarizeStoppedSourceInterval,
   naturalPauseRuntimeUrl, validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
-  stopSourceBeforeNaturalPauseExport, readNaturalPauseBrowserCommandLine} from '../scripts/natural_pause_diagnostic.mjs';
+  stopSourceBeforeDiagnosticExport, readNaturalPauseBrowserCommandLine} from '../scripts/natural_pause_diagnostic.mjs';
 
 const sha = 'a'.repeat(64);
 const manifest = () => ({
@@ -18,6 +20,9 @@ const manifest = () => ({
       header: {version: 8, seed: 3980218793, frames: 42127}}},
   protocol: {...NATURAL_PAUSE_PROTOCOL},
 });
+const scenePairManifest = () => ({...manifest(),
+  schema: 'melee-web-stopped-scene-pair-diagnostic-manifest-v1',
+  protocol: {...STOPPED_SCENE_PAIR_PROTOCOL}});
 
 assert.deepEqual(resolveCaptureMode(), {mode: 'state', diagnostic: false});
 assert.deepEqual(resolveCaptureMode('performance', '/private/plan.json'),
@@ -28,9 +33,18 @@ assert.throws(() => resolveCaptureMode('hitch'), /must be state or performance/)
 
 assert.equal(validateNaturalPauseManifest(manifest(), ['runtime.js']).schema,
   'melee-web-natural-pause-diagnostic-manifest-v1');
+assert.equal(validateStoppedScenePairManifest(scenePairManifest(), ['runtime.js']).schema,
+  'melee-web-stopped-scene-pair-diagnostic-manifest-v1');
 assert.equal(NATURAL_PAUSE_PROTOCOL.replay_phase_timeout_ms, 65000);
 assert.equal(NATURAL_PAUSE_PROTOCOL.overall_timeout_ms, 95000);
 assert.equal(NATURAL_PAUSE_PROTOCOL.observation_timeout_ms, 5000);
+assert.equal(STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_target, 1600);
+assert.equal(STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_limit, 1800);
+assert.equal(STOPPED_SCENE_PAIR_PROTOCOL.replay_timeout_ms, 35000);
+assert.equal(STOPPED_SCENE_PAIR_PROTOCOL.replay_phase_timeout_ms, 40000);
+assert.equal(STOPPED_SCENE_PAIR_PROTOCOL.expected_frame_slots, 2);
+assert.equal(STOPPED_SCENE_PAIR_PROTOCOL.auto_resume, false);
+assert.equal(STOPPED_SCENE_PAIR_PROTOCOL.require_zero_source_steps_and_draws_between_images, true);
 for (const mutate of [
   value => {
     value.protocol.process_timeout_ms = value.protocol.replay_phase_timeout_ms;
@@ -44,6 +58,15 @@ for (const mutate of [
 ]) {
   const value = manifest(); mutate(value);
   assert.throws(() => validateNaturalPauseManifest(value, ['runtime.js']));
+}
+for (const mutate of [
+  value => {value.protocol.source_cursor_target = 1599;},
+  value => {value.protocol.auto_resume = true;},
+  value => {value.protocol.expected_frame_slots = 4;},
+  value => {value.build.configuration = 'Debug';},
+]) {
+  const value = scenePairManifest(); mutate(value);
+  assert.throws(() => validateStoppedScenePairManifest(value, ['runtime.js']));
 }
 
 const configuredUrl = naturalPauseRuntimeUrl('http://127.0.0.1:8795/runtime.html');
@@ -102,10 +125,45 @@ assert.equal(firstNaturalPauseStop({source_running: 1, source_cursor: 2999}, 600
 assert.equal(firstNaturalPauseStop({source_running: 1, source_cursor: 3000, runtime_error: 'fatal',
   incidents: [{reason: 1, at_ms: 5, value: 9, threshold: 8}]}, 1).outcome,
   'runtime_error', 'a runtime failure remains terminal while source is still running');
+assert.equal(firstNaturalPauseIncident({source_running: 1, source_cursor: 3000,
+  incidents: [{reason: 7, value: 0, threshold: 0}]}), null,
+  'ordinary preparation settling does not end the short visual prefix');
+assert.equal(firstStoppedScenePairStop({source_running: 1, source_cursor: 1599,
+  latest_callback: {sample_source_frame: 100, sample_replay_cursor: 1599}}, 5000), null,
+  'a positive match frame before the fixed cursor target is insufficient');
+assert.equal(firstStoppedScenePairStop({source_running: 1, source_cursor: 1601,
+  latest_callback: {sample_source_frame: 1, sample_replay_cursor: 1600, row: 55}}, 5000).outcome,
+  'paired_screenshot_target', 'the short target stops after the first observed positive match source frame');
+assert.equal(firstStoppedScenePairStop({source_running: 1, source_cursor: 1601,
+  latest_callback: {sample_source_frame: 0, sample_replay_cursor: 1600, row: 55}}, 5000), null,
+  'the target does not stop on pre-match callback rows');
+assert.equal(firstStoppedScenePairStop({source_running: 0, source_cursor: 1601,
+  latest_callback: {sample_source_frame: 1, sample_replay_cursor: 1600, row: 55}}, 5000).outcome,
+  'source_stopped_before_screenshot_target',
+  'a source that stopped without a classified timing/runtime incident is not accepted as the pair target');
+assert.equal(firstStoppedScenePairStop({source_running: 1, source_cursor: 1800,
+  latest_callback: {sample_source_frame: 0, sample_replay_cursor: 1800, row: 77}}, 5000).outcome,
+  'positive_match_frame_not_observed');
+assert.equal(firstStoppedScenePairStop({source_running: 1, source_cursor: 1500}, 35000).outcome,
+  'pair_replay_timeout');
+assert.equal(firstStoppedScenePairStop({source_running: 0, source_cursor: 1600,
+  incidents: [{reason: 1, value: 9, threshold: 8}], latest_callback: {sample_source_frame: 1,
+    sample_replay_cursor: 1600}}, 5000).outcome, 'timing_pause',
+  'a real source timing stop takes precedence over the screenshot target');
+
+const sourceIntervalCapture = {rows: 3, columns: ['source_steps', 'source_draws', 'frame'],
+  table: [0, 0, 1, 0, 0, 2, 1, 0, 3]};
+assert.deepEqual(summarizeStoppedSourceInterval(sourceIntervalCapture, 0, 2), {
+  first_row_inclusive: 0, end_row_exclusive: 2, callback_rows_observed: 2,
+  source_steps: 0, source_draws: 0, all_observed_callbacks_zero_source_steps_and_draws: true,
+});
+assert.equal(summarizeStoppedSourceInterval(sourceIntervalCapture, 1, 3)
+  .all_observed_callbacks_zero_source_steps_and_draws, false);
+assert.throws(() => summarizeStoppedSourceInterval(sourceIntervalCapture, 0, 4), /complete callback table span/);
 
 const order = [];
 let statusReads = 0;
-const lifecycle = await stopSourceBeforeNaturalPauseExport({
+const lifecycle = await stopSourceBeforeDiagnosticExport({
   readStatus: async () => {order.push('status'); return {source_running: ++statusReads === 1 ? 1 : 0};},
   stopPlayback: async () => {order.push('stop');},
   finalizeTrace: async () => {order.push('finalize'); return {complete: true};},
@@ -116,8 +174,30 @@ assert.deepEqual(order, ['status', 'stop', 'status', 'finalize', 'export', 'clea
 assert.equal(lifecycle.stopped.source_running, 0);
 assert.deepEqual(lifecycle.evidence, {rows: 1});
 assert.deepEqual(lifecycle.cleanup, {unloaded: true});
+const pairOrder = [];
+const pairLifecycle = await stopSourceBeforeDiagnosticExport({
+  readStatus: async () => {pairOrder.push('status'); return {source_running: pairOrder.length === 1 ? 1 : 0};},
+  stopPlayback: async () => {pairOrder.push('stop');},
+  captureImmediate: async status => {assert.equal(status.source_running, 0); pairOrder.push('immediate-image');},
+  finalizeTrace: async () => {pairOrder.push('trace');},
+  readEvidence: async () => {pairOrder.push('delayed-image-and-export');},
+  cleanupAfterEvidence: async () => {pairOrder.push('unload');},
+});
+assert.deepEqual(pairOrder, ['status', 'stop', 'status', 'immediate-image', 'trace',
+  'delayed-image-and-export', 'unload']);
+assert.equal(pairLifecycle.immediate, undefined);
+const failedImageOrder = [];
+await assert.rejects(() => stopSourceBeforeDiagnosticExport({
+  readStatus: async () => {failedImageOrder.push('status'); return {source_running: failedImageOrder.length === 1 ? 1 : 0};},
+  stopPlayback: async () => {failedImageOrder.push('stop');},
+  captureImmediate: async () => {failedImageOrder.push('immediate-image'); throw Error('image boundary failed');},
+  finalizeTrace: async () => {failedImageOrder.push('trace');},
+  readEvidence: async () => {failedImageOrder.push('delayed-image');},
+}), /image boundary failed/);
+assert.deepEqual(failedImageOrder, ['status', 'stop', 'status', 'immediate-image'],
+  'an incomplete immediate image prevents later trace/export work from masking the first boundary');
 const unsafeOrder = [];
-await assert.rejects(() => stopSourceBeforeNaturalPauseExport({
+await assert.rejects(() => stopSourceBeforeDiagnosticExport({
   readStatus: async () => {unsafeOrder.push('status'); return {source_running: 1};},
   stopPlayback: async () => {unsafeOrder.push('stop');},
   finalizeTrace: async () => {unsafeOrder.push('finalize');},
@@ -126,7 +206,7 @@ await assert.rejects(() => stopSourceBeforeNaturalPauseExport({
 assert.deepEqual(unsafeOrder, ['status', 'stop', 'status'],
   'trace stream and capture reads are skipped unless source_running is confirmed zero');
 const timedOutStatusOrder = [];
-await assert.rejects(() => stopSourceBeforeNaturalPauseExport({
+await assert.rejects(() => stopSourceBeforeDiagnosticExport({
   readStatus: async () => {timedOutStatusOrder.push('status'); throw Error('renderer observation timed out');},
   stopPlayback: async () => {timedOutStatusOrder.push('stop');},
   finalizeTrace: async () => {timedOutStatusOrder.push('finalize');},
@@ -166,6 +246,20 @@ assert.ok(stateExportTimeoutGuardAt > finalSnapshotAt &&
   'state-mode final exports are skipped if its final renderer snapshot times out');
 assert.ok(runner.includes('if (!diagnostic && stopAfter && !report.deliberate_prefix_stop'),
   'the natural-pause loop cannot enter state-mode cursor-stop/unload handling');
+assert.ok(runner.includes("'stopped-scene-pair': {type: 'boolean', default: false}"),
+  'the short stopped-scene pair requires a separate explicit opt-in');
+const immediateCaptureAt = runner.indexOf('captureImmediate: stoppedScenePair &&');
+const traceFinalizeAt = runner.indexOf('finalizeTrace: async () =>');
+const gpuQueryAt = runner.indexOf("observePageOperation('stopped scene and GPU status'");
+const delayedCaptureAt = runner.indexOf("captureStoppedSceneImage('stopped-scene-after-export'");
+assert.ok(immediateCaptureAt >= 0 && immediateCaptureAt < traceFinalizeAt &&
+  traceFinalizeAt < gpuQueryAt && gpuQueryAt < delayedCaptureAt,
+  'paired screenshot order is stop, immediate image, trace delay, GPU query, delayed image');
+assert.ok(!runner.includes('stopped_scene_visual'),
+  'artifact presence is never serialized under a visual-completeness claim');
+assert.ok(runner.includes('stopped_scene_artifacts_complete') &&
+  runner.includes("visible_gameplay_observed: 'not_assessed'"),
+  'artifact completeness and actual visible gameplay are recorded separately');
 
 console.log('Natural-pause mode, frozen preflight, first-stop classification and export ordering passed.');
 
@@ -189,3 +283,4 @@ assert.deepEqual(await readNaturalPauseBrowserCommandLine({send: async name =>
   {arguments: ['--user-data-dir', '/tmp/fresh']});
 assert.ok(runner.includes("'--enable-automation'"), 'diagnostic launch enables the established Chrome command-line API');
 console.log('Browser identity retains process attribution before command-line failure and rejects wrong profiles.');
+console.log('Stopped-scene pair target, source interval, order, and scoped image completeness passed.');

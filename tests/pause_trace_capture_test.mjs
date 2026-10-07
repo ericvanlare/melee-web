@@ -93,7 +93,8 @@ try {
   sample[1] = 476;
   globalThis.window.menuDiagnosticSample(...sample);
   cursor = 601;
-  globalThis.window.menuRuntimeTiming({frame: 476, total_ms: 2, preparation_ms: 0});
+  globalThis.window.menuRuntimeTiming({frame: 476, total_ms: 2, preparation_ms: 0,
+    source_steps: 1, source_draws: 1, draw_calls: 410});
   state = globalThis.window.__meleePauseTrace.state;
   const cursorColumn = state.columns.indexOf('sample_replay_cursor');
   assert.ok(cursorColumn >= 0);
@@ -121,6 +122,12 @@ try {
   assert.equal(ready.source_running, 1);
   assert.equal(ready.phase, 2);
   assert.equal(nativeReads, 4, 'default status reads native APIs across serialized boundary');
+  assert.equal(Object.hasOwn(ready, 'latest_callback'), false,
+    'state and other existing callers keep the prior status shape unless they opt in');
+  const sourceReady = await readPauseTraceStatus(page, {readNative: false, includeLatestCallback: true});
+  assert.deepEqual(JSON.parse(JSON.stringify(sourceReady.latest_callback)), {row: 0, source_steps: 1, source_draws: 1,
+    draw_calls: 410, sample_source_frame: 476, sample_replay_cursor: 601},
+  'opt-in source counters are paired with the latest exact replay/source frame boundary');
   nativeReads = 0;
   for (const name of Object.keys(globalThis.window.Module))
     globalThis.window.Module[name] = () => {nativeReads++; throw Error('freed module');};

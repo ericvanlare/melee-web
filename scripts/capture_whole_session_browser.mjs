@@ -18,9 +18,11 @@ import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {finalizeSessionCapture, validateRuntimeDataAbort, boundedCaptureOperation,
   retainFirstCaptureError} from './whole_session_capture_result.mjs';
 import {parseRngDrawProbe, validateRngDrawProbeRows} from './rng_draw_probe.mjs';
-import {NATURAL_PAUSE_PROTOCOL, resolveCaptureMode, validateNaturalPauseManifest,
-  naturalPauseRuntimeUrl, validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
-  stopSourceBeforeNaturalPauseExport, readNaturalPauseBrowserCommandLine} from './natural_pause_diagnostic.mjs';
+import {NATURAL_PAUSE_PROTOCOL, STOPPED_SCENE_PAIR_PROTOCOL, resolveCaptureMode,
+  validateNaturalPauseManifest, validateStoppedScenePairManifest, naturalPauseRuntimeUrl,
+  validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
+  firstStoppedScenePairStop, summarizeStoppedSourceInterval, stopSourceBeforeDiagnosticExport,
+  readNaturalPauseBrowserCommandLine} from './natural_pause_diagnostic.mjs';
 import {installPauseTraceCapture, readPauseTraceCapture, readPauseTraceStatus,
   readRetainedPauseDiagnostics} from '../tests/pause_trace_capture.mjs';
 import {traceSettings, finalizeTrace} from './run_hitch_matrix.mjs';
@@ -33,6 +35,7 @@ const {values, tokens} = parseArgs({tokens: true, options: {
   'runtime-data': {type: 'string'},
   out: {type: 'string'},
   mode: {type: 'string', default: 'state'},
+  'stopped-scene-pair': {type: 'boolean', default: false},
   'diagnostic-manifest': {type: 'string'},
   'build-dir': {type: 'string'},
   'browser-profile': {type: 'string'},
@@ -62,6 +65,10 @@ if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runt
   throw Error('A real HTTP development runtime.html URL is required');
 const captureMode = resolveCaptureMode(values.mode, values['diagnostic-manifest']);
 const diagnostic = captureMode.diagnostic;
+const stoppedScenePair = values['stopped-scene-pair'];
+if (stoppedScenePair && !diagnostic)
+  throw Error('--stopped-scene-pair requires performance mode and a diagnostic manifest');
+const diagnosticProtocol = stoppedScenePair ? STOPPED_SCENE_PAIR_PROTOCOL : NATURAL_PAUSE_PROTOCOL;
 const diagnosticUrl = diagnostic ? naturalPauseRuntimeUrl(url.href) : url;
 const diagnosticManifestPath = diagnostic ? path.resolve(values['diagnostic-manifest']) : null;
 let diagnosticManifest = null;
@@ -80,7 +87,9 @@ if (diagnostic) {
   try { diagnosticManifest = JSON.parse(manifestBytes); }
   catch (error) { throw Error(`Diagnostic manifest is not JSON: ${error.message}`); }
   diagnosticArtifactNames = JSON.parse(await fs.readFile(new URL('../tools/browser_build_artifacts.json', import.meta.url)));
-  validateNaturalPauseManifest(diagnosticManifest, diagnosticArtifactNames);
+  if (stoppedScenePair)
+    validateStoppedScenePairManifest(diagnosticManifest, diagnosticArtifactNames);
+  else validateNaturalPauseManifest(diagnosticManifest, diagnosticArtifactNames);
   if (new URL(diagnosticManifest.runtime_url).href !== url.href ||
       path.resolve(diagnosticManifest.inputs.disc.path) !== path.resolve(values.disc) ||
       path.resolve(diagnosticManifest.inputs.recipe.path) !== path.resolve(values.recipe) ||
@@ -96,13 +105,13 @@ if (diagnostic) {
   if (diagnosticManifest.protocol.mode !== values.mode)
     throw Error('Diagnostic manifest mode disagrees with --mode');
 }
-const phaseTimeoutMs = diagnostic ? NATURAL_PAUSE_PROTOCOL.phase_timeout_ms : integer('phase-timeout', 1000, 300000);
-const replayTimeoutMs = diagnostic ? NATURAL_PAUSE_PROTOCOL.replay_timeout_ms : integer('replay-timeout', 1000, 1800000);
-const pollMs = diagnostic ? NATURAL_PAUSE_PROTOCOL.phase_observation_interval_ms : integer('poll-ms', 50, 2000);
-const replayPollMs = diagnostic ? NATURAL_PAUSE_PROTOCOL.replay_poll_interval_ms :
+const phaseTimeoutMs = diagnostic ? diagnosticProtocol.phase_timeout_ms : integer('phase-timeout', 1000, 300000);
+const replayTimeoutMs = diagnostic ? diagnosticProtocol.replay_timeout_ms : integer('replay-timeout', 1000, 1800000);
+const pollMs = diagnostic ? diagnosticProtocol.phase_observation_interval_ms : integer('poll-ms', 50, 2000);
+const replayPollMs = diagnostic ? diagnosticProtocol.replay_poll_interval_ms :
   values['replay-poll-ms'] === undefined ? pollMs : integer('replay-poll-ms', 1, 2000);
 const requestedStopAfter = values['stop-after-source-frames'] ? integer('stop-after-source-frames',1,108000) : null;
-const stopAfter = diagnostic ? NATURAL_PAUSE_PROTOCOL.source_cursor_limit : requestedStopAfter;
+const stopAfter = diagnostic ? diagnosticProtocol.source_cursor_limit : requestedStopAfter;
 if (diagnostic && requestedStopAfter !== null && requestedStopAfter !== stopAfter)
   throw Error('Performance capture cursor bound is frozen by the diagnostic manifest');
 const resumeTimingPauses = diagnostic ? false : values['resume-timing-pauses'];
@@ -114,20 +123,22 @@ if (diagnostic && (values['cpu-observations'] || rngDrawProbe))
   throw Error('Performance diagnosis does not enable CPU-prefix or RNG observers');
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
-const observationTimeoutMs = diagnostic ? NATURAL_PAUSE_PROTOCOL.observation_timeout_ms : Math.min(phaseTimeoutMs, 5000);
+const observationTimeoutMs = diagnostic ? diagnosticProtocol.observation_timeout_ms : Math.min(phaseTimeoutMs, 5000);
 const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data']]
   .filter(Boolean).map(value => path.resolve(value));
 
 await fs.mkdir(output, {recursive: false});
 const report = {
   schema: 'melee-web-headless-whole-session-replay-v1',
-  scope: diagnostic ? 'One bounded headless natural-pause performance diagnosis; no admission, pixel, PCM, foreground, or physical-input claim' :
+  scope: stoppedScenePair ? 'One bounded paired stopped-scene screenshot timing check; image presence does not establish visible gameplay' :
+    diagnostic ? 'One bounded headless natural-pause performance diagnosis; no admission, pixel, PCM, foreground, or physical-input claim' :
     'Single headless browser MWRC v8/v9 diagnostic; no pixel, PCM, performance, or admission claim',
   result: 'fail',
   url: values.url,
   mode: captureMode.mode,
   ...(diagnostic ? {diagnostic_manifest: {path: diagnosticManifestPath, sha256: diagnosticManifestSha256}} : {}),
-  ...(diagnostic ? {diagnostic_protocol: NATURAL_PAUSE_PROTOCOL} : {}),
+  ...(diagnostic ? {diagnostic_protocol: diagnosticProtocol,
+    diagnostic_kind: stoppedScenePair ? 'paired_stopped_scene_screenshots' : 'natural_pause'} : {}),
   phase_timeout_ms: phaseTimeoutMs,
   replay_timeout_ms: replayTimeoutMs,
   observation_timeout_ms: observationTimeoutMs,
@@ -247,6 +258,41 @@ async function observePageOperation(label, operation) {
 
 async function pauseTraceStatus(options = {}) {
   return observePageOperation('pause trace status', readPauseTraceStatus(page, options));
+}
+
+function stoppedSceneSourceCounters(status) {
+  const callback = status?.latest_callback;
+  return {at_ms: status?.at_ms ?? null, replay_cursor: status?.replay_cursor ?? null,
+    source_running: status?.source_running ?? null, callback_rows: status?.rows ?? null,
+    match_source_frame: callback?.sample_source_frame ?? null,
+    callback_replay_cursor: callback?.sample_replay_cursor ?? null,
+    callback_source_steps: callback?.source_steps ?? null,
+    callback_source_draws: callback?.source_draws ?? null,
+    callback_draw_calls: callback?.draw_calls ?? null};
+}
+
+async function captureStoppedSceneImage(name, expectedCursor, initialStatus = null) {
+  const before = initialStatus ?? await pauseTraceStatus({includeLatestCallback: true});
+  if (before?.source_running !== 0 || !Number.isSafeInteger(before?.replay_cursor))
+    throw Error(`Refusing ${name} screenshot without a stopped source and exact cursor`);
+  if (expectedCursor !== null && before.replay_cursor !== expectedCursor)
+    throw Error(`${name} screenshot cursor changed before capture: ${before.replay_cursor} != ${expectedCursor}`);
+  const screenshotPath = path.join(output, `${name}.png`);
+  const capturedAt = before.at_ms;
+  await observePageOperation(`${name} stopped-scene screenshot`,
+    page.screenshot({path: screenshotPath, fullPage: false}));
+  const after = await pauseTraceStatus({includeLatestCallback: true});
+  if (after?.source_running !== 0 || after.replay_cursor !== before.replay_cursor)
+    throw Error(`${name} screenshot interval changed source running/cursor state`);
+  const screenshotStat = await fs.stat(screenshotPath);
+  if (!screenshotStat.isFile() || screenshotStat.size <= 0)
+    throw Error(`${name} screenshot artifact is empty`);
+  return {image: {name, path: screenshotPath, bytes: screenshotStat.size,
+    sha256: await digest(screenshotPath), capture_window_page_ms: {started_after: capturedAt,
+      completed_before: after.at_ms ?? null}},
+  counters: {before: stoppedSceneSourceCounters(before), after: stoppedSceneSourceCounters(after),
+    exact_cursor: before.replay_cursor, source_running_zero_before_and_after: true,
+    cursor_unchanged_during_capture: true}};
 }
 
 async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
@@ -424,9 +470,9 @@ try {
     playwright: playwrightPath};
   const browserOptions = {...browserLaunchOptions(launchOptions, {timeout: phaseTimeoutMs}), headless: true,
     ...(diagnostic ? {args: [...browserLaunchOptions(launchOptions).args, '--enable-automation'],
-      viewport: {width: NATURAL_PAUSE_PROTOCOL.viewport_width,
-      height: NATURAL_PAUSE_PROTOCOL.viewport_height},
-      deviceScaleFactor: NATURAL_PAUSE_PROTOCOL.device_scale_factor} : {})};
+      viewport: {width: diagnosticProtocol.viewport_width,
+      height: diagnosticProtocol.viewport_height},
+      deviceScaleFactor: diagnosticProtocol.device_scale_factor} : {})};
   if (diagnostic) {
     const chromeVersionOutput = execFileSync(browserPath, ['--version'], {encoding: 'utf8'}).trim();
     const chromeVersion = chromeVersionOutput.match(/\d+(?:\.\d+){2,3}/)?.[0] ?? null;
@@ -628,22 +674,30 @@ try {
       last = await snapshot('replay-poll', {captureCss: !diagnostic});
       if (!last) throw Error('Browser page closed before the recorded-session replay completed');
       if (last.snapshot_error) throw Error(last.snapshot_error);
-      if (Date.now() - lastProgressWriteAt >= NATURAL_PAUSE_PROTOCOL.progress_write_interval_ms) {
+      if (Date.now() - lastProgressWriteAt >= diagnosticProtocol.progress_write_interval_ms) {
         await write('progress.json', {harness_phase:currentPhase,phase:last?.phase,cursor:last?.source_cursor,
           status:last?.status,error:last?.runtime_error,log:last?.log?.slice(-1600),
           browser_report:last?.replay_report,at_ms:last?.at_ms});
         lastProgressWriteAt = Date.now();
       }
       if (diagnostic) {
-        const observed = await pauseTraceStatus();
-        const stop = firstNaturalPauseStop({source_running: observed.source_running,
+        const observed = await pauseTraceStatus({includeLatestCallback: stoppedScenePair});
+        const observedTerminal = {source_running: observed.source_running,
           source_cursor: observed.replay_cursor, runtime_error: observed.runtime_error,
           dialog_error: observed.dialog_error, native_message: observed.native_message,
-          status_text: observed.status_text, incidents: observed.incidents}, Date.now() - replayStartedAt);
+          status_text: observed.status_text, incidents: observed.incidents,
+          latest_callback: observed.latest_callback};
+        const elapsedMs = Date.now() - replayStartedAt;
+        const stop = stoppedScenePair
+          ? firstStoppedScenePairStop(observedTerminal, elapsedMs)
+          : firstNaturalPauseStop(observedTerminal, elapsedMs);
         if (stop) {
           report.natural_pause_terminal = {...stop, observed_at_ms: observed.at_ms,
-            elapsed_ms: Date.now() - replayStartedAt, source_cursor: observed.replay_cursor,
+            elapsed_ms: elapsedMs, source_cursor: observed.replay_cursor,
             source_running: observed.source_running, phase: observed.phase};
+          if (stop.outcome === 'paired_screenshot_target')
+            report.stopped_scene_pair_target = {source_cursor: observed.replay_cursor,
+              source_running: observed.source_running, latest_callback: observed.latest_callback};
           return;
         }
         if (pageErrors.length) {
@@ -713,7 +767,7 @@ try {
       return;
     }
     throw Error(`whole-session replay exceeded ${replayTimeoutMs} ms; last snapshot ${JSON.stringify(last)}`);
-  }, diagnostic ? NATURAL_PAUSE_PROTOCOL.replay_phase_timeout_ms : replayTimeoutMs,
+  }, diagnostic ? diagnosticProtocol.replay_phase_timeout_ms : replayTimeoutMs,
   diagnostic ? 0 : pollMs);
 } catch (error) {
   firstError(currentPhase, error.message || error, report.last_successful_snapshot ?? null);
@@ -727,8 +781,8 @@ try {
       process.exitCode = 1;
     } else if (page && !page.isClosed() && report.pause_trace_installation) {
       try {
-        const stopped = await stopSourceBeforeNaturalPauseExport({
-          readStatus: () => pauseTraceStatus(),
+        const stopped = await stopSourceBeforeDiagnosticExport({
+          readStatus: () => pauseTraceStatus({includeLatestCallback: stoppedScenePair}),
           stopPlayback: async () => {
             const pause = await observePageOperation('native source pause', page.evaluate(() => {
               const module = globalThis.Module;
@@ -742,52 +796,114 @@ try {
             report.source_pause = pause;
             if (pause.after !== 0) throw Error('Native pause did not stop source playback');
           },
+          captureImmediate: stoppedScenePair &&
+            report.natural_pause_terminal?.outcome === 'paired_screenshot_target'
+            ? async status => {
+              const immediate = await captureStoppedSceneImage('stopped-scene-immediate',
+                report.natural_pause_terminal.source_cursor, status);
+              report.stopped_scene_pair ||= {images: [], source_counters: {}, render_environment: null,
+                visible_gameplay_observed: 'not_assessed', capture_order: []};
+              report.stopped_scene_pair.capture_order.push('source_running_zero_verified',
+                'immediate_screenshot_complete_before_trace_finalization');
+              report.stopped_scene_pair.images.push(immediate.image);
+              report.stopped_scene_pair.source_counters.immediate_before = immediate.counters.before;
+              report.stopped_scene_pair.source_counters.immediate_after = immediate.counters.after;
+              return immediate;
+            } : undefined,
           finalizeTrace: async () => {
             if (!traceStarted || !diagnosticCdp || !naturalPauseTraceSettings)
               return {paths: [], complete: false, reusable: false, error: 'Trace was not started'};
             const value = await boundedCaptureOperation(
               finalizeTrace(diagnosticCdp, output, naturalPauseTraceSettings),
-              NATURAL_PAUSE_PROTOCOL.phase_timeout_ms, 'trace finalization');
+              diagnosticProtocol.phase_timeout_ms, 'trace finalization');
             traceStarted = false;
             report.trace = value;
+            if (stoppedScenePair && report.stopped_scene_pair)
+              report.stopped_scene_pair.capture_order.push('trace_finalization_returned');
             if (!value.complete) process.exitCode = 1;
             return value;
           },
           readEvidence: async () => {
-            const stoppedVisual = await observePageOperation('stopped scene and GPU status', page.evaluate(async () => {
-              const canvas = document.querySelector('#canvas');
-              const rect = canvas?.getBoundingClientRect();
-              let adapterAvailable = false;
-              if (navigator.gpu && typeof navigator.gpu.requestAdapter === 'function') {
-                try { adapterAvailable = (await navigator.gpu.requestAdapter()) !== null; } catch {}
+            const pairEligible = stoppedScenePair &&
+              report.natural_pause_terminal?.outcome === 'paired_screenshot_target' &&
+              report.stopped_scene_pair?.images?.length === 1;
+            let stoppedVisual = null;
+            if (!stoppedScenePair || pairEligible) {
+              stoppedVisual = await observePageOperation('stopped scene and GPU status', page.evaluate(async () => {
+                const canvas = document.querySelector('#canvas');
+                const rect = canvas?.getBoundingClientRect();
+                let adapterAvailable = false;
+                if (navigator.gpu && typeof navigator.gpu.requestAdapter === 'function') {
+                  try { adapterAvailable = (await navigator.gpu.requestAdapter()) !== null; } catch {}
+                }
+                let contextAvailable = false;
+                try { contextAvailable = canvas?.getContext('webgpu') !== null; } catch {}
+                return {viewport: {inner_width: innerWidth, inner_height: innerHeight,
+                    visual_width: visualViewport?.width ?? null, visual_height: visualViewport?.height ?? null,
+                    device_pixel_ratio: devicePixelRatio},
+                  canvas: canvas ? {buffer_width: canvas.width, buffer_height: canvas.height,
+                    css_width: rect.width, css_height: rect.height} : null,
+                  gpu_status: {secure_context: isSecureContext, cross_origin_isolated: crossOriginIsolated,
+                    adapter_available: adapterAvailable,
+                    preferred_canvas_format: navigator.gpu?.getPreferredCanvasFormat?.() ?? null,
+                    webgpu_context_available: contextAvailable}};
+              }));
+              if (stoppedScenePair) {
+                report.stopped_scene_pair.capture_order.push('gpu_status_queried');
+                const delayed = await captureStoppedSceneImage('stopped-scene-after-export',
+                  report.natural_pause_terminal.source_cursor);
+                report.stopped_scene_pair.images.push(delayed.image);
+                report.stopped_scene_pair.capture_order.push('delayed_screenshot_complete_after_trace_and_gpu_query');
+                report.stopped_scene_pair.source_counters.delayed_before = delayed.counters.before;
+                report.stopped_scene_pair.source_counters.delayed_after = delayed.counters.after;
+                report.stopped_scene_pair.render_environment = stoppedVisual;
+              } else {
+                const screenshotPath = path.join(output, 'stopped-scene.png');
+                await observePageOperation('stopped scene screenshot',
+                  page.screenshot({path: screenshotPath, fullPage: false}));
+                const screenshotStat = await fs.stat(screenshotPath);
+                report.stopped_scene = {...stoppedVisual, screenshot: {path: screenshotPath,
+                  bytes: screenshotStat.size, sha256: await digest(screenshotPath)}};
               }
-              let contextAvailable = false;
-              try { contextAvailable = canvas?.getContext('webgpu') !== null; } catch {}
-              return {viewport: {inner_width: innerWidth, inner_height: innerHeight,
-                  visual_width: visualViewport?.width ?? null, visual_height: visualViewport?.height ?? null,
-                  device_pixel_ratio: devicePixelRatio},
-                canvas: canvas ? {buffer_width: canvas.width, buffer_height: canvas.height,
-                  css_width: rect.width, css_height: rect.height} : null,
-                gpu_status: {secure_context: isSecureContext, cross_origin_isolated: crossOriginIsolated,
-                  adapter_available: adapterAvailable,
-                  preferred_canvas_format: navigator.gpu?.getPreferredCanvasFormat?.() ?? null,
-                  webgpu_context_available: contextAvailable}};
-            }));
-            const screenshotPath = path.join(output, 'stopped-scene.png');
-            await observePageOperation('stopped scene screenshot',
-              page.screenshot({path: screenshotPath, fullPage: false}));
-            const screenshotStat = await fs.stat(screenshotPath);
-            report.stopped_scene = {...stoppedVisual, screenshot: {path: screenshotPath,
-              bytes: screenshotStat.size, sha256: await digest(screenshotPath)}};
+            } else {
+              report.stopped_scene_pair ||= {images: [], source_counters: {}, render_environment: null,
+                visible_gameplay_observed: 'not_assessed', capture_order: []};
+              report.stopped_scene_pair.capture_skipped =
+                'Positive-match source cursor target was not reached; no paired images were produced.';
+            }
             report.runtime_incident_recorder = await observePageOperation('retained incident recorder',
               readRetainedPauseDiagnostics(page,
                 ['timing_pause', 'runtime_error', 'preparation_error'].includes(report.natural_pause_terminal?.outcome)));
             report.staging_incident_summaries = (report.runtime_incident_recorder.retained_records || [])
               .map(record => ({id: record.id, reason: record.reason, timestamp: record.timestamp,
                 staging: record.staging ?? null}));
-            report.capture_status_after_stop = await pauseTraceStatus({readNative: false});
+            report.capture_status_after_stop = await pauseTraceStatus({readNative: false,
+              includeLatestCallback: stoppedScenePair});
             report.capture = await observePageOperation('callback capture export',
               readPauseTraceCapture(page, report.natural_pause_terminal?.outcome ?? 'capture_failure'));
+            if (stoppedScenePair && pairEligible) {
+              const counters = report.stopped_scene_pair.source_counters;
+              const firstRow = counters.immediate_after.callback_rows;
+              const endRow = counters.delayed_after.callback_rows;
+              const interval = summarizeStoppedSourceInterval(report.capture, firstRow, endRow);
+              const snapshots = [counters.immediate_before, counters.immediate_after,
+                counters.delayed_before, counters.delayed_after];
+              const targetCursor = report.natural_pause_terminal.source_cursor;
+              const sourceStopped = snapshots.every(row => row.source_running === 0);
+              const cursorUnchanged = snapshots.every(row => row.replay_cursor === targetCursor);
+              report.stopped_scene_pair.source_counters.interval = {
+                exact_cursor_before_and_after_both_images: cursorUnchanged,
+                source_running_zero_at_all_image_boundaries: sourceStopped,
+                source_cursor_start: counters.immediate_after.replay_cursor,
+                source_cursor_end: counters.delayed_before.replay_cursor,
+                callback_interval: interval,
+                no_source_advance_verified: cursorUnchanged && sourceStopped &&
+                  interval.all_observed_callbacks_zero_source_steps_and_draws,
+              };
+              report.stopped_scene_pair.artifact_set_complete = report.stopped_scene_pair.images.length === 2 &&
+                report.stopped_scene_pair.images.every(image => Number.isSafeInteger(image.bytes) &&
+                  image.bytes > 0 && /^[0-9a-f]{64}$/.test(image.sha256 || ''));
+            }
             return {runtime_incident_recorder: report.runtime_incident_recorder,
               capture_rows: report.capture.rows, capture_errors: report.capture.errors,
               capture_dropped: report.capture.dropped};
@@ -955,7 +1071,9 @@ try {
     }
     const terminal = report.natural_pause_terminal;
     const validTerminalOutcomes = new Set(['timing_pause', 'runtime_error', 'cursor_limit',
-      'replay_timeout', 'replay_completed']);
+      'replay_timeout', 'replay_completed', 'paired_screenshot_target',
+      'positive_match_frame_not_observed', 'pair_replay_timeout',
+      'source_stopped_before_screenshot_target']);
     const preflightValid = diagnosticPreflightValid &&
       report.browser_identity_preflight?.valid === true && report.browser_identity_postlaunch?.valid === true &&
       report.ring_status_validation?.valid === true;
@@ -967,22 +1085,33 @@ try {
       report.cleanup.cdp_detached === true && report.cleanup.browser_context_closed === true &&
       report.source_stop?.source_stopped_before_trace_stream_and_capture_export === true &&
       !report.source_stop_error && !report.close_error && !report.cdp_close_error;
-    const visualValid = Number.isSafeInteger(report.stopped_scene?.screenshot?.bytes) &&
+    const stoppedSceneArtifactsComplete = stoppedScenePair
+      ? report.stopped_scene_pair?.artifact_set_complete === true
+      : Number.isSafeInteger(report.stopped_scene?.screenshot?.bytes) &&
       report.stopped_scene.screenshot.bytes > 0 &&
       Number.isFinite(report.stopped_scene?.viewport?.device_pixel_ratio) &&
       !!report.stopped_scene?.gpu_status;
-    const captureValid = preflightValid && postflightValid && cleanupValid && visualValid &&
+    const stoppedScenePairValid = !stoppedScenePair || (
+      terminal?.outcome === 'paired_screenshot_target' &&
+      report.stopped_scene_pair?.source_counters?.interval?.no_source_advance_verified === true);
+    const captureValid = preflightValid && postflightValid && cleanupValid &&
+      stoppedSceneArtifactsComplete && stoppedScenePairValid &&
       validTerminalOutcomes.has(terminal?.outcome) && report.trace?.complete === true &&
       report.capture?.status === 'captured' && report.capture.rows > 0 &&
       report.capture.errors === 0 && report.capture.dropped === 0 && report.capture.incident_overflow === 0;
     report.diagnostic_capture_valid = captureValid;
+    report.diagnostic_capture_validity_scope =
+      'Protocol and artifact completeness only; no image pixel or visible-gameplay interpretation.';
     report.diagnostic_validity = {preflight: preflightValid, ring_default_two: report.ring_status_validation?.valid === true,
       explicit_terminal_outcome: validTerminalOutcomes.has(terminal?.outcome), trace_complete: report.trace?.complete === true,
       callback_capture_complete: report.capture?.status === 'captured' && report.capture?.rows > 0 &&
         report.capture?.errors === 0 && report.capture?.dropped === 0 && report.capture?.incident_overflow === 0,
-      stopped_scene_visual: visualValid,
+      stopped_scene_artifacts_complete: stoppedSceneArtifactsComplete,
+      visible_gameplay_observed: 'not_assessed',
+      ...(stoppedScenePair ? {paired_source_interval_zero_steps_and_draws:
+        report.stopped_scene_pair?.source_counters?.interval?.no_source_advance_verified === true} : {}),
       producer_postflight: postflightValid, cleanup: cleanupValid,
-      clean_prefix: captureValid && ['cursor_limit', 'replay_timeout'].includes(terminal?.outcome),
+      clean_prefix: captureValid && ['cursor_limit', 'replay_timeout', 'paired_screenshot_target'].includes(terminal?.outcome),
       terminal_failure: terminal?.outcome === 'runtime_error'};
     report.result = captureValid ? 'captured' : 'incomplete';
   } else finalizeSessionCapture(report);

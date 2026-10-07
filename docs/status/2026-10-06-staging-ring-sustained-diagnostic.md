@@ -140,31 +140,30 @@ checks, harness syntax check and offline reproduction also passed. The receipt
 binds validation logs separately from the historical browser runs. Its tracked
 offline tool reproduces the unchanged original source-informed result and metrics.
 
-The next bounded step addresses the existing natural-session failure in
-[audio-output-clock startup v2](../evidence/audio-output-clock-startup-v2.json):
-the four-player MWRC v8 replay paused at cursor 1645/live source frame 63.
-[The pause-trace receipt](../evidence/gameplay-pause-trace-v1.json) used a different
-CPU9 composition and did not reproduce that failure. The retained #157 handoff
-confirms its exact-recipe follow-up was never launched. Its staging observations
-are correlations, not a guard/completion trace or an established natural cause.
+The packet audit showed the exact-recipe follow-up was never launched and that the
+earlier staging observations were correlations, not a guard/completion trace or
+an established natural cause. A fresh producer-bound Release diagnosis then used
+that exact MWRC v8 recipe and disc with the default two-slot ring and no injected
+load or stall. It reached its cursor limit and crossed the previously reported
+pause identity without a timing/runtime incident. The
+[H1 clean-prefix entry](2026-10-06-h1-clean-prefix-visual-followup.md) and
+[receipt](../evidence/h1-248fe763-clean-prefix-v1.json) retain the scoped result.
+The run is a clean prefix only: it does not reproduce or explain the earlier
+pause, and its independent local/HTTP file maps do not verify bytes consumed by
+Chrome or the Wasm filesystem.
 
-First verify that packet's producer/build binding and reduce its first guard to
-source cursor, exact incident, preceding active callback, staging occupancy and
-completion, CPU phases and audio state. If the packet lacks those observations,
-propose one separately approved **default-two** diagnostic using the same pinned
-MWRC v8 recipe/disc and producer-identified Release package, with no injected load
-or stall. Freeze the existing handoff's limits: first pause/error, cursor 3000 or
-60-second replay timeout; 65-second process and 95-second overall caps. Capture
-bounded startup CDP/User Timing plus the existing hitch recorder; stop source
-playback before large evidence reads. No resume, tuning or automatic retry.
+Review found the retained stopped screenshot black; its old
+`stopped_scene_visual` field meant artifact/viewport/GPU presence only. The next
+changed hypothesis is a short paired screenshot reducer: stop after a positive
+match source-frame callback near cursor 1600, verify the source remains stopped,
+then capture immediately before trace finalization and after the existing
+trace/GPU-query delay. It must not resume, advance or redraw the source. If both
+images are black, the presentation cause remains unknown and this boundary stops.
 
-A reproduced pause must retain its actual guard and completion path; reaching
-cursor 3000 only establishes a clean prefix. A missing retained input or uncertain
-build identity stops preflight. After reducing that boundary, a separate original
-CSS → SSS → Mario-versus-Mario four-stock Final Destination → Results → CSS
-natural run remains necessary for the acceptance gap, with separately declared
-callback/gap/audio criteria. Foreground, physical-input and retail gates remain
-open. This recommendation authorizes no run, changed limits or default ring change.
+A separate original CSS → SSS → Mario-versus-Mario four-stock Final Destination
+→ Results → CSS natural run remains necessary for the acceptance gap, with
+separately declared callback/gap/audio criteria. Foreground, physical-input and
+retail gates remain open; no timing-pause fix or default ring change is claimed.
 
 [H1's natural original-menu match](../ROADMAP.md#current-priorities),
 [the accuracy contract](../ACCURACY_CONTRACT.md), and the
