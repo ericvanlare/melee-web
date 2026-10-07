@@ -1,0 +1,320 @@
+{
+  "schema": "melee-web-b4-v10-first-match-clock1000-comparison-v1",
+  "date": "2026-10-07",
+  "issue": 229,
+  "scope": "One bounded original-to-browser comparison through the first match-0 match_frame at or above 1000. The capture and comparison remain incomplete.",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Retail compared",
+    "Browser exercised"
+  ],
+  "source": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "revision": "GALE01r2",
+    "recipe": {
+      "version": 10,
+      "bytes": 2241622,
+      "frame_count": 50394,
+      "seed": 3336171383,
+      "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b"
+    },
+    "manifest_sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7",
+    "report_sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913",
+    "setup_identity_audit": {
+      "sha256": "742a9a6b7317651c654620c1f69c87cff4177a8c9e7eea8c34d596e817af43e8",
+      "entry_sequence": 4088,
+      "setup_sequence": 4113,
+      "first_tick_sequence": 4115
+    },
+    "full_trace": {
+      "recorded_bytes": 2137257881,
+      "recorded_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "fresh_full_hash_computed": false,
+      "stat_stable_during_comparison": true
+    },
+    "bounded_prefix": {
+      "bytes": 50873188,
+      "records": 9731,
+      "first_source_tick": 0,
+      "first_source_sequence": 4115,
+      "last_source_sequence": 9730,
+      "fresh_sha256": "7f71d2c8c9529e8171dfab854cd114abb0eef44ca8d59c6f7e96af5495d13cf7",
+      "max_bytes": 67108864,
+      "max_records": 12000
+    },
+    "ordered_checkpoints_rejoined_before_continuing": [
+      {
+        "label": "clock1",
+        "tuple": {
+          "source_tick": 124,
+          "source_sequence": 4735,
+          "pad_consume_sequence": 4734,
+          "match_frame": 1,
+          "timeline_frame_index": 1308,
+          "browser_cursor": 1309
+        },
+        "prefix_bytes": 10389712,
+        "prefix_records": 4736,
+        "prefix_sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a"
+      },
+      {
+        "label": "clock60",
+        "tuple": {
+          "source_tick": 183,
+          "source_sequence": 5030,
+          "pad_consume_sequence": 5029,
+          "match_frame": 60,
+          "timeline_frame_index": 1367,
+          "browser_cursor": 1368
+        },
+        "prefix_bytes": 12780628,
+        "prefix_records": 5031,
+        "prefix_sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77"
+      },
+      {
+        "label": "clock300",
+        "tuple": {
+          "source_tick": 423,
+          "source_sequence": 6230,
+          "pad_consume_sequence": 6229,
+          "match_frame": 300,
+          "timeline_frame_index": 1607,
+          "browser_cursor": 1608
+        },
+        "prefix_bytes": 22506388,
+        "prefix_records": 6231,
+        "prefix_sha256": "ef9569c32524aa79443a998867c4c418a2cfd8b21719ed24b03fc966ded025ef"
+      },
+      {
+        "label": "clock500",
+        "tuple": {
+          "source_tick": 623,
+          "source_sequence": 7230,
+          "pad_consume_sequence": 7229,
+          "match_frame": 500,
+          "timeline_frame_index": 1807,
+          "browser_cursor": 1808
+        },
+        "prefix_bytes": 30611188,
+        "prefix_records": 7231,
+        "prefix_sha256": "ec1ceb5c56c87ec35b5dd8cd0d318c85b1917d554871883732de4d2e4f52e7b6"
+      },
+      {
+        "label": "target",
+        "tuple": {
+          "source_tick": 1123,
+          "source_sequence": 9730,
+          "pad_consume_sequence": 9729,
+          "match_frame": 1000,
+          "timeline_frame_index": 2307,
+          "browser_cursor": 2308
+        },
+        "prefix_bytes": 50873188,
+        "prefix_records": 9731,
+        "prefix_sha256": "7f71d2c8c9529e8171dfab854cd114abb0eef44ca8d59c6f7e96af5495d13cf7"
+      }
+    ],
+    "historical_clock1000_audit": {
+      "private_run_id": "b4-clock1000-source-audit-proposal-20261007-LdGe1v",
+      "artifact": "clock1000-source-audit-v1.json",
+      "sha256": "521e00f57aac27a999619d5adb3aa6fe6fa86e5c4f774b8f211cd002f9bcb632",
+      "schema": "melee-web-b4-source-clock1000-audit-v1",
+      "report_write_failed": "unrecorded"
+    }
+  },
+  "capture": {
+    "private_run_id": "b4-clock1000-browser-capture-20261007-8aa8526-v1",
+    "capture_id": "b4-v10-first-match-clock1000-browser-prefix-20261007-r2",
+    "producer": {
+      "head": "8aa85261e145d4b7d23f3d8fcb72b67e6a36594e",
+      "tree": "70f4edbbbeeaa03b9d0f4d5a09b93ec3bbe558bd",
+      "base_main": "41495f1894ec624c5aabb87bd8c2a4ce7b34d1cf"
+    },
+    "producer_manifest_sha256": "92b18d425d55387d6e864addb3126251cede4086ef68b9e7264457a32dd74879",
+    "capture_packet_sha256": "f8586855b4b2bb89525dabd13176cdb024a4bf7c0565b6bdccf9488f2701287f",
+    "disc_identity_recorded_at_capture": {
+      "bytes": 1449165376,
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "runtime_data_loaded_and_hash_verified_during_capture": {
+      "bytes": 3674112,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    },
+    "release_runtime_artifacts": {
+      "count": 32,
+      "manifest_sha256": "8f785d5fc1d713894a1786a55df95abe889bc4f1d0d9bfc15ff66e469ddedc21"
+    },
+    "browser_report": {
+      "artifact": "capture-output-v2/retail-browser-report.json",
+      "bytes": 18482,
+      "sha256": "69673338820618d667ffb34bc10f4469bcf995b05be7df8a592ebea9f87efc08"
+    },
+    "capture_report": {
+      "artifact": "capture-output-v2/report.json",
+      "bytes": 2125400,
+      "sha256": "dc73fb3ef11e44877dae3e06b5b420e5b8e0f3d7adfc4ebceea3cf3f4881bdd1"
+    },
+    "browser_trace": {
+      "artifact": "capture-output-v2/retail-port.jsonl",
+      "bytes": 7542557,
+      "sha256": "7053998492ccf1fdd5e950e92af9154e858a63b435853bd6c3a24796870978cd",
+      "total_jsonl_records": 2314,
+      "session_frames": 2312,
+      "contiguous_frame_indices": [0, 2311],
+      "scene_frame_counts": {
+        "css": 937,
+        "sss": 247,
+        "match": 1128
+      }
+    },
+    "bounded_stop": {
+      "requested_cursor": 2308,
+      "observed_cursor": 2310,
+      "exported_cursor": 2312,
+      "capture_exit_code": 1,
+      "owner_exit_code": 1,
+      "incomplete_bounded_prefix": true
+    },
+    "pre_stop_browser_errors": 0,
+    "unexpected_requests": 0,
+    "timing_pause_resumes": 0,
+    "pre_and_post_32_artifact_inventories_passed": true,
+    "strict_process_cleanup_passed": true,
+    "root_capture_review_sha256": "b4d364ac1ed85a1286a23ed79a43009067278c45f32b2929e043b9dd016024fa"
+  },
+  "comparison": {
+    "private_run_id": "b4-clock1000-ordered-lineage-comparison-prep-20261007-8aa8526-v1",
+    "producer": {
+      "head": "8aa85261e145d4b7d23f3d8fcb72b67e6a36594e",
+      "tree": "70f4edbbbeeaa03b9d0f4d5a09b93ec3bbe558bd",
+      "base_main": "41495f1894ec624c5aabb87bd8c2a4ce7b34d1cf"
+    },
+    "scope": "v10-first-match-clock-ordered-lineage",
+    "tools": {
+      "tools/whole_session_state_compare.py": {
+        "bytes": 276623,
+        "sha256": "94dc658733aad8c5110bc9dadb86e06fcf8b72b72730192ed1b7b4c26d32dc33"
+      },
+      "scripts/compare_whole_session_state.py": {
+        "bytes": 4323,
+        "sha256": "48b711d12d5defe046b327258ded84e692f22d00b3616eb11b6b0254dfffacb9"
+      }
+    },
+    "expectations_sha256": "89bb7ae99e7acc159f37f5c1deb9be71cc1a38ebcf518ef5d62943eef37ec79e",
+    "launch_packet_sha256": "dd08ece3383fbaa6ea8b23c7d3e563e18b71a929c80c9195c207f508876077fe",
+    "metadata_preflight": {
+      "artifact": "metadata-preflight-v3.json",
+      "sha256": "5c19fc735405349c89d5630d0fdd9a3f9df39bfc3e161315d16e6abdaa2e35c4",
+      "source_content_opened": false,
+      "iterator_sentinel_reached": true,
+      "validated_jsonl_records": 2314,
+      "session_frames": 2312
+    },
+    "authorization_sha256": "d8098e30b6b556e701e9aa851d703512fb104ba3c484507a2856fe00cb312127",
+    "report": {
+      "artifact": "comparison-report-v3.json",
+      "bytes": 25838,
+      "sha256": "0ba6e7b4bd3e4d2540163666a4a82307cac479b278d4b76d7f5c7b33b0eb950e"
+    },
+    "execution_receipt": {
+      "artifact": "comparison-execution-v3.json",
+      "sha256": "4d7400320ab51260af4908d4d6e9ca241fba6a5e880ce8fa75627d2add4a279d"
+    },
+    "stdout_sha256": "0ba6e7b4bd3e4d2540163666a4a82307cac479b278d4b76d7f5c7b33b0eb950e",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "elapsed_seconds": 1.0220959580037743,
+    "cli_exit_code": 1,
+    "boundary_result": "equivalent",
+    "result": "incomplete",
+    "complete": false,
+    "whole_session_equivalent": false,
+    "timeline_frames_consumed": 2308,
+    "css_sss_input_order_only": 1184,
+    "nonmatch_fields_compared": [],
+    "setup_records_compared": 1,
+    "match_state_frames_compared": 1124,
+    "match_source_ticks_compared": [0, 1123],
+    "compared_fields": [
+      "rng",
+      "match_frame",
+      "pad_state_hex",
+      "fighters",
+      "fighter_entities"
+    ],
+    "no_declared_field_difference": true,
+    "fresh_clock300_hash_guard_in_this_comparison": true,
+    "terminal_tuple": {
+      "source_tick": 1123,
+      "source_sequence": 9730,
+      "pad_consume_sequence": 9729,
+      "match_frame": 1000,
+      "timeline_frame_index": 2307,
+      "browser_cursor": 2308
+    },
+    "source_stat_stable": true,
+    "source_full_trace_hash_recomputed": false,
+    "runtime_data_comparison_preparation": {
+      "content_opened": false,
+      "freshly_rehashed": false,
+      "recorded_capture_identity_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    },
+    "root_result_review_sha256": "4cfd7bcb2380da5369f57bec5377acb0d73277c8070d9ff5fbee8312489c347a"
+  },
+  "integration_validation": {
+    "current_main": "e3220aa2e2da7b17b99dce0999811bd1e66a0814",
+    "producer": {
+      "commit": "e29cb5af7f46097aec4d2d3ecd2187d2bab29400",
+      "tree": "58a5ccb6304c3f171c0e28d754e887c259fd45b8",
+      "patch_equivalent_to_frozen_producer": true
+    },
+    "focused_comparator_suite": {
+      "command": "python3 -m unittest discover -s tests -p test_whole_session_state_compare.py -v",
+      "workspace_wrapper": "python3 scripts/agent_workspace.py run --",
+      "tests_run": 80,
+      "status": "pass",
+      "log_artifact": "focused-comparator-tests-v1.log",
+      "log_sha256": "a44df1e6b0db8bc21190283e45b14c285b917be9b48649aaec34152645b187ff"
+    },
+    "full_python_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "workspace_wrapper": "python3 scripts/agent_workspace.py run --",
+      "tests_run": 2029,
+      "skipped": 151,
+      "status": "pass",
+      "elapsed_seconds": 371.429,
+      "log_artifact": "full-python-suite-v1.log",
+      "log_sha256": "1cafb5e7b8fe1b5e33fedc2207eb206bfe3e9b32560e0ba60110b41faea23f49"
+    },
+    "release_build_reuse": {
+      "runtime_rebuild_performed": false,
+      "reason": "Comparator-only Python change; no runtime source changed.",
+      "runtime_source_inputs_verified": 60,
+      "release_artifacts_verified": 32,
+      "source_inputs_changed": 0,
+      "artifacts_changed": 0,
+      "post_suite_reuse_review_sha256": "5c451d49a3c82c1d7f4a044e75f3f6f3ba697d00a6cb8e0d197965108720dc1b"
+    }
+  },
+  "retained_preparation_failures": [
+    {
+      "attempt": "packet-preparation-v1",
+      "failure": "The first-positive audit does not include source_tick_seq; that sequence is bound by the runner checkpoint and authenticated source-prefix observation. The initial packet projection did not preserve that mapping, so the packet was not accepted. No source content was opened and no comparison ran."
+    },
+    {
+      "attempt": "metadata-preflight-v2",
+      "failure": "The preflight expected the validator's total record count to equal session_frame rows. The actual export contained 2,314 validated JSONL records and 2,312 session_frame rows. Source opening was blocked; no comparison ran."
+    },
+    {
+      "attempt": "result-review-metadata-projection-v1",
+      "failure": "An initial review projection looked up last_source_sequence in a checkpoint tuple that uses source_sequence. The source was not read again and the comparison was not repeated; corrected review accepted the retained result."
+    }
+  ],
+  "limitations": [
+    "CSS/SSS frames provide recipe input-order evidence only; no nonmatch state fields were compared.",
+    "Exported rows after the target received shape and order validation only; their state was not compared.",
+    "The capture and comparison are incomplete bounded-prefix evidence, not whole-session acceptance.",
+    "No claim follows about later match frames, later matches, Results, return to CSS, pixels, PCM, live timing, performance, physical input or competitive readiness."
+  ],
+  "whole_session_acceptance": false
+}
