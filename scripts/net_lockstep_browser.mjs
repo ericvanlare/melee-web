@@ -12,6 +12,7 @@ import path from 'node:path';
 import {createRoomId} from './net_lockstep_websocket_relay.mjs';
 import {parseArgs} from 'node:util';
 import {loadBrowserTools} from './browser_tools.mjs';
+import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {classifyRoute, collapseConsecutiveScenes, expectedFullSceneOrder, validateFullRoute} from './net_determinism_contract.mjs';
 import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstance, browserPeerFacade} from './net_session_instance.mjs';
 import {createTransportCallbackQueue, describeLockstepTransport, describeLockstepTransportAttempt,
@@ -41,6 +42,7 @@ const {values} = parseArgs({options: {
   'relay-url': {type: 'string'},
   'peer-owner': {type: 'string', default: 'node'},
   'peer-transport': {type: 'string'},
+  'webrtc-signaling': {type: 'string', default: 'memory'},
   'source-ticks': {type: 'string', default: '8'}, 'timeout-ms': {type: 'string', default: '3600000'},
   'stall-ms': {type: 'string', default: '120000'}, 'poll-ms': {type: 'string', default: '50'},
   'delay-ms': {type: 'string', default: '250'}, 'flip': {type: 'string'},
@@ -77,6 +79,11 @@ if (values['peer-transport'] !== undefined && !['relay', 'webrtc'].includes(peer
 if (!browserOwned && values['peer-transport'] !== undefined)
   throw Error('--peer-transport applies only to browser-owned peers');
 const localWebRtc = peerTransport === 'webrtc';
+const roomWorkerSignaling = values['webrtc-signaling'] === 'room-worker';
+if (!['memory', 'room-worker'].includes(values['webrtc-signaling']))
+  throw Error('--webrtc-signaling must be memory or room-worker');
+if (!localWebRtc && values['webrtc-signaling'] !== 'memory')
+  throw Error('--webrtc-signaling applies only to the local WebRTC transport');
 if (browserOwned && !localWebRtc && !values['relay-url']) throw Error('Browser-owned relay peers require --relay-url');
 if (localWebRtc && (!browserOwned || !inputSampling))
   throw Error('The local WebRTC endpoint is scoped to browser-owned input-sampling');
@@ -174,9 +181,11 @@ const pairResults = {
     beta_deferred_input_tick: 0} : null,
   transport_attempt: localWebRtc ? {type: 'webrtc-datachannel', local_only: true, ice_servers: []} :
     describeLockstepTransportAttempt(values['relay-url']),
+  webrtc_signaling: localWebRtc ? values['webrtc-signaling'] : null,
   peers: [], outcome: 'fail', first_error: null, relay_closed: false, started_at: new Date().toISOString(),
 };
-let instances = null, relay = null, peers = null, disconnectHandled = false, intentionalRelayClose = false;
+let instances = null, relay = null, peers = null, roomRuntime = null,
+  disconnectHandled = false, intentionalRelayClose = false, runPassed = false;
 let disconnectTask = null;
 const peerSummaries = {alpha: null, beta: null};
 const checksumFiles = {};
@@ -378,6 +387,8 @@ async function finishRouteBoundaryEvidence(role, phase, cursor) {
 
 async function refreshBrowserPeers() {
   if (browserOwned && peers) {
+    if (roomWorkerSignaling)
+      await Promise.all(['alpha', 'beta'].map(role => instances[role].assertRoomSignalingHealthy()));
     await Promise.all(['alpha', 'beta'].map(role => peers[role].refresh()));
     if (peers.alpha.terminal?.kind === 'disconnect' || peers.beta.terminal?.kind === 'disconnect') disconnectHandled = true;
   }
@@ -656,7 +667,8 @@ async function run() {
   const openTimeout = Math.min(180000, deadline - Date.now());
   if (openTimeout <= 0) throw Error('No run deadline remains for browser startup');
   const peerModuleNames = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs',
-    ...(localWebRtc ? ['net_lockstep_webrtc.mjs'] : [])];
+    ...(localWebRtc ? ['net_lockstep_webrtc.mjs'] : []),
+    ...(roomWorkerSignaling ? ['net_lockstep_webrtc_signaling.mjs'] : [])];
   const peerModuleHashes = browserOwned ? Object.fromEntries(await Promise.all(peerModuleNames.map(async name =>
     [name, sha256(await fs.readFile(new URL(name, import.meta.url)))]))) : null;
   const opened = await Promise.allSettled(['alpha', 'beta'].map(role => openNetInstance({
@@ -726,22 +738,40 @@ async function run() {
     if (localWebRtc) {
       await Promise.all(['alpha', 'beta'].map(role =>
         instances[role].installLocalWebRtcPeerFactory(peerOptions(role))));
-      await instances.beta.prepareLocalWebRtcReceiver();
-      const offer = await instances.alpha.createLocalWebRtcOffer();
-      if (offer.candidate_types.length === 0 || offer.candidate_types.some(type => type !== 'host'))
-        throw Error('Local WebRTC offer did not contain only host ICE candidates');
-      const answer = await instances.beta.acceptLocalWebRtcOffer(offer.description);
-      if (answer.candidate_types.length === 0 || answer.candidate_types.some(type => type !== 'host'))
-        throw Error('Local WebRTC answer did not contain only host ICE candidates');
-      await instances.alpha.acceptLocalWebRtcAnswer(answer.description);
-      const betaInitial = await instances.beta.waitForLocalWebRtcPeer();
-      peers.alpha = browserPeerFacade(instances.alpha, offer.peer);
-      peers.beta = browserPeerFacade(instances.beta, betaInitial);
-      pairResults.local_webrtc_signaling = {ice_servers: [],
-        signaling: 'in-memory offer/answer after host candidate gathering',
-        offer_candidate_types: offer.candidate_types, answer_candidate_types: answer.candidate_types,
-        receiver_handler_registered_before_offer: true,
-        beta_peer_created_in_datachannel_handler: true};
+      if (roomWorkerSignaling) {
+        roomRuntime = await startRoomRelayRuntime({evidenceDir: path.join(output, 'worker-evidence')});
+        const roomId = createRoomId();
+        const signalingUrl = roomRuntime.base.replace(/^http:/, 'ws:');
+        const started = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role => [role,
+          await instances[role].startRoomSignaledLocalWebRtc({url: signalingUrl, roomId, role,
+            timeoutMs: Math.min(stallMs, deadline - Date.now())})])));
+        peers.alpha = browserPeerFacade(instances.alpha, started.alpha.peer);
+        peers.beta = browserPeerFacade(instances.beta, started.beta.peer);
+        pairResults.local_webrtc_signaling = {ice_servers: [],
+          signaling: 'page-owned offer/answer over the existing local RoomRelay Worker',
+          room_worker: {loopback: true, port: roomRuntime.port, identity: roomRuntime.runtimeIdentity,
+            hashes: roomRuntime.hashes},
+          peers: {alpha: started.alpha.local_webrtc, beta: started.beta.local_webrtc},
+          signaling_states: {alpha: started.alpha.signaling, beta: started.beta.signaling},
+          raw_sdp_exposed_to_node: false};
+      } else {
+        await instances.beta.prepareLocalWebRtcReceiver();
+        const offer = await instances.alpha.createLocalWebRtcOffer();
+        if (offer.candidate_types.length === 0 || offer.candidate_types.some(type => type !== 'host'))
+          throw Error('Local WebRTC offer did not contain only host ICE candidates');
+        const answer = await instances.beta.acceptLocalWebRtcOffer(offer.description);
+        if (answer.candidate_types.length === 0 || answer.candidate_types.some(type => type !== 'host'))
+          throw Error('Local WebRTC answer did not contain only host ICE candidates');
+        await instances.alpha.acceptLocalWebRtcAnswer(answer.description);
+        const betaInitial = await instances.beta.waitForLocalWebRtcPeer();
+        peers.alpha = browserPeerFacade(instances.alpha, offer.peer);
+        peers.beta = browserPeerFacade(instances.beta, betaInitial);
+        pairResults.local_webrtc_signaling = {ice_servers: [],
+          signaling: 'in-memory offer/answer after host candidate gathering',
+          offer_candidate_types: offer.candidate_types, answer_candidate_types: answer.candidate_types,
+          receiver_handler_registered_before_offer: true,
+          beta_peer_created_in_datachannel_handler: true};
+      }
     } else {
       await Promise.all(['alpha', 'beta'].map(async role => {
         const initial = await instances[role].createBrowserPeer(peerOptions(role));
@@ -1068,6 +1098,7 @@ async function run() {
 
 try {
   await run();
+  runPassed = true;
 } catch (error) {
   stopRouteCaptureWatchers = true;
   await Promise.allSettled([...routeCaptureTasks.values()]);
@@ -1175,6 +1206,18 @@ try {
       pairResults.relay_closed = false;
       closeNotes.push(`relay close: ${String(error.message || error)}`);
     }
+  }
+  if (roomRuntime) {
+    try {
+      const cleanup = await roomRuntime.close(runPassed && closeNotes.length === 0);
+      pairResults.room_worker_cleanup = {passed: cleanup.passed, ready: cleanup.ready,
+        disposed: cleanup.disposed, runtime_identity: cleanup.runtimeIdentity,
+        hashes: cleanup.hashes, ports: cleanup.ports,
+        exit: cleanup.exit, process_close: cleanup.processClose,
+        group_alive: cleanup.groupAlive, fallback_used: cleanup.fallbackUsed,
+        owned_temp_paths_clean: cleanup.ownedTempPathsClean};
+      if (!cleanup.passed) closeNotes.push('local RoomRelay Worker cleanup was not clean');
+    } catch (error) { closeNotes.push(`local RoomRelay Worker close: ${String(error.message || error)}`); }
   }
   // TCP close events may admit callbacks without awaiting them; join once more
   // after transport closure before freezing the result.

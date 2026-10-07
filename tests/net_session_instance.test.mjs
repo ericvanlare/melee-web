@@ -136,3 +136,66 @@ test('bounds a pending navigation by the session deadline and closes Chrome', as
     assert.deepEqual(chrome.cdpCalls.map(row => row.name), ['Network.enable']);
   });
 });
+
+test('passes bounded room-signaling options through the page invocation', async () => {
+  await withProfile(async profile => {
+    const listeners = new Map();
+    const cdp = {
+      on(name, listener) { listeners.set(name, listener); },
+      off(name, listener) { assert.equal(listeners.get(name), listener); listeners.delete(name); },
+      async send(name) { assert.equal(name, 'Network.enable'); return {}; },
+      async detach() { assert.equal(listeners.size, 0); },
+    };
+    let invocation;
+    const page = {
+      on() {}, off() {},
+      setDefaultTimeout() {}, setDefaultNavigationTimeout() {},
+      async addInitScript() {},
+      async goto() { return {status: () => 200, headers: () => ({
+        'cross-origin-opener-policy': 'same-origin',
+        'cross-origin-embedder-policy': 'require-corp',
+      })}; },
+      async evaluate(fn, argument) {
+        if (argument && typeof argument === 'object' && 'roomId' in argument) {
+          invocation = {argument, source: String(fn)};
+          return {peer: {ready: true}};
+        }
+        if (String(fn).includes('Room WebRTC signaling is unavailable')) {
+          const hadWindow = Object.hasOwn(globalThis, 'window');
+          const oldWindow = globalThis.window;
+          globalThis.window = {};
+          try { return fn(); }
+          finally {
+            if (hadWindow) globalThis.window = oldWindow;
+            else delete globalThis.window;
+          }
+        }
+        if (String(fn).includes('crossOriginIsolated')) return true;
+        return undefined;
+      },
+      async waitForFunction() {
+        return {jsonValue: async () => ({ready: true}), dispose: async () => {}};
+      },
+    };
+    const context = {
+      pages: () => [page], browser: () => ({version: () => 'fake-chrome'}),
+      async newCDPSession(target) { assert.equal(target, page); return cdp; },
+      async close() {},
+    };
+    const chromium = {async launchPersistentContext() { return context; }};
+    const instance = await openNetInstance({...common, chromium, userDataDir: profile});
+    try {
+      const result = await instance.startRoomSignaledLocalWebRtc({url: 'ws://127.0.0.1:8787',
+        roomId: 'a'.repeat(32), role: 'beta', timeoutMs: 800});
+      assert.deepEqual(result, {peer: {ready: true}});
+      assert.equal(invocation.argument.url, 'ws://127.0.0.1:8787');
+      assert.equal(invocation.argument.roomId, 'a'.repeat(32));
+      assert.equal(invocation.argument.role, 'beta');
+      assert.ok(invocation.argument.timeoutMs > 0 && invocation.argument.timeoutMs <= 800);
+      assert.match(invocation.source, /createRoomWebRtcSignaler/);
+      await assert.rejects(instance.assertRoomSignalingHealthy(), /Room WebRTC signaling is unavailable/);
+    } finally {
+      assert.equal(await instance.close(), true);
+    }
+  });
+});
