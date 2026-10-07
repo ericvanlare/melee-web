@@ -115,7 +115,19 @@ int melee_web_gameplay_startup(size_t heap_bytes, char* error, size_t error_size
  * prepares source HSD components, starts the source SIS owner, and invokes the
  * original gm_801A4BD4 manager, which creates the GObj tables itself. */
 typedef int (*MeleeWebGameplayVSStartup)(char* error, size_t error_size);
-typedef void (*MeleeWebGameplayVSShutdown)(void);
+/* The configured VS owner supplies SIS access; narrow non-VS worlds have no
+ * SIS dependency. Ownership operations return checked success/refusal. DRAIN
+ * must execute original SIS shutdown completely or fail fatally. An unexpected
+ * returned failure keeps the world blocked, with no retry of an unknown drain. */
+typedef enum MeleeWebGameplayVSSisOperation {
+    MELEE_WEB_VS_SIS_VALIDATE_BORROW,
+    MELEE_WEB_VS_SIS_PREFLIGHT_BORROW,
+    MELEE_WEB_VS_SIS_DRAIN,
+    MELEE_WEB_VS_SIS_RETIRE_BORROW
+} MeleeWebGameplayVSSisOperation;
+typedef int (*MeleeWebGameplayVSShutdown)(MeleeWebGameplayVSSisOperation,
+                                         int font_slot, void* expected,
+                                         char* error, size_t error_size);
 int melee_web_gameplay_prepare_vs_startup(MeleeWebGameplayVSStartup startup,
                                           MeleeWebGameplayVSShutdown shutdown,
                                           char* error, size_t error_size);

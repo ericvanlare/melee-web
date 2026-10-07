@@ -10,7 +10,6 @@
 #include <sysdolphin/baselib/initialize.h>
 #include <sysdolphin/baselib/memory.h>
 #include <sysdolphin/baselib/objalloc.h>
-#include <sysdolphin/baselib/sislib.h>
 #include <sysdolphin/baselib/sobjlib.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -368,12 +367,10 @@ int melee_web_gameplay_vs_register_borrowed_sis(int font_slot,
     if (vs_borrowed_sis_slot != UINT32_MAX || vs_borrowed_sis_descriptor)
         return fail(error, error_size,
                     "A borrowed SIS descriptor is already registered");
-    if (!descriptor || !HSD_SisLib_FontSlotBorrowable(font_slot))
-        return fail(error, error_size,
-                    "Borrowed SIS slot is invalid or has a source archive owner");
-    if (HSD_SisLib_804D1124[font_slot] != NULL)
-        return fail(error, error_size,
-                    "Borrowed SIS slot already has a descriptor owner");
+    if (!descriptor)
+        return fail(error, error_size, "Borrowed SIS descriptor is missing");
+    if (!vs_shutdown_callback(MELEE_WEB_VS_SIS_VALIDATE_BORROW,
+                              font_slot, descriptor, error, error_size)) return 0;
     vs_borrowed_sis_slot = (uint32_t)font_slot;
     vs_borrowed_sis_descriptor = descriptor;
     return success(error, error_size);
@@ -385,24 +382,20 @@ static int preflight_borrowed_sis(char* error, size_t error_size)
         return vs_borrowed_sis_descriptor ?
             fail(error, error_size, "Borrowed SIS owner record is inconsistent") :
             success(error, error_size);
-    if (!vs_borrowed_sis_descriptor ||
-        !HSD_SisLib_FontSlotBorrowable((s32)vs_borrowed_sis_slot))
-        return fail(error, error_size,
-                    "Borrowed SIS slot has an invalid index or source archive owner");
-    SIS* current = HSD_SisLib_804D1124[vs_borrowed_sis_slot];
-    if (current != NULL && current != (SIS*)vs_borrowed_sis_descriptor)
-        return fail(error, error_size,
-                    "Borrowed SIS slot was replaced by a foreign descriptor");
-    return success(error, error_size);
+    if (!vs_borrowed_sis_descriptor || !vs_shutdown_callback)
+        return fail(error, error_size, "Borrowed SIS owner record is inconsistent");
+    return vs_shutdown_callback(MELEE_WEB_VS_SIS_PREFLIGHT_BORROW,
+                                (int)vs_borrowed_sis_slot,
+                                vs_borrowed_sis_descriptor, error, error_size);
 }
 
 static int retire_borrowed_sis(char* error, size_t error_size)
 {
-    if (!preflight_borrowed_sis(error, error_size)) return 0;
     if (vs_borrowed_sis_slot != UINT32_MAX) {
-        if (HSD_SisLib_804D1124[vs_borrowed_sis_slot] ==
-            (SIS*)vs_borrowed_sis_descriptor)
-            HSD_SisLib_804D1124[vs_borrowed_sis_slot] = NULL;
+        if (!vs_shutdown_callback(MELEE_WEB_VS_SIS_RETIRE_BORROW,
+                                  (int)vs_borrowed_sis_slot,
+                                  vs_borrowed_sis_descriptor,
+                                  error, error_size)) return 0;
         vs_borrowed_sis_slot = UINT32_MAX;
         vs_borrowed_sis_descriptor = NULL;
     }
@@ -539,13 +532,18 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     if (has_render_objects())
         return fail(error, error_size, "Cannot destroy uninitialized HSD render-object lifetimes");
     /* Preflight precedes the first destructive step, or a retained retry.
-     * The private archive table is read only through the reviewed SIS patch. */
+     * Only the configured VS source owner accesses SIS state. */
     if (!preflight_borrowed_sis(error, error_size)) return 0;
     shutting_down = SHUTDOWN_ACTIVE;
     if (vs_sis_live) {
         /* Source SIS teardown owns its text GObjs and must run before the
          * generic object sweep and before destroying the source heap. */
-        vs_shutdown_callback();
+        if (!vs_shutdown_callback(MELEE_WEB_VS_SIS_DRAIN, -1, NULL,
+                                  error, error_size)) {
+            /* Drain completion is unknown. Keep active shutdown latched and
+             * forbid any retry rather than rerunning destructive source work. */
+            return 0;
+        }
         vs_sis_live = 0;
     }
     if (!retire_borrowed_sis(error, error_size)) {

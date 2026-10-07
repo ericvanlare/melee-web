@@ -1,3 +1,4 @@
+#include "gameplay_vs_sis.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_archive_sections.h"
 #include "gameplay_rumble.h"
@@ -52,7 +53,11 @@ static int vs_manager_startup(char* error, size_t size)
     if (error && size) error[0] = '\0';
     return 1;
 }
-static void vs_sis_shutdown(void) { HSD_SisLib_803A5FBC(); }
+static int vs_sis_shutdown(MeleeWebGameplayVSSisOperation operation, int slot,
+                           void* expected, char* error, size_t size)
+{
+    return melee_web_gameplay_vs_sis(operation, slot, expected, error, size);
+}
 
 static void borrowed_sis_parent_removed(void* data)
 {
@@ -64,9 +69,12 @@ static void borrowed_sis_parent_removed(void* data)
     borrowed_sis_sweep_seen = 1;
 }
 
-static void vs_borrowed_sis_shutdown(void)
+static int vs_borrowed_sis_shutdown(MeleeWebGameplayVSSisOperation operation,
+                                   int slot, void* expected,
+                                   char* failure, size_t size)
 {
-    HSD_SisLib_803A5FBC();
+    if (!melee_web_gameplay_vs_sis(operation, slot, expected, failure, size)) return 0;
+    if (operation != MELEE_WEB_VS_SIS_DRAIN) return 1;
     check(borrowed_sis_owner && borrowed_sis_owner->canary == 0x51A51A51,
           "borrowed SIS owner remains alive during original text teardown");
     check(HSD_SisLib_804D7978 == NULL && HSD_SisLib_804D797C == NULL,
@@ -86,6 +94,7 @@ static void vs_borrowed_sis_shutdown(void)
     ++borrowed_sis_shutdown_calls;
     if (borrowed_sis_replace_after_drain)
         HSD_SisLib_804D1124[1] = &borrowed_sis_foreign_after_drain;
+    return 1;
 }
 
 static void put_be32(uint8_t* bytes, size_t offset, uint32_t value)
