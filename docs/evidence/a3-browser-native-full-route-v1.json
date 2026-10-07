@@ -2656,14 +2656,26 @@
       "bytes": 1855,
       "sha256": "ad735bdfb9293416a54574d16c3b5fa66aa1145a386c10b7ac3d8cf8c484d808",
       "classification": "preparation/component-test failure retained separately; not a browser session failure"
+    },
+    {
+      "retained_container": "issue205-browser-native-probe-preparation-20261007-055242-27724d97",
+      "file": "root-launch-preflight-failure-v1.json",
+      "bytes": 378,
+      "sha256": "dc799cb50b3224cfe2852552e0ee433c8fa128b59727ff24041562054844f4a8",
+      "classification": "root preflight KeyError before any services; retained preparation failure, not a browser session failure"
     }
   ],
   "visual_review": {
-    "reviewer": "repository owner/root",
+    "reviewer": "lead review",
     "inspected": "all five alpha route phases plus beta match",
     "known_defect": "Final Destination magenta/geometry defect #175 persists",
     "phase_stable_screenshots_may_advance_source_cursor": true,
-    "pixel_fidelity_claim": false
+    "pixel_fidelity_claim": false,
+    "receipt": {
+      "file": "root-visual-review-v1.json",
+      "bytes": 1270,
+      "sha256": "d7d03db8d02ce8b26168b169cf1f34a5d56d59a14fdbc0a4933e52a5779b810d"
+    }
   },
   "limitations": [
     "Single-host headless recorded-input functional evidence only; no Internet/two-machine/WebRTC acceptance.",
