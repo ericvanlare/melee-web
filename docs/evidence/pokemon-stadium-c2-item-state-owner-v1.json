@@ -1,0 +1,159 @@
+{
+  "schema": "melee-web-pokemon-stadium-c2-item-state-owner-v1",
+  "result": "passed_scoped_item_owner_prerequisite",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "issue": "https://github.com/ericvanlare/melee-web/issues/214",
+  "issue_state": "OPEN; missing-input, malformed-root, and insufficient-capacity negative cases remain unexecuted",
+  "boundary": "Two diagnostic source-item prepare/end lifetimes in retained C1 context, before Stage_8022524C, OnInit, or Ground_801C0800. This establishes only the checked item-state owner prerequisite; it does not admit Stadium or establish gameplay.",
+  "source": {
+    "branch": "codex/stadium-item-state-preflight-20261007",
+    "commit": "5cf2f859f7eb9a2d3fb91f63bfb3258d86c188ac",
+    "tree": "a4b18237a0ad759e20c775d185359a8658e7baeb",
+    "working_tree_at_build": "clean",
+    "combined_diff_sha256": "d40205395ec718fe43a57b39eb1c19bbad0f5cc2829fa5b9ff96c8a040b650f6",
+    "root_source_review_sha256": "e41ee5b06ab871a897ad784b5fdbfb8f86143eb415b961db75ded2a0eb9b7143",
+    "root_focused_result_review_sha256": "8146f40cd0e55e4b0fafc6aff2aacf5fff1f954528dc5b5822ff9b6a7048f934",
+    "files": {
+      "tests/native_menu_host_trace.cpp": "b718c6cc816168a1cc89da72c062de86e9d8218feb3b7f980138840adfa34c1d",
+      "tests/stadium_c1_stage_state_probe.c": "09444d7113681b673906749fe72d975e791bb325ae4345df8b4a06f16b7f4e7d",
+      "tests/stadium_c1_stage_state_probe.h": "9024f73e513d0609476518d6ea12c3f9e6d3305206ca9bef931a339aab40a7c9",
+      "tests/test_gameplay_native_menus.py": "9a3f9c3ea7f9c53477ea5379f63728341b647d04e05bc257cb272ca97e2e42ee"
+    }
+  },
+  "build": {
+    "producer_commit": "5cf2f859f7eb9a2d3fb91f63bfb3258d86c188ac",
+    "producer_tree": "a4b18237a0ad759e20c775d185359a8658e7baeb",
+    "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --trace-target native_menu_host_trace --configuration Release --stadium-c1a-diagnostic",
+    "configuration": "Release",
+    "compiler_job_policy": "default unchanged",
+    "exit_code": 0,
+    "targets": {
+      "native_menu_host_trace.js": {
+        "bytes": 232567,
+        "sha256": "7a3795cba424ead073deab7012fcafbdcf4369892770d23c97e53084bb850f2b"
+      },
+      "native_menu_host_trace.wasm": {
+        "bytes": 13698022,
+        "sha256": "552cdf116597a3fa05724b765fab1cdab2002fa781e25cbb87d2da1464f0aa75"
+      }
+    },
+    "logs": {
+      "diagnostic-release-build.stdout.log": {
+        "bytes": 15362,
+        "sha256": "3481bb67bba348ab279c0a680f076dade51c141d4371a965d0480e7583d10c4c"
+      },
+      "diagnostic-release-build.stderr.log": {
+        "bytes": 1530,
+        "sha256": "67426491e8fdf614f25168afaa2344710c0cfd1819e7c3f2c37fd97ae9f981ca"
+      }
+    }
+  },
+  "fixture": {
+    "selected_kind": 3,
+    "reviewed_fixture_manifest_sha256": "258233cd7ad22041a65aca34329157272f2248a9985729e7f47b52a21a662ea6",
+    "menu_name_count": 76,
+    "selected_name_count": 36,
+    "union_name_count": 98,
+    "missing_name_count": 0,
+    "ItCo.usd_sha256": "5d62efd6437149335b9eef87624ae1253ba7bb260fb08cbae04a3d9215eacd11",
+    "GrPs.usd_sha256": "aa740cfbbeced294f058449caca8ac0380532521dde06ca4a6dcc03080cf6a6d"
+  },
+  "focused_execution": {
+    "command": "MELEE_MENU_FIXTURE_ROOT=<retained-98-file-fixture-root> MELEE_KEEP_TEST_ARTIFACTS=1 python3 scripts/agent_workspace.py run -- python3 tests/test_gameplay_native_menus.py NativeMenuSourceTests.test_stadium_c1_item_state_owner_preflight",
+    "test_count": 1,
+    "skipped": 0,
+    "unittest_exit_code": 0,
+    "native_process_exit_code": 0,
+    "elapsed_seconds": 0.936,
+    "trace_header_source_revision": "5cf2f859f7eb9a2d3fb91f63bfb3258d86c188ac",
+    "trace_build_configuration": "browser-release",
+    "trace_input_recipe": "stadium-c1-item-state-preflight-v1",
+    "trace_record_count": 1,
+    "trace_event_count": 0,
+    "prepare_end_lifetimes": 2,
+    "checks": {
+      "RandomArticle_registry_identity": true,
+      "native_state_table_identity": true,
+      "every_nonnull_ALDYakuAll_consumer_row1_through7_below_authored_state_count": true,
+      "script_pointers_unchanged_before_Ground_801C0800": true,
+      "competing_active_item_owner_refused": true,
+      "seven_captured_item_global_pointer_values_restored": true,
+      "source_color_pointer_restored_before_owner_destruction": true,
+      "item_entity_link9_empty_before_and_after": true,
+      "gameplay_generation_and_tick_count_unchanged": true,
+      "source_rng_owner_and_value_unchanged": true,
+      "save_card_and_CSS_SSS_selection_unchanged": true,
+      "raw_GrPs_usd_bytes_unchanged": true,
+      "E8_request_stage_publication_and_source_menu_entry_absent": true
+    },
+    "focused_output": {
+      "c1-item-state-preflight-command.txt": "f25f2e3bd8e5832e7235a5cc0c25a117bfa1a1b78f3bec0c37d4e50796522b4b",
+      "c1-item-state-preflight.jsonl": "77f02c74bb6c034eedeb5348843bc21225d10dc26bb76c655d0c18b5e14f9208",
+      "c1-item-state-preflight.stdout": "7177278b4b7deadfe76dbb155c35c61fc2c5cf4265267e677082307b2dd02d49",
+      "c1-item-state-preflight.stderr": "087cc69dbbd279f86a411a249db11474adf553656d68ac33a2c1f8981169cf58"
+    },
+    "unittest_runner_logs": {
+      "focused-preflight.stdout.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "focused-preflight.stderr.log": {
+        "bytes": 253,
+        "sha256": "baebf11c859fd98398a92152b9f8bd349b660036ddb40b559d3070483b04d780"
+      }
+    }
+  },
+  "integration_suite": {
+    "command": "env -u MELEE_MENU_FIXTURE_ROOT -u MELEE_REQUIRE_STADIUM_E8_FIXTURES -u MELEE_KEEP_TEST_ARTIFACTS python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+    "environment": "default fixtures; no Stadium fixture campaign selected",
+    "exit_code": 0,
+    "tests_run": 2012,
+    "skipped": 135,
+    "failures": 0,
+    "elapsed_seconds": 355.139,
+    "stadium_boundary_results": {
+      "explicit_retained_fixture_item_state_preflight": "passed in the separate one-test run above",
+      "default_fixture_item_state_preflight": "skipped before native launch because the default root lacks the 98-file union",
+      "E8_request": "skipped; no reviewed fixture campaign selected",
+      "E8_was_rerun": false
+    },
+    "logs": {
+      "fullsuite.stdout.log": {
+        "bytes": 4453,
+        "sha256": "95b2e7843d6f08726afcedc1c5021212f32ab60c54410c4888f15df0d819b602"
+      },
+      "fullsuite.stderr.log": {
+        "bytes": 362033,
+        "sha256": "39e7b541d8467be8a61dac03c479adb81cc5ee9eadee75ae529dd564b88f0e57"
+      }
+    }
+  },
+  "first_build_failure": {
+    "retained_run_bundle": "stadium-item-owner-20261007T164653Z-1dedd62",
+    "producer_commit": "1dedd6205a7579acee92c7fcf0a357513a6d39bb",
+    "producer_tree": "9f192e3fc628e0ef90f93d1413f4ce78a133be92",
+    "exit_code": 1,
+    "failure": "C++ compilation rejected the upstream C-only it_3F14.h inclusion; the diagnostic now observes those typed fields through the existing C test probe.",
+    "preserved_logs": {
+      "diagnostic-release-build.stdout.log": "b0b5e50336e2f52026ec9ce9d7e094cb3cfa4cfac828f7a7fb1b9ba010aec77e",
+      "diagnostic-release-build.stderr.log": "c76b18bbab40d4a338449dbd3c0d8325e8b6c635d9d46377d666ac650b2751fb"
+    }
+  },
+  "unexecuted_failure_cases": [
+    "ItCo.usd missing",
+    "Random Article missing",
+    "insufficient authored state capacity",
+    "malformed color or public-data root"
+  ],
+  "retained_run_bundle": "stadium-item-owner-20261007T165308Z-5cf2f85",
+  "exclusions": [
+    "No E8 rerun, data extraction, or source/data audit.",
+    "No Ground storage, Stage_8022524C, OnInit, Ground_801C0800, stage process/draw/tick, or item startup through Item_80266FCC.",
+    "No screen IMAGE/DatSis/auxiliary GObj or buffer ownership work.",
+    "No ordinary Stadium admission or gameplay claim."
+  ]
+}
