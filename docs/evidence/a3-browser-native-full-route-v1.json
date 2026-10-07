@@ -1,0 +1,2684 @@
+{
+  "schema": "melee-web-a3-browser-native-full-route-v1",
+  "issue": 205,
+  "evidence_labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised"
+  ],
+  "scope": "Two browser-owned native/protocol peers execute the complete recorded supported route through local actual Worker direct Miniflare; historical reduced controls separately bound.",
+  "implementation": {
+    "producer_commit": "a57a0e421e4e4abc61f249e0958ab8b6e5dfb1af",
+    "producer_tree": "37c881f5ccde730202b2786e2fd75fd7d8ce3f56",
+    "base_main": "789de9b2945b976fff665813bfc3e8a72ad0703f",
+    "branch": "codex/a3-browser-native-integration-20261007",
+    "default_peer_owner": "node",
+    "explicit_browser_mode": "--peer-owner browser",
+    "core_and_endpoint_unchanged": true,
+    "checksum_export_limit_records": 512,
+    "sticky_overflow_and_callback_failures": true,
+    "source_hashes": {
+      "scripts/agent_workspace.py": "bc59ae0029508ad57703558022e7d583b18328c5ca2b7b94574fd4ec6ec64d86",
+      "scripts/net_lockstep_browser.mjs": "eee01bb7d5bf4b28345f4eeed96208e43c5b27817846a26f912af73302c0cd20",
+      "scripts/net_session_instance.mjs": "ded5bf3adb55ad86a77b469cf7af658540e05ce948ec811aeeff918b29a9507e",
+      "scripts/net_room_relay_runtime_owner.mjs": "9ba5fafdcc7955646959362228e5cc07a19c7f99be11543fbd56f670a30ddb68",
+      "scripts/net_room_relay_direct_runtime.mjs": "e7e77746b7a1f7857bea1818c96df9e4246f0bcb77eed6fc63383e498d6df2b5",
+      "scripts/net_room_relay_miniflare_options.mjs": "4c9ea6e34c679034c285ca4b634ef9dd196c781528970b4b5c05aa2f07f0f7b3",
+      "scripts/capture_owner_deadline.py": "6b4c8130bb3f3ae353d6e7a5a8a0987dc6408486bfab421a089da981b5a3f122",
+      "scripts/browser_tools.mjs": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81",
+      "scripts/browser_driver.mjs": "75e4886df976a4c9292cef13ddfc8af89c2e0795f4ef7a6bc57b66cccb8a0233",
+      "scripts/net_lockstep_observers.mjs": "9c4178d889a43ab04662efd51afe6be3021bdc34022263dc45c70859f0a7370c",
+      "scripts/net_source_accounting.mjs": "554f486a54655369a0d6116be747bb153c5fb0bb347f99f0d6e397ecc0fa084c",
+      "scripts/serve.py": "32734f1515420190408c565b66d9e907331e1d3c711307d4ff61ec810ad1eea4",
+      "tools/browser_build_artifacts.json": "30f8d2541d59d597f6de064c1c640cb17d6cb768169eac6add12b3aac64b60eb",
+      "dependencies.lock.json": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385",
+      "online/relay/worker.mjs": "850b0f1dbb5f8c48c997a9d46405644ef2a36b6795e6b7fac5bbacd2005cb709",
+      "online/relay/wrangler.jsonc": "bb6478a7d663ce4b54349e631baa02c85eaf35d6daf32ba5188e89f531595846"
+    }
+  },
+  "full_route": {
+    "private_run_id": "issue205-browser-native-full-route-reviewed-20261007-065439-16f1f9af",
+    "producer": {
+      "commit": "a57a0e421e4e4abc61f249e0958ab8b6e5dfb1af",
+      "tree": "37c881f5ccde730202b2786e2fd75fd7d8ce3f56",
+      "trackedCleanAtStart": true,
+      "trackedCleanAtFinish": true,
+      "headUnchanged": true
+    },
+    "root_review": {
+      "file": "root-result-review-v1.json",
+      "bytes": 5024,
+      "sha256": "06a2fcfb2e187153fe83af9b69ae6db741fd50af6a5503e1f0efaba437635808"
+    },
+    "outcome": "complete",
+    "run_files": {
+      "http-server.stdout.log": {
+        "bytes": 162,
+        "sha256": "b3889090f03c72781bdd0e445a13a7422793298c17200af7675fd83ca9eda6ab"
+      },
+      "browser-runner.stdout.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "browser-process-trace.jsonl": {
+        "bytes": 152961,
+        "sha256": "33cafba3502c7809bb4b84b43fa563eaf756ffd13088d10feb0c84b491504438"
+      },
+      "browser-owner.json": {
+        "bytes": 167933,
+        "sha256": "0ffff731c72a6ed41ead77497b8e76fc93624614c9f647c3a096e040ff740d09"
+      },
+      "coordinator.json": {
+        "bytes": 221574,
+        "sha256": "16dc103228c364702061614d2df7c112322a382090b23e1e2d87f61d41c674c6"
+      },
+      "browser-capture.log": {
+        "bytes": 99,
+        "sha256": "30257ca4593a88c1ba9d21b14071444ad96808f99ad90cb49b644ded2398081f"
+      },
+      "browser-runner.stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "http-server.stderr.log": {
+        "bytes": 10912,
+        "sha256": "ced9aa53bb64f782696ce3621dfc4ce7f1239a4515edc40e43bd3115d9c959f0"
+      },
+      "browser-run/run.json": {
+        "bytes": 1519527,
+        "sha256": "676251e9ec567d7fea1955b3550044cd4fca54e1b977136fe922785b52aaf32b"
+      },
+      "relay-owner/direct-miniflare-a3-room-relay-direct-klNUHa.stderr.log": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "relay-owner/direct-miniflare-a3-room-relay-direct-klNUHa.stdout.log": {
+        "bytes": 2192,
+        "sha256": "f4edee60c0e10608af6174acec96c8e458c7fa032a84318e1491e7f399a02f04"
+      },
+      "relay-owner/direct-miniflare-a3-room-relay-direct-klNUHa.receipt.json": {
+        "bytes": 6969,
+        "sha256": "94875cb2274af40b81bd1f76df9b54d6cf6c18025a9122734f9665c4205d8c15"
+      },
+      "browser-run/beta/final.png": {
+        "bytes": 452576,
+        "sha256": "d2f56f48fa723cfffabd7e4082d2d3f752483410b51ec1819d31ac114ab75314"
+      },
+      "browser-run/beta/route-sss.png": {
+        "bytes": 308599,
+        "sha256": "6d26cce352744f000f50cad8f0f4b00f3f10471af1a152cb0b729b4439a3cbe9"
+      },
+      "browser-run/beta/source-accounting.json": {
+        "bytes": 525531,
+        "sha256": "020d31fc92f8bf420465e8342d7c1c248a1f48bc5b9790efab1ee9da5e5f1a2e"
+      },
+      "browser-run/beta/route-results.png": {
+        "bytes": 134083,
+        "sha256": "495a1b2adc086e9ed13449e30f975a549202d616ca396f073f701c10e6312e82"
+      },
+      "browser-run/beta/instance.json": {
+        "bytes": 317581,
+        "sha256": "55ccc02aceb5fb91cf9a567fbd6901fbaf4ef13253b85b55e73199560bf84db9"
+      },
+      "browser-run/beta/checksums.bin": {
+        "bytes": 325376,
+        "sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0"
+      },
+      "browser-run/beta/route-match.png": {
+        "bytes": 496755,
+        "sha256": "0d295f6a5e7f12dce1850995b7cded9d06f225ce929fad182810f57d0b3e4c0c"
+      },
+      "browser-run/beta/route-css-start.png": {
+        "bytes": 451253,
+        "sha256": "b7ccf63141126de8a31c1164dc2478ff391445762a09f0fdb7c273473d5d5e3a"
+      },
+      "browser-run/alpha/final.png": {
+        "bytes": 452620,
+        "sha256": "5070bcc00250fc381bd4335633fa6b3f020f1a299fe4a442bf717a9a983079a6"
+      },
+      "browser-run/alpha/route-sss.png": {
+        "bytes": 281661,
+        "sha256": "7db9f8489aa747ed818318e58084f83cc8ab805c853a1ab664ead716871fdcc3"
+      },
+      "browser-run/alpha/source-accounting.json": {
+        "bytes": 524925,
+        "sha256": "c560f3f470d3c301a1ffe2143c36c8f7008d71dcfe093d691add6f043e0cf79b"
+      },
+      "browser-run/alpha/route-results.png": {
+        "bytes": 134105,
+        "sha256": "6d119b99f5354f22f906437f384653ac360679de15357f9dc7ffc9eae44fde79"
+      },
+      "browser-run/alpha/instance.json": {
+        "bytes": 317595,
+        "sha256": "2641c6857cdc55354610da1379bc3fa6cc9daf1b23876f43a319550af8a913c6"
+      },
+      "browser-run/alpha/checksums.bin": {
+        "bytes": 325376,
+        "sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0"
+      },
+      "browser-run/alpha/route-match.png": {
+        "bytes": 497228,
+        "sha256": "6b7041aead3d27cad6015034ef4ecd4712dbe56bf6497468ea5bcb643b11221d"
+      },
+      "browser-run/alpha/route-css-start.png": {
+        "bytes": 442664,
+        "sha256": "4f9cf306548a1d4ac2ff808850291522b8efa79ec5723573850c54c37ceedcf8"
+      }
+    },
+    "peers": {
+      "alpha": {
+        "cursor": 5084,
+        "source_steps": 5084,
+        "source_draws": 5084,
+        "protocol_compared": 5084,
+        "checksum_sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0",
+        "checksum_ownership": {
+          "owner": "browser-page",
+          "export_limit_records": 512,
+          "active_native_records_submitted_before_export": 5084,
+          "post_terminal_native_evidence_records": 0
+        },
+        "terminal": null,
+        "protocol_counts": {
+          "ready": true,
+          "local_input_ticks": 5082,
+          "remote_input_ticks": 5082,
+          "remote_ack_input": 5081,
+          "remote_ack_checksum": 5083,
+          "input_duplicates": 1216,
+          "checksum_duplicates": 4454,
+          "out_of_order_inputs": 4923,
+          "acknowledged_inputs": 5082,
+          "acknowledged_checksums": 5084,
+          "local_checksum_ticks": 5084,
+          "remote_checksum_ticks": 5084,
+          "next_checksum_compare": 5084,
+          "terminal": null
+        }
+      },
+      "beta": {
+        "cursor": 5084,
+        "source_steps": 5084,
+        "source_draws": 5084,
+        "protocol_compared": 5084,
+        "checksum_sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0",
+        "checksum_ownership": {
+          "owner": "browser-page",
+          "export_limit_records": 512,
+          "active_native_records_submitted_before_export": 5084,
+          "post_terminal_native_evidence_records": 0
+        },
+        "terminal": null,
+        "protocol_counts": {
+          "ready": true,
+          "local_input_ticks": 5082,
+          "remote_input_ticks": 5082,
+          "remote_ack_input": 5081,
+          "remote_ack_checksum": 5083,
+          "input_duplicates": 672,
+          "checksum_duplicates": 4418,
+          "out_of_order_inputs": 4923,
+          "acknowledged_inputs": 5082,
+          "acknowledged_checksums": 5084,
+          "local_checksum_ticks": 5084,
+          "remote_checksum_ticks": 5084,
+          "next_checksum_compare": 5084,
+          "terminal": null
+        }
+      }
+    },
+    "cleanup": {
+      "OS_observations": 22,
+      "distinct_pids": 20,
+      "no_cdp_process_inventory": true,
+      "multiplicity_reconciled": true,
+      "current_owned_pids_absent": true,
+      "ports_closed": true,
+      "worker_disposed_without_fallback": true,
+      "profiles_removed": true
+    },
+    "input_ticks_used": 5082,
+    "source_ticks": 5084,
+    "browser_peer_module_responses": {
+      "expected": {
+        "net_lockstep_browser_peer.mjs": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+        "net_lockstep_core.mjs": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+        "net_lockstep_websocket_relay.mjs": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"
+      },
+      "responses": {
+        "alpha": [
+          {
+            "url": "http://127.0.0.1:8787/net_lockstep_browser_peer.mjs",
+            "status": 200,
+            "bytes": 6090,
+            "sha256": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+            "coop": "same-origin",
+            "coep": "require-corp"
+          },
+          {
+            "url": "http://127.0.0.1:8787/net_lockstep_core.mjs",
+            "status": 200,
+            "bytes": 25527,
+            "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+            "coop": "same-origin",
+            "coep": "require-corp"
+          },
+          {
+            "url": "http://127.0.0.1:8787/net_lockstep_websocket_relay.mjs",
+            "status": 200,
+            "bytes": 19394,
+            "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+            "coop": "same-origin",
+            "coep": "require-corp"
+          }
+        ],
+        "beta": [
+          {
+            "url": "http://127.0.0.1:8787/net_lockstep_browser_peer.mjs",
+            "status": 200,
+            "bytes": 6090,
+            "sha256": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+            "coop": "same-origin",
+            "coep": "require-corp"
+          },
+          {
+            "url": "http://127.0.0.1:8787/net_lockstep_core.mjs",
+            "status": 200,
+            "bytes": 25527,
+            "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+            "coop": "same-origin",
+            "coep": "require-corp"
+          },
+          {
+            "url": "http://127.0.0.1:8787/net_lockstep_websocket_relay.mjs",
+            "status": 200,
+            "bytes": 19394,
+            "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+            "coop": "same-origin",
+            "coep": "require-corp"
+          }
+        ]
+      }
+    },
+    "checksum_summary": {
+      "records_each": 5084,
+      "streams_identical": true,
+      "sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0"
+    },
+    "terminal_hold": null,
+    "negative_control": null,
+    "route": {
+      "scope": "full",
+      "expected_full_scene_order": [
+        1,
+        2,
+        3,
+        4,
+        1
+      ],
+      "alpha": {
+        "scope": "full",
+        "status": "passed",
+        "observed_scenes": [
+          1,
+          2,
+          3,
+          4,
+          1
+        ],
+        "selection": {
+          "stage": 32,
+          "player_stocks": [
+            4,
+            4
+          ],
+          "humans": [
+            true,
+            true
+          ]
+        }
+      },
+      "beta": {
+        "scope": "full",
+        "status": "passed",
+        "observed_scenes": [
+          1,
+          2,
+          3,
+          4,
+          1
+        ],
+        "selection": {
+          "stage": 32,
+          "player_stocks": [
+            4,
+            4
+          ],
+          "humans": [
+            true,
+            true
+          ]
+        }
+      },
+      "boundary_capture_contract": {
+        "expected": [
+          {
+            "name": "css-start",
+            "phase": 1,
+            "label": "original CSS at the first ready source draw"
+          },
+          {
+            "name": "sss",
+            "phase": 3,
+            "label": "original SSS"
+          },
+          {
+            "name": "match",
+            "phase": 7,
+            "label": "original match"
+          },
+          {
+            "name": "results",
+            "phase": 8,
+            "label": "original Results"
+          },
+          {
+            "name": "css-return",
+            "phase": 1,
+            "label": "original CSS after Results"
+          }
+        ],
+        "source": "existing browser-driver diagnostics, net-session WebGPU diagnostics, and headless Chrome viewport screenshots",
+        "pixel_equivalence_claim": false,
+        "alpha": {
+          "expected": [
+            {
+              "name": "css-start",
+              "phase": 1,
+              "label": "original CSS at the first ready source draw"
+            },
+            {
+              "name": "sss",
+              "phase": 3,
+              "label": "original SSS"
+            },
+            {
+              "name": "match",
+              "phase": 7,
+              "label": "original match"
+            },
+            {
+              "name": "results",
+              "phase": 8,
+              "label": "original Results"
+            },
+            {
+              "name": "css-return",
+              "phase": 1,
+              "label": "original CSS after Results"
+            }
+          ],
+          "captured": [
+            {
+              "name": "css-start",
+              "phase": 1,
+              "source_cursor_sampled_before_screenshot": 2,
+              "last_consumed_tick": 1,
+              "source_cursor_after_screenshot": 4,
+              "source_cursor_stable_during_screenshot": false,
+              "screenshot": "alpha/route-css-start.png",
+              "render_readiness": {
+                "phase": 1,
+                "kind": "Live render resource",
+                "frame": 34,
+                "draw_calls": 297,
+                "source_draws": 1,
+                "draw_suppressed": 0,
+                "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0",
+                "signature": "Live render resource {\"frame\":34,\"started\":4151,\"valid\":1,\"first_use\":1,\"input_ms\":0.045,\"simulation_audio_ms\":11.19,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.01,\"record_ms\":0.005,\"pipeline_ms\":0,\"worker_ms\":0.02,\"encoder_ms\":0.015,\"total_ms\":0.035,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.06,\"outer_fifo_ms\":0,\"outer_total_ms\":0.1,\"outer_residual_ms\":0,\"start_ms\":4162.235,\"end_ms\":4162.335,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":172},\"begin_ms\":0.105,\"draw_ms\":10.8,\"end_ms\":2,\"total_ms\":24.145,\"end_phases\":{\"last_frame\":172,\"fifo_texture_ms\":0.005,\"gfx_finish_ms\":0.525,\"staging_writes_ms\":1.155,\"surface_encode_ms\":0.185,\"encoder_finish_ms\":0.005,\"queue_submit_ms\":0.025,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.015,\"record_ms\":0.005,\"packet_ms\":0.025,\"callback_ms\":0.235,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.025,\"callback_residual_ms\":0.015,\"tail_ms\":0.005,\"worker_ms\":1.45,\"worker_residual_ms\":0.005,\"total_ms\":2,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":884,\"draw_calls\":297,\"texture_upload_bytes\":1460480,\"staging_used_bytes\":2294692,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0\"}"
+              },
+              "screenshot_bytes": 442664,
+              "screenshot_sha256": "4f9cf306548a1d4ac2ff808850291522b8efa79ec5723573850c54c37ceedcf8",
+              "screenshot_phase_stable": true,
+              "gpu_observed": true
+            },
+            {
+              "name": "sss",
+              "phase": 3,
+              "source_cursor_sampled_before_screenshot": 155,
+              "last_consumed_tick": 154,
+              "source_cursor_after_screenshot": 159,
+              "source_cursor_stable_during_screenshot": false,
+              "screenshot": "alpha/route-sss.png",
+              "render_readiness": {
+                "phase": 3,
+                "kind": "Native callback",
+                "frame": 197,
+                "draw_calls": 90,
+                "source_draws": 1,
+                "draw_suppressed": 0,
+                "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 4 \u00b7 revisits: 0",
+                "signature": "Native callback {\"frame\":197,\"started\":6883.625,\"valid\":1,\"first_use\":1,\"input_ms\":0.035,\"simulation_audio_ms\":5.9,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.005,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.005,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.015,\"encoder_ms\":0.01,\"total_ms\":0.035,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.05,\"outer_fifo_ms\":0,\"outer_total_ms\":0.09,\"outer_residual_ms\":0,\"start_ms\":6889.56,\"end_ms\":6889.65,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":329},\"begin_ms\":0.09,\"draw_ms\":0.62,\"end_ms\":0.415,\"total_ms\":7.06,\"end_phases\":{\"last_frame\":329,\"fifo_texture_ms\":0.125,\"gfx_finish_ms\":0.09,\"staging_writes_ms\":0.11,\"surface_encode_ms\":0.035,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.01,\"cleanup_ms\":0,\"outer_prep_ms\":0.01,\"record_ms\":0,\"packet_ms\":0.01,\"callback_ms\":0.06,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.01,\"callback_residual_ms\":0.01,\"tail_ms\":0,\"worker_ms\":0.19,\"worker_residual_ms\":0,\"total_ms\":0.415,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":884,\"draw_calls\":90,\"texture_upload_bytes\":0,\"staging_used_bytes\":403912,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 4 \u00b7 revisits: 0\"}"
+              },
+              "screenshot_bytes": 281661,
+              "screenshot_sha256": "7db9f8489aa747ed818318e58084f83cc8ab805c853a1ab664ead716871fdcc3",
+              "screenshot_phase_stable": true,
+              "gpu_observed": true
+            },
+            {
+              "name": "match",
+              "phase": 7,
+              "source_cursor_sampled_before_screenshot": 430,
+              "last_consumed_tick": 429,
+              "source_cursor_after_screenshot": 435,
+              "source_cursor_stable_during_screenshot": false,
+              "screenshot": "alpha/route-match.png",
+              "render_readiness": {
+                "phase": 7,
+                "kind": "Live render resource",
+                "frame": 494,
+                "draw_calls": 237,
+                "source_draws": 1,
+                "draw_suppressed": 0,
+                "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 source frame: 0 \u00b7 P1 motion: 66 \u00b7 anim: 20.000 \u00b7 ground/air: 1 \u00b7 position: [-60.000,8.855] \u00b7 source pause: 0 \u00b7 ready: 1",
+                "signature": "Live render resource {\"frame\":494,\"started\":11900.665,\"valid\":1,\"first_use\":0,\"input_ms\":0.04,\"simulation_audio_ms\":0.505,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.015,\"record_ms\":0.015,\"pipeline_ms\":0,\"worker_ms\":0.01,\"encoder_ms\":0.005,\"total_ms\":0.04,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.05,\"outer_fifo_ms\":0,\"outer_total_ms\":0.105,\"outer_residual_ms\":0.01,\"start_ms\":11901.21,\"end_ms\":11901.315,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":611},\"begin_ms\":0.105,\"draw_ms\":2.08,\"end_ms\":0.76,\"total_ms\":3.495,\"end_phases\":{\"last_frame\":611,\"fifo_texture_ms\":0.21,\"gfx_finish_ms\":0.115,\"staging_writes_ms\":0.35,\"surface_encode_ms\":0.035,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.015,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.005,\"record_ms\":0,\"packet_ms\":0.005,\"callback_ms\":0.05,\"callback_post_submit_ms\":0,\"observer_ms\":0.01,\"callback_residual_ms\":0,\"tail_ms\":0.005,\"worker_ms\":0.425,\"worker_residual_ms\":0.005,\"total_ms\":0.76,\"residual_ms\":0.005},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":890,\"draw_calls\":237,\"texture_upload_bytes\":24576,\"staging_used_bytes\":1229984,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 source frame: 0 \u00b7 P1 motion: 66 \u00b7 anim: 20.000 \u00b7 ground/air: 1 \u00b7 position: [-60.000,8.855] \u00b7 source pause: 0 \u00b7 ready: 1\"}"
+              },
+              "screenshot_bytes": 497228,
+              "screenshot_sha256": "6b7041aead3d27cad6015034ef4ecd4712dbe56bf6497468ea5bcb643b11221d",
+              "screenshot_phase_stable": true,
+              "gpu_observed": true
+            },
+            {
+              "name": "results",
+              "phase": 8,
+              "source_cursor_sampled_before_screenshot": 4293,
+              "last_consumed_tick": 4292,
+              "source_cursor_after_screenshot": 4297,
+              "source_cursor_stable_during_screenshot": false,
+              "screenshot": "alpha/route-results.png",
+              "render_readiness": {
+                "phase": 8,
+                "kind": "Live render resource",
+                "frame": 4387,
+                "draw_calls": 213,
+                "source_draws": 1,
+                "draw_suppressed": 0,
+                "source": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 Results source frame: 1",
+                "signature": "Live render resource {\"frame\":4387,\"started\":76862.93,\"valid\":1,\"first_use\":1,\"input_ms\":0.055,\"simulation_audio_ms\":5.105,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.005,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.02,\"encoder_ms\":0.015,\"total_ms\":0.04,\"residual_ms\":0.005,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.065,\"outer_fifo_ms\":0,\"outer_total_ms\":0.11,\"outer_residual_ms\":0,\"start_ms\":76868.09,\"end_ms\":76868.2,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":4482},\"begin_ms\":0.11,\"draw_ms\":2.345,\"end_ms\":0.995,\"total_ms\":8.61,\"end_phases\":{\"last_frame\":4482,\"fifo_texture_ms\":0.43,\"gfx_finish_ms\":0.085,\"staging_writes_ms\":0.37,\"surface_encode_ms\":0.04,\"encoder_finish_ms\":0.005,\"queue_submit_ms\":0.02,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.01,\"record_ms\":0.005,\"packet_ms\":0.005,\"callback_ms\":0.07,\"callback_post_submit_ms\":0,\"observer_ms\":0.015,\"callback_residual_ms\":0.005,\"tail_ms\":0.005,\"worker_ms\":0.465,\"worker_residual_ms\":0,\"total_ms\":0.995,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":908,\"draw_calls\":213,\"texture_upload_bytes\":8192,\"staging_used_bytes\":1325744,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 Results source frame: 1\"}"
+              },
+              "screenshot_bytes": 134105,
+              "screenshot_sha256": "6d119b99f5354f22f906437f384653ac360679de15357f9dc7ffc9eae44fde79",
+              "screenshot_phase_stable": true,
+              "gpu_observed": true
+            },
+            {
+              "name": "css-return",
+              "phase": 1,
+              "source_cursor_sampled_before_screenshot": 4906,
+              "last_consumed_tick": 4905,
+              "source_cursor_after_screenshot": 4911,
+              "source_cursor_stable_during_screenshot": false,
+              "screenshot": "alpha/final.png",
+              "render_readiness": {
+                "phase": 1,
+                "kind": "Native callback",
+                "frame": 5017,
+                "draw_calls": 297,
+                "source_draws": 1,
+                "draw_suppressed": 0,
+                "source": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0",
+                "signature": "Native callback {\"frame\":5017,\"started\":87580.54,\"valid\":1,\"first_use\":1,\"input_ms\":0.03,\"simulation_audio_ms\":4.39,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.015,\"record_ms\":0,\"pipeline_ms\":0,\"worker_ms\":0.025,\"encoder_ms\":0.015,\"total_ms\":0.04,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.04,\"outer_fifo_ms\":0,\"outer_total_ms\":0.085,\"outer_residual_ms\":0,\"start_ms\":87584.96,\"end_ms\":87585.045,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":5109},\"begin_ms\":0.085,\"draw_ms\":1.38,\"end_ms\":1.24,\"total_ms\":7.125,\"end_phases\":{\"last_frame\":5109,\"fifo_texture_ms\":0.755,\"gfx_finish_ms\":0.17,\"staging_writes_ms\":0.215,\"surface_encode_ms\":0.045,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.01,\"cleanup_ms\":0,\"outer_prep_ms\":0.01,\"record_ms\":0,\"packet_ms\":0,\"callback_ms\":0.06,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.015,\"callback_residual_ms\":0,\"tail_ms\":0,\"worker_ms\":0.305,\"worker_residual_ms\":0.015,\"total_ms\":1.24,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":908,\"draw_calls\":297,\"texture_upload_bytes\":0,\"staging_used_bytes\":834212,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0\"}"
+              },
+              "screenshot_bytes": 452620,
+              "screenshot_sha256": "5070bcc00250fc381bd4335633fa6b3f020f1a299fe4a442bf717a9a983079a6",
+              "screenshot_phase_stable": true,
+              "gpu_observed": true
+            }
+          ],
+          "missed": [],
+          "captures_complete": true,
+          "ready_draw_complete": true,
+          "gpu_diagnostics_complete": true,
+          "phase_stable_through_screenshots": true,
+          "complete": true,
+          "pixel_equivalence_claim": false
+        },
+        "beta": {
+          "expected": [
+            {
+              "name": "css-start",
+              "phase": 1,
+              "label": "original CSS at the first ready source draw"
+            },
+            {
+              "name": "sss",
+              "phase": 3,
+              "label": "original SSS"
+            },
+            {
+              "name": "match",
+              "phase": 7,
+              "label": "original match"
+            },
+            {
+              "name": "results",
+              "phase": 8,
+              "label": "original Results"
+            },
+            {
+              "name": "css-return",
+              "phase": 1,
+              "label": "original CSS after Results"
+            }
+          ],
+          "captured": [
+            {
+              "name": "css-start",
+              "phase": 1,
+              "source_cursor_sampled_before_screenshot": 2,
+              "last_consumed_tick": 1,
+              "source_cursor_after_screenshot": 6,
+              "source_cursor_stable_during_screenshot": false,
+              "screenshot": "beta/route-css-start.png",
+              "render_readiness": {
+                "phase": 1,
+                "kind": "Live render resource",
+                "frame": 34,
+                "draw_calls": 297,
+                "source_draws": 1,
+                "draw_suppressed": 0,
+                "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0",
+                "signature": "Live render resource {\"frame\":34,\"started\":4145.58,\"valid\":1,\"first_use\":1,\"input_ms\":0.045,\"simulation_audio_ms\":11.18,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.01,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.025,\"encoder_ms\":0.02,\"total_ms\":0.045,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.055,\"outer_fifo_ms\":0,\"outer_total_ms\":0.105,\"outer_residual_ms\":0,\"start_ms\":4156.81,\"end_ms\":4156.915,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":176},\"begin_ms\":0.11,\"draw_ms\":9.68,\"end_ms\":1.69,\"total_ms\":22.71,\"end_phases\":{\"last_frame\":176,\"fifo_texture_ms\":0,\"gfx_finish_ms\":0.56,\"staging_writes_ms\":0.94,\"surface_encode_ms\":0.1,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.015,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.01,\"record_ms\":0.005,\"packet_ms\":0.015,\"callback_ms\":0.125,\"callback_post_submit_ms\":0.01,\"observer_ms\":0.015,\"callback_residual_ms\":0,\"tail_ms\":0.005,\"worker_ms\":1.105,\"worker_residual_ms\":0.005,\"total_ms\":1.68,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":884,\"draw_calls\":297,\"texture_upload_bytes\":1460480,\"staging_used_bytes\":2294692,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0\"}"
+              },
+              "screenshot_bytes": 451253,
+              "screenshot_sha256": "b7ccf63141126de8a31c1164dc2478ff391445762a09f0fdb7c273473d5d5e3a",
+              "screenshot_phase_stable": true,
+              "gpu_observed": true
+            },
+            {
+              "name": "sss",
+              "phase": 3,
+              "source_cursor_sampled_before_screenshot": 156,
+              "last_consumed_tick": 155,
+              "source_cursor_after_screenshot": 159,
+              "source_cursor_stable_during_screenshot": false,
+              "screenshot": "beta/route-sss.png",
+              "render_readiness": {
+                "phase": 3,
+                "kind": "Native callback",
+                "frame": 197,
+                "draw_calls": 180,
+                "source_draws": 2,
+                "draw_suppressed": 0,
+                "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 4 \u00b7 revisits: 0",
+                "signature": "Native callback {\"frame\":197,\"started\":6878.205,\"valid\":1,\"first_use\":1,\"input_ms\":0.035,\"simulation_audio_ms\":5.97,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.01,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.01,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.025,\"encoder_ms\":0.02,\"total_ms\":0.055,\"residual_ms\":0,\"outer_surface_ms\":0.01,\"outer_imgui_ms\":0.07,\"outer_fifo_ms\":0,\"outer_total_ms\":0.14,\"outer_residual_ms\":0.005,\"start_ms\":6885.34,\"end_ms\":6885.385,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":334},\"begin_ms\":0.145,\"draw_ms\":1.115,\"end_ms\":0.775,\"total_ms\":8.04,\"end_phases\":{\"last_frame\":334,\"fifo_texture_ms\":0.21,\"gfx_finish_ms\":0.17,\"staging_writes_ms\":0.22,\"surface_encode_ms\":0.075,\"encoder_finish_ms\":0.005,\"queue_submit_ms\":0.03,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.02,\"record_ms\":0,\"packet_ms\":0.005,\"callback_ms\":0.115,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.02,\"callback_residual_ms\":0,\"tail_ms\":0.005,\"worker_ms\":0.37,\"worker_residual_ms\":0.005,\"total_ms\":0.77,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":884,\"draw_calls\":180,\"texture_upload_bytes\":0,\"staging_used_bytes\":807824,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":2,\"source_draws\":2,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 4 \u00b7 revisits: 0\"}"
+              },
+              "screenshot_bytes": 308599,
+              "screenshot_sha256": "6d26cce352744f000f50cad8f0f4b00f3f10471af1a152cb0b729b4439a3cbe9",
+              "screenshot_phase_stable": true,
+              "gpu_observed": true
+            },
+            {
+              "name": "match",
+              "phase": 7,
+              "source_cursor_sampled_before_screenshot": 431,
+              "last_consumed_tick": 430,
+              "source_cursor_after_screenshot": 436,
+              "source_cursor_stable_during_screenshot": false,
+              "screenshot": "beta/route-match.png",
+              "render_readiness": {
+                "phase": 7,
+                "kind": "Live render resource",
+                "frame": 495,
+                "draw_calls": 236,
+                "source_draws": 1,
+                "draw_suppressed": 0,
+                "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 source frame: 1 \u00b7 P1 motion: 66 \u00b7 anim: 21.000 \u00b7 ground/air: 1 \u00b7 position: [-60.000,8.165] \u00b7 source pause: 0 \u00b7 ready: 1",
+                "signature": "Live render resource {\"frame\":495,\"started\":11895.245,\"valid\":1,\"first_use\":0,\"input_ms\":0.04,\"simulation_audio_ms\":0.515,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.02,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.01,\"encoder_ms\":0.01,\"total_ms\":0.04,\"residual_ms\":0,\"outer_surface_ms\":0,\"outer_imgui_ms\":0.05,\"outer_fifo_ms\":0,\"outer_total_ms\":0.095,\"outer_residual_ms\":0.005,\"start_ms\":11895.8,\"end_ms\":11895.895,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":616},\"begin_ms\":0.095,\"draw_ms\":2.11,\"end_ms\":0.745,\"total_ms\":3.51,\"end_phases\":{\"last_frame\":616,\"fifo_texture_ms\":0.215,\"gfx_finish_ms\":0.115,\"staging_writes_ms\":0.35,\"surface_encode_ms\":0.03,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.01,\"cleanup_ms\":0,\"outer_prep_ms\":0.005,\"record_ms\":0,\"packet_ms\":0.005,\"callback_ms\":0.04,\"callback_post_submit_ms\":0,\"observer_ms\":0.01,\"callback_residual_ms\":0,\"tail_ms\":0,\"worker_ms\":0.41,\"worker_residual_ms\":0.005,\"total_ms\":0.745,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":890,\"draw_calls\":236,\"texture_upload_bytes\":16384,\"staging_used_bytes\":1219680,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 source frame: 1 \u00b7 P1 motion: 66 \u00b7 anim: 21.000 \u00b7 ground/air: 1 \u00b7 position: [-60.000,8.165] \u00b7 source pause: 0 \u00b7 ready: 1\"}"
+              },
+              "screenshot_bytes": 496755,
+              "screenshot_sha256": "0d295f6a5e7f12dce1850995b7cded9d06f225ce929fad182810f57d0b3e4c0c",
+              "screenshot_phase_stable": true,
+              "gpu_observed": true
+            },
+            {
+              "name": "results",
+              "phase": 8,
+              "source_cursor_sampled_before_screenshot": 4295,
+              "last_consumed_tick": 4294,
+              "source_cursor_after_screenshot": 4299,
+              "source_cursor_stable_during_screenshot": false,
+              "screenshot": "beta/route-results.png",
+              "render_readiness": {
+                "phase": 8,
+                "kind": "Live render resource",
+                "frame": 4388,
+                "draw_calls": 213,
+                "source_draws": 1,
+                "draw_suppressed": 0,
+                "source": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 Results source frame: 1",
+                "signature": "Live render resource {\"frame\":4388,\"started\":76857.515,\"valid\":1,\"first_use\":1,\"input_ms\":0.055,\"simulation_audio_ms\":5.1,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.005,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.005,\"record_ms\":0.005,\"pipeline_ms\":0,\"worker_ms\":0.025,\"encoder_ms\":0.02,\"total_ms\":0.045,\"residual_ms\":0.005,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.06,\"outer_fifo_ms\":0,\"outer_total_ms\":0.115,\"outer_residual_ms\":0.005,\"start_ms\":76862.67,\"end_ms\":76862.785,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":4486},\"begin_ms\":0.115,\"draw_ms\":2.355,\"end_ms\":0.98,\"total_ms\":8.61,\"end_phases\":{\"last_frame\":4486,\"fifo_texture_ms\":0.435,\"gfx_finish_ms\":0.08,\"staging_writes_ms\":0.355,\"surface_encode_ms\":0.04,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.02,\"cleanup_ms\":0,\"outer_prep_ms\":0.005,\"record_ms\":0,\"packet_ms\":0.01,\"callback_ms\":0.065,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.015,\"callback_residual_ms\":0,\"tail_ms\":0,\"worker_ms\":0.455,\"worker_residual_ms\":0.01,\"total_ms\":0.975,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":908,\"draw_calls\":213,\"texture_upload_bytes\":8192,\"staging_used_bytes\":1325744,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 Results source frame: 1\"}"
+              },
+              "screenshot_bytes": 134083,
+              "screenshot_sha256": "495a1b2adc086e9ed13449e30f975a549202d616ca396f073f701c10e6312e82",
+              "screenshot_phase_stable": true,
+              "gpu_observed": true
+            },
+            {
+              "name": "css-return",
+              "phase": 1,
+              "source_cursor_sampled_before_screenshot": 4906,
+              "last_consumed_tick": 4905,
+              "source_cursor_after_screenshot": 4910,
+              "source_cursor_stable_during_screenshot": false,
+              "screenshot": "beta/final.png",
+              "render_readiness": {
+                "phase": 1,
+                "kind": "Native callback",
+                "frame": 5018,
+                "draw_calls": 297,
+                "source_draws": 1,
+                "draw_suppressed": 0,
+                "source": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0",
+                "signature": "Native callback {\"frame\":5018,\"started\":87575.12,\"valid\":1,\"first_use\":1,\"input_ms\":0.03,\"simulation_audio_ms\":4.42,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.005,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.02,\"record_ms\":0.005,\"pipeline_ms\":0,\"worker_ms\":0.015,\"encoder_ms\":0.01,\"total_ms\":0.045,\"residual_ms\":0,\"outer_surface_ms\":0,\"outer_imgui_ms\":0.045,\"outer_fifo_ms\":0,\"outer_total_ms\":0.09,\"outer_residual_ms\":0,\"start_ms\":87579.57,\"end_ms\":87579.66,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":5113},\"begin_ms\":0.09,\"draw_ms\":1.505,\"end_ms\":1.22,\"total_ms\":7.265,\"end_phases\":{\"last_frame\":5113,\"fifo_texture_ms\":0.755,\"gfx_finish_ms\":0.155,\"staging_writes_ms\":0.225,\"surface_encode_ms\":0.04,\"encoder_finish_ms\":0.005,\"queue_submit_ms\":0.005,\"cleanup_ms\":0,\"outer_prep_ms\":0.01,\"record_ms\":0,\"packet_ms\":0,\"callback_ms\":0.055,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.015,\"callback_residual_ms\":0,\"tail_ms\":0,\"worker_ms\":0.3,\"worker_residual_ms\":0.005,\"total_ms\":1.22,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":908,\"draw_calls\":297,\"texture_upload_bytes\":0,\"staging_used_bytes\":834212,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0\"}"
+              },
+              "screenshot_bytes": 452576,
+              "screenshot_sha256": "d2f56f48fa723cfffabd7e4082d2d3f752483410b51ec1819d31ac114ab75314",
+              "screenshot_phase_stable": true,
+              "gpu_observed": true
+            }
+          ],
+          "missed": [],
+          "captures_complete": true,
+          "ready_draw_complete": true,
+          "gpu_diagnostics_complete": true,
+          "phase_stable_through_screenshots": true,
+          "complete": true,
+          "pixel_equivalence_claim": false
+        }
+      }
+    },
+    "identity": {
+      "wasm_sha256_equal": true,
+      "loaded_wasm_response_sha256_equal": true,
+      "wasm_sha256_source": "peerIdentity fresh fetch compared with frozen initial browser load-response body SHA-256",
+      "disc_identity_equal": true,
+      "native_start_equal": true,
+      "alpha": {
+        "wasm_sha256": "6c8812737401d3506ee817879a384282b73f35c8b8fe6a92fcb15ac8ded232a9",
+        "disc": {
+          "algorithm": "sha256",
+          "dol": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+          "fst": "ef099ee0edf64189544d36fe8e4be2293282d595eef27715df8aacb95fc6d4d7",
+          "dolSize": 4425184,
+          "fstSize": 29993
+        },
+        "native_start": {
+          "required": 1,
+          "recorded": 1,
+          "scene": 1,
+          "seed": 305419896,
+          "frame": 0,
+          "confirmed": 0,
+          "capture_failed": 0,
+          "card": "2fe3d8fd274c828a",
+          "pad_history": "af900bb4021c8716",
+          "native_context": "db94ef51d4c4ef9c",
+          "total": "a8f1925aa316f1e8",
+          "pad": "419eb4f4f4bbee75",
+          "scene_state": "3391b05bd2e60036",
+          "object_state": "d0e868a4883380b5",
+          "objects": 33,
+          "flags": 10
+        }
+      },
+      "beta": {
+        "wasm_sha256": "6c8812737401d3506ee817879a384282b73f35c8b8fe6a92fcb15ac8ded232a9",
+        "disc": {
+          "algorithm": "sha256",
+          "dol": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+          "fst": "ef099ee0edf64189544d36fe8e4be2293282d595eef27715df8aacb95fc6d4d7",
+          "dolSize": 4425184,
+          "fstSize": 29993
+        },
+        "native_start": {
+          "required": 1,
+          "recorded": 1,
+          "scene": 1,
+          "seed": 305419896,
+          "frame": 0,
+          "confirmed": 0,
+          "capture_failed": 0,
+          "card": "2fe3d8fd274c828a",
+          "pad_history": "af900bb4021c8716",
+          "native_context": "db94ef51d4c4ef9c",
+          "total": "a8f1925aa316f1e8",
+          "pad": "419eb4f4f4bbee75",
+          "scene_state": "3391b05bd2e60036",
+          "object_state": "d0e868a4883380b5",
+          "objects": 33,
+          "flags": 10
+        }
+      },
+      "browser_loaded_wasm_response": {
+        "source": "response body observed before navigation and frozen before peerIdentity fresh fetch",
+        "alpha": {
+          "sha256": "6c8812737401d3506ee817879a384282b73f35c8b8fe6a92fcb15ac8ded232a9",
+          "byte_length": 15738629,
+          "response_count": 1,
+          "response_hashes": [
+            {
+              "status": 200,
+              "url": "http://127.0.0.1:8787/gameplay_menu_browser.wasm",
+              "resource_type": "fetch",
+              "method": "GET",
+              "request_id": "68180.28",
+              "sha256": "6c8812737401d3506ee817879a384282b73f35c8b8fe6a92fcb15ac8ded232a9",
+              "byte_length": 15738629
+            }
+          ],
+          "response_set_frozen_before_handshake_fetch": true,
+          "capture_method": "cdp-load-response",
+          "max_body_bytes": 33554432,
+          "inspector_resource_buffer_bytes": 67108864,
+          "inspector_total_buffer_bytes": 134217728
+        },
+        "beta": {
+          "sha256": "6c8812737401d3506ee817879a384282b73f35c8b8fe6a92fcb15ac8ded232a9",
+          "byte_length": 15738629,
+          "response_count": 1,
+          "response_hashes": [
+            {
+              "status": 200,
+              "url": "http://127.0.0.1:8787/gameplay_menu_browser.wasm",
+              "resource_type": "fetch",
+              "method": "GET",
+              "request_id": "68179.28",
+              "sha256": "6c8812737401d3506ee817879a384282b73f35c8b8fe6a92fcb15ac8ded232a9",
+              "byte_length": 15738629
+            }
+          ],
+          "response_set_frozen_before_handshake_fetch": true,
+          "capture_method": "cdp-load-response",
+          "max_body_bytes": 33554432,
+          "inspector_resource_buffer_bytes": 67108864,
+          "inspector_total_buffer_bytes": 134217728
+        },
+        "compared_to_handshake_fresh_fetch": true,
+        "fresh_fetch_byte_length": "not exposed by peerIdentity"
+      },
+      "handshake_confirmed_before_tick0": true,
+      "peer_agreement_sha256": "639cfc7fc644b377e3dc93894f06c99db22f23665e9edd6acfe29b1adcbb6921"
+    },
+    "timing_resumes_each": 0,
+    "boundary_reports": {
+      "alpha": {
+        "expected": [
+          {
+            "name": "css-start",
+            "phase": 1,
+            "label": "original CSS at the first ready source draw"
+          },
+          {
+            "name": "sss",
+            "phase": 3,
+            "label": "original SSS"
+          },
+          {
+            "name": "match",
+            "phase": 7,
+            "label": "original match"
+          },
+          {
+            "name": "results",
+            "phase": 8,
+            "label": "original Results"
+          },
+          {
+            "name": "css-return",
+            "phase": 1,
+            "label": "original CSS after Results"
+          }
+        ],
+        "captured": [
+          {
+            "name": "css-start",
+            "phase": 1,
+            "source_cursor_sampled_before_screenshot": 2,
+            "last_consumed_tick": 1,
+            "source_cursor_after_screenshot": 4,
+            "source_cursor_stable_during_screenshot": false,
+            "screenshot": "alpha/route-css-start.png",
+            "render_readiness": {
+              "phase": 1,
+              "kind": "Live render resource",
+              "frame": 34,
+              "draw_calls": 297,
+              "source_draws": 1,
+              "draw_suppressed": 0,
+              "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0",
+              "signature": "Live render resource {\"frame\":34,\"started\":4151,\"valid\":1,\"first_use\":1,\"input_ms\":0.045,\"simulation_audio_ms\":11.19,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.01,\"record_ms\":0.005,\"pipeline_ms\":0,\"worker_ms\":0.02,\"encoder_ms\":0.015,\"total_ms\":0.035,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.06,\"outer_fifo_ms\":0,\"outer_total_ms\":0.1,\"outer_residual_ms\":0,\"start_ms\":4162.235,\"end_ms\":4162.335,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":172},\"begin_ms\":0.105,\"draw_ms\":10.8,\"end_ms\":2,\"total_ms\":24.145,\"end_phases\":{\"last_frame\":172,\"fifo_texture_ms\":0.005,\"gfx_finish_ms\":0.525,\"staging_writes_ms\":1.155,\"surface_encode_ms\":0.185,\"encoder_finish_ms\":0.005,\"queue_submit_ms\":0.025,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.015,\"record_ms\":0.005,\"packet_ms\":0.025,\"callback_ms\":0.235,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.025,\"callback_residual_ms\":0.015,\"tail_ms\":0.005,\"worker_ms\":1.45,\"worker_residual_ms\":0.005,\"total_ms\":2,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":884,\"draw_calls\":297,\"texture_upload_bytes\":1460480,\"staging_used_bytes\":2294692,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0\"}"
+            },
+            "screenshot_bytes": 442664,
+            "screenshot_sha256": "4f9cf306548a1d4ac2ff808850291522b8efa79ec5723573850c54c37ceedcf8",
+            "screenshot_phase_stable": true,
+            "gpu_observed": true
+          },
+          {
+            "name": "sss",
+            "phase": 3,
+            "source_cursor_sampled_before_screenshot": 155,
+            "last_consumed_tick": 154,
+            "source_cursor_after_screenshot": 159,
+            "source_cursor_stable_during_screenshot": false,
+            "screenshot": "alpha/route-sss.png",
+            "render_readiness": {
+              "phase": 3,
+              "kind": "Native callback",
+              "frame": 197,
+              "draw_calls": 90,
+              "source_draws": 1,
+              "draw_suppressed": 0,
+              "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 4 \u00b7 revisits: 0",
+              "signature": "Native callback {\"frame\":197,\"started\":6883.625,\"valid\":1,\"first_use\":1,\"input_ms\":0.035,\"simulation_audio_ms\":5.9,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.005,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.005,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.015,\"encoder_ms\":0.01,\"total_ms\":0.035,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.05,\"outer_fifo_ms\":0,\"outer_total_ms\":0.09,\"outer_residual_ms\":0,\"start_ms\":6889.56,\"end_ms\":6889.65,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":329},\"begin_ms\":0.09,\"draw_ms\":0.62,\"end_ms\":0.415,\"total_ms\":7.06,\"end_phases\":{\"last_frame\":329,\"fifo_texture_ms\":0.125,\"gfx_finish_ms\":0.09,\"staging_writes_ms\":0.11,\"surface_encode_ms\":0.035,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.01,\"cleanup_ms\":0,\"outer_prep_ms\":0.01,\"record_ms\":0,\"packet_ms\":0.01,\"callback_ms\":0.06,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.01,\"callback_residual_ms\":0.01,\"tail_ms\":0,\"worker_ms\":0.19,\"worker_residual_ms\":0,\"total_ms\":0.415,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":884,\"draw_calls\":90,\"texture_upload_bytes\":0,\"staging_used_bytes\":403912,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 4 \u00b7 revisits: 0\"}"
+            },
+            "screenshot_bytes": 281661,
+            "screenshot_sha256": "7db9f8489aa747ed818318e58084f83cc8ab805c853a1ab664ead716871fdcc3",
+            "screenshot_phase_stable": true,
+            "gpu_observed": true
+          },
+          {
+            "name": "match",
+            "phase": 7,
+            "source_cursor_sampled_before_screenshot": 430,
+            "last_consumed_tick": 429,
+            "source_cursor_after_screenshot": 435,
+            "source_cursor_stable_during_screenshot": false,
+            "screenshot": "alpha/route-match.png",
+            "render_readiness": {
+              "phase": 7,
+              "kind": "Live render resource",
+              "frame": 494,
+              "draw_calls": 237,
+              "source_draws": 1,
+              "draw_suppressed": 0,
+              "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 source frame: 0 \u00b7 P1 motion: 66 \u00b7 anim: 20.000 \u00b7 ground/air: 1 \u00b7 position: [-60.000,8.855] \u00b7 source pause: 0 \u00b7 ready: 1",
+              "signature": "Live render resource {\"frame\":494,\"started\":11900.665,\"valid\":1,\"first_use\":0,\"input_ms\":0.04,\"simulation_audio_ms\":0.505,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.015,\"record_ms\":0.015,\"pipeline_ms\":0,\"worker_ms\":0.01,\"encoder_ms\":0.005,\"total_ms\":0.04,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.05,\"outer_fifo_ms\":0,\"outer_total_ms\":0.105,\"outer_residual_ms\":0.01,\"start_ms\":11901.21,\"end_ms\":11901.315,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":611},\"begin_ms\":0.105,\"draw_ms\":2.08,\"end_ms\":0.76,\"total_ms\":3.495,\"end_phases\":{\"last_frame\":611,\"fifo_texture_ms\":0.21,\"gfx_finish_ms\":0.115,\"staging_writes_ms\":0.35,\"surface_encode_ms\":0.035,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.015,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.005,\"record_ms\":0,\"packet_ms\":0.005,\"callback_ms\":0.05,\"callback_post_submit_ms\":0,\"observer_ms\":0.01,\"callback_residual_ms\":0,\"tail_ms\":0.005,\"worker_ms\":0.425,\"worker_residual_ms\":0.005,\"total_ms\":0.76,\"residual_ms\":0.005},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":890,\"draw_calls\":237,\"texture_upload_bytes\":24576,\"staging_used_bytes\":1229984,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 source frame: 0 \u00b7 P1 motion: 66 \u00b7 anim: 20.000 \u00b7 ground/air: 1 \u00b7 position: [-60.000,8.855] \u00b7 source pause: 0 \u00b7 ready: 1\"}"
+            },
+            "screenshot_bytes": 497228,
+            "screenshot_sha256": "6b7041aead3d27cad6015034ef4ecd4712dbe56bf6497468ea5bcb643b11221d",
+            "screenshot_phase_stable": true,
+            "gpu_observed": true
+          },
+          {
+            "name": "results",
+            "phase": 8,
+            "source_cursor_sampled_before_screenshot": 4293,
+            "last_consumed_tick": 4292,
+            "source_cursor_after_screenshot": 4297,
+            "source_cursor_stable_during_screenshot": false,
+            "screenshot": "alpha/route-results.png",
+            "render_readiness": {
+              "phase": 8,
+              "kind": "Live render resource",
+              "frame": 4387,
+              "draw_calls": 213,
+              "source_draws": 1,
+              "draw_suppressed": 0,
+              "source": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 Results source frame: 1",
+              "signature": "Live render resource {\"frame\":4387,\"started\":76862.93,\"valid\":1,\"first_use\":1,\"input_ms\":0.055,\"simulation_audio_ms\":5.105,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.005,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.02,\"encoder_ms\":0.015,\"total_ms\":0.04,\"residual_ms\":0.005,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.065,\"outer_fifo_ms\":0,\"outer_total_ms\":0.11,\"outer_residual_ms\":0,\"start_ms\":76868.09,\"end_ms\":76868.2,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":4482},\"begin_ms\":0.11,\"draw_ms\":2.345,\"end_ms\":0.995,\"total_ms\":8.61,\"end_phases\":{\"last_frame\":4482,\"fifo_texture_ms\":0.43,\"gfx_finish_ms\":0.085,\"staging_writes_ms\":0.37,\"surface_encode_ms\":0.04,\"encoder_finish_ms\":0.005,\"queue_submit_ms\":0.02,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.01,\"record_ms\":0.005,\"packet_ms\":0.005,\"callback_ms\":0.07,\"callback_post_submit_ms\":0,\"observer_ms\":0.015,\"callback_residual_ms\":0.005,\"tail_ms\":0.005,\"worker_ms\":0.465,\"worker_residual_ms\":0,\"total_ms\":0.995,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":908,\"draw_calls\":213,\"texture_upload_bytes\":8192,\"staging_used_bytes\":1325744,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 Results source frame: 1\"}"
+            },
+            "screenshot_bytes": 134105,
+            "screenshot_sha256": "6d119b99f5354f22f906437f384653ac360679de15357f9dc7ffc9eae44fde79",
+            "screenshot_phase_stable": true,
+            "gpu_observed": true
+          },
+          {
+            "name": "css-return",
+            "phase": 1,
+            "source_cursor_sampled_before_screenshot": 4906,
+            "last_consumed_tick": 4905,
+            "source_cursor_after_screenshot": 4911,
+            "source_cursor_stable_during_screenshot": false,
+            "screenshot": "alpha/final.png",
+            "render_readiness": {
+              "phase": 1,
+              "kind": "Native callback",
+              "frame": 5017,
+              "draw_calls": 297,
+              "source_draws": 1,
+              "draw_suppressed": 0,
+              "source": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0",
+              "signature": "Native callback {\"frame\":5017,\"started\":87580.54,\"valid\":1,\"first_use\":1,\"input_ms\":0.03,\"simulation_audio_ms\":4.39,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.015,\"record_ms\":0,\"pipeline_ms\":0,\"worker_ms\":0.025,\"encoder_ms\":0.015,\"total_ms\":0.04,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.04,\"outer_fifo_ms\":0,\"outer_total_ms\":0.085,\"outer_residual_ms\":0,\"start_ms\":87584.96,\"end_ms\":87585.045,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":5109},\"begin_ms\":0.085,\"draw_ms\":1.38,\"end_ms\":1.24,\"total_ms\":7.125,\"end_phases\":{\"last_frame\":5109,\"fifo_texture_ms\":0.755,\"gfx_finish_ms\":0.17,\"staging_writes_ms\":0.215,\"surface_encode_ms\":0.045,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.01,\"cleanup_ms\":0,\"outer_prep_ms\":0.01,\"record_ms\":0,\"packet_ms\":0,\"callback_ms\":0.06,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.015,\"callback_residual_ms\":0,\"tail_ms\":0,\"worker_ms\":0.305,\"worker_residual_ms\":0.015,\"total_ms\":1.24,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":908,\"draw_calls\":297,\"texture_upload_bytes\":0,\"staging_used_bytes\":834212,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0\"}"
+            },
+            "screenshot_bytes": 452620,
+            "screenshot_sha256": "5070bcc00250fc381bd4335633fa6b3f020f1a299fe4a442bf717a9a983079a6",
+            "screenshot_phase_stable": true,
+            "gpu_observed": true
+          }
+        ],
+        "missed": [],
+        "captures_complete": true,
+        "ready_draw_complete": true,
+        "gpu_diagnostics_complete": true,
+        "phase_stable_through_screenshots": true,
+        "complete": true,
+        "pixel_equivalence_claim": false
+      },
+      "beta": {
+        "expected": [
+          {
+            "name": "css-start",
+            "phase": 1,
+            "label": "original CSS at the first ready source draw"
+          },
+          {
+            "name": "sss",
+            "phase": 3,
+            "label": "original SSS"
+          },
+          {
+            "name": "match",
+            "phase": 7,
+            "label": "original match"
+          },
+          {
+            "name": "results",
+            "phase": 8,
+            "label": "original Results"
+          },
+          {
+            "name": "css-return",
+            "phase": 1,
+            "label": "original CSS after Results"
+          }
+        ],
+        "captured": [
+          {
+            "name": "css-start",
+            "phase": 1,
+            "source_cursor_sampled_before_screenshot": 2,
+            "last_consumed_tick": 1,
+            "source_cursor_after_screenshot": 6,
+            "source_cursor_stable_during_screenshot": false,
+            "screenshot": "beta/route-css-start.png",
+            "render_readiness": {
+              "phase": 1,
+              "kind": "Live render resource",
+              "frame": 34,
+              "draw_calls": 297,
+              "source_draws": 1,
+              "draw_suppressed": 0,
+              "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0",
+              "signature": "Live render resource {\"frame\":34,\"started\":4145.58,\"valid\":1,\"first_use\":1,\"input_ms\":0.045,\"simulation_audio_ms\":11.18,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.01,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.025,\"encoder_ms\":0.02,\"total_ms\":0.045,\"residual_ms\":0,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.055,\"outer_fifo_ms\":0,\"outer_total_ms\":0.105,\"outer_residual_ms\":0,\"start_ms\":4156.81,\"end_ms\":4156.915,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":176},\"begin_ms\":0.11,\"draw_ms\":9.68,\"end_ms\":1.69,\"total_ms\":22.71,\"end_phases\":{\"last_frame\":176,\"fifo_texture_ms\":0,\"gfx_finish_ms\":0.56,\"staging_writes_ms\":0.94,\"surface_encode_ms\":0.1,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.015,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.01,\"record_ms\":0.005,\"packet_ms\":0.015,\"callback_ms\":0.125,\"callback_post_submit_ms\":0.01,\"observer_ms\":0.015,\"callback_residual_ms\":0,\"tail_ms\":0.005,\"worker_ms\":1.105,\"worker_residual_ms\":0.005,\"total_ms\":1.68,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":884,\"draw_calls\":297,\"texture_upload_bytes\":1460480,\"staging_used_bytes\":2294692,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 3 \u00b7 revisits: 0\"}"
+            },
+            "screenshot_bytes": 451253,
+            "screenshot_sha256": "b7ccf63141126de8a31c1164dc2478ff391445762a09f0fdb7c273473d5d5e3a",
+            "screenshot_phase_stable": true,
+            "gpu_observed": true
+          },
+          {
+            "name": "sss",
+            "phase": 3,
+            "source_cursor_sampled_before_screenshot": 156,
+            "last_consumed_tick": 155,
+            "source_cursor_after_screenshot": 159,
+            "source_cursor_stable_during_screenshot": false,
+            "screenshot": "beta/route-sss.png",
+            "render_readiness": {
+              "phase": 3,
+              "kind": "Native callback",
+              "frame": 197,
+              "draw_calls": 180,
+              "source_draws": 2,
+              "draw_suppressed": 0,
+              "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 4 \u00b7 revisits: 0",
+              "signature": "Native callback {\"frame\":197,\"started\":6878.205,\"valid\":1,\"first_use\":1,\"input_ms\":0.035,\"simulation_audio_ms\":5.97,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.01,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.01,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.025,\"encoder_ms\":0.02,\"total_ms\":0.055,\"residual_ms\":0,\"outer_surface_ms\":0.01,\"outer_imgui_ms\":0.07,\"outer_fifo_ms\":0,\"outer_total_ms\":0.14,\"outer_residual_ms\":0.005,\"start_ms\":6885.34,\"end_ms\":6885.385,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":334},\"begin_ms\":0.145,\"draw_ms\":1.115,\"end_ms\":0.775,\"total_ms\":8.04,\"end_phases\":{\"last_frame\":334,\"fifo_texture_ms\":0.21,\"gfx_finish_ms\":0.17,\"staging_writes_ms\":0.22,\"surface_encode_ms\":0.075,\"encoder_finish_ms\":0.005,\"queue_submit_ms\":0.03,\"cleanup_ms\":0.005,\"outer_prep_ms\":0.02,\"record_ms\":0,\"packet_ms\":0.005,\"callback_ms\":0.115,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.02,\"callback_residual_ms\":0,\"tail_ms\":0.005,\"worker_ms\":0.37,\"worker_residual_ms\":0.005,\"total_ms\":0.77,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":884,\"draw_calls\":180,\"texture_upload_bytes\":0,\"staging_used_bytes\":807824,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":2,\"source_draws\":2,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 4 \u00b7 revisits: 0\"}"
+            },
+            "screenshot_bytes": 308599,
+            "screenshot_sha256": "6d26cce352744f000f50cad8f0f4b00f3f10471af1a152cb0b729b4439a3cbe9",
+            "screenshot_phase_stable": true,
+            "gpu_observed": true
+          },
+          {
+            "name": "match",
+            "phase": 7,
+            "source_cursor_sampled_before_screenshot": 431,
+            "last_consumed_tick": 430,
+            "source_cursor_after_screenshot": 436,
+            "source_cursor_stable_during_screenshot": false,
+            "screenshot": "beta/route-match.png",
+            "render_readiness": {
+              "phase": 7,
+              "kind": "Live render resource",
+              "frame": 495,
+              "draw_calls": 236,
+              "source_draws": 1,
+              "draw_suppressed": 0,
+              "source": "Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 source frame: 1 \u00b7 P1 motion: 66 \u00b7 anim: 21.000 \u00b7 ground/air: 1 \u00b7 position: [-60.000,8.165] \u00b7 source pause: 0 \u00b7 ready: 1",
+              "signature": "Live render resource {\"frame\":495,\"started\":11895.245,\"valid\":1,\"first_use\":0,\"input_ms\":0.04,\"simulation_audio_ms\":0.515,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.02,\"record_ms\":0.01,\"pipeline_ms\":0,\"worker_ms\":0.01,\"encoder_ms\":0.01,\"total_ms\":0.04,\"residual_ms\":0,\"outer_surface_ms\":0,\"outer_imgui_ms\":0.05,\"outer_fifo_ms\":0,\"outer_total_ms\":0.095,\"outer_residual_ms\":0.005,\"start_ms\":11895.8,\"end_ms\":11895.895,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":616},\"begin_ms\":0.095,\"draw_ms\":2.11,\"end_ms\":0.745,\"total_ms\":3.51,\"end_phases\":{\"last_frame\":616,\"fifo_texture_ms\":0.215,\"gfx_finish_ms\":0.115,\"staging_writes_ms\":0.35,\"surface_encode_ms\":0.03,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.01,\"cleanup_ms\":0,\"outer_prep_ms\":0.005,\"record_ms\":0,\"packet_ms\":0.005,\"callback_ms\":0.04,\"callback_post_submit_ms\":0,\"observer_ms\":0.01,\"callback_residual_ms\":0,\"tail_ms\":0,\"worker_ms\":0.41,\"worker_residual_ms\":0.005,\"total_ms\":0.745,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":890,\"draw_calls\":236,\"texture_upload_bytes\":16384,\"staging_used_bytes\":1219680,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 0 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 source frame: 1 \u00b7 P1 motion: 66 \u00b7 anim: 21.000 \u00b7 ground/air: 1 \u00b7 position: [-60.000,8.165] \u00b7 source pause: 0 \u00b7 ready: 1\"}"
+            },
+            "screenshot_bytes": 496755,
+            "screenshot_sha256": "0d295f6a5e7f12dce1850995b7cded9d06f225ce929fad182810f57d0b3e4c0c",
+            "screenshot_phase_stable": true,
+            "gpu_observed": true
+          },
+          {
+            "name": "results",
+            "phase": 8,
+            "source_cursor_sampled_before_screenshot": 4295,
+            "last_consumed_tick": 4294,
+            "source_cursor_after_screenshot": 4299,
+            "source_cursor_stable_during_screenshot": false,
+            "screenshot": "beta/route-results.png",
+            "render_readiness": {
+              "phase": 8,
+              "kind": "Live render resource",
+              "frame": 4388,
+              "draw_calls": 213,
+              "source_draws": 1,
+              "draw_suppressed": 0,
+              "source": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 Results source frame: 1",
+              "signature": "Live render resource {\"frame\":4388,\"started\":76857.515,\"valid\":1,\"first_use\":1,\"input_ms\":0.055,\"simulation_audio_ms\":5.1,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.005,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.005,\"record_ms\":0.005,\"pipeline_ms\":0,\"worker_ms\":0.025,\"encoder_ms\":0.02,\"total_ms\":0.045,\"residual_ms\":0.005,\"outer_surface_ms\":0.005,\"outer_imgui_ms\":0.06,\"outer_fifo_ms\":0,\"outer_total_ms\":0.115,\"outer_residual_ms\":0.005,\"start_ms\":76862.67,\"end_ms\":76862.785,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":4486},\"begin_ms\":0.115,\"draw_ms\":2.355,\"end_ms\":0.98,\"total_ms\":8.61,\"end_phases\":{\"last_frame\":4486,\"fifo_texture_ms\":0.435,\"gfx_finish_ms\":0.08,\"staging_writes_ms\":0.355,\"surface_encode_ms\":0.04,\"encoder_finish_ms\":0,\"queue_submit_ms\":0.02,\"cleanup_ms\":0,\"outer_prep_ms\":0.005,\"record_ms\":0,\"packet_ms\":0.01,\"callback_ms\":0.065,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.015,\"callback_residual_ms\":0,\"tail_ms\":0,\"worker_ms\":0.455,\"worker_residual_ms\":0.01,\"total_ms\":0.975,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":908,\"draw_calls\":213,\"texture_upload_bytes\":8192,\"staging_used_bytes\":1325744,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 Results source frame: 1\"}"
+            },
+            "screenshot_bytes": 134083,
+            "screenshot_sha256": "495a1b2adc086e9ed13449e30f975a549202d616ca396f073f701c10e6312e82",
+            "screenshot_phase_stable": true,
+            "gpu_observed": true
+          },
+          {
+            "name": "css-return",
+            "phase": 1,
+            "source_cursor_sampled_before_screenshot": 4906,
+            "last_consumed_tick": 4905,
+            "source_cursor_after_screenshot": 4910,
+            "source_cursor_stable_during_screenshot": false,
+            "screenshot": "beta/final.png",
+            "render_readiness": {
+              "phase": 1,
+              "kind": "Native callback",
+              "frame": 5018,
+              "draw_calls": 297,
+              "source_draws": 1,
+              "draw_suppressed": 0,
+              "source": "Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0",
+              "signature": "Native callback {\"frame\":5018,\"started\":87575.12,\"valid\":1,\"first_use\":1,\"input_ms\":0.03,\"simulation_audio_ms\":4.42,\"preparation_ms\":0,\"begin_phases\":{\"frame_slot_ms\":0.005,\"frame_slot_wait_ms\":0,\"frame_slot_wait_count\":0,\"staging_slot_ms\":0,\"staging_slot_wait_ms\":0,\"staging_slot_wait_count\":0,\"packet_ms\":0.02,\"record_ms\":0.005,\"pipeline_ms\":0,\"worker_ms\":0.015,\"encoder_ms\":0.01,\"total_ms\":0.045,\"residual_ms\":0,\"outer_surface_ms\":0,\"outer_imgui_ms\":0.045,\"outer_fifo_ms\":0,\"outer_total_ms\":0.09,\"outer_residual_ms\":0,\"start_ms\":87579.57,\"end_ms\":87579.66,\"max_wait_ms\":0,\"max_wait_start_ms\":0,\"max_wait_end_ms\":0,\"max_wait_kind\":0,\"last_frame_id\":5113},\"begin_ms\":0.09,\"draw_ms\":1.505,\"end_ms\":1.22,\"total_ms\":7.265,\"end_phases\":{\"last_frame\":5113,\"fifo_texture_ms\":0.755,\"gfx_finish_ms\":0.155,\"staging_writes_ms\":0.225,\"surface_encode_ms\":0.04,\"encoder_finish_ms\":0.005,\"queue_submit_ms\":0.005,\"cleanup_ms\":0,\"outer_prep_ms\":0.01,\"record_ms\":0,\"packet_ms\":0,\"callback_ms\":0.055,\"callback_post_submit_ms\":0.005,\"observer_ms\":0.015,\"callback_residual_ms\":0,\"tail_ms\":0,\"worker_ms\":0.3,\"worker_residual_ms\":0.005,\"total_ms\":1.22,\"residual_ms\":0},\"began\":1,\"drawn\":1,\"queued_delta\":0,\"created_delta\":0,\"queued_total\":0,\"created_total\":908,\"draw_calls\":297,\"texture_upload_bytes\":0,\"staging_used_bytes\":834212,\"wasm_heap_bytes\":231997440,\"draw_suppressed\":0,\"source_steps\":1,\"source_draws\":1,\"source\":\"Completed matches: 1 \u00b7 stock check: 0 \u00b7 ticks: 0 \u00b7 stocks: 4 \u00b7 respawns: 0 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0\"}"
+            },
+            "screenshot_bytes": 452576,
+            "screenshot_sha256": "d2f56f48fa723cfffabd7e4082d2d3f752483410b51ec1819d31ac114ab75314",
+            "screenshot_phase_stable": true,
+            "gpu_observed": true
+          }
+        ],
+        "missed": [],
+        "captures_complete": true,
+        "ready_draw_complete": true,
+        "gpu_diagnostics_complete": true,
+        "phase_stable_through_screenshots": true,
+        "complete": true,
+        "pixel_equivalence_claim": false
+      }
+    }
+  },
+  "historical_bounded_controls": {
+    "producer": {
+      "commit": "bf407f6fede9f6b57a7e9b428565ecfeaaec59b3",
+      "tree": "16db37f776f5cf781f3bd7c83b0bd3dad2cb3d04",
+      "trackedCleanAtStart": true,
+      "trackedCleanAtFinish": true,
+      "headUnchanged": true
+    },
+    "probe": {
+      "private_run_id": "issue205-browser-native-reviewed-probe-20261007-061815-03b2e9ab",
+      "producer": {
+        "commit": "bf407f6fede9f6b57a7e9b428565ecfeaaec59b3",
+        "tree": "16db37f776f5cf781f3bd7c83b0bd3dad2cb3d04",
+        "trackedCleanAtStart": true,
+        "trackedCleanAtFinish": true,
+        "headUnchanged": true
+      },
+      "root_review": {
+        "file": "root-result-review-v1.json",
+        "bytes": 4866,
+        "sha256": "96ff02422e2d1ca3decaeec86115db27af74716bd12de8a9fd01b164063a46ad"
+      },
+      "outcome": "complete",
+      "run_files": {
+        "browser-capture.log": {
+          "bytes": 96,
+          "sha256": "817c93724f5a54f6bf3e703a5ec0e090c9f92cbabee7b79f75a75a4adf66bb40"
+        },
+        "browser-owner.json": {
+          "bytes": 178170,
+          "sha256": "deaa3897eaa10348b179f221d50859bacf4226cec9346a1fac380efa78f3bbff"
+        },
+        "browser-process-trace.jsonl": {
+          "bytes": 161608,
+          "sha256": "f53bf8edf2d3db41352efcb03546e9edd09c5e2a825608f0b6b8ec066afb2f52"
+        },
+        "browser-run/alpha/accounted-css.png": {
+          "bytes": 480835,
+          "sha256": "007d4347584281878b2a76d6058d2ebeaa0f587d202f32aa506da0397a91a188"
+        },
+        "browser-run/alpha/checksums.bin": {
+          "bytes": 512,
+          "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+        },
+        "browser-run/alpha/instance.json": {
+          "bytes": 10712,
+          "sha256": "b2d10ce326d803edff5c76154a08a9c7779653fe641aa7f6c2af9bd019764479"
+        },
+        "browser-run/alpha/source-accounting.json": {
+          "bytes": 5763,
+          "sha256": "df00c557b2eb13f9d0cdec16ce78ac53d92b52ff01ee95dd78eeb5f27ab394c4"
+        },
+        "browser-run/beta/accounted-css.png": {
+          "bytes": 480678,
+          "sha256": "c024763be72e30c41b75ae82b4003b3cf1c7c2ba3f8fbef03f0423f50532673a"
+        },
+        "browser-run/beta/checksums.bin": {
+          "bytes": 512,
+          "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+        },
+        "browser-run/beta/instance.json": {
+          "bytes": 7234,
+          "sha256": "ec14ddb34081b564cb29b61206b7e693fc326549c56afa798f70d372d6f4da9c"
+        },
+        "browser-run/beta/source-accounting.json": {
+          "bytes": 5862,
+          "sha256": "b217884f7db528de05bfbf13d864392e768ac51762fba8e78ab78b06b45d6888"
+        },
+        "browser-run/run.json": {
+          "bytes": 40202,
+          "sha256": "6c02e874f53349030d92949b2d9feb9b17b61c43f0545bb6dac49ad249136c52"
+        },
+        "browser-runner.stderr.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "browser-runner.stdout.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "coordinator.json": {
+          "bytes": 232491,
+          "sha256": "a1057e5746bd5027098a86f7888ce63fe0420b43749bac4fd9f24d9128fc05c4"
+        },
+        "http-server.stderr.log": {
+          "bytes": 10912,
+          "sha256": "4a3a43b079402ac806cedebe50625518b8d823b930d9dfbac6faddf5fbd27df2"
+        },
+        "http-server.stdout.log": {
+          "bytes": 157,
+          "sha256": "aca7492d36318bced630f4b9fff544a8df4e25656df5b2f1b79ff2dfc765aae9"
+        },
+        "relay-owner/direct-miniflare-a3-room-relay-direct-fgZJ4E.receipt.json": {
+          "bytes": 6969,
+          "sha256": "607de1d6d5b5355dc816c0b6050c96afdf49cef2ae91b1cb5b46a885c395dabd"
+        },
+        "relay-owner/direct-miniflare-a3-room-relay-direct-fgZJ4E.stderr.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "relay-owner/direct-miniflare-a3-room-relay-direct-fgZJ4E.stdout.log": {
+          "bytes": 2192,
+          "sha256": "5ee7f2dede5c1179ab4ce0cb1e3b6c2879ced0206a64f59ee8794e4ba14db4d0"
+        }
+      },
+      "peers": {
+        "records_each": 8,
+        "remote_comparisons_each": 8,
+        "active_page_records_each": 8,
+        "post_terminal_records_each": 0,
+        "held_source_cursor": 3,
+        "hold_ms": 120
+      },
+      "cleanup": {
+        "process_observations": 25,
+        "distinct_pids": 23,
+        "all_observed_absent_without_signals": true,
+        "http_and_worker_closed": true,
+        "profiles_removed_afterpass": 2,
+        "cdp_process_inventory": "not observed; CDPwasusedforWASMbodyidentity only"
+      },
+      "input_ticks_used": 6,
+      "source_ticks": 8,
+      "browser_peer_module_responses": {
+        "expected": {
+          "net_lockstep_browser_peer.mjs": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+          "net_lockstep_core.mjs": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+          "net_lockstep_websocket_relay.mjs": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"
+        },
+        "responses": {
+          "alpha": [
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_browser_peer.mjs",
+              "status": 200,
+              "bytes": 6090,
+              "sha256": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_websocket_relay.mjs",
+              "status": 200,
+              "bytes": 19394,
+              "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_core.mjs",
+              "status": 200,
+              "bytes": 25527,
+              "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            }
+          ],
+          "beta": [
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_browser_peer.mjs",
+              "status": 200,
+              "bytes": 6090,
+              "sha256": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_websocket_relay.mjs",
+              "status": 200,
+              "bytes": 19394,
+              "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_core.mjs",
+              "status": 200,
+              "bytes": 25527,
+              "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            }
+          ]
+        }
+      },
+      "checksum_summary": {
+        "records_each": 8,
+        "streams_identical": true,
+        "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+      },
+      "terminal_hold": null,
+      "negative_control": null
+    },
+    "disconnect": {
+      "private_run_id": "issue205-browser-native-disconnect-20261007-063608-bce43346",
+      "producer": {
+        "commit": "bf407f6fede9f6b57a7e9b428565ecfeaaec59b3",
+        "tree": "16db37f776f5cf781f3bd7c83b0bd3dad2cb3d04",
+        "trackedCleanAtStart": true,
+        "trackedCleanAtFinish": true,
+        "headUnchanged": true
+      },
+      "root_review": {
+        "file": "root-result-review-v1.json",
+        "bytes": 3938,
+        "sha256": "20b9e21e4d5777f9bdabffe0412f6244582cc67f0a998ca178c1b974a59d26b3"
+      },
+      "outcome": "expected-disconnect",
+      "run_files": {
+        "http-server.stdout.log": {
+          "bytes": 157,
+          "sha256": "aca7492d36318bced630f4b9fff544a8df4e25656df5b2f1b79ff2dfc765aae9"
+        },
+        "browser-runner.stdout.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "browser-process-trace.jsonl": {
+          "bytes": 161165,
+          "sha256": "5dd3712d7ee26c3ef2231e3dabc3c205f37d4a0cb9d3e01636d14b5f65ac382d"
+        },
+        "browser-owner.json": {
+          "bytes": 177724,
+          "sha256": "71f4de48afe050a59c8079cdf9c4315c8699baa9ef40cbd3255cf0b35b28692d"
+        },
+        "coordinator.json": {
+          "bytes": 232039,
+          "sha256": "f404c677ab729fd84f9b5f72e966edc94369c946d28adec4e130cd96b3e97284"
+        },
+        "browser-capture.log": {
+          "bytes": 112,
+          "sha256": "0e2ca8062352f06f23f135c5285575f1d00f08aba148e8adfc098cbcbe932597"
+        },
+        "browser-runner.stderr.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "http-server.stderr.log": {
+          "bytes": 10912,
+          "sha256": "7ec6db0116921e4697d2099b408c5143ba16beb93f15500f357bb14ec2825dc7"
+        },
+        "browser-run/run.json": {
+          "bytes": 34640,
+          "sha256": "d0b59637d1048e529d208d4ab43f855920367f397d59b8c00849bfb262078d4c"
+        },
+        "relay-owner/direct-miniflare-a3-room-relay-direct-Q4s4DB.stderr.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "relay-owner/direct-miniflare-a3-room-relay-direct-Q4s4DB.stdout.log": {
+          "bytes": 2192,
+          "sha256": "894c0c590a685e7f87ab33274371c8cfd4d70b7ed48599dbd1bc21d06131580f"
+        },
+        "relay-owner/direct-miniflare-a3-room-relay-direct-Q4s4DB.receipt.json": {
+          "bytes": 6969,
+          "sha256": "20e4377ab583772af72172a004a96678dcfcf337a33410b1d5bd6753a5104319"
+        },
+        "browser-run/beta/source-accounting.json": {
+          "bytes": 6167,
+          "sha256": "e21b286348c90e3417486ff9264a613a88765f260aa404e1e73e9eebb76e108c"
+        },
+        "browser-run/beta/instance.json": {
+          "bytes": 6752,
+          "sha256": "a705e84740d4a2dadce4bf0ff48850a4eed7de1ac547e12ce0d04ae1f6686eae"
+        },
+        "browser-run/beta/checksums.bin": {
+          "bytes": 1024,
+          "sha256": "d0b340864708f7cd478a3b2cbaec1bd83e3ba63db7cf9972955896d22b4c0120"
+        },
+        "browser-run/alpha/source-accounting.json": {
+          "bytes": 6266,
+          "sha256": "562d668db9fcd1e935e7610ab39a393a67ed23150581c374c573986debdbdce8"
+        },
+        "browser-run/alpha/instance.json": {
+          "bytes": 6753,
+          "sha256": "6c58d70cc28271274859fcaafb7994f444bb80db16a91d017d9de2395d5e6d3d"
+        },
+        "browser-run/alpha/checksums.bin": {
+          "bytes": 1024,
+          "sha256": "d0b340864708f7cd478a3b2cbaec1bd83e3ba63db7cf9972955896d22b4c0120"
+        }
+      },
+      "peers": {
+        "alpha": {
+          "cursor": 16,
+          "source_steps": 16,
+          "source_draws": 16,
+          "protocol_compared": 14,
+          "checksum_sha256": "d0b340864708f7cd478a3b2cbaec1bd83e3ba63db7cf9972955896d22b4c0120",
+          "checksum_ownership": {
+            "owner": "browser-page",
+            "export_limit_records": 512,
+            "active_native_records_submitted_before_export": 16,
+            "post_terminal_native_evidence_records": 0
+          },
+          "terminal": {
+            "kind": "disconnect",
+            "reason": "4001: peer disconnected"
+          },
+          "protocol_counts": {
+            "ready": true,
+            "local_input_ticks": 14,
+            "remote_input_ticks": 14,
+            "remote_ack_input": 13,
+            "remote_ack_checksum": 13,
+            "input_duplicates": 0,
+            "checksum_duplicates": 14,
+            "out_of_order_inputs": 13,
+            "acknowledged_inputs": 14,
+            "acknowledged_checksums": 14,
+            "local_checksum_ticks": 16,
+            "remote_checksum_ticks": 14,
+            "next_checksum_compare": 14,
+            "terminal": {
+              "kind": "disconnect",
+              "reason": "4001: peer disconnected"
+            }
+          }
+        },
+        "beta": {
+          "cursor": 16,
+          "source_steps": 16,
+          "source_draws": 16,
+          "protocol_compared": 14,
+          "checksum_sha256": "d0b340864708f7cd478a3b2cbaec1bd83e3ba63db7cf9972955896d22b4c0120",
+          "checksum_ownership": {
+            "owner": "browser-page",
+            "export_limit_records": 512,
+            "active_native_records_submitted_before_export": 16,
+            "post_terminal_native_evidence_records": 0
+          },
+          "terminal": {
+            "kind": "disconnect",
+            "reason": "1000: client closed"
+          },
+          "protocol_counts": {
+            "ready": true,
+            "local_input_ticks": 14,
+            "remote_input_ticks": 14,
+            "remote_ack_input": 13,
+            "remote_ack_checksum": 13,
+            "input_duplicates": 0,
+            "checksum_duplicates": 12,
+            "out_of_order_inputs": 13,
+            "acknowledged_inputs": 14,
+            "acknowledged_checksums": 14,
+            "local_checksum_ticks": 16,
+            "remote_checksum_ticks": 14,
+            "next_checksum_compare": 14,
+            "terminal": {
+              "kind": "disconnect",
+              "reason": "1000: client closed"
+            }
+          }
+        }
+      },
+      "cleanup": {
+        "OS_observations": 25,
+        "distinct_pids": 22,
+        "no_cdp_process_inventory": true,
+        "multiplicity_reconciled": true,
+        "current_owned_pids_absent": true,
+        "ports_closed": true,
+        "worker_disposed_without_fallback": true,
+        "profiles_removed": true
+      },
+      "input_ticks_used": 15,
+      "source_ticks": 17,
+      "browser_peer_module_responses": {
+        "expected": {
+          "net_lockstep_browser_peer.mjs": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+          "net_lockstep_core.mjs": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+          "net_lockstep_websocket_relay.mjs": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"
+        },
+        "responses": {
+          "alpha": [
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_browser_peer.mjs",
+              "status": 200,
+              "bytes": 6090,
+              "sha256": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_websocket_relay.mjs",
+              "status": 200,
+              "bytes": 19394,
+              "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_core.mjs",
+              "status": 200,
+              "bytes": 25527,
+              "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            }
+          ],
+          "beta": [
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_browser_peer.mjs",
+              "status": 200,
+              "bytes": 6090,
+              "sha256": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_websocket_relay.mjs",
+              "status": 200,
+              "bytes": 19394,
+              "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_core.mjs",
+              "status": 200,
+              "bytes": 25527,
+              "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            }
+          ]
+        }
+      },
+      "checksum_summary": null,
+      "terminal_hold": {
+        "minimum_hold_ms": 120,
+        "peers": {
+          "alpha": {
+            "kind": 2,
+            "tick": 0,
+            "channel": 0,
+            "active": 1,
+            "blocker": "terminal",
+            "cursor_before": 16,
+            "cursor_after": 16,
+            "pushed_before": 16,
+            "pushed_after": 16
+          },
+          "beta": {
+            "kind": 2,
+            "tick": 0,
+            "channel": 0,
+            "active": 1,
+            "blocker": "terminal",
+            "cursor_before": 16,
+            "cursor_after": 16,
+            "pushed_before": 16,
+            "pushed_after": 16
+          }
+        },
+        "no_fallback": true,
+        "window_observed_ms": 124
+      },
+      "negative_control": {
+        "disconnect_at_source_tick": 16,
+        "terminals": {
+          "alpha": {
+            "kind": "disconnect",
+            "reason": "4001: peer disconnected"
+          },
+          "beta": {
+            "kind": "disconnect",
+            "reason": "1000: client closed"
+          }
+        },
+        "explicit": true
+      }
+    },
+    "first_desync": {
+      "private_run_id": "issue205-browser-native-desync-20261007-063608-87163768",
+      "producer": {
+        "commit": "bf407f6fede9f6b57a7e9b428565ecfeaaec59b3",
+        "tree": "16db37f776f5cf781f3bd7c83b0bd3dad2cb3d04",
+        "trackedCleanAtStart": true,
+        "trackedCleanAtFinish": true,
+        "headUnchanged": true
+      },
+      "root_review": {
+        "file": "root-result-review-v1.json",
+        "bytes": 3922,
+        "sha256": "82d448f299492ad98a10446d377094fa38b8e33104913d0315c1cc7df6497102"
+      },
+      "outcome": "expected-desync",
+      "run_files": {
+        "http-server.stdout.log": {
+          "bytes": 157,
+          "sha256": "aca7492d36318bced630f4b9fff544a8df4e25656df5b2f1b79ff2dfc765aae9"
+        },
+        "browser-runner.stdout.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "browser-process-trace.jsonl": {
+          "bytes": 163940,
+          "sha256": "ea9c4952c933e62c2c4185002beaeb46da42198f4c037b5fe93bac64ffb54f8c"
+        },
+        "browser-owner.json": {
+          "bytes": 181015,
+          "sha256": "c0bff4397b8c3a9ff43681421afd476486cd1df9df1dbebf2c98e535d58b1a88"
+        },
+        "coordinator.json": {
+          "bytes": 235515,
+          "sha256": "dc9ea3f05d58303b2f2544a0975b18fb043bc20655e712a955d5584d967e6448"
+        },
+        "browser-capture.log": {
+          "bytes": 102,
+          "sha256": "c8db063312a51001d62b9f32238c363e6816d76bd290b15d30412bc8117816ed"
+        },
+        "browser-runner.stderr.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "http-server.stderr.log": {
+          "bytes": 10912,
+          "sha256": "5df7a7a46f22b1e627285fc1e04d7789a953ed9835317fc64ab0fde574175ad7"
+        },
+        "browser-run/run.json": {
+          "bytes": 33633,
+          "sha256": "79aedf26f7c68ccbb10b8213ffc2f5b7825dee42791636ee8c02a78c73b8e5c5"
+        },
+        "relay-owner/direct-miniflare-a3-room-relay-direct-wjq574.stdout.log": {
+          "bytes": 2192,
+          "sha256": "658f9c1213407c394ba0c0f64a5de2dcbfd90731015dce21f5970b517f5e1cb2"
+        },
+        "relay-owner/direct-miniflare-a3-room-relay-direct-wjq574.receipt.json": {
+          "bytes": 6969,
+          "sha256": "e6c2dc407ef16084958960f3f5e3cdc720df516bc5f8e6bdc369a4a942a4833b"
+        },
+        "relay-owner/direct-miniflare-a3-room-relay-direct-wjq574.stderr.log": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "browser-run/beta/source-accounting.json": {
+          "bytes": 5471,
+          "sha256": "5c1c0d295207a663916b19af9afafd6a2cd683f53f5515de8b8dca989749d0ce"
+        },
+        "browser-run/beta/instance.json": {
+          "bytes": 6483,
+          "sha256": "a6be53d8e4864372e5b7434540dcc2016bf0677a430831acdf1375d73ffe881e"
+        },
+        "browser-run/beta/checksums.bin": {
+          "bytes": 896,
+          "sha256": "6b0b2afa1da46d479a93ac1c872e6560c71006a56582b9d483617e74b8587e99"
+        },
+        "browser-run/alpha/source-accounting.json": {
+          "bytes": 5570,
+          "sha256": "406c5bad31d75095b75dee1b1891812e78f456b849edeabb45fa90caf8ec5e86"
+        },
+        "browser-run/alpha/instance.json": {
+          "bytes": 6532,
+          "sha256": "daa8e94bda6575ae3d2678fd6c0f9a9b8e271563dee1ade5cd8fa9ab841a5545"
+        },
+        "browser-run/alpha/checksums.bin": {
+          "bytes": 960,
+          "sha256": "947d61c3801355760ad7c6c2b38e5231c17963fbebb2f5d344cd4852a35e4e7c"
+        }
+      },
+      "peers": {
+        "alpha": {
+          "cursor": 15,
+          "source_steps": 15,
+          "source_draws": 15,
+          "protocol_compared": 12,
+          "checksum_sha256": "947d61c3801355760ad7c6c2b38e5231c17963fbebb2f5d344cd4852a35e4e7c",
+          "checksum_ownership": {
+            "owner": "browser-page",
+            "export_limit_records": 512,
+            "active_native_records_submitted_before_export": 15,
+            "post_terminal_native_evidence_records": 0
+          },
+          "terminal": {
+            "kind": "desync",
+            "tick": 12,
+            "channel": 1
+          },
+          "protocol_counts": {
+            "ready": true,
+            "local_input_ticks": 18,
+            "remote_input_ticks": 18,
+            "remote_ack_input": 17,
+            "remote_ack_checksum": 8,
+            "input_duplicates": 0,
+            "checksum_duplicates": 7,
+            "out_of_order_inputs": 17,
+            "acknowledged_inputs": 18,
+            "acknowledged_checksums": 9,
+            "local_checksum_ticks": 15,
+            "remote_checksum_ticks": 12,
+            "next_checksum_compare": 12,
+            "terminal": {
+              "kind": "desync",
+              "tick": 12,
+              "channel": 1
+            }
+          }
+        },
+        "beta": {
+          "cursor": 14,
+          "source_steps": 14,
+          "source_draws": 14,
+          "protocol_compared": 12,
+          "checksum_sha256": "6b0b2afa1da46d479a93ac1c872e6560c71006a56582b9d483617e74b8587e99",
+          "checksum_ownership": {
+            "owner": "browser-page",
+            "export_limit_records": 512,
+            "active_native_records_submitted_before_export": 14,
+            "post_terminal_native_evidence_records": 0
+          },
+          "terminal": {
+            "kind": "desync",
+            "tick": 12,
+            "channel": 1
+          },
+          "protocol_counts": {
+            "ready": true,
+            "local_input_ticks": 18,
+            "remote_input_ticks": 18,
+            "remote_ack_input": 17,
+            "remote_ack_checksum": 7,
+            "input_duplicates": 0,
+            "checksum_duplicates": 7,
+            "out_of_order_inputs": 17,
+            "acknowledged_inputs": 18,
+            "acknowledged_checksums": 8,
+            "local_checksum_ticks": 14,
+            "remote_checksum_ticks": 13,
+            "next_checksum_compare": 12,
+            "terminal": {
+              "kind": "desync",
+              "tick": 12,
+              "channel": 1
+            }
+          }
+        }
+      },
+      "cleanup": {
+        "OS_observations": 26,
+        "distinct_pids": 22,
+        "no_cdp_process_inventory": true,
+        "multiplicity_reconciled": true,
+        "current_owned_pids_absent": true,
+        "ports_closed": true,
+        "worker_disposed_without_fallback": true,
+        "profiles_removed": true
+      },
+      "input_ticks_used": 18,
+      "source_ticks": 20,
+      "browser_peer_module_responses": {
+        "expected": {
+          "net_lockstep_browser_peer.mjs": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+          "net_lockstep_core.mjs": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+          "net_lockstep_websocket_relay.mjs": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"
+        },
+        "responses": {
+          "alpha": [
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_browser_peer.mjs",
+              "status": 200,
+              "bytes": 6090,
+              "sha256": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_core.mjs",
+              "status": 200,
+              "bytes": 25527,
+              "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_websocket_relay.mjs",
+              "status": 200,
+              "bytes": 19394,
+              "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            }
+          ],
+          "beta": [
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_browser_peer.mjs",
+              "status": 200,
+              "bytes": 6090,
+              "sha256": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_core.mjs",
+              "status": 200,
+              "bytes": 25527,
+              "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            },
+            {
+              "url": "http://127.0.0.1:8787/net_lockstep_websocket_relay.mjs",
+              "status": 200,
+              "bytes": 19394,
+              "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5",
+              "coop": "same-origin",
+              "coep": "require-corp"
+            }
+          ]
+        }
+      },
+      "checksum_summary": null,
+      "terminal_hold": {
+        "minimum_hold_ms": 120,
+        "peers": {
+          "alpha": {
+            "kind": 1,
+            "tick": 12,
+            "channel": 1,
+            "active": 1,
+            "blocker": "terminal",
+            "cursor_before": 15,
+            "cursor_after": 15,
+            "pushed_before": 20,
+            "pushed_after": 20
+          },
+          "beta": {
+            "kind": 1,
+            "tick": 12,
+            "channel": 1,
+            "active": 1,
+            "blocker": "terminal",
+            "cursor_before": 14,
+            "cursor_after": 14,
+            "pushed_before": 20,
+            "pushed_after": 20
+          }
+        },
+        "no_fallback": true,
+        "window_observed_ms": 122
+      },
+      "negative_control": {
+        "changed_local_port": 0,
+        "input_tick": 10,
+        "source_tick": 12,
+        "byte": 2,
+        "bit": 0,
+        "detected_at_first_mismatch": true,
+        "channel": 1,
+        "native_checksum_prefix": {
+          "equal_prefix_through_tick": 11,
+          "first_mismatch_tick": 12,
+          "first_mismatch_channel": 1
+        }
+      }
+    },
+    "scope": "bf407f6 probe and controls were not repeated on a57a0e4; current-main full route separately identified"
+  },
+  "runtime_inventories": {
+    "current_main": [
+      {
+        "path": "gameplay_menu_browser.js",
+        "bytes": 299682,
+        "sha256": "6a3f8ebb5039151a31983b2226e2208b90ba67f6cd82e9439dc4c4d3a4e16782"
+      },
+      {
+        "path": "gameplay_menu_browser.wasm",
+        "bytes": 15738629,
+        "sha256": "6c8812737401d3506ee817879a384282b73f35c8b8fe6a92fcb15ac8ded232a9"
+      },
+      {
+        "path": "gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "path": "runtime.html",
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      {
+        "path": "runtime-development.mjs",
+        "bytes": 60714,
+        "sha256": "258dde2991c34f06f89c2e5ec3800aa8a1fad185949f807d3c3f8412e93f0e24"
+      },
+      {
+        "path": "net-timing-pause.mjs",
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      {
+        "path": "melee-runtime.mjs",
+        "bytes": 50699,
+        "sha256": "0fdd584a8636e821eb08b2a3232ec05d7c3ce0c33e43e5e640a16e0809709013"
+      },
+      {
+        "path": "runtime-diagnostics.mjs",
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      {
+        "path": "runtime-diagnostics-delivery.mjs",
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      {
+        "path": "diagnostics-settings.mjs",
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      {
+        "path": "diagnostics-schema.mjs",
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      {
+        "path": "controller-input.mjs",
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "path": "controller-panel.mjs",
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      {
+        "path": "controller-panel.css",
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      {
+        "path": "controller-settings.mjs",
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      {
+        "path": "controller-settings.css",
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      {
+        "path": "touch-controls.mjs",
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      {
+        "path": "touch-controls.css",
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      {
+        "path": "prototype-keyboard-layouts.mjs",
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      {
+        "path": "runtime-cache.js",
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      {
+        "path": "audio-worklet.js",
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      {
+        "path": "audio-ring.mjs",
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      {
+        "path": "disc-image.mjs",
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      {
+        "path": "disc-session.mjs",
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      {
+        "path": "dsp-coefficients.mjs",
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      {
+        "path": "runtime-assets.mjs",
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      {
+        "path": "runtime-audio-assets.mjs",
+        "bytes": 5451,
+        "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+      },
+      {
+        "path": "runtime-audio.mjs",
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      {
+        "path": "match-flow.mjs",
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      {
+        "path": "match-menu.mjs",
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      {
+        "path": "action-sweep.mjs",
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      {
+        "path": "hitch-capture.mjs",
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      },
+      {
+        "path": "net_lockstep_core.mjs",
+        "bytes": 25527,
+        "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff"
+      },
+      {
+        "path": "net_lockstep_websocket_relay.mjs",
+        "bytes": 19394,
+        "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"
+      },
+      {
+        "path": "net_lockstep_browser_peer.mjs",
+        "bytes": 6090,
+        "sha256": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133"
+      }
+    ],
+    "historical": [
+      {
+        "path": "gameplay_menu_browser.js",
+        "source_path": "build/browser-release/gameplay_menu_browser.js",
+        "bytes": 299682,
+        "sha256": "6a3f8ebb5039151a31983b2226e2208b90ba67f6cd82e9439dc4c4d3a4e16782"
+      },
+      {
+        "path": "gameplay_menu_browser.wasm",
+        "source_path": "build/browser-release/gameplay_menu_browser.wasm",
+        "bytes": 15738629,
+        "sha256": "2687c93fe8a36f4e90e4f8ac75bcef511d24f82a014bb2e532a4db15e0854dcb"
+      },
+      {
+        "path": "gameplay_menu_browser.data",
+        "source_path": "build/browser-release/gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "path": "runtime.html",
+        "source_path": "build/browser-release/runtime.html",
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      {
+        "path": "runtime-development.mjs",
+        "source_path": "build/browser-release/runtime-development.mjs",
+        "bytes": 60714,
+        "sha256": "258dde2991c34f06f89c2e5ec3800aa8a1fad185949f807d3c3f8412e93f0e24"
+      },
+      {
+        "path": "net-timing-pause.mjs",
+        "source_path": "build/browser-release/net-timing-pause.mjs",
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      {
+        "path": "melee-runtime.mjs",
+        "source_path": "build/browser-release/melee-runtime.mjs",
+        "bytes": 50699,
+        "sha256": "0fdd584a8636e821eb08b2a3232ec05d7c3ce0c33e43e5e640a16e0809709013"
+      },
+      {
+        "path": "runtime-diagnostics.mjs",
+        "source_path": "build/browser-release/runtime-diagnostics.mjs",
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      {
+        "path": "runtime-diagnostics-delivery.mjs",
+        "source_path": "build/browser-release/runtime-diagnostics-delivery.mjs",
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      {
+        "path": "diagnostics-settings.mjs",
+        "source_path": "build/browser-release/diagnostics-settings.mjs",
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      {
+        "path": "diagnostics-schema.mjs",
+        "source_path": "build/browser-release/diagnostics-schema.mjs",
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      {
+        "path": "controller-input.mjs",
+        "source_path": "build/browser-release/controller-input.mjs",
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "path": "controller-panel.mjs",
+        "source_path": "build/browser-release/controller-panel.mjs",
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      {
+        "path": "controller-panel.css",
+        "source_path": "build/browser-release/controller-panel.css",
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      {
+        "path": "controller-settings.mjs",
+        "source_path": "build/browser-release/controller-settings.mjs",
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      {
+        "path": "controller-settings.css",
+        "source_path": "build/browser-release/controller-settings.css",
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      {
+        "path": "touch-controls.mjs",
+        "source_path": "build/browser-release/touch-controls.mjs",
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      {
+        "path": "touch-controls.css",
+        "source_path": "build/browser-release/touch-controls.css",
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      {
+        "path": "prototype-keyboard-layouts.mjs",
+        "source_path": "build/browser-release/prototype-keyboard-layouts.mjs",
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      {
+        "path": "runtime-cache.js",
+        "source_path": "build/browser-release/runtime-cache.js",
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      {
+        "path": "audio-worklet.js",
+        "source_path": "build/browser-release/audio-worklet.js",
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      {
+        "path": "audio-ring.mjs",
+        "source_path": "build/browser-release/audio-ring.mjs",
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      {
+        "path": "disc-image.mjs",
+        "source_path": "build/browser-release/disc-image.mjs",
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      {
+        "path": "disc-session.mjs",
+        "source_path": "build/browser-release/disc-session.mjs",
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      {
+        "path": "dsp-coefficients.mjs",
+        "source_path": "build/browser-release/dsp-coefficients.mjs",
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      {
+        "path": "runtime-assets.mjs",
+        "source_path": "build/browser-release/runtime-assets.mjs",
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      {
+        "path": "runtime-audio-assets.mjs",
+        "source_path": "build/browser-release/runtime-audio-assets.mjs",
+        "bytes": 5451,
+        "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+      },
+      {
+        "path": "runtime-audio.mjs",
+        "source_path": "build/browser-release/runtime-audio.mjs",
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      {
+        "path": "match-flow.mjs",
+        "source_path": "build/browser-release/match-flow.mjs",
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      {
+        "path": "match-menu.mjs",
+        "source_path": "build/browser-release/match-menu.mjs",
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      {
+        "path": "action-sweep.mjs",
+        "source_path": "build/browser-release/action-sweep.mjs",
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      {
+        "path": "hitch-capture.mjs",
+        "source_path": "build/browser-release/hitch-capture.mjs",
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      },
+      {
+        "path": "net_lockstep_core.mjs",
+        "source_path": "scripts/net_lockstep_core.mjs",
+        "bytes": 25527,
+        "sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff"
+      },
+      {
+        "path": "net_lockstep_websocket_relay.mjs",
+        "source_path": "scripts/net_lockstep_websocket_relay.mjs",
+        "bytes": 19394,
+        "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"
+      },
+      {
+        "path": "net_lockstep_browser_peer.mjs",
+        "source_path": "scripts/net_lockstep_browser_peer.mjs",
+        "bytes": 6090,
+        "sha256": "04cfdc6a9ebc91a5dc7074695342be518ea7cc6b9f4310357e23dbfceaa73133"
+      }
+    ],
+    "source_staged_HTTP_before_after_all35_match": true,
+    "actual_peer_response_identities_each": 3,
+    "actual_loaded_WASM_body_identity_observed": true,
+    "only_changed_artifact_from_historical": "gameplay_menu_browser.wasm"
+  },
+  "tools": {
+    "sdk_node": {
+      "path": "node",
+      "bytes": 121306800,
+      "sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+      "version": "v24.19.0"
+    },
+    "python": {
+      "path": "python3",
+      "bytes": 18041104,
+      "sha256": "f64cf6322e4f20cd0458aab89c0d332895817bb8f243b943109b6a957582fd5d",
+      "version": "3.12.13"
+    },
+    "chrome": {
+      "path": "Google Chrome",
+      "bytes": 367696,
+      "sha256": "ccffd5c5fe77ba3212e07c2c69091f8048b73c396b4647ecaa150e1e01a04954",
+      "version": "154.0.8037.98",
+      "bundle_plist": {
+        "path": "Info.plist",
+        "bytes": 18856,
+        "sha256": "89dd2f1a7b8a46a153603197c416dab4078d47d499785422ba5286d4f39b2e69"
+      }
+    },
+    "playwright_package": {
+      "path": "package.json",
+      "bytes": 1416,
+      "sha256": "ca170ec143a88ed3043ac953eb3b2377b2b97304104f4e1e23316684ce2c35af",
+      "package_directory": "playwright",
+      "version": "1.62.1"
+    }
+  },
+  "worker_packages": {
+    "wrangler": {
+      "path": "package.json",
+      "bytes": 6714,
+      "sha256": "f8c0028333405b155b088117dda5181e7b2927d74e558ac9baae0fcdda05dfa8"
+    },
+    "miniflare": {
+      "path": "package.json",
+      "bytes": 4186,
+      "sha256": "2c26f1ea6dfda3c29f80ae2cb78f96d1ca38dfdf530b0e51f6f66dac1823b765"
+    },
+    "workerd": {
+      "path": "package.json",
+      "bytes": 676,
+      "sha256": "065d0b712ed53706c846b553029a0384c017a60b64eee33772b02c2272b959fa"
+    }
+  },
+  "input_recipe": {
+    "recipe": {
+      "path": "route1.mwni",
+      "bytes": 223624,
+      "sha256": "007fafb2bfc1c34b81509b8ee073b6250b32ab6d227502be6d4b986ddd8cbb4c"
+    },
+    "seed": 305419896,
+    "source_ticks": 5084,
+    "input_ticks": 5082,
+    "delay_ticks": 2,
+    "disc": {
+      "path": "Super Smash Bros. Melee (USA) (En,Ja) (Rev 2).ciso",
+      "bytes": 1449165376,
+      "mtime_ns": 1666055962000000000,
+      "whole_image_hash_computed": false,
+      "identity_policy": "Native peer disc identity must agree; no whole-image hash claim."
+    }
+  },
+  "packets_and_helpers": {
+    "full_route_packet": {
+      "file": "full-route-launch-packet-v1.json",
+      "bytes": 41819,
+      "sha256": "7a72f14e3d4816b536c39ba73f4deafca1e5443515a126ab37bd01f18456b4bf"
+    },
+    "probe_packet": {
+      "file": "launch-packet-v1.json",
+      "bytes": 38610,
+      "sha256": "6d9c831f3f986e0b075696761630c7128d321a557915dbe662fb9735664a657c"
+    },
+    "terminal_packet": {
+      "file": "terminal-launch-packet-v1.json",
+      "bytes": 44388,
+      "sha256": "f998fd4595ce253bc45ebde653bb5c1407d111e532d4be4f33c0cc1708429538"
+    },
+    "full_route_coordinator": {
+      "file": "run_full_route.mjs",
+      "bytes": 42936,
+      "sha256": "2dfcdef748e9a22007ca7d90b14f0fa9308464636b5963468b77ace6e1886e5b"
+    },
+    "probe_coordinator": {
+      "file": "run_probe.mjs",
+      "bytes": 38364,
+      "sha256": "dd3e161925d71eab9fc1a78757fee6c0a1f774dc3b519ae65ae4e2303f61497a"
+    },
+    "terminal_coordinator": {
+      "file": "run_terminal_control.mjs",
+      "bytes": 40710,
+      "sha256": "9b17981b0f5f8f3623e284002435c38267d6198e5e1bc5d2cc2c7618613104c0"
+    },
+    "stager": {
+      "file": "stage_runtime.py",
+      "bytes": 4570,
+      "sha256": "0f9064948c08cc9442804a15a82f6d128a8d80bbc03e8cd7b44b48d34e7cd636"
+    },
+    "current_staged_manifest": {
+      "file": "manifest.json",
+      "bytes": 8980,
+      "sha256": "4c4af6c5095b77aeb7bda26da90e8d224d430dab0a6a1fbe57286af54099866d"
+    },
+    "historical_staged_manifest": {
+      "file": "manifest.json",
+      "bytes": 8975,
+      "sha256": "f8b94723231d31a074e898279b9fa880dca4db5663c2def61785fdf802b388c0"
+    }
+  },
+  "integration_validation": {
+    "schema": "melee-web-issue205-current-main-integration-validation-v1",
+    "producer_commit": "a57a0e421e4e4abc61f249e0958ab8b6e5dfb1af",
+    "producer_tree": "37c881f5ccde730202b2786e2fd75fd7d8ce3f56",
+    "base_main": "789de9b2945b976fff665813bfc3e8a72ad0703f",
+    "clean": true,
+    "identical_rebased_patches": true,
+    "full_suite": {
+      "tests": 1988,
+      "passed": 1843,
+      "skipped": 145,
+      "seconds": 346.362,
+      "exit": 0,
+      "command": [
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ]
+    },
+    "release_runtime": {
+      "exit": 0,
+      "command": [
+        "python3",
+        "scripts/build.py",
+        "--target",
+        "runtime",
+        "--configuration",
+        "Release"
+      ],
+      "job_defaults_unchanged": true
+    },
+    "logs": {
+      "full-unittest.log": {
+        "path": "full-unittest.log",
+        "bytes": 363492,
+        "sha256": "5389da16ac88c64fe728d486627b17b02098a5aa64e34b4446da9e37f618edc8"
+      },
+      "runtime-release.log": {
+        "path": "runtime-release.log",
+        "bytes": 18023,
+        "sha256": "92b1aeebd488951e155a898f8e91b87d930741b3efcf3d54e0f8624da214d944"
+      }
+    },
+    "runtime_artifacts": {
+      "gameplay_menu_browser.js": {
+        "path": "gameplay_menu_browser.js",
+        "bytes": 299682,
+        "sha256": "6a3f8ebb5039151a31983b2226e2208b90ba67f6cd82e9439dc4c4d3a4e16782"
+      },
+      "gameplay_menu_browser.wasm": {
+        "path": "gameplay_menu_browser.wasm",
+        "bytes": 15738629,
+        "sha256": "6c8812737401d3506ee817879a384282b73f35c8b8fe6a92fcb15ac8ded232a9"
+      },
+      "gameplay_menu_browser.data": {
+        "path": "gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "runtime.html": {
+        "path": "runtime.html",
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      "runtime-development.mjs": {
+        "path": "runtime-development.mjs",
+        "bytes": 60714,
+        "sha256": "258dde2991c34f06f89c2e5ec3800aa8a1fad185949f807d3c3f8412e93f0e24"
+      },
+      "net-timing-pause.mjs": {
+        "path": "net-timing-pause.mjs",
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      "melee-runtime.mjs": {
+        "path": "melee-runtime.mjs",
+        "bytes": 50699,
+        "sha256": "0fdd584a8636e821eb08b2a3232ec05d7c3ce0c33e43e5e640a16e0809709013"
+      },
+      "runtime-diagnostics.mjs": {
+        "path": "runtime-diagnostics.mjs",
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      "runtime-diagnostics-delivery.mjs": {
+        "path": "runtime-diagnostics-delivery.mjs",
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      "diagnostics-settings.mjs": {
+        "path": "diagnostics-settings.mjs",
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      "diagnostics-schema.mjs": {
+        "path": "diagnostics-schema.mjs",
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      "controller-input.mjs": {
+        "path": "controller-input.mjs",
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      "controller-panel.mjs": {
+        "path": "controller-panel.mjs",
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      "controller-panel.css": {
+        "path": "controller-panel.css",
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      "controller-settings.mjs": {
+        "path": "controller-settings.mjs",
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      "controller-settings.css": {
+        "path": "controller-settings.css",
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      "touch-controls.mjs": {
+        "path": "touch-controls.mjs",
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      "touch-controls.css": {
+        "path": "touch-controls.css",
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      "prototype-keyboard-layouts.mjs": {
+        "path": "prototype-keyboard-layouts.mjs",
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      "runtime-cache.js": {
+        "path": "runtime-cache.js",
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      "audio-worklet.js": {
+        "path": "audio-worklet.js",
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      "audio-ring.mjs": {
+        "path": "audio-ring.mjs",
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      "disc-image.mjs": {
+        "path": "disc-image.mjs",
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      "disc-session.mjs": {
+        "path": "disc-session.mjs",
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      "dsp-coefficients.mjs": {
+        "path": "dsp-coefficients.mjs",
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      "runtime-assets.mjs": {
+        "path": "runtime-assets.mjs",
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      "runtime-audio-assets.mjs": {
+        "path": "runtime-audio-assets.mjs",
+        "bytes": 5451,
+        "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+      },
+      "runtime-audio.mjs": {
+        "path": "runtime-audio.mjs",
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      "match-flow.mjs": {
+        "path": "match-flow.mjs",
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      "match-menu.mjs": {
+        "path": "match-menu.mjs",
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      "action-sweep.mjs": {
+        "path": "action-sweep.mjs",
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      "hitch-capture.mjs": {
+        "path": "hitch-capture.mjs",
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      }
+    },
+    "scope": "Current-main suite/build only; no browser capture or graphical/session acceptance."
+  },
+  "offline_validation": {
+    "probe": {
+      "file": "offline-validator-receipt-v1.json",
+      "bytes": 6372,
+      "sha256": "48bf97b7572609532fccddbe9868af5b756c1a0a05ed00fbac498217caabfeed"
+    },
+    "terminal": {
+      "file": "offline-terminal-validator-receipt-v1.json",
+      "bytes": 7560,
+      "sha256": "cdd5abf79b91943a3be6e329ca7b82238f79ff2dfd7e5b6955707c116f9b46f9"
+    },
+    "full_route": {
+      "file": "offline-full-route-validator-receipt-v1.json",
+      "bytes": 4698,
+      "sha256": "ca9b02ee8e3e93310a432beaffc77a873610558e97b63dc4e1cda21e0f2d5451"
+    },
+    "cases": [
+      21,
+      29,
+      21
+    ],
+    "scope": "synthetic offline receipt mutations; no browser behavior claim",
+    "historical_route_validator_and_owner_cleanup_byte_identity_verified": true
+  },
+  "retained_failures": [
+    {
+      "retained_container": "issue205-browser-native-probe-preparation-20261007-055242-27724d97",
+      "file": "freeze-launch-preparation-failure-v1.txt",
+      "bytes": 345,
+      "sha256": "890ef99abd0bfe3ce1e9eb46540afab1cb6c71cf5afb5165bbd9dcc81f4e0958",
+      "classification": "preparation/component-test failure retained separately; not a browser session failure"
+    },
+    {
+      "retained_container": "issue205-browser-native-terminal-preparation-20261007-063058-000edc7d",
+      "file": "packet-preparation-failure-v1.txt",
+      "bytes": 215,
+      "sha256": "2e5be5edee883ee6cc77bf77feb649a0430d8d65079a38acb524237bf8520981",
+      "classification": "preparation/component-test failure retained separately; not a browser session failure"
+    },
+    {
+      "retained_container": "issue205-browser-native-full-route-preparation-20261007-065137-23a94163",
+      "file": "packet-preparation-failure-v1.txt",
+      "bytes": 252,
+      "sha256": "7e6e495c3d4f28f62bcce41b0f212d4bf592f2c2f1a69cbb60acb869ae86eee0",
+      "classification": "preparation/component-test failure retained separately; not a browser session failure"
+    },
+    {
+      "retained_container": "a3-205-component-review",
+      "file": "initial-wrapper-failure-summary.json",
+      "bytes": 1855,
+      "sha256": "ad735bdfb9293416a54574d16c3b5fa66aa1145a386c10b7ac3d8cf8c484d808",
+      "classification": "preparation/component-test failure retained separately; not a browser session failure"
+    }
+  ],
+  "visual_review": {
+    "reviewer": "repository owner/root",
+    "inspected": "all five alpha route phases plus beta match",
+    "known_defect": "Final Destination magenta/geometry defect #175 persists",
+    "phase_stable_screenshots_may_advance_source_cursor": true,
+    "pixel_fidelity_claim": false
+  },
+  "limitations": [
+    "Single-host headless recorded-input functional evidence only; no Internet/two-machine/WebRTC acceptance.",
+    "No live or physical input, foreground timing, uninterrupted-audio/audible-output, pixel/PCM fidelity, general performance, whole competitive-session or tournament acceptance.",
+    "Normal audio processing retained with muted host output; no audio fidelity claim.",
+    "Direct Miniflare path only; no Wrangler proxy lifecycle or deployment claim.",
+    "H1/#116 and #84 acceptance gates remain independent; broader issue #158 remains open."
+  ],
+  "next_bounded_experiment": {
+    "choice": "browser-side live-input boundary before WebRTC signaling",
+    "failure_to_observe": "local browser sampled PAD bytes must reach the page-owned protocol/native queue at the declared delayed source tick without Node reconstructing packets",
+    "smallest_experiment": "one neutral browser-side input sample and one declared synthetic button transition over the existing local Worker; compare source input tick, delay, ACK, native cursor and checksum accounting",
+    "pass_criteria": "browser publishes each input exactly once; both peers account for delayed consumption and ACK; no terminal/overflow/callback failure; existing source arithmetic and route unchanged",
+    "exclusions": "No physical-controller/foreground gate, Internet, signaling service change, WebRTC transport, performance or full-route claim",
+    "stopping_rule": "stop at first missing or reordered input/ACK/cursor discrepancy and retain a reduced trace",
+    "reuse": "Reuse page controller/core/Worker endpoint; inspect existing room signaling before any future WebRTC experiment. No implementation in this PR."
+  }
+}
