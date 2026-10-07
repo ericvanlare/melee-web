@@ -403,7 +403,8 @@ export class LockstepPeer {
   }
 
   async disconnect(reason = 'loopback transport closed') {
-    await this.fail('disconnect', {reason});
+    // Transport-close notification cannot be sent over the failed connection.
+    await this.fail('disconnect', {reason}, {notify: false});
   }
 
   summary() {

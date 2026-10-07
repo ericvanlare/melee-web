@@ -256,3 +256,55 @@ test('the real relay reports rejected peer callbacks and keeps its message chain
     assert.equal(relay.alpha.errors.length, 2);
   } finally { await relay.close(); }
 });
+
+
+test('transport close reaches both terminal callbacks without sending to either TCP endpoint', async () => {
+  let peers, intentionalClose = false, resolveDisconnected;
+  const disconnected = new Promise(resolve => { resolveDisconnected = resolve; });
+  const nativeTerminals = [], sends = [], endpointErrors = [];
+  const relay = await openLoopbackPeerPair({
+    onEndpointError: (role, error) => endpointErrors.push({role, message: error.message}),
+    onDisconnect: (role, reason) => {
+      if (intentionalClose) return;
+      intentionalClose = true;
+      void Promise.allSettled(['alpha', 'beta'].map(name => peers[name].disconnect(`${role}: ${reason}`)))
+        .then(resolveDisconnected);
+    },
+  });
+  try {
+    peers = Object.fromEntries(['alpha', 'beta'].map(role => {
+      const peer = new LockstepPeer({role, sourceTicks: 6, inputTicks: 4,
+        pushFrame: async () => { throw Error('terminal transport must not push source input'); },
+        onTerminal: async terminal => nativeTerminals.push({role, kind: terminal.kind}),
+      });
+      peer.attach(raw => { sends.push(role); return relay[role].send(raw); });
+      return [role, peer];
+    }));
+    relay.beta.close();
+    let timer;
+    const results = await Promise.race([disconnected, new Promise((_, reject) => {
+      timer = setTimeout(() => reject(Error('TCP disconnect callback did not settle')), 1000);
+    })]).finally(() => clearTimeout(timer));
+    assert.deepEqual(results.map(row => row.status), ['fulfilled', 'fulfilled'],
+      'closed TCP transport must not become a terminal notification failure');
+    assert.deepEqual(sends, [], 'transport-close terminals never attempt peer notification');
+    assert.deepEqual(nativeTerminals.sort((a, b) => a.role.localeCompare(b.role)), [
+      {role: 'alpha', kind: 'disconnect'}, {role: 'beta', kind: 'disconnect'},
+    ]);
+    assert.equal(peers.alpha.terminal.kind, 'disconnect');
+    assert.equal(peers.beta.terminal.kind, 'disconnect');
+    assert.deepEqual(endpointErrors, []);
+  } finally { intentionalClose = true; relay.alpha.destroy(); relay.beta.destroy(); await relay.close(); }
+});
+
+test('transport-close disconnect preserves native terminal callback rejection', async () => {
+  let sendAttempts = 0;
+  const peer = new LockstepPeer({role: 'beta', sourceTicks: 6, inputTicks: 4,
+    pushFrame: async () => {},
+    onTerminal: async () => { throw Error('native terminal callback rejected sentinel'); },
+  });
+  peer.attach(async () => { ++sendAttempts; throw Error('closed socket must not be used'); });
+  await assert.rejects(peer.disconnect('TCP close'), /native terminal callback rejected sentinel/);
+  assert.equal(peer.terminal.kind, 'disconnect');
+  assert.equal(sendAttempts, 0);
+});
