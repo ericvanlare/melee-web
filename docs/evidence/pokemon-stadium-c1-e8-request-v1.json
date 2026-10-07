@@ -265,6 +265,55 @@
         }
       },
       "artifact_hashes_match_the_pre-rebase_E8_build": true
+    },
+    "current_main_refresh": {
+      "external_receipt": {
+        "bundle_id": "stadium-c1-main-refresh-20261007T154841Z/integration-results-v1.json",
+        "sha256": "372c0d3c47fe2873b0e9a32a784a5704a43eac28de9ab22fdd73b2e8275e2558"
+      },
+      "new_base_commit": "30d8a3be4a3b0339129d91f6df56e9c8c359d4e8",
+      "new_base_tree": "14014fe9afd127fb9accea07fc97464a0ebf1da4",
+      "validated_head": "8471dc4fa1fd9e76ce314ff04f4b8d21dd437879",
+      "validated_tree": "8f2199b01356446a3eb6dd6298478ca84d3668bc",
+      "eight_commit_range_diff_equal": true,
+      "full_suite": {
+        "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+        "exit_code": 0,
+        "tests_run": 2011,
+        "skipped": 134,
+        "elapsed_seconds": 358.471,
+        "stadium_boundary_results": {
+          "synthetic_missing_selected_file_preflight": "passed",
+          "reopened_context_lifecycle": "skipped before native trace; missing EfCoData.dat, EfMrData.dat, GmPause.usd, GrPs.usd, GrPs1.dat",
+          "C1a raw PAD selection": "passed",
+          "E8 request and checked teardown": "skipped; reviewed C1 fixture root not selected"
+        },
+        "stdout_bytes": 4447,
+        "stdout_sha256": "46d7dce6632e0128e2fc52c12f5beb01e24855ca8d002749bfabeef94a3ec994",
+        "stderr_bytes": 361752,
+        "stderr_sha256": "dcedebeba4b1e960f84e73ffa90e07cd9b5cd05129da1e8ca839efcaa946375e"
+      },
+      "diagnostic_release_build": {
+        "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --trace-target native_menu_host_trace --configuration Release --stadium-c1a-diagnostic",
+        "exit_code": 0,
+        "producer_commit": "8471dc4fa1fd9e76ce314ff04f4b8d21dd437879",
+        "producer_tree": "8f2199b01356446a3eb6dd6298478ca84d3668bc",
+        "default_compiler_job_policy": "unchanged",
+        "stdout_sha256": "8d8e4499ed4e046628301a23ac36fb4a5e87543112474e099235741a597d4e1d",
+        "stderr_sha256": "67426491e8fdf614f25168afaa2344710c0cfd1819e7c3f2c37fd97ae9f981ca",
+        "targets": {
+          "native_menu_host_trace.js": {
+            "bytes": 232567,
+            "sha256": "76d63008d538b57e6ef97933d21c67d17637bcf7d53195ca943fb32f559143a9"
+          },
+          "native_menu_host_trace.wasm": {
+            "bytes": 13678850,
+            "sha256": "c6f7d95380400d05e2c9fdc167a84c35ad7147aaec0643ace22c188fe8766586"
+          }
+        },
+        "artifact_hashes_match_retained_c1_e8_build": true
+      },
+      "no_new_lifecycle_e8_native_or_browser_capture": true
     }
   },
   "exclusions": [
