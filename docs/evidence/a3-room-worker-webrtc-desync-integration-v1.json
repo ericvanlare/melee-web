@@ -1,0 +1,259 @@
+{
+  "schema": "melee-web-a3-room-worker-webrtc-desync-integration-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/243",
+  "scope": "Source, full-suite and fresh ordinary Release compile validation after integration onto current main. No browser run at this integration producer.",
+  "evidence_labels": [
+    "Source identified",
+    "Compiled"
+  ],
+  "integration_source": {
+    "head": "15bc1023bcc6cba461274bb06ee3ec9ff6d86b31",
+    "tree": "617009b5d6e010d059641c9f748d48d72a0beb30",
+    "base_main": "b58747c49c0a91c91c9ff4c6afce1dddbb24c3ee",
+    "clean_during_build_and_suite": true,
+    "only_issue243_source_commits_rebased": true,
+    "captured_producer_preserved_separately": true
+  },
+  "full_python_suite": {
+    "result": "pass",
+    "tests": 2030,
+    "skipped": 151,
+    "seconds": 432.234,
+    "log": {
+      "name": "full-suite-v1.log",
+      "bytes": 372493,
+      "sha256": "6f83ded622c5f2335c97324c34ad100c11ccc938978482de8d631548c85889ae"
+    }
+  },
+  "ordinary_Release_build": {
+    "result": "pass",
+    "exit_code": 0,
+    "argv": [
+      "python3",
+      "scripts/build.py",
+      "--target",
+      "runtime",
+      "--configuration",
+      "Release"
+    ],
+    "producer_commit": "15bc1023bcc6cba461274bb06ee3ec9ff6d86b31",
+    "producer_tree": "617009b5d6e010d059641c9f748d48d72a0beb30",
+    "configuration": "Release",
+    "fresh_build_at_integration_source": true,
+    "optional_flags": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "runtime_artifact_count": 32,
+    "runtime_artifacts": [
+      {
+        "name": "gameplay_menu_browser.js",
+        "bytes": 300352,
+        "sha256": "05e19b0c1e508ef44bacc45b1ed513e4dd450eb25e88fa9e40150f100ca42ab3"
+      },
+      {
+        "name": "gameplay_menu_browser.wasm",
+        "bytes": 15741510,
+        "sha256": "98b286604004434ae0c8d80f6f4c496cbb8c820b9aeda4496d09923b618d634f"
+      },
+      {
+        "name": "gameplay_menu_browser.data",
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "name": "runtime.html",
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      {
+        "name": "runtime-development.mjs",
+        "bytes": 60714,
+        "sha256": "258dde2991c34f06f89c2e5ec3800aa8a1fad185949f807d3c3f8412e93f0e24"
+      },
+      {
+        "name": "net-timing-pause.mjs",
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      {
+        "name": "melee-runtime.mjs",
+        "bytes": 50699,
+        "sha256": "0fdd584a8636e821eb08b2a3232ec05d7c3ce0c33e43e5e640a16e0809709013"
+      },
+      {
+        "name": "runtime-diagnostics.mjs",
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      {
+        "name": "runtime-diagnostics-delivery.mjs",
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      {
+        "name": "diagnostics-settings.mjs",
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      {
+        "name": "diagnostics-schema.mjs",
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      {
+        "name": "controller-input.mjs",
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      {
+        "name": "controller-panel.mjs",
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      {
+        "name": "controller-panel.css",
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      {
+        "name": "controller-settings.mjs",
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      {
+        "name": "controller-settings.css",
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      {
+        "name": "touch-controls.mjs",
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      {
+        "name": "touch-controls.css",
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      {
+        "name": "prototype-keyboard-layouts.mjs",
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      {
+        "name": "runtime-cache.js",
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      {
+        "name": "audio-worklet.js",
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      {
+        "name": "audio-ring.mjs",
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      {
+        "name": "disc-image.mjs",
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      {
+        "name": "disc-session.mjs",
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      {
+        "name": "dsp-coefficients.mjs",
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      {
+        "name": "runtime-assets.mjs",
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      {
+        "name": "runtime-audio-assets.mjs",
+        "bytes": 5451,
+        "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+      },
+      {
+        "name": "runtime-audio.mjs",
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      {
+        "name": "match-flow.mjs",
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      {
+        "name": "match-menu.mjs",
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      {
+        "name": "action-sweep.mjs",
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      {
+        "name": "hitch-capture.mjs",
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      }
+    ],
+    "build_log": {
+      "name": "ordinary-release-build-v1.log",
+      "bytes": 1430173,
+      "sha256": "cc0433fe76e33236ab7a2b63c5a478054e0e7c118c429a795fedeb37c3db7220"
+    },
+    "cache": {
+      "name": "ordinary-release-CMakeCache-v1.txt",
+      "bytes": 60839,
+      "sha256": "fd0fbd5a610af974864da67d0fd8b17e7c3ee3a333bd8eeaf35b05b428025ce8"
+    },
+    "private_retained_build_receipt": {
+      "name": "ordinary-release-build-receipt-v1.json",
+      "bytes": 6862,
+      "sha256": "18d3bc9858f932d474bb97ff345142ea052b18821ea24e994c66c4dc0f6e7965"
+    },
+    "native_target_input_changes_since_capture_native_producer": [
+      "patches/melee-gameplay.patch",
+      "src/gameplay_source_memory_runtime.cpp",
+      "src/gameplay_source_memory_runtime.h",
+      "src/gameplay_source_preload.h"
+    ],
+    "artifact_names_changed_since_captured_native_inventory": [
+      "gameplay_menu_browser.wasm"
+    ],
+    "note": "Main advanced through #241, changing native target inputs. This is a fresh build at 15bc102, not a reuse of 0d855 claim. The historical browser capture stays a94c37e/0d8556e and its frozen 37-file staging remains unchanged."
+  },
+  "historical_browser_capture": {
+    "source": "a94c37ef7701970c132dcf34968b60eb521a549c",
+    "native_build": "0d8556e44bf65ca9db4f93fabb44a35b07ca2350",
+    "receipt": "a3-room-worker-webrtc-desync-v1.json",
+    "new_browser_at_integration_source": false
+  },
+  "exclusions": [
+    "browser-exercised behavior at this integration build",
+    "autonomous browser native pump",
+    "user-facing room/session integration",
+    "Internet/two-machine or physical/live input",
+    "timing/performance/pixel/audio acceptance",
+    "retail/whole-session equivalence",
+    "general A3 acceptance"
+  ]
+}
