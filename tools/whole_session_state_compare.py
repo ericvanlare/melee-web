@@ -2550,16 +2550,7 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
     target = expected_source["match_clock_boundary"]
     threshold = target["target_match_frame_at_least"]
     suffix = str(threshold)
-    if (audit.get("schema") != f"melee-web-b4-source-clock-ge{suffix}-audit-v3" or
-            audit.get("scope") != f"source-only-clock-ge{suffix}" or
-            audit.get("audit_completed") is not True or
-            audit.get("complete") is not False or
-            audit.get("whole_session_equivalent") is not False or
-            audit.get("report_write_failed") is not False or
-            audit.get("status") != f"first_match_clock_ge{suffix}_found" or
-            audit.get("target_match_frame_at_least") != threshold or
-            audit.get("error") is not None):
-        raise ComparisonError("match-clock source audit schema or bounded status is unsupported")
+    _validate_match_clock_audit_status(audit, threshold, ordered_lineage=ordered_lineage)
 
     source = audit.get("source")
     provenance = source.get("provenance") if isinstance(source, dict) else None
@@ -2742,6 +2733,95 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
     return audit, digest
 
 
+def _validate_match_clock_audit_status(audit: Mapping[str, Any], threshold: int, *,
+                                       ordered_lineage: bool) -> None:
+    """Accept the exact retained clock-1000 v1 header in ordered scope only."""
+    legacy_clock1000 = (
+        ordered_lineage and threshold == 1000 and
+        audit.get("schema") == "melee-web-b4-source-clock1000-audit-v1")
+    expected_schema = ("melee-web-b4-source-clock1000-audit-v1"
+                       if legacy_clock1000 else
+                       f"melee-web-b4-source-clock-ge{threshold}-audit-v3")
+    report_write_failed = audit.get("report_write_failed")
+    if (audit.get("schema") != expected_schema or
+            audit.get("scope") != f"source-only-clock-ge{threshold}" or
+            audit.get("audit_completed") is not True or
+            audit.get("complete") is not False or
+            audit.get("whole_session_equivalent") is not False or
+            audit.get("status") != f"first_match_clock_ge{threshold}_found" or
+            audit.get("target_match_frame_at_least") != threshold or
+            audit.get("error") is not None):
+        raise ComparisonError("match-clock source audit schema or bounded status is unsupported")
+    if legacy_clock1000:
+        if "report_write_failed" in audit and report_write_failed is not False:
+            raise ComparisonError("legacy clock-1000 report-write status is contradictory")
+    elif report_write_failed is not False:
+        raise ComparisonError("match-clock source audit report-write status is unsupported")
+
+
+def _validate_ordered_clock_runner_reference(
+        audit_reference: Any, runner_identity: Mapping[str, Any], *,
+        allow_legacy_pathless: bool) -> None:
+    """Bind the report's embedded runner reference to its externally pinned file."""
+    identity_fields = {"path", "bytes", "sha256"}
+    if (not isinstance(runner_identity, Mapping) or
+            set(runner_identity) != identity_fields or
+            not isinstance(runner_identity.get("path"), str) or
+            not runner_identity["path"] or
+            type(runner_identity.get("bytes")) is not int or
+            runner_identity["bytes"] <= 0 or
+            not isinstance(runner_identity.get("sha256"), str) or
+            re.fullmatch(r"[0-9a-f]{64}", runner_identity["sha256"]) is None):
+        raise ComparisonError("ordered clock runner packet identity is malformed")
+    if not isinstance(audit_reference, Mapping):
+        raise ComparisonError("ordered clock audit runner reference is malformed")
+    if (type(audit_reference.get("bytes")) is not int or
+            audit_reference["bytes"] <= 0 or
+            not isinstance(audit_reference.get("sha256"), str) or
+            re.fullmatch(r"[0-9a-f]{64}", audit_reference["sha256"]) is None or
+            ("path" in audit_reference and
+             (not isinstance(audit_reference["path"], str) or
+              not audit_reference["path"]))):
+        raise ComparisonError("ordered clock audit runner reference is malformed")
+    if set(audit_reference) == identity_fields:
+        matches = dict(audit_reference) == dict(runner_identity)
+    elif allow_legacy_pathless and set(audit_reference) == {"bytes", "sha256"}:
+        matches = {
+            "bytes": audit_reference.get("bytes"),
+            "sha256": audit_reference.get("sha256"),
+        } == {"bytes": runner_identity["bytes"],
+              "sha256": runner_identity["sha256"]}
+    else:
+        matches = False
+    if not matches:
+        raise ComparisonError("ordered clock audit does not bind its frozen runner packet")
+
+
+def _validate_ordered_clock_runner_prefix(packet_prefix: Any,
+                                          expected_prefix: Mapping[str, Any],
+                                          label: str) -> None:
+    """Validate exact data fields with an optional nonempty v1 hash annotation."""
+    if not isinstance(packet_prefix, Mapping):
+        raise ComparisonError(f"ordered clock runner packet {label} prefix differs")
+    fields = set(packet_prefix)
+    if fields == ORDERED_CLOCK_PREFIX_FIELDS | {"hash_basis"}:
+        if (not isinstance(packet_prefix.get("hash_basis"), str) or
+                not packet_prefix["hash_basis"]):
+            raise ComparisonError(
+                f"ordered clock runner packet {label} hash-basis annotation is malformed")
+    elif fields != ORDERED_CLOCK_PREFIX_FIELDS:
+        raise ComparisonError(f"ordered clock runner packet {label} prefix differs")
+    if (any(type(packet_prefix.get(name)) is not int or packet_prefix[name] <= 0
+            for name in ("bytes_read", "records_read")) or
+            type(packet_prefix.get("last_source_sequence")) is not int or
+            packet_prefix["last_source_sequence"] < 0 or
+            not isinstance(packet_prefix.get("sha256"), str) or
+            re.fullmatch(r"[0-9a-f]{64}", packet_prefix["sha256"]) is None):
+        raise ComparisonError(f"ordered clock runner packet {label} prefix differs")
+    if {key: packet_prefix[key] for key in ORDERED_CLOCK_PREFIX_FIELDS} != dict(expected_prefix):
+        raise ComparisonError(f"ordered clock runner packet {label} prefix differs")
+
+
 def _lineage_boundary_from_observation(observation: Mapping[str, Any], *,
                                         context: str = "ordered clock-lineage observation"
                                         ) -> dict[str, int]:
@@ -2830,15 +2910,18 @@ def _validate_ordered_clock_audit_lineage(audit: Mapping[str, Any],
     expected_source = packet["source"]
     lineage = expected_source["ordered_clock_lineage"]
     runner_identity = lineage["runner_packet"]
-    if audit.get("packet") != runner_identity:
-        raise ComparisonError("ordered clock audit does not bind its frozen runner packet")
+    threshold = expected_source["match_clock_boundary"]["target_match_frame_at_least"]
+    legacy_clock1000 = (
+        threshold == 1000 and
+        audit.get("schema") == "melee-web-b4-source-clock1000-audit-v1")
+    _validate_ordered_clock_runner_reference(
+        audit.get("packet"), runner_identity, allow_legacy_pathless=legacy_clock1000)
     runner_path = Path(runner_identity["path"])
     runner, digest, size = _read_json_sidecar(
         runner_path, "ordered clock source runner packet", max_bytes=2 * 1024 * 1024)
     _verify_expected_file(runner_identity, runner_path, digest, size,
                           "ordered clock source runner packet")
     target = expected_source["match_clock_boundary"]
-    threshold = target["target_match_frame_at_least"]
     if (runner.get("schema") != f"melee-web-b4-source-clock{threshold}-launch-v1" or
             runner.get("scope") != f"source-only-clock-ge{threshold}" or
             runner.get("version") != 1 or
@@ -2897,13 +2980,7 @@ def _validate_ordered_clock_audit_lineage(audit: Mapping[str, Any],
                 item.get("tuple") != expected["tuple"]):
             raise ComparisonError(f"ordered clock runner packet {label} checkpoint differs")
         packet_prefix = item.get("prefix")
-        if (not isinstance(packet_prefix, dict) or
-                set(packet_prefix) != ORDERED_CLOCK_PREFIX_FIELDS | {"hash_basis"} or
-                not isinstance(packet_prefix.get("hash_basis"), str) or
-                not packet_prefix["hash_basis"] or
-                {key: packet_prefix[key] for key in ORDERED_CLOCK_PREFIX_FIELDS} !=
-                expected["prefix"]):
-            raise ComparisonError(f"ordered clock runner packet {label} prefix differs")
+        _validate_ordered_clock_runner_prefix(packet_prefix, expected["prefix"], label)
 
     small_inputs = runner.get("small_inputs")
     selected_paths = runner.get("selected_paths")
@@ -3976,6 +4053,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "target": match_clock_target,
                 "scope": "source-only audit target; browser comparison uses fresh packet identities",
             }
+            if "report_write_failed" not in match_clock_audit:
+                result["match_clock_boundary_audit"]["report_write_failed_observation"] = (
+                    "not_recorded_in_historical_clock1000_v1")
         if ordered_lineage_scope:
             ordered_checkpoints = packet["source"]["ordered_clock_lineage"]["checkpoints"]
         if positive_scope:
