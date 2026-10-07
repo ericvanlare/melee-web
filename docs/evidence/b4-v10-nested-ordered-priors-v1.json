@@ -1,0 +1,123 @@
+{
+  "schema": "melee-web-b4-v10-nested-ordered-priors-v1",
+  "date": "2026-10-07",
+  "issue": 240,
+  "scope": {
+    "name": "Nested ordered prior metadata validation",
+    "evidence_label": "Synthetic comparator validation",
+    "description": "The ordered clock-lineage validator can recursively validate an earlier ordered-scope packet under the same source, recipe, anchors, and bounded lineage rules.",
+    "not_claimed": [
+      "No authentic clock-2000 source audit exists.",
+      "No original MWRO content was read or freshly hashed.",
+      "No browser capture or original-to-browser comparison was run.",
+      "No whole-session equivalence is established."
+    ]
+  },
+  "implementation": {
+    "base_main_commit": "d8f76001fc93ca593228fe740f70aec6b8f9ee4b",
+    "reviewed_code_commit": "92a011d899ee1221dfad0dca7925d03db13f1606",
+    "final_commit": "46ca937674952bc81ecca55df8095594837ec44d",
+    "final_tree": "748dc43f5c7aef007a3e4373a2a810cee75d48bc",
+    "changed_files": [
+      "tools/whole_session_state_compare.py",
+      "tests/test_whole_session_state_compare.py"
+    ],
+    "final_file_sha256": {
+      "tools/whole_session_state_compare.py": "ac3894cfa6be03be39f9dc7e20d4e78b893a3aecae96f2b4c9c1604bf1a61eae",
+      "tests/test_whole_session_state_compare.py": "4f58de6f85bfa1899162509489381003613c7bd94a66b6baddb60a8edff3885d"
+    },
+    "behavior": [
+      "An ordered packet may cite an earlier ordered-scope prior; the prior target must be strictly lower and its source, recipe, anchors, audit identity, tuple, and prefix must match the parent checkpoint.",
+      "Nested audit validation uses the existing bounded validator and shared depth, work-count, and cycle checks.",
+      "The existing historical clock-1000 v1 format remains accepted only under its prior ordered-scope rules; no evidence is rewritten or normalized.",
+      "Whole-session, v8/v9, and existing bounded-scope behavior is unchanged."
+    ],
+    "bounds": {
+      "checkpoints_per_lineage_max": 16,
+      "nested_depth_max": 8,
+      "ordered_audit_validations_max": 32,
+      "cycle_identity": "resolved audit path, byte size, and SHA-256"
+    }
+  },
+  "review": {
+    "run_id": "b4-nested-ordered-priors-focused-20261007",
+    "artifact": "root-source-review-v1.json",
+    "sha256": "d03b5c0171884d4d279b82fbe76c50470c56e44339f37351cc7805d415298d2e"
+  },
+  "validation": {
+    "focused_comparator_module": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_whole_session_state_compare.py -v",
+      "tests": 84,
+      "status": "passed",
+      "run_id": "b4-nested-ordered-priors-focused-20261007",
+      "log": "full-comparator-module-fix-v1.log",
+      "sha256": "7ed6426b5321a7b178418941dfefd1cb29bfda1840449c803df03a4b1636eb5e"
+    },
+    "specific_fixture_regression": {
+      "test": "test_ordered_clock_runner_rehash_cannot_rewrite_inner_checkpoint_identity",
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_whole_session_state_compare.py -k ordered_clock_runner_rehash_cannot_rewrite_inner_checkpoint_identity -v",
+      "tests": 1,
+      "status": "passed",
+      "run_id": "b4-nested-ordered-priors-focused-20261007",
+      "log": "focused-runner-rehash-fix-v1.log",
+      "sha256": "bf8a03aeaa536c14b41b644afd16ed60eb33e31f3ead600fdeac7db08c53a47f"
+    },
+    "full_python_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "tests": 2033,
+      "skipped": 151,
+      "elapsed_seconds": 350.706,
+      "status": "passed",
+      "footer": "Ran 2033 tests in 350.706s; OK (skipped=151)",
+      "run_id": "b4-nested-ordered-priors-focused-20261007",
+      "log": "full-suite-rebased-d8f760-v2.log",
+      "sha256": "bd152f2ce246626fb7101fabad48d7fda3805024c6684d226e24b47c6beb439b",
+      "actual_validation_state": "The suite ran with HEAD 92a011d and only the test file modified. The comparator and test-file SHA-256 values recorded above match the final 46ca937 tree; no executable source changed between the run and commit."
+    },
+    "initial_full_suite_failure": {
+      "tests": 2033,
+      "skipped": 151,
+      "status": "failed on one stale mock fixture",
+      "error": "test_ordered_clock_runner_rehash_cannot_rewrite_inner_checkpoint_identity omitted the boundary packet schema/scope/version in its mock and its validator double did not accept the explicit keyword contract.",
+      "run_id": "b4-nested-ordered-priors-focused-20261007",
+      "log": "full-suite-rebased-d8f760-v1.log",
+      "sha256": "d2fdd63227fca706357793b19d872412081e419fe8023b491bfbf2a75df3dc9f",
+      "correction": "The test double now supplies the actual boundary packet labels and explicit validator keyword arguments. Production code was unchanged by the correction."
+    },
+    "authentic_clock1000_metadata_preflight": {
+      "status": "passed with source MWRO open blocked",
+      "run_id": "b4-nested-ordered-priors-focused-20261007",
+      "log": "authentic-clock1000-metadata-v1.log",
+      "sha256": "c84737d52bc60893e76455349e803f75ad216057aa1c7e758e6521f9dc89d577"
+    },
+    "runtime_reuse": {
+      "runtime_build_performed": false,
+      "reason": "The issue-240 delta from the reviewed base changes only the Python comparator and its tests; no compiled runtime inputs, build configuration, or runtime artifacts changed.",
+      "prior_verified_counts": {
+        "runtime_source_inputs": 60,
+        "release_artifacts": 32,
+        "source_inputs_changed": 0,
+        "artifacts_changed": 0
+      },
+      "prior_reuse_evidence": {
+        "receipt": "docs/evidence/b4-v10-first-match-clock1000-comparison-v1.json",
+        "validation_commit": "e3220aa2e2da7b17b99dce0999811bd1e66a0814",
+        "verification_sha256": "5c451d49a3c82c1d7f4a044e75f3f6f3ba697d00a6cb8e0d197965108720dc1b"
+      },
+      "current_task_reinventory": "not performed; the retained verified build was not rebuilt or modified by this Python-only change"
+    }
+  },
+  "retained_preparation": {
+    "failed_broad_rebase": {
+      "run_id": "b4-nested-ordered-priors-focused-20261007",
+      "artifact": "rebase-scope-correction-v1.txt",
+      "sha256": "88efad0d7772fb037385fc7171a651941a914da794a904d8cc1faf9f37208ac8",
+      "note": "A broad rebase encountered an add/add conflict in already-merged #239 documentation. It was aborted; the range was then rebased with the exact #239 parent and issue-240 commit boundary. No runtime or code failure occurred."
+    }
+  },
+  "limitations": [
+    "Synthetic outer 2000-to-1000 and 3000-to-2000 validation fixtures exercise the production metadata path only up to a blocked source-iteration sentinel.",
+    "The retained authentic clock-1000 sidecars were checked without opening the original source trace; no authentic clock-2000 audit or target tuple was created.",
+    "No browser, runtime capture, native build, original-state comparison, or full-session acceptance claim is included."
+  ]
+}
