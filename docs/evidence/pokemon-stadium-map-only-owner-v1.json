@@ -91,5 +91,99 @@
     "retained_external_run_inventory_id": "stadium-map-marker-structural-20261007-EcS57s/grps-map-only-20261007-D0Q6qj",
     "exit_code": 1,
     "classification": "Test assertion compared the archive's resolved data-section view with full raw-file bytes. Test-only correction now compares the data section to a pre-owner baseline and separately checks the full file."
+  },
+  "integration_validation": {
+    "validation_producer": {
+      "branch": "codex/stadium-map-marker-structural-20261007",
+      "commit": "318a84791418e70241ecb43e16808323e2943a79",
+      "tree": "cedcf8567dbfc1c9c6b1319215aa11ede0ca9cda",
+      "tracked_worktree_clean_before_and_after": true,
+      "executable_source_commit": "f6eff36dacabf174ffaabc6aa1f8df570332ea76",
+      "source_code_unchanged_from_map_probe": true,
+      "docs_receipt_followup": "This receipt and status prose were updated after the 318a847 source/docs validation producer; no executable source changed."
+    },
+    "documentation_checks": {
+      "status_index": "passed",
+      "status_entries_test": {
+        "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_status_entries.py -v",
+        "tests": 4,
+        "exit_code": 0
+      },
+      "markdown_link_test": {
+        "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_markdown_links.py -v",
+        "tests": 1,
+        "exit_code": 0
+      },
+      "diff_check": "git diff --check origin/main...HEAD passed",
+      "json_parse": "passed",
+      "final_after_validation_update": {
+        "status_entries_test": {
+          "tests": 4,
+          "exit_code": 0,
+          "stderr_sha256": "9eab8bd5d492e94886d26d364f01be0b45793da6785bb091b57d8f9ff125af06"
+        },
+        "markdown_link_test": {
+          "tests": 1,
+          "exit_code": 0,
+          "stderr_sha256": "0c9f2b467e9c160ebe087d32cbcc012f33d6b053ec1c88ddd6eee98e45ad7862"
+        },
+        "status_index_sha256": "48f9e1f874c0a7ecf9d99d771b20f3227106b95aca0098393fcc475f2b79c3ba",
+        "diff_check": "git diff --check passed"
+      }
+    },
+    "full_python_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "tests": 1944,
+      "skipped": 135,
+      "elapsed_seconds": 368.892,
+      "exit_code": 0,
+      "external_run_inventory_id": "stadium-map-marker-structural-20261007-EcS57s/integration-20261007-dUC1Ud",
+      "stdout_sha256": "40ebe3ef13d57abddbb2bea2fd4db14fcf741f77cd96985abafecb9fb2806318",
+      "stderr_sha256": "60081a4cc4b839b0a981c5af026eec96f60373271dbb191f56e9c2b01548e1f8"
+    },
+    "release_runtime_build": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "target": "gameplay_menu_browser",
+      "configuration": "Release",
+      "platform": "Emscripten wasm32",
+      "exit_code": 0,
+      "compiled_affected_sources": [
+        "src/gameplay_stage_numeric.c",
+        "src/dat_native_stage.cpp"
+      ],
+      "artifacts": {
+        "gameplay_menu_browser.js": {
+          "bytes": 299682,
+          "sha256": "64f70283f7aedd5bb0ee89e4375326c40fd9c26ae7ee0e84db02b58aab0bc839"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15737625,
+          "sha256": "89f2bd37496ef1d38f541c3aa96532aa3eb6fbb8574a53da8dc7225ff4dbbc8e"
+        }
+      },
+      "preexisting_release_artifacts": {
+        "gameplay_menu_browser.js": {
+          "bytes": 299505,
+          "sha256": "f9e1d4492e242947a65f914ee173e22afc69bccb28e1dd5b470008fba5ddc315"
+        },
+        "gameplay_menu_browser.wasm": {
+          "bytes": 15716811,
+          "sha256": "bfe3397088f8de7fc6b6cd4d0c753b8313ec7092647eb6268d36c356d923905e"
+        }
+      },
+      "build_log_inventory_id": "stadium-map-marker-structural-20261007-EcS57s/integration-20261007-dUC1Ud",
+      "stdout_sha256": "a00c794fbafbd4cd5915891e0cf5d7ed6d2f81bad72c8b7275960ef6851741f5",
+      "stderr_sha256": "21c6fec15fe4097868f5576455de36b5f8bdc50c0683c3849e8c4ec9eb6ec8fa"
+    },
+    "original_relwithdebinfo_probe_preserved": {
+      "probe_commit": "f6eff36dacabf174ffaabc6aa1f8df570332ea76",
+      "corrected_packet_sha256": "180bf4714fb630f3b8a06efcbc53243c94744581f258074c748bd488e183bb5a",
+      "map_js_sha256": "695e7af9cd8ac1c8d5c8b5833503342ea5b9c9ddc7219bd11f9b8946d6901163",
+      "map_wasm_sha256": "9a6b139e6f4a7128aded2132a43a764cbce92ae747ec396c0f888f49f3993022",
+      "grps_sha256": "aa740cfbbeced294f058449caca8ac0380532521dde06ca4a6dcc03080cf6a6d",
+      "fd_sha256": "2a295a733414fb65a7061a5c092144fb197570682562b87ba5567ff3f08abb02",
+      "unchanged_across_release_build": true
+    },
+    "claim_boundary": "Full suite and Release compile validate repository integration and the affected runtime build. The Release runtime was not executed; no original menu handoff, gameplay stage construction, stage callback, rendering, readiness/admission, E8/publication, or browser evidence is added."
   }
 }

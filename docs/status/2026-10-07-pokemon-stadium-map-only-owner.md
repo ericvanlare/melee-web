@@ -29,8 +29,18 @@ The corrected assertion compares like-for-like data-section bytes and checks
 the complete raw file separately. Synthetic marker-order and focused FD
 numeric/map regressions passed in separate runs recorded in the receipt.
 
+Subsequent integration validation passed the complete Python suite (1,944
+tests, 135 optional skips) and built the Release runtime target
+`gameplay_menu_browser`. That build compiled both changed runtime translation
+units, and the receipt records the resulting JS/Wasm hashes separately from
+the original RelWithDebInfo map-probe artifacts. The Release runtime was
+compiled but not executed.
+
 This trace directly exercises DatNativeMap; it does not follow the original
 CSS/SSS handoff or construct the gameplay stage. Stage_8022524C, on_init,
 stage callbacks, transformation, collision, rendering, readiness/admission,
-publication/E8, browser behavior, and the full suite remain unrun. Stadium
-remains outside public content admission.
+publication/E8, and browser behavior remain unrun. The original menu's source
+archive request is still unobserved, so C1 source lookup remains open. Stadium
+remains outside public content admission. The full suite and Release build had
+not run at the time of the initial map-only probe; their later results are
+recorded separately in the portable receipt.
