@@ -8,6 +8,7 @@ export const NATURAL_PAUSE_PROTOCOL = Object.freeze({
   // startup consumes that overall budget and truncation leaves evidence incomplete.
   replay_phase_timeout_ms: 65000,
   overall_timeout_ms: 95000,
+  observation_timeout_ms: 5000,
   phase_timeout_ms: 20000,
   replay_poll_interval_ms: 250,
   phase_observation_interval_ms: 1000,

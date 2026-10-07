@@ -30,6 +30,7 @@ assert.equal(validateNaturalPauseManifest(manifest(), ['runtime.js']).schema,
   'melee-web-natural-pause-diagnostic-manifest-v1');
 assert.equal(NATURAL_PAUSE_PROTOCOL.replay_phase_timeout_ms, 65000);
 assert.equal(NATURAL_PAUSE_PROTOCOL.overall_timeout_ms, 95000);
+assert.equal(NATURAL_PAUSE_PROTOCOL.observation_timeout_ms, 5000);
 for (const mutate of [
   value => {
     value.protocol.process_timeout_ms = value.protocol.replay_phase_timeout_ms;
@@ -124,6 +125,15 @@ await assert.rejects(() => stopSourceBeforeNaturalPauseExport({
 }), /Refusing large diagnostic exports/);
 assert.deepEqual(unsafeOrder, ['status', 'stop', 'status'],
   'trace stream and capture reads are skipped unless source_running is confirmed zero');
+const timedOutStatusOrder = [];
+await assert.rejects(() => stopSourceBeforeNaturalPauseExport({
+  readStatus: async () => {timedOutStatusOrder.push('status'); throw Error('renderer observation timed out');},
+  stopPlayback: async () => {timedOutStatusOrder.push('stop');},
+  finalizeTrace: async () => {timedOutStatusOrder.push('finalize');},
+  readEvidence: async () => {timedOutStatusOrder.push('export');},
+}), /renderer observation timed out/);
+assert.deepEqual(timedOutStatusOrder, ['status'],
+  'a timed-out renderer status observation cannot trigger stop or large exports');
 
 const runner = await readFile(new URL('../scripts/capture_whole_session_browser.mjs', import.meta.url), 'utf8');
 const readyAt = runner.indexOf("await phase('runtime-ready'");
@@ -136,6 +146,24 @@ assert.ok(runner.includes("snapshot('replay-poll', {captureCss: !diagnostic})"),
   'state mode preserves CSS observations while performance polling avoids allocations');
 assert.ok(runner.includes("browserCdp.send('SystemInfo.getProcessInfo')"),
   'strict owner cleanup receives a CDP process inventory before measurement');
+const processInfoAt = runner.indexOf("browserCdp.send('SystemInfo.getProcessInfo')");
+const durableInventoryAt = runner.indexOf("await write('report.json', report);", processInfoAt);
+const pageCreateAt = runner.indexOf('page = diagnostic ?');
+const navigationAt = runner.indexOf('page.goto(');
+assert.ok(processInfoAt >= 0 && durableInventoryAt > processInfoAt &&
+  pageCreateAt > durableInventoryAt && navigationAt > durableInventoryAt,
+  'owned Chrome CDP identity is durable before page creation, navigation, or measurement');
+assert.ok(runner.includes('report.last_successful_snapshot = value'),
+  'the first successful observation remains available when later renderer work hangs');
+assert.ok(runner.includes("outcome: 'observation_timeout', source_cursor: null"),
+  'an unobservable terminal cursor is explicitly incomplete rather than inferred');
+assert.ok(runner.includes("Renderer observation timed out; terminal cursor unknown and no pause, trace, screenshot, or capture export was attempted."),
+  'renderer observation timeout skips native pause and every large evidence export');
+const finalSnapshotAt = runner.indexOf("const final = await snapshot('finally')");
+const stateExportTimeoutGuardAt = runner.indexOf('if (pageObservationTimedOut)', finalSnapshotAt);
+assert.ok(stateExportTimeoutGuardAt > finalSnapshotAt &&
+  runner.indexOf('page_exports_skipped', stateExportTimeoutGuardAt) > stateExportTimeoutGuardAt,
+  'state-mode final exports are skipped if its final renderer snapshot times out');
 assert.ok(runner.includes('if (!diagnostic && stopAfter && !report.deliberate_prefix_stop'),
   'the natural-pause loop cannot enter state-mode cursor-stop/unload handling');
 

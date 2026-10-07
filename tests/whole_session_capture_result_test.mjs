@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {finalizeSessionCapture, REQUIRED_SESSION_DOWNLOADS,
-  validateRuntimeDataAbort} from '../scripts/whole_session_capture_result.mjs';
+  validateRuntimeDataAbort, boundedCaptureOperation, retainFirstCaptureError} from '../scripts/whole_session_capture_result.mjs';
 
 const clean = () => ({
   result: 'fail', first_error: null, browser_errors: [], unexpected_requests: [],
@@ -72,3 +72,15 @@ for (const name of REQUIRED_SESSION_DOWNLOADS) {
 }
 rejects(r => { r.deliberate_prefix_stop = {requested_cursor: 1}; }, 'Deliberate prefix', 'incomplete');
 console.log(`Whole-session capture finalization: clean pass and ${checks} rejection controls passed`);
+
+assert.equal(await boundedCaptureOperation(Promise.resolve(7), 100, 'resolved observation'), 7);
+await assert.rejects(boundedCaptureOperation(new Promise(() => {}), 5, 'stuck observation'),
+  error => error.captureOperationTimeout === true && /stuck observation exceeded 5 ms/.test(error.message));
+console.log('Bounded observation rejects a renderer promise that never settles.');
+
+const firstErrorReport = {first_error: null};
+retainFirstCaptureError(firstErrorReport, 'observation_timeout', 'snapshot exceeded 5 ms', 'replay');
+retainFirstCaptureError(firstErrorReport, 'cleanup', 'TargetClosed', 'finally');
+assert.deepEqual(firstErrorReport.first_error,
+  {kind: 'observation_timeout', message: 'snapshot exceeded 5 ms', phase: 'replay', details: null});
+console.log('A later TargetClosed cleanup error cannot replace the first renderer timeout.');

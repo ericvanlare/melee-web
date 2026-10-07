@@ -15,7 +15,8 @@ import {execFileSync} from 'node:child_process';
 import {parseArgs} from 'node:util';
 import {loadBrowserTools, browserLaunchOptions} from '../scripts/browser_tools.mjs';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
-import {finalizeSessionCapture, validateRuntimeDataAbort} from './whole_session_capture_result.mjs';
+import {finalizeSessionCapture, validateRuntimeDataAbort, boundedCaptureOperation,
+  retainFirstCaptureError} from './whole_session_capture_result.mjs';
 import {parseRngDrawProbe, validateRngDrawProbeRows} from './rng_draw_probe.mjs';
 import {NATURAL_PAUSE_PROTOCOL, resolveCaptureMode, validateNaturalPauseManifest,
   naturalPauseRuntimeUrl, validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
@@ -113,6 +114,7 @@ if (diagnostic && (values['cpu-observations'] || rngDrawProbe))
   throw Error('Performance diagnosis does not enable CPU-prefix or RNG observers');
 const runtimeDataUrl = new URL('gameplay_menu_browser.data', url).href;
 const output = path.resolve(values.out);
+const observationTimeoutMs = diagnostic ? NATURAL_PAUSE_PROTOCOL.observation_timeout_ms : Math.min(phaseTimeoutMs, 5000);
 const inputPaths = [values.disc, values.recipe, values.manifest, values['runtime-data']]
   .filter(Boolean).map(value => path.resolve(value));
 
@@ -125,8 +127,10 @@ const report = {
   url: values.url,
   mode: captureMode.mode,
   ...(diagnostic ? {diagnostic_manifest: {path: diagnosticManifestPath, sha256: diagnosticManifestSha256}} : {}),
+  ...(diagnostic ? {diagnostic_protocol: NATURAL_PAUSE_PROTOCOL} : {}),
   phase_timeout_ms: phaseTimeoutMs,
   replay_timeout_ms: replayTimeoutMs,
+  observation_timeout_ms: observationTimeoutMs,
   poll_ms: pollMs,
   replay_poll_ms: replayPollMs,
   resume_timing_pauses: resumeTimingPauses,
@@ -165,6 +169,7 @@ let traceStarted = false;
 let naturalPauseTraceSettings = null;
 let diagnosticPreflightValid = false;
 let browserTools = null;
+let pageObservationTimedOut = false;
 
 const write = async (name, value) => {
   await fs.writeFile(path.join(output, name), typeof value === 'string' ? value : JSON.stringify(value, null, 2) + '\n');
@@ -222,14 +227,34 @@ async function releaseArtifactMap(buildDirectory, baseUrl) {
 }
 
 function firstError(kind, message, details = null) {
-  if (!report.first_error) report.first_error = {kind, message: String(message), phase: currentPhase, details};
+  retainFirstCaptureError(report, kind, message, currentPhase, details);
+}
+
+async function observePageOperation(label, operation) {
+  if (pageObservationTimedOut) throw Error('Page observation already timed out; renderer evidence is unknown');
+  try {
+    return await boundedCaptureOperation(operation, observationTimeoutMs, label);
+  } catch (error) {
+    if (error.captureOperationTimeout) {
+      pageObservationTimedOut = true;
+      report.renderer_observation_timeout = {label, timeout_ms: observationTimeoutMs,
+        phase: currentPhase, last_successful_snapshot: report.last_successful_snapshot ?? null};
+      firstError('observation_timeout', error.message || error, report.last_successful_snapshot ?? null);
+    }
+    throw error;
+  }
+}
+
+async function pauseTraceStatus(options = {}) {
+  return observePageOperation('pause trace status', readPauseTraceStatus(page, options));
 }
 
 async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
   if (!page || page.isClosed()) return null;
   let value;
   try {
-    value = await page.evaluate(({reason, captureCss}) => {
+    if (pageObservationTimedOut) return {reason, snapshot_error: 'Page observation already timed out'};
+    value = await observePageOperation(`snapshot ${reason}`, page.evaluate(({reason, captureCss}) => {
       const module = globalThis.Module;
       const ready = globalThis.__meleeNativeRuntimeReady === true;
       const call = name => {
@@ -271,11 +296,12 @@ async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
         replay_report: replayReport,
         replay_downloads: [...document.querySelectorAll('#retail-replay-downloads a')].map(link => link.download),
       };
-    }, {reason, captureCss});
+    }, {reason, captureCss}));
   } catch (error) {
     firstError('snapshot', error.message || error);
     return {reason, snapshot_error: String(error.message || error)};
   }
+  report.last_successful_snapshot = value;
   const key = JSON.stringify({phase: value.phase, running: value.running, cursor: value.source_cursor,
     error: value.runtime_error, report: value.replay_report?.result || null,
     report_pass: value.replay_report?.pass ?? null});
@@ -303,9 +329,11 @@ async function phase(name, task, timeoutMs = phaseTimeoutMs, observationInterval
   const started = Date.now();
   const row = {name, started_at: new Date(started).toISOString(), timeout_ms: timeoutMs, result: 'fail'};
   report.phases.push(row);
-  await snapshot('phase-start:' + name);
+  const initial = await snapshot('phase-start:' + name);
+  if (initial?.snapshot_error) throw Error(initial.snapshot_error);
   const pendingPolls = new Set();
   const timer = observationIntervalMs > 0 ? setInterval(() => {
+    if (pendingPolls.size || pageObservationTimedOut) return;
     const pending = snapshot('phase-poll:' + name);
     pendingPolls.add(pending);
     void pending.finally(() => pendingPolls.delete(pending));
@@ -318,14 +346,22 @@ async function phase(name, task, timeoutMs = phaseTimeoutMs, observationInterval
     ]);
     row.result = 'pass';
   } catch (error) {
-    firstError(name, error.message || error, await snapshot('phase-error:' + name));
+    firstError(name, error.message || error, report.last_successful_snapshot ?? null);
+    await write('report.json', report);
+    if (!pageObservationTimedOut && !pendingPolls.size) await snapshot('phase-error:' + name);
     throw error;
   } finally {
     if (timer) clearInterval(timer);
     clearTimeout(timeout);
-    await Promise.all(pendingPolls);
+    try {
+      await boundedCaptureOperation(Promise.all(pendingPolls), observationTimeoutMs,
+        'pending phase observations');
+    } catch (error) {
+      report.pending_observation_error = String(error.message || error);
+      pageObservationTimedOut = true;
+    }
     row.elapsed_ms = Date.now() - started;
-    await snapshot('phase-end:' + name);
+    if (row.result === 'pass' && !pageObservationTimedOut) await snapshot('phase-end:' + name);
   }
 }
 
@@ -409,8 +445,6 @@ try {
     browser = await chromium.launch(browserOptions);
   }
   report.browser.version = browser.version();
-  page = diagnostic ? (browserContext.pages()[0] || await browserContext.newPage()) :
-    await browser.newPage({viewport: {width: 900, height: 700}, deviceScaleFactor: 1});
   if (diagnostic) {
     const identity = {executable_path: path.resolve(browserPath), version: report.browser.version,
       profile_path: path.resolve(values['browser-profile']), profile_existed_before_launch: false};
@@ -430,7 +464,12 @@ try {
           !(profileIndex >= 0 && arguments_[profileIndex + 1] === expectedProfile))
         throw Error('Chrome command line does not bind the exact diagnostic profile path');
     } finally { await browserCdp.detach(); }
+    // Make owned Chrome attribution durable before navigation or replay can
+    // block the renderer and outlive the strict external owner deadline.
+    await write('report.json', report);
   }
+  page = diagnostic ? (browserContext.pages()[0] || await browserContext.newPage()) :
+    await browser.newPage({viewport: {width: 900, height: 700}, deviceScaleFactor: 1});
   await page.addInitScript(({cpuObservationRowLimit, captureCpuObservations,
     rngDrawProbeSelection}) => {
     window.__meleeNativeRuntimeReady = false;
@@ -592,6 +631,7 @@ try {
     while (Date.now() < deadline) {
       last = await snapshot('replay-poll', {captureCss: !diagnostic});
       if (!last) throw Error('Browser page closed before the recorded-session replay completed');
+      if (last.snapshot_error) throw Error(last.snapshot_error);
       if (Date.now() - lastProgressWriteAt >= NATURAL_PAUSE_PROTOCOL.progress_write_interval_ms) {
         await write('progress.json', {harness_phase:currentPhase,phase:last?.phase,cursor:last?.source_cursor,
           status:last?.status,error:last?.runtime_error,log:last?.log?.slice(-1600),
@@ -599,7 +639,7 @@ try {
         lastProgressWriteAt = Date.now();
       }
       if (diagnostic) {
-        const observed = await readPauseTraceStatus(page);
+        const observed = await pauseTraceStatus();
         const stop = firstNaturalPauseStop({source_running: observed.source_running,
           source_cursor: observed.replay_cursor, runtime_error: observed.runtime_error,
           dialog_error: observed.dialog_error, native_message: observed.native_message,
@@ -680,16 +720,21 @@ try {
   }, diagnostic ? NATURAL_PAUSE_PROTOCOL.replay_phase_timeout_ms : replayTimeoutMs,
   diagnostic ? 0 : pollMs);
 } catch (error) {
-  firstError(currentPhase, error.message || error, await snapshot('fatal'));
+  firstError(currentPhase, error.message || error, report.last_successful_snapshot ?? null);
   report.failure = String(error.stack || error);
 } finally {
   if (diagnostic) {
-    if (page && !page.isClosed() && report.pause_trace_installation) {
+    if (pageObservationTimedOut) {
+      report.natural_pause_terminal ||= {outcome: 'observation_timeout', source_cursor: null,
+        source_running: null, phase: currentPhase};
+      report.trace_finalization_skipped = 'Renderer observation timed out; terminal cursor unknown and no pause, trace, screenshot, or capture export was attempted.';
+      process.exitCode = 1;
+    } else if (page && !page.isClosed() && report.pause_trace_installation) {
       try {
         const stopped = await stopSourceBeforeNaturalPauseExport({
-          readStatus: () => readPauseTraceStatus(page),
+          readStatus: () => pauseTraceStatus(),
           stopPlayback: async () => {
-            const pause = await page.evaluate(() => {
+            const pause = await observePageOperation('native source pause', page.evaluate(() => {
               const module = globalThis.Module;
               if (typeof module?._melee_web_native_menu_pause !== 'function' ||
                   typeof module?._melee_web_native_menu_running !== 'function')
@@ -697,21 +742,23 @@ try {
               const before = module._melee_web_native_menu_running();
               if (before === 1) module._melee_web_native_menu_pause(1);
               return {before, after: module._melee_web_native_menu_running()};
-            });
+            }));
             report.source_pause = pause;
             if (pause.after !== 0) throw Error('Native pause did not stop source playback');
           },
           finalizeTrace: async () => {
             if (!traceStarted || !diagnosticCdp || !naturalPauseTraceSettings)
               return {paths: [], complete: false, reusable: false, error: 'Trace was not started'};
-            const value = await finalizeTrace(diagnosticCdp, output, naturalPauseTraceSettings);
+            const value = await boundedCaptureOperation(
+              finalizeTrace(diagnosticCdp, output, naturalPauseTraceSettings),
+              NATURAL_PAUSE_PROTOCOL.phase_timeout_ms, 'trace finalization');
             traceStarted = false;
             report.trace = value;
             if (!value.complete) process.exitCode = 1;
             return value;
           },
           readEvidence: async () => {
-            const stoppedVisual = await page.evaluate(async () => {
+            const stoppedVisual = await observePageOperation('stopped scene and GPU status', page.evaluate(async () => {
               const canvas = document.querySelector('#canvas');
               const rect = canvas?.getBoundingClientRect();
               let adapterAvailable = false;
@@ -729,37 +776,39 @@ try {
                   adapter_available: adapterAvailable,
                   preferred_canvas_format: navigator.gpu?.getPreferredCanvasFormat?.() ?? null,
                   webgpu_context_available: contextAvailable}};
-            });
+            }));
             const screenshotPath = path.join(output, 'stopped-scene.png');
-            await page.screenshot({path: screenshotPath, fullPage: false});
+            await observePageOperation('stopped scene screenshot',
+              page.screenshot({path: screenshotPath, fullPage: false}));
             const screenshotStat = await fs.stat(screenshotPath);
             report.stopped_scene = {...stoppedVisual, screenshot: {path: screenshotPath,
               bytes: screenshotStat.size, sha256: await digest(screenshotPath)}};
-            report.runtime_incident_recorder = await readRetainedPauseDiagnostics(page,
-              ['timing_pause', 'runtime_error', 'preparation_error'].includes(report.natural_pause_terminal?.outcome));
+            report.runtime_incident_recorder = await observePageOperation('retained incident recorder',
+              readRetainedPauseDiagnostics(page,
+                ['timing_pause', 'runtime_error', 'preparation_error'].includes(report.natural_pause_terminal?.outcome)));
             report.staging_incident_summaries = (report.runtime_incident_recorder.retained_records || [])
               .map(record => ({id: record.id, reason: record.reason, timestamp: record.timestamp,
                 staging: record.staging ?? null}));
-            report.capture_status_after_stop = await readPauseTraceStatus(page, {readNative: false});
-            report.capture = await readPauseTraceCapture(page,
-              report.natural_pause_terminal?.outcome ?? 'capture_failure');
+            report.capture_status_after_stop = await pauseTraceStatus({readNative: false});
+            report.capture = await observePageOperation('callback capture export',
+              readPauseTraceCapture(page, report.natural_pause_terminal?.outcome ?? 'capture_failure'));
             return {runtime_incident_recorder: report.runtime_incident_recorder,
               capture_rows: report.capture.rows, capture_errors: report.capture.errors,
               capture_dropped: report.capture.dropped};
           },
           cleanupAfterEvidence: async () => {
-            const unloaded = await page.evaluate(() => {
+            const unloaded = await observePageOperation('native session unload', page.evaluate(() => {
               const module = globalThis.Module;
               if (typeof module?._melee_web_native_menu_unload !== 'function')
                 throw Error('Native unload export is unavailable after evidence export');
               const result = module._melee_web_native_menu_unload();
               return {result, phase: module._melee_web_native_menu_phase?.() ?? null,
                 source_running: module._melee_web_native_menu_running?.() ?? null};
-            });
+            }));
             if (unloaded.result !== 1 || unloaded.phase !== 0 || unloaded.source_running !== 0)
               throw Error(`Native unload did not verify cleanly: ${JSON.stringify(unloaded)}`);
             if (diagnosticCdp) {
-              await diagnosticCdp.detach();
+              await boundedCaptureOperation(diagnosticCdp.detach(), observationTimeoutMs, 'CDP detach');
               diagnosticCdp = null;
             }
             report.cleanup = {native_unload: unloaded, cdp_detached: true};
@@ -780,14 +829,23 @@ try {
         report.source_stop_error = String(error?.stack || error);
         process.exitCode = 1;
       }
+      if (pageObservationTimedOut) {
+        report.natural_pause_terminal ||= {outcome: 'observation_timeout', source_cursor: null,
+          source_running: null, phase: currentPhase};
+        report.trace_finalization_skipped ||= 'Renderer observation timed out; remaining diagnostic exports were skipped.';
+        process.exitCode = 1;
+      }
     } else if (traceStarted) {
       // Without a readable stopped page there is no safe large trace export.
       report.trace_finalization_skipped = 'Source-stop state could not be verified; trace bytes were not streamed.';
       process.exitCode = 1;
     }
-  } else if (page && !page.isClosed()) {
+  } else if (page && !page.isClosed() && !pageObservationTimedOut) {
     const final = await snapshot('finally');
     report.final_snapshot = final;
+    if (pageObservationTimedOut) {
+      report.page_exports_skipped = 'Renderer observation timed out; last successful snapshot retained and page exports were skipped.';
+    } else {
     try {
       const artifacts = await page.locator('#retail-replay-downloads a').evaluateAll(async links => {
         const retained = [];
@@ -833,18 +891,22 @@ try {
     try { await write('source-main-allocation-trace.json', {total: await page.evaluate(() => window.__meleeSourceAllocationTraceTotal || 0), events: await page.evaluate(() => window.__meleeSourceAllocationTrace || [])}); } catch(error) { report.source_allocation_trace_error = String(error); }
     try { await write('page.txt', await page.locator('body').innerText()); } catch (error) { report.page_dump_error = String(error); }
     try { await page.screenshot({path: path.join(output, 'final.png'), fullPage: false}); } catch (error) { report.screenshot_error = String(error); }
+    }
   }
   try { driver?.dispose(); } catch (error) { report.close_error = String(error); }
   // Quiesce browser callbacks before deciding whether diagnostics permit success.
   try {
     if (diagnostic && browserContext) {
-      await browserContext.close();
+      await boundedCaptureOperation(browserContext.close(), observationTimeoutMs, 'owned browser context close');
       report.cleanup ||= {};
       report.cleanup.browser_context_closed = true;
     }
-    else if (browser) await browser.close();
+    else if (browser) await boundedCaptureOperation(browser.close(), observationTimeoutMs, 'owned browser close');
   } catch (error) { report.close_error = String(error); }
-  try { await diagnosticCdp?.detach(); } catch (error) { report.cdp_close_error = String(error); }
+  try {
+    if (diagnosticCdp)
+      await boundedCaptureOperation(diagnosticCdp.detach(), observationTimeoutMs, 'CDP detach');
+  } catch (error) { report.cdp_close_error = String(error); }
   for (const candidate of runtimeDataAbortCandidates) {
     const expected = report.inputs?.runtime_data;
     const actual = report.runtime_data_load;
