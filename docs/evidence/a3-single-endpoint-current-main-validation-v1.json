@@ -56,6 +56,37 @@
       "log_sha256": "d4daf5945ca84abc6274e1a4558d3db940f030f7e72a337b58d5dd1b81d82790"
     },
     {
+      "name": "direct SDK Node transport and actual Worker/A2 tests",
+      "command": "python3 scripts/agent_workspace.py run -- .deps/emsdk/node/24.19.0_64bit/bin/node --test tests/net_lockstep_transport.test.mjs tests/net_room_relay_worker.test.mjs",
+      "outcome": "pass",
+      "tests_total": 19,
+      "tests_passed": 19,
+      "tests_failed": 0,
+      "tests_skipped": 0,
+      "execution_checkout_head": "36a8292a9972ae0116d65e478e5e22e746f7f983",
+      "execution_checkout_tree": "4cb60397c3ba257945e13a9a28e02560b3ccf229",
+      "code_and_test_sources_match_validated_producer": true,
+      "environment": {
+        "MELEE_A3_ROOM_RELAY_TOOLS": "work/a3-room-relay-tools/node_modules",
+        "MELEE_A3_ROOM_RELAY_EVIDENCE_DIR": "<external-run>/worker-evidence-direct",
+        "MELEE_A3_ROOM_RELAY_PRODUCER_COMMIT": "4677a53dab376186df610ad84e584e7434825fe5",
+        "MELEE_A3_ROOM_RELAY_PRODUCER_TREE": "60e8a6f0bfaf0e30e406d5afa1cef17facfd2feb"
+      },
+      "runtime_identity": {
+        "node": "v24.19.0",
+        "wrangler": "4.131.1",
+        "miniflare": "5.20260911.0-alpha",
+        "workerd": "1.20260911.1"
+      },
+      "worker_evidence": [
+        {"receipt": "worker-evidence-direct/direct-miniflare-a3-room-relay-direct-9BjHZ4.receipt.json", "sha256": "70574e66061f8ccf8b28fb3bcb684eb14efccc1bba50a6f1db91aa1a79bfab77", "ready": true, "disposed": true, "exit_code": 0, "process_group_absent": true, "fallback_used": false},
+        {"receipt": "worker-evidence-direct/direct-miniflare-a3-room-relay-direct-XFIQzl.receipt.json", "sha256": "4a6387d4fdda9700e94392aafeb8f1747ebbefa52f797dc58f402b014860368c", "ready": true, "disposed": true, "exit_code": 0, "process_group_absent": true, "fallback_used": false}
+      ],
+      "run_inventory_id": "a3-single-endpoint-main-validation-20261007-6PrVTR",
+      "log": "focused-node24-transport-worker.log",
+      "log_sha256": "12b2629f7cf722f71fdde0b32050d908baeb8ec2e0fec01802ce1ab8872609a4"
+    },
+    {
       "name": "full Python unittest discovery",
       "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
       "outcome": "pass",
