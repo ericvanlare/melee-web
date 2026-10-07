@@ -52,7 +52,7 @@
       }
     ],
     "harness_visible_gameplay_observed": "not_assessed",
-    "human_visual_review": "Independent visual review found the same four-Mario Final Destination scene and HUD in both images, with existing magenta geometry. Audio-queue UI state differed; exact pixel equality is not claimed.",
+    "agent_visual_review": "The lead agent independently inspected both rendered images and found the same four-Mario Final Destination scene and HUD, with existing magenta geometry. Audio-queue UI state differed; exact pixel equality is not claimed.",
     "shared_pinned_stopped_cursor": 1603
   },
   "inputs": {
