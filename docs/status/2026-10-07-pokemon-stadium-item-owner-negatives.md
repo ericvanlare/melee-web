@@ -43,3 +43,14 @@ and [#164](https://github.com/ericvanlare/melee-web/issues/164). It does not adm
 Stadium. No E8 request, `Stage_8022524C`, `OnInit`, `Ground_801C0800`, item startup,
 stage process/draw/tick, browser, extraction, deployment, retail comparison, or
 performance gate was run.
+
+The current-main integration refresh uses clean producer
+`9f9cf165373471ae0ab5e3296ac0477dfa0da703` on main
+`af13467f09ee0245bceeb7c80fb4ede698ec5f69`. Its executable patch is equivalent;
+all nine item-owner source/helper files are unchanged. Both affected Release
+builds passed with ordinary diagnostic OFF and native trace diagnostic ON.
+Full discovery passed 2,019 tests with 135 skips and no failures. All 98 retained
+input identities still match. The native fixture was not rerun: its observed
+preflight stays bound to producer `4852d07`, separately from this refresh's build
+and suite validation. The receipt's `current_integration_validation` section
+records the new producer and artifact/log hashes.

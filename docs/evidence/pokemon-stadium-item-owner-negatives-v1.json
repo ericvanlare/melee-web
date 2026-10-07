@@ -204,5 +204,109 @@
     "Production deployment",
     "Retail comparison",
     "Performance or whole-session acceptance"
-  ]
+  ],
+  "current_integration_validation": {
+    "main_base": "af13467f09ee0245bceeb7c80fb4ede698ec5f69",
+    "producer_commit": "9f9cf165373471ae0ab5e3296ac0477dfa0da703",
+    "producer_tree": "0e3de7a399d7ce584ae8efa722527ef41821b75d",
+    "working_tree_at_build": "clean",
+    "executable_patch_id": "abea55398a3cac591395f911572022ab511cf3ba",
+    "historical_patch_id": "abea55398a3cac591395f911572022ab511cf3ba",
+    "own_patch_equivalent": true,
+    "owned_executable_helper_files_unchanged": 9,
+    "CMake_main_delta": "Only main219 browser-local-input capture export differs from the historical owned-file snapshot; the item-owner CMake patch is identical.",
+    "builds": {
+      "ordinary_release_runtime": {
+        "command": "python3 scripts/build.py --target runtime --configuration Release",
+        "exit_code": 0,
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": false
+      },
+      "diagnostic_release_native_trace": {
+        "command": "python3 scripts/build.py --trace-target native_menu_host_trace --configuration Release --stadium-c1a-diagnostic",
+        "exit_code": 0,
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": true
+      },
+      "compiler_jobs": "Unchanged entry-point default; no --jobs override"
+    },
+    "full_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "tests": 2019,
+      "skipped": 135,
+      "elapsed_seconds": 371.194,
+      "fixture_settings": "Default; retained-context/E8 fixture gates skip before native launch."
+    },
+    "historical_retained_preflight": {
+      "producer_commit": "4852d072a3777070f778ecc893f34fa72fefb31a",
+      "rerun": false,
+      "all_98_logical_input_identities_rechecked_unchanged": true,
+      "source_guard_wrapper_and_invariant_files_unchanged": true,
+      "scope": "Historical actual native preflight remains bound to4852; current validation is builds/full discovery and input identity recheck, not recapture."
+    },
+    "artifacts": {
+      "artifacts/browser-release/gameplay_menu_browser.js": {
+        "bytes": 300352,
+        "sha256": "4e751ebb2467c3a8ee74583b37aa1753f1233c89e496b61458594c16eb262e61"
+      },
+      "artifacts/browser-release/gameplay_menu_browser.wasm": {
+        "bytes": 15742171,
+        "sha256": "490a4a4434cc2a490dbf4d979d48506b539870023687622642a7e07096b575d0"
+      },
+      "artifacts/browser-release/CMakeCache.txt": {
+        "bytes": 60977,
+        "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+      },
+      "artifacts/browser-release/build.ninja": {
+        "bytes": 5600070,
+        "sha256": "0fa78cb34e4b73ab360450ba04fcf1e2b39f698a3eaf35e78741e816f359034e"
+      },
+      "artifacts/browser-stadium-c1a-release/native_menu_host_trace.js": {
+        "bytes": 232759,
+        "sha256": "810e1827b4eb2c1d9802371be757f55a9bb7e0b1bbdd8ec9f56412d70c13f1ac"
+      },
+      "artifacts/browser-stadium-c1a-release/native_menu_host_trace.wasm": {
+        "bytes": 13733826,
+        "sha256": "471c610860cb3c3276296b13289410fe3e916feae98e8c1d762d7e0b7a81f3b0"
+      },
+      "artifacts/browser-stadium-c1a-release/CMakeCache.txt": {
+        "bytes": 61252,
+        "sha256": "59b26ab9d7f1414fd337c83e8dc3f009655dad37c38dbd6e7434268b69e7d9e6"
+      },
+      "artifacts/browser-stadium-c1a-release/build.ninja": {
+        "bytes": 5768119,
+        "sha256": "76450a92bff55c6f19a2fcdbceeca0d98dfed19817d017ad505a29cc851cdc08"
+      }
+    },
+    "raw_logs": {
+      "ordinary-release-build.log": {
+        "bytes": 1216004,
+        "sha256": "c74b66849ff06466347dc6289fa449139afe6ffd756d1f41d5c320c656d25c7e"
+      },
+      "diagnostic-release-build.log": {
+        "bytes": 17160,
+        "sha256": "8367b1c8bb35bba60f827b8347161d2c3cdd0c375d0d9640c1497957f6bd9fba"
+      },
+      "fullsuite.stdout.log": {
+        "bytes": 4460,
+        "sha256": "911ea25609efa6799ee6049ad3494cfa77da9f6d8ed77bdcd91b92c51dcc166d"
+      },
+      "fullsuite.stderr.log": {
+        "bytes": 363434,
+        "sha256": "b49447a5bc60d886b4ed43fa650964d06b0f5093b267d250bd808f3569a74bb2"
+      }
+    },
+    "private_evidence_locator": "stadium-item-owner-current-main-refresh-20261007-111639-e3845bc0",
+    "preparation_notes": "Verifier initially expected the CMake file unchanged despite main219 export; inspected delta and stable patch-id. A second verifier confused the supplied root-review hash with the portable receipt hash; exact historical git-file comparison proved the receipt unchanged. Both preparation-only assertions preceded validation conclusions and are transcribed in source-equivalence.json.",
+    "documentation_validation": {
+      "state": "passed",
+      "JSON_parse": true,
+      "diff_check": true,
+      "status_and_relative_links_tests": 4,
+      "status_and_relative_links_exit_code": 0,
+      "raw_log": {
+        "bytes": 582,
+        "sha256": "64f0925bef58d931eb5d73549140d046f346c51b0c0dea9de4c5b30ff92d6a27"
+      }
+    }
+  }
 }
