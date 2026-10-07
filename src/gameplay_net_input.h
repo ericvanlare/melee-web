@@ -22,6 +22,10 @@ typedef struct MeleeWebMenuHost MeleeWebMenuHost;
 enum {
     MELEE_WEB_NET_FRAME_BYTES = 44,
     MELEE_WEB_NET_MAX_FRAMES = 216000,
+    MELEE_WEB_NET_TERMINAL_DESYNC = 1,
+    MELEE_WEB_NET_TERMINAL_DISCONNECT = 2,
+    MELEE_WEB_NET_TERMINAL_PROTOCOL = 3,
+    MELEE_WEB_NET_TERMINAL_START_IDENTITY = 4,
 };
 
 #if defined(MELEE_WEB_NET_SESSION)
@@ -31,6 +35,10 @@ int melee_web_net_active(void);
  * Everything save mode with default rules, preferences and PAD history. */
 int melee_web_net_begin(uint32_t seed, uint32_t max_frames, char* error,
                         size_t error_size);
+/* A2 lockstep starts at a mandatory pre-tick identity handshake; the A1
+ * sequential replay adapter keeps its established non-handshaked entry. */
+int melee_web_net_begin_lockstep(uint32_t seed, uint32_t max_frames,
+                                 char* error, size_t error_size);
 /* Apply the agreed context immediately before the first CSS entry. */
 int melee_web_net_apply_start_context(MeleeWebMenuHost* host, char* error,
                                       size_t error_size);
@@ -38,6 +46,17 @@ int melee_web_net_apply_start_context(MeleeWebMenuHost* host, char* error,
 const PADStatus* melee_web_net_before_step(uint32_t scene);
 /* Record the checksum of the tick that consumed the frame. */
 void melee_web_net_after_step(void);
+/* Append a contiguous indexed packet at the native queue's current boundary.
+ * An identical retransmission is idempotent; conflicting overlap and gaps
+ * are refused. Sequential A1 pushes remain supported by the existing export. */
+int melee_web_net_push_indexed(uint32_t first_tick, const uint8_t* bytes,
+                               unsigned count);
+/* Confirm a peer's identity only after the transport has compared the full
+ * prepared start record. Until then the native source loop stays before tick0. */
+int melee_web_net_confirm_start(void);
+/* Stop an active session on an explicit protocol terminal. `kind` is a small
+ * stable enum used only for diagnostics; tick/channel identify desynces. */
+void melee_web_net_terminate(unsigned kind, uint32_t tick, unsigned channel);
 void melee_web_net_reset(void);
 /* Begin the reserved arena. An optional diagnostic fill is applied only while
  * that allocation is created, and the request is consumed once. */
@@ -57,6 +76,19 @@ static inline const PADStatus* melee_web_net_before_step(uint32_t scene)
     return NULL;
 }
 static inline void melee_web_net_after_step(void) {}
+static inline int melee_web_net_push_indexed(uint32_t first_tick,
+                                             const uint8_t* bytes,
+                                             unsigned count)
+{
+    (void) first_tick; (void) bytes; (void) count;
+    return 0;
+}
+static inline int melee_web_net_confirm_start(void) { return 0; }
+static inline void melee_web_net_terminate(unsigned kind, uint32_t tick,
+                                           unsigned channel)
+{
+    (void) kind; (void) tick; (void) channel;
+}
 static inline void melee_web_net_reset(void) {}
 #endif
 

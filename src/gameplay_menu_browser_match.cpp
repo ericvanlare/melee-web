@@ -51,6 +51,13 @@ int melee_web_native_menu_net_begin(unsigned seed,unsigned max_frames){try{
  char error[256]{};check(melee_web_net_begin(seed,max_frames,error,sizeof(error)),error);
  reference_heap_used=true;message="Networked session ready; launch to enter character select.";return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_net_begin_lockstep(unsigned seed,unsigned max_frames){try{
+ check(!replay&&!reference_heap_used&&world&&host&&!host_entered&&!world_exposed&&!match&&
+       !results&&!prize&&melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,
+       "Lockstep session requires the fresh prepared character-select owner");
+ char error[256]{};check(melee_web_net_begin_lockstep(seed,max_frames,error,sizeof(error)),error);
+ reference_heap_used=true;message="Lockstep session waiting for peer start identity; launch to enter character select.";return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
 #endif
 unsigned melee_web_native_menu_replay_cursor(){return static_cast<unsigned>(replay_cursor);}
 int melee_web_native_menu_replay_whole_session(){return replay&&replay->whole_session()?1:0;}
