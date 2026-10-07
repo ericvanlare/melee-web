@@ -535,9 +535,12 @@ async function run() {
     userDataDir: path.join(childDirectory(role), 'profile'), label: role,
     timeoutMs: openTimeout, deadline,
   })));
+  // Transfer every successful launch before reporting a sibling failure so
+  // the shared finalizer still owns its source session and browser context.
+  for (const [index, row] of opened.entries())
+    if (row.status === 'fulfilled') instances[['alpha', 'beta'][index]] = row.value;
   const failed = opened.find(row => row.status === 'rejected');
   if (failed) throw failed.reason;
-  instances.alpha = opened[0].value; instances.beta = opened[1].value;
   pairResults.browser_version = instances.alpha.browserVersion;
   pairResults.user_agents = {alpha: instances.alpha.userAgent, beta: instances.beta.userAgent};
   checksumFiles.alpha = await fs.open(path.join(childDirectory('alpha'), 'checksums.bin'), 'wx');

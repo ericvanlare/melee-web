@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import test from 'node:test';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
   verifyTerminalHold, WasmResponseIdentityObserver, attachWasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
@@ -200,5 +203,42 @@ test('dedicated observer rejects load failure, incomplete teardown, conflicts an
     }
     await assert.rejects(observer.freeze(), /failed sentinel|detached before|conflicting|No runtime/);
     await observer.detach();
+  }
+});
+
+// Exercise the actual runner's acquisition and finalizer with one rejected
+// launch and one live owned sibling, without launching a desktop browser.
+test('asymmetric lockstep startup failures close the successfully opened sibling', async () => {
+  const source = await fs.readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const start = source.indexOf('  const opened = await Promise.allSettled(');
+  const end = source.indexOf('  pairResults.browser_version', start);
+  const cleanupStart = source.indexOf('  intentionalRelayClose = true;', end);
+  const cleanupEnd = source.indexOf('  pairResults.cleanup_notes =', cleanupStart);
+  assert(start >= 0 && end > start && cleanupStart > end && cleanupEnd > cleanupStart);
+  for (const failedRole of ['alpha', 'beta']) {
+    const healthyRole = failedRole === 'alpha' ? 'beta' : 'alpha';
+    const failure = new Error(`injected ${failedRole} startup failure`);
+    const healthy = {closed: false, errors: [], unloaded: false,
+      async timingPauseDiagnostics() { return null; },
+      async unload() { this.unloaded = true; },
+      async close() { this.closed = true; },
+      async status() { return null; }, async native() { return null; }};
+    const context = vm.createContext({instances: {}, instanceRows: {alpha: {}, beta: {}},
+      chromium: {}, launchOptions: {}, values: {url: 'http://127.0.0.1/', disc: '/unused'},
+      path, childDirectory: role => role, openTimeout: 100, deadline: 100,
+      checksumFiles: {}, pairResults: {transport: {}}, closeNotes: [],
+      fs: {async writeFile() {}}, intentionalRelayClose: false,
+      relay: {traffic: {alpha_to_beta_bytes: 0, beta_to_alpha_bytes: 0}, async close() {}},
+      openNetInstance: async ({label}) => {
+        if (label === failedRole) throw failure;
+        return healthy;
+      }});
+    await assert.rejects(vm.runInContext(`(async()=>{${source.slice(start, end)}})()`, context), failure);
+    await vm.runInContext(`(async()=>{${source.slice(cleanupStart, cleanupEnd)}})()`, context);
+    assert.equal(healthy.unloaded, true, `${healthyRole} source owner was not unloaded`);
+    assert.equal(healthy.closed, true, `${healthyRole} browser escaped final cleanup`);
+    assert.equal(context.instanceRows[healthyRole].browser_closed, true);
+    assert.equal(context.pairResults.relay_closed, true);
+    assert.equal(context.closeNotes.length, 0);
   }
 });
