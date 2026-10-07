@@ -29,7 +29,11 @@ from typing import Any, Iterable, Mapping
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "reference-capture" / "dolphin"), str(ROOT / "tools")]
 
-from reference_observer_stream import iter_records  # noqa: E402
+from reference_observer_stream import (  # noqa: E402
+    ObserverStreamError,
+    ObserverStreamStats,
+    iter_records,
+)
 import reference_capture_semantics as semantics  # noqa: E402
 from reference_capture_semantics import SliceMemory, pad_snapshot_bytes, state_snapshot  # noqa: E402
 from whole_session_replay import (  # noqa: E402
@@ -42,8 +46,16 @@ from whole_session_replay import (  # noqa: E402
     PAD_STATE_BYTES,
     SCENES,
     SPAN,
+    EXPECTED_DOLPHIN_COMMIT,
+    EXPECTED_DOL_SHA1,
+    EXPECTED_DOL_SHA256,
+    EXPECTED_OBSERVER_SCHEMA,
+    V9_MILESTONE_RULES,
+    WholeSessionReplayError,
     _consumed_ports,
     _decode_setup,
+    _first_css_context,
+    _gpr,
     validate_milestone_setups,
 )
 
@@ -55,6 +67,10 @@ MWRC_HEADER = struct.Struct(">4sIIIHH")
 MWRC_CONTEXT_VERSION = 2
 MWRC_V8_VERSION = 8
 MWRC_VERSION = 9
+MWRC_V10_VERSION = 10
+WHOLE_SESSION_SCOPE = "whole-session"
+V10_FIRST_SETUP_TICK0_SCOPE = "v10-first-setup-tick0"
+PRIMARY_STATIC_ENTITY_PROFILE = "primary-static-player-pair-v1"
 FRAME_BYTES = 44
 PORT_BYTES = 11
 PORT_COUNT = 4
@@ -62,6 +78,35 @@ MAX_UINT32 = 0xFFFFFFFF
 SCENE_NAMES = {value: key for key, value in SCENES.items()}
 COMPARE_FIELDS = ("rng", "match_frame", "pad_state_hex", "fighters")
 V9_COMPARE_FIELDS = COMPARE_FIELDS + ("fighter_entities",)
+V10_FIGHTER_ROSTER = (
+    (1, 5, 11, 12),
+    (15, 10, 24, 18),
+    (4, 14, 16, 17),
+)
+# Keep the complete authored rules bytes, including fields not exposed by the
+# decoded setup dictionary, in step with kMilestoneRules in the native reader.
+V10_RULES_BYTES = bytes.fromhex(
+    "3000864cc3000000000000ffff6e002000000000000000000000000000000000ffffffffffffffff000000003f8000003f8000003f80000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+)
+V10_SOURCE_REPORT_SCHEMA = "melee-web-recorded-session-12-character-capture-v1"
+V10_SOURCE_LINEUP_PROFILE = "v10-fighter-coverage"
+V10_SOURCE_INPUT_MODE = "ordinary-controller-pipe-record"
+V10_BROWSER_CAPTURE_SCHEMA = "melee-web-headless-whole-session-replay-v1"
+V10_BROWSER_PRODUCER_SCHEMA = "melee-web-b4-match-entry-producer-source-v1"
+V10_PREFIX_BYTE_CAP = 32 * 1024 * 1024
+V10_PREFIX_RECORD_CAP = 4200
+V10_DEFAULT_OFF_GATES = {
+    "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+    "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+    "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+    "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+    "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+    "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+    "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+    "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+    "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+    "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF",
+}
 NONMATCH_FIELDS: tuple[str, ...] = ()
 FIGHTER_KEYS = {
     "slot", "kind", "motion", "animation", "ground_air", "facing_bits",
@@ -75,12 +120,66 @@ class ComparisonError(ValueError):
     """Input or observer evidence cannot be admitted to this comparison."""
 
 
-def comparison_fields(version: int) -> tuple[str, ...]:
+def comparison_fields(version: int, *, scope: str = WHOLE_SESSION_SCOPE) -> tuple[str, ...]:
+    if scope == V10_FIRST_SETUP_TICK0_SCOPE:
+        if version == MWRC_V10_VERSION:
+            return V9_COMPARE_FIELDS
+        raise ComparisonError("v10 first-setup/tick-0 scope requires MWRC v10")
+    if scope != WHOLE_SESSION_SCOPE:
+        raise ComparisonError(f"unsupported whole-session comparison scope {scope!r}")
     if version == MWRC_VERSION:
         return V9_COMPARE_FIELDS
     if version == MWRC_V8_VERSION:
         return COMPARE_FIELDS
     raise ComparisonError(f"unsupported whole-session comparison version {version}")
+
+
+def _source_prefix_identity(handshake: Mapping[str, Any],
+                             start: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate the pinned passive-observer identity needed before first tick."""
+    if handshake.get("schema") != EXPECTED_OBSERVER_SCHEMA or handshake.get("version") != 1:
+        raise ComparisonError("source handshake is not the pinned passive observer schema/version")
+    for field, expected in (
+        ("dolphin_commit", EXPECTED_DOLPHIN_COMMIT),
+        ("dol_sha1", EXPECTED_DOL_SHA1),
+        ("dol_sha256", EXPECTED_DOL_SHA256),
+        ("cpu", "JITARM64"),
+    ):
+        if handshake.get(field) != expected:
+            raise ComparisonError(f"source handshake {field} is not the pinned reference identity")
+    if handshake.get("writes_guest_memory") is not False:
+        raise ComparisonError("source observer must declare writes_guest_memory=false")
+    if handshake.get("fighter_entity_profile") != "v10-live-static-player-pair":
+        raise ComparisonError("source observer does not declare the v10 primary-entity profile")
+    for announcement, context in ((handshake, "handshake"), (start, "start")):
+        if announcement.get("whole_session") is not True:
+            raise ComparisonError(f"source {context} does not declare whole_session=true")
+        if announcement.get("match_count") != 3:
+            raise ComparisonError(f"source {context} must declare exactly three matches")
+        for field in ("capture_id", "sequence_id"):
+            value = announcement.get(field)
+            if not isinstance(value, str) or re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", value) is None:
+                raise ComparisonError(f"source {context} {field} is not a safe identity")
+    for field in ("capture_id", "sequence_id", "match_count"):
+        if handshake.get(field) != start.get(field):
+            raise ComparisonError(f"source {field} disagrees between handshake and start")
+    if start.get("source_revision") != "GALE01r2":
+        raise ComparisonError("source start is not for GALE01r2")
+    return {
+        "capture_id": handshake["capture_id"],
+        "sequence_id": handshake["sequence_id"],
+        "match_count": 3,
+        "source_revision": "GALE01r2",
+        "observer_schema": EXPECTED_OBSERVER_SCHEMA,
+        "observer_version": 1,
+        "dolphin_commit": EXPECTED_DOLPHIN_COMMIT,
+        "dol_sha1": EXPECTED_DOL_SHA1,
+        "dol_sha256": EXPECTED_DOL_SHA256,
+        "cpu": "JITARM64",
+        "fighter_entity_profile": "v10-live-static-player-pair",
+        "writes_guest_memory": False,
+        "whole_session": True,
+    }
 
 
 def _is_match_field(field: Any) -> bool:
@@ -374,18 +473,64 @@ def _fighter_entities(payload: Mapping[str, Any], context: str, match_index: int
     return result
 
 
-class Recipe:
-    """Decoded, checked MWRC v8/v9 transport."""
+def _validate_v10_setups(setups: list[bytes]) -> list[dict[str, Any]]:
+    """Validate all three v10 StartMeleeData rows against the native profile."""
+    if len(setups) != 3:
+        raise ComparisonError("MWRC v10 requires exactly three match setups")
+    if len(V10_RULES_BYTES) != 0x60:
+        raise ComparisonError("internal v10 rules profile has the wrong size")
+    declared: list[dict[str, Any]] = []
+    for match_index, raw in enumerate(setups):
+        if len(raw) != GAME_INFO_SIZE:
+            raise ComparisonError(f"MWRC v10 setup {match_index} is not 0x138 bytes")
+        if raw[:len(V10_RULES_BYTES)] != V10_RULES_BYTES:
+            raise ComparisonError(f"MWRC v10 setup {match_index} rules differ from the CPU9 profile")
+        try:
+            setup = _decode_setup(raw.hex())
+        except (KeyError, TypeError, ValueError) as error:
+            raise ComparisonError(f"MWRC v10 setup {match_index} is unsupported: {error}") from error
+        rules = {key: value for key, value in setup.items() if key != "players"}
+        if rules != V9_MILESTONE_RULES:
+            raise ComparisonError(f"MWRC v10 setup {match_index} decoded rules differ from the CPU9 profile")
+        players = setup["players"]
+        if len(players) != 4 or [player["port"] for player in players] != [1, 2, 3, 4]:
+            raise ComparisonError(f"MWRC v10 setup {match_index} must contain four contiguous CPU players")
+        for slot, player in enumerate(players):
+            if (player["player_type"] != 1 or player.get("cpu_kind") != 4 or
+                    player.get("cpu_level") != 9 or player["stocks"] != 4 or
+                    player["costume"] != slot or player["rumble_enabled"]):
+                raise ComparisonError(
+                    f"MWRC v10 setup {match_index} port {slot + 1} is not the declared CPU9 profile")
+        actual = tuple(player["character_kind"] for player in players)
+        if actual != V10_FIGHTER_ROSTER[match_index]:
+            raise ComparisonError(f"MWRC v10 setup {match_index} differs from the fighter-coverage roster")
+        declared.append(setup)
+    if len({player["character_kind"] for setup in declared for player in setup["players"]}) != 12:
+        raise ComparisonError("MWRC v10 does not contain twelve distinct fighter identities")
+    return declared
 
-    def __init__(self, path: Path, raw: bytes) -> None:
+
+class Recipe:
+    """Decoded MWRC recipe; v10 is admitted only by its explicit prefix scope."""
+
+    def __init__(self, path: Path, raw: bytes, *, scope: str = WHOLE_SESSION_SCOPE) -> None:
         self.path = path
         self.raw = raw
+        if scope not in {WHOLE_SESSION_SCOPE, V10_FIRST_SETUP_TICK0_SCOPE}:
+            raise ComparisonError(f"unsupported whole-session comparison scope {scope!r}")
+        self.scope = scope
         if len(raw) < MWRC_HEADER.size + CONTEXT_HEADER.size:
             raise ComparisonError("MWRC recipe is truncated")
         magic, version, self.seed, count, self.characters, self.stages = MWRC_HEADER.unpack_from(raw)
-        if magic != b"MWRC" or version not in (MWRC_V8_VERSION, MWRC_VERSION):
-            raise ComparisonError("whole-session comparison requires MWRC v8 or v9")
+        allowed_versions = ((MWRC_V8_VERSION, MWRC_VERSION) if scope == WHOLE_SESSION_SCOPE
+                            else (MWRC_V10_VERSION,))
+        if magic != b"MWRC" or version not in allowed_versions:
+            if scope == WHOLE_SESSION_SCOPE:
+                raise ComparisonError("whole-session comparison requires MWRC v8 or v9")
+            raise ComparisonError("v10 first-setup/tick-0 scope requires MWRC v10")
         self.version = version
+        self.entity_profile = (PRIMARY_STATIC_ENTITY_PROFILE
+                               if version in (MWRC_VERSION, MWRC_V10_VERSION) else None)
         self.frame_count = count
         if not 1 <= count <= 108000:
             raise ComparisonError(f"MWRC frame count is outside v{version} bounds")
@@ -411,14 +556,16 @@ class Recipe:
             cursor += GAME_INFO_SIZE
         else:
             if cursor + 4 > len(raw):
-                raise ComparisonError("MWRC v9 setup table header is truncated")
+                raise ComparisonError(f"MWRC v{version} setup table header is truncated")
             setup_count, setup_flags = struct.unpack_from(">HH", raw, cursor)
             cursor += 4
-            if setup_flags != 0 or not 3 <= setup_count <= 64:
-                raise ComparisonError("MWRC v9 setup table count or flags are invalid")
+            if (setup_flags != 0 or
+                    (version == MWRC_V10_VERSION and setup_count != 3) or
+                    (version == MWRC_VERSION and not 3 <= setup_count <= 64)):
+                raise ComparisonError(f"MWRC v{version} setup table count or flags are invalid")
             setup_end = cursor + setup_count * GAME_INFO_SIZE
             if setup_end + PAD_STATE_BYTES > len(raw):
-                raise ComparisonError("MWRC v9 setup table is truncated")
+                raise ComparisonError(f"MWRC v{version} setup table is truncated")
             self.match_setups = [raw[cursor + index * GAME_INFO_SIZE:
                                       cursor + (index + 1) * GAME_INFO_SIZE]
                                  for index in range(setup_count)]
@@ -457,14 +604,23 @@ class Recipe:
             next_frame = last + 1
         if next_frame != count or self.spans[0]["scene"] != SCENES["css"]:
             raise ComparisonError("MWRC spans do not cover the admitted whole-session timeline")
+        if version == MWRC_V10_VERSION:
+            expected_route = [SCENES[name] for name in ("css", "sss", "match", "results") * 3]
+            if [span["scene"] for span in self.spans] != expected_route:
+                raise ComparisonError("MWRC v10 scene spans do not follow the three-match CSS/SSS route")
         if self.spans[-1]["scene"] not in (SCENES["results"], SCENES["prize"]):
             raise ComparisonError("MWRC timeline does not end in Results or Prize")
-        if version == MWRC_VERSION:
+        self.declared_match_setups: list[dict[str, Any]] = []
+        if version in (MWRC_VERSION, MWRC_V10_VERSION):
             match_spans = sum(span["scene"] == SCENES["match"] for span in self.spans)
             if len(self.match_setups) != 3 or match_spans != 3:
-                raise ComparisonError("MWRC v9 requires exactly three match setups and match spans")
+                raise ComparisonError(f"MWRC v{version} requires exactly three match setups and match spans")
             try:
-                validate_milestone_setups([setup.hex() for setup in self.match_setups])
+                if version == MWRC_VERSION:
+                    self.declared_match_setups = validate_milestone_setups(
+                        [setup.hex() for setup in self.match_setups])
+                else:
+                    self.declared_match_setups = _validate_v10_setups(self.match_setups)
             except ValueError as error:
                 raise ComparisonError(str(error)) from error
         if cursor != len(raw):
@@ -540,7 +696,7 @@ class Comparator:
     def __init__(self, recipe: Recipe, browser: BrowserReader) -> None:
         self.recipe = recipe
         self.browser = browser
-        self.compare_fields = comparison_fields(recipe.version)
+        self.compare_fields = comparison_fields(recipe.version, scope=recipe.scope)
         if browser.header["frames_requested"] != recipe.frame_count:
             raise ComparisonError("browser header frames_requested disagrees with MWRC recipe")
         self.frame_index = 0
@@ -588,7 +744,7 @@ class Comparator:
         expected_keys = {"record", "scene", "index", "supplied_inputs", "rng", "pad_state_hex"}
         if expected_scene == SCENES["match"]:
             expected_keys |= {"match_frame", "fighters"}
-            if self.recipe.version == MWRC_VERSION:
+            if self.recipe.entity_profile is not None:
                 expected_keys.add("fighter_entities")
         BrowserReader._require(row, expected_keys,
                                f"browser frame index {index} line {self.browser.line}")
@@ -615,7 +771,7 @@ class Comparator:
         if expected_scene == SCENES["match"]:
             _int(row["match_frame"], f"browser frame {index}.match_frame")
             _validate_browser_fighters(row["fighters"], f"browser frame {index}")
-            if self.recipe.version == MWRC_VERSION:
+            if self.recipe.entity_profile is not None:
                 row["fighter_entities"] = _browser_entities(
                     row["fighter_entities"], f"browser frame {index}", self.current_match)
         return row
@@ -630,7 +786,7 @@ class Comparator:
                       record="session_match_enter_complete", index=match_index,
                       expected="session_match_enter_complete", actual=str(error))
         expected_keys = {"record", "rng", "match_frame", "pad_state_hex", "fighters"}
-        if self.recipe.version == MWRC_VERSION:
+        if self.recipe.entity_profile is not None:
             expected_keys |= {"declared_setup", "fighter_entities"}
         BrowserReader._require(row, expected_keys,
                                f"browser match_enter_complete before match {match_index}")
@@ -640,12 +796,12 @@ class Comparator:
             self.fail("browser match setup record is missing or reordered", record=row.get("record"),
                       index=self.frame_index, expected="session_match_enter_complete",
                       actual=row.get("record"))
-        if self.recipe.version == MWRC_VERSION:
+        if self.recipe.entity_profile is not None:
             row["fighter_entities"] = _browser_entities(
                 row["fighter_entities"], f"browser match {match_index} setup", match_index)
         self._compare(state, row, self.compare_fields, record="match_enter_complete",
                       index=match_index, context=f"match {match_index} setup")
-        if self.recipe.version == MWRC_VERSION:
+        if self.recipe.entity_profile is not None:
             self._compare({"declared_setup": state["declared_setup"]}, row,
                           ("declared_setup",), record="match_enter_complete",
                           index=match_index, context=f"match {match_index} declared setup")
@@ -700,7 +856,7 @@ class Comparator:
             raise ComparisonError("source frame count does not cover the MWRC recipe")
         if self.source_spans != self.recipe.spans:
             raise ComparisonError("source scene spans disagree with the MWRC recipe")
-        if self.setup_count == 0 or (self.recipe.version == MWRC_VERSION and self.setup_count != 3):
+        if self.setup_count == 0 or (self.recipe.entity_profile is not None and self.setup_count != 3):
             raise ComparisonError("source session has the wrong number of match setups")
         row = self.browser.next()
         if row.get("record") != "end":
@@ -723,9 +879,15 @@ class Comparator:
 class SourceCollector:
     """Stream MWRO and invoke a comparator without retaining its huge slices."""
 
-    def __init__(self, callback: Comparator, recipe: Recipe) -> None:
+    def __init__(self, callback: Comparator, recipe: Recipe,
+                 source_manifest: Mapping[str, Any] | None = None,
+                 source_audit: Mapping[str, Any] | None = None,
+                 source_expectations: Mapping[str, Any] | None = None) -> None:
         self.callback = callback
         self.recipe = recipe
+        self.source_manifest = source_manifest
+        self.source_audit = source_audit
+        self.source_expectations = source_expectations
         self.handshake: dict[str, Any] | None = None
         self.start: dict[str, Any] | None = None
         self.end: dict[str, Any] | None = None
@@ -739,6 +901,13 @@ class SourceCollector:
         self.lifecycle_rows: list[dict[str, Any]] = []
         self.first_css: dict[str, Any] | None = None
         self.setup_bytes: list[bytes] = []
+        self.entry_setup_bytes: bytes | None = None
+        self.first_entry_seq: int | None = None
+        self.first_setup_seq: int | None = None
+        self.first_setup_source_tick: int | None = None
+        self.first_source_tick_seq: int | None = None
+        self.first_source_tick: int | None = None
+        self.prefix_binding_validated = False
         self.entity_previous: dict[int, dict[int, tuple[int, int]]] = {}
         self.final_css: dict[str, Any] | None = None
         self.last_source_tick: dict[int, int] = {}
@@ -834,16 +1003,57 @@ class SourceCollector:
     def _setup(self, row: Mapping[str, Any]) -> None:
         if self.scene != "match":
             raise ComparisonError("source setup occurred outside VS")
+        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE and (
+                self.match_index != 0 or self.setup_bytes):
+            raise ComparisonError("v10 first-match prefix contains an extra or reordered setup")
+        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE and self.pending is not None:
+            raise ComparisonError("v10 first-match setup followed an unjoined PAD consume")
         _, raw = _slice(row["payload"], "match_setup", GAME_INFO_SIZE, "source setup")
         self.setup_bytes.append(raw)
+        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE:
+            first_setup = (self.source_audit or {}).get("first_setup")
+            if (not isinstance(first_setup, dict) or
+                    row.get("seq") != first_setup.get("seq") or
+                    row.get("source_tick") != first_setup.get("source_tick")):
+                raise ComparisonError("source first setup is detached from the bounded identity audit")
+            if self.entry_setup_bytes is None or raw != self.entry_setup_bytes:
+                raise ComparisonError("source setup bytes disagree with the bound entry setup")
+            self._validate_prefix_binding()
+            self.first_setup_seq = row["seq"]
+            self.first_setup_source_tick = row["source_tick"]
         state = self._match_state(row["payload"], "source setup")
-        if self.recipe.version == MWRC_VERSION:
+        if self.recipe.entity_profile is not None:
             state["declared_setup"] = _decode_setup(raw.hex())
         self.callback.on_setup(self.match_index, state, row["seq"])
+
+    def _entry(self, row: Mapping[str, Any]) -> None:
+        if self.recipe.scope != V10_FIRST_SETUP_TICK0_SCOPE:
+            return
+        expected_entry_seq = (self.source_audit or {}).get("first_entry_verified_seq")
+        if (self.match_index != 0 or type(expected_entry_seq) is not int or
+                row.get("seq") != expected_entry_seq):
+            raise ComparisonError("source first entry is detached from the bounded identity audit")
+        if self.entry_setup_bytes is not None:
+            raise ComparisonError("source has duplicate first entry setup")
+        item, raw = _slice(row["payload"], "match_setup", GAME_INFO_SIZE, "source entry")
+        pointer = _gpr(row["payload"], 3, "source entry")
+        if item.get("address") != pointer:
+            raise ComparisonError("source entry setup slice address disagrees with source r3")
+        self.entry_setup_bytes = raw
+        self.first_entry_seq = row["seq"]
 
     def _tick(self, row: Mapping[str, Any]) -> None:
         if self.scene != "match" or self.pending is None:
             raise ComparisonError("source_tick is missing its preceding VS PAD consume")
+        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE:
+            if self.callback.setup_count != 1 or not self.prefix_binding_validated:
+                raise ComparisonError("source first tick preceded its bound setup")
+            first_tick = (self.source_audit or {}).get("first_source_tick")
+            if (not isinstance(first_tick, dict) or self.match_index != 0 or
+                    row.get("seq") != first_tick.get("seq") or
+                    row.get("source_tick") != first_tick.get("source_tick") or
+                    row.get("source_tick") != 0):
+                raise ComparisonError("source first tick is detached from the bounded identity audit")
         state = self._match_state(row["payload"], "source_tick")
         expected_tick = self.last_source_tick.get(self.match_index, -1) + 1
         if row["source_tick"] != expected_tick:
@@ -859,11 +1069,120 @@ class SourceCollector:
         self.callback.on_frame(frame)
         self.pending = None
         self.last_source_tick[self.match_index] = row["source_tick"]
+        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE:
+            self.first_source_tick_seq = row["seq"]
+            self.first_source_tick = row["source_tick"]
+
+    def _validate_prefix_binding(self) -> None:
+        """Bind source identity, CSS context, lifecycle, and setup before tick 0."""
+        if self.prefix_binding_validated:
+            return
+        if self.recipe.scope != V10_FIRST_SETUP_TICK0_SCOPE:
+            raise ComparisonError("prefix binding is only valid in the explicit v10 prefix scope")
+        if (self.source_manifest is None or self.source_audit is None or
+                self.source_expectations is None):
+            raise ComparisonError("v10 prefix validation lacks frozen source identities")
+        if self.handshake is None or self.start is None or self.first_css is None:
+            raise ComparisonError("v10 prefix is missing its source announcement or first CSS context")
+        identity = _source_prefix_identity(self.handshake, self.start)
+        source_input = self.source_manifest.get("input")
+        capture = source_input.get("capture") if isinstance(source_input, dict) else None
+        if not isinstance(capture, dict):
+            raise ComparisonError("source candidate manifest lacks capture identity")
+        if (identity["capture_id"] != self.source_expectations.get("capture_id") or
+                identity["sequence_id"] != self.source_expectations.get("sequence_id")):
+            raise ComparisonError("source observer identity disagrees with frozen expectations")
+        for field in ("capture_id", "sequence_id", "match_count", "source_revision",
+                      "observer_schema", "observer_version", "dolphin_commit", "dol_sha1",
+                      "dol_sha256", "cpu"):
+            if capture.get(field) != identity.get(field):
+                raise ComparisonError(f"source candidate manifest capture.{field} disagrees with observer")
+
+        names = [row["payload"].get("boundary") for row in self.lifecycle_rows]
+        startup_prelude = ["prize_mode_enter", "prize_scene_enter", "prize_scene_exit",
+                           "startup_prize_mode_exit"]
+        if names[:len(startup_prelude)] == startup_prelude:
+            route_rows = self.lifecycle_rows[len(startup_prelude):]
+        elif any(name in startup_prelude for name in names):
+            raise ComparisonError("source startup Prize lifecycle prefix is incomplete or reordered")
+        else:
+            route_rows = self.lifecycle_rows
+        expected_lifecycle = list(semantics.WHOLE_OBSERVER_ORDER[:6])
+        actual_lifecycle = [row["payload"].get("boundary") for row in route_rows]
+        if actual_lifecycle != expected_lifecycle:
+            raise ComparisonError("source first CSS/SSS/entry/setup lifecycle prefix is missing or reordered")
+        for row in self.lifecycle_rows:
+            payload = row["payload"]
+            name = payload.get("boundary")
+            if (payload.get("match_index") != 0 or
+                    payload.get("pc") != semantics.WHOLE_OBSERVER_PCS[name]):
+                raise ComparisonError(f"source first lifecycle boundary {name} has wrong match or source PC")
+
+        if self.entry_setup_bytes != self.recipe.match_setups[0]:
+            raise ComparisonError("MWRC first setup differs from source entry raw StartMeleeData")
+        if self.setup_bytes != [self.recipe.match_setups[0]]:
+            raise ComparisonError("source first setup differs from the complete MWRC setup table")
+
+        css_row = {"event": "boundary", "seq": self.first_css["source_seq"],
+                   "source_tick": self.first_css["source_tick"],
+                   "draw_ordinal": 0, "payload": self.first_css["payload"]}
+        try:
+            css = _first_css_context([css_row])
+        except (WholeSessionReplayError, KeyError, TypeError, ValueError) as error:
+            raise ComparisonError(f"source first CSS context is invalid: {error}") from error
+        expected_css = self.source_manifest["input"]["first_css"]
+        for field in ("game_rules_hex", "save_data_hex", "css_data_hex", "ko_counts_hex",
+                      "pad_state_hex", "rng", "profile_masks",
+                      "profile_game_rules_sha256", "profile_save_data_sha256",
+                      "observer_seq", "source_tick"):
+            if css.get(field) != expected_css.get(field):
+                raise ComparisonError(f"source first CSS {field} disagrees with candidate manifest")
+        if self.source_manifest["input"].get("profile_context") != css.get("profile_context"):
+            raise ComparisonError("source first CSS profile context disagrees with candidate manifest")
+        if (bytes.fromhex(css["game_rules_hex"]) != self.recipe.game_rules or
+                bytes.fromhex(css["save_data_hex"]) != self.recipe.save_data or
+                bytes.fromhex(css["css_data_hex"]) != self.recipe.css_data or
+                bytes.fromhex(css["ko_counts_hex"]) != self.recipe.ko_counts or
+                bytes.fromhex(css["pad_state_hex"]) != self.recipe.initial_pad or
+                css["rng"] != self.recipe.seed or
+                css["profile_masks"]["characters"] != self.recipe.characters or
+                css["profile_masks"]["stages"] != self.recipe.stages):
+            raise ComparisonError("MWRC first-CSS context disagrees with typed source context")
+        first_setup = self.source_manifest["input"]["match_setups"][0]
+        if (first_setup.get("match_index") != 0 or
+                first_setup.get("start_melee_hex") != self.recipe.match_setups[0].hex() or
+                first_setup.get("declared_setup") != self.recipe.declared_match_setups[0] or
+                self.source_manifest["input"].get("setup_hex") != self.recipe.setup.hex() or
+                self.source_manifest["input"].get("declared_setup") !=
+                self.recipe.declared_match_setups[0]):
+            raise ComparisonError("source candidate manifest first setup disagrees with MWRC v10")
+        self.prefix_binding_validated = True
+
+    def _validate_initial_css_binding(self) -> None:
+        """Bind source first-CSS typed context, seed, and initial PAD to MWRC."""
+        if self.first_css is None:
+            raise ComparisonError("source stream lacks first CSS boundary")
+        payload = self.first_css["payload"]
+        _, rules = _slice(payload, "profile_game_rules", 0x18, "first CSS")
+        _, save = _slice(payload, "profile_save_data", 0x55E8, "first CSS")
+        _, css = _slice(payload, "menu_css_context", CSS_DATA_SIZE, "first CSS")
+        _, ko = _slice(payload, "menu_css_ko_counts", KO_COUNTS_SIZE, "first CSS")
+        if (rules != self.recipe.game_rules or save != self.recipe.save_data or
+                css != self.recipe.css_data or ko != self.recipe.ko_counts):
+            raise ComparisonError("MWRC first-CSS typed context disagrees with source")
+        chars = int.from_bytes(_slice(payload, "profile_characters", 2, "first CSS")[1], "big")
+        stages = int.from_bytes(_slice(payload, "profile_stages", 2, "first CSS")[1], "big")
+        if chars != self.recipe.characters or stages != self.recipe.stages:
+            raise ComparisonError("MWRC unlock masks disagree with source first CSS")
+        if self.first_css["rng"] != self.recipe.seed:
+            raise ComparisonError("MWRC seed disagrees with source first CSS RNG")
+        if bytes.fromhex(self.first_css["pad_state_hex"]) != self.recipe.initial_pad:
+            raise ComparisonError("MWRC initial PAD state disagrees with source first CSS")
 
     def _match_state(self, payload: Mapping[str, Any], context: str) -> dict[str, Any]:
         state = _state_from_payload(payload, context)
         state.update(_snapshot_values(payload, context))
-        if self.recipe.version == MWRC_VERSION:
+        if self.recipe.entity_profile is not None:
             previous = self.entity_previous.setdefault(self.match_index, {})
             state["fighter_entities"] = _fighter_entities(
                 payload, context, self.match_index, previous)
@@ -913,6 +1232,8 @@ class SourceCollector:
             if boundary == "css_enter" and self.first_css is None:
                 self.first_css = {**_snapshot_values(payload, "first CSS"), "payload": payload,
                                   "source_seq": row["seq"], "source_tick": row["source_tick"]}
+            elif boundary == "entry":
+                self._entry(row)
             elif boundary == "setup":
                 self._setup(row)
             elif boundary == "return_css" and self.finished:
@@ -936,6 +1257,8 @@ class SourceCollector:
                 raise ComparisonError(f"source contains unsupported boundary {boundary!r}")
 
     def finish(self) -> None:
+        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE:
+            raise ComparisonError("v10 first-setup/tick-0 evidence cannot finish a whole-session comparison")
         if self.handshake is None or self.start is None or self.end is None:
             raise ComparisonError("source stream is missing handshake, start, or end")
         if self.handshake.get("whole_session") is not True or self.start.get("whole_session") is not True:
@@ -968,37 +1291,617 @@ class SourceCollector:
                 raise ComparisonError("source StartMeleeData setup changed or disagrees with MWRC v8")
         elif self.setup_bytes != self.recipe.match_setups:
             raise ComparisonError("source per-match StartMeleeData disagrees with the MWRC v9 setup table")
-        # Bind the typed first-CSS context and initial source identity to the
-        # recipe. The full save block stays byte exact; no profile field is guessed.
-        payload = self.first_css["payload"]
-        _, rules = _slice(payload, "profile_game_rules", 0x18, "first CSS")
-        _, save = _slice(payload, "profile_save_data", 0x55E8, "first CSS")
-        _, css = _slice(payload, "menu_css_context", CSS_DATA_SIZE, "first CSS")
-        _, ko = _slice(payload, "menu_css_ko_counts", KO_COUNTS_SIZE, "first CSS")
-        if (rules != self.recipe.game_rules or save != self.recipe.save_data or
-                css != self.recipe.css_data or ko != self.recipe.ko_counts):
-            raise ComparisonError("MWRC first-CSS typed context disagrees with source")
-        chars = int.from_bytes(_slice(payload, "profile_characters", 2, "first CSS")[1], "big")
-        stages = int.from_bytes(_slice(payload, "profile_stages", 2, "first CSS")[1], "big")
-        if chars != self.recipe.characters or stages != self.recipe.stages:
-            raise ComparisonError("MWRC unlock masks disagree with source first CSS")
-        if self.first_css["rng"] != self.recipe.seed:
-            raise ComparisonError("MWRC seed disagrees with source first CSS RNG")
-        if bytes.fromhex(self.first_css["pad_state_hex"]) != self.recipe.initial_pad:
-            raise ComparisonError("MWRC initial PAD state disagrees with source first CSS")
+        try:
+            self._validate_initial_css_binding()
+        except (WholeSessionReplayError, KeyError, TypeError, ValueError) as error:
+            raise ComparisonError(f"source first-CSS context is invalid: {error}") from error
         self.callback.finalize()
+
+
+def _read_json_sidecar(path: Path, context: str, *, max_bytes: int = 16 * 1024 * 1024
+                       ) -> tuple[dict[str, Any], str, int]:
+    try:
+        size = path.stat().st_size
+        if size > max_bytes:
+            raise ComparisonError(f"{context} exceeds its {max_bytes}-byte bound")
+        raw = path.read_bytes()
+    except OSError as error:
+        raise ComparisonError(f"{context} cannot be read: {error}") from error
+    if len(raw) != size:
+        raise ComparisonError(f"{context} changed size while being read")
+    try:
+        value = json.loads(raw.decode("utf-8"), object_pairs_hook=_reject_duplicate_keys)
+    except (UnicodeDecodeError, json.JSONDecodeError, ComparisonError) as error:
+        raise ComparisonError(f"{context} is invalid JSON: {error}") from error
+    if not isinstance(value, dict):
+        raise ComparisonError(f"{context} must be a JSON object")
+    return value, hashlib.sha256(raw).hexdigest(), size
 
 
 def _browser_report(path: Path | None) -> dict[str, Any] | None:
     if path is None:
         return None
-    try:
-        value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_reject_duplicate_keys)
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ComparisonError) as error:
-        raise ComparisonError(f"browser report cannot be read: {error}") from error
-    if not isinstance(value, dict):
-        raise ComparisonError("browser report must be an object")
+    value, _, _ = _read_json_sidecar(path, "browser report")
     return value
+
+
+def _path_identity(value: Any, expected: Path, context: str) -> None:
+    if not isinstance(value, str) or Path(value).resolve() != expected.resolve():
+        raise ComparisonError(f"{context} path does not bind to the selected input")
+
+
+EXPECTATION_SCHEMA = "melee-web-v10-first-setup-tick0-expectations"
+
+
+def _load_expectations(path: Path, selected: Mapping[str, Path]
+                       ) -> tuple[dict[str, Any], str]:
+    packet, packet_sha, _ = _read_json_sidecar(path, "v10 comparison expectations", max_bytes=1024 * 1024)
+    if packet.get("schema") != EXPECTATION_SCHEMA or packet.get("version") != 1:
+        raise ComparisonError("v10 comparison expectations schema/version is unsupported")
+    if packet.get("scope") != V10_FIRST_SETUP_TICK0_SCOPE:
+        raise ComparisonError("v10 comparison expectations scope is unsupported")
+    source = packet.get("source")
+    recipe = packet.get("recipe")
+    browser = packet.get("browser")
+    if not all(isinstance(section, dict) for section in (source, recipe, browser)):
+        raise ComparisonError("v10 comparison expectations require source, recipe, and browser identities")
+    named_paths = {
+        "reference": source.get("trace"),
+        "source_manifest": source.get("manifest"),
+        "source_report": source.get("report"),
+        "source_audit": source.get("audit"),
+        "recipe": recipe,
+        "browser_capture_report": browser.get("capture_report"),
+        "browser_producer_manifest": browser.get("producer_manifest"),
+        "browser_report": browser.get("report"),
+        "port_trace": browser.get("trace"),
+    }
+    for name, expected_path in selected.items():
+        identity = named_paths.get(name)
+        if not isinstance(identity, dict):
+            raise ComparisonError(f"v10 comparison expectations lack {name} identity")
+        _path_identity(identity.get("path"), expected_path, f"expectations {name}")
+        digest = (identity.get("recorded_full_sha256") if name == "reference"
+                  else identity.get("sha256"))
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            raise ComparisonError(f"v10 comparison expectations {name} lacks a frozen SHA-256")
+        if name != "reference" and (
+                type(identity.get("bytes")) is not int or identity["bytes"] <= 0):
+            raise ComparisonError(f"v10 comparison expectations {name} lacks a frozen byte size")
+    source_trace = source.get("trace")
+    if (not isinstance(source_trace, dict) or
+            type(source_trace.get("bytes")) is not int or source_trace["bytes"] <= 0 or
+            not isinstance(source_trace.get("recorded_full_sha256"), str) or
+            re.fullmatch(r"[0-9a-f]{64}", source_trace["recorded_full_sha256"]) is None):
+        raise ComparisonError("v10 expectations lack the recorded full MWRO hash/size")
+    for field in ("capture_id", "sequence_id"):
+        value = source.get(field)
+        if not isinstance(value, str) or re.fullmatch(r"[A-Za-z0-9_.-]{1,128}", value) is None:
+            raise ComparisonError(f"v10 expectations source.{field} is invalid")
+    if (type(recipe.get("bytes")) is not int or recipe["bytes"] <= 0 or
+            recipe.get("version") != MWRC_V10_VERSION or
+            type(recipe.get("frame_count")) is not int or recipe["frame_count"] <= 0 or
+            type(recipe.get("seed")) is not int or not 0 <= recipe["seed"] <= MAX_UINT32):
+        raise ComparisonError("v10 expectations lack the recipe version, size, seed, or frame count")
+    producer = browser.get("producer")
+    if not isinstance(producer, dict) or any(
+            not isinstance(producer.get(field), str) or not producer[field]
+            for field in ("branch", "head", "tree", "base_main")):
+        raise ComparisonError("v10 expectations lack the browser producer identity")
+    for field in ("head", "tree", "base_main"):
+        if re.fullmatch(r"[0-9a-f]{40}", producer[field]) is None:
+            raise ComparisonError(f"v10 expectations browser producer {field} is not a commit identity")
+    trace = browser.get("trace")
+    if not isinstance(trace, dict) or type(trace.get("bytes")) is not int or trace["bytes"] <= 0:
+        raise ComparisonError("v10 expectations lack the browser trace size")
+    for name in ("disc", "runtime_data"):
+        identity = browser.get(name)
+        if (not isinstance(identity, dict) or
+                not isinstance(identity.get("path"), str) or not identity["path"] or
+                type(identity.get("bytes")) is not int or identity["bytes"] <= 0 or
+                not isinstance(identity.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", identity["sha256"]) is None):
+            raise ComparisonError(f"v10 expectations lack the recorded browser {name} identity")
+        if name == "runtime_data" and identity.get("freshly_rehashed") is not False:
+            raise ComparisonError("v10 expectations must label runtime data as recorded, not freshly rehashed")
+    return packet, packet_sha
+
+
+def _verify_expected_file(identity: Mapping[str, Any], path: Path, digest: str,
+                          size: int, context: str) -> None:
+    _path_identity(identity.get("path"), path, context)
+    if identity.get("sha256") != digest:
+        raise ComparisonError(f"{context} hash differs from frozen expectations")
+    if identity.get("bytes") is not None and identity.get("bytes") != size:
+        raise ComparisonError(f"{context} byte size differs from frozen expectations")
+
+
+def _expectation_files(packet: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    source = packet["source"]
+    recipe = packet["recipe"]
+    browser = packet["browser"]
+    return {
+        "reference": source["trace"],
+        "source_manifest": source["manifest"],
+        "source_report": source["report"],
+        "source_audit": source["audit"],
+        "recipe": recipe,
+        "browser_capture_report": browser["capture_report"],
+        "browser_producer_manifest": browser["producer_manifest"],
+        "browser_report": browser["report"],
+        "port_trace": browser["trace"],
+    }
+
+
+def _validate_source_manifest_capture(capture: Mapping[str, Any],
+                                      expected_source: Mapping[str, Any]) -> None:
+    expected_capture = {
+        "capture_id": expected_source["capture_id"],
+        "sequence_id": expected_source["sequence_id"],
+        "match_count": 3,
+        "source_revision": "GALE01r2",
+        "observer_schema": EXPECTED_OBSERVER_SCHEMA,
+        "observer_version": 1,
+        "dolphin_commit": EXPECTED_DOLPHIN_COMMIT,
+        "dol_sha1": EXPECTED_DOL_SHA1,
+        "dol_sha256": EXPECTED_DOL_SHA256,
+        "cpu": "JITARM64",
+    }
+    for field, expected in expected_capture.items():
+        if capture.get(field) != expected:
+            raise ComparisonError(f"source candidate capture.{field} differs from the expected v10 identity")
+
+
+def _source_manifest_profile(manifest: Mapping[str, Any], recipe: Recipe,
+                             recipe_sha: str, recipe_path: Path,
+                             reference_path: Path, expected_source: Mapping[str, Any]) -> None:
+    if manifest.get("schema") != "melee-web-whole-session-replay-candidate" or \
+            manifest.get("version") != 1:
+        raise ComparisonError("source candidate manifest schema/version is unsupported")
+    source_input = manifest.get("input")
+    transport = manifest.get("transport")
+    output = manifest.get("output")
+    if not isinstance(source_input, dict) or not isinstance(transport, dict) or \
+            not isinstance(output, dict):
+        raise ComparisonError("source candidate manifest lacks input, transport, or output identity")
+    capture = source_input.get("capture")
+    if not isinstance(capture, dict):
+        raise ComparisonError("source candidate manifest lacks capture identity")
+    _validate_source_manifest_capture(capture, expected_source)
+    _path_identity(capture.get("path"), reference_path, "source candidate capture")
+    if capture.get("raw_sha256") != expected_source["trace"]["recorded_full_sha256"]:
+        raise ComparisonError("source candidate full-trace hash disagrees with the frozen expectations")
+    _path_identity(output.get("path"), recipe_path, "source candidate output")
+    for field, expected in (("version", MWRC_V10_VERSION),
+                            ("frame_count", recipe.frame_count),
+                            ("seed", recipe.seed), ("output_sha256", recipe_sha)):
+        if transport.get(field) != expected or output.get("sha256") != recipe_sha:
+            raise ComparisonError(f"source candidate transport.{field} disagrees with MWRC")
+    pad_bytes = b"".join(bytes.fromhex(pad)
+                         for frame in recipe.frames for pad in frame["pads"])
+    if (len(pad_bytes) != recipe.frame_count * FRAME_BYTES or
+            transport.get("input_bytes_sha256") != hashlib.sha256(pad_bytes).hexdigest()):
+        raise ComparisonError("source candidate input-byte identity disagrees with MWRC PAD frames")
+    if source_input.get("spans") != recipe.spans:
+        raise ComparisonError("source candidate spans disagree with the complete v10 recipe")
+    setups = source_input.get("match_setups")
+    if not isinstance(setups, list) or len(setups) != 3:
+        raise ComparisonError("source candidate manifest must declare all three v10 setups")
+    for index, (entry, raw, declared) in enumerate(zip(
+            setups, recipe.match_setups, recipe.declared_match_setups)):
+        if (not isinstance(entry, dict) or entry.get("match_index") != index or
+                entry.get("start_melee_hex") != raw.hex() or
+                entry.get("declared_setup") != declared):
+            raise ComparisonError(f"source candidate manifest setup {index} disagrees with MWRC")
+    if source_input.get("setup_hex") != recipe.setup.hex() or \
+            source_input.get("declared_setup") != recipe.declared_match_setups[0]:
+        raise ComparisonError("source candidate first setup aliases disagree with MWRC v10")
+    expected_css = source_input.get("first_css")
+    if not isinstance(expected_css, dict):
+        raise ComparisonError("source candidate manifest lacks first-CSS binding")
+    for key, expected in (("game_rules_hex", recipe.game_rules.hex()),
+                          ("save_data_hex", recipe.save_data.hex()),
+                          ("css_data_hex", recipe.css_data.hex()),
+                          ("ko_counts_hex", recipe.ko_counts.hex()),
+                          ("pad_state_hex", recipe.initial_pad.hex()),
+                          ("rng", recipe.seed),
+                          ("profile_masks", {"characters": recipe.characters,
+                                             "stages": recipe.stages})):
+        if expected_css.get(key) != expected:
+            raise ComparisonError(f"source candidate first_css.{key} disagrees with MWRC")
+
+
+def _validate_source_capture_report(source_report: Mapping[str, Any],
+                                   expected_source: Mapping[str, Any],
+                                   manifest_capture: Mapping[str, Any]) -> dict[str, Any]:
+    if (source_report.get("schema") != V10_SOURCE_REPORT_SCHEMA or
+            source_report.get("result") != "three_match_source_capture_complete" or
+            source_report.get("input_mode") != V10_SOURCE_INPUT_MODE or
+            source_report.get("lineup_profile") != V10_SOURCE_LINEUP_PROFILE or
+            source_report.get("readiness_only") is not False or
+            source_report.get("capture_id") != expected_source.get("capture_id") or
+            source_report.get("raw_observer_sha256") !=
+            expected_source.get("trace", {}).get("recorded_full_sha256")):
+        raise ComparisonError("source capture report is not the expected ordinary v10 capture")
+    handshake = source_report.get("observer_handshake")
+    if not isinstance(handshake, dict):
+        raise ComparisonError("source capture report lacks the passive observer handshake")
+    identity = _source_prefix_identity(handshake, {
+        "capture_id": handshake.get("capture_id"),
+        "sequence_id": handshake.get("sequence_id"),
+        "whole_session": handshake.get("whole_session"),
+        "match_count": handshake.get("match_count"),
+        "source_revision": manifest_capture.get("source_revision"),
+    })
+    if (identity["capture_id"] != expected_source.get("capture_id") or
+            identity["sequence_id"] != expected_source.get("sequence_id")):
+        raise ComparisonError("source report observer identity differs from frozen expectations")
+    if source_report.get("observer_identity") != {
+            "capture_id": identity["capture_id"], "sequence_id": identity["sequence_id"]}:
+        raise ComparisonError("source report observer_identity disagrees with its handshake")
+    return identity
+
+
+def _validate_v10_source_provenance(reference_path: Path, recipe_path: Path,
+                                    recipe: Recipe, recipe_sha: str,
+                                    manifest_path: Path, source_report_path: Path,
+                                    audit_path: Path, packet: Mapping[str, Any]
+                                    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any],
+                                               dict[str, Any]]:
+    expected_files = _expectation_files(packet)
+    expected_source = packet["source"]
+    expected_recipe = packet["recipe"]
+    manifest, manifest_sha, _ = _read_json_sidecar(manifest_path, "source candidate manifest")
+    source_report, report_sha, _ = _read_json_sidecar(source_report_path, "source capture report")
+    audit, audit_sha, _ = _read_json_sidecar(audit_path, "first-setup identity audit")
+    _verify_expected_file(expected_files["source_manifest"], manifest_path,
+                          manifest_sha, manifest_path.stat().st_size, "source candidate manifest")
+    _verify_expected_file(expected_files["source_report"], source_report_path,
+                          report_sha, source_report_path.stat().st_size, "source capture report")
+    _verify_expected_file(expected_files["source_audit"], audit_path,
+                          audit_sha, audit_path.stat().st_size, "first-setup identity audit")
+    _verify_expected_file(expected_files["recipe"], recipe_path,
+                          recipe_sha, recipe_path.stat().st_size, "MWRC recipe")
+    if (recipe.version != expected_recipe["version"] or
+            recipe.frame_count != expected_recipe["frame_count"] or
+            recipe.seed != expected_recipe["seed"]):
+        raise ComparisonError("MWRC version, frame count, or seed differs from frozen expectations")
+    _source_manifest_profile(manifest, recipe, recipe_sha, recipe_path,
+                             reference_path, expected_source)
+    _path_identity(audit.get("manifest"), manifest_path, "identity audit manifest")
+    _path_identity(audit.get("source_report"), source_report_path, "identity audit source report")
+    _path_identity(audit.get("trace"), reference_path, "identity audit source trace")
+    if (audit.get("manifest_sha256") != manifest_sha or
+            audit.get("source_report_sha256") != report_sha or
+            audit.get("recipe_sha256_verified") != recipe_sha):
+        raise ComparisonError("identity audit sidecar hashes disagree with selected inputs")
+    if (audit.get("trace_bytes") != expected_source["trace"]["bytes"] or
+            audit.get("recorded_full_trace_sha256") != expected_source["trace"]["recorded_full_sha256"] or
+            audit.get("full_trace_rehashed") is not False or
+            audit.get("byte_cap") != V10_PREFIX_BYTE_CAP or
+            audit.get("record_cap") != V10_PREFIX_RECORD_CAP or
+            type(audit.get("records_decoded")) is not int or
+            not 1 <= audit["records_decoded"] <= V10_PREFIX_RECORD_CAP or
+            type(audit.get("bytes_read")) is not int or
+            not 1 <= audit["bytes_read"] <= V10_PREFIX_BYTE_CAP or
+            audit.get("first_setup_matches_manifest") is not True):
+        raise ComparisonError("first-setup audit does not bind the required bounded source prefix")
+    stat = reference_path.stat()
+    if (stat.st_size != audit["trace_bytes"] or
+            stat.st_size != expected_source["trace"]["bytes"]):
+        raise ComparisonError("source trace size differs from its recorded, unrehashed full-trace identity")
+    first_setup = audit.get("first_setup")
+    first_tick = audit.get("first_source_tick")
+    first_entry_seq = audit.get("first_entry_verified_seq")
+    if (type(first_entry_seq) is not int or first_entry_seq < 0 or
+            not isinstance(first_setup, dict) or first_setup.get("match_index") != 0 or
+            type(first_setup.get("seq")) is not int or first_setup["seq"] <= first_entry_seq or
+            type(first_setup.get("source_tick")) is not int or first_setup["source_tick"] < 0 or
+            not isinstance(first_tick, dict) or first_tick.get("match_index") != 0 or
+            type(first_tick.get("seq")) is not int or first_tick["seq"] <= first_setup["seq"] or
+            first_tick.get("source_tick") != 0 or
+            first_tick["seq"] != audit["records_decoded"] - 1):
+        raise ComparisonError("first-setup audit records differ from the v10 tick-0 boundary")
+
+    capture = manifest["input"]["capture"]
+    identity = _validate_source_capture_report(source_report, expected_source, capture)
+    for status_name in ("observer_status", "final_observer_status"):
+        status = source_report.get(status_name)
+        if (not isinstance(status, dict) or status.get("state") != "completed" or
+                status.get("completed") is not True or status.get("invalid") is not False or
+                status.get("error") is not None or type(status.get("event_count")) is not int or
+                status["event_count"] <= 0 or
+                status.get("last_seq") != status["event_count"] - 1):
+            raise ComparisonError(f"source report {status_name} is not a completed observer stream")
+    if (source_report["observer_status"]["event_count"] !=
+            source_report["final_observer_status"]["event_count"] or
+            source_report["observer_status"]["last_seq"] !=
+            source_report["final_observer_status"]["last_seq"]):
+        raise ComparisonError("source report observer status changed between capture and finalization")
+    for status_name in ("input_status", "final_input_status"):
+        status = source_report.get(status_name)
+        if (not isinstance(status, dict) or status.get("complete") is not True or
+                status.get("invalid") is not False or status.get("mode") != "record"):
+            raise ComparisonError(f"source report {status_name} is not a complete recorded input stream")
+    counts = source_report.get("observer_counts")
+    final_status = source_report["final_observer_status"]
+    if (not isinstance(counts, dict) or set(counts) != {"boundary", "end", "handshake", "start"} or
+            any(type(value) is not int or value < 0 for value in counts.values()) or
+            counts["handshake"] != 1 or counts["start"] != 1 or counts["end"] != 1 or
+            sum(counts.values()) != final_status["event_count"]):
+        raise ComparisonError("source report observer counts do not describe one complete stream")
+    source_input_capture = manifest["input"]["capture"]
+    if source_input_capture.get("raw_sha256") != source_report.get("raw_observer_sha256"):
+        raise ComparisonError("source report and candidate disagree on the recorded full-trace hash")
+    if not isinstance(source_report.get("setup_records"), list) or \
+            len(source_report["setup_records"]) != 3:
+        raise ComparisonError("source report does not contain all three setup identities")
+    previous_sequence = -1
+    for index, (record, raw, declared) in enumerate(zip(
+            source_report["setup_records"], recipe.match_setups,
+            recipe.declared_match_setups)):
+        if (not isinstance(record, dict) or record.get("match_index") != index or
+                type(record.get("source_sequence")) is not int or
+                record["source_sequence"] <= previous_sequence or
+                (index == 0 and record.get("source_sequence") != first_entry_seq) or
+                record.get("raw_hex") != raw.hex() or record.get("decoded") != declared):
+            raise ComparisonError(f"source report setup record {index} disagrees with v10 recipe")
+        previous_sequence = record["source_sequence"]
+    if source_report["setup_records"][0]["source_sequence"] != first_entry_seq:
+        raise ComparisonError("source report first entry sequence disagrees with the bounded audit")
+    return manifest, source_report, audit, {
+        "manifest_sha256": manifest_sha,
+        "source_report_sha256": report_sha,
+        "audit_sha256": audit_sha,
+        "recorded_full_trace_sha256": expected_source["trace"]["recorded_full_sha256"],
+        "full_trace_rehashed": False,
+        "trace_bytes": stat.st_size,
+        "audit_records_decoded": audit["records_decoded"],
+        "audit_bytes_read": audit["bytes_read"],
+        "first_entry_seq": first_entry_seq,
+        "first_setup_seq": first_setup["seq"],
+        "first_setup_source_tick": first_setup["source_tick"],
+        "first_source_tick_seq": first_tick["seq"],
+    }
+
+
+def _first_match_required_cursor(recipe: Recipe) -> int:
+    match_spans = [span for span in recipe.spans if span["scene"] == SCENES["match"]]
+    if len(match_spans) != 3:
+        raise ComparisonError("v10 recipe does not contain three ordered match spans")
+    first_match = match_spans[0]
+    if first_match["first_frame"] == 0:
+        raise ComparisonError("v10 first match is not preceded by its CSS/SSS route")
+    return first_match["first_frame"] + 1
+
+
+def _validate_browser_producer_source(producer: Mapping[str, Any],
+                                      expected_browser: Mapping[str, Any]) -> Mapping[str, Any]:
+    if producer.get("schema") != V10_BROWSER_PRODUCER_SCHEMA:
+        raise ComparisonError("browser producer manifest schema is unsupported")
+    source = producer.get("source")
+    expected = expected_browser.get("producer")
+    if not isinstance(source, dict) or not isinstance(expected, dict):
+        raise ComparisonError("browser producer or frozen producer identity is malformed")
+    for field in ("branch", "head", "tree", "base_main"):
+        value = source.get(field)
+        if not isinstance(value, str) or value != expected.get(field):
+            raise ComparisonError(f"browser producer {field} differs from frozen expectations")
+    if source.get("clean") is not True:
+        raise ComparisonError("browser producer source was not clean at capture")
+    return source
+
+
+def _first_match_tick_join_complete(row: Mapping[str, Any], source: SourceCollector,
+                                    comparator: Comparator) -> bool:
+    payload = row.get("payload")
+    return (row.get("event") == "boundary" and isinstance(payload, dict) and
+            payload.get("boundary") == "source_tick" and
+            payload.get("match_index") == 0 and row.get("source_tick") == 0 and
+            source.match_index == 0 and source.pending is None and
+            source.last_source_tick.get(0) == 0 and source.prefix_binding_validated and
+            comparator.setup_count == 1 and comparator.current_match == 0 and
+            comparator.match_compared == 1 and
+            source.first_source_tick_seq == row.get("seq"))
+
+
+def _file_stat_identity(path: Path) -> dict[str, int]:
+    stat = path.stat()
+    return {"device": stat.st_dev, "inode": stat.st_ino,
+            "bytes": stat.st_size, "mtime_ns": stat.st_mtime_ns}
+
+
+def _require_stable_mwro_stat(before: Mapping[str, int], after: Mapping[str, int]) -> None:
+    if before != after:
+        raise ComparisonError("source MWRO stat identity changed during bounded prefix read")
+
+
+def _validate_v10_browser_provenance(capture_report_path: Path,
+                                     producer_manifest_path: Path,
+                                     browser_report_path: Path,
+                                     port_trace_path: Path,
+                                     recipe_path: Path,
+                                     recipe_sha: str,
+                                     recipe: Recipe,
+                                     packet: Mapping[str, Any]
+                                     ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any],
+                                                dict[str, Any]]:
+    expected_files = _expectation_files(packet)
+    expected_browser = packet["browser"]
+    wrapper, capture_sha, _ = _read_json_sidecar(capture_report_path, "browser capture report")
+    producer, producer_sha, _ = _read_json_sidecar(producer_manifest_path,
+                                                   "browser producer manifest")
+    browser_report, report_sha, _ = _read_json_sidecar(browser_report_path,
+                                                       "retail browser report")
+    _verify_expected_file(expected_files["browser_capture_report"], capture_report_path,
+                          capture_sha, capture_report_path.stat().st_size,
+                          "browser capture report")
+    _verify_expected_file(expected_files["browser_producer_manifest"], producer_manifest_path,
+                          producer_sha, producer_manifest_path.stat().st_size,
+                          "browser producer manifest")
+    _verify_expected_file(expected_files["browser_report"], browser_report_path,
+                          report_sha, browser_report_path.stat().st_size,
+                          "retail browser report")
+    if (wrapper.get("schema") != V10_BROWSER_CAPTURE_SCHEMA or
+            wrapper.get("mode") != "state" or wrapper.get("result") != "incomplete"):
+        raise ComparisonError("browser capture report is not the bounded v10 state capture")
+    inputs = wrapper.get("inputs")
+    if not isinstance(inputs, dict):
+        raise ComparisonError("browser capture report lacks bound input identities")
+    for name, expected_path in (("recipe", recipe_path), ("manifest", producer_manifest_path)):
+        value = inputs.get(name)
+        if not isinstance(value, dict):
+            raise ComparisonError(f"browser capture report lacks its {name} input")
+        _path_identity(value.get("path"), expected_path, f"browser capture {name}")
+        if value.get("bytes") != expected_path.stat().st_size:
+            raise ComparisonError(f"browser capture {name} byte size disagrees with selected file")
+        expected_sha = recipe_sha if name == "recipe" else producer_sha
+        if value.get("sha256") != expected_sha:
+            raise ComparisonError(f"browser capture {name} hash disagrees with selected file")
+    runtime = inputs.get("runtime_data")
+    producer_source = producer.get("source")
+    build = producer.get("build")
+    if not isinstance(producer_source, dict) or not isinstance(build, dict):
+        raise ComparisonError("browser producer manifest lacks source or build identity")
+    expected_producer = expected_browser.get("producer")
+    if not isinstance(expected_producer, dict):
+        raise ComparisonError("expectations lack browser producer identity")
+    _validate_browser_producer_source(producer, expected_browser)
+
+    disc = inputs.get("disc")
+    expected_disc = expected_browser["disc"]
+    if not isinstance(disc, dict):
+        raise ComparisonError("browser capture lacks its disc identity")
+    _path_identity(disc.get("path"), Path(expected_disc["path"]), "browser capture disc")
+    if (disc.get("bytes") != expected_disc["bytes"] or
+            disc.get("sha256") != expected_disc["sha256"]):
+        raise ComparisonError("browser capture disc differs from frozen expectations")
+
+    if (not isinstance(build, dict) or build.get("configuration") != "Release" or
+            build.get("target") != "runtime" or
+            type(build.get("artifact_count")) is not int or
+            not isinstance(build.get("artifacts"), dict) or
+            build["artifact_count"] != len(build["artifacts"])):
+        raise ComparisonError("browser producer manifest does not identify the reviewed Release runtime")
+    for name, artifact in build["artifacts"].items():
+        if (not isinstance(name, str) or not isinstance(artifact, dict) or
+                type(artifact.get("bytes")) is not int or artifact["bytes"] < 0 or
+                not isinstance(artifact.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", artifact["sha256"]) is None):
+            raise ComparisonError("browser producer artifact inventory is malformed")
+    gates = build.get("default_off_gates")
+    if gates != V10_DEFAULT_OFF_GATES:
+        raise ComparisonError("browser producer manifest has an enabled diagnostic or non-default gate")
+    runtime_artifact = build["artifacts"].get("gameplay_menu_browser.data")
+    if (not isinstance(runtime, dict) or not isinstance(runtime_artifact, dict) or
+            runtime.get("bytes") != runtime_artifact["bytes"] or
+            runtime.get("sha256") != runtime_artifact["sha256"] or
+            Path(runtime.get("path", "")).resolve() !=
+            (Path(build.get("directory", "")) / "gameplay_menu_browser.data").resolve()):
+        raise ComparisonError("browser capture runtime data disagrees with its producer artifact inventory")
+    expected_runtime = expected_browser["runtime_data"]
+    _path_identity(runtime.get("path"), Path(expected_runtime["path"]),
+                   "browser capture runtime data")
+    if (runtime.get("bytes") != expected_runtime["bytes"] or
+            runtime.get("sha256") != expected_runtime["sha256"]):
+        raise ComparisonError("browser runtime data differs from frozen recorded expectations")
+    if (type(runtime.get("bytes")) is not int or runtime["bytes"] < 0 or
+            not isinstance(runtime.get("sha256"), str) or
+            re.fullmatch(r"[0-9a-f]{64}", runtime["sha256"]) is None):
+        raise ComparisonError("browser runtime artifact recorded identity is malformed")
+
+    stop = wrapper.get("deliberate_prefix_stop")
+    required_cursor = _first_match_required_cursor(recipe)
+    if not isinstance(stop, dict):
+        raise ComparisonError("browser capture lacks structured deliberate-prefix-stop provenance")
+    requested_cursor = _int(stop.get("requested_cursor"), "browser requested stop cursor", 1,
+                             recipe.frame_count)
+    observed_cursor = _int(stop.get("observed_cursor"), "browser observed stop cursor", 1,
+                           recipe.frame_count)
+    if requested_cursor < required_cursor or observed_cursor < required_cursor:
+        raise ComparisonError("browser capture stopped before the first-match state boundary")
+    snapshots = wrapper.get("snapshots")
+    if not isinstance(snapshots, list):
+        raise ComparisonError("browser capture report lacks replay snapshots")
+    target_rows = []
+    for row in snapshots:
+        if not isinstance(row, dict):
+            raise ComparisonError("browser capture snapshot list contains a malformed row")
+        cursor = row.get("source_cursor")
+        if type(cursor) is not int or not 0 <= cursor <= recipe.frame_count:
+            raise ComparisonError("browser capture snapshot has an invalid source cursor")
+        at_ms = row.get("at_ms")
+        if type(at_ms) not in (int, float):
+            raise ComparisonError("browser capture snapshot lacks a numeric observation time")
+        if cursor == observed_cursor and row.get("runtime_error") is None:
+            target_rows.append(row)
+    if not target_rows:
+        raise ComparisonError("browser capture has no clean snapshot at its observed stop cursor")
+    target_time = max(row["at_ms"] for row in target_rows)
+    for row in snapshots:
+        at_ms = row.get("at_ms")
+        if type(at_ms) in (int, float) and at_ms <= target_time:
+            if row.get("runtime_error") is not None:
+                raise ComparisonError("browser capture has a runtime error before the deliberate stop")
+            cursor = row.get("source_cursor")
+            if type(cursor) is int and cursor > observed_cursor:
+                raise ComparisonError("browser capture advanced past its reported stop cursor")
+    browser_errors = wrapper.get("browser_errors")
+    if not isinstance(browser_errors, list) or browser_errors:
+        raise ComparisonError("browser capture has a pre-stop browser error")
+    first_error = wrapper.get("first_error")
+    if first_error is not None:
+        if not isinstance(first_error, dict) or not isinstance(first_error.get("details"), dict):
+            raise ComparisonError("browser capture first error lacks structured details")
+        details = first_error["details"]
+        if (type(details.get("at_ms")) not in (int, float) or
+                details["at_ms"] <= target_time or details.get("runtime_error") is not None):
+            raise ComparisonError("browser capture first error was not observed after its deliberate stop")
+
+    if wrapper.get("browser_report") != browser_report:
+        raise ComparisonError("embedded and sidecar retail browser reports disagree")
+    if (browser_report.get("schema") != "melee-web-browser-retail-replay" or
+            browser_report.get("version") != 1 or
+            browser_report.get("recipe_sha256") != recipe_sha or
+            browser_report.get("frames") != recipe.frame_count or
+            browser_report.get("mode") != "state_capture" or
+            browser_report.get("complete") is not False or
+            browser_report.get("pass") is not False or
+            browser_report.get("final_scene") is not None):
+        raise ComparisonError("retail browser report is not the incomplete v10 state capture")
+    metrics = browser_report.get("metrics")
+    if (not isinstance(metrics, dict) or
+            any(metrics.get(name) != observed_cursor
+                for name in ("sourceFrames", "sourceSteps", "sourceDraws"))):
+        raise ComparisonError("retail browser report source cursors disagree with stop provenance")
+    trace_size = port_trace_path.stat().st_size
+    if trace_size > V10_PREFIX_BYTE_CAP:
+        raise ComparisonError("browser trace exceeds its bounded diagnostic size")
+    trace_sha = _sha256(port_trace_path)
+    trace_bytes = port_trace_path.stat().st_size
+    _verify_expected_file(expected_files["port_trace"], port_trace_path,
+                          trace_sha, trace_bytes, "browser port trace")
+    if (browser_report.get("trace_sha256") != trace_sha or
+            inputs.get("recipe", {}).get("sha256") != browser_report.get("recipe_sha256")):
+        raise ComparisonError("retail browser report hashes disagree with selected trace/recipe")
+    return producer, wrapper, browser_report, {
+        "capture_report_sha256": capture_sha,
+        "producer_manifest_sha256": producer_sha,
+        "browser_report_sha256": report_sha,
+        "port_trace_sha256": trace_sha,
+        "port_trace_bytes": trace_bytes,
+        "target_cursor": observed_cursor,
+        "requested_cursor": requested_cursor,
+        "required_cursor": required_cursor,
+        "target_snapshot_ms": target_time,
+        "browser_errors_before_stop": 0,
+        "runtime_data_recorded_identity": {
+            "path": runtime["path"],
+            "bytes": runtime["bytes"],
+            "sha256": runtime["sha256"],
+            "freshly_rehashed": False,
+        },
+    }
 
 
 def _validate_browser_report(report: Mapping[str, Any], *, recipe_sha: str,
@@ -1026,12 +1929,281 @@ def _browser_completion_ok(report: Mapping[str, Any]) -> bool:
             not report.get("failures") and not report.get("errors"))
 
 
+def _compare_v10_first_setup_tick0(reference_path: Path, recipe_path: Path,
+                                   port_path: Path, *, source_manifest_path: Path,
+                                   source_report_path: Path, source_audit_path: Path,
+                                   browser_capture_report_path: Path,
+                                   browser_producer_manifest_path: Path,
+                                   browser_report_path: Path,
+                                   expectations_path: Path) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "schema": SCHEMA,
+        "scope": V10_FIRST_SETUP_TICK0_SCOPE,
+        "boundary_result": None,
+        "result": "invalid",
+        "complete": False,
+        "whole_session_equivalent": False,
+        "nonmatch_fields_compared": [],
+        "checks": {
+            "source_provenance": "not_checked",
+            "browser_capture_provenance": "not_checked",
+            "source_first_css_and_setup_binding": "not_checked",
+            "source_pad_to_tick0_join": "not_checked",
+            "setup_state": "not_checked",
+            "tick0_state": "not_checked",
+            "whole_session": "incomplete",
+        },
+        "limitations": {
+            "boundary": "Checks CSS/SSS consumed-input order and compares first match setup plus source tick 0 state only; no later match frame is read by the comparator.",
+            "nonmatch_state": "CSS/SSS consumed-input ordering is not scalar state equivalence; nonmatch_fields_compared is empty.",
+            "whole_session": "This is incomplete prefix evidence and never establishes whole-session equivalence.",
+            "timing_rendering_audio": "No timing, draw cadence, pixels, PCM, performance, or tournament-admission claim.",
+        },
+    }
+    comparator: Comparator | None = None
+    source: SourceCollector | None = None
+    browser: BrowserReader | None = None
+    records = None
+    stats: ObserverStreamStats | None = None
+    packet_sha: str | None = None
+    source_identity: dict[str, Any] | None = None
+    browser_identity: dict[str, Any] | None = None
+    source_stat_before: dict[str, int] | None = None
+    last_source_sequence: int | None = None
+    try:
+        selected = {
+            "reference": reference_path,
+            "source_manifest": source_manifest_path,
+            "source_report": source_report_path,
+            "source_audit": source_audit_path,
+            "recipe": recipe_path,
+            "browser_capture_report": browser_capture_report_path,
+            "browser_producer_manifest": browser_producer_manifest_path,
+            "browser_report": browser_report_path,
+            "port_trace": port_path,
+        }
+        packet, packet_sha = _load_expectations(expectations_path, selected)
+        result["expectations"] = {"path": str(expectations_path), "sha256": packet_sha}
+        result["selected_input_identities"] = {
+            "source": packet["source"],
+            "recipe": packet["recipe"],
+            "browser": packet["browser"],
+        }
+        source_trace_expectation = packet["source"]["trace"]
+        source_stat_before = _file_stat_identity(reference_path)
+        result["source_full_trace"] = {
+            "path": str(reference_path),
+            "trace_bytes": source_stat_before["bytes"],
+            "recorded_full_trace_sha256": source_trace_expectation["recorded_full_sha256"],
+            "full_trace_rehashed": False,
+            "stat_before": source_stat_before,
+        }
+        if source_stat_before["bytes"] != source_trace_expectation["bytes"]:
+            raise ComparisonError("source trace size differs from its recorded full-trace identity")
+        recipe_size = recipe_path.stat().st_size
+        if recipe_size > 16 * 1024 * 1024:
+            raise ComparisonError("MWRC recipe exceeds its bounded input size")
+        recipe_raw = recipe_path.read_bytes()
+        if len(recipe_raw) != recipe_size:
+            raise ComparisonError("MWRC recipe changed size while being read")
+        recipe_sha = hashlib.sha256(recipe_raw).hexdigest()
+        _verify_expected_file(packet["recipe"], recipe_path,
+                              recipe_sha, recipe_size, "MWRC recipe")
+        recipe_obj = Recipe(recipe_path, recipe_raw, scope=V10_FIRST_SETUP_TICK0_SCOPE)
+        if (recipe_obj.version != packet["recipe"]["version"] or
+                recipe_obj.frame_count != packet["recipe"]["frame_count"] or
+                recipe_obj.seed != packet["recipe"]["seed"]):
+            raise ComparisonError("v10 recipe fields differ from frozen expectations")
+
+        manifest, source_report, audit, source_identity = _validate_v10_source_provenance(
+            reference_path, recipe_path, recipe_obj, recipe_sha,
+            source_manifest_path, source_report_path, source_audit_path, packet)
+        result["source_full_trace"].update(source_identity)
+        result["checks"]["source_provenance"] = "pass"
+        producer, capture_report, browser_report, browser_identity = \
+            _validate_v10_browser_provenance(
+                browser_capture_report_path, browser_producer_manifest_path,
+                browser_report_path, port_path, recipe_path, recipe_sha, recipe_obj, packet)
+        result["browser_capture"] = browser_identity
+        result["checks"]["browser_capture_provenance"] = "pass"
+        required_cursor = browser_identity["required_cursor"]
+        browser = BrowserReader(port_path)
+        comparator = Comparator(recipe_obj, browser)
+        source = SourceCollector(comparator, recipe_obj, manifest, audit, packet["source"])
+        stats = ObserverStreamStats()
+        records = iter_records(reference_path, max_bytes=V10_PREFIX_BYTE_CAP,
+                               max_records=V10_PREFIX_RECORD_CAP, stats=stats)
+        prefix_complete = False
+        for row in records:
+            last_source_sequence = row["seq"]
+            source.consume(row)
+            if _first_match_tick_join_complete(row, source, comparator):
+                prefix_complete = True
+                break
+        result["last_source_sequence"] = last_source_sequence
+        if not prefix_complete:
+            raise ComparisonError("source prefix ended before the completed match-0 source_tick 0 join")
+        source_stat_after = _file_stat_identity(reference_path)
+        result["source_full_trace"]["stat_after"] = source_stat_after
+        _require_stable_mwro_stat(source_stat_before, source_stat_after)
+        result["source_full_trace"]["stat_stable_during_attempt"] = True
+        if (source.record_count != stats.records_read or
+                stats.records_read != source_identity["audit_records_decoded"] or
+                stats.bytes_read != source_identity["audit_bytes_read"]):
+            raise ComparisonError("freshly consumed source prefix differs from its bounded identity audit")
+        if (comparator.frame_index != required_cursor or comparator.compared != required_cursor):
+            raise ComparisonError("comparison did not stop immediately after the first match tick join")
+        if source.setup_bytes != [recipe_obj.match_setups[0]]:
+            raise ComparisonError("bounded source prefix consumed an unexpected match setup count")
+        result["checks"]["source_first_css_and_setup_binding"] = "pass"
+        result["checks"]["source_pad_to_tick0_join"] = "pass"
+        result["checks"]["setup_state"] = "pass"
+        result["checks"]["tick0_state"] = "pass"
+        result["source_full_trace"].update(source_identity)
+        result["source_full_trace"]["stat_before"] = source_stat_before
+        result["source_full_trace"]["stat_after"] = source_stat_after
+        result["source_full_trace"]["stat_stable_during_attempt"] = True
+        result.update({
+            "boundary_result": "equivalent",
+            "result": "incomplete",
+            "complete": False,
+            "whole_session_equivalent": False,
+            "match_state_fields_compared": list(comparator.compare_fields),
+            "setup_state_fields_compared": [*comparator.compare_fields, "declared_setup"],
+            "frames_requested": recipe_obj.frame_count,
+            "timeline_frames_consumed": comparator.compared,
+            "nonmatch_frames_input_ordered": comparator.nonmatch_compared,
+            "browser_frames_captured": browser_identity["target_cursor"],
+            "match_state_frames_compared": comparator.match_compared,
+            "source_prefix": {
+                "records_read": stats.records_read,
+                "bytes_read": stats.bytes_read,
+                "sha256": stats.prefix_sha256,
+                "hash_basis": "fresh SHA-256 over exactly the raw bytes consumed through source_tick 0",
+                "last_source_sequence": last_source_sequence,
+                "first_entry_seq": source.first_entry_seq,
+                "first_setup_seq": source.first_setup_seq,
+                "first_setup_source_tick": source.first_setup_source_tick,
+                "first_source_tick_seq": source.first_source_tick_seq,
+                "first_source_tick": source.first_source_tick,
+            },
+            "setup_records_compared": comparator.setup_count,
+            "first_match_boundary": {
+                "match_index": 0,
+                "setup_source_seq": source.first_setup_seq,
+                "source_tick_seq": source.first_source_tick_seq,
+                "source_tick": source.first_source_tick,
+                "timeline_frame_index": comparator.frame_index - 1,
+                "browser_target_cursor": browser_identity["target_cursor"],
+            },
+            "source_scene_spans_observed": comparator.source_spans,
+            "capture_status": "incomplete bounded capture; semantic comparison stopped after the first source tick join",
+            "original_prefix_audit": {
+                "path": str(source_audit_path),
+                "sha256": source_identity["audit_sha256"],
+                "records_and_bytes_agree": True,
+                "full_source_trace_was_rehashed": False,
+            },
+            "producer_manifest_sha256": browser_identity["producer_manifest_sha256"],
+            "source_manifest_sha256": source_identity["manifest_sha256"],
+            "source_report_sha256": source_identity["source_report_sha256"],
+            "browser_capture_report_sha256": browser_identity["capture_report_sha256"],
+            "browser_report_sha256": browser_identity["browser_report_sha256"],
+            "browser_trace_sha256": browser_identity["port_trace_sha256"],
+        })
+    except (ComparisonError, ObserverStreamError, OSError, ValueError, KeyError,
+            TypeError, struct.error) as error:
+        first_difference = comparator.first_difference if comparator is not None else None
+        is_browser_divergence = first_difference is not None
+        result["boundary_result"] = "divergent" if is_browser_divergence else None
+        result["result"] = "incomplete" if is_browser_divergence else "invalid"
+        result["complete"] = False
+        result["whole_session_equivalent"] = False
+        result["error"] = str(error)
+        if last_source_sequence is not None:
+            result["last_source_sequence"] = last_source_sequence
+        if source_stat_before is not None:
+            try:
+                source_stat_after = _file_stat_identity(reference_path)
+                result.setdefault("source_full_trace", {})["stat_after"] = source_stat_after
+                try:
+                    _require_stable_mwro_stat(source_stat_before, source_stat_after)
+                    result["source_full_trace"]["stat_stable_during_attempt"] = True
+                except ComparisonError:
+                    result["source_full_trace"]["stat_stable_during_attempt"] = False
+                    result["result"] = "invalid"
+                    result["boundary_result"] = None
+                    result["error"] = (
+                        f"{error}; source MWRO stat identity changed during bounded prefix read")
+            except OSError as stat_error:
+                result.setdefault("source_full_trace", {})["stat_after_error"] = str(stat_error)
+        if stats is not None:
+            result["source_prefix"] = {
+                "records_read": stats.records_read,
+                "bytes_read": stats.bytes_read,
+                "sha256": stats.prefix_sha256,
+                "hash_basis": "fresh SHA-256 over exactly the raw bytes consumed before stop/failure",
+                "last_source_sequence": last_source_sequence,
+            }
+        if comparator is not None:
+            result.update({
+                "frames_requested": comparator.recipe.frame_count,
+                "timeline_frames_consumed": comparator.compared,
+                "nonmatch_frames_input_ordered": comparator.nonmatch_compared,
+                "setup_records_compared": comparator.setup_count,
+                "match_state_frames_compared": comparator.match_compared,
+            })
+            if comparator.setup_count:
+                result["setup_state_fields_compared"] = [*comparator.compare_fields,
+                                                         "declared_setup"]
+            if comparator.match_compared:
+                result["match_state_fields_compared"] = list(comparator.compare_fields)
+            if first_difference is not None:
+                result["first_difference"] = first_difference
+    finally:
+        if records is not None:
+            records.close()
+        if browser is not None:
+            browser.close()
+    return result
+
+
 def compare_paths(reference: str | Path, recipe: str | Path, port_trace: str | Path,
-                  *, browser_report: str | Path | None = None) -> dict[str, Any]:
+                  *, browser_report: str | Path | None = None,
+                  scope: str = WHOLE_SESSION_SCOPE,
+                  expectations: str | Path | None = None,
+                  source_manifest: str | Path | None = None,
+                  source_report: str | Path | None = None,
+                  source_audit: str | Path | None = None,
+                  browser_capture_report: str | Path | None = None,
+                  browser_producer_manifest: str | Path | None = None) -> dict[str, Any]:
     """Compare one source capture, its MWRC recipe, and one browser trace."""
     reference_path = Path(reference)
     recipe_path = Path(recipe)
     port_path = Path(port_trace)
+    if scope == V10_FIRST_SETUP_TICK0_SCOPE:
+        required = (source_manifest, source_report, source_audit, browser_capture_report,
+                    browser_producer_manifest, browser_report, expectations)
+        if any(value is None for value in required):
+            return {
+                "schema": SCHEMA, "scope": V10_FIRST_SETUP_TICK0_SCOPE,
+                "boundary_result": None, "result": "invalid", "complete": False,
+                "whole_session_equivalent": False,
+                "error": "v10 first-setup/tick-0 scope requires frozen expectations and all provenance sidecars",
+            }
+        return _compare_v10_first_setup_tick0(
+            reference_path, recipe_path, port_path,
+            source_manifest_path=Path(source_manifest),
+            source_report_path=Path(source_report), source_audit_path=Path(source_audit),
+            browser_capture_report_path=Path(browser_capture_report),
+            browser_producer_manifest_path=Path(browser_producer_manifest),
+            browser_report_path=Path(browser_report),
+            expectations_path=Path(expectations))
+    if scope != WHOLE_SESSION_SCOPE:
+        return {"schema": SCHEMA, "scope": scope, "boundary_result": None,
+                "result": "invalid", "complete": False,
+                "whole_session_equivalent": False,
+                "error": f"unsupported whole-session comparison scope {scope!r}"}
     result: dict[str, Any] = {
         "schema": SCHEMA,
         "scope": "Exact source-consumed scene/input state comparison; no timing, draw cadence, pixels, PCM, or admission claim",

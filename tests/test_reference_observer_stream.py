@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import io
 from pathlib import Path
 import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zlib
 
 
@@ -108,7 +111,88 @@ def startup_prize_exit_boundary_payload() -> bytes:
     return prefix + gprs + descriptor + raw + metadata
 
 
+class TrackingReader:
+    def __init__(self, raw: bytes) -> None:
+        self.stream = io.BytesIO(raw)
+        self.bytes_read = 0
+        self.closed = False
+
+    def read(self, size: int = -1) -> bytes:
+        raw = self.stream.read(size)
+        self.bytes_read += len(raw)
+        return raw
+
+    def close(self) -> None:
+        self.closed = True
+        self.stream.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+        return False
+
+
 class ObserverStreamTests(unittest.TestCase):
+    def test_iter_records_enforces_record_cap_before_reading_next_header(self) -> None:
+        first = frame(1, 0, b'{"schema":"test"}')
+        second = frame(2, 1, b'{"status":"recording"}')
+        raw = first + second
+        reader = TrackingReader(raw)
+        stats = stream.ObserverStreamStats()
+        with mock.patch.object(Path, "open", return_value=reader):
+            records = stream.iter_records("memory.mwro", max_records=1, stats=stats)
+            self.assertEqual(next(records)["event"], "handshake")
+            offset = reader.bytes_read
+            with self.assertRaisesRegex(stream.ObserverStreamError, "record limit 1"):
+                next(records)
+            self.assertEqual(reader.bytes_read, offset)
+            self.assertTrue(reader.closed)
+        self.assertEqual(stats.records_read, 1)
+        self.assertEqual(stats.bytes_read, len(first))
+        self.assertEqual(stats.prefix_sha256, hashlib.sha256(first).hexdigest())
+
+    def test_iter_records_enforces_byte_cap_before_header_and_payload_reads(self) -> None:
+        first = frame(1, 0, b'{"schema":"test"}')
+        second = frame(2, 1, b'{"status":"recording"}')
+        raw = first + second
+
+        reader = TrackingReader(raw)
+        stats = stream.ObserverStreamStats()
+        with mock.patch.object(Path, "open", return_value=reader):
+            records = stream.iter_records("memory.mwro", max_bytes=len(first), stats=stats)
+            next(records)
+            offset = reader.bytes_read
+            with self.assertRaisesRegex(stream.ObserverStreamError, "before the next record header"):
+                next(records)
+            self.assertEqual(reader.bytes_read, offset)
+            self.assertTrue(reader.closed)
+
+        second_header_end = len(first) + stream.HEADER.size
+        reader = TrackingReader(raw)
+        stats = stream.ObserverStreamStats()
+        with mock.patch.object(Path, "open", return_value=reader):
+            records = stream.iter_records("memory.mwro",
+                                          max_bytes=second_header_end, stats=stats)
+            next(records)
+            with self.assertRaisesRegex(stream.ObserverStreamError, "before record 1 payload"):
+                next(records)
+            self.assertEqual(reader.bytes_read, second_header_end)
+            self.assertTrue(reader.closed)
+        self.assertEqual(stats.records_read, 1)
+        self.assertEqual(stats.bytes_read, second_header_end)
+        self.assertEqual(stats.prefix_sha256,
+                         hashlib.sha256(raw[:second_header_end]).hexdigest())
+
+    def test_iter_records_rejects_invalid_caps_without_opening(self) -> None:
+        with mock.patch.object(Path, "open") as open_path:
+            with self.assertRaisesRegex(stream.ObserverStreamError, "max_bytes"):
+                next(stream.iter_records("unused.mwro", max_bytes=True))
+            with self.assertRaisesRegex(stream.ObserverStreamError, "max_records"):
+                next(stream.iter_records("unused.mwro", max_records=-1))
+        open_path.assert_not_called()
+
     def test_live_decoder_defaults_to_the_current_slice_schema(self) -> None:
         record = frame(3, 0, boundary_payload(), pc=0x8034DD8C)
         header = stream.HEADER.unpack(record[:stream.HEADER.size])
