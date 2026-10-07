@@ -101,10 +101,13 @@ test('loaded Wasm identity rejects missing, failed, unreadable, and conflicting 
 });
 
 test('loaded Wasm response set freezes before the later handshake fresh fetch', async () => {
-  let resolveInitial;
+  let resolveInitial, bodyReadStarted = false;
   const observer = new WasmResponseIdentityObserver();
-  observer.observe(fakeResponse(() => new Promise(resolve => { resolveInitial = resolve; })));
-  await Promise.resolve();
+  observer.observe(fakeResponse(() => {
+    bodyReadStarted = true;
+    return new Promise(resolve => { resolveInitial = resolve; });
+  }));
+  assert.equal(bodyReadStarted, true, 'response body capture starts synchronously in the response event');
   const frozen = observer.freeze();
   observer.observe(fakeResponse(Buffer.from('handshake fresh fetch')));
   resolveInitial(Buffer.from('runtime load body'));

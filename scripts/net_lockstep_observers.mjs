@@ -110,7 +110,10 @@ export class WasmResponseIdentityObserver {
     try { row.resource_type = response.request().resourceType(); } catch {}
     const target = this.#frozen ? this.#later : this.#initial;
     target.push(row);
-    row.body = Promise.resolve().then(() => response.body()).then(bytes => {
+    let bodyPromise;
+    try { bodyPromise = response.body(); }
+    catch (error) { bodyPromise = Promise.reject(error); }
+    row.body = Promise.resolve(bodyPromise).then(bytes => {
       if (!(Buffer.isBuffer(bytes) || bytes instanceof Uint8Array)) throw Error('response body was not bytes');
       const body = Buffer.from(bytes);
       row.sha256 = sha256(body);
