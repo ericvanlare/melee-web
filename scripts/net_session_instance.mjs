@@ -7,6 +7,7 @@
  * (recorded in `timingResumes`).
  */
 import fs from 'node:fs/promises';
+import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {browserLaunchOptions} from './browser_tools.mjs';
 import {createBrowserDriver} from './browser_driver.mjs';
@@ -102,7 +103,7 @@ const PAGE_HELPERS = () => {
 };
 
 export async function openNetInstance({chromium, launchOptions, url, disc, userDataDir, label,
-  throttle = 1, arenaFill = -1, timeoutMs = 120000, deadline = Infinity}) {
+  throttle = 1, arenaFill = -1, timeoutMs = 120000, deadline = Infinity, peerModuleHashes = null}) {
   await fs.mkdir(path.resolve(userDataDir), {recursive: true});
   const context = await chromium.launchPersistentContext(path.resolve(userDataDir), {
     ...browserLaunchOptions(launchOptions, {timeout: timeoutMs}),
@@ -144,6 +145,12 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
   try {
     page = context.pages()[0] || await bounded(() => context.newPage());
     const errors = [];
+    const peerModules = peerModuleHashes ? createPeerModuleResponseObserver({url, peerModuleHashes,
+      runtimeArtifactNames: JSON.parse(await fs.readFile(new URL('../tools/browser_build_artifacts.json', import.meta.url), 'utf8')),
+      onFailure: error => noteError({kind: 'peer-module-identity', message: String(error?.stack || error)}),
+    }) : null;
+    if (peerModules) page.on('response', response => peerModules.observe(response));
+    let browserPeerAllocated = false;
     const noteError = error => { if (errors.length < 32) errors.push(error); };
     const wasmCdp = await bounded(() => context.newCDPSession(page));
     wasmResponses = await bounded(() => attachWasmResponseIdentityObserver(wasmCdp, {
@@ -166,6 +173,39 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     instance = {label, page, context, errors, timingResumes: [], throttle, arenaFill, closed: false, close};
     driver = createBrowserDriver(page, {surface: 'development', timeoutMs, deadline});
     instance.driver = driver;
+    instance.freezePeerModuleIdentity = () => bounded(() => peerModules.freeze());
+    instance.createBrowserPeer = options => {
+      if (!peerModules) throw Error('Browser peer requires expected module hashes');
+      browserPeerAllocated = true;
+      return bounded(() => page.evaluate(async options => {
+        if (window.__netPeer) throw Error('Browser native peer already allocated');
+        const {createBrowserNativePeer} = await import('./net_lockstep_browser_peer.mjs');
+        const encode = bytes => {
+          let text = '';
+          for (const byte of bytes) text += String.fromCharCode(byte);
+          return btoa(text);
+        };
+        window.__netPeer = createBrowserNativePeer({...options, native: {
+          pushIndexed: (tick, bytes) => window.__net.pushIndexed(tick, encode(bytes)),
+          confirmStart: () => window.__net.confirmStart(),
+          terminate: (...args) => window.__net.terminate(...args),
+          status: () => window.__net.status(),
+          drain: max => {
+            const result = window.__net.drain(max), text = atob(result.data), records = [];
+            if (text.length !== result.count * 64) throw Error('Native checksum byte count differs');
+            for (let offset = 0; offset < text.length; offset += 64)
+              records.push(Array.from(text.slice(offset, offset + 64), byte => byte.charCodeAt(0)));
+            return records;
+          },
+        }});
+        return window.__netPeer.snapshot();
+      }, options));
+    };
+    instance.peerRpc = (name, args = []) => bounded(() => page.evaluate(([name, args]) =>
+      window.__netPeer.rpc(name, args), [name, args]));
+    instance.armPeerClose = () => bounded(() => page.evaluate(() => window.__netPeer?.armClose()));
+    instance.closePeer = intentional => bounded(() => page.evaluate(intentional =>
+      window.__netPeer?.close({intentional}), intentional));
     instance.freezeLoadedWasmIdentity = () => bounded(() => wasmResponses.freeze());
     const response = await bounded(() => page.goto(url, {waitUntil: 'domcontentloaded'}));
     if (response?.status() !== 200) throw Error(`runtime.html returned HTTP ${response?.status()}`);
@@ -206,6 +246,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       window.__net.terminate(k, t, c); return window.__net.status();
     }, [kind, tick, channel]));
     instance.drain = async (max = 1024) => {
+      if (browserPeerAllocated) throw Error('Browser peer solely owns the native checksum drain');
       const result = await bounded(() => page.evaluate(count => window.__net.drain(count), max));
       return {count: result.count, bytes: Buffer.from(result.data, 'base64')};
     };
@@ -249,4 +290,87 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     if (error && typeof error === 'object') error.browserClosed = browserClosed;
     throw error;
   }
+}
+
+/** Recipe-facing facade. Cached fields are only for decisions immediately after
+ * refreshBrowserPeers(); the page snapshot is the authoritative evidence. */
+export function browserPeerFacade(instance, initial) {
+  let snapshot = initial;
+  const update = row => { snapshot = row; return row; };
+  const serialize = value => ArrayBuffer.isView(value) ? Array.from(value) :
+    Array.isArray(value) ? value.map(serialize) : value && typeof value === 'object' ?
+      Object.fromEntries(Object.entries(value).map(([key, child]) => [key, serialize(child)])) : value;
+  const invoke = async (name, args) => update(await instance.peerRpc(name, serialize(args)));
+  const facade = {
+    browserOwned: true,
+    refresh: () => invoke('snapshot', []),
+    start: () => invoke('start', []),
+    addLocalInput: (...args) => invoke('addLocalInput', args),
+    addLocalInputs: (...args) => invoke('addLocalInputs', args),
+    setNativeProgress: (...args) => invoke('setNativeProgress', args),
+    disconnect: (...args) => invoke('disconnect', args),
+    fail: (...args) => invoke('fail', args),
+    async drain() {
+      const row = await invoke('drain', []);
+      return {count: row.records.length, bytes: Buffer.concat(row.records.map(record => Buffer.from(record)))};
+    },
+    close: intentional => instance.closePeer(intentional).then(update),
+    armClose: () => instance.armPeerClose(),
+    summary: () => snapshot.protocol,
+    get errors() { return snapshot.endpointErrors; },
+    get transport() { return snapshot.transport; },
+    get checksumOwnership() { return snapshot.checksumOwnership; },
+  };
+  for (const [name, field] of Object.entries({ready: 'ready', terminal: 'terminal',
+    remoteAckInput: 'remote_ack_input', inputDuplicates: 'input_duplicates',
+    outOfOrderInputs: 'out_of_order_inputs', checksumMismatches: 'checksum_mismatches',
+    agreementHash: 'start_identity_hash'}))
+    Object.defineProperty(facade, name, {get: () => snapshot.protocol[field]});
+  return facade;
+}
+
+export function createPeerModuleResponseObserver({url, peerModuleHashes, runtimeArtifactNames, onFailure = () => {}}) {
+  const names = ['net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs'];
+  if (Object.keys(peerModuleHashes).sort().join() !== [...names].sort().join() ||
+      Object.values(peerModuleHashes).some(hash => !/^[0-9a-f]{64}$/.test(hash)))
+    throw Error('Browser peer requires exact three module SHA-256 identities');
+  const expected = new Map(names.map(name => [new URL(name, url).href, peerModuleHashes[name]]));
+  const allowed = new Set([...runtimeArtifactNames, ...names].map(name => new URL(name, url).href));
+  const responses = [], tasks = new Set();
+  let failure = null, eventCount = 0;
+  const fail = error => {
+    if (failure) return;
+    failure = error;
+    onFailure(error);
+  };
+  function observe(response) {
+    const responseUrl = response.url();
+    if (!new URL(responseUrl).pathname.endsWith('.mjs')) return;
+    if (failure) return;
+    if (++eventCount > allowed.size) { fail(Error('Browser module response event bound exceeded')); return; }
+    const task = (async () => {
+      if (!allowed.has(responseUrl)) throw Error(`Unexpected browser module import: ${responseUrl}`);
+      if (!expected.has(responseUrl)) return;
+      const headers = await response.allHeaders(), bytes = await response.body();
+      if (bytes.length > 1024 * 1024) throw Error('Browser peer module response exceeded its 1 MiB bound');
+      const hash = createHash('sha256').update(bytes).digest('hex');
+      if (response.status() !== 200 || hash !== expected.get(responseUrl) ||
+          headers['cross-origin-opener-policy'] !== 'same-origin' ||
+          headers['cross-origin-embedder-policy'] !== 'require-corp')
+        throw Error(`Browser peer module response identity differs: ${responseUrl}`);
+      if (responses.some(row => row.url === responseUrl)) throw Error('Browser peer module response inventory is incomplete or duplicated');
+      responses.push({url: responseUrl, status: response.status(), bytes: bytes.length, sha256: hash,
+        coop: headers['cross-origin-opener-policy'], coep: headers['cross-origin-embedder-policy']});
+    })().catch(fail).finally(() => tasks.delete(task));
+    tasks.add(task);
+  }
+  async function freeze() {
+    while (tasks.size) await Promise.all([...tasks]);
+    if (failure) throw failure;
+    if (responses.length !== expected.size || [...expected.keys()].some(url =>
+      responses.filter(row => row.url === url).length !== 1))
+      throw Error('Browser peer module response inventory is incomplete or duplicated');
+    return [...responses];
+  }
+  return {observe, freeze};
 }

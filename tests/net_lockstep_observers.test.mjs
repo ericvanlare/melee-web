@@ -224,7 +224,7 @@ test('asymmetric lockstep startup failures close the successfully opened sibling
       async unload() { this.unloaded = true; },
       async close() { this.closed = true; return true; },
       async status() { return null; }, async native() { return null; }};
-    const context = vm.createContext({instances: {}, instanceRows: {alpha: {}, beta: {}},
+    const context = vm.createContext({browserOwned: false, peerModuleHashes: null, instances: {}, instanceRows: {alpha: {}, beta: {}},
       chromium: {}, launchOptions: {}, values: {url: 'http://127.0.0.1/', disc: '/unused'},
       path, childDirectory: role => role, openTimeout: 100, deadline: 100,
       checksumFiles: {}, pairResults: {transport: {}}, closeNotes: [],
@@ -254,7 +254,7 @@ test('relay cleanup outcome is recorded only after awaited close succeeds', asyn
   const cleanup = source.slice(cleanupStart, cleanupEnd);
   const runCleanup = async relay => {
     const context = vm.createContext({
-      intentionalRelayClose: false, transportCallbackQueue: {async drain() { return []; }},
+      browserOwned: false, intentionalRelayClose: false, transportCallbackQueue: {async drain() { return []; }},
       instances: {}, instanceRows: {}, checksumFiles: {}, peers: null, relay,
       path, output: 'out', childDirectory: role => role,
       pairResults: {outcome: 'complete', first_error: null, relay_closed: false, transport: {type: 'room-websocket'}},
@@ -303,7 +303,7 @@ test('finalizer joins a delayed callback admitted during relay close', async () 
   let callbackStarted = false;
   let callbackFinished = false;
   const context = vm.createContext({
-    intentionalRelayClose: false, transportCallbackQueue,
+    browserOwned: false, intentionalRelayClose: false, transportCallbackQueue,
     instances: {}, instanceRows: {}, checksumFiles: {}, peers: null,
     relay: {transport: {type: 'room-websocket'}, async close() {
       // Model an event emitter dispatching terminal work without awaiting it.
