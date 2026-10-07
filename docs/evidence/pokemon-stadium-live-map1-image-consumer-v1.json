@@ -220,7 +220,21 @@
     "one_native_packet_authorization_sha256": "05ce23244f21161b105d3611bdddb12425de674fd5d6ba25f0d5b5dff1ba1241",
     "native_result_sha256": "ef5f8f702695b8a1595ea877fb9908e8f25e0cbfd72efcc36ca1e32da6af469c"
   },
-  "current_integration_validation": {
+  "private_evidence": "Retained external NVMe runs discoverable by stadium-live-image-escalation, stadium-live-image-reuse, stadium-live-image-native-packet and stadium-live-image-integration prefixes; raw logs, binaries, failed reproducers, original fixture and owned native scratch preserved.",
+  "unrun": [
+    "E8",
+    "Stage2524C",
+    "OnInit/Ground",
+    "registered stage GObj or stage publication/profile/admission",
+    "source animation/gameplay ticks/draw",
+    "global SIS/camera/text/copy-buffer consumers",
+    "browser",
+    "retail comparison",
+    "performance/pixels/audio acceptance",
+    "deployment"
+  ],
+  "whole_stage_admission": false,
+  "historical_integration_validation": {
     "producer": "4544b8d1e0754af6fd37a05007a24e87e72839ac",
     "tree": "2de5caa5bae7b4fdd2d711b9926253f6f089e013",
     "base": "10dd466c3ac4103fc11f56b1943ba4930c477959",
@@ -324,18 +338,147 @@
       "content_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     }
   },
-  "private_evidence": "Retained external NVMe runs discoverable by stadium-live-image-escalation, stadium-live-image-reuse, stadium-live-image-native-packet and stadium-live-image-integration prefixes; raw logs, binaries, failed reproducers, original fixture and owned native scratch preserved.",
-  "unrun": [
-    "E8",
-    "Stage2524C",
-    "OnInit/Ground",
-    "registered stage GObj or stage publication/profile/admission",
-    "source animation/gameplay ticks/draw",
-    "global SIS/camera/text/copy-buffer consumers",
-    "browser",
-    "retail comparison",
-    "performance/pixels/audio acceptance",
-    "deployment"
-  ],
-  "whole_stage_admission": false
+  "current_integration_validation": {
+    "producer": "adee01b9b35fdebf4a3d4377880fb68a5dec7f4e",
+    "tree": "35cf095af5b22169fa377712d69b83e6589b60ad",
+    "base": "2fd79a51afb84e3a260b8553d568cb6360f91171",
+    "clean": true,
+    "source_hashes": {
+      "tests/stadium_live_image_consumer.hpp": "cb81fb10eab01aa424b69a8aa82e59abfdd7c73ac259e64d6e48163a880c3a3e",
+      "tests/stadium_screen_roots_probe.c": "0318dd83d2446f85c7b6c226a6d0ae28d589fe425a5165a87c16b823730df18f",
+      "tests/stadium_screen_roots_probe.h": "00daac59b3b72768f114428778c1a4be231027a4d0504ce78fb27070a0bad2cd",
+      "tests/stadium_screen_roots_trace.cpp": "5c3c6ff0896d8ab1ed5a07c4170d4601bb569296bfc47660e35c77539ade4ad7",
+      "tests/native_menu_host_trace.cpp": "01aed8f89779cd4f5ffb6dc090bdb6d8989a1ac4080fd11d45b1eef84690d35c",
+      "tests/stadium_screen_roots_synthetic.hpp": "0a396fda44b743e179408a1ca1d9d7c1f0088aad8b8a0f1801917da452464e37",
+      "tests/stadium_screen_roots_checks.hpp": "c2b7d6c4e72d25fb5ee3f1afc139b1f3394595c10fff552d5bd2a65dca9fab23",
+      "tests/stadium_c0_native_map_contract.hpp": "6c7d9a6de710f3e006960d87155a6d1f9a9ef5b2e24fb78a0feb25bd59d25143",
+      "CMakeLists.txt": "8e7b7e766ca4c7c3ba1d38fbb0c66fe156d9654746c79b2fb231bd27255046c7",
+      "cmake/FighterRuntime.cmake": "9aa5b509d1ea3cda74ae33bc878ae9c4b17fa6bef3da8a4752ea348fe66c1c42",
+      "src/dat_native_stage.cpp": "3cbd102048f86d925b46f59c2d644b0f67a2353a220caa7ba56af1ea4cdc6393",
+      "src/dat_native_stage.hpp": "6f5758f56894a394c16ca13d071356316bfeedc94584830716c98bd8a376c781",
+      "src/dat_sis.cpp": "4759d19d6b02d3f6859d792e851828c0596e35cffa8f4e8939cd1993adda6672",
+      "tests/test_dat_native_stage.py": "712a84687313a8060de185f6f74ec519ee3beaa448d84e8ae05a3f1a812ba10f",
+      "tests/test_gameplay_native_menus.py": "f657940ee0d5c4fb67d51504b556c745aaede452ade5833a377cf1f42f205382",
+      "dependencies.lock.json": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385"
+    },
+    "all16_boundary_source_hashes_unchanged": true,
+    "source_delta": "Rebase onto current main; no boundary C/C++/Python changes. Final receipt/status refresh is documentation only.",
+    "native_producer": "2ded3d4f465d82cea1a3323343ef300a1ab8b6d6",
+    "ordinary_release_native_target": {
+      "producer": "4544b8d1e0754af6fd37a05007a24e87e72839ac",
+      "tree": "2de5caa5bae7b4fdd2d711b9926253f6f089e013",
+      "command": [
+        "python3",
+        "scripts/build.py",
+        "--trace-target",
+        "native_menu_host_trace",
+        "--configuration",
+        "Release"
+      ],
+      "target": "native_menu_host_trace",
+      "configuration": "Release",
+      "diagnostic": false,
+      "exit_code": 0,
+      "log_sha256": "b842bb6b9f4a5dbdc83f039ebc1f1b2429f73972ccf3047dcd71164e93e2d69c",
+      "artifacts": {
+        "native_menu_host_trace.js": {
+          "bytes": 232567,
+          "sha256": "a38469b0da5e97b03f9a1d7d6d5b6c9d0dd9a7b697777c26350064430fa0a3f9"
+        },
+        "native_menu_host_trace.wasm": {
+          "bytes": 13584106,
+          "sha256": "4e55e2a6efec320088debb6a6857c46218d970be0a2c6d5788365029a0baf6c4"
+        },
+        "CMakeCache.txt": {
+          "bytes": 60977,
+          "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+        },
+        "build.ninja": {
+          "bytes": 5617594,
+          "sha256": "d11466440968997a8275b2e64408da815c773cd386affbf2529b446291f1494e"
+        }
+      }
+    },
+    "full_suite": {
+      "producer": "adee01b9b35fdebf4a3d4377880fb68a5dec7f4e",
+      "tree": "35cf095af5b22169fa377712d69b83e6589b60ad",
+      "command": [
+        "env",
+        "-u",
+        "MELEE_MENU_FIXTURE_ROOT",
+        "-u",
+        "MELEE_KEEP_TEST_ARTIFACTS",
+        "python3",
+        "scripts/agent_workspace.py",
+        "run",
+        "--",
+        "python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests",
+        "-v"
+      ],
+      "exit_code": 0,
+      "tests": 2030,
+      "seconds": 387.434,
+      "skipped": 132,
+      "retained_fixture_environment": "UNSET",
+      "keep_test_artifacts_environment": "UNSET",
+      "retained_screen_roots_and_E8_skipped_before_native_launch": true,
+      "stdout_sha256": "7360b91367dbf59fce9914658675eebd645109230e9261b0204e903f88ed100e",
+      "stderr_sha256": "b55b438a93bde38f3d768223e6a9cb56c8073afd27403f364c0fa5cb9faf498b"
+    },
+    "retained_native_run_repeated": false,
+    "build_reuse": {
+      "producer": "4544b8d1e0754af6fd37a05007a24e87e72839ac",
+      "all4_artifacts_identical": true,
+      "artifacts": {
+        "native_menu_host_trace.js": {
+          "bytes": 232567,
+          "sha256": "a38469b0da5e97b03f9a1d7d6d5b6c9d0dd9a7b697777c26350064430fa0a3f9"
+        },
+        "native_menu_host_trace.wasm": {
+          "bytes": 13584106,
+          "sha256": "4e55e2a6efec320088debb6a6857c46218d970be0a2c6d5788365029a0baf6c4"
+        },
+        "CMakeCache.txt": {
+          "bytes": 60977,
+          "sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc"
+        },
+        "build.ninja": {
+          "bytes": 5617594,
+          "sha256": "d11466440968997a8275b2e64408da815c773cd386affbf2529b446291f1494e"
+        }
+      },
+      "profile": "Release diagnostic OFF",
+      "actual_ninja_input_listing": "ordinary-target-inputs.txt",
+      "main_delta_intersection_with_explicit_target_inputs": [],
+      "source_and_build_configuration_inputs": "C/C++/CMake/pinned dependency files unchanged; main delta consists only of unrelated lockstep JS/Python test and2docs files. Existing target/toolchain retained; no replacement."
+    },
+    "skip_difference": {
+      "previous_skips": 136,
+      "current_skips": 132,
+      "previous_skips_now_executed": [
+        "test_opening_movie_entry_requires_source_heap_owner (test_gameplay_native_menus.NativeMenuSourceTests.test_opening_movie_entry_requires_source_heap_owner)",
+        "test_original_main_settings_sound_mix_route (test_gameplay_native_menus.NativeMenuSourceTests.test_original_main_settings_sound_mix_route)",
+        "test_title_and_main_checked_abort_teardown (test_gameplay_native_menus.NativeMenuSourceTests.test_title_and_main_checked_abort_teardown)",
+        "test_trophy_baseline_waits_for_original_tydati_owner (test_gameplay_native_menus.NativeMenuSourceTests.test_trophy_baseline_waits_for_original_tydati_owner)"
+      ],
+      "retained_stadium_and_E8_skip_lines": [
+        "test_stadium_e8_one_request_and_checked_teardown (test_gameplay_native_menus.NativeMenuSourceTests.test_stadium_e8_one_request_and_checked_teardown) ... skipped 'The reviewed C1 fixture root is required for the E8 trace'",
+        "test_stadium_screen_roots_owner_preflight (test_gameplay_native_menus.NativeMenuSourceTests.test_stadium_screen_roots_owner_preflight) ... skipped 'Stadium owner preflight requires the retained 98-file union; missing EfCoData.dat, EfMrData.dat, GmPause.usd, GrPs.usd, GrPs1.dat'"
+      ]
+    },
+    "documentation": {
+      "tests": 4,
+      "result": "pass",
+      "repository_content_tracked_entries": 1927,
+      "repository_content_findings": 0,
+      "diff_check": "pass",
+      "docs_stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "docs_stderr_sha256": "d3376c6071835912396d579a144de83a24d65f75134d8eb636df4304ac050246"
+    }
+  }
 }

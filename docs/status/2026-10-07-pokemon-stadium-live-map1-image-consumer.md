@@ -33,15 +33,21 @@ The synthetic source fixture also passed hit/miss/remove twice. Compiler and
 packet-preparation failures are retained; the receipt explicitly identifies the
 earlier transcript-only log gap and the appended producer-label correction.
 
-Integration validation used clean source producer
-`4544b8d1e0754af6fd37a05007a24e87e72839ac`. Executable C/C++ source matches the
-retained producer; the only source delta adds the persistent Python assertion for
-the new observed completion line. Full discovery passed with the fixture
-environment unset; retained/E8 tests skipped before native launch. The affected
-`native_menu_host_trace` also compiled in ordinary Release with diagnostic OFF.
-The historical native execution used diagnostic ON; the generic
-`browser-release` trace header does not identify that profile. Native evidence
-was not recaptured for integration.
+Current-main integration validation used clean source producer
+`adee01b9b35fdebf4a3d4377880fb68a5dec7f4e`, based on
+`2fd79a51afb84e3a260b8553d568cb6360f91171`. All 16 boundary source hashes
+remain unchanged after rebase. Full discovery passed with 2,030 tests and 132
+skips, with the fixture environment unset; retained/E8 tests skipped before
+native launch. Four existing ordinary menu owner tests now run because their
+ordinary native target is available, explaining the earlier 136 skips.
+
+The affected ordinary Release target with diagnostic OFF is reused from exact
+historical producer `4544b8d1e0754af6fd37a05007a24e87e72839ac`: all four retained
+build artifacts match and no current-main change intersects its explicit Ninja
+inputs. This is historical build reuse, not a new build producer. The retained
+native execution remains at `2ded3d4f465d82cea1a3323343ef300a1ab8b6d6`, using
+diagnostic ON; the generic `browser-release` trace header does not identify that
+profile. Native evidence was not recaptured for integration.
 
 The [portable receipt](../evidence/pokemon-stadium-live-map1-image-consumer-v1.json)
 records producer, source, build, input, log, artifact and review identities.
