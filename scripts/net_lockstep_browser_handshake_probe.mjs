@@ -21,6 +21,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NODE_FACADE = path.join(ROOT, 'scripts/net_lockstep_protocol.mjs');
 const CORE = path.join(ROOT, 'scripts/net_lockstep_core.mjs');
 const ADAPTER = path.join(ROOT, 'scripts/net_lockstep_websocket_relay.mjs');
+const MINIFLARE_OPTIONS = path.join(ROOT, 'scripts/net_room_relay_miniflare_options.mjs');
 const SERVE = path.join(ROOT, 'scripts/serve.py');
 const PRE_PORTABLE_FIXTURE = path.join(ROOT, 'tests/fixtures/net_lockstep_pre_portable_wire_v1.json');
 const SITE_NAMES = ['net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs', 'probe.html'];
@@ -410,6 +411,23 @@ export async function runCleanupStages(stages, errors = []) {
   return errors;
 }
 
+async function browserProfileDirectories(tempDirectory) {
+  const entries = await fs.readdir(tempDirectory, {withFileTypes: true});
+  return entries.filter(entry => entry.isDirectory() &&
+    /^playwright_chromiumdev_profile-[A-Za-z0-9_-]+$/.test(entry.name))
+    .map(entry => path.join(tempDirectory, entry.name));
+}
+
+async function waitForDirectoryEmpty(directory, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let entries = await fs.readdir(directory);
+  while (entries.length && Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, 25));
+    entries = await fs.readdir(directory);
+  }
+  return entries;
+}
+
 async function fileSha256(file) {
   const hash = createHash('sha256');
   const stream = createReadStream(file);
@@ -539,6 +557,7 @@ async function prepare() {
       websocketEndpoint: {path: 'scripts/net_lockstep_websocket_relay.mjs', sha256: sha256(adapter)},
       runtimeOwner: {path: 'scripts/net_room_relay_runtime_owner.mjs', sha256: sha256(await fs.readFile(path.join(ROOT, 'scripts/net_room_relay_runtime_owner.mjs')))},
       directRuntime: {path: 'scripts/net_room_relay_direct_runtime.mjs', sha256: sha256(await fs.readFile(path.join(ROOT, 'scripts/net_room_relay_direct_runtime.mjs')))},
+      miniflareOptions: {path: 'scripts/net_room_relay_miniflare_options.mjs', sha256: sha256(await fs.readFile(MINIFLARE_OPTIONS))},
       worker: {path: 'online/relay/worker.mjs', sha256: sha256(await fs.readFile(path.join(ROOT, 'online/relay/worker.mjs')))},
       workerConfig: {path: 'online/relay/wrangler.jsonc', sha256: sha256(await fs.readFile(path.join(ROOT, 'online/relay/wrangler.jsonc')))},
       dependenciesLock: {path: 'dependencies.lock.json', sha256: sha256(await fs.readFile(path.join(ROOT, 'dependencies.lock.json')))},
@@ -674,6 +693,7 @@ async function run() {
   const sourcePaths = {core: CORE, nodeFacade: NODE_FACADE, adapter: ADAPTER,
     runtimeOwner: path.join(ROOT, 'scripts/net_room_relay_runtime_owner.mjs'),
     directRuntime: path.join(ROOT, 'scripts/net_room_relay_direct_runtime.mjs'),
+    miniflareOptions: MINIFLARE_OPTIONS,
     worker: path.join(ROOT, 'online/relay/worker.mjs'),
     workerConfig: path.join(ROOT, 'online/relay/wrangler.jsonc'),
     dependenciesLock: path.join(ROOT, 'dependencies.lock.json'),
@@ -733,7 +753,7 @@ async function run() {
       bundleVersion: currentBrowserIdentity.version, pageErrors: [], loadedResponses: []},
     roles: {browser: 'alpha', node: 'beta'}, contract: manifest.probe,
     events: [], firstError: null, cleanup: {browserContextClosed: false, browserClosed: false,
-      browserCdpDetached: false, browserTempDirectoryEmpty: false,
+      browserCdpDetached: false, browserProfileAbsent: false, globalTempDirectoryEmpty: false,
       endpointsClosed: false, workerDisposed: false}};
   const recordEvent = event => report.events.push({event, monotonicNs: process.hrtime.bigint().toString(), at: new Date().toISOString()});
   const termination = createTerminationRequest(() => {
@@ -768,6 +788,10 @@ async function run() {
     const {page: fixtureUrl, origin} = {page: 'probe.html', origin: manifest.probe.origin};
     await awaitOwnedAcquisition(chromium.launch(browserLaunchOptions(launchOptions,
       {headed: false, audible: false, timeout: 15000})), value => { browser = value; }, termination);
+    const activeProfiles = await browserProfileDirectories(browserTempDirectory);
+    if (activeProfiles.length !== 1)
+      throw Error(`Expected exactly one owned Playwright Chrome profile, found ${activeProfiles.length}`);
+    report.browser.profileDirectory = activeProfiles[0];
     const actualBrowserVersion = browser.version();
     report.browser.actualVersion = actualBrowserVersion;
     const actualBrowserVersionNumber = actualBrowserVersion.match(/\d+(?:\.\d+){2,3}/)?.[0];
@@ -973,11 +997,11 @@ async function run() {
       await bounded(browser.close(), 5000, 'browser close');
       report.cleanup.browserClosed = true;
     }});
-    cleanupStages.push({name: 'browser temporary profile cleanup', run: async () => {
-      const remaining = await fs.readdir(browserTempDirectory);
-      if (remaining.length)
-        throw Error(`Browser temporary profile directory retained entries: ${remaining.join(', ')}`);
-      report.cleanup.browserTempDirectoryEmpty = true;
+    cleanupStages.push({name: 'browser profile cleanup', run: async () => {
+      const remainingProfiles = await browserProfileDirectories(browserTempDirectory);
+      if (remainingProfiles.length)
+        throw Error(`Playwright Chrome profiles remain after browser close: ${remainingProfiles.join(', ')}`);
+      report.cleanup.browserProfileAbsent = true;
     }});
     if (runtime) cleanupStages.push({name: 'Worker disposal', run: async () => {
       const disposal = await runtime.close(Boolean(probePassed && cleanupErrors.length === 0 && !termination.requested));
@@ -990,6 +1014,12 @@ async function run() {
         disposal?.stderrErrors === false && !(disposal?.cleanupEvents || []).some(row => row.error);
       if (!report.cleanup.workerDisposed)
         throw Error('Worker disposal returned without complete clean-runtime evidence');
+    }});
+    cleanupStages.push({name: 'external temporary directory cleanup', run: async () => {
+      const remaining = await waitForDirectoryEmpty(browserTempDirectory, 2000);
+      if (remaining.length)
+        throw Error(`External TMPDIR retained entries after browser and Worker disposal: ${remaining.join(', ')}`);
+      report.cleanup.globalTempDirectoryEmpty = true;
     }});
     await runCleanupStages(cleanupStages, cleanupErrors);
     report.browser.pageErrors = [...pageErrors];
@@ -1004,7 +1034,7 @@ async function run() {
   report.cleanup.errors = cleanupErrors;
   report.outcome = probePassed && !termination.requested && report.cleanup.endpointsClosed && report.cleanup.browserClosed &&
     report.cleanup.browserContextClosed && report.cleanup.browserCdpDetached &&
-    report.cleanup.browserTempDirectoryEmpty &&
+    report.cleanup.browserProfileAbsent && report.cleanup.globalTempDirectoryEmpty &&
     report.cleanup.workerDisposed && cleanupErrors.length === 0
     ? 'pass' : 'fail';
   report.finishedAt = new Date().toISOString();

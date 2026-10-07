@@ -4,7 +4,7 @@ import {createServer, request as httpRequest} from 'node:http';
 import {existsSync} from 'node:fs';
 import {mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import test from 'node:test';
 import {LockstepPeer, LOCKSTEP_DELAY} from '../scripts/net_lockstep_protocol.mjs';
 import {
@@ -12,6 +12,7 @@ import {
 } from '../scripts/net_lockstep_websocket_relay.mjs';
 import {describeLockstepTransport, openLockstepPeerPair} from '../scripts/net_lockstep_transport.mjs';
 import {startRoomRelayRuntime} from '../scripts/net_room_relay_runtime_owner.mjs';
+import {buildRoomRelayMiniflareOptions} from '../scripts/net_room_relay_miniflare_options.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TOOLS = path.resolve(process.env.MELEE_A3_ROOM_RELAY_TOOLS ||
@@ -21,6 +22,7 @@ const MINIFLARE_PACKAGE = path.join(TOOLS, 'miniflare/package.json');
 const WORKERD_PACKAGE = path.join(TOOLS, 'workerd/package.json');
 const HAS_RUNTIME_TOOLS = [WRANGLER_PACKAGE, MINIFLARE_PACKAGE, WORKERD_PACKAGE]
   .every(existsSync);
+const RAW_UPGRADE_TIMEOUT_MS = 5000;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 function rawUpgradeStatus(urlText, extraHeaders = {}) {
@@ -32,6 +34,7 @@ function rawUpgradeStatus(urlText, extraHeaders = {}) {
       port: url.port,
       path: url.pathname,
       method: 'GET',
+      signal: AbortSignal.timeout(RAW_UPGRADE_TIMEOUT_MS),
       headers: {
         connection: 'Upgrade', upgrade: 'websocket',
         'sec-websocket-version': '13', 'sec-websocket-key': key,
@@ -173,6 +176,63 @@ async function startWorker(t) {
     },
   });
 }
+
+test('pinned Miniflare V4 conversion preserves relay bindings and owned paths', {
+  skip: !HAS_RUNTIME_TOOLS && `pinned direct-runtime packages not present under ${TOOLS}`,
+}, async () => {
+  const [{unstable_readConfig}, miniflare] = await Promise.all([
+    import(pathToFileURL(path.join(TOOLS, 'wrangler/wrangler-dist/cli.js')).href),
+    import(pathToFileURL(path.join(TOOLS, 'miniflare/dist/src/index.js')).href),
+  ]);
+  const config = unstable_readConfig({config: path.join(ROOT, 'online/relay/wrangler.jsonc')});
+  const resourcePersistencePath = path.join(ROOT, 'work/offline-relay-options/state');
+  const resourceTmpPath = path.join(ROOT, 'work/offline-relay-options/resource-tmp');
+  const v4Options = buildRoomRelayMiniflareOptions({config, root: ROOT, port: 23101,
+    inspectorPort: 23102, resourcePersistencePath, resourceTmpPath,
+    handleUncaughtError: () => {}, handleStructuredLogs: () => {},
+  });
+  const converted = miniflare.convertV4MiniflareOptions(v4Options);
+  const options = miniflare.MiniflareOptionsSchema.parse(converted);
+  const originBinding = options.workers[0].config.env.RELAY_ALLOWED_ORIGINS;
+  assert.deepEqual(originBinding, {type: 'text', value: config.vars.RELAY_ALLOWED_ORIGINS});
+  assert(config.vars.RELAY_ALLOWED_ORIGINS.split(',').includes('http://127.0.0.1:8787'));
+  assert.equal(options.resourcePersistencePath, resourcePersistencePath);
+  assert.equal(options.isolatedResourcePersistencePath, resourcePersistencePath);
+  assert.equal(options.resourceTmpPath, resourceTmpPath);
+  assert.equal(Object.hasOwn(v4Options.workers[0], 'vars'), false);
+  assert.equal(Object.hasOwn(v4Options, 'durableObjectsPersist'), false);
+});
+
+test('actual Worker accepts only the configured Origin at WebSocket upgrade', {
+  skip: !HAS_RUNTIME_TOOLS && `pinned direct-runtime packages not present under ${TOOLS}`,
+}, async t => {
+  const worker = await startWorker(t);
+  let passed = false;
+  let failure = null;
+  try {
+    const wsBase = worker.base.replace(/^http:/, 'ws:');
+    const allowed = await rawUpgradeStatus(
+      `${wsBase}/v1/rooms/${createRoomId()}/socket`,
+      {origin: 'http://127.0.0.1:8787'});
+    assert.equal(allowed.status, 101,
+      'configured loopback Origin reaches the actual Worker WebSocket upgrade boundary');
+
+    const rejected = await rawUpgradeStatus(
+      `${wsBase}/v1/rooms/${createRoomId()}/socket`,
+      {origin: 'https://untrusted.invalid'});
+    assert.equal(rejected.status, 403);
+    assert.deepEqual(JSON.parse(rejected.body), {error: 'origin is not allowed'});
+    passed = true;
+    t.diagnostic('Origin scope is HTTP upgrade acceptance/rejection only; the raw101 fixture destroys its socket and does not observe a clean WebSocket close.');
+  } catch (error) {
+    failure = error;
+  }
+  try { await worker.close(passed); }
+  catch (cleanupError) {
+    failure = failure ? new AggregateError([failure, cleanupError], 'Origin boundary and Worker cleanup both failed') : cleanupError;
+  }
+  if (failure) throw failure;
+});
 
 function makeChecksum(tick, inputHash = tick) {
   const bytes = Buffer.alloc(64);
