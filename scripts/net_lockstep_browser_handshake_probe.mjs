@@ -473,6 +473,24 @@ async function ensureExternalRunDirectory() {
   if (!info.isDirectory() || info.isSymbolicLink()) throw Error('Probe output must be a real directory');
 }
 
+async function ensureExternalBrowserTempDirectory() {
+  const configuredRoot = process.env.MELEE_A3_PROBE_RUNS_ROOT;
+  const configuredTemp = process.env.TMPDIR;
+  if (!configuredRoot || !configuredTemp)
+    throw Error('Set TMPDIR to a fresh owned directory on the external probe volume');
+  const externalRoot = await fs.realpath(path.resolve(configuredRoot));
+  const tempPath = path.resolve(configuredTemp);
+  const tempReal = await fs.realpath(tempPath);
+  if (!tempReal.startsWith(`${externalRoot}${path.sep}`))
+    throw Error('Browser temporary profile directory must be beneath the configured external NVMe runs root');
+  const info = await fs.lstat(tempPath);
+  if (!info.isDirectory() || info.isSymbolicLink())
+    throw Error('Browser temporary profile directory must be a real directory');
+  if ((await fs.readdir(tempPath)).length)
+    throw Error('Browser temporary profile directory must be fresh and empty');
+  return tempReal;
+}
+
 async function prepare() {
   await ensureExternalRunDirectory();
   if ((await fs.readdir(output)).length)
@@ -620,6 +638,7 @@ function verifyBrowserResponseSet(rows, manifest) {
 
 async function run() {
   await ensureExternalRunDirectory();
+  const browserTempDirectory = await ensureExternalBrowserTempDirectory();
   for (const name of ['result.json', 'browser-alpha-ready.png', 'worker-evidence']) {
     try { await fs.lstat(path.join(output, name)); throw Error(`Probe run refuses prior output ${name}`); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -701,12 +720,14 @@ async function run() {
     producer: manifest.producer, sourceHashes: Object.fromEntries(Object.entries(manifest.sources)
       .map(([key, value]) => [key, value.sha256])), served: manifest.served,
     runtime: null, browser_process_info: [], httpResponses, browser: {path: browserPath, playwrightPath,
+      tempDirectory: browserTempDirectory,
       executableSha256: currentBrowserIdentity.executableSha256,
       infoPlistSha256: currentBrowserIdentity.infoPlistSha256,
       bundleVersion: currentBrowserIdentity.version, pageErrors: [], loadedResponses: []},
     roles: {browser: 'alpha', node: 'beta'}, contract: manifest.probe,
     events: [], firstError: null, cleanup: {browserContextClosed: false, browserClosed: false,
-      browserCdpDetached: false, endpointsClosed: false, workerDisposed: false}};
+      browserCdpDetached: false, browserTempDirectoryEmpty: false,
+      endpointsClosed: false, workerDisposed: false}};
   const recordEvent = event => report.events.push({event, monotonicNs: process.hrtime.bigint().toString(), at: new Date().toISOString()});
   const termination = createTerminationRequest(() => {
     report.terminationRequested = true;
@@ -945,6 +966,12 @@ async function run() {
       await bounded(browser.close(), 5000, 'browser close');
       report.cleanup.browserClosed = true;
     }});
+    cleanupStages.push({name: 'browser temporary profile cleanup', run: async () => {
+      const remaining = await fs.readdir(browserTempDirectory);
+      if (remaining.length)
+        throw Error(`Browser temporary profile directory retained entries: ${remaining.join(', ')}`);
+      report.cleanup.browserTempDirectoryEmpty = true;
+    }});
     if (runtime) cleanupStages.push({name: 'Worker disposal', run: async () => {
       const disposal = await runtime.close(Boolean(probePassed && cleanupErrors.length === 0 && !termination.requested));
       report.runtime.disposal = disposal;
@@ -970,6 +997,7 @@ async function run() {
   report.cleanup.errors = cleanupErrors;
   report.outcome = probePassed && !termination.requested && report.cleanup.endpointsClosed && report.cleanup.browserClosed &&
     report.cleanup.browserContextClosed && report.cleanup.browserCdpDetached &&
+    report.cleanup.browserTempDirectoryEmpty &&
     report.cleanup.workerDisposed && cleanupErrors.length === 0
     ? 'pass' : 'fail';
   report.finishedAt = new Date().toISOString();
