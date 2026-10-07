@@ -4,8 +4,9 @@ The default whole-session comparison covers the three-match, four-Mario CPU9
 Final Destination MWRC v8 regression and the three-match, twelve-distinct-
 character CPU9 MWRC v9 milestone. Both run through original character select,
 stage select, gameplay, Results and the intended final character-select
-return. An explicit MWRC v10 first-setup/tick-0 prefix scope is documented
-below; it does not admit v10 to whole-session comparison.
+return. Explicit MWRC v10 first-setup/tick-0 and first-positive-match-frame
+prefix scopes are documented below; neither admits v10 to whole-session
+comparison.
 [STATUS](../STATUS.md) indexes the observed results and their receipts.
 
 The MWRC v8 input contains source-consumed controller samples and their scene
@@ -257,6 +258,37 @@ negative controls with:
 python3 -m unittest discover -s tests -p test_whole_session_state_compare.py -v
 python3 -m unittest discover -s tests -p test_compare_whole_session_state_cli.py -v
 ```
+
+## Bounded MWRC v10 first-positive-match-frame comparison
+
+Use `--scope v10-first-positive-match-frame` only with a fresh frozen
+expectations packet, the source first-setup identity audit, the separate
+source-only first-positive audit, and provenance sidecars for the browser
+capture made for this boundary. The earlier tick-0 browser capture does not
+bind or authorize this browser trace. Pass the first-positive audit with
+`--positive-boundary-audit`; the packet also pins its path and hash, the source
+and browser inputs, and the first-positive target (match, source tick and
+sequence, preceding PAD-consume sequence, recipe timeline index, browser
+cursor, and match-frame value).
+
+The explicit scope validates the entire MWRC v10 recipe, then streams the
+source and browser in order from CSS through that target. It requires
+contiguous match-0 source ticks, match frame zero before the externally pinned
+first positive clock value, and an exact PAD-to-tick, timeline, state, and
+source-sequence join at the target. CSS/SSS frames still establish consumed
+input order only; the setup and every match tick through the target use the
+declared state fields and strict primary-entity checks. The source reader is
+capped at 32 MiB and 8,192 records. It stops at the first invalid or divergent
+join, the target join, or either cap; it never searches for a later match with
+clock zero.
+
+Like the tick-0 scope, a matched first-positive boundary reports
+`boundary_result: equivalent` with `result: incomplete`, `complete: false`,
+and `whole_session_equivalent: false`. The CLI exits 1 for that bounded result.
+It does not establish later gameplay or whole-session accuracy. The default
+scope and the existing tick-0 behavior remain unchanged.
+The recorded result and exact boundary are documented in the
+[B4 first-positive entry](status/2026-10-07-b4-v10-first-positive-match-frame.md).
 
 ## Capture command failure gates
 

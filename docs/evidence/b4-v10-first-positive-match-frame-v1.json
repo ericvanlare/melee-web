@@ -1,0 +1,153 @@
+{
+  "schema": "melee-web-b4-v10-first-positive-match-frame-v1",
+  "date": "2026-10-07",
+  "scope": "One bounded comparison through the first positive match frame; the whole session remains incomplete.",
+  "private_run_id": "b4-navigation-provenance-preflight-20261007T093836Z",
+  "source": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "revision": "GALE01r2",
+    "dol_sha1": "08e0bf20134dfcb2606996710047b2d6bb1a45",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "source_manifest_sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7",
+    "source_capture_report_sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913",
+    "recipe": {
+      "version": 10,
+      "bytes": 2241622,
+      "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+      "frame_count": 50394,
+      "seed": 3336171383
+    },
+    "first_setup_identity_audit_sha256": "742a9a6b7317651c654620c1f69c87cff4177a8c9e7eea8c34d596e817af43e8",
+    "first_positive_source_audit_sha256": "9e74c7018001369295e569ef071427633db53e2a0e6dc1db182c8aa3604d096d",
+    "full_mwro": {
+      "bytes": 2137257881,
+      "recorded_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "fresh_full_hash_computed": false,
+      "stat_stable": true
+    },
+    "consumed_prefix": {
+      "bytes": 10389712,
+      "records": 4736,
+      "first_entry_sequence": 4088,
+      "first_setup_sequence": 4113,
+      "first_match_tick_sequence": 4115,
+      "last_sequence": 4735,
+      "fresh_sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a"
+    }
+  },
+  "browser_capture": {
+    "producer": {
+      "commit": "940411fa13a17de796217b1dba5b4c338dd02b8f",
+      "tree": "1a952c3537b98ae6777ddd6b166c24525d3994b9",
+      "base_main": "6c0ccecd6c88d50670668a032a6882463639e809"
+    },
+    "capture_report_sha256": "85a4fd196f1d6efb25fdb43fd287684c9d91d68207b0b94792da77aa722ebcf0",
+    "retail_browser_report_sha256": "d3e734025b62dfd35fb9da9a785c503ad4fe3345d40c0ad0c6800c9d951bf393",
+    "retail_port_trace": {
+      "bytes": 2811974,
+      "sha256": "50ea4d53af90aaeb390f0096352782c38fafd0c069556e8ce6f2b725b5f776c2",
+      "rows_validated": 1316,
+      "requested_cursor": 1309,
+      "observed_cursor": 1311,
+      "exported_cursor": 1314,
+      "browser_errors_before_stop": 0
+    },
+    "runtime_data_recorded_identity": {
+      "bytes": 3674112,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+      "freshly_rehashed": false
+    }
+  },
+  "comparison": {
+    "scope": "v10-first-positive-match-frame",
+    "expectations_sha256": "1d65ba58b2db9cf764a57010e8e6531faa03c5ddc0668e3d53d2a8deb8fc15f0",
+    "launch_packet_sha256": "bbbef1204fd3ebcf963234b6b6554c55d9f5e4e5783839b4041f62fd2927b153",
+    "report_sha256": "0ec654b52392f40fa5ba89e7cbbf04e070781e6afab40f400aaf824b104f6ff9",
+    "boundary_result": "equivalent",
+    "result": "incomplete",
+    "complete": false,
+    "whole_session_equivalent": false,
+    "cli_exit_code": 1,
+    "first_positive_boundary": {
+      "match_index": 0,
+      "source_tick": 124,
+      "match_frame": 1,
+      "source_sequence": 4735,
+      "pad_consume_sequence": 4734,
+      "timeline_frame_index": 1308,
+      "browser_cursor": 1309
+    },
+    "timeline_frames_consumed": 1309,
+    "css_sss_frames_input_ordered_only": 1184,
+    "timeline_scene_spans": [
+      {"scene": 1, "first_frame": 0, "last_frame": 936},
+      {"scene": 2, "first_frame": 937, "last_frame": 1183},
+      {"scene": 3, "first_frame": 1184, "last_frame": 1308}
+    ],
+    "nonmatch_fields_compared": [],
+    "setup_records_compared": 1,
+    "match_state_frames_compared": 125,
+    "source_max_bytes": 33554432,
+    "source_max_records": 8192,
+    "first_difference": null
+  },
+  "comparison_producer": {
+    "commit": "2e9dd41de2cf5644aec1367f9eec970a4bcee449",
+    "tree": "6260d72f66a4cc6140ef96eff466576275df543b",
+    "base_main": "95175a9d34a2e23e4bc0a08ac5aac55f0ede969c",
+    "rebased_patch_series_unchanged": true
+  },
+  "integration_validation": {
+    "base_main": "52f735dbd9198d0aa570f7f52ed625f47ba90332",
+    "source_commit": "039e0a328d2249ef7069fae3938675e6c080c9f8",
+    "source_tree": "3e584695216a48771545245456cbe037258fda85",
+    "full_python_suite": {
+      "result": "pass",
+      "test_count": 1977,
+      "skipped": 145,
+      "failures": 0,
+      "errors": 0,
+      "log_sha256": "5498d4d6ed4aad3c78c3d2e81bd5d5b874733c36e4d0c6ee6e0e9a9dc8fe716a"
+    },
+    "release_runtime_build": {
+      "result": "pass",
+      "configuration": "Release",
+      "target": "runtime",
+      "exit_code": 0,
+      "log_sha256": "b1771cbd8d04bcfc68cf51483c6fa51e21419a5d86c866735cfa2fc04a5be200"
+    }
+  },
+  "preserved_preflight_failures": [
+    {
+      "result": "invalid_preflight",
+      "private_run_id": "b4-first-positive-match-frame-validation-20261007-20261007-010135-460cfb10",
+      "receipt": "comparison-expectations-preflight-failure-v1.json",
+      "sha256": "f6127877b66d27e96163d4db5c1bf9b6bb96c51117601e1107ae4a4543114dcb",
+      "cause": "Validator incorrectly required browser report metrics to equal the wrapper-observed cursor instead of validating requested, observed and exported cursors independently.",
+      "repair_commit": "dc16ae24a963bbbae7e436982bd8640b1fac7070"
+    },
+    {
+      "result": "invalid",
+      "private_run_id": "b4-first-positive-compare-preflight-20261007T092128Z",
+      "receipt": "browser-provenance-preflight-v1.json",
+      "sha256": "302fcb7771f3f88e26b8e98f688624eaab6da7380bec2f3c82944c9c6b98f725",
+      "cause": "Any runtime-data abort diagnostic was rejected before checking complete-package transport evidence; causal origin remains unproven.",
+      "repair_commit": "f1e6a7d87956514e6ab64ea854ed3227c1911b95"
+    },
+    {
+      "result": "invalid",
+      "private_run_id": "b4-abort-provenance-preflight-20261007T093232Z",
+      "receipt": "browser-provenance-preflight-v1.json",
+      "sha256": "6c704a6309977e099ec3f4995fe2ee14874b0968d0f9da7b09b00aec26655881",
+      "cause": "Browser chronology rejected the initial navigation clock reset before replay cursor availability.",
+      "repair_commit": "039e0a328d2249ef7069fae3938675e6c080c9f8"
+    }
+  ],
+  "limits": [
+    "One source/browser pair and one bounded boundary only.",
+    "Export rows after the target were validated for provenance, input ordering and shape but not compared for state.",
+    "No whole-session, later gameplay, pixels, PCM, timing, performance or competitive-accuracy claim.",
+    "No full MWRO or runtime-data content hash was computed during comparison or integration."
+  ]
+}
