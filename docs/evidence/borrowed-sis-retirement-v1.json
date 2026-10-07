@@ -148,8 +148,8 @@
       "stderr_sha256": "8b298caebac4d92b8ea0566983838306913ba6166c7f531b26b46933bd600e76",
       "executable_producer": "b5cee0eab77c36420939a82ba841c7c96f35a0e0",
       "run_label": "stadium-sis-post198-validation-20261007-030717-ddc6fda9",
-      "tests": 0,
-      "unittest_seconds": 0.0,
+      "tests": 1985,
+      "unittest_seconds": 353.218,
       "skipped": 132
     },
     "current_main_release": {
