@@ -275,7 +275,8 @@ target_link_options(gameplay_gamewatch_visibility_trace PRIVATE -sENVIRONMENT=no
 set_target_properties(gameplay_gamewatch_visibility_trace PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_random_article_trace EXCLUDE_FROM_ALL
-  tests/gameplay_random_article_trace.cpp tests/gameplay_random_article_fields.c)
+  tests/gameplay_random_article_trace.cpp tests/gameplay_random_article_fields.c
+  tests/stadium_c1_item_owner_negative_cases.cpp)
 target_link_libraries(gameplay_random_article_trace PRIVATE fighter_asset_runtime)
 target_compile_options(gameplay_random_article_trace PRIVATE -UNDEBUG
   "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
@@ -633,7 +634,9 @@ add_executable(native_menu_host_trace EXCLUDE_FROM_ALL tests/native_menu_host_tr
 if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   target_sources(native_menu_host_trace PRIVATE
     tests/stadium_c1_stage_state_probe.c
-    tests/stadium_c1_e8_call_observer.c)
+    tests/stadium_c1_e8_call_observer.c
+    tests/gameplay_random_article_fields.c
+    tests/stadium_c1_item_owner_negative_cases.cpp)
   target_compile_definitions(native_menu_host_trace PRIVATE
     MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
   target_link_options(native_menu_host_trace PRIVATE

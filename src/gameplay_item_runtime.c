@@ -89,6 +89,11 @@ void* melee_web_item_public_data_decode(const MeleeWebNativeDat* r,uint32_t root
                  "Incomplete original ItCo itPublicData root");
     item_require(r,common_table%4==0&&character_table%4==0&&pokemon_table%4==0,
                  "ItCo Article table is unaligned");
+    /* The per-entry pointer reads below only establish that each zero/null or
+     * non-null word is archive-readable. Preserve the authored table bound as
+     * well, so readable adjacent bytes cannot extend a short character table. */
+    r->region(r->context,character_table,
+              (size_t)MELEE_WEB_ITEM_CHARACTER_COUNT*4);
     Article* decoded_articles[MELEE_WEB_ITEM_COMMON_COUNT+MELEE_WEB_ITEM_POKEMON_COUNT];
     uint32_t decoded_roots[MELEE_WEB_ITEM_COMMON_COUNT+MELEE_WEB_ITEM_POKEMON_COUNT];
     uint32_t decoded_count=0;
