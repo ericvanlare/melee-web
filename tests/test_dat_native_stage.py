@@ -87,6 +87,10 @@ class NativeStageOriginalRuntime(unittest.TestCase):
         output=self.run_trace("dat_native_stage_map_trace","--stadium-map",asset)
         self.assertIn("C0 Stadium map-only owner",output)
 
+    def test_screen_roots_synthetic_ownership_and_catalog(self):
+        output=self.run_trace("stadium_screen_roots_trace")
+        self.assertIn("Screen roots synthetic canonical IMAGE, writable SIS, catalog negatives and two lifetimes passed",output)
+
     def test_structural_marker_pairs_preserve_authored_order_and_checks(self):
         output=self.run_trace("dat_native_stage_map_trace","--marker-fixture")
         self.assertIn("Structural marker pairs preserve duplicates/order",output)

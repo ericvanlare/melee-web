@@ -167,6 +167,16 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         )
 
     def test_stadium_c1_item_state_owner_preflight(self):
+        self.run_stadium_owner_preflight(
+            "stadium-c1-item-state-preflight-v1", "c1-item-state-preflight",
+            "C1 reopened-context lifecycle and item-state-owner preflight passed; no E8 request")
+
+    def test_stadium_screen_roots_owner_preflight(self):
+        self.run_stadium_owner_preflight(
+            "stadium-screen-roots-preflight-v1", "screen-roots-preflight",
+            "C1 screen-root preflight preserved canonical IMAGE, writable SIS and two owner/catalog lifetimes; no stage entry or ticks")
+
+    def run_stadium_owner_preflight(self, recipe, prefix, success_message):
         target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
         fixture_root = Path(os.environ.get("MELEE_MENU_FIXTURE_ROOT", ROOT / "assets-local"))
         if not fixture_root.is_absolute():
@@ -189,46 +199,50 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
         if missing:
             detail = ", ".join(missing[:5])
             message = (
-                "C1 item-state preflight requires the retained 98-file union"
+                "Stadium owner preflight requires the retained 98-file union"
                 f"; missing {detail}"
             )
             if stadium_fixture_campaign_is_explicit():
                 self.fail(message)
             self.skipTest(message)
         if not target.is_file():
-            self.skipTest("C1 item-state preflight requires its built host trace")
+            self.skipTest("Stadium owner preflight requires its built host trace")
         source_revision = subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-        trace = self.scratch / "c1-item-state-preflight.jsonl"
+        trace = self.scratch / (prefix + ".jsonl")
         command = [str(node_runtime()), str(target), str(menu), str(game), "3",
                    str(trace), source_revision,
-                   "stadium-c1-item-state-preflight-v1"]
-        (self.scratch / "c1-item-state-preflight-command.txt").write_text(
+                   recipe]
+        (self.scratch / (prefix + "-command.txt")).write_text(
             " ".join(command) + "\n", encoding="utf-8")
         try:
             run = subprocess.run(
                 command, cwd=ROOT, capture_output=True, text=True, timeout=120)
         except subprocess.TimeoutExpired as failure:
-            (self.scratch / "c1-item-state-preflight.stdout").write_bytes(
+            (self.scratch / (prefix + ".stdout")).write_bytes(
                 failure.stdout.encode() if isinstance(failure.stdout, str)
                 else (failure.stdout or b""))
-            (self.scratch / "c1-item-state-preflight.stderr").write_bytes(
+            (self.scratch / (prefix + ".stderr")).write_bytes(
                 failure.stderr.encode() if isinstance(failure.stderr, str)
                 else (failure.stderr or b""))
             raise
-        (self.scratch / "c1-item-state-preflight.stdout").write_text(
+        (self.scratch / (prefix + ".stdout")).write_text(
             run.stdout, encoding="utf-8")
-        (self.scratch / "c1-item-state-preflight.stderr").write_text(
+        (self.scratch / (prefix + ".stderr")).write_text(
             run.stderr, encoding="utf-8")
         self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
         self.assertIn(
-            "C1 reopened-context lifecycle and item-state-owner preflight passed; no E8 request",
+            success_message,
             run.stdout,
         )
         self.assertIn(
             "stage publication, or source menu entry",
             run.stdout,
         )
+
+        if recipe == "stadium-screen-roots-preflight-v1":
+            self.assertEqual(len(trace.read_text(encoding="utf-8").splitlines()), 1,
+                             "Screen root probe must retain a header-only trace")
 
     def test_stadium_c1_fixture_preflight_detects_missing_selected_file(self):
         target = self.scratch / "synthetic-c1-fixture-preflight"

@@ -409,6 +409,10 @@ DatNativeMap::DatNativeMap(std::shared_ptr<const DatArchive> archive,
 }
 DatNativeMap::~DatNativeMap()=default;
 void* DatNativeMap::map_head()const noexcept{return storage_->native_map;}
+void* DatNativeMap::image_descriptor(uint32_t source_offset)const{
+ require(storage_->images.contains(source_offset),"IMAGE is absent from native map texture graph");
+ return storage_->images.at(source_offset);
+}
 void* DatNativeMap::collision(){
  if(!storage_->native_collision)storage_->native_collision=storage_->collision();
  return storage_->native_collision;
