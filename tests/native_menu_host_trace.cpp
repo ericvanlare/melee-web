@@ -1858,6 +1858,9 @@ void run_stadium_screen_roots_preflight(
     const auto& raw = files.at("GrPs.usd");
     const auto raw_before = raw;
     auto archive = std::make_shared<const DatArchive>(raw, DatExternalPolicy::ResolveNull);
+    // ResolveNull clears validated external-link slots in the archive's owned
+    // copy. Preserve that decoded baseline separately from immutable input.
+    const std::vector<std::uint8_t> archive_before(archive->data().begin(), archive->data().end());
     const auto image_offset = screen::root(*archive, screen::image_name);
     const auto sis_offset = screen::root(*archive, screen::sis_name);
     check(image_offset == 35276 && archive->be16(image_offset+4) == 16 &&
@@ -1881,8 +1884,10 @@ void run_stadium_screen_roots_preflight(
               "Screen descriptor checks changed RNG owner/value");
         check(((HSD_GObj**)HSD_GObj_Entities)[9] == nullptr,
               "Screen descriptor checks created an item object");
-        check(raw == raw_before && std::equal(archive->data().begin(), archive->data().end(), raw_before.begin()+32),
+        check(raw == raw_before,
               "Screen descriptor checks changed raw GrPs bytes");
+        check(std::equal(archive->data().begin(), archive->data().end(), archive_before.begin()),
+              "Screen descriptor checks changed the decoded GrPs owner");
         std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> save_after{};
         char error[256]{};
         check(melee_web_menu_host_snapshot_card_data(host, 0, save_after.data(), save_after.size(), error, sizeof(error)), error);
