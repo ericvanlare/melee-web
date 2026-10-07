@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {NATURAL_PAUSE_PROTOCOL, STOPPED_SCENE_PAIR_PROTOCOL, resolveCaptureMode, validateNaturalPauseManifest,
   validateStoppedScenePairManifest, firstNaturalPauseIncident, firstStoppedScenePairStop,
-  summarizeStoppedSourceInterval,
+  validateStoppedScenePairBoundary, summarizeStoppedSourceInterval,
   naturalPauseRuntimeUrl, validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
   stopSourceBeforeDiagnosticExport, readNaturalPauseBrowserCommandLine} from '../scripts/natural_pause_diagnostic.mjs';
 
@@ -22,6 +22,8 @@ const manifest = () => ({
 });
 const scenePairManifest = () => ({...manifest(),
   schema: 'melee-web-stopped-scene-pair-diagnostic-manifest-v1',
+  build: {...manifest().build,
+    producer_source: {commit: 'b'.repeat(40), tree: 'c'.repeat(40)}},
   protocol: {...STOPPED_SCENE_PAIR_PROTOCOL}});
 
 assert.deepEqual(resolveCaptureMode(), {mode: 'state', diagnostic: false});
@@ -64,6 +66,7 @@ for (const mutate of [
   value => {value.protocol.auto_resume = true;},
   value => {value.protocol.expected_frame_slots = 4;},
   value => {value.build.configuration = 'Debug';},
+  value => {delete value.build.producer_source;},
 ]) {
   const value = scenePairManifest(); mutate(value);
   assert.throws(() => validateStoppedScenePairManifest(value, ['runtime.js']));
@@ -131,9 +134,27 @@ assert.equal(firstNaturalPauseIncident({source_running: 1, source_cursor: 3000,
 assert.equal(firstStoppedScenePairStop({source_running: 1, source_cursor: 1599,
   latest_callback: {sample_source_frame: 100, sample_replay_cursor: 1599}}, 5000), null,
   'a positive match frame before the fixed cursor target is insufficient');
-assert.equal(firstStoppedScenePairStop({source_running: 1, source_cursor: 1601,
-  latest_callback: {sample_source_frame: 1, sample_replay_cursor: 1600, row: 55}}, 5000).outcome,
-  'paired_screenshot_target', 'the short target stops after the first observed positive match source frame');
+const pairTrigger = firstStoppedScenePairStop({source_running: 1, source_cursor: 1601,
+  latest_callback: {sample_source_frame: 1, sample_replay_cursor: 1600, row: 55}}, 5000);
+assert.equal(pairTrigger.outcome, 'paired_screenshot_target',
+  'the short target stops after the first observed positive match source frame');
+assert.equal(pairTrigger.trigger_cursor, 1601,
+  'the cursor seen when the pair target fires remains a separate trigger boundary');
+assert.equal(Object.hasOwn(pairTrigger, 'source_cursor'), false,
+  'the trigger cursor is not mistaken for the later stopped cursor');
+const stoppedPairBoundary = validateStoppedScenePairBoundary(pairTrigger, {source_running: 0,
+  replay_cursor: 1603, latest_callback: {sample_source_frame: 2, sample_replay_cursor: 1602, row: 57}});
+assert.deepEqual(stoppedPairBoundary, {valid: true, problems: [], trigger_cursor: 1601, stopped_cursor: 1603,
+  source_running: 0,
+  latest_callback: {sample_source_frame: 2, sample_replay_cursor: 1602, row: 57}},
+  'the actual stopped cursor may advance during the pause round trip but is pinned independently');
+assert.equal(validateStoppedScenePairBoundary(pairTrigger, {source_running: 0, replay_cursor: 1801,
+  latest_callback: {sample_source_frame: 2, sample_replay_cursor: 1800, row: 77}}).valid, false,
+  'a stop cursor that advanced beyond 1800 cannot qualify');
+assert.ok(validateStoppedScenePairBoundary(pairTrigger, {source_running: 1, replay_cursor: 1603,
+  latest_callback: {sample_source_frame: 2, sample_replay_cursor: 1602, row: 57}}).problems.includes('source_not_stopped'));
+assert.ok(validateStoppedScenePairBoundary(pairTrigger, {source_running: 0, replay_cursor: 1603,
+  latest_callback: {sample_source_frame: 0, sample_replay_cursor: 1602, row: 57}}).problems.includes('latest_callback_not_positive_match'));
 assert.equal(firstStoppedScenePairStop({source_running: 1, source_cursor: 1601,
   latest_callback: {sample_source_frame: 0, sample_replay_cursor: 1600, row: 55}}, 5000), null,
   'the target does not stop on pre-match callback rows');
@@ -160,6 +181,12 @@ assert.deepEqual(summarizeStoppedSourceInterval(sourceIntervalCapture, 0, 2), {
 assert.equal(summarizeStoppedSourceInterval(sourceIntervalCapture, 1, 3)
   .all_observed_callbacks_zero_source_steps_and_draws, false);
 assert.throws(() => summarizeStoppedSourceInterval(sourceIntervalCapture, 0, 4), /complete callback table span/);
+assert.throws(() => summarizeStoppedSourceInterval({rows: 2, columns: ['source_steps', 'source_draws'],
+  table: [1, 0, -1, 0]}, 0, 2), /unknown source counters/,
+  'negative step counters cannot cancel positive source work to manufacture a zero interval');
+assert.throws(() => summarizeStoppedSourceInterval({rows: 2, columns: ['source_steps', 'source_draws'],
+  table: [0, 1, 0, -1]}, 0, 2), /unknown source counters/,
+  'negative draw counters cannot cancel positive source work to manufacture a zero interval');
 
 const order = [];
 let statusReads = 0;
@@ -255,6 +282,16 @@ const delayedCaptureAt = runner.indexOf("captureStoppedSceneImage('stopped-scene
 assert.ok(immediateCaptureAt >= 0 && immediateCaptureAt < traceFinalizeAt &&
   traceFinalizeAt < gpuQueryAt && gpuQueryAt < delayedCaptureAt,
   'paired screenshot order is stop, immediate image, trace delay, GPU query, delayed image');
+assert.ok(runner.includes('boundary.stopped_cursor, status'),
+  'the immediate image is bound to the cursor observed after native stop');
+assert.ok(runner.includes('report.stopped_scene_pair.stop_boundary.stopped_cursor'),
+  'the delayed image is bound to that same pinned stopped cursor');
+assert.ok(runner.includes('const firstRow = counters.immediate_before.callback_rows'),
+  'the verified source interval begins at the immediate pre-image status row count');
+assert.ok(runner.includes('const endRow = counters.delayed_after.callback_rows'),
+  'the verified source interval ends at the delayed post-image status row count');
+assert.ok(runner.includes('runtime_producer_source: diagnosticManifest.build.producer_source ?? null'),
+  'the capture report distinguishes current harness source from runtime artifact producer source');
 assert.ok(!runner.includes('stopped_scene_visual'),
   'artifact presence is never serialized under a visual-completeness claim');
 assert.ok(runner.includes('stopped_scene_artifacts_complete') &&

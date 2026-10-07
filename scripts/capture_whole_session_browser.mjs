@@ -21,7 +21,8 @@ import {parseRngDrawProbe, validateRngDrawProbeRows} from './rng_draw_probe.mjs'
 import {NATURAL_PAUSE_PROTOCOL, STOPPED_SCENE_PAIR_PROTOCOL, resolveCaptureMode,
   validateNaturalPauseManifest, validateStoppedScenePairManifest, naturalPauseRuntimeUrl,
   validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
-  firstStoppedScenePairStop, summarizeStoppedSourceInterval, stopSourceBeforeDiagnosticExport,
+  firstStoppedScenePairStop, validateStoppedScenePairBoundary, summarizeStoppedSourceInterval,
+  stopSourceBeforeDiagnosticExport,
   readNaturalPauseBrowserCommandLine} from './natural_pause_diagnostic.mjs';
 import {installPauseTraceCapture, readPauseTraceCapture, readPauseTraceStatus,
   readRetainedPauseDiagnostics} from '../tests/pause_trace_capture.mjs';
@@ -427,6 +428,7 @@ try {
     report.producer = {configuration: diagnosticManifest.build.configuration,
       target: diagnosticManifest.build.target, directory: diagnosticManifest.build.directory,
       source_commit: source.commit, source_tree: source.tree,
+      runtime_producer_source: diagnosticManifest.build.producer_source ?? null,
       expected_artifacts: diagnosticManifest.build.artifacts};
     report.build_artifacts_before = await releaseArtifactMap(diagnosticManifest.build.directory, url);
     const beforeComparison = compareIdentityMaps(diagnosticManifest.build.artifacts, report.build_artifacts_before);
@@ -693,10 +695,13 @@ try {
           : firstNaturalPauseStop(observedTerminal, elapsedMs);
         if (stop) {
           report.natural_pause_terminal = {...stop, observed_at_ms: observed.at_ms,
-            elapsed_ms: elapsedMs, source_cursor: observed.replay_cursor,
+            elapsed_ms: elapsedMs,
+            ...(stop.outcome === 'paired_screenshot_target'
+              ? {trigger_cursor: observed.replay_cursor}
+              : {source_cursor: observed.replay_cursor}),
             source_running: observed.source_running, phase: observed.phase};
           if (stop.outcome === 'paired_screenshot_target')
-            report.stopped_scene_pair_target = {source_cursor: observed.replay_cursor,
+            report.stopped_scene_pair_target = {trigger_cursor: observed.replay_cursor,
               source_running: observed.source_running, latest_callback: observed.latest_callback};
           return;
         }
@@ -799,16 +804,25 @@ try {
           captureImmediate: stoppedScenePair &&
             report.natural_pause_terminal?.outcome === 'paired_screenshot_target'
             ? async status => {
-              const immediate = await captureStoppedSceneImage('stopped-scene-immediate',
-                report.natural_pause_terminal.source_cursor, status);
               report.stopped_scene_pair ||= {images: [], source_counters: {}, render_environment: null,
                 visible_gameplay_observed: 'not_assessed', capture_order: []};
+              const boundary = validateStoppedScenePairBoundary(report.natural_pause_terminal, status);
+              report.stopped_scene_pair.stop_boundary = boundary;
+              report.stopped_scene_pair.capture_order.push('source_stop_boundary_validated');
+              if (!boundary.valid) {
+                report.stopped_scene_pair.capture_skipped =
+                  `Stopped source boundary failed validation: ${boundary.problems.join(', ')}`;
+                process.exitCode = 1;
+                return {valid: false, boundary};
+              }
+              const immediate = await captureStoppedSceneImage('stopped-scene-immediate',
+                boundary.stopped_cursor, status);
               report.stopped_scene_pair.capture_order.push('source_running_zero_verified',
                 'immediate_screenshot_complete_before_trace_finalization');
               report.stopped_scene_pair.images.push(immediate.image);
               report.stopped_scene_pair.source_counters.immediate_before = immediate.counters.before;
               report.stopped_scene_pair.source_counters.immediate_after = immediate.counters.after;
-              return immediate;
+              return {valid: true, boundary, image: immediate};
             } : undefined,
           finalizeTrace: async () => {
             if (!traceStarted || !diagnosticCdp || !naturalPauseTraceSettings)
@@ -826,6 +840,7 @@ try {
           readEvidence: async () => {
             const pairEligible = stoppedScenePair &&
               report.natural_pause_terminal?.outcome === 'paired_screenshot_target' &&
+              report.stopped_scene_pair?.stop_boundary?.valid === true &&
               report.stopped_scene_pair?.images?.length === 1;
             let stoppedVisual = null;
             if (!stoppedScenePair || pairEligible) {
@@ -851,7 +866,7 @@ try {
               if (stoppedScenePair) {
                 report.stopped_scene_pair.capture_order.push('gpu_status_queried');
                 const delayed = await captureStoppedSceneImage('stopped-scene-after-export',
-                  report.natural_pause_terminal.source_cursor);
+                  report.stopped_scene_pair.stop_boundary.stopped_cursor);
                 report.stopped_scene_pair.images.push(delayed.image);
                 report.stopped_scene_pair.capture_order.push('delayed_screenshot_complete_after_trace_and_gpu_query');
                 report.stopped_scene_pair.source_counters.delayed_before = delayed.counters.before;
@@ -869,7 +884,8 @@ try {
               report.stopped_scene_pair ||= {images: [], source_counters: {}, render_environment: null,
                 visible_gameplay_observed: 'not_assessed', capture_order: []};
               report.stopped_scene_pair.capture_skipped =
-                'Positive-match source cursor target was not reached; no paired images were produced.';
+                report.stopped_scene_pair.capture_skipped ||
+                'Validated stopped-source boundary was not reached; no paired images were produced.';
             }
             report.runtime_incident_recorder = await observePageOperation('retained incident recorder',
               readRetainedPauseDiagnostics(page,
@@ -883,18 +899,20 @@ try {
               readPauseTraceCapture(page, report.natural_pause_terminal?.outcome ?? 'capture_failure'));
             if (stoppedScenePair && pairEligible) {
               const counters = report.stopped_scene_pair.source_counters;
-              const firstRow = counters.immediate_after.callback_rows;
+              const firstRow = counters.immediate_before.callback_rows;
               const endRow = counters.delayed_after.callback_rows;
               const interval = summarizeStoppedSourceInterval(report.capture, firstRow, endRow);
               const snapshots = [counters.immediate_before, counters.immediate_after,
                 counters.delayed_before, counters.delayed_after];
-              const targetCursor = report.natural_pause_terminal.source_cursor;
+              const targetCursor = report.stopped_scene_pair.stop_boundary.stopped_cursor;
               const sourceStopped = snapshots.every(row => row.source_running === 0);
               const cursorUnchanged = snapshots.every(row => row.replay_cursor === targetCursor);
               report.stopped_scene_pair.source_counters.interval = {
+                trigger_cursor: report.stopped_scene_pair.stop_boundary.trigger_cursor,
+                stopped_cursor: targetCursor,
                 exact_cursor_before_and_after_both_images: cursorUnchanged,
                 source_running_zero_at_all_image_boundaries: sourceStopped,
-                source_cursor_start: counters.immediate_after.replay_cursor,
+                source_cursor_start: counters.immediate_before.replay_cursor,
                 source_cursor_end: counters.delayed_before.replay_cursor,
                 callback_interval: interval,
                 no_source_advance_verified: cursorUnchanged && sourceStopped &&
@@ -1093,6 +1111,7 @@ try {
       !!report.stopped_scene?.gpu_status;
     const stoppedScenePairValid = !stoppedScenePair || (
       terminal?.outcome === 'paired_screenshot_target' &&
+      report.stopped_scene_pair?.stop_boundary?.valid === true &&
       report.stopped_scene_pair?.source_counters?.interval?.no_source_advance_verified === true);
     const captureValid = preflightValid && postflightValid && cleanupValid &&
       stoppedSceneArtifactsComplete && stoppedScenePairValid &&
@@ -1109,7 +1128,8 @@ try {
       stopped_scene_artifacts_complete: stoppedSceneArtifactsComplete,
       visible_gameplay_observed: 'not_assessed',
       ...(stoppedScenePair ? {paired_source_interval_zero_steps_and_draws:
-        report.stopped_scene_pair?.source_counters?.interval?.no_source_advance_verified === true} : {}),
+        report.stopped_scene_pair?.source_counters?.interval?.no_source_advance_verified === true,
+      stopped_scene_pair_stop_boundary_valid: report.stopped_scene_pair?.stop_boundary?.valid === true} : {}),
       producer_postflight: postflightValid, cleanup: cleanupValid,
       clean_prefix: captureValid && ['cursor_limit', 'replay_timeout', 'paired_screenshot_target'].includes(terminal?.outcome),
       terminal_failure: terminal?.outcome === 'runtime_error'};

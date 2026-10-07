@@ -119,9 +119,14 @@ export function validateNaturalPauseManifest(manifest, artifactNames = []) {
 }
 
 export function validateStoppedScenePairManifest(manifest, artifactNames = []) {
-  return validateDiagnosticManifest(manifest, artifactNames,
+  const validated = validateDiagnosticManifest(manifest, artifactNames,
     'melee-web-stopped-scene-pair-diagnostic-manifest-v1', STOPPED_SCENE_PAIR_PROTOCOL,
     'Stopped-scene-pair');
+  const producer = validated.build.producer_source;
+  if (!producer || !/^[0-9a-f]{40}$/.test(producer.commit || '') ||
+      !/^[0-9a-f]{40}$/.test(producer.tree || ''))
+    throw Error('Stopped-scene-pair manifest needs the exact runtime artifact producer source identity');
+  return validated;
 }
 
 export function validateNaturalPauseBrowserIdentity(expected, actual) {
@@ -204,14 +209,14 @@ export function firstStoppedScenePairStop(snapshot, elapsedMs) {
   const cursor = snapshot?.source_cursor;
   const callback = snapshot?.latest_callback;
   if (snapshot?.source_running === 0)
-    return {outcome: 'source_stopped_before_screenshot_target', source_cursor: cursor ?? null,
+    return {outcome: 'source_stopped_before_screenshot_target', observed_cursor: cursor ?? null,
       latest_callback: callback ?? null};
   if (Number.isSafeInteger(cursor) && cursor >= STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_target &&
       snapshot?.source_running === 1 &&
       Number.isSafeInteger(callback?.sample_replay_cursor) &&
       callback.sample_replay_cursor >= STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_target &&
       Number.isFinite(callback?.sample_source_frame) && callback.sample_source_frame > 0)
-    return {outcome: 'paired_screenshot_target', source_cursor: cursor,
+    return {outcome: 'paired_screenshot_target', trigger_cursor: cursor,
       source_frame: callback.sample_source_frame, callback_replay_cursor: callback.sample_replay_cursor,
       callback_row: callback.row};
   if (Number.isSafeInteger(cursor) && cursor >= STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_limit)
@@ -221,6 +226,35 @@ export function firstStoppedScenePairStop(snapshot, elapsedMs) {
     return {outcome: 'pair_replay_timeout', elapsed_ms: elapsedMs,
       source_cursor: Number.isSafeInteger(cursor) ? cursor : null, latest_callback: callback ?? null};
   return null;
+}
+
+/** Bind the replay-loop trigger to the later, actually stopped native cursor. */
+export function validateStoppedScenePairBoundary(trigger, stopped) {
+  const triggerCursor = trigger?.trigger_cursor;
+  const stoppedCursor = stopped?.replay_cursor;
+  const callback = stopped?.latest_callback;
+  const problems = [];
+  if (trigger?.outcome !== 'paired_screenshot_target' ||
+      !Number.isSafeInteger(triggerCursor) ||
+      triggerCursor < STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_target ||
+      triggerCursor > STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_limit)
+    problems.push('invalid_trigger_cursor');
+  if (stopped?.source_running !== 0) problems.push('source_not_stopped');
+  if (!Number.isSafeInteger(stoppedCursor) ||
+      stoppedCursor < STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_target ||
+      stoppedCursor > STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_limit ||
+      (Number.isSafeInteger(triggerCursor) && stoppedCursor < triggerCursor))
+    problems.push('stopped_cursor_out_of_bounds');
+  if (!Number.isSafeInteger(callback?.sample_replay_cursor) ||
+      callback.sample_replay_cursor < STOPPED_SCENE_PAIR_PROTOCOL.source_cursor_target ||
+      (Number.isSafeInteger(stoppedCursor) && callback.sample_replay_cursor > stoppedCursor) ||
+      !Number.isFinite(callback?.sample_source_frame) || callback.sample_source_frame <= 0)
+    problems.push('latest_callback_not_positive_match');
+  return {valid: problems.length === 0, problems,
+    trigger_cursor: Number.isSafeInteger(triggerCursor) ? triggerCursor : null,
+    stopped_cursor: Number.isSafeInteger(stoppedCursor) ? stoppedCursor : null,
+    source_running: stopped?.source_running ?? null,
+    latest_callback: callback ?? null};
 }
 
 export function summarizeStoppedSourceInterval(capture, firstRow, endRow) {
@@ -238,7 +272,7 @@ export function summarizeStoppedSourceInterval(capture, firstRow, endRow) {
   for (let row = firstRow; row < endRow; row++) {
     const steps = table[row * columns.length + stepIndex];
     const draws = table[row * columns.length + drawIndex];
-    if (!Number.isSafeInteger(steps) || !Number.isSafeInteger(draws))
+    if (!Number.isSafeInteger(steps) || !Number.isSafeInteger(draws) || steps < 0 || draws < 0)
       throw Error(`Stopped-scene callback row ${row} has unknown source counters`);
     sourceSteps += steps;
     sourceDraws += draws;
