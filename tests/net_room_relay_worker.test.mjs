@@ -476,6 +476,8 @@ test('real Worker HTTP/WebSocket room contract and serialized async callbacks', 
     await assert.deepEqual(pair1.transport, {
       type: 'room-websocket', peer_limit: 2, packet_limit_bytes: 1024 * 1024,
       buffered_queue_limit_bytes: 1024 * 1024,
+      pending_send_queue_limit_bytes: 1024 * 1024,
+      pending_send_queue_limit_messages: 256,
       inbound_callback_queue_limit_bytes: 1024 * 1024,
       inbound_callback_queue_limit_messages: 256,
     });

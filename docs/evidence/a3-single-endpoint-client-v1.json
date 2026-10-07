@@ -1,0 +1,148 @@
+{
+  "schema": "melee-web-a3-single-endpoint-client-evidence-v1",
+  "scope": "One browser-portable single-peer room endpoint and its Node compatibility pair only. Local HTTP/WebSocket transport and Worker/A2 contract evidence; no browser-owned peer, Internet, two-machine, complete-set, deployment, WebRTC, rollback, gameplay accuracy, or performance claim.",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/197",
+  "evidence_labels": ["Source identified"],
+  "source": {
+    "repository": "melee-web",
+    "base_main_commit": "52f735dbd9198d0aa570f7f52ed625f47ba90332",
+    "base_main_tree": "b1e6c55208d17df72e1843787a8079226ffcdebd",
+    "producer_commit": "dce48f9829bf1430404153b6d8fa96842c856024",
+    "producer_tree": "ab130db509e1aed295f9c76709714c2c43dd24d1",
+    "producer_branch": "codex/a3-single-endpoint-20261007",
+    "validation_source_clean_before_and_after": true,
+    "changed_files": [
+      {
+        "path": "scripts/net_lockstep_websocket_relay.mjs",
+        "bytes": 19394,
+        "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"
+      },
+      {
+        "path": "tests/net_lockstep_transport.test.mjs",
+        "bytes": 23918,
+        "sha256": "b8efc605b9557913d1c86698a87412aef9eae3c0098dd97488856dd574c9bca3"
+      },
+      {
+        "path": "tests/net_room_relay_worker.test.mjs",
+        "bytes": 30599,
+        "sha256": "0169e69c5219967c3a2e8836f51f62dbfd6c8fdf515bd823459b7bc8d969e2c6"
+      }
+    ],
+    "a2_protocol_sources_unchanged": true,
+    "portable_core_sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+    "node_protocol_facade_sha256": "9a6886adc3cca97ab8433bd1a3662abc7418ba640b4bf435ef212f613fc52e5f"
+  },
+  "pre_change_reproducer": {
+    "producer_commit": "1607b34400718a9a6d29c929095950933809f279",
+    "runtime": "SDK Node v24.19.0",
+    "run_inventory_id": "a3-single-endpoint-reproducer-20261007-023646-b5271d05",
+    "result_file": "result.json",
+    "result_sha256": "00be72f9e99eeb039ee7dc1a5c6685ac91ad114aa65d228847a152df5aa054e9",
+    "script_file": "reproduce.mjs",
+    "script_sha256": "af58549587b1905482e1bfe9bf745d90a263384d01e44b34a73af2701aa77a48",
+    "server": "Real node:http upgrade and raw WebSocket frames over TCP; READY and opaque first hello were written together to each of two sockets.",
+    "observed_deliveries": {"alpha": 0, "beta": 0},
+    "cleanup_note": "Both client endpoints and the server were confirmed closed. The recorded transport errors occurred during deliberate socket destruction in final cleanup, not during the delivery assertion."
+  },
+  "implementation_contract": {
+    "single_peer_api": "createRoomRelayPeerEndpoint returns synchronously with role, ready, send, onMessage, close, and drainInbound; the initial receiver is installed before the return and before readiness can expose remote packets.",
+    "readiness": "READY is transport control, never an A2 message. Outbound A2 sends wait for endpoint readiness.",
+    "pair_compatibility": "openRoomRelayPeerPair composes two endpoint handles and retains early data in the existing bounded serialized receive lane until callers subscribe.",
+    "send_queue": {"max_bytes": 1048576, "max_messages": 256},
+    "inbound_queue": {"max_bytes": 1048576, "max_messages": 256},
+    "pair_close": "All concurrent and repeated close callers share one cached promise, including its rejection when an awaited callback fails."
+  },
+  "runtime": {
+    "sdk_node": "v24.19.0",
+    "sdk_node_sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1",
+    "dependencies_lock_sha256": "b51fcde84db09641e4936339af970d74e97c71043ce6f6efee0c70e09211b385",
+    "worker_test_runtime": "Wrangler 4.131.1, Miniflare 5.20260911.0-alpha, workerd 1.20260911.1; direct Miniflare disposal and process-group cleanup passed."
+  },
+  "checks": [
+    {
+      "name": "focused real HTTP/WebSocket transport tests",
+      "command": "python3 scripts/agent_workspace.py run -- .deps/emsdk/node/24.19.0_64bit/bin/node --test tests/net_lockstep_transport.test.mjs",
+      "outcome": "pass",
+      "tests_total": 15,
+      "tests_passed": 15,
+      "tests_failed": 0,
+      "run_inventory_id": "a3-single-endpoint-post-rebase-197-20261007-025421-11f1da1f",
+      "log": "focused-node24.log",
+      "log_sha256": "05844dd27e54c3b6de5aee75009571163f7be3f6e4e1bef2e16e2efc1bd57f77"
+    },
+    {
+      "name": "actual Worker/DO and existing A2 transport contract",
+      "command": "python3 scripts/agent_workspace.py run -- .deps/emsdk/node/24.19.0_64bit/bin/node --test tests/net_room_relay_worker.test.mjs",
+      "outcome": "pass",
+      "tests_total": 4,
+      "tests_passed": 4,
+      "tests_failed": 0,
+      "run_inventory_id": "a3-single-endpoint-post-rebase-197-20261007-025421-11f1da1f",
+      "log": "worker-contract-node24.log",
+      "log_sha256": "7934041890b8390c69e7dd9d77f9b07e2c2949e7e07a131f77ab790b3f3b72bf"
+    },
+    {
+      "name": "full Python unittest discovery",
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "outcome": "pass",
+      "tests_total": 1964,
+      "tests_passed": 1819,
+      "tests_skipped": 145,
+      "duration_seconds": 343.415,
+      "run_inventory_id": "a3-single-endpoint-current-main-validation-197-20261007-025519-654d7080",
+      "log": "full-python-suite.log",
+      "log_sha256": "628a71a1faa7f0f17c414b8a4fc73076a36802716a5702b8751db1bc4d8b0fe3"
+    },
+    {
+      "name": "Release runtime build",
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "outcome": "pass",
+      "build_record_succeeded": true,
+      "run_inventory_id": "a3-single-endpoint-current-main-validation-197-20261007-025519-654d7080",
+      "log": "release-runtime-build.log",
+      "log_sha256": "c188bce2b6bd02642f89bc29d03862e0803d820738b1f61e9bcaeb12d990b8c4",
+      "artifacts": [
+        {
+          "path": "build/browser-release/gameplay_menu_browser.js",
+          "bytes": 299682,
+          "sha256": "63766185f1cccef75d3c07bd4088061c39056ae5328e60d2812ad84cf8509229"
+        },
+        {
+          "path": "build/browser-release/gameplay_menu_browser.wasm",
+          "bytes": 15736979,
+          "sha256": "80d0fa5e33f662eb8d13e8b1a2e6471929eb4b30bc484ee083b65ef1fd1665bb"
+        },
+        {
+          "path": "build/browser-release/runtime.html",
+          "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+        }
+      ],
+      "scope_note": "Repository Release runtime build validation only; the endpoint was not executed in a browser."
+    }
+  ],
+  "retained_focused_assertion_failure": {
+    "run_inventory_id": "a3-single-endpoint-close-regressions-197-20261007-025320-7f34f0b7",
+    "log": "focused-node24.log",
+    "sha256": "7b1ff948ee5b3e36e95460d540c7f18d3bbe8ced9988b57fcaa28c1f0c8a69a2",
+    "note": "The first new pair-close assertion expected the callback error at the top AggregateError level. The actual cleanup intentionally preserves nested endpoint and pair AggregateErrors; the corrected recursive assertion passed."
+  },
+  "evidence_boundary": {
+    "claims": [
+      "reproduced local READY plus first-packet loss before implementation",
+      "single endpoint installs its first receiver before readiness",
+      "A2 sends are gated by room readiness",
+      "bounded early packet retention and serialized callbacks",
+      "pair close is idempotent and retains async callback failures",
+      "actual Worker/A2 contract compatibility",
+      "full Python suite and Release runtime build passed"
+    ],
+    "exclusions": [
+      "actual browser import or execution of the endpoint",
+      "two independent browser-owned peers",
+      "Internet or two-machine session",
+      "WebRTC, relay fallback, rollback, deployment",
+      "complete competitive set, gameplay accuracy, or performance"
+    ]
+  },
+  "external_run_inventory_id": "a3-single-endpoint-current-main-validation-197-20261007-025519-654d7080"
+}

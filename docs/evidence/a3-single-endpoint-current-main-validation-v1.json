@@ -1,0 +1,134 @@
+{
+  "schema": "melee-web-a3-single-endpoint-current-main-validation-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/197",
+  "scope": "Current-main revalidation of the single-peer WebSocket endpoint implementation. Focused transport/Worker compatibility, full Python discovery, and a Release runtime build. No browser endpoint execution or new gameplay observation.",
+  "evidence_labels": ["Source identified", "Compiled"],
+  "source": {
+    "base_main_commit": "c3e9112ce2112a12920531b56637d886b9ae5e9c",
+    "base_main_tree": "65f9e25d23fb4f47e56a2d9b790d4cd9f89e419a",
+    "validated_producer_commit": "4677a53dab376186df610ad84e584e7434825fe5",
+    "validated_producer_tree": "60e8a6f0bfaf0e30e406d5afa1cef17facfd2feb",
+    "branch": "codex/a3-single-endpoint-20261007",
+    "tracked_worktree_clean_before_and_after_validation": true,
+    "rebase_range_diff": [
+      {"old_commit": "dce48f9829bf1430404153b6d8fa96842c856024", "new_commit": "609459549a1c1c0839b6a068f07c1baf4ca78d1f", "patch_equivalent": true},
+      {"old_commit": "fd08883193367ada3023026dd81bb8573816e8b1", "new_commit": "4677a53dab376186df610ad84e584e7434825fe5", "patch_equivalent": true}
+    ],
+    "implementation_files": [
+      {"path": "scripts/net_lockstep_websocket_relay.mjs", "bytes": 19394, "sha256": "615db82a1c16f916121c93452a86ed1d1ba75590eb83069a72a70d3d447bdce5"},
+      {"path": "tests/net_lockstep_transport.test.mjs", "bytes": 23918, "sha256": "b8efc605b9557913d1c86698a87412aef9eae3c0098dd97488856dd574c9bca3"},
+      {"path": "tests/net_room_relay_worker.test.mjs", "bytes": 30599, "sha256": "0169e69c5219967c3a2e8836f51f62dbfd6c8fdf515bd823459b7bc8d969e2c6"}
+    ],
+    "a2_protocol_sources_unchanged": true,
+    "portable_core_sha256": "89c97e99bfa8898e1314d672a11cc2094093951392aafdcb8d7905aadf700fff",
+    "node_protocol_facade_sha256": "9a6886adc3cca97ab8433bd1a3662abc7418ba640b4bf435ef212f613fc52e5f"
+  },
+  "historical_browser_evidence": {
+    "receipt": "docs/evidence/a3-browser-relay-full-route-controls-v1.json",
+    "producer_commit": "4b58eaeb6a1821f7ff7bbe12f5f060408261f71a",
+    "run_inventory_id": "a3-full-route-controls-batch-20261007T082510Z-981bbd42",
+    "scope": "Previously reviewed browser full-route and bounded flip/disconnect controls through the local Worker relay. This historical capture was not repeated or relabeled as current-main validation."
+  },
+  "runtime_tools": {
+    "sdk_node": "v24.19.0",
+    "sdk_node_executable": ".deps/emsdk/node/24.19.0_64bit/bin/node",
+    "python": "Python 3.12.13",
+    "release_configuration": "Release"
+  },
+  "checks": [
+    {
+      "name": "focused lockstep transport and Worker/A2 contract wrapper",
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest tests.test_net_lockstep_contracts -v",
+      "outcome": "pass",
+      "tests_total": 1,
+      "tests_passed": 1,
+      "nested_node_contracts": [
+        "tests/net_lockstep_observers.test.mjs",
+        "tests/net_source_accounting.test.mjs",
+        "tests/net_lockstep_core.test.mjs",
+        "tests/net_lockstep_protocol.test.mjs",
+        "tests/net_lockstep_transport.test.mjs",
+        "tests/net_room_relay_worker.test.mjs",
+        "tests/net_determinism_browser.test.mjs"
+      ],
+      "run_inventory_id": "a3-single-endpoint-main-validation-20261007-6PrVTR",
+      "log": "focused-contracts.log",
+      "log_sha256": "d4daf5945ca84abc6274e1a4558d3db940f030f7e72a337b58d5dd1b81d82790"
+    },
+    {
+      "name": "direct SDK Node transport and actual Worker/A2 tests",
+      "command": "python3 scripts/agent_workspace.py run -- .deps/emsdk/node/24.19.0_64bit/bin/node --test tests/net_lockstep_transport.test.mjs tests/net_room_relay_worker.test.mjs",
+      "outcome": "pass",
+      "tests_total": 19,
+      "tests_passed": 19,
+      "tests_failed": 0,
+      "tests_skipped": 0,
+      "execution_checkout_head": "36a8292a9972ae0116d65e478e5e22e746f7f983",
+      "execution_checkout_tree": "4cb60397c3ba257945e13a9a28e02560b3ccf229",
+      "code_and_test_sources_match_validated_producer": true,
+      "environment": {
+        "MELEE_A3_ROOM_RELAY_TOOLS": "work/a3-room-relay-tools/node_modules",
+        "MELEE_A3_ROOM_RELAY_EVIDENCE_DIR": "<external-run>/worker-evidence-direct",
+        "MELEE_A3_ROOM_RELAY_PRODUCER_COMMIT": "4677a53dab376186df610ad84e584e7434825fe5",
+        "MELEE_A3_ROOM_RELAY_PRODUCER_TREE": "60e8a6f0bfaf0e30e406d5afa1cef17facfd2feb"
+      },
+      "runtime_identity": {
+        "node": "v24.19.0",
+        "wrangler": "4.131.1",
+        "miniflare": "5.20260911.0-alpha",
+        "workerd": "1.20260911.1"
+      },
+      "worker_evidence": [
+        {"receipt": "worker-evidence-direct/direct-miniflare-a3-room-relay-direct-9BjHZ4.receipt.json", "sha256": "70574e66061f8ccf8b28fb3bcb684eb14efccc1bba50a6f1db91aa1a79bfab77", "ready": true, "disposed": true, "exit_code": 0, "process_group_absent": true, "fallback_used": false},
+        {"receipt": "worker-evidence-direct/direct-miniflare-a3-room-relay-direct-XFIQzl.receipt.json", "sha256": "4a6387d4fdda9700e94392aafeb8f1747ebbefa52f797dc58f402b014860368c", "ready": true, "disposed": true, "exit_code": 0, "process_group_absent": true, "fallback_used": false}
+      ],
+      "run_inventory_id": "a3-single-endpoint-main-validation-20261007-6PrVTR",
+      "log": "focused-node24-transport-worker.log",
+      "log_sha256": "12b2629f7cf722f71fdde0b32050d908baeb8ec2e0fec01802ce1ab8872609a4"
+    },
+    {
+      "name": "full Python unittest discovery",
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "outcome": "pass",
+      "tests_total": 1979,
+      "tests_passed": 1834,
+      "tests_skipped": 145,
+      "duration_seconds": 350.346,
+      "run_inventory_id": "a3-single-endpoint-main-validation-20261007-6PrVTR",
+      "log": "full-python-suite.log",
+      "log_sha256": "a5d2a0885998343118f590e9f314ae7384b4065cbec850b45abae71beb5550c9"
+    },
+    {
+      "name": "Release runtime build",
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "outcome": "pass",
+      "build_record_succeeded": true,
+      "run_inventory_id": "a3-single-endpoint-main-validation-20261007-6PrVTR",
+      "log": "runtime-release-build.log",
+      "log_sha256": "a236abc19b5247e68e7f919ab335fd87dbaf100853dcf8769506cf99b9b149c8",
+      "compiler_warnings_present": true,
+      "artifacts": [
+        {"path": "build/browser-release/gameplay_menu_browser.js", "bytes": 299682, "sha256": "6a3f8ebb5039151a31983b2226e2208b90ba67f6cd82e9439dc4c4d3a4e16782"},
+        {"path": "build/browser-release/gameplay_menu_browser.wasm", "bytes": 15738629, "sha256": "5a6aba3d771e2f33d27be5811e171f3571013ba2f3c679f00595609b935eb920"},
+        {"path": "build/browser-release/runtime.html", "bytes": 5205, "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"}
+      ],
+      "scope_note": "The Release runtime build is compilation evidence only. It did not import or execute the WebSocket endpoint in a browser."
+    }
+  ],
+  "evidence_boundary": {
+    "claims": [
+      "the rebased single-peer endpoint implementation preserves its reviewed patch content",
+      "focused transport and actual Worker/A2 compatibility checks passed on the current-main producer",
+      "full Python discovery passed on that producer",
+      "the affected Release runtime target built successfully"
+    ],
+    "exclusions": [
+      "current-main browser execution of the endpoint",
+      "new full-route or control capture",
+      "two-machine or Internet play",
+      "WebRTC, rollback, production deployment, or complete A3 acceptance",
+      "gameplay accuracy, performance, pixel, or PCM equivalence"
+    ]
+  },
+  "external_run_inventory_id": "a3-single-endpoint-main-validation-20261007-6PrVTR"
+}
