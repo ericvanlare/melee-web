@@ -341,6 +341,8 @@ export function validateBrowserProcessInfo(rows) {
       !row || !Number.isSafeInteger(row.id) || row.id <= 0 ||
       typeof row.type !== 'string' || row.type.length === 0))
     throw Error('Chrome CDP process inventory must contain nonempty typed positive PID rows');
+  if (new Set(rows.map(row => row.id)).size !== rows.length)
+    throw Error('Chrome CDP process inventory contains duplicate PIDs');
   return rows.map(({id, type}) => ({id, type}));
 }
 

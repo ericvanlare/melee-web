@@ -133,6 +133,8 @@ test('served manifest requires every staged file hash and rejects response drift
   assert.throws(() => validateBrowserProcessInfo([]), /nonempty typed positive PID rows/);
   assert.throws(() => validateBrowserProcessInfo([{id: 0, type: 'browser'}]), /nonempty typed positive PID rows/);
   assert.throws(() => validateBrowserProcessInfo([{id: 12, type: ''}]), /nonempty typed positive PID rows/);
+  assert.throws(() => validateBrowserProcessInfo([{id: 12, type: 'browser'},
+    {id: 12, type: 'renderer'}]), /duplicate PIDs/);
 });
 
 test('READY snapshots require complementary pinned hellos and reject late packets or batches', async () => {
