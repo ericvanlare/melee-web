@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {EventEmitter} from 'node:events';
 import {test} from 'node:test';
 import {runInNewContext} from 'node:vm';
@@ -9,6 +10,7 @@ import {
   assertReadySnapshot,
   armBrowserBeforeNodeClose,
   awaitOwnedAcquisition,
+  captureBrowserResponse,
   capturePreCloseObservation,
   createTerminationRequest,
   EXPECTED_AGREEMENT_JSON,
@@ -135,6 +137,52 @@ test('served manifest requires every staged file hash and rejects response drift
   assert.throws(() => validateBrowserProcessInfo([{id: 12, type: ''}]), /nonempty typed positive PID rows/);
   assert.throws(() => validateBrowserProcessInfo([{id: 12, type: 'browser'},
     {id: 12, type: 'renderer'}]), /duplicate PIDs/);
+});
+
+test('real browser response capture reads fixture bytes and headers and rejects resource drift', async () => {
+  const origin = 'http://127.0.0.1:8787/';
+  for (const name of ['probe.html', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs']) {
+    const url = new URL(name, origin).href;
+    const body = Buffer.from(`exact fixture bytes for ${name}\n`);
+    const bodyHash = createHash('sha256').update(body).digest('hex');
+    const calls = [];
+    const response = {
+      url: () => url,
+      status: () => 200,
+      body: async () => { calls.push('body'); return body; },
+      allHeaders: async () => {
+        calls.push('headers');
+        return {'Cross-Origin-Opener-Policy': 'same-origin',
+          'Cross-Origin-Embedder-Policy': 'require-corp'};
+      },
+    };
+    const row = await captureBrowserResponse(response, origin);
+    assert.deepEqual(row, {url, status: 200, headers: {
+      'cross-origin-opener-policy': 'same-origin',
+      'cross-origin-embedder-policy': 'require-corp'}, bytes: body.byteLength, bodyHash});
+    assert.deepEqual(calls, ['body', 'headers']);
+    assert.doesNotThrow(() => validateResponseRecord(row, url, bodyHash));
+    const changedBytes = await captureBrowserResponse({...response,
+      body: async () => Buffer.from('changed bytes')}, origin);
+    assert.throws(() => validateResponseRecord(changedBytes, url, bodyHash), /identity or bytes differ/);
+    const missingHeader = await captureBrowserResponse({...response,
+      allHeaders: async () => ({'Cross-Origin-Opener-Policy': 'same-origin'})}, origin);
+    assert.throws(() => validateResponseRecord(missingHeader, url, bodyHash), /missing required/);
+    const badStatus = await captureBrowserResponse({...response, status: () => 404}, origin);
+    assert.throws(() => validateResponseRecord(badStatus, url, bodyHash), /identity or bytes differ/);
+    const queryDrift = await captureBrowserResponse({...response, url: () => `${url}?different=1`}, origin);
+    assert.throws(() => validateResponseRecord(queryDrift, url, bodyHash), /identity or bytes differ/);
+    await assert.rejects(captureBrowserResponse({...response,
+      body: async () => { throw Error('response body unavailable'); }}, origin), /body unavailable/);
+  }
+  const unexpected = {url: () => `${origin}unexpected.mjs`,
+    body: async () => { throw Error('must not read unexpected body'); }};
+  await assert.rejects(captureBrowserResponse(unexpected, origin), /unexpected fixture resource/);
+  await assert.rejects(captureBrowserResponse({...unexpected,
+    url: () => 'https://example.invalid/probe.html'}, origin), /outside the frozen loopback origins/);
+  assert.equal(await captureBrowserResponse({...unexpected, url: () => 'data:,'}, origin), null);
+  assert.equal(await captureBrowserResponse({...unexpected,
+    url: () => 'ws://127.0.0.1:49152/v1/socket'}, origin), null);
 });
 
 test('READY snapshots require complementary pinned hellos and reject late packets or batches', async () => {

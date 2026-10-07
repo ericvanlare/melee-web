@@ -618,9 +618,10 @@ async function verifyHttpServedFiles(manifest) {
   return rows;
 }
 
-async function captureBrowserResponse(response, origin) {
+export async function captureBrowserResponse(response, origin) {
   const url = response.url();
   if (validateBrowserResponseUrl(url, origin) !== 'fixture') return null;
+  const parsed = new URL(url);
   const name = parsed.pathname.replace(/^\//, '');
   if (!SITE_NAMES.includes(name)) throw Error(`Browser requested an unexpected fixture resource: ${url}`);
   const body = await response.body();
