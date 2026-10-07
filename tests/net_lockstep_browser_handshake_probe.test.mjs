@@ -4,6 +4,7 @@ import {EventEmitter} from 'node:events';
 import {test} from 'node:test';
 import {runInNewContext} from 'node:vm';
 import {
+  assertClosedSnapshot,
   assertFinalObservation,
   assertNeutralBatch,
   assertPreCloseObservation,
@@ -213,6 +214,30 @@ test('READY snapshots require complementary pinned hellos and reject late packet
     pageErrors: [],
     expectedFrames: 2,
   }), /non-hello A2 packet/);
+});
+
+test('intentional disconnect requires CLOSED and one allowed recorded close code without errors', () => {
+  const snapshot = {...readySnapshot('alpha'), endpointClosed: true,
+    terminal: {kind: 'disconnect'}, terminals: [{kind: 'disconnect'}],
+    disconnects: [{role: 'alpha', reason: '1000: client closed'}]};
+  for (const reason of ['1000: client closed', '4001: peer disconnected']) {
+    const accepted = {...snapshot, disconnects: [{role: 'alpha', reason}]};
+    assert.doesNotThrow(() => assertClosedSnapshot(accepted, 'browser alpha'));
+    assert.equal(accepted.disconnects[0].reason, reason);
+  }
+  for (const reason of ['1006: room relay closed', '1001: going away', '4003: overflow',
+    '10000: client closed', '1000', '1000:', '1000: ', ' 1000: client closed',
+    '01000: client closed', null, 1000]) {
+    assert.throws(() => assertClosedSnapshot({...snapshot,
+      disconnects: [{role: 'alpha', reason}]}, 'browser alpha'), /intentional disconnect/);
+  }
+  for (const changed of [{endpointClosed: false}, {disconnects: []},
+    {disconnects: [...snapshot.disconnects, ...snapshot.disconnects]},
+    {endpointErrors: ['transport error']}, {endpointErrorsFromApi: ['transport error']},
+    {unexpectedTerminalBeforeClose: true}]) {
+    assert.throws(() => assertClosedSnapshot({...snapshot, ...changed}, 'browser alpha'),
+      /intentional disconnect/);
+  }
 });
 
 test('SIGTERM during an owned acquisition keeps and assigns the late resource before failing', async () => {

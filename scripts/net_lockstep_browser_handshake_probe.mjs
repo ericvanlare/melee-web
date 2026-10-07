@@ -584,13 +584,17 @@ function packetTypesOnlyHello(record, side) {
     throw Error(`${side} did not exchange exactly one hello in each direction`);
 }
 
-function assertClosedSnapshot(snapshot, side) {
+export function assertClosedSnapshot(snapshot, side) {
+  const disconnectReason = snapshot.disconnects?.[0]?.reason;
+  const allowedCloseCode = typeof disconnectReason === 'string' &&
+    /^(?:1000|4001): .+$/.test(disconnectReason);
   if (snapshot.endpointClosed !== true || snapshot.disconnects.length !== 1 ||
+      !allowedCloseCode ||
       snapshot.terminal?.kind !== 'disconnect' || snapshot.terminals.length !== 1 ||
       snapshot.terminals[0]?.kind !== 'disconnect' || snapshot.unexpectedTerminalBeforeClose ||
       snapshot.endpointErrors.length ||
       snapshot.endpointErrorsFromApi.length)
-    throw Error(`${side} endpoint did not finish one clean intentional disconnect: ${JSON.stringify({
+    throw Error(`${side} endpoint did not finish one allowed-code intentional disconnect: ${JSON.stringify({
       endpointClosed: snapshot.endpointClosed, disconnects: snapshot.disconnects,
       terminal: snapshot.terminal, errors: snapshot.endpointErrors,
       apiErrors: snapshot.endpointErrorsFromApi})}`);
