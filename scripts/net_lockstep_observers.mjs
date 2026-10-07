@@ -228,3 +228,26 @@ export async function attachWasmResponseIdentityObserver(cdp, {expectedUrl,
       inspector_total_buffer_bytes: 128 * 1024 * 1024}));
   }, detach};
 }
+
+// Completion is distinct from exporting the local checksum stream: the remote
+// receipt and comparison can arrive after the final native record is drained.
+export function verifyPositivePeerCompletion(summary, inputTicks, sourceTicks) {
+  const expected = {remote_ack_input: inputTicks - 1, local_checksum_ticks: sourceTicks,
+    remote_checksum_ticks: sourceTicks, next_checksum_compare: sourceTicks};
+  if (summary?.terminal || !Array.isArray(summary?.checksum_mismatches) ||
+      summary.checksum_mismatches.length || Object.entries(expected).some(([key, value]) =>
+        summary[key] !== value))
+    throw Error(`Positive peer did not complete exact ACK/checksum totals without terminal or mismatch: ${JSON.stringify(summary)}`);
+  return expected;
+}
+
+export function verifyReliableHostWebRtc(state) {
+  if (!state || state.attach_error !== null || state.ready_state !== 'open' ||
+      state.ordered !== true || state.max_retransmits !== null ||
+      state.max_packet_lifetime !== null || state.connection_state !== 'connected' ||
+      !['connected', 'completed'].includes(state.ice_connection_state) ||
+      ['local_candidate_types', 'remote_candidate_types'].some(key =>
+        !Array.isArray(state[key]) || !state[key].length || state[key].some(type => type !== 'host')))
+    throw Error(`WebRTC is not connected, reliable, ordered and host-only: ${JSON.stringify(state)}`);
+  return state;
+}

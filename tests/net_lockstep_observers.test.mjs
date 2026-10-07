@@ -6,7 +6,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
-  verifyTerminalHold, WasmResponseIdentityObserver, attachWasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
+  verifyTerminalHold, verifyPositivePeerCompletion, verifyReliableHostWebRtc, WasmResponseIdentityObserver, attachWasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
 import {createTransportCallbackQueue} from '../scripts/net_lockstep_transport.mjs';
 
 function callback(data, kind = 'Native callback') {
@@ -365,4 +365,34 @@ test('browser finalizer observes late module failure after context close before 
   assert.equal(context.pairResults.outcome, 'fail');
   assert.match(context.pairResults.first_error, /closed-browser module identity.*late module response failure sentinel/);
   assert.equal(context.instanceRows.alpha.browser_closed, true);
+});
+
+const completedPeer = overrides => ({remote_ack_input: 5081, local_checksum_ticks: 5084,
+  remote_checksum_ticks: 5084, next_checksum_compare: 5084, terminal: null,
+  checksum_mismatches: [], ...overrides});
+test('positive completion requires remote receipt and comparison, not just exported native records', () => {
+  assert.deepEqual(verifyPositivePeerCompletion(completedPeer(), 5082, 5084), {
+    remote_ack_input: 5081, local_checksum_ticks: 5084,
+    remote_checksum_ticks: 5084, next_checksum_compare: 5084});
+  for (const field of ['remote_ack_input', 'local_checksum_ticks', 'remote_checksum_ticks', 'next_checksum_compare']) {
+    for (const delta of [-1, 1])
+      assert.throws(() => verifyPositivePeerCompletion(completedPeer({[field]: completedPeer()[field] + delta}),
+        5082, 5084), /exact ACK\/checksum totals/);
+  }
+  for (const change of [{terminal: {kind: 'disconnect'}}, {checksum_mismatches: [{tick: 5083}]},
+    {checksum_mismatches: undefined}, {remote_checksum_ticks: '5084'}])
+    assert.throws(() => verifyPositivePeerCompletion(completedPeer(change), 5082, 5084), /exact ACK\/checksum totals/);
+});
+
+const connectedRtc = overrides => ({attach_error: null, ready_state: 'open', ordered: true,
+  max_retransmits: null, max_packet_lifetime: null, connection_state: 'connected',
+  ice_connection_state: 'connected', local_candidate_types: ['host'], remote_candidate_types: ['host'], ...overrides});
+test('final WebRTC observation rejects closed, unreliable or non-host endpoints', () => {
+  assert.deepEqual(verifyReliableHostWebRtc(connectedRtc()), connectedRtc());
+  assert.equal(verifyReliableHostWebRtc(connectedRtc({ice_connection_state: 'completed'})).ice_connection_state, 'completed');
+  for (const change of [{ready_state: 'closed'}, {ordered: false}, {max_retransmits: 1},
+    {max_packet_lifetime: 1}, {connection_state: 'disconnected'}, {ice_connection_state: 'failed'},
+    {attach_error: 'error'}, {local_candidate_types: []}, {remote_candidate_types: ['srflx']},
+    {remote_candidate_types: undefined}])
+    assert.throws(() => verifyReliableHostWebRtc(connectedRtc(change)), /connected, reliable, ordered and host-only/);
 });

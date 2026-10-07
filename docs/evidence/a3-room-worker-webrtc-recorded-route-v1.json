@@ -1,0 +1,636 @@
+{
+  "schema": "melee-web-a3-room-worker-webrtc-recorded-route-v1",
+  "issue": "https://github.com/ericvanlare/melee-web/issues/235",
+  "scope": "One same-host headless Chrome execution of the supported recorded-input route with page-owned lockstep/WebRTC peers and page-owned negotiation over the local RoomRelay Worker. Functional recorded-input evidence only.",
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised"
+  ],
+  "source_producer": {
+    "head": "0b8ae6206d6cc9ee272e7dcc07794b88252ddd03",
+    "tree": "e3c525f00728dec8e1a32c18d0227767311cc37d",
+    "base_main": "e3220aa2e2da7b17b99dce0999811bd1e66a0814",
+    "clean_at_capture_start_and_finish": true
+  },
+  "validation": {
+    "focused_contracts": {
+      "result": "pass",
+      "log_sha256": "51f875e8a68e322b544b8e4652be8d0169edc6c5d6a8c3430ae89e6d02981b05",
+      "includes": "existing network/session/Worker/source-accounting/route bundle, seven command-mode cases and two final completion/WebRTC cases"
+    },
+    "python_suite": {
+      "result": "pass",
+      "tests": 2024,
+      "skipped": 151,
+      "seconds": 378.13,
+      "log_sha256": "2c6d30d026a645a8f811283b2bceecded956a6b051afef31af15b5138f3f60b5"
+    },
+    "coordinator_preflight": {
+      "result": "pass",
+      "log_sha256": "35a19a02746b5a97d17eb744a8b92a0d6eb8f48a365b67c8b820251b73b4436b",
+      "scope": "pure synthetic metadata fixture and retained historical artifact validation; not additional browser execution",
+      "rejected_metadata_mutations": 8,
+      "rejected_screenshot_mutations": 2,
+      "rejected_readiness_mutations": 4,
+      "worker_path_contract_cases": 6
+    },
+    "root_source_review_sha256": "0345698a8a822a52f7f1a2b06a1f69754fff9ea9f55c06f4d6d0b9f81aaa7ec2"
+  },
+  "runtime_build": {
+    "producer_commit": "0d8556e44bf65ca9db4f93fabb44a35b07ca2350",
+    "producer_tree": "8ff5460dcecef41acd25375cbca62e32dbaf9af5",
+    "configuration": "Release",
+    "fresh_native_build_for_issue235": false,
+    "runtime_target_input_delta_to_capture_source": [],
+    "runtime_file_count": 32,
+    "page_peer_module_count": 5,
+    "complete_staged_inventory_count": 37,
+    "all_files_equal_prior_issue231_staging": true,
+    "ordinary_release_optional_flags": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "staged_manifest_sha256": "74f3c58c20f462e6e62a74a859c57c10b86d22ed23120734360a8cc88b2ead1e",
+    "build_to_capture_source_diff_sha256": "df777b71204c24f20c97f2e4a800f997afc64d4b8a7070831a59e575b4e6a6cb",
+    "note": "The capture source changes are harness/observer contracts and tests. Exact target-input and complete artifact identities were verified before reusing historical ordinary Release bytes. This is not a new native build at the capture source."
+  },
+  "recorded_input": {
+    "bytes": 223624,
+    "sha256": "007fafb2bfc1c34b81509b8ee073b6250b32ab6d227502be6d4b986ddd8cbb4c",
+    "version": 1,
+    "input_ticks": 5082,
+    "neutral_source_ticks": 2,
+    "source_ticks": 5084,
+    "frame_bytes": 44
+  },
+  "signaling_and_transport": {
+    "browser": "Google Chrome 154.0.8037.98, headless, Playwright 1.62.1",
+    "speaker_muted": true,
+    "audio_processing_disabled": false,
+    "peer_owner": "browser",
+    "signaling": "Page-owned offer/answer through the existing local RoomRelay Worker; Node coordinates lifecycle and recorded input.",
+    "raw_sdp_exposed_to_node": false,
+    "worker_runtime": "Wrangler 4.131.1, Miniflare 5.20260911.0-alpha, workerd 1.20260911.1",
+    "ice_servers": [],
+    "candidate_types": [
+      "host"
+    ],
+    "reliable_ordered": true,
+    "initial_both_connected": true,
+    "final_both_connected": true,
+    "final_peers": {
+      "alpha": {
+        "attach_source": "createDataChannel",
+        "ready_state_at_attach": "connecting",
+        "ready_state": "open",
+        "ordered": true,
+        "max_retransmits": null,
+        "max_packet_lifetime": null,
+        "connection_state": "connected",
+        "ice_connection_state": "connected",
+        "local_candidate_types": [
+          "host",
+          "host"
+        ],
+        "remote_candidate_types": [
+          "host",
+          "host"
+        ],
+        "room_signaling": {
+          "role": "alpha",
+          "phase": "negotiated",
+          "failure_code": null,
+          "endpoint_closed": false
+        }
+      },
+      "beta": {
+        "attach_source": "datachannel",
+        "ready_state_at_attach": "open",
+        "ready_state": "open",
+        "ordered": true,
+        "max_retransmits": null,
+        "max_packet_lifetime": null,
+        "connection_state": "connected",
+        "ice_connection_state": "connected",
+        "local_candidate_types": [
+          "host",
+          "host"
+        ],
+        "remote_candidate_types": [
+          "host",
+          "host"
+        ],
+        "room_signaling": {
+          "role": "beta",
+          "phase": "negotiated",
+          "failure_code": null,
+          "endpoint_closed": false
+        }
+      }
+    }
+  },
+  "recorded_route": {
+    "scene_order": [
+      1,
+      2,
+      3,
+      4,
+      1
+    ],
+    "source_steps_draws_and_checksum_records_each": 5084,
+    "checksum_indices": [
+      0,
+      5083
+    ],
+    "checksum_record_bytes": 64,
+    "checksum_stream_bytes_each": 325376,
+    "checksum_streams_identical": true,
+    "checksum_stream_sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0",
+    "peers": {
+      "alpha": {
+        "records": 5084,
+        "source_accounting": {
+          "source_cursor": 5084,
+          "source_steps": 5084,
+          "source_draws": 5084,
+          "callback_count": 5223,
+          "first_callback": 38,
+          "last_callback": 5260,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+        },
+        "protocol_totals": {
+          "remote_ack_input": 5081,
+          "local_checksum_ticks": 5084,
+          "remote_checksum_ticks": 5084,
+          "next_checksum_compare": 5084,
+          "checksum_mismatches": [],
+          "terminal": null
+        },
+        "route": {
+          "scope": "full",
+          "status": "passed",
+          "observed_scenes": [
+            1,
+            2,
+            3,
+            4,
+            1
+          ],
+          "selection": {
+            "stage": 32,
+            "player_stocks": [
+              4,
+              4
+            ],
+            "humans": [
+              true,
+              true
+            ]
+          }
+        },
+        "declared_rules": {
+          "match_kind": 1,
+          "stage": 32,
+          "timer_enabled": 0,
+          "time_limit": 0,
+          "item_frequency": -1,
+          "item_mask_hex": "ffffffffffffffff",
+          "is_teams": 0,
+          "player_teams": [
+            0,
+            0
+          ],
+          "player_stocks": [
+            4,
+            4
+          ],
+          "door_teams": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "friendly_fire": 0
+        },
+        "fighters": [
+          {
+            "fighter": 0,
+            "human": true
+          },
+          {
+            "fighter": 0,
+            "human": true
+          }
+        ],
+        "timing_resumes": [],
+        "owner_audio_snapshot": "enabled",
+        "page_errors": [],
+        "browser_closed": true,
+        "unloaded": true,
+        "browser_diagnostics": [
+          {
+            "kind": "requestfailed",
+            "method": "GET",
+            "failure": "net::ERR_ABORTED"
+          }
+        ]
+      },
+      "beta": {
+        "records": 5084,
+        "source_accounting": {
+          "source_cursor": 5084,
+          "source_steps": 5084,
+          "source_draws": 5084,
+          "callback_count": 5229,
+          "first_callback": 38,
+          "last_callback": 5266,
+          "callback_ids_contiguous": true,
+          "each_step_drawn": true,
+          "scope": "Source draw completion accounting; no pixel, GPU completion or timing equivalence claim"
+        },
+        "protocol_totals": {
+          "remote_ack_input": 5081,
+          "local_checksum_ticks": 5084,
+          "remote_checksum_ticks": 5084,
+          "next_checksum_compare": 5084,
+          "checksum_mismatches": [],
+          "terminal": null
+        },
+        "route": {
+          "scope": "full",
+          "status": "passed",
+          "observed_scenes": [
+            1,
+            2,
+            3,
+            4,
+            1
+          ],
+          "selection": {
+            "stage": 32,
+            "player_stocks": [
+              4,
+              4
+            ],
+            "humans": [
+              true,
+              true
+            ]
+          }
+        },
+        "declared_rules": {
+          "match_kind": 1,
+          "stage": 32,
+          "timer_enabled": 0,
+          "time_limit": 0,
+          "item_frequency": -1,
+          "item_mask_hex": "ffffffffffffffff",
+          "is_teams": 0,
+          "player_teams": [
+            0,
+            0
+          ],
+          "player_stocks": [
+            4,
+            4
+          ],
+          "door_teams": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "friendly_fire": 0
+        },
+        "fighters": [
+          {
+            "fighter": 0,
+            "human": true
+          },
+          {
+            "fighter": 0,
+            "human": true
+          }
+        ],
+        "timing_resumes": [],
+        "owner_audio_snapshot": "enabled",
+        "page_errors": [],
+        "browser_closed": true,
+        "unloaded": true,
+        "browser_diagnostics": [
+          {
+            "kind": "requestfailed",
+            "method": "GET",
+            "failure": "net::ERR_ABORTED"
+          }
+        ]
+      }
+    }
+  },
+  "screenshots": [
+    {
+      "role": "alpha",
+      "boundary": "css-start",
+      "phase": 1,
+      "png_dimensions": [
+        900,
+        700
+      ],
+      "canvas_dimensions": [
+        640,
+        480
+      ],
+      "bytes": 465451,
+      "sha256": "80b54a3d8b5b5170a01729bc5591033da72e92b488aef7d96e892f82f653fc16",
+      "source_cursor_before_screenshot": 4,
+      "source_cursor_after_screenshot": 8,
+      "source_cursor_stable": false,
+      "phase_stable": true,
+      "positive_source_draw_observed": true,
+      "webgpu_and_isolation": true
+    },
+    {
+      "role": "alpha",
+      "boundary": "sss",
+      "phase": 3,
+      "png_dimensions": [
+        900,
+        700
+      ],
+      "canvas_dimensions": [
+        640,
+        480
+      ],
+      "bytes": 281358,
+      "sha256": "b4708be7558fff988cf2f1ff9f8cfc12e314d6afeb122ceab2c4f3a54e9e7214",
+      "source_cursor_before_screenshot": 157,
+      "source_cursor_after_screenshot": 160,
+      "source_cursor_stable": false,
+      "phase_stable": true,
+      "positive_source_draw_observed": true,
+      "webgpu_and_isolation": true
+    },
+    {
+      "role": "alpha",
+      "boundary": "match",
+      "phase": 7,
+      "png_dimensions": [
+        900,
+        700
+      ],
+      "canvas_dimensions": [
+        640,
+        480
+      ],
+      "bytes": 493488,
+      "sha256": "9326a337cf78a4b70cc4b3da8957163ea02ce15270708080aaf8445a063c18d1",
+      "source_cursor_before_screenshot": 431,
+      "source_cursor_after_screenshot": 437,
+      "source_cursor_stable": false,
+      "phase_stable": true,
+      "positive_source_draw_observed": true,
+      "webgpu_and_isolation": true
+    },
+    {
+      "role": "alpha",
+      "boundary": "results",
+      "phase": 8,
+      "png_dimensions": [
+        900,
+        700
+      ],
+      "canvas_dimensions": [
+        640,
+        480
+      ],
+      "bytes": 134405,
+      "sha256": "e1c9758576d831eb55cbb69df01d77aa50193f7afd113bcddb1068b57974a5e8",
+      "source_cursor_before_screenshot": 4296,
+      "source_cursor_after_screenshot": 4298,
+      "source_cursor_stable": false,
+      "phase_stable": true,
+      "positive_source_draw_observed": true,
+      "webgpu_and_isolation": true
+    },
+    {
+      "role": "alpha",
+      "boundary": "css-return",
+      "phase": 1,
+      "png_dimensions": [
+        900,
+        700
+      ],
+      "canvas_dimensions": [
+        640,
+        480
+      ],
+      "bytes": 453070,
+      "sha256": "2f11a164ac86636457006909e5a73aef78da6f22c75fe4312109e8ed6cdd20ee",
+      "source_cursor_before_screenshot": 4906,
+      "source_cursor_after_screenshot": 4910,
+      "source_cursor_stable": false,
+      "phase_stable": true,
+      "positive_source_draw_observed": true,
+      "webgpu_and_isolation": true
+    },
+    {
+      "role": "beta",
+      "boundary": "css-start",
+      "phase": 1,
+      "png_dimensions": [
+        900,
+        700
+      ],
+      "canvas_dimensions": [
+        640,
+        480
+      ],
+      "bytes": 465478,
+      "sha256": "adf0c3ad65bc344f4b44d4f74f72a1691181c0af240976cbb68d837cacdbf654",
+      "source_cursor_before_screenshot": 3,
+      "source_cursor_after_screenshot": 9,
+      "source_cursor_stable": false,
+      "phase_stable": true,
+      "positive_source_draw_observed": true,
+      "webgpu_and_isolation": true
+    },
+    {
+      "role": "beta",
+      "boundary": "sss",
+      "phase": 3,
+      "png_dimensions": [
+        900,
+        700
+      ],
+      "canvas_dimensions": [
+        640,
+        480
+      ],
+      "bytes": 281565,
+      "sha256": "ac90768476467871f3eb8017f505e6f9bd2b3a6ac3b73b52941a8df3c5be163d",
+      "source_cursor_before_screenshot": 157,
+      "source_cursor_after_screenshot": 160,
+      "source_cursor_stable": false,
+      "phase_stable": true,
+      "positive_source_draw_observed": true,
+      "webgpu_and_isolation": true
+    },
+    {
+      "role": "beta",
+      "boundary": "match",
+      "phase": 7,
+      "png_dimensions": [
+        900,
+        700
+      ],
+      "canvas_dimensions": [
+        640,
+        480
+      ],
+      "bytes": 496593,
+      "sha256": "24c0fa44406d2653c7f18e2e96981af931a9fb26d51646d834a578471d86508c",
+      "source_cursor_before_screenshot": 431,
+      "source_cursor_after_screenshot": 437,
+      "source_cursor_stable": false,
+      "phase_stable": true,
+      "positive_source_draw_observed": true,
+      "webgpu_and_isolation": true
+    },
+    {
+      "role": "beta",
+      "boundary": "results",
+      "phase": 8,
+      "png_dimensions": [
+        900,
+        700
+      ],
+      "canvas_dimensions": [
+        640,
+        480
+      ],
+      "bytes": 135253,
+      "sha256": "ae1169da1391a1845ac1dd7c0c78010444e2fa8441f34539c7ab944eaf1cdc15",
+      "source_cursor_before_screenshot": 4294,
+      "source_cursor_after_screenshot": 4298,
+      "source_cursor_stable": false,
+      "phase_stable": true,
+      "positive_source_draw_observed": true,
+      "webgpu_and_isolation": true
+    },
+    {
+      "role": "beta",
+      "boundary": "css-return",
+      "phase": 1,
+      "png_dimensions": [
+        900,
+        700
+      ],
+      "canvas_dimensions": [
+        640,
+        480
+      ],
+      "bytes": 451888,
+      "sha256": "da7e3ed886733de26cd231e07cc62f79754b0f4ed7b4db4df96a853ff2a81495",
+      "source_cursor_before_screenshot": 4906,
+      "source_cursor_after_screenshot": 4910,
+      "source_cursor_stable": false,
+      "phase_stable": true,
+      "positive_source_draw_observed": true,
+      "webgpu_and_isolation": true
+    }
+  ],
+  "observation_limits": {
+    "screenshot_phase_stable_each": true,
+    "screenshot_source_cursor_stable_each": false,
+    "interpretation": "All ten screenshots had the requested scene phase before and after capture. Source cursors advanced during each screenshot; these are scene-boundary diagnostics, not synchronized frame comparisons.",
+    "rendering": "PNG, positive source draw, WebGPU and cross-origin-isolation checks only. Pixel/render fidelity remains open.",
+    "timing": "Every source step/draw and checksum is accounted for, but headless callback counts and absence of timing resumes do not establish foreground pacing, latency or performance.",
+    "audio": "Both final owner snapshots report audio enabled and speakers stayed muted. Reviewed alpha overlays display 107 underrun frames; no complete per-peer/final underrun witness, PCM comparison, uninterrupted-audio or audible-output check was collected. Historical issue231 counts are not substituted for this run.",
+    "visual_review": {
+      "reviewed_images": [
+        "alpha/route-css-start.png",
+        "alpha/route-sss.png",
+        "beta/route-sss.png",
+        "alpha/route-match.png",
+        "alpha/route-results.png"
+      ],
+      "observed_gaps": [
+        "CSS red geometry extends near right edge; lower viewport clipped",
+        "SSS screenshots during transition with icons at right; no settled-image comparison",
+        "Final Destination has prominent magenta geometry/edges; no pixel fidelity accepted",
+        "Results image visible; no retail comparison",
+        "Alpha overlays show 107 audio underrun frames; no complete audio witness or continuity acceptance"
+      ],
+      "no_pixel_or_visual_fidelity_acceptance": true
+    },
+    "audio_overlay_observation": {
+      "role": "alpha",
+      "displayed_underrun_frames": 107,
+      "scope": "Value visible on reviewed alpha screenshot overlays; not a complete per-peer or final underrun-count witness."
+    }
+  },
+  "cleanup": {
+    "coordinator_pass": true,
+    "capture_owner_result": "pass",
+    "runner_cleanup_notes": [],
+    "transport_errors": [],
+    "callback_errors": [],
+    "both_profiles_removed": true,
+    "worker_clean_exit_no_fallback": true,
+    "local_and_http_served_inventory_unchanged": true,
+    "independent_root_review_sha256": "228b30dd409d7bcab128511372fccee222486b85828d34dd1f40830d0c3c5864",
+    "independent_root_review_result": "pass",
+    "independently_checked_pids_absent": 25,
+    "independently_checked_process_groups_absent": 6,
+    "independently_checked_ports_bindable": 3,
+    "worker_owned_paths_absent": true,
+    "chrome_temporary_directory_empty": true,
+    "owned_command_fragments_absent": true
+  },
+  "capture_identity": {
+    "launch_packet_sha256": "3302f3a65fa7859cd05eeb4a20fda259b59079501fc1c1db6d664a8c5e4ebeb6",
+    "authorization_sha256": "2fc0d24c91c1ba4d736e7708a6cb3e0ba29abfcbf14d2ac95f2b4ba4c13ce69f",
+    "run_report_sha256": "3c5fed0b706f271127d83631b06da1ffe63cce36a7515c326af7c6eb8dfdfbae",
+    "coordinator_report_sha256": "1fde16041652c3839dab948327ed43555c73eca9999745e919edbd46172f96fc",
+    "capture_owner_report_sha256": "ba78cab92e766c1c5adfc157de5543b56b9660b65d9e7bc68e0116bdce77e181",
+    "result_summary_sha256": "74500fd967d45d2e512370ced7091f4a4231dc03c4333be3b9e29a64795ca8dc",
+    "single_execution_exit_code": 0,
+    "retries": 0
+  },
+  "retained_failures_and_history": {
+    "first_coordinator_validator_fixture_failure": {
+      "receipt_sha256": "108cd3d475d2c59d99c0d4b675decf8d68206df7aa50cd1009aef62a88453b6c",
+      "log_sha256": "432ecdff17b771492aa65d34b880e289776bbae9434687aae0dd46d995ae6d67",
+      "cause": "The old full-route fixture predates the page-owned native checksum ownership sidecar. The strict validator rejected missing ownership. The corrected explicitly synthetic fixture grafts that schema; no runtime/comparator contract was weakened."
+    },
+    "prior_issue231_receipt": "a3-room-worker-webrtc-input-sampling-v1.json",
+    "inherited_historical_gap": {
+      "initial_source_manifest_sha256": "1fe0580da3afa0a2358cc0407c31f42175c4ce85b07d1ef0ad9c5d1d5d03745b",
+      "original_bytes_recovered": false,
+      "original_manifest_reconstructed": false,
+      "note": "The prior issue231 frozen-source manifest overwrite gap remains documented in its historical receipt. Issue235 created fresh immutable source freezes and fresh complete staging checks; it does not repair or reconstitute that historical manifest."
+    },
+    "issue235_initial_and_updated_source_freezes_preserved": true,
+    "root_review_preparation_failure": {
+      "receipt_sha256": "e41dcf04ca8890506779206157cc02bbdf2ce971bf1f93381ff9c040dfc902b5",
+      "cause": "Root review initially assumed endpoint_errors was a flat array. The actual schema is an object with alpha and beta arrays; both were empty. Schema-aware review passed without another capture or mutation of captured evidence."
+    }
+  },
+  "limitations": [
+    "Same-host recorded input; no physical/live or keyboard input validation.",
+    "Local Worker and host-only ICE; no Internet, STUN/TURN, relay fallback or two-machine validation.",
+    "No foreground timing/performance, pixel fidelity, uninterrupted audio or audible-output acceptance.",
+    "No retail comparison or general whole-session accuracy; peer agreement is conditional on this recorded schedule.",
+    "No general A3 acceptance, tournament readiness, deployment or infrastructure claim."
+  ]
+}

@@ -11,6 +11,7 @@ import {createHash} from 'node:crypto';
 import path from 'node:path';
 import {createRoomId} from './net_lockstep_websocket_relay.mjs';
 import {parseArgs} from 'node:util';
+import {validateLockstepBrowserMode} from './net_lockstep_browser_modes.mjs';
 import {loadBrowserTools} from './browser_tools.mjs';
 import {startRoomRelayRuntime} from './net_room_relay_runtime_owner.mjs';
 import {classifyRoute, collapseConsecutiveScenes, expectedFullSceneOrder, validateFullRoute} from './net_determinism_contract.mjs';
@@ -19,7 +20,7 @@ import {createTransportCallbackQueue, describeLockstepTransport, describeLockste
   openLockstepPeerPair, recordAvailableTransportMetrics} from './net_lockstep_transport.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
-  verifyTerminalHold} from './net_lockstep_observers.mjs';
+  verifyTerminalHold, verifyPositivePeerCompletion, verifyReliableHostWebRtc} from './net_lockstep_observers.mjs';
 import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
 import {BUTTONS} from '../web/controller-input.mjs';
 import {lockstepConstants} from './net_lockstep_core.mjs';
@@ -67,28 +68,9 @@ if (!values.url || !values.disc || !values.out || !values.seed || (!inputSamplin
   throw Error('Required: --url runtime.html --disc DISC [--script route1.mwni] --seed U32 --out NEW_DIR');
 if (inputSampling && values.script)
   throw Error('The input-sampling scenario captures browser-local input and does not accept --script');
-if (!['probe', 'positive', 'flip', 'disconnect', 'input-sampling'].includes(values.scenario))
-  throw Error('--scenario must be probe, positive, flip, disconnect, or input-sampling');
 const scenario = values.scenario;
-if (!['node', 'browser'].includes(values['peer-owner'])) throw Error('--peer-owner must be node or browser');
-const browserOwned = values['peer-owner'] === 'browser';
-const peerTransport = values['peer-transport'] ??
-  (browserOwned || values['relay-url'] ? 'relay' : 'tcp-loopback');
-if (values['peer-transport'] !== undefined && !['relay', 'webrtc'].includes(peerTransport))
-  throw Error('--peer-transport must be relay or webrtc');
-if (!browserOwned && values['peer-transport'] !== undefined)
-  throw Error('--peer-transport applies only to browser-owned peers');
-const localWebRtc = peerTransport === 'webrtc';
-const roomWorkerSignaling = values['webrtc-signaling'] === 'room-worker';
-if (!['memory', 'room-worker'].includes(values['webrtc-signaling']))
-  throw Error('--webrtc-signaling must be memory or room-worker');
-if (!localWebRtc && values['webrtc-signaling'] !== 'memory')
-  throw Error('--webrtc-signaling applies only to the local WebRTC transport');
-if (browserOwned && !localWebRtc && !values['relay-url']) throw Error('Browser-owned relay peers require --relay-url');
-if (localWebRtc && (!browserOwned || !inputSampling))
-  throw Error('The local WebRTC endpoint is scoped to browser-owned input-sampling');
-if (inputSampling && !browserOwned)
-  throw Error('The input-sampling scenario requires --peer-owner browser');
+const {browserOwned, peerTransport, localWebRtc, roomWorkerSignaling} =
+  validateLockstepBrowserMode(values);
 const url = new URL(values.url);
 if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
@@ -614,6 +596,33 @@ async function pollRun() {
   if (Date.now() > deadline) throw Error('Lockstep run exceeded its wall-time bound');
 }
 
+async function waitForPositivePeerCompletion() {
+  const receiptDeadline = Math.min(deadline, Date.now() + stallMs);
+  const expected = {remote_ack_input: usedInputs - 1, local_checksum_ticks: sourceTicks,
+    remote_checksum_ticks: sourceTicks, next_checksum_compare: sourceTicks};
+  while (Date.now() <= receiptDeadline) {
+    await refreshBrowserPeers();
+    for (const role of ['alpha', 'beta']) await drainChecksums(role, peers[role]);
+    await refreshBrowserPeers();
+    const summaries = Object.fromEntries(['alpha', 'beta'].map(role => [role, peers[role].summary()]));
+    for (const summary of Object.values(summaries)) {
+      if (summary.terminal || !Array.isArray(summary.checksum_mismatches) || summary.checksum_mismatches.length ||
+          Object.entries(expected).some(([key, value]) =>
+            !Number.isInteger(summary[key]) || summary[key] < (key === 'remote_ack_input' ? -1 : 0) ||
+            summary[key] > value))
+        verifyPositivePeerCompletion(summary, usedInputs, sourceTicks);
+    }
+    if (Object.values(summaries).every(summary =>
+        Object.entries(expected).every(([key, value]) => summary[key] === value))) {
+      for (const role of ['alpha', 'beta'])
+        instanceRows[role].positive_completion = verifyPositivePeerCompletion(summaries[role], usedInputs, sourceTicks);
+      return;
+    }
+    await sleep(pollMs);
+  }
+  throw Error('Positive peer final ACK/checksum receipt exceeded its bounded completion window');
+}
+
 async function waitForTerminalPair(kind) {
   const terminalDeadline = Math.min(deadline, Date.now() + stallMs);
   while (Date.now() <= terminalDeadline) {
@@ -893,6 +902,7 @@ async function run() {
     await drainChecksums('alpha', peers.alpha); await drainChecksums('beta', peers.beta);
   }
   if (scenario === 'positive') {
+    await waitForPositivePeerCompletion();
     for (const role of ['alpha', 'beta']) {
       const [status, native] = await Promise.all([instances[role].status(), instances[role].native()]);
       captureObservedRouteBoundary(role, native.phase);
@@ -1049,6 +1059,7 @@ async function run() {
     pairResults.outcome = 'complete';
   } else if (scenario === 'positive') {
     for (const role of ['alpha', 'beta']) {
+      verifyPositivePeerCompletion(peers[role].summary(), usedInputs, sourceTicks);
       if (instanceRows[role].records !== sourceTicks)
         throw Error(`${role} checksum count ${instanceRows[role].records} did not equal ${sourceTicks}`);
       instanceRows[role].final_status = await instances[role].status();
@@ -1071,6 +1082,12 @@ async function run() {
     const bytesA = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
     const bytesB = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
     if (!bytesA.equals(bytesB)) throw Error('Two native per-consumed-tick checksum streams differ');
+    if (localWebRtc) {
+      const states = Object.fromEntries(await Promise.all(['alpha', 'beta'].map(async role =>
+        [role, verifyReliableHostWebRtc(await instances[role].localWebRtcState())])));
+      pairResults.local_webrtc_final = {ice_servers: [], peers: states,
+        both_connections_connected: true, reliable_ordered_host_only: true};
+    }
     pairResults.checksums = {records_each: sourceTicks, streams_identical: true, sha256: sha256(bytesA)};
     pairResults.outcome = 'complete';
   } else if (scenario === 'flip') {
