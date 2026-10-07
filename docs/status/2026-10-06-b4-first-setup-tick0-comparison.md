@@ -27,7 +27,9 @@ comparison did not recompute that full-file hash. Its pre/post stat identity
 was stable. The [portable receipt](../evidence/b4-v10-first-setup-tick0-comparison-v1.json)
 binds the exact recipe, source capture, browser sidecars, expectation packet,
 comparator commit and result, and retains both failed preparation attempts
-separately from the successful comparison.
+separately from the successful comparison. A later compatibility commit
+restored the legacy v8/v9 browser-report reader unchanged; 47 focused tests and
+the full Python suite (1,959 tests, 142 skipped) passed on the final branch.
 
 This prefix does not establish whole-session equivalence, later gameplay,
 active-match accuracy, pixels, PCM, timing, performance or competitive

@@ -234,6 +234,54 @@
     "exit_code": 1,
     "stderr_empty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
   },
+  "integration_validation": {
+    "branch": "codex/b4-first-match-comparison-20261007",
+    "head": "a98a0034f17f2ea573aaa85a1d49e822e8a9bdcc",
+    "tree": "67a28db11737007bfb028c93714dfb9e6477c250",
+    "tracked_worktree_clean": true,
+    "focused_checks": {
+      "result": "pass",
+      "test_count": 47,
+      "skipped": 0,
+      "command": "python3 -m unittest tests.test_whole_session_state_compare tests.test_compare_whole_session_state_cli tests.test_reference_observer_stream -v",
+      "tests": {
+        "tests/test_whole_session_state_compare.py": "1e6fe33f3c8b244ae4036e3263a4ec8ecb7df6f51de36033a2a6c08c48106745",
+        "tests/test_compare_whole_session_state_cli.py": "fa2b0c516ae04e454050c40582a22551164eade52e45ab9b7e79b4e088fd23de",
+        "tests/test_reference_observer_stream.py": "834f2785bcf0fa82635c4a6f21cb129e3c3e94d3399f30f7cbf2ae6010b4ce62"
+      }
+    },
+    "full_python_suite": {
+      "result": "pass",
+      "command": "python3 -m unittest discover -s tests -v",
+      "workspace_wrapper": "python3 scripts/agent_workspace.py run",
+      "exit_code": 0,
+      "test_count": 1959,
+      "skipped": 142,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 352.830,
+      "raw_log": {
+        "private_run_id": "b4-v10-first-setup-tick0-final-validation-20261007-000320-b90e3fe4",
+        "name": "full-suite.log",
+        "bytes": 357547,
+        "sha256": "2e151f2053643d26ada1e86d1e404c427cfe54e5d52415981820167c18a16164"
+      },
+      "footer_lines": {"ran": 2225, "ok": 2227},
+      "runner_parser_correction": {
+        "original_metadata_name": "full-suite-result.json",
+        "original_metadata_sha256": "c53b92d0bb99311512e03bac8cf59a671e7134be99eef5b5cbec54cc428e6674",
+        "corrected_summary_name": "full-suite-summary-corrected.json",
+        "corrected_summary_sha256": "8f9cc3feb1a8b1499a0da5d7a77bac6c2f831f0762586b20d012071c50f9d107",
+        "note": "The original parser selected a nested one-test unittest summary. The final suite footer was read from the retained log; no tests were rerun."
+      }
+    },
+    "final_code_sha256": {
+      "scripts/compare_whole_session_state.py": "79381862b75a294b3d336fcab2c1cbbde3f5d6978d25f9e04859841ecd573f29",
+      "tools/whole_session_state_compare.py": "980b54739b137031e3e9f65596786ae3ba4d560224bfa5935db16bb726caeac6",
+      "reference-capture/dolphin/reference_observer_stream.py": "51df479caf303791c981c020161557671dbc901d02e192964af10be7baff063f"
+    },
+    "comparison_result_producer_commit": "587eb69f87ea8daf9e83204923a596b404cbdb12"
+  },
   "limitations": [
     "This evidence covers one source/browser pair and one bounded first-setup/tick-0 boundary.",
     "CSS/SSS scalar state was not compared; only consumed input ordering was checked.",
