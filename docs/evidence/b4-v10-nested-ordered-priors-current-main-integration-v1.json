@@ -1,0 +1,115 @@
+{
+  "schema": "melee-web-b4-v10-nested-ordered-priors-current-main-integration-v1",
+  "date": "2026-10-07",
+  "issue": 240,
+  "evidence_label": "Synthetic comparator validation with current-main Release build",
+  "historical_receipt": {
+    "file": "b4-v10-nested-ordered-priors-v1.json",
+    "sha256": "4c3c503095ef9e0c6e3f2a8609f96515247f0c6776e65137f64dcd65e5bd8b8d",
+    "note": "The earlier bounded comparison/source-audit identities and results remain unchanged."
+  },
+  "source": {
+    "integration_base_main": "b58747c49c0a91c91c9ff4c6afce1dddbb24c3ee",
+    "integration_base_tree": "46d3db1151ea5daf627c4590acb1f5124e54b167",
+    "validated_head": "7740c7e22ae9262326ff306339ca35278aaa4638",
+    "validated_tree": "724c2857acc1de4b15d05fd796a8d879148a16e6",
+    "rebased_commit_map": [
+      {
+        "old": "92a011d899ee1221dfad0dca7925d03db13f1606",
+        "new": "6acef1a",
+        "equivalence": "patch-identical"
+      },
+      {
+        "old": "46ca937674952bc81ecca55df8095594837ec44d",
+        "new": "d103ea4",
+        "equivalence": "patch-identical"
+      },
+      {
+        "old": "23d61fed5001df7cc884b9fd7d4a7ccc5858542f",
+        "new": "82dcdc7",
+        "equivalence": "patch-identical"
+      },
+      {
+        "old": "ca10b90becbec78255155c1cfc02eb9565f27bbe",
+        "new": "7740c7e",
+        "equivalence": "patch-identical"
+      }
+    ],
+    "changed_files_from_base": [
+      "docs/RECORDED_SESSION_STATE.md",
+      "docs/evidence/b4-v10-nested-ordered-priors-v1.json",
+      "docs/status/2026-10-07-b4-v10-nested-ordered-priors.md",
+      "tests/test_whole_session_state_compare.py",
+      "tools/whole_session_state_compare.py"
+    ],
+    "worktree_clean_at_validation": true
+  },
+  "validation": {
+    "full_python_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "tests": 2034,
+      "elapsed_seconds": 440.381,
+      "skipped": 151,
+      "footer": "Ran 2034 tests in 440.381s; OK (skipped=151)",
+      "log": {
+        "file": "full-suite.log",
+        "bytes": 373415,
+        "sha256": "341ad688922912840c35689a1406ad9a8b7a8083adf1cd0e0c846ad20908656e"
+      },
+      "validated_head": "7740c7e22ae9262326ff306339ca35278aaa4638"
+    },
+    "release_runtime_build": {
+      "command": "python3 scripts/build.py --target runtime --configuration Release",
+      "exit_code": 0,
+      "target": "runtime",
+      "configuration": "Release",
+      "jobs": "build.py default (min(host CPU count, 6))",
+      "default_off_flags_seen": [
+        "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE=OFF",
+        "MELEE_WEB_PIPELINE_PROVENANCE=OFF",
+        "MELEE_WEB_SELECTIVE_PIPELINES=OFF",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=OFF",
+        "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC=OFF",
+        "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC=OFF",
+        "MELEE_WEB_SLIPPI_PROFILE_BROWSER=OFF"
+      ],
+      "log": {
+        "file": "release-build.log",
+        "bytes": 1471111,
+        "sha256": "402c770e4de271560ab66465ef238591c7ee985c16a909d15b5aba1192e4a1a3"
+      },
+      "outputs": [
+        {
+          "path": "build/browser-release/gameplay_menu_browser.js",
+          "bytes": 300352,
+          "sha256": "1c7619d300dfa6ac187063f72fa9f4c7d91cfc7d6e9eb8808d2ed773d622429f"
+        },
+        {
+          "path": "build/browser-release/gameplay_menu_browser.wasm",
+          "bytes": 15742957,
+          "sha256": "e162cb83255e624501f3bc14403d2d88145dedf2f7bd011999c2a2ad3bec6055"
+        },
+        {
+          "path": "build/browser-release/gameplay_menu_browser.data",
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        }
+      ],
+      "validated_head": "7740c7e22ae9262326ff306339ca35278aaa4638"
+    },
+    "external_run": {
+      "run_id": "b4-pr244-current-main-validation-20261007-b58747",
+      "artifact": "current-main-integration-v1.json",
+      "sha256": "08c7db9d95c95dd1ca80489cc909cfcdcd964fbef3500a284f5ed5476b9088b4"
+    }
+  },
+  "interpretation": {
+    "current_main_integration": "The nested ordered-prior comparator branch was rebased onto the reviewed #241 main and validated on the exact recorded head. The full Python suite and ordinary default-off Release runtime build passed.",
+    "not_claimed": [
+      "No original MWRO content was opened, read, or compared during this integration validation.",
+      "No browser capture or new source audit was run.",
+      "No whole-session equivalence or gameplay acceptance is established."
+    ]
+  }
+}
