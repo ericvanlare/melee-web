@@ -46,6 +46,10 @@ int melee_web_net_begin_lockstep(uint32_t seed, uint32_t max_frames,
  * by the browser runtime and never polls hardware itself. */
 int melee_web_net_enable_local_input_capture(unsigned local_port,
                                              uint32_t input_ticks);
+/* Read-only scheduler hint: after start confirmation, a new native PAD sample
+ * is still required for the current source cursor. It never polls, publishes
+ * or advances the session; a cursor with already-published bytes is immutable. */
+int melee_web_net_local_capture_pending(void);
 int melee_web_net_capture_local_input(uint64_t poll_serial,
                                       const PADStatus raw[4]);
 /* Internal synchronous bridge into the page callback. */
@@ -95,6 +99,7 @@ static inline int melee_web_net_enable_local_input_capture(unsigned port,
     (void) port; (void) ticks;
     return 0;
 }
+static inline int melee_web_net_local_capture_pending(void) { return 0; }
 static inline int melee_web_net_capture_local_input(uint64_t serial,
                                                      const PADStatus raw[4])
 {

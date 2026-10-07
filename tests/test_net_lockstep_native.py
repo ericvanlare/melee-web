@@ -50,7 +50,8 @@ def _harness(include_clock_composition: bool = False) -> str:
     names = (
         "fail", "melee_web_net_active", "melee_web_net_reset", "net_begin",
         "melee_web_net_begin", "melee_web_net_begin_lockstep",
-        "melee_web_net_enable_local_input_capture", "encode_local_pad",
+        "melee_web_net_enable_local_input_capture", "melee_web_net_local_capture_pending",
+        "encode_local_pad",
         "local_capture_failure_name", "record_local_capture_failure",
         "melee_web_net_capture_local_input", "ring_used",
         "capture_start_identity", "record_arena", "melee_web_net_before_step",
@@ -60,7 +61,7 @@ def _harness(include_clock_composition: bool = False) -> str:
     )
     functions = "\n".join(_function(source, name) for name in names)
     clock_declarations = """int a3_run_clock_native_reproducer(void);
-int a3_run_budgeted_clock_candidate(void);""" if include_clock_composition else ""
+int a3_run_budgeted_clock_tests(void);""" if include_clock_composition else ""
     clock_helpers = """
 int a3_test_prepare_local_capture(unsigned port, unsigned prefix_count) {
   uint8_t frames[MELEE_WEB_NET_FRAME_BYTES*6] = {0};
@@ -92,7 +93,7 @@ uint32_t a3_test_pushed(void){return net.pushed;}
 """ if include_clock_composition else ""
     clock_finish = """
   if(a3_run_clock_native_reproducer()!=0)return 74;
-  if(a3_run_budgeted_clock_candidate()!=0)return 75;
+  if(a3_run_budgeted_clock_tests()!=0)return 75;
 """ if include_clock_composition else ""
     return f'''#include <stdint.h>
 #include <stddef.h>
@@ -236,12 +237,15 @@ int main(void) {{
   local_capture_publications=0;local_capture_accept=1;
   if(!melee_web_net_begin_lockstep(9,6,NULL,0))return 31;
   net.context_applied=1;net.host=(MeleeWebMenuHost*)1;
-  if(melee_web_net_enable_local_input_capture(2,4)||
+  if(melee_web_net_local_capture_pending()||
+     melee_web_net_enable_local_input_capture(2,4)||
      melee_web_net_enable_local_input_capture(0,3)||
      !melee_web_net_enable_local_input_capture(0,4)||
+     melee_web_net_local_capture_pending()||
      melee_web_net_enable_local_input_capture(0,4))return 32;
   if(!melee_web_net_capture_local_input(19,NULL)||local_capture_publications)return 33;
-  if(melee_web_net_before_step(1)!=NULL||!melee_web_net_confirm_start())return 33;
+  if(melee_web_net_before_step(1)!=NULL||!melee_web_net_confirm_start()||
+     !melee_web_net_local_capture_pending())return 33;
   PADStatus raw[4]={{0}};
   raw[0].button=0x1234;raw[0].stickX=INT8_MIN;raw[0].stickY=INT8_MAX;
   raw[0].substickX=-1;raw[0].substickY=1;raw[0].triggerLeft=0x22;
@@ -250,15 +254,18 @@ int main(void) {{
      local_capture_tick!=0||local_capture_port!=0||local_capture_serial!=20||
      memcmp(local_capture_bytes,(uint8_t[11]){{0x12,0x34,0x80,0x7f,0xff,0x01,
        0x22,0x33,0x44,0x55,0x00}},11)||
-     memcmp(net.local_capture_last_bytes,local_capture_bytes,11))return 34;
-  if(melee_web_net_before_step(1)!=NULL||net.wait_episodes!=1)return 35;
+     memcmp(net.local_capture_last_bytes,local_capture_bytes,11)||
+     melee_web_net_local_capture_pending())return 34;
+  if(melee_web_net_before_step(1)!=NULL||net.wait_episodes!=1||
+     melee_web_net_local_capture_pending())return 35;
   raw[0].button=0;
   if(!melee_web_net_capture_local_input(21,raw)||local_capture_publications!=1||
      memcmp(net.local_capture_last_bytes,local_capture_bytes,11))return 35;
   uint8_t source_frames[MELEE_WEB_NET_FRAME_BYTES*6]={{0}};
   if(!melee_web_net_push_indexed(0,source_frames,6))return 36;
-  if(melee_web_net_before_step(1)==NULL)return 37;
+  if(melee_web_net_before_step(1)==NULL||melee_web_net_local_capture_pending())return 37;
   melee_web_net_after_step();
+  if(!melee_web_net_local_capture_pending())return 37;
   raw[0].button=0x80;
   if(!melee_web_net_capture_local_input(22,raw)||local_capture_publications!=2||
      local_capture_tick!=1||local_capture_serial!=22)return 38;
@@ -277,9 +284,11 @@ int main(void) {{
   if(!melee_web_net_capture_local_input(31,raw)||local_capture_publications!=4)return 44;
   if(melee_web_net_before_step(1)==NULL)return 45;
   melee_web_net_after_step();
-  if(net.cursor!=6||net.local_capture_count!=4)return 46;
+  if(net.cursor!=6||net.local_capture_count!=4||
+     melee_web_net_local_capture_pending())return 46;
   melee_web_net_reset();
-  if(net.local_capture_enabled||net.local_capture_count||net.local_capture_last_poll_serial)return 60;
+  if(net.local_capture_enabled||net.local_capture_count||net.local_capture_last_poll_serial||
+     melee_web_net_local_capture_pending())return 60;
 
   /* New source contributions sharing a PAD poll serial fail before any
    * second publication, and an unavailable local port fails the same way. */
@@ -320,11 +329,12 @@ int main(void) {{
        local_capture_publications!=2||local_capture_tick!=1||
        melee_web_net_before_step(1)==NULL)return 64;
     melee_web_net_after_step();
-    if(melee_web_net_capture_local_input(81,raw)||
-       local_capture_publications!=2||net.local_capture_count!=2||
-       net.terminal_kind!=MELEE_WEB_NET_TERMINAL_PROTOCOL||net.cursor!=2||
-       net.terminal_tick!=2||net.terminal_channel!=port||
-       net.local_capture_failure_reason!=LOCAL_CAPTURE_FAILURE_POLL_SERIAL||
+  if(melee_web_net_capture_local_input(81,raw)||
+     local_capture_publications!=2||net.local_capture_count!=2||
+     net.terminal_kind!=MELEE_WEB_NET_TERMINAL_PROTOCOL||net.cursor!=2||
+     net.terminal_tick!=2||net.terminal_channel!=port||
+     net.local_capture_failure_reason!=LOCAL_CAPTURE_FAILURE_POLL_SERIAL||
+     melee_web_net_local_capture_pending()||
        net.local_capture_failure_cursor!=2||net.local_capture_failure_count!=2||
        net.local_capture_failure_poll_serial!=81||
        net.local_capture_failure_last_poll_serial!=81||
@@ -411,7 +421,7 @@ class NetLockstepNativeTests(unittest.TestCase):
             self.fail(f"native lockstep control failed ({result.returncode}); retained {directory}")
         shutil.rmtree(directory)
 
-    def test_fixed_clock_composes_with_native_capture_and_budget_candidate(self):
+    def test_fixed_clock_budget_api_composes_with_native_capture(self):
         compiler = shutil.which("cc")
         cxx = shutil.which("c++")
         if not compiler or not cxx:

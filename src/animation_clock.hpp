@@ -5,8 +5,9 @@
 
 namespace melee_web {
 // Fixed 60 Hz clock for source simulation and inspection playback.
-// Each callback executes at most eight ticks. Gameplay can retain a bounded
-// backlog across callbacks; inspection playback keeps its strict pause policy.
+// Callbacks execute at most eight ticks by default. A scoped caller budget can
+// lower that count while gameplay retains the bounded backlog; inspection
+// playback keeps its strict pause policy.
 class FixedTickClock {
 public:
     enum class OverrunPolicy { Pause, CatchUp };
@@ -24,12 +25,23 @@ public:
     void reset() noexcept { previous_.reset(); pending_ = 0; }
     double pending_ticks() const noexcept { return pending_; }
     Tick tick(double now_ms, bool running) noexcept {
-        return tick(now_ms, running, [](const Tick&) noexcept {});
+        return tick_with_budget(now_ms, running, 8);
     }
     // The read-only receipt is delivered before reset destroys the clock debt.
     // Observers must not throw or alter source scheduling.
     template<class ObserveStall>
     Tick tick(double now_ms, bool running, ObserveStall observe_stall) noexcept {
+        return tick_with_budget(now_ms, running, 8, observe_stall);
+    }
+    Tick tick_with_budget(double now_ms, bool running, unsigned max_steps) noexcept {
+        return tick_with_budget(now_ms, running, max_steps,
+                               [](const Tick&) noexcept {});
+    }
+    // Keep full-debt guards and stall receipts identical to tick(); the budget
+    // limits only how many due steps this callback returns to its caller.
+    template<class ObserveStall>
+    Tick tick_with_budget(double now_ms, bool running, unsigned max_steps,
+                          ObserveStall observe_stall) noexcept {
         if (!running) { reset(); return {}; }
         if (!std::isfinite(now_ms) || (previous_ && now_ms < *previous_)) {
             const Tick failure{0, true, 0,
@@ -51,7 +63,8 @@ public:
             observe_stall(failure);
             reset(); return failure;
         }
-        const unsigned steps = static_cast<unsigned>(std::min(whole, 8.0));
+        const unsigned steps = static_cast<unsigned>(
+            std::min({whole, 8.0, static_cast<double>(max_steps)}));
         pending_ = std::max(0.0, pending_ - steps);
         return {steps, false, static_cast<unsigned>(whole) - steps,
                 StallReason::None, whole, limit, interval};

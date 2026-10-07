@@ -190,6 +190,18 @@ EMSCRIPTEN_KEEPALIVE int melee_web_net_enable_local_input_capture(
     return 1;
 }
 
+int melee_web_net_local_capture_pending(void)
+{
+    if (!net.active || net.terminal_kind || !net.local_capture_enabled ||
+        !net.start_confirmed ||
+        net.local_capture_count >= net.local_capture_input_ticks)
+        return 0;
+    /* A remote wait may revisit the cursor whose local bytes were already
+     * published. Keep that immutable contribution and use ordinary pacing. */
+    return !net.local_capture_count ||
+           net.cursor != net.local_capture_last_cursor;
+}
+
 static int encode_local_pad(const PADStatus* pad,
                             uint8_t out[MELEE_WEB_NET_PAD_BYTES])
 {

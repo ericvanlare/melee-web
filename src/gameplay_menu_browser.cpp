@@ -1486,9 +1486,16 @@ void tick(){
   // construction work. Sample again here so that work is not charged to the
   // first active gameplay interval on the following callback.
   const double simulation_clock_now=emscripten_get_now();
-  const auto elapsed=menu_clock.tick(
-      simulation_clock_now,running&&(world||match||results||prize)&&input->visible,
-      [](const auto& event) noexcept {diagnostic_clock_stall(event,1);});
+  const bool local_capture_clock=melee_web_net_local_capture_pending();
+  const bool simulation_clock_running=running&&(world||match||results||prize)&&input->visible;
+  const auto observe_simulation_clock_stall=[](const auto& event) noexcept {
+   diagnostic_clock_stall(event,1);
+  };
+  const auto elapsed=local_capture_clock?
+      menu_clock.tick_with_budget(simulation_clock_now,simulation_clock_running,1,
+                                  observe_simulation_clock_stall):
+      menu_clock.tick(simulation_clock_now,simulation_clock_running,
+                      observe_simulation_clock_stall);
   if(elapsed.stalled){running=false;message="Paused after a timing disruption. Resume to continue.";}
   if(elapsed.steps&&transition_audio_continues){
    transition_audio_continues=false;
@@ -1730,6 +1737,19 @@ void tick(){
                        static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
 #endif
   source_frames.finish(present_source);
+#if !defined(MELEE_WEB_PUBLIC_RUNTIME)
+  if(local_capture_clock){
+   const double due_steps=elapsed.stalled?elapsed.triggering_value:
+       static_cast<double>(elapsed.steps+elapsed.pending_steps);
+   EM_ASM({try{globalThis.menuDiagnosticInputClockSample?.({
+     callback_ms:$0,interval_ms:$1,due_steps:$2,budget_steps:1,
+     returned_steps:$3,unconsumed_whole_steps:$4,pending_ticks_after:$5,
+     completed_source_steps:$6,source_draws:$7,stalled:!!$8});}catch(_){}},
+     simulation_clock_now,elapsed.interval_ms,due_steps,elapsed.steps,
+     elapsed.pending_steps,menu_clock.pending_ticks(),source_frames.steps(),
+     source_frames.draws(),elapsed.stalled?1:0);
+  }
+#endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
   replay_boundary_mark("source_frames_finish_returned",static_cast<int>(source_frames.steps()),
                        static_cast<int>(source_frames.draws()),static_cast<int>(replay_cursor));
