@@ -336,6 +336,14 @@ export function validateBrowserResponseUrl(url, origin) {
   throw Error(`Browser requested a resource outside the frozen loopback origins: ${url}`);
 }
 
+export function validateBrowserProcessInfo(rows) {
+  if (!Array.isArray(rows) || rows.length === 0 || rows.some(row =>
+      !row || !Number.isSafeInteger(row.id) || row.id <= 0 ||
+      typeof row.type !== 'string' || row.type.length === 0))
+    throw Error('Chrome CDP process inventory must contain nonempty typed positive PID rows');
+  return rows.map(({id, type}) => ({id, type}));
+}
+
 export function createTerminationRequest(onRequest, emitter = process) {
   let requested = false;
   let resolveRequest;
@@ -692,19 +700,19 @@ async function run() {
   const report = {schema: 'melee-web-a3-browser-owned-handshake-result-v2', outcome: 'fail',
     producer: manifest.producer, sourceHashes: Object.fromEntries(Object.entries(manifest.sources)
       .map(([key, value]) => [key, value.sha256])), served: manifest.served,
-    runtime: null, httpResponses, browser: {path: browserPath, playwrightPath,
+    runtime: null, browser_process_info: [], httpResponses, browser: {path: browserPath, playwrightPath,
       executableSha256: currentBrowserIdentity.executableSha256,
       infoPlistSha256: currentBrowserIdentity.infoPlistSha256,
       bundleVersion: currentBrowserIdentity.version, pageErrors: [], loadedResponses: []},
     roles: {browser: 'alpha', node: 'beta'}, contract: manifest.probe,
     events: [], firstError: null, cleanup: {browserContextClosed: false, browserClosed: false,
-      endpointsClosed: false, workerDisposed: false}};
+      browserCdpDetached: false, endpointsClosed: false, workerDisposed: false}};
   const recordEvent = event => report.events.push({event, monotonicNs: process.hrtime.bigint().toString(), at: new Date().toISOString()});
   const termination = createTerminationRequest(() => {
     report.terminationRequested = true;
     recordEvent('capture-owner-sigterm-requested');
   });
-  let runtime = null, browser = null, context = null, page = null;
+  let runtime = null, browser = null, context = null, page = null, browserCdp = null;
   let endpoint = null, peer = null, startPromise = null, intentionalClose = false;
   let browserStartInvoked = false;
   let probePassed = false;
@@ -757,6 +765,12 @@ async function run() {
       throw Error(`Browser fixture response capture failed: ${JSON.stringify(browserResponseErrors)}`);
     verifyBrowserResponseSet(browserResponseRows, manifest);
     report.browser.loadedResponses = [...browserResponseRows];
+
+    await awaitOwnedAcquisition(browser.newBrowserCDPSession(),
+      value => { browserCdp = value; }, termination);
+    const browserProcessResult = await termination.wait(
+      browserCdp.send('SystemInfo.getProcessInfo'), 3000, 'Chrome CDP process inventory');
+    report.browser_process_info = validateBrowserProcessInfo(browserProcessResult?.processInfo);
 
     recordEvent('worker-start-begin');
     await awaitOwnedAcquisition(startRoomRelayRuntime({evidenceDir: path.join(output, 'worker-evidence'),
@@ -918,6 +932,11 @@ async function run() {
     cleanupStages.push({name: 'browser response capture drain', run: async () => {
       await bounded(Promise.allSettled(browserResponseTasks), 3000, 'browser response capture drain');
     }});
+    if (browserCdp) cleanupStages.push({name: 'browser CDP detach', run: async () => {
+      await bounded(browserCdp.detach(), 1000, 'browser CDP detach');
+      browserCdp = null;
+      report.cleanup.browserCdpDetached = true;
+    }});
     if (context) cleanupStages.push({name: 'browser context close', run: async () => {
       await bounded(context.close(), 5000, 'browser context close');
       report.cleanup.browserContextClosed = true;
@@ -950,7 +969,8 @@ async function run() {
 
   report.cleanup.errors = cleanupErrors;
   report.outcome = probePassed && !termination.requested && report.cleanup.endpointsClosed && report.cleanup.browserClosed &&
-    report.cleanup.browserContextClosed && report.cleanup.workerDisposed && cleanupErrors.length === 0
+    report.cleanup.browserContextClosed && report.cleanup.browserCdpDetached &&
+    report.cleanup.workerDisposed && cleanupErrors.length === 0
     ? 'pass' : 'fail';
   report.finishedAt = new Date().toISOString();
   const reportPath = path.join(output, 'result.json');

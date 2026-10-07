@@ -16,6 +16,7 @@ import {
   runCleanupStages,
   validateAgreement,
   validateBrowserStartOptions,
+  validateBrowserProcessInfo,
   validateBrowserResponseUrl,
   validateExpectedNeutralFrames,
   validateResponseRecord,
@@ -127,6 +128,11 @@ test('served manifest requires every staged file hash and rejects response drift
     'http://127.0.0.1:8787/'), /outside the frozen loopback origins/);
   assert.throws(() => validateBrowserResponseUrl('http://127.0.0.1:8788/other',
     'http://127.0.0.1:8787/'), /outside the frozen loopback origins/);
+  assert.deepEqual(validateBrowserProcessInfo([{id: 12, type: 'browser'}, {id: 13, type: 'renderer'}]),
+    [{id: 12, type: 'browser'}, {id: 13, type: 'renderer'}]);
+  assert.throws(() => validateBrowserProcessInfo([]), /nonempty typed positive PID rows/);
+  assert.throws(() => validateBrowserProcessInfo([{id: 0, type: 'browser'}]), /nonempty typed positive PID rows/);
+  assert.throws(() => validateBrowserProcessInfo([{id: 12, type: ''}]), /nonempty typed positive PID rows/);
 });
 
 test('READY snapshots require complementary pinned hellos and reject late packets or batches', async () => {
