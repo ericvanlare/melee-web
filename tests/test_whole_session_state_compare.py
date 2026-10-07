@@ -25,12 +25,15 @@ from whole_session_state_compare import (  # noqa: E402
     ComparisonError, CONTEXT_HEADER, CONTEXT_BYTES, MWRC_HEADER, PAD_STATE_BYTES,
     MWRC_V10_VERSION, PRIMARY_STATIC_ENTITY_PROFILE, Recipe, SPAN, V10_DEFAULT_OFF_GATES,
     V10_FIGHTER_ROSTER, V10_FIRST_SETUP_TICK0_SCOPE, V10_PREFIX_BYTE_CAP,
+    V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE, V10_FIRST_POSITIVE_RECORD_CAP,
     V10_PREFIX_RECORD_CAP, V10_RULES_BYTES, WHOLE_SESSION_SCOPE,
     _file_stat_identity, _first_match_required_cursor, _first_match_tick_join_complete,
+    _first_match_timeline_index, _first_positive_match_join_complete,
     _load_expectations, _require_stable_mwro_stat,
     _first_difference, _source_prefix_identity, _validate_browser_producer_source,
     _validate_source_capture_report, _validate_source_manifest_capture,
-    _validate_v10_browser_provenance, _browser_entities, compare_paths,
+    _validate_v10_browser_provenance, _validate_first_positive_audit,
+    _browser_entities, compare_paths,
 )
 
 
@@ -41,7 +44,10 @@ def _word(raw, offset, value):
     struct.pack_into(">I", raw, offset, value)
 
 
-def _state_slices(motion=80, tick=0, rng=0x12345678, fighter_count=4):
+def _state_slices(motion=80, tick=0, rng=0x12345678, fighter_count=4,
+                  match_frame=None):
+    if match_frame is None:
+        match_frame = tick
     slices = [
         {"name": "pad_snapshot", "address": 0x804C1F84, "size": 0x358,
          "hex": _raw_pad_snapshot().hex()},
@@ -52,7 +58,7 @@ def _state_slices(motion=80, tick=0, rng=0x12345678, fighter_count=4):
         {"name": "scene_frame", "address": 0x80479D58, "size": 4,
          "hex": tick.to_bytes(4, "big").hex()},
         {"name": "match_frame", "address": 0x8046B6C4, "size": 4,
-         "hex": tick.to_bytes(4, "big").hex()},
+         "hex": match_frame.to_bytes(4, "big").hex()},
     ]
     for slot in range(fighter_count):
         pointer = 0x80580000 + slot * 0x3000
@@ -315,6 +321,93 @@ def _expectation_packet(directory: Path, *, capture_id: str, sequence_id: str,
     return packet_path, selected, packet
 
 
+def _positive_expectation_packet(directory: Path, *, capture_id="capture-positive",
+                                 sequence_id="sequence-positive", producer_head="1" * 40,
+                                 source_tick=3, source_sequence=50):
+    packet_path, selected, packet = _expectation_packet(
+        directory, capture_id=capture_id, sequence_id=sequence_id,
+        producer_head=producer_head)
+    recipe = Recipe(selected["recipe"], _v10_recipe_bytes(),
+                    scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE)
+    timeline_index = _first_match_timeline_index(recipe) + source_tick
+    target = {
+        "match_index": 0,
+        "source_tick": source_tick,
+        "source_sequence": source_sequence,
+        "pad_consume_sequence": source_sequence - 1,
+        "timeline_frame_index": timeline_index,
+        "browser_cursor": timeline_index + 1,
+        "match_frame": 1,
+    }
+    packet["schema"] = "melee-web-v10-first-positive-match-frame-expectations"
+    packet["scope"] = V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
+    packet["source"]["first_positive_boundary"] = target
+    audit_path = directory / "positive-audit.json"
+    stat_identity = {"device": 10, "inode": 20,
+                     "bytes": packet["source"]["trace"]["bytes"], "mtime_ns": 30}
+    expected_source = packet["source"]
+    audit = {
+        "schema": "melee-web-b4-first-positive-match-frame-source-audit-v1",
+        "audit_completed": True,
+        "whole_session_equivalent": False,
+        "source": {
+            "path": expected_source["trace"]["path"],
+            "capture_id": capture_id,
+            "sequence_id": sequence_id,
+            "recorded_full_trace_bytes": expected_source["trace"]["bytes"],
+            "recorded_full_trace_sha256": expected_source["trace"]["recorded_full_sha256"],
+            "full_trace_rehashed": False,
+            "stat_before": stat_identity,
+            "stat_after": stat_identity,
+            "stat_stable_during_audit": True,
+            "provenance": {
+                "manifest_sha256": expected_source["manifest"]["sha256"],
+                "source_report_sha256": expected_source["report"]["sha256"],
+                "audit_sha256": expected_source["audit"]["sha256"],
+                "recorded_full_trace_sha256": expected_source["trace"]["recorded_full_sha256"],
+                "full_trace_rehashed": False,
+                "trace_bytes": expected_source["trace"]["bytes"],
+            },
+        },
+        "observed": {
+            "first_positive": {
+                "match_index": 0,
+                "source_tick": source_tick,
+                "pad_consume_source_sequence": source_sequence - 1,
+                "timeline_frame_index": timeline_index,
+                "cursor_after_frame": timeline_index + 1,
+                "match_frame": 1,
+            },
+            "source_prefix": {
+                "last_source_sequence": source_sequence,
+                "records_read": source_sequence + 1,
+                "bytes_read": 100,
+                "sha256": "a" * 64,
+            },
+            "match_ticks_observed": source_tick + 1,
+            "timeline_frames_input_ordered_against_recipe": timeline_index + 1,
+            "css_sss_frames_input_ordered_against_recipe": _first_match_timeline_index(recipe),
+            "minimum_browser_target_cursor": timeline_index + 1,
+            "match_frame_runs": [
+                {"first_source_tick": 0, "last_source_tick": source_tick - 1,
+                 "first_timeline_frame_index": _first_match_timeline_index(recipe),
+                 "last_timeline_frame_index": timeline_index - 1, "match_frame": 0},
+                {"first_source_tick": source_tick, "last_source_tick": source_tick,
+                 "first_timeline_frame_index": timeline_index,
+                 "last_timeline_frame_index": timeline_index, "match_frame": 1},
+            ],
+        },
+    }
+    audit_path.write_text(json.dumps(audit), encoding="utf-8")
+    packet["source"]["positive_boundary_audit"] = {
+        "path": str(audit_path), "bytes": audit_path.stat().st_size,
+        "sha256": hashlib.sha256(audit_path.read_bytes()).hexdigest(),
+    }
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+    selected["positive_boundary_audit"] = audit_path
+    return packet_path, selected, packet, audit_path, audit
+
+
 class WholeSessionStateCompareTests(unittest.TestCase):
     def test_bounded_source_trace_stat_identity_must_remain_stable(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -377,6 +470,319 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertEqual(loaded_second["source"]["sequence_id"], "sequence-alt-b")
             self.assertNotEqual(first["browser"]["producer"]["head"],
                                 second["browser"]["producer"]["head"])
+
+    def test_positive_scope_packet_and_audit_bind_dynamic_source_boundary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            first_path, first_selected, first, first_audit_path, _ = \
+                _positive_expectation_packet(
+                    Path(directory) / "first", capture_id="capture-one",
+                    sequence_id="sequence-one", source_tick=3, source_sequence=50)
+            second_path, second_selected, second, second_audit_path, _ = \
+                _positive_expectation_packet(
+                    Path(directory) / "second", capture_id="capture-two",
+                    sequence_id="sequence-two", source_tick=4, source_sequence=78,
+                    producer_head="2" * 40)
+            loaded_first, _ = _load_expectations(
+                first_path, first_selected, scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE)
+            loaded_second, _ = _load_expectations(
+                second_path, second_selected, scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE)
+            self.assertEqual(loaded_first["source"]["capture_id"], "capture-one")
+            self.assertEqual(loaded_first["source"]["first_positive_boundary"]["source_sequence"], 50)
+            self.assertEqual(loaded_second["source"]["capture_id"], "capture-two")
+            self.assertEqual(loaded_second["source"]["first_positive_boundary"]["source_tick"], 4)
+            recipe = Recipe(first_selected["recipe"], _v10_recipe_bytes(),
+                            scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE)
+            _, first_sha = _validate_first_positive_audit(
+                first_audit_path, loaded_first, recipe)
+            _, second_sha = _validate_first_positive_audit(
+                second_audit_path, loaded_second, recipe)
+            self.assertEqual(first_sha, first["source"]["positive_boundary_audit"]["sha256"])
+            self.assertEqual(second_sha, second["source"]["positive_boundary_audit"]["sha256"])
+
+    def test_positive_scope_rejects_wrong_target_and_audit_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            packet_path, selected, packet, audit_path, _ = _positive_expectation_packet(
+                Path(directory), source_tick=3, source_sequence=50)
+            packet["source"]["first_positive_boundary"]["timeline_frame_index"] += 1
+            packet_path.write_text(json.dumps(packet), encoding="utf-8")
+            with self.assertRaisesRegex(ComparisonError, "invalid first-positive target"):
+                _load_expectations(packet_path, selected,
+                                   scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE)
+
+            packet["source"]["first_positive_boundary"]["timeline_frame_index"] -= 1
+            audit = json.loads(audit_path.read_text(encoding="utf-8"))
+            audit["source"]["capture_id"] = "other-capture"
+            audit_path.write_text(json.dumps(audit), encoding="utf-8")
+            packet["source"]["positive_boundary_audit"].update({
+                "bytes": audit_path.stat().st_size,
+                "sha256": hashlib.sha256(audit_path.read_bytes()).hexdigest(),
+            })
+            packet_path.write_text(json.dumps(packet), encoding="utf-8")
+            loaded, _ = _load_expectations(packet_path, selected,
+                                           scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE)
+            recipe = Recipe(selected["recipe"], _v10_recipe_bytes(),
+                            scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE)
+            with self.assertRaisesRegex(ComparisonError, "source trace identity"):
+                _validate_first_positive_audit(audit_path, loaded, recipe)
+
+    def test_positive_scope_keeps_legacy_defaults_and_uses_wider_prefix_record_cap(self):
+        raw = _v10_recipe_bytes()
+        with self.assertRaisesRegex(ComparisonError, "whole-session comparison requires MWRC"):
+            Recipe(Path("v10.mwrc"), raw)
+        with self.assertRaisesRegex(ComparisonError, "whole-session comparison version"):
+            from whole_session_state_compare import comparison_fields
+            comparison_fields(10)
+        recipe = Recipe(Path("v10.mwrc"), raw,
+                        scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE)
+        self.assertEqual(recipe.entity_profile, PRIMARY_STATIC_ENTITY_PROFILE)
+        self.assertEqual(V10_PREFIX_RECORD_CAP, 4200)
+        self.assertEqual(V10_FIRST_POSITIVE_RECORD_CAP, 8192)
+
+    def test_positive_scope_passes_caps_to_reader_and_cannot_pass_on_cap_stop(self):
+        with tempfile.TemporaryDirectory() as directory:
+            packet_path, selected, packet, _, _ = _positive_expectation_packet(Path(directory))
+            recipe_raw = _v10_recipe_bytes()
+            selected["recipe"].write_bytes(recipe_raw)
+            packet["recipe"].update({
+                "bytes": len(recipe_raw),
+                "sha256": hashlib.sha256(recipe_raw).hexdigest(),
+                "version": 10,
+                "frame_count": 12,
+                "seed": 0x12345678,
+            })
+            packet_path.write_text(json.dumps(packet), encoding="utf-8")
+            packet_sha = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+            observed_limits = {}
+
+            class FakeBrowser:
+                header = {"frames_requested": 12}
+
+                def close(self):
+                    pass
+
+            source_identity = {
+                "trace_bytes": selected["reference"].stat().st_size,
+                "recorded_full_trace_sha256": "b" * 64,
+                "full_trace_rehashed": False,
+                "audit_records_decoded": 1,
+                "audit_bytes_read": 1,
+                "manifest_sha256": "a" * 64,
+                "source_report_sha256": "a" * 64,
+                "audit_sha256": "a" * 64,
+            }
+            browser_identity = {
+                "required_cursor": 6,
+                "target_cursor": 6,
+                "capture_report_sha256": "c" * 64,
+                "producer_manifest_sha256": "c" * 64,
+                "browser_report_sha256": "c" * 64,
+                "port_trace_sha256": "c" * 64,
+            }
+
+            def capped_source(path, *, max_bytes, max_records, stats):
+                observed_limits.update(max_bytes=max_bytes, max_records=max_records)
+                raise ComparisonError("bounded source record cap reached before target")
+                yield  # pragma: no cover
+
+            with (mock.patch("whole_session_state_compare._validate_v10_source_provenance",
+                             return_value=({}, {}, {}, source_identity)),
+                  mock.patch("whole_session_state_compare._validate_v10_browser_provenance",
+                             return_value=({}, {}, {}, browser_identity)),
+                  mock.patch("whole_session_state_compare.BrowserReader",
+                             return_value=FakeBrowser()),
+                  mock.patch("whole_session_state_compare.iter_records",
+                             side_effect=capped_source)):
+                result = compare_paths(
+                    selected["reference"], selected["recipe"], selected["port_trace"],
+                    scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE,
+                    expectations=packet_path,
+                    source_manifest=selected["source_manifest"],
+                    source_report=selected["source_report"],
+                    source_audit=selected["source_audit"],
+                    browser_capture_report=selected["browser_capture_report"],
+                    browser_producer_manifest=selected["browser_producer_manifest"],
+                    browser_report=selected["browser_report"],
+                    positive_boundary_audit=selected["positive_boundary_audit"],
+                )
+            self.assertEqual(observed_limits, {
+                "max_bytes": V10_PREFIX_BYTE_CAP,
+                "max_records": V10_FIRST_POSITIVE_RECORD_CAP,
+            })
+            self.assertEqual(result["result"], "invalid")
+            self.assertFalse(result["complete"])
+            self.assertFalse(result["whole_session_equivalent"])
+            self.assertEqual(result["expectations"]["sha256"], packet_sha)
+
+    def test_positive_comparator_requires_contiguous_zero_clock_and_exact_target(self):
+        pads = ["00" * 11] * 4
+        spans = [
+            {"scene": SCENES["css"], "first_frame": 0, "last_frame": 0},
+            {"scene": SCENES["sss"], "first_frame": 1, "last_frame": 1},
+            {"scene": SCENES["match"], "first_frame": 2, "last_frame": 7},
+            {"scene": SCENES["results"], "first_frame": 8, "last_frame": 8},
+            {"scene": SCENES["css"], "first_frame": 9, "last_frame": 9},
+            {"scene": SCENES["sss"], "first_frame": 10, "last_frame": 10},
+            {"scene": SCENES["match"], "first_frame": 11, "last_frame": 12},
+            {"scene": SCENES["results"], "first_frame": 13, "last_frame": 13},
+            {"scene": SCENES["css"], "first_frame": 14, "last_frame": 14},
+            {"scene": SCENES["sss"], "first_frame": 15, "last_frame": 15},
+            {"scene": SCENES["match"], "first_frame": 16, "last_frame": 16},
+            {"scene": SCENES["results"], "first_frame": 17, "last_frame": 17},
+        ]
+        frames = [{"index": index, "scene": span["scene"], "pads": list(pads)}
+                  for span in spans
+                  for index in range(span["first_frame"], span["last_frame"] + 1)]
+        recipe = SimpleNamespace(
+            frame_count=len(frames), version=10,
+            scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE,
+            entity_profile=PRIMARY_STATIC_ENTITY_PROFILE,
+            spans=spans, frames=frames, seed=0,
+        )
+        target = {
+            "match_index": 0, "source_tick": 3,
+            "source_sequence": 50, "pad_consume_sequence": 49,
+            "timeline_frame_index": 5, "browser_cursor": 6, "match_frame": 1,
+        }
+
+        class FakeBrowser:
+            header = {"frames_requested": len(frames)}
+            line = 2
+
+            def __init__(self, row):
+                self.row = row
+                self.reads = 0
+
+            def next(self):
+                self.reads += 1
+                return self.row
+
+        def frame_for(tick, match_frame, *, sequence=50, pad_sequence=49, pads_value=None):
+            state = _v9_state({"slices": _state_slices(tick=tick, match_frame=match_frame)})
+            index = _first_match_timeline_index(recipe) + tick
+            source_pads = list(pads if pads_value is None else pads_value)
+            row = {
+                "record": "session_frame", "scene": SCENES["match"], "index": index,
+                "supplied_inputs": list(pads), "rng": state["rng"],
+                "match_frame": state["match_frame"],
+                "pad_state_hex": state["pad_state_hex"],
+                "fighters": copy.deepcopy(state["fighters"]),
+                "fighter_entities": copy.deepcopy(state["fighter_entities"]),
+            }
+            frame = {
+                "scene": SCENES["match"], "pads": source_pads,
+                "state": state, "match_index": 0, "source_tick": tick,
+                "source_tick_seq": sequence, "source_seq": pad_sequence,
+            }
+            return index, frame, row
+
+        target_index, frame, row = frame_for(3, 1)
+        browser = FakeBrowser(row)
+        comparator = Comparator(recipe, browser, positive_boundary=target)
+        comparator.frame_index = target_index
+        comparator.compared = target_index
+        comparator.match_compared = 3
+        comparator.setup_count = 1
+        comparator.current_match = 0
+        comparator.on_frame(frame)
+        self.assertEqual(comparator.frame_index, target["browser_cursor"])
+        self.assertEqual(comparator.match_compared, 4)
+
+        index, source_frame, reordered_row = frame_for(3, 1)
+        reordered_row["index"] += 1
+        browser = FakeBrowser(reordered_row)
+        comparator = Comparator(recipe, browser, positive_boundary=target)
+        comparator.frame_index = index
+        comparator.compared = index
+        comparator.match_compared = 3
+        comparator.setup_count = 1
+        comparator.current_match = 0
+        with self.assertRaisesRegex(ComparisonError, "missing, extra, or reordered"):
+            comparator.on_frame(source_frame)
+
+        index, source_frame, early_clock_row = frame_for(2, 0)
+        early_clock_row["match_frame"] = 1
+        comparator = Comparator(recipe, FakeBrowser(early_clock_row),
+                                positive_boundary=target)
+        comparator.frame_index = index
+        comparator.compared = index
+        comparator.match_compared = 2
+        comparator.setup_count = 1
+        comparator.current_match = 0
+        with self.assertRaisesRegex(ComparisonError, "exact state differs at match_frame"):
+            comparator.on_frame(source_frame)
+        self.assertEqual(comparator.first_difference["field"], "match_frame")
+
+        for tick, clock in ((2, 1), (4, 1)):
+            index, bad_frame, bad_row = frame_for(tick, clock)
+            browser = FakeBrowser(bad_row)
+            comparator = Comparator(recipe, browser, positive_boundary=target)
+            comparator.frame_index = index
+            comparator.compared = index
+            comparator.match_compared = tick
+            comparator.setup_count = 1
+            comparator.current_match = 0
+            with self.assertRaisesRegex(ComparisonError, "clock became positive|advanced past"):
+                comparator.on_frame(bad_frame)
+            self.assertEqual(browser.reads, 0)
+
+        index, late_clock_frame, late_clock_row = frame_for(3, 0)
+        browser = FakeBrowser(late_clock_row)
+        comparator = Comparator(recipe, browser, positive_boundary=target)
+        comparator.frame_index = index
+        comparator.compared = index
+        comparator.match_compared = 3
+        comparator.setup_count = 1
+        comparator.current_match = 0
+        with self.assertRaisesRegex(ComparisonError, "match_frame"):
+            comparator.on_frame(late_clock_frame)
+        self.assertEqual(browser.reads, 0)
+
+        index, bad_frame, bad_row = frame_for(3, 1, sequence=51)
+        browser = FakeBrowser(bad_row)
+        comparator = Comparator(recipe, browser, positive_boundary=target)
+        comparator.frame_index = index
+        comparator.compared = index
+        comparator.match_compared = 3
+        comparator.setup_count = 1
+        comparator.current_match = 0
+        with self.assertRaisesRegex(ComparisonError, "source_sequence"):
+            comparator.on_frame(bad_frame)
+        self.assertEqual(browser.reads, 0)
+
+        index, bad_pad_frame, bad_row = frame_for(3, 1, pad_sequence=48)
+        comparator = Comparator(recipe, FakeBrowser(bad_row), positive_boundary=target)
+        comparator.frame_index = index
+        comparator.compared = index
+        comparator.match_compared = 3
+        comparator.setup_count = 1
+        comparator.current_match = 0
+        with self.assertRaisesRegex(ComparisonError, "pad_consume_sequence"):
+            comparator.on_frame(bad_pad_frame)
+
+        altered_pads = list(pads)
+        altered_pads[0] = "01" + "00" * 10
+        index, bad_frame, bad_row = frame_for(3, 1, pads_value=altered_pads)
+        comparator = Comparator(recipe, FakeBrowser(bad_row), positive_boundary=target)
+        comparator.frame_index = index
+        comparator.compared = index
+        comparator.match_compared = 3
+        comparator.setup_count = 1
+        comparator.current_match = 0
+        with self.assertRaisesRegex(ComparisonError, "PAD/scene order"):
+            comparator.on_frame(bad_frame)
+
+        index, source_frame, divergent_row = frame_for(3, 1)
+        divergent_row["match_frame"] = 0
+        browser = FakeBrowser(divergent_row)
+        comparator = Comparator(recipe, browser, positive_boundary=target)
+        comparator.frame_index = index
+        comparator.compared = index
+        comparator.match_compared = 3
+        comparator.setup_count = 1
+        comparator.current_match = 0
+        with self.assertRaisesRegex(ComparisonError, "exact state differs at match_frame"):
+            comparator.on_frame(source_frame)
+        self.assertEqual(comparator.first_difference["field"], "match_frame")
 
     def test_external_expectations_require_recorded_disc_and_runtime_identities(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -643,6 +1049,10 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertEqual(identity["required_cursor"], 3)
             self.assertEqual(identity["target_cursor"], 4)
             self.assertFalse(identity["runtime_data_recorded_identity"]["freshly_rehashed"])
+            with self.assertRaisesRegex(ComparisonError, "stopped before the first-match state boundary"):
+                _validate_v10_browser_provenance(
+                    capture_path, producer_path, browser_report_path, trace_path,
+                    recipe_path, recipe_sha, recipe, packet, required_cursor=5)
 
             def assert_bad_snapshots(rows, error):
                 wrapper["snapshots"] = rows
@@ -727,6 +1137,32 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             source, comparator))
         source.pending = {"source_tick": 0}
         self.assertFalse(_first_match_tick_join_complete(tick, source, comparator))
+
+    def test_positive_join_stops_only_at_the_frozen_tick_and_browser_cursor(self):
+        target = {"match_index": 0, "source_tick": 3, "source_sequence": 50,
+                  "pad_consume_sequence": 49, "timeline_frame_index": 5,
+                  "browser_cursor": 6, "match_frame": 1}
+        source = SimpleNamespace(
+            match_index=0, pending=None, last_source_tick={0: 3},
+            last_source_tick_seq=50, prefix_binding_validated=True)
+        comparator = SimpleNamespace(
+            setup_count=1, current_match=0, match_compared=4, frame_index=6)
+        row = {"event": "boundary", "seq": 50, "source_tick": 3,
+               "payload": {"boundary": "source_tick", "match_index": 0}}
+        self.assertTrue(_first_positive_match_join_complete(row, source, comparator, target))
+        for changed in (
+                {**row, "seq": 51},
+                {**row, "source_tick": 2},
+                {**row, "payload": {**row["payload"], "match_index": 1}},
+                {**row, "payload": {**row["payload"], "boundary": "draw_return"}},
+        ):
+            self.assertFalse(_first_positive_match_join_complete(
+                changed, source, comparator, target))
+        comparator.frame_index = 5
+        self.assertFalse(_first_positive_match_join_complete(row, source, comparator, target))
+        comparator.frame_index = 6
+        source.pending = {"source_tick": 3}
+        self.assertFalse(_first_positive_match_join_complete(row, source, comparator, target))
 
     def test_v10_primary_entity_profile_keeps_strict_secondary_and_backlink_rejection(self):
         recipe = Recipe(Path("v10.mwrc"), _v10_recipe_bytes(),
@@ -851,6 +1287,88 @@ class WholeSessionStateCompareTests(unittest.TestCase):
         wrong_scene_frame = _boundary("source_tick", 9, 0, slices=wrong_state)
         with self.assertRaisesRegex(ComparisonError, "scene frame"):
             collector._tick(wrong_scene_frame)
+
+    def test_first_positive_scope_reuses_ordered_pad_and_contiguous_tick_checks(self):
+        raw_setup = _v10_setup_bytes()[0]
+        recipe = SimpleNamespace(
+            scope=V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE, version=10,
+            entity_profile=PRIMARY_STATIC_ENTITY_PROFILE,
+            match_setups=[raw_setup, *_v10_setup_bytes()[1:]], setup=raw_setup,
+            spans=[{"scene": SCENES["match"]}] * 3,
+        )
+        state_slices = _state_slices(tick=0, match_frame=0)
+        setup_slices = [*state_slices, {
+            "name": "match_setup", "address": 0x80600000,
+            "size": len(raw_setup), "hex": raw_setup.hex(),
+        }]
+        setup_row = _boundary("setup", 7, 31, slices=setup_slices)
+        setup_row["payload"]["gprs"] = [0] * 32
+        setup_row["payload"]["gprs"][3] = 0x80600000
+
+        class Callback:
+            def __init__(self):
+                self.setup_count = 0
+                self.current_match = -1
+                self.match_compared = 0
+                self.frames = []
+
+            def on_setup(self, match_index, state, source_seq):
+                self.setup_count += 1
+                self.current_match = match_index
+
+            def on_frame(self, frame):
+                self.match_compared += frame["scene"] == SCENES["match"]
+                self.frames.append(frame)
+
+        callback = Callback()
+        collector = SourceCollector(
+            callback, recipe,
+            source_audit={
+                "first_setup": {"seq": 7, "source_tick": 31, "match_index": 0},
+                "first_source_tick": {"seq": 9, "source_tick": 0, "match_index": 0},
+                "first_entry_verified_seq": 6,
+            },
+            source_expectations={"capture_id": "dynamic-capture",
+                                 "sequence_id": "dynamic-sequence"})
+        collector.scene = "match"
+        collector.match_index = 0
+        collector.started = True
+        collector.prefix_binding_validated = True
+        collector.entry_setup_bytes = raw_setup
+        collector._setup(setup_row)
+
+        pad0 = _pad_consume(0, 0x10, 0)
+        pad0.update({"seq": 8, "source_tick": 0, "draw_ordinal": 8})
+        collector._consume(pad0)
+        collector._tick(_boundary("source_tick", 9, 0, slices=state_slices))
+        self.assertEqual(collector.first_source_tick_seq, 9)
+        self.assertEqual(collector.last_source_tick_seq, 9)
+
+        pad1 = _pad_consume(0, 0x20, 0)
+        pad1.update({"seq": 10, "source_tick": 1, "draw_ordinal": 10})
+        collector._consume(pad1)
+        with self.assertRaisesRegex(ComparisonError, "multiple PAD consumes"):
+            collector._consume({**pad1, "seq": 11})
+
+        skipped_state = _state_slices(tick=2, match_frame=0)
+        with self.assertRaisesRegex(ComparisonError, "not contiguous"):
+            collector._tick(_boundary("source_tick", 11, 2, slices=skipped_state))
+
+        state1 = _state_slices(tick=1, match_frame=0)
+        collector._tick(_boundary("source_tick", 11, 1, slices=state1))
+        self.assertEqual(collector.first_source_tick_seq, 9)
+        self.assertEqual(collector.last_source_tick_seq, 11)
+        self.assertEqual(callback.match_compared, 2)
+
+        collector.pending = None
+        with self.assertRaisesRegex(ComparisonError, "preceding VS PAD consume"):
+            collector._tick(_boundary("source_tick", 12, 2, slices=state1))
+
+        collector.pending = {"scene": SCENES["match"], "pads": [],
+                             "source_seq": 11, "source_tick": 1}
+        with self.assertRaisesRegex(ComparisonError, "PAD consume"):
+            collector._tick(_boundary("source_tick", 12, 2,
+                                      slices=_state_slices(tick=2, match_frame=0)))
 
     def test_source_collector_and_comparator_match_setup_and_tick(self):
         source, pads, _, _ = _source_rows()

@@ -71,6 +71,7 @@ MWRC_VERSION = 9
 MWRC_V10_VERSION = 10
 WHOLE_SESSION_SCOPE = "whole-session"
 V10_FIRST_SETUP_TICK0_SCOPE = "v10-first-setup-tick0"
+V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE = "v10-first-positive-match-frame"
 PRIMARY_STATIC_ENTITY_PROFILE = "primary-static-player-pair-v1"
 FRAME_BYTES = 44
 PORT_BYTES = 11
@@ -96,6 +97,7 @@ V10_BROWSER_CAPTURE_SCHEMA = "melee-web-headless-whole-session-replay-v1"
 V10_BROWSER_PRODUCER_SCHEMA = "melee-web-b4-match-entry-producer-source-v1"
 V10_PREFIX_BYTE_CAP = 32 * 1024 * 1024
 V10_PREFIX_RECORD_CAP = 4200
+V10_FIRST_POSITIVE_RECORD_CAP = 8192
 V10_DEFAULT_OFF_GATES = {
     "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
     "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
@@ -117,15 +119,22 @@ FIGHTER_KEYS = {
 HEX_RE = re.compile(r"^[0-9a-f]+$")
 
 
+def _is_v10_prefix_scope(scope: str) -> bool:
+    return scope in {V10_FIRST_SETUP_TICK0_SCOPE, V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE}
+
+
 class ComparisonError(ValueError):
     """Input or observer evidence cannot be admitted to this comparison."""
 
 
 def comparison_fields(version: int, *, scope: str = WHOLE_SESSION_SCOPE) -> tuple[str, ...]:
-    if scope == V10_FIRST_SETUP_TICK0_SCOPE:
+    if scope in {V10_FIRST_SETUP_TICK0_SCOPE, V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE}:
         if version == MWRC_V10_VERSION:
             return V9_COMPARE_FIELDS
-        raise ComparisonError("v10 first-setup/tick-0 scope requires MWRC v10")
+        message = ("v10 first-positive match-frame scope requires MWRC v10"
+                   if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE else
+                   "v10 first-setup/tick-0 scope requires MWRC v10")
+        raise ComparisonError(message)
     if scope != WHOLE_SESSION_SCOPE:
         raise ComparisonError(f"unsupported whole-session comparison scope {scope!r}")
     if version == MWRC_VERSION:
@@ -517,7 +526,8 @@ class Recipe:
     def __init__(self, path: Path, raw: bytes, *, scope: str = WHOLE_SESSION_SCOPE) -> None:
         self.path = path
         self.raw = raw
-        if scope not in {WHOLE_SESSION_SCOPE, V10_FIRST_SETUP_TICK0_SCOPE}:
+        if scope not in {WHOLE_SESSION_SCOPE, V10_FIRST_SETUP_TICK0_SCOPE,
+                         V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE}:
             raise ComparisonError(f"unsupported whole-session comparison scope {scope!r}")
         self.scope = scope
         if len(raw) < MWRC_HEADER.size + CONTEXT_HEADER.size:
@@ -528,7 +538,10 @@ class Recipe:
         if magic != b"MWRC" or version not in allowed_versions:
             if scope == WHOLE_SESSION_SCOPE:
                 raise ComparisonError("whole-session comparison requires MWRC v8 or v9")
-            raise ComparisonError("v10 first-setup/tick-0 scope requires MWRC v10")
+            message = ("v10 first-positive match-frame scope requires MWRC v10"
+                       if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE else
+                       "v10 first-setup/tick-0 scope requires MWRC v10")
+            raise ComparisonError(message)
         self.version = version
         self.entity_profile = (PRIMARY_STATIC_ENTITY_PROFILE
                                if version in (MWRC_VERSION, MWRC_V10_VERSION) else None)
@@ -694,9 +707,18 @@ class BrowserReader:
 
 
 class Comparator:
-    def __init__(self, recipe: Recipe, browser: BrowserReader) -> None:
+    def __init__(self, recipe: Recipe, browser: BrowserReader, *,
+                 positive_boundary: Mapping[str, int] | None = None) -> None:
         self.recipe = recipe
         self.browser = browser
+        if recipe.scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
+            if not isinstance(positive_boundary, Mapping):
+                raise ComparisonError("first-positive scope lacks its frozen boundary target")
+            self.positive_boundary = positive_boundary
+        else:
+            if positive_boundary is not None:
+                raise ComparisonError("positive boundary target is only valid in its explicit scope")
+            self.positive_boundary = None
         self.compare_fields = comparison_fields(recipe.version, scope=recipe.scope)
         if browser.header["frames_requested"] != recipe.frame_count:
             raise ComparisonError("browser header frames_requested disagrees with MWRC recipe")
@@ -829,6 +851,45 @@ class Comparator:
         else:
             self.source_spans.append({"scene": expected_scene, "first_frame": index,
                                       "last_frame": index})
+        if (self.positive_boundary is not None and
+                expected_scene == SCENES["match"]):
+            boundary = self.positive_boundary
+            match_index = _int(frame.get("match_index"), "source match index", 0, 2)
+            source_tick = _int(frame.get("source_tick"), "source match tick")
+            source_tick_seq = _int(frame.get("source_tick_seq"), "source match tick sequence",
+                                   0, (1 << 64) - 1)
+            pad_consume_seq = _int(frame.get("source_seq"), "source PAD consume sequence",
+                                   0, (1 << 64) - 1)
+            target_tick = boundary["source_tick"]
+            state = frame.get("state")
+            if match_index != boundary["match_index"]:
+                raise ComparisonError("first-positive prefix left match 0 before its target")
+            if index != _first_match_timeline_index(self.recipe) + source_tick:
+                raise ComparisonError("source match tick is not contiguous with its recipe timeline")
+            if source_tick < target_tick:
+                if not isinstance(state, dict) or state.get("match_frame") != 0:
+                    raise ComparisonError("source match clock became positive before the frozen target")
+            elif source_tick == target_tick:
+                actual_target = {
+                    "match_index": match_index,
+                    "source_tick": source_tick,
+                    "source_sequence": source_tick_seq,
+                    "pad_consume_sequence": pad_consume_seq,
+                    "timeline_frame_index": index,
+                    "browser_cursor": index + 1,
+                    "match_frame": state.get("match_frame") if isinstance(state, dict) else None,
+                }
+                expected_target = {key: boundary[key] for key in actual_target}
+                difference = _first_difference(expected_target, actual_target)
+                if difference:
+                    field, wanted, got = difference
+                    raise ComparisonError(
+                        f"source first-positive boundary differs at {field}: "
+                        f"expected {wanted!r}, got {got!r}")
+                if boundary["match_frame"] != 1:
+                    raise ComparisonError("frozen first-positive target is not match_frame 1")
+            else:
+                raise ComparisonError("source prefix advanced past the frozen first-positive target")
         row = self._expect_frame_row(expected_scene, index)
         if index == 0 and expected_scene == SCENES["css"]:
             self._compare({"rng": self.recipe.seed}, row,
@@ -912,6 +973,7 @@ class SourceCollector:
         self.entity_previous: dict[int, dict[int, tuple[int, int]]] = {}
         self.final_css: dict[str, Any] | None = None
         self.last_source_tick: dict[int, int] = {}
+        self.last_source_tick_seq: int | None = None
         self.record_count = 0
 
     def _lifecycle(self, boundary: str, row: Mapping[str, Any]) -> None:
@@ -1004,14 +1066,14 @@ class SourceCollector:
     def _setup(self, row: Mapping[str, Any]) -> None:
         if self.scene != "match":
             raise ComparisonError("source setup occurred outside VS")
-        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE and (
+        if _is_v10_prefix_scope(self.recipe.scope) and (
                 self.match_index != 0 or self.setup_bytes):
             raise ComparisonError("v10 first-match prefix contains an extra or reordered setup")
-        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE and self.pending is not None:
+        if _is_v10_prefix_scope(self.recipe.scope) and self.pending is not None:
             raise ComparisonError("v10 first-match setup followed an unjoined PAD consume")
         _, raw = _slice(row["payload"], "match_setup", GAME_INFO_SIZE, "source setup")
         self.setup_bytes.append(raw)
-        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE:
+        if _is_v10_prefix_scope(self.recipe.scope):
             first_setup = (self.source_audit or {}).get("first_setup")
             if (not isinstance(first_setup, dict) or
                     row.get("seq") != first_setup.get("seq") or
@@ -1028,7 +1090,7 @@ class SourceCollector:
         self.callback.on_setup(self.match_index, state, row["seq"])
 
     def _entry(self, row: Mapping[str, Any]) -> None:
-        if self.recipe.scope != V10_FIRST_SETUP_TICK0_SCOPE:
+        if not _is_v10_prefix_scope(self.recipe.scope):
             return
         expected_entry_seq = (self.source_audit or {}).get("first_entry_verified_seq")
         if (self.match_index != 0 or type(expected_entry_seq) is not int or
@@ -1046,15 +1108,17 @@ class SourceCollector:
     def _tick(self, row: Mapping[str, Any]) -> None:
         if self.scene != "match" or self.pending is None:
             raise ComparisonError("source_tick is missing its preceding VS PAD consume")
-        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE:
+        if _is_v10_prefix_scope(self.recipe.scope):
             if self.callback.setup_count != 1 or not self.prefix_binding_validated:
                 raise ComparisonError("source first tick preceded its bound setup")
-            first_tick = (self.source_audit or {}).get("first_source_tick")
-            if (not isinstance(first_tick, dict) or self.match_index != 0 or
-                    row.get("seq") != first_tick.get("seq") or
-                    row.get("source_tick") != first_tick.get("source_tick") or
-                    row.get("source_tick") != 0):
-                raise ComparisonError("source first tick is detached from the bounded identity audit")
+            if self.first_source_tick_seq is None:
+                first_tick = (self.source_audit or {}).get("first_source_tick")
+                if (not isinstance(first_tick, dict) or self.match_index != 0 or
+                        row.get("seq") != first_tick.get("seq") or
+                        row.get("source_tick") != first_tick.get("source_tick") or
+                        row.get("source_tick") != 0):
+                    raise ComparisonError(
+                        "source first tick is detached from the bounded identity audit")
         state = self._match_state(row["payload"], "source_tick")
         expected_tick = self.last_source_tick.get(self.match_index, -1) + 1
         if row["source_tick"] != expected_tick:
@@ -1067,10 +1131,13 @@ class SourceCollector:
             raise ComparisonError("source_tick envelope disagrees with source scene frame")
         frame = self.pending
         frame["state"] = state
+        frame["match_index"] = self.match_index
+        frame["source_tick_seq"] = row["seq"]
         self.callback.on_frame(frame)
         self.pending = None
         self.last_source_tick[self.match_index] = row["source_tick"]
-        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE:
+        self.last_source_tick_seq = row["seq"]
+        if _is_v10_prefix_scope(self.recipe.scope) and self.first_source_tick_seq is None:
             self.first_source_tick_seq = row["seq"]
             self.first_source_tick = row["source_tick"]
 
@@ -1078,7 +1145,7 @@ class SourceCollector:
         """Bind source identity, CSS context, lifecycle, and setup before tick 0."""
         if self.prefix_binding_validated:
             return
-        if self.recipe.scope != V10_FIRST_SETUP_TICK0_SCOPE:
+        if not _is_v10_prefix_scope(self.recipe.scope):
             raise ComparisonError("prefix binding is only valid in the explicit v10 prefix scope")
         if (self.source_manifest is None or self.source_audit is None or
                 self.source_expectations is None):
@@ -1258,8 +1325,12 @@ class SourceCollector:
                 raise ComparisonError(f"source contains unsupported boundary {boundary!r}")
 
     def finish(self) -> None:
-        if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE:
-            raise ComparisonError("v10 first-setup/tick-0 evidence cannot finish a whole-session comparison")
+        if _is_v10_prefix_scope(self.recipe.scope):
+            if self.recipe.scope == V10_FIRST_SETUP_TICK0_SCOPE:
+                raise ComparisonError(
+                    "v10 first-setup/tick-0 evidence cannot finish a whole-session comparison")
+            raise ComparisonError(
+                "v10 first-positive match-frame evidence cannot finish a whole-session comparison")
         if self.handshake is None or self.start is None or self.end is None:
             raise ComparisonError("source stream is missing handshake, start, or end")
         if self.handshake.get("whole_session") is not True or self.start.get("whole_session") is not True:
@@ -1337,14 +1408,18 @@ def _path_identity(value: Any, expected: Path, context: str) -> None:
 
 
 EXPECTATION_SCHEMA = "melee-web-v10-first-setup-tick0-expectations"
+POSITIVE_EXPECTATION_SCHEMA = "melee-web-v10-first-positive-match-frame-expectations"
 
 
-def _load_expectations(path: Path, selected: Mapping[str, Path]
+def _load_expectations(path: Path, selected: Mapping[str, Path], *,
+                       scope: str = V10_FIRST_SETUP_TICK0_SCOPE
                        ) -> tuple[dict[str, Any], str]:
     packet, packet_sha, _ = _read_json_sidecar(path, "v10 comparison expectations", max_bytes=1024 * 1024)
-    if packet.get("schema") != EXPECTATION_SCHEMA or packet.get("version") != 1:
+    expected_schema = (POSITIVE_EXPECTATION_SCHEMA
+                       if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE else EXPECTATION_SCHEMA)
+    if packet.get("schema") != expected_schema or packet.get("version") != 1:
         raise ComparisonError("v10 comparison expectations schema/version is unsupported")
-    if packet.get("scope") != V10_FIRST_SETUP_TICK0_SCOPE:
+    if packet.get("scope") != scope or not _is_v10_prefix_scope(scope):
         raise ComparisonError("v10 comparison expectations scope is unsupported")
     source = packet.get("source")
     recipe = packet.get("recipe")
@@ -1362,6 +1437,8 @@ def _load_expectations(path: Path, selected: Mapping[str, Path]
         "browser_report": browser.get("report"),
         "port_trace": browser.get("trace"),
     }
+    if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
+        named_paths["positive_boundary_audit"] = source.get("positive_boundary_audit")
     for name, expected_path in selected.items():
         identity = named_paths.get(name)
         if not isinstance(identity, dict):
@@ -1389,6 +1466,26 @@ def _load_expectations(path: Path, selected: Mapping[str, Path]
             type(recipe.get("frame_count")) is not int or recipe["frame_count"] <= 0 or
             type(recipe.get("seed")) is not int or not 0 <= recipe["seed"] <= MAX_UINT32):
         raise ComparisonError("v10 expectations lack the recipe version, size, seed, or frame count")
+    if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
+        target = source.get("first_positive_boundary")
+        required_target_fields = {
+            "match_index", "source_tick", "source_sequence", "pad_consume_sequence",
+            "timeline_frame_index", "browser_cursor", "match_frame",
+        }
+        if not isinstance(target, dict) or set(target) != required_target_fields:
+            raise ComparisonError("positive-boundary expectations lack the exact frozen target fields")
+        for field in required_target_fields:
+            _int(target[field], f"positive-boundary expectations {field}",
+                 1 if field in {"source_sequence", "browser_cursor", "match_frame"} else 0,
+                 (1 << 64) - 1 if field in {"source_sequence", "pad_consume_sequence"}
+                 else MAX_UINT32)
+        if (target["match_index"] != 0 or target["source_tick"] == 0 or
+                target["match_frame"] != 1 or
+                target["timeline_frame_index"] + 1 != target["browser_cursor"] or
+                target["source_sequence"] <= target["pad_consume_sequence"] or
+                target["source_sequence"] >= V10_FIRST_POSITIVE_RECORD_CAP or
+                target["browser_cursor"] > recipe["frame_count"]):
+            raise ComparisonError("positive-boundary expectations contain an invalid first-positive target")
     producer = browser.get("producer")
     if not isinstance(producer, dict) or any(
             not isinstance(producer.get(field), str) or not producer[field]
@@ -1426,7 +1523,7 @@ def _expectation_files(packet: Mapping[str, Any]) -> dict[str, Mapping[str, Any]
     source = packet["source"]
     recipe = packet["recipe"]
     browser = packet["browser"]
-    return {
+    files = {
         "reference": source["trace"],
         "source_manifest": source["manifest"],
         "source_report": source["report"],
@@ -1437,6 +1534,9 @@ def _expectation_files(packet: Mapping[str, Any]) -> dict[str, Mapping[str, Any]
         "browser_report": browser["report"],
         "port_trace": browser["trace"],
     }
+    if "positive_boundary_audit" in source:
+        files["positive_boundary_audit"] = source["positive_boundary_audit"]
+    return files
 
 
 def _validate_source_manifest_capture(capture: Mapping[str, Any],
@@ -1672,13 +1772,148 @@ def _validate_v10_source_provenance(reference_path: Path, recipe_path: Path,
 
 
 def _first_match_required_cursor(recipe: Recipe) -> int:
+    return _first_match_timeline_index(recipe) + 1
+
+
+def _first_match_timeline_index(recipe: Recipe) -> int:
     match_spans = [span for span in recipe.spans if span["scene"] == SCENES["match"]]
     if len(match_spans) != 3:
         raise ComparisonError("v10 recipe does not contain three ordered match spans")
     first_match = match_spans[0]
     if first_match["first_frame"] == 0:
         raise ComparisonError("v10 first match is not preceded by its CSS/SSS route")
-    return first_match["first_frame"] + 1
+    return first_match["first_frame"]
+
+
+def _first_positive_match_join_complete(row: Mapping[str, Any], source: SourceCollector,
+                                        comparator: Comparator,
+                                        target: Mapping[str, int]) -> bool:
+    payload = row.get("payload")
+    return (row.get("event") == "boundary" and isinstance(payload, dict) and
+            payload.get("boundary") == "source_tick" and
+            payload.get("match_index") == target.get("match_index") == 0 and
+            row.get("source_tick") == target.get("source_tick") and
+            row.get("seq") == target.get("source_sequence") and
+            source.match_index == 0 and source.pending is None and
+            source.last_source_tick.get(0) == target.get("source_tick") and
+            source.last_source_tick_seq == target.get("source_sequence") and
+            source.prefix_binding_validated and
+            comparator.setup_count == 1 and comparator.current_match == 0 and
+            comparator.match_compared == target.get("source_tick", -1) + 1 and
+            comparator.frame_index == target.get("browser_cursor"))
+
+
+def _validate_first_positive_audit(path: Path, packet: Mapping[str, Any],
+                                   recipe: Recipe) -> tuple[dict[str, Any], str]:
+    expected = packet["source"]["positive_boundary_audit"]
+    audit, digest, size = _read_json_sidecar(
+        path, "first-positive source audit", max_bytes=8 * 1024 * 1024)
+    _verify_expected_file(expected, path, digest, size, "first-positive source audit")
+    if (audit.get("schema") != "melee-web-b4-first-positive-match-frame-source-audit-v1" or
+            audit.get("audit_completed") is not True or
+            audit.get("whole_session_equivalent") is not False):
+        raise ComparisonError("first-positive source audit schema or bounded status is unsupported")
+    source = audit.get("source")
+    provenance = source.get("provenance") if isinstance(source, dict) else None
+    expected_source = packet["source"]
+    trace = expected_source["trace"]
+    source_path = source.get("path") if isinstance(source, dict) else None
+    if (not isinstance(source, dict) or not isinstance(provenance, dict) or
+            not isinstance(source_path, str) or
+            Path(source_path).resolve() != Path(trace["path"]).resolve() or
+            source.get("capture_id") != expected_source["capture_id"] or
+            source.get("sequence_id") != expected_source["sequence_id"] or
+            source.get("recorded_full_trace_bytes") != trace["bytes"] or
+            source.get("recorded_full_trace_sha256") != trace["recorded_full_sha256"] or
+            source.get("full_trace_rehashed") is not False):
+        raise ComparisonError("first-positive audit does not bind the frozen source trace identity")
+    expected_provenance = {
+        "manifest_sha256": expected_source["manifest"]["sha256"],
+        "source_report_sha256": expected_source["report"]["sha256"],
+        "audit_sha256": expected_source["audit"]["sha256"],
+        "recorded_full_trace_sha256": trace["recorded_full_sha256"],
+        "full_trace_rehashed": False,
+        "trace_bytes": trace["bytes"],
+    }
+    for field, value in expected_provenance.items():
+        if provenance.get(field) != value:
+            raise ComparisonError(f"first-positive audit source provenance {field} differs from expectations")
+    source_stat = source.get("stat_before")
+    if (not isinstance(source_stat, dict) or
+            set(source_stat) != {"device", "inode", "bytes", "mtime_ns"} or
+            any(type(value) is not int for value in source_stat.values()) or
+            source_stat.get("bytes") != trace["bytes"] or
+            source_stat != source.get("stat_after") or
+            source.get("stat_stable_during_audit") is not True):
+        raise ComparisonError("first-positive audit source trace stat identity was not stable")
+
+    target = expected_source.get("first_positive_boundary")
+    observed = audit.get("observed")
+    first_positive = observed.get("first_positive") if isinstance(observed, dict) else None
+    prefix = observed.get("source_prefix") if isinstance(observed, dict) else None
+    if not isinstance(target, dict) or not isinstance(observed, dict) or \
+            not isinstance(first_positive, dict) or not isinstance(prefix, dict):
+        raise ComparisonError("first-positive audit lacks its source target observation")
+    first_match_index = _first_match_timeline_index(recipe)
+    if (target["timeline_frame_index"] != first_match_index + target["source_tick"] or
+            target["browser_cursor"] != target["timeline_frame_index"] + 1 or
+            target["browser_cursor"] > recipe.frame_count):
+        raise ComparisonError("frozen positive target does not align with the complete MWRC timeline")
+    audit_target = {
+        "match_index": first_positive.get("match_index"),
+        "source_tick": first_positive.get("source_tick"),
+        "source_sequence": prefix.get("last_source_sequence"),
+        "pad_consume_sequence": first_positive.get("pad_consume_source_sequence"),
+        "timeline_frame_index": first_positive.get("timeline_frame_index"),
+        "browser_cursor": first_positive.get("cursor_after_frame"),
+        "match_frame": first_positive.get("match_frame"),
+    }
+    difference = _first_difference(target, audit_target)
+    if difference:
+        field = difference[0]
+        raise ComparisonError(f"first-positive source audit differs from frozen target at {field}")
+    prefix_bytes = _int(prefix.get("bytes_read"), "first-positive audit prefix bytes",
+                        1, V10_PREFIX_BYTE_CAP)
+    prefix_records = _int(prefix.get("records_read"), "first-positive audit prefix records",
+                          1, V10_FIRST_POSITIVE_RECORD_CAP)
+    if (not isinstance(prefix.get("sha256"), str) or
+            re.fullmatch(r"[0-9a-f]{64}", prefix["sha256"]) is None or
+            _int(prefix.get("last_source_sequence"),
+                 "first-positive audit last source sequence", 0, (1 << 64) - 1) !=
+            target["source_sequence"] or
+            prefix_records != target["source_sequence"] + 1 or
+            _int(observed.get("match_ticks_observed"),
+                 "first-positive audit match tick count", 1, MAX_UINT32) !=
+            target["source_tick"] + 1 or
+            _int(observed.get("timeline_frames_input_ordered_against_recipe"),
+                 "first-positive audit timeline frame count", 1, MAX_UINT32) !=
+            target["browser_cursor"] or
+            _int(observed.get("css_sss_frames_input_ordered_against_recipe"),
+                 "first-positive audit CSS/SSS frame count", 1, MAX_UINT32) !=
+            first_match_index or
+            _int(observed.get("minimum_browser_target_cursor"),
+                 "first-positive audit minimum browser cursor", 1, MAX_UINT32) !=
+            target["browser_cursor"]):
+        raise ComparisonError("first-positive source audit prefix counts disagree with the frozen target")
+    expected_runs = []
+    if target["source_tick"] > 0:
+        expected_runs.append({
+            "first_source_tick": 0,
+            "last_source_tick": target["source_tick"] - 1,
+            "first_timeline_frame_index": first_match_index,
+            "last_timeline_frame_index": target["timeline_frame_index"] - 1,
+            "match_frame": 0,
+        })
+    expected_runs.append({
+        "first_source_tick": target["source_tick"],
+        "last_source_tick": target["source_tick"],
+        "first_timeline_frame_index": target["timeline_frame_index"],
+        "last_timeline_frame_index": target["timeline_frame_index"],
+        "match_frame": 1,
+    })
+    if _first_difference(expected_runs, observed.get("match_frame_runs")):
+        raise ComparisonError("first-positive source audit clock runs differ from the frozen boundary")
+    return audit, digest
 
 
 def _validate_browser_producer_source(producer: Mapping[str, Any],
@@ -1729,7 +1964,8 @@ def _validate_v10_browser_provenance(capture_report_path: Path,
                                      recipe_path: Path,
                                      recipe_sha: str,
                                      recipe: Recipe,
-                                     packet: Mapping[str, Any]
+                                     packet: Mapping[str, Any], *,
+                                     required_cursor: int | None = None
                                      ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any],
                                                 dict[str, Any]]:
     expected_files = _expectation_files(packet)
@@ -1817,7 +2053,9 @@ def _validate_v10_browser_provenance(capture_report_path: Path,
         raise ComparisonError("browser runtime artifact recorded identity is malformed")
 
     stop = wrapper.get("deliberate_prefix_stop")
-    required_cursor = _first_match_required_cursor(recipe)
+    required_cursor = (_first_match_required_cursor(recipe) if required_cursor is None
+                       else _int(required_cursor, "frozen browser boundary cursor", 1,
+                                 recipe.frame_count))
     if not isinstance(stop, dict):
         raise ComparisonError("browser capture lacks structured deliberate-prefix-stop provenance")
     requested_cursor = _int(stop.get("requested_cursor"), "browser requested stop cursor", 1,
@@ -1949,16 +2187,23 @@ def _browser_completion_ok(report: Mapping[str, Any]) -> bool:
             not report.get("failures") and not report.get("errors"))
 
 
-def _compare_v10_first_setup_tick0(reference_path: Path, recipe_path: Path,
-                                   port_path: Path, *, source_manifest_path: Path,
+def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
+                                port_path: Path, *, scope: str,
+                                source_manifest_path: Path,
                                    source_report_path: Path, source_audit_path: Path,
                                    browser_capture_report_path: Path,
                                    browser_producer_manifest_path: Path,
                                    browser_report_path: Path,
-                                   expectations_path: Path) -> dict[str, Any]:
+                                   expectations_path: Path,
+                                   positive_boundary_audit_path: Path | None = None) -> dict[str, Any]:
+    positive_scope = scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
+    if not _is_v10_prefix_scope(scope):
+        raise ComparisonError(f"unsupported bounded v10 prefix scope {scope!r}")
+    if positive_scope != (positive_boundary_audit_path is not None):
+        raise ComparisonError("bounded prefix scope and positive-boundary audit selection disagree")
     result: dict[str, Any] = {
         "schema": SCHEMA,
-        "scope": V10_FIRST_SETUP_TICK0_SCOPE,
+        "scope": scope,
         "boundary_result": None,
         "result": "invalid",
         "complete": False,
@@ -1974,12 +2219,16 @@ def _compare_v10_first_setup_tick0(reference_path: Path, recipe_path: Path,
             "whole_session": "incomplete",
         },
         "limitations": {
-            "boundary": "Checks CSS/SSS consumed-input order and compares first match setup plus source tick 0 state only; no later match frame is read by the comparator.",
+            "boundary": ("Checks CSS/SSS consumed-input order and compares first match setup plus every contiguous match tick through the externally bound first positive match frame."
+                         if positive_scope else
+                         "Checks CSS/SSS consumed-input order and compares first match setup plus source tick 0 state only; no later match frame is read by the comparator."),
             "nonmatch_state": "CSS/SSS consumed-input ordering is not scalar state equivalence; nonmatch_fields_compared is empty.",
             "whole_session": "This is incomplete prefix evidence and never establishes whole-session equivalence.",
             "timing_rendering_audio": "No timing, draw cadence, pixels, PCM, performance, or tournament-admission claim.",
         },
     }
+    if positive_scope:
+        result["checks"]["source_ticks_through_first_positive"] = "not_checked"
     comparator: Comparator | None = None
     source: SourceCollector | None = None
     browser: BrowserReader | None = None
@@ -2002,7 +2251,9 @@ def _compare_v10_first_setup_tick0(reference_path: Path, recipe_path: Path,
             "browser_report": browser_report_path,
             "port_trace": port_path,
         }
-        packet, packet_sha = _load_expectations(expectations_path, selected)
+        if positive_scope:
+            selected["positive_boundary_audit"] = positive_boundary_audit_path
+        packet, packet_sha = _load_expectations(expectations_path, selected, scope=scope)
         result["expectations"] = {"path": str(expectations_path), "sha256": packet_sha}
         result["selected_input_identities"] = {
             "source": packet["source"],
@@ -2029,7 +2280,7 @@ def _compare_v10_first_setup_tick0(reference_path: Path, recipe_path: Path,
         recipe_sha = hashlib.sha256(recipe_raw).hexdigest()
         _verify_expected_file(packet["recipe"], recipe_path,
                               recipe_sha, recipe_size, "MWRC recipe")
-        recipe_obj = Recipe(recipe_path, recipe_raw, scope=V10_FIRST_SETUP_TICK0_SCOPE)
+        recipe_obj = Recipe(recipe_path, recipe_raw, scope=scope)
         if (recipe_obj.version != packet["recipe"]["version"] or
                 recipe_obj.frame_count != packet["recipe"]["frame_count"] or
                 recipe_obj.seed != packet["recipe"]["seed"]):
@@ -2040,45 +2291,91 @@ def _compare_v10_first_setup_tick0(reference_path: Path, recipe_path: Path,
             source_manifest_path, source_report_path, source_audit_path, packet)
         result["source_full_trace"].update(source_identity)
         result["checks"]["source_provenance"] = "pass"
+        positive_audit: dict[str, Any] | None = None
+        positive_audit_sha: str | None = None
+        target: Mapping[str, int] | None = None
+        if positive_scope:
+            assert positive_boundary_audit_path is not None
+            positive_audit, positive_audit_sha = _validate_first_positive_audit(
+                positive_boundary_audit_path, packet, recipe_obj)
+            target = packet["source"]["first_positive_boundary"]
+            result["positive_boundary_audit"] = {
+                "path": str(positive_boundary_audit_path),
+                "sha256": positive_audit_sha,
+                "target": target,
+                "scope": "source-only audit target; browser comparison uses fresh packet identities",
+            }
         producer, capture_report, browser_report, browser_identity = \
             _validate_v10_browser_provenance(
                 browser_capture_report_path, browser_producer_manifest_path,
-                browser_report_path, port_path, recipe_path, recipe_sha, recipe_obj, packet)
+                browser_report_path, port_path, recipe_path, recipe_sha, recipe_obj, packet,
+                required_cursor=(target["browser_cursor"] if target is not None else None))
         result["browser_capture"] = browser_identity
         result["checks"]["browser_capture_provenance"] = "pass"
         required_cursor = browser_identity["required_cursor"]
         browser = BrowserReader(port_path)
-        comparator = Comparator(recipe_obj, browser)
+        comparator = Comparator(recipe_obj, browser, positive_boundary=target)
         source = SourceCollector(comparator, recipe_obj, manifest, audit, packet["source"])
         stats = ObserverStreamStats()
-        records = iter_records(reference_path, max_bytes=V10_PREFIX_BYTE_CAP,
-                               max_records=V10_PREFIX_RECORD_CAP, stats=stats)
+        records = iter_records(
+            reference_path, max_bytes=V10_PREFIX_BYTE_CAP,
+            max_records=(V10_FIRST_POSITIVE_RECORD_CAP if positive_scope
+                         else V10_PREFIX_RECORD_CAP), stats=stats)
         prefix_complete = False
         for row in records:
             last_source_sequence = row["seq"]
             source.consume(row)
-            if _first_match_tick_join_complete(row, source, comparator):
+            joined = (_first_positive_match_join_complete(row, source, comparator, target)
+                      if positive_scope and target is not None
+                      else _first_match_tick_join_complete(row, source, comparator))
+            if joined:
                 prefix_complete = True
                 break
         result["last_source_sequence"] = last_source_sequence
         if not prefix_complete:
-            raise ComparisonError("source prefix ended before the completed match-0 source_tick 0 join")
+            boundary = ("frozen first-positive match-frame join" if positive_scope
+                        else "completed match-0 source_tick 0 join")
+            raise ComparisonError(f"source prefix ended before the {boundary}")
         source_stat_after = _file_stat_identity(reference_path)
         result["source_full_trace"]["stat_after"] = source_stat_after
         _require_stable_mwro_stat(source_stat_before, source_stat_after)
         result["source_full_trace"]["stat_stable_during_attempt"] = True
+        if positive_scope:
+            assert positive_audit is not None
+            audited_prefix = positive_audit["observed"]["source_prefix"]
+            expected_prefix_records = audited_prefix["records_read"]
+            expected_prefix_bytes = audited_prefix["bytes_read"]
+            expected_prefix_sha = audited_prefix["sha256"]
+        else:
+            expected_prefix_records = source_identity["audit_records_decoded"]
+            expected_prefix_bytes = source_identity["audit_bytes_read"]
+            expected_prefix_sha = None
         if (source.record_count != stats.records_read or
-                stats.records_read != source_identity["audit_records_decoded"] or
-                stats.bytes_read != source_identity["audit_bytes_read"]):
-            raise ComparisonError("freshly consumed source prefix differs from its bounded identity audit")
+                stats.records_read != expected_prefix_records or
+                stats.bytes_read != expected_prefix_bytes or
+                (expected_prefix_sha is not None and
+                 stats.prefix_sha256 != expected_prefix_sha)):
+            message = ("freshly consumed source prefix differs from its bounded source audit"
+                       if positive_scope else
+                       "freshly consumed source prefix differs from its bounded identity audit")
+            raise ComparisonError(message)
         if (comparator.frame_index != required_cursor or comparator.compared != required_cursor):
-            raise ComparisonError("comparison did not stop immediately after the first match tick join")
+            message = ("comparison did not stop immediately after its frozen match boundary"
+                       if positive_scope else
+                       "comparison did not stop immediately after the first match tick join")
+            raise ComparisonError(message)
         if source.setup_bytes != [recipe_obj.match_setups[0]]:
             raise ComparisonError("bounded source prefix consumed an unexpected match setup count")
         result["checks"]["source_first_css_and_setup_binding"] = "pass"
-        result["checks"]["source_pad_to_tick0_join"] = "pass"
         result["checks"]["setup_state"] = "pass"
-        result["checks"]["tick0_state"] = "pass"
+        if positive_scope:
+            result["checks"]["source_ticks_through_first_positive"] = "pass"
+            result["checks"]["source_pad_to_tick0_join"] = "pass"
+            result["checks"]["tick0_state"] = "pass"
+            result["checks"]["first_positive_match_frame_state"] = "pass"
+        else:
+            result["checks"]["source_pad_to_tick0_join"] = "pass"
+            result["checks"]["tick0_state"] = "pass"
         result["source_full_trace"].update(source_identity)
         result["source_full_trace"]["stat_before"] = source_stat_before
         result["source_full_trace"]["stat_after"] = source_stat_after
@@ -2099,7 +2396,9 @@ def _compare_v10_first_setup_tick0(reference_path: Path, recipe_path: Path,
                 "records_read": stats.records_read,
                 "bytes_read": stats.bytes_read,
                 "sha256": stats.prefix_sha256,
-                "hash_basis": "fresh SHA-256 over exactly the raw bytes consumed through source_tick 0",
+                "hash_basis": ("fresh SHA-256 over exactly the raw bytes consumed through the first positive match frame"
+                               if positive_scope else
+                               "fresh SHA-256 over exactly the raw bytes consumed through source_tick 0"),
                 "last_source_sequence": last_source_sequence,
                 "first_entry_seq": source.first_entry_seq,
                 "first_setup_seq": source.first_setup_seq,
@@ -2108,16 +2407,18 @@ def _compare_v10_first_setup_tick0(reference_path: Path, recipe_path: Path,
                 "first_source_tick": source.first_source_tick,
             },
             "setup_records_compared": comparator.setup_count,
-            "first_match_boundary": {
+            **({"first_match_boundary": {
                 "match_index": 0,
                 "setup_source_seq": source.first_setup_seq,
                 "source_tick_seq": source.first_source_tick_seq,
                 "source_tick": source.first_source_tick,
                 "timeline_frame_index": comparator.frame_index - 1,
                 "browser_target_cursor": browser_identity["target_cursor"],
-            },
+            }} if not positive_scope else {}),
             "source_scene_spans_observed": comparator.source_spans,
-            "capture_status": "incomplete bounded capture; semantic comparison stopped after the first source tick join",
+            "capture_status": ("incomplete bounded capture; semantic comparison stopped after the frozen first-positive match-frame join"
+                               if positive_scope else
+                               "incomplete bounded capture; semantic comparison stopped after the first source tick join"),
             "original_prefix_audit": {
                 "path": str(source_audit_path),
                 "sha256": source_identity["audit_sha256"],
@@ -2131,6 +2432,16 @@ def _compare_v10_first_setup_tick0(reference_path: Path, recipe_path: Path,
             "browser_report_sha256": browser_identity["browser_report_sha256"],
             "browser_trace_sha256": browser_identity["port_trace_sha256"],
         })
+        if positive_scope and target is not None and positive_audit_sha is not None:
+            result["first_positive_match_frame_boundary"] = {
+                **target,
+                "setup_source_sequence": source.first_setup_seq,
+                "browser_observed_cursor": browser_identity["target_cursor"],
+                "source_prefix_sha256": stats.prefix_sha256,
+                "source_prefix_records": stats.records_read,
+                "source_prefix_bytes": stats.bytes_read,
+                "audit_sha256": positive_audit_sha,
+            }
     except (ComparisonError, ObserverStreamError, OSError, ValueError, KeyError,
             TypeError, struct.error) as error:
         first_difference = comparator.first_difference if comparator is not None else None
@@ -2196,29 +2507,37 @@ def compare_paths(reference: str | Path, recipe: str | Path, port_trace: str | P
                   source_report: str | Path | None = None,
                   source_audit: str | Path | None = None,
                   browser_capture_report: str | Path | None = None,
-                  browser_producer_manifest: str | Path | None = None) -> dict[str, Any]:
+                  browser_producer_manifest: str | Path | None = None,
+                  positive_boundary_audit: str | Path | None = None) -> dict[str, Any]:
     """Compare one source capture, its MWRC recipe, and one browser trace."""
     reference_path = Path(reference)
     recipe_path = Path(recipe)
     port_path = Path(port_trace)
-    if scope == V10_FIRST_SETUP_TICK0_SCOPE:
+    if _is_v10_prefix_scope(scope):
         required = (source_manifest, source_report, source_audit, browser_capture_report,
                     browser_producer_manifest, browser_report, expectations)
+        if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
+            required += (positive_boundary_audit,)
         if any(value is None for value in required):
+            label = ("v10 first-positive match-frame" if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
+                     else "v10 first-setup/tick-0")
             return {
-                "schema": SCHEMA, "scope": V10_FIRST_SETUP_TICK0_SCOPE,
+                "schema": SCHEMA, "scope": scope,
                 "boundary_result": None, "result": "invalid", "complete": False,
                 "whole_session_equivalent": False,
-                "error": "v10 first-setup/tick-0 scope requires frozen expectations and all provenance sidecars",
+                "error": f"{label} scope requires frozen expectations and all provenance sidecars",
             }
-        return _compare_v10_first_setup_tick0(
+        return _compare_v10_bounded_prefix(
             reference_path, recipe_path, port_path,
+            scope=scope,
             source_manifest_path=Path(source_manifest),
             source_report_path=Path(source_report), source_audit_path=Path(source_audit),
             browser_capture_report_path=Path(browser_capture_report),
             browser_producer_manifest_path=Path(browser_producer_manifest),
             browser_report_path=Path(browser_report),
-            expectations_path=Path(expectations))
+            expectations_path=Path(expectations),
+            positive_boundary_audit_path=(Path(positive_boundary_audit)
+                                          if positive_boundary_audit is not None else None))
     if scope != WHOLE_SESSION_SCOPE:
         return {"schema": SCHEMA, "scope": scope, "boundary_result": None,
                 "result": "invalid", "complete": False,
