@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {loadRuntimeDisc,RUNTIME_DISC_FILES,loadNativeMenuDisc,NATIVE_MENU_DISC_FILES,loadNativeGameDisc,NATIVE_GAME_DISC_FILES} from '../web/runtime-audio-assets.mjs';
+import {loadRuntimeDisc,RUNTIME_DISC_FILES,loadNativeMenuDisc,NATIVE_MENU_DISC_FILES,loadNativeGameDisc,NATIVE_GAME_DISC_FILES,NATIVE_STADIUM_C1A_DISC_FILES,nativeStadiumC1aDiscPaths} from '../web/runtime-audio-assets.mjs';
 assert.equal(Object.keys(RUNTIME_DISC_FILES).length,14);
 assert.equal(RUNTIME_DISC_FILES['LbRb.dat'],'LbRb.dat');
 for(const name of ['main.ssm','mario.ssm','smash2.sem'])assert.equal(RUNTIME_DISC_FILES[name],'audio/us/'+name);
@@ -26,6 +26,19 @@ for (const name of Object.keys(NATIVE_MENU_DISC_FILES).filter(name => name.endsW
 assert.equal(NATIVE_MENU_DISC_FILES['kongo.ssm'],'audio/us/kongo.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['kongo.ssm'],'audio/us/kongo.ssm');
 assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,408);
+const stadiumC1aNames=['GrPs.usd','GrPs1.dat','GrPs2.dat','GrPs3.dat','GrPs4.dat','pstadium.hps','pokesta.hps'];
+assert.deepEqual(NATIVE_STADIUM_C1A_DISC_FILES,{
+  'GrPs.usd':'GrPs.usd','GrPs1.dat':'GrPs1.dat','GrPs2.dat':'GrPs2.dat',
+  'GrPs3.dat':'GrPs3.dat','GrPs4.dat':'GrPs4.dat',
+  'pstadium.hps':'audio/pstadium.hps','pokesta.hps':'audio/pokesta.hps',
+});
+for(const name of stadiumC1aNames)assert.equal(Object.hasOwn(NATIVE_GAME_DISC_FILES,name),false);
+assert.deepEqual({...nativeStadiumC1aDiscPaths(stadiumC1aNames)},NATIVE_STADIUM_C1A_DISC_FILES);
+assert.throws(()=>nativeStadiumC1aDiscPaths(['GrPs.usd']),/complete source stage closure/);
+for(const inherited of ['constructor','toString','hasOwnProperty','__proto__'])
+  assert.throws(()=>nativeStadiumC1aDiscPaths([...stadiumC1aNames,inherited]),
+    /Unknown native scene asset/,
+    `Stadium C1a importer accepted inherited mapping key ${inherited}`);
 for(const donor of ['Dk','Pr','Mt','Fc'])
   for(const color of ['Nr','Ye','Bu','Re','Gr','Wh']) {
     const name=`PlKb${color}Cp${donor}.dat`;

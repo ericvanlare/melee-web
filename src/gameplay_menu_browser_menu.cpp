@@ -333,6 +333,35 @@ int melee_web_native_menu_launch(){try{
 #endif
  return 1;
 }catch(const std::exception& e){diagnostic_incident(4);message=e.what();running=false;return 0;}}
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+int melee_web_native_menu_stadium_c1a_arm(){try{
+ check(!stadium_c1a_armed&&scoped_assets&&
+       asset_destination==AssetDestination::None&&!asset_committed&&
+       asset_scope.pending_generation()==0&&world&&host&&!host_entered&&
+       !match&&!results&&!prize&&!pending&&!running&&
+       melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED&&
+       melee_web_menu_host_mode_kind(host)==GM_VS,
+       "Stadium C1a arm requires one prepared imported-disc VS menu session");
+ char error[256]{};
+ check(melee_web_menu_host_enable_stadium_c1a(host,error,sizeof(error)),error);
+ stadium_c1a_armed=true;stadium_c1a_observation.clear();
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_stadium_c1a_asset_scope(unsigned generation){
+ if(!generation||generation!=asset_generation||
+    generation!=asset_scope.pending_generation()||
+    !stadium_c1a_armed||!scoped_assets||asset_committed||
+    asset_destination!=AssetDestination::StadiumC1a||
+    !asset_selection_valid||world||match||results||prize||host_entered)
+  return 0;
+ try{
+  return requested_assets==melee_web::stadium_c1a_asset_names(asset_selection)?1:0;
+ }catch(...){return 0;}
+}
+const char* melee_web_native_menu_stadium_c1a_observe(){
+ return stadium_c1a_observation.empty()?nullptr:stadium_c1a_observation.c_str();
+}
+#endif
 int melee_web_native_menu_drive_fighter(int character_kind){try{
  if(!host||melee_web_menu_host_phase(host)!=1)throw std::runtime_error("Fighter selection drive requires the original CSS");
  if(css_fighter_release_port>=0){

@@ -1,5 +1,6 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_asset_manifest.hpp"
+#include "gameplay_content.h"
 #include <algorithm>
 #include "gameplay_menu_host.h"
 #include "gameplay_save_profile.h"
@@ -952,6 +953,135 @@ void run_trophy_baseline_smoke(const melee_web::RuntimeFiles& files)
     std::cout << "Original TyDatai-backed save baseline initialized after source-file ownership; "
                  "trophy and source unlock tables passed\n";
 }
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void run_stadium_c1a_selection_smoke(const melee_web::RuntimeFiles& files)
+{
+    char error[256]{};
+    MeleeWebMenuHost* host = melee_web_menu_host_create(error, sizeof(error));
+    check(host != nullptr, error);
+    check(melee_web_menu_host_enable_stadium_c1a(host, error, sizeof(error)), error);
+    auto world = std::make_unique<melee_web::GameplayMenuWorld>(files);
+    check(melee_web_menu_host_enter(host, world->audio(), error, sizeof(error)), error);
+
+    PADStatus raw[4]{};
+    melee_web_stage_input_neutral(raw);
+    float pcm[1068]{};
+    unsigned audio_phase = 0;
+    auto tick = [&]() {
+        const int result = melee_web_menu_host_tick(host, raw, error, sizeof(error));
+        check(result == 1 || result == 3, error);
+        audio_phase += 32000;
+        const unsigned count = audio_phase / 60;
+        audio_phase %= 60;
+        check(melee_web_audio_render(world->audio(), pcm, count,
+                                     error, sizeof(error)), error);
+        return result;
+    };
+    auto transition = [&]() {
+        melee_web_stage_input_button(raw, PAD_BUTTON_START);
+        int result = tick();
+        melee_web_stage_input_neutral(raw);
+        for (unsigned wait = 0; result != 3 && wait < 120; ++wait)
+            result = tick();
+        if (result != 3) {
+            std::string detail = "Original menu input did not complete its C1a transition: phase=" +
+                std::to_string(melee_web_menu_host_phase(host)) +
+                " scene=" + std::to_string(melee_web_menu_host_source_scene(host));
+            MeleeWebFighterInputObservation css{};
+            if (melee_web_menu_host_phase(host) == MELEE_WEB_MENU_CSS &&
+                melee_web_fighter_input_observe(CKIND_MARIO, &css)) {
+                detail += " start_ready=" + std::to_string(css.source_start_ready) +
+                    " start_cooldown=" + std::to_string(css.source_start_cooldown) +
+                    " pending_scene=" + std::to_string(css.source_pending_scene) +
+                    " last_start_trigger=" + std::to_string(css.source_last_start_trigger) +
+                    " last_start_ready=" + std::to_string(css.source_last_start_ready) +
+                    " last_start_pending=" + std::to_string(css.source_last_start_pending);
+            }
+            check(0, detail.c_str());
+        }
+        check(melee_web_menu_host_leave(host, 0, error, sizeof(error)), error);
+    };
+
+    // The armed SSS still begins on an admitted stage. Its existing validation
+    // remains live while the source cursor navigates toward Stadium.
+    for (unsigned frame = 0; frame < 120; ++frame)
+        check(tick() == 1, "C1a SSS navigation rejected its initial admitted stage");
+    transition();
+    check(melee_web_menu_host_phase(host) == MELEE_WEB_MENU_SSS_READY,
+          "C1a CSS did not complete the original SSS transition");
+    world->rebuild_scene(melee_web::GameplayMenuScene::Stages);
+    check(melee_web_menu_host_enter(host, world->audio(), error, sizeof(error)), error);
+    melee_web_stage_input_neutral(raw);
+    for (unsigned frame = 0; frame < 120; ++frame)
+        check(tick() == 1, "C1a rejected the ordinary initial SSS tile");
+
+    bool at_stadium = false;
+    for (unsigned frame = 0; frame < 180; ++frame) {
+        MeleeWebStageInputObservation observed{};
+        check(melee_web_stage_input_observe(St_Kind_PStadium, &observed),
+              "Original SSS Stadium cursor observation is unavailable");
+        const int state = melee_web_stage_input_drive(
+            raw, &observed, St_Kind_PStadium);
+        check(state != MELEE_WEB_STAGE_INPUT_INVALID,
+              "Original SSS Stadium cursor target is invalid");
+        if (state == MELEE_WEB_STAGE_INPUT_AT_TARGET) {
+            check(observed.selected_stage_kind == St_Kind_PStadium,
+                  "Raw PAD reached the Stadium target without source tile selection");
+            at_stadium = true;
+            break;
+        }
+        check(tick() == 1, "Original SSS transitioned during raw Stadium navigation");
+    }
+    check(at_stadium, "Raw PAD did not select the original Stadium SSS tile");
+    check(melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium) &&
+          !melee_web_menu_stage_available(St_Kind_PStadium),
+          "C1a explicit confirmation did not remain separate from admission/random availability");
+    transition();
+    check(melee_web_menu_host_phase(host) == MELEE_WEB_MENU_READY,
+          "Original SSS did not commit the C1a selection");
+
+    check(!melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium),
+          "C1a explicit-confirm permission survived source SSS exit");
+    StartMeleeData raw_selection{};
+    check(melee_web_menu_host_stadium_c1a_raw_selection(
+              host, &raw_selection, error, sizeof(error)), error);
+    check(raw_selection.rules.stkind == St_Kind_PStadium,
+          "Source SSS raw payload did not retain StKind 3");
+    SSSData unarmed_validation{};
+    unarmed_validation.force_stage_id = -1;
+    unarmed_validation.start_game = true;
+    unarmed_validation.vs.start = raw_selection;
+    check(!melee_web_menu_sss_selection_valid(&unarmed_validation),
+          "The ordinary SSS validator admitted Stadium without its session gate");
+
+    MeleeWebMenuMatchSelection ordinary{};
+    check(!melee_web_menu_host_selection(host, &ordinary, error, sizeof(error)),
+          "Ordinary match admission accepted Stadium through the diagnostic gate");
+    MeleeWebMenuMatchSelection selected{};
+    check(melee_web_menu_host_stadium_c1a_selection(
+              host, &selected, error, sizeof(error)), error);
+    check(selected.start.rules.stkind == St_Kind_PStadium,
+          "Prepared C1a payload did not retain source StKind 3");
+    const auto names = melee_web::stadium_c1a_asset_names(selected);
+    for (const char* required : {
+             "GrPs.usd", "GrPs1.dat", "GrPs2.dat", "GrPs3.dat", "GrPs4.dat",
+             "pstadium.hps", "pokesta.hps", "pstadium.ssm"})
+        check(std::find(names.begin(), names.end(), required) != names.end(),
+              "C1a source manifest omitted a Stadium dependency");
+    check(!melee_web_stage_content(St_Kind_PStadium),
+          "C1a diagnostic unexpectedly registered Stadium as playable");
+
+    world->verify_immutable_archives();
+    world->close();
+    world.reset();
+    check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+    check(!melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium),
+          "C1a explicit-confirm permission survived unload");
+    std::cout << "C1a raw PAD CSS->SSS Stadium selection and exact preparation manifest passed; "
+                 "ordinary admission and source/stage construction remain closed\n";
+}
+#endif
 }
 int main(int argc,char** argv){try{
  if(argc<3||argc>7)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
@@ -966,16 +1096,25 @@ int main(int argc,char** argv){try{
  const bool opening_movie_preload_recipe=input_recipe&&std::string(input_recipe)=="opening-movie-preload-v1";
  const bool trophy_baseline_recipe=input_recipe&&std::string(input_recipe)=="trophy-baseline-v1";
  const bool sound_settings_recipe=input_recipe&&std::string(input_recipe)=="main-settings-sound-v1";
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ const bool stadium_c1a_recipe=input_recipe&&std::string(input_recipe)=="stadium-c1a-v1";
+#else
+ const bool stadium_c1a_recipe=false;
+#endif
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
-    !sound_settings_recipe)
+    !sound_settings_recipe&&!stadium_c1a_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if((retail_fd_recipe||results_mario_recipe)&&stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
+ if(stadium_c1a_recipe&&stage_kind!=St_Kind_PStadium)
+   throw std::runtime_error("C1a recipe requires source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(title_main_abort_recipe||opening_movie_preload_recipe||trophy_baseline_recipe||sound_settings_recipe)keys=melee_web::menu_asset_names();
+ if(stadium_c1a_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
+    trophy_baseline_recipe||sound_settings_recipe)
+  keys=melee_web::menu_asset_names();
  for(const auto& key:melee_web::menu_asset_names())
   if(std::find(keys.begin(),keys.end(),key)==keys.end())keys.push_back(key);
  for(const auto& key:keys){
@@ -993,6 +1132,13 @@ int main(int argc,char** argv){try{
  char session_error[256]{};
  check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
  const auto session_allocation=melee_web_gameplay_allocation();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ if(stadium_c1a_recipe){
+  run_stadium_c1a_selection_smoke(files);
+  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+  return 0;
+ }
+#endif
  if(title_main_abort_recipe){
   run_title_main_abort_smoke(files);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);

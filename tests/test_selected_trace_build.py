@@ -57,6 +57,11 @@ class SelectedTraceBuildTests(unittest.TestCase):
                                   configuration="RelWithDebInfo"),
             root / "build/browser",
         )
+        self.assertEqual(
+            BUILD.build_directory(root, target="native_menu_host_trace",
+                                  configuration="Release"),
+            root / "build/browser-release",
+        )
 
     def test_repeated_trace_targets_build_only_reviewed_targets_with_pinned_environment(self):
         root = self._configured_root()
@@ -175,6 +180,105 @@ class SelectedTraceBuildTests(unittest.TestCase):
         self.assertIn("-DMELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE=OFF", configure)
         self.assertNotIn("-DMELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE=ON", configure)
         self.assertFalse(any("EXPORTED_FUNCTIONS" in argument for argument in configure))
+
+    def test_stadium_c1a_build_contract_is_private_opt_in_and_isolated(self):
+        root = self._configured_root()
+        default = BUILD.build_directory(root, target="runtime", configuration="Release")
+        diagnostic = BUILD.build_directory(
+            root, target="runtime", configuration="Release",
+            stadium_c1a_diagnostic=True)
+        self.assertEqual(default, root / "build/browser-release")
+        self.assertEqual(diagnostic, root / "build/browser-stadium-c1a-release")
+        self.assertNotEqual(default, diagnostic)
+        self.assertEqual(
+            BUILD.build_directory(root, target="runtime",
+                                  stadium_c1a_diagnostic=True),
+            root / "build/browser-stadium-c1a",
+        )
+
+        for target in (BUILD.PUBLIC_RUNTIME_TARGET,
+                       BUILD.AUDIO_PREVIEW_RUNTIME_TARGET):
+            with self.subTest(target=target), self.assertRaisesRegex(
+                    ValueError, "private runtime"):
+                BUILD.build_directory(root, target=target,
+                                      configuration="Release",
+                                      stadium_c1a_diagnostic=True)
+
+        lock = {"repositories": {}, "emscripten": "6.0.9"}
+        generated = root / "build/gameplay-source/src"
+        with patch.object(BUILD, "read_lock", return_value=lock), \
+                patch.object(BUILD, "verify_sources"), \
+                patch.object(BUILD, "prepare_sources", return_value=generated), \
+                patch.object(BUILD.subprocess, "run") as run:
+            BUILD.build(1, root=root, target="runtime", configuration="Release",
+                        stadium_c1a_diagnostic=True)
+        configure = next(call.args[0] for call in run.call_args_list
+                         if "-S" in call.args[0])
+        build_command = next(call.args[0] for call in run.call_args_list
+                             if "--build" in call.args[0])
+        self.assertIn("-DMELEE_WEB_STADIUM_C1A_DIAGNOSTIC=ON", configure)
+        self.assertEqual(build_command[build_command.index("--build") + 1],
+                         str(diagnostic))
+
+    def test_stadium_c1a_host_trace_uses_the_same_private_diagnostic_profile(self):
+        root = self._configured_root()
+        diagnostic = BUILD.build_directory(
+            root, target="native_menu_host_trace", configuration="Release",
+            stadium_c1a_diagnostic=True)
+        self.assertEqual(diagnostic, root / "build/browser-stadium-c1a-release")
+
+        lock = {"repositories": {}, "emscripten": "6.0.9"}
+        generated = root / "build/gameplay-source/src"
+        with patch.object(BUILD, "read_lock", return_value=lock), \
+                patch.object(BUILD, "verify_sources"), \
+                patch.object(BUILD, "prepare_sources", return_value=generated), \
+                patch.object(BUILD.subprocess, "run") as run:
+            BUILD.build(1, root=root, configuration="Release",
+                        trace_targets=("native_menu_host_trace",),
+                        stadium_c1a_diagnostic=True)
+        configure = next(call.args[0] for call in run.call_args_list
+                         if "-S" in call.args[0])
+        build_command = next(call.args[0] for call in run.call_args_list
+                             if "--build" in call.args[0])
+        self.assertIn("-DMELEE_WEB_STADIUM_C1A_DIAGNOSTIC=ON", configure)
+        self.assertEqual(build_command[build_command.index("--build") + 1],
+                         str(diagnostic))
+        self.assertEqual(build_command[build_command.index("--target") + 1:
+                                       build_command.index("-j")],
+                         ["native_menu_host_trace"])
+
+    def test_stadium_c1a_diagnostic_rejects_unrelated_trace_combinations(self):
+        for trace_targets in (
+            ("gameplay_stage_battlefield_trace",),
+            ("native_menu_host_trace", "gameplay_stage_battlefield_trace"),
+        ):
+            options = {"trace_targets": trace_targets,
+                       "stadium_c1a_diagnostic": True}
+            with self.subTest(options=options), \
+                    patch.object(BUILD, "read_lock") as read_lock, \
+                    patch.object(BUILD.subprocess, "run") as run, \
+                    self.assertRaises(ValueError):
+                BUILD.build(1, root=Path("/missing/repo"), **options)
+            read_lock.assert_not_called()
+            run.assert_not_called()
+
+    def test_stadium_c1a_build_rejects_public_surfaces_before_source_work(self):
+        cmake = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
+        self.assertIn(
+            "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC AND\n   (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME)",
+            cmake,
+        )
+        for target in (BUILD.PUBLIC_RUNTIME_TARGET,
+                       BUILD.AUDIO_PREVIEW_RUNTIME_TARGET):
+            with self.subTest(target=target), \
+                    patch.object(BUILD, "read_lock") as read_lock, \
+                    patch.object(BUILD.subprocess, "run") as run, \
+                    self.assertRaisesRegex(ValueError, "private runtime"):
+                BUILD.build(1, root=Path("/missing/repo"), target=target,
+                            configuration="Release",
+                            stadium_c1a_diagnostic=True)
+            read_lock.assert_not_called()
+            run.assert_not_called()
 
     def test_trace_selection_rejects_other_target_graphs_before_source_work(self):
         for kwargs in (

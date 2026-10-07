@@ -85,11 +85,20 @@ extern melee_web::RuntimeFiles files;
 extern melee_web::RuntimeAssetScope asset_scope;
 enum class AssetDestination {
  None, InitialMenu, Match, ReturnMenu, Replay, Results, Prize,
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+ StadiumC1a,
+#endif
  OpeningScene, OpeningMatch, TitleReturn
 };
 extern AssetDestination asset_destination;
 extern bool scoped_disc_import;
 extern bool scoped_assets,asset_committed;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+extern bool stadium_c1a_armed;
+extern std::string stadium_c1a_observation;
+extern bool asset_selection_valid;
+extern MeleeWebMenuMatchSelection asset_selection;
+#endif
 extern uint32_t asset_generation;
 extern std::vector<std::string> requested_assets;
 extern std::unique_ptr<melee_web::RuntimeArchiveCache> archive_cache;

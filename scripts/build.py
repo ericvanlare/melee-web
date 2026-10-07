@@ -40,6 +40,7 @@ TRACE_TARGETS = (
     "gameplay_stage_old_yoshi_trace",
     "gameplay_pikachu_articles_trace",
     "pokemon_stadium_c0_trace",
+    "native_menu_host_trace",
 )
 
 # Keep the target closure in one place so callers that need to configure once
@@ -71,7 +72,8 @@ BUILD_TARGETS = {
 
 
 def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
-                    pipeline_provenance=False, selective_pipelines=False):
+                    pipeline_provenance=False, selective_pipelines=False,
+                    stadium_c1a_diagnostic=False):
     """Return the build directory selected by the normal build contract.
 
     Trace targets use the private development build directory and intentionally
@@ -84,6 +86,11 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError(f"Unsupported build target: {target}")
     if target in TRACE_TARGETS and (pipeline_provenance or selective_pipelines):
         raise ValueError("trace targets require the private development build")
+    if stadium_c1a_diagnostic:
+        if target not in {"runtime", "native_menu_host_trace"} or pipeline_provenance or selective_pipelines:
+            raise ValueError("--stadium-c1a-diagnostic requires the private runtime or native menu host trace")
+        suffix = "-release" if configuration == "Release" else ""
+        return root / f"build/browser-stadium-c1a{suffix}"
     if selective_pipelines:
         suffix = "-release" if configuration == "Release" else ""
         return root / ("build/browser-public-selective-release" if target == PUBLIC_RUNTIME_TARGET
@@ -807,7 +814,8 @@ def _write_audio_preview_identity(root, build_dir, version, cmake, ninja,
 
 def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
           pipeline_provenance=False, selective_pipelines=False, configure_only=False,
-          trace_targets=None, gameplay_bootstrap_state=False):
+          trace_targets=None, gameplay_bootstrap_state=False,
+          stadium_c1a_diagnostic=False):
     trace_targets = tuple(trace_targets or ())
     if gameplay_bootstrap_state and (
         tuple(trace_targets or ()) != ("gameplay_snapshot_probe",)):
@@ -829,6 +837,12 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError("--selective-pipelines requires runtime/runtime-public without --pipeline-provenance")
     if pipeline_provenance and target != "runtime":
         raise ValueError("--pipeline-provenance requires the private runtime target")
+    if stadium_c1a_diagnostic and (
+        pipeline_provenance or selective_pipelines or
+        (trace_targets and trace_targets != ("native_menu_host_trace",)) or
+        (not trace_targets and target != "runtime")
+    ):
+        raise ValueError("--stadium-c1a-diagnostic requires the private runtime or its native menu host trace")
     if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} and configuration != "Release":
         raise ValueError(f"{target} is Release-only; pass --configuration Release")
     if target == AURORA_QUIESCENCE_DIAGNOSTIC_TARGET and configuration != "Release":
@@ -866,7 +880,8 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         build_target = trace_targets[0] if trace_targets else target
         build_dir = build_directory(root, target=build_target, configuration=configuration,
                                     pipeline_provenance=pipeline_provenance,
-                                    selective_pipelines=selective_pipelines)
+                                    selective_pipelines=selective_pipelines,
+                                    stadium_c1a_diagnostic=stadium_c1a_diagnostic)
         if (root / "build").is_symlink() or build_dir.is_symlink():
             raise ValueError("Build output must be a local directory, not a symlink")
         source_inputs_before = (
@@ -888,6 +903,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         )
         configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
         configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
+        configure.append(
+            f"-DMELEE_WEB_STADIUM_C1A_DIAGNOSTIC={'ON' if stadium_c1a_diagnostic else 'OFF'}"
+        )
         configure.append(
             f"-DMELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC={'ON' if 'aurora_future_owner_probe' in trace_targets else 'OFF'}"
         )
@@ -940,6 +958,8 @@ def main():
                         help="Configure the selected build directory without compiling targets")
     parser.add_argument("--gameplay-bootstrap-state", action="store_true",
                         help="Enable the typed bootstrap-state diagnostic on gameplay_snapshot_probe")
+    parser.add_argument("--stadium-c1a-diagnostic", action="store_true",
+                        help="Build the opt-in development-only Stadium selection/preparation checkpoint")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
@@ -949,7 +969,8 @@ def main():
         build(args.jobs, target=args.target or "all", configuration=args.configuration,
               pipeline_provenance=args.pipeline_provenance, selective_pipelines=args.selective_pipelines,
               configure_only=args.configure_only, trace_targets=args.trace_targets,
-              gameplay_bootstrap_state=args.gameplay_bootstrap_state)
+              gameplay_bootstrap_state=args.gameplay_bootstrap_state,
+              stadium_c1a_diagnostic=args.stadium_c1a_diagnostic)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 

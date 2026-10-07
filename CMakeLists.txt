@@ -17,6 +17,12 @@ option(MELEE_WEB_PUBLIC_RUNTIME "Redact local paths from public artifacts" OFF)
 option(MELEE_WEB_AUDIO_PREVIEW_RUNTIME "Build the Release audio-enabled staging runtime" OFF)
 option(MELEE_WEB_PIPELINE_PROVENANCE "Private pipeline-use coverage recorder" OFF)
 option(MELEE_WEB_SELECTIVE_PIPELINES "Prepare certified descriptor unions before source interaction" OFF)
+option(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC
+  "Enable the development-only Pokémon Stadium selection/preparation checkpoint" OFF)
+if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC AND
+   (MELEE_WEB_PUBLIC_RUNTIME OR MELEE_WEB_AUDIO_PREVIEW_RUNTIME))
+  message(FATAL_ERROR "Pokémon Stadium C1a is unavailable in public and audio-preview runtimes")
+endif()
 option(MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC
   "Build the opt-in read-only Emscripten Future/object ownership diagnostic" OFF)
 if(MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC AND NOT EMSCRIPTEN)

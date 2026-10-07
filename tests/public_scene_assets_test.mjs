@@ -82,6 +82,10 @@ try {
   assert.equal(NATIVE_GAME_DISC_FILES['LbRf.dat'], 'LbRf.dat');
   assert.equal(NATIVE_GAME_DISC_FILES['main.ssm'], 'audio/us/main.ssm');
   assert.equal(Object.hasOwn(NATIVE_GAME_DISC_FILES, 'dsp_coef.bin'), false);
+  for (const name of ['GrPs.usd','GrPs1.dat','GrPs2.dat','GrPs3.dat','GrPs4.dat',
+                      'pstadium.hps','pokesta.hps'])
+    assert.equal(Object.hasOwn(NATIVE_GAME_DISC_FILES, name), false,
+      `private Stadium C1a mapping must not extend the public disc manifest: ${name}`);
   const kirbyCopyArchives = [
     'PlKbCpMr.dat','PlKbCpFx.dat','PlKbCpCa.dat','PlKbCpDk.dat',
     'PlKbCpKp.dat','PlKbCpLk.dat','PlKbCpSk.dat','PlKbCpNs.dat',
@@ -129,10 +133,12 @@ try {
   assert.deepEqual(streamed, files, 'streaming retains complete file/font bytes and order');
   assert.equal(readCalls, 2);
 
-  for (const names of [['PlCo.dat', 'PlCo.dat'], ['unknown-native-name'], ['dsp_coef.bin']]) {
+  for (const names of [['PlCo.dat', 'PlCo.dat'], ['unknown-native-name'],
+                       ['dsp_coef.bin'], ['GrPs.usd']]) {
     await assert.rejects(session.streamScope(names).next(), names[0] === 'dsp_coef.bin'
       ? /DSP coefficients/ : names[0] === 'unknown-native-name'
-        ? /Unknown native scene asset/ : /duplicate/);
+        ? /Unknown native scene asset/ : names[0] === 'GrPs.usd'
+          ? /Unknown native scene asset/ : /duplicate/);
   }
   assert.equal(readCalls, 2, 'invalid public names fail before any payload read');
 

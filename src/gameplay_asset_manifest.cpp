@@ -109,7 +109,7 @@ unsigned active_player_count(const MeleeWebMenuMatchSelection& selection)
     return active;
 }
 
-void check_selection(const MeleeWebMenuMatchSelection& selection)
+void check_selection_common(const MeleeWebMenuMatchSelection& selection)
 {
     const auto& rules = selection.start.rules;
     const unsigned active = active_player_count(selection);
@@ -124,9 +124,6 @@ void check_selection(const MeleeWebMenuMatchSelection& selection)
     // rule normalization or consume any source state here.
     if (selection.hud_layout != rules.x0_3)
         reject("Match selection has an unsupported HUD layout");
-    if (!melee_web_stage_content(rules.stkind))
-        reject("Match selection stage has no admitted source content");
-
     for (unsigned i = active; i < GM_MAX_PLAYERS; ++i) {
         if (selection.start.players[i].slot_type != Gm_PKind_NA)
             reject("Match selection has an inactive source slot with data");
@@ -157,6 +154,13 @@ void check_selection(const MeleeWebMenuMatchSelection& selection)
     }
 }
 
+void check_selection(const MeleeWebMenuMatchSelection& selection)
+{
+    check_selection_common(selection);
+    if (!melee_web_stage_content(selection.start.rules.stkind))
+        reject("Match selection stage has no admitted source content");
+}
+
 struct StageMusicWords {
     int stage_kind;
     std::array<int, 4> words; // StageParam x4, x8, xC, x10
@@ -170,7 +174,7 @@ struct StageMusicWords {
 // here makes the descriptor independent of fn_8016E5C0: it enumerates every
 // possible source candidate without selecting music, touching save unlocks,
 // or consuming RNG.
-constexpr std::array<StageMusicWords, 7> kStageMusicWords = {{
+constexpr auto kStageMusicWords = std::to_array<StageMusicWords>({
     {St_Kind_Last,      {78, 39, 78, 39}},
     {St_Kind_Battle,    {81, 38, 81, 38}},
     {St_Kind_Story,     {96, -1, 96, -1}},
@@ -178,7 +182,10 @@ constexpr std::array<StageMusicWords, 7> kStageMusicWords = {{
     {St_Kind_Shrine,    {75, 1, 75, 1}},
     {St_Kind_Izumi,     {49, -1, 49, -1}},
     {St_Kind_OldYoshi,  {59, -1, 59, -1}},
-}};
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    {St_Kind_PStadium,  {64, 63, 64, 63}},
+#endif
+});
 
 std::string_view music_file(int id)
 {
@@ -192,6 +199,10 @@ std::string_view music_file(int id)
     case 49: return "izumi.hps";
     case 58: return "old_kb.hps";
     case 59: return "old_ys.hps";
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    case 63: return "pokesta.hps";
+    case 64: return "pstadium.hps";
+#endif
     case 75: return "shrine.hps";
     case 78: return "sp_end.hps";
     case 81: return "sp_zako.hps";
@@ -253,6 +264,30 @@ void add_selection_fighter_assets(std::vector<std::string>& result,
     }
 }
 
+std::vector<std::string>
+common_match_asset_names(const MeleeWebMenuMatchSelection& selection)
+{
+    std::vector<std::string> result;
+    result.reserve(64);
+    for (const auto name : std::array<std::string_view, 14>{
+             "PlCo.dat", "ItCo.usd", "EfCoData.dat", "PdPm.dat", "LbRb.dat",
+             "LbRf.dat", "sislib_font.bin", "IfAll.usd", "IfCoGet.dat",
+             "SdIntro.dat", "GmPause.usd", "LbBf.dat", "TyDatai.usd",
+             // Toy_803124BC chooses TyDatai.dat or TyDatai.usd from the
+             // original saved-language setting, which may differ from the
+             // runtime's English asset-resolution setting.
+             "TyDatai.dat"})
+        add_unique(result, name);
+    for (const auto name : kMatchCommonAudio) add_unique(result, name);
+
+    add_selection_fighter_assets(result, selection);
+    for (const auto& archive : kirby_copy_archive_requirements(selection))
+        add_unique(result, archive.filename);
+    for (const auto& effect : kirby_copy_effect_requirements(selection))
+        add_unique(result, effect.filename);
+    return result;
+}
+
 } // namespace
 
 std::vector<std::string> menu_asset_names()
@@ -276,25 +311,7 @@ std::vector<std::string>
 match_asset_names(const MeleeWebMenuMatchSelection& selection)
 {
     check_selection(selection);
-
-    std::vector<std::string> result;
-    result.reserve(64);
-    for (const auto name : std::array<std::string_view, 14>{
-             "PlCo.dat", "ItCo.usd", "EfCoData.dat", "PdPm.dat", "LbRb.dat",
-             "LbRf.dat", "sislib_font.bin", "IfAll.usd", "IfCoGet.dat",
-             "SdIntro.dat", "GmPause.usd", "LbBf.dat", "TyDatai.usd",
-             // Toy_803124BC chooses TyDatai.dat or TyDatai.usd from the
-             // original saved-language setting, which may differ from the
-             // runtime's English asset-resolution setting.
-             "TyDatai.dat"})
-        add_unique(result, name);
-    for (const auto name : kMatchCommonAudio) add_unique(result, name);
-
-    add_selection_fighter_assets(result, selection);
-    for (const auto& archive : kirby_copy_archive_requirements(selection))
-        add_unique(result, archive.filename);
-    for (const auto& effect : kirby_copy_effect_requirements(selection))
-        add_unique(result, effect.filename);
+    std::vector<std::string> result = common_match_asset_names(selection);
 
     const auto* stage = melee_web_stage_content(selection.start.rules.stkind);
     add_unique(result, stage->archive);
@@ -302,6 +319,24 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection)
     add_stage_music(result, stage->stage_kind);
     return result;
 }
+
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+std::vector<std::string>
+stadium_c1a_asset_names(const MeleeWebMenuMatchSelection& selection)
+{
+    check_selection_common(selection);
+    if (selection.start.rules.stkind != St_Kind_PStadium)
+        reject("Stadium C1a preparation requires the source-selected Stadium stage");
+
+    std::vector<std::string> result = common_match_asset_names(selection);
+    add_unique(result, "GrPs.usd");
+    for (const auto name : {"GrPs1.dat", "GrPs2.dat", "GrPs3.dat", "GrPs4.dat"})
+        add_unique(result, name);
+    add_unique(result, "pstadium.ssm");
+    add_stage_music(result, St_Kind_PStadium);
+    return result;
+}
+#endif
 
 std::vector<std::string>
 opening_match_asset_names(const MeleeWebOpeningPreview& preview)

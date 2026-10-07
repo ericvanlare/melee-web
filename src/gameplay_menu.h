@@ -172,8 +172,16 @@ int melee_web_menu_active_player_count(const StartMeleeData*);
  * availability before selecting or loading an entry. */
 int melee_web_menu_character_available(int ckind);
 int melee_web_menu_stage_available(int stkind);
+/* Source explicit-tile confirmation only; never use for random or admission. */
+int melee_web_menu_stage_explicit_confirm_available(int stkind);
 int melee_web_menu_css_selection_valid(const CSSData*);
 int melee_web_menu_sss_selection_valid(const SSSData*);
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+/* Development-only opt-in, scoped to one fresh VS menu session. It permits
+ * only the Stadium SSS diagnostic selection and never changes stage admission. */
+int melee_web_menu_enable_stadium_c1a(MeleeWebMenuSession*, char*, size_t);
+int melee_web_menu_stadium_c1a_ready_selection_valid(const MeleeWebMenuSession*);
+#endif
 
 #ifdef __cplusplus
 }

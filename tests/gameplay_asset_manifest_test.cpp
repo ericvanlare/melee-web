@@ -6,9 +6,13 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_result_motion_table.hpp"
 #include "gameplay_kirby_copy_assets.hpp"
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#include "runtime_asset_scope.hpp"
+#endif
 #include <melee/pl/forward.h>
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -16,6 +20,7 @@
 #include <iostream>
 #include <iterator>
 #include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -359,6 +364,53 @@ void kirby_copy_manifest_closure()
           "Non-Kirby match descriptor requested Kirby copy-effect banks");
 }
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void stadium_c1a_manifest_contract()
+{
+    const auto ordinary = match_asset_names(
+        selection(St_Kind_Last, CKIND_MARIO, CKIND_FOX));
+    const auto stadium = stadium_c1a_asset_names(
+        selection(St_Kind_PStadium, CKIND_MARIO, CKIND_FOX));
+    const std::set<std::string> ordinary_names(ordinary.begin(), ordinary.end());
+    std::set<std::string> stage_additions;
+    for (const auto& name : stadium)
+        if (!ordinary_names.contains(name)) stage_additions.insert(name);
+    const std::set<std::string> expected = {
+        "GrPs.usd", "GrPs1.dat", "GrPs2.dat", "GrPs3.dat", "GrPs4.dat",
+        "pstadium.hps", "pokesta.hps", "pstadium.ssm",
+    };
+    check(stage_additions == expected,
+          "Stadium C1a did not add exactly its archive, transformations, music and bank");
+    no_duplicates(stadium);
+    rejects([&] {
+        (void)match_asset_names(
+            selection(St_Kind_PStadium, CKIND_MARIO, CKIND_FOX));
+    });
+    rejects([&] {
+        (void)stadium_c1a_asset_names(
+            selection(St_Kind_Last, CKIND_MARIO, CKIND_FOX));
+    });
+
+    melee_web::RuntimeFiles active;
+    melee_web::RuntimeAssetScope scope(active);
+    const auto generation = scope.request(stadium);
+    const std::array<std::uint8_t, 1> byte = {1};
+    for (std::size_t i = 0; i + 1 < stadium.size(); ++i)
+        scope.put(generation, stadium[i], byte);
+    try {
+        scope.commit(generation);
+        throw std::runtime_error("Incomplete Stadium C1a closure unexpectedly committed");
+    } catch (const std::runtime_error& error) {
+        check(std::string_view(error.what()).find(stadium.back()) !=
+                  std::string_view::npos,
+              "Missing Stadium C1a closure error omitted the absent source file");
+    }
+    check(active.empty() && scope.pending_generation() == generation,
+          "Incomplete Stadium C1a closure modified the active runtime files");
+    scope.abort(generation);
+}
+#endif
+
 void rejects_invalid_without_mutation()
 {
     auto value = selection(St_Kind_Last, CKIND_MARIO, CKIND_MARIO);
@@ -451,6 +503,9 @@ int main(int argc, char** argv)
         source_prize_locale_closure();
         source_stage_music();
         kirby_copy_manifest_closure();
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+        stadium_c1a_manifest_contract();
+#endif
         rejects_invalid_without_mutation();
         std::cout << "Source menu/match/results asset descriptors, fighter/archive closure, authored music candidates, and rejection boundaries: passed\n";
         return 0;

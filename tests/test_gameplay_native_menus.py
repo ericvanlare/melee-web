@@ -10,6 +10,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from check_gameplay import node_runtime
+sys.path.insert(0, str(ROOT / "tests"))
+from owned_test_workspace import OwnedWorkspaceTests
 sys.path.insert(0, str(ROOT / "tools"))
 import compare_transition_trace as transition_compare
 
@@ -17,7 +19,58 @@ def has_menu_trophy_assets(*roots):
     return all(any((root / name).is_file() for root in roots)
                for name in ("TyDatai.usd", "TyDatai.dat"))
 
-class NativeMenuSourceTests(unittest.TestCase):
+class NativeMenuSourceTests(OwnedWorkspaceTests):
+    @classmethod
+    def setUpClass(cls):
+        cls.scratch = cls.new_workspace(ROOT, "stadium-c1a-native-menu-")
+
+    def test_stadium_c1a_raw_pad_selection_stops_before_match_admission(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_root = Path(os.environ.get("MELEE_MENU_FIXTURE_ROOT", ROOT / "assets-local"))
+        if not fixture_root.is_absolute():
+            fixture_root = ROOT / fixture_root
+        menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
+        script = "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; " \
+                 "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), " \
+                 "'dsp_coef.bin', 'sislib_font.bin']))"
+        required = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        missing = [str(menu / name) for name in required if not (menu / name).is_file()]
+        if not target.is_file() or missing:
+            detail = ", ".join(missing[:5])
+            self.skipTest("C1a requires its built host trace and exact owned menu closure" +
+                          (f"; missing {detail}" if detail else ""))
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "c1a-selection-port.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source_revision, "stadium-c1a-v1"]
+        (self.scratch / "c1a-selection-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "c1a-selection.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "c1a-selection.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "c1a-selection.stdout").write_text(run.stdout, encoding="utf-8")
+        (self.scratch / "c1a-selection.stderr").write_text(run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn(
+            "C1a raw PAD CSS->SSS Stadium selection and exact preparation manifest passed",
+            run.stdout,
+        )
+        self.assertIn(
+            "ordinary admission and source/stage construction remain closed",
+            run.stdout,
+        )
+
     def test_owned_css_scene_lifecycle(self):
         targets = [ROOT / "build" / name / "native_css_callbacks.js"
                    for name in ("browser", "browser-release")]

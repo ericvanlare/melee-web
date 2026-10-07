@@ -29,6 +29,7 @@ class GameplayAssetManifestTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory(prefix="melee asset manifest ")
         cls.addClassCleanup(cls.temp.cleanup)
         cls.binary = Path(cls.temp.name) / "gameplay_asset_manifest_test"
+        cls.stadium_binary = Path(cls.temp.name) / "gameplay_asset_manifest_stadium_c1a_test"
         command = [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-O1", "-g",
                    "-DTARGET_PC",
                    "-I", str(ROOT / "src"),
@@ -44,6 +45,12 @@ class GameplayAssetManifestTests(unittest.TestCase):
                    "-o", str(cls.binary)]
         cls.compile_command = command
         result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=120)
+        if result.returncode:
+            raise RuntimeError(result.stdout + result.stderr)
+        stadium_command = [*command[:-2], "-DMELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1",
+                           "-o", str(cls.stadium_binary)]
+        result = subprocess.run(stadium_command, cwd=ROOT, capture_output=True,
+                                text=True, timeout=120)
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)
 
@@ -73,6 +80,45 @@ class GameplayAssetManifestTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Source menu/match/results asset descriptors", result.stdout)
+
+    def test_stadium_c1a_descriptor_is_private_exact_and_fail_closed(self):
+        result = subprocess.run([str(self.stadium_binary)], cwd=ROOT,
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_stadium_c1a_disc_paths_are_mapped_for_scoped_preparation(self):
+        import json
+        import sys
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from check_gameplay import node_runtime
+        script = """import {NATIVE_GAME_DISC_FILES} from './web/runtime-assets.mjs';
+import {NATIVE_STADIUM_C1A_DISC_FILES,nativeStadiumC1aDiscPaths} from './web/runtime-audio-assets.mjs';
+const stage=Object.keys(NATIVE_STADIUM_C1A_DISC_FILES);
+const paths=nativeStadiumC1aDiscPaths([...stage,'PlMr.dat','sislib_font.bin','dsp_coef.bin']);
+let partialRejected=false;try{nativeStadiumC1aDiscPaths(['GrPs.usd']);}catch{partialRejected=true;}
+console.log(JSON.stringify({public:Object.fromEntries(stage.map(name=>[name,Object.hasOwn(NATIVE_GAME_DISC_FILES,name)])),
+ private:NATIVE_STADIUM_C1A_DISC_FILES,paths:{...paths},partialRejected}))"""
+        mapped = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        self.assertEqual(mapped, {
+            "public": {name: False for name in (
+                "GrPs.usd", "GrPs1.dat", "GrPs2.dat", "GrPs3.dat",
+                "GrPs4.dat", "pstadium.hps", "pokesta.hps")},
+            "private": {
+                "GrPs.usd": "GrPs.usd", "GrPs1.dat": "GrPs1.dat",
+                "GrPs2.dat": "GrPs2.dat", "GrPs3.dat": "GrPs3.dat",
+                "GrPs4.dat": "GrPs4.dat", "pstadium.hps": "audio/pstadium.hps",
+                "pokesta.hps": "audio/pokesta.hps",
+            },
+            "paths": {
+                "GrPs.usd": "GrPs.usd", "GrPs1.dat": "GrPs1.dat",
+                "GrPs2.dat": "GrPs2.dat", "GrPs3.dat": "GrPs3.dat",
+                "GrPs4.dat": "GrPs4.dat", "pstadium.hps": "audio/pstadium.hps",
+                "pokesta.hps": "audio/pokesta.hps", "PlMr.dat": "PlMr.dat",
+            },
+            "partialRejected": True,
+        })
 
     def test_public_descriptor_excludes_only_coefficients(self):
         public = Path(self.temp.name) / "gameplay_asset_manifest_public_test"

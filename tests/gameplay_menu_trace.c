@@ -257,6 +257,37 @@ static void setup(CSSData* css)
 
 int main(void)
 {
+    /* Reduced owner-lifetime check; source callbacks here are fixtures. The
+     * owned-asset recipe separately exercises original SSS confirmation. */
+    if (melee_web_menu_stage_available(St_Kind_PStadium) ||
+        melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium) ||
+        !melee_web_menu_stage_explicit_confirm_available(St_Kind_Last)) return 120;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    for (int armed = 0; armed < 2; ++armed) {
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition, NULL, NULL};
+        char error[128];
+        MeleeWebMenuSession* session =
+            melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
+        if (!session || (armed && !melee_web_menu_enable_stadium_c1a(
+                session, error, sizeof(error)))) return 121;
+        if (melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium) ||
+            !melee_web_menu_enter_css(session, error, sizeof(error)) ||
+            melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium)) return 122;
+        transition_request = 1;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+            !melee_web_menu_leave_css(session, error, sizeof(error)) ||
+            melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium) ||
+            !melee_web_menu_enter_sss(session, error, sizeof(error))) return 123;
+        if (melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium) != armed ||
+            melee_web_menu_stage_available(St_Kind_PStadium) ||
+            melee_web_menu_stage_explicit_confirm_available(St_Kind_Dummy)) return 124;
+        if (!melee_web_menu_abort(session, error, sizeof(error)) ||
+            melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium) ||
+            !melee_web_menu_session_destroy(session, error, sizeof(error)) ||
+            melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium)) return 125;
+    }
+#endif
     /* CSS has 25 icons because Zelda and Sheik share an icon, while its
      * CharacterKind namespace has 26 playable entries, ending in Ganondorf. */
     MeleeWebFighterInputObservation observed={0};

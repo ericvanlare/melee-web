@@ -33,6 +33,10 @@ struct MeleeWebMenuSession {
     int css_parent_route_requested;
     int css_parent_ready;
     int training_mode_scene;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    int stadium_c1a_enabled;
+    int stadium_c1a_ready;
+#endif
     HSD_GObj** gobj_snapshot;
     size_t gobj_snapshot_count;
     HSD_GObjList* gobj_snapshot_entities;
@@ -529,6 +533,21 @@ int melee_web_menu_stage_available(int stkind)
     return melee_web_stage_content(stkind) != NULL;
 }
 
+int melee_web_menu_stage_explicit_confirm_available(int stkind)
+{
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    /* Called only with the source's explicitly selected tile. Random-stage
+     * selection and ordinary match admission keep the content-only predicate. */
+    if (stkind == St_Kind_PStadium && owner != NULL &&
+        owner->stadium_c1a_enabled && owner->phase == MELEE_WEB_MENU_SSS &&
+        owner->sss_open && !owner->training_mode_scene &&
+        owner->css.match_type == VS_MELEE && !owner->selection_rejected &&
+        !owner->transition_failed && owner->transition_requested == 0)
+        return 1;
+#endif
+    return melee_web_menu_stage_available(stkind);
+}
+
 int melee_web_menu_active_player_count(const StartMeleeData* start)
 {
     int count = 0;
@@ -802,6 +821,60 @@ int melee_web_menu_sss_selection_valid(const SSSData* sss)
     return vs_selection_valid(&sss->vs, 1);
 }
 
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+static int stadium_c1a_sss_selection_valid(const SSSData* sss)
+{
+    VsModeData validation;
+    if (sss == NULL || sss->force_stage_id != -1 ||
+        sss->vs.start.rules.stkind != St_Kind_PStadium)
+        return 0;
+    validation = sss->vs;
+    /* Validate the ordinary source VS payload without changing the original
+     * SSS-owned StKind value being observed by this development checkpoint. */
+    validation.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
+    return vs_selection_valid(&validation, 1);
+}
+
+int melee_web_menu_enable_stadium_c1a(MeleeWebMenuSession* session,
+                                      char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size) ||
+        session->phase != MELEE_WEB_MENU_CREATED || session->css_open ||
+        session->sss_open || session->training_mode_scene ||
+        session->stadium_c1a_enabled)
+        return fail(error, error_size,
+                    "Stadium C1a requires one fresh, unentered VS menu session");
+    session->stadium_c1a_enabled = 1;
+    return ok(error, error_size);
+}
+
+int melee_web_menu_stadium_c1a_ready_selection_valid(
+    const MeleeWebMenuSession* session)
+{
+    StartMeleeData validation;
+    if (session == NULL || session != owner || !session->stadium_c1a_enabled ||
+        !session->stadium_c1a_ready || session->training_mode_scene ||
+        session->phase != MELEE_WEB_MENU_READY || !session->sss.start_game ||
+        !stadium_c1a_sss_selection_valid(&session->sss) ||
+        session->match_vs.start.rules.stkind != St_Kind_PStadium)
+        return 0;
+    validation = session->match_vs.start;
+    validation.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
+    return match_selection_valid(&validation);
+}
+#endif
+
+static int sss_selection_valid_for_session(const MeleeWebMenuSession* session)
+{
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    if (session != NULL && session->stadium_c1a_enabled &&
+        !session->training_mode_scene &&
+        session->sss.vs.start.rules.stkind == St_Kind_PStadium)
+        return stadium_c1a_sss_selection_valid(&session->sss);
+#endif
+    return session != NULL && melee_web_menu_sss_selection_valid(&session->sss);
+}
+
 MeleeWebMenuSession* melee_web_menu_session_create(
     const MeleeWebMenuRuntime* runtime, const MeleeWebMenuConfig* config,
     char* error, size_t error_size)
@@ -1029,6 +1102,9 @@ int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
     session->sss.vs = session->css.vs;
     session->sss.force_stage_id = -1;
     session->sss.start_game = false;
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+    session->stadium_c1a_ready = 0;
+#endif
     session->selection_rejected = 0;
     session->transition_failed = 0;
     session->transition_requested = 0;
@@ -1101,7 +1177,7 @@ int melee_web_menu_tick(MeleeWebMenuSession* session, char* error,
         }
     } else if (session->training_mode_scene
                    ? !training_sss_selection_valid_internal(&session->sss, 1)
-                   : !melee_web_menu_sss_selection_valid(&session->sss)) {
+                   : !sss_selection_valid_for_session(session)) {
         rejected = 1;
     }
     if (rejected) {
@@ -1232,7 +1308,7 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
     }
     if (session->training_mode_scene
             ? !training_sss_selection_valid_internal(&session->sss, 1)
-            : !melee_web_menu_sss_selection_valid(&session->sss)) {
+            : !sss_selection_valid_for_session(session)) {
         return fail(error, error_size,
                     "Cannot commit an unavailable stage selection");
     }
@@ -1253,7 +1329,7 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
     if (session->training_mode_scene
             ? !training_sss_selection_valid_internal(&session->sss,
                                                       !session->sss.start_game)
-            : !melee_web_menu_sss_selection_valid(&session->sss)) {
+            : !sss_selection_valid_for_session(session)) {
         session->phase = MELEE_WEB_MENU_CLOSED;
         return fail(error, error_size, "SSS published an unavailable selection");
     }
@@ -1270,6 +1346,30 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
             return ok(error, error_size);
         }
         if (!melee_web_menu_stage_available(session->sss.vs.start.rules.stkind)) {
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+            if (session->stadium_c1a_enabled &&
+                session->sss.vs.start.rules.stkind == St_Kind_PStadium) {
+                StartMeleeData validation;
+                session->css.vs = session->sss.vs;
+                session->match_vs = session->sss.vs;
+                if (!melee_web_vs_prepare_start_source(&session->match_vs.start,
+                                                        &session->sss.vs)) {
+                    session->phase = MELEE_WEB_MENU_CLOSED;
+                    return fail(error, error_size,
+                                "Original VS entry could not prepare the Stadium diagnostic payload");
+                }
+                validation = session->match_vs.start;
+                validation.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
+                if (!match_selection_valid(&validation)) {
+                    session->phase = MELEE_WEB_MENU_CLOSED;
+                    return fail(error, error_size,
+                                "Original VS entry produced an unsupported Stadium diagnostic payload");
+                }
+                session->stadium_c1a_ready = 1;
+                session->phase = MELEE_WEB_MENU_READY;
+                return ok(error, error_size);
+            }
+#endif
             session->phase = MELEE_WEB_MENU_CLOSED;
             return fail(error, error_size,
                         "Original VS entry committed an unavailable stage");
