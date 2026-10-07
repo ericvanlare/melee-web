@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {finalizeSessionCapture, REQUIRED_SESSION_DOWNLOADS,
-  validateRuntimeDataAbort, boundedCaptureOperation, retainFirstCaptureError} from '../scripts/whole_session_capture_result.mjs';
+  validateRuntimeDataAbort, boundedCaptureOperation, retainFirstCaptureError,
+  FIRST_REPLAY_BOUNDARY_MARKER_PREFIX, FIRST_REPLAY_BOUNDARY_MARKER_NAMES,
+  parseFirstReplayBoundaryMarker, inspectFirstReplayBoundaryMarkers} from '../scripts/whole_session_capture_result.mjs';
 
 const clean = () => ({
   result: 'fail', first_error: null, browser_errors: [], unexpected_requests: [],
@@ -87,3 +89,84 @@ retainFirstCaptureError(firstErrorReport, 'cleanup', 'TargetClosed', 'finally');
 assert.deepEqual(firstErrorReport.first_error,
   {kind: 'observation_timeout', message: 'snapshot exceeded 5 ms', phase: 'replay', details: null});
 console.log('A later TargetClosed cleanup error cannot replace the first renderer timeout.');
+let markerSequence = 0;
+const markerRows = [];
+const marker = (name, values = [0, 0, 0]) => markerRows.push({sequence: ++markerSequence,
+  marker: name, page_timestamp_ms: markerSequence, values});
+marker('header_emit_begin');marker('header_onLog_begin');marker('header_onLog_returned');marker('header_emit_returned');
+marker('menu_replay_started_dispatch_begin');marker('menu_replay_started_js_begin');
+marker('native_memory_snapshot_begin');marker('native_memory_snapshot_returned');
+marker('menu_replay_started_js_returned');marker('menu_replay_started_dispatch_returned');
+marker('css_tick_begin', [0, 0, 1]);marker('css_tick_returned', [0, 0, 1]);
+marker('session_frame_emit_begin', [0, 1, 1]);marker('frame0_emit_begin', [0, 1, 1]);
+marker('session_frame_onLog_begin', [0, 0, 0]);marker('frame0_onLog_begin', [0, 0, 0]);
+marker('frame0_onLog_returned', [0, 0, 0]);marker('session_frame_onLog_returned', [0, 0, 0]);
+marker('frame0_emit_returned', [0, 1, 1]);marker('session_frame_emit_returned', [0, 1, 1]);
+marker('ordinary_audio_boundary_begin', [1, 0, 0]);marker('ordinary_audio_tick_begin', [0, 1, 1]);
+marker('ordinary_audio_tick_returned', [0, 1, 1]);marker('ordinary_audio_boundary_returned', [1, 0, 0]);
+marker('source_frames_finish_begin', [1, 0, 1]);marker('aurora_begin_frame_begin', [0, 1, 1]);
+marker('aurora_begin_frame_returned', [0, 1, 1]);marker('css_host_draw_begin', [0, 1, 1]);
+marker('css_host_draw_returned', [0, 1, 1]);marker('aurora_end_frame_begin', [0, 1, 1]);
+marker('aurora_end_frame_returned', [0, 0, 1]);marker('source_frames_finish_returned', [1, 1, 1]);
+marker('first_replay_callback_tail_begin', [1, 1, 1]);marker('native_pause_begin', [1, 1, 1]);
+marker('native_pause_returned', [0, 1, 1]);marker('first_replay_callback_tail_returned', [1, 1, 0]);
+const encodedMarker = FIRST_REPLAY_BOUNDARY_MARKER_PREFIX + JSON.stringify(markerRows[0]);
+assert.deepEqual(parseFirstReplayBoundaryMarker(encodedMarker), markerRows[0]);
+assert.equal(parseFirstReplayBoundaryMarker('ordinary browser console output'), null);
+assert.throws(() => parseFirstReplayBoundaryMarker(FIRST_REPLAY_BOUNDARY_MARKER_PREFIX + '{'), /Malformed/);
+assert.throws(() => parseFirstReplayBoundaryMarker(FIRST_REPLAY_BOUNDARY_MARKER_PREFIX +
+  JSON.stringify({...markerRows[0], marker: 'unrecognized'})), /Malformed/);
+assert(FIRST_REPLAY_BOUNDARY_MARKER_NAMES.includes('aurora_end_frame_returned'));
+const markerValidation = inspectFirstReplayBoundaryMarkers(markerRows);
+assert.equal(markerValidation.complete, true, JSON.stringify(markerValidation));
+assert.equal(markerValidation.callback_source_steps, 1);
+assert.equal(markerValidation.callback_source_draws, 1);
+assert.equal(markerValidation.replay_cursor_at_pause, 1);
+assert.equal(markerValidation.source_draw_boundaries.length, 1);
+assert.equal(markerValidation.native_pause_running, 0);
+
+const multiStepRows = [];
+let multiStepSequence = 0;
+const multiStepMarker = (name, values = [0, 0, 0]) => multiStepRows.push({
+  sequence: ++multiStepSequence, marker: name, page_timestamp_ms: multiStepSequence, values,
+});
+const appendMultiStep = row => multiStepMarker(row.marker, row.values);
+const frame0ReturnedAt = markerRows.findIndex(row => row.marker === 'frame0_emit_returned');
+for (const row of markerRows.slice(0, frame0ReturnedAt + 1)) appendMultiStep(row);
+multiStepMarker('session_frame_emit_returned', [0, 1, 1]);
+const drawStageNames = new Set(['aurora_begin_frame_begin', 'aurora_begin_frame_returned',
+  'css_host_draw_begin', 'css_host_draw_returned', 'aurora_end_frame_begin',
+  'aurora_end_frame_returned']);
+for (const row of markerRows) if (drawStageNames.has(row.marker)) appendMultiStep(row);
+multiStepMarker('css_tick_begin', [1, 1, 1]);multiStepMarker('css_tick_returned', [1, 1, 1]);
+multiStepMarker('session_frame_emit_begin', [1, 1, 1]);
+multiStepMarker('session_frame_onLog_begin', [1, 0, 0]);
+multiStepMarker('session_frame_onLog_returned', [1, 0, 0]);
+multiStepMarker('session_frame_emit_returned', [1, 1, 1]);
+const audioBeginAt = markerRows.findIndex(row => row.marker === 'ordinary_audio_boundary_begin');
+const finishBeginAt = markerRows.findIndex(row => row.marker === 'source_frames_finish_begin');
+for (const row of markerRows.slice(audioBeginAt, finishBeginAt)) appendMultiStep(row);
+multiStepMarker('source_frames_finish_begin', [2, 1, 2]);
+multiStepMarker('aurora_begin_frame_begin', [1, 2, 2]);
+multiStepMarker('aurora_begin_frame_returned', [1, 2, 1]);
+multiStepMarker('css_host_draw_begin', [1, 2, 1]);
+multiStepMarker('css_host_draw_returned', [1, 1, 2]);
+multiStepMarker('aurora_end_frame_begin', [1, 2, 2]);
+multiStepMarker('aurora_end_frame_returned', [1, 1, 1]);
+multiStepMarker('source_frames_finish_returned', [2, 2, 2]);
+multiStepMarker('first_replay_callback_tail_begin', [2, 2, 2]);
+multiStepMarker('native_pause_begin', [2, 2, 2]);
+multiStepMarker('native_pause_returned', [0, 2, 2]);
+multiStepMarker('first_replay_callback_tail_returned', [2, 2, 0]);
+const multiStepValidation = inspectFirstReplayBoundaryMarkers(multiStepRows);
+assert.equal(multiStepValidation.complete, true, JSON.stringify(multiStepValidation));
+assert.equal(multiStepValidation.callback_source_steps, 2);
+assert.equal(multiStepValidation.callback_source_draws, 2);
+assert.equal(multiStepValidation.css_tick_markers, 2);
+assert.deepEqual(multiStepValidation.source_draw_boundaries.map(row => row.index), [0, 1]);
+const missingReturn = inspectFirstReplayBoundaryMarkers(markerRows.slice(0, -1));
+assert.equal(missingReturn.complete, false);
+assert.equal(missingReturn.first_unmatched_marker.marker, 'first_replay_callback_tail_begin');
+const sequenceGap = markerRows.map(row => ({...row}));sequenceGap[4].sequence++;
+assert(inspectFirstReplayBoundaryMarkers(sequenceGap).errors.some(reason => reason.includes('sequence gap')));
+console.log('First replay callback marker protocol validates source order, paired boundaries, and pause state.');

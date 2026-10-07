@@ -5,6 +5,7 @@ import {createRuntimeAudio} from './runtime-audio.mjs';
 import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.mjs';
 import {attemptNetworkTimingPauseResume, evaluateNetworkTimingPause} from './net-timing-pause.mjs';
 const developmentHooks = {};
+const markFirstReplayBoundary=(...args)=>{try{window.__meleeReplayBoundaryProbe?.mark?.(...args);}catch{}};
 const RETAIL_REPLAY_LEGACY_MAX_FRAMES = 36000;
 const RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES = 108000;
 const RETAIL_REPLAY_STATE_RECORD_OVERHEAD = 4;
@@ -220,7 +221,20 @@ function finishRetailReplay(reason){
  const text=JSON.stringify(report,null,2);window.lastRetailReplayReport=report;$('retail-replay-report').textContent=text;replayDownload('retail-browser-report.json',text);retailRun=null;$('launch').disabled=fatal||!bundle;$('disc').disabled=fatal||importing;$('pause').disabled=$('unload').disabled=true;syncAudio();
  })();return run.finishPromise;
 }
-window.menuReplayStarted=(frames,observe,draws=frames,scheduling=0)=>{const run=retailRun;if(!run)throw Error('Missing browser replay owner');if(!Number.isInteger(draws)||draws<1||draws>frames)throw Error('Invalid replay clock draw count');if(![0,1,2].includes(scheduling)||(scheduling===2&&!observe))throw Error('Invalid replay scheduling scope');run.scheduling=scheduling;run.frames=frames;run.expectedDraws=draws;run.observe=observe;run.preparation=latestNativePreparation;run.memory.prepared=replayMemorySnapshot();resetTiming(false);run.baseline={preparations:preparationCount,heap:Module.HEAPU8.length,underruns:Number(latestAudio.underruns||0),overflows:Number(latestAudio.overflows||0)};run.lastProgress=performance.now();};
+window.menuReplayStarted=(frames,observe,draws=frames,scheduling=0)=>{
+ markFirstReplayBoundary('menu_replay_started_js_begin',frames,draws,scheduling);
+ const run=retailRun;if(!run)throw Error('Missing browser replay owner');
+ if(!Number.isInteger(draws)||draws<1||draws>frames)throw Error('Invalid replay clock draw count');
+ if(![0,1,2].includes(scheduling)||(scheduling===2&&!observe))throw Error('Invalid replay scheduling scope');
+ run.scheduling=scheduling;run.frames=frames;run.expectedDraws=draws;run.observe=observe;run.preparation=latestNativePreparation;
+ markFirstReplayBoundary('native_memory_snapshot_begin',frames,draws,scheduling);
+ run.memory.prepared=replayMemorySnapshot();
+ markFirstReplayBoundary('native_memory_snapshot_returned',frames,draws,scheduling);
+ resetTiming(false);
+ run.baseline={preparations:preparationCount,heap:Module.HEAPU8.length,underruns:Number(latestAudio.underruns||0),overflows:Number(latestAudio.overflows||0)};
+ run.lastProgress=performance.now();
+ markFirstReplayBoundary('menu_replay_started_js_returned',frames,draws,scheduling);
+};
 window.menuReplayCompleted=(frames,matchComplete,outcome,winner,finalScene)=>{if(retailRun){retailRun.finalScene=finalScene;retailRun.consumed=frames;retailRun.completed=true;retailRun.sourceMatch={complete:!!matchComplete,outcome:Number.isInteger(outcome)?outcome:null,winner:Number.isInteger(winner)?winner:null};setTimeout(()=>finishRetailReplay(null),0);}};
 window.menuReplayPoll=()=>{
  $('retail-replay-start').disabled=!ready||fatal||!bundle||replayLoading||!!retailRun||!$('retail-replay-file').files[0];
@@ -394,6 +408,22 @@ try {
     },
     onError(error){log(error.message);$('status').dataset.runtimeError=error.message;},
     onLog(text,isError){
+      const boundaryProbe=window.__meleeReplayBoundaryProbe;
+      const probeEnabled=boundaryProbe?.enabled===true;
+      let replayHeader=false,sessionFrame=false,frameIndex=-1;
+      if(probeEnabled){
+        replayHeader=!isError&&text.startsWith('{"record":"header"');
+        sessionFrame=!isError&&text.startsWith('{"record":"session_frame"');
+        if(sessionFrame){
+          const index=Number(text.match(/,"index":(\d+),/)?.[1]);
+          frameIndex=Number.isSafeInteger(index)?index:-1;
+        }
+      }
+      if(probeEnabled&&replayHeader)markFirstReplayBoundary('header_onLog_begin',0,0,0);
+      if(probeEnabled&&sessionFrame){
+        markFirstReplayBoundary('session_frame_onLog_begin',frameIndex,0,0);
+        if(frameIndex===0)markFirstReplayBoundary('frame0_onLog_begin',frameIndex,0,0);
+      }
       if(retailRun?.observe&&!isError&&text.startsWith('{"record":')){
         const limit=retailRun.wholeSession
           ? RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES+RETAIL_REPLAY_SESSION_RECORD_OVERHEAD
@@ -405,6 +435,11 @@ try {
           : RETAIL_REPLAY_LEGACY_MAX_FRAMES+RETAIL_REPLAY_TIMER_RECORD_OVERHEAD;
         if(retailRun.timerRows.length>=limit)throw Error('Timer trace exceeded its record bound');retailRun.timerRows.push(text.slice(12));
       }else log(text);
+      if(probeEnabled&&replayHeader)markFirstReplayBoundary('header_onLog_returned',0,0,0);
+      if(probeEnabled&&sessionFrame){
+        if(frameIndex===0)markFirstReplayBoundary('frame0_onLog_returned',frameIndex,0,0);
+        markFirstReplayBoundary('session_frame_onLog_returned',frameIndex,0,0);
+      }
     },
     onEvent(name,data){
       if(name==='assetScopeReleased'||name==='assetScopeCommitted'){
