@@ -46,7 +46,9 @@ def _harness() -> str:
     state = source[state_start:state_end]
     names = (
         "fail", "melee_web_net_active", "melee_web_net_reset", "net_begin",
-        "melee_web_net_begin", "melee_web_net_begin_lockstep", "ring_used",
+        "melee_web_net_begin", "melee_web_net_begin_lockstep",
+        "melee_web_net_enable_local_input_capture", "encode_local_pad",
+        "melee_web_net_capture_local_input", "ring_used",
         "capture_start_identity", "record_arena", "melee_web_net_before_step",
         "melee_web_net_after_step", "decode_frame", "melee_web_net_push",
         "melee_web_net_push_indexed", "melee_web_net_confirm_start",
@@ -67,7 +69,9 @@ typedef struct {{ uint32_t tick, scene, seed, frame, flags, objects;
   uint64_t input, pad, scene_state, object_state, total; }} MeleeWebNetChecksumRecord;
 typedef struct {{ uint32_t tick, scene, base, bytes; uint64_t hash; }} MeleeWebNetArenaRecord;
 typedef struct MeleeWebMenuHost MeleeWebMenuHost;
+void melee_web_net_terminate(unsigned kind, uint32_t tick, unsigned channel);
 enum {{ MELEE_WEB_NET_FRAME_BYTES=44, MELEE_WEB_NET_MAX_FRAMES=216000,
+  MELEE_WEB_NET_INPUT_DELAY=2, MELEE_WEB_NET_PAD_BYTES=11,
   MELEE_WEB_NET_TERMINAL_DESYNC=1, MELEE_WEB_NET_TERMINAL_DISCONNECT=2,
   MELEE_WEB_NET_TERMINAL_PROTOCOL=3, MELEE_WEB_NET_TERMINAL_START_IDENTITY=4,
   MELEE_WEB_NET_CHECKSUM_RING=8, MELEE_WEB_NET_ARENA_RECORDS=64,
@@ -77,6 +81,18 @@ enum {{ PAD_ERR_NONE=0, PAD_ERR_NO_CONTROLLER=-1 }};
 #define FNV_OFFSET 0xcbf29ce484222325ull
 static unsigned card_snapshots, pad_snapshots;
 static char status_text[16384];
+static unsigned local_capture_publications;
+static uint32_t local_capture_tick;
+static unsigned local_capture_port;
+static uint64_t local_capture_serial;
+static uint8_t local_capture_bytes[MELEE_WEB_NET_PAD_BYTES];
+static int local_capture_accept=1;
+int melee_web_net_publish_local_input(uint32_t tick,unsigned port,uint64_t serial,
+  const uint8_t bytes[MELEE_WEB_NET_PAD_BYTES]) {{
+  ++local_capture_publications;local_capture_tick=tick;local_capture_port=port;
+  local_capture_serial=serial;memcpy(local_capture_bytes,bytes,MELEE_WEB_NET_PAD_BYTES);
+  return local_capture_accept;
+}}
 uint64_t melee_web_net_fnv1a64(uint64_t hash, const void* bytes, size_t size) {{
   const uint8_t* p=bytes; for(size_t i=0;i<size;++i){{hash^=p[i];hash*=0x100000001b3ull;}} return hash;
 }}
@@ -170,6 +186,98 @@ int main(void) {{
      !net.start_recorded||net.start_required||card_snapshots!=before)return 24;
   melee_web_net_after_step();
   if(net.cursor!=1)return 25;
+
+  /* Native local sampling keeps the existing 11-byte conversion and does not
+   * revisit a cursor while a remote contribution holds the source boundary. */
+  melee_web_net_reset();
+  local_capture_publications=0;local_capture_accept=1;
+  if(!melee_web_net_begin_lockstep(9,6,NULL,0))return 31;
+  net.context_applied=1;net.host=(MeleeWebMenuHost*)1;
+  if(melee_web_net_enable_local_input_capture(2,4)||
+     melee_web_net_enable_local_input_capture(0,3)||
+     !melee_web_net_enable_local_input_capture(0,4)||
+     melee_web_net_enable_local_input_capture(0,4))return 32;
+  if(!melee_web_net_capture_local_input(19,NULL)||local_capture_publications)return 33;
+  if(melee_web_net_before_step(1)!=NULL||!melee_web_net_confirm_start())return 33;
+  PADStatus raw[4]={{0}};
+  raw[0].button=0x1234;raw[0].stickX=INT8_MIN;raw[0].stickY=INT8_MAX;
+  raw[0].substickX=-1;raw[0].substickY=1;raw[0].triggerLeft=0x22;
+  raw[0].triggerRight=0x33;raw[0].analogA=0x44;raw[0].analogB=0x55;
+  if(!melee_web_net_capture_local_input(20,raw)||local_capture_publications!=1||
+     local_capture_tick!=0||local_capture_port!=0||local_capture_serial!=20||
+     memcmp(local_capture_bytes,(uint8_t[11]){{0x12,0x34,0x80,0x7f,0xff,0x01,
+       0x22,0x33,0x44,0x55,0x00}},11)||
+     memcmp(net.local_capture_last_bytes,local_capture_bytes,11))return 34;
+  if(melee_web_net_before_step(1)!=NULL||net.wait_episodes!=1)return 35;
+  raw[0].button=0;
+  if(!melee_web_net_capture_local_input(21,raw)||local_capture_publications!=1||
+     memcmp(net.local_capture_last_bytes,local_capture_bytes,11))return 35;
+  uint8_t source_frames[MELEE_WEB_NET_FRAME_BYTES*6]={{0}};
+  if(!melee_web_net_push_indexed(0,source_frames,6))return 36;
+  if(melee_web_net_before_step(1)==NULL)return 37;
+  melee_web_net_after_step();
+  raw[0].button=0x80;
+  if(!melee_web_net_capture_local_input(22,raw)||local_capture_publications!=2||
+     local_capture_tick!=1||local_capture_serial!=22)return 38;
+  if(melee_web_net_before_step(1)==NULL)return 39;
+  melee_web_net_after_step();
+  raw[0].button=0;
+  for(uint32_t tick=2;tick<4;++tick){{
+    if(!melee_web_net_capture_local_input(20+tick*2,raw)||
+       local_capture_publications!=tick+1||local_capture_tick!=tick)return 40;
+    if(melee_web_net_before_step(1)==NULL)return 41;
+    melee_web_net_after_step();
+  }}
+  if(!melee_web_net_capture_local_input(30,raw)||local_capture_publications!=4)return 42;
+  if(melee_web_net_before_step(1)==NULL)return 43;
+  melee_web_net_after_step();
+  if(!melee_web_net_capture_local_input(31,raw)||local_capture_publications!=4)return 44;
+  if(melee_web_net_before_step(1)==NULL)return 45;
+  melee_web_net_after_step();
+  if(net.cursor!=6||net.local_capture_count!=4)return 46;
+  melee_web_net_reset();
+  if(net.local_capture_enabled||net.local_capture_count||net.local_capture_last_poll_serial)return 60;
+
+  /* New source contributions sharing a PAD poll serial fail before any
+   * second publication, and an unavailable local port fails the same way. */
+  melee_web_net_reset();
+  if(!melee_web_net_begin_lockstep(9,6,NULL,0))return 47;
+  net.context_applied=1;net.host=(MeleeWebMenuHost*)1;
+  if(!melee_web_net_enable_local_input_capture(0,4)||
+     melee_web_net_before_step(1)!=NULL||!melee_web_net_confirm_start())return 48;
+  local_capture_publications=0;raw[0].err=PAD_ERR_NONE;
+  uint8_t prefix_frames[MELEE_WEB_NET_FRAME_BYTES*2]={{0}};
+  if(!melee_web_net_capture_local_input(50,raw)||
+     !melee_web_net_push_indexed(0,prefix_frames,2)||
+     melee_web_net_before_step(1)==NULL)return 49;
+  melee_web_net_after_step();
+  if(melee_web_net_capture_local_input(50,raw)||local_capture_publications!=1||
+     net.terminal_kind!=MELEE_WEB_NET_TERMINAL_PROTOCOL||net.cursor!=1)return 56;
+  melee_web_net_reset();
+  if(!melee_web_net_begin_lockstep(9,6,NULL,0))return 50;
+  net.context_applied=1;net.host=(MeleeWebMenuHost*)1;
+  if(!melee_web_net_enable_local_input_capture(1,4)||
+     melee_web_net_before_step(1)!=NULL||!melee_web_net_confirm_start())return 51;
+  raw[1].err=PAD_ERR_NO_CONTROLLER;
+  if(melee_web_net_capture_local_input(60,raw)||
+     net.terminal_kind!=MELEE_WEB_NET_TERMINAL_PROTOCOL||local_capture_publications!=1)return 52;
+  melee_web_net_reset();
+  if(!melee_web_net_begin_lockstep(9,6,NULL,0))return 57;
+  net.context_applied=1;net.host=(MeleeWebMenuHost*)1;
+  if(!melee_web_net_enable_local_input_capture(0,4)||
+     melee_web_net_before_step(1)!=NULL||!melee_web_net_confirm_start())return 58;
+  net.cursor=1;local_capture_publications=0;
+  if(melee_web_net_capture_local_input(65,raw)||local_capture_publications||
+     net.terminal_kind!=MELEE_WEB_NET_TERMINAL_PROTOCOL)return 59;
+  melee_web_net_reset();
+  if(!melee_web_net_begin_lockstep(9,6,NULL,0))return 53;
+  net.context_applied=1;net.host=(MeleeWebMenuHost*)1;
+  if(!melee_web_net_enable_local_input_capture(0,4)||
+     melee_web_net_before_step(1)!=NULL||!melee_web_net_confirm_start())return 54;
+  local_capture_publications=0;local_capture_accept=0;raw[0].err=PAD_ERR_NONE;
+  if(melee_web_net_capture_local_input(70,raw)||net.cursor!=0||
+     net.terminal_kind!=MELEE_WEB_NET_TERMINAL_PROTOCOL)return 55;
+  melee_web_net_reset();local_capture_accept=1;
   melee_web_net_reset();
   return 0;
 }}

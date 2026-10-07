@@ -22,6 +22,16 @@ let current = [], manager = createControllerManager({getGamepads: () => current,
 function sample() { return manager.sample()[0]; }
 let p = standardPad(3); current = [null, null, null, p]; sample();
 assert.equal(sample().port, 0, 'browser index is not the player port');
+const loneIndexOne = standardPad(1);
+const loneControllerManager = createControllerManager({getGamepads: () => [null, loneIndexOne],
+  storage: memoryStorage(), platform: 'test'});
+const discoveredIndexOne = loneControllerManager.inspect()[0];
+assert.equal(discoveredIndexOne.port, 0, 'a lone browser index 1 is initially assigned to player port 0');
+loneControllerManager.assign(discoveredIndexOne.key, 1);
+const routedIndexOne = loneControllerManager.inspect()[0];
+assert.equal(routedIndexOne.port, 1, 'explicit assignment routes browser index 1 to player port 1');
+assert.equal(routedIndexOne.active, true, 'neutral discovery reactivates the explicitly assigned controller');
+assert.equal(routedIndexOne.output.buttons, 0, 'the assigned controller remains neutral before source sampling');
 for (const [input, expected] of [[0,256],[1,512],[2,1024],[3,2048],[5,16],[9,4096],
   [12,8],[13,4],[14,1],[15,2]]) {
   set(p, input); assert.equal(sample().output.buttons, expected, `standard button ${input}`);

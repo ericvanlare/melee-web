@@ -39,6 +39,13 @@ typedef struct NetSession {
     int start_required;
     int start_confirmed;
     int start_capture_failed;
+    int local_capture_enabled;
+    unsigned local_capture_port;
+    uint32_t local_capture_input_ticks;
+    uint32_t local_capture_count;
+    uint32_t local_capture_last_cursor;
+    uint64_t local_capture_last_poll_serial;
+    uint8_t local_capture_last_bytes[MELEE_WEB_NET_PAD_BYTES];
     uint64_t start_card_hash;
     uint64_t start_pad_history_hash;
     uint64_t start_native_context;
@@ -126,6 +133,81 @@ int melee_web_net_begin_lockstep(uint32_t seed, uint32_t max_frames,
                                  char* e, size_t n)
 {
     return net_begin(seed, max_frames, 1, e, n);
+}
+
+EMSCRIPTEN_KEEPALIVE int melee_web_net_enable_local_input_capture(
+    unsigned local_port, uint32_t input_ticks)
+{
+    if (!net.active || !net.start_required || net.start_confirmed ||
+        net.cursor || net.local_capture_enabled || local_port > 1 ||
+        !input_ticks || input_ticks > UINT32_MAX - MELEE_WEB_NET_INPUT_DELAY ||
+        input_ticks + MELEE_WEB_NET_INPUT_DELAY != net.max_frames)
+        return 0;
+    net.local_capture_enabled = 1;
+    net.local_capture_port = local_port;
+    net.local_capture_input_ticks = input_ticks;
+    return 1;
+}
+
+static int encode_local_pad(const PADStatus* pad,
+                            uint8_t out[MELEE_WEB_NET_PAD_BYTES])
+{
+    if (!pad || !out || pad->err != PAD_ERR_NONE) return 0;
+    out[0] = (uint8_t) (pad->button >> 8);
+    out[1] = (uint8_t) pad->button;
+    out[2] = (uint8_t) pad->stickX;
+    out[3] = (uint8_t) pad->stickY;
+    out[4] = (uint8_t) pad->substickX;
+    out[5] = (uint8_t) pad->substickY;
+    out[6] = pad->triggerLeft;
+    out[7] = pad->triggerRight;
+    out[8] = pad->analogA;
+    out[9] = pad->analogB;
+    out[10] = (uint8_t) pad->err;
+    return 1;
+}
+
+int melee_web_net_capture_local_input(uint64_t poll_serial,
+                                      const PADStatus raw[4])
+{
+    if (!net.active || !net.local_capture_enabled) return 1;
+    if (net.terminal_kind) return 0;
+    /* The first loop callback records identity before the page can confirm it.
+     * Do not sample until that barrier releases source tick zero. */
+    if (!net.start_confirmed) return 1;
+    if (net.cursor >= net.local_capture_input_ticks) {
+        if (net.local_capture_count != net.local_capture_input_ticks) {
+            melee_web_net_terminate(MELEE_WEB_NET_TERMINAL_PROTOCOL,
+                                    net.cursor, net.local_capture_port);
+            return 0;
+        }
+        return 1;
+    }
+    /* A network wait may revisit one cursor on later browser callbacks. Its
+     * already-published contribution is immutable; never sample the new PAD. */
+    if (net.local_capture_count && net.cursor == net.local_capture_last_cursor)
+        return 1;
+    if (!raw || net.cursor != net.local_capture_count ||
+        net.local_capture_count >= net.local_capture_input_ticks ||
+        (net.local_capture_count && poll_serial <= net.local_capture_last_poll_serial)) {
+        melee_web_net_terminate(MELEE_WEB_NET_TERMINAL_PROTOCOL,
+                                net.cursor, net.local_capture_port);
+        return 0;
+    }
+
+    uint8_t bytes[MELEE_WEB_NET_PAD_BYTES];
+    if (!encode_local_pad(&raw[net.local_capture_port], bytes) ||
+        !melee_web_net_publish_local_input(net.cursor, net.local_capture_port,
+                                           poll_serial, bytes)) {
+        melee_web_net_terminate(MELEE_WEB_NET_TERMINAL_PROTOCOL,
+                                net.cursor, net.local_capture_port);
+        return 0;
+    }
+    memcpy(net.local_capture_last_bytes, bytes, sizeof(bytes));
+    net.local_capture_last_cursor = net.cursor;
+    net.local_capture_last_poll_serial = poll_serial;
+    ++net.local_capture_count;
+    return 1;
 }
 
 int melee_web_net_apply_start_context(MeleeWebMenuHost* host, char* e, size_t n)
