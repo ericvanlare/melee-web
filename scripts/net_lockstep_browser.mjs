@@ -121,6 +121,21 @@ const scriptHash = scriptBytes ? sha256(scriptBytes) : null;
 const deadline = Date.now() + timeoutMs;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const childDirectory = role => path.join(output, role);
+async function captureAccountedCss(role, expectedCursor) {
+  const filename = path.join(childDirectory(role), 'accounted-css.png');
+  await instances[role].screenshot(filename);
+  const bytes = await fs.readFile(filename);
+  const graphics = await instances[role].graphics();
+  const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
+  if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
+      graphics.cross_origin_isolated !== true || graphics.webgpu_adapter !== true ||
+      native.phase !== 1 || status.cursor !== expectedCursor || status.blocker !== 'complete')
+    throw Error(`${role} CSS accounting capture did not retain its rendered final cursor ${expectedCursor}`);
+  instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
+    screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
+    gpu: graphics, source_steps_and_draws: instanceRows[role].source_accounting,
+    scope: 'CSS at the completed prefix; source counters exclude preparation-only draws'};
+}
 // Match melee_web_net_fnv1a64 over already-native PADStatus bytes; this does not
 // convert JavaScript Gamepad state into the protocol's PAD record layout.
 const fnv1a64 = bytes => {
@@ -845,21 +860,7 @@ async function run() {
     pairResults.checksums = {records_each: sourceTicks, streams_identical: true, sha256: sha256(bytesA)};
     if (peers.alpha.inputDuplicates < 1 || peers.alpha.outOfOrderInputs < 1)
       throw Error('Reduced probe did not exercise duplicate and out-of-order remote input');
-    for (const role of ['alpha', 'beta']) {
-      const filename = path.join(childDirectory(role), 'accounted-css.png');
-      await instances[role].screenshot(filename);
-      const bytes = await fs.readFile(filename);
-      const graphics = await instances[role].graphics();
-      const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
-      if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
-          graphics.cross_origin_isolated !== true || graphics.webgpu_adapter !== true ||
-          native.phase !== 1 || status.cursor !== sourceTicks || status.blocker !== 'complete')
-        throw Error(`${role} reduced accounting probe did not retain its final rendered CSS boundary`);
-      instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
-        screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
-        gpu: graphics, source_steps_and_draws: instanceRows[role].source_accounting,
-        scope: 'CSS at the completed prefix; source counters exclude preparation-only draws'};
-    }
+    for (const role of ['alpha', 'beta']) await captureAccountedCss(role, sourceTicks);
     pairResults.route = {scope: 'CSS-only prefix', status: 'not-full-route', scene: 'CSS'};
     pairResults.outcome = 'complete';
   } else if (inputSampling) {
@@ -891,6 +892,7 @@ async function run() {
       if (instanceRows[role].final_status.cursor !== sourceTicks ||
           instanceRows[role].final_status.blocker !== 'complete')
         throw Error(`${role} native source did not finish the declared sampling prefix`);
+      await captureAccountedCss(role, sourceTicks);
     }
     const alphaSamples = peers.alpha.localInputCapture.captures.map(row => row.bytes);
     const betaSamples = peers.beta.localInputCapture.captures.map(row => row.bytes);
