@@ -1,6 +1,34 @@
 /* Pure acceptance predicates for the bounded C1a CSS -> SSS browser reducer. */
 // Source PAD ABI: .deps/melee/extern/dolphin/include/dolphin/pad.h:36.
 export const SOURCE_PAD_BUTTON_START = 0x1000;
+export const CSS_SSS_TRANSITION_LIMITS = Object.freeze({
+  readinessFrames: 180,
+  transitionMs: 20000,
+  sampleCapHz: 144,
+});
+
+export function createCssSssTransitionCapture(scope) {
+  return {
+    scope,
+    max_readiness_frames: CSS_SSS_TRANSITION_LIMITS.readinessFrames,
+    max_post_start_frames: Math.ceil(CSS_SSS_TRANSITION_LIMITS.transitionMs *
+      CSS_SSS_TRANSITION_LIMITS.sampleCapHz / 1000),
+    post_start_sample_cap_hz: CSS_SSS_TRANSITION_LIMITS.sampleCapHz,
+    post_start_transition_deadline_ms: CSS_SSS_TRANSITION_LIMITS.transitionMs,
+    observer_contract: {css_ids_length: 14, cooldown_index: 5, pending_scene_index: 7,
+      start_ready_index: 8, callback_count_index: 10, last_start_trigger_index: 11,
+      last_start_ready_index: 12, last_start_pending_index: 13},
+    canvas_focused_before_observation: false,
+    samples: [],
+    readiness: null,
+    input_before_start: null,
+    input_after_start: null,
+    start_key: null,
+    last_source_start: null,
+    transition: null,
+    outcome: null,
+  };
+}
 
 export function hasCssMenuReadiness(sample) {
   const ids = sample?.css?.ids;

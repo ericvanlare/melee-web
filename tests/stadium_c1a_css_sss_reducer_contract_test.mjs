@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {cssReadinessEvidence, cssSssOutcome, hasCssMenuReadiness,
+import {createCssSssTransitionCapture, CSS_SSS_TRANSITION_LIMITS,
+  cssReadinessEvidence, cssSssOutcome, hasCssMenuReadiness,
   rawKeyboardStartDelivered, SOURCE_PAD_BUTTON_START} from './stadium_c1a_css_sss_reducer.mjs';
 
 function sample({phase = 1, running = 1, cooldown = 0, pending = 0, ready = 1,
@@ -36,6 +37,23 @@ test('readiness evidence requires advancing source callbacks and input samples',
     input_progressed: true, source_callback_progressed: true,
     readiness_observed: true, ready_sample_index: 0,
   });
+});
+
+test('reducer and full C1a route share one bounded CSS-to-SSS capture contract', () => {
+  const reducer = createCssSssTransitionCapture('CSS-to-SSS reducer');
+  const fullRoute = createCssSssTransitionCapture('Full C1a route');
+  assert.deepEqual(CSS_SSS_TRANSITION_LIMITS,
+    {readinessFrames: 180, transitionMs: 20000, sampleCapHz: 144});
+  for (const capture of [reducer, fullRoute]) {
+    assert.equal(capture.max_readiness_frames, 180);
+    assert.equal(capture.max_post_start_frames, 2880);
+    assert.equal(capture.post_start_sample_cap_hz, 144);
+    assert.equal(capture.post_start_transition_deadline_ms, 20000);
+    assert.deepEqual(capture.samples, []);
+    assert.equal(capture.outcome, null);
+  }
+  assert.notEqual(reducer.samples, fullRoute.samples,
+    'Each route needs a separate retained source/input sample history');
 });
 
 test('raw Start delivery requires a new non-neutral P1 keyboard sample', () => {
