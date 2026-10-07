@@ -30,18 +30,21 @@ internally and were not printed. The observer and constructor phases are tied to
 their separate source producers: observer review at `ea42449`, then the clean
 constructor freeze and native fixture at `cf4a167`.
 
-Integration producer `69e44ffc` passed full unittest discovery: 2,031 tests,
-132 skipped. A previous full-suite run failed only because the downstream
-gameplay patch was not in canonical file order. The documented canonicalizer
-reordered the patch hunk and index metadata, leaving generated source bytes and
-the pinned upstream checkout unchanged; focused canonicality and ownership
-checks then passed. Both ordinary Release builds also passed with the C1 and
-other diagnostic opt-ins OFF: the `native_menu_host_trace` target and the
-shipped `gameplay_menu_browser` runtime target. These results are from the
-recorded `69e44ffc` producer based on `e3220aa`; the queued refresh onto current
-main `d8f7600` had not yet been validated when this entry was drafted. The
-ordinary Release cache recorded all ten `MELEE_WEB_*` boolean options OFF; its
-cache, Ninja graph, targets and outputs are identified in the receipt.
+The first integration producer, 69e44ffc based on e3220aa, passed 2,031 tests
+with 132 skipped and built both ordinary Release targets. Its earlier suite
+attempt failed only because the downstream patch was not in canonical file
+order; the documented canonicalizer reordered hunk and index metadata while
+preserving generated source bytes and the pinned upstream checkout.
+
+After refresh onto current main d8f7600, source head 4355887 passed full unittest
+discovery with 2,036 tests and 132 skipped. Focused canonical, heap-ownership,
+and source-heap-context checks passed (15, 5, and 2 tests). Ordinary Release
+builds for native_menu_host_trace and gameplay_menu_browser also passed with all
+ten MELEE_WEB boolean options OFF. The retained C1 fixture was not rerun: the
+accepted fixture JS/Wasm/object and generated Stadium source hashes still match
+the cf4a producer, and the relevant source/test inputs are byte-identical;
+only the already-reviewed canonical patch ordering changed. The external
+validation receipt records these exact inputs, logs, outputs, and limits.
 
 The [portable receipt](../evidence/pokemon-stadium-buffer-consumer-v1.json)
 records source, IR, patch, fixture, test, build and output identities. It also

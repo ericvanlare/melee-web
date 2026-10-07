@@ -36,8 +36,7 @@
       "tree": "100a9baa59eda71b152a516bf8249f9bb5d49359",
       "base_at_validation": "e3220aa2e2da7b17b99dce0999811bd1e66a0814",
       "working_tree_clean_at_validation": true,
-      "current_main_note": "The full suite and ordinary Release builds were produced on 69e44ffc based on e3220aa. A final refresh onto d8f76001fc93ca593228fe740f70aec6b8f9ee4b is queued and not yet validated.",
-      "queued_refresh_target": "d8f76001fc93ca593228fe740f70aec6b8f9ee4b"
+      "validation_role": "Historical validation on 69e44ffc based on e3220aa; current-main validation is recorded separately below."
     }
   },
   "observers_and_abi": {
@@ -230,7 +229,7 @@
     ],
     "browser_gx_service_audit": {
       "target": "gameplay_menu_browser",
-      "profile": "ordinary Release, C1 and all other ten MELEE_WEB boolean options OFF; Emscripten 6.0.9; O3; non-pthreads; WebGPU port",
+      "profile": "ordinary Release, C1 and all other nine MELEE_WEB boolean options OFF; Emscripten 6.0.9; O3; non-pthreads; WebGPU port",
       "pinned_aurora_commit": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
       "downstream_aurora_patch": "patches/aurora-browser.patch",
       "downstream_aurora_patch_sha256": "97d8af9c8474b692d049d243eda2ad9913a67025e88cfd6f4d3be7a63676db4a",
@@ -309,13 +308,94 @@
   "not_established": [
     "No callback dispatch, Ground OnInit, stage entry/publication/admission, or gameplay tick/draw",
     "No 0x7D4 second buffer, camera/text, or global SIS consumer",
-    "No browser, screenshot, retail comparison, timing, pixels, audio fidelity, or whole-session acceptance",
-    "The successful suite and ordinary Release builds are on 69e44ffc based on e3220aa, not the queued d8f76001 final base."
+    "No browser, screenshot, retail comparison, timing, pixels, audio fidelity, or whole-session acceptance"
   ],
   "private_evidence_run_ids": [
     "stadium-buffer-observer-phase1-20261007-20261007-140617-f31ffb2e",
     "stadium-buffer-constructor-sourcefreeze-20261007-20261007-144025-553f9cd3",
     "stadium-buffer-retained98-c1-prep-20261007-215542-cf4a",
-    "stadium-buffer-integration-e322-20261007-2206-cf4a"
-  ]
+    "stadium-buffer-integration-e322-20261007-2206-cf4a",
+    "stadium-buffer-final-main-d8f760-20261007-4355887"
+  ],
+  "final_current_base_validation": {
+    "run_id": "stadium-buffer-final-main-d8f760-20261007-4355887",
+    "external_receipt_artifact": "final-validation-v1.json",
+    "external_receipt_sha256": "6a703384fe1d173960bb76852590a265ec1d2bd89cb986354922916486c16f5b",
+    "validated_commit": "4355887f3217a1ad1e9c37d7ffc2abda673b2b6b",
+    "validated_tree": "94cb36854ef3a9cf9bae3b7544188e374d7ebe69",
+    "base_commit": "d8f76001fc93ca593228fe740f70aec6b8f9ee4b",
+    "working_tree_clean_at_validation": true,
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v through scripts/agent_workspace.py run",
+      "tests": 2036,
+      "skipped": 132,
+      "result": "passed",
+      "log_artifact": "full-unittest-final.log",
+      "log_sha256": "1036cf7ea1fe2915e6b01d0214d3e1a197f87ccb964aab99688554c0706a8ca7"
+    },
+    "focused_checks": [
+      {
+        "name": "test_gameplay_patch_canonical.py",
+        "tests": 15,
+        "result": "passed",
+        "log_artifact": "focused-canonical.log",
+        "log_sha256": "2bd37c0ce56cb4e69aa427ca67679b1ada571dd221e3a78893987a6b4cd53437"
+      },
+      {
+        "name": "test_gameplay_heap.py",
+        "tests": 5,
+        "result": "passed",
+        "log_artifact": "focused-heap-ownership.log",
+        "log_sha256": "45da4e6cfafebdfac9999bbf15321826154cc8ba62006ac4807d8a5740e9a2e5"
+      },
+      {
+        "name": "test_source_game_heap_context.py",
+        "tests": 2,
+        "result": "passed",
+        "log_artifact": "focused-source-heap-context.log",
+        "log_sha256": "a226c9ea0019587c060090dd46e692e86cdeae7ea683bef69269e6d28fbd47e2"
+      }
+    ],
+    "ordinary_release": {
+      "configuration": "Release; C1 and all other nine MELEE_WEB boolean options OFF",
+      "all_ten_boolean_options_off": true,
+      "CMakeCache_sha256": "de0c1275f03b2fd5b618fbbe59e3d7d16a251176ad41c68db9939100d6356bdc",
+      "build_ninja_sha256": "3066b10d098da57343b358a10405f91c8e8f6afd8be4e5d5b3295c55d0bf635f",
+      "targets": [
+        {
+          "target": "native_menu_host_trace",
+          "log_artifact": "ordinary-release-native-menu-build.log",
+          "log_sha256": "cd323e26b4b551865869862f6cf837d4be9e71335a202c0764c5f7b4db911b0c",
+          "js_sha256": "a38469b0da5e97b03f9a1d7d6d5b6c9d0dd9a7b697777c26350064430fa0a3f9",
+          "wasm_sha256": "e15e58419b95b80817e3341c2988323b9bfd61d822626f5790a0f56b58659299"
+        },
+        {
+          "target": "gameplay_menu_browser",
+          "build_entrypoint_target": "runtime",
+          "log_artifact": "ordinary-release-gameplay-menu-browser-build.log",
+          "log_sha256": "4b25f4db7b23fe720c506f9f1172bee3e16eaaf466fcd9a8a6a5aa031fe9d782",
+          "js_sha256": "4e751ebb2467c3a8ee74583b37aa1753f1233c89e496b61458594c16eb262e61",
+          "wasm_sha256": "7b858d9eaffa5d269b85f2d5cadbfe04e0ddb8ec0ff60c4297dc7995be1d6981"
+        }
+      ],
+      "current_browser_wasm_contains": [
+        "lb_800122C8",
+        "HSD_ImageDescCopyFromEFB",
+        "GXSetTexCopySrc",
+        "GXSetTexCopyDst",
+        "GXCopyTex",
+        "GXPixModeSync"
+      ]
+    },
+    "retained_c1_target_input_proof": {
+      "fixture_rerun": false,
+      "source_runtime_and_probe_inputs_match_cf4a": true,
+      "canonical_patch_text_changed_only_by_reviewed_ordering": true,
+      "generated_grpstadium_source_sha256": "dfd603804f36a8d53fa39a17be444b59df9d6586f887083c6ed40e44fcbeb23d",
+      "grpstadium_object_sha256": "c40ab6d44f014d7a3264dedeb402d06a45b6b438b0cada82f2db3de7609d61f8",
+      "c1_js_sha256": "96bd0647d3528867909f519756412520c22da383f398fe1586334c5ce3e82a79",
+      "c1_wasm_sha256": "1899fa1c39cd6edfd059502315a9effd5f36f68662d4cc0db31ee3a00c61e570"
+    },
+    "scope_note": "No browser, stage entry, callback dispatch, EFB operation, or pixel/GPU-completion assertion was run."
+  }
 }
