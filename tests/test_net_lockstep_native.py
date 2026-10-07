@@ -39,7 +39,7 @@ def _function(source: str, name: str) -> str:
     raise AssertionError(f"unterminated source function: {name}")
 
 
-def _harness() -> str:
+def _harness(include_clock_composition: bool = False) -> str:
     source = SOURCE.read_text(encoding="utf-8")
     failure_enum_start = source.index("enum LocalCaptureFailureReason {")
     failure_enum_end = source.index("};", failure_enum_start) + 2
@@ -59,6 +59,41 @@ def _harness() -> str:
         "melee_web_net_terminate", "melee_web_net_status",
     )
     functions = "\n".join(_function(source, name) for name in names)
+    clock_declarations = """int a3_run_clock_native_reproducer(void);
+int a3_run_budgeted_clock_candidate(void);""" if include_clock_composition else ""
+    clock_helpers = """
+int a3_test_prepare_local_capture(unsigned port, unsigned prefix_count) {
+  uint8_t frames[MELEE_WEB_NET_FRAME_BYTES*6] = {0};
+  if(!prefix_count||prefix_count>6)return 0;
+  melee_web_net_reset();local_capture_publications=0;local_capture_accept=1;
+  if(!melee_web_net_begin_lockstep(9,6,NULL,0))return 0;
+  net.context_applied=1;net.host=(MeleeWebMenuHost*)1;
+  if(!melee_web_net_enable_local_input_capture(port,4)||
+     melee_web_net_before_step(1)!=NULL||!melee_web_net_confirm_start()||
+     !melee_web_net_push_indexed(0,frames,prefix_count))return 0;
+  return 1;
+}
+unsigned a3_test_publications(void){return local_capture_publications;}
+unsigned a3_test_capture_count(void){return net.local_capture_count;}
+uint32_t a3_test_cursor(void){return net.cursor;}
+unsigned a3_test_terminal_kind(void){return net.terminal_kind;}
+unsigned a3_test_terminal_is_protocol(void){return net.terminal_kind==MELEE_WEB_NET_TERMINAL_PROTOCOL;}
+uint32_t a3_test_terminal_tick(void){return net.terminal_tick;}
+unsigned a3_test_terminal_channel(void){return net.terminal_channel;}
+unsigned a3_test_capture_failure_is_poll_serial(void){return net.local_capture_failure_reason==LOCAL_CAPTURE_FAILURE_POLL_SERIAL;}
+uint32_t a3_test_capture_failure_cursor(void){return net.local_capture_failure_cursor;}
+uint32_t a3_test_capture_failure_count(void){return net.local_capture_failure_count;}
+uint64_t a3_test_capture_failure_serial(void){return net.local_capture_failure_poll_serial;}
+uint64_t a3_test_capture_failure_last_serial(void){return net.local_capture_failure_last_poll_serial;}
+unsigned a3_test_capture_failure_port(void){return net.local_capture_failure_port;}
+uint32_t a3_test_ring_write(void){return net.ring_write;}
+uint32_t a3_test_wait_callbacks(void){return net.wait_callbacks;}
+uint32_t a3_test_pushed(void){return net.pushed;}
+""" if include_clock_composition else ""
+    clock_finish = """
+  if(a3_run_clock_native_reproducer()!=0)return 74;
+  if(a3_run_budgeted_clock_candidate()!=0)return 75;
+""" if include_clock_composition else ""
     return f'''#include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -74,6 +109,7 @@ typedef struct {{ uint32_t tick, scene, seed, frame, flags, objects;
 typedef struct {{ uint32_t tick, scene, base, bytes; uint64_t hash; }} MeleeWebNetArenaRecord;
 typedef struct MeleeWebMenuHost MeleeWebMenuHost;
 void melee_web_net_terminate(unsigned kind, uint32_t tick, unsigned channel);
+{clock_declarations}
 enum {{ MELEE_WEB_NET_FRAME_BYTES=44, MELEE_WEB_NET_MAX_FRAMES=216000,
   MELEE_WEB_NET_INPUT_DELAY=2, MELEE_WEB_NET_PAD_BYTES=11,
   MELEE_WEB_NET_TERMINAL_DESYNC=1, MELEE_WEB_NET_TERMINAL_DISCONNECT=2,
@@ -120,6 +156,7 @@ int melee_web_net_arena_hash(uint32_t* base,uint32_t* bytes,uint64_t* hash) {{
 {state}
 static NetSession net = {{.arena_fill=-1}};
 {functions}
+{clock_helpers}
 int main(void) {{
   uint8_t frame[MELEE_WEB_NET_FRAME_BYTES]={{0}};
   char* status;
@@ -347,6 +384,7 @@ int main(void) {{
   if(!strstr(status,"\\\"reason\\\":\\\"publish_rejected\\\""))return 73;
   melee_web_net_reset();local_capture_accept=1;
   melee_web_net_reset();
+{clock_finish}
   return 0;
 }}
 '''
@@ -371,6 +409,39 @@ class NetLockstepNativeTests(unittest.TestCase):
                                 timeout=10, check=False)
         if result.returncode:
             self.fail(f"native lockstep control failed ({result.returncode}); retained {directory}")
+        shutil.rmtree(directory)
+
+    def test_fixed_clock_composes_with_native_capture_and_budget_candidate(self):
+        compiler = shutil.which("cc")
+        cxx = shutil.which("c++")
+        if not compiler or not cxx:
+            self.fail("cc and c++ are required for the native clock/input composition control")
+        SCRATCH_PARENT.mkdir(parents=True, exist_ok=True)
+        directory = Path(tempfile.mkdtemp(prefix="clock-composition-", dir=SCRATCH_PARENT))
+        harness = directory / "net_lockstep_clock_composition.c"
+        native_object = directory / "net_lockstep_clock_composition.o"
+        clock_object = directory / "clock_composition.o"
+        binary = directory / "net_lockstep_clock_composition"
+        harness.write_text(_harness(include_clock_composition=True), encoding="utf-8")
+        result = subprocess.run([compiler, "-std=c11", "-Wall", "-Wextra", "-Werror",
+                                 "-c", str(harness), "-o", str(native_object)],
+                               capture_output=True, text=True, timeout=30, check=False)
+        if result.returncode:
+            self.fail(f"native composition harness compile failed; retained {directory}: {result.stderr}")
+        result = subprocess.run([cxx, "-std=c++20", "-Wall", "-Wextra", "-Werror",
+                                 "-Isrc", "-c", "tests/net_input_clock_composition.cpp",
+                                 "-o", str(clock_object)], capture_output=True, text=True,
+                                timeout=30, check=False)
+        if result.returncode:
+            self.fail(f"clock composition adapter compile failed; retained {directory}: {result.stderr}")
+        result = subprocess.run([cxx, str(native_object), str(clock_object), "-o", str(binary)],
+                               capture_output=True, text=True, timeout=30, check=False)
+        if result.returncode:
+            self.fail(f"clock composition link failed; retained {directory}: {result.stderr}")
+        result = subprocess.run([str(binary)], capture_output=True, text=True,
+                                timeout=10, check=False)
+        if result.returncode:
+            self.fail(f"clock/native composition control failed ({result.returncode}); retained {directory}: {result.stderr}")
         shutil.rmtree(directory)
 
 
