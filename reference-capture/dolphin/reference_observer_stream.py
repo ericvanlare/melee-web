@@ -9,6 +9,7 @@ never hides an overflow or write failure.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import struct
@@ -134,6 +135,23 @@ SLICE_NAMES = {
 
 class ObserverStreamError(ValueError):
     """The stream cannot be admitted as a complete raw observer input."""
+
+
+class ObserverStreamStats:
+    """Raw-byte accounting for one bounded observer-stream iteration."""
+
+    def __init__(self) -> None:
+        self.bytes_read = 0
+        self.records_read = 0
+        self._digest = hashlib.sha256()
+
+    def record_bytes(self, raw: bytes) -> None:
+        self.bytes_read += len(raw)
+        self._digest.update(raw)
+
+    @property
+    def prefix_sha256(self) -> str:
+        return self._digest.hexdigest()
 
 
 def _json_payload(raw: bytes, context: str) -> dict[str, Any]:
@@ -275,9 +293,24 @@ def _decode_record(header: tuple[int, ...], payload: bytes, context: str,
 
 
 def iter_records(path: str | Path, *,
-                 slice_names: Mapping[int, str] | None = None
+                 slice_names: Mapping[int, str] | None = None,
+                 max_bytes: int | None = None,
+                 max_records: int | None = None,
+                 stats: ObserverStreamStats | None = None,
                  ) -> Iterator[dict[str, Any]]:
-    """Yield every record under the current or an explicitly selected slice schema."""
+    """Yield records, optionally enforcing aggregate byte and record caps.
+
+    Caps are checked before reading a record header and again before reading
+    its payload.  ``stats`` accounts for exactly the bytes read, including a
+    partial malformed record, and counts only fully decoded records.
+    """
+
+    for name, limit in (("max_bytes", max_bytes), ("max_records", max_records)):
+        if limit is not None and (type(limit) is not int or limit < 0):
+            raise ObserverStreamError(f"{name} must be a nonnegative integer")
+    if stats is not None and (not isinstance(stats, ObserverStreamStats) or
+                              stats.bytes_read != 0 or stats.records_read != 0):
+        raise ObserverStreamError("stats must be a fresh ObserverStreamStats instance")
 
     stream_path = Path(path)
     names = SLICE_NAMES if slice_names is None else slice_names
@@ -290,8 +323,18 @@ def iter_records(path: str | Path, *,
     whole_session_count = None
     with stream:
         index = 0
+        bytes_read = 0
         while True:
+            if max_records is not None and index >= max_records:
+                raise ObserverStreamError(
+                    f"record limit {max_records} reached before the next record")
+            if max_bytes is not None and bytes_read + HEADER.size > max_bytes:
+                raise ObserverStreamError(
+                    f"byte limit {max_bytes} reached before the next record header")
             raw_header = stream.read(HEADER.size)
+            bytes_read += len(raw_header)
+            if stats is not None:
+                stats.record_bytes(raw_header)
             if not raw_header:
                 break
             context = f"record {index}"
@@ -301,7 +344,13 @@ def iter_records(path: str | Path, *,
             payload_size = header[8]
             if payload_size > MAX_PAYLOAD:
                 raise ObserverStreamError(f"{context}: payload exceeds bound")
+            if max_bytes is not None and bytes_read + payload_size > max_bytes:
+                raise ObserverStreamError(
+                    f"byte limit {max_bytes} reached before {context} payload")
             payload = stream.read(payload_size)
+            bytes_read += len(payload)
+            if stats is not None:
+                stats.record_bytes(payload)
             if len(payload) != payload_size:
                 raise ObserverStreamError(f"{context}: truncated payload")
             sequence = header[3]
@@ -327,6 +376,8 @@ def iter_records(path: str | Path, *,
                 if boundary_payload.get("whole_session") and not whole_session_announced:
                     raise ObserverStreamError(
                         f"{context}: whole-session boundary precedes opt-in announcement")
+            if stats is not None:
+                stats.records_read += 1
             yield decoded
             index += 1
 

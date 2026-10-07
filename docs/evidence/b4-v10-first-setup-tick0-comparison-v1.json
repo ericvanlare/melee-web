@@ -1,0 +1,291 @@
+{
+  "schema": "melee-web-b4-v10-first-setup-tick0-comparison-v1",
+  "date": "2026-10-06",
+  "scope": "One explicit bounded v10 comparison from original CSS through match-0 setup and completed source tick 0. This is not a whole-session comparison.",
+  "private_run_id": "b4-first-setup-tick0-sol-reviewed-20261006-235017-ba8f24dd",
+  "expectations": {
+    "schema": "melee-web-v10-first-setup-tick0-expectations",
+    "version": 1,
+    "sha256": "3534f48a191d15bbbd14081a2a68d7f99428b1380362d55e896a711679cbe1c4",
+    "bytes": 3648
+  },
+  "comparison_producer": {
+    "branch": "codex/b4-first-match-comparison-20261007",
+    "commit": "587eb69f87ea8daf9e83204923a596b404cbdb12",
+    "tree": "b956196a652db5dfdcd3233ba6c62e61dcde832d",
+    "parent": "d71bdb91044da0fe686434f8f9446393bb22f5fd",
+    "clean": true,
+    "files": {
+      "scripts/compare_whole_session_state.py": "79381862b75a294b3d336fcab2c1cbbde3f5d6978d25f9e04859841ecd573f29",
+      "tools/whole_session_state_compare.py": "129c7f43c5214dfe294b958f7cddd7c859c9a394e06fdbf70ac484fcd84a5937",
+      "reference-capture/dolphin/reference_observer_stream.py": "51df479caf303791c981c020161557671dbc901d02e192964af10be7baff063f"
+    }
+  },
+  "source": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "revision": "GALE01r2",
+    "observer": {
+      "schema": "melee-web-passive-dolphin-observer",
+      "version": 1,
+      "writes_guest_memory": false,
+      "whole_session": true,
+      "match_count": 3,
+      "fighter_entity_profile": "v10-live-static-player-pair"
+    },
+    "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "cpu": "JITARM64",
+    "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "input_mode": "ordinary-controller-pipe-record",
+    "lineup_profile": "v10-fighter-coverage",
+    "source_artifacts": {
+      "candidate_manifest": {
+        "bytes": 64352,
+        "sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7"
+      },
+      "capture_report": {
+        "bytes": 406213,
+        "sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913"
+      },
+      "first_setup_identity_audit": {
+        "bytes": 15485,
+        "sha256": "742a9a6b7317651c654620c1f69c87cff4177a8c9e7eea8c34d596e817af43e8"
+      }
+    },
+    "recipe": {
+      "version": 10,
+      "bytes": 2241622,
+      "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+      "frame_count": 50394,
+      "seed": 3336171383
+    },
+    "full_mwro": {
+      "bytes": 2137257881,
+      "recorded_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "sha256_recomputed": false,
+      "stat_before": {
+        "device": 16777242,
+        "inode": 6599739,
+        "mtime_ns": 1791051579441504716,
+        "bytes": 2137257881
+      },
+      "stat_after": {
+        "device": 16777242,
+        "inode": 6599739,
+        "mtime_ns": 1791051579441504716,
+        "bytes": 2137257881
+      },
+      "stat_stable_during_attempt": true
+    },
+    "consumed_prefix": {
+      "bytes": 5364736,
+      "records": 4116,
+      "first_entry_sequence": 4088,
+      "first_setup_sequence": 4113,
+      "first_setup_source_tick": 247,
+      "first_match_source_tick": 0,
+      "first_match_source_tick_sequence": 4115,
+      "last_source_sequence": 4115,
+      "sha256": "4ace98afe66c1bb2229c0289b9d76bc321049f1434c68a65fd7ee5b0840db21a",
+      "hash_basis": "fresh SHA-256 over exactly the raw bytes consumed through the joined match-0 source tick 0"
+    }
+  },
+  "browser": {
+    "capture_id": null,
+    "identity_basis": "No separate browser capture ID is emitted; the frozen capture-wrapper report, producer manifest, retail report, trace and expectation packet bind this run.",
+    "producer": {
+      "branch": "codex/b4-v10-primary-identity-20261006",
+      "head": "be3704767f1ff0ec82daec1681b3337495d25724",
+      "tree": "7e9402f70e1a1f14ad2fb65c72c6bc6e6b7cc68c",
+      "base_main": "558d6e89e42a2b26e3cee83457efaea19a4d22e6",
+      "clean_at_capture": true
+    },
+    "build": {
+      "configuration": "Release",
+      "target": "runtime",
+      "artifact_count": 32,
+      "diagnostic_gates_default_off": true
+    },
+    "disc": {
+      "bytes": 1449165376,
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "runtime_data_recorded_identity": {
+      "bytes": 3674112,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+      "freshly_rehashed": false
+    },
+    "capture": {
+      "mode": "state",
+      "result": "incomplete",
+      "browser_capture_report": {
+        "bytes": 1480442,
+        "sha256": "e33cbb1984b5d04e91aea26662d94ed52c285262982e7614e440b07cd3117291"
+      },
+      "producer_manifest": {
+        "bytes": 9859,
+        "sha256": "1817598aa90629ed4c1818276ece0d7a019322cdd24232a4fba935dfec7254b8"
+      },
+      "retail_report": {
+        "bytes": 18460,
+        "sha256": "cfb83d0d56332f0088ebded4f35576d0cc1915dc43c139d1a7cae061e3f59b45"
+      },
+      "port_trace": {
+        "bytes": 2270697,
+        "sha256": "94f9f15dccccd30b1860299a4b7e9de630fe46922b3b8acebabfd2fea6008814"
+      },
+      "requested_cursor": 1200,
+      "observed_cursor": 1200,
+      "browser_errors_before_stop": 0
+    }
+  },
+  "comparison": {
+    "scope": "v10-first-setup-tick0",
+    "boundary_result": "equivalent",
+    "result": "incomplete",
+    "complete": false,
+    "whole_session_equivalent": false,
+    "cli_exit_code": 1,
+    "timeline_frames_consumed": 1185,
+    "nonmatch_frames_input_ordered": 1184,
+    "nonmatch_fields_compared": [],
+    "setup_records_compared": 1,
+    "match_state_frames_compared": 1,
+    "first_match": {
+      "match_index": 0,
+      "timeline_frame_index": 1184,
+      "setup_source_sequence": 4113,
+      "source_tick": 0,
+      "source_tick_sequence": 4115
+    },
+    "setup_state_fields_compared": [
+      "rng",
+      "match_frame",
+      "pad_state_hex",
+      "fighters",
+      "fighter_entities",
+      "declared_setup"
+    ],
+    "match_state_fields_compared": [
+      "rng",
+      "match_frame",
+      "pad_state_hex",
+      "fighters",
+      "fighter_entities"
+    ],
+    "source_scene_spans_observed": [
+      {"scene": 1, "first_frame": 0, "last_frame": 936},
+      {"scene": 2, "first_frame": 937, "last_frame": 1183},
+      {"scene": 3, "first_frame": 1184, "last_frame": 1184}
+    ],
+    "checks": {
+      "source_provenance": "pass",
+      "browser_capture_provenance": "pass",
+      "source_first_css_and_setup_binding": "pass",
+      "source_pad_to_tick0_join": "pass",
+      "setup_state": "pass",
+      "tick0_state": "pass",
+      "whole_session": "incomplete"
+    },
+    "limits": {
+      "source_max_bytes": 33554432,
+      "source_max_records": 4200,
+      "stop": "first completed match-0 source tick-0 join",
+      "later_match_state_read": false,
+      "whole_session_acceptance": false,
+      "timing_pixels_pcm_performance_claim": false
+    }
+  },
+  "provenance_only_preflight": {
+    "result": "pass",
+    "scope": "frozen browser sidecars and recipe only; source MWRO was not opened or stat-ed",
+    "report_sha256": "0b95ddb5a1dac192999b33deb1642dfe1848d20d852a1f98a057e3e9528be9f0"
+  },
+  "preparation_failures": [
+    {
+      "attempt": "comparison-run-v1",
+      "result": "invalid",
+      "exit_code": 2,
+      "error": "browser capture snapshot has an invalid source cursor",
+      "prefix_bytes_consumed": 0,
+      "report_sha256": "477e062a2782e49974974af8a517455d41ff173f726e30015c830fd0110d9915",
+      "invocation_sha256": "b93106111d07094701e88a8fa768d59fb5bb7a83212a3aef886ab9543376ede0",
+      "exit_record_sha256": "a77b0e5df2648c3d9a7352014d7eebdd9a30fc1beee0fd4c2aad8bd461f06fde",
+      "reason": "The first cursor poll was a structurally valid pre-replay snapshot with a null source cursor; status/reason text was not used for acceptance."
+    },
+    {
+      "attempt": "comparison-run-v2",
+      "result": "invalid",
+      "exit_code": 2,
+      "error": "v10 first-setup/tick-0 scope requires frozen expectations and all provenance sidecars",
+      "prefix_bytes_consumed": 0,
+      "report_sha256": "551d3b9e3b9007497b894a89b4dafd15a371960100ad4b2c73150e2c9781631a",
+      "invocation_sha256": "1b0d5b5abcaa222dc69ebc7957d7431cc527c4783808c8d256bdd839afae795c",
+      "exit_record_sha256": "ddc35cfee67bf10d942c4d32153b4fb129cac59770ac2d6d2f27e53ab8df29ff",
+      "reason": "The exact CLI invocation omitted the separate --browser-report sidecar option."
+    }
+  ],
+  "successful_run": {
+    "report_bytes": 9589,
+    "report_sha256": "39bf0edcb7de5fe2d01d449a7445dae7a5b3d6e032854dc7c9a4c76bcfaa1de2",
+    "invocation_sha256": "540817aa047a0be3600fb7b32c8b17cf85b0fefa99bffedf326beb892561798f",
+    "exit_record_sha256": "ef746d83808fae27d56618343439dbbceddaec5d868cc6b288282adf8054c713",
+    "exit_code": 1,
+    "stderr_empty_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "integration_validation": {
+    "branch": "codex/b4-first-match-comparison-20261007",
+    "head": "a98a0034f17f2ea573aaa85a1d49e822e8a9bdcc",
+    "tree": "67a28db11737007bfb028c93714dfb9e6477c250",
+    "tracked_worktree_clean": true,
+    "focused_checks": {
+      "result": "pass",
+      "test_count": 47,
+      "skipped": 0,
+      "command": "python3 -m unittest tests.test_whole_session_state_compare tests.test_compare_whole_session_state_cli tests.test_reference_observer_stream -v",
+      "tests": {
+        "tests/test_whole_session_state_compare.py": "1e6fe33f3c8b244ae4036e3263a4ec8ecb7df6f51de36033a2a6c08c48106745",
+        "tests/test_compare_whole_session_state_cli.py": "fa2b0c516ae04e454050c40582a22551164eade52e45ab9b7e79b4e088fd23de",
+        "tests/test_reference_observer_stream.py": "834f2785bcf0fa82635c4a6f21cb129e3c3e94d3399f30f7cbf2ae6010b4ce62"
+      }
+    },
+    "full_python_suite": {
+      "result": "pass",
+      "command": "python3 -m unittest discover -s tests -v",
+      "workspace_wrapper": "python3 scripts/agent_workspace.py run",
+      "exit_code": 0,
+      "test_count": 1959,
+      "skipped": 142,
+      "failures": 0,
+      "errors": 0,
+      "duration_seconds": 352.830,
+      "raw_log": {
+        "private_run_id": "b4-v10-first-setup-tick0-final-validation-20261007-000320-b90e3fe4",
+        "name": "full-suite.log",
+        "bytes": 357547,
+        "sha256": "2e151f2053643d26ada1e86d1e404c427cfe54e5d52415981820167c18a16164"
+      },
+      "footer_lines": {"ran": 2225, "ok": 2227},
+      "runner_parser_correction": {
+        "original_metadata_name": "full-suite-result.json",
+        "original_metadata_sha256": "c53b92d0bb99311512e03bac8cf59a671e7134be99eef5b5cbec54cc428e6674",
+        "corrected_summary_name": "full-suite-summary-corrected.json",
+        "corrected_summary_sha256": "8f9cc3feb1a8b1499a0da5d7a77bac6c2f831f0762586b20d012071c50f9d107",
+        "note": "The original parser selected a nested one-test unittest summary. The final suite footer was read from the retained log; no tests were rerun."
+      }
+    },
+    "final_code_sha256": {
+      "scripts/compare_whole_session_state.py": "79381862b75a294b3d336fcab2c1cbbde3f5d6978d25f9e04859841ecd573f29",
+      "tools/whole_session_state_compare.py": "980b54739b137031e3e9f65596786ae3ba4d560224bfa5935db16bb726caeac6",
+      "reference-capture/dolphin/reference_observer_stream.py": "51df479caf303791c981c020161557671dbc901d02e192964af10be7baff063f"
+    },
+    "comparison_result_producer_commit": "587eb69f87ea8daf9e83204923a596b404cbdb12"
+  },
+  "limitations": [
+    "This evidence covers one source/browser pair and one bounded first-setup/tick-0 boundary.",
+    "CSS/SSS scalar state was not compared; only consumed input ordering was checked.",
+    "Only the first match setup and first match source tick 0 state were compared; no later match frame was read by the comparator.",
+    "The result does not establish active-gameplay accuracy, whole-session equivalence, pixels, PCM, timing, performance, or competitive readiness."
+  ]
+}

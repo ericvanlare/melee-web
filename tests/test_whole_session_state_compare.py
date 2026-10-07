@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import json
 from pathlib import Path
 import struct
@@ -6,16 +7,30 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "tools"), str(ROOT / "reference-capture" / "dolphin"), str(ROOT / "tests")]
 
 from reference_capture_semantics import pad_snapshot_bytes  # noqa: E402
 from test_whole_session_replay import _pad_consume, _raw_pad_snapshot, _whole_setup  # noqa: E402
-from whole_session_replay import SCENES, _consumed_ports  # noqa: E402
+from whole_session_replay import (  # noqa: E402
+    EXPECTED_DOLPHIN_COMMIT, EXPECTED_DOL_SHA1, EXPECTED_DOL_SHA256,
+    EXPECTED_OBSERVER_SCHEMA, SCENES, _consumed_ports,
+)
 from whole_session_state_compare import (  # noqa: E402
     BrowserReader, Comparator, SourceCollector, _browser_completion_ok, _is_match_field,
-    _fighter_entities, _snapshot_values, _state_from_payload, _validate_browser_report,
+    _browser_report, _fighter_entities, _snapshot_values, _state_from_payload,
+    _validate_browser_report,
+    ComparisonError, CONTEXT_HEADER, CONTEXT_BYTES, MWRC_HEADER, PAD_STATE_BYTES,
+    MWRC_V10_VERSION, PRIMARY_STATIC_ENTITY_PROFILE, Recipe, SPAN, V10_DEFAULT_OFF_GATES,
+    V10_FIGHTER_ROSTER, V10_FIRST_SETUP_TICK0_SCOPE, V10_PREFIX_BYTE_CAP,
+    V10_PREFIX_RECORD_CAP, V10_RULES_BYTES, WHOLE_SESSION_SCOPE,
+    _file_stat_identity, _first_match_required_cursor, _first_match_tick_join_complete,
+    _load_expectations, _require_stable_mwro_stat,
+    _first_difference, _source_prefix_identity, _validate_browser_producer_source,
+    _validate_source_capture_report, _validate_source_manifest_capture,
+    _validate_v10_browser_provenance, _browser_entities, compare_paths,
 )
 
 
@@ -190,6 +205,8 @@ def _run_source(browser_path, source_rows, pads, *, finish=True, version=8):
     recipe = type("RecipeFixture", (), {
         "frame_count": 1,
         "version": version,
+        "scope": WHOLE_SESSION_SCOPE,
+        "entity_profile": (PRIMARY_STATIC_ENTITY_PROFILE if version == 9 else None),
         "frames": [{"index": 0, "scene": SCENES["match"], "pads": pads}],
         "spans": [{"scene": SCENES["match"], "first_frame": 0, "last_frame": 0}],
         "setup": bytes.fromhex(_whole_setup()["start_melee_hex"]),
@@ -214,7 +231,627 @@ def _run_source(browser_path, source_rows, pads, *, finish=True, version=8):
         browser.close()
 
 
+def _v10_setup_bytes():
+    setups = []
+    for roster in V10_FIGHTER_ROSTER:
+        raw = bytearray(0x138)
+        raw[:len(V10_RULES_BYTES)] = V10_RULES_BYTES
+        for slot, character in enumerate(roster):
+            base = 0x60 + slot * 0x24
+            raw[base] = character
+            raw[base + 1] = 1
+            raw[base + 2] = 4
+            raw[base + 3] = slot
+            raw[base + 4] = 0
+            raw[base + 14] = 4
+            raw[base + 15] = 9
+        for slot in range(4, 6):
+            raw[0x60 + slot * 0x24 + 1] = 3
+        setups.append(bytes(raw))
+    return setups
+
+
+def _v10_recipe_bytes(*, corrupt_later_roster=False, trailing=b""):
+    frame_count = 12
+    seed = 0x12345678
+    setups = _v10_setup_bytes()
+    if corrupt_later_roster:
+        changed = bytearray(setups[1])
+        changed[0x60] ^= 1
+        setups[1] = bytes(changed)
+    header = MWRC_HEADER.pack(b"MWRC", MWRC_V10_VERSION, seed, frame_count, 0, 0)
+    context = CONTEXT_HEADER.pack(2, 0, CONTEXT_BYTES) + bytes(CONTEXT_BYTES)
+    setup_table = struct.pack(">HH", 3, 0) + b"".join(setups)
+    route = [SCENES[name] for name in ("css", "sss", "match", "results") * 3]
+    spans = struct.pack(">H", len(route)) + b"".join(
+        SPAN.pack(scene, 0, 0, index, index) for index, scene in enumerate(route))
+    return (header + context + setup_table + bytes(PAD_STATE_BYTES) +
+            bytes(frame_count * 44) + spans + trailing)
+
+
+def _expectation_packet(directory: Path, *, capture_id: str, sequence_id: str,
+                        producer_head: str):
+    directory.mkdir(parents=True, exist_ok=True)
+    selected = {}
+    identities = {}
+    for name in ("reference", "source_manifest", "source_report", "source_audit",
+                 "recipe", "browser_capture_report", "browser_producer_manifest",
+                 "browser_report", "port_trace"):
+        path = directory / f"{name}.bin"
+        path.write_bytes(name.encode("ascii"))
+        selected[name] = path
+        identities[name] = {"path": str(path), "bytes": path.stat().st_size,
+                            "sha256": "a" * 64}
+    identities["reference"]["recorded_full_sha256"] = "b" * 64
+    identities["recipe"].update({"version": 10, "frame_count": 12, "seed": 7})
+    packet = {
+        "schema": "melee-web-v10-first-setup-tick0-expectations",
+        "version": 1,
+        "scope": V10_FIRST_SETUP_TICK0_SCOPE,
+        "source": {
+            "trace": identities["reference"],
+            "manifest": identities["source_manifest"],
+            "report": identities["source_report"],
+            "audit": identities["source_audit"],
+            "capture_id": capture_id,
+            "sequence_id": sequence_id,
+        },
+        "recipe": identities["recipe"],
+        "browser": {
+            "capture_report": identities["browser_capture_report"],
+            "producer_manifest": identities["browser_producer_manifest"],
+            "report": identities["browser_report"],
+            "trace": identities["port_trace"],
+            "disc": {"path": str(directory / "disc.ciso"), "bytes": 5,
+                     "sha256": "e" * 64},
+            "runtime_data": {"path": str(directory / "runtime.data"), "bytes": 7,
+                             "sha256": "f" * 64, "freshly_rehashed": False},
+            "producer": {"branch": "codex/test", "head": producer_head,
+                         "tree": "c" * 40, "base_main": "d" * 40},
+        },
+    }
+    packet_path = directory / "expectations.json"
+    packet_path.write_text(json.dumps(packet), encoding="utf-8")
+    return packet_path, selected, packet
+
+
 class WholeSessionStateCompareTests(unittest.TestCase):
+    def test_bounded_source_trace_stat_identity_must_remain_stable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "trace.mwro"
+            path.write_bytes(b"same-size")
+            before = _file_stat_identity(path)
+            replacement = Path(directory) / "replacement.mwro"
+            replacement.write_bytes(b"same-size")
+            replacement.replace(path)
+            after = _file_stat_identity(path)
+            self.assertNotEqual(before, after)
+            with self.assertRaisesRegex(ComparisonError, "stat identity changed"):
+                _require_stable_mwro_stat(before, after)
+
+    def test_v10_recipe_is_opt_in_and_validates_all_later_profiles_and_spans(self):
+        raw = _v10_recipe_bytes()
+        recipe = Recipe(Path("v10.mwrc"), raw, scope=V10_FIRST_SETUP_TICK0_SCOPE)
+        self.assertEqual(recipe.version, 10)
+        self.assertEqual(recipe.entity_profile, PRIMARY_STATIC_ENTITY_PROFILE)
+        self.assertEqual(len(recipe.declared_match_setups), 3)
+        self.assertEqual(tuple(tuple(player["character_kind"]
+                                     for player in setup["players"])
+                               for setup in recipe.declared_match_setups), V10_FIGHTER_ROSTER)
+        self.assertEqual(_first_match_required_cursor(recipe), 3)
+        with self.assertRaisesRegex(ComparisonError, "v8 or v9"):
+            Recipe(Path("v10.mwrc"), raw)
+        with self.assertRaisesRegex(ComparisonError, "whole-session comparison version"):
+            from whole_session_state_compare import comparison_fields
+            comparison_fields(10)
+        with self.assertRaisesRegex(ComparisonError, "setup 1"):
+            Recipe(Path("bad-roster.mwrc"), _v10_recipe_bytes(corrupt_later_roster=True),
+                   scope=V10_FIRST_SETUP_TICK0_SCOPE)
+        with self.assertRaisesRegex(ComparisonError, "trailing bytes"):
+            Recipe(Path("trailing.mwrc"), _v10_recipe_bytes(trailing=b"\0"),
+                   scope=V10_FIRST_SETUP_TICK0_SCOPE)
+        missing_packet = compare_paths(
+            "source.mwro", "recipe.mwrc", "browser.jsonl",
+            scope=V10_FIRST_SETUP_TICK0_SCOPE,
+            source_manifest="manifest.json", source_report="source-report.json",
+            source_audit="audit.json", browser_capture_report="capture.json",
+            browser_producer_manifest="producer.json", browser_report="browser-report.json")
+        self.assertEqual(missing_packet["result"], "invalid")
+        self.assertFalse(missing_packet["complete"])
+        self.assertFalse(missing_packet["whole_session_equivalent"])
+
+    def test_external_expectations_accept_an_independent_capture_and_sequence_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first_path, first_selected, first = _expectation_packet(
+                root / "first", capture_id="capture-alt-a", sequence_id="sequence-alt-a",
+                producer_head="1" * 40)
+            second_path, second_selected, second = _expectation_packet(
+                root / "second", capture_id="capture-alt-b", sequence_id="sequence-alt-b",
+                producer_head="2" * 40)
+            loaded_first, _ = _load_expectations(first_path, first_selected)
+            loaded_second, _ = _load_expectations(second_path, second_selected)
+            self.assertEqual(loaded_first["source"]["capture_id"], "capture-alt-a")
+            self.assertEqual(loaded_first["source"]["sequence_id"], "sequence-alt-a")
+            self.assertEqual(loaded_second["source"]["capture_id"], "capture-alt-b")
+            self.assertEqual(loaded_second["source"]["sequence_id"], "sequence-alt-b")
+            self.assertNotEqual(first["browser"]["producer"]["head"],
+                                second["browser"]["producer"]["head"])
+
+    def test_external_expectations_require_recorded_disc_and_runtime_identities(self):
+        with tempfile.TemporaryDirectory() as directory:
+            packet_path, selected, packet = _expectation_packet(
+                Path(directory), capture_id="capture-alt", sequence_id="sequence-alt",
+                producer_head="1" * 40)
+            packet["browser"].pop("disc")
+            packet_path.write_text(json.dumps(packet), encoding="utf-8")
+            with self.assertRaisesRegex(ComparisonError, "disc identity"):
+                _load_expectations(packet_path, selected)
+            packet["browser"]["disc"] = {
+                "path": str(Path(directory) / "disc.ciso"), "bytes": 5,
+                "sha256": "e" * 64,
+            }
+            packet["browser"].pop("runtime_data")
+            packet_path.write_text(json.dumps(packet), encoding="utf-8")
+            with self.assertRaisesRegex(ComparisonError, "runtime_data identity"):
+                _load_expectations(packet_path, selected)
+
+    def test_failure_result_retains_frozen_inputs_provenance_and_last_source_sequence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            packet_path, selected, packet = _expectation_packet(
+                root, capture_id="capture-alt", sequence_id="sequence-alt",
+                producer_head="1" * 40)
+            recipe_raw = _v10_recipe_bytes()
+            selected["recipe"].write_bytes(recipe_raw)
+            packet["recipe"].update({
+                "bytes": len(recipe_raw),
+                "sha256": hashlib.sha256(recipe_raw).hexdigest(),
+                "version": 10,
+                "frame_count": 12,
+                "seed": 0x12345678,
+            })
+            packet_path.write_text(json.dumps(packet), encoding="utf-8")
+            packet_sha = hashlib.sha256(packet_path.read_bytes()).hexdigest()
+
+            class FakeBrowser:
+                header = {"frames_requested": 12}
+
+                def close(self):
+                    pass
+
+            def failed_source(path, *, max_bytes, max_records, stats):
+                raw = b"bad-row"
+                stats.record_bytes(raw)
+                stats.records_read = 1
+                yield {"seq": 0, "event": "unexpected", "payload": {}}
+
+            source_identity = {
+                "trace_bytes": selected["reference"].stat().st_size,
+                "recorded_full_trace_sha256": "b" * 64,
+                "full_trace_rehashed": False,
+                "audit_records_decoded": 1,
+                "audit_bytes_read": 7,
+                "manifest_sha256": "a" * 64,
+                "source_report_sha256": "a" * 64,
+                "audit_sha256": "a" * 64,
+            }
+            browser_identity = {
+                "required_cursor": 3,
+                "capture_report_sha256": "c" * 64,
+                "producer_manifest_sha256": "c" * 64,
+                "browser_report_sha256": "c" * 64,
+                "port_trace_sha256": "c" * 64,
+            }
+            with (mock.patch("whole_session_state_compare._validate_v10_source_provenance",
+                             return_value=({}, {}, {}, source_identity)),
+                  mock.patch("whole_session_state_compare._validate_v10_browser_provenance",
+                             return_value=({}, {}, {}, browser_identity)),
+                  mock.patch("whole_session_state_compare.BrowserReader", return_value=FakeBrowser()),
+                  mock.patch("whole_session_state_compare.iter_records", side_effect=failed_source)):
+                result = compare_paths(
+                    selected["reference"], selected["recipe"], selected["port_trace"],
+                    scope=V10_FIRST_SETUP_TICK0_SCOPE,
+                    expectations=packet_path,
+                    source_manifest=selected["source_manifest"],
+                    source_report=selected["source_report"],
+                    source_audit=selected["source_audit"],
+                    browser_capture_report=selected["browser_capture_report"],
+                    browser_producer_manifest=selected["browser_producer_manifest"],
+                    browser_report=selected["browser_report"],
+                )
+            self.assertEqual(result["result"], "invalid")
+            self.assertEqual(result["expectations"]["sha256"], packet_sha)
+            self.assertEqual(result["selected_input_identities"]["source"]["capture_id"],
+                             "capture-alt")
+            self.assertEqual(result["checks"]["source_provenance"], "pass")
+            self.assertEqual(result["checks"]["browser_capture_provenance"], "pass")
+            self.assertEqual(result["last_source_sequence"], 0)
+            self.assertEqual(result["source_prefix"]["records_read"], 1)
+            self.assertFalse(result["source_full_trace"]["full_trace_rehashed"])
+            self.assertTrue(result["source_full_trace"]["stat_stable_during_attempt"])
+            self.assertIn("stat_before", result["source_full_trace"])
+            self.assertIn("stat_after", result["source_full_trace"])
+
+    def test_source_report_and_manifest_reject_mutually_matching_wrong_identity(self):
+        expected_source = {
+            "capture_id": "capture-alt",
+            "sequence_id": "sequence-alt",
+            "trace": {"recorded_full_sha256": "a" * 64},
+        }
+        capture = {
+            "capture_id": "capture-alt", "sequence_id": "sequence-alt",
+            "match_count": 3, "source_revision": "GALE01r2",
+            "observer_schema": EXPECTED_OBSERVER_SCHEMA, "observer_version": 1,
+            "dolphin_commit": EXPECTED_DOLPHIN_COMMIT,
+            "dol_sha1": EXPECTED_DOL_SHA1, "dol_sha256": EXPECTED_DOL_SHA256,
+            "cpu": "JITARM64",
+        }
+        _validate_source_manifest_capture(capture, expected_source)
+        handshake = {
+            "schema": EXPECTED_OBSERVER_SCHEMA, "version": 1,
+            "capture_id": "capture-alt", "sequence_id": "sequence-alt",
+            "match_count": 3, "whole_session": True,
+            "dolphin_commit": EXPECTED_DOLPHIN_COMMIT,
+            "dol_sha1": EXPECTED_DOL_SHA1, "dol_sha256": EXPECTED_DOL_SHA256,
+            "cpu": "JITARM64", "fighter_entity_profile": "v10-live-static-player-pair",
+            "writes_guest_memory": False,
+        }
+        report = {
+            "schema": "melee-web-recorded-session-12-character-capture-v1",
+            "result": "three_match_source_capture_complete",
+            "input_mode": "ordinary-controller-pipe-record",
+            "lineup_profile": "v10-fighter-coverage", "readiness_only": False,
+            "capture_id": "capture-alt", "raw_observer_sha256": "a" * 64,
+            "observer_handshake": handshake,
+            "observer_identity": {"capture_id": "capture-alt", "sequence_id": "sequence-alt"},
+        }
+        identity = _validate_source_capture_report(report, expected_source, capture)
+        self.assertEqual(identity["capture_id"], "capture-alt")
+
+        wrong_capture = dict(capture, dolphin_commit="0" * 40)
+        with self.assertRaisesRegex(ComparisonError, "dolphin_commit"):
+            _validate_source_manifest_capture(wrong_capture, expected_source)
+        wrong_handshake = dict(handshake, dolphin_commit="0" * 40)
+        wrong_report = dict(report, observer_handshake=wrong_handshake)
+        with self.assertRaisesRegex(ComparisonError, "dolphin_commit"):
+            _validate_source_capture_report(wrong_report, expected_source, wrong_capture)
+        for field, value in (("fighter_entity_profile", "different-profile"),
+                             ("writes_guest_memory", True)):
+            wrong_report = dict(report, observer_handshake=dict(handshake, **{field: value}))
+            with self.subTest(field=field), self.assertRaises(ComparisonError):
+                _validate_source_capture_report(wrong_report, expected_source, capture)
+        for field, value in (("input_mode", "replay"),
+                             ("lineup_profile", "arbitrary-roster"),
+                             ("readiness_only", True)):
+            wrong_report = dict(report, **{field: value})
+            with self.subTest(field=field), self.assertRaises(ComparisonError):
+                _validate_source_capture_report(wrong_report, expected_source, capture)
+
+    def test_browser_producer_identity_must_match_the_frozen_packet(self):
+        expected = {"producer": {
+            "branch": "codex/second-capture", "head": "4" * 40,
+            "tree": "5" * 40, "base_main": "6" * 40,
+        }}
+        producer = {
+            "schema": "melee-web-b4-match-entry-producer-source-v1",
+            "source": {**expected["producer"], "clean": True},
+        }
+        self.assertTrue(_validate_browser_producer_source(producer, expected)["clean"])
+        producer["source"]["head"] = "7" * 40
+        with self.assertRaisesRegex(ComparisonError, "head"):
+            _validate_browser_producer_source(producer, expected)
+
+    def test_browser_capture_provenance_rejects_pre_stop_errors_without_rehashing_runtime(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            recipe_path = root / "recipe.mwrc"
+            recipe_raw = _v10_recipe_bytes()
+            recipe_path.write_bytes(recipe_raw)
+            recipe = Recipe(recipe_path, recipe_raw, scope=V10_FIRST_SETUP_TICK0_SCOPE)
+            recipe_sha = hashlib.sha256(recipe_raw).hexdigest()
+
+            trace_path = root / "port.jsonl"
+            trace_path.write_bytes(b"bounded browser trace")
+            trace_sha = hashlib.sha256(trace_path.read_bytes()).hexdigest()
+            report = {
+                "schema": "melee-web-browser-retail-replay", "version": 1,
+                "recipe_sha256": recipe_sha, "frames": recipe.frame_count,
+                "mode": "state_capture", "complete": False, "pass": False,
+                "final_scene": None,
+                "metrics": {"sourceFrames": 4, "sourceSteps": 4, "sourceDraws": 4},
+                "trace_sha256": trace_sha,
+            }
+            browser_report_path = root / "retail-report.json"
+            browser_report_path.write_text(json.dumps(report), encoding="utf-8")
+
+            runtime_path = root / "build" / "gameplay_menu_browser.data"
+            producer = {
+                "schema": "melee-web-b4-match-entry-producer-source-v1",
+                "source": {"branch": "codex/frozen", "head": "1" * 40,
+                           "tree": "2" * 40, "base_main": "3" * 40, "clean": True},
+                "build": {
+                    "configuration": "Release", "target": "runtime",
+                    "artifact_count": 1,
+                    "directory": str(runtime_path.parent),
+                    "artifacts": {"gameplay_menu_browser.data": {
+                        "bytes": 3, "sha256": "c" * 64,
+                    }},
+                    "default_off_gates": dict(V10_DEFAULT_OFF_GATES),
+                },
+            }
+            producer_path = root / "producer.json"
+            producer_path.write_text(json.dumps(producer), encoding="utf-8")
+            producer_sha = hashlib.sha256(producer_path.read_bytes()).hexdigest()
+
+            capture_path = root / "capture.json"
+            wrapper = {
+                "schema": "melee-web-headless-whole-session-replay-v1",
+                "mode": "state", "result": "incomplete",
+                "inputs": {
+                    "recipe": {"path": str(recipe_path), "bytes": recipe_path.stat().st_size,
+                               "sha256": recipe_sha},
+                    "manifest": {"path": str(producer_path),
+                                 "bytes": producer_path.stat().st_size,
+                                 "sha256": producer_sha},
+                    "disc": {"path": str(root / "rev2.ciso"),
+                             "bytes": 1_449_165_376,
+                             "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"},
+                    "runtime_data": {"path": str(runtime_path), "bytes": 3,
+                                     "sha256": "c" * 64},
+                },
+                "deliberate_prefix_stop": {"requested_cursor": 4,
+                                            "observed_cursor": 4},
+                "snapshots": [
+                    {"source_cursor": None, "phase": None, "running": None,
+                     "replay_report": None, "replay_downloads": [],
+                     "runtime_error": None, "at_ms": 1.25,
+                     "status": "startup text can vary", "reason": "unclassified"},
+                    {"source_cursor": 4, "at_ms": 100, "runtime_error": None},
+                    {"source_cursor": 0, "at_ms": 101, "runtime_error": None},
+                ],
+                "browser_errors": [], "first_error": None,
+                "browser_report": report,
+            }
+            capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
+            capture_sha = hashlib.sha256(capture_path.read_bytes()).hexdigest()
+            expected_files = {
+                "capture_report": {"path": str(capture_path), "bytes": capture_path.stat().st_size,
+                                   "sha256": capture_sha},
+                "producer_manifest": {"path": str(producer_path),
+                                      "bytes": producer_path.stat().st_size,
+                                      "sha256": producer_sha},
+                "report": {"path": str(browser_report_path),
+                           "bytes": browser_report_path.stat().st_size,
+                           "sha256": hashlib.sha256(browser_report_path.read_bytes()).hexdigest()},
+                "trace": {"path": str(trace_path), "bytes": trace_path.stat().st_size,
+                          "sha256": trace_sha},
+            }
+            packet = {"browser": {
+                **expected_files,
+                "disc": {"path": str(root / "rev2.ciso"),
+                         "bytes": 1_449_165_376,
+                         "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"},
+                "runtime_data": {"path": str(runtime_path), "bytes": 3,
+                                 "sha256": "c" * 64, "freshly_rehashed": False},
+                "producer": producer["source"],
+            }, "source": {"trace": {}, "manifest": {}, "report": {}, "audit": {}},
+                "recipe": {}}
+            _, _, _, identity = _validate_v10_browser_provenance(
+                capture_path, producer_path, browser_report_path, trace_path,
+                recipe_path, recipe_sha, recipe, packet)
+            self.assertEqual(identity["required_cursor"], 3)
+            self.assertEqual(identity["target_cursor"], 4)
+            self.assertFalse(identity["runtime_data_recorded_identity"]["freshly_rehashed"])
+
+            def assert_bad_snapshots(rows, error):
+                wrapper["snapshots"] = rows
+                capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
+                expected_files["capture_report"]["bytes"] = capture_path.stat().st_size
+                expected_files["capture_report"]["sha256"] = hashlib.sha256(
+                    capture_path.read_bytes()).hexdigest()
+                with self.assertRaisesRegex(ComparisonError, error):
+                    _validate_v10_browser_provenance(
+                        capture_path, producer_path, browser_report_path, trace_path,
+                        recipe_path, recipe_sha, recipe, packet)
+
+            good_rows = wrapper["snapshots"]
+            assert_bad_snapshots([
+                good_rows[0], good_rows[1],
+                {"source_cursor": None, "phase": None, "running": None,
+                 "replay_report": None, "replay_downloads": [], "runtime_error": None,
+                 "at_ms": 102},
+            ], "null cursor after replay observation")
+            assert_bad_snapshots([
+                {**good_rows[0], "runtime_error": "startup failed"}, *good_rows[1:]],
+                "inconsistent unavailable fields")
+            assert_bad_snapshots([
+                {key: value for key, value in good_rows[0].items()
+                 if key != "source_cursor"}, *good_rows[1:]],
+                "lacks its cursor or runtime-error field")
+            assert_bad_snapshots([
+                good_rows[0], {"source_cursor": 2.5, "at_ms": 99,
+                               "runtime_error": None}, *good_rows[2:]],
+                "invalid source cursor")
+            assert_bad_snapshots([
+                {**good_rows[0], "at_ms": float("inf")}, *good_rows[1:]],
+                "finite numeric observation time")
+            wrapper["snapshots"] = good_rows
+            capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
+            expected_files["capture_report"]["bytes"] = capture_path.stat().st_size
+            expected_files["capture_report"]["sha256"] = hashlib.sha256(
+                capture_path.read_bytes()).hexdigest()
+
+            packet["browser"]["disc"]["sha256"] = "d" * 64
+            with self.assertRaisesRegex(ComparisonError, "disc differs from frozen"):
+                _validate_v10_browser_provenance(
+                    capture_path, producer_path, browser_report_path, trace_path,
+                    recipe_path, recipe_sha, recipe, packet)
+            packet["browser"]["disc"]["sha256"] = wrapper["inputs"]["disc"]["sha256"]
+            packet["browser"]["runtime_data"]["sha256"] = "d" * 64
+            with self.assertRaisesRegex(ComparisonError, "runtime data differs from frozen"):
+                _validate_v10_browser_provenance(
+                    capture_path, producer_path, browser_report_path, trace_path,
+                    recipe_path, recipe_sha, recipe, packet)
+            packet["browser"]["runtime_data"]["sha256"] = "c" * 64
+
+            wrapper["browser_errors"] = [{"message": "pre-stop failure"}]
+            capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
+            expected_files["capture_report"]["bytes"] = capture_path.stat().st_size
+            expected_files["capture_report"]["sha256"] = hashlib.sha256(
+                capture_path.read_bytes()).hexdigest()
+            with self.assertRaisesRegex(ComparisonError, "pre-stop browser error"):
+                _validate_v10_browser_provenance(
+                    capture_path, producer_path, browser_report_path, trace_path,
+                    recipe_path, recipe_sha, recipe, packet)
+
+    def test_prefix_join_stops_only_at_completed_match_zero_tick(self):
+        source = SimpleNamespace(
+            match_index=0, pending=None, last_source_tick={0: 0},
+            prefix_binding_validated=True, first_source_tick_seq=19,
+        )
+        comparator = SimpleNamespace(setup_count=1, current_match=0, match_compared=1)
+        tick = {"event": "boundary", "seq": 19, "source_tick": 0,
+                "payload": {"boundary": "source_tick", "match_index": 0}}
+        self.assertTrue(_first_match_tick_join_complete(tick, source, comparator))
+        later_match_clock_zero = copy.deepcopy(tick)
+        later_match_clock_zero["seq"] = 20
+        later_match_clock_zero["payload"]["match_index"] = 1
+        self.assertFalse(_first_match_tick_join_complete(
+            later_match_clock_zero, source, comparator))
+        self.assertFalse(_first_match_tick_join_complete(
+            {"event": "end", "seq": 20, "source_tick": 0, "payload": {}},
+            source, comparator))
+        self.assertFalse(_first_match_tick_join_complete(
+            {**tick, "payload": {**tick["payload"], "boundary": "draw_return"}},
+            source, comparator))
+        source.pending = {"source_tick": 0}
+        self.assertFalse(_first_match_tick_join_complete(tick, source, comparator))
+
+    def test_v10_primary_entity_profile_keeps_strict_secondary_and_backlink_rejection(self):
+        recipe = Recipe(Path("v10.mwrc"), _v10_recipe_bytes(),
+                        scope=V10_FIRST_SETUP_TICK0_SCOPE)
+        self.assertEqual(recipe.entity_profile, PRIMARY_STATIC_ENTITY_PROFILE)
+        from whole_session_state_compare import comparison_fields
+        self.assertIn("fighter_entities", comparison_fields(
+            10, scope=V10_FIRST_SETUP_TICK0_SCOPE))
+        _, _, state_slices, _ = _source_rows()
+        valid_entities = _fighter_entities({"slices": copy.deepcopy(state_slices)},
+                                           "v10 primary", 0, {})
+        changed_generation = copy.deepcopy(valid_entities)
+        changed_generation[0]["generation"] = 1
+        self.assertEqual(_browser_entities(changed_generation, "v10 changed generation", 0),
+                         changed_generation)
+        self.assertEqual(_first_difference(valid_entities, changed_generation)[0],
+                         "[0].generation")
+        secondary = copy.deepcopy(state_slices)
+        next(item for item in secondary if item["name"] == "player_entities").update(
+            {"hex": "8068000000000001"})
+        with self.assertRaisesRegex(ValueError, "secondary entity"):
+            _fighter_entities({"slices": secondary}, "v10 secondary", 0, {})
+        detached = copy.deepcopy(state_slices)
+        head = next(item for item in detached if item["name"] == "fighter_head")
+        head["hex"] = "00000000" + head["hex"][8:]
+        with self.assertRaisesRegex(ValueError, "backlink"):
+            _fighter_entities({"slices": detached}, "v10 detached", 0, {})
+
+    def test_v10_source_collector_rejects_duplicate_setup_pad_and_wrong_tick_envelopes(self):
+        raw_setup = _v10_setup_bytes()[0]
+        recipe = SimpleNamespace(
+            scope=V10_FIRST_SETUP_TICK0_SCOPE, version=10,
+            entity_profile=PRIMARY_STATIC_ENTITY_PROFILE,
+            match_setups=[raw_setup, *_v10_setup_bytes()[1:]], setup=raw_setup,
+            spans=[{"scene": SCENES["match"]}] * 3,
+        )
+        state_slices = _state_slices()
+        setup_slices = [*state_slices, {
+            "name": "match_setup", "address": 0x80600000,
+            "size": len(raw_setup), "hex": raw_setup.hex(),
+        }]
+        setup_row = _boundary("setup", 7, 31, slices=setup_slices)
+        setup_row["payload"]["gprs"] = [0] * 32
+        setup_row["payload"]["gprs"][3] = 0x80600000
+
+        class Callback:
+            setup_count = 0
+            current_match = -1
+            match_compared = 0
+
+            def on_setup(self, match_index, state, source_seq):
+                self.setup_count += 1
+                self.current_match = match_index
+
+            def on_frame(self, frame):
+                self.match_compared += frame["scene"] == SCENES["match"]
+
+        def collector_for_setup():
+            callback = Callback()
+            collector = SourceCollector(
+                callback, recipe,
+                source_audit={
+                    "first_setup": {"seq": 7, "source_tick": 31, "match_index": 0},
+                    "first_source_tick": {"seq": 9, "source_tick": 0, "match_index": 0},
+                    "first_entry_verified_seq": 6,
+                },
+                source_expectations={"capture_id": "capture-dynamic",
+                                     "sequence_id": "sequence-dynamic"},
+            )
+            collector.scene = "match"
+            collector.match_index = 0
+            collector.started = True
+            collector.prefix_binding_validated = True
+            collector.entry_setup_bytes = raw_setup
+            return callback, collector
+
+        callback, collector = collector_for_setup()
+        collector._setup(setup_row)
+        self.assertEqual(callback.setup_count, 1)
+        self.assertEqual(collector.first_setup_seq, 7)
+        with self.assertRaisesRegex(ComparisonError, "extra or reordered setup"):
+            collector._setup({**setup_row, "seq": 8})
+
+        callback, collector = collector_for_setup()
+        collector.scene = "sss"
+        with self.assertRaisesRegex(ComparisonError, "outside VS"):
+            collector._setup(setup_row)
+
+        callback, collector = collector_for_setup()
+        collector.pending = {"scene": SCENES["match"], "pads": [],
+                             "source_seq": 6, "source_tick": 0}
+        with self.assertRaisesRegex(ComparisonError, "setup followed an unjoined PAD"):
+            collector._setup(setup_row)
+
+        callback, collector = collector_for_setup()
+        collector._setup(setup_row)
+        pad = _pad_consume(0, 0x10, 0)
+        pad.update({"seq": 8, "source_tick": 0, "draw_ordinal": 8})
+        collector._consume(pad)
+        with self.assertRaisesRegex(ComparisonError, "multiple PAD consumes"):
+            collector._consume(pad)
+
+        tick_row = _boundary("source_tick", 9, 0, slices=state_slices)
+        collector._tick(tick_row)
+        self.assertEqual(collector.first_source_tick_seq, 9)
+        self.assertIsNone(collector.pending)
+
+        callback, collector = collector_for_setup()
+        collector._setup(setup_row)
+        collector.pending = {"scene": SCENES["match"], "pads": [],
+                             "source_seq": 8, "source_tick": 0}
+        wrong_envelope = _boundary("source_tick", 9, 1, slices=state_slices)
+        with self.assertRaisesRegex(ComparisonError, "bounded identity audit"):
+            collector._tick(wrong_envelope)
+
+        callback, collector = collector_for_setup()
+        collector._setup(setup_row)
+        collector.pending = {"scene": SCENES["match"], "pads": [],
+                             "source_seq": 8, "source_tick": 0}
+        wrong_state = copy.deepcopy(state_slices)
+        next(item for item in wrong_state if item["name"] == "scene_frame")["hex"] = "00000001"
+        wrong_scene_frame = _boundary("source_tick", 9, 0, slices=wrong_state)
+        with self.assertRaisesRegex(ComparisonError, "scene frame"):
+            collector._tick(wrong_scene_frame)
+
     def test_source_collector_and_comparator_match_setup_and_tick(self):
         source, pads, _, _ = _source_rows()
         # Build expected state through the same checked source decoder used by
@@ -560,6 +1197,26 @@ class WholeSessionStateCompareTests(unittest.TestCase):
         report["final_scene"] = None
         _validate_browser_report(report, recipe_sha="r", trace_sha="t", frame_count=1)
         self.assertFalse(_browser_completion_ok(report))
+
+    def test_legacy_browser_report_reader_keeps_unbounded_text_and_duplicate_key_behavior(self):
+        class TextOnlyPath:
+            def __init__(self, text):
+                self.text = text
+                self.encoding = None
+
+            def read_text(self, *, encoding):
+                self.encoding = encoding
+                return self.text
+
+            def stat(self):
+                raise AssertionError("legacy browser report loading must not add a size/stat cap")
+
+        path = TextOnlyPath('{"complete":true}')
+        self.assertEqual(_browser_report(path), {"complete": True})
+        self.assertEqual(path.encoding, "utf-8")
+        with self.assertRaisesRegex(ComparisonError, "duplicate JSON key"):
+            _browser_report(TextOnlyPath('{"complete":true,"complete":false}'))
+        self.assertIsNone(_browser_report(None))
 
 
 if __name__ == "__main__":

@@ -1,9 +1,11 @@
 # Recorded-session state comparison
 
-This check covers the three-match, four-Mario CPU9 Final Destination MWRC v8
-regression and the three-match, twelve-distinct-character CPU9 MWRC v9
-milestone. Both run through original character select, stage select, gameplay,
-Results and the intended final character-select return.
+The default whole-session comparison covers the three-match, four-Mario CPU9
+Final Destination MWRC v8 regression and the three-match, twelve-distinct-
+character CPU9 MWRC v9 milestone. Both run through original character select,
+stage select, gameplay, Results and the intended final character-select
+return. An explicit MWRC v10 first-setup/tick-0 prefix scope is documented
+below; it does not admit v10 to whole-session comparison.
 [STATUS](../STATUS.md) indexes the observed results and their receipts.
 
 The MWRC v8 input contains source-consumed controller samples and their scene
@@ -206,6 +208,55 @@ recipe, checks scene order, and compares each match setup and tick without
 searching for a later matching record. Keep both reports and their hashes.
 Run the comparator's negative controls with
 `python3 -m unittest discover -s tests -p test_whole_session_state_compare.py -v`.
+
+## Bounded MWRC v10 first-setup/tick-0 comparison
+
+The comparator keeps `whole-session` as its default scope and admits only MWRC
+v8/v9 there. Use `--scope v10-first-setup-tick0` only with a frozen expectations
+packet and all bound source and browser sidecars. `--browser-report` selects the
+retail browser report; `--browser-capture-report` selects the separate capture
+wrapper report. Both are required for this scope, as are the source manifest,
+source capture report, first-setup identity audit, and browser producer
+manifest. The command rejects missing or mismatched identities.
+
+```sh
+python3 scripts/compare_whole_session_state.py \
+  --reference "$SESSION_REFERENCE" --recipe "$SESSION_RECIPE" \
+  --port-trace "$SESSION_BROWSER_TRACE" \
+  --browser-report "$SESSION_BROWSER_REPORT" \
+  --scope v10-first-setup-tick0 \
+  --expectations "$SESSION_EXPECTATIONS" \
+  --source-manifest "$SESSION_SOURCE_MANIFEST" \
+  --source-report "$SESSION_SOURCE_REPORT" \
+  --source-audit "$SESSION_SOURCE_AUDIT" \
+  --browser-capture-report "$SESSION_BROWSER_CAPTURE_REPORT" \
+  --browser-producer-manifest "$SESSION_BROWSER_PRODUCER_MANIFEST" \
+  --out "$SESSION_COMPARISON_OUT"
+```
+
+The bounded reader caps source input at 32 MiB and 4,200 records, stopping at
+the first invalid or divergent boundary, or immediately after the first
+match's completed source tick 0 join. CSS/SSS frames establish consumed-input
+ordering only: they do not compare menu scalar state, and
+`nonmatch_fields_compared` stays empty. The one setup and one match-tick state
+use the declared fields and strict primary-entity identity checks. The whole
+v10 recipe is still validated before prefix consumption, but later match state
+is not compared. The packet's full-MWRO SHA-256 is recorded provenance; the
+comparison freshly hashes only bytes consumed through the join and checks
+pre/post file stat identity. It does not hash the remaining MWRO bytes.
+
+When this bounded boundary matches, the report records
+`boundary_result: equivalent` while keeping `result: incomplete`,
+`complete: false`, and `whole_session_equivalent: false`. The CLI exits 1 for
+that incomplete prefix; exit 0 remains reserved for complete whole-session
+equivalence, and exit 2 reports invalid evidence. The scope does not support a
+later-gameplay or whole-session accuracy claim. Run the comparator and CLI
+negative controls with:
+
+```sh
+python3 -m unittest discover -s tests -p test_whole_session_state_compare.py -v
+python3 -m unittest discover -s tests -p test_compare_whole_session_state_cli.py -v
+```
 
 ## Capture command failure gates
 
