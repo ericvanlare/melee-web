@@ -35,6 +35,10 @@ assert.deepEqual(NATIVE_STADIUM_C1A_DISC_FILES,{
 for(const name of stadiumC1aNames)assert.equal(Object.hasOwn(NATIVE_GAME_DISC_FILES,name),false);
 assert.deepEqual({...nativeStadiumC1aDiscPaths(stadiumC1aNames)},NATIVE_STADIUM_C1A_DISC_FILES);
 assert.throws(()=>nativeStadiumC1aDiscPaths(['GrPs.usd']),/complete source stage closure/);
+for(const inherited of ['constructor','toString','hasOwnProperty','__proto__'])
+  assert.throws(()=>nativeStadiumC1aDiscPaths([...stadiumC1aNames,inherited]),
+    /Unknown native scene asset/,
+    `Stadium C1a importer accepted inherited mapping key ${inherited}`);
 for(const donor of ['Dk','Pr','Mt','Fc'])
   for(const color of ['Nr','Ye','Bu','Re','Gr','Wh']) {
     const name=`PlKb${color}Cp${donor}.dat`;

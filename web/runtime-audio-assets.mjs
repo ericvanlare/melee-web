@@ -21,7 +21,11 @@ export function nativeStadiumC1aDiscPaths(names) {
       throw Error('Invalid or duplicate native asset name.');
     seen.add(name);
     if (name === 'sislib_font.bin' || name === 'dsp_coef.bin') continue;
-    const path = NATIVE_STADIUM_C1A_DISC_FILES[name] ?? disc.NATIVE_GAME_DISC_FILES[name];
+    const path = Object.hasOwn(NATIVE_STADIUM_C1A_DISC_FILES, name)
+      ? NATIVE_STADIUM_C1A_DISC_FILES[name]
+      : Object.hasOwn(disc.NATIVE_GAME_DISC_FILES, name)
+        ? disc.NATIVE_GAME_DISC_FILES[name]
+        : undefined;
     if (!path) throw Error('Unknown native scene asset: ' + name);
     paths[name] = path;
   }
