@@ -29,18 +29,21 @@ The corrected assertion compares like-for-like data-section bytes and checks
 the complete raw file separately. Synthetic marker-order and focused FD
 numeric/map regressions passed in separate runs recorded in the receipt.
 
-Subsequent integration validation passed the complete Python suite (1,944
+The first integration validation passed the complete Python suite (1,944
 tests, 135 optional skips) and built the Release runtime target
-`gameplay_menu_browser`. That build compiled both changed runtime translation
-units, and the receipt records the resulting JS/Wasm hashes separately from
-the original RelWithDebInfo map-probe artifacts. The Release runtime was
-compiled but not executed.
+`gameplay_menu_browser`; those producer and artifact identities remain in the
+receipt. After PR #188 advanced main to `59fdecf3`, the five PR #189 commits
+rebased with identical patches. The current-main producer then passed the full
+suite (1,961 tests: 1,826 passed, 135 optional skips; 353.421 seconds) and
+rebuilt the Release runtime target. Its JS/Wasm hashes and logs are recorded as
+a separate current-main validation, apart from the initial RelWithDebInfo map
+probe. The Release runtime was compiled but not executed.
 
 This trace directly exercises DatNativeMap; it does not follow the original
 CSS/SSS handoff or construct the gameplay stage. Stage_8022524C, on_init,
 stage callbacks, transformation, collision, rendering, readiness/admission,
 publication/E8, and browser behavior remain unrun. The original menu's source
 archive request is still unobserved, so C1 source lookup remains open. Stadium
-remains outside public content admission. The full suite and Release build had
-not run at the time of the initial map-only probe; their later results are
-recorded separately in the portable receipt.
+remains outside public content admission. The initial map-only probe did not
+include the full suite or Release build; later integration results are recorded
+separately in the portable receipt.

@@ -185,5 +185,104 @@
       "unchanged_across_release_build": true
     },
     "claim_boundary": "Full suite and Release compile validate repository integration and the affected runtime build. The Release runtime was not executed; no original menu handoff, gameplay stage construction, stage callback, rendering, readiness/admission, E8/publication, or browser evidence is added."
+  },
+  "post_rebase_current_main_validation": {
+    "producer": {
+      "branch": "codex/stadium-map-marker-structural-20261007",
+      "commit": "282e7d42e24fb0bb1cfef05c74315be87cfc259b",
+      "tree": "070f483589ca233974c88aeae0da9d2181b0451e",
+      "base": "59fdecf3b4ddcba18b8df24932c9beae6ad686d6",
+      "tracked_and_untracked_worktree_clean_after_validation": true,
+      "porcelain_status": "",
+      "rebase_comparison": "git range-diff maps all five commits from c9f8217 producer to this series as identical (=); no patch changed or dropped."
+    },
+    "full_python_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "total": 1961,
+      "passed": 1826,
+      "skipped": 135,
+      "elapsed_seconds": 353.421,
+      "exit_code": 0,
+      "stdout": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/stadium-map-marker-structural-20261007-EcS57s/integration-current-main-20261007-59fdecf/full-suite.stdout.log",
+        "bytes": 4467,
+        "sha256": "0ffa600e03f892c72eaa5ab861417440cf92c5a390db61d000c37e50a3e21cf7"
+      },
+      "stderr": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/stadium-map-marker-structural-20261007-EcS57s/integration-current-main-20261007-59fdecf/full-suite.stderr.log",
+        "bytes": 352131,
+        "sha256": "5041e9fce37b535c2e384dea95cc732d77efd3ad03dcf84d132ea2cca9118608"
+      }
+    },
+    "release_runtime_build": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "target": "gameplay_menu_browser",
+      "configuration": "Release",
+      "platform": "Emscripten wasm32",
+      "exit_code": 0,
+      "compiled_affected_sources": [
+        "src/gameplay_stage_numeric.c",
+        "src/dat_native_stage.cpp"
+      ],
+      "build_stdout": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/stadium-map-marker-structural-20261007-EcS57s/integration-current-main-20261007-59fdecf/release-build.stdout.log",
+        "bytes": 16763,
+        "sha256": "a12d010e56fc76f148531766ccb989f2a2ede8991efa18a455c659f9b0805063"
+      },
+      "build_stderr": {
+        "path": "/Volumes/AgentStorage/melee-web/runs/stadium-map-marker-structural-20261007-EcS57s/integration-current-main-20261007-59fdecf/release-build.stderr.log",
+        "bytes": 1519,
+        "sha256": "21c6fec15fe4097868f5576455de36b5f8bdc50c0683c3849e8c4ec9eb6ec8fa"
+      },
+      "artifacts": {
+        "js": {
+          "path": "build/browser-release/gameplay_menu_browser.js",
+          "bytes": 299682,
+          "sha256": "64f70283f7aedd5bb0ee89e4375326c40fd9c26ae7ee0e84db02b58aab0bc839"
+        },
+        "wasm": {
+          "path": "build/browser-release/gameplay_menu_browser.wasm",
+          "bytes": 15737625,
+          "sha256": "68454fd43ce9e819a7efe8730ee60e52d6bf0c795c3a50c8148e130a82c9cd07"
+        }
+      },
+      "execution": "Compiled only; Release runtime not executed."
+    },
+    "external_run_inventory_id": "stadium-map-marker-structural-20261007-EcS57s/integration-current-main-20261007-59fdecf",
+    "scope": "Repository integration validation only. No new asset probe; no browser run; Release runtime was compiled but not executed. Original focused RelWithDebInfo probe and 318a847 suite/build identities remain recorded separately.",
+    "documentation_checks": {
+      "status_entries": {
+        "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_status_entries.py -v",
+        "tests": 4,
+        "exit_code": 0,
+        "stdout": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-map-marker-structural-20261007-EcS57s/integration-current-main-20261007-59fdecf/status-entries-final.stdout.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-map-marker-structural-20261007-EcS57s/integration-current-main-20261007-59fdecf/status-entries-final.stderr.log",
+          "bytes": 582,
+          "sha256": "9eab8bd5d492e94886d26d364f01be0b45793da6785bb091b57d8f9ff125af06"
+        }
+      },
+      "markdown_links": {
+        "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_markdown_links.py -v",
+        "tests": 1,
+        "exit_code": 0,
+        "stdout": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-map-marker-structural-20261007-EcS57s/integration-current-main-20261007-59fdecf/markdown-links-final.stdout.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "stderr": {
+          "path": "/Volumes/AgentStorage/melee-web/runs/stadium-map-marker-structural-20261007-EcS57s/integration-current-main-20261007-59fdecf/markdown-links-final.stderr.log",
+          "bytes": 200,
+          "sha256": "065707826eec62d113198c66185fe86e374e0d76a7338129a21b3c73e35efa53"
+        }
+      },
+      "json_parse": "python3 -m json.tool docs/evidence/pokemon-stadium-map-only-owner-v1.json passed after final receipt update",
+      "diff_check": "git diff --check passed against final unstaged docs changes"
+    }
   }
 }
