@@ -19,6 +19,38 @@ def has_menu_trophy_assets(*roots):
     return all(any((root / name).is_file() for root in roots)
                for name in ("TyDatai.usd", "TyDatai.dat"))
 
+def find_stadium_c1_manifest_names(value):
+    if isinstance(value, dict):
+        if isinstance(value.get("manifest_names"), list):
+            return value["manifest_names"]
+        for child in value.values():
+            found = find_stadium_c1_manifest_names(child)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for child in value:
+            found = find_stadium_c1_manifest_names(child)
+            if found is not None:
+                return found
+    return None
+
+def stadium_c1_selected_file_names():
+    preparation = json.loads(
+        (ROOT / "docs/evidence/pokemon-stadium-c1a-css-sss-preparation-v1.json")
+        .read_text(encoding="utf-8"))
+    names = find_stadium_c1_manifest_names(preparation)
+    if not isinstance(names, list):
+        raise AssertionError("C1 evidence has no selected-file manifest")
+    return names
+
+def missing_stadium_fixture_names(menu, game, required_names):
+    return sorted(name for name in set(required_names)
+                  if not (menu / name).is_file() and not (game / name).is_file())
+
+def stadium_fixture_campaign_is_explicit():
+    return (bool(os.environ.get("MELEE_MENU_FIXTURE_ROOT"))
+            or os.environ.get("MELEE_REQUIRE_STADIUM_E8_FIXTURES") == "1")
+
 class NativeMenuSourceTests(OwnedWorkspaceTests):
     @classmethod
     def setUpClass(cls):
@@ -70,6 +102,210 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             "ordinary admission and source/stage construction remain closed",
             run.stdout,
         )
+
+    def test_stadium_c1_reopened_context_lifecycle_preflight(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_root = Path(os.environ.get("MELEE_MENU_FIXTURE_ROOT", ROOT / "assets-local"))
+        if not fixture_root.is_absolute():
+            fixture_root = ROOT / fixture_root
+        menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
+        script = "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; " \
+                 "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), " \
+                 "'dsp_coef.bin', 'sislib_font.bin']))"
+        required = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        selected = stadium_c1_selected_file_names()
+        self.assertEqual(len(required), 76)
+        self.assertEqual(len(set(required)), 76)
+        self.assertEqual(len(selected), 36)
+        self.assertEqual(len(set(selected)), 36)
+        required_union = sorted(set(required) | set(selected))
+        self.assertEqual(len(required_union), 98)
+        missing = missing_stadium_fixture_names(menu, game, required_union)
+        if missing:
+            detail = ", ".join(missing[:5])
+            message = (
+                "C1 context preflight requires the exact 98-file menu/selected union"
+                f"; missing {detail}"
+            )
+            if stadium_fixture_campaign_is_explicit():
+                self.fail(message)
+            self.skipTest(message)
+        if not target.is_file():
+            self.skipTest("C1 context preflight requires its built host trace")
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "c1-context-preflight.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source_revision, "stadium-c1-context-preflight-v1"]
+        (self.scratch / "c1-context-preflight-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "c1-context-preflight.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "c1-context-preflight.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "c1-context-preflight.stdout").write_text(
+            run.stdout, encoding="utf-8")
+        (self.scratch / "c1-context-preflight.stderr").write_text(
+            run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn(
+            "C1 reopened-context lifecycle preflight passed; no E8 request",
+            run.stdout,
+        )
+        self.assertIn(
+            "stage publication, or source menu entry",
+            run.stdout,
+        )
+
+    def test_stadium_c1_fixture_preflight_detects_missing_selected_file(self):
+        target = self.scratch / "synthetic-c1-fixture-preflight"
+        menu, game = target / "native-menus", target / "next-gate"
+        menu.mkdir(parents=True)
+        game.mkdir()
+        script = "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; " \
+                 "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), " \
+                 "'dsp_coef.bin', 'sislib_font.bin']))"
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        selected_names = stadium_c1_selected_file_names()
+        self.assertIn("PlCo.dat", selected_names)
+        required_union = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual(len(menu_names), 76)
+        self.assertEqual(len(selected_names), 36)
+        self.assertEqual(len(required_union), 98)
+        for name in required_union:
+            if name == "PlCo.dat":
+                continue
+            root = menu if name in menu_names else game
+            path = root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+        self.assertEqual(
+            missing_stadium_fixture_names(menu, game, required_union),
+            ["PlCo.dat"],
+        )
+
+    def test_stadium_e8_one_request_and_checked_teardown(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_value = os.environ.get("MELEE_MENU_FIXTURE_ROOT")
+        if not fixture_value:
+            if os.environ.get("MELEE_REQUIRE_STADIUM_E8_FIXTURES") == "1":
+                self.fail("MELEE_MENU_FIXTURE_ROOT is required for the frozen E8 packet")
+            self.skipTest("The reviewed C1 fixture root is required for the E8 trace")
+        fixture_root = Path(fixture_value)
+        if not fixture_root.is_absolute():
+            fixture_root = ROOT / fixture_root
+        menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
+        self.assertTrue(target.is_file(), f"Build the diagnostic target first: {target}")
+        self.assertTrue(menu.is_dir(), f"Missing owned menu fixture root: {menu}")
+        self.assertTrue(game.is_dir(), f"Missing owned game fixture root: {game}")
+
+        script = (
+            "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; "
+            "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), "
+            "'dsp_coef.bin', 'sislib_font.bin']))"
+        )
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        self.assertEqual(len(menu_names), 76)
+        self.assertEqual(len(set(menu_names)), len(menu_names))
+        preparation = json.loads(
+            (ROOT / "docs/evidence/pokemon-stadium-c1a-css-sss-preparation-v1.json")
+            .read_text(encoding="utf-8"))
+        self.assertEqual(
+            preparation.get("schema"),
+            "melee-web-pokemon-stadium-c1a-css-sss-preparation-v1",
+        )
+
+        selected_names = stadium_c1_selected_file_names()
+        self.assertIsNotNone(selected_names, "C1 evidence has no selected-file manifest")
+        self.assertEqual(len(selected_names), 36)
+        self.assertEqual(len(set(selected_names)), len(selected_names))
+        self.assertEqual(
+            set(selected_names) & {
+                "GrPs.usd", "GrPs1.dat", "GrPs2.dat", "GrPs3.dat",
+                "GrPs4.dat", "pstadium.ssm", "pstadium.hps", "pokesta.hps",
+            },
+            {
+                "GrPs.usd", "GrPs1.dat", "GrPs2.dat", "GrPs3.dat",
+                "GrPs4.dat", "pstadium.ssm", "pstadium.hps", "pokesta.hps",
+            },
+        )
+        required = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual(len(required), 98)
+        missing = [name for name in required
+                   if not (menu / name).is_file() and not (game / name).is_file()]
+        self.assertFalse(
+            missing,
+            "Frozen C1 selected RuntimeFiles are incomplete before launch: " +
+            ", ".join(missing),
+        )
+
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "stadium-e8-request.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source_revision, "stadium-e8-request-v1"]
+        (self.scratch / "stadium-e8-request-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        (self.scratch / "stadium-e8-fixture-preflight.json").write_text(
+            json.dumps({"menu_names": menu_names,
+                        "selected_names": selected_names,
+                        "missing": missing}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "stadium-e8-request.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "stadium-e8-request.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "stadium-e8-request.stdout").write_text(
+            run.stdout, encoding="utf-8")
+        (self.scratch / "stadium-e8-request.stderr").write_text(
+            run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-6000:])
+        self.assertIn(
+            "C1 reopened-context lifecycle preflight and one E8 typed request passed",
+            run.stdout,
+        )
+        self.assertIn(
+            "ordinary match admission and gameplay entry remain closed",
+            run.stdout,
+        )
+        result = next(json.loads(line) for line in run.stdout.splitlines()
+                      if line.startswith('{"probe":"stadium-e8-request"'))
+        self.assertEqual(result["source_size_name"], "/GrPs.usd")
+        self.assertEqual(result["typed_open_name"], "/GrPs.usd")
+        self.assertEqual(result["stage_info_x6E4"][0], -1)
+        self.assertIn("stage_info_xA0_observed_only", result)
+        self.assertEqual(result["itemdata_public_calls"], 0)
+        self.assertEqual(result["map_plit_public_calls"], 0)
+        self.assertFalse(result["stage_objects_started"])
+        self.assertTrue(result["checked_teardown"])
+        rows = [json.loads(line) for line in trace.read_text().splitlines()]
+        self.assertEqual(rows[0]["record"], "header")
+        self.assertEqual(rows[0]["input_recipe"], "stadium-e8-request-v1")
+        events = [row for row in rows if row.get("record") == "event"]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["event"], "stadium_e8_request_returned")
+        self.assertEqual(events[0]["selection"]["rules"]["stage_kind"], 3)
 
     def test_owned_css_scene_lifecycle(self):
         targets = [ROOT / "build" / name / "native_css_callbacks.js"
