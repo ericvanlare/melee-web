@@ -133,7 +133,7 @@ const report = {
   schema: 'melee-web-headless-whole-session-replay-v1',
   scope: stoppedScenePair ? 'One bounded paired stopped-scene screenshot timing check; image presence does not establish visible gameplay' :
     diagnostic ? 'One bounded headless natural-pause performance diagnosis; no admission, pixel, PCM, foreground, or physical-input claim' :
-    'Single headless browser MWRC v8/v9 diagnostic; no pixel, PCM, performance, or admission claim',
+    'Single headless browser MWRC v8/v9/v10 diagnostic; no pixel, PCM, performance, or admission claim',
   result: 'fail',
   url: values.url,
   mode: captureMode.mode,
@@ -465,9 +465,9 @@ try {
     version: recipeBytes.readUInt32BE(4), seed: recipeBytes.readUInt32BE(8),
     frames: recipeBytes.readUInt32BE(12), bytes: recipeBytes.length,
   };
-  if (![8, 9].includes(report.recipe_header.version) ||
+  if (![8, 9, 10].includes(report.recipe_header.version) ||
       report.recipe_header.frames < 1 || report.recipe_header.frames > 108000)
-    throw Error('Whole-session replay requires a valid MWRC v8/v9 frame count');
+    throw Error('Whole-session replay requires a valid MWRC v8/v9/v10 frame count');
   if (diagnostic && (report.recipe_header.version !== diagnosticManifest.inputs.recipe.header.version ||
       report.recipe_header.seed !== diagnosticManifest.inputs.recipe.header.seed ||
       report.recipe_header.frames !== diagnosticManifest.inputs.recipe.header.frames ||
