@@ -47,6 +47,10 @@ public:
     DatNativeMap(const DatNativeMap&)=delete;
     DatNativeMap& operator=(const DatNativeMap&)=delete;
     void* map_head()const noexcept;
+    /* Checked native MapCollData for callers that take ownership of this
+     * source collision root. Decoded lazily because marker-only maps need no
+     * collision archive. */
+    void* collision();
     std::span<const uint32_t> source_light_counts()const noexcept;
 private:
     struct Storage;

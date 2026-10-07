@@ -409,6 +409,10 @@ DatNativeMap::DatNativeMap(std::shared_ptr<const DatArchive> archive,
 }
 DatNativeMap::~DatNativeMap()=default;
 void* DatNativeMap::map_head()const noexcept{return storage_->native_map;}
+void* DatNativeMap::collision(){
+ if(!storage_->native_collision)storage_->native_collision=storage_->collision();
+ return storage_->native_collision;
+}
 std::span<const uint32_t> DatNativeMap::source_light_counts()const noexcept{return storage_->source_light_counts;}
 
 DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive)

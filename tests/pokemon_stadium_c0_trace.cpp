@@ -5,15 +5,21 @@
 #include "dat_collision.hpp"
 #include "dat_effect_banks.hpp"
 #include "dat_lights.hpp"
+#include "dat_native_stage.hpp"
 #include "dat_native_joint.hpp"
 #include "dat_scene.hpp"
 #include "dat_sis.hpp"
 #include "dat_stage.hpp"
+#include "dat_stage_items.hpp"
+#include "dat_stage_yaku.hpp"
 #include "dat_texture.hpp"
+#include "gameplay_bootstrap.h"
 #include "gameplay_effect_banks.h"
 #include "gameplay_ground_data.h"
+#include "gameplay_stage_stadium.h"
 #include "native_dat.hpp"
 #include "pokemon_stadium_ground_snapshot.h"
+#include "stadium_c0_native_map_contract.hpp"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wwrite-strings"
@@ -1264,6 +1270,91 @@ int run_sis_probe(const std::filesystem::path& directory)
 
 int run_probe(std::string_view probe, const std::filesystem::path& path)
 {
+    if (probe == "catalog") {
+        const auto bytes = read_file(path);
+        const auto archive = std::make_shared<const DatArchive>(
+            bytes, DatExternalPolicy::ResolveNull);
+        const std::vector<std::uint8_t> source_data(
+            archive->data().begin(), archive->data().end());
+        char error[256]{};
+        check(melee_web_gameplay_startup(32U * 1024U * 1024U,
+                                         error, sizeof(error)),
+              std::string("source world startup failed: ") + error);
+        check(melee_web_native_world_enable(error, sizeof(error)),
+              std::string("native descriptor ownership failed: ") + error);
+        {
+            NativeDatArena scalar_owner(archive);
+            void* decoded_ground = melee_web_ground_data_decode(
+                scalar_owner.reader(), symbol_offset(*archive, "grGroundParam"));
+            StadiumGroundSnapshot ground{};
+            check(stadium_ground_snapshot(decoded_ground, &ground) &&
+                      ground.stage_param_count == 18 &&
+                      ground.row0_stkind == 3 && ground.row0_x14 == 6,
+                  "catalog GroundParam owner did not retain the checked C0 rows");
+
+            auto* yakumono = static_cast<MeleeWebStadiumYakumono*>(
+                melee_web_stadium_yakumono_decode(
+                    scalar_owner.reader(),
+                    symbol_offset(*archive, "yakumono_param")));
+            check(yakumono && yakumono->x0 == 3600 && yakumono->r == 150 &&
+                      yakumono->g == 180 && yakumono->b == 160,
+                  "catalog Stadium yakumono owner differs from the typed source ABI");
+
+            melee_web::DatNativeMap map_owner(
+                archive, melee_web::test::stadium_contract);
+            check(map_owner.map_head() && map_owner.collision(),
+                  "catalog map_head/coll_data owners are incomplete");
+            melee_web::DatStageYaku random_yaku(
+                archive, symbol_offset(*archive, "ALDYakuAll"));
+            check(random_yaku.native_data(),
+                  "catalog ALDYakuAll typed owner is absent");
+            melee_web::DatEffectBanks effects(
+                archive, "map_ptcl", "map_texg", 64);
+            MeleeWebEffectBankStats effect_stats{};
+            check(melee_web_effect_bank_stats(effects.bank(), &effect_stats,
+                                              error, sizeof(error)), error);
+            check(effects.command_root() && effects.texture_root() &&
+                      effect_stats.bank == 64 &&
+                      !effect_stats.particle_bank_ready &&
+                      !effect_stats.effect_entries_ready,
+                  "catalog particle roots were not retained as decode-only bank 0x40");
+            melee_web::DatScene quake(
+                archive, "quake_model_set",
+                melee_web::DatSceneRootKind::DynamicModel);
+            check(quake.single_model() && quake.model_count() == 1,
+                  "catalog quake_model_set typed owner is absent");
+
+            const auto itemdata = symbol_offset(*archive, "itemdata");
+            const bool itemdata_is_authored_null =
+                archive->be32(itemdata) == 0 &&
+                !archive->has_relocation(itemdata) &&
+                !archive->pointer(itemdata, 4);
+            melee_web::DatStageItems items(archive);
+            check(itemdata_is_authored_null && items.items().empty(),
+                  "catalog must retain C0's authored null itemdata root and empty decoded items");
+            (void)symbol_offset(*archive, "map_plit");
+            check(std::equal(source_data.begin(), source_data.end(),
+                             archive->data().begin(), archive->data().end()),
+                  "typed catalog changed the immutable GrPs.usd data section");
+
+            std::size_t map_light_descriptors = 0;
+            for (const auto count : map_owner.source_light_counts())
+                map_light_descriptors += count;
+            std::cout << "{\"probe\":\"catalog\",\"scope\":\"typed C0 preparation only; no publication or E8\","
+                         "\"map_head\":true,\"coll_data\":true,\"grGroundParam\":true,"
+                         "\"ALDYakuAll\":true,\"map_ptcl\":true,\"map_texg\":true,"
+                         "\"yakumono_param\":true,\"quake_model_set\":true,"
+                         "\"map_light_descriptors\":" << map_light_descriptors
+                      << ",\"map_plit\":\"not separately owned on the native-map route\","
+                         "\"itemdata\":{\"symbol_present\":true,\"root_word\":0,"
+                         "\"relocated\":false,\"decoded_items\":0},"
+                         "\"particle_bank_published\":false,\"native_map_published\":false,"
+                         "\"source_data_unchanged\":true}\n";
+        }
+        check(melee_web_gameplay_shutdown(error, sizeof(error)),
+              std::string("source world teardown failed: ") + error);
+        return 0;
+    }
     if (probe == "sis") return run_sis_probe(path);
     if (probe == "animation-slots") {
         constexpr std::array<const char*, 6> names{
