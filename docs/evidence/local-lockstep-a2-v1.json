@@ -1,0 +1,875 @@
+{
+  "schema": "melee-web-local-lockstep-a2-v1",
+  "evidence_labels": [
+    "Source identified",
+    "Browser exercised: full original-route local loopback and bounded negative controls",
+    "Not retail compared or performance admitted"
+  ],
+  "native_source": "01f29ba77c700394e63a89687aefe05f0548b77f",
+  "native_build_outputs": [
+    {
+      "path": "build/browser-release/gameplay_menu_browser.js",
+      "bytes": 299506,
+      "sha256": "0f3f8bfec2976b33911a6a0e097dd67d2e5967ed6fbe88164565319fd28c3873"
+    },
+    {
+      "path": "build/browser-release/gameplay_menu_browser.wasm",
+      "bytes": 15716100,
+      "sha256": "bc94a8257a226e62a27409f3fc39c64e06c3d0d8ed00c8b37ea0c41295cdfd46"
+    },
+    {
+      "path": "build/browser-release/runtime-development.mjs",
+      "bytes": 56665,
+      "sha256": "7faecdf82fa101d9c256e4cf9335d780fd1da1c99a58d6c7429bfcfe36d74c7d"
+    },
+    {
+      "path": "build/browser-release/runtime-assets.mjs",
+      "bytes": 17029,
+      "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190",
+      "matches_source": true
+    },
+    {
+      "path": "build/browser-release/runtime-audio-assets.mjs",
+      "bytes": 3685,
+      "sha256": "2201d9156f3c4902a81a39d4520fc0f684eaeac4c9d4c8c46cb010010697ed3b",
+      "matches_source": true
+    }
+  ],
+  "historical_build_scope": "Affected Release build state verified for committed source; first invocation exit status was lost; follow-up official incremental check passed. No browser evidence in this receipt.",
+  "runner_sources": {
+    "missing_input_probe": "67c21cf884ca137e9a57657a66e6262bb58761ad",
+    "flip": "7ba9763880fa6d0a28a83b709d982c1863a1f66a",
+    "disconnect_and_full_route": "06970593792e40046d6dfe1753ec8d97aa3ab836"
+  },
+  "scenario": {
+    "browser": "154.0.8037.98",
+    "headless": true,
+    "host_speaker_output": "muted, audio processing retained",
+    "seed": 305419896,
+    "script": {
+      "name": "route1.mwni",
+      "sha256": "007fafb2bfc1c34b81509b8ee073b6250b32ab6d227502be6d4b986ddd8cbb4c",
+      "frame_count": 5082,
+      "input_ticks_used": 5082,
+      "source_ticks": 5084
+    },
+    "delay_source_ticks": 2,
+    "transport": {
+      "host": "127.0.0.1",
+      "port": 60716,
+      "framing": "opaque length-prefixed JSON",
+      "alpha_to_beta_bytes": 1769269,
+      "beta_to_alpha_bytes": 1765048
+    },
+    "route": [
+      "CSS",
+      "SSS",
+      "match",
+      "Results",
+      "CSS"
+    ],
+    "humans": 2,
+    "stocks": [
+      4,
+      4
+    ],
+    "stage": "Final Destination (32)"
+  },
+  "positive": {
+    "records_each": 5084,
+    "checksum_stream_sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0",
+    "six_checksum_channels": {
+      "source_identity": {
+        "equal_ticks": 5084,
+        "sha256": "cc56d475d7ecd68afd7d021eb334e4a250eaa585d01eb0a79742e5391df650ef"
+      },
+      "input": {
+        "equal_ticks": 5084,
+        "sha256": "1364b5e7c8e7759fbc5a614a224f69338ca80a017b5385a83d2ce6627c803a9d"
+      },
+      "pad": {
+        "equal_ticks": 5084,
+        "sha256": "38191a9727e12ca3714bfb6d4b26712df87d293b0ac3ea794e4d93bc6590311b"
+      },
+      "scene": {
+        "equal_ticks": 5084,
+        "sha256": "0d509b045ebce009a346a0c8aad820c7075ea386664eb9e2cfe8f185136964f6"
+      },
+      "total": {
+        "equal_ticks": 5084,
+        "sha256": "666d92fe9ef0eabbc7485a941ee7f91d0e267c9438f5963b02b39ba3da1eec42"
+      },
+      "objects": {
+        "equal_ticks": 5084,
+        "sha256": "b9063774e56d4b963e7aa15fe2bcf4ea18e34489794b88345a39c93c7cd88541"
+      }
+    },
+    "actual_loaded_identity": {
+      "source": "response body observed before navigation and frozen before peerIdentity fresh fetch",
+      "alpha": {
+        "sha256": "bc94a8257a226e62a27409f3fc39c64e06c3d0d8ed00c8b37ea0c41295cdfd46",
+        "byte_length": 15716100,
+        "response_count": 1,
+        "response_hashes": [
+          {
+            "status": 200,
+            "url": "http://127.0.0.1:18943/gameplay_menu_browser.wasm",
+            "resource_type": "fetch",
+            "method": "GET",
+            "request_id": "15810.28",
+            "sha256": "bc94a8257a226e62a27409f3fc39c64e06c3d0d8ed00c8b37ea0c41295cdfd46",
+            "byte_length": 15716100
+          }
+        ],
+        "response_set_frozen_before_handshake_fetch": true,
+        "capture_method": "cdp-load-response",
+        "max_body_bytes": 33554432,
+        "inspector_resource_buffer_bytes": 67108864,
+        "inspector_total_buffer_bytes": 134217728
+      },
+      "beta": {
+        "sha256": "bc94a8257a226e62a27409f3fc39c64e06c3d0d8ed00c8b37ea0c41295cdfd46",
+        "byte_length": 15716100,
+        "response_count": 1,
+        "response_hashes": [
+          {
+            "status": 200,
+            "url": "http://127.0.0.1:18943/gameplay_menu_browser.wasm",
+            "resource_type": "fetch",
+            "method": "GET",
+            "request_id": "15808.28",
+            "sha256": "bc94a8257a226e62a27409f3fc39c64e06c3d0d8ed00c8b37ea0c41295cdfd46",
+            "byte_length": 15716100
+          }
+        ],
+        "response_set_frozen_before_handshake_fetch": true,
+        "capture_method": "cdp-load-response",
+        "max_body_bytes": 33554432,
+        "inspector_resource_buffer_bytes": 67108864,
+        "inspector_total_buffer_bytes": 134217728
+      },
+      "compared_to_handshake_fresh_fetch": true,
+      "fresh_fetch_byte_length": "not exposed by peerIdentity"
+    },
+    "captures": {
+      "alpha": [
+        {
+          "name": "css-start",
+          "phase": 1,
+          "phase_after": 1,
+          "ready_draw": {
+            "began": 1,
+            "drawn": 1,
+            "preparation_ms": 0,
+            "draw_suppressed": 0,
+            "draw_calls": 297,
+            "source_draws": 1
+          },
+          "source_cursor_before": 2,
+          "source_cursor_after": 5,
+          "source_cursor_stable": false,
+          "screenshot": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-03/alpha/route-css-start.png",
+          "screenshot_sha256": "b0b1694d95d32140cd36e3195a70460a94e5b6962f80f2ddc1b84704bd1bde4b",
+          "gpu_observed": true
+        },
+        {
+          "name": "sss",
+          "phase": 3,
+          "phase_after": 3,
+          "ready_draw": {
+            "began": 1,
+            "drawn": 1,
+            "preparation_ms": 0,
+            "draw_suppressed": 0,
+            "draw_calls": 90,
+            "source_draws": 1
+          },
+          "source_cursor_before": 157,
+          "source_cursor_after": 162,
+          "source_cursor_stable": false,
+          "screenshot": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-03/alpha/route-sss.png",
+          "screenshot_sha256": "ab552da5ae37cbeafed25bebc4e03ee81ec3be8179c8b94ba1a7611a31010b39",
+          "gpu_observed": true
+        },
+        {
+          "name": "match",
+          "phase": 7,
+          "phase_after": 7,
+          "ready_draw": {
+            "began": 1,
+            "drawn": 1,
+            "preparation_ms": 0,
+            "draw_suppressed": 0,
+            "draw_calls": 237,
+            "source_draws": 1
+          },
+          "source_cursor_before": 432,
+          "source_cursor_after": 436,
+          "source_cursor_stable": false,
+          "screenshot": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-03/alpha/route-match.png",
+          "screenshot_sha256": "388b8a3b8c5b64ecf1d8c64e9f8967b83e041ed32abe71c795c309006b3900ef",
+          "gpu_observed": true
+        },
+        {
+          "name": "results",
+          "phase": 8,
+          "phase_after": 8,
+          "ready_draw": {
+            "began": 1,
+            "drawn": 1,
+            "preparation_ms": 0,
+            "draw_suppressed": 0,
+            "draw_calls": 712,
+            "source_draws": 2
+          },
+          "source_cursor_before": 4456,
+          "source_cursor_after": 4459,
+          "source_cursor_stable": false,
+          "screenshot": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-03/alpha/route-results.png",
+          "screenshot_sha256": "85dcdf2188de80ce434d849f5f4be41bbb19af5092a2b37400f04e9e2ed4497e",
+          "gpu_observed": true
+        },
+        {
+          "name": "css-return",
+          "phase": 1,
+          "phase_after": 1,
+          "ready_draw": {
+            "began": 1,
+            "drawn": 1,
+            "preparation_ms": 0,
+            "draw_suppressed": 0,
+            "draw_calls": 297,
+            "source_draws": 1
+          },
+          "source_cursor_before": 4906,
+          "source_cursor_after": 4913,
+          "source_cursor_stable": false,
+          "screenshot": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-03/alpha/final.png",
+          "screenshot_sha256": "c5107d81aaf45d2e9546b91f87042e2f0011c339c04659d2de2baef149f6ae1f",
+          "gpu_observed": true
+        }
+      ],
+      "beta": [
+        {
+          "name": "css-start",
+          "phase": 1,
+          "phase_after": 1,
+          "ready_draw": {
+            "began": 1,
+            "drawn": 1,
+            "preparation_ms": 0,
+            "draw_suppressed": 0,
+            "draw_calls": 297,
+            "source_draws": 1
+          },
+          "source_cursor_before": 2,
+          "source_cursor_after": 5,
+          "source_cursor_stable": false,
+          "screenshot": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-03/beta/route-css-start.png",
+          "screenshot_sha256": "38af3b3a344955e513a6a202790188cd97722e0f572ababd7a6323933f0b0133",
+          "gpu_observed": true
+        },
+        {
+          "name": "sss",
+          "phase": 3,
+          "phase_after": 3,
+          "ready_draw": {
+            "began": 1,
+            "drawn": 1,
+            "preparation_ms": 0,
+            "draw_suppressed": 0,
+            "draw_calls": 90,
+            "source_draws": 1
+          },
+          "source_cursor_before": 157,
+          "source_cursor_after": 162,
+          "source_cursor_stable": false,
+          "screenshot": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-03/beta/route-sss.png",
+          "screenshot_sha256": "33e74dc91ed64006d4c727e0c988f31c0da64d927803086322d853485bca488e",
+          "gpu_observed": true
+        },
+        {
+          "name": "match",
+          "phase": 7,
+          "phase_after": 7,
+          "ready_draw": {
+            "began": 1,
+            "drawn": 1,
+            "preparation_ms": 0,
+            "draw_suppressed": 0,
+            "draw_calls": 237,
+            "source_draws": 1
+          },
+          "source_cursor_before": 432,
+          "source_cursor_after": 436,
+          "source_cursor_stable": false,
+          "screenshot": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-03/beta/route-match.png",
+          "screenshot_sha256": "867fa981bb489f97e59468f5f95f008476e1858521f8af4ecdbc9dcb63a6c2be",
+          "gpu_observed": true
+        },
+        {
+          "name": "results",
+          "phase": 8,
+          "phase_after": 8,
+          "ready_draw": {
+            "began": 1,
+            "drawn": 1,
+            "preparation_ms": 0,
+            "draw_suppressed": 0,
+            "draw_calls": 409,
+            "source_draws": 1
+          },
+          "source_cursor_before": 4453,
+          "source_cursor_after": 4455,
+          "source_cursor_stable": false,
+          "screenshot": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-03/beta/route-results.png",
+          "screenshot_sha256": "21ae6990831ed57cef5b58e0f36a8433f38ca4647cf4297d7b87aece3d480160",
+          "gpu_observed": true
+        },
+        {
+          "name": "css-return",
+          "phase": 1,
+          "phase_after": 1,
+          "ready_draw": {
+            "began": 1,
+            "drawn": 1,
+            "preparation_ms": 0,
+            "draw_suppressed": 0,
+            "draw_calls": 297,
+            "source_draws": 1
+          },
+          "source_cursor_before": 4906,
+          "source_cursor_after": 4913,
+          "source_cursor_stable": false,
+          "screenshot": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-03/beta/final.png",
+          "screenshot_sha256": "34227d1a31ffd467d79ebfcfecfeb0d16043f8cb2a5cb9f06e96805e17b2efda",
+          "gpu_observed": true
+        }
+      ]
+    },
+    "observer_misses": {
+      "alpha": [],
+      "beta": []
+    },
+    "timing_resumes": {
+      "alpha": [],
+      "beta": []
+    },
+    "cleanup_complete": true
+  },
+  "missing_input_probe": {
+    "identity_agreed_before_tick0": true,
+    "source_ticks_each": 8,
+    "css_ticks_each": 8,
+    "checksums": {
+      "records_each": 8,
+      "streams_identical": true,
+      "sha256": "a1ca04fff4a658ac8542e90e1580b3d456f29dfe31132e1be35fa4a348d1baab"
+    },
+    "alpha_startup_waits": {
+      "episodes": 1,
+      "resumes": 1,
+      "observed": [
+        {
+          "role": "alpha",
+          "scope": "startup-publication",
+          "wait_episodes": 1,
+          "wait_start_tick": 2,
+          "wait_last_tick": 2,
+          "cursor": 2,
+          "pushed": 2,
+          "blocker": "network_wait",
+          "wait_callbacks": 1,
+          "wait_resume_count": 0,
+          "observed_at_ms": 1791329881795
+        }
+      ]
+    },
+    "alpha_intended_hold": {
+      "before_cursor": 3,
+      "after_cursor": 3,
+      "wait_callbacks_before": 5,
+      "wait_callbacks_after": 8,
+      "wait_resume_count_before": 1,
+      "blocker": "network_wait",
+      "held_ms": 120
+    },
+    "alpha_final_cursor": 8,
+    "alpha_target_wait_episodes": 2,
+    "alpha_target_wait_resumes": 1,
+    "alpha_final_wait_episodes": 2,
+    "alpha_final_wait_resumes": 2,
+    "alpha_duplicate_inputs": 19,
+    "alpha_out_of_order_inputs": 13,
+    "timing_resume_calls": 0,
+    "page_errors": [],
+    "both_unloaded_and_browser_closed": true,
+    "relay_closed": true,
+    "server_cleaned_up": true
+  },
+  "flip": {
+    "schema": "melee-web-a2-flip02-independent-validation-v1",
+    "outcome": "pass",
+    "scope": "Browser exercised: bounded local-loopback intentional input mismatch; not production, Internet, whole-session, timing or performance acceptance",
+    "runner_commit": "7ba9763880fa6d0a28a83b709d982c1863a1f66a",
+    "native_build_source": "01f29ba77c700394e63a89687aefe05f0548b77f",
+    "preflight_receipt": "negative-flip-02-server/batch-result.json",
+    "raw_run_receipt": "negative-flip-02/run.json",
+    "actual_load_identity_matches_build_and_handshake": true,
+    "actual_load_bytes": 15716100,
+    "actual_load_sha256": "bc94a8257a226e62a27409f3fc39c64e06c3d0d8ed00c8b37ea0c41295cdfd46",
+    "equal_raw_checksum_prefix_ticks": [
+      0,
+      11
+    ],
+    "first_raw_input_divergence": {
+      "tick": 12,
+      "channel": 1
+    },
+    "terminal_hold_ms": 126,
+    "terminal_hold": {
+      "alpha": {
+        "kind": 1,
+        "tick": 12,
+        "channel": 1,
+        "active": 1,
+        "blocker": "terminal",
+        "cursor_before": 15,
+        "cursor_after": 15,
+        "pushed_before": 20,
+        "pushed_after": 20
+      },
+      "beta": {
+        "kind": 1,
+        "tick": 12,
+        "channel": 1,
+        "active": 1,
+        "blocker": "terminal",
+        "cursor_before": 15,
+        "cursor_after": 15,
+        "pushed_before": 20,
+        "pushed_after": 20
+      }
+    },
+    "checksum_files": {
+      "alpha": {
+        "bytes": 960,
+        "sha256": "947d61c3801355760ad7c6c2b38e5231c17963fbebb2f5d344cd4852a35e4e7c"
+      },
+      "beta": {
+        "bytes": 960,
+        "sha256": "7f16ae4f08380069183544d2a4c7d0f736d6612c200917a61b5549755a3cea7b"
+      }
+    },
+    "cleanup_complete": true,
+    "h1_marker_absent_after": true,
+    "next_proposal": "One guarded negative-disconnect-01 run with disconnect-at16, same runner/native/recipe; require both terminalkind2 and stationarycursor/pushed>=120ms, no post-disconnect fallback, identity and cleanup; no positive full route until further grant."
+  },
+  "disconnect": {
+    "schema": "melee-web-a2-disconnect02-validation-v1",
+    "outcome": "pass",
+    "scope": "Browser exercised: bounded local-loopback disconnect at source16; no whole-session/Internet/production/timing/performanceclaim",
+    "runner_commit": "06970593792e40046d6dfe1753ec8d97aa3ab836",
+    "native_build_source": "01f29ba77c700394e63a89687aefe05f0548b77f",
+    "raw_run": "negative-disconnect-02/run.json",
+    "guarded_launcher_receipt": "negative-disconnect-02-server/batch-result.json",
+    "actual_loaded_identity": {
+      "source": "response body observed before navigation and frozen before peerIdentity fresh fetch",
+      "alpha": {
+        "sha256": "bc94a8257a226e62a27409f3fc39c64e06c3d0d8ed00c8b37ea0c41295cdfd46",
+        "byte_length": 15716100,
+        "response_count": 1,
+        "response_hashes": [
+          {
+            "status": 200,
+            "url": "http://127.0.0.1:18943/gameplay_menu_browser.wasm",
+            "resource_type": "fetch",
+            "method": "GET",
+            "request_id": "15506.28",
+            "sha256": "bc94a8257a226e62a27409f3fc39c64e06c3d0d8ed00c8b37ea0c41295cdfd46",
+            "byte_length": 15716100
+          }
+        ],
+        "response_set_frozen_before_handshake_fetch": true,
+        "capture_method": "cdp-load-response",
+        "max_body_bytes": 33554432,
+        "inspector_resource_buffer_bytes": 67108864,
+        "inspector_total_buffer_bytes": 134217728
+      },
+      "beta": {
+        "sha256": "bc94a8257a226e62a27409f3fc39c64e06c3d0d8ed00c8b37ea0c41295cdfd46",
+        "byte_length": 15716100,
+        "response_count": 1,
+        "response_hashes": [
+          {
+            "status": 200,
+            "url": "http://127.0.0.1:18943/gameplay_menu_browser.wasm",
+            "resource_type": "fetch",
+            "method": "GET",
+            "request_id": "15508.28",
+            "sha256": "bc94a8257a226e62a27409f3fc39c64e06c3d0d8ed00c8b37ea0c41295cdfd46",
+            "byte_length": 15716100
+          }
+        ],
+        "response_set_frozen_before_handshake_fetch": true,
+        "capture_method": "cdp-load-response",
+        "max_body_bytes": 33554432,
+        "inspector_resource_buffer_bytes": 67108864,
+        "inspector_total_buffer_bytes": 134217728
+      },
+      "compared_to_handshake_fresh_fetch": true,
+      "fresh_fetch_byte_length": "not exposed by peerIdentity"
+    },
+    "terminal_hold": {
+      "minimum_hold_ms": 120,
+      "peers": {
+        "alpha": {
+          "kind": 2,
+          "tick": 0,
+          "channel": 0,
+          "active": 1,
+          "blocker": "terminal",
+          "cursor_before": 16,
+          "cursor_after": 16,
+          "pushed_before": 16,
+          "pushed_after": 16
+        },
+        "beta": {
+          "kind": 2,
+          "tick": 0,
+          "channel": 0,
+          "active": 1,
+          "blocker": "terminal",
+          "cursor_before": 16,
+          "cursor_after": 16,
+          "pushed_before": 16,
+          "pushed_after": 16
+        }
+      },
+      "no_fallback": true,
+      "window_observed_ms": 125
+    },
+    "negative_control": {
+      "disconnect_at_source_tick": 16,
+      "terminals": {
+        "alpha": {
+          "kind": "disconnect",
+          "reason": "beta: loopback socket closed"
+        },
+        "beta": {
+          "kind": "disconnect",
+          "reason": "beta: loopback socket closed"
+        }
+      },
+      "explicit": true
+    },
+    "no_timing_resumes": true,
+    "cleanup_complete": true
+  },
+  "visual_review": {
+    "all10screenshots_inspected": true,
+    "no_preparation_black_captures": true,
+    "open_rendering_defect": "Conspicuous magenta FD stage geometry/texture artifacts in both match screenshots; same symptom present in bound A1 screenshots before A2. Precise cause not established.",
+    "a1_baselines": [
+      {
+        "path": "claude-net-determinism-a1-20261006-20261006-115937-e9eec3b0/preflight/a/final.png",
+        "sha256": "eb5c01d64540240d36a5cb891298d316428f4691284e9eb4d3929f3c7b69d77b",
+        "visual_observation": "Bound A1 FD screenshot visibly shows conspicuous magenta stage geometry and textured mesh artifacts, matching the A2 symptom; not pixel equivalence.",
+        "a1_frozen_native_build": "7eb5d89b1e4310cf2d33ec23ae3d780dc87dace5",
+        "a1_harness_source": "baa9ff5d64ac4f919c46edcce2f87dc5b6374537",
+        "a1_frozen_build_is_ancestor_of_a2_native": false,
+        "shared_source_ancestor": "e92c5764f4392269e32e061d94ca6537e9bf7079",
+        "same_binary_claim": false
+      },
+      {
+        "path": "claude-net-determinism-a1-20261006-20261006-115937-e9eec3b0/negative-flip-prefix/base/final.png",
+        "sha256": "9a2f66845e5f27800e8b22b06ca630ccda378305475b8b16f877a6777a1e074a",
+        "visual_observation": "Bound A1 FD screenshot visibly shows conspicuous magenta stage geometry and textured mesh artifacts, matching the A2 symptom; not pixel equivalence.",
+        "a1_frozen_native_build": "7eb5d89b1e4310cf2d33ec23ae3d780dc87dace5",
+        "a1_harness_source": "baa9ff5d64ac4f919c46edcce2f87dc5b6374537",
+        "a1_frozen_build_is_ancestor_of_a2_native": false,
+        "shared_source_ancestor": "e92c5764f4392269e32e061d94ca6537e9bf7079",
+        "same_binary_claim": false
+      }
+    ],
+    "same_binary_a2_prior_baseline": {
+      "path": "local-lockstep-a2-20261006-153940-d164548c/positive-full-route-02/alpha/route-match.png",
+      "observation": "Black preparation capture; not useful to assess magenta defect."
+    },
+    "limitations": [
+      "SSS is first-ready entry-animation capture, not stable final SSS pixels.",
+      "Screenshots are phase-stable but source cursors advance during screenshots; they are not exact-tick pixel comparisons.",
+      "Results peers captured at different animation states; no pixel equality assertion.",
+      "Initial CSS watcher was scheduled before input publication but capture occurred with sourcecursor2 to5; receipt label must not imply a pre-input frozen screenshot.",
+      "A1 and A2 retained native builds differ and have a shared Git ancestor, rather than one frozen commit being a direct ancestor of the other. No same-binary comparison or defect-cause proof is claimed."
+    ]
+  },
+  "parent_review": {
+    "all10screenshots_inspected": true,
+    "actual_screens_rendered": true,
+    "pixel_correctness": false,
+    "notes": "Initial CSS and returned CSS render; SSS/Results are entry animations with source cursor advancing during screenshots. Both match images have magenta FD geometry; the same symptom appears in bound A1 images with different native builds."
+  },
+  "retained_failure_summary": [
+    "Early probe launch failures and startup-versus-intended-wait distinction retained; reduced ACK/retransmission test fixed deferred input escaping before release.",
+    "Full-route01 reached completion but failed a validator that compared per-tick scenes with a compressed route.",
+    "Full-route02 matched simulation streams but initial scene captures could occur during preparation; actual-load Wasm identity was not yet observed.",
+    "Flip01 stopped before tick zero because Chrome inspector evicted the base64-encoded Wasm body. Dedicated bounded CDP response capture passed real HTTP probes and flip02.",
+    "Disconnect01 reached native terminals but attempted to send on the closed transport before the hold check. Real TCP old/new regression verifies notify:false only for transport-close disconnect."
+  ],
+  "receipt_corrections": {
+    "historical_css_start_label": "The watcher starts before publication, but its image was captured at source cursors2..5. Integration relabels it first ready source draw; historical raw receipt remains unchanged.",
+    "historical_loopback_transport_zero_fields": "Initial loopback_transport byte placeholders were never updated. Actual counters are in transport; integration removes the unused placeholders without altering transport behavior."
+  },
+  "integration_validation": {
+    "state": "pending full suite and current-main Release build; historical browser evidence remains bound to original sources"
+  },
+  "limitations": [
+    "Node-controlled real TCP loopback with two fresh Chrome instances; not a public browser networking UI or Internet transport.",
+    "Agreement covers declared checksum channels, not whole-heap bitwise equality; raw arena hashes differ.",
+    "No retail state, pixel or PCM equivalence; no foreground timing, physical input, audible output or performance admission.",
+    "H1 and cross-browser/cross-architecture determinism remain open; A3 is still gated by H1."
+  ],
+  "artifacts": [
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "identity-forwarding-release-build.json",
+      "bytes": 2216,
+      "sha256": "079ab7e8dd2c9241a0144e8e922cff25d4675af11a2c33a60f1b0edd08e80674"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "identity-forwarding-release-build-confirm.log",
+      "bytes": 12045,
+      "sha256": "1153efecba5c59ca0ebe84f45f969e7c571ba6e6a96223a999fd7307131bef5a"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "probe-css-delay-05-result.json",
+      "bytes": 2724,
+      "sha256": "b7068652d9f6a4c27c957274fece7ca00963da5d563c1968f3f56b5050b345e0"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "probe-css-delay-05-provenance.json",
+      "bytes": 1399,
+      "sha256": "7a8a2ffcb94254817bd3142c3f6b2933b8a022c81d2f5d03c02df95b7a145a58"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "probe-css-delay-05/run.json",
+      "bytes": 22419,
+      "sha256": "3a17a5026dca0e7a140b81e3db584926a26ae7b840ee4548ae58266851a24b31"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-01/run.json",
+      "bytes": 680188,
+      "sha256": "b9b33842673adfc31f50c40b5e1b3321986741eb9cc8e8fc9fce3e10fceddeec"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-02/run.json",
+      "bytes": 1418097,
+      "sha256": "eca26c4c0f637dcc41429dfa41310aa50e92854efc9b3df1cc7cc22188ec1a56"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/run.json",
+      "bytes": 1506377,
+      "sha256": "2131ca37425f8d7660727092b843af980c5af6b568fb483f89962d074a696c08"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03-validation.json",
+      "bytes": 15013,
+      "sha256": "0dc066ae74013bcc57c0743950fae076c80d7bdf73b27a1dc0e23b153e98384c"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03-server/batch-result.json",
+      "bytes": 2288,
+      "sha256": "dfe011019ffd8f9769436c2152d81f8b5c8e4734842ebded39cb39a4f014a553"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "negative-flip-01/run.json",
+      "bytes": 12079,
+      "sha256": "a163ddeca1569baa03fd6d472cbbf0baff650f43963ddb2ed7876512717ef0e0"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "negative-flip-02/run.json",
+      "bytes": 20674,
+      "sha256": "01a931443a3556400cbabcc27132a0001badf4f1b2fdd2e95b0ffcf661ca6ab6"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "negative-flip-02-validation.json",
+      "bytes": 1924,
+      "sha256": "645f5fa896b0063c98bcb995e185212836018e4a5b4460a343b42589ac8cec0b"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "negative-flip-02-server/batch-result.json",
+      "bytes": 2289,
+      "sha256": "763281ecf0e1bcd01a2aeb0ae7f76cecff86200e0bfee02e589226b23375befb"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "negative-disconnect-01/run.json",
+      "bytes": 21231,
+      "sha256": "4eb9d1abf34c25112026ceb471fdd34156da0850bb277e80eb7feb8c4af226b6"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "negative-disconnect-01-diagnosis.json",
+      "bytes": 5334,
+      "sha256": "acce0524c8fcbb20bb852b79c8bad530f141adf4649864f637b85de8576be0e8"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "negative-disconnect-02/run.json",
+      "bytes": 21213,
+      "sha256": "e3089cc68ee0a9ee1e755f5953bf87ea95755d0e6572b9b0cfc54e0d0b29c5f3"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "negative-disconnect-02-validation.json",
+      "bytes": 3277,
+      "sha256": "d9c30f4da9950f712c4875dba6d2593ec52c9af0a055e2ec6e93170852455202"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "negative-disconnect-02-server/batch-result.json",
+      "bytes": 2299,
+      "sha256": "f86344fb5e499eec465b38b8f930254f94616c229078fad21d704e51815a4217"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/alpha/checksums.bin",
+      "bytes": 325376,
+      "sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/alpha/instance.json",
+      "bytes": 314879,
+      "sha256": "51684d087250ce6326e1988d8bfa3cbd8bc821eafa85e2485f1237b48504fbfb"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/alpha/route-css-start.png",
+      "bytes": 451304,
+      "sha256": "b0b1694d95d32140cd36e3195a70460a94e5b6962f80f2ddc1b84704bd1bde4b"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/alpha/route-sss.png",
+      "bytes": 338775,
+      "sha256": "ab552da5ae37cbeafed25bebc4e03ee81ec3be8179c8b94ba1a7611a31010b39"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/alpha/route-match.png",
+      "bytes": 496605,
+      "sha256": "388b8a3b8c5b64ecf1d8c64e9f8967b83e041ed32abe71c795c309006b3900ef"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/alpha/route-results.png",
+      "bytes": 151458,
+      "sha256": "85dcdf2188de80ce434d849f5f4be41bbb19af5092a2b37400f04e9e2ed4497e"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/alpha/final.png",
+      "bytes": 458702,
+      "sha256": "c5107d81aaf45d2e9546b91f87042e2f0011c339c04659d2de2baef149f6ae1f"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/beta/checksums.bin",
+      "bytes": 325376,
+      "sha256": "4ac68c125ef7de127db9ab6c56e3fd40665bd42f02bff7ad8a75519b461d82a0"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/beta/instance.json",
+      "bytes": 314753,
+      "sha256": "0935b9b9c83e3fd1c3d1847b24bc65da041b3b0581dcec85f12c99cf350cc8cd"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/beta/route-css-start.png",
+      "bytes": 451873,
+      "sha256": "38af3b3a344955e513a6a202790188cd97722e0f572ababd7a6323933f0b0133"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/beta/route-sss.png",
+      "bytes": 337641,
+      "sha256": "33e74dc91ed64006d4c727e0c988f31c0da64d927803086322d853485bca488e"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/beta/route-match.png",
+      "bytes": 497305,
+      "sha256": "867fa981bb489f97e59468f5f95f008476e1858521f8af4ecdbc9dcb63a6c2be"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/beta/route-results.png",
+      "bytes": 139427,
+      "sha256": "21ae6990831ed57cef5b58e0f36a8433f38ca4647cf4297d7b87aece3d480160"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "positive-full-route-03/beta/final.png",
+      "bytes": 459191,
+      "sha256": "34227d1a31ffd467d79ebfcfecfeb0d16043f8cb2a5cb9f06e96805e17b2efda"
+    },
+    {
+      "run": "claude-net-determinism-a1-20261006-20261006-115937-e9eec3b0",
+      "path": "preflight/a/final.png",
+      "bytes": 529026,
+      "sha256": "eb5c01d64540240d36a5cb891298d316428f4691284e9eb4d3929f3c7b69d77b"
+    },
+    {
+      "run": "claude-net-determinism-a1-20261006-20261006-115937-e9eec3b0",
+      "path": "negative-flip-prefix/base/final.png",
+      "bytes": 529468,
+      "sha256": "9a2f66845e5f27800e8b22b06ca630ccda378305475b8b16f877a6777a1e074a"
+    },
+    {
+      "run": "a2-wasm-response-identity-20261006-171621-9c9be757",
+      "path": "diagnosis.json",
+      "bytes": 2098,
+      "sha256": "ebf92298e7a658803932851cdd7cd6b4d770d3f95710f1de2e105070bf987023"
+    },
+    {
+      "run": "a2-wasm-response-identity-20261006-171621-9c9be757",
+      "path": "source-identities.json",
+      "bytes": 1090,
+      "sha256": "a2fb1025c8d677a040939f79ed4320cc309c9f50c75ac38223b9d8ed96fbfd9e"
+    },
+    {
+      "run": "a2-wasm-response-identity-20261006-171621-9c9be757",
+      "path": "probe.json",
+      "bytes": 1150,
+      "sha256": "208a9ee8120446e29357a7de9aa20d658ef70eab07c21d885bed6917aac7307d"
+    },
+    {
+      "run": "a2-wasm-response-identity-20261006-171621-9c9be757",
+      "path": "helper-probe.json",
+      "bytes": 1379,
+      "sha256": "a97222e6048689ad97bb80ee1a9ca4641ef91947532f6841d90bdbf23c0d3dd1"
+    },
+    {
+      "run": "a2-wasm-response-identity-20261006-171621-9c9be757",
+      "path": "disconnect-fix-receipt.json",
+      "bytes": 1721,
+      "sha256": "2a79c3b22f182843df3b4aaded91076416e46fbda4cf611dd81b10646336c374"
+    }
+  ]
+}

@@ -19,7 +19,7 @@ import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
 
 const HEADER_BYTES = 16;
 const POSITIVE_ROUTE_BOUNDARIES = Object.freeze([
-  Object.freeze({name: 'css-start', phase: 1, label: 'original CSS before input publication'}),
+  Object.freeze({name: 'css-start', phase: 1, label: 'original CSS at the first ready source draw'}),
   Object.freeze({name: 'sss', phase: 3, label: 'original SSS'}),
   Object.freeze({name: 'match', phase: 7, label: 'original match'}),
   Object.freeze({name: 'results', phase: 8, label: 'original Results'}),
@@ -111,8 +111,7 @@ const pairResults = {
   neutral_prefix: {source_ticks: LOCKSTEP_DELAY, player_ports: 'neutral PADStatus', unowned_ports: 'no-controller'},
   script: {name: path.basename(values.script), sha256: scriptHash, frame_count: inputCount,
     input_ticks_used: usedInputs, source_ticks: sourceTicks},
-  loopback_transport: {protocol: 'TCP length-prefixed JSON, 4-byte big-endian length', relay_interprets_packets: false,
-    alpha_to_beta_bytes: 0, beta_to_alpha_bytes: 0},
+  loopback_transport: {protocol: 'TCP length-prefixed JSON, 4-byte big-endian length', relay_interprets_packets: false},
   peers: [], outcome: 'fail', first_error: null, started_at: new Date().toISOString(),
 };
 let instances = null, relay = null, peers = null, disconnectHandled = false, intentionalRelayClose = false;
