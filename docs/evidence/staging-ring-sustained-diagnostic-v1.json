@@ -1,0 +1,1482 @@
+{
+  "schema": "melee-web-staging-ring-sustained-diagnostic-v1",
+  "date": "2026-10-06",
+  "labels": [
+    "Source identified",
+    "Browser exercised"
+  ],
+  "result": "ring2 induced simulation-debt guard; source-informed interpretation; ring4 comparison inconclusive on one frozen control-load metric",
+  "acceptance": {
+    "H1_fix": false,
+    "natural_pause_cause": false,
+    "performance_passed": false,
+    "full_original_menu_route": false,
+    "retail_state_pixels_PCM": false,
+    "foreground_or_physical_input": false
+  },
+  "machine": {
+    "name": "owner Mac mini",
+    "platform": "darwin",
+    "arch": "arm64",
+    "browser": "Google Chrome",
+    "browser_version": "154.0.8037.98",
+    "mode": "headless installed Chrome; speakers silent; WebAudio and PCM remain processed"
+  },
+  "input": {
+    "disc": {
+      "bytes": 1449165376,
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "recipe": {
+      "bytes": 80354,
+      "sha256": "bfb5ead0432704e3088d8ab5b9dcec248ae550c413db990df1851bafea31b0eb"
+    },
+    "recipe_sidecar_sha256": "1931d7bbb65318fa986162165fe49ac0835b7995ffa9a31305c1b8755d62ccf6",
+    "scope": "synthetic conditioned MWRCv4,1800 neutral four-player inputs; no retail/menu/session identity"
+  },
+  "protocol": {
+    "slots": [
+      2,
+      4
+    ],
+    "default_slots": 2,
+    "hash_capture": false,
+    "staging_diagnostics": true,
+    "host_stall": false,
+    "automatic_resume": false,
+    "adaptive_tuning": false,
+    "calibration_iterations": [
+      300,
+      600
+    ],
+    "calibration_requested_ms_each": 500,
+    "calibration_before_game_clock": true,
+    "preparation_wait_max_ms": 180000,
+    "control_requested_callback_ms": 2000,
+    "treatment_requested_load_ms": 2000,
+    "maximum_observed_load_ms": 2100,
+    "declared_observer_slack_ms": 100,
+    "stop": "first preparation/pause/fault; no automatic retry"
+  },
+  "provenance": {
+    "captured_harness_sources": {
+      "ring2-sustained-attempt-1": {
+        "commit": "1a0c4d21c503b27f2f7cc378ef92276a181dc32a",
+        "tree": "8b49c140e3580784b84e09afd20326c8ab39faf1",
+        "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "aurora_patch_sha256": "97d8af9c8474b692d049d243eda2ad9913a67025e88cfd6f4d3be7a63676db4a"
+      },
+      "ring2-sustained-attempt-2": {
+        "commit": "aaca1b7e39f078807d426c55efbc5907acc42d5d",
+        "tree": "9fac31324d748918b35a519cdaea066d234b53d3",
+        "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "aurora_patch_sha256": "97d8af9c8474b692d049d243eda2ad9913a67025e88cfd6f4d3be7a63676db4a"
+      },
+      "ring4-sustained-attempt-1": {
+        "commit": "178e908ffdb97ab78132ab6eba63cf3561107d5e",
+        "tree": "004086b8da5f2eb9206e71a9b75e0b20e8626388",
+        "tracked_diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "aurora_patch_sha256": "97d8af9c8474b692d049d243eda2ad9913a67025e88cfd6f4d3be7a63676db4a"
+      }
+    },
+    "build_inventory_binding": "prospective exact local+HTTP31-file bytes, NOT proof of native binary source-producer commit or historical timing-build equivalence",
+    "native_source_producer_established_by_prospective_manifest": false,
+    "build_artifact_map_sha256": "1e365338badde8049f31e033e28b9f99e4149b9011a0dbec8437ae1292a88e93",
+    "artifact_count": 31,
+    "artifact_map": {
+      "gameplay_menu_browser.js": {
+        "bytes": 298172,
+        "sha256": "de2a7c416b3a13684681788c5f30dc4d6c1bc0633ad098a2dde6ee7ec2ccee70"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15664729,
+        "sha256": "e5206a526e96a439a8096a419047c726b1f9685a2e7032bc0a7dfb9f7c9ab691"
+      },
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "runtime.html": {
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      "runtime-development.mjs": {
+        "bytes": 52893,
+        "sha256": "41927b6466d8417ba3cc3fe0a9f65fe6c953841110b9ae5766e37b94eb7b612a"
+      },
+      "melee-runtime.mjs": {
+        "bytes": 49923,
+        "sha256": "a447108bcff8765dd1c8281a821b06225e500ed34c2d064f9da0c3f32df54b5a"
+      },
+      "runtime-diagnostics.mjs": {
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      "runtime-diagnostics-delivery.mjs": {
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      "diagnostics-settings.mjs": {
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      "diagnostics-schema.mjs": {
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      "controller-input.mjs": {
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      "controller-panel.mjs": {
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      "controller-panel.css": {
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      "controller-settings.mjs": {
+        "bytes": 18314,
+        "sha256": "6fc3c8fd6210c37916d97a8b32fba8c7d4c5acbc5694d0be3213303468d1d195"
+      },
+      "controller-settings.css": {
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      "touch-controls.mjs": {
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      },
+      "touch-controls.css": {
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      "prototype-keyboard-layouts.mjs": {
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      "runtime-cache.js": {
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      "audio-worklet.js": {
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      "audio-ring.mjs": {
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      "disc-image.mjs": {
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      "disc-session.mjs": {
+        "bytes": 6913,
+        "sha256": "80cf5b766afe66a8e6a35fc33208f9f849f40a61cdfe9eb97b9ba6a587df327d"
+      },
+      "dsp-coefficients.mjs": {
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      "runtime-assets.mjs": {
+        "bytes": 16989,
+        "sha256": "108da8726a8f2f3e1403fde9607b08f61c2c87c8e7d8e17a4f44f8dd634d2918"
+      },
+      "runtime-audio-assets.mjs": {
+        "bytes": 3645,
+        "sha256": "5a5f540492304e45367d25f00497d868a6e7ad6370cdef64c5eebe2bf5ae5319"
+      },
+      "runtime-audio.mjs": {
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      "match-flow.mjs": {
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      "match-menu.mjs": {
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      "action-sweep.mjs": {
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      "hitch-capture.mjs": {
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      }
+    },
+    "all_attempt2_ring4_http_pre_post_equal_manifest": true,
+    "historical_timing_differences": [
+      {
+        "name": "gameplay_menu_browser.wasm",
+        "expected_historical": {
+          "bytes": 15664729,
+          "sha256": "e23ba192a39640670093f63759216e2314c97a4bb495843455147977602105de"
+        },
+        "current_prospective": {
+          "bytes": 15664729,
+          "sha256": "e5206a526e96a439a8096a419047c726b1f9685a2e7032bc0a7dfb9f7c9ab691"
+        }
+      },
+      {
+        "name": "runtime-development.mjs",
+        "expected_historical": {
+          "bytes": 52794,
+          "sha256": "5b0b5a495b1f98c8859d0ca75fdcc7f33c726cfbe02ac89e9196f8e4c6a65e72"
+        },
+        "current_prospective": {
+          "bytes": 52893,
+          "sha256": "41927b6466d8417ba3cc3fe0a9f65fe6c953841110b9ae5766e37b94eb7b612a"
+        }
+      }
+    ],
+    "earlier_natural_map_scope": "24 actual response identities plus local WASM, not retrospective31-file pre/post",
+    "no_rebuild_between_named_attempts": true,
+    "rebased_review_base": "c212e99",
+    "rebased_source_is_not_capture_source": true,
+    "later_main_native_changes": "current main contains independent network-session seams absent from the frozen capture source; no browser claim for rebased code",
+    "frozen_source_archives": [
+      {
+        "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+        "artifact": "frozen-harness-source-178e908.tar",
+        "source_commit": "178e908ffdb97ab78132ab6eba63cf3561107d5e",
+        "bytes": 450560,
+        "sha256": "00ca87a7cae721ed54ca0793ca338a95b9744512d3649f289bdcecd949f825b5",
+        "every_regular_member_verified_against_git_object": true,
+        "members": [
+          {
+            "file": "patches/aurora-browser.patch",
+            "bytes": 237520,
+            "sha256": "97d8af9c8474b692d049d243eda2ad9913a67025e88cfd6f4d3be7a63676db4a"
+          },
+          {
+            "file": "scripts/browser_driver.mjs",
+            "bytes": 11876,
+            "sha256": "75e4886df976a4c9292cef13ddfc8af89c2e0795f4ef7a6bc57b66cccb8a0233"
+          },
+          {
+            "file": "scripts/browser_tools.mjs",
+            "bytes": 3853,
+            "sha256": "737a8ef5807edba0009487877e1b65badc3a8bb4d07ff9fcd445a7b8bef40c81"
+          },
+          {
+            "file": "src/animation_clock.hpp",
+            "bytes": 2842,
+            "sha256": "eeb235b12ba6280ead54975ca9e6d4ebc3f8e813eadb256f9e672dc4e9549c3c"
+          },
+          {
+            "file": "src/gameplay_menu_browser.cpp",
+            "bytes": 91365,
+            "sha256": "c0d07e36015c94073d2a465fa1587c681d1bd148bc1bd6910d004a1fcc4d4e7b"
+          },
+          {
+            "file": "src/source_frame_sequence.hpp",
+            "bytes": 1585,
+            "sha256": "ea69ed677c5685d6b03bb22e850f70f78e206196ebf746029d4adf3c9751d05a"
+          },
+          {
+            "file": "tests/pause_trace_capture.mjs",
+            "bytes": 15857,
+            "sha256": "a03e77c102d0860bade336941a6a4eb1d9aaf804f6dc942c7c3ac92bd83fc209"
+          },
+          {
+            "file": "tests/pause_trace_perturb.mjs",
+            "bytes": 6975,
+            "sha256": "b27cc8b2c6caac8768e91347fa4988bc5a89893734f2cb010dcc1d88d921d589"
+          },
+          {
+            "file": "tests/staging_ring_sustained_capture.mjs",
+            "bytes": 46275,
+            "sha256": "1ccc30866399c127b85f44dd3821593ff60bd742a6122acc283a9f681410da40"
+          },
+          {
+            "file": "tests/staging_ring_sustained_decision.mjs",
+            "bytes": 16416,
+            "sha256": "32f4a1a9c45cb9a915b972bba13f3af91db500119f3bd83bdacbab77d95f8e46"
+          },
+          {
+            "file": "tools/browser_build_artifacts.json",
+            "bytes": 806,
+            "sha256": "29e49d6b6c867bf035d843a3ac210ad5c9927111897cd0e0b0a7fbc9054cc598"
+          }
+        ]
+      },
+      {
+        "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+        "artifact": "frozen-harness-source-aaca1b7.tar",
+        "source_commit": "aaca1b7e39f078807d426c55efbc5907acc42d5d",
+        "bytes": 81920,
+        "sha256": "f3ff2f2afd53a6569f1a3e8d6088c370bb3a96cc4f8543643dd4f800fc91d71f",
+        "every_regular_member_verified_against_git_object": true,
+        "members": [
+          {
+            "file": "tests/pause_trace_capture.mjs",
+            "bytes": 15857,
+            "sha256": "a03e77c102d0860bade336941a6a4eb1d9aaf804f6dc942c7c3ac92bd83fc209"
+          },
+          {
+            "file": "tests/staging_ring_sustained_capture.mjs",
+            "bytes": 45572,
+            "sha256": "28ba1b4081327a59b7ab1afaf39a4f2596cdde395bbba9d4ad8ede160c42bcdd"
+          },
+          {
+            "file": "tests/staging_ring_sustained_decision.mjs",
+            "bytes": 15155,
+            "sha256": "2c105d9d0ee9189080b129c75fe55c446d506c9a1896a6edfd3b5716d335cd17"
+          }
+        ]
+      },
+      {
+        "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+        "artifact": "failed-helper-source-1a0c4d2.tar",
+        "source_commit": "1a0c4d21c503b27f2f7cc378ef92276a181dc32a",
+        "bytes": 30720,
+        "sha256": "8657a8dce312fa4050577148ae111cbd4f46ecd2d82d9f398e701a78645267fb",
+        "every_regular_member_verified_against_git_object": true,
+        "members": [
+          {
+            "file": "tests/pause_trace_capture.mjs",
+            "bytes": 15733,
+            "sha256": "ce2c64f3c6a01b96dd80c0c53b189e3e621228f314ff3f6c3cd287cff9455f2b"
+          },
+          {
+            "file": "tests/pause_trace_capture_test.mjs",
+            "bytes": 5407,
+            "sha256": "5911bce02b05a03403fb08597a2c7c57c52b7a83011cd6496016fed5ea020c7e"
+          }
+        ]
+      }
+    ]
+  },
+  "retained_failures": [
+    {
+      "kind": "identity_preflight",
+      "result": "blocked historical identity mismatch; no browser/server started; new prospective manifests preserve differing identities"
+    },
+    {
+      "kind": "ring2_attempt1_harness",
+      "failure": "page.evaluate ReferenceError: readNative is not defined after calibration and before control/treatment",
+      "integrity_errors": [
+        "runner_failure",
+        "capture_status_read_error",
+        "post_unload_capture_status_missing"
+      ],
+      "fix": "explicit serialized callback argument and skip every native read after unload; isolated-realm negative/control tests"
+    },
+    {
+      "kind": "ring4_comparability",
+      "frozen_result": "inconclusive",
+      "failed_checks": [
+        {
+          "window": "control_window",
+          "metric": "p95_ms",
+          "baseline": 21.899999856948853,
+          "candidate": 28.600000143051147,
+          "ratio": 1.3059360881217719,
+          "within_frozen_bounds": false
+        }
+      ],
+      "no_threshold_or_classifier_retcon": true
+    }
+  ],
+  "ring2": {
+    "legacy_frozen_decision": {
+      "result": "classified_pause",
+      "decision": "park_ring_four",
+      "classification": "staging_wait_without_rising_callback_debt",
+      "debt_tail_ticks": [
+        0.9835999965667659,
+        0.9426000022888115,
+        0.0007000017166056693
+      ],
+      "rising_callback_debt": false,
+      "pause_callback_total_ms": 158.985,
+      "pause_callback_staging_wait_ms": 111.28,
+      "staging_wait_dominant": true,
+      "observed_batch_duration_stats_ms": {
+        "count": 21,
+        "min_ms": 35.09999990463257,
+        "mean_ms": 35.419047616776965,
+        "p50_ms": 35.40000009536743,
+        "p95_ms": 35.799999952316284,
+        "max_ms": 35.89999985694885
+      },
+      "requested_gpu_load_window_ms": 2000,
+      "actual_gpu_load_window_ms": 848,
+      "gpu_load_actual_minus_requested_ms": -1152,
+      "gpu_load_observer_overshoot_ms": 0,
+      "gpu_load_early_stop_ms": 1152,
+      "genuine_recorder_staging_incident": true
+    },
+    "source_informed_semantics": {
+      "sample_semantics": "Post-consumption pending remainder. Default Pause policy admits whole demand <=8 and consumes it entirely, so successful pending sample is fractional <1; guard emits pre-consumption whole value before reset. Fractional trend criterion targets the wrong quantity for increasing tick demand.",
+      "timing_semantics": "Callback started_ms precedes input and preparation; exact tick now is sampled later at gameplay_menu_browser.cpp:1356. Finished native sample at1616-1624 carries clock state already updated by tick. Current callback render time affects elapsed demand on the next tick. No claim that started_ms equals the tick timestamp.",
+      "reconstruction": "On accepted active rows with every returned clock step consumed and no later reset, pre-consumption pending=source_steps+post-consumption remainder. This reconstructs accepted demand at the tick boundary, not unbounded carried whole backlog.",
+      "no_break_no_reset_basis": [
+        "Row scene remains match(7), running1, preparation_ms0; no preparation event in either measured window, no runtime/browser/telemetry errors.",
+        "Recipe cursor below1800 excludes fixture exhaustion break at1365. Match remains incomplete before unload, no owner transition; source frame and input cursor increments equal completed steps.",
+        "Deferred pipeline break at1379 invokes prepare_deferred_pipelines, which emits reason7 and sets runningfalse/resets clocks at355-369; absent for eligible rows.",
+        "Fault/scene-preparation/completion reset paths would invalidate reconstruction; do not generalize the formula to arbitrary callbacks."
+      ]
+    },
+    "control_tail": [
+      {
+        "row": 352,
+        "hook_at_ms": 9403.620000123978,
+        "started_ms": 9398.26,
+        "total_ms": 5.295,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 0.69,
+        "staging_slot_wait_ms": 0,
+        "source_steps": 1,
+        "source_draws": 1,
+        "sample_pending_ticks": 0.9395999908447215,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 118,
+        "sample_replay_cursor": 242,
+        "previous_row": 351,
+        "input_cursor_delta": 1,
+        "source_frame_delta": 1,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 1.9395999908447215
+      },
+      {
+        "row": 353,
+        "hook_at_ms": 9419.755000114441,
+        "started_ms": 9414.605,
+        "total_ms": 5.085,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 0.61,
+        "staging_slot_wait_ms": 0,
+        "source_steps": 1,
+        "source_draws": 1,
+        "sample_pending_ticks": 0.9208999919891308,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 119,
+        "sample_replay_cursor": 243,
+        "previous_row": 352,
+        "input_cursor_delta": 1,
+        "source_frame_delta": 1,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 1.9208999919891308
+      },
+      {
+        "row": 354,
+        "hook_at_ms": 9436.81500005722,
+        "started_ms": 9431.595,
+        "total_ms": 5.155,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 0.65,
+        "staging_slot_wait_ms": 0,
+        "source_steps": 1,
+        "source_draws": 1,
+        "sample_pending_ticks": 0.9394000005721996,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 120,
+        "sample_replay_cursor": 244,
+        "previous_row": 353,
+        "input_cursor_delta": 1,
+        "source_frame_delta": 1,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 1.9394000005721996
+      },
+      {
+        "row": 355,
+        "hook_at_ms": 9453.465000152588,
+        "started_ms": 9448.015,
+        "total_ms": 5.395,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 0.795,
+        "staging_slot_wait_ms": 0,
+        "source_steps": 1,
+        "source_draws": 1,
+        "sample_pending_ticks": 0.9248999977111767,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 121,
+        "sample_replay_cursor": 245,
+        "previous_row": 354,
+        "input_cursor_delta": 1,
+        "source_frame_delta": 1,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 1.9248999977111767
+      },
+      {
+        "row": 356,
+        "hook_at_ms": 9470.610000133514,
+        "started_ms": 9464.905,
+        "total_ms": 5.64,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 0.87,
+        "staging_slot_wait_ms": 0,
+        "source_steps": 1,
+        "source_draws": 1,
+        "sample_pending_ticks": 0.9383000040054272,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 122,
+        "sample_replay_cursor": 246,
+        "previous_row": 355,
+        "input_cursor_delta": 1,
+        "source_frame_delta": 1,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 1.9383000040054272
+      },
+      {
+        "row": 357,
+        "hook_at_ms": 9486.740000009537,
+        "started_ms": 9481.38,
+        "total_ms": 5.3,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 0.495,
+        "staging_slot_wait_ms": 0,
+        "source_steps": 1,
+        "source_draws": 1,
+        "sample_pending_ticks": 0.9264999914169261,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 123,
+        "sample_replay_cursor": 247,
+        "previous_row": 356,
+        "input_cursor_delta": 1,
+        "source_frame_delta": 1,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 1.926499991416926
+      }
+    ],
+    "treatment_tail": [
+      {
+        "row": 366,
+        "hook_at_ms": 9636.560000181198,
+        "started_ms": 9631.52,
+        "total_ms": 5,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 0.52,
+        "staging_slot_wait_ms": 0,
+        "source_steps": 1,
+        "source_draws": 1,
+        "sample_pending_ticks": 0.934899997711176,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 132,
+        "sample_replay_cursor": 256,
+        "previous_row": 365,
+        "input_cursor_delta": 1,
+        "source_frame_delta": 1,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 1.934899997711176
+      },
+      {
+        "row": 367,
+        "hook_at_ms": 9672.945000171661,
+        "started_ms": 9648.225,
+        "total_ms": 24.655,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 0.445,
+        "staging_slot_wait_ms": 19.14,
+        "source_steps": 1,
+        "source_draws": 1,
+        "sample_pending_ticks": 0.936900000572199,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 133,
+        "sample_replay_cursor": 257,
+        "previous_row": 366,
+        "input_cursor_delta": 1,
+        "source_frame_delta": 1,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 1.936900000572199
+      },
+      {
+        "row": 368,
+        "hook_at_ms": 9713.634999990463,
+        "started_ms": 9682.08,
+        "total_ms": 31.485,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 0.98,
+        "staging_slot_wait_ms": 20.495,
+        "source_steps": 2,
+        "source_draws": 2,
+        "sample_pending_ticks": 0.9684999942779484,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 135,
+        "sample_replay_cursor": 259,
+        "previous_row": 367,
+        "input_cursor_delta": 2,
+        "source_frame_delta": 2,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 2.9684999942779484
+      },
+      {
+        "row": 369,
+        "hook_at_ms": 9751.485000133514,
+        "started_ms": 9715.92,
+        "total_ms": 35.5,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 1.215,
+        "staging_slot_wait_ms": 24.375,
+        "source_steps": 2,
+        "source_draws": 2,
+        "sample_pending_ticks": 0.9989000034332216,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 137,
+        "sample_replay_cursor": 261,
+        "previous_row": 368,
+        "input_cursor_delta": 2,
+        "source_frame_delta": 2,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 2.9989000034332216
+      },
+      {
+        "row": 370,
+        "hook_at_ms": 9800.31500005722,
+        "started_ms": 9752.765,
+        "total_ms": 47.485,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 1.625,
+        "staging_slot_wait_ms": 30.7,
+        "source_steps": 3,
+        "source_draws": 3,
+        "sample_pending_ticks": 0.20959999084472036,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 140,
+        "sample_replay_cursor": 264,
+        "previous_row": 369,
+        "input_cursor_delta": 3,
+        "source_frame_delta": 3,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 3.2095999908447204
+      },
+      {
+        "row": 371,
+        "hook_at_ms": 9873.950000047684,
+        "started_ms": 9801.535,
+        "total_ms": 72.35,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 1.625,
+        "staging_slot_wait_ms": 55.28,
+        "source_steps": 3,
+        "source_draws": 3,
+        "sample_pending_ticks": 0.1360999965667662,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 143,
+        "sample_replay_cursor": 267,
+        "previous_row": 370,
+        "input_cursor_delta": 3,
+        "source_frame_delta": 3,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 3.136099996566766
+      },
+      {
+        "row": 372,
+        "hook_at_ms": 9953.175000190735,
+        "started_ms": 9882,
+        "total_ms": 71.11,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 2.1,
+        "staging_slot_wait_ms": 49.36,
+        "source_steps": 4,
+        "source_draws": 4,
+        "sample_pending_ticks": 0.9639999914169248,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 147,
+        "sample_replay_cursor": 271,
+        "previous_row": 371,
+        "input_cursor_delta": 4,
+        "source_frame_delta": 4,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 4.963999991416925
+      },
+      {
+        "row": 373,
+        "hook_at_ms": 10043.810000181198,
+        "started_ms": 9965.66,
+        "total_ms": 78.09,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 2.875,
+        "staging_slot_wait_ms": 49.99,
+        "source_steps": 5,
+        "source_draws": 5,
+        "sample_pending_ticks": 0.9835999965667659,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 152,
+        "sample_replay_cursor": 276,
+        "previous_row": 372,
+        "input_cursor_delta": 5,
+        "source_frame_delta": 5,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 5.983599996566766
+      },
+      {
+        "row": 374,
+        "hook_at_ms": 10161.480000019073,
+        "started_ms": 10048.32,
+        "total_ms": 113.09,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 2.305,
+        "staging_slot_wait_ms": 84.74,
+        "source_steps": 5,
+        "source_draws": 5,
+        "sample_pending_ticks": 0.9426000022888115,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 157,
+        "sample_replay_cursor": 281,
+        "previous_row": 373,
+        "input_cursor_delta": 5,
+        "source_frame_delta": 5,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 5.9426000022888115
+      },
+      {
+        "row": 375,
+        "hook_at_ms": 10325.009999990463,
+        "started_ms": 10165.95,
+        "total_ms": 158.985,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 5.08,
+        "staging_slot_wait_ms": 111.28,
+        "source_steps": 8,
+        "source_draws": 8,
+        "sample_pending_ticks": 0.0007000017166056693,
+        "sample_running": 1,
+        "sample_scene": 7,
+        "sample_source_frame": 165,
+        "sample_replay_cursor": 289,
+        "previous_row": 374,
+        "input_cursor_delta": 8,
+        "source_frame_delta": 8,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": true,
+        "reconstructed_accepted_pre_consumption_pending_ticks": 8.000700001716606
+      }
+    ],
+    "actual_guard": {
+      "incident": {
+        "at_ms": 10332.94000005722,
+        "row": 376,
+        "reason": 1,
+        "value": 9,
+        "threshold": 8,
+        "source_frame": 165,
+        "scene": 7,
+        "clock_owner": 1
+      },
+      "callback": {
+        "row": 376,
+        "hook_at_ms": 10334.630000114441,
+        "started_ms": 10332.31,
+        "total_ms": 2.205,
+        "preparation_ms": 0,
+        "simulation_audio_ms": 2.18,
+        "staging_slot_wait_ms": 0,
+        "source_steps": 0,
+        "source_draws": 0,
+        "sample_pending_ticks": 0,
+        "sample_running": 0,
+        "sample_scene": 7,
+        "sample_source_frame": 165,
+        "sample_replay_cursor": 289,
+        "previous_row": 375,
+        "input_cursor_delta": 0,
+        "source_frame_delta": 0,
+        "cursor_and_source_delta_equal_steps": true,
+        "reconstruction_eligible_under_retained_no_break_no_reset_conditions": false,
+        "reconstructed_accepted_pre_consumption_pending_ticks": null
+      },
+      "ordering": "row375 hook10325.01 -> row376 started10332.31 -> guard incident10332.94 -> row376 timing hook10334.63. Guard row376 has zero steps and post-reset pending0; 9>8 independently comes from incident, not reconstruction.",
+      "classifier_fallback_row": 375,
+      "classifier_pause_callback_fields_semantically": "Preceding active callback, not actual guard callback"
+    },
+    "control": {
+      "callback_ms": 2000,
+      "callbacks": 120,
+      "actual_load_ms": 2006.6000001430511,
+      "native_max_ms": 10.685,
+      "staging_max_ms": 5.665
+    },
+    "treatment": {
+      "actual_load_ms": 848,
+      "callbacks_before_incident": 17,
+      "preceding_active_callback_native_ms": 158.985,
+      "preceding_active_callback_staging_ms": 111.28,
+      "accepted_pre_consumption_tail": [
+        5.983599996566766,
+        5.9426000022888115,
+        8.000700001716606
+      ],
+      "actual_guard_callback_native_ms": 2.205,
+      "actual_guard_value": 9,
+      "actual_guard_threshold": 8,
+      "source_frame": 165,
+      "completed_input_cursor": 289
+    },
+    "genuine_incident": {
+      "read_api": "createRuntimeDiagnostics().exportRetained()",
+      "status": "retained_incidents",
+      "qualifying_incident_count": 1,
+      "incidents": [
+        {
+          "reason": "simulation_debt",
+          "reason_code": 1,
+          "value": 9,
+          "threshold": 8,
+          "source_frame": 165,
+          "staging": {
+            "window_ms": 10000,
+            "sample_count": 92,
+            "active_slots": 2,
+            "peak_occupied_slots": 2,
+            "queue_completion_registrations": 462,
+            "queue_completion_callbacks": 462,
+            "peak_queue_completion_callback_ms": 75.09999990463257,
+            "last_queue_callback_source_frame": 164
+          }
+        }
+      ]
+    },
+    "genuine_recorder_retained_flags": {
+      "history_evicted": false,
+      "history_evicted_count": 0,
+      "incident_evicted": false,
+      "incident_evicted_count": 0,
+      "storage_evicted": false,
+      "storage_evicted_count": 0,
+      "report_truncated": false,
+      "persistence_failed": false,
+      "persistence_unavailable": false,
+      "storage_denied": false,
+      "quota_exceeded": false,
+      "malformed_record": false,
+      "malformed_count": 0,
+      "recent_event_evicted": true,
+      "recent_event_evicted_count": 20,
+      "recovery_timed_out": false,
+      "clock_regression_count": 0,
+      "crypto_unavailable": false
+    }
+  },
+  "ring4": {
+    "legacy_frozen_decision": {
+      "result": "clean_nonreproduction",
+      "decision": "park_ring_four",
+      "observed_batch_duration_stats_ms": {
+        "count": 50,
+        "min_ms": 34.89999985694885,
+        "mean_ms": 35.64199999809265,
+        "p50_ms": 35.700000047683716,
+        "p95_ms": 36.59999990463257,
+        "max_ms": 36.90000009536743
+      },
+      "requested_gpu_load_window_ms": 2000,
+      "actual_gpu_load_window_ms": 2018.2000000476837,
+      "gpu_load_actual_minus_requested_ms": 18.200000047683716,
+      "gpu_load_observer_overshoot_ms": 18.200000047683716,
+      "gpu_load_early_stop_ms": 0
+    },
+    "separate_source_informed_result": "inconclusive",
+    "problem": "observed_load_not_comparable",
+    "observed": {
+      "separate_assessment": "inconclusive",
+      "problems": [
+        "observed_load_not_comparable"
+      ],
+      "failed_metric_checks": [
+        {
+          "window": "control_window",
+          "metric": "p95_ms",
+          "baseline": 21.899999856948853,
+          "candidate": 28.600000143051147,
+          "ratio": 1.3059360881217719,
+          "within_frozen_bounds": false
+        }
+      ],
+      "all_metric_checks": [
+        {
+          "window": "calibration_300",
+          "metric": "mean_ms",
+          "baseline": 20.574999976158143,
+          "candidate": 20.55999997854233,
+          "ratio": 0.9992709600178277,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "calibration_300",
+          "metric": "p95_ms",
+          "baseline": 30.299999952316284,
+          "candidate": 31.899999856948853,
+          "ratio": 1.0528052774637136,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "calibration_300",
+          "metric": "batches_per_enabled_second",
+          "baseline": 38.83495145631068,
+          "candidate": 39.40886699507389,
+          "ratio": 1.0147783251231528,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "calibration_600",
+          "metric": "mean_ms",
+          "baseline": 36.06153847621037,
+          "candidate": 36.23076921242934,
+          "ratio": 1.004692831847166,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "calibration_600",
+          "metric": "p95_ms",
+          "baseline": 36.700000047683716,
+          "candidate": 36.799999952316284,
+          "ratio": 1.002724793038219,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "calibration_600",
+          "metric": "batches_per_enabled_second",
+          "baseline": 24.280911463736256,
+          "candidate": 24.114264519198137,
+          "ratio": 0.9931367096829538,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "control_window",
+          "metric": "mean_ms",
+          "baseline": 18.689411763583912,
+          "candidate": 20.710126584089256,
+          "ratio": 1.108120835800872,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "control_window",
+          "metric": "p95_ms",
+          "baseline": 21.899999856948853,
+          "candidate": 28.600000143051147,
+          "ratio": 1.3059360881217719,
+          "within_frozen_bounds": false
+        },
+        {
+          "window": "control_window",
+          "metric": "batches_per_enabled_second",
+          "baseline": 42.36021129968121,
+          "candidate": 39.06443158871717,
+          "ratio": 0.9221963344883305,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "treatment_window",
+          "metric": "mean_ms",
+          "baseline": 35.419047616776965,
+          "candidate": 35.64199999809265,
+          "ratio": 1.0062947028877784,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "treatment_window",
+          "metric": "p95_ms",
+          "baseline": 35.799999952316284,
+          "candidate": 36.59999990463257,
+          "ratio": 1.0223463674129005,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "treatment_window",
+          "metric": "batches_per_enabled_second",
+          "baseline": 24.764150943396228,
+          "candidate": 24.774551580031048,
+          "ratio": 1.0004199876126822,
+          "within_frozen_bounds": true
+        }
+      ],
+      "source_offsets": [
+        {
+          "window": "control_window",
+          "field": "first_source",
+          "offset_ticks": -2,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "control_window",
+          "field": "first_cursor",
+          "offset_ticks": -2,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "treatment_window",
+          "field": "first_source",
+          "offset_ticks": -1,
+          "within_frozen_bounds": true
+        },
+        {
+          "window": "treatment_window",
+          "field": "first_cursor",
+          "offset_ticks": -1,
+          "within_frozen_bounds": true
+        }
+      ],
+      "windows": {
+        "control_window": {
+          "terminal": {
+            "outcome": "window_complete",
+            "end_at_ms": 9406.830000162125
+          },
+          "actual_gpu_load_ms": 2022.2999999523163,
+          "assessment_elapsed_ms": 2000,
+          "callback_rows": 120,
+          "input_cursor_range": [
+            126,
+            245
+          ],
+          "source_frame_range": [
+            2,
+            121
+          ],
+          "all_reconstructions_valid": true,
+          "maximum_native_callback_ms": 5.925,
+          "maximum_staging_wait_ms": 0,
+          "maximum_reconstructed_accepted_demand": 1.969300012588497,
+          "accepted_demand_tail": [
+            1.8842000102996777,
+            1.96030000686645,
+            1.8753000068664498,
+            1.95530000686645,
+            1.9285000085830637,
+            1.9554000091552683,
+            1.8704000091552682,
+            1.9582000017166084,
+            1.8753000068664496,
+            1.900400009155268
+          ],
+          "incidents_through_actual_off": [],
+          "batch_stats": {
+            "count": 79,
+            "min_ms": 18,
+            "mean_ms": 20.710126584089256,
+            "p50_ms": 18.399999856948853,
+            "p95_ms": 28.600000143051147,
+            "max_ms": 30.59999990463257
+          }
+        },
+        "treatment_window": {
+          "terminal": {
+            "outcome": "window_complete",
+            "end_at_ms": 11426.335205078125
+          },
+          "actual_gpu_load_ms": 2018.2000000476837,
+          "assessment_elapsed_ms": 2000,
+          "callback_rows": 120,
+          "input_cursor_range": [
+            248,
+            367
+          ],
+          "source_frame_range": [
+            124,
+            243
+          ],
+          "all_reconstructions_valid": true,
+          "maximum_native_callback_ms": 7.79,
+          "maximum_staging_wait_ms": 0,
+          "maximum_reconstructed_accepted_demand": 1.9662000131606985,
+          "accepted_demand_tail": [
+            1.9527000045776255,
+            1.8554000091552623,
+            1.8595000028610118,
+            1.9152000045776256,
+            1.886300001144398,
+            1.858300004005421,
+            1.8651000022888071,
+            1.8971000051498301,
+            1.8709000062942391,
+            1.9008000040054207
+          ],
+          "incidents_through_actual_off": [],
+          "batch_stats": {
+            "count": 50,
+            "min_ms": 34.89999985694885,
+            "mean_ms": 35.64199999809265,
+            "p50_ms": 35.700000047683716,
+            "p95_ms": 36.59999990463257,
+            "max_ms": 36.90000009536743
+          }
+        }
+      },
+      "genuine_recorder_status": "no_qualifying_incident_generated",
+      "genuine_retained_count": 0
+    },
+    "reservation_bytes": 264241152,
+    "reservation_increase_bytes": 132120576,
+    "reservation_semantics": "252MiB declared ring4 staging reservation;126MiB additional; not physical allocation/residency"
+  },
+  "source_semantics": {
+    "historical_source_citations": [
+      {
+        "bytes": 2842,
+        "sha256": "eeb235b12ba6280ead54975ca9e6d4ebc3f8e813eadb256f9e672dc4e9549c3c",
+        "line_start": 13,
+        "line_end": 57,
+        "meaning": "Pause default; interval accrual, pre-consumption whole guard, receipt before reset, full consumption of admissible ticks",
+        "file": "src/animation_clock.hpp"
+      },
+      {
+        "bytes": 91365,
+        "sha256": "c0d07e36015c94073d2a465fa1587c681d1bd148bc1bd6910d004a1fcc4d4e7b",
+        "line_start": 118,
+        "line_end": 119,
+        "meaning": "Simulation clock default Pause versus separate audio CatchUp clock",
+        "file": "src/gameplay_menu_browser.cpp"
+      },
+      {
+        "bytes": 91365,
+        "sha256": "c0d07e36015c94073d2a465fa1587c681d1bd148bc1bd6910d004a1fcc4d4e7b",
+        "line_start": 1353,
+        "line_end": 1365,
+        "meaning": "Exact tick timestamp sampled after preparation; stall sets runningfalse; allocated steps loop",
+        "file": "src/gameplay_menu_browser.cpp"
+      },
+      {
+        "bytes": 91365,
+        "sha256": "c0d07e36015c94073d2a465fa1587c681d1bd148bc1bd6910d004a1fcc4d4e7b",
+        "line_start": 1378,
+        "line_end": 1379,
+        "meaning": "Source draw from preceding tick may occur before next step; deferred pipeline break",
+        "file": "src/gameplay_menu_browser.cpp"
+      },
+      {
+        "bytes": 91365,
+        "sha256": "c0d07e36015c94073d2a465fa1587c681d1bd148bc1bd6910d004a1fcc4d4e7b",
+        "line_start": 355,
+        "line_end": 369,
+        "meaning": "Deferred preparation break publishes incident and resets clock",
+        "file": "src/gameplay_menu_browser.cpp"
+      },
+      {
+        "bytes": 91365,
+        "sha256": "c0d07e36015c94073d2a465fa1587c681d1bd148bc1bd6910d004a1fcc4d4e7b",
+        "line_start": 1442,
+        "line_end": 1453,
+        "meaning": "Match tick completion increments source step and recipe cursor",
+        "file": "src/gameplay_menu_browser.cpp"
+      },
+      {
+        "bytes": 91365,
+        "sha256": "c0d07e36015c94073d2a465fa1587c681d1bd148bc1bd6910d004a1fcc4d4e7b",
+        "line_start": 1502,
+        "line_end": 1513,
+        "meaning": "Scene-transition loop break exclusion",
+        "file": "src/gameplay_menu_browser.cpp"
+      },
+      {
+        "bytes": 91365,
+        "sha256": "c0d07e36015c94073d2a465fa1587c681d1bd148bc1bd6910d004a1fcc4d4e7b",
+        "line_start": 1616,
+        "line_end": 1627,
+        "meaning": "Pending remainder sample published after clock/steps/render, before timing hook",
+        "file": "src/gameplay_menu_browser.cpp"
+      },
+      {
+        "bytes": 15857,
+        "sha256": "a03e77c102d0860bade336941a6a4eb1d9aaf804f6dc942c7c3ac92bd83fc209",
+        "line_start": 45,
+        "line_end": 47,
+        "meaning": "args[8] sampled as pending ticks",
+        "file": "tests/pause_trace_capture.mjs"
+      },
+      {
+        "bytes": 15857,
+        "sha256": "a03e77c102d0860bade336941a6a4eb1d9aaf804f6dc942c7c3ac92bd83fc209",
+        "line_start": 89,
+        "line_end": 115,
+        "meaning": "Timing hook retains completed callback row and source input cursor",
+        "file": "tests/pause_trace_capture.mjs"
+      },
+      {
+        "bytes": 15155,
+        "sha256": "2c105d9d0ee9189080b129c75fe55c446d506c9a1896a6edfd3b5716d335cd17",
+        "line_start": 111,
+        "line_end": 115,
+        "meaning": "Incident end bound excludes later paused callback hook",
+        "file": "tests/staging_ring_sustained_decision.mjs"
+      },
+      {
+        "bytes": 15155,
+        "sha256": "2c105d9d0ee9189080b129c75fe55c446d506c9a1896a6edfd3b5716d335cd17",
+        "line_start": 195,
+        "line_end": 225,
+        "meaning": "Frozen fractional-tail criterion and fallback to preceding active row",
+        "file": "tests/staging_ring_sustained_decision.mjs"
+      }
+    ],
+    "summary": "Pause policy consumes all admissible whole ticks. Published pending fraction is after consumption; guard whole9>8 is before reset. Current callback rendering contributes to elapsed demand at the next clock tick. Falling fractional tail does not exclude increasing accepted pre-step demand.",
+    "historical_classifier_warning": "pause_callback_total_ms/staging_wait_ms describe preceding active row375 because actual guard row376 hook occurs after incident end cutoff. Raw historical fields and decisions preserved."
+  },
+  "artifacts": [
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "preflight-mismatch.json",
+      "bytes": 23084,
+      "sha256": "6360b812307e56a7f0359e1ca438993936b29716a308e03f4d9817db614aa4c3"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "prospective-build-manifest.json",
+      "bytes": 9140,
+      "sha256": "83fd3060b49b90cafe300548b8c3e38962ab735ff0104872e237cf2ebc5bb893"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "prospective-build-manifest-v2.json",
+      "bytes": 9259,
+      "sha256": "c953c38446acec89d1834b81c76c8f17f4cb94667a271b321ca7eb1aba9d44ee"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "prospective-build-manifest-v3.json",
+      "bytes": 10683,
+      "sha256": "6cbb23d980c4dba62cdf6fa5c1c07b9bbbe73ac7a928d14b432cc616763c50c5"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "prospective-build-manifest-v4.json",
+      "bytes": 13498,
+      "sha256": "783af85ccebe447ad0b8d127541f569c632104dc9cc25df9b96bd5cfa32cf20e"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring2-sustained-attempt-1/report.json",
+      "bytes": 274832,
+      "sha256": "a4f09d95d2fb7e2ba99b39490bb2b4a05177516e1fbfeac26f3e1325b1c2273e"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring2-sustained-attempt-1/capture.json",
+      "bytes": 224929,
+      "sha256": "ef2ae401da728d549d069c3b2729a967fb7818e7113bc60323d63c05c0ad3f21"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring2-sustained-attempt-1/recorder.json",
+      "bytes": 926,
+      "sha256": "a5e1affd4d0bd05f1897f76ed1547d713c6298b3d97c5e5c54c34902336a8a58"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "h1-timing-lane-receipt.json",
+      "bytes": 2165,
+      "sha256": "761279665b4acc2fef40557d6b9e5850c740f7e10566badef5b27a393decfb23"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring2-sustained-attempt-2/report.json",
+      "bytes": 1328172,
+      "sha256": "39665aefc745b98ca4ef09b6a81456c094e86c826626c840c28b7fbc181dac6f"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring2-sustained-attempt-2/capture.json",
+      "bytes": 1005232,
+      "sha256": "3e865bbc6e5b65b3f4dd3d24bc37f165f3893884b75add7bed2e282cc0803e83"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring2-sustained-attempt-2/recorder.json",
+      "bytes": 58992,
+      "sha256": "b02fb0bc7b8480de3e6cc78a8971de3a70aac49dc2e6aa38815808c640dc96b1"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "h1-timing-lane-receipt-v2.json",
+      "bytes": 2118,
+      "sha256": "d8d4ef25819cfffa4e61bdadf51cb9035fa0fb3a3d677c95e96bfbdc00d19014"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "source-informed-interpretation-v1.json",
+      "bytes": 23413,
+      "sha256": "721a6c842674b9adc7ca46c41e02af3b486f100d36a325155bc554fbe08c8282"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring-four-comparison-proposal-v1.json",
+      "bytes": 10931,
+      "sha256": "e7db19ec56d1c4ee9ace537e65fd7f99c211d4be5c542ebfad571e3c8dc4656e"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring4-sustained-attempt-1/report.json",
+      "bytes": 1635425,
+      "sha256": "94fdd3a9f0ec504b9103caac50d5b47d31ad90ab17244d28e31756c098d465d3"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring4-sustained-attempt-1/capture.json",
+      "bytes": 1271827,
+      "sha256": "2206a89b2b5b800083456ac92021a672b671f75ea742581805c0f745562abbf8"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring4-sustained-attempt-1/recorder.json",
+      "bytes": 926,
+      "sha256": "53cb8a9d7fbee8095dbdc20b098dd5368b0692aea505bb00a60b935e9205c213"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring4-sustained-attempt-1/source-informed-comparison.json",
+      "bytes": 77060,
+      "sha256": "48684b68be9e1727f2d14dc75adce3b467916f39c6afd7585cb425795a269e2c"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring-four-timing-lane-receipt-v1.json",
+      "bytes": 2146,
+      "sha256": "c56759a6c9d506afbf9478b1c4ae497463f53b1af8d46d565f0c9acbcec3e690"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring-four-attempt-1-cleanup-review.json",
+      "bytes": 2034,
+      "sha256": "1c0ffbad4555e682b2ae5021cdff6fb7d75e42ba1756b991ceea6f24494320bb"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "ring-four-attempt-1-outcome-summary.json",
+      "bytes": 6117,
+      "sha256": "1626d5e294b05ff10c2f9632b82ad60c3aac9a71d6648c1e9d13971d46ab5132"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "assess_ring_four_comparison.py",
+      "bytes": 13559,
+      "sha256": "6343272eeca49d1f98753e1f0391184dea835ae98486fff6cb80e8a2b810fd9b"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "integration-rebased-main-v1.log",
+      "bytes": 349566,
+      "sha256": "f17b4947377f10b377812fe95ed621a25bc3d58f9e5ca5370a2a68b054b4b2ac"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "focused-rebased-main-v1.log",
+      "bytes": 1647,
+      "sha256": "373a699dc97bec20d1aa4492f6212e7ff9a0e66ae835a38273052335b3d04507"
+    },
+    {
+      "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+      "artifact": "rebased-offline-comparison-v1.json",
+      "bytes": 77083,
+      "sha256": "f229e30d828eda7668fd5ae80e2ccc214b060fcb829111a9dae27bf5bf7248d7"
+    }
+  ],
+  "validation": {
+    "review_base_commit": "c212e99aec20685b893a6ba90c3517c388b43908",
+    "rebased_harness_commit_before_integration": "8d5ff4f656ceb0488d2754e4abdabf62e3ea6721",
+    "full_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "result": "pass",
+      "tests": 1924,
+      "skipped": 141,
+      "elapsed_seconds": 348.912,
+      "log": {
+        "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+        "artifact": "integration-rebased-main-v1.log",
+        "bytes": 349566,
+        "sha256": "f17b4947377f10b377812fe95ed621a25bc3d58f9e5ca5370a2a68b054b4b2ac"
+      }
+    },
+    "focused": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p 'test_staging_ring*.py' -v",
+      "result": "pass",
+      "tests": 10,
+      "log": {
+        "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+        "artifact": "focused-rebased-main-v1.log",
+        "bytes": 1647,
+        "sha256": "373a699dc97bec20d1aa4492f6212e7ff9a0e66ae835a38273052335b3d04507"
+      }
+    },
+    "harness_syntax": {
+      "command": "node --check tests/staging_ring_sustained_capture.mjs",
+      "result": "pass"
+    },
+    "offline_reproduction": {
+      "result": "identical source-informed result, problems, metric comparisons, source offsets, candidate/baseline windows and preserved legacy decisions; only provenance paths/tool identity differ",
+      "artifact": {
+        "run_id": "h1-sustained-load-reducer-20261006-154556-073b048c",
+        "artifact": "rebased-offline-comparison-v1.json",
+        "bytes": 77083,
+        "sha256": "f229e30d828eda7668fd5ae80e2ccc214b060fcb829111a9dae27bf5bf7248d7"
+      }
+    },
+    "native_build": "not required: diff against review base changes harness/offline tools/tests/docs only; canonical Aurora patch and native/runtime source unchanged; historical executable evidence not relabeled",
+    "incremental_builds": "retained for review and frozen-byte verification; unrelated scratch untouched"
+  },
+  "limitations": [
+    "Induced synthetic GPU workload, not natural four-stock H1 route or retail comparison.",
+    "Frozen ring4 comparison remains inconclusive despite no guard; controlp95 ratio1.305936 exceeds1.2. No retrospective metric relaxation or retry.",
+    "Accepted-demand reconstruction conditional on no clock reset/step-loop break; source/cursor/step agreement and no preparation verified for these captured active rows.",
+    "Guard event retains floored whole9 and threshold8; exact floating pre-tick guard value/timestamp not independently retained.",
+    "Batch wall observations and queue registration-to-delivery wall measurements are not pure GPU execution.",
+    "Recorder producer metadata has source_commit/runtime_hash null and build_profile unknown; external manifests bind session reports and bytes separately.",
+    "HTTP equality proves served-byte identity, not native compiler producer provenance. Historical reports/manifests not rebaselined.",
+    "Headless/silent results do not satisfy foreground timing, physical controllers, uninterrupted audio, natural-cause or H1 acceptance."
+  ],
+  "next_H1_recommendation": {
+    "scope": "remaining exact natural-session failure and acceptance gap, not another synthetic comparison",
+    "existing_evidence": [
+      "docs/evidence/audio-output-clock-startup-v2.json",
+      "docs/evidence/gameplay-pause-trace-v1.json"
+    ],
+    "read_only_handoff": {
+      "checkout_basename": "performance-regression-20261003-20261003-132641-c0cd483f",
+      "manifest_relative_file": "work/checkpoint-private-20261003/manifest.json",
+      "manifest_sha256": "025aef0da4b0537ca6d04862faca68f2763287033c2751bbc257150dff3f8a59",
+      "run_basename": "performance-regression-pause-trace-20261003-232216-7bc7875a",
+      "file": "HANDOFF.md",
+      "bytes": 4689,
+      "sha256": "bb5945646f1711cab293904775b659de3e36337320f107098d0499225b6516b3",
+      "observed": "planned exact-recipe trace was not launched; staging observations were correlational"
+    },
+    "first_step": "verify natural producer/build identity and reduce first actual guard, preceding active callback, staging/completion, CPU phases and audio; cursor1645/liveframe63 used four-player MWRCv8, different from CPU9 and this synthetic reducer",
+    "conditional_experiment": "only if retained packet is insufficient and separately authorized: one default2 same pinned MWRCv8/disc and producer-identified Release package with bounded startup CDP/User Timing and hitch recorder; no injected workload/stall; missing input or uncertain build identity stops preflight",
+    "limits": {
+      "stop": "first pause/error or cursor3000 or replay60s",
+      "process_cap_seconds": 65,
+      "overall_cap_seconds": 95,
+      "no_resume_tuning_retry": true,
+      "large_reads": "stop source playback before large evidence reads"
+    },
+    "observable_outcome": "actual guard/completion packet for reproduced failure or clean cursor3000 prefix only",
+    "acceptance_followup": "after boundary reduction, separate natural original CSS->SSS->Mario-versus-Mario four-stock Final Destination->Results->CSS route with declared callback/gap/audio criteria; original comparison/foreground/physical-input gates remain",
+    "exclusions": "no changed synthetic-comparison limits, default4, inferred naturalcause, retail/pixels/PCM/foreground/physical-input or H1 acceptance",
+    "authorization": "recommendation only; no new run performed or authorized by this receipt"
+  }
+}
