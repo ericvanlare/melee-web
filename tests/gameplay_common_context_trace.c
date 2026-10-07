@@ -1,3 +1,4 @@
+#include "gameplay_vs_sis.h"
 #include "gameplay_common_context.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_archive_sections.h"
@@ -37,7 +38,11 @@ static int start_vs_manager(char* error, size_t size)
     if(error&&size)error[0]='\0';
     return 1;
 }
-static void stop_vs_sis(void) { HSD_SisLib_803A5FBC(); }
+static int stop_vs_sis(MeleeWebGameplayVSSisOperation operation, int slot,
+                void* expected, char* error, size_t size)
+{
+    return melee_web_gameplay_vs_sis(operation, slot, expected, error, size);
+}
 static void cpu_destroy(MeleeWebCommonCpuData* data)
 {
     (void)data;

@@ -33,7 +33,7 @@ typedef struct MeleeWebGameplayBootstrapState {
     uint32_t abi_version;
     uint32_t abi_size;
     uint32_t schema;
-    uint32_t reserved0;
+    uint32_t vs_borrowed_sis_slot;
     uint64_t ticks;
     uint64_t disabled_links;
     uint64_t generation;
@@ -45,7 +45,7 @@ typedef struct MeleeWebGameplayBootstrapState {
     int32_t heap_handle;
     uint32_t object_kind_count;
     uint32_t stepping;
-    uint32_t shutting_down;
+    uint32_t shutting_down; /* 0 idle, 1 active, 2 retained after SIS drain. */
     uint32_t tables_live;
     uint32_t vs_startup_pending;
     uint32_t startup_in_progress;
@@ -55,12 +55,12 @@ typedef struct MeleeWebGameplayBootstrapState {
     uint32_t vs_startup_callback;
     uint32_t vs_shutdown_callback;
     uint32_t finish_hsd_objects;
-    uint32_t reserved1;
+    uint32_t vs_borrowed_sis_descriptor;
 } MeleeWebGameplayBootstrapState;
 
 enum {
     MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_ABI_VERSION = 1,
-    MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_SCHEMA = 0x47504253u /* GPBS */,
+    MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE_SCHEMA = 0x47504232u /* GPB2 */,
 };
 
 #if defined(__cplusplus)
@@ -71,7 +71,7 @@ static_assert(offsetof(MeleeWebGameplayBootstrapState, ticks) == 16 &&
               offsetof(MeleeWebGameplayBootstrapState, heap_handle) == 72 &&
               offsetof(MeleeWebGameplayBootstrapState, stepping) == 80 &&
               offsetof(MeleeWebGameplayBootstrapState, vs_startup_callback) == 112 &&
-              offsetof(MeleeWebGameplayBootstrapState, reserved1) == 124,
+              offsetof(MeleeWebGameplayBootstrapState, vs_borrowed_sis_descriptor) == 124,
               "Bootstrap state ABI offsets changed");
 #else
 _Static_assert(sizeof(MeleeWebGameplayBootstrapState) == 128,
@@ -81,7 +81,7 @@ _Static_assert(offsetof(MeleeWebGameplayBootstrapState, ticks) == 16 &&
                offsetof(MeleeWebGameplayBootstrapState, heap_handle) == 72 &&
                offsetof(MeleeWebGameplayBootstrapState, stepping) == 80 &&
                offsetof(MeleeWebGameplayBootstrapState, vs_startup_callback) == 112 &&
-               offsetof(MeleeWebGameplayBootstrapState, reserved1) == 124,
+               offsetof(MeleeWebGameplayBootstrapState, vs_borrowed_sis_descriptor) == 124,
                "Bootstrap state ABI offsets changed");
 #endif
 
@@ -115,10 +115,32 @@ int melee_web_gameplay_startup(size_t heap_bytes, char* error, size_t error_size
  * prepares source HSD components, starts the source SIS owner, and invokes the
  * original gm_801A4BD4 manager, which creates the GObj tables itself. */
 typedef int (*MeleeWebGameplayVSStartup)(char* error, size_t error_size);
-typedef void (*MeleeWebGameplayVSShutdown)(void);
+/* The configured VS owner supplies SIS access; narrow non-VS worlds have no
+ * SIS dependency. Ownership operations return checked success/refusal. DRAIN
+ * must execute original SIS shutdown completely or fail fatally. An unexpected
+ * returned failure keeps the world blocked, with no retry of an unknown drain. */
+typedef enum MeleeWebGameplayVSSisOperation {
+    MELEE_WEB_VS_SIS_VALIDATE_BORROW,
+    MELEE_WEB_VS_SIS_PREFLIGHT_BORROW,
+    MELEE_WEB_VS_SIS_DRAIN,
+    MELEE_WEB_VS_SIS_RETIRE_BORROW
+} MeleeWebGameplayVSSisOperation;
+typedef int (*MeleeWebGameplayVSShutdown)(MeleeWebGameplayVSSisOperation,
+                                         int font_slot, void* expected,
+                                         char* error, size_t error_size);
 int melee_web_gameplay_prepare_vs_startup(MeleeWebGameplayVSStartup startup,
                                           MeleeWebGameplayVSShutdown shutdown,
                                           char* error, size_t error_size);
+/* Register one externally-owned SIS descriptor before source code publishes it
+ * to the global font table. The caller keeps that descriptor's allocation
+ * alive through gameplay shutdown and its generic GObj sweep. A failed
+ * initial shutdown preflight leaves the world and every source SIS slot unchanged.
+ * Failure after source drain retains the owner and blocks gameplay until a
+ * checked shutdown retry succeeds. */
+int melee_web_gameplay_vs_register_borrowed_sis(int font_slot,
+                                                void* descriptor,
+                                                char* error,
+                                                size_t error_size);
 int melee_web_gameplay_vs_startup_active(void);
 /* True only while the configured VS callback owns the heap and generation,
  * before the original scene manager publishes its GObj tables. */

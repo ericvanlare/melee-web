@@ -66,13 +66,13 @@ const readState = (bytes) => {
   const u32 = offset => view.getUint32(offset, true);
   const u64 = offset => view.getBigUint64(offset, true).toString();
   return {
-    abi_version: u32(0), abi_size: u32(4), schema: u32(8), reserved0: u32(12),
+    abi_version: u32(0), abi_size: u32(4), schema: u32(8), vs_borrowed_sis_slot: u32(12),
     ticks: u64(16), disabled_links: u64(24), generation: u64(32), allocation_generation: u64(40),
     arena_bytes: u64(48), session_bytes: u64(56), arena_identity: u32(64), session_identity: u32(68),
     heap_handle: view.getInt32(72, true), object_kind_count: u32(76),
     stepping: u32(80), shutting_down: u32(84), tables_live: u32(88), vs_startup_pending: u32(92),
     startup_in_progress: u32(96), vs_sis_live: u32(100), vs_dynamics_ready: u32(104), vs_manager_ready: u32(108),
-    vs_startup_callback: u32(112), vs_shutdown_callback: u32(116), finish_hsd_objects: u32(120), reserved1: u32(124),
+    vs_startup_callback: u32(112), vs_shutdown_callback: u32(116), finish_hsd_objects: u32(120), vs_borrowed_sis_descriptor: u32(124),
     raw_length: bytes.length, raw_hex: Buffer.from(bytes).toString('hex'),
   };
 };
@@ -101,8 +101,9 @@ const recordLog = (kind, message) => {
   report.runtime_log.push({kind, text});
 };
 const requireState = state => {
-  if (state.abi_version !== 1 || state.abi_size !== 128 || state.schema !== 0x47504253 || state.reserved0 !== 0 || state.reserved1 !== 0) throw new Error('bootstrap ABI/schema/padding mismatch');
-  for (const key of ['stepping', 'shutting_down', 'tables_live', 'vs_startup_pending', 'startup_in_progress', 'vs_sis_live', 'vs_dynamics_ready', 'vs_manager_ready']) if (![0, 1].includes(state[key])) throw new Error(`bootstrap flag is not 0/1: ${key}`);
+  if (state.abi_version !== 1 || state.abi_size !== 128 || state.schema !== 0x47504232) throw new Error('bootstrap ABI/schema mismatch');
+  for (const key of ['stepping', 'tables_live', 'vs_startup_pending', 'startup_in_progress', 'vs_sis_live', 'vs_dynamics_ready', 'vs_manager_ready']) if (![0, 1].includes(state[key])) throw new Error(`bootstrap flag is not 0/1: ${key}`);
+  if (![0, 1, 2].includes(state.shutting_down)) throw new Error('bootstrap shutdown phase is invalid');
   if (state.stepping || state.shutting_down || state.startup_in_progress || state.tables_live !== 1) throw new Error('bootstrap observation is not a published quiescent world');
   if (!state.arena_identity || state.heap_handle < 0 || state.generation === '0' || state.allocation_generation === '0') throw new Error('bootstrap arena/generation ownership is not live');
   for (const key of ['arena_bytes', 'session_bytes']) if (state[key] !== '0' && (BigInt(state[key]) < 65536n || BigInt(state[key]) > 64n * 1024n * 1024n)) throw new Error(`bootstrap ${key} outside authored bounds`);
@@ -110,6 +111,12 @@ const requireState = state => {
   if (state.vs_sis_live && (!state.vs_manager_ready || !state.tables_live)) throw new Error('VS SIS/manager phase mismatch');
   if (state.vs_dynamics_ready && !state.vs_sis_live) throw new Error('VS dynamics phase mismatch');
   if ((state.vs_startup_callback === 0) !== (state.vs_shutdown_callback === 0)) throw new Error('VS callback identities are unpaired');
+  if (state.vs_borrowed_sis_slot === 0xffffffff) {
+    if (state.vs_borrowed_sis_descriptor !== 0) throw new Error('unbound borrowed SIS owner has a descriptor identity');
+  } else if (state.vs_borrowed_sis_slot >= 5 || !state.vs_sis_live ||
+             !state.vs_borrowed_sis_descriptor) {
+    throw new Error('borrowed SIS owner identity is outside its live font slot');
+  }
 };
 try {
   const wasmPath = options['--runtime'].replace(/\.js$/, '.wasm');
@@ -129,7 +136,7 @@ try {
   if (probeIdentity !== report.identities.probe_source_sha256 ||
       sourceCIdentity !== report.identities.source_c_sha256 ||
       sourceHIdentity !== report.identities.source_h_sha256) throw new Error('compiled probe/source identity mismatch');
-  if (module._melee_web_gameplay_bootstrap_state_abi_size() !== 128 || module._melee_web_gameplay_bootstrap_state_abi_version() !== 1 || module._melee_web_gameplay_bootstrap_state_schema() !== 0x47504253) throw new Error('compiled bootstrap ABI exports mismatch');
+  if (module._melee_web_gameplay_bootstrap_state_abi_size() !== 128 || module._melee_web_gameplay_bootstrap_state_abi_version() !== 1 || module._melee_web_gameplay_bootstrap_state_schema() !== 0x47504232) throw new Error('compiled bootstrap ABI exports mismatch');
   requireRefusal('before world initialization', ptr => module._melee_web_gameplay_bootstrap_state_capture(ptr, 128));
   // Initialization can allocate before returning a refusal or throwing.
   // Record cleanup ownership before entering it, and attempt close only once.

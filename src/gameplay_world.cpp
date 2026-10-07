@@ -1,3 +1,4 @@
+#include "gameplay_vs_sis.h"
 #include "gameplay_world.hpp"
 #include "runtime_archive_cache.hpp"
 #include "gameplay_content.h"
@@ -74,7 +75,11 @@ int start_vs_scene_manager(char* error, size_t size)
     if (error && size) error[0] = '\0';
     return 1;
 }
-void stop_vs_sis(void) { HSD_SisLib_803A5FBC(); }
+int stop_vs_sis(MeleeWebGameplayVSSisOperation operation, int slot,
+                void* expected, char* error, size_t size)
+{
+    return melee_web_gameplay_vs_sis(operation, slot, expected, error, size);
+}
 void check(int ok,const char* error){if(!ok)throw DatError(error);}
 std::string_view melee_web_runtime_file_name_impl(const RuntimeFiles& files,
                                                   std::string_view authored_name,

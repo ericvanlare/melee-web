@@ -83,6 +83,7 @@ static void valid_owner(void)
     producer_state.session_identity = 0x2000;
     producer_state.heap_handle = 3;
     producer_state.tables_live = 1;
+    producer_state.vs_borrowed_sis_slot = UINT32_MAX;
     producer_state.vs_dynamics_ready = 1;
     producer_state.vs_manager_ready = 1;
     producer_state.vs_sis_live = 1;
@@ -140,6 +141,10 @@ int main(void)
         if (!refusal()) return 4;
         *flag = flag == &producer_state.tables_live ? 1 : 0;
     }
+
+    producer_state.shutting_down = 2;
+    if (!refusal()) return 14;
+    producer_state.shutting_down = 0;
 
     /* Source-memory, world/session, allocation, and stats relations are atomic. */
     source_ok = 0; if (!refusal()) return 5; source_ok = 1;

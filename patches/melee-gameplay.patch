@@ -10671,7 +10671,7 @@ index 9536d2a353ac39e156c8fc17f9a780871229c060..41143790a92d43d934e32627112598ea
              if (a->frame == -2) {
                  return 1;
 diff --git a/src/sysdolphin/baselib/sislib.c b/src/sysdolphin/baselib/sislib.c
-index bc3a9125d905210c360664c5b93a78eb49f43b4d..a71424e7544f30015c4a8f8b59f070dd7961571f 100644
+index bc3a9125d905210c360664c5b93a78eb49f43b4d..e8d131263678cfa010a01e43e8d37c28334c4b2c 100644
 --- a/src/sysdolphin/baselib/sislib.c
 +++ b/src/sysdolphin/baselib/sislib.c
 @@ -1,6 +1,8 @@
@@ -10683,6 +10683,33 @@ index bc3a9125d905210c360664c5b93a78eb49f43b4d..a71424e7544f30015c4a8f8b59f070dd
  #include <stdio.h>
  
  #include "cobj.h"
+@@ -456,6 +458,14 @@ void HSD_SisLib_803A5FBC(void)
+     HSD_Free(HSD_SisLib_804D796C);
+ }
+ 
++int HSD_SisLib_FontSlotBorrowable(s32 font_idx)
++{
++    return font_idx >= 0 &&
++           (size_t) font_idx <
++               sizeof(HSD_SisLib_804D1110) / sizeof(HSD_SisLib_804D1110[0]) &&
++           HSD_SisLib_804D1110[font_idx] == NULL;
++}
++
+ /// @todo Currently 97.56% match - extra lwz reload optimized away by
+ /// compiler after dual global store
+ void HSD_SisLib_803A6048(size_t size)
+diff --git a/src/sysdolphin/baselib/sislib.h b/src/sysdolphin/baselib/sislib.h
+index 153b907c1b0375796291582008f24380142e3bdc..a8b503947a43a6f5ca6299ee3211bec0bc50676f 100644
+--- a/src/sysdolphin/baselib/sislib.h
++++ b/src/sysdolphin/baselib/sislib.h
+@@ -149,6 +149,7 @@ void HSD_SisLib_803A5DA0(s32);
+ void HSD_SisLib_803A5E70(void);
+ void HSD_SisLib_803A5F50(s32);
+ void HSD_SisLib_803A5FBC(void);
++int HSD_SisLib_FontSlotBorrowable(s32 font_idx);
+ void fn_803A60EC(void*);
+ u8* fn_803A6FEC(u8*, s32, s32*);
+ /// void *HSD_SisLib_803A84BC(HSD_GObj *, s32);
 diff --git a/src/sysdolphin/baselib/sislib_font.c b/src/sysdolphin/baselib/sislib_font.c
 index 60f0b175744429b2e4e1879a87634a553c528a8a..27ee6bb7d74d55cd4aded93fd2606a845e075546 100644
 --- a/src/sysdolphin/baselib/sislib_font.c

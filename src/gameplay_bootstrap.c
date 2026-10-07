@@ -32,11 +32,14 @@ static void* session_arena;
 static size_t session_bytes;
 static OSHeapHandle heap = -1;
 static uint64_t ticks, disabled_links, generation, allocation_generation;
+enum { SHUTDOWN_IDLE, SHUTDOWN_ACTIVE, SHUTDOWN_RETAINED_AFTER_DRAIN };
 static int stepping, shutting_down, tables_live;
 static int vs_startup_pending, startup_in_progress, vs_sis_live;
 static int vs_dynamics_ready, vs_manager_ready;
 static MeleeWebGameplayVSStartup vs_startup_callback;
 static MeleeWebGameplayVSShutdown vs_shutdown_callback;
+static uint32_t vs_borrowed_sis_slot = UINT32_MAX;
+static void* vs_borrowed_sis_descriptor;
 static unsigned object_kind_count;
 static void (*finish_hsd_objects)(void);
 
@@ -151,6 +154,9 @@ int melee_web_gameplay_bootstrap_state(MeleeWebGameplayBootstrapState* out,
     out->vs_startup_callback = bootstrap_startup_identity(vs_startup_callback);
     out->vs_shutdown_callback = bootstrap_shutdown_identity(vs_shutdown_callback);
     out->finish_hsd_objects = bootstrap_finish_identity(finish_hsd_objects);
+    out->vs_borrowed_sis_slot = vs_borrowed_sis_slot;
+    out->vs_borrowed_sis_descriptor =
+        bootstrap_pointer_identity(vs_borrowed_sis_descriptor);
     return 1;
 }
 
@@ -349,6 +355,53 @@ int melee_web_gameplay_prepare_vs_startup(MeleeWebGameplayVSStartup startup,
     return success(error, error_size);
 }
 
+int melee_web_gameplay_vs_register_borrowed_sis(int font_slot,
+                                                void* descriptor,
+                                                char* error,
+                                                size_t error_size)
+{
+    if (!vs_sis_live || !vs_manager_ready || !tables_live || shutting_down ||
+        stepping || !melee_web_gameplay_heap_owns(arena))
+        return fail(error, error_size,
+                    "Borrowed SIS registration requires the live VS owner");
+    if (vs_borrowed_sis_slot != UINT32_MAX || vs_borrowed_sis_descriptor)
+        return fail(error, error_size,
+                    "A borrowed SIS descriptor is already registered");
+    if (!descriptor)
+        return fail(error, error_size, "Borrowed SIS descriptor is missing");
+    if (!vs_shutdown_callback(MELEE_WEB_VS_SIS_VALIDATE_BORROW,
+                              font_slot, descriptor, error, error_size)) return 0;
+    vs_borrowed_sis_slot = (uint32_t)font_slot;
+    vs_borrowed_sis_descriptor = descriptor;
+    return success(error, error_size);
+}
+
+static int preflight_borrowed_sis(char* error, size_t error_size)
+{
+    if (vs_borrowed_sis_slot == UINT32_MAX)
+        return vs_borrowed_sis_descriptor ?
+            fail(error, error_size, "Borrowed SIS owner record is inconsistent") :
+            success(error, error_size);
+    if (!vs_borrowed_sis_descriptor || !vs_shutdown_callback)
+        return fail(error, error_size, "Borrowed SIS owner record is inconsistent");
+    return vs_shutdown_callback(MELEE_WEB_VS_SIS_PREFLIGHT_BORROW,
+                                (int)vs_borrowed_sis_slot,
+                                vs_borrowed_sis_descriptor, error, error_size);
+}
+
+static int retire_borrowed_sis(char* error, size_t error_size)
+{
+    if (vs_borrowed_sis_slot != UINT32_MAX) {
+        if (!vs_shutdown_callback(MELEE_WEB_VS_SIS_RETIRE_BORROW,
+                                  (int)vs_borrowed_sis_slot,
+                                  vs_borrowed_sis_descriptor,
+                                  error, error_size)) return 0;
+        vs_borrowed_sis_slot = UINT32_MAX;
+        vs_borrowed_sis_descriptor = NULL;
+    }
+    return success(error, error_size);
+}
+
 int melee_web_gameplay_vs_startup_active(void)
 {
     return vs_sis_live && vs_manager_ready && tables_live && !shutting_down &&
@@ -466,7 +519,8 @@ uint64_t melee_web_gameplay_provenance_tick(void)
 int melee_web_gameplay_shutdown(char* error, size_t error_size)
 {
     if (!arena) return success(error, error_size);
-    if (shutting_down) return fail(error, error_size, "Gameplay world destruction cannot be reentered");
+    if (shutting_down == SHUTDOWN_ACTIVE)
+        return fail(error, error_size, "Gameplay world destruction cannot be reentered");
     if (stepping) return fail(error, error_size, "Cannot destroy the gameplay world during a process callback");
     if (!melee_web_gameplay_heap_owns(arena))
         return fail(error, error_size, "Gameplay SDK heap ownership was replaced; arena retained");
@@ -477,12 +531,30 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     }
     if (has_render_objects())
         return fail(error, error_size, "Cannot destroy uninitialized HSD render-object lifetimes");
-    shutting_down = 1;
+    /* Preflight precedes the first destructive step, or a retained retry.
+     * Only the configured VS source owner accesses SIS state. */
+    if (!preflight_borrowed_sis(error, error_size)) return 0;
+    shutting_down = SHUTDOWN_ACTIVE;
     if (vs_sis_live) {
         /* Source SIS teardown owns its text GObjs and must run before the
          * generic object sweep and before destroying the source heap. */
-        vs_shutdown_callback();
+        if (!vs_shutdown_callback(MELEE_WEB_VS_SIS_DRAIN, -1, NULL,
+                                  error, error_size)) {
+            /* Drain completion is unknown. Keep active shutdown latched and
+             * forbid any retry rather than rerunning destructive source work. */
+            if (error && error_size && !error[0])
+                snprintf(error, error_size,
+                         "Original VS SIS shutdown did not confirm complete source drain");
+            return 0;
+        }
         vs_sis_live = 0;
+    }
+    if (!retire_borrowed_sis(error, error_size)) {
+        /* SIS is already drained. Keep all live-world APIs blocked while
+         * retaining the owner and objects for a checked shutdown-only retry.
+         * The completed source callback must not run a second time. */
+        shutting_down = SHUTDOWN_RETAINED_AFTER_DRAIN;
+        return 0;
     }
     for (unsigned link = 0; link <= HSD_GObjLibInitData.p_link_max; ++link)
         while (((HSD_GObj**) HSD_GObj_Entities)[link])
