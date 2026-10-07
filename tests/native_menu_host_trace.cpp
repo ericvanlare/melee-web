@@ -53,7 +53,6 @@ extern "C" {
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 #include <melee/gr/grdatfiles.h>
 #include <melee/gr/stage.h>
-#include <melee/it/it_3F14.h>
 #include <sysdolphin/baselib/gobj.h>
 #endif
 #include <melee/ty/forward.h>
@@ -62,6 +61,14 @@ extern "C" {
 extern HSD_Archive* _Toy_sbss_804D6ED0;
 }
 #include <melee/gr/forward.h>
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wwrite-strings"
+extern "C" {
+#include <melee/it/forward.h>
+}
+#pragma GCC diagnostic pop
+#endif
 #include <sysdolphin/baselib/random.h>
 extern "C" {
 #include <melee/lb/lb_013B.h>
@@ -1555,24 +1562,16 @@ void run_stadium_e8_request(
     }
 }
 
-struct StadiumItemRuntimeGlobals {
-    it_804D6D20_t* public_data;
-    Article** common_articles;
-    ItemCommonData* common_data;
-    Article** pokemon_articles;
-    Article** character_articles;
-    it_804D6D40_t* bounce_data;
-    Fighter_804D653C_t* color_rows;
-};
-
-StadiumItemRuntimeGlobals stadium_item_runtime_globals()
+MeleeWebStadiumC1ItemRuntimeGlobalsView stadium_item_runtime_globals()
 {
-    return {it_804D6D20, it_804D6D24, it_804D6D28, it_804D6D30,
-            it_804D6D38, it_804D6D40, it_804D6D04};
+    MeleeWebStadiumC1ItemRuntimeGlobalsView view{};
+    check(melee_web_stadium_c1_item_runtime_globals_view(&view),
+          "C1 item-state preflight cannot read source item globals");
+    return view;
 }
 
 void check_stadium_item_runtime_globals(
-    const StadiumItemRuntimeGlobals& expected)
+    const MeleeWebStadiumC1ItemRuntimeGlobalsView& expected)
 {
     const auto observed = stadium_item_runtime_globals();
     check(observed.public_data == expected.public_data &&
@@ -1651,24 +1650,29 @@ void run_stadium_c1_item_state_preflight(
               "Original Random Pokémon Article root is absent from ItCo.usd");
 
         DatItemRegistryNative registered_articles(itco_archive);
-        auto* const random_article = static_cast<Article*>(
-            registered_articles.articles()[random_index]);
+        void* const random_article = registered_articles.articles()[random_index];
         check(random_article != nullptr,
               "Original Random Pokémon Article registration is absent");
         DatItemArticle random_article_owner(
             itco_archive, *source_registry.articles[random_index],
             It_PKind_Random, random_article);
-        check(random_article->xC_itemStates != nullptr,
-              "Random Pokémon Article state table is absent");
-        ItemStateArray* const random_states = random_article->xC_itemStates;
         std::array<void*, 8> script_rows_before{};
+        void* random_states = nullptr;
         for (std::size_t row = 1; row < scripts.size(); ++row) {
             if (!scripts[row]) continue;
             check(row < random_article_owner.state_count(),
                   "ALDYakuAll consumer exceeds the authored Random Article state table");
-            script_rows_before[row] =
-                random_states->x0_itemStateDesc[row].xC_script;
+            void* row_table = nullptr;
+            check(melee_web_stadium_c1_random_article_state_row(
+                      random_article, static_cast<std::uint32_t>(row), &row_table,
+                      &script_rows_before[row]),
+                  "Random Pokémon Article source state row is unavailable");
+            if (!random_states) random_states = row_table;
+            check(row_table == random_states,
+                  "Random Pokémon Article state rows do not share one source table");
         }
+        check(random_states != nullptr,
+              "Stadium ALDYakuAll has no checked Random Article state consumers");
 
         const auto item_root = source_registry.root_offset;
         const auto color_root = itco_archive->pointer(item_root + 20, 8);
@@ -1680,41 +1684,57 @@ void run_stadium_c1_item_state_preflight(
             throw DatError("Original ItCo color-animation extent is invalid");
         DatColorAnimation color_owner(itco_archive, *color_root,
                                       color_bytes / 8);
-        auto* const source_item = static_cast<it_804D6D20_t*>(
-            melee_web_item_public_data_decode(
-                public_data_arena.reader(), item_root,
-                registered_articles.articles(),
-                MELEE_WEB_ITEM_REGISTRY_COUNT));
-        check(source_item != nullptr && source_item->x4 != nullptr &&
-                  source_item->x8 != nullptr && source_item->xC != nullptr,
+        void* const source_item = melee_web_item_public_data_decode(
+            public_data_arena.reader(), item_root,
+            registered_articles.articles(), MELEE_WEB_ITEM_REGISTRY_COUNT);
+        MeleeWebStadiumC1ItemPublicDataView source_view{};
+        check(melee_web_stadium_c1_item_public_data_view(source_item,
+                                                         &source_view) &&
+                  source_view.common_data != nullptr &&
+                  source_view.common_articles != nullptr &&
+                  source_view.character_articles != nullptr &&
+                  source_view.pokemon_articles != nullptr &&
+                  source_view.bounce_data != nullptr,
               "Original ItCo public-data root did not retain all Article tables");
-        check(static_cast<const void*>(source_item->x8) ==
+        check(source_view.character_articles ==
                   static_cast<const void*>(registered_articles.articles()),
               "ItCo public-data root did not borrow the checked character Article registry");
 
         const auto globals_before = stadium_item_runtime_globals();
-        const auto source_color_before = source_item->x14;
+        const auto source_color_before = source_view.color_rows;
         char error[256]{};
         StadiumItemRuntimeEndGuard runtime;
         runtime.runtime = melee_web_item_runtime_prepare_source(
             source_item, color_owner.table(), color_bytes / 8,
             error, sizeof(error));
         check(runtime.runtime != nullptr, error);
-        check(it_804D6D20 == source_item &&
-                  it_804D6D24 == source_item->x4 &&
-                  it_804D6D28 == source_item->x0 &&
-                  it_804D6D30 == source_item->xC &&
-                  it_804D6D38 == source_item->x8 &&
-                  it_804D6D38[random_index] == random_article &&
-                  it_804D6D40 == source_item->x10 &&
-                  it_804D6D04 == source_item->x14 &&
-                  source_item->x14 != source_color_before &&
-                  random_article->xC_itemStates == random_states,
+        const auto globals_active = stadium_item_runtime_globals();
+        MeleeWebStadiumC1ItemPublicDataView source_active{};
+        check(melee_web_stadium_c1_item_public_data_view(source_item,
+                                                         &source_active) &&
+                  globals_active.public_data == source_item &&
+                  globals_active.common_articles == source_active.common_articles &&
+                  globals_active.common_data == source_active.common_data &&
+                  globals_active.pokemon_articles == source_active.pokemon_articles &&
+                  globals_active.character_articles == source_active.character_articles &&
+                  globals_active.character_articles ==
+                      static_cast<const void*>(registered_articles.articles()) &&
+                  ((void**) globals_active.character_articles)[random_index] ==
+                      random_article &&
+                  globals_active.bounce_data == source_active.bounce_data &&
+                  globals_active.color_rows == source_active.color_rows &&
+                  source_active.color_rows != source_color_before,
               "Prepared item-state globals do not reach the checked Random Article and color rows");
         for (std::size_t row = 1; row < scripts.size(); ++row) {
             if (!scripts[row]) continue;
-            check(random_states->x0_itemStateDesc[row].xC_script ==
-                      script_rows_before[row],
+            void* row_table = nullptr;
+            void* script = nullptr;
+            check(row < random_article_owner.state_count() &&
+                      melee_web_stadium_c1_random_article_state_row(
+                          random_article, static_cast<std::uint32_t>(row),
+                          &row_table, &script) &&
+                      row_table == random_states &&
+                      script == script_rows_before[row],
                   "Item-state preflight attached a Stadium script before Ground_801C0800");
         }
 
@@ -1726,15 +1746,21 @@ void run_stadium_c1_item_state_preflight(
                       "Item startup requires checked data") !=
                       std::string_view::npos,
               "A competing active item-state owner was not refused explicitly");
-        check(it_804D6D38 == source_item->x8 &&
-                  it_804D6D38[random_index] == random_article,
+        const auto globals_competing = stadium_item_runtime_globals();
+        check(globals_competing.character_articles ==
+                  source_active.character_articles &&
+                  ((void**) globals_competing.character_articles)[random_index] ==
+                      random_article,
               "Competing item-state owner changed the active Random Article registry");
         check(((HSD_GObj**)HSD_GObj_Entities)[9] == nullptr,
               "C1 item-state preflight created an item object");
 
         runtime.end();
         check_stadium_item_runtime_globals(globals_before);
-        check(source_item->x14 == source_color_before,
+        MeleeWebStadiumC1ItemPublicDataView source_after{};
+        check(melee_web_stadium_c1_item_public_data_view(source_item,
+                                                         &source_after) &&
+                  source_after.color_rows == source_color_before,
               "Item runtime teardown did not restore the source color pointer before owner destruction");
         check(((HSD_GObj**)HSD_GObj_Entities)[9] == nullptr,
               "Item runtime teardown left an item object");

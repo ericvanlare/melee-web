@@ -41,6 +41,35 @@ typedef struct MeleeWebStadiumC1StageInfoView {
     void* quake_model_set;
 } MeleeWebStadiumC1StageInfoView;
 
+/* Read only the item owner fields needed by the retained-context preflight.
+ * Keep upstream item layouts in this C translation unit; the native harness
+ * consumes opaque pointer identities through this view. */
+typedef struct MeleeWebStadiumC1ItemRuntimeGlobalsView {
+    void* public_data;
+    void* common_articles;
+    void* common_data;
+    void* pokemon_articles;
+    void* character_articles;
+    void* bounce_data;
+    void* color_rows;
+} MeleeWebStadiumC1ItemRuntimeGlobalsView;
+typedef struct MeleeWebStadiumC1ItemPublicDataView {
+    void* common_data;
+    void* common_articles;
+    void* character_articles;
+    void* pokemon_articles;
+    void* bounce_data;
+    void* color_rows;
+} MeleeWebStadiumC1ItemPublicDataView;
+
+int melee_web_stadium_c1_item_runtime_globals_view(
+    MeleeWebStadiumC1ItemRuntimeGlobalsView* view);
+int melee_web_stadium_c1_item_public_data_view(
+    void* public_data, MeleeWebStadiumC1ItemPublicDataView* view);
+/* Ground's checked ALDYakuAll consumer rows are bounded to 0..7. */
+int melee_web_stadium_c1_random_article_state_row(
+    void* article, uint32_t row, void** state_table, void** script);
+
 /* Owns a byte-exact copy of the source StageInfo declaration. The snapshot is
  * test-only and must be restored before release. */
 MeleeWebStadiumC1StageInfoSnapshot*

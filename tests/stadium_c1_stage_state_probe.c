@@ -3,6 +3,7 @@
 #include <melee/gr/grdatfiles.h>
 #include <melee/gr/ground.h>
 #include <melee/gr/types.h>
+#include <melee/it/it_3F14.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,6 +15,45 @@ struct MeleeWebStadiumC1StageInfoSnapshot {
 };
 
 static struct MeleeWebStadiumC1StageInfoSnapshot* active_snapshot;
+
+int melee_web_stadium_c1_item_runtime_globals_view(
+    MeleeWebStadiumC1ItemRuntimeGlobalsView* view)
+{
+    if (!view) return 0;
+    view->public_data = it_804D6D20;
+    view->common_articles = it_804D6D24;
+    view->common_data = it_804D6D28;
+    view->pokemon_articles = it_804D6D30;
+    view->character_articles = it_804D6D38;
+    view->bounce_data = it_804D6D40;
+    view->color_rows = it_804D6D04;
+    return 1;
+}
+
+int melee_web_stadium_c1_item_public_data_view(
+    void* public_data, MeleeWebStadiumC1ItemPublicDataView* view)
+{
+    if (!public_data || !view) return 0;
+    const it_804D6D20_t* source = public_data;
+    view->common_data = source->x0;
+    view->common_articles = source->x4;
+    view->character_articles = source->x8;
+    view->pokemon_articles = source->xC;
+    view->bounce_data = source->x10;
+    view->color_rows = source->x14;
+    return 1;
+}
+
+int melee_web_stadium_c1_random_article_state_row(
+    void* value, uint32_t row, void** state_table, void** script)
+{
+    if (!value || !state_table || !script || row >= 8) return 0;
+    Article* article = value;
+    if (!article->xC_itemStates) return 0;
+    *state_table = article->xC_itemStates;
+    *script = article->xC_itemStates->x0_itemStateDesc[row].xC_script;
+    return 1;
+}
 
 static int snapshot_fail(char* error, size_t size, const char* message)
 {
