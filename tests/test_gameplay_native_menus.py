@@ -120,6 +120,129 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             run.stdout,
         )
 
+    def test_stadium_e8_one_request_and_checked_teardown(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_value = os.environ.get("MELEE_MENU_FIXTURE_ROOT")
+        if not fixture_value:
+            if os.environ.get("MELEE_REQUIRE_STADIUM_E8_FIXTURES") == "1":
+                self.fail("MELEE_MENU_FIXTURE_ROOT is required for the frozen E8 packet")
+            self.skipTest("The reviewed C1 fixture root is required for the E8 trace")
+        fixture_root = Path(fixture_value)
+        if not fixture_root.is_absolute():
+            fixture_root = ROOT / fixture_root
+        menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
+        self.assertTrue(target.is_file(), f"Build the diagnostic target first: {target}")
+        self.assertTrue(menu.is_dir(), f"Missing owned menu fixture root: {menu}")
+        self.assertTrue(game.is_dir(), f"Missing owned game fixture root: {game}")
+
+        script = (
+            "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; "
+            "console.log(JSON.stringify(Object.keys(NATIVE_MENU_DISC_FILES)))"
+        )
+        menu_names = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        preparation = json.loads(
+            (ROOT / "docs/evidence/pokemon-stadium-c1a-css-sss-preparation-v1.json")
+            .read_text(encoding="utf-8"))
+        self.assertEqual(
+            preparation.get("schema"),
+            "melee-web-pokemon-stadium-c1a-css-sss-preparation-v1",
+        )
+
+        def find_manifest(value):
+            if isinstance(value, dict):
+                if isinstance(value.get("manifest_names"), list):
+                    return value["manifest_names"]
+                for child in value.values():
+                    found = find_manifest(child)
+                    if found is not None:
+                        return found
+            elif isinstance(value, list):
+                for child in value:
+                    found = find_manifest(child)
+                    if found is not None:
+                        return found
+            return None
+
+        selected_names = find_manifest(preparation)
+        self.assertIsNotNone(selected_names, "C1 evidence has no selected-file manifest")
+        self.assertEqual(len(selected_names), 36)
+        self.assertEqual(len(set(selected_names)), len(selected_names))
+        self.assertEqual(
+            set(selected_names) & {
+                "GrPs.usd", "GrPs1.dat", "GrPs2.dat", "GrPs3.dat",
+                "GrPs4.dat", "pstadium.ssm", "pstadium.hps", "pokesta.hps",
+            },
+            {
+                "GrPs.usd", "GrPs1.dat", "GrPs2.dat", "GrPs3.dat",
+                "GrPs4.dat", "pstadium.ssm", "pstadium.hps", "pokesta.hps",
+            },
+        )
+        required = sorted(set(menu_names) | set(selected_names))
+        missing = [name for name in required
+                   if not (menu / name).is_file() and not (game / name).is_file()]
+        self.assertFalse(
+            missing,
+            "Frozen C1 selected RuntimeFiles are incomplete before launch: " +
+            ", ".join(missing),
+        )
+
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "stadium-e8-request.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source_revision, "stadium-e8-request-v1"]
+        (self.scratch / "stadium-e8-request-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        (self.scratch / "stadium-e8-fixture-preflight.json").write_text(
+            json.dumps({"menu_names": menu_names,
+                        "selected_names": selected_names,
+                        "missing": missing}, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "stadium-e8-request.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "stadium-e8-request.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "stadium-e8-request.stdout").write_text(
+            run.stdout, encoding="utf-8")
+        (self.scratch / "stadium-e8-request.stderr").write_text(
+            run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-6000:])
+        self.assertIn(
+            "C1 reopened-context lifecycle preflight and one E8 typed request passed",
+            run.stdout,
+        )
+        self.assertIn(
+            "ordinary match admission and gameplay entry remain closed",
+            run.stdout,
+        )
+        result = next(json.loads(line) for line in run.stdout.splitlines()
+                      if line.startswith('{"probe":"stadium-e8-request"'))
+        self.assertEqual(result["source_size_name"], "/GrPs.usd")
+        self.assertEqual(result["typed_open_name"], "/GrPs.usd")
+        self.assertEqual(result["stage_info_x6E4"][0], -1)
+        self.assertIn("stage_info_xA0_observed_only", result)
+        self.assertEqual(result["itemdata_public_calls"], 0)
+        self.assertEqual(result["map_plit_public_calls"], 0)
+        self.assertFalse(result["stage_objects_started"])
+        self.assertTrue(result["checked_teardown"])
+        rows = [json.loads(line) for line in trace.read_text().splitlines()]
+        self.assertEqual(rows[0]["record"], "header")
+        self.assertEqual(rows[0]["input_recipe"], "stadium-e8-request-v1")
+        events = [row for row in rows if row.get("record") == "event"]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["event"], "stadium_e8_request_returned")
+        self.assertEqual(events[0]["selection"]["rules"]["stage_kind"], 3)
+
     def test_owned_css_scene_lifecycle(self):
         targets = [ROOT / "build" / name / "native_css_callbacks.js"
                    for name in ("browser", "browser-release")]

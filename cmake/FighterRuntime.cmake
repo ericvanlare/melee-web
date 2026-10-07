@@ -632,9 +632,14 @@ add_executable(native_menu_host_trace EXCLUDE_FROM_ALL tests/native_menu_host_tr
   tests/native_menu_fighter_input.c tests/native_menu_stage_input.c tests/native_menu_alarm_unavailable.c)
 if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
   target_sources(native_menu_host_trace PRIVATE
-    tests/stadium_c1_stage_state_probe.c)
+    tests/stadium_c1_stage_state_probe.c
+    tests/stadium_c1_e8_call_observer.c)
   target_compile_definitions(native_menu_host_trace PRIVATE
     MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
+  target_link_options(native_menu_host_trace PRIVATE
+    -Wl,--wrap=melee_web_source_file_size
+    -Wl,--wrap=melee_web_archive_sections_open_preloaded
+    -Wl,--wrap=melee_web_archive_sections_public)
 endif()
 target_compile_options(native_menu_host_trace PRIVATE
   "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
