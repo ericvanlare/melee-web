@@ -11,20 +11,28 @@
 #include "gameplay_bootstrap.h"
 #include "gameplay_audio_stream.h"
 #include "gameplay_retail_recipe.hpp"
+#include "gameplay_source_files.h"
+#include "gameplay_stage_map.h"
 #include "native_menu_fighter_input.h"
 #include "native_menu_stage_input.h"
+#include "stadium_c1_stage_state_probe.h"
 #include <melee/ft/forward.h>
 #include <melee/gm/forward.h>
 extern "C" {
 #include <melee/gm/gm_1601.h>
 #include <melee/gm/gm_16F1.h>
+#include <melee/gm/gm_1A3F.h>
 #include <melee/gm/gm_16AE.h>
 #include <melee/gm/gmresultplayer.h>
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/types.h>
+#include <melee/lb/lbfile.h>
+#include <melee/lb/lblanguage.h>
 #include <melee/mn/mnmain.h>
 #include <melee/ty/forward.h>
+#include <melee/ty/toy.h>
 #include <melee/ty/types.h>
+extern HSD_Archive* _Toy_sbss_804D6ED0;
 }
 #include <melee/gr/forward.h>
 #include <sysdolphin/baselib/random.h>
@@ -44,6 +52,7 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 #include <map>
 #include <memory>
 #include <sstream>
+#include <set>
 #include <stdexcept>
 #include <vector>
 extern "C" int melee_web_vs_mode_begin(void);
@@ -60,6 +69,109 @@ std::string stream_name(MeleeWebAudio* audio){
  const char* path=melee_web_audio_stream_path(audio);if(!path)return {};
  std::string result(path);const auto slash=result.find_last_of("/\\");return slash==std::string::npos?result:result.substr(slash+1);
 }
+#if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+void check_stadium_preflight_stage_empty()
+{
+    check(melee_web_stage_map_archives() == nullptr,
+          "C1 context preflight found a pre-existing native stage map scope");
+    const uint32_t failures = melee_web_stadium_c1_stage_state_failures();
+    std::string detail = "C1 context preflight stage-state bridge reported mask=" +
+                         std::to_string(failures) + ":";
+    if (failures & MELEE_WEB_STADIUM_C1_STAGE_LIST_UNAVAILABLE)
+        detail += " HSD GObj list unavailable";
+    if (failures & MELEE_WEB_STADIUM_C1_STAGE_MAP_GOBJ)
+        detail += " StageInfo.map_gobjs occupied";
+    if (failures & MELEE_WEB_STADIUM_C1_STAGE_INSTANCE)
+        detail += " stage instance GObj present";
+    if (failures & MELEE_WEB_STADIUM_C1_GROUND_GOBJ)
+        detail += " Ground GObj present";
+    if (failures & MELEE_WEB_STADIUM_C1_STAGE_ITEMS)
+        detail += " StageInfo.itemdata published";
+    if (failures & MELEE_WEB_STADIUM_C1_STAGE_LIGHTS)
+        detail += " StageInfo.map_plit published";
+    if (failures & MELEE_WEB_STADIUM_C1_ORDINARY_GRDAT_SLOT)
+        detail += " ordinary grDatFiles slot occupied";
+    check(failures == 0, detail.c_str());
+}
+
+melee_web::RuntimeFiles exact_stadium_runtime_union(
+    const melee_web::RuntimeFiles& menu_files,
+    const std::vector<std::string>& selected_names,
+    const std::filesystem::path& menu_dir,
+    const std::filesystem::path& game_dir)
+{
+    melee_web::RuntimeFiles result = menu_files;
+    std::set<std::string, std::less<>> expected_names;
+    for (const auto& [name, _] : menu_files) expected_names.insert(name);
+    for (const auto& name : selected_names) {
+        expected_names.insert(name);
+        if (result.contains(name)) continue;
+
+        const std::filesystem::path menu_path = menu_dir / name;
+        const std::filesystem::path game_path = game_dir / name;
+        const auto path = std::filesystem::is_regular_file(menu_path)
+                              ? menu_path
+                              : game_path;
+        if (!std::filesystem::is_regular_file(path))
+            throw std::runtime_error(
+                "Missing exact C1 source RuntimeFiles entry: " + name);
+        std::ifstream input(path, std::ios::binary);
+        if (!input)
+            throw std::runtime_error(
+                "Cannot read exact C1 source RuntimeFiles entry: " + name);
+        std::vector<std::uint8_t> bytes(
+            (std::istreambuf_iterator<char>(input)), {});
+        if (input.bad())
+            throw std::runtime_error(
+                "Cannot finish reading exact C1 source RuntimeFiles entry: " +
+                name);
+        result.emplace(name, std::move(bytes));
+    }
+
+    check(result.size() == expected_names.size(),
+          "C1 reopened RuntimeFiles is not the exact menu/selection union");
+    for (const auto& [name, _] : result)
+        check(expected_names.contains(name),
+              "C1 reopened RuntimeFiles contains an unselected extra entry");
+    return result;
+}
+
+void check_stadium_selection_preserved(
+    MeleeWebMenuHost* host,
+    const MeleeWebMenuMatchSelection& expected,
+    const std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES>&
+        expected_baseline)
+{
+    check(host != nullptr &&
+              melee_web_menu_host_phase(host) == MELEE_WEB_MENU_READY &&
+              melee_web_menu_host_source_scene(host) == 0,
+          "C1 context preflight changed the closed source SSS selection");
+    MeleeWebMenuMatchSelection observed{};
+    char error[256]{};
+    check(melee_web_menu_host_stadium_c1a_selection(
+              host, &observed, error, sizeof(error)), error);
+    check(observed.start.rules.stkind == St_Kind_PStadium &&
+              std::memcmp(&observed.start, &expected.start,
+                          sizeof(expected.start)) == 0,
+          "C1 context preflight changed the source-selected StKind 3 payload");
+    check(std::memcmp(observed.players, expected.players,
+                      sizeof(expected.players)) == 0 &&
+              observed.player_count == expected.player_count &&
+              observed.random_seed == expected.random_seed &&
+              observed.hud_layout == expected.hud_layout &&
+              observed.unlocked_characters == expected.unlocked_characters &&
+              observed.unlocked_stages == expected.unlocked_stages &&
+              observed.save_profile_present == expected.save_profile_present &&
+              observed.opening_demo == expected.opening_demo,
+          "C1 context preflight changed retained menu save or RNG provenance");
+    std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> baseline{};
+    check(melee_web_menu_host_snapshot_card_data(
+              host, 1, baseline.data(), baseline.size(), error,
+              sizeof(error)), error);
+    check(baseline == expected_baseline,
+          "C1 context preflight changed the retained save-owner baseline");
+}
+#endif
 void run_results_source_smoke(const melee_web::RuntimeFiles& files,
                               MeleeWebMenuHost* host,
                               const MatchExitInfo& exit_info,
@@ -1079,7 +1191,186 @@ void run_trophy_baseline_smoke(const melee_web::RuntimeFiles& files)
 }
 
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
-void run_stadium_c1a_selection_smoke(const melee_web::RuntimeFiles& files)
+void run_stadium_c1_context_preflight(
+    const melee_web::RuntimeFiles& menu_files,
+    MeleeWebMenuHost*& host,
+    std::unique_ptr<melee_web::GameplayMenuWorld>& world,
+    const MeleeWebMenuMatchSelection& selected,
+    const std::vector<std::string>& selected_names,
+    const std::filesystem::path& menu_dir,
+    const std::filesystem::path& game_dir)
+{
+    char error[256]{};
+    const int previous_mode = gm_GetCurrentGameMode();
+    const int previous_language = lbLang_GetLanguageSetting();
+    const int previous_saved_language = lbLang_GetSavedLanguage();
+    std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> save_before{};
+    std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> baseline{};
+    check(selected.start.rules.stkind == St_Kind_PStadium &&
+              selected.save_profile_present,
+          "C1 context preflight requires source StKind 3 and its retained save owner");
+    check(melee_web_menu_host_snapshot_card_data(
+              host, 1, baseline.data(), baseline.size(), error,
+              sizeof(error)), error);
+    check_stadium_selection_preserved(host, selected, baseline);
+    check(melee_web_menu_host_snapshot_card_data(
+              host, 0, save_before.data(), save_before.size(), error,
+              sizeof(error)), error);
+    check(melee_web_source_files_active() && _Toy_sbss_804D6ED0 != nullptr &&
+              (Toy_804A284C[3] & 4) != 0,
+          "C1 source handoff lost its menu files, Toy archive alias, or baseline category bit");
+    check_stadium_preflight_stage_empty();
+    world->verify_immutable_archives();
+    world->close();
+    world.reset();
+
+    bool vs_mode_owned = false;
+    bool language_scope_owned = false;
+    bool cleanup_complete = false;
+    melee_web::RuntimeFiles reopened_files;
+    auto restore_context = [&]() {
+        if (language_scope_owned) {
+            lbLang_SetLanguageSetting(previous_language);
+            lbLang_SetSavedLanguage(previous_saved_language);
+            language_scope_owned = false;
+        }
+        if (vs_mode_owned) {
+            check(melee_web_vs_mode_end(),
+                  "C1 context preflight lost its source VS mode lease");
+            vs_mode_owned = false;
+        }
+        check(gm_GetCurrentGameMode() == previous_mode,
+              "C1 context preflight did not restore the source game mode");
+        check(lbLang_GetLanguageSetting() == previous_language &&
+                  lbLang_GetSavedLanguage() == previous_saved_language,
+              "C1 context preflight did not restore both source language settings");
+    };
+    auto cleanup = [&]() {
+        if (world) {
+            world->close_prepared();
+            world.reset();
+        }
+        check(!melee_web_source_files_active(),
+              "C1 context preflight left a RuntimeFiles scope active");
+        check(_Toy_sbss_804D6ED0 == nullptr,
+              "C1 context preflight left Toy aliases past MenuWorld close");
+        restore_context();
+        if (host) {
+            check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+            host = nullptr;
+        }
+        cleanup_complete = true;
+    };
+
+    try {
+        check(!melee_web_source_files_active() &&
+                  _Toy_sbss_804D6ED0 == nullptr,
+              "Closing the selected SSS world did not release its file and Toy owners");
+        check((Toy_804A284C[3] & 4) != 0,
+              "Closing MenuWorld erased the retained Toy category baseline");
+        reopened_files = exact_stadium_runtime_union(
+            menu_files, selected_names, menu_dir, game_dir);
+        check(reopened_files.contains("GrPs.usd"),
+              "Exact C1 RuntimeFiles union omitted GrPs.usd");
+
+        check(melee_web_vs_mode_begin(),
+              "C1 context preflight could not acquire the source VS mode lease");
+        vs_mode_owned = true;
+        language_scope_owned = true;
+        lbLang_SetLanguageSetting(LANG_US);
+        lbLang_SetSavedLanguage(LANG_US);
+        check(gm_GetCurrentGameMode() == GM_VS && !gm_IsCurrently1PMode(),
+              "Reopened C1 context is not source GM_VS non-1P mode");
+        check(lbLang_GetLanguageSetting() == LANG_US &&
+                  lbLang_GetSavedLanguage() == LANG_US,
+              "Reopened C1 context did not set both source language scopes to US");
+        check_stadium_selection_preserved(host, selected, baseline);
+
+        world = std::make_unique<melee_web::GameplayMenuWorld>(reopened_files);
+        check(melee_web_source_files_active(),
+              "Reopened MenuWorld did not activate its exact RuntimeFiles union");
+        check(melee_web_menu_host_source_scene(host) == 0 &&
+                  melee_web_menu_host_phase(host) == MELEE_WEB_MENU_READY,
+              "Reopened MenuWorld entered a source menu scene");
+        check(gm_GetCurrentGameMode() == GM_VS && !gm_IsCurrently1PMode(),
+              "Reopened MenuWorld did not preserve the explicit source VS context");
+        check(lbLang_GetLanguageSetting() == LANG_US &&
+                  lbLang_GetSavedLanguage() == LANG_US,
+              "Reopened MenuWorld changed one of the scoped US language settings");
+        check(_Toy_sbss_804D6ED0 == nullptr,
+              "Fresh MenuWorld unexpectedly retained Toy aliases from the closed world");
+        check_stadium_preflight_stage_empty();
+
+        const std::string grps_name = lbFileGetFullName("GrPs");
+        check(grps_name == "GrPs.usd",
+              "US C1 source resolution did not select the exact GrPs.usd filename");
+        const auto grps = reopened_files.find(grps_name);
+        check(grps != reopened_files.end() && !grps->second.empty(),
+              "Exact C1 RuntimeFiles union has no GrPs.usd bytes");
+        size_t resolved_size = 0;
+        size_t root_path_size = 0;
+        check(melee_web_source_file_size(grps_name.c_str(), &resolved_size) &&
+                  resolved_size == grps->second.size() &&
+                  lbFileGetSize("GrPs") == resolved_size,
+              "Original lbFile GrPs resolution changed the exact RuntimeFiles size");
+        check(melee_web_source_file_size("/GrPs.usd", &root_path_size) &&
+                  root_path_size == resolved_size,
+              "Retail root-path GrPs.usd resolution changed the exact RuntimeFiles size");
+        const int grps_entry = melee_web_source_file_entry(grps_name.c_str());
+        check(grps_entry > 0 && melee_web_source_file_entry_owned(grps_entry),
+              "Reopened source file owner did not retain the GrPs.usd DVD entry");
+
+        check((Toy_804A284C[3] & 4) != 0,
+              "C1 preflight lost the menu host's existing Toy category baseline");
+        Toy_803124BC();
+        check(_Toy_sbss_804D6ED0 != nullptr && (Toy_804A284C[3] & 4) != 0,
+              "Reopened source files did not restore Toy aliases over the retained baseline");
+        const std::string toy_name = lbFileGetFullName("TyDatai");
+        check(toy_name == "TyDatai.usd" &&
+                  melee_web_source_file_size(toy_name.c_str(), &resolved_size) &&
+                  resolved_size == reopened_files.at(toy_name).size(),
+              "US Toy alias did not resolve through the reopened RuntimeFiles owner");
+        check_stadium_selection_preserved(host, selected, baseline);
+        world->verify_immutable_archives();
+        check_stadium_preflight_stage_empty();
+
+        world->close_prepared();
+        world.reset();
+        check(!melee_web_source_files_active() &&
+                  _Toy_sbss_804D6ED0 == nullptr,
+              "Prepared MenuWorld teardown retained source-file or Toy aliases");
+        restore_context();
+        std::array<std::uint8_t, MELEE_WEB_SAVE_PROFILE_CARD_BYTES> save_after{};
+        check(melee_web_menu_host_snapshot_card_data(
+                  host, 0, save_after.data(), save_after.size(), error,
+                  sizeof(error)), error);
+        check(save_after == save_before,
+              "C1 reopened-context preflight changed the live source save owner");
+        check_stadium_selection_preserved(host, selected, baseline);
+        check((Toy_804A284C[3] & 4) != 0,
+              "C1 context teardown changed the retained Toy category baseline");
+        cleanup();
+        check(host == nullptr && !melee_web_source_files_active(),
+              "C1 context preflight did not release host and source-file owners");
+        std::cout << "C1 reopened-context lifecycle preflight passed; no E8 request, "
+                     "stage publication, or source menu entry\n";
+    } catch (...) {
+        if (!cleanup_complete) {
+            try {
+                cleanup();
+            } catch (...) {
+                std::abort();
+            }
+        }
+        throw;
+    }
+}
+
+void run_stadium_c1a_selection_smoke(
+    const melee_web::RuntimeFiles& files,
+    bool reopened_context_preflight,
+    const std::filesystem::path& menu_dir,
+    const std::filesystem::path& game_dir)
 {
     char error[256]{};
     MeleeWebMenuHost* host = melee_web_menu_host_create(error, sizeof(error));
@@ -1196,10 +1487,16 @@ void run_stadium_c1a_selection_smoke(const melee_web::RuntimeFiles& files)
     check(!melee_web_stage_content(St_Kind_PStadium),
           "C1a diagnostic unexpectedly registered Stadium as playable");
 
-    world->verify_immutable_archives();
-    world->close();
-    world.reset();
-    check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+    if (reopened_context_preflight) {
+        run_stadium_c1_context_preflight(
+            files, host, world, selected, names, menu_dir, game_dir);
+    } else {
+        world->verify_immutable_archives();
+        world->close();
+        world.reset();
+        check(melee_web_menu_host_destroy(host, error, sizeof(error)), error);
+        host = nullptr;
+    }
     check(!melee_web_menu_stage_explicit_confirm_available(St_Kind_PStadium),
           "C1a explicit-confirm permission survived unload");
     std::cout << "C1a raw PAD CSS->SSS Stadium selection and exact preparation manifest passed; "
@@ -1225,12 +1522,16 @@ int main(int argc,char** argv){try{
      std::string(input_recipe)=="whole-session-css-replay-start-v10-v1";
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
  const bool stadium_c1a_recipe=input_recipe&&std::string(input_recipe)=="stadium-c1a-v1";
+ const bool stadium_c1_context_preflight_recipe=input_recipe&&
+     std::string(input_recipe)=="stadium-c1-context-preflight-v1";
 #else
  const bool stadium_c1a_recipe=false;
+ const bool stadium_c1_context_preflight_recipe=false;
 #endif
  if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe&&
     !title_main_abort_recipe&&!opening_movie_preload_recipe&&!trophy_baseline_recipe&&
-    !sound_settings_recipe&&!stadium_c1a_recipe&&!v10_css_replay_start_recipe)
+    !sound_settings_recipe&&!stadium_c1a_recipe&&
+    !stadium_c1_context_preflight_recipe&&!v10_css_replay_start_recipe)
     throw std::runtime_error("Unknown transition input recipe");
  if(v10_css_replay_start_recipe&&
     (argc!=8||!replay_recipe_path||!trace_path||!source_revision))
@@ -1240,12 +1541,14 @@ int main(int argc,char** argv){try{
  if((retail_fd_recipe||results_mario_recipe||v10_css_replay_start_recipe)&&
     stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
- if(stadium_c1a_recipe&&stage_kind!=St_Kind_PStadium)
-   throw std::runtime_error("C1a recipe requires source StKind 3");
+ if((stadium_c1a_recipe||stadium_c1_context_preflight_recipe)&&
+    stage_kind!=St_Kind_PStadium)
+   throw std::runtime_error("C1a recipes require source StKind 3");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
- if(stadium_c1a_recipe||v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
+ if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe||
+    v10_css_replay_start_recipe||title_main_abort_recipe||opening_movie_preload_recipe||
     trophy_baseline_recipe||sound_settings_recipe)
   keys=melee_web::menu_asset_names();
  for(const auto& key:melee_web::menu_asset_names())
@@ -1273,8 +1576,9 @@ int main(int argc,char** argv){try{
   return 0;
  }
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
- if(stadium_c1a_recipe){
-  run_stadium_c1a_selection_smoke(files);
+ if(stadium_c1a_recipe||stadium_c1_context_preflight_recipe){
+  run_stadium_c1a_selection_smoke(
+      files, stadium_c1_context_preflight_recipe, argv[1], argv[2]);
   check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
   return 0;
  }

@@ -631,6 +631,8 @@ target_compile_options(native_audio_banks PRIVATE
 add_executable(native_menu_host_trace EXCLUDE_FROM_ALL tests/native_menu_host_trace.cpp
   tests/native_menu_fighter_input.c tests/native_menu_stage_input.c tests/native_menu_alarm_unavailable.c)
 if(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
+  target_sources(native_menu_host_trace PRIVATE
+    tests/stadium_c1_stage_state_probe.c)
   target_compile_definitions(native_menu_host_trace PRIVATE
     MELEE_WEB_STADIUM_C1A_DIAGNOSTIC=1)
 endif()

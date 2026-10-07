@@ -71,6 +71,55 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             run.stdout,
         )
 
+    def test_stadium_c1_reopened_context_lifecycle_preflight(self):
+        target = ROOT / "build/browser-stadium-c1a-release/native_menu_host_trace.js"
+        fixture_root = Path(os.environ.get("MELEE_MENU_FIXTURE_ROOT", ROOT / "assets-local"))
+        if not fixture_root.is_absolute():
+            fixture_root = ROOT / fixture_root
+        menu, game = fixture_root / "native-menus", fixture_root / "next-gate"
+        script = "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; " \
+                 "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), " \
+                 "'dsp_coef.bin', 'sislib_font.bin']))"
+        required = json.loads(subprocess.check_output(
+            [str(node_runtime()), "--input-type=module", "-e", script],
+            cwd=ROOT, text=True))
+        missing = [str(menu / name) for name in required if not (menu / name).is_file()]
+        if not target.is_file() or missing:
+            detail = ", ".join(missing[:5])
+            self.skipTest("C1 context preflight requires its built host trace and exact owned menu closure" +
+                          (f"; missing {detail}" if detail else ""))
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        trace = self.scratch / "c1-context-preflight.jsonl"
+        command = [str(node_runtime()), str(target), str(menu), str(game), "3",
+                   str(trace), source_revision, "stadium-c1-context-preflight-v1"]
+        (self.scratch / "c1-context-preflight-command.txt").write_text(
+            " ".join(command) + "\n", encoding="utf-8")
+        try:
+            run = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True, timeout=120)
+        except subprocess.TimeoutExpired as failure:
+            (self.scratch / "c1-context-preflight.stdout").write_bytes(
+                failure.stdout.encode() if isinstance(failure.stdout, str)
+                else (failure.stdout or b""))
+            (self.scratch / "c1-context-preflight.stderr").write_bytes(
+                failure.stderr.encode() if isinstance(failure.stderr, str)
+                else (failure.stderr or b""))
+            raise
+        (self.scratch / "c1-context-preflight.stdout").write_text(
+            run.stdout, encoding="utf-8")
+        (self.scratch / "c1-context-preflight.stderr").write_text(
+            run.stderr, encoding="utf-8")
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn(
+            "C1 reopened-context lifecycle preflight passed; no E8 request",
+            run.stdout,
+        )
+        self.assertIn(
+            "stage publication, or source menu entry",
+            run.stdout,
+        )
+
     def test_owned_css_scene_lifecycle(self):
         targets = [ROOT / "build" / name / "native_css_callbacks.js"
                    for name in ("browser", "browser-release")]
