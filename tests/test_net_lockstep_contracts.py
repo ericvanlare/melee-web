@@ -19,6 +19,7 @@ class NetLockstepContractTests(unittest.TestCase):
             str(ROOT / 'tests/net_lockstep_browser_peer.test.mjs'),
             str(ROOT / 'tests/net_lockstep_protocol.test.mjs'),
             str(ROOT / 'tests/net_lockstep_transport.test.mjs'),
+            str(ROOT / 'tests/net_lockstep_webrtc.test.mjs'),
             str(ROOT / 'tests/net_room_relay_worker.test.mjs'),
             str(ROOT / 'tests/net_lockstep_browser_handshake_probe.test.mjs'),
             str(ROOT / 'tests/net_determinism_browser.test.mjs'),
