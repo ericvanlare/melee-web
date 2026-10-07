@@ -398,10 +398,9 @@ the match setup. A matching target is still an incomplete prefix result with
 `whole_session_equivalent: false` and CLI exit 1. The default whole-session
 scope and all earlier v8/v9 and v10 scopes keep their existing behavior.
 
-The current issue-221 synthetic comparator controls exercise ordered descriptor
-lists with three, four, five and six checkpoints, including a terminal at clock
-90. They validate comparator contracts only; source and browser provenance are
-fixtures, not retained source/browser comparison evidence. The separate
+The issue-221 synthetic comparator controls and their limitations are recorded
+in the [scoped comparator entry](status/2026-10-07-b4-v10-ordered-clock-lineage-comparator.md).
+The separate
 [clock-1000 source-only entry](status/2026-10-07-b4-v10-first-match-clock1000-source-only.md)
 records the original-trace observation without a browser comparison.
 
