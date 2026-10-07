@@ -16,7 +16,7 @@ component hash for each source tick matched the expected sampled input at
 source cursor S+2, with neutral bootstrap inputs at ticks 0 and 1. During the
 withheld-input wait at cursor 2, alpha's capture count, bytes, and poll serial
 remained unchanged until beta released input 0. Both peers completed six CSS
-source steps and draws and acknowledged four local inputs and six checksums.
+source steps and draws, acknowledged four local inputs, and compared six checksums.
 
 The receipt includes 900×700 screenshot hashes and cross-origin-isolation and
 WebGPU diagnostics. The canvases were 640×480. Root's visual review noted red
