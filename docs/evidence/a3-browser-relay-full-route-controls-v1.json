@@ -1,0 +1,232 @@
+{
+  "build_and_suite": {
+    "python_suite_passed": 1817,
+    "python_suite_receipt": {
+      "file": "full-python-suite-receipt-v1.json",
+      "run_id": "a3-main-current-validation-20261007-004625-b5270c53"
+    },
+    "python_suite_receipt_sha256": "be7f5efe7aa3e6377b58cd4f256c9356fc922e7ee63ff64fcdfec5de699f57a4",
+    "python_suite_skipped": 144,
+    "python_suite_total": 1961,
+    "release_build_log_sha256": "7bd6117ace33a9f531f7d72bb02535c7318e9af6d205aa634e622c42e86d5996",
+    "release_build_receipt": {
+      "file": "release-build-receipt-v1.json",
+      "run_id": "a3-main-current-validation-20261007-004625-b5270c53"
+    },
+    "release_build_receipt_sha256": "90c909efd6db9a576a1921835c17e80d06689547c381c5092ea73b251a769adf"
+  },
+  "cleanup": {
+    "browser_identity_rows_absent_without_intervention": 65,
+    "browser_process_groups_absent": 6,
+    "failed_v3_profiles_touched": false,
+    "http_process_groups_absent": 3,
+    "lane_release_receipt": {
+      "file": "lane-release-v1.json",
+      "run_id": "a3-full-route-controls-batch-20261007T082510Z-981bbd42"
+    },
+    "lane_release_sha256": "5f87e0bc90e456f55966c16b5cc514be7ddf95fb22239c8b7ef0f27850ccdbad",
+    "owned_ports_free": 9,
+    "passing_browser_profiles_removed_after_cleanup": 6,
+    "verification": {
+      "file": "batch-cleanup-verification-v1.json",
+      "run_id": "a3-full-route-controls-batch-20261007T082510Z-981bbd42"
+    },
+    "verification_sha256": "04bee84f49f163859f57cdc0a8f3b193a752790e6315ab504faffd406e26942b",
+    "worker_process_groups_absent": 3
+  },
+  "evidence_labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised: local Worker relay"
+  ],
+  "independent_root_review": {
+    "file": "root-batch-result-review-v1.json",
+    "review_pass": true,
+    "run_id": "a3-full-route-controls-batch-20261007T082510Z-981bbd42",
+    "sha256": "960627d645838e4de42284706c37cff4b89068bee5b096770978a34690264a84"
+  },
+  "issue": "https://github.com/ericvanlare/melee-web/issues/187",
+  "known_issue": "Root image review confirmed the existing magenta Final Destination appearance tracked in #175; no pixel-equivalence claim.",
+  "launch_packet": {
+    "path": {
+      "file": "a3-full-route-controls-packet-v2.md",
+      "run_id": "a3-main-current-validation-20261007-004625-b5270c53"
+    },
+    "root_launch_review": {
+      "file": "root-full-route-launch-review-v2.json",
+      "run_id": "a3-main-current-validation-20261007-004625-b5270c53"
+    },
+    "sha256": "ab9d44e291be2e5f19b6d9dcb05ab9ce411262a4d59009f0ebcc0d30142fc67f"
+  },
+  "postrun_verifier_error": {
+    "correction": "disconnect_missing_input_tick is the missing input index (14); the explicit injected disconnect is at source tick 16 with the existing two-tick input delay. No capture was repeated.",
+    "failed_check_sha256": "1c11628c0388ab8b99ea5a3b8e29eca96a84fb1069b68bc6b3852ac132771f4a",
+    "file": "disconnect-postrun-verifier-failure-v1.json",
+    "run_id": "a3-full-route-controls-batch-20261007T082510Z-981bbd42",
+    "sha256": "a3ff6d1cdfc1272fd5bcc88c293ddb00634622bc8b6baa4d939a871b2606c9ec",
+    "verifier_file": "disconnect-postrun-verifier-failed-v1.py"
+  },
+  "prior_short_probe_provenance": {
+    "v3_failure": {
+      "result_file": "probe-result-v1.md",
+      "run_id": "a3-browser-relay-8tick-css-probe-20261007-20261007-002817-a9c7a940",
+      "scope": "CSS-only coordinator process-inventory multiplicity validation failure; browser and Worker cleanup evidence retained",
+      "sha256": "7264227ddd11db3dab990b23966e79a2cb24c840a123d3140d760d1190cbc92b"
+    },
+    "v4_css_only_pass": {
+      "result_file": "probe-result-v1.md",
+      "root_review_file": "root-result-review-v1.json",
+      "root_review_sha256": "1813c9fc9fe34f438faab1c10a7c980d4ade1e799b6dedc938b69d1ad4421580",
+      "run_id": "a3-browser-relay-8tick-css-probe-20261007-003833-4acb6f75",
+      "scope": "separate CSS-only eight-source-tick pass; not full-route evidence",
+      "sha256": "2c44662940de63ec119e60cff4770d4c2363a0e729b120030b470332adbb1711"
+    }
+  },
+  "private_run_inventory": {
+    "batch_run_id": "a3-full-route-controls-batch-20261007T082510Z-981bbd42",
+    "current_main_validation_run_id": "a3-main-current-validation-20261007-004625-b5270c53",
+    "historical_css_probe_run_ids": {
+      "v3_failure": "a3-browser-relay-8tick-css-probe-20261007-20261007-002817-a9c7a940",
+      "v4_css_only_pass": "a3-browser-relay-8tick-css-probe-20261007-003833-4acb6f75"
+    },
+    "scenario_run_ids": {
+      "disconnect": "a3-full-route-controls-disconnect-20261007-010432-38621158",
+      "flip": "a3-full-route-controls-flip-20261007-010430-24485fe7",
+      "positive": "a3-full-route-controls-positive-20261007-010427-284489d6"
+    },
+    "storage": "verified external NVMe; absolute mount path is kept only in the external run manifest, not this repository receipt"
+  },
+  "remaining_scope": [
+    "Two-machine and Internet play",
+    "WebRTC and rollback",
+    "Production deployment",
+    "Performance or timing equivalence",
+    "Pixel or PCM equivalence",
+    "Foreground physical-input and audible-output acceptance",
+    "Broad A3 and whole-session acceptance"
+  ],
+  "runs": [
+    {
+      "browser_owner_sha256": "9a635839b3db0e48f950bc46ac22c2d488997ee1e44caee7afb64bc08eaf7ad8",
+      "checksum_records_each": 5084,
+      "checksum_streams_identical": true,
+      "coordinator_sha256": "372340e248b501069299aedc3296f9b219c5940cb88493878e2286fd10fac2b1",
+      "humans": [
+        true,
+        true
+      ],
+      "name": "positive",
+      "relay_closed": true,
+      "relay_receipt_sha256": "de8e67a34c74033d89e1dcfc3d20a91eb220fa003305d960a8670dabcdd58a20",
+      "result": "complete",
+      "route_captures_each": 5,
+      "route_ready_draw_and_gpu_observations_passed": true,
+      "route_scenes": [
+        1,
+        2,
+        3,
+        4,
+        1
+      ],
+      "run_id": "a3-full-route-controls-positive-20261007-010427-284489d6",
+      "run_report_sha256": "2cc5c967bf214360695d2d6fd6f3ca46af9f68df2daf3904058fdbca9ae6794d",
+      "source_steps_and_draws_each": 5084,
+      "stage": 32,
+      "stocks": [
+        4,
+        4
+      ],
+      "timing_resumes": {
+        "alpha": [],
+        "beta": []
+      }
+    },
+    {
+      "browser_owner_sha256": "6f9b84997dde60036dcfeab451e2637f080b2063ad5062b45e016e1422d38f0f",
+      "change": {
+        "bit": 0,
+        "byte": 2,
+        "input_tick": 10,
+        "local_port": 0
+      },
+      "coordinator_sha256": "7cb6a6fa91416072523774619d1960f01a462e8b7d70dd2d07c29064b1e01156",
+      "cursor_each_before_after": [
+        16,
+        16
+      ],
+      "first_mismatch": {
+        "channel": 1,
+        "equal_prefix_through_tick": 11,
+        "source_tick": 12
+      },
+      "name": "flip",
+      "pushed_each_before_after": [
+        20,
+        20
+      ],
+      "relay_closed": true,
+      "relay_receipt_sha256": "5aaf5192feac4fbca6aca6f476d5f48577522df3ee7759df6b8fbc4392026eeb",
+      "result": "expected-desync",
+      "run_id": "a3-full-route-controls-flip-20261007-010430-24485fe7",
+      "run_report_sha256": "0a189eef18a37b4f1e7c875e19311a23e707c68abf2bc5aa8e8ed7d1c86c51da",
+      "terminal_hold_ms": 125,
+      "timing_resumes": {
+        "alpha": [],
+        "beta": []
+      }
+    },
+    {
+      "browser_owner_sha256": "42f2e1e2b7181264c059c817e5f6ad65a1a9d880e269c88412676d164456814b",
+      "coordinator_sha256": "621254bd6034ffac217f5c5b238fbe90c2d93b8fc0851d8950d9bfa469dacd54",
+      "cursor_each_before_after": [
+        16,
+        16
+      ],
+      "disconnect_at_source_tick": 16,
+      "disconnect_missing_input_tick": 14,
+      "explicit_disconnect_terminals": true,
+      "name": "disconnect",
+      "pushed_each_before_after": [
+        16,
+        16
+      ],
+      "relay_closed": true,
+      "relay_receipt_sha256": "5ea3121dc5173bbbf62fc9cf6be677295f9369d9f25fbbc826a711ce2bdc6df5",
+      "result": "expected-disconnect",
+      "run_id": "a3-full-route-controls-disconnect-20261007-010432-38621158",
+      "run_report_sha256": "758567f72ad82b8c20832fac0ca216e41185a05a48e32f3a3ea9f81ce1cc5ecb",
+      "selected_input_records": 15,
+      "source_frame_limit": 17,
+      "terminal_hold_ms": 124,
+      "timing_resumes": {
+        "alpha": [],
+        "beta": []
+      }
+    }
+  ],
+  "runtime": {
+    "browser_mode": "headless",
+    "browser_speaker_output": "muted; normal audio processing retained",
+    "chrome": "154.0.8037.98",
+    "miniflare": "5.20260911.0-alpha",
+    "node": "v24.19.0",
+    "worker_mode": "actual Worker/config over direct local Miniflare listener",
+    "workerd": "1.20260911.1",
+    "wrangler": "4.131.1"
+  },
+  "schema": "melee-web-a3-browser-relay-full-route-controls-evidence-v1",
+  "scope": "Single-host headless browser functional route and A2 terminal controls through the actual local Worker/Durable Object relay. No two-machine/Internet, WebRTC, rollback, deployment, performance, pixel/PCM, foreground, or audible-output acceptance.",
+  "source": {
+    "a2_protocol_source_changed": false,
+    "base_main": "6c0ccecd6c88d50670668a032a6882463639e809",
+    "producer_commit": "4b58eaeb6a1821f7ff7bbe12f5f060408261f71a",
+    "producer_tree": "a4293650c96867e7be230ee0ae55ae49362b0b74",
+    "repository": "melee-web",
+    "runtime_inputs_unchanged_by_scope": true,
+    "served_file_count": 32,
+    "served_inventory_sha256_before_and_after": "b46be56901259bfe0916af5bc66905d1c5d58425fcc27a404cf08ff67da09c36",
+    "served_manifest_sha256": "84b4d9050f89666407deb4cc50e5327fa859ce076f032b303a337e4a55bfa0e6",
+    "tracked_clean_at_capture_start_and_finish": true,
+    "transport_ownership": "Node owns both LockstepPeer protocol instances and WebSocket endpoints; two independent headless browser runtimes execute the game source and receive their own input. The actual local Worker relay connects the Node-owned endpoints."
+  }
+}
