@@ -1,0 +1,84 @@
+{
+  "boundary": {
+    "corrected_browser_allocations_bytes": {
+      "geometry": 32,
+      "ids": 56
+    },
+    "declaration_file": "src/gameplay_net_checksum.c",
+    "native_observer": "melee_web_css_observe_port",
+    "oom_cleanup": "If either allocation fails, free any allocation that succeeded before throwing.",
+    "output_types": {
+      "geometry": "float32[8]",
+      "ids": "int32[14]"
+    },
+    "prior_browser_allocations_bytes": {
+      "geometry": 32,
+      "ids": 16
+    },
+    "required_bytes": {
+      "geometry": 32,
+      "ids": 56
+    },
+    "snapshot_gate": "CSS capture remains gated to captureCss and native phase 1; the existing H1 diagnostic path passes captureCss=false."
+  },
+  "evidence_labels": [
+    "Source identified"
+  ],
+  "limitations": [
+    "A passing repository suite does not establish a new browser run or full original-menu/gameplay acceptance.",
+    "The previously retained paired-image report and all 32 producer artifacts remain historical evidence tied to 3470; this receipt does not relabel them as 06f570c output."
+  ],
+  "producer_distinction": {
+    "diagnostic_css_observer_branch_in_h1_capture": "Not exercised: diagnostic snapshots disable captureCss.",
+    "h1_capture_remains_bound_to": "3470f887c2633e25f2112d76ab25a04ac2713546 Release producer and its frozen 32-artifact manifest.",
+    "no_claim": "This observer storage repair does not explain the prior H1 cursor reset, stopped-scene presentation, or natural timing-pause cause.",
+    "no_rebuild_or_browser_rerun_at_06f570c": true,
+    "web_and_src_unchanged_since_that_producer": true
+  },
+  "run": {
+    "external_run_locator": "h1-full-unittest-20261007-20261006-202157-dfc77437",
+    "log_filename": "full-suite.log",
+    "log_sha256": "b499c77a433fc3628833e1e5703c24f808f8719535197f313c29e1c2e5f5e674",
+    "result_filename": "result.json",
+    "result_sha256": "c4b3fdfccc773c1afc09fb6ec98217920862fecb881070446ba71b1c3398a937"
+  },
+  "schema": "melee-web-h1-css-observer-abi-suite-receipt-v1",
+  "scope": "Correct browser-side storage for the native CSS-port observer output arrays and validate the full repository suite. No runtime producer rebuild or browser capture was performed at this source commit.",
+  "source": {
+    "changed_files": [
+      "scripts/capture_whole_session_browser.mjs",
+      "tests/character_reference_browser_test.mjs",
+      "tests/development_css_observer_storage_test.mjs"
+    ],
+    "commit": "06f570c0409ad2ee29c59dcfe96e71998d8a8791",
+    "h1_manifest_sha256": "bc32e45cae322c0dc80b63afea05cc5ecd13c383dfabff31bb7ea1aaa817ebba",
+    "producer_source_commit": "3470f887c2633e25f2112d76ab25a04ac2713546",
+    "producer_source_tree": "79f7e42e59f65884ffbeb49da911ae3fa0834de1",
+    "runtime_and_native_sources_unchanged_from_h1_producer": true,
+    "tree": "737c1ace4ecd3d7807a7c4e99b9dafcd57929e4d"
+  },
+  "tests": {
+    "command": [
+      "python3",
+      "scripts/agent_workspace.py",
+      "run",
+      "--",
+      "python3",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "tests",
+      "-v"
+    ],
+    "development_css_observer_boundary_test": "test_actual_development_observer_storage passed; its VM cases exercise all 14 int and 8 float outputs, allocation canaries, each allocation-failure cleanup path, null observer returns, and non-CSS phase gating.",
+    "elapsed_seconds": 337.063,
+    "exit_code": 0,
+    "failed": 0,
+    "passed": 1788,
+    "skipped": 141,
+    "source_commit": "06f570c0409ad2ee29c59dcfe96e71998d8a8791",
+    "total": 1929,
+    "whole_session_capture_and_replay_tests": "Included in the passing full suite."
+  }
+}
