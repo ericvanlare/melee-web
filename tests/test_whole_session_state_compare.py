@@ -44,8 +44,11 @@ from whole_session_state_compare import (  # noqa: E402
     _validate_v10_browser_provenance, _validate_v10_browser_export,
     _validate_first_positive_audit, _validate_clock60_audit,
     _validate_match_clock_boundary_audit,
+    _validate_match_clock_audit_status,
     _validate_ordered_clock_audit_lineage,
     _validate_ordered_clock_lineage_expectations,
+    _validate_ordered_clock_runner_prefix,
+    _validate_ordered_clock_runner_reference,
     _consume_ordered_clock_lineage,
     _ordered_audit_checkpoint_status_key,
     _ordered_runner_checkpoint_observation_key,
@@ -1133,13 +1136,14 @@ def _run_clock60_comparison(fixture, *, raw_overrides=None,
         "audit_bytes_read": 5364736,
     }
     match_clock_scope = fixture["match_clock_target"]["target_match_frame_at_least"] > 60
+    ordered_lineage_scope = "ordered_clock_lineage" in packet["source"]
     terminal_target = (fixture["match_clock_target"] if match_clock_scope
                        else fixture["clock_target"])
     browser_cursor = terminal_target["browser_cursor"]
     browser_identity = {
         "required_cursor": browser_cursor, "target_cursor": browser_cursor,
         "observed_cursor": browser_cursor, "requested_cursor": browser_cursor,
-        "exported_cursor": browser_cursor,
+        "exported_cursor": browser_cursor + int(ordered_lineage_scope),
         "capture_report_sha256": "c" * 64,
         "producer_manifest_sha256": "d" * 64,
         "browser_report_sha256": "e" * 64,
@@ -1150,14 +1154,20 @@ def _run_clock60_comparison(fixture, *, raw_overrides=None,
         raw_records[index] = value
     yielded = []
     observed_limits = {}
+    fixture["iterator_calls"] = []
 
     def synthetic_records(path, *, max_bytes, max_records, stats):
         observed_limits.update(max_bytes=max_bytes, max_records=max_records)
-        for row, raw in zip(fixture["rows"], raw_records):
-            stats.record_bytes(raw)
-            stats.records_read += 1
-            yielded.append(row["seq"])
-            yield row
+        fixture["iterator_calls"].append(str(path))
+
+        def stream():
+            for row, raw in zip(fixture["rows"], raw_records):
+                stats.record_bytes(raw)
+                stats.records_read += 1
+                yielded.append(row["seq"])
+                yield row
+
+        return stream()
 
     browser_provenance_patch = mock.patch(
         "whole_session_state_compare._validate_v10_browser_provenance",
@@ -1174,7 +1184,8 @@ def _run_clock60_comparison(fixture, *, raw_overrides=None,
                      side_effect=synthetic_records)):
         result = compare_paths(
             selected["reference"], selected["recipe"], selected["port_trace"],
-            scope=(V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE if match_clock_scope else
+            scope=(V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE if ordered_lineage_scope else
+                   V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE if match_clock_scope else
                    V10_FIRST_MATCH_CLOCK_GE60_SCOPE),
             expectations=fixture["packet_path"],
             source_manifest=selected["source_manifest"],
@@ -1439,6 +1450,57 @@ def _attach_ordered_comparison_lineage(fixture, intermediate_frames):
     fixture["match_clock_audit"] = terminal_audit
     fixture["ordered_checkpoints"] = checkpoints
     return fixture
+
+
+def _convert_ordered_fixture_to_legacy_clock1000(fixture):
+    """Model the retained v1 report and v1 runner shape without rewriting real evidence."""
+    source = fixture["packet"]["source"]
+    if source["match_clock_boundary"]["target_match_frame_at_least"] != 1000:
+        raise ValueError("legacy compatibility fixture must target clock 1000")
+    lineage = source["ordered_clock_lineage"]
+    runner_path = Path(lineage["runner_packet"]["path"])
+    runner = json.loads(runner_path.read_text(encoding="utf-8"))
+    for checkpoint in runner["checkpoints"]:
+        checkpoint["prefix"].pop("hash_basis", None)
+    runner_path.write_text(json.dumps(runner), encoding="utf-8")
+    runner_identity = {
+        "path": str(runner_path), "bytes": runner_path.stat().st_size,
+        "sha256": hashlib.sha256(runner_path.read_bytes()).hexdigest(),
+    }
+
+    audit_path = fixture["match_clock_path"]
+    audit = json.loads(audit_path.read_text(encoding="utf-8"))
+    audit["schema"] = "melee-web-b4-source-clock1000-audit-v1"
+    audit.pop("report_write_failed", None)
+    audit["packet"] = {"bytes": runner_identity["bytes"],
+                        "sha256": runner_identity["sha256"]}
+    audit_path.write_text(json.dumps(audit), encoding="utf-8")
+    audit_identity = {
+        "path": str(audit_path), "bytes": audit_path.stat().st_size,
+        "sha256": hashlib.sha256(audit_path.read_bytes()).hexdigest(),
+    }
+
+    lineage["runner_packet"] = runner_identity
+    lineage["checkpoints"][-1]["audit"] = audit_identity
+    source["match_clock_boundary_audit"] = audit_identity
+    fixture["packet_path"].write_text(json.dumps(fixture["packet"]), encoding="utf-8")
+    fixture["match_clock_audit"] = audit
+    return fixture
+
+
+def _refresh_ordered_terminal_audit_identity(fixture, audit):
+    audit_path = fixture["match_clock_path"]
+    audit_path.write_text(json.dumps(audit), encoding="utf-8")
+    identity = {
+        "path": str(audit_path), "bytes": audit_path.stat().st_size,
+        "sha256": hashlib.sha256(audit_path.read_bytes()).hexdigest(),
+    }
+    source = fixture["packet"]["source"]
+    source["match_clock_boundary_audit"] = identity
+    source["ordered_clock_lineage"]["checkpoints"][-1]["audit"] = identity
+    fixture["packet_path"].write_text(json.dumps(fixture["packet"]), encoding="utf-8")
+    fixture["match_clock_audit"] = audit
+    return identity
 
 
 class WholeSessionStateCompareTests(unittest.TestCase):
@@ -3436,6 +3498,147 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                                  1 + len(intermediate_frames))
                 self.assertEqual(loaded_prior_packets.call_count,
                                  len(intermediate_frames))
+
+    def test_ordered_clock1000_legacy_report_and_runner_shapes_compare(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _clock60_comparison_fixture(
+                Path(directory), terminal_match_frame=1000)
+            fixture = _attach_ordered_comparison_lineage(fixture, (300,))
+            fixture = _convert_ordered_fixture_to_legacy_clock1000(fixture)
+
+            result, yielded, observed_limits = _run_clock60_comparison(fixture)
+
+            self.assertEqual(result["result"], "incomplete", result)
+            self.assertEqual(observed_limits, {
+                "max_bytes": V10_ORDERED_LINEAGE_BYTE_CAP,
+                "max_records": V10_ORDERED_LINEAGE_RECORD_CAP,
+            })
+            self.assertEqual(yielded[-1], fixture["match_clock_target"]["source_sequence"])
+            self.assertEqual(len(yielded), fixture["match_clock_target"]["source_sequence"] + 1)
+            self.assertEqual(result["boundary_result"], "equivalent")
+            self.assertEqual(result["result"], "incomplete")
+            self.assertFalse(result["complete"])
+            self.assertFalse(result["whole_session_equivalent"])
+            self.assertEqual(result["ordered_match_clock_boundary"]["match_frame"], 1000)
+            self.assertEqual(
+                result["match_clock_boundary_audit"]["report_write_failed_observation"],
+                "not_recorded_in_historical_clock1000_v1")
+
+    def test_ordered_clock1000_legacy_status_is_scoped_and_does_not_invent_write_result(self):
+        audit = {
+            "schema": "melee-web-b4-source-clock1000-audit-v1",
+            "scope": "source-only-clock-ge1000", "audit_completed": True,
+            "complete": False, "whole_session_equivalent": False,
+            "status": "first_match_clock_ge1000_found",
+            "target_match_frame_at_least": 1000, "error": None,
+        }
+        self.assertIsNone(_validate_match_clock_audit_status(
+            audit, 1000, ordered_lineage=True))
+        self.assertNotIn("report_write_failed", audit)
+        for mutate, threshold, ordered in (
+                (lambda value: value.__setitem__("report_write_failed", True), 1000, True),
+                (lambda value: value.__setitem__("report_write_failed", None), 1000, True),
+                (lambda value: None, 500, True),
+                (lambda value: None, 1000, False)):
+            candidate = dict(audit)
+            mutate(candidate)
+            with self.assertRaises(ComparisonError):
+                _validate_match_clock_audit_status(
+                    candidate, threshold, ordered_lineage=ordered)
+
+        current = {
+            **audit,
+            "schema": "melee-web-b4-source-clock-ge1000-audit-v3",
+            "report_write_failed": False,
+        }
+        self.assertIsNone(_validate_match_clock_audit_status(
+            current, 1000, ordered_lineage=True))
+        current.pop("report_write_failed")
+        with self.assertRaisesRegex(ComparisonError, "report-write status"):
+            _validate_match_clock_audit_status(
+                current, 1000, ordered_lineage=True)
+
+    def test_ordered_clock_runner_reference_accepts_only_bound_pathful_or_v1_projection(self):
+        identity = {"path": "/frozen/runner.json", "bytes": 81, "sha256": "a" * 64}
+        _validate_ordered_clock_runner_reference(
+            dict(identity), identity, allow_legacy_pathless=False)
+        _validate_ordered_clock_runner_reference(
+            {"bytes": 81, "sha256": "a" * 64}, identity,
+            allow_legacy_pathless=True)
+        invalid = (
+            ({"bytes": 81, "sha256": "a" * 64}, False),
+            ({"path": "/other/runner.json", "bytes": 81, "sha256": "a" * 64}, True),
+            ({"path": identity["path"], "bytes": True, "sha256": "a" * 64}, True),
+            ({"path": identity["path"], "bytes": 81, "sha256": "a" * 63 + "b"}, True),
+            ({"bytes": 81, "sha256": "a" * 64, "extra": 1}, True),
+        )
+        for reference, allow_legacy in invalid:
+            with self.subTest(reference=reference, allow_legacy=allow_legacy):
+                with self.assertRaises(ComparisonError):
+                    _validate_ordered_clock_runner_reference(
+                        reference, identity, allow_legacy_pathless=allow_legacy)
+
+    def test_ordered_clock_runner_prefix_accepts_only_v1_annotation_variant(self):
+        expected = {
+            "bytes_read": 123, "records_read": 7,
+            "last_source_sequence": 6, "sha256": "b" * 64,
+        }
+        _validate_ordered_clock_runner_prefix(dict(expected), expected, "clock1000")
+        _validate_ordered_clock_runner_prefix(
+            {**expected, "hash_basis": "fresh prefix through boundary"}, expected, "clock1000")
+        malformed = (
+            {**expected, "hash_basis": ""},
+            {**expected, "hash_basis": 1},
+            {**expected, "unexpected": True},
+            {key: value for key, value in expected.items() if key != "records_read"},
+            {**expected, "records_read": True},
+            {**expected, "sha256": "not-a-digest"},
+        )
+        for prefix in malformed:
+            with self.subTest(prefix=prefix):
+                with self.assertRaises(ComparisonError):
+                    _validate_ordered_clock_runner_prefix(prefix, expected, "clock1000")
+
+    def test_ordered_clock1000_rehashed_metadata_failures_stop_before_source_iteration(self):
+        cases = (
+            ("contradictory-write-status", lambda fixture, audit: audit.__setitem__(
+                "report_write_failed", True), "report-write status is contradictory"),
+            ("runner-packet-hash", lambda fixture, audit: audit["packet"].__setitem__(
+                "sha256", "0" * 64), "does not bind its frozen runner packet"),
+            ("runner-packet-path", lambda fixture, audit: audit["packet"].__setitem__(
+                "path", "/tmp/other-ordered-runner.json"),
+             "does not bind its frozen runner packet"),
+            ("terminal-tuple", lambda fixture, audit: audit["observed"][
+                "target_clock_ge1000_observed"].__setitem__("source_tick_seq", 1),
+             "terminal match-clock differs"),
+            ("terminal-prefix-hash", lambda fixture, audit: audit["observed"][
+                "source_prefix"].__setitem__("sha256", "0" * 64),
+             "ordered match-clock audit prefixes differ"),
+        )
+        original_path_open = Path.open
+        for name, mutate, expected in cases:
+            with self.subTest(case=name), tempfile.TemporaryDirectory() as directory:
+                fixture = _convert_ordered_fixture_to_legacy_clock1000(
+                    _attach_ordered_comparison_lineage(
+                        _clock60_comparison_fixture(
+                            Path(directory), terminal_match_frame=1000), (300,)))
+                audit = copy.deepcopy(fixture["match_clock_audit"])
+                mutate(fixture, audit)
+                _refresh_ordered_terminal_audit_identity(fixture, audit)
+                source_path = fixture["selected"]["reference"]
+
+                def refuse_source_open(path, *args, **kwargs):
+                    if Path(path) == source_path:
+                        raise AssertionError("original source trace content was opened")
+                    return original_path_open(path, *args, **kwargs)
+
+                with mock.patch.object(Path, "open", new=refuse_source_open):
+                    result, yielded, _ = _run_clock60_comparison(fixture)
+
+                self.assertEqual(result["result"], "invalid", result)
+                self.assertIn(expected, result["error"])
+                self.assertEqual(fixture["iterator_calls"], [])
+                self.assertEqual(yielded, [])
 
     def test_ordered_clock90_rehashed_runner_tampering_fails_before_source_read(self):
         for corruption in ("missing", "reordered", "tuple"):

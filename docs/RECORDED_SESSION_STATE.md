@@ -403,6 +403,10 @@ in the [scoped comparator entry](status/2026-10-07-b4-v10-ordered-clock-lineage-
 The separate
 [clock-1000 source-only entry](status/2026-10-07-b4-v10-first-match-clock1000-source-only.md)
 records the original-trace observation without a browser comparison.
+The [clock-1000 comparison entry](status/2026-10-07-b4-v10-first-match-clock1000-comparison.md)
+records the bounded source-to-browser result. Its retained historical v1 source
+audit does not contain `report_write_failed`; that observation remains
+unrecorded and is not inferred from the audit's successful exit.
 
 ## Capture command failure gates
 
