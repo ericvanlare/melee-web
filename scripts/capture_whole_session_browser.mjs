@@ -20,7 +20,7 @@ import {finalizeSessionCapture, validateRuntimeDataAbort, boundedCaptureOperatio
 import {parseRngDrawProbe, validateRngDrawProbeRows} from './rng_draw_probe.mjs';
 import {NATURAL_PAUSE_PROTOCOL, resolveCaptureMode, validateNaturalPauseManifest,
   naturalPauseRuntimeUrl, validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
-  stopSourceBeforeNaturalPauseExport} from './natural_pause_diagnostic.mjs';
+  stopSourceBeforeNaturalPauseExport, readNaturalPauseBrowserCommandLine} from './natural_pause_diagnostic.mjs';
 import {installPauseTraceCapture, readPauseTraceCapture, readPauseTraceStatus,
   readRetainedPauseDiagnostics} from '../tests/pause_trace_capture.mjs';
 import {traceSettings, finalizeTrace} from './run_hitch_matrix.mjs';
@@ -423,7 +423,8 @@ try {
   report.browser = {executable: diagnostic ? path.resolve(browserPath) : path.basename(browserPath),
     playwright: playwrightPath};
   const browserOptions = {...browserLaunchOptions(launchOptions, {timeout: phaseTimeoutMs}), headless: true,
-    ...(diagnostic ? {viewport: {width: NATURAL_PAUSE_PROTOCOL.viewport_width,
+    ...(diagnostic ? {args: [...browserLaunchOptions(launchOptions).args, '--enable-automation'],
+      viewport: {width: NATURAL_PAUSE_PROTOCOL.viewport_width,
       height: NATURAL_PAUSE_PROTOCOL.viewport_height},
       deviceScaleFactor: NATURAL_PAUSE_PROTOCOL.device_scale_factor} : {})};
   if (diagnostic) {
@@ -453,16 +454,11 @@ try {
       throw Error(`Launched Chrome identity differs from manifest: ${JSON.stringify(report.browser_identity_postlaunch)}`);
     const browserCdp = await browser.newBrowserCDPSession();
     try {
-      report.browser.command_line = await browserCdp.send('Browser.getBrowserCommandLine');
-      report.browser_process_info = (await browserCdp.send('SystemInfo.getProcessInfo')).processInfo;
-      if (!Array.isArray(report.browser_process_info) || !report.browser_process_info.length)
-        throw Error('Owned Chrome CDP process inventory is unavailable');
-      const expectedProfile = path.resolve(values['browser-profile']);
-      const arguments_ = report.browser.command_line.arguments || [];
-      const profileIndex = arguments_.indexOf('--user-data-dir');
-      if (!arguments_.some(argument => argument === `--user-data-dir=${expectedProfile}`) &&
-          !(profileIndex >= 0 && arguments_[profileIndex + 1] === expectedProfile))
-        throw Error('Chrome command line does not bind the exact diagnostic profile path');
+      report.browser.command_line = await readNaturalPauseBrowserCommandLine(
+        browserCdp, path.resolve(values['browser-profile']), async inventory => {
+          report.browser_process_info = inventory;
+          await write('report.json', report);
+        });
     } finally { await browserCdp.detach(); }
     // Make owned Chrome attribution durable before navigation or replay can
     // block the renderer and outlive the strict external owner deadline.

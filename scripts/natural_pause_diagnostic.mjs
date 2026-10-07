@@ -178,3 +178,19 @@ export async function stopSourceBeforeNaturalPauseExport({readStatus, stopPlayba
   const cleanup = cleanupAfterEvidence ? await cleanupAfterEvidence() : null;
   return {before, stopped, trace, evidence, cleanup};
 }
+
+/** Persist safe process attribution before querying command-line capability. */
+export async function readNaturalPauseBrowserCommandLine(cdp, expectedProfile, persistInventory) {
+  const inventory = (await cdp.send('SystemInfo.getProcessInfo')).processInfo;
+  if (!Array.isArray(inventory) || !inventory.length || inventory.some(row =>
+      !Number.isSafeInteger(row.id) || row.id <= 0 || typeof row.type !== 'string'))
+    throw Error('Owned Chrome CDP process inventory is unavailable or malformed');
+  await persistInventory(inventory);
+  const commandLine = await cdp.send('Browser.getBrowserCommandLine');
+  const args = commandLine.arguments || [];
+  const profileIndex = args.indexOf('--user-data-dir');
+  if (!args.some(argument => argument === `--user-data-dir=${expectedProfile}`) &&
+      !(profileIndex >= 0 && args[profileIndex + 1] === expectedProfile))
+    throw Error('Chrome command line does not bind the exact diagnostic profile path');
+  return commandLine;
+}

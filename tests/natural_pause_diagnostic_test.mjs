@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {NATURAL_PAUSE_PROTOCOL, resolveCaptureMode, validateNaturalPauseManifest,
   naturalPauseRuntimeUrl, validateNaturalPauseBrowserIdentity, validateDefaultTwoRingStatus, firstNaturalPauseStop,
-  stopSourceBeforeNaturalPauseExport} from '../scripts/natural_pause_diagnostic.mjs';
+  stopSourceBeforeNaturalPauseExport, readNaturalPauseBrowserCommandLine} from '../scripts/natural_pause_diagnostic.mjs';
 
 const sha = 'a'.repeat(64);
 const manifest = () => ({
@@ -144,9 +144,9 @@ assert.ok(readyAt >= 0 && readyAt < installAt && installAt < importAt,
 
 assert.ok(runner.includes("snapshot('replay-poll', {captureCss: !diagnostic})"),
   'state mode preserves CSS observations while performance polling avoids allocations');
-assert.ok(runner.includes("browserCdp.send('SystemInfo.getProcessInfo')"),
+assert.ok(runner.includes("readNaturalPauseBrowserCommandLine("),
   'strict owner cleanup receives a CDP process inventory before measurement');
-const processInfoAt = runner.indexOf("browserCdp.send('SystemInfo.getProcessInfo')");
+const processInfoAt = runner.indexOf("report.browser.command_line = await readNaturalPauseBrowserCommandLine(");
 const durableInventoryAt = runner.indexOf("await write('report.json', report);", processInfoAt);
 const pageCreateAt = runner.indexOf('page = diagnostic ?');
 const navigationAt = runner.indexOf('page.goto(');
@@ -168,3 +168,24 @@ assert.ok(runner.includes('if (!diagnostic && stopAfter && !report.deliberate_pr
   'the natural-pause loop cannot enter state-mode cursor-stop/unload handling');
 
 console.log('Natural-pause mode, frozen preflight, first-stop classification and export ordering passed.');
+
+const browserIdentityOrder = [];
+const fakeInventory = [{id: 123, type: 'browser', cpuTime: 0}];
+await assert.rejects(readNaturalPauseBrowserCommandLine({send: async name => {
+  browserIdentityOrder.push(name);
+  if (name === 'SystemInfo.getProcessInfo') return {processInfo: fakeInventory};
+  throw Error('Command line not returned because --enable-automation not set');
+}}, '/tmp/fresh', async inventory => {
+  assert.deepEqual(inventory, fakeInventory); browserIdentityOrder.push('persist');
+}), /enable-automation/);
+assert.deepEqual(browserIdentityOrder, ['SystemInfo.getProcessInfo', 'persist', 'Browser.getBrowserCommandLine']);
+await assert.rejects(readNaturalPauseBrowserCommandLine({send: async name =>
+  name === 'SystemInfo.getProcessInfo' ? {processInfo: fakeInventory} :
+    {arguments: ['--user-data-dir=/tmp/wrong-profile']}}, '/tmp/fresh', async () => {}),
+  /exact diagnostic profile/);
+assert.deepEqual(await readNaturalPauseBrowserCommandLine({send: async name =>
+  name === 'SystemInfo.getProcessInfo' ? {processInfo: fakeInventory} :
+    {arguments: ['--user-data-dir', '/tmp/fresh']}}, '/tmp/fresh', async () => {}),
+  {arguments: ['--user-data-dir', '/tmp/fresh']});
+assert.ok(runner.includes("'--enable-automation'"), 'diagnostic launch enables the established Chrome command-line API');
+console.log('Browser identity retains process attribution before command-line failure and rejects wrong profiles.');
