@@ -1,0 +1,95 @@
+{
+  "schema": "melee-web-pokemon-stadium-map-only-owner-v1",
+  "result": "passed_with_explicit_scope_exclusions",
+  "evidence_labels": [
+    "Source identified",
+    "Native traced"
+  ],
+  "boundary": "One C0 Stadium DatNativeMap-only native trace. This is not evidence of the original menu handoff, gameplay-stage construction, or playable Stadium.",
+  "producer": {
+    "branch": "codex/stadium-map-marker-structural-20261007",
+    "commit": "f6eff36dacabf174ffaabc6aa1f8df570332ea76",
+    "tree": "f9738f14467eb4be7aab28bc9efcbe70e3c9cb1f",
+    "tracked_worktree_clean_before_and_after": true,
+    "test_source_compiled_content_matches_commit": true,
+    "build_preceded_test_only_commit": true,
+    "configuration": "build/browser; RelWithDebInfo; Emscripten wasm32",
+    "cmake": "3.31.6",
+    "emscripten": "6.0.9 (4e4223852a0835923411059a3929907d7df1232e)",
+    "compiler": "Clang 24.0.0 / emcc"
+  },
+  "source": {
+    "archive": "GrPs.usd",
+    "bytes": 1461024,
+    "sha256": "aa740cfbbeced294f058449caca8ac0380532521dde06ca4a6dcc03080cf6a6d",
+    "provenance": "Retained C0 source input; matches the input identity frozen before the probe."
+  },
+  "runtime_artifacts": {
+    "dat_native_stage_map_trace.js": {
+      "sha256": "695e7af9cd8ac1c8d5c8b5833503342ea5b9c9ddc7219bd11f9b8946d6901163",
+      "bytes": 342732
+    },
+    "dat_native_stage_map_trace.wasm": {
+      "sha256": "9a6b139e6f4a7128aded2132a43a764cbce92ae747ec396c0f888f49f3993022",
+      "bytes": 95863908
+    }
+  },
+  "execution": {
+    "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_dat_native_stage.py -k stadium_map_only_owner -v",
+    "test": "test_stadium_map_only_owner_preserves_exact_imports_and_nulls",
+    "exit_code": 0,
+    "run_count": 1,
+    "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderr_sha256": "1061e850bf8a4af6ab2d8a0897462deeebea6d3651e475f76b083b76d2a23307",
+    "identity_capture": {
+      "pre_sha256": "b09f3e01d83efe8b3b00cb4fa1a7ae2d0999ae20839fd594a306fa829559592b",
+      "post_sha256": "b09f3e01d83efe8b3b00cb4fa1a7ae2d0999ae20839fd594a306fa829559592b",
+      "head_tree_inputs_targets_packet_unchanged": true
+    },
+    "external_run_inventory_id": "stadium-map-marker-structural-20261007-EcS57s/grps-corrected-20261007-EMEdVZ"
+  },
+  "assertions": {
+    "authored_descriptor_rows": 10,
+    "resident_source_ids": [
+      0,
+      1,
+      2,
+      5
+    ],
+    "exact_import_fields": 26,
+    "flagged_object_expectations": 44,
+    "checks": [
+      "Exact external row/field/symbol identities, authored flagged-object order, imported-null names and local material targets.",
+      "Hydrated resident map objects, source light table counts with bounded null terminators, and source animation flag bytes on imported rows.",
+      "Flagged-object null ordering and repeated material alias identity.",
+      "Two map owner construction/destruction cycles and recovery after an expected partial-allocation rejection.",
+      "Archive data-section bytes equal the pre-owner resolved baseline, and independently reread full raw archive bytes remain identical."
+    ],
+    "negative_contract_checks": [
+      "Wrong entry count",
+      "Wrong animation-consumer bound",
+      "Missing resident joint",
+      "Wrong external row symbol",
+      "Changed flagged external name, slot, or authored order",
+      "Shifted external flagged-object source slot",
+      "Malformed local joint range",
+      "Zeroed expected-local flagged-object pointer",
+      "Unowned flagged-object target"
+    ]
+  },
+  "related_focused_checks": {
+    "synthetic_marker_fixture": "Passed separately before this GrPs probe; preserves authored duplicate pair order and Ground last-write behavior; malformed pair/tree/transform inputs and strict legacy missing/duplicate marker requirements rejected.",
+    "fd_numeric_and_map_regressions": "Passed separately before this GrPs probe."
+  },
+  "exclusions": [
+    "No original CSS/SSS stage handoff.",
+    "No gameplay-stage construction, Stage_8022524C, on_init, stage callback, transformation, or collision claim.",
+    "No readiness/admission, public content registry, publication/E8, or browser.",
+    "No full test suite."
+  ],
+  "prior_failed_attempt": {
+    "retained_external_run_inventory_id": "stadium-map-marker-structural-20261007-EcS57s/grps-map-only-20261007-D0Q6qj",
+    "exit_code": 1,
+    "classification": "Test assertion compared the archive's resolved data-section view with full raw-file bytes. Test-only correction now compares the data section to a pre-owner baseline and separately checks the full file."
+  }
+}
