@@ -1,0 +1,428 @@
+{
+  "schema": "melee-web-b4-v10-primary-identity-target1200-evidence-v1",
+  "scope": "One ordinary MWRC v10 state-mode replay to source cursor 1200, with live primary fighter identities observed at setup and match source ticks. Match-entry identity evidence only; no active-gameplay, original-state equality, whole-session acceptance, pixels, PCM, performance, foreground timing, GPU-cause, or admission claim.",
+  "source": {
+    "repository": "melee-web",
+    "base_main": "558d6e89e42a2b26e3cee83457efaea19a4d22e6",
+    "branch": "codex/b4-v10-primary-identity-20261006",
+    "capture_head": "be3704767f1ff0ec82daec1681b3337495d25724",
+    "capture_tree": "7e9402f70e1a1f14ad2fb65c72c6bc6e6b7cc68c",
+    "changed_paths": [
+      {
+        "bytes": 34799,
+        "path": "src/gameplay_retail_recipe.cpp",
+        "sha256": "88215c6cf04605d48637d617305bf842d07a979e5ff7fc7d715350d3ac80ccd5"
+      },
+      {
+        "bytes": 9995,
+        "path": "tests/test_retail_entity_state.py",
+        "sha256": "408c488488d6be7d3b5fcd3ac1ca81e0e0b0fed08669af3bf90ed8775ea5efe2"
+      },
+      {
+        "bytes": 22328,
+        "path": "tests/test_retail_recipe_scene_trace.py",
+        "sha256": "37f313dfe16a9bcf1ad633acfb02d78aba1fe06aa3bd3b0b8c6ec29a05a73012"
+      }
+    ],
+    "source_manifest_sha256": "1817598aa90629ed4c1818276ece0d7a019322cdd24232a4fba935dfec7254b8",
+    "source_clean_at_capture": true,
+    "build_source_content_matches_capture_producer": true,
+    "validation_completed_before_source_commit": true,
+    "no_executable_content_edits_between_validation_and_commit": true
+  },
+  "input": {
+    "recipe_format_version": 10,
+    "source_frame_count": 50394,
+    "seed": 3336171383,
+    "recipe_bytes": 2241622,
+    "recipe_sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+    "disc_bytes": 1449165376,
+    "disc_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "raw_game_assets_included": false
+  },
+  "producer": {
+    "target": "runtime",
+    "configuration": "Release",
+    "build_command": "python3 scripts/build.py --target runtime --configuration Release",
+    "build_exit_code": 0,
+    "artifact_count": 32,
+    "artifacts": {
+      "action-sweep.mjs": {
+        "bytes": 18698,
+        "sha256": "904f0b5d4f892628f5fc58b29210c7e0c4eac625352b9cd09588d246f293aa30"
+      },
+      "audio-ring.mjs": {
+        "bytes": 2040,
+        "sha256": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf"
+      },
+      "audio-worklet.js": {
+        "bytes": 1517,
+        "sha256": "f879fb58401d3edf7cc71345b95a876327795f0b9082f62e3480cd5383fea6ea"
+      },
+      "controller-input.mjs": {
+        "bytes": 19263,
+        "sha256": "32881a311af8bb9fa4bc2d57986b3f4c551175a3325bf4cec3802e9f01bde842"
+      },
+      "controller-panel.css": {
+        "bytes": 5240,
+        "sha256": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e"
+      },
+      "controller-panel.mjs": {
+        "bytes": 36847,
+        "sha256": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95"
+      },
+      "controller-settings.css": {
+        "bytes": 3482,
+        "sha256": "8f2d175b5b51cf4e9d7ef0d1148b80c4d63370527c658af77da4d02f65991e00"
+      },
+      "controller-settings.mjs": {
+        "bytes": 18680,
+        "sha256": "d79ff3d26619d48c97801eab51710c8f539d3b1320aaeb8ed6b5e1b3060c265f"
+      },
+      "diagnostics-schema.mjs": {
+        "bytes": 18780,
+        "sha256": "5ab51074505763796d9b7f2219da5fdcda545f488db418010d78120daddba1b5"
+      },
+      "diagnostics-settings.mjs": {
+        "bytes": 2876,
+        "sha256": "c3c1dbccb83ae164d8629affb7c8e9eec4cdc8f9c52c1371779c750acb2885f7"
+      },
+      "disc-image.mjs": {
+        "bytes": 15255,
+        "sha256": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a"
+      },
+      "disc-session.mjs": {
+        "bytes": 7552,
+        "sha256": "f68df2beaa7f89c4f8ff84aacfbf586774df69a9fa1af53744f919d0d324b8d2"
+      },
+      "dsp-coefficients.mjs": {
+        "bytes": 4043,
+        "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+      },
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      "gameplay_menu_browser.js": {
+        "bytes": 299681,
+        "sha256": "fd0faf2d6bb5630abc218ac7b27136578d69822973f12f0ccca47b49667e051f"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 15722601,
+        "sha256": "536bcd7e31b702a9b0a4a4ec7ea9c4e97c872c834eaaeee5ebaaf5ce9b993753"
+      },
+      "hitch-capture.mjs": {
+        "bytes": 21958,
+        "sha256": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+      },
+      "match-flow.mjs": {
+        "bytes": 10679,
+        "sha256": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f"
+      },
+      "match-menu.mjs": {
+        "bytes": 8566,
+        "sha256": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba"
+      },
+      "melee-runtime.mjs": {
+        "bytes": 50699,
+        "sha256": "0fdd584a8636e821eb08b2a3232ec05d7c3ce0c33e43e5e640a16e0809709013"
+      },
+      "net-timing-pause.mjs": {
+        "bytes": 1043,
+        "sha256": "189e4dc343f95c3c1f53fd2ff58e973eaa3c67ef8f25cb715aca1eb19ef1ba16"
+      },
+      "prototype-keyboard-layouts.mjs": {
+        "bytes": 935,
+        "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+      },
+      "runtime-assets.mjs": {
+        "bytes": 17029,
+        "sha256": "f594f2f84c513e414255d20bb8ea55aa31ed0ba87fba7afd8d4fabbd7735d190"
+      },
+      "runtime-audio-assets.mjs": {
+        "bytes": 5451,
+        "sha256": "033bf0bd4caa6c744ebead3dd7091bec8496b5f8d2039d60a3cdf9d398a7f05c"
+      },
+      "runtime-audio.mjs": {
+        "bytes": 7660,
+        "sha256": "93fbc8e78dd364abdebdc8eba0430d7e295d4e8dc9333a22e24574b15ba085cc"
+      },
+      "runtime-cache.js": {
+        "bytes": 16143,
+        "sha256": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26"
+      },
+      "runtime-development.mjs": {
+        "bytes": 60714,
+        "sha256": "258dde2991c34f06f89c2e5ec3800aa8a1fad185949f807d3c3f8412e93f0e24"
+      },
+      "runtime-diagnostics-delivery.mjs": {
+        "bytes": 51514,
+        "sha256": "2b71bad6ae3439c981002ee761671b31109f679549dfd45a94038c87ba6b7241"
+      },
+      "runtime-diagnostics.mjs": {
+        "bytes": 85702,
+        "sha256": "6e500027c52b91b01c0fc52b48eae6dd2c2672d70d460bdaf8f25bcd1873a2ec"
+      },
+      "runtime.html": {
+        "bytes": 5205,
+        "sha256": "55bbcc68a2c77cd143a24e84a013d6669468f382330818f5ca24586b81e5fd1d"
+      },
+      "touch-controls.css": {
+        "bytes": 6381,
+        "sha256": "314627c5b0bb2f5b75cd4207f7a82ccfa1b999e0ee4110dd1db6463966667b0d"
+      },
+      "touch-controls.mjs": {
+        "bytes": 13954,
+        "sha256": "b718f95e088bafd76ecfeef7efb28ce8ac4a333a9dcf1c8e6c6638da463e8bf7"
+      }
+    },
+    "default_off_gates": {
+      "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+      "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+      "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+      "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+      "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+      "MELEE_WEB_RESULTS_RENDERED_TRACE": "OFF",
+      "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+      "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF",
+      "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF"
+    },
+    "local_and_served_inventory_matched_frozen_before_and_after": true
+  },
+  "protocol": {
+    "first_callback_probe": false,
+    "http_request_timeout_ms": 5000,
+    "identity_observation": "Primary identity rows are emitted from live source pointers on match setup and source match ticks; no transformed-move correctness or original-state equality claim.",
+    "mode": "state (default)",
+    "one_run_only": true,
+    "owner_cleanup_reserve_ms": 45000,
+    "owner_overall_timeout_ms": 300000,
+    "pass_criteria": "Capture source records through requested cursor 1200 or retain actual overshoot, with CSS→SSS→match ordering and first match ticks; stop at the requested target or first failure, no resume/retry. Incomplete prefix remains incomplete.",
+    "phase_timeout_ms": 18000,
+    "poll_ms": 250,
+    "recipe_spans": [
+      {
+        "first_frame": 0,
+        "last_frame": 936,
+        "scene": "CSS"
+      },
+      {
+        "first_frame": 937,
+        "last_frame": 1183,
+        "scene": "SSS"
+      },
+      {
+        "first_frame": 1184,
+        "last_frame": 16289,
+        "scene": "match"
+      }
+    ],
+    "replay_timeout_ms": 90000,
+    "requested_cursor": 1200,
+    "resume_timing_pauses": false,
+    "scope": "Ordinary progress/first match-entry diagnostic only; no original-state equality, complete-session acceptance, pixel/PCM/timing/performance/admission claim.",
+    "stop_on_first_error": true,
+    "expected_observation_timeout_ms": 5000,
+    "headless": true,
+    "speaker_output_muted": true,
+    "audio_processing_disabled": false,
+    "other_capture_environment_overrides": "none found; frozen explicit MELEE_BROWSER_PATH and TMPDIR only",
+    "temporary_profile_policy": "Fresh mode-0700 temp root on verified external NVMe; retained empty after cleanup."
+  },
+  "observation": {
+    "result": "incomplete",
+    "comparison": "not_run",
+    "whole_session_state_equality_claimed": false,
+    "requested_cursor": 1200,
+    "observed_cursor": 1200,
+    "cursor_overshoot": 0,
+    "last_live_snapshot": {
+      "at_ms": 24577.5,
+      "phase": 7,
+      "running": 0,
+      "source_cursor": 1200,
+      "status": "Preparing first-use rendering... · 0 ms · audio paused",
+      "runtime_error": null,
+      "focused": true,
+      "hidden": false
+    },
+    "record_counts": {
+      "header": 1,
+      "session_frame": 1200,
+      "session_match_enter_complete": 1
+    },
+    "source_frames_steps_draws": {
+      "sourceFrames": 1200,
+      "sourceSteps": 1200,
+      "sourceDraws": 1200
+    },
+    "browser_callbacks": 1205,
+    "ordered_scene_spans": [
+      {
+        "scene": "CSS",
+        "scene_id": 1,
+        "first_index": 0,
+        "last_index": 936,
+        "record_count": 937
+      },
+      {
+        "scene": "SSS",
+        "scene_id": 2,
+        "first_index": 937,
+        "last_index": 1183,
+        "record_count": 247
+      },
+      {
+        "scene": "match",
+        "scene_id": 3,
+        "first_index": 1184,
+        "last_index": 1199,
+        "record_count": 16
+      }
+    ],
+    "match_entry_event_record_order": 1185,
+    "match_entry_event_precedes_first_match_frame": true,
+    "match_source_rows": 16,
+    "match_frame_values": [
+      0
+    ],
+    "identity_validation": {
+      "validator": "tools/whole_session_state_compare.py::_browser_entities",
+      "validator_source_sha256": "79c1d709965a41b835c8aa8f5e256787d387f5a5465fa9a52bdef15c2d025448",
+      "identity_records_checked": 17,
+      "records": {
+        "setup": 1,
+        "match_source_frames": 16
+      },
+      "all_passed": true,
+      "four_ordered_primary_rows_each": true,
+      "slots": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "entity_indices": [
+        0
+      ],
+      "generations": [
+        0
+      ],
+      "fighter_player_ids": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "fighter_gobj_linked": true
+    },
+    "pixels": "not_compared"
+  },
+  "incomplete_result": {
+    "expected": true,
+    "capture_exit_code": 1,
+    "wrapper_exit_code": 1,
+    "first_error_after_manual_unload": {
+      "kind": "whole-session-replay",
+      "phase": "whole-session-replay",
+      "at_ms": 24855.980000019073,
+      "source_cursor": 0,
+      "status": "Native menus unloaded.",
+      "message": "Browser replay report failed: [\"whole-session final CSS was not entered\",\"Manual unload stopped the replay\",\"incomplete input timeline\",\"source tick/draw count mismatch\"]"
+    },
+    "browser_report_failures": [
+      "whole-session final CSS was not entered",
+      "Manual unload stopped the replay",
+      "incomplete input timeline",
+      "source tick/draw count mismatch"
+    ],
+    "browser_errors": [],
+    "runtime_error_at_last_live_snapshot": null,
+    "final_report_snapshot_overwritten_by_unload": {
+      "source_cursor": 0,
+      "phase": 0,
+      "status": "Native menus unloaded."
+    },
+    "note": "The capture and wrapper exit 1 because the bounded prefix was deliberately unloaded before whole-session completion. This is retained as incomplete, not accepted as a full-session pass."
+  },
+  "inventory_and_cleanup": {
+    "pre_inventory_result": "pass",
+    "post_inventory_result": "pass",
+    "pre_artifact_count": 32,
+    "post_artifact_count": 32,
+    "inventory_wrapper_pass": true,
+    "cdp_attribution_complete": true,
+    "process_observation_passed": true,
+    "capture_process_group_absent": true,
+    "server_process_group_absent": true,
+    "cleanup_elapsed_ms": 157,
+    "elapsed_ms": 29309,
+    "port_18796_free_after_cleanup": true,
+    "owned_timing_marker_released": true,
+    "external_temp_root_empty_and_preserved": true
+  },
+  "validation": {
+    "release_runtime_build": "pass",
+    "release_runtime_build_log_sha256": "84461a23ece0a039fe127aa0312226b5734595086eca0f6432ff0f077da4efcd",
+    "full_python_suite": {
+      "result": "pass",
+      "tests": 1942,
+      "skipped": 142,
+      "log_sha256": "3843b66715d1dfb242a5983029b33d11d2f700d727b0d6343ea334cb2bfd5dbd"
+    },
+    "focused_failure_fix_note_sha256": "911c30f27c356c3b1a9f3a3a7d95a2d66f4cb1258229acf0c121cef5a2f44f0a"
+  },
+  "tools": {
+    "versions": {
+      "chrome": "Google Chrome 154.0.8037.98",
+      "cmake": "cmake version 3.31.6",
+      "emscripten": "6.0.9",
+      "git": "git version 2.50.1 (Apple Git-155)",
+      "ninja": "1.13.0.git.kitware.jobserver-pipe-1",
+      "node": "v24.19.0",
+      "playwright": "1.62.1",
+      "python": "3.12.13 (main, Jul 23 2026, 14:33:47) [Clang 22.1.3 ]"
+    },
+    "tool_manifest_sha256": "38d1ba60a522efeba9a1218e345da0299138ca6c547a36ccfebbe6caed8567a1",
+    "identity_validator": "tools/whole_session_state_compare.py::_browser_entities",
+    "identity_validator_source_sha256": "79c1d709965a41b835c8aa8f5e256787d387f5a5465fa9a52bdef15c2d025448"
+  },
+  "private_run": {
+    "run_id": "b4-v10-primary-identity-target1200-20261006-a02043f4",
+    "summary_schema": "melee-web-b4-v10-primary-identity-capture-summary-v1",
+    "summary_sha256": "9ee02dbdd7744669675a0976802d045b926250409f55dcfa6ab11c31386b79b2",
+    "private_locations_omitted": true
+  },
+  "external_evidence_sha256": {
+    "private_identity_analysis_summary_sha256": "9ee02dbdd7744669675a0976802d045b926250409f55dcfa6ab11c31386b79b2",
+    "source_jsonl_sha256": "94f9f15dccccd30b1860299a4b7e9de630fe46922b3b8acebabfd2fea6008814",
+    "capture_report_sha256": "e33cbb1984b5d04e91aea26662d94ed52c285262982e7614e440b07cd3117291",
+    "browser_report_sha256": "cfb83d0d56332f0088ebded4f35576d0cc1915dc43c139d1a7cae061e3f59b45",
+    "progress_report_sha256": "b785556307b892da7fb5ea884aa80ef83c157a3eab5749ae13d91929fce62817",
+    "owner_report_sha256": "2aba5fb36fc05c78a0baa8fdc9f17026908015cf26c7435a84b8210ce70d9b2b",
+    "wrapper_report_sha256": "51151967135e328c2d69dd654c82c50b44adc9a61c13f271a5ab07273767cdc0",
+    "pre_inventory_sha256": "762f72ab7c1778027eb9cd268957acf416c3e1ed9e90f6076ed92a05285f4f38",
+    "post_inventory_sha256": "77ae485a1f621ee6e0c7728dcd32b63e3f381c5dc9a084fe8dab0004932707d5",
+    "launch_review_packet_sha256": "6da5538d30015f9d461ce675d8158168bf5db8671687ce207bed8c5f305cf3bf",
+    "root_launch_review_sha256": "cf18a83659047b9462aa5974143d8128e53e5a595e5917d42de787e99457a52f",
+    "source_manifest_sha256": "1817598aa90629ed4c1818276ece0d7a019322cdd24232a4fba935dfec7254b8",
+    "tool_manifest_sha256": "38d1ba60a522efeba9a1218e345da0299138ca6c547a36ccfebbe6caed8567a1",
+    "launch_environment_sha256": "09b61afe044b45895125c9a593c443d69831623609909599a99455f949b915c5",
+    "launch_preflight_sha256": "7f3dfbb389aa8cb77f2b31dabc6c9a6c7de06975f6241e615f4cca8144e88c8c",
+    "lane_acquisition_receipt_sha256": "23ce0372884eddcceae68a7363391172b186400bc016946a78aa2127307265e5",
+    "lane_release_receipt_sha256": "25b144ea48cb2ab21907cadd4117b7e39d35d9e734c10eb1862b9b29dc10a1d2",
+    "runtime_build_log_sha256": "84461a23ece0a039fe127aa0312226b5734595086eca0f6432ff0f077da4efcd",
+    "full_python_suite_log_sha256": "3843b66715d1dfb242a5983029b33d11d2f700d727b0d6343ea334cb2bfd5dbd",
+    "focused_test_failure_fix_note_sha256": "911c30f27c356c3b1a9f3a3a7d95a2d66f4cb1258229acf0c121cef5a2f44f0a",
+    "identity_validator_source_sha256": "79c1d709965a41b835c8aa8f5e256787d387f5a5465fa9a52bdef15c2d025448"
+  },
+  "not_claimed": [
+    "active gameplay; all 16 observed match source rows have match_frame 0",
+    "original-state agreement or whole-session state equality",
+    "whole-session completion or acceptance",
+    "pixels or PCM",
+    "performance or foreground timing",
+    "GPU cause or competitive accuracy"
+  ]
+}

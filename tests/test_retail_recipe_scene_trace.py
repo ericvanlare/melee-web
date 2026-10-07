@@ -61,11 +61,15 @@ int cpu_tick = 0;
 int cpu_draw = 0;
 int cpu_preparation_draw = 0;
 int cpu_end = 0;
+int entity_resets = 0;
+std::vector<uint32_t> entity_indices;
 bool state_allowed = false;
 bool cpu_available = true;
 void reset() {
     state = rng = cpu_begin = cpu_tick = cpu_draw =
         cpu_preparation_draw = cpu_end = 0;
+    entity_resets = 0;
+    entity_indices.clear();
     state_allowed = false;
     cpu_available = true;
 }
@@ -122,8 +126,21 @@ extern "C" void melee_web_retail_entities(void) {
     if (!fake::state_allowed) std::abort();
     std::cout << ",\"fighter_entities\":[]";
 }
-extern "C" void melee_web_retail_entities_index(uint32_t) {}
-extern "C" void melee_web_retail_entities_reset(void) {}
+extern "C" void melee_web_retail_entities_index(uint32_t match_index) {
+    if (!fake::state_allowed) std::abort();
+    fake::entity_indices.push_back(match_index);
+    std::cout << ",\"fighter_entities\":[";
+    for (unsigned slot = 0; slot < 4; ++slot) {
+        if (slot) std::cout << ",";
+        std::cout << "{\"match_index\":" << match_index
+                  << ",\"slot\":" << slot
+                  << ",\"entity_index\":0,\"generation\":0"
+                  << ",\"fighter_player_id\":" << slot
+                  << ",\"fighter_gobj_linked\":true}";
+    }
+    std::cout << "]";
+}
+extern "C" void melee_web_retail_entities_reset(void) { ++fake::entity_resets; }
 extern "C" uint32_t melee_web_retail_rng(void) { ++fake::rng; return 123; }
 extern "C" uint32_t gm_GetFrameCount(void) { return 0; }
 extern "C" uint32_t gm_8016AEEC(void) { return 0; }
@@ -297,6 +314,26 @@ static void print_counts(const char* label) {
               << fake::cpu_draw << ' ' << fake::cpu_preparation_draw << ' '
               << fake::cpu_end << "\n";
 }
+static void print_entity_counts(const char* label) {
+    std::cout << "ENTITY_COUNTS " << label << " " << fake::entity_resets << " "
+              << fake::entity_indices.size();
+    for (auto index : fake::entity_indices) std::cout << " " << index;
+    std::cout << "\n";
+}
+static void identity_observation_case(uint32_t version) {
+    using namespace melee_web;
+    fake::reset();
+    auto recipe = read_retail_replay(recipe_fixture(version));
+    fake::state_allowed = true;
+    retail_replay_session_initial(recipe);
+    retail_replay_initial(recipe, true, recipe.match_selections[0].start);
+    const auto match = std::find_if(recipe.spans.begin(), recipe.spans.end(),
+        [](const RetailReplaySpan& span) { return span.scene == kRetailReplayMatch; });
+    if (match == recipe.spans.end()) throw std::runtime_error("fixture lost match span");
+    retail_replay_frame(recipe, match->first_frame, kRetailReplayMatch);
+    fake::state_allowed = false;
+    print_entity_counts(version == 9 ? "v9" : "v10");
+}
 
 int main() {
     using namespace melee_web;
@@ -325,6 +362,7 @@ int main() {
     retail_replay_preparation_draw(whole);
     retail_replay_end(1, true);
     print_counts("whole");
+    print_entity_counts("v8");
 
     // A fresh session can capture again and close during its first match.
     fake::reset();
@@ -358,6 +396,10 @@ int main() {
     retail_replay_end(1);
     print_counts("legacy");
     reader_format_checks();
+    std::cout << "IDENTITY_CASE_BEGIN v9\n";
+    identity_observation_case(9);
+    std::cout << "IDENTITY_CASE_BEGIN v10\n";
+    identity_observation_case(10);
 }
 '''
 
@@ -409,7 +451,8 @@ class RetailRecipeSceneTraceTests(unittest.TestCase):
                 timeout=10,
             )
 
-        records = [json.loads(line) for line in result.stdout.splitlines()
+        baseline_output = result.stdout.split("IDENTITY_CASE_BEGIN", 1)[0]
+        records = [json.loads(line) for line in baseline_output.splitlines()
                    if line.startswith("{")]
         self.assertEqual(records[0]["record"], "header")
         self.assertEqual(records[0]["schema"], "melee-web-port-session-diagnostic")
@@ -451,3 +494,36 @@ class RetailRecipeSceneTraceTests(unittest.TestCase):
             "FORMAT preserved_v9",
             "FORMAT preserved_v8",
         })
+
+        identity_counts = {}
+        identity_records = {}
+        current_case = None
+        for line in result.stdout.splitlines():
+            if line.startswith("IDENTITY_CASE_BEGIN "):
+                current_case = line.split()[1]
+                identity_records[current_case] = []
+            elif line.startswith("ENTITY_COUNTS "):
+                _, label, *values = line.split()
+                identity_counts[label] = tuple(map(int, values))
+            elif current_case and line.startswith("{"):
+                identity_records[current_case].append(json.loads(line))
+        self.assertEqual(identity_counts["v8"], (0, 0))
+        self.assertEqual(identity_counts["v9"], (1, 2, 0, 0))
+        self.assertEqual(identity_counts["v10"], (1, 2, 0, 0))
+        for version in ("v9", "v10"):
+            rows = identity_records[version]
+            self.assertEqual(rows[0]["record"], "header")
+            self.assertNotIn("fighter_entities", rows[0])
+            setup, tick = rows[1:]
+            self.assertEqual(setup["record"], "session_match_enter_complete")
+            self.assertEqual(tick["record"], "session_frame")
+            self.assertEqual(tick["scene"], 3)
+            self.assertEqual(tick["index"], 1)
+            for record in (setup, tick):
+                entities = record["fighter_entities"]
+                self.assertEqual(
+                    [(e["match_index"], e["slot"], e["entity_index"],
+                      e["generation"], e["fighter_player_id"], e["fighter_gobj_linked"])
+                     for e in entities],
+                    [(0, slot, 0, 0, slot, True) for slot in range(4)],
+                )
