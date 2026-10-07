@@ -316,9 +316,14 @@ async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
       try { replayReport = reportText.trim().startsWith('{') ? JSON.parse(reportText) : null; } catch {}
       const phase = call('_melee_web_native_menu_phase');
       let css = null;
+      // CSS_PORT_OBSERVER_ABI_BEGIN
       if (captureCss && phase === 1 && module?._melee_web_css_observe_port) {
-        const ids = module._malloc(16), geometry = module._malloc(32);
-        if (!ids || !geometry) throw Error('CSS observation allocation failed');
+        const ids = module._malloc(14 * 4), geometry = module._malloc(8 * 4);
+        if (!ids || !geometry) {
+          if (ids) module._free(ids);
+          if (geometry) module._free(geometry);
+          throw Error('CSS observation allocation failed');
+        }
         try {
           css = [];
           for (let port = 0; port < 4; ++port) {
@@ -327,6 +332,7 @@ async function snapshot(reason = 'poll', {captureCss = !diagnostic} = {}) {
           }
         } finally { module._free(ids); module._free(geometry); }
       }
+      // CSS_PORT_OBSERVER_ABI_END
       return {
         reason,
         css,
