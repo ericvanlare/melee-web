@@ -403,7 +403,7 @@ async function pollRun() {
   let lastProgress = Date.now();
   const lastCursors = {alpha: -1, beta: -1};
   let disconnectInjected = false;
-  while (Date.now() <= deadline) {
+  polling: while (Date.now() <= deadline) {
     if (transportErrors.length)
       throw Error(`Loopback receive callback failed: ${JSON.stringify(transportErrors[0])}`);
     if (peers.alpha.terminal || peers.beta.terminal) break;
@@ -413,6 +413,8 @@ async function pollRun() {
       rows[role] = status;
       if (scenario === 'positive') captureObservedRouteBoundary(role, native.phase);
       await drainChecksums(role, peers[role]);
+      // Checksum delivery can end either peer while the browser drain awaits.
+      if (peers.alpha.terminal || peers.beta.terminal) break polling;
       await peers[role].setNativeProgress(status.cursor);
       if (status.wait_episodes > instanceRows[role].last_wait_episodes) {
         instanceRows[role].last_wait_episodes = status.wait_episodes;
