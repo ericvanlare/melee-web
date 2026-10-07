@@ -316,6 +316,9 @@ A matching clock-60 boundary remains incomplete evidence with
 gameplay or whole-session accuracy. The default whole-session scope and the
 existing v8/v9 and v10 prefix scopes remain unchanged.
 
+The measured result and its capture, comparator, and validation identities are
+recorded in the [B4 clock-60 comparison entry](status/2026-10-07-b4-v10-first-match-clock60-comparison.md).
+
 ## Capture command failure gates
 
 The capture command reports success only after the replay completes, browser

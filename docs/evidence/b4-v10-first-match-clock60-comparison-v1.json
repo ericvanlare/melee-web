@@ -1,0 +1,310 @@
+{
+  "capture": {
+    "browser_errors_before_stop": 0,
+    "capture_report_sha256": "d38e1309570a7c438ca9b3e9972b34b2fd4c421182614ca4d6ed45d0424e8142",
+    "child_exit_code": 1,
+    "cleanup": {
+      "cdp_identities": 5,
+      "cleanup_review_sha256": "34174602b14588bcb3ddd53337d7174459f452fea053450233667b0fe2d8b806",
+      "cleanup_verification_sha256": "937e75fcc01a61f300e24875fcd3a719b8e5ea3826c5c9a99c06ae266b3f292a",
+      "os_process_identities": 10,
+      "pass": true
+    },
+    "cursor": {
+      "exported": 1381,
+      "observed": 1378,
+      "requested": 1368
+    },
+    "deliberate_bounded_stop": true,
+    "disc": {
+      "bytes": 1449165376,
+      "hash_rechecked_during_comparison_prep": false,
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "inventories": {
+      "expected_artifacts": 32,
+      "post_capture_pass": true,
+      "pre_capture_pass": true
+    },
+    "match_clock_range": [
+      0,
+      73
+    ],
+    "port_trace": {
+      "bytes": 3129573,
+      "indices": [
+        0,
+        1380
+      ],
+      "session_frames": 1381,
+      "sha256": "88bdc33f1ed82409a6e263a1bf24a5e4453c2c0ac634740e4c76efb6206d69e9"
+    },
+    "private_run_id": "b4-clock60-browser-capture-prep-20261007-90289a2",
+    "producer": {
+      "base_main": "34b7815cefc8f9928c9df3d13e1477f0c13f0611",
+      "commit": "90289a29b57a8008ee8fd801754100867c718536",
+      "tree": "feb7ed9a3a013e64ff4027f9009ff88d09878914"
+    },
+    "release_runtime": {
+      "all_default_off_gates": "OFF",
+      "artifact_count": 32,
+      "configuration": "Release",
+      "manifest_sha256": "420272aa6500cf3317c0cd9d1e7b6c61fc015a42a6f429edfd1643d2fcf6b814"
+    },
+    "result": "incomplete",
+    "retail_browser_report_sha256": "873b0efd41f2eb680fa6ee2833359da98ff47b3bc5337f677de36f7308f3d571",
+    "runtime_data": {
+      "bytes": 3674112,
+      "content_opened": false,
+      "freshly_rehashed": false,
+      "recorded_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    }
+  },
+  "comparison": {
+    "authorized_execution_receipt_sha256": "349d58e5cdb7ef5bb6f3fa76e9e3d8d7d4738af88eb9d36012732d73c5db0f26",
+    "boundary_result": "equivalent",
+    "clock60_prefix": {
+      "bytes": 12780628,
+      "records": 5031,
+      "sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77",
+      "source_sequence": 5030
+    },
+    "complete": false,
+    "declared_fields": {
+      "all_declared_fields_matched": true,
+      "entities": {
+        "compared_state_samples": 185,
+        "four_primary_fighters_per_state": true,
+        "identity_rows_compared": 740
+      },
+      "fighter_float_bits": {
+        "bit_scalars": 10360,
+        "compared_state_samples": 185,
+        "derivation": "five scalar 32-bit bit fields plus three 3-component vector bit fields; derived from schema and compared as exact strings within fighters",
+        "fighters_per_state": 4,
+        "per_fighter": 14
+      },
+      "match": [
+        "rng",
+        "match_frame",
+        "pad_state_hex",
+        "fighters",
+        "fighter_entities"
+      ],
+      "setup": [
+        "rng",
+        "match_frame",
+        "pad_state_hex",
+        "fighters",
+        "fighter_entities",
+        "declared_setup"
+      ]
+    },
+    "elapsed_seconds": 0.428,
+    "exit_code": 1,
+    "expectations_sha256": "9d8469aa2505258acb178a8b464aadd855ad0f2f8483ee2e44b5cee0afa5da0f",
+    "first_difference": null,
+    "first_positive_prefix_rejoin": {
+      "bytes": 10389712,
+      "passed": true,
+      "records": 4736,
+      "sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a",
+      "source_sequence": 4735
+    },
+    "frames": {
+      "browser_rows_after_target_shape_only": 13,
+      "css_input_order_only": 937,
+      "match_frame_target": 60,
+      "match_tick_range": [
+        0,
+        183
+      ],
+      "match_ticks_compared": 184,
+      "nonmatch_fields_compared": [],
+      "setup_records_compared": 1,
+      "sss_input_order_only": 247,
+      "timeline_consumed": 1368
+    },
+    "full_session_acceptance": false,
+    "full_source_sha256_recomputed": false,
+    "later_gameplay_claim": false,
+    "launch_packet_sha256": "fff4018f0e080ae18461107afd1e67b04a13213060dfea19e816a2cf6ce92099",
+    "nonmatch_and_export_scope": {
+      "css_frames": [
+        0,
+        936
+      ],
+      "exported_match_frames": [
+        1184,
+        1380
+      ],
+      "match_frames_compared": [
+        1184,
+        1367
+      ],
+      "rows_after_semantic_boundary": "shape/order/entity schema checks only; no source-state comparison",
+      "sss_frames": [
+        937,
+        1183
+      ]
+    },
+    "private_run_id": "b4-clock60-comparison-prep-20261007-90289a2-v2",
+    "producer": {
+      "base_main": "34b7815cefc8f9928c9df3d13e1477f0c13f0611",
+      "cli_sha256": "a81689148b84ec669a3f57e26445caada34eccdeb2df363e49054eee12121f74",
+      "commit": "90289a29b57a8008ee8fd801754100867c718536",
+      "comparator_sha256": "eca27708da7298d88db5130dd43f56ff1e1c5d6ec795498193dc5a2f4c3bd494",
+      "tree": "feb7ed9a3a013e64ff4027f9009ff88d09878914"
+    },
+    "provenance_preflight_sha256": "45e53b1825b6145f4d0d50cb6d0041eb849cb69e2335c0124e6d30e673116d12",
+    "report_sha256": "4913639c41f65e6f1bbb69aed2f5dae6bbd943e0f36f27ba8192399e9e460749",
+    "result": "incomplete",
+    "root_result_review_sha256": "21b53886eacfc1f9cf04bd94e3729a6e0d0bb05f58fbe958bf20e59f4826630d",
+    "source_caps": {
+      "bytes": 33554432,
+      "records": 8192
+    },
+    "source_prefix_fresh_hash": true,
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stdout_sha256": "4913639c41f65e6f1bbb69aed2f5dae6bbd943e0f36f27ba8192399e9e460749",
+    "whole_session_equivalent": false
+  },
+  "date": "2026-10-07",
+  "full_validation": {
+    "private_run_id": "b4-clock60-current-main-validation-20261007-90289a2",
+    "producer_commit": "90289a29b57a8008ee8fd801754100867c718536",
+    "producer_tree": "feb7ed9a3a013e64ff4027f9009ff88d09878914",
+    "python_suite": {
+      "log_sha256": "c04066ac042444de27d8ac95efe63bf6b453977e38ccf249ecaed15f93dd2b60",
+      "skipped": 145,
+      "status": "OK",
+      "tests_completed": 1988
+    },
+    "release_build": {
+      "artifact_count": 32,
+      "configuration": "Release",
+      "log_sha256": "fdf5e8d2e1da91d1361bceb6a113c4de8312f2b179e55093d91eb7b130426568",
+      "status": "success",
+      "target": "runtime"
+    },
+    "validation_run_is_separate_from_capture_and_comparison": true,
+    "validation_tree_matches_capture_and_comparison_producer": true
+  },
+  "limitations": [
+    "Only the listed declared fields through the first clock-60 source boundary were compared.",
+    "CSS/SSS established recipe input order only; their scalar state was not compared.",
+    "The browser capture and comparison are incomplete bounded evidence, not gameplay breadth or whole-session acceptance."
+  ],
+  "next_boundary_proposal": {
+    "caps": {
+      "mwro_bytes": 33554432,
+      "mwro_records": 8192
+    },
+    "exclusions": [
+      "whole-session acceptance",
+      "later matches or results",
+      "pixels, PCM, timing, performance, or live-input claims"
+    ],
+    "initial_step": "bounded source-only audit from the beginning; rejoin the accepted clock-60 tuple and freshly consumed prefix digest, then validate contiguous recipe/PAD/source ticks and entity lineage through the first clock >= 300",
+    "later_gates": "Only after source-audit review: freeze a fresh browser capture packet for the derived cursor and a separate explicit comparator scope; do not reuse this cursor-1368 capture as evidence through clock 300.",
+    "pass_criteria": [
+      "source clock-60 prefix tuple and fresh digest rejoin exactly",
+      "no clock regression, jump, unsupported entity, invalid PAD/tick join, or recipe-order mismatch",
+      "first clock >= 300 reached within caps with stable pre/post source stat and fresh consumed-prefix digest"
+    ],
+    "provisional_projection": "If the observed +1 clock progression continues, this is near source tick 423 and browser cursor 1608; the audit must select and bind the actual tuple rather than treating this projection as expected identity.",
+    "purpose": "one multi-second continuation beyond the clock-60 comparison, using the same strict state and primary-entity join",
+    "status": "proposal only; not authorized or executed",
+    "stop_rule": "stop at the first invalid/divergent record, unsupported identity, cap, or exact target; retain the first outcome and do not retry",
+    "target": "first match-0 match_frame >= 300"
+  },
+  "preparation_failures_retained": [
+    {
+      "failure": "four browser-sidecar path date tokens were wrong; rejected before MWRO stat or stream open; no retry",
+      "receipt_sha256": "33d0cb413707c75d0f3702172a776e33edcd6a62ff5bc8c16a2e8bf75bfa117f",
+      "stage": "Earlier source-only clock60 audit packet v2"
+    },
+    {
+      "failure": "final summary print raised KeyError capture_report_sha256 after preflight and preliminary files were written; no comparison output was created",
+      "receipt_sha256": "f976357e8b4edb7120c428f9fb410779a36a23f5654b24cfbbc500abd52fd075",
+      "stage": "First clock60 comparison packet freeze"
+    }
+  ],
+  "schema": "melee-web-b4-v10-first-match-clock60-comparison-v1",
+  "scope": "One bounded GALE01r2 MWRC v10 comparison through the first match-0 clock value 60; the whole session remains incomplete.",
+  "source": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "capture_report_sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913",
+    "clock60_source_audit": {
+      "fresh_prefix": {
+        "bytes": 12780628,
+        "last_sequence": 5030,
+        "records": 5031,
+        "sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77"
+      },
+      "private_run_id": "b4-source-first-clock60-proposal-20261007-20261007-030328-7133ec91",
+      "producer_commit": "9095073629a1cc4bdd1a46d7b71902e933e87db7",
+      "producer_tree": "93e1e38aff1f00d61a82800380e17331590cb484",
+      "sha256": "c4f2bd73157f36c80c7ad5b11275c205d484608813241d3af94b9462bf3187b1",
+      "tuple": {
+        "browser_cursor": 1368,
+        "match_frame": 60,
+        "match_index": 0,
+        "pad_consume_sequence": 5029,
+        "source_sequence": 5030,
+        "source_tick": 183,
+        "timeline_frame_index": 1367
+      }
+    },
+    "dol_sha1": "08e0bf20134dfcb2606996710047b2d6bb1a45",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "first_positive_audit": {
+      "fresh_prefix": {
+        "bytes": 10389712,
+        "last_sequence": 4735,
+        "records": 4736,
+        "sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a"
+      },
+      "sha256": "9e74c7018001369295e569ef071427633db53e2a0e6dc1db182c8aa3604d096d",
+      "tuple": {
+        "browser_cursor": 1309,
+        "match_frame": 1,
+        "match_index": 0,
+        "pad_consume_sequence": 4734,
+        "source_sequence": 4735,
+        "source_tick": 124,
+        "timeline_frame_index": 1308
+      }
+    },
+    "first_setup_identity_audit": {
+      "entry_sequence": 4088,
+      "first_tick_sequence": 4115,
+      "full_source_content_rehashed": false,
+      "setup_sequence": 4113,
+      "sha256": "742a9a6b7317651c654620c1f69c87cff4177a8c9e7eea8c34d596e817af43e8"
+    },
+    "full_mwro": {
+      "bounded_prefix_read": true,
+      "bytes": 2137257881,
+      "fresh_full_hash_computed": false,
+      "recorded_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "stat_before_after_stable": true,
+      "stat_identity": {
+        "bytes": 2137257881,
+        "device": 16777242,
+        "inode": 6599739,
+        "mtime_ns": 1791051579441504716
+      }
+    },
+    "manifest_sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7",
+    "recipe": {
+      "bytes": 2241622,
+      "frame_count": 50394,
+      "seed": 3336171383,
+      "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+      "version": 10
+    },
+    "revision": "GALE01r2",
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1"
+  }
+}
