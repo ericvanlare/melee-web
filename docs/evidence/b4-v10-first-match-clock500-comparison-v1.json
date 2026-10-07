@@ -1,0 +1,283 @@
+{
+  "schema": "melee-web-b4-v10-first-match-clock500-comparison-v1",
+  "date": "2026-10-07",
+  "issue": 213,
+  "scope": "One bounded original-to-browser comparison through the first match-0 match_frame at or above 500. The capture and comparison remain incomplete.",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Retail compared",
+    "Browser exercised"
+  ],
+  "source": {
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "revision": "GALE01r2",
+    "recipe": {
+      "version": 10,
+      "bytes": 2241622,
+      "frame_count": 50394,
+      "seed": 3336171383,
+      "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b"
+    },
+    "manifest_sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7",
+    "report_sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913",
+    "setup_identity_audit": {
+      "sha256": "742a9a6b7317651c654620c1f69c87cff4177a8c9e7eea8c34d596e817af43e8",
+      "entry_sequence": 4088,
+      "setup_sequence": 4113,
+      "first_tick_sequence": 4115
+    },
+    "clock1_rejoin": {
+      "audit_sha256": "9e74c7018001369295e569ef071427633db53e2a0e6dc1db182c8aa3604d096d",
+      "source_sequence": 4735,
+      "pad_consume_sequence": 4734,
+      "source_tick": 124,
+      "match_frame": 1,
+      "browser_cursor": 1309,
+      "prefix_bytes": 10389712,
+      "prefix_records": 4736,
+      "fresh_prefix_sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a"
+    },
+    "clock60_rejoin": {
+      "audit_sha256": "c4f2bd73157f36c80c7ad5b11275c205d484608813241d3af94b9462bf3187b1",
+      "source_sequence": 5030,
+      "pad_consume_sequence": 5029,
+      "source_tick": 183,
+      "match_frame": 60,
+      "browser_cursor": 1368,
+      "prefix_bytes": 12780628,
+      "prefix_records": 5031,
+      "fresh_prefix_sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77"
+    },
+    "clock300_source_audit": {
+      "private_run_id": "b4-clock300-source-audit-proposal-20261007-20261007-055105-be1c2721",
+      "artifact": "clock300-source-audit-v3-final.json",
+      "sha256": "503e1d5c54262fa1c3369aae0e950f646890f98dea4598a9823cd1e0d06f34bb",
+      "target": {
+        "source_sequence": 6230,
+        "pad_consume_sequence": 6229,
+        "source_tick": 423,
+        "match_frame": 300,
+        "timeline_frame_index": 1607,
+        "browser_cursor": 1608
+      },
+      "clock500_source_audit_rejoined_this_checkpoint": true,
+      "comparison_validated_audit_tuple_and_prefix_lineage": true,
+      "comparison_had_separate_fresh_clock300_hash_guard": false
+    },
+    "clock500_source_audit": {
+      "private_run_id": "b4-clock500-source-audit-20261007-155239-30e164cd",
+      "artifact": "clock500-source-audit-v1.json",
+      "bytes": 112239,
+      "sha256": "b5cc71c227bd619e14407f2535d9e38063cf142c33936df221f16759cf9b91f4",
+      "root_review_sha256": "8467925e990df1878e293668bbdb7c6af3b507511fb3335f1e0372270646a486",
+      "root_authorization_sha256": "6ba51569e023c5d906a3679df0444cf368bdd9c5dd115468d4679b7a0119b5d3",
+      "complete": false
+    },
+    "clock500_target": {
+      "match_index": 0,
+      "match_frame": 500,
+      "source_tick": 623,
+      "source_sequence": 7230,
+      "pad_consume_sequence": 7229,
+      "timeline_frame_index": 1807,
+      "browser_cursor": 1808
+    },
+    "bounded_consumed_prefix": {
+      "bytes": 30611188,
+      "records": 7231,
+      "last_source_sequence": 7230,
+      "fresh_sha256": "ec1ceb5c56c87ec35b5dd8cd0d318c85b1917d554871883732de4d2e4f52e7b6",
+      "cap_bytes": 33554432,
+      "cap_records": 8192
+    },
+    "full_mwro": {
+      "recorded_bytes": 2137257881,
+      "recorded_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "fresh_full_hash_computed": false,
+      "stat_stable_during_bounded_read": true
+    }
+  },
+  "capture": {
+    "private_run_id": "b4-clock500-browser-capture-20261007-20261007-090908-ef6859dc",
+    "producer": {
+      "commit": "192a78ec9b9d3b517946e8be484ba09db3324265",
+      "tree": "00a1262cfbec527b670f3bf1fe7d706fab18ae30",
+      "base_main": "192a78ec9b9d3b517946e8be484ba09db3324265"
+    },
+    "producer_manifest_sha256": "225c66074fb7461a2df5f6c19454bcaeea33757ba1e2980f7170f701d0d295da",
+    "capture_packet_sha256": "f8ee2d9b696ed7134be6f51f27632b48b6b87ae3bf0438993cad080a2337764d",
+    "disc_identity_recorded_at_capture": {
+      "bytes": 1449165376,
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "runtime_data_loaded_and_hash_verified_during_capture": {
+      "bytes": 3674112,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    },
+    "release_runtime_artifact_manifest": {
+      "artifact_count": 32,
+      "sha256": "ea6fe055f8b568db723d85482555e241b01ff4089dfd9fb1884cfd20130092f7"
+    },
+    "capture_report": {
+      "artifact": "capture-output-v3/report.json",
+      "sha256": "e8a378ab1c1581ffe6a763a09a17bd9ca0e978a21e19f203425f1fe0e9982a9d"
+    },
+    "retail_browser_report": {
+      "artifact": "capture-output-v3/retail-browser-report.json",
+      "sha256": "ac95a2523c48143e42e9fce0a3f47789814486fc46432f7a685dfa22c4ade62b"
+    },
+    "browser_trace": {
+      "artifact": "capture-output-v3/retail-port.jsonl",
+      "bytes": 5229424,
+      "sha256": "dfb01a2c8c1c63efd47e3639dffdf9773cc74b05c5969616da3616c2b9163c34",
+      "session_frame_count": 1824,
+      "contiguous_indices": [0, 1823],
+      "records_validated": 1826,
+      "scene_frame_counts": {
+        "css": 937,
+        "sss": 247,
+        "match": 640
+      }
+    },
+    "bounded_stop": {
+      "requested_cursor": 1808,
+      "observed_cursor": 1822,
+      "exported_cursor": 1824,
+      "manual_unload_incomplete_outcome": true,
+      "child_exit_code": 1,
+      "owner_exit_code": 1
+    },
+    "launch_authorization_sha256": "6d47adf879a61d387d6a95981e90e07361d5604664fd7ca3945a28fa76aed18e",
+    "pre_stop_browser_errors": 0,
+    "unexpected_requests": 0,
+    "timing_pause_resumes": 0,
+    "pre_and_post_32_artifact_inventories_passed": true,
+    "strict_process_cleanup_passed": true,
+    "root_capture_review_sha256": "f279e11351a9272d422ba2e6651093509598e7c37d7c7c7c7d75524fba2c3eaf",
+    "result": "incomplete"
+  },
+  "comparison": {
+    "private_run_id": "b4-clock500-lineage-comparison-v2-20261007-101400-7acd9256",
+    "producer": {
+      "commit": "84530621f61bf3fdf8ad3b3dfe053646ba7cb4c3",
+      "tree": "7ccb4be2fb767bfd1913e653624e49093a833564",
+      "base_main": "dec8372910b8d1a54f32e26040ad43f8f4859cb2"
+    },
+    "scope": "v10-first-match-clock-boundary",
+    "boundary_result": "equivalent",
+    "result": "incomplete",
+    "complete": false,
+    "whole_session_equivalent": false,
+    "cli_exit_code": 1,
+    "report": {
+      "artifact": "clock500-comparison-report-v2.json",
+      "bytes": 18009,
+      "sha256": "40bda10d6e99293b1100339949c7635d2897b7cf9e2ca489ebbe030793976bae"
+    },
+    "execution_receipt": {
+      "artifact": "comparison-v2-execution-receipt.json",
+      "sha256": "f18a15f0213eb6b6df7fa8c25fffd0227f6a4dc20972a1cea4ed5395810e56ae"
+    },
+    "tool_identities": {
+      "tools/whole_session_state_compare.py": {
+        "bytes": 230701,
+        "sha256": "7219ce981371268315a84ee4ca5c11f7997d0fd28cc5a2c7da8e1f72c4757573"
+      },
+      "scripts/compare_whole_session_state.py": {
+        "bytes": 4238,
+        "sha256": "4d2b2ac64be5ae31885f8f781c5dc195f07340e1c0b5940dd4fdc652b746808f"
+      }
+    },
+    "expectations_sha256": "4ae2a255dd269ffdc34299862742c3a1c20eb58d4a31a3254c934e0c1a201136",
+    "launch_packet_sha256": "2b7a7b38c14cbee3a7fc98cad2514a3aa003cfa3202f753637d2e5e237c1ccbc",
+    "metadata_preflight_sha256": "d50bd95f30f6a83d37f93c37f3d62840ba09508d1120b1c5c0378d7fcd54120c",
+    "root_comparison_authorization_sha256": "af9818fcb81ef959ddaa0b1d8694fee78983ea477c3fa535aa5f0ab3b4e6b4dd",
+    "root_comparison_result_review_sha256": "912546b49f8849c7413b12299a729cf9f7cc6252b930d0b1e304846fedc7df1c",
+    "elapsed_seconds": 0.65,
+    "source_stat_stable": true,
+    "recorded_full_source_hash_recomputed": false,
+    "runtime_data_comparison_preparation": {
+      "content_opened": false,
+      "freshly_rehashed": false,
+      "recorded_capture_identity_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    },
+    "source_fresh_prefix": {
+      "bytes": 30611188,
+      "records": 7231,
+      "last_sequence": 7230,
+      "sha256": "ec1ceb5c56c87ec35b5dd8cd0d318c85b1917d554871883732de4d2e4f52e7b6"
+    },
+    "fresh_checkpoint_hash_guards": [
+      "first-positive match_frame 1",
+      "first clock-60 match_frame",
+      "terminal clock-500 match_frame"
+    ],
+    "clock300_lineage": {
+      "retained_audit_tuple_and_prefix_validated": true,
+      "separate_fresh_comparator_hash_guard": false,
+      "clock500_source_audit_had_rejoined_clock300": true
+    },
+    "scope_counts": {
+      "css_sss_input_order_only": 1184,
+      "nonmatch_fields_compared": [],
+      "setup_records_compared": 1,
+      "setup_fields_compared": [
+        "rng",
+        "match_frame",
+        "pad_state_hex",
+        "fighters",
+        "fighter_entities",
+        "declared_setup"
+      ],
+      "match_state_frames_compared": 624,
+      "match_source_ticks_compared": [0, 623],
+      "match_browser_frames_compared": [1184, 1807],
+      "match_fields_compared": [
+        "rng",
+        "match_frame",
+        "pad_state_hex",
+        "fighters",
+        "fighter_entities"
+      ],
+      "exported_match_rows_after_target_shape_order_only": 16,
+      "browser_export_validated_through_eof": true,
+      "first_difference": null
+    }
+  },
+  "integration_validation": {
+    "producer": {
+      "commit": "84530621f61bf3fdf8ad3b3dfe053646ba7cb4c3",
+      "tree": "7ccb4be2fb767bfd1913e653624e49093a833564"
+    },
+    "python_suite": {
+      "status": "pass",
+      "exit_code": 0,
+      "tests_run": 2010,
+      "skipped": 148,
+      "elapsed_seconds": 362.445,
+      "log_artifact": "full-suite.log",
+      "log_sha256": "486eb627aefeeed11fa0c2baeb05449fd49a4d858e06d87be30e9bf8159c908f"
+    },
+    "runtime_build": {
+      "performed": false,
+      "reason": "Comparator-only Python changes; no runtime source changed."
+    }
+  },
+  "preparation_failures_retained": [
+    {
+      "private_run_id": "b4-clock500-comparison-prep-20261007-20261007T164152Z",
+      "artifact": "clock500-comparison-preflight-failure-v1.json",
+      "sha256": "c2cff340f7999ee1be50c25411d2fe3c484b206f1211dcf7030a4ceb66dbf32a",
+      "failure": "The validator rejected the source audit's already observed clock-300 checkpoint because the later-boundary schema did not yet admit the lineage evidence. The MWRO was not opened and no comparison ran."
+    }
+  ],
+  "limitations": [
+    "State agreement covers the compared setup and contiguous first-match ticks only through match_frame 500.",
+    "CSS/SSS rows establish recipe input order only; nonmatch_fields_compared is empty.",
+    "The 16 exported match rows after the target receive shape and order validation only; their state is not compared.",
+    "The capture is incomplete and does not establish later match frames, later matches, Results, return to CSS or whole-session accuracy.",
+    "No pixels, PCM, live timing, performance, physical input, competitive-readiness or admission claim follows."
+  ],
+  "whole_session_acceptance": false
+}
