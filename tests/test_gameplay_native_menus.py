@@ -137,11 +137,14 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
 
         script = (
             "import {NATIVE_MENU_DISC_FILES} from './web/runtime-assets.mjs'; "
-            "console.log(JSON.stringify(Object.keys(NATIVE_MENU_DISC_FILES)))"
+            "console.log(JSON.stringify([...Object.keys(NATIVE_MENU_DISC_FILES), "
+            "'dsp_coef.bin', 'sislib_font.bin']))"
         )
         menu_names = json.loads(subprocess.check_output(
             [str(node_runtime()), "--input-type=module", "-e", script],
             cwd=ROOT, text=True))
+        self.assertEqual(len(menu_names), 76)
+        self.assertEqual(len(set(menu_names)), len(menu_names))
         preparation = json.loads(
             (ROOT / "docs/evidence/pokemon-stadium-c1a-css-sss-preparation-v1.json")
             .read_text(encoding="utf-8"))
@@ -180,6 +183,7 @@ class NativeMenuSourceTests(OwnedWorkspaceTests):
             },
         )
         required = sorted(set(menu_names) | set(selected_names))
+        self.assertEqual(len(required), 98)
         missing = [name for name in required
                    if not (menu / name).is_file() and not (game / name).is_file()]
         self.assertFalse(
