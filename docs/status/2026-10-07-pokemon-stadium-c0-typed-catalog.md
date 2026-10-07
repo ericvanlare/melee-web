@@ -36,5 +36,7 @@ stage data, enter `Stage_8022524C`/`on_init`, run a browser, or make a gameplay
 or admission claim. Stadium remains disabled. The actual C1 E8 request and its
 selected-file lifetime remain open under [#203](https://github.com/ericvanlare/melee-web/issues/203)
 and the broader [#164](https://github.com/ericvanlare/melee-web/issues/164).
-The next probe must observe that request and stop before `Stage_8022524C` or
-`on_init`, then verify teardown.
+The next step is a separately verified, trace-only reopened-context lifecycle
+preflight after C1a selection; that preflight does not call E8. After it passes,
+run one E8 request/teardown trace that observes the actual request and stops
+before `Stage_8022524C` or `on_init`.
