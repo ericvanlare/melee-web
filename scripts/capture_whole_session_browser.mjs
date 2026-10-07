@@ -619,7 +619,8 @@ try {
       throw Error('Natural-pause capture hooks are missing or unexpectedly support an injected stall');
   }
   if (report.inputs.runtime_data) {
-    report.runtime_data_load = await page.evaluate(async expectedUrl => {
+    report.runtime_data_load = await observePageOperation('loaded runtime data identity',
+      page.evaluate(async expectedUrl => {
       const module = globalThis.Module;
       const bytes = module.FS.readFile('/initial_pipeline_cache.db');
       const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
@@ -631,7 +632,7 @@ try {
         loaded_bytes: download?.loaded ?? null, total_bytes: download?.total ?? null,
         from_cache: preload?.fromCache ?? null,
       };
-    }, runtimeDataUrl);
+    }, runtimeDataUrl));
     const expected = report.inputs.runtime_data;
     const actual = report.runtime_data_load;
     if (actual.file_bytes !== expected.bytes || actual.sha256 !== expected.sha256 ||

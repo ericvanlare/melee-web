@@ -325,6 +325,8 @@ assert.ok(runner.includes('const endRow = counters.delayed_after.callback_rows')
   'the verified source interval ends at the delayed post-image status row count');
 assert.ok(runner.includes('runtime_producer_source: diagnosticManifest.build.producer_source ?? null'),
   'the capture report distinguishes current harness source from runtime artifact producer source');
+assert.ok(runner.includes("observePageOperation('loaded runtime data identity',\n      page.evaluate("),
+  'frozen runtime-data byte/hash verification is bounded by the renderer observation timeout');
 assert.ok(!runner.includes('stopped_scene_visual'),
   'artifact presence is never serialized under a visual-completeness claim');
 assert.ok(runner.includes('stopped_scene_artifacts_complete') &&
