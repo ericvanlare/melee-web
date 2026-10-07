@@ -142,6 +142,20 @@ class PublicRuntimeBuildTests(unittest.TestCase):
         for forbidden in public_build.PUBLIC_RUNTIME_FORBIDDEN_EXPORTS:
             self.assertNotIn(forbidden, public)
 
+    def test_browser_local_sampling_export_is_development_only(self):
+        import build_public
+
+        symbol = "_melee_web_net_enable_local_input_capture"
+        cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text(encoding="utf-8")
+        development_exports = cmake.split('set(gameplay_menu_browser_exports "', 1)[1].split('"', 1)[0]
+        public = cmake.split("# The public player", 1)[1].split(
+            "# Shared typed scene/model tables", 1
+        )[0]
+        self.assertIn(symbol, development_exports)
+        self.assertIn(symbol, public_build.PUBLIC_RUNTIME_FORBIDDEN_EXPORTS)
+        self.assertIn(symbol, build_public.RUNTIME_FORBIDDEN_EXPORTS)
+        self.assertNotIn(symbol, public)
+
     def test_stadium_c1a_compile_and_export_surface_is_development_only(self):
         top_level = (ROOT / "CMakeLists.txt").read_text(encoding="utf-8")
         cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text(encoding="utf-8")

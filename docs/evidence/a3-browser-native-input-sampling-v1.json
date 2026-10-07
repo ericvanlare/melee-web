@@ -1,0 +1,268 @@
+{
+  "schema": "melee-web-a3-browser-native-input-sampling-v1",
+  "issue": 210,
+  "scope": "One headless, single-host, two-browser-peer synthetic Gamepad input-sampling and fixed two-tick consumption probe through the actual local Worker. Component evidence only.",
+  "evidence_labels": [
+    "Source identified",
+    "Compiled",
+    "Browser exercised"
+  ],
+  "producer": {
+    "repository": "melee-web",
+    "branch": "codex/a3-native-input-sampling-20261007",
+    "base_main_commit": "dec8372910b8d1a54f32e26040ad43f8f4859cb2",
+    "commit": "e1bbfa93e9babe2a5327f07adcef226bbf6096f8",
+    "tree": "40f5afaf21427114834435ad70b18208aba1b2cf",
+    "source_and_release_build_same_commit": true,
+    "tracked_worktree_clean_before_capture": true,
+    "patch_equivalent_rebase_commits": 7
+  },
+  "implementation": {
+    "native_boundary": "Synchronous hook immediately before native net_before_step; it reads the selected port from input->raw after native PAD processing, serializes the existing 11-byte PADStatus representation, and records input->samples poll serial. It does not poll again or await page work.",
+    "protocol": {
+      "input_tick_captured_at_source_cursor": "S",
+      "input_consumed_at_source_tick": "S+2",
+      "bootstrap_source_ticks": [0, 1],
+      "bootstrap_inputs": "neutral"
+    },
+    "clock_policy": {
+      "normal_budget_steps": 8,
+      "opt_in_local_capture_budget_steps": 1,
+      "budget_applies_while": "native local capture contributions remain unpublished, including a sampled cursor during and after a remote-input wait",
+      "clock_debt_and_overrun_checks": "evaluated before the returned-step limit; only returned steps are subtracted",
+      "source_order_or_poll_serial_guard_changed": false,
+      "historical_samples_synthesized": false
+    },
+    "source_hashes": {
+      "src/animation_clock.hpp": "72dd9ca0cbfe1539feda8d52021187ce013900c0dec1fc5ba587b63a8d76ce04",
+      "src/gameplay_menu_browser.cpp": "c2643a7541897acbd516d934efd951175a2968ab5dd500dce56628953472e117",
+      "src/gameplay_net_input.c": "a89540e5cd02fc4446fe7ce72c1bff1fff09e59f40385ab42a49644dbe307dfe",
+      "src/gameplay_net_input.h": "ff93da5d5e4b8c4ba8997298610315008a4728371fb43b4923690d4f5e26c2a6",
+      "tests/net_input_clock_composition.cpp": "9c0509bfbb09be756504c9165128ffb607705c888780f53a5c0135aecc86da8c",
+      "tests/test_net_lockstep_native.py": "a9980ba5e55c67bf504af68539a525c0d2ab1d941dadca269cd047adcad3f6bf"
+    }
+  },
+  "probe": {
+    "private_run_id": "issue210-budgeted-input-sampling-capture-20261007-102959-ae0bfdb0",
+    "capture_result_sha256": "fc2a5ceb93fc887ed0ed577dfc91e5e81306f51c75944edb6052db6ea2884178",
+    "coordinator_sha256": "6f79aac53911973e8cd132902745f37169159847145e9a9f9f048ea66445d923",
+    "root_result_review_sha256": "58953e362acff8d95fbb00d898afaeaecfabc73ea1e1c3c280fb58730b37e67b",
+    "outcome": "pass",
+    "first_error": null,
+    "machine": "Mac mini",
+    "browser": {
+      "name": "Google Chrome",
+      "version": "154.0.8037.98",
+      "mode": "headless",
+      "speaker_muted": true,
+      "audio_processing_disabled": false
+    },
+    "runtime_tools": {
+      "node": "24.19.0",
+      "playwright": "1.62.1",
+      "wrangler": "4.131.1",
+      "miniflare": "5.20260911.0-alpha",
+      "workerd": "1.20260911.1"
+    },
+    "transport": "Loopback HTTP and WebSocket through direct Miniflare running the actual Worker; two Chrome browser peers.",
+    "synthetic_gamepad": {
+      "alpha": {
+        "gamepad_index": 0,
+        "local_port": 0,
+        "input_pattern": ["neutral", "A", "release", "neutral"],
+        "captured_source_cursors": [0, 1, 2, 3],
+        "poll_serials_strictly_increasing": true
+      },
+      "beta": {
+        "gamepad_index": 1,
+        "local_port": 1,
+        "input_pattern": ["neutral", "neutral", "neutral", "neutral"],
+        "captured_source_cursors": [0, 1, 2, 3],
+        "poll_serials_strictly_increasing": true
+      }
+    },
+    "native_input_consumption_witness": {
+      "pad_bytes_per_sample": 11,
+      "alpha_a_sample_bytes": [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      "beta_samples_neutral": true,
+      "source_tick_mapping": [
+        {"source_tick": 0, "input_tick": null, "state": "neutral bootstrap"},
+        {"source_tick": 1, "input_tick": null, "state": "neutral bootstrap"},
+        {"source_tick": 2, "input_tick": 0, "state": "neutral"},
+        {"source_tick": 3, "input_tick": 1, "state": "A"},
+        {"source_tick": 4, "input_tick": 2, "state": "release"},
+        {"source_tick": 5, "input_tick": 3, "state": "neutral"}
+      ],
+      "native_input_component_fnv1a64_by_source_tick": [
+        "908c9d77152a1213",
+        "908c9d77152a1213",
+        "908c9d77152a1213",
+        "66930180ccd3f0e2",
+        "908c9d77152a1213",
+        "908c9d77152a1213"
+      ],
+      "actual_matches_expected_for_every_native_checksum_record_on_both_peers": true,
+      "acknowledged_through_input_tick": 3
+    },
+    "remote_wait": {
+      "source_cursor": 2,
+      "withheld_input_tick": 0,
+      "held_ms": 120,
+      "local_capture_count_before": 3,
+      "local_capture_count_after": 3,
+      "captured_bytes_and_poll_serial_unchanged": true
+    },
+    "source_and_checksums": {
+      "source_ticks_each_peer": 6,
+      "source_steps_each_peer": 6,
+      "source_draws_each_peer": 6,
+      "native_checksum_records_each_peer": 6,
+      "remote_checksum_comparisons_each_peer": 6,
+      "native_local_divergences": 0,
+      "checksum_streams_identical": true
+    },
+    "css_boundary": {
+      "source_cursor": 6,
+      "screenshot_png_dimensions": [900, 700],
+      "alpha_screenshot_sha256": "2fed9dbb97c999cb5114982e217d0c49a871b82811165f46ebd7dff7d6b702c7",
+      "beta_screenshot_sha256": "a5705f0df7046068995849c74028e31695b1b25de4473bd86ec64cff23485598",
+      "canvas_dimensions_each": [640, 480],
+      "cross_origin_isolated_each": true,
+      "webgpu_api_and_adapter_each": true,
+      "page_errors_each": 0,
+      "alpha_request_aborted_during_shutdown": "GET gameplay_menu_browser.data reported net::ERR_ABORTED after the passing scenario; no page error"
+    },
+    "cleanup": {
+      "capture_owner_passed": true,
+      "worker_disposed": true,
+      "http_server_stopped": true,
+      "all_owned_pids_absent": 26,
+      "all_owned_process_groups_absent": 6,
+      "browser_profiles_removed": 2,
+      "worker_owned_scratch_clean": true,
+      "owned_ports_free": [8787, 59157, 59158],
+      "lane_marker_released": true,
+      "source_clean_after_capture": true,
+      "staged_runtime_files_unchanged": 35
+    }
+  },
+  "validation": {
+    "full_python_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "source_commit": "e1bbfa93e9babe2a5327f07adcef226bbf6096f8",
+      "tests_total_including_skips": 2008,
+      "skipped": 148,
+      "failed": 0,
+      "log_sha256": "422ddabb494d6b2aa3cdc517944b8a0e0bcd2f486c93c3aba561f6d186e1d131"
+    },
+    "release_runtime_build": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 scripts/build.py --target runtime --configuration Release",
+      "source_and_build_commit": "e1bbfa93e9babe2a5327f07adcef226bbf6096f8",
+      "configuration": "Release",
+      "exit_code": 0,
+      "compiler_job_override": false,
+      "log_sha256": "d16b59e9128b26d190747f55a2721c22984e5fa6ab5e795325f0d514d74c356f",
+      "artifacts": {
+        "gameplay_menu_browser.js": "05e19b0c1e508ef44bacc45b1ed513e4dd450eb25e88fa9e40150f100ca42ab3",
+        "gameplay_menu_browser.wasm": "005519d7e794203a39f344c4fa171228917282159c8ba15e0a043092b11a5d3b",
+        "gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      }
+    }
+  },
+  "historical_experiments": [
+    {
+      "private_run_id": "issue210-browser-local-input-sampling-20261007-152348",
+      "launch_packet_sha256": "3e87e6d36da8259b3176eb9eeaa596459141f6ec82bb7e727dbb84f420998c26",
+      "coordinator_sha256": "51f8c0168f9b704c6a3b9c6a8a9d42adcbda0f607afe8792e45ec90b063b4206",
+      "coordinator_adaptation_diff_sha256": "7aa869a3052e322ac296cf670fa3820abd5190cef0720a00409d628a7432ef45",
+      "runner_source_head": {
+        "commit": "574a9d0d44719ae123b9974c7c8fe2c0c7fc7ad9",
+        "tree": "146b18789f20a565fc043d86f802a96447fe44cc",
+        "runner_overlay_from_staged_source_sha256": "3e659003c878daed3e78555fc9ee4fc55cbb80f6cff9a5ee3673b8a6c293dadd",
+        "overlay_path": "scripts/net_lockstep_browser.mjs"
+      },
+      "staged_runtime_source": {
+        "commit": "934e79ef8086ebceed37acc65359592e650d7955",
+        "tree": "110789e667d1debd8ee2bc13624a1952a574a86b",
+        "manifest_sha256": "c721c3cfb9d1f153c0e52c3ca6b12a204efc9c64f3753a971185dd93a2b5b1b2"
+      },
+      "runtime_build_producer": {
+        "commit": "420c740435a5b3a9e4f71a4ce0c8766e8ffa6e3d",
+        "tree": "2c33339b692fda0a80ae279de113de498fc6e6ad",
+        "configuration": "Release",
+        "test_only_dirty_delta_sha256": "83ed8eca2e9dc769c0faeb56d34a71f880d2f6b55c96077fda0a9992736b9136",
+        "test_only_dirty_delta": "One define in tests/test_net_arena_fill_lifetime.py matching the existing 11-byte PADStatus contract; no native runtime source changed.",
+        "build_log_sha256": "2508d85acfd0d5fe9581d7c81411c567d1e54612865000a8a86add22317f8a34",
+        "runtime_artifacts": {
+          "gameplay_menu_browser.js": "9c17e5f1dcd06f9d5667e1e57bd0c5f77adfd51a9e0074481a973847f5d7e9db",
+          "gameplay_menu_browser.wasm": "2abc10ade1c082e7b4bb213ca2c5b57cafde95e69d1295fcf3fed4f76f75ab66"
+        }
+      },
+      "runner_overlay_changed_native_runtime_or_staged_site": false,
+      "result": "failed before acceptance; runner reported an indexed native frame push error at source tick 2",
+      "root_failure_review_sha256": "d6830c33866eef31eac1f43a79aac9b5c1fb93703e4f0a077f229e7ff90092da",
+      "cause_limit": "The captured status had no local-capture failure reason, and the stale peer snapshot does not identify the first native cause. The later diagnostic run identified a repeated poll serial at cursor 1; that finding is not evidence of this first run's cause."
+    },
+    {
+      "private_run_id": "issue210-diagnostics-input-sampling-capture-20261007-091855-c52102bc",
+      "producer_commit": "9239d688fa8a7e943682a92779a8283d011e3a0e",
+      "result": "failed at the native local-capture boundary; later indexed-frame error was secondary",
+      "diagnostic_result_sha256": "fdcd1e81b63fd118700cbaff91f3ab0c8a9c4e7b7bbce2e48bda6396e50673b6",
+      "root_review_sha256": "94c1ae08f0e8da42e2af206d1e3bd60cfa08b76f4c680911a9a84c8546f145a0",
+      "first_rejection": "Both peers rejected a new sample at source cursor 1 because its poll_serial repeated the previous sample (alpha port 0: 204; beta port 1: 203)."
+    }
+  ],
+  "integration_validation": {
+    "validated_code_head_commit": "0bb60f8cfeb4a996a9f2f949decddeb11ef1d79f",
+    "current_base_main_commit": "74451fcc61d77b7441b4e447badc5fc7c7ff2052",
+    "range_diff": "All nine original PR commits are patch-equivalent after rebasing onto current main.",
+    "focused_clock_native": {
+      "commands": [
+        "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_net_lockstep_native.py -v",
+        "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -p test_animation_clock.py -v"
+      ],
+      "tests_total": 3,
+      "failed": 0,
+      "log_sha256": [
+        "a94741d7d097d38b5e67d0bdcb986bc5bfd95cdd8b18cd86fb5e429e30753257",
+        "235aeab7f1f26375070a9b281d48eb4f17fcc35bfb4056409dc039df54fce55e"
+      ]
+    },
+    "full_python_suite": {
+      "command": "python3 scripts/agent_workspace.py run -- python3 -m unittest discover -s tests -v",
+      "tests_total_including_skips": 2012,
+      "skipped": 148,
+      "failed": 0,
+      "log_sha256": "abb836d7136c49084b312f1a7f58cc85de69542fa0dcaec7ed469373998a9306"
+    },
+    "runtime_source_equivalence": {
+      "capture_and_release_build_producer_commit": "e1bbfa93e9babe2a5327f07adcef226bbf6096f8",
+      "producer_tree": "40f5afaf21427114834435ad70b18208aba1b2cf",
+      "recorded_runtime_source_hashes_match": true,
+      "release_build_reused": true,
+      "new_runtime_build_performed": false,
+      "current_main_merge_runtime_sources_changed": false,
+      "historical_capture_identity_changed": false
+    }
+  },
+  "reducer_review": {
+    "reviewed_pre_rebase_commit": "4321cde5453a2a8c9c4435be85f3a87a79a5e83b",
+    "patch_equivalent_capture_producer": "e1bbfa93e9babe2a5327f07adcef226bbf6096f8",
+    "pre_fix_failure": "An early budget release after remote-wait resume allowed three due steps from one browser callback and reused a native poll serial.",
+    "correction": "Keep the one-step budget active across remote-wait resume until all four local contributions are published; preserve the strict serial guard and ordinary eight-step clock path.",
+    "root_review_sha256": "d518acb750adee659417830f26a31089bc5d0831f8d897c32f9a2449e07bdce2"
+  },
+  "exclusions": [
+    "physical controllers",
+    "keyboard sampling",
+    "historical samples or acquisition phase",
+    "wall-clock input latency or foreground timing",
+    "uninterrupted audio or speaker-output acceptance",
+    "Internet or two-machine play",
+    "WebRTC or relay fallback",
+    "pixel or PCM equivalence",
+    "full route or whole-session accuracy",
+    "performance"
+  ],
+  "acceptance": "The bounded #210 synthetic input/delay probe criteria passed on this producer. Integration remains subject to the pull request's final-main CI and merge. Broader A3 acceptance remains open."
+}

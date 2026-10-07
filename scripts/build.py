@@ -163,6 +163,7 @@ PUBLIC_RUNTIME_FORBIDDEN_EXPORTS = frozenset(
         "_melee_web_native_menu_net_begin_lockstep",
         "_melee_web_net_push",
         "_melee_web_net_push_indexed",
+        "_melee_web_net_enable_local_input_capture",
         "_melee_web_net_confirm_start",
         "_melee_web_net_terminate",
         "_melee_web_net_cursor",

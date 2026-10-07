@@ -8,6 +8,19 @@ import {firstFatalBrowserError, openNetInstance} from '../scripts/net_session_in
 function fakeChrome(goto) {
   let closeCalls = 0;
   let removeCalls = 0;
+  const cdpListeners = new Map(), cdpCalls = [];
+  let cdpDetachCalls = 0, cdpSessions = 0;
+  const cdp = {
+    on(name, listener) { assert(!cdpListeners.has(name)); cdpListeners.set(name, listener); },
+    off(name, listener) { assert.equal(cdpListeners.get(name), listener); cdpListeners.delete(name); },
+    async send(name, params) {
+      cdpCalls.push({name, params});
+      assert.equal(name, 'Network.enable', 'Startup failure fixture must not fabricate a loaded Wasm body');
+      assert.deepEqual(params, {maxResourceBufferSize: 64 * 1024 * 1024, maxTotalBufferSize: 128 * 1024 * 1024});
+      return {};
+    },
+    async detach() { ++cdpDetachCalls; assert.equal(cdpListeners.size, 0); },
+  };
   const listeners = new Map();
   const emit = (kind, value) => { for (const listener of listeners.get(kind) || []) listener(value); };
   const page = {
@@ -20,16 +33,25 @@ function fakeChrome(goto) {
     async addInitScript() {},
     setDefaultTimeout() {},
     setDefaultNavigationTimeout() {},
-    goto: (...args) => goto(emit, ...args),
+    goto: (...args) => {
+      assert.equal(cdpSessions, 1, 'Wasm CDP observer must attach before navigation');
+      assert.equal(cdpCalls[0]?.name, 'Network.enable');
+      assert.equal(cdpListeners.size, 4, 'All loaded-Wasm lifecycle events must be observed');
+      return goto(emit, ...args);
+    },
   };
   const context = {
     pages: () => [page],
     browser: () => null,
+    async newCDPSession(target) { assert.equal(target, page); ++cdpSessions; return cdp; },
     async close() { ++closeCalls; },
   };
   return {
     chromium: {async launchPersistentContext() { return context; }},
     context,
+    get cdpDetachCalls() { return cdpDetachCalls; },
+    get cdpSessions() { return cdpSessions; },
+    get cdpCalls() { return cdpCalls; },
     get closeCalls() { return closeCalls; },
     get removeCalls() { return removeCalls; },
   };
@@ -65,6 +87,9 @@ test('closes Chrome and removes driver listeners when runtime navigation fails',
     assert.match(failure?.message ?? '', /ERR_CONNECTION_REFUSED/);
     assert.equal(failure.browserClosed, true);
     assert.equal(chrome.closeCalls, 1);
+    assert.equal(chrome.cdpSessions, 1);
+    assert.equal(chrome.cdpDetachCalls, 1, 'Wasm observer session closes on startup failure');
+    assert.deepEqual(chrome.cdpCalls.map(row => row.name), ['Network.enable']);
     assert.equal(chrome.removeCalls, 2);
   });
 });
@@ -89,6 +114,9 @@ test('preserves HTTP, request and page errors when runtime startup fails before 
     assert.equal(failure.browserErrors[1].failure, 'net::ERR_ABORTED');
     assert.match(failure.startupDiagnostics.errors[0].message, /404/);
     assert.equal(chrome.closeCalls, 1);
+    assert.equal(chrome.cdpSessions, 1);
+    assert.equal(chrome.cdpDetachCalls, 1, 'Wasm observer session closes on startup failure');
+    assert.deepEqual(chrome.cdpCalls.map(row => row.name), ['Network.enable']);
   });
 });
 
@@ -103,5 +131,8 @@ test('bounds a pending navigation by the session deadline and closes Chrome', as
     assert.match(failure?.message ?? '', /wall-time bound exhausted/);
     assert.equal(failure.browserClosed, true);
     assert.equal(chrome.closeCalls, 1);
+    assert.equal(chrome.cdpSessions, 1);
+    assert.equal(chrome.cdpDetachCalls, 1, 'Wasm observer session closes on startup failure');
+    assert.deepEqual(chrome.cdpCalls.map(row => row.name), ['Network.enable']);
   });
 });

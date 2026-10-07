@@ -1,4 +1,20 @@
 #include "gameplay_menu_browser_state.hpp"
+#if defined(MELEE_WEB_NET_SESSION)
+extern "C" int melee_web_net_publish_local_input(
+    uint32_t source_tick, unsigned local_port, uint64_t poll_serial,
+    const uint8_t bytes[MELEE_WEB_NET_PAD_BYTES])
+{
+ const auto serial_low=static_cast<uint32_t>(poll_serial);
+ const auto serial_high=static_cast<uint32_t>(poll_serial>>32);
+ return EM_ASM_INT({
+  const callback=globalThis.__meleeWebNetLocalInputCapture;
+  const serial=$0*4294967296+$1;
+  if(typeof callback!=="function"||!Number.isSafeInteger(serial))return 0;
+  try{return callback($2,$3,serial,HEAPU8.slice($4,$4+11))===true?1:0;}
+  catch(_){return 0;}
+ },serial_high,serial_low,source_tick,local_port,bytes);
+}
+#endif
 #if !defined(MELEE_WEB_PUBLIC_RUNTIME)
 extern "C" void melee_web_native_menu_pause(int paused);
 #endif
@@ -1470,9 +1486,16 @@ void tick(){
   // construction work. Sample again here so that work is not charged to the
   // first active gameplay interval on the following callback.
   const double simulation_clock_now=emscripten_get_now();
-  const auto elapsed=menu_clock.tick(
-      simulation_clock_now,running&&(world||match||results||prize)&&input->visible,
-      [](const auto& event) noexcept {diagnostic_clock_stall(event,1);});
+  const bool local_capture_clock=melee_web_net_local_capture_pending();
+  const bool simulation_clock_running=running&&(world||match||results||prize)&&input->visible;
+  const auto observe_simulation_clock_stall=[](const auto& event) noexcept {
+   diagnostic_clock_stall(event,1);
+  };
+  const auto elapsed=local_capture_clock?
+      menu_clock.tick_with_budget(simulation_clock_now,simulation_clock_running,1,
+                                  observe_simulation_clock_stall):
+      menu_clock.tick(simulation_clock_now,simulation_clock_running,
+                      observe_simulation_clock_stall);
   if(elapsed.stalled){running=false;message="Paused after a timing disruption. Resume to continue.";}
   if(elapsed.steps&&transition_audio_continues){
    transition_audio_continues=false;
@@ -1520,6 +1543,9 @@ void tick(){
    if(melee_web_net_active()){
     // Agreed network input replaces the sample at the replay seam. Without
     // the next frame this is a network wait: no tick and no clock debt.
+    if(!melee_web_net_capture_local_input(input->samples,input->raw)){
+     menu_clock.reset();break;
+    }
     const PADStatus* agreed=melee_web_net_before_step(static_cast<uint32_t>(observed_replay_scene()));
     if(!agreed){menu_clock.reset();break;}
     sample=agreed;

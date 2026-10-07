@@ -21,6 +21,8 @@ typedef struct MeleeWebMenuHost MeleeWebMenuHost;
 
 enum {
     MELEE_WEB_NET_FRAME_BYTES = 44,
+    MELEE_WEB_NET_INPUT_DELAY = 2,
+    MELEE_WEB_NET_PAD_BYTES = 11,
     MELEE_WEB_NET_MAX_FRAMES = 216000,
     MELEE_WEB_NET_TERMINAL_DESYNC = 1,
     MELEE_WEB_NET_TERMINAL_DISCONNECT = 2,
@@ -39,6 +41,22 @@ int melee_web_net_begin(uint32_t seed, uint32_t max_frames, char* error,
  * sequential replay adapter keeps its established non-handshaked entry. */
 int melee_web_net_begin_lockstep(uint32_t seed, uint32_t max_frames,
                                  char* error, size_t error_size);
+/* Optional A3 page-owned sampling mode. Configure only before the identity
+ * barrier is confirmed; capture observes the PADRead snapshot already polled
+ * by the browser runtime and never polls hardware itself. */
+int melee_web_net_enable_local_input_capture(unsigned local_port,
+                                             uint32_t input_ticks);
+/* Read-only scheduler hint: after start confirmation, further local samples
+ * remain in this session. It stays true at an already-sampled wait cursor until
+ * all contributions are published; it never polls, publishes or advances. */
+int melee_web_net_local_capture_pending(void);
+int melee_web_net_capture_local_input(uint64_t poll_serial,
+                                      const PADStatus raw[4]);
+/* Internal synchronous bridge into the page callback. */
+int melee_web_net_publish_local_input(uint32_t source_tick,
+                                      unsigned local_port,
+                                      uint64_t poll_serial,
+                                      const uint8_t bytes[MELEE_WEB_NET_PAD_BYTES]);
 /* Apply the agreed context immediately before the first CSS entry. */
 int melee_web_net_apply_start_context(MeleeWebMenuHost* host, char* error,
                                       size_t error_size);
@@ -74,6 +92,19 @@ static inline const PADStatus* melee_web_net_before_step(uint32_t scene)
 {
     (void) scene;
     return NULL;
+}
+static inline int melee_web_net_enable_local_input_capture(unsigned port,
+                                                            uint32_t ticks)
+{
+    (void) port; (void) ticks;
+    return 0;
+}
+static inline int melee_web_net_local_capture_pending(void) { return 0; }
+static inline int melee_web_net_capture_local_input(uint64_t serial,
+                                                     const PADStatus raw[4])
+{
+    (void) serial; (void) raw;
+    return 1;
 }
 static inline void melee_web_net_after_step(void) {}
 static inline int melee_web_net_push_indexed(uint32_t first_tick,

@@ -108,6 +108,61 @@ test('portable core imports and runs without Buffer, Node imports, or a transpor
   });
 });
 
+test('browser-local input ticks 0 and 1 keep the neutral prefix and map to source ticks 2 and 3', async () => {
+  const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
+  const {peers, wire, frames} = await readyPair(core);
+  const portSamples = {alpha: [sample(5), sample(7)], beta: [sample(6), sample(8)]};
+  let alphaRead = wire.alpha.length, betaRead = wire.beta.length;
+  const exchangePendingStates = async () => {
+    for (let round = 0; round < 16; ++round) {
+      const before = [alphaRead, betaRead, wire.alpha.length, wire.beta.length].join(':');
+      while (betaRead < wire.beta.length)
+        await peers.alpha.receive(wire.beta[betaRead++]);
+      while (alphaRead < wire.alpha.length)
+        await peers.beta.receive(wire.alpha[alphaRead++]);
+      if (before === [alphaRead, betaRead, wire.alpha.length, wire.beta.length].join(':')) return;
+    }
+    assert.fail('bounded peer-state exchange did not settle');
+  };
+  const neutralPad = new Uint8Array(core.NET_FRAME_BYTES);
+  neutralPad.set(core.lockstepConstants.noControllerPad.match(/../g).map(byte => Number.parseInt(byte, 16)), 22);
+  neutralPad.set(core.lockstepConstants.noControllerPad.match(/../g).map(byte => Number.parseInt(byte, 16)), 33);
+  for (const role of ['alpha', 'beta']) {
+    assert.equal(frames[role].length, 2);
+    assert.deepEqual([...frames[role][0].bytes], [...neutralPad]);
+    assert.deepEqual([...frames[role][1].bytes], [...neutralPad]);
+  }
+  await Promise.all(['alpha', 'beta'].map(role => peers[role].addLocalInput(0, portSamples[role][0])));
+  await exchangePendingStates();
+  for (const role of ['alpha', 'beta']) {
+    const row = frames[role].find(frame => frame.tick === 2);
+    assert.ok(row, `${role} input tick 0 should first be consumed at source tick 2`);
+    const localPort = role === 'alpha' ? 0 : 1, remotePort = localPort === 0 ? 1 : 0;
+    assert.deepEqual([...row.bytes.subarray(localPort * 11, localPort * 11 + 11)], [...portSamples[role][0]]);
+    assert.deepEqual([...row.bytes.subarray(remotePort * 11, remotePort * 11 + 11)],
+      [...portSamples[role === 'alpha' ? 'beta' : 'alpha'][0]]);
+  }
+  await Promise.all(['alpha', 'beta'].map(role => peers[role].addLocalInput(1, portSamples[role][1])));
+  await exchangePendingStates();
+  for (const role of ['alpha', 'beta']) {
+    const row = frames[role].find(frame => frame.tick === 3);
+    assert.ok(row, `${role} input tick 1 should first be consumed at source tick 3`);
+    const localPort = role === 'alpha' ? 0 : 1, remotePort = localPort === 0 ? 1 : 0;
+    assert.deepEqual([...row.bytes.subarray(localPort * 11, localPort * 11 + 11)], [...portSamples[role][1]]);
+    assert.deepEqual([...row.bytes.subarray(remotePort * 11, remotePort * 11 + 11)],
+      [...portSamples[role === 'alpha' ? 'beta' : 'alpha'][1]]);
+  }
+});
+
+test('existing local publication boundary rejects changed bytes for a repeated input tick', async () => {
+  const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
+  const peer = await readyAlpha(core);
+  await peer.addLocalInput(0, sample(3));
+  await peer.addLocalInput(0, sample(4));
+  assert.equal(peer.terminal?.kind, 'protocol');
+  assert.match(peer.terminal?.reason ?? '', /local input changed after publication/);
+});
+
 test('start identity preparation is atomic and a remote hello waits for WebCrypto', async () => {
   const core = portableCore ?? await import('../scripts/net_lockstep_core.mjs');
   const originalCrypto = globalThis.crypto;

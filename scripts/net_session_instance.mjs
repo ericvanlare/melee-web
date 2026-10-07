@@ -55,6 +55,9 @@ const PAGE_HELPERS = () => {
       for (let i = 0; i < text.length; ++i) heap[ptr + i] = text.charCodeAt(i);
       return Module._melee_web_net_push_indexed(firstTick >>> 0, ptr, text.length / 44);
     },
+    configureLocalInputCapture(port, ticks) {
+      return Module._melee_web_net_enable_local_input_capture(port, ticks);
+    },
     confirmStart() { return Module._melee_web_net_confirm_start(); },
     terminate(kind, tick, channel) {
       Module._melee_web_net_terminate(kind >>> 0, tick >>> 0, channel >>> 0);
@@ -103,7 +106,8 @@ const PAGE_HELPERS = () => {
 };
 
 export async function openNetInstance({chromium, launchOptions, url, disc, userDataDir, label,
-  throttle = 1, arenaFill = -1, timeoutMs = 120000, deadline = Infinity, peerModuleHashes = null}) {
+  throttle = 1, arenaFill = -1, timeoutMs = 120000, deadline = Infinity, peerModuleHashes = null,
+  syntheticGamepad = null}) {
   await fs.mkdir(path.resolve(userDataDir), {recursive: true});
   const context = await chromium.launchPersistentContext(path.resolve(userDataDir), {
     ...browserLaunchOptions(launchOptions, {timeout: timeoutMs}),
@@ -170,6 +174,19 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
       module.onRuntimeInitialized = () => { window.__meleeNativeRuntimeReady = true; };
       globalThis.Module = module;
     }));
+    if (syntheticGamepad) await bounded(() => page.addInitScript(pad => {
+      window.testPad = pad;
+      window.testPads = Array.from({length: pad.index + 1}, () => null);
+      window.testPads[pad.index] = window.testPad;
+      window.__meleeSyntheticPadState = 'neutral';
+      window.__meleeSyntheticPadTransition = state => {
+        if (!['neutral', 'A', 'release'].includes(state)) throw Error('Unknown synthetic PAD sample state');
+        window.__meleeSyntheticPadState = state;
+        window.testPad.buttons[0] = state === 'A' ? {pressed: true, value: 1} : {pressed: false, value: 0};
+      };
+      Object.defineProperty(navigator, 'getGamepads', {configurable: true,
+        value: () => window.testPads});
+    }, syntheticGamepad));
     instance = {label, page, context, errors, timingResumes: [], throttle, arenaFill, closed: false, close};
     driver = createBrowserDriver(page, {surface: 'development', timeoutMs, deadline});
     instance.driver = driver;
@@ -188,6 +205,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
         };
         window.__netPeer = createBrowserNativePeer({...options, native: {
           pushIndexed: (tick, bytes) => window.__net.pushIndexed(tick, encode(bytes)),
+          configureLocalInputCapture: (port, ticks) => window.__net.configureLocalInputCapture(port, ticks),
           confirmStart: () => window.__net.confirmStart(),
           terminate: (...args) => window.__net.terminate(...args),
           status: () => window.__net.status(),
@@ -228,6 +246,28 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     instance.userAgent = await bounded(() => page.evaluate(() => navigator.userAgent));
     instance.browserVersion = context.browser()?.version() ?? null;
     instance.importDisc = async () => { await driver.selectDisc(disc); await driver.waitForStart(); };
+    instance.prepareSyntheticGamepadRouting = localPort => {
+      if (!syntheticGamepad) throw Error('Synthetic Gamepad routing requires its input fixture');
+      return bounded(() => page.evaluate(({localPort, gamepadIndex}) => {
+        const manager = Module?.meleeControllers;
+        if (!manager || typeof manager.inspect !== 'function' || typeof manager.assign !== 'function')
+          throw Error('The existing browser controller manager is unavailable');
+        const discovered = manager.inspect();
+        if (discovered.length !== 1 || discovered[0].index !== gamepadIndex)
+          throw Error(`Expected only synthetic Gamepad ${gamepadIndex} after neutral discovery`);
+        const row = discovered[0];
+        const automaticPort = row.port;
+        manager.assign(row.key, localPort);
+        const routed = manager.inspect().find(candidate => candidate.key === row.key);
+        const output = routed?.output;
+        if (!routed || routed.port !== localPort || !routed.active || routed.status !== 'ready' ||
+            output?.buttons !== 0 || [...(output?.stick || []), ...(output?.cstick || []),
+              ...(output?.triggers || [])].some(value => value !== 0))
+          throw Error(`Synthetic Gamepad ${gamepadIndex} did not activate neutrally on local port ${localPort}`);
+        return {gamepad_index: gamepadIndex, automatic_port: automaticPort,
+          assigned_port: routed.port, active: routed.active, neutral: true};
+      }, {localPort, gamepadIndex: syntheticGamepad.index}));
+    };
     instance.begin = (seed, maxFrames) => bounded(() => page.evaluate(([s, m]) => window.meleeNetBegin(s, m), [seed >>> 0, maxFrames]));
     instance.beginLockstep = (seed, maxFrames) => bounded(() => page.evaluate(([s, m]) => window.meleeNetBeginLockstep(s, m), [seed >>> 0, maxFrames]));
     instance.peerIdentity = () => bounded(() => page.evaluate(() => window.meleeNetPeerIdentity()));
@@ -308,6 +348,7 @@ export function browserPeerFacade(instance, initial) {
     start: () => invoke('start', []),
     addLocalInput: (...args) => invoke('addLocalInput', args),
     addLocalInputs: (...args) => invoke('addLocalInputs', args),
+    releaseCapturedInput: tick => invoke('releaseCapturedInput', [tick]),
     setNativeProgress: (...args) => invoke('setNativeProgress', args),
     disconnect: (...args) => invoke('disconnect', args),
     fail: (...args) => invoke('fail', args),
@@ -321,6 +362,7 @@ export function browserPeerFacade(instance, initial) {
     get errors() { return snapshot.endpointErrors; },
     get transport() { return snapshot.transport; },
     get checksumOwnership() { return snapshot.checksumOwnership; },
+    get localInputCapture() { return snapshot.localInputCapture; },
   };
   for (const [name, field] of Object.entries({ready: 'ready', terminal: 'terminal',
     remoteAckInput: 'remote_ack_input', inputDuplicates: 'input_duplicates',

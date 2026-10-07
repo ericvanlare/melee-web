@@ -20,8 +20,14 @@ import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lo
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
   verifyTerminalHold} from './net_lockstep_observers.mjs';
 import {verifyNetSourceAccounting} from './net_source_accounting.mjs';
+import {BUTTONS} from '../web/controller-input.mjs';
+import {lockstepConstants} from './net_lockstep_core.mjs';
+import {standardPad} from '../tests/controller-fixtures.mjs';
 
 const HEADER_BYTES = 16;
+const INPUT_SAMPLING_SOURCE_TICKS = 6;
+const FNV_OFFSET = 0xcbf29ce484222325n;
+const FNV_PRIME = 0x100000001b3n;
 const POSITIVE_ROUTE_BOUNDARIES = Object.freeze([
   Object.freeze({name: 'css-start', phase: 1, label: 'original CSS at the first ready source draw'}),
   Object.freeze({name: 'sss', phase: 3, label: 'original SSS'}),
@@ -53,14 +59,19 @@ const uint32 = text => {
     throw Error('--seed must be an unsigned 32-bit integer');
   return value;
 };
-if (!values.url || !values.disc || !values.script || !values.out || !values.seed)
-  throw Error('Required: --url runtime.html --disc DISC --script route1.mwni --seed U32 --out NEW_DIR');
-if (!['probe', 'positive', 'flip', 'disconnect'].includes(values.scenario))
-  throw Error('--scenario must be probe, positive, flip, or disconnect');
+const inputSampling = values.scenario === 'input-sampling';
+if (!values.url || !values.disc || !values.out || !values.seed || (!inputSampling && !values.script))
+  throw Error('Required: --url runtime.html --disc DISC [--script route1.mwni] --seed U32 --out NEW_DIR');
+if (inputSampling && values.script)
+  throw Error('The input-sampling scenario captures browser-local input and does not accept --script');
+if (!['probe', 'positive', 'flip', 'disconnect', 'input-sampling'].includes(values.scenario))
+  throw Error('--scenario must be probe, positive, flip, disconnect, or input-sampling');
 const scenario = values.scenario;
 if (!['node', 'browser'].includes(values['peer-owner'])) throw Error('--peer-owner must be node or browser');
 const browserOwned = values['peer-owner'] === 'browser';
 if (browserOwned && !values['relay-url']) throw Error('Browser-owned peers require --relay-url');
+if (inputSampling && !browserOwned)
+  throw Error('The input-sampling scenario requires --peer-owner browser');
 const url = new URL(values.url);
 if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
@@ -85,42 +96,71 @@ if (values.scenario === 'disconnect' && disconnectAt === null)
 if (values.scenario === 'disconnect' && disconnectAt < 3)
   throw Error('The bounded disconnect must occur after the two neutral-prefix source ticks');
 
-const scriptBytes = await fs.readFile(values.script);
-if (scriptBytes.length < HEADER_BYTES || scriptBytes.subarray(0, 4).toString() !== 'MWNI' ||
-    scriptBytes.readUInt32BE(4) !== 1)
+const scriptBytes = inputSampling ? null : await fs.readFile(values.script);
+if (scriptBytes && (scriptBytes.length < HEADER_BYTES || scriptBytes.subarray(0, 4).toString() !== 'MWNI' ||
+    scriptBytes.readUInt32BE(4) !== 1))
   throw Error('Script is not an MWNI v1 input recipe');
-const inputCount = scriptBytes.readUInt32BE(8);
-if (scriptBytes.length !== HEADER_BYTES + inputCount * NET_FRAME_BYTES)
+const inputCount = scriptBytes?.readUInt32BE(8) ?? 0;
+if (scriptBytes && scriptBytes.length !== HEADER_BYTES + inputCount * NET_FRAME_BYTES)
   throw Error('Script length disagrees with its declared input count');
-const scriptFrames = scriptBytes.subarray(HEADER_BYTES);
+const scriptFrames = scriptBytes?.subarray(HEADER_BYTES) ?? Buffer.alloc(0);
 const probe = values.scenario === 'probe';
-const usedInputs = probe ? probeSourceTicks - LOCKSTEP_DELAY :
+const usedInputs = inputSampling ? INPUT_SAMPLING_SOURCE_TICKS - LOCKSTEP_DELAY : probe ? probeSourceTicks - LOCKSTEP_DELAY :
   scenario === 'flip' && flip ? Math.min(inputCount, flip.tick + 8) :
   scenario === 'disconnect' ? Math.min(inputCount, Math.max(1, disconnectAt + 1 - LOCKSTEP_DELAY)) : inputCount;
-if (usedInputs > inputCount) throw Error('Requested local input workload exceeds the script');
+if (!inputSampling && usedInputs > inputCount) throw Error('Requested local input workload exceeds the script');
 if (flip && flip.tick >= usedInputs) throw Error('Input flip tick is outside the selected workload');
-const sourceTicks = usedInputs + LOCKSTEP_DELAY;
+const sourceTicks = inputSampling ? INPUT_SAMPLING_SOURCE_TICKS : usedInputs + LOCKSTEP_DELAY;
 if (sourceTicks > 216000) throw Error('Source tick workload exceeds the native bound');
 if (disconnectAt !== null && disconnectAt >= sourceTicks)
   throw Error('Disconnect source tick must precede the bounded run end');
 const output = path.resolve(values.out);
 await fs.mkdir(output, {recursive: false});
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
-const scriptHash = sha256(scriptBytes);
+const scriptHash = scriptBytes ? sha256(scriptBytes) : null;
 const deadline = Date.now() + timeoutMs;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const childDirectory = role => path.join(output, role);
+async function captureAccountedCss(role, expectedCursor) {
+  const filename = path.join(childDirectory(role), 'accounted-css.png');
+  await instances[role].screenshot(filename);
+  const bytes = await fs.readFile(filename);
+  const graphics = await instances[role].graphics();
+  const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
+  if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
+      graphics.cross_origin_isolated !== true || graphics.webgpu_adapter !== true ||
+      native.phase !== 1 || status.cursor !== expectedCursor || status.blocker !== 'complete')
+    throw Error(`${role} CSS accounting capture did not retain its rendered final cursor ${expectedCursor}`);
+  instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
+    screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
+    gpu: graphics, source_steps_and_draws: instanceRows[role].source_accounting,
+    scope: 'CSS at the completed prefix; source counters exclude preparation-only draws'};
+}
+// Match melee_web_net_fnv1a64 over already-native PADStatus bytes; this does not
+// convert JavaScript Gamepad state into the protocol's PAD record layout.
+const fnv1a64 = bytes => {
+  let hash = FNV_OFFSET;
+  for (const byte of bytes) hash = BigInt.asUintN(64, (hash ^ BigInt(byte)) * FNV_PRIME);
+  return hash;
+};
 
 const pairResults = {
-  schema: 'melee-web-local-lockstep-a2-run-v1', scenario, seed,
-  scope: probe ? 'CSS network-wait and duplicate-contribution probe' :
+  schema: inputSampling ? 'melee-web-local-lockstep-a3-input-sampling-v1' : 'melee-web-local-lockstep-a2-run-v1', scenario, seed,
+  scope: inputSampling ? 'synthetic browser-local native PAD sampling and two-tick delay component check' :
+    probe ? 'CSS network-wait and duplicate-contribution probe' :
     scenario === 'positive' ? 'full original-route functional lockstep' : `bounded ${scenario} control`,
-  exclusions: ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'two-machine Internet acceptance'],
+  exclusions: inputSampling ? ['physical controllers', 'keyboard sampling', 'wall-clock latency',
+    'foreground timing', 'uninterrupted/audio-output acceptance', 'Internet/two-machine/WebRTC play',
+    'pixels/PCM', 'full-route or whole-session accuracy', 'performance'] :
+    ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'two-machine Internet acceptance'],
   peer_owner: values['peer-owner'],
   input_delay: LOCKSTEP_DELAY,
   neutral_prefix: {source_ticks: LOCKSTEP_DELAY, player_ports: 'neutral PADStatus', unowned_ports: 'no-controller'},
-  script: {name: path.basename(values.script), sha256: scriptHash, frame_count: inputCount,
-    input_ticks_used: usedInputs, source_ticks: sourceTicks},
+  script: scriptBytes ? {name: path.basename(values.script), sha256: scriptHash, frame_count: inputCount,
+    input_ticks_used: usedInputs, source_ticks: sourceTicks} : null,
+  input_capture: inputSampling ? {source: 'browser-local native PADStatus', input_ticks: usedInputs,
+    source_ticks: sourceTicks, pattern: ['neutral', 'A', 'release', 'neutral'],
+    beta_deferred_input_tick: 0} : null,
   transport_attempt: describeLockstepTransportAttempt(values['relay-url']),
   peers: [], outcome: 'fail', first_error: null, relay_closed: false, started_at: new Date().toISOString(),
 };
@@ -357,7 +397,8 @@ function createAgreement(identity, start) {
     neutral_prefix: {ticks: LOCKSTEP_DELAY, ports_0_1: 'zero-PADStatus', ports_2_3: 'PAD_ERR_NO_CONTROLLER'},
     pad_encoding: 'MWNI-v1-port-records-11-byte',
     port_ownership: {0: 'alpha', 1: 'beta', 2: 'no-controller', 3: 'no-controller'},
-    input_recipe: {sha256: scriptHash, frame_count: inputCount, input_ticks_used: usedInputs},
+    ...(inputSampling ? {input_source: 'browser-local-native-PADStatus'} :
+      {input_recipe: {sha256: scriptHash, frame_count: inputCount, input_ticks_used: usedInputs}}),
     runtime_wasm_sha256: identity.wasm,
     disc: identity.disc,
     native_start: start,
@@ -458,6 +499,30 @@ async function pollRun() {
           observed_at_ms: Date.now()});
       }
       if (status.cursor !== lastCursors[role]) { lastCursors[role] = status.cursor; lastProgress = Date.now(); }
+    }
+    if (inputSampling && !instanceRows.input_capture_released &&
+        rows.alpha.cursor === LOCKSTEP_DELAY && rows.alpha.blocker === 'network_wait' &&
+        rows.alpha.pushed === LOCKSTEP_DELAY &&
+        peers.alpha.localInputCapture?.captures.length >= 1 &&
+        peers.beta.localInputCapture?.captures.length >= 1 &&
+        peers.beta.summary().deferred_input_ticks.includes(0)) {
+      const beforeCapture = JSON.stringify(peers.alpha.localInputCapture.captures);
+      const wait = {...rows.alpha};
+      await sleep(120);
+      await peers.alpha.refresh();
+      const held = await instances.alpha.status();
+      const afterCapture = JSON.stringify(peers.alpha.localInputCapture.captures);
+      if (held.cursor !== wait.cursor || held.pushed !== wait.pushed ||
+          held.blocker !== 'network_wait' || !held.network_wait.active ||
+          held.wait_start_tick !== wait.wait_start_tick || held.wait_last_tick !== wait.wait_last_tick ||
+          held.wait_resume_count !== wait.wait_resume_count || beforeCapture !== afterCapture)
+        throw Error(`Withheld remote input changed the source cursor or captured local bytes: ${JSON.stringify(held)}`);
+      await peers.beta.releaseCapturedInput(0);
+      instanceRows.input_capture_wait = {source_cursor: wait.cursor, blocker: wait.blocker,
+        capture_count_before: peers.alpha.localInputCapture.captures.length,
+        capture_count_after: JSON.parse(afterCapture).length, stable_bytes_and_serial: true,
+        held_ms: 120, released_role: 'beta', released_input_tick: 0};
+      instanceRows.input_capture_released = true;
     }
     if (!probe && scenario === 'disconnect' && !disconnectInjected &&
         Math.min(rows.alpha.cursor, rows.beta.cursor) >= disconnectAt) {
@@ -585,6 +650,7 @@ async function run() {
     chromium, launchOptions, url: values.url, disc: values.disc,
     userDataDir: path.join(childDirectory(role), 'profile'), label: role,
     timeoutMs: openTimeout, deadline, peerModuleHashes,
+    syntheticGamepad: inputSampling ? standardPad(role === 'alpha' ? 0 : 1) : null,
   })));
   // Transfer every successful launch before reporting a sibling failure so
   // the shared finalizer still owns its source session and browser context.
@@ -597,6 +663,13 @@ async function run() {
   checksumFiles.alpha = await fs.open(path.join(childDirectory('alpha'), 'checksums.bin'), 'wx');
   checksumFiles.beta = await fs.open(path.join(childDirectory('beta'), 'checksums.bin'), 'wx');
   await Promise.all(['alpha', 'beta'].map(role => instances[role].importDisc()));
+  if (inputSampling) {
+    for (const role of ['alpha', 'beta']) {
+      const localPort = role === 'alpha' ? 0 : 1;
+      instanceRows[role].synthetic_gamepad_routing =
+        await instances[role].prepareSyntheticGamepadRouting(localPort);
+    }
+  }
   await Promise.all(['alpha', 'beta'].map(role => instances[role].beginLockstep(seed, sourceTicks)));
   const startRows = await waitForStart();
   for (const role of ['alpha', 'beta']) {
@@ -634,7 +707,9 @@ async function run() {
     const roomId = createRoomId();
     await Promise.all(['alpha', 'beta'].map(async role => {
       const initial = await instances[role].createBrowserPeer({role, sourceTicks, inputTicks: usedInputs,
-        relayUrl: values['relay-url'], roomId, agreement: agreements[role], timeoutMs: Math.min(stallMs, deadline - Date.now())});
+        relayUrl: values['relay-url'], roomId, agreement: agreements[role], timeoutMs: Math.min(stallMs, deadline - Date.now()),
+        ...(inputSampling ? {inputCapture: {deferSendTicks: role === 'beta' ? [0] : [],
+          pattern: role === 'alpha' ? ['neutral', 'A', 'release', 'neutral'] : Array(usedInputs).fill('neutral')}} : {})});
       peers[role] = browserPeerFacade(instances[role], initial);
     }));
     pairResults.browser_peer_modules = {expected: peerModuleHashes, responses: {
@@ -696,7 +771,10 @@ async function run() {
       }
     }));
   }
-  if (scenario === 'probe') {
+  if (inputSampling) {
+    // Native input hooks own both local contributions; Node only releases the
+    // explicitly deferred browser-owned beta sample after observing the wait.
+  } else if (scenario === 'probe') {
     await publishProbeInputs(peers.alpha, peers.beta);
   } else if (scenario === 'disconnect') {
     await publishDisconnectPrefix(peers.alpha, peers.beta);
@@ -736,7 +814,7 @@ async function run() {
     instanceRows[role].source_accounting_artifact = {name: 'source-accounting.json',
       bytes: bytes.length, sha256: sha256(bytes)};
     instanceRows[role].source_accounting = verifyNetSourceAccounting(capture,
-      scenario === 'positive' || scenario === 'probe' ? sourceTicks : capture.final.cursor);
+      scenario === 'positive' || scenario === 'probe' || inputSampling ? sourceTicks : capture.final.cursor);
   }
   pairResults.wait_observations = waitObservations;
   pairResults.transport_errors = transportErrors;
@@ -748,9 +826,10 @@ async function run() {
       ...status,
       protocol: peers[role].summary(),
       ...(browserOwned ? {native_checksum_ownership: peers[role].checksumOwnership} : {}),
+      ...(inputSampling ? {local_input_capture: peers[role].localInputCapture} : {}),
     };
   });
-  if (browserOwned && (probe || scenario === 'positive')) {
+  if (browserOwned && (probe || scenario === 'positive' || inputSampling)) {
     for (const role of ['alpha', 'beta']) {
       const ownership = peers[role].checksumOwnership;
       if (ownership.active_native_records_submitted_before_export !== sourceTicks ||
@@ -781,22 +860,98 @@ async function run() {
     pairResults.checksums = {records_each: sourceTicks, streams_identical: true, sha256: sha256(bytesA)};
     if (peers.alpha.inputDuplicates < 1 || peers.alpha.outOfOrderInputs < 1)
       throw Error('Reduced probe did not exercise duplicate and out-of-order remote input');
-    for (const role of ['alpha', 'beta']) {
-      const filename = path.join(childDirectory(role), 'accounted-css.png');
-      await instances[role].screenshot(filename);
-      const bytes = await fs.readFile(filename);
-      const graphics = await instances[role].graphics();
-      const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
-      if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
-          graphics.cross_origin_isolated !== true || graphics.webgpu_adapter !== true ||
-          native.phase !== 1 || status.cursor !== sourceTicks || status.blocker !== 'complete')
-        throw Error(`${role} reduced accounting probe did not retain its final rendered CSS boundary`);
-      instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
-        screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
-        gpu: graphics, source_steps_and_draws: instanceRows[role].source_accounting,
-        scope: 'CSS at the completed prefix; source counters exclude preparation-only draws'};
-    }
+    for (const role of ['alpha', 'beta']) await captureAccountedCss(role, sourceTicks);
     pairResults.route = {scope: 'CSS-only prefix', status: 'not-full-route', scene: 'CSS'};
+    pairResults.outcome = 'complete';
+  } else if (inputSampling) {
+    if (!instanceRows.input_capture_released || !instanceRows.input_capture_wait?.stable_bytes_and_serial)
+      throw Error('Input-sampling probe did not hold the native cursor and immutable first local sample');
+    for (const role of ['alpha', 'beta']) {
+      const captures = peers[role].localInputCapture?.captures;
+      const summary = peers[role].summary();
+      const routing = instanceRows[role].synthetic_gamepad_routing;
+      const expectedPort = role === 'alpha' ? 0 : 1;
+      const expectedIndex = expectedPort;
+      if (!routing || routing.gamepad_index !== expectedIndex || routing.assigned_port !== expectedPort ||
+          !routing.active || !routing.neutral || (role === 'beta' && routing.automatic_port !== 0))
+        throw Error(`${role} synthetic Gamepad was not explicitly assigned to its role-owned local port`);
+      if (!Array.isArray(captures) || captures.length !== usedInputs ||
+          captures.some((row, tick) => row.source_cursor !== tick || row.input_tick !== tick ||
+            row.local_port !== expectedPort || row.bytes.length !== 11 ||
+            row.bytes[10] !== 0 || (tick && row.poll_serial <= captures[tick - 1].poll_serial)))
+        throw Error(`${role} browser-local capture set is missing, reordered, malformed or reused a poll serial`);
+      if (summary.remote_ack_input !== usedInputs - 1 || summary.local_checksum_ticks !== sourceTicks ||
+          summary.remote_checksum_ticks !== sourceTicks || summary.next_checksum_compare !== sourceTicks ||
+          summary.checksum_mismatches.length || instanceRows[role].records !== sourceTicks ||
+          instanceRows[role].source_accounting.source_steps !== sourceTicks ||
+          instanceRows[role].source_accounting.source_draws !== sourceTicks ||
+          instanceRows[role].scene_runs.length !== sourceTicks ||
+          instanceRows[role].scene_runs.some(row => row.scene !== 1))
+        throw Error(`${role} input-sampling probe did not complete six CSS source steps, draws, ACKs and checksum comparisons`);
+      instanceRows[role].final_status = await instances[role].status();
+      if (instanceRows[role].final_status.cursor !== sourceTicks ||
+          instanceRows[role].final_status.blocker !== 'complete')
+        throw Error(`${role} native source did not finish the declared sampling prefix`);
+      await captureAccountedCss(role, sourceTicks);
+    }
+    const alphaSamples = peers.alpha.localInputCapture.captures.map(row => row.bytes);
+    const betaSamples = peers.beta.localInputCapture.captures.map(row => row.bytes);
+    if (alphaSamples[0].some(byte => byte !== 0) || betaSamples[0].some(byte => byte !== 0) ||
+        betaSamples.some(sample =>
+        sample.some((byte, index) => byte !== betaSamples[0][index])))
+      throw Error('Initial neutral or beta-neutral native PADStatus bytes differ');
+    if (alphaSamples[0].join(',') !== alphaSamples[2].join(',') ||
+        alphaSamples[0].join(',') !== alphaSamples[3].join(',') ||
+        alphaSamples[1].slice(2).join(',') !== alphaSamples[0].slice(2).join(','))
+      throw Error('Synthetic A press/release changed native PADStatus fields beyond the button word');
+    const pressedButtons = (alphaSamples[1][0] << 8) | alphaSamples[1][1];
+    if (pressedButtons !== BUTTONS.A || BUTTONS.A !== 0x0100)
+      throw Error('Synthetic A press did not encode exactly BUTTONS.A (0x0100) in native PADStatus bytes');
+    const bytesA = await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin'));
+    const bytesB = await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin'));
+    if (!bytesA.equals(bytesB)) throw Error('Input-sampling per-consumed-tick checksum streams differ');
+    const neutralPad = Buffer.from(lockstepConstants.neutralPad, 'hex');
+    const noControllerPad = Buffer.from(lockstepConstants.noControllerPad, 'hex');
+    const expectedInputComponents = Array.from({length: sourceTicks}, (_, sourceTick) => {
+      const inputTick = sourceTick - LOCKSTEP_DELAY;
+      const playerPads = inputTick < 0 ? [neutralPad, neutralPad] :
+        [Buffer.from(alphaSamples[inputTick]), Buffer.from(betaSamples[inputTick])];
+      // Port order and the existing 11-byte records are the core's 44-byte frame layout.
+      const nativePadBytes = Buffer.concat([...playerPads, noControllerPad, noControllerPad]);
+      return {source_tick: sourceTick, input_tick: inputTick < 0 ? null : inputTick,
+        input_hash: fnv1a64(nativePadBytes).toString(16).padStart(16, '0')};
+    });
+    const actualInputComponents = {};
+    for (const [role, bytes] of [['alpha', bytesA], ['beta', bytesB]]) {
+      if (bytes.length !== sourceTicks * NET_RECORD_BYTES)
+        throw Error(`${role} input-sampling checksum evidence has an unexpected record count`);
+      actualInputComponents[role] = [];
+      for (const expected of expectedInputComponents) {
+        const offset = expected.source_tick * NET_RECORD_BYTES;
+        const parsed = parseNetChecksum(bytes.subarray(offset, offset + NET_RECORD_BYTES));
+        if (parsed.tick !== expected.source_tick || parsed.input !== expected.input_hash)
+          throw Error(`${role} native input checksum at source ${expected.source_tick} does not match ` +
+            `the sample expected from input ${expected.input_tick}: ${parsed.input} != ${expected.input_hash}`);
+        actualInputComponents[role].push({source_tick: parsed.tick, input_hash: parsed.input});
+      }
+    }
+    pairResults.input_capture_result = {input_ticks: usedInputs, source_ticks: sourceTicks,
+      sample_source: 'native input->raw selected local PADStatus; no second poll or JavaScript serializer',
+      delay: 'capture S is consumed at source S+2; source ticks 0/1 remain neutral',
+      alpha_samples: alphaSamples.map((bytes, tick) => ({tick, bytes})),
+      beta_samples: betaSamples.map((bytes, tick) => ({tick, bytes})),
+      synthetic_gamepad_routing: {alpha: instanceRows.alpha.synthetic_gamepad_routing,
+        beta: instanceRows.beta.synthetic_gamepad_routing},
+      consumed_input_component_witness: {
+        algorithm: 'existing native FNV-1a64 input component over four existing 11-byte PAD records in port order',
+        matched_every_native_checksum_record: true,
+        expected: expectedInputComponents,
+        actual: actualInputComponents,
+      },
+      withheld_remote_input_wait: instanceRows.input_capture_wait,
+      six_source_steps_and_draws_each: true, six_native_checksums_each: true,
+      six_remote_checksum_comparisons_each: true, ack_through_input_3_each: true};
+    pairResults.checksums = {records_each: sourceTicks, streams_identical: true, sha256: sha256(bytesA)};
     pairResults.outcome = 'complete';
   } else if (scenario === 'positive') {
     for (const role of ['alpha', 'beta']) {
