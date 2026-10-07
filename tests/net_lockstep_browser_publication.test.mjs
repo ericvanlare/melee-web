@@ -177,3 +177,31 @@ test('missing actual ACK without terminal still fails at the bounded wait', asyn
     assert.equal(row.snapshots[role].protocol.remote_ack_input, -1);
   }
 });
+
+// Exercise the existing live CSS capture helper with both real terminal kinds.
+const cssSource = source.slice(source.indexOf('async function captureAccountedCss('),
+  source.indexOf('// Match melee_web_net_fnv1a64'));
+for (const expectedTerminal of [1, 2]) {
+  test(`held CSS capture preserves expected terminal ${expectedTerminal} and observed cursor`, async () => {
+    const rows = {alpha: {source_accounting: {source_cursor: 16}}};
+    const context = vm.createContext({Buffer, Number, TERMINAL: {disconnect: 2},
+      instanceRows: rows, childDirectory: () => '/pure-fixture',
+      path: {join: (...parts) => parts.join('/')},
+      fs: {readFile: async () => Buffer.from([137,80,78,71,13,10,26,10])},
+      sha256: () => 'synthetic-fixture-hash',
+      readyRenderEvent: () => ({draw_calls: 16, source_draws: 16, draw_suppressed: 0}),
+      instances: {alpha: {screenshot: async () => {},
+        graphics: async () => ({cross_origin_isolated: true, webgpu_adapter: true}),
+        driver: {diagnostics: async () => ({})},
+        native: async () => ({phase: 1, running: 1, error: null}),
+        status: async () => ({cursor: 16, blocker: 'terminal', terminal: {kind: expectedTerminal}})}},
+    });
+    const capture = vm.runInContext(cssSource + '\ncaptureAccountedCss', context);
+    await capture('alpha', 16, 'terminal', expectedTerminal);
+    assert.equal(rows.alpha.accounted_css.source_cursor, 16);
+    assert.equal(rows.alpha.accounted_css.render_readiness.draw_calls, 16);
+    await assert.rejects(capture('alpha', 16, 'terminal', expectedTerminal === 1 ? 2 : 1), /CSS accounting capture/);
+    context.readyRenderEvent = () => ({draw_calls: NaN, source_draws: 16});
+    await assert.rejects(capture('alpha', 16, 'terminal', expectedTerminal), /CSS accounting capture/);
+  });
+}

@@ -120,20 +120,24 @@ const scriptHash = scriptBytes ? sha256(scriptBytes) : null;
 const deadline = Date.now() + timeoutMs;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const childDirectory = role => path.join(output, role);
-async function captureAccountedCss(role, expectedCursor, expectedBlocker = 'complete') {
+async function captureAccountedCss(role, expectedCursor, expectedBlocker = 'complete', expectedTerminal = TERMINAL.disconnect) {
   const filename = path.join(childDirectory(role), 'accounted-css.png');
   await instances[role].screenshot(filename);
   const bytes = await fs.readFile(filename);
   const graphics = await instances[role].graphics();
+  const readiness = readyRenderEvent(await instances[role].driver.diagnostics(), 1);
   const [native, status] = await Promise.all([instances[role].native(), instances[role].status()]);
   if (!bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) ||
       graphics.cross_origin_isolated !== true || graphics.webgpu_adapter !== true ||
-      native.phase !== 1 || status.cursor !== expectedCursor || status.blocker !== expectedBlocker ||
-      (expectedBlocker === 'terminal' && status.terminal.kind !== TERMINAL.disconnect))
+      native.phase !== 1 || native.running !== 1 || native.error !== null ||
+      !readiness || !Number.isSafeInteger(readiness.draw_calls) || readiness.draw_calls <= 0 ||
+      !Number.isSafeInteger(readiness.source_draws) || readiness.source_draws <= 0 ||
+      status.cursor !== expectedCursor || status.blocker !== expectedBlocker ||
+      (expectedBlocker === 'terminal' && status.terminal.kind !== expectedTerminal))
     throw Error(`${role} CSS accounting capture did not retain its rendered final cursor ${expectedCursor}`);
   instanceRows[role].accounted_css = {source_cursor: status.cursor, phase: native.phase,
     screenshot: 'accounted-css.png', bytes: bytes.length, sha256: sha256(bytes),
-    gpu: graphics, source_steps_and_draws: instanceRows[role].source_accounting,
+    gpu: graphics, render_readiness: readiness, source_steps_and_draws: instanceRows[role].source_accounting,
     blocker: status.blocker,
     scope: 'CSS at the held source prefix; source counters exclude preparation-only draws'};
 }
@@ -1124,6 +1128,12 @@ async function run() {
       await fs.readFile(path.join(childDirectory('alpha'), 'checksums.bin')),
       await fs.readFile(path.join(childDirectory('beta'), 'checksums.bin')),
       expectedTick, 1);
+    if (localWebRtc) for (const role of ['alpha', 'beta']) {
+      const row = instanceRows[role];
+      row.final_status = await instances[role].status();
+      row.final_native = await instances[role].native();
+      await captureAccountedCss(role, row.final_status.cursor, 'terminal', TERMINAL.desync);
+    }
     pairResults.negative_control = {changed_local_port: flip.port, input_tick: flip.tick,
       source_tick: expectedTick, byte: flip.byte, bit: flip.bit, detected_at_first_mismatch: true,
       channel: mismatch.channel, native_checksum_prefix: rawPrefix};

@@ -23,9 +23,9 @@ test('positive WebRTC cannot pass SDP through the Node memory coordinator', () =
 });
 
 test('unsupported WebRTC scenarios and owners fail before acquisition', () => {
-  for (const scenario of ['probe', 'flip'])
+  for (const scenario of ['probe'])
     assert.throws(() => validateLockstepBrowserMode(options({scenario})),
-      /browser-owned input-sampling, positive, or disconnect mode/);
+      /browser-owned input-sampling, positive, disconnect, or flip mode/);
   assert.throws(() => validateLockstepBrowserMode(options({'peer-owner': 'node'})),
     /applies only to browser-owned peers/);
 });
@@ -60,4 +60,13 @@ test('disconnect WebRTC requires page-owned room signaling', () => {
   assert.equal(validateLockstepBrowserMode(options({scenario: 'disconnect'})).roomWorkerSignaling, true);
   assert.throws(() => validateLockstepBrowserMode(options({scenario: 'disconnect',
     'webrtc-signaling': 'memory'})), /Disconnect WebRTC mode requires/);
+});
+
+test('flip WebRTC reuses page-owned room signaling and rejects Node SDP coordination', () => {
+  assert.deepEqual(validateLockstepBrowserMode(options({scenario: 'flip'})), {
+    browserOwned: true, peerTransport: 'webrtc', localWebRtc: true, roomWorkerSignaling: true});
+  assert.throws(() => validateLockstepBrowserMode(options({scenario: 'flip',
+    'webrtc-signaling': 'memory'})), /Flip WebRTC mode requires/);
+  assert.throws(() => validateLockstepBrowserMode(options({scenario: 'flip',
+    'peer-owner': 'node'})), /applies only to browser-owned peers/);
 });
