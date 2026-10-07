@@ -203,7 +203,8 @@ struct NativeMapStorage {
         unsigned points=d->type==1?3*(d->numcv-1)+1:d->type>=2?d->numcv+2:d->numcv;uint32_t cv=pointer(o+8,points*12);record(cv,points*12);d->cv=make<Vec3>(points);for(unsigned i=0;i<points;i++)d->cv[i]=*vector(cv+12*i);
         uint32_t lengths=pointer(o+16,d->numcv*4);record(lengths,d->numcv*4);d->segLength=make<float>(d->numcv);for(int i=0;i<d->numcv;i++){d->segLength[i]=number(lengths+4*i);require(d->segLength[i]>=0&&d->segLength[i]<=1&&(!i||d->segLength[i]>d->segLength[i-1]),"Stage spline arc table is not strictly ordered");}require(d->segLength[0]==0&&d->segLength[d->numcv-1]==1,"Stage spline arc table endpoints invalid");
         if(auto p=archive->pointer(o+20,(d->numcv-1)*20)){record(*p,(d->numcv-1)*20);auto* values=make<float>((d->numcv-1)*5);d->segPoly=reinterpret_cast<float(*)[5]>(values);for(int i=0;i<(d->numcv-1)*5;i++)values[i]=number(*p+4*i);}else require(d->type==0,"Nonlinear stage spline requires arc polynomial");splines[o]=d;return d;}
-    void hydrate_map(const DatNativeMapContract& contract){
+    void hydrate_map(const DatNativeMapContract& contract,MeleeWebStageMarkers* markers){
+        require(markers,"Native map marker owner is absent");
         constexpr std::array<uint32_t,11> pointer_fields={0,4,8,12,16,20,24,28,32,40,44};
         require(metadata.entries.size()==contract.entry_count,"Native map entry count differs from its authored contract");
         require(contract.animation_consumer_counts.size()==contract.entry_count,
@@ -291,7 +292,6 @@ struct NativeMapStorage {
         }
 
         source_light_counts.assign(metadata.entries.size(),0);
-        auto* markers=melee_web_stage_markers_decode(arena.reader(),metadata.root_offset);
         map.unkC=static_cast<int32_t>(metadata.entries.size());map.unk8=make<MeleeWebMapEntryInput>(map.unkC);
         for(const auto& e:metadata.entries){
             auto& out=map.unk8[e.index];
@@ -401,7 +401,10 @@ struct DatNativeStage::Storage : NativeMapStorage {
 DatNativeMap::DatNativeMap(std::shared_ptr<const DatArchive> archive,
                            const DatNativeMapContract& contract)
     : storage_(std::make_unique<Storage>(archive)) {
-    storage_->hydrate_map(contract);
+    auto* markers=melee_web_stage_markers_decode_structural(
+        storage_->arena.reader(),storage_->metadata.root_offset);
+    require(markers,"Native map structural marker decoder returned null");
+    storage_->hydrate_map(contract,markers);
     storage_->build_map();
 }
 DatNativeMap::~DatNativeMap()=default;
@@ -453,7 +456,9 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
   animation_flag_consumers,
   flag_expectations
  };
- s.hydrate_map(contract);
+ auto* markers=melee_web_stage_markers_decode(s.arena.reader(),meta.root_offset);
+ require(markers,"Native stage strict marker decoder returned null");
+ s.hydrate_map(contract,markers);
 
  for(const auto& symbol:a.public_symbols())if(symbol.name=="yakumono_param"){
   if(profile->decode_yakumono){s.yaku=profile->decode_yakumono(s.arena.reader(),symbol.data_offset);require(s.yaku,"Native stage yakumono decoder returned null");continue;}

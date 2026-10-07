@@ -1,4 +1,5 @@
 #include "gameplay_compat.h"
+#include <melee/gr/ground.h>
 #include <melee/gr/types.h>
 #include <melee/sc/types.h>
 #include <sysdolphin/baselib/jobj.h>
@@ -63,4 +64,35 @@ const u8* melee_web_test_native_stadium_flags(void* pointer,int index){
 void* melee_web_test_native_stadium_flag(void* pointer,int index){
  UnkStageDat* map=pointer;
  return map&&index>=0&&index<map->unk2C?map->unk28[index]:NULL;
+}
+
+struct MarkerJointReference { HSD_Joint* joint; s16* pairs; s32 count; };
+int melee_web_test_native_marker_pairs(void* pointer,const uint16_t* expected,int count){
+ UnkStageDat* map=pointer;
+ if(!map||!expected||count<=0||map->unk4!=1||!map->unk0||map->unkC!=1||!map->unk8)return 0;
+ struct MarkerJointReference* refs=(struct MarkerJointReference*)map->unk0;
+ if(refs[0].joint!=map->unk8[0].unk0||refs[0].count!=count||!refs[0].pairs)return 0;
+ for(int i=0;i<count*2;i++)if((uint16_t)refs[0].pairs[i]!=expected[i])return 0;
+ return 1;
+}
+int melee_web_test_ground_marker_last_write(void* pointer){
+ UnkStageDat* map=pointer;
+ if(!map||map->unk4!=1||!map->unk0)return 0;
+ struct MarkerJointReference* refs=(struct MarkerJointReference*)map->unk0;
+ const uint16_t* pairs=(const uint16_t*)refs[0].pairs;
+ const int count=refs[0].count;
+ if(!pairs||count<=0||count>261)return 0;
+ HSD_JObj marker_joints[13]={{0}};
+ HSD_JObj* before_135=Ground_801C2CF4(135);
+ HSD_JObj* before_134=Ground_801C2CF4(134);
+ for(int i=0;i<count;i++)if(pairs[2*i]>=13)return 0;
+ for(int i=0;i<count;i++){
+  const uint16_t index=pairs[2*i],id=pairs[2*i+1];
+  if(id==135||id==134)Ground_801C2D0C((s32)id,&marker_joints[index]);
+ }
+ const int last_wins=Ground_801C2CF4(135)==&marker_joints[4]&&
+                     Ground_801C2CF4(134)==&marker_joints[9]&&
+                     Ground_801C2CF4(135)!=&marker_joints[12];
+ Ground_801C2D0C(135,before_135);Ground_801C2D0C(134,before_134);
+ return last_wins;
 }

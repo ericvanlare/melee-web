@@ -1,17 +1,24 @@
 #include "dat_native_stage.hpp"
 #include "dat_stage.hpp"
 #include "gameplay_bootstrap.h"
+#include "gameplay_stage_numeric.h"
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <sstream>
+#include <stdexcept>
 #include <string_view>
+#include <vector>
 extern "C" int melee_web_test_native_stage_map(void*,void*);
 extern "C" int melee_web_test_native_stadium_map(void*);
 extern "C" const uint8_t* melee_web_test_native_stadium_flags(void*,int);
 extern "C" void* melee_web_test_native_stadium_flag(void*,int);
+extern "C" int melee_web_test_native_marker_pairs(void*,const uint16_t*,int);
+extern "C" int melee_web_test_ground_marker_last_write(void*);
 static void check(bool c,const char* e){if(!c)throw std::runtime_error(e);}
 namespace {
 constexpr std::array<uint8_t,10> stadium_animation_counts={1,1,1,1,1,1,1,1,1,1};
@@ -106,6 +113,10 @@ void write_be32(std::vector<uint8_t>& bytes,uint32_t offset,uint32_t value){
  check(size_t(offset)+4<=bytes.size(),"corrupt source pointer remains within test input");
  for(unsigned i=0;i<4;i++)bytes[offset+i]=uint8_t(value>>(24-8*i));
 }
+void write_be16(std::vector<uint8_t>& bytes,uint32_t offset,uint16_t value){
+ check(size_t(offset)+2<=bytes.size(),"corrupt source halfword remains within test input");
+ bytes[offset]=uint8_t(value>>8);bytes[offset+1]=uint8_t(value);
+}
 uint32_t read_be32(const std::vector<uint8_t>& bytes,uint32_t offset){
  check(size_t(offset)+4<=bytes.size(),"read source word remains within test input");
  return (uint32_t(bytes[offset])<<24)|(uint32_t(bytes[offset+1])<<16)|
@@ -115,6 +126,93 @@ template<class F>void expect_error(F&& operation,std::string_view expected){
  bool rejected=false;
  try{operation();}catch(const melee_web::DatError& error){rejected=std::string_view(error.what()).find(expected)!=std::string_view::npos;}
  check(rejected,"native map negative case rejects at its declared boundary");
+}
+std::vector<uint8_t> marker_fixture(uint32_t node_count=13){
+ constexpr uint32_t data_size=0x600,root=0x100,references=0x140,entries=0x160;
+ constexpr uint32_t pairs=0x1a0,tree=0x200;
+ check(node_count>=13&&tree+node_count*64<=data_size,"synthetic marker tree fits bounded fixture");
+ std::vector<uint8_t> data(data_size,0);
+ write_be32(data,root,references);write_be32(data,root+4,1);
+ write_be32(data,root+8,entries);write_be32(data,root+12,1);
+ write_be32(data,references,tree);write_be32(data,references+4,pairs);write_be32(data,references+8,8);
+ write_be32(data,entries,tree);
+ for(uint32_t i=0;i<node_count;i++){
+  const uint32_t node=tree+64*i;
+  if(i+1<node_count)write_be32(data,node+8,node+64);
+  write_be32(data,node+32,0x3f800000);write_be32(data,node+36,0x3f800000);write_be32(data,node+40,0x3f800000);
+ }
+ constexpr std::array<std::array<uint16_t,2>,8> authored={{{3,0},{0,1},{2,2},{1,3},{12,135},{4,135},{9,134},{9,134}}};
+ for(uint32_t i=0;i<authored.size();i++){
+  write_be16(data,pairs+4*i,authored[i][0]);write_be16(data,pairs+4*i+2,authored[i][1]);
+ }
+ std::vector<uint32_t> relocations={root,root+8,references,references+4,entries};
+ for(uint32_t i=0;i+1<node_count;i++)relocations.push_back(tree+64*i+8);
+ std::sort(relocations.begin(),relocations.end());
+ const std::vector<uint8_t> names={'m','a','p','_','h','e','a','d',0};
+ const size_t total=0x20+data.size()+relocations.size()*4+8+names.size();
+ std::vector<uint8_t> archive(total,0);
+ write_be32(archive,0,uint32_t(total));write_be32(archive,4,data_size);
+ write_be32(archive,8,uint32_t(relocations.size()));write_be32(archive,12,1);
+ std::copy(data.begin(),data.end(),archive.begin()+0x20);
+ size_t cursor=0x20+data.size();
+ for(uint32_t slot:relocations){write_be32(archive,uint32_t(cursor),slot);cursor+=4;}
+ write_be32(archive,uint32_t(cursor),root);write_be32(archive,uint32_t(cursor+4),0);cursor+=8;
+ std::copy(names.begin(),names.end(),archive.begin()+static_cast<std::ptrdiff_t>(cursor));
+ return archive;
+}
+const melee_web::DatNativeMapContract& marker_contract(){
+ static constexpr std::array<uint8_t,1> animation_counts={1};
+ static constexpr std::array<uint32_t,1> residents={0};
+ static const melee_web::DatNativeMapContract contract{1,animation_counts,residents,{},{},{}};
+ return contract;
+}
+void expect_marker_map_error(const std::vector<uint8_t>& bytes,std::string_view message){
+ auto archive=std::make_shared<melee_web::DatArchive>(bytes);
+ expect_error([&]{melee_web::DatNativeMap rejected(archive,marker_contract());},message);
+}
+void marker_fixture_trace(){
+ const auto original=marker_fixture();
+ auto archive=std::make_shared<melee_web::DatArchive>(original);
+ {
+  melee_web::NativeDatArena arena(archive);
+  expect_error([&]{melee_web_stage_markers_decode(arena.reader(),0x100);},
+               "Invalid or duplicate marker binding");
+ }
+ auto unique_without_camera=original;
+ write_be16(unique_without_camera,0x20+0x1a0+5*4+2,136);
+ write_be16(unique_without_camera,0x20+0x1a0+7*4+2,137);
+ auto unique_archive=std::make_shared<melee_web::DatArchive>(unique_without_camera);
+ {
+  melee_web::NativeDatArena arena(unique_archive);
+  expect_error([&]{melee_web_stage_markers_decode(arena.reader(),0x100);},
+               "Missing source camera or blast marker");
+ }
+ char error[256];
+ check(melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)),error);
+ check(melee_web_native_world_enable(error,sizeof(error)),error);
+ constexpr std::array<uint16_t,16> authored={3,0,0,1,2,2,1,3,12,135,4,135,9,134,9,134};
+ {
+  melee_web::DatNativeMap owner(archive,marker_contract());
+  void* map=owner.map_head();
+  check(melee_web_test_native_marker_pairs(map,authored.data(),8),
+        "structural owner preserves exact native joint-reference pair order");
+  check(melee_web_test_ground_marker_last_write(map),
+        "authored duplicate marker pairs retain original Ground last-write semantics");
+ }
+ auto bad_pair_index=original;write_be16(bad_pair_index,0x20+0x1a0+4,13);
+ expect_marker_map_error(bad_pair_index,"Invalid marker binding");
+ auto bad_marker_id=original;write_be16(bad_marker_id,0x20+0x1a0+2,261);
+ expect_marker_map_error(bad_marker_id,"Invalid marker binding");
+ auto excessive_pair_count=original;write_be32(excessive_pair_count,0x20+0x140+8,262);
+ expect_marker_map_error(excessive_pair_count,"Invalid marker tree or pair count");
+ auto bad_pair_range=original;write_be32(bad_pair_range,0x20+0x140+4,0x5f0);
+ expect_marker_map_error(bad_pair_range,"range");
+ auto cycle=original;write_be32(cycle,0x20+0x200+8,0x200);
+ expect_marker_map_error(cycle,"Marker joint cycle or shared subtree");
+ auto nonfinite=original;write_be32(nonfinite,0x20+0x200+20,0x7fc00000);
+ expect_marker_map_error(nonfinite,"Nonfinite marker transform");
+ check(melee_web_gameplay_shutdown(error,sizeof(error)),error);
+ std::cout<<"Structural marker pairs preserve duplicates/order, strict stage requirements and checked negatives passed\n";
 }
 void stadium_map_trace(const char* path){
  auto bytes=read_bytes(path);
@@ -263,6 +361,7 @@ void stadium_map_trace(const char* path){
 }
 }
 int main(int argc,char** argv){try{
+ if(argc==2&&std::string_view(argv[1])=="--marker-fixture"){marker_fixture_trace();return 0;}
  if(argc==3&&std::string_view(argv[1])=="--stadium-map"){stadium_map_trace(argv[2]);return 0;}
  check(argc==2,"expected local GrNLa.dat path");std::ifstream f(argv[1],std::ios::binary);check(bool(f),"open GrNLa.dat");
  std::vector<uint8_t> bytes((std::istreambuf_iterator<char>(f)),{});

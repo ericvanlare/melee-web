@@ -6,8 +6,13 @@ extern "C" {
 #endif
 typedef struct MeleeWebStageMarkers MeleeWebStageMarkers;
 typedef struct MeleeWebStageNumeric MeleeWebStageNumeric;
-/* Strict source marker-only tree. The reader arena must outlive the context and
- * its original HSD objects. No rendering/stage on_init is invoked. */
+/* Structural source marker tree and pair table. Preserves authored row order,
+ * duplicate IDs, descending joint indices and absent source-specific IDs. The
+ * reader arena must outlive the context and its original HSD objects. */
+MeleeWebStageMarkers* melee_web_stage_markers_decode_structural(
+    const MeleeWebNativeDat*,uint32_t map_head);
+/* Strict legacy stage marker contract, including unique IDs and the current
+ * player/camera marker set. No rendering/stage on_init is invoked. */
 MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat*,uint32_t map_head);
 /* Borrowed original HSD_Joint descriptor for a complete native map owner. */
 void* melee_web_stage_markers_descriptor(MeleeWebStageMarkers*);
