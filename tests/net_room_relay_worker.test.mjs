@@ -12,6 +12,7 @@ import {LockstepPeer, LOCKSTEP_DELAY} from '../scripts/net_lockstep_protocol.mjs
 import {
   createRoomId, openRoomRelayPeerPair,
 } from '../scripts/net_lockstep_websocket_relay.mjs';
+import {describeLockstepTransport, openLockstepPeerPair} from '../scripts/net_lockstep_transport.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TOOLS = path.resolve(process.env.MELEE_A3_ROOM_RELAY_TOOLS ||
@@ -708,8 +709,13 @@ test('A2 lockstep identity, input/ACK, checksum desync, and disconnect remain un
   try {
     const base = worker.base.replace(/^http:/, 'ws:');
     const agreement = {protocol: 'melee-web-local-lockstep-a2-v1', test: 'real-worker-relay', marker: '雪'};
-    const pair = await openRoomRelayPeerPair({url: base});
+    const pair = await openLockstepPeerPair({relayUrl: base});
     pairs.push(pair);
+    const transport = describeLockstepTransport(pair, {relayUrl: base});
+    assert.equal(transport.type, 'room-websocket');
+    assert.equal(transport.endpoint_origin, base);
+    assert.equal(Object.hasOwn(transport, 'alpha_to_beta_bytes'), false,
+      'WebSocket transport must not report unavailable byte counters');
     const frames = {alpha: [], beta: []};
     const sent = {alpha: [], beta: []};
     const received = {alpha: [], beta: []};
