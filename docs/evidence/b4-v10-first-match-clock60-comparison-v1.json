@@ -229,9 +229,10 @@
     },
     {
       "failure": "final packet display raised TypeError because the reporting step passed write_json metadata to sha_file instead of the packet path; packet and companion files had already been written and independently verified; no server or browser was started",
-      "receipt_path": "/Volumes/AgentStorage/melee-web/runs/b4-clock60-browser-capture-prep-20261007-90289a2/packet-preparation-note-v1.json",
       "receipt_sha256": "cab892b973e12111575aa7c4dddb4c4521a815e3b8f01301b29d64a82cf2a84e",
-      "stage": "Clock60 browser capture packet v1 preparation"
+      "stage": "Clock60 browser capture packet v1 preparation",
+      "receipt_run_id": "b4-clock60-browser-capture-prep-20261007-90289a2",
+      "receipt_artifact": "packet-preparation-note-v1.json"
     },
     {
       "failure": "final summary print raised KeyError capture_report_sha256 after preflight and preliminary files were written; no comparison output was created",
