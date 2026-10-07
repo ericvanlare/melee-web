@@ -36,6 +36,14 @@
     "wrangler": {
       "package": "wrangler",
       "version": "4.131.1"
+    },
+    "miniflare": {
+      "package": "miniflare",
+      "version": "5.20260911.0-alpha"
+    },
+    "workerd": {
+      "package": "workerd",
+      "version": "1.20260911.1"
     }
   }
 }
