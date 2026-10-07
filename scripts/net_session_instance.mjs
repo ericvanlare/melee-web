@@ -174,6 +174,7 @@ export async function openNetInstance({chromium, launchOptions, url, disc, userD
     driver = createBrowserDriver(page, {surface: 'development', timeoutMs, deadline});
     instance.driver = driver;
     instance.freezePeerModuleIdentity = () => bounded(() => peerModules.freeze());
+    instance.finishPeerModuleIdentity = () => bounded(() => peerModules.freeze({closed: true}));
     instance.createBrowserPeer = options => {
       if (!peerModules) throw Error('Browser peer requires expected module hashes');
       browserPeerAllocated = true;
@@ -337,7 +338,7 @@ export function createPeerModuleResponseObserver({url, peerModuleHashes, runtime
   const expected = new Map(names.map(name => [new URL(name, url).href, peerModuleHashes[name]]));
   const allowed = new Set([...runtimeArtifactNames, ...names].map(name => new URL(name, url).href));
   const responses = [], tasks = new Set();
-  let failure = null, eventCount = 0;
+  let failure = null, eventCount = 0, browserClosed = false;
   const fail = error => {
     if (failure) return;
     failure = error;
@@ -351,7 +352,9 @@ export function createPeerModuleResponseObserver({url, peerModuleHashes, runtime
     const task = (async () => {
       if (!allowed.has(responseUrl)) throw Error(`Unexpected browser module import: ${responseUrl}`);
       if (!expected.has(responseUrl)) return;
-      const headers = await response.allHeaders(), bytes = await response.body();
+      const headers = await response.allHeaders();
+      if (browserClosed) throw Error('Browser closed before peer module response body observation');
+      const bytes = await response.body();
       if (bytes.length > 1024 * 1024) throw Error('Browser peer module response exceeded its 1 MiB bound');
       const hash = createHash('sha256').update(bytes).digest('hex');
       if (response.status() !== 200 || hash !== expected.get(responseUrl) ||
@@ -364,7 +367,8 @@ export function createPeerModuleResponseObserver({url, peerModuleHashes, runtime
     })().catch(fail).finally(() => tasks.delete(task));
     tasks.add(task);
   }
-  async function freeze() {
+  async function freeze({closed = false} = {}) {
+    browserClosed ||= closed;
     while (tasks.size) await Promise.all([...tasks]);
     if (failure) throw failure;
     if (responses.length !== expected.size || [...expected.keys()].some(url =>

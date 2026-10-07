@@ -907,6 +907,10 @@ try {
         const closed = await instance.close();
         if (closed !== true) closeNotes.push(`${role} browser close did not confirm completion`);
       } catch (error) { closeNotes.push(`${role} browser close: ${String(error.message || error)}`); }
+      if (browserOwned) {
+        try { instanceRows[role].final_peer_module_responses = await instance.finishPeerModuleIdentity(); }
+        catch (error) { closeNotes.push(`${role} closed-browser module identity: ${String(error.message || error)}`); }
+      }
       instanceRows[role].browser_closed = instance.closed;
       instanceRows[role].browser_diagnostics = instance.errors;
       instanceRows[role].page_errors = instance.errors.filter(row => row.kind === 'pageerror' || row.kind === 'console');

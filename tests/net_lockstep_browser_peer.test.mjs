@@ -229,3 +229,19 @@ test('post-terminal records remain separately labeled native evidence without to
   assert.deepEqual(row.records, [run.record(0)]);
   await run.controller.close();
 });
+
+
+test('closed-browser inventory joins pending observations and rejects without a new body read', async () => {
+  const observer = moduleObserver();
+  for (const name of moduleNames) observer.observe(response(name));
+  await observer.freeze();
+  const gate = deferred();
+  let bodyReads = 0;
+  observer.observe({...response(moduleNames[0]), allHeaders: () => gate.promise,
+    body: async () => { ++bodyReads; return moduleBody; }});
+  const finishing = observer.freeze({closed: true});
+  gate.resolve({'cross-origin-opener-policy': 'same-origin', 'cross-origin-embedder-policy': 'require-corp'});
+  await assert.rejects(finishing, /closed before peer module response body/);
+  assert.equal(bodyReads, 0);
+  await assert.rejects(observer.freeze(), /closed before peer module response body/);
+});
