@@ -119,6 +119,8 @@ export function createDataChannelEndpoint({channel, role, timeoutMs = 5000,
   let closePromise = null;
   let readySettled = false;
   let timeout;
+  let detachOpenListener = () => {};
+  let detachOwnedListeners = () => {};
   let api;
   let resolveReady;
   let rejectReady;
@@ -158,10 +160,11 @@ export function createDataChannelEndpoint({channel, role, timeoutMs = 5000,
     if (readySettled) return;
     readySettled = true;
     clearTimeout(timeout);
+    detachOpenListener();
     if (error) rejectReady(error);
     else resolveReady(api);
   };
-  const failClosed = (error, closeReason = 'WebRTC data channel failed') => {
+  const failClosed = error => {
     if (terminalError) return terminalError;
     terminalError = error;
     acceptingMessages = false;
@@ -182,15 +185,13 @@ export function createDataChannelEndpoint({channel, role, timeoutMs = 5000,
   const onMessageEvent = event => {
     if (!acceptingMessages) return;
     if (typeof event.data !== 'string') {
-      failClosed(Error('WebRTC data channel delivered a non-text A2 packet'),
-        'non-text A2 packet received');
+      failClosed(Error('WebRTC data channel delivered a non-text A2 packet'));
       return;
     }
     const bytes = utf8.encode(event.data).byteLength;
     if (inboundPendingMessages >= WEBRTC_MAX_INBOUND_PENDING_MESSAGES ||
         inboundPendingBytes + bytes > WEBRTC_MAX_INBOUND_PENDING_BYTES) {
-      failClosed(Error('WebRTC inbound callback queue exceeded its bound'),
-        'inbound callback queue exceeded limit');
+      failClosed(Error('WebRTC inbound callback queue exceeded its bound'));
       return;
     }
     const callbacks = [...listeners];
@@ -204,9 +205,21 @@ export function createDataChannelEndpoint({channel, role, timeoutMs = 5000,
     acceptingMessages = false;
     if (!readySettled) settleReady(Error('WebRTC data channel closed before opening'));
     notifyDisconnect('WebRTC data channel closed');
+    detachOwnedListeners();
   };
   const onError = event => failClosed(event?.error instanceof Error ? event.error :
-    Error('WebRTC data channel transport failed'), 'data channel transport failed');
+    Error('WebRTC data channel transport failed'));
+
+  detachOpenListener = () => channel.removeEventListener('open', onOpen);
+  let ownedListenersAttached = true;
+  detachOwnedListeners = () => {
+    if (!ownedListenersAttached) return;
+    ownedListenersAttached = false;
+    channel.removeEventListener('message', onMessageEvent);
+    channel.removeEventListener('close', onClose);
+    channel.removeEventListener('error', onError);
+    detachOpenListener();
+  };
 
   api = {
     role,
@@ -227,8 +240,7 @@ export function createDataChannelEndpoint({channel, role, timeoutMs = 5000,
         return Promise.reject(Error('WebRTC data channel is closed'));
       if (pendingSendMessages >= WEBRTC_MAX_PENDING_SEND_MESSAGES ||
           channel.bufferedAmount + pendingSendBytes + packetBytes > WEBRTC_MAX_BUFFERED_BYTES) {
-        const error = failClosed(Error('WebRTC queued send bytes would exceed 1 MiB'),
-          'outbound callback queue exceeded limit');
+        const error = failClosed(Error('WebRTC queued send bytes would exceed 1 MiB'));
         return Promise.reject(error);
       }
       ++pendingSendMessages;
@@ -241,7 +253,7 @@ export function createDataChannelEndpoint({channel, role, timeoutMs = 5000,
           throw Error('WebRTC data channel send buffer exceeded its bound');
         try { channel.send(text); }
         catch (error) {
-          failClosed(error, 'data channel send failed');
+          failClosed(error);
           throw error;
         }
       });
@@ -306,8 +318,7 @@ export function createDataChannelEndpoint({channel, role, timeoutMs = 5000,
   channel.addEventListener('close', onClose);
   channel.addEventListener('error', onError);
   channel.addEventListener('open', onOpen, {once: true});
-  timeout = setTimeout(() => failClosed(Error('WebRTC data channel open timed out'),
-    'data channel open timed out'), timeoutMs);
+  timeout = setTimeout(() => failClosed(Error('WebRTC data channel open timed out')), timeoutMs);
   if (channel.readyState === 'open') settleReady();
   else if (channel.readyState === 'closed') onClose();
   else if (channel.readyState === 'closing') settleReady(Error('WebRTC data channel closed before opening'));

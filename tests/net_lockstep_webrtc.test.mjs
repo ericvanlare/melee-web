@@ -89,12 +89,11 @@ function makeEndpoint(channel, role, extra = {}) {
   return createDataChannelEndpoint({channel, role, onMessage: () => {}, ...extra});
 }
 
-test('portable A2 identity hello crosses the endpoint contract with no native API calls', async () => {
+test('portable A2 identity hello uses only the explicit neutral-frame test sink', async () => {
   const channels = pairedChannels();
   const received = {alpha: [], beta: []};
   const sinkFrames = {alpha: [], beta: []};
   const disconnects = {alpha: 0, beta: 0};
-  let nativeApiCalls = 0;
   const peers = {};
   for (const role of ['alpha', 'beta']) {
     peers[role] = new LockstepPeer({role, sourceTicks: 2, inputTicks: 0,
@@ -131,7 +130,6 @@ test('portable A2 identity hello crosses the endpoint contract with no native AP
     alpha: [{firstTick: 0, bytes: 2 * 44}],
     beta: [{firstTick: 0, bytes: 2 * 44}],
   }, 'the portable core may send its neutral bootstrap batch only to the test sink');
-  assert.equal(nativeApiCalls, 0, 'this milestone makes no native runtime calls');
   assert.equal(endpoints.alpha.transport.type, 'webrtc-datachannel');
   assert.equal(endpoints.alpha.transport.ordered, true);
   assert.equal(endpoints.alpha.transport.reliable, true);
@@ -139,6 +137,8 @@ test('portable A2 identity hello crosses the endpoint contract with no native AP
   await Promise.all([endpoints.alpha.close(), endpoints.beta.close()]);
   assert(endpoints.alpha.closed && endpoints.beta.closed);
   assert.deepEqual(disconnects, {alpha: 1, beta: 1});
+  assertOwnedListenersDetached(channels.alpha);
+  assertOwnedListenersDetached(channels.beta);
 });
 
 test('the first receiver is installed before open and handles a packet at the open boundary', async () => {
@@ -147,12 +147,29 @@ test('the first receiver is installed before open and handles a packet at the op
   const endpoint = createDataChannelEndpoint({channel, role: 'alpha',
     onMessage: text => received.push(text)});
   assert.equal(channel.listenerCount('message'), 1);
+  assert.equal(channel.listenerCount('open'), 1);
   channel.open();
   channel.deliver('first packet');
   await endpoint.ready;
+  assert.equal(channel.listenerCount('open'), 0, 'ready endpoints release their unused open listener');
   await endpoint.drainInbound();
   assert.deepEqual(received, ['first packet']);
   await endpoint.close();
+  assertOwnedListenersDetached(channel);
+  channel.deliver('after close');
+  channel.dispatchEvent(event('error', {error: Error('late error')}));
+  channel.dispatchEvent(event('open'));
+  await endpoint.drainInbound();
+  assert.deepEqual(received, ['first packet'], 'detached endpoint receives no post-close callbacks');
+
+  const alreadyOpen = new FakeDataChannel();
+  alreadyOpen.readyState = 'open';
+  const immediate = makeEndpoint(alreadyOpen, 'beta');
+  await immediate.ready;
+  assert.equal(alreadyOpen.listenerCount('open'), 0,
+    'an endpoint attached to an already-open channel drops its unused open listener');
+  await immediate.close();
+  assertOwnedListenersDetached(alreadyOpen);
 });
 
 test('close before open rejects readiness and still delivers one disconnect callback', async () => {
@@ -166,6 +183,50 @@ test('close before open rejects readiness and still delivers one disconnect call
   await endpoint.close();
   assert.equal(disconnects.length, 1);
   assert(endpoint.closed);
+  assertOwnedListenersDetached(channel);
+  channel.deliver('after close');
+  channel.dispatchEvent(event('open'));
+  assert.deepEqual(disconnects, ['WebRTC data channel closed']);
+});
+
+test('local and remote close detach owned listeners and suppress later callbacks', async () => {
+  const channels = pairedChannels();
+  const disconnects = {alpha: 0, beta: 0};
+  const messages = {alpha: [], beta: []};
+  const alphaOrder = [];
+  let releaseMessage;
+  const messageGate = new Promise(resolve => { releaseMessage = resolve; });
+  const alpha = createDataChannelEndpoint({channel: channels.alpha, role: 'alpha',
+    onMessage: async text => { messages.alpha.push(text); alphaOrder.push('message-start'); await messageGate; alphaOrder.push('message-end'); },
+    onDisconnect: () => { ++disconnects.alpha; alphaOrder.push('disconnect'); }});
+  const beta = createDataChannelEndpoint({channel: channels.beta, role: 'beta',
+    onMessage: text => messages.beta.push(text), onDisconnect: () => { ++disconnects.beta; }});
+  channels.alpha.open();
+  channels.beta.open();
+  await Promise.all([alpha.ready, beta.ready]);
+
+  await beta.send('queued before close');
+  await beta.close();
+  let alphaCloseSettled = false;
+  const alphaClose = alpha.close().then(() => { alphaCloseSettled = true; });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(alphaCloseSettled, false, 'remote close must drain an already-queued message callback');
+  releaseMessage();
+  await alphaClose;
+  await alpha.drainInbound();
+  assert(alpha.closed && beta.closed);
+  assert.deepEqual(disconnects, {alpha: 1, beta: 1});
+  assert.deepEqual(alphaOrder, ['message-start', 'message-end', 'disconnect']);
+  assertOwnedListenersDetached(channels.alpha);
+  assertOwnedListenersDetached(channels.beta);
+
+  channels.alpha.deliver('late alpha packet');
+  channels.beta.deliver('late beta packet');
+  channels.alpha.dispatchEvent(event('error', {error: Error('late alpha error')}));
+  channels.beta.dispatchEvent(event('error', {error: Error('late beta error')}));
+  await Promise.all([alpha.drainInbound(), beta.drainInbound()]);
+  assert.deepEqual(messages, {alpha: ['queued before close'], beta: []});
+  assert.deepEqual(disconnects, {alpha: 1, beta: 1});
 });
 
 test('unreliable or unordered channels are rejected before listeners are installed', () => {
@@ -283,6 +344,7 @@ test('repeated close reuses the same promise and retains disconnect cleanup erro
     return true;
   });
   assert.equal(disconnectCalls, 1);
+  assertOwnedListenersDetached(channel);
 });
 
 function endpointForFailure(channel, role, options = {}) {
@@ -292,6 +354,11 @@ function endpointForFailure(channel, role, options = {}) {
 function errorMessages(error) {
   return [String(error?.message || error),
     ...(Array.isArray(error?.errors) ? error.errors.flatMap(errorMessages) : [])];
+}
+
+function assertOwnedListenersDetached(channel) {
+  for (const type of ['message', 'open', 'error', 'close'])
+    assert.equal(channel.listenerCount(type), 0, `owned ${type} listener must be detached`);
 }
 
 async function waitForClosed(channel) {
