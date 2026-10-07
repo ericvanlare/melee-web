@@ -1,0 +1,112 @@
+{
+  "schema": "melee-web-pokemon-stadium-c0-integration-v1",
+  "result": "passed_with_post_merge_same_tree_equivalence",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified"
+  ],
+  "boundary": "Full Python suite and ordinary private Release runtime build verified integration health for the unchanged C0 catalog tree. The focused C0 catalog trace is retained separately and was not rerun.",
+  "validation_execution": {
+    "branch": "codex/stadium-e8-preparation-20261007",
+    "producer_commit": "2e0406c965894c758bd922abb1a2c6d111cbc786",
+    "producer_tree": "fb02087e62f51c5c96257558ffc8dd47a2fbd7eb",
+    "base_role": "B4 PR final head stack base; not current main at execution time",
+    "base_commit": "9c4712290365abd653d975a729d696ea2afc0af0",
+    "base_tree": "9bcba3d864973d4bb1d91b6cb104c66f9de3c29a"
+  },
+  "post_merge_equivalence": {
+    "main_commit": "550601a63e91a2fd566f42ea3dff2c79cdef1e8e",
+    "main_tree": "9bcba3d864973d4bb1d91b6cb104c66f9de3c29a",
+    "main_tree_equals_validation_base_tree": true,
+    "catalog_branch_commit_after_rebase": "8925fada3fc82585fab92b9f7192f515eac7e474",
+    "catalog_branch_tree_after_rebase": "fb02087e62f51c5c96257558ffc8dd47a2fbd7eb",
+    "catalog_branch_tree_equals_validation_producer_tree": true,
+    "catalog_branch_tree_equals_pre_rebase_validated_tree": true,
+    "release_artifact_hashes_unchanged_after_rebase": true,
+    "suite_or_build_rerun_after_rebase": false,
+    "interpretation": "The checks ran before merge on the B4 stack. Main now has the same base tree; rebasing the catalog commits onto main reproduced the exact validated producer tree and Release artifacts. This is same-content validation, not a second test or build run after merge."
+  },
+  "checks": {
+    "full_python_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "checkout_wrapper": "scripts/agent_workspace.py run",
+      "exit_code": 0,
+      "tests_run": 1994,
+      "skipped": 132,
+      "elapsed_seconds": 363.814
+    },
+    "ordinary_release_runtime": {
+      "command": "python3 scripts/build.py --target runtime --configuration Release",
+      "checkout_wrapper": "scripts/agent_workspace.py run",
+      "exit_code": 0,
+      "target": "runtime",
+      "configuration": "Release",
+      "jobs": "build.py default; no jobs override",
+      "effective_opt_ins": {
+        "MELEE_WEB_PUBLIC_RUNTIME": "OFF",
+        "MELEE_WEB_AUDIO_PREVIEW_RUNTIME": "OFF",
+        "MELEE_WEB_GAMEPLAY_BOOTSTRAP_STATE": "OFF",
+        "MELEE_WEB_PIPELINE_PROVENANCE": "OFF",
+        "MELEE_WEB_SELECTIVE_PIPELINES": "OFF",
+        "MELEE_WEB_STADIUM_C1A_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_AURORA_FUTURE_OWNER_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_AURORA_QUIESCENCE_DIAGNOSTIC": "OFF",
+        "MELEE_WEB_SLIPPI_PROFILE_BROWSER": "OFF"
+      },
+      "compiler_warnings": 5,
+      "artifacts": [
+        {
+          "path": "build/browser-release/gameplay_menu_browser.js",
+          "bytes": 299682,
+          "sha256": "e848edeb48d2b3712113b81543019d8df7bd3e0001aa726e8b98b407e41ab328"
+        },
+        {
+          "path": "build/browser-release/gameplay_menu_browser.wasm",
+          "bytes": 15739269,
+          "sha256": "3c1923c964a18b94118846c6a5b327dcc20f29be9f0ad3b40b7599f0b062e50f"
+        },
+        {
+          "path": "build/browser-release/gameplay_menu_browser.data",
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+        }
+      ]
+    }
+  },
+  "retained_validation_artifacts": {
+    "manifest": {
+      "path": "artifact-manifest.json",
+      "bytes": 4668,
+      "sha256": "f0c5df2d2a94aeae2dceba93011157c1e03855ac75cc80e4f8022b35606e543e"
+    },
+    "logs": [
+      {
+        "path": "logs/full-suite.stdout.log",
+        "bytes": 4447,
+        "sha256": "442f577b39aa46b06a3f3c5388939c03a0fc085ad742f39eaef81fe6adcc336e"
+      },
+      {
+        "path": "logs/full-suite.stderr.log",
+        "bytes": 358195,
+        "sha256": "289ccd9a3d01bf8628cd1b0e2a6a18dbb5e1d69b2afb0f7f0b556cdc8558d44c"
+      },
+      {
+        "path": "logs/release-runtime.stdout.log",
+        "bytes": 16609,
+        "sha256": "2c8e6097442c347b231dc431d11710b7e6dec44ce5810534f9cb0336a770d69f"
+      },
+      {
+        "path": "logs/release-runtime.stderr.log",
+        "bytes": 1519,
+        "sha256": "21c6fec15fe4097868f5576455de36b5f8bdc50c0683c3849e8c4ec9eb6ec8fa"
+      }
+    ]
+  },
+  "catalog_trace_reference": "pokemon-stadium-c0-typed-catalog-v1.json",
+  "exclusions": [
+    "No C0 catalog trace rerun.",
+    "No E8 request or selected-file closure observation.",
+    "No SIS query, stage publication, Stage_8022524C, on_init, browser, gameplay, readiness, or admission claim.",
+    "This receipt does not close Stadium issue #203 or broaden playable scope."
+  ]
+}

@@ -1,0 +1,164 @@
+{
+  "schema": "melee-web-pokemon-stadium-c0-typed-catalog-v1",
+  "result": "passed_with_explicit_scope_exclusions",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "boundary": "One C0 typed catalog preparation trace on the retained GrPs.usd input. It does not exercise E8, publish the native map, or admit playable Stadium.",
+  "producer": {
+    "branch": "codex/stadium-e8-preparation-20261007",
+    "commit": "afa7b61df57bdfafc48205eaa9c613141de60c0b",
+    "tree": "ba848024be7cab3835f14ed3e11db54470edcb90",
+    "parent": "e91e69a1b960df89883435146e0d523d9b2e6ee6",
+    "tracked_worktree_clean_before_and_after": true,
+    "identity_before_and_after_equal": true
+  },
+  "source": {
+    "archive": "assets-local/stadium-c0-20261006/GrPs.usd",
+    "bytes": 1461024,
+    "sha256_before_and_after": "aa740cfbbeced294f058449caca8ac0380532521dde06ca4a6dcc03080cf6a6d",
+    "provenance": "Previously retained C0 input; the run read this file only, with no extraction or copy."
+  },
+  "source_files": {
+    "tests/pokemon_stadium_c0_trace.cpp": "d8a56d26438afa5829ca5aa072bee95f622505e49f4787825948f98e1d90062b",
+    "tests/dat_native_stage_map_trace.cpp": "15034ee3ca6dd0a50d288e9829a096ac5d8742c38c0bdb2943eae62e1704220e",
+    "tests/stadium_c0_native_map_contract.hpp": "6c7d9a6de710f3e006960d87155a6d1f9a9ef5b2e24fb78a0feb25bd59d25143",
+    "src/dat_native_stage.cpp": "38f27d6f4f2342e373bef74456d9108a17a11572852a31cbfa762dc10f55ec28"
+  },
+  "targets": {
+    "pokemon_stadium_c0_trace.js": {
+      "bytes": 340048,
+      "sha256": "7d802aa3af8becaa5e3aaaa0476a437cdfcbc016275be8f19779912933346ce0"
+    },
+    "pokemon_stadium_c0_trace.wasm": {
+      "bytes": 94211536,
+      "sha256": "64fe5a537bb4d6cd09c1693b19920af2e0917b69d3d9e6783ff0a0336d86e586"
+    },
+    "dat_native_stage_map_trace.js": {
+      "bytes": 342732,
+      "sha256": "7573674fdfefc208fbd4968b80aadd9c728c0270f0a58d1d00bdc3c9c32b00d1"
+    },
+    "dat_native_stage_map_trace.wasm": {
+      "bytes": 95874574,
+      "sha256": "fe181864ae866d8a7e963fe190f0842e919786a67508620f38e0701e159ca8f1"
+    }
+  },
+  "builds": {
+    "c0_catalog_target": {
+      "command": "scripts/build.py --trace-target pokemon_stadium_c0_trace --configuration RelWithDebInfo",
+      "exit_code": 0,
+      "stdout_sha256": "30cbd89005369e93cf031f869b32a26dd66f1b4a473c75935a5807b2c2324b76",
+      "stderr_sha256": "778010fb0fa7590bfe79cd4d0e4a4df963e18bdd2ad4d2fd2b19988c0e23df84"
+    },
+    "native_map_trace_target": {
+      "command": ".venv/bin/cmake --build build/browser --target dat_native_stage_map_trace",
+      "exit_code": 0,
+      "stdout_sha256": "a6d30e5bee6dbe76fce97bfff75936cb8363710ba1e80e6d58e0430900cadd1b",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "synthetic_marker_control": {
+      "command": "node build/browser/dat_native_stage_map_trace.js --marker-fixture",
+      "exit_code": 0,
+      "stdout_sha256": "6eabce211ad2c227f3db91321f365752819a2be4ab7866182cf0a112d4f8592c",
+      "stderr_sha256": "bdd236b8af79b47bd3e6c3c66f7efa714d4f533688fbbb6265c127474a51bbf8"
+    }
+  },
+  "runtime_tools": {
+    "node": {
+      "version": "v24.19.0",
+      "sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1"
+    },
+    "python": {
+      "version": "Python 3.12.13",
+      "sha256": "f64cf6322e4f20cd0458aab89c0d332895817bb8f243b943109b6a957582fd5d"
+    },
+    "workspace_wrapper": {
+      "path": "scripts/agent_workspace.py",
+      "sha256": "bc59ae0029508ad57703558022e7d583b18328c5ca2b7b94574fd4ec6ec64d86"
+    },
+    "emscripten": "6.0.9 (4e4223852a0835923411059a3929907d7df1232e)",
+    "cmake": "3.31.6",
+    "ninja": "1.13.0.git.kitware.jobserver-pipe-1"
+  },
+  "execution": {
+    "workspace_managed": true,
+    "command": "node build/browser/pokemon_stadium_c0_trace.js --probe catalog assets-local/stadium-c0-20261006/GrPs.usd",
+    "timeout_seconds": 60,
+    "elapsed_seconds": 0.499,
+    "child_exit_code": 0,
+    "runner_exit_code": 0,
+    "timed_out": false,
+    "passed": true,
+    "checked_source_world_shutdown": true,
+    "raw_result_sha256": "8c6d2ba110cbe2c3cf4fd4f1fb2f63a4339d5fd89af905b4cfd4188d0d5ca530",
+    "stdout": {
+      "bytes": 687,
+      "sha256": "c8656269680cf3d6395369949124d58618bd9b4919e408ad5dd2fe772ce7a2ce"
+    },
+    "stderr": {
+      "bytes": 180,
+      "sha256": "d4d4862c41dde60ba062bd926e007c5f4e02a8471607d557b0ba63f2b5f91d0e",
+      "classification": "Two allowed Emscripten heap-growth diagnostics; no unexpected stderr lines."
+    }
+  },
+  "observations": {
+    "typed_roots_present": [
+      "map_head",
+      "coll_data",
+      "grGroundParam",
+      "ALDYakuAll",
+      "map_ptcl",
+      "map_texg",
+      "yakumono_param",
+      "quake_model_set"
+    ],
+    "itemdata": {
+      "symbol_present": true,
+      "root_word": 0,
+      "relocated": false,
+      "decoded_items": 0,
+      "interpretation": "Symbol exists with a null root; this is not an authored empty list."
+    },
+    "ground_light_source_counts_match_native": true,
+    "ground_light_table_pointer_counts": [
+      2,
+      2,
+      2,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      0
+    ],
+    "ground_light_table_pointer_count_sum": 8,
+    "ground_light_count_semantics": "Per-entry authored pointer slots; aliased pointer values count once per slot, not once per unique descriptor.",
+    "light_override_rows": "Separate map-level light_override_table rows; these are not Ground-list slots.",
+    "native_map_published": false,
+    "particle_bank_published": false,
+    "map_plit": "Symbol present but not separately owned on this native-map route.",
+    "source_data_unchanged": true
+  },
+  "historical_correction": {
+    "original_packet_sha256": "a7b6176ef9a3316ce322878cf2ba594e3bfb878e01ea28c2622e17bbe5a22486",
+    "original_failed_result_sha256": "6556fcec233725ce78b12f49ab808a3a45dfa2e45d106003e8876e5b07080e6a",
+    "original_fixed_expectation": 24,
+    "original_observation": 8,
+    "source_review_conclusion": "The 24 count belongs to the separate bounded map light_override_table rows. The correct Ground pointer-slot vector is derived from each authored source entry and checked entry-by-entry against DatNativeMap::source_light_counts().",
+    "corrected_packet_sha256": "b982fc7be2d201ac9d1cd61a93f37a5b46f21cee64b3a3319223ce96a305150d",
+    "independent_root_review_sha256": "39f5db50156cc759fc12b952936087c9b14e428ff61bb5fa3f7ebad1734e0d29",
+    "source_contract_review_sha256": "941dc094ee87934311e37ca103d731d3907d9e8728a0c7ecc80f54720a5a0cd8"
+  },
+  "exclusions_and_next_boundary": {
+    "excluded": [
+      "No E8 source archive lookup or actual C1 selected-file request observation.",
+      "No stage-map or particle-bank publication, Stage_8022524C, on_init, or stage callbacks.",
+      "No SIS query, browser, gameplay, readiness, or admission claim.",
+      "No full test suite or Release build."
+    ],
+    "open_boundary": "The next Stadium C1 source-lookup boundary remains the actual E8 request and selected-file closure, with an execution stop before Stage_8022524C/on_init and teardown. This catalog result does not close that gap; playable Stadium remains disabled."
+  }
+}
