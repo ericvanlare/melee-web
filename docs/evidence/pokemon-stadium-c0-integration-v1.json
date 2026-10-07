@@ -73,6 +73,35 @@
       ]
     }
   },
+  "retained_validation_artifacts": {
+    "manifest": {
+      "path": "artifact-manifest.json",
+      "bytes": 4668,
+      "sha256": "f0c5df2d2a94aeae2dceba93011157c1e03855ac75cc80e4f8022b35606e543e"
+    },
+    "logs": [
+      {
+        "path": "logs/full-suite.stdout.log",
+        "bytes": 4447,
+        "sha256": "442f577b39aa46b06a3f3c5388939c03a0fc085ad742f39eaef81fe6adcc336e"
+      },
+      {
+        "path": "logs/full-suite.stderr.log",
+        "bytes": 358195,
+        "sha256": "289ccd9a3d01bf8628cd1b0e2a6a18dbb5e1d69b2afb0f7f0b556cdc8558d44c"
+      },
+      {
+        "path": "logs/release-runtime.stdout.log",
+        "bytes": 16609,
+        "sha256": "2c8e6097442c347b231dc431d11710b7e6dec44ce5810534f9cb0336a770d69f"
+      },
+      {
+        "path": "logs/release-runtime.stderr.log",
+        "bytes": 1519,
+        "sha256": "21c6fec15fe4097868f5576455de36b5f8bdc50c0683c3849e8c4ec9eb6ec8fa"
+      }
+    ]
+  },
   "catalog_trace_reference": "pokemon-stadium-c0-typed-catalog-v1.json",
   "exclusions": [
     "No C0 catalog trace rerun.",
