@@ -22,7 +22,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="optional browser completion report with bound final_scene")
     parser.add_argument("--scope", choices=("whole-session", "v10-first-setup-tick0",
                                             "v10-first-positive-match-frame",
-                                            "v10-first-match-clock-ge60"),
+                                            "v10-first-match-clock-ge60",
+                                            "v10-first-match-clock-boundary"),
                         default="whole-session", help="comparison scope (default: whole-session)")
     parser.add_argument("--expectations", type=Path,
                         help="frozen expectations packet for a bounded v10 prefix scope")
@@ -36,6 +37,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="bounded first-positive match-frame source audit for its explicit v10 scope")
     parser.add_argument("--clock60-boundary-audit", type=Path,
                         help="bounded first-match clock-60 source audit for its explicit v10 scope")
+    parser.add_argument("--match-clock-boundary-audit", type=Path,
+                        help="bounded terminal match-clock source audit for its explicit v10 scope")
     parser.add_argument("--browser-capture-report", type=Path,
                         help="browser capture wrapper report for the bounded v10 scope")
     parser.add_argument("--browser-producer-manifest", type=Path,
@@ -53,7 +56,8 @@ def main(argv: list[str] | None = None) -> int:
                            browser_capture_report=args.browser_capture_report,
                            browser_producer_manifest=args.browser_producer_manifest,
                            positive_boundary_audit=args.positive_boundary_audit,
-                           clock60_boundary_audit=args.clock60_boundary_audit)
+                           clock60_boundary_audit=args.clock60_boundary_audit,
+                           match_clock_boundary_audit=args.match_clock_boundary_audit)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(json.dumps({key: value for key, value in report.items()

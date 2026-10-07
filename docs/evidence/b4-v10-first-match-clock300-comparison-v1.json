@@ -1,0 +1,353 @@
+{
+  "capture": {
+    "bounded_stop": {
+      "child_exit_code": 1,
+      "exported_cursor": 1615,
+      "manual_unload_incomplete_outcome": true,
+      "observed_cursor": 1614,
+      "owner_exit_code": 1,
+      "requested_cursor": 1608
+    },
+    "browser_errors": 0,
+    "browser_trace": {
+      "artifact": "capture-output/retail-port.jsonl",
+      "bytes": 4238837,
+      "frame_indices": [
+        0,
+        1614
+      ],
+      "session_frame_count": 1615,
+      "sha256": "ad3d896a3cb852f4cfbbca7685281f73bf5db4d764ecbcfad5e0ae91516f2d78"
+    },
+    "capture_packet_sha256": "c766fcb2194f80617ae11060ead02b397aa1682aeccf700aa09fd862b30f8e2c",
+    "capture_producer_manifest_sha256": "4a4790f6d36f43febb0fa430754815a0003b5dbee8e6b4532855c4b9cd77079d",
+    "capture_report": {
+      "artifact": "capture-output/report.json",
+      "bytes": 1767759,
+      "sha256": "897f9b3e2a9e35c9b7a0ce23e2d5ac477f14edf1c25c108016ce393381c24a89"
+    },
+    "disc_identity_recorded_at_capture": {
+      "bytes": 1449165376,
+      "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+    },
+    "failure_log": {
+      "artifact": "capture-output/failure.txt",
+      "pre_stop_browser_errors_empty": true,
+      "pre_stop_unexpected_requests_empty": true,
+      "reported_errors": [
+        "whole-session final CSS was not entered",
+        "Manual unload stopped the replay",
+        "incomplete input timeline",
+        "source tick/draw count mismatch"
+      ],
+      "sha256": "638310a0b034f9cf42e44eadcbdecbcc666de3d5e5fc6acff40aaca6f66891ae"
+    },
+    "pre_and_post_32_artifact_inventories_passed": true,
+    "preserved_capture_artifacts": {
+      "all_hashes_verified_before_build_mutation": true,
+      "artifact_count": 32,
+      "manifest_artifact": "preserved-runtime-artifact-manifest-v1.json",
+      "manifest_sha256": "4542e6b973392555ddacca56d25ff6f509dd2da7e98154e30654ac648956f2cb",
+      "private_run_id": "b4-clock300-capture-artifacts-retained-20261007-7127265-20261007-081641-c3c462b6"
+    },
+    "private_run_id": "b4-match-clock300-browser-capture-prep-20261007-7127265",
+    "producer": {
+      "base_main": "789de9b2945b976fff665813bfc3e8a72ad0703f",
+      "commit": "7127265d1e1020087b6ece64b36bae77b346584e",
+      "tree": "031614ed339fea3b992440fb770d5bc3df87477a"
+    },
+    "producer_manifest_schema": "melee-web-b4-first-match-clock300-browser-producer-v1",
+    "release_runtime_artifact_manifest": {
+      "artifact": "runtime-artifact-manifest-v1.json",
+      "artifact_count": 32,
+      "sha256": "97d7e21550c1b42406f72fba3f9096502d2268e8fc75e723a79456602d2b3bad"
+    },
+    "result": "incomplete",
+    "retail_browser_report": {
+      "artifact": "capture-output/retail-browser-report.json",
+      "bytes": 18483,
+      "sha256": "39d3ef409007aa01ecbdb288e8d5a41696dd946ddaae559e8e9d7f815b7a3acb"
+    },
+    "root_capture_review_sha256": "0c606427b3bd9dff6bcc54345fab7df547a13c44ab7db5cd770478e0748d6de8",
+    "runtime_data": {
+      "bytes": 3674112,
+      "content_opened_during_comparison": false,
+      "freshly_rehashed_during_comparison": false,
+      "loaded_and_hash_verified_during_capture": true,
+      "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+    },
+    "scene_frame_counts": {
+      "css": 937,
+      "match": 431,
+      "sss": 247
+    },
+    "timing_pause_resumes": 0,
+    "unexpected_requests": 0
+  },
+  "comparison": {
+    "boundary_result": "equivalent",
+    "browser_provenance_preflight_sha256": "d9b2970bbac260a840afa81f94a738a332401f50b9ace5853a0ffe420192e330",
+    "cli_tool_sha256": "4d2b2ac64be5ae31885f8f781c5dc195f07340e1c0b5940dd4fdc652b746808f",
+    "comparator_tool_sha256": "85d3b9a90cc2eebd65e1cec1bad7606320e5a4d46e27c54b0f72201a4bd3ec6e",
+    "comparison_scope": {
+      "browser_export_rows_validated_to_eof": 1615,
+      "browser_rows_after_target_shape_only": 7,
+      "css_sss_frames_input_order_only": 1184,
+      "match_browser_frame_range": [
+        1184,
+        1607
+      ],
+      "match_source_tick_range": [
+        0,
+        423
+      ],
+      "match_state_fields_compared": [
+        "rng",
+        "match_frame",
+        "pad_state_hex",
+        "fighters",
+        "fighter_entities"
+      ],
+      "match_ticks_compared": 424,
+      "nonmatch_fields_compared": [],
+      "setup_fields_compared": [
+        "rng",
+        "match_frame",
+        "pad_state_hex",
+        "fighters",
+        "fighter_entities",
+        "declared_setup"
+      ],
+      "setup_records_compared": 1,
+      "terminal_match_frame": 300
+    },
+    "complete": false,
+    "elapsed_seconds": 0.5672244580928236,
+    "execution_receipt": {
+      "artifact": "clock300-comparison-run-v1.json",
+      "sha256": "49ea8b251cc6ab4162c2f029b623fb791f2e038f1ea33bef0213cea68e1cc90e"
+    },
+    "exit_code": 1,
+    "expectations_sha256": "b0f49845d2ad762d271dd0d869ffec4328906bef3da32a02c197834986615177",
+    "first_difference": null,
+    "historical_browser_producer_schema_accepted_only_for_this_scope": "melee-web-b4-first-match-clock300-browser-producer-v1",
+    "launch_packet_sha256": "20a3bb28649bca5b452c0b25109ddc112eaa37ebe384b57519b077b64326655b",
+    "previous_checkpoints_rejoined_before_continuing": [
+      4735,
+      5030
+    ],
+    "producer": {
+      "base_main": "789de9b2945b976fff665813bfc3e8a72ad0703f",
+      "branch": "codex/b4-match-clock-boundary-20261007",
+      "commit": "fc4222dbe78bf2300ee0d041a72d4f71a4938f9f",
+      "tree": "54623478330fc56bf94fa671587f638923706462"
+    },
+    "report": {
+      "artifact": "clock300-comparison-report-v1.json",
+      "bytes": 15882,
+      "sha256": "567e3dccc3c9986e973843f540ee59bb14717a81297783d408fbc2b3634fa849"
+    },
+    "result": "incomplete",
+    "root_launch_review_sha256": "ee6a1d984316c5f1ec517a33207a9c5942a5b0a30f7d36665942c333dfafbf34",
+    "root_result_review_sha256": "8e6f112281fbef23578aa0dcdc3a7a28aa9b495a2da78f08a930e8f80e697637",
+    "scope": "v10-first-match-clock-boundary",
+    "source_full_hash_recomputed": false,
+    "source_stat_stable": true,
+    "timed_out": false,
+    "whole_session_equivalent": false
+  },
+  "current_integration": {
+    "artifact_diff_vs_capture": [
+      {
+        "bytes": 15740066,
+        "capture_sha256": "e0d3dd97d8c944e89cff3359bc294fbaacdee17f24957153fc0e8442a5de9879",
+        "integration_sha256": "56d9a93893df69cdafe1d940a0f0ad93b7e01faf89d800a533acd4cc70f34b30",
+        "name": "gameplay_menu_browser.wasm"
+      }
+    ],
+    "capture_artifact_preservation_manifest_sha256": "4542e6b973392555ddacca56d25ff6f509dd2da7e98154e30654ac648956f2cb",
+    "integration_build_used_for_capture_or_comparison": false,
+    "post_validation_changes": "Documentation only.",
+    "private_run_id": "b4-clock300-integration-validation-20261007-7127265-20261007-081744-40b9fd4c",
+    "producer": {
+      "base_main": "2bb56a5f1707f2723f51d1a23e65e73f8658da28",
+      "commit": "ad8c94e1726c1130b2020ac729cf7b3f80e248cb",
+      "tree": "bad0e5d617198b814cb6af5651daddaf3d1dae87"
+    },
+    "python_suite": {
+      "elapsed_seconds": 366.732,
+      "exit_code": 0,
+      "log_artifact": "full-python-suite.log",
+      "log_sha256": "1b8ad216038518136d7efa7d0fd655c1872110d7e47872cfa1239bb944a549b4",
+      "result_artifact": "full-python-suite-result-v2.json",
+      "result_sha256": "6dc57ace8c546648fe76fc1cccff39df32996c1df8ebbe29f791e7e93b2cbdfc",
+      "skipped": 145,
+      "status": "pass",
+      "tests_run": 2001
+    },
+    "rebase_range_diff": "Both owned commits preserved exactly: 7127265 = 8024805; fc4222d = ad8c94e.",
+    "release_runtime_build": {
+      "artifact_count": 32,
+      "artifact_manifest": "release-runtime-artifact-manifest-integration-v1.json",
+      "artifact_manifest_sha256": "f0391377b37ca3f3c0896588a6bc14e305af92440d2bc9b2cd61d723cd0f01ec",
+      "configuration": "Release",
+      "default_off_gates_verified": true,
+      "jobs": "build default; --jobs not supplied",
+      "log_artifact": "release-runtime-build.log",
+      "log_sha256": "2386aa93d0918d003ef7e7d345f1983e93821d4469b967cf3a78cad649016d18",
+      "status": "pass",
+      "target": "runtime"
+    }
+  },
+  "date": "2026-10-07",
+  "issue": 208,
+  "limitations": [
+    "State agreement covers only the compared setup and contiguous first-match ticks through match_frame 300.",
+    "CSS/SSS frames establish input order only; their state fields are not compared.",
+    "Seven exported match rows after cursor 1608 receive shape/order validation only; their state is not compared.",
+    "The source/browser run is incomplete and does not establish later match frames, later matches, Results, return to CSS, or whole-session accuracy.",
+    "No pixel, PCM, timing, live-input, performance, physical-controller, tournament-readiness, or admission claim follows."
+  ],
+  "preparation_failures_retained": [
+    {
+      "artifact": "packet-preflight-failure-v1.log",
+      "note": "Pinned interpreter version was emitted on stderr; the first verifier read stdout only.",
+      "private_run_id": "b4-clock300-source-audit-proposal-20261007-20261007-055105-be1c2721",
+      "sha256": "6eb46cfd8db3004e34e0fb0b0f384fdc327385d9932b85c7fab01013eb01e3e9",
+      "stage": "source-only clock300 packet verification"
+    },
+    {
+      "artifact": "packet-preflight-failure-v2.log",
+      "note": "Second verifier compared the full version string instead of the numeric version.",
+      "private_run_id": "b4-clock300-source-audit-proposal-20261007-20261007-055105-be1c2721",
+      "sha256": "6bd1b41cb0c3bdb28b8f6c75094d311c9338a3c899a450b9467f021a058d89a7",
+      "stage": "source-only clock300 packet verification"
+    },
+    {
+      "artifact": "packet-preparation-failure-v1.json",
+      "note": "Historical first-positive checkpoint key was incorrect.",
+      "private_run_id": "b4-match-clock300-browser-capture-prep-20261007-7127265",
+      "sha256": "5f55d82d1ebc70770d140f989387fdec19a9a8ece362b420cb30cc350537def2",
+      "stage": "capture packet assembly"
+    },
+    {
+      "artifact": "packet-preparation-failure-v2.json",
+      "note": "Historical first-positive report lacked source_tick_seq; the later clock60 audit supplied it.",
+      "private_run_id": "b4-match-clock300-browser-capture-prep-20261007-7127265",
+      "sha256": "c602e8adeab889c1d2eaee3b3456a0741305f9d35ee871df1deecd9ad6707e31",
+      "stage": "capture packet assembly"
+    },
+    {
+      "artifact": "packet-preparation-failure-v3.json",
+      "note": "Source audit prefix included an additional hash_basis field.",
+      "private_run_id": "b4-match-clock300-browser-capture-prep-20261007-7127265",
+      "sha256": "92fe628c6faaa3ed3803a20ef71d3381faa0fc7a973f01c79345e1c53582fa95",
+      "stage": "capture packet assembly"
+    },
+    {
+      "artifact": "comparison-packet-preparation-failure-v1.json",
+      "note": "A local expected-hash literal was mistyped; no capture input was changed.",
+      "private_run_id": "b4-match-clock300-browser-capture-prep-20261007-7127265",
+      "sha256": "4c9ecdd2d05fc7b4fef2be500482ff6742d9b05eb583bd4a5e1c4fca339a3ef9",
+      "stage": "comparison packet identity check"
+    },
+    {
+      "artifact": "clock300-browser-provenance-preflight-v1.json",
+      "note": "Historical producer schema was not yet admitted; no MWRO content or iterator was opened.",
+      "private_run_id": "b4-match-clock300-browser-capture-prep-20261007-7127265",
+      "sha256": "466383e1003a18aeedf00a1f5b1167d9123cc59344a4fc5a0e538c0ee6076a2d",
+      "stage": "browser provenance preflight"
+    },
+    {
+      "artifact": "clock300-browser-provenance-preflight-v2.json",
+      "note": "A later expected capture_id lookup failed; no MWRO content or iterator was opened.",
+      "private_run_id": "b4-match-clock300-browser-capture-prep-20261007-7127265",
+      "sha256": "0bc512da14f8a28d59925e9bed86f8e66f588bf959c64530546901706a18a26d",
+      "stage": "browser provenance preflight"
+    },
+    {
+      "artifact": "clock300-comparison-launcher-preparation-failure-v1.json",
+      "note": "Prelaunch receipt key was wrong; comparator argv was not spawned.",
+      "private_run_id": "b4-match-clock300-browser-capture-prep-20261007-7127265",
+      "sha256": "0a63e99c387f5972b414e05f80381313ca8e9a647802bebf35de660cd859b5ba",
+      "stage": "comparison launcher preparation"
+    }
+  ],
+  "schema": "melee-web-b4-v10-first-match-clock300-comparison-v1",
+  "scope": "One bounded original-to-browser comparison for the first match-0 prefix through the first source match_frame at or above 300. The session remains incomplete.",
+  "source": {
+    "bounded_consumed_prefix": {
+      "bytes": 22506388,
+      "cap_bytes": 33554432,
+      "cap_records": 8192,
+      "fresh_sha256": "ef9569c32524aa79443a998867c4c418a2cfd8b21719ed24b03fc966ded025ef",
+      "last_source_sequence": 6230,
+      "records": 6231
+    },
+    "capture_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "clock300_source_audit": {
+      "artifact": "clock300-source-audit-v3-final.json",
+      "audit_was_source_only": true,
+      "private_run_id": "b4-clock300-source-audit-proposal-20261007-20261007-055105-be1c2721",
+      "root_review_sha256": "4dfffee101340a3473014c42d47a2076185c8754606d6c254ea6c48ca98fa1e2",
+      "sha256": "503e1d5c54262fa1c3369aae0e950f646890f98dea4598a9823cd1e0d06f34bb"
+    },
+    "clock300_target": {
+      "browser_cursor": 1608,
+      "match_frame": 300,
+      "match_index": 0,
+      "pad_consume_sequence": 6229,
+      "source_sequence": 6230,
+      "source_tick": 423,
+      "timeline_frame_index": 1607
+    },
+    "clock60_rejoin": {
+      "audit_sha256": "c4f2bd73157f36c80c7ad5b11275c205d484608813241d3af94b9462bf3187b1",
+      "browser_cursor": 1368,
+      "fresh_prefix_sha256": "32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77",
+      "match_frame": 60,
+      "pad_consume_sequence": 5029,
+      "prefix_bytes": 12780628,
+      "prefix_records": 5031,
+      "source_sequence": 5030,
+      "source_tick": 183,
+      "timeline_frame_index": 1367
+    },
+    "first_positive_rejoin": {
+      "audit_sha256": "9e74c7018001369295e569ef071427633db53e2a0e6dc1db182c8aa3604d096d",
+      "browser_cursor": 1309,
+      "fresh_prefix_sha256": "24d520abccf98ee109b3cee2ae67767d4363c7e941d688c3534c0cbfdd7cde4a",
+      "match_frame": 1,
+      "pad_consume_sequence": 4734,
+      "prefix_bytes": 10389712,
+      "prefix_records": 4736,
+      "source_sequence": 4735,
+      "source_tick": 124,
+      "timeline_frame_index": 1308
+    },
+    "full_mwro": {
+      "fresh_full_hash_computed": false,
+      "recorded_bytes": 2137257881,
+      "recorded_sha256": "81f8a0a3c8cac644e86be2e07451a5876be08b60ebb4295290a35c8a187c5580",
+      "stat_stable_during_bounded_read": true
+    },
+    "manifest_sha256": "c88f0e2cbd1fd79d28cb9cd554ce1b34ca2b858262d6032a327c08c46b941da7",
+    "recipe": {
+      "bytes": 2241622,
+      "frame_count": 50394,
+      "seed": 3336171383,
+      "sha256": "cb6bf42b6db5595edd3dec9b626988b0c00da6898a989a3e972ced36be13b95b",
+      "version": 10
+    },
+    "report_sha256": "88a8ca551d2077f200fbcf4670836357e508fdb503d7b360e8b3b67654911913",
+    "revision": "GALE01r2",
+    "sequence_id": "melee-fighter-v10-origin-main-20261003-r1",
+    "setup_identity_audit": {
+      "entry_sequence": 4088,
+      "first_tick_sequence": 4115,
+      "setup_sequence": 4113,
+      "sha256": "742a9a6b7317651c654620c1f69c87cff4177a8c9e7eea8c34d596e817af43e8"
+    }
+  },
+  "whole_session_acceptance": false
+}
