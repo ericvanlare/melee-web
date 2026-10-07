@@ -92,19 +92,27 @@
     },
     "runtime_reuse": {
       "runtime_build_performed": false,
-      "reason": "The issue-240 delta from the reviewed base changes only the Python comparator and its tests; no compiled runtime inputs, build configuration, or runtime artifacts changed.",
-      "prior_verified_counts": {
-        "runtime_source_inputs": 60,
-        "release_artifacts": 32,
-        "source_inputs_changed": 0,
-        "artifacts_changed": 0
+      "reason": "Only the Python comparator and its tests changed; the compiled-runtime target input delta is empty.",
+      "owner_review": {
+        "run_id": "b4-nested-ordered-priors-focused-20261007",
+        "artifact": "root-runtime-reuse-v1.json",
+        "sha256": "a48c96f58a59a78402c12fa846d8f3fff8b3b573d4911e46c2aeb3c282007eb4",
+        "checked_head": "23d61fed5001df7cc884b9fd7d4a7ccc5858542f",
+        "implementation_commit": "46ca937674952bc81ecca55df8095594837ec44d",
+        "capture_build_head": "8aa85261e145d4b7d23f3d8fcb72b67e6a36594e",
+        "capture_build_tree": "70f4edbbbeeaa03b9d0f4d5a09b93ec3bbe558bd"
       },
-      "prior_reuse_evidence": {
-        "receipt": "docs/evidence/b4-v10-first-match-clock1000-comparison-v1.json",
-        "validation_commit": "e3220aa2e2da7b17b99dce0999811bd1e66a0814",
-        "verification_sha256": "5c451d49a3c82c1d7f4a044e75f3f6f3ba697d00a6cb8e0d197965108720dc1b"
+      "selected_source_inventory": {
+        "entries_checked": 60,
+        "unchanged": 59,
+        "intentional_changed_path": "tests/test_whole_session_state_compare.py"
       },
-      "current_task_reinventory": "not performed; the retained verified build was not rebuilt or modified by this Python-only change"
+      "release_artifacts": {
+        "checked": 32,
+        "all_match": true
+      },
+      "compiled_runtime_target_input_delta": [],
+      "new_build": false
     }
   },
   "retained_preparation": {
