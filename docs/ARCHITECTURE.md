@@ -302,3 +302,13 @@ session as a desync. Recorded state is never injected to hide one.
 and a delayed checksum. The same protocol runs first over a loopback relay, then
 over a Cloudflare Worker that relays WebSocket traffic for each room, and later
 over a WebRTC data channel with that relay as fallback.
+
+The local functional harness can select `--peer-owner browser` in
+`scripts/net_lockstep_browser.mjs`. Each page then composes the portable core,
+room endpoint and native callbacks in `net_lockstep_browser_peer.mjs`; Node
+orchestrates the recipe and evidence through asynchronous page RPCs. Native
+checksums enter the protocol before a bounded evidence export. Callback and
+export-overflow failures propagate through settled page shutdown. The default
+Node-owned harness remains the regression mode. See the scoped
+[browser-native route evidence](status/2026-10-07-a3-browser-native-full-route.md);
+Internet and live-input acceptance remain separate gates.

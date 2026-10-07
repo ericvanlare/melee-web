@@ -9,10 +9,11 @@
 import fs from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import path from 'node:path';
+import {createRoomId} from './net_lockstep_websocket_relay.mjs';
 import {parseArgs} from 'node:util';
 import {loadBrowserTools} from './browser_tools.mjs';
 import {classifyRoute, collapseConsecutiveScenes, expectedFullSceneOrder, validateFullRoute} from './net_determinism_contract.mjs';
-import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstance} from './net_session_instance.mjs';
+import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstance, browserPeerFacade} from './net_session_instance.mjs';
 import {createTransportCallbackQueue, describeLockstepTransport, describeLockstepTransportAttempt,
   openLockstepPeerPair, recordAvailableTransportMetrics} from './net_lockstep_transport.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
@@ -32,6 +33,7 @@ const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, script: {type: 'string'}, out: {type: 'string'},
   playwright: {type: 'string'}, seed: {type: 'string'}, scenario: {type: 'string', default: 'probe'},
   'relay-url': {type: 'string'},
+  'peer-owner': {type: 'string', default: 'node'},
   'source-ticks': {type: 'string', default: '8'}, 'timeout-ms': {type: 'string', default: '3600000'},
   'stall-ms': {type: 'string', default: '120000'}, 'poll-ms': {type: 'string', default: '50'},
   'delay-ms': {type: 'string', default: '250'}, 'flip': {type: 'string'},
@@ -56,6 +58,9 @@ if (!values.url || !values.disc || !values.script || !values.out || !values.seed
 if (!['probe', 'positive', 'flip', 'disconnect'].includes(values.scenario))
   throw Error('--scenario must be probe, positive, flip, or disconnect');
 const scenario = values.scenario;
+if (!['node', 'browser'].includes(values['peer-owner'])) throw Error('--peer-owner must be node or browser');
+const browserOwned = values['peer-owner'] === 'browser';
+if (browserOwned && !values['relay-url']) throw Error('Browser-owned peers require --relay-url');
 const url = new URL(values.url);
 if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
@@ -111,6 +116,7 @@ const pairResults = {
   scope: probe ? 'CSS network-wait and duplicate-contribution probe' :
     scenario === 'positive' ? 'full original-route functional lockstep' : `bounded ${scenario} control`,
   exclusions: ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'two-machine Internet acceptance'],
+  peer_owner: values['peer-owner'],
   input_delay: LOCKSTEP_DELAY,
   neutral_prefix: {source_ticks: LOCKSTEP_DELAY, player_ports: 'neutral PADStatus', unowned_ports: 'no-controller'},
   script: {name: path.basename(values.script), sha256: scriptHash, frame_count: inputCount,
@@ -318,10 +324,17 @@ async function finishRouteBoundaryEvidence(role, phase, cursor) {
   };
 }
 
+async function refreshBrowserPeers() {
+  if (browserOwned && peers) {
+    await Promise.all(['alpha', 'beta'].map(role => peers[role].refresh()));
+    if (peers.alpha.terminal?.kind === 'disconnect' || peers.beta.terminal?.kind === 'disconnect') disconnectHandled = true;
+  }
+}
+
 async function drainChecksums(role, peer) {
   const instance = instances[role], result = instanceRows[role];
   for (;;) {
-    const drained = await instance.drain(512);
+    const drained = browserOwned ? await peer.drain() : await instance.drain(512);
     for (let index = 0; index < drained.count; ++index) {
       const record = drained.bytes.subarray(index * NET_RECORD_BYTES, (index + 1) * NET_RECORD_BYTES);
       const tick = record.readUInt32LE(0);
@@ -330,7 +343,7 @@ async function drainChecksums(role, peer) {
       result.records++;
       const parsed = parseNetChecksum(record);
       result.scene_runs.push({tick: parsed.tick, scene: parsed.scene});
-      if (!peer.terminal) await peer.addChecksum(record);
+      if (!browserOwned && !peer.terminal) await peer.addChecksum(record);
     }
     if (drained.count < 512) break;
   }
@@ -367,11 +380,14 @@ async function publishAllInputs(alpha, beta) {
     await beta.addLocalInputs(right, {nativeOverrides: rightOverrides});
     const ackEnd = end - 1;
     const started = Date.now();
-    while (alpha.remoteAckInput < ackEnd || beta.remoteAckInput < ackEnd) {
+    for (;;) {
+      await refreshBrowserPeers();
+      if (alpha.remoteAckInput >= ackEnd && beta.remoteAckInput >= ackEnd) break;
       if (Date.now() > deadline || Date.now() - started > stallMs)
         throw Error(`Loopback input acknowledgement stalled before tick ${ackEnd}`);
       await sleep(2);
     }
+    if (browserOwned) { await drainChecksums('alpha', alpha); await drainChecksums('beta', beta); }
   }
 }
 
@@ -386,11 +402,14 @@ async function publishDisconnectPrefix(alpha, beta) {
     }
     await alpha.addLocalInputs(left); await beta.addLocalInputs(right);
     const ackEnd = end - 1, started = Date.now();
-    while (alpha.remoteAckInput < ackEnd || beta.remoteAckInput < ackEnd) {
+    for (;;) {
+      await refreshBrowserPeers();
+      if (alpha.remoteAckInput >= ackEnd && beta.remoteAckInput >= ackEnd) break;
       if (Date.now() > deadline || Date.now() - started > stallMs)
         throw Error(`Loopback input acknowledgement stalled before disconnect tick ${ackEnd}`);
       await sleep(2);
     }
+    if (browserOwned) { await drainChecksums('alpha', alpha); await drainChecksums('beta', beta); }
   }
   pairResults.disconnect_missing_input_tick = count;
 }
@@ -416,6 +435,7 @@ async function pollRun() {
   polling: while (Date.now() <= deadline) {
     if (transportErrors.length)
       throw Error(`Loopback receive callback failed: ${JSON.stringify(transportErrors[0])}`);
+    await refreshBrowserPeers();
     if (peers.alpha.terminal || peers.beta.terminal) break;
     const rows = {};
     for (const role of ['alpha', 'beta']) {
@@ -423,6 +443,7 @@ async function pollRun() {
       rows[role] = status;
       if (scenario === 'positive') captureObservedRouteBoundary(role, native.phase);
       await drainChecksums(role, peers[role]);
+      await refreshBrowserPeers();
       // Checksum delivery can end either peer while the browser drain awaits.
       if (peers.alpha.terminal || peers.beta.terminal) break polling;
       await peers[role].setNativeProgress(status.cursor);
@@ -442,7 +463,8 @@ async function pollRun() {
         Math.min(rows.alpha.cursor, rows.beta.cursor) >= disconnectAt) {
       disconnectInjected = true;
       instanceRows.injected_disconnect = {role: 'beta', source_tick: disconnectAt, at_ms: Date.now()};
-      relay.beta.close();
+      if (browserOwned) await relay.beta.close(false);
+      else relay.beta.close();
     }
     // The start handshake confirms source time before asynchronous input0
     // delivery. Preserve those startup wait counters; select the actual
@@ -475,6 +497,7 @@ async function pollRun() {
         [3, localSample('beta', 3)], [4, localSample('beta', 4)], [5, localSample('beta', 5)]], {repeat: true});
       instanceRows.probe_released = true;
     }
+    await refreshBrowserPeers();
     if (scenario === 'disconnect' && disconnectInjected &&
         (peers.alpha.terminal?.kind === 'disconnect' || peers.beta.terminal?.kind === 'disconnect')) break;
     if ((scenario === 'flip') && (peers.alpha.terminal?.kind === 'desync' || peers.beta.terminal?.kind === 'desync')) break;
@@ -506,6 +529,7 @@ async function pollRun() {
 async function waitForTerminalPair(kind) {
   const terminalDeadline = Math.min(deadline, Date.now() + stallMs);
   while (Date.now() <= terminalDeadline) {
+    await refreshBrowserPeers();
     const [alpha, beta] = await Promise.all(['alpha', 'beta'].map(role => instances[role].status()));
     if (peers.alpha.terminal?.kind === (kind === TERMINAL.desync ? 'desync' : 'disconnect') &&
         peers.beta.terminal?.kind === (kind === TERMINAL.desync ? 'desync' : 'disconnect') &&
@@ -521,7 +545,7 @@ async function run() {
   pairResults.browser = path.basename(browserPath);
   pairResults.playwright = playwrightPath;
   await Promise.all(['alpha', 'beta'].map(role => fs.mkdir(childDirectory(role))));
-  relay = await openLockstepPeerPair({relayUrl: values['relay-url'],
+  if (!browserOwned) relay = await openLockstepPeerPair({relayUrl: values['relay-url'],
     onEndpointError(role, error) {
       const row = {role, message: String(error?.stack || error?.message || error)};
       transportErrors.push(row);
@@ -546,7 +570,7 @@ async function run() {
       return disconnectTask;
     },
   });
-  pairResults.transport = describeLockstepTransport(relay, {relayUrl: values['relay-url']});
+  if (!browserOwned) pairResults.transport = describeLockstepTransport(relay, {relayUrl: values['relay-url']});
   instances = {};
   instanceRows.alpha = {role: 'alpha', local_port: 0, remote_port: 1, records: 0, timing_resumes: [], scene_runs: [], last_wait_episodes: 0,
     route_boundary_captures: [], route_boundary_misses: []};
@@ -554,10 +578,13 @@ async function run() {
     route_boundary_captures: [], route_boundary_misses: []};
   const openTimeout = Math.min(180000, deadline - Date.now());
   if (openTimeout <= 0) throw Error('No run deadline remains for browser startup');
+  const peerModuleHashes = browserOwned ? Object.fromEntries(await Promise.all([
+    'net_lockstep_browser_peer.mjs', 'net_lockstep_core.mjs', 'net_lockstep_websocket_relay.mjs',
+  ].map(async name => [name, sha256(await fs.readFile(new URL(name, import.meta.url)))]))) : null;
   const opened = await Promise.allSettled(['alpha', 'beta'].map(role => openNetInstance({
     chromium, launchOptions, url: values.url, disc: values.disc,
     userDataDir: path.join(childDirectory(role), 'profile'), label: role,
-    timeoutMs: openTimeout, deadline,
+    timeoutMs: openTimeout, deadline, peerModuleHashes,
   })));
   // Transfer every successful launch before reporting a sibling failure so
   // the shared finalizer still owns its source session and browser context.
@@ -603,7 +630,26 @@ async function run() {
     },
   };
   peers = {};
-  for (const role of ['alpha', 'beta']) {
+  if (browserOwned) {
+    const roomId = createRoomId();
+    await Promise.all(['alpha', 'beta'].map(async role => {
+      const initial = await instances[role].createBrowserPeer({role, sourceTicks, inputTicks: usedInputs,
+        relayUrl: values['relay-url'], roomId, agreement: agreements[role], timeoutMs: Math.min(stallMs, deadline - Date.now())});
+      peers[role] = browserPeerFacade(instances[role], initial);
+    }));
+    pairResults.browser_peer_modules = {expected: peerModuleHashes, responses: {
+      alpha: await instances.alpha.freezePeerModuleIdentity(), beta: await instances.beta.freezePeerModuleIdentity(),
+    }};
+    relay = {alpha: peers.alpha, beta: peers.beta, transport: peers.alpha.transport,
+      async close() {
+        await Promise.all(['alpha', 'beta'].map(role => peers[role].armClose()));
+        const rows = await Promise.allSettled(['alpha', 'beta'].map(role => peers[role].close(true)));
+        const errors = rows.filter(row => row.status === 'rejected').map(row => row.reason);
+        if (errors.length) throw new AggregateError(errors, 'Browser peer pair close failed');
+      }};
+    pairResults.transport = describeLockstepTransport(relay, {relayUrl: values['relay-url']});
+  }
+  if (!browserOwned) for (const role of ['alpha', 'beta']) {
     peers[role] = new LockstepPeer({role, sourceTicks, inputTicks: usedInputs,
       pushFrame: (tick, frames) => instances[role].pushIndexed(tick, frames),
       onReady: async () => {
@@ -617,15 +663,20 @@ async function run() {
       },
     });
   }
-  for (const role of ['alpha', 'beta']) {
+  if (!browserOwned) for (const role of ['alpha', 'beta']) {
     const endpoint = relay[role];
     endpoint.onMessage(text => peers[role].receive(text));
     peers[role].attach(text => endpoint.send(text));
   }
-  await peers.alpha.start(agreements.alpha); await peers.beta.start(agreements.beta);
+  if (browserOwned) await Promise.all([peers.alpha.start(agreements.alpha), peers.beta.start(agreements.beta)]);
+  else { await peers.alpha.start(agreements.alpha); await peers.beta.start(agreements.beta); }
   const startDeadline = Math.min(deadline, Date.now() + stallMs);
   while ((!peers.alpha.ready || !peers.beta.ready) && Date.now() < startDeadline &&
-      !peers.alpha.terminal && !peers.beta.terminal) await sleep(pollMs);
+      !peers.alpha.terminal && !peers.beta.terminal) {
+    await refreshBrowserPeers();
+    await sleep(pollMs);
+  }
+  await refreshBrowserPeers();
   if (peers.alpha.terminal || peers.beta.terminal)
     throw Error(`Start identity handshake failed: ${JSON.stringify([peers.alpha.terminal, peers.beta.terminal])}`);
   if (!peers.alpha.ready || !peers.beta.ready) throw Error('A2 start identity handshake timed out');
@@ -689,14 +740,24 @@ async function run() {
   }
   pairResults.wait_observations = waitObservations;
   pairResults.transport_errors = transportErrors;
+  await refreshBrowserPeers();
   pairResults.endpoint_errors = {alpha: relay.alpha.errors, beta: relay.beta.errors};
   pairResults.peers = ['alpha', 'beta'].map(role => {
     const status = instanceRows[role];
     return {
       ...status,
       protocol: peers[role].summary(),
+      ...(browserOwned ? {native_checksum_ownership: peers[role].checksumOwnership} : {}),
     };
   });
+  if (browserOwned && (probe || scenario === 'positive')) {
+    for (const role of ['alpha', 'beta']) {
+      const ownership = peers[role].checksumOwnership;
+      if (ownership.active_native_records_submitted_before_export !== sourceTicks ||
+          ownership.post_terminal_native_evidence_records !== 0)
+        throw Error(`${role} active native checksum ownership differs: ${JSON.stringify(ownership)}`);
+    }
+  }
   if (probe) {
     const alphaWait = instanceRows.alpha.target_wait;
     if (!alphaWait || !instanceRows.alpha.wait_hold || !instanceRows.probe_released)
@@ -805,6 +866,23 @@ try {
   }
 } finally {
   intentionalRelayClose = true;
+  if (browserOwned && instances) {
+    for (const [role, instance] of Object.entries(instances)) {
+      try { await instance.freezePeerModuleIdentity(); }
+      catch (error) { closeNotes.push(`${role} final module identity: ${String(error.message || error)}`); }
+    }
+  }
+  if (browserOwned && relay) {
+    try { await relay.close(); pairResults.relay_closed = true; }
+    catch (error) { closeNotes.push(`browser peer close: ${String(error.stack || error)}`); }
+  } else if (browserOwned && instances) {
+    // Partial setup still owns page endpoints, even if no pair facade was built.
+    await Promise.allSettled(Object.values(instances).map(instance => instance.armPeerClose()));
+    for (const instance of Object.values(instances)) {
+      try { await instance.closePeer(true); }
+      catch (error) { closeNotes.push(`partial browser peer close: ${String(error.message || error)}`); }
+    }
+  }
   await transportCallbackQueue.drain();
   for (const role of ['alpha', 'beta']) {
     const instance = instances?.[role];
@@ -829,6 +907,10 @@ try {
         const closed = await instance.close();
         if (closed !== true) closeNotes.push(`${role} browser close did not confirm completion`);
       } catch (error) { closeNotes.push(`${role} browser close: ${String(error.message || error)}`); }
+      if (browserOwned) {
+        try { instanceRows[role].final_peer_module_responses = await instance.finishPeerModuleIdentity(); }
+        catch (error) { closeNotes.push(`${role} closed-browser module identity: ${String(error.message || error)}`); }
+      }
       instanceRows[role].browser_closed = instance.closed;
       instanceRows[role].browser_diagnostics = instance.errors;
       instanceRows[role].page_errors = instance.errors.filter(row => row.kind === 'pageerror' || row.kind === 'console');
@@ -846,7 +928,7 @@ try {
       catch (error) { closeNotes.push(`${role} instance report write: ${String(error.message || error)}`); }
     }
   }
-  if (relay) {
+  if (relay && !browserOwned) {
     recordAvailableTransportMetrics(pairResults.transport, relay);
     try {
       await relay.close();
