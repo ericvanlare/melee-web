@@ -1216,9 +1216,12 @@ void run_stadium_c1_context_preflight(
     check(melee_web_menu_host_snapshot_card_data(
               host, 0, save_before.data(), save_before.size(), error,
               sizeof(error)), error);
-    check(melee_web_source_files_active() && _Toy_sbss_804D6ED0 != nullptr &&
-              (Toy_804A284C[3] & 4) != 0,
-          "C1 source handoff lost its menu files, Toy archive alias, or baseline category bit");
+    check(melee_web_source_files_active(),
+          "C1 source handoff lost its menu files");
+    check(_Toy_sbss_804D6ED0 == nullptr,
+          "C1 source handoff retained a Toy archive alias past MenuWorld close");
+    check((Toy_804A284C[3] & 4) != 0,
+          "C1 source handoff lost the retained Toy category baseline");
     check_stadium_preflight_stage_empty();
     world->verify_immutable_archives();
     world->close();
