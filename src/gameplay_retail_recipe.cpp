@@ -94,7 +94,7 @@ bool whole_session_cpu_observation_requested = false;
 bool whole_session_cpu_observation_started = false;
 bool whole_session_cpu_observation_finished = false;
 uint32_t whole_session_match_index = 0;
-bool whole_session_v9_active = false;
+bool whole_session_primary_identity_active = false;
 bool whole_session_setup_table_active = false;
 
 constexpr std::array<uint8_t, 0x60> kMilestoneRules = {
@@ -468,10 +468,12 @@ void retail_replay_session_initial(const RetailReplayRecipe& recipe) {
     whole_session_cpu_observation_started = false;
     whole_session_cpu_observation_finished = false;
     whole_session_match_index = 0;
-    whole_session_v9_active = recipe.version == kRetailReplayVersion;
+    whole_session_primary_identity_active =
+        recipe.version == kRetailReplayVersion ||
+        recipe.version == kRetailReplayFighterVersion;
     whole_session_setup_table_active = recipe.version == kRetailReplayVersion ||
                                        recipe.version == kRetailReplayFighterVersion;
-    if (whole_session_v9_active) melee_web_retail_entities_reset();
+    if (whole_session_primary_identity_active) melee_web_retail_entities_reset();
     std::cout << "{\"record\":\"header\",\"schema\":\"melee-web-port-session-diagnostic\","
         "\"version\":1,\"frames_requested\":" << recipe.frames.size()
         << ",\"comparison\":\"not_run\",\"cpu_observations\":\""
@@ -531,7 +533,7 @@ void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing
         retail_replay_validate_match_setup(recipe, whole_session_match_index, actual_setup);
         std::cout << "{\"record\":\"session_match_enter_complete\",";
         melee_web_retail_state();
-        if (recipe.version == kRetailReplayVersion)
+        if (whole_session_primary_identity_active)
             melee_web_retail_entities_index(whole_session_match_index);
         history(recipe);
         if (whole_session_setup_table_active) {
@@ -602,7 +604,7 @@ void retail_replay_frame(const RetailReplayRecipe& recipe, size_t index, unsigne
         scene == kRetailReplayMatch) {
         check(whole_session_match_index > 0,
               "Whole-session match tick preceded its match setup record");
-        if (recipe.version == kRetailReplayVersion)
+        if (whole_session_primary_identity_active)
             melee_web_retail_entities_index(whole_session_match_index - 1);
     }
     history(recipe); std::cout << "}\n";
