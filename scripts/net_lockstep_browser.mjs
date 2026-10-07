@@ -539,7 +539,7 @@ async function pollRun() {
           [role, verifyDisconnectBoundary(rows[role], peers[role].summary(), disconnectAt, publishedInputs)]));
       }
       disconnectInjected = true;
-      instanceRows.injected_disconnect = {role: 'beta', source_tick: disconnectAt, at_ms: Date.now()};
+      pairResults.injected_disconnect = {role: 'beta', source_tick: disconnectAt, at_ms: Date.now()};
       if (browserOwned) await relay.beta.close(false);
       else relay.beta.close();
     }
