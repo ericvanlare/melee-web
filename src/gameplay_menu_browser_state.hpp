@@ -96,6 +96,8 @@ extern bool scoped_assets,asset_committed;
 #if defined(MELEE_WEB_STADIUM_C1A_DIAGNOSTIC)
 extern bool stadium_c1a_armed;
 extern std::string stadium_c1a_observation;
+extern bool asset_selection_valid;
+extern MeleeWebMenuMatchSelection asset_selection;
 #endif
 extern uint32_t asset_generation;
 extern std::vector<std::string> requested_assets;
