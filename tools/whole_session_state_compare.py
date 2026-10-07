@@ -79,6 +79,7 @@ V10_FIRST_SETUP_TICK0_SCOPE = "v10-first-setup-tick0"
 V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE = "v10-first-positive-match-frame"
 V10_FIRST_MATCH_CLOCK_GE60_SCOPE = "v10-first-match-clock-ge60"
 V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE = "v10-first-match-clock-boundary"
+V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE = "v10-first-match-clock-ordered-lineage"
 PRIMARY_STATIC_ENTITY_PROFILE = "primary-static-player-pair-v1"
 FRAME_BYTES = 44
 PORT_BYTES = 11
@@ -110,6 +111,8 @@ V10_PREFIX_RECORD_CAP = 4200
 V10_FIRST_POSITIVE_RECORD_CAP = 8192
 V10_MATCH_CLOCK_RECORD_CAP = V10_FIRST_POSITIVE_RECORD_CAP
 V10_MATCH_CLOCK_REJOIN_FRAME = 300
+V10_ORDERED_LINEAGE_BYTE_CAP = 64 * 1024 * 1024
+V10_ORDERED_LINEAGE_RECORD_CAP = 12000
 V10_BROWSER_EXPORT_RECORD_CAP = 8192
 V10_MANUAL_UNLOAD_FAILURES = (
     "whole-session final CSS was not entered",
@@ -141,7 +144,8 @@ HEX_RE = re.compile(r"^[0-9a-f]+$")
 def _is_v10_prefix_scope(scope: str) -> bool:
     return scope in {V10_FIRST_SETUP_TICK0_SCOPE, V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE,
                      V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
-                     V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE}
+                     V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                     V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}
 
 
 class ComparisonError(ValueError):
@@ -158,6 +162,8 @@ def comparison_fields(version: int, *, scope: str = WHOLE_SESSION_SCOPE) -> tupl
                    if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE else
                    "v10 first-match clock-boundary scope requires MWRC v10"
                    if scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE else
+                   "v10 ordered match-clock lineage scope requires MWRC v10"
+                   if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else
                    "v10 first-setup/tick-0 scope requires MWRC v10")
         raise ComparisonError(message)
     if scope != WHOLE_SESSION_SCOPE:
@@ -554,7 +560,8 @@ class Recipe:
         if scope not in {WHOLE_SESSION_SCOPE, V10_FIRST_SETUP_TICK0_SCOPE,
                          V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE,
                          V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
-                         V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE}:
+                         V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                         V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
             raise ComparisonError(f"unsupported whole-session comparison scope {scope!r}")
         self.scope = scope
         if len(raw) < MWRC_HEADER.size + CONTEXT_HEADER.size:
@@ -571,6 +578,8 @@ class Recipe:
                        if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE else
                        "v10 first-match clock-boundary scope requires MWRC v10"
                        if scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE else
+                       "v10 ordered match-clock lineage scope requires MWRC v10"
+                       if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else
                        "v10 first-setup/tick-0 scope requires MWRC v10")
             raise ComparisonError(message)
         self.version = version
@@ -753,10 +762,41 @@ class Comparator:
     def __init__(self, recipe: Recipe, browser: BrowserReader, *,
                  positive_boundary: Mapping[str, int] | None = None,
                  clock60_boundary: Mapping[str, int] | None = None,
-                 match_clock_boundary: Mapping[str, int] | None = None) -> None:
+                 match_clock_boundary: Mapping[str, int] | None = None,
+                 ordered_clock_checkpoints: Sequence[Mapping[str, Any]] | None = None) -> None:
         self.recipe = recipe
         self.browser = browser
-        if recipe.scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
+        self.ordered_clock_checkpoints: tuple[Mapping[str, int], ...] | None = None
+        if recipe.scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE:
+            if (not isinstance(positive_boundary, Mapping) or
+                    not isinstance(clock60_boundary, Mapping) or
+                    not isinstance(match_clock_boundary, Mapping) or
+                    not isinstance(ordered_clock_checkpoints, Sequence) or
+                    isinstance(ordered_clock_checkpoints, (str, bytes)) or
+                    len(ordered_clock_checkpoints) != len(ORDERED_CLOCK_CHECKPOINT_LABELS)):
+                raise ComparisonError("ordered match-clock scope lacks all frozen checkpoints")
+            tuples: list[Mapping[str, int]] = []
+            for checkpoint, label in zip(ordered_clock_checkpoints,
+                                         ORDERED_CLOCK_CHECKPOINT_LABELS):
+                if (not isinstance(checkpoint, Mapping) or checkpoint.get("label") != label or
+                        not isinstance(checkpoint.get("tuple"), Mapping)):
+                    raise ComparisonError("ordered match-clock checkpoint selection is malformed")
+                tuples.append(checkpoint["tuple"])
+            if (_first_difference(tuples[0], positive_boundary) or
+                    _first_difference(tuples[1], clock60_boundary) or
+                    _first_difference(tuples[-1], {
+                        key: value for key, value in match_clock_boundary.items()
+                        if key != "target_match_frame_at_least"})):
+                raise ComparisonError("ordered match-clock boundaries disagree with checkpoint list")
+            self.ordered_clock_checkpoints = tuple(tuples)
+            self.positive_boundary = positive_boundary
+            self.clock60_boundary = clock60_boundary
+            self.match_clock_boundary = match_clock_boundary
+        elif ordered_clock_checkpoints is not None:
+            raise ComparisonError("ordered clock checkpoints are only valid in their explicit scope")
+        if recipe.scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE:
+            pass
+        elif recipe.scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
             if not isinstance(positive_boundary, Mapping):
                 raise ComparisonError("first-positive scope lacks its frozen boundary target")
             if clock60_boundary is not None or match_clock_boundary is not None:
@@ -922,7 +962,15 @@ class Comparator:
         else:
             self.source_spans.append({"scene": expected_scene, "first_frame": index,
                                       "last_frame": index})
-        if (self.positive_boundary is not None and
+        if (self.ordered_clock_checkpoints is not None and
+                expected_scene == SCENES["match"]):
+            checkpoints = self.ordered_clock_checkpoints
+            assert self.match_clock_boundary is not None
+            self._validate_match_clock_lineage_frame(
+                frame, index, positive=checkpoints[0], intermediate=checkpoints[1:-1],
+                terminal=self.match_clock_boundary,
+                label=f"match-clock {self.match_clock_boundary['target_match_frame_at_least']}")
+        elif (self.positive_boundary is not None and
                 self.recipe.scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE and
                 expected_scene == SCENES["match"]):
             boundary = self.positive_boundary
@@ -1590,13 +1638,131 @@ EXPECTATION_SCHEMA = "melee-web-v10-first-setup-tick0-expectations"
 POSITIVE_EXPECTATION_SCHEMA = "melee-web-v10-first-positive-match-frame-expectations"
 CLOCK60_EXPECTATION_SCHEMA = "melee-web-v10-first-match-clock-ge60-expectations"
 MATCH_CLOCK_EXPECTATION_SCHEMA = "melee-web-v10-first-match-clock-boundary-expectations"
+ORDERED_CLOCK_LINEAGE_SCHEMA = "melee-web-v10-ordered-match-clock-lineage-v1"
+ORDERED_CLOCK_LINEAGE_EXPECTATION_SCHEMA = "melee-web-v10-first-match-clock-ordered-lineage-expectations"
+ORDERED_CLOCK_CHECKPOINT_LABELS = ("clock1", "clock60", "clock300", "clock500", "target")
+ORDERED_CLOCK_TUPLE_FIELDS = frozenset({
+    "match_index", "source_tick", "source_sequence", "pad_consume_sequence",
+    "timeline_frame_index", "browser_cursor", "match_frame",
+})
+ORDERED_CLOCK_PREFIX_FIELDS = frozenset({
+    "bytes_read", "records_read", "last_source_sequence", "sha256",
+})
+
+
+def _validate_ordered_clock_lineage_expectations(source: Mapping[str, Any],
+                                                 recipe: Mapping[str, Any]) -> None:
+    lineage = source.get("ordered_clock_lineage")
+    if (not isinstance(lineage, dict) or
+            lineage.get("schema") != ORDERED_CLOCK_LINEAGE_SCHEMA or
+            set(lineage) != {"schema", "checkpoints", "runner_packet",
+                             "supporting_expectations"}):
+        raise ComparisonError("ordered clock-lineage expectations schema is malformed")
+    checkpoints = lineage.get("checkpoints")
+    if (not isinstance(checkpoints, list) or
+            len(checkpoints) != len(ORDERED_CLOCK_CHECKPOINT_LABELS)):
+        raise ComparisonError("ordered clock-lineage checkpoints are incomplete")
+    normalized: list[dict[str, Any]] = []
+    for index, (item, label) in enumerate(zip(checkpoints, ORDERED_CLOCK_CHECKPOINT_LABELS)):
+        if (not isinstance(item, dict) or set(item) != {"label", "tuple", "prefix", "audit"} or
+                item.get("label") != label):
+            raise ComparisonError("ordered clock-lineage checkpoints are not uniquely ordered")
+        value = item.get("tuple")
+        if not isinstance(value, dict) or set(value) != ORDERED_CLOCK_TUPLE_FIELDS:
+            raise ComparisonError(f"ordered clock-lineage {label} tuple fields are malformed")
+        for field, entry in value.items():
+            _int(entry, f"ordered clock-lineage {label}.{field}",
+                 1 if field in {"source_sequence", "browser_cursor", "match_frame"} else 0,
+                 (1 << 64) - 1 if field in {"source_sequence", "pad_consume_sequence"}
+                 else MAX_UINT32)
+        prefix = item.get("prefix")
+        if not isinstance(prefix, dict) or set(prefix) != ORDERED_CLOCK_PREFIX_FIELDS:
+            raise ComparisonError(f"ordered clock-lineage {label} prefix fields are malformed")
+        _int(prefix.get("bytes_read"), f"ordered clock-lineage {label} prefix bytes",
+             1, V10_ORDERED_LINEAGE_BYTE_CAP)
+        records = _int(prefix.get("records_read"),
+                       f"ordered clock-lineage {label} prefix records",
+                       1, V10_ORDERED_LINEAGE_RECORD_CAP)
+        last_sequence = _int(prefix.get("last_source_sequence"),
+                             f"ordered clock-lineage {label} last source sequence",
+                             1, (1 << 64) - 1)
+        if (records != value["source_sequence"] + 1 or
+                last_sequence != value["source_sequence"] or
+                not isinstance(prefix.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", prefix["sha256"]) is None):
+            raise ComparisonError(f"ordered clock-lineage {label} prefix identity is malformed")
+        audit = item.get("audit")
+        if (not isinstance(audit, dict) or set(audit) != {"path", "bytes", "sha256"} or
+                not isinstance(audit.get("path"), str) or not audit["path"] or
+                type(audit.get("bytes")) is not int or audit["bytes"] <= 0 or
+                not isinstance(audit.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", audit["sha256"]) is None):
+            raise ComparisonError(f"ordered clock-lineage {label} audit identity is malformed")
+        if value["match_index"] != 0 or value["timeline_frame_index"] + 1 != value["browser_cursor"]:
+            raise ComparisonError(f"ordered clock-lineage {label} tuple is outside match-0 timeline")
+        if value["source_sequence"] <= value["pad_consume_sequence"]:
+            raise ComparisonError(f"ordered clock-lineage {label} PAD join is malformed")
+        if index and (
+                value["source_tick"] <= normalized[-1]["tuple"]["source_tick"] or
+                value["source_sequence"] <= normalized[-1]["tuple"]["source_sequence"] or
+                value["match_frame"] <= normalized[-1]["tuple"]["match_frame"] or
+                value["browser_cursor"] <= normalized[-1]["tuple"]["browser_cursor"] or
+                prefix["bytes_read"] <= normalized[-1]["prefix"]["bytes_read"] or
+                records <= normalized[-1]["prefix"]["records_read"]):
+            raise ComparisonError("ordered clock-lineage checkpoints are not strictly ascending")
+        normalized.append(item)
+
+    positive = source.get("first_positive_boundary")
+    clock60 = source.get("clock60_boundary")
+    target = source.get("match_clock_boundary")
+    if (not isinstance(positive, dict) or not isinstance(clock60, dict) or
+            not isinstance(target, dict)):
+        raise ComparisonError("ordered clock-lineage lacks positive, clock-60, or terminal target")
+    if (_first_difference(normalized[0]["tuple"], positive) or
+            _first_difference(normalized[1]["tuple"], clock60) or
+            _first_difference(normalized[-1]["tuple"],
+                              {key: value for key, value in target.items()
+                               if key != "target_match_frame_at_least"})):
+        raise ComparisonError("ordered clock-lineage checkpoints disagree with frozen source targets")
+    if ([normalized[index]["tuple"]["match_frame"] for index in range(4)] !=
+            [1, 60, 300, 500] or
+            normalized[0]["audit"] != source.get("positive_boundary_audit") or
+            normalized[1]["audit"] != source.get("clock60_boundary_audit") or
+            normalized[4]["audit"] != source.get("match_clock_boundary_audit")):
+        raise ComparisonError("ordered clock-lineage prior checkpoint identities or clocks differ")
+    threshold = _int(target.get("target_match_frame_at_least"),
+                     "ordered clock-lineage target threshold", 501, MAX_UINT32)
+    if (normalized[-1]["tuple"]["match_frame"] != threshold or
+            normalized[-1]["tuple"]["source_sequence"] + 1 > V10_ORDERED_LINEAGE_RECORD_CAP or
+            normalized[-1]["prefix"]["bytes_read"] > V10_ORDERED_LINEAGE_BYTE_CAP or
+            normalized[-1]["tuple"]["browser_cursor"] > recipe.get("frame_count", 0)):
+        raise ComparisonError("ordered clock-lineage terminal target exceeds its frozen bounds")
+    for name, identity in (("runner packet", lineage.get("runner_packet")),):
+        if (not isinstance(identity, dict) or set(identity) != {"path", "bytes", "sha256"} or
+                not isinstance(identity.get("path"), str) or not identity["path"] or
+                type(identity.get("bytes")) is not int or identity["bytes"] <= 0 or
+                not isinstance(identity.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", identity["sha256"]) is None):
+            raise ComparisonError(f"ordered clock-lineage {name} identity is malformed")
+    supporting = lineage.get("supporting_expectations")
+    if (not isinstance(supporting, dict) or set(supporting) != {"clock300", "clock500"}):
+        raise ComparisonError("ordered clock-lineage supporting expectations are incomplete")
+    for label, identity in supporting.items():
+        if (not isinstance(identity, dict) or set(identity) != {"path", "bytes", "sha256"} or
+                not isinstance(identity.get("path"), str) or not identity["path"] or
+                type(identity.get("bytes")) is not int or identity["bytes"] <= 0 or
+                not isinstance(identity.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", identity["sha256"]) is None):
+            raise ComparisonError(f"ordered clock-lineage {label} expectations identity is malformed")
 
 
 def _load_expectations(path: Path, selected: Mapping[str, Path], *,
                        scope: str = V10_FIRST_SETUP_TICK0_SCOPE
                        ) -> tuple[dict[str, Any], str]:
     packet, packet_sha, _ = _read_json_sidecar(path, "v10 comparison expectations", max_bytes=1024 * 1024)
-    expected_schema = (POSITIVE_EXPECTATION_SCHEMA
+    expected_schema = (ORDERED_CLOCK_LINEAGE_EXPECTATION_SCHEMA
+                       if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else
+                       POSITIVE_EXPECTATION_SCHEMA
                        if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE else
                        CLOCK60_EXPECTATION_SCHEMA
                        if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE else EXPECTATION_SCHEMA)
@@ -1625,10 +1791,12 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
     if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
         named_paths["positive_boundary_audit"] = source.get("positive_boundary_audit")
     elif scope in {V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
-                   V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE}:
+                   V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                   V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
         named_paths["positive_boundary_audit"] = source.get("positive_boundary_audit")
         named_paths["clock60_boundary_audit"] = source.get("clock60_boundary_audit")
-    if scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE:
+    if scope in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                 V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
         named_paths["match_clock_boundary_audit"] = source.get("match_clock_boundary_audit")
     for name, expected_path in selected.items():
         identity = named_paths.get(name)
@@ -1659,7 +1827,8 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
         raise ComparisonError("v10 expectations lack the recipe version, size, seed, or frame count")
     if scope in {V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE,
                  V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
-                 V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE}:
+                 V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                 V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
         target = source.get("first_positive_boundary")
         required_target_fields = {
             "match_index", "source_tick", "source_sequence", "pad_consume_sequence",
@@ -1680,7 +1849,8 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
                 target["browser_cursor"] > recipe["frame_count"]):
             raise ComparisonError("positive-boundary expectations contain an invalid first-positive target")
     if scope in {V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
-                 V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE}:
+                 V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                 V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
         target = source.get("clock60_boundary")
         required_target_fields = {
             "match_index", "source_tick", "source_sequence", "pad_consume_sequence",
@@ -1701,7 +1871,8 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
                 target["source_sequence"] >= V10_MATCH_CLOCK_RECORD_CAP or
                 target["browser_cursor"] > recipe["frame_count"]):
             raise ComparisonError("clock-60 expectations contain an invalid first-match target")
-    if scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE:
+    if scope in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                 V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
         target = source.get("match_clock_boundary")
         required_target_fields = {
             "target_match_frame_at_least", "match_index", "source_tick",
@@ -1710,22 +1881,28 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
         }
         if not isinstance(target, dict) or set(target) != required_target_fields:
             raise ComparisonError("match-clock expectations lack the exact frozen target fields")
+        minimum_threshold = (501 if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else 61)
         threshold = _int(target["target_match_frame_at_least"],
-                         "match-clock target threshold", 61, MAX_UINT32)
+                         "match-clock target threshold", minimum_threshold, MAX_UINT32)
         for field in required_target_fields - {"target_match_frame_at_least"}:
             _int(target[field], f"match-clock expectations {field}",
                  1 if field in {"source_sequence", "browser_cursor", "match_frame"} else 0,
                  (1 << 64) - 1 if field in {"source_sequence", "pad_consume_sequence"}
                  else MAX_UINT32)
         clock60 = source["clock60_boundary"]
+        record_cap = (V10_ORDERED_LINEAGE_RECORD_CAP
+                      if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE
+                      else V10_MATCH_CLOCK_RECORD_CAP)
         if (target["match_index"] != 0 or target["match_frame"] != threshold or
                 target["source_tick"] <= clock60["source_tick"] or
                 target["match_frame"] <= clock60["match_frame"] or
                 target["timeline_frame_index"] + 1 != target["browser_cursor"] or
                 target["source_sequence"] <= target["pad_consume_sequence"] or
-                target["source_sequence"] >= V10_MATCH_CLOCK_RECORD_CAP or
+                target["source_sequence"] + 1 > record_cap or
                 target["browser_cursor"] > recipe["frame_count"]):
             raise ComparisonError("match-clock expectations contain an invalid post-clock-60 target")
+    if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE:
+        _validate_ordered_clock_lineage_expectations(source, recipe)
     producer = browser.get("producer")
     if not isinstance(producer, dict) or any(
             not isinstance(producer.get(field), str) or not producer[field]
@@ -2273,9 +2450,14 @@ def _validate_clock60_audit(path: Path, packet: Mapping[str, Any], recipe: Recip
 
 
 def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
-                                         recipe: Recipe
+                                         recipe: Recipe, *, ordered_lineage: bool = False,
+                                         positive_audit: Mapping[str, Any] | None = None,
+                                         clock60_audit: Mapping[str, Any] | None = None
                                          ) -> tuple[dict[str, Any], str]:
     """Validate the packet-bound terminal audit produced by the bounded clock runner."""
+    if ordered_lineage and (not isinstance(positive_audit, Mapping) or
+                            not isinstance(clock60_audit, Mapping)):
+        raise ComparisonError("ordered clock validation lacks its validated clock-1/60 audits")
     expected_source = packet["source"]
     expected = expected_source["match_clock_boundary_audit"]
     audit, digest, size = _read_json_sidecar(
@@ -2372,14 +2554,43 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
                         pad_seq="pad_consume_source_sequence", cursor="cursor_after_frame"),
          "terminal match-clock"),
     )
-    for expected_boundary, observed_boundary, name in differences:
+    ordered_differences = list(differences)
+    if ordered_lineage:
+        lineage = expected_source["ordered_clock_lineage"]
+        for label, observation_key, checkpoint_index in (
+                ("clock-300", "clock300_observed", 2),
+                ("clock-500", "clock500_observed", 3)):
+            checkpoint = lineage["checkpoints"][checkpoint_index]["tuple"]
+            observation = observed.get(observation_key)
+            if not isinstance(observation, dict):
+                raise ComparisonError(f"match-clock source audit lacks its {label} observation")
+            ordered_differences.append((
+                checkpoint,
+                boundary_tuple(observation, source_seq="source_tick_seq",
+                               pad_seq="pad_consume_source_sequence",
+                               cursor="cursor_after_frame"),
+                label))
+    for expected_boundary, observed_boundary, name in ordered_differences:
         difference = _first_difference(expected_boundary, observed_boundary)
         if difference:
             raise ComparisonError(f"match-clock source audit {name} differs at {difference[0]}")
-    for observation, expected_boundary, name in (
-            (positive_observed, expected_positive, "first-positive"),
-            (clock60_observed, expected_clock60, "clock-60"),
-            (terminal, target, "terminal")):
+    observations = [
+        (positive_observed, expected_positive, "first-positive"),
+        (clock60_observed, expected_clock60, "clock-60"),
+    ]
+    if ordered_lineage:
+        observations.extend((
+            (observed.get("clock300_observed"),
+             expected_source["ordered_clock_lineage"]["checkpoints"][2]["tuple"],
+             "clock-300"),
+            (observed.get("clock500_observed"),
+             expected_source["ordered_clock_lineage"]["checkpoints"][3]["tuple"],
+             "clock-500"),
+        ))
+    observations.append((terminal, target, "terminal"))
+    for observation, expected_boundary, name in observations:
+        if not isinstance(observation, dict):
+            raise ComparisonError(f"match-clock source audit {name} observation is malformed")
         if (type(observation.get("scene_frame")) is not int or
                 not 0 <= observation["scene_frame"] <= MAX_UINT32 or
                 type(observation.get("rng")) is not int or
@@ -2395,14 +2606,23 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
             target["browser_cursor"] != target["timeline_frame_index"] + 1 or
             target["browser_cursor"] > recipe.frame_count):
         raise ComparisonError("frozen match-clock target does not align with the complete MWRC timeline")
+    prefix_byte_cap = (V10_ORDERED_LINEAGE_BYTE_CAP if ordered_lineage
+                       else V10_PREFIX_BYTE_CAP)
+    prefix_record_cap = (V10_ORDERED_LINEAGE_RECORD_CAP if ordered_lineage
+                         else V10_MATCH_CLOCK_RECORD_CAP)
     prefix_bytes = _int(prefix.get("bytes_read"), "match-clock audit prefix bytes",
-                        1, V10_PREFIX_BYTE_CAP)
+                        1, prefix_byte_cap)
     prefix_records = _int(prefix.get("records_read"), "match-clock audit prefix records",
-                          1, V10_MATCH_CLOCK_RECORD_CAP)
+                          1, prefix_record_cap)
     expected_checkpoints = {
         "first_positive_clock1": "pass", "first_clock60": "pass",
     }
-    if threshold > V10_MATCH_CLOCK_REJOIN_FRAME:
+    if ordered_lineage:
+        expected_checkpoints.update({
+            "first_match_clock300": "pass", "first_match_clock500": "pass",
+            f"target_clock{suffix}": "observed_after_rejoins",
+        })
+    elif threshold > V10_MATCH_CLOCK_REJOIN_FRAME:
         expected_checkpoints.update({
             "first_match_clock300": "pass",
             f"target_clock{suffix}": "observed_after_rejoins",
@@ -2425,18 +2645,298 @@ def _validate_match_clock_boundary_audit(path: Path, packet: Mapping[str, Any],
             observed.get("clock60_rejoined") is not True or
             _int(source.get("content_bytes_read"),
                  "match-clock audit source content bytes read", 1,
-                 V10_PREFIX_BYTE_CAP) != prefix_bytes or
+                 prefix_byte_cap) != prefix_bytes or
             source.get("stream_attempted") is not True or
             audit.get("checkpoints") != expected_checkpoints):
         raise ComparisonError("match-clock audit prefix counts or checkpoint rejoin evidence disagree")
+    if ordered_lineage:
+        rejoined = observed.get("checkpoint_rejoins")
+        if (not isinstance(rejoined, dict) or rejoined != {
+                "clock1": True, "clock60": True, "clock300": True, "clock500": True}):
+            raise ComparisonError("ordered match-clock audit lacks every prior checkpoint rejoin")
+        lineage = expected_source["ordered_clock_lineage"]["checkpoints"]
+        positive_observed = positive_audit.get("observed", {})
+        positive_boundary = positive_observed.get("first_positive")
+        clock60_observed = clock60_audit.get("observed", {})
+        clock60_boundary = clock60_observed.get("target_clock_at_least_60")
+        if (not isinstance(positive_boundary, dict) or
+                not isinstance(clock60_boundary, dict) or
+                _lineage_boundary_from_observation({**positive_boundary,
+                    "source_tick_seq": positive_observed.get("source_prefix", {}).get("last_source_sequence")})
+                != lineage[0]["tuple"] or
+                _lineage_prefix_from_observation(positive_observed) != lineage[0]["prefix"] or
+                _lineage_boundary_from_observation(clock60_boundary) != lineage[1]["tuple"] or
+                _lineage_prefix_from_observation(clock60_observed) != lineage[1]["prefix"] or
+                _lineage_prefix_from_observation(observed) != lineage[4]["prefix"]):
+            raise ComparisonError("ordered match-clock audit prefixes differ from validated checkpoint audits")
     if threshold > V10_MATCH_CLOCK_REJOIN_FRAME:
         limits = audit.get("limits")
         if (not isinstance(limits, dict) or
-                limits.get("max_bytes") != V10_PREFIX_BYTE_CAP or
-                limits.get("max_records") != V10_MATCH_CLOCK_RECORD_CAP):
+                limits.get("max_bytes") != prefix_byte_cap or
+                limits.get("max_records") != prefix_record_cap):
             raise ComparisonError("later match-clock audit caps differ from the frozen bounded reader")
-        _validate_clock300_checkpoint_lineage(audit, packet, recipe)
+        if ordered_lineage:
+            _validate_ordered_clock_audit_lineage(audit, packet, recipe)
+        else:
+            _validate_clock300_checkpoint_lineage(audit, packet, recipe)
     return audit, digest
+
+
+def _lineage_boundary_from_observation(observation: Mapping[str, Any]) -> dict[str, int]:
+    value = {
+        "match_index": observation.get("match_index"),
+        "source_tick": observation.get("source_tick"),
+        "source_sequence": observation.get("source_tick_seq"),
+        "pad_consume_sequence": observation.get("pad_consume_source_sequence"),
+        "timeline_frame_index": observation.get("timeline_frame_index"),
+        "browser_cursor": observation.get("cursor_after_frame"),
+        "match_frame": observation.get("match_frame"),
+    }
+    if set(value) != ORDERED_CLOCK_TUPLE_FIELDS:
+        raise ComparisonError("ordered clock-lineage observation fields are malformed")
+    for field, entry in value.items():
+        _int(entry, f"ordered clock-lineage observation {field}",
+             1 if field in {"source_sequence", "browser_cursor", "match_frame"} else 0,
+             (1 << 64) - 1 if field in {"source_sequence", "pad_consume_sequence"}
+             else MAX_UINT32)
+    return value
+
+
+def _lineage_prefix_from_observation(observation: Mapping[str, Any]) -> dict[str, Any]:
+    prefix = observation.get("source_prefix")
+    if not isinstance(prefix, dict):
+        raise ComparisonError("ordered clock-lineage audit lacks a source-prefix identity")
+    value = {field: prefix.get(field) for field in ORDERED_CLOCK_PREFIX_FIELDS}
+    if set(value) != ORDERED_CLOCK_PREFIX_FIELDS:
+        raise ComparisonError("ordered clock-lineage source-prefix fields are malformed")
+    for field in ("bytes_read", "records_read", "last_source_sequence"):
+        _int(value[field], f"ordered clock-lineage prefix {field}", 1,
+             V10_ORDERED_LINEAGE_RECORD_CAP if field == "records_read" else
+             V10_ORDERED_LINEAGE_BYTE_CAP if field == "bytes_read" else (1 << 64) - 1)
+    if (not isinstance(value["sha256"], str) or
+            re.fullmatch(r"[0-9a-f]{64}", value["sha256"]) is None):
+        raise ComparisonError("ordered clock-lineage source-prefix hash is malformed")
+    return value
+
+
+def _load_prior_clock_expectations(identity: Mapping[str, Any],
+                                   audit_identity: Mapping[str, Any],
+                                   current_packet: Mapping[str, Any],
+                                   recipe: Recipe, label: str
+                                   ) -> tuple[dict[str, Any], dict[str, Any]]:
+    path = Path(identity["path"])
+    prior, digest, size = _read_json_sidecar(
+        path, f"ordered {label} expectations", max_bytes=1024 * 1024)
+    _verify_expected_file(identity, path, digest, size, f"ordered {label} expectations")
+    if (prior.get("schema") != MATCH_CLOCK_EXPECTATION_SCHEMA or
+            prior.get("scope") != V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE or
+            prior.get("version") != 1):
+        raise ComparisonError(f"ordered {label} expectations schema or scope is unsupported")
+    prior_source = prior.get("source")
+    current_source = current_packet["source"]
+    for field in ("capture_id", "sequence_id", "trace", "manifest", "report", "audit",
+                  "positive_boundary_audit", "first_positive_boundary",
+                  "clock60_boundary_audit", "clock60_boundary"):
+        if not isinstance(prior_source, dict) or prior_source.get(field) != current_source.get(field):
+            raise ComparisonError(f"ordered {label} source expectations differ at {field}")
+    if prior.get("recipe") != current_packet.get("recipe"):
+        raise ComparisonError(f"ordered {label} expectations bind a different MWRC recipe")
+    if prior_source.get("match_clock_boundary_audit") != audit_identity:
+        raise ComparisonError(f"ordered {label} expectations bind a different audit")
+    expected_target = prior_source.get("match_clock_boundary")
+    lineage = current_source["ordered_clock_lineage"]
+    checkpoint_index = 2 if label == "clock300" else 3
+    checkpoint_tuple = lineage["checkpoints"][checkpoint_index]["tuple"]
+    if (not isinstance(expected_target, dict) or
+            expected_target.get("target_match_frame_at_least") != checkpoint_tuple["match_frame"] or
+            _first_difference({key: value for key, value in expected_target.items()
+                               if key != "target_match_frame_at_least"}, checkpoint_tuple)):
+        raise ComparisonError(f"ordered {label} expectations differ from the frozen checkpoint")
+    files = _expectation_files(prior)
+    files["clock60_boundary_audit"] = prior_source.get("clock60_boundary_audit")
+    files["match_clock_boundary_audit"] = prior_source.get("match_clock_boundary_audit")
+    selected: dict[str, Path] = {}
+    for name, expected_file in files.items():
+        if (not isinstance(expected_file, dict) or
+                not isinstance(expected_file.get("path"), str)):
+            raise ComparisonError(f"ordered {label} expectations contain a malformed {name} identity")
+        selected[name] = Path(expected_file["path"])
+    loaded, _ = _load_expectations(path, selected,
+                                   scope=V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE)
+    return loaded, prior_source
+
+
+def _validate_ordered_clock_audit_lineage(audit: Mapping[str, Any],
+                                          packet: Mapping[str, Any],
+                                          recipe: Recipe) -> None:
+    """Validate the frozen 1/60/300/500 audit chain behind a later source target."""
+    expected_source = packet["source"]
+    lineage = expected_source["ordered_clock_lineage"]
+    runner_identity = lineage["runner_packet"]
+    if audit.get("packet") != runner_identity:
+        raise ComparisonError("ordered clock audit does not bind its frozen runner packet")
+    runner_path = Path(runner_identity["path"])
+    runner, digest, size = _read_json_sidecar(
+        runner_path, "ordered clock source runner packet", max_bytes=2 * 1024 * 1024)
+    _verify_expected_file(runner_identity, runner_path, digest, size,
+                          "ordered clock source runner packet")
+    target = expected_source["match_clock_boundary"]
+    threshold = target["target_match_frame_at_least"]
+    if (runner.get("schema") != f"melee-web-b4-source-clock{threshold}-launch-v1" or
+            runner.get("scope") != f"source-only-clock-ge{threshold}" or
+            runner.get("version") != 1 or
+            runner.get("target_match_frame_ge") != threshold):
+        raise ComparisonError("ordered clock runner packet schema or target is unsupported")
+    source_trace = runner.get("source_trace")
+    if (not isinstance(source_trace, dict) or
+            not isinstance(source_trace.get("path"), str) or
+            type(source_trace.get("bytes")) is not int or
+            source_trace.get("bytes") <= 0 or
+            not isinstance(source_trace.get("recorded_full_sha256"), str) or
+            re.fullmatch(r"[0-9a-f]{64}", source_trace["recorded_full_sha256"]) is None or
+            Path(source_trace["path"]).resolve() !=
+            Path(expected_source["trace"]["path"]).resolve() or
+            source_trace.get("bytes") != expected_source["trace"]["bytes"] or
+            source_trace.get("recorded_full_sha256") !=
+            expected_source["trace"]["recorded_full_sha256"]):
+        raise ComparisonError("ordered clock runner packet binds a different original trace")
+    limits = runner.get("caps")
+    if limits != {"max_bytes": V10_ORDERED_LINEAGE_BYTE_CAP,
+                  "max_records": V10_ORDERED_LINEAGE_RECORD_CAP}:
+        raise ComparisonError("ordered clock runner packet caps differ from this bounded scope")
+    target_packet = runner.get("target")
+    if (not isinstance(target_packet, dict) or
+            target_packet.get("derive_tuple_from_source") is not True or
+            target_packet.get("match_index") != 0 or
+            target_packet.get("predicate") != f"first observed match_frame >= {threshold}" or
+            target_packet.get("tuple") is not None):
+        raise ComparisonError("ordered clock runner packet does not derive its target from source")
+    checkout = runner.get("source_checkout")
+    if (not isinstance(checkout, dict) or checkout.get("clean") is not True or
+            not isinstance(checkout.get("head"), str) or
+            re.fullmatch(r"[0-9a-f]{40}", checkout["head"]) is None or
+            not isinstance(checkout.get("tree"), str) or
+            re.fullmatch(r"[0-9a-f]{40}", checkout["tree"]) is None):
+        raise ComparisonError("ordered clock runner packet lacks its clean source identity")
+    frozen_stat = source_trace.get("stat_at_packet_freeze")
+    if (not isinstance(frozen_stat, dict) or
+            set(frozen_stat) != {"bytes", "device", "inode", "mtime_ns"} or
+            any(type(value) is not int for value in frozen_stat.values()) or
+            frozen_stat["bytes"] != source_trace["bytes"]):
+        raise ComparisonError("ordered clock runner packet source stat identity is malformed")
+
+    packet_checkpoints = runner.get("checkpoints")
+    if not isinstance(packet_checkpoints, list) or len(packet_checkpoints) != 4:
+        raise ComparisonError("ordered clock runner packet checkpoint list is malformed")
+    expected_runner_checkpoints = lineage["checkpoints"][:4]
+    observation_keys = ("first_positive", "target_clock_at_least_60",
+                        "target_clock_ge300_observed", "target_clock_ge500_observed")
+    for item, expected, label, observation_key in zip(
+            packet_checkpoints, expected_runner_checkpoints,
+            ORDERED_CLOCK_CHECKPOINT_LABELS[:4], observation_keys):
+        if (not isinstance(item, dict) or
+                set(item) != {"label", "audit_observation_key", "tuple", "prefix"} or
+                item.get("label") != label or
+                item.get("audit_observation_key") != observation_key or
+                item.get("tuple") != expected["tuple"]):
+            raise ComparisonError(f"ordered clock runner packet {label} checkpoint differs")
+        packet_prefix = item.get("prefix")
+        if (not isinstance(packet_prefix, dict) or
+                set(packet_prefix) != ORDERED_CLOCK_PREFIX_FIELDS | {"hash_basis"} or
+                not isinstance(packet_prefix.get("hash_basis"), str) or
+                not packet_prefix["hash_basis"] or
+                {key: packet_prefix[key] for key in ORDERED_CLOCK_PREFIX_FIELDS} !=
+                expected["prefix"]):
+            raise ComparisonError(f"ordered clock runner packet {label} prefix differs")
+
+    small_inputs = runner.get("small_inputs")
+    selected_paths = runner.get("selected_paths")
+    expected_small_names = {
+        "clock300_boundary_audit", "clock300_expectations", "clock500_boundary_audit",
+        "clock500_expectations", "clock60_boundary_audit", "positive_boundary_audit",
+        "recipe", "source_audit", "source_manifest", "source_report",
+    }
+    if (not isinstance(small_inputs, dict) or set(small_inputs) != expected_small_names or
+            not isinstance(selected_paths, dict)):
+        raise ComparisonError("ordered clock runner packet input identity map is malformed")
+    expected_selected_names = expected_small_names | {"out", "reference"}
+    if set(selected_paths) != expected_selected_names:
+        raise ComparisonError("ordered clock runner packet selected-path map is malformed")
+    for name, identity in small_inputs.items():
+        if (not isinstance(identity, dict) or set(identity) != {"bytes", "path", "sha256"} or
+                not isinstance(identity.get("path"), str) or not identity["path"] or
+                type(identity.get("bytes")) is not int or identity["bytes"] <= 0 or
+                not isinstance(identity.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", identity["sha256"]) is None or
+                selected_paths.get(name) != identity["path"]):
+            raise ComparisonError(f"ordered clock runner packet {name} identity is malformed")
+    if (selected_paths.get("reference") != expected_source["trace"]["path"] or
+            selected_paths.get("out") != audit.get("report_path")):
+        raise ComparisonError("ordered clock runner packet reference or report path differs")
+    expected_small_identities = {
+        "positive_boundary_audit": expected_source["positive_boundary_audit"],
+        "clock60_boundary_audit": expected_source["clock60_boundary_audit"],
+        "recipe": packet["recipe"],
+        "source_audit": expected_source["audit"],
+        "source_manifest": expected_source["manifest"],
+        "source_report": expected_source["report"],
+    }
+    for name, identity in expected_small_identities.items():
+        actual = small_inputs[name]
+        if (actual.get("path") != identity.get("path") or
+                actual.get("bytes") != identity.get("bytes") or
+                actual.get("sha256") != identity.get("sha256")):
+            raise ComparisonError(f"ordered clock runner packet {name} identity differs")
+    stat_at_freeze = source_trace.get("stat_at_packet_freeze")
+    terminal_stat = audit.get("source", {}).get("stat_before")
+    if (not isinstance(stat_at_freeze, dict) or stat_at_freeze != terminal_stat):
+        raise ComparisonError("ordered clock runner packet and audit trace stat identities differ")
+    source_code = runner.get("source_code")
+    runner_source = runner.get("runner")
+    if (not isinstance(source_code, dict) or not source_code or
+            not isinstance(runner_source, dict) or
+            not isinstance(runner_source.get("path"), str) or
+            type(runner_source.get("bytes")) is not int or runner_source["bytes"] <= 0 or
+            not isinstance(runner_source.get("sha256"), str) or
+            re.fullmatch(r"[0-9a-f]{64}", runner_source["sha256"]) is None):
+        raise ComparisonError("ordered clock runner packet lacks source/runner identities")
+    for name, identity in source_code.items():
+        if (not isinstance(name, str) or not isinstance(identity, dict) or
+                set(identity) != {"bytes", "path", "sha256"} or
+                not isinstance(identity.get("path"), str) or not identity["path"] or
+                type(identity.get("bytes")) is not int or identity["bytes"] <= 0 or
+                not isinstance(identity.get("sha256"), str) or
+                re.fullmatch(r"[0-9a-f]{64}", identity["sha256"]) is None):
+            raise ComparisonError("ordered clock runner packet source-code identity is malformed")
+
+    for label in ("clock300", "clock500"):
+        expected_exp = lineage["supporting_expectations"][label]
+        input_exp = small_inputs[f"{label}_expectations"]
+        if expected_exp != input_exp:
+            raise ComparisonError(f"ordered clock runner packet {label} expectations identity differs")
+        audit_identity = small_inputs[f"{label}_boundary_audit"]
+        checkpoint_index = 2 if label == "clock300" else 3
+        if lineage["checkpoints"][checkpoint_index]["audit"] != audit_identity:
+            raise ComparisonError(f"ordered clock runner packet {label} audit identity differs")
+        nested_packet, nested_source = _load_prior_clock_expectations(
+            expected_exp, audit_identity, packet, recipe, label)
+        nested_audit, _ = _validate_match_clock_boundary_audit(
+            Path(audit_identity["path"]), nested_packet, recipe)
+        nested_observed = nested_audit["observed"].get(
+            f"target_clock_ge{nested_source['match_clock_boundary']['target_match_frame_at_least']}_observed")
+        if not isinstance(nested_observed, dict):
+            raise ComparisonError(f"ordered {label} audit lacks its target observation")
+        checkpoint = lineage["checkpoints"][checkpoint_index]
+        if (_lineage_boundary_from_observation(nested_observed) != checkpoint["tuple"] or
+                _lineage_prefix_from_observation(nested_audit["observed"]) != checkpoint["prefix"]):
+            raise ComparisonError(f"ordered {label} audit differs from its frozen checkpoint")
+
+    expected_positive_audit = lineage["checkpoints"][0]["audit"]
+    expected_clock60_audit = lineage["checkpoints"][1]["audit"]
+    if (expected_positive_audit != expected_source.get("positive_boundary_audit") or
+            expected_clock60_audit != expected_source.get("clock60_boundary_audit") or
+            lineage["checkpoints"][4]["audit"] != expected_source.get("match_clock_boundary_audit")):
+        raise ComparisonError("ordered clock lineage audit identities differ from source expectations")
 
 
 def _validate_clock300_checkpoint_lineage(audit: Mapping[str, Any],
@@ -2744,18 +3244,25 @@ def _validate_v10_browser_export(port_trace_path: Path, recipe: Recipe,
         first_positive = packet["source"].get("first_positive_boundary")
         positive_boundary = (first_positive if recipe.scope in {
             V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE, V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
-            V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE
+            V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+            V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE
         } else None)
         clock60_boundary = (packet["source"].get("clock60_boundary")
                             if recipe.scope in {V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
-                                                V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE}
+                                                V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                                                V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}
                             else None)
         match_clock_boundary = (packet["source"].get("match_clock_boundary")
-                                if recipe.scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE
+                                if recipe.scope in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                                                    V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}
                                 else None)
+        ordered_clock_checkpoints = (
+            packet["source"]["ordered_clock_lineage"]["checkpoints"]
+            if recipe.scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else None)
         frame_validator = Comparator(recipe, browser, positive_boundary=positive_boundary,
                                      clock60_boundary=clock60_boundary,
-                                     match_clock_boundary=match_clock_boundary)
+                                     match_clock_boundary=match_clock_boundary,
+                                     ordered_clock_checkpoints=ordered_clock_checkpoints)
         match_starts = {
             span["first_frame"]: match_index
             for match_index, span in enumerate(
@@ -3238,7 +3745,8 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
     positive_scope = scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
     clock60_scope = scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE
     match_clock_scope = scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE
-    clock_lineage_scope = clock60_scope or match_clock_scope
+    ordered_lineage_scope = scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE
+    clock_lineage_scope = clock60_scope or match_clock_scope or ordered_lineage_scope
     if not _is_v10_prefix_scope(scope):
         raise ComparisonError(f"unsupported bounded v10 prefix scope {scope!r}")
     result: dict[str, Any] = {
@@ -3259,7 +3767,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             "whole_session": "incomplete",
         },
         "limitations": {
-            "boundary": ("Checks CSS/SSS consumed-input order and compares first match setup plus every contiguous match tick through the externally bound match-clock boundary, rejoining the earlier clock-1 and clock-60 prefixes before continuing."
+            "boundary": ("Checks continuous CSS/SSS consumed-input order and compares first match setup plus every contiguous match tick through the externally bound ordered clock-lineage target, freshly rejoining the clock-1, 60, 300, and 500 prefixes before continuing."
+                         if ordered_lineage_scope else
+                         "Checks CSS/SSS consumed-input order and compares first match setup plus every contiguous match tick through the externally bound match-clock boundary, rejoining the earlier clock-1 and clock-60 prefixes before continuing."
                          if match_clock_scope else
                          "Checks CSS/SSS consumed-input order and compares first match setup plus every contiguous match tick through the externally bound match_frame 60 boundary, rejoining the earlier clock-1 prefix before continuing."
                          if clock60_scope else
@@ -3278,6 +3788,8 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         result["checks"]["source_ticks_through_clock60"] = "not_checked"
     if match_clock_scope:
         result["checks"]["source_ticks_through_match_clock_boundary"] = "not_checked"
+    if ordered_lineage_scope:
+        result["checks"]["source_ticks_through_ordered_clock_lineage"] = "not_checked"
     comparator: Comparator | None = None
     source: SourceCollector | None = None
     browser: BrowserReader | None = None
@@ -3296,7 +3808,8 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         if clock_lineage_scope != (clock60_boundary_audit_path is not None):
             raise ComparisonError(
                 "bounded prefix scope and clock-60 audit selection disagree")
-        if match_clock_scope != (match_clock_boundary_audit_path is not None):
+        if (match_clock_scope or ordered_lineage_scope) != (
+                match_clock_boundary_audit_path is not None):
             raise ComparisonError(
                 "bounded prefix scope and match-clock audit selection disagree")
         selected = {
@@ -3314,7 +3827,7 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             selected["positive_boundary_audit"] = positive_boundary_audit_path
         if clock_lineage_scope:
             selected["clock60_boundary_audit"] = clock60_boundary_audit_path
-        if match_clock_scope:
+        if match_clock_scope or ordered_lineage_scope:
             selected["match_clock_boundary_audit"] = match_clock_boundary_audit_path
         packet, packet_sha = _load_expectations(expectations_path, selected, scope=scope)
         result["expectations"] = {"path": str(expectations_path), "sha256": packet_sha}
@@ -3363,6 +3876,7 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         clock60_audit_sha: str | None = None
         match_clock_audit: dict[str, Any] | None = None
         match_clock_audit_sha: str | None = None
+        ordered_checkpoints: list[dict[str, Any]] | None = None
         target: Mapping[str, int] | None = None
         if needs_positive_audit:
             assert positive_boundary_audit_path is not None
@@ -3386,11 +3900,14 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "target": clock60_target,
                 "scope": "source-only audit target; browser comparison uses fresh packet identities",
             }
-        if match_clock_scope:
+        if match_clock_scope or ordered_lineage_scope:
             assert (match_clock_boundary_audit_path is not None and
                     clock60_audit_sha is not None)
             match_clock_audit, match_clock_audit_sha = _validate_match_clock_boundary_audit(
-                match_clock_boundary_audit_path, packet, recipe_obj)
+                match_clock_boundary_audit_path, packet, recipe_obj,
+                ordered_lineage=ordered_lineage_scope,
+                positive_audit=positive_audit if ordered_lineage_scope else None,
+                clock60_audit=clock60_audit if ordered_lineage_scope else None)
             match_clock_target = packet["source"]["match_clock_boundary"]
             result["match_clock_boundary_audit"] = {
                 "path": str(match_clock_boundary_audit_path),
@@ -3398,11 +3915,13 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "target": match_clock_target,
                 "scope": "source-only audit target; browser comparison uses fresh packet identities",
             }
+        if ordered_lineage_scope:
+            ordered_checkpoints = packet["source"]["ordered_clock_lineage"]["checkpoints"]
         if positive_scope:
             target = positive_target
         elif clock60_scope:
             target = clock60_target
-        elif match_clock_scope:
+        elif match_clock_scope or ordered_lineage_scope:
             target = match_clock_target
         producer, capture_report, browser_report, browser_identity = \
             _validate_v10_browser_provenance(
@@ -3417,21 +3936,43 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             recipe_obj, browser,
             positive_boundary=(positive_target if needs_positive_audit else None),
             clock60_boundary=clock60_target,
-            match_clock_boundary=match_clock_target)
+            match_clock_boundary=match_clock_target,
+            ordered_clock_checkpoints=ordered_checkpoints)
         source = SourceCollector(comparator, recipe_obj, manifest, audit, packet["source"])
         stats = ObserverStreamStats()
         records = iter_records(
-            reference_path, max_bytes=V10_PREFIX_BYTE_CAP,
-            max_records=(V10_MATCH_CLOCK_RECORD_CAP if clock_lineage_scope else
+            reference_path,
+            max_bytes=(V10_ORDERED_LINEAGE_BYTE_CAP if ordered_lineage_scope
+                       else V10_PREFIX_BYTE_CAP),
+            max_records=(V10_ORDERED_LINEAGE_RECORD_CAP if ordered_lineage_scope else
+                         V10_MATCH_CLOCK_RECORD_CAP if clock_lineage_scope else
                          V10_FIRST_POSITIVE_RECORD_CAP if positive_scope
                          else V10_PREFIX_RECORD_CAP), stats=stats)
         prefix_complete = False
         positive_prefix_rejoined = not clock_lineage_scope
         clock60_prefix_rejoined = not match_clock_scope
+        ordered_checkpoint_index = 0
         for row in records:
             last_source_sequence = row["seq"]
             source.consume(row)
-            if match_clock_scope:
+            if ordered_lineage_scope:
+                assert ordered_checkpoints is not None
+                if ordered_checkpoint_index < len(ordered_checkpoints):
+                    checkpoint = ordered_checkpoints[ordered_checkpoint_index]
+                    if _match_boundary_join_complete(
+                            row, source, comparator, checkpoint["tuple"]):
+                        prefix = checkpoint["prefix"]
+                        if (stats.records_read != prefix["records_read"] or
+                                stats.bytes_read != prefix["bytes_read"] or
+                                stats.prefix_sha256 != prefix["sha256"]):
+                            raise ComparisonError(
+                                f"fresh source prefix differs from the accepted {checkpoint['label']} checkpoint")
+                        ordered_checkpoint_index += 1
+                        if ordered_checkpoint_index == len(ordered_checkpoints):
+                            prefix_complete = True
+                            break
+                        continue
+            elif match_clock_scope:
                 assert (positive_target is not None and clock60_target is not None and
                         match_clock_target is not None and positive_audit is not None and
                         clock60_audit is not None and match_clock_audit is not None)
@@ -3496,7 +4037,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                     break
         result["last_source_sequence"] = last_source_sequence
         if not prefix_complete:
-            boundary = ("frozen match-clock boundary after rejoining the first-positive and clock-60 prefixes"
+            boundary = ("frozen ordered match-clock target after rejoining all four earlier prefixes"
+                        if ordered_lineage_scope else
+                        "frozen match-clock boundary after rejoining the first-positive and clock-60 prefixes"
                         if match_clock_scope else
                         "frozen clock-60 boundary after rejoining the first-positive prefix"
                         if clock60_scope else
@@ -3507,7 +4050,13 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         result["source_full_trace"]["stat_after"] = source_stat_after
         _require_stable_mwro_stat(source_stat_before, source_stat_after)
         result["source_full_trace"]["stat_stable_during_attempt"] = True
-        if match_clock_scope:
+        if ordered_lineage_scope:
+            assert ordered_checkpoints is not None
+            audited_prefix = ordered_checkpoints[-1]["prefix"]
+            expected_prefix_records = audited_prefix["records_read"]
+            expected_prefix_bytes = audited_prefix["bytes_read"]
+            expected_prefix_sha = audited_prefix["sha256"]
+        elif match_clock_scope:
             assert match_clock_audit is not None
             audited_prefix = match_clock_audit["observed"]["source_prefix"]
             expected_prefix_records = audited_prefix["records_read"]
@@ -3534,7 +4083,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 stats.bytes_read != expected_prefix_bytes or
                 (expected_prefix_sha is not None and
                  stats.prefix_sha256 != expected_prefix_sha)):
-            message = ("freshly consumed source prefix differs from its bounded match-clock audit"
+            message = ("freshly consumed source prefix differs from its bounded ordered clock-lineage audit"
+                       if ordered_lineage_scope else
+                       "freshly consumed source prefix differs from its bounded match-clock audit"
                        if match_clock_scope else
                        "freshly consumed source prefix differs from its bounded clock-60 audit"
                        if clock60_scope else
@@ -3543,7 +4094,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                        "freshly consumed source prefix differs from its bounded identity audit")
             raise ComparisonError(message)
         if (comparator.frame_index != required_cursor or comparator.compared != required_cursor):
-            message = ("comparison did not stop immediately after its frozen match-clock boundary"
+            message = ("comparison did not stop immediately after its frozen ordered clock-lineage target"
+                       if ordered_lineage_scope else
+                       "comparison did not stop immediately after its frozen match-clock boundary"
                        if match_clock_scope else
                        "comparison did not stop immediately after its frozen clock-60 boundary"
                        if clock60_scope else
@@ -3555,7 +4108,15 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             raise ComparisonError("bounded source prefix consumed an unexpected match setup count")
         result["checks"]["source_first_css_and_setup_binding"] = "pass"
         result["checks"]["setup_state"] = "pass"
-        if match_clock_scope:
+        if ordered_lineage_scope:
+            result["checks"]["source_ticks_through_ordered_clock_lineage"] = "pass"
+            result["checks"]["source_ticks_through_clock1_clock60_clock300_clock500"] = "pass"
+            result["checks"]["source_pad_to_tick0_join"] = "pass"
+            result["checks"]["tick0_state"] = "pass"
+            result["checks"]["first_positive_match_frame_state"] = "pass"
+            result["checks"]["clock60_match_frame_state"] = "pass"
+            result["checks"]["ordered_clock_checkpoint_states"] = "pass"
+        elif match_clock_scope:
             result["checks"]["source_ticks_through_match_clock_boundary"] = "pass"
             result["checks"]["source_ticks_through_clock60"] = "pass"
             result["checks"]["source_pad_to_tick0_join"] = "pass"
@@ -3597,7 +4158,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "records_read": stats.records_read,
                 "bytes_read": stats.bytes_read,
                 "sha256": stats.prefix_sha256,
-                "hash_basis": (f"fresh SHA-256 over exactly the raw bytes consumed through the first match_frame {match_clock_target['target_match_frame_at_least']} boundary"
+                "hash_basis": (f"fresh SHA-256 over exactly the raw bytes consumed through the ordered first match_frame {match_clock_target['target_match_frame_at_least']} boundary"
+                               if ordered_lineage_scope and match_clock_target is not None else
+                               f"fresh SHA-256 over exactly the raw bytes consumed through the first match_frame {match_clock_target['target_match_frame_at_least']} boundary"
                                if match_clock_scope and match_clock_target is not None else
                                "fresh SHA-256 over exactly the raw bytes consumed through the first match_frame 60 boundary"
                                if clock60_scope else
@@ -3621,7 +4184,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "browser_target_cursor": browser_identity["target_cursor"],
             }} if not needs_positive_audit else {}),
             "source_scene_spans_observed": comparator.source_spans,
-            "capture_status": ("incomplete bounded capture; semantic comparison stopped after the frozen match-clock source boundary"
+            "capture_status": ("incomplete bounded capture; semantic comparison stopped after the frozen ordered match-clock source boundary"
+                               if ordered_lineage_scope else
+                               "incomplete bounded capture; semantic comparison stopped after the frozen match-clock source boundary"
                                if match_clock_scope else
                                "incomplete bounded capture; semantic comparison stopped after the frozen clock-60 source boundary"
                                if clock60_scope else
@@ -3672,6 +4237,28 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "source_prefix_records": prior_prefix["records_read"],
                 "source_prefix_bytes": prior_prefix["bytes_read"],
                 "rejoined_before_continuing": True,
+            }
+        if (ordered_lineage_scope and ordered_checkpoints is not None and
+                match_clock_target is not None and match_clock_audit_sha is not None):
+            result["ordered_match_clock_boundary"] = {
+                **match_clock_target,
+                "setup_source_sequence": source.first_setup_seq,
+                "browser_observed_cursor": browser_identity["target_cursor"],
+                "browser_exported_cursor": browser_identity["exported_cursor"],
+                "source_prefix_sha256": stats.prefix_sha256,
+                "source_prefix_records": stats.records_read,
+                "source_prefix_bytes": stats.bytes_read,
+                "terminal_audit_sha256": match_clock_audit_sha,
+                "runner_packet_sha256": packet["source"]["ordered_clock_lineage"]
+                ["runner_packet"]["sha256"],
+                "fresh_prefix_checkpoints": [
+                    {"label": checkpoint["label"], **checkpoint["tuple"],
+                     "bytes_read": checkpoint["prefix"]["bytes_read"],
+                     "records_read": checkpoint["prefix"]["records_read"],
+                     "source_prefix_sha256": checkpoint["prefix"]["sha256"],
+                     "audit_sha256": checkpoint["audit"]["sha256"],
+                     "rejoined_before_continuing": True}
+                    for checkpoint in ordered_checkpoints],
             }
         if (match_clock_scope and match_clock_target is not None and
                 positive_audit_sha is not None and clock60_audit_sha is not None and
@@ -3779,15 +4366,19 @@ def compare_paths(reference: str | Path, recipe: str | Path, port_trace: str | P
                     browser_producer_manifest, browser_report, expectations)
         if scope in {V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE,
                      V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
-                     V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE}:
+                     V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                     V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
             required += (positive_boundary_audit,)
         if scope in {V10_FIRST_MATCH_CLOCK_GE60_SCOPE,
-                     V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE}:
+                     V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                     V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
             required += (clock60_boundary_audit,)
-        if scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE:
+        if scope in {V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE,
+                     V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE}:
             required += (match_clock_boundary_audit,)
         if any(value is None for value in required):
-            label = ("v10 first-match clock-boundary" if scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE else
+            label = ("v10 ordered match-clock lineage" if scope == V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE else
+                     "v10 first-match clock-boundary" if scope == V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE else
                      "v10 first-match clock-60" if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE else
                      "v10 first-positive match-frame" if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
                      else "v10 first-setup/tick-0")

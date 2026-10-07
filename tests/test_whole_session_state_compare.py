@@ -30,7 +30,9 @@ from whole_session_state_compare import (  # noqa: E402
     V10_FIRST_MATCH_CLOCK_GE60_SCOPE, V10_MATCH_CLOCK_RECORD_CAP,
     V10_MATCH_CLOCK_REJOIN_FRAME,
     V10_FIRST_MATCH_CLOCK_BOUNDARY_SCOPE, CLOCK60_EXPECTATION_SCHEMA,
-    MATCH_CLOCK_EXPECTATION_SCHEMA,
+    MATCH_CLOCK_EXPECTATION_SCHEMA, V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE,
+    ORDERED_CLOCK_LINEAGE_SCHEMA, V10_ORDERED_LINEAGE_BYTE_CAP,
+    V10_ORDERED_LINEAGE_RECORD_CAP,
     V10_BROWSER_PRODUCER_SCHEMA, V10_HISTORICAL_CLOCK300_PRODUCER_SCHEMA,
     V10_PREFIX_RECORD_CAP, V10_RULES_BYTES, WHOLE_SESSION_SCOPE,
     _file_stat_identity, _first_match_required_cursor, _first_match_tick_join_complete,
@@ -41,6 +43,8 @@ from whole_session_state_compare import (  # noqa: E402
     _validate_v10_browser_provenance, _validate_v10_browser_export,
     _validate_first_positive_audit, _validate_clock60_audit,
     _validate_match_clock_boundary_audit,
+    _validate_ordered_clock_audit_lineage,
+    _validate_ordered_clock_lineage_expectations,
     _match_boundary_join_complete,
     _browser_entities, compare_paths,
 )
@@ -1181,6 +1185,41 @@ def _run_clock60_comparison(fixture, *, raw_overrides=None,
                                         if match_clock_scope else None),
         )
     return result, yielded, observed_limits
+
+
+def _ordered_fixture_checkpoints(fixture):
+    target = fixture["match_clock_target"]
+    source = fixture["packet"]["source"]
+    boundaries = [
+        ("clock1", source["first_positive_boundary"], source["positive_boundary_audit"]),
+        ("clock60", source["clock60_boundary"], source["clock60_boundary_audit"]),
+    ]
+    for label, match_frame in (("clock300", 300), ("clock500", 500)):
+        tick = 123 + match_frame
+        sequence = 11 + 2 * tick
+        timeline = 2 + tick
+        boundaries.append((label, {
+            "match_index": 0, "source_tick": tick, "source_sequence": sequence,
+            "pad_consume_sequence": sequence - 1, "timeline_frame_index": timeline,
+            "browser_cursor": timeline + 1, "match_frame": match_frame,
+        }, {"path": f"{label}-audit.json", "bytes": 10,
+            "sha256": ("3" if label == "clock300" else "4") * 64}))
+    boundaries.append(("target", {
+        key: value for key, value in target.items()
+        if key != "target_match_frame_at_least"
+    }, source["match_clock_boundary_audit"]))
+    checkpoints = []
+    for label, boundary, audit in boundaries:
+        seq = boundary["source_sequence"]
+        raw_prefix = b"".join(fixture["raw_records"][:seq + 1])
+        checkpoints.append({
+            "label": label, "tuple": dict(boundary),
+            "prefix": {"bytes_read": len(raw_prefix), "records_read": seq + 1,
+                       "last_source_sequence": seq,
+                       "sha256": hashlib.sha256(raw_prefix).hexdigest()},
+            "audit": audit,
+        })
+    return checkpoints
 
 
 class WholeSessionStateCompareTests(unittest.TestCase):
@@ -2976,6 +3015,270 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertTrue(result["clock60_prefix_rejoin"]["rejoined_before_continuing"])
             self.assertEqual(result["match_clock_boundary"]["match_frame"], 300)
             self.assertEqual(result["match_clock_boundary"]["source_tick"], 423)
+
+    def test_ordered_clock_lineage_collector_joins_all_five_checkpoints(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _clock60_comparison_fixture(Path(directory), terminal_match_frame=520)
+            checkpoints = _ordered_fixture_checkpoints(fixture)
+            recipe = Recipe(fixture["recipe"].path, fixture["recipe"].raw,
+                            scope=V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE)
+            browser = BrowserReader(fixture["selected"]["port_trace"])
+            comparator = Comparator(
+                recipe, browser,
+                positive_boundary=checkpoints[0]["tuple"],
+                clock60_boundary=checkpoints[1]["tuple"],
+                match_clock_boundary={**checkpoints[-1]["tuple"],
+                                      "target_match_frame_at_least": 520},
+                ordered_clock_checkpoints=checkpoints)
+            collector = SourceCollector(
+                comparator, recipe, fixture["source_manifest"], fixture["source_audit"],
+                fixture["packet"]["source"])
+            joined = []
+            try:
+                for row in fixture["rows"]:
+                    collector.consume(row)
+                    if len(joined) < len(checkpoints):
+                        checkpoint = checkpoints[len(joined)]
+                        if _match_boundary_join_complete(
+                                row, collector, comparator, checkpoint["tuple"]):
+                            prefix = checkpoint["prefix"]
+                            self.assertEqual(prefix["records_read"], collector.record_count)
+                            self.assertEqual(prefix["last_source_sequence"], row["seq"])
+                            joined.append(checkpoint["label"])
+                            if len(joined) == len(checkpoints):
+                                break
+                self.assertEqual(joined, ["clock1", "clock60", "clock300", "clock500", "target"])
+                self.assertEqual(collector.record_count,
+                                 checkpoints[-1]["tuple"]["source_sequence"] + 1)
+                self.assertEqual(comparator.compared,
+                                 checkpoints[-1]["tuple"]["browser_cursor"])
+                self.assertEqual(comparator.match_compared,
+                                 checkpoints[-1]["tuple"]["source_tick"] + 1)
+                self.assertEqual(comparator.nonmatch_compared, 2)
+                self.assertIsNone(collector.pending)
+            finally:
+                browser.close()
+
+    def test_ordered_clock_lineage_stops_at_first_post500_state_divergence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _clock60_comparison_fixture(Path(directory), terminal_match_frame=520)
+            checkpoints = _ordered_fixture_checkpoints(fixture)
+            recipe = Recipe(fixture["recipe"].path, fixture["recipe"].raw,
+                            scope=V10_FIRST_MATCH_CLOCK_ORDERED_LINEAGE_SCOPE)
+            port_path = fixture["selected"]["port_trace"]
+            original_rows = [json.loads(line) for line in port_path.read_text().splitlines()]
+            divergence_index = 2 + 123 + 501
+            expected_source_row = next(
+                row for row in fixture["rows"]
+                if row["event"] == "boundary" and row["payload"].get("boundary") == "source_tick" and
+                row["source_tick"] == 624)
+            self.assertEqual(divergence_index, 626)
+
+            for field in ("rng", "match_frame", "pad_state_hex", "fighters", "fighter_entities"):
+                with self.subTest(field=field):
+                    rows = copy.deepcopy(original_rows)
+                    browser_row = next(row for row in rows
+                                       if row.get("record") == "session_frame" and
+                                       row.get("index") == divergence_index)
+                    if field == "rng":
+                        browser_row[field] += 1
+                    elif field == "match_frame":
+                        browser_row[field] -= 1
+                    elif field == "pad_state_hex":
+                        browser_row[field] = "00" * PAD_STATE_BYTES
+                    elif field == "fighters":
+                        browser_row[field][0]["damage_bits"] = "00000001"
+                    else:
+                        browser_row[field][0]["generation"] += 1
+                    port_path.write_text("\n".join(json.dumps(row, separators=(",", ":"))
+                                               for row in rows) + "\n")
+                    browser = BrowserReader(port_path)
+                    comparator = Comparator(
+                        recipe, browser,
+                        positive_boundary=checkpoints[0]["tuple"],
+                        clock60_boundary=checkpoints[1]["tuple"],
+                        match_clock_boundary={**checkpoints[-1]["tuple"],
+                                              "target_match_frame_at_least": 520},
+                        ordered_clock_checkpoints=checkpoints)
+                    collector = SourceCollector(
+                        comparator, recipe, fixture["source_manifest"], fixture["source_audit"],
+                        fixture["packet"]["source"])
+                    with self.assertRaises(ComparisonError):
+                        for row in fixture["rows"]:
+                            collector.consume(row)
+                    self.assertEqual(collector.record_count, expected_source_row["seq"] + 1)
+                    self.assertEqual(comparator.frame_index, divergence_index)
+                    self.assertEqual(comparator.first_difference["record"], "session_frame")
+                    browser.close()
+
+    def test_ordered_clock_lineage_expectations_reject_reordered_or_tampered_inner_checkpoints(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _clock60_comparison_fixture(Path(directory), terminal_match_frame=520)
+            checkpoints = _ordered_fixture_checkpoints(fixture)
+            source = copy.deepcopy(fixture["packet"]["source"])
+            source["ordered_clock_lineage"] = {
+                "schema": ORDERED_CLOCK_LINEAGE_SCHEMA,
+                "checkpoints": checkpoints,
+                "runner_packet": {"path": "runner.json", "bytes": 1,
+                                  "sha256": "a" * 64},
+                "supporting_expectations": {
+                    "clock300": {"path": "clock300-expectations.json", "bytes": 1,
+                                 "sha256": "b" * 64},
+                    "clock500": {"path": "clock500-expectations.json", "bytes": 1,
+                                 "sha256": "c" * 64},
+                },
+            }
+            recipe_identity = {"frame_count": fixture["recipe"].frame_count}
+            _validate_ordered_clock_lineage_expectations(source, recipe_identity)
+
+            reordered = copy.deepcopy(source)
+            reordered["ordered_clock_lineage"]["checkpoints"][2:4] = reversed(
+                reordered["ordered_clock_lineage"]["checkpoints"][2:4])
+            with self.assertRaisesRegex(ComparisonError, "not uniquely ordered"):
+                _validate_ordered_clock_lineage_expectations(reordered, recipe_identity)
+
+            tampered = copy.deepcopy(source)
+            tampered["ordered_clock_lineage"]["checkpoints"][3]["tuple"]["match_frame"] = 501
+            with self.assertRaisesRegex(ComparisonError, "strictly ascending|prior checkpoint"):
+                _validate_ordered_clock_lineage_expectations(tampered, recipe_identity)
+
+    def test_ordered_clock_runner_rehash_cannot_rewrite_inner_checkpoint_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = _clock60_comparison_fixture(Path(directory), terminal_match_frame=520)
+            checkpoints = _ordered_fixture_checkpoints(fixture)
+            source = copy.deepcopy(fixture["packet"]["source"])
+            runner_path = Path(directory) / "clock1000-runner.json"
+            audit_stat = _file_stat_identity(fixture["selected"]["reference"])
+            source["ordered_clock_lineage"] = {
+                "schema": ORDERED_CLOCK_LINEAGE_SCHEMA,
+                "checkpoints": checkpoints,
+                "runner_packet": {"path": str(runner_path), "bytes": 0,
+                                  "sha256": "0" * 64},
+                "supporting_expectations": {
+                    "clock300": {"path": "clock300-expectations.json", "bytes": 10,
+                                 "sha256": "b" * 64},
+                    "clock500": {"path": "clock500-expectations.json", "bytes": 10,
+                                 "sha256": "c" * 64},
+                },
+            }
+            packet = {"source": source, "recipe": fixture["packet"]["recipe"]}
+            threshold = 520
+            small_inputs = {
+                "clock300_boundary_audit": checkpoints[2]["audit"],
+                "clock300_expectations": source["ordered_clock_lineage"][
+                    "supporting_expectations"]["clock300"],
+                "clock500_boundary_audit": checkpoints[3]["audit"],
+                "clock500_expectations": source["ordered_clock_lineage"][
+                    "supporting_expectations"]["clock500"],
+                "clock60_boundary_audit": source["clock60_boundary_audit"],
+                "positive_boundary_audit": source["positive_boundary_audit"],
+                "recipe": {key: packet["recipe"][key]
+                           for key in ("bytes", "path", "sha256")},
+                "source_audit": source["audit"],
+                "source_manifest": source["manifest"], "source_report": source["report"],
+            }
+            runner = {
+                "schema": f"melee-web-b4-source-clock{threshold}-launch-v1",
+                "scope": f"source-only-clock-ge{threshold}", "version": 1,
+                "target_match_frame_ge": threshold,
+                "caps": {"max_bytes": V10_ORDERED_LINEAGE_BYTE_CAP,
+                         "max_records": V10_ORDERED_LINEAGE_RECORD_CAP},
+                "source_trace": {
+                    "path": source["trace"]["path"], "bytes": source["trace"]["bytes"],
+                    "recorded_full_sha256": source["trace"]["recorded_full_sha256"],
+                    "stat_at_packet_freeze": audit_stat,
+                },
+                "target": {"derive_tuple_from_source": True, "match_index": 0,
+                           "predicate": f"first observed match_frame >= {threshold}",
+                           "tuple": None},
+                "source_checkout": {"clean": True, "head": "1" * 40,
+                                     "tree": "2" * 40},
+                "source_code": {"compare.py": {"bytes": 10, "path": "compare.py",
+                                                 "sha256": "3" * 64}},
+                "runner": {"path": "audit.py", "bytes": 10, "sha256": "4" * 64},
+                "checkpoints": [
+                    {"label": item["label"], "audit_observation_key": key,
+                     "tuple": item["tuple"],
+                     "prefix": {**item["prefix"], "hash_basis": "fresh prefix"}}
+                    for item, key in zip(checkpoints[:4], (
+                        "first_positive", "target_clock_at_least_60",
+                        "target_clock_ge300_observed", "target_clock_ge500_observed"))],
+                "selected_paths": {}, "small_inputs": small_inputs,
+            }
+            for name, identity in small_inputs.items():
+                runner["selected_paths"][name] = identity["path"]
+            report_path = str(Path(directory) / "clock1000-report.json")
+            runner["selected_paths"].update({
+                "reference": source["trace"]["path"], "out": report_path,
+            })
+            audit = {
+                "report_path": report_path,
+                "source": {"stat_before": audit_stat},
+            }
+            runner_path.write_text(json.dumps(runner), encoding="utf-8")
+            runner_identity = {
+                "path": str(runner_path), "bytes": runner_path.stat().st_size,
+                "sha256": hashlib.sha256(runner_path.read_bytes()).hexdigest(),
+            }
+            source["ordered_clock_lineage"]["runner_packet"] = runner_identity
+            audit["packet"] = runner_identity
+
+            target_descriptors = {}
+            for label, idx in (("clock300", 2), ("clock500", 3)):
+                descriptor = checkpoints[idx]
+                target_descriptors[label] = (
+                    {"source": {"match_clock_boundary": {
+                        "target_match_frame_at_least": descriptor["tuple"]["match_frame"],
+                        **descriptor["tuple"]}}},
+                    {"observed": {
+                        f"target_clock_ge{descriptor['tuple']['match_frame']}_observed": {
+                            "match_index": 0, "source_tick": descriptor["tuple"]["source_tick"],
+                            "source_tick_seq": descriptor["tuple"]["source_sequence"],
+                            "pad_consume_source_sequence": descriptor["tuple"]["pad_consume_sequence"],
+                            "timeline_frame_index": descriptor["tuple"]["timeline_frame_index"],
+                            "cursor_after_frame": descriptor["tuple"]["browser_cursor"],
+                            "match_frame": descriptor["tuple"]["match_frame"],
+                    }, "source_prefix": copy.deepcopy(descriptor["prefix"])}},
+                )
+
+            def prior_expectations(identity, audit_identity, current_packet, recipe, label):
+                nested_packet, nested_audit = target_descriptors[label]
+                return nested_packet, nested_packet["source"]
+
+            def validate_prior(audit_path, nested_packet, recipe):
+                label = "clock300" if str(audit_path).endswith("clock300-audit.json") else "clock500"
+                return target_descriptors[label][1], "d" * 64
+
+            with (mock.patch("whole_session_state_compare._load_prior_clock_expectations",
+                             side_effect=prior_expectations),
+                  mock.patch("whole_session_state_compare._validate_match_clock_boundary_audit",
+                             side_effect=validate_prior)):
+                _validate_ordered_clock_audit_lineage(audit, packet, fixture["recipe"])
+
+                # Refresh both outer and runner identities after changing
+                # validly typed checkpoint prefixes. The retained nested
+                # audits must still reject both the clock-300 and clock-500
+                # rewrites.
+                original_runner = copy.deepcopy(runner)
+                original_checkpoints = copy.deepcopy(checkpoints)
+                for label, checkpoint_index in (("clock300", 2), ("clock500", 3)):
+                    with self.subTest(checkpoint=label):
+                        runner.clear()
+                        runner.update(copy.deepcopy(original_runner))
+                        checkpoints[:] = copy.deepcopy(original_checkpoints)
+                        runner["checkpoints"][checkpoint_index]["prefix"]["sha256"] = "f" * 64
+                        checkpoints[checkpoint_index]["prefix"]["sha256"] = "f" * 64
+                        runner_path.write_text(json.dumps(runner), encoding="utf-8")
+                        refreshed = {
+                            "path": str(runner_path), "bytes": runner_path.stat().st_size,
+                            "sha256": hashlib.sha256(runner_path.read_bytes()).hexdigest(),
+                        }
+                        source["ordered_clock_lineage"]["runner_packet"] = refreshed
+                        audit["packet"] = refreshed
+                        with self.assertRaisesRegex(
+                                ComparisonError, "differs from its frozen checkpoint"):
+                            _validate_ordered_clock_audit_lineage(
+                                audit, packet, fixture["recipe"])
 
     def test_later_match_clock_audit_validates_the_prior_clock300_tuple_prefix_and_audit(self):
         with tempfile.TemporaryDirectory() as directory:
