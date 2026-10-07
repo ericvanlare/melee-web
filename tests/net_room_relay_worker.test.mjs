@@ -1,10 +1,8 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {spawn} from 'node:child_process';
 import {createServer, request as httpRequest} from 'node:http';
 import {existsSync} from 'node:fs';
-import {lstat, mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises';
-import net from 'node:net';
+import {mkdir, readFile, rm, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import test from 'node:test';
@@ -12,6 +10,8 @@ import {LockstepPeer, LOCKSTEP_DELAY} from '../scripts/net_lockstep_protocol.mjs
 import {
   createRoomId, openRoomRelayPeerPair,
 } from '../scripts/net_lockstep_websocket_relay.mjs';
+import {describeLockstepTransport, openLockstepPeerPair} from '../scripts/net_lockstep_transport.mjs';
+import {startRoomRelayRuntime} from '../scripts/net_room_relay_runtime_owner.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TOOLS = path.resolve(process.env.MELEE_A3_ROOM_RELAY_TOOLS ||
@@ -22,27 +22,6 @@ const WORKERD_PACKAGE = path.join(TOOLS, 'workerd/package.json');
 const HAS_RUNTIME_TOOLS = [WRANGLER_PACKAGE, MINIFLARE_PACKAGE, WORKERD_PACKAGE]
   .every(existsSync);
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
-let directRuntimeEvidenceIndex = 0;
-async function bounded(promise, timeoutMs) {
-  let timer;
-  try {
-    return await Promise.race([promise, new Promise(resolve => {
-      timer = setTimeout(() => resolve(null), timeoutMs);
-    })]);
-  } finally { clearTimeout(timer); }
-}
-
-async function freePort() {
-  const server = net.createServer();
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolve);
-  });
-  const port = server.address().port;
-  await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
-  return port;
-}
 
 function rawUpgradeStatus(urlText, extraHeaders = {}) {
   const url = new URL(urlText);
@@ -185,194 +164,14 @@ function listen(endpoint) {
 
 async function startWorker(t) {
   if (!HAS_RUNTIME_TOOLS) t.skip(`install the pinned local runtime under work or set MELEE_A3_ROOM_RELAY_TOOLS; looked in ${TOOLS}`);
-  const lock = JSON.parse(await readFile(path.join(ROOT, 'dependencies.lock.json'), 'utf8'));
-  const [wrangler, miniflare, workerd] = await Promise.all([
-    readFile(WRANGLER_PACKAGE), readFile(MINIFLARE_PACKAGE), readFile(WORKERD_PACKAGE),
-  ]).then(rows => rows.map(bytes => JSON.parse(bytes.toString('utf8'))));
-  assert.equal(wrangler.version, lock.deployment_tools.wrangler.version);
-  assert.equal(miniflare.version, lock.deployment_tools.miniflare.version);
-  assert.equal(workerd.version, lock.deployment_tools.workerd.version);
-  assert.equal(wrangler.dependencies.miniflare, miniflare.version,
-    'direct Miniflare must match the package Wrangler declares');
-  assert.equal(wrangler.dependencies.workerd, workerd.version,
-    'direct workerd must match the package Wrangler declares');
-  assert.equal(miniflare.dependencies.workerd, workerd.version,
-    'Miniflare must use the pinned workerd runtime');
-  assert.equal(typeof globalThis.WebSocket, 'function', 'test requires Node global WebSocket');
-  assert(Number(process.versions.node.split('.')[0]) >= 22, 'pinned Wrangler requires Node 22 or newer');
-
-  const workRoot = path.join(ROOT, 'work');
-  await mkdir(workRoot, {recursive: true});
-  const workInfo = await lstat(workRoot);
-  assert(workInfo.isDirectory() && !workInfo.isSymbolicLink(), 'test scratch requires the real checkout work directory');
-  const scratch = await mkdtemp(path.join(workRoot, 'a3-room-relay-direct-'));
-  const persist = path.join(scratch, 'state');
-  await mkdir(persist);
-  const port = await freePort();
-  const inspectorPort = await freePort();
-  const runtimeScript = path.join(ROOT, 'scripts/net_room_relay_direct_runtime.mjs');
-  const wranglerCli = path.join(TOOLS, 'wrangler/wrangler-dist/cli.js');
-  const miniflareEntry = path.join(TOOLS, 'miniflare/dist/src/index.js');
-  const configPath = path.join(ROOT, 'online/relay/wrangler.jsonc');
-  const hashes = {
-    worker: sha256(await readFile(path.join(ROOT, 'online/relay/worker.mjs'))),
-    config: sha256(await readFile(configPath)),
-    adapter: sha256(await readFile(path.join(ROOT, 'scripts/net_lockstep_websocket_relay.mjs'))),
-    protocol: sha256(await readFile(path.join(ROOT, 'scripts/net_lockstep_protocol.mjs'))),
-    directRuntime: sha256(await readFile(runtimeScript)),
-    dependenciesLock: sha256(await readFile(path.join(ROOT, 'dependencies.lock.json'))),
-    testHarness: sha256(await readFile(fileURLToPath(import.meta.url))),
-    contractWrapper: sha256(await readFile(path.join(ROOT, 'tests/test_net_lockstep_contracts.py'))),
-    wranglerPackage: sha256(await readFile(WRANGLER_PACKAGE)),
-    miniflarePackage: sha256(await readFile(MINIFLARE_PACKAGE)),
-    workerdPackage: sha256(await readFile(WORKERD_PACKAGE)),
-  };
-  const env = {...process.env,
-    MELEE_ROOM_RELAY_ROOT: ROOT,
-    MELEE_ROOM_RELAY_CONFIG: configPath,
-    MELEE_ROOM_RELAY_WRANGLER_CLI: wranglerCli,
-    MELEE_ROOM_RELAY_MINIFLARE_ENTRY: miniflareEntry,
-    MELEE_ROOM_RELAY_PERSIST: persist,
-    MELEE_ROOM_RELAY_PORT: String(port),
-    MELEE_ROOM_RELAY_INSPECTOR_PORT: String(inspectorPort),
-  };
-  for (const key of ['CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_API_KEY', 'CLOUDFLARE_EMAIL', 'CLOUDFLARE_ACCOUNT_ID'])
-    delete env[key];
-  const child = spawn(process.execPath, [runtimeScript], {
-    cwd: ROOT, env, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], detached: true,
+  return startRoomRelayRuntime({
+    diagnostic: message => t.diagnostic(message),
+    evidenceDir: process.env.MELEE_A3_ROOM_RELAY_EVIDENCE_DIR || null,
+    producer: {
+      commit: process.env.MELEE_A3_ROOM_RELAY_PRODUCER_COMMIT || null,
+      tree: process.env.MELEE_A3_ROOM_RELAY_PRODUCER_TREE || null,
+    },
   });
-  let stdout = '';
-  let stderr = '';
-  const append = (current, chunk) => {
-    const next = current + chunk.toString();
-    return next.length <= 4 * 1024 * 1024 ? next : next.slice(-4 * 1024 * 1024);
-  };
-  child.stdout.on('data', chunk => { stdout = append(stdout, chunk); });
-  child.stderr.on('data', chunk => { stderr = append(stderr, chunk); });
-  const exitPromise = new Promise(resolve => child.once('exit', (code, signal) => resolve({code, signal})));
-  const closePromise = new Promise(resolve => child.once('close', (code, signal) => resolve({code, signal})));
-  const base = `http://127.0.0.1:${port}`;
-  let cleanupPromise = null;
-  const close = passed => {
-    if (cleanupPromise) return cleanupPromise;
-    cleanupPromise = (async () => {
-      const cleanupEvents = [];
-      const record = (event, details = {}) => cleanupEvents.push({
-        event, monotonicNs: process.hrtime.bigint().toString(), wallTime: new Date().toISOString(), ...details,
-      });
-      let exit = child.exitCode === null ? null : {code: child.exitCode, signal: child.signalCode};
-      if (!exit && child.connected) {
-        record('owner-dispose-request');
-        await new Promise(resolve => child.send({type: 'dispose'}, error => {
-          record('owner-dispose-send-result', {error: error ? String(error.stack || error) : null});
-          resolve();
-        }));
-        exit = await bounded(exitPromise, 5000);
-      }
-      if (!exit && child.pid) {
-        record('fallback-sigterm-request', {pid: child.pid});
-        try { process.kill(-child.pid, 'SIGTERM'); } catch (error) { record('fallback-sigterm-error', {error: String(error)}); }
-        exit = await bounded(exitPromise, 3000);
-      }
-      if (!exit && child.pid) {
-        record('fallback-sigkill-request', {pid: child.pid});
-        try { process.kill(-child.pid, 'SIGKILL'); } catch (error) { record('fallback-sigkill-error', {error: String(error)}); }
-        exit = await bounded(exitPromise, 3000);
-      }
-      if (exit) await bounded(closePromise, 1000);
-      let groupAlive = false;
-      if (child.pid) {
-        try { process.kill(-child.pid, 0); groupAlive = true; }
-        catch (error) { if (error.code !== 'ESRCH') groupAlive = true; }
-      }
-      record('owner-process-group-check', {pid: child.pid || null, alive: groupAlive});
-      if (groupAlive && child.pid) {
-        record('cleanup-sigkill-request', {pid: child.pid});
-        try { process.kill(-child.pid, 'SIGKILL'); } catch (error) { record('cleanup-sigkill-error', {error: String(error)}); }
-        await bounded(closePromise, 3000);
-        try { process.kill(-child.pid, 0); groupAlive = true; }
-        catch (error) { groupAlive = error.code !== 'ESRCH'; }
-      }
-
-      const records = stdout.split(/\r?\n/).flatMap(line => {
-        const prefix = 'MELEE_ROOM_RELAY_RUNTIME ';
-        if (!line.startsWith(prefix)) return [];
-        try { return [JSON.parse(line.slice(prefix.length))]; }
-        catch { return [{event: 'runtime-record-parse-error', line}]; }
-      });
-      const runtimeErrors = records.filter(row => [
-        'runtime-uncaught-error', 'bootstrap-error', 'dispose-error', 'host-unhandledRejection',
-        'host-uncaughtException', 'runtime-record-parse-error',
-      ].includes(row.event));
-      const structuredErrors = records.filter(row => row.event === 'structured-log' &&
-        (String(row.log?.level || '').toLowerCase() === 'error' ||
-          /Uncaught Error|Network connection lost|exception outcome/i.test(String(row.log?.message || ''))));
-      const stderrErrors = /\bERROR\b|Uncaught Error|Network connection lost|exception outcome/i.test(stderr);
-      const ready = records.some(row => row.event === 'direct-miniflare-ready');
-      const disposed = records.some(row => row.event === 'dispose-complete');
-      const fallbackUsed = cleanupEvents.some(row => row.event.startsWith('fallback-') ||
-        row.event.startsWith('cleanup-sigkill'));
-      const runtimeClean = ready && disposed && exit?.code === 0 && !exit?.signal && !groupAlive &&
-        !fallbackUsed && !runtimeErrors.length && !structuredErrors.length && !stderrErrors &&
-        !cleanupEvents.some(row => row.error);
-      const summary = {
-        passed: Boolean(passed && runtimeClean),
-        producer: {
-          commit: process.env.MELEE_A3_ROOM_RELAY_PRODUCER_COMMIT || null,
-          tree: process.env.MELEE_A3_ROOM_RELAY_PRODUCER_TREE || null,
-        },
-        runtimeIdentity: {
-          node: process.version, wrangler: wrangler.version, miniflare: miniflare.version, workerd: workerd.version,
-        },
-        paths: {worker: 'online/relay/worker.mjs', config: 'online/relay/wrangler.jsonc'},
-        hashes,
-        ready, disposed, runtimeErrors, structuredErrors, stderrErrors,
-        exit, groupAlive, fallbackUsed, cleanupEvents, runtimeRecords: records, stderr,
-      };
-      await writeFile(path.join(scratch, 'receipt.json'), JSON.stringify(summary, null, 2) + '\n');
-      await writeFile(path.join(scratch, 'runtime.stdout.log'), stdout);
-      await writeFile(path.join(scratch, 'runtime.stderr.log'), stderr);
-      const evidenceDir = process.env.MELEE_A3_ROOM_RELAY_EVIDENCE_DIR;
-      if (evidenceDir) {
-        const evidenceRoot = path.resolve(evidenceDir);
-        const scratchRoot = path.resolve(scratch);
-        assert(evidenceRoot !== scratchRoot && !evidenceRoot.startsWith(`${scratchRoot}${path.sep}`),
-          'retained Worker evidence must be outside disposable runtime scratch');
-        await mkdir(evidenceRoot, {recursive: true});
-        const runName = `direct-miniflare-${String(++directRuntimeEvidenceIndex).padStart(2, '0')}`;
-        await writeFile(path.join(evidenceRoot, `${runName}.receipt.json`), JSON.stringify(summary, null, 2) + '\n');
-        await writeFile(path.join(evidenceRoot, `${runName}.stdout.log`), stdout);
-        await writeFile(path.join(evidenceRoot, `${runName}.stderr.log`), stderr);
-      }
-      if (passed && runtimeClean) {
-        await rm(scratch, {recursive: true});
-        t.diagnostic(`Direct Miniflare cleanup verified: dispose complete, exit ${exit.code}, process group absent; disposable scratch removed.`);
-      } else {
-        t.diagnostic(`Direct Miniflare evidence retained at ${scratch}`);
-      }
-      if (!runtimeClean) throw Error(`direct Miniflare cleanup/runtime outcome failed; retained ${scratch}`);
-      return summary;
-    })();
-    return cleanupPromise;
-  };
-
-  const startupDeadline = Date.now() + 20000;
-  let startupResponse = null;
-  try {
-    while (Date.now() < startupDeadline && child.exitCode === null && child.signalCode === null) {
-      try {
-        startupResponse = await fetch(`${base}/v1/rooms/too-short/socket`);
-        if (startupResponse.status === 400) break;
-      } catch {}
-      await wait(50);
-    }
-    assert.equal(startupResponse?.status, 400, 'actual Worker invalid-room HTTP route did not become ready');
-  } catch (error) {
-    await close(false).catch(cleanupError => { error.cleanupError = cleanupError; });
-    throw error;
-  }
-  return {base, close, hashes, runtimeIdentity: {node: process.version,
-    wrangler: wrangler.version, miniflare: miniflare.version, workerd: workerd.version}};
 }
 
 function makeChecksum(tick, inputHash = tick) {
@@ -708,8 +507,13 @@ test('A2 lockstep identity, input/ACK, checksum desync, and disconnect remain un
   try {
     const base = worker.base.replace(/^http:/, 'ws:');
     const agreement = {protocol: 'melee-web-local-lockstep-a2-v1', test: 'real-worker-relay', marker: '雪'};
-    const pair = await openRoomRelayPeerPair({url: base});
+    const pair = await openLockstepPeerPair({relayUrl: base});
     pairs.push(pair);
+    const transport = describeLockstepTransport(pair, {relayUrl: base});
+    assert.equal(transport.type, 'room-websocket');
+    assert.equal(transport.endpoint_origin, base);
+    assert.equal(Object.hasOwn(transport, 'alpha_to_beta_bytes'), false,
+      'WebSocket transport must not report unavailable byte counters');
     const frames = {alpha: [], beta: []};
     const sent = {alpha: [], beta: []};
     const received = {alpha: [], beta: []};

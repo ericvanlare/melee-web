@@ -7,6 +7,7 @@ import vm from 'node:vm';
 import {EventEmitter} from 'node:events';
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
   verifyTerminalHold, WasmResponseIdentityObserver, attachWasmResponseIdentityObserver} from '../scripts/net_lockstep_observers.mjs';
+import {createTransportCallbackQueue} from '../scripts/net_lockstep_transport.mjs';
 
 function callback(data, kind = 'Native callback') {
   return `${kind} ${JSON.stringify(data)}`;
@@ -221,13 +222,15 @@ test('asymmetric lockstep startup failures close the successfully opened sibling
     const healthy = {closed: false, errors: [], unloaded: false,
       async timingPauseDiagnostics() { return null; },
       async unload() { this.unloaded = true; },
-      async close() { this.closed = true; },
+      async close() { this.closed = true; return true; },
       async status() { return null; }, async native() { return null; }};
     const context = vm.createContext({instances: {}, instanceRows: {alpha: {}, beta: {}},
       chromium: {}, launchOptions: {}, values: {url: 'http://127.0.0.1/', disc: '/unused'},
       path, childDirectory: role => role, openTimeout: 100, deadline: 100,
       checksumFiles: {}, pairResults: {transport: {}}, closeNotes: [],
       fs: {async writeFile() {}}, intentionalRelayClose: false,
+      transportCallbackQueue: {async drain() { return []; }},
+      recordAvailableTransportMetrics() {}, transportErrors: [], callbackErrors: [],
       relay: {traffic: {alpha_to_beta_bytes: 0, beta_to_alpha_bytes: 0}, async close() {}},
       openNetInstance: async ({label}) => {
         if (label === failedRole) throw failure;
@@ -241,4 +244,96 @@ test('asymmetric lockstep startup failures close the successfully opened sibling
     assert.equal(context.pairResults.relay_closed, true);
     assert.equal(context.closeNotes.length, 0);
   }
+});
+
+test('relay cleanup outcome is recorded only after awaited close succeeds', async () => {
+  const source = await fs.readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const cleanupStart = source.indexOf('  intentionalRelayClose = true;');
+  const cleanupEnd = source.indexOf('  pairResults.finished_at =', cleanupStart);
+  assert(cleanupStart >= 0 && cleanupEnd > cleanupStart);
+  const cleanup = source.slice(cleanupStart, cleanupEnd);
+  const runCleanup = async relay => {
+    const context = vm.createContext({
+      intentionalRelayClose: false, transportCallbackQueue: {async drain() { return []; }},
+      instances: {}, instanceRows: {}, checksumFiles: {}, peers: null, relay,
+      path, output: 'out', childDirectory: role => role,
+      pairResults: {outcome: 'complete', first_error: null, relay_closed: false, transport: {type: 'room-websocket'}},
+      closeNotes: [], transportErrors: [], callbackErrors: [],
+      recordAvailableTransportMetrics() {},
+      fs: {async writeFile() {}},
+    });
+    await vm.runInContext(`(async()=>{${cleanup}})()`, context);
+    return context;
+  };
+  const success = await runCleanup({transport: {type: 'room-websocket'}, async close() { return true; }});
+  assert.equal(success.pairResults.relay_closed, true);
+  assert.equal(success.pairResults.outcome, 'complete');
+  assert.deepEqual(success.closeNotes, []);
+
+  const failure = await runCleanup({transport: {type: 'room-websocket'}, async close() {
+    throw Error('relay disposal rejection sentinel');
+  }});
+  assert.equal(failure.pairResults.relay_closed, false);
+  assert.equal(failure.pairResults.outcome, 'fail');
+  assert.match(failure.pairResults.first_error, /relay disposal rejection sentinel/);
+  assert.match(failure.closeNotes[0], /relay disposal rejection sentinel/);
+});
+
+test('finalizer joins a delayed callback admitted during relay close', async () => {
+  const source = await fs.readFile(new URL('../scripts/net_lockstep_browser.mjs', import.meta.url), 'utf8');
+  const cleanupStart = source.indexOf('  intentionalRelayClose = true;');
+  const cleanupEnd = source.indexOf('  pairResults.finished_at =', cleanupStart);
+  assert(cleanupStart >= 0 && cleanupEnd > cleanupStart);
+  const cleanup = source.slice(cleanupStart, cleanupEnd);
+  const callbackErrors = [];
+  const transportErrors = [];
+  const queue = createTransportCallbackQueue(({role, kind, error}) => {
+    const row = {role, kind, message: String(error?.stack || error?.message || error)};
+    callbackErrors.push(row);
+    transportErrors.push({role, message: `${kind} callback failed: ${row.message}`});
+  });
+  let drainCalls = 0;
+  const transportCallbackQueue = {
+    track: queue.track,
+    async drain() { ++drainCalls; return queue.drain(); },
+    get pendingCount() { return queue.pendingCount; },
+  };
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let callbackStarted = false;
+  let callbackFinished = false;
+  const context = vm.createContext({
+    intentionalRelayClose: false, transportCallbackQueue,
+    instances: {}, instanceRows: {}, checksumFiles: {}, peers: null,
+    relay: {transport: {type: 'room-websocket'}, async close() {
+      // Model an event emitter dispatching terminal work without awaiting it.
+      transportCallbackQueue.track('alpha', 'disconnect-terminal', async () => {
+        callbackStarted = true;
+        await gate;
+        callbackFinished = true;
+        throw Error('delayed during close rejection sentinel');
+      });
+      return true;
+    }},
+    path, output: 'out', childDirectory: role => role,
+    pairResults: {outcome: 'complete', first_error: null, relay_closed: false, transport: {type: 'room-websocket'}},
+    closeNotes: [], transportErrors, callbackErrors,
+    recordAvailableTransportMetrics() {}, fs: {async writeFile() {}},
+  });
+  let settled = false;
+  const finalizer = vm.runInContext(`(async()=>{${cleanup}})()`, context).finally(() => { settled = true; });
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(drainCalls, 2, 'the finalizer must drain before and after transport close');
+  assert.equal(queue.pendingCount, 1);
+  assert.equal(callbackStarted, true);
+  assert.equal(callbackFinished, false);
+  assert.equal(settled, false, 'the run result must wait for the close-admitted callback');
+  release();
+  await finalizer;
+  assert.equal(callbackFinished, true);
+  assert.equal(context.pairResults.relay_closed, true, 'relay close itself succeeded');
+  assert.equal(context.pairResults.outcome, 'fail', 'late callback rejection fails the run');
+  assert.match(context.pairResults.first_error, /delayed during close rejection sentinel/);
+  assert.equal(context.pairResults.callback_errors.length, 1);
+  assert.equal(transportCallbackQueue.pendingCount, 0);
 });

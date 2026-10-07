@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 /*
- * Track A2 functional two-peer lockstep over real loopback TCP. Each peer owns
- * one local PAD port; the relay forwards opaque framed packets and each peer
- * validates identities, acknowledgements, remote PAD contributions and delayed
- * checksums before it submits complete indexed frames to its own native queue.
+ * Track A2 functional two-peer lockstep. Each peer owns one local PAD port;
+ * the relay forwards opaque packets and each peer validates identities,
+ * acknowledgements, remote PAD contributions and delayed checksums before it
+ * submits complete indexed frames to its own native queue. --relay-url selects
+ * the room WebSocket relay explicitly; omission preserves the TCP baseline.
  */
 import fs from 'node:fs/promises';
 import {createHash} from 'node:crypto';
@@ -12,7 +13,8 @@ import {parseArgs} from 'node:util';
 import {loadBrowserTools} from './browser_tools.mjs';
 import {classifyRoute, collapseConsecutiveScenes, expectedFullSceneOrder, validateFullRoute} from './net_determinism_contract.mjs';
 import {NET_FRAME_BYTES, NET_RECORD_BYTES, firstFatalBrowserError, openNetInstance} from './net_session_instance.mjs';
-import {openLoopbackPeerPair} from './net_lockstep_relay.mjs';
+import {createTransportCallbackQueue, describeLockstepTransport, describeLockstepTransportAttempt,
+  openLockstepPeerPair, recordAvailableTransportMetrics} from './net_lockstep_transport.mjs';
 import {LOCKSTEP_DELAY, LockstepPeer, parseNetChecksum, TERMINAL} from './net_lockstep_protocol.mjs';
 import {readyRenderEvent, renderEventSignatures, verifyFirstChecksumMismatch,
   verifyTerminalHold} from './net_lockstep_observers.mjs';
@@ -29,6 +31,7 @@ const POSITIVE_ROUTE_BOUNDARIES = Object.freeze([
 const {values} = parseArgs({options: {
   url: {type: 'string'}, disc: {type: 'string'}, script: {type: 'string'}, out: {type: 'string'},
   playwright: {type: 'string'}, seed: {type: 'string'}, scenario: {type: 'string', default: 'probe'},
+  'relay-url': {type: 'string'},
   'source-ticks': {type: 'string', default: '8'}, 'timeout-ms': {type: 'string', default: '3600000'},
   'stall-ms': {type: 'string', default: '120000'}, 'poll-ms': {type: 'string', default: '50'},
   'delay-ms': {type: 'string', default: '250'}, 'flip': {type: 'string'},
@@ -107,15 +110,16 @@ const pairResults = {
   schema: 'melee-web-local-lockstep-a2-run-v1', scenario, seed,
   scope: probe ? 'CSS network-wait and duplicate-contribution probe' :
     scenario === 'positive' ? 'full original-route functional lockstep' : `bounded ${scenario} control`,
-  exclusions: ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'remote Internet transport'],
+  exclusions: ['live timing', 'performance', 'pixels', 'PCM equivalence', 'retail equivalence', 'two-machine Internet acceptance'],
   input_delay: LOCKSTEP_DELAY,
   neutral_prefix: {source_ticks: LOCKSTEP_DELAY, player_ports: 'neutral PADStatus', unowned_ports: 'no-controller'},
   script: {name: path.basename(values.script), sha256: scriptHash, frame_count: inputCount,
     input_ticks_used: usedInputs, source_ticks: sourceTicks},
-  loopback_transport: {protocol: 'TCP length-prefixed JSON, 4-byte big-endian length', relay_interprets_packets: false},
-  peers: [], outcome: 'fail', first_error: null, started_at: new Date().toISOString(),
+  transport_attempt: describeLockstepTransportAttempt(values['relay-url']),
+  peers: [], outcome: 'fail', first_error: null, relay_closed: false, started_at: new Date().toISOString(),
 };
 let instances = null, relay = null, peers = null, disconnectHandled = false, intentionalRelayClose = false;
+let disconnectTask = null;
 const peerSummaries = {alpha: null, beta: null};
 const checksumFiles = {};
 const instanceRows = {};
@@ -124,9 +128,15 @@ const waitObservations = [];
 const scheduled = new Map();
 const closeNotes = [];
 const transportErrors = [];
+const callbackErrors = [];
 const routeCaptureTasks = new Map();
 const routeCaptureErrors = [];
 let stopRouteCaptureWatchers = false;
+const transportCallbackQueue = createTransportCallbackQueue(({role, kind, error}) => {
+  const row = {role, kind, message: String(error?.stack || error?.message || error)};
+  callbackErrors.push(row);
+  transportErrors.push({role, message: `${kind} callback failed: ${row.message}`});
+});
 
 async function checkedHealth(role) {
   const instance = instances[role];
@@ -511,21 +521,32 @@ async function run() {
   pairResults.browser = path.basename(browserPath);
   pairResults.playwright = playwrightPath;
   await Promise.all(['alpha', 'beta'].map(role => fs.mkdir(childDirectory(role))));
-  relay = await openLoopbackPeerPair({onEndpointError(role, error) {
-    const row = {role, message: String(error?.stack || error?.message || error)};
-    transportErrors.push(row);
-    if (peers?.[role]) void peers[role].fail('protocol', {reason: `loopback receive failed: ${row.message}`})
-      .catch(failure => transportErrors.push({role, message: `terminal handling failed: ${String(failure.message || failure)}`}));
-  }, onDisconnect(role, reason) {
-    if (intentionalRelayClose || disconnectHandled || !peers) return;
-    disconnectHandled = true;
-    void Promise.allSettled(['alpha', 'beta'].map(name => peers[name].disconnect(`${role}: ${reason}`)))
-      .then(results => {
-        for (const [index, result] of results.entries()) if (result.status === 'rejected')
-          transportErrors.push({role: ['alpha', 'beta'][index], message: `disconnect handling failed: ${String(result.reason?.message || result.reason)}`});
-      }).finally(() => setImmediate(() => { try { relay?.alpha.destroy(); relay?.beta.destroy(); } catch {} }));
-  }});
-  pairResults.transport = {host: '127.0.0.1', port: null, framing: 'opaque length-prefixed JSON'};
+  relay = await openLockstepPeerPair({relayUrl: values['relay-url'],
+    onEndpointError(role, error) {
+      const row = {role, message: String(error?.stack || error?.message || error)};
+      transportErrors.push(row);
+      if (!peers?.[role]) return Promise.resolve();
+      return transportCallbackQueue.track(role, 'endpoint-error', () =>
+        peers[role].fail('protocol', {reason: `transport receive failed: ${row.message}`}));
+    },
+    onDisconnect(role, reason) {
+      if (intentionalRelayClose || !peers) return Promise.resolve();
+      if (disconnectTask) return disconnectTask;
+      disconnectHandled = true;
+      disconnectTask = transportCallbackQueue.track(role, 'disconnect-terminal', async () => {
+        const results = await Promise.allSettled(['alpha', 'beta'].map(name =>
+          peers[name].disconnect(`${role}: ${reason}`)));
+        const failures = results.flatMap((result, index) => result.status === 'rejected'
+          ? [{role: ['alpha', 'beta'][index], reason: result.reason}] : []);
+        if (failures.length) throw new AggregateError(failures.map(row => row.reason),
+          `disconnect terminal handling failed for ${failures.map(row => row.role).join(', ')}`);
+        relay?.alpha.destroy();
+        relay?.beta.destroy();
+      });
+      return disconnectTask;
+    },
+  });
+  pairResults.transport = describeLockstepTransport(relay, {relayUrl: values['relay-url']});
   instances = {};
   instanceRows.alpha = {role: 'alpha', local_port: 0, remote_port: 1, records: 0, timing_resumes: [], scene_runs: [], last_wait_episodes: 0,
     route_boundary_captures: [], route_boundary_misses: []};
@@ -607,10 +628,9 @@ async function run() {
       !peers.alpha.terminal && !peers.beta.terminal) await sleep(pollMs);
   if (peers.alpha.terminal || peers.beta.terminal)
     throw Error(`Start identity handshake failed: ${JSON.stringify([peers.alpha.terminal, peers.beta.terminal])}`);
-  if (!peers.alpha.ready || !peers.beta.ready) throw Error('Loopback start identity handshake timed out');
+  if (!peers.alpha.ready || !peers.beta.ready) throw Error('A2 start identity handshake timed out');
   pairResults.identity.handshake_confirmed_before_tick0 = true;
   pairResults.identity.peer_agreement_sha256 = peers.alpha.agreementHash;
-  pairResults.transport.port = relay.port ?? null;
   if (scenario === 'positive') {
     const initial = await Promise.all(['alpha', 'beta'].map(async role => ({
       role, status: await instances[role].status(), native: await instances[role].native(),
@@ -632,8 +652,7 @@ async function run() {
   } else {
     await publishAllInputs(peers.alpha, peers.beta);
   }
-  pairResults.transport.alpha_to_beta_bytes = relay.traffic.alpha_to_beta_bytes;
-  pairResults.transport.beta_to_alpha_bytes = relay.traffic.beta_to_alpha_bytes;
+  recordAvailableTransportMetrics(pairResults.transport, relay);
   await pollRun();
   if (scenario === 'flip' || scenario === 'disconnect') {
     const expectedKind = scenario === 'flip' ? TERMINAL.desync : TERMINAL.disconnect;
@@ -760,7 +779,7 @@ async function run() {
     pairResults.outcome = 'expected-desync';
   } else {
     if (!disconnectHandled || peers.alpha.terminal?.kind !== 'disconnect' || peers.beta.terminal?.kind !== 'disconnect')
-      throw Error('Loopback disconnect did not produce an explicit bounded terminal');
+      throw Error('Transport disconnect did not produce an explicit bounded terminal');
     pairResults.negative_control = {disconnect_at_source_tick: disconnectAt,
       terminals: {alpha: peers.alpha.terminal, beta: peers.beta.terminal}, explicit: true};
     pairResults.outcome = 'expected-disconnect';
@@ -786,6 +805,7 @@ try {
   }
 } finally {
   intentionalRelayClose = true;
+  await transportCallbackQueue.drain();
   for (const role of ['alpha', 'beta']) {
     const instance = instances?.[role];
     if (instance) {
@@ -800,8 +820,15 @@ try {
       }
       try { instanceRows[role].timing_pause_diagnostics = await instance.timingPauseDiagnostics(); } catch {}
       try { await instance.unload(); instanceRows[role].unloaded = true; }
-      catch (error) { instanceRows[role].unloaded = false; instanceRows[role].unload_error = String(error.message || error); }
-      try { await instance.close(); } catch (error) { closeNotes.push(`${role}: ${String(error.message || error)}`); }
+      catch (error) {
+        instanceRows[role].unloaded = false;
+        instanceRows[role].unload_error = String(error.message || error);
+        closeNotes.push(`${role} unload: ${String(error.message || error)}`);
+      }
+      try {
+        const closed = await instance.close();
+        if (closed !== true) closeNotes.push(`${role} browser close did not confirm completion`);
+      } catch (error) { closeNotes.push(`${role} browser close: ${String(error.message || error)}`); }
       instanceRows[role].browser_closed = instance.closed;
       instanceRows[role].browser_diagnostics = instance.errors;
       instanceRows[role].page_errors = instance.errors.filter(row => row.kind === 'pageerror' || row.kind === 'console');
@@ -809,21 +836,36 @@ try {
       instanceRows[role].final_native ??= await instance.native().catch(() => null);
     }
     if (checksumFiles[role]) {
-      await checksumFiles[role].close().catch(() => {});
+      await checksumFiles[role].close().catch(error => closeNotes.push(`${role} checksum file close: ${String(error.message || error)}`));
       const file = path.join(childDirectory(role), 'checksums.bin');
       try { instanceRows[role].checksums_sha256 = sha256(await fs.readFile(file)); } catch {}
     }
     if (instanceRows[role]) {
       pairResults[`peer_${role}`] = instanceRows[role];
-      await fs.writeFile(path.join(childDirectory(role), 'instance.json'), JSON.stringify(instanceRows[role], null, 2) + '\n');
+      try { await fs.writeFile(path.join(childDirectory(role), 'instance.json'), JSON.stringify(instanceRows[role], null, 2) + '\n'); }
+      catch (error) { closeNotes.push(`${role} instance report write: ${String(error.message || error)}`); }
     }
   }
   if (relay) {
-    pairResults.transport.alpha_to_beta_bytes = relay.traffic.alpha_to_beta_bytes;
-    pairResults.transport.beta_to_alpha_bytes = relay.traffic.beta_to_alpha_bytes;
-    await relay.close().catch(error => closeNotes.push(`relay: ${String(error.message || error)}`));
-    pairResults.relay_closed = true;
+    recordAvailableTransportMetrics(pairResults.transport, relay);
+    try {
+      await relay.close();
+      pairResults.relay_closed = true;
+    } catch (error) {
+      pairResults.relay_closed = false;
+      closeNotes.push(`relay close: ${String(error.message || error)}`);
+    }
   }
+  // TCP close events may admit callbacks without awaiting them; join once more
+  // after transport closure before freezing the result.
+  await transportCallbackQueue.drain();
+  if (transportErrors.length || callbackErrors.length || closeNotes.length) {
+    pairResults.outcome = 'fail';
+    pairResults.first_error ??= transportErrors[0]?.message || callbackErrors[0]?.message || closeNotes[0] ||
+      'transport callback or cleanup failed';
+  }
+  pairResults.transport_errors = transportErrors;
+  pairResults.callback_errors = callbackErrors;
   pairResults.cleanup_notes = closeNotes;
   pairResults.finished_at = new Date().toISOString();
   await fs.writeFile(path.join(output, 'run.json'), JSON.stringify(pairResults, null, 2) + '\n');
