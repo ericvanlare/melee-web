@@ -77,6 +77,7 @@ MWRC_V10_VERSION = 10
 WHOLE_SESSION_SCOPE = "whole-session"
 V10_FIRST_SETUP_TICK0_SCOPE = "v10-first-setup-tick0"
 V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE = "v10-first-positive-match-frame"
+V10_FIRST_MATCH_CLOCK_GE60_SCOPE = "v10-first-match-clock-ge60"
 PRIMARY_STATIC_ENTITY_PROFILE = "primary-static-player-pair-v1"
 FRAME_BYTES = 44
 PORT_BYTES = 11
@@ -103,6 +104,7 @@ V10_BROWSER_PRODUCER_SCHEMA = "melee-web-b4-match-entry-producer-source-v1"
 V10_PREFIX_BYTE_CAP = 32 * 1024 * 1024
 V10_PREFIX_RECORD_CAP = 4200
 V10_FIRST_POSITIVE_RECORD_CAP = 8192
+V10_MATCH_CLOCK_RECORD_CAP = V10_FIRST_POSITIVE_RECORD_CAP
 V10_BROWSER_EXPORT_RECORD_CAP = 8192
 V10_MANUAL_UNLOAD_FAILURES = (
     "whole-session final CSS was not entered",
@@ -132,7 +134,8 @@ HEX_RE = re.compile(r"^[0-9a-f]+$")
 
 
 def _is_v10_prefix_scope(scope: str) -> bool:
-    return scope in {V10_FIRST_SETUP_TICK0_SCOPE, V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE}
+    return scope in {V10_FIRST_SETUP_TICK0_SCOPE, V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE,
+                     V10_FIRST_MATCH_CLOCK_GE60_SCOPE}
 
 
 class ComparisonError(ValueError):
@@ -140,11 +143,13 @@ class ComparisonError(ValueError):
 
 
 def comparison_fields(version: int, *, scope: str = WHOLE_SESSION_SCOPE) -> tuple[str, ...]:
-    if scope in {V10_FIRST_SETUP_TICK0_SCOPE, V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE}:
+    if _is_v10_prefix_scope(scope):
         if version == MWRC_V10_VERSION:
             return V9_COMPARE_FIELDS
         message = ("v10 first-positive match-frame scope requires MWRC v10"
                    if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE else
+                   "v10 first-match clock-60 scope requires MWRC v10"
+                   if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE else
                    "v10 first-setup/tick-0 scope requires MWRC v10")
         raise ComparisonError(message)
     if scope != WHOLE_SESSION_SCOPE:
@@ -539,7 +544,8 @@ class Recipe:
         self.path = path
         self.raw = raw
         if scope not in {WHOLE_SESSION_SCOPE, V10_FIRST_SETUP_TICK0_SCOPE,
-                         V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE}:
+                         V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE,
+                         V10_FIRST_MATCH_CLOCK_GE60_SCOPE}:
             raise ComparisonError(f"unsupported whole-session comparison scope {scope!r}")
         self.scope = scope
         if len(raw) < MWRC_HEADER.size + CONTEXT_HEADER.size:
@@ -552,6 +558,8 @@ class Recipe:
                 raise ComparisonError("whole-session comparison requires MWRC v8 or v9")
             message = ("v10 first-positive match-frame scope requires MWRC v10"
                        if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE else
+                       "v10 first-match clock-60 scope requires MWRC v10"
+                       if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE else
                        "v10 first-setup/tick-0 scope requires MWRC v10")
             raise ComparisonError(message)
         self.version = version
@@ -732,17 +740,28 @@ class BrowserReader:
 
 class Comparator:
     def __init__(self, recipe: Recipe, browser: BrowserReader, *,
-                 positive_boundary: Mapping[str, int] | None = None) -> None:
+                 positive_boundary: Mapping[str, int] | None = None,
+                 clock60_boundary: Mapping[str, int] | None = None) -> None:
         self.recipe = recipe
         self.browser = browser
         if recipe.scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
             if not isinstance(positive_boundary, Mapping):
                 raise ComparisonError("first-positive scope lacks its frozen boundary target")
+            if clock60_boundary is not None:
+                raise ComparisonError("clock-60 target is only valid in its explicit scope")
             self.positive_boundary = positive_boundary
+            self.clock60_boundary = None
+        elif recipe.scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE:
+            if (not isinstance(positive_boundary, Mapping) or
+                    not isinstance(clock60_boundary, Mapping)):
+                raise ComparisonError("clock-60 scope lacks its two frozen source boundaries")
+            self.positive_boundary = positive_boundary
+            self.clock60_boundary = clock60_boundary
         else:
-            if positive_boundary is not None:
-                raise ComparisonError("positive boundary target is only valid in its explicit scope")
+            if positive_boundary is not None or clock60_boundary is not None:
+                raise ComparisonError("bounded target is only valid in its explicit scope")
             self.positive_boundary = None
+            self.clock60_boundary = None
         self.compare_fields = comparison_fields(recipe.version, scope=recipe.scope)
         if browser.header["frames_requested"] != recipe.frame_count:
             raise ComparisonError("browser header frames_requested disagrees with MWRC recipe")
@@ -758,6 +777,7 @@ class Comparator:
         self.setup_states: list[dict[str, Any]] = []
         self.final_css_source: dict[str, Any] | None = None
         self.boundary_checkpoints: list[dict[str, Any]] = []
+        self.last_observed_match_frame: int | None = None
 
     def fail(self, message: str, *, record: str | None = None,
              index: int | None = None, field: str | None = None,
@@ -876,6 +896,7 @@ class Comparator:
             self.source_spans.append({"scene": expected_scene, "first_frame": index,
                                       "last_frame": index})
         if (self.positive_boundary is not None and
+                self.recipe.scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE and
                 expected_scene == SCENES["match"]):
             boundary = self.positive_boundary
             match_index = _int(frame.get("match_index"), "source match index", 0, 2)
@@ -914,6 +935,9 @@ class Comparator:
                     raise ComparisonError("frozen first-positive target is not match_frame 1")
             else:
                 raise ComparisonError("source prefix advanced past the frozen first-positive target")
+        elif (self.clock60_boundary is not None and
+              expected_scene == SCENES["match"]):
+            self._validate_clock60_source_frame(frame, index)
         row = self._expect_frame_row(expected_scene, index)
         if index == 0 and expected_scene == SCENES["css"]:
             self._compare({"rng": self.recipe.seed}, row,
@@ -931,6 +955,61 @@ class Comparator:
             self.nonmatch_compared += 1
         self.compared += 1
         self.frame_index += 1
+
+    def _validate_clock60_source_frame(self, frame: Mapping[str, Any], index: int) -> None:
+        """Validate both frozen clock boundaries and unbroken clock lineage."""
+        positive = self.positive_boundary
+        terminal = self.clock60_boundary
+        assert positive is not None and terminal is not None
+        match_index = _int(frame.get("match_index"), "source match index", 0, 2)
+        source_tick = _int(frame.get("source_tick"), "source match tick")
+        source_tick_seq = _int(frame.get("source_tick_seq"), "source match tick sequence",
+                               0, (1 << 64) - 1)
+        pad_consume_seq = _int(frame.get("source_seq"), "source PAD consume sequence",
+                               0, (1 << 64) - 1)
+        state = frame.get("state")
+        if not isinstance(state, Mapping):
+            raise ComparisonError("clock-60 source frame lacks typed state")
+        match_frame = _int(state.get("match_frame"), "source match clock")
+        if match_index != 0:
+            raise ComparisonError("clock-60 prefix left match 0 before its target")
+        first_match_index = _first_match_timeline_index(self.recipe)
+        if index != first_match_index + source_tick:
+            raise ComparisonError("source match tick is not contiguous with its recipe timeline")
+        if source_tick > terminal["source_tick"]:
+            raise ComparisonError("source prefix advanced past the frozen clock-60 target")
+
+        actual = {
+            "match_index": match_index,
+            "source_tick": source_tick,
+            "source_sequence": source_tick_seq,
+            "pad_consume_sequence": pad_consume_seq,
+            "timeline_frame_index": index,
+            "browser_cursor": index + 1,
+            "match_frame": match_frame,
+        }
+        if source_tick < positive["source_tick"]:
+            if match_frame != 0:
+                raise ComparisonError("source match clock became positive before its frozen first-positive boundary")
+        elif source_tick == positive["source_tick"]:
+            difference = _first_difference(positive, actual)
+            if difference:
+                raise ComparisonError(
+                    f"source first-positive boundary differs at {difference[0]}")
+        elif source_tick < terminal["source_tick"]:
+            previous = self.last_observed_match_frame
+            if (previous is None or match_frame < previous or
+                    match_frame > previous + 1 or match_frame >= terminal["match_frame"]):
+                raise ComparisonError("source match clock regressed, jumped, or reached 60 before the frozen target")
+        else:
+            previous = self.last_observed_match_frame
+            if (previous is None or match_frame < previous or
+                    match_frame > previous + 1 or previous >= terminal["match_frame"]):
+                raise ComparisonError("source match clock regressed, jumped, or reached 60 before the frozen target")
+            difference = _first_difference(terminal, actual)
+            if difference:
+                raise ComparisonError(f"source clock-60 boundary differs at {difference[0]}")
+        self.last_observed_match_frame = match_frame
 
     def on_final_css(self, state: dict[str, Any], source_seq: int) -> None:
         self.final_css_source = state
@@ -1433,6 +1512,7 @@ def _path_identity(value: Any, expected: Path, context: str) -> None:
 
 EXPECTATION_SCHEMA = "melee-web-v10-first-setup-tick0-expectations"
 POSITIVE_EXPECTATION_SCHEMA = "melee-web-v10-first-positive-match-frame-expectations"
+CLOCK60_EXPECTATION_SCHEMA = "melee-web-v10-first-match-clock-ge60-expectations"
 
 
 def _load_expectations(path: Path, selected: Mapping[str, Path], *,
@@ -1440,7 +1520,9 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
                        ) -> tuple[dict[str, Any], str]:
     packet, packet_sha, _ = _read_json_sidecar(path, "v10 comparison expectations", max_bytes=1024 * 1024)
     expected_schema = (POSITIVE_EXPECTATION_SCHEMA
-                       if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE else EXPECTATION_SCHEMA)
+                       if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE else
+                       CLOCK60_EXPECTATION_SCHEMA
+                       if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE else EXPECTATION_SCHEMA)
     if packet.get("schema") != expected_schema or packet.get("version") != 1:
         raise ComparisonError("v10 comparison expectations schema/version is unsupported")
     if packet.get("scope") != scope or not _is_v10_prefix_scope(scope):
@@ -1463,6 +1545,9 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
     }
     if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
         named_paths["positive_boundary_audit"] = source.get("positive_boundary_audit")
+    elif scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE:
+        named_paths["positive_boundary_audit"] = source.get("positive_boundary_audit")
+        named_paths["clock60_boundary_audit"] = source.get("clock60_boundary_audit")
     for name, expected_path in selected.items():
         identity = named_paths.get(name)
         if not isinstance(identity, dict):
@@ -1490,7 +1575,8 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
             type(recipe.get("frame_count")) is not int or recipe["frame_count"] <= 0 or
             type(recipe.get("seed")) is not int or not 0 <= recipe["seed"] <= MAX_UINT32):
         raise ComparisonError("v10 expectations lack the recipe version, size, seed, or frame count")
-    if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
+    if scope in {V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE,
+                 V10_FIRST_MATCH_CLOCK_GE60_SCOPE}:
         target = source.get("first_positive_boundary")
         required_target_fields = {
             "match_index", "source_tick", "source_sequence", "pad_consume_sequence",
@@ -1510,6 +1596,27 @@ def _load_expectations(path: Path, selected: Mapping[str, Path], *,
                 target["source_sequence"] >= V10_FIRST_POSITIVE_RECORD_CAP or
                 target["browser_cursor"] > recipe["frame_count"]):
             raise ComparisonError("positive-boundary expectations contain an invalid first-positive target")
+    if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE:
+        target = source.get("clock60_boundary")
+        required_target_fields = {
+            "match_index", "source_tick", "source_sequence", "pad_consume_sequence",
+            "timeline_frame_index", "browser_cursor", "match_frame",
+        }
+        if not isinstance(target, dict) or set(target) != required_target_fields:
+            raise ComparisonError("clock-60 expectations lack the exact frozen target fields")
+        for field in required_target_fields:
+            _int(target[field], f"clock-60 expectations {field}",
+                 1 if field in {"source_sequence", "browser_cursor", "match_frame"} else 0,
+                 (1 << 64) - 1 if field in {"source_sequence", "pad_consume_sequence"}
+                 else MAX_UINT32)
+        first_positive = source["first_positive_boundary"]
+        if (target["match_index"] != 0 or target["match_frame"] != 60 or
+                target["source_tick"] <= first_positive["source_tick"] or
+                target["timeline_frame_index"] + 1 != target["browser_cursor"] or
+                target["source_sequence"] <= target["pad_consume_sequence"] or
+                target["source_sequence"] >= V10_MATCH_CLOCK_RECORD_CAP or
+                target["browser_cursor"] > recipe["frame_count"]):
+            raise ComparisonError("clock-60 expectations contain an invalid first-match target")
     producer = browser.get("producer")
     if not isinstance(producer, dict) or any(
             not isinstance(producer.get(field), str) or not producer[field]
@@ -1812,6 +1919,12 @@ def _first_match_timeline_index(recipe: Recipe) -> int:
 def _first_positive_match_join_complete(row: Mapping[str, Any], source: SourceCollector,
                                         comparator: Comparator,
                                         target: Mapping[str, int]) -> bool:
+    return _match_boundary_join_complete(row, source, comparator, target)
+
+
+def _match_boundary_join_complete(row: Mapping[str, Any], source: SourceCollector,
+                                  comparator: Comparator,
+                                  target: Mapping[str, int]) -> bool:
     payload = row.get("payload")
     return (row.get("event") == "boundary" and isinstance(payload, dict) and
             payload.get("boundary") == "source_tick" and
@@ -1940,6 +2053,116 @@ def _validate_first_positive_audit(path: Path, packet: Mapping[str, Any],
     return audit, digest
 
 
+def _validate_clock60_audit(path: Path, packet: Mapping[str, Any], recipe: Recipe,
+                            positive_audit_sha256: str
+                            ) -> tuple[dict[str, Any], str]:
+    """Validate the reviewed source-only clock-60 boundary audit sidecar."""
+    expected = packet["source"]["clock60_boundary_audit"]
+    audit, digest, size = _read_json_sidecar(
+        path, "clock-60 source audit", max_bytes=8 * 1024 * 1024)
+    _verify_expected_file(expected, path, digest, size, "clock-60 source audit")
+    if (audit.get("schema") != "melee-web-b4-first-match-clock-ge60-source-audit-v2" or
+            audit.get("audit_completed") is not True or
+            audit.get("whole_session_equivalent") is not False or
+            audit.get("status") != "first_match_clock_ge60_found" or
+            audit.get("target_match_frame_at_least") != 60):
+        raise ComparisonError("clock-60 source audit schema or bounded status is unsupported")
+
+    source = audit.get("source")
+    provenance = source.get("provenance") if isinstance(source, dict) else None
+    expected_source = packet["source"]
+    trace = expected_source["trace"]
+    if (not isinstance(source, dict) or not isinstance(provenance, dict) or
+            not isinstance(source.get("path"), str) or
+            Path(source["path"]).resolve() != Path(trace["path"]).resolve() or
+            source.get("capture_id") != expected_source["capture_id"] or
+            source.get("sequence_id") != expected_source["sequence_id"] or
+            source.get("recorded_full_trace_bytes") != trace["bytes"] or
+            source.get("recorded_full_trace_sha256") != trace["recorded_full_sha256"] or
+            source.get("full_trace_rehashed") is not False or
+            source.get("prior_first_positive_audit_sha256") != positive_audit_sha256):
+        raise ComparisonError("clock-60 audit does not bind the frozen source and prior audit identities")
+    expected_positive = expected_source["first_positive_boundary"]
+    if _first_difference(expected_positive, source.get("prior_first_positive_boundary")):
+        raise ComparisonError("clock-60 audit prior first-positive target differs from expectations")
+
+    expected_provenance = {
+        "manifest_sha256": expected_source["manifest"]["sha256"],
+        "source_report_sha256": expected_source["report"]["sha256"],
+        "audit_sha256": expected_source["audit"]["sha256"],
+        "recorded_full_trace_sha256": trace["recorded_full_sha256"],
+        "full_trace_rehashed": False,
+        "trace_bytes": trace["bytes"],
+    }
+    for field, value in expected_provenance.items():
+        if provenance.get(field) != value:
+            raise ComparisonError(f"clock-60 audit source provenance {field} differs from expectations")
+    source_stat = source.get("stat_before")
+    if (not isinstance(source_stat, dict) or
+            set(source_stat) != {"device", "inode", "bytes", "mtime_ns"} or
+            any(type(value) is not int for value in source_stat.values()) or
+            source_stat.get("bytes") != trace["bytes"] or
+            source_stat != source.get("stat_after") or
+            source.get("stat_stable_during_audit") is not True):
+        raise ComparisonError("clock-60 audit source trace stat identity was not stable")
+
+    observed = audit.get("observed")
+    terminal = observed.get("target_clock_at_least_60") if isinstance(observed, dict) else None
+    prefix = observed.get("source_prefix") if isinstance(observed, dict) else None
+    expected_terminal = expected_source.get("clock60_boundary")
+    if not isinstance(observed, dict) or not isinstance(terminal, dict) or \
+            not isinstance(prefix, dict) or not isinstance(expected_terminal, dict):
+        raise ComparisonError("clock-60 audit lacks its terminal source observation")
+    audit_terminal = {
+        "match_index": terminal.get("match_index"),
+        "source_tick": terminal.get("source_tick"),
+        "source_sequence": terminal.get("source_tick_seq"),
+        "pad_consume_sequence": terminal.get("pad_consume_source_sequence"),
+        "timeline_frame_index": terminal.get("timeline_frame_index"),
+        "browser_cursor": terminal.get("cursor_after_frame"),
+        "match_frame": terminal.get("match_frame"),
+    }
+    difference = _first_difference(expected_terminal, audit_terminal)
+    if difference:
+        raise ComparisonError(f"clock-60 source audit differs from frozen target at {difference[0]}")
+
+    first_match_index = _first_match_timeline_index(recipe)
+    if (expected_terminal["timeline_frame_index"] !=
+            first_match_index + expected_terminal["source_tick"] or
+            expected_terminal["browser_cursor"] !=
+            expected_terminal["timeline_frame_index"] + 1 or
+            expected_terminal["browser_cursor"] > recipe.frame_count):
+        raise ComparisonError("frozen clock-60 target does not align with the complete MWRC timeline")
+    prefix_bytes = _int(prefix.get("bytes_read"), "clock-60 audit prefix bytes",
+                        1, V10_PREFIX_BYTE_CAP)
+    prefix_records = _int(prefix.get("records_read"), "clock-60 audit prefix records",
+                          1, V10_MATCH_CLOCK_RECORD_CAP)
+    if (not isinstance(prefix.get("sha256"), str) or
+            re.fullmatch(r"[0-9a-f]{64}", prefix["sha256"]) is None or
+            _int(prefix.get("last_source_sequence"),
+                 "clock-60 audit last source sequence", 0, (1 << 64) - 1) !=
+            expected_terminal["source_sequence"] or
+            prefix_records != expected_terminal["source_sequence"] + 1 or
+            _int(observed.get("match_ticks_observed"),
+                 "clock-60 audit match tick count", 1, MAX_UINT32) !=
+            expected_terminal["source_tick"] + 1 or
+            _int(observed.get("timeline_frames_input_ordered_against_recipe"),
+                 "clock-60 audit timeline frame count", 1, MAX_UINT32) !=
+            expected_terminal["browser_cursor"] or
+            _int(observed.get("css_sss_frames_input_ordered_against_recipe"),
+                 "clock-60 audit CSS/SSS frame count", 1, MAX_UINT32) !=
+            first_match_index or
+            _int(observed.get("candidate_browser_cursor"),
+                 "clock-60 audit candidate browser cursor", 1, MAX_UINT32) !=
+            expected_terminal["browser_cursor"] or
+            observed.get("accepted_first_positive_rejoined") is not True):
+        raise ComparisonError("clock-60 audit prefix counts disagree with the frozen target")
+
+    if expected_terminal["match_frame"] != 60:
+        raise ComparisonError("clock-60 source audit did not select the first exact clock-60 boundary")
+    return audit, digest
+
+
 def _validate_browser_producer_source(producer: Mapping[str, Any],
                                       expected_browser: Mapping[str, Any]) -> Mapping[str, Any]:
     if producer.get("schema") != V10_BROWSER_PRODUCER_SCHEMA:
@@ -2044,9 +2267,13 @@ def _validate_v10_browser_export(port_trace_path: Path, recipe: Recipe,
                 browser.header["frames_requested"] != recipe.frame_count):
             raise ComparisonError("browser trace header frames_requested disagrees with MWRC recipe")
         first_positive = packet["source"].get("first_positive_boundary")
-        positive_boundary = (first_positive if recipe.scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
-                             else None)
-        frame_validator = Comparator(recipe, browser, positive_boundary=positive_boundary)
+        positive_boundary = (first_positive if recipe.scope in {
+            V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE, V10_FIRST_MATCH_CLOCK_GE60_SCOPE
+        } else None)
+        clock60_boundary = (packet["source"].get("clock60_boundary")
+                            if recipe.scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE else None)
+        frame_validator = Comparator(recipe, browser, positive_boundary=positive_boundary,
+                                     clock60_boundary=clock60_boundary)
         match_starts = {
             span["first_frame"]: match_index
             for match_index, span in enumerate(
@@ -2522,8 +2749,10 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                                    browser_producer_manifest_path: Path,
                                    browser_report_path: Path,
                                    expectations_path: Path,
-                                   positive_boundary_audit_path: Path | None = None) -> dict[str, Any]:
+                                   positive_boundary_audit_path: Path | None = None,
+                                   clock60_boundary_audit_path: Path | None = None) -> dict[str, Any]:
     positive_scope = scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
+    clock60_scope = scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE
     if not _is_v10_prefix_scope(scope):
         raise ComparisonError(f"unsupported bounded v10 prefix scope {scope!r}")
     result: dict[str, Any] = {
@@ -2544,7 +2773,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             "whole_session": "incomplete",
         },
         "limitations": {
-            "boundary": ("Checks CSS/SSS consumed-input order and compares first match setup plus every contiguous match tick through the externally bound first positive match frame."
+            "boundary": ("Checks CSS/SSS consumed-input order and compares first match setup plus every contiguous match tick through the externally bound match_frame 60 boundary, rejoining the earlier clock-1 prefix before continuing."
+                         if clock60_scope else
+                         "Checks CSS/SSS consumed-input order and compares first match setup plus every contiguous match tick through the externally bound first positive match frame."
                          if positive_scope else
                          "Checks CSS/SSS consumed-input order and compares first match setup plus source tick 0 state only; no later match frame is read by the comparator."),
             "nonmatch_state": "CSS/SSS consumed-input ordering is not scalar state equivalence; nonmatch_fields_compared is empty.",
@@ -2555,6 +2786,8 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
     }
     if positive_scope:
         result["checks"]["source_ticks_through_first_positive"] = "not_checked"
+    if clock60_scope:
+        result["checks"]["source_ticks_through_clock60"] = "not_checked"
     comparator: Comparator | None = None
     source: SourceCollector | None = None
     browser: BrowserReader | None = None
@@ -2566,9 +2799,13 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
     source_stat_before: dict[str, int] | None = None
     last_source_sequence: int | None = None
     try:
-        if positive_scope != (positive_boundary_audit_path is not None):
+        needs_positive_audit = positive_scope or clock60_scope
+        if needs_positive_audit != (positive_boundary_audit_path is not None):
             raise ComparisonError(
                 "bounded prefix scope and positive-boundary audit selection disagree")
+        if clock60_scope != (clock60_boundary_audit_path is not None):
+            raise ComparisonError(
+                "bounded prefix scope and clock-60 audit selection disagree")
         selected = {
             "reference": reference_path,
             "source_manifest": source_manifest_path,
@@ -2580,8 +2817,10 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             "browser_report": browser_report_path,
             "port_trace": port_path,
         }
-        if positive_scope:
+        if needs_positive_audit:
             selected["positive_boundary_audit"] = positive_boundary_audit_path
+        if clock60_scope:
+            selected["clock60_boundary_audit"] = clock60_boundary_audit_path
         packet, packet_sha = _load_expectations(expectations_path, selected, scope=scope)
         result["expectations"] = {"path": str(expectations_path), "sha256": packet_sha}
         result["selected_input_identities"] = {
@@ -2622,18 +2861,35 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         result["checks"]["source_provenance"] = "pass"
         positive_audit: dict[str, Any] | None = None
         positive_audit_sha: str | None = None
+        positive_target: Mapping[str, int] | None = None
+        clock60_target: Mapping[str, int] | None = None
         target: Mapping[str, int] | None = None
-        if positive_scope:
+        if needs_positive_audit:
             assert positive_boundary_audit_path is not None
             positive_audit, positive_audit_sha = _validate_first_positive_audit(
                 positive_boundary_audit_path, packet, recipe_obj)
-            target = packet["source"]["first_positive_boundary"]
+            positive_target = packet["source"]["first_positive_boundary"]
             result["positive_boundary_audit"] = {
                 "path": str(positive_boundary_audit_path),
                 "sha256": positive_audit_sha,
-                "target": target,
+                "target": positive_target,
                 "scope": "source-only audit target; browser comparison uses fresh packet identities",
             }
+        if clock60_scope:
+            assert clock60_boundary_audit_path is not None and positive_audit_sha is not None
+            clock60_audit, clock60_audit_sha = _validate_clock60_audit(
+                clock60_boundary_audit_path, packet, recipe_obj, positive_audit_sha)
+            clock60_target = packet["source"]["clock60_boundary"]
+            result["clock60_boundary_audit"] = {
+                "path": str(clock60_boundary_audit_path),
+                "sha256": clock60_audit_sha,
+                "target": clock60_target,
+                "scope": "source-only audit target; browser comparison uses fresh packet identities",
+            }
+        if positive_scope:
+            target = positive_target
+        elif clock60_scope:
+            target = clock60_target
         producer, capture_report, browser_report, browser_identity = \
             _validate_v10_browser_provenance(
                 browser_capture_report_path, browser_producer_manifest_path,
@@ -2643,33 +2899,69 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
         result["checks"]["browser_capture_provenance"] = "pass"
         required_cursor = browser_identity["required_cursor"]
         browser = BrowserReader(port_path)
-        comparator = Comparator(recipe_obj, browser, positive_boundary=target)
+        comparator = Comparator(
+            recipe_obj, browser,
+            positive_boundary=(positive_target if needs_positive_audit else None),
+            clock60_boundary=clock60_target)
         source = SourceCollector(comparator, recipe_obj, manifest, audit, packet["source"])
         stats = ObserverStreamStats()
         records = iter_records(
             reference_path, max_bytes=V10_PREFIX_BYTE_CAP,
-            max_records=(V10_FIRST_POSITIVE_RECORD_CAP if positive_scope
+            max_records=(V10_MATCH_CLOCK_RECORD_CAP if clock60_scope else
+                         V10_FIRST_POSITIVE_RECORD_CAP if positive_scope
                          else V10_PREFIX_RECORD_CAP), stats=stats)
         prefix_complete = False
+        positive_prefix_rejoined = not clock60_scope
         for row in records:
             last_source_sequence = row["seq"]
             source.consume(row)
-            joined = (_first_positive_match_join_complete(row, source, comparator, target)
-                      if positive_scope and target is not None
-                      else _first_match_tick_join_complete(row, source, comparator))
-            if joined:
-                prefix_complete = True
-                break
+            if clock60_scope:
+                assert positive_target is not None and clock60_target is not None
+                if (not positive_prefix_rejoined and
+                        _match_boundary_join_complete(row, source, comparator, positive_target)):
+                    audited_prefix = positive_audit["observed"]["source_prefix"]
+                    if (stats.records_read != audited_prefix["records_read"] or
+                            stats.bytes_read != audited_prefix["bytes_read"] or
+                            stats.prefix_sha256 != audited_prefix["sha256"]):
+                        raise ComparisonError(
+                            "fresh source prefix differs from the accepted first-positive audit before continuation")
+                    positive_prefix_rejoined = True
+                    continue
+                if _match_boundary_join_complete(row, source, comparator, clock60_target):
+                    terminal_prefix = clock60_audit["observed"]["source_prefix"]
+                    if (stats.records_read != terminal_prefix["records_read"] or
+                            stats.bytes_read != terminal_prefix["bytes_read"] or
+                            stats.prefix_sha256 != terminal_prefix["sha256"]):
+                        raise ComparisonError(
+                            "fresh source prefix differs from the clock-60 audit at the terminal boundary")
+                    prefix_complete = positive_prefix_rejoined
+                    break
+            else:
+                joined = (_first_positive_match_join_complete(
+                    row, source, comparator, target)
+                    if positive_scope and target is not None
+                    else _first_match_tick_join_complete(row, source, comparator))
+                if joined:
+                    prefix_complete = True
+                    break
         result["last_source_sequence"] = last_source_sequence
         if not prefix_complete:
-            boundary = ("frozen first-positive match-frame join" if positive_scope
+            boundary = ("frozen clock-60 boundary after rejoining the first-positive prefix"
+                        if clock60_scope else
+                        "frozen first-positive match-frame join" if positive_scope
                         else "completed match-0 source_tick 0 join")
             raise ComparisonError(f"source prefix ended before the {boundary}")
         source_stat_after = _file_stat_identity(reference_path)
         result["source_full_trace"]["stat_after"] = source_stat_after
         _require_stable_mwro_stat(source_stat_before, source_stat_after)
         result["source_full_trace"]["stat_stable_during_attempt"] = True
-        if positive_scope:
+        if clock60_scope:
+            assert clock60_audit is not None
+            audited_prefix = clock60_audit["observed"]["source_prefix"]
+            expected_prefix_records = audited_prefix["records_read"]
+            expected_prefix_bytes = audited_prefix["bytes_read"]
+            expected_prefix_sha = audited_prefix["sha256"]
+        elif positive_scope:
             assert positive_audit is not None
             audited_prefix = positive_audit["observed"]["source_prefix"]
             expected_prefix_records = audited_prefix["records_read"]
@@ -2684,12 +2976,16 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 stats.bytes_read != expected_prefix_bytes or
                 (expected_prefix_sha is not None and
                  stats.prefix_sha256 != expected_prefix_sha)):
-            message = ("freshly consumed source prefix differs from its bounded source audit"
+            message = ("freshly consumed source prefix differs from its bounded clock-60 audit"
+                       if clock60_scope else
+                       "freshly consumed source prefix differs from its bounded source audit"
                        if positive_scope else
                        "freshly consumed source prefix differs from its bounded identity audit")
             raise ComparisonError(message)
         if (comparator.frame_index != required_cursor or comparator.compared != required_cursor):
-            message = ("comparison did not stop immediately after its frozen match boundary"
+            message = ("comparison did not stop immediately after its frozen clock-60 boundary"
+                       if clock60_scope else
+                       "comparison did not stop immediately after its frozen match boundary"
                        if positive_scope else
                        "comparison did not stop immediately after the first match tick join")
             raise ComparisonError(message)
@@ -2697,7 +2993,13 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
             raise ComparisonError("bounded source prefix consumed an unexpected match setup count")
         result["checks"]["source_first_css_and_setup_binding"] = "pass"
         result["checks"]["setup_state"] = "pass"
-        if positive_scope:
+        if clock60_scope:
+            result["checks"]["source_ticks_through_clock60"] = "pass"
+            result["checks"]["source_pad_to_tick0_join"] = "pass"
+            result["checks"]["tick0_state"] = "pass"
+            result["checks"]["first_positive_match_frame_state"] = "pass"
+            result["checks"]["clock60_match_frame_state"] = "pass"
+        elif positive_scope:
             result["checks"]["source_ticks_through_first_positive"] = "pass"
             result["checks"]["source_pad_to_tick0_join"] = "pass"
             result["checks"]["tick0_state"] = "pass"
@@ -2725,7 +3027,9 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "records_read": stats.records_read,
                 "bytes_read": stats.bytes_read,
                 "sha256": stats.prefix_sha256,
-                "hash_basis": ("fresh SHA-256 over exactly the raw bytes consumed through the first positive match frame"
+                "hash_basis": ("fresh SHA-256 over exactly the raw bytes consumed through the first match_frame 60 boundary"
+                               if clock60_scope else
+                               "fresh SHA-256 over exactly the raw bytes consumed through the first positive match frame"
                                if positive_scope else
                                "fresh SHA-256 over exactly the raw bytes consumed through source_tick 0"),
                 "last_source_sequence": last_source_sequence,
@@ -2743,9 +3047,11 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "source_tick": source.first_source_tick,
                 "timeline_frame_index": comparator.frame_index - 1,
                 "browser_target_cursor": browser_identity["target_cursor"],
-            }} if not positive_scope else {}),
+            }} if not needs_positive_audit else {}),
             "source_scene_spans_observed": comparator.source_spans,
-            "capture_status": ("incomplete bounded capture; semantic comparison stopped after the frozen first-positive match-frame join"
+            "capture_status": ("incomplete bounded capture; semantic comparison stopped after the frozen clock-60 source boundary"
+                               if clock60_scope else
+                               "incomplete bounded capture; semantic comparison stopped after the frozen first-positive match-frame join"
                                if positive_scope else
                                "incomplete bounded capture; semantic comparison stopped after the first source tick join"),
             "original_prefix_audit": {
@@ -2771,6 +3077,27 @@ def _compare_v10_bounded_prefix(reference_path: Path, recipe_path: Path,
                 "source_prefix_records": stats.records_read,
                 "source_prefix_bytes": stats.bytes_read,
                 "audit_sha256": positive_audit_sha,
+            }
+        if clock60_scope and clock60_target is not None and positive_audit_sha is not None:
+            assert clock60_boundary_audit_path is not None
+            result["clock60_match_frame_boundary"] = {
+                **clock60_target,
+                "setup_source_sequence": source.first_setup_seq,
+                "browser_observed_cursor": browser_identity["target_cursor"],
+                "browser_exported_cursor": browser_identity["exported_cursor"],
+                "source_prefix_sha256": stats.prefix_sha256,
+                "source_prefix_records": stats.records_read,
+                "source_prefix_bytes": stats.bytes_read,
+                "first_positive_audit_sha256": positive_audit_sha,
+                "clock60_audit_sha256": result["clock60_boundary_audit"]["sha256"],
+            }
+            prior_prefix = positive_audit["observed"]["source_prefix"]
+            result["first_positive_prefix_rejoin"] = {
+                "source_sequence": positive_target["source_sequence"],
+                "source_prefix_sha256": prior_prefix["sha256"],
+                "source_prefix_records": prior_prefix["records_read"],
+                "source_prefix_bytes": prior_prefix["bytes_read"],
+                "rejoined_before_continuing": True,
             }
     except (ComparisonError, ObserverStreamError, OSError, ValueError, KeyError,
             TypeError, struct.error) as error:
@@ -2838,7 +3165,8 @@ def compare_paths(reference: str | Path, recipe: str | Path, port_trace: str | P
                   source_audit: str | Path | None = None,
                   browser_capture_report: str | Path | None = None,
                   browser_producer_manifest: str | Path | None = None,
-                  positive_boundary_audit: str | Path | None = None) -> dict[str, Any]:
+                  positive_boundary_audit: str | Path | None = None,
+                  clock60_boundary_audit: str | Path | None = None) -> dict[str, Any]:
     """Compare one source capture, its MWRC recipe, and one browser trace."""
     reference_path = Path(reference)
     recipe_path = Path(recipe)
@@ -2846,10 +3174,14 @@ def compare_paths(reference: str | Path, recipe: str | Path, port_trace: str | P
     if _is_v10_prefix_scope(scope):
         required = (source_manifest, source_report, source_audit, browser_capture_report,
                     browser_producer_manifest, browser_report, expectations)
-        if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE:
+        if scope in {V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE,
+                     V10_FIRST_MATCH_CLOCK_GE60_SCOPE}:
             required += (positive_boundary_audit,)
+        if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE:
+            required += (clock60_boundary_audit,)
         if any(value is None for value in required):
-            label = ("v10 first-positive match-frame" if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
+            label = ("v10 first-match clock-60" if scope == V10_FIRST_MATCH_CLOCK_GE60_SCOPE else
+                     "v10 first-positive match-frame" if scope == V10_FIRST_POSITIVE_MATCH_FRAME_SCOPE
                      else "v10 first-setup/tick-0")
             return {
                 "schema": SCHEMA, "scope": scope,
@@ -2867,7 +3199,9 @@ def compare_paths(reference: str | Path, recipe: str | Path, port_trace: str | P
             browser_report_path=Path(browser_report),
             expectations_path=Path(expectations),
             positive_boundary_audit_path=(Path(positive_boundary_audit)
-                                          if positive_boundary_audit is not None else None))
+                                          if positive_boundary_audit is not None else None),
+            clock60_boundary_audit_path=(Path(clock60_boundary_audit)
+                                         if clock60_boundary_audit is not None else None))
     if scope != WHOLE_SESSION_SCOPE:
         return {"schema": SCHEMA, "scope": scope, "boundary_result": None,
                 "result": "invalid", "complete": False,

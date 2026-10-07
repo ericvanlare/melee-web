@@ -4,7 +4,7 @@
 
 Source-only bounded observation passed; browser comparison through this boundary is pending.
 
-The retained GALE01 revision-2 MWRC v10 source trace passed provenance, full recipe input order, CSS/setup binding, PAD-to-tick join and primary fighter-entity checks through the first match-0 `match_frame` value at least 60. Before continuing, the audit rejoined the accepted clock-1 boundary against its exact source tuple and freshly consumed prefix digest. The clock-60 target was tick 183 / sequence 5030, after PAD consume 5029, at timeline index 1367 and candidate browser cursor 1368.
+The retained GALE01 revision-2 MWRC v10 source trace passed provenance, continuous recipe input order through this boundary, CSS/setup binding, PAD-to-tick join and primary fighter-entity checks through the first match-0 `match_frame` value at least 60. Before continuing, the audit rejoined the accepted clock-1 boundary against its exact source tuple and freshly consumed prefix digest. The clock-60 target was tick 183 / sequence 5030, after PAD consume 5029, at timeline index 1367 and candidate browser cursor 1368.
 
 The audit consumed 5,031 records and 12,780,628 raw bytes through the target. Its fresh bounded-prefix SHA-256 is `32b763453688c6335b90c9807b71c79d919b85e6e7435a3c2abccd1792f00e77`. The full 2,137,257,881-byte trace kept its recorded SHA-256; it was not rehashed, and its before/after stat identity remained stable. CSS frames 0–936 and SSS frames 937–1183 established consumed-input order only. The audit did not compare clock-60 state with the browser.
 

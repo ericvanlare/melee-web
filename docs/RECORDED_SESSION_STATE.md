@@ -290,6 +290,32 @@ scope and the existing tick-0 behavior remain unchanged.
 The recorded result and exact boundary are documented in the
 [B4 first-positive entry](status/2026-10-07-b4-v10-first-positive-match-frame.md).
 
+## Bounded MWRC v10 first match clock-60 comparison
+
+Use `--scope v10-first-match-clock-ge60` only with a separately frozen
+expectations packet, the accepted first-positive audit, the source-only
+first-clock-60 audit, and fresh browser provenance for an export that includes
+the pinned target cursor. Pass the two source audits with
+`--positive-boundary-audit` and `--clock60-boundary-audit`. The packet binds both
+exact source tuples, their sidecars, the complete v10 recipe, and the new browser
+capture; the earlier cursor-1314 export is too short for the audited cursor-1368
+target.
+
+The scope compares the setup and every contiguous match-0 tick through the
+first match clock value of 60. It checks the clock-1 tuple and freshly consumed
+prefix digest before continuing, then checks the exact terminal tuple and a
+fresh digest through that row. Clock regression, a jump, an early threshold,
+PAD/tick mismatch, entity failure, or the first declared-state difference ends
+the comparison. CSS/SSS rows establish consumed-input order only, so
+`nonmatch_fields_compared` remains empty. The source reader uses the existing
+32 MiB and 8,192-record caps; it does not hash the rest of the MWRO file.
+
+A matching clock-60 boundary remains incomplete evidence with
+`boundary_result: equivalent`, `result: incomplete`, `complete: false`, and
+`whole_session_equivalent: false` (CLI exit 1). It does not establish later
+gameplay or whole-session accuracy. The default whole-session scope and the
+existing v8/v9 and v10 prefix scopes remain unchanged.
+
 ## Capture command failure gates
 
 The capture command reports success only after the replay completes, browser
