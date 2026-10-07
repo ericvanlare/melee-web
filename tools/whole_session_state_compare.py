@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import struct
@@ -1824,15 +1825,29 @@ def _validate_v10_browser_provenance(capture_report_path: Path,
     if not isinstance(snapshots, list):
         raise ComparisonError("browser capture report lacks replay snapshots")
     target_rows = []
+    cursor_available = False
     for row in snapshots:
         if not isinstance(row, dict):
             raise ComparisonError("browser capture snapshot list contains a malformed row")
-        cursor = row.get("source_cursor")
+        if "source_cursor" not in row or "runtime_error" not in row:
+            raise ComparisonError("browser capture snapshot lacks its cursor or runtime-error field")
+        cursor = row["source_cursor"]
+        at_ms = row.get("at_ms")
+        if (type(at_ms) is not int and
+                (type(at_ms) is not float or not math.isfinite(at_ms))):
+            raise ComparisonError("browser capture snapshot lacks a finite numeric observation time")
+        if cursor is None:
+            if cursor_available:
+                raise ComparisonError("browser capture has a null cursor after replay observation began")
+            if (row.get("phase", object()) is not None or
+                    row.get("running", object()) is not None or
+                    row.get("replay_report", object()) is not None or
+                    row.get("replay_downloads") != [] or row["runtime_error"] is not None):
+                raise ComparisonError("browser pre-replay snapshot has inconsistent unavailable fields")
+            continue
         if type(cursor) is not int or not 0 <= cursor <= recipe.frame_count:
             raise ComparisonError("browser capture snapshot has an invalid source cursor")
-        at_ms = row.get("at_ms")
-        if type(at_ms) not in (int, float):
-            raise ComparisonError("browser capture snapshot lacks a numeric observation time")
+        cursor_available = True
         if cursor == observed_cursor and row.get("runtime_error") is None:
             target_rows.append(row)
     if not target_rows:

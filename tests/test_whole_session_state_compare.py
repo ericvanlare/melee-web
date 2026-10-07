@@ -602,6 +602,10 @@ class WholeSessionStateCompareTests(unittest.TestCase):
                 "deliberate_prefix_stop": {"requested_cursor": 4,
                                             "observed_cursor": 4},
                 "snapshots": [
+                    {"source_cursor": None, "phase": None, "running": None,
+                     "replay_report": None, "replay_downloads": [],
+                     "runtime_error": None, "at_ms": 1.25,
+                     "status": "startup text can vary", "reason": "unclassified"},
                     {"source_cursor": 4, "at_ms": 100, "runtime_error": None},
                     {"source_cursor": 0, "at_ms": 101, "runtime_error": None},
                 ],
@@ -638,6 +642,44 @@ class WholeSessionStateCompareTests(unittest.TestCase):
             self.assertEqual(identity["required_cursor"], 3)
             self.assertEqual(identity["target_cursor"], 4)
             self.assertFalse(identity["runtime_data_recorded_identity"]["freshly_rehashed"])
+
+            def assert_bad_snapshots(rows, error):
+                wrapper["snapshots"] = rows
+                capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
+                expected_files["capture_report"]["bytes"] = capture_path.stat().st_size
+                expected_files["capture_report"]["sha256"] = hashlib.sha256(
+                    capture_path.read_bytes()).hexdigest()
+                with self.assertRaisesRegex(ComparisonError, error):
+                    _validate_v10_browser_provenance(
+                        capture_path, producer_path, browser_report_path, trace_path,
+                        recipe_path, recipe_sha, recipe, packet)
+
+            good_rows = wrapper["snapshots"]
+            assert_bad_snapshots([
+                good_rows[0], good_rows[1],
+                {"source_cursor": None, "phase": None, "running": None,
+                 "replay_report": None, "replay_downloads": [], "runtime_error": None,
+                 "at_ms": 102},
+            ], "null cursor after replay observation")
+            assert_bad_snapshots([
+                {**good_rows[0], "runtime_error": "startup failed"}, *good_rows[1:]],
+                "inconsistent unavailable fields")
+            assert_bad_snapshots([
+                {key: value for key, value in good_rows[0].items()
+                 if key != "source_cursor"}, *good_rows[1:]],
+                "lacks its cursor or runtime-error field")
+            assert_bad_snapshots([
+                good_rows[0], {"source_cursor": 2.5, "at_ms": 99,
+                               "runtime_error": None}, *good_rows[2:]],
+                "invalid source cursor")
+            assert_bad_snapshots([
+                {**good_rows[0], "at_ms": float("inf")}, *good_rows[1:]],
+                "finite numeric observation time")
+            wrapper["snapshots"] = good_rows
+            capture_path.write_text(json.dumps(wrapper), encoding="utf-8")
+            expected_files["capture_report"]["bytes"] = capture_path.stat().st_size
+            expected_files["capture_report"]["sha256"] = hashlib.sha256(
+                capture_path.read_bytes()).hexdigest()
 
             packet["browser"]["disc"]["sha256"] = "d" * 64
             with self.assertRaisesRegex(ComparisonError, "disc differs from frozen"):
