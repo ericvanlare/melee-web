@@ -292,6 +292,12 @@ void run_v10_css_replay_start_prefix(const melee_web::RuntimeFiles& files,
         trace.event("original_css_host_tick_returned", world->audio());
         replay_start_marker("original_css_host_tick_returned", tick_result);
 
+        replay_start_marker("retail_replay_frame_css_begin");
+        melee_web::retail_replay_frame(recipe, 0,
+                                       melee_web::kRetailReplayCss);
+        std::cout << std::flush;
+        replay_start_marker("retail_replay_frame_css_returned");
+
         replay_start_marker("ordinary_audio_boundary_begin");
         audio_phase += 32000;
         const unsigned samples = audio_phase / 60;
@@ -301,12 +307,6 @@ void run_v10_css_replay_start_prefix(const melee_web::RuntimeFiles& files,
         trace.event("ordinary_audio_boundary_returned", world->audio());
         replay_start_marker("ordinary_audio_boundary_returned",
                             static_cast<int>(samples));
-
-        replay_start_marker("retail_replay_frame_css_begin");
-        melee_web::retail_replay_frame(recipe, 0,
-                                       melee_web::kRetailReplayCss);
-        std::cout << std::flush;
-        replay_start_marker("retail_replay_frame_css_returned");
 
         replay_start_marker("source_teardown_begin");
         check(melee_web_menu_host_leave(host, 1, error, sizeof(error)), error);

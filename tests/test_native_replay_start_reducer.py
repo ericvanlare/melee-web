@@ -41,8 +41,8 @@ class NativeReplayStartReducerTests(unittest.TestCase):
             "melee_web_menu_host_enter(",
             "melee_web::retail_replay_session_initial(recipe)",
             "melee_web_menu_host_tick(",
-            "melee_web_audio_render(",
             "melee_web::retail_replay_frame(recipe, 0,",
+            "melee_web_audio_render(",
             "melee_web_menu_host_leave(",
         )
         positions = [body.rindex(boundary) if boundary ==
