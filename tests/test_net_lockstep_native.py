@@ -82,7 +82,13 @@ uint64_t melee_web_net_fnv1a64(uint64_t hash, const void* bytes, size_t size) {{
 }}
 int melee_web_menu_host_snapshot_card_data(MeleeWebMenuHost* host,int baseline,uint8_t* out,
   size_t size,char* error,size_t capacity) {{ (void)host;(void)baseline;(void)error;(void)capacity;
-  if(size!=MELEE_WEB_SAVE_PROFILE_CARD_BYTES)return 0;memset(out,0x5a,size);++card_snapshots;return 1; }}
+  if (size != MELEE_WEB_SAVE_PROFILE_CARD_BYTES) {{
+    return 0;
+  }}
+  memset(out, 0x5a, size);
+  ++card_snapshots;
+  return 1;
+}}
 void melee_web_pad_state_capture(uint8_t* out) {{ memset(out,0x39,MELEE_WEB_PAD_STATE_BYTES);++pad_snapshots; }}
 void melee_web_net_checksum_compute(uint32_t tick,uint32_t scene,const PADStatus pads[4],
   const MeleeWebMenuHost* host,MeleeWebNetChecksumRecord* out) {{

@@ -838,7 +838,20 @@
         "boundary": "Initial queued build invocation used unsupported CLI target/options and exited before compilation. Correct official --configuration Release --target runtime invocation is separately bound above."
       }
     ],
-    "browser_scope": "Historical browser evidence remains bound to original native and runner sources; the current-main integration build is compile/artifact evidence only."
+    "browser_scope": "Historical browser evidence remains bound to original native and runner sources; the current-main integration build is compile/artifact evidence only.",
+    "ci_fixture_repair": {
+      "failed_ci_run": 37554827234,
+      "failed_head": "6a767df0a4de067ea7b27bebde39c8d3396ab80b",
+      "boundary": "Linux GCC -Werror=misleading-indentation rejected a one-line if followed by unconditional fixture initialization. Runtime source was unchanged. The fixture now uses an explicit block and separate statements.",
+      "fixture_test_file_sha256": "be5ca8968a3da9bde47f8589dabec8af8fbb3f696b2e8426a290335d69003345",
+      "focused_native_test": {
+        "tests": 1,
+        "failures": 0,
+        "host": "local macOS compiler; Linux GCC remains covered by final PR-head CI",
+        "log": "ci-native-fixture-focused-after.log"
+      },
+      "failed_ci_artifact_directory": "ci-37554827234-unit-1"
+    }
   },
   "limitations": [
     "Node-controlled real TCP loopback with two fresh Chrome instances; not a public browser networking UI or Internet transport.",
@@ -1158,6 +1171,42 @@
       "path": "integration-release-build-v2.log",
       "bytes": 1199293,
       "sha256": "fc7ecd2edb67d7c0de748e3a5bad2754da373bef8d6e94f12f806cd3174f6a89"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "ci-37554827234-failed.log",
+      "bytes": 458880,
+      "sha256": "fe8762a21599dbed0183868ceeadc45c0ed007d57fb210693c305280ef8b0caf"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "ci-native-fixture-before.c",
+      "bytes": 21241,
+      "sha256": "8bcead448b96cb28dcec1ad05379ce9f272b37a5fdedf1d7fa1d20ab55e144a4"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "ci-native-fixture-after.c",
+      "bytes": 21266,
+      "sha256": "8db2c7be408b0bcd2ea471734759da97eb01987a5afc33c84aa7ce4bcfe7a5f0"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "ci-native-fixture-focused-after.log",
+      "bytes": 276,
+      "sha256": "a521eef3af8a6a2a65f637a82706c381d177da6bf68738c5c7628af02019943c"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "ci-37554827234-unit-1/unit-1.json",
+      "bytes": 341982,
+      "sha256": "f574ec700b896f7e710a2ae697aed11da2ac1f72a231336c0e15c8cf132f7f53"
+    },
+    {
+      "run": "local-lockstep-a2-20261006-153940-d164548c",
+      "path": "ci-37554827234-unit-1/ccache-unit-1.txt",
+      "bytes": 1242,
+      "sha256": "9b5203b7d3319cc7b416d57ab04274041a16aa5e9f2f20214e66445070ffd70b"
     }
   ]
 }

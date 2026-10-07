@@ -105,7 +105,10 @@ successful sibling outside cleanup ownership. The actual runner/finalizer failed
 a reduced injected-startup test before repair; all 25 focused checks passed after
 `6537e35` registered every successful launch before rethrowing a sibling error.
 The official Release runtime build passed on that clean source, with all 32
-packaged artifact identities retained. Final PR-head CI remains the merge gate.
+packaged artifact identities retained. Linux CI then rejected a compact C test
+fixture under GCC's misleading-indentation warning. An explicit block fixes that
+fixture without changing runtime source; its focused native test passes locally.
+The failed CI log/artifact is retained, and final PR-head CI remains the merge gate.
 The receipt also preserves the earlier lifecycle-fixture failure and an invalid
 build CLI invocation that stopped before compilation. Browser evidence above
 keeps its original source identities. Both successful controls and the full route
