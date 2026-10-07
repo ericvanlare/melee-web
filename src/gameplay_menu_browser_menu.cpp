@@ -347,6 +347,17 @@ int melee_web_native_menu_stadium_c1a_arm(){try{
  stadium_c1a_armed=true;stadium_c1a_observation.clear();
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_stadium_c1a_asset_scope(unsigned generation){
+ if(!generation||generation!=asset_generation||
+    generation!=asset_scope.pending_generation()||
+    !stadium_c1a_armed||!scoped_assets||asset_committed||
+    asset_destination!=AssetDestination::StadiumC1a||
+    !asset_selection_valid||world||match||results||prize||host_entered)
+  return 0;
+ try{
+  return requested_assets==melee_web::stadium_c1a_asset_names(asset_selection)?1:0;
+ }catch(...){return 0;}
+}
 const char* melee_web_native_menu_stadium_c1a_observe(){
  return stadium_c1a_observation.empty()?nullptr:stadium_c1a_observation.c_str();
 }

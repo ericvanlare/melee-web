@@ -162,10 +162,12 @@ class PublicRuntimeBuildTests(unittest.TestCase):
             "# The public player", 1)[0]
         self.assertIn("target_compile_definitions(gameplay_menu_browser PRIVATE", browser)
         self.assertIn("_melee_web_native_menu_stadium_c1a_arm", browser)
+        self.assertIn("_melee_web_native_menu_stadium_c1a_asset_scope", browser)
         public_player = cmake.split("# The public player", 1)[1].split(
             "# Shared typed scene/model tables", 1)[0]
         self.assertNotIn("MELEE_WEB_STADIUM_C1A_DIAGNOSTIC", public_player)
         self.assertNotIn("_melee_web_native_menu_stadium_c1a_arm", public_player)
+        self.assertNotIn("_melee_web_native_menu_stadium_c1a_asset_scope", public_player)
         self.assertNotIn("_melee_web_native_menu_stadium_c1a_observe", public_player)
 
     def test_development_target_keeps_instrumentation(self):

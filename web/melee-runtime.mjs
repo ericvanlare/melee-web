@@ -717,8 +717,17 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         return Array.from({length: count}, (_, index) =>
           Module.UTF8ToString(check(Module._melee_web_native_asset_name(generation, index))));
       });
+      const stadiumC1a = typeof Module._melee_web_native_menu_stadium_c1a_asset_scope === 'function' &&
+        await boundary(() => Module._melee_web_native_menu_stadium_c1a_asset_scope(generation) === 1);
+      const streamScope = stadiumC1a
+        ? discSession.streamStadiumC1aScope
+        : discSession.streamScope;
+      if (typeof streamScope !== 'function')
+        throw Error(stadiumC1a
+          ? 'The armed Stadium C1a import requires its private disc mapping.'
+          : 'The local disc session cannot stream the requested asset scope.');
       let batch = [], batchBytes = 0, files = 0, bytes = 0;
-      for await (const [name, data] of discSession.streamScope(names, reportDiscRead)) {
+      for await (const [name, data] of streamScope.call(discSession, names, reportDiscRead)) {
         // The next file may exceed the existing batch budget on its own. Keep
         // at most the bounded pending batch plus this one complete file alive.
         if (batch.length && (batch.length >= IMPORT_BATCH_MAX_FILES ||

@@ -61,11 +61,6 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlFxNr.dat':'PlFxNr.dat','PlFxOr.dat':'PlFxOr.dat',
   'PlFxLa.dat':'PlFxLa.dat','PlFxGr.dat':'PlFxGr.dat',
   'fox.ssm':'audio/us/fox.ssm',
-  // These paths are data-source mappings for the opt-in private C1a
-  // diagnostic manifest; the public runtime has no Stadium content row.
-  'GrPs.usd':'GrPs.usd','GrPs1.dat':'GrPs1.dat','GrPs2.dat':'GrPs2.dat',
-  'GrPs3.dat':'GrPs3.dat','GrPs4.dat':'GrPs4.dat',
-  'pstadium.hps':'audio/pstadium.hps','pokesta.hps':'audio/pokesta.hps',
   'GrSt.dat':'GrSt.dat','ystory.hps':'audio/ystory.hps',
   'PlMs.dat':'PlMs.dat','PlMsAJ.dat':'PlMsAJ.dat',
   'PlMsNr.dat':'PlMsNr.dat','PlMsRe.dat':'PlMsRe.dat','PlMsGr.dat':'PlMsGr.dat',

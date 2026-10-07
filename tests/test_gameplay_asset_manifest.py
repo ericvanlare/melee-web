@@ -92,16 +92,32 @@ class GameplayAssetManifestTests(unittest.TestCase):
         sys.path.insert(0, str(ROOT / "scripts"))
         from check_gameplay import node_runtime
         script = """import {NATIVE_GAME_DISC_FILES} from './web/runtime-assets.mjs';
-console.log(JSON.stringify(Object.fromEntries(Object.entries(NATIVE_GAME_DISC_FILES).filter(([name])=>
-  ['GrPs.usd','GrPs1.dat','GrPs2.dat','GrPs3.dat','GrPs4.dat','pstadium.hps','pokesta.hps'].includes(name)))))"""
+import {NATIVE_STADIUM_C1A_DISC_FILES,nativeStadiumC1aDiscPaths} from './web/runtime-audio-assets.mjs';
+const stage=Object.keys(NATIVE_STADIUM_C1A_DISC_FILES);
+const paths=nativeStadiumC1aDiscPaths([...stage,'PlMr.dat','sislib_font.bin','dsp_coef.bin']);
+let partialRejected=false;try{nativeStadiumC1aDiscPaths(['GrPs.usd']);}catch{partialRejected=true;}
+console.log(JSON.stringify({public:Object.fromEntries(stage.map(name=>[name,Object.hasOwn(NATIVE_GAME_DISC_FILES,name)])),
+ private:NATIVE_STADIUM_C1A_DISC_FILES,paths:{...paths},partialRejected}))"""
         mapped = json.loads(subprocess.check_output(
             [str(node_runtime()), "--input-type=module", "-e", script],
             cwd=ROOT, text=True))
         self.assertEqual(mapped, {
-            "GrPs.usd": "GrPs.usd", "GrPs1.dat": "GrPs1.dat",
-            "GrPs2.dat": "GrPs2.dat", "GrPs3.dat": "GrPs3.dat",
-            "GrPs4.dat": "GrPs4.dat", "pstadium.hps": "audio/pstadium.hps",
-            "pokesta.hps": "audio/pokesta.hps",
+            "public": {name: False for name in (
+                "GrPs.usd", "GrPs1.dat", "GrPs2.dat", "GrPs3.dat",
+                "GrPs4.dat", "pstadium.hps", "pokesta.hps")},
+            "private": {
+                "GrPs.usd": "GrPs.usd", "GrPs1.dat": "GrPs1.dat",
+                "GrPs2.dat": "GrPs2.dat", "GrPs3.dat": "GrPs3.dat",
+                "GrPs4.dat": "GrPs4.dat", "pstadium.hps": "audio/pstadium.hps",
+                "pokesta.hps": "audio/pokesta.hps",
+            },
+            "paths": {
+                "GrPs.usd": "GrPs.usd", "GrPs1.dat": "GrPs1.dat",
+                "GrPs2.dat": "GrPs2.dat", "GrPs3.dat": "GrPs3.dat",
+                "GrPs4.dat": "GrPs4.dat", "pstadium.hps": "audio/pstadium.hps",
+                "pokesta.hps": "audio/pokesta.hps", "PlMr.dat": "PlMr.dat",
+            },
+            "partialRejected": True,
         })
 
     def test_public_descriptor_excludes_only_coefficients(self):
