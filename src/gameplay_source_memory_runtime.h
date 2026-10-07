@@ -21,6 +21,35 @@ int melee_web_source_memory_alloc(int source_heap, void* host_payload,
 int melee_web_source_memory_free(int source_heap, void* host_payload);
 int melee_web_source_memory_healthy(void);
 
+/* Pure observations of the active source-memory owner. These queries never
+ * fail the owner, allocate a generation, or expose its allocation container. */
+typedef enum MeleeWebSourceMemoryReadStatus {
+    MELEE_WEB_SOURCE_MEMORY_READ_OK = 0,
+    MELEE_WEB_SOURCE_MEMORY_READ_INACTIVE = 1,
+    MELEE_WEB_SOURCE_MEMORY_READ_UNHEALTHY = 2,
+    MELEE_WEB_SOURCE_MEMORY_READ_INVALID_ARGUMENT = 3,
+} MeleeWebSourceMemoryReadStatus;
+
+typedef struct MeleeWebSourceMemoryContext {
+    int source_heap_handle;
+    uint64_t world_generation;
+    uint64_t allocation_generation_watermark;
+} MeleeWebSourceMemoryContext;
+
+typedef struct MeleeWebSourceMemoryAllocation {
+    int source_heap_handle;
+    uint32_t requested_bytes;
+    uint64_t world_generation;
+    uint64_t allocation_generation;
+    uint8_t live;
+    uint8_t reserved[7];
+} MeleeWebSourceMemoryAllocation;
+
+MeleeWebSourceMemoryReadStatus melee_web_source_memory_context_read(
+    MeleeWebSourceMemoryContext* out);
+MeleeWebSourceMemoryReadStatus melee_web_source_memory_allocation_read(
+    const void* exact_host_payload, MeleeWebSourceMemoryAllocation* out);
+
 /* Fighter_Create / ftDemo_CreateFighter and Fighter_Unload bind the allocation to its
  * live host owner. Reuse advances allocation_generation even if an HSD free
  * chain returns the same object address. */

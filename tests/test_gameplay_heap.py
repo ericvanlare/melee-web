@@ -67,6 +67,9 @@ class GameplayHeapTests(unittest.TestCase):
     def test_release_refuses_replaced_allocator_identity(self):
         self.run_case("changed_identity")
 
+    def test_source_memory_read_observers_preserve_allocator_owner(self):
+        self.run_case("unhealthy_observer")
+
 
 if __name__ == "__main__":
     unittest.main()

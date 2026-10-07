@@ -7564,22 +7564,102 @@ index 5ea9c63cc9ac017b5ae38ed9ccd57495d03e9747..b943ec8e6145317f0ba08987dd1ed446
  }
  
  /// Execute Loop
+diff --git a/src/melee/gr/grpstadium.c b/src/melee/gr/grpstadium.c
+index c3017129f5cd1ed1cd7850034b8acb4dcc4a0ca7..546cd2ddc741ddc4de9fac9bd4e547534089286d 100644
+--- a/src/melee/gr/grpstadium.c
++++ b/src/melee/gr/grpstadium.c
+@@ -1,4 +1,9 @@
+ #include "grpstadium.h"
++
++#if defined(MELEE_WEB_GAMEPLAY)
++#include <stddef.h>
++#include "gameplay_source_preload.h"
++#endif
+ 
+ #include <sysdolphin/baselib/forward.h>
+ 
+@@ -652,6 +657,36 @@
+     u16 x1A, x1C;
+ } ImageDescWrapper;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++int melee_web_stadium_buffer_layout_read(MeleeWebStadiumBufferLayout* out)
++{
++    size_t desc_end;
++    size_t flag_end;
++    size_t x1a_offset;
++    if (out == NULL) return 0;
++    x1a_offset = offsetof(ImageDescWrapper, x1A);
++    if (x1a_offset < sizeof(u16)) return 0;
++    out->pointer_bytes = sizeof(void*);
++    out->image_desc_bytes = sizeof(HSD_ImageDesc);
++    out->wrapper_bytes = sizeof(ImageDescWrapper);
++    out->desc_offset = offsetof(ImageDescWrapper, desc);
++    out->flag_storage_bytes = sizeof(u16);
++    /* flag is the u16 bitfield immediately before the authored x1A member.
++     * Derive its storage from this TU's private type; do not copy its ABI. */
++    out->flag_storage_offset = x1a_offset - sizeof(u16);
++    out->x1a_offset = x1a_offset;
++    out->x1c_offset = offsetof(ImageDescWrapper, x1C);
++    out->constructor_allocation_bytes = 0x1C;
++    desc_end = out->desc_offset + out->image_desc_bytes;
++    flag_end = out->flag_storage_offset + out->flag_storage_bytes;
++    out->written_prefix_bytes = desc_end > flag_end ? desc_end : flag_end;
++    return out->desc_offset == 0 &&
++           out->image_desc_bytes == 0x18 &&
++           out->flag_storage_offset == desc_end &&
++           out->x1a_offset == flag_end;
++}
++#endif
++
+ #define GET_WRAPPER(x) ((ImageDescWrapper*) HSD_GObjGetUserData(x))
+ 
+ void grStadium_801D1EF8(Ground_GObj* gobj)
 diff --git a/src/melee/lb/lbdvd.c b/src/melee/lb/lbdvd.c
 index d5b38ac5c92ce0e82ca005de8a205cb338790bb4..1e811f97a6fd8a6e65adc1472edf0a7c8640beeb 100644
 --- a/src/melee/lb/lbdvd.c
 +++ b/src/melee/lb/lbdvd.c
-@@ -1,5 +1,10 @@
+@@ -1,5 +1,11 @@
  #include <string.h>
  
 +#if defined(MELEE_WEB_GAMEPLAY)
 +#include "gameplay_source_files.h"
 +#include "gameplay_archive_sections.h"
++#include "gameplay_source_preload.h"
 +#endif
 +
  #include "lb_0195.h"
  #include "lbarchive.h"
  #include "lbdvd.static.h"
-@@ -463,6 +468,19 @@ HSD_Archive* lbDvd_8001819C(const char* basename)
+@@ -343,6 +349,27 @@
+     lbDvd_80017CC4();
+ }
+ 
++int melee_web_source_preload_predicate(int state, int load_score,
++                                       int entry_num, int requested_entry)
++{
++    return state != 0 && load_score > 0 && entry_num == requested_entry;
++}
++
++MeleeWebSourcePreloadStatus melee_web_source_preload_observe(
++    int requested_entry)
++{
++    int i;
++    if (requested_entry < 0) return MELEE_WEB_SOURCE_PRELOAD_INVALID;
++    for (i = 0; i < (signed) ARRAY_SIZE(preloadCache.entries); i++) {
++        const PreloadEntry* entry = &preloadCache.entries[i];
++        if (melee_web_source_preload_predicate(
++                entry->state, entry->load_score, entry->entry_num,
++                requested_entry))
++            return MELEE_WEB_SOURCE_PRELOAD_PRESENT;
++    }
++    return MELEE_WEB_SOURCE_PRELOAD_ABSENT;
++}
++
+ void* lbDvd_GetPreloadedArchive(ssize_t entry_num)
+ {
+     s8 type;
+@@ -463,6 +490,19 @@ HSD_Archive* lbDvd_8001819C(const char* basename)
  {
      HSD_Archive* archive;
      char* filename = lbFileGetFullName(basename);
